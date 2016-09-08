@@ -1,0 +1,8 @@
+parameter void
+code
+  { # This contract stop to accept transactions after N incoming transactions
+    CDR ; PUSH (Uint32 1) ; SWAP ; SUB ;
+    DUP ; PUSH (Uint32 0) ; COMPARE ; EQ ; IF { FAIL } {} ;
+    PUSH VOID ; PAIR }
+return void
+storage uint32

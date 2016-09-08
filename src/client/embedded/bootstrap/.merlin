@@ -1,0 +1,12 @@
+REC
+S .
+B .
+S mining
+B mining
+S ../../../proto
+B ../../../proto
+S ../../../proto/bootstrap
+B _tzbuild
+FLG -open Client_embedded_proto_bootstrap
+FLG -open Register_client_embedded_proto_bootstrap
+FLG -open Tezos_context

@@ -1,0 +1,40 @@
+S node/net
+B node/net
+S node/updater
+B node/updater
+S node/shell
+B node/shell
+S node/db
+B node/db
+S utils
+B utils
+S proto/environment
+B proto/environment
+S compiler
+B compiler
+S client
+B client
+FLG -open Result
+FLG -w -30
+FLG -w -40
+PKG base64
+PKG calendar
+PKG cohttp
+PKG compiler-libs.optcomp
+PKG conduit
+PKG config-file
+PKG cryptokit
+PKG cstruct
+PKG dynlink
+PKG ezjsonm
+PKG git
+PKG irmin
+PKG lwt
+PKG ocplib-endian
+PKG ocplib-json-typed
+PKG ocplib-ocamlres
+PKG ocplib-resto.directory
+PKG result
+PKG sodium
+PKG unix
+PKG zarith

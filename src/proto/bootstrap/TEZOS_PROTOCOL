@@ -1,0 +1,57 @@
+hash = "TnrnfGHMCPAcxtMAHXdpfebbnn2XvPAxq7DHbpeJbKTkJQPgcgRGr"
+modules = [
+
+  Misc ;
+  Tezos_hash ;
+
+  Qty_repr ;
+  Tez_repr ;
+  Period_repr ;
+  Time_repr ;
+  Constants_repr ;
+  Fitness_repr ;
+  Raw_level_repr ;
+  Voting_period_repr ;
+  Cycle_repr ;
+  Level_repr ;
+  Seed_repr ;
+  Script_int_repr ;
+  Script_repr ;
+  Contract_repr ;
+  Roll_repr ;
+  Asset_repr ;
+  Vote_repr ;
+  Operation_repr ;
+  Block_repr ;
+
+  Storage_sigs ;
+  Storage_functors ;
+  Storage ;
+
+  Level_storage ;
+  Nonce_storage ;
+  Seed_storage ;
+  Roll_storage ;
+  Contract_storage ;
+  Reward_storage ;
+  Bootstrap_storage ;
+  Fitness_storage ;
+  Vote_storage ;
+  Init_storage ;
+
+  Tezos_context ;
+
+  Script_typed_ir ;
+  Script_ir_translator ;
+  Script_interpreter ;
+
+  Mining ;
+  Amendment ;
+  Apply ;
+
+  Services ;
+  Services_registration ;
+
+  Main ;
+
+]

@@ -1,0 +1,7 @@
+parameter void
+code
+  { # This is a noop contract
+    CDR ; PUSH VOID ; PAIR
+  }
+return void
+storage VOID

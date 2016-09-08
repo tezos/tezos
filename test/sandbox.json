@@ -1,0 +1,5 @@
+{
+    "time_between_slots" : 10,
+    "cycle_length" : 128,
+    "first_free_mining_slot" : 4
+}

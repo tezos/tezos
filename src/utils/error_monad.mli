@@ -1,0 +1,36 @@
+(**************************************************************************)
+(*                                                                        *)
+(*    Copyright (c) 2014 - 2016.                                          *)
+(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
+(*                                                                        *)
+(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
+(*                                                                        *)
+(**************************************************************************)
+
+(** Tezos Protocol Implementation - Error Monad *)
+
+(** Categories of error *)
+type error_category =
+  [ `Branch (** Errors that may not happen in another context *)
+  | `Temporary (** Errors that may not happen in a later context *)
+  | `Permanent (** Errors that will happen no matter the context *)
+  ]
+
+include Error_monad_sig.S
+
+(** Erroneous result (shortcut for generic errors) *)
+val generic_error : string -> 'a tzresult
+
+(** Erroneous return (shortcut for generic errors) *)
+val failwith :
+  ('a, Format.formatter, unit, 'b tzresult Lwt.t) format4 ->
+  'a
+
+val error_exn : exn -> 'a tzresult
+val record_trace_exn : exn -> 'a tzresult -> 'a tzresult
+val trace_exn : exn -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+
+type error += Exn of exn
+type error += Unclassified of string
+
+module Make() : Error_monad_sig.S

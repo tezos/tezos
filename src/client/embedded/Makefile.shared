@@ -1,0 +1,78 @@
+
+all: ../client_$(PROTO_VERSION).cmx
+
+include ../../../Makefile.config
+
+NODE_DIRECTORIES = \
+  $(addprefix ../../../, \
+    utils \
+    node/updater \
+    node/db \
+    node/net \
+    node/shell \
+    client \
+)
+
+SOURCE_DIRECTORIES += \
+  ${NODE_DIRECTORIES} \
+  ../../../proto
+
+OPENED_MODULES := \
+  Client_embedded_proto_${PROTO_VERSION} \
+  Register_client_embedded_proto_${PROTO_VERSION} \
+  Error_monad \
+  Hash \
+  ${OPENED_MODULES}
+
+OBJS := \
+  ${IMPLS:.ml=.cmx} ${IMPLS:.ml=.ml.deps} \
+  ${INTFS:.mli=.cmi} ${INTFS:.mli=.mli.deps} \
+  ../client_$(PROTO_VERSION).cmx
+${OBJS}: TARGET="(client_$(PROTO_VERSION).cmx)"
+${OBJS}: PACKAGES=lwt ocplib-json-typed config-file sodium
+${OBJS}: ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
+
+../client_$(PROTO_VERSION).cmx: $(patsubst %.ml, %.cmx, ${IMPLS})
+	@echo LINK $(notdir $@)
+	@$(OCAMLOPT) -linkall ${OCAMLFLAGS} -pack -o $@ \
+	   $(patsubst %.ml, %.cmx, ${IMPLS})
+
+%.cmx: %.ml
+	@echo OCAMLOPT ${TARGET} $(notdir $@)
+	@$(OCAMLOPT) ${OCAMLFLAGS} -for-pack Client_$(PROTO_VERSION) -c $<
+
+%.cmi: %.mli
+	@echo OCAMLOPT ${TARGET} $(notdir $@)
+	@$(OCAMLOPT) ${OCAMLFLAGS} -for-pack Client_$(PROTO_VERSION) -c $<
+
+%.ml: %.mll
+	@echo OCAMLLEX ${TARGET} $(notdir $@)
+	@$(OCAMLLEX) $<
+
+%.ml %.mli: %.mly
+	@echo MENHIR ${TARGET} $(notdir $@)
+	@$(MENHIR) --explain $<
+
+.PHONY: clean
+clean::
+	-rm -f ../client_$(PROTO_VERSION).cm* ../client_$(PROTO_VERSION).o
+	-rm -f *.cm* *~ *.o *.a *.deps
+	-rm -rf _tzbuild
+	-rm -f .depend
+
+ifneq ($(MAKECMDGOALS),clean)
+-include .depend
+endif
+
+predepend:
+
+DEPENDS := ${INTFS} ${IMPLS}
+.SECONDARY: $(patsubst %,%.deps,${DEPENDS})
+.depend: $(patsubst %,%.deps,${DEPENDS})
+	@cat $^ > .depend
+%.ml.deps: %.ml | predepend
+	@echo OCAMLDEP ${TARGET} $(notdir $<)
+	@$(OCAMLDEP) -native $(INCLUDES) ${EXTRA_OCAMLFLAGS} $^ > $@
+%.mli.deps: %.mli | predepend
+	@echo OCAMLDEP ${TARGET} $(notdir $<)
+	@$(OCAMLDEP) -native $(INCLUDES) ${EXTRA_OCAMLFLAGS} $^ > $@
