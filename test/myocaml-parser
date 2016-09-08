@@ -1,0 +1,9 @@
+#! /bin/sh
+
+TESTDIR="$(dirname $0)"
+TEZOSDIR="$(dirname $TESTDIR)"
+
+export OCAMLRUNPARAM=b
+export LWT_LOG="* -> debug"
+
+opam config --switch 4.01.0 exec -- make -C ${TEZOSDIR} top-parser

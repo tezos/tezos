@@ -1,0 +1,31 @@
+opam-version: "1.2"
+name: "tezos-deps"
+version: "dev"
+maintainer: "Grégoire Henry <gregoire.henry@ocamlpro.com>"
+authors: [
+  "Arthur Breitman <arthur.breitman@gmail.com>"
+  "Benjamin Canou <benjamin@ocamlpro.com>"
+  "Pierre Chambart <pierre@ocamlpro.com>"
+  "Grégoire Henry <gregoire@ocamlpro.com>"
+]
+dev-repo: "https://gitlab.ocamlpro.com/tezos/tezos.git"
+homepage: "https://gitlab.ocamlpro.com/tezos/tezos"
+bug-reports: "https://gitlab.ocamlpro.com/tezos/tezos/issues"
+depends: [
+  "ocamlfind" {build}
+  "base-bigarray"
+  "base-threads"
+  "calendar"
+  "cohttp" {>= "0.21" }
+  "config-file"
+  "cryptokit"
+  "git"
+  "git-unix"
+  "irmin" {>= "0.11"}
+  "menhir"
+  "ocp-ocamlres" {>= "dev"}
+  "ocplib-endian"
+  "ocplib-json-typed"
+  "ocplib-resto" {>= "dev"}
+  "sodium" {>= "0.3.0"}
+]

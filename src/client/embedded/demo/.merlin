@@ -1,0 +1,9 @@
+REC
+S .
+B .
+S ../../../proto
+B ../../../proto
+S ../../../proto/demo
+B _tzbuild
+FLG -open Client_embedded_proto_demo
+FLG -open Register_client_embedded_proto_demo
