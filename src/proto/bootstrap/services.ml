@@ -243,7 +243,7 @@ module Context = struct
 
     let spendable custom_root =
       RPC.service
-        ~description: "Tells if the contract funds can be spent by the manager."
+        ~description: "Tells if the contract tokens can be spent by the manager."
         ~input: empty
         ~output: (wrap_tzerror bool)
         RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "spendable")

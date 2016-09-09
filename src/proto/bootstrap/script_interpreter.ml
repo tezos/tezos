@@ -463,7 +463,7 @@ let rec interp
           | Manager, Item ((_, _, contract), rest) ->
               Contract.get_manager ctxt contract >>=? fun manager ->
               return (Item (manager, rest), qta - 1, ctxt)
-          | Transfer_funds (storage_type, loc),
+          | Transfer_tokens (storage_type, loc),
             Item (p, Item (amount, Item ((tp, Void_t, destination), Item (sto, Empty)))) -> begin
               Contract.unconditional_spend ctxt source amount >>=? fun ctxt ->
               Contract.credit ctxt destination amount >>=? fun ctxt ->
@@ -493,7 +493,7 @@ let rec interp
                       parse_untagged_data ctxt storage_type storage >>=? fun sto ->
                       return (Item ((), Item (sto, Empty)), qta - 1, ctxt))
               end
-            | Transfer_funds (storage_type, loc),
+            | Transfer_tokens (storage_type, loc),
               Item (p, Item (amount, Item ((tp, tr, destination), Item (sto, Empty)))) -> begin
                 Contract.unconditional_spend ctxt source amount >>=? fun ctxt ->
                 Contract.credit ctxt destination amount >>=? fun ctxt ->

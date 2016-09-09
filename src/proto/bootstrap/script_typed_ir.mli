@@ -296,7 +296,7 @@ and ('bef, 'aft) instr =
   (* protocol *)
   | Manager :
       (('arg, 'ret) typed_contract * 'rest, public_key_hash * 'rest) instr
-  | Transfer_funds : 'sto ty * Script.location ->
+  | Transfer_tokens : 'sto ty * Script.location ->
     ('arg * (Tez.t * (('arg, 'ret) typed_contract * ('sto * end_of_stack))), 'ret * ('sto * end_of_stack)) instr
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
