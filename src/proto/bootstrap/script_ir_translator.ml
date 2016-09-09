@@ -1076,13 +1076,13 @@ and parse_instr
     (* protocol *)
     | Prim (_, "manager", []), Item_t (Contract_t _, rest) ->
         return (Typed (Manager, Item_t (Key_t, rest)))
-    | Prim (loc, "transfer_funds", []),
+    | Prim (loc, "transfer_tokens", []),
       Item_t (p, Item_t (Tez_t, Item_t (Contract_t (cp, cr), Item_t (storage, Empty_t)))) ->
         check_item_ty p cp loc 1 >>=? fun (Eq _) ->
         begin match storage_type with
           | Some storage_type ->
               check_item_ty storage storage_type loc 3 >>=? fun (Eq _) ->
-              return (Typed (Transfer_funds (storage, loc), Item_t (cr, Item_t (storage, Empty_t))))
+              return (Typed (Transfer_tokens (storage, loc), Item_t (cr, Item_t (storage, Empty_t))))
           | None ->
               fail (Transfer_in_lambda loc)
         end
@@ -1128,7 +1128,7 @@ and parse_instr
                  | "abs" | "neg" | "lsl" | "lsr"
                  | "compare" | "eq" | "neq"
                  | "lt" | "gt" | "le" | "ge"
-                 | "manager" | "transfer_funds" | "create_account"
+                 | "manager" | "transfer_tokens" | "create_account"
                  | "create_contract" | "now" | "amount" | "balance"
                  | "check_signature" | "h" | "steps_to_quota"
                   as name), (_ :: _ as l)), _ ->
@@ -1162,7 +1162,7 @@ and parse_instr
         fail (Bad_stack (loc, 6, Stack_ty stack_ty))
     | Prim (loc, "create_account", []), _ ->
         fail (Bad_stack (loc, 4, Stack_ty stack_ty))
-    | Prim (loc, "transfer_funds", []), _ ->
+    | Prim (loc, "transfer_tokens", []), _ ->
         fail (Bad_stack (loc, 3, Stack_ty stack_ty))
     | Prim (loc, ("drop" | "dup" | "car" | "cdr" | "some" | "h" | "dip"
                  | "if_none" | "left" | "right" | "if_left" | "if"
