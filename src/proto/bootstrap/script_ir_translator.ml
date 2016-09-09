@@ -542,14 +542,14 @@ and parse_untagged_data
     | Int_t k, (Float (loc, _) | Prim (loc, _, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, string_of_int_kind k)
     (* Tez amounts *)
-    | Tez_t, Int (loc, v) -> begin try
+    | Tez_t, String (loc, v) -> begin try
           match Tez.of_string v with
           | None -> raise Exit
           | Some tez -> return tez
         with _ ->
           fail @@ Invalid_constant (loc, "tez")
       end
-    | Tez_t, (Float (loc, _) | Prim (loc, _, _) | String (loc, _) | Seq (loc, _)) ->
+    | Tez_t, (Float (loc, _) | Int (loc, _) | Prim (loc, _, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "tez")
     (* Timestamps *)
     | Timestamp_t, (Float (loc, v) | Int (loc, v)) -> begin
