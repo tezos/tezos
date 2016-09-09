@@ -253,7 +253,7 @@ let commands () =
          return ()) ;
     command
       ~group: "context"
-      ~desc: "transfer funds"
+      ~desc: "transfer tokens"
       ~args: [ fee_arg ; arg_arg ; force_arg ]
       (prefixes [ "transfer" ]
        @@ tez_param
