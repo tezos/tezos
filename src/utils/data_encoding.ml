@@ -719,6 +719,10 @@ module Encoding = struct
         `Variable in
     make @@ Mu (kind, name, self)
 
+  let assoc enc =
+    let json = Json_encoding.assoc (Json.get_json enc) in
+    let binary = list (tup2 string enc) in
+    raw_splitted ~json ~binary
 end
 
 include Encoding

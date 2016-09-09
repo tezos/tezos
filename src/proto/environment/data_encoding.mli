@@ -147,6 +147,8 @@ val merge_tups : 'a1 encoding -> 'a2 encoding -> ('a1 * 'a2) encoding
 val array : 'a encoding -> 'a array encoding
 val list : 'a encoding -> 'a list encoding
 
+val assoc : 'a encoding -> (string * 'a) list encoding
+
 type 't case
 val case :
   ?tag:int -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
