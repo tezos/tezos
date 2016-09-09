@@ -43,7 +43,19 @@ let expr_encoding =
   let string_encoding =
     obj1 (req "string" string) in
   let prim_encoding expr_encoding =
-    obj2 (req "prim" string) (opt "args" @@ list expr_encoding) in
+    let json =
+      union
+        [ case string
+            (function (v, []) -> Some v |  _ -> None)
+            (fun v -> (v, [])) ;
+          case (assoc (list expr_encoding))
+            (fun (v, args) -> Some [ (v, args) ])
+            (function
+              | [ (v, args) ] -> (v, args)
+              | _ -> Json.cannot_destruct "invalid script expression") ] in
+    let binary =
+      obj2 (req "prim" string) (req "args" (list expr_encoding)) in
+    splitted ~json ~binary in
   let seq_encoding expr_encoding =
     list expr_encoding in
   mu "tezosScriptExpression" (fun expr_encoding ->
@@ -61,12 +73,9 @@ let expr_encoding =
             (fun v -> String (-1, v)) ;
           case ~tag:3 (prim_encoding expr_encoding)
             (function
-              | Prim (_, v, []) -> Some (v, None)
-              | Prim (_, v, args) -> Some (v, Some args)
+              | Prim (_, v, args) -> Some (v, args)
               | _ -> None)
-            (function
-              | (prim, None) -> Prim (-1, prim, [])
-              | (prim, Some args) -> Prim (-1, prim, args)) ;
+            (function (prim, args) -> Prim (-1, prim, args)) ;
           case ~tag:4 (seq_encoding expr_encoding)
             (function Seq (_, v) -> Some v | _ -> None)
             (fun args -> Seq (-1, args)) ])
