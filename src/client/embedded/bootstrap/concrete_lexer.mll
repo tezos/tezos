@@ -239,8 +239,6 @@ let float_literal =
   ['0'-'9'] ['0'-'9' '_']*
   ('.' ['0'-'9' '_']* )?
     (['e' 'E'] ['+' '-']? ['0'-'9'] ['0'-'9' '_']*)?
-let cadr =
-  ['c' 'C'] ['a' 'A' 'd' 'D']+ ['r' 'R']
 
 rule indent_tokens st nl = parse
 
