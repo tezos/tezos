@@ -105,7 +105,7 @@ let parse_data s =
   try
     match Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf with
     | [node] -> Lwt.return (Script_located_ir.strip_locations node)
-    | _ -> Cli_entries.error "single data expected"
+    | _ -> Cli_entries.error "single data expression expected"
   with
   | exn -> report_parse_error "data: " exn lexbuf
 
@@ -114,7 +114,7 @@ let parse_data_type s =
   try
     match Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf with
     | [node] -> Lwt.return (Script_located_ir.strip_locations node)
-    | _ -> Cli_entries.error "single data type expected"
+    | _ -> Cli_entries.error "single type expression expected"
   with
   | exn -> report_parse_error "data_type: " exn lexbuf
 
@@ -170,10 +170,69 @@ let commands () =
       (fun program () ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_code (block ()) program >>= function
-         | Ok _contracts ->
+         | Ok () ->
              message "Well typed" ;
              Lwt.return ()
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
              error "ill-typed program") ;
+    command
+      ~group: "programs"
+      ~desc: "ask the node to typecheck a tagged data expression"
+      (prefixes [ "typecheck" ; "data" ]
+       @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck" parse_data
+       @@ prefixes [ "against" ; "type" ]
+       @@ Cli_entries.param ~name:"type" ~desc:"the expected type" parse_data
+       @@ stop)
+      (fun data exp_ty () ->
+         let open Data_encoding in
+         Client_proto_rpcs.Helpers.typecheck_untagged_data
+           (block ()) (data, exp_ty) >>= function
+         | Ok () ->
+             message "Well typed" ;
+             Lwt.return ()
+         | Error errs ->
+             pp_print_error Format.err_formatter errs ;
+             error "ill-typed data") ;
+    command
+      ~group: "programs"
+      ~desc: "ask the node to compute the hash of an untagged data expression \
+              using the same algorithm as script instruction H"
+      (prefixes [ "hash" ; "data" ]
+       @@ Cli_entries.param ~name:"data" ~desc:"the data to hash" parse_data
+       @@ stop)
+      (fun data () ->
+         let open Data_encoding in
+         Client_proto_rpcs.Helpers.hash_data (block ()) data >>= function
+         | Ok hash ->
+             message "%S" hash;
+             Lwt.return ()
+         | Error errs ->
+             pp_print_error Format.err_formatter errs ;
+             error "ill-formed data") ;
+    command
+      ~group: "programs"
+      ~desc: "ask the node to compute the hash of an untagged data expression \
+              using the same algorithm as script instruction H, sign it using \
+              a given secret key, and display it using the format expected by \
+              script instruction CHECK_SIGNATURE"
+      (prefixes [ "hash" ; "and" ; "sign" ; "data" ]
+       @@ Cli_entries.param ~name:"data" ~desc:"the data to hash" parse_data
+       @@ prefixes [ "for" ]
+       @@ Client_keys.Secret_key.alias_param
+       @@ stop)
+      (fun data (_, key) () ->
+         let open Data_encoding in
+         Client_proto_rpcs.Helpers.hash_data (block ()) data >>= function
+         | Ok hash ->
+             let signature = Ed25519.sign key (MBytes.of_string hash) in
+             message "Hash: %S@.Signature: %S"
+               hash
+               (signature |>
+                Data_encoding.Binary.to_bytes Ed25519.signature_encoding |>
+                Hex_encode.hex_of_bytes) ;
+             Lwt.return ()
+         | Error errs ->
+             pp_print_error Format.err_formatter errs ;
+             error "ill-formed data") ;
   ]

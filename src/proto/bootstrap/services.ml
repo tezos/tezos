@@ -333,6 +333,33 @@ module Helpers = struct
       ~output: (wrap_tzerror empty)
       RPC.Path.(custom_root / "helpers" / "typecheck_code")
 
+  let typecheck_tagged_data custom_root =
+    RPC.service
+      ~description: "Check that some tagged data expression is well formed \
+                     and well typed in the current context"
+      ~input: (obj1 (req "data" Script.expr_encoding))
+      ~output: (wrap_tzerror empty)
+      RPC.Path.(custom_root / "helpers" / "typecheck_tagged_data")
+
+  let typecheck_untagged_data custom_root =
+    RPC.service
+      ~description: "Check that some untagged data expression is well formed \
+                     and of a given type in the current context"
+      ~input: (obj2
+                 (req "data" Script.expr_encoding)
+                 (req "type" Script.expr_encoding))
+      ~output: (wrap_tzerror empty)
+      RPC.Path.(custom_root / "helpers" / "typecheck_untagged_data")
+
+  let hash_data custom_root =
+    RPC.service
+      ~description: "Computes the hash of some (untagged) data expression \
+                     using the same algorithm as script instruction H"
+      ~input: (obj1 (req "data" Script.expr_encoding))
+      ~output: (wrap_tzerror @@
+                obj1 (req "hash" string))
+      RPC.Path.(custom_root / "helpers" / "hash_data")
+
   let level custom_root =
     RPC.service
       ~description: "..."
