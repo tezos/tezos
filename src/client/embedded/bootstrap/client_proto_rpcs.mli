@@ -93,6 +93,9 @@ module Helpers : sig
   val minimal_time:
     block -> ?prio:int -> unit -> Time.t tzresult Lwt.t
   val typecheck_code: block -> Script.code -> unit tzresult Lwt.t
+  val typecheck_tagged_data: block -> Script.expr -> unit tzresult Lwt.t
+  val typecheck_untagged_data: block -> Script.expr * Script.expr -> unit tzresult Lwt.t
+  val hash_data: block -> Script.expr -> string tzresult Lwt.t
   val level: block -> ?offset:int32 -> Raw_level.t -> Level.t tzresult Lwt.t
   val levels: block -> Cycle.t -> Level.t list tzresult Lwt.t
 

@@ -1448,3 +1448,16 @@ let typecheck_code
   let ret_type_full = Pair_t (ret_type, storage_type) in
   parse_lambda ctxt ~storage_type arg_type_full ret_type_full code >>=? fun _ ->
   return ()
+
+let typecheck_tagged_data
+  : context -> Script.expr -> unit tzresult Lwt.t
+  = fun ctxt data ->
+    parse_tagged_data ctxt data >>=? fun (Ex _) ->
+    return ()
+
+let typecheck_untagged_data
+  : context -> Script.expr * Script.expr -> unit tzresult Lwt.t
+  = fun ctxt (data, exp_ty) ->
+    parse_ty exp_ty >>=? fun (Ex exp_ty) ->
+    parse_untagged_data ctxt exp_ty data >>=? fun _ ->
+    return ()

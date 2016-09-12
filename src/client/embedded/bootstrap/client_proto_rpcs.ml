@@ -127,6 +127,12 @@ module Helpers = struct
 
   let typecheck_code = call_error_service1 Services.Helpers.typecheck_code
 
+  let typecheck_tagged_data = call_error_service1 Services.Helpers.typecheck_tagged_data
+
+  let typecheck_untagged_data = call_error_service1 Services.Helpers.typecheck_untagged_data
+
+  let hash_data = call_error_service1 Services.Helpers.hash_data
+
   let level block ?offset lvl =
     call_error_service2 Services.Helpers.level block lvl offset
 

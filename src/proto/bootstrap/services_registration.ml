@@ -183,6 +183,18 @@ let () =
   register1 Services.Helpers.typecheck_code
     Script_ir_translator.typecheck_code
 
+let () =
+  register1 Services.Helpers.typecheck_tagged_data
+    Script_ir_translator.typecheck_tagged_data
+
+let () =
+  register1 Services.Helpers.typecheck_untagged_data
+    Script_ir_translator.typecheck_untagged_data
+
+let () =
+  register1 Services.Helpers.hash_data
+    (fun _ctxt expr -> return (Script.hash_expr expr))
+
 let compute_level ctxt raw offset =
   return (Level.from_raw ctxt ?offset raw)
 
