@@ -241,7 +241,7 @@ end = struct
 
   let remove_by_point point ({ by_point ; by_gid } as map) =
     try
-      let (gid, v) = PointMap.find point by_point in
+      let (gid, _) = PointMap.find point by_point in
       { by_point = PointMap.remove point by_point ;
         by_gid = match gid with
           | None -> by_gid
@@ -495,9 +495,13 @@ let answerable_discovery_message message my_gid when_ok when_not =
       else when_not ()
   | _ -> when_not ()
 
+let string_of_unix_exn = function
+  | Unix.Unix_error (err, fn, _) -> "in " ^ fn ^ ", " ^ Unix.error_message err
+  | exn -> Printexc.to_string exn
+
 (* Launch an answer machine for the discovery mechanism, takes a
    callback to fill the answers and returns a canceler function *)
-let discovery_answerer config limits my_gid disco_port cancelation callback =
+let discovery_answerer my_gid disco_port cancelation callback =
   (* init a UDP listening socket on the broadcast canal *)
   catch
     (fun () ->
@@ -506,11 +510,11 @@ let discovery_answerer config limits my_gid disco_port cancelation callback =
        LU.(setsockopt main_socket SO_REUSEADDR true) ;
        LU.(bind main_socket (ADDR_INET (Unix.inet_addr_any, disco_port))) ;
        return (Some main_socket))
-    (fun exn -> return None) >>= function
-  | None ->
-      debug "(%a) will not listen to discovery requests (port taken or closed)"
-        pp_gid my_gid ;
-      return ()
+    (fun exn ->
+       debug "(%a) will not listen to discovery requests (%s)"
+         pp_gid my_gid (string_of_unix_exn exn) ;
+       return None) >>= function
+  | None -> return ()
   | Some main_socket ->
       (* the answering function *)
       let rec step () =
@@ -524,7 +528,7 @@ let discovery_answerer config limits my_gid disco_port cancelation callback =
               step () (* drop bytes, better luck next time ! *)
             else
               answerable_discovery_message (Netbits.of_raw buffer) my_gid
-                (fun gid port ->
+                (fun _ port ->
                    catch
                      (fun () ->
                         let socket = LU.(socket PF_INET SOCK_STREAM 0) in
@@ -542,7 +546,7 @@ let discovery_answerer config limits my_gid disco_port cancelation callback =
 
 (* Sends dicover messages into space in an exponentially delayed loop,
    restartable using a condition *)
-let discovery_sender config limits my_gid disco_port inco_port cancelation restart =
+let discovery_sender my_gid disco_port inco_port cancelation restart =
   let message = discovery_message my_gid inco_port in
   let rec loop delay n =
     catch
@@ -687,8 +691,8 @@ let bootstrap config limits =
              LU.listen main_socket limits.max_connections ;
              return (Some main_socket))
           (fun exn ->
-             debug "(%a) cannot accept incoming peers (port taken or closed)"
-               pp_gid my_gid ;
+             debug "(%a) cannot accept incoming peers (%s)"
+               pp_gid my_gid (string_of_unix_exn exn) ;
              return None)>>= function
         | None ->
             (* FIXME: run in degraded mode, better exit ? *)
@@ -762,7 +766,7 @@ let bootstrap config limits =
                 let uaddr = Ipaddr_unix.to_inet_addr addr in
                 catch
                   (fun () ->
-                     lwt_debug "Trying connection to %a:%d"
+                     lwt_debug "Trying to connect to %a:%d"
                        Ipaddr.pp_hum addr port >>= fun () ->
                      Lwt.pick
                        [ (Lwt_unix.sleep 2.0 >>= fun _ -> Lwt.fail Not_found) ;
@@ -772,9 +776,10 @@ let bootstrap config limits =
                        Ipaddr.pp_hum addr port >>= fun () ->
                      enqueue_event (Contact ((addr, port), socket)) ;
                      return (nb - 1))
-                  (fun e ->
-                     lwt_debug "Connection failed to %a:%d"
-                       Ipaddr.pp_hum addr port >>= fun () ->
+                  (fun exn ->
+                     lwt_debug "Connection failed to %a:%d (%s)"
+                       Ipaddr.pp_hum addr port
+                       (string_of_unix_exn exn) >>= fun () ->
                      (* if we didn't succes, we greylist it *)
                      let now = Unix.gettimeofday () in
                      known_peers :=
@@ -810,7 +815,7 @@ let bootstrap config limits =
         let to_kill = n_connected - limits.max_connections in
         debug "(%a) too many connections, will kill %d" pp_gid my_gid to_kill ;
         snd (PeerMap.fold
-               (fun lid _ peer (i, t) ->
+               (fun _ _ peer (i, t) ->
                   if i = 0 then (0, t)
                   else (i - 1, t >>= fun () -> peer.disconnect ()))
                !connected (to_kill, return ())) >>= fun () ->
@@ -970,7 +975,7 @@ let bootstrap config limits =
     match config.discovery_port with
     | Some disco_port ->
         let answerer () =
-          discovery_answerer config limits my_gid disco_port cancelation @@ fun addr port socket ->
+          discovery_answerer my_gid disco_port cancelation @@ fun addr port socket ->
           (* do not reply to ourselves or conncted peers *)
           if not (PeerMap.mem_by_point (addr, port) !connected)
           && (try match PeerMap.gid_by_point (addr, port) !known_peers with
@@ -993,7 +998,7 @@ let bootstrap config limits =
     match config.incoming_port, config.discovery_port with
     | Some inco_port, Some disco_port ->
         let sender () =
-          discovery_sender config limits my_gid disco_port inco_port cancelation restart_discovery in
+          discovery_sender my_gid disco_port inco_port cancelation restart_discovery in
         worker (Format.asprintf "(%a) discovery sender" pp_gid my_gid) sender cancel
     | _ -> return ()  in
   (* net manipulation callbacks *)
@@ -1100,7 +1105,7 @@ let faked_network =
   let send_to _ = Lwt.return_unit in
   let push _ = () in
   let broadcast _ = () in
-  let blacklist ?duration _ = () in
+  let blacklist ?duration _ = ignore duration ; () in
   let whitelist _ = () in
   let maintain () = Lwt.return_unit in
   let roll () = Lwt.return_unit in
