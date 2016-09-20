@@ -5,7 +5,7 @@ TEZOS
 To compile:
 
 ```
-make build-deps
+make build_deps
 make
 ```
 
