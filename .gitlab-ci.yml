@@ -112,8 +112,13 @@ publish:expurge:
             "docs/proof of stake.md"
             src/client/embedded/bootstrap/mining/'
           --env-filter
-            'export GIT_AUTHOR_NAME="Dynamic Ledger Solutions, Inc." ;
-             export GIT_AUTHOR_EMAIL="contact@tezos.com"'
+            'if [ $GIT_COMMIT != "f42e9d12ac75d2876a4cf600d44976b7090d4533" ] ; then
+               export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" ;
+               export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL" ;
+               export GIT_COMMITTER_DATE="$GIT_AUTHOR_DATE" ;
+               export GIT_AUTHOR_NAME="Dynamic Ledger Solutions, Inc." ;
+               export GIT_AUTHOR_EMAIL="contact@tezos.com" ;
+             fi'
          HEAD
     - git tag ${CI_BUILD_REF}_expurged
     - git push git@gitlab.ocamlpro.com:${CI_PROJECT_PATH}.git
