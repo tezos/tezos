@@ -261,14 +261,18 @@ module Blocks = struct
     heads: Block_hash.t list option ;
     monitor: bool option ;
     delay: int option ;
+    min_date: Time.t option;
+    min_heads: int option;
   }
   let list_param_encoding =
     conv
-      (fun {operations;length;heads;monitor;delay} ->
-         (operations,length,heads,monitor,delay))
-      (fun (operations,length,heads,monitor,delay) ->
-         {operations;length;heads;monitor;delay})
-      (obj5
+      (fun { operations ; length ; heads ; monitor ;
+             delay ; min_date ; min_heads } ->
+         (operations, length, heads, monitor, delay, min_date, min_heads))
+      (fun (operations, length, heads, monitor, delay, min_date, min_heads) ->
+         { operations ; length ; heads ; monitor ;
+           delay ; min_date ; min_heads })
+      (obj7
          (opt "operations"
             (Data_encoding.describe
                ~description:
@@ -302,6 +306,17 @@ module Blocks = struct
                   When this optional argument is 0, only blocks with a \
                   timestamp in the past are considered. Other values allows to \
                   adjust the current time."
+               int31))
+         (opt "min_date"
+            (Data_encoding.describe
+               ~description: "When `min_date` is provided, heads with a \
+                              timestamp before `min_date` are filtered ouf"
+               Time.encoding))
+         (opt "min_heads"
+            (Data_encoding.describe
+               ~description:"When `min_date` is provided, returns at least \
+                             `min_heads` even when their timestamp is before \
+                             `min_date`."
                int31)))
 
   let list =

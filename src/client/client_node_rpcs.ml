@@ -194,12 +194,14 @@ module Blocks = struct
     call_service1 Services.Blocks.pending_operations block ()
   let info ?(operations = false) h =
     call_service1 Services.Blocks.info h operations
-  let list ?operations ?length ?heads ?delay () =
+  let list ?operations ?length ?heads ?delay ?min_date ?min_heads () =
     call_service0 Services.Blocks.list
-      { operations; length ; heads ; monitor = Some false ; delay }
-  let monitor ?operations ?length ?heads ?delay () =
+      { operations; length ; heads ; monitor = Some false ; delay ;
+        min_date ; min_heads }
+  let monitor ?operations ?length ?heads ?delay ?min_date ?min_heads () =
     call_streamed_service0 Services.Blocks.list
-      { operations; length ; heads ; monitor = Some true ; delay }
+      { operations; length ; heads ; monitor = Some true ; delay ;
+        min_date ; min_heads }
 end
 
 module Operations = struct
