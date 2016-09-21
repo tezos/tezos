@@ -54,8 +54,11 @@ let sort_blocks ?(compare = compare) blocks =
   let blocks = Utils.unopt_list blocks in
   List.sort compare blocks
 
-let monitor ?operations ?length ?heads ?delay ?compare () =
-  Client_node_rpcs.Blocks.monitor ?operations ?length ?heads ?delay
+let monitor
+    ?operations ?length ?heads ?delay
+    ?min_date ?min_heads ?compare () =
+  Client_node_rpcs.Blocks.monitor
+    ?operations ?length ?heads ?delay ?min_date ?min_heads
     () >>= fun block_stream ->
   let convert blocks = sort_blocks ?compare (List.flatten blocks) in
   Lwt.return (Lwt_stream.map_s convert block_stream)

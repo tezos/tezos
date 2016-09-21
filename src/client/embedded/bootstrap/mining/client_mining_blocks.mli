@@ -22,7 +22,8 @@ val info:
 val compare: block_info -> block_info -> int
 
 val monitor:
-  ?operations:bool -> ?length:int -> ?heads:Block_hash.t list -> ?delay:int ->
+  ?operations:bool -> ?length:int -> ?heads:Block_hash.t list ->
+  ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
   ?compare:(block_info -> block_info -> int) ->
   unit -> block_info list Lwt_stream.t Lwt.t
 
