@@ -61,6 +61,8 @@ module Blocks : sig
     heads: Block_hash.t list option ;
     monitor: bool option ;
     delay: int option ;
+    min_date: Time.t option;
+    min_heads: int option;
   }
   val list:
     (unit, unit, list_param, block_info list list) RPC.service

@@ -105,6 +105,7 @@ let run_daemon delegates =
   Client_mining_daemon.run
     ?max_priority:!max_priority
     ~delay:!endorsement_delay
+    ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
     (List.map snd delegates)
 
 let commands () =

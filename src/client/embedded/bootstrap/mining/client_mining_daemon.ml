@@ -9,11 +9,11 @@
 
 open Logging.Client.Mining
 
-let run ?max_priority ~delay delegates =
+let run ?max_priority ~delay ?min_date delegates =
   (* TODO really detach... *)
   let endorsement =
     if Client_proto_args.Daemon.(!all || !endorsement) then
-      Client_mining_blocks.monitor () >>= fun block_stream ->
+      Client_mining_blocks.monitor ?min_date () >>= fun block_stream ->
       Client_mining_endorsement.create ~delay delegates block_stream
     else
       Lwt.return_unit
@@ -26,7 +26,7 @@ let run ?max_priority ~delay delegates =
       Lwt.return_unit
   in
   let forge =
-    Client_mining_blocks.monitor () >>= fun block_stream ->
+    Client_mining_blocks.monitor ?min_date () >>= fun block_stream ->
     Client_mining_operations.monitor_endorsement () >>= fun endorsement_stream ->
     if Client_proto_args.Daemon.(!all || !mining) then
       Client_mining_forge.create

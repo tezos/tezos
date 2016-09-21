@@ -64,11 +64,13 @@ module Blocks : sig
     ?operations:bool -> block -> block_info Lwt.t
 
   val list:
-    ?operations:bool -> ?length:int -> ?heads:Block_hash.t list -> ?delay:int ->
+    ?operations:bool -> ?length:int -> ?heads:Block_hash.t list ->
+    ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
     unit -> block_info list list Lwt.t
 
   val monitor:
-    ?operations:bool -> ?length:int -> ?heads:Block_hash.t list -> ?delay:int ->
+    ?operations:bool -> ?length:int -> ?heads:Block_hash.t list ->
+    ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
     unit -> block_info list list Lwt_stream.t Lwt.t
 
   type preapply_result = {

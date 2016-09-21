@@ -205,10 +205,12 @@ let create_delayed_stream
 
 let list_blocks
     node
-    { Services.Blocks.operations ; length ; heads ; monitor ; delay } =
+    { Services.Blocks.operations ; length ; heads ; monitor ; delay ;
+      min_date; min_heads} =
   let include_ops = match operations with None -> false | Some x -> x in
   let len = match length with None -> 1 | Some x -> x in
   let monitor = match monitor with None -> false | Some x -> x in
+
   let time =
     match delay with
     | None -> None
@@ -218,6 +220,20 @@ let list_blocks
     | None ->
         Node.RPC.heads node >>= fun heads ->
         let heads = List.map snd (Block_hash_map.bindings heads) in
+        let heads =
+          match min_date with
+          | None -> heads
+          | Some date ->
+              let min_heads =
+                match min_heads with
+                | None -> 0
+                | Some min_heads -> min_heads in
+              snd @@
+              List.fold_left (fun (min_heads, acc) (bi : Node.RPC.block_info) ->
+                  min_heads - 1,
+                  if Time.(>) bi.timestamp date || min_heads > 0 then bi :: acc
+                  else acc)
+                (min_heads, []) heads in
         begin
           match time with
           | None -> Lwt.return heads
