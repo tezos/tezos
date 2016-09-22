@@ -236,6 +236,65 @@ module Operation = struct
 
 end
 
+let iter_predecessors
+    (type t)
+    (compare: t -> t -> int)
+    (predecessor: state -> t -> t option Lwt.t)
+    (date: t -> Time.t)
+    (fitness: t -> Fitness.fitness)
+    state ?max ?min_fitness ?min_date heads ~f =
+  let module Local = struct exception Exit end in
+  let pop, push =
+    (* Poor-man priority queue *)
+    let queue : t list ref = ref [] in
+    let pop () =
+      match !queue with
+      | [] -> None
+      | b :: bs -> queue := bs ; Some b in
+    let push b =
+      let rec loop = function
+        | [] -> [b]
+        | b' :: bs' as bs ->
+            let cmp = compare b b' in
+            if cmp = 0 then
+              bs
+            else if cmp < 0 then
+              b' :: loop bs'
+            else
+              b :: bs in
+      queue := loop !queue in
+    pop, push in
+  let check_count =
+    match max with
+    | None -> (fun () -> ())
+    | Some max ->
+        let cpt = ref 0 in
+        fun () ->
+          if !cpt >= max then raise Local.Exit ;
+          incr cpt in
+  let check_fitness =
+    match min_fitness with
+    | None -> (fun _ -> true)
+    | Some min_fitness ->
+        (fun b -> Fitness.compare min_fitness (fitness b) <= 0) in
+  let check_date =
+    match min_date with
+    | None -> (fun _ -> true)
+    | Some min_date ->  (fun b -> Time.compare min_date (date b) <= 0) in
+  let rec loop () =
+      match pop () with
+      | None -> return ()
+      | Some b ->
+          check_count () ;
+          f b >>= fun () ->
+          predecessor state b >>= function
+          | None -> loop ()
+          | Some p ->
+              if check_fitness p && check_date p then push p ;
+              loop () in
+    List.iter push heads ;
+    try loop () with Local.Exit -> return ()
+
 module Block = struct
 
   type shell_header = Store.shell_block_header = {
@@ -367,6 +426,28 @@ module Block = struct
       block_locator_loop state [] sz 1 9 h >>= fun locator ->
       return locator
     end
+
+  let iter_predecessors =
+    let compare b1 b2 =
+      match Fitness.compare b1.shell.fitness b2.shell.fitness with
+      | 0 -> begin
+          match Time.compare b1.shell.timestamp b2.shell.timestamp with
+          | 0 -> Block_hash.compare (hash b1) (hash b2)
+          | res -> res
+        end
+      | res -> res in
+    let predecessor state b =
+      read state b.shell.predecessor >|= function
+      | None -> None
+      | Some { data } ->
+          if Block_hash.equal data.shell.predecessor b.shell.predecessor
+             && Block_hash.equal (hash b) b.shell.predecessor
+          then
+            None
+          else
+            Some data in
+    iter_predecessors compare predecessor
+      (fun b -> b.shell.timestamp) (fun b -> b.shell.fitness)
 
 end
 
@@ -705,6 +786,25 @@ module Valid_block = struct
           locked_store_invalid vstate hash exns >>= fun _changed ->
           Lwt.return vstate
   end
+
+  let iter_predecessors =
+    let compare b1 b2 =
+      match Fitness.compare b1.fitness b2.fitness with
+      | 0 -> begin
+          match Time.compare b1.timestamp b2.timestamp with
+          | 0 -> Block_hash.compare b1.hash b2.hash
+          | res -> res
+        end
+      | res -> res in
+    let predecessor state b =
+      if Block_hash.equal b.hash b.pred then
+        Lwt.return None
+      else
+        read state b.pred >|= function
+        | None | Some (Error _) -> None
+        | Some (Ok b) -> Some b in
+    iter_predecessors compare predecessor
+      (fun b -> b.timestamp) (fun b -> b.fitness)
 
 end
 

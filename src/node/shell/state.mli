@@ -206,6 +206,22 @@ module Block : sig
   val block_locator:
     state -> int -> Block_hash.t -> Block_hash.t list tzresult Lwt.t
 
+  (** [iter_predecessors state blocks f] iter [f] on [blocks] and
+      their recursive (known) predecessors. Blocks are visited with a
+      decreasing fitness (then decreasing timestamp). If the optional
+      argument [max] is provided, the iteration is stopped after [max]
+      visited block. If [min_fitness] id provided, blocks with a
+      fitness lower than [min_fitness] are ignored. If [min_date],
+      blocks with a fitness lower than [min_date] are ignored. *)
+  val iter_predecessors:
+    state ->
+    ?max:int ->
+    ?min_fitness:Fitness.fitness ->
+    ?min_date:Time.t ->
+    block list ->
+    f:(block -> unit Lwt.t) ->
+    unit tzresult Lwt.t
+
 end
 
 (** {2 Valid block} ***********************************************************)
@@ -296,6 +312,22 @@ module Valid_block : sig
   (** [block_locator state max_length h] compute the sparse block locator
       (/à la/ Bitcoin) for the block [h]. *)
   val block_locator: state -> int -> valid_block -> Block_hash.t list Lwt.t
+
+  (** [iter_predecessors state blocks f] iter [f] on [blocks] and
+      their recursive predecessors. Blocks are visited with a
+      decreasing fitness (then decreasing timestamp). If the optional
+      argument [max] is provided, the iteration is stopped after [max]
+      visited block. If [min_fitness] id provided, blocks with a
+      fitness lower than [min_fitness] are ignored. If [min_date],
+      blocks with a fitness lower than [min_date] are ignored. *)
+  val iter_predecessors:
+    state ->
+    ?max:int ->
+    ?min_fitness:Fitness.fitness ->
+    ?min_date:Time.t ->
+    valid_block list ->
+    f:(valid_block -> unit Lwt.t) ->
+    unit tzresult Lwt.t
 
   (**/**)
 
