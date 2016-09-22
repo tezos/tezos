@@ -9,5 +9,5 @@ clean:
 test:
 	${MAKE} -C test
 
-build_deps:
+build-deps:
 	@./scripts/install_build_deps.sh all
