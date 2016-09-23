@@ -330,7 +330,7 @@ module RPC = struct
 
   let prevalidation_hash =
     Block_hash.of_b48check
-      "Et22nEeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      "eeeeeeeeeeeeeegqJHARhSaNXggmMs8K3tvsgn4rBprkvpFAMVD5d"
 
   let get_net node = function
     | `Head _ | `Prevalidation -> node.global_validator, node.global_net

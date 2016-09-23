@@ -15,7 +15,7 @@ let decode_alphabet alphabet =
   Bytes.to_string str
 
 let default_alphabet =
-  "eXMNE9qvHPQDdcFx5J86rT7VRm2atAypGhgLfbS3CKjnksB4"
+  "eE2NXaQvHPqDdTJxfF36jb7VRmp9tAyMgG4L5cS8CKrnksBh"
 
 let default_decode_alphabet = decode_alphabet default_alphabet
 
@@ -85,13 +85,13 @@ let sha256 s =
   computed_hash
 
 let safe_encode ?alphabet s =
-  raw_encode ?alphabet (String.sub (sha256 (sha256 s)) 0 4 ^ s)
+  raw_encode ?alphabet (s ^ String.sub (sha256 (sha256 s)) 0 4)
 
 let safe_decode ?alphabet s =
   let s = raw_decode ?alphabet s in
   let len = String.length s in
-  let msg_hash = String.sub s 0 4 in
-  let msg = String.sub s 4 (len-4) in
+  let msg = String.sub s 0 (len-4)
+  and msg_hash = String.sub s (len-4) 4 in
   if msg_hash <> String.sub (sha256 (sha256 msg)) 0 4 then
     invalid_arg "safe_decode" ;
   msg
