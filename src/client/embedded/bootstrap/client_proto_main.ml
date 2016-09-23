@@ -9,7 +9,7 @@
 
 let protocol =
   Protocol_hash.of_b48check
-    "TnrnfGHMCPAcxtMAHXdpfebbnn2XvPAxq7DHbpeJbKTkJQPgcgRGr"
+    "4prgmSgbaeMKbgLtLjpsHaDD9QvG2dbC2bLq2XBmyxd2RJgLFpcAg"
 
 let () =
   Client_version.register protocol @@
