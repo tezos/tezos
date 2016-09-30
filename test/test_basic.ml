@@ -13,10 +13,8 @@ let should_fail f t =
   | Error error ->
       if not (List.exists f error) then
         failwith "@[<v 2>Unexpected error@ %a@]" pp_print_error error
-      else begin
-        Format.printf "-> Failure (as expected)\n%!" ;
+      else
         return ()
-      end
 
 let fork_node () =
   let init_timeout = 4 in
@@ -77,16 +75,18 @@ let create_account name =
   Lwt.return { name ; contract ; public_key_hash ; public_key ; secret_key }
 
 let transfer ?(block = `Prevalidation) ?(fee = 5L) ~src ~target amount =
-  Cli_entries.message "Transfer %Ld from %s to %s (fee: %Ld)"
-    amount src.name target.name fee;
   let fee =
-    match Tez.of_cents fee with
+    let fee = Tez.of_cents fee in
+    Assert.is_some ~msg:__LOC__ fee ;
+    match fee with
     | Some x -> x
-    | None -> assert false in
+    | None -> assert false in (* will be captured by the previous assert *)
   let amount =
-    match Tez.of_cents amount with
+    let amount = Tez.of_cents amount in
+    Assert.is_some ~msg:__LOC__ amount ;
+    match amount with
     | Some x -> x
-    | None -> assert false in
+    | None -> assert false in (* will be captured by the previous assert *)
   Client_proto_context.transfer
     block
     ~source:src.contract
@@ -96,16 +96,11 @@ let transfer ?(block = `Prevalidation) ?(fee = 5L) ~src ~target amount =
     ~amount ~fee ()
 
 let check_balance ?(block = `Prevalidation) account expected =
-  Client_proto_rpcs.Context.Contract.balance block account.contract >>=? fun balance ->
+  Client_proto_rpcs.Context.Contract.balance
+    block account.contract >>=? fun balance ->
   let balance = Tez.to_cents balance in
-  if balance <> expected then
-    failwith
-      "Unexpected balance for %s: %Ld (expected: %Ld)"
-      account.name balance expected
-  else begin
-    Cli_entries.message "Balance for %s: %Ld" account.name balance ;
-    return ()
-  end
+  Assert.equal_int64 ~msg:__LOC__ expected balance ;
+  return ()
 
 let mine contract =
   let block = `Head 0 in
@@ -114,19 +109,17 @@ let mine contract =
   Client_mining_forge.forge_block
     ~timestamp:(Time.now ()) ~seed_nonce ~src_sk:contract.secret_key
     block contract.public_key_hash >>=? fun block_hash ->
-  Cli_entries.message "Injected %a" Block_hash.pp_short block_hash ;
   return ()
 
 let ecoproto_error f = function
-  | Register_client_embedded_proto_bootstrap.Ecoproto_error errors -> List.exists f errors
+  | Register_client_embedded_proto_bootstrap.Ecoproto_error errors ->
+      List.exists f errors
   | _ -> false
 
 let main () =
   fork_node () ;
   bootstrap_accounts () >>= fun bootstrap_accounts ->
   let bootstrap = List.hd bootstrap_accounts in
-  Format.printf "Received bootstrap key %a@."
-    Ed25519.Public_key_hash.pp_short bootstrap.public_key_hash ;
   create_account "foo" >>= fun foo ->
   create_account "bar" >>= fun bar ->
   transfer ~src:bootstrap ~target:foo 1000_00L >>=? fun () ->
@@ -138,17 +131,10 @@ let main () =
   should_fail
     (ecoproto_error (function Contract.Too_low_balance -> true | _ -> false))
   @@ transfer ~src:bar ~target:foo 1000_00L >>=? fun () ->
-  mine bootstrap >>=? fun () ->
-  print_endline "\nEnd of test\n" ;
-  return ()
+  mine bootstrap
+
+let tests =
+  [ "main", (fun _ -> main () >>= fun _ -> Lwt.return_unit) ]
 
 let () =
-  try
-    Lwt_main.run (
-      main () >>= function
-      | Error exns ->
-          Format.eprintf "%a@." pp_print_error exns ;
-        exit 1
-      | Ok () -> Lwt.return_unit)
-  with Cli_entries.Command_failed msg ->
-    Format.eprintf "Error: %s@." msg ;
+  Test.run "basic." tests

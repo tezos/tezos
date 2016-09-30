@@ -1,5 +1,3 @@
-
-open Utils
 open Hash
 open Context
 
@@ -46,7 +44,7 @@ let faked_block : Store.block_header = {
 let create_block2 idx =
   checkout idx genesis_block >>= function
   | None | Some (Error _) ->
-      Test.fail "checkout genesis_block"
+      Assert.fail_msg "checkout genesis_block"
   | Some (Ok ctxt) ->
       set ctxt ["a"; "b"] (MBytes.of_string "Novembre") >>= fun ctxt ->
       set ctxt ["a"; "c"] (MBytes.of_string "Juin") >>= fun ctxt ->
@@ -60,7 +58,7 @@ let block3a =
 let create_block3a idx =
   checkout idx block2 >>= function
   | None | Some (Error _) ->
-      Test.fail "checkout block2"
+      Assert.fail_msg "checkout block2"
   | Some (Ok ctxt) ->
       del ctxt ["a"; "b"] >>= fun ctxt ->
       set ctxt ["a"; "d"] (MBytes.of_string "Mars") >>= fun ctxt ->
@@ -77,7 +75,7 @@ let block3c =
 let create_block3b idx =
   checkout idx block2 >>= function
   | None | Some (Error _) ->
-      Test.fail "checkout block3b"
+      Assert.fail_msg "checkout block3b"
   | Some (Ok ctxt) ->
       del ctxt ["a"; "c"] >>= fun ctxt ->
       set ctxt ["a"; "d"] (MBytes.of_string "Février") >>= fun ctxt ->
@@ -93,7 +91,6 @@ let wrap_context_init f base_dir =
   commit_invalid idx faked_block block3c [Error_monad.Unclassified "TEST"] >>= fun () ->
   f idx
 
-
 (** Simple test *)
 
 let c = function
@@ -103,50 +100,50 @@ let c = function
 let test_simple idx =
   checkout idx block2 >>= function
   | None | Some (Error _) ->
-      Test.fail "checkout block2"
+      Assert.fail_msg "checkout block2"
   | Some (Ok ctxt) ->
       get ctxt ["version"] >>= fun version ->
-      assert (c version = Some "0.0");
+      Assert.equal_string_option ~msg:__LOC__ (c version) (Some "0.0") ;
       get ctxt ["a";"b"] >>= fun novembre ->
-      assert (c novembre = Some "Novembre");
+      Assert.equal_string_option (Some "Novembre") (c novembre) ;
       get ctxt ["a";"c"] >>= fun juin ->
-      assert (c juin = Some "Juin");
+      Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
       Lwt.return ()
 
 let test_continuation idx =
   checkout idx block3a >>= function
   | None | Some (Error _) ->
-      Test.fail "checkout block3a"
+      Assert.fail_msg "checkout block3a"
   | Some (Ok ctxt) ->
       get ctxt ["version"] >>= fun version ->
-      assert (c version = Some "0.0");
+      Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
       get ctxt ["a";"b"] >>= fun novembre ->
-      assert (c novembre = None);
+      Assert.is_none ~msg:__LOC__ (c novembre) ;
       get ctxt ["a";"c"] >>= fun juin ->
-      assert (c juin = Some "Juin");
+      Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
       get ctxt ["a";"d"] >>= fun mars ->
-      assert (c mars = Some "Mars");
+      Assert.equal_string_option ~msg:__LOC__  (Some "Mars") (c mars) ;
       Lwt.return ()
 
 let test_fork idx =
   checkout idx block3b >>= function
   | None | Some (Error _) ->
-      Test.fail "checkout block3b"
+      Assert.fail_msg "checkout block3b"
   | Some (Ok ctxt) ->
       get ctxt ["version"] >>= fun version ->
-      assert (c version = Some "0.0");
+      Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
       get ctxt ["a";"b"] >>= fun novembre ->
-      assert (c novembre = Some "Novembre");
+      Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
       get ctxt ["a";"c"] >>= fun juin ->
-      assert (c juin = None);
+      Assert.is_none ~msg:__LOC__ (c juin) ;
       get ctxt ["a";"d"] >>= fun mars ->
-      assert (c mars = Some "Février");
+      Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
       Lwt.return ()
 
 let test_replay idx =
   checkout idx genesis_block >>= function
   | None | Some (Error _) ->
-      Test.fail "checkout genesis_block"
+      Assert.fail_msg "checkout genesis_block"
   | Some (Ok ctxt0) ->
       set ctxt0 ["version"] (MBytes.of_string "0.0") >>= fun ctxt1 ->
       set ctxt1 ["a"; "b"] (MBytes.of_string "Novembre") >>= fun ctxt2 ->
@@ -155,21 +152,21 @@ let test_replay idx =
       set ctxt3 ["a"; "d"] (MBytes.of_string "Juillet") >>= fun ctxt4b ->
       set ctxt4a ["a"; "b"] (MBytes.of_string "November") >>= fun ctxt5a ->
       get ctxt4a ["a";"b"] >>= fun novembre ->
-      assert (c novembre = Some "Novembre");
+      Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
       get ctxt5a ["a";"b"] >>= fun november ->
-      assert (c november = Some "November");
+      Assert.equal_string_option ~msg:__LOC__ (Some "November") (c november) ;
       get ctxt5a ["a";"d"] >>= fun july ->
-      assert (c july = Some "July");
+      Assert.equal_string_option ~msg:__LOC__ (Some "July") (c july) ;
       get ctxt4b ["a";"b"] >>= fun novembre ->
-      assert (c novembre = Some "Novembre");
+      Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
       get ctxt4b ["a";"d"] >>= fun juillet ->
-      assert (c juillet = Some "Juillet");
+      Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
       Lwt.return ()
 
 let test_list idx =
   checkout idx genesis_block >>= function
   | None | Some (Error _) ->
-      Test.fail "checkout genesis_block"
+      Assert.fail_msg "checkout genesis_block"
   | Some (Ok ctxt) ->
       set ctxt ["a"; "b"] (MBytes.of_string "Novembre") >>= fun ctxt ->
       set ctxt ["a"; "c"] (MBytes.of_string "Juin") >>= fun ctxt ->
@@ -177,31 +174,33 @@ let test_list idx =
       set ctxt ["f";] (MBytes.of_string "Avril") >>= fun ctxt ->
       set ctxt ["g"; "h"] (MBytes.of_string "Avril") >>= fun ctxt ->
       list ctxt [[]] >>= fun l ->
-      assert (l = [["a"];["f"];["g"]]);
+      Assert.equal_persist_list ~msg:__LOC__ [["a"];["f"];["g"]] l ;
       list ctxt [["a"]] >>= fun l ->
-      assert (l = [["a";"b"]; ["a";"c"]; ["a";"d"]]);
+      Assert.equal_persist_list
+        ~msg:__LOC__ [["a";"b"]; ["a";"c"]; ["a";"d"]] l ;
       list ctxt [["f"]] >>= fun l ->
-      assert (l = []);
+      Assert.equal_persist_list ~msg:__LOC__ [] l ;
       list ctxt [["g"]] >>= fun l ->
-      assert (l = [["g";"h"]]);
+      Assert.equal_persist_list ~msg:__LOC__ [["g";"h"]] l ;
       list ctxt [["i"]] >>= fun l ->
-      assert (l = []);
+      Assert.equal_persist_list ~msg:__LOC__ [] l ;
       list ctxt [["a"];["g"]] >>= fun l ->
-      assert (l = [["a"; "b"]; ["a"; "c"]; ["a"; "d"]; ["g"; "h"]]);
+      Assert.equal_persist_list ~msg:__LOC__
+        [["a"; "b"]; ["a"; "c"]; ["a"; "d"]; ["g"; "h"]] l ;
       Lwt.return ()
 
 let test_invalid idx =
   checkout idx block3c >>= function
   | Some (Error [exn]) ->
-      assert (exn = Error_monad.Unclassified "TEST") ;
+      Assert.equal_error_monad
+        ~msg:__LOC__(Error_monad.Unclassified "TEST") exn ;
       Lwt.return_unit
   | Some (Error _) ->
-      Test.fail "checkout unexpected error in block3c"
+      Assert.fail_msg "checkout unexpected error in block3c"
   | Some (Ok _) ->
-      Test.fail "checkout valid block3c"
+      Assert.fail_msg "checkout valid block3c"
   | None ->
-      Test.fail "checkout absent block3c"
-
+      Assert.fail_msg "checkout absent block3c"
 
 
 (******************************************************************************)
@@ -215,5 +214,5 @@ let tests : (string * (index -> unit Lwt.t)) list = [
   "invalid", test_invalid ;
 ]
 
-let res =
+let () =
   Test.run "context." (List.map (fun (s, f) -> s, wrap_context_init f) tests)

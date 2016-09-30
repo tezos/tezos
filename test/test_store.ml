@@ -1,5 +1,4 @@
 
-open Utils
 open Hash
 open Store
 
@@ -109,16 +108,15 @@ let test_block (s: Store.store) =
 let check s k d =
   get s k >|= fun d' ->
   if d' <> Some d then begin
-    Test.fail
-      "Error while reading key %S\n%!"
-      (String.concat Filename.dir_sep k);
+    Assert.fail_msg
+      "Error while reading key %S\n%!"  (String.concat Filename.dir_sep k) ;
   end
 
 let check_none s k =
   get s k >|= function
   | None -> ()
   | Some _ ->
-      Test.fail
+      Assert.fail_msg
         "Error while reading non-existent key %S\n%!"
         (String.concat Filename.dir_sep k)
 
@@ -139,26 +137,27 @@ let test_generic_list (s: Store.store) =
       set s ["f";] (MBytes.of_string "Avril") >>= fun () ->
       set s ["g"; "h"] (MBytes.of_string "Avril") >>= fun () ->
       list s [] >>= fun l ->
-      assert (l = []);
+      Assert.equal_persist_list ~msg:__LOC__ [] l ;
       list s [[]] >>= fun l ->
-      assert (l = [["a"];["f"];["g"];["version"]]);
+      Assert.equal_persist_list
+        ~msg:__LOC__ [["a"];["f"];["g"];["version"]] l ;
       list s [["a"]] >>= fun l ->
-      assert (l = [["a";"b"]; ["a";"c"]; ["a";"d"]]);
+      Assert.equal_persist_list
+        ~msg:__LOC__ [["a";"b"]; ["a";"c"]; ["a";"d"]] l ;
       list s [["f"]] >>= fun l ->
-      assert (l = []);
+      Assert.equal_persist_list ~msg:__LOC__ [] l ;
       list s [["g"]] >>= fun l ->
-      assert (l = [["g";"h"]]);
+      Assert.equal_persist_list ~msg:__LOC__ [["g";"h"]] l ;
       list s [["i"]] >>= fun l ->
-      assert (l = []);
+      Assert.equal_persist_list ~msg:__LOC__ [] l ;
       list s [["a"];["g"]] >>= fun l ->
-      assert (l = [["a"; "b"]; ["a"; "c"]; ["a"; "d"]; ["g"; "h"]]);
+      Assert.equal_persist_list ~msg:__LOC__
+        [["a"; "b"]; ["a"; "c"]; ["a"; "d"]; ["g"; "h"]] l ;
       Lwt.return_unit)
 
 (** HashSet *)
 
 let test_hashset (s: Store.store) =
-  let test name b =
-    if b then Lwt.return_unit else Test.fail name in
   let module BlockSet = Hash_set(Block_hash) in
   let module StoreSet =
     Persist.MakeBufferedPersistentSet
@@ -168,22 +167,25 @@ let test_hashset (s: Store.store) =
         let prefix = [ "test_set" ]
         let length = path_len
       end)(BlockSet) in
-  let bhset = BlockSet.empty |> BlockSet.add bh1 |> BlockSet.add bh2 in
+  let open BlockSet in
+  let eq = BlockSet.equal in
+  let bhset : BlockSet.t = BlockSet.add bh2 (BlockSet.add bh1 BlockSet.empty) in
   Persist.use s.global_store (fun s ->
       StoreSet.write s bhset >>= fun s ->
       StoreSet.read s >>= fun bhset' ->
-      test "init" (BlockSet.compare bhset bhset' = 0) >>= fun () ->
-      let bhset2 = bhset |> BlockSet.add bh3 |> BlockSet.remove bh1 in
+      Assert.equal_block_map ~msg:__LOC__ ~eq bhset bhset' ;
+      let bhset2 =
+        Pervasives.(bhset |> BlockSet.add bh3 |> BlockSet.remove bh1) in
       StoreSet.write s bhset2 >>= fun s ->
       StoreSet.read s >>= fun bhset2' ->
-      test "add/del" (BlockSet.compare bhset2 bhset2' = 0) >>= fun () ->
+      Assert.equal_block_map ~msg:__LOC__ ~eq bhset2 bhset2' ;
       StoreSet.fold s BlockSet.empty
         (fun bh acc -> Lwt.return (BlockSet.add bh acc)) >>= fun bhset2'' ->
-      test "fold" (BlockSet.compare bhset2 bhset2'' = 0) >>= fun () ->
+      Assert.equal_block_map ~msg:__LOC__ ~eq bhset2 bhset2'' ;
       set s ["day";"current"] (MBytes.of_string "Mercredi") >>= fun () ->
       StoreSet.clear s >>= fun s ->
       StoreSet.read s >>= fun empty ->
-      test "clean" (BlockSet.compare empty BlockSet.empty = 0) >>= fun () ->
+      Assert.equal_block_map ~msg:__LOC__ ~eq BlockSet.empty empty ;
       check s ["day";"current"] (MBytes.of_string "Mercredi") >>= fun () ->
       Lwt.return_unit)
 
@@ -191,8 +193,6 @@ let test_hashset (s: Store.store) =
 (** HashMap *)
 
 let test_hashmap (s: Store.store) =
-  let test name b =
-    if b then Lwt.return_unit else Test.fail name in
   let module BlockMap = Hash_map(Block_hash) in
   let module StoreMap =
     Persist.MakeBufferedPersistentTypedMap
@@ -208,17 +208,19 @@ let test_hashmap (s: Store.store) =
           Data_encoding.(tup2 int31 (conv int_of_char char_of_int int8))
       end)
       (BlockMap) in
+  let eq = BlockMap.equal (=) in
   let map =
-    BlockMap.empty |> BlockMap.add bh1 (1, 'a') |> BlockMap.add bh2 (2, 'b') in
+    Pervasives.(BlockMap.empty |>
+                BlockMap.add bh1 (1, 'a') |> BlockMap.add bh2 (2, 'b')) in
   Persist.use s.global_store (fun s ->
       StoreMap.write s map >>= fun s ->
       StoreMap.read s >>= fun map' ->
-      test "init" (BlockMap.compare Pervasives.compare map map' = 0) >>= fun () ->
-      let map2 = map |> BlockMap.add bh3 (3, 'c') |> BlockMap.remove bh1 in
+      Assert.equal_block_map ~msg:__LOC__ ~eq map map' ;
+      let map2 =
+        Pervasives.(map |> BlockMap.add bh3 (3, 'c') |> BlockMap.remove bh1) in
       StoreMap.write s map2 >>= fun s ->
       StoreMap.read s >>= fun map2' ->
-      test "add/del"
-        (BlockMap.compare Pervasives.compare map2 map2' = 0) >>= fun () ->
+      Assert.equal_block_map ~msg:__LOC__ ~eq map2 map2' ;
       Lwt.return_unit)
 
 (** *)
@@ -231,8 +233,7 @@ let tests : (string * (store -> unit Lwt.t)) list = [
   "generic_list", test_generic_list ;
   "hashset", test_hashset ;
   "hashmap", test_hashmap ;
- ]
+]
 
-let res =
+let () =
   Test.run "store." (List.map (fun (s, f) -> s, wrap_store_init f) tests)
-
