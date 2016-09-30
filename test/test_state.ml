@@ -1,6 +1,4 @@
 
-
-open Utils
 open Hash
 open Error_monad
 
@@ -31,10 +29,12 @@ let incr_fitness fitness =
   let new_fitness =
     match fitness with
     | [ _ ; fitness ] ->
-        Data_encoding.Binary.of_bytes Data_encoding.int64 fitness
-        |> Utils.unopt 0L
-        |> Int64.succ
-        |> Data_encoding.Binary.to_bytes Data_encoding.int64
+        Pervasives.(
+          Data_encoding.Binary.of_bytes Data_encoding.int64 fitness
+          |> Utils.unopt 0L
+          |> Int64.succ
+          |> Data_encoding.Binary.to_bytes Data_encoding.int64
+        )
     | _ -> Data_encoding.Binary.to_bytes Data_encoding.int64 1L
   in
   [ MBytes.of_string "\000" ; new_fitness ]
@@ -44,8 +44,8 @@ let incr_timestamp timestamp =
 
 let operation op =
   let op : Store.operation = {
-      shell = { net_id = Net genesis_block } ;
-      proto = MBytes.of_string op ;
+    shell = { net_id = Net genesis_block } ;
+    proto = MBytes.of_string op ;
   } in
   Store.Operation.hash op,
   op,
@@ -66,17 +66,17 @@ let build_chain state tbl otbl pred names =
     (fun (pred_hash, pred) name ->
        begin
          let oph, op, bytes = operation name in
-         State.Operation.store state bytes >>=? fun _changed ->
-         assert (_changed = Some (oph, op)) ;
-         State.Operation.mark_invalid state oph [] >>= fun _changed ->
-         assert _changed;
+         State.Operation.store state bytes >>=? fun op' ->
+         Assert.equal_operation ~msg:__LOC__ (Some (oph, op)) op' ;
+         State.Operation.mark_invalid state oph [] >>= fun state_invalid ->
+         Assert.is_true ~msg:__LOC__ state_invalid ;
          Hashtbl.add otbl name (oph, Error []) ;
          let block = block ~operations:[oph] state pred_hash pred name in
          let hash = Store.Block.hash block in
-         State.Block.store state (Store.Block.to_bytes block) >>=? fun _changed ->
-         assert (_changed = Some (hash, block)) ;
-         State.Valid_block.store_invalid state hash [] >>= fun _changed ->
-         assert _changed ;
+         State.Block.store state (Store.Block.to_bytes block) >>=? fun block' ->
+         Assert.equal_block ~msg:__LOC__ (Some (hash, block)) block' ;
+         State.Valid_block.store_invalid state hash [] >>= fun store_invalid ->
+         Assert.is_true ~msg:__LOC__ store_invalid ;
          Hashtbl.add tbl name (hash, block) ;
          return (hash, block)
        end >>= function
@@ -103,15 +103,15 @@ let build_valid_chain state net tbl vtbl otbl pred names =
     (fun pred name ->
        begin
          let oph, op, bytes = operation name in
-         State.Operation.store state bytes >>=? fun _changed ->
-         assert (_changed = Some (oph, op)) ;
-         State.Net.Mempool.add net oph >>= fun _changed ->
-         assert _changed ;
+         State.Operation.store state bytes >>=? fun op' ->
+         Assert.equal_operation ~msg:__LOC__ (Some (oph, op)) op' ;
+         State.Net.Mempool.add net oph >>= fun add_status ->
+         Assert.is_true ~msg:__LOC__ add_status ;
          Hashtbl.add otbl name (oph, Ok op) ;
          let block = block state ~operations:[oph] pred name in
          let hash = Store.Block.hash block in
-         State.Block.store state (Store.Block.to_bytes block) >>=? fun _changed ->
-         assert (_changed = Some (hash, block)) ;
+         State.Block.store state (Store.Block.to_bytes block) >>=? fun block' ->
+         Assert.equal_block ~msg:__LOC__ (Some (hash, block)) block' ;
          Hashtbl.add tbl name (hash, block) ;
          Lwt.return (Proto.parse_block_header block) >>=? fun block_header ->
          Proto.apply pred.context block_header [] >>=? fun ctxt ->
@@ -142,11 +142,16 @@ let build_example_tree state net =
   build_chain state tbl otbl b7 chain >>= fun () ->
   let pending_op = "PP" in
   let oph, op, bytes = operation pending_op in
-  State.Operation.store state bytes >>= fun _changed ->
-  assert (_changed = Ok (Some (oph, op))) ;
+  State.Operation.store state bytes >>= fun op' ->
+  Assert.equal_result
+    ~msg:__LOC__
+    (Ok (Some (oph, op)))
+    op'
+    ~equal_ok:Assert.equal_operation
+    ~equal_err:(fun ?msg _ _ -> Assert.fail_msg "Operations differs") ;
   Hashtbl.add otbl pending_op (oph, Ok op) ;
-  State.Net.Mempool.add net oph >>= fun _changed ->
-  assert _changed ;
+  State.Net.Mempool.add net oph >>= fun add_status ->
+  Assert.is_true ~msg:__LOC__ add_status ;
   Lwt.return (tbl, vtbl, otbl)
 
 type state = {
@@ -172,16 +177,19 @@ let rev_find s h =
   with Found s -> s
 
 let blocks s =
-  Hashtbl.fold (fun k v acc -> (k,v) :: acc) s.block []
-  |> List.sort Pervasives.compare
+  Pervasives.(
+    Hashtbl.fold (fun k v acc -> (k,v) :: acc) s.block []
+    |> List.sort Pervasives.compare)
 
 let vblocks s =
-  Hashtbl.fold (fun k v acc -> (k,v) :: acc) s.vblock []
-  |> List.sort Pervasives.compare
+  Pervasives.(
+    Hashtbl.fold (fun k v acc -> (k,v) :: acc) s.vblock []
+    |> List.sort Pervasives.compare)
 
 let operations s =
-  Hashtbl.fold (fun k v acc -> (k,v) :: acc) s.operation []
-  |> List.sort Pervasives.compare
+  Pervasives.(
+    Hashtbl.fold (fun k v acc -> (k,v) :: acc) s.operation []
+    |> List.sort Pervasives.compare)
 
 let wrap_state_init f base_dir =
   begin
@@ -205,7 +213,7 @@ let wrap_state_init f base_dir =
   end >>= function
   | Ok () -> Lwt.return_unit
   | Error err ->
-      Test.fail "%a@." Error_monad.pp_print_error err
+      Lwt.return (Error_monad.pp_print_error Format.err_formatter err)
 
 let save_reload s =
   State.shutdown s.state >>= fun () ->
@@ -221,10 +229,10 @@ let test_read_operation (s: state) =
   Lwt_list.iter_s (fun (name, (oph, op)) ->
       State.Operation.read s.state oph >>= function
       | None ->
-          Test.fail "Cannot read block %s" name
+          Assert.fail_msg "Cannot read block %s" name
       | Some { Time.data } ->
           if op <> data then
-            Test.fail "Incorrect operation read %s" name ;
+            Assert.fail_msg "Incorrect operation read %s" name ;
           Lwt.return_unit)
     (operations s) >>= fun () ->
   return s
@@ -240,11 +248,10 @@ let test_read_block (s: state) =
       begin
         State.Block.read s.state hash >>= function
         | None ->
-            Test.fail "Cannot read block %s" name
+            Assert.fail_msg "Cannot read block %s" name
         | Some { Time.data = block' ; time } ->
             if not (Store.Block.equal block block') then
-              Test.fail "Error while reading block %s" name ;
-            Test.log "Read block %s %a\n" name Time.pp_hum time;
+              Assert.fail_msg "Error while reading block %s" name ;
             Lwt.return_unit
       end >>= fun () ->
       let vblock =
@@ -252,18 +259,16 @@ let test_read_block (s: state) =
         with Not_found -> None in
       State.Valid_block.read s.state hash >>= function
       | None ->
-          Test.fail "Cannot read %s" name
+          Assert.fail_msg "Cannot read %s" name
       | Some (Error _) ->
           if vblock <> None then
-            Test.fail "Error while reading valid block %s" name ;
-          Test.log "Read invalid block %s\n" name ;
+            Assert.fail_msg "Error while reading valid block %s" name ;
           Lwt.return_unit
       | Some (Ok _vblock') ->
           match vblock with
           | None ->
-              Test.fail "Error while reading invalid block %s" name
+              Assert.fail_msg "Error while reading invalid block %s" name
           | Some _vblock ->
-              Test.log "Read valid block %s\n" name ;
               Lwt.return_unit
     ) (blocks s) >>= fun () ->
   return s
@@ -275,20 +280,23 @@ let test_read_block (s: state) =
 
 let compare s kind name succs l =
   if Block_hash_set.cardinal succs <> List.length l then
-    Test.fail "unexpected %ssuccessors size (%s: %d %d)"
+    Assert.fail_msg
+      "unexpected %ssuccessors size (%s: %d %d)"
       kind name (Block_hash_set.cardinal succs) (List.length l) ;
   List.iter
     (fun bname ->
        let bh = fst @@ block s bname in
        if not (Block_hash_set.mem bh succs) then
-         Test.fail "missing block in %ssuccessors (%s: %s)" kind name bname)
+         Assert.fail_msg
+           "missing block in %ssuccessors (%s: %s)" kind name bname)
     l
+
 let test_successors s =
   let test s name expected invalid_expected =
     let b = vblock s name in
     State.Valid_block.read s.state b.hash >>= function
     | None | Some (Error _) ->
-        Test.fail "Failed while reading block %s" name
+        Assert.fail_msg "Failed while reading block %s" name
     | Some (Ok { successors ; invalid_successors}) ->
         compare s "" name successors expected ;
         compare s "invalid " name invalid_successors invalid_expected ;
@@ -314,13 +322,13 @@ let rec compare_path p1 p2 = match p1, p2 with
 
 let test_path (s: state) =
   let check_path h1 h2 p2 =
-    Test.log "check_path %s -> %s\n" h1 h2 ;
     State.Block.path s.state (fst @@ block s h1) (fst @@ block s h2) >>= function
     | Error _ ->
-        Test.fail "cannot compute path %s -> %s" h1 h2 ;
+        Assert.fail_msg "cannot compute path %s -> %s" h1 h2
     | Ok p1 ->
         let p2 = List.map (fun b -> fst (block s b)) p2 in
-        if not (compare_path p1 p2) then Test.fail "bad path %s -> %s" h1 h2 ;
+        if not (compare_path p1 p2) then
+          Assert.fail_msg "bad path %s -> %s" h1 h2 ;
         Lwt.return_unit in
   check_path "A2" "A6" ["A3"; "A4"; "A5"; "A6"] >>= fun () ->
   check_path "B2" "B6" ["B3"; "B4"; "B5"; "B6"] >>= fun () ->
@@ -331,14 +339,14 @@ let test_path (s: state) =
 
 let test_valid_path (s: state) =
   let check_path h1 h2 p2 =
-    Test.log "check_path %s -> %s\n" h1 h2 ;
     State.Valid_block.path s.state (vblock s h1) (vblock s h2) >>= function
     | None ->
-        Test.fail "cannot compute path %s -> %s" h1 h2 ;
+        Assert.fail_msg "cannot compute path %s -> %s" h1 h2 ;
     | Some (p: State.Valid_block.t list) ->
         let p = List.map (fun b -> b.State.Valid_block.hash) p in
         let p2 = List.map (fun b -> (vblock s b).hash) p2 in
-        if not (compare_path p p2) then Test.fail "bad path %s -> %s" h1 h2 ;
+        if not (compare_path p p2) then
+          Assert.fail_msg "bad path %s -> %s" h1 h2 ;
         Lwt.return_unit in
   check_path "A2" "A6" ["A3"; "A4"; "A5"; "A6"] >>= fun () ->
   check_path "B2" "B6" ["B3"; "B4"; "B5"; "B6"] >>= fun () ->
@@ -355,19 +363,18 @@ let test_ancestor s =
     State.Block.common_ancestor
       s.state (fst @@ block s h1) (fst @@ block s h2) >>= function
     | Error _ ->
-        Test.fail "Cannot compure ancestor for %s %s" h1 h2
+        Assert.fail_msg "Cannot compure ancestor for %s %s" h1 h2 ;
     | Ok a ->
         if not (Block_hash.equal a (fst expected)) then
-          Test.fail "bad ancestor %s %s: found %s, expected %s"
-            h1 h2 (rev_find s a) (rev_find s @@ fst expected);
-        Test.log "Found the expected ancestor %s %s\n" h1 h2 ;
+          Assert.fail_msg
+            "bad ancestor %s %s: found %s, expected %s"
+            h1 h2 (rev_find s a) (rev_find s @@ fst expected) ;
         Lwt.return_unit in
   let check_valid_ancestor h1 h2 expected =
     State.Valid_block.common_ancestor
       s.state (vblock s h1) (vblock s h2) >>= fun a ->
     if not (Block_hash.equal a.hash expected.State.Valid_block.hash) then
-      Test.fail "bad ancestor %s %s" h1 h2 ;
-    Test.log "Found the expected valid ancestor %s %s\n" h1 h2 ;
+      Assert.fail_msg "bad ancestor %s %s" h1 h2 ;
     Lwt.return_unit in
   check_ancestor "A6" "B6" (block s "A3") >>= fun () ->
   check_ancestor "B6" "A6" (block s "A3") >>= fun () ->
@@ -401,30 +408,31 @@ let test_locator s =
     State.Block.block_locator
       s.state (List.length expected) (fst @@ block s h1) >>= function
     | Error _ ->
-        Test.fail "Cannot compute locator for %s" h1
+        Assert.fail_msg "Cannot compute locator for %s" h1
     | Ok l ->
         if List.length l <> List.length expected then
-          Test.fail "Invalid locator length %s (found: %d, expected: %d)"
+          Assert.fail_msg
+            "Invalid locator length %s (found: %d, expected: %d)"
             h1 (List.length l) (List.length expected) ;
         List.iter2
           (fun h h2 ->
              if not (Block_hash.equal h (fst @@ block s h2)) then
-               Test.fail "Invalid locator %s (expectd: %s)" h1 h2)
+               Assert.fail_msg "Invalid locator %s (expectd: %s)" h1 h2)
           l expected;
         Lwt.return_unit in
   let check_valid_locator h1 expected =
     State.Valid_block.block_locator
       s.state (List.length expected) (vblock s h1) >>= fun l ->
     if List.length l <> List.length expected then
-      Test.fail "Invalid locator length %s (found: %d, expected: %d)"
+      Assert.fail_msg
+        "Invalid locator length %s (found: %d, expected: %d)"
         h1 (List.length l) (List.length expected) ;
     List.iter2
       (fun h h2 ->
          if not (Block_hash.equal h (fst @@ block s h2)) then
-           Test.fail "Invalid locator %s (expectd: %s)" h1 h2)
+           Assert.fail_msg "Invalid locator %s (expectd: %s)" h1 h2)
       l expected ;
     Lwt.return_unit in
-  Printf.eprintf "Checking Block\n%!" ;
   check_locator "A8" ["A8";"A7";"A6";"A5";"A4";"A3";"A2";"A1"] >>= fun () ->
   check_locator "B8"
     ["B8";"B7";"B6";"B5";"B4";"B3";"B2";"B1";"A3"] >>= fun () ->
@@ -432,7 +440,6 @@ let test_locator s =
     ["C8";"C7";"C6";"C5";"C4";"C3";"C2";"C1";
      "B7";"B6";"B4";"B2";"A3";"A1"] >>= fun () ->
   check_locator "C8" ["C8";"C7";"C6";"C5";"C4"] >>= fun () ->
-  Printf.eprintf "Checking Valid_block\n%!" ;
   check_valid_locator "A8"
     ["A8";"A7";"A6";"A5";"A4";"A3";"A2"] >>= fun () ->
   check_valid_locator "B8"
@@ -447,13 +454,14 @@ let test_locator s =
 
 let compare s name heads l =
   if Block_hash_map.cardinal heads <> List.length l then
-    Test.fail "unexpected known_heads size (%s: %d %d)"
+    Assert.fail_msg
+      "unexpected known_heads size (%s: %d %d)"
       name (Block_hash_map.cardinal heads) (List.length l) ;
   List.iter
     (fun bname ->
        let hash = (vblock s bname).hash in
        if not (Block_hash_map.mem hash heads) then
-         Test.fail "missing block in known_heads (%s: %s)" name bname)
+         Assert.fail_msg "missing block in known_heads (%s: %s)" name bname)
     l
 
 let test_known_heads s =
@@ -473,15 +481,15 @@ let test_known_heads s =
 let test_head s =
   State.Net.Blockchain.head s.net >>= fun head ->
   if not (Block_hash.equal head.hash genesis_block) then
-    Test.fail "unexpected head" ;
+    Assert.fail_msg "unexpected head" ;
   State.Net.Blockchain.set_head s.net (vblock s "A6") >>= fun _ ->
   State.Net.Blockchain.head s.net >>= fun head ->
   if not (Block_hash.equal head.hash (vblock s "A6").hash) then
-    Test.fail "unexpected head" ;
+    Assert.fail_msg "unexpected head" ;
   save_reload s >>=? fun s ->
   State.Net.Blockchain.head s.net >>= fun head ->
   if not (Block_hash.equal head.hash (vblock s "A6").hash) then
-    Test.fail "unexpected head" ;
+    Assert.fail_msg "unexpected head" ;
   return s
 
 
@@ -495,11 +503,11 @@ let test_mem s =
   let test_mem s x =
     mem s x >>= function
     | true -> Lwt.return_unit
-    | false -> Test.fail "mem %s" x in
+    | false -> Assert.fail_msg "mem %s" x in
   let test_not_mem s x =
     mem s x >>= function
     | false -> Lwt.return_unit
-    | true -> Test.fail "not (mem %s)" x in
+    | true -> Assert.fail_msg "not (mem %s)" x in
   test_not_mem s "A3" >>= fun () ->
   test_not_mem s "A6" >>= fun () ->
   test_not_mem s "A8" >>= fun () ->
@@ -539,7 +547,7 @@ let test_mem s =
   save_reload s >>=? fun s ->
   State.Net.Blockchain.head s.net >>= fun head ->
   if not (Block_hash.equal head.hash (vblock s "B8").hash) then
-    Test.fail "Invalid head after save/load" ;
+    Assert.fail_msg "Invalid head after save/load" ;
   return s
 
 
@@ -552,20 +560,20 @@ let test_new s =
     State.Valid_block.block_locator s.state 50 (vblock s h) >>= fun loc ->
     State.Net.Blockchain.find_new s.net loc (List.length expected) >>= function
     | Error _ ->
-        Test.fail "Failed to compute new blocks %s" h
+        Assert.fail_msg "Failed to compute new blocks %s" h
     | Ok blocks ->
         if List.length blocks <> List.length expected then
-          Test.fail "Invalid locator length %s (found: %d, expected: %d)"
+          Assert.fail_msg
+            "Invalid locator length %s (found: %d, expected: %d)"
             h (List.length blocks) (List.length expected) ;
         List.iter2
           (fun h1 h2 ->
              if not (Block_hash.equal h1 (vblock s h2).hash) then
-               Test.fail "Invalid locator %s (expected: %s)" h h2)
+               Assert.fail_msg "Invalid locator %s (expected: %s)" h h2)
           blocks expected ;
-    Lwt.return_unit
+        Lwt.return_unit
   in
   test s "A6" [] >>= fun () ->
-  Printf.eprintf "Set_head A8.\n%!" ;
   State.Net.Blockchain.set_head s.net (vblock s "A8") >>= fun _ ->
   test s "A6" ["A7";"A8"] >>= fun () ->
   test s "A6" ["A7"] >>= fun () ->
@@ -579,14 +587,21 @@ let test_new s =
 (** State.mempool *)
 
 let compare s name mempool l =
-  if Operation_hash_set.cardinal mempool <> List.length l then
-    Test.fail "unexpected mempool size (%s: %d %d)"
-      name (Operation_hash_set.cardinal mempool) (List.length l) ;
+  let mempool_sz = Operation_hash_set.cardinal mempool in
+  let l_sz = List.length l in
+  if mempool_sz <> l_sz then
+    Assert.fail
+      (string_of_int mempool_sz)
+      (string_of_int l_sz)
+      "unexpected mempool size (%s)" name ;
   List.iter
     (fun oname ->
-       let oph = fst @@ operation s oname in
-       if not (Operation_hash_set.mem oph mempool) then
-         Test.fail "missing operation in mempool (%s: %s)" name oname)
+       try
+         let oph = fst @@ operation s oname  in
+         if not (Operation_hash_set.mem oph mempool) then
+           Assert.fail_msg "missing operation in mempool (%s: %s)" name oname
+       with Not_found ->
+         Assert.fail_msg "Read value not found in mempool (%s: %s)" name oname)
     l
 
 let test_mempool s =
@@ -611,10 +626,10 @@ let test_mempool s =
     ["PP";
      "A4" ; "A5" ; "A6" ; "A7" ; "A8" ;
      "B7" ; "B8" ] ;
-  State.Net.Mempool.remove s.net (fst @@ operation s "PP") >>= fun _changed ->
-  assert _changed ;
-  State.Net.Mempool.remove s.net (fst @@ operation s "PP") >>= fun _changed ->
-  assert (not _changed) ;
+  State.Net.Mempool.remove s.net (fst @@ operation s "PP") >>= fun rm_status ->
+  Assert.is_true ~msg:__LOC__ rm_status ;
+  State.Net.Mempool.remove s.net (fst @@ operation s "PP") >>= fun rm_status ->
+  Assert.is_false ~msg:__LOC__ rm_status ;
   State.Net.Mempool.get s.net >>= fun mempool ->
   compare s "B6.remove" mempool
     ["A4" ; "A5" ; "A6" ; "A7" ; "A8" ;
@@ -649,5 +664,5 @@ let tests : (string * (state -> state tzresult Lwt.t)) list = [
   "mempool", test_mempool;
 ]
 
-let res =
+let () =
   Test.run "state." (List.map (fun (s, f) -> s, wrap_state_init f) tests)

@@ -3,7 +3,7 @@ TESTS := store context state basic basic.sh
 
 all: test
 
-INCLUDES = $(patsubst %, -I %, $(SOURCE_DIRECTORIES))
+INCLUDES = $(patsubst %, -I %, $(SOURCE_DIRECTORIES) lib)
 OCAMLFLAGS = \
   -g -safe-string -w -40 \
   ${INCLUDES} \
@@ -39,7 +39,8 @@ PACKAGES := \
   ocplib-json-typed \
   ocplib-resto.directory \
   sodium \
-  unix
+  unix \
+  kaputt
 
 ############################################################################
 ## External packages
@@ -76,8 +77,9 @@ run-test-store:
 TEST_STORE_INTFS =
 
 TEST_STORE_IMPLS = \
-  test.ml \
-  test_store.ml \
+  lib/assert.ml \
+  lib/test.ml \
+  test_store.ml
 
 ${TEST_STORE_IMPLS:.ml=.cmx}: ${NODELIB}
 test-store: ${NODELIB} ${TEST_STORE_IMPLS:.ml=.cmx}
@@ -98,8 +100,9 @@ run-test-context:
 TEST_CONTEXT_INTFS =
 
 TEST_CONTEXT_IMPLS = \
-  test.ml \
-  test_context.ml \
+  lib/assert.ml \
+  lib/test.ml \
+  test_context.ml
 
 ${TEST_CONTEXT_IMPLS:.ml=.cmx}: ${NODELIB}
 test-context: ${NODELIB} ${TEST_CONTEXT_IMPLS:.ml=.cmx}
@@ -120,8 +123,9 @@ run-test-state:
 TEST_STATE_INTFS =
 
 TEST_STATE_IMPLS = \
-  test.ml \
-  test_state.ml \
+  lib/assert.ml \
+  lib/test.ml \
+  test_state.ml
 
 ${TEST_STATE_IMPLS:.ml=.cmx}: ${NODELIB}
 test-state: ${NODELIB} ../src/proto/embedded_proto_demo.cmxa ${TEST_STATE_IMPLS:.ml=.cmx}
@@ -147,8 +151,9 @@ run-test-basic:
 TEST_BASIC_INTFS =
 
 TEST_BASIC_IMPLS = \
-  test.ml \
-  test_basic.ml \
+  lib/assert.ml \
+  lib/test.ml \
+  test_basic.ml
 
 test-basic \
 ${TEST_BASIC_IMPLS:.ml=.cmx}: \
@@ -180,7 +185,7 @@ clean::
 	-rm -f *.cm*
 
 -include .depend
-.depend: $(wildcard *.ml *.mli)
+.depend: $(wildcard *.ml *.mli lib/*.ml lib/*.mli)
 	ocamldep $^ > .depend
 
 clean::

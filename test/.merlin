@@ -20,3 +20,4 @@ B ../src/client/embedded
 FLG -w -40
 PKG lwt
 PKG sodium
+PKG kaputt
