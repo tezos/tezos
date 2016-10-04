@@ -102,9 +102,17 @@ in the config file. Tezos never modifies the content of an existing
 JSON/RPC interface
 ------------------
 
-The tezos node provides a JSON/RPC interface. It is not active by
-default and it should be explicitely activated with the `rpc-port`
-option. This RPC interface is self-documented and the `tezos-client`
+The tezos node provides a JSON/RPC interface. Note that it is an RPC,
+and it is JSON based, but it does not follow the "JSON-RPC" protocol.
+It is not active by default and it should be explicitely activated with
+the `rpc-port` option. Typically, if you are not trying to run a local
+network and just want to explore the RPC, you should run:
+
+```
+./tezos-node -sandbox /path/to/a/custom/data/dir -rpc-port 8732
+```
+
+The RPC interface is self-documented and the `tezos-client`
 is able to pretty-print the list of available RPCs. For instance, for
 the list of RPC provided by the Shell:
 
