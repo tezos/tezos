@@ -1,3 +1,4 @@
+
 (**************************************************************************)
 (*                                                                        *)
 (*    Copyright (c) 2014 - 2016.                                          *)
@@ -15,11 +16,18 @@ type data = ..
 val decode: ?alphabet:string -> string -> data
 val encode: ?alphabet:string -> data -> string
 
+val decode_partial: ?alphabet:string -> string -> data list Lwt.t
+
+type kind
+
 val register:
   prefix:string ->
   read:(data -> string option) ->
   build:(string -> data) ->
-  unit
+  kind
+
+val register_resolver:
+  kind -> (string -> string list Lwt.t) -> unit
 
 module Prefix : sig
   val block_hash: string
