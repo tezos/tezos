@@ -505,10 +505,10 @@ let discovery_answerer my_gid disco_port cancelation callback =
   (* init a UDP listening socket on the broadcast canal *)
   catch
     (fun () ->
-       let main_socket = LU.(socket PF_INET SOCK_DGRAM 0) in
+       let main_socket = LU.(socket PF_INET6 SOCK_DGRAM 0) in
        LU.(setsockopt main_socket SO_BROADCAST true) ;
        LU.(setsockopt main_socket SO_REUSEADDR true) ;
-       LU.(bind main_socket (ADDR_INET (Unix.inet_addr_any, disco_port))) ;
+       LU.(bind main_socket (ADDR_INET (Unix.inet6_addr_any, disco_port))) ;
        return (Some main_socket))
     (fun exn ->
        debug "(%a) will not listen to discovery requests (%s)"
@@ -531,7 +531,7 @@ let discovery_answerer my_gid disco_port cancelation callback =
                 (fun _ port ->
                    catch
                      (fun () ->
-                        let socket = LU.(socket PF_INET SOCK_STREAM 0) in
+                        let socket = LU.(socket PF_INET6 SOCK_STREAM 0) in
                         LU.connect socket LU.(ADDR_INET (addr, port)) >>= fun () ->
                         let addr = Ipaddr_unix.of_inet_addr addr in
                         callback addr port socket >>= fun () ->
@@ -551,9 +551,9 @@ let discovery_sender my_gid disco_port inco_port cancelation restart =
   let rec loop delay n =
     catch
       (fun () ->
-         let socket = LU.(socket PF_INET SOCK_DGRAM 0) in
+         let socket = LU.(socket PF_INET6 SOCK_DGRAM 0) in
          LU.setsockopt socket LU.SO_BROADCAST true ;
-         LU.connect socket LU.(ADDR_INET (Unix.inet_addr_any, disco_port)) >>= fun () ->
+         LU.connect socket LU.(ADDR_INET (Unix.inet6_addr_any, disco_port)) >>= fun () ->
          Netbits.(write socket message) >>= fun _ ->
          LU.close socket)
       (fun _ ->
@@ -682,10 +682,10 @@ let bootstrap config limits =
     | None -> (* no input port => no welcome worker *) return ()
     | Some port ->
         (* open port for incoming connexions *)
-        let addr = Unix.inet_addr_any in
+        let addr = Unix.inet6_addr_any in
         catch
           (fun () ->
-             let main_socket = LU.(socket PF_INET SOCK_STREAM 0) in
+             let main_socket = LU.(socket PF_INET6 SOCK_STREAM 0) in
              LU.(setsockopt main_socket SO_REUSEADDR true) ;
              LU.(bind main_socket (ADDR_INET (addr, port))) ;
              LU.listen main_socket limits.max_connections ;
@@ -762,7 +762,7 @@ let bootstrap config limits =
             | _, [] -> return false (* we didn't manage to contact enough peers *)
             | nb, ((addr, port), gid, source) :: tl ->
                 (* we try to open a connection *)
-                let socket = LU.(socket PF_INET SOCK_STREAM 0) in
+                let socket = LU.(socket PF_INET6 SOCK_STREAM 0) in
                 let uaddr = Ipaddr_unix.to_inet_addr addr in
                 catch
                   (fun () ->
