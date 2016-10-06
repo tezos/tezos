@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Tezos - Versionned, block indexed (key x value) store *)
+(** Tezos - Versioned, block indexed (key x value) store *)
 
 (** A block-indexed (key x value) store directory.  *)
 type index
@@ -15,7 +15,7 @@ type index
 (** A (key x value) store for a given block. *)
 type store
 
-(** Open or initialize a versionned store at a given path. *)
+(** Open or initialize a versioned store at a given path. *)
 val init:
   ?patch_context:(store -> store Lwt.t) ->
   root:string ->

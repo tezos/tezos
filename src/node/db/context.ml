@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Tezos - Versionned (key x value) store (over Irmin) *)
+(** Tezos - Versioned (key x value) store (over Irmin) *)
 
 open Logging.Db
 
