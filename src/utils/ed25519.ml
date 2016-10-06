@@ -55,19 +55,19 @@ type Base48.data +=
   | Secret_key of secret_key
   | Signature of signature
 
-let () =
+let _ =
   Base48.register
     ~prefix:Base48.Prefix.public_key
     ~read:(function Public_key x -> Some (Bytes.to_string (Sodium.Sign.Bytes.of_public_key x)) | _ -> None)
     ~build:(fun x -> Public_key (Sodium.Sign.Bytes.to_public_key (Bytes.of_string x)))
 
-let () =
+let _ =
   Base48.register
     ~prefix:Base48.Prefix.secret_key
     ~read:(function Secret_key x -> Some (Bytes.to_string (Sodium.Sign.Bytes.of_secret_key x)) | _ -> None)
     ~build:(fun x -> Secret_key (Sodium.Sign.Bytes.to_secret_key (Bytes.of_string x)))
 
-let () =
+let _ =
   Base48.register
     ~prefix:Base48.Prefix.signature
     ~read:(function Signature x -> Some (MBytes.to_string x) | _ -> None)

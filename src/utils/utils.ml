@@ -122,6 +122,14 @@ let rec remove_elem_from_list nb = function
   | l when nb <= 0 -> l
   | _ :: tl -> remove_elem_from_list (nb - 1) tl
 
+let remove_prefix ~prefix s =
+  let x = String.length prefix in
+  let n = String.length s in
+  if n >= x && String.sub s 0 x = prefix then
+    Some (String.sub s x (n - x))
+  else
+    None
+
 let finalize f g = try let res = f () in g (); res with exn -> g (); raise exn
 
 let read_file ?(bin=false) fn =

@@ -102,9 +102,9 @@ clean::
 
 UTILS_LIB_INTFS := \
   utils/mBytes.mli \
+  utils/utils.mli \
   utils/base48.mli \
   utils/hex_encode.mli \
-  utils/utils.mli \
   utils/cli_entries.mli \
   utils/compare.mli \
   utils/data_encoding.mli \
@@ -118,9 +118,9 @@ UTILS_LIB_INTFS := \
 
 UTILS_LIB_IMPLS := \
   utils/mBytes.ml \
-  utils/base48.ml \
-  utils/hex_encode.ml \
   utils/utils.ml \
+  utils/hex_encode.ml \
+  utils/base48.ml \
   utils/cli_entries.ml \
   utils/compare.ml \
   utils/data_encoding.ml \
