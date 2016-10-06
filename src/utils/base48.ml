@@ -7,6 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Utils
+
+let (>>=) = Lwt.bind
+
 let decode_alphabet alphabet =
   let str = Bytes.make 256 '\255' in
   for i = 0 to String.length alphabet - 1 do
@@ -98,20 +102,14 @@ let safe_decode ?alphabet s =
 
 type data = ..
 
-type kinds =
+type kind =
     Kind : { prefix: string;
              read: data -> string option ;
-             build: string -> data } -> kinds
+             build: string -> data ;
+             mutable resolver: string -> string list Lwt.t ;
+           } -> kind
 
-let kinds = ref ([] : kinds list)
-
-let remove_prefix ~prefix s =
-  let x = String.length prefix in
-  let n = String.length s in
-  if n >= x && String.sub s 0 x = prefix then
-    Some (String.sub s x (n - x))
-  else
-    None
+let kinds = ref ([] : kind list)
 
 exception Unknown_prefix
 
@@ -137,14 +135,21 @@ let encode ?alphabet s =
   try find s !kinds
   with Not_found -> raise Unknown_prefix
 
+let default_resolver _ = Lwt.return_nil
+
 let register ~prefix ~read ~build =
   match List.find (fun (Kind {prefix=s}) -> remove_prefix s prefix <> None || remove_prefix prefix s <> None) !kinds with
   | exception Not_found ->
-      kinds := Kind { prefix ; read ; build } :: !kinds
+      let kind =
+        Kind { prefix ; read ; build ; resolver = default_resolver } in
+      kinds := kind :: !kinds ;
+      kind
   | Kind { prefix = s } ->
       Format.kasprintf
         Pervasives.failwith
-        "Base49.register: Conflicting prefixes: %S and %S." prefix s ;
+        "Base48.register: Conflicting prefixes: %S and %S." prefix s
+
+let register_resolver (Kind k) resolver = k.resolver <- resolver
 
 module Prefix = struct
   let block_hash = "\000"
@@ -154,5 +159,26 @@ module Prefix = struct
   let public_key = "\004"
   let secret_key = "\005"
   let signature = "\006"
-  let protocol_prefix = "\255"
+  let protocol_prefix = "\015"
 end
+
+let decode_partial ?alphabet request =
+  let n = String.length request in
+  let s = raw_decode request ?alphabet in
+  let partial = String.sub s 0 (n/2) in
+  let rec find s = function
+    | [] -> Lwt.return_nil
+    | Kind { prefix ; build ; resolver } :: kinds ->
+        match remove_prefix ~prefix s with
+        | None -> find s kinds
+        | Some msg ->
+            resolver msg >>= fun msgs ->
+            let candidates = List.map build msgs in
+            Lwt.return @@
+            List.filter
+              (fun data ->
+                 match Utils.remove_prefix ~prefix:request (encode data) with
+                 | None -> false
+                 | Some _ -> true)
+              candidates in
+  find partial !kinds

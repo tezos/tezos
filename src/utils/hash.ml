@@ -36,11 +36,13 @@ module type HASH = sig
   val write: MBytes.t -> int -> t -> unit
   val to_path: t -> string list
   val of_path: string list -> t
+  val prefix_path: string -> string list
   val path_len: int
   val encoding: t Data_encoding.t
   val pp: Format.formatter -> t -> unit
   val pp_short: Format.formatter -> t -> unit
   type Base48.data += Hash of t
+  val kind: Base48.kind option
 end
 
 module type Name = sig
@@ -72,14 +74,14 @@ module Make_SHA256 (K : Name) = struct
 
   type Base48.data += Hash of t
 
-  let () =
-    match K.prefix with
-    | Some prefix ->
-        Base48.register
-          ~prefix
-          ~read:(function Hash x -> Some x | _ -> None)
-          ~build:(fun x -> Hash x)
-    | None -> ()
+  let kind =
+    Utils.map_option
+      K.prefix
+      ~f:(fun prefix ->
+           Base48.register
+             ~prefix
+             ~read:(function Hash x -> Some x | _ -> None)
+             ~build:(fun x -> Hash x))
 
   let of_b48check s =
     match Base48.decode s with
@@ -150,6 +152,16 @@ module Make_SHA256 (K : Name) = struct
   let of_path path =
     let path = String.concat "" path in
     of_hex path
+
+  let prefix_path p =
+    let p = to_hex p in
+    let len = String.length p in
+    let p1 = if len >= 2 then String.sub p 0 2 else ""
+    and p2 = if len >= 4 then String.sub p 2 2 else ""
+    and p3 = if len >= 6 then String.sub p 4 2 else ""
+    and p4 = if len >= 8 then String.sub p 6 2 else ""
+    and p5 = if len > 8 then String.sub p 8 (len - 8) else "" in
+    [ p1 ; p2 ; p3 ; p4 ; p5 ]
 
   (* Serializers *)
 

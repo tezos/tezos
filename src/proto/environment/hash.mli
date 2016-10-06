@@ -29,11 +29,13 @@ module type HASH = sig
   val write: MBytes.t -> int -> t -> unit
   val to_path: t -> string list
   val of_path: string list -> t
+  val prefix_path: string -> string list
   val path_len: int
   val encoding: t Data_encoding.t
   val pp: Format.formatter -> t -> unit
   val pp_short: Format.formatter -> t -> unit
   type Base48.data += Hash of t
+  val kind: Base48.kind option
 end
 
 (** {2 Building Hashes} *******************************************************)

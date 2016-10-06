@@ -50,6 +50,10 @@ module FS = struct
     let file = file_of_key root key in
     Lwt.return (Sys.file_exists file && not (Sys.is_directory file))
 
+  let exists root key =
+    let file = file_of_key root key in
+    Sys.file_exists file
+
   let get root key =
     mem root key >>= function
     | true  ->
@@ -222,6 +226,37 @@ module Make (K : KEY) (V : Persist.VALUE) = struct
   let keys _t = undefined_key_fn
 end
 
+module MakeResolver (P: sig val prefix: string list end) (H: HASH) = struct
+  let plen = List.length P.prefix
+  let build path =
+    H.to_raw @@ H.of_path @@
+    Utils.remove_elem_from_list plen path
+  let resolve t p =
+    let rec loop prefix = function
+      | [] -> Lwt.return [build prefix]
+      | "" :: ds ->
+          FS.list t [ prefix] >>= fun prefixes ->
+          Lwt_list.map_p (fun prefix -> loop prefix ds) prefixes
+          >|= List.flatten
+      | [d] ->
+          FS.list t [prefix] >>= fun prefixes ->
+          Lwt_list.filter_map_p (fun prefix ->
+              match remove_prefix d (List.hd (List.rev prefix)) with
+              | None -> Lwt.return_none
+              | Some _ -> Lwt.return (Some (build prefix))
+            ) prefixes
+      | d :: ds ->
+          if FS.exists t prefix then
+            loop (prefix @ [d]) ds
+          else
+            Lwt.return_nil in
+    loop P.prefix (H.prefix_path p)
+  let register t =
+    match H.kind with
+    | None -> ()
+    | Some kind -> Base48.register_resolver kind (resolve t)
+end
+
 module Data_store : IMPERATIVE_STORE with type t = FS.t =
   Make (Raw_key) (Raw_value)
 
@@ -306,6 +341,9 @@ module Block_errors_key = struct
   let to_path p = "blocks" :: Block_hash.to_path p @ [ "errors" ]
 end
 module Block_errors = Make (Block_errors_key) (Errors_value)
+
+module Block_resolver =
+  MakeResolver(struct let prefix = ["blocks"] end)(Block_hash)
 
 module Block = struct
   type t = FS.t
@@ -457,6 +495,9 @@ module Operation_errors_key = struct
   let to_path p = "operations" :: Operation_hash.to_path p @ [ "errors" ]
 end
 module Operation_errors = Make (Operation_errors_key) (Errors_value)
+
+module Operation_resolver =
+  MakeResolver(struct let prefix = ["operations"] end)(Operation_hash)
 
 module Operation = struct
   type t = FS.t
@@ -715,6 +756,8 @@ let net_destroy ~root { net_genesis } =
 
 let init root =
   raw_init ~root:(Filename.concat root "global") () >>= fun t ->
+  Block_resolver.register t ;
+  Operation_resolver.register t ;
   Lwt.return
     { block = Persist.share t ;
       blockchain = Persist.share t ;

@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Hash
 open Kaputt.Abbreviations
 
 include Kaputt.Assertion
@@ -20,6 +21,17 @@ let equal_persist_list ?msg l1 l2 =
       String.concat ";" (List.map (fun s -> Printf.sprintf "%S" s) l) in
     Printf.sprintf "[%s]" res in
   Assert.make_equal_list ?msg (=) pr_persist l1 l2
+
+let equal_block_hash_list ?msg l1 l2 =
+  let msg = format_msg msg in
+  let pr_block_hash = Block_hash.to_short_b48check in
+  Assert.make_equal_list ?msg Block_hash.equal pr_block_hash l1 l2
+
+let equal_base48_list ?msg l1 l2 =
+  let msg = format_msg msg in
+  let pr_base48 = Base48.encode in
+  (* TODO do not use polymorphic equality ! *)
+  Assert.make_equal_list ?msg (=) pr_base48 l1 l2
 
 let equal_string_option ?msg o1 o2 =
   let msg = format_msg msg in
