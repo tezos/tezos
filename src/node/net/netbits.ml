@@ -194,7 +194,7 @@ let read descr limit =
          return None
        else
          let len = Int32.to_int (BE.get_int32 szbuf 0) + 4 in
-         if len > limit then
+         if len < 0 || len > limit then
            return None
          else
            let buf = MBytes.create len in
