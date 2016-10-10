@@ -505,10 +505,10 @@ let discovery_answerer my_gid disco_port cancelation callback =
   (* init a UDP listening socket on the broadcast canal *)
   catch
     (fun () ->
-       let main_socket = LU.(socket PF_INET6 SOCK_DGRAM 0) in
+       let main_socket = LU.(socket PF_INET SOCK_DGRAM 0) in
        LU.(setsockopt main_socket SO_BROADCAST true) ;
        LU.(setsockopt main_socket SO_REUSEADDR true) ;
-       LU.(bind main_socket (ADDR_INET (Unix.inet6_addr_any, disco_port))) ;
+       LU.(bind main_socket (ADDR_INET (Unix.inet_addr_any, disco_port))) ;
        return (Some main_socket))
     (fun exn ->
        debug "(%a) will not listen to discovery requests (%s)"
@@ -523,18 +523,18 @@ let discovery_answerer my_gid disco_port cancelation callback =
         pick [ (cancelation () >>= fun () -> return None) ;
                (Lwt_bytes.recvfrom main_socket buffer 0 len [] >>= fun r ->
                 return (Some r)) ] >>= function
-        | Some (len, LU.ADDR_INET (addr, _)) ->
-            if len <> len then
+        | Some (len', LU.ADDR_INET (addr, _)) ->
+            if len' <> len then
               step () (* drop bytes, better luck next time ! *)
             else
               answerable_discovery_message (Netbits.of_raw buffer) my_gid
                 (fun _ port ->
                    catch
                      (fun () ->
-                        let socket = LU.(socket PF_INET6 SOCK_STREAM 0) in
+                        let ipaddr = Ipaddr_unix.of_inet_addr addr in
+                        let socket = LU.(socket (match ipaddr with Ipaddr.V4 _ -> PF_INET | V6 _ -> PF_INET6) SOCK_STREAM 0) in
                         LU.connect socket LU.(ADDR_INET (addr, port)) >>= fun () ->
-                        let addr = Ipaddr_unix.of_inet_addr addr in
-                        callback addr port socket >>= fun () ->
+                        callback ipaddr port socket >>= fun () ->
                         return ())
                      (fun _ -> (* ignore errors *) return ()) >>= fun () ->
                    step ())
@@ -551,9 +551,9 @@ let discovery_sender my_gid disco_port inco_port cancelation restart =
   let rec loop delay n =
     catch
       (fun () ->
-         let socket = LU.(socket PF_INET6 SOCK_DGRAM 0) in
+         let socket = LU.(socket PF_INET SOCK_DGRAM 0) in
          LU.setsockopt socket LU.SO_BROADCAST true ;
-         LU.connect socket LU.(ADDR_INET (Unix.inet6_addr_any, disco_port)) >>= fun () ->
+         LU.connect socket LU.(ADDR_INET (Unix.inet_addr_of_string "255.255.255.255", disco_port)) >>= fun () ->
          Netbits.(write socket message) >>= fun _ ->
          LU.close socket)
       (fun _ ->
