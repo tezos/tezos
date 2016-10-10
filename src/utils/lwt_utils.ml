@@ -111,11 +111,12 @@ let queue () : ('a -> unit) * (unit -> 'a list Lwt.t) =
   queue, wait
 
 (* A worker launcher, takes a cancel callback to call upon *)
-let worker name ~run ~cancel =
+let worker ?(safe=false) name ~run ~cancel =
   let stop = LC.create () in
   let fail e =
     log_error "%s worker failed with %s" name (Printexc.to_string e) ;
-    cancel () >>= fun () -> Lwt.fail e
+    cancel () >>= fun () ->
+    if safe then Lwt.return_unit else Lwt.fail e
   in
   let waiter = LC.wait stop in
   log_info "%s worker started" name ;
