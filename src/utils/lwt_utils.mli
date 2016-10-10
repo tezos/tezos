@@ -15,6 +15,7 @@ val canceler : unit ->
   ((unit -> unit Lwt.t) -> unit)
 
 val worker:
+  ?safe:bool ->
   string ->
   run:(unit -> unit Lwt.t) ->
   cancel:(unit -> unit Lwt.t) ->
