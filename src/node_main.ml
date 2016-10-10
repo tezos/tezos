@@ -306,7 +306,7 @@ let may f = function
 
 let init_signal () =
   let handler id = try Utils.exit id with _ -> () in
-  ignore (Lwt_unix.on_signal 2 handler : Lwt_unix.signal_handler_id)
+  ignore (Lwt_unix.on_signal Sys.sigint handler : Lwt_unix.signal_handler_id)
 
 let main () =
   Random.self_init () ;
