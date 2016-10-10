@@ -406,7 +406,7 @@ let connect_to_peer config limits my_gid socket (addr, port) push white_listed =
     Format.asprintf
       "(%a) connection handler for %a:%d"
       pp_gid my_gid Ipaddr.pp_hum addr port in
-  ignore (worker worker_name connect cancel) ;
+  ignore (worker ~safe:true worker_name ~run:connect ~cancel) ;
   (* return the canceler *)
   cancel
 
