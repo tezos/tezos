@@ -54,7 +54,7 @@ let () =
       | exn ->
           Printf.eprintf "Uncaught (asynchronous) exception: %S\n%s\n%!"
             (Printexc.to_string exn) (Printexc.get_backtrace ());
-          exit 1)
+          Lwt.wakeup exit_wakener 1)
 
 module StringMap = Map.Make (String)
 
