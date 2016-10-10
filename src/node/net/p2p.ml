@@ -762,7 +762,7 @@ let bootstrap config limits =
             | _, [] -> return false (* we didn't manage to contact enough peers *)
             | nb, ((addr, port), gid, source) :: tl ->
                 (* we try to open a connection *)
-                let socket = LU.(socket PF_INET6 SOCK_STREAM 0) in
+                let socket = LU.(socket (match addr with Ipaddr.V4 _ -> PF_INET | V6 _ -> PF_INET6) SOCK_STREAM 0) in
                 let uaddr = Ipaddr_unix.to_inet_addr addr in
                 catch
                   (fun () ->
