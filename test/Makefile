@@ -182,11 +182,11 @@ test.cmx: test.cmi
 	ocamlfind ocamlc ${OCAMLFLAGS} -c $<
 
 clean::
-	-rm -f *.cm*
+	-rm -f *.cm* lib/*.cm*
 
 -include .depend
 .depend: $(wildcard *.ml *.mli lib/*.ml lib/*.mli)
-	ocamldep $^ > .depend
+	ocamldep -I lib $^ > .depend
 
 clean::
 	-rm .depend
