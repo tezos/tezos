@@ -89,7 +89,7 @@ module Make_SHA256 (K : Name) = struct
     | _ -> Format.kasprintf failwith "Unexpected hash (%s)" K.name
   let to_b48check s = Base48.encode (Hash s)
 
-  let to_short_b48check s = String.sub (to_b48check s) 0 8
+  let to_short_b48check s = String.sub (to_b48check s) 0 12
 
   let compare = String.compare
   let equal : t -> t -> bool = (=)
