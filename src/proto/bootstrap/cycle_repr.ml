@@ -22,6 +22,7 @@ let arg =
       ~name: "block_cycle"
       ~construct
       ~destruct
+      ()
 
 let pp ppf cycle = Format.fprintf ppf "%ld" cycle
 

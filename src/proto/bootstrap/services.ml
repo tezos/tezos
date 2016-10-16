@@ -187,6 +187,7 @@ module Context = struct
         ~name: "public_key_hash"
         ~construct
         ~destruct
+        ()
 
     let pk_encoding =
       (obj2
