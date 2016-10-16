@@ -132,5 +132,7 @@ val inject_protocol:
   (unit, unit,
    (Store.protocol * bool * bool option), Protocol_hash.t tzresult) RPC.service
 
+val complete: (unit, unit * string, unit, string list) RPC.service
+
 val describe:
   (unit, unit, bool option, RPC.Description.directory_descr) RPC.service
