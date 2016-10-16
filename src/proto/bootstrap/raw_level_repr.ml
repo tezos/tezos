@@ -23,6 +23,7 @@ let arg =
     ~name: "block_level"
     ~construct
     ~destruct
+    ()
 
 let root = 0l
 let succ = Int32.succ

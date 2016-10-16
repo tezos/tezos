@@ -125,6 +125,7 @@ let arg =
     ~name: "contract_id"
     ~construct
     ~destruct
+    ()
 
 let compare l1 l2 =
   match l1, l2 with
