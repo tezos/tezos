@@ -104,6 +104,8 @@ module Protocols : sig
     (Protocol_hash.t * Store.protocol option) list Lwt.t
 end
 
+val complete: string -> string list Lwt.t
+
 val describe: ?recurse:bool -> string list -> RPC.Description.directory_descr Lwt.t
 
 (** Low-level *)

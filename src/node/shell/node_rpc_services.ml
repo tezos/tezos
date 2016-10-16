@@ -583,6 +583,19 @@ let inject_protocol =
        (obj1 (req "injectedProtocol" Protocol_hash.encoding)))
     RPC.Path.(root / "inject_protocol")
 
+let complete =
+  let prefix_arg =
+    let destruct s = Ok s
+    and construct s = s in
+    RPC.Arg.make ~name:"prefix" ~destruct ~construct () in
+  RPC.service
+    ~description: "Try to complete a prefix of a Base48Check-encoded data. \
+                   This RPC is actually able to complete hashes of \
+                   black and hashes of operations."
+    ~input: empty
+    ~output: (list string)
+    RPC.Path.(root / "complete" /: prefix_arg )
+
 let describe =
   RPC.Description.service
     ~description: "RPCs documentation and input/output schema"
