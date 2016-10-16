@@ -90,7 +90,7 @@ module Blocks = struct
       | `Test_prevalidation -> "test_prevalidation"
       | `Hash h -> Block_hash.to_b48check h in
     let destruct = parse_block in
-    RPC.Arg.make ~name ~descr ~construct ~destruct
+    RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
   type preapply_param = {
     operations: Operation_hash.t list ;
@@ -341,7 +341,7 @@ module Operations = struct
     let destruct h =
       try Ok (Operation_hash.of_b48check h)
       with _ -> Error "Can't parse hash" in
-    RPC.Arg.make ~name ~descr ~construct ~destruct
+    RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
   let bytes =
     RPC.service

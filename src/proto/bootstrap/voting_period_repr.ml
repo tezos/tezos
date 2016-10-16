@@ -23,6 +23,7 @@ let arg =
     ~name: "voting_period"
     ~construct
     ~destruct
+    ()
 
 let root = 0l
 let succ = Int32.succ

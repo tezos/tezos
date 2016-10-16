@@ -13,7 +13,7 @@ module Arg : sig
     name:string ->
     destruct:(string -> ('a, string) result) ->
     construct:('a -> string) ->
-    'a arg
+    unit -> 'a arg
 
   type descr = {
     name: string ;
