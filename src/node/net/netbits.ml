@@ -142,7 +142,7 @@ let of_raw buf =
           decode items (offset + 8) stop
       | 0x04 ->
           if_remains offset 2 @@ fun () ->
-          let len = BE.get_int16 buf offset in
+          let len = BE.get_uint16 buf offset in
           let offset = offset + 2 in
           if_remains offset len @@ fun () ->
           let items = B (MBytes.sub buf offset len) :: items in
@@ -153,7 +153,7 @@ let of_raw buf =
           decode items (offset + 8) stop
       | 0x06 ->
           if_remains offset 2 @@ fun () ->
-          let len = BE.get_int16 buf offset in
+          let len = BE.get_uint16 buf offset in
           let offset = offset + 2 in
           if_remains offset len @@ fun () ->
           begin match decode [] offset (offset + len) with
@@ -162,7 +162,7 @@ let of_raw buf =
           end
       | 0x07 ->
           if_remains offset 2 @@ fun () ->
-          let len = BE.get_int16 buf offset in
+          let len = BE.get_uint16 buf offset in
           let offset = offset + 2 in
           if_remains offset len @@ fun () ->
           let items = C (MBytes.substring buf offset len) :: items in
