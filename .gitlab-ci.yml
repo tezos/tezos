@@ -95,6 +95,16 @@ test:basic.sh:
     - build
     - build:test
 
+test:data-encoding:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test run-test-data-encoding
+  dependencies:
+    - build
+    - build:test
+
 publish:expurge:
   stage: publish
   tags:
