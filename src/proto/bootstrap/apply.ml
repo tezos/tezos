@@ -192,31 +192,31 @@ let may_start_new_cycle ctxt =
         ctxt last_cycle reward_date >>=? fun ctxt ->
       return ctxt
 
-let apply_main ctxt accept_failing_script block_header operations =
+let apply_main ctxt accept_failing_script block operations =
   (* read only checks *)
-  Mining.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
-  Mining.check_fitness_gap ctxt block_header >>=? fun () ->
-  Mining.check_mining_rights ctxt block_header >>=? fun delegate_pkh ->
-  Mining.check_signature ctxt block_header delegate_pkh >>=? fun () ->
+  Mining.check_proof_of_work_stamp ctxt block >>=? fun () ->
+  Mining.check_fitness_gap ctxt block >>=? fun () ->
+  Mining.check_mining_rights ctxt block >>=? fun delegate_pkh ->
+  Mining.check_signature ctxt block delegate_pkh >>=? fun () ->
   (* automatic bonds payment *)
-  Mining.pay_mining_bond ctxt block_header delegate_pkh >>=? fun ctxt ->
+  Mining.pay_mining_bond ctxt block delegate_pkh >>=? fun ctxt ->
   (* set timestamp *)
-  Timestamp.set_current ctxt block_header.shell.timestamp >>=? fun ctxt ->
+  Timestamp.set_current ctxt block.shell.timestamp >>=? fun ctxt ->
   (* do effectful stuff *)
   Fitness.increase ctxt >>=? fun ctxt ->
-  let priority = snd block_header.proto.mining_slot in
+  let priority = snd block.proto.mining_slot in
   fold_left_s (fun ctxt operation ->
       apply_operation
         ctxt accept_failing_script
         (Some (Contract.default_contract delegate_pkh))
-        block_header.shell.predecessor priority operation)
+        block.shell.predecessor priority operation)
     ctxt operations >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
   let reward =
     Mining.base_mining_reward ctxt
-      ~priority:(snd block_header.proto.mining_slot) in
+      ~priority:(snd block.proto.mining_slot) in
   Nonce.record_hash ctxt
-    delegate_pkh reward block_header.proto.seed_nonce_hash >>=? fun ctxt ->
+    delegate_pkh reward block.proto.seed_nonce_hash >>=? fun ctxt ->
   Reward.pay_due_rewards ctxt >>=? fun ctxt ->
   Level.increment_current ctxt >>=? fun ctxt ->
   (* end of cycle *)
@@ -226,13 +226,13 @@ let apply_main ctxt accept_failing_script block_header operations =
 
 type error += Internal_error of string
 
-let apply ctxt accept_failing_script block_header operations =
+let apply ctxt accept_failing_script block operations =
   (init ctxt >>=? fun ctxt ->
    get_prevalidation ctxt >>= function
    | true ->
        fail (Internal_error "we should not call `apply` after `preapply`!")
    | false ->
-       apply_main ctxt accept_failing_script block_header operations >>=? fun ctxt ->
+       apply_main ctxt accept_failing_script block operations >>=? fun ctxt ->
        finalize ctxt)
 
 let empty_result =

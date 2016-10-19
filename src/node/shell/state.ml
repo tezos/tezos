@@ -78,7 +78,7 @@ type t = {
   nets: net Block_hash_table.t ;
   store: Store.store ;
   block_db: Db_proxy.Block.t ;
-  block_watchers: (Block_hash.t * Store.block_header) Watcher.t list ref ;
+  block_watchers: (Block_hash.t * Store.block) Watcher.t list ref ;
   operation_db: Db_proxy.Operation.t ;
   operation_watchers:
     (Operation_hash.t * Store.operation) Watcher.t list ref ;
@@ -297,14 +297,14 @@ let iter_predecessors
 
 module Block = struct
 
-  type shell_header = Store.shell_block_header = {
+  type shell_header = Store.shell_block = {
     net_id: net_id ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     fitness: MBytes.t list ;
     operations: Operation_hash.t list ;
   }
-  type t = Store.block_header = {
+  type t = Store.block = {
     shell: shell_header ;
     proto: MBytes.t ;
   }
@@ -341,7 +341,7 @@ module Block = struct
     block >>= function
     | None -> assert false
     | Some block -> Lwt.return block
-  let db_store db k (v: Store.block_header) =
+  let db_store db k (v: Store.block) =
     Db_proxy.Block.store db k
       (v.shell.predecessor, lazy (Lwt.return (Some (Time.make_timed v))))
   let store t bytes =

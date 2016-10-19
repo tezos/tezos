@@ -132,7 +132,7 @@ end
 (** The local and distributed database of blocks. *)
 module Block : sig
 
-  type shell_header = Store.shell_block_header = {
+  type shell_header = Store.shell_block = {
     net_id: net_id ;
     (** The genesis of the chain this block belongs to. *)
     predecessor: Block_hash.t ;
@@ -146,7 +146,7 @@ module Block : sig
     operations: Operation_hash.t list ;
     (** The raw part of the block header, as understood only by the protocol. *)
   }
-  type t = Store.block_header = {
+  type t = Store.block = {
     shell: shell_header ;
     proto: MBytes.t ;
   }

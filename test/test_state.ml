@@ -59,7 +59,7 @@ let operation op =
   op,
   Store.Operation.to_bytes op
 
-let block state ?(operations = []) pred_hash pred name : Store.block_header =
+let block state ?(operations = []) pred_hash pred name : Store.block =
   let fitness = incr_fitness pred.Store.shell.fitness in
   let timestamp = incr_timestamp pred.Store.shell.timestamp in
   { shell = {
@@ -121,8 +121,8 @@ let build_valid_chain state net tbl vtbl otbl pred names =
          State.Block.store state (Store.Block.to_bytes block) >>=? fun block' ->
          Assert.equal_block ~msg:__LOC__ (Some (hash, block)) block' ;
          Hashtbl.add tbl name (hash, block) ;
-         Lwt.return (Proto.parse_block_header block) >>=? fun block_header ->
-         Proto.apply pred.context block_header [] >>=? fun ctxt ->
+         Lwt.return (Proto.parse_block block) >>=? fun block ->
+         Proto.apply pred.context block [] >>=? fun ctxt ->
          State.Valid_block.store state hash ctxt >>=? fun vblock ->
          Hashtbl.add vtbl name vblock ;
          return vblock
@@ -163,7 +163,7 @@ let build_example_tree state net =
   Lwt.return (tbl, vtbl, otbl)
 
 type state = {
-  block: (string, Block_hash.t * Store.block_header) Hashtbl.t ;
+  block: (string, Block_hash.t * Store.block) Hashtbl.t ;
   operation: (string, Operation_hash.t * Store.operation tzresult) Hashtbl.t ;
   vblock: (string, State.Valid_block.t) Hashtbl.t ;
   state: State.t ;

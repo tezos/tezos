@@ -156,19 +156,19 @@ type error +=
   | Invalid_signature
   | Invalid_stamp
 
-let check_proof_of_work_stamp ctxt block_header =
+let check_proof_of_work_stamp ctxt block =
   let proof_of_work_threshold = Constants.proof_of_work_threshold ctxt in
-  if check_header_hash block_header proof_of_work_threshold then
+  if check_header_hash block proof_of_work_threshold then
     return ()
   else
     fail Invalid_stamp
 
-let check_signature ctxt block_header id =
+let check_signature ctxt block id =
   Public_key.get ctxt id >>=? fun key ->
   let check_signature key { Block.proto ; shell ; signature } =
     let unsigned_header = Block.forge_header shell proto in
     Ed25519.check_signature key signature unsigned_header in
-  if check_signature key block_header then
+  if check_signature key block then
     return ()
   else
     fail Invalid_signature
@@ -179,9 +179,9 @@ let max_fitness_gap ctxt =
 
 type error += Invalid_fitness_gap
 
-let check_fitness_gap ctxt (block_header : Block.header)  =
+let check_fitness_gap ctxt (block : Block.header)  =
   Fitness.raw_get ctxt >>=? fun current_fitness ->
-  Fitness.raw_read block_header.shell.fitness >>=? fun announced_fitness ->
+  Fitness.raw_read block.shell.fitness >>=? fun announced_fitness ->
   let gap = Int64.sub announced_fitness current_fitness in
   if Compare.Int64.(gap <= 0L || max_fitness_gap ctxt < gap) then
     fail Invalid_fitness_gap

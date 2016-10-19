@@ -16,8 +16,8 @@ type message =
   | Discover_blocks of net_id * Block_hash.t list (* Block locator *)
   | Block_inventory of net_id * Block_hash.t list
 
-  | Get_block_headers of Block_hash.t list
-  | Block_header of MBytes.t
+  | Get_blocks of Block_hash.t list
+  | Block of MBytes.t
 
   | Current_operations of net_id
   | Operation_inventory of net_id * Operation_hash.t list
@@ -40,9 +40,9 @@ let to_frame msg =
       [ S 2100 ; bh netid ; F (List.map bh blocks) ]
   | Block_inventory (Net netid, blocks) ->
       [ S 2101 ; bh netid ; F (List.map bh blocks) ]
-  | Get_block_headers blocks ->
+  | Get_blocks blocks ->
       [ S 2102 ; F (List.map bh blocks) ]
-  | Block_header b ->
+  | Block b ->
       [ S 2103 ; B b ]
 
   | Current_operations (Net net_id) ->
@@ -72,8 +72,8 @@ let from_frame msg =
     | [ S 2101 ; B netid ; F blocks ] ->
         Some (Block_inventory (net netid, List.map bh blocks))
     | [ S 2102 ; F blocks ] ->
-        Some (Get_block_headers (List.map bh blocks))
-    | [ S 2103 ; B bh ] -> Some (Block_header bh)
+        Some (Get_blocks (List.map bh blocks))
+    | [ S 2103 ; B bh ] -> Some (Block bh)
     | [ S 2700 ; B netid ] ->
         Some (Current_operations (net netid))
     | [ S 2701 ; B netid ; F ops ] ->

@@ -10,12 +10,12 @@
 type operation = Operation_hash.t
 let max_operation_data_length = 42
 
-type block_header = unit
+type block = unit
 
-let max_block_header_length = 42
+let max_block_length = 42
 let max_number_of_operations = 42
 
-let parse_block_header _ = Ok ()
+let parse_block _ = Ok ()
 let parse_operation h _ = Ok h
 
 let fitness_key = ["v1";"store";"fitness"]

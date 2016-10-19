@@ -32,9 +32,9 @@ include Persist.STORE with type t = store
 
 exception Preexistent_context of string * Block_hash.t
 val exists: index -> Block_hash.t -> bool Lwt.t
-val commit: index -> Store.block_header -> Block_hash.t -> store -> unit Lwt.t
+val commit: index -> Store.block -> Block_hash.t -> store -> unit Lwt.t
 val commit_invalid:
-  index -> Store.block_header -> Block_hash.t -> error list -> unit Lwt.t
+  index -> Store.block -> Block_hash.t -> error list -> unit Lwt.t
 val checkout: index -> Block_hash.t -> store tzresult option Lwt.t
 exception Invalid_context of error list
 val checkout_exn: index -> Block_hash.t -> store Lwt.t

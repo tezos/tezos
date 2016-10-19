@@ -15,7 +15,7 @@ type worker = {
   get: State.net_id -> t tzresult Lwt.t ;
   get_exn: State.net_id -> t Lwt.t ;
   deactivate: t -> unit Lwt.t ;
-  notify_block: Block_hash.t -> Store.block_header -> unit Lwt.t ;
+  notify_block: Block_hash.t -> Store.block -> unit Lwt.t ;
   shutdown: unit -> unit Lwt.t ;
 }
 
@@ -25,7 +25,7 @@ and t = {
   parent: t option ;
   mutable child: t option ;
   prevalidator: Prevalidator.t ;
-  notify_block: Block_hash.t -> Store.block_header -> unit Lwt.t ;
+  notify_block: Block_hash.t -> Store.block -> unit Lwt.t ;
   fetch_block: Block_hash.t -> State.Valid_block.t tzresult Lwt.t ;
   create_child: State.Valid_block.t -> unit tzresult Lwt.t ;
   test_validator: unit -> (t * State.Net.t) option ;
@@ -126,7 +126,7 @@ let apply_block net (pred: State.Valid_block.t) hash (block: State.Block.t) =
     Protocol_hash.pp_short Proto.hash >>= fun () ->
   lwt_debug "validation of %a: parsing header..."
     Block_hash.pp_short hash >>= fun () ->
-  Lwt.return (Proto.parse_block_header block) >>=? fun parsed_header ->
+  Lwt.return (Proto.parse_block block) >>=? fun parsed_header ->
   lwt_debug "validation of %a: parsing operations..."
     Block_hash.pp_short hash >>= fun () ->
   map2_s
@@ -148,7 +148,7 @@ module Validation_scheduler = struct
   let name = "validator"
   type state = State.Net.t * Block_hash_set.t ref
   type rdata = t
-  type data = Store.block_header Time.timed_data
+  type data = Store.block Time.timed_data
   let init_request (net, _) hash =
     State.Block.fetch (State.Net.state net) (State.Net.id net) hash
 
@@ -344,7 +344,7 @@ let create_worker p2p state =
         v.shutdown ()
   in
 
-  let notify_block hash (block : Store.block_header) =
+  let notify_block hash (block : Store.block) =
     match get_exn block.shell.net_id with
     | exception Not_found -> Lwt.return_unit
     | net ->

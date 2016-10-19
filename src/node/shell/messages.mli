@@ -13,8 +13,8 @@ type message =
   | Discover_blocks of Store.net_id * Block_hash.t list (* Block locator *)
   | Block_inventory of Store.net_id * Block_hash.t list
 
-  | Get_block_headers of Block_hash.t list
-  | Block_header of MBytes.t
+  | Get_blocks of Block_hash.t list
+  | Block of MBytes.t
 
   | Current_operations of Store.net_id
   | Operation_inventory of Store.net_id * Operation_hash.t list

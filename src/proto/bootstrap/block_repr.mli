@@ -11,7 +11,7 @@ open Tezos_hash
 
 (** Exported type *)
 type header = {
-  shell: Updater.shell_block_header ;
+  shell: Updater.shell_block ;
   proto: proto_header ;
   signature: Ed25519.signature ;
 }
@@ -30,11 +30,11 @@ val mining_slot_encoding: mining_slot Data_encoding.encoding
 val max_header_length: int
 
 (** Parse the protocol-specific part of a block header. *)
-val parse_header: Updater.raw_block_header -> header tzresult
+val parse_header: Updater.raw_block -> header tzresult
 
 val unsigned_header_encoding:
-  (Updater.shell_block_header * proto_header) Data_encoding.encoding
+  (Updater.shell_block * proto_header) Data_encoding.encoding
 
 val forge_header:
-  Updater.shell_block_header -> proto_header -> MBytes.t
+  Updater.shell_block -> proto_header -> MBytes.t
 

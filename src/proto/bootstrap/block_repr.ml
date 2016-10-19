@@ -13,7 +13,7 @@ open Tezos_hash
 
 (** Exported type *)
 type header = {
-  shell: Updater.shell_block_header ;
+  shell: Updater.shell_block ;
   proto: proto_header ;
   signature: Ed25519.signature ;
 }
@@ -50,7 +50,7 @@ let signed_proto_header_encoding =
 let unsigned_header_encoding =
   let open Data_encoding in
   merge_objs
-    Updater.shell_block_header_encoding
+    Updater.shell_block_encoding
     proto_header_encoding
 
 (** Constants *)
@@ -67,7 +67,7 @@ type error +=
 
 let parse_header
     ({ shell = { net_id ; predecessor ; timestamp ; fitness ; operations } ;
-       proto } : Updater.raw_block_header) : header tzresult =
+       proto } : Updater.raw_block) : header tzresult =
   match Data_encoding.Binary.of_bytes signed_proto_header_encoding proto with
   | None -> Error [Cant_parse_proto_header]
   | Some (proto, signature) ->
