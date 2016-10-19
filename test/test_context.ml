@@ -39,7 +39,7 @@ let block2 =
   Block_hash.of_hex
     "2222222222222222222222222222222222222222222222222222222222222222"
 
-let faked_block : Store.block_header = {
+let faked_block : Store.block = {
   shell = {
     net_id = Net genesis_block ;
     predecessor = genesis_block ;

@@ -23,7 +23,7 @@ type raw_operation = Store.operation = {
 val raw_operation_encoding: raw_operation Data_encoding.t
 
 (** The version agnostic toplevel structure of blocks. *)
-type shell_block_header = Store.shell_block_header = {
+type shell_block = Store.shell_block = {
   net_id: net_id ;
   (** The genesis of the chain this block belongs to. *)
   predecessor: Block_hash.t ;
@@ -37,13 +37,13 @@ type shell_block_header = Store.shell_block_header = {
   operations: Operation_hash.t list ;
   (** The sequence of operations. *)
 }
-val shell_block_header_encoding: shell_block_header Data_encoding.t
+val shell_block_encoding: shell_block Data_encoding.t
 
-type raw_block_header = Store.block_header = {
-  shell: shell_block_header ;
+type raw_block = Store.block = {
+  shell: shell_block ;
   proto: MBytes.t ;
 }
-val raw_block_header_encoding: raw_block_header Data_encoding.t
+val raw_block_encoding: raw_block Data_encoding.t
 
 type 'error preapply_result = 'error Protocol.preapply_result = {
   applied: Operation_hash.t list;

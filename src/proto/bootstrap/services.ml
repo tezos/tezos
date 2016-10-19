@@ -522,7 +522,7 @@ module Helpers = struct
                describe ~title: "new contracts" (list Contract.encoding))))
         RPC.Path.(custom_root / "helpers" / "forge" / "operations" )
 
-    let block_header custom_root =
+    let block custom_root =
       RPC.service
         ~description: "Forge a block header"
         ~input:
@@ -538,7 +538,7 @@ module Helpers = struct
              (req "proof_of_work_nonce"
                 (Fixed.bytes Tezos_context.Constants.proof_of_work_nonce_size)))
         ~output: (wrap_tzerror bytes)
-        RPC.Path.(custom_root / "helpers" / "forge" / "block_header")
+        RPC.Path.(custom_root / "helpers" / "forge" / "block")
 
   end
 

@@ -10,7 +10,9 @@ OCAMLFLAGS = \
   $(patsubst %, -package %, $(PACKAGES)) \
   ${EXTRA_OCAMLFLAGS}
 
-SOURCE_DIRECTORIES := $(addprefix ../src/, \
+SOURCE_DIRECTORIES := \
+  lib \
+$(addprefix ../src/, \
   utils \
   compiler \
   node/db \

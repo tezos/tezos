@@ -197,7 +197,7 @@ module Helpers : sig
         nonce:Nonce.t ->
         unit -> MBytes.t tzresult Lwt.t
     end
-    val block_header:
+    val block:
       block ->
       net:net ->
       predecessor:Block_hash.t ->

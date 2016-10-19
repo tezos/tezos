@@ -214,15 +214,15 @@ include Data_store
 
 (*-- Typed block store under "blocks/" ---------------------------------------*)
 
-type shell_block_header = {
+type shell_block = {
   net_id: net_id ;
   predecessor: Block_hash.t ;
   timestamp: Time.t ;
   fitness: MBytes.t list ;
   operations: Operation_hash.t list ;
 }
-type block_header = {
-  shell: shell_block_header ;
+type block = {
+  shell: shell_block ;
   proto: MBytes.t ;
 }
 
@@ -235,7 +235,7 @@ let net_id_encoding =
 
 let pp_net_id ppf (Net id) = Block_hash.pp_short ppf id
 
-let shell_block_header_encoding =
+let shell_block_encoding =
   let open Data_encoding in
   conv
     (fun { net_id ; predecessor ; timestamp ; fitness ; operations } ->
@@ -249,29 +249,29 @@ let shell_block_header_encoding =
        (req "fitness" Fitness.encoding)
        (req "operations" (list Operation_hash.encoding)))
 
-let block_header_encoding =
+let block_encoding =
   let open Data_encoding in
   conv
     (fun { shell ; proto } -> (shell, proto))
     (fun (shell, proto) -> { shell ; proto })
     (merge_objs
-       shell_block_header_encoding
+       shell_block_encoding
        (obj1 (req "data" Variable.bytes)))
 
 module Raw_block_value = struct
-  type t = block_header
+  type t = block
   let to_bytes v =
-    Data_encoding.Binary.to_bytes block_header_encoding v
+    Data_encoding.Binary.to_bytes block_encoding v
   let of_bytes b =
-    Data_encoding.Binary.of_bytes block_header_encoding b
+    Data_encoding.Binary.of_bytes block_encoding b
 end
 
-module Block_header_key = struct
+module Block_key = struct
   type t = Block_hash.t
   let to_path p = "blocks" :: Block_hash.to_path p @ [ "contents" ]
 end
-module Block_header = Make (Block_header_key) (Raw_block_value)
-module Raw_block = Make (Block_header_key) (Raw_value)
+module Parsed_block = Make (Block_key) (Raw_block_value)
+module Raw_block = Make (Block_key) (Raw_value)
 
 module Block_pred_key = struct
   type t = Block_hash.t
@@ -295,13 +295,13 @@ module Block = struct
   type t = FS.t
   type key = Block_hash.t
   type value = Block_hash.t *
-               block_header Time.timed_data option Lwt.t Lazy.t
+               block Time.timed_data option Lwt.t Lazy.t
   let mem = Block_pred.mem
   let full_get s k =
     Block_time.get s k >>= function
     | None -> Lwt.return_none
     | Some time ->
-        Block_header.get s k >>= function
+        Parsed_block.get s k >>= function
         | None -> Lwt.return_none
         | Some data -> Lwt.return (Some { Time.data ; time })
   let get s k =
@@ -318,14 +318,14 @@ module Block = struct
     r >>= function
     | None -> Lwt.return_unit
     | Some { Time.data ; time } ->
-        Block_header.set s k data >>= fun () ->
+        Parsed_block.set s k data >>= fun () ->
         Block_time.set s k time
   let full_set s k r =
     set s k (r.Time.data.shell.predecessor, Lazy.from_val (Lwt.return (Some r)))
   let del s k =
     Block_pred.del s k >>= fun () ->
     Block_time.del s k >>= fun () ->
-    Block_header.del s k
+    Parsed_block.del s k
 
   let compare b1 b2 =
     let (>>) x y = if x = 0 then y () else x in

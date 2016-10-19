@@ -389,7 +389,7 @@ let forge_operations ctxt (shell, proto) =
 
 let () = register1 Services.Helpers.Forge.operations forge_operations
 
-let forge_block_header _ctxt
+let forge_block _ctxt
     (net_id, predecessor, timestamp, fitness, operations,
      raw_level, priority, seed_nonce_hash, proof_of_work_nonce) : MBytes.t tzresult Lwt.t =
   let priority = Int32.of_int priority in
@@ -398,7 +398,7 @@ let forge_block_header _ctxt
             { net_id ; predecessor ; timestamp ; fitness ; operations }
             { mining_slot ; seed_nonce_hash ; proof_of_work_nonce })
 
-let () = register1 Services.Helpers.Forge.block_header forge_block_header
+let () = register1 Services.Helpers.Forge.block forge_block
 
 (*-- Helpers.Parse -----------------------------------------------------------*)
 

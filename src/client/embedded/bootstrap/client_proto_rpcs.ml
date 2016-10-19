@@ -235,10 +235,10 @@ module Helpers = struct
           block ~net ~level ~nonce () =
         operations block ~net [Seed_nonce_revelation { level ; nonce }]
     end
-    let block_header
+    let block
         block ~net ~predecessor ~timestamp ~fitness ~operations
         ~level ~priority ~seed_nonce_hash ~proof_of_work_nonce () =
-      call_error_service1 Services.Helpers.Forge.block_header block
+      call_error_service1 Services.Helpers.Forge.block block
         (net, predecessor, timestamp, fitness, operations,
          level, priority, seed_nonce_hash, proof_of_work_nonce)
   end

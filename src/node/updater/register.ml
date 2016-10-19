@@ -34,7 +34,7 @@ let register proto =
   let module V = struct
     include Proto
     include Make(Proto)
-    let parse_block_header d = parse_block_header d |> wrap_error
+    let parse_block d = parse_block d |> wrap_error
     let parse_operation h b = parse_operation h b |> wrap_error
     let apply c h ops = apply c h ops >|= wrap_error
     let preapply c h t b ops =
