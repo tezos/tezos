@@ -48,7 +48,7 @@ let inject_block block
   let slot = level.level, Int32.of_int priority in
   compute_stamp block
     src_sk shell slot seed_nonce_hash >>=? fun proof_of_work_nonce ->
-  Client_proto_rpcs.Helpers.Forge.block_header
+  Client_proto_rpcs.Helpers.Forge.block
     block
     ~net:bi.net
     ~predecessor:bi.hash

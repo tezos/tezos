@@ -98,16 +98,16 @@ let process state validator msg =
         State.Block.prefetch state net_id blocks ;
       Lwt.return_nil
 
-  | Get_block_headers blocks ->
-      lwt_log_info "process Get_block_headers" >>= fun () ->
+  | Get_blocks blocks ->
+      lwt_log_info "process Get_blocks" >>= fun () ->
       Lwt_list.map_p (State.Block.raw_read state) blocks >>= fun blocks ->
       let cons_block acc = function
-        | Some b -> Block_header b :: acc
+        | Some b -> Block b :: acc
         | None -> acc in
       Lwt.return (List.fold_left cons_block [] blocks)
 
-  | Block_header block ->
-      lwt_log_info "process Block_header" >>= fun () ->
+  | Block block ->
+      lwt_log_info "process Block" >>= fun () ->
       process_block state validator block >>= fun _ ->
       Lwt.return_nil
 
@@ -182,7 +182,7 @@ let request_operations net _net_id operations =
 let request_blocks net _net_id blocks =
   (* TODO improve the lookup strategy.
           For now simply broadcast the request to all our neighbours. *)
-  P2p.broadcast (Messages.(to_frame (Get_block_headers blocks))) net
+  P2p.broadcast (Messages.(to_frame (Get_blocks blocks))) net
 
 let init_p2p net_params =
   match net_params with

@@ -93,41 +93,41 @@ val shell_operation_encoding: shell_operation Data_encoding.t
 val operation_encoding: operation Data_encoding.t
 
 (** Raw blocks in the database (partially parsed). *)
-type shell_block_header = {
+type shell_block = {
   net_id: net_id ;
   predecessor: Block_hash.t ;
   timestamp: Time.t ;
   fitness: MBytes.t list ;
   operations: Operation_hash.t list ;
 }
-type block_header = {
-  shell: shell_block_header ;
+type block = {
+  shell: shell_block ;
   proto: MBytes.t ;
 }
-val shell_block_header_encoding: shell_block_header Data_encoding.t
-val block_header_encoding: block_header Data_encoding.t
+val shell_block_encoding: shell_block Data_encoding.t
+val block_encoding: block Data_encoding.t
 
 (** {2 Block and operations store} ********************************************)
 
 module Block : sig
 
-  val of_bytes: MBytes.t -> block_header option
-  val to_bytes: block_header -> MBytes.t
-  val hash: block_header -> Block_hash.t
+  val of_bytes: MBytes.t -> block option
+  val to_bytes: block -> MBytes.t
+  val hash: block -> Block_hash.t
 
   include TYPED_IMPERATIVE_STORE
     with type t = block_store
      and type key = Block_hash.t
      and type value =
-           Block_hash.t * block_header Time.timed_data option Lwt.t Lazy.t
+           Block_hash.t * block Time.timed_data option Lwt.t Lazy.t
 
-  val compare: block_header -> block_header -> int
-  val equal: block_header -> block_header -> bool
+  val compare: block -> block -> int
+  val equal: block -> block -> bool
 
   val raw_get: t -> Block_hash.t -> MBytes.t option Lwt.t
-  val full_get: t -> Block_hash.t -> block_header Time.timed_data option Lwt.t
+  val full_get: t -> Block_hash.t -> block Time.timed_data option Lwt.t
 
-  val full_set: t -> Block_hash.t -> block_header Time.timed_data -> unit Lwt.t
+  val full_set: t -> Block_hash.t -> block Time.timed_data -> unit Lwt.t
 
 end
 

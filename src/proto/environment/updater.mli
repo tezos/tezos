@@ -17,7 +17,7 @@ type raw_operation = {
 
 
 (** The version agnostic toplevel structure of blocks. *)
-type shell_block_header = {
+type shell_block = {
   net_id: net_id ;
   (** The genesis of the chain this block belongs to. *)
   predecessor: Block_hash.t ;
@@ -31,10 +31,10 @@ type shell_block_header = {
   operations: Operation_hash.t list ;
   (** The sequence of operations. *)
 }
-val shell_block_header_encoding: shell_block_header Data_encoding.t
+val shell_block_encoding: shell_block Data_encoding.t
 
-type raw_block_header = {
-  shell: shell_block_header ;
+type raw_block = {
+  shell: shell_block ;
   proto: MBytes.t ;
 }
 
@@ -68,10 +68,10 @@ module type PROTOCOL = sig
   val max_operation_data_length : int
 
   (** The version specific part of blocks. *)
-  type block_header
+  type block
 
   (** The maximum size of block headers in bytes *)
-  val max_block_header_length : int
+  val max_block_length : int
 
   (** The maximum *)
   val max_number_of_operations : int
@@ -79,21 +79,21 @@ module type PROTOCOL = sig
   (** The parsing / preliminary validation function for blocks. Its
       role is to check that the raw header is well formed, and to
       produce a pre-decomposed value of the high level, protocol defined
-      {!block_header} type. It does not have access to the storage
+      {!block} type. It does not have access to the storage
       context. It may store the hash and raw bytes for later signature
       verification by {!apply} or {!preapply}. *)
-  val parse_block_header : raw_block_header -> block_header tzresult
+  val parse_block : raw_block -> block tzresult
 
   (** The parsing / preliminary validation function for
-      operations. Similar to {!parse_block_header}. *)
+      operations. Similar to {!parse_block}. *)
   val parse_operation :
     Operation_hash.t -> raw_operation -> operation tzresult
 
   (** The main protocol function that validates blocks. It receives the
       block header and the list of associated operations, as
-      pre-decomposed by {!parse_block_header} and {!parse_operation}. *)
+      pre-decomposed by {!parse_block} and {!parse_operation}. *)
   val apply :
-    Context.t -> block_header -> operation list -> Context.t tzresult Lwt.t
+    Context.t -> block -> operation list -> Context.t tzresult Lwt.t
 
   (** The auxiliary protocol entry point that validates pending
       operations out of blocks. This function tries to apply the all

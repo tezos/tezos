@@ -32,8 +32,8 @@ val equal_operation :
 
 val equal_block :
   ?msg:string ->
-  (Hash.Block_hash.t * Store.block_header) option ->
-  (Hash.Block_hash.t * Store.block_header) option ->
+  (Hash.Block_hash.t * Store.block) option ->
+  (Hash.Block_hash.t * Store.block) option ->
   unit
 
 val equal_result :

@@ -12,7 +12,7 @@ type worker
 val create_worker: P2p.net -> State.t -> worker
 val shutdown: worker -> unit Lwt.t
 
-val notify_block: worker -> Block_hash.t -> Store.block_header -> unit Lwt.t
+val notify_block: worker -> Block_hash.t -> Store.block -> unit Lwt.t
 
 type t
 
