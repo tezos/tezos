@@ -142,7 +142,8 @@ UTILS_PACKAGES := \
   lwt  \
   ocplib-json-typed \
   sodium \
-  zarith
+  zarith \
+  $(COVERAGEPKG) \
 
 UTILS_OBJS := \
   ${UTILS_LIB_IMPLS:.ml=.cmx} ${UTILS_LIB_IMPLS:.ml=.ml.deps} \
@@ -167,10 +168,10 @@ COMPILER_LIB_INTFS := \
 
 COMPILER_LIB_IMPLS := \
   compiler/embedded_cmis.ml \
-  compiler/tezos_compiler.ml
+  compiler/tezos_compiler.ml \
 
 COMPILER_IMPLS := \
-  compiler_main.ml
+  compiler_main.ml \
 
 COMPILER_PACKAGES := \
   ${UTILS_PACKAGES} \
@@ -179,7 +180,7 @@ COMPILER_PACKAGES := \
   lwt.unix \
   ocplib-endian \
   ocplib-ocamlres \
-  unix
+  unix \
 
 COMPILER_OBJS := \
   ${COMPILER_IMPLS:.ml=.cmx} ${COMPILER_IMPLS:.ml=.ml.deps} \
@@ -277,7 +278,8 @@ NODE_PACKAGES := \
   dynlink \
   git \
   irmin.unix \
-  ocplib-resto.directory
+  ocplib-resto.directory \
+
 
 EMBEDDED_NODE_PROTOCOLS := \
   $(patsubst proto/%/,proto/embedded_proto_%.cmxa, \
@@ -426,7 +428,7 @@ clean::
 
 .PHONY: clean
 clean::
-	-find \( -name \*.cm\* -or -name \*~ -or -name \*.o -or -name \*.a \) -delete
+	-find \( -name \*.cm\* -or -name \*.cmp -or -name \*.out -or -name \*~ -or -name \*.o -or -name \*.a \) -delete
 
 ## Dependencies
 

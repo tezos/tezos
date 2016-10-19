@@ -42,7 +42,8 @@ PACKAGES := \
   ocplib-resto.directory \
   sodium \
   unix \
-  kaputt
+  kaputt \
+  bisect_ppx.runtime
 
 ############################################################################
 ## External packages
@@ -190,6 +191,28 @@ test-data-encoding: ${NODELIB} ${TEST_DATA_ENCODING_IMPLS:.ml=.cmx}
 clean::
 	rm -f test-data-encoding
 
+COVERAGESRCDIR= \
+  -I ../src \
+  -I ../src/client \
+  -I ../src/client/embedded \
+  -I ../src/client/embedded/bootstrap \
+  -I ../src/client/embedded/bootstrap/mining \
+  -I ../src/client/embedded/bootstrap/demo \
+  -I ../src/compiler \
+  -I ../src/node \
+  -I ../src/node/db \
+  -I ../src/node/updater \
+  -I ../src/node/net \
+  -I ../src/node/shell \
+  -I ../src/proto \
+  -I ../src/proto/bootstrap \
+  -I ../src/proto/demo \
+  -I ../src/utils
+
+bisect:
+	bisect-ppx-report $(COVERAGESRCDIR) \
+          -ignore-missing-files -html reports bisect*.out
+
 ############################################################################
 ## Generic rules
 
@@ -205,7 +228,7 @@ test.cmx: test.cmi
 	ocamlfind ocamlc ${OCAMLFLAGS} -c $<
 
 clean::
-	-rm -f *.cm* lib/*.cm*
+	-rm -f *.cm* lib/*.cm* *.out *.o
 
 -include .depend
 .depend: $(wildcard *.ml *.mli lib/*.ml lib/*.mli)

@@ -28,5 +28,6 @@ depends: [
   "ocplib-json-typed"
   "ocplib-resto" {>= "dev"}
   "sodium" {>= "0.3.0"}
-  "kaputt"
+  "kaputt"     (* only for testing *)
+  "bisect_ppx" (* only for testing *)
 ]
