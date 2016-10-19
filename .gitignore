@@ -21,6 +21,7 @@
 /src/client/embedded/bootstrap/concrete_parser.mli
 
 /test/.depend
+/test/reports
 
 /test/test-store
 /test/test-state
@@ -39,8 +40,11 @@
 *.cmti
 *.cmxa
 *.cmxs
+*.cmp
 *.mli.deps
 *.ml.deps
+
+bisect*.out
 
 *.rej
 *.orig
