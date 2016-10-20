@@ -190,7 +190,6 @@ let apply_block net db
     Protocol_hash.pp_short Proto.hash >>= fun () ->
   lwt_debug "validation of %a: parsing header..."
     Block_hash.pp_short hash >>= fun () ->
-  Lwt.return (Proto.parse_block block pred.timestamp) >>=? fun parsed_header ->
   lwt_debug "validation of %a: parsing operations..."
     Block_hash.pp_short hash >>= fun () ->
   map2_s
@@ -201,8 +200,15 @@ let apply_block net db
     operations >>=? fun parsed_operations ->
   lwt_debug "validation of %a: applying block..."
     Block_hash.pp_short hash >>= fun () ->
-  Proto.apply
-    patched_context parsed_header parsed_operations >>=? fun new_context ->
+  Proto.begin_application
+    ~predecessor_context:patched_context
+    ~predecessor_timestamp:pred.timestamp
+    block >>=? fun state ->
+  fold_left_s (fun state op ->
+      Proto.apply_operation state op >>=? fun state ->
+      return state)
+    state parsed_operations >>=? fun state ->
+  Proto.finalize_block state >>=? fun new_context ->
   lwt_log_info "validation of %a: success"
     Block_hash.pp_short hash >>= fun () ->
   return new_context

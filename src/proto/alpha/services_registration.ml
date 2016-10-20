@@ -89,10 +89,12 @@ let () =
 
 (*-- Context -----------------------------------------------------------------*)
 
+type error += Unexpected_level_in_context
+
 let level ctxt =
   Level.current ctxt >>=? fun level ->
   match Level.pred ctxt level with
-  | None -> fail (Apply.Internal_error "unexpected level in context")
+  | None -> fail Unexpected_level_in_context
   | Some level -> return level
 
 let () = register0 Services.Context.level level
@@ -192,9 +194,11 @@ let () =
            Mining.mining_priorities ctxt level >>=? fun (Misc.LCons (miner_pkh, _)) ->
            let miner_contract = Contract.default_contract miner_pkh in
            let block_prio = 0l in
-           Apply.apply_operation ctxt false (Some miner_contract) pred_block block_prio operation
-           >>=? fun (_ctxt, contracts) ->
-           Error_monad.return contracts) ;
+           Apply.apply_operation
+             ctxt (Some miner_contract) pred_block block_prio operation
+           >>=? function
+           | (_ctxt, _, Some script_err) -> Lwt.return (Error script_err)
+           | (_ctxt, contracts, None) -> Lwt.return (Ok contracts)) ;
   let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =
     let amount =
       match amount with

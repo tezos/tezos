@@ -157,7 +157,7 @@ module Blocks = struct
           (opt "timestamp" Time.encoding)))
 
   type preapply_result = {
-    operations: error Updater.preapply_result ;
+    operations: error Prevalidation.preapply_result ;
     fitness: MBytes.t list ;
     timestamp: Time.t ;
   }
@@ -171,7 +171,7 @@ module Blocks = struct
        (obj3
           (req "timestamp" Time.encoding)
           (req "fitness" Fitness.encoding)
-          (req "operations" (Updater.preapply_result_encoding Error.encoding))))
+          (req "operations" (Prevalidation.preapply_result_encoding Error.encoding))))
 
   let block_path : (unit, unit * block) RPC.Path.path =
     RPC.Path.(root / "blocks" /: blocks_arg )
@@ -266,14 +266,14 @@ module Blocks = struct
       ~input: empty
       ~output:
         (conv
-           (fun ({ Updater.applied; branch_delayed ; branch_refused },
+           (fun ({ Prevalidation.applied; branch_delayed ; branch_refused },
                  unprocessed) ->
              (applied,
               Operation_hash.Map.bindings branch_delayed,
               Operation_hash.Map.bindings branch_refused,
               Operation_hash.Set.elements unprocessed))
            (fun (applied, branch_delayed, branch_refused, unprocessed) ->
-              ({ Updater.applied ; refused = Operation_hash.Map.empty ;
+              ({ Prevalidation.applied ; refused = Operation_hash.Map.empty ;
                  branch_refused =
                    List.fold_right
                      (fun (k, o) -> Operation_hash.Map.add k o)

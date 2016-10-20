@@ -162,8 +162,14 @@ let build_valid_chain state tbl vtbl otbl pred names =
          State.Block_header.read_opt state hash >>= fun block' ->
          equal_block ~msg:__LOC__ (Some block) block' ;
          Hashtbl.add tbl name (hash, block) ;
-         Lwt.return (Proto.parse_block block pred.timestamp) >>=? fun block ->
-         Proto.apply pred.context block [] >>=? fun ctxt ->
+         begin
+           Proto.begin_application
+             ~predecessor_context: pred.context
+             ~predecessor_timestamp: pred.timestamp
+             block >>=? fun vstate ->
+           (* no operations *)
+           Proto.finalize_block vstate
+         end >>=? fun ctxt ->
          State.Valid_block.store state hash ctxt >>=? fun _vblock ->
          State.Valid_block.read state hash >>=? fun vblock ->
          Hashtbl.add vtbl name vblock ;

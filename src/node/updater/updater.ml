@@ -53,51 +53,6 @@ type raw_block = Store.Block_header.t = {
 }
 let raw_block_encoding = Store.Block_header.encoding
 
-type 'error preapply_result = 'error Protocol.preapply_result = {
-  applied: Operation_hash.t list;
-  refused: 'error list Operation_hash.Map.t;
-  branch_refused: 'error list Operation_hash.Map.t;
-  branch_delayed: 'error list Operation_hash.Map.t;
-}
-
-let empty_result = {
-  applied = [] ;
-  refused = Operation_hash.Map.empty ;
-  branch_refused = Operation_hash.Map.empty ;
-  branch_delayed = Operation_hash.Map.empty ;
-}
-
-let map_result f r = {
-  applied = r.applied;
-  refused = Operation_hash.Map.map f r.refused ;
-  branch_refused = Operation_hash.Map.map f r.branch_refused ;
-  branch_delayed = Operation_hash.Map.map f r.branch_delayed ;
-}
-
-let preapply_result_encoding error_encoding =
-  let open Data_encoding in
-  let refused_encoding = tup2 Operation_hash.encoding error_encoding in
-  let build_list map = Operation_hash.Map.bindings map in
-  let build_map list =
-    List.fold_right
-      (fun (k, e) m -> Operation_hash.Map.add k e m)
-      list Operation_hash.Map.empty in
-  conv
-    (fun { applied ; refused ; branch_refused ; branch_delayed } ->
-       (applied, build_list refused,
-        build_list branch_refused, build_list branch_delayed))
-    (fun (applied, refused, branch_refused, branch_delayed) ->
-       let refused = build_map refused in
-       let branch_refused = build_map branch_refused in
-       let branch_delayed = build_map branch_delayed in
-       { applied ; refused ; branch_refused ; branch_delayed })
-    (obj4
-       (req "applied" (list Operation_hash.encoding))
-       (req "refused" (list refused_encoding))
-       (req "branch_refused" (list refused_encoding))
-       (req "branch_delayed" (list refused_encoding)))
-
-
 (** Version table *)
 
 module VersionTable = Protocol_hash.Table
@@ -200,18 +155,3 @@ let compile hash units =
       log_error "Internal error while compiling %a" Protocol_hash.pp hash;
     Lwt.return loaded
   end
-
-let operations t =
-  let ops =
-    List.fold_left
-      (fun acc x -> Operation_hash.Set.add x acc)
-      Operation_hash.Set.empty t.applied in
-  let ops =
-    Operation_hash.Map.fold
-      (fun x _ acc -> Operation_hash.Set.add x acc)
-      t.branch_delayed ops in
-  let ops =
-    Operation_hash.Map.fold
-      (fun x _ acc -> Operation_hash.Set.add x acc)
-      t.branch_refused ops in
-  ops
