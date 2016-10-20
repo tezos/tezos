@@ -17,6 +17,8 @@ S ../src/client
 B ../src/client
 S ../src/client/embedded
 B ../src/client/embedded
+S ./lib
+B ./lib
 FLG -w -40
 PKG lwt
 PKG sodium
