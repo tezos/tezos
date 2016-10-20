@@ -11,12 +11,6 @@ open Kaputt.Abbreviations
 
 include Kaputt.Assertion
 
-let fail_msg fmt =
-  Format.kasprintf Assert.fail_msg fmt
-
-let fail expected given fmt =
-  Format.kasprintf (Assert.fail expected given) fmt
-
 let format_msg = function None -> None | Some msg -> Some (msg ^ "\n")
 
 let equal_persist_list ?msg l1 l2 =
@@ -80,3 +74,25 @@ let equal_result ?msg r1 r2 ~equal_ok ~equal_err =
   | Error e1, Error e2 -> equal_err ?msg e1 e2
   | Ok r, Error e | Error e, Ok r ->
       Assert.fail_msg "Results are not the same"
+
+let equal_exn ?msg exn1 exn2 =
+  let msg = format_msg msg in
+  let prn = Printexc.to_string in
+  Assert.equal ?msg ~prn exn1 exn2
+
+let test_fail ?(msg  = "") ?(prn = Assert.default_printer) f may_fail =
+  try
+    let value = f () in
+    fail "any exception" ("no exception: " ^ prn value) msg
+  with exn ->
+    if not (may_fail exn) then
+      fail "exception"
+        (Printf.sprintf "unexpectec exception: %s" (Printexc.to_string exn))
+        msg
+
+let fail_msg fmt =
+  Format.kasprintf Assert.fail_msg fmt
+
+let fail expected given fmt =
+  Format.kasprintf (Assert.fail expected given) fmt
+
