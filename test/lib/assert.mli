@@ -42,3 +42,12 @@ val equal_result :
   ('a, 'b) result ->
   equal_ok:(?msg:string -> 'a -> 'a -> 'c) ->
   equal_err:(?msg:string -> 'b -> 'b -> 'c) -> 'c
+
+val equal_exn : ?msg:string -> exn -> exn -> unit
+
+val test_fail :
+  ?msg:string ->
+  ?prn:('a -> string) ->
+  (unit -> 'a) ->
+  (exn -> bool) ->
+  unit

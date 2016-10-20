@@ -1,5 +1,5 @@
 
-TESTS := store context state basic basic.sh
+TESTS :=  data-encoding store context state basic basic.sh
 
 all: test
 
@@ -62,7 +62,7 @@ ${NODELIB} ${CLIENTLIB}:
 .PHONY: build-test run-test test
 build-test: ${addprefix build-test-,${TESTS}}
 run-test:
-	@$(patsubst %,${MAKE} run-test-% &&, ${TESTS}) \
+	@$(patsubst %,${MAKE} run-test-% ; , ${TESTS}) \
 	  echo && echo "Success" && echo
 test:
 	@${MAKE} --no-print-directory build-test
@@ -168,6 +168,27 @@ test-basic: ${NODELIB} ${CLIENTLIB} ${TEST_BASIC_IMPLS:.ml=.cmx}
 clean::
 	rm -f test-basic
 
+############################################################################
+## data encoding test program
+
+.PHONY:build-test-data-encoding run-test-data-encoding
+build-test-data-encoding: test-data-encoding
+run-test-data-encoding:
+	./test-data-encoding
+
+TEST_DATA_ENCODING_INTFS =
+
+TEST_DATA_ENCODING_IMPLS = \
+  lib/assert.ml \
+  lib/test.ml \
+  test_data_encoding.ml
+
+${TEST_DATA_ENCODING_IMPLS:.ml=.cmx}: ${NODELIB}
+test-data-encoding: ${NODELIB} ${TEST_DATA_ENCODING_IMPLS:.ml=.cmx}
+	ocamlfind ocamlopt -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	rm -f test-data-encoding
 
 ############################################################################
 ## Generic rules

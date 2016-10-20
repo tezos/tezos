@@ -11,6 +11,9 @@ open Kaputt.Abbreviations
 
 let keep_dir = try ignore (Sys.getenv "KEEPDIR") ; true with _ -> false
 
+let make_test ~title test =
+  Test.add_simple_test ~title (fun () -> Lwt_main.run (test ()))
+
 let rec remove_dir dir =
   Array.iter (fun file ->
       let f = Filename.concat dir file in

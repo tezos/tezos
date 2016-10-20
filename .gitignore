@@ -26,6 +26,7 @@
 /test/test-state
 /test/test-context
 /test/test-basic
+/test/test-data-encoding
 /test/LOG
 
 *~
