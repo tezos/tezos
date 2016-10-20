@@ -32,9 +32,10 @@ let () =
     (function Invalid_signature -> Some () | _ -> None)
     (fun () -> Invalid_signature)
 
-type operation = ()
+type operation = unit
 let max_operation_data_length = 0
 let parse_operation _h _op = Error []
+let compare_operations _ _ = 0
 let max_number_of_operations = 0
 
 type block = {
@@ -48,7 +49,7 @@ let max_block_length =
   | None -> assert false
   | Some len -> len
 
-let parse_block { Updater.shell ; proto } _pred_timestamp : block tzresult =
+let parse_block { Updater.shell ; proto } : block tzresult =
   match Data_encoding.Binary.of_bytes Data.Command.signed_encoding proto with
   | None -> Error [Parsing_error]
   | Some (command, signature) -> Ok { shell ; command ; signature }
@@ -60,7 +61,36 @@ let check_signature ctxt { shell ; command ; signature } =
     (Ed25519.Signature.check public_key signature bytes)
     Invalid_signature
 
-let apply ctxt header _ops =
+type validation_state = block * Context.t
+
+let current_context (_, ctxt) =
+  return ctxt
+
+let precheck_block
+    ~ancestor_context:_
+    ~ancestor_timestamp:_
+    raw_block =
+  Lwt.return (parse_block raw_block) >>=? fun _ ->
+  return ()
+
+let begin_application
+    ~predecessor_context:ctxt
+    ~predecessor_timestamp:_
+    raw_block =
+  Lwt.return (parse_block raw_block) >>=? fun block ->
+  return (block, ctxt)
+
+let begin_construction
+    ~predecessor_context:_
+    ~predecessor_timestamp:_
+    ~predecessor:_
+    ~timestamp:_ =
+  Lwt.return (Error []) (* absurd *)
+
+let apply_operation _vctxt _ =
+  Lwt.return (Error []) (* absurd *)
+
+let finalize_block (header, ctxt) =
   check_signature ctxt header >>=? fun () ->
   Data.Init.may_initialize ctxt >>=? fun ctxt ->
   Context.set_fitness ctxt header.shell.fitness >>= fun ctxt ->
@@ -78,14 +108,6 @@ let apply ctxt header _ops =
       Updater.set_test_protocol ctxt hash >>= fun ctxt ->
       Updater.fork_test_network ctxt >>= fun ctxt ->
       return ctxt
-
-let preapply ctxt _block_pred _sort _ops =
-  return ( ctxt,
-           { Updater.applied = [] ;
-             refused = Operation_hash.Map.empty ;
-             branch_refused = Operation_hash.Map.empty ;
-             branch_delayed = Operation_hash.Map.empty ;
-           } )
 
 let rpc_services = Services.rpc_services
 
