@@ -70,7 +70,7 @@ module Blocks = struct
     timestamp: Time.t option ;
   }
   type preapply_result = Services.Blocks.preapply_result = {
-    operations: error Updater.preapply_result ;
+    operations: error Prevalidation.preapply_result ;
     fitness: MBytes.t list ;
     timestamp: Time.t ;
   }

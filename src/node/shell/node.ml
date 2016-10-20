@@ -276,13 +276,20 @@ module RPC = struct
         let pv = Validator.prevalidator validator in
         let net_state = Validator.net_state validator in
         State.Valid_block.Current.head net_state >>= fun head ->
-        let ctxt = Prevalidator.context pv in
-        Context.get_fitness ctxt >|= fun fitness ->
-        { (convert head) with
-          hash = prevalidation_hash ;
-          fitness ;
-          timestamp = Prevalidator.timestamp pv
-        }
+        Prevalidator.context pv >>= function
+        | Error _ -> Lwt.fail Not_found
+        | Ok ctxt ->
+            Context.get_fitness ctxt >>= fun fitness ->
+            Context.get_protocol ctxt >>= fun protocol ->
+            let operations =
+              let pv_result, _ = Prevalidator.operations pv in
+              Some [ pv_result.applied ] in
+            let timestamp = Prevalidator.timestamp pv in
+            Lwt.return
+              { (convert head) with
+                hash = prevalidation_hash ;
+                protocol = Some protocol ;
+                fitness ; operations ; timestamp }
 
   let get_context node block =
     match block with
@@ -304,7 +311,9 @@ module RPC = struct
     | ( `Prevalidation | `Test_prevalidation ) as block ->
         let validator, _net = get_net node block in
         let pv = Validator.prevalidator validator in
-        Lwt.return (Some (Prevalidator.context pv))
+        Prevalidator.context pv >>= function
+        | Error _ -> Lwt.fail Not_found
+        | Ok ctxt -> Lwt.return (Some ctxt)
 
   let operations node block =
     match block with
@@ -321,9 +330,9 @@ module RPC = struct
     | (`Prevalidation | `Test_prevalidation) as block ->
         let validator, _net = get_net node block in
         let pv = Validator.prevalidator validator in
-        let { Updater.applied }, _ = Prevalidator.operations pv in
+        let { Prevalidation.applied }, _ = Prevalidator.operations pv in
         Lwt.return [applied]
-    | `Hash hash->
+    | `Hash hash ->
         read_valid_block node hash >|= function
         | None -> []
         | Some { operations } -> operations
@@ -347,24 +356,24 @@ module RPC = struct
         State.Valid_block.Current.head net_state >>= fun head ->
         get_pred net_db n head >>= fun b ->
         Prevalidator.pending ~block:b prevalidator >|= fun ops ->
-        Updater.empty_result, ops
+        Prevalidation.empty_result, ops
     | `Genesis ->
         let net = node.mainnet_net in
         State.Valid_block.Current.genesis net >>= fun b ->
         let validator = get_validator node `Genesis in
         let prevalidator = Validator.prevalidator validator in
         Prevalidator.pending ~block:b prevalidator >|= fun ops ->
-        Updater.empty_result, ops
+        Prevalidation.empty_result, ops
     | `Hash h -> begin
         get_validator_per_hash node h >>= function
         | None ->
-            Lwt.return (Updater.empty_result, Operation_hash.Set.empty)
+            Lwt.return (Prevalidation.empty_result, Operation_hash.Set.empty)
         | Some (validator, net_db) ->
             let net_state = Distributed_db.state net_db in
             let prevalidator = Validator.prevalidator validator in
             State.Valid_block.read_exn net_state h >>= fun block ->
             Prevalidator.pending ~block prevalidator >|= fun ops ->
-            Updater.empty_result, ops
+            Prevalidation.empty_result, ops
       end
 
   let protocols { state } =
@@ -396,17 +405,21 @@ module RPC = struct
           read_valid_block node hash >>= function
           | None -> Lwt.return (error_exn Not_found)
           | Some data -> return data
-    end >>=? fun { hash ; context ; protocol } ->
-    begin
-      match protocol with
-      | None -> failwith "Unknown protocol version"
-      | Some protocol -> return protocol
-    end >>=? fun ((module Proto) as protocol) ->
+    end >>=? fun predecessor ->
     let net_db = Validator.net_db node.mainnet_validator in
-    Prevalidator.preapply
-      net_db context protocol hash timestamp sort ops >>=? fun (ctxt, r) ->
+    map_p
+      (fun h ->
+         Distributed_db.Operation.read net_db h >>= function
+         | None -> failwith "Unknown operation %a" Operation_hash.pp h
+         | Some po -> return (h, po))
+      ops >>=? fun rops ->
+    Prevalidation.start_prevalidation
+      ~predecessor ~timestamp >>=? fun validation_state ->
+    Prevalidation.prevalidate
+      validation_state ~sort rops >>=? fun (validation_state, r) ->
+    Prevalidation.end_prevalidation validation_state >>=? fun ctxt ->
     Context.get_fitness ctxt >>= fun fitness ->
-    return (fitness, r)
+    return (fitness, { r with applied = List.rev r.applied })
 
   let complete node ?block str =
     match block with

@@ -10,13 +10,12 @@
 type operation = Operation_hash.t
 let max_operation_data_length = 42
 
-type block = unit
-
 let max_block_length = 42
 let max_number_of_operations = 42
 
-let parse_block _ _pred_timestamp = Ok ()
 let parse_operation h _ = Ok h
+
+let compare_operations _ _ = 0
 
 module Fitness = struct
 
@@ -64,23 +63,40 @@ module Fitness = struct
 
 end
 
-let apply ctxt () _operations =
+type validation_state = Context.t
+
+let current_context ctxt =
+  return ctxt
+
+let precheck_block
+    ~ancestor_context:_
+    ~ancestor_timestamp:_
+    _raw_block =
+  return ()
+
+let begin_application
+    ~predecessor_context:ctxt
+    ~predecessor_timestamp:_
+    _raw_block =
+  return ctxt
+
+let begin_construction
+    ~predecessor_context:ctxt
+    ~predecessor_timestamp:_
+    ~predecessor:_
+    ~timestamp:_ =
+  return ctxt
+
+let apply_operation ctxt _ =
+  return ctxt
+
+let finalize_block ctxt =
   Fitness.increase ctxt >>=? fun ctxt ->
   Fitness.get ctxt >>=? fun fitness ->
   let commit_message =
     Format.asprintf "fitness <- %Ld" fitness in
   Context.set_commit_message ctxt commit_message >>= fun ctxt ->
   return ctxt
-
-let preapply context _block_pred _sort operations =
-  Lwt.return
-    (Ok
-       (context,
-        { Updater.applied = List.map (fun h -> h) operations;
-          refused = Operation_hash.Map.empty;
-          branch_delayed = Operation_hash.Map.empty;
-          branch_refused = Operation_hash.Map.empty;
-        }))
 
 let rpc_services = Services.rpc_services
 

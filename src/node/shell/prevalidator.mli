@@ -43,13 +43,7 @@ val inject_operation:
 
 val flush: t -> State.Valid_block.t -> unit
 val timestamp: t -> Time.t
-val operations: t -> error Updater.preapply_result * Operation_hash.Set.t
-val context: t -> Context.t
-val protocol: t -> (module Updater.REGISTRED_PROTOCOL)
+val operations: t -> error Prevalidation.preapply_result * Operation_hash.Set.t
+val context: t -> Context.t tzresult Lwt.t
 
 val pending: ?block:State.Valid_block.t -> t -> Operation_hash.Set.t Lwt.t
-
-val preapply:
-  Distributed_db.net -> Context.t -> (module Updater.REGISTRED_PROTOCOL) ->
-  Block_hash.t -> Time.t -> bool -> Operation_hash.t list ->
-  (Context.t * error Updater.preapply_result) tzresult Lwt.t

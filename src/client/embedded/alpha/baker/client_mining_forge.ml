@@ -93,7 +93,9 @@ let forge_block cctxt block
         Client_node_rpcs.Blocks.pending_operations
           cctxt block >>=? fun (ops, pendings) ->
         return (Operation_hash.Set.elements @@
-                Operation_hash.Set.union (Updater.operations ops) pendings)
+                Operation_hash.Set.union
+                  (Prevalidation.preapply_result_operations ops)
+                  pendings)
     | Some operations -> return operations
   end >>=? fun operations ->
   begin
@@ -417,7 +419,7 @@ let mine cctxt state =
          block >>=? fun (res, ops) ->
        let operations =
          let open Operation_hash.Set in
-         elements (union ops (Updater.operations res)) in
+         elements (union ops (Prevalidation.preapply_result_operations res)) in
        let request = List.length operations in
        Client_node_rpcs.Blocks.preapply cctxt.rpc_config block
          ~timestamp ~sort:true operations >>= function

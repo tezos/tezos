@@ -98,7 +98,7 @@ module Blocks : sig
   val pending_operations:
     config ->
     block ->
-    (error Updater.preapply_result * Operation_hash.Set.t) tzresult Lwt.t
+    (error Prevalidation.preapply_result * Operation_hash.Set.t) tzresult Lwt.t
 
   type block_info = {
     hash: Block_hash.t ;
@@ -131,7 +131,7 @@ module Blocks : sig
     unit -> block_info list list tzresult Lwt_stream.t tzresult Lwt.t
 
   type preapply_result = {
-    operations: error Updater.preapply_result ;
+    operations: error Prevalidation.preapply_result ;
     fitness: MBytes.t list ;
     timestamp: Time.t ;
   }

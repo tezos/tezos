@@ -64,7 +64,7 @@ module Blocks : sig
     (unit, unit * block, unit, (Net_id.t * Time.t) option) RPC.service
   val pending_operations:
     (unit, unit * block, unit,
-     error Updater.preapply_result * Hash.Operation_hash.Set.t) RPC.service
+     error Prevalidation.preapply_result * Hash.Operation_hash.Set.t) RPC.service
 
   type list_param = {
     operations: bool ;
@@ -85,7 +85,7 @@ module Blocks : sig
     timestamp: Time.t option ;
   }
   type preapply_result = {
-    operations: error Updater.preapply_result ;
+    operations: error Prevalidation.preapply_result ;
     fitness: MBytes.t list ;
     timestamp: Time.t ;
   }

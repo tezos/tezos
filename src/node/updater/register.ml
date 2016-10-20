@@ -33,12 +33,30 @@ let register (module Proto : Protocol.PACKED_PROTOCOL) =
   let module V = struct
     include Proto
     include Make(Proto)
-    let parse_block d t = parse_block d t |> wrap_error
+    let precheck_block
+        ~ancestor_context ~ancestor_timestamp
+        raw_block =
+      precheck_block
+        ~ancestor_context ~ancestor_timestamp
+        raw_block >|= wrap_error
+    let begin_application
+        ~predecessor_context ~predecessor_timestamp
+        raw_block =
+      begin_application
+        ~predecessor_context ~predecessor_timestamp
+        raw_block >|= wrap_error
+    let begin_construction
+        ~predecessor_context ~predecessor_timestamp
+        ~predecessor ~timestamp =
+      begin_construction
+        ~predecessor_context ~predecessor_timestamp
+        ~predecessor ~timestamp >|= wrap_error
+    let current_context c =
+      current_context c >|= wrap_error
+    let apply_operation c o =
+      apply_operation c o >|= wrap_error
+    let finalize_block c = finalize_block c >|= wrap_error
     let parse_operation h b = parse_operation h b |> wrap_error
-    let apply c h ops = apply c h ops >|= wrap_error
-    let preapply c h b ops =
-      (preapply c h b ops >|= wrap_error) >>=? fun (ctxt, r) ->
-      return (ctxt, Updater.map_result (fun l -> [Ecoproto_error l]) r)
     let configure_sandbox c j =
       configure_sandbox c j >|= wrap_error
   end in
