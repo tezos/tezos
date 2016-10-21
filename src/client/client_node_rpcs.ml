@@ -148,6 +148,8 @@ let inject_block ?(wait = true) ?force block =
   call_service0 Services.inject_block (block, wait, force)
 let inject_operation ?(wait = true) ?force operation =
   call_service0 Services.inject_operation (operation, wait, force)
+let inject_protocol ?(wait = true) ?force protocol =
+  call_service0 Services.inject_protocol (protocol, wait, force)
 let describe ?recurse path =
   let prefix, arg = RPC.forge_request Services.describe () recurse in
   get_json (prefix @ path) arg >>=

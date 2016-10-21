@@ -22,8 +22,9 @@ type message =
   | Get_operations of Operation_hash.t list
   | Operation of MBytes.t
 
-  | Current_protocol of Store.net_id
-  | Protocol_inventory of Protocol_hash.t
+  | Get_protocols of Protocol_hash.t list
+  | Protocol of MBytes.t
+
 
 (** Converts a high level message to a network frame *)
 val to_frame: message -> Netbits.frame

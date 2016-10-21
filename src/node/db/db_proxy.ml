@@ -23,6 +23,8 @@ module type DISTRIBUTED_DB = sig
   val update: t -> key -> value -> bool Lwt.t
   val remove: t -> key -> bool Lwt.t
   val shutdown: t -> unit Lwt.t
+
+  val keys: t -> key list Lwt.t
 end
 
 type operation_state = {
@@ -106,3 +108,42 @@ module Block =
   Persist.MakeImperativeProxy
     (Store.Faked_functional_block)
     (Block_hash_table) (Block_scheduler)
+
+type protocol_state = {
+  request_protocols: Protocol_hash.t list -> unit ;
+}
+
+module Protocol_scheduler = struct
+  let name = "protocol_scheduler"
+  type rdata = Store.net_id
+  type data = float ref
+  type state = protocol_state
+  let init_request _ _ = Lwt.return (ref 0.0)
+  let request net ~get:_ ~set:_ pendings =
+    let current_time = Unix.gettimeofday () in
+    let time = current_time -. (3. +. Random.float 8.) in
+    let protocols =
+      List.fold_left
+        (fun acc (hash, last_request, Store.Net net_id) ->
+           if !last_request < time then begin
+             last_request := current_time ;
+             let prev =
+               try Block_hash_map.find net_id acc
+               with Not_found -> [] in
+             Block_hash_map.add net_id (hash :: prev) acc
+           end else
+             acc)
+        Block_hash_map.empty
+        pendings in
+    if Block_hash_map.is_empty protocols then
+      0.
+    else begin
+      Block_hash_map.iter (fun _net_id -> net.request_protocols) protocols ;
+      1. +. Random.float 4.
+    end
+end
+
+module Protocol =
+  Persist.MakeImperativeProxy
+    (Store.Faked_functional_protocol)
+    (Protocol_hash_table) (Protocol_scheduler)

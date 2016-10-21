@@ -131,7 +131,7 @@ let get_basedir () =
 let init dir =
   basedir := Some dir
 
-type component = {
+type component = Store.component = {
   name : string ;
   interface : string option ;
   implementation : string ;
