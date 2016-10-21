@@ -27,6 +27,8 @@ module type STORE = sig
   val del: t -> key -> t Lwt.t
   val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
+
+  val keys : t -> key list Lwt.t
 end
 
 (** Projection of OCaml keys of some abstract type to concrete storage
@@ -55,6 +57,8 @@ module type BYTES_STORE = sig
   val del: t -> key -> t Lwt.t
   val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
+
+  val keys : t -> key list Lwt.t
 end
 
 module MakeBytesStore (S : STORE) (K : KEY) :
@@ -82,6 +86,8 @@ module type TYPED_STORE = sig
   val get: t -> key -> value option Lwt.t
   val set: t -> key -> value -> t Lwt.t
   val del: t -> key -> t Lwt.t
+
+  val keys: t -> key list Lwt.t (** Not always relevant, BEWARE! *)
 end
 
 (** Gives a typed view of a store (values of a given type stored under
@@ -90,6 +96,7 @@ end
     keys under this prefix must be homogeneously typed. *)
 module MakeTypedStore (S : STORE) (K : KEY) (C : VALUE) :
   TYPED_STORE with type t = S.t and type key = K.t and type value = C.t
+
 
 (** {2 Persistent Sets} ******************************************************)
 
@@ -194,6 +201,8 @@ module type IMPERATIVE_PROXY = sig
   val fetch: t -> rdata -> Store.key -> Store.value Lwt.t
   val pending: t -> Store.key -> bool
   val shutdown: t -> unit Lwt.t
+
+  val keys: t -> Store.key list Lwt.t
 end
 
 module type IMPERATIVE_PROXY_SCHEDULER = sig

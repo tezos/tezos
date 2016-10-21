@@ -23,6 +23,8 @@ module type DISTRIBUTED_DB = sig
   val update: t -> key -> value -> bool Lwt.t
   val remove: t -> key -> bool Lwt.t
   val shutdown: t -> unit Lwt.t
+
+  val keys: t -> key list Lwt.t
 end
 
 type operation_state = {
@@ -44,3 +46,13 @@ module Block :
                   and type key := Store.Block.key
                   and type value := Store.Block.value
                   and type state := block_state
+
+
+type protocol_state = {
+  request_protocols: Protocol_hash.t list -> unit ;
+}
+module Protocol :
+  DISTRIBUTED_DB with type store := Store.Protocol.t
+                  and type key := Store.Protocol.key
+                  and type value := Store.Protocol.value
+                  and type state := protocol_state
