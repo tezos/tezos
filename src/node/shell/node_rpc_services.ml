@@ -383,6 +383,56 @@ module Operations = struct
 
 end
 
+module Protocols = struct
+  let protocols_arg =
+    let name = "protocol_id" in
+    let descr =
+      "A protocol identifier in hexadecimal." in
+    let construct = Protocol_hash.to_b48check in
+    let destruct h =
+      try Ok (Protocol_hash.of_b48check h)
+      with _ -> Error "Can't parse hash" in
+    RPC.Arg.make ~name ~descr ~construct ~destruct ()
+
+  let bytes =
+    RPC.service
+      ~input: empty
+      ~output:
+        (obj1 (req "data"
+                 (describe ~title: "Tezos protocol"
+                    (Time.timed_encoding @@
+                     RPC.Error.wrap @@
+                     Store.protocol_encoding))))
+      RPC.Path.(root / "protocols" /: protocols_arg)
+
+  type list_param = {
+    contents: bool option ;
+    monitor: bool option ;
+  }
+
+  let list_param_encoding =
+    conv
+      (fun {contents; monitor} -> (contents, monitor))
+      (fun (contents, monitor) -> {contents; monitor})
+      (obj2
+         (opt "contents" bool)
+         (opt "monitor" bool))
+
+  let list =
+    RPC.service
+      ~input: list_param_encoding
+      ~output:
+        (obj1
+           (req "protocols"
+              (list
+                 (obj2
+                    (req "hash" Protocol_hash.encoding)
+                    (opt "contents"
+                       (dynamic_size Store.protocol_encoding)))
+              )))
+      RPC.Path.(root / "protocols")
+end
+
 let forge_block =
   RPC.service
     ~description: "Forge a block header"
@@ -479,6 +529,59 @@ let inject_operation =
          ~title: "Hash of the injected operation" @@
        (obj1 (req "injectedOperation" Operation_hash.encoding)))
     RPC.Path.(root / "inject_operation")
+
+let inject_protocol =
+  let proto =
+    (list
+       (obj3
+          (req "name"
+             (describe ~title:"OCaml module name"
+                string))
+          (opt "interface"
+             (describe
+                ~description:"Content of the .mli file"
+                string))
+          (req "implementation"
+             (describe
+                ~description:"Content of the .ml file"
+                string))))
+  in
+  let proto_of_rpc =
+    List.map (fun (name, interface, implementation) ->
+        { Store.name; interface; implementation })
+  in
+  let rpc_of_proto =
+    List.map (fun { Store.name; interface; implementation } ->
+                (name, interface, implementation))
+  in
+  RPC.service
+    ~description:
+      "Inject a protocol in node. Returns the ID of the protocol."
+    ~input:
+      (conv
+         (fun (proto, blocking, force) -> (rpc_of_proto proto, Some blocking, force))
+         (fun (proto, blocking, force) -> (proto_of_rpc proto, unopt true blocking, force))
+         (obj3
+            (req "protocol"
+               (describe ~title: "Tezos protocol"
+                  proto))
+            (opt "blocking"
+               (describe
+                  ~description:
+                    "Should the RPC wait for the protocol to be \
+                     validated before to answer. (default: true)"
+                  bool))
+            (opt "force"
+               (describe
+                  ~description:
+                    "Should we inject protocol that is invalid. (default: false)"
+                  bool))))
+    ~output:
+      (RPC.Error.wrap @@
+       describe
+         ~title: "Hash of the injected protocol" @@
+       (obj1 (req "injectedProtocol" Protocol_hash.encoding)))
+    RPC.Path.(root / "inject_protocol")
 
 let describe =
   RPC.Description.service

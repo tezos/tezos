@@ -25,6 +25,8 @@ val inject_block:
   Block_hash.t tzresult Lwt.t
 val inject_operation:
   ?wait:bool -> ?force:bool -> MBytes.t -> Operation_hash.t tzresult Lwt.t
+val inject_protocol:
+  ?wait:bool -> ?force:bool -> Store.protocol -> Protocol_hash.t tzresult Lwt.t
 
 module Blocks : sig
 

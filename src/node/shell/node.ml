@@ -24,6 +24,13 @@ let inject_operation validator ?force bytes =
   let hash = Operation_hash.hash_bytes [bytes] in
   Lwt.return (hash, t)
 
+let inject_protocol state ?force:_ proto =
+  (* TODO: Validate the protocol *)
+  let proto_bytes = Store.Protocol.to_bytes proto in
+  let hash = Protocol_hash.hash_bytes [proto_bytes] in
+  let t = State.Protocol.store state proto_bytes >>|? ignore in
+  Lwt.return (hash, t)
+
 let process_operation state validator bytes =
   State.Operation.store state bytes >>= function
   | Error _ | Ok None -> Lwt.return_unit
@@ -37,6 +44,13 @@ let process_operation state validator bytes =
           let prevalidator = Validator.prevalidator net_validator in
           Prevalidator.register_operation prevalidator hash ;
           Lwt.return_unit
+
+let process_protocol state _validator bytes =
+  State.Protocol.store state bytes >>= function
+  | Error _ | Ok None -> Lwt.return_unit
+  | Ok (Some (hash, _proto)) ->
+      (* TODO: Store only pending protocols... *)
+      lwt_log_info "process Protocol %a" Protocol_hash.pp_short hash
 
 let process_block state validator bytes =
   State.Block.store state bytes >>= function
@@ -144,22 +158,19 @@ let process state validator msg =
       process_operation state validator content >>= fun () ->
       Lwt.return_nil
 
-  | Current_protocol net_id ->
-      lwt_log_info "process Current_protocol" >>= fun () ->
-      if not (State.Net.is_active state net_id) then
-        Lwt.return_nil
-      else begin
-        match State.Net.get state net_id with
-        | Error _ -> Lwt.return_nil
-        | Ok net ->
-            State.Net.Blockchain.head net >>= fun head ->
-            Lwt.return [Protocol_inventory head.protocol_hash]
-      end
+  | Get_protocols protos ->
+      lwt_log_info "process Get_protocols" >>= fun () ->
+      Lwt_list.map_p (State.Protocol.raw_read state) protos >>= fun protos ->
+      let cons_protocol acc = function
+        | Some proto -> Protocol proto :: acc
+        | None -> acc in
+      Lwt.return (List.fold_left cons_protocol [] protos)
 
-  | Protocol_inventory _ ->
-      lwt_log_info "process Protocol_inventory" >>= fun () ->
-      (* TODO... *)
+  | Protocol content ->
+      lwt_log_info "process Protocol" >>= fun () ->
+      process_protocol state validator content >>= fun () ->
       Lwt.return_nil
+
 
 type t = {
   state: State.t ;
@@ -170,6 +181,8 @@ type t = {
     ?force:bool -> MBytes.t -> (Block_hash.t * unit tzresult Lwt.t) Lwt.t ;
   inject_operation:
     ?force:bool -> MBytes.t -> (Operation_hash.t * unit tzresult Lwt.t) Lwt.t ;
+  inject_protocol:
+    ?force:bool -> Store.protocol -> (Protocol_hash.t * unit tzresult Lwt.t) Lwt.t ;
   shutdown: unit -> unit Lwt.t ;
 }
 
@@ -183,6 +196,11 @@ let request_blocks net _net_id blocks =
   (* TODO improve the lookup strategy.
           For now simply broadcast the request to all our neighbours. *)
   P2p.broadcast (Messages.(to_frame (Get_blocks blocks))) net
+
+let request_protocols net protocols =
+  (* TODO improve the lookup strategy.
+          For now simply broadcast the request to all our neighbours. *)
+  P2p.broadcast (Messages.(to_frame (Get_protocols protocols))) net
 
 let init_p2p net_params =
   match net_params with
@@ -200,8 +218,9 @@ let create
   lwt_log_info "reading state..." >>= fun () ->
   let request_operations = request_operations p2p in
   let request_blocks = request_blocks p2p in
+  let request_protocols = request_protocols p2p in
   State.read
-    ~request_operations ~request_blocks
+    ~request_operations ~request_blocks ~request_protocols
     ~store_root ~context_root ~ttl:(48 * 3600) (* 2 days *)
     ?patch_context () >>= fun state ->
   let validator = Validator.create_worker p2p state in
@@ -264,6 +283,7 @@ let create
     global_validator ;
     inject_block = inject_block state validator ;
     inject_operation = inject_operation validator ;
+    inject_protocol = inject_protocol state ;
     shutdown ;
   }
 
@@ -310,6 +330,7 @@ module RPC = struct
 
   let inject_block node = node.inject_block
   let inject_operation node = node.inject_operation
+  let inject_protocol node = node.inject_protocol
 
   let raw_block_info node hash =
     State.Valid_block.read_exn node.state hash >|= convert
@@ -449,6 +470,11 @@ module RPC = struct
                 State.Net.Mempool.for_block net b >|= fun ops ->
                 Updater.empty_result, ops
 
+  let protocols { state } = State.Protocol.keys state
+
+  let protocol_content node hash =
+    State.Protocol.read node.state hash
+
   let preapply node block ~timestamp ~sort ops =
     begin
       match block with
@@ -538,6 +564,9 @@ module RPC = struct
 
   let operation_watcher node =
     State.Operation.create_watcher node.state
+
+  let protocol_watcher node =
+    State.Protocol.create_watcher node.state
 
   let validate node net_id block =
     Validator.get node.validator net_id >>=? fun net_v ->

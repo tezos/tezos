@@ -24,6 +24,8 @@ module type STORE = sig
   val del: t -> key -> t Lwt.t
   val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
+
+  val keys : t -> key list Lwt.t
 end
 
 module type BYTES_STORE = sig
@@ -35,6 +37,8 @@ module type BYTES_STORE = sig
   val del: t -> key -> t Lwt.t
   val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
+
+  val keys : t -> key list Lwt.t
 end
 
 module type TYPED_STORE = sig
@@ -45,6 +49,8 @@ module type TYPED_STORE = sig
   val get: t -> key -> value option Lwt.t
   val set: t -> key -> value -> t Lwt.t
   val del: t -> key -> t Lwt.t
+
+  val keys: t -> key list Lwt.t
 end
 
 module type KEY = sig
@@ -146,6 +152,7 @@ module MakeBytesStore
   let remove_rec s k =
     S.remove_rec s (to_path k)
 
+  let keys s = S.keys s >|= List.map of_path
 end
 
 module MakeTypedStore
@@ -167,6 +174,7 @@ module MakeTypedStore
 
   let raw_get = S.get
 
+  let keys = S.keys
 end
 
 module RawKey = struct
@@ -369,6 +377,8 @@ module type IMPERATIVE_PROXY = sig
   val fetch: t -> rdata -> Store.key -> Store.value Lwt.t
   val pending: t -> Store.key -> bool
   val shutdown: t -> unit Lwt.t
+
+  val keys: t -> Store.key list Lwt.t
 end
 
 module type IMPERATIVE_PROXY_SCHEDULER = sig
@@ -457,6 +467,8 @@ module MakeImperativeProxy
   let known { store } hash =
     use store (fun store -> Store.mem store hash)
 
+  let keys { store } = use store Store.keys
+
   let read { store } hash =
     use store (fun store -> Store.get store hash)
 
@@ -528,6 +540,8 @@ module MakeImperativeProxy
   let shutdown { cancel ; worker } =
     cancel () >>= fun () -> worker
 
+  let keys { store } =
+    use store (fun store -> Store.keys store)
 end
 
 (*-- Predefined Instances ----------------------------------------------------*)
