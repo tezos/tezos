@@ -36,11 +36,6 @@ module Backend = struct
 end
 let backend = (module Backend : Backend_intf.S)
 
-let usage () =
-  Printf.eprintf
-    "Usage: %s output.cmxs source_dir [--in-place]\n%!"
-    Sys.argv.(0)
-
 let warnings = "+a-4-6-7-9-29-40..42-44-45-48"
 let warn_error = "-a"
 
@@ -215,11 +210,11 @@ let pack_objects ?(ctxt = "") ?(keep_object = false) output objects =
   if not keep_object then at_exit (fun () -> unlink_object output) ;
   Warnings.check_fatal ()
 
-let link_shared output objects =
+let link_shared ?(static=false) output objects =
   Printf.printf "LINK %s\n%!" (Filename.basename output);
   Compenv.(readenv Format.err_formatter Before_link);
   Compmisc.init_path true;
-  if Filename.check_suffix output ".cmxa" then
+  if static then
     Asmlibrarian.create_archive objects output
   else
     Asmlink.link_shared Format.err_formatter objects output;
@@ -283,12 +278,14 @@ let main () =
   and client = ref false
   and build_dir = ref None
   and include_dirs = ref [] in
+  let static = ref false in
   let args_spec = [
-    "--client", Arg.Set client, "TODO" ;
-    "-I", Arg.String (fun s -> include_dirs := s :: !include_dirs), "TODO" ;
-    "--build-dir", Arg.String (fun s -> build_dir := Some s), "TODO"] in
-  let usage_msg = "TODO" in
-  Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) "TODO" ;
+    "-static", Arg.Set static, " Build a library (.cmxa)";
+    "-client", Arg.Set client, " Preserve type equality with concrete node environment (used to embed protocol into the client)" ;
+    "-I", Arg.String (fun s -> include_dirs := s :: !include_dirs), "path Path for concrete node signatures (used to embed protocol into the client)" ;
+    "-build-dir", Arg.String (fun s -> build_dir := Some s), "path Reuse build dir (incremental compilation)"] in
+  let usage_msg = Printf.sprintf "Usage: %s <out> <src>\nOptions are:" Sys.argv.(0) in
+  Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
 
   let client = !client and include_dirs = !include_dirs in
   let output, source_dir =
@@ -439,4 +436,4 @@ let main () =
 
   (* Create the final [cmxs] *)
   Clflags.link_everything := true ;
-  link_shared output [packed_objects; register_object]
+  link_shared ~static:!static output [packed_objects; register_object]
