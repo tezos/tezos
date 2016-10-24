@@ -104,48 +104,48 @@ let unlink_object obj =
 
 (** TEZOS_PROTOCOL files *)
 
+module Protocol = struct
+  type component = {
+    name: string;
+    interface: string option;
+    implementation: string;
+  }
+
+  let component_encoding =
+    let open Data_encoding in
+    conv
+      (fun { name ; interface; implementation } -> (name, interface, implementation))
+      (fun (name, interface, implementation) -> { name ; interface ; implementation })
+      (obj3
+         (req "name" string)
+         (opt "interface" string)
+         (req "implementation" string))
+
+  type t = component list
+  let encoding = Data_encoding.list component_encoding
+
+  let to_bytes v = Data_encoding.Binary.to_bytes encoding v
+  let of_bytes b = Data_encoding.Binary.of_bytes encoding b
+  let hash proto = Protocol_hash.hash_bytes [to_bytes proto]
+end
+
 module Meta = struct
+  let config_file_encoding =
+    let open Data_encoding in
+    obj2
+      (opt "hash" ~description:"Used to force the hash of the protocol" Protocol_hash.encoding)
+      (req "modules" ~description:"Modules comprising the protocol" (list string))
 
-  let hash_wrapper =
-    let open Config_file in
-    { to_raw = (fun h -> Raw.String (Protocol_hash.to_b48check h));
-      of_raw = (function
-          | Raw.String h -> begin try
-                Protocol_hash.of_b48check h
-              with _ ->
-                let error oc = Printf.fprintf oc "Invalid Base48Check-encoded SHA256 key %S" h in
-                raise (Wrong_type error)
-            end
-          | _ ->
-              let error oc =
-                Printf.fprintf oc "Unexcepted value: should be a Base48Check-encoded SHA256 key." in
-              raise (Wrong_type error));
-    }
+  let to_file fn ?hash modules =
+    let open Data_encoding.Json in
+    let config_file = construct config_file_encoding (hash, modules) in
+    Utils.write_file ~bin:false fn @@ to_string config_file
 
-  class protocol_hash_cp =
-    [Protocol_hash.t] Config_file.cp_custom_type hash_wrapper
-
-  let to_file file hash modules =
-    let group = new Config_file.group in
-    let _ = new protocol_hash_cp ~group ["hash"] hash "" in
-    let _ =
-      new Config_file.list_cp Config_file.string_wrappers ~group
-        ["modules"] modules "" in
-    group#write file
-
-  let of_file file =
-    let group = new Config_file.group in
-    let hash =
-      new protocol_hash_cp ~group ["hash"]
-        (Protocol_hash.of_b48check
-           "TnrnfGHMCPAcxtMAHXdpfebbnn2XvPAxq7DHbpeJbKTkJQPgcgRGr")
-        "" in
-    let modules =
-      new Config_file.list_cp Config_file.string_wrappers ~group
-        ["modules"] [] "" in
-    group#read file;
-    (hash#get, modules#get)
-
+  let of_file fn =
+    let open Data_encoding.Json in
+    Utils.read_file ~bin:false fn |> from_string |> function
+    | Error err -> Pervasives.failwith err
+    | Ok json -> destruct config_file_encoding json
 end
 
 (** Semi-generic compilation functions *)
@@ -269,6 +269,15 @@ let mktemp_dir () =
   Filename.get_temp_dir_name () //
   Printf.sprintf "tezos-protocol-build-%06X" (Random.int 0xFFFFFF)
 
+let create_component dirname name =
+  let name_lowercase = String.uncapitalize_ascii name in
+  let implementation = dirname // name_lowercase ^ ".ml" in
+  let interface = implementation ^ "i" in
+  match Sys.file_exists implementation, Sys.file_exists interface with
+  | false, _ -> Pervasives.failwith ("No such file " ^ implementation)
+  | true, false -> { Protocol.name; interface = None; implementation }
+  | _ -> { name; interface = Some  interface; implementation }
+
 let main () =
 
   Random.self_init () ;
@@ -310,6 +319,10 @@ let main () =
       if not keep_object then Unix.rmdir build_dir ) ;
 
   let hash, units = Meta.of_file (source_dir // "TEZOS_PROTOCOL") in
+  let hash = match hash with
+    | Some hash -> hash
+    | None -> Protocol.hash @@ List.map (create_component source_dir) units
+  in
   let packname =
     if keep_object then
       String.capitalize_ascii (Filename.(basename @@ chop_extension output))

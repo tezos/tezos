@@ -113,15 +113,8 @@ type block = {
 val shell_block_encoding: shell_block Data_encoding.t
 val block_encoding: block Data_encoding.t
 
-(** Protocol *)
-type component = {
-  name : string ;
-  interface : string option ;
-  implementation : string ;
-}
-
-type protocol = component list
-val protocol_encoding : protocol Data_encoding.t
+type protocol = Tezos_compiler.Protocol.t
+val protocol_encoding: protocol Data_encoding.t
 
 (** {2 Block and operations store} ********************************************)
 
@@ -194,14 +187,14 @@ module Operation : sig
 end
 
 module Protocol : sig
-  val of_bytes: MBytes.t -> protocol option
-  val to_bytes: protocol -> MBytes.t
-  val hash: protocol -> Protocol_hash.t
+  val of_bytes: MBytes.t -> Tezos_compiler.Protocol.t option
+  val to_bytes: Tezos_compiler.Protocol.t -> MBytes.t
+  val hash: Tezos_compiler.Protocol.t -> Protocol_hash.t
 
   include TYPED_IMPERATIVE_STORE
     with type t = protocol_store
      and type key = Protocol_hash.t
-     and type value = protocol tzresult Time.timed_data
+     and type value = Tezos_compiler.Protocol.t tzresult Time.timed_data
 
   val raw_get: t -> Protocol_hash.t -> MBytes.t option Lwt.t
 end

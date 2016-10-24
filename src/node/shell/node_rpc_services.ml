@@ -548,10 +548,10 @@ let inject_protocol =
   in
   let proto_of_rpc =
     List.map (fun (name, interface, implementation) ->
-        { Store.name; interface; implementation })
+        { Tezos_compiler.Protocol.name; interface; implementation })
   in
   let rpc_of_proto =
-    List.map (fun { Store.name; interface; implementation } ->
+    List.map (fun { Tezos_compiler.Protocol.name; interface; implementation } ->
                 (name, interface, implementation))
   in
   RPC.service
