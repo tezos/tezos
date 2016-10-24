@@ -131,7 +131,7 @@ let get_basedir () =
 let init dir =
   basedir := Some dir
 
-type component = Store.component = {
+type component = Tezos_compiler.Protocol.component = {
   name : string ;
   interface : string option ;
   implementation : string ;
@@ -164,7 +164,7 @@ let do_compile hash units =
   create_files source_dir units >>= fun _files ->
   Tezos_compiler.Meta.to_file
     (source_dir // "TEZOS")
-    hash
+    ~hash
     (List.map (fun {name} -> String.capitalize_ascii name) units);
   let compiler_command =
     (Sys.executable_name,

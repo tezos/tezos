@@ -251,7 +251,7 @@ end
 module Protocol = struct
   type key = Store.Protocol.key
 
-  type component = Store.component = {
+  type component = Tezos_compiler.Protocol.component = {
     name: string;
     interface: string option;
     implementation: string
