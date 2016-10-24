@@ -508,30 +508,10 @@ end
 
 (*-- Typed operation store under "protocols/" -------------------------------*)
 
-type component = {
-  name : string ;
-  interface : string option ;
-  implementation : string ;
-}
+type protocol = Tezos_compiler.Protocol.t
+let protocol_encoding = Tezos_compiler.Protocol.encoding
 
-let component_encoding =
-  let open Data_encoding in
-  conv
-    (fun { name ; interface; implementation } -> (name, interface, implementation))
-    (fun (name, interface, implementation) -> { name ; interface ; implementation })
-    (obj3
-       (req "name" string)
-       (opt "interface" string)
-       (req "implementation" string))
-
-type protocol = component list
-let protocol_encoding = Data_encoding.list component_encoding
-
-module Raw_protocol_value = struct
-  type t = protocol
-  let to_bytes v = Data_encoding.Binary.to_bytes protocol_encoding v
-  let of_bytes b = Data_encoding.Binary.of_bytes protocol_encoding b
-end
+module Raw_protocol_value = Tezos_compiler.Protocol
 
 module Raw_protocol_key = struct
   type t = Protocol_hash.t
@@ -556,7 +536,7 @@ module Protocol_errors = Make (Protocol_errors_key) (Errors_value)
 module Protocol = struct
   type t = FS.t
   type key = Protocol_hash.t
-  type value = protocol tzresult Time.timed_data
+  type value = Tezos_compiler.Protocol.t tzresult Time.timed_data
   let mem = Protocol_data.mem
   let get s k =
     Protocol_time.get s k >>= function
@@ -587,7 +567,7 @@ module Protocol = struct
     Protocol_errors.del s k
   let of_bytes = Raw_protocol_value.of_bytes
   let to_bytes = Raw_protocol_value.to_bytes
-  let hash proto = Protocol_hash.hash_bytes [to_bytes proto]
+  let hash = Raw_protocol_value.hash
   let compare p1 p2 =
     Protocol_hash.(compare (hash_bytes [to_bytes p1]) (hash_bytes [to_bytes p2]))
   let equal b1 b2 = compare b1 b2 = 0

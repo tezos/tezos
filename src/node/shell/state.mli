@@ -350,13 +350,13 @@ module Protocol : sig
 
   type key = Protocol_hash.t
 
-  type component = Store.component = {
+  type component = Tezos_compiler.Protocol.component = {
     name : string ;
     interface : string option ;
     implementation : string ;
   }
 
-  type t = Store.protocol
+  type t = Tezos_compiler.Protocol.t
 
   type protocol = t
 

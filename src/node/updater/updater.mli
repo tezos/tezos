@@ -70,7 +70,7 @@ module type REGISTRED_PROTOCOL = sig
                              and type 'a tzresult := 'a tzresult
 end
 
-type component = Store.component = {
+type component = Tezos_compiler.Protocol.component = {
   name : string ;
   interface : string option ;
   implementation : string ;
