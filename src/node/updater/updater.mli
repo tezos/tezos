@@ -70,7 +70,7 @@ module type REGISTRED_PROTOCOL = sig
                              and type 'a tzresult := 'a tzresult
 end
 
-type component = {
+type component = Store.component = {
   name : string ;
   interface : string option ;
   implementation : string ;

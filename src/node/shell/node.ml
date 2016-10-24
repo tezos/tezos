@@ -25,11 +25,16 @@ let inject_operation validator ?force bytes =
   Lwt.return (hash, t)
 
 let inject_protocol state ?force:_ proto =
-  (* TODO: Validate the protocol *)
   let proto_bytes = Store.Protocol.to_bytes proto in
   let hash = Protocol_hash.hash_bytes [proto_bytes] in
-  let t = State.Protocol.store state proto_bytes >>|? ignore in
-  Lwt.return (hash, t)
+  let validation = Updater.compile hash proto >>= function
+    | false -> Lwt.fail_with (Format.asprintf "Invalid protocol %a: compilation failed" Protocol_hash.pp_short hash)
+    | true ->
+        State.Protocol.store state proto_bytes >>= function
+        | Ok None -> Lwt.fail_with "Previously registred protocol"
+        | t -> t >|? ignore |> Lwt.return
+  in
+  Lwt.return (hash, validation)
 
 let process_operation state validator bytes =
   State.Operation.store state bytes >>= function
