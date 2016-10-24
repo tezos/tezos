@@ -315,7 +315,7 @@ proto/embedded_proto_%.cmxa: \
   proto/%/TEZOS_PROTOCOL \
   $$(wildcard proto/%/*.ml) \
   $$(wildcard proto/%/*.mli)
-	@${TZCOMPILER} --build-dir proto/$*/_tzbuild $@ proto/$*/
+	@${TZCOMPILER} -static -build-dir proto/$*/_tzbuild $@ proto/$*/
 
 CLIENT_PROTO_INCLUDES := \
   utils node/updater node/db node/net node/shell client \
@@ -328,7 +328,7 @@ proto/client_embedded_proto_%.cmxa: \
   proto/%/TEZOS_PROTOCOL \
   $$(wildcard proto/%/*.ml) \
   $$(wildcard proto/%/*.mli)
-	@./${TZCOMPILER} --client --build-dir client/embedded/$*/_tzbuild \
+	@./${TZCOMPILER} -static -client -build-dir client/embedded/$*/_tzbuild \
 	   $(addprefix -I , ${CLIENT_PROTO_INCLUDES}) \
 	   $@ proto/$*
 
