@@ -1,6 +1,4 @@
-hash = "JF7Fxgeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-modules = [
-  Error ;
-  Services ;
-  Main ;
-]
+{
+    "hash": "JF7Fxgeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "modules": ["Error", "Services", "Main"]
+}
