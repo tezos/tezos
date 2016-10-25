@@ -348,6 +348,7 @@ CLIENT_LIB_INTFS := \
   client/client_generic_rpcs.mli \
   client/client_aliases.mli \
   client/client_keys.mli \
+  client/client_protocols.mli \
 
 CLIENT_LIB_IMPLS := \
   client/client_version.ml \
@@ -356,6 +357,7 @@ CLIENT_LIB_IMPLS := \
   client/client_generic_rpcs.ml \
   client/client_aliases.ml \
   client/client_keys.ml \
+  client/client_protocols.ml \
 
 CLIENT_IMPLS := \
   client_main.ml
@@ -378,7 +380,7 @@ CLIENT_OBJS := \
   ${CLIENT_LIB_INTFS:.mli=.cmi} ${CLIENT_LIB_INTFS:.mli=.mli.deps} \
   ${TZCLIENT}
 ${CLIENT_OBJS}: PACKAGES=${CLIENT_PACKAGES}
-${CLIENT_OBJS}: SOURCE_DIRECTORIES=client client/embedded utils node/net node/shell node/updater node/db
+${CLIENT_OBJS}: SOURCE_DIRECTORIES=client client/embedded utils node/net node/shell node/updater node/db compiler
 ${CLIENT_OBJS}: TARGET="(client.cmxa)"
 ${CLIENT_OBJS}: OPENED_MODULES=Error_monad Hash Utils
 

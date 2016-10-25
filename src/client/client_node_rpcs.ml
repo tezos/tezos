@@ -211,3 +211,10 @@ module Operations = struct
     call_streamed_service0 Services.Operations.list
       { monitor = Some true ; contents }
 end
+
+module Protocols = struct
+  let bytes hash =
+    call_service1 Services.Protocols.bytes hash ()
+  let list ?contents () =
+    call_service0 Services.Protocols.list { contents; monitor = Some false }
+end
