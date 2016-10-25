@@ -141,11 +141,12 @@ let create_files dir units =
   Utils.remove_dir dir >>= fun () ->
   Utils.create_dir dir >>= fun () ->
   Lwt_list.map_s
-    (fun unit ->
-       let ml = dir // (unit.name ^ ".ml") in
-       let mli = dir // (unit.name ^ ".mli") in
-       Utils.create_file ml unit.implementation >>= fun () ->
-       match unit.interface with
+    (fun { name; interface; implementation } ->
+       let name = String.lowercase_ascii name in
+       let ml = dir // (name ^ ".ml") in
+       let mli = dir // (name ^ ".mli") in
+       Utils.create_file ml implementation >>= fun () ->
+       match interface with
        | None -> Lwt.return [ml]
        | Some content ->
            Utils.create_file mli content >>= fun () ->
@@ -154,17 +155,21 @@ let create_files dir units =
   let files = List.concat files in
   Lwt.return files
 
+let extract dirname hash units =
+  let source_dir = dirname // Protocol_hash.to_short_b48check hash // "src" in
+  create_files source_dir units >|= fun _files ->
+  Tezos_compiler.Meta.to_file source_dir ~hash
+    (List.map (fun {name} -> String.capitalize_ascii name) units)
+
 let do_compile hash units =
   let basedir = get_basedir () in
   let source_dir = basedir // Protocol_hash.to_short_b48check hash // "src" in
   let log_file = basedir // Protocol_hash.to_short_b48check hash // "LOG" in
-  let plugin_file =
-    basedir // Protocol_hash.to_b48check hash
-            // Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp hash in
+  let plugin_file = basedir // Protocol_hash.to_short_b48check hash //
+                    Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp hash
+  in
   create_files source_dir units >>= fun _files ->
-  Tezos_compiler.Meta.to_file
-    (source_dir // "TEZOS")
-    ~hash
+  Tezos_compiler.Meta.to_file source_dir ~hash
     (List.map (fun {name} -> String.capitalize_ascii name) units);
   let compiler_command =
     (Sys.executable_name,

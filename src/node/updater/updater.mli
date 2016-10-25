@@ -76,6 +76,7 @@ type component = Tezos_compiler.Protocol.component = {
   implementation : string ;
 }
 
+val extract: Lwt_io.file_name -> Protocol_hash.t -> component list -> unit Lwt.t
 val compile: Protocol_hash.t -> component list -> bool Lwt.t
 
 val activate: Context.t -> Protocol_hash.t -> Context.t Lwt.t

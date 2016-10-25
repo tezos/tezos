@@ -104,6 +104,26 @@ let unlink_object obj =
 
 (** TEZOS_PROTOCOL files *)
 
+module Meta = struct
+  let name = "TEZOS_PROTOCOL"
+  let config_file_encoding =
+    let open Data_encoding in
+    obj2
+      (opt "hash" ~description:"Used to force the hash of the protocol" Protocol_hash.encoding)
+      (req "modules" ~description:"Modules comprising the protocol" (list string))
+
+  let to_file dirname ?hash modules =
+    let open Data_encoding.Json in
+    let config_file = construct config_file_encoding (hash, modules) in
+    Utils.write_file ~bin:false (dirname // name) @@ to_string config_file
+
+  let of_file dirname =
+    let open Data_encoding.Json in
+    Utils.read_file ~bin:false (dirname // name) |> from_string |> function
+    | Error err -> Pervasives.failwith err
+    | Ok json -> destruct config_file_encoding json
+end
+
 module Protocol = struct
   type component = {
     name: string;
@@ -127,25 +147,24 @@ module Protocol = struct
   let to_bytes v = Data_encoding.Binary.to_bytes encoding v
   let of_bytes b = Data_encoding.Binary.of_bytes encoding b
   let hash proto = Protocol_hash.hash_bytes [to_bytes proto]
-end
 
-module Meta = struct
-  let config_file_encoding =
-    let open Data_encoding in
-    obj2
-      (opt "hash" ~description:"Used to force the hash of the protocol" Protocol_hash.encoding)
-      (req "modules" ~description:"Modules comprising the protocol" (list string))
+  let find_component dirname module_name =
+    let name_lowercase = String.uncapitalize_ascii module_name in
+    let implementation = dirname // name_lowercase ^ ".ml" in
+    let interface = implementation ^ "i" in
+    match Sys.file_exists implementation, Sys.file_exists interface with
+    | false, _ -> Pervasives.failwith @@ "Not such file: " ^ implementation
+    | true, false ->
+        let implementation = Utils.read_file ~bin:false implementation in
+        { name = module_name; interface = None; implementation }
+    | _ ->
+        let interface = Utils.read_file ~bin:false interface in
+        let implementation = Utils.read_file ~bin:false implementation in
+        { name = module_name; interface = Some interface; implementation }
 
-  let to_file fn ?hash modules =
-    let open Data_encoding.Json in
-    let config_file = construct config_file_encoding (hash, modules) in
-    Utils.write_file ~bin:false fn @@ to_string config_file
-
-  let of_file fn =
-    let open Data_encoding.Json in
-    Utils.read_file ~bin:false fn |> from_string |> function
-    | Error err -> Pervasives.failwith err
-    | Ok json -> destruct config_file_encoding json
+  let of_dir dirname =
+    let _hash, modules = Meta.of_file dirname in
+    List.map (find_component dirname) modules
 end
 
 (** Semi-generic compilation functions *)
@@ -269,15 +288,6 @@ let mktemp_dir () =
   Filename.get_temp_dir_name () //
   Printf.sprintf "tezos-protocol-build-%06X" (Random.int 0xFFFFFF)
 
-let create_component dirname name =
-  let name_lowercase = String.uncapitalize_ascii name in
-  let implementation = dirname // name_lowercase ^ ".ml" in
-  let interface = implementation ^ "i" in
-  match Sys.file_exists implementation, Sys.file_exists interface with
-  | false, _ -> Pervasives.failwith ("No such file " ^ implementation)
-  | true, false -> { Protocol.name; interface = None; implementation }
-  | _ -> { name; interface = Some  interface; implementation }
-
 let main () =
 
   Random.self_init () ;
@@ -318,10 +328,10 @@ let main () =
       Unix.rmdir sigs_dir ;
       if not keep_object then Unix.rmdir build_dir ) ;
 
-  let hash, units = Meta.of_file (source_dir // "TEZOS_PROTOCOL") in
+  let hash, units = Meta.of_file source_dir in
   let hash = match hash with
     | Some hash -> hash
-    | None -> Protocol.hash @@ List.map (create_component source_dir) units
+    | None -> Protocol.hash @@ List.map (Protocol.find_component source_dir) units
   in
   let packname =
     if keep_object then
