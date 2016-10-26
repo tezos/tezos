@@ -28,7 +28,7 @@ val record_ballot:
 val get_ballots: Storage.t -> ballots tzresult Lwt.t
 val clear_ballots: Storage.t -> Storage.t Lwt.t
 
-val froze_listings: Storage.t -> Storage.t tzresult Lwt.t
+val freeze_listings: Storage.t -> Storage.t tzresult Lwt.t
 val clear_listings: Storage.t -> Storage.t tzresult Lwt.t
 
 val listing_size: Storage.t -> int32 tzresult Lwt.t

@@ -397,7 +397,7 @@ module Vote : sig
     context -> int32 Protocol_hash_map.t tzresult Lwt.t
   val clear_proposals: context -> context tzresult Lwt.t
 
-  val froze_listings: context -> context tzresult Lwt.t
+  val freeze_listings: context -> context tzresult Lwt.t
   val clear_listings: context -> context tzresult Lwt.t
   val listing_size: context -> int32 tzresult Lwt.t
   val in_listings: context -> public_key_hash -> bool Lwt.t
@@ -554,7 +554,7 @@ end
 
 module Roll : sig
 
-  val froze_rolls_for_cycle: context -> Cycle.t -> context tzresult Lwt.t
+  val freeze_rolls_for_cycle: context -> Cycle.t -> context tzresult Lwt.t
   val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t
 
   val mining_rights_owner:

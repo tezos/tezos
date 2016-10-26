@@ -28,7 +28,7 @@ val fold :
   f:(Roll_repr.roll -> Contract_repr.t -> 'a -> 'a tzresult Lwt.t) ->
   'a -> 'a tzresult Lwt.t
 
-val froze_rolls_for_cycle :
+val freeze_rolls_for_cycle :
   Storage.t -> Cycle_repr.t -> Storage.t tzresult Lwt.t
 
 val clear_cycle :

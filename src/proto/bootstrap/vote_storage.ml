@@ -45,7 +45,7 @@ let get_ballots ctxt =
 
 let clear_ballots = Storage.Vote.Ballots.clear
 
-let froze_listings ctxt =
+let freeze_listings ctxt =
   Roll_storage.fold ctxt (ctxt, 0l)
     ~f:(fun _roll contract (ctxt, total as acc) ->
         Contract_storage.get_delegate_opt ctxt contract >>=? function

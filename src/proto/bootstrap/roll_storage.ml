@@ -42,7 +42,7 @@ let fold ctxt ~f init =
           loop ctxt (Roll_repr.succ roll) (f roll contract acc) in
   loop ctxt Roll_repr.first (return init)
 
-let froze_rolls_for_cycle ctxt cycle =
+let freeze_rolls_for_cycle ctxt cycle =
   fold ctxt (ctxt, Roll_repr.first)
     ~f:(fun roll contract (ctxt, promoted_roll as acc) ->
         get_contract_delegate ctxt contract >>=? function

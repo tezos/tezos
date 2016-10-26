@@ -184,7 +184,7 @@ let may_start_new_cycle ctxt =
       Seed.clear_cycle ctxt last_cycle >>=? fun ctxt ->
       Seed.compute_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
       Roll.clear_cycle ctxt last_cycle >>=? fun ctxt ->
-      Roll.froze_rolls_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
+      Roll.freeze_rolls_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
       Timestamp.get_current ctxt >>=? fun timestamp ->
       Lwt.return (Timestamp.(timestamp +? (Constants.time_before_reward ctxt)))
       >>=? fun reward_date ->
