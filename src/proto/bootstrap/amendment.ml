@@ -54,12 +54,12 @@ let start_new_voting_cycle ctxt =
       Vote.clear_listings ctxt >>=? fun ctxt ->
       match select_winning_proposal proposals with
       | None ->
-          Vote.froze_listings ctxt >>=? fun ctxt ->
+          Vote.freeze_listings ctxt >>=? fun ctxt ->
           Vote.clear_current_proposal ctxt >>=? fun ctxt ->
           return ctxt
       | Some proposal ->
           Vote.set_current_proposal ctxt proposal >>=? fun ctxt ->
-          Vote.froze_listings ctxt >>=? fun ctxt ->
+          Vote.freeze_listings ctxt >>=? fun ctxt ->
           Vote.set_current_period_kind ctxt Testing_vote >>=? fun ctxt ->
           return ctxt
     end
@@ -75,11 +75,11 @@ let start_new_voting_cycle ctxt =
         return ctxt
       else
         Vote.clear_current_proposal ctxt >>=? fun ctxt ->
-        Vote.froze_listings ctxt >>=? fun ctxt ->
+        Vote.freeze_listings ctxt >>=? fun ctxt ->
         Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt ->
         return ctxt
   | Testing ->
-      Vote.froze_listings ctxt >>=? fun ctxt ->
+      Vote.freeze_listings ctxt >>=? fun ctxt ->
       Vote.set_current_period_kind ctxt Promotion_vote >>=? fun ctxt ->
       return ctxt
   | Promotion_vote ->
@@ -95,7 +95,7 @@ let start_new_voting_cycle ctxt =
       Vote.clear_ballots ctxt >>= fun ctxt ->
       Vote.clear_listings ctxt >>=? fun ctxt ->
       Vote.clear_current_proposal ctxt >>=? fun ctxt ->
-      Vote.froze_listings ctxt >>=? fun ctxt ->
+      Vote.freeze_listings ctxt >>=? fun ctxt ->
       Vote.set_current_period_kind ctxt Proposal >>=? fun ctxt ->
       return ctxt
 

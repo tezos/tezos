@@ -25,9 +25,9 @@ let initialize (ctxt:Context.t) =
   Contract_storage.init store >>=? fun store ->
   Reward_storage.init store >>=? fun store ->
   Bootstrap_storage.init store >>=? fun store ->
-  Roll_storage.froze_rolls_for_cycle
+  Roll_storage.freeze_rolls_for_cycle
     store Cycle_repr.root >>=? fun store ->
-  Roll_storage.froze_rolls_for_cycle
+  Roll_storage.freeze_rolls_for_cycle
     store Cycle_repr.(succ root) >>=? fun store ->
   Vote_storage.init store >>=? fun store ->
   return store
