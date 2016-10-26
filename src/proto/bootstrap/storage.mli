@@ -69,6 +69,39 @@ module Roll : sig
      and type value = Contract_repr.t
      and type context := t
 
+  (** The next roll to be allocated. *)
+  module Next : Single_data_storage
+    with type value = Roll_repr.t
+     and type context := t
+
+  (** Rolls linked lists represent both account owned and free rolls.
+      All rolls belongs either to the limbo list or to an owned list. *)
+
+  (** Head of the linked list of rolls in limbo *)
+  module Limbo : Single_optional_data_storage
+    with type value = Roll_repr.t
+     and type context := t
+
+  (** Rolls associated to contracts, a linked list per contract *)
+  module Contract_roll_list : Indexed_optional_data_storage
+    with type key = Contract_repr.t
+     and type value = Roll_repr.t
+     and type context := t
+
+  (** Use this to iter on a linked list of rolls *)
+  module Successor : Indexed_optional_data_storage
+    with type key = Roll_repr.t
+     and type value = Roll_repr.t
+     and type context := t
+
+  (** The tez of a contract that are not assigned to rolls *)
+  module Contract_change : Indexed_data_storage
+    with type key = Contract_repr.t
+     and type value = Tez_repr.t
+     and type context := t
+
+  (** Frozen rolls per cycle *)
+
   module Last_for_cycle : Indexed_data_storage
     with type key = Cycle_repr.t
      and type value = Roll_repr.t
@@ -77,33 +110,6 @@ module Roll : sig
   module Owner_for_cycle : Indexed_data_storage
     with type key = Cycle_repr.t * Roll_repr.t
      and type value = Ed25519.public_key_hash
-     and type context := t
-
-  (** The next roll to be allocated. *)
-  module Next : Single_data_storage
-    with type value = Roll_repr.t
-     and type context := t
-
-  (** Rolls linked lists represent both account owned and free rolls.
-      All rolls belongs either to the limbo list or to an owned list. *)
-  module Successor : Indexed_optional_data_storage
-    with type key = Roll_repr.t
-     and type value = Roll_repr.t
-     and type context := t
-
-  module Limbo : Single_optional_data_storage
-    with type value = Roll_repr.t
-     and type context := t
-
-  module Contract_roll_list : Indexed_optional_data_storage
-    with type key = Contract_repr.t
-     and type value = Roll_repr.t
-     and type context := t
-
-  (** The tez of a contract that are not assigned to rolls *)
-  module Contract_change : Indexed_data_storage
-    with type key = Contract_repr.t
-     and type value = Tez_repr.t
      and type context := t
 
 end
