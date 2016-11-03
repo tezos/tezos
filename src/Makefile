@@ -106,6 +106,7 @@ UTILS_LIB_INTFS := \
   utils/hex_encode.mli \
   utils/utils.mli \
   utils/cli_entries.mli \
+	utils/crypto_box.mli \
   utils/compare.mli \
   utils/data_encoding.mli \
   utils/time.mli \
@@ -123,6 +124,7 @@ UTILS_LIB_IMPLS := \
   utils/utils.ml \
   utils/cli_entries.ml \
   utils/compare.ml \
+	utils/crypto_box.ml \
   utils/data_encoding.ml \
   utils/time.ml \
   utils/hash.ml \
