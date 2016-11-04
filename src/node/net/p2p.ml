@@ -434,8 +434,8 @@ let addr_encoding =
 let public_key_encoding =
   let open Data_encoding in
     conv
-      (fun public_key -> MBytes.to_string (Crypto_box.of_public_key public_key))
-      (fun str -> Crypto_box.to_public_key (MBytes.of_string str))
+      (MBytes.to_string << Crypto_box.of_public_key)
+      (Crypto_box.to_public_key << MBytes.of_string)
       string
 
 let peers_file_encoding =

@@ -38,3 +38,5 @@ val remove_elem_from_list: int -> 'a list -> 'a list
 
 val filter_map: ('a -> 'b option) -> 'a list -> 'b list
 
+(** Compose functions from right to left. *)
+val (<<) : ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
