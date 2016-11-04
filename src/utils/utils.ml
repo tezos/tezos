@@ -121,3 +121,5 @@ let rec remove_elem_from_list nb = function
   | [] -> []
   | l when nb <= 0 -> l
   | _ :: tl -> remove_elem_from_list (nb - 1) tl
+
+let (<<) g f = fun a -> g (f a)
