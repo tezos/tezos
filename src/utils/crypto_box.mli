@@ -18,3 +18,5 @@ val random_nonce : unit -> nonce
 val increment_nonce : ?step:int -> nonce -> nonce
 val box : secret_key -> public_key -> MBytes.t -> nonce -> MBytes.t
 val box_open : secret_key -> public_key -> MBytes.t -> nonce -> MBytes.t
+val to_public_key : MBytes.t -> public_key
+val of_public_key : public_key -> MBytes.t

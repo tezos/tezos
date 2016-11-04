@@ -66,7 +66,7 @@ type point = addr * port
    not a real kind of packet, it means that something indecypherable
    was transmitted. *)
 type packet =
-  | Connect of gid * int option * version list
+  | Connect of gid * Crypto_box.public_key * int option * version list
   | Disconnect
   | Advertise of (addr * port) list
   | Message of Netbits.frame
@@ -96,12 +96,12 @@ let recv_packet
         | [ S 2 ] -> return Ping
         | [ S 12 ] -> return Pong
         | [ S 3 ] -> return Bootstrap
-        | [ S 4 ; B gid ; S port ; F rest ] as msg ->
+        | [ S 4 ; B gid ; B public_key ; S port ; F rest ] as msg ->
             decode_versions msg rest @@ fun versions ->
-            return (Connect (MBytes.to_string gid, Some port, versions))
-        | [ S 4 ; B gid ; F rest ] as msg ->
+            return (Connect (MBytes.to_string gid, Crypto_box.to_public_key public_key, Some port, versions))
+        | [ S 4 ; B gid ; B public_key ; F rest ] as msg ->
             decode_versions msg rest @@ fun versions ->
-            return (Connect (MBytes.to_string gid, None, versions))
+            return (Connect (MBytes.to_string gid, Crypto_box.to_public_key public_key, None, versions))
         | [ S 5 ; F rest ] as msg ->
             let rec decode_peers acc = function
               | F [ B addr ; S port ] :: rest -> begin
@@ -127,14 +127,14 @@ let send_packet
       | Ping -> [ S 2 ]
       | Pong -> [ S 12 ]
       | Bootstrap -> [ S 3 ]
-      | Connect (gid, port, versions) ->
+      | Connect (gid, public_key, port, versions) ->
           let rec encode = function
             | (name, maj, min) :: tl ->
                 let rest = encode tl in
                 F [ B (MBytes.of_string name) ; S maj ; S min ] :: rest
             | [] -> []
           in
-          [ S 4 ; B (MBytes.of_string gid) ]
+          [ S 4 ; B (MBytes.of_string gid) ; B (Crypto_box.of_public_key public_key) ]
           @ (match port with | Some port -> [ S port ] | None -> [])
           @ [ F (encode versions) ]
       | Advertise peers ->
@@ -170,6 +170,7 @@ type net = {
    workers (on shutdown of during maintenance). *)
 and peer = {
   gid : gid ;
+  public_key : Crypto_box.public_key ;
   point : point ;
   listening_port : port option ;
   version : version ;
@@ -282,7 +283,7 @@ end
    function for communicating with the main worker using events
    (including the one sent when the connection is alive). Returns a
    canceler. *)
-let connect_to_peer config limits my_gid socket (addr, port) push white_listed =
+let connect_to_peer config limits my_gid my_public_key socket (addr, port) push white_listed =
   (* a non exception-based cancelation mechanism *)
   let cancelation, cancel, on_cancel = canceler () in
   (* a cancelable reception *)
@@ -294,11 +295,12 @@ let connect_to_peer config limits my_gid socket (addr, port) push white_listed =
      connection, both parties must first present themselves. *)
   let rec connect () =
     send_packet socket (Connect (my_gid,
+                                 my_public_key,
                                  config.incoming_port,
                                  config.supported_versions)) >>= fun _ ->
     pick [ (LU.sleep limits.peer_answer_timeout >>= fun () -> return Disconnect) ;
            recv () ] >>= function
-    | Connect (gid, listening_port, versions) ->
+    | Connect (gid, public_key , listening_port, versions) ->
         debug "(%a) connection requested from %a @ %a:%d"
           pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
         begin match common_version config.supported_versions versions with
@@ -310,7 +312,7 @@ let connect_to_peer config limits my_gid socket (addr, port) push white_listed =
               if config.closed_network then
                 match listening_port with
                 | Some port when white_listed (addr, port) ->
-                    connected version gid listening_port
+                    connected version gid public_key listening_port
                 | Some port ->
                     debug "(%a) connection rejected (out of the closed network) from %a:%d"
                       pp_gid my_gid Ipaddr.pp_hum addr port ;
@@ -320,7 +322,7 @@ let connect_to_peer config limits my_gid socket (addr, port) push white_listed =
                       pp_gid my_gid Ipaddr.pp_hum addr ;
                     cancel ()
               else
-                connected version gid listening_port
+                connected version gid public_key listening_port
         end
     | Advertise peers ->
         (* alternatively, one can refuse a connection but reply with
@@ -338,7 +340,7 @@ let connect_to_peer config limits my_gid socket (addr, port) push white_listed =
           pp_gid my_gid Ipaddr.pp_hum addr port ;
         cancel ()
   (* Them we can build the net object and launch the worker. *)
-  and connected version gid listening_port =
+  and connected version gid public_key listening_port =
     (* net object state *)
     let last = ref (Unix.gettimeofday ()) in
     (* net object callbaks *)
@@ -346,7 +348,7 @@ let connect_to_peer config limits my_gid socket (addr, port) push white_listed =
     let disconnect () = cancel () in
     let send p = send_packet socket p >>= fun _ -> return () in
     (* net object construction *)
-    let peer = { gid ; point = (addr, port) ; listening_port ;
+    let peer = { gid ; public_key ; point = (addr, port) ; listening_port ;
                  version ; last_seen ; disconnect ; send } in
     (* The packet reception loop. *)
     let rec receiver () =
@@ -429,10 +431,18 @@ let addr_encoding =
              (fun b -> Ipaddr.(V6 (V6.of_bytes_exn b))) ;
          ])
 
+let public_key_encoding =
+  let open Data_encoding in
+    conv
+      (fun public_key -> MBytes.to_string (Crypto_box.of_public_key public_key))
+      (fun str -> Crypto_box.to_public_key (MBytes.of_string str))
+      string
+
 let peers_file_encoding =
   let open Data_encoding in
-  obj2
+  obj3
     (req "gid" string)
+    (req "public_key" public_key_encoding)
     (req "peers"
        (obj3
           (req "known"
@@ -591,10 +601,12 @@ let bootstrap config limits =
   on_cancel (fun () -> close_msg_queue () ; return ()) ;
   (* fill the known peers pools from last time *)
   Data_encoding.Json.read_file config.peers_file >>= fun res ->
-  let known_peers, black_list, my_gid =
+  let known_peers, black_list, my_gid, my_public_key =
     let init_peers () =
       let my_gid =
         fresh_gid () in
+      let (my_secret_key, my_public_key) =
+        Crypto_box.random_keypair () in
       let known_peers =
         let source =
           { unreachable_since = None ;
@@ -605,19 +617,19 @@ let bootstrap config limits =
           PeerMap.empty config.known_peers in
       let black_list =
         BlackList.empty in
-      known_peers, black_list, my_gid in
+      known_peers, black_list, my_gid, my_public_key in
     match res with
     | None ->
-        let known_peers, black_list, my_gid = init_peers () in
+        let known_peers, black_list, my_gid, my_public_key = init_peers () in
         debug "(%a) peer cache initiated" pp_gid my_gid ;
-        ref known_peers, ref black_list, my_gid
+        ref known_peers, ref black_list, my_gid, my_public_key
     | Some json ->
         match Data_encoding.Json.destruct peers_file_encoding json with
         | exception _ ->
-            let known_peers, black_list, my_gid = init_peers () in
+            let known_peers, black_list, my_gid, my_public_key = init_peers () in
             debug "(%a) peer cache reset" pp_gid my_gid ;
-            ref known_peers, ref black_list, my_gid
-        | (my_gid, (k, b, w)) ->
+            ref known_peers, ref black_list, my_gid, my_public_key
+        | (my_gid, my_public_key, (k, b, w)) ->
             let white_list =
               List.fold_right PointSet.add w PointSet.empty in
             let known_peers =
@@ -642,7 +654,7 @@ let bootstrap config limits =
                 (fun r (a, d) -> BlackList.add a d r)
                 BlackList.empty b in
             debug "(%a) peer cache loaded" pp_gid my_gid ;
-            ref known_peers, ref black_list, my_gid
+            ref known_peers, ref black_list, my_gid, my_public_key
   in
   (* some peer reachability predicates *)
   let black_listed (addr, _) =
@@ -660,6 +672,7 @@ let bootstrap config limits =
       let json =
         Data_encoding.Json.construct peers_file_encoding @@
         (my_gid,
+         my_public_key,
          PeerMap.fold
            (fun (addr, port) gid source (k, b, w) ->
               let infos = match gid, source.connections with
@@ -919,7 +932,7 @@ let bootstrap config limits =
           main ()
         else
           let canceler =
-            connect_to_peer config limits my_gid socket (addr, port) enqueue_event white_listed in
+            connect_to_peer config limits my_gid my_public_key socket (addr, port) enqueue_event white_listed in
           debug "(%a) incoming peer at %a:%d"
             pp_gid my_gid Ipaddr.pp_hum addr port ;
           incoming := PointMap.add (addr, port) canceler !incoming ;
