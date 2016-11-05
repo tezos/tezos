@@ -22,3 +22,5 @@ val to_secret_key : MBytes.t -> secret_key
 val of_secret_key : secret_key -> MBytes.t
 val to_public_key : MBytes.t -> public_key
 val of_public_key : public_key -> MBytes.t
+val to_nonce : MBytes.t -> nonce
+val of_nonce : nonce -> MBytes.t
