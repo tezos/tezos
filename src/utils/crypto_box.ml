@@ -19,5 +19,7 @@ let random_nonce = Sodium.Box.random_nonce
 let increment_nonce = Sodium.Box.increment_nonce
 let box = Sodium.Box.Bigbytes.box
 let box_open = Sodium.Box.Bigbytes.box_open
+let to_secret_key = Sodium.Box.Bigbytes.to_secret_key
+let of_secret_key = Sodium.Box.Bigbytes.of_secret_key
 let to_public_key = Sodium.Box.Bigbytes.to_public_key
 let of_public_key = Sodium.Box.Bigbytes.of_public_key

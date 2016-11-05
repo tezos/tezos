@@ -438,11 +438,19 @@ let public_key_encoding =
       (Crypto_box.to_public_key << MBytes.of_string)
       string
 
+let secret_key_encoding =
+  let open Data_encoding in
+    conv
+      (MBytes.to_string << Crypto_box.of_secret_key)
+      (Crypto_box.to_secret_key << MBytes.of_string)
+      string
+
 let peers_file_encoding =
   let open Data_encoding in
-  obj3
+  obj4
     (req "gid" string)
     (req "public_key" public_key_encoding)
+    (req "secret_key" secret_key_encoding)
     (req "peers"
        (obj3
           (req "known"
@@ -601,7 +609,7 @@ let bootstrap config limits =
   on_cancel (fun () -> close_msg_queue () ; return ()) ;
   (* fill the known peers pools from last time *)
   Data_encoding.Json.read_file config.peers_file >>= fun res ->
-  let known_peers, black_list, my_gid, my_public_key =
+  let known_peers, black_list, my_gid, my_public_key, my_secret_key =
     let init_peers () =
       let my_gid =
         fresh_gid () in
@@ -617,19 +625,19 @@ let bootstrap config limits =
           PeerMap.empty config.known_peers in
       let black_list =
         BlackList.empty in
-      known_peers, black_list, my_gid, my_public_key in
+      known_peers, black_list, my_gid, my_public_key, my_secret_key in
     match res with
     | None ->
-        let known_peers, black_list, my_gid, my_public_key = init_peers () in
+        let known_peers, black_list, my_gid, my_public_key, my_secret_key = init_peers () in
         debug "(%a) peer cache initiated" pp_gid my_gid ;
-        ref known_peers, ref black_list, my_gid, my_public_key
+        ref known_peers, ref black_list, my_gid, my_public_key, my_secret_key
     | Some json ->
         match Data_encoding.Json.destruct peers_file_encoding json with
         | exception _ ->
-            let known_peers, black_list, my_gid, my_public_key = init_peers () in
+            let known_peers, black_list, my_gid, my_public_key, my_secret_key = init_peers () in
             debug "(%a) peer cache reset" pp_gid my_gid ;
-            ref known_peers, ref black_list, my_gid, my_public_key
-        | (my_gid, my_public_key, (k, b, w)) ->
+            ref known_peers, ref black_list, my_gid, my_public_key, my_secret_key
+        | (my_gid, my_public_key, my_secret_key, (k, b, w)) ->
             let white_list =
               List.fold_right PointSet.add w PointSet.empty in
             let known_peers =
@@ -654,7 +662,7 @@ let bootstrap config limits =
                 (fun r (a, d) -> BlackList.add a d r)
                 BlackList.empty b in
             debug "(%a) peer cache loaded" pp_gid my_gid ;
-            ref known_peers, ref black_list, my_gid, my_public_key
+            ref known_peers, ref black_list, my_gid, my_public_key, my_secret_key
   in
   (* some peer reachability predicates *)
   let black_listed (addr, _) =
@@ -673,6 +681,7 @@ let bootstrap config limits =
         Data_encoding.Json.construct peers_file_encoding @@
         (my_gid,
          my_public_key,
+         my_secret_key,
          PeerMap.fold
            (fun (addr, port) gid source (k, b, w) ->
               let infos = match gid, source.connections with
