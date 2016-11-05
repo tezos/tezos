@@ -23,3 +23,5 @@ let to_secret_key = Sodium.Box.Bigbytes.to_secret_key
 let of_secret_key = Sodium.Box.Bigbytes.of_secret_key
 let to_public_key = Sodium.Box.Bigbytes.to_public_key
 let of_public_key = Sodium.Box.Bigbytes.of_public_key
+let to_nonce = Sodium.Box.Bigbytes.to_nonce
+let of_nonce = Sodium.Box.Bigbytes.of_nonce
