@@ -355,6 +355,7 @@ let connect_to_peer config limits my_gid my_public_key my_secret_key socket (add
       let nonce = Crypto_box.random_nonce () in
       let msg_encr = Crypto_box.box my_secret_key public_key msg nonce in
       let packet = Box (nonce, msg_encr) in
+      Format.printf "encoding %s as %s" (MBytes.to_string msg) (MBytes.to_string msg_encr);
       send_packet socket packet >>= fun _ -> return () in
     (* net object construction *)
     let peer = { gid ; public_key ; point = (addr, port) ; listening_port ;
@@ -381,6 +382,7 @@ let connect_to_peer config limits my_gid my_public_key my_secret_key socket (add
           push (Recv (peer, msg)) ; receiver ()
       | Box (nonce, msg_encr) ->
           let msg = Crypto_box.box_open my_secret_key public_key msg_encr nonce in
+          Format.printf "decoding %s as %s" (MBytes.to_string msg_encr) (MBytes.to_string msg);
           push (Recv (peer, [B msg])) ; receiver ()
     in
     (* The polling loop *)
@@ -1069,7 +1071,8 @@ let bootstrap config limits =
   and recv_from () =
     dequeue_msg ()
   and send_to (peer, msg) =
-    peer.send (Message msg) >>= fun _ -> return ()
+    peer.send (Message msg) <&>
+    peer.send_encr (MBytes.of_string "Eitan")
   and push (peer, msg) =
     Lwt.async (fun () -> peer.send (Message msg))
   and broadcast msg =
