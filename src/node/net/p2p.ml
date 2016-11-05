@@ -458,10 +458,11 @@ let peers_file_encoding =
                        (req "addr" addr_encoding)
                        (req "port" int31)
                        (opt "infos"
-                          (obj3
+                          (obj4
                              (req "connections" int31)
                              (req "lastSeen" float)
-                             (req "gid" string))))))
+                             (req "gid" string)
+                             (req "public_key" public_key_encoding))))))
           (req "blacklisted"
              (list (obj2
                        (req "addr" addr_encoding)
@@ -474,7 +475,7 @@ let peers_file_encoding =
 (* Info on peers maintained between connections *)
 type source =
   { unreachable_since : float option;
-    connections : (int * float) option ;
+    connections : (int * float * Crypto_box.public_key) option ;
     white_listed : bool }
 
 (* Ad hoc comparison on sources such as good source < bad source *)
@@ -487,7 +488,7 @@ let compare_sources s1 s2 =
       | _, _ ->
           match s1.connections, s2.connections with
           | Some _, None -> -1 | None, Some _ -> 1 | None, None -> 0
-          | Some (n1, t1), Some (n2, t2) ->
+          | Some (n1, t1, _), Some (n2, t2, _) ->
               if n1 = n2 then compare t2 t1
               else compare n2 n1
 
@@ -650,10 +651,10 @@ let bootstrap config limits =
                            connections = None ;
                            white_listed = true } in
                        PeerMap.update (addr, port) source r
-                   | Some (c, t, gid) ->
+                   | Some (c, t, gid, pk) ->
                        let source =
                          { unreachable_since = None ;
-                           connections = Some (c, t) ;
+                           connections = Some (c, t, pk) ;
                            white_listed = PointSet.mem (addr, port) white_list } in
                        PeerMap.update (addr, port) ~gid source r)
                 PeerMap.empty k in
@@ -685,7 +686,7 @@ let bootstrap config limits =
          PeerMap.fold
            (fun (addr, port) gid source (k, b, w) ->
               let infos = match gid, source.connections with
-                | Some gid, Some (n, t) -> Some (n, t, gid)
+                | Some gid, Some (n, t, pk) -> Some (n, t, gid, pk)
                 | _ -> None in
               ((addr, port, infos) :: k,
                b,
@@ -891,15 +892,15 @@ let bootstrap config limits =
               in update @@
               try match PeerMap.by_gid peer.gid !known_peers with
                 | { connections = None ; white_listed } ->
-                    { connections = Some (1, Unix.gettimeofday ()) ;
+                    { connections = Some (1, Unix.gettimeofday (), peer.public_key) ;
                       unreachable_since = None ;
                       white_listed }
-                | { connections = Some (n, _) ; white_listed } ->
-                    { connections = Some (n + 1, Unix.gettimeofday ()) ;
+                | { connections = Some (n, _, _) ; white_listed } ->
+                    { connections = Some (n + 1, Unix.gettimeofday (), peer.public_key) ;
                       unreachable_since = None ;
                       white_listed}
               with Not_found ->
-                { connections = Some (1, Unix.gettimeofday ()) ;
+                { connections = Some (1, Unix.gettimeofday (), peer.public_key) ;
                   unreachable_since = None ;
                   white_listed = white_listed point }
         in
