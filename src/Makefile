@@ -231,7 +231,6 @@ NODE_LIB_INTFS := \
   node/shell/prevalidator.mli \
   node/shell/validator.mli \
   \
-  node/shell/messages.mli \
   node/shell/discoverer.mli \
   node/shell/node_rpc_services.mli \
   node/shell/node.mli \
@@ -257,9 +256,10 @@ NODE_LIB_IMPLS := \
   node/updater/proto_environment.ml \
   node/updater/register.ml \
   \
+  node/shell/messages.ml \
+  node/shell/netparams.ml \
   node/shell/state.ml \
   \
-  node/shell/messages.ml \
   node/shell/prevalidator.ml \
   node/shell/validator.ml \
   \

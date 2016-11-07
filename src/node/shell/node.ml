@@ -7,11 +7,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module P2p = Netparams
+
 open Logging.Node.Worker
 
 let (>|=) = Lwt.(>|=)
-
-let supported_versions = ["TEZOS", 0, 0]
 
 let inject_operation validator ?force bytes =
   let t =
@@ -194,18 +194,17 @@ type t = {
 let request_operations net _net_id operations =
   (* TODO improve the lookup strategy.
           For now simply broadcast the request to all our neighbours. *)
-  P2p.broadcast
-    (Messages.(to_frame (Get_operations operations))) net
+  P2p.broadcast net (Get_operations operations)
 
 let request_blocks net _net_id blocks =
   (* TODO improve the lookup strategy.
           For now simply broadcast the request to all our neighbours. *)
-  P2p.broadcast (Messages.(to_frame (Get_blocks blocks))) net
+  P2p.broadcast net (Get_blocks blocks)
 
 let request_protocols net protocols =
   (* TODO improve the lookup strategy.
           For now simply broadcast the request to all our neighbours. *)
-  P2p.broadcast (Messages.(to_frame (Get_protocols protocols))) net
+  P2p.broadcast net (Get_protocols protocols)
 
 let init_p2p net_params =
   match net_params with
@@ -244,21 +243,12 @@ let create
 
   lwt_log_info "starting worker..." >>= fun () ->
   let worker =
-    let handle_msg peer frame =
-      lwt_log_info "received message" >>= fun () ->
-      match Messages.from_frame frame with
-      | None ->
-          lwt_warn "can't parse message" >>= fun () ->
-          (* FIXME 60 second ? parameter... and Log_notice *)
-          let addr, _, _ = P2p.peer_info peer p2p in
-          P2p.blacklist ~duration:60. addr p2p ;
-          Lwt.return_unit
-      | Some msg ->
-          process state validator msg >>= fun msgs ->
-          List.iter
-            (fun msg -> P2p.push (peer, Messages.to_frame msg) p2p)
-            msgs;
-          Lwt.return_unit
+    let handle_msg peer msg =
+      process state validator msg >>= fun msgs ->
+      List.iter
+        (fun msg -> ignore @@ P2p.try_send p2p peer msg)
+        msgs;
+      Lwt.return_unit
     in
     let rec worker_loop () =
       P2p.recv p2p >>= fun (peer, msg) ->

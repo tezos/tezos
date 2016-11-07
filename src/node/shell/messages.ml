@@ -7,11 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Netbits
-
 type net_id = Store.net_id
 
-type message =
+type t =
 
   | Discover_blocks of net_id * Block_hash.t list (* Block locator *)
   | Block_inventory of net_id * Block_hash.t list
@@ -28,65 +26,53 @@ type message =
   | Get_protocols of Protocol_hash.t list
   | Protocol of MBytes.t
 
+let encoding =
+  let open Data_encoding in
+  let case ?max_length ~tag encoding unwrap wrap =
+    P2p.Encoding { tag; encoding; wrap; unwrap; max_length }
+  in [
+    case ~tag:0x10 (tup2 Block_hash.encoding (list Block_hash.encoding))
+      (function
+        | Discover_blocks (Net genesis_bh, bhs) -> Some (genesis_bh, bhs)
+        | _ -> None)
+      (fun (genesis_bh, bhs) -> Discover_blocks (Net genesis_bh, bhs));
+    case ~tag:0x11 (tup2 Block_hash.encoding (list Block_hash.encoding))
+      (function
+        | Block_inventory (Net genesis_bh, bhs) -> Some (genesis_bh, bhs)
+        | _ -> None)
+      (fun (genesis_bh, bhs) -> Block_inventory (Net genesis_bh, bhs));
 
-let to_frame msg =
+    case ~tag:0x12 (list Block_hash.encoding)
+      (function
+        | Get_blocks bhs -> Some bhs
+        | _ -> None)
+      (fun bhs -> Get_blocks bhs);
+    case ~tag:0x13 Data_encoding.bytes
+      (function Block b -> Some b  | _ -> None)
+      (fun b -> Block b);
 
-  let bh h = B (Block_hash.to_bytes h) in
-  let oph h = B (Operation_hash.to_bytes h) in
-  let ph h = B (Protocol_hash.to_bytes h) in
-  match msg with
+    case ~tag:0x20 Block_hash.encoding
+      (function Current_operations (Net genesis_bh) -> Some genesis_bh | _ -> None)
+      (fun genesis_bh -> Current_operations (Net genesis_bh));
+    case ~tag:0x21 (tup2 Block_hash.encoding (list Operation_hash.encoding))
+      (function Operation_inventory ((Net genesis_bh), ops) -> Some (genesis_bh, ops) | _ -> None)
+      (fun (genesis_bh, ops) -> Operation_inventory (Net genesis_bh, ops));
 
-  | Discover_blocks (Net netid, blocks) ->
-      [ S 2100 ; bh netid ; F (List.map bh blocks) ]
-  | Block_inventory (Net netid, blocks) ->
-      [ S 2101 ; bh netid ; F (List.map bh blocks) ]
-  | Get_blocks blocks ->
-      [ S 2102 ; F (List.map bh blocks) ]
-  | Block b ->
-      [ S 2103 ; B b ]
+    case ~tag:0x22 (list Operation_hash.encoding)
+      (function
+        | Get_operations ops -> Some ops
+        | _ -> None)
+      (fun ops -> Get_operations ops);
+    case ~tag:0x23 Data_encoding.bytes
+      (function Operation o -> Some o  | _ -> None)
+      (fun o -> Operation o);
 
-  | Current_operations (Net net_id) ->
-      [ S 2700 ; bh net_id ]
-  | Operation_inventory (Net net_id, ops) ->
-      [ S 2701 ; bh net_id ; F (List.map oph ops) ]
-  | Get_operations ops ->
-      [ S 2702 ; F (List.map oph ops) ]
-  | Operation b ->
-      [ S 2703 ; B b ]
-
-  | Get_protocols protos ->
-      [ S 2800 ; F (List.map ph protos) ]
-  | Protocol p ->
-      [ S 2801 ; B p ]
-
-let from_frame msg =
-
-  let bh = function B s -> (Block_hash.of_bytes s) | _ -> invalid_arg "bh" in
-  let oph = function B s -> (Operation_hash.of_bytes s) | _ -> invalid_arg "oph" in
-  let ph = function B s -> (Protocol_hash.of_bytes s) | _ -> invalid_arg "ph" in
-  let net = function netid -> Store.Net (Block_hash.of_bytes netid) in
-  try match msg with
-
-    | [ S 2100 ; B netid ; F blocks ] ->
-        Some (Discover_blocks (net netid, List.map bh blocks))
-    | [ S 2101 ; B netid ; F blocks ] ->
-        Some (Block_inventory (net netid, List.map bh blocks))
-    | [ S 2102 ; F blocks ] ->
-        Some (Get_blocks (List.map bh blocks))
-    | [ S 2103 ; B bh ] -> Some (Block bh)
-    | [ S 2700 ; B netid ] ->
-        Some (Current_operations (net netid))
-    | [ S 2701 ; B netid ; F ops ] ->
-        Some (Operation_inventory (net netid, List.map oph ops))
-    | [ S 2702 ; F ops ] ->
-        Some (Get_operations (List.map oph ops))
-    | [ S 2703 ; B contents ] -> Some (Operation contents)
-
-    | [ S 2800 ; F protos ] -> Some (Get_protocols (List.map ph protos))
-
-    | [ S 2801 ; B contents ] -> Some (Protocol contents)
-
-    | _ -> None
-
-  with Invalid_argument _ -> None
-
+    case ~tag:0x32 (list Protocol_hash.encoding)
+      (function
+        | Get_protocols protos -> Some protos
+        | _ -> None)
+      (fun protos -> Get_protocols protos);
+    case ~tag:0x33 Data_encoding.bytes
+      (function Protocol proto -> Some proto  | _ -> None)
+      (fun proto -> Protocol proto);
+]

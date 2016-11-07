@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module P2p = Netparams
+
 open Logging.Node.Validator
 
 type worker = {
@@ -43,7 +45,7 @@ let test_validator w = w.test_validator ()
 let fetch_block v = v.fetch_block
 let prevalidator v = v.prevalidator
 
-let broadcast w m = P2p.broadcast (Messages.to_frame m) w.p2p
+let broadcast w m = P2p.broadcast w.p2p m
 
 (** Current block computation *)
 
