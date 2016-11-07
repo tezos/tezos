@@ -9,6 +9,8 @@
 
 type worker
 
+module P2p = Netparams
+
 val create_worker: P2p.net -> State.t -> worker
 val shutdown: worker -> unit Lwt.t
 

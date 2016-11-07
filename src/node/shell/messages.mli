@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 (** High level messages *)
-type message =
+type t =
 
   | Discover_blocks of Store.net_id * Block_hash.t list (* Block locator *)
   | Block_inventory of Store.net_id * Block_hash.t list
@@ -25,9 +25,4 @@ type message =
   | Get_protocols of Protocol_hash.t list
   | Protocol of MBytes.t
 
-
-(** Converts a high level message to a network frame *)
-val to_frame: message -> Netbits.frame
-
-(** Tries and convert a network frame to a high level message *)
-val from_frame: Netbits.frame -> message option
+val encoding : t P2p.msg_encoding list

@@ -9,8 +9,6 @@
 
 type t
 
-val supported_versions: P2p.version list
-
 val create:
   genesis:Store.genesis ->
   store_root:string ->

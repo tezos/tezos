@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module P2p = Netparams
+
 type worker = {
   shutdown: unit -> unit Lwt.t;
 }
@@ -15,7 +17,7 @@ let create_worker p2p state =
 
   let cancelation, cancel, _on_cancel = Lwt_utils.canceler () in
 
-  let broadcast m = P2p.broadcast (Messages.to_frame m) p2p in
+  let broadcast m = P2p.broadcast p2p m in
 
   let discovery_worker =
     let rec worker_loop () =
