@@ -18,7 +18,9 @@ let random_keypair = Sodium.Box.random_keypair
 let random_nonce = Sodium.Box.random_nonce
 let increment_nonce = Sodium.Box.increment_nonce
 let box = Sodium.Box.Bigbytes.box
-let box_open = Sodium.Box.Bigbytes.box_open
+let box_open sk pk msg nonce =
+  try Some (Sodium.Box.Bigbytes.box_open sk pk msg nonce) with
+    | Sodium.Verification_failure -> None
 let to_secret_key = Sodium.Box.Bigbytes.to_secret_key
 let of_secret_key = Sodium.Box.Bigbytes.of_secret_key
 let to_public_key = Sodium.Box.Bigbytes.to_public_key
