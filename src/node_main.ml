@@ -288,7 +288,6 @@ let init_node () =
           { incoming_port = Globals.incoming_port#get ;
             discovery_port =
               if Globals.discovery_port#get then Some 7732 else None ;
-            supported_versions = Node.supported_versions ;
             known_peers = Globals.bootstrap_peers#get ;
             peers_file = Globals.peers_file#get ;
             closed_network = Globals.closed_network#get }

@@ -7,35 +7,27 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** A P2P network *)
-type net
-
-(** A faked p2p layer, which do not initiate any connection
-    nor open any listening socket. *)
-val faked_network : net
-
 (** A peer connection address *)
 type addr = Ipaddr.t
 
 (** A peer connection port *)
 type port = int
 
-(** A protocol version tag: (name, major, minor) *)
-type version = string * int * int
+(** A p2p protocol version *)
+type version = {
+  name : string ;
+  major : int ;
+  minor : int ;
+}
 
 (** Network configuration *)
 type config = {
   (** Tells if incoming connections accepted, precising the TCP port
-  on which the peer can be reached *)
+      on which the peer can be reached *)
   incoming_port : port option ;
   (** Tells if peers should be discovered automatically on the local
-  network, precising the UDP port to use *)
+      network, precising the UDP port to use *)
   discovery_port : port option ;
-  (** High level protocol(s) talked by the peer. When two peers
-      initiate a connection, they exchange their list of supported
-      versions. The chosen one, if any, is the maximum common one (in
-      lexicographic order) *)
-  supported_versions : version list ;
   (** List of hard-coded known peers to bootstrap the network from *)
   known_peers : (addr * port) list ;
   (** The path to the JSON file where the peer cache is loaded / stored *)
@@ -47,7 +39,7 @@ type config = {
 
 (** Network capacities *)
 type limits = {
-  (** Maximum length in bytes of network frames *)
+  (** Maximum length in bytes of network messages' payload *)
   max_packet_size : int ;
   (** Delay after which a non responding peer is considered dead *)
   peer_answer_timeout : float ;
@@ -61,42 +53,94 @@ type limits = {
   blacklist_time : float ;
 }
 
-(** Main network initialisation function *)
-val bootstrap : config -> limits -> net Lwt.t
+type 'msg msg_encoding = Encoding : {
+    tag: int ;
+    encoding: 'a Data_encoding.t ;
+    wrap: 'a -> 'msg ;
+    unwrap: 'msg -> 'a option ;
+    max_length: int option ;
+  } -> 'msg msg_encoding
 
-(** A maintenance operation : try and reach the ideal number of peers *)
-val maintain : net -> unit Lwt.t
+module type NET_PARAMS = sig
+  type meta (** Type of metadata associated to an identity *)
+  type msg (** Type of message used by higher layers *)
 
-(** Voluntarily drop some peers and replace them by new buddies *)
-val roll : net -> unit Lwt.t
+  val msg_encodings : msg msg_encoding list
 
-(** Close all connections properly *)
-val shutdown : net -> unit Lwt.t
+  val init_meta : meta
+  val score_enc : meta Data_encoding.t
+  val score: meta -> float
 
-(** A connection to a peer *)
-type peer
+  (** High level protocol(s) talked by the peer. When two peers
+      initiate a connection, they exchange their list of supported
+      versions. The chosen one, if any, is the maximum common one (in
+      lexicographic order) *)
+  val supported_versions : version list
+end
 
-(** Access the domain of active peers *)
-val peers : net -> peer list
+module Make (P : NET_PARAMS) : sig
+  type net
 
-(** Access the info of an active peer, if available *)
-val peer_info : peer -> net -> addr * port * version
+  (** A faked p2p layer, which do not initiate any connection
+      nor open any listening socket. *)
+  val faked_network : net
 
-(** Wait for a Netbits.frame from any peer in the network *)
-val recv : net -> (peer * Netbits.frame) Lwt.t
+  (** Main network initialisation function *)
+  val bootstrap : config:config -> limits:limits -> net Lwt.t
 
-(** Send a Netbits.frame to a peer and wait for it to be in the tube *)
-val send : peer * Netbits.frame -> net -> unit Lwt.t
+  (** A maintenance operation : try and reach the ideal number of peers *)
+  val maintain : net -> unit Lwt.t
 
-(** Send a Netbits.frame to a peer asynchronously *)
-val push : peer * Netbits.frame -> net -> unit
+  (** Voluntarily drop some peers and replace them by new buddies *)
+  val roll : net -> unit Lwt.t
 
-(** Send a Netbits.frame to all peers *)
-val broadcast : Netbits.frame -> net -> unit
+  (** Close all connections properly *)
+  val shutdown : net -> unit Lwt.t
 
-(** Shutdown the connection to all peers at this address and stop the
-    communications with this machine for [duration] seconds *)
-val blacklist : ?duration:float -> addr -> net -> unit
+  (** A connection to a peer *)
+  type peer
 
-(** Keep a connection to this pair as often as possible *)
-val whitelist : peer -> net -> unit
+  (** A global identifier for a peer, a.k.a. an identity *)
+  type gid
+
+  (** Access the domain of active peers *)
+  val peers : net -> peer list
+
+  (** Return the active peer with identity [gid] *)
+  val find_peer : net -> gid -> peer option
+
+  type peer_info = {
+    gid : gid;
+    addr : addr;
+    port : port;
+    version : version;
+  }
+
+  (** Access the info of an active peer, if available *)
+  val peer_info : net -> peer -> peer_info
+
+  (** Accessors for meta information about a peer *)
+  val get_meta : net -> gid -> P.meta option
+  val set_meta : net -> gid -> P.meta -> unit
+
+  (** Wait for a payload from any peer in the network *)
+  val recv : net -> (peer * P.msg) Lwt.t
+
+  (** Send a payload to a peer and wait for it to be in the tube *)
+  val send : net -> peer -> P.msg -> unit Lwt.t
+
+  (** Send a payload to a peer without waiting for the result. Return
+      [true] if the message can be enqueued in the peer's output queue
+      or [false] otherwise. *)
+  val try_send : net -> peer -> P.msg -> bool
+
+  (** Send a payload to all peers *)
+  val broadcast : net -> P.msg -> unit
+
+  (** Shutdown the connection to all peers at this address and stop the
+      communications with this machine for [duration] seconds *)
+  val blacklist : net -> gid -> unit
+
+  (** Keep a connection to this pair as often as possible *)
+  val whitelist : net -> gid -> unit
+end

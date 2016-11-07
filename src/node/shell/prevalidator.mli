@@ -26,6 +26,8 @@
 
 *)
 
+module P2p = Netparams
+
 type t
 
 (** Creation and destruction of a "prevalidation" worker. *)

@@ -9,6 +9,6 @@
 
 type worker
 
-val create_worker: P2p.net -> State.t -> worker
+val create_worker: Netparams.net -> State.t -> worker
 
 val shutdown: worker -> unit Lwt.t
