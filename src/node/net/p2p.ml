@@ -181,7 +181,7 @@ and peer = {
   last_seen : unit -> float ;
   disconnect : unit -> unit Lwt.t;
   send : packet -> unit Lwt.t ;
-  send_encr : MBytes.t -> unit Lwt.t ;
+  send_encr : frame -> unit Lwt.t ;
 }
 
 (* The (internal) type of network events, those dispatched from peer
@@ -357,7 +357,7 @@ let connect_to_peer config limits my_gid my_public_key my_nonce my_secret_key so
     let disconnect () = cancel () in
     let send p = send_packet socket p >>= fun _ -> return () in
     let send_encr msg =
-      let msg_encr = Crypto_box.box my_secret_key public_key msg (current_nonce ()) in
+      let msg_encr = Crypto_box.box my_secret_key public_key (to_raw msg) (current_nonce ()) in
       let packet = Box msg_encr in
       next_nonce (); send_packet socket packet >>= fun _ -> return () in
     (* net object construction *)
@@ -388,7 +388,10 @@ let connect_to_peer config limits my_gid my_public_key my_nonce my_secret_key so
             |> function
               | None -> debug "(%a) cannot decrypt message (from peer) %a @ %a:%d"
                   pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ; receiver ()
-              | Some msg -> push (Recv (peer, [B msg])) ; receiver ()
+              | Some bytes -> of_raw bytes |> function
+                | None -> debug "(%a) cannot decode message (from peer) %a @ %a:%d"
+                    pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ; receiver ()
+                | Some msg -> push (Recv (peer, msg)) ; receiver ()
     in
     (* The polling loop *)
     let rec pulse_monitor ping =
