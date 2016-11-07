@@ -101,6 +101,10 @@ module Globals = struct
       | Some dir -> base_dir#set dir in
     sandbox#add_hook sandboxed
 
+  let verbose_param =
+    new string_option_cp ~group:cli_group ["verbosity"] ~short_name:"v" (Some "notice")
+      "Verbosity level (fatal, error, warning, notice, info, debug)"
+
   (** File options *)
 
   let file_group = new group
@@ -220,6 +224,17 @@ end
 
 let init_logger () =
   let open Logging in
+  begin
+    let open Lwt_log_core in
+    match Globals.verbose_param#get with
+    | Some "fatal" -> add_rule "*" Fatal
+    | Some "error" -> add_rule "*" Error
+    | Some "warning" -> add_rule "*" Warning
+    | Some "notice" -> add_rule "*" Notice
+    | Some "info" -> add_rule "*" Info
+    | Some "debug" -> add_rule "*" Debug
+    | _ -> ()
+  end;
   match Globals.log_kind#get with
   | "" | "stderr" -> Logging.init Stderr
   | "stdout" -> Logging.init Stdout
