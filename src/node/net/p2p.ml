@@ -384,8 +384,11 @@ let connect_to_peer config limits my_gid my_public_key my_nonce my_secret_key so
       | Message msg ->
           push (Recv (peer, msg)) ; receiver ()
       | Box msg_encr ->
-          let msg = Crypto_box.box_open my_secret_key public_key msg_encr (peer.current_nonce ()) in
-          push (Recv (peer, [B msg])) ; receiver ()
+          Crypto_box.box_open my_secret_key public_key msg_encr (peer.current_nonce ())
+            |> function
+              | None -> debug "(%a) cannot decrypt message (from peer) %a @ %a:%d"
+                  pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ; receiver ()
+              | Some msg -> push (Recv (peer, [B msg])) ; receiver ()
     in
     (* The polling loop *)
     let rec pulse_monitor ping =
