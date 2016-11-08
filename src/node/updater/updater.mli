@@ -70,12 +70,13 @@ module type REGISTRED_PROTOCOL = sig
                              and type 'a tzresult := 'a tzresult
 end
 
-type component = {
+type component = Tezos_compiler.Protocol.component = {
   name : string ;
   interface : string option ;
   implementation : string ;
 }
 
+val extract: Lwt_io.file_name -> Protocol_hash.t -> component list -> unit Lwt.t
 val compile: Protocol_hash.t -> component list -> bool Lwt.t
 
 val activate: Context.t -> Protocol_hash.t -> Context.t Lwt.t

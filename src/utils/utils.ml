@@ -121,3 +121,23 @@ let rec remove_elem_from_list nb = function
   | [] -> []
   | l when nb <= 0 -> l
   | _ :: tl -> remove_elem_from_list (nb - 1) tl
+
+let finalize f g = try let res = f () in g (); res with exn -> g (); raise exn
+
+let read_file ?(bin=false) fn =
+  let ic = (if bin then open_in_bin else open_in) fn in
+  finalize (fun () ->
+      let len = in_channel_length ic in
+      let buf = Bytes.create len in
+      let nb_read = input ic buf 0 len in
+      if nb_read <> len then failwith (Printf.sprintf "read_file: read %d, expected %d" nb_read len)
+      else Bytes.unsafe_to_string buf)
+    (fun () -> close_in ic)
+
+let write_file ?(bin=false) fn contents =
+  let oc = (if bin then open_out_bin else open_out) fn in
+  finalize (fun () ->
+      let contents = Bytes.unsafe_of_string contents in
+      output oc contents 0 @@ Bytes.length contents
+    )
+    (fun () -> close_out oc)

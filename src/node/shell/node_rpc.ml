@@ -332,6 +332,42 @@ let get_operations node hash () =
   | Some bytes -> RPC.Answer.return bytes
   | None -> raise Not_found
 
+let list_protocols node {Services.Protocols.monitor; contents} =
+  let monitor = match monitor with None -> false | Some x -> x in
+  let include_contents = match contents with None -> false | Some x -> x in
+  Node.RPC.protocols node >>= fun protocols ->
+  Lwt_list.map_p
+    (fun hash ->
+       if include_contents then
+         Node.RPC.protocol_content node hash >>= function
+         | None | Some { Time.data = Error _ } -> Lwt.return (hash, None)
+         | Some { Time.data = Ok bytes }->
+             Lwt.return (hash, Some bytes)
+       else
+         Lwt.return (hash, None))
+    protocols >>= fun protocols ->
+  if not monitor then
+    RPC.Answer.return protocols
+  else
+    let stream, shutdown = Node.RPC.protocol_watcher node in
+    let first_request = ref true in
+    let next () =
+      if not !first_request then
+        Lwt_stream.get stream >>= function
+        | None -> Lwt.return_none
+        | Some (h, op) when include_contents -> Lwt.return (Some [h, Some op])
+        | Some (h, _) -> Lwt.return (Some [h, None])
+      else begin
+        first_request := false ;
+        Lwt.return (Some protocols)
+      end in
+    RPC.Answer.return_stream { next ; shutdown }
+
+let get_protocols node hash () =
+  Node.RPC.protocol_content node hash >>= function
+  | Some bytes -> RPC.Answer.return bytes
+  | None -> raise Not_found
+
 let build_rpc_directory node =
   let dir = RPC.empty in
   let dir = RPC.register0 dir Services.Blocks.list (list_blocks node) in
@@ -351,6 +387,10 @@ let build_rpc_directory node =
     RPC.register0 dir Services.Operations.list (list_operations node) in
   let dir =
     RPC.register1 dir Services.Operations.bytes (get_operations node) in
+  let dir =
+    RPC.register0 dir Services.Protocols.list (list_protocols node) in
+  let dir =
+    RPC.register1 dir Services.Protocols.bytes (get_protocols node) in
   let dir =
     let implementation (net_id, pred, time, fitness, operations, header) =
       Node.RPC.block_info node (`Head 0) >>= fun bi ->
@@ -383,6 +423,13 @@ let build_rpc_directory node =
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end >>= RPC.Answer.return in
     RPC.register0 dir Services.inject_operation implementation in
+  let dir =
+    let implementation (proto, blocking, force) =
+      Node.RPC.inject_protocol ?force node proto >>= fun (hash, wait) ->
+      begin
+        (if blocking then wait else return ()) >>=? fun () -> return hash
+      end >>= RPC.Answer.return in
+    RPC.register0 dir Services.inject_protocol implementation in
   let dir =
     let implementation () =
       RPC.Answer.return Data_encoding.Json.(schema (Error_monad.error_encoding ())) in

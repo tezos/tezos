@@ -97,6 +97,19 @@ module Operations : sig
      list_param, (Operation_hash.t * Store.operation option) list) RPC.service
 end
 
+module Protocols : sig
+  val bytes:
+    (unit, unit * Protocol_hash.t, unit,
+     Store.protocol tzresult Time.timed_data) RPC.service
+  type list_param = {
+    contents: bool option ;
+    monitor: bool option ;
+  }
+  val list:
+    (unit, unit,
+     list_param, (Protocol_hash.t * Store.protocol option) list) RPC.service
+end
+
 val forge_block:
   (unit, unit,
    Updater.net_id option * Block_hash.t option * Time.t option *
@@ -114,6 +127,10 @@ val inject_block:
 val inject_operation:
   (unit, unit,
    (MBytes.t * bool * bool option), Operation_hash.t tzresult) RPC.service
+
+val inject_protocol:
+  (unit, unit,
+   (Store.protocol * bool * bool option), Protocol_hash.t tzresult) RPC.service
 
 val describe:
   (unit, unit, bool option, RPC.Description.directory_descr) RPC.service

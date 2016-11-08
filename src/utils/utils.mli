@@ -38,3 +38,6 @@ val remove_elem_from_list: int -> 'a list -> 'a list
 
 val filter_map: ('a -> 'b option) -> 'a list -> 'b list
 
+val finalize: (unit -> 'a) -> (unit -> unit) -> 'a
+val read_file: ?bin:bool -> string -> string
+val write_file: ?bin:bool -> string -> string -> unit
