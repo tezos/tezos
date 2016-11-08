@@ -32,10 +32,20 @@ type input = {
 let fill_in input schema =
   let rec element path { title ; kind }=
     match kind with
-    | Integer ->
-        input.int 0 (1 lsl 30 - 1) title path >>= fun i ->
+    | Integer { minimum ; maximum } ->
+        let minimum =
+          match minimum with
+          | None -> min_int
+          | Some (m, `Inclusive) -> int_of_float m
+          | Some (m, `Exclusive) -> int_of_float m + 1 in
+        let maximum =
+          match maximum with
+          | None -> max_int
+          | Some (m, `Inclusive) -> int_of_float m
+          | Some (m, `Exclusive) -> int_of_float m - 1 in
+        input.int minimum maximum title path >>= fun i ->
         return (`Float (float i))
-    | Number ->
+    | Number _ ->
         input.float title path >>= fun f ->
         return (`Float f)
     | Boolean ->
@@ -51,8 +61,6 @@ let fill_in input schema =
     | Combine ((All_of | Not), _) -> fail Unsupported_construct
     | Def_ref name ->
         return (`String (Json_query.json_pointer_of_path name))
-(*        (try element path (find_definition name schema)
-          with Not_found -> fail Erroneous_construct) *)
     | Id_ref _ | Ext_ref _ ->
         fail Unsupported_construct
     | Array (elts, _) ->
