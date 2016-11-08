@@ -82,6 +82,9 @@ type t = {
   operation_db: Db_proxy.Operation.t ;
   operation_watchers:
     (Operation_hash.t * Store.operation) Watcher.t list ref ;
+  protocol_db: Db_proxy.Protocol.t ;
+  protocol_watchers:
+    (Protocol_hash.t * Store.protocol) Watcher.t list ref ;
   valid_block_state: valid_block_state Persist.shared_ref ;
 }
 
@@ -153,6 +156,15 @@ end
 module InvalidOperations =
   Persist.MakeBufferedPersistentSet
     (Store.Faked_functional_store) (InvalidOperations_key) (Operation_hash_set)
+
+module InvalidProtocols_key = struct
+  include Protocol_hash
+  let prefix = ["state"; "invalid_protocols"]
+  let length = path_len
+end
+module InvalidProtocols =
+  Persist.MakeBufferedPersistentSet
+    (Store.Faked_functional_store) (InvalidProtocols_key) (Protocol_hash_set)
 
 module InvalidBlocks_key = struct
   include Block_hash
@@ -233,6 +245,66 @@ module Operation = struct
     Persist.use state.store.global_store InvalidOperations.read
 
   let create_watcher t = Watcher.create_stream t.operation_watchers ()
+
+end
+
+module Protocol = struct
+  type key = Store.Protocol.key
+
+  type component = Tezos_compiler.Protocol.component = {
+    name: string;
+    interface: string option;
+    implementation: string
+  }
+
+  type t = Store.protocol
+
+  type protocol = t
+  exception Invalid of key * error list
+  let of_bytes = Store.Protocol.of_bytes
+  let to_bytes = Store.Protocol.to_bytes
+  let known t k = Db_proxy.Protocol.known t.protocol_db k
+  let read t k = Db_proxy.Protocol.read t.protocol_db k
+  let read_exn t k =
+    Db_proxy.Protocol.read t.protocol_db k >>= function
+    | None -> Lwt.fail Not_found
+    | Some { data = Error e } -> Lwt.fail (Invalid (k, e))
+    | Some { data = Ok data ; time }  -> Lwt.return { Time.data ; time }
+  let hash = Store.Protocol.hash
+  let raw_read t k =
+    Persist.use t.store.Store.protocol
+      (fun store -> Store.Protocol.raw_get store k)
+  let prefetch t net_id ks =
+    List.iter (Db_proxy.Protocol.prefetch t.protocol_db net_id) ks
+  let fetch t net_id k = Db_proxy.Protocol.fetch t.protocol_db net_id k
+  let store t bytes =
+    match of_bytes bytes with
+    | None -> fail Cannot_parse
+    | Some proto ->
+        let h = hash proto in
+        Db_proxy.Protocol.store t.protocol_db h (Time.make_timed (Ok proto))
+        >>= function
+        | true ->
+            Watcher.notify !(t.protocol_watchers) (h, proto) ;
+            return (Some (h, proto))
+        | false ->
+            return None
+  let mark_invalid t k e =
+    Db_proxy.Protocol.update t.protocol_db k (Time.make_timed (Error e))
+    >>= function
+    | true ->
+        Persist.update t.store.global_store (fun store ->
+            InvalidProtocols.set store k >>= fun store ->
+            Lwt.return (Some store)) >>= fun _ ->
+        Lwt.return true
+    | false -> Lwt.return false
+
+  let invalid state =
+    Persist.use state.store.global_store InvalidProtocols.read
+
+  let create_watcher t = Watcher.create_stream t.protocol_watchers ()
+
+  let keys { protocol_db } = Db_proxy.Protocol.keys protocol_db
 
 end
 
@@ -458,7 +530,7 @@ module Valid_block = struct
     hash: Block_hash.t ;
     pred: Block_hash.t ;
     timestamp: Time.t ;
-    fitness: Protocol.fitness ;
+    fitness: Fitness.fitness ;
     operations: Operation_hash.t list ;
     discovery_time: Time.t ;
     protocol_hash: Protocol_hash.t ;
@@ -785,6 +857,8 @@ module Valid_block = struct
       | Error exns ->
           locked_store_invalid vstate hash exns >>= fun _changed ->
           Lwt.return vstate
+
+    let keys _ = Store.undefined_key_fn
   end
 
   let iter_predecessors =
@@ -1216,12 +1290,14 @@ let () =
 (** Whole protocol state : read and store. *)
 
 let read
-    ~request_operations ~request_blocks
+    ~request_operations ~request_blocks ~request_protocols
     ~store_root ~context_root ~ttl ?patch_context () =
   Store.init store_root >>= fun store ->
   lwt_log_info "Initialising the distributed database..." >>= fun () ->
   let operation_db =
     Db_proxy.Operation.create { request_operations } store.operation in
+  let protocol_db =
+    Db_proxy.Protocol.create { request_protocols } store.protocol in
   let block_db =
     Db_proxy.Block.create { request_blocks } store.block in
   Valid_block.create
@@ -1233,6 +1309,8 @@ let read
     nets = Block_hash_table.create 7 ;
     operation_db ;
     operation_watchers = ref [] ;
+    protocol_db ;
+    protocol_watchers = ref [] ;
     block_db ; block_watchers = ref [] ;
     valid_block_state ;
   }

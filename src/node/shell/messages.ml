@@ -25,8 +25,8 @@ type message =
   | Get_operations of Operation_hash.t list
   | Operation of MBytes.t
 
-  | Current_protocol of net_id
-  | Protocol_inventory of Protocol_hash.t
+  | Get_protocols of Protocol_hash.t list
+  | Protocol of MBytes.t
 
 
 let to_frame msg =
@@ -54,10 +54,10 @@ let to_frame msg =
   | Operation b ->
       [ S 2703 ; B b ]
 
-  | Current_protocol (Net net_id) ->
-      [ S 2800 ; bh net_id ]
-  | Protocol_inventory p ->
-      [ S 2801 ; ph p ]
+  | Get_protocols protos ->
+      [ S 2800 ; F (List.map ph protos) ]
+  | Protocol p ->
+      [ S 2801 ; B p ]
 
 let from_frame msg =
 
@@ -82,9 +82,9 @@ let from_frame msg =
         Some (Get_operations (List.map oph ops))
     | [ S 2703 ; B contents ] -> Some (Operation contents)
 
-    | [ S 2800 ; B netid ] -> Some (Current_protocol (net netid))
+    | [ S 2800 ; F protos ] -> Some (Get_protocols (List.map ph protos))
 
-    | [ S 2801 ; p ] -> Some (Protocol_inventory (ph p))
+    | [ S 2801 ; B contents ] -> Some (Protocol contents)
 
     | _ -> None
 

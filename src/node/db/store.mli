@@ -21,6 +21,7 @@ module type TYPED_IMPERATIVE_STORE = sig
   val get_exn: t -> key -> value Lwt.t
   val set: t -> key -> value -> unit Lwt.t
   val del: t -> key -> unit Lwt.t
+  val keys: t -> key list Lwt.t
 end
 
 module type IMPERATIVE_STORE = sig
@@ -39,11 +40,13 @@ type generic_store
 type block_store
 type blockchain_store
 type operation_store
+type protocol_store
 
 type store = private {
   block: block_store Persist.shared_ref ;
   blockchain: blockchain_store Persist.shared_ref ;
   operation: operation_store Persist.shared_ref ;
+  protocol: protocol_store Persist.shared_ref ;
   global_store: generic_store Persist.shared_ref ;
   net_init: ?expiration:Time.t -> genesis -> net_store Lwt.t ;
   net_read: net_id -> net_store tzresult Lwt.t ;
@@ -69,6 +72,9 @@ val pp_net_id: Format.formatter -> net_id -> unit
 
 (** Open or initialize a store at a given path. *)
 val init: string -> store Lwt.t
+
+(** Lwt exn returned when function keys is not implemented *)
+val undefined_key_fn : 'a Lwt.t
 
 (** {2 Generic interface} ****************************************************)
 
@@ -106,6 +112,9 @@ type block = {
 }
 val shell_block_encoding: shell_block Data_encoding.t
 val block_encoding: block Data_encoding.t
+
+type protocol = Tezos_compiler.Protocol.t
+val protocol_encoding: protocol Data_encoding.t
 
 (** {2 Block and operations store} ********************************************)
 
@@ -177,6 +186,19 @@ module Operation : sig
 
 end
 
+module Protocol : sig
+  val of_bytes: MBytes.t -> Tezos_compiler.Protocol.t option
+  val to_bytes: Tezos_compiler.Protocol.t -> MBytes.t
+  val hash: Tezos_compiler.Protocol.t -> Protocol_hash.t
+
+  include TYPED_IMPERATIVE_STORE
+    with type t = protocol_store
+     and type key = Protocol_hash.t
+     and type value = Tezos_compiler.Protocol.t tzresult Time.timed_data
+
+  val raw_get: t -> Protocol_hash.t -> MBytes.t option Lwt.t
+end
+
 (**/**) (* For testing only *)
 
 (* module LwtUnixStore : sig *)
@@ -197,5 +219,10 @@ module Faked_functional_block :
   Persist.TYPED_STORE with type t = Block.t
                        and type value = Block.value
                        and type key = Block.key
+
+module Faked_functional_protocol :
+  Persist.TYPED_STORE with type t = Protocol.t
+                       and type value = Protocol.value
+                       and type key = Protocol.key
 
 module Faked_functional_store : Persist.STORE with type t = t

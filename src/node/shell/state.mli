@@ -39,6 +39,7 @@ type error +=
 val read:
   request_operations: (net_id -> Operation_hash.t list -> unit) ->
   request_blocks: (net_id -> Block_hash.t list -> unit) ->
+  request_protocols: (Protocol_hash.t list -> unit) ->
   store_root:string ->
   context_root:string ->
   ttl:int ->
@@ -340,6 +341,78 @@ module Valid_block : sig
   val store: state -> Block_hash.t -> Context.t -> valid_block tzresult Lwt.t
   val store_invalid: state -> Block_hash.t -> error list -> bool Lwt.t
 
+end
+
+(** {2 Protocol database} ****************************************************)
+
+(** The local and distributed database of protocols. *)
+module Protocol : sig
+
+  type key = Protocol_hash.t
+
+  type component = Tezos_compiler.Protocol.component = {
+    name : string ;
+    interface : string option ;
+    implementation : string ;
+  }
+
+  type t = Tezos_compiler.Protocol.t
+
+  type protocol = t
+
+  (** Is a protocol stored in the local database ? *)
+  val known: state -> key -> bool Lwt.t
+
+  (** Read a protocol in the local database. This returns [None]
+      when the protocol does not exist in the local database; this returns
+      [Some (Error _)] when [mark_invalid] was used. This also returns
+      the time when the protocol was stored on the local database. *)
+  val read:
+    state -> key -> protocol tzresult Time.timed_data option Lwt.t
+
+  (** Read a protocol in the local database. This throws [Not_found]
+      when the protocol does not exist in the local database or when
+      [mark_invalid] was used. *)
+  val read_exn:
+    state -> key -> protocol Time.timed_data Lwt.t
+  exception Invalid of key * error list
+
+  (** Read an operation in the local database (without parsing). *)
+  val raw_read: state -> key -> MBytes.t option Lwt.t
+
+  (** Read a protocol from the distributed database. This may block
+      while the block is fetched from the P2P network. *)
+  val fetch:
+    state -> Store.net_id -> key -> protocol tzresult Time.timed_data Lwt.t
+
+  (** Request protocols on the P2P network without waiting for answers. *)
+  val prefetch: state -> Store.net_id -> key list -> unit
+
+  (** Add a protocol to the local database. This returns [Ok None]
+      if the protocol was already stored in the database, or returns
+      the parsed operation if not. It may also fails when the shell
+      part of the operation cannot be parsed or when the operation
+      does not belong to an active "network". For a given sequence of
+      bytes, it is guaranted that at most one call to [store] returns
+      [Some _]. *)
+  val store:
+    state -> MBytes.t -> (Protocol_hash.t * protocol) option tzresult Lwt.t
+
+  (** Mark a protocol as invalid in the local database. This returns
+      [false] if the protocol was previously stored in the local
+      database. The protocol is not removed from the local database,
+      but its content is replaced by a list of errors. *)
+  val mark_invalid: state -> key -> error list -> bool Lwt.t
+
+  (** Returns the list known-invalid procols. *)
+  val invalid: state -> Protocol_hash_set.t Lwt.t
+
+  (** Create a stream of all the newly locally-stored protocols.
+      The returned function allows to terminate the stream. *)
+  val create_watcher:
+    state -> (key * protocol) Lwt_stream.t * (unit -> unit)
+
+  val keys: state -> key list Lwt.t
 end
 
 (** {2 Network} ****************************************************************)

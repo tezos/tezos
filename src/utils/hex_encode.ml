@@ -24,13 +24,14 @@ let hex_encode = gen_encode String.length (fun s i -> int_of_char s.[i])
 (* From OCaml's stdlib. See [Digest.from_hex]. *)
 let gen_decode create set h =
   let n = String.length h in
-  if n mod 2 <> 0 then invalid_arg "hex_decode" ;
+  if n mod 2 <> 0 then invalid_arg ("hex_decode: " ^ h);
   let digit c =
     match c with
     | '0'..'9' -> int_of_char c - int_of_char '0'
     | 'A'..'F' -> int_of_char c - int_of_char 'A' + 10
     | 'a'..'f' -> int_of_char c - int_of_char 'a' + 10
-    | _c -> invalid_arg "hex_decode" in
+    | _c -> invalid_arg ("hex_decode: " ^ h)
+  in
   let byte i = digit h.[i] lsl 4 + digit h.[i+1] in
   let result = create (n / 2) in
   for i = 0 to n/2 - 1 do

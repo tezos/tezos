@@ -29,6 +29,8 @@ module RPC : sig
     t -> ?force:bool -> MBytes.t -> (Block_hash.t * unit tzresult Lwt.t) Lwt.t
   val inject_operation:
     t -> ?force:bool -> MBytes.t -> (Operation_hash.t * unit tzresult Lwt.t) Lwt.t
+  val inject_protocol:
+    t -> ?force:bool -> Store.protocol -> (Protocol_hash.t * unit tzresult Lwt.t) Lwt.t
 
   val raw_block_info:
     t -> Block_hash.t -> block_info Lwt.t
@@ -53,6 +55,13 @@ module RPC : sig
 
   val pending_operations:
     t -> block -> (error Updater.preapply_result * Operation_hash_set.t) Lwt.t
+
+  val protocols:
+    t -> Protocol_hash.t list Lwt.t
+  val protocol_content:
+    t -> Protocol_hash.t -> Store.protocol tzresult Time.timed_data option Lwt.t
+  val protocol_watcher:
+    t -> (Protocol_hash.t * Store.protocol) Lwt_stream.t * (unit -> unit)
 
   val context_dir:
     t -> block -> 'a RPC.directory option Lwt.t

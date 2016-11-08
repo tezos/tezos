@@ -25,6 +25,8 @@ val inject_block:
   Block_hash.t tzresult Lwt.t
 val inject_operation:
   ?wait:bool -> ?force:bool -> MBytes.t -> Operation_hash.t tzresult Lwt.t
+val inject_protocol:
+  ?wait:bool -> ?force:bool -> Tezos_compiler.Protocol.t -> Protocol_hash.t tzresult Lwt.t
 
 module Blocks : sig
 
@@ -91,6 +93,15 @@ module Operations : sig
   val monitor:
     ?contents:bool -> unit ->
     (Operation_hash.t * Store.operation option) list Lwt_stream.t Lwt.t
+end
+
+module Protocols : sig
+  val bytes:
+    Protocol_hash.t -> Store.protocol tzresult Time.timed_data Lwt.t
+
+  val list:
+    ?contents:bool -> unit ->
+    (Protocol_hash.t * Store.protocol option) list Lwt.t
 end
 
 val describe: ?recurse:bool -> string list -> RPC.Description.directory_descr Lwt.t
