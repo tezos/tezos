@@ -71,7 +71,6 @@ let () =
 
 let location = function
   | Prim (loc, _, _)
-  | Float (loc, _)
   | Int (loc, _)
   | String (loc, _)
   | Seq (loc, _) -> loc
@@ -132,7 +131,6 @@ let rec ty_eq
         record_trace (Inconsistent_types (Ty ta, Ty tb))
     | String_t, String_t -> eq ta tb
     | Signature_t, Signature_t -> eq ta tb
-    | Float_t, Float_t -> eq ta tb
     | Tez_t, Tez_t -> eq ta tb
     | Timestamp_t, Timestamp_t -> eq ta tb
     | Bool_t, Bool_t -> eq ta tb
@@ -201,14 +199,13 @@ let parse_comparable_ty : Script.expr -> ex_comparable_ty tzresult Lwt.t = funct
   | Prim (_, "uint32", []) -> return @@ Ex (Int_key Uint32)
   | Prim (_, "uint64", []) -> return @@ Ex (Int_key Uint64)
   | Prim (_, "string", []) -> return @@ Ex String_key
-  | Prim (_, "float", []) -> return @@ Ex Float_key
   | Prim (_, "tez", []) -> return @@ Ex Tez_key
   | Prim (_, "bool", []) -> return @@ Ex Bool_key
   | Prim (_, "key", []) -> return @@ Ex Key_key
   | Prim (_, "timestamp", []) -> return @@ Ex Timestamp_key
   | Prim (loc, ("int8" | "int16" | "int32" | "int64"
              | "uint8" | "uint16" | "uint32" | "uint64"
-             | "string" | "float" | "tez" | "bool"
+             | "string" | "tez" | "bool"
              | "key" | "timestamp" as prim), l) ->
       fail @@ Invalid_arity (loc, Type, prim, 0, List.length l)
   | Prim (loc, ("pair" | "union" | "set" | "map"
@@ -217,7 +214,7 @@ let parse_comparable_ty : Script.expr -> ex_comparable_ty tzresult Lwt.t = funct
       fail @@ Comparable_type_expected loc
   | Prim (loc, prim, _) ->
       fail @@ Invalid_primitive (loc, Type, prim)
-  | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)  ->
+  | Int (loc, _) | String (loc, _) | Seq (loc, _)  ->
       fail @@ Invalid_expression_kind loc
 
 type ex_ty = Ex : 'a ty -> ex_ty
@@ -233,7 +230,6 @@ let rec parse_ty : Script.expr -> ex_ty tzresult Lwt.t = function
   | Prim (_, "uint32", []) -> return @@ Ex (Int_t Uint32)
   | Prim (_, "uint64", []) -> return @@ Ex (Int_t Uint64)
   | Prim (_, "string", []) -> return @@ Ex String_t
-  | Prim (_, "float", []) -> return @@ Ex Float_t
   | Prim (_, "tez", []) -> return @@ Ex Tez_t
   | Prim (_, "bool", []) -> return @@ Ex Bool_t
   | Prim (_, "key", []) -> return @@ Ex Key_t
@@ -276,19 +272,18 @@ let rec parse_ty : Script.expr -> ex_ty tzresult Lwt.t = function
                | "void" | "signature"  | "contract"
                | "int8" | "int16" | "int32" | "int64"
                | "uint8" | "uint16" | "uint32" | "uint64"
-               | "string" | "float" | "tez" | "bool"
+               | "string" | "tez" | "bool"
                | "key" | "timestamp" as prim), l) ->
       fail @@ Invalid_arity (loc, Type, prim, 0, List.length l)
   | Prim (loc, prim, _) ->
       fail @@ Invalid_primitive (loc, Type, prim)
-  | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)  ->
+  | Int (loc, _) | String (loc, _) | Seq (loc, _)  ->
       fail @@ Invalid_expression_kind loc
 
 let ty_of_comparable_ty
   : type a. a comparable_ty -> a ty = function
   | Int_key k -> Int_t k
   | String_key -> String_t
-  | Float_key -> Float_t
   | Tez_key -> Tez_t
   | Bool_key -> Bool_t
   | Key_key -> Key_t
@@ -298,7 +293,6 @@ let comparable_ty_of_ty
   : type a. a ty -> a comparable_ty tzresult = function
   | Int_t k -> ok (Int_key k)
   | String_t -> ok String_key
-  | Float_t -> ok Float_key
   | Tez_t -> ok Tez_key
   | Bool_t -> ok Bool_key
   | Key_t -> ok Key_key
@@ -335,16 +329,6 @@ let rec parse_tagged_data
         return @@ Ex (Bool_t, v)
     | Prim (loc, "bool", l) ->
         fail @@ Invalid_arity (loc, Constant, "bool", 1, List.length l)
-    | Float (loc, v) -> begin try
-          return (Ex (Float_t, float_of_string v))
-        with _ ->
-          fail @@ Invalid_constant (loc, "float")
-      end
-    | Prim (_, "float", [ arg ]) ->
-        parse_untagged_data ctxt Float_t arg >>=? fun v ->
-        return @@ Ex (Float_t, v)
-    | Prim (loc, "float", l) ->
-        fail @@ Invalid_arity (loc, Constant, "float", 1, List.length l)
     | Prim (_, "timestamp", [ arg ]) ->
         parse_untagged_data ctxt Timestamp_t arg >>=? fun v ->
         return @@ Ex (Timestamp_t, v)
@@ -513,24 +497,16 @@ and parse_untagged_data
     match ty, script_data with
     (* Void *)
     | Void_t, Prim (_, "void", []) -> return ()
-    | Void_t, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Float (loc, _) | Seq (loc, _)) ->
+    | Void_t, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "void")
     (* Strings *)
     | String_t, String (_, v) -> return v
-    | String_t, (Prim (loc, _, _) | Int (loc, _) | Float (loc, _) | Seq (loc, _)) ->
+    | String_t, (Prim (loc, _, _) | Int (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "string")
-    (* Floats *)
-    | Float_t, Float (loc, v) -> begin try
-          return (float_of_string v)
-        with _ ->
-          fail @@ Invalid_constant (loc, "float")
-      end
-    | Float_t, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
-        fail @@ Invalid_constant (loc, "float")
     (* Booleans *)
     | Bool_t, Prim (_, "true", []) -> return true
     | Bool_t, Prim (_, "false", []) -> return false
-    | Bool_t, (Prim (loc, _, _) | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
+    | Bool_t, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "bool")
     (* Integers *)
     | Int_t k, Int (loc, v) -> begin try
@@ -539,7 +515,7 @@ and parse_untagged_data
           | Some i -> return i
         with _ -> fail @@ Invalid_constant (loc, string_of_int_kind k)
       end
-    | Int_t k, (Float (loc, _) | Prim (loc, _, _) | String (loc, _) | Seq (loc, _)) ->
+    | Int_t k, (Prim (loc, _, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, string_of_int_kind k)
     (* Tez amounts *)
     | Tez_t, String (loc, v) -> begin try
@@ -549,10 +525,10 @@ and parse_untagged_data
         with _ ->
           fail @@ Invalid_constant (loc, "tez")
       end
-    | Tez_t, (Float (loc, _) | Int (loc, _) | Prim (loc, _, _) | Seq (loc, _)) ->
+    | Tez_t, (Int (loc, _) | Prim (loc, _, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "tez")
     (* Timestamps *)
-    | Timestamp_t, (Float (loc, v) | Int (loc, v)) -> begin
+    | Timestamp_t, (Int (loc, v)) -> begin
         match (Timestamp.of_seconds v) with
         | Some v -> return v
         | None -> fail @@ Invalid_constant (loc, "timestamp")
@@ -570,7 +546,7 @@ and parse_untagged_data
           return (Ed25519.Public_key_hash.of_b48check s)
         with _ -> fail @@ Invalid_constant (loc, "key")
       end
-    | Key_t, (Prim (loc, _, _) | Seq (loc, _) | Int (loc, _) | Float (loc, _)) ->
+    | Key_t, (Prim (loc, _, _) | Seq (loc, _) | Int (loc, _)) ->
         fail @@ Invalid_constant (loc, "key")
     (* Signatures *)
     | Signature_t, String (loc, s) -> begin try
@@ -582,7 +558,7 @@ and parse_untagged_data
         with _ ->
           fail @@ Invalid_constant (loc, "signature")
       end
-    | Signature_t, (Prim (loc, _, _) | Int (loc, _) | Float (loc, _) | Seq (loc, _)) ->
+    | Signature_t, (Prim (loc, _, _) | Int (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "signature")
     (* Contracts *)
     | Contract_t (ty1, ty2), String (loc, s) ->
@@ -591,7 +567,7 @@ and parse_untagged_data
           (Lwt.return (Contract.of_b48check s)) >>=? fun c ->
         parse_contract ctxt ty1 ty2 loc c >>=? fun _ ->
         return (ty1, ty2, c)
-    | Contract_t _, (Prim (loc, _, _) | Int (loc, _) | Float (loc, _) | Seq (loc, _)) ->
+    | Contract_t _, (Prim (loc, _, _) | Int (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "contract")
     (* Pairs *)
     | Pair_t (ta, tb), Prim (_, "pair", [ va; vb ]) ->
@@ -600,7 +576,7 @@ and parse_untagged_data
         return (va, vb)
     | Pair_t _, Prim (loc, "pair", l) ->
         fail @@ Invalid_arity (loc, Constant, "pair", 2, List.length l)
-    | Pair_t _, (Prim (loc, _, _) | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
+    | Pair_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "pair")
     (* Unions *)
     | Union_t (tl, _), Prim (_, "left", [ v ]) ->
@@ -613,12 +589,12 @@ and parse_untagged_data
         return (R v)
     | Union_t _, Prim (loc, "right", l) ->
         fail @@ Invalid_arity (loc, Constant, "right", 1, List.length l)
-    | Union_t _, (Prim (loc, _, _) | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
+    | Union_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "union")
     (* Lambdas *)
     | Lambda_t (ta, tr), (Seq _ as script_instr) ->
         parse_lambda ctxt ta tr script_instr
-    | Lambda_t (_, _), (Prim (loc, _, _) | Float (loc, _) | Int (loc, _) | String (loc, _)) ->
+    | Lambda_t (_, _), (Prim (loc, _, _) | Int (loc, _) | String (loc, _)) ->
         fail @@ Invalid_constant (loc, "lambda")
     (* References *)
     | Ref_t t, Prim (_, "ref", [ v ]) ->
@@ -626,7 +602,7 @@ and parse_untagged_data
         return (ref v)
     | Ref_t _, Prim (loc, "ref", l) ->
         fail @@ Invalid_arity (loc, Constant, "ref", 1, List.length l)
-    | Ref_t _, (Prim (loc, _, _) | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
+    | Ref_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "ref")
     (* Options *)
     | Option_t t, Prim (_, "some", [ v ]) ->
@@ -638,7 +614,7 @@ and parse_untagged_data
         return None
     | Option_t _, Prim (loc, "none", l) ->
         fail @@ Invalid_arity (loc, Constant, "none", 0, List.length l)
-    | Option_t _, (Prim (loc, _, _) | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
+    | Option_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "option")
     (* Lists *)
     | List_t t, Prim (_, "list", vs) ->
@@ -647,7 +623,7 @@ and parse_untagged_data
              parse_untagged_data ctxt t v >>=? fun v ->
              return (v :: rest))
           [] vs
-    | List_t _, (Prim (loc, _, _) | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
+    | List_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "list")
     (* Sets *)
     | Set_t t, Prim (_, "set", vs) ->
@@ -657,7 +633,7 @@ and parse_untagged_data
           return (v :: rest))
         [] vs >>=? fun v ->
       return (ref v, t)
-    | Set_t _, (Prim (loc, _, _) | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
+    | Set_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "set")
     (* Maps *)
     | Map_t (tk, tv), Prim (_, "map", vs) ->
@@ -669,11 +645,11 @@ and parse_untagged_data
                return ((k, v) :: rest)
            | Prim (loc, "item", l) ->
                fail @@ Invalid_arity (loc, Constant, "item", 2, List.length l)
-           | Prim (loc, _, _) | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _) ->
+           | Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _) ->
                fail @@ Invalid_constant (loc, "item"))
         [] vs >>=? fun v ->
       return (ref v, tk)
-    | Map_t _, (Prim (loc, _, _) | Float (loc, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
+    | Map_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "map")
 
 and parse_untagged_comparable_data
@@ -899,13 +875,9 @@ and parse_instr
     | Prim (_, "nop", []), rest ->
         return (Typed (Nop, rest))
     (* timestamp operations *)
-    | Prim (_, "add", []), Item_t (Timestamp_t, Item_t (Float_t, rest)) ->
-        return (Typed (Add_timestamp_to_period, Item_t (Timestamp_t, rest)))
     | Prim (loc, "add", []), Item_t (Timestamp_t, Item_t (Int_t kind, rest)) ->
         trace (Bad_stack_item (loc, 2)) (Lwt.return (unsigned_int_kind kind)) >>=? fun (Eq _) ->
         return (Typed (Add_timestamp_to_seconds (kind, loc), Item_t (Timestamp_t, rest)))
-    | Prim (_, "add", []), Item_t (Float_t, Item_t (Timestamp_t, rest)) ->
-        return (Typed (Add_period_to_timestamp, Item_t (Timestamp_t, rest)))
     | Prim (loc, "add", []), Item_t (Int_t kind, Item_t (Timestamp_t, rest)) ->
         trace
           (Bad_stack_item (loc, 1))
@@ -927,33 +899,6 @@ and parse_instr
           (Bad_stack_item (loc, 1))
           (Lwt.return (unsigned_int_kind kind)) >>=? fun (Eq _) ->
         return (Typed (Mul_tez' kind, Item_t (Tez_t, rest)))
-    (* float operations *)
-    | Prim (_, "floor", []), Item_t (Float_t, rest) ->
-        return (Typed (Floor, Item_t (Float_t, rest)))
-    | Prim (_, "ceil", []), Item_t (Float_t, rest) ->
-        return (Typed (Ceil, Item_t (Float_t, rest)))
-    | Prim (_, "inf", []), rest ->
-        return (Typed (Inf, Item_t (Float_t, rest)))
-    | Prim (_, "nan", []), rest ->
-        return (Typed (NaN, Item_t (Float_t, rest)))
-    | Prim (_, "isnan", []), Item_t (Float_t, rest) ->
-        return (Typed (IsNaN, Item_t (Bool_t, rest)))
-    | Prim (loc, "nanan", []), Item_t (Float_t, rest) ->
-        return (Typed (NaNaN loc, rest))
-    | Prim (_, "abs", []), Item_t (Float_t, rest) ->
-        return (Typed (Abs_float, Item_t (Float_t, rest)))
-    | Prim (_, "neg", []), Item_t (Float_t, rest) ->
-        return (Typed (Neg_float, Item_t (Float_t, rest)))
-    | Prim (_, "add", []), Item_t (Float_t, Item_t (Float_t, rest)) ->
-        return (Typed (Add_float, Item_t (Float_t, rest)))
-    | Prim (_, "sub", []), Item_t (Float_t, Item_t (Float_t, rest)) ->
-        return (Typed (Sub_float, Item_t (Float_t, rest)))
-    | Prim (_, "mul", []), Item_t (Float_t, Item_t (Float_t, rest)) ->
-        return (Typed (Mul_float, Item_t (Float_t, rest)))
-    | Prim (_, "div", []), Item_t (Float_t, Item_t (Float_t, rest)) ->
-        return (Typed (Div_float, Item_t (Float_t, rest)))
-    | Prim (_, "mod", []), Item_t (Float_t, Item_t (Float_t, rest)) ->
-        return (Typed (Mod_float, Item_t (Float_t, rest)))
     (* boolean operations *)
     | Prim (_, "or", []), Item_t (Bool_t, Item_t (Bool_t, rest)) ->
         return (Typed (Or, Item_t (Bool_t, rest)))
@@ -1029,8 +974,6 @@ and parse_instr
         return (Typed (Compare Bool_key, Item_t (Int_t Int64, rest)))
     | Prim (_, "compare", []), Item_t (String_t, Item_t (String_t, rest)) ->
         return (Typed (Compare String_key, Item_t (Int_t Int64, rest)))
-    | Prim (_, "compare", []), Item_t (Float_t, Item_t (Float_t, rest)) ->
-        return (Typed (Compare Float_key, Item_t (Int_t Int64, rest)))
     | Prim (_, "compare", []), Item_t (Tez_t, Item_t (Tez_t, rest)) ->
         return (Typed (Compare Tez_key, Item_t (Int_t Int64, rest)))
     | Prim (_, "compare", []), Item_t (Key_t, Item_t (Key_t, rest)) ->
@@ -1064,10 +1007,6 @@ and parse_instr
         parse_ty t >>=? fun (Ex ty) -> begin match ty,stack_ty with
         | Int_t kt, Item_t (Int_t kf, rest)  ->
             return (Typed (Int_of_int (kf, kt), Item_t (Int_t kt, rest)))
-        | Float_t, Item_t (Int_t kf, rest)  ->
-            return (Typed (Float_of_int kf, Item_t (Float_t, rest)))
-        | Int_t kt, Item_t (Float_t, rest)  ->
-            return (Typed (Int_of_float kt, Item_t (Int_t kt, rest)))
         | ty, Item_t (ty', _) ->
             fail (Undefined_cast (loc, Ty ty', Ty ty))
         | _, Empty_t ->
@@ -1181,7 +1120,7 @@ and parse_instr
     (* Generic parsing errors *)
     | Prim (loc, prim, _), _ ->
         fail @@ Invalid_primitive (loc, Instr, prim)
-    | (Float (loc, _) | Int (loc, _) | String (loc, _)), _ ->
+    | (Int (loc, _) | String (loc, _)), _ ->
         fail @@ Invalid_expression_kind loc
 
 and parse_contract
@@ -1224,7 +1163,6 @@ let unparse_comparable_ty
   | Int_key Uint32 -> Prim (-1, "uint32", [])
   | Int_key Uint64 -> Prim (-1, "uint64", [])
   | String_key -> Prim (-1, "string", [])
-  | Float_key -> Prim (-1, "float", [])
   | Tez_key -> Prim (-1, "tez", [])
   | Bool_key -> Prim (-1, "bool", [])
   | Key_key -> Prim (-1, "key", [])
@@ -1242,7 +1180,6 @@ let rec unparse_ty
   | Int_t Uint32 -> Prim (-1, "uint32", [])
   | Int_t Uint64 -> Prim (-1, "uint64", [])
   | String_t -> Prim (-1, "string", [])
-  | Float_t -> Prim (-1, "float", [])
   | Tez_t -> Prim (-1, "tez", [])
   | Bool_t -> Prim (-1, "bool", [])
   | Key_t -> Prim (-1, "key", [])
@@ -1290,8 +1227,6 @@ let rec unparse_untagged_data
         Int (-1, Int64.to_string (to_int64 k v))
     | String_t, s ->
         String (-1, s)
-    | Float_t, f ->
-        Float (-1, string_of_float f)
     | Bool_t, true ->
         Prim (-1, "true", [])
     | Bool_t, false ->
@@ -1355,8 +1290,6 @@ let rec unparse_tagged_data
         Prim (-1, string_of_int_kind k, [ String (-1, Int64.to_string (to_int64 k v))])
     | String_t, s ->
         Prim (-1, "string", [ String (-1, s) ])
-    | Float_t, f ->
-        Prim (-1, "float", [ String (-1, string_of_float f) ])
     | Bool_t, true ->
         Prim (-1, "bool", [ Prim (-1, "true", []) ])
     | Bool_t, false ->

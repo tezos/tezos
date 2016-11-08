@@ -69,7 +69,6 @@ let rec print_ir ppf node =
   match node with
   | String (_, s) -> Format.fprintf ppf "%S" s
   | Int (_, s) -> Format.fprintf ppf "%s" s
-  | Float (_, s) -> Format.fprintf ppf "%s" s
   | Seq (_, [ one ]) -> print_ir ppf one
   | Seq (_, []) -> Format.fprintf ppf "{}" ;
   | Seq (_, seq) ->

@@ -32,7 +32,7 @@ I - Type system
 
 The types `T` of values in the stack are written using notations
 
-  * `bool`, `string`, `void`, `u?int{8|16|32|64}`, `float`,
+  * `bool`, `string`, `void`, `u?int{8|16|32|64}`,
     the core primitive types,
   * `identifier` for a primitive data-type,
   * `T identifier` for a parametric data-type with one parameter type `T`,
@@ -94,7 +94,6 @@ the form `variable = constant, ...`.
 The constants are of one of the following forms.
 
   * integers with their sign and size, e.g. `(Uint8 3)`,
-  * floats in libc-style notation, e.g. `(Float 4.5e2)`,
   * `Void`, the unique value of type `void`
   * booleans `True` and `False`,
   * string literals, as in `(String "contents")`,
@@ -274,7 +273,7 @@ combinators, and also for branching.
 IV - Data types
 ---------------
 
-   * `bool`, `string`, `void`, `u?int{8|16|32|64}`, `float`:
+   * `bool`, `string`, `void`, `u?int{8|16|32|64}`:
      The core primitive types.
 
    * `list 'a`:
@@ -506,129 +505,6 @@ Bitwise logical operators are also available on unsigned integers.
      Integer comparison (signed or unsigned according to the type)
 
         :: t : t : 'S   ->   int64 : 'S   where   t in uint{8|16|32|64}
-
-### Operations on Floats
-
-The float type uses double precision IEEE754 semantics, including NaN
-and infinite values.
-
-   * `ADD`
-
-        :: float : float : 'S   ->   float : 'S
-
-        > ADD ; C / x : y : S   =>   C / (x + y) : S
-
-   * `SUB`
-
-        :: float : float : 'S   ->   float : 'S
-
-        > SUB ; C / x : y : S   =>   C / (x - y) : S
-
-   * `MUL`
-
-        :: float : float : 'S   ->   float : 'S
-
-        > MUL ; C / x : y : S   =>   C / (x * y) : S
-
-   * `DIV`
-
-        :: float : float : 'S   ->   float : 'S
-
-        > DIV ; C / x : y : S   =>   C / (x / y) : S
-
-   * `MOD`
-
-        :: float : float : 'S   ->   float : 'S
-
-        > MOD ; C / x : y : S   =>   C / (fmod (x, y)) : S
-
-   * `ABS`
-
-        :: float : 'S   ->   float : 'S
-
-        > ABS ; C / x : S   =>   C / (abs (x)) : S
-
-   * `NEG`
-
-        :: float : 'S   ->   float : 'S
-
-        > NEG ; C / x : S   =>   C / (-x) : S
-
-   * `FLOOR`
-
-        :: float : 'S   ->   float : 'S
-
-        > FLOOR ; C / x : S   =>   C / (floor (x)) : S
-
-   * `CEIL`
-
-        :: float : 'S   ->   float : 'S
-
-        > CEIL ; C / x : S   =>   C / (ceil (x)) : S
-
-   * `INF`
-
-        :: 'S   ->   float : 'S
-
-        > INF ; C / S   =>   C / +Inf : S
-
-   * `NAN`
-
-        :: 'S   ->   float : 'S
-
-        > NAN ; C / S   =>   C / NaN : S
-
-   * `ISNAN`
-
-        :: float : 'S   ->   bool : 'S
-
-        > ISNAN ; C / NaN : S   =>   C / true : S
-        > ISNAN ; C / _ : S     =>   C / false : S
-
-   * `NANAN`
-
-        :: float : 'S   ->   'S
-
-        > NANAN ; C / NaN : S   =>   [FAIL]
-        > NANAN ; C / _ : S     =>   C / S
-
-   * `CAST float`:
-     Conversion from integers.
-
-        :: t_from : 'S   ->   float : 'S   where   t_from in u?int{8|16|32|64}
-
-        > CAST float ; C / x : S   =>   C / float (x) : S
-
-   * `CAST t_to` where `t_to in u?int{8|16|32|64}`:
-     Conversion to integers.
-
-        :: float : 'S   ->   t_to : 'S
-
-        > CAST t_to ; C / NaN : S      =>   C / t_to (0) : S
-        > CAST t_to ; C / +/-Inf : S   =>   C / t_to (0) : S
-        > CAST t_to ; C / x : S        =>   C / t_to (floor (x)) : S
-
-   * `CHECKED_CAST float`:
-     Conversion from integers with overflow checking.
-
-        :: t_from : 'S   ->   float : 'S   where   t_from in u?int{8|16|32|64}
-
-        > CHECKED_CAST float ; C / x : S   =>   [FAIL]   on overflow
-        > CHECKED_CAST float ; C / x : S   =>   C / float (x) : S
-
-   * `CHECKED_CAST t_to` where `t_to in u?int{8|16|32|64}`:
-     Conversion to integers with overflow checking.
-
-        :: float : 'S   ->   t_to : 'S
-
-        > CHECKED_CAST t_to ; C / x : S   =>   [FAIL]   on overflow or NaN
-        > CHECKED_CAST t_to ; C / x : S   =>   C / t_to (floor (x)) : S
-
-
-   * `COMPARE`:
-     IEEE754 comparison
-
-        :: float : float : 'S   ->   int64 : 'S
 
 ### Operations on strings
 
@@ -1111,14 +987,11 @@ parsing policy is described just after.
 
 ### Constants
 
-There are three kinds of constants:
+There are two kinds of constants:
 
   1. Integers in decimal (no prefix), hexadecimal (0x prefix), octal
      (0o prefix) or binary (0b prefix).
-  2. Floating point IEEE754 doubles in libc-style notation, with a
-      mandatory period character. (`3` is an `int` but `3.` is a
-      `float`).
-  3. Strings with usual escapes `\n`, `\t`, `\b`, `\r`, `\\`, `\"`.
+  2. Strings with usual escapes `\n`, `\t`, `\b`, `\r`, `\\`, `\"`.
      Strings are encoding agnostic sequences of bytes. Non printable
      characters can be escaped by 3 digits decimal codes `\ddd` or
      2 digit hexadecimal codes `\xHH`.
@@ -1257,8 +1130,6 @@ Capitalised.
     followed by the actual value.
 
         Int8 1
-
-        Float 3.5e12
 
     Compound constants such as lists, in order not to repeat the same
     constant constructor for each element, take the type(s) of inner
@@ -1675,7 +1546,6 @@ X - Full grammar
 
     <tagged data> ::=
       | <string constant>
-      | <float constant>
       | Int8 <int constant>
       | Int16 <int constant>
       | Int32 <int constant>
@@ -1710,7 +1580,6 @@ X - Full grammar
     <untagged data> ::=
       | <int constant>
       | <string constant>
-      | <float constant>
       | <timestamp string constant>
       | <signature string constant>
       | <key string constant>
@@ -1820,7 +1689,6 @@ X - Full grammar
       | uint64
       | void
       | string
-      | float
       | tez
       | bool
       | key
@@ -1845,7 +1713,6 @@ X - Full grammar
       | uint32
       | uint64
       | string
-      | float
       | tez
       | bool
       | key
@@ -1880,9 +1747,9 @@ The language is implemented in OCaml as follows:
     interpreting the If instruction.
 
   * The input, untyped internal representation is an OCaml ADT with
-    the only 5 grammar constructions: `String`, `Float`, `Int`, `Seq`
-    and `Prim`.  It is the target language for the parser, since not
-    all parsable programs are well typed, and thus could simply not be
+    the only 5 grammar constructions: `String`, `Int`, `Seq` and
+    `Prim`.  It is the target language for the parser, since not all
+    parsable programs are well typed, and thus could simply not be
     constructed using the GADT.
 
   * The typechecker is a simple function that recognizes the abstract

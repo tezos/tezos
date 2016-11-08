@@ -65,16 +65,11 @@ type 'tys stack =
   | Item : 'ty * 'rest stack -> ('ty * 'rest) stack
   | Empty : end_of_stack stack
 
-let is_nan x = match classify_float x with
-  | FP_nan -> true
-  | _ -> false
-
 let eq_comparable
   : type a. a comparable_ty -> a -> a -> bool
   = fun kind x v -> match kind with
     | String_key -> Compare.String.(x = v)
     | Bool_key -> Compare.Bool.(x = v)
-    | Float_key -> Compare.Float.(x = v)
     | Tez_key -> Tez.(x = v)
     | Key_key -> Ed25519.Public_key_hash.(equal x v)
     | Int_key kind -> Script_int.(equal kind x v)
@@ -235,20 +230,10 @@ let rec interp
               r := v ;
               return (rest, qta - 1, ctxt)
           (* timestamp operations *)
-          | Add_period_to_timestamp, Item (p, Item (t, rest)) ->
-              Lwt.return
-                (Period.of_seconds (Int64.of_float p) >>? fun p ->
-                 Timestamp.(t +? p) >>? fun res ->
-                 Ok (Item (res, rest), qta - 1, ctxt))
           | Add_seconds_to_timestamp (kind, _pos), Item (n, Item (t, rest)) ->
               let n = Script_int.to_int64 kind n in
               Lwt.return
                 (Period.of_seconds n >>? fun p ->
-                 Timestamp.(t +? p) >>? fun res ->
-                 Ok (Item (res, rest), qta - 1, ctxt))
-          | Add_timestamp_to_period, Item (t, Item (p, rest)) ->
-              Lwt.return
-                (Period.of_seconds (Int64.of_float p) >>? fun p ->
                  Timestamp.(t +? p) >>? fun res ->
                  Ok (Item (res, rest), qta - 1, ctxt))
           | Add_timestamp_to_seconds (kind, _pos), Item (t, Item (n, rest)) ->
@@ -273,33 +258,6 @@ let rec interp
           | Mul_tez' kind, Item (y, Item (x, rest)) ->
               Lwt.return Tez.(x *? Script_int.to_int64 kind y) >>=? fun res ->
               return (Item (res, rest), qta - 1, ctxt)
-          (* float operations *)
-          | Floor, Item (x, rest) ->
-              return (Item (floor x, rest), qta - 1, ctxt)
-          | Ceil, Item (x, rest) ->
-              return (Item (ceil x, rest), qta - 1, ctxt)
-          | Inf, rest ->
-              return (Item (infinity, rest), qta - 1, ctxt)
-          | NaN, rest ->
-              return (Item (nan, rest), qta - 1, ctxt)
-          | IsNaN, Item (x, rest) ->
-              return (Item (is_nan x, rest), qta - 1, ctxt)
-          | NaNaN pos, Item (x, rest) ->
-              if is_nan x then fail (Reject pos) else return (rest, qta - 1, ctxt)
-          | Abs_float, Item (x, rest) ->
-              return (Item (abs_float x, rest), qta - 1, ctxt)
-          | Neg_float, Item (x, rest) ->
-              return (Item (0. -. x, rest), qta - 1, ctxt)
-          | Add_float, Item (x, Item (y, rest)) ->
-              return (Item (x +. y, rest), qta - 1, ctxt)
-          | Sub_float, Item (x, Item (y, rest)) ->
-              return (Item (x -. y, rest), qta - 1, ctxt)
-          | Mul_float, Item (x, Item (y, rest)) ->
-              return (Item (x *. y, rest), qta - 1, ctxt)
-          | Div_float, Item (x, Item (y, rest)) ->
-              return (Item (x /. y, rest), qta - 1, ctxt)
-          | Mod_float, Item (x, Item (y, rest)) ->
-              return (Item (mod_float x y, rest), qta - 1, ctxt)
           (* boolean operations *)
           | Or, Item (x, Item (y, rest)) ->
               return (Item (x || y, rest), qta - 1, ctxt)
@@ -401,10 +359,6 @@ let rec interp
               let cmpres = Compare.String.compare a b in
               let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
               return (Item (cmpres, rest), qta - 1, ctxt)
-          | Compare Float_key, Item (a, Item (b, rest)) ->
-              let cmpres = Compare.Float.compare a b in
-              let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare Tez_key, Item (a, Item (b, rest)) ->
               let cmpres = Tez.compare a b in
               let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
@@ -453,12 +407,6 @@ let rec interp
               end
           | Int_of_int (_, kt), Item (v, rest) ->
               return (Item (Script_int.cast kt v, rest), qta - 1, ctxt)
-          | Int_of_float kt, Item (v, rest) ->
-              let v = Int64.of_float v in
-              return (Item (Script_int.of_int64 kt v, rest), qta - 1, ctxt)
-          | Float_of_int kf, Item (v, rest) ->
-              let v = Int64.to_float (Script_int.to_int64 kf v) in
-              return (Item (v, rest), qta - 1, ctxt)
           (* protocol *)
           | Manager, Item ((_, _, contract), rest) ->
               Contract.get_manager ctxt contract >>=? fun manager ->
