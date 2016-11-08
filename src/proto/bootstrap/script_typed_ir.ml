@@ -34,7 +34,6 @@ and ('arg, 'ret) typed_contract =
 and 'ty comparable_ty =
   | Int_key : ('s, 'l) int_kind -> ('s, 'l) int_val comparable_ty
   | String_key : string comparable_ty
-  | Float_key : float comparable_ty
   | Tez_key : Tez.t comparable_ty
   | Bool_key : bool comparable_ty
   | Key_key : public_key_hash comparable_ty
@@ -45,7 +44,6 @@ and 'ty ty =
   | Int_t : ('s, 'l) int_kind -> ('s, 'l) int_val ty
   | Signature_t : signature ty
   | String_t : string ty
-  | Float_t : float ty
   | Tez_t : Tez.t ty
   | Key_t : public_key_hash ty
   | Timestamp_t : Timestamp.t ty
@@ -161,12 +159,8 @@ and ('bef, 'aft) instr =
   | Concat :
       (string * (string * 'rest), string * 'rest) instr
   (* timestamp operations *)
-  | Add_period_to_timestamp :
-      (float * (Timestamp.t * 'rest), Timestamp.t * 'rest) instr
   | Add_seconds_to_timestamp : (unsigned, 'l) int_kind * Script.location ->
     ((unsigned, 'l) int_val * (Timestamp.t * 'rest), Timestamp.t * 'rest) instr
-  | Add_timestamp_to_period :
-      (Timestamp.t * (float * 'rest), Timestamp.t * 'rest) instr
   | Add_timestamp_to_seconds : (unsigned, 'l) int_kind * Script.location ->
     (Timestamp.t * ((unsigned, 'l) int_val * 'rest), Timestamp.t * 'rest) instr
   (* currency operations *)
@@ -178,33 +172,6 @@ and ('bef, 'aft) instr =
     (Tez.t * ((unsigned, 'l) int_val * 'rest), Tez.t * 'rest) instr
   | Mul_tez' : (unsigned, 'l) int_kind ->
     ((unsigned, 'l) int_val * (Tez.t * 'rest), Tez.t * 'rest) instr
-  (* float operations *)
-  | Neg_float :
-      (float * 'rest, float * 'rest) instr
-  | Abs_float :
-      (float * 'rest, float * 'rest) instr
-  | Add_float :
-      (float * (float * 'rest), float * 'rest) instr
-  | Sub_float :
-      (float * (float * 'rest), float * 'rest) instr
-  | Mul_float :
-      (float * (float * 'rest), float * 'rest) instr
-  | Div_float :
-      (float * (float * 'rest), float * 'rest) instr
-  | Mod_float :
-      (float * (float * 'rest), float * 'rest) instr
-  | Floor :
-      (float * 'rest, float * 'rest) instr
-  | Ceil :
-      (float * 'rest, float * 'rest) instr
-  | Inf :
-      ('rest, float * 'rest) instr
-  | NaN :
-      ('rest, float * 'rest) instr
-  | IsNaN :
-      (float * 'rest, bool * 'rest) instr
-  | NaNaN : Script.location ->
-    (float * 'rest, 'rest) instr
   (* boolean operations *)
   | Or :
       (bool * (bool * 'rest), bool * 'rest) instr
@@ -289,10 +256,6 @@ and ('bef, 'aft) instr =
     (('sf, 'lf) int_val * 'rest, ('st, 'lt) int_val * 'rest) instr
   | Checked_int_of_int : ('sf, 'lf) int_kind * ('st, 'lt) int_kind * Script.location ->
     (('sf, 'lf) int_val * 'rest, ('st, 'lt) int_val * 'rest) instr
-  | Int_of_float : ('st, 'lt) int_kind ->
-    (float * 'rest, ('st, 'lt) int_val * 'rest) instr
-  | Float_of_int : ('sf, 'lf) int_kind ->
-    (('sf, 'lf) int_val * 'rest, float * 'rest) instr
   (* protocol *)
   | Manager :
       (('arg, 'ret) typed_contract * 'rest, public_key_hash * 'rest) instr
