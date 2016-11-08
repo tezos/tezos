@@ -208,6 +208,7 @@ let wrap_state_init f base_dir =
         ~ttl:(3600 * 24)
         ~request_operations: (fun _ -> assert false)
         ~request_blocks: (fun _ -> assert false)
+        ~request_protocols: (fun _ -> assert false)
         ~store_root
         ~context_root
         () in
