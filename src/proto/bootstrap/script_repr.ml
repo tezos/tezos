@@ -29,7 +29,6 @@ let location_encoding =
 
 type expr = (* TODO: turn the location into an alpha ? *)
   | Int of location * string
-  | Float of location * string
   | String of location * string
   | Prim of location * string * expr list
   | Seq of location * expr list
@@ -38,8 +37,6 @@ let expr_encoding =
   let open Data_encoding in
   let int_encoding =
     obj1 (req "int" string) in
-  let float_encoding =
-    obj1 (req "float" string) in
   let string_encoding =
     obj1 (req "string" string) in
   let prim_encoding expr_encoding =
@@ -65,25 +62,21 @@ let expr_encoding =
         [ case ~tag:0 int_encoding
             (function Int (_, v) -> Some v | _ -> None)
             (fun v -> Int (-1, v)) ;
-          case ~tag:1 float_encoding
-            (function Float (_, v) -> Some v | _ -> None)
-            (fun v -> Float (-1, v)) ;
-          case ~tag:2 string_encoding
+          case ~tag:1 string_encoding
             (function String (_, v) -> Some v | _ -> None)
             (fun v -> String (-1, v)) ;
-          case ~tag:3 (prim_encoding expr_encoding)
+          case ~tag:2 (prim_encoding expr_encoding)
             (function
               | Prim (_, v, args) -> Some (v, args)
               | _ -> None)
             (function (prim, args) -> Prim (-1, prim, args)) ;
-          case ~tag:4 (seq_encoding expr_encoding)
+          case ~tag:3 (seq_encoding expr_encoding)
             (function Seq (_, v) -> Some v | _ -> None)
             (fun args -> Seq (-1, args)) ])
 
 let update_locations ir =
   let rec update_locations i = function
     | Int (_, v) -> (Int (i, v), succ i)
-    | Float (_, v) -> (Float (i, v), succ i)
     | String (_, v) -> (String (i, v), succ i)
     | Prim (_, name, args) ->
         let (nargs, ni) =
