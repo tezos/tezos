@@ -30,6 +30,7 @@ let main () =
        let commands =
          Client_generic_rpcs.commands @
          Client_keys.commands () @
+         Client_protocols.commands () @
          Client_version.commands_for_version version in
        Client_config.parse_args ~version
          (Cli_entries.usage commands)

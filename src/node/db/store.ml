@@ -92,11 +92,13 @@ type generic_store = FS.t
 type block_store = FS.t
 type blockchain_store = FS.t
 type operation_store = FS.t
+type protocol_store = FS.t
 
 type store = {
   block: block_store Persist.shared_ref ;
   blockchain: blockchain_store Persist.shared_ref ;
   operation: operation_store Persist.shared_ref ;
+  protocol: protocol_store Persist.shared_ref ;
   global_store: generic_store Persist.shared_ref ;
   net_init: ?expiration:Time.t -> genesis -> net_store Lwt.t ;
   net_read: net_id -> net_store tzresult Lwt.t ;
@@ -126,6 +128,8 @@ module type TYPED_IMPERATIVE_STORE = sig
   val get_exn: t -> key -> value Lwt.t
   val set: t -> key -> value -> unit Lwt.t
   val del: t -> key -> unit Lwt.t
+
+  val keys: t -> key list Lwt.t
 end
 
 module type IMPERATIVE_STORE = sig
@@ -144,6 +148,14 @@ end
 module type KEY = sig
   type t
   val to_path: t -> string list
+end
+
+module type HASHKEY = sig
+  type t
+  val to_path: t -> string list
+  val of_path: string list -> t
+  val prefix : string list
+  val length : int
 end
 
 module Raw_key = struct
@@ -187,6 +199,7 @@ module Errors_value = struct
   let of_bytes b = Data_encoding.(Binary.of_bytes (list (error_encoding ()))) b
 end
 
+let undefined_key_fn = Lwt.fail_invalid_arg "function keys cannot be implemented in this module"
 
 module Make (K : KEY) (V : Persist.VALUE) = struct
   type t = FS.t
@@ -205,12 +218,15 @@ module Make (K : KEY) (V : Persist.VALUE) = struct
   let del t k = FS.del t (K.to_path k)
   let list t ks = FS.list t (List.map K.to_path ks)
   let remove_rec t k = FS.remove_rec t (K.to_path k)
+
+  let keys _t = undefined_key_fn
 end
 
 module Data_store : IMPERATIVE_STORE with type t = FS.t =
   Make (Raw_key) (Raw_value)
 
 include Data_store
+
 
 (*-- Typed block store under "blocks/" ---------------------------------------*)
 
@@ -350,6 +366,7 @@ module Block = struct
 
   let raw_get t k = Raw_block.get t k
 
+  let keys _t = undefined_key_fn (** We never list keys here *)
 end
 
 module Blockchain_succ_key = struct
@@ -484,8 +501,90 @@ module Operation = struct
   let to_bytes = Raw_operation_value.to_bytes
   let hash op = Operation_hash.hash_bytes [to_bytes op]
   let raw_get t k = Raw_operation_data.get t k
+
+  let keys _t = undefined_key_fn (** We never list keys here *)
 end
 
+
+(*-- Typed operation store under "protocols/" -------------------------------*)
+
+type protocol = Tezos_compiler.Protocol.t
+let protocol_encoding = Tezos_compiler.Protocol.encoding
+
+module Raw_protocol_value = Tezos_compiler.Protocol
+
+module Raw_protocol_key = struct
+  type t = Protocol_hash.t
+  let to_path p = "protocols" :: Protocol_hash.to_path p @ [ "contents" ]
+end
+
+module Protocol_data = Make (Raw_protocol_key) (Raw_protocol_value)
+module Raw_protocol_data = Make (Raw_protocol_key) (Raw_value)
+
+module Protocol_time_key = struct
+  type t = Protocol_hash.t
+  let to_path p = "protocols" :: Protocol_hash.to_path p @ [ "discovery_time" ]
+end
+module Protocol_time = Make (Protocol_time_key) (Time_value)
+
+module Protocol_errors_key = struct
+  type t = Protocol_hash.t
+  let to_path p = "protocols" :: Protocol_hash.to_path p @ [ "errors" ]
+end
+module Protocol_errors = Make (Protocol_errors_key) (Errors_value)
+
+module Protocol = struct
+  type t = FS.t
+  type key = Protocol_hash.t
+  type value = Tezos_compiler.Protocol.t tzresult Time.timed_data
+  let mem = Protocol_data.mem
+  let get s k =
+    Protocol_time.get s k >>= function
+    | None -> Lwt.return_none
+    | Some time ->
+        Protocol_errors.get s k >>= function
+        | Some exns -> Lwt.return (Some { Time.data = Error exns ; time })
+        | None ->
+            Protocol_data.get s k >>= function
+            | None -> Lwt.return_none
+            | Some bytes -> Lwt.return (Some { Time.data = Ok bytes ; time })
+  let get_exn s k =
+    get s k >>= function
+    | None -> Lwt.fail Not_found
+    | Some x -> Lwt.return x
+  let set s k { Time.data ; time } =
+    Protocol_time.set s k time >>= fun () ->
+    match data with
+    | Ok bytes ->
+        Protocol_data.set s k bytes >>= fun () ->
+        Protocol_errors.del s k
+    | Error exns ->
+        Protocol_errors.set s k exns >>= fun () ->
+        Protocol_data.del s k
+  let del s k =
+    Protocol_time.del s k >>= fun () ->
+    Protocol_data.del s k >>= fun () ->
+    Protocol_errors.del s k
+  let of_bytes = Raw_protocol_value.of_bytes
+  let to_bytes = Raw_protocol_value.to_bytes
+  let hash = Raw_protocol_value.hash
+  let compare p1 p2 =
+    Protocol_hash.(compare (hash_bytes [to_bytes p1]) (hash_bytes [to_bytes p2]))
+  let equal b1 b2 = compare b1 b2 = 0
+  let raw_get t k = Raw_protocol_data.get t k
+
+  let fold s x ~f =
+    let rec dig i root acc =
+      if i <= 0 then
+        f (Protocol_hash.of_path @@ List.tl root) acc
+      else
+        FS.list s [root] >>= fun roots ->
+        Lwt_list.fold_right_s (dig (i - 1)) roots acc
+    in
+    dig Protocol_hash.path_len ["protocols"] x
+
+  let keys s = fold s [] ~f:(fun k a -> Lwt.return @@ k :: a)
+end
 
 (*- Genesis and initialization -----------------------------------------------*)
 
@@ -620,6 +719,7 @@ let init root =
     { block = Persist.share t ;
       blockchain = Persist.share t ;
       operation = Persist.share t ;
+      protocol = Persist.share t ;
       global_store = Persist.share t ;
       net_init = net_init ~root ;
       net_read = net_read ~root ;
@@ -638,6 +738,7 @@ end
 
 module Faked_functional_operation = Faked_functional_typed_store (Operation)
 module Faked_functional_block = Faked_functional_typed_store (Block)
+module Faked_functional_protocol = Faked_functional_typed_store (Protocol)
 
 module Faked_functional_store : Persist.STORE with type t = t
 = struct
@@ -645,4 +746,6 @@ module Faked_functional_store : Persist.STORE with type t = t
   let set s k v = Data_store.set s k v >>= fun () -> Lwt.return s
   let del s k = Data_store.del s k >>= fun () -> Lwt.return s
   let remove_rec s k = Data_store.remove_rec s k >>= fun () -> Lwt.return s
+
+  let keys _s = invalid_arg "function keys not implementable here" (** We never use list here. *)
 end

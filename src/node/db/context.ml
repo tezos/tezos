@@ -216,7 +216,7 @@ let remove_rec (module View : VIEW) key =
   GitStore.FunView.remove_rec View.v (data_key key) >>= fun v ->
   Lwt.return (pack (module GitStore) View.s v)
 
-
+let keys (module View : VIEW) = Store.undefined_key_fn
 
 (*-- Initialisation ----------------------------------------------------------*)
 

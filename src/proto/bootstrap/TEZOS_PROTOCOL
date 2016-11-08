@@ -1,57 +1,56 @@
-hash = "TnrnfGHMCPAcxtMAHXdpfebbnn2XvPAxq7DHbpeJbKTkJQPgcgRGr"
-modules = [
+{
+    "hash": "TnrnfGHMCPAcxtMAHXdpfebbnn2XvPAxq7DHbpeJbKTkJQPgcgRGr",
+    "modules": [
+        "Misc",
+        "Tezos_hash",
+        "Qty_repr",
+        "Tez_repr",
+        "Period_repr",
+        "Time_repr",
+        "Constants_repr",
+        "Fitness_repr",
+        "Raw_level_repr",
+        "Voting_period_repr",
+        "Cycle_repr",
+        "Level_repr",
+        "Seed_repr",
+        "Script_int_repr",
+        "Script_repr",
+        "Contract_repr",
+        "Roll_repr",
+        "Asset_repr",
+        "Vote_repr",
+        "Operation_repr",
+        "Block_repr",
 
-  Misc ;
-  Tezos_hash ;
+        "Storage_sigs",
+        "Storage_functors",
+        "Storage",
 
-  Qty_repr ;
-  Tez_repr ;
-  Period_repr ;
-  Time_repr ;
-  Constants_repr ;
-  Fitness_repr ;
-  Raw_level_repr ;
-  Voting_period_repr ;
-  Cycle_repr ;
-  Level_repr ;
-  Seed_repr ;
-  Script_int_repr ;
-  Script_repr ;
-  Contract_repr ;
-  Roll_repr ;
-  Asset_repr ;
-  Vote_repr ;
-  Operation_repr ;
-  Block_repr ;
+        "Level_storage",
+        "Nonce_storage",
+        "Seed_storage",
+        "Roll_storage",
+        "Contract_storage",
+        "Reward_storage",
+        "Bootstrap_storage",
+        "Fitness_storage",
+        "Vote_storage",
+        "Init_storage",
 
-  Storage_sigs ;
-  Storage_functors ;
-  Storage ;
+        "Tezos_context",
 
-  Level_storage ;
-  Nonce_storage ;
-  Seed_storage ;
-  Roll_storage ;
-  Contract_storage ;
-  Reward_storage ;
-  Bootstrap_storage ;
-  Fitness_storage ;
-  Vote_storage ;
-  Init_storage ;
+        "Script_typed_ir",
+        "Script_ir_translator",
+        "Script_interpreter",
 
-  Tezos_context ;
+        "Mining",
+        "Amendment",
+        "Apply",
 
-  Script_typed_ir ;
-  Script_ir_translator ;
-  Script_interpreter ;
+        "Services",
+        "Services_registration",
 
-  Mining ;
-  Amendment ;
-  Apply ;
-
-  Services ;
-  Services_registration ;
-
-  Main ;
-
-]
+        "Main"
+    ]
+}

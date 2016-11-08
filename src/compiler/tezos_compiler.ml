@@ -36,11 +36,6 @@ module Backend = struct
 end
 let backend = (module Backend : Backend_intf.S)
 
-let usage () =
-  Printf.eprintf
-    "Usage: %s output.cmxs source_dir [--in-place]\n%!"
-    Sys.argv.(0)
-
 let warnings = "+a-4-6-7-9-29-40..42-44-45-48"
 let warn_error = "-a"
 
@@ -110,47 +105,66 @@ let unlink_object obj =
 (** TEZOS_PROTOCOL files *)
 
 module Meta = struct
+  let name = "TEZOS_PROTOCOL"
+  let config_file_encoding =
+    let open Data_encoding in
+    obj2
+      (opt "hash" ~description:"Used to force the hash of the protocol" Protocol_hash.encoding)
+      (req "modules" ~description:"Modules comprising the protocol" (list string))
 
-  let hash_wrapper =
-    let open Config_file in
-    { to_raw = (fun h -> Raw.String (Protocol_hash.to_b48check h));
-      of_raw = (function
-          | Raw.String h -> begin try
-                Protocol_hash.of_b48check h
-              with _ ->
-                let error oc = Printf.fprintf oc "Invalid Base48Check-encoded SHA256 key %S" h in
-                raise (Wrong_type error)
-            end
-          | _ ->
-              let error oc =
-                Printf.fprintf oc "Unexcepted value: should be a Base48Check-encoded SHA256 key." in
-              raise (Wrong_type error));
-    }
+  let to_file dirname ?hash modules =
+    let open Data_encoding.Json in
+    let config_file = construct config_file_encoding (hash, modules) in
+    Utils.write_file ~bin:false (dirname // name) @@ to_string config_file
 
-  class protocol_hash_cp =
-    [Protocol_hash.t] Config_file.cp_custom_type hash_wrapper
+  let of_file dirname =
+    let open Data_encoding.Json in
+    Utils.read_file ~bin:false (dirname // name) |> from_string |> function
+    | Error err -> Pervasives.failwith err
+    | Ok json -> destruct config_file_encoding json
+end
 
-  let to_file file hash modules =
-    let group = new Config_file.group in
-    let _ = new protocol_hash_cp ~group ["hash"] hash "" in
-    let _ =
-      new Config_file.list_cp Config_file.string_wrappers ~group
-        ["modules"] modules "" in
-    group#write file
+module Protocol = struct
+  type component = {
+    name: string;
+    interface: string option;
+    implementation: string;
+  }
 
-  let of_file file =
-    let group = new Config_file.group in
-    let hash =
-      new protocol_hash_cp ~group ["hash"]
-        (Protocol_hash.of_b48check
-           "TnrnfGHMCPAcxtMAHXdpfebbnn2XvPAxq7DHbpeJbKTkJQPgcgRGr")
-        "" in
-    let modules =
-      new Config_file.list_cp Config_file.string_wrappers ~group
-        ["modules"] [] "" in
-    group#read file;
-    (hash#get, modules#get)
+  let component_encoding =
+    let open Data_encoding in
+    conv
+      (fun { name ; interface; implementation } -> (name, interface, implementation))
+      (fun (name, interface, implementation) -> { name ; interface ; implementation })
+      (obj3
+         (req "name" string)
+         (opt "interface" string)
+         (req "implementation" string))
 
+  type t = component list
+  let encoding = Data_encoding.list component_encoding
+
+  let to_bytes v = Data_encoding.Binary.to_bytes encoding v
+  let of_bytes b = Data_encoding.Binary.of_bytes encoding b
+  let hash proto = Protocol_hash.hash_bytes [to_bytes proto]
+
+  let find_component dirname module_name =
+    let name_lowercase = String.uncapitalize_ascii module_name in
+    let implementation = dirname // name_lowercase ^ ".ml" in
+    let interface = implementation ^ "i" in
+    match Sys.file_exists implementation, Sys.file_exists interface with
+    | false, _ -> Pervasives.failwith @@ "Not such file: " ^ implementation
+    | true, false ->
+        let implementation = Utils.read_file ~bin:false implementation in
+        { name = module_name; interface = None; implementation }
+    | _ ->
+        let interface = Utils.read_file ~bin:false interface in
+        let implementation = Utils.read_file ~bin:false implementation in
+        { name = module_name; interface = Some interface; implementation }
+
+  let of_dir dirname =
+    let _hash, modules = Meta.of_file dirname in
+    List.map (find_component dirname) modules
 end
 
 (** Semi-generic compilation functions *)
@@ -215,11 +229,11 @@ let pack_objects ?(ctxt = "") ?(keep_object = false) output objects =
   if not keep_object then at_exit (fun () -> unlink_object output) ;
   Warnings.check_fatal ()
 
-let link_shared output objects =
+let link_shared ?(static=false) output objects =
   Printf.printf "LINK %s\n%!" (Filename.basename output);
   Compenv.(readenv Format.err_formatter Before_link);
   Compmisc.init_path true;
-  if Filename.check_suffix output ".cmxa" then
+  if static then
     Asmlibrarian.create_archive objects output
   else
     Asmlink.link_shared Format.err_formatter objects output;
@@ -283,12 +297,14 @@ let main () =
   and client = ref false
   and build_dir = ref None
   and include_dirs = ref [] in
+  let static = ref false in
   let args_spec = [
-    "--client", Arg.Set client, "TODO" ;
-    "-I", Arg.String (fun s -> include_dirs := s :: !include_dirs), "TODO" ;
-    "--build-dir", Arg.String (fun s -> build_dir := Some s), "TODO"] in
-  let usage_msg = "TODO" in
-  Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) "TODO" ;
+    "-static", Arg.Set static, " Build a library (.cmxa)";
+    "-client", Arg.Set client, " Preserve type equality with concrete node environment (used to embed protocol into the client)" ;
+    "-I", Arg.String (fun s -> include_dirs := s :: !include_dirs), "path Path for concrete node signatures (used to embed protocol into the client)" ;
+    "-build-dir", Arg.String (fun s -> build_dir := Some s), "path Reuse build dir (incremental compilation)"] in
+  let usage_msg = Printf.sprintf "Usage: %s <out> <src>\nOptions are:" Sys.argv.(0) in
+  Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
 
   let client = !client and include_dirs = !include_dirs in
   let output, source_dir =
@@ -312,7 +328,11 @@ let main () =
       Unix.rmdir sigs_dir ;
       if not keep_object then Unix.rmdir build_dir ) ;
 
-  let hash, units = Meta.of_file (source_dir // "TEZOS_PROTOCOL") in
+  let hash, units = Meta.of_file source_dir in
+  let hash = match hash with
+    | Some hash -> hash
+    | None -> Protocol.hash @@ List.map (Protocol.find_component source_dir) units
+  in
   let packname =
     if keep_object then
       String.capitalize_ascii (Filename.(basename @@ chop_extension output))
@@ -439,4 +459,4 @@ let main () =
 
   (* Create the final [cmxs] *)
   Clflags.link_everything := true ;
-  link_shared output [packed_objects; register_object]
+  link_shared ~static:!static output [packed_objects; register_object]
