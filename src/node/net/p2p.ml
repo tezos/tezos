@@ -174,6 +174,7 @@ type net = {
 and peer = {
   gid : gid ;
   public_key : Crypto_box.public_key ;
+  (*proof_of_work_nonce : Crypto_box.nonce ;*)
   current_nonce : unit -> Crypto_box.nonce ;
   point : point ;
   listening_port : port option ;
