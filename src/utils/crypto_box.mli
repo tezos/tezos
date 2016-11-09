@@ -12,6 +12,7 @@
 type secret_key
 type public_key
 type nonce
+type difficulty
 
 val random_keypair : unit -> secret_key * public_key
 val random_nonce : unit -> nonce
@@ -24,3 +25,5 @@ val to_public_key : MBytes.t -> public_key
 val of_public_key : public_key -> MBytes.t
 val to_nonce : MBytes.t -> nonce
 val of_nonce : nonce -> MBytes.t
+val check_proof_of_work : public_key -> nonce -> difficulty -> bool
+val generate_proof_of_work : public_key -> difficulty -> nonce
