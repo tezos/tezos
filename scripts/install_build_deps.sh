@@ -37,10 +37,10 @@ set -e
 set -x
 
 if [ ! -z "$pin" ] ; then
-    opam pin --yes remove --no-action --dev-repo ocplib-json-typed || true
     opam pin --yes remove --no-action --dev-repo ocplib-resto || true
     opam pin --yes add --no-action --dev-repo sodium
     opam pin --yes add --no-action --dev-repo ocp-ocamlres
+    opam pin --yes add --no-action --dev-repo ocplib-json-typed
     opam pin --yes add --no-action --dev-repo ocplib-resto
     opam pin --yes add --no-action tezos-deps src
 fi
@@ -52,7 +52,7 @@ fi
 
 if [ ! -z "$install" ] ; then
     if opam list --installed tezos-deps ; then
-	opam upgrade $(opam list -s --required-by tezos-deps --test | grep -ve '^ocaml *$')
+	opam upgrade $(opam list -s --required-by tezos-deps | grep -ve '^ocaml *$')
     else
 	opam install tezos-deps
     fi
