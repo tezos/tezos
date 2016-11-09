@@ -10,6 +10,7 @@
 (** Tezos - X25519/XSalsa20-Poly1305 cryptography *)
 
 type nonce
+type difficulty
 
 val random_nonce : unit -> nonce
 val increment_nonce : ?step:int -> nonce -> nonce
@@ -28,3 +29,5 @@ val box : secret_key -> public_key -> MBytes.t -> nonce -> MBytes.t
 
 val box_open : secret_key -> public_key -> MBytes.t -> nonce -> MBytes.t option
 
+val check_proof_of_work : public_key -> nonce -> difficulty -> bool
+val generate_proof_of_work : public_key -> difficulty -> nonce

@@ -15,6 +15,7 @@ type secret_key = Sodium.Box.secret_key
 type public_key = Sodium.Box.public_key
 type channel_key = Sodium.Box.channel_key
 type nonce = Sodium.Box.nonce
+type difficulty = int
 
 let random_keypair = Sodium.Box.random_keypair
 let random_nonce = Sodium.Box.random_nonce
@@ -23,6 +24,13 @@ let box = Sodium.Box.Bigbytes.box
 let box_open sk pk msg nonce =
   try Some (Sodium.Box.Bigbytes.box_open sk pk msg nonce) with
     | Sodium.Verification_failure -> None
+
+let check_proof_of_work pk nonce difficulty = assert false
+let generate_proof_of_work pk difficulty =
+  let rec loop nonce =
+    if check_proof_of_work pk nonce difficulty then nonce
+    else loop (increment_nonce nonce) in
+  loop (random_nonce ())
 
 let public_key_encoding =
   let open Data_encoding in
@@ -44,4 +52,3 @@ let nonce_encoding =
       Sodium.Box.Bigbytes.of_nonce
       Sodium.Box.Bigbytes.to_nonce
       (Fixed.bytes Sodium.Box.nonce_size)
-
