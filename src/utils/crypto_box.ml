@@ -28,7 +28,20 @@ let to_public_key = Sodium.Box.Bigbytes.to_public_key
 let of_public_key = Sodium.Box.Bigbytes.of_public_key
 let to_nonce = Sodium.Box.Bigbytes.to_nonce
 let of_nonce = Sodium.Box.Bigbytes.of_nonce
-let check_proof_of_work pk nonce difficulty = assert false
+let check_proof_of_work pk nonce difficulty =
+  let hash_bytes l =
+    let hash = Cryptokit.Hash.sha256 () in
+    List.iter (fun b -> hash#add_string (MBytes.to_string b)) l;
+    let r = hash#result in hash#wipe; r in
+  let hash = hash_bytes [of_public_key pk; of_nonce nonce] in
+  let bytes = MBytes.of_string hash in
+  let len = MBytes.length bytes * 8 in
+  try
+    for i = len - 1 downto (len - difficulty) do
+      if MBytes.get_bool bytes i then raise Exit
+    done;
+    true
+  with Exit -> false
 let generate_proof_of_work pk difficulty =
   let rec loop nonce =
     if check_proof_of_work pk nonce difficulty then nonce
