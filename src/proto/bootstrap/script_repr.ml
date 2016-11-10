@@ -92,7 +92,7 @@ let update_locations ir =
               (narg :: nargs, ni))
             ([], succ i) args in
         (Seq (i, List.rev nargs), ni) in
-  fst (update_locations 0 ir)
+  fst (update_locations 1 ir)
 
 let expr_encoding =
   Data_encoding.conv
