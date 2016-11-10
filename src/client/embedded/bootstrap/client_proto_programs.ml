@@ -56,48 +56,47 @@ let parse_program s =
   with
   | exn -> report_parse_error "program: " exn lexbuf
 
-let rec print_ir ppf node =
+let rec print_ir locations ppf node =
   let open Script in
   let rec do_seq = function
     | [] -> assert false
-    | [ last ] -> Format.fprintf ppf "%a }@]" print_ir last
-    | fst :: rest -> Format.fprintf ppf "%a ;@ " print_ir fst ; do_seq rest in
+    | [ last ] -> Format.fprintf ppf "%a }@]" (print_ir locations) last
+    | fst :: rest -> Format.fprintf ppf "%a ;@ " (print_ir locations) fst ; do_seq rest in
   let rec do_args = function
     | [] -> assert false
-    | [ last ] -> Format.fprintf ppf "%a@]" print_ir last
-    | fst :: rest -> Format.fprintf ppf "%a@," print_ir fst ; do_args rest in
+    | [ last ] -> Format.fprintf ppf "%a@]" (print_ir locations) last
+    | fst :: rest -> Format.fprintf ppf "%a@," (print_ir locations) fst ; do_args rest in
+  let print_location ppf loc =
+    if locations loc then begin
+      Format.fprintf ppf " /* %d */" loc
+  end in
   match node with
   | String (_, s) -> Format.fprintf ppf "%S" s
   | Int (_, s) -> Format.fprintf ppf "%s" s
-  | Seq (_, [ one ]) -> print_ir ppf one
+  | Seq (_, [ one ]) -> print_ir locations ppf one
   | Seq (_, []) -> Format.fprintf ppf "{}" ;
   | Seq (_, seq) ->
       Format.fprintf ppf "{ @[<v>" ;
       do_seq seq
-  | Prim (_, "push", [ Prim (_, name, []) ]) ->
-      Format.fprintf ppf "push %s" name
-  | Prim (_, name, []) ->
-      Format.fprintf ppf "%s" name
-  | Prim (_, "push", [ Prim (_, name, seq) ]) ->
-      Format.fprintf ppf "push @[<v 2>%s@," name ;
-      do_args seq
-  | Prim (_, name, seq) ->
-      Format.fprintf ppf "@[<v 2>%s@," name ;
+  | Prim (loc, name, []) ->
+      Format.fprintf ppf "%s%a" name print_location loc
+  | Prim (loc, name, seq) ->
+      Format.fprintf ppf "@[<v 2>%s%a@," name print_location loc;
       do_args seq
 
-let print_program ppf c =
+let print_program locations ppf c =
   Format.fprintf ppf
     "@[<v 2>storage@,%a@]@."
-    print_ir (c : Script.code).Script.storage_type ;
+    (print_ir (fun _ -> false)) (c : Script.code).Script.storage_type ;
   Format.fprintf ppf
     "@[<v 2>parameter@,%a@]@."
-    print_ir (c : Script.code).Script.arg_type ;
+    (print_ir (fun _ -> false)) (c : Script.code).Script.arg_type ;
   Format.fprintf ppf
     "@[<v 2>return@,%a@]@."
-    print_ir (c : Script.code).Script.ret_type ;
+    (print_ir (fun _ -> false)) (c : Script.code).Script.ret_type ;
   Format.fprintf ppf
     "@[<v 2>code@,%a@]"
-    print_ir (c : Script.code).Script.code
+    (print_ir locations) (c : Script.code).Script.code
 
 let parse_data s =
   let lexbuf = Lexing.from_string s in
@@ -121,7 +120,7 @@ module Program = Client_aliases.Alias (struct
     type t = Script.code
     let encoding = Script.code_encoding
     let of_source s = parse_program s
-    let to_source p = Lwt.return (Format.asprintf "%a" print_program p)
+    let to_source p = Lwt.return (Format.asprintf "%a" (print_program (fun _ -> false)) p)
     let name = "program"
   end)
 
@@ -169,8 +168,22 @@ let commands () =
       (fun program () ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_code (block ()) program >>= function
-         | Ok () ->
+         | Ok type_map ->
              message "Well typed" ;
+             print_program
+               (fun l -> List.mem_assoc l type_map)
+               Format.std_formatter program ;
+             Format.printf "@." ;
+             List.iter
+               (fun (loc, (before, after)) ->
+                  Format.printf
+                    "%3d@[<v 0> : [ @[<v 0>%a ]@]@,-> [ @[<v 0>%a ]@]@]@."
+                    loc
+                    (Format.pp_print_list (print_ir (fun _ -> false)))
+                    before
+                    (Format.pp_print_list (print_ir (fun _ -> false)))
+                    after)
+               type_map ;
              Lwt.return ()
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
