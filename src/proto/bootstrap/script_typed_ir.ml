@@ -232,7 +232,7 @@ and ('bef, 'aft) instr =
   | Lambda : ('arg, 'ret) lambda ->
     ('rest, ('arg, 'ret) lambda * 'rest) instr
   | Fail : Script.location ->
-    ('rest, 'rest) instr
+    ('bef, 'aft) instr
   | Nop :
       ('rest, 'rest) instr
   (* comparison *)

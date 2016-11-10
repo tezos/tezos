@@ -33,6 +33,7 @@ type error += Invalid_constant of Script.location * string
 type error += Invalid_primitive of Script.location * kind * string
 type error += Invalid_expression_kind of Script.location (* TODO: expected *)
 type error += Sequence_parameter_expected of Script.location * kind * string * int
+type error += Fail_not_in_tail_position of Script.location
 
 (* Instruction errors *)
 type error += Comparable_type_expected of Script.location
@@ -184,8 +185,32 @@ let rec stack_ty_eq
 
 type 'bef judgement =
   | Typed : ('bef, 'aft) instr * 'aft stack_ty -> 'bef judgement
+  | Failed : { instr : 'aft. 'aft stack_ty -> ('bef, 'aft) instr } -> 'bef judgement
 
 (* ---- type checker --------------------------------------------------------*)
+
+type ('t, 'f, 'b) branch =
+  { branch : 'r. ('t, 'r) instr -> ('f, 'r) instr -> ('b, 'r) instr } [@@unboxed]
+
+let merge_branches
+  : type bef a b. int -> a judgement -> b judgement ->
+    (a, b, bef) branch ->
+    bef judgement tzresult Lwt.t
+  = fun loc btr bfr { branch } ->
+    match btr, bfr with
+    | Typed (ibt, aftbt), Typed (ibf, aftbf) ->
+        trace
+          (Unmatched_branches (loc, Stack_ty aftbt, Stack_ty aftbf))
+          (Lwt.return (stack_ty_eq 0 aftbt aftbf)) >>=? fun (Eq _) ->
+        return (Typed (branch ibt ibf, aftbt))
+    | Failed { instr = instrt }, Failed { instr = instrf } ->
+        let instr ret =
+          branch (instrt ret) (instrf ret) in
+        return (Failed { instr })
+    | Typed (ibt, aftbt), Failed { instr = instrf } ->
+        return (Typed (branch ibt (instrf aftbt), aftbt))
+    | Failed { instr = instrt }, Typed (ibf, aftbf) ->
+        return (Typed (branch (instrt aftbf) ibf, aftbf))
 
 type ex_comparable_ty = Ex : 'a comparable_ty -> ex_comparable_ty
 
@@ -671,6 +696,8 @@ and parse_lambda
         return (Lam (instr, script_instr) : (arg, ret) lambda)
     | Typed (_, stack_ty) ->
         fail (Bad_return (loc, Stack_ty stack_ty, Ty ret))
+    | Failed { instr } ->
+        return (Lam (instr (Item_t (ret, Empty_t)), script_instr) : (arg, ret) lambda)
 
 and parse_instr
   : type bef storage. context ->
@@ -701,12 +728,10 @@ and parse_instr
     | Prim (loc, "if_none", [ bt ; bf ]), Item_t (Option_t t, rest) ->
         expect_sequence_parameter loc Instr "if_none" 0 bt >>=? fun () ->
         expect_sequence_parameter loc Instr "if_none" 1 bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt rest >>=? fun (Typed (ibt, aftbt)) ->
-        parse_instr ?storage_type ctxt bf (Item_t (t, rest)) >>=? fun (Typed (ibf, aftbf)) ->
-        trace
-          (Unmatched_branches (loc, Stack_ty aftbt, Stack_ty aftbf))
-          (Lwt.return (stack_ty_eq 0 aftbt aftbf)) >>=? fun (Eq _) ->
-        return (Typed (If_none (ibt, ibf), aftbt))
+        parse_instr ?storage_type ctxt bt rest >>=? fun btr ->
+        parse_instr ?storage_type ctxt bf (Item_t (t, rest)) >>=? fun bfr ->
+        let branch ibt ibf = If_none (ibt, ibf) in
+        merge_branches loc btr bfr { branch }
     (* pairs *)
     | Prim (_, "pair", []), Item_t (a, Item_t (b, rest)) ->
         return (Typed (Cons_pair, Item_t (Pair_t(a, b), rest)))
@@ -724,12 +749,10 @@ and parse_instr
     | Prim (loc, "if_left", [ bt ; bf ]), Item_t (Union_t (tl, tr), rest) ->
         expect_sequence_parameter loc Instr "if_left" 0 bt >>=? fun () ->
         expect_sequence_parameter loc Instr "if_left" 1 bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt (Item_t (tl, rest)) >>=? fun (Typed (ibt, aftbt)) ->
-        parse_instr ?storage_type ctxt bf (Item_t (tr, rest)) >>=? fun (Typed (ibf, aftbf)) ->
-        trace
-          (Unmatched_branches (loc, Stack_ty aftbt, Stack_ty aftbf))
-          (Lwt.return (stack_ty_eq 0 aftbt aftbf)) >>=? fun (Eq _) ->
-        return (Typed (If_left (ibt, ibf), aftbt))
+        parse_instr ?storage_type ctxt bt (Item_t (tl, rest)) >>=? fun btr ->
+        parse_instr ?storage_type ctxt bf (Item_t (tr, rest)) >>=? fun bfr ->
+        let branch ibt ibf = If_left (ibt, ibf) in
+        merge_branches loc btr bfr { branch }
     (* lists *)
     | Prim (_, "nil", [ t ]), rest ->
         parse_ty t >>=? fun (Ex t) ->
@@ -742,12 +765,10 @@ and parse_instr
     | Prim (loc, "if_cons", [ bt ; bf ]), Item_t (List_t t, rest) ->
         expect_sequence_parameter loc Instr "if_cons" 0 bt >>=? fun () ->
         expect_sequence_parameter loc Instr "if_cons" 1 bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt (Item_t (t, Item_t (List_t t, rest))) >>=? fun (Typed (ibt, aftbt)) ->
-        parse_instr ?storage_type ctxt bf rest >>=? fun (Typed (ibf, aftbf)) ->
-        trace
-          (Unmatched_branches (loc, Stack_ty aftbt, Stack_ty aftbf))
-          (Lwt.return (stack_ty_eq 0 aftbt aftbf)) >>=? fun (Eq _) ->
-        return (Typed (If_cons (ibt, ibf), aftbt))
+        parse_instr ?storage_type ctxt bt (Item_t (t, Item_t (List_t t, rest))) >>=? fun btr ->
+        parse_instr ?storage_type ctxt bf rest >>=? fun bfr ->
+        let branch ibt ibf = If_cons (ibt, ibf) in
+        merge_branches loc btr bfr { branch }
     | Prim (loc, "iter", []), Item_t (Lambda_t (param, Void_t), Item_t (List_t elt, rest)) ->
         check_item_ty elt param loc 2 >>=? fun (Eq _) ->
         return (Typed (List_iter, rest))
@@ -755,7 +776,7 @@ and parse_instr
         check_item_ty elt param loc 2 >>=? fun (Eq _) ->
         return (Typed (List_map, Item_t (List_t ret, rest)))
     | Prim (loc, "reduce", []), Item_t (Lambda_t (Pair_t (pelt, pr), r),
-                      Item_t (List_t elt, Item_t (init, rest))) ->
+                                        Item_t (List_t elt, Item_t (init, rest))) ->
         check_item_ty r pr loc 1 >>=? fun (Eq _) ->
         check_item_ty elt pelt loc 2 >>=? fun (Eq _) ->
         check_item_ty init r loc 3 >>=? fun (Eq _) ->
@@ -838,25 +859,36 @@ and parse_instr
     | Seq (_, [ single ]), stack_ty ->
         parse_instr ?storage_type ctxt single stack_ty
     | Seq (loc, hd :: tl), stack_ty ->
-        parse_instr ?storage_type ctxt hd stack_ty >>=? fun (Typed (ihd, trans)) ->
-        parse_instr ?storage_type ctxt (Seq (loc, tl)) trans >>=? fun (Typed (itl, aft)) ->
-        return (Typed (Seq (ihd, itl), aft))
+        parse_instr ?storage_type ctxt hd stack_ty >>=? begin function
+          | Failed _ ->
+              fail (Fail_not_in_tail_position loc)
+          | Typed (ihd, trans) ->
+              parse_instr ?storage_type ctxt (Seq (loc, tl)) trans >>=? function
+              | Failed { instr } ->
+                  let instr ret = Seq (ihd, instr ret) in
+                  return (Failed { instr })
+              | Typed (itl, aft) ->
+                  return (Typed (Seq (ihd, itl), aft))
+        end
     | Prim (loc, "if", [ bt ; bf ]), Item_t (Bool_t, rest) ->
         expect_sequence_parameter loc Instr "if" 0 bt >>=? fun () ->
         expect_sequence_parameter loc Instr "if" 1 bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt rest >>=? fun (Typed (ibt, aftbt)) ->
-        parse_instr ?storage_type ctxt bf rest >>=? fun (Typed (ibf, aftbf)) ->
-        trace
-          (Unmatched_branches (loc, Stack_ty aftbt, Stack_ty aftbf))
-          (Lwt.return (stack_ty_eq 0 aftbt aftbf)) >>=? fun (Eq _) ->
-        return (Typed (If (ibt, ibf), aftbt))
+        parse_instr ?storage_type ctxt bt rest >>=? fun btr ->
+        parse_instr ?storage_type ctxt bf rest >>=? fun bfr ->
+        let branch ibt ibf = If (ibt, ibf) in
+        merge_branches loc btr bfr { branch }
     | Prim (loc, "loop", [ body ]), Item_t (Bool_t, rest) ->
         expect_sequence_parameter loc Instr "loop" 0 body >>=? fun () ->
-        parse_instr ?storage_type ctxt body rest >>=? fun (Typed (ibody, aftbody)) ->
-        trace
-          (Unmatched_branches (loc, Stack_ty aftbody, Stack_ty stack_ty))
-          (Lwt.return (stack_ty_eq 0 aftbody stack_ty)) >>=? fun (Eq _) ->
-        return (Typed (Loop ibody, rest))
+        parse_instr ?storage_type ctxt body rest >>=? begin function
+          | Typed (ibody, aftbody) ->
+              trace
+                (Unmatched_branches (loc, Stack_ty aftbody, Stack_ty stack_ty))
+                (Lwt.return (stack_ty_eq 0 aftbody stack_ty)) >>=? fun (Eq _) ->
+              return (Typed (Loop ibody, rest))
+          | Failed { instr } ->
+              let ibody = instr (Item_t (Bool_t, rest)) in
+              return (Typed (Loop ibody, rest))
+        end
     | Prim (loc, "lambda", [ arg ; ret ; code ]), rest ->
         parse_ty arg >>=? fun (Ex arg) ->
         parse_ty ret >>=? fun (Ex ret) ->
@@ -868,10 +900,15 @@ and parse_instr
         return (Typed (Exec, Item_t (ret, rest)))
     | Prim (loc, "dip", [ code ]), Item_t (v, rest) ->
         expect_sequence_parameter loc Instr "dip" 0 code >>=? fun () ->
-        parse_instr ctxt code rest >>=? fun (Typed (instr, aft_rest)) ->
-        return (Typed (Dip instr, Item_t (v, aft_rest)))
-    | Prim (loc, "fail", []), rest ->
-        return (Typed (Fail loc, rest)) (* FIXME *)
+        parse_instr ctxt code rest >>=? begin function
+          | Typed (instr, aft_rest) ->
+              return (Typed (Dip instr, Item_t (v, aft_rest)))
+          | Failed _ ->
+              fail (Fail_not_in_tail_position loc)
+        end
+    | Prim (loc, "fail", []), _ ->
+        let instr _ = Fail loc in
+        return (Failed { instr })
     | Prim (_, "nop", []), rest ->
         return (Typed (Nop, rest))
     (* timestamp operations *)
