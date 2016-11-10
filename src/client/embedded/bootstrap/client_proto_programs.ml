@@ -116,6 +116,45 @@ let parse_data_type s =
   with
   | exn -> report_parse_error "data_type: " exn lexbuf
 
+let unexpand_macros type_map program =
+  let open Script in
+  let rec caddr type_map acc = function
+    | [] -> Some (List.rev acc)
+    | Prim (loc, "car" , []) :: rest when List.mem_assoc loc type_map ->
+        caddr type_map ((loc, "a") :: acc) rest
+    | Prim (loc, "cdr" , []) :: rest when List.mem_assoc loc type_map ->
+        caddr type_map ((loc, "d") :: acc) rest
+    | _ -> None in
+  let rec unexpand type_map node =
+    match node with
+    | Seq (loc, l) ->
+        begin match caddr type_map [] l with
+          | None ->
+              let type_map, l =
+                List.fold_left
+                  (fun (type_map, acc) e ->
+                     let type_map, e = unexpand type_map e in
+                     type_map, e :: acc)
+                  (type_map, [])
+                  l in
+              type_map, Seq (loc, List.rev l)
+          | Some l ->
+              let locs, steps = List.split l in
+              let name = "c" ^ String.concat "" steps ^ "r" in
+              let first, last = List.hd locs, List.hd (List.rev locs) in
+              let (before, _) = List.assoc first type_map in
+              let (_, after) = List.assoc last type_map in
+              let type_map =
+                List.filter
+                  (fun (loc, _) -> not (List.mem loc locs))
+                  type_map in
+              let type_map = (loc, (before, after)):: type_map in
+              type_map, Prim (loc, name, [])
+        end
+    | oth -> type_map, oth in
+  let type_map, code = unexpand type_map program.code in
+  type_map, { program with code }
+
 module Program = Client_aliases.Alias (struct
     type t = Script.code
     let encoding = Script.code_encoding
@@ -169,6 +208,7 @@ let commands () =
          let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_code (block ()) program >>= function
          | Ok type_map ->
+             let type_map, program = unexpand_macros type_map program in
              message "Well typed" ;
              print_program
                (fun l -> List.mem_assoc l type_map)
