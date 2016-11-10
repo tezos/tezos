@@ -331,7 +331,7 @@ module Helpers = struct
     RPC.service
       ~description: "Typecheck a piece of code in the current context"
       ~input: Script.code_encoding
-      ~output: (wrap_tzerror empty)
+      ~output: (wrap_tzerror Script_ir_translator.type_map_enc)
       RPC.Path.(custom_root / "helpers" / "typecheck_code")
 
   let typecheck_tagged_data custom_root =
