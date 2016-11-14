@@ -291,11 +291,8 @@ IV - Data types
      A union of two types, a value holding either a value a of type 'a
      or a value b of type 'b, that we write (Left a) or (Right b).
 
-   * `ref 'a`:
-     Classical imperative stores, that we note (Ref const).
-
    * `set 'a`, `map 'a 'b`:
-     Imperative map and sets, optimized in the db.
+     Immutable map and sets.
 
 
 V - Operations
@@ -559,49 +556,10 @@ constants as is, concatenate them and use them as keys.
         > CD(\rest)R ; C / S   =>   CDR ; C(\rest)R ; C / S
         > CR ; C / S          =>   C / S
 
-### Operations on refs
-
-   * `REF`:
-     Build a ref from its initial contents.
-
-        :: 'a : 'S   ->   ref 'a : 'S
-
-        > REF ; C / a : S / M   =>   C / l : S / l = (Ref a), M
-
-   * `DEREF`:
-     Access the contents of a ref.
-
-        :: ref 'a : 'S   ->   'a : 'S
-
-        > DEREF ; C / l : S / l = (Ref a), M   =>   C / a : S / l = (Ref a), M
-
-   * `SET`
-     Update the contents of a ref.
-
-        :: 'a : ref 'a : 'S   ->   'S
-
-        > SET ; C / v :: l : S / l = (Ref _), M   =>   C / S / l = (Ref v), M
-
-   * `INCR step`:
-     Increments a counter.
-
-        :: ref 'a : 'S   ->   'S
-           iff   step :: 'a, operator ADD defined on 'a
-
-        > INCR step ; C / l : S / M   =>   DUP ; DEREF ; PUSH step ; ADD ; Set ; C / S / M
-
-   * `DECR step`:
-     Decrements a counter.
-
-        :: ref 'a : 'S   ->   'S
-           iff   step :: 'a, operator SUB defined on 'a
-
-        > DECR step ; C / l : S / M   =>   DUP ; DEREF ; PUSH step ; SUB ; Set ; C / S / M
-
 ### Operations on sets
 
    * `EMPTY_SET 'elt`:
-     Build a new, empty imperative set for elements of a given type.
+     Build a new, empty set for elements of a given type.
 
         :: 'S   ->   set 'elt : 'S
 
@@ -616,12 +574,7 @@ constants as is, concatenate them and use them as keys.
    * `UPDATE`:
      Inserts or removes an element in a set, replacing a previous value.
 
-        :: 'elt : bool : set 'elt : 'S   ->   'S
-
-   * `ITER`:
-     Apply an imperative function over all the elements of a set.
-
-        :: lambda 'elt void : set 'elt : 'S   ->   'S
+        :: 'elt : bool : set 'elt : 'S   ->   set 'elt : 'S
 
    * `REDUCE`:
      Apply a function on a set passing the result of each
@@ -632,7 +585,7 @@ constants as is, concatenate them and use them as keys.
 ### Operations on maps
 
    * `EMPTY_MAP 'key 'val`:
-     Build a new, empty imperative map.
+     Build a new, empty map.
 
      The `'key` type must be comparable (the `COMPARE` primitive must be
      defined over it).
@@ -653,12 +606,7 @@ constants as is, concatenate them and use them as keys.
    * `UPDATE`:
      Assign or remove an element in a map.
 
-        :: 'key : option 'val : map 'key 'val : 'S   ->   'S
-
-   * `ITER`:
-     Apply an imperative function over all the bindings of a map.
-
-        :: lambda (pair 'key 'val) void : map 'key 'val : 'S   ->   'S
+        :: 'key : option 'val : map 'key 'val : 'S   ->   map 'key 'val : 'S
 
    * `MAP`:
      Apply a function on a map and return the map of results under
@@ -749,11 +697,6 @@ constants as is, concatenate them and use them as keys.
 
         > IF_CONS ; C / (Cons a rest) : S   =>    bt ; C / a : rest : S
         > IF_CONS ; C / Nil : S   =>    bf ; C / S
-
-   * `ITER`:
-     Apply a function on a list from left to right.
-
-        :: lambda 'a void : list 'a : 'S -> 'S
 
    * `MAP`:
      Apply a function on a list from left to right and
@@ -1191,10 +1134,7 @@ data. For this, the code of the contract is checked to be of the
 following type lambda (pair (pair tez 'arg) 'global) -> (pair 'ret
 'global) where 'global is the type of the original global store given
 on origination. The contract also takes a parameter and an amount, and
-returns a value, hence the complete calling convention above.  The
-global values can be updated either by rewriting the object, or by
-putting mutable values in it and performing side effects on them,
-allowing both imperative and functional style.
+returns a value, hence the complete calling convention above.
 
 ### Empty contract
 
@@ -1564,8 +1504,6 @@ X - Full grammar
       | Left <tagged data> <type>
       | Right <type> <tagged data>
       | Or <type> <type> <untagged data>
-      | Ref <tagged data>
-      | Ref <type> <untagged data>
       | Some <tagged data>
       | Some <type> <untagged data>
       | None <type>
@@ -1591,7 +1529,6 @@ X - Full grammar
       | Pair <untagged data> <untagged data>
       | Left <untagged data>
       | Right <untagged data>
-      | Ref <untagged data>
       | Some <untagged data>
       | None
       | List <untagged data> ...
@@ -1617,15 +1554,11 @@ X - Full grammar
       | IF_CONS { <instruction> ... } { <instruction> ... }
       | EMPTY_SET <type>
       | EMPTY_MAP <comparable type> <type>
-      | ITER
       | MAP
       | REDUCE
       | MEM
       | GET
       | UPDATE
-      | REF
-      | DEREF
-      | SET
       | IF { <instruction> ... } { <instruction> ... }
       | LOOP { <instruction> ... }
       | LAMBDA <type> <type> { <instruction> ... }
@@ -1694,7 +1627,6 @@ X - Full grammar
       | key
       | timestamp
       | signature
-      | ref <type>
       | option <type>
       | list <type>
       | set <comparable type>
@@ -1757,7 +1689,7 @@ The language is implemented in OCaml as follows:
     well-typed, corresponding GADT expressions. It is mostly a
     checker, not a full inferer, and thus takes some annotations
     (basically the inpout and output of the program, of lambdas and of
-    uninitialized imperative structures). It works by performing a
+    uninitialized maps and sets). It works by performing a
     symbolic evaluation of the program, transforming a symbolic
     stack. It only needs one pass over the whole program.
 
