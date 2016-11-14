@@ -437,8 +437,11 @@ let build_rpc_directory node =
   let dir =
     RPC.register1 dir Services.complete
       (fun s () ->
-         Base48.decode_partial s >>= fun l ->
-        RPC.Answer.return (List.map Base48.encode l)) in
+         Node.RPC.complete node s >>= RPC.Answer.return) in
+  let dir =
+    RPC.register2 dir Services.Blocks.complete
+      (fun block s () ->
+         Node.RPC.complete node ~block s >>= RPC.Answer.return) in
   let dir =
     RPC.register_describe_directory_service dir Services.describe in
   dir

@@ -27,6 +27,7 @@ val split_path: string -> string list
 val split: char -> ?limit: int -> string -> string list
 
 val map_option: f:('a -> 'b) -> 'a option -> 'b option
+val apply_option: f:('a -> 'b option) -> 'a option -> 'b option
 val iter_option: f:('a -> unit) -> 'a option -> unit
 val unopt: 'a -> 'a option -> 'a
 val unopt_list: 'a option list -> 'a list

@@ -258,7 +258,8 @@ let link_shared ?(static=false) output objects =
 
 let create_register_file client file hash packname modules =
   let unit = List.hd (List.rev modules) in
-  let error_monad = packname ^ ".Local_error_monad.Error_monad" in
+  let error_monad = packname ^ ".Local_modules.Error_monad" in
+  let base48 = packname ^ ".Local_modules.Base48" in
   create_file file
     (Printf.sprintf
        "module Packed_protocol = struct\n\
@@ -269,6 +270,7 @@ let create_register_file client file hash packname modules =
        \  let error_encoding  = %s.error_encoding  ()\n\
        \  let classify_errors = %s.classify_errors\n\
        \  let pp = %s.pp\n\
+       \  let complete_b48prefix = %s.complete
        \ end\n\
        \ %s\n\
        "
@@ -279,6 +281,7 @@ let create_register_file client file hash packname modules =
        error_monad
        error_monad
        error_monad
+       base48
        (if client then
           "include Register.Make(Packed_protocol)"
         else
@@ -397,38 +400,44 @@ let main () =
   (* Compile the /ad-hoc/ Error_monad. *)
   List.iter (dump_cmi sigs_dir) tezos_protocol_env ;
   at_exit (fun () -> List.iter (unlink_cmi sigs_dir) tezos_protocol_env ) ;
-  let error_monad_unit = "local_error_monad" in
-  let error_monad_ml = build_dir // error_monad_unit ^ ".ml" in
-  create_file error_monad_ml @@ Printf.sprintf {|
+  let local_modules_unit = "local_modules" in
+  let local_modules_ml = build_dir // local_modules_unit ^ ".ml" in
+  create_file local_modules_ml @@ Printf.sprintf {|
       module Error_monad = struct
         type error_category = [ `Branch | `Temporary | `Permanent ]
         include Error_monad.Make()
       end
       module Logging = Logging.Make(struct let name = %S end)
+      module Base48 = struct
+        include Base48
+        include Make(struct type context = Context.t end)
+      end
     |}
     logname ;
-  let error_monad_mli = build_dir // error_monad_unit ^ ".mli" in
-  create_file error_monad_mli @@ Printf.sprintf {|
+  let local_modules_mli = build_dir // local_modules_unit ^ ".mli" in
+  create_file local_modules_mli @@ Printf.sprintf {|
       module Error_monad : sig %s end
       module Logging : sig %s end
+      module Base48 : sig %s end
     |}
     Embedded_cmis.error_monad_mli
-    Embedded_cmis.logging_mli  ;
+    Embedded_cmis.logging_mli
+    Embedded_cmis.base48_mli ;
   if not keep_object then
     at_exit (fun () ->
-        safe_unlink error_monad_mli ;
-        safe_unlink error_monad_ml) ;
-  let error_monad_object =
+        safe_unlink local_modules_mli ;
+        safe_unlink local_modules_ml) ;
+  let local_modules_object =
     compile_units
       ~ctxt
       ~for_pack:packname
       ~keep_object
-      ~build_dir ~source_dir:build_dir [error_monad_unit]
+      ~build_dir ~source_dir:build_dir [local_modules_unit]
   in
 
   Compenv.implicit_modules :=
     !Compenv.implicit_modules @
-    [ "Local_error_monad"; "Error_monad" ; "Hash" ; "Logging" ];
+    [ "Local_modules"; "Error_monad" ; "Hash" ; "Logging" ];
 
   (* Compile the protocol *)
   let objects =
@@ -437,7 +446,7 @@ let main () =
       ~update_needed
       ~keep_object ~for_pack:packname ~build_dir ~source_dir units in
   pack_objects ~ctxt ~keep_object
-    packed_objects (error_monad_object @ objects) ;
+    packed_objects (local_modules_object @ objects) ;
 
   (* Compiler the 'registering module' *)
   List.iter (dump_cmi sigs_dir) register_env;

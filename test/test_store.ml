@@ -121,12 +121,12 @@ let test_expand (s: Store.store) =
       Block.full_set s bh2 b2 >>= fun () ->
       Block.full_set s bh3 b3 >>= fun () ->
       Block.full_set s bh3' b3 >>= fun () ->
-      Base48.decode_partial (Block_hash.to_short_b48check bh1) >>= fun res ->
-      Assert.equal_base48_list ~msg:__LOC__ res [Block_hash.Hash bh1] ;
-      Base48.decode_partial (Block_hash.to_short_b48check bh2) >>= fun res ->
-      Assert.equal_base48_list ~msg:__LOC__ res [Block_hash.Hash bh2] ;
-      Base48.decode_partial (Block_hash.to_short_b48check bh3) >>= fun res ->
-      Assert.equal_base48_list ~msg:__LOC__ res [Block_hash.Hash bh3] ;
+      Base48.complete (Block_hash.to_short_b48check bh1) >>= fun res ->
+      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b48check bh1] ;
+      Base48.complete (Block_hash.to_short_b48check bh2) >>= fun res ->
+      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b48check bh2] ;
+      Base48.complete (Block_hash.to_short_b48check bh3) >>= fun res ->
+      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b48check bh3] ;
       Lwt.return_unit)
 
 

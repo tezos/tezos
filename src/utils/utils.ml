@@ -96,6 +96,10 @@ let map_option ~f = function
   | None -> None
   | Some x -> Some (f x)
 
+let apply_option ~f = function
+  | None -> None
+  | Some x -> f x
+
 let iter_option ~f = function
   | None -> ()
   | Some x -> f x

@@ -255,6 +255,19 @@ module Blocks = struct
       ~output: (RPC.Error.wrap preapply_result_encoding)
       RPC.Path.(block_path / "preapply")
 
+  let complete =
+    let prefix_arg =
+      let destruct s = Ok s
+      and construct s = s in
+      RPC.Arg.make ~name:"prefix" ~destruct ~construct () in
+    RPC.service
+      ~description: "Try to complete a prefix of a Base48Check-encoded data. \
+                     This RPC is actually able to complete hashes of \
+                     block, operations, public_keys and contracts."
+      ~input: empty
+      ~output: (list string)
+      RPC.Path.(block_path / "complete" /: prefix_arg )
+
   type list_param = {
     operations: bool option ;
     length: int option ;
@@ -328,6 +341,8 @@ module Blocks = struct
       ~input: list_param_encoding
       ~output: (obj1 (req "blocks" (list (list block_info_encoding))))
       RPC.Path.(root / "blocks")
+
+
 
 end
 
@@ -591,7 +606,7 @@ let complete =
   RPC.service
     ~description: "Try to complete a prefix of a Base48Check-encoded data. \
                    This RPC is actually able to complete hashes of \
-                   black and hashes of operations."
+                   block and hashes of operations."
     ~input: empty
     ~output: (list string)
     RPC.Path.(root / "complete" /: prefix_arg )

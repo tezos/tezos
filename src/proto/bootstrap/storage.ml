@@ -88,6 +88,7 @@ module Key = struct
   end
 
   module Contract = struct
+
     let store_root l = store_root ("contracts" :: l)
     let set = store_root ["set"]
     let pubkey_contract l = store_root ("pubkey" :: l)
@@ -238,6 +239,7 @@ module Contract = struct
       let encoding = Data_encoding.int32
     end)
 
+  (** FIXME REMOVE : use 'list' *)
   module Set =
     Make_data_set_storage(struct
       type value = Contract_repr.t
@@ -518,3 +520,15 @@ let fork_test_network (c, constants) =
   Updater.fork_test_network c >>= fun c -> Lwt.return (c, constants)
 let set_test_protocol (c, constants) h =
   Updater.set_test_protocol c h >>= fun c -> Lwt.return (c, constants)
+
+
+(** Resolver *)
+
+let () =
+  Storage_functors.register_resolvers
+    (module Contract_hash)
+    [ Key.Contract.generic_contract [] ] ;
+  Storage_functors.register_resolvers
+    (module Ed25519.Public_key_hash)
+    [ Key.Contract.pubkey_contract [] ;
+      Key.public_keys ]

@@ -3,6 +3,7 @@ B _tzbuild
 FLG -nopervasives
 FLG -open Proto_environment
 FLG -open Hash
-FLG -open Local_error_monad
+FLG -open Local_modules
 FLG -open Error_monad
+FLG -open Logging
 FLG -w -40

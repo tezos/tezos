@@ -498,6 +498,20 @@ module RPC = struct
     Proto.fitness ctxt >>= fun fitness ->
     return (fitness, r)
 
+  let complete node ?block str =
+    match block with
+    | None ->
+        Base48.complete str
+    | Some block ->
+        get_context node block >>= function
+        | None -> Lwt.fail Not_found
+        | Some ctxt ->
+            Context.get_protocol ctxt >>= fun protocol_hash ->
+            let (module Proto) = Updater.get_exn protocol_hash in
+            Base48.complete str >>= fun l1 ->
+            Proto.complete_b48prefix ctxt str >>= fun l2 ->
+            Lwt.return (l1 @ l2)
+
   let context_dir node block =
     get_context node block >>= function
     | None -> Lwt.return None
