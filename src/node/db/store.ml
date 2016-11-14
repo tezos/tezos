@@ -50,6 +50,10 @@ module FS = struct
     let file = file_of_key root key in
     Lwt.return (Sys.file_exists file && not (Sys.is_directory file))
 
+  let dir_mem root key =
+    let file = file_of_key root key in
+    Lwt.return (Sys.file_exists file && Sys.is_directory file)
+
   let exists root key =
     let file = file_of_key root key in
     Sys.file_exists file
@@ -139,6 +143,7 @@ end
 module type IMPERATIVE_STORE = sig
   type t
   val mem: t -> key -> bool Lwt.t
+  val dir_mem: t -> key -> bool Lwt.t
   val get: t -> key -> value option Lwt.t
   val get_exn: t -> key -> value Lwt.t
   val set: t -> key -> value -> unit Lwt.t
@@ -210,6 +215,7 @@ module Make (K : KEY) (V : Persist.VALUE) = struct
   type key = K.t
   type value = V.t
   let mem t k = FS.mem t (K.to_path k)
+  let dir_mem t k = FS.dir_mem t (K.to_path k)
   let get t k =
     FS.get t (K.to_path k) >|= function
     | None -> None
@@ -224,37 +230,6 @@ module Make (K : KEY) (V : Persist.VALUE) = struct
   let remove_rec t k = FS.remove_rec t (K.to_path k)
 
   let keys _t = undefined_key_fn
-end
-
-module MakeResolver (P: sig val prefix: string list end) (H: HASH) = struct
-  let plen = List.length P.prefix
-  let build path =
-    H.to_raw @@ H.of_path @@
-    Utils.remove_elem_from_list plen path
-  let resolve t p =
-    let rec loop prefix = function
-      | [] -> Lwt.return [build prefix]
-      | "" :: ds ->
-          FS.list t [ prefix] >>= fun prefixes ->
-          Lwt_list.map_p (fun prefix -> loop prefix ds) prefixes
-          >|= List.flatten
-      | [d] ->
-          FS.list t [prefix] >>= fun prefixes ->
-          Lwt_list.filter_map_p (fun prefix ->
-              match remove_prefix d (List.hd (List.rev prefix)) with
-              | None -> Lwt.return_none
-              | Some _ -> Lwt.return (Some (build prefix))
-            ) prefixes
-      | d :: ds ->
-          if FS.exists t prefix then
-            loop (prefix @ [d]) ds
-          else
-            Lwt.return_nil in
-    loop P.prefix (H.prefix_path p)
-  let register t =
-    match H.kind with
-    | None -> ()
-    | Some kind -> Base48.register_resolver kind (resolve t)
 end
 
 module Data_store : IMPERATIVE_STORE with type t = FS.t =
@@ -343,7 +318,12 @@ end
 module Block_errors = Make (Block_errors_key) (Errors_value)
 
 module Block_resolver =
-  MakeResolver(struct let prefix = ["blocks"] end)(Block_hash)
+  Persist.MakeHashResolver
+    (struct
+      include FS
+      let prefix = ["blocks"]
+    end)
+    (Block_hash)
 
 module Block = struct
   type t = FS.t
@@ -497,7 +477,13 @@ end
 module Operation_errors = Make (Operation_errors_key) (Errors_value)
 
 module Operation_resolver =
-  MakeResolver(struct let prefix = ["operations"] end)(Operation_hash)
+  Persist.MakeHashResolver
+    (struct
+      include FS
+      let mem t k = Lwt.return (exists t k)
+      let prefix = ["operations"]
+    end)
+    (Operation_hash)
 
 module Operation = struct
   type t = FS.t
@@ -756,8 +742,12 @@ let net_destroy ~root { net_genesis } =
 
 let init root =
   raw_init ~root:(Filename.concat root "global") () >>= fun t ->
-  Block_resolver.register t ;
-  Operation_resolver.register t ;
+  Base48.register_resolver
+    Block_hash.b48check_encoding
+    (fun s -> Block_resolver.resolve t s);
+  Base48.register_resolver
+    Operation_hash.b48check_encoding
+    (fun s -> Operation_resolver.resolve t s);
   Lwt.return
     { block = Persist.share t ;
       blockchain = Persist.share t ;

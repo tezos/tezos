@@ -15,8 +15,12 @@ open Utils
 
 (*-- Signatures -------------------------------------------------------------*)
 
-module type HASH = sig
+module type MINIMAL_HASH = sig
+
   type t
+
+  val name: string
+  val title: string
 
   val hash_bytes: MBytes.t list -> t
   val hash_string: string list -> t
@@ -27,9 +31,6 @@ module type HASH = sig
   val to_raw: t -> string
   val of_hex: string -> t
   val to_hex: t -> string
-  val of_b48check: string -> t
-  val to_b48check: t -> string
-  val to_short_b48check: t -> string
   val to_bytes: t -> MBytes.t
   val of_bytes: MBytes.t -> t
   val read: MBytes.t -> int -> t
@@ -38,24 +39,41 @@ module type HASH = sig
   val of_path: string list -> t
   val prefix_path: string -> string list
   val path_len: int
+
+end
+
+module type HASH = sig
+
+  include MINIMAL_HASH
+
+  val of_b48check: string -> t
+  val to_b48check: t -> string
+  val to_short_b48check: t -> string
   val encoding: t Data_encoding.t
   val pp: Format.formatter -> t -> unit
   val pp_short: Format.formatter -> t -> unit
   type Base48.data += Hash of t
-  val kind: Base48.kind option
+  val b48check_encoding: t Base48.encoding
+
 end
 
 module type Name = sig
-  val name : string
-  val title : string
-  val prefix : string option
+  val name: string
+  val title:  string
+end
+
+module type PrefixedName = sig
+  include Name
+  val b48check_prefix: string
 end
 
 (*-- Type specific Hash builder ---------------------------------------------*)
 
-module Make_SHA256 (K : Name) = struct
+module Make_minimal_SHA256 (K : Name) = struct
 
   type t = string
+
+  include K
 
   let size = 32 (* SHA256 *)
 
@@ -71,25 +89,6 @@ module Make_SHA256 (K : Name) = struct
 
   let of_hex s = of_raw (Hex_encode.hex_decode s)
   let to_hex s = Hex_encode.hex_encode s
-
-  type Base48.data += Hash of t
-
-  let kind =
-    Utils.map_option
-      K.prefix
-      ~f:(fun prefix ->
-           Base48.register
-             ~prefix
-             ~read:(function Hash x -> Some x | _ -> None)
-             ~build:(fun x -> Hash x))
-
-  let of_b48check s =
-    match Base48.decode s with
-    | Hash x -> x
-    | _ -> Format.kasprintf failwith "Unexpected hash (%s)" K.name
-  let to_b48check s = Base48.encode (Hash s)
-
-  let to_short_b48check s = String.sub (to_b48check s) 0 12
 
   let compare = String.compare
   let equal : t -> t -> bool = (=)
@@ -143,12 +142,12 @@ module Make_SHA256 (K : Name) = struct
       let equal = equal
     end)
 
-  let path_len = 5
+  let path_len = 6
   let to_path key =
     let key = to_hex key in
     [ String.sub key 0 2 ; String.sub key 2 2 ;
       String.sub key 4 2 ; String.sub key 6 2 ;
-      String.sub key 8 (size * 2 - 8) ]
+      String.sub key 8 2 ; String.sub key 10 (size * 2 - 10) ]
   let of_path path =
     let path = String.concat "" path in
     of_hex path
@@ -160,10 +159,40 @@ module Make_SHA256 (K : Name) = struct
     and p2 = if len >= 4 then String.sub p 2 2 else ""
     and p3 = if len >= 6 then String.sub p 4 2 else ""
     and p4 = if len >= 8 then String.sub p 6 2 else ""
-    and p5 = if len > 8 then String.sub p 8 (len - 8) else "" in
-    [ p1 ; p2 ; p3 ; p4 ; p5 ]
+    and p5 = if len >= 10 then String.sub p 8 2 else ""
+    and p6 = if len > 10 then String.sub p 10 (len - 10) else "" in
+    [ p1 ; p2 ; p3 ; p4 ; p5 ; p6 ]
+
+end
+
+module Make_SHA256 (R : sig
+    val register_encoding:
+      prefix: string ->
+      to_raw: ('a -> string) ->
+      of_raw: (string -> 'a option) ->
+      wrap: ('a -> Base48.data) ->
+      'a Base48.encoding
+  end) (K : PrefixedName) = struct
+
+  include Make_minimal_SHA256(K)
 
   (* Serializers *)
+
+  type Base48.data += Hash of t
+
+  let b48check_encoding =
+    R.register_encoding
+      ~prefix: K.b48check_prefix
+      ~wrap: (fun x -> Hash x)
+      ~of_raw:(fun s -> Some s) ~to_raw
+
+  let of_b48check s =
+    match Base48.simple_decode b48check_encoding s with
+    | Some x -> x
+    | None -> Format.kasprintf failwith "Unexpected hash (%s)" K.name
+  let to_b48check s = Base48.simple_encode b48check_encoding s
+
+  let to_short_b48check s = String.sub (to_b48check s) 0 12
 
   let encoding =
     let open Data_encoding in
@@ -219,10 +248,10 @@ module Hash_table (Hash : HASH)
 (*-- Pre-instanciated hashes ------------------------------------------------*)
 
 module Block_hash =
-  Make_SHA256 (struct
+  Make_SHA256 (Base48) (struct
     let name = "Block_hash"
     let title = "A Tezos block ID"
-    let prefix = Some Base48.Prefix.block_hash
+    let b48check_prefix = Base48.Prefix.block_hash
   end)
 
 module Block_hash_set = Hash_set (Block_hash)
@@ -230,10 +259,10 @@ module Block_hash_map = Hash_map (Block_hash)
 module Block_hash_table = Hash_table (Block_hash)
 
 module Operation_hash =
-  Make_SHA256 (struct
+  Make_SHA256 (Base48) (struct
     let name = "Operation_hash"
     let title = "A Tezos operation ID"
-    let prefix = Some Base48.Prefix.operation_hash
+    let b48check_prefix = Base48.Prefix.operation_hash
    end)
 
 module Operation_hash_set = Hash_set (Operation_hash)
@@ -241,10 +270,10 @@ module Operation_hash_map = Hash_map (Operation_hash)
 module Operation_hash_table = Hash_table (Operation_hash)
 
 module Protocol_hash =
-  Make_SHA256 (struct
+  Make_SHA256 (Base48) (struct
     let name = "Protocol_hash"
     let title = "A Tezos protocol ID"
-    let prefix = Some Base48.Prefix.protocol_hash
+    let b48check_prefix = Base48.Prefix.protocol_hash
   end)
 
 module Protocol_hash_set = Hash_set (Protocol_hash)

@@ -72,21 +72,25 @@ module Ed25519 = struct
     Base48.register_encoding
       ~prefix: Base48.Prefix.ed25519_public_key
       ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_public_key x))
-      ~of_raw:(fun x -> Sodium.Sign.Bytes.to_public_key (Bytes.of_string x))
+      ~of_raw:(fun x ->
+          try Some (Sodium.Sign.Bytes.to_public_key (Bytes.of_string x))
+          with _ -> None)
       ~wrap:(fun x -> Public_key x)
 
   let b48check_secret_key_encoding =
     Base48.register_encoding
       ~prefix: Base48.Prefix.ed25519_secret_key
       ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_secret_key x))
-      ~of_raw:(fun x -> Sodium.Sign.Bytes.to_secret_key (Bytes.of_string x))
+      ~of_raw:(fun x ->
+          try Some (Sodium.Sign.Bytes.to_secret_key (Bytes.of_string x))
+          with _ -> None)
       ~wrap:(fun x -> Secret_key x)
 
   let b48check_signature_encoding =
     Base48.register_encoding
       ~prefix: Base48.Prefix.ed25519_signature
       ~to_raw:MBytes.to_string
-      ~of_raw:MBytes.of_string
+      ~of_raw:(fun s -> Some (MBytes.of_string s))
       ~wrap:(fun x -> Signature x)
 
   let public_key_encoding =
@@ -164,4 +168,6 @@ module type PACKED_PROTOCOL = sig
   val error_encoding : error Data_encoding.t
   val classify_errors : error list -> [ `Branch | `Temporary | `Permanent ]
   val pp : Format.formatter -> error -> unit
+  val complete_b48prefix :
+    ?alphabet:string -> Context.t -> string -> string list Lwt.t
 end

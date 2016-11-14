@@ -12,7 +12,8 @@ all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT}
 ## Protocol environment
 ############################################################################
 
-PROTOCOL_ENV_INTFS := $(addprefix proto/environment/, \
+PROTOCOL_ENV_INTFS := \
+$(addprefix proto/environment/, \
   pervasives.mli \
   compare.mli \
   \
@@ -30,7 +31,7 @@ PROTOCOL_ENV_INTFS := $(addprefix proto/environment/, \
   uri.mli \
   data_encoding.mli \
   time.mli \
-  base48.mli \
+  ../../utils/base48.mli \
   hash.mli \
   ed25519.mli \
   persist.mli \
@@ -42,7 +43,8 @@ PROTOCOL_ENV_INTFS := $(addprefix proto/environment/, \
 ) \
 utils/logging.mli \
 utils/error_monad_sig.ml \
-utils/error_monad.mli
+utils/error_monad.mli \
+
 
 .INTERMEDIATE: node/updater/environment_gen
 .SECONDARY: node/updater/proto_environment.mli
@@ -75,6 +77,7 @@ EMBEDDED_PROTOCOL_LIB_CMIS := \
   tmp/camlinternalFormatBasics.cmi \
   utils/error_monad.cmi \
   proto/environment/error_monad.mli \
+  proto/environment/base48.mli \
   proto/environment/logging.mli \
   node/updater/proto_environment.cmi \
   node/updater/register.cmi
