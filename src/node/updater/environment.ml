@@ -31,7 +31,121 @@ module Data_encoding = Data_encoding
 module Time = Time
 module Base48 = Base48
 module Hash = Hash
-module Ed25519 = Ed25519
+module Ed25519 = struct
+
+  type secret_key = Sodium.Sign.secret_key
+  type public_key = Sodium.Sign.public_key
+  type signature = MBytes.t
+
+  let sign key msg =
+    Sodium.Sign.Bigbytes.(of_signature @@ sign_detached key msg)
+
+  let check_signature public_key signature msg =
+    try
+      Sodium.Sign.Bigbytes.(verify public_key (to_signature signature) msg) ;
+      true
+    with _ -> false
+
+  let append_signature key msg =
+    MBytes.concat msg (sign key msg)
+
+  module Public_key_hash = Hash.Make_SHA256(Base48)(struct
+      let name = "Ed25519.Public_key_hash"
+      let title = "An Ed25519 public key ID"
+      let b48check_prefix = Base48.Prefix.ed25519_public_key_hash
+    end)
+
+  let hash v =
+    Public_key_hash.hash_bytes
+      [ Sodium.Sign.Bigbytes.of_public_key v ]
+
+  let generate_key () =
+    let secret, pub = Sodium.Sign.random_keypair () in
+    (hash pub, pub, secret)
+
+  type Base48.data +=
+    | Public_key of public_key
+    | Secret_key of secret_key
+    | Signature of signature
+
+  let b48check_public_key_encoding =
+    Base48.register_encoding
+      ~prefix: Base48.Prefix.ed25519_public_key
+      ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_public_key x))
+      ~of_raw:(fun x -> Sodium.Sign.Bytes.to_public_key (Bytes.of_string x))
+      ~wrap:(fun x -> Public_key x)
+
+  let b48check_secret_key_encoding =
+    Base48.register_encoding
+      ~prefix: Base48.Prefix.ed25519_secret_key
+      ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_secret_key x))
+      ~of_raw:(fun x -> Sodium.Sign.Bytes.to_secret_key (Bytes.of_string x))
+      ~wrap:(fun x -> Secret_key x)
+
+  let b48check_signature_encoding =
+    Base48.register_encoding
+      ~prefix: Base48.Prefix.ed25519_signature
+      ~to_raw:MBytes.to_string
+      ~of_raw:MBytes.of_string
+      ~wrap:(fun x -> Signature x)
+
+  let public_key_encoding =
+    let open Data_encoding in
+    splitted
+      ~json:
+        (describe
+           ~title: "An Ed25519 public key (Base48Check encoded)" @@
+         conv
+           (fun s -> Base48.simple_encode b48check_public_key_encoding s)
+           (fun s ->
+              match Base48.simple_decode b48check_public_key_encoding s with
+              | Some x -> x
+              | None -> Data_encoding.Json.cannot_destruct
+                          "Ed25519 public key: unexpected prefix.")
+           string)
+      ~binary:
+        (conv
+           Sodium.Sign.Bigbytes.of_public_key
+           Sodium.Sign.Bigbytes.to_public_key
+           bytes)
+
+  let secret_key_encoding =
+    let open Data_encoding in
+    splitted
+      ~json:
+        (describe
+           ~title: "An Ed25519 secret key (Base48Check encoded)" @@
+         conv
+           (fun s -> Base48.simple_encode b48check_secret_key_encoding s)
+           (fun s ->
+              match Base48.simple_decode b48check_secret_key_encoding s with
+              | Some x -> x
+              | None -> Data_encoding.Json.cannot_destruct
+                          "Ed25519 secret key: unexpected prefix.")
+           string)
+      ~binary:
+        (conv
+           Sodium.Sign.Bigbytes.of_secret_key
+           Sodium.Sign.Bigbytes.to_secret_key
+           bytes)
+
+  let signature_encoding =
+    let open Data_encoding in
+    splitted
+      ~json:
+        (describe
+           ~title: "An Ed25519 signature (Base48Check encoded)" @@
+         conv
+           (fun s -> Base48.simple_encode b48check_signature_encoding s)
+           (fun s ->
+              match Base48.simple_decode b48check_signature_encoding s with
+              | Some x -> x
+              | None -> Data_encoding.Json.cannot_destruct
+                          "Ed25519 signature: unexpected prefix.")
+           string)
+      ~binary: (Fixed.bytes 64)
+
+end
 module Persist = Persist
 module Context = Context
 module RPC = RPC

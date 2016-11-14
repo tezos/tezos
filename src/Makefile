@@ -110,7 +110,6 @@ UTILS_LIB_INTFS := \
   utils/data_encoding.mli \
   utils/time.mli \
   utils/hash.mli \
-  utils/ed25519.mli \
   utils/error_monad.mli \
   utils/logging.mli \
   utils/lwt_utils.mli \
@@ -126,7 +125,6 @@ UTILS_LIB_IMPLS := \
   utils/data_encoding.ml \
   utils/time.ml \
   utils/hash.ml \
-  utils/ed25519.ml \
   utils/error_monad_sig.ml \
   utils/error_monad.ml \
   utils/logging.ml \
@@ -318,7 +316,7 @@ proto/embedded_proto_%.cmxa: \
 
 CLIENT_PROTO_INCLUDES := \
   utils node/updater node/db node/net node/shell client \
-  $(shell ocamlfind query lwt ocplib-json-typed)
+  $(shell ocamlfind query lwt ocplib-json-typed sodium)
 
 proto/client_embedded_proto_%.cmxa: \
   ${TZCOMPILER} \
