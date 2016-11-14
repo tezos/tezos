@@ -22,10 +22,10 @@ let encoding =
 
 module Map = struct
   module Raw = Map.Make(struct
-      type t = asset * Ed25519.public_key_hash
+      type t = asset * Ed25519.Public_key_hash.t
       let compare (a1, pk1) (a2, pk2) =
         if Compare.Int32.(a1 = a2) then
-          Ed25519.compare_hash pk1 pk2
+          Ed25519.Public_key_hash.compare pk1 pk2
         else
           Compare.Int32.compare a1 a2
     end)
@@ -54,7 +54,7 @@ let encoding =
        (Json.wrap_error of_tuple_list_exn)
        (list
           (tup2
-             (tup2 encoding Ed25519.public_key_hash_encoding)
+             (tup2 encoding Ed25519.Public_key_hash.encoding)
              Tez_repr.encoding)))
 
 end

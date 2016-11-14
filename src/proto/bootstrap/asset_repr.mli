@@ -17,6 +17,6 @@ module Map : sig
   type t
   val empty: t
   val add:
-    t -> asset -> Ed25519.public_key_hash -> Tez_repr.tez -> t tzresult
+    t -> asset -> Ed25519.Public_key_hash.t -> Tez_repr.tez -> t tzresult
   val encoding: t Data_encoding.t
 end
