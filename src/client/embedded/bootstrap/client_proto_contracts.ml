@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Ed25519 = Environment.Ed25519
+
 module RawContractAlias = Client_aliases.Alias (struct
     type t = Contract.t
     let encoding = Contract.encoding
