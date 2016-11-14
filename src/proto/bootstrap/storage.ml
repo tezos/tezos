@@ -60,6 +60,8 @@ module Key = struct
   let next_cycle_to_be_rewarded = store_root ["next_cycle_to_be_rewarded"]
   let rewards = store_root ["rewards"]
 
+  let public_keys = ["public_keys" ; "ed25519"]
+
   module Roll = struct
     let store_root l = store_root ("rolls" :: l)
     let next = store_root [ "next" ]
@@ -88,13 +90,14 @@ module Key = struct
   module Contract = struct
     let store_root l = store_root ("contracts" :: l)
     let set = store_root ["set"]
+    let pubkey_contract l = store_root ("pubkey" :: l)
+    let generic_contract l = store_root ("generic" :: l)
     let contract_store c l =
-      store_root @@
       match c with
       | Contract_repr.Default k ->
-          "pubkey" :: Ed25519.hash_path k @ l
+          pubkey_contract @@ Ed25519.Public_key_hash.to_path k @ l
       | Contract_repr.Hash h ->
-          "generic" :: Contract_hash.to_path h @ l
+          generic_contract @@ Contract_hash.to_path h @ l
     let roll_list c = contract_store c ["roll_list"]
     let change c = contract_store c ["change"]
     let balance c = contract_store c ["balance"]
@@ -401,7 +404,7 @@ module Public_key =
   Make_iterable_data_storage (Ed25519.Public_key_hash)
     (struct
       type value = Ed25519.public_key
-      let key = ["public_keys"]
+      let key = Key.public_keys
       let name = "public keys"
       let encoding = Ed25519.public_key_encoding
     end)
