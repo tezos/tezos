@@ -21,17 +21,17 @@ val encoding: nonce Data_encoding.t
 
 val record_hash:
   Storage.t ->
-  Ed25519.public_key_hash -> Tez_repr.t ->
+  Ed25519.Public_key_hash.t -> Tez_repr.t ->
   Nonce_hash.t -> Storage.t tzresult Lwt.t
 
 val reveal:
   Storage.t -> Level_repr.t -> nonce ->
-  (Storage.t * Ed25519.public_key_hash * Tez_repr.t) tzresult Lwt.t
+  (Storage.t * Ed25519.Public_key_hash.t * Tez_repr.t) tzresult Lwt.t
 
 type status =
   | Unrevealed of {
       nonce_hash: Tezos_hash.Nonce_hash.t ;
-      delegate_to_reward: Ed25519.public_key_hash ;
+      delegate_to_reward: Ed25519.Public_key_hash.t ;
       reward_amount: Tez_repr.t ;
     }
   | Revealed of nonce

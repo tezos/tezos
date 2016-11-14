@@ -26,7 +26,7 @@ module Nonce_hash_set = Tezos_hash.Nonce_hash_set
 module Nonce_hash_map = Tezos_hash.Nonce_hash_map
 
 type public_key = Ed25519.public_key
-type public_key_hash = Ed25519.public_key_hash
+type public_key_hash = Ed25519.Public_key_hash.t
 type secret_key = Ed25519.secret_key
 type signature = Ed25519.signature
 

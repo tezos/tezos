@@ -197,10 +197,10 @@ module Roll = struct
   module Owner_for_cycle =
     Make_indexed_data_storage(struct
       type key = Cycle_repr.t * Roll_repr.t
-      type value = Ed25519.public_key_hash
+      type value = Ed25519.Public_key_hash.t
       let name = "roll owner for current cycle"
       let key = Key.Cycle.roll_owner
-      let encoding = Ed25519.public_key_hash_encoding
+      let encoding = Ed25519.Public_key_hash.encoding
     end)
 
    module Contract_roll_list =
@@ -266,10 +266,10 @@ module Contract = struct
   module Manager =
     Make_indexed_data_storage(struct
       type key = Contract_repr.t
-      type value = Ed25519.public_key_hash
+      type value = Ed25519.Public_key_hash.t
       let name = "contract manager"
       let key = Key.Contract.manager
-      let encoding = Ed25519.public_key_hash_encoding
+      let encoding = Ed25519.Public_key_hash.encoding
     end)
 
   module Spendable =
@@ -293,10 +293,10 @@ module Contract = struct
   module Delegate =
     Make_indexed_data_storage(struct
       type key = Contract_repr.t
-      type value = Ed25519.public_key_hash
+      type value = Ed25519.Public_key_hash.t
       let name = "contract delegate"
       let key = Key.Contract.delegate
-      let encoding = Ed25519.public_key_hash_encoding
+      let encoding = Ed25519.Public_key_hash.encoding
     end)
 
   module Counter =
@@ -376,7 +376,7 @@ module Vote = struct
   module Proposals =
     Make_data_set_storage
       (struct
-        type value = Protocol_hash.t * Ed25519.public_key_hash
+        type value = Protocol_hash.t * Ed25519.Public_key_hash.t
         let name = "proposals"
         let encoding =
           Data_encoding.tup2
@@ -413,7 +413,7 @@ module Seed = struct
   type nonce_status =
     | Unrevealed of {
         nonce_hash: Tezos_hash.Nonce_hash.t ;
-        delegate_to_reward: Ed25519.public_key_hash ;
+        delegate_to_reward: Ed25519.Public_key_hash.t ;
         reward_amount: Tez_repr.t ;
       }
     | Revealed of Seed_repr.nonce
@@ -482,7 +482,7 @@ module Rewards = struct
 
   module Amount =
     Raw_make_iterable_data_storage(struct
-      type t = Ed25519.public_key_hash * Cycle_repr.t
+      type t = Ed25519.Public_key_hash.t * Cycle_repr.t
       let prefix = Key.rewards
       let length = Ed25519.Public_key_hash.path_len + 1
       let to_path (pkh, c) =

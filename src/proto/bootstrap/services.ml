@@ -191,7 +191,7 @@ module Context = struct
 
     let pk_encoding =
       (obj2
-         (req "hash" Ed25519.public_key_hash_encoding)
+         (req "hash" Ed25519.Public_key_hash.encoding)
          (req "public_key" Ed25519.public_key_encoding))
 
     let list custom_root =
@@ -225,14 +225,14 @@ module Context = struct
       RPC.service
         ~description: "Access the manager of a contract."
         ~input: empty
-        ~output: (wrap_tzerror Ed25519.public_key_hash_encoding)
+        ~output: (wrap_tzerror Ed25519.Public_key_hash.encoding)
         RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "manager")
 
     let delegate custom_root =
       RPC.service
         ~description: "Access the delegate of a contract, if any."
         ~input: empty
-        ~output: (wrap_tzerror (option Ed25519.public_key_hash_encoding))
+        ~output: (wrap_tzerror (option Ed25519.Public_key_hash.encoding))
         RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "delegate")
 
     let counter custom_root =
@@ -292,12 +292,12 @@ module Context = struct
              (fun (manager,balance,spendable,delegate,script,assets,counter) ->
                 {manager;balance;spendable;delegate;script;assets;counter}) @@
            obj7
-             (req "manager" Ed25519.public_key_hash_encoding)
+             (req "manager" Ed25519.Public_key_hash.encoding)
              (req "balance" Tez.encoding)
              (req "spendable" bool)
              (req "delegate" @@ obj2
                 (req "setable" bool)
-                (opt "value" Ed25519.public_key_hash_encoding))
+                (opt "value" Ed25519.Public_key_hash.encoding))
              (dft "script" Script.encoding No_script)
              (req "assets" Asset.Map.encoding)
              (req "counter" int32))
@@ -404,7 +404,7 @@ module Helpers = struct
                     (req "mining_rights"
                        (list
                           (obj2
-                             (req "delegate" Ed25519.public_key_hash_encoding)
+                             (req "delegate" Ed25519.Public_key_hash.encoding)
                              (req "timestamp" Timestamp.encoding)))))
         RPC.Path.(custom_root / "helpers" / "rights" / "mining")
 
@@ -418,7 +418,7 @@ module Helpers = struct
                   obj2
                     (req "level" Raw_level.encoding)
                     (req "delegates"
-                       (list Ed25519.public_key_hash_encoding)))
+                       (list Ed25519.Public_key_hash.encoding)))
         RPC.Path.(custom_root / "helpers" / "rights"
                   / "mining" / "level" /: Raw_level.arg )
 
@@ -447,7 +447,7 @@ module Helpers = struct
         ~input: empty
         ~output: (wrap_tzerror @@
                   obj1 (req "delegates"
-                          (list Ed25519.public_key_hash_encoding)))
+                          (list Ed25519.Public_key_hash.encoding)))
         RPC.Path.(custom_root / "helpers" / "rights"
                   / "mining" / "delegate"  )
 
@@ -460,7 +460,7 @@ module Helpers = struct
                   obj2
                     (req "level" Raw_level.encoding)
                     (req "delegates"
-                       (list Ed25519.public_key_hash_encoding)))
+                       (list Ed25519.Public_key_hash.encoding)))
         RPC.Path.(custom_root / "helpers" / "rights" / "endorsement")
 
     let endorsement_rights_for_level custom_root =
@@ -472,7 +472,7 @@ module Helpers = struct
                   obj2
                     (req "level" Raw_level.encoding)
                     (req "delegates"
-                       (list Ed25519.public_key_hash_encoding)))
+                       (list Ed25519.Public_key_hash.encoding)))
         RPC.Path.(custom_root / "helpers" / "rights"
                   / "endorsement" / "level" /: Raw_level.arg )
 
@@ -501,7 +501,7 @@ module Helpers = struct
         ~input: empty
         ~output: (wrap_tzerror @@
                   obj1 (req "delegates"
-                          (list Ed25519.public_key_hash_encoding)))
+                          (list Ed25519.Public_key_hash.encoding)))
         RPC.Path.(custom_root / "helpers" / "rights"
                   / "endorsement" / "delegate"  )
 

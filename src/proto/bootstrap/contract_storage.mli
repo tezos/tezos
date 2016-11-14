@@ -33,9 +33,9 @@ val is_delegatable : Storage.t -> Contract_repr.t -> bool tzresult Lwt.t
 val is_spendable : Storage.t -> Contract_repr.t -> bool tzresult Lwt.t
 
 val get_descr: Storage.t -> Contract_repr.t -> Contract_repr.descr tzresult Lwt.t
-val get_manager: Storage.t -> Contract_repr.t -> Ed25519.public_key_hash tzresult Lwt.t
-val get_delegate: Storage.t -> Contract_repr.t -> Ed25519.public_key_hash tzresult Lwt.t
-val get_delegate_opt: Storage.t -> Contract_repr.t -> Ed25519.public_key_hash option tzresult Lwt.t
+val get_manager: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t tzresult Lwt.t
+val get_delegate: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t tzresult Lwt.t
+val get_delegate_opt: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option tzresult Lwt.t
 val get_balance: Storage.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 val get_assets: Storage.t -> Contract_repr.t -> Asset_repr.Map.t tzresult Lwt.t
 val get_counter: Storage.t -> Contract_repr.t -> int32 tzresult Lwt.t
@@ -49,7 +49,7 @@ val update_script_storage: Storage.t -> Contract_repr.t -> Script_repr.expr ->
   Storage.t tzresult Lwt.t
 
 (** fails if the contract is not delegatable *)
-val set_delegate : Storage.t -> Contract_repr.t -> Ed25519.public_key_hash option -> Storage.t tzresult Lwt.t
+val set_delegate : Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option -> Storage.t tzresult Lwt.t
 
 val credit : Storage.t -> Contract_repr.t -> Tez_repr.t -> Storage.t tzresult Lwt.t
 
@@ -60,14 +60,14 @@ val spend : Storage.t -> Contract_repr.t -> Tez_repr.t -> Storage.t tzresult Lwt
 val unconditional_spend : Storage.t -> Contract_repr.t -> Tez_repr.t -> Storage.t tzresult Lwt.t
 
 val issue :
-  Storage.t -> Contract_repr.t ->  Asset_repr.t -> Ed25519.public_key_hash -> Tez_repr.t -> Storage.t tzresult Lwt.t
+  Storage.t -> Contract_repr.t ->  Asset_repr.t -> Ed25519.Public_key_hash.t -> Tez_repr.t -> Storage.t tzresult Lwt.t
 
 val originate :
   Storage.t ->
   balance:Tez_repr.t ->
-  manager:Ed25519.public_key_hash ->
+  manager:Ed25519.Public_key_hash.t ->
   script:Script_repr.t ->
-  delegate:Ed25519.public_key_hash option ->
+  delegate:Ed25519.Public_key_hash.t option ->
   spendable:bool ->
   delegatable:bool ->
   (Storage.t * Contract_repr.t) tzresult Lwt.t
