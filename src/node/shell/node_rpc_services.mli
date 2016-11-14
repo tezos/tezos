@@ -80,6 +80,8 @@ module Blocks : sig
   val preapply:
     (unit, unit * block, preapply_param, preapply_result tzresult) RPC.service
 
+  val complete: (unit, (unit * block) * string, unit, string list) RPC.service
+
   val proto_path: (unit, unit * block) RPC.Path.path
 
 end

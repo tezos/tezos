@@ -20,8 +20,8 @@ val equal_persist_list :
 val equal_block_hash_list :
   ?msg:string -> Block_hash.t list -> Block_hash.t list -> unit
 
-val equal_base48_list :
-  ?msg:string -> Base48.data list -> Base48.data list -> unit
+val equal_string_list :
+  ?msg:string -> string list -> string list -> unit
 
 val equal_string_option : ?msg:string -> string option -> string option -> unit
 

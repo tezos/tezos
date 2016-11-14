@@ -16,6 +16,8 @@ module type REGISTRED_PROTOCOL = sig
   val hash: Protocol_hash.t
   include Protocol.PROTOCOL with type error := error
                              and type 'a tzresult := 'a tzresult
+  val complete_b48prefix :
+    ?alphabet:string -> Context.t -> string -> string list Lwt.t
 end
 
 type net_id = Store.net_id = Net of Block_hash.t
