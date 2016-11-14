@@ -376,6 +376,6 @@ let register_resolvers (module H : Hash.HASH) prefixes =
           Set.empty hs |>
         Set.elements in
 
-  Base48.register_resolver H.b48check_encoding resolve
+  Context.register_resolver H.b48check_encoding resolve
 
 
