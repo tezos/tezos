@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Ed25519 = Environment.Ed25519
+
 open Logging.Client.Mining
 
 open Operation
