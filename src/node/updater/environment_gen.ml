@@ -22,6 +22,11 @@ let dump_file oc file =
 let included = ["Pervasives"]
 
 let () =
+  Printf.fprintf mli
+    "module Make(Param : sig val name: string end)() : sig\n"
+
+
+let () =
   for i = 2 to Array.length Sys.argv - 1 do
     let file = Sys.argv.(i) in
     let unit =
@@ -36,9 +41,11 @@ let () =
     dump_file mli file;
     Printf.fprintf mli "end\n";
     if unit = "Result" then begin
-      Printf.fprintf mli "type ('a, 'b) result = ('a, 'b) Result.result = Ok of 'a | Error of 'b\n";
+      Printf.fprintf mli
+        "type ('a, 'b) result = ('a, 'b) Result.result = Ok of 'a | Error of 'b\n";
     end;
   done
+
 
 let () =
   Printf.fprintf mli {|
@@ -55,4 +62,5 @@ val __cast: (module PACKED_PROTOCOL) -> (module Protocol.PACKED_PROTOCOL)
 |}
 
 let () =
+  Printf.fprintf mli "end\n" ;
   close_out mli

@@ -8,9 +8,5 @@
 (**************************************************************************)
 
 val camlinternalFormatBasics_cmi: string
-val error_monad_cmi: string
-val error_monad_mli: string
-val logging_mli: string
-val base48_mli: string
 val proto_environment_cmi: string
 val register_cmi: string

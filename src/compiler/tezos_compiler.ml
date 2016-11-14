@@ -258,12 +258,14 @@ let link_shared ?(static=false) output objects =
 
 let create_register_file client file hash packname modules =
   let unit = List.hd (List.rev modules) in
-  let error_monad = packname ^ ".Local_modules.Error_monad" in
-  let base48 = packname ^ ".Local_modules.Base48" in
+  let environment_module = packname ^ ".Local_environment.Environment" in
+  let error_monad_module = environment_module ^ ".Error_monad" in
+  let context_module = environment_module ^ ".Context" in
+  let hash_module = environment_module ^ ".Hash" in
   create_file file
     (Printf.sprintf
        "module Packed_protocol = struct\n\
-       \  let hash = (Hash.Protocol_hash.of_b48check %S)\n\
+       \  let hash = (%s.Protocol_hash.of_b48check %S)\n\
        \  type error = %s.error = ..\n\
        \  type 'a tzresult = 'a %s.tzresult\n\
        \  include %s.%s\n\
@@ -274,18 +276,20 @@ let create_register_file client file hash packname modules =
        \ end\n\
        \ %s\n\
        "
+       hash_module
        (Protocol_hash.to_b48check hash)
-       error_monad
-       error_monad
+       error_monad_module
+       error_monad_module
        packname (String.capitalize_ascii unit)
-       error_monad
-       error_monad
-       error_monad
-       base48
+       error_monad_module
+       error_monad_module
+       error_monad_module
+       context_module
        (if client then
           "include Register.Make(Packed_protocol)"
         else
-          "let () = Register.register (module Packed_protocol : PACKED_PROTOCOL)"))
+          Printf.sprintf
+            "let () = Register.register (%s.__cast (module Packed_protocol : %s.PACKED_PROTOCOL))" environment_module environment_module))
 
 let mktemp_dir () =
   Filename.get_temp_dir_name () //
@@ -394,50 +398,30 @@ let main () =
   if keep_object then
     create_file (build_dir // ".tezos_compiler") (md5 ^ "\n");
 
-  Compenv.implicit_modules :=
-    if client then [ "Environment" ] else [ "Proto_environment" ] ;
-
   (* Compile the /ad-hoc/ Error_monad. *)
   List.iter (dump_cmi sigs_dir) tezos_protocol_env ;
   at_exit (fun () -> List.iter (unlink_cmi sigs_dir) tezos_protocol_env ) ;
-  let local_modules_unit = "local_modules" in
-  let local_modules_ml = build_dir // local_modules_unit ^ ".ml" in
-  create_file local_modules_ml @@ Printf.sprintf {|
-      module Error_monad = struct
-        type error_category = [ `Branch | `Temporary | `Permanent ]
-        include Error_monad.Make()
-      end
-      module Logging = Logging.Make(struct let name = %S end)
-      module Base48 = struct
-        include Base48
-        include Make(struct type context = Context.t end)
-      end
+  let local_environment_unit = "local_environment" in
+  let local_environment_ml = build_dir // local_environment_unit ^ ".ml" in
+  create_file local_environment_ml @@ Printf.sprintf {|
+      module Environment = %s.Make(struct let name = %S end)()
     |}
+    (if client then "Environment" else "Proto_environment")
     logname ;
-  let local_modules_mli = build_dir // local_modules_unit ^ ".mli" in
-  create_file local_modules_mli @@ Printf.sprintf {|
-      module Error_monad : sig %s end
-      module Logging : sig %s end
-      module Base48 : sig %s end
-    |}
-    Embedded_cmis.error_monad_mli
-    Embedded_cmis.logging_mli
-    Embedded_cmis.base48_mli ;
   if not keep_object then
     at_exit (fun () ->
-        safe_unlink local_modules_mli ;
-        safe_unlink local_modules_ml) ;
-  let local_modules_object =
+        safe_unlink local_environment_ml) ;
+  let local_environment_object =
     compile_units
       ~ctxt
       ~for_pack:packname
       ~keep_object
-      ~build_dir ~source_dir:build_dir [local_modules_unit]
+      ~build_dir ~source_dir:build_dir [local_environment_unit]
   in
 
   Compenv.implicit_modules :=
-    !Compenv.implicit_modules @
-    [ "Local_modules"; "Error_monad" ; "Hash" ; "Logging" ];
+    [ "Local_environment"; "Environment" ;
+      "Error_monad" ; "Hash" ; "Logging" ];
 
   (* Compile the protocol *)
   let objects =
@@ -446,7 +430,7 @@ let main () =
       ~update_needed
       ~keep_object ~for_pack:packname ~build_dir ~source_dir units in
   pack_objects ~ctxt ~keep_object
-    packed_objects (local_modules_object @ objects) ;
+    packed_objects (local_environment_object @ objects) ;
 
   (* Compiler the 'registering module' *)
   List.iter (dump_cmi sigs_dir) register_env;
