@@ -10,14 +10,41 @@
 open Tezos_context
 open Script_int
 
+
+(* ---- Auxiliary types -----------------------------------------------------*)
+
+type 'ty comparable_ty =
+  | Int_key : ('s, 'l) int_kind -> ('s, 'l) int_val comparable_ty
+  | String_key : string comparable_ty
+  | Tez_key : Tez.t comparable_ty
+  | Bool_key : bool comparable_ty
+  | Key_key : public_key_hash comparable_ty
+  | Timestamp_key : Timestamp.t comparable_ty
+
+module type Boxed_set = sig
+  type elt
+  module OPS : Set.S with type elt = elt
+  val boxed : OPS.t
+end
+
+type 'elt set = (module Boxed_set with type elt = 'elt)
+
+module type Boxed_map = sig
+  type key
+  type value
+  val key_ty : key comparable_ty
+  module OPS : Map.S with type key = key
+  val boxed : value OPS.t
+end
+
+type ('key, 'value) map = (module Boxed_map with type key = 'key and type value = 'value)
+
 type ('arg, 'ret, 'storage) script =
   { code : (((Tez.t, 'arg) pair, 'storage) pair, ('ret, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
     ret_type : 'ret ty ;
     storage : 'storage ;
     storage_type : 'storage ty }
-
-(* ---- Auxiliary types -----------------------------------------------------*)
 
 and ('a, 'b) pair = 'a * 'b
 
@@ -30,14 +57,6 @@ and ('arg, 'ret) lambda =
 
 and ('arg, 'ret) typed_contract =
   'arg ty * 'ret ty * Contract.t
-
-and 'ty comparable_ty =
-  | Int_key : ('s, 'l) int_kind -> ('s, 'l) int_val comparable_ty
-  | String_key : string comparable_ty
-  | Tez_key : Tez.t comparable_ty
-  | Bool_key : bool comparable_ty
-  | Key_key : public_key_hash comparable_ty
-  | Timestamp_key : Timestamp.t comparable_ty
 
 and 'ty ty =
   | Void_t : unit ty
@@ -52,17 +71,10 @@ and 'ty ty =
   | Union_t : 'a ty * 'b ty -> ('a, 'b) union ty
   | Lambda_t : 'arg ty * 'ret ty -> ('arg, 'ret) lambda ty
   | Option_t : 'v ty -> 'v option ty
-  | Ref_t : 'v ty -> 'v ref ty
   | List_t : 'v ty -> 'v list ty
   | Set_t : 'v comparable_ty -> 'v set ty
   | Map_t : 'k comparable_ty * 'v ty -> ('k, 'v) map ty
   | Contract_t : 'arg ty * 'ret ty -> ('arg, 'ret) typed_contract ty
-
-and 'a set =
-  'a list ref * 'a comparable_ty (* FIXME: ok, this is bad *)
-
-and ('a, 'b) map =
-  ('a * 'b) list ref * 'a comparable_ty (* FIXME: we'll have to do better *)
 
 (* ---- Instructions --------------------------------------------------------*)
 
@@ -111,8 +123,6 @@ and ('bef, 'aft) instr =
       ('rest, ('a list * 'rest)) instr
   | If_cons : ('a * ('a list * 'bef), 'aft) instr * ('bef, 'aft) instr ->
     ('a list * 'bef, 'aft) instr
-  | List_iter :
-      (('param, unit) lambda * ('param list * 'rest), 'rest) instr
   | List_map :
       (('param, 'ret) lambda * ('param list * 'rest), 'ret list * 'rest) instr
   | List_reduce :
@@ -121,8 +131,6 @@ and ('bef, 'aft) instr =
   (* sets *)
   | Empty_set : 'a comparable_ty ->
     ('rest, 'a set * 'rest) instr
-  | Set_iter :
-      (('param, unit) lambda * ('param set * 'rest), 'rest) instr
   | Set_map : 'ret comparable_ty ->
     (('param, 'ret) lambda * ('param set * 'rest), 'ret set * 'rest) instr
   | Set_reduce :
@@ -131,12 +139,10 @@ and ('bef, 'aft) instr =
   | Set_mem :
       ('elt * ('elt set * 'rest), bool * 'rest) instr
   | Set_update :
-      ('elt * (bool * ('elt set * 'rest)), 'rest) instr
+      ('elt * (bool * ('elt set * 'rest)), 'elt set * 'rest) instr
   (* maps *)
   | Empty_map : 'a comparable_ty * 'v ty ->
     ('rest, ('a, 'v) map * 'rest) instr
-  | Map_iter :
-      (('a * 'v, unit) lambda * (('a, 'v) map * 'rest), 'rest) instr
   | Map_map :
       (('a * 'v, 'r) lambda * (('a, 'v) map * 'rest), ('a, 'r) map * 'rest) instr
   | Map_reduce :
@@ -147,14 +153,7 @@ and ('bef, 'aft) instr =
   | Map_get :
       ('a * (('a, 'v) map * 'rest), 'v option * 'rest) instr
   | Map_update :
-      ('a * ('v option * (('a, 'v) map * 'rest)), 'rest) instr
-  (* reference cells *)
-  | Ref :
-      ('v * 'rest, 'v ref * 'rest) instr
-  | Deref :
-      ('v ref * 'rest, 'v * 'rest) instr
-  | Set :
-      ('v ref * ('v * 'rest), 'rest) instr
+      ('a * ('v option * (('a, 'v) map * 'rest)), ('a, 'v) map * 'rest) instr
   (* string operations *)
   | Concat :
       (string * (string * 'rest), string * 'rest) instr
