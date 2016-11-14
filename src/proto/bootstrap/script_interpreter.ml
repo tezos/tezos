@@ -65,16 +65,6 @@ type 'tys stack =
   | Item : 'ty * 'rest stack -> ('ty * 'rest) stack
   | Empty : end_of_stack stack
 
-let eq_comparable
-  : type a. a comparable_ty -> a -> a -> bool
-  = fun kind x v -> match kind with
-    | String_key -> Compare.String.(x = v)
-    | Bool_key -> Compare.Bool.(x = v)
-    | Tez_key -> Tez.(x = v)
-    | Key_key -> Ed25519.Public_key_hash.(equal x v)
-    | Int_key kind -> Script_int.(equal kind x v)
-    | Timestamp_key -> Timestamp.(x = v)
-
 let rec interp
   : type p r.
     int -> Contract.t -> Contract.t -> Tez.t ->
@@ -131,11 +121,6 @@ let rec interp
               step qta ctxt bf rest
           | If_cons (bt, _), Item (hd :: tl, rest) ->
               step qta ctxt bt (Item (hd, Item (tl, rest)))
-          | List_iter, Item (lam, Item (l, rest)) ->
-              fold_left_s (fun ((), qta, ctxt) arg ->
-                  interp qta orig source amount ctxt lam arg)
-                ((), qta, ctxt) l >>=? fun ((), qta, ctxt) ->
-              return (rest, qta, ctxt)
           | List_map, Item (lam, Item (l, rest)) ->
               fold_left_s (fun (tail, qta, ctxt) arg ->
                   interp qta orig source amount ctxt lam arg
@@ -153,82 +138,60 @@ let rec interp
               return (Item (res, rest), qta, ctxt)
           (* sets *)
           | Empty_set t, rest ->
-              return (Item ((ref [], t), rest), qta - 1, ctxt)
-          | Set_iter, Item (lam, Item ((l, _), rest)) ->
-              fold_left_s (fun ((), qta, ctxt) arg ->
-                  interp qta orig source amount ctxt lam arg)
-                ((), qta, ctxt) !l >>=? fun ((), qta, ctxt) ->
-              return (rest, qta, ctxt)
-          | Set_map t, Item (lam, Item ((l, _), rest)) ->
+              return (Item (empty_set t, rest), qta - 1, ctxt)
+          | Set_map t, Item (lam, Item (set, rest)) ->
+              let items =
+                List.rev (set_fold (fun e acc -> e :: acc) set []) in
               fold_left_s
-                (fun (tail, qta, ctxt) arg ->
+                (fun (res, qta, ctxt) arg ->
                    interp qta orig source amount ctxt lam arg >>=?
                    fun (ret, qta, ctxt) ->
-                   return (ret :: tail, qta, ctxt))
-                ([], qta, ctxt) !l >>=? fun (res, qta, ctxt) ->
-              return (Item ((ref res, t), rest), qta, ctxt)
-          | Set_reduce, Item (lam, Item ((l, _), Item (init, rest))) ->
+                   return (set_update ret true res, qta, ctxt))
+                (empty_set t, qta, ctxt) items >>=? fun (res, qta, ctxt) ->
+              return (Item (res, rest), qta, ctxt)
+          | Set_reduce, Item (lam, Item (set, Item (init, rest))) ->
+              let items =
+                List.rev (set_fold (fun e acc -> e :: acc) set []) in
               fold_left_s
                 (fun (partial, qta, ctxt) arg ->
                    interp qta orig source amount ctxt lam (arg, partial)
                    >>=? fun (partial, qta, ctxt) ->
                    return (partial, qta, ctxt))
-                (init, qta, ctxt) !l >>=? fun (res, qta, ctxt) ->
+                (init, qta, ctxt) items >>=? fun (res, qta, ctxt) ->
               return (Item (res, rest), qta, ctxt)
-          | Set_mem, Item (v, Item ((l, kind), rest)) ->
-              return (Item (List.exists (eq_comparable kind v) !l, rest), qta - 1, ctxt)
-          | Set_update, Item (v, Item (false, Item ((l, kind), rest))) ->
-              l := List.filter (fun x -> not (eq_comparable kind x v)) !l ;
-              return (rest, qta - 1, ctxt)
-          | Set_update, Item (v, Item (true, Item ((l, kind), rest))) ->
-              l := v :: List.filter (fun x -> not (eq_comparable kind x v)) !l ;
-              return (rest, qta - 1, ctxt)
+          | Set_mem, Item (v, Item (set, rest)) ->
+              return (Item (set_mem v set, rest), qta - 1, ctxt)
+          | Set_update, Item (v, Item (presence, Item (set, rest))) ->
+              return (Item (set_update v presence set, rest), qta - 1, ctxt)
           (* maps *)
           | Empty_map (t, _), rest ->
-              return (Item ((ref [], t), rest), qta - 1, ctxt)
-          | Map_iter, Item (lam, Item ((l, _), rest)) ->
+              return (Item (empty_map t, rest), qta - 1, ctxt)
+          | Map_map, Item (lam, Item (map, rest)) ->
+              let items =
+                List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
               fold_left_s
-                (fun ((), qta, ctxt) arg -> interp qta orig source amount ctxt lam arg)
-                ((), qta, ctxt) !l >>=? fun ((), qta, ctxt) ->
-              return (rest, qta, ctxt)
-          | Map_map, Item (lam, Item ((l, t), rest)) ->
-              fold_left_s
-                (fun (tail, qta, ctxt) (k, v) ->
+                (fun (acc, qta, ctxt) (k, v) ->
                    interp qta orig source amount ctxt lam (k, v)
                    >>=? fun (ret, qta, ctxt) ->
-                   return ((k, ret) :: tail, qta, ctxt))
-                ([], qta, ctxt) !l >>=? fun (res, qta, ctxt) ->
-              return (Item ((ref res, t), rest), qta, ctxt)
-          | Map_reduce, Item (lam, Item ((l, _), Item (init, rest))) ->
+                   return (map_update k (Some ret) acc, qta, ctxt))
+                (empty_map (map_key_ty map), qta, ctxt) items >>=? fun (res, qta, ctxt) ->
+              return (Item (res, rest), qta, ctxt)
+          | Map_reduce, Item (lam, Item (map, Item (init, rest))) ->
+              let items =
+                List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
               fold_left_s
                 (fun (partial, qta, ctxt) arg ->
                    interp qta orig source amount ctxt lam (arg, partial)
                    >>=? fun (partial, qta, ctxt) ->
                    return (partial, qta, ctxt))
-                (init, qta, ctxt) !l >>=? fun (res, qta, ctxt) ->
+                (init, qta, ctxt) items >>=? fun (res, qta, ctxt) ->
               return (Item (res, rest), qta, ctxt)
-          | Map_mem, Item (v, Item ((l, kind), rest)) ->
-              let res = List.exists (fun (k, _) -> eq_comparable kind k v) !l in
-              return (Item (res, rest), qta - 1, ctxt)
-          | Map_get, Item (v, Item ((l, kind), rest)) ->
-              let res =
-                try Some (snd (List.find (fun (k, _) -> eq_comparable kind k v) !l))
-                with Not_found -> None in
-              return (Item (res, rest), qta - 1, ctxt)
-          | Map_update, Item (vk, Item (None, Item ((l, kind), rest))) ->
-              l := List.filter (fun (k, _) -> not (eq_comparable kind k vk)) !l ;
-              return (rest, qta - 1, ctxt)
-          | Map_update, Item (vk, Item (Some v, Item ((l, kind), rest))) ->
-              l := (vk, v) :: List.filter (fun (k, _) -> not (eq_comparable kind k vk)) !l ;
-              return (rest, qta - 1, ctxt)
-          (* reference cells *)
-          | Ref, Item (v, rest) ->
-              return (Item (ref v, rest), qta - 1, ctxt)
-          | Deref, Item ({ contents = v}, rest) ->
-              return (Item (v, rest), qta - 1, ctxt)
-          | Set, Item (r, Item (v, rest)) ->
-              r := v ;
-              return (rest, qta - 1, ctxt)
+          | Map_mem, Item (v, Item (map, rest)) ->
+              return (Item (map_mem v map, rest), qta - 1, ctxt)
+          | Map_get, Item (v, Item (map, rest)) ->
+              return (Item (map_get v map, rest), qta - 1, ctxt)
+          | Map_update, Item (k, Item (v, Item (map, rest))) ->
+              return (Item (map_update k v map, rest), qta - 1, ctxt)
           (* timestamp operations *)
           | Add_seconds_to_timestamp (kind, _pos), Item (n, Item (t, rest)) ->
               let n = Script_int.to_int64 kind n in

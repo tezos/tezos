@@ -155,10 +155,6 @@ let rec ty_eq
          ty_eq tar tbr >>? fun (Eq _) ->
          (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (Ty ta, Ty tb))
-    | Ref_t tva, Ref_t tvb ->
-        (ty_eq tva tvb >>? fun (Eq _) ->
-         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
-        record_trace (Inconsistent_types (Ty ta, Ty tb))
     | Option_t tva, Option_t tvb ->
         (ty_eq tva tvb >>? fun (Eq _) ->
          (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
@@ -180,6 +176,108 @@ let rec stack_ty_eq
       (eq ta tb : (ta stack_ty, tb stack_ty) eq tzresult)
   | Empty_t, Empty_t -> eq ta tb
   | _, _ -> error Inconsistent_stack_lengths
+
+(* ---- Sets and Maps -------------------------------------------------------*)
+
+let compare_comparable
+  : type a. a comparable_ty -> a -> a -> int
+  = fun kind x y -> match kind with
+    | String_key -> Compare.String.compare x y
+    | Bool_key -> Compare.Bool.compare x y
+    | Tez_key -> Tez.compare x y
+    | Key_key -> Ed25519.Public_key_hash.compare x y
+    | Int_key kind ->
+        let res =
+          Script_int.to_int64 Script_int.Int64
+            (Script_int.compare kind x y) in
+        if Compare.Int64.(res = 0L) then 0
+        else if Compare.Int64.(res > 0L) then 1
+        else -1
+    | Timestamp_key -> Timestamp.compare x y
+
+let empty_set
+  : type a. a comparable_ty -> a set
+  = fun ty ->
+    let module OPS = Set.Make (struct
+        type t = a
+        let compare = compare_comparable ty
+      end) in
+    (module struct
+      type elt = a
+      module OPS = OPS
+      let boxed = OPS.empty
+    end)
+
+let set_update
+  : type a. a -> bool -> a set -> a set
+  = fun v b (module Box) ->
+    (module struct
+      type elt = a
+      module OPS = Box.OPS
+      let boxed =
+        if b then
+          Box.OPS.add v Box.boxed
+        else
+          Box.OPS.remove v Box.boxed
+    end)
+
+let set_mem
+  : type elt. elt -> elt set -> bool
+  = fun v (module Box) ->
+    Box.OPS.mem v Box.boxed
+
+let set_fold
+  : type elt acc. (elt -> acc -> acc) -> elt set -> acc -> acc
+  = fun f (module Box) ->
+    Box.OPS.fold f Box.boxed
+
+let map_key_ty
+  : type a b. (a, b) map -> a comparable_ty
+  = fun (module Box) -> Box.key_ty
+
+let empty_map
+  : type a b. a comparable_ty -> (a, b) map
+  = fun ty ->
+    let module OPS = Map.Make (struct
+        type t = a
+        let compare = compare_comparable ty
+      end) in
+    (module struct
+      type key = a
+      type value = b
+      let key_ty = ty
+      module OPS = OPS
+      let boxed = OPS.empty
+    end)
+
+let map_get
+  : type key value. key -> (key, value) map -> value option
+  = fun k (module Box) ->
+    try Some (Box.OPS.find k Box.boxed) with Not_found -> None
+
+let map_update
+  : type a b. a -> b option -> (a, b) map -> (a, b) map
+  = fun k v (module Box) ->
+    (module struct
+      type key = a
+      type value = b
+      let key_ty = Box.key_ty
+      module OPS = Box.OPS
+      let boxed =
+        match v with
+        | Some v -> Box.OPS.add k v Box.boxed
+        | None -> Box.OPS.remove k Box.boxed
+    end)
+
+let map_mem
+  : type key value. key -> (key, value) map -> bool
+  = fun k (module Box) ->
+    Box.OPS.mem k Box.boxed
+
+let map_fold
+  : type key value acc. (key -> value -> acc -> acc) -> (key, value) map -> acc -> acc
+  = fun f (module Box) ->
+    Box.OPS.fold f Box.boxed
 
 (* ---- Type checker resuls -------------------------------------------------*)
 
@@ -276,9 +374,6 @@ let rec parse_ty : Script.expr -> ex_ty tzresult Lwt.t = function
       parse_ty uta >>=? fun (Ex ta) ->
       parse_ty utr >>=? fun (Ex tr) ->
       return @@ Ex (Lambda_t (ta, tr))
-  | Prim (_, "ref", [ ut ]) ->
-      parse_ty ut >>=? fun (Ex t) ->
-      return @@ Ex (Ref_t t)
   | Prim (_, "option", [ ut ]) ->
       parse_ty ut >>=? fun (Ex t) ->
       return @@ Ex (Option_t t)
@@ -433,15 +528,6 @@ let rec parse_tagged_data
         return @@ Ex (Union_t (tl, tr), v)
     | Prim (loc, "or", l) ->
         fail @@ Invalid_arity (loc, Constant, "or", 3, List.length l)
-    | Prim (_, "ref", [ r ]) ->
-        parse_tagged_data ctxt r >>=? fun (Ex (tr, r)) ->
-        return @@ Ex (Ref_t tr, ref r)
-    | Prim (_, "ref", [ tr; r ]) ->
-        parse_ty tr >>=? fun (Ex tr) ->
-        parse_untagged_data ctxt tr r >>=? fun r ->
-        return @@ Ex (Ref_t tr, ref r)
-    | Prim (loc, "ref", l) ->
-        fail @@ Invalid_arity (loc, Constant, "ref", 1, List.length l)
     | Prim (_, "some", [ r ]) ->
         parse_tagged_data ctxt r >>=? fun (Ex (tr, r)) ->
         return @@ Ex (Option_t tr, Some r)
@@ -621,14 +707,6 @@ and parse_untagged_data
         parse_lambda ctxt ta tr script_instr
     | Lambda_t (_, _), (Prim (loc, _, _) | Int (loc, _) | String (loc, _)) ->
         fail @@ Invalid_constant (loc, "lambda")
-    (* References *)
-    | Ref_t t, Prim (_, "ref", [ v ]) ->
-        parse_untagged_data ctxt t v >>=? fun v ->
-        return (ref v)
-    | Ref_t _, Prim (loc, "ref", l) ->
-        fail @@ Invalid_arity (loc, Constant, "ref", 1, List.length l)
-    | Ref_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
-        fail @@ Invalid_constant (loc, "ref")
     (* Options *)
     | Option_t t, Prim (_, "some", [ v ]) ->
         parse_untagged_data ctxt t v >>=? fun v ->
@@ -653,27 +731,25 @@ and parse_untagged_data
     (* Sets *)
     | Set_t t, Prim (_, "set", vs) ->
         fold_left_s
-          (fun rest v ->
+          (fun acc v ->
              parse_untagged_comparable_data ctxt t v >>=? fun v ->
-             return (v :: rest))
-          [] vs >>=? fun v ->
-        return (ref v, t)
+             return (set_update v true acc))
+          (empty_set t) vs
     | Set_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "set")
     (* Maps *)
     | Map_t (tk, tv), Prim (_, "map", vs) ->
         fold_left_s
-          (fun rest -> function
+          (fun acc -> function
              | Prim (_, "item", [ k; v ]) ->
                  parse_untagged_comparable_data ctxt tk k >>=? fun k ->
                  parse_untagged_data ctxt tv v >>=? fun v ->
-                 return ((k, v) :: rest)
+                 return (map_update k (Some v) acc)
              | Prim (loc, "item", l) ->
                  fail @@ Invalid_arity (loc, Constant, "item", 2, List.length l)
              | Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _) ->
                  fail @@ Invalid_constant (loc, "item"))
-          [] vs >>=? fun v ->
-        return (ref v, tk)
+          (empty_map tk) vs
     | Map_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "map")
 
@@ -786,10 +862,6 @@ and parse_instr
           parse_instr ?log ?storage_type ctxt bf rest >>=? fun bfr ->
           let branch ibt ibf = If_cons (ibt, ibf) in
           merge_branches loc btr bfr { branch }
-      | Prim (loc, "iter", []),
-        Item_t (Lambda_t (param, Void_t), Item_t (List_t elt, rest)) ->
-          check_item_ty elt param loc 2 >>=? fun (Eq _) ->
-          return (Typed (List_iter, rest))
       | Prim (loc, "map", []),
         Item_t (Lambda_t (param, ret), Item_t (List_t elt, rest)) ->
           check_item_ty elt param loc 2 >>=? fun (Eq _) ->
@@ -806,11 +878,6 @@ and parse_instr
         rest ->
           parse_comparable_ty t >>=? fun (Ex t) ->
           return (Typed (Empty_set t, Item_t (Set_t t, rest)))
-      | Prim (loc, "iter", []),
-        Item_t (Lambda_t (param, Void_t), Item_t (Set_t elt, rest)) ->
-          let elt = ty_of_comparable_ty elt in
-          check_item_ty elt param loc 2 >>=? fun (Eq _) ->
-          return (Typed (Set_iter, rest))
       | Prim (loc, "map", []),
         Item_t (Lambda_t (param, ret), Item_t (Set_t elt, rest)) ->
           let elt = ty_of_comparable_ty elt in
@@ -832,21 +899,15 @@ and parse_instr
           return (Typed (Set_mem, Item_t (Bool_t, rest)))
       | Prim (loc, "update", []),
         Item_t (v, Item_t (Bool_t, Item_t (Set_t elt, rest))) ->
-          let elt = ty_of_comparable_ty elt in
-          check_item_ty elt v loc 3 >>=? fun (Eq _) ->
-          return (Typed (Set_update, rest))
+          let ty = ty_of_comparable_ty elt in
+          check_item_ty ty v loc 3 >>=? fun (Eq _) ->
+          return (Typed (Set_update, Item_t (Set_t elt, rest)))
       (* maps *)
       | Prim (_, "empty_map", [ tk ; tv ]),
         stack ->
           parse_comparable_ty tk >>=? fun (Ex tk) ->
           parse_ty tv >>=? fun (Ex tv) ->
           return (Typed (Empty_map (tk, tv), Item_t (Map_t (tk, tv), stack)))
-      | Prim (loc, "iter", []),
-        Item_t (Lambda_t (Pair_t (pk, pv), Void_t), Item_t (Map_t (k, v), rest)) ->
-          let k = ty_of_comparable_ty k in
-          check_item_ty pk k loc 2 >>=? fun (Eq _) ->
-          check_item_ty pv v loc 2 >>=? fun (Eq _) ->
-          return (Typed (Map_iter, rest))
       | Prim (loc, "map", []),
         Item_t (Lambda_t (Pair_t (pk, pv), ret), Item_t (Map_t (ck, v), rest)) ->
           let k = ty_of_comparable_ty ck in
@@ -877,18 +938,7 @@ and parse_instr
           let k = ty_of_comparable_ty ck in
           check_item_ty vk k loc 1 >>=? fun (Eq _) ->
           check_item_ty vv v loc 2 >>=? fun (Eq _) ->
-          return (Typed (Map_update, rest))
-      (* reference cells *)
-      | Prim (_, "ref", []),
-        Item_t (t, rest) ->
-          return (Typed (Ref, Item_t (Ref_t t, rest)))
-      | Prim (_, "deref", []),
-        Item_t (Ref_t t, rest) ->
-          return (Typed (Deref, Item_t (t, rest)))
-      | Prim (loc, "set", []),
-        Item_t (Ref_t t, Item_t (tv, rest)) ->
-          check_item_ty tv t loc 2 >>=? fun (Eq _) ->
-          return (Typed (Set, rest))
+          return (Typed (Map_update, Item_t (Map_t (ck, v), rest)))
       (* control *)
       | Seq (_, []),
         stack ->
@@ -1254,7 +1304,7 @@ and parse_instr
       (* Primitive parsing errors *)
       | Prim (loc, ("drop" | "dup" | "swap" | "some"
                    | "pair" | "car" | "cdr" | "cons"
-                   | "mem" | "update" | "iter" | "map" | "reduce"
+                   | "mem" | "update" | "map" | "reduce"
                    | "get" | "ref" | "deref"
                    | "set" | "exec" | "fail" | "nop"
                    | "concat" | "add" | "sub"
@@ -1315,7 +1365,7 @@ and parse_instr
         stack ->
           fail (Bad_stack (loc, 1, Stack_ty stack))
       | Prim (loc, ("swap" | "pair" | "cons" | "set" | "incr" | "decr"
-                   | "map" | "iter" | "get" | "mem" | "exec"
+                   | "map" | "get" | "mem" | "exec"
                    | "check_signature" | "add" | "sub" | "mul"
                    | "div" | "mod" | "and" | "or" | "xor"
                    | "lsl" | "lsr" | "concat"
@@ -1414,9 +1464,6 @@ let rec unparse_ty
       let ta = unparse_ty uta in
       let tr = unparse_ty utr in
       Prim (-1, "lambda", [ ta; tr ])
-  | Ref_t ut ->
-      let t = unparse_ty ut in
-      Prim (-1, "ref", [ t ])
   | Option_t ut ->
       let t = unparse_ty ut in
       Prim (-1, "option", [ t ])
@@ -1467,9 +1514,6 @@ let rec unparse_untagged_data
     | Union_t (_, tr), R r ->
         let r = unparse_untagged_data tr r in
         Prim (-1, "right", [ r ])
-    | Ref_t t, { contents } ->
-        let contents = unparse_untagged_data t contents in
-        Prim (-1, "ref", [ contents ])
     | Option_t t, Some v ->
         let v = unparse_untagged_data t v in
         Prim (-1, "some", [ v ])
@@ -1478,18 +1522,23 @@ let rec unparse_untagged_data
     | List_t t, items ->
         let items = List.map (unparse_untagged_data t) items in
         Prim (-1, "list", items)
-    | Set_t t, ({ contents = items }, _) ->
+    | Set_t t, set ->
         let t = ty_of_comparable_ty t in
-        let items = List.map (unparse_untagged_data t) items in
+        let items =
+          set_fold
+            (fun item acc ->
+               unparse_untagged_data t item :: acc )
+            set [] in
         Prim (-1, "set", items)
-    | Map_t (kt, vt), ({ contents = items }, _) ->
+    | Map_t (kt, vt), map ->
         let kt = ty_of_comparable_ty kt in
         let items =
-          List.map (fun (k, v) ->
+          map_fold (fun k v acc ->
               Prim (-1, "item",
                     [ unparse_untagged_data kt k;
-                      unparse_untagged_data vt v ]))
-            items in
+                      unparse_untagged_data vt v ])
+              :: acc)
+            map [] in
         Prim (-1, "map", items)
     | Lambda_t _, Lam (_, original_code) ->
         original_code
@@ -1536,9 +1585,6 @@ let rec unparse_tagged_data
         let r = unparse_tagged_data tr r in
         let tl = unparse_ty tl in
         Prim (-1, "right", [ tl; r ])
-    | Ref_t t, { contents } ->
-        let contents = unparse_tagged_data t contents in
-        Prim (-1, "ref", [ contents ])
     | Option_t t, Some v ->
         let v = unparse_tagged_data t v in
         Prim (-1, "some", [ v ])
@@ -1549,19 +1595,24 @@ let rec unparse_tagged_data
         let items = List.map (unparse_untagged_data t) items in
         let t = unparse_ty t in
         Prim (-1, "list", t :: items)
-    | Set_t t, ({ contents = items }, _) ->
+    | Set_t t, set ->
         let t = ty_of_comparable_ty t in
-        let items = List.map (unparse_untagged_data t) items in
+        let items =
+          set_fold
+            (fun item acc ->
+               unparse_untagged_data t item :: acc )
+            set [] in
         let t = unparse_ty t in
         Prim (-1, "set", t :: items)
-    | Map_t (kt, vt), ({ contents = items }, _) ->
+    | Map_t (kt, vt), map ->
         let kt = ty_of_comparable_ty kt in
         let items =
-          List.map (fun (k, v) ->
+          map_fold (fun k v acc ->
               Prim (-1, "item",
                     [ unparse_untagged_data kt k;
-                      unparse_untagged_data vt v ]))
-            items in
+                      unparse_untagged_data vt v ])
+              :: acc)
+            map [] in
         let kt = unparse_ty kt in
         let vt = unparse_ty vt in
         Prim (-1, "map", kt :: vt :: items)

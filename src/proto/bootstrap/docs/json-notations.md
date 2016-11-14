@@ -102,8 +102,6 @@ with the following JSON script description.
       | { "left": [ /* tagged data */, /* type */ ] }
       | { "right": [ /* type */, /* tagged data */ ] }
       | { "or": [ /* type */, /* type */, /* untagged data */ ] }
-      | { "ref": [ /* tagged data */ ] }
-      | { "ref": [ /* type */, /* untagged data */ ] }
       | { "some": [ /* tagged data */ ] }
       | { "some": [ /* type */, /* untagged data */ ] }
       | { "none": [ /* type */ ] }
@@ -135,7 +133,6 @@ with the following JSON script description.
       | { "pair": [ /* untagged data */, /* untagged data */ ] }
       | { "left": [ /* untagged data */ ] }
       | { "right": [ /* untagged data */ ] }
-      | { "ref": [ /* untagged data */ ] }
       | { "some": [ /* untagged data */ ] }
       | "none"
       | { "list": [ /* untagged data */ ... ] }
@@ -161,15 +158,11 @@ with the following JSON script description.
       | { "if_cons": [ [ /* instruction */ ... ], [ /* instruction */ ... ] ] }
       | { "empty_set": [ /* type */ ] }
       | { "empty_map": [ /* comparable type */, /* type */ ] }
-      | "iter"
       | "map"
       | "reduce"
       | "mem"
       | "get"
       | "update"
-      | "ref"
-      | "deref"
-      | "set"
       | { "if": [ [ /* instruction */ ... ], [ /* instruction */ ... ] ] }
       | { "loop": [ [ /* instruction */ ... ] ] }
       | { "lambda": [ /* type */, /* type */, [ /* instruction */ ... ] ] }
@@ -239,7 +232,6 @@ with the following JSON script description.
       | "key"
       | "timestamp"
       | "signature"
-      | { "ref": [ /* type */ ] }
       | { "option": [ /* type */ ] }
       | { "list": [ /* type */ ] }
       | { "set": [ /* comparable type */ ] }
