@@ -53,6 +53,9 @@ type limits = {
   blacklist_time : float ;
 }
 
+(** A global identifier for a peer, a.k.a. an identity *)
+type gid
+
 type 'msg msg_encoding = Encoding : {
     tag: int ;
     encoding: 'a Data_encoding.t ;
@@ -99,9 +102,6 @@ module Make (P : NET_PARAMS) : sig
 
   (** A connection to a peer *)
   type peer
-
-  (** A global identifier for a peer, a.k.a. an identity *)
-  type gid
 
   (** Access the domain of active peers *)
   val peers : net -> peer list
