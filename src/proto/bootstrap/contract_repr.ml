@@ -49,7 +49,7 @@ let encoding =
        as replied by the contract origination RPC." @@
   splitted
     ~binary:
-      (union ~tag_size:`Int8 [
+      (union ~tag_size:`Uint8 [
           case ~tag:0 Ed25519.public_key_hash_encoding
             (function Default k -> Some k | _ -> None)
             (fun k -> Default k) ;

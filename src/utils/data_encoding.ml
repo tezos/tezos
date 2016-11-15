@@ -26,7 +26,7 @@ type json_schema = Json_schema.schema
 exception No_case_matched
 exception Unexpected_tag of int
 exception Duplicated_tag of int
-exception Invalid_tag of int * [ `Int8 | `Int16 ]
+exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
 exception Unexpected_enum of string * string list
 
 let apply fs v =
@@ -41,18 +41,20 @@ let apply fs v =
 module Size = struct
   let bool = 1
   let int8 = 1
+  let uint8 = 1
   let int16 = 2
+  let uint16 = 2
   let int31 = 4
   let int32 = 4
   let int64 = 8
   let float = 8
 end
 
-type tag_size = [ `Int8 | `Int16 ]
+type tag_size = [ `Uint8 | `Uint16 ]
 
 let tag_size = function
-  | `Int8 -> Size.int8
-  | `Int16 -> Size.int16
+  | `Uint8 -> Size.uint8
+  | `Uint16 -> Size.uint16
 
 module Kind = struct
 
@@ -108,7 +110,9 @@ type 'a desc =
   | Constant : string -> unit desc
   | Bool : bool desc
   | Int8 : int desc
+  | Uint8 : int desc
   | Int16 : int desc
+  | Uint16 : int desc
   | Int31 : int desc
   | Int32 : Int32.t desc
   | Int64 : Int64.t desc
@@ -167,7 +171,9 @@ let rec classify : type a l. a t -> Kind.t = fun e ->
   | Constant _ -> `Fixed 0
   | Bool -> `Fixed Size.bool
   | Int8 -> `Fixed Size.int8
+  | Uint8 -> `Fixed Size.uint8
   | Int16 -> `Fixed Size.int16
+  | Uint16 -> `Fixed Size.uint16
   | Int31 -> `Fixed Size.int31
   | Int32 -> `Fixed Size.int32
   | Int64 -> `Fixed Size.int64
@@ -361,8 +367,10 @@ module Json = struct
     | Empty -> empty
     | Constant s -> string_enum [s, ()]
     | Ignore -> unit
-    | Int8 -> int
-    | Int16 -> int
+    | Int8 -> ranged_int ~minimum:~-(1 lsl 7) ~maximum:((1 lsl 7) - 1) "int8"
+    | Uint8 -> ranged_int ~minimum:0 ~maximum:((1 lsl 8) - 1) "uint8"
+    | Int16 -> ranged_int ~minimum:~-(1 lsl 15) ~maximum:((1 lsl 15) - 1) "int16"
+    | Uint16 -> ranged_int ~minimum:0 ~maximum:((1 lsl 16) - 1) "uint16"
     | Int31 -> int
     | Int32 -> int32
     | Int64 -> int64_encoding
@@ -470,7 +478,9 @@ module Encoding = struct
   let constant s = make @@ Constant s
   let bool = make @@ Bool
   let int8 = make @@ Int8
+  let uint8 = make @@ Uint8
   let int16 = make @@ Int16
+  let uint16 = make @@ Uint16
   let int31 = make @@ Int31
   let int32 = make @@ Int32
   let int64 = make @@ Int64
@@ -676,8 +686,8 @@ module Encoding = struct
       invalid_arg "Data_encoding.union: empty list of cases." ;
     let max_tag =
       match tag_size with
-      | `Int8 -> 256
-      | `Int16 -> 256 * 256 in
+      | `Uint8 -> 256
+      | `Uint16 -> 256 * 256 in
     ignore @@
     List.fold_left
       (fun others (Case { tag }) ->
@@ -691,7 +701,7 @@ module Encoding = struct
       )
       [] cases
 
-  let union ?(tag_size = `Int8) cases =
+  let union ?(tag_size = `Uint8) cases =
     check_cases tag_size cases ;
     let kinds =
       List.map (fun (Case { encoding }) -> classify encoding) cases in
@@ -700,7 +710,7 @@ module Encoding = struct
   let case ?tag encoding proj inj = Case { encoding ; proj ; inj ; tag }
   let option ty =
     union
-      ~tag_size:`Int8
+      ~tag_size:`Uint8
       [ case ~tag:1 ty
           (fun x -> x)
           (fun x -> Some x) ;
@@ -746,7 +756,9 @@ let rec length : type x. x t -> x -> int = fun e ->
     | Constant _ -> fun _ -> 0
     | Bool -> fun _ -> Size.bool
     | Int8 -> fun _ -> Size.int8
+    | Uint8 -> fun _ -> Size.uint8
     | Int16 -> fun _ -> Size.int16
+    | Uint16 -> fun _ -> Size.uint16
     | Int31 -> fun _ -> Size.int31
     | Int32 -> fun _ -> Size.int32
     | Int64 -> fun _ -> Size.int64
@@ -843,18 +855,34 @@ let rec length : type x. x t -> x -> int = fun e ->
   module Writer = struct
 
     let int8 v buf ofs =
+      if (v < - (1 lsl 7) || v >= 1 lsl 7) then
+        invalid_arg "Data_encoding.Binary.Writer.int8" ;
       MBytes.set_int8 buf ofs v;
       ofs + Size.int8
 
+    let uint8 v buf ofs =
+      if (v < 0 || v >= 1 lsl 8) then
+        invalid_arg "Data_encoding.Binary.Writer.uint8" ;
+      MBytes.set_int8 buf ofs v;
+      ofs + Size.uint8
+
     let char v buf ofs =
-      int8 (Char.code v) buf ofs
+      uint8 (Char.code v) buf ofs
 
     let bool v buf ofs =
-      int8 (if v then 255 else 0) buf ofs
+      uint8 (if v then 255 else 0) buf ofs
 
     let int16 v buf ofs =
+      if (v < - (1 lsl 15) || v >= 1 lsl 15) then
+        invalid_arg "Data_encoding.Binary.Writer.int16" ;
       MBytes.set_int16 buf ofs v;
       ofs + Size.int16
+
+    let uint16 v buf ofs =
+      if (v < 0 || v >= 1 lsl 16) then
+        invalid_arg "Data_encoding.Binary.Writer.uint16" ;
+      MBytes.set_int16 buf ofs v;
+      ofs + Size.uint16
 
     let int31 v buf ofs =
       MBytes.set_int32 buf ofs (Int32.of_int v);
@@ -904,8 +932,8 @@ let rec length : type x. x t -> x -> int = fun e ->
       w (proj v) buf ofs
 
     let write_tag = function
-      | `Int8 -> int8
-      | `Int16 -> int16
+      | `Uint8 -> uint8
+      | `Uint16 -> uint16
 
     let union w sz cases =
       let writes_case = function
@@ -934,7 +962,9 @@ let rec length : type x. x t -> x -> int = fun e ->
     | Ignore -> (fun () _buf ofs -> ofs)
     | Bool -> bool
     | Int8 -> int8
+    | Uint8 -> uint8
     | Int16 -> int16
+    | Uint16 -> uint16
     | Int31 -> int31
     | Int32 -> int32
     | Int64 -> int64
@@ -997,6 +1027,9 @@ let rec length : type x. x t -> x -> int = fun e ->
     let int8 buf ofs _len =
       ofs + Size.int8, MBytes.get_int8 buf ofs
 
+    let uint8 buf ofs _len =
+      ofs + Size.uint8, MBytes.get_uint8 buf ofs
+
     let char buf ofs len =
       let ofs, v = int8 buf ofs len in
       ofs, Char.chr v
@@ -1007,6 +1040,9 @@ let rec length : type x. x t -> x -> int = fun e ->
 
     let int16 buf ofs _len =
       ofs + Size.int16, MBytes.get_int16 buf ofs
+
+    let uint16 buf ofs _len =
+      ofs + Size.uint16, MBytes.get_uint16 buf ofs
 
     let int31 buf ofs _len =
       ofs + Size.int31, Int32.to_int (MBytes.get_int32 buf ofs)
@@ -1074,8 +1110,8 @@ let rec length : type x. x t -> x -> int = fun e ->
       ofs, inj v
 
     let read_tag = function
-      | `Int8 -> int8
-      | `Int16 -> int16
+      | `Uint8 -> uint8
+      | `Uint16 -> uint16
 
     let union r sz cases =
       let read_cases =
@@ -1105,7 +1141,9 @@ let rec length : type x. x t -> x -> int = fun e ->
     | Ignore -> (fun _buf ofs len -> ofs + len, ())
     | Bool -> bool
     | Int8 -> int8
+    | Uint8 -> uint8
     | Int16 -> int16
+    | Uint16 -> uint16
     | Int31 -> int31
     | Int32 -> int32
     | Int64 -> int64

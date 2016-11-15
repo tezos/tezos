@@ -61,7 +61,7 @@ let expr_encoding =
   mu "tezosScriptExpression" (fun expr_encoding ->
       describe
         ~title: "Script expression (data, type or code)" @@
-      union ~tag_size:`Int8
+      union ~tag_size:`Uint8
         [ case ~tag:0 int_encoding
             (function Int (_, v) -> Some v | _ -> None)
             (fun v -> Int (-1, v)) ;
@@ -155,7 +155,7 @@ type t =
 
 let encoding =
   let open Data_encoding in
-  union ~tag_size:`Int8 [
+  union ~tag_size:`Uint8 [
     case ~tag:0 empty
       (function No_script -> Some () | _ -> None)
       (fun () -> No_script) ;

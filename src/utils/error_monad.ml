@@ -158,7 +158,7 @@ module Make() = struct
       describe ~title: "A successful result" @@
       obj1 (req "result" t_encoding) in
     union
-      ~tag_size:`Int8
+      ~tag_size:`Uint8
       [ case ~tag:0 t_encoding
           (function Ok x -> Some x | _ -> None)
           (function res -> Ok res) ;

@@ -21,7 +21,7 @@ type json_schema = Json_schema.schema
 exception No_case_matched
 exception Unexpected_tag of int
 exception Duplicated_tag of int
-exception Invalid_tag of int * [ `Int8 | `Int16 ]
+exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
 exception Unexpected_enum of string * string list
 
 type 'a t
@@ -35,7 +35,9 @@ val null : unit encoding
 val empty : unit encoding
 val constant : string -> unit encoding
 val int8 : int encoding
+val uint8 : int encoding
 val int16 : int encoding
+val uint16 : int encoding
 val int31 : int encoding
 val int32 : int32 encoding
 val int64 : int64 encoding
@@ -161,7 +163,7 @@ type 't case
 val case :
   ?tag:int -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 val union :
-  ?tag_size:[ `Int8 | `Int16 ] -> 't case list -> 't encoding
+  ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
 
 val describe :
   ?title:string -> ?description:string ->
