@@ -149,8 +149,6 @@ module Make (P: PARAMS) = struct
     | Connect of hello
     | Disconnect
     | Advertise of point list
-    | Ping
-    | Pong
     | Bootstrap
     | Message of P.msg
 
@@ -163,12 +161,6 @@ module Make (P: PARAMS) = struct
       case ~tag:0x01 null
         (function Disconnect -> Some () | _ -> None)
         (fun () -> Disconnect);
-      case ~tag:0x02 null
-        (function Ping -> Some () | _ -> None)
-        (fun () -> Ping);
-      case ~tag:0x03 null
-        (function Pong -> Some () | _ -> None)
-        (fun () -> Pong);
       case ~tag:0x04 (Variable.list point_encoding)
         (function Advertise points -> Some points | _ -> None)
         (fun points -> Advertise points);
@@ -458,38 +450,13 @@ module Make (P: PARAMS) = struct
             cancel ()
         | Bootstrap -> push (Bootstrap peer) ; receiver ()
         | Advertise peers -> push (Peers peers) ; receiver ()
-        | Ping -> send_msg socket buf Pong >>= fun _ -> receiver ()
-        | Pong -> receiver ()
         | Message msg -> push (Recv (peer, msg)) ; receiver ()
-      in
-      (* The polling loop *)
-      let rec pulse_monitor ping =
-        pick [ (cancelation () >>= fun () -> return false) ;
-               (LU.sleep limits.peer_answer_timeout >>= fun () -> return true)]
-        >>= fun continue ->
-        if continue then
-          match ping with
-          | Some tping ->
-              if !last -. tping < 0. then begin
-                debug "(%a) disconnected (timeout exceeded) %a @ %a:%d"
-                  pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
-                cancel ()
-              end else
-                pulse_monitor None
-          | None ->
-              let now = Unix.gettimeofday () in
-              if now -. !last < limits.peer_answer_timeout then
-                pulse_monitor None
-              else
-                send_msg socket buf Ping >>= fun _ ->
-                pulse_monitor (Some (Unix.gettimeofday ()))
-        else return ()
       in
       (* Events for the main worker *)
       push (Connected peer) ;
       on_cancel (fun () -> push (Disconnected peer) ; return ()) ;
-      (* Launch both workers *)
-      join [ pulse_monitor None ; receiver () ]
+      (* Launch the worker *)
+      receiver ()
     in
     let buf = MBytes.create 0x100_000 in
     on_cancel (fun () ->
