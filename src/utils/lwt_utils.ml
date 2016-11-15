@@ -242,8 +242,9 @@ let read_mbytes ?(pos=0) ?len fd buf =
     if len = 0 then
       Lwt.return_unit
     else
-      Lwt_bytes.read fd buf pos len >>= fun nb_read ->
-      inner (pos + nb_read) (len - nb_read)
+      Lwt_bytes.read fd buf pos len >>= function
+      | 0 -> Lwt.fail End_of_file (* other endpoint cleanly closed its connection *)
+      | nb_read -> inner (pos + nb_read) (len - nb_read)
   in
   inner pos len
 
