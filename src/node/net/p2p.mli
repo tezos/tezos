@@ -56,36 +56,42 @@ type limits = {
 (** A global identifier for a peer, a.k.a. an identity *)
 type gid
 
-type 'msg msg_encoding = Encoding : {
+type 'msg encoding = Encoding : {
     tag: int ;
     encoding: 'a Data_encoding.t ;
     wrap: 'a -> 'msg ;
     unwrap: 'msg -> 'a option ;
     max_length: int option ;
-  } -> 'msg msg_encoding
+  } -> 'msg encoding
 
-module type NET_PARAMS = sig
-  type meta (** Type of metadata associated to an identity *)
-  type msg (** Type of message used by higher layers *)
+module type PARAMS = sig
 
-  val msg_encodings : msg msg_encoding list
+  (** Type of message used by higher layers *)
+  type msg
 
-  val init_meta : meta
-  val score_enc : meta Data_encoding.t
-  val score: meta -> float
+  val encodings : msg encoding list
+
+  (** Type of metadata associated to an identity *)
+  type metadata
+
+  val initial_metadata : metadata
+  val metadata_encoding : metadata Data_encoding.t
+  val score : metadata -> float
 
   (** High level protocol(s) talked by the peer. When two peers
       initiate a connection, they exchange their list of supported
       versions. The chosen one, if any, is the maximum common one (in
       lexicographic order) *)
   val supported_versions : version list
+
 end
 
-module Make (P : NET_PARAMS) : sig
+module Make (P : PARAMS) : sig
+
   type net
 
   (** A faked p2p layer, which do not initiate any connection
-      nor open any listening socket. *)
+      nor open any listening socket *)
   val faked_network : net
 
   (** Main network initialisation function *)
@@ -110,18 +116,18 @@ module Make (P : NET_PARAMS) : sig
   val find_peer : net -> gid -> peer option
 
   type peer_info = {
-    gid : gid;
-    addr : addr;
-    port : port;
-    version : version;
+    gid : gid ;
+    addr : addr ;
+    port : port ;
+    version : version ;
   }
 
   (** Access the info of an active peer, if available *)
   val peer_info : net -> peer -> peer_info
 
-  (** Accessors for meta information about a peer *)
-  val get_meta : net -> gid -> P.meta option
-  val set_meta : net -> gid -> P.meta -> unit
+  (** Accessors for meta information about a global identifier *)
+  val get_metadata : net -> gid -> P.metadata option
+  val set_metadata : net -> gid -> P.metadata -> unit
 
   (** Wait for a payload from any peer in the network *)
   val recv : net -> (peer * P.msg) Lwt.t
@@ -143,4 +149,5 @@ module Make (P : NET_PARAMS) : sig
 
   (** Keep a connection to this pair as often as possible *)
   val whitelist : net -> gid -> unit
+
 end

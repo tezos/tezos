@@ -40,10 +40,10 @@ val peer_info : net -> peer -> peer_info
 
 (** Accessors for meta information about a global identifier *)
 
-type meta = unit
+type metadata = unit
 
-val get_meta : net -> gid -> meta option
-val set_meta : net -> gid -> meta -> unit
+val get_metadata : net -> gid -> metadata option
+val set_metadata : net -> gid -> metadata -> unit
 
 type net_id = Store.net_id
 
