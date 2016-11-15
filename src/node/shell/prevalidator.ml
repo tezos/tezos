@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module P2p = Netparams
-
 open Logging.Node.Prevalidator
 
 let preapply
@@ -97,7 +95,7 @@ let create p2p net =
     Lwt.return_unit in
 
   let broadcast_operation ops =
-    P2p.broadcast p2p (Operation_inventory (State.Net.id net, ops)) in
+    Tezos_p2p.broadcast p2p (Operation_inventory (State.Net.id net, ops)) in
 
   let handle_unprocessed () =
     if Operation_hash_set.is_empty !unprocessed then

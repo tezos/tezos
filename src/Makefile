@@ -227,6 +227,7 @@ NODE_LIB_INTFS := \
   node/updater/proto_environment.mli \
   node/updater/register.mli \
   \
+  node/shell/tezos_p2p.mli \
   node/shell/state.mli \
   node/shell/prevalidator.mli \
   node/shell/validator.mli \
@@ -256,10 +257,8 @@ NODE_LIB_IMPLS := \
   node/updater/proto_environment.ml \
   node/updater/register.ml \
   \
-  node/shell/messages.ml \
-  node/shell/netparams.ml \
+  node/shell/tezos_p2p.ml \
   node/shell/state.ml \
-  \
   node/shell/prevalidator.ml \
   node/shell/validator.ml \
   \

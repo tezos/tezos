@@ -9,9 +9,7 @@
 
 type worker
 
-module P2p = Netparams
-
-val create_worker: P2p.net -> State.t -> worker
+val create_worker: Tezos_p2p.net -> State.t -> worker
 val shutdown: worker -> unit Lwt.t
 
 val notify_block: worker -> Block_hash.t -> Store.block -> unit Lwt.t

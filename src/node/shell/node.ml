@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module P2p = Netparams
-
 open Logging.Node.Worker
 
 let (>|=) = Lwt.(>|=)
@@ -93,7 +91,7 @@ let inject_block state validator ?(force = false) bytes =
   Lwt.return (hash, validation)
 
 let process state validator msg =
-  let open Messages in
+  let open Tezos_p2p in
   match msg with
 
   | Discover_blocks (net_id, blocks) ->
@@ -194,26 +192,26 @@ type t = {
 let request_operations net _net_id operations =
   (* TODO improve the lookup strategy.
           For now simply broadcast the request to all our neighbours. *)
-  P2p.broadcast net (Get_operations operations)
+  Tezos_p2p.broadcast net (Get_operations operations)
 
 let request_blocks net _net_id blocks =
   (* TODO improve the lookup strategy.
           For now simply broadcast the request to all our neighbours. *)
-  P2p.broadcast net (Get_blocks blocks)
+  Tezos_p2p.broadcast net (Get_blocks blocks)
 
 let request_protocols net protocols =
   (* TODO improve the lookup strategy.
           For now simply broadcast the request to all our neighbours. *)
-  P2p.broadcast net (Get_protocols protocols)
+  Tezos_p2p.broadcast net (Get_protocols protocols)
 
 let init_p2p net_params =
   match net_params with
   | None ->
       lwt_log_notice "P2P layer is disabled" >>= fun () ->
-      Lwt.return P2p.faked_network
+      Lwt.return Tezos_p2p.faked_network
   | Some (config, limits) ->
       lwt_log_notice "bootstraping network..." >>= fun () ->
-      P2p.bootstrap config limits
+      Tezos_p2p.bootstrap config limits
 
 let create
     ~genesis ~store_root ~context_root ?test_protocol ?patch_context net_params =
@@ -246,12 +244,12 @@ let create
     let handle_msg peer msg =
       process state validator msg >>= fun msgs ->
       List.iter
-        (fun msg -> ignore @@ P2p.try_send p2p peer msg)
+        (fun msg -> ignore @@ Tezos_p2p.try_send p2p peer msg)
         msgs;
       Lwt.return_unit
     in
     let rec worker_loop () =
-      P2p.recv p2p >>= fun (peer, msg) ->
+      Tezos_p2p.recv p2p >>= fun (peer, msg) ->
       handle_msg peer msg >>= fun () ->
       worker_loop () in
     Lwt.catch
@@ -261,12 +259,12 @@ let create
         | exn ->
             lwt_log_error "unexpected exception in worker\n%s"
               (Printexc.to_string exn) >>= fun () ->
-            P2p.shutdown p2p >>= fun () ->
+            Tezos_p2p.shutdown p2p >>= fun () ->
             cleanup ())
   in
   let shutdown () =
     lwt_log_info "stopping worker..." >>= fun () ->
-    P2p.shutdown p2p >>= fun () ->
+    Tezos_p2p.shutdown p2p >>= fun () ->
     worker >>= fun () ->
     lwt_log_info "stopped"
   in
