@@ -7,12 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module P2p = Netparams
-
 open Logging.Node.Validator
 
 type worker = {
-  p2p: P2p.net ;
+  p2p: Tezos_p2p.net ;
   activate: ?parent:t -> State.Net.t -> t Lwt.t ;
   get: State.net_id -> t tzresult Lwt.t ;
   get_exn: State.net_id -> t Lwt.t ;
@@ -45,7 +43,7 @@ let test_validator w = w.test_validator ()
 let fetch_block v = v.fetch_block
 let prevalidator v = v.prevalidator
 
-let broadcast w m = P2p.broadcast w.p2p m
+let broadcast w m = Tezos_p2p.broadcast w.p2p m
 
 (** Current block computation *)
 
@@ -75,7 +73,7 @@ let rec may_set_head v (block: State.Valid_block.t) =
     State.Net.Blockchain.test_and_set_head v.net ~old:head block >>= function
     | false -> may_set_head v block
     | true ->
-        broadcast v.worker Messages.(Block_inventory (State.Net.id v.net, [])) ;
+        broadcast v.worker Tezos_p2p.(Block_inventory (State.Net.id v.net, [])) ;
         Prevalidator.flush v.prevalidator ;
         may_change_test_network v block >>= fun () ->
         lwt_log_notice "update current head %a %a %a(%t)"
