@@ -327,6 +327,21 @@ module Helpers = struct
                 obj1 (req "timestamp" Timestamp.encoding))
       RPC.Path.(custom_root / "helpers" / "minimal_timestamp")
 
+  let run_code custom_root =
+    RPC.service
+      ~description: "Run a piece of code in the current context"
+      ~input: (obj5
+                 (req "script" Script.code_encoding)
+                 (req "storage" Script.expr_encoding)
+                 (req "input" Script.expr_encoding)
+                 (opt "amount" Tez.encoding)
+                 (opt "contract" Contract.encoding))
+      ~output: (wrap_tzerror
+                  (obj2
+                     (req "storage" Script.expr_encoding)
+                     (req "output" Script.expr_encoding)))
+      RPC.Path.(custom_root / "helpers" / "run_code")
+
   let typecheck_code custom_root =
     RPC.service
       ~description: "Typecheck a piece of code in the current context"
