@@ -381,7 +381,7 @@ module Make (P: PARAMS) = struct
       pick [ (LU.sleep limits.peer_answer_timeout >>= fun () -> return Disconnect) ;
              recv_msg socket buf ] >>= function
       | Connect { gid; port = listening_port; versions } ->
-          debug "(%a) connection requested from %a @ %a:%d"
+          debug "(%a) connection requested from %a @@ %a:%d"
             pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
           begin match common_version P.supported_versions versions with
             | None ->
@@ -437,7 +437,7 @@ module Make (P: PARAMS) = struct
         match packet with
         | Connect _
         | Disconnect ->
-            debug "(%a) disconnected (by peer) %a @ %a:%d"
+            debug "(%a) disconnected (by peer) %a @@ %a:%d"
               pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
             cancel ()
         | Bootstrap -> push (Bootstrap peer) ; receiver ()
@@ -960,13 +960,13 @@ module Make (P: PARAMS) = struct
           end
           (* keep only one connection to each node by checking its gid *)
           else if PeerMap.mem_by_gid peer.gid !connected then begin
-            debug "(%a) rejected already connected peer %a @ %a:%d"
+            debug "(%a) rejected already connected peer %a @@ %a:%d"
               pp_gid my_gid pp_gid peer.gid
               Ipaddr.pp_hum (fst peer.point) (snd peer.point) ;
             update_infos () ;
             Lwt.async peer.disconnect
           end else begin
-            debug "(%a) connected peer %a @ %a:%d"
+            debug "(%a) connected peer %a @@ %a:%d"
               pp_gid my_gid pp_gid peer.gid
               Ipaddr.pp_hum (fst peer.point) (snd peer.point) ;
             update_infos () ;
@@ -988,7 +988,7 @@ module Make (P: PARAMS) = struct
           else
             let canceler =
               connect_to_peer config limits my_gid socket (addr, port) enqueue_event white_listed in
-            debug "(%a) incoming peer at %a:%d"
+            debug "(%a) incoming peer @@ %a:%d"
               pp_gid my_gid Ipaddr.pp_hum addr port ;
             incoming := PointMap.add (addr, port) canceler !incoming ;
             main ()
