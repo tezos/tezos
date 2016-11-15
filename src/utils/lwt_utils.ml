@@ -224,3 +224,36 @@ let stable_sort cmp l =
   if len < 2 then Lwt.return l else sort len l
 
 let sort = stable_sort
+
+let rec read_bytes ?(pos = 0) ?len fd buf =
+  let len = match len with None -> Bytes.length buf - pos | Some l -> l in
+  let rec inner pos len =
+    if len = 0 then
+      Lwt.return_unit
+    else
+      Lwt_unix.read fd buf pos len >>= fun nb_read ->
+      inner (pos + nb_read) (len - nb_read)
+  in
+  inner pos len
+
+let read_mbytes ?(pos=0) ?len fd buf =
+  let len = match len with None -> MBytes.length buf - pos | Some l -> l in
+  let rec inner pos len =
+    if len = 0 then
+      Lwt.return_unit
+    else
+      Lwt_bytes.read fd buf pos len >>= fun nb_read ->
+      inner (pos + nb_read) (len - nb_read)
+  in
+  inner pos len
+
+let write_mbytes ?(pos=0) ?len descr buf =
+  let len = match len with None -> MBytes.length buf - pos | Some l -> l in
+  let rec inner pos len =
+    if len = 0 then
+      Lwt.return_unit
+    else
+      Lwt_bytes.write descr buf pos len >>= fun nb_written ->
+      inner (pos + nb_written) (len - nb_written) in
+  inner pos len
+
