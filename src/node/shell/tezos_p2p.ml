@@ -20,7 +20,7 @@ module Param = struct
     | Get_protocols of Protocol_hash.t list
     | Protocol of MBytes.t
 
-  let msg_encodings =
+  let encodings =
     let open Data_encoding in
     let case ?max_length ~tag encoding unwrap wrap =
       P2p.Encoding { tag; encoding; wrap; unwrap; max_length } in
@@ -71,9 +71,9 @@ module Param = struct
         (fun proto -> Protocol proto);
     ]
 
-  type meta = unit
-  let init_meta = ()
-  let score_enc = Data_encoding.empty
+  type metadata = unit
+  let initial_metadata = ()
+  let metadata_encoding = Data_encoding.empty
   let score () = 0.
 
   let supported_versions =
