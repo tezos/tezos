@@ -210,7 +210,7 @@ clean::
 ############################################################################
 
 NODE_LIB_INTFS := \
-  node/net/netbits.mli \
+  \
   node/net/p2p.mli \
   node/net/RPC.mli \
   \
@@ -237,9 +237,9 @@ NODE_LIB_INTFS := \
   node/shell/node_rpc.mli \
 
 NODE_LIB_IMPLS := \
+  \
   compiler/node_compiler_main.ml \
   \
-  node/net/netbits.ml \
   node/net/p2p.ml \
   node/net/RPC.ml \
   \
