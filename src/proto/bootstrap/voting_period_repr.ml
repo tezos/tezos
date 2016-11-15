@@ -42,7 +42,7 @@ type kind =
 
 let kind_encoding =
   let open Data_encoding in
-  union ~tag_size:`Int8 [
+  union ~tag_size:`Uint8 [
     case ~tag:0
       (constant "proposal")
       (function Proposal -> Some () | _ -> None)

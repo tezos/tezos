@@ -418,7 +418,7 @@ let addr_encoding =
     ~json:
       (conv Ipaddr.to_string (Data_encoding.Json.wrap_error Ipaddr.of_string_exn) string)
     ~binary:
-      (union ~tag_size:`Int8
+      (union ~tag_size:`Uint8
          [ case ~tag:4
              (Fixed.string 4)
              (fun ip -> Utils.map_option Ipaddr.V4.to_bytes (Ipaddr.to_v4 ip) )
