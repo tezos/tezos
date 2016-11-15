@@ -42,6 +42,11 @@ type config = {
   closed_network : bool ;
 }
 
+(* The global net identificator. *)
+type gid = string
+
+let gid_length = 16
+
 type 'msg msg_encoding = Encoding : {
     tag: int ;
     encoding: 'a Data_encoding.t ;
@@ -91,9 +96,6 @@ module type S = sig
   (** A connection to a peer *)
   type peer
 
-  (** A global identifier for a peer, a.k.a. an identity *)
-  type gid
-
   (** Access the domain of active peers *)
   val peers : net -> peer list
 
@@ -141,7 +143,6 @@ module Make (P: NET_PARAMS) = struct
   module LC = Lwt_condition
   open Lwt
   open Lwt_utils
-  open Netbits
   open Logging.Net
 
   let pp_gid ppf gid =
@@ -159,9 +160,6 @@ module Make (P: NET_PARAMS) = struct
           else if a < b then find (ta, lb)
           else find (la, tb)
     in find (la, lb)
-
-  (* The global net identificator. *)
-  type gid = string
 
   (* A net point (address x port). *)
   type point = addr * port
@@ -668,16 +666,20 @@ module Make (P: NET_PARAMS) = struct
 
 
   (* The (fixed size) broadcast frame. *)
+  let discovery_message_encoding =
+    let open Data_encoding in
+    tup3 (Fixed.string 8) (Fixed.string gid_length) int16
+
   let discovery_message gid port =
-    Netbits.([ B (MBytes.of_string "DISCO") ; B (MBytes.of_string gid) ; S port ])
+    Data_encoding.Binary.to_bytes
+      discovery_message_encoding
+      ("DISCOVER", gid, port)
 
   (* Broadcast frame verifier. *)
-  let answerable_discovery_message message my_gid when_ok when_not =
-    match message with
-    | Some [ B magic ; B gid ; S port ] ->
-        if MBytes.to_string magic = "DISCO" && MBytes.to_string gid <> my_gid then
-          when_ok gid port
-        else when_not ()
+  let answerable_discovery_message msg my_gid when_ok when_not =
+    match msg with
+    | Some ("DISCOVER", gid, port) when gid <> my_gid ->
+        when_ok gid port
     | _ -> when_not ()
 
   let string_of_unix_exn = function
@@ -703,7 +705,7 @@ module Make (P: NET_PARAMS) = struct
     | Some main_socket ->
         (* the answering function *)
         let rec step () =
-          let buffer = Netbits.to_raw (discovery_message my_gid 0) in
+          let buffer = discovery_message my_gid 0 in
           let len = MBytes.length buffer in
           pick [ (cancelation () >>= fun () -> return None) ;
                  (Lwt_bytes.recvfrom main_socket buffer 0 len [] >>= fun r ->
@@ -712,7 +714,10 @@ module Make (P: NET_PARAMS) = struct
               if len' <> len then
                 step () (* drop bytes, better luck next time ! *)
               else
-                answerable_discovery_message (Netbits.of_raw buffer) my_gid
+                answerable_discovery_message
+                  (Data_encoding.Binary.of_bytes
+                     discovery_message_encoding buffer)
+                  my_gid
                   (fun _ port ->
                      catch
                        (fun () ->
@@ -732,14 +737,14 @@ module Make (P: NET_PARAMS) = struct
   (* Sends dicover messages into space in an exponentially delayed loop,
      restartable using a condition *)
   let discovery_sender my_gid disco_port inco_port cancelation restart =
-    let message = discovery_message my_gid inco_port in
+    let msg = discovery_message my_gid inco_port in
     let rec loop delay n =
       catch
         (fun () ->
            let socket = LU.(socket PF_INET SOCK_DGRAM 0) in
            LU.setsockopt socket LU.SO_BROADCAST true ;
            LU.connect socket LU.(ADDR_INET (Unix.inet_addr_of_string "255.255.255.255", disco_port)) >>= fun () ->
-           Netbits.(write socket message) >>= fun _ ->
+           Lwt_utils.write_mbytes socket msg >>= fun _ ->
            LU.close socket)
         (fun _ ->
            debug "(%a) error broadcasting a discovery request" pp_gid my_gid ;
