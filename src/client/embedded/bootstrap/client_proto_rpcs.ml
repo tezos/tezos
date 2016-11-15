@@ -127,6 +127,10 @@ module Helpers = struct
 
   let typecheck_code = call_error_service1 Services.Helpers.typecheck_code
 
+  let run_code block code (storage, input) =
+    call_error_service1 Services.Helpers.run_code
+      block (code, storage, input, None, None)
+
   let typecheck_tagged_data = call_error_service1 Services.Helpers.typecheck_tagged_data
 
   let typecheck_untagged_data = call_error_service1 Services.Helpers.typecheck_untagged_data

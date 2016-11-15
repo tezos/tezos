@@ -200,6 +200,27 @@ let commands () =
          Lwt.return ()) ;
     command
       ~group: "programs"
+      ~desc: "ask the node to run a program"
+      (prefixes [ "run" ; "program" ]
+       @@ Program.source_param
+       @@ prefixes [ "on" ; "storage" ]
+       @@ Cli_entries.param ~name:"storage" ~desc:"the untagged storage data" parse_data
+       @@ prefixes [ "and" ; "input" ]
+       @@ Cli_entries.param ~name:"storage" ~desc:"the untagged input data" parse_data
+       @@ stop)
+      (fun program storage input () ->
+         let open Data_encoding in
+         Client_proto_rpcs.Helpers.run_code (block ()) program (storage, input) >>= function
+         | Ok (storage, output) ->
+             Format.printf "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
+               (print_ir (fun l -> false)) storage
+               (print_ir (fun l -> false)) output ;
+             Lwt.return ()
+         | Error errs ->
+             pp_print_error Format.err_formatter errs ;
+             error "error running program") ;
+    command
+      ~group: "programs"
       ~desc: "ask the node to typecheck a program"
       (prefixes [ "typecheck" ; "program" ]
        @@ Program.source_param

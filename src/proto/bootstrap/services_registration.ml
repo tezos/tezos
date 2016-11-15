@@ -180,6 +180,33 @@ let minimal_timestamp ctxt prio =
 let () = register1 Services.Helpers.minimal_timestamp minimal_timestamp
 
 let () =
+  register1 Services.Helpers.run_code
+    (fun ctxt (script, storage, input, amount, contract) ->
+       let amount =
+         match amount with
+         | Some amount -> amount
+         | None ->
+             match Tez.of_cents 100_00L with
+             | Some tez -> tez
+             | None -> Tez.zero in
+       let contract =
+         match contract with
+         | Some contract -> contract
+         | None ->
+             Contract.default_contract
+               (List.hd Bootstrap.accounts).Bootstrap.public_key_hash in
+       let storage =
+         { Script.storage ; storage_type = script.storage_type } in
+       let qta =
+         Constants.instructions_per_transaction ctxt in
+       Script_interpreter.execute
+         contract (* transaction initiator *)
+         contract (* script owner *)
+         ctxt storage script amount input
+         qta >>=? fun (sto, ret, _qta, _ctxt) ->
+       Error_monad.return (sto, ret))
+
+let () =
   register1 Services.Helpers.typecheck_code
     Script_ir_translator.typecheck_code
 
