@@ -26,12 +26,10 @@
 
 *)
 
-module P2p = Netparams
-
 type t
 
 (** Creation and destruction of a "prevalidation" worker. *)
-val create: P2p.net -> State.Net.t -> t Lwt.t
+val create: Tezos_p2p.net -> State.Net.t -> t Lwt.t
 val shutdown: t -> unit Lwt.t
 
 (** Notify the prevalidator of a new operation. This is the
