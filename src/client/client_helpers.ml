@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Client_config
+
 let () =
   let open Cli_entries in
   register_group "helpers" "Various helpers"
@@ -21,11 +23,12 @@ let commands () = Cli_entries.[
     command
       ~desc: "Lookup for the possible completion of a \
               given prefix of Base48Check-encoded hash. This actually \
-              works only for blocks and operations."
+              works only for blocks, operations, public key and contract \
+              identifiers."
       ~args: [unique_arg]
       (prefixes [ "complete" ] @@ string "prefix" "the prefix of the Base48Check-encoded hash to be completed" @@ stop)
       (fun prefix () ->
-         Client_node_rpcs.complete prefix >>= fun completions ->
+         Client_node_rpcs.complete ~block:(block ()) prefix >>= fun completions ->
          match completions with
          | [] -> Pervasives.exit 3
          | _ :: _ :: _ when !unique -> Pervasives.exit 3
