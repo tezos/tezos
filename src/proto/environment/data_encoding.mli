@@ -13,7 +13,7 @@ type json_schema
 exception No_case_matched
 exception Unexpected_tag of int
 exception Duplicated_tag of int
-exception Invalid_tag of int * [ `Int8 | `Int16 ]
+exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
 exception Unexpected_enum of string * string list
 
 type 'a t
@@ -153,7 +153,7 @@ type 't case
 val case :
   ?tag:int -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 val union :
-  ?tag_size:[ `Int8 | `Int16 ] -> 't case list -> 't encoding
+  ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
 
 val describe :
   ?title:string -> ?description:string ->

@@ -152,7 +152,7 @@ module Encoding = struct
        (req "fee" Tez_repr.encoding)
        (req "counter" int32)
        (req "operations"
-          (list (union ~tag_size:`Int8 [
+          (list (union ~tag_size:`Uint8 [
                transaction_case 0 ;
                origination_case 1 ;
                issuance_case 2 ;
