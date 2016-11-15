@@ -638,7 +638,9 @@ module Make (P: PARAMS) = struct
                      catch
                        (fun () ->
                           let ipaddr = Ipaddr_unix.of_inet_addr addr in
-                          let socket = LU.(socket (match ipaddr with Ipaddr.V4 _ -> PF_INET | V6 _ -> PF_INET6) SOCK_STREAM 0) in
+                          let ipaddr = Ipaddr.(match ipaddr with V4 addr -> V6 (v6_of_v4 addr) | _ -> ipaddr) in
+                          let addr = Ipaddr_unix.to_inet_addr ipaddr in
+                          let socket = LU.(socket PF_INET6 SOCK_STREAM 0) in
                           LU.connect socket LU.(ADDR_INET (addr, port)) >>= fun () ->
                           callback ipaddr port socket >>= fun () ->
                           return ())
