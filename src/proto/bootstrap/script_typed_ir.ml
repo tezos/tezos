@@ -53,7 +53,7 @@ and ('a, 'b) union = L of 'a | R of 'b
 and end_of_stack = unit
 
 and ('arg, 'ret) lambda =
-    Lam of ('arg * end_of_stack, 'ret * end_of_stack) instr * Script.expr
+    Lam of ('arg * end_of_stack, 'ret * end_of_stack) descr * Script.expr
 
 and ('arg, 'ret) typed_contract =
   'arg ty * 'ret ty * Contract.t
@@ -75,6 +75,10 @@ and 'ty ty =
   | Set_t : 'v comparable_ty -> 'v set ty
   | Map_t : 'k comparable_ty * 'v ty -> ('k, 'v) map ty
   | Contract_t : 'arg ty * 'ret ty -> ('arg, 'ret) typed_contract ty
+
+and 'ty stack_ty =
+  | Item_t : 'ty ty * 'rest stack_ty -> ('ty * 'rest) stack_ty
+  | Empty_t : end_of_stack stack_ty
 
 (* ---- Instructions --------------------------------------------------------*)
 
@@ -107,21 +111,21 @@ and ('bef, 'aft) instr =
       ('v * 'rest, 'v option * 'rest) instr
   | Cons_none : 'a ty ->
     ('rest, 'a option * 'rest) instr
-  | If_none : ('bef, 'aft) instr * ('a * 'bef, 'aft) instr ->
+  | If_none : ('bef, 'aft) descr * ('a * 'bef, 'aft) descr ->
     ('a option * 'bef, 'aft) instr
   (* unions *)
   | Left :
       ('l * 'rest, (('l, 'r) union * 'rest)) instr
   | Right :
       ('r * 'rest, (('l, 'r) union * 'rest)) instr
-  | If_left : ('l * 'bef, 'aft) instr * ('r * 'bef, 'aft) instr ->
+  | If_left : ('l * 'bef, 'aft) descr * ('r * 'bef, 'aft) descr ->
     (('l, 'r) union * 'bef, 'aft) instr
   (* lists *)
   | Cons_list :
       ('a * ('a list * 'rest), ('a list * 'rest)) instr
   | Nil :
       ('rest, ('a list * 'rest)) instr
-  | If_cons : ('a * ('a list * 'bef), 'aft) instr * ('bef, 'aft) instr ->
+  | If_cons : ('a * ('a list * 'bef), 'aft) descr * ('bef, 'aft) descr ->
     ('a list * 'bef, 'aft) instr
   | List_map :
       (('param, 'ret) lambda * ('param list * 'rest), 'ret list * 'rest) instr
@@ -158,9 +162,9 @@ and ('bef, 'aft) instr =
   | Concat :
       (string * (string * 'rest), string * 'rest) instr
   (* timestamp operations *)
-  | Add_seconds_to_timestamp : (unsigned, 'l) int_kind * Script.location ->
+  | Add_seconds_to_timestamp : (unsigned, 'l) int_kind ->
     ((unsigned, 'l) int_val * (Timestamp.t * 'rest), Timestamp.t * 'rest) instr
-  | Add_timestamp_to_seconds : (unsigned, 'l) int_kind * Script.location ->
+  | Add_timestamp_to_seconds : (unsigned, 'l) int_kind ->
     (Timestamp.t * ((unsigned, 'l) int_val * 'rest), Timestamp.t * 'rest) instr
   (* currency operations *)
   | Add_tez :
@@ -181,15 +185,15 @@ and ('bef, 'aft) instr =
   | Not :
       (bool * 'rest, bool * 'rest) instr
   (* integer operations *)
-  | Checked_neg_int : (signed, 'l) int_kind * Script.location ->
+  | Checked_neg_int : (signed, 'l) int_kind ->
     ((signed, 'l) int_val * 'rest, (signed, 'l) int_val * 'rest) instr
-  | Checked_abs_int : (signed, 'l) int_kind * Script.location ->
+  | Checked_abs_int : (signed, 'l) int_kind ->
     ((signed, 'l) int_val * 'rest, (signed, 'l) int_val * 'rest) instr
-  | Checked_add_int : ('s, 'l) int_kind * Script.location ->
+  | Checked_add_int : ('s, 'l) int_kind ->
     (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Checked_sub_int : ('s, 'l) int_kind * Script.location ->
+  | Checked_sub_int : ('s, 'l) int_kind ->
     (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Checked_mul_int : ('s, 'l) int_kind * Script.location ->
+  | Checked_mul_int : ('s, 'l) int_kind ->
     (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
   | Neg_int : (signed, 'l) int_kind ->
     ((signed, 'l) int_val * 'rest, (signed, 'l) int_val * 'rest) instr
@@ -201,9 +205,9 @@ and ('bef, 'aft) instr =
     (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
   | Mul_int : ('s, 'l) int_kind ->
     (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Div_int : ('s, 'l) int_kind * Script.location ->
+  | Div_int : ('s, 'l) int_kind ->
     (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Mod_int : ('s, 'l) int_kind * Script.location ->
+  | Mod_int : ('s, 'l) int_kind ->
     (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
   | Lsl_int : (unsigned, 'l) int_kind ->
     ((unsigned, 'l) int_val * ((unsigned, eight) int_val * 'rest), (unsigned, 'l) int_val * 'rest) instr
@@ -218,19 +222,19 @@ and ('bef, 'aft) instr =
   | Not_int : (unsigned, 'l) int_kind ->
     ((unsigned, 'l) int_val * 'rest, (unsigned, 'l) int_val * 'rest) instr
   (* control *)
-  | Seq : ('bef, 'trans) instr * ('trans, 'aft) instr ->
+  | Seq : ('bef, 'trans) descr * ('trans, 'aft) descr ->
     ('bef, 'aft) instr
-  | If : ('bef, 'aft) instr * ('bef, 'aft) instr ->
+  | If : ('bef, 'aft) descr * ('bef, 'aft) descr ->
     (bool * 'bef, 'aft) instr
-  | Loop : ('rest, bool * 'rest) instr ->
+  | Loop : ('rest, bool * 'rest) descr ->
     (bool * 'rest, 'rest) instr
-  | Dip : ('bef, 'aft) instr ->
+  | Dip : ('bef, 'aft) descr ->
     ('top * 'bef, 'top * 'aft) instr
   | Exec :
       ('arg * (('arg, 'ret) lambda * 'rest), 'ret * 'rest) instr
   | Lambda : ('arg, 'ret) lambda ->
     ('rest, ('arg, 'ret) lambda * 'rest) instr
-  | Fail : Script.location ->
+  | Fail :
     ('bef, 'aft) instr
   | Nop :
       ('rest, 'rest) instr
@@ -253,12 +257,12 @@ and ('bef, 'aft) instr =
   (* casts *)
   | Int_of_int : ('sf, 'lf) int_kind * ('st, 'lt) int_kind ->
     (('sf, 'lf) int_val * 'rest, ('st, 'lt) int_val * 'rest) instr
-  | Checked_int_of_int : ('sf, 'lf) int_kind * ('st, 'lt) int_kind * Script.location ->
+  | Checked_int_of_int : ('sf, 'lf) int_kind * ('st, 'lt) int_kind ->
     (('sf, 'lf) int_val * 'rest, ('st, 'lt) int_val * 'rest) instr
   (* protocol *)
   | Manager :
       (('arg, 'ret) typed_contract * 'rest, public_key_hash * 'rest) instr
-  | Transfer_tokens : 'sto ty * Script.location ->
+  | Transfer_tokens : 'sto ty ->
     ('arg * (Tez.t * (('arg, 'ret) typed_contract * ('sto * end_of_stack))), 'ret * ('sto * end_of_stack)) instr
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
@@ -281,3 +285,9 @@ and ('bef, 'aft) instr =
     ('rest, ('p, 'r) typed_contract * 'rest) instr
   | Amount :
       ('rest, Tez.t * 'rest) instr
+
+and ('bef, 'aft) descr =
+  { loc : Script.location ;
+    bef : 'bef stack_ty ;
+    aft : 'aft stack_ty ;
+    instr : ('bef, 'aft)  instr }
