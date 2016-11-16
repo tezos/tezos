@@ -95,6 +95,10 @@ module Helpers : sig
   val run_code: block -> Script.code ->
     (Script.expr * Script.expr) ->
     (Script.expr * Script.expr) tzresult Lwt.t
+  val trace_code: block -> Script.code ->
+    (Script.expr * Script.expr) ->
+    (Script.expr * Script.expr *
+     (Script.location * int * Script.expr list) list) tzresult Lwt.t
   val typecheck_code: block -> Script.code -> Script_ir_translator.type_map tzresult Lwt.t
   val typecheck_tagged_data: block -> Script.expr -> unit tzresult Lwt.t
   val typecheck_untagged_data: block -> Script.expr * Script.expr -> unit tzresult Lwt.t
