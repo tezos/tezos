@@ -406,7 +406,7 @@ module Make (P: PARAMS) = struct
       pick [ (LU.sleep limits.peer_answer_timeout >>= fun () -> return Disconnect) ;
              recv_msg socket buf ] >>= function
       | Connect { gid; port = listening_port; versions ; public_key ; nonce } ->
-          debug "(%a) connection requested from %a @ %a:%d"
+          debug "(%a) connection requested from %a @@ %a:%d"
             pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
           begin match common_version P.supported_versions versions with
             | None ->
@@ -479,7 +479,7 @@ module Make (P: PARAMS) = struct
         match packet with
         | Connect _
         | Disconnect ->
-            debug "(%a) disconnected (by peer) %a @ %a:%d"
+            debug "(%a) disconnected (by peer) %a @@ %a:%d"
               pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
             cancel ()
         | Bootstrap -> push (Bootstrap peer) ; receiver ()
@@ -887,20 +887,20 @@ module Make (P: PARAMS) = struct
                   let uaddr = Ipaddr_unix.to_inet_addr addr in
                   catch
                     (fun () ->
-                       lwt_debug "Trying to connect to %a:%d"
-                         Ipaddr.pp_hum addr port >>= fun () ->
+                       debug "(%a) trying to connect to %a:%d"
+                         pp_gid my_gid Ipaddr.pp_hum addr port;
                        Lwt.pick
                          [ (Lwt_unix.sleep 2.0 >>= fun _ -> Lwt.fail Not_found) ;
                            LU.connect socket (LU.ADDR_INET (uaddr, port))
                          ] >>= fun () ->
-                       lwt_debug "Connected to %a:%d"
-                         Ipaddr.pp_hum addr port >>= fun () ->
+                       debug "(%a) connected to %a:%d"
+                         pp_gid my_gid Ipaddr.pp_hum addr port;
                        enqueue_event (Contact ((addr, port), socket)) ;
                        return (nb - 1))
                     (fun exn ->
-                       lwt_debug "Connection failed to %a:%d (%s)"
-                         Ipaddr.pp_hum addr port
-                         (string_of_unix_exn exn) >>= fun () ->
+                       debug "(%a) connection failed to %a:%d (%s)"
+                         pp_gid my_gid Ipaddr.pp_hum addr port
+                         (string_of_unix_exn exn);
                        (* if we didn't succes, we greylist it *)
                        let now = Unix.gettimeofday () in
                        known_peers :=
