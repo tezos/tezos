@@ -141,3 +141,5 @@ let write_file ?(bin=false) fn contents =
       output oc contents 0 @@ Bytes.length contents
     )
     (fun () -> close_out oc)
+
+let (<<) g f = fun a -> g (f a)

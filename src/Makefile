@@ -108,6 +108,7 @@ UTILS_LIB_INTFS := \
   utils/cli_entries.mli \
   utils/compare.mli \
   utils/data_encoding.mli \
+  utils/crypto_box.mli \
   utils/time.mli \
   utils/hash.mli \
   utils/ed25519.mli \
@@ -124,6 +125,7 @@ UTILS_LIB_IMPLS := \
   utils/cli_entries.ml \
   utils/compare.ml \
   utils/data_encoding.ml \
+  utils/crypto_box.ml \
   utils/time.ml \
   utils/hash.ml \
   utils/ed25519.ml \

@@ -134,6 +134,8 @@ module Make (P: PARAMS) = struct
         gid : string ;
         port : int option ;
         versions : version list ;
+        public_key : Crypto_box.public_key ;
+        nonce : Crypto_box.nonce ;
       }
     | Disconnect
     | Bootstrap
@@ -144,18 +146,20 @@ module Make (P: PARAMS) = struct
     let open Data_encoding in
     union ~tag_size:`Uint16
       ([ case ~tag:0x00
-           (obj3
+           (obj5
               (req "gid" (Fixed.string gid_length))
               (req "port" uint16)
+              (req "pubKey" Crypto_box.public_key_encoding)
+              (req "nonce" Crypto_box.nonce_encoding)
               (req "versions" (Variable.list version_encoding)))
            (function
-             | Connect { gid ; port ; versions } ->
+             | Connect { gid ; port ; versions ; public_key ; nonce } ->
                  let port = match port with None -> 0 | Some port -> port in
-                 Some (gid, port, versions)
+                 Some (gid, port, public_key, nonce, versions)
              | _ -> None)
-           (fun (gid, port, versions) ->
+           (fun (gid, port, public_key, nonce, versions) ->
               let port = if port = 0 then None else Some port in
-              Connect { gid ; port ; versions });
+              Connect { gid ; port ; versions ; public_key ; nonce });
          case ~tag:0x01 null
            (function Disconnect -> Some () | _ -> None)
            (fun () -> Disconnect);
@@ -176,7 +180,7 @@ module Make (P: PARAMS) = struct
   let maxlen = hdrlen + 2 lsl 16
 
   (* read a message from a TCP socket *)
-  let recv_msg fd buf =
+  let recv_msg ?(uncrypt = (fun buf -> Some buf)) fd buf =
     catch
       (fun () ->
          assert (MBytes.length buf >= 2 lsl 16) ;
@@ -184,36 +188,51 @@ module Make (P: PARAMS) = struct
          let len = EndianBigstring.BigEndian.get_uint16 buf 0 in
          (* TODO timeout read ??? *)
          Lwt_utils.read_mbytes ~len fd buf >>= fun () ->
-         (* TODO conditionnaly decrypt payload... ?? *)
-         match Data_encoding.Binary.read msg_encoding buf 0 len with
+         let buf = MBytes.sub buf hdrlen len in
+         match uncrypt buf with
          | None ->
              (* TODO track invalid message *)
              return Disconnect
-         | Some (read, _) when read <> len ->
-             (* TODO track invalid message *)
-             return Disconnect
-         | Some (_, msg) ->
-             Lwt.return msg)
+         | Some buf ->
+             match Data_encoding.Binary.of_bytes msg_encoding buf with
+             | None ->
+                 (* TODO track invalid message *)
+                 return Disconnect
+             | Some msg ->
+                 Lwt.return msg)
       (function
         | Unix.Unix_error _ -> return Disconnect
         | e -> fail e)
 
   (* send a message over a TCP socket *)
-  let send_msg fd buf msg =
+  let send_msg ?crypt fd buf msg =
     catch
       (fun () ->
          match Data_encoding.Binary.write msg_encoding msg buf hdrlen with
          | None -> return_false
          | Some len ->
-             if len > maxlen then
-               return_false
-             else begin
-               EndianBigstring.BigEndian.set_int16 buf 0 (len - hdrlen) ;
-               (* TODO conditionnaly encrypt payload... ? *)
-               (* TODO timeout write ??? *)
-               Lwt_utils.write_mbytes ~len fd buf >>= fun () ->
-               return true
-             end)
+             match crypt with
+             | None ->
+                 if len > maxlen then
+                   return_false
+                 else begin
+                   EndianBigstring.BigEndian.set_int16 buf 0 (len - hdrlen) ;
+                   (* TODO timeout write ??? *)
+                   Lwt_utils.write_mbytes ~len fd buf >>= fun () ->
+                   return true
+                 end
+             | Some crypt ->
+                 let encbuf = crypt (MBytes.sub buf hdrlen (len - hdrlen)) in
+                 let len = MBytes.length encbuf in
+                 if len > maxlen then
+                   return_false
+                 else begin
+                   let lenbuf = MBytes.create 2 in
+                   EndianBigstring.BigEndian.set_int16 lenbuf 0 len ;
+                   Lwt_utils.write_mbytes fd lenbuf >>= fun () ->
+                   Lwt_utils.write_mbytes fd encbuf >>= fun () ->
+                   return true
+                 end)
       (function
         | Unix.Unix_error _ -> return_false
         | e -> fail e)
@@ -224,6 +243,7 @@ module Make (P: PARAMS) = struct
      workers (on shutdown of during maintenance). *)
   type peer = {
     gid : gid ;
+    public_key : Crypto_box.public_key ;
     point : point ;
     listening_port : port option ;
     version : version ;
@@ -363,25 +383,30 @@ module Make (P: PARAMS) = struct
      function for communicating with the main worker using events
      (including the one sent when the connection is alive). Returns a
      canceler. *)
-  let connect_to_peer config limits my_gid socket (addr, port) push white_listed =
+  let connect_to_peer
+      config limits my_gid my_public_key my_secret_key
+      socket (addr, port) push white_listed =
     (* a non exception-based cancelation mechanism *)
     let cancelation, cancel, on_cancel = canceler () in
-    (* a cancelable reception *)
-    let recv buf =
-      pick [ recv_msg socket buf ;
+    (* a cancelable encrypted reception *)
+    let recv ~uncrypt buf =
+      pick [ recv_msg ~uncrypt socket buf ;
              (cancelation () >>= fun () -> return Disconnect) ] in
     (* First step: send and receive credentials, makes no difference
        whether we're trying to connect to a peer or checking an incoming
        connection, both parties must first present themselves. *)
     let rec connect buf =
+      let local_nonce = Crypto_box.random_nonce () in
       send_msg socket buf
         (Connect { gid = my_gid ;
+                   public_key = my_public_key ;
+                   nonce = local_nonce ;
                    port = config.incoming_port ;
                    versions = P.supported_versions }) >>= fun _ ->
       pick [ (LU.sleep limits.peer_answer_timeout >>= fun () -> return Disconnect) ;
              recv_msg socket buf ] >>= function
-      | Connect { gid; port = listening_port; versions } ->
-          debug "(%a) connection requested from %a @@ %a:%d"
+      | Connect { gid; port = listening_port; versions ; public_key ; nonce } ->
+          debug "(%a) connection requested from %a @ %a:%d"
             pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
           begin match common_version P.supported_versions versions with
             | None ->
@@ -392,7 +417,7 @@ module Make (P: PARAMS) = struct
                 if config.closed_network then
                   match listening_port with
                   | Some port when white_listed (addr, port) ->
-                      connected buf version gid listening_port
+                      connected buf local_nonce version gid public_key nonce listening_port
                   | Some port ->
                       debug "(%a) connection rejected (out of the closed network) from %a:%d"
                         pp_gid my_gid Ipaddr.pp_hum addr port ;
@@ -402,7 +427,7 @@ module Make (P: PARAMS) = struct
                         pp_gid my_gid Ipaddr.pp_hum addr ;
                       cancel ()
                 else
-                  connected buf version gid listening_port
+                  connected buf local_nonce version gid public_key nonce listening_port
           end
       | Advertise peers ->
           (* alternatively, one can refuse a connection but reply with
@@ -420,24 +445,41 @@ module Make (P: PARAMS) = struct
             pp_gid my_gid Ipaddr.pp_hum addr port ;
           cancel ()
     (* Them we can build the net object and launch the worker. *)
-    and connected buf version gid listening_port =
+    and connected buf local_nonce version gid public_key nonce listening_port =
       (* net object state *)
       let last = ref (Unix.gettimeofday ()) in
+      let local_nonce = ref local_nonce in
+      let remote_nonce = ref nonce in
       (* net object callbaks *)
       let last_seen () = !last in
+      let get_nonce nonce =
+        let current_nonce = !nonce in
+        nonce := Crypto_box.increment_nonce !nonce ;
+        current_nonce in
       let disconnect () = cancel () in
-      let send p = send_msg socket buf p >>= fun _ -> return () in
+      let crypt buf =
+        let nonce = get_nonce remote_nonce in
+        Crypto_box.box my_secret_key public_key buf nonce in
+      let send p = send_msg ~crypt socket buf p >>= fun _ -> return () in
       (* net object construction *)
-      let peer = { gid ; point = (addr, port) ; listening_port ;
-                   version ; last_seen ; disconnect ; send } in
+      let peer = { gid ; public_key ; point = (addr, port) ;
+                   listening_port ; version ; last_seen ; disconnect ; send } in
+      let uncrypt buf =
+        let nonce = get_nonce local_nonce in
+        match Crypto_box.box_open my_secret_key public_key buf nonce with
+        | None ->
+            debug "(%a) cannot decrypt message (from peer) %a @ %a:%d"
+              pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
+            None
+        | Some _ as res -> res in
       (* The packet reception loop. *)
       let rec receiver () =
-        recv buf >>= fun packet ->
+        recv ~uncrypt buf >>= fun packet ->
         last := Unix.gettimeofday () ;
         match packet with
         | Connect _
         | Disconnect ->
-            debug "(%a) disconnected (by peer) %a @@ %a:%d"
+            debug "(%a) disconnected (by peer) %a @ %a:%d"
               pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
             cancel ()
         | Bootstrap -> push (Bootstrap peer) ; receiver ()
@@ -452,7 +494,7 @@ module Make (P: PARAMS) = struct
     in
     let buf = MBytes.create maxlen in
     on_cancel (fun () ->
-        send_msg socket buf Disconnect >>= fun _ ->
+        (* send_msg ~crypt socket buf Disconnect >>= fun _ -> *)
         LU.close socket >>= fun _ ->
         return ()) ;
     let worker_name =
@@ -484,8 +526,10 @@ module Make (P: PARAMS) = struct
 
   let peers_file_encoding =
     let open Data_encoding in
-    obj2
+    obj4
       (req "gid" string)
+      (req "public_key" Crypto_box.public_key_encoding)
+      (req "secret_key" Crypto_box.secret_key_encoding)
       (req "peers"
          (obj3
             (req "known"
@@ -493,10 +537,12 @@ module Make (P: PARAMS) = struct
                         (req "addr" addr_encoding)
                         (req "port" int31)
                         (opt "infos"
-                           (obj3
+                           (obj4
                               (req "connections" int31)
                               (req "lastSeen" float)
-                              (req "gid" string))))))
+                              (req "gid" string)
+                              (req "public_key"
+                                 Crypto_box.public_key_encoding))))))
             (req "blacklisted"
                (list (obj2
                         (req "addr" addr_encoding)
@@ -509,7 +555,7 @@ module Make (P: PARAMS) = struct
   (* Info on peers maintained between connections *)
   type source = {
     unreachable_since : float option;
-    connections : (int * float) option ;
+    connections : (int * float * Crypto_box.public_key) option ;
     white_listed : bool ;
     meta : P.metadata ;
   }
@@ -524,7 +570,7 @@ module Make (P: PARAMS) = struct
         | _, _ ->
             match s1.connections, s2.connections with
             | Some _, None -> -1 | None, Some _ -> 1 | None, None -> 0
-            | Some (n1, t1), Some (n2, t2) ->
+            | Some (n1, t1, _), Some (n2, t2, _) ->
                 if n1 = n2 then compare t2 t1
                 else compare n2 n1
 
@@ -549,8 +595,7 @@ module Make (P: PARAMS) = struct
   (* Broadcast frame verifier. *)
   let answerable_discovery_message msg my_gid when_ok when_not =
     match msg with
-    | Some ("DISCOVER", gid, port) when gid <> my_gid ->
-        when_ok gid port
+    | Some ("DISCOVER", gid, port) when gid <> my_gid -> when_ok gid port
     | _ -> when_not ()
 
   let string_of_unix_exn = function
@@ -593,9 +638,7 @@ module Make (P: PARAMS) = struct
                      catch
                        (fun () ->
                           let ipaddr = Ipaddr_unix.of_inet_addr addr in
-                          let ipaddr = Ipaddr.(match ipaddr with V4 addr -> V6 (v6_of_v4 addr) | _ -> ipaddr) in
-                          let addr = Ipaddr_unix.to_inet_addr ipaddr in
-                          let socket = LU.(socket PF_INET6 SOCK_STREAM 0) in
+                          let socket = LU.(socket (match ipaddr with Ipaddr.V4 _ -> PF_INET | V6 _ -> PF_INET6) SOCK_STREAM 0) in
                           LU.connect socket LU.(ADDR_INET (addr, port)) >>= fun () ->
                           callback ipaddr port socket >>= fun () ->
                           return ())
@@ -654,10 +697,12 @@ module Make (P: PARAMS) = struct
     on_cancel (fun () -> close_msg_queue () ; return ()) ;
     (* fill the known peers pools from last time *)
     Data_encoding.Json.read_file config.peers_file >>= fun res ->
-    let known_peers, black_list, my_gid =
+    let known_peers, black_list, my_gid, my_public_key, my_secret_key =
       let init_peers () =
         let my_gid =
           fresh_gid () in
+        let (my_secret_key, my_public_key) =
+          Crypto_box.random_keypair () in
         let known_peers =
           let source = { unreachable_since = None ;
                          connections = None ;
@@ -670,19 +715,23 @@ module Make (P: PARAMS) = struct
             PeerMap.empty config.known_peers in
         let black_list =
           BlackList.empty in
-        known_peers, black_list, my_gid in
+        known_peers, black_list, my_gid, my_public_key, my_secret_key in
       match res with
       | None ->
-          let known_peers, black_list, my_gid = init_peers () in
+          let known_peers, black_list, my_gid,
+              my_public_key, my_secret_key = init_peers () in
           debug "(%a) peer cache initiated" pp_gid my_gid ;
-          ref known_peers, ref black_list, my_gid
+          ref known_peers, ref black_list, my_gid,
+          my_public_key, my_secret_key
       | Some json ->
           match Data_encoding.Json.destruct peers_file_encoding json with
           | exception _ ->
-              let known_peers, black_list, my_gid = init_peers () in
+              let known_peers, black_list, my_gid,
+                  my_public_key, my_secret_key = init_peers () in
               debug "(%a) peer cache reset" pp_gid my_gid ;
-              ref known_peers, ref black_list, my_gid
-          | (my_gid, (k, b, w)) ->
+              ref known_peers, ref black_list,
+              my_gid, my_public_key, my_secret_key
+          | (my_gid, my_public_key, my_secret_key, (k, b, w)) ->
               let white_list =
                 List.fold_right PointSet.add w PointSet.empty in
               let known_peers =
@@ -696,10 +745,10 @@ module Make (P: PARAMS) = struct
                              white_listed = true ;
                                meta = P.initial_metadata ; } in
                          PeerMap.update (addr, port) source r
-                     | Some (c, t, gid) ->
+                     | Some (c, t, gid, pk) ->
                          let source =
                            { unreachable_since = None ;
-                             connections = Some (c, t) ;
+                             connections = Some (c, t, pk) ;
                              white_listed = PointSet.mem (addr, port) white_list ;
                              meta = P.initial_metadata ; } in
                          PeerMap.update (addr, port) ~gid source r)
@@ -709,7 +758,8 @@ module Make (P: PARAMS) = struct
                   (fun r (a, d) -> BlackList.add a d r)
                   BlackList.empty b in
               debug "(%a) peer cache loaded" pp_gid my_gid ;
-              ref known_peers, ref black_list, my_gid
+              ref known_peers, ref black_list,
+              my_gid, my_public_key, my_secret_key
     in
     (* some peer reachability predicates *)
     let black_listed (addr, _) =
@@ -727,10 +777,12 @@ module Make (P: PARAMS) = struct
         let json =
           Data_encoding.Json.construct peers_file_encoding @@
           (my_gid,
+           my_public_key,
+           my_secret_key,
            PeerMap.fold
              (fun (addr, port) gid source (k, b, w) ->
                 let infos = match gid, source.connections with
-                  | Some gid, Some (n, t) -> Some (n, t, gid)
+                  | Some gid, Some (n, t, pk) -> Some (n, t, gid, pk)
                   | _ -> None in
                 ((addr, port, infos) :: k,
                  b,
@@ -936,17 +988,20 @@ module Make (P: PARAMS) = struct
                 in update @@
                 try match PeerMap.by_gid peer.gid !known_peers with
                   | { connections = None ; white_listed } ->
-                      { connections = Some (1, Unix.gettimeofday ()) ;
+                      { connections =
+                          Some (1, Unix.gettimeofday (), peer.public_key) ;
                         unreachable_since = None ;
                         white_listed ;
                         meta = P.initial_metadata }
-                  | { connections = Some (n, _) ; white_listed } ->
-                      { connections = Some (n + 1, Unix.gettimeofday ()) ;
+                  | { connections = Some (n, _, _) ; white_listed } ->
+                      { connections =
+                          Some (n + 1, Unix.gettimeofday (), peer.public_key) ;
                         unreachable_since = None ;
                         white_listed ;
                         meta = P.initial_metadata }
                 with Not_found ->
-                  { connections = Some (1, Unix.gettimeofday ()) ;
+                  { connections =
+                      Some (1, Unix.gettimeofday (), peer.public_key) ;
                     unreachable_since = None ;
                     white_listed = white_listed point ;
                     meta = P.initial_metadata }
@@ -989,7 +1044,9 @@ module Make (P: PARAMS) = struct
             main ()
           else
             let canceler =
-              connect_to_peer config limits my_gid socket (addr, port) enqueue_event white_listed in
+              connect_to_peer
+                config limits my_gid my_public_key my_secret_key
+                socket (addr, port) enqueue_event white_listed in
             debug "(%a) incoming peer @@ %a:%d"
               pp_gid my_gid Ipaddr.pp_hum addr port ;
             incoming := PointMap.add (addr, port) canceler !incoming ;
