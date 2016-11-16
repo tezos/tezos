@@ -61,7 +61,7 @@ ${NODELIB} ${CLIENTLIB}:
 	${MAKE} -C ../src $@
 
 .PHONY: build-test run-test test
-build-test: ${addprefix build-test-,${TESTS}}
+build-test: ${addprefix build-test-,${TESTS}} test-p2p
 run-test:
 	@$(patsubst %,${MAKE} run-test-% ; , ${TESTS}) \
 	  echo && echo "Success" && echo
@@ -168,6 +168,21 @@ test-basic: ${NODELIB} ${CLIENTLIB} ${TEST_BASIC_IMPLS:.ml=.cmx}
 
 clean::
 	rm -f test-basic
+
+############################################################################
+## p2p test program
+
+TEST_P2P_INTFS =
+
+TEST_P2P_IMPLS = \
+  test_p2p.ml
+
+${TEST_BASIC_IMPLS:.ml=.cmx}: ${NODELIB}
+test-p2p: ${NODELIB} ${TEST_P2P_IMPLS:.ml=.cmx}
+	ocamlfind ocamlopt -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	rm -f test-p2p
 
 ############################################################################
 ## data encoding test program
