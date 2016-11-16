@@ -165,6 +165,16 @@ module Program = Client_aliases.Alias (struct
 
 let commands () =
   let open Cli_entries in
+  let show_types = ref false in
+  let show_types_arg =
+    "-details",
+    Arg.Set show_types,
+    "Show the types of each instruction" in
+  let trace_stack = ref false in
+  let trace_stack_arg =
+    "-trace-stack",
+    Arg.Set trace_stack,
+    "Show the stack after each step" in
   register_group "programs" "Commands for managing the record of known programs" ;
   [
     command
@@ -201,6 +211,7 @@ let commands () =
     command
       ~group: "programs"
       ~desc: "ask the node to run a program"
+      ~args: [ trace_stack_arg ]
       (prefixes [ "run" ; "program" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
@@ -210,18 +221,38 @@ let commands () =
        @@ stop)
       (fun program storage input () ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.run_code (block ()) program (storage, input) >>= function
-         | Ok (storage, output) ->
-             Format.printf "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
-               (print_ir (fun l -> false)) storage
-               (print_ir (fun l -> false)) output ;
-             Lwt.return ()
-         | Error errs ->
-             pp_print_error Format.err_formatter errs ;
-             error "error running program") ;
+         if !trace_stack then
+           Client_proto_rpcs.Helpers.trace_code (block ()) program (storage, input) >>= function
+           | Ok (storage, output, trace) ->
+               Format.printf "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
+                 (print_ir (fun _ -> false)) storage
+                 (print_ir (fun _ -> false)) output
+                 (Format.pp_print_list
+                    (fun ppf (loc, gas, stack) ->
+                       Format.fprintf ppf
+                         "- @[<v 0>location: %d (remaining gas: %d)@,[ @[<v 0>%a ]@]@]"
+                         loc gas
+                         (Format.pp_print_list (print_ir (fun _ -> false)))
+                         stack))
+                 trace ;
+               Lwt.return ()
+           | Error errs ->
+               pp_print_error Format.err_formatter errs ;
+               error "error running program"
+         else
+           Client_proto_rpcs.Helpers.run_code (block ()) program (storage, input) >>= function
+           | Ok (storage, output) ->
+               Format.printf "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
+                 (print_ir (fun _ -> false)) storage
+                 (print_ir (fun _ -> false)) output ;
+               Lwt.return ()
+           | Error errs ->
+               pp_print_error Format.err_formatter errs ;
+               error "error running program") ;
     command
       ~group: "programs"
       ~desc: "ask the node to typecheck a program"
+      ~args: [ show_types_arg ]
       (prefixes [ "typecheck" ; "program" ]
        @@ Program.source_param
        @@ stop)
@@ -231,20 +262,22 @@ let commands () =
          | Ok type_map ->
              let type_map, program = unexpand_macros type_map program in
              message "Well typed" ;
-             print_program
-               (fun l -> List.mem_assoc l type_map)
-               Format.std_formatter program ;
-             Format.printf "@." ;
-             List.iter
-               (fun (loc, (before, after)) ->
-                  Format.printf
-                    "%3d@[<v 0> : [ @[<v 0>%a ]@]@,-> [ @[<v 0>%a ]@]@]@."
-                    loc
-                    (Format.pp_print_list (print_ir (fun _ -> false)))
-                    before
-                    (Format.pp_print_list (print_ir (fun _ -> false)))
-                    after)
-               type_map ;
+             if !show_types then begin
+               print_program
+                 (fun l -> List.mem_assoc l type_map)
+                 Format.std_formatter program ;
+               Format.printf "@." ;
+               List.iter
+                 (fun (loc, (before, after)) ->
+                    Format.printf
+                      "%3d@[<v 0> : [ @[<v 0>%a ]@]@,-> [ @[<v 0>%a ]@]@]@."
+                      loc
+                      (Format.pp_print_list (print_ir (fun _ -> false)))
+                      before
+                      (Format.pp_print_list (print_ir (fun _ -> false)))
+                      after)
+                 (List.sort compare type_map)
+             end ;
              Lwt.return ()
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
