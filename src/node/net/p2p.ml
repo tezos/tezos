@@ -188,7 +188,7 @@ module Make (P: PARAMS) = struct
          let len = EndianBigstring.BigEndian.get_uint16 buf 0 in
          (* TODO timeout read ??? *)
          Lwt_utils.read_mbytes ~len fd buf >>= fun () ->
-         let buf = MBytes.sub buf hdrlen len in
+         let buf = MBytes.sub buf 0 len in
          match uncrypt buf with
          | None ->
              (* TODO track invalid message *)
