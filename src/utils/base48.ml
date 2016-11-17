@@ -7,6 +7,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Utils
+
+let (>>=) = Lwt.bind
+let (>|=) = Lwt.(>|=)
+
 let decode_alphabet alphabet =
   let str = Bytes.make 256 '\255' in
   for i = 0 to String.length alphabet - 1 do
@@ -15,7 +20,7 @@ let decode_alphabet alphabet =
   Bytes.to_string str
 
 let default_alphabet =
-  "eXMNE9qvHPQDdcFx5J86rT7VRm2atAypGhgLfbS3CKjnksB4"
+  "eE2NXaQvHPqDdTJxfF36jb7VRmp9tAyMgG4L5cS8CKrnksBh"
 
 let default_decode_alphabet = decode_alphabet default_alphabet
 
@@ -85,74 +90,144 @@ let sha256 s =
   computed_hash
 
 let safe_encode ?alphabet s =
-  raw_encode ?alphabet (String.sub (sha256 (sha256 s)) 0 4 ^ s)
+  raw_encode ?alphabet (s ^ String.sub (sha256 (sha256 s)) 0 4)
 
 let safe_decode ?alphabet s =
   let s = raw_decode ?alphabet s in
   let len = String.length s in
-  let msg_hash = String.sub s 0 4 in
-  let msg = String.sub s 4 (len-4) in
+  let msg = String.sub s 0 (len-4)
+  and msg_hash = String.sub s (len-4) 4 in
   if msg_hash <> String.sub (sha256 (sha256 msg)) 0 4 then
     invalid_arg "safe_decode" ;
   msg
 
 type data = ..
 
-type kinds =
-    Kind : { prefix: string;
-             read: data -> string option ;
-             build: string -> data } -> kinds
+type 'a encoding = {
+  prefix: string;
+  to_raw: 'a -> string ;
+  of_raw: string -> 'a option ;
+  wrap: 'a -> data ;
+}
 
-let kinds = ref ([] : kinds list)
+let simple_decode ?alphabet { prefix ; of_raw } s =
+  safe_decode ?alphabet s |>
+  remove_prefix ~prefix |>
+  Utils.apply_option ~f:of_raw
 
-let remove_prefix ~prefix s =
-  let x = String.length prefix in
-  let n = String.length s in
-  if n >= x && String.sub s 0 x = prefix then
-    Some (String.sub s x (n - x))
-  else
-    None
+let simple_encode ?alphabet { prefix ; to_raw } d =
+  safe_encode ?alphabet (prefix ^ to_raw d)
 
-exception Unknown_prefix
+type registred_encoding = Encoding : 'a encoding -> registred_encoding
 
-let decode ?alphabet s =
-  let rec find s = function
-    | [] -> raise Unknown_prefix
-    | Kind { prefix ; build } :: kinds ->
-        match remove_prefix ~prefix s with
-        | None -> find s kinds
-        | Some msg -> build msg in
-  let s = safe_decode ?alphabet s in
-  find s !kinds
+module MakeEncodings(E: sig
+    val encodings: registred_encoding list
+  end) = struct
 
-exception Unregistred_kind
+  let encodings = ref E.encodings
 
-let encode ?alphabet s =
-  let rec find s = function
-    | [] -> raise Unregistred_kind
-    | Kind { prefix ; read } :: kinds ->
-        match read s with
-        | None -> find s kinds
-        | Some msg -> safe_encode ?alphabet (prefix ^ msg) in
-  try find s !kinds
-  with Not_found -> raise Unknown_prefix
+  let ambiguous_prefix prefix encodings =
+    List.exists (fun (Encoding { prefix = s }) ->
+        remove_prefix s prefix <> None ||
+        remove_prefix prefix s <> None)
+      encodings
 
-let register ~prefix ~read ~build =
-  match List.find (fun (Kind {prefix=s}) -> remove_prefix s prefix <> None || remove_prefix prefix s <> None) !kinds with
-  | exception Not_found ->
-      kinds := Kind { prefix ; read ; build } :: !kinds
-  | Kind { prefix = s } ->
-      Format.kasprintf
-        Pervasives.failwith
-        "Base49.register: Conflicting prefixes: %S and %S." prefix s ;
+  let register_encoding ~prefix ~to_raw ~of_raw ~wrap =
+    if ambiguous_prefix prefix !encodings then
+      Format.ksprintf invalid_arg
+        "Base48.register_encoding: duplicate prefix: %S" prefix ;
+    let encoding = { prefix ; to_raw ; of_raw ; wrap } in
+    encodings := Encoding encoding :: !encodings ;
+    encoding
+
+  let decode ?alphabet s =
+    let rec find s = function
+      | [] -> None
+      | Encoding { prefix ; of_raw ; wrap } :: encodings ->
+          match remove_prefix ~prefix s with
+          | None -> find s encodings
+          | Some msg -> of_raw msg |> Utils.map_option ~f:wrap in
+    let s = safe_decode ?alphabet s in
+    find s !encodings
+
+end
+
+type 'a resolver =
+    Resolver : {
+      encoding: 'h encoding ;
+      resolver: 'a -> string -> 'h list Lwt.t ;
+    } -> 'a resolver
+
+module MakeResolvers(R: sig
+    type context
+    val encodings: registred_encoding list ref
+  end) = struct
+
+  let resolvers = ref []
+
+  let register_resolver
+      (type a)
+      (encoding : a encoding)
+      (resolver : R.context -> string -> a list Lwt.t) =
+    try
+      resolvers := Resolver { encoding ; resolver } :: !resolvers
+    with Not_found ->
+      invalid_arg "Base48.register_resolver: unregistred encodings"
+
+  type context = R.context
+
+  let complete ?alphabet context request =
+    (* One may extract from the prefix of a Base48-encoded value, a
+       prefix of the original encoded value. Given that `48 = 3 * 2^4`,
+       every "digits" in the Base48-prefix (i.e. a "bytes" in its ascii
+       representation), provides for sure 4 bits of the original data.
+       Hence, when we decode a prefix of a Base48-encoded value of
+       length `n`, the `n/2` first bytes of the decoded value are (for
+       sure) a prefix of the original value. *)
+    let n = String.length request in
+    let s = raw_decode request ?alphabet in
+    let partial = String.sub s 0 (n / 2) in
+    let rec find s = function
+      | [] -> Lwt.return_nil
+      | Resolver { encoding ; resolver } :: resolvers ->
+          match remove_prefix ~prefix:encoding.prefix s with
+          | None -> find s resolvers
+          | Some msg ->
+              resolver context msg >|= fun msgs ->
+              filter_map
+                (fun msg ->
+                   let res = simple_encode encoding ?alphabet msg in
+                   Utils.remove_prefix ~prefix:request res |>
+                   Utils.map_option ~f:(fun _ -> res))
+                msgs in
+    find partial !resolvers
+
+end
+
+include MakeEncodings(struct let encodings = [] end)
+include MakeResolvers(struct
+    type context = unit
+    let encodings = encodings
+  end)
+
+let register_resolver enc f = register_resolver enc (fun () s -> f s)
+let complete ?alphabet s = complete ?alphabet () s
+
+module Make(C: sig type context end) = struct
+  include MakeEncodings(struct let encodings = !encodings end)
+  include MakeResolvers(struct
+      type context = C.context
+      let encodings = encodings
+    end)
+end
 
 module Prefix = struct
   let block_hash = "\000"
   let operation_hash = "\001"
   let protocol_hash = "\002"
-  let public_key_hash = "\003"
-  let public_key = "\004"
-  let secret_key = "\005"
-  let signature = "\006"
-  let protocol_prefix = "\255"
+  let ed25519_public_key_hash = "\003"
+  let ed25519_public_key = "\012"
+  let ed25519_secret_key = "\013"
+  let ed25519_signature = "\014"
+  let protocol_prefix = "\015"
 end

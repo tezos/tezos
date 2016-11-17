@@ -60,6 +60,8 @@ module Key = struct
   let next_cycle_to_be_rewarded = store_root ["next_cycle_to_be_rewarded"]
   let rewards = store_root ["rewards"]
 
+  let public_keys = ["public_keys" ; "ed25519"]
+
   module Roll = struct
     let store_root l = store_root ("rolls" :: l)
     let next = store_root [ "next" ]
@@ -86,15 +88,17 @@ module Key = struct
   end
 
   module Contract = struct
+
     let store_root l = store_root ("contracts" :: l)
     let set = store_root ["set"]
+    let pubkey_contract l = store_root ("pubkey" :: l)
+    let generic_contract l = store_root ("generic" :: l)
     let contract_store c l =
-      store_root @@
       match c with
       | Contract_repr.Default k ->
-          "pubkey" :: Ed25519.hash_path k @ l
+          pubkey_contract @@ Ed25519.Public_key_hash.to_path k @ l
       | Contract_repr.Hash h ->
-          "generic" :: Contract_hash.to_path h @ l
+          generic_contract @@ Contract_hash.to_path h @ l
     let roll_list c = contract_store c ["roll_list"]
     let change c = contract_store c ["change"]
     let balance c = contract_store c ["balance"]
@@ -197,10 +201,10 @@ module Roll = struct
   module Owner_for_cycle =
     Make_indexed_data_storage(struct
       type key = Cycle_repr.t * Roll_repr.t
-      type value = Ed25519.public_key_hash
+      type value = Ed25519.Public_key_hash.t
       let name = "roll owner for current cycle"
       let key = Key.Cycle.roll_owner
-      let encoding = Ed25519.public_key_hash_encoding
+      let encoding = Ed25519.Public_key_hash.encoding
     end)
 
    module Contract_roll_list =
@@ -235,6 +239,7 @@ module Contract = struct
       let encoding = Data_encoding.int32
     end)
 
+  (** FIXME REMOVE : use 'list' *)
   module Set =
     Make_data_set_storage(struct
       type value = Contract_repr.t
@@ -266,10 +271,10 @@ module Contract = struct
   module Manager =
     Make_indexed_data_storage(struct
       type key = Contract_repr.t
-      type value = Ed25519.public_key_hash
+      type value = Ed25519.Public_key_hash.t
       let name = "contract manager"
       let key = Key.Contract.manager
-      let encoding = Ed25519.public_key_hash_encoding
+      let encoding = Ed25519.Public_key_hash.encoding
     end)
 
   module Spendable =
@@ -293,10 +298,10 @@ module Contract = struct
   module Delegate =
     Make_indexed_data_storage(struct
       type key = Contract_repr.t
-      type value = Ed25519.public_key_hash
+      type value = Ed25519.Public_key_hash.t
       let name = "contract delegate"
       let key = Key.Contract.delegate
-      let encoding = Ed25519.public_key_hash_encoding
+      let encoding = Ed25519.Public_key_hash.encoding
     end)
 
   module Counter =
@@ -376,7 +381,7 @@ module Vote = struct
   module Proposals =
     Make_data_set_storage
       (struct
-        type value = Protocol_hash.t * Ed25519.public_key_hash
+        type value = Protocol_hash.t * Ed25519.Public_key_hash.t
         let name = "proposals"
         let encoding =
           Data_encoding.tup2
@@ -401,7 +406,7 @@ module Public_key =
   Make_iterable_data_storage (Ed25519.Public_key_hash)
     (struct
       type value = Ed25519.public_key
-      let key = ["public_keys"]
+      let key = Key.public_keys
       let name = "public keys"
       let encoding = Ed25519.public_key_encoding
     end)
@@ -413,7 +418,7 @@ module Seed = struct
   type nonce_status =
     | Unrevealed of {
         nonce_hash: Tezos_hash.Nonce_hash.t ;
-        delegate_to_reward: Ed25519.public_key_hash ;
+        delegate_to_reward: Ed25519.Public_key_hash.t ;
         reward_amount: Tez_repr.t ;
       }
     | Revealed of Seed_repr.nonce
@@ -482,7 +487,7 @@ module Rewards = struct
 
   module Amount =
     Raw_make_iterable_data_storage(struct
-      type t = Ed25519.public_key_hash * Cycle_repr.t
+      type t = Ed25519.Public_key_hash.t * Cycle_repr.t
       let prefix = Key.rewards
       let length = Ed25519.Public_key_hash.path_len + 1
       let to_path (pkh, c) =
@@ -515,3 +520,15 @@ let fork_test_network (c, constants) =
   Updater.fork_test_network c >>= fun c -> Lwt.return (c, constants)
 let set_test_protocol (c, constants) h =
   Updater.set_test_protocol c h >>= fun c -> Lwt.return (c, constants)
+
+
+(** Resolver *)
+
+let () =
+  Storage_functors.register_resolvers
+    (module Contract_hash)
+    [ Key.Contract.generic_contract [] ] ;
+  Storage_functors.register_resolvers
+    (module Ed25519.Public_key_hash)
+    [ Key.Contract.pubkey_contract [] ;
+      Key.public_keys ]

@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 type account = {
-  public_key_hash : Ed25519.public_key_hash ;
+  public_key_hash : Ed25519.Public_key_hash.t ;
   public_key : Ed25519.public_key ;
   secret_key : Ed25519.secret_key ;
 }
@@ -94,7 +94,7 @@ let account_encoding =
     (fun (public_key_hash, public_key, secret_key) ->
        { public_key_hash ; public_key ; secret_key })
     (obj3
-       (req "publicKeyHash" Ed25519.public_key_hash_encoding)
+       (req "publicKeyHash" Ed25519.Public_key_hash.encoding)
        (req "publicKey" Ed25519.public_key_encoding)
        (req "secretKey" Ed25519.secret_key_encoding))
 

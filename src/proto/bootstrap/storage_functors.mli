@@ -98,3 +98,5 @@ module Raw_make_iterable_data_storage (K: Persist.KEY) (P: Data_description) :
                          and type value = P.value
                          and type context := context
 
+val register_resolvers: (module Hash.HASH) -> string list list -> unit
+

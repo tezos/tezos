@@ -27,6 +27,7 @@ end
 module type IMPERATIVE_STORE = sig
   type t
   val mem: t -> key -> bool Lwt.t
+  val dir_mem: t -> key -> bool Lwt.t
   val get: t -> key -> value option Lwt.t
   val get_exn: t -> key -> value Lwt.t
   val set: t -> key -> value -> unit Lwt.t

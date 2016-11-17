@@ -13,12 +13,12 @@ type value = MBytes.t
 module type STORE = sig
   type t
   val mem: t -> key -> bool Lwt.t
+  val dir_mem: t -> key -> bool Lwt.t
   val get: t -> key -> value option Lwt.t
   val set: t -> key -> value -> t Lwt.t
   val del: t -> key -> t Lwt.t
   val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
-
   val keys: t -> key list Lwt.t
 end
 
@@ -196,3 +196,14 @@ module MakeBufferedPersistentTypedMap
      and type key := K.t
      and type value := T.value
      and module Map := Map
+
+module MakeHashResolver
+    (Store : sig
+       type t
+       val dir_mem: t -> key -> bool Lwt.t
+       val list: t -> key list -> key list Lwt.t
+       val prefix: string list
+     end)
+    (H: Hash.HASH) : sig
+  val resolve : Store.t -> string -> H.t list Lwt.t
+end

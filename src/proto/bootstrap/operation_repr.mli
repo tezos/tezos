@@ -46,18 +46,18 @@ and manager_operation =
       destination: Contract_repr.contract ;
     }
   | Origination of {
-      manager: Ed25519.public_key_hash ;
-      delegate: Ed25519.public_key_hash option ;
+      manager: Ed25519.Public_key_hash.t ;
+      delegate: Ed25519.Public_key_hash.t option ;
       script: Script_repr.t ;
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
     }
   | Issuance of {
-      asset: Asset_repr.t * Ed25519.public_key_hash ;
+      asset: Asset_repr.t * Ed25519.Public_key_hash.t ;
       amount: Tez_repr.tez ;
     }
-  | Delegation of Ed25519.public_key_hash option
+  | Delegation of Ed25519.Public_key_hash.t option
 
 and delegate_operation =
   | Endorsement of {

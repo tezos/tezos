@@ -78,7 +78,7 @@ let bootstrap_accounts () =
 
 let create_account name =
   let secret_key, public_key = Sodium.Sign.random_keypair () in
-  let public_key_hash = Ed25519.hash public_key in
+  let public_key_hash = Environment.Ed25519.hash public_key in
   let contract = Contract.default_contract public_key_hash in
   Lwt.return { name ; contract ; public_key_hash ; public_key ; secret_key }
 

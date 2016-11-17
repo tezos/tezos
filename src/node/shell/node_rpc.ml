@@ -435,5 +435,13 @@ let build_rpc_directory node =
       RPC.Answer.return Data_encoding.Json.(schema (Error_monad.error_encoding ())) in
     RPC.register0 dir RPC.Error.service implementation in
   let dir =
+    RPC.register1 dir Services.complete
+      (fun s () ->
+         Node.RPC.complete node s >>= RPC.Answer.return) in
+  let dir =
+    RPC.register2 dir Services.Blocks.complete
+      (fun block s () ->
+         Node.RPC.complete node ~block s >>= RPC.Answer.return) in
+  let dir =
     RPC.register_describe_directory_service dir Services.describe in
   dir
