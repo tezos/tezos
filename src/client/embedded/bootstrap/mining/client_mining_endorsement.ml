@@ -10,6 +10,8 @@
 open Logging.Client.Endorsement
 open Cli_entries
 
+module Ed25519 = Environment.Ed25519
+
 module State : sig
 
   val get_endorsement:

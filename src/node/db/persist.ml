@@ -19,13 +19,13 @@ type value = MBytes.t
 module type STORE = sig
   type t
   val mem: t -> key -> bool Lwt.t
+  val dir_mem: t -> key -> bool Lwt.t
   val get: t -> key -> value option Lwt.t
   val set: t -> key -> value -> t Lwt.t
   val del: t -> key -> t Lwt.t
   val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
-
-  val keys : t -> key list Lwt.t
+  val keys: t -> key list Lwt.t
 end
 
 module type BYTES_STORE = sig
@@ -37,8 +37,7 @@ module type BYTES_STORE = sig
   val del: t -> key -> t Lwt.t
   val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
-
-  val keys : t -> key list Lwt.t
+  val keys: t -> key list Lwt.t
 end
 
 module type TYPED_STORE = sig
@@ -49,7 +48,6 @@ module type TYPED_STORE = sig
   val get: t -> key -> value option Lwt.t
   val set: t -> key -> value -> t Lwt.t
   val del: t -> key -> t Lwt.t
-
   val keys: t -> key list Lwt.t
 end
 
@@ -583,3 +581,37 @@ module MakeBufferedPersistentTypedMap
     (Map : Map.S with type key = K.t)
   =
   MakeBufferedPersistentMap(S)(K)(TypedValue(T))(Map)
+
+module MakeHashResolver
+    (Store : sig
+       type t
+       val dir_mem: t -> string list -> bool Lwt.t
+       val list: t -> string list list -> string list list Lwt.t
+       val prefix: string list
+     end)
+    (H: HASH) = struct
+  let plen = List.length Store.prefix
+  let build path =
+    H.of_path @@
+    Utils.remove_elem_from_list plen path
+  let resolve t p =
+    let rec loop prefix = function
+      | [] ->
+          Lwt.return [build prefix]
+      | "" :: ds ->
+          Store.list t [ prefix] >>= fun prefixes ->
+          Lwt_list.map_p (fun prefix -> loop prefix ds) prefixes
+          >|= List.flatten
+      | [d] ->
+          Store.list t [prefix] >>= fun prefixes ->
+          Lwt_list.filter_map_p (fun prefix ->
+              match remove_prefix d (List.hd (List.rev prefix)) with
+              | None -> Lwt.return_none
+              | Some _ -> Lwt.return (Some (build prefix))
+            ) prefixes
+      | d :: ds ->
+          Store.dir_mem t (prefix @ [d]) >>= function
+          | true -> loop (prefix @ [d]) ds
+          | false -> Lwt.return_nil in
+    loop Store.prefix (H.prefix_path p)
+end

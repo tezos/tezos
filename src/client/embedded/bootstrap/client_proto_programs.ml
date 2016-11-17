@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Ed25519 = Environment.Ed25519
 open Client_proto_args
 
 let report_parse_error _prefix exn _lexbuf =

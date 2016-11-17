@@ -109,7 +109,7 @@ module Roll : sig
 
   module Owner_for_cycle : Indexed_data_storage
     with type key = Cycle_repr.t * Roll_repr.t
-     and type value = Ed25519.public_key_hash
+     and type value = Ed25519.Public_key_hash.t
      and type context := t
 
 end
@@ -144,13 +144,13 @@ module Contract : sig
   (** The manager of a contract *)
   module Manager : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Ed25519.public_key_hash
+     and type value = Ed25519.Public_key_hash.t
      and type context := t
 
   (** The delegate of a contract, if any. *)
   module Delegate : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Ed25519.public_key_hash
+     and type value = Ed25519.Public_key_hash.t
      and type context := t
 
   module Spendable : Indexed_data_storage
@@ -201,16 +201,16 @@ module Vote : sig
      and type context := t
 
   module Listings : Iterable_data_storage
-    with type key = Ed25519.public_key_hash
+    with type key = Ed25519.Public_key_hash.t
      and type value = int32 (* number of rolls for the key. *)
      and type context := t
 
   module Proposals : Data_set_storage
-    with type value = Protocol_hash.t * Ed25519.public_key_hash
+    with type value = Protocol_hash.t * Ed25519.Public_key_hash.t
      and type context := t
 
   module Ballots : Iterable_data_storage
-    with type key = Ed25519.public_key_hash
+    with type key = Ed25519.Public_key_hash.t
      and type value = Vote_repr.ballot
      and type context := t
 
@@ -220,7 +220,7 @@ end
 (** Keys *)
 
 module Public_key : Iterable_data_storage
-  with type key = Ed25519.public_key_hash
+  with type key = Ed25519.Public_key_hash.t
    and type value = Ed25519.public_key
    and type context := t
 
@@ -234,7 +234,7 @@ module Seed : sig
   type nonce_status =
     | Unrevealed of {
         nonce_hash: Tezos_hash.Nonce_hash.t ;
-        delegate_to_reward: Ed25519.public_key_hash ;
+        delegate_to_reward: Ed25519.Public_key_hash.t ;
         reward_amount: Tez_repr.t ;
       }
     | Revealed of Seed_repr.nonce
@@ -266,7 +266,7 @@ module Rewards : sig
      and type context := t
 
   module Amount : Iterable_data_storage
-    with type key = Ed25519.public_key_hash * Cycle_repr.t
+    with type key = Ed25519.Public_key_hash.t * Cycle_repr.t
      and type value = Tez_repr.t
      and type context := t
 

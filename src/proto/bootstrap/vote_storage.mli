@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 val record_proposal:
-  Storage.t -> Protocol_hash.t -> Ed25519.public_key_hash ->
+  Storage.t -> Protocol_hash.t -> Ed25519.Public_key_hash.t ->
   Storage.t tzresult Lwt.t
 
 val get_proposals:
@@ -23,7 +23,7 @@ type ballots = {
 }
 
 val record_ballot:
-  Storage.t -> Ed25519.public_key_hash -> Vote_repr.ballot ->
+  Storage.t -> Ed25519.Public_key_hash.t -> Vote_repr.ballot ->
   Storage.t tzresult Lwt.t
 val get_ballots: Storage.t -> ballots tzresult Lwt.t
 val clear_ballots: Storage.t -> Storage.t Lwt.t
@@ -33,7 +33,7 @@ val clear_listings: Storage.t -> Storage.t tzresult Lwt.t
 
 val listing_size: Storage.t -> int32 tzresult Lwt.t
 val in_listings:
-  Storage.t -> Ed25519.public_key_hash -> bool Lwt.t
+  Storage.t -> Ed25519.Public_key_hash.t -> bool Lwt.t
 
 val get_current_quorum: Storage.t -> int32 tzresult Lwt.t
 val set_current_quorum: Storage.t -> int32 -> Storage.t tzresult Lwt.t

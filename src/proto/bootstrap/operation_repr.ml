@@ -46,18 +46,18 @@ and manager_operation =
       destination: Contract_repr.contract ;
     }
   | Origination of {
-      manager: Ed25519.public_key_hash ;
-      delegate: Ed25519.public_key_hash option ;
+      manager: Ed25519.Public_key_hash.t ;
+      delegate: Ed25519.Public_key_hash.t option ;
       script: Script_repr.t ;
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;
     }
   | Issuance of {
-      asset: Asset_repr.asset * Ed25519.public_key_hash ;
+      asset: Asset_repr.asset * Ed25519.Public_key_hash.t ;
       amount: Tez_repr.tez ;
     }
-  | Delegation of Ed25519.public_key_hash option
+  | Delegation of Ed25519.Public_key_hash.t option
 
 and delegate_operation =
   | Endorsement of {
@@ -99,11 +99,11 @@ module Encoding = struct
   let origination_encoding =
     (obj7
        (req "kind" (constant "origination"))
-       (req "managerPubkey" Ed25519.public_key_hash_encoding)
+       (req "managerPubkey" Ed25519.Public_key_hash.encoding)
        (req "balance" Tez_repr.encoding)
        (opt "spendable" bool)
        (opt "delegatable" bool)
-       (opt "delegate" Ed25519.public_key_hash_encoding)
+       (opt "delegate" Ed25519.Public_key_hash.encoding)
        (req "script" Script_repr.encoding))
 
   let origination_case tag =
@@ -125,7 +125,7 @@ module Encoding = struct
   let issuance_encoding =
     (obj3
        (req "kind" (constant "issuance"))
-       (req "asset" (tup2 Asset_repr.encoding Ed25519.public_key_hash_encoding))
+       (req "asset" (tup2 Asset_repr.encoding Ed25519.Public_key_hash.encoding))
        (req "quantity" Tez_repr.encoding))
 
   let issuance_case tag =
@@ -138,7 +138,7 @@ module Encoding = struct
   let delegation_encoding =
     (obj2
        (req "kind" (constant "delegation"))
-       (opt "delegate" Ed25519.public_key_hash_encoding))
+       (opt "delegate" Ed25519.Public_key_hash.encoding))
 
   let delegation_case tag =
     case ~tag delegation_encoding

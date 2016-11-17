@@ -55,7 +55,7 @@ let reveal c level nonce =
 type status = Storage.Seed.nonce_status =
   | Unrevealed of {
       nonce_hash: Tezos_hash.Nonce_hash.t ;
-      delegate_to_reward: Ed25519.public_key_hash ;
+      delegate_to_reward: Ed25519.Public_key_hash.t ;
       reward_amount: Tez_repr.t ;
     }
   | Revealed of nonce

@@ -72,6 +72,12 @@ module RPC : sig
 
   val validate: t -> State.net_id -> Block_hash.t -> unit tzresult Lwt.t
 
+  val context_dir:
+    t -> block -> 'a RPC.directory option Lwt.t
+
+  val complete:
+    t -> ?block:block -> string -> string list Lwt.t
+
 end
 
 val shutdown: t -> unit Lwt.t

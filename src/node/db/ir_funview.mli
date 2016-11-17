@@ -9,6 +9,7 @@
 
 module type S = sig
   include Irmin.RO
+  val dir_mem: t -> key -> bool Lwt.t
   val update: t -> key -> value -> t Lwt.t
   val remove: t -> key -> t Lwt.t
   val list: t -> key -> key list Lwt.t
