@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Ed25519 = Environment.Ed25519
+
 module RawContractAlias = Client_aliases.Alias (struct
     type t = Contract.t
     let encoding = Contract.encoding
@@ -101,7 +103,7 @@ let get_delegate block source =
 let may_check_key sourcePubKey sourcePubKeyHash =
   match sourcePubKey with
   | Some sourcePubKey ->
-      if not (Ed25519.equal_hash (Ed25519.hash sourcePubKey) sourcePubKeyHash)
+      if not (Ed25519.Public_key_hash.equal (Ed25519.hash sourcePubKey) sourcePubKeyHash)
       then
         failwith "Invalid public key in `client_proto_endorsement`"
       else

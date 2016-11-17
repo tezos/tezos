@@ -17,8 +17,13 @@
     various kinds of hashes in the system at typing time. Each type is
     equipped with functions to use it as is of as keys in the database
     or in memory sets and maps. *)
-module type HASH = sig
+
+module type MINIMAL_HASH = sig
+
   type t
+
+  val name: string
+  val title: string
 
   val hash_bytes: MBytes.t list -> t
   val hash_string: string list -> t
@@ -29,20 +34,30 @@ module type HASH = sig
   val to_raw: t -> string
   val of_hex: string -> t
   val to_hex: t -> string
-  val of_b48check: string -> t
-  val to_b48check: t -> string
-  val to_short_b48check: t -> string
   val to_bytes: t -> MBytes.t
   val of_bytes: MBytes.t -> t
   val read: MBytes.t -> int -> t
   val write: MBytes.t -> int -> t -> unit
   val to_path: t -> string list
   val of_path: string list -> t
+  val prefix_path: string -> string list
   val path_len: int
+
+end
+
+module type HASH = sig
+
+  include MINIMAL_HASH
+
+  val of_b48check: string -> t
+  val to_b48check: t -> string
+  val to_short_b48check: t -> string
   val encoding: t Data_encoding.t
   val pp: Format.formatter -> t -> unit
   val pp_short: Format.formatter -> t -> unit
   type Base48.data += Hash of t
+  val b48check_encoding: t Base48.encoding
+
 end
 
 (** {2 Building Hashes} *******************************************************)
@@ -50,14 +65,29 @@ end
 (** The parameters for creating a new Hash type using
     {!Make_SHA256}. Both {!name} and {!title} are only informative,
     used in error messages and serializers. *)
+
 module type Name = sig
   val name : string
   val title : string
-  val prefix : string option
+end
+
+module type PrefixedName = sig
+  include Name
+  val b48check_prefix : string
 end
 
 (** Builds a new Hash type using Sha256. *)
-module Make_SHA256 (Name:Name) : HASH
+module Make_minimal_SHA256 (Name : Name) : MINIMAL_HASH
+module Make_SHA256
+    (Register : sig
+       val register_encoding:
+         prefix: string ->
+         to_raw: ('a -> string) ->
+         of_raw: (string -> 'a option) ->
+         wrap: ('a -> Base48.data) ->
+         'a Base48.encoding
+     end)
+    (Name : PrefixedName) : HASH
 
 (** Builds a Set of values of some Hash type. *)
 module Hash_set (Hash : HASH) : sig
@@ -101,3 +131,4 @@ module Protocol_hash : HASH
 module Protocol_hash_set : module type of Hash_set (Protocol_hash)
 module Protocol_hash_map : module type of Hash_map (Protocol_hash)
 module Protocol_hash_table : module type of Hash_table (Protocol_hash)
+

@@ -202,10 +202,9 @@ end
 module Make_data_set_storage (P : Single_data_description) = struct
 
   module Key = struct
-    include Hash.Make_SHA256(struct
+    include Hash.Make_minimal_SHA256(struct
         let name = P.name
         let title = ("A " ^ P.name ^ "key")
-        let prefix = None
       end)
     let prefix = P.key
     let length = path_len
@@ -352,3 +351,31 @@ module Make_iterable_data_storage (H: HASH) (P: Single_data_description) =
     let prefix = P.key
     let length = path_len
   end)(P)
+
+let register_resolvers (module H : Hash.HASH) prefixes =
+
+  let module Set = Hash_set(H) in
+
+  let resolvers =
+    List.map
+      (fun prefix ->
+         let module R = Persist.MakeHashResolver(struct
+             include Context
+             let prefix = prefix
+           end)(H) in
+         R.resolve)
+      prefixes in
+
+  let resolve c m =
+    match resolvers with
+    | [resolve] -> resolve c m
+    | resolvers ->
+        Lwt_list.map_p (fun resolve -> resolve c m) resolvers >|= fun hs ->
+        List.fold_left
+          (fun acc hs -> List.fold_left (fun acc h -> Set.add h acc) acc hs)
+          Set.empty hs |>
+        Set.elements in
+
+  Context.register_resolver H.b48check_encoding resolve
+
+

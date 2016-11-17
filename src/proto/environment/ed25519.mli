@@ -22,24 +22,10 @@ val check_signature : public_key -> signature -> MBytes.t -> bool
 
 module Public_key_hash : Hash.HASH
 
-(** A Sha256 hash of an Ed25519 public key for use as an ID *)
-type public_key_hash = Public_key_hash.t
-
 (** Hashes an Ed25519 public key *)
-val hash : public_key -> public_key_hash
-
-(** For using IDs as keys in the database *)
-val hash_path : public_key_hash -> string list
-
-(** ID comparison *)
-val equal_hash : public_key_hash -> public_key_hash -> bool
-
-(** ID comparison *)
-val compare_hash : public_key_hash -> public_key_hash -> int
+val hash : public_key -> Public_key_hash.t
 
 (** {2 Serializers} **********************************************************)
-
-val public_key_hash_encoding : public_key_hash Data_encoding.t
 
 val public_key_encoding : public_key Data_encoding.t
 

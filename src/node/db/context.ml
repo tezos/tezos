@@ -30,6 +30,7 @@ module rec S : sig
       val update_path: t -> IrminPath.t -> v -> unit Lwt.t
 
       val mem: v -> IrminPath.t -> bool Lwt.t
+      val dir_mem: v -> IrminPath.t -> bool Lwt.t
       val get: v -> IrminPath.t -> MBytes.t option Lwt.t
       val set: v -> IrminPath.t -> MBytes.t-> v Lwt.t
       val del: v -> IrminPath.t -> v Lwt.t
@@ -185,6 +186,11 @@ let undata_key = function
 let mem (module View : VIEW) key =
   let module GitStore = View.Store in
   GitStore.FunView.mem View.v (data_key key) >>= fun v ->
+  Lwt.return v
+
+let dir_mem (module View : VIEW) key =
+  let module GitStore = View.Store in
+  GitStore.FunView.dir_mem View.v (data_key key) >>= fun v ->
   Lwt.return v
 
 let raw_get (module View : VIEW) key =
