@@ -29,8 +29,7 @@ module Make(Proto : Protocol.PACKED_PROTOCOL) = struct
       (function ecoerrors -> Ecoproto_error ecoerrors)
 end
 
-let register proto =
-  let module Proto = (val Proto_environment.__cast proto) in
+let register (module Proto : Protocol.PACKED_PROTOCOL) =
   let module V = struct
     include Proto
     include Make(Proto)

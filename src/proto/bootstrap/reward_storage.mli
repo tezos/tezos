@@ -8,10 +8,10 @@
 (**************************************************************************)
 
 val record:
-  Storage.t -> Ed25519.public_key_hash -> Cycle_repr.t -> Tez_repr.t -> Storage.t tzresult Lwt.t
+  Storage.t -> Ed25519.Public_key_hash.t -> Cycle_repr.t -> Tez_repr.t -> Storage.t tzresult Lwt.t
 
 val discard:
-  Storage.t -> Ed25519.public_key_hash -> Cycle_repr.t -> Tez_repr.t -> Storage.t tzresult Lwt.t
+  Storage.t -> Ed25519.Public_key_hash.t -> Cycle_repr.t -> Tez_repr.t -> Storage.t tzresult Lwt.t
 
 val pay_due_rewards: Storage.t -> Storage.t tzresult Lwt.t
 

@@ -12,4 +12,4 @@ module Make(Proto : Protocol.PACKED_PROTOCOL) : sig
   val wrap_error: 'a Proto.tzresult -> 'a tzresult
 end
 
-val register: (module Proto_environment.PACKED_PROTOCOL) -> unit
+val register: (module Protocol.PACKED_PROTOCOL) -> unit

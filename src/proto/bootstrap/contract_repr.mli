@@ -10,13 +10,13 @@
 open Tezos_hash
 
 type t = private
-  | Default of Ed25519.public_key_hash
+  | Default of Ed25519.Public_key_hash.t
   | Hash of Contract_hash.t
 type contract = t
 
 type descr = {
-  manager: Ed25519.public_key_hash ;
-  delegate: Ed25519.public_key_hash option ;
+  manager: Ed25519.Public_key_hash.t ;
+  delegate: Ed25519.Public_key_hash.t option ;
   spendable: bool ;
   delegatable: bool ;
   script: Script_repr.t ;
@@ -24,13 +24,13 @@ type descr = {
 
 include Compare.S with type t := contract
 
-val default_contract : Ed25519.public_key_hash -> contract
+val default_contract : Ed25519.Public_key_hash.t -> contract
 
-val is_default : contract -> Ed25519.public_key_hash option
+val is_default : contract -> Ed25519.Public_key_hash.t option
 
 val generic_contract :
-  manager:Ed25519.public_key_hash ->
-  delegate:Ed25519.public_key_hash option ->
+  manager:Ed25519.Public_key_hash.t ->
+  delegate:Ed25519.Public_key_hash.t option ->
   spendable:bool ->
   delegatable:bool ->
   script:Script_repr.t ->

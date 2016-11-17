@@ -466,6 +466,11 @@ module Make (S: Irmin.S) = struct
     | None  -> Lwt.return false
     | _     -> Lwt.return true
 
+  let dir_mem t k =
+    sub t k >>= function
+    | Some _ -> Lwt.return true
+    | None -> Lwt.return false
+
   let list_aux t path =
     sub t path >>= function
     | None   -> Lwt.return []
@@ -662,6 +667,7 @@ end
 
 module type S = sig
   include Irmin.RO
+  val dir_mem: t -> key -> bool Lwt.t
   val update: t -> key -> value -> t Lwt.t
   val remove: t -> key -> t Lwt.t
   val list: t -> key -> key list Lwt.t
