@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 open Logging.Client.Mining
+module Ed25519 = Environment.Ed25519
 
 let generate_proof_of_work_nonce () =
   Sodium.Random.Bigbytes.generate Constants.proof_of_work_nonce_size

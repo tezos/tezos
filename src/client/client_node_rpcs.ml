@@ -150,6 +150,12 @@ let inject_operation ?(wait = true) ?force operation =
   call_service0 Services.inject_operation (operation, wait, force)
 let inject_protocol ?(wait = true) ?force protocol =
   call_service0 Services.inject_protocol (protocol, wait, force)
+let complete ?block prefix =
+  match block with
+  | None ->
+      call_service1 Services.complete prefix ()
+  | Some block ->
+      call_service2 Services.Blocks.complete block prefix ()
 let describe ?recurse path =
   let prefix, arg = RPC.forge_request Services.describe () recurse in
   get_json (prefix @ path) arg >>=
@@ -196,6 +202,8 @@ module Blocks = struct
     call_service1 Services.Blocks.pending_operations block ()
   let info ?(operations = false) h =
     call_service1 Services.Blocks.info h operations
+  let complete block prefix =
+    call_service2 Services.Blocks.complete block prefix ()
   let list ?operations ?length ?heads ?delay ?min_date ?min_heads () =
     call_service0 Services.Blocks.list
       { operations; length ; heads ; monitor = Some false ; delay ;

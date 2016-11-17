@@ -11,6 +11,7 @@ open Client_proto_args
 open Client_proto_contracts
 open Client_proto_programs
 open Client_keys
+module Ed25519 = Environment.Ed25519
 
 let handle_error f () =
     f () >>= Client_proto_rpcs.handle_error

@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Ed25519 = Environment.Ed25519
+
 module Public_key_hash = Client_aliases.Alias (struct
     type t = Ed25519.Public_key_hash.t
     let encoding = Ed25519.Public_key_hash.encoding

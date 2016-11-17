@@ -227,3 +227,10 @@ module Make_data_set_storage (P : Single_data_description) :
 
 module Make_iterable_data_storage (H : HASH) (P: Single_data_description) :
   Iterable_data_storage with type key = H.t and type value = P.value
+
+module Make_hash_resolver
+    (K: sig val prefix: string list end)
+    (H: Hash.HASH) : sig
+  val register : Store.t -> unit
+end
+

@@ -18,11 +18,11 @@ let (//) = Filename.concat
 
 let genesis_block =
   Block_hash.of_b48check
-    "Et22nEeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    "eeeeeeeeeeeeeegqJHARhSaNXggmMs8K3tvsgn4rBprkvpFAMVD5d"
 
 let genesis_protocol =
   Protocol_hash.of_b48check
-    "JF7Fxgeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    "2gagXCT66nmJ2mKh3a6Aeysy9CHaHsAJyDEGSyFNeFAxGCJehsKpK"
 
 let genesis_time =
   Time.of_seconds 0L
@@ -88,6 +88,11 @@ let b2 = lolblock "Tacatlopo"
 let bh2 = Store.Block.hash b2.data
 let b3 = lolblock ~operations:[oph1;oph2] "Persil"
 let bh3 = Store.Block.hash b3.data
+let bh3' =
+  let raw = Bytes.of_string @@ Block_hash.to_raw bh3 in
+  Bytes.set raw 31 '\000' ;
+  Bytes.set raw 30 '\000' ;
+  Block_hash.of_raw @@ Bytes.to_string raw
 
 let check_block s h b =
   Block.full_get s h >>= function
@@ -109,6 +114,20 @@ let test_block (s: Store.store) =
       check_block s bh1 b1 >>= fun () ->
       check_block s bh2 b2 >>= fun () ->
       check_block s bh3 b3)
+
+let test_expand (s: Store.store) =
+  Persist.use s.block (fun s ->
+      Block.full_set s bh1 b1 >>= fun () ->
+      Block.full_set s bh2 b2 >>= fun () ->
+      Block.full_set s bh3 b3 >>= fun () ->
+      Block.full_set s bh3' b3 >>= fun () ->
+      Base48.complete (Block_hash.to_short_b48check bh1) >>= fun res ->
+      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b48check bh1] ;
+      Base48.complete (Block_hash.to_short_b48check bh2) >>= fun res ->
+      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b48check bh2] ;
+      Base48.complete (Block_hash.to_short_b48check bh3) >>= fun res ->
+      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b48check bh3] ;
+      Lwt.return_unit)
 
 
 (** Generic store *)
@@ -235,6 +254,7 @@ let test_hashmap (s: Store.store) =
 
 let tests : (string * (store -> unit Lwt.t)) list = [
   "init", test_init ;
+  "expand", test_expand ;
   "operation", test_operation ;
   "block", test_block ;
   "generic", test_generic ;
