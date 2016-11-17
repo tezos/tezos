@@ -41,9 +41,6 @@ val substring: t -> int -> int -> string
 val get_char: t -> int -> char
 (** [get_char buff i] reads 1 byte at offset i as a char *)
 
-val get_bool: t -> int -> bool
-(** [get_bool buff i] reads 1 bit at offset i as an unsigned int bit. *)
-
 val get_uint8: t -> int -> int
 (** [get_uint8 buff i] reads 1 byte at offset i as an unsigned int of 8
     bits. i.e. It returns a value between 0 and 2^8-1 *)

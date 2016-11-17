@@ -97,7 +97,7 @@ module Constants = struct
       ~description: "Stamp threshold"
       ~input: empty
       ~output: (wrap_tzerror @@
-                describe ~title: "proof_of_work threshold" int31)
+                describe ~title: "proof_of_work threshold" int64)
       RPC.Path.(custom_root / "constants" / "proof_of_work_threshold")
 
   let errors custom_root =

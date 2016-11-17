@@ -185,7 +185,7 @@ module Constants : sig
   val first_free_mining_slot: context -> int32
   val max_signing_slot: context -> int
   val instructions_per_transaction: context -> int
-  val proof_of_work_threshold: context -> int
+  val proof_of_work_threshold: context -> int64
 
 end
 

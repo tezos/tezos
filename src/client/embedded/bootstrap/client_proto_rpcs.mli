@@ -29,7 +29,7 @@ module Constants : sig
   val first_free_mining_slot: block -> int32 tzresult Lwt.t
   val max_signing_slot: block -> int tzresult Lwt.t
   val instructions_per_transaction: block -> int tzresult Lwt.t
-  val stamp_threshold: block -> int tzresult Lwt.t
+  val stamp_threshold: block -> int64 tzresult Lwt.t
 end
 
 module Context : sig
