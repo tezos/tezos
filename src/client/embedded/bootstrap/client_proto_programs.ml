@@ -57,49 +57,47 @@ let parse_program s =
   with
   | exn -> report_parse_error "program: " exn lexbuf
 
-let rec print_ir ppf node =
+let rec print_ir locations ppf node =
   let open Script in
   let rec do_seq = function
     | [] -> assert false
-    | [ last ] -> Format.fprintf ppf "%a }@]" print_ir last
-    | fst :: rest -> Format.fprintf ppf "%a ;@ " print_ir fst ; do_seq rest in
+    | [ last ] -> Format.fprintf ppf "%a }@]" (print_ir locations) last
+    | fst :: rest -> Format.fprintf ppf "%a ;@ " (print_ir locations) fst ; do_seq rest in
   let rec do_args = function
     | [] -> assert false
-    | [ last ] -> Format.fprintf ppf "%a@]" print_ir last
-    | fst :: rest -> Format.fprintf ppf "%a@," print_ir fst ; do_args rest in
+    | [ last ] -> Format.fprintf ppf "%a@]" (print_ir locations) last
+    | fst :: rest -> Format.fprintf ppf "%a@," (print_ir locations) fst ; do_args rest in
+  let print_location ppf loc =
+    if locations loc then begin
+      Format.fprintf ppf " /* %d */" loc
+  end in
   match node with
   | String (_, s) -> Format.fprintf ppf "%S" s
   | Int (_, s) -> Format.fprintf ppf "%s" s
-  | Float (_, s) -> Format.fprintf ppf "%s" s
-  | Seq (_, [ one ]) -> print_ir ppf one
+  | Seq (_, [ one ]) -> print_ir locations ppf one
   | Seq (_, []) -> Format.fprintf ppf "{}" ;
   | Seq (_, seq) ->
       Format.fprintf ppf "{ @[<v>" ;
       do_seq seq
-  | Prim (_, "push", [ Prim (_, name, []) ]) ->
-      Format.fprintf ppf "push %s" name
-  | Prim (_, name, []) ->
-      Format.fprintf ppf "%s" name
-  | Prim (_, "push", [ Prim (_, name, seq) ]) ->
-      Format.fprintf ppf "push @[<v 2>%s@," name ;
-      do_args seq
-  | Prim (_, name, seq) ->
-      Format.fprintf ppf "@[<v 2>%s@," name ;
+  | Prim (loc, name, []) ->
+      Format.fprintf ppf "%s%a" name print_location loc
+  | Prim (loc, name, seq) ->
+      Format.fprintf ppf "@[<v 2>%s%a@," name print_location loc;
       do_args seq
 
-let print_program ppf c =
+let print_program locations ppf c =
   Format.fprintf ppf
     "@[<v 2>storage@,%a@]@."
-    print_ir (c : Script.code).Script.storage_type ;
+    (print_ir (fun _ -> false)) (c : Script.code).Script.storage_type ;
   Format.fprintf ppf
     "@[<v 2>parameter@,%a@]@."
-    print_ir (c : Script.code).Script.arg_type ;
+    (print_ir (fun _ -> false)) (c : Script.code).Script.arg_type ;
   Format.fprintf ppf
     "@[<v 2>return@,%a@]@."
-    print_ir (c : Script.code).Script.ret_type ;
+    (print_ir (fun _ -> false)) (c : Script.code).Script.ret_type ;
   Format.fprintf ppf
     "@[<v 2>code@,%a@]"
-    print_ir (c : Script.code).Script.code
+    (print_ir locations) (c : Script.code).Script.code
 
 let parse_data s =
   let lexbuf = Lexing.from_string s in
@@ -119,16 +117,65 @@ let parse_data_type s =
   with
   | exn -> report_parse_error "data_type: " exn lexbuf
 
+let unexpand_macros type_map program =
+  let open Script in
+  let rec caddr type_map acc = function
+    | [] -> Some (List.rev acc)
+    | Prim (loc, "car" , []) :: rest when List.mem_assoc loc type_map ->
+        caddr type_map ((loc, "a") :: acc) rest
+    | Prim (loc, "cdr" , []) :: rest when List.mem_assoc loc type_map ->
+        caddr type_map ((loc, "d") :: acc) rest
+    | _ -> None in
+  let rec unexpand type_map node =
+    match node with
+    | Seq (loc, l) ->
+        begin match caddr type_map [] l with
+          | None ->
+              let type_map, l =
+                List.fold_left
+                  (fun (type_map, acc) e ->
+                     let type_map, e = unexpand type_map e in
+                     type_map, e :: acc)
+                  (type_map, [])
+                  l in
+              type_map, Seq (loc, List.rev l)
+          | Some l ->
+              let locs, steps = List.split l in
+              let name = "c" ^ String.concat "" steps ^ "r" in
+              let first, last = List.hd locs, List.hd (List.rev locs) in
+              let (before, _) = List.assoc first type_map in
+              let (_, after) = List.assoc last type_map in
+              let type_map =
+                List.filter
+                  (fun (loc, _) -> not (List.mem loc locs))
+                  type_map in
+              let type_map = (loc, (before, after)):: type_map in
+              type_map, Prim (loc, name, [])
+        end
+    | oth -> type_map, oth in
+  let type_map, code = unexpand type_map program.code in
+  type_map, { program with code }
+
 module Program = Client_aliases.Alias (struct
     type t = Script.code
     let encoding = Script.code_encoding
     let of_source s = parse_program s
-    let to_source p = Lwt.return (Format.asprintf "%a" print_program p)
+    let to_source p = Lwt.return (Format.asprintf "%a" (print_program (fun _ -> false)) p)
     let name = "program"
   end)
 
 let commands () =
   let open Cli_entries in
+  let show_types = ref false in
+  let show_types_arg =
+    "-details",
+    Arg.Set show_types,
+    "Show the types of each instruction" in
+  let trace_stack = ref false in
+  let trace_stack_arg =
+    "-trace-stack",
+    Arg.Set trace_stack,
+    "Show the stack after each step" in
   register_group "programs" "Commands for managing the record of known programs" ;
   [
     command
@@ -164,15 +211,74 @@ let commands () =
          Lwt.return ()) ;
     command
       ~group: "programs"
+      ~desc: "ask the node to run a program"
+      ~args: [ trace_stack_arg ]
+      (prefixes [ "run" ; "program" ]
+       @@ Program.source_param
+       @@ prefixes [ "on" ; "storage" ]
+       @@ Cli_entries.param ~name:"storage" ~desc:"the untagged storage data" parse_data
+       @@ prefixes [ "and" ; "input" ]
+       @@ Cli_entries.param ~name:"storage" ~desc:"the untagged input data" parse_data
+       @@ stop)
+      (fun program storage input () ->
+         let open Data_encoding in
+         if !trace_stack then
+           Client_proto_rpcs.Helpers.trace_code (block ()) program (storage, input) >>= function
+           | Ok (storage, output, trace) ->
+               Format.printf "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
+                 (print_ir (fun _ -> false)) storage
+                 (print_ir (fun _ -> false)) output
+                 (Format.pp_print_list
+                    (fun ppf (loc, gas, stack) ->
+                       Format.fprintf ppf
+                         "- @[<v 0>location: %d (remaining gas: %d)@,[ @[<v 0>%a ]@]@]"
+                         loc gas
+                         (Format.pp_print_list (print_ir (fun _ -> false)))
+                         stack))
+                 trace ;
+               Lwt.return ()
+           | Error errs ->
+               pp_print_error Format.err_formatter errs ;
+               error "error running program"
+         else
+           Client_proto_rpcs.Helpers.run_code (block ()) program (storage, input) >>= function
+           | Ok (storage, output) ->
+               Format.printf "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
+                 (print_ir (fun _ -> false)) storage
+                 (print_ir (fun _ -> false)) output ;
+               Lwt.return ()
+           | Error errs ->
+               pp_print_error Format.err_formatter errs ;
+               error "error running program") ;
+    command
+      ~group: "programs"
       ~desc: "ask the node to typecheck a program"
+      ~args: [ show_types_arg ]
       (prefixes [ "typecheck" ; "program" ]
        @@ Program.source_param
        @@ stop)
       (fun program () ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_code (block ()) program >>= function
-         | Ok () ->
+         | Ok type_map ->
+             let type_map, program = unexpand_macros type_map program in
              message "Well typed" ;
+             if !show_types then begin
+               print_program
+                 (fun l -> List.mem_assoc l type_map)
+                 Format.std_formatter program ;
+               Format.printf "@." ;
+               List.iter
+                 (fun (loc, (before, after)) ->
+                    Format.printf
+                      "%3d@[<v 0> : [ @[<v 0>%a ]@]@,-> [ @[<v 0>%a ]@]@]@."
+                      loc
+                      (Format.pp_print_list (print_ir (fun _ -> false)))
+                      before
+                      (Format.pp_print_list (print_ir (fun _ -> false)))
+                      after)
+                 (List.sort compare type_map)
+             end ;
              Lwt.return ()
          | Error errs ->
              pp_print_error Format.err_formatter errs ;

@@ -9,12 +9,11 @@
 %token RPAREN
 %token SEMICOLON
 
-%token <string> FLOAT
 %token <string> INT
 %token <string> PRIM
 %token <string> STRING
 
-%left PRIM INT FLOAT LPAREN LBRACE STRING
+%left PRIM INT LPAREN LBRACE STRING
 %left apply
 
 %start <Script_located_ir.node list> tree
@@ -127,7 +126,7 @@ let expand = function
 let apply node arg =
   match node with
   | Prim (loc, n, args) -> Prim (loc, n, args @ [arg])
-  | Int _ | Float _ | String _ | Seq _ as _node ->
+  | Int _ | String _ | Seq _ as _node ->
       raise (Invalid_application (node_location arg))
 
 let rec apply_seq node = function
@@ -166,7 +165,6 @@ line_node:
 | LBRACE nodes = nodes RBRACE { Seq (pos $startpos $endpos, nodes) }
 | prim = PRIM { Prim (pos $startpos $endpos, prim, []) }
 | i = INT { Int (pos $startpos $endpos, i) }
-| f = FLOAT { Float (pos $startpos $endpos, f) }
 | s = STRING { String (pos $startpos $endpos, s) }
 
 %%
