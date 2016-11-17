@@ -15,7 +15,11 @@ type secret_key = Sodium.Box.secret_key
 type public_key = Sodium.Box.public_key
 type channel_key = Sodium.Box.channel_key
 type nonce = Sodium.Box.nonce
-type difficulty = int64
+(* target ought to be an unsigned 256 bit integer
+but this representation works better with ocplib-endian; make
+sure target has length 16! *)
+type target = int list
+exception TargetNot256Bit
 
 let random_keypair = Sodium.Box.random_keypair
 let random_nonce = Sodium.Box.random_nonce
@@ -25,22 +29,32 @@ let box_open sk pk msg nonce =
   try Some (Sodium.Box.Bigbytes.box_open sk pk msg nonce) with
     | Sodium.Verification_failure -> None
 
-let check_proof_of_work pk nonce difficulty =
-  let hash_bytes l =
-    let hash = Cryptokit.Hash.sha256 () in
-    List.iter (fun b -> hash#add_string (MBytes.to_string b)) l;
-    let r = hash#result in hash#wipe; r in
+let validate_target target =
+  if List.length target <> 16 then raise TargetNot256Bit;
+  if List.for_all (fun t -> t < 0 || t >= 1 lsl 16) target
+    then raise TargetNot256Bit
+
+(* compare a SHA256 hash to a 256 bit target *)
+let compare_target xs target =
   let hash =
-    hash_bytes
-      [ Sodium.Box.Bigbytes.of_public_key pk ;
-        Sodium.Box.Bigbytes.of_nonce nonce ] in
+    let hash = Cryptokit.Hash.sha256 () in
+    List.iter (fun b -> hash#add_string (MBytes.to_string b)) xs;
+    let r = hash#result in hash#wipe; r in
   let bytes = MBytes.of_string hash in
-  let last_int64 =
-    EndianBigstring.BigEndian.get_int64 bytes (MBytes.length bytes - 8) in
-  Int64.logand last_int64 (Int64.of_int 1) < difficulty
-let generate_proof_of_work pk difficulty =
+  let get_16 = EndianBigstring.BigEndian.get_uint16 bytes in
+  let offsets = [0;2;4;6;8;10;12;14;16;18;20;22;24;26;28;30] in
+  List.for_all2 (fun o t -> get_16 o < t) offsets target
+
+let check_proof_of_work pk nonce target =
+  let what_to_hash =
+    [ Sodium.Box.Bigbytes.of_public_key pk
+    ; Sodium.Box.Bigbytes.of_nonce nonce ] in
+  compare_target what_to_hash target
+
+let generate_proof_of_work pk target =
+  validate_target target;
   let rec loop nonce =
-    if check_proof_of_work pk nonce difficulty then nonce
+    if check_proof_of_work pk nonce target then nonce
     else loop (increment_nonce nonce) in
   loop (random_nonce ())
 
