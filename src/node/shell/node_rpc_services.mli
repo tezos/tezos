@@ -80,6 +80,8 @@ module Blocks : sig
   val preapply:
     (unit, unit * block, preapply_param, preapply_result tzresult) RPC.service
 
+  val complete: (unit, (unit * block) * string, unit, string list) RPC.service
+
   val proto_path: (unit, unit * block) RPC.Path.path
 
 end
@@ -131,6 +133,8 @@ val inject_operation:
 val inject_protocol:
   (unit, unit,
    (Store.protocol * bool * bool option), Protocol_hash.t tzresult) RPC.service
+
+val complete: (unit, unit * string, unit, string list) RPC.service
 
 val describe:
   (unit, unit, bool option, RPC.Description.directory_descr) RPC.service

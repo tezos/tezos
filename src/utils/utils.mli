@@ -27,6 +27,7 @@ val split_path: string -> string list
 val split: char -> ?limit: int -> string -> string list
 
 val map_option: f:('a -> 'b) -> 'a option -> 'b option
+val apply_option: f:('a -> 'b option) -> 'a option -> 'b option
 val iter_option: f:('a -> unit) -> 'a option -> unit
 val unopt: 'a -> 'a option -> 'a
 val unopt_list: 'a option list -> 'a list
@@ -35,6 +36,8 @@ val display_paragraph: Format.formatter -> string -> unit
 
 (** [remove nb list] remove the first [nb] elements from the list [list]. *)
 val remove_elem_from_list: int -> 'a list -> 'a list
+
+val remove_prefix: prefix:string -> string -> string option
 
 val filter_map: ('a -> 'b option) -> 'a list -> 'b list
 

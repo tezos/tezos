@@ -10,15 +10,15 @@
 open Tezos_hash
 
 type descr = {
-  manager: Ed25519.public_key_hash ;
-  delegate: Ed25519.public_key_hash option ;
+  manager: Ed25519.Public_key_hash.t ;
+  delegate: Ed25519.Public_key_hash.t option ;
   spendable: bool ;
   delegatable: bool ;
   script: Script_repr.t ;
 }
 
 type t =
-  | Default of Ed25519.public_key_hash
+  | Default of Ed25519.Public_key_hash.t
   | Hash of Contract_hash.t
 type contract = t
 
@@ -29,12 +29,10 @@ let to_b48check = function
   | Hash h -> Contract_hash.to_b48check h
 
 let of_b48check s =
-  try
-    match Base48.decode s with
-    | Ed25519.Public_key_hash.Hash h -> ok (Default h)
-    | Contract_hash.Hash h -> ok (Hash h)
-    | _ -> error (Invalid_contract_notation s)
-  with _ -> error (Invalid_contract_notation s)
+  match Base48.decode s with
+  | Some (Ed25519.Public_key_hash.Hash h) -> ok (Default h)
+  | Some (Contract_hash.Hash h) -> ok (Hash h)
+  | _ -> error (Invalid_contract_notation s)
 
 let encoding =
   let open Data_encoding in
@@ -50,7 +48,7 @@ let encoding =
   splitted
     ~binary:
       (union ~tag_size:`Uint8 [
-          case ~tag:0 Ed25519.public_key_hash_encoding
+          case ~tag:0 Ed25519.Public_key_hash.encoding
             (function Default k -> Some k | _ -> None)
             (fun k -> Default k) ;
           case ~tag:1 Contract_hash.encoding
@@ -96,8 +94,8 @@ let descr_encoding =
     (fun (manager, delegate, spendable, delegatable, script) ->
        { manager; delegate; spendable; delegatable; script })
     (obj5
-       (req "manager" Ed25519.public_key_hash_encoding)
-       (opt "delegate" Ed25519.public_key_hash_encoding)
+       (req "manager" Ed25519.Public_key_hash.encoding)
+       (opt "delegate" Ed25519.Public_key_hash.encoding)
        (dft "spendable" bool false)
        (dft "delegatable" bool false)
        (req "script" Script_repr.encoding))
@@ -105,7 +103,7 @@ let descr_encoding =
 let generic_contract ~manager ~delegate ~spendable ~delegatable ~script =
   match delegate, spendable, delegatable, script with
   | Some delegate, true, false, Script_repr.No_script
-    when Ed25519.equal_hash manager delegate ->
+    when Ed25519.Public_key_hash.equal manager delegate ->
       default_contract manager
   | _ ->
       let data =
@@ -130,7 +128,7 @@ let arg =
 let compare l1 l2 =
   match l1, l2 with
   | Default pkh1, Default pkh2 ->
-      Ed25519.compare_hash pkh1 pkh2
+      Ed25519.Public_key_hash.compare pkh1 pkh2
   | Hash h1, Hash h2 ->
       Contract_hash.compare h1 h2
   | Default _, Hash _ -> -1

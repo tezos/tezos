@@ -36,11 +36,11 @@ val clear_cycle :
 
 val mining_rights_owner :
   Storage.t -> Level_repr.t -> priority:int32 ->
-  Ed25519.public_key_hash tzresult Lwt.t
+  Ed25519.Public_key_hash.t tzresult Lwt.t
 
 val endorsement_rights_owner :
   Storage.t -> Level_repr.t -> slot:int ->
-  Ed25519.public_key_hash tzresult Lwt.t
+  Ed25519.Public_key_hash.t tzresult Lwt.t
 
 module Contract : sig
 
@@ -60,4 +60,4 @@ end
 (**/**)
 
 val get_contract_delegate:
-  Storage.t -> Contract_repr.t -> Ed25519.public_key_hash option tzresult Lwt.t
+  Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option tzresult Lwt.t

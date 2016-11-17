@@ -12,7 +12,8 @@ all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT}
 ## Protocol environment
 ############################################################################
 
-PROTOCOL_ENV_INTFS := $(addprefix proto/environment/, \
+PROTOCOL_ENV_INTFS := \
+$(addprefix proto/environment/, \
   pervasives.mli \
   compare.mli \
   \
@@ -29,6 +30,8 @@ PROTOCOL_ENV_INTFS := $(addprefix proto/environment/, \
   \
   uri.mli \
   data_encoding.mli \
+  error_monad.mli \
+  logging.mli \
   time.mli \
   base48.mli \
   hash.mli \
@@ -39,10 +42,7 @@ PROTOCOL_ENV_INTFS := $(addprefix proto/environment/, \
   \
   fitness.mli \
   updater.mli \
-) \
-utils/logging.mli \
-utils/error_monad_sig.ml \
-utils/error_monad.mli
+)
 
 .INTERMEDIATE: node/updater/environment_gen
 .SECONDARY: node/updater/proto_environment.mli
@@ -73,9 +73,6 @@ clean::
 
 EMBEDDED_PROTOCOL_LIB_CMIS := \
   tmp/camlinternalFormatBasics.cmi \
-  utils/error_monad.cmi \
-  proto/environment/error_monad.mli \
-  proto/environment/logging.mli \
   node/updater/proto_environment.cmi \
   node/updater/register.cmi
 
@@ -102,16 +99,15 @@ clean::
 
 UTILS_LIB_INTFS := \
   utils/mBytes.mli \
+  utils/utils.mli \
   utils/base48.mli \
   utils/hex_encode.mli \
-  utils/utils.mli \
   utils/cli_entries.mli \
   utils/compare.mli \
   utils/data_encoding.mli \
   utils/crypto_box.mli \
   utils/time.mli \
   utils/hash.mli \
-  utils/ed25519.mli \
   utils/error_monad.mli \
   utils/logging.mli \
   utils/lwt_utils.mli \
@@ -119,16 +115,15 @@ UTILS_LIB_INTFS := \
 
 UTILS_LIB_IMPLS := \
   utils/mBytes.ml \
-  utils/base48.ml \
-  utils/hex_encode.ml \
   utils/utils.ml \
+  utils/hex_encode.ml \
+  utils/base48.ml \
   utils/cli_entries.ml \
   utils/compare.ml \
   utils/data_encoding.ml \
   utils/crypto_box.ml \
   utils/time.ml \
   utils/hash.ml \
-  utils/ed25519.ml \
   utils/error_monad_sig.ml \
   utils/error_monad.ml \
   utils/logging.ml \
@@ -320,7 +315,7 @@ proto/embedded_proto_%.cmxa: \
 
 CLIENT_PROTO_INCLUDES := \
   utils node/updater node/db node/net node/shell client \
-  $(shell ocamlfind query lwt ocplib-json-typed)
+  $(shell ocamlfind query lwt ocplib-json-typed sodium)
 
 proto/client_embedded_proto_%.cmxa: \
   ${TZCOMPILER} \
@@ -347,6 +342,7 @@ CLIENT_LIB_INTFS := \
   client/client_version.mli \
   client/client_node_rpcs.mli \
   client/client_generic_rpcs.mli \
+  client/client_helpers.mli \
   client/client_aliases.mli \
   client/client_keys.mli \
   client/client_protocols.mli \
@@ -356,6 +352,7 @@ CLIENT_LIB_IMPLS := \
   client/client_config.ml \
   client/client_node_rpcs.ml \
   client/client_generic_rpcs.ml \
+  client/client_helpers.ml \
   client/client_aliases.ml \
   client/client_keys.ml \
   client/client_protocols.ml \

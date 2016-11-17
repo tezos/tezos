@@ -50,6 +50,14 @@ module FS = struct
     let file = file_of_key root key in
     Lwt.return (Sys.file_exists file && not (Sys.is_directory file))
 
+  let dir_mem root key =
+    let file = file_of_key root key in
+    Lwt.return (Sys.file_exists file && Sys.is_directory file)
+
+  let exists root key =
+    let file = file_of_key root key in
+    Sys.file_exists file
+
   let get root key =
     mem root key >>= function
     | true  ->
@@ -135,6 +143,7 @@ end
 module type IMPERATIVE_STORE = sig
   type t
   val mem: t -> key -> bool Lwt.t
+  val dir_mem: t -> key -> bool Lwt.t
   val get: t -> key -> value option Lwt.t
   val get_exn: t -> key -> value Lwt.t
   val set: t -> key -> value -> unit Lwt.t
@@ -206,6 +215,7 @@ module Make (K : KEY) (V : Persist.VALUE) = struct
   type key = K.t
   type value = V.t
   let mem t k = FS.mem t (K.to_path k)
+  let dir_mem t k = FS.dir_mem t (K.to_path k)
   let get t k =
     FS.get t (K.to_path k) >|= function
     | None -> None
@@ -306,6 +316,14 @@ module Block_errors_key = struct
   let to_path p = "blocks" :: Block_hash.to_path p @ [ "errors" ]
 end
 module Block_errors = Make (Block_errors_key) (Errors_value)
+
+module Block_resolver =
+  Persist.MakeHashResolver
+    (struct
+      include FS
+      let prefix = ["blocks"]
+    end)
+    (Block_hash)
 
 module Block = struct
   type t = FS.t
@@ -457,6 +475,15 @@ module Operation_errors_key = struct
   let to_path p = "operations" :: Operation_hash.to_path p @ [ "errors" ]
 end
 module Operation_errors = Make (Operation_errors_key) (Errors_value)
+
+module Operation_resolver =
+  Persist.MakeHashResolver
+    (struct
+      include FS
+      let mem t k = Lwt.return (exists t k)
+      let prefix = ["operations"]
+    end)
+    (Operation_hash)
 
 module Operation = struct
   type t = FS.t
@@ -715,6 +742,12 @@ let net_destroy ~root { net_genesis } =
 
 let init root =
   raw_init ~root:(Filename.concat root "global") () >>= fun t ->
+  Base48.register_resolver
+    Block_hash.b48check_encoding
+    (fun s -> Block_resolver.resolve t s);
+  Base48.register_resolver
+    Operation_hash.b48check_encoding
+    (fun s -> Operation_resolver.resolve t s);
   Lwt.return
     { block = Persist.share t ;
       blockchain = Persist.share t ;

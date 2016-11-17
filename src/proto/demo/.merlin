@@ -1,8 +1,9 @@
 B ../../node/updater/
 B _tzbuild
 FLG -nopervasives
-FLG -open Proto_environment
+FLG -open Local_environment
+FLG -open Environment
 FLG -open Hash
-FLG -open Local_error_monad
 FLG -open Error_monad
+FLG -open Logging
 FLG -w -40
