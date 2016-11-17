@@ -73,22 +73,6 @@ let char_for_hexadecimal_code lexbuf i =
   in
   char_of_int (val1 * 16 + val2)
 
-
-(* Remove underscores from float literals *)
-
-let remove_underscores s =
-  let s = Bytes.of_string s in
-  let l = Bytes.length s in
-  let rec remove src dst =
-    if Compare.Int.(src >= l) then
-      if Compare.Int.(dst >= l) then s else Bytes.sub s 0 dst
-    else
-     match Bytes.get s src with
-        '_' -> remove (src + 1) dst
-      |  c  -> Bytes.set s dst c; remove (src + 1) (dst + 1)
-  in Bytes.to_string (remove 0 0)
-
-
 (** Lexer state *)
 
 type state = {
@@ -234,11 +218,6 @@ let bin_literal =
   '0' ['b' 'B'] ['0'-'1'] ['0'-'1' '_']*
 let int_literal =
   '-' ? ( decimal_literal | hex_literal | oct_literal | bin_literal)
-let float_literal =
-  '-' ?
-  ['0'-'9'] ['0'-'9' '_']*
-  ('.' ['0'-'9' '_']* )?
-    (['e' 'E'] ['+' '-']? ['0'-'9'] ['0'-'9' '_']*)?
 
 rule indent_tokens st nl = parse
 
@@ -331,9 +310,6 @@ and raw_token st = parse
 
 | int_literal
     { INT (Lexing.lexeme lexbuf) }
-
-| float_literal
-    { FLOAT (remove_underscores (Lexing.lexeme lexbuf)) }
 
 | "\""
     { reset_string_buffer st;
