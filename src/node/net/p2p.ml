@@ -135,7 +135,8 @@ module Make (P: PARAMS) = struct
         port : int option ;
         versions : version list ;
         public_key : Crypto_box.public_key ;
-        nonce : Crypto_box.nonce ;
+        proof_of_work : Crypto_box.nonce ;
+        message_nonce : Crypto_box.nonce ;
       }
     | Disconnect
     | Bootstrap
@@ -146,20 +147,21 @@ module Make (P: PARAMS) = struct
     let open Data_encoding in
     union ~tag_size:`Uint16
       ([ case ~tag:0x00
-           (obj5
+           (obj6
               (req "gid" (Fixed.string gid_length))
               (req "port" uint16)
               (req "pubKey" Crypto_box.public_key_encoding)
-              (req "nonce" Crypto_box.nonce_encoding)
+              (req "proof_of_work" Crypto_box.nonce_encoding)
+              (req "message_nonce" Crypto_box.nonce_encoding)
               (req "versions" (Variable.list version_encoding)))
            (function
-             | Connect { gid ; port ; versions ; public_key ; nonce } ->
+             | Connect { gid ; port ; versions ; public_key ; proof_of_work; message_nonce } ->
                  let port = match port with None -> 0 | Some port -> port in
-                 Some (gid, port, public_key, nonce, versions)
+                 Some (gid, port, public_key, proof_of_work, message_nonce, versions)
              | _ -> None)
-           (fun (gid, port, public_key, nonce, versions) ->
+           (fun (gid, port, public_key, proof_of_work, message_nonce, versions) ->
               let port = if port = 0 then None else Some port in
-              Connect { gid ; port ; versions ; public_key ; nonce });
+              Connect { gid ; port ; versions ; public_key ; proof_of_work; message_nonce });
          case ~tag:0x01 null
            (function Disconnect -> Some () | _ -> None)
            (fun () -> Disconnect);
@@ -384,7 +386,7 @@ module Make (P: PARAMS) = struct
      (including the one sent when the connection is alive). Returns a
      canceler. *)
   let connect_to_peer
-      config limits my_gid my_public_key my_secret_key
+      config limits my_gid my_public_key my_secret_key my_proof_of_work
       socket (addr, port) push white_listed =
     (* a non exception-based cancelation mechanism *)
     let cancelation, cancel, on_cancel = canceler () in
@@ -400,15 +402,24 @@ module Make (P: PARAMS) = struct
       send_msg socket buf
         (Connect { gid = my_gid ;
                    public_key = my_public_key ;
-                   nonce = local_nonce ;
+                   proof_of_work = my_proof_of_work ;
+                   message_nonce = local_nonce ;
                    port = config.incoming_port ;
                    versions = P.supported_versions }) >>= fun _ ->
       pick [ (LU.sleep limits.peer_answer_timeout >>= fun () -> return Disconnect) ;
              recv_msg socket buf ] >>= function
-      | Connect { gid; port = listening_port; versions ; public_key ; nonce } ->
+      | Connect { gid; port = listening_port; versions ; public_key ; proof_of_work ; message_nonce } ->
           debug "(%a) connection requested from %a @@ %a:%d"
             pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
-          begin match common_version P.supported_versions versions with
+          let work_proved =
+            Crypto_box.check_proof_of_work
+              public_key proof_of_work Crypto_box.default_target in
+          if not work_proved then
+            (*debug "connection rejected (invalid proof of work)"
+              pp_gid my_gid Ipaddr.pp_hum addr port ;*)
+            cancel ()
+          else
+            begin match common_version P.supported_versions versions with
             | None ->
                 debug "(%a) connection rejected (incompatible versions) from %a:%d"
                   pp_gid my_gid Ipaddr.pp_hum addr port ;
@@ -417,7 +428,7 @@ module Make (P: PARAMS) = struct
                 if config.closed_network then
                   match listening_port with
                   | Some port when white_listed (addr, port) ->
-                      connected buf local_nonce version gid public_key nonce listening_port
+                      connected buf local_nonce version gid public_key message_nonce listening_port
                   | Some port ->
                       debug "(%a) connection rejected (out of the closed network) from %a:%d"
                         pp_gid my_gid Ipaddr.pp_hum addr port ;
@@ -427,8 +438,8 @@ module Make (P: PARAMS) = struct
                         pp_gid my_gid Ipaddr.pp_hum addr ;
                       cancel ()
                 else
-                  connected buf local_nonce version gid public_key nonce listening_port
-          end
+                  connected buf local_nonce version gid public_key message_nonce listening_port
+            end
       | Advertise peers ->
           (* alternatively, one can refuse a connection but reply with
              some peers, so we accept this info *)
@@ -526,10 +537,11 @@ module Make (P: PARAMS) = struct
 
   let peers_file_encoding =
     let open Data_encoding in
-    obj4
+    obj5
       (req "gid" string)
       (req "public_key" Crypto_box.public_key_encoding)
       (req "secret_key" Crypto_box.secret_key_encoding)
+      (req "proof_of_work" Crypto_box.nonce_encoding)
       (req "peers"
          (obj3
             (req "known"
@@ -699,12 +711,14 @@ module Make (P: PARAMS) = struct
     on_cancel (fun () -> close_msg_queue () ; return ()) ;
     (* fill the known peers pools from last time *)
     Data_encoding.Json.read_file config.peers_file >>= fun res ->
-    let known_peers, black_list, my_gid, my_public_key, my_secret_key =
+    let known_peers, black_list, my_gid, my_public_key, my_secret_key, my_proof_of_work =
       let init_peers () =
         let my_gid =
           fresh_gid () in
         let (my_secret_key, my_public_key) =
           Crypto_box.random_keypair () in
+        let my_proof_of_work =
+          Crypto_box.generate_proof_of_work my_public_key Crypto_box.default_target in
         let known_peers =
           let source = { unreachable_since = None ;
                          connections = None ;
@@ -717,23 +731,23 @@ module Make (P: PARAMS) = struct
             PeerMap.empty config.known_peers in
         let black_list =
           BlackList.empty in
-        known_peers, black_list, my_gid, my_public_key, my_secret_key in
+        known_peers, black_list, my_gid, my_public_key, my_secret_key, my_proof_of_work in
       match res with
       | None ->
           let known_peers, black_list, my_gid,
-              my_public_key, my_secret_key = init_peers () in
+              my_public_key, my_secret_key, my_proof_of_work = init_peers () in
           debug "(%a) peer cache initiated" pp_gid my_gid ;
           ref known_peers, ref black_list, my_gid,
-          my_public_key, my_secret_key
+          my_public_key, my_secret_key, my_proof_of_work
       | Some json ->
           match Data_encoding.Json.destruct peers_file_encoding json with
           | exception _ ->
               let known_peers, black_list, my_gid,
-                  my_public_key, my_secret_key = init_peers () in
+                  my_public_key, my_secret_key, my_proof_of_work = init_peers () in
               debug "(%a) peer cache reset" pp_gid my_gid ;
               ref known_peers, ref black_list,
-              my_gid, my_public_key, my_secret_key
-          | (my_gid, my_public_key, my_secret_key, (k, b, w)) ->
+              my_gid, my_public_key, my_secret_key, my_proof_of_work
+          | (my_gid, my_public_key, my_secret_key, my_proof_of_work, (k, b, w)) ->
               let white_list =
                 List.fold_right PointSet.add w PointSet.empty in
               let known_peers =
@@ -761,7 +775,7 @@ module Make (P: PARAMS) = struct
                   BlackList.empty b in
               debug "(%a) peer cache loaded" pp_gid my_gid ;
               ref known_peers, ref black_list,
-              my_gid, my_public_key, my_secret_key
+              my_gid, my_public_key, my_secret_key, my_proof_of_work
     in
     (* some peer reachability predicates *)
     let black_listed (addr, _) =
@@ -781,6 +795,7 @@ module Make (P: PARAMS) = struct
           (my_gid,
            my_public_key,
            my_secret_key,
+           my_proof_of_work,
            PeerMap.fold
              (fun (addr, port) gid source (k, b, w) ->
                 let infos = match gid, source.connections with
@@ -1047,7 +1062,7 @@ module Make (P: PARAMS) = struct
           else
             let canceler =
               connect_to_peer
-                config limits my_gid my_public_key my_secret_key
+                config limits my_gid my_public_key my_secret_key my_proof_of_work
                 socket (addr, port) enqueue_event white_listed in
             debug "(%a) incoming peer @@ %a:%d"
               pp_gid my_gid Ipaddr.pp_hum addr port ;
@@ -1272,4 +1287,3 @@ module Make (P: PARAMS) = struct
   let get_metadata net gid = net.get_metadata gid
   let set_metadata net gid meta = net.set_metadata gid meta
 end
-
