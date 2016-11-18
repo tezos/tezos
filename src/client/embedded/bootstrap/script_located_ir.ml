@@ -15,14 +15,12 @@ type location =
 
 type node =
   | Int of location * string
-  | Float of location * string
   | String of location * string
   | Prim of location * string * node list
   | Seq of location * node list
 
 let node_location = function
   | Int (loc, _)
-  | Float (loc, _)
   | String (loc, _)
   | Prim (loc, _, _)
   | Seq (loc, _) -> loc
@@ -57,8 +55,6 @@ let strip_locations root =
     match l with
     | Int (_, v) ->
         Script.Int (id, v)
-    | Float (_, v) ->
-        Script.Float (id, v)
     | String (_, v) ->
         Script.String (id, v)
     | Seq (_, seq) ->

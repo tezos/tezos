@@ -65,308 +65,246 @@ type 'tys stack =
   | Item : 'ty * 'rest stack -> ('ty * 'rest) stack
   | Empty : end_of_stack stack
 
-let is_nan x = match classify_float x with
-  | FP_nan -> true
-  | _ -> false
-
-let eq_comparable
-  : type a. a comparable_ty -> a -> a -> bool
-  = fun kind x v -> match kind with
-    | String_key -> Compare.String.(x = v)
-    | Bool_key -> Compare.Bool.(x = v)
-    | Float_key -> Compare.Float.(x = v)
-    | Tez_key -> Tez.(x = v)
-    | Key_key -> Ed25519.Public_key_hash.(equal x v)
-    | Int_key kind -> Script_int.(equal kind x v)
-    | Timestamp_key -> Timestamp.(x = v)
+let rec unparse_stack
+  : type a. a stack * a stack_ty -> Script.expr list
+  = function
+    | Empty, Empty_t -> []
+    | Item (v, rest), Item_t (ty, rest_ty) ->
+        unparse_tagged_data ty v :: unparse_stack (rest, rest_ty)
 
 let rec interp
   : type p r.
+    ?log: (Script.location * int * Script.expr list) list ref ->
     int -> Contract.t -> Contract.t -> Tez.t ->
     context -> (p, r) lambda -> p -> (r * int * context) tzresult Lwt.t
-  = fun qta orig source amount ctxt (Lam (code, _)) arg ->
+  = fun ?log qta orig source amount ctxt (Lam (code, _)) arg ->
     let rec step
       : type b a.
-        int -> context -> (b, a) instr -> b stack ->
+        int -> context -> (b, a) descr -> b stack ->
         (a stack * int * context) tzresult Lwt.t =
-      fun qta ctxt instr stack ->
+      fun qta ctxt ({ instr ; loc } as descr) stack ->
         if Compare.Int.(qta <= 0) then
           fail Quota_exceeded
-        else match instr, stack with
+        else
+          let logged_return ((ret, qta, _) as res) =
+            match log with
+            | None -> return res
+            | Some log ->
+                log := (descr.loc, qta, unparse_stack (ret, descr.aft)) :: !log ;
+                return res in
+          match instr, stack with
           (* stack ops *)
           | Drop, Item (_, rest) ->
-              return (rest, qta - 1, ctxt)
+              logged_return (rest, qta - 1, ctxt)
           | Dup, Item (v, rest) ->
-              return (Item (v, Item (v, rest)), qta - 1, ctxt)
+              logged_return (Item (v, Item (v, rest)), qta - 1, ctxt)
           | Swap, Item (vi, Item (vo, rest)) ->
-              return (Item (vo, Item (vi, rest)), qta - 1, ctxt)
+              logged_return (Item (vo, Item (vi, rest)), qta - 1, ctxt)
           | Const v, rest ->
-              return (Item (v, rest), qta - 1, ctxt)
+              logged_return (Item (v, rest), qta - 1, ctxt)
           (* options *)
           | Cons_some, Item (v, rest) ->
-              return (Item (Some v, rest), qta - 1, ctxt)
+              logged_return (Item (Some v, rest), qta - 1, ctxt)
           | Cons_none _, rest ->
-              return (Item (None, rest), qta - 1, ctxt)
+              logged_return (Item (None, rest), qta - 1, ctxt)
           | If_none (bt, _), Item (None, rest) ->
               step qta ctxt bt rest
           | If_none (_, bf), Item (Some v, rest) ->
               step qta ctxt bf (Item (v, rest))
           (* pairs *)
           | Cons_pair, Item (a, Item (b, rest)) ->
-              return (Item ((a, b), rest), qta - 1, ctxt)
+              logged_return (Item ((a, b), rest), qta - 1, ctxt)
           | Car, Item ((a, _), rest) ->
-              return (Item (a, rest), qta - 1, ctxt)
+              logged_return (Item (a, rest), qta - 1, ctxt)
           | Cdr, Item ((_, b), rest) ->
-              return (Item (b, rest), qta - 1, ctxt)
+              logged_return (Item (b, rest), qta - 1, ctxt)
           (* unions *)
           | Left, Item (v, rest) ->
-              return (Item (L v, rest), qta - 1, ctxt)
+              logged_return (Item (L v, rest), qta - 1, ctxt)
           | Right, Item (v, rest) ->
-              return (Item (R v, rest), qta - 1, ctxt)
+              logged_return (Item (R v, rest), qta - 1, ctxt)
           | If_left (bt, _), Item (L v, rest) ->
               step qta ctxt bt (Item (v, rest))
           | If_left (_, bf), Item (R v, rest) ->
               step qta ctxt bf (Item (v, rest))
           (* lists *)
           | Cons_list, Item (hd, Item (tl, rest)) ->
-              return (Item (hd :: tl, rest), qta - 1, ctxt)
+              logged_return (Item (hd :: tl, rest), qta - 1, ctxt)
           | Nil, rest ->
-              return (Item ([], rest), qta - 1, ctxt)
+              logged_return (Item ([], rest), qta - 1, ctxt)
           | If_cons (_, bf), Item ([], rest) ->
               step qta ctxt bf rest
           | If_cons (bt, _), Item (hd :: tl, rest) ->
               step qta ctxt bt (Item (hd, Item (tl, rest)))
-          | List_iter, Item (lam, Item (l, rest)) ->
-              fold_left_s (fun ((), qta, ctxt) arg ->
-                  interp qta orig source amount ctxt lam arg)
-                ((), qta, ctxt) l >>=? fun ((), qta, ctxt) ->
-              return (rest, qta, ctxt)
           | List_map, Item (lam, Item (l, rest)) ->
               fold_left_s (fun (tail, qta, ctxt) arg ->
-                  interp qta orig source amount ctxt lam arg
+                  interp ?log qta orig source amount ctxt lam arg
                   >>=? fun (ret, qta, ctxt) ->
                   return (ret :: tail, qta, ctxt))
                 ([], qta, ctxt) l >>=? fun (res, qta, ctxt) ->
-              return (Item (res, rest), qta, ctxt)
+              logged_return (Item (res, rest), qta, ctxt)
           | List_reduce, Item (lam, Item (l, Item (init, rest))) ->
               fold_left_s
                 (fun (partial, qta, ctxt) arg ->
-                   interp qta orig source amount ctxt lam (arg, partial)
+                   interp ?log qta orig source amount ctxt lam (arg, partial)
                    >>=? fun (partial, qta, ctxt) ->
                    return (partial, qta, ctxt))
                 (init, qta, ctxt) l >>=? fun (res, qta, ctxt) ->
-              return (Item (res, rest), qta, ctxt)
+              logged_return (Item (res, rest), qta, ctxt)
           (* sets *)
           | Empty_set t, rest ->
-              return (Item ((ref [], t), rest), qta - 1, ctxt)
-          | Set_iter, Item (lam, Item ((l, _), rest)) ->
-              fold_left_s (fun ((), qta, ctxt) arg ->
-                  interp qta orig source amount ctxt lam arg)
-                ((), qta, ctxt) !l >>=? fun ((), qta, ctxt) ->
-              return (rest, qta, ctxt)
-          | Set_map t, Item (lam, Item ((l, _), rest)) ->
+              logged_return (Item (empty_set t, rest), qta - 1, ctxt)
+          | Set_map t, Item (lam, Item (set, rest)) ->
+              let items =
+                List.rev (set_fold (fun e acc -> e :: acc) set []) in
               fold_left_s
-                (fun (tail, qta, ctxt) arg ->
-                   interp qta orig source amount ctxt lam arg >>=?
+                (fun (res, qta, ctxt) arg ->
+                   interp ?log qta orig source amount ctxt lam arg >>=?
                    fun (ret, qta, ctxt) ->
-                   return (ret :: tail, qta, ctxt))
-                ([], qta, ctxt) !l >>=? fun (res, qta, ctxt) ->
-              return (Item ((ref res, t), rest), qta, ctxt)
-          | Set_reduce, Item (lam, Item ((l, _), Item (init, rest))) ->
+                   return (set_update ret true res, qta, ctxt))
+                (empty_set t, qta, ctxt) items >>=? fun (res, qta, ctxt) ->
+              logged_return (Item (res, rest), qta, ctxt)
+          | Set_reduce, Item (lam, Item (set, Item (init, rest))) ->
+              let items =
+                List.rev (set_fold (fun e acc -> e :: acc) set []) in
               fold_left_s
                 (fun (partial, qta, ctxt) arg ->
-                   interp qta orig source amount ctxt lam (arg, partial)
+                   interp ?log qta orig source amount ctxt lam (arg, partial)
                    >>=? fun (partial, qta, ctxt) ->
                    return (partial, qta, ctxt))
-                (init, qta, ctxt) !l >>=? fun (res, qta, ctxt) ->
-              return (Item (res, rest), qta, ctxt)
-          | Set_mem, Item (v, Item ((l, kind), rest)) ->
-              return (Item (List.exists (eq_comparable kind v) !l, rest), qta - 1, ctxt)
-          | Set_update, Item (v, Item (false, Item ((l, kind), rest))) ->
-              l := List.filter (fun x -> not (eq_comparable kind x v)) !l ;
-              return (rest, qta - 1, ctxt)
-          | Set_update, Item (v, Item (true, Item ((l, kind), rest))) ->
-              l := v :: List.filter (fun x -> not (eq_comparable kind x v)) !l ;
-              return (rest, qta - 1, ctxt)
+                (init, qta, ctxt) items >>=? fun (res, qta, ctxt) ->
+              logged_return (Item (res, rest), qta, ctxt)
+          | Set_mem, Item (v, Item (set, rest)) ->
+              logged_return (Item (set_mem v set, rest), qta - 1, ctxt)
+          | Set_update, Item (v, Item (presence, Item (set, rest))) ->
+              logged_return (Item (set_update v presence set, rest), qta - 1, ctxt)
           (* maps *)
           | Empty_map (t, _), rest ->
-              return (Item ((ref [], t), rest), qta - 1, ctxt)
-          | Map_iter, Item (lam, Item ((l, _), rest)) ->
+              logged_return (Item (empty_map t, rest), qta - 1, ctxt)
+          | Map_map, Item (lam, Item (map, rest)) ->
+              let items =
+                List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
               fold_left_s
-                (fun ((), qta, ctxt) arg -> interp qta orig source amount ctxt lam arg)
-                ((), qta, ctxt) !l >>=? fun ((), qta, ctxt) ->
-              return (rest, qta, ctxt)
-          | Map_map, Item (lam, Item ((l, t), rest)) ->
-              fold_left_s
-                (fun (tail, qta, ctxt) (k, v) ->
-                   interp qta orig source amount ctxt lam (k, v)
+                (fun (acc, qta, ctxt) (k, v) ->
+                   interp ?log qta orig source amount ctxt lam (k, v)
                    >>=? fun (ret, qta, ctxt) ->
-                   return ((k, ret) :: tail, qta, ctxt))
-                ([], qta, ctxt) !l >>=? fun (res, qta, ctxt) ->
-              return (Item ((ref res, t), rest), qta, ctxt)
-          | Map_reduce, Item (lam, Item ((l, _), Item (init, rest))) ->
+                   return (map_update k (Some ret) acc, qta, ctxt))
+                (empty_map (map_key_ty map), qta, ctxt) items >>=? fun (res, qta, ctxt) ->
+              logged_return (Item (res, rest), qta, ctxt)
+          | Map_reduce, Item (lam, Item (map, Item (init, rest))) ->
+              let items =
+                List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
               fold_left_s
                 (fun (partial, qta, ctxt) arg ->
-                   interp qta orig source amount ctxt lam (arg, partial)
+                   interp ?log qta orig source amount ctxt lam (arg, partial)
                    >>=? fun (partial, qta, ctxt) ->
                    return (partial, qta, ctxt))
-                (init, qta, ctxt) !l >>=? fun (res, qta, ctxt) ->
-              return (Item (res, rest), qta, ctxt)
-          | Map_mem, Item (v, Item ((l, kind), rest)) ->
-              let res = List.exists (fun (k, _) -> eq_comparable kind k v) !l in
-              return (Item (res, rest), qta - 1, ctxt)
-          | Map_get, Item (v, Item ((l, kind), rest)) ->
-              let res =
-                try Some (snd (List.find (fun (k, _) -> eq_comparable kind k v) !l))
-                with Not_found -> None in
-              return (Item (res, rest), qta - 1, ctxt)
-          | Map_update, Item (vk, Item (None, Item ((l, kind), rest))) ->
-              l := List.filter (fun (k, _) -> not (eq_comparable kind k vk)) !l ;
-              return (rest, qta - 1, ctxt)
-          | Map_update, Item (vk, Item (Some v, Item ((l, kind), rest))) ->
-              l := (vk, v) :: List.filter (fun (k, _) -> not (eq_comparable kind k vk)) !l ;
-              return (rest, qta - 1, ctxt)
-          (* reference cells *)
-          | Ref, Item (v, rest) ->
-              return (Item (ref v, rest), qta - 1, ctxt)
-          | Deref, Item ({ contents = v}, rest) ->
-              return (Item (v, rest), qta - 1, ctxt)
-          | Set, Item (r, Item (v, rest)) ->
-              r := v ;
-              return (rest, qta - 1, ctxt)
+                (init, qta, ctxt) items >>=? fun (res, qta, ctxt) ->
+              logged_return (Item (res, rest), qta, ctxt)
+          | Map_mem, Item (v, Item (map, rest)) ->
+              logged_return (Item (map_mem v map, rest), qta - 1, ctxt)
+          | Map_get, Item (v, Item (map, rest)) ->
+              logged_return (Item (map_get v map, rest), qta - 1, ctxt)
+          | Map_update, Item (k, Item (v, Item (map, rest))) ->
+              logged_return (Item (map_update k v map, rest), qta - 1, ctxt)
           (* timestamp operations *)
-          | Add_period_to_timestamp, Item (p, Item (t, rest)) ->
-              Lwt.return
-                (Period.of_seconds (Int64.of_float p) >>? fun p ->
-                 Timestamp.(t +? p) >>? fun res ->
-                 Ok (Item (res, rest), qta - 1, ctxt))
-          | Add_seconds_to_timestamp (kind, _pos), Item (n, Item (t, rest)) ->
+          | Add_seconds_to_timestamp kind, Item (n, Item (t, rest)) ->
               let n = Script_int.to_int64 kind n in
               Lwt.return
                 (Period.of_seconds n >>? fun p ->
                  Timestamp.(t +? p) >>? fun res ->
-                 Ok (Item (res, rest), qta - 1, ctxt))
-          | Add_timestamp_to_period, Item (t, Item (p, rest)) ->
-              Lwt.return
-                (Period.of_seconds (Int64.of_float p) >>? fun p ->
-                 Timestamp.(t +? p) >>? fun res ->
-                 Ok (Item (res, rest), qta - 1, ctxt))
-          | Add_timestamp_to_seconds (kind, _pos), Item (t, Item (n, rest)) ->
+                 Ok (Item (res, rest), qta - 1, ctxt)) >>=? fun res ->
+              logged_return res
+          | Add_timestamp_to_seconds kind, Item (t, Item (n, rest)) ->
               let n = Script_int.to_int64 kind n in
               Lwt.return
                 (Period.of_seconds n >>? fun p ->
                  Timestamp.(t +? p) >>? fun res ->
-                 Ok (Item (res, rest), qta - 1, ctxt))
+                 Ok (Item (res, rest), qta - 1, ctxt)) >>=? fun res ->
+              logged_return res
           (* string operations *)
           | Concat, Item (x, Item (y, rest)) ->
-              return (Item (x ^ y, rest), qta - 1, ctxt)
+              logged_return (Item (x ^ y, rest), qta - 1, ctxt)
           (* currency operations *)
           | Add_tez, Item (x, Item (y, rest)) ->
               Lwt.return Tez.(x +? y) >>=? fun res ->
-              return (Item (res, rest), qta - 1, ctxt)
+              logged_return (Item (res, rest), qta - 1, ctxt)
           | Sub_tez, Item (x, Item (y, rest)) ->
               Lwt.return Tez.(x -? y) >>=? fun res ->
-              return (Item (res, rest), qta - 1, ctxt)
+              logged_return (Item (res, rest), qta - 1, ctxt)
           | Mul_tez kind, Item (x, Item (y, rest)) ->
               Lwt.return Tez.(x *? Script_int.to_int64 kind y) >>=? fun res ->
-              return (Item (res, rest), qta - 1, ctxt)
+              logged_return (Item (res, rest), qta - 1, ctxt)
           | Mul_tez' kind, Item (y, Item (x, rest)) ->
               Lwt.return Tez.(x *? Script_int.to_int64 kind y) >>=? fun res ->
-              return (Item (res, rest), qta - 1, ctxt)
-          (* float operations *)
-          | Floor, Item (x, rest) ->
-              return (Item (floor x, rest), qta - 1, ctxt)
-          | Ceil, Item (x, rest) ->
-              return (Item (ceil x, rest), qta - 1, ctxt)
-          | Inf, rest ->
-              return (Item (infinity, rest), qta - 1, ctxt)
-          | NaN, rest ->
-              return (Item (nan, rest), qta - 1, ctxt)
-          | IsNaN, Item (x, rest) ->
-              return (Item (is_nan x, rest), qta - 1, ctxt)
-          | NaNaN pos, Item (x, rest) ->
-              if is_nan x then fail (Reject pos) else return (rest, qta - 1, ctxt)
-          | Abs_float, Item (x, rest) ->
-              return (Item (abs_float x, rest), qta - 1, ctxt)
-          | Neg_float, Item (x, rest) ->
-              return (Item (0. -. x, rest), qta - 1, ctxt)
-          | Add_float, Item (x, Item (y, rest)) ->
-              return (Item (x +. y, rest), qta - 1, ctxt)
-          | Sub_float, Item (x, Item (y, rest)) ->
-              return (Item (x -. y, rest), qta - 1, ctxt)
-          | Mul_float, Item (x, Item (y, rest)) ->
-              return (Item (x *. y, rest), qta - 1, ctxt)
-          | Div_float, Item (x, Item (y, rest)) ->
-              return (Item (x /. y, rest), qta - 1, ctxt)
-          | Mod_float, Item (x, Item (y, rest)) ->
-              return (Item (mod_float x y, rest), qta - 1, ctxt)
+              logged_return (Item (res, rest), qta - 1, ctxt)
           (* boolean operations *)
           | Or, Item (x, Item (y, rest)) ->
-              return (Item (x || y, rest), qta - 1, ctxt)
+              logged_return (Item (x || y, rest), qta - 1, ctxt)
           | And, Item (x, Item (y, rest)) ->
-              return (Item (x && y, rest), qta - 1, ctxt)
+              logged_return (Item (x && y, rest), qta - 1, ctxt)
           | Xor, Item (x, Item (y, rest)) ->
-              return (Item (not x && y || x && not y, rest), qta - 1, ctxt)
+              logged_return (Item (not x && y || x && not y, rest), qta - 1, ctxt)
           | Not, Item (x, rest) ->
-              return (Item (not x, rest), qta - 1, ctxt)
+              logged_return (Item (not x, rest), qta - 1, ctxt)
           (* integer operations *)
-          | Checked_abs_int (kind, pos), Item (x, rest) ->
+          | Checked_abs_int kind, Item (x, rest) ->
               begin match Script_int.checked_abs kind x with
-                | None -> fail (Overflow pos)
-                | Some res -> return (Item (res, rest), qta - 1, ctxt)
+                | None -> fail (Overflow loc)
+                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
               end
-          | Checked_neg_int (kind, pos), Item (x, rest) ->
+          | Checked_neg_int kind, Item (x, rest) ->
               begin match Script_int.checked_neg kind x with
-                | None -> fail (Overflow pos)
-                | Some res -> return (Item (res, rest), qta - 1, ctxt)
+                | None -> fail (Overflow loc)
+                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
               end
-          | Checked_add_int (kind, pos), Item (x, Item (y, rest)) ->
+          | Checked_add_int kind, Item (x, Item (y, rest)) ->
               begin match Script_int.checked_add kind x y with
-                | None -> fail (Overflow pos)
-                | Some res -> return (Item (res, rest), qta - 1, ctxt)
+                | None -> fail (Overflow loc)
+                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
               end
-          | Checked_sub_int (kind, pos), Item (x, Item (y, rest)) ->
+          | Checked_sub_int kind, Item (x, Item (y, rest)) ->
               begin match Script_int.checked_sub kind x y with
-                | None -> fail (Overflow pos)
-                | Some res -> return (Item (res, rest), qta - 1, ctxt)
+                | None -> fail (Overflow loc)
+                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
               end
-          | Checked_mul_int (kind, pos), Item (x, Item (y, rest)) ->
+          | Checked_mul_int kind, Item (x, Item (y, rest)) ->
               begin match Script_int.checked_mul kind x y with
-                | None -> fail (Overflow pos)
-                | Some res -> return (Item (res, rest), qta - 1, ctxt)
+                | None -> fail (Overflow loc)
+                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
               end
           | Abs_int kind, Item (x, rest) ->
-              return (Item (Script_int.abs kind x, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.abs kind x, rest), qta - 1, ctxt)
           | Neg_int kind, Item (x, rest) ->
-              return (Item (Script_int.neg kind x, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.neg kind x, rest), qta - 1, ctxt)
           | Add_int kind, Item (x, Item (y, rest)) ->
-              return (Item (Script_int.add kind x y, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.add kind x y, rest), qta - 1, ctxt)
           | Sub_int kind, Item (x, Item (y, rest)) ->
-              return (Item (Script_int.sub kind x y, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.sub kind x y, rest), qta - 1, ctxt)
           | Mul_int kind, Item (x, Item (y, rest)) ->
-              return (Item (Script_int.mul kind x y, rest), qta - 1, ctxt)
-          | Div_int (kind, pos), Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.mul kind x y, rest), qta - 1, ctxt)
+          | Div_int kind, Item (x, Item (y, rest)) ->
               if Compare.Int64.(Script_int.to_int64 kind y = 0L) then
-                fail (Division_by_zero pos)
+                fail (Division_by_zero loc)
               else
-                return (Item (Script_int.div kind x y, rest), qta - 1, ctxt)
-          | Mod_int (kind, pos), Item (x, Item (y, rest)) ->
+                logged_return (Item (Script_int.div kind x y, rest), qta - 1, ctxt)
+          | Mod_int kind, Item (x, Item (y, rest)) ->
               if Compare.Int64.(Script_int.to_int64 kind y = 0L) then
-                fail (Division_by_zero pos)
+                fail (Division_by_zero loc)
               else
-                return (Item (Script_int.rem kind x y, rest), qta - 1, ctxt)
+                logged_return (Item (Script_int.rem kind x y, rest), qta - 1, ctxt)
           | Lsl_int kind, Item (x, Item (y, rest)) ->
-              return (Item (Script_int.logsl kind x y, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.logsl kind x y, rest), qta - 1, ctxt)
           | Lsr_int kind, Item (x, Item (y, rest)) ->
-              return (Item (Script_int.logsr kind x y, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.logsr kind x y, rest), qta - 1, ctxt)
           | Or_int kind, Item (x, Item (y, rest)) ->
-              return (Item (Script_int.logor kind x y, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.logor kind x y, rest), qta - 1, ctxt)
           | And_int kind, Item (x, Item (y, rest)) ->
-              return (Item (Script_int.logand kind x y, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.logand kind x y, rest), qta - 1, ctxt)
           | Xor_int kind, Item (x, Item (y, rest)) ->
-              return (Item (Script_int.logxor kind x y, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.logxor kind x y, rest), qta - 1, ctxt)
           | Not_int kind, Item (x, rest) ->
-              return (Item (Script_int.lognot kind x, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.lognot kind x, rest), qta - 1, ctxt)
           (* control *)
           | Seq (hd, tl), stack ->
               step qta ctxt hd stack >>=? fun (trans, qta, ctxt) ->
@@ -377,93 +315,83 @@ let rec interp
               step qta ctxt bf rest
           | Loop body, Item (true, rest) ->
               step qta ctxt body rest >>=? fun (trans, qta, ctxt) ->
-              step (qta - 1) ctxt (Loop body) trans
+              step (qta - 1) ctxt descr trans
           | Loop _, Item (false, rest) ->
-              return (rest, qta, ctxt)
+              logged_return (rest, qta, ctxt)
           | Dip b, Item (ign, rest) ->
               step qta ctxt b rest >>=? fun (res, qta, ctxt) ->
-              return (Item (ign, res), qta, ctxt)
+              logged_return (Item (ign, res), qta, ctxt)
           | Exec, Item (arg, Item (lam, rest)) ->
-              interp qta orig source amount ctxt lam arg >>=? fun (res, qta, ctxt) ->
-              return (Item (res, rest), qta - 1, ctxt)
+              interp ?log qta orig source amount ctxt lam arg >>=? fun (res, qta, ctxt) ->
+              logged_return (Item (res, rest), qta - 1, ctxt)
           | Lambda lam, rest ->
-              return (Item (lam, rest), qta - 1, ctxt)
-          | Fail pos, _ ->
-              fail (Reject pos)
+              logged_return (Item (lam, rest), qta - 1, ctxt)
+          | Fail, _ ->
+              fail (Reject loc)
           | Nop, stack ->
-              return (stack, qta - 1, ctxt)
+              logged_return (stack, qta - 1, ctxt)
           (* comparison *)
           | Compare Bool_key, Item (a, Item (b, rest)) ->
               let cmpres = Compare.Bool.compare a b in
               let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare String_key, Item (a, Item (b, rest)) ->
               let cmpres = Compare.String.compare a b in
               let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
-          | Compare Float_key, Item (a, Item (b, rest)) ->
-              let cmpres = Compare.Float.compare a b in
-              let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare Tez_key, Item (a, Item (b, rest)) ->
               let cmpres = Tez.compare a b in
               let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare (Int_key kind), Item (a, Item (b, rest)) ->
               let cmpres = Script_int.compare kind a b in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare Key_key, Item (a, Item (b, rest)) ->
               let cmpres = Ed25519.Public_key_hash.compare a b in
               let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare Timestamp_key, Item (a, Item (b, rest)) ->
               let cmpres = Timestamp.compare a b in
               let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           (* comparators *)
           | Eq, Item (cmpres, rest) ->
               let cmpres = Script_int.to_int64 Int64 cmpres in
               let cmpres = Compare.Int64.(cmpres = 0L) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Neq, Item (cmpres, rest) ->
               let cmpres = Script_int.to_int64 Int64 cmpres in
               let cmpres = Compare.Int64.(cmpres <> 0L) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Lt, Item (cmpres, rest) ->
               let cmpres = Script_int.to_int64 Int64 cmpres in
               let cmpres = Compare.Int64.(cmpres < 0L) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Gt, Item (cmpres, rest) ->
               let cmpres = Script_int.to_int64 Int64 cmpres in
               let cmpres = Compare.Int64.(cmpres > 0L) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Le, Item (cmpres, rest) ->
               let cmpres = Script_int.to_int64 Int64 cmpres in
               let cmpres = Compare.Int64.(cmpres <= 0L) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Ge, Item (cmpres, rest) ->
               let cmpres = Script_int.to_int64 Int64 cmpres in
               let cmpres = Compare.Int64.(cmpres >= 0L) in
-              return (Item (cmpres, rest), qta - 1, ctxt)
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
           (* casts *)
-          | Checked_int_of_int (_, kt, pos), Item (v, rest) ->
+          | Checked_int_of_int (_, kt), Item (v, rest) ->
               begin match Script_int.checked_cast kt v with
-                | None -> fail (Overflow pos)
-                | Some res -> return (Item (res, rest), qta - 1, ctxt)
+                | None -> fail (Overflow loc)
+                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
               end
           | Int_of_int (_, kt), Item (v, rest) ->
-              return (Item (Script_int.cast kt v, rest), qta - 1, ctxt)
-          | Int_of_float kt, Item (v, rest) ->
-              let v = Int64.of_float v in
-              return (Item (Script_int.of_int64 kt v, rest), qta - 1, ctxt)
-          | Float_of_int kf, Item (v, rest) ->
-              let v = Int64.to_float (Script_int.to_int64 kf v) in
-              return (Item (v, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.cast kt v, rest), qta - 1, ctxt)
           (* protocol *)
           | Manager, Item ((_, _, contract), rest) ->
               Contract.get_manager ctxt contract >>=? fun manager ->
-              return (Item (manager, rest), qta - 1, ctxt)
-          | Transfer_tokens (storage_type, loc),
+              logged_return (Item (manager, rest), qta - 1, ctxt)
+          | Transfer_tokens storage_type,
             Item (p, Item (amount, Item ((tp, Void_t, destination), Item (sto, Empty)))) -> begin
               Contract.unconditional_spend ctxt source amount >>=? fun ctxt ->
               Contract.credit ctxt destination amount >>=? fun ctxt ->
@@ -491,39 +419,39 @@ let rec interp
                   | No_script -> assert false
                   | Script { storage = { storage } } ->
                       parse_untagged_data ctxt storage_type storage >>=? fun sto ->
-                      return (Item ((), Item (sto, Empty)), qta - 1, ctxt))
-              end
-            | Transfer_tokens (storage_type, loc),
-              Item (p, Item (amount, Item ((tp, tr, destination), Item (sto, Empty)))) -> begin
-                Contract.unconditional_spend ctxt source amount >>=? fun ctxt ->
-                Contract.credit ctxt destination amount >>=? fun ctxt ->
-                Contract.get_script ctxt destination >>=? function
-                | No_script -> fail (Invalid_contract (loc, destination))
-                | Script { code ; storage } ->
-                    let sto = unparse_untagged_data storage_type sto in
-                    Contract.update_script_storage ctxt source sto >>=? fun ctxt ->
-                    let p = unparse_untagged_data tp p in
-                    execute source destination ctxt storage code amount p qta
-                    >>=? fun (sto, ret, qta, ctxt) ->
-                    Contract.update_script_storage
-                      ctxt destination sto >>=? fun ctxt ->
-                    trace
-                      (Invalid_contract (loc, destination))
-                      (parse_untagged_data ctxt tr ret) >>=? fun v ->
-                    Contract.get_script ctxt source >>=? (function
-                        | No_script -> assert false
-                        | Script { storage = { storage } } ->
-                            parse_untagged_data ctxt storage_type storage >>=? fun sto ->
-                            return (Item (v, Item (sto, Empty)), qta - 1, ctxt))
-              end
-            | Create_account,
-              Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
+                      logged_return (Item ((), Item (sto, Empty)), qta - 1, ctxt))
+            end
+          | Transfer_tokens storage_type,
+            Item (p, Item (amount, Item ((tp, tr, destination), Item (sto, Empty)))) -> begin
+              Contract.unconditional_spend ctxt source amount >>=? fun ctxt ->
+              Contract.credit ctxt destination amount >>=? fun ctxt ->
+              Contract.get_script ctxt destination >>=? function
+              | No_script -> fail (Invalid_contract (loc, destination))
+              | Script { code ; storage } ->
+                  let sto = unparse_untagged_data storage_type sto in
+                  Contract.update_script_storage ctxt source sto >>=? fun ctxt ->
+                  let p = unparse_untagged_data tp p in
+                  execute source destination ctxt storage code amount p qta
+                  >>=? fun (sto, ret, qta, ctxt) ->
+                  Contract.update_script_storage
+                    ctxt destination sto >>=? fun ctxt ->
+                  trace
+                    (Invalid_contract (loc, destination))
+                    (parse_untagged_data ctxt tr ret) >>=? fun v ->
+                  Contract.get_script ctxt source >>=? (function
+                      | No_script -> assert false
+                      | Script { storage = { storage } } ->
+                          parse_untagged_data ctxt storage_type storage >>=? fun sto ->
+                          logged_return (Item (v, Item (sto, Empty)), qta - 1, ctxt))
+            end
+          | Create_account,
+            Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
               Contract.unconditional_spend ctxt source credit >>=? fun ctxt ->
               Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
               Contract.originate ctxt
                 ~manager ~delegate ~balance
                 ~script:No_script ~spendable:true ~delegatable >>=? fun (ctxt, contract) ->
-              return (Item ((Void_t, Void_t, contract), rest), qta - 1, ctxt)
+              logged_return (Item ((Void_t, Void_t, contract), rest), qta - 1, ctxt)
           | Create_contract (g, p, r),
             Item (manager, Item (delegate, Item (delegatable, Item (credit,
                                                                     Item (Lam (_, code), Item (init, rest)))))) ->
@@ -543,35 +471,43 @@ let rec interp
                 ~manager ~delegate ~balance
                 ~script:(Script { code ; storage }) ~spendable:true ~delegatable
               >>=? fun (ctxt, contract) ->
-              return (Item ((p, r, contract), rest), qta - 1, ctxt)
+              logged_return (Item ((p, r, contract), rest), qta - 1, ctxt)
           | Balance, rest ->
               Contract.get_balance ctxt source >>=? fun balance ->
-              return (Item (balance, rest), qta - 1, ctxt)
+              logged_return (Item (balance, rest), qta - 1, ctxt)
           | Now, rest ->
               Timestamp.get_current ctxt >>=? fun now ->
-              return (Item (now, rest), qta - 1, ctxt)
+              logged_return (Item (now, rest), qta - 1, ctxt)
           | Check_signature, Item (key, Item ((signature, message), rest)) ->
               Public_key.get ctxt key >>=? fun key ->
               let message = MBytes.of_string message in
               let res = Ed25519.check_signature key signature message in
-              return (Item (res, rest), qta - 1, ctxt)
+              logged_return (Item (res, rest), qta - 1, ctxt)
           | H ty, Item (v, rest) ->
               let hash = Script.hash_expr (unparse_untagged_data ty v) in
-              return (Item (hash, rest), qta - 1, ctxt)
+              logged_return (Item (hash, rest), qta - 1, ctxt)
           | Steps_to_quota, rest ->
               let steps = Script_int.of_int64 Uint32 (Int64.of_int qta) in
-              return (Item (steps, rest), qta - 1, ctxt)
+              logged_return (Item (steps, rest), qta - 1, ctxt)
           | Source (ta, tb), rest ->
-              return (Item ((ta, tb, orig), rest), qta - 1, ctxt)
+              logged_return (Item ((ta, tb, orig), rest), qta - 1, ctxt)
           | Amount, rest ->
-              return (Item (amount, rest), qta - 1, ctxt)
+              logged_return (Item (amount, rest), qta - 1, ctxt)
     in
-    step qta ctxt code (Item (arg, Empty)) >>=? fun (Item (ret, Empty), qta, ctxt) ->
+    let stack = (Item (arg, Empty)) in
+    begin match log with
+      | None -> ()
+      | Some log ->
+          log := (code.loc, qta, unparse_stack (stack, code.bef)) :: !log
+    end ;
+    step qta ctxt code stack >>=? fun (Item (ret, Empty), qta, ctxt) ->
     return (ret, qta, ctxt)
 
 (* ---- contract handling ---------------------------------------------------*)
 
-and execute orig source ctxt { storage; storage_type } { code; arg_type; ret_type } amount arg qta =
+and execute ?log orig source ctxt storage script amount arg qta =
+  let { Script.storage ; storage_type } = storage in
+  let { Script.code ; arg_type ; ret_type } = script in
   parse_ty arg_type >>=? fun (Ex arg_type) ->
   parse_ty ret_type >>=? fun (Ex ret_type) ->
   parse_ty storage_type >>=? fun (Ex storage_type) ->
@@ -580,8 +516,17 @@ and execute orig source ctxt { storage; storage_type } { code; arg_type; ret_typ
   parse_lambda ctxt arg_type_full ret_type_full code >>=? fun lambda ->
   parse_untagged_data ctxt arg_type arg >>=? fun arg ->
   parse_untagged_data ctxt storage_type storage >>=? fun storage ->
-  interp qta orig source amount ctxt lambda ((amount, arg), storage) >>=? fun (ret, qta, ctxt) ->
-              let ret, storage = ret in
-              return (unparse_untagged_data storage_type storage,
-                      unparse_untagged_data ret_type ret,
-                      qta, ctxt)
+  interp ?log qta orig source amount ctxt lambda ((amount, arg), storage)
+  >>=? fun (ret, qta, ctxt) ->
+  let ret, storage = ret in
+  return (unparse_untagged_data storage_type storage,
+          unparse_untagged_data ret_type ret,
+          qta, ctxt)
+
+let trace orig source ctxt storage script amount arg qta =
+  let log = ref [] in
+  execute ~log orig source ctxt storage script amount arg qta >>=? fun res ->
+  return (res, List.rev !log)
+
+let execute orig source ctxt storage script amount arg qta =
+  execute orig source ctxt storage script amount arg qta
