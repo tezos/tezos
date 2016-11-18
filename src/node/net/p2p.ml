@@ -415,9 +415,10 @@ module Make (P: PARAMS) = struct
             Crypto_box.check_proof_of_work
               public_key proof_of_work Crypto_box.default_target in
           if not work_proved then
-            (*debug "connection rejected (invalid proof of work)"
-              pp_gid my_gid Ipaddr.pp_hum addr port ;*)
+            begin
+            debug "connection rejected (invalid proof of work)";
             cancel ()
+            end
           else
             begin match common_version P.supported_versions versions with
             | None ->
