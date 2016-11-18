@@ -4,6 +4,7 @@ all:
 
 clean:
 	${MAKE} -C src clean
+	${MAKE} -C test clean
 
 .PHONY: test
 test:

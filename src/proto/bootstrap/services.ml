@@ -327,11 +327,45 @@ module Helpers = struct
                 obj1 (req "timestamp" Timestamp.encoding))
       RPC.Path.(custom_root / "helpers" / "minimal_timestamp")
 
+  let run_code_input_encoding =
+    (obj5
+       (req "script" Script.code_encoding)
+       (req "storage" Script.expr_encoding)
+       (req "input" Script.expr_encoding)
+       (opt "amount" Tez.encoding)
+       (opt "contract" Contract.encoding))
+
+  let run_code custom_root =
+    RPC.service
+      ~description: "Run a piece of code in the current context"
+      ~input: run_code_input_encoding
+      ~output: (wrap_tzerror
+                  (obj2
+                     (req "storage" Script.expr_encoding)
+                     (req "output" Script.expr_encoding)))
+      RPC.Path.(custom_root / "helpers" / "run_code")
+
+  let trace_code custom_root =
+    RPC.service
+      ~description: "Run a piece of code in the current context, \
+                     keeping a trace"
+      ~input: run_code_input_encoding
+      ~output: (wrap_tzerror
+                  (obj3
+                     (req "storage" Script.expr_encoding)
+                     (req "output" Script.expr_encoding)
+                     (req "trace"
+                        (list @@ obj3
+                           (req "location" Script.location_encoding)
+                           (req "gas" int31)
+                           (req "stack" (list (Script.expr_encoding)))))))
+      RPC.Path.(custom_root / "helpers" / "trace_code")
+
   let typecheck_code custom_root =
     RPC.service
       ~description: "Typecheck a piece of code in the current context"
       ~input: Script.code_encoding
-      ~output: (wrap_tzerror empty)
+      ~output: (wrap_tzerror Script_ir_translator.type_map_enc)
       RPC.Path.(custom_root / "helpers" / "typecheck_code")
 
   let typecheck_tagged_data custom_root =
