@@ -46,8 +46,7 @@ let compare_target xs target =
   List.for_all2 (fun o t -> get_16 o <= t) offsets target
 
 let default_target =
-  let x = 1 lsl 16 - 1 in
-  [0;1 lsl 13;x;x;x;x;x;x;x;x;x;x;x;x;x;x]
+  let x = 65535 in [0;256;x;x;x;x;x;x;x;x;x;x;x;x;x;x]
 
 let check_proof_of_work pk nonce target =
   let what_to_hash =
