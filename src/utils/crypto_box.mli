@@ -18,6 +18,7 @@ val nonce_encoding : nonce Data_encoding.t
 type target
 val compare_target : MBytes.t list -> target -> bool
 val validate_target : target -> unit
+val default_target : target
 
 type secret_key
 type public_key
