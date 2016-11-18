@@ -21,3 +21,9 @@ val execute: Contract.t -> Contract.t -> Tezos_context.t ->
   Script.storage -> Script.code -> Tez.t ->
   Script.expr -> int ->
   (Script.expr * Script.expr * int * context) tzresult Lwt.t
+
+val trace: Contract.t -> Contract.t -> Tezos_context.t ->
+  Script.storage -> Script.code -> Tez.t ->
+  Script.expr -> int ->
+  ((Script.expr * Script.expr * int * context) *
+   (Script.location * int * Script.expr list) list) tzresult Lwt.t
