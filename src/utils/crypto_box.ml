@@ -43,7 +43,11 @@ let compare_target xs target =
   let bytes = MBytes.of_string hash in
   let get_16 = EndianBigstring.BigEndian.get_uint16 bytes in
   let offsets = [0;2;4;6;8;10;12;14;16;18;20;22;24;26;28;30] in
-  List.for_all2 (fun o t -> get_16 o < t) offsets target
+  List.for_all2 (fun o t -> get_16 o <= t) offsets target
+
+let default_target =
+  let x = 1 lsl 16 - 1 in
+  [0;1 lsl 13;x;x;x;x;x;x;x;x;x;x;x;x;x;x]
 
 let check_proof_of_work pk nonce target =
   let what_to_hash =
