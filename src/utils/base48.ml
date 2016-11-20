@@ -89,6 +89,7 @@ let sha256 s =
   let computed_hash = hash#result in hash#wipe;
   computed_hash
 
+(* Prepend a 4 byte cryptographic checksum before encoding string s *)
 let safe_encode ?alphabet s =
   raw_encode ?alphabet (s ^ String.sub (sha256 (sha256 s)) 0 4)
 
