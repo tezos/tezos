@@ -73,9 +73,6 @@ let substring src srcoff len =
 
 include EndianBigstring.BigEndian
 
-let get_bool s off =
-  ((get_uint8 s (off / 8)) lsr (off mod 8)) land 1 = 1
-
 let of_float f =
   let buf = create 8 in
   set_float buf 0 f;

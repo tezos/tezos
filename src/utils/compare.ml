@@ -85,6 +85,32 @@ module Int64 = struct
   let min x y = if x <= y then x else y
 end
 
+module MakeUnsigned(Int : S)(Z : sig val zero : Int.t end) = struct
+  type t = Int.t
+  let compare va vb =
+    Int.(if va >= Z.zero then if vb >= Z.zero then compare va vb else -1
+           else if vb >= Z.zero then 1 else compare va vb)
+  let (=) = ((=) : t -> t -> bool)
+  let (<>) = ((<>) : t -> t -> bool)
+  let (<) a b =
+    Int.(if Z.zero <= a then
+             (a < b || b < Z.zero)
+           else
+             (b < Z.zero && a < b))
+  let (<=) a b =
+    Int.(if Z.zero <= a then
+             (a <= b || b < Z.zero)
+           else
+             (b < Z.zero && a <= b))
+  let (>=) a b = (<=) b a
+  let (>) a b = (<) b a
+  let max x y = if x >= y then x else y
+  let min x y = if x <= y then x else y
+end
+
+module Uint32 = MakeUnsigned(Int32)(struct let zero = 0l end)
+module Uint64 = MakeUnsigned(Int64)(struct let zero = 0L end)
+
 module Float = struct
   type t = float
   let (=) = ((=) : t -> t -> bool)
