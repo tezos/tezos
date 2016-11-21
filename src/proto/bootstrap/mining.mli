@@ -70,7 +70,7 @@ val first_endorsement_slots:
 val check_signature:
   context -> Block.header -> public_key_hash -> unit tzresult Lwt.t
 
-val check_hash: Block_hash.t -> int -> bool
+val check_hash: Block_hash.t -> int64 -> bool
 val check_proof_of_work_stamp:
   context -> Block.header -> unit tzresult Lwt.t
 
