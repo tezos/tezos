@@ -134,8 +134,16 @@ module Make(Param : sig val name: string end)() = struct
   module Compare = Compare
   module Array = Array
   module List = List
-  module Bytes = Bytes
-  module String = String
+  module Bytes = struct
+    include Bytes
+    include EndianBytes.BigEndian
+    module LE = EndianBytes.LittleEndian
+  end
+  module String = struct
+    include String
+    include EndianString.BigEndian
+    module LE = EndianString.LittleEndian
+  end
   module Set = Set
   module Map = Map
   module Int32 = Int32

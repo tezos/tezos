@@ -79,7 +79,8 @@ let () =
 let proof_of_work_threshold ctxt =
   return @@ Constants.proof_of_work_threshold ctxt
 
-let () = register0 Services.Constants.proof_of_work_threshold proof_of_work_threshold
+let () =
+  register0 Services.Constants.proof_of_work_threshold proof_of_work_threshold
 
 let () =
   register1_noctxt Services.Constants.errors
