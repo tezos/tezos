@@ -141,23 +141,18 @@ let logsr _ (Int va) (Int vb) =
   Int (Int64.shift_right_logical va (Int64.to_int vb))
 
 (* sign aware comparison *)
-let signed_compare va vb =
-  Compare.Int64.(if va = vb then 0 else if va > vb then 1 else -1)
-let unsigned_compare va vb =
-  Compare.Int64.(if va >= 0L then if vb >= 0L then signed_compare va vb else -1
-                 else if vb >= 0L then 1 else signed_compare va vb)
 let compare
   : type s l. (s, l) int_kind -> (s, l) int_val -> (s, l) int_val -> (signed, sixtyfour) int_val
   = fun kind (Int va) (Int vb) ->
     let cmp = match kind with
-      | Int8 -> signed_compare va vb
-      | Uint8 -> unsigned_compare va vb
-      | Int16 -> signed_compare va vb
-      | Uint16 -> unsigned_compare va vb
-      | Int32 -> signed_compare va vb
-      | Uint32 -> unsigned_compare va vb
-      | Int64 -> signed_compare va vb
-      | Uint64 -> unsigned_compare va vb in
+      | Int8 -> Compare.Int64.compare va vb
+      | Uint8 -> Compare.Uint64.compare va vb
+      | Int16 -> Compare.Int64.compare va vb
+      | Uint16 -> Compare.Uint64.compare va vb
+      | Int32 -> Compare.Int64.compare va vb
+      | Uint32 -> Compare.Uint64.compare va vb
+      | Int64 -> Compare.Int64.compare va vb
+      | Uint64 -> Compare.Uint64.compare va vb in
     Int Compare.Int.(if cmp = 0 then 0L else if cmp > 0 then 1L else -1L)
 
 let equal kind va vb =
@@ -172,9 +167,9 @@ let checked_add : type s l. (s, l) int_kind -> (s, l) int_val -> (s, l) int_val 
     | Uint16 -> checked_of_int64 Uint16 r
     | Int32 -> checked_of_int64 Int32 r
     | Uint32 -> checked_of_int64 Uint32 r
-    | Int64 when Compare.Int.(signed_compare r va < 0) -> None
+    | Int64 when Compare.Int.(Compare.Int64.compare r va < 0) -> None
     | Int64 -> Some (Int r)
-    | Uint64 when Compare.Int.(unsigned_compare r va < 0) -> None
+    | Uint64 when Compare.Int.(Compare.Uint64.compare r va < 0) -> None
     | Uint64 -> Some (Int r)
 
 let checked_sub : type s l. (s, l) int_kind -> (s, l) int_val -> (s, l) int_val -> (s, l) int_val option
@@ -186,10 +181,10 @@ let checked_sub : type s l. (s, l) int_kind -> (s, l) int_val -> (s, l) int_val 
     | Int32 -> checked_of_int64 Int32 r
     | Uint32 -> checked_of_int64 Uint32 r
     | Int64 when Compare.Int64.(vb >= 0L) ->
-        if Compare.Int.(signed_compare r va <= 0) then Some (Int r) else None
+        if Compare.Int.(Compare.Int64.compare r va <= 0) then Some (Int r) else None
     | Int64 ->
-        if Compare.Int.(signed_compare r va >= 0) then Some (Int r) else None
-    | Uint64 when Compare.Int.(unsigned_compare r va > 0) -> None
+        if Compare.Int.(Compare.Int64.compare r va >= 0) then Some (Int r) else None
+    | Uint64 when Compare.Int.(Compare.Uint64.compare r va > 0) -> None
     | Uint64 -> Some (Int r)
 
 let checked_neg : type l. (signed, l) int_kind -> (signed, l) int_val -> (signed, l) int_val option

@@ -39,7 +39,7 @@ type constants = {
   first_free_mining_slot: int32 ;
   max_signing_slot: int ;
   instructions_per_transaction: int ;
-  proof_of_work_threshold: int ;
+  proof_of_work_threshold: int64 ;
 }
 
 let default = {
@@ -56,7 +56,8 @@ let default = {
   first_free_mining_slot = 16l ;
   max_signing_slot = 15 ;
   instructions_per_transaction = 16 * 1024 ;
-  proof_of_work_threshold = 8 ;
+  proof_of_work_threshold =
+    Int64.(lognot (sub (shift_left 1L 56) 1L)) ;
 }
 
 let opt (=) def v = if def = v then None else Some v
@@ -95,7 +96,7 @@ let constants_encoding =
          opt Int.(=)
            default.instructions_per_transaction c.instructions_per_transaction
        and proof_of_work_threshold =
-         opt Int.(=)
+         opt Int64.(=)
            default.proof_of_work_threshold c.proof_of_work_threshold
        in
        ( cycle_length,
@@ -144,7 +145,7 @@ let constants_encoding =
         (opt "first_free_mining_slot" int32)
         (opt "max_signing_slot" int31)
         (opt "instructions_per_transaction" int31)
-        (opt "proof_of_work_threshold" int31)
+        (opt "proof_of_work_threshold" int64)
     )
 
 type error += Constant_read of exn
