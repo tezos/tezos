@@ -238,3 +238,53 @@ val compare: t -> t -> int
     {!Pervasives.compare}.  Along with the type [t], this function [compare]
     allows the module [String] to be passed as argument to the functors
     {!Set.Make} and {!Map.Make}. *)
+
+
+(** Functions reading bytes  *)
+
+val get_char: t -> int -> char
+(** [get_char buff i] reads 1 byte at offset i as a char *)
+
+val get_uint8: t -> int -> int
+(** [get_uint8 buff i] reads 1 byte at offset i as an unsigned int of 8
+    bits. i.e. It returns a value between 0 and 2^8-1 *)
+
+val get_int8: t -> int -> int
+(** [get_int8 buff i] reads 1 byte at offset i as a signed int of 8
+    bits. i.e. It returns a value between -2^7 and 2^7-1 *)
+
+(** Functions reading according to Big Endian byte order *)
+
+val get_uint16: t -> int -> int
+(** [get_uint16 buff i] reads 2 bytes at offset i as an unsigned int
+      of 16 bits. i.e. It returns a value between 0 and 2^16-1 *)
+
+val get_int16: t -> int -> int
+(** [get_int16 buff i] reads 2 byte at offset i as a signed int of
+      16 bits. i.e. It returns a value between -2^15 and 2^15-1 *)
+
+val get_int32: t -> int -> int32
+(** [get_int32 buff i] reads 4 bytes at offset i as an int32. *)
+
+val get_int64: t -> int -> int64
+(** [get_int64 buff i] reads 8 bytes at offset i as an int64. *)
+
+module LE: sig
+
+  (** Functions reading according to Little Endian byte order *)
+
+  val get_uint16: t -> int -> int
+  (** [get_uint16 buff i] reads 2 bytes at offset i as an unsigned int
+      of 16 bits. i.e. It returns a value between 0 and 2^16-1 *)
+
+  val get_int16: t -> int -> int
+  (** [get_int16 buff i] reads 2 byte at offset i as a signed int of
+      16 bits. i.e. It returns a value between -2^15 and 2^15-1 *)
+
+  val get_int32: t -> int -> int32
+  (** [get_int32 buff i] reads 4 bytes at offset i as an int32. *)
+
+  val get_int64: t -> int -> int64
+  (** [get_int64 buff i] reads 8 bytes at offset i as an int64. *)
+
+end

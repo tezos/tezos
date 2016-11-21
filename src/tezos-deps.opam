@@ -8,9 +8,9 @@ authors: [
   "Pierre Chambart <pierre@ocamlpro.com>"
   "Grégoire Henry <gregoire@ocamlpro.com>"
 ]
-dev-repo: "https://gitlab.ocamlpro.com/tezos/tezos.git"
-homepage: "https://gitlab.ocamlpro.com/tezos/tezos"
-bug-reports: "https://gitlab.ocamlpro.com/tezos/tezos/issues"
+dev-repo: "https://github.com/tezos/tezos.git"
+homepage: "https://gihub.com/tezos/tezos"
+bug-reports: "https://github.com/tezos/tezos/issues"
 depends: [
   "ocamlfind" {build}
   "base-bigarray"
@@ -21,7 +21,8 @@ depends: [
   "cryptokit"
   "git"
   "git-unix"
-  "irmin" {>= "0.11"}
+  "irmin-watcher" (* for `irmin.unix` *)
+  "irmin" {>= "0.12"}
   "menhir"
   "ocp-ocamlres" {>= "dev"}
   "ocplib-endian"

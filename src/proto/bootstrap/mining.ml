@@ -132,16 +132,10 @@ let first_endorsement_slots
   endorsement_priorities ctxt level >>=? fun delegate_list ->
   select_delegate delegate delegate_list max_priority
 
-
 let check_hash hash stamp_threshold =
-  let bytes = Block_hash.to_bytes hash in
-  let len = MBytes.length bytes * 8 in
-  try
-    for i = len - 1 downto (len - stamp_threshold) do
-      if MBytes.get_bool bytes i then raise Exit
-    done;
-    true
-  with Exit -> false
+  let bytes = Block_hash.to_raw hash in
+  let word = String.get_int64 bytes 0 in
+  Compare.Uint64.(word < stamp_threshold)
 
 let check_header_hash {Block.shell;proto;signature} stamp_threshold =
   let hash =
