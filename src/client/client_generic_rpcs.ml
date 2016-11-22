@@ -272,12 +272,12 @@ let list url () =
     Format.pp_print_list
       (fun ppf (n,t) -> display ppf ([ n ], tpath @ [ n ], t))
   in
-  Format.printf "@ @[<v 2>Available services:@ @ %a@]@."
-    display (args, args, tree) ;
+  Cli_entries.message "@ @[<v 2>Available services:@ @ %a@]@."
+    display (args, args, tree) >>= fun () ->
   if !collected_args <> [] then
-    Format.printf "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
-      (Format.pp_print_list display_arg) !collected_args ;
-  return ()
+    Cli_entries.message "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
+      (Format.pp_print_list display_arg) !collected_args
+  else Lwt.return ()
 
 
 let schema url () =
@@ -285,14 +285,12 @@ let schema url () =
   let open RPC.Description in
   Client_node_rpcs.describe ~recurse:false args >>= function
   | Static { service = Some { input ; output } } ->
-      Printf.printf "Input schema:\n%s\nOutput schema:\n%s\n%!"
+      Cli_entries.message "Input schema:\n%s\nOutput schema:\n%s\n%!"
         (Data_encoding.Json.to_string (Json_schema.to_json input))
-        (Data_encoding.Json.to_string (Json_schema.to_json output));
-      return ()
+        (Data_encoding.Json.to_string (Json_schema.to_json output))
   | _ ->
-      Printf.printf
-        "No service found at this URL (but this is a valid prefix)\n%!" ;
-      return ()
+      Cli_entries.message
+        "No service found at this URL (but this is a valid prefix)\n%!"
 
 let fill_in schema =
   let open Json_schema in
@@ -311,13 +309,11 @@ let call url () =
           error "%s" msg
       | Ok json ->
           Client_node_rpcs.get_json args json >>= fun json ->
-          Printf.printf "Output:\n%s\n%!" (Data_encoding.Json.to_string json) ;
-          return ()
+          Cli_entries.message "Output:\n%s\n%!" (Data_encoding.Json.to_string json)
     end
   | _ ->
-      Printf.printf
-        "No service found at this URL (but this is a valid prefix)\n%!" ;
-      return ()
+      Cli_entries.message
+        "No service found at this URL (but this is a valid prefix)\n%!"
 
 let () =
   let open Cli_entries in

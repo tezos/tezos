@@ -68,15 +68,16 @@ let reveal_block_nonces ?force block_hashes =
             | Error _ ->
                 Lwt.fail Not_found)
          (fun _ ->
-            Format.eprintf "Cannot find block %a in the chain. (ignoring)@."
-              Block_hash.pp_short hash ;
+            Cli_entries.warning
+              "Cannot find block %a in the chain. (ignoring)@."
+              Block_hash.pp_short hash >>= fun () ->
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
   map_filter_s (fun (bi : Client_mining_blocks.block_info) ->
       Client_proto_nonces.find bi.hash >>= function
       | None ->
-          Format.eprintf "Cannot find nonces for block %a (ignoring)@."
-            Block_hash.pp_short bi.hash ;
+          Cli_entries.warning "Cannot find nonces for block %a (ignoring)@."
+            Block_hash.pp_short bi.hash >>= fun () ->
           return None
       | Some nonce ->
           return (Some (bi.hash, (bi.level.level, nonce))))
@@ -93,8 +94,8 @@ let reveal_nonces ?force () =
       Client_proto_nonces.find bi.hash >>= function
       | None -> return None
       | Some nonce ->
-          Format.eprintf "Found nonce for %a (level: %a)@."
-            Block_hash.pp_short bi.hash Level.pp bi.level ;
+          Cli_entries.warning "Found nonce for %a (level: %a)@."
+            Block_hash.pp_short bi.hash Level.pp bi.level >>= fun () ->
           return (Some (bi.hash, (bi.level.level, nonce))))
     block_infos >>=? fun blocks ->
   do_reveal ?force block blocks

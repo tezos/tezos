@@ -38,7 +38,7 @@ let main () =
   Sodium.Random.stir () ;
   catch
     (fun () ->
-       let block = Client_config.preparse_args () in
+       Client_config.preparse_args () >>= fun block ->
        Lwt.catch
          (fun () ->
             Client_node_rpcs.Blocks.protocol block)

@@ -179,6 +179,5 @@ let commands  () =
        @@ RawContractAlias.alias_param
        @@ stop)
       (fun (_, contract) () ->
-         Format.printf "%a\n%!" Contract.pp contract ;
-         Lwt.return ()) ;
+         Cli_entries.message "%a\n%!" Contract.pp contract) ;
   ]
