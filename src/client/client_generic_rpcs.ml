@@ -104,7 +104,12 @@ let fill_in input schema =
 
 let random_fill_in schema =
   let display _ = return () in
-  let int min max _ _ = return (Random.int (max - min) + min) in
+  let int min max _ _ =
+    let max = Int64.of_int max
+    and min = Int64.of_int min in
+    let range = Int64.sub max min in
+    let random_int64 = Int64.add (Random.int64 range) min in
+    return (Int64.to_int random_int64) in
   let string _title _ = return "" in
   let float _ _ = return (Random.float infinity) in
   let bool _ _ = return (Random.int 2 = 0) in
@@ -155,7 +160,9 @@ let editor_fill_in schema =
   and reread () =
     (* finally reread the file *)
     Lwt_io.(with_file Input tmp (fun fp -> read fp)) >>= fun text ->
-    return (Data_encoding.Json.from_string text)
+    match Data_encoding.Json.from_string text with
+    | Ok r -> return (Ok r)
+    | Error msg -> return (Error (Printf.sprintf "bad input: %s" msg))
   and delete () =
     (* and delete the temp file *)
     Lwt_unix.unlink tmp
@@ -300,8 +307,8 @@ let call url () =
   Client_node_rpcs.describe ~recurse:false args >>= function
   | Static { service = Some { input } } -> begin
       fill_in input >>= function
-      | Error _ ->
-          error "bad input"
+      | Error msg ->
+          error "%s" msg
       | Ok json ->
           Client_node_rpcs.get_json args json >>= fun json ->
           Printf.printf "Output:\n%s\n%!" (Data_encoding.Json.to_string json) ;
