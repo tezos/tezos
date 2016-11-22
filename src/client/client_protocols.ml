@@ -11,8 +11,8 @@ let commands () =
       ~desc: "list known protocols"
       (prefixes [ "list" ; "protocols" ] stop)
       (fun () ->
-         Client_node_rpcs.Protocols.list ~contents:false () >|= fun protos ->
-         List.iter (fun (ph, _p) -> message "%a" Protocol_hash.pp ph) protos
+         Client_node_rpcs.Protocols.list ~contents:false () >>= fun protos ->
+         Lwt_list.iter_s (fun (ph, _p) -> message "%a" Protocol_hash.pp ph) protos
       );
     command
       ~group: "protocols"
@@ -26,8 +26,7 @@ let commands () =
               let proto = Tezos_compiler.Protocol.of_dir dirname in
               Client_node_rpcs.inject_protocol proto >>= function
               | Ok hash ->
-                  message "Injected protocol %a successfully" Protocol_hash.pp_short hash;
-                  Lwt.return ();
+                  message "Injected protocol %a successfully" Protocol_hash.pp_short hash
               | Error err ->
                   error "Error while injecting protocol from %s: %a"
                     dirname Error_monad.pp_print_error err)
@@ -44,7 +43,7 @@ let commands () =
       (fun ph () ->
          Client_node_rpcs.Protocols.bytes ph >>= fun { data } -> match data with
          | Ok proto ->
-             Updater.extract "" ph proto >|= fun () ->
+             Updater.extract "" ph proto >>= fun () ->
              message "Extracted protocol %a" Protocol_hash.pp_short ph
          | Error err ->
              error "Error while dumping protocol %a: %a"

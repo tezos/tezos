@@ -13,31 +13,13 @@ open Lwt
 open Cli_entries
 open Logging.RPC
 
-let log_file =
-  let open CalendarLib in
-  Printer.Precise_Calendar.sprint
-    "%Y-%m-%dT%H:%M:%SZ.log"
-    (Calendar.Precise.now ())
-
-let with_log_file f =
-  Utils.create_dir Client_config.(base_dir#get // "logs") >>= fun () ->
-  Lwt_io.with_file
-    ~flags: Unix.[ O_APPEND ; O_CREAT ; O_WRONLY ]
-    ~mode: Lwt_io.Output
-    Client_config.(base_dir#get // "logs" // log_file)
-    f
-
 let log_request cpt url req =
-  with_log_file
-    (fun fp ->
-       Lwt_io.fprintf fp">>>>%d: %s\n%s\n" cpt url req >>= fun () ->
-       Lwt_io.flush fp)
+  Cli_entries.log "requests"
+    ">>>>%d: %s\n%s\n" cpt url req
 
 let log_response cpt code ans =
-  with_log_file
-    (fun fp ->
-       Lwt_io.fprintf fp"<<<<%d: %s\n%s\n" cpt (Cohttp.Code.string_of_status code) ans >>= fun () ->
-       Lwt_io.flush fp)
+  Cli_entries.log "requests"
+    "<<<<%d: %s\n%s\n" cpt (Cohttp.Code.string_of_status code) ans
 
 let cpt = ref 0
 let make_request service json =
@@ -67,9 +49,10 @@ let get_streamed_json service json =
   let ansbody = Cohttp_lwt_body.to_stream ansbody in
   match code, ansbody with
   | #Cohttp.Code.success_status, ansbody ->
-      if Client_config.print_timings#get then
+      (if Client_config.print_timings#get then
         message "Request to /%s succeeded in %gs"
-          (String.concat "/" service) time ;
+          (String.concat "/" service) time
+       else Lwt.return ()) >>= fun () ->
       Lwt.return (
         Lwt_stream.filter_map_s
           (function
@@ -80,11 +63,12 @@ let get_streamed_json service json =
                 Lwt.return None)
           (Data_encoding.Json.from_stream ansbody))
   | err, _ansbody ->
-      if Client_config.print_timings#get then
+      (if Client_config.print_timings#get then
         message "Request to /%s failed in %gs"
-          (String.concat "/" service) time ;
+          (String.concat "/" service) time
+       else Lwt.return ()) >>= fun () ->
       message "Request to /%s failed, server returned %s"
-        (String.concat "/" service) (Cohttp.Code.string_of_status err) ;
+        (String.concat "/" service) (Cohttp.Code.string_of_status err) >>= fun () ->
       error "the RPC server returned a non-success status (%s)"
         (Cohttp.Code.string_of_status err)
 
@@ -93,9 +77,10 @@ let get_json service json =
   Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
   match code, ansbody with
   | #Cohttp.Code.success_status, ansbody -> begin
-      if Client_config.print_timings#get then
-        message "Request to /%s succeeded in %gs"
-          (String.concat "/" service) time ;
+      (if Client_config.print_timings#get then
+         message "Request to /%s succeeded in %gs"
+           (String.concat "/" service) time
+       else Lwt.return ()) >>= fun () ->
       log_response cpt code ansbody >>= fun () ->
       if ansbody = "" then Lwt.return `Null
       else match Data_encoding.Json.from_string ansbody with
@@ -103,11 +88,12 @@ let get_json service json =
         | Ok res -> Lwt.return res
     end
   | err, _ansbody ->
-      if Client_config.print_timings#get then
-        message "Request to /%s failed in %gs"
-          (String.concat "/" service) time ;
+      (if Client_config.print_timings#get then
+         message "Request to /%s failed in %gs"
+           (String.concat "/" service) time
+       else Lwt.return ()) >>= fun () ->
       message "Request to /%s failed, server returned %s"
-        (String.concat "/" service) (Cohttp.Code.string_of_status err) ;
+        (String.concat "/" service) (Cohttp.Code.string_of_status err) >>= fun () ->
       error "the RPC server returned a non-success status (%s)"
         (Cohttp.Code.string_of_status err)
 

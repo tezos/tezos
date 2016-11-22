@@ -183,7 +183,7 @@ let commands () =
       ~desc: "lists all known programs"
       (fixed [ "list" ; "known" ; "programs" ])
       (fun () -> Program.load () >>= fun list ->
-        List.iter (fun (n, _) -> message "%s" n) list ; Lwt.return ()) ;
+        Lwt_list.iter_s (fun (n, _) -> message "%s" n) list) ;
     command
       ~group: "programs"
       ~desc: "remember a program under some name"
@@ -262,7 +262,7 @@ let commands () =
          Client_proto_rpcs.Helpers.typecheck_code (block ()) program >>= function
          | Ok type_map ->
              let type_map, program = unexpand_macros type_map program in
-             message "Well typed" ;
+             message "Well typed" >>= fun () ->
              if !show_types then begin
                print_program
                  (fun l -> List.mem_assoc l type_map)
@@ -296,8 +296,7 @@ let commands () =
          Client_proto_rpcs.Helpers.typecheck_untagged_data
            (block ()) (data, exp_ty) >>= function
          | Ok () ->
-             message "Well typed" ;
-             Lwt.return ()
+             message "Well typed"
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
              error "ill-typed data") ;
@@ -312,8 +311,7 @@ let commands () =
          let open Data_encoding in
          Client_proto_rpcs.Helpers.hash_data (block ()) data >>= function
          | Ok hash ->
-             message "%S" hash;
-             Lwt.return ()
+             message "%S" hash
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
              error "ill-formed data") ;
@@ -337,8 +335,7 @@ let commands () =
                hash
                (signature |>
                 Data_encoding.Binary.to_bytes Ed25519.signature_encoding |>
-                Hex_encode.hex_of_bytes) ;
-             Lwt.return ()
+                Hex_encode.hex_of_bytes)
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
              error "ill-formed data") ;
