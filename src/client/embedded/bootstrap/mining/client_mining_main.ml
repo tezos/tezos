@@ -27,7 +27,7 @@ let mine_block block ?force ?max_priority ?src_sk delegate =
     ~seed_nonce ~src_sk block delegate >>=? fun block_hash ->
   Client_mining_forge.State.record_block level block_hash seed_nonce
   |> trace_exn (Failure "Error while recording block") >>=? fun () ->
-  message "Injected block %a" Block_hash.pp_short block_hash ;
+  message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return ()
 
 let endorse_block ?force ?max_priority delegate =
@@ -35,8 +35,8 @@ let endorse_block ?force ?max_priority delegate =
   Client_keys.get_key delegate >>=? fun (_src_name, src_pk, src_sk) ->
   Client_mining_endorsement.forge_endorsement
     block ?force ?max_priority ~src_sk src_pk >>=? fun oph ->
-  answer "Operation successfully injected in the node." ;
-  answer "Operation hash is '%a'." Operation_hash.pp oph ;
+  answer "Operation successfully injected in the node." >>= fun () ->
+  answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return ()
 
 let get_predecessor_cycle cycle =
