@@ -31,11 +31,11 @@ let forge_seed_nonce_revelation block ?(force = false) redempted_nonces =
           Client_proto_rpcs.Context.Nonce.get block level >>=? function
           | Forgotten ->
               message "Too late revelation for level %a"
-                Raw_level.pp level ;
+                Raw_level.pp level >>= fun () ->
               return None
           | Revealed _ ->
               message "Ignoring previously-revealed nonce for level %a"
-                Raw_level.pp level ;
+                Raw_level.pp level >>= fun () ->
               return None
           | Missing nonce_hash ->
               if Nonce.check_hash nonce nonce_hash then
@@ -53,6 +53,6 @@ let forge_seed_nonce_revelation block ?(force = false) redempted_nonces =
   | _ ->
       inject_seed_nonce_revelation
         block ~force ~wait:true nonces >>=? fun oph ->
-      answer "Operation successfully injected in the node." ;
-      answer "Operation hash is '%a'." Operation_hash.pp_short oph ;
+      answer "Operation successfully injected in the node." >>= fun () ->
+      answer "Operation hash is '%a'." Operation_hash.pp_short oph >>= fun () ->
       return ()

@@ -292,7 +292,7 @@ let endorse state =
              Block_hash.pp_short hash
              Raw_level.pp level
              slot name
-             Operation_hash.pp_short oph ;
+             Operation_hash.pp_short oph >>= fun () ->
            return ())
     to_endorse
 

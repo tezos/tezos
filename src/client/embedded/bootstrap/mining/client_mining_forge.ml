@@ -374,7 +374,7 @@ let mine state =
         Block_hash.pp_short bi.hash
         Raw_level.pp level priority
         Fitness.pp fitness
-        (List.length operations.applied) ;
+        (List.length operations.applied) >>= fun () ->
       return ()
     end
   | _ ->
