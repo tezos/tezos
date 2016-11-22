@@ -61,8 +61,8 @@ module ContractAlias = struct
   let destination_param ?(name = "dst") ?(desc = "destination contract") next =
     let desc =
       desc ^ "\n"
-      ^ "can be an alias, a key alias, or a litteral (autodetected in this order)\n\
-         use 'text:litteral', 'alias:name', 'key:name' to force" in
+      ^ "can be an alias, a key alias, or a literal (autodetected in this order)\n\
+         use 'text:literal', 'alias:name', 'key:name' to force" in
     Cli_entries.param ~name ~desc
       (fun s ->
          match Utils.split ~limit:1 ':' s with

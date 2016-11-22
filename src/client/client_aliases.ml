@@ -164,8 +164,8 @@ module Alias = functor (Entity : Entity) -> struct
   let source_param ?(name = "src") ?(desc = "source " ^ name) next =
     let desc =
       desc ^ "\n"
-      ^ "can be an alias, file or litteral (autodetected in this order)\n\
-         use 'file:path', 'text:litteral' or 'alias:name' to force" in
+      ^ "can be an alias, file or literal (autodetected in this order)\n\
+         use 'file:path', 'text:literal' or 'alias:name' to force" in
     param ~name ~desc
       (fun s ->
          let read path =
