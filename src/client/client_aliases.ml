@@ -33,16 +33,16 @@ module type Alias = sig
   val save : (Lwt_io.file_name * t) list -> unit Lwt.t
   val to_source : t -> string Lwt.t
   val alias_param :
-    ?n:string ->
+    ?name:string ->
     ?desc:string ->
     'a Cli_entries.params ->
     (Lwt_io.file_name * t -> 'a) Cli_entries.params
   val fresh_alias_param :
-    ?n:string ->
+    ?name:string ->
     ?desc:string ->
     'a Cli_entries.params -> (string -> 'a) Cli_entries.params
   val source_param :
-    ?n:string ->
+    ?name:string ->
     ?desc:string ->
     'a Cli_entries.params -> (t -> 'a) Cli_entries.params
 end
@@ -115,9 +115,8 @@ module Alias = functor (Entity : Entity) -> struct
     (if not Client_config.force#get then
        Lwt_list.iter_s (fun (n, v) ->
            if n = name && v = value then
-             (message "The %s alias %s already exists with the same value." Entity.name n ;
-              keep := true ;
-              return ())
+             (keep := true ;
+              message "The %s alias %s already exists with the same value." Entity.name n)
            else if n = name && v <> value then
              error "another %s is already aliased as %s, use -force true to update" Entity.name n
            else if n <> name && v = value then
@@ -130,8 +129,7 @@ module Alias = functor (Entity : Entity) -> struct
       return ()
     else
       save list >>= fun () ->
-      message "New %s alias '%s' saved." Entity.name name ;
-      return ()
+      message "New %s alias '%s' saved." Entity.name name
 
   let del name =
     load () >>= fun list ->
@@ -140,55 +138,56 @@ module Alias = functor (Entity : Entity) -> struct
 
   let save list =
     save list >>= fun () ->
-    message "Successful update of the %s alias file." Entity.name ;
-    return ()
+    message "Successful update of the %s alias file." Entity.name
 
   include Entity
 
-  let alias_param ?(n = "name") ?(desc = "existing " ^ name ^ " alias") next =
-    Param (n, desc, (fun s -> find s >>= fun v -> return (s, v)), next)
+  let alias_param ?(name = "name") ?(desc = "existing " ^ name ^ " alias") next =
+    param ~name ~desc
+      (fun s -> find s >>= fun v -> return (s, v))
+      next
 
-  let fresh_alias_param ?(n = "new") ?(desc = "new " ^ name ^ " alias") next =
-    Param (n,
-           desc,
-           (fun s ->
-              load () >>= fun list ->
-              if not Client_config.force#get then
-                Lwt_list.iter_s (fun (n, _v) ->
-                    if n = name then
-                      error "the %s alias %s already exists, use -force true to update" Entity.name n
-                    else return ())
-                  list >>= fun () ->
-                return s
-              else return s),
-           next)
+  let fresh_alias_param ?(name = "new") ?(desc = "new " ^ name ^ " alias") next =
+    param ~name ~desc
+      (fun s ->
+         load () >>= fun list ->
+         if not Client_config.force#get then
+           Lwt_list.iter_s (fun (n, _v) ->
+               if n = name then
+                 error "the %s alias %s already exists, use -force true to update" Entity.name n
+               else return ())
+             list >>= fun () ->
+           return s
+         else return s)
+      next
 
-  let source_param ?(n = "src") ?(desc = "source " ^ name) next =
-    Param (n,
-           desc ^ "\n"
-           ^ "can be an alias, file or litteral (autodetected in this order)\n\
-              use 'file:path', 'text:litteral' or 'alias:name' to force",
-           (fun s ->
-              let read path =
-                catch
-                  (fun () -> Lwt_io.(with_file ~mode:Input path read))
-                  (fun exn -> param_error "cannot read file (%s)" (Printexc.to_string exn))
-                >>= of_source in
-              match Utils.split ~limit:1 ':' s with
-              | [ "alias" ; alias ]->
-                  find alias
-              | [ "text" ; text ] ->
-                  of_source text
-              | [ "file" ; path ] ->
-                  read path
-              | _ ->
+  let source_param ?(name = "src") ?(desc = "source " ^ name) next =
+    let desc =
+      desc ^ "\n"
+      ^ "can be an alias, file or litteral (autodetected in this order)\n\
+         use 'file:path', 'text:litteral' or 'alias:name' to force" in
+    param ~name ~desc
+      (fun s ->
+         let read path =
+           catch
+             (fun () -> Lwt_io.(with_file ~mode:Input path read))
+             (fun exn -> Lwt.fail_with @@ Format.asprintf "cannot read file (%s)" (Printexc.to_string exn))
+           >>= of_source in
+         match Utils.split ~limit:1 ':' s with
+         | [ "alias" ; alias ]->
+             find alias
+         | [ "text" ; text ] ->
+             of_source text
+         | [ "file" ; path ] ->
+             read path
+         | _ ->
+             catch
+               (fun () -> find s)
+               (fun _ ->
                   catch
-                    (fun () -> find s)
-                    (fun _ ->
-                       catch
-                         (fun () -> read s)
-                         (fun _ -> of_source s))),
-           next)
+                    (fun () -> read s)
+                    (fun _ -> of_source s)))
+      next
 
    let name d =
      rev_find d >>= function
