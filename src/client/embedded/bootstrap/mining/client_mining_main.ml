@@ -101,7 +101,7 @@ let reveal_nonces ?force () =
 
 open Client_proto_args
 
-let run_daemon delegates =
+let run_daemon delegates () =
   Client_mining_daemon.run
     ?max_priority:!max_priority
     ~delay:!endorsement_delay
@@ -126,7 +126,7 @@ let commands () =
       ~args: [ force_arg ]
       (prefixes [ "endorse"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
-         ~n:"miner" ~desc: "name of the delegate owning the endorsement right"
+         ~name:"miner" ~desc: "name of the delegate owning the endorsement right"
        @@ stop)
       (fun (_, delegate) () ->
          endorse_block
@@ -138,7 +138,7 @@ let commands () =
       ~args: [ max_priority_arg ; force_arg ]
       (prefixes [ "mine"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
-         ~n:"miner" ~desc: "name of the delegate owning the mining right"
+         ~name:"miner" ~desc: "name of the delegate owning the mining right"
        @@ stop)
       (fun (_, delegate) () ->
          mine_block (block ())
@@ -150,7 +150,7 @@ let commands () =
       ~args: [ force_arg ]
       (prefixes [ "reveal"; "nonce"; "for" ]
        @@ Cli_entries.seq_of_param Block_hash.param)
-      (fun block_hashes ->
+      (fun block_hashes () ->
          reveal_block_nonces ~force:!force block_hashes >>= Client_proto_rpcs.handle_error) ;
     command
       ~group: "delegate"

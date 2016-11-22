@@ -11,6 +11,27 @@
 
 open Lwt
 
+let () =
+  let startup =
+    CalendarLib.Printer.Precise_Calendar.sprint
+      "%Y-%m-%dT%H:%M:%SZ"
+      (CalendarLib.Calendar.Precise.now ()) in
+  let log channel msg = match channel with
+    | "stdout" ->
+        print_endline msg ;
+        Lwt.return ()
+    | "stderr" ->
+        prerr_endline msg ;
+        Lwt.return ()
+    | log ->
+        Utils.create_dir Client_config.(base_dir#get // "logs" // log) >>= fun () ->
+        Lwt_io.with_file
+          ~flags: Unix.[ O_APPEND ; O_CREAT ; O_WRONLY ]
+          ~mode: Lwt_io.Output
+          Client_config.(base_dir#get // "logs" // log // startup)
+          (fun chan -> Lwt_io.write chan msg) in
+  Cli_entries.log_hook := Some log
+
 (* Main (lwt) entry *)
 let main () =
   Random.self_init () ;
@@ -24,7 +45,7 @@ let main () =
          (fun _ ->
             Cli_entries.message "\n\
                                  The connection to the RPC server failed, \
-                                 using the default protocol version.\n" ;
+                                 using the default protocol version.\n" >>= fun () ->
             Lwt.return Client_bootstrap.Client_proto_main.protocol)
        >>= fun version ->
        let commands =
@@ -35,7 +56,7 @@ let main () =
          Client_version.commands_for_version version in
        Client_config.parse_args ~version
          (Cli_entries.usage commands)
-         (Cli_entries.inline_dispatcher commands))
+         (Cli_entries.inline_dispatch commands))
     (function
       | Arg.Help help ->
           Format.printf "%s%!" help ;

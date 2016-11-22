@@ -332,9 +332,9 @@ let commands = Cli_entries.([
       ~desc: "list all understood protocol versions"
       (fixed [ "list" ; "versions" ])
       (fun () ->
-         List.iter
+         Lwt_list.iter_s
            (fun (ver, _) -> message "%a" Protocol_hash.pp_short ver)
-           (Client_version.get_versions ()) ; return ()) ;
+           (Client_version.get_versions ())) ;
     command
       ~tags: [ "low-level" ; "local" ]
       ~group: "rpc"
