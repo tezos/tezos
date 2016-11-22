@@ -76,6 +76,9 @@ let main () =
       | Cli_entries.Command_failed message ->
           Format.eprintf "Command failed, %s.\n%!" message ;
           Pervasives.exit 1
+      | Failure message ->
+          Format.eprintf "%s%!" message ;
+          Pervasives.exit 1
       | exn ->
           Format.printf "Fatal internal error: %s\n%!"
             (Printexc.to_string exn) ;
