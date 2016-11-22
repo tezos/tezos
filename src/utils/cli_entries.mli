@@ -68,6 +68,7 @@ val dispatch:
 val log_hook : (string -> string -> unit Lwt.t) option ref
 
 val error : ('a, Format.formatter, unit, 'b Lwt.t) format4 -> 'a
+val warning : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 val message : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 val answer : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 val log : string -> ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a

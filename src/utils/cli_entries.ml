@@ -361,6 +361,11 @@ let error fmt=
        Lwt.fail (Failure msg))
     fmt
 
+let warning fmt =
+  Format.kasprintf
+    (fun msg -> log "stderr" msg)
+    fmt
+
 let message fmt =
   Format.kasprintf
     (fun msg -> log "stdout" msg)
