@@ -1,39 +1,36 @@
-#!/bin/sh
+#! /bin/sh
 
-if ! [ -f 'src/tezos-deps.opam' ]; then
-    echo
-    echo "   Please run from the project's root directory. Aborting."
-    echo
-    exit 1
-fi
-
-ocaml_version=4.03.0
-if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
-    echo
-    echo "   Unexpected compiler version ($(ocaml -vnum))"
-    echo "   You should use ocaml-$ocaml_version."
-    echo
-    exit 1
+OCAML_VERSION=4.03.0
+if [ "$(ocaml -vnum)" != "$OCAML_VERSION" ]; then
+  echo ;
+  echo "   Unexpected compiler version ($(ocaml -vnum))";
+  echo "   You should use ocaml-$OCAML_VERSION.";
+  echo ;
+  exit 1;
 fi
 
 cmd="$1"
 if [ -z "$cmd" ]; then cmd=all; fi
 
-case "$cmd" in
+pin=false
+depext=false
+install=false
+
+case $cmd in
     pin)
-        pin=yes
-        ;;
+	pin=true
+	;;
     depext)
-        depext=yes
-        ;;
+	depext=true
+	;;
     install)
-        install=yes
-        ;;
+	install=true
+	;;
     all)
-        pin=yes
-        depext=yes
-        install=yes
-        ;;
+	pin=true
+	depext=true
+	install=true
+	;;
     *)
         echo "Unknown command '$cmd'."
         echo "Usage: $0 [pin|depext|install|all|]"
@@ -43,7 +40,7 @@ esac
 set -e
 set -x
 
-if ! [ -z "$pin" ]; then
+if "$pin"; then
     opam pin --yes remove --no-action --dev-repo ocplib-resto || true
     opam pin --yes add --no-action --dev-repo sodium
     opam pin --yes add --no-action --dev-repo ocp-ocamlres
@@ -56,15 +53,15 @@ if ! [ -z "$pin" ]; then
     opam pin --yes add --no-action tezos-deps src
 fi
 
-if ! [ -z "$depext" ]; then
-    ## In our CI, this rule is executed as user 'root'
-    ## The other rules are executed as user 'opam'.
+if "$depext"; then
     opam list --installed depext || opam install depext
-    opam depext tezos-deps
+    opam depext $DEPEXTOPT tezos-deps
 fi
 
-if ! [ -z "$install" ]; then
-    opam install tezos-deps
-    ## This seems broken in the current opam-repo (2016-12-09)
-    ## opam install --build-test tezos-deps
+if "$install"; then
+    if opam list --installed tezos-deps ; then
+	opam upgrade $(opam list -s --required-by tezos-deps | grep -ve '^ocaml *$')
+    else
+	opam install tezos-deps
+    fi
 fi
