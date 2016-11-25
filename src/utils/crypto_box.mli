@@ -16,8 +16,7 @@ val increment_nonce : ?step:int -> nonce -> nonce
 val nonce_encoding : nonce Data_encoding.t
 
 type target
-val compare_target : MBytes.t list -> target -> bool
-val validate_target : target -> unit
+val make_target : (* unsigned *) Int64.t list -> target
 val default_target : target
 
 type secret_key
