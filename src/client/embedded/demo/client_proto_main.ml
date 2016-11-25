@@ -9,7 +9,7 @@
 
 let protocol =
   Protocol_hash.of_b48check
-    "2gagXCT66nmJ2mKh3a6Aeysy9CHaHsAJyDEGSyFNeFAxGCJehsKpK"
+    "2gagsSEvTKAHRjxAamgSdBNkv39VtNCqpaDXrrH4K8R4KQAAHrhe3"
 
 let demo () =
   let block = Client_config.block () in

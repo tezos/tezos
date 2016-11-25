@@ -33,6 +33,7 @@ let make_target target =
 (* Compare a SHA256 hash to a 256bits-target prefix.
    The prefix is a list of "unsigned" int64. *)
 let compare_target hash target =
+  let hash = Hash.Generic_hash.to_string hash in
   let rec check offset = function
     | [] -> true
     | x :: xs ->
@@ -46,10 +47,10 @@ let default_target =
 
 let check_proof_of_work pk nonce target =
   let hash =
-    let hash = Cryptokit.Hash.sha256 () in
-    hash#add_string (Bytes.to_string @@ Sodium.Box.Bytes.of_public_key pk) ;
-    hash#add_string (Bytes.to_string @@ Sodium.Box.Bytes.of_nonce nonce) ;
-    let r = hash#result in hash#wipe ; r in
+    Hash.Generic_hash.hash_bytes [
+      Sodium.Box.Bigbytes.of_public_key pk ;
+      Sodium.Box.Bigbytes.of_nonce nonce ;
+    ] in
   compare_target hash target
 
 let generate_proof_of_work pk target =
