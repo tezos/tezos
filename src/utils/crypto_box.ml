@@ -15,10 +15,7 @@ type secret_key = Sodium.Box.secret_key
 type public_key = Sodium.Box.public_key
 type channel_key = Sodium.Box.channel_key
 type nonce = Sodium.Box.nonce
-(* target ought to be an unsigned 256 bit integer
-but this representation works better with ocplib-endian; make
-sure target has length 16! *)
-type target = int list
+type target = int64 list (* used as unsigned intergers... *)
 exception TargetNot256Bit
 
 let random_keypair = Sodium.Box.random_keypair
@@ -29,33 +26,33 @@ let box_open sk pk msg nonce =
   try Some (Sodium.Box.Bigbytes.box_open sk pk msg nonce) with
     | Sodium.Verification_failure -> None
 
-let validate_target target =
-  if List.length target <> 16 then raise TargetNot256Bit;
-  if List.for_all (fun t -> t < 0 || t >= 1 lsl 16) target
-    then raise TargetNot256Bit
+let make_target target =
+  if List.length target > 8 then raise TargetNot256Bit ;
+  target
 
-(* compare a SHA256 hash to a 256 bit target *)
-let compare_target xs target =
-  let hash =
-    let hash = Cryptokit.Hash.sha256 () in
-    List.iter (fun b -> hash#add_string (MBytes.to_string b)) xs;
-    let r = hash#result in hash#wipe; r in
-  let bytes = MBytes.of_string hash in
-  let get_16 = EndianBigstring.BigEndian.get_uint16 bytes in
-  let offsets = [0;2;4;6;8;10;12;14;16;18;20;22;24;26;28;30] in
-  List.for_all2 (fun o t -> get_16 o <= t) offsets target
+(* Compare a SHA256 hash to a 256bits-target prefix.
+   The prefix is a list of "unsigned" int64. *)
+let compare_target hash target =
+  let rec check offset = function
+    | [] -> true
+    | x :: xs ->
+        Compare.Uint64.(EndianString.BigEndian.get_int64 hash offset < x)
+        && check (offset + 8) xs in
+  check 0 target
 
 let default_target =
-  let x = 65535 in [0;256;x;x;x;x;x;x;x;x;x;x;x;x;x;x]
+  (* FIXME we use an easy target until we allow custom configuration. *)
+  [ Int64.shift_left 1L 48 ]
 
 let check_proof_of_work pk nonce target =
-  let what_to_hash =
-    [ Sodium.Box.Bigbytes.of_public_key pk
-    ; Sodium.Box.Bigbytes.of_nonce nonce ] in
-  compare_target what_to_hash target
+  let hash =
+    let hash = Cryptokit.Hash.sha256 () in
+    hash#add_string (Bytes.to_string @@ Sodium.Box.Bytes.of_public_key pk) ;
+    hash#add_string (Bytes.to_string @@ Sodium.Box.Bytes.of_nonce nonce) ;
+    let r = hash#result in hash#wipe ; r in
+  compare_target hash target
 
 let generate_proof_of_work pk target =
-  validate_target target;
   let rec loop nonce =
     if check_proof_of_work pk nonce target then nonce
     else loop (increment_nonce nonce) in
