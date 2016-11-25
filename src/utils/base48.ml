@@ -83,22 +83,25 @@ let raw_decode ?alphabet s =
   String.sub res 0 (String.length res - res_tzeros) ^
   String.make zeros '\000'
 
-let sha256 s =
-  let hash = Cryptokit.Hash.sha256 () in
-  hash#add_string s;
-  let computed_hash = hash#result in hash#wipe;
-  computed_hash
+let checksum s =
+  let bytes = Bytes.of_string s in
+  let hash =
+    let open Sodium.Generichash in
+    let state = init ~size:32 () in
+    Bytes.update state bytes ;
+    Bytes.of_hash (final state) in
+  Bytes.sub_string hash 0 4
 
-(* Prepend a 4 byte cryptographic checksum before encoding string s *)
+(* Prepend a 4 bytes cryptographic checksum before encoding string s *)
 let safe_encode ?alphabet s =
-  raw_encode ?alphabet (s ^ String.sub (sha256 (sha256 s)) 0 4)
+  raw_encode ?alphabet (s ^ checksum s)
 
 let safe_decode ?alphabet s =
   let s = raw_decode ?alphabet s in
   let len = String.length s in
   let msg = String.sub s 0 (len-4)
   and msg_hash = String.sub s (len-4) 4 in
-  if msg_hash <> String.sub (sha256 (sha256 msg)) 0 4 then
+  if msg_hash <> checksum msg then
     invalid_arg "safe_decode" ;
   msg
 

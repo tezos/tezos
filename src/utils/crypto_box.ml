@@ -15,6 +15,8 @@ type secret_key = Sodium.Box.secret_key
 type public_key = Sodium.Box.public_key
 type channel_key = Sodium.Box.channel_key
 type nonce = Sodium.Box.nonce
+type target = int64 list (* used as unsigned intergers... *)
+exception TargetNot256Bit
 
 let random_keypair = Sodium.Box.random_keypair
 let random_nonce = Sodium.Box.random_nonce
@@ -23,6 +25,39 @@ let box = Sodium.Box.Bigbytes.box
 let box_open sk pk msg nonce =
   try Some (Sodium.Box.Bigbytes.box_open sk pk msg nonce) with
     | Sodium.Verification_failure -> None
+
+let make_target target =
+  if List.length target > 8 then raise TargetNot256Bit ;
+  target
+
+(* Compare a SHA256 hash to a 256bits-target prefix.
+   The prefix is a list of "unsigned" int64. *)
+let compare_target hash target =
+  let hash = Hash.Generic_hash.to_string hash in
+  let rec check offset = function
+    | [] -> true
+    | x :: xs ->
+        Compare.Uint64.(EndianString.BigEndian.get_int64 hash offset < x)
+        && check (offset + 8) xs in
+  check 0 target
+
+let default_target =
+  (* FIXME we use an easy target until we allow custom configuration. *)
+  [ Int64.shift_left 1L 48 ]
+
+let check_proof_of_work pk nonce target =
+  let hash =
+    Hash.Generic_hash.hash_bytes [
+      Sodium.Box.Bigbytes.of_public_key pk ;
+      Sodium.Box.Bigbytes.of_nonce nonce ;
+    ] in
+  compare_target hash target
+
+let generate_proof_of_work pk target =
+  let rec loop nonce =
+    if check_proof_of_work pk nonce target then nonce
+    else loop (increment_nonce nonce) in
+  loop (random_nonce ())
 
 let public_key_encoding =
   let open Data_encoding in
@@ -44,4 +79,3 @@ let nonce_encoding =
       Sodium.Box.Bigbytes.of_nonce
       Sodium.Box.Bigbytes.to_nonce
       (Fixed.bytes Sodium.Box.nonce_size)
-

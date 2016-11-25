@@ -13,6 +13,17 @@ let (>|=) = Lwt.(>|=)
 
 open Utils
 
+let () =
+  let expected_primitive = "blake2b"
+  and primitive = Sodium.Generichash.primitive in
+  if primitive <> expected_primitive then begin
+    Printf.eprintf
+      "FATAL ERROR: \
+       invalid value for Sodium.Generichash.primitive: %S (expected %S)@."
+      primitive expected_primitive ;
+    exit 1
+  end
+
 (*-- Signatures -------------------------------------------------------------*)
 
 module type MINIMAL_HASH = sig
@@ -27,10 +38,10 @@ module type MINIMAL_HASH = sig
   val size: int (* in bytes *)
   val compare: t -> t -> int
   val equal: t -> t -> bool
-  val of_raw: string -> t
-  val to_raw: t -> string
   val of_hex: string -> t
   val to_hex: t -> string
+  val of_string: string -> t
+  val to_string: t -> string
   val to_bytes: t -> MBytes.t
   val of_bytes: MBytes.t -> t
   val read: MBytes.t -> int -> t
@@ -60,6 +71,7 @@ end
 module type Name = sig
   val name: string
   val title:  string
+  val size: int option
 end
 
 module type PrefixedName = sig
@@ -69,56 +81,61 @@ end
 
 (*-- Type specific Hash builder ---------------------------------------------*)
 
-module Make_minimal_SHA256 (K : Name) = struct
+module Make_minimal_Blake2B (K : Name) = struct
 
-  type t = string
+  type t = Sodium.Generichash.hash
 
   include K
 
-  let size = 32 (* SHA256 *)
+  let size =
+    match K.size with
+    | None -> 32
+    | Some x -> x
 
-  let of_raw s =
+  let of_string s =
     if String.length s <> size then begin
       let msg =
-        Printf.sprintf "%s.of_raw: wrong string size for %S (%d)"
-          K.name s (String.length s) in
+        Printf.sprintf "%s.of_string: wrong string size (%d)"
+          K.name (String.length s) in
       raise (Invalid_argument msg)
-    end;
-    s
-  let to_raw s = s
+    end ;
+    Sodium.Generichash.Bytes.to_hash (Bytes.of_string s)
+  let to_string s = Bytes.to_string (Sodium.Generichash.Bytes.of_hash s)
 
-  let of_hex s = of_raw (Hex_encode.hex_decode s)
-  let to_hex s = Hex_encode.hex_encode s
+  let of_hex s = of_string (Hex_encode.hex_decode s)
+  let to_hex s = Hex_encode.hex_encode (to_string s)
 
-  let compare = String.compare
-  let equal : t -> t -> bool = (=)
+  let compare = Sodium.Generichash.compare
+  let equal x y = compare x y = 0
 
   let of_bytes b =
-    let s = MBytes.to_string b in
-    if String.length s <> size then begin
+    if MBytes.length b <> size then begin
       let msg =
-        Printf.sprintf "%s.of_bytes: wrong string size for %S (%d)"
-          K.name s (String.length s) in
+        Printf.sprintf "%s.of_bytes: wrong string size (%d)"
+          K.name (MBytes.length b) in
       raise (Invalid_argument msg)
-    end;
-    s
-  let to_bytes = MBytes.of_string
+    end ;
+    Sodium.Generichash.Bigbytes.to_hash b
+  let to_bytes = Sodium.Generichash.Bigbytes.of_hash
 
-  let read src off = MBytes.substring src off size
-  let write dst off h = MBytes.blit_from_string h 0 dst off size
+  let read src off = of_bytes @@ MBytes.sub src off size
+  let write dst off h = MBytes.blit (to_bytes h) 0 dst off size
 
   let hash_bytes l =
-    let hash = Cryptokit.Hash.sha256 () in
-    (* FIXME... bigstring... *)
-    List.iter (fun b -> hash#add_string (MBytes.to_string b)) l;
-    let r = hash#result in hash#wipe; r
+    let open Sodium.Generichash in
+    let state = init ~size () in
+    List.iter (Bigbytes.update state) l ;
+    final state
 
   let hash_string l =
-    let hash = Cryptokit.Hash.sha256 () in
-    List.iter (fun b -> hash#add_string b) l;
-    let r = hash#result in hash#wipe; r
+    let open Sodium.Generichash in
+    let state = init ~size () in
+    List.iter
+      (fun s -> Bytes.update state (BytesLabels.unsafe_of_string s))
+      l ;
+    final state
 
-  module Set = Set.Make(struct type t = string let compare = compare end)
+  module Set = Set.Make(struct type nonrec t = t let compare = compare end)
 
   let fold_read f buf off len init =
     let last = off + len * size in
@@ -133,12 +150,15 @@ module Make_minimal_SHA256 (K : Name) = struct
     in
     loop init off
 
-  module Map = Map.Make(struct type t = string let compare = compare end)
+  module Map = Map.Make(struct type nonrec t = t let compare = compare end)
   module Table =
-    (* TODO improve *)
     Hashtbl.Make(struct
-      type t = string
-      let hash s = Int64.to_int (EndianString.BigEndian.get_int64 s 0)
+      type nonrec t = t
+      let hash s =
+        Int64.to_int
+          (EndianString.BigEndian.get_int64
+             (Bytes.unsafe_to_string (Sodium.Generichash.Bytes.of_hash s))
+             0)
       let equal = equal
     end)
 
@@ -153,7 +173,7 @@ module Make_minimal_SHA256 (K : Name) = struct
     of_hex path
 
   let prefix_path p =
-    let p = to_hex p in
+    let p = Hex_encode.hex_encode p in
     let len = String.length p in
     let p1 = if len >= 2 then String.sub p 0 2 else ""
     and p2 = if len >= 4 then String.sub p 2 2 else ""
@@ -165,7 +185,7 @@ module Make_minimal_SHA256 (K : Name) = struct
 
 end
 
-module Make_SHA256 (R : sig
+module Make_Blake2B (R : sig
     val register_encoding:
       prefix: string ->
       to_raw: ('a -> string) ->
@@ -174,7 +194,7 @@ module Make_SHA256 (R : sig
       'a Base48.encoding
   end) (K : PrefixedName) = struct
 
-  include Make_minimal_SHA256(K)
+  include Make_minimal_Blake2B(K)
 
   (* Serializers *)
 
@@ -183,8 +203,8 @@ module Make_SHA256 (R : sig
   let b48check_encoding =
     R.register_encoding
       ~prefix: K.b48check_prefix
-      ~wrap: (fun x -> Hash x)
-      ~of_raw:(fun s -> Some s) ~to_raw
+      ~wrap: (fun s -> Hash s)
+      ~of_raw:(fun h -> Some (of_string h)) ~to_raw:to_string
 
   let of_b48check s =
     match Base48.simple_decode b48check_encoding s with
@@ -240,7 +260,7 @@ module Hash_table (Hash : HASH)
     type t = Hash.t
     let equal = Hash.equal
     let hash v =
-      let raw_hash = Hash.to_raw v in
+      let raw_hash = Hash.to_string v in
       let int64_hash = EndianString.BigEndian.get_int64 raw_hash 0 in
       Int64.to_int int64_hash
   end)
@@ -248,10 +268,11 @@ module Hash_table (Hash : HASH)
 (*-- Pre-instanciated hashes ------------------------------------------------*)
 
 module Block_hash =
-  Make_SHA256 (Base48) (struct
+  Make_Blake2B (Base48) (struct
     let name = "Block_hash"
     let title = "A Tezos block ID"
     let b48check_prefix = Base48.Prefix.block_hash
+    let size = None
   end)
 
 module Block_hash_set = Hash_set (Block_hash)
@@ -259,10 +280,11 @@ module Block_hash_map = Hash_map (Block_hash)
 module Block_hash_table = Hash_table (Block_hash)
 
 module Operation_hash =
-  Make_SHA256 (Base48) (struct
+  Make_Blake2B (Base48) (struct
     let name = "Operation_hash"
     let title = "A Tezos operation ID"
     let b48check_prefix = Base48.Prefix.operation_hash
+    let size = None
    end)
 
 module Operation_hash_set = Hash_set (Operation_hash)
@@ -270,12 +292,21 @@ module Operation_hash_map = Hash_map (Operation_hash)
 module Operation_hash_table = Hash_table (Operation_hash)
 
 module Protocol_hash =
-  Make_SHA256 (Base48) (struct
+  Make_Blake2B (Base48) (struct
     let name = "Protocol_hash"
     let title = "A Tezos protocol ID"
     let b48check_prefix = Base48.Prefix.protocol_hash
+    let size = None
   end)
 
 module Protocol_hash_set = Hash_set (Protocol_hash)
 module Protocol_hash_map = Hash_map (Protocol_hash)
 module Protocol_hash_table = Hash_table (Protocol_hash)
+
+module Generic_hash =
+  Make_minimal_Blake2B (struct
+    let name = "Generic_hash"
+    let title = ""
+    let size = None
+  end)
+

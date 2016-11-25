@@ -121,9 +121,9 @@ UTILS_LIB_IMPLS := \
   utils/cli_entries.ml \
   utils/compare.ml \
   utils/data_encoding.ml \
-  utils/crypto_box.ml \
   utils/time.ml \
   utils/hash.ml \
+  utils/crypto_box.ml \
   utils/error_monad_sig.ml \
   utils/error_monad.ml \
   utils/logging.ml \
@@ -133,7 +133,6 @@ UTILS_LIB_IMPLS := \
 UTILS_PACKAGES := \
   base64 \
   calendar \
-  cryptokit \
   cstruct \
   ezjsonm \
   lwt  \
