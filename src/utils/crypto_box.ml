@@ -37,7 +37,7 @@ let compare_target hash target =
   let rec check offset = function
     | [] -> true
     | x :: xs ->
-        Compare.Uint64.(EndianString.BigEndian.get_int64 hash offset < x)
+        Compare.Uint64.(EndianString.BigEndian.get_int64 hash offset <= x)
         && check (offset + 8) xs in
   check 0 target
 
