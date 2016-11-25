@@ -1,6 +1,6 @@
 (*
 ocamlfind ocamlopt \
-   -package 'lwt,lwt.unix,lwt.log,ezjsonm,ocplib-endian,config-file,cryptokit,cstruct' \
+   -package 'lwt,lwt.unix,lwt.log,ezjsonm,ocplib-endian,config-file,cstruct' \
   ../core/utils.cmx ../core/logs.cmx ../core/mMBytes.cmx ../core/json.cmx \
   netbits.cmx p2p.cmx test_p2p.ml -linkpkg \
   -o test_p2p && ./test_p2p

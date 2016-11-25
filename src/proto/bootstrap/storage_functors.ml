@@ -202,9 +202,10 @@ end
 module Make_data_set_storage (P : Single_data_description) = struct
 
   module Key = struct
-    include Hash.Make_minimal_SHA256(struct
+    include Hash.Make_minimal_Blake2B(struct
         let name = P.name
         let title = ("A " ^ P.name ^ "key")
+        let size = None
       end)
     let prefix = P.key
     let length = path_len

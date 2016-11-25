@@ -12,18 +12,18 @@ open Logging.Node.Main
 
 let genesis_block =
   Block_hash.of_b48check
-    "eeHfgnr9QeDNvcMgSfATNeDeec4KG4CkHHkNNJt5B9xdVmsxhsHNR"
+    "grHGHkVfgJb5gPaRd5AtQsa65g9GyLcXgQsHbSnQ5SD5DEp2ctqck"
 
 let genesis_protocol =
   Protocol_hash.of_b48check
-    "4prgmSgbaeMKbgLtLjpsHaDD9QvG2dbC2bLq2XBmyxd2RJgLFpcAg"
+    "4p64VagsbXchSF88eaPy5XrkqMLEjBCaSnaGv2vQkhv8e37Nnqmrd"
 
 let test_protocol =
   Some (Protocol_hash.of_b48check
-          "2gagXCT66nmJ2mKh3a6Aeysy9CHaHsAJyDEGSyFNeFAxGCJehsKpK")
+          "2gagsSEvTKAHRjxAamgSdBNkv39VtNCqpaDXrrH4K8R4KQAAHrhe3")
 
 let genesis_time =
-  Time.of_notation_exn "2016-08-01T00:00:00Z"
+  Time.of_notation_exn "2016-11-01T00:00:00Z"
 
 let genesis = {
   Store.time = genesis_time ;
