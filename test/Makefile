@@ -28,7 +28,6 @@ PACKAGES := \
   cohttp.lwt \
   compiler-libs.optcomp \
   config-file \
-  cryptokit \
   cstruct \
   dynlink \
   ezjsonm \

@@ -18,7 +18,6 @@ depends: [
   "calendar"
   "cohttp" {>= "0.21" }
   "config-file"
-  "cryptokit"
   "git"
   "git-unix"
   "irmin-watcher" (* for `irmin.unix` *)
