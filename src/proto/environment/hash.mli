@@ -21,10 +21,10 @@ module type MINIMAL_HASH = sig
   val size: int (* in bytes *)
   val compare: t -> t -> int
   val equal: t -> t -> bool
-  val of_raw: string -> t
-  val to_raw: t -> string
   val of_hex: string -> t
   val to_hex: t -> string
+  val of_string: string -> t
+  val to_string: t -> string
   val to_bytes: t -> MBytes.t
   val of_bytes: MBytes.t -> t
   val read: MBytes.t -> int -> t
@@ -54,12 +54,13 @@ end
 (** {2 Building Hashes} *******************************************************)
 
 (** The parameters for creating a new Hash type using
-    {!Make_SHA256}. Both {!name} and {!title} are only informative,
+    {!Make_Blake2B}. Both {!name} and {!title} are only informative,
     used in error messages and serializers. *)
 
 module type Name = sig
   val name : string
   val title : string
+  val size : int option
 end
 
 module type PrefixedName = sig
@@ -69,8 +70,8 @@ end
 
 (** Builds a new Hash type using Sha256. *)
 
-module Make_minimal_SHA256 (Name : Name) : MINIMAL_HASH
-module Make_SHA256
+module Make_minimal_Blake2B (Name : Name) : MINIMAL_HASH
+module Make_Blake2B
     (Register : sig
        val register_encoding:
          prefix: string ->
@@ -109,4 +110,3 @@ module Operation_hash_map : module type of Hash_map (Operation_hash)
 module Protocol_hash : HASH
 module Protocol_hash_set : Set.S with type elt = Protocol_hash.t
 module Protocol_hash_map : module type of Hash_map (Protocol_hash)
-
