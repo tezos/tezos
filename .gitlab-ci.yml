@@ -11,6 +11,7 @@ stages:
   - build
   - build_test
   - test
+  - expurge
   - publish
   - cleanup
 
@@ -105,15 +106,15 @@ test:data-encoding:
     - build
     - build:test
 
-publish:expurge:
-  stage: publish
+expurge:
+  stage: expurge
   tags:
     - tezos_builder
   only:
     - master@tezos/tezos
   script:
     - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - echo "${CI_PK}" > ~/.ssh/id_rsa
+    - echo "${CI_PK_GITLAB}" > ~/.ssh/id_rsa
     - chmod 400 ~/.ssh/id_rsa
     - rm -fr .git/refs/original
     - git filter-branch --prune-empty --index-filter
@@ -141,14 +142,12 @@ publish:github:
     - tezos_builder
   only:
     - master@tezos/tezos
-  when: manual
   script:
     - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - echo "${CI_PK}" > ~/.ssh/id_rsa
+    - echo "${CI_PK_GITHUB}" > ~/.ssh/id_rsa
     - chmod 400 ~/.ssh/id_rsa
     - git reset ${CI_BUILD_REF}_expurged
-    - git push git@github.com:OCamlPro/tezos.git
-               -f HEAD:master
+    - git push git@github.com:tezos/tezos.git -f HEAD:master
 
 cleanup:
   stage: cleanup
