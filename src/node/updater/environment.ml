@@ -25,10 +25,11 @@ module Ed25519 = struct
   let append_signature key msg =
     MBytes.concat msg (sign key msg)
 
-  module Public_key_hash = Hash.Make_SHA256(Base48)(struct
+  module Public_key_hash = Hash.Make_Blake2B(Base48)(struct
       let name = "Ed25519.Public_key_hash"
       let title = "An Ed25519 public key ID"
       let b48check_prefix = Base48.Prefix.ed25519_public_key_hash
+      let size = Some 20
     end)
 
   let hash v =

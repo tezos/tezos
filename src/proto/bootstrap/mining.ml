@@ -133,7 +133,7 @@ let first_endorsement_slots
   select_delegate delegate delegate_list max_priority
 
 let check_hash hash stamp_threshold =
-  let bytes = Block_hash.to_raw hash in
+  let bytes = Block_hash.to_string hash in
   let word = String.get_int64 bytes 0 in
   Compare.Uint64.(word < stamp_threshold)
 
