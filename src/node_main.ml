@@ -102,7 +102,7 @@ module Globals = struct
     sandbox#add_hook sandboxed
 
   let verbose_param =
-    new string_option_cp ~group:cli_group ["verbosity"] ~short_name:"v" (Some "notice")
+    new string_option_cp ~group:cli_group ["verbosity"] ~short_name:"v" None
       "Verbosity level (fatal, error, warning, notice, info, debug)"
 
   (** File options *)
@@ -233,7 +233,9 @@ let init_logger () =
     | Some "notice" -> add_rule "*" Notice
     | Some "info" -> add_rule "*" Info
     | Some "debug" -> add_rule "*" Debug
-    | _ -> ()
+    | Some level ->
+        Printf.eprintf "Warning: unknown verbosity level \"%s\".\n%!" level
+    | None -> ()
   end;
   match Globals.log_kind#get with
   | "" | "stderr" -> Logging.init Stderr
