@@ -203,7 +203,7 @@ module Make (P: PARAMS) = struct
              | Some msg ->
                  Lwt.return msg)
       (function
-        | Unix.Unix_error _ -> return Disconnect
+        | Unix.Unix_error _ | End_of_file -> return Disconnect
         | e -> fail e)
 
   (* send a message over a TCP socket *)
@@ -236,7 +236,7 @@ module Make (P: PARAMS) = struct
                    return true
                  end)
       (function
-        | Unix.Unix_error _ -> return_false
+        | Unix.Unix_error _ | End_of_file -> return_false
         | e -> fail e)
 
   (* A peer handle, as a record-encoded object, abstract from the
