@@ -231,8 +231,9 @@ let rec read_bytes ?(pos = 0) ?len fd buf =
     if len = 0 then
       Lwt.return_unit
     else
-      Lwt_unix.read fd buf pos len >>= fun nb_read ->
-      inner (pos + nb_read) (len - nb_read)
+      Lwt_unix.read fd buf pos len >>= function
+      | 0 -> Lwt.fail End_of_file (* other endpoint cleanly closed its connection *)
+      | nb_read -> inner (pos + nb_read) (len - nb_read)
   in
   inner pos len
 
@@ -254,7 +255,8 @@ let write_mbytes ?(pos=0) ?len descr buf =
     if len = 0 then
       Lwt.return_unit
     else
-      Lwt_bytes.write descr buf pos len >>= fun nb_written ->
-      inner (pos + nb_written) (len - nb_written) in
+      Lwt_bytes.write descr buf pos len >>= function
+      | 0 -> Lwt.fail End_of_file (* other endpoint cleanly closed its connection *)
+      | nb_written -> inner (pos + nb_written) (len - nb_written) in
   inner pos len
 
