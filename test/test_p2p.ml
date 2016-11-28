@@ -39,7 +39,7 @@ let main () =
   let known_peers = ref [] in
   let closed_network = ref false in
 
-  let max_packet_size = ref 1024 in
+  let max_message_size = ref 1024 in
   let peer_answer_timeout = ref 10. in
   let expected_connections = ref 1 in
   let min_connections = ref 0 in
@@ -52,7 +52,7 @@ let main () =
       "-peers-file", Set_string peers_file, " Peers filepath";
       "-closed", Set closed_network, " Closed network mode";
 
-      "-max-packet-size", Set_int max_packet_size, "int Max size of packets";
+      "-max-message-size", Set_int max_message_size, "int Max size of messages";
       "-peer-answer-timeout", Set_float peer_answer_timeout, "float Number of seconds";
       "-expected-connections", Set_int expected_connections, "conns Expected connections";
       "-min-connections", Set_int min_connections, "conns Minimal number of connections";
@@ -74,7 +74,7 @@ let main () =
     }
     in
     let limits = {
-      max_packet_size = !max_packet_size;
+      max_message_size = !max_message_size;
       peer_answer_timeout = !peer_answer_timeout;
       expected_connections = !expected_connections;
       min_connections = !min_connections;
