@@ -63,6 +63,8 @@ let gid_length = 16
 let pp_gid ppf gid =
   Format.pp_print_string ppf (Hex_encode.hex_encode gid)
 
+let zero_gid = String.make 16 '\x00'
+
 (* the common version for a pair of peers, if any, is the maximum one,
    in lexicographic order *)
 let common_version la lb =
@@ -280,6 +282,7 @@ module Make (P: PARAMS) = struct
      outside world. Hidden Lwt workers are associated to a net at its
      creation and can be killed using the shutdown callback. *)
   type net = {
+    gid : gid ;
     recv_from : unit -> (peer * P.msg) Lwt.t ;
     send_to : peer -> P.msg -> unit Lwt.t ;
     try_send_to : peer -> P.msg -> bool ;
@@ -1317,7 +1320,7 @@ module Make (P: PARAMS) = struct
     and set_metadata _gid _meta = () (* TODO: implement *)
     in
     let net =
-      { shutdown ; peers ; find_peer ;
+      { gid = my_gid ; shutdown ; peers ; find_peer ;
         recv_from ; send_to ; try_send_to ; broadcast ;
         blacklist ; whitelist ; maintain ; roll ;
         peer_info ; get_metadata ; set_metadata } in
@@ -1327,6 +1330,7 @@ module Make (P: PARAMS) = struct
     Lwt.return net
 
   let faked_network =
+    let gid = String.make 16 '\000' in
     let infinity, wakeup = Lwt.wait () in
     let shutdown () =
       Lwt.wakeup_exn wakeup Lwt_stream.Empty;
@@ -1344,13 +1348,14 @@ module Make (P: PARAMS) = struct
     let peer_info _ = assert false in
     let get_metadata _ = None in
     let set_metadata _ _ = () in
-    { shutdown ; peers ; find_peer ;
+    { gid ; shutdown ; peers ; find_peer ;
       recv_from ; send_to ; try_send_to ; broadcast ;
       blacklist ; whitelist ; maintain ; roll ;
       peer_info ; get_metadata ; set_metadata }
 
 
   (* Plug toplevel functions to callback calls. *)
+  let gid net = net.gid
   let shutdown net = net.shutdown ()
   let peers net = net.peers ()
   let find_peer net gid = net.find_peer gid
