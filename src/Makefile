@@ -111,6 +111,7 @@ UTILS_LIB_INTFS := \
   utils/error_monad.mli \
   utils/logging.mli \
   utils/lwt_utils.mli \
+  utils/lwt_pipe.mli \
   utils/IO.mli \
 
 UTILS_LIB_IMPLS := \
@@ -128,6 +129,7 @@ UTILS_LIB_IMPLS := \
   utils/error_monad.ml \
   utils/logging.ml \
   utils/lwt_utils.ml \
+  utils/lwt_pipe.ml \
   utils/IO.ml \
 
 UTILS_PACKAGES := \
