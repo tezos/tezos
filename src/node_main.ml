@@ -396,7 +396,7 @@ let init_node { sandbox ; sandbox_param ;
     | Some _ -> None
     | None ->
         let limits =
-          { max_packet_size = 10_000 ;
+          { max_message_size = 10_000 ;
             peer_answer_timeout = 5. ;
             expected_connections ;
             min_connections ;
