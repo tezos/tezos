@@ -55,6 +55,7 @@ type limits = {
 
 (** A global identifier for a peer, a.k.a. an identity *)
 type gid
+val pp_gid : Format.formatter -> gid -> unit
 
 type 'msg encoding = Encoding : {
     tag: int ;
@@ -96,6 +97,9 @@ module Make (P : PARAMS) : sig
 
   (** Main network initialisation function *)
   val bootstrap : config:config -> limits:limits -> net Lwt.t
+
+  (** Return one's gid *)
+  val gid : net -> gid
 
   (** A maintenance operation : try and reach the ideal number of peers *)
   val maintain : net -> unit Lwt.t
