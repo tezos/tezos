@@ -33,7 +33,7 @@ let version_encoding =
        (req "minor" int8))
 
 type limits = {
-  max_packet_size : int ;
+  max_message_size : int ;
   peer_answer_timeout : float ;
   expected_connections : int ;
   min_connections : int ;
@@ -121,14 +121,12 @@ end
 
 module Make (P: PARAMS) = struct
 
-  (* Low-level network protocol packets (internal). The protocol is
+  (* Low-level network protocol messages (internal). The protocol is
      completely symmetrical and asynchronous. First both peers must
-     present their credentials with a [Connect] packet, then any
-     combination of the other packets can be received at any time. An
+     present their credentials with a [Connect] message, then any
+     combination of the other messages can be received at any time. An
      exception is the [Disconnect] message, which should mark the end of
-     transmission (and needs not being replied). The [Unkown] packet is
-     not a real kind of packet, it means that something indecypherable
-     was transmitted. *)
+     transmission (and needs not being replied). *)
   type msg =
     | Connect of {
         gid : string ;
@@ -282,7 +280,7 @@ module Make (P: PARAMS) = struct
   type net = {
     recv_from : unit -> (peer * P.msg) Lwt.t ;
     send_to : peer -> P.msg -> unit Lwt.t ;
-    try_send : peer -> P.msg -> bool ;
+    try_send_to : peer -> P.msg -> bool ;
     broadcast : P.msg -> unit ;
     blacklist : ?duration:float -> addr -> unit ;
     whitelist : peer -> unit ;
@@ -496,11 +494,11 @@ module Make (P: PARAMS) = struct
               pp_gid my_gid pp_gid gid Ipaddr.pp_hum addr port ;
             None
         | Some _ as res -> res in
-      (* The packet reception loop. *)
+      (* The message reception loop. *)
       let rec receiver () =
-        recv ~uncrypt buf >>= fun packet ->
+        recv ~uncrypt buf >>= fun message ->
         last := Unix.gettimeofday () ;
-        match packet with
+        match message with
         | Connect _
         | Disconnect ->
             debug "(%a) disconnected (by peer) %a @@ %a:%d"
@@ -1252,7 +1250,7 @@ module Make (P: PARAMS) = struct
       dequeue_msg ()
     and send_to peer msg =
       peer.send (Message msg) >>= fun _ -> Lwt.return_unit
-    and try_send peer msg =
+    and try_send_to peer msg =
       Lwt.async (fun () -> peer.send (Message msg)); true
     and broadcast msg =
       PeerMap.iter
@@ -1310,7 +1308,7 @@ module Make (P: PARAMS) = struct
     in
     let net =
       { shutdown ; peers ; find_peer ;
-        recv_from ; send_to ; try_send ; broadcast ;
+        recv_from ; send_to ; try_send_to ; broadcast ;
         blacklist ; whitelist ; maintain ; roll ;
         peer_info ; get_metadata ; set_metadata } in
     (* main thread, returns after first successful maintenance *)
@@ -1327,7 +1325,7 @@ module Make (P: PARAMS) = struct
     let find_peer _ = None in
     let recv_from () = infinity in
     let send_to _ _ = Lwt.return_unit in
-    let try_send _ _ = true in
+    let try_send_to _ _ = true in
     let broadcast _ = () in
     let blacklist ?duration _ = ignore duration ; () in
     let whitelist _ = () in
@@ -1337,7 +1335,7 @@ module Make (P: PARAMS) = struct
     let get_metadata _ = None in
     let set_metadata _ _ = () in
     { shutdown ; peers ; find_peer ;
-      recv_from ; send_to ; try_send ; broadcast ;
+      recv_from ; send_to ; try_send_to ; broadcast ;
       blacklist ; whitelist ; maintain ; roll ;
       peer_info ; get_metadata ; set_metadata }
 
@@ -1349,7 +1347,7 @@ module Make (P: PARAMS) = struct
   let peer_info net peer = net.peer_info peer
   let recv net = net.recv_from ()
   let send net peer msg = net.send_to peer msg
-  let try_send net peer = net.try_send peer
+  let try_send net peer msg = net.try_send_to peer msg
   let broadcast net msg = net.broadcast msg
   let maintain net = net.maintain ()
   let roll net = net.roll ()
