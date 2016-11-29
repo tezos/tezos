@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+val may : ('a -> unit Lwt.t) -> 'a option -> unit Lwt.t
+
 val never_ending: 'a Lwt.t
 
 val canceler : unit ->
