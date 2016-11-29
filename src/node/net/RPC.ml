@@ -35,8 +35,8 @@ module ConnectionMap = Map.Make(Cohttp.Connection)
 exception Invalid_method
 exception Cannot_parse_body of string
 
-(* Promise a running RPC server. Takes the address and port. *)
-let launch addr port root =
+(* Promise a running RPC server. Takes the port. *)
+let launch port root =
   (* launch the worker *)
   let cancelation, canceler, _ = Lwt_utils.canceler () in
   let open Cohttp_lwt_unix in
@@ -119,7 +119,7 @@ let launch addr port root =
   and conn_closed (_, con) =
     log_info "connection close %s" (Cohttp.Connection.to_string con) ;
     shutdown_stream con  in
-  lwt_log_info "create server %s:%d" addr port >>= fun () ->
+  lwt_log_info "create server listening on port %d" port >>= fun () ->
   let ctx = Cohttp_lwt_unix_net.init () in
   let mode = `TCP (`Port port) in
   let stop = cancelation () in
