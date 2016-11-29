@@ -31,6 +31,7 @@ val apply_option: f:('a -> 'b option) -> 'a option -> 'b option
 val iter_option: f:('a -> unit) -> 'a option -> unit
 val unopt: 'a -> 'a option -> 'a
 val unopt_list: 'a option list -> 'a list
+val first_some: 'a option -> 'a option -> 'a option
 
 val display_paragraph: Format.formatter -> string -> unit
 
