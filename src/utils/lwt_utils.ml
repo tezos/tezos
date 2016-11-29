@@ -8,10 +8,13 @@
 (**************************************************************************)
 
 module LC = Lwt_condition
+
+open Lwt.Infix
 open Logging.Core
 
-let (>>=) = Lwt.(>>=)
-let (>|=) = Lwt.(>|=)
+let may f = function
+  | None -> Lwt.return_unit
+  | Some x -> f x
 
 let never_ending = fst (Lwt.wait ())
 
