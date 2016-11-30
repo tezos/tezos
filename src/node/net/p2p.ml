@@ -470,12 +470,9 @@ module Make (P: PARAMS) = struct
                     buf local_nonce version gid
                     public_key message_nonce listening_port
           end
-      | Ok (Advertise peers) ->
-          (* alternatively, one can refuse a connection but reply with
-             some peers, so we accept this info *)
-          debug "(%a) new peers received from %a:%d"
+      | Ok (Advertise _) ->
+          debug "(%a) connection rejected (unauthenticated Advertise) from %a:%d"
             pp_gid my_gid Ipaddr.pp_hum addr port ;
-          let (_:bool) = Lwt_pipe.push_now control_events (Peers peers) in
           cancel ()
       | Ok Disconnect ->
           debug "(%a) connection rejected (closed by peer or timeout) from %a:%d"
