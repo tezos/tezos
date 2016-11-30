@@ -424,11 +424,13 @@ module Make (P: PARAMS) = struct
                    port = config.incoming_port ;
                    versions = P.supported_versions }) >>= fun _ ->
       Lwt.pick
-        [ ( LU.sleep limits.peer_answer_timeout >>= fun () ->
-            Error_monad.fail Timeout ) ;
+        [ ( LU.sleep limits.peer_answer_timeout >>= fun () -> Error_monad.fail Timeout ) ;
           recv buf ] >>= function
+      | Error [Timeout] | Error [Canceled] | Error [Exn End_of_file] ->
+          (* Expected errors. No logging. *)
+          cancel ()
       | Error err ->
-          debug "(%a) error receiving from %a:%d: %a"
+          log_error "(%a) error receiving from %a:%d: %a"
             pp_gid my_gid Ipaddr.pp_hum addr port Error_monad.pp_print_error err ;
           cancel ()
       | Ok (Connect { gid; port = listening_port; versions ;
