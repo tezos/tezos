@@ -225,38 +225,38 @@ module Cmdline = struct
   (* cli args *)
   let misc_sect = "MISC"
   let base_dir =
-    let doc = "The directory where the tezos node will store all its data." in
+    let doc = "The directory where the Tezos node will store all its data." in
     Arg.(value & opt (some string) None & info ~docs:"CONFIG" ~doc ~docv:"DIR" ["base-dir"])
   let config_file =
     let doc = "The main configuration file." in
     Arg.(value & opt (some string) None & info ~docs:"CONFIG" ~doc ~docv:"FILE" ["config-file"])
   let sandbox =
-    let doc = "Run a sandboxed daemon  (P2P is disabled, data is stored in custom directory)." in
+    let doc = "Run the daemon in a sandbox (P2P is disabled, data is stored in a custom directory)." in
     Arg.(value & opt (some string) None & info ~docs:"NETWORK" ~doc ~docv:"DIR" ["sandbox"])
   let sandbox_param =
     let doc = "Custom parameter for the economical protocol." in
     Arg.(value & opt (some string) None & info ~docs:"NETWORK" ~doc ["sandbox-param"])
   let v =
-    let doc = "Increase log level. Use several time to increase log level, e.g. `-vv'." in
+    let doc = "Increase log level. Use several times to increase log level, e.g. `-vv'." in
     Arg.(value & flag_all & info ~docs:misc_sect ~doc ["v"])
   (* net args *)
   let min_connections =
-    let doc = "The number of connections under which aggressive peer discovery mode must be entered." in
+    let doc = "The number of connections below which aggressive peer discovery mode is entered." in
     Arg.(value & opt int default_cfg.min_connections & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["min-connections"])
   let max_connections =
-    let doc = "The number of connections over which some have to be closed." in
+    let doc = "The number of connections above which some connections will be closed." in
     Arg.(value & opt int default_cfg.max_connections & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["max-connections"])
   let expected_connections =
     let doc = "The minimum number of connections to be ensured by the cruise control." in
     Arg.(value & opt int default_cfg.expected_connections & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["expected-connections"])
   let net_addr =
-    let doc = "The TCP socket address at which this instance can be reached." in
+    let doc = "The TCP address and port at which this instance can be reached." in
     Arg.(value & opt sockaddr_converter (default_cfg.net_addr, default_cfg.net_port) & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["net-addr"])
   let local_discovery =
     let doc = "Automatic discovery of peers on the local network." in
     Arg.(value & opt (some int) default_cfg.local_discovery & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["local-discovery"])
   let peers =
-    let doc = "A peer to bootstrap the networks from. Can be used several times to add several peers." in
+    let doc = "A peer to bootstrap the network from. Can be used several times to add several peers." in
     Arg.(value & opt_all sockaddr_converter [] & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["peer"])
   let closed =
     let doc = "Only accept connections from the bootstrap peers." in
@@ -270,7 +270,7 @@ module Cmdline = struct
 
   (* rpc args *)
   let rpc_addr =
-    let doc = "The TCP socket address at which this RPC-server instance can be reached" in
+    let doc = "The TCP socket address at which this RPC server instance can be reached" in
     Arg.(value & opt (some sockaddr_converter) None & info ~docs:"RPC" ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
 
   let parse base_dir config_file sandbox sandbox_param log_level
@@ -385,7 +385,7 @@ let init_node { sandbox ; sandbox_param ;
             Data_encoding.Json.read_file file >>= function
             | None ->
                 lwt_warn
-                  "Can't parse sandbox parameters (%s)" file >>= fun () ->
+                  "Can't parse sandbox parameters. (%s)" file >>= fun () ->
                 Lwt.return (Some (patch_context None))
             | Some _ as json ->
                 Lwt.return (Some (patch_context json))
@@ -457,18 +457,18 @@ let () =
   | `Error _ -> exit 1
   | `Help -> exit 1
   | `Version -> exit 1
-  | `Ok (config_file, resetted, updated, cfg) ->
-      if resetted then log_notice "Overwriting %s to factory defaults." config_file;
+  | `Ok (config_file, was_reset, updated, cfg) ->
+      if was_reset then log_notice "Overwriting %s with factory defaults." config_file;
       if updated then log_notice "Updated %s from command line arguments." config_file;
       Lwt_main.run begin
         if not @@ Sys.file_exists cfg.base_dir then begin
           Unix.mkdir cfg.base_dir 0o700;
           log_notice "Created base directory %s." cfg.base_dir
         end;
-        log_notice "Using config file %s" config_file;
+        log_notice "Using config file %s." config_file;
         if not @@ Sys.file_exists config_file then begin
           Cfg_file.write config_file cfg;
-          log_notice "Created config file %s" config_file
+          log_notice "Created config file %s." config_file
         end;
         main cfg >>= function
         | Ok () -> Lwt.return_unit
