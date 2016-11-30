@@ -494,7 +494,7 @@ module Make (P: PARAMS) = struct
           let received = !counter in
           ma#add_int (received - old_received);
           inner received in
-        Lwt.async (fun () -> inner !counter)
+        Lwt.async (fun () -> Lwt.pick [cancelation (); inner !counter])
       in
       (* net object state *)
       let last = ref (Unix.gettimeofday ()) in
