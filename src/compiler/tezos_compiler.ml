@@ -113,15 +113,16 @@ module Meta = struct
       (req "modules" ~description:"Modules comprising the protocol" (list string))
 
   let to_file dirname ?hash modules =
-    let open Data_encoding.Json in
-    let config_file = construct config_file_encoding (hash, modules) in
-    Utils.write_file ~bin:false (dirname // name) @@ to_string config_file
+    let config_file =
+      Data_encoding.Json.construct config_file_encoding (hash, modules) in
+    Utils.write_file ~bin:false (dirname // name) @@
+    Data_encoding_ezjsonm.to_string config_file
 
   let of_file dirname =
-    let open Data_encoding.Json in
-    Utils.read_file ~bin:false (dirname // name) |> from_string |> function
+    Utils.read_file ~bin:false (dirname // name) |>
+    Data_encoding_ezjsonm.from_string |> function
     | Error err -> Pervasives.failwith err
-    | Ok json -> destruct config_file_encoding json
+    | Ok json -> Data_encoding.Json.destruct config_file_encoding json
 end
 
 module Protocol = struct

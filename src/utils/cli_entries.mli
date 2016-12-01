@@ -14,28 +14,12 @@ exception Command_not_found
 exception Bad_argument of int * string * string
 exception Command_failed of string
 
-type 'a params =
-  | Prefix: string * 'a params -> 'a params
-  | Param: string * string * (string -> 'p Lwt.t) * 'a params -> ('p -> 'a) params
-  | Stop: (unit -> unit Lwt.t) params
-  | More: (string list -> unit Lwt.t) params
-  | Seq : string * string * (string -> 'p Lwt.t) -> ('p list -> unit Lwt.t) params
-
-and command =
-  | Command
-    : 'a params * 'a *
-      desc option * tag list * group option *
-      (Arg.key * Arg.spec * Arg.doc) list
-    -> command
+type 'a params
+type command
 
 and desc = string
 and group = string
 and tag = string
-
-val error: ('a, Format.formatter, unit, 'b Lwt.t) format4 -> 'a
-val param_error: ('a, Format.formatter, unit, 'b Lwt.t) format4 -> 'a
-val message: ('a, Format.formatter, unit, unit) format4 -> 'a
-val answer: ('a, Format.formatter, unit, unit) format4 -> 'a
 
 val param:
   name: string ->
@@ -49,12 +33,13 @@ val stop: (unit -> unit Lwt.t) params
 val seq:
   name: string ->
   desc: string ->
-  (string -> 'p Lwt.t) -> ('p list -> unit Lwt.t) params
+  (string -> 'p Lwt.t) ->
+  ('p list -> unit -> unit Lwt.t) params
 
-(* [seq_of_param (param ~name ~desc f) = seq ~name ~desc f] *)
 val seq_of_param:
-  ((unit -> unit Lwt.t) params -> ('a -> unit -> unit Lwt.t) params) ->
-  ('a list -> unit Lwt.t) params
+  ((unit -> unit Lwt.t) params ->
+   ('a -> unit -> unit Lwt.t) params) ->
+  ('a list -> unit -> unit Lwt.t) params
 
 val command:
   ?desc:desc ->
@@ -68,7 +53,7 @@ val register_tag: tag -> string -> unit
 
 val usage:
   command list -> (string * Arg.spec * string) list -> string
-val inline_dispatcher:
+val inline_dispatch:
   command list ->
   unit ->
   [> `Arg of string | `End ] ->
@@ -76,3 +61,14 @@ val inline_dispatcher:
   | `Fail of exn
   | `Nop
   | `Res of unit Lwt.t ]
+
+val dispatch:
+  command list -> unit -> string list -> unit Lwt.t
+
+val log_hook : (string -> string -> unit Lwt.t) option ref
+
+val error : ('a, Format.formatter, unit, 'b Lwt.t) format4 -> 'a
+val warning : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+val message : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+val answer : ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+val log : string -> ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a

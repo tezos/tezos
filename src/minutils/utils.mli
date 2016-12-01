@@ -7,14 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val remove_dir: string -> unit Lwt.t
-
-val create_dir: ?perm:int -> string -> unit Lwt.t
-val create_file: ?perm:int -> string -> string -> unit Lwt.t
-
-val termination_thread: int Lwt.t
-val exit: int -> 'a
-
 module StringMap : Map.S with type key = string
 
 (** Splits a string on slashes, grouping multiple slashes, and

@@ -13,12 +13,12 @@ module RawContractAlias :
 module ContractAlias : sig
   val get_contract: string -> (string * Contract.t) Lwt.t
   val alias_param:
-    ?n:string ->
+    ?name:string ->
     ?desc:string ->
     'a Cli_entries.params ->
     (Lwt_io.file_name * Contract.t -> 'a) Cli_entries.params
   val destination_param:
-    ?n:string ->
+    ?name:string ->
     ?desc:string ->
     'a Cli_entries.params ->
     (Lwt_io.file_name * Contract.t -> 'a) Cli_entries.params

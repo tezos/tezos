@@ -18,7 +18,7 @@ type 'err full_error_category =
 
 let json_pp encoding ppf x =
   Format.pp_print_string ppf @@
-  Data_encoding.Json.to_string @@
+  Data_encoding_ezjsonm.to_string @@
   Data_encoding.Json.(construct encoding x)
 
 module Make() = struct

@@ -773,7 +773,7 @@ module Make (P: PARAMS) = struct
     (* create the external message pipe *)
     let messages = Lwt_pipe.create 100 in
     (* fill the known peers pools from last time *)
-    Data_encoding.Json.read_file config.peers_file >>= fun res ->
+    Data_encoding_ezjsonm.read_file config.peers_file >>= fun res ->
     let known_peers, black_list, my_gid,
         my_public_key, my_secret_key, my_proof_of_work =
       let init_peers () =
@@ -872,7 +872,7 @@ module Make (P: PARAMS) = struct
                  if source.white_listed then (addr, port) :: w else w))
              !known_peers ([], BlackList.bindings !black_list, []))
         in
-        Data_encoding.Json.write_file config.peers_file json >>= fun _ ->
+        Data_encoding_ezjsonm.write_file config.peers_file json >>= fun _ ->
         debug "(%a) peer cache saved" pp_gid my_gid ;
         Lwt.return_unit) ;
     (* storage of active and not yet active peers *)

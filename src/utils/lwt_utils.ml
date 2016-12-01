@@ -263,3 +263,37 @@ let write_mbytes ?(pos=0) ?len descr buf =
       | nb_written -> inner (pos + nb_written) (len - nb_written) in
   inner pos len
 
+let (>>=) = Lwt.bind
+
+let remove_dir dir =
+  let rec remove dir =
+    let files = Lwt_unix.files_of_directory dir in
+    Lwt_stream.iter_s
+      (fun file ->
+         if file = "." || file = ".." then
+           Lwt.return ()
+         else begin
+           let file = Filename.concat dir file in
+           if Sys.is_directory file
+           then remove file
+           else Lwt_unix.unlink file
+         end)
+      files >>= fun () ->
+    Lwt_unix.rmdir dir in
+  if Sys.file_exists dir && Sys.is_directory dir then
+    remove dir
+  else
+    Lwt.return ()
+
+let rec create_dir ?(perm = 0o755) dir =
+  if Sys.file_exists dir then
+    Lwt.return ()
+  else begin
+    create_dir (Filename.dirname dir) >>= fun () ->
+    Lwt_unix.mkdir dir perm
+  end
+
+let create_file ?(perm = 0o644) name content =
+  Lwt_unix.openfile name Unix.([O_TRUNC; O_CREAT; O_WRONLY]) perm >>= fun fd ->
+  Lwt_unix.write_string fd content 0 (String.length content) >>= fun _ ->
+  Lwt_unix.close fd

@@ -48,7 +48,7 @@ end = struct
   let load () =
     let filename = filename () in
     if not (Sys.file_exists filename) then return LevelMap.empty else
-      Data_encoding.Json.read_file filename >>= function
+      Data_encoding_ezjsonm.read_file filename >>= function
       | None ->
           error "couldn't to read the endorsement file"
       | Some json ->
@@ -62,11 +62,11 @@ end = struct
     Lwt.catch
       (fun () ->
          let dirname = Client_config.base_dir#get in
-         (if not (Sys.file_exists dirname) then Utils.create_dir dirname
+         (if not (Sys.file_exists dirname) then Lwt_utils.create_dir dirname
           else Lwt.return ()) >>= fun () ->
          let filename = filename () in
          let json = Data_encoding.Json.construct encoding map in
-         Data_encoding.Json.write_file filename json >>= function
+         Data_encoding_ezjsonm.write_file filename json >>= function
          | false -> failwith "Json.write_file"
          | true -> return ())
       (fun exn ->
@@ -292,7 +292,7 @@ let endorse state =
              Block_hash.pp_short hash
              Raw_level.pp level
              slot name
-             Operation_hash.pp_short oph ;
+             Operation_hash.pp_short oph >>= fun () ->
            return ())
     to_endorse
 
