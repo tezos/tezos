@@ -29,16 +29,16 @@ module type Alias = sig
   val save : (Lwt_io.file_name * t) list -> unit Lwt.t
   val to_source : t -> string Lwt.t
   val alias_param :
-    ?n:string ->
+    ?name:string ->
     ?desc:string ->
     'a Cli_entries.params ->
     (Lwt_io.file_name * t -> 'a) Cli_entries.params
   val fresh_alias_param :
-    ?n:string ->
+    ?name:string ->
     ?desc:string ->
     'a Cli_entries.params -> (string -> 'a) Cli_entries.params
   val source_param :
-    ?n:string ->
+    ?name:string ->
     ?desc:string ->
     'a Cli_entries.params -> (t -> 'a) Cli_entries.params
 end

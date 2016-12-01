@@ -51,33 +51,34 @@ module ContractAlias = struct
         find_key key
     | _ -> find s
 
-  let alias_param ?(n = "name") ?(desc = "existing contract alias") next =
-    Cli_entries.Param
-      (n, desc ^ "\n"
-          ^ "can be an contract alias or a key alias (autodetected in this order)\n\
-             use 'key:name' to force the later", get_contract, next)
+  let alias_param ?(name = "name") ?(desc = "existing contract alias") next =
+    let desc =
+      desc ^ "\n"
+      ^ "can be an contract alias or a key alias (autodetected in this order)\n\
+         use 'key:name' to force the later" in
+    Cli_entries.param ~name ~desc get_contract next
 
-   let destination_param ?(n = "dst") ?(desc = "destination contract") next =
-     Cli_entries.Param
-       (n,
-        desc ^ "\n"
-        ^ "can be an alias, a key alias, or a litteral (autodetected in this order)\n\
-           use 'text:litteral', 'alias:name', 'key:name' to force",
-        (fun s ->
-           match Utils.split ~limit:1 ':' s with
-           | [ "alias" ; alias ]->
-               find alias
-           | [ "key" ; text ] ->
-               Client_keys.Public_key_hash.find text >>= fun v ->
-               Lwt.return (s, Contract.default_contract v)
-           | _ ->
-               Lwt.catch
-                 (fun () -> find s)
-                 (fun _ ->
-                    match Contract.of_b48check s with
-                    | Error _ -> Lwt.fail (Failure "bad contract notation")
-                    | Ok v -> Lwt.return (s, v))),
-        next)
+  let destination_param ?(name = "dst") ?(desc = "destination contract") next =
+    let desc =
+      desc ^ "\n"
+      ^ "can be an alias, a key alias, or a literal (autodetected in this order)\n\
+         use 'text:literal', 'alias:name', 'key:name' to force" in
+    Cli_entries.param ~name ~desc
+      (fun s ->
+         match Utils.split ~limit:1 ':' s with
+         | [ "alias" ; alias ]->
+             find alias
+         | [ "key" ; text ] ->
+             Client_keys.Public_key_hash.find text >>= fun v ->
+             Lwt.return (s, Contract.default_contract v)
+         | _ ->
+             Lwt.catch
+               (fun () -> find s)
+               (fun _ ->
+                  match Contract.of_b48check s with
+                  | Error _ -> Lwt.fail (Failure "bad contract notation")
+                  | Ok v -> Lwt.return (s, v)))
+      next
 
    let name contract =
      rev_find contract >|= function
@@ -150,17 +151,16 @@ let commands  () =
       (fixed [ "list" ; "known" ; "contracts" ])
       (fun () ->
          RawContractAlias.load () >>= fun list ->
-         List.iter (fun (n, v) ->
+         Lwt_list.iter_s (fun (n, v) ->
              let v = Contract.to_b48check v in
              message "%s: %s" n v)
-           list ;
+           list >>= fun () ->
          Client_keys.Public_key_hash.load () >>= fun list ->
          Lwt_list.iter_s (fun (n, v) ->
              RawContractAlias.mem n >>= fun mem ->
              let p = if mem then "key:" else "" in
              let v = Contract.to_b48check (Contract.default_contract v) in
-             message "%s%s: %s" p n v ;
-             Lwt.return_unit)
+             message "%s%s: %s" p n v)
            list >>= fun () ->
          Lwt.return ()) ;
     command
@@ -179,6 +179,5 @@ let commands  () =
        @@ RawContractAlias.alias_param
        @@ stop)
       (fun (_, contract) () ->
-         Format.printf "%a\n%!" Contract.pp contract ;
-         Lwt.return ()) ;
+         Cli_entries.message "%a\n%!" Contract.pp contract) ;
   ]

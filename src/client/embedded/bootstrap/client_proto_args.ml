@@ -81,14 +81,14 @@ let delegatable_args =
     Arg.Clear delegatable,
     "Set the created contract to be non delegatable (default)" ]
 
-let tez_param ~n ~desc next =
+let tez_param ~name ~desc next =
   Cli_entries.param
-    n
+    name
     (desc ^ " in \xEA\x9C\xA9\n\
              text format: D,DDD,DDD.DD (centiles and comas are optional)")
     (fun s ->
        try Lwt.return (tez_of_string s)
-       with _ -> Cli_entries.param_error "invalid \xEA\x9C\xA9 notation")
+       with _ -> Lwt.fail_with "invalid \xEA\x9C\xA9 notation")
     next
 
 let max_priority = ref None

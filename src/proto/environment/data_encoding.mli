@@ -170,13 +170,6 @@ val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
 
 module Json : sig
 
-  (** Read a JSON document from a string. *)
-  val from_string : string -> (json, string) result
-
-  (** Write a JSON document to a string. This goes via an intermediate
-      buffer and so may be slow on large documents. *)
-  val to_string : json -> string
-
   val schema : 'a encoding -> json_schema
   val construct : 't encoding -> 't -> json
   val destruct : 't encoding -> json -> 't

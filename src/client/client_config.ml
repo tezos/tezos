@@ -128,20 +128,19 @@ let parse_args ?version usage dispatcher =
             ~current:(ref 0) Sys.argv args (anon dispatch) (usage base_args) ;
           Lwt.return ()
         with Sys_error msg ->
-          Printf.eprintf "Error: can't read the configuration file: %s\n%!" msg;
-          exit 1
+          Cli_entries.error
+            "Error: can't read the configuration file: %s\n%!" msg
       end else begin
        try
          (* parse once again with contextual options *)
          Arg.parse_argv_dynamic
            ~current:(ref 0) Sys.argv args (anon dispatch) (usage base_args) ;
-         Utils.create_dir (Filename.dirname config_file#get) >>= fun () ->
+         Lwt_utils.create_dir (Filename.dirname config_file#get) >>= fun () ->
          file_group#write config_file#get ;
          Lwt.return ()
        with Sys_error msg ->
-         Printf.eprintf
-           "Warning: can't create the default configuration file: %s\n%!" msg ;
-         Lwt.return ()
+         Cli_entries.warning
+           "Warning: can't create the default configuration file: %s\n%!" msg
      end) >>= fun () ->
     begin match dispatch `End with
       | `Res res ->
@@ -161,7 +160,7 @@ let preparse name argv =
     None
   with Found s -> Some s
 
-let preparse_args () : Node_rpc_services.Blocks.block =
+let preparse_args () : Node_rpc_services.Blocks.block Lwt.t =
   begin
     match preparse "-base-dir" Sys.argv with
     | None -> ()
@@ -174,11 +173,13 @@ let preparse_args () : Node_rpc_services.Blocks.block =
   end ;
   begin
     if Sys.file_exists config_file#get then try
-      file_group#read config_file#get ;
+      (file_group#read config_file#get ;
+      Lwt.return ())
     with Sys_error msg ->
-      Printf.eprintf "Error: can't read the configuration file: %s\n%!" msg;
-      exit 1
-  end ;
+      Cli_entries.error
+        "Error: can't read the configuration file: %s\n%!" msg
+    else Lwt.return ()
+  end >>= fun () ->
   begin
     match preparse "-addr" Sys.argv with
     | None -> ()
@@ -186,17 +187,20 @@ let preparse_args () : Node_rpc_services.Blocks.block =
   end ;
   begin
     match preparse "-port" Sys.argv with
-    | None -> ()
+    | None -> Lwt.return ()
     | Some port ->
-        try incoming_port#set (int_of_string port)
+        try
+          incoming_port#set (int_of_string port) ;
+          Lwt.return ()
         with _ ->
-          Printf.eprintf "Error: can't parse the -port option: %S.\n%!" port ;
-          exit 1  end ;
+          Cli_entries.error
+            "Error: can't parse the -port option: %S.\n%!" port
+  end >>= fun () ->
   match preparse "-block" Sys.argv with
-  | None -> `Prevalidation
+  | None -> Lwt.return `Prevalidation
   | Some x ->
       match Node_rpc_services.Blocks.parse_block x with
       | Error _ ->
-          Printf.eprintf "Error: can't parse the -block option: %S.\n%!" x ;
-          exit 1
-      | Ok b -> b
+          Cli_entries.error
+            "Error: can't parse the -block option: %S.\n%!" x
+      | Ok b -> Lwt.return b

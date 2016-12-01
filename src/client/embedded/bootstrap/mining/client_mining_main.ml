@@ -27,7 +27,7 @@ let mine_block block ?force ?max_priority ?src_sk delegate =
     ~seed_nonce ~src_sk block delegate >>=? fun block_hash ->
   Client_mining_forge.State.record_block level block_hash seed_nonce
   |> trace_exn (Failure "Error while recording block") >>=? fun () ->
-  message "Injected block %a" Block_hash.pp_short block_hash ;
+  message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return ()
 
 let endorse_block ?force ?max_priority delegate =
@@ -35,8 +35,8 @@ let endorse_block ?force ?max_priority delegate =
   Client_keys.get_key delegate >>=? fun (_src_name, src_pk, src_sk) ->
   Client_mining_endorsement.forge_endorsement
     block ?force ?max_priority ~src_sk src_pk >>=? fun oph ->
-  answer "Operation successfully injected in the node." ;
-  answer "Operation hash is '%a'." Operation_hash.pp oph ;
+  answer "Operation successfully injected in the node." >>= fun () ->
+  answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return ()
 
 let get_predecessor_cycle cycle =
@@ -68,15 +68,16 @@ let reveal_block_nonces ?force block_hashes =
             | Error _ ->
                 Lwt.fail Not_found)
          (fun _ ->
-            Format.eprintf "Cannot find block %a in the chain. (ignoring)@."
-              Block_hash.pp_short hash ;
+            Cli_entries.warning
+              "Cannot find block %a in the chain. (ignoring)@."
+              Block_hash.pp_short hash >>= fun () ->
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
   map_filter_s (fun (bi : Client_mining_blocks.block_info) ->
       Client_proto_nonces.find bi.hash >>= function
       | None ->
-          Format.eprintf "Cannot find nonces for block %a (ignoring)@."
-            Block_hash.pp_short bi.hash ;
+          Cli_entries.warning "Cannot find nonces for block %a (ignoring)@."
+            Block_hash.pp_short bi.hash >>= fun () ->
           return None
       | Some nonce ->
           return (Some (bi.hash, (bi.level.level, nonce))))
@@ -93,15 +94,15 @@ let reveal_nonces ?force () =
       Client_proto_nonces.find bi.hash >>= function
       | None -> return None
       | Some nonce ->
-          Format.eprintf "Found nonce for %a (level: %a)@."
-            Block_hash.pp_short bi.hash Level.pp bi.level ;
+          Cli_entries.warning "Found nonce for %a (level: %a)@."
+            Block_hash.pp_short bi.hash Level.pp bi.level >>= fun () ->
           return (Some (bi.hash, (bi.level.level, nonce))))
     block_infos >>=? fun blocks ->
   do_reveal ?force block blocks
 
 open Client_proto_args
 
-let run_daemon delegates =
+let run_daemon delegates () =
   Client_mining_daemon.run
     ?max_priority:!max_priority
     ~delay:!endorsement_delay
@@ -126,7 +127,7 @@ let commands () =
       ~args: [ force_arg ]
       (prefixes [ "endorse"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
-         ~n:"miner" ~desc: "name of the delegate owning the endorsement right"
+         ~name:"miner" ~desc: "name of the delegate owning the endorsement right"
        @@ stop)
       (fun (_, delegate) () ->
          endorse_block
@@ -138,7 +139,7 @@ let commands () =
       ~args: [ max_priority_arg ; force_arg ]
       (prefixes [ "mine"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
-         ~n:"miner" ~desc: "name of the delegate owning the mining right"
+         ~name:"miner" ~desc: "name of the delegate owning the mining right"
        @@ stop)
       (fun (_, delegate) () ->
          mine_block (block ())
@@ -150,7 +151,7 @@ let commands () =
       ~args: [ force_arg ]
       (prefixes [ "reveal"; "nonce"; "for" ]
        @@ Cli_entries.seq_of_param Block_hash.param)
-      (fun block_hashes ->
+      (fun block_hashes () ->
          reveal_block_nonces ~force:!force block_hashes >>= Client_proto_rpcs.handle_error) ;
     command
       ~group: "delegate"

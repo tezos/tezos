@@ -7,6 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Error : sig
+  val service: (unit, unit, unit, Json_schema.schema) RPC.service
+  val encoding: error list Data_encoding.t
+  val wrap: 'a Data_encoding.t -> 'a tzresult Data_encoding.encoding
+end
+
 module Blocks : sig
 
   type block = [
@@ -15,6 +21,7 @@ module Blocks : sig
     | `Test_head of int | `Test_prevalidation
     | `Hash of Block_hash.t
     ]
+  val blocks_arg : block RPC.Arg.arg
 
   val parse_block: string -> (block, string) result
   type net = Store.net_id = Net of Block_hash.t

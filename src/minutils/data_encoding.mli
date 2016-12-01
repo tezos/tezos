@@ -180,24 +180,6 @@ val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
 
 module Json : sig
 
-  (** Read a JSON document from a string. *)
-  val from_string : string -> (json, string) result
-
-  (** Read a stream of JSON documents from a stream of strings.
-      A single JSON document may be represented in multiple consecutive
-      strings. But only the first document of a string is considered. *)
-  val from_stream : string Lwt_stream.t -> (json, string) result Lwt_stream.t
-
-  (** Write a JSON document to a string. This goes via an intermediate
-      buffer and so may be slow on large documents. *)
-  val to_string : json -> string
-
-  (** Loads a JSON file in memory *)
-  val read_file : string -> json option Lwt.t
-
-  (** (Over)write a JSON file from in memory data *)
-  val write_file : string -> json -> bool Lwt.t
-
   val convert : 'a encoding -> 'a Json_encoding.encoding
 
   val schema : 'a encoding -> json_schema

@@ -92,23 +92,58 @@ clean::
 	rm -f compiler/embedded_cmis.ml
 	rm -rf tmp
 
+############################################################################
+## Minimal utils library compatible with js_of_ocaml
+############################################################################
+
+MINUTILS_LIB_INTFS := \
+  minutils/mBytes.mli \
+	minutils/hex_encode.mli \
+  minutils/utils.mli \
+  minutils/compare.mli \
+  minutils/data_encoding.mli \
+  minutils/RPC.mli \
+
+MINUTILS_LIB_IMPLS := \
+  minutils/mBytes.ml \
+  minutils/hex_encode.ml \
+  minutils/utils.ml \
+  minutils/compare.ml \
+  minutils/data_encoding.ml \
+  minutils/RPC.ml \
+
+MINUTILS_PACKAGES := \
+  cstruct \
+  lwt  \
+  ocplib-json-typed.bson \
+  ocplib-resto.directory \
+  $(COVERAGEPKG) \
+
+MINUTILS_OBJS := \
+  ${MINUTILS_LIB_IMPLS:.ml=.cmx} ${MINUTILS_LIB_IMPLS:.ml=.ml.deps} \
+  ${MINUTILS_LIB_INTFS:.mli=.cmi} ${MINUTILS_LIB_INTFS:.mli=.mli.deps}
+${MINUTILS_OBJS}: PACKAGES=${MINUTILS_PACKAGES}
+${MINUTILS_OBJS}: SOURCE_DIRECTORIES=minutils
+${MINUTILS_OBJS}: TARGET="(minutils.cmxa)"
+${MINUTILS_OBJS}: OPENED_MODULES=
+
+minutils.cmxa: ${MINUTILS_LIB_IMPLS:.ml=.cmx}
+	@echo LINK $(notdir $@)
+	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
 
 ############################################################################
-## Node protocol compiler (also embedded in the main program)
+## Utils library
 ############################################################################
 
 UTILS_LIB_INTFS := \
-  utils/mBytes.mli \
-  utils/utils.mli \
   utils/base48.mli \
-  utils/hex_encode.mli \
   utils/cli_entries.mli \
-  utils/compare.mli \
-  utils/data_encoding.mli \
+  utils/data_encoding_ezjsonm.mli \
   utils/crypto_box.mli \
   utils/time.mli \
   utils/hash.mli \
   utils/error_monad.mli \
+  utils/lwt_exit.mli \
   utils/logging.mli \
   utils/lwt_utils.mli \
   utils/lwt_pipe.mli \
@@ -116,18 +151,15 @@ UTILS_LIB_INTFS := \
   utils/moving_average.mli \
 
 UTILS_LIB_IMPLS := \
-  utils/mBytes.ml \
-  utils/utils.ml \
-  utils/hex_encode.ml \
   utils/base48.ml \
   utils/cli_entries.ml \
-  utils/compare.ml \
-  utils/data_encoding.ml \
+  utils/data_encoding_ezjsonm.ml \
   utils/time.ml \
   utils/hash.ml \
   utils/crypto_box.ml \
   utils/error_monad_sig.ml \
   utils/error_monad.ml \
+  utils/lwt_exit.ml \
   utils/logging.ml \
   utils/lwt_utils.ml \
   utils/lwt_pipe.ml \
@@ -135,12 +167,10 @@ UTILS_LIB_IMPLS := \
   utils/moving_average.ml \
 
 UTILS_PACKAGES := \
+  ${MINUTILS_PACKAGES} \
   base64 \
   calendar \
-  cstruct \
   ezjsonm \
-  lwt  \
-  ocplib-json-typed \
   sodium \
   zarith \
   $(COVERAGEPKG) \
@@ -149,14 +179,13 @@ UTILS_OBJS := \
   ${UTILS_LIB_IMPLS:.ml=.cmx} ${UTILS_LIB_IMPLS:.ml=.ml.deps} \
   ${UTILS_LIB_INTFS:.mli=.cmi} ${UTILS_LIB_INTFS:.mli=.mli.deps}
 ${UTILS_OBJS}: PACKAGES=${UTILS_PACKAGES}
-${UTILS_OBJS}: SOURCE_DIRECTORIES=utils
+${UTILS_OBJS}: SOURCE_DIRECTORIES=minutils utils
 ${UTILS_OBJS}: TARGET="(utils.cmxa)"
 ${UTILS_OBJS}: OPENED_MODULES=
 
 utils.cmxa: ${UTILS_LIB_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
 	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
-
 
 ############################################################################
 ## Node protocol compiler (also embedded in the main program)
@@ -188,7 +217,7 @@ COMPILER_OBJS := \
   ${COMPILER_LIB_INTFS:.mli=.cmi} ${COMPILER_LIB_INTFS:.mli=.mli.deps} \
   ${TZCOMPILER}
 ${COMPILER_OBJS}: PACKAGES=${COMPILER_PACKAGES}
-${COMPILER_OBJS}: SOURCE_DIRECTORIES=utils compiler
+${COMPILER_OBJS}: SOURCE_DIRECTORIES=utils minutils compiler
 ${COMPILER_OBJS}: TARGET="(compiler.cmxa)"
 ${COMPILER_OBJS}: \
   OPENED_MODULES=Error_monad Hash Utils
@@ -197,7 +226,7 @@ compiler.cmxa: ${COMPILER_LIB_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
 	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
 
-${TZCOMPILER}: utils.cmxa compiler.cmxa ${COMPILER_IMPLS:.ml=.cmx}
+${TZCOMPILER}: minutils.cmxa utils.cmxa compiler.cmxa ${COMPILER_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
 	@$(OCAMLOPT) -linkpkg $(patsubst %, -package %, $(COMPILER_PACKAGES)) -o $@ $^
 
@@ -212,7 +241,7 @@ clean::
 NODE_LIB_INTFS := \
   \
   node/net/p2p.mli \
-  node/net/RPC.mli \
+  node/net/RPC_server.mli \
   \
   node/updater/fitness.mli \
   \
@@ -242,7 +271,7 @@ NODE_LIB_IMPLS := \
   compiler/node_compiler_main.ml \
   \
   node/net/p2p.ml \
-  node/net/RPC.ml \
+  node/net/RPC_server.ml \
   \
   node/updater/fitness.ml \
   \
@@ -291,7 +320,7 @@ NODE_OBJS := \
   ${NODE_LIB_INTFS:.mli=.cmi} ${NODE_LIB_INTFS:.mli=.mli.deps} \
   ${TZNODE}
 ${NODE_OBJS}: PACKAGES=${NODE_PACKAGES}
-${NODE_OBJS}: SOURCE_DIRECTORIES=utils compiler node/db node/net node/updater node/shell
+${NODE_OBJS}: SOURCE_DIRECTORIES=minutils utils compiler node/db node/net node/updater node/shell
 ${NODE_OBJS}: TARGET="(node.cmxa)"
 ${NODE_OBJS}: OPENED_MODULES=Error_monad Hash Utils
 
@@ -300,7 +329,7 @@ node.cmxa: ${NODE_LIB_IMPLS:.ml=.cmx}
 	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
 
  ${NODE_IMPLS:.ml=.cmx}: ${EMBEDDED_CLIENT_PROTOCOLS}
-${TZNODE}: utils.cmxa compiler.cmxa node.cmxa ${EMBEDDED_NODE_PROTOCOLS} ${NODE_IMPLS:.ml=.cmx}
+${TZNODE}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa ${EMBEDDED_NODE_PROTOCOLS} ${NODE_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
 	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
@@ -318,7 +347,7 @@ proto/embedded_proto_%.cmxa: \
 	@${TZCOMPILER} -static -build-dir proto/$*/_tzbuild $@ proto/$*/
 
 CLIENT_PROTO_INCLUDES := \
-  utils node/updater node/db node/net node/shell client \
+  minutils utils node/updater node/db node/net node/shell client \
   $(shell ocamlfind query lwt ocplib-json-typed sodium)
 
 proto/client_embedded_proto_%.cmxa: \
@@ -382,7 +411,7 @@ CLIENT_OBJS := \
   ${CLIENT_LIB_INTFS:.mli=.cmi} ${CLIENT_LIB_INTFS:.mli=.mli.deps} \
   ${TZCLIENT}
 ${CLIENT_OBJS}: PACKAGES=${CLIENT_PACKAGES}
-${CLIENT_OBJS}: SOURCE_DIRECTORIES=client client/embedded utils node/net node/shell node/updater node/db compiler
+${CLIENT_OBJS}: SOURCE_DIRECTORIES=client client/embedded minutils utils node/net node/shell node/updater node/db compiler
 ${CLIENT_OBJS}: TARGET="(client.cmxa)"
 ${CLIENT_OBJS}: OPENED_MODULES=Error_monad Hash Utils
 
@@ -393,7 +422,7 @@ client.cmxa: ${CLIENT_LIB_IMPLS:.ml=.cmx}
 ${EMBEDDED_CLIENT_PROTOCOLS}: client.cmxa
 ${CLIENT_IMPLS:.ml=.cmx}: ${EMBEDDED_CLIENT_PROTOCOLS}
 
-${TZCLIENT}: utils.cmxa compiler.cmxa node.cmxa \
+${TZCLIENT}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa \
              client.cmxa ${EMBEDDED_CLIENT_PROTOCOLS} \
 	     ${CLIENT_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
@@ -446,7 +475,8 @@ ifneq ($(MAKECMDGOALS),build-deps)
 -include .depend
 endif
 endif
-DEPENDS := $(filter-out $(NO_DEPS), $(UTILS_LIB_INTFS) $(UTILS_LIB_IMPLS) \
+DEPENDS := $(filter-out $(NO_DEPS), $(MINUTILS_LIB_INTFS) $(MINUTILS_LIB_IMPLS) \
+                                    $(UTILS_LIB_INTFS) $(UTILS_LIB_IMPLS) \
                                     $(COMPILER_LIB_INTFS) $(COMPILER_LIB_IMPLS) \
                                     $(COMPILER_INTFS) $(COMPILER_IMPLS) \
                                     $(NODE_LIB_INTFS) $(NODE_LIB_IMPLS) \

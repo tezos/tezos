@@ -16,21 +16,30 @@ exception Command_not_found
 exception Bad_argument of int * string * string
 exception Command_failed of string
 
-(* A simple structure for command interpreters. *)
-type 'a params =
-  | Prefix : string * 'a params -> 'a params
-  | Param : string * string * (string -> 'p Lwt.t) * 'a params -> ('p -> 'a) params
-  | Stop : (unit -> unit Lwt.t) params
-  | More : (string list -> unit Lwt.t) params
-  | Seq : string * string * (string -> 'p Lwt.t) -> ('p list -> unit Lwt.t) params
+(* A simple structure for command interpreters.
+   This is more generic than the exported one, see end of file. *)
+type ('a, 'arg, 'ret) tparams =
+  | Prefix : string * ('a, 'arg, 'ret) tparams ->
+    ('a, 'arg, 'ret) tparams
+  | Param : string * string *
+            (string -> 'p Lwt.t) *
+            ('a, 'arg, 'ret) tparams ->
+    ('p -> 'a, 'arg, 'ret) tparams
+  | Stop :
+      ('arg -> 'ret Lwt.t, 'arg, 'ret) tparams
+  | More :
+      (string list -> 'arg -> 'ret Lwt.t, 'arg, 'ret) tparams
+  | Seq : string * string *
+          (string -> 'p Lwt.t) ->
+    ('p list -> 'arg -> 'ret Lwt.t, 'arg, 'ret) tparams
 
 (* A command wraps a callback with its type and info *)
-and command =
+and ('arg, 'ret) tcommand =
   | Command
-    : 'a params * 'a *
+    : ('a, 'arg, 'ret) tparams * 'a *
       desc option * tag list * group option *
       (Arg.key * Arg.spec * Arg.doc) list
-    -> command
+    -> ('arg, 'ret) tcommand
 
 and desc = string
 and group = string
@@ -77,25 +86,15 @@ let command ?desc ?(tags = []) ?group ?(args = []) params cb =
 (* Param combinators *)
 let string n desc next = param n desc (fun s -> return s) next
 
-(* Error combinators for use in commands *)
-let kasprintf cont fmt =
-  let buffer = Buffer.create 100 in
-  let ppf = Format.formatter_of_buffer buffer in
-  Format.kfprintf (fun ppf ->
-      Format.fprintf ppf "%!";
-      cont (Buffer.contents buffer))
-    ppf fmt
-let error fmt = kasprintf (fun msg -> Lwt.fail (Command_failed msg)) fmt
-let message fmt = kasprintf (Format.eprintf "%s\n%!") fmt
-let answer fmt = kasprintf (Format.printf "%s\n%!") fmt
-let param_error fmt = kasprintf (fun msg -> Lwt.fail (Failure msg)) fmt
-
 (* Command execution *)
-let exec (Command (params, cb, _, _, _, _)) args =
+let exec
+    (type arg) (type ret)
+    (Command (params, cb, _, _, _, _)) (last : arg) args =
   let rec exec
-    : type a. int -> a params -> a -> string list -> unit Lwt.t = fun i params cb args ->
+    : type a. int -> (a, arg, ret) tparams -> a -> string list -> ret Lwt.t
+    = fun i params cb args ->
     match params, args with
-    | Stop, [] -> cb ()
+    | Stop, [] -> cb last
     | Stop, _ -> Lwt.fail Command_not_found
     | Seq (_, _, f), seq ->
         let rec do_seq i acc = function
@@ -108,8 +107,8 @@ let exec (Command (params, cb, _, _, _, _)) args =
                   | exn -> Lwt.fail exn) >>= fun v ->
               do_seq (succ i) (v :: acc) rest in
         do_seq i [] seq >>= fun parsed ->
-        cb parsed
-    | More, rest -> cb rest
+        cb parsed last
+    | More, rest -> cb rest last
     | Prefix (n, next), p :: rest when n = p ->
         exec (succ i) next cb rest
     | Param (_, _, f, next), p :: rest ->
@@ -122,116 +121,125 @@ let exec (Command (params, cb, _, _, _, _)) args =
     | _ -> Lwt.fail Command_not_found
   in exec 1 params cb args
 
-module Command_tree = struct
-  type level =
-    { stop : command option ;
-      prefix : (string * tree) list }
-  and param_level =
-    { stop : command option ;
-      tree : tree }
-  and tree =
-    | TPrefix of level
-    | TParam of param_level
-    | TStop of command
-    | TMore of command
-    | TEmpty
-  let insert root (Command (params, _, _, _, _, _) as command) =
-    let rec insert_tree
-      : type a. tree -> a params -> tree
-      = fun t c -> match t, c with
-        | TEmpty, Stop -> TStop command
-        | TEmpty, More -> TMore command
-        | TEmpty, Seq _ -> TMore command
-        | TEmpty, Param (_, _, _, next) ->
-            TParam { tree = insert_tree TEmpty next ; stop = None }
-        | TEmpty, Prefix (n, next) ->
-            TPrefix { stop = None ; prefix = [ (n, insert_tree TEmpty next) ] }
-        | TStop command, Param (_, _, _, next) ->
-            TParam { tree = insert_tree TEmpty next ; stop = Some command }
-        | TStop command, Prefix (n, next) ->
-            TPrefix { stop = Some command ;
-                      prefix = [ (n, insert_tree TEmpty next) ] }
-        | TParam t, Param (_, _, _, next) ->
-            TParam { t with tree = insert_tree t.tree next }
-        | TPrefix ({ prefix } as l), Prefix (n, next) ->
-            let rec insert_prefix = function
-              | [] -> [ (n, insert_tree TEmpty next) ]
-              | (n', t) :: rest when n = n' -> (n, insert_tree t next) :: rest
-              | item :: rest -> item :: insert_prefix rest in
-            TPrefix { l with prefix = insert_prefix prefix }
-        | TPrefix ({ stop = None } as l), Stop ->
-            TPrefix { l with stop = Some command }
-        | TParam ({ stop = None } as l), Stop ->
-            TParam { l with stop = Some command }
-        | _, _ ->
-            Pervasives.failwith
-              "Cli_entries.Command_tree.insert: conflicting commands" in
-    insert_tree root params
-  let make commands =
-    List.fold_left insert TEmpty commands
-  let dispatcher tree args =
-    let rec loop = function
-      | TStop c, [] -> exec c args
-      | TPrefix { stop = Some c }, [] -> exec c args
-      | TMore c, _ -> exec c args
-      | TPrefix { prefix }, n :: rest ->
-          begin try
-              let t = List.assoc n prefix in
-              loop (t, rest)
-            with Not_found -> Lwt.fail Command_not_found end
-      | TParam { tree }, _ :: rest ->
-          loop (tree, rest)
-      | _, _ -> Lwt.fail Command_not_found
-    in
-    loop (tree, args)
-  let inline_dispatcher tree () =
-    let state = ref (tree, []) in
-    fun arg -> match !state, arg with
-      | (( TStop c |
-           TMore c |
-           TPrefix { stop = Some c } |
-           TParam { stop = Some c}), acc),
-        `End ->
-          state := (TEmpty, []) ;
-          `Res (exec c (List.rev acc))
-      | (TMore c, acc), `Arg n ->
-          state := (TMore c, n :: acc) ;
-          `Nop
-      | (TPrefix { prefix }, acc), `Arg n ->
-          begin try
-              let t = List.assoc n prefix in
-              state := (t, n :: acc) ;
-              begin match t with
-                | TStop (Command (_, _, _, _, _, args))
-                | TMore (Command (_, _, _, _, _, args)) -> `Args args
-                | _ -> `Nop end
-            with Not_found -> `Fail Command_not_found end
-      | (TParam { tree }, acc), `Arg n ->
-          state := (tree, n :: acc) ;
-          begin match tree with
-            | TStop (Command (_, _, _, _, _, args))
-            | TMore (Command (_, _, _, _, _, args)) -> `Args args
-            | _ -> `Nop end
-      | _, _ -> `Fail Command_not_found
-end
+(* Command dispatch tree *)
+type ('arg, 'ret) level =
+  { stop : ('arg, 'ret) tcommand option ;
+    prefix : (string * ('arg, 'ret) tree) list }
+and ('arg, 'ret) param_level =
+  { stop : ('arg, 'ret) tcommand option ;
+    tree : ('arg, 'ret) tree }
+and ('arg, 'ret) tree =
+  | TPrefix of ('arg, 'ret) level
+  | TParam of ('arg, 'ret) param_level
+  | TStop of ('arg, 'ret) tcommand
+  | TMore of ('arg, 'ret) tcommand
+  | TEmpty
+
+let insert_in_dispatch_tree
+    (type arg) (type ret)
+    root (Command (params, _, _, _, _, _) as command) =
+  let rec insert_tree
+    : type a. (arg, ret) tree -> (a, arg, ret) tparams -> (arg, ret) tree
+    = fun t c -> match t, c with
+      | TEmpty, Stop -> TStop command
+      | TEmpty, More -> TMore command
+      | TEmpty, Seq _ -> TMore command
+      | TEmpty, Param (_, _, _, next) ->
+          TParam { tree = insert_tree TEmpty next ; stop = None }
+      | TEmpty, Prefix (n, next) ->
+          TPrefix { stop = None ; prefix = [ (n, insert_tree TEmpty next) ] }
+      | TStop command, Param (_, _, _, next) ->
+          TParam { tree = insert_tree TEmpty next ; stop = Some command }
+      | TStop command, Prefix (n, next) ->
+          TPrefix { stop = Some command ;
+                    prefix = [ (n, insert_tree TEmpty next) ] }
+      | TParam t, Param (_, _, _, next) ->
+          TParam { t with tree = insert_tree t.tree next }
+      | TPrefix ({ prefix } as l), Prefix (n, next) ->
+          let rec insert_prefix = function
+            | [] -> [ (n, insert_tree TEmpty next) ]
+            | (n', t) :: rest when n = n' -> (n, insert_tree t next) :: rest
+            | item :: rest -> item :: insert_prefix rest in
+          TPrefix { l with prefix = insert_prefix prefix }
+      | TPrefix ({ stop = None } as l), Stop ->
+          TPrefix { l with stop = Some command }
+      | TParam ({ stop = None } as l), Stop ->
+          TParam { l with stop = Some command }
+      | _, _ ->
+          Pervasives.failwith
+            "Cli_entries.Command_tree.insert: conflicting commands" in
+  insert_tree root params
+
+let make_dispatch_tree commands =
+  List.fold_left insert_in_dispatch_tree TEmpty commands
+
+let tree_dispatch tree last args =
+  let rec loop = function
+    | TStop c, [] -> exec c last args
+    | TPrefix { stop = Some c }, [] -> exec c last args
+    | TMore c, _ -> exec c last args
+    | TPrefix { prefix }, n :: rest ->
+        begin try
+            let t = List.assoc n prefix in
+            loop (t, rest)
+          with Not_found -> Lwt.fail Command_not_found end
+    | TParam { tree }, _ :: rest ->
+        loop (tree, rest)
+    | _, _ -> Lwt.fail Command_not_found
+  in
+  loop (tree, args)
+
+let inline_tree_dispatch tree last =
+  let state = ref (tree, []) in
+  fun arg -> match !state, arg with
+    | (( TStop c |
+         TMore c |
+         TPrefix { stop = Some c } |
+         TParam { stop = Some c}), acc),
+      `End ->
+        state := (TEmpty, []) ;
+        `Res (exec c last (List.rev acc))
+    | (TMore c, acc), `Arg n ->
+        state := (TMore c, n :: acc) ;
+        `Nop
+    | (TPrefix { prefix }, acc), `Arg n ->
+        begin try
+            let t = List.assoc n prefix in
+            state := (t, n :: acc) ;
+            begin match t with
+              | TStop (Command (_, _, _, _, _, args))
+              | TMore (Command (_, _, _, _, _, args)) -> `Args args
+              | _ -> `Nop end
+          with Not_found -> `Fail Command_not_found end
+    | (TParam { tree }, acc), `Arg n ->
+        state := (tree, n :: acc) ;
+        begin match tree with
+          | TStop (Command (_, _, _, _, _, args))
+          | TMore (Command (_, _, _, _, _, args)) -> `Args args
+          | _ -> `Nop end
+    | _, _ -> `Fail Command_not_found
 
 (* Try a list of commands on a list of arguments *)
-let dispatcher commands =
-  let tree = Command_tree.make commands in
-  fun args -> Command_tree.dispatcher tree args
+let dispatch commands =
+  let tree = make_dispatch_tree commands in
+  tree_dispatch tree
 
 (* Argument-by-argument dispatcher to be used during argument parsing *)
-let inline_dispatcher commands =
-  let tree = Command_tree.make commands in
-  Command_tree.inline_dispatcher tree
+let inline_dispatch commands =
+  let tree = make_dispatch_tree commands in
+  inline_tree_dispatch tree
 
 (* Command line help for a set of commands *)
-let usage commands options =
+let usage
+      (type arg) (type ret)
+      commands options =
   let trim s = (* config-file wokaround *)
     Utils.split '\n' s |>
     List.map String.trim |>
     String.concat "\n" in
-  let rec help : type a. Format.formatter -> a params -> unit = fun ppf -> function
+  let rec help
+    : type a. Format.formatter -> (a, arg, ret) tparams -> unit
+    = fun ppf -> function
     | Stop -> ()
     | More -> Format.fprintf ppf "..."
     | Seq (n, "", _) -> Format.fprintf ppf "[ (%s) ...]" n
@@ -242,7 +250,9 @@ let usage commands options =
     | Prefix (n, next) -> Format.fprintf ppf "%s %a" n help next
     | Param (n, "", _, next) -> Format.fprintf ppf "(%s) %a" n help next
     | Param (_, desc, _, next) -> Format.fprintf ppf "(%s) %a" desc help next in
-  let rec help_sum : type a. Format.formatter -> a params -> unit = fun ppf -> function
+  let rec help_sum
+    : type a. Format.formatter -> (a, arg, ret) tparams -> unit
+    = fun ppf -> function
     | Stop -> ()
     | More -> Format.fprintf ppf "..."
     | Seq (n, _, _) -> Format.fprintf ppf "[ (%s) ... ]" n
@@ -250,13 +260,21 @@ let usage commands options =
     | Param (n, _, _, Stop) -> Format.fprintf ppf "(%s)" n
     | Prefix (n, next) -> Format.fprintf ppf "%s %a" n help_sum next
     | Param (n, _, _, next) -> Format.fprintf ppf "(%s) %a" n help_sum next in
-  let rec help_args : type a. Format.formatter -> a params -> unit = fun ppf -> function
-    | Stop -> ()
-    | More -> Format.fprintf ppf "..."
-    | Seq (n, desc, _) -> Format.fprintf ppf "(%s): @[<hov>%a@]" n Format.pp_print_text (trim desc)
-    | Prefix (_, next) -> help_args ppf next
-    | Param (n, desc, _, Stop) -> Format.fprintf ppf "(%s): @[<hov>%a@]" n Format.pp_print_text (trim desc)
-    | Param (n, desc, _, next) -> Format.fprintf ppf "(%s): @[<hov>%a@]@,%a" n Format.pp_print_text (trim desc) help_args next in
+  let rec help_args
+    : type a. Format.formatter -> (a, arg, ret) tparams -> unit
+    = fun ppf -> function
+      | Stop -> ()
+      | More -> Format.fprintf ppf "..."
+      | Seq (n, desc, _) ->
+          Format.fprintf ppf "(%s): @[<hov>%a@]"
+            n Format.pp_print_text (trim desc)
+      | Prefix (_, next) -> help_args ppf next
+      | Param (n, desc, _, Stop) ->
+          Format.fprintf ppf "(%s): @[<hov>%a@]"
+            n Format.pp_print_text (trim desc)
+      | Param (n, desc, _, next) ->
+          Format.fprintf ppf "(%s): @[<hov>%a@]@,%a"
+            n Format.pp_print_text (trim desc) help_args next in
   let option_help ppf (n, opt, desc) =
     Format.fprintf ppf "%s%s" n
       Arg.(let rec example opt = match opt with
@@ -277,27 +295,38 @@ let usage commands options =
       Format.fprintf ppf "@,  @[<hov>%a@]" Format.pp_print_text (trim desc) in
   let command_help ppf (Command (p, _, desc, _, _, options)) =
     let small = Format.asprintf "@[<h>%a@]" help p in
+    let desc =
+      match desc with
+      | None -> "undocumented command"
+      | Some desc -> trim desc in
     if String.length small < 50 then begin
       Format.fprintf ppf "@[<v 2>%s@,@[<hov>%a@]"
-        small
-        Format.pp_print_text (match desc with None -> "undocumented command" | Some desc -> trim desc)
+        small Format.pp_print_text desc
     end else begin
       Format.fprintf ppf "@[<v 2>%a@,@[<hov 0>%a@]@,%a"
         help_sum p
-        Format.pp_print_text (match desc with None -> "undocumented command" | Some desc -> trim desc)
+        Format.pp_print_text desc
         help_args p ;
     end ;
     if options = [] then
       Format.fprintf ppf "@]"
     else
-      Format.fprintf ppf "@,%a@]" (Format.pp_print_list option_help) options in
+      Format.fprintf ppf "@,%a@]"
+        (Format.pp_print_list option_help)
+        options in
   let rec group_help ppf (n, commands) =
+    let title =
+      match n with
+      | None -> "Miscellaneous commands"
+      | Some n -> group_title n in
     Format.fprintf ppf "@[<v 2>%s:@,%a@]"
-      (match n with None -> "Miscellaneous commands" | Some n -> group_title n)
+      title
       (Format.pp_print_list command_help) !commands in
   let usage ppf (by_group, options) =
     Format.fprintf ppf
-      "@[<v>@[<v 2>Usage:@,%s [ options ] command [ command options ]@]@,@[<v 2>Options:@,%a@]@,%a@]"
+      "@[<v>@[<v 2>Usage:@,%s [ options ] command [ command options ]@]@,\
+       @[<v 2>Options:@,%a@]@,\
+       %a@]"
       Sys.argv.(0)
       (Format.pp_print_list option_help) options
       (Format.pp_print_list group_help) by_group in
@@ -312,3 +341,39 @@ let usage commands options =
            (g, ref [ c ]) :: acc)
       [] commands |> List.sort compare in
   Format.asprintf "%a" usage (by_group, options)
+
+(* Pre-instanciated types *)
+type 'a params = ('a, unit, unit) tparams
+type command = (unit, unit) tcommand
+
+let log_hook
+  : (string -> string -> unit Lwt.t) option ref
+  = ref None
+
+let log channel msg =
+  match !log_hook with
+  | None -> Lwt.fail (Invalid_argument "Cli_entries.log: uninitialized hook")
+  | Some hook -> hook channel msg
+
+let error fmt=
+  Format.kasprintf
+    (fun msg ->
+       Lwt.fail (Failure msg))
+    fmt
+
+let warning fmt =
+  Format.kasprintf
+    (fun msg -> log "stderr" msg)
+    fmt
+
+let message fmt =
+  Format.kasprintf
+    (fun msg -> log "stdout" msg)
+    fmt
+
+let answer = message
+
+let log name fmt =
+  Format.kasprintf
+    (fun msg -> log name msg)
+    fmt

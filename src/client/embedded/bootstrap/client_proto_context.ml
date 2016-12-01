@@ -34,8 +34,7 @@ let get_delegate_pkh = function
 
 let get_timestamp block () =
   Client_node_rpcs.Blocks.timestamp block >>= fun v ->
-  Cli_entries.message "%s" (Time.to_notation v) ;
-  Lwt.return ()
+  Cli_entries.message "%s" (Time.to_notation v)
 
 let list_contracts block () =
   Client_proto_rpcs.Context.Contract.list block >>=? fun contracts ->
@@ -58,7 +57,7 @@ let list_contracts block () =
       let kind = match Contract.is_default h with
         | Some _ -> " (default)"
         | None -> "" in
-      Cli_entries.message "%s%s%s" (Contract.to_b48check h) kind nm;
+      Cli_entries.message "%s%s%s" (Contract.to_b48check h) kind nm >>= fun () ->
       return ())
     contracts
 
@@ -75,15 +74,15 @@ let transfer block ?force
   Client_proto_rpcs.Context.Contract.counter block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   message "Acquired the source's sequence counter (%ld -> %ld)."
-    pcounter counter ;
+    pcounter counter >>= fun () ->
   Client_proto_rpcs.Helpers.Forge.Manager.transaction block
     ~net ~source ~sourcePubKey:src_pk ~counter ~amount
     ~destination ?parameters ~fee () >>=? fun bytes ->
-  message "Forged the raw transaction frame." ;
+  message "Forged the raw transaction frame." >>= fun () ->
   let signed_bytes = Ed25519.append_signature src_sk bytes in
   Client_node_rpcs.inject_operation ?force ~wait:true signed_bytes >>=? fun oph ->
-  answer "Operation successfully injected in the node." ;
-  answer "Operation hash is '%a'." Operation_hash.pp oph ;
+  answer "Operation successfully injected in the node." >>= fun () ->
+  answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return ()
 
 let originate_account block ?force
@@ -93,16 +92,16 @@ let originate_account block ?force
   Client_proto_rpcs.Context.Contract.counter block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   message "Acquired the source's sequence counter (%ld -> %ld)."
-    pcounter counter ;
+    pcounter counter >>= fun () ->
   Client_proto_rpcs.Helpers.Forge.Manager.origination block
     ~net ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ?spendable
     ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun (contract, bytes) ->
-  message "Forged the raw origination frame." ;
+  message "Forged the raw origination frame." >>= fun () ->
   let signed_bytes = Ed25519.append_signature src_sk bytes in
   Client_node_rpcs.inject_operation ?force ~wait:true signed_bytes >>=? fun oph ->
-  message "Operation successfully injected in the node." ;
-  message "Operation hash is '%a'." Operation_hash.pp oph ;
+  message "Operation successfully injected in the node." >>= fun () ->
+  message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return contract
 
 let originate_contract
@@ -115,18 +114,18 @@ let originate_contract
   Client_proto_rpcs.Context.Contract.counter block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   message "Acquired the source's sequence counter (%ld -> %ld)."
-    pcounter counter ;
+    pcounter counter >>= fun () ->
   Client_node_rpcs.Blocks.net block >>= fun net ->
   Client_proto_rpcs.Helpers.Forge.Manager.origination block
     ~net ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ~spendable:!spendable
     ?delegatable ?delegatePubKey
     ~script:(code, init) ~fee () >>=? fun (contract, bytes) ->
-  message "Forged the raw origination frame." ;
+  message "Forged the raw origination frame." >>= fun () ->
   let signed_bytes = Ed25519.append_signature src_sk bytes in
   Client_node_rpcs.inject_operation ?force ~wait:true signed_bytes >>=? fun oph ->
-  message "Operation successfully injected in the node." ;
-  message "Operation hash is '%a'." Operation_hash.pp oph ;
+  message "Operation successfully injected in the node." >>= fun () ->
+  message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return contract
 
 let commands () =
@@ -157,26 +156,24 @@ let commands () =
              Public_key_hash.add name pkh >>= fun () ->
              Public_key.add name pk >>= fun () ->
              Secret_key.add name sk >>= fun () ->
-             message "Bootstrap keys added under the name '%s'." name;
-             Lwt.return_unit)
+             message "Bootstrap keys added under the name '%s'." name)
            accounts >>= fun () ->
          Lwt.return_unit) ;
     command
       ~group: "context"
       ~desc: "get the balance of a contract"
       (prefixes [ "get" ; "balance" ]
-       @@ ContractAlias.destination_param ~n:"src" ~desc:"source contract"
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       (fun (_, contract) () ->
          Client_proto_rpcs.Context.Contract.balance (block ()) contract
          >>= Client_proto_rpcs.handle_error >>= fun amount ->
-         answer "%a %s" Tez.pp amount tez_sym;
-         Lwt.return ());
+         answer "%a %s" Tez.pp amount tez_sym);
     command
       ~group: "context"
       ~desc: "get the manager of a block"
       (prefixes [ "get" ; "manager" ]
-       @@ ContractAlias.destination_param ~n:"src" ~desc:"source contract"
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       (fun (_, contract) () ->
          Client_proto_rpcs.Context.Contract.manager (block ()) contract
@@ -184,8 +181,7 @@ let commands () =
          Public_key_hash.rev_find manager >>= fun mn ->
          Public_key_hash.to_source manager >>= fun m ->
          message "%s (%s)" m
-           (match mn with None -> "unknown" | Some n -> "known as " ^ n) ;
-         Lwt.return ());
+           (match mn with None -> "unknown" | Some n -> "known as " ^ n));
     command
       ~group: "context"
       ~desc: "open a new account"
@@ -193,16 +189,16 @@ let commands () =
               @ delegatable_args @ spendable_args)
       (prefixes [ "originate" ; "account" ]
        @@ RawContractAlias.fresh_alias_param
-         ~n: "new" ~desc: "name of the new contract"
+         ~name: "new" ~desc: "name of the new contract"
        @@ prefix "for"
        @@ Public_key_hash.alias_param
-         ~n: "mgr" ~desc: "manager of the new contract"
+         ~name: "mgr" ~desc: "manager of the new contract"
        @@ prefix "transfering"
        @@ tez_param
-         ~n: "qty" ~desc: "amount taken from source"
+         ~name: "qty" ~desc: "amount taken from source"
        @@ prefix "from"
        @@ ContractAlias.alias_param
-         ~n:"src" ~desc: "name of the source contract"
+         ~name:"src" ~desc: "name of the source contract"
        @@ stop)
       (fun neu (_, manager) balance (_, source) ->
          handle_error @@ fun () ->
@@ -210,7 +206,7 @@ let commands () =
          get_delegate_pkh !delegate >>= fun delegate ->
          Client_proto_contracts.get_manager (block ()) source >>=? fun src_pkh ->
          Client_keys.get_key src_pkh >>=? fun (src_name, src_pk, src_sk) ->
-         message "Got the source's manager keys (%s)." src_name ;
+         message "Got the source's manager keys (%s)." src_name >>= fun () ->
          originate_account (block ()) ~force:!force
            ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
            ~delegatable:!delegatable ~spendable:!spendable ?delegate:delegate
@@ -224,19 +220,19 @@ let commands () =
               delegatable_args @ spendable_args @ [ init_arg ])
       (prefixes [ "originate" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
-         ~n: "new" ~desc: "name of the new contract"
+         ~name: "new" ~desc: "name of the new contract"
        @@ prefix "for"
        @@ Public_key_hash.alias_param
-         ~n: "mgr" ~desc: "manager of the new contract"
+         ~name: "mgr" ~desc: "manager of the new contract"
        @@ prefix "transfering"
        @@ tez_param
-         ~n: "qty" ~desc: "amount taken from source"
+         ~name: "qty" ~desc: "amount taken from source"
        @@ prefix "from"
        @@ ContractAlias.alias_param
-         ~n:"src" ~desc: "name of the source contract"
+         ~name:"src" ~desc: "name of the source contract"
        @@ prefix "running"
        @@ Program.source_param
-         ~n:"prg" ~desc: "script of the account\n\
+         ~name:"prg" ~desc: "script of the account\n\
                           combine with -init if the storage type is non void"
        @@ stop)
       (fun neu (_, manager) balance (_, source) code ->
@@ -245,7 +241,7 @@ let commands () =
          get_delegate_pkh !delegate >>= fun delegate ->
          Client_proto_contracts.get_manager (block ()) source >>=? fun src_pkh ->
          Client_keys.get_key src_pkh >>=? fun (src_name, src_pk, src_sk) ->
-         message "Got the source's manager keys (%s)." src_name ;
+         message "Got the source's manager keys (%s)." src_name >>= fun () ->
          originate_contract (block ()) ~force:!force
            ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
            ~delegatable:!delegatable ?delegatePubKey:delegate ~code ~init:!init ()
@@ -258,19 +254,19 @@ let commands () =
       ~args: [ fee_arg ; arg_arg ; force_arg ]
       (prefixes [ "transfer" ]
        @@ tez_param
-         ~n: "qty" ~desc: "amount taken from source"
+         ~name: "qty" ~desc: "amount taken from source"
        @@ prefix "from"
        @@ ContractAlias.alias_param
-         ~n: "src" ~desc: "name of the source contract"
+         ~name: "src" ~desc: "name of the source contract"
        @@ prefix "to"
        @@ ContractAlias.destination_param
-         ~n: "dst" ~desc: "name/literal of the destination contract"
+         ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
       (fun amount (_, source) (_, destination) ->
          handle_error @@ fun () ->
          Client_proto_contracts.get_manager (block ()) source >>=? fun src_pkh ->
          Client_keys.get_key src_pkh >>=? fun (src_name, src_pk, src_sk) ->
-         message "Got the source's manager keys (%s)." src_name ;
+         message "Got the source's manager keys (%s)." src_name >>= fun () ->
          transfer (block ()) ~force:!force
            ~source ~src_pk ~src_sk ~destination ?arg:!arg ~amount ~fee:!fee ())
   ]
