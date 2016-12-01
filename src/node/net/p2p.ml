@@ -713,16 +713,7 @@ module Make (P: PARAMS) = struct
                 my_gid
                 (fun _ port ->
                    Lwt.catch begin fun () ->
-                     let ipaddr =
-                       let open Ipaddr in
-                       match Ipaddr_unix.of_inet_addr addr with
-                       | V4 addr -> V6 (v6_of_v4 addr)
-                       | V6 _ as addr -> addr in
-                     let addr = Ipaddr_unix.to_inet_addr ipaddr in
-                     let socket = LU.(socket PF_INET6 SOCK_STREAM 0) in
-                     LU.connect socket LU.(ADDR_INET (addr, port)) >>= fun () ->
-                     callback ipaddr port socket >>= fun () ->
-                     Lwt.return_unit
+                     callback addr port
                    end
                      (fun _ -> (* ignore errors *) Lwt.return_unit) >>= fun () ->
                    step ())
@@ -1249,7 +1240,8 @@ module Make (P: PARAMS) = struct
         (Format.asprintf "(%a) unblacklister" pp_gid my_gid)
         unblock cancel in
     let discovery_answerer =
-      let callback addr port socket =
+      let callback inet_addr port =
+        let addr = Ipaddr_unix.of_inet_addr inet_addr in
         (* do not reply to ourselves or connected peers *)
         if not (PeerMap.mem_by_point (addr, port) !connected)
         && (try match PeerMap.gid_by_point (addr, port) !known_peers with
@@ -1258,12 +1250,13 @@ module Make (P: PARAMS) = struct
            with Not_found -> true)
         then
           (* connect if we need peers *)
-          if PeerMap.cardinal !connected >= limits.expected_connections then begin
-            Lwt_pipe.push events (Peers [ addr, port ]) >>= fun () ->
-            LU.close socket
-          end else
+          if PeerMap.cardinal !connected >= limits.expected_connections then
+            Lwt_pipe.push events (Peers [ addr, port ])
+          else
+            let socket = LU.(socket PF_INET6 SOCK_STREAM 0) in
+            LU.connect socket LU.(ADDR_INET (inet_addr, port)) >>= fun () ->
             Lwt_pipe.push events (Contact ((addr, port), socket))
-        else LU.close socket
+        else Lwt.return_unit
       in
       match config.discovery_port with
       | None -> Lwt.return_unit
