@@ -282,14 +282,14 @@ val register_describe_directory_service:
 (** A handle on the server worker. *)
 type server
 
-(** Promise a running RPC serve ; takes the address and port. To call
+(** Promise a running RPC serve ; takes the port. To call
     an RPX at /p/a/t/h/ in the provided service, one must call the URI
     /call/p/a/t/h/. Calling /list/p/a/t/h/ will list the services
     prefixed by /p/a/t/h/, if any. Calling /schema/p/a/t/h/ will
     describe the input and output of the service, if it is
     callable. Calling /pipe will read a sequence of services to call in
     sequence from the request body, see {!pipe_encoding}. *)
-val launch : string -> int -> unit directory -> server Lwt.t
+val launch : int -> unit directory -> server Lwt.t
 
 (** Kill an RPC server. *)
 val shutdown : server -> unit Lwt.t
