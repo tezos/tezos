@@ -213,54 +213,6 @@ module Json = struct
 
   type nonrec json = json
 
-  let to_root = function
-    | `O ctns -> `O ctns
-    | `A ctns -> `A ctns
-    | `Null -> `O []
-    | oth -> `A [ oth ]
-
-  let to_string j = Ezjsonm.to_string ~minify:false (to_root j)
-
-  let from_string s =
-    try Ok (Ezjsonm.from_string s :> json)
-    with Ezjsonm.Parse_error (_, msg) -> Error msg
-
-  let from_stream (stream: string Lwt_stream.t) =
-    let buffer = ref "" in
-    Lwt_stream.filter_map
-      (fun str ->
-         buffer := !buffer ^ str ;
-         try
-           let json = Ezjsonm.from_string !buffer in
-           buffer := "" ;
-           Some (Ok json)
-         with Ezjsonm.Parse_error (_, msg) ->
-           if String.length str = 32 * 1024 then None
-           else Some (Error msg))
-      stream
-
-  let write_file file json =
-    let json = to_root json in
-    let open Lwt in
-    catch
-      (fun () ->
-         Lwt_io.(with_file ~mode:Output file (fun chan ->
-             let str = to_string json in
-             write chan str >>= fun _ ->
-             return true)))
-      (fun _ -> return false)
-
-  let read_file file =
-    let open Lwt in
-    catch
-      (fun () ->
-         Lwt_io.(with_file ~mode:Input file (fun chan ->
-             read chan >>= fun str ->
-             return (Some (Ezjsonm.from_string str :> json)))))
-      (fun _ ->
-         (* TODO log error or use Error_monad. *)
-         return None)
-
   let wrap_error f =
     fun str ->
       try f str
@@ -523,19 +475,35 @@ module Encoding = struct
     let json = Json.convert json in
     raw_splitted ~binary ~json
 
-  let raw_json json =
+  let json =
     let binary =
       conv
-        (fun v -> Json_encoding.construct json v |> Json.to_string)
-        (fun s ->
-           match Json.from_string s with
-           | Error msg -> raise (Json.Parse_error msg)
-           | Ok v -> Json_encoding.destruct json v)
+        (fun json ->
+           Json_repr.convert
+             (module Json_repr.Ezjsonm)
+             (module Json_repr_bson.Repr)
+             json |>
+           Json_repr_bson.bson_to_bytes |>
+           Bytes.to_string)
+        (fun s -> try
+            Bytes.of_string s |>
+            Json_repr_bson.bytes_to_bson ~copy:false |>
+            Json_repr.convert
+              (module Json_repr_bson.Repr)
+              (module Json_repr.Ezjsonm)
+          with
+          | Json_repr_bson.Bson_decoding_error (msg, _, _) ->
+              raise (Json.Parse_error msg))
         string in
+    let json =
+      Json_encoding.any_ezjson_value in
     raw_splitted ~binary ~json
 
-  let json = raw_json Json_encoding.any_ezjson_value
-  let json_schema = raw_json Json_encoding.any_schema
+  let json_schema =
+    conv
+      Json_schema.to_json
+      Json_schema.of_json
+      json
 
   let raw_merge_objs e1 e2 =
     let kind = Kind.combine "objects" (classify e1) (classify e2) in

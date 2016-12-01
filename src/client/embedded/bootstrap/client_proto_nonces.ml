@@ -28,7 +28,7 @@ let load () =
   if not (Sys.file_exists filename) then
     Lwt.return []
   else
-    Data_encoding.Json.read_file filename >>= function
+    Data_encoding_ezjsonm.read_file filename >>= function
     | None -> error "couldn't to read the nonces file"
     | Some json ->
         match Data_encoding.Json.destruct encoding json with
@@ -39,7 +39,7 @@ let load () =
 
 let check_dir dirname =
   if not (Sys.file_exists dirname) then
-    Utils.create_dir dirname
+    Lwt_utils.create_dir dirname
   else
     Lwt.return ()
 
@@ -50,7 +50,7 @@ let save list =
        check_dir dirname >>= fun () ->
        let filename = filename () in
        let json = Data_encoding.Json.construct encoding list in
-       Data_encoding.Json.write_file filename json >>= function
+       Data_encoding_ezjsonm.write_file filename json >>= function
        | false -> failwith "Json.write_file"
        | true -> return ())
     (fun exn ->

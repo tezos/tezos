@@ -135,7 +135,7 @@ let parse_args ?version usage dispatcher =
          (* parse once again with contextual options *)
          Arg.parse_argv_dynamic
            ~current:(ref 0) Sys.argv args (anon dispatch) (usage base_args) ;
-         Utils.create_dir (Filename.dirname config_file#get) >>= fun () ->
+         Lwt_utils.create_dir (Filename.dirname config_file#get) >>= fun () ->
          file_group#write config_file#get ;
          Lwt.return ()
        with Sys_error msg ->

@@ -16,19 +16,19 @@ let prevalidation_key = [ version ; "prevalidation" ]
 
 type t = Storage_functors.context
 
-type error += Invalid_sandbox_parameter of string
+type error += Invalid_sandbox_parameter
 
 let get_sandboxed c =
   Context.get c sandboxed_key >>= function
   | None -> return None
-  | Some json ->
-      match Data_encoding.Json.from_string (MBytes.to_string json) with
-      | Error err -> fail (Invalid_sandbox_parameter err)
-      | Ok json -> return (Some json)
+  | Some bytes ->
+      match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
+      | None -> fail Invalid_sandbox_parameter
+      | Some json -> return (Some json)
 
 let set_sandboxed c json =
   Context.set c sandboxed_key
-    (MBytes.of_string (Data_encoding.Json.to_string json))
+    (Data_encoding.Binary.to_bytes Data_encoding.json json)
 
 let prepare (c : Context.t) : t tzresult Lwt.t =
   get_sandboxed c >>=? fun sandbox ->

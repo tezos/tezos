@@ -140,18 +140,18 @@ type component = Tezos_compiler.Protocol.component = {
 }
 
 let create_files dir units =
-  Utils.remove_dir dir >>= fun () ->
-  Utils.create_dir dir >>= fun () ->
+  Lwt_utils.remove_dir dir >>= fun () ->
+  Lwt_utils.create_dir dir >>= fun () ->
   Lwt_list.map_s
     (fun { name; interface; implementation } ->
        let name = String.lowercase_ascii name in
        let ml = dir // (name ^ ".ml") in
        let mli = dir // (name ^ ".mli") in
-       Utils.create_file ml implementation >>= fun () ->
+       Lwt_utils.create_file ml implementation >>= fun () ->
        match interface with
        | None -> Lwt.return [ml]
        | Some content ->
-           Utils.create_file mli content >>= fun () ->
+           Lwt_utils.create_file mli content >>= fun () ->
            Lwt.return [mli;ml])
     units >>= fun files ->
   let files = List.concat files in

@@ -7,23 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open RPC
 open Logging.RPC
-
-module Arg = Resto.Arg
-module Path = Resto.Path
-module Description = Resto.Description
-let read_answer = Resto.read_answer
-let forge_request = Resto.forge_request
-let service ?description ~input ~output path =
-  Resto.service
-    ?description
-    ~input:(Data_encoding.Json.convert input)
-    ~output:(Data_encoding.Json.convert output)
-    path
-type ('prefix, 'params, 'input, 'output) service =
-  ('prefix, 'params, 'input, 'output) Resto.service
-
-include RestoDirectory
 
 (* public types *)
 type server = (* hidden *)
@@ -99,7 +84,7 @@ let launch port ?pre_hook ?post_hook root =
                match req.meth with
                | `POST -> begin
                    Cohttp_lwt_body.to_string body >>= fun body ->
-                   match Data_encoding.Json.from_string body with
+                   match Data_encoding_ezjsonm.from_string body with
                    | Error msg -> Lwt.fail (Cannot_parse_body msg)
                    | Ok body -> Lwt.return (Some body)
                  end
@@ -111,10 +96,10 @@ let launch port ?pre_hook ?post_hook root =
                | Empty ->
                    Cohttp_lwt_body.empty
                | Single json ->
-                   Cohttp_lwt_body.of_string (Data_encoding.Json.to_string json)
+                   Cohttp_lwt_body.of_string (Data_encoding_ezjsonm.to_string json)
                | Stream s ->
                    let stream =
-                     create_stream io con Data_encoding.Json.to_string s in
+                     create_stream io con Data_encoding_ezjsonm.to_string s in
                    Cohttp_lwt_body.of_stream stream in
              lwt_log_info "(%s) RPC %s"
                (Cohttp.Connection.to_string con)
@@ -171,41 +156,3 @@ let set_root_service server root = server.root <- root
 
 let shutdown server =
   server.shutdown ()
-
-module Error = struct
-
-  let service =
-    service
-      ~description: "Schema for all the RPC errors from the shell"
-      ~input: Data_encoding.empty
-      ~output: Data_encoding.json_schema
-      Path.(root / "errors")
-
-  let encoding =
-    let open Data_encoding in
-    let path, _ = forge_request service () () in
-    describe
-      ~description:
-        (Printf.sprintf
-           "The full list of error is available with \
-            the global RPC `/%s`" (String.concat "/" path))
-      (conv
-         ~schema:Json_schema.any
-         (fun exn -> `A (List.map json_of_error exn))
-         (function `A exns -> List.map error_of_json exns | _ -> [])
-         json)
-
-  let wrap param_encoding =
-    let open Data_encoding in
-    union [
-      case
-        (obj1 (req "ok" param_encoding))
-        (function Ok x -> Some x | _ -> None)
-        (fun x -> Ok x) ;
-      case
-        (obj1 (req "error" encoding))
-        (function Error x -> Some x | _ -> None)
-        (fun x -> Error x) ;
-    ]
-
-end
