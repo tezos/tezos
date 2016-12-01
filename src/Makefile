@@ -274,6 +274,7 @@ NODE_PACKAGES := \
   git \
   irmin.unix \
   ocplib-resto.directory \
+  cmdliner \
 
 
 EMBEDDED_NODE_PROTOCOLS := \
