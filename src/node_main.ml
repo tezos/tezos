@@ -206,14 +206,15 @@ module Cfg_file = struct
          (req "log" log))
 
   let read fp =
-    let open Data_encoding.Json in
-    read_file fp >|= function
+    Data_encoding_ezjsonm.read_file fp >|= function
     | None -> None
-    | Some json -> Some (destruct t json)
+    | Some json -> Some (Data_encoding.Json.destruct t json)
 
   let from_json json = Data_encoding.Json.destruct t json
   let write out cfg =
-    Utils.write_file ~bin:false out Data_encoding.Json.(construct t cfg |> to_string)
+    Utils.write_file ~bin:false out
+      (Data_encoding.Json.construct t cfg |>
+       Data_encoding_ezjsonm.to_string)
 end
 
 module Cmdline = struct
@@ -289,7 +290,7 @@ module Cmdline = struct
       default_cfg_of_base_dir base_dir
     in
     let cfg =
-      match Utils.read_file ~bin:false config_file |> Data_encoding.Json.from_string with
+      match Utils.read_file ~bin:false config_file |> Data_encoding_ezjsonm.from_string with
       | exception _ -> no_config ()
       | Error msg -> corrupted_config msg
       | Ok cfg -> try Cfg_file.from_json cfg with
@@ -382,7 +383,7 @@ let init_node { sandbox ; sandbox_param ;
         match sandbox_param with
         | None -> Lwt.return (Some (patch_context None))
         | Some file ->
-            Data_encoding.Json.read_file file >>= function
+            Data_encoding_ezjsonm.read_file file >>= function
             | None ->
                 lwt_warn
                   "Can't parse sandbox parameters. (%s)" file >>= fun () ->
@@ -427,11 +428,11 @@ let init_rpc { rpc_addr } node =
   | Some (_addr, port) ->
       lwt_log_notice "Starting the RPC server listening on port %d." port >>= fun () ->
       let dir = Node_rpc.build_rpc_directory node in
-      RPC.(launch port dir) >>= fun server ->
+      RPC_server.launch port dir >>= fun server ->
       Lwt.return (Some server)
 
 let init_signal () =
-  let handler id = try Utils.exit id with _ -> () in
+  let handler id = try Lwt_exit.exit id with _ -> () in
   ignore (Lwt_unix.on_signal Sys.sigint handler : Lwt_unix.signal_handler_id)
 
 let main cfg =
@@ -444,11 +445,11 @@ let main cfg =
   init_rpc cfg node >>= fun rpc ->
   init_signal ();
   lwt_log_notice "The Tezos node is now running!" >>= fun () ->
-  Utils.termination_thread >>= fun x ->
+  Lwt_exit.termination_thread >>= fun x ->
   lwt_log_notice "Shutting down the Tezos node..." >>= fun () ->
   Node.shutdown node >>= fun () ->
   lwt_log_notice "Shutting down the RPC server..." >>= fun () ->
-  Lwt_utils.may RPC.shutdown rpc >>= fun () ->
+  Lwt_utils.may RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
   return ()
 

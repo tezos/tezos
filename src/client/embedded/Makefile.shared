@@ -5,6 +5,7 @@ include ../../../Makefile.config
 
 NODE_DIRECTORIES = \
   $(addprefix ../../../, \
+    minutils \
     utils \
     node/updater \
     node/db \

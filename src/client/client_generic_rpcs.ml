@@ -132,7 +132,7 @@ let editor_fill_in schema =
     | Error msg -> return (Error msg)
     | Ok json ->
         Lwt_io.(with_file Output tmp (fun fp ->
-            write_line fp (Data_encoding.Json.to_string json))) >>= fun () ->
+            write_line fp (Data_encoding_ezjsonm.to_string json))) >>= fun () ->
         edit ()
   and edit () =
     (* launch the user's editor on it *)
@@ -160,7 +160,7 @@ let editor_fill_in schema =
   and reread () =
     (* finally reread the file *)
     Lwt_io.(with_file Input tmp (fun fp -> read fp)) >>= fun text ->
-    match Data_encoding.Json.from_string text with
+    match Data_encoding_ezjsonm.from_string text with
     | Ok r -> return (Ok r)
     | Error msg -> return (Error (Printf.sprintf "bad input: %s" msg))
   and delete () =
@@ -272,12 +272,12 @@ let list url () =
     Format.pp_print_list
       (fun ppf (n,t) -> display ppf ([ n ], tpath @ [ n ], t))
   in
-  Format.printf "@ @[<v 2>Available services:@ @ %a@]@."
-    display (args, args, tree) ;
+  Cli_entries.message "@ @[<v 2>Available services:@ @ %a@]@."
+    display (args, args, tree) >>= fun () ->
   if !collected_args <> [] then
-    Format.printf "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
-      (Format.pp_print_list display_arg) !collected_args ;
-  return ()
+    Cli_entries.message "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
+      (Format.pp_print_list display_arg) !collected_args
+  else Lwt.return ()
 
 
 let schema url () =
@@ -285,14 +285,12 @@ let schema url () =
   let open RPC.Description in
   Client_node_rpcs.describe ~recurse:false args >>= function
   | Static { service = Some { input ; output } } ->
-      Printf.printf "Input schema:\n%s\nOutput schema:\n%s\n%!"
-        (Data_encoding.Json.to_string (Json_schema.to_json input))
-        (Data_encoding.Json.to_string (Json_schema.to_json output));
-      return ()
+      Cli_entries.message "Input schema:\n%s\nOutput schema:\n%s\n%!"
+        (Data_encoding_ezjsonm.to_string (Json_schema.to_json input))
+        (Data_encoding_ezjsonm.to_string (Json_schema.to_json output))
   | _ ->
-      Printf.printf
-        "No service found at this URL (but this is a valid prefix)\n%!" ;
-      return ()
+      Cli_entries.message
+        "No service found at this URL (but this is a valid prefix)\n%!"
 
 let fill_in schema =
   let open Json_schema in
@@ -311,13 +309,11 @@ let call url () =
           error "%s" msg
       | Ok json ->
           Client_node_rpcs.get_json args json >>= fun json ->
-          Printf.printf "Output:\n%s\n%!" (Data_encoding.Json.to_string json) ;
-          return ()
+          Cli_entries.message "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
     end
   | _ ->
-      Printf.printf
-        "No service found at this URL (but this is a valid prefix)\n%!" ;
-      return ()
+      Cli_entries.message
+        "No service found at this URL (but this is a valid prefix)\n%!"
 
 let () =
   let open Cli_entries in
@@ -332,9 +328,9 @@ let commands = Cli_entries.([
       ~desc: "list all understood protocol versions"
       (fixed [ "list" ; "versions" ])
       (fun () ->
-         List.iter
+         Lwt_list.iter_s
            (fun (ver, _) -> message "%a" Protocol_hash.pp_short ver)
-           (Client_version.get_versions ()) ; return ()) ;
+           (Client_version.get_versions ())) ;
     command
       ~tags: [ "low-level" ; "local" ]
       ~group: "rpc"

@@ -13,24 +13,24 @@ let protocol =
 
 let demo () =
   let block = Client_config.block () in
-  Cli_entries.message "Calling the 'echo' RPC." ;
+  Cli_entries.message "Calling the 'echo' RPC." >>= fun () ->
   let msg = "test" in
   Client_proto_rpcs.echo block msg >>= fun reply ->
   fail_unless (reply = msg) (Unclassified "...") >>=? fun () ->
   begin
-    Cli_entries.message "Calling the 'failing' RPC." ;
+    Cli_entries.message "Calling the 'failing' RPC." >>= fun () ->
     Client_proto_rpcs.failing block 3 >>= function
     | Error [Ecoproto_error [Error.Demo_error 3]] ->
         return ()
     | _ -> failwith "..."
   end >>=? fun () ->
-  Cli_entries.message "Direct call to `demo_error`." ;
+  Cli_entries.message "Direct call to `demo_error`." >>= fun () ->
   begin Error.demo_error 101010 >|= wrap_error >>= function
     | Error [Ecoproto_error [Error.Demo_error 101010]] ->
         return ()
     | _ -> failwith "...."
   end >>=? fun () ->
-  Cli_entries.answer "All good!" ;
+  Cli_entries.answer "All good!" >>= fun () ->
   return ()
 
 let mine () =
@@ -47,13 +47,14 @@ let mine () =
         MBytes.set_int64 b 0 (Int64.succ f) ;
         [ v ; b ]
     | _ ->
-        Cli_entries.message "Cannot parse fitness: %a" Fitness.pp bi.fitness  ;
+        Lwt.ignore_result
+          (Cli_entries.message "Cannot parse fitness: %a" Fitness.pp bi.fitness);
         exit 2 in
   Client_node_rpcs.forge_block
     ~net:bi.net ~predecessor:bi.hash
     fitness [] (MBytes.create 0) >>= fun bytes ->
   Client_node_rpcs.inject_block ~wait:true bytes >>=? fun hash ->
-  Cli_entries.answer "Injected %a" Block_hash.pp_short hash ;
+  Cli_entries.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()
 
 let handle_error = function

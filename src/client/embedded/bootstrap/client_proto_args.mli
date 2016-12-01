@@ -23,7 +23,7 @@ val force_arg: string * Arg.spec * string
 val endorsement_delay_arg: string * Arg.spec * string
 
 val tez_param :
-  n:string ->
+  name:string ->
   desc:string ->
   'a Cli_entries.params -> (Tez.t -> 'a) Cli_entries.params
 

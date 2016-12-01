@@ -46,8 +46,7 @@ let gen_keys name =
   Secret_key.add name secret_key >>= fun () ->
   Public_key.add name public_key >>= fun () ->
   Public_key_hash.add name (Ed25519.hash public_key) >>= fun () ->
-  Cli_entries.message "I generated a brand new pair of keys under the name '%s'." name ;
-  Lwt.return ()
+  Cli_entries.message "I generated a brand new pair of keys under the name '%s'." name
 
 let check_keys_consistency pk sk =
   let message = MBytes.of_string "Voulez-vous coucher avec moi, ce soir ?" in
@@ -122,8 +121,7 @@ let commands () =
              Public_key_hash.to_source pkh >>= fun v ->
              message "%s: %s%s%s" name v
                (if pkm then " (public key known)" else "")
-               (if pks then " (secret key known)" else "") ;
-             Lwt.return ())
+               (if pks then " (secret key known)" else ""))
            l) ;
     command
       ~group: "keys"

@@ -1,6 +1,8 @@
 REC
 S .
 B .
+S ../src/minutils
+B ../src/minutils
 S ../src/utils
 B ../src/utils
 S ../src/node/db

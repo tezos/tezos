@@ -183,7 +183,7 @@ let commands () =
       ~desc: "lists all known programs"
       (fixed [ "list" ; "known" ; "programs" ])
       (fun () -> Program.load () >>= fun list ->
-        List.iter (fun (n, _) -> message "%s" n) list ; Lwt.return ()) ;
+        Lwt_list.iter_s (fun (n, _) -> message "%s" n) list) ;
     command
       ~group: "programs"
       ~desc: "remember a program under some name"
@@ -207,8 +207,7 @@ let commands () =
        @@ stop)
       (fun (_, program) () ->
          Program.to_source program >>= fun source ->
-         Format.printf "%s\n" source ;
-         Lwt.return ()) ;
+         Cli_entries.message "%s\n" source) ;
     command
       ~group: "programs"
       ~desc: "ask the node to run a program"
@@ -225,7 +224,7 @@ let commands () =
          if !trace_stack then
            Client_proto_rpcs.Helpers.trace_code (block ()) program (storage, input) >>= function
            | Ok (storage, output, trace) ->
-               Format.printf "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
+               Cli_entries.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
                  (print_ir (fun _ -> false)) storage
                  (print_ir (fun _ -> false)) output
                  (Format.pp_print_list
@@ -235,18 +234,16 @@ let commands () =
                          loc gas
                          (Format.pp_print_list (print_ir (fun _ -> false)))
                          stack))
-                 trace ;
-               Lwt.return ()
+                 trace
            | Error errs ->
                pp_print_error Format.err_formatter errs ;
                error "error running program"
          else
            Client_proto_rpcs.Helpers.run_code (block ()) program (storage, input) >>= function
            | Ok (storage, output) ->
-               Format.printf "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
+               Cli_entries.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
                  (print_ir (fun _ -> false)) storage
-                 (print_ir (fun _ -> false)) output ;
-               Lwt.return ()
+                 (print_ir (fun _ -> false)) output
            | Error errs ->
                pp_print_error Format.err_formatter errs ;
                error "error running program") ;
@@ -262,15 +259,15 @@ let commands () =
          Client_proto_rpcs.Helpers.typecheck_code (block ()) program >>= function
          | Ok type_map ->
              let type_map, program = unexpand_macros type_map program in
-             message "Well typed" ;
+             message "Well typed" >>= fun () ->
              if !show_types then begin
                print_program
                  (fun l -> List.mem_assoc l type_map)
                  Format.std_formatter program ;
-               Format.printf "@." ;
-               List.iter
+               Cli_entries.message "@." >>= fun () ->
+               Lwt_list.iter_s
                  (fun (loc, (before, after)) ->
-                    Format.printf
+                    Cli_entries.message
                       "%3d@[<v 0> : [ @[<v 0>%a ]@]@,-> [ @[<v 0>%a ]@]@]@."
                       loc
                       (Format.pp_print_list (print_ir (fun _ -> false)))
@@ -278,8 +275,8 @@ let commands () =
                       (Format.pp_print_list (print_ir (fun _ -> false)))
                       after)
                  (List.sort compare type_map)
-             end ;
-             Lwt.return ()
+             end
+             else Lwt.return ()
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
              error "ill-typed program") ;
@@ -296,8 +293,7 @@ let commands () =
          Client_proto_rpcs.Helpers.typecheck_untagged_data
            (block ()) (data, exp_ty) >>= function
          | Ok () ->
-             message "Well typed" ;
-             Lwt.return ()
+             message "Well typed"
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
              error "ill-typed data") ;
@@ -312,8 +308,7 @@ let commands () =
          let open Data_encoding in
          Client_proto_rpcs.Helpers.hash_data (block ()) data >>= function
          | Ok hash ->
-             message "%S" hash;
-             Lwt.return ()
+             message "%S" hash
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
              error "ill-formed data") ;
@@ -337,8 +332,7 @@ let commands () =
                hash
                (signature |>
                 Data_encoding.Binary.to_bytes Ed25519.signature_encoding |>
-                Hex_encode.hex_of_bytes) ;
-             Lwt.return ()
+                Hex_encode.hex_of_bytes)
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
              error "ill-formed data") ;

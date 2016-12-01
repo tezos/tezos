@@ -9,6 +9,42 @@
 
 open Data_encoding
 
+module Error = struct
+
+  let service =
+    RPC.service
+      ~description: "Schema for all the RPC errors from the shell"
+      ~input: Data_encoding.empty
+      ~output: Data_encoding.json_schema
+      RPC.Path.(root / "errors")
+
+  let encoding =
+    let path, _ = RPC.forge_request service () () in
+    describe
+      ~description:
+        (Printf.sprintf
+           "The full list of error is available with \
+            the global RPC `/%s`" (String.concat "/" path))
+      (conv
+         ~schema:Json_schema.any
+         (fun exn -> `A (List.map json_of_error exn))
+         (function `A exns -> List.map error_of_json exns | _ -> [])
+         json)
+
+  let wrap param_encoding =
+    union [
+      case
+        (obj1 (req "ok" param_encoding))
+        (function Ok x -> Some x | _ -> None)
+        (fun x -> Ok x) ;
+      case
+        (obj1 (req "error" encoding))
+        (function Error x -> Some x | _ -> None)
+        (fun x -> Error x) ;
+    ]
+
+end
+
 module Blocks = struct
 
   type block = [
@@ -128,7 +164,7 @@ module Blocks = struct
        (obj3
           (req "timestamp" Time.encoding)
           (req "fitness" Fitness.encoding)
-          (req "operations" (Updater.preapply_result_encoding RPC.Error.encoding))))
+          (req "operations" (Updater.preapply_result_encoding Error.encoding))))
 
   let block_path : (unit, unit * block) RPC.Path.path =
     RPC.Path.(root / "blocks" /: blocks_arg )
@@ -237,9 +273,9 @@ module Blocks = struct
            (obj4
               (req "applied" (list Operation_hash.encoding))
               (req "branch_delayed"
-                 (list (tup2 Operation_hash.encoding RPC.Error.encoding)))
+                 (list (tup2 Operation_hash.encoding Error.encoding)))
               (req "branch_refused"
-                 (list (tup2 Operation_hash.encoding RPC.Error.encoding)))
+                 (list (tup2 Operation_hash.encoding Error.encoding)))
               (req "unprocessed" (list Operation_hash.encoding))))
       RPC.Path.(block_path / "pending_operations")
 
@@ -252,7 +288,7 @@ module Blocks = struct
         "Simulate the validation of a block that would contain \
          the given operations and return the resulting fitness."
       ~input: preapply_param_encoding
-      ~output: (RPC.Error.wrap preapply_result_encoding)
+      ~output: (Error.wrap preapply_result_encoding)
       RPC.Path.(block_path / "preapply")
 
   let complete =
@@ -365,7 +401,7 @@ module Operations = struct
         (obj1 (req "data"
                  (describe ~title: "Tezos signed operation (hex encoded)"
                     (Time.timed_encoding @@
-                     RPC.Error.wrap @@
+                     Error.wrap @@
                      Updater.raw_operation_encoding))))
       RPC.Path.(root / "operations" /: operations_arg)
 
@@ -416,7 +452,7 @@ module Protocols = struct
         (obj1 (req "data"
                  (describe ~title: "Tezos protocol"
                     (Time.timed_encoding @@
-                     RPC.Error.wrap @@
+                     Error.wrap @@
                      Store.protocol_encoding))))
       RPC.Path.(root / "protocols" /: protocols_arg)
 
@@ -471,7 +507,7 @@ let validate_block =
          (req "net" Blocks.net_encoding)
          (req "hash" Block_hash.encoding))
     ~output:
-      (RPC.Error.wrap @@ empty)
+      (Error.wrap @@ empty)
     RPC.Path.(root / "validate_block")
 
 let inject_block =
@@ -504,7 +540,7 @@ let inject_block =
                      the current head. (default: false)"
                   bool))))
     ~output:
-      (RPC.Error.wrap @@
+      (Error.wrap @@
        (obj1 (req "block_hash" Block_hash.encoding)))
     RPC.Path.(root / "inject_block")
 
@@ -539,7 +575,7 @@ let inject_operation =
                      or \"branch_delayed\". (default: false)"
                   bool))))
     ~output:
-      (RPC.Error.wrap @@
+      (Error.wrap @@
        describe
          ~title: "Hash of the injected operation" @@
        (obj1 (req "injectedOperation" Operation_hash.encoding)))
@@ -592,7 +628,7 @@ let inject_protocol =
                     "Should we inject protocol that is invalid. (default: false)"
                   bool))))
     ~output:
-      (RPC.Error.wrap @@
+      (Error.wrap @@
        describe
          ~title: "Hash of the injected protocol" @@
        (obj1 (req "injectedProtocol" Protocol_hash.encoding)))

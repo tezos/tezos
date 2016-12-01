@@ -13,6 +13,7 @@ OCAMLFLAGS = \
 SOURCE_DIRECTORIES := \
   lib \
 $(addprefix ../src/, \
+  minutils \
   utils \
   compiler \
   node/db \
@@ -37,7 +38,7 @@ PACKAGES := \
   lwt.unix \
   ocplib-endian \
   ocplib-ocamlres \
-  ocplib-json-typed \
+  ocplib-json-typed.bson \
   ocplib-resto.directory \
   sodium \
   unix \
@@ -47,7 +48,9 @@ PACKAGES := \
 ############################################################################
 ## External packages
 
-NODELIB := ../src/utils.cmxa ../src/compiler.cmxa ../src/node.cmxa
+NODELIB := \
+  ../src/minutils.cmxa ../src/utils.cmxa \
+  ../src/compiler.cmxa ../src/node.cmxa
 CLIENTLIB := ../src/client.cmxa \
   $(patsubst ../src/client/embedded/%/, \
 	     ../src/proto/client_embedded_proto_%.cmxa, \
@@ -221,6 +224,7 @@ COVERAGESRCDIR= \
   -I ../src/proto \
   -I ../src/proto/bootstrap \
   -I ../src/proto/demo \
+  -I ../src/minutils \
   -I ../src/utils
 
 bisect:
