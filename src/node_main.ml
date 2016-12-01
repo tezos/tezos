@@ -65,6 +65,8 @@ type cfg = {
     rpc_addr : (Ipaddr.t * int) option ;
     cors_origins : string list ;
     cors_headers : string list ;
+    rpc_crt : string option ;
+    rpc_key : string option ;
 
     (* log *)
     log_output : [`Stderr | `File of string | `Syslog | `Null] ;
@@ -97,6 +99,8 @@ let default_cfg_of_base_dir base_dir = {
   rpc_addr = None ;
   cors_origins = [] ;
   cors_headers = ["content-type"] ;
+  rpc_crt = None ;
+  rpc_key = None ;
 
   (* log *)
   log_output = `Stderr ;
@@ -280,8 +284,11 @@ module Cmdline = struct
 
   (* rpc args *)
   let rpc_addr =
-    let doc = "The TCP socket address at which this RPC server instance can be reached" in
+    let doc = "The TCP socket address at which this RPC server instance can be reached." in
     Arg.(value & opt (some sockaddr_converter) None & info ~docs:"RPC" ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
+  let rpc_tls =
+    let doc = "Enable TLS for this RPC server with the provided certificate and key." in
+    Arg.(value & opt (some (pair string string)) None & info ~docs:"RPC" ~doc ~docv:"crt,key" ["rpc-tls"])
   let cors_origins =
     let doc = "CORS origin allowed by the RPC server via Access-Control-Allow-Origin; may be used multiple times" in
     Arg.(value & opt_all string [] & info ~docs:"RPC" ~doc ~docv:"ORIGIN" ["cors-origin"])
@@ -291,7 +298,8 @@ module Cmdline = struct
 
   let parse base_dir config_file sandbox sandbox_param log_level
       min_connections max_connections expected_connections
-      net_saddr local_discovery peers closed rpc_addr cors_origins cors_headers reset_cfg update_cfg =
+      net_saddr local_discovery peers closed rpc_addr tls cors_origins cors_headers reset_cfg update_cfg =
+
     let base_dir = Utils.(unopt (unopt default_cfg.base_dir base_dir) sandbox) in
     let config_file = Utils.(unopt ((unopt base_dir sandbox) // "config")) config_file in
     let no_config () =
@@ -317,6 +325,10 @@ module Cmdline = struct
       | 1 -> Some Lwt_log.Info
       | _ -> Some Lwt_log.Debug
     in
+    let rpc_crt, rpc_key = match tls with
+      | None -> None, None
+      | Some (crt, key) -> Some crt, Some key
+    in
     let cfg =
       { cfg with
         base_dir ;
@@ -334,6 +346,8 @@ module Cmdline = struct
         rpc_addr = Utils.first_some rpc_addr cfg.rpc_addr ;
         cors_origins = (match cors_origins with [] -> cfg.cors_origins | _ -> cors_origins) ;
         cors_headers = (match cors_headers with [] -> cfg.cors_headers | _ -> cors_headers) ;
+        rpc_crt ;
+        rpc_key ;
         log_output = cfg.log_output ;
       }
     in
@@ -346,7 +360,7 @@ module Cmdline = struct
                      $ sandbox $ sandbox_param $ v
                      $ min_connections $ max_connections $ expected_connections
                      $ net_addr $ local_discovery $ peers $ closed
-                     $ rpc_addr $ cors_origins $ cors_headers
+                     $ rpc_addr $ rpc_tls $ cors_origins $ cors_headers
                      $ reset_config $ update_config
       ),
     let doc = "The Tezos daemon" in
@@ -438,16 +452,22 @@ let init_node { sandbox ; sandbox_param ;
     ?patch_context
     net_params
 
-let init_rpc { rpc_addr ; cors_origins ; cors_headers } node =
-  match rpc_addr with
-  | None ->
+let init_rpc { rpc_addr ; rpc_crt; rpc_key ; cors_origins ; cors_headers } node =
+  match rpc_addr, rpc_crt, rpc_key with
+  | Some (_addr, port), Some crt, Some key ->
+      lwt_log_notice "Starting the RPC server listening on port %d (TLS enabled)." port >>= fun () ->
+      let dir = Node_rpc.build_rpc_directory node in
+      let mode = `TLS_native (`Crt_file_path crt, `Key_file_path key, `No_password, `Port port) in
+      RPC_server.launch mode dir cors_origins cors_headers >>= fun server ->
+      Lwt.return (Some server)
+  | Some (_addr, port), _, _ ->
+      lwt_log_notice "Starting the RPC server listening on port %d (TLS disabled)." port >>= fun () ->
+      let dir = Node_rpc.build_rpc_directory node in
+      RPC_server.launch (`TCP (`Port port)) dir cors_origins cors_headers >>= fun server ->
+      Lwt.return (Some server)
+  | _ ->
       lwt_log_notice "Not listening to RPC calls." >>= fun () ->
       Lwt.return None
-  | Some (_addr, port) ->
-      lwt_log_notice "Starting the RPC server listening on port %d." port >>= fun () ->
-      let dir = Node_rpc.build_rpc_directory node in
-      RPC_server.launch port dir cors_origins cors_headers >>= fun server ->
-      Lwt.return (Some server)
 
 let init_signal () =
   let handler id = try Lwt_exit.exit id with _ -> () in
