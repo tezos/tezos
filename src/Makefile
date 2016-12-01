@@ -111,7 +111,9 @@ UTILS_LIB_INTFS := \
   utils/error_monad.mli \
   utils/logging.mli \
   utils/lwt_utils.mli \
+  utils/lwt_pipe.mli \
   utils/IO.mli \
+  utils/moving_average.mli \
 
 UTILS_LIB_IMPLS := \
   utils/mBytes.ml \
@@ -128,7 +130,9 @@ UTILS_LIB_IMPLS := \
   utils/error_monad.ml \
   utils/logging.ml \
   utils/lwt_utils.ml \
+  utils/lwt_pipe.ml \
   utils/IO.ml \
+  utils/moving_average.ml \
 
 UTILS_PACKAGES := \
   base64 \

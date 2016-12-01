@@ -39,8 +39,8 @@ type config = {
 
 (** Network capacities *)
 type limits = {
-  (** Maximum length in bytes of network messages' payload *)
-  max_packet_size : int ;
+  (** Maximum length in bytes of network messages *)
+  max_message_size : int ;
   (** Delay after which a non responding peer is considered dead *)
   peer_answer_timeout : float ;
   (** Minimum number of connections to reach when staring / maitening *)
@@ -55,6 +55,7 @@ type limits = {
 
 (** A global identifier for a peer, a.k.a. an identity *)
 type gid
+val pp_gid : Format.formatter -> gid -> unit
 
 type 'msg encoding = Encoding : {
     tag: int ;
@@ -97,6 +98,9 @@ module Make (P : PARAMS) : sig
   (** Main network initialisation function *)
   val bootstrap : config:config -> limits:limits -> net Lwt.t
 
+  (** Return one's gid *)
+  val gid : net -> gid
+
   (** A maintenance operation : try and reach the ideal number of peers *)
   val maintain : net -> unit Lwt.t
 
@@ -129,18 +133,18 @@ module Make (P : PARAMS) : sig
   val get_metadata : net -> gid -> P.metadata option
   val set_metadata : net -> gid -> P.metadata -> unit
 
-  (** Wait for a payload from any peer in the network *)
+  (** Wait for a message from any peer in the network *)
   val recv : net -> (peer * P.msg) Lwt.t
 
-  (** Send a payload to a peer and wait for it to be in the tube *)
+  (** [send net peer msg] is a thread that returns when [msg] has been
+      successfully enqueued in the send queue. *)
   val send : net -> peer -> P.msg -> unit Lwt.t
 
-  (** Send a payload to a peer without waiting for the result. Return
-      [true] if the message can be enqueued in the peer's output queue
-      or [false] otherwise. *)
+  (** [try_send net peer msg] is [true] if [msg] has been added to the
+      send queue for [peer], [false] otherwise *)
   val try_send : net -> peer -> P.msg -> bool
 
-  (** Send a payload to all peers *)
+  (** Send a message to all peers *)
   val broadcast : net -> P.msg -> unit
 
   (** Shutdown the connection to all peers at this address and stop the
