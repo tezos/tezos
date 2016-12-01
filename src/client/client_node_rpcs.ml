@@ -29,7 +29,7 @@ let make_request service json =
              ^ ":" ^ string_of_int Client_config.incoming_port#get in
   let string_uri = String.concat "/" (serv :: service) in
   let uri = Uri.of_string string_uri in
-  let reqbody = Data_encoding.Json.to_string json in
+  let reqbody = Data_encoding_ezjsonm.to_string json in
   let tzero = Unix.gettimeofday () in
   catch
     (fun () ->
@@ -61,7 +61,7 @@ let get_streamed_json service json =
                 lwt_log_error
                   "Failed to parse json: %s" msg >>= fun () ->
                 Lwt.return None)
-          (Data_encoding.Json.from_stream ansbody))
+          (Data_encoding_ezjsonm.from_stream ansbody))
   | err, _ansbody ->
       (if Client_config.print_timings#get then
         message "Request to /%s failed in %gs"
@@ -83,7 +83,7 @@ let get_json service json =
        else Lwt.return ()) >>= fun () ->
       log_response cpt code ansbody >>= fun () ->
       if ansbody = "" then Lwt.return `Null
-      else match Data_encoding.Json.from_string ansbody with
+      else match Data_encoding_ezjsonm.from_string ansbody with
         | Error _ -> error "the RPC server returned malformed JSON"
         | Ok res -> Lwt.return res
     end
@@ -103,7 +103,7 @@ let parse_answer service path json =
   match RPC.read_answer service json with
   | Error msg -> (* TODO print_error *)
       error "request to /%s returned wrong JSON (%s)\n%s"
-        (String.concat "/" path) msg (Data_encoding.Json.to_string json)
+        (String.concat "/" path) msg (Data_encoding_ezjsonm.to_string json)
   | Ok v -> return v
 
 let call_service0 service arg =
@@ -124,7 +124,7 @@ let call_streamed_service0 service arg =
   Lwt_stream.map_s (parse_answer service path) st
 
 module Services = Node_rpc_services
-let errors = call_service0 RPC.Error.service
+let errors = call_service0 Services.Error.service
 let forge_block ?net ?predecessor ?timestamp fitness ops header =
   call_service0 Services.forge_block
     (net, predecessor, timestamp, fitness, ops, header)
