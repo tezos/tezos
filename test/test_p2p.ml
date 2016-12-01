@@ -77,6 +77,13 @@ let net_monitor config limits num_nets net =
       Lwt.async (fun () -> send_msgs_to_neighbours neighbours);
       let rec recv_peer_msgs acc =
         if List.length acc = num_nets - 1 then begin
+          (* Print total sent/recv *)
+          let peers = Net.peers net in
+          ListLabels.iter peers ~f:begin fun p ->
+            let pi = Net.peer_info net p in
+            log_info "%a -> %a %d %d %.2f %.2f" pp_gid (Net.gid net) pp_gid pi.gid
+              pi.total_sent pi.total_recv pi.current_inflow pi.current_outflow;
+          end;
           ListLabels.iter acc ~f:(fun (k, v) -> log_info "%s %s" k v);
           Lwt.return_unit
         end
