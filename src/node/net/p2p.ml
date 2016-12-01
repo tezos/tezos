@@ -426,12 +426,16 @@ module Make (P: PARAMS) = struct
       Lwt.pick
         [ ( LU.sleep limits.peer_answer_timeout >>= fun () -> Error_monad.fail Timeout ) ;
           recv buf ] >>= function
-      | Error [Timeout] | Error [Canceled] | Error [Exn End_of_file] ->
-          (* Expected errors. No logging. *)
+      | Error [Timeout]
+      | Error [Canceled]
+      | Error [Exn End_of_file] ->
+          debug "(%a) Closed connection to %a:%d."
+            pp_gid my_gid Ipaddr.pp_hum addr port ;
           cancel ()
       | Error err ->
           log_error "(%a) error receiving from %a:%d: %a"
-            pp_gid my_gid Ipaddr.pp_hum addr port Error_monad.pp_print_error err ;
+            pp_gid my_gid Ipaddr.pp_hum addr port
+            Error_monad.pp_print_error err ;
           cancel ()
       | Ok (Connect { gid; port = listening_port; versions ;
                       public_key ; proof_of_work ; message_nonce }) ->
@@ -472,10 +476,6 @@ module Make (P: PARAMS) = struct
                     buf local_nonce version gid
                     public_key message_nonce listening_port
           end
-      | Ok (Advertise _) ->
-          debug "(%a) connection rejected (unauthenticated Advertise) from %a:%d"
-            pp_gid my_gid Ipaddr.pp_hum addr port ;
-          cancel ()
       | Ok Disconnect ->
           debug "(%a) connection rejected (closed by peer or timeout) from %a:%d"
             pp_gid my_gid Ipaddr.pp_hum addr port ;
@@ -1065,9 +1065,9 @@ module Make (P: PARAMS) = struct
       let rec peer_events () =
         let peers = PeerMap.bindings !connected in
         let current_peers_evts =
-          List.map begin function
-            | _, Some gid, p -> Lwt_pipe.values_available p.reader >|= fun () -> gid, p.reader
-            | _ -> Lwt_utils.never_ending
+          filter_map begin function
+            | _, Some gid, p -> Some (Lwt_pipe.values_available p.reader >|= fun () -> gid, p.reader)
+            | _ -> None
           end peers
         in
         Lwt.choose [
