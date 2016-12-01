@@ -1249,30 +1249,30 @@ module Make (P: PARAMS) = struct
         (Format.asprintf "(%a) unblacklister" pp_gid my_gid)
         unblock cancel in
     let discovery_answerer =
-      let buf = MBytes.create 0x100_000 in
+      let callback addr port socket =
+        (* do not reply to ourselves or connected peers *)
+        if not (PeerMap.mem_by_point (addr, port) !connected)
+        && (try match PeerMap.gid_by_point (addr, port) !known_peers with
+            | Some gid -> not (PeerMap.mem_by_gid gid !connected) && not (my_gid = gid)
+            | None -> true
+           with Not_found -> true)
+        then
+          (* connect if we need peers *)
+          if PeerMap.cardinal !connected >= limits.expected_connections then begin
+            Lwt_pipe.push events (Peers [ addr, port ]) >>= fun () ->
+            LU.close socket
+          end else
+            Lwt_pipe.push events (Contact ((addr, port), socket))
+        else LU.close socket
+      in
       match config.discovery_port with
       | None -> Lwt.return_unit
       | Some disco_port ->
-          let answerer () =
-            discovery_answerer
-              my_gid disco_port cancelation @@ fun addr port socket ->
-            (* do not reply to ourselves or connected peers *)
-            if not (PeerMap.mem_by_point (addr, port) !connected)
-            && (try match PeerMap.gid_by_point (addr, port) !known_peers with
-                | Some gid -> not (PeerMap.mem_by_gid gid !connected)
-                              && not (my_gid = gid)
-                | None -> true with Not_found -> true) then
-              (* either reply by a list of peer or connect if we need peers *)
-              if PeerMap.cardinal !connected >= limits.expected_connections then begin
-                Lwt_pipe.push events (Peers [ addr, port ]) >>= fun () ->
-                send_msg socket buf (Advertise (bootstrap_peers ())) >>= fun _ ->
-                LU.close socket
-              end else
-                Lwt_pipe.push events (Contact ((addr, port), socket))
-            else LU.close socket in
           Lwt_utils.worker
             (Format.asprintf "(%a) discovery answerer" pp_gid my_gid)
-            answerer cancel in
+            (fun () -> discovery_answerer my_gid disco_port cancelation callback)
+            cancel
+    in
     let discovery_sender =
       match config.incoming_port, config.discovery_port with
       | Some inco_port, Some disco_port ->
