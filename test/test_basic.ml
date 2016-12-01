@@ -13,7 +13,17 @@ open Tezos_context
 open Error_monad
 open Hash
 
-let () = Random.self_init ()
+let () =
+  Random.self_init () ;
+  let log channel msg = match channel with
+    | "stdout" ->
+        print_endline msg ;
+        Lwt.return ()
+    | "stderr" ->
+        prerr_endline msg ;
+        Lwt.return ()
+    | _ -> Lwt.return () in
+  Cli_entries.log_hook := Some log
 
 let should_fail f t =
   t >>= function

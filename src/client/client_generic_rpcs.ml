@@ -132,7 +132,7 @@ let editor_fill_in schema =
     | Error msg -> return (Error msg)
     | Ok json ->
         Lwt_io.(with_file Output tmp (fun fp ->
-            write_line fp (Data_encoding.Json.to_string json))) >>= fun () ->
+            write_line fp (Data_encoding_ezjsonm.to_string json))) >>= fun () ->
         edit ()
   and edit () =
     (* launch the user's editor on it *)
@@ -160,7 +160,7 @@ let editor_fill_in schema =
   and reread () =
     (* finally reread the file *)
     Lwt_io.(with_file Input tmp (fun fp -> read fp)) >>= fun text ->
-    match Data_encoding.Json.from_string text with
+    match Data_encoding_ezjsonm.from_string text with
     | Ok r -> return (Ok r)
     | Error msg -> return (Error (Printf.sprintf "bad input: %s" msg))
   and delete () =
@@ -286,8 +286,8 @@ let schema url () =
   Client_node_rpcs.describe ~recurse:false args >>= function
   | Static { service = Some { input ; output } } ->
       Cli_entries.message "Input schema:\n%s\nOutput schema:\n%s\n%!"
-        (Data_encoding.Json.to_string (Json_schema.to_json input))
-        (Data_encoding.Json.to_string (Json_schema.to_json output))
+        (Data_encoding_ezjsonm.to_string (Json_schema.to_json input))
+        (Data_encoding_ezjsonm.to_string (Json_schema.to_json output))
   | _ ->
       Cli_entries.message
         "No service found at this URL (but this is a valid prefix)\n%!"
@@ -309,7 +309,7 @@ let call url () =
           error "%s" msg
       | Ok json ->
           Client_node_rpcs.get_json args json >>= fun json ->
-          Cli_entries.message "Output:\n%s\n%!" (Data_encoding.Json.to_string json)
+          Cli_entries.message "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
     end
   | _ ->
       Cli_entries.message

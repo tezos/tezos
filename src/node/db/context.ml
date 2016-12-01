@@ -112,7 +112,7 @@ let checkout ((module GitStore : STORE) as index) key =
         GitStore.patch_context (pack (module GitStore) store v) >>= fun ctxt ->
         Lwt.return (Some (Ok ctxt))
     | Some bytes ->
-        match Data_encoding.Json.from_string (MBytes.to_string bytes) with
+        match Data_encoding_ezjsonm.from_string (MBytes.to_string bytes) with
         | Ok (`A errors) ->
             Lwt.return (Some (Error (List.map error_of_json errors)))
         | Error _ | Ok _->
@@ -166,7 +166,7 @@ let commit_invalid (module GitStore : STORE) block key exns =
   GitStore.clone Irmin.Task.none store (Block_hash.to_b48check key) >>= function
   | `Empty_head ->
       GitStore.update store invalid_context_key
-        (MBytes.of_string @@ Data_encoding.Json.to_string @@
+        (MBytes.of_string @@ Data_encoding_ezjsonm.to_string @@
          `A (List.map json_of_error exns))
   | `Duplicated_branch | `Ok _ ->
       Lwt.fail (Preexistent_context (GitStore.path, key))

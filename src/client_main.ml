@@ -24,7 +24,7 @@ let () =
         prerr_endline msg ;
         Lwt.return ()
     | log ->
-        Utils.create_dir Client_config.(base_dir#get // "logs" // log) >>= fun () ->
+        Lwt_utils.create_dir Client_config.(base_dir#get // "logs" // log) >>= fun () ->
         Lwt_io.with_file
           ~flags: Unix.[ O_APPEND ; O_CREAT ; O_WRONLY ]
           ~mode: Lwt_io.Output

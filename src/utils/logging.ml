@@ -54,7 +54,7 @@ module Make(S : sig val name: string end) : LOG = struct
   let log_error fmt = ign_log_f ~section ~level:Lwt_log.Error fmt
   let fatal_error fmt =
     Format.kasprintf
-      (fun s -> Lwt_log.ign_fatal ~section s; Utils.exit 1)
+      (fun s -> Lwt_log.ign_fatal ~section s; Lwt_exit.exit 1)
       fmt
 
   let lwt_debug fmt = log_f ~section ~level:Lwt_log.Debug fmt

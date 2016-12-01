@@ -61,7 +61,7 @@ module Alias = functor (Entity : Entity) -> struct
   let load () =
     let filename = filename () in
     if not (Sys.file_exists filename) then return [] else
-      Data_encoding.Json.read_file filename >>= function
+      Data_encoding_ezjsonm.read_file filename >>= function
       | None ->
           error "couldn't to read the %s alias file" Entity.name
       | Some json ->
@@ -98,11 +98,11 @@ module Alias = functor (Entity : Entity) -> struct
     catch
       (fun () ->
          let dirname = Client_config.base_dir#get in
-         (if not (Sys.file_exists dirname) then Utils.create_dir dirname
+         (if not (Sys.file_exists dirname) then Lwt_utils.create_dir dirname
           else return ()) >>= fun () ->
          let filename = filename () in
          let json = Data_encoding.Json.construct encoding list in
-         Data_encoding.Json.write_file filename json >>= function
+         Data_encoding_ezjsonm.write_file filename json >>= function
          | false -> fail (Failure "Json.write_file")
          | true -> return ())
       (fun exn ->

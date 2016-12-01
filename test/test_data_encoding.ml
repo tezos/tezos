@@ -104,15 +104,16 @@ let test_simple_values _ =
   Lwt.return_unit
 
 let test_json testdir =
+  let open Data_encoding_ezjsonm in
   let file = testdir // "testing_data_encoding.tezos" in
   let v = `Float 42. in
-  let f_str = Json.to_string v in
+  let f_str = to_string v in
   Assert.equal_string  ~msg:__LOC__ f_str "[\n  42\n]";
-  Json.read_file (testdir // "NONEXISTINGFILE") >>= fun rf ->
+  read_file (testdir // "NONEXISTINGFILE") >>= fun rf ->
   Assert.is_none ~msg:__LOC__ rf;
-  Json.write_file file v >>= fun success ->
+  write_file file v >>= fun success ->
   Assert.is_true ~msg:__LOC__ success;
-  Json.read_file file >>= fun opt ->
+  read_file file >>= fun opt ->
   Assert.is_some ~msg:__LOC__ opt;
   Lwt.return ()
 
@@ -267,7 +268,7 @@ let test_json_input testdir =
 }
 |}
     in
-    Json.read_file file >>= function
+    Data_encoding_ezjsonm.read_file file >>= function
       None -> Assert.fail_msg "Cannot parse \"good.json\"."
     | Some json ->
         let (id, value, popup) = Json.destruct enc json in
@@ -293,7 +294,7 @@ let test_json_input testdir =
 }
 |}
     in
-    Json.read_file file >>= function
+    Data_encoding_ezjsonm.read_file file >>= function
       None -> Assert.fail_msg "Cannot parse \"unknown.json\"."
     | Some json ->
         Assert.test_fail ~msg:__LOC__

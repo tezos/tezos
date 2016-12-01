@@ -631,7 +631,7 @@ let read_genesis, store_genesis =
     get t key >>= function
     | None -> Lwt.return None
     | Some v ->
-        match Data_encoding.Json.from_string (MBytes.to_string v) with
+        match Data_encoding_ezjsonm.from_string (MBytes.to_string v) with
         | Error _ ->
             fatal_error
               "Store.read_genesis: invalid json object."
@@ -643,7 +643,7 @@ let read_genesis, store_genesis =
                 "Store.read_genesis: cannot parse json object."  in
   let store t h =
     set t key ( MBytes.of_string @@
-                Data_encoding.Json.to_string @@
+                Data_encoding_ezjsonm.to_string @@
                 Data_encoding.Json.construct genesis_encoding h ) in
   (read, store)
 
