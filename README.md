@@ -61,7 +61,7 @@ Running the node in a sandbox
 To run a single instance of a Tezos node in sandbox mode:
 
 ```
-./tezos-node -sandbox /path/to/a/custom/data/dir -rpc-port 8732
+./tezos-node --sandbox /path/to/a/custom/data/dir --rpc-addr :::8732
 ```
 
 This "sandboxed" node will not participate in the P2P network, but will accept
@@ -81,11 +81,11 @@ connections:
 ```
 
 The node will listen to connections coming in on `0.0.0.0:9732` (and
-`[::]:9732`). All used data is stored at `${HOME}/.tezos-node/`. For example,
-the default configuration file is at `${HOME}/.tezos-node/config`.
+`[::]:9732`). All used data is stored at `$HOME/.tezos-node/`. For example,
+the default configuration file is at `$HOME/.tezos-node/config`.
 
 To run multiple nodes on the same machine, you can duplicate and edit
-`${HOME}/.tezos-node/config` while making sure they don't share paths to the
+`$HOME/.tezos-node/config` while making sure they don't share paths to the
 database or any other data file (cf. options `db.store` ; `db.context` ;
 `net.peers` and `protocol.dir`).
 
@@ -95,7 +95,7 @@ command will generate it and replace the default values with the values from
 the command line:
 
 ```
-./tezos-node -base-dir "$dir" -net-port 9733 -net-addr 127.0.0.1
+./tezos-node --base-dir "$dir" --net-addr 127.0.0.1:9733
 ```
 
 The Tezos server has a built-in mechanism to discover peers on the local
@@ -106,8 +106,8 @@ initial peers, either by editing the option `net.bootstrap.peers` in the
 `config` file, or by specifying a command line parameter:
 
 ```
-./tezos-node -base-dir "$dir" -net-port 2023 -net-addr 127.0.0.1 \
-             -net-bootstrap-peers '[("127.0.0.1", 2021);("127.0.0.1", 2022)]'
+./tezos-node --base-dir "$dir" --net-addr 127.0.0.1:2023 \
+             --peer 127.0.0.1:2021 --peer 127.0.0.1:2022
 ```
 
 If `"$dir"/config` exists, the command line options override those read in the
@@ -115,7 +115,7 @@ config file. Tezos won't modify the content of an existing `"$dir"/config`
 file.
 
 ```
-./tezos-node -config-file "$dir"/config
+./tezos-node --config-file "$dir"/config
 ```
 
 
@@ -124,12 +124,12 @@ JSON/RPC interface
 
 The Tezos node provides a JSON/RPC interface. Note that it is an RPC, and it is
 JSON based, but it does not follow the "JSON-RPC" protocol. It is not active by
-default and it must be explicitely activated with the `-rpc-port` option.
+default and it must be explicitely activated with the `--rpc-addr` option.
 Typically, if you are not trying to run a local network and just want to
 explore the RPC, you would run:
 
 ```
-./tezos-node -sandbox /path/to/a/custom/data/dir -rpc-port 8732
+./tezos-node --sandbox /path/to/a/custom/data/dir --rpc-addr :::8732
 ```
 
 The RPC interface is self-documented and the `tezos-client` executable is able
