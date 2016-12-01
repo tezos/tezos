@@ -17,8 +17,8 @@ trap cleanup EXIT QUIT INT
 NODE=../tezos-node
 CLIENT="../tezos-client -base-dir ${CLIENT_DIR}"
 
-CUSTOM_PARAM="-sandbox-param ./sandbox.json "
-${NODE} -sandbox ${DATA_DIR} ${CUSTOM_PARAM} -rpc-port 8732 > LOG 2>&1 &
+CUSTOM_PARAM="--sandbox-param ./sandbox.json"
+${NODE} --sandbox "${DATA_DIR}" ${CUSTOM_PARAM} --rpc-addr :::8732 > LOG 2>&1 &
 NODE_PID="$!"
 
 sleep 3
