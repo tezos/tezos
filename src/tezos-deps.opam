@@ -27,6 +27,9 @@ depends: [
   "ocplib-endian"
   "ocplib-json-typed"
   "ocplib-resto" {>= "dev"}
+  "reactiveData"
+  "tyxml"
+  "js_of_ocaml"
   "sodium" {>= "0.3.0"}
   "kaputt"     (* only for testing *)
   "bisect_ppx" (* only for testing *)

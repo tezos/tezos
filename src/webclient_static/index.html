@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Tezos Web Client</title>
+    <meta charset="utf-8" />
+    <script src="//code.jquery.com/jquery-2.1.0.min.js"></script>
+  </head>
+  <body>
+    <h1>Tezos Web client</h1>
+    <form id="form">
+      ./tezos-client <input type="text" name="command" id="command">
+      <input type="submit" value="RUN">
+      <br/>
+      <textarea id="console" cols="80" rows="50"></textarea>
+    </form>
+    <script>
+     $('#form').on('submit', function(e) {
+       e.preventDefault();
+       $.ajax ({
+         url: '/command',
+         method: 'POST',
+         contentType: 'application/json',
+         dataType: 'json',
+         data: JSON.stringify({ command : './tezos-client ' + $('#command')[0].value }),
+         processData: false
+       }).done (function ({ output }) {
+         console.log (output);
+         $('#console')[0].value += output;
+       })
+     })
+    </script>
+  </body>
+</html>
