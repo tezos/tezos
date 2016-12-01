@@ -33,6 +33,10 @@ type peer_info = {
   addr : addr ;
   port : port ;
   version : version ;
+  total_sent : int ;
+  total_recv : int ;
+  current_inflow : float ;
+  current_outflow : float ;
 }
 
 (** Access the info of an active peer, if available *)
