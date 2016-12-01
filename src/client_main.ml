@@ -38,7 +38,7 @@ let main () =
   Sodium.Random.stir () ;
   catch
     (fun () ->
-       Client_config.preparse_args () >>= fun block ->
+       Client_config.preparse_args Sys.argv >>= fun block ->
        Lwt.catch
          (fun () ->
             Client_node_rpcs.Blocks.protocol block)
@@ -56,33 +56,36 @@ let main () =
          Client_version.commands_for_version version in
        Client_config.parse_args ~version
          (Cli_entries.usage commands)
-         (Cli_entries.inline_dispatch commands))
+         (Cli_entries.inline_dispatch commands)
+         Sys.argv >>= fun command ->
+       command () >>= fun () ->
+       Lwt.return 0)
     (function
       | Arg.Help help ->
           Format.printf "%s%!" help ;
-          Pervasives.exit 0
+          Lwt.return 0
       | Arg.Bad help ->
           Format.eprintf "%s%!" help ;
-          Pervasives.exit 1
+          Lwt.return 1
       | Cli_entries.Command_not_found ->
           Format.eprintf "Unkonwn command, try `-help`.\n%!" ;
-          Pervasives.exit 1
+          Lwt.return 1
       | Client_version.Version_not_found ->
           Format.eprintf "Unkonwn protocol version, try `list versions`.\n%!" ;
-          Pervasives.exit 1
+          Lwt.return 1
       | Cli_entries.Bad_argument (idx, _n, v) ->
           Format.eprintf "There's a problem with argument %d, %s.\n%!" idx v ;
-          Pervasives.exit 1
+          Lwt.return 1
       | Cli_entries.Command_failed message ->
           Format.eprintf "Command failed, %s.\n%!" message ;
-          Pervasives.exit 1
+          Lwt.return 1
       | Failure message ->
           Format.eprintf "%s%!" message ;
-          Pervasives.exit 1
+          Lwt.return 1
       | exn ->
           Format.printf "Fatal internal error: %s\n%!"
             (Printexc.to_string exn) ;
-          Pervasives.exit 1)
+          Lwt.return 1)
 
 (* Where all the user friendliness starts *)
-let () = Lwt_main.run (main ())
+let () = Pervasives.exit (Lwt_main.run (main ()))

@@ -54,13 +54,12 @@ val register_tag: tag -> string -> unit
 val usage:
   command list -> (string * Arg.spec * string) list -> string
 val inline_dispatch:
-  command list ->
-  unit ->
-  [> `Arg of string | `End ] ->
-  [> `Args of (Arg.key * Arg.spec * Arg.doc) list
+  command list -> unit ->
+  [ `Arg of string | `End ] ->
+  [ `Args of (Arg.key * Arg.spec * Arg.doc) list
   | `Fail of exn
   | `Nop
-  | `Res of unit Lwt.t ]
+  | `Res of unit -> unit Lwt.t ]
 
 val dispatch:
   command list -> unit -> string list -> unit Lwt.t

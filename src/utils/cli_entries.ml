@@ -189,7 +189,7 @@ let tree_dispatch tree last args =
   in
   loop (tree, args)
 
-let inline_tree_dispatch tree last =
+let inline_tree_dispatch tree () =
   let state = ref (tree, []) in
   fun arg -> match !state, arg with
     | (( TStop c |
@@ -198,7 +198,7 @@ let inline_tree_dispatch tree last =
          TParam { stop = Some c}), acc),
       `End ->
         state := (TEmpty, []) ;
-        `Res (exec c last (List.rev acc))
+        `Res (fun last -> exec c last (List.rev acc))
     | (TMore c, acc), `Arg n ->
         state := (TMore c, n :: acc) ;
         `Nop

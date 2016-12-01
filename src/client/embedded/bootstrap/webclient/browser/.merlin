@@ -1,0 +1,9 @@
+B ../../../../../minutils
+S ../../../../../minutils
+B ../shared
+S ../shared
+PKG lwt
+PKG ocplib-json-typed.bson
+PKG ocplib-resto.directory \
+PKG js_of_ocaml.ppx
+PKG js_of_ocaml.tyxml
