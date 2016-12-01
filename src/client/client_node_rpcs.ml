@@ -24,10 +24,12 @@ let cpt = ref 0
 let make_request cctxt service json =
   incr cpt ;
   let cpt = !cpt in
-  let serv = "http://" ^ Client_config.incoming_addr#get
-             ^ ":" ^ string_of_int Client_config.incoming_port#get in
-  let string_uri = String.concat "/" (serv :: service) in
-  let uri = Uri.of_string string_uri in
+  let scheme = if Client_config.tls#get then "https" else "http" in
+  let host = Client_config.incoming_addr#get in
+  let port = Client_config.incoming_port#get in
+  let path = String.concat "/" service in
+  let uri = Uri.make ~scheme ~host ~port ~path () in
+  let string_uri = Uri.to_string uri in
   let reqbody = Data_encoding_ezjsonm.to_string json in
   let tzero = Unix.gettimeofday () in
   catch
