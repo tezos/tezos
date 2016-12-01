@@ -218,32 +218,29 @@ module Make (P: PARAMS) = struct
   (* send a message over a TCP socket *)
   let send_msg ?crypt fd buf msg =
     Lwt.catch begin fun () ->
-      match Data_encoding.Binary.write msg_encoding msg buf hdrlen with
-      | None -> Error_monad.fail Encoding_error
-      | Some len ->
-          match crypt with
-          | None ->
-              if len > maxlen then Error_monad.fail Message_too_big
-              else begin
-                EndianBigstring.BigEndian.set_int16 buf 0 (len - hdrlen) ;
-                (* TODO timeout write ??? *)
-                Lwt_utils.write_mbytes ~len fd buf >>= fun () ->
-                Error_monad.return len
-              end
-          | Some crypt ->
-              let encbuf = crypt (MBytes.sub buf hdrlen (len - hdrlen)) in
-              let len = MBytes.length encbuf in
-              if len > maxlen then Error_monad.fail Message_too_big
-              else begin
-                let lenbuf = MBytes.create 2 in
-                EndianBigstring.BigEndian.set_int16 lenbuf 0 len ;
-                Lwt_utils.write_mbytes fd lenbuf >>= fun () ->
-                Lwt_utils.write_mbytes fd encbuf >>= fun () ->
-                Error_monad.return len
-              end
+      match crypt, Data_encoding.Binary.write msg_encoding msg buf hdrlen with
+      | _, None -> Error_monad.fail Encoding_error
+      | None, Some len ->
+          if len > maxlen then Error_monad.fail Message_too_big
+          else begin
+            EndianBigstring.BigEndian.set_int16 buf 0 (len - hdrlen) ;
+            (* TODO timeout write ??? *)
+            Lwt_utils.write_mbytes ~len fd buf >>= fun () ->
+            Error_monad.return len
+          end
+      | Some crypt, Some len ->
+          let encbuf = crypt (MBytes.sub buf hdrlen (len - hdrlen)) in
+          let len = MBytes.length encbuf in
+          if len > maxlen then Error_monad.fail Message_too_big
+          else begin
+            let lenbuf = MBytes.create 2 in
+            EndianBigstring.BigEndian.set_int16 lenbuf 0 len ;
+            Lwt_utils.write_mbytes fd lenbuf >>= fun () ->
+            Lwt_utils.write_mbytes fd encbuf >>= fun () ->
+            Error_monad.return len
+          end
     end
       (fun exn -> Lwt.return @@ Error_monad.error_exn exn)
-
 
   (* The (internal) type of network events, those dispatched from peer
      workers to the net and others internal to net workers. *)
