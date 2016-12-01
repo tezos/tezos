@@ -37,3 +37,4 @@ PKG result
 PKG sodium
 PKG unix
 PKG zarith
+PKG cmdliner

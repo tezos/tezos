@@ -112,6 +112,11 @@ let unopt_list l =
   let may_cons xs x = match x with None -> xs | Some x -> x :: xs in
   List.rev @@ List.fold_left may_cons [] l
 
+let first_some a b = match a, b with
+  | None, None -> None
+  | None, Some v -> Some v
+  | Some v, _ -> Some v
+
 let filter_map f l =
   let may_cons xs x = match f x with None -> xs | Some x -> x :: xs in
   List.rev @@ List.fold_left may_cons [] l

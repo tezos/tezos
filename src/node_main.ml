@@ -31,221 +31,337 @@ let genesis = {
   protocol = genesis_protocol ;
 }
 
-module Globals = struct
+let (//) = Filename.concat
 
-  open Config_file
+let home =
+  try Sys.getenv "HOME"
+  with Not_found -> "/root"
 
-  let (//) = Filename.concat
+let default_base_dir = home // ".tezos-node"
 
-  let home =
-    try Sys.getenv "HOME"
-    with Not_found -> "/root"
+type cfg = {
+    (* cli *)
+    base_dir : string ;
+    sandbox : string option ;
+    sandbox_param : string option ;
 
-  class string_option_cp ?group name ?short_name default help =
-    object (self)
-      inherit [string] option_cp
-          string_wrappers ?group name ?short_name default help
-    method get_spec =
-      let set = function
-        | ""
-        | "none" -> self#set None | s -> self#set (Some s) in
-      Arg.String set
-  end
+    (* db *)
+    store : string ;
+    context : string ;
+    protocol : string ;
 
-  let addr_wrappers = {
-    to_raw = (fun v -> Raw.String (Ipaddr.to_string v));
-    of_raw = function
-      | Raw.String v -> Ipaddr.of_string_exn v
-      | r -> raise (Wrong_type (fun outchan -> Printf.fprintf outchan
-                                   "Raw.Int expected, got %a\n%!" Raw.to_channel r))}
-  class addr_cp = [Ipaddr.t] cp_custom_type addr_wrappers
+    (* net *)
+    min_connections : int ;
+    max_connections : int ;
+    expected_connections : int ;
+    net_addr : Ipaddr.t ;
+    net_port : int ;
+    local_discovery : int option ;
+    peers : (Ipaddr.t * int) list ;
+    peers_cache : string ;
+    closed : bool ;
 
-  (** Command line options *)
+    (* rpc *)
+    rpc_addr : (Ipaddr.t * int) option ;
 
-  let cli_group = new group
+    (* log *)
+    log_output : [`Stderr | `File of string | `Syslog | `Null] ;
+    log_level : Lwt_log.level option ;
+  }
 
-  let base_dir =
-    new filename_cp ~group:cli_group ["base-dir"] (home // ".tezos-node")
-      "The directory where the tezos node will store all its data."
+let default_cfg_of_base_dir base_dir = {
+  (* cli *)
+  base_dir ;
+  sandbox = None ;
+  sandbox_param = None ;
 
-  let config_file =
-    new filename_cp ~group:cli_group ["config-file"] (base_dir#get // "config")
-      "The main configuration file."
+  (* db *)
+  store = base_dir // "store" ;
+  context = base_dir // "context" ;
+  protocol = base_dir // "protocol" ;
 
-  let () =
-    let config_file_forced = ref false in
-    let update_config _old_file _new_file = config_file_forced := true in
-    let update_base_dir old_dir new_dir =
-      if new_dir <> old_dir then
-        if not !config_file_forced then begin
-          config_file#set (new_dir // "config");
-          config_file_forced := false
-        end
-    in
-    config_file#add_hook update_config;
-    base_dir#add_hook update_base_dir
+  (* net *)
+  min_connections = 4 ;
+  max_connections = 400 ;
+  expected_connections = 20 ;
+  net_addr = Ipaddr.(V6 V6.unspecified) ;
+  net_port = 9732 ;
+  local_discovery = None ;
+  peers = [] ;
+  closed = false ;
+  peers_cache = base_dir // "peers_cache" ;
 
-  let sandbox =
-    new string_option_cp ~group:cli_group ["sandbox"] None
-      "Run a sandboxed daemon \
-      \ (P2P is disabled, \
-       \ data are stored in custom directory)."
+  (* rpc *)
+  rpc_addr = None ;
 
-  let sandbox_param =
-    new string_option_cp ~group:cli_group ["sandbox-param"] None
-      "Custom paramater for the ecoproto."
+  (* log *)
+  log_output = `Stderr ;
+  log_level = None ;
+}
 
-  let () =
-    let sandboxed _ = function
-      | None -> base_dir#reset
-      | Some dir -> base_dir#set dir in
-    sandbox#add_hook sandboxed
+let default_cfg = default_cfg_of_base_dir default_base_dir
 
-  let verbose_param =
-    new string_option_cp ~group:cli_group ["verbosity"] ~short_name:"v" None
-      "Verbosity level (fatal, error, warning, notice, info, debug)"
+let log_of_string s = match Utils.split ':' ~limit:2 s with
+  | ["stderr"] -> `Stderr
+  | ["file"; fn] -> `File fn
+  | ["syslog"] -> `Syslog
+  | ["null"] -> `Null
+  | _ -> invalid_arg "log_of_string"
 
-  (** File options *)
+let string_of_log = function
+  | `Stderr -> "stderr"
+  | `File fn -> "file:" ^ fn
+  | `Syslog -> "syslog"
+  | `Null -> "null"
 
-  let file_group = new group
+let sockaddr_of_string str =
+  match String.rindex str ':' with
+  | exception Not_found -> `Error "not a sockaddr"
+  | pos ->
+      let len = String.length str in
+      let addr, port = String.sub str 0 pos, String.sub str (pos+1) (len - pos - 1) in
+      match Ipaddr.of_string_exn addr, int_of_string port with
+      | exception Failure _ -> `Error "not a sockaddr"
+      | ip, port -> `Ok (ip, port)
 
-  let store_root =
-    new filename_cp ~group:file_group ["db"; "store"]
-      "DUMMY" (* See update default *) "TODO"
+let sockaddr_of_string_exn str =
+  match sockaddr_of_string str with
+  | `Ok saddr -> saddr
+  | `Error msg -> invalid_arg msg
 
-  let context_root =
-    new filename_cp ~group:file_group ["db"; "context"]
-      "DUMMY" (* See update default *) "TODO"
+let pp_sockaddr fmt (ip, port) = Format.fprintf fmt "%a:%d" Ipaddr.pp_hum ip port
+let string_of_sockaddr saddr = Format.asprintf "%a" pp_sockaddr saddr
 
-  let protocol_dir =
-    new filename_cp ~group:file_group ["protocol"; "dir"]
-      "DUMMY" (* See update default *) "TODO"
+module Cfg_file = struct
+  open Data_encoding
 
-  let peers_file =
-    new filename_cp ~group:file_group ["net"; "peers"]
-      "DUMMY" (* See update default *)
-      "A file storing information about known peers"
+  let db =
+    obj3
+      (opt "store" string)
+      (opt "context" string)
+      (opt "protocol" string)
 
-  (** Network options *)
+  let net =
+    obj8
+      (opt "min-connections" uint16)
+      (opt "max-connections" uint16)
+      (opt "expected-connections" uint16)
+      (opt "addr" string)
+      (opt "local-discovery" uint16)
+      (opt "peers" (list string))
+      (dft "closed" bool false)
+      (opt "peers-cache" string)
 
-  let in_both_groups cp =
-    file_group # add cp ; cli_group # add cp ; cp
+  let rpc =
+    obj1
+      (opt "addr" string)
 
-  let min_connections = in_both_groups @@
-    new int_cp [ "net" ; "min-connections" ] 4
-      "The number of connections under which aggressive peer discovery mode must be entered"
+  let log =
+    obj1
+      (opt "output" string)
 
-  let max_connections = in_both_groups @@
-    new int_cp [ "net" ; "max-connections" ] 400
-      "The number of connections over which some have to be closed"
+  let t =
+    conv
+      (fun { store ; context ; protocol ;
+             min_connections ; max_connections ; expected_connections;
+             net_addr ; net_port ; local_discovery ; peers;
+             closed ; peers_cache ; rpc_addr; log_output } ->
+        let net_addr = string_of_sockaddr (net_addr, net_port) in
+        let rpc_addr = Utils.map_option string_of_sockaddr rpc_addr in
+        let peers = ListLabels.map peers ~f:string_of_sockaddr in
+        let log_output = string_of_log log_output in
+        ((Some store, Some context, Some protocol),
+         (Some min_connections, Some max_connections, Some expected_connections,
+          Some net_addr, local_discovery, Some peers, closed, Some peers_cache),
+         rpc_addr, Some log_output))
+      (fun (
+         (store, context, protocol),
+         (min_connections, max_connections, expected_connections,
+          net_addr, local_discovery, peers, closed, peers_cache), rpc_addr, log_output) ->
+         let open Utils in
+         let store = unopt default_cfg.store store in
+         let context = unopt default_cfg.context context in
+         let protocol = unopt default_cfg.protocol protocol in
+         let net_addr = map_option sockaddr_of_string_exn net_addr in
+         let net_addr, net_port = unopt (default_cfg.net_addr, default_cfg.net_port) net_addr in
+         let rpc_addr = map_option sockaddr_of_string_exn rpc_addr in
+         let peers = unopt [] peers in
+         let peers = ListLabels.map peers ~f:sockaddr_of_string_exn in
+         let peers_cache = unopt default_cfg.peers_cache peers_cache in
+         let log_output = unopt default_cfg.log_output (map_option log_of_string log_output) in
+         let min_connections = unopt default_cfg.min_connections min_connections in
+         let max_connections = unopt default_cfg.max_connections max_connections in
+         let expected_connections = unopt default_cfg.expected_connections expected_connections in
+         { default_cfg with
+           store ; context ; protocol ;
+           min_connections; max_connections; expected_connections;
+           net_addr; net_port ; local_discovery; peers; closed; peers_cache;
+           rpc_addr; log_output
+         }
+      )
+      (obj4
+         (req "db" db)
+         (req "net" net)
+         (req "rpc" rpc)
+         (req "log" log))
 
-  let expected_connections = in_both_groups @@
-    new int_cp [ "net" ; "expected-connections" ] 20
-      "The minimum number of connections to be ensured by the cruise control"
+  let read fp =
+    let open Data_encoding.Json in
+    read_file fp >|= function
+    | None -> None
+    | Some json -> Some (destruct t json)
 
-  let incoming_port = in_both_groups @@
-    new option_cp int_wrappers [ "net" ; "port" ] ~short_name:"P" (Some 9732)
-      "The TCP address at which this instance can be reached"
-
-  let discovery_port = in_both_groups @@
-    new bool_cp [ "net" ; "local-discovery" ] ~short_name:"D" false
-      "Automatic discovery of peers on the local network"
-
-  let bootstrap_peers = in_both_groups @@
-    new list_cp (tuple2_wrappers addr_wrappers int_wrappers)
-      [ "net" ; "bootstrap-peers" ] ~short_name:"B" [ ]
-      "The peers to bootstrap the networks from"
-
-  let closed_network = in_both_groups @@
-    new bool_cp
-      [ "net" ; "closed" ] ~short_name:"X" false
-      "Only accept connections from the bootstrap peers"
-
-
-  (** Logging *)
-
-  let log_kind =
-    new string_cp ~group:file_group [ "log" ; "kind" ] "stderr"
-      "Which logger to use: 'stderr', 'stdout', 'file', 'null' or 'syslog'."
-
-  let log_file =
-    new filename_cp ~group:file_group ["log"; "file"]
-      "DUMMY" (* See update default *)
-      "The log-file path when 'log_kind = file'."
-
-  (** RPC *)
-
-  let rpc_listening_port = in_both_groups @@
-    new option_cp int_wrappers [ "rpc" ; "port" ] ~short_name:"P" None
-      "The TCP port at which this RPC-server instance can be reached"
-
-  let rpc_listening_addr = in_both_groups @@
-    new string_option_cp [ "rpc" ; "addr" ] ~short_name:"A" None
-      "The TCP address at which this RPC-server instance can be reached"
-
-  (** Entry point *)
-
-  let update_defaults () =
-    (* Set default path relatively to [base_dir]. *)
-    store_root#set (base_dir#get // "store");
-    context_root#set (base_dir#get // "context");
-    protocol_dir#set (base_dir#get // "protocol");
-    peers_file#set (base_dir#get // "peers-cache");
-    log_file#set (base_dir#get // "tezos-node.log")
-
-  let parse_args () =
-    let args = cli_group#command_line_args "-" in
-    let anon_fun str =
-      Arg.usage args
-        (Printf.sprintf
-           "\nError: Unknown command line argument %S.\n\nUsage:" str);
-      Utils.exit 1
-    in
-    Arg.parse args anon_fun "Usage:";
-    update_defaults ();
-    if Sys.file_exists config_file#get then begin
-      try
-        file_group#read config_file#get ;
-        (* parse once again to overwrite file options by cli ones *)
-        Arg.parse_argv ~current:(ref 0) Sys.argv args anon_fun "Usage:"
-      with Sys_error msg ->
-        Printf.eprintf "Error: can't read the configuration file: %s\n%!" msg;
-        Utils.exit 1
-    end else begin
-      try
-        Lwt_main.run (Utils.create_dir (Filename.dirname config_file#get));
-        file_group#write config_file#get
-      with Sys_error msg ->
-        Printf.eprintf
-          "Warning: can't create the default configuration file: %s\n%!" msg
-    end
-
+  let from_json json = Data_encoding.Json.destruct t json
+  let write out cfg =
+    Utils.write_file ~bin:false out Data_encoding.Json.(construct t cfg |> to_string)
 end
 
-let init_logger () =
-  let open Logging in
-  begin
-    let open Lwt_log_core in
-    match Globals.verbose_param#get with
-    | Some "fatal" -> add_rule "*" Fatal
-    | Some "error" -> add_rule "*" Error
-    | Some "warning" -> add_rule "*" Warning
-    | Some "notice" -> add_rule "*" Notice
-    | Some "info" -> add_rule "*" Info
-    | Some "debug" -> add_rule "*" Debug
-    | Some level ->
-        Printf.eprintf "Warning: unknown verbosity level \"%s\".\n%!" level
-    | None -> ()
-  end;
-  match Globals.log_kind#get with
-  | "" | "stderr" -> Logging.init Stderr
-  | "stdout" -> Logging.init Stdout
-  | "file" -> Logging.init (File Globals.log_file#get)
-  | "null" -> Logging.init Null
-  | "syslog" -> Logging.init Syslog
-  | kind -> Printf.eprintf "Warning: unknown log_kind \"%s\".\n%!" kind
+module Cmdline = struct
+  open Cmdliner
 
-let init_node () =
+  (* custom converters *)
+  let sockaddr_converter = sockaddr_of_string, pp_sockaddr
+
+  (* cli args *)
+  let misc_sect = "MISC"
+  let base_dir =
+    let doc = "The directory where the Tezos node will store all its data." in
+    Arg.(value & opt (some string) None & info ~docs:"CONFIG" ~doc ~docv:"DIR" ["base-dir"])
+  let config_file =
+    let doc = "The main configuration file." in
+    Arg.(value & opt (some string) None & info ~docs:"CONFIG" ~doc ~docv:"FILE" ["config-file"])
+  let sandbox =
+    let doc = "Run the daemon in a sandbox (P2P is disabled, data is stored in a custom directory)." in
+    Arg.(value & opt (some string) None & info ~docs:"NETWORK" ~doc ~docv:"DIR" ["sandbox"])
+  let sandbox_param =
+    let doc = "Custom parameter for the economical protocol." in
+    Arg.(value & opt (some string) None & info ~docs:"NETWORK" ~doc ["sandbox-param"])
+  let v =
+    let doc = "Increase log level. Use several times to increase log level, e.g. `-vv'." in
+    Arg.(value & flag_all & info ~docs:misc_sect ~doc ["v"])
+  (* net args *)
+  let min_connections =
+    let doc = "The number of connections below which aggressive peer discovery mode is entered." in
+    Arg.(value & opt int default_cfg.min_connections & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["min-connections"])
+  let max_connections =
+    let doc = "The number of connections above which some connections will be closed." in
+    Arg.(value & opt int default_cfg.max_connections & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["max-connections"])
+  let expected_connections =
+    let doc = "The minimum number of connections to be ensured by the cruise control." in
+    Arg.(value & opt int default_cfg.expected_connections & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["expected-connections"])
+  let net_addr =
+    let doc = "The TCP address and port at which this instance can be reached." in
+    Arg.(value & opt sockaddr_converter (default_cfg.net_addr, default_cfg.net_port) & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["net-addr"])
+  let local_discovery =
+    let doc = "Automatic discovery of peers on the local network." in
+    Arg.(value & opt (some int) default_cfg.local_discovery & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["local-discovery"])
+  let peers =
+    let doc = "A peer to bootstrap the network from. Can be used several times to add several peers." in
+    Arg.(value & opt_all sockaddr_converter [] & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["peer"])
+  let closed =
+    let doc = "Only accept connections from the bootstrap peers." in
+    Arg.(value & flag & info ~docs:"NETWORK" ~doc ["closed"])
+  let reset_config =
+    let doc = "Overwrite config file with factory defaults." in
+    Arg.(value & flag & info ~docs:"CONFIG" ~doc ["reset-config"])
+  let update_config =
+    let doc = "Update config file with values from the command line." in
+    Arg.(value & flag & info ~docs:"CONFIG" ~doc ["update-config"])
+
+  (* rpc args *)
+  let rpc_addr =
+    let doc = "The TCP socket address at which this RPC server instance can be reached" in
+    Arg.(value & opt (some sockaddr_converter) None & info ~docs:"RPC" ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
+
+  let parse base_dir config_file sandbox sandbox_param log_level
+      min_connections max_connections expected_connections
+      (net_addr, net_port) local_discovery peers closed rpc_addr reset_cfg update_cfg =
+    let base_dir = Utils.(unopt (unopt default_cfg.base_dir base_dir) sandbox) in
+    let config_file = Utils.(unopt ((unopt base_dir sandbox) // "config")) config_file in
+    let no_config () =
+      warn "Found no config file at %s" config_file;
+      warn "Using factory defaults";
+      default_cfg_of_base_dir base_dir
+    in
+    let corrupted_config msg =
+      log_error "Config file %s corrupted: %s" config_file msg;
+      warn "Using factory defaults";
+      default_cfg_of_base_dir base_dir
+    in
+    let cfg =
+      match Utils.read_file ~bin:false config_file |> Data_encoding.Json.from_string with
+      | exception _ -> no_config ()
+      | Error msg -> corrupted_config msg
+      | Ok cfg -> try Cfg_file.from_json cfg with
+        | Invalid_argument msg
+        | Failure msg -> corrupted_config msg
+    in
+    let log_level = match List.length log_level with
+      | 0 -> None
+      | 1 -> Some Lwt_log.Info
+      | _ -> Some Lwt_log.Debug
+    in
+    let cfg =
+      { cfg with
+        base_dir ;
+        sandbox ;
+        sandbox_param ;
+        log_level ;
+        min_connections ;
+        max_connections ;
+        expected_connections ;
+        net_addr ;
+        net_port ;
+        local_discovery ;
+        peers = List.rev_append peers cfg.peers ;
+        closed ;
+        rpc_addr = Utils.first_some rpc_addr cfg.rpc_addr ;
+        log_output = cfg.log_output ;
+      }
+    in
+    if update_cfg then Cfg_file.write config_file cfg;
+    `Ok (config_file, reset_cfg, update_cfg, cfg)
+
+  let cmd =
+    let open Term in
+    ret (const parse $ base_dir $ config_file
+                     $ sandbox $ sandbox_param $ v
+                     $ min_connections $ max_connections $ expected_connections
+                     $ net_addr $ local_discovery $ peers $ closed $ rpc_addr
+                     $ reset_config $ update_config
+      ),
+    let doc = "The Tezos daemon" in
+    let man = [
+      `S "NETWORK";
+      `S "RPC";
+      `S "CONFIG";
+      `S misc_sect;
+      `S "EXAMPLES" ;
+      `P "Use `$(mname) --sandbox /path/to/a/custom/data/dir --rpc-addr :::8732' \
+          to run a single instance in sandbox mode, \
+          listening to RPC commands at localhost port 8732.";
+      `P "Use `$(mname)' for a node that accepts network connections.";
+      `S "BUGS"; `P "Check bug reports at https://github.com/tezos/tezos/issues.";
+    ]
+    in
+    info ~sdocs:misc_sect ~man ~doc "tezos-node"
+
+  let parse () = Term.eval cmd
+end
+
+let init_logger { log_output ; log_level } =
+  let open Logging in
+  Utils.iter_option log_level ~f:(Lwt_log_core.add_rule "*") ;
+  match log_output with
+  | `Stderr -> Logging.init Stderr
+  | `File fp -> Logging.init (File fp)
+  | `Null -> Logging.init Null
+  | `Syslog -> Logging.init Syslog
+
+let init_node { sandbox ; sandbox_param ;
+                store ; context ;
+                min_connections ; max_connections ; expected_connections ;
+                net_port ; peers ; peers_cache ; local_discovery ; closed } =
   let patch_context json ctxt =
     let module Proto = (val Updater.get_exn genesis_protocol) in
     Lwt.catch
@@ -260,93 +376,102 @@ let init_node () =
            (Printexc.to_string exn) ;
          Lwt.return ctxt) in
   begin
-    match Globals.sandbox#get with
+    match sandbox with
     | None -> Lwt.return_none
     | Some _ ->
-        match Globals.sandbox_param#get with
+        match sandbox_param with
         | None -> Lwt.return (Some (patch_context None))
         | Some file ->
             Data_encoding.Json.read_file file >>= function
             | None ->
                 lwt_warn
-                  "Can't parse sandbox parameters (%s)" file >>= fun () ->
+                  "Can't parse sandbox parameters. (%s)" file >>= fun () ->
                 Lwt.return (Some (patch_context None))
             | Some _ as json ->
                 Lwt.return (Some (patch_context json))
   end >>= fun patch_context ->
   let net_params =
     let open P2p in
-    match Globals.sandbox#get with
+    match sandbox with
     | Some _ -> None
     | None ->
         let limits =
           { max_packet_size = 10_000 ;
             peer_answer_timeout = 5. ;
-            expected_connections = Globals.expected_connections#get ;
-            min_connections = Globals.min_connections#get ;
-            max_connections = Globals.max_connections#get ;
+            expected_connections ;
+            min_connections ;
+            max_connections ;
             blacklist_time = 30. }
-        and config =
-          { incoming_port = Globals.incoming_port#get ;
-            discovery_port =
-              if Globals.discovery_port#get then Some 7732 else None ;
-            known_peers = Globals.bootstrap_peers#get ;
-            peers_file = Globals.peers_file#get ;
-            closed_network = Globals.closed_network#get }
+        in
+        let config =
+          { incoming_port = Some net_port ;
+            discovery_port = local_discovery ;
+            known_peers = peers ;
+            peers_file = peers_cache ;
+            closed_network = closed }
         in
         Some (config, limits) in
   Node.create
     ~genesis
-    ~store_root:Globals.store_root#get
-    ~context_root:Globals.context_root#get
+    ~store_root:store
+    ~context_root:context
     ?test_protocol
     ?patch_context
     net_params
 
-let init_rpc node =
-  match Globals.rpc_listening_port#get, Globals.rpc_listening_addr#get with
-  | None, None ->
+let init_rpc { rpc_addr } node =
+  match rpc_addr with
+  | None ->
       lwt_log_notice "Not listening to RPC calls." >>= fun () ->
       Lwt.return None
-  | port, addr ->
-      let addr = match addr with Some a -> a | None -> "127.0.0.1" in
-      let port = match port with Some p -> p | None -> 8732 in
-      lwt_log_notice "Starting the RPC server at %s:%d." addr port >>= fun () ->
+  | Some (_addr, port) ->
+      lwt_log_notice "Starting the RPC server listening on port %d." port >>= fun () ->
       let dir = Node_rpc.build_rpc_directory node in
-      RPC.(launch addr port dir) >>= fun server ->
+      RPC.(launch port dir) >>= fun server ->
       Lwt.return (Some server)
-
-let may f = function
-  | None -> Lwt.return_unit
-  | Some x -> f x
 
 let init_signal () =
   let handler id = try Utils.exit id with _ -> () in
   ignore (Lwt_unix.on_signal Sys.sigint handler : Lwt_unix.signal_handler_id)
 
-let main () =
+let main cfg =
   Random.self_init () ;
   Sodium.Random.stir () ;
-  Globals.parse_args ();
-  init_logger ();
-  Updater.init Globals.protocol_dir#get;
+  init_logger cfg;
+  Updater.init cfg.protocol;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
-  init_node () >>=? fun node ->
-  init_rpc node >>= fun rpc ->
+  init_node cfg >>=? fun node ->
+  init_rpc cfg node >>= fun rpc ->
   init_signal ();
   lwt_log_notice "The Tezos node is now running!" >>= fun () ->
   Utils.termination_thread >>= fun x ->
   lwt_log_notice "Shutting down the Tezos node..." >>= fun () ->
   Node.shutdown node >>= fun () ->
   lwt_log_notice "Shutting down the RPC server..." >>= fun () ->
-  may RPC.shutdown rpc >>= fun () ->
+  Lwt_utils.may RPC.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
   return ()
 
 let () =
-  Lwt_main.run begin
-    main () >>= function
-    | Ok () -> Lwt.return_unit
-    | Error err ->
-        lwt_log_error "%a@." Error_monad.pp_print_error err
-  end
+  match Cmdline.parse () with
+  | `Error _ -> exit 1
+  | `Help -> exit 1
+  | `Version -> exit 1
+  | `Ok (config_file, was_reset, updated, cfg) ->
+      if was_reset then log_notice "Overwriting %s with factory defaults." config_file;
+      if updated then log_notice "Updated %s from command line arguments." config_file;
+      Lwt_main.run begin
+        if not @@ Sys.file_exists cfg.base_dir then begin
+          Unix.mkdir cfg.base_dir 0o700;
+          log_notice "Created base directory %s." cfg.base_dir
+        end;
+        log_notice "Using config file %s." config_file;
+        if not @@ Sys.file_exists config_file then begin
+          Cfg_file.write config_file cfg;
+          log_notice "Created config file %s." config_file
+        end;
+        main cfg >>= function
+        | Ok () -> Lwt.return_unit
+        | Error err ->
+            lwt_log_error "%a@." Error_monad.pp_print_error err
+      end
