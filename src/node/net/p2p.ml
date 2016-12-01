@@ -270,9 +270,9 @@ module Make (P: PARAMS) = struct
     reader : event Lwt_pipe.t ;
     writer : msg Lwt_pipe.t ;
     total_sent : unit -> int ;
-    total_received : unit -> int ;
-    inflow : unit -> float ;
-    outflow : unit -> float ;
+    total_recv : unit -> int ;
+    current_inflow : unit -> float ;
+    current_outflow : unit -> float ;
   }
 
   type peer_info = {
@@ -280,6 +280,10 @@ module Make (P: PARAMS) = struct
     addr : addr ;
     port : port ;
     version : version ;
+    total_sent : int ;
+    total_recv : int ;
+    current_inflow : float ;
+    current_outflow : float ;
   }
 
   (* A net handler, as a record-encoded object, abstract from the
@@ -515,14 +519,14 @@ module Make (P: PARAMS) = struct
       let try_send p = Lwt_pipe.push_now writer p in
       let reader = Lwt_pipe.create 2 in
       let total_sent () = !sent in
-      let total_received () = !received in
-      let inflow () = received_ema#get in
-      let outflow () = sent_ema#get in
+      let total_recv () = !received in
+      let current_inflow () = received_ema#get in
+      let current_outflow () = sent_ema#get in
       (* net object construction *)
       let peer = { gid ; public_key ; point = (addr, port) ;
                    listening_port ; version ; last_seen ;
                    disconnect ; send ; try_send ; reader ; writer ;
-                   total_sent ; total_received ; inflow ; outflow } in
+                   total_sent ; total_recv ; current_inflow ; current_outflow } in
       let uncrypt buf =
         let nonce = get_nonce local_nonce in
         match Crypto_box.box_open my_secret_key public_key buf nonce with
@@ -1313,6 +1317,10 @@ module Make (P: PARAMS) = struct
       addr = fst peer.point ;
       port = snd peer.point ;
       version = peer.version ;
+      total_sent = peer.total_sent () ;
+      total_recv = peer.total_recv () ;
+      current_outflow = peer.current_outflow () ;
+      current_inflow = peer.current_inflow () ;
     }
     and recv_from () =
       Lwt_pipe.pop messages
