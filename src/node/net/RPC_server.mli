@@ -12,13 +12,13 @@
 (** A handle on the server worker. *)
 type server
 
-(** Promise a running RPC serve ; takes the port. To call
-    an RPC at /p/a/t/h/ in the provided service, one must call the URI
-    /call/p/a/t/h/. Calling /list/p/a/t/h/ will list the services
-    prefixed by /p/a/t/h/, if any. Calling /schema/p/a/t/h/ will
-    describe the input and output of the service, if it is
-    callable. Calling /pipe will read a sequence of services to call in
-    sequence from the request body, see {!pipe_encoding}.
+(** Promise a running RPC serve. To call a RPC at /p/a/t/h/ in the
+    provided service, one must call the URI /call/p/a/t/h/. Calling
+    /list/p/a/t/h/ will list the services prefixed by /p/a/t/h/, if
+    any. Calling /schema/p/a/t/h/ will describe the input and output
+    of the service, if it is callable. Calling /pipe will read a
+    sequence of services to call in sequence from the request body,
+    see {!pipe_encoding}.
 
     The arguments cors_allowed_origins and cors_allowed_headers define
     the cross-origin resource sharing using the headers
@@ -43,11 +43,11 @@ val launch : Conduit_lwt_unix.server ->
   string list ->
   server Lwt.t
 
-(** Kill an RPC server. *)
+(** Kill a RPC server. *)
 val shutdown : server -> unit Lwt.t
 
-(** Retrieve the root service of the server *)
+(** Retrieve the root service of the server. *)
 val root_service : server -> unit RPC.directory
 
-(** Change the root service of the server *)
+(** Change the root service of the server. *)
 val set_root_service : server -> unit RPC.directory -> unit
