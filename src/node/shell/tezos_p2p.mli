@@ -67,12 +67,12 @@ type msg =
 (** Wait for a payload from any peer in the network *)
 val recv : net -> (peer * msg) Lwt.t
 
-(** Send a payload to a peer and wait for it to be in the tube *)
+(** [send net peer msg] is a thread that returns when [msg] has been
+    successfully enqueued in the send queue. *)
 val send : net -> peer -> msg -> unit Lwt.t
 
-(** Send a payload to a peer without waiting for the result. Return
-    [true] if the msg can be enqueued in the peer's output queue
-    or [false] otherwise. *)
+(** [try_send net peer msg] is [true] if [msg] has been added to the
+    send queue for [peer], [false] otherwise *)
 val try_send : net -> peer -> msg -> bool
 
 (** Send a payload to all peers *)
