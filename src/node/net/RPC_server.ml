@@ -54,7 +54,7 @@ let make_cors_headers ?(headers=Cohttp.Header.init ())
             "Access-Control-Allow-Origin" [allowed_origin]
 
 (* Promise a running RPC server. Takes the port. *)
-let launch port ?pre_hook ?post_hook root cors_allowed_origins cors_allowed_headers =
+let launch mode ?pre_hook ?post_hook root cors_allowed_origins cors_allowed_headers =
   (* launch the worker *)
   let cancelation, canceler, _ = Lwt_utils.canceler () in
   let open Cohttp_lwt_unix in
@@ -180,9 +180,7 @@ let launch port ?pre_hook ?post_hook root cors_allowed_origins cors_allowed_head
   and conn_closed (_, con) =
     log_info "connection close %s" (Cohttp.Connection.to_string con) ;
     shutdown_stream con  in
-  lwt_log_info "create server listening on port %d" port >>= fun () ->
   let ctx = Cohttp_lwt_unix_net.init () in
-  let mode = `TCP (`Port port) in
   let stop = cancelation () in
   let _server =
     Server.create
