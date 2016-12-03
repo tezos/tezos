@@ -12,7 +12,7 @@ let protocol =
     "4p64VagsbXchSF88eaPy5XrkqMLEjBCaSnaGv2vQkhv8e37Nnqmrd"
 
 let () =
-  Client_version.register protocol @@
+  Client_commands.register protocol @@
   Client_proto_programs.commands () @
   Client_proto_contracts.commands () @
   Client_proto_context.commands ()

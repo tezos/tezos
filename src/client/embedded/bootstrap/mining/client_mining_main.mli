@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 val mine_block:
+  Client_commands.context ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   ?max_priority: int ->
@@ -15,4 +16,4 @@ val mine_block:
   public_key_hash ->
   unit tzresult Lwt.t
 
-val commands: unit -> Cli_entries.command list
+val commands: unit -> Client_commands.command list

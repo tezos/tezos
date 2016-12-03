@@ -18,15 +18,15 @@ type operation = {
   content: (Updater.shell_operation * proto_operation) option
 }
 
-let monitor ?contents ?check () =
-  Client_node_rpcs.Operations.monitor ?contents () >>= fun ops_stream ->
+let monitor cctxt ?contents ?check () =
+  Client_node_rpcs.Operations.monitor cctxt ?contents () >>= fun ops_stream ->
   let convert ops =
     Lwt_list.filter_map_p
       (fun (hash, bytes) ->
          match bytes with
          | None -> Lwt.return (Some { hash; content = None })
          | Some ({ Store.shell ; proto } : Updater.raw_operation) ->
-             Client_proto_rpcs.Helpers.Parse.operations
+             Client_proto_rpcs.Helpers.Parse.operations cctxt
                `Prevalidation ?check shell proto >>= function
              | Ok proto -> Lwt.return (Some { hash ; content = Some (shell, proto) })
              | Error err ->
@@ -46,7 +46,7 @@ type valid_endorsement = {
   slots: int list ;
 }
 
-let filter_valid_endorsement { hash; content } =
+let filter_valid_endorsement cctxt { hash; content } =
   let open Tezos_context in
   match content with
   | None
@@ -73,14 +73,14 @@ let filter_valid_endorsement { hash; content } =
                 slots in
             (* Ensure thath the block has been previously validated by
                the node. This might took some times... *)
-            Client_node_rpcs.validate_block net_id block >>= function
+            Client_node_rpcs.validate_block cctxt net_id block >>= function
             | Error error ->
                 lwt_log_info
                   "@[<v 2>Found endorsement for an invalid block@,%a@["
                   pp_print_error error >>= fun () ->
                 Lwt.return_none
             | Ok () ->
-                Client_node_rpcs.Blocks.preapply (`Hash block) [hash] >>= function
+                Client_node_rpcs.Blocks.preapply cctxt (`Hash block) [hash] >>= function
                 | Ok _ ->
                     Lwt.return (Some { hash ; source ; block ; slots })
                 | Error error ->
@@ -90,14 +90,14 @@ let filter_valid_endorsement { hash; content } =
                     Lwt.return_none
           with Not_found -> Lwt.return_none
 
-let monitor_endorsement () =
-  monitor ~contents:true ~check:true () >>= fun ops_stream ->
+let monitor_endorsement cctxt =
+  monitor cctxt ~contents:true ~check:true () >>= fun ops_stream ->
   let endorsement_stream, push = Lwt_stream.create () in
   Lwt_stream.on_termination ops_stream (fun () -> push None) ;
   Lwt.async (fun () ->
       Lwt_stream.iter_p
         (Lwt_list.iter_p (fun e ->
-             filter_valid_endorsement e >>= function
+             filter_valid_endorsement cctxt e >>= function
              | None -> Lwt.return_unit
              | Some e -> push (Some e) ; Lwt.return_unit))
         ops_stream) ;

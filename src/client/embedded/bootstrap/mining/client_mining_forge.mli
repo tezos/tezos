@@ -10,6 +10,7 @@
 val generate_seed_nonce: unit -> Nonce.t
 
 val inject_block:
+  Client_commands.context ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   priority:int ->
@@ -21,6 +22,7 @@ val inject_block:
   Block_hash.t tzresult Lwt.t
 
 val forge_block:
+  Client_commands.context ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   ?operations:Operation_hash.t list ->
@@ -35,11 +37,16 @@ val forge_block:
   Block_hash.t tzresult Lwt.t
 
 module State : sig
-  val get_block: Raw_level.t -> Block_hash.t list tzresult Lwt.t
-  val record_block: Raw_level.t -> Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
+  val get_block:
+    Client_commands.context ->
+    Raw_level.t -> Block_hash.t list tzresult Lwt.t
+  val record_block:
+    Client_commands.context ->
+    Raw_level.t -> Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
 end
 
 val create:
+  Client_commands.context ->
   ?max_priority: int ->
   public_key_hash list ->
   Client_mining_blocks.block_info list Lwt_stream.t ->

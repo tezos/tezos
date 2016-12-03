@@ -12,107 +12,88 @@
 open Lwt.Infix
 open Logging.Webclient
 
-let with_cli_entries_logging =
-  let startup =
-    CalendarLib.Printer.Precise_Calendar.sprint
-      "%Y-%m-%dT%H:%M:%SZ"
-      (CalendarLib.Calendar.Precise.now ()) in
-  let stdout = Buffer.create 1000 in
-  let stderr = Buffer.create 1000 in
-  let log channel msg = match channel with
-    | "stdout" ->
-        Buffer.add_string stdout msg ;
-        Lwt.return ()
-    | "stderr" ->
-        Buffer.add_string stderr msg ;
-        Lwt.return ()
-    | log ->
-        Lwt_utils.create_dir Client_config.(base_dir#get // "webclient_logs" // log) >>= fun () ->
-        Lwt_io.with_file
-          ~flags: Unix.[ O_APPEND ; O_CREAT ; O_WRONLY ]
-          ~mode: Lwt_io.Output
-          Client_config.(base_dir#get // "webclient_logs" // log // startup)
-          (fun chan -> Lwt_io.write chan msg) in
-  Cli_entries.log_hook := Some log ;
-  let global_cli_entries_mutex = Lwt_mutex.create () in
-  (fun callback ->
-     Lwt_mutex.with_lock
-       global_cli_entries_mutex
-       (fun () ->
-          Buffer.clear stdout ;
-          Buffer.clear stderr ;
-          Lwt.catch
-            (fun () ->
-               callback () >>= fun result ->
-               Lwt.return
-                 (Ok (result,
-                      Buffer.contents stdout,
-                      Buffer.contents stderr)))
-            (fun exn ->
-               Lwt.return
-                 (Error (exn,
-                         Buffer.contents stdout,
-                         Buffer.contents stderr)))))
+let make_context () =
+  let buffers = Hashtbl.create 50 in
+  Hashtbl.add buffers "stdout" (Buffer.create 1000) ;
+  Hashtbl.add buffers "stderr" (Buffer.create 1000) ;
+  let log channel msg =
+    let buffer =
+      try Hashtbl.find buffers channel with
+        Not_found ->
+          let buffer = Buffer.create 1000 in
+          Hashtbl.add buffers channel buffer ;
+          buffer in
+    Buffer.add_string buffer msg ;
+    Buffer.add_char buffer '\n' ;
+    Lwt.return () in
+  Client_commands.make_context log,
+  (fun () ->
+     Hashtbl.fold
+       (fun channel buffer acc ->
+          (channel, Buffer.contents buffer) :: acc)
+       buffers [])
 
-let block_protocol block =
+let block_protocol cctxt block =
   Lwt.catch
     (fun () ->
-       Client_node_rpcs.Blocks.protocol block)
+       Client_node_rpcs.Blocks.protocol cctxt block)
     (fun _ ->
-       Cli_entries.message "\n\
-                            The connection to the RPC server failed, \
-                            using the default protocol version.\n" >>= fun () ->
+       cctxt.Client_commands.message
+         "\n\
+          The connection to the RPC server failed, \
+          using the default protocol version.\n" >>= fun () ->
        Lwt.return Client_bootstrap.Client_proto_main.protocol)
 
 let eval_command argv =
-  with_cli_entries_logging
+  let cctxt, result = make_context () in
+  Lwt.catch
     (fun () ->
-       Client_config.preparse_args argv >>= fun block ->
-       block_protocol block >>= fun version ->
+       Client_config.preparse_args argv cctxt >>= fun block ->
+       block_protocol cctxt block >>= fun version ->
        let commands =
          Client_generic_rpcs.commands @
          Client_keys.commands () @
          Client_protocols.commands () @
          Client_helpers.commands () @
-         Client_version.commands_for_version version in
+         Client_commands.commands_for_version version in
        Client_config.parse_args ~version
-         (Cli_entries.usage commands)
+         (Cli_entries.usage ~commands)
          (Cli_entries.inline_dispatch commands)
-         argv >>= fun command ->
-       command ()) >>= function
-  | Ok ((), stdout, _stderr) ->
-      Lwt.return (Ok stdout)
-  | Error (exn, stdout, stderr) ->
-      let msg = match exn with
-        | Arg.Help help ->
-            Format.asprintf "%s%!" help
-        | Arg.Bad help ->
-            Format.asprintf "%s%!" help
-        | Cli_entries.Command_not_found ->
-            Format.asprintf "Unkonwn command, try `-help`.\n%!"
-        | Client_version.Version_not_found ->
-            Format.asprintf "Unkonwn protocol version, try `list versions`.\n%!"
-        | Cli_entries.Bad_argument (idx, _n, v) ->
-            Format.asprintf "There's a problem with argument %d, %s.\n%!" idx v
-        | Cli_entries.Command_failed message ->
-            Format.asprintf "Command failed, %s.\n%!" message
-        | Failure msg ->
-            Format.asprintf "Fatal error: %s\n%!" msg
-        | exn ->
-            Format.asprintf "Fatal internal error: %s\n%!" (Printexc.to_string exn) in
-      let stderr =
-        if stdout = ""
-        || String.get stdout (String.length stderr - 1) = '\n' then
-          stdout ^ stderr
-        else
-          stdout ^ "\n" ^ stderr in
-      let stderr =
-        if stderr = ""
-        || String.get stderr (String.length stderr - 1) = '\n' then
-          msg
-        else
-          stderr ^ "\n" ^ msg in
-      Lwt.return (Error stderr)
+         argv cctxt >>= fun command ->
+       command cctxt >>= fun () ->
+       Lwt.return (Ok (result ())))
+    (fun exn ->
+       let msg = match exn with
+         | Arg.Help help ->
+             Format.asprintf "%s%!" help
+         | Arg.Bad help ->
+             Format.asprintf "%s%!" help
+         | Cli_entries.Command_not_found ->
+             Format.asprintf "Unkonwn command, try `-help`.\n%!"
+         | Client_commands.Version_not_found ->
+             Format.asprintf "Unkonwn protocol version, try `list versions`.\n%!"
+         | Cli_entries.Bad_argument (idx, _n, v) ->
+             Format.asprintf "There's a problem with argument %d, %s.\n%!" idx v
+         | Cli_entries.Command_failed message ->
+             Format.asprintf "Command failed, %s.\n%!" message
+         | Failure msg ->
+             Format.asprintf "Fatal error: %s\n%!" msg
+         | exn ->
+             Format.asprintf "Fatal internal error: %s\n%!" (Printexc.to_string exn) in
+       let result =
+         result () in
+       let stderr =
+         List.assoc "stderr" result in
+       let stderr =
+         if stderr = ""
+         || String.get stderr (String.length stderr - 1) = '\n' then
+           msg
+         else
+           stderr ^ "\n" ^ msg in
+       let result =
+         ("stderr", stderr)::
+         List.filter (fun (n, _) -> n <> "stderr") result in
+       Lwt.return (Error result))
 
 module ConnectionMap = Map.Make(Cohttp.Connection)
 
@@ -123,7 +104,7 @@ let root =
   let input, output =
     let open Data_encoding in
     (obj1 (req "command" string)),
-    (obj1 (req "output" string)) in
+    (obj1 (req "outputs" (assoc string))) in
   let root =
     RPC.empty in
   let root =
@@ -138,7 +119,7 @@ let root =
     RPC.register_dynamic_directory1 root
       RPC.Path.(root / "block" /: Node_rpc_services.Blocks.blocks_arg)
       (fun block ->
-         Client_node_rpcs.Blocks.protocol block >>= fun version ->
+         Client_node_rpcs.Blocks.protocol Client_commands.ignore_context block >>= fun version ->
          let directory = Webclient_version.find_contextual_services version in
          let directory = RPC.map (fun ((), block) -> block) directory in
          Lwt.return directory) in
@@ -154,7 +135,7 @@ let find_static_file path =
       let path = index (path, file) in
       (match Node_rpc_services.Blocks.parse_block block with
        | Ok block ->
-           block_protocol block >>= fun version ->
+           block_protocol Client_commands.ignore_context block >>= fun version ->
            Lwt.return
              (try
                 let root =
@@ -194,11 +175,11 @@ let () =
     (Lwt.catch
        (fun () ->
           Client_config.parse_args
-            (Cli_entries.usage [])
+            (Cli_entries.usage ~commands: [])
             (fun () -> function
                | `Arg arg -> raise (Arg.Bad ("unexpected argument " ^ arg))
                | `End -> `Res (fun () -> Lwt.return ()))
-            Sys.argv >>= fun _no_command ->
+            Sys.argv Client_commands.ignore_context>>= fun _no_command ->
           Random.self_init () ;
           Sodium.Random.stir () ;
           http_proxy web_port#get >>= fun _server ->

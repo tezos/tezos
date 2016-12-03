@@ -10,7 +10,7 @@
 module Ed25519 = Environment.Ed25519
 open Client_proto_args
 
-let report_parse_error _prefix exn _lexbuf =
+let report_parse_error cctxt _prefix exn _lexbuf =
   let open Lexing in
   let open Script_located_ir in
   let print_loc ppf ((sl, sc), (el, ec)) =
@@ -29,17 +29,17 @@ let report_parse_error _prefix exn _lexbuf =
         sl sc el ec in
   match exn with
   | Missing_program_field n ->
-      Cli_entries.error "missing script %s" n
+      cctxt.Client_commands.error "missing script %s" n
   | Illegal_character (loc, c) ->
-      Cli_entries.error "%a, illegal character %C" print_loc loc c
+      cctxt.Client_commands.error "%a, illegal character %C" print_loc loc c
   | Illegal_escape (loc, c) ->
-      Cli_entries.error "%a, illegal escape sequence %S" print_loc loc c
+      cctxt.Client_commands.error "%a, illegal escape sequence %S" print_loc loc c
   | Failure s ->
-      Cli_entries.error "%s" s
+      cctxt.Client_commands.error "%s" s
   | exn ->
-      Cli_entries.error "%s" @@ Printexc.to_string exn
+      cctxt.Client_commands.error "%s" @@ Printexc.to_string exn
 
-let parse_program s =
+let parse_program cctxt s =
   let lexbuf = Lexing.from_string s in
   try
     Lwt.return
@@ -55,7 +55,7 @@ let parse_program s =
                 storage_type = get_field "storage" fields }
       )
   with
-  | exn -> report_parse_error "program: " exn lexbuf
+  | exn -> report_parse_error cctxt "program: " exn lexbuf
 
 let rec print_ir locations ppf node =
   let open Script in
@@ -99,23 +99,23 @@ let print_program locations ppf c =
     "@[<v 2>code@,%a@]"
     (print_ir locations) (c : Script.code).Script.code
 
-let parse_data s =
+let parse_data cctxt s =
   let lexbuf = Lexing.from_string s in
   try
     match Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf with
     | [node] -> Lwt.return (Script_located_ir.strip_locations node)
-    | _ -> Cli_entries.error "single data expression expected"
+    | _ -> cctxt.Client_commands.error "single data expression expected"
   with
-  | exn -> report_parse_error "data: " exn lexbuf
+  | exn -> report_parse_error cctxt "data: " exn lexbuf
 
-let parse_data_type s =
+let parse_data_type cctxt s =
   let lexbuf = Lexing.from_string s in
   try
     match Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf with
     | [node] -> Lwt.return (Script_located_ir.strip_locations node)
-    | _ -> Cli_entries.error "single type expression expected"
+    | _ -> cctxt.Client_commands.error "single type expression expected"
   with
-  | exn -> report_parse_error "data_type: " exn lexbuf
+  | exn -> report_parse_error cctxt "data_type: " exn lexbuf
 
 let unexpand_macros type_map program =
   let open Script in
@@ -159,10 +159,14 @@ let unexpand_macros type_map program =
 module Program = Client_aliases.Alias (struct
     type t = Script.code
     let encoding = Script.code_encoding
-    let of_source s = parse_program s
-    let to_source p = Lwt.return (Format.asprintf "%a" (print_program (fun _ -> false)) p)
+    let of_source cctxt s = parse_program cctxt s
+    let to_source _ p = Lwt.return (Format.asprintf "%a" (print_program (fun _ -> false)) p)
     let name = "program"
   end)
+
+let group =
+  { Cli_entries.name = "programs" ;
+    title = "Commands for managing the record of known programs" }
 
 let commands () =
   let open Cli_entries in
@@ -176,41 +180,32 @@ let commands () =
     "-trace-stack",
     Arg.Set trace_stack,
     "Show the stack after each step" in
-  register_group "programs" "Commands for managing the record of known programs" ;
   [
-    command
-      ~group: "programs"
-      ~desc: "lists all known programs"
+    command ~group ~desc: "lists all known programs"
       (fixed [ "list" ; "known" ; "programs" ])
-      (fun () -> Program.load () >>= fun list ->
-        Lwt_list.iter_s (fun (n, _) -> message "%s" n) list) ;
-    command
-      ~group: "programs"
-      ~desc: "remember a program under some name"
+      (fun cctxt -> Program.load cctxt >>= fun list ->
+        Lwt_list.iter_s (fun (n, _) -> cctxt.message "%s" n) list) ;
+    command ~group ~desc: "remember a program under some name"
       (prefixes [ "remember" ; "program" ]
        @@ Program.fresh_alias_param
        @@ Program.source_param
        @@ stop)
-      (fun name hash () -> Program.add name hash) ;
-    command
-      ~group: "programs"
-      ~desc: "forget a remembered program"
+      (fun name hash cctxt ->
+         Program.add cctxt name hash) ;
+    command ~group ~desc: "forget a remembered program"
       (prefixes [ "forget" ; "program" ]
        @@ Program.alias_param
        @@ stop)
-      (fun (name, _) () -> Program.del name) ;
-    command
-      ~group: "programs"
-      ~desc: "display a program"
+      (fun (name, _) cctxt ->
+         Program.del cctxt name) ;
+    command ~group ~desc: "display a program"
       (prefixes [ "show" ; "known" ; "program" ]
        @@ Program.alias_param
        @@ stop)
-      (fun (_, program) () ->
-         Program.to_source program >>= fun source ->
-         Cli_entries.message "%s\n" source) ;
-    command
-      ~group: "programs"
-      ~desc: "ask the node to run a program"
+      (fun (_, program) cctxt ->
+         Program.to_source cctxt program >>= fun source ->
+         cctxt.message "%s\n" source) ;
+    command ~group ~desc: "ask the node to run a program"
       ~args: [ trace_stack_arg ]
       (prefixes [ "run" ; "program" ]
        @@ Program.source_param
@@ -219,12 +214,13 @@ let commands () =
        @@ prefixes [ "and" ; "input" ]
        @@ Cli_entries.param ~name:"storage" ~desc:"the untagged input data" parse_data
        @@ stop)
-      (fun program storage input () ->
+      (fun program storage input cctxt ->
          let open Data_encoding in
          if !trace_stack then
-           Client_proto_rpcs.Helpers.trace_code (block ()) program (storage, input) >>= function
+           Client_proto_rpcs.Helpers.trace_code cctxt
+             (block ()) program (storage, input) >>= function
            | Ok (storage, output, trace) ->
-               Cli_entries.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
+               cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
                  (print_ir (fun _ -> false)) storage
                  (print_ir (fun _ -> false)) output
                  (Format.pp_print_list
@@ -237,37 +233,36 @@ let commands () =
                  trace
            | Error errs ->
                pp_print_error Format.err_formatter errs ;
-               error "error running program"
+               cctxt.error "error running program"
          else
-           Client_proto_rpcs.Helpers.run_code (block ()) program (storage, input) >>= function
+           Client_proto_rpcs.Helpers.run_code cctxt
+             (block ()) program (storage, input) >>= function
            | Ok (storage, output) ->
-               Cli_entries.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
+               cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
                  (print_ir (fun _ -> false)) storage
                  (print_ir (fun _ -> false)) output
            | Error errs ->
                pp_print_error Format.err_formatter errs ;
-               error "error running program") ;
-    command
-      ~group: "programs"
-      ~desc: "ask the node to typecheck a program"
+               cctxt.error "error running program") ;
+    command ~group ~desc: "ask the node to typecheck a program"
       ~args: [ show_types_arg ]
       (prefixes [ "typecheck" ; "program" ]
        @@ Program.source_param
        @@ stop)
-      (fun program () ->
+      (fun program cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.typecheck_code (block ()) program >>= function
+         Client_proto_rpcs.Helpers.typecheck_code cctxt (block ()) program >>= function
          | Ok type_map ->
              let type_map, program = unexpand_macros type_map program in
-             message "Well typed" >>= fun () ->
+             cctxt.message "Well typed" >>= fun () ->
              if !show_types then begin
                print_program
                  (fun l -> List.mem_assoc l type_map)
                  Format.std_formatter program ;
-               Cli_entries.message "@." >>= fun () ->
+               cctxt.message "@." >>= fun () ->
                Lwt_list.iter_s
                  (fun (loc, (before, after)) ->
-                    Cli_entries.message
+                    cctxt.message
                       "%3d@[<v 0> : [ @[<v 0>%a ]@]@,-> [ @[<v 0>%a ]@]@]@."
                       loc
                       (Format.pp_print_list (print_ir (fun _ -> false)))
@@ -279,41 +274,38 @@ let commands () =
              else Lwt.return ()
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
-             error "ill-typed program") ;
-    command
-      ~group: "programs"
-      ~desc: "ask the node to typecheck a tagged data expression"
+             cctxt.error "ill-typed program") ;
+    command ~group ~desc: "ask the node to typecheck a tagged data expression"
       (prefixes [ "typecheck" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck" parse_data
        @@ prefixes [ "against" ; "type" ]
        @@ Cli_entries.param ~name:"type" ~desc:"the expected type" parse_data
        @@ stop)
-      (fun data exp_ty () ->
+      (fun data exp_ty cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.typecheck_untagged_data
+         Client_proto_rpcs.Helpers.typecheck_untagged_data cctxt
            (block ()) (data, exp_ty) >>= function
          | Ok () ->
-             message "Well typed"
+             cctxt.message "Well typed"
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
-             error "ill-typed data") ;
-    command
-      ~group: "programs"
+             cctxt.error "ill-typed data") ;
+    command ~group
       ~desc: "ask the node to compute the hash of an untagged data expression \
               using the same algorithm as script instruction H"
       (prefixes [ "hash" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to hash" parse_data
        @@ stop)
-      (fun data () ->
+      (fun data cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.hash_data (block ()) data >>= function
+         Client_proto_rpcs.Helpers.hash_data cctxt
+           (block ()) data >>= function
          | Ok hash ->
-             message "%S" hash
+             cctxt.message "%S" hash
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
-             error "ill-formed data") ;
-    command
-      ~group: "programs"
+             cctxt.error "ill-formed data") ;
+    command ~group
       ~desc: "ask the node to compute the hash of an untagged data expression \
               using the same algorithm as script instruction H, sign it using \
               a given secret key, and display it using the format expected by \
@@ -323,17 +315,18 @@ let commands () =
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.alias_param
        @@ stop)
-      (fun data (_, key) () ->
+      (fun data (_, key) cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.hash_data (block ()) data >>= function
+         Client_proto_rpcs.Helpers.hash_data cctxt
+           (block ()) data >>= function
          | Ok hash ->
              let signature = Ed25519.sign key (MBytes.of_string hash) in
-             message "Hash: %S@.Signature: %S"
+             cctxt.message "Hash: %S@.Signature: %S"
                hash
                (signature |>
                 Data_encoding.Binary.to_bytes Ed25519.signature_encoding |>
                 Hex_encode.hex_of_bytes)
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
-             error "ill-formed data") ;
+             cctxt.error "ill-formed data") ;
   ]

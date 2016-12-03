@@ -11,18 +11,17 @@
 
 open Lwt
 open Cli_entries
+open Client_commands
 open Logging.RPC
 
-let log_request cpt url req =
-  Cli_entries.log "requests"
-    ">>>>%d: %s\n%s\n" cpt url req
+let log_request { log } cpt url req =
+  log "requests" ">>>>%d: %s\n%s\n" cpt url req
 
-let log_response cpt code ans =
-  Cli_entries.log "requests"
-    "<<<<%d: %s\n%s\n" cpt (Cohttp.Code.string_of_status code) ans
+let log_response { log } cpt code ans =
+  log "requests" "<<<<%d: %s\n%s\n" cpt (Cohttp.Code.string_of_status code) ans
 
 let cpt = ref 0
-let make_request service json =
+let make_request cctxt service json =
   incr cpt ;
   let cpt = !cpt in
   let serv = "http://" ^ Client_config.incoming_addr#get
@@ -35,23 +34,23 @@ let make_request service json =
     (fun () ->
        let body = Cohttp_lwt_body.of_string reqbody in
        Cohttp_lwt_unix.Client.post ~body uri >>= fun (code, ansbody) ->
-       log_request cpt string_uri reqbody >>= fun () ->
+       log_request cctxt cpt string_uri reqbody >>= fun () ->
        return (cpt, Unix.gettimeofday () -. tzero,
                code.Cohttp.Response.status, ansbody))
     (fun e ->
        let msg = match e with
          | Unix.Unix_error (e, _, _) -> Unix.error_message e
          | e -> Printexc.to_string e in
-       error "cannot connect to the RPC server (%s)" msg)
+       cctxt.error "cannot connect to the RPC server (%s)" msg)
 
-let get_streamed_json service json =
-  make_request service json >>= fun (_cpt, time, code, ansbody) ->
+let get_streamed_json cctxt service json =
+  make_request cctxt service json >>= fun (_cpt, time, code, ansbody) ->
   let ansbody = Cohttp_lwt_body.to_stream ansbody in
   match code, ansbody with
   | #Cohttp.Code.success_status, ansbody ->
       (if Client_config.print_timings#get then
-        message "Request to /%s succeeded in %gs"
-          (String.concat "/" service) time
+         cctxt.message "Request to /%s succeeded in %gs"
+           (String.concat "/" service) time
        else Lwt.return ()) >>= fun () ->
       Lwt.return (
         Lwt_stream.filter_map_s
@@ -64,88 +63,92 @@ let get_streamed_json service json =
           (Data_encoding_ezjsonm.from_stream ansbody))
   | err, _ansbody ->
       (if Client_config.print_timings#get then
-        message "Request to /%s failed in %gs"
-          (String.concat "/" service) time
+         cctxt.message "Request to /%s failed in %gs"
+           (String.concat "/" service) time
        else Lwt.return ()) >>= fun () ->
-      message "Request to /%s failed, server returned %s"
+      cctxt.message "Request to /%s failed, server returned %s"
         (String.concat "/" service) (Cohttp.Code.string_of_status err) >>= fun () ->
-      error "the RPC server returned a non-success status (%s)"
+      cctxt.error "the RPC server returned a non-success status (%s)"
         (Cohttp.Code.string_of_status err)
 
-let get_json service json =
-  make_request service json >>= fun (cpt, time, code, ansbody) ->
+let get_json cctxt service json =
+  make_request cctxt service json >>= fun (cpt, time, code, ansbody) ->
   Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
   match code, ansbody with
   | #Cohttp.Code.success_status, ansbody -> begin
       (if Client_config.print_timings#get then
-         message "Request to /%s succeeded in %gs"
+         cctxt.message "Request to /%s succeeded in %gs"
            (String.concat "/" service) time
        else Lwt.return ()) >>= fun () ->
-      log_response cpt code ansbody >>= fun () ->
+      log_response cctxt cpt code ansbody >>= fun () ->
       if ansbody = "" then Lwt.return `Null
       else match Data_encoding_ezjsonm.from_string ansbody with
-        | Error _ -> error "the RPC server returned malformed JSON"
+        | Error _ -> cctxt.error "the RPC server returned malformed JSON"
         | Ok res -> Lwt.return res
     end
   | err, _ansbody ->
       (if Client_config.print_timings#get then
-         message "Request to /%s failed in %gs"
+         cctxt.message "Request to /%s failed in %gs"
            (String.concat "/" service) time
        else Lwt.return ()) >>= fun () ->
-      message "Request to /%s failed, server returned %s"
+      cctxt.message "Request to /%s failed, server returned %s"
         (String.concat "/" service) (Cohttp.Code.string_of_status err) >>= fun () ->
-      error "the RPC server returned a non-success status (%s)"
+      cctxt.error "the RPC server returned a non-success status (%s)"
         (Cohttp.Code.string_of_status err)
 
 exception Unknown_error of Data_encoding.json
 
-let parse_answer service path json =
+let parse_answer cctxt service path json =
   match RPC.read_answer service json with
   | Error msg -> (* TODO print_error *)
-      error "request to /%s returned wrong JSON (%s)\n%s"
+      cctxt.error "request to /%s returned wrong JSON (%s)\n%s"
         (String.concat "/" path) msg (Data_encoding_ezjsonm.to_string json)
   | Ok v -> return v
 
-let call_service0 service arg =
+let call_service0 cctxt service arg =
   let path, arg = RPC.forge_request service () arg in
-  get_json path arg >>= parse_answer service path
+  get_json cctxt path arg >>= fun json ->
+  parse_answer cctxt service path json
 
-let call_service1 service a1 arg =
+let call_service1 cctxt service a1 arg =
   let path, arg = RPC.forge_request service ((), a1) arg in
-  get_json path arg >>= parse_answer service path
+  get_json cctxt path arg >>= fun json ->
+  parse_answer cctxt service path json
 
-let call_service2 service a1 a2 arg =
+let call_service2 cctxt service a1 a2 arg =
   let path, arg = RPC.forge_request service (((), a1), a2) arg in
-  get_json path arg >>= parse_answer service path
+  get_json cctxt path arg >>= fun json ->
+  parse_answer cctxt service path json
 
-let call_streamed_service0 service arg =
+let call_streamed_service0 cctxt service arg =
   let path, arg = RPC.forge_request service () arg in
-  get_streamed_json path arg >|= fun st ->
-  Lwt_stream.map_s (parse_answer service path) st
+  get_streamed_json cctxt path arg >|= fun st ->
+  Lwt_stream.map_s (parse_answer cctxt service path) st
 
 module Services = Node_rpc_services
-let errors = call_service0 Services.Error.service
-let forge_block ?net ?predecessor ?timestamp fitness ops header =
-  call_service0 Services.forge_block
+let errors cctxt =
+  call_service0 cctxt Services.Error.service ()
+let forge_block cctxt ?net ?predecessor ?timestamp fitness ops header =
+  call_service0 cctxt Services.forge_block
     (net, predecessor, timestamp, fitness, ops, header)
-let validate_block net block =
-  call_service0 Services.validate_block (net, block)
-let inject_block ?(wait = true) ?force block =
-  call_service0 Services.inject_block (block, wait, force)
-let inject_operation ?(wait = true) ?force operation =
-  call_service0 Services.inject_operation (operation, wait, force)
-let inject_protocol ?(wait = true) ?force protocol =
-  call_service0 Services.inject_protocol (protocol, wait, force)
-let complete ?block prefix =
+let validate_block cctxt net block =
+  call_service0 cctxt Services.validate_block (net, block)
+let inject_block cctxt ?(wait = true) ?force block =
+  call_service0 cctxt Services.inject_block (block, wait, force)
+let inject_operation cctxt ?(wait = true) ?force operation =
+  call_service0 cctxt Services.inject_operation (operation, wait, force)
+let inject_protocol cctxt ?(wait = true) ?force protocol =
+  call_service0 cctxt Services.inject_protocol (protocol, wait, force)
+let complete cctxt ?block prefix =
   match block with
   | None ->
-      call_service1 Services.complete prefix ()
+      call_service1 cctxt Services.complete prefix ()
   | Some block ->
-      call_service2 Services.Blocks.complete block prefix ()
-let describe ?recurse path =
+      call_service2 cctxt Services.Blocks.complete block prefix ()
+let describe cctxt ?recurse path =
   let prefix, arg = RPC.forge_request Services.describe () recurse in
-  get_json (prefix @ path) arg >>=
-  parse_answer Services.describe prefix
+  get_json cctxt (prefix @ path) arg >>=
+  parse_answer cctxt Services.describe prefix
 
 type net = Services.Blocks.net = Net of Block_hash.t
 
@@ -173,42 +176,42 @@ module Blocks = struct
     fitness: MBytes.t list ;
     timestamp: Time.t ;
   }
-  let net h = call_service1 Services.Blocks.net h ()
-  let predecessor h = call_service1 Services.Blocks.predecessor h ()
-  let hash h = call_service1 Services.Blocks.hash h ()
-  let timestamp h = call_service1 Services.Blocks.timestamp h ()
-  let fitness h = call_service1 Services.Blocks.fitness h ()
-  let operations h = call_service1 Services.Blocks.operations h ()
-  let protocol h = call_service1 Services.Blocks.protocol h ()
-  let test_protocol h = call_service1 Services.Blocks.test_protocol h ()
-  let test_network h = call_service1 Services.Blocks.test_network h ()
-  let preapply h ?timestamp ?(sort = false) operations =
-    call_service1 Services.Blocks.preapply h { operations ; sort ; timestamp }
-  let pending_operations block =
-    call_service1 Services.Blocks.pending_operations block ()
-  let info ?(operations = false) h =
-    call_service1 Services.Blocks.info h operations
-  let complete block prefix =
-    call_service2 Services.Blocks.complete block prefix ()
-  let list ?operations ?length ?heads ?delay ?min_date ?min_heads () =
-    call_service0 Services.Blocks.list
+  let net cctxt h = call_service1 cctxt Services.Blocks.net h ()
+  let predecessor cctxt h = call_service1 cctxt Services.Blocks.predecessor h ()
+  let hash cctxt h = call_service1 cctxt Services.Blocks.hash h ()
+  let timestamp cctxt h = call_service1 cctxt Services.Blocks.timestamp h ()
+  let fitness cctxt h = call_service1 cctxt Services.Blocks.fitness h ()
+  let operations cctxt h = call_service1 cctxt Services.Blocks.operations h ()
+  let protocol cctxt h = call_service1 cctxt Services.Blocks.protocol h ()
+  let test_protocol cctxt h = call_service1 cctxt Services.Blocks.test_protocol h ()
+  let test_network cctxt h = call_service1 cctxt Services.Blocks.test_network h ()
+  let preapply cctxt h ?timestamp ?(sort = false) operations =
+    call_service1 cctxt Services.Blocks.preapply h { operations ; sort ; timestamp }
+  let pending_operations cctxt block =
+    call_service1 cctxt Services.Blocks.pending_operations block ()
+  let info cctxt ?(operations = false) h =
+    call_service1 cctxt Services.Blocks.info h operations
+  let complete cctxt block prefix =
+    call_service2 cctxt Services.Blocks.complete block prefix ()
+  let list cctxt ?operations ?length ?heads ?delay ?min_date ?min_heads () =
+    call_service0 cctxt Services.Blocks.list
       { operations; length ; heads ; monitor = Some false ; delay ;
         min_date ; min_heads }
-  let monitor ?operations ?length ?heads ?delay ?min_date ?min_heads () =
-    call_streamed_service0 Services.Blocks.list
+  let monitor cctxt ?operations ?length ?heads ?delay ?min_date ?min_heads () =
+    call_streamed_service0 cctxt Services.Blocks.list
       { operations; length ; heads ; monitor = Some true ; delay ;
         min_date ; min_heads }
 end
 
 module Operations = struct
-  let monitor ?contents () =
-    call_streamed_service0 Services.Operations.list
+  let monitor cctxt ?contents () =
+    call_streamed_service0 cctxt Services.Operations.list
       { monitor = Some true ; contents }
 end
 
 module Protocols = struct
-  let bytes hash =
-    call_service1 Services.Protocols.bytes hash ()
-  let list ?contents () =
-    call_service0 Services.Protocols.list { contents; monitor = Some false }
+  let bytes cctxt hash =
+    call_service1 cctxt Services.Protocols.bytes hash ()
+  let list cctxt ?contents () =
+    call_service0 cctxt Services.Protocols.list { contents; monitor = Some false }
 end

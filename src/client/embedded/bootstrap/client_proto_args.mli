@@ -25,7 +25,8 @@ val endorsement_delay_arg: string * Arg.spec * string
 val tez_param :
   name:string ->
   desc:string ->
-  'a Cli_entries.params -> (Tez.t -> 'a) Cli_entries.params
+  ('a, Client_commands.context, unit) Cli_entries.params ->
+  (Tez.t -> 'a, Client_commands.context, unit) Cli_entries.params
 
 val delegate: string option ref
 val source: string option ref

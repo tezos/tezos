@@ -19,8 +19,8 @@ let generate_seed_nonce () =
   | Error _ -> assert false
   | Ok nonce -> nonce
 
-let rec compute_stamp block delegate_sk shell mining_slot seed_nonce_hash =
-  Client_proto_rpcs.Constants.stamp_threshold block >>=? fun stamp_threshold ->
+let rec compute_stamp cctxt block delegate_sk shell mining_slot seed_nonce_hash =
+  Client_proto_rpcs.Constants.stamp_threshold cctxt block >>=? fun stamp_threshold ->
   let rec loop () =
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
     let unsigned_header =
@@ -35,21 +35,21 @@ let rec compute_stamp block delegate_sk shell mining_slot seed_nonce_hash =
       loop () in
   return (loop ())
 
-let inject_block block
+let inject_block cctxt block
     ?force
     ~priority ~timestamp ~fitness ~seed_nonce
     ~src_sk operations =
   let block = match block with `Prevalidation -> `Head 0 | block -> block in
-  Client_node_rpcs.Blocks.info block >>= fun bi ->
+  Client_node_rpcs.Blocks.info cctxt block >>= fun bi ->
   let seed_nonce_hash = Nonce.hash seed_nonce in
-  Client_proto_rpcs.Context.next_level block >>=? fun level ->
+  Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
   let shell =
     { Store.net_id = bi.net ; predecessor = bi.hash ;
       timestamp ; fitness ; operations } in
   let slot = level.level, Int32.of_int priority in
-  compute_stamp block
+  compute_stamp cctxt block
     src_sk shell slot seed_nonce_hash >>=? fun proof_of_work_nonce ->
-  Client_proto_rpcs.Helpers.Forge.block
+  Client_proto_rpcs.Helpers.Forge.block cctxt
     block
     ~net:bi.net
     ~predecessor:bi.hash
@@ -62,11 +62,11 @@ let inject_block block
     ~proof_of_work_nonce
     () >>=? fun unsigned_header ->
   let signed_header = Ed25519.append_signature src_sk unsigned_header in
-  Client_node_rpcs.inject_block
+  Client_node_rpcs.inject_block cctxt
     ~wait:true ?force signed_header >>=? fun block_hash ->
   return block_hash
 
-let forge_block block
+let forge_block cctxt block
     ?force
     ?operations ?(best_effort = operations = None) ?(sort = best_effort)
     ?timestamp ?max_priority ?priority
@@ -76,12 +76,12 @@ let forge_block block
     | `Prevalidation -> `Head 0
     | `Test_prevalidation -> `Test_head 0
     | block -> block in
-  Client_proto_rpcs.Context.level block >>=? fun level ->
+  Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
   let level = Raw_level.succ level.level in
   begin
     match operations with
     | None ->
-        Client_node_rpcs.Blocks.pending_operations block >|= fun (ops, pendings) ->
+        Client_node_rpcs.Blocks.pending_operations cctxt block >|= fun (ops, pendings) ->
         Operation_hash_set.elements @@
         Operation_hash_set.union (Updater.operations ops) pendings
     | Some operations -> Lwt.return operations
@@ -89,11 +89,11 @@ let forge_block block
   begin
     match priority with
     | Some prio -> begin
-        Client_proto_rpcs.Helpers.minimal_time block ~prio () >>=? fun time ->
+        Client_proto_rpcs.Helpers.minimal_time cctxt block ~prio () >>=? fun time ->
         return (prio, Some time)
       end
     | None ->
-        Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate
+        Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate cctxt
           ?max_priority
           ~first_level:level
           ~last_level:level
@@ -103,7 +103,7 @@ let forge_block block
             List.find (fun (l,_,_) -> l = level) possibilities in
           return (prio, time)
         with Not_found ->
-          failwith "No slot found at level %a" Raw_level.pp level
+          Error_monad.failwith "No slot found at level %a" Raw_level.pp level
   end >>=? fun (priority, minimal_timestamp) ->
   lwt_log_info "Mining block at level %a prio %d"
     Raw_level.pp level priority >>= fun () ->
@@ -113,7 +113,7 @@ let forge_block block
     | None, timestamp | timestamp, None -> return timestamp
     | Some timestamp, Some minimal_timestamp ->
         if timestamp < minimal_timestamp then
-          failwith
+          Error_monad.failwith
             "Proposed timestamp %a is earlier than minimal timestamp %a"
             Time.pp_hum timestamp
             Time.pp_hum minimal_timestamp
@@ -121,7 +121,7 @@ let forge_block block
           return (Some timestamp)
   end >>=? fun timestamp ->
   let request = List.length operations in
-  Client_node_rpcs.Blocks.preapply block ?timestamp ~sort operations >>=?
+  Client_node_rpcs.Blocks.preapply cctxt block ?timestamp ~sort operations >>=?
   fun { operations ; fitness ; timestamp } ->
   let valid = List.length operations.applied in
   lwt_log_info "Found %d valid operations (%d refused) for timestamp %a"
@@ -132,7 +132,7 @@ let forge_block block
      || ( Operation_hash_map.is_empty operations.refused
           && Operation_hash_map.is_empty operations.branch_refused
           && Operation_hash_map.is_empty operations.branch_delayed ) then
-    inject_block ?force ~src_sk
+    inject_block cctxt ?force ~src_sk
        ~priority ~timestamp ~fitness ~seed_nonce block operations.applied
   else
     failwith "Cannot (fully) validate the given operations."
@@ -143,9 +143,11 @@ let forge_block block
 module State : sig
 
   val get_block:
+    Client_commands.context ->
     Raw_level.t -> Block_hash.t list tzresult Lwt.t
 
   val record_block:
+    Client_commands.context ->
     Raw_level.t -> Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
 
 end = struct
@@ -190,13 +192,13 @@ end = struct
          | false -> failwith "Json.write_file"
          | true -> return ())
       (fun exn ->
-         failwith
+         Error_monad.failwith
            "could not write the block file: %s."
            (Printexc.to_string exn))
 
   let lock = Lwt_mutex.create ()
 
-  let get_block level =
+  let get_block cctxt level =
     Lwt_mutex.with_lock lock
       (fun () ->
          load () >>=? fun map ->
@@ -205,7 +207,7 @@ end = struct
            return blocks
          with Not_found -> return [])
 
-  let record_block level hash nonce =
+  let record_block cctxt level hash nonce =
     Lwt_mutex.with_lock lock
       (fun () ->
          load () >>=? fun map ->
@@ -214,17 +216,17 @@ end = struct
            with Not_found -> [] in
          save
            (LevelMap.add level (hash :: previous) map)) >>=? fun () ->
-    Client_proto_nonces.add hash nonce
+    Client_proto_nonces.add cctxt hash nonce
 
 end
 
-let get_mining_slot
+let get_mining_slot cctxt
     ?max_priority (bi: Client_mining_blocks.block_info) delegates =
   let block = `Hash bi.hash in
   let level = Raw_level.succ bi.level.level in
   Lwt_list.filter_map_p
     (fun delegate ->
-       Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate
+       Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate cctxt
          ?max_priority
          ~first_level:level
          ~last_level:level
@@ -278,16 +280,16 @@ let compute_timeout { future_slots } =
       else
         Lwt_unix.sleep (Int64.to_float delay)
 
-let insert_block ?max_priority state (bi: Client_mining_blocks.block_info) =
+let insert_block cctxt ?max_priority state (bi: Client_mining_blocks.block_info) =
   if Fitness.compare state.best_fitness bi.fitness < 0 then
     state.best_fitness <- bi.fitness ;
-  get_mining_slot ?max_priority bi state.delegates >>= function
+  get_mining_slot cctxt ?max_priority bi state.delegates >>= function
   | None ->
       lwt_debug
         "Can't compute slot for %a" Block_hash.pp_short bi.hash >>= fun () ->
       Lwt.return_unit
   | Some ((timestamp, (_,_,delegate)) as slot) ->
-      Client_keys.Public_key_hash.name delegate >>= fun name ->
+      Client_keys.Public_key_hash.name cctxt delegate >>= fun name ->
       lwt_log_info "New mining slot at %a for %s after %a"
         Time.pp_hum timestamp
         name
@@ -306,10 +308,10 @@ let pop_mining_slots state =
   state.future_slots <- future_slots ;
   slots
 
-let insert_blocks ?max_priority state bis =
-  Lwt_list.iter_s (insert_block ?max_priority state) bis
+let insert_blocks cctxt ?max_priority state bis =
+  Lwt_list.iter_s (insert_block cctxt ?max_priority state) bis
 
-let mine state =
+let mine cctxt state =
   let slots = pop_mining_slots state in
   Lwt_list.map_p
     (fun (timestamp, (bi, prio, delegate)) ->
@@ -319,17 +321,17 @@ let mine state =
            Time.now ()
          else
            timestamp in
-       Client_keys.Public_key_hash.name delegate >>= fun name ->
+       Client_keys.Public_key_hash.name cctxt delegate >>= fun name ->
        lwt_debug "Try mining after %a (slot %d) for %s (%a)"
          Block_hash.pp_short bi.hash
          prio name Time.pp_hum timestamp >>= fun () ->
-       Client_node_rpcs.Blocks.pending_operations
+       Client_node_rpcs.Blocks.pending_operations cctxt
          block >>= fun (res, ops) ->
        let operations =
          let open Operation_hash_set in
          elements (union ops (Updater.operations res)) in
        let request = List.length operations in
-       Client_node_rpcs.Blocks.preapply block
+       Client_node_rpcs.Blocks.preapply cctxt block
          ~timestamp ~sort:true operations >>= function
        | Error errs ->
            lwt_log_error "Error while prevalidating operations:\n%a"
@@ -359,14 +361,14 @@ let mine state =
         Block_hash.pp_short bi.hash priority
         Fitness.pp fitness >>= fun () ->
       let seed_nonce = generate_seed_nonce () in
-      Client_keys.get_key delegate >>=? fun (_,_,src_sk) ->
-      inject_block ~force:true ~src_sk ~priority ~timestamp ~fitness ~seed_nonce
+      Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
+      inject_block cctxt ~force:true ~src_sk ~priority ~timestamp ~fitness ~seed_nonce
         (`Hash bi.hash) operations.applied
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
-      State.record_block level block_hash seed_nonce
+      State.record_block cctxt level block_hash seed_nonce
       |> trace_exn (Failure "Error while recording block") >>=? fun () ->
-      Client_keys.Public_key_hash.name delegate >>= fun name ->
-      Cli_entries.message
+      Client_keys.Public_key_hash.name cctxt delegate >>= fun name ->
+      cctxt.message
         "Injected block %a for %s after %a \
         \ (level %a, slot %d, fitness %a, operations %d)"
         Block_hash.pp_short block_hash
@@ -381,14 +383,14 @@ let mine state =
       lwt_debug "No valid candidates." >>= fun () ->
       return ()
 
-let create ?max_priority delegates
+let create cctxt ?max_priority delegates
     (block_stream: Client_mining_blocks.block_info list Lwt_stream.t)
     (endorsement_stream: Client_mining_operations.valid_endorsement Lwt_stream.t) =
   Lwt_stream.get block_stream >>= function
   | None | Some [] ->
-      Cli_entries.error "Can't fetch the current block head."
+      cctxt.Client_commands.error "Can't fetch the current block head."
   | Some ({ Client_mining_blocks.fitness } :: _ as initial_heads) ->
-      Client_node_rpcs.Blocks.hash `Genesis >>= fun genesis_hash ->
+      Client_node_rpcs.Blocks.hash cctxt `Genesis >>= fun genesis_hash ->
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with
@@ -406,7 +408,7 @@ let create ?max_priority delegates
             t
         | Some t -> t in
       let state = create_state genesis_hash delegates fitness in
-      insert_blocks ?max_priority state initial_heads >>= fun () ->
+      insert_blocks cctxt ?max_priority state initial_heads >>= fun () ->
       let rec worker_loop () =
         let timeout = compute_timeout state in
         Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
@@ -426,20 +428,20 @@ let create ?max_priority delegates
                     Block_hash.pp_short ppf bi.Client_mining_blocks.hash))
               bis
               >>= fun () ->
-              insert_blocks ?max_priority state bis >>= fun () ->
+              insert_blocks cctxt ?max_priority state bis >>= fun () ->
               worker_loop ()
           end
         | `Endorsement (Some e) ->
             Lwt.cancel timeout ;
             last_get_endorsement := None ;
-            Client_keys.Public_key_hash.name
+            Client_keys.Public_key_hash.name cctxt
               e.Client_mining_operations.source >>= fun _source ->
             (* TODO *)
             worker_loop ()
         | `Timeout ->
             lwt_debug "Waking up for mining..." >>= fun () ->
             begin
-              mine state >>= function
+              mine cctxt state >>= function
               | Ok () -> Lwt.return_unit
               | Error errs ->
                   lwt_log_error "Error while mining:\n%a"
