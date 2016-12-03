@@ -7,8 +7,42 @@
 (*                                                                        *)
 (**************************************************************************)
 
+type ('a, 'b) lwt_format =
+  ('a, Format.formatter, unit, 'b Lwt.t) format4
 
-(* A global store for version indexed commands. *)
+type context =
+  { error : 'a 'b. ('a, 'b) lwt_format -> 'a ;
+    warning : 'a. ('a, unit) lwt_format -> 'a ;
+    message : 'a. ('a, unit) lwt_format -> 'a ;
+    answer : 'a. ('a, unit) lwt_format -> 'a ;
+    log : 'a. string -> ('a, unit) lwt_format -> 'a }
+
+type command = (context, unit) Cli_entries.command
+
+let make_context log =
+  let error fmt =
+    Format.kasprintf
+      (fun msg ->
+         Lwt.fail (Failure msg))
+      fmt in
+  let warning fmt =
+    Format.kasprintf
+      (fun msg -> log "stderr" msg)
+      fmt in
+  let message fmt =
+    Format.kasprintf
+      (fun msg -> log "stdout" msg)
+      fmt in
+  let answer =
+    message in
+  let log name fmt =
+    Format.kasprintf
+      (fun msg -> log name msg)
+      fmt in
+  { error ; warning ; message ; answer ; log }
+
+let ignore_context =
+  make_context (fun _ _ -> Lwt.return ())
 
 exception Version_not_found
 

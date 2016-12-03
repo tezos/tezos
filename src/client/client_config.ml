@@ -102,7 +102,7 @@ let register_config_option version option =
 
 (* Entry point *)
 
-let parse_args ?version usage dispatcher argv =
+let parse_args ?version usage dispatcher argv cctxt =
   let open Lwt in
   catch
     (fun () ->
@@ -129,7 +129,7 @@ let parse_args ?version usage dispatcher argv =
                ~current:(ref 0) argv args (anon dispatch) "\000" ;
              Lwt.return ()
            with Sys_error msg ->
-             Cli_entries.error
+             cctxt.Client_commands.error
                "Error: can't read the configuration file: %s\n%!" msg
          end else begin
           try
@@ -140,7 +140,7 @@ let parse_args ?version usage dispatcher argv =
             file_group#write config_file#get ;
             Lwt.return ()
           with Sys_error msg ->
-            Cli_entries.warning
+            cctxt.Client_commands.warning
               "Warning: can't create the default configuration file: %s\n%!" msg
         end) >>= fun () ->
        begin match dispatch `End with
@@ -171,7 +171,7 @@ let preparse name argv =
     None
   with Found s -> Some s
 
-let preparse_args argv : Node_rpc_services.Blocks.block Lwt.t =
+let preparse_args argv cctxt : Node_rpc_services.Blocks.block Lwt.t =
   begin
     match preparse "-base-dir" argv with
     | None -> ()
@@ -187,7 +187,7 @@ let preparse_args argv : Node_rpc_services.Blocks.block Lwt.t =
       (file_group#read config_file#get ;
       Lwt.return ())
     with Sys_error msg ->
-      Cli_entries.error
+      cctxt.Client_commands.error
         "Error: can't read the configuration file: %s\n%!" msg
     else Lwt.return ()
   end >>= fun () ->
@@ -204,7 +204,7 @@ let preparse_args argv : Node_rpc_services.Blocks.block Lwt.t =
           incoming_port#set (int_of_string port) ;
           Lwt.return ()
         with _ ->
-          Cli_entries.error
+          cctxt.Client_commands.error
             "Error: can't parse the -port option: %S.\n%!" port
   end >>= fun () ->
   match preparse "-block" Sys.argv with
@@ -212,6 +212,6 @@ let preparse_args argv : Node_rpc_services.Blocks.block Lwt.t =
   | Some x ->
       match Node_rpc_services.Blocks.parse_block x with
       | Error _ ->
-          Cli_entries.error
+          cctxt.Client_commands.error
             "Error: can't parse the -block option: %S.\n%!" x
       | Ok b -> Lwt.return b

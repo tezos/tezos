@@ -13,43 +13,40 @@ open Client_proto_programs
 open Client_keys
 module Ed25519 = Environment.Ed25519
 
-let handle_error f () =
-    f () >>= Client_proto_rpcs.handle_error
-
-let check_contract neu =
-  RawContractAlias.mem neu >>= function
+let check_contract cctxt neu =
+  RawContractAlias.mem cctxt neu >>= function
   | true ->
-      Cli_entries.error "contract '%s' already exists" neu
+      cctxt.error "contract '%s' already exists" neu
   | false ->
       Lwt.return ()
 
-let get_delegate_pkh = function
+let get_delegate_pkh cctxt = function
   | None -> Lwt.return None
   | Some delegate ->
       Lwt.catch
         (fun () ->
-           Public_key_hash.find delegate >>= fun r ->
+           Public_key_hash.find cctxt delegate >>= fun r ->
            Lwt.return (Some r))
         (fun _ -> Lwt.return None)
 
-let get_timestamp block () =
-  Client_node_rpcs.Blocks.timestamp block >>= fun v ->
-  Cli_entries.message "%s" (Time.to_notation v)
+let get_timestamp cctxt block =
+  Client_node_rpcs.Blocks.timestamp cctxt block >>= fun v ->
+  cctxt.message "%s" (Time.to_notation v)
 
-let list_contracts block () =
-  Client_proto_rpcs.Context.Contract.list block >>=? fun contracts ->
+let list_contracts cctxt block =
+  Client_proto_rpcs.Context.Contract.list cctxt block >>=? fun contracts ->
   iter_s (fun h ->
       begin match Contract.is_default h with
         | Some m -> begin
-            Public_key_hash.rev_find m >>= function
+            Public_key_hash.rev_find cctxt m >>= function
             | None -> Lwt.return ""
             | Some nm ->
-                RawContractAlias.find_opt nm >|= function
+                RawContractAlias.find_opt cctxt nm >|= function
                 | None -> " (known as " ^ nm ^ ")"
                 | Some _ -> " (known as key:" ^ nm ^ ")"
           end
         | None -> begin
-            RawContractAlias.rev_find h >|= function
+            RawContractAlias.rev_find cctxt h >|= function
             | None -> ""
             | Some nm ->  " (known as " ^ nm ^ ")"
           end
@@ -57,134 +54,129 @@ let list_contracts block () =
       let kind = match Contract.is_default h with
         | Some _ -> " (default)"
         | None -> "" in
-      Cli_entries.message "%s%s%s" (Contract.to_b48check h) kind nm >>= fun () ->
+      cctxt.message "%s%s%s" (Contract.to_b48check h) kind nm >>= fun () ->
       return ())
     contracts
 
-let transfer block ?force
+let transfer cctxt
+    block ?force
     ~source ~src_pk ~src_sk ~destination ?arg ~amount ~fee () =
   let open Cli_entries in
-  Client_node_rpcs.Blocks.net block >>= fun net ->
+  Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
   begin match arg with
     | Some arg ->
-        Client_proto_programs.parse_data arg >>= fun arg ->
+        Client_proto_programs.parse_data cctxt arg >>= fun arg ->
         Lwt.return (Some arg)
     | None -> Lwt.return None
   end >>= fun parameters ->
-  Client_proto_rpcs.Context.Contract.counter block source >>=? fun pcounter ->
+  Client_proto_rpcs.Context.Contract.counter cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
-  message "Acquired the source's sequence counter (%ld -> %ld)."
+  cctxt.message "Acquired the source's sequence counter (%ld -> %ld)."
     pcounter counter >>= fun () ->
-  Client_proto_rpcs.Helpers.Forge.Manager.transaction block
+  Client_proto_rpcs.Helpers.Forge.Manager.transaction cctxt block
     ~net ~source ~sourcePubKey:src_pk ~counter ~amount
     ~destination ?parameters ~fee () >>=? fun bytes ->
-  message "Forged the raw transaction frame." >>= fun () ->
+  cctxt.message "Forged the raw transaction frame." >>= fun () ->
   let signed_bytes = Ed25519.append_signature src_sk bytes in
-  Client_node_rpcs.inject_operation ?force ~wait:true signed_bytes >>=? fun oph ->
-  answer "Operation successfully injected in the node." >>= fun () ->
-  answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
+  Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun oph ->
+  cctxt.answer "Operation successfully injected in the node." >>= fun () ->
+  cctxt.answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return ()
 
-let originate_account block ?force
+let originate_account cctxt
+    block ?force
     ~source ~src_pk ~src_sk ~manager_pkh ?delegatable ?spendable ?delegate ~balance ~fee () =
   let open Cli_entries in
-  Client_node_rpcs.Blocks.net block >>= fun net ->
-  Client_proto_rpcs.Context.Contract.counter block source >>=? fun pcounter ->
+  Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
+  Client_proto_rpcs.Context.Contract.counter cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
-  message "Acquired the source's sequence counter (%ld -> %ld)."
+  cctxt.message "Acquired the source's sequence counter (%ld -> %ld)."
     pcounter counter >>= fun () ->
-  Client_proto_rpcs.Helpers.Forge.Manager.origination block
+  Client_proto_rpcs.Helpers.Forge.Manager.origination cctxt block
     ~net ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ?spendable
     ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun (contract, bytes) ->
-  message "Forged the raw origination frame." >>= fun () ->
+  cctxt.message "Forged the raw origination frame." >>= fun () ->
   let signed_bytes = Ed25519.append_signature src_sk bytes in
-  Client_node_rpcs.inject_operation ?force ~wait:true signed_bytes >>=? fun oph ->
-  message "Operation successfully injected in the node." >>= fun () ->
-  message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
+  Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun oph ->
+  cctxt.message "Operation successfully injected in the node." >>= fun () ->
+  cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return contract
 
-let originate_contract
+let originate_contract cctxt
     block ?force
     ~source ~src_pk ~src_sk ~manager_pkh ~balance ?delegatable ?delegatePubKey
     ~(code:Script.code) ~init ~fee () =
   let open Cli_entries in
-  Client_proto_programs.parse_data init >>= fun storage ->
+  Client_proto_programs.parse_data cctxt init >>= fun storage ->
   let init = Script.{ storage ; storage_type = code.storage_type } in
-  Client_proto_rpcs.Context.Contract.counter block source >>=? fun pcounter ->
+  Client_proto_rpcs.Context.Contract.counter cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
-  message "Acquired the source's sequence counter (%ld -> %ld)."
+  cctxt.message "Acquired the source's sequence counter (%ld -> %ld)."
     pcounter counter >>= fun () ->
-  Client_node_rpcs.Blocks.net block >>= fun net ->
-  Client_proto_rpcs.Helpers.Forge.Manager.origination block
+  Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
+  Client_proto_rpcs.Helpers.Forge.Manager.origination cctxt block
     ~net ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ~spendable:!spendable
     ?delegatable ?delegatePubKey
     ~script:(code, init) ~fee () >>=? fun (contract, bytes) ->
-  message "Forged the raw origination frame." >>= fun () ->
+  cctxt.message "Forged the raw origination frame." >>= fun () ->
   let signed_bytes = Ed25519.append_signature src_sk bytes in
-  Client_node_rpcs.inject_operation ?force ~wait:true signed_bytes >>=? fun oph ->
-  message "Operation successfully injected in the node." >>= fun () ->
-  message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
+  Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun oph ->
+  cctxt.message "Operation successfully injected in the node." >>= fun () ->
+  cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return contract
+
+let group =
+  { Cli_entries.name = "context" ;
+    title = "Block contextual commands (see option -block)" }
 
 let commands () =
   let open Cli_entries in
-  register_group "context" "Block contextual commands (see option -block)" ;
-  [ command
-      ~group: "context"
-      ~desc: "access the timestamp of the block"
+  [ command ~group ~desc: "access the timestamp of the block"
       (fixed [ "get" ; "timestamp" ])
-      (get_timestamp (block ())) ;
-    command
-      ~group: "context"
-      ~desc: "lists all non empty contracts of the block"
+      (fun cctxt -> get_timestamp cctxt (block ())) ;
+    command ~group ~desc: "lists all non empty contracts of the block"
       (fixed [ "list" ; "contracts" ])
-      (handle_error (list_contracts (block ()))) ;
-    command
-      ~group: "context"
-      ~desc: "get the bootstrap keys and bootstrap contract handle"
+      (fun cctxt ->
+         list_contracts cctxt (block ()) >>= fun res ->
+         Client_proto_rpcs.handle_error cctxt res) ;
+    command ~group ~desc: "get the bootstrap keys and bootstrap contract handle"
       (fixed [ "bootstrap" ])
-      (fun () ->
-         Client_proto_rpcs.Constants.bootstrap `Genesis >>= fun accounts ->
+      (fun cctxt ->
+         Client_proto_rpcs.Constants.bootstrap cctxt `Genesis >>= fun accounts ->
          let cpt = ref 0 in
          Lwt_list.iter_s
            (fun { Bootstrap.public_key_hash = pkh ;
                   public_key = pk ; secret_key = sk } ->
              incr cpt ;
              let name = Printf.sprintf "bootstrap%d" !cpt in
-             Public_key_hash.add name pkh >>= fun () ->
-             Public_key.add name pk >>= fun () ->
-             Secret_key.add name sk >>= fun () ->
-             message "Bootstrap keys added under the name '%s'." name)
+             Public_key_hash.add cctxt name pkh >>= fun () ->
+             Public_key.add cctxt name pk >>= fun () ->
+             Secret_key.add cctxt name sk >>= fun () ->
+             cctxt.message "Bootstrap keys added under the name '%s'." name)
            accounts >>= fun () ->
          Lwt.return_unit) ;
-    command
-      ~group: "context"
-      ~desc: "get the balance of a contract"
+    command ~group ~desc: "get the balance of a contract"
       (prefixes [ "get" ; "balance" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      (fun (_, contract) () ->
-         Client_proto_rpcs.Context.Contract.balance (block ()) contract
-         >>= Client_proto_rpcs.handle_error >>= fun amount ->
-         answer "%a %s" Tez.pp amount tez_sym);
-    command
-      ~group: "context"
-      ~desc: "get the manager of a block"
+      (fun (_, contract) cctxt ->
+         Client_proto_rpcs.Context.Contract.balance cctxt (block ()) contract
+         >>= Client_proto_rpcs.handle_error cctxt >>= fun amount ->
+         cctxt.answer "%a %s" Tez.pp amount tez_sym);
+    command ~group ~desc: "get the manager of a block"
       (prefixes [ "get" ; "manager" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      (fun (_, contract) () ->
-         Client_proto_rpcs.Context.Contract.manager (block ()) contract
-         >>= Client_proto_rpcs.handle_error >>= fun manager ->
-         Public_key_hash.rev_find manager >>= fun mn ->
-         Public_key_hash.to_source manager >>= fun m ->
-         message "%s (%s)" m
+      (fun (_, contract) cctxt ->
+         Client_proto_rpcs.Context.Contract.manager cctxt (block ()) contract
+         >>= Client_proto_rpcs.handle_error cctxt >>= fun manager ->
+         Public_key_hash.rev_find cctxt manager >>= fun mn ->
+         Public_key_hash.to_source cctxt manager >>= fun m ->
+         cctxt.message "%s (%s)" m
            (match mn with None -> "unknown" | Some n -> "known as " ^ n));
-    command
-      ~group: "context"
-      ~desc: "open a new account"
+    command ~group ~desc: "open a new account"
       ~args: ([ fee_arg ; delegate_arg ; force_arg ]
               @ delegatable_args @ spendable_args)
       (prefixes [ "originate" ; "account" ]
@@ -200,22 +192,18 @@ let commands () =
        @@ ContractAlias.alias_param
          ~name:"src" ~desc: "name of the source contract"
        @@ stop)
-      (fun neu (_, manager) balance (_, source) ->
-         handle_error @@ fun () ->
-         check_contract neu >>= fun () ->
-         get_delegate_pkh !delegate >>= fun delegate ->
-         Client_proto_contracts.get_manager (block ()) source >>=? fun src_pkh ->
-         Client_keys.get_key src_pkh >>=? fun (src_name, src_pk, src_sk) ->
-         message "Got the source's manager keys (%s)." src_name >>= fun () ->
-         originate_account (block ()) ~force:!force
-           ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
-           ~delegatable:!delegatable ~spendable:!spendable ?delegate:delegate
-           () >>=? fun contract ->
-         RawContractAlias.add neu contract >>= fun () ->
-         return ()) ;
-    command
-      ~group: "context"
-      ~desc: "open a new scripted account"
+      (fun neu (_, manager) balance (_, source) cctxt ->
+         check_contract cctxt neu >>= fun () ->
+         get_delegate_pkh cctxt !delegate >>= fun delegate ->
+         (Client_proto_contracts.get_manager cctxt (block ()) source >>=? fun src_pkh ->
+          Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
+          cctxt.message "Got the source's manager keys (%s)." src_name >>= fun () ->
+          originate_account cctxt (block ()) ~force:!force
+            ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
+            ~delegatable:!delegatable ~spendable:!spendable ?delegate:delegate
+            ()) >>= Client_proto_rpcs.handle_error cctxt >>= fun contract ->
+         RawContractAlias.add cctxt neu contract) ;
+    command ~group ~desc: "open a new scripted account"
       ~args: ([ fee_arg ; delegate_arg ; force_arg ] @
               delegatable_args @ spendable_args @ [ init_arg ])
       (prefixes [ "originate" ; "contract" ]
@@ -233,24 +221,20 @@ let commands () =
        @@ prefix "running"
        @@ Program.source_param
          ~name:"prg" ~desc: "script of the account\n\
-                          combine with -init if the storage type is non void"
+                             combine with -init if the storage type is non void"
        @@ stop)
-      (fun neu (_, manager) balance (_, source) code ->
-         handle_error @@ fun () ->
-         check_contract neu >>= fun () ->
-         get_delegate_pkh !delegate >>= fun delegate ->
-         Client_proto_contracts.get_manager (block ()) source >>=? fun src_pkh ->
-         Client_keys.get_key src_pkh >>=? fun (src_name, src_pk, src_sk) ->
-         message "Got the source's manager keys (%s)." src_name >>= fun () ->
-         originate_contract (block ()) ~force:!force
-           ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
-           ~delegatable:!delegatable ?delegatePubKey:delegate ~code ~init:!init ()
-         >>=? fun contract ->
-         RawContractAlias.add neu contract >>= fun () ->
-         return ()) ;
-    command
-      ~group: "context"
-      ~desc: "transfer tokens"
+      (fun neu (_, manager) balance (_, source) code cctxt ->
+         check_contract cctxt neu >>= fun () ->
+         get_delegate_pkh cctxt !delegate >>= fun delegate ->
+         (Client_proto_contracts.get_manager cctxt (block ()) source >>=? fun src_pkh ->
+          Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
+          cctxt.message "Got the source's manager keys (%s)." src_name >>= fun () ->
+          originate_contract cctxt (block ()) ~force:!force
+            ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
+            ~delegatable:!delegatable ?delegatePubKey:delegate ~code ~init:!init
+            ()) >>= Client_proto_rpcs.handle_error cctxt >>= fun contract ->
+         RawContractAlias.add cctxt neu contract) ;
+    command ~group ~desc: "transfer tokens"
       ~args: [ fee_arg ; arg_arg ; force_arg ]
       (prefixes [ "transfer" ]
        @@ tez_param
@@ -262,11 +246,11 @@ let commands () =
        @@ ContractAlias.destination_param
          ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
-      (fun amount (_, source) (_, destination) ->
-         handle_error @@ fun () ->
-         Client_proto_contracts.get_manager (block ()) source >>=? fun src_pkh ->
-         Client_keys.get_key src_pkh >>=? fun (src_name, src_pk, src_sk) ->
-         message "Got the source's manager keys (%s)." src_name >>= fun () ->
-         transfer (block ()) ~force:!force
-           ~source ~src_pk ~src_sk ~destination ?arg:!arg ~amount ~fee:!fee ())
+      (fun amount (_, source) (_, destination) cctxt ->
+         (Client_proto_contracts.get_manager cctxt (block ()) source >>=? fun src_pkh ->
+         Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
+         cctxt.message "Got the source's manager keys (%s)." src_name >>= fun () ->
+         transfer cctxt (block ()) ~force:!force
+           ~source ~src_pk ~src_sk ~destination ?arg:!arg ~amount ~fee:!fee ()) >>=
+         Client_proto_rpcs.handle_error cctxt)
   ]
