@@ -9,5 +9,9 @@
 
 open Node_rpc_services
 
-val echo: Blocks.block -> string -> string Lwt.t
-val failing: Blocks.block -> int -> unit tzresult Lwt.t
+val echo:
+  Client_commands.context ->
+  Blocks.block -> string -> string Lwt.t
+val failing:
+  Client_commands.context ->
+  Blocks.block -> int -> unit tzresult Lwt.t

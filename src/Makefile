@@ -383,7 +383,7 @@ clean::
 ############################################################################
 
 CLIENT_LIB_INTFS := \
-  client/client_version.mli \
+  client/client_commands.mli \
   client/client_node_rpcs.mli \
   client/client_generic_rpcs.mli \
   client/client_helpers.mli \
@@ -392,7 +392,7 @@ CLIENT_LIB_INTFS := \
   client/client_protocols.mli \
 
 CLIENT_LIB_IMPLS := \
-  client/client_version.ml \
+  client/client_commands.ml \
   client/client_config.ml \
   client/client_node_rpcs.ml \
   client/client_generic_rpcs.ml \

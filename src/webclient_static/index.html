@@ -7,11 +7,11 @@
   </head>
   <body>
     <h1>Tezos Web client</h1>
+    <pre id="console"></pre>
+    <br/>
     <form id="form">
       ./tezos-client <input type="text" name="command" id="command">
       <input type="submit" value="RUN">
-      <br/>
-      <textarea id="console" cols="80" rows="50"></textarea>
     </form>
     <script>
      $('#form').on('submit', function(e) {
@@ -23,9 +23,14 @@
          dataType: 'json',
          data: JSON.stringify({ command : './tezos-client ' + $('#command')[0].value }),
          processData: false
-       }).done (function ({ output }) {
-         console.log (output);
-         $('#console')[0].value += output;
+       }).done (function ({ outputs }) {
+         let stdout = document.createElement ("span");
+         stdout.appendChild (document.createTextNode (outputs.stdout));
+         let stderr = document.createElement ("span");
+         stderr.appendChild (document.createTextNode (outputs.stderr));
+         stderr.style.color = "darkred";
+         $('#console')[0].appendChild (stdout);
+         $('#console')[0].appendChild (stderr);
        })
      })
     </script>

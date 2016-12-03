@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 val transfer:
+  Client_commands.context ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   source:Contract.t ->
@@ -20,6 +21,7 @@ val transfer:
   unit -> unit tzresult Lwt.t
 
 val originate_account:
+  Client_commands.context ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   source:Contract.t ->
@@ -34,6 +36,7 @@ val originate_account:
   unit -> Contract.t tzresult Lwt.t
 
 val originate_contract:
+  Client_commands.context ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   source:Contract.t ->
@@ -48,4 +51,4 @@ val originate_contract:
   fee:Tez.t ->
   unit -> Contract.t tzresult Lwt.t
 
-val commands: unit -> Cli_entries.command list
+val commands: unit -> Client_commands.command list

@@ -192,9 +192,9 @@ let rec count =
 
 (*-- Commands ---------------------------------------------------------------*)
 
-let list url () =
+let list url cctxt =
   let args = Utils.split '/' url in
-  Client_node_rpcs.describe ~recurse:true args >>= fun tree ->
+  Client_node_rpcs.describe cctxt ~recurse:true args >>= fun tree ->
   let open RPC.Description in
   let collected_args = ref [] in
   let collect arg =
@@ -272,24 +272,24 @@ let list url () =
     Format.pp_print_list
       (fun ppf (n,t) -> display ppf ([ n ], tpath @ [ n ], t))
   in
-  Cli_entries.message "@ @[<v 2>Available services:@ @ %a@]@."
+  cctxt.message "@ @[<v 2>Available services:@ @ %a@]@."
     display (args, args, tree) >>= fun () ->
   if !collected_args <> [] then
-    Cli_entries.message "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
+    cctxt.message "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
       (Format.pp_print_list display_arg) !collected_args
   else Lwt.return ()
 
 
-let schema url () =
+let schema url cctxt =
   let args = Utils.split '/' url in
   let open RPC.Description in
-  Client_node_rpcs.describe ~recurse:false args >>= function
+  Client_node_rpcs.describe cctxt ~recurse:false args >>= function
   | Static { service = Some { input ; output } } ->
-      Cli_entries.message "Input schema:\n%s\nOutput schema:\n%s\n%!"
+      cctxt.message "Input schema:\n%s\nOutput schema:\n%s\n%!"
         (Data_encoding_ezjsonm.to_string (Json_schema.to_json input))
         (Data_encoding_ezjsonm.to_string (Json_schema.to_json output))
   | _ ->
-      Cli_entries.message
+      cctxt.message
         "No service found at this URL (but this is a valid prefix)\n%!"
 
 let fill_in schema =
@@ -299,60 +299,43 @@ let fill_in schema =
   | Any | Object { properties = [] } -> Lwt.return (Ok (`O []))
   | _ -> editor_fill_in schema
 
-let call url () =
+let call url cctxt =
   let args = Utils.split '/' url in
   let open RPC.Description in
-  Client_node_rpcs.describe ~recurse:false args >>= function
+  Client_node_rpcs.describe cctxt ~recurse:false args >>= function
   | Static { service = Some { input } } -> begin
       fill_in input >>= function
       | Error msg ->
-          error "%s" msg
+          cctxt.error "%s" msg
       | Ok json ->
-          Client_node_rpcs.get_json args json >>= fun json ->
-          Cli_entries.message "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
+          Client_node_rpcs.get_json cctxt args json >>= fun json ->
+          cctxt.message "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
     end
   | _ ->
-      Cli_entries.message
+      cctxt.message
         "No service found at this URL (but this is a valid prefix)\n%!"
 
-let () =
-  let open Cli_entries in
-  register_tag "low-level" "low level commands for advanced users" ;
-  register_tag "local" "commands that do not require a running node" ;
-  register_tag "debug" "commands mostly useful for debugging" ;
-  register_group "rpc" "Commands for the low level RPC layer"
+let group =
+  { Cli_entries.name = "rpc" ;
+    title = "Commands for the low level RPC layer" }
 
-let commands = Cli_entries.([
-    command
-      ~tags: [ "local" ]
-      ~desc: "list all understood protocol versions"
-      (fixed [ "list" ; "versions" ])
-      (fun () ->
-         Lwt_list.iter_s
-           (fun (ver, _) -> message "%a" Protocol_hash.pp_short ver)
-           (Client_version.get_versions ())) ;
-    command
-      ~tags: [ "low-level" ; "local" ]
-      ~group: "rpc"
-      ~desc: "list available RPCs (low level command for advanced users)"
-      (prefixes [ "rpc" ; "list" ] @@ stop)
-      (list "/");
-    command
-      ~tags: [ "low-level" ; "local" ]
-      ~group: "rpc"
-      ~desc: "list available RPCs (low level command for advanced users)"
-      (prefixes [ "rpc" ; "list" ] @@ string "url" "the RPC's prefix to be described" @@ stop)
-      list ;
-    command
-      ~tags: [ "low-level" ; "local" ]
-      ~group: "rpc"
-      ~desc: "get the schemas of an RPC"
-      (prefixes [ "rpc" ; "schema" ] @@ string "url" "the RPC's URL" @@ stop)
-      schema ;
-    command
-      ~tags: [ "low-level" ; "local" ]
-      ~group: "rpc"
-      ~desc: "call an RPC (low level command for advanced users)"
-      (prefixes [ "rpc" ; "call" ] @@ string "url" "the RPC's URL" @@ stop)
-      call
-  ])
+let commands = [
+  command ~desc: "list all understood protocol versions"
+    (fixed [ "list" ; "versions" ])
+    (fun cctxt ->
+       Lwt_list.iter_s
+         (fun (ver, _) -> cctxt.Client_commands.message "%a" Protocol_hash.pp_short ver)
+         (Client_commands.get_versions ())) ;
+  command ~group ~desc: "list available RPCs (low level command for advanced users)"
+    (prefixes [ "rpc" ; "list" ] @@ stop)
+    (list "/");
+  command ~group ~desc: "list available RPCs (low level command for advanced users)"
+    (prefixes [ "rpc" ; "list" ] @@ string ~name:"url" ~desc: "the RPC's prefix to be described" @@ stop)
+    list ;
+  command ~group ~desc: "get the schemas of an RPC"
+    (prefixes [ "rpc" ; "schema" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
+    schema ;
+  command ~group ~desc: "call an RPC (low level command for advanced users)"
+    (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
+    call
+]
