@@ -243,19 +243,19 @@ module Cmdline = struct
   (* net args *)
   let min_connections =
     let doc = "The number of connections below which aggressive peer discovery mode is entered." in
-    Arg.(value & opt int default_cfg.min_connections & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["min-connections"])
+    Arg.(value & opt (some int) None & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["min-connections"])
   let max_connections =
     let doc = "The number of connections above which some connections will be closed." in
-    Arg.(value & opt int default_cfg.max_connections & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["max-connections"])
+    Arg.(value & opt (some int) None & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["max-connections"])
   let expected_connections =
     let doc = "The minimum number of connections to be ensured by the cruise control." in
-    Arg.(value & opt int default_cfg.expected_connections & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["expected-connections"])
+    Arg.(value & opt (some int) None & info ~docs:"NETWORK" ~doc ~docv:"NUM" ["expected-connections"])
   let net_addr =
     let doc = "The TCP address and port at which this instance can be reached." in
-    Arg.(value & opt sockaddr_converter (default_cfg.net_addr, default_cfg.net_port) & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["net-addr"])
+    Arg.(value & opt (some sockaddr_converter) None & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["net-addr"])
   let local_discovery =
     let doc = "Automatic discovery of peers on the local network." in
-    Arg.(value & opt (some int) default_cfg.local_discovery & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["local-discovery"])
+    Arg.(value & opt (some int) None & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["local-discovery"])
   let peers =
     let doc = "A peer to bootstrap the network from. Can be used several times to add several peers." in
     Arg.(value & opt_all sockaddr_converter [] & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["peer"])
@@ -276,7 +276,7 @@ module Cmdline = struct
 
   let parse base_dir config_file sandbox sandbox_param log_level
       min_connections max_connections expected_connections
-      (net_addr, net_port) local_discovery peers closed rpc_addr reset_cfg update_cfg =
+      net_saddr local_discovery peers closed rpc_addr reset_cfg update_cfg =
     let base_dir = Utils.(unopt (unopt default_cfg.base_dir base_dir) sandbox) in
     let config_file = Utils.(unopt ((unopt base_dir sandbox) // "config")) config_file in
     let no_config () =
@@ -305,17 +305,17 @@ module Cmdline = struct
     let cfg =
       { cfg with
         base_dir ;
-        sandbox ;
-        sandbox_param ;
-        log_level ;
-        min_connections ;
-        max_connections ;
-        expected_connections ;
-        net_addr ;
-        net_port ;
-        local_discovery ;
-        peers = List.rev_append peers cfg.peers ;
-        closed ;
+        sandbox = Utils.first_some sandbox cfg.sandbox ;
+        sandbox_param = Utils.first_some sandbox_param cfg.sandbox_param ;
+        log_level = Utils.first_some log_level cfg.log_level ;
+        min_connections = Utils.unopt cfg.min_connections min_connections ;
+        max_connections = Utils.unopt cfg.max_connections max_connections ;
+        expected_connections = Utils.unopt cfg.expected_connections expected_connections ;
+        net_addr = (match net_saddr with None -> cfg.net_addr | Some (addr, _) -> addr) ;
+        net_port = (match net_saddr with None -> cfg.net_port | Some (_, port) -> port) ;
+        local_discovery = Utils.first_some local_discovery cfg.local_discovery ;
+        peers = (match peers with [] -> cfg.peers | _ -> peers) ;
+        closed = closed || cfg.closed ;
         rpc_addr = Utils.first_some rpc_addr cfg.rpc_addr ;
         log_output = cfg.log_output ;
       }
