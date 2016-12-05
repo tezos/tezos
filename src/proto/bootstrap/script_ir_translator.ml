@@ -117,6 +117,22 @@ let signed_int_kind
     | Int64 -> eq Signed Signed
     | _ -> error @@ Bad_sign (Int_kind kind)
 
+let comparable_ty_eq
+  : type ta tb.
+    ta comparable_ty -> tb comparable_ty ->
+    (ta comparable_ty, tb comparable_ty) eq tzresult
+  = fun ta tb -> match ta, tb with
+    | Int_key ka, Int_key kb ->
+        record_trace (Inconsistent_types (Comparable_ty ta, Comparable_ty tb)) @@
+        int_kind_eq ka kb >>? fun (Eq _) ->
+        (eq ta tb : (ta comparable_ty, tb comparable_ty) eq tzresult)
+    | String_key, String_key -> eq ta tb
+    | Tez_key, Tez_key -> eq ta tb
+    | Bool_key, Bool_key -> eq ta tb
+    | Key_key, Key_key -> eq ta tb
+    | Timestamp_key, Timestamp_key -> eq ta tb
+    | _, _ -> error (Inconsistent_types (Comparable_ty ta, Comparable_ty tb))
+
 let rec ty_eq
   : type ta tb. ta ty -> tb ty -> (ta ty, tb ty) eq tzresult
   = fun ta tb ->
@@ -126,11 +142,21 @@ let rec ty_eq
         (int_kind_eq ka kb >>? fun (Eq _) ->
          (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (Ty ta, Ty tb))
+    | Key_t, Key_t -> eq ta tb
     | String_t, String_t -> eq ta tb
     | Signature_t, Signature_t -> eq ta tb
     | Tez_t, Tez_t -> eq ta tb
     | Timestamp_t, Timestamp_t -> eq ta tb
     | Bool_t, Bool_t -> eq ta tb
+    | Map_t (tal, tar), Map_t (tbl, tbr) ->
+        (comparable_ty_eq tal tbl >>? fun (Eq _) ->
+         ty_eq tar tbr >>? fun (Eq _) ->
+         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
+        record_trace (Inconsistent_types (Ty ta, Ty tb))
+    | Set_t ea, Set_t eb ->
+        (comparable_ty_eq ea eb >>? fun (Eq _) ->
+         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
+        record_trace (Inconsistent_types (Ty ta, Ty tb))
     | Pair_t (tal, tar), Pair_t (tbl, tbr) ->
         (ty_eq tal tbl >>? fun (Eq _) ->
          ty_eq tar tbr >>? fun (Eq _) ->
