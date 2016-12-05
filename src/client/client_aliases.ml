@@ -177,18 +177,18 @@ module Alias = functor (Entity : Entity) -> struct
 
   include Entity
 
-  let alias_param ?(name = "name") ?(desc = "existing " ^ name ^ " alias") next =
+  let alias_param ?(name = "name") ?(desc = "existing " ^ Entity.name ^ " alias") next =
     param ~name ~desc
       (fun cctxt s -> find cctxt s >>= fun v -> return (s, v))
       next
 
-  let fresh_alias_param ?(name = "new") ?(desc = "new " ^ name ^ " alias") next =
+  let fresh_alias_param ?(name = "new") ?(desc = "new " ^ Entity.name ^ " alias") next =
     param ~name ~desc
       (fun cctxt s ->
          load cctxt >>= fun list ->
          if not Client_config.force#get then
            Lwt_list.iter_s (fun (n, _v) ->
-               if n = name then
+               if n = s then
                  cctxt.Client_commands.error
                    "the %s alias %s already exists, use -force true to update" Entity.name n
                else return ())
@@ -197,7 +197,7 @@ module Alias = functor (Entity : Entity) -> struct
          else return s)
       next
 
-  let source_param ?(name = "src") ?(desc = "source " ^ name) next =
+  let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
     let desc =
       desc ^ "\n"
       ^ "can be an alias, file or literal (autodetected in this order)\n\

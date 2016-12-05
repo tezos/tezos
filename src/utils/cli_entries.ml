@@ -291,12 +291,12 @@ let usage
         Format.pp_print_text desc
         help_args params ;
     end ;
-    if options = [] then
+    if args = [] then
       Format.fprintf ppf "@]"
     else
       Format.fprintf ppf "@,%a@]"
         (Format.pp_print_list option_help)
-        options in
+        args in
   let rec group_help ppf ({ title }, commands) =
     Format.fprintf ppf "@[<v 2>%s:@,%a@]"
       title
