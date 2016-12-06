@@ -7,18 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val mem:
-  Client_commands.context ->
-  Block_hash.t -> bool Lwt.t
-val find:
-  Client_commands.context ->
-  Block_hash.t -> Nonce.t option Lwt.t
-val add:
-  Client_commands.context ->
-  Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
-val del:
-  Client_commands.context ->
-  Block_hash.t -> unit tzresult Lwt.t
-val dels:
-  Client_commands.context ->
-  Block_hash.t list -> unit tzresult Lwt.t
+module type RPC_CONTEXT = sig
+  type root
+end
+
+module Make (RPC_context : RPC_CONTEXT) : sig
+  val contracts :
+    (RPC_context.root, RPC_context.root, unit, string list) RPC.service
+  val hash :
+    (RPC_context.root, RPC_context.root, unit, string) RPC.service
+end

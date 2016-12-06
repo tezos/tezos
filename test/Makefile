@@ -214,7 +214,6 @@ COVERAGESRCDIR= \
   -I ../src/client/embedded \
   -I ../src/client/embedded/bootstrap \
   -I ../src/client/embedded/bootstrap/mining \
-  -I ../src/client/embedded/bootstrap/demo \
   -I ../src/compiler \
   -I ../src/node \
   -I ../src/node/db \

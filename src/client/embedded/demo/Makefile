@@ -1,11 +1,11 @@
 
 PROTO_VERSION = demo
 
-IMPLS = \
+CLIENT_IMPLS = \
   client_proto_rpcs.ml \
   client_proto_main.ml
 
-INTFS = \
+CLIENT_INTFS = \
   client_proto_rpcs.mli \
   client_proto_main.mli
 

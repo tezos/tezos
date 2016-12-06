@@ -11,35 +11,35 @@ let protocol =
   Protocol_hash.of_b48check
     "2gagsSEvTKAHRjxAamgSdBNkv39VtNCqpaDXrrH4K8R4KQAAHrhe3"
 
-let demo () =
+let demo cctxt =
   let block = Client_config.block () in
-  Cli_entries.message "Calling the 'echo' RPC." >>= fun () ->
+  cctxt.Client_commands.message "Calling the 'echo' RPC." >>= fun () ->
   let msg = "test" in
-  Client_proto_rpcs.echo block msg >>= fun reply ->
+  Client_proto_rpcs.echo cctxt block msg >>= fun reply ->
   fail_unless (reply = msg) (Unclassified "...") >>=? fun () ->
   begin
-    Cli_entries.message "Calling the 'failing' RPC." >>= fun () ->
-    Client_proto_rpcs.failing block 3 >>= function
+    cctxt.message "Calling the 'failing' RPC." >>= fun () ->
+    Client_proto_rpcs.failing cctxt block 3 >>= function
     | Error [Ecoproto_error [Error.Demo_error 3]] ->
         return ()
     | _ -> failwith "..."
   end >>=? fun () ->
-  Cli_entries.message "Direct call to `demo_error`." >>= fun () ->
+  cctxt.message "Direct call to `demo_error`." >>= fun () ->
   begin Error.demo_error 101010 >|= wrap_error >>= function
     | Error [Ecoproto_error [Error.Demo_error 101010]] ->
         return ()
     | _ -> failwith "...."
   end >>=? fun () ->
-  Cli_entries.answer "All good!" >>= fun () ->
+  cctxt.answer "All good!" >>= fun () ->
   return ()
 
-let mine () =
+let mine cctxt =
   let block =
     match Client_config.block () with
     | `Prevalidation -> `Head 0
     | `Test_prevalidation -> `Test_head 0
     | b -> b in
-  Client_node_rpcs.Blocks.info block >>= fun bi ->
+  Client_node_rpcs.Blocks.info cctxt block >>= fun bi ->
   let fitness =
     match bi.fitness with
     | [ v ; b ] ->
@@ -48,46 +48,40 @@ let mine () =
         [ v ; b ]
     | _ ->
         Lwt.ignore_result
-          (Cli_entries.message "Cannot parse fitness: %a" Fitness.pp bi.fitness);
+          (cctxt.message "Cannot parse fitness: %a" Fitness.pp bi.fitness);
         exit 2 in
-  Client_node_rpcs.forge_block
+  Client_node_rpcs.forge_block cctxt
     ~net:bi.net ~predecessor:bi.hash
     fitness [] (MBytes.create 0) >>= fun bytes ->
-  Client_node_rpcs.inject_block ~wait:true bytes >>=? fun hash ->
-  Cli_entries.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+  Client_node_rpcs.inject_block cctxt ~wait:true bytes >>=? fun hash ->
+  cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()
 
-let handle_error = function
+let handle_error cctxt = function
   | Ok res ->
       Lwt.return res
   | Error exns ->
       pp_print_error Format.err_formatter exns ;
-      Cli_entries.error "cannot continue"
+      cctxt.Client_commands.error "%s" "cannot continue"
 
 let commands () =
   let open Cli_entries in
-  register_group "demo" "Some demo command" ;
+  let group = {name = "demo" ; title = "Some demo command" } in
   [
-    command
-      ~group: "demo"
-      ~desc: "A demo command"
+    command ~group ~desc: "A demo command"
       (fixed [ "demo" ])
-      (fun () -> demo () >>= handle_error) ;
-    command
-      ~group: "demo"
-      ~desc: "An failing command"
+      (fun cctxt -> demo cctxt >>= handle_error cctxt) ;
+    command ~group ~desc: "A failing command"
       (fixed [ "fail" ])
-      (fun () ->
+      (fun cctxt ->
          Error.demo_error 101010
          >|= wrap_error
-         >>= handle_error ) ;
-    command
-      ~group: "demo"
-      ~desc: "Mine an empty block"
+         >>= handle_error cctxt) ;
+    command ~group ~desc: "Mine an empty block"
       (fixed [ "mine" ])
-      (fun () -> mine () >>= handle_error) ;
+      (fun cctxt -> mine cctxt >>= handle_error cctxt) ;
   ]
 
 let () =
-  Client_version.register protocol @@
+  Client_commands.register protocol @@
   commands ()

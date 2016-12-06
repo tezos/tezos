@@ -7,18 +7,24 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val mem:
-  Client_commands.context ->
-  Block_hash.t -> bool Lwt.t
-val find:
-  Client_commands.context ->
-  Block_hash.t -> Nonce.t option Lwt.t
-val add:
-  Client_commands.context ->
-  Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
-val del:
-  Client_commands.context ->
-  Block_hash.t -> unit tzresult Lwt.t
-val dels:
-  Client_commands.context ->
-  Block_hash.t list -> unit tzresult Lwt.t
+module type RPC_CONTEXT = sig
+  type root
+end
+
+module Make (RPC_context : RPC_CONTEXT) = struct
+
+  let box_result field enc =
+    let open Data_encoding in
+    obj1 (req field enc)
+
+  let contracts =
+    let input = Data_encoding.empty in
+    let output = box_result "contracts" Data_encoding.(list string) in
+    RPC.service ~input ~output RPC.Path.(root / "contracts")
+
+  let hash =
+    let input = Data_encoding.empty in
+    let output = box_result "hash" Data_encoding.string in
+    RPC.service ~input ~output RPC.Path.(root / "hash")
+
+end

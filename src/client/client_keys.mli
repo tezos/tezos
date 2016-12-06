@@ -15,8 +15,9 @@ module Public_key : Client_aliases.Alias with type t = Ed25519.public_key
 module Secret_key : Client_aliases.Alias with type t = Ed25519.secret_key
 
 val get_key:
+  Client_commands.context ->
   Public_key_hash.t ->
   ( string * Public_key.t * Secret_key.t ) tzresult Lwt.t
 
 
-val commands: unit -> Cli_entries.command list
+val commands: unit -> Client_commands.command list
