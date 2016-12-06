@@ -20,6 +20,16 @@ type server
     callable. Calling /pipe will read a sequence of services to call in
     sequence from the request body, see {!pipe_encoding}.
 
+    The arguments cors_allowed_origins and cors_allowed_headers define
+    the cross-origin resource sharing using the headers
+    Access-Control-Allow-Origin and Access-Control-Allow-Headers. The
+    argument cors_allowed_headers sets the content of
+    Access-Control-Allow-Headers. Since you cannot have multiple
+    values for Access-Control-Allow-Origin, the server accepts a list
+    in cors_allowed_origins and matches it against the origin of the
+    incoming request; then returns the longest element of the passed
+    list as the content of Access-Control-Allow-Origin.
+
     The optional [pre_hook] is called with the path part of the URL
     before resolving each request, to delegate the answering to
     another resolution mechanism. Its result is ignored if the return
@@ -28,7 +38,10 @@ type server
 val launch : int ->
   ?pre_hook: (string -> string RPC.Answer.answer Lwt.t) ->
   ?post_hook: (string -> string RPC.Answer.answer Lwt.t) ->
-  unit RPC.directory -> server Lwt.t
+  unit RPC.directory ->
+  string list ->
+  string list ->
+  server Lwt.t
 
 (** Kill an RPC server. *)
 val shutdown : server -> unit Lwt.t
