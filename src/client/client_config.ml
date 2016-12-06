@@ -102,53 +102,64 @@ let register_config_option version option =
 
 (* Entry point *)
 
-let parse_args ?version usage dispatcher =
+let parse_args ?version usage dispatcher argv cctxt =
   let open Lwt in
-  try begin match version with
-    | None -> ()
-    | Some version ->
-        try
-          !(Protocol_hash_table.find contextual_options version) ()
-        with Not_found -> () end ;
-    let base_args = cli_group#command_line_args "-" in
-    let args = ref base_args in
-    let anon dispatch n = match dispatch (`Arg n) with
-      | `Nop -> ()
-      | `Args nargs -> args := nargs @ !args
-      | `Fail exn -> raise exn
-      | `Res _ -> assert false in
-    Arg.parse_argv_dynamic
-      ~current:(ref 0) Sys.argv args (anon (dispatcher ())) (usage base_args) ;
-    let dispatch = dispatcher () in
-    (if Sys.file_exists config_file#get then begin
-        try
-          file_group#read config_file#get ;
-          (* parse once again to overwrite file options by cli ones *)
-          Arg.parse_argv_dynamic
-            ~current:(ref 0) Sys.argv args (anon dispatch) (usage base_args) ;
-          Lwt.return ()
-        with Sys_error msg ->
-          Cli_entries.error
-            "Error: can't read the configuration file: %s\n%!" msg
-      end else begin
-       try
-         (* parse once again with contextual options *)
-         Arg.parse_argv_dynamic
-           ~current:(ref 0) Sys.argv args (anon dispatch) (usage base_args) ;
-         Lwt_utils.create_dir (Filename.dirname config_file#get) >>= fun () ->
-         file_group#write config_file#get ;
-         Lwt.return ()
-       with Sys_error msg ->
-         Cli_entries.warning
-           "Warning: can't create the default configuration file: %s\n%!" msg
-     end) >>= fun () ->
-    begin match dispatch `End with
-      | `Res res ->
-          res
-      | `Fail exn -> fail exn
-      | `Nop | `Args _ -> assert false
-    end
-  with exn -> Lwt.fail exn
+  catch
+    (fun () ->
+       let args = ref (cli_group#command_line_args "-") in
+       begin match version with
+         | None -> ()
+         | Some version ->
+             try
+               !(Protocol_hash_table.find contextual_options version) ()
+             with Not_found -> () end ;
+       let anon dispatch n = match dispatch (`Arg n) with
+         | `Nop -> ()
+         | `Args nargs -> args := nargs @ !args
+         | `Fail exn -> raise exn
+         | `Res _ -> assert false in
+       Arg.parse_argv_dynamic
+         ~current:(ref 0) argv args (anon (dispatcher ())) "\000" ;
+       let dispatch = dispatcher () in
+       (if Sys.file_exists config_file#get then begin
+           try
+             file_group#read config_file#get ;
+             (* parse once again to overwrite file options by cli ones *)
+             Arg.parse_argv_dynamic
+               ~current:(ref 0) argv args (anon dispatch) "\000" ;
+             Lwt.return ()
+           with Sys_error msg ->
+             cctxt.Client_commands.error
+               "Error: can't read the configuration file: %s\n%!" msg
+         end else begin
+          try
+            (* parse once again with contextual options *)
+            Arg.parse_argv_dynamic
+              ~current:(ref 0) argv args (anon dispatch) "\000" ;
+            Lwt_utils.create_dir (Filename.dirname config_file#get) >>= fun () ->
+            file_group#write config_file#get ;
+            Lwt.return ()
+          with Sys_error msg ->
+            cctxt.Client_commands.warning
+              "Warning: can't create the default configuration file: %s\n%!" msg
+        end) >>= fun () ->
+       begin match dispatch `End with
+         | `Res res -> Lwt.return res
+         | `Fail exn -> fail exn
+         | `Nop | `Args _ -> assert false
+       end)
+    (function
+      | Arg.Bad msg ->
+          (* FIXME: this is an ugly hack to circumvent [Arg]
+             spuriously printing options at the end of the error
+             message. *)
+          let args = cli_group#command_line_args "-" in
+          let msg = List.hd (Utils.split '\000' msg) in
+          Lwt.fail (Arg.Help (msg ^ usage args ^ "\n"))
+      | Arg.Help _ ->
+          let args = cli_group#command_line_args "-" in
+          Lwt.fail (Arg.Help (usage args ^ "\n"))
+      | exn -> Lwt.fail exn)
 
 exception Found of string
 let preparse name argv =
@@ -160,14 +171,14 @@ let preparse name argv =
     None
   with Found s -> Some s
 
-let preparse_args () : Node_rpc_services.Blocks.block Lwt.t =
+let preparse_args argv cctxt : Node_rpc_services.Blocks.block Lwt.t =
   begin
-    match preparse "-base-dir" Sys.argv with
+    match preparse "-base-dir" argv with
     | None -> ()
     | Some dir -> base_dir#set dir
   end ;
   begin
-    match preparse "-config-file" Sys.argv with
+    match preparse "-config-file" argv with
     | None -> config_file#set @@ base_dir#get // "config"
     | Some file -> config_file#set file
   end ;
@@ -176,24 +187,24 @@ let preparse_args () : Node_rpc_services.Blocks.block Lwt.t =
       (file_group#read config_file#get ;
       Lwt.return ())
     with Sys_error msg ->
-      Cli_entries.error
+      cctxt.Client_commands.error
         "Error: can't read the configuration file: %s\n%!" msg
     else Lwt.return ()
   end >>= fun () ->
   begin
-    match preparse "-addr" Sys.argv with
+    match preparse "-addr" argv with
     | None -> ()
     | Some addr -> incoming_addr#set addr
   end ;
   begin
-    match preparse "-port" Sys.argv with
+    match preparse "-port" argv with
     | None -> Lwt.return ()
     | Some port ->
         try
           incoming_port#set (int_of_string port) ;
           Lwt.return ()
         with _ ->
-          Cli_entries.error
+          cctxt.Client_commands.error
             "Error: can't parse the -port option: %S.\n%!" port
   end >>= fun () ->
   match preparse "-block" Sys.argv with
@@ -201,6 +212,6 @@ let preparse_args () : Node_rpc_services.Blocks.block Lwt.t =
   | Some x ->
       match Node_rpc_services.Blocks.parse_block x with
       | Error _ ->
-          Cli_entries.error
+          cctxt.Client_commands.error
             "Error: can't parse the -block option: %S.\n%!" x
       | Ok b -> Lwt.return b

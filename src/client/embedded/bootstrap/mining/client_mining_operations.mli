@@ -13,6 +13,7 @@ type operation = {
 }
 
 val monitor:
+  Client_commands.context ->
   ?contents:bool -> ?check:bool -> unit ->
   operation list Lwt_stream.t Lwt.t
 
@@ -24,7 +25,9 @@ type valid_endorsement = {
 }
 
 val filter_valid_endorsement:
+  Client_commands.context ->
   operation -> valid_endorsement option Lwt.t
 
 val monitor_endorsement:
-  unit -> valid_endorsement Lwt_stream.t Lwt.t
+  Client_commands.context ->
+  valid_endorsement Lwt_stream.t Lwt.t

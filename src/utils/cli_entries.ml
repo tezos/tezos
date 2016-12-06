@@ -18,50 +18,35 @@ exception Command_failed of string
 
 (* A simple structure for command interpreters.
    This is more generic than the exported one, see end of file. *)
-type ('a, 'arg, 'ret) tparams =
-  | Prefix : string * ('a, 'arg, 'ret) tparams ->
-    ('a, 'arg, 'ret) tparams
+type ('a, 'arg, 'ret) params =
+  | Prefix : string * ('a, 'arg, 'ret) params ->
+    ('a, 'arg, 'ret) params
   | Param : string * string *
-            (string -> 'p Lwt.t) *
-            ('a, 'arg, 'ret) tparams ->
-    ('p -> 'a, 'arg, 'ret) tparams
+            ('arg -> string -> 'p Lwt.t) *
+            ('a, 'arg, 'ret) params ->
+    ('p -> 'a, 'arg, 'ret) params
   | Stop :
-      ('arg -> 'ret Lwt.t, 'arg, 'ret) tparams
+      ('arg -> 'ret Lwt.t, 'arg, 'ret) params
   | More :
-      (string list -> 'arg -> 'ret Lwt.t, 'arg, 'ret) tparams
+      (string list -> 'arg -> 'ret Lwt.t, 'arg, 'ret) params
   | Seq : string * string *
-          (string -> 'p Lwt.t) ->
-    ('p list -> 'arg -> 'ret Lwt.t, 'arg, 'ret) tparams
+          ('arg -> string -> 'p Lwt.t) ->
+    ('p list -> 'arg -> 'ret Lwt.t, 'arg, 'ret) params
+
+(* A command group *)
+type group =
+  { name : string ;
+    title : string }
 
 (* A command wraps a callback with its type and info *)
-and ('arg, 'ret) tcommand =
+type ('arg, 'ret) command =
   | Command
-    : ('a, 'arg, 'ret) tparams * 'a *
-      desc option * tag list * group option *
-      (Arg.key * Arg.spec * Arg.doc) list
-    -> ('arg, 'ret) tcommand
-
-and desc = string
-and group = string
-and tag = string
-
-(* Associates group names with group titles *)
-let groups : (group * string) list ref = ref []
-let register_group group title =
-  try ignore @@ List.assoc group !groups with
-  | Not_found -> groups := (group, title) :: !groups
-let group_title group =
-  try List.assoc group !groups with
-  | Not_found -> group
-
-(* Associates tag names with tag descriptions *)
-let tags : (tag * string) list ref = ref []
-let register_tag tag title =
-  try ignore @@ List.assoc tag !tags with
-  | Not_found -> tags := (tag, title) :: !tags
-let tag_description tag =
-  try List.assoc tag !tags with
-  | Not_found -> "undocumented tag"
+    : { params: ('a, 'arg, 'ret) params ;
+        handler : 'a ;
+        desc : string ;
+        group : group option ;
+        args : (Arg.key * Arg.spec * Arg.doc) list }
+    -> ('arg, 'ret) command
 
 (* Some combinators for writing commands concisely. *)
 let param ~name ~desc kind next = Param (name, desc, kind, next)
@@ -80,18 +65,19 @@ let stop = Stop
 let more = More
 let void = Stop
 let any = More
-let command ?desc ?(tags = []) ?group ?(args = []) params cb =
-  Command (params, cb, desc,tags, group, args)
+let command ?group ?(args = []) ~desc params handler =
+  Command { params ; handler ; desc ; group ; args }
 
 (* Param combinators *)
-let string n desc next = param n desc (fun s -> return s) next
+let string ~name ~desc next =
+  param name desc (fun _ s -> return s) next
 
 (* Command execution *)
 let exec
     (type arg) (type ret)
-    (Command (params, cb, _, _, _, _)) (last : arg) args =
+    (Command { params ; handler }) (last : arg) args =
   let rec exec
-    : type a. int -> (a, arg, ret) tparams -> a -> string list -> ret Lwt.t
+    : type a. int -> (a, arg, ret) params -> a -> string list -> ret Lwt.t
     = fun i params cb args ->
     match params, args with
     | Stop, [] -> cb last
@@ -101,7 +87,7 @@ let exec
           | [] -> Lwt.return (List.rev acc)
           | p :: rest ->
               catch
-                (fun () -> f p)
+                (fun () -> f last p)
                 (function
                   | Failure msg -> Lwt.fail (Bad_argument (i, p, msg))
                   | exn -> Lwt.fail exn) >>= fun v ->
@@ -113,33 +99,33 @@ let exec
         exec (succ i) next cb rest
     | Param (_, _, f, next), p :: rest ->
         catch
-          (fun () -> f p)
+          (fun () -> f last p)
           (function
             | Failure msg -> Lwt.fail (Bad_argument (i, p, msg))
             | exn -> Lwt.fail exn) >>= fun v ->
         exec (succ i) next (cb v) rest
     | _ -> Lwt.fail Command_not_found
-  in exec 1 params cb args
+  in exec 1 params handler args
 
 (* Command dispatch tree *)
 type ('arg, 'ret) level =
-  { stop : ('arg, 'ret) tcommand option ;
+  { stop : ('arg, 'ret) command option ;
     prefix : (string * ('arg, 'ret) tree) list }
 and ('arg, 'ret) param_level =
-  { stop : ('arg, 'ret) tcommand option ;
+  { stop : ('arg, 'ret) command option ;
     tree : ('arg, 'ret) tree }
 and ('arg, 'ret) tree =
   | TPrefix of ('arg, 'ret) level
   | TParam of ('arg, 'ret) param_level
-  | TStop of ('arg, 'ret) tcommand
-  | TMore of ('arg, 'ret) tcommand
+  | TStop of ('arg, 'ret) command
+  | TMore of ('arg, 'ret) command
   | TEmpty
 
 let insert_in_dispatch_tree
     (type arg) (type ret)
-    root (Command (params, _, _, _, _, _) as command) =
+    root (Command { params } as command) =
   let rec insert_tree
-    : type a. (arg, ret) tree -> (a, arg, ret) tparams -> (arg, ret) tree
+    : type a. (arg, ret) tree -> (a, arg, ret) params -> (arg, ret) tree
     = fun t c -> match t, c with
       | TEmpty, Stop -> TStop command
       | TEmpty, More -> TMore command
@@ -189,7 +175,7 @@ let tree_dispatch tree last args =
   in
   loop (tree, args)
 
-let inline_tree_dispatch tree last =
+let inline_tree_dispatch tree () =
   let state = ref (tree, []) in
   fun arg -> match !state, arg with
     | (( TStop c |
@@ -198,7 +184,7 @@ let inline_tree_dispatch tree last =
          TParam { stop = Some c}), acc),
       `End ->
         state := (TEmpty, []) ;
-        `Res (exec c last (List.rev acc))
+        `Res (fun last -> exec c last (List.rev acc))
     | (TMore c, acc), `Arg n ->
         state := (TMore c, n :: acc) ;
         `Nop
@@ -207,15 +193,15 @@ let inline_tree_dispatch tree last =
             let t = List.assoc n prefix in
             state := (t, n :: acc) ;
             begin match t with
-              | TStop (Command (_, _, _, _, _, args))
-              | TMore (Command (_, _, _, _, _, args)) -> `Args args
+              | TStop (Command { args })
+              | TMore (Command { args }) -> `Args args
               | _ -> `Nop end
           with Not_found -> `Fail Command_not_found end
     | (TParam { tree }, acc), `Arg n ->
         state := (tree, n :: acc) ;
         begin match tree with
-          | TStop (Command (_, _, _, _, _, args))
-          | TMore (Command (_, _, _, _, _, args)) -> `Args args
+          | TStop (Command { args })
+          | TMore (Command { args }) -> `Args args
           | _ -> `Nop end
     | _, _ -> `Fail Command_not_found
 
@@ -231,14 +217,14 @@ let inline_dispatch commands =
 
 (* Command line help for a set of commands *)
 let usage
-      (type arg) (type ret)
-      commands options =
+    (type arg) (type ret)
+    ~commands options =
   let trim s = (* config-file wokaround *)
     Utils.split '\n' s |>
     List.map String.trim |>
     String.concat "\n" in
   let rec help
-    : type a. Format.formatter -> (a, arg, ret) tparams -> unit
+    : type a. Format.formatter -> (a, arg, ret) params -> unit
     = fun ppf -> function
     | Stop -> ()
     | More -> Format.fprintf ppf "..."
@@ -251,7 +237,7 @@ let usage
     | Param (n, "", _, next) -> Format.fprintf ppf "(%s) %a" n help next
     | Param (_, desc, _, next) -> Format.fprintf ppf "(%s) %a" desc help next in
   let rec help_sum
-    : type a. Format.formatter -> (a, arg, ret) tparams -> unit
+    : type a. Format.formatter -> (a, arg, ret) params -> unit
     = fun ppf -> function
     | Stop -> ()
     | More -> Format.fprintf ppf "..."
@@ -261,7 +247,7 @@ let usage
     | Prefix (n, next) -> Format.fprintf ppf "%s %a" n help_sum next
     | Param (n, _, _, next) -> Format.fprintf ppf "(%s) %a" n help_sum next in
   let rec help_args
-    : type a. Format.formatter -> (a, arg, ret) tparams -> unit
+    : type a. Format.formatter -> (a, arg, ret) params -> unit
     = fun ppf -> function
       | Stop -> ()
       | More -> Format.fprintf ppf "..."
@@ -293,35 +279,28 @@ let usage
           | Rest _ -> "" in example opt) ;
     if desc <> "" then
       Format.fprintf ppf "@,  @[<hov>%a@]" Format.pp_print_text (trim desc) in
-  let command_help ppf (Command (p, _, desc, _, _, options)) =
-    let small = Format.asprintf "@[<h>%a@]" help p in
-    let desc =
-      match desc with
-      | None -> "undocumented command"
-      | Some desc -> trim desc in
+  let command_help ppf (Command { params ; desc ; args }) =
+    let small = Format.asprintf "@[<h>%a@]" help params in
+    let desc = trim desc in
     if String.length small < 50 then begin
       Format.fprintf ppf "@[<v 2>%s@,@[<hov>%a@]"
         small Format.pp_print_text desc
     end else begin
       Format.fprintf ppf "@[<v 2>%a@,@[<hov 0>%a@]@,%a"
-        help_sum p
+        help_sum params
         Format.pp_print_text desc
-        help_args p ;
+        help_args params ;
     end ;
-    if options = [] then
+    if args = [] then
       Format.fprintf ppf "@]"
     else
       Format.fprintf ppf "@,%a@]"
         (Format.pp_print_list option_help)
-        options in
-  let rec group_help ppf (n, commands) =
-    let title =
-      match n with
-      | None -> "Miscellaneous commands"
-      | Some n -> group_title n in
+        args in
+  let rec group_help ppf ({ title }, commands) =
     Format.fprintf ppf "@[<v 2>%s:@,%a@]"
       title
-      (Format.pp_print_list command_help) !commands in
+      (Format.pp_print_list command_help) commands in
   let usage ppf (by_group, options) =
     Format.fprintf ppf
       "@[<v>@[<v 2>Usage:@,%s [ options ] command [ command options ]@]@,\
@@ -331,49 +310,26 @@ let usage
       (Format.pp_print_list option_help) options
       (Format.pp_print_list group_help) by_group in
   let by_group =
-    List.fold_left
-      (fun acc (Command (_, _, _, _, g, _) as c) ->
-         try
-           let r = List.assoc g acc in
-           r := c :: !r ;
-           acc
-         with Not_found ->
-           (g, ref [ c ]) :: acc)
-      [] commands |> List.sort compare in
+    let ungrouped = ref [] in
+    let grouped =
+      List.fold_left
+        (fun acc (Command { group } as command) ->
+           match group with
+           | None ->
+               ungrouped := command :: !ungrouped ;
+               acc
+           | Some group ->
+               try
+                 let ({ title }, r) =
+                   List.find (fun ({ name }, _) -> group.name = name) acc in
+                 if title <> group.title then
+                   invalid_arg "Cli_entries.usage: duplicate group name" ;
+                 r := command :: !r ;
+                 acc
+               with Not_found ->
+                 (group, ref [ command ]) :: acc)
+        [] commands in
+    List.map (fun (g, c) -> (g, List.rev !c)) grouped @
+    [ { name = "untitled" ; title = "Miscellaneous commands" },
+      List.rev !ungrouped ] in
   Format.asprintf "%a" usage (by_group, options)
-
-(* Pre-instanciated types *)
-type 'a params = ('a, unit, unit) tparams
-type command = (unit, unit) tcommand
-
-let log_hook
-  : (string -> string -> unit Lwt.t) option ref
-  = ref None
-
-let log channel msg =
-  match !log_hook with
-  | None -> Lwt.fail (Invalid_argument "Cli_entries.log: uninitialized hook")
-  | Some hook -> hook channel msg
-
-let error fmt=
-  Format.kasprintf
-    (fun msg ->
-       Lwt.fail (Failure msg))
-    fmt
-
-let warning fmt =
-  Format.kasprintf
-    (fun msg -> log "stderr" msg)
-    fmt
-
-let message fmt =
-  Format.kasprintf
-    (fun msg -> log "stdout" msg)
-    fmt
-
-let answer = message
-
-let log name fmt =
-  Format.kasprintf
-    (fun msg -> log name msg)
-    fmt

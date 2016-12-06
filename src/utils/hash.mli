@@ -113,8 +113,8 @@ module Block_hash : sig
   val param :
     ?name:string ->
     ?desc:string ->
-    'a Cli_entries.params ->
-    (t -> 'a) Cli_entries.params
+    ('a, 'arg, 'ret) Cli_entries.params ->
+    (t -> 'a, 'arg, 'ret) Cli_entries.params
 end
 
 module Block_hash_set : module type of Hash_set (Block_hash)

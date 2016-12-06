@@ -1,7 +1,7 @@
 
 SOURCE_DIRECTORIES += mining
 
-INTFS += \
+CLIENT_INTFS += \
   mining/client_mining_blocks.mli \
   mining/client_mining_operations.mli \
   mining/client_mining_endorsement.mli \
@@ -11,7 +11,7 @@ INTFS += \
   mining/client_mining_daemon.mli \
   mining/client_mining_main.mli \
 
-IMPLS += \
+CLIENT_IMPLS += \
   mining/client_mining_blocks.ml \
   mining/client_mining_operations.ml \
   mining/client_mining_endorsement.ml \

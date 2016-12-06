@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val commands: unit -> Cli_entries.command list
+val commands: unit -> Client_commands.command list

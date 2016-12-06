@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 val run:
+  Client_commands.context ->
   ?max_priority: int ->
   delay: int ->
   ?min_date: Time.t ->
