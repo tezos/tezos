@@ -63,6 +63,8 @@ type cfg = {
 
     (* rpc *)
     rpc_addr : (Ipaddr.t * int) option ;
+    cors_origins : string list ;
+    cors_headers : string list ;
 
     (* log *)
     log_output : [`Stderr | `File of string | `Syslog | `Null] ;
@@ -93,6 +95,8 @@ let default_cfg_of_base_dir base_dir = {
 
   (* rpc *)
   rpc_addr = None ;
+  cors_origins = [] ;
+  cors_headers = ["content-type"] ;
 
   (* log *)
   log_output = `Stderr ;
@@ -153,8 +157,10 @@ module Cfg_file = struct
       (opt "peers-cache" string)
 
   let rpc =
-    obj1
+    obj3
       (opt "addr" string)
+      (dft "cors-origin" (list string) [])
+      (dft "cors-header" (list string) [])
 
   let log =
     obj1
@@ -163,9 +169,9 @@ module Cfg_file = struct
   let t =
     conv
       (fun { store ; context ; protocol ;
-             min_connections ; max_connections ; expected_connections;
-             net_addr ; net_port ; local_discovery ; peers;
-             closed ; peers_cache ; rpc_addr; log_output } ->
+             min_connections ; max_connections ; expected_connections ;
+             net_addr ; net_port ; local_discovery ; peers ;
+             closed ; peers_cache ; rpc_addr ; cors_origins ; cors_headers ; log_output } ->
         let net_addr = string_of_sockaddr (net_addr, net_port) in
         let rpc_addr = Utils.map_option string_of_sockaddr rpc_addr in
         let peers = ListLabels.map peers ~f:string_of_sockaddr in
@@ -173,11 +179,14 @@ module Cfg_file = struct
         ((Some store, Some context, Some protocol),
          (Some min_connections, Some max_connections, Some expected_connections,
           Some net_addr, local_discovery, Some peers, closed, Some peers_cache),
-         rpc_addr, Some log_output))
+         (rpc_addr, cors_origins, cors_headers),
+         Some log_output))
       (fun (
          (store, context, protocol),
-         (min_connections, max_connections, expected_connections,
-          net_addr, local_discovery, peers, closed, peers_cache), rpc_addr, log_output) ->
+         (min_connections, max_connections, expected_connections, net_addr,
+          local_discovery, peers, closed, peers_cache),
+         (rpc_addr, cors_origins, cors_headers),
+         log_output) ->
          let open Utils in
          let store = unopt default_cfg.store store in
          let context = unopt default_cfg.context context in
@@ -196,7 +205,7 @@ module Cfg_file = struct
            store ; context ; protocol ;
            min_connections; max_connections; expected_connections;
            net_addr; net_port ; local_discovery; peers; closed; peers_cache;
-           rpc_addr; log_output
+           rpc_addr; cors_origins ; cors_headers ; log_output
          }
       )
       (obj4
@@ -273,10 +282,16 @@ module Cmdline = struct
   let rpc_addr =
     let doc = "The TCP socket address at which this RPC server instance can be reached" in
     Arg.(value & opt (some sockaddr_converter) None & info ~docs:"RPC" ~doc ~docv:"ADDR:PORT" ["rpc-addr"])
+  let cors_origins =
+    let doc = "CORS origin allowed by the RPC server via Access-Control-Allow-Origin; may be used multiple times" in
+    Arg.(value & opt_all string [] & info ~docs:"RPC" ~doc ~docv:"ORIGIN" ["cors-origin"])
+  let cors_headers =
+    let doc = "Header reported by Access-Control-Allow-Headers reported during CORS preflighting; may be used multiple times" in
+    Arg.(value & opt_all string [] & info ~docs:"RPC" ~doc ~docv:"HEADER" ["cors-header"])
 
   let parse base_dir config_file sandbox sandbox_param log_level
       min_connections max_connections expected_connections
-      net_saddr local_discovery peers closed rpc_addr reset_cfg update_cfg =
+      net_saddr local_discovery peers closed rpc_addr cors_origins cors_headers reset_cfg update_cfg =
     let base_dir = Utils.(unopt (unopt default_cfg.base_dir base_dir) sandbox) in
     let config_file = Utils.(unopt ((unopt base_dir sandbox) // "config")) config_file in
     let no_config () =
@@ -317,6 +332,8 @@ module Cmdline = struct
         peers = (match peers with [] -> cfg.peers | _ -> peers) ;
         closed = closed || cfg.closed ;
         rpc_addr = Utils.first_some rpc_addr cfg.rpc_addr ;
+        cors_origins = (match cors_origins with [] -> cfg.cors_origins | _ -> cors_origins) ;
+        cors_headers = (match cors_headers with [] -> cfg.cors_headers | _ -> cors_headers) ;
         log_output = cfg.log_output ;
       }
     in
@@ -328,7 +345,8 @@ module Cmdline = struct
     ret (const parse $ base_dir $ config_file
                      $ sandbox $ sandbox_param $ v
                      $ min_connections $ max_connections $ expected_connections
-                     $ net_addr $ local_discovery $ peers $ closed $ rpc_addr
+                     $ net_addr $ local_discovery $ peers $ closed
+                     $ rpc_addr $ cors_origins $ cors_headers
                      $ reset_config $ update_config
       ),
     let doc = "The Tezos daemon" in
@@ -420,7 +438,7 @@ let init_node { sandbox ; sandbox_param ;
     ?patch_context
     net_params
 
-let init_rpc { rpc_addr } node =
+let init_rpc { rpc_addr ; cors_origins ; cors_headers } node =
   match rpc_addr with
   | None ->
       lwt_log_notice "Not listening to RPC calls." >>= fun () ->
@@ -428,7 +446,7 @@ let init_rpc { rpc_addr } node =
   | Some (_addr, port) ->
       lwt_log_notice "Starting the RPC server listening on port %d." port >>= fun () ->
       let dir = Node_rpc.build_rpc_directory node in
-      RPC_server.launch port dir >>= fun server ->
+      RPC_server.launch port dir cors_origins cors_headers >>= fun server ->
       Lwt.return (Some server)
 
 let init_signal () =
