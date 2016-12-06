@@ -163,7 +163,7 @@ let http_proxy port =
       | None ->
           Lwt.return (RPC.Answer.Empty)) >>= fun body ->
     Lwt.return { RPC.Answer.code = 404 ; body } in
-  RPC_server.launch ~pre_hook ~post_hook port root
+  RPC_server.launch ~pre_hook ~post_hook port root [] []
 
 let web_port = Client_config.in_both_groups @@
   new Config_file.int_cp [ "web" ; "port" ] 8080
