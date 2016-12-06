@@ -9,7 +9,7 @@
 
 open Logging.Client.Denunciation
 
-let create endorsement_stream =
+let create cctxt endorsement_stream =
   let last_get_endorsement = ref None in
   let get_endorsement () =
     match !last_get_endorsement with
@@ -28,7 +28,7 @@ let create endorsement_stream =
         Lwt.return_unit
     | `Endorsement (Some e) ->
         last_get_endorsement := None ;
-        Client_keys.Public_key_hash.name
+        Client_keys.Public_key_hash.name cctxt
           e.Client_mining_operations.source >>= fun source ->
         lwt_debug
           "Discovered endorsement for block %a by %s (slot @[<h>%a@])"

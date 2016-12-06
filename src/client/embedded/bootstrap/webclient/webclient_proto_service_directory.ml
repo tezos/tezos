@@ -7,25 +7,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Services = Webclient_proto_services.Make (struct
+    type root = Node_rpc_services.Blocks.block
+  end)
 
-(* A global store for version indexed commands. *)
+let cctxt = Client_commands.ignore_context
 
-exception Version_not_found
-
-let versions = Protocol_hash_table.create 7
-
-let get_versions () =
-  Protocol_hash_table.fold
-    (fun k c acc -> (k, c) :: acc)
-    versions
-    []
-
-let register name commands =
-  let previous =
-    try Protocol_hash_table.find versions name
-    with Not_found -> [] in
-  Protocol_hash_table.add versions name (commands @ previous)
-
-let commands_for_version version =
-  try Protocol_hash_table.find versions version
-  with Not_found -> raise Version_not_found
+let root =
+  let root =
+    RPC.register RPC.empty Services.contracts @@ fun block () ->
+    Client_proto_contracts.RawContractAlias.load cctxt >>= fun list ->
+    let (names, _) = List.split list in
+    RPC.Answer.return names in
+  let root =
+    RPC.register root Services.hash @@ fun block () ->
+    Client_node_rpcs.(call_service1 cctxt Node_rpc_services.Blocks.hash block ()) >>= fun res ->
+    RPC.Answer.return (Hash.Block_hash.to_b48check res) in
+  root

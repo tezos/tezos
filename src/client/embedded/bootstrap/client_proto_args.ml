@@ -86,7 +86,7 @@ let tez_param ~name ~desc next =
     name
     (desc ^ " in \xEA\x9C\xA9\n\
              text format: D,DDD,DDD.DD (centiles and comas are optional)")
-    (fun s ->
+    (fun _ s ->
        try Lwt.return (tez_of_string s)
        with _ -> Lwt.fail_with "invalid \xEA\x9C\xA9 notation")
     next

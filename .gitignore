@@ -2,7 +2,9 @@
 /tezos-node
 /tezos-protocol-compiler
 /tezos-client
+/tezos-webclient
 
+/src/webclient_static.ml
 /src/.depend
 
 /src/node/updater/environment_gen
@@ -19,6 +21,12 @@
 /src/client/embedded/bootstrap/concrete_lexer.ml
 /src/client/embedded/bootstrap/concrete_parser.ml
 /src/client/embedded/bootstrap/concrete_parser.mli
+/src/client/embedded/bootstrap/webclient_proto_static.ml
+/src/client/embedded/bootstrap/main.byte
+/src/client/embedded/bootstrap/webclient_static/main.js
+/src/client/embedded/bootstrap/webclient/browser/main.byte
+/src/client/embedded/bootstrap/webclient/static/main.js
+/src/client/embedded/bootstrap/webclient/webclient_proto_static.ml
 
 /test/.depend
 /test/reports
@@ -44,6 +52,8 @@
 *.cmp
 *.mli.deps
 *.ml.deps
+*.mli.deps.byte
+*.ml.deps.byte
 
 bisect*.out
 

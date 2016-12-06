@@ -1,5 +1,7 @@
 
-all: ../client_$(PROTO_VERSION).cmx
+all: \
+  ../client_$(PROTO_VERSION).cmx \
+  ../webclient_$(PROTO_VERSION).cmx
 
 include ../../../Makefile.config
 
@@ -26,25 +28,56 @@ OPENED_MODULES := \
   ${OPENED_MODULES}
 
 OBJS := \
-  ${IMPLS:.ml=.cmx} ${IMPLS:.ml=.ml.deps} \
-  ${INTFS:.mli=.cmi} ${INTFS:.mli=.mli.deps} \
-  ../client_$(PROTO_VERSION).cmx
-${OBJS}: TARGET="(client_$(PROTO_VERSION).cmx)"
-${OBJS}: PACKAGES=lwt ocplib-json-typed config-file sodium
-${OBJS}: ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
+  ${CLIENT_IMPLS:.ml=.cmx} ${CLIENT_INTFS:.mli=.cmi}
+OBJS_DEPS := \
+   ${CLIENT_IMPLS:.ml=.ml.deps} ${CLIENT_INTFS:.mli=.mli.deps}
 
-../client_$(PROTO_VERSION).cmx: $(patsubst %.ml, %.cmx, ${IMPLS})
+${OBJS} ${OBJS_DEPS}: TARGET="(client_$(PROTO_VERSION).cmx)"
+${OBJS}: EXTRA_OCAMLFLAGS = -for-pack Client_$(PROTO_VERSION)
+../client_$(PROTO_VERSION).cmx: EXTRA_OCAMLFLAGS =
+${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
+  PACKAGES=lwt ocplib-json-typed config-file sodium ocplib-ocamlres
+${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
+  ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
+
+WEBOBJS := \
+  ${WEBCLIENT_IMPLS:.ml=.cmx} ${WEBCLIENT_INTFS:.mli=.cmi}
+WEBOBJS_DEPENDS := \
+  ${WEBCLIENT_IMPLS:.ml=.ml.deps} ${WEBCLIENT_INTFS:.mli=.mli.deps}
+
+${WEBOBJS} ${WEBOBJS_DEPS}: TARGET="(webclient_$(PROTO_VERSION).cmx)"
+${WEBOBJS} ${WEBOBJS_DEPS}: SOURCE_DIRECTORIES += ..
+${WEBOBJS} ${WEBOBJS_DEPS}: OPENED_MODULES += Client_${PROTO_VERSION}
+${WEBOBJS}: EXTRA_OCAMLFLAGS = -for-pack Webclient_$(PROTO_VERSION)
+../client_$(PROTO_VERSION).cmx: EXTRA_OCAMLFLAGS =
+${WEBOBJS} ${WEBOBJS_DEPS} ../webclient_$(PROTO_VERSION).cmx: \
+  PACKAGES=lwt ocplib-json-typed config-file sodium ocplib-ocamlres
+${WEBOBJS} ${WEBOBJS_DEPS} ../webclient_$(PROTO_VERSION).cmx: \
+  ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
+${WEBOBJS} ../webclient_$(PROTO_VERSION).cmx: \
+  ../client_${PROTO_VERSION}.cmx
+
+../client_$(PROTO_VERSION).cmx: $(patsubst %.ml, %.cmx, ${CLIENT_IMPLS})
 	@echo LINK $(notdir $@)
 	@$(OCAMLOPT) -linkall ${OCAMLFLAGS} -pack -o $@ \
-	   $(patsubst %.ml, %.cmx, ${IMPLS})
+	   $(patsubst %.ml, %.cmx, ${CLIENT_IMPLS})
+
+../webclient_$(PROTO_VERSION).cmx: $(patsubst %.ml, %.cmx, ${WEBCLIENT_IMPLS})
+	@echo LINK $(notdir $@)
+	@$(OCAMLOPT) -linkall ${OCAMLFLAGS} -pack -o $@ \
+	   $(patsubst %.ml, %.cmx, ${WEBCLIENT_IMPLS})
 
 %.cmx: %.ml
 	@echo OCAMLOPT ${TARGET} $(notdir $@)
-	@$(OCAMLOPT) ${OCAMLFLAGS} -for-pack Client_$(PROTO_VERSION) -c $<
+	@$(OCAMLOPT) ${OCAMLFLAGS} -c $<
+
+%.cmo: %.ml
+	@echo OCAMLC ${TARGET} $(notdir $@)
+	@$(OCAMLC) ${OCAMLFLAGS} -c $<
 
 %.cmi: %.mli
 	@echo OCAMLOPT ${TARGET} $(notdir $@)
-	@$(OCAMLOPT) ${OCAMLFLAGS} -for-pack Client_$(PROTO_VERSION) -c $<
+	@$(OCAMLOPT) ${OCAMLFLAGS} -c $<
 
 %.ml: %.mll
 	@echo OCAMLLEX ${TARGET} $(notdir $@)
@@ -57,23 +90,39 @@ ${OBJS}: ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
 .PHONY: clean
 clean::
 	-rm -f ../client_$(PROTO_VERSION).cm* ../client_$(PROTO_VERSION).o
-	-rm -f *.cm* *~ *.o *.a *.deps
+	-rm -f ../webclient_$(PROTO_VERSION).cm* ../webclient_$(PROTO_VERSION).o
+	-rm -f *.cm* *~ *.o *.a *.deps *.deps.byte
 	-rm -rf _tzbuild
 	-rm -f .depend
 
 ifneq ($(MAKECMDGOALS),clean)
--include .depend
+include .depend
 endif
 
 predepend:
 
-DEPENDS := ${INTFS} ${IMPLS}
-.SECONDARY: $(patsubst %,%.deps,${DEPENDS})
-.depend: $(patsubst %,%.deps,${DEPENDS})
+DEPENDS += \
+  $(patsubst %,%.deps,${CLIENT_INTFS} ${CLIENT_IMPLS}) \
+  $(patsubst %,%.deps,${WEBCLIENT_INTFS} ${WEBCLIENT_IMPLS})
+DEPENDS := $(filter-out ${NODEPENDS}, ${DEPENDS})
+
+.SECONDARY: ${DEPENDS}
+
+.depend: ${DEPENDS}
 	@cat $^ > .depend
+
 %.ml.deps: %.ml | predepend
 	@echo OCAMLDEP ${TARGET} $(notdir $<)
-	@$(OCAMLDEP) -native $(INCLUDES) ${EXTRA_OCAMLFLAGS} $^ > $@
+	@$(OCAMLDEP) -native $(INCLUDES) ${EXTRA_OCAMLFLAGS} $< > $@
+
 %.mli.deps: %.mli | predepend
 	@echo OCAMLDEP ${TARGET} $(notdir $<)
-	@$(OCAMLDEP) -native $(INCLUDES) ${EXTRA_OCAMLFLAGS} $^ > $@
+	@$(OCAMLDEP) -native $(INCLUDES) ${EXTRA_OCAMLFLAGS} $< > $@
+
+%.ml.deps.byte: %.ml | predepend
+	@echo OCAMLDEP ${TARGET} $(notdir $<)
+	@$(OCAMLDEP) $(INCLUDES) ${EXTRA_OCAMLFLAGS} $< > $@
+
+%.mli.deps.byte: %.mli | predepend
+	@echo OCAMLDEP ${TARGET} $(notdir $<)
+	@$(OCAMLDEP) $(INCLUDES) ${EXTRA_OCAMLFLAGS} $< > $@

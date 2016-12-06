@@ -9,10 +9,6 @@
 
 open Client_config
 
-let () =
-  let open Cli_entries in
-  register_group "helpers" "Various helpers"
-
 let unique = ref false
 let unique_arg =
   "-unique",
@@ -26,13 +22,17 @@ let commands () = Cli_entries.[
               works only for blocks, operations, public key and contract \
               identifiers."
       ~args: [unique_arg]
-      (prefixes [ "complete" ] @@ string "prefix" "the prefix of the Base48Check-encoded hash to be completed" @@ stop)
-      (fun prefix () ->
-         Client_node_rpcs.complete ~block:(block ()) prefix >>= fun completions ->
+      (prefixes [ "complete" ] @@
+       string
+         ~name: "prefix"
+         ~desc: "the prefix of the Base48Check-encoded hash to be completed" @@
+       stop)
+      (fun prefix cctxt ->
+         Client_node_rpcs.complete cctxt ~block:(block ()) prefix >>= fun completions ->
          match completions with
          | [] -> Pervasives.exit 3
          | _ :: _ :: _ when !unique -> Pervasives.exit 3
          | completions ->
              List.iter print_endline completions ;
              Lwt.return_unit)
-]
+  ]

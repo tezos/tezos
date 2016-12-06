@@ -85,6 +85,7 @@ module Client = struct
   module Revelation = Make(struct let name = "client.revealation" end)
   module Denunciation = Make(struct let name = "client.denunciation" end)
 end
+module Webclient = Make(struct let name = "webclient" end)
 
 let default_logger () =
   Lwt_log.channel ~close_mode:`Keep ~channel:Lwt_io.stderr ()

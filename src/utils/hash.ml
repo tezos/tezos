@@ -224,7 +224,7 @@ module Make_Blake2B (R : sig
          conv to_b48check (Data_encoding.Json.wrap_error of_b48check) string)
 
   let param ?(name=K.name) ?(desc=K.title) t =
-    Cli_entries.param ~name ~desc (fun str -> Lwt.return (of_b48check str)) t
+    Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b48check str)) t
 
   let pp ppf t =
     Format.pp_print_string ppf (to_b48check t)

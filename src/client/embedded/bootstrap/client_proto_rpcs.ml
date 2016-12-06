@@ -10,11 +10,11 @@
 let string_of_errors exns =
   Format.asprintf "  @[<v>%a@]" pp_print_error exns
 
-let handle_error = function
+let handle_error cctxt = function
   | Ok res -> Lwt.return res
   | Error exns ->
       pp_print_error Format.err_formatter exns ;
-      Cli_entries.error "cannot continue"
+      cctxt.Client_commands.error "%s" "cannot continue"
 
 type net = State.net_id = Net of Block_hash.t
 type block = [
@@ -24,42 +24,46 @@ type block = [
   | `Hash of Block_hash.t
 ]
 
-let call_service1 s block a1 =
-  Client_node_rpcs.call_service1
+let call_service1 cctxt s block a1 =
+  Client_node_rpcs.call_service1 cctxt
     (s Node_rpc_services.Blocks.proto_path) block a1
-let call_error_service1 s block a1 =
-  call_service1 s block a1 >|= wrap_error
-let call_service2 s block a1 a2 =
-  Client_node_rpcs.call_service2
+let call_error_service1 cctxt s block a1 =
+  call_service1 cctxt s block a1 >|= wrap_error
+let call_service2 cctxt s block a1 a2 =
+  Client_node_rpcs.call_service2 cctxt
     (s Node_rpc_services.Blocks.proto_path) block a1 a2
-let call_error_service2 s block a1 a2 =
-  call_service2 s block a1 a2 >|= wrap_error
+let call_error_service2 cctxt s block a1 a2 =
+  call_service2 cctxt s block a1 a2 >|= wrap_error
 
 module Constants = struct
-  let bootstrap block = call_service1 Services.Constants.bootstrap block ()
-  let errors block = call_service1 Services.Constants.errors block ()
-  let cycle_length block =
-    call_error_service1 Services.Constants.cycle_length block ()
-  let voting_period_length block =
-    call_error_service1 Services.Constants.voting_period_length block ()
-  let time_before_reward block =
-    call_error_service1 Services.Constants.time_before_reward block ()
-  let time_between_slots block =
-    call_error_service1 Services.Constants.time_between_slots block ()
-  let first_free_mining_slot block =
-    call_error_service1 Services.Constants.first_free_mining_slot block ()
-  let max_signing_slot block =
-    call_error_service1 Services.Constants.max_signing_slot block ()
-  let instructions_per_transaction block =
-    call_error_service1 Services.Constants.instructions_per_transaction block ()
-  let stamp_threshold block =
-    call_error_service1 Services.Constants.proof_of_work_threshold block ()
+  let bootstrap cctxt block =
+    call_service1 cctxt Services.Constants.bootstrap block ()
+  let errors cctxt block =
+    call_service1 cctxt Services.Constants.errors block ()
+  let cycle_length cctxt block =
+    call_error_service1 cctxt Services.Constants.cycle_length block ()
+  let voting_period_length cctxt block =
+    call_error_service1 cctxt Services.Constants.voting_period_length block ()
+  let time_before_reward cctxt block =
+    call_error_service1 cctxt Services.Constants.time_before_reward block ()
+  let time_between_slots cctxt block =
+    call_error_service1 cctxt Services.Constants.time_between_slots block ()
+  let first_free_mining_slot cctxt block =
+    call_error_service1 cctxt Services.Constants.first_free_mining_slot block ()
+  let max_signing_slot cctxt block =
+    call_error_service1 cctxt Services.Constants.max_signing_slot block ()
+  let instructions_per_transaction cctxt block =
+    call_error_service1 cctxt Services.Constants.instructions_per_transaction block ()
+  let stamp_threshold cctxt block =
+    call_error_service1 cctxt Services.Constants.proof_of_work_threshold block ()
 end
 
 module Context = struct
 
-  let level block = call_error_service1 Services.Context.level block ()
-  let next_level block = call_error_service1 Services.Context.next_level block ()
+  let level cctxt block =
+    call_error_service1 cctxt Services.Context.level block ()
+  let next_level cctxt block =
+    call_error_service1 cctxt Services.Context.next_level block ()
 
   module Nonce = struct
 
@@ -68,27 +72,27 @@ module Context = struct
       | Missing of Nonce_hash.t
       | Forgotten
 
-    let get block level =
-      call_error_service2 Services.Context.Nonce.get block level ()
+    let get cctxt block level =
+      call_error_service2 cctxt Services.Context.Nonce.get block level ()
 
-    let hash block =
-      call_error_service1 Services.Context.Nonce.hash block ()
+    let hash cctxt block =
+      call_error_service1 cctxt Services.Context.Nonce.hash block ()
 
   end
 
   module Key = struct
 
-    let get block pk_h =
-      call_error_service2 Services.Context.Key.get block pk_h ()
+    let get cctxt block pk_h =
+      call_error_service2 cctxt Services.Context.Key.get block pk_h ()
 
-    let list block =
-      call_error_service1 Services.Context.Key.list block ()
+    let list cctxt block =
+      call_error_service1 cctxt Services.Context.Key.list block ()
 
   end
 
   module Contract = struct
-    let list b =
-      call_error_service1 Services.Context.Contract.list b ()
+    let list cctxt b =
+      call_error_service1 cctxt Services.Context.Contract.list b ()
     type info = Services.Context.Contract.info = {
       manager: public_key_hash ;
       balance: Tez.t ;
@@ -98,64 +102,68 @@ module Context = struct
       assets: Asset.Map.t ;
       counter: int32 ;
     }
-    let get b c =
-      call_error_service2 Services.Context.Contract.get b c ()
-    let balance b c =
-      call_error_service2 Services.Context.Contract.balance b c ()
-    let manager b c =
-      call_error_service2 Services.Context.Contract.manager b c ()
-    let delegate b c =
-      call_error_service2 Services.Context.Contract.delegate b c ()
-    let counter b c =
-      call_error_service2 Services.Context.Contract.counter b c ()
-    let spendable b c =
-      call_error_service2 Services.Context.Contract.spendable b c ()
-    let delegatable b c =
-      call_error_service2 Services.Context.Contract.delegatable b c ()
-    let script b c =
-      call_error_service2 Services.Context.Contract.script b c ()
-    let assets b c =
-      call_error_service2 Services.Context.Contract.assets b c ()
+    let get cctxt b c =
+      call_error_service2 cctxt Services.Context.Contract.get b c ()
+    let balance cctxt b c =
+      call_error_service2 cctxt Services.Context.Contract.balance b c ()
+    let manager cctxt b c =
+      call_error_service2 cctxt Services.Context.Contract.manager b c ()
+    let delegate cctxt b c =
+      call_error_service2 cctxt Services.Context.Contract.delegate b c ()
+    let counter cctxt b c =
+      call_error_service2 cctxt Services.Context.Contract.counter b c ()
+    let spendable cctxt b c =
+      call_error_service2 cctxt Services.Context.Contract.spendable b c ()
+    let delegatable cctxt b c =
+      call_error_service2 cctxt Services.Context.Contract.delegatable b c ()
+    let script cctxt b c =
+      call_error_service2 cctxt Services.Context.Contract.script b c ()
+    let assets cctxt b c =
+      call_error_service2 cctxt Services.Context.Contract.assets b c ()
   end
 
 end
 
 module Helpers = struct
 
-  let minimal_time block ?prio () =
-    call_error_service1 Services.Helpers.minimal_timestamp block prio
+  let minimal_time cctxt block ?prio () =
+    call_error_service1 cctxt Services.Helpers.minimal_timestamp block prio
 
-  let typecheck_code = call_error_service1 Services.Helpers.typecheck_code
+  let typecheck_code cctxt =
+    call_error_service1 cctxt Services.Helpers.typecheck_code
 
-  let run_code block code (storage, input) =
-    call_error_service1 Services.Helpers.run_code
+  let run_code cctxt block code (storage, input) =
+    call_error_service1 cctxt Services.Helpers.run_code
       block (code, storage, input, None, None)
 
-  let trace_code block code (storage, input) =
-    call_error_service1 Services.Helpers.trace_code
+  let trace_code cctxt block code (storage, input) =
+    call_error_service1 cctxt Services.Helpers.trace_code
       block (code, storage, input, None, None)
 
-  let typecheck_tagged_data = call_error_service1 Services.Helpers.typecheck_tagged_data
+  let typecheck_tagged_data cctxt =
+    call_error_service1 cctxt Services.Helpers.typecheck_tagged_data
 
-  let typecheck_untagged_data = call_error_service1 Services.Helpers.typecheck_untagged_data
+  let typecheck_untagged_data cctxt =
+    call_error_service1 cctxt Services.Helpers.typecheck_untagged_data
 
-  let hash_data = call_error_service1 Services.Helpers.hash_data
+  let hash_data cctxt =
+    call_error_service1 cctxt Services.Helpers.hash_data
 
-  let level block ?offset lvl =
-    call_error_service2 Services.Helpers.level block lvl offset
+  let level cctxt block ?offset lvl =
+    call_error_service2 cctxt Services.Helpers.level block lvl offset
 
-  let levels block cycle =
-    call_error_service2 Services.Helpers.levels block cycle ()
+  let levels cctxt block cycle =
+    call_error_service2 cctxt Services.Helpers.levels block cycle ()
 
   module Rights = struct
     type slot = Raw_level.t * int * Time.t option
-    let mining_rights_for_delegate
+    let mining_rights_for_delegate cctxt
         b c ?max_priority ?first_level ?last_level () =
-      call_error_service2 Services.Helpers.Rights.mining_rights_for_delegate
+      call_error_service2 cctxt Services.Helpers.Rights.mining_rights_for_delegate
       b c (max_priority, first_level, last_level)
-    let endorsement_rights_for_delegate
+    let endorsement_rights_for_delegate cctxt
         b c ?max_priority ?first_level ?last_level () =
-    call_error_service2 Services.Helpers.Rights.endorsement_rights_for_delegate
+    call_error_service2 cctxt Services.Helpers.Rights.endorsement_rights_for_delegate
       b c (max_priority, first_level, last_level)
   end
 
@@ -168,24 +176,24 @@ module Helpers = struct
     open Operation
 
     module Manager = struct
-      let operations
+      let operations cctxt
           block ~net ~source ?sourcePubKey ~counter ~fee operations =
         let ops =
           Manager_operations { source ; public_key = sourcePubKey ;
                                counter ; operations ; fee } in
-        (call_error_service1 Services.Helpers.Forge.operations block
+        (call_error_service1 cctxt Services.Helpers.Forge.operations block
            ({net_id=net}, Sourced_operations ops))
         >>=? fun (bytes, contracts) ->
         return (bytes, match contracts with None -> [] | Some l -> l)
-      let transaction
+      let transaction cctxt
           block ~net ~source ?sourcePubKey ~counter
           ~amount ~destination ?parameters ~fee ()=
-        operations block ~net ~source ?sourcePubKey ~counter ~fee
+        operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[Transaction { amount ; parameters ; destination }]
         >>=? fun (bytes, contracts) ->
         assert (contracts = []) ;
         return bytes
-      let origination
+      let origination cctxt
           block ~net
           ~source ?sourcePubKey ~counter
           ~managerPubKey ~balance
@@ -193,7 +201,7 @@ module Helpers = struct
           ?(delegatable = true)
           ?delegatePubKey ?script ~fee () =
         let script = script_of_option script in
-        operations block ~net ~source ?sourcePubKey ~counter ~fee
+        operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[
             Origination { manager = managerPubKey ;
                           delegate = delegatePubKey ;
@@ -206,54 +214,56 @@ module Helpers = struct
         match contracts with
         | [contract] -> return (contract, bytes)
         | _ -> assert false
-      let issuance
+      let issuance cctxt
           block ~net ~source ?sourcePubKey ~counter ~assetType ~quantity ~fee ()=
-        operations block ~net ~source ?sourcePubKey ~counter ~fee
+        operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[Issuance { asset = assetType ; amount = quantity }]
         >>=? fun (bytes, contracts) ->
         assert (contracts = []) ;
         return bytes
-      let delegation
+      let delegation cctxt
           block ~net ~source ?sourcePubKey ~counter ~fee delegate =
-        operations block ~net ~source ?sourcePubKey ~counter ~fee
+        operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[Delegation delegate]
         >>=? fun (bytes, contracts) ->
         assert (contracts = []) ;
         return bytes
     end
     module Delegate = struct
-      let operations
+      let operations cctxt
           block ~net ~source operations =
         let ops = Delegate_operations { source ; operations } in
-        (call_error_service1 Services.Helpers.Forge.operations block
+        (call_error_service1 cctxt Services.Helpers.Forge.operations block
            ({net_id=net}, Sourced_operations ops))
         >>=? fun (hash, _contracts) ->
         return hash
-      let endorsement b ~net ~source ~block ~slot () =
-        operations b ~net ~source
+      let endorsement cctxt
+          b ~net ~source ~block ~slot () =
+        operations cctxt b ~net ~source
           Tezos_context.[Endorsement { block ; slot }]
     end
     module Anonymous = struct
-      let operations block ~net operations =
-        (call_error_service1 Services.Helpers.Forge.operations block
+      let operations cctxt block ~net operations =
+        (call_error_service1 cctxt Services.Helpers.Forge.operations block
            ({net_id=net}, Anonymous_operations operations))
         >>=? fun (hash, _contracts) ->
         return hash
-      let seed_nonce_revelation
+      let seed_nonce_revelation cctxt
           block ~net ~level ~nonce () =
-        operations block ~net [Seed_nonce_revelation { level ; nonce }]
+        operations cctxt block ~net [Seed_nonce_revelation { level ; nonce }]
     end
-    let block
+    let block cctxt
         block ~net ~predecessor ~timestamp ~fitness ~operations
         ~level ~priority ~seed_nonce_hash ~proof_of_work_nonce () =
-      call_error_service1 Services.Helpers.Forge.block block
+      call_error_service1 cctxt Services.Helpers.Forge.block block
         (net, predecessor, timestamp, fitness, operations,
          level, priority, seed_nonce_hash, proof_of_work_nonce)
   end
 
   module Parse = struct
-    let operations block ?check shell bytes =
-      call_error_service1 Services.Helpers.Parse.operations block (shell, bytes, check)
+    let operations cctxt
+        block ?check shell bytes =
+      call_error_service1 cctxt Services.Helpers.Parse.operations block (shell, bytes, check)
   end
 
 end

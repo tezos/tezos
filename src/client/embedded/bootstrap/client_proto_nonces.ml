@@ -23,17 +23,17 @@ let encoding : t Data_encoding.t =
 let filename () =
   Client_config.(base_dir#get // "nonces")
 
-let load () =
+let load cctxt =
   let filename = filename () in
   if not (Sys.file_exists filename) then
     Lwt.return []
   else
     Data_encoding_ezjsonm.read_file filename >>= function
-    | None -> error "couldn't to read the nonces file"
+    | None -> cctxt.Client_commands.error "couldn't to read the nonces file"
     | Some json ->
         match Data_encoding.Json.destruct encoding json with
         | exception _ -> (* TODO print_error *)
-            error "didn't understand the nonces file"
+            cctxt.Client_commands.error "didn't understand the nonces file"
         | list ->
             Lwt.return list
 
@@ -43,7 +43,7 @@ let check_dir dirname =
   else
     Lwt.return ()
 
-let save list =
+let save cctxt list =
   Lwt.catch
     (fun () ->
        let dirname = Client_config.base_dir#get in
@@ -54,29 +54,30 @@ let save list =
        | false -> failwith "Json.write_file"
        | true -> return ())
     (fun exn ->
-       error "could not write the nonces file: %s." (Printexc.to_string exn))
+       cctxt.Client_commands.error
+         "could not write the nonces file: %s." (Printexc.to_string exn))
 
-let mem block_hash =
-  load () >|= fun data ->
+let mem cctxt block_hash =
+  load cctxt >|= fun data ->
   List.mem_assoc block_hash data
 
-let find block_hash =
-  load () >|= fun data ->
+let find cctxt block_hash =
+  load cctxt >|= fun data ->
   try Some (List.assoc block_hash data)
   with Not_found -> None
 
-let add block_hash nonce =
-  load () >>= fun data ->
-  save ((block_hash, nonce) ::
+let add cctxt block_hash nonce =
+  load cctxt >>= fun data ->
+  save cctxt ((block_hash, nonce) ::
         List.remove_assoc block_hash data)
 
-let del block_hash =
-  load () >>= fun data ->
-  save (List.remove_assoc block_hash data)
+let del cctxt block_hash =
+  load cctxt >>= fun data ->
+  save cctxt (List.remove_assoc block_hash data)
 
-let dels hashes =
-  load () >>= fun data ->
-  save @@
+let dels cctxt hashes =
+  load cctxt >>= fun data ->
+  save cctxt @@
   List.fold_left
     (fun data hash -> List.remove_assoc hash data)
     data hashes

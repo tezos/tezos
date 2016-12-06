@@ -44,6 +44,7 @@ module Client : sig
   module Revelation : LOG
   module Denunciation : LOG
 end
+module Webclient : LOG
 
 module Make(S: sig val name: string end) : LOG
 

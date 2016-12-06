@@ -8,5 +8,6 @@
 (**************************************************************************)
 
 val create:
+  Client_commands.context ->
   Client_mining_operations.valid_endorsement Lwt_stream.t ->
   unit Lwt.t

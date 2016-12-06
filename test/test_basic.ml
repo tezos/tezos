@@ -14,7 +14,9 @@ open Error_monad
 open Hash
 
 let () =
-  Random.self_init () ;
+  Random.self_init ()
+
+let cctxt =
   let log channel msg = match channel with
     | "stdout" ->
         print_endline msg ;
@@ -23,7 +25,7 @@ let () =
         prerr_endline msg ;
         Lwt.return ()
     | _ -> Lwt.return () in
-  Cli_entries.log_hook := Some log
+  Client_commands.make_context log
 
 let should_fail f t =
   t >>= function
@@ -74,7 +76,7 @@ type account = {
 }
 
 let bootstrap_accounts () =
-  Client_proto_rpcs.Constants.bootstrap `Genesis
+  Client_proto_rpcs.Constants.bootstrap cctxt `Genesis
   >>= fun accounts ->
   let cpt = ref 0 in
   Lwt.return
@@ -105,7 +107,7 @@ let transfer ?(block = `Prevalidation) ?(fee = 5L) ~src ~target amount =
     match amount with
     | Some x -> x
     | None -> assert false in (* will be captured by the previous assert *)
-  Client_proto_context.transfer
+  Client_proto_context.transfer cctxt
     block
     ~source:src.contract
     ~src_pk:src.public_key
@@ -114,7 +116,7 @@ let transfer ?(block = `Prevalidation) ?(fee = 5L) ~src ~target amount =
     ~amount ~fee ()
 
 let check_balance ?(block = `Prevalidation) account expected =
-  Client_proto_rpcs.Context.Contract.balance
+  Client_proto_rpcs.Context.Contract.balance cctxt
     block account.contract >>=? fun balance ->
   let balance = Tez.to_cents balance in
   Assert.equal_int64 ~msg:__LOC__ expected balance ;
@@ -122,9 +124,9 @@ let check_balance ?(block = `Prevalidation) account expected =
 
 let mine contract =
   let block = `Head 0 in
-  Client_proto_rpcs.Context.level block >>=? fun level ->
+  Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
   let seed_nonce = Client_mining_forge.generate_seed_nonce () in
-  Client_mining_forge.forge_block
+  Client_mining_forge.forge_block cctxt
     ~timestamp:(Time.now ()) ~seed_nonce ~src_sk:contract.secret_key
     block contract.public_key_hash >>=? fun block_hash ->
   return ()
