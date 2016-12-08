@@ -1,5 +1,6 @@
 #! /bin/sh
 
+
 OCAML_VERSION=4.03.0
 if [ "$(ocaml -vnum)" != "${OCAML_VERSION}" ]; then
   echo ;
@@ -42,18 +43,18 @@ if [ ! -z "$pin" ] ; then
     opam pin --yes add --no-action --dev-repo ocp-ocamlres
     opam pin --yes add --no-action --dev-repo ocplib-json-typed
     opam pin --yes add --no-action --dev-repo ocplib-resto
+    ## Force opam to take account of the new `tezos-deps.opam`
+    opam pin --yes remove tezos-deps
     opam pin --yes add --no-action tezos-deps src
 fi
 
 if [ ! -z "$depext" ] ; then
+    ## In our CI, this rule is executed as user 'root'
+    ## The other rules are executed as user 'opam'.
     opam list --installed depext || opam install depext
     opam depext ${DEPEXTOPT} tezos-deps
 fi
 
 if [ ! -z "$install" ] ; then
-    if opam list --installed tezos-deps ; then
-	opam upgrade $(opam list -s --required-by tezos-deps | grep -ve '^ocaml *$')
-    else
-	opam install tezos-deps
-    fi
+    opam install --build-test tezos-deps
 fi
