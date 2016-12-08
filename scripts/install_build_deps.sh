@@ -1,43 +1,49 @@
-#! /bin/sh
+#!/bin/sh
 
-
-OCAML_VERSION=4.03.0
-if [ "$(ocaml -vnum)" != "${OCAML_VERSION}" ]; then
-  echo ;
-  echo "   Unexpected compiler version ($(ocaml -vnum))";
-  echo "   You should use ocaml-${OCAML_VERSION}.";
-  echo ;
-  exit 1;
+if ! [ -f 'src/tezos-deps.opam' ]; then
+    echo
+    echo "   Please run from the project's root directory. Aborting."
+    echo
+    exit 1
 fi
 
-cmd=$1
-if [ -z "$cmd" ] ; then cmd=all ; fi
+ocaml_version=4.03.0
+if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
+    echo
+    echo "   Unexpected compiler version ($(ocaml -vnum))"
+    echo "   You should use ocaml-$ocaml_version."
+    echo
+    exit 1
+fi
 
-case $cmd in
+cmd="$1"
+if [ -z "$cmd" ]; then cmd=all; fi
+
+case "$cmd" in
     pin)
-	pin=yes
-	;;
+        pin=yes
+        ;;
     depext)
-	depext=yes
-	;;
+        depext=yes
+        ;;
     install)
-	install=yes
-	;;
+        install=yes
+        ;;
     all)
-	pin=yes
-	depext=yes
-	install=yes
-	;;
+        pin=yes
+        depext=yes
+        install=yes
+        ;;
     *)
-	echo "Unknown command '$cmd'."
-        echo "Usage: $0 [pin|depext|install|all]"
-	exit 1
+        echo "Unknown command '$cmd'."
+        echo "Usage: $0 [pin|depext|install|all|]"
+        exit 1
 esac
 
 set -e
 set -x
 
-if [ ! -z "$pin" ] ; then
+if ! [ -z "$pin" ]; then
     opam pin --yes remove --no-action --dev-repo ocplib-resto || true
     opam pin --yes add --no-action --dev-repo sodium
     opam pin --yes add --no-action --dev-repo ocp-ocamlres
@@ -48,13 +54,13 @@ if [ ! -z "$pin" ] ; then
     opam pin --yes add --no-action tezos-deps src
 fi
 
-if [ ! -z "$depext" ] ; then
+if ! [ -z "$depext" ]; then
     ## In our CI, this rule is executed as user 'root'
     ## The other rules are executed as user 'opam'.
     opam list --installed depext || opam install depext
-    opam depext ${DEPEXTOPT} tezos-deps
+    opam depext tezos-deps
 fi
 
-if [ ! -z "$install" ] ; then
+if ! [ -z "$install" ]; then
     opam install --build-test tezos-deps
 fi
