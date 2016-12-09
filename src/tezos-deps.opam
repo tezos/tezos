@@ -31,6 +31,6 @@ depends: [
   "tyxml"
   "js_of_ocaml"
   "sodium" {>= "0.3.0"}
-  "kaputt" { test }
-  "bisect_ppx" { test }
+  "kaputt" # { test }
+  "bisect_ppx" # { test }
 ]

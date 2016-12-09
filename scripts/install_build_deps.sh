@@ -62,5 +62,7 @@ if ! [ -z "$depext" ]; then
 fi
 
 if ! [ -z "$install" ]; then
-    opam install --build-test tezos-deps
+    opam install tezos-deps
+    ## This seems broken in the current opam-repo (2016-12-09)
+    ## opam install --build-test tezos-deps
 fi
