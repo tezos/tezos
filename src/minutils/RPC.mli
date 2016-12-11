@@ -59,10 +59,60 @@ module Path : sig
 
 end
 
+(** HTTP methods as defined in Cohttp.Code *)
+
+type meth = [
+  | `GET
+  | `POST
+  | `HEAD
+  | `DELETE
+  | `PATCH
+  | `PUT
+  | `OPTIONS
+  | `TRACE
+  | `CONNECT
+  | `Other of string
+]
+
+val string_of_method : meth -> string
+
 (** Services. *)
 type ('prefix, 'params, 'input, 'output) service
 
 val service:
+  ?meth: meth ->
+  ?description: string ->
+  input: 'input Data_encoding.t ->
+  output: 'output Data_encoding.t ->
+  ('prefix, 'params) Path.path ->
+  ('prefix, 'params, 'input, 'output) service
+
+val get_service:
+  ?description: string ->
+  output: 'output Data_encoding.t ->
+  ('prefix, 'params) Path.path ->
+  ('prefix, 'params, unit, 'output) service
+
+val head_service:
+  ?description: string ->
+  ('prefix, 'params) Path.path ->
+  ('prefix, 'params, unit, unit) service
+
+val post_service:
+  ?description: string ->
+  input: 'input Data_encoding.t ->
+  output: 'output Data_encoding.t ->
+  ('prefix, 'params) Path.path ->
+  ('prefix, 'params, 'input, 'output) service
+
+val put_service:
+  ?description: string ->
+  input: 'input Data_encoding.t ->
+  output: 'output Data_encoding.t ->
+  ('prefix, 'params) Path.path ->
+  ('prefix, 'params, 'input, 'output) service
+
+val delete_service:
   ?description: string ->
   input: 'input Data_encoding.t ->
   output: 'output Data_encoding.t ->
@@ -76,7 +126,7 @@ val prefix:
 
 val forge_request:
   (unit, 'params, 'input, 'output) service ->
-  'params -> 'input -> string list * Data_encoding.json
+  'params -> 'input -> meth * string list * Data_encoding.json
 
 val read_answer:
   (unit, 'params, 'input, 'output) service ->
@@ -105,6 +155,7 @@ module Description : sig
     | Arg of Arg.descr * directory_descr
 
   val service:
+    ?meth: meth ->
     ?description:string ->
     ('prefix, 'params) Path.path ->
     ('prefix, 'params, bool option, directory_descr) service
@@ -141,7 +192,7 @@ end
 (** Dispatch tree *)
 type 'prefix directory
 
-(** Empty tree *)
+(** Empty list of dispatch trees *)
 val empty: 'prefix directory
 
 val map: ('a -> 'b) -> 'b directory -> 'a directory
@@ -206,9 +257,11 @@ val register5:
 
 (** Registring dynamic subtree. *)
 val register_dynamic_directory:
+  ?meths:meth list ->
   ?descr:string ->
   'prefix directory ->
-  ('prefix, 'a) Path.path -> ('a -> 'a directory Lwt.t) ->
+  ('prefix, 'a) Path.path ->
+  ('a -> 'a directory Lwt.t) ->
   'prefix directory
 
 (** Registring dynamic subtree. (Curryfied variant) *)
@@ -234,13 +287,14 @@ val register_dynamic_directory3:
   'prefix directory
 
 (** Registring custom directory lookup. *)
-type custom_lookup =
-  | CustomService of Description.service_descr *
-                     ( Data_encoding.json option ->
-                       Data_encoding.json Answer.answer Lwt.t )
-  | CustomDirectory of Description.directory_descr
+type custom_lookup = RestoDirectory.custom_lookup
+  (* | CustomService of Description.service_descr * *)
+  (*                    ( Data_encoding.json option -> *)
+  (*                      Data_encoding.json Answer.answer Lwt.t ) *)
+  (* | CustomDirectory of Description.directory_descr *)
 
 val register_custom_lookup:
+  ?meth:meth ->
   ?descr:string ->
   'prefix directory ->
   ('prefix, 'params) Path.path ->
@@ -248,6 +302,7 @@ val register_custom_lookup:
   'prefix directory
 
 val register_custom_lookup1:
+  ?meth:meth ->
   ?descr:string ->
   'prefix directory ->
   ('prefix, unit * 'a) Path.path ->
@@ -255,6 +310,7 @@ val register_custom_lookup1:
   'prefix directory
 
 val register_custom_lookup2:
+  ?meth:meth ->
   ?descr:string ->
   'prefix directory ->
   ('prefix, (unit * 'a) * 'b) Path.path ->
@@ -262,6 +318,7 @@ val register_custom_lookup2:
   'prefix directory
 
 val register_custom_lookup3:
+  ?meth:meth ->
   ?descr:string ->
   'prefix directory ->
   ('prefix, ((unit * 'a) * 'b) * 'c) Path.path ->
@@ -278,5 +335,5 @@ exception Cannot_parse of Arg.descr * string * string list
 
 (** Resolve a service. *)
 val lookup:
-  'prefix directory -> 'prefix -> string list ->
+  'prefix directory -> ?meth:meth -> 'prefix -> string list ->
   (Data_encoding.json option -> Data_encoding.json Answer.answer Lwt.t) Lwt.t

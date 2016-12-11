@@ -82,7 +82,12 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
         Lwt.catch
           (fun () ->
              hook (Uri.path (Cohttp.Request.uri req))
-             >>= fun { Answer.code ; body } ->
+             >>= fun (content_type, { Answer.code ; body }) ->
+             let headers =
+               match content_type with
+               | None -> Cohttp.Header.init ()
+               | Some ct -> Cohttp.Header.init_with "Content-Type" ct
+             in
              if code = 404 && not answer_404 then
                Lwt.return None
              else
@@ -96,7 +101,7 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
                        create_stream io con (fun s -> s) s in
                      Cohttp_lwt_body.of_stream stream in
                Lwt.return_some
-                 (Response.make ~flush:true ~status:(`Code code) (),
+                 (Response.make ~flush:true ~status:(`Code code) ~headers (),
                   body))
           (function
             | Not_found -> Lwt.return None
@@ -114,16 +119,20 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
          | Some res ->
              Lwt.return res
          | None ->
-             lookup root () path >>= fun handler ->
+             lookup root ~meth:req.meth () path >>= fun handler ->
              begin
                match req.meth with
-               | `POST -> begin
+               | `POST
+               | `PUT
+               | `PATCH
+               | `DELETE -> begin
                    Cohttp_lwt_body.to_string body >>= fun body ->
                    match Data_encoding_ezjsonm.from_string body with
                    | Error msg -> Lwt.fail (Cannot_parse_body msg)
                    | Ok body -> Lwt.return (Some body)
                  end
-               | `GET -> Lwt.return None
+               | `GET
+               | `HEAD -> Lwt.return None
                | `OPTIONS -> Lwt.fail Options_preflight
                | _ -> Lwt.fail Invalid_method
              end >>= fun body ->
@@ -142,7 +151,12 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
                (if Cohttp.Code.is_error code
                 then "failed"
                 else "success") >>= fun () ->
-             let headers = make_cors_headers cors_allowed_headers cors_allowed_origins origin_header in
+             let headers =
+               Cohttp.Header.init_with "Content-Type" "application/json" in
+             let headers =
+               make_cors_headers ~headers
+                 cors_allowed_headers cors_allowed_origins origin_header
+             in
              Lwt.return (Response.make
                            ~flush:true ~status:(`Code code) ~headers (), body))
       (function

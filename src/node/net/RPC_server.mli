@@ -34,10 +34,12 @@ type server
     before resolving each request, to delegate the answering to
     another resolution mechanism. Its result is ignored if the return
     code is [404]. The optional [post_hook] is called if both the
-    [pre_hook] and the serviced answered with a [404] code. *)
+    [pre_hook] and the serviced answered with a [404] code. [pre_hook] and
+    [post_hook] return a pair made of an optional Content-Type value and the
+    answer. *)
 val launch :
-  ?pre_hook: (string -> string RPC.Answer.answer Lwt.t) ->
-  ?post_hook: (string -> string RPC.Answer.answer Lwt.t) ->
+  ?pre_hook: (string -> (string option * string RPC.Answer.answer) Lwt.t) ->
+  ?post_hook: (string -> (string option * string RPC.Answer.answer) Lwt.t) ->
   ?host:string ->
   Conduit_lwt_unix.server ->
   unit RPC.directory ->

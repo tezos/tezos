@@ -185,7 +185,7 @@ val describe:
 
 val get_json:
   Client_commands.context ->
-  string list -> Data_encoding.json -> Data_encoding.json Lwt.t
+  RPC.meth -> string list -> Data_encoding.json -> Data_encoding.json Lwt.t
 
 val call_service0:
   Client_commands.context ->
