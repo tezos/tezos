@@ -522,7 +522,8 @@ WEBCLIENT_IMPLS := \
   webclient_main.ml
 
 CLIENT_PACKAGES := \
-  ${NODE_PACKAGES}
+  ${NODE_PACKAGES} \
+  magic-mime \
 
 EMBEDDED_CLIENT_PROTOCOLS := \
   $(patsubst client/embedded/%/, \

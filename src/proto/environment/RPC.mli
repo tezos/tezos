@@ -57,7 +57,22 @@ end
 (** Services. *)
 type ('prefix, 'params, 'input, 'output) service
 
+(** HTTP methods as defined in Cohttp.Code *)
+type meth = [
+  | `GET
+  | `POST
+  | `HEAD
+  | `DELETE
+  | `PATCH
+  | `PUT
+  | `OPTIONS
+  | `TRACE
+  | `CONNECT
+  | `Other of string
+]
+
 val service:
+  ?meth: meth ->
   ?description: string ->
   input: 'input Data_encoding.t ->
   output: 'output Data_encoding.t ->

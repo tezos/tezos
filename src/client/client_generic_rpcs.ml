@@ -308,7 +308,7 @@ let call url cctxt =
       | Error msg ->
           cctxt.error "%s" msg
       | Ok json ->
-          Client_node_rpcs.get_json cctxt args json >>= fun json ->
+          Client_node_rpcs.get_json cctxt `POST args json >>= fun json ->
           cctxt.message
             "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
     end
@@ -325,7 +325,7 @@ let call_with_json url json (cctxt: Client_commands.context) =
         err
   | Ok json ->
       let open RPC.Description in
-      Client_node_rpcs.get_json cctxt args json >>= fun json ->
+      Client_node_rpcs.get_json cctxt `POST args json >>= fun json ->
       cctxt.message
         "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
 

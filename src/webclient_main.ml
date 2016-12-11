@@ -125,14 +125,14 @@ let root =
          Lwt.return directory) in
   root
 
-let find_static_file path =
-  let path = OCamlRes.Path.of_string path in
+let find_static_file path_str =
+  let path = OCamlRes.Path.of_string path_str in
   let index path = match path with
-    | ([], None) -> ([], Some ("index", Some "html"))
-    | oth -> oth in
+    | [], None -> "text/html", ([], Some ("index", Some "html"))
+    | oth -> Magic_mime.lookup path_str, oth in
   match path with
   | ("block" :: block :: path, file) ->
-      let path = index (path, file) in
+      let content_type, path = index (path, file) in
       (match Node_rpc_services.Blocks.parse_block block with
        | Ok block ->
            block_protocol Client_commands.ignore_context block >>= fun version ->
@@ -140,29 +140,33 @@ let find_static_file path =
              (try
                 let root =
                   Webclient_version.find_contextual_static_files version in
-                Some (OCamlRes.Res.find path root)
+                Some (content_type, OCamlRes.Res.find path root)
               with Not_found -> None)
        | Error _ -> Lwt.return None)
   | _ ->
       Lwt.return
         (try
-           Some (OCamlRes.Res.find (index path) Webclient_static.root)
+           let content_type, path = index path in
+           Some (content_type, OCamlRes.Res.find path Webclient_static.root)
          with Not_found -> None)
 
 let http_proxy mode =
   let pre_hook path =
     find_static_file path >>= function
-    | Some body ->
-        Lwt.return { RPC.Answer.code = 200 ; body = RPC.Answer.Single body }
+    | Some (content_type, body) ->
+        Lwt.return
+          (Some content_type,
+            { RPC.Answer.code = 200 ; body = RPC.Answer.Single body })
     | None ->
-        Lwt.return { RPC.Answer.code = 404 ; body = RPC.Answer.Empty } in
+        Lwt.return
+          (None, { RPC.Answer.code = 404 ; body = RPC.Answer.Empty }) in
   let post_hook _ =
     (find_static_file "not_found.html" >>= function
-      | Some body ->
-          Lwt.return (RPC.Answer.Single body)
+      | Some (content_type, body) ->
+          Lwt.return (Some content_type, RPC.Answer.Single body)
       | None ->
-          Lwt.return (RPC.Answer.Empty)) >>= fun body ->
-    Lwt.return { RPC.Answer.code = 404 ; body } in
+          Lwt.return (None, RPC.Answer.Empty)) >>= fun (content_type, body) ->
+    Lwt.return (content_type, { RPC.Answer.code = 404 ; body }) in
   RPC_server.launch ~pre_hook ~post_hook mode root [] []
 
 let web_port = Client_config.in_both_groups @@
