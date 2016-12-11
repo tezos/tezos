@@ -26,7 +26,8 @@ let call_service service params input =
       (module Json_repr_browser.Repr)
       (module Json_repr.Ezjsonm)
       (Js._JSON##parse body) in
-  let path, json = RPC.forge_request service params input in
+  let meth, path, json = RPC.forge_request service params input in
+  let meth_str = RPC.string_of_method meth in
   let url = String.concat "/" path in
   let xhr = XmlHttpRequest.create () in
   let t, u = Lwt.wait () in
@@ -34,7 +35,7 @@ let call_service service params input =
       if xhr##.readyState = XmlHttpRequest.DONE then
         let response = read_json_body xhr##.responseText in
         Lwt.wakeup u response) ;
-  xhr##_open (Js.string "POST") (Js.string url) Js._true ;
+  xhr##_open (Js.string meth_str) (Js.string url) Js._true ;
   xhr##send (Js.Opt.return (write_json_body json)) ;
   t >>= fun json ->
   match RPC.read_answer service json with

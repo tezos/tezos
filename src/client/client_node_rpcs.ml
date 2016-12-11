@@ -21,7 +21,7 @@ let log_response { log } cpt code ans =
   log "requests" "<<<<%d: %s\n%s\n" cpt (Cohttp.Code.string_of_status code) ans
 
 let cpt = ref 0
-let make_request cctxt service json =
+let make_request cctxt meth service json =
   incr cpt ;
   let cpt = !cpt in
   let scheme = if Client_config.tls#get then "https" else "http" in
@@ -35,7 +35,7 @@ let make_request cctxt service json =
   catch
     (fun () ->
        let body = Cohttp_lwt_body.of_string reqbody in
-       Cohttp_lwt_unix.Client.post ~body uri >>= fun (code, ansbody) ->
+       Cohttp_lwt_unix.Client.call meth ~body uri >>= fun (code, ansbody) ->
        log_request cctxt cpt string_uri reqbody >>= fun () ->
        return (cpt, Unix.gettimeofday () -. tzero,
                code.Cohttp.Response.status, ansbody))
@@ -45,8 +45,8 @@ let make_request cctxt service json =
          | e -> Printexc.to_string e in
        cctxt.error "cannot connect to the RPC server (%s)" msg)
 
-let get_streamed_json cctxt service json =
-  make_request cctxt service json >>= fun (_cpt, time, code, ansbody) ->
+let get_streamed_json cctxt meth service json =
+  make_request cctxt meth service json >>= fun (_cpt, time, code, ansbody) ->
   let ansbody = Cohttp_lwt_body.to_stream ansbody in
   match code, ansbody with
   | #Cohttp.Code.success_status, ansbody ->
@@ -73,8 +73,8 @@ let get_streamed_json cctxt service json =
       cctxt.error "the RPC server returned a non-success status (%s)"
         (Cohttp.Code.string_of_status err)
 
-let get_json cctxt service json =
-  make_request cctxt service json >>= fun (cpt, time, code, ansbody) ->
+let get_json cctxt meth service json =
+  make_request cctxt meth service json >>= fun (cpt, time, code, ansbody) ->
   Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
   match code, ansbody with
   | #Cohttp.Code.success_status, ansbody -> begin
@@ -108,23 +108,23 @@ let parse_answer cctxt service path json =
   | Ok v -> return v
 
 let call_service0 cctxt service arg =
-  let path, arg = RPC.forge_request service () arg in
-  get_json cctxt path arg >>= fun json ->
+  let meth, path, arg = RPC.forge_request service () arg in
+  get_json cctxt meth path arg >>= fun json ->
   parse_answer cctxt service path json
 
 let call_service1 cctxt service a1 arg =
-  let path, arg = RPC.forge_request service ((), a1) arg in
-  get_json cctxt path arg >>= fun json ->
+  let meth, path, arg = RPC.forge_request service ((), a1) arg in
+  get_json cctxt meth path arg >>= fun json ->
   parse_answer cctxt service path json
 
 let call_service2 cctxt service a1 a2 arg =
-  let path, arg = RPC.forge_request service (((), a1), a2) arg in
-  get_json cctxt path arg >>= fun json ->
+  let meth, path, arg = RPC.forge_request service (((), a1), a2) arg in
+  get_json cctxt meth path arg >>= fun json ->
   parse_answer cctxt service path json
 
 let call_streamed_service0 cctxt service arg =
-  let path, arg = RPC.forge_request service () arg in
-  get_streamed_json cctxt path arg >|= fun st ->
+  let meth, path, arg = RPC.forge_request service () arg in
+  get_streamed_json cctxt meth path arg >|= fun st ->
   Lwt_stream.map_s (parse_answer cctxt service path) st
 
 module Services = Node_rpc_services
@@ -150,8 +150,8 @@ let complete cctxt ?block prefix =
   | Some block ->
       call_service2 cctxt Services.Blocks.complete block prefix ()
 let describe cctxt ?recurse path =
-  let prefix, arg = RPC.forge_request Services.describe () recurse in
-  get_json cctxt (prefix @ path) arg >>=
+  let meth, prefix, arg = RPC.forge_request Services.describe () recurse in
+  get_json cctxt meth (prefix @ path) arg >>=
   parse_answer cctxt Services.describe prefix
 
 module Blocks = struct

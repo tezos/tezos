@@ -37,6 +37,7 @@ PKG git
 PKG ipv6-multicast
 PKG irmin
 PKG lwt
+PKG magic-mime
 PKG mtime.os
 PKG nocrypto
 PKG ocplib-endian

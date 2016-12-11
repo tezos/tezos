@@ -19,12 +19,13 @@ module Error = struct
       RPC.Path.(root / "errors")
 
   let encoding =
-    let path, _ = RPC.forge_request service () () in
+    let meth, path, _ = RPC.forge_request service () () in
     describe
       ~description:
         (Printf.sprintf
            "The full list of error is available with \
-            the global RPC `/%s`" (String.concat "/" path))
+            the global RPC `%s /%s`"
+            (RPC.string_of_method meth) (String.concat "/" path))
       (conv
          ~schema:Json_schema.any
          (fun exn -> `A (List.map json_of_error exn))

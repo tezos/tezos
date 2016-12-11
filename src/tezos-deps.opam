@@ -37,6 +37,7 @@ depends: [
   "tyxml"
   "js_of_ocaml"
   "sodium" {>= "0.3.0" }
+  "magic-mime"
   "kaputt" # { test }
   "bisect_ppx" # { test }
 ]
