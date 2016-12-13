@@ -151,7 +151,7 @@ You might also want the JSON schema describing the expected input and output of
 a RPC. For instance:
 
 ```
-./tezos-client rpc schema /block/genesis/hash
+./tezos-client rpc schema /blocks/genesis/hash
 ```
 
 Note: you can get the same information, but as a raw JSON object, with a simple
