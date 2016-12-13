@@ -35,9 +35,11 @@ type server
     another resolution mechanism. Its result is ignored if the return
     code is [404]. The optional [post_hook] is called if both the
     [pre_hook] and the serviced answered with a [404] code. *)
-val launch : Conduit_lwt_unix.server ->
+val launch :
   ?pre_hook: (string -> string RPC.Answer.answer Lwt.t) ->
   ?post_hook: (string -> string RPC.Answer.answer Lwt.t) ->
+  ?host:string ->
+  Conduit_lwt_unix.server ->
   unit RPC.directory ->
   string list ->
   string list ->
