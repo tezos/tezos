@@ -454,11 +454,12 @@ let init_node { sandbox ; sandbox_param ;
 
 let init_rpc { rpc_addr ; rpc_crt; rpc_key ; cors_origins ; cors_headers } node =
   match rpc_addr, rpc_crt, rpc_key with
-  | Some (_addr, port), Some crt, Some key ->
+  | Some (addr, port), Some crt, Some key ->
       lwt_log_notice "Starting the RPC server listening on port %d (TLS enabled)." port >>= fun () ->
       let dir = Node_rpc.build_rpc_directory node in
       let mode = `TLS_native (`Crt_file_path crt, `Key_file_path key, `No_password, `Port port) in
-      RPC_server.launch mode dir cors_origins cors_headers >>= fun server ->
+      let host = Ipaddr.to_string addr in
+      RPC_server.launch ~host mode dir cors_origins cors_headers >>= fun server ->
       Lwt.return (Some server)
   | Some (_addr, port), _, _ ->
       lwt_log_notice "Starting the RPC server listening on port %d (TLS disabled)." port >>= fun () ->
