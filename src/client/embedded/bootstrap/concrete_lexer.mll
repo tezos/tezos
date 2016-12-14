@@ -306,7 +306,7 @@ and raw_token st = parse
 | ";" { SEMICOLON }
 
 | firstidentchar identchar *
-    { PRIM (String.lowercase_ascii (Lexing.lexeme lexbuf)) }
+    { PRIM (Lexing.lexeme lexbuf) }
 
 | int_literal
     { INT (Lexing.lexeme lexbuf) }

@@ -121,10 +121,10 @@ let unexpand_macros type_map program =
   let open Script in
   let rec caddr type_map acc = function
     | [] -> Some (List.rev acc)
-    | Prim (loc, "car" , []) :: rest when List.mem_assoc loc type_map ->
-        caddr type_map ((loc, "a") :: acc) rest
-    | Prim (loc, "cdr" , []) :: rest when List.mem_assoc loc type_map ->
-        caddr type_map ((loc, "d") :: acc) rest
+    | Prim (loc, "CAR" , []) :: rest when List.mem_assoc loc type_map ->
+        caddr type_map ((loc, "A") :: acc) rest
+    | Prim (loc, "CDR" , []) :: rest when List.mem_assoc loc type_map ->
+        caddr type_map ((loc, "D") :: acc) rest
     | _ -> None in
   let rec unexpand type_map node =
     match node with
@@ -141,7 +141,7 @@ let unexpand_macros type_map program =
               type_map, Seq (loc, List.rev l)
           | Some l ->
               let locs, steps = List.split l in
-              let name = "c" ^ String.concat "" steps ^ "r" in
+              let name = "C" ^ String.concat "" steps ^ "R" in
               let first, last = List.hd locs, List.hd (List.rev locs) in
               let (before, _) = List.assoc first type_map in
               let (_, after) = List.assoc last type_map in
@@ -256,14 +256,13 @@ let commands () =
              let type_map, program = unexpand_macros type_map program in
              cctxt.message "Well typed" >>= fun () ->
              if !show_types then begin
-               print_program
-                 (fun l -> List.mem_assoc l type_map)
-                 Format.std_formatter program ;
-               cctxt.message "@." >>= fun () ->
+               cctxt.message "%a"
+                 (print_program (fun l -> List.mem_assoc l type_map))
+                 program >>= fun () ->
                Lwt_list.iter_s
                  (fun (loc, (before, after)) ->
                     cctxt.message
-                      "%3d@[<v 0> : [ @[<v 0>%a ]@]@,-> [ @[<v 0>%a ]@]@]@."
+                      "%3d@[<v 0> : [ @[<v 0>%a ]@]@,-> [ @[<v 0>%a ]@]@]"
                       loc
                       (Format.pp_print_list (print_ir (fun _ -> false)))
                       before

@@ -25,15 +25,15 @@ open Script_located_ir
 let expand_caddadr loc str =
   let len = String.length str in
   if len > 3
-  && String.get str 0 = 'c'
-  && String.get str (len - 1) = 'r' then
+  && String.get str 0 = 'C'
+  && String.get str (len - 1) = 'R' then
     let rec parse i acc =
       if i = 0 then
         Some (Seq (loc, acc))
       else
         match String.get str i with
-        | 'a' -> parse (i - 1) (Prim (loc, "car", []) :: acc)
-        | 'd' -> parse (i - 1) (Prim (loc, "cdr", []) :: acc)
+        | 'A' -> parse (i - 1) (Prim (loc, "CAR", []) :: acc)
+        | 'D' -> parse (i - 1) (Prim (loc, "CDR", []) :: acc)
         | _ -> None in
     parse (len - 2) []
   else
@@ -48,13 +48,13 @@ let decimal_of_roman roman =
   for i = (String.length roman) - 1 downto 0 do
     let n =
       match roman.[i] with
-      | 'm' -> 1000
-      | 'd' -> 500
-      | 'c' -> 100
-      | 'l' -> 50
-      | 'x' -> 10
-      | 'v' -> 5
-      | 'i' -> 1
+      | 'M' -> 1000
+      | 'D' -> 500
+      | 'C' -> 100
+      | 'L' -> 50
+      | 'X' -> 10
+      | 'V' -> 5
+      | 'I' -> 1
       | _ -> raise Not_a_roman
     in
     if Compare.Int.(n < !lastval)
@@ -67,8 +67,8 @@ let decimal_of_roman roman =
 let expand_dxiiivp loc str arg =
   let len = String.length str in
   if len > 3
-  && String.get str 0 = 'd'
-  && String.get str (len - 1) = 'p' then
+  && String.get str 0 = 'D'
+  && String.get str (len - 1) = 'P' then
     try
       let depth = decimal_of_roman (String.sub str 1 (len - 2)) in
       let rec make i =
@@ -76,7 +76,7 @@ let expand_dxiiivp loc str arg =
           arg
         else
           let sub = make (i - 1) in
-          Prim (loc, "dip", [ sub ]) in
+          Prim (loc, "DIP", [ Seq (loc, [ sub ]) ]) in
       Some (make depth)
     with Not_a_roman -> None
   else None
@@ -86,19 +86,19 @@ exception Not_a_pair
 let expand_paaiair loc str =
   let len = String.length str in
   if len > 4
-  && String.get str 0 = 'p'
-  && String.get str (len - 1) = 'r' then
+  && String.get str 0 = 'P'
+  && String.get str (len - 1) = 'R' then
     try
       let rec parse i acc =
-        if String.get str i = 'i'
-        && String.get str (i - 1) = 'a' then
-          parse (i - 2) (Prim (loc, "pair", []) :: acc)
-        else if String.get str i = 'a' then
+        if String.get str i = 'I'
+        && String.get str (i - 1) = 'A' then
+          parse (i - 2) (Prim (loc, "PAIR", []) :: acc)
+        else if String.get str i = 'A' then
           match acc with
           | [] ->
               raise Not_a_pair
           | acc :: accs ->
-              parse (i - 1) (Prim (loc, "dip", [ acc ]) :: accs)
+              parse (i - 1) (Prim (loc, "DIP", [ acc ]) :: accs)
         else
           raise Not_a_pair in
       Some (Seq (loc, parse (len - 2) []))
