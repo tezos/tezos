@@ -457,8 +457,13 @@ let init_rpc { rpc_addr ; rpc_crt; rpc_key ; cors_origins ; cors_headers } node 
   | Some (addr, port), Some crt, Some key ->
       lwt_log_notice "Starting the RPC server listening on port %d (TLS enabled)." port >>= fun () ->
       let dir = Node_rpc.build_rpc_directory node in
-      let mode = `TLS_native (`Crt_file_path crt, `Key_file_path key, `No_password, `Port port) in
+      let mode = `TLS (`Crt_file_path crt, `Key_file_path key, `No_password, `Port port) in
       let host = Ipaddr.to_string addr in
+      let () =
+        let old_hook = !Lwt.async_exception_hook in
+        Lwt.async_exception_hook := function
+          | Ssl.Read_error _ -> ()
+          | exn -> old_hook exn in
       RPC_server.launch ~host mode dir cors_origins cors_headers >>= fun server ->
       Lwt.return (Some server)
   | Some (_addr, port), _, _ ->
