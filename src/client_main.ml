@@ -42,11 +42,14 @@ let main () =
        Lwt.catch
          (fun () ->
             Client_node_rpcs.Blocks.protocol cctxt block)
-         (fun _ ->
-            cctxt.message
-              "\n\
-               The connection to the RPC server failed, \
-               using the default protocol version.\n" >>= fun () ->
+         (fun exn ->
+            cctxt.warning
+              "Error trying to acquire the protocol version from the node: %s."
+              (match exn with
+               | Failure msg -> msg
+               | exn -> Printexc.to_string exn) >>= fun () ->
+            cctxt.warning
+              "Using the default protocol version." >>= fun () ->
             Lwt.return Client_bootstrap.Client_proto_main.protocol)
        >>= fun version ->
        let commands =
@@ -81,7 +84,7 @@ let main () =
           Format.eprintf "Command failed, %s.\n%!" message ;
           Lwt.return 1
       | Failure message ->
-          Format.eprintf "%s\n%!" message ;
+          Format.eprintf "Fatal error: %s\n%!" message ;
           Lwt.return 1
       | exn ->
           Format.printf "Fatal internal error: %s\n%!"
