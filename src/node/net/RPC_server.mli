@@ -12,7 +12,7 @@
 (** A handle on the server worker. *)
 type server
 
-(** Promise a running RPC serve. To call a RPC at /p/a/t/h/ in the
+(** Promise a running RPC server. To call an RPC at /p/a/t/h/ in the
     provided service, one must call the URI /call/p/a/t/h/. Calling
     /list/p/a/t/h/ will list the services prefixed by /p/a/t/h/, if
     any. Calling /schema/p/a/t/h/ will describe the input and output
@@ -45,7 +45,7 @@ val launch :
   string list ->
   server Lwt.t
 
-(** Kill a RPC server. *)
+(** Kill an RPC server. *)
 val shutdown : server -> unit Lwt.t
 
 (** Retrieve the root service of the server. *)

@@ -53,7 +53,7 @@ let make_cors_headers ?(headers=Cohttp.Header.init ())
           Cohttp.Header.add_multi cors_headers
             "Access-Control-Allow-Origin" [allowed_origin]
 
-(* Promise a running RPC server. Takes the port. *)
+(* Promise a running RPC server. *)
 let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors_allowed_headers =
   (* launch the worker *)
   let cancelation, canceler, _ = Lwt_utils.canceler () in
