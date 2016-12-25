@@ -543,7 +543,7 @@ constants as is, concatenate them and use them as keys.
         > Car ; C / (Pair a _) : S   =>   C / a : S
 
    * `CDR`:
-     Access the left part of a pair.
+     Access the right part of a pair.
 
         :: pair _ 'b : 'S   ->   'b : 'S
 
