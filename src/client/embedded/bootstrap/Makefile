@@ -69,6 +69,8 @@ clean::
 	-rm -f mining/*.cm* mining/*~ mining/*.o mining/*.a
 	-rm -f mining/*.deps mining/*.deps.byte
 
+.INTERMEDIATE: webclient/browser/main.byte
+
 JS_PACKAGES := \
   lwt \
   cstruct \

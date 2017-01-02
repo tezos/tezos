@@ -43,7 +43,10 @@ PACKAGES := \
   sodium \
   unix \
   kaputt \
-  bisect_ppx.runtime
+
+ifeq ($(strip ${COVERAGE}),yes)
+PACKAGES += bisect_ppx.runtime
+endif
 
 ############################################################################
 ## External packages
