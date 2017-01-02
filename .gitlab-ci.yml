@@ -29,6 +29,7 @@ build:
   tags:
     - tezos_builder
   script:
+    - echo "PRODUCTION=yes" > src/Makefile.local
     - make -j4
   artifacts:
     expire_in: 1 week

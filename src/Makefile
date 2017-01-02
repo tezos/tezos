@@ -1,4 +1,5 @@
 
+-include Makefile.local
 include Makefile.config
 
 TZCOMPILER=../tezos-protocol-compiler
@@ -357,7 +358,9 @@ proto/embedded_proto_%.cmxa: \
   proto/%/TEZOS_PROTOCOL \
   $$(wildcard proto/%/*.ml) \
   $$(wildcard proto/%/*.mli)
-	@${TZCOMPILER} -static -build-dir proto/$*/_tzbuild $@ proto/$*/
+	@${TZCOMPILER} -static ${DEVFLAGS} \
+	    -build-dir proto/$*/_tzbuild \
+	    $@ proto/$*/
 
 CLIENT_PROTO_INCLUDES := \
   minutils utils node/updater node/db node/net node/shell client \
@@ -370,7 +373,8 @@ proto/client_embedded_proto_%.cmxa: \
   proto/%/TEZOS_PROTOCOL \
   $$(wildcard proto/%/*.ml) \
   $$(wildcard proto/%/*.mli)
-	@./${TZCOMPILER} -static -client -build-dir client/embedded/$*/_tzbuild \
+	@./${TZCOMPILER} -static -client ${DEVFLAGS} \
+	   -build-dir client/embedded/$*/_tzbuild \
 	   $(addprefix -I , ${CLIENT_PROTO_INCLUDES}) \
 	   $@ proto/$*
 
