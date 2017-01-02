@@ -149,7 +149,7 @@ let find_static_file path =
            Some (OCamlRes.Res.find (index path) Webclient_static.root)
          with Not_found -> None)
 
-let http_proxy port =
+let http_proxy mode =
   let pre_hook path =
     find_static_file path >>= function
     | Some body ->
@@ -163,7 +163,7 @@ let http_proxy port =
       | None ->
           Lwt.return (RPC.Answer.Empty)) >>= fun body ->
     Lwt.return { RPC.Answer.code = 404 ; body } in
-  RPC_server.launch ~pre_hook ~post_hook port root [] []
+  RPC_server.launch ~pre_hook ~post_hook mode root [] []
 
 let web_port = Client_config.in_both_groups @@
   new Config_file.int_cp [ "web" ; "port" ] 8080
@@ -182,7 +182,8 @@ let () =
             Sys.argv Client_commands.ignore_context>>= fun _no_command ->
           Random.self_init () ;
           Sodium.Random.stir () ;
-          http_proxy web_port#get >>= fun _server ->
+          (* TODO: add TLS? *)
+          http_proxy (`TCP (`Port web_port#get)) >>= fun _server ->
           fst (Lwt.wait ()))
        (function
          | Arg.Help help ->

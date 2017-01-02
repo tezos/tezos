@@ -18,6 +18,7 @@ depends: [
   "calendar"
   "cohttp" {>= "0.21" }
   "config-file"
+  "conduit" {= "0.14.0" } # Version 0.14.1 doas not compile with `ssl` (17/01/02)
   "git"
   "git-unix"
   "irmin-watcher" (* for `irmin.unix` *)
@@ -31,6 +32,7 @@ depends: [
   "tyxml"
   "js_of_ocaml"
   "sodium" {>= "0.3.0"}
+  "ssl"
   "kaputt" # { test }
   "bisect_ppx" # { test }
 ]
