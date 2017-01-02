@@ -16,6 +16,8 @@ S compiler
 B compiler
 S client
 B client
+S attacker
+B attacker
 FLG -open Result
 FLG -w -30
 FLG -w -40
