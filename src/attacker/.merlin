@@ -1,0 +1,4 @@
+REC
+FLG -open Error_monad -open Hash -open Utils
+S ../proto
+B ../proto

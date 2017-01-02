@@ -3,6 +3,7 @@
 /tezos-protocol-compiler
 /tezos-client
 /tezos-webclient
+/tezos-attacker
 
 /src/webclient_static.ml
 /src/.depend
