@@ -85,6 +85,10 @@ let incoming_port = in_both_groups @@
   new int_cp [ "port" ] ~short_name:"P" 8732
     "The TCP port at which the node's RPC server can be reached."
 
+let tls = in_both_groups @@
+  new bool_cp [ "tls" ] false
+    "Use TLS to connect to node."
+
 (* Version specific options *)
 
 let contextual_options : (unit -> unit) ref Protocol_hash_table.t =
@@ -191,6 +195,11 @@ let preparse_args argv cctxt : Node_rpc_services.Blocks.block Lwt.t =
         "Error: can't read the configuration file: %s\n%!" msg
     else Lwt.return ()
   end >>= fun () ->
+  begin
+    match preparse "-tls" argv with
+    | None -> ()
+    | Some _ -> tls#set true
+  end ;
   begin
     match preparse "-addr" argv with
     | None -> ()
