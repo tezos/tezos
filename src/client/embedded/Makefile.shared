@@ -3,6 +3,7 @@ all: \
   ../client_$(PROTO_VERSION).cmx \
   ../webclient_$(PROTO_VERSION).cmx
 
+-include ../../../Makefile.local
 include ../../../Makefile.config
 
 NODE_DIRECTORIES = \

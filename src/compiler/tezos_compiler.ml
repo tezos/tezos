@@ -310,6 +310,8 @@ let main () =
     "-static", Arg.Set static, " Build a library (.cmxa)";
     "-client", Arg.Set client, " Preserve type equality with concrete node environment (used to embed protocol into the client)" ;
     "-I", Arg.String (fun s -> include_dirs := s :: !include_dirs), "path Path for concrete node signatures (used to embed protocol into the client)" ;
+    "-bin-annot", Arg.Set Clflags.binary_annotations, " (see ocamlopt)" ;
+    "-g", Arg.Set Clflags.debug, " (see ocamlopt)" ;
     "-build-dir", Arg.String (fun s -> build_dir := Some s), "path Reuse build dir (incremental compilation)"] in
   let usage_msg = Printf.sprintf "Usage: %s <out> <src>\nOptions are:" Sys.argv.(0) in
   Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
@@ -374,7 +376,6 @@ let main () =
   Clflags.nopervasives := true;
   Warnings.parse_options false warnings;
   Warnings.parse_options true warn_error;
-  if keep_object then Clflags.binary_annotations := true;
 
   let md5 =
     if not client then

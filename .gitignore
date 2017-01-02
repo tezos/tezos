@@ -5,6 +5,8 @@
 /tezos-webclient
 /tezos-attacker
 
+/src/Makefile.local
+
 /src/webclient_static.ml
 /src/.depend
 
