@@ -1,12 +1,14 @@
 
+-include Makefile.local
 include Makefile.config
 
 TZCOMPILER=../tezos-protocol-compiler
 TZNODE=../tezos-node
 TZCLIENT=../tezos-client
 TZWEBCLIENT=../tezos-webclient
+TZATTACKER=../tezos-attacker
 
-all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT} ${TZWEBCLIENT}
+all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT} ${TZWEBCLIENT} ${TZATTACKER}
 
 
 ############################################################################
@@ -356,7 +358,9 @@ proto/embedded_proto_%.cmxa: \
   proto/%/TEZOS_PROTOCOL \
   $$(wildcard proto/%/*.ml) \
   $$(wildcard proto/%/*.mli)
-	@${TZCOMPILER} -static -build-dir proto/$*/_tzbuild $@ proto/$*/
+	@${TZCOMPILER} -static ${DEVFLAGS} \
+	    -build-dir proto/$*/_tzbuild \
+	    $@ proto/$*/
 
 CLIENT_PROTO_INCLUDES := \
   minutils utils node/updater node/db node/net node/shell client \
@@ -369,7 +373,8 @@ proto/client_embedded_proto_%.cmxa: \
   proto/%/TEZOS_PROTOCOL \
   $$(wildcard proto/%/*.ml) \
   $$(wildcard proto/%/*.mli)
-	@./${TZCOMPILER} -static -client -build-dir client/embedded/$*/_tzbuild \
+	@./${TZCOMPILER} -static -client ${DEVFLAGS} \
+	   -build-dir client/embedded/$*/_tzbuild \
 	   $(addprefix -I , ${CLIENT_PROTO_INCLUDES}) \
 	   $@ proto/$*
 
@@ -507,7 +512,59 @@ clean::
 	-for d in $$(ls -d client/embedded/*/) ; do make clean -C $$d ; done
 	-rm -f client/embedded/*.cm* client/embedded/*.o
 
+
+############################################################################
+## Attacker program
+############################################################################
+
+ATTACKER_LIB_INTFS := \
+  attacker/attacker_minimal.mli \
+
+ATTACKER_LIB_IMPLS := \
+  attacker/attacker_minimal.ml \
+
+ATTACKER_IMPLS := \
+  attacker_main.ml
+
+ATTACKER_PACKAGES := \
+  ${NODE_PACKAGES}
+
+EMBEDDED_ATTACKER_PROTOCOLS := \
+  $(patsubst client/embedded/%/, \
+	     proto/client_embedded_proto_%.cmxa, \
+             $(shell ls -d client/embedded/*/))
+
+ATTACKER_OBJS := \
+  ${ATTACKER_IMPLS:.ml=.cmx} ${ATTACKER_IMPLS:.ml=.ml.deps} \
+  ${ATTACKER_LIB_IMPLS:.ml=.cmx} ${ATTACKER_LIB_IMPLS:.ml=.ml.deps} \
+  ${ATTACKER_LIB_INTFS:.mli=.cmi} ${ATTACKER_LIB_INTFS:.mli=.mli.deps} \
+  ${TZATTACKER}
+${ATTACKER_OBJS}: PACKAGES=${ATTACKER_PACKAGES}
+${ATTACKER_OBJS}: SOURCE_DIRECTORIES=attacker proto client/embedded minutils utils node/net node/shell node/updater node/db compiler
+${ATTACKER_OBJS}: TARGET="(attacker.cmxa)"
+${ATTACKER_OBJS}: OPENED_MODULES=Error_monad Hash Utils
+
+attacker.cmxa: ${ATTACKER_LIB_IMPLS:.ml=.cmx}
+	@echo LINK $(notdir $@)
+	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
+
+${ATTACKER_LIB_IMPLS:.ml=.cmx} ${ATTACKER_IMPLS:.ml=.cmx}: \
+  ${EMBEDDED_ATTACKER_PROTOCOLS}
+
+${TZATTACKER}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa \
+	       ${EMBEDDED_ATTACKER_PROTOCOLS} attacker.cmxa \
+	     ${ATTACKER_IMPLS:.ml=.cmx}
+	@echo LINK $(notdir $@)
+	@${OCAMLOPT} -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	-rm -f ${TZATTACKER}
+
+
+
+############################################################################
 ## Generic rules
+############################################################################
 
 %.cmx: %.ml
 	@echo OCAMLOPT ${TARGET} $(notdir $@)
@@ -539,19 +596,22 @@ ifneq ($(MAKECMDGOALS),build-deps)
 include .depend
 endif
 endif
-
-DEPENDS := $(filter-out $(NO_DEPS), $(MINUTILS_LIB_INTFS) $(MINUTILS_LIB_IMPLS) \
-                                    $(UTILS_LIB_INTFS) $(UTILS_LIB_IMPLS) \
-                                    $(COMPILER_LIB_INTFS) $(COMPILER_LIB_IMPLS) \
-                                    $(COMPILER_INTFS) $(COMPILER_IMPLS) \
-                                    $(NODE_LIB_INTFS) $(NODE_LIB_IMPLS) \
-                                    $(NODE_INTFS) $(NODE_IMPLS) \
-                                    $(CLIENT_LIB_INTFS) $(CLIENT_LIB_IMPLS) \
-                                    $(WEBCLIENT_LIB_INTFS) $(WEBCLIENT_LIB_IMPLS) \
-                                    $(CLIENT_INTFS) $(CLIENT_IMPLS) \
-                                    $(WEBCLIENT_INTFS) $(WEBCLIENT_IMPLS))
-
-DEPENDS_BYTECODE := $(filter-out $(NO_DEPS), $(MINUTILS_LIB_INTFS) $(MINUTILS_LIB_IMPLS))
+DEPENDS := $(filter-out $(NO_DEPS), \
+  $(MINUTILS_LIB_INTFS) $(MINUTILS_LIB_IMPLS) \
+  $(UTILS_LIB_INTFS) $(UTILS_LIB_IMPLS) \
+  $(COMPILER_LIB_INTFS) $(COMPILER_LIB_IMPLS) \
+  $(COMPILER_INTFS) $(COMPILER_IMPLS) \
+  $(NODE_LIB_INTFS) $(NODE_LIB_IMPLS) \
+  $(NODE_INTFS) $(NODE_IMPLS) \
+  $(CLIENT_LIB_INTFS) $(CLIENT_LIB_IMPLS) \
+  $(CLIENT_INTFS) $(CLIENT_IMPLS) \
+  $(WEBCLIENT_LIB_INTFS) $(WEBCLIENT_LIB_IMPLS) \
+  $(ATTACKER_LIB_INTFS) $(ATTACKER_LIB_IMPLS) \
+  $(WEBCLIENT_INTFS) $(WEBCLIENT_IMPLS) \
+  $(ATTACKER_INTFS) $(ATTACKER_IMPLS) \
+)
+DEPENDS_BYTECODE := \
+  $(filter-out $(NO_DEPS), $(MINUTILS_LIB_INTFS) $(MINUTILS_LIB_IMPLS))
 
 predepend: node/updater/proto_environment.mli
 compiler/tezos_compiler.cmo compiler/tezos_compiler.cmx: \

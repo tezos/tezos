@@ -255,7 +255,7 @@ let create
     Lwt.catch
       worker_loop
       (function
-        | Lwt_stream.Empty -> cleanup ()
+        | Queue.Empty -> cleanup ()
         | exn ->
             lwt_log_error "unexpected exception in worker\n%s"
               (Printexc.to_string exn) >>= fun () ->
