@@ -59,7 +59,7 @@ and ('arg, 'ret) typed_contract =
   'arg ty * 'ret ty * Contract.t
 
 and 'ty ty =
-  | Void_t : unit ty
+  | Unit_t : unit ty
   | Int_t : ('s, 'l) int_kind -> ('s, 'l) int_val ty
   | Signature_t : signature ty
   | String_t : string ty
