@@ -77,7 +77,7 @@ with the following JSON script description.
         "retType": "uint8",
         "storageType": "unit" },
       "storage":
-      { "storage": "unit",
+      { "storage": "Unit",
         "storageType": "unit" } }
 
 ### Full grammar

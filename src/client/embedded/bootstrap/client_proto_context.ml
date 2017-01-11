@@ -221,7 +221,7 @@ let commands () =
        @@ prefix "running"
        @@ Program.source_param
          ~name:"prg" ~desc: "script of the account\n\
-                             combine with -init if the storage type is non void"
+                             combine with -init if the storage type is not unit"
        @@ stop)
       (fun neu (_, manager) balance (_, source) code cctxt ->
          check_contract cctxt neu >>= fun () ->

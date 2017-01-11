@@ -137,7 +137,7 @@ let rec ty_eq
   : type ta tb. ta ty -> tb ty -> (ta ty, tb ty) eq tzresult
   = fun ta tb ->
     match ta, tb with
-    | Void_t, Void_t -> eq ta tb
+    | Unit_t, Unit_t -> eq ta tb
     | Int_t ka, Int_t kb ->
         (int_kind_eq ka kb >>? fun (Eq _) ->
          (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
@@ -355,7 +355,7 @@ let parse_comparable_ty : Script.expr -> ex_comparable_ty tzresult Lwt.t = funct
       fail @@ Invalid_arity (loc, Type, prim, 0, List.length l)
   | Prim (loc, ("pair" | "union" | "set" | "map"
                | "list" | "option"  | "lambda"
-               | "void" | "signature"  | "contract"), _) ->
+               | "unit" | "signature"  | "contract"), _) ->
       fail @@ Comparable_type_expected loc
   | Prim (loc, prim, _) ->
       fail @@ Invalid_primitive (loc, Type, prim)
@@ -365,7 +365,7 @@ let parse_comparable_ty : Script.expr -> ex_comparable_ty tzresult Lwt.t = funct
 type ex_ty = Ex : 'a ty -> ex_ty
 
 let rec parse_ty : Script.expr -> ex_ty tzresult Lwt.t = function
-  | Prim (_, "void", []) -> return @@ Ex Void_t
+  | Prim (_, "unit", []) -> return @@ Ex Unit_t
   | Prim (_, "int8", []) -> return @@ Ex (Int_t Int8)
   | Prim (_, "int16", []) -> return @@ Ex (Int_t Int16)
   | Prim (_, "int32", []) -> return @@ Ex (Int_t Int32)
@@ -411,7 +411,7 @@ let rec parse_ty : Script.expr -> ex_ty tzresult Lwt.t = function
       return @@ Ex (Map_t (ta, tr))
   | Prim (loc, ("pair" | "union" | "set" | "map"
                | "list" | "option"  | "lambda"
-               | "void" | "signature"  | "contract"
+               | "unit" | "signature"  | "contract"
                | "int8" | "int16" | "int32" | "int64"
                | "uint8" | "uint16" | "uint32" | "uint64"
                | "string" | "tez" | "bool"
@@ -447,10 +447,10 @@ let rec parse_tagged_data
   : context -> Script.expr -> ex_tagged_data tzresult Lwt.t
   = fun ctxt script_data ->
     match script_data with
-    | Prim (_, "Void", []) ->
-        return @@ Ex (Void_t, ())
-    | Prim (loc, "Void", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Void", 0, List.length l)
+    | Prim (_, "Unit", []) ->
+        return @@ Ex (Unit_t, ())
+    | Prim (loc, "Unit", l) ->
+        fail @@ Invalid_arity (loc, Constant, "Unit", 0, List.length l)
     | String (_, v) ->
         return @@ Ex (String_t, v)
     | Prim (_, "String", [ arg ]) ->
@@ -628,10 +628,10 @@ and parse_untagged_data
   : type a. context -> a ty -> Script.expr -> a tzresult Lwt.t
   = fun ctxt ty script_data ->
     match ty, script_data with
-    (* Void *)
-    | Void_t, Prim (_, "Void", []) -> return ()
-    | Void_t, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
-        fail @@ Invalid_constant (loc, "void")
+    (* Unit *)
+    | Unit_t, Prim (_, "Unit", []) -> return ()
+    | Unit_t, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
+        fail @@ Invalid_constant (loc, "unit")
     (* Strings *)
     | String_t, String (_, v) -> return v
     | String_t, (Prim (loc, _, _) | Int (loc, _) | Seq (loc, _)) ->
@@ -1291,7 +1291,7 @@ and parse_instr
               (Bool_t, Item_t
                  (Tez_t, rest)))) ->
         return (typed loc (Create_account,
-                           Item_t (Contract_t (Void_t, Void_t), rest)))
+                           Item_t (Contract_t (Unit_t, Unit_t), rest)))
     | Prim (loc, "CREATE_CONTRACT", []),
       Item_t
         (Key_t, Item_t
@@ -1417,8 +1417,8 @@ and parse_contract
         Contract.get_script ctxt contract >>=? function
         | No_script ->
             (Lwt.return
-               (ty_eq arg Void_t >>? fun (Eq _) ->
-                ty_eq ret Void_t >>? fun (Eq _) ->
+               (ty_eq arg Unit_t >>? fun (Eq _) ->
+                ty_eq ret Unit_t >>? fun (Eq _) ->
                 let contract : (arg, ret) typed_contract =
                   (arg, ret, contract) in
                 ok contract))
@@ -1452,7 +1452,7 @@ let unparse_comparable_ty
 
 let rec unparse_ty
   : type a. a ty -> Script.expr = function
-  | Void_t -> Prim (-1, "void", [])
+  | Unit_t -> Prim (-1, "unit", [])
   | Int_t Int8 -> Prim (-1, "int8", [])
   | Int_t Int16 -> Prim (-1, "int16", [])
   | Int_t Int32 -> Prim (-1, "int32", [])
@@ -1500,8 +1500,8 @@ let rec unparse_ty
 let rec unparse_untagged_data
   : type a. a ty -> a -> Script.expr
   = fun ty a -> match ty, a with
-    | Void_t, () ->
-        Prim (-1, "Void", [])
+    | Unit_t, () ->
+        Prim (-1, "Unit", [])
     | Int_t k, v ->
         Int (-1, Int64.to_string (to_int64 k v))
     | String_t, s ->
@@ -1565,8 +1565,8 @@ let rec unparse_untagged_data
 let rec unparse_tagged_data
   : type a. a ty -> a -> Script.expr
   = fun ty a -> match ty, a with
-    | Void_t, () ->
-        Prim (-1, "Void", [])
+    | Unit_t, () ->
+        Prim (-1, "Unit", [])
     | Int_t k, v ->
         Prim (-1, string_of_int_kind k, [ String (-1, Int64.to_string (to_int64 k v))])
     | String_t, s ->

@@ -55,7 +55,7 @@ let apply_manager_operation_content ctxt accept_failing_script source = function
       Contract.get_script ctxt destination >>=? function
       | No_script -> begin
           match parameters with
-          | None | Some (Prim (_, "void", [])) -> return ctxt
+          | None | Some (Prim (_, "Unit", [])) -> return ctxt
           | Some _ -> fail Non_scripted_contract_with_parameter
         end
       | Script { code ; storage } ->

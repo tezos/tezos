@@ -392,7 +392,7 @@ let rec interp
               Contract.get_manager ctxt contract >>=? fun manager ->
               logged_return (Item (manager, rest), qta - 1, ctxt)
           | Transfer_tokens storage_type,
-            Item (p, Item (amount, Item ((tp, Void_t, destination), Item (sto, Empty)))) -> begin
+            Item (p, Item (amount, Item ((tp, Unit_t, destination), Item (sto, Empty)))) -> begin
               Contract.unconditional_spend ctxt source amount >>=? fun ctxt ->
               Contract.credit ctxt destination amount >>=? fun ctxt ->
               Contract.get_script ctxt destination >>=? fun destination_script ->
@@ -400,8 +400,8 @@ let rec interp
               Contract.update_script_storage ctxt source sto >>=? fun ctxt ->
               begin match destination_script with
                 | No_script ->
-                    (* we see non scripted contracts as (void, void) contract *)
-                    Lwt.return (ty_eq tp Void_t |>
+                    (* we see non scripted contracts as (unit, unit) contract *)
+                    Lwt.return (ty_eq tp Unit_t |>
                                 record_trace (Invalid_contract (loc, destination))) >>=? fun (Eq _) ->
                     return (ctxt, qta)
                 | Script { code ; storage } ->
@@ -412,7 +412,7 @@ let rec interp
                       ctxt destination csto >>=? fun ctxt ->
                     trace
                       (Invalid_contract (loc, destination))
-                      (parse_untagged_data ctxt Void_t ret) >>=? fun () ->
+                      (parse_untagged_data ctxt Unit_t ret) >>=? fun () ->
                     return (ctxt, qta)
               end >>=? fun (ctxt, qta) ->
               Contract.get_script ctxt source >>=? (function
@@ -451,7 +451,7 @@ let rec interp
               Contract.originate ctxt
                 ~manager ~delegate ~balance
                 ~script:No_script ~spendable:true ~delegatable >>=? fun (ctxt, contract) ->
-              logged_return (Item ((Void_t, Void_t, contract), rest), qta - 1, ctxt)
+              logged_return (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
           | Create_contract (g, p, r),
             Item (manager, Item (delegate, Item (delegatable, Item (credit,
                                                                     Item (Lam (_, code), Item (init, rest)))))) ->

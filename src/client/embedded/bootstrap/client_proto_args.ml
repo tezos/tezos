@@ -27,12 +27,12 @@ let fee_arg =
    default: \'0.05\"\n\
    text format: D,DDD,DDD.DD (centiles are optional, comas are optional)"
 
-let init = ref "void"
+let init = ref "Unit"
 let init_arg =
   "-init",
   Arg.Set_string init,
   "The initial value of the contract's storage.\n\
-   default: void"
+   default: unit"
 
 let arg = ref None
 let arg_arg =

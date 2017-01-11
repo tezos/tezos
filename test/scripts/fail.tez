@@ -1,9 +1,9 @@
-parameter void
+parameter unit
 code
   { # This contract will never accept a incoming transaction
     FAIL ;
     # Alas, FAIL is not (yet?) polymorphic, and we need to keep unused
     # instructions for the sake of typing...
-    CDR ; PUSH VOID ; PAIR }
-return void
-storage VOID
+    CDR ; UNIT ; PAIR }
+return unit
+storage unit
