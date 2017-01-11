@@ -22,22 +22,25 @@
 
 open Script_located_ir
 
-let expand_caddadr loc str =
-  let len = String.length str in
-  if len > 3
-  && String.get str 0 = 'C'
-  && String.get str (len - 1) = 'R' then
-    let rec parse i acc =
-      if i = 0 then
-        Some (Seq (loc, acc))
-      else
-        match String.get str i with
-        | 'A' -> parse (i - 1) (Prim (loc, "CAR", []) :: acc)
-        | 'D' -> parse (i - 1) (Prim (loc, "CDR", []) :: acc)
-        | _ -> None in
-    parse (len - 2) []
-  else
-    None
+let expand_caddadr original =
+  match original with
+  | Prim (loc, str, []) ->
+     let len = String.length str in
+     if len > 3
+        && String.get str 0 = 'C'
+        && String.get str (len - 1) = 'R' then
+       let rec parse i acc =
+         if i = 0 then
+           Some (Seq (loc, acc))
+         else
+           match String.get str i with
+           | 'A' -> parse (i - 1) (Prim (loc, "CAR", []) :: acc)
+           | 'D' -> parse (i - 1) (Prim (loc, "CDR", []) :: acc)
+           | _ -> None in
+       parse (len - 2) []
+     else
+       None
+  | _ -> None
 
 exception Not_a_roman
 
@@ -64,64 +67,163 @@ let decimal_of_roman roman =
   done;
   !arabic
 
-let expand_dxiiivp loc str arg =
-  let len = String.length str in
-  if len > 3
-  && String.get str 0 = 'D'
-  && String.get str (len - 1) = 'P' then
-    try
-      let depth = decimal_of_roman (String.sub str 1 (len - 2)) in
-      let rec make i =
-        if i = 0 then
-          arg
-        else
-          let sub = make (i - 1) in
-          Prim (loc, "DIP", [ Seq (loc, [ sub ]) ]) in
-      Some (make depth)
-    with Not_a_roman -> None
-  else None
+let expand_dxiiivp original =
+  match original with
+  | Prim (loc, str, [ arg ]) ->
+     let len = String.length str in
+     if len > 3
+        && String.get str 0 = 'D'
+        && String.get str (len - 1) = 'P' then
+       try
+         let depth = decimal_of_roman (String.sub str 1 (len - 2)) in
+         let rec make i acc =
+           if i = 0 then
+             acc
+           else
+             make (i - 1)
+               (Seq (loc, [ Prim (loc, "DIP", [ acc ]) ])) in
+         Some (make depth arg)
+       with Not_a_roman -> None
+     else None
+  | _ -> None
 
 exception Not_a_pair
 
-let expand_paaiair loc str =
-  let len = String.length str in
-  if len > 4
-  && String.get str 0 = 'P'
-  && String.get str (len - 1) = 'R' then
-    try
-      let rec parse i acc =
-        if String.get str i = 'I'
-        && String.get str (i - 1) = 'A' then
-          parse (i - 2) (Prim (loc, "PAIR", []) :: acc)
-        else if String.get str i = 'A' then
-          match acc with
-          | [] ->
-              raise Not_a_pair
-          | acc :: accs ->
-              parse (i - 1) (Prim (loc, "DIP", [ acc ]) :: accs)
-        else
-          raise Not_a_pair in
-      Some (Seq (loc, parse (len - 2) []))
-    with Not_a_pair -> None
-  else
-    None
+let expand_paaiair original =
+  match original with
+  | Prim (loc, str, []) ->
+     let len = String.length str in
+     if len > 4
+        && String.get str 0 = 'P'
+        && String.get str (len - 1) = 'R' then
+       try
+         let rec parse i acc =
+           if i = 0 then
+             acc
+           else if String.get str i = 'I'
+              && String.get str (i - 1) = 'A' then
+             parse (i - 2) (Prim (loc, "PAIR", []) :: acc)
+           else if String.get str i = 'A' then
+             match acc with
+             | [] ->
+                raise Not_a_pair
+             | acc :: accs ->
+                parse (i - 1) (Prim (loc, "DIP", [ acc ]) :: accs)
+           else
+             raise Not_a_pair in
+         Some (Seq (loc, parse (len - 2) []))
+       with Not_a_pair -> None
+     else
+       None
+  | _ -> None
 
-let expand = function
-  | Prim (loc, name, [ arg ]) as original ->
-      begin match expand_dxiiivp loc name arg with
-        | None -> original
-        | Some rewritten -> rewritten
-      end
-  | Prim (loc, name, []) as original ->
-      begin match expand_paaiair loc name with
-        | None ->
-            begin match expand_caddadr loc name with
-              | None -> original
-              | Some rewritten -> rewritten
-            end
-        | Some rewritten -> rewritten
-      end
-  | original -> original
+exception Not_a_dup
+
+let expand_duuuuup original =
+  match original with
+  | Prim (loc, str, []) ->
+     let len = String.length str in
+     if len > 3
+        && String.get str 0 = 'D'
+        && String.get str 1 = 'U'
+        && String.get str (len - 1) = 'P' then
+       try
+         let rec parse i acc =
+           if i = 1 then acc
+           else if String.get str i = 'U' then
+             parse (i - 1)
+                   (Seq (loc, [ Prim (loc, "DIP", [ acc ]) ;
+                                Prim (loc, "SWAP", []) ]))
+           else
+             raise Not_a_dup in
+         Some (parse (len - 2) (Seq (loc, [ Prim (loc, "DUP", []) ])))
+       with Not_a_dup -> None
+     else
+       None
+  | _ -> None
+
+
+let expand_compare original =
+  match original with
+  | Prim (loc, "CMPEQ", []) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "EQ", []) ]))
+  | Prim (loc, "CMPNEQ", []) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "NEQ", []) ]))
+  | Prim (loc, "CMPLT", []) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "LT", []) ]))
+  | Prim (loc, "CMPGT", []) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "GT", []) ]))
+  | Prim (loc, "CMPLE", []) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "LE", []) ]))
+  | Prim (loc, "CMPGE", []) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "GE", []) ]))
+  | Prim (loc, "IFCMPEQ", args) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "EQ", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFCMPNEQ", args) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "NEQ", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFCMPLT", args) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "LT", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFCMPGT", args) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "GT", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFCMPLE", args) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "LE", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFCMPGE", args) ->
+     Some (Seq (loc, [ Prim (loc, "COMPARE", []) ;
+                       Prim (loc, "GE", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFEQ", args) ->
+     Some (Seq (loc, [ Prim (loc, "EQ", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFNEQ", args) ->
+     Some (Seq (loc, [ Prim (loc, "NEQ", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFLT", args) ->
+     Some (Seq (loc, [ Prim (loc, "LT", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFGT", args) ->
+     Some (Seq (loc, [ Prim (loc, "GT", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFLE", args) ->
+     Some (Seq (loc, [ Prim (loc, "LE", []) ;
+                       Prim (loc, "IF", args) ]))
+  | Prim (loc, "IFGE", args) ->
+     Some (Seq (loc, [ Prim (loc, "GE", []) ;
+                       Prim (loc, "IF", args) ]))
+  | _ -> None
+
+let expand original =
+  let try_expansions expanders =
+    match
+      List.fold_left
+        (fun acc f ->
+          match acc with
+          | None -> f original
+          | Some rewritten -> Some rewritten)
+        None expanders with
+    | None -> original
+    | Some rewritten -> rewritten in
+  try_expansions
+    [ expand_dxiiivp ;
+      expand_paaiair ;
+      expand_caddadr ;
+      expand_duuuuup ;
+      expand_compare ]
 
 let apply node arg =
   match node with
