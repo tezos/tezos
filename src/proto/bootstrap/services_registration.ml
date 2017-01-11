@@ -226,12 +226,8 @@ let () =
     Script_ir_translator.typecheck_code
 
 let () =
-  register1 Services.Helpers.typecheck_tagged_data
-    Script_ir_translator.typecheck_tagged_data
-
-let () =
-  register1 Services.Helpers.typecheck_untagged_data
-    Script_ir_translator.typecheck_untagged_data
+  register1 Services.Helpers.typecheck_data
+    Script_ir_translator.typecheck_data
 
 let () =
   register1 Services.Helpers.hash_data

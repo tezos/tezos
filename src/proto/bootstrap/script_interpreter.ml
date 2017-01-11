@@ -70,7 +70,7 @@ let rec unparse_stack
   = function
     | Empty, Empty_t -> []
     | Item (v, rest), Item_t (ty, rest_ty) ->
-        unparse_tagged_data ty v :: unparse_stack (rest, rest_ty)
+        unparse_data ty v :: unparse_stack (rest, rest_ty)
 
 let rec interp
   : type p r.
@@ -396,7 +396,7 @@ let rec interp
               Contract.unconditional_spend ctxt source amount >>=? fun ctxt ->
               Contract.credit ctxt destination amount >>=? fun ctxt ->
               Contract.get_script ctxt destination >>=? fun destination_script ->
-              let sto = unparse_untagged_data storage_type sto in
+              let sto = unparse_data storage_type sto in
               Contract.update_script_storage ctxt source sto >>=? fun ctxt ->
               begin match destination_script with
                 | No_script ->
@@ -405,20 +405,20 @@ let rec interp
                                 record_trace (Invalid_contract (loc, destination))) >>=? fun (Eq _) ->
                     return (ctxt, qta)
                 | Script { code ; storage } ->
-                    let p = unparse_untagged_data tp p in
+                    let p = unparse_data tp p in
                     execute source destination ctxt storage code amount p qta
                     >>=? fun (csto, ret, qta, ctxt) ->
                     Contract.update_script_storage
                       ctxt destination csto >>=? fun ctxt ->
                     trace
                       (Invalid_contract (loc, destination))
-                      (parse_untagged_data ctxt Unit_t ret) >>=? fun () ->
+                      (parse_data ctxt Unit_t ret) >>=? fun () ->
                     return (ctxt, qta)
               end >>=? fun (ctxt, qta) ->
               Contract.get_script ctxt source >>=? (function
                   | No_script -> assert false
                   | Script { storage = { storage } } ->
-                      parse_untagged_data ctxt storage_type storage >>=? fun sto ->
+                      parse_data ctxt storage_type storage >>=? fun sto ->
                       logged_return (Item ((), Item (sto, Empty)), qta - 1, ctxt))
             end
           | Transfer_tokens storage_type,
@@ -428,20 +428,20 @@ let rec interp
               Contract.get_script ctxt destination >>=? function
               | No_script -> fail (Invalid_contract (loc, destination))
               | Script { code ; storage } ->
-                  let sto = unparse_untagged_data storage_type sto in
+                  let sto = unparse_data storage_type sto in
                   Contract.update_script_storage ctxt source sto >>=? fun ctxt ->
-                  let p = unparse_untagged_data tp p in
+                  let p = unparse_data tp p in
                   execute source destination ctxt storage code amount p qta
                   >>=? fun (sto, ret, qta, ctxt) ->
                   Contract.update_script_storage
                     ctxt destination sto >>=? fun ctxt ->
                   trace
                     (Invalid_contract (loc, destination))
-                    (parse_untagged_data ctxt tr ret) >>=? fun v ->
+                    (parse_data ctxt tr ret) >>=? fun v ->
                   Contract.get_script ctxt source >>=? (function
                       | No_script -> assert false
                       | Script { storage = { storage } } ->
-                          parse_untagged_data ctxt storage_type storage >>=? fun sto ->
+                          parse_data ctxt storage_type storage >>=? fun sto ->
                           logged_return (Item (v, Item (sto, Empty)), qta - 1, ctxt))
             end
           | Create_account,
@@ -457,7 +457,7 @@ let rec interp
                                                                     Item (Lam (_, code), Item (init, rest)))))) ->
               let code, storage =
                 { code; arg_type = unparse_ty p; ret_type = unparse_ty r; storage_type =  unparse_ty g },
-                { storage = unparse_untagged_data g init; storage_type =  unparse_ty g } in
+                { storage = unparse_data g init; storage_type =  unparse_ty g } in
               let storage_fee = Script.storage_cost storage in
               let code_fee = Script.code_cost code in
               Lwt.return Tez.(code_fee +? storage_fee) >>=? fun script_fee ->
@@ -484,7 +484,7 @@ let rec interp
               let res = Ed25519.check_signature key signature message in
               logged_return (Item (res, rest), qta - 1, ctxt)
           | H ty, Item (v, rest) ->
-              let hash = Script.hash_expr (unparse_untagged_data ty v) in
+              let hash = Script.hash_expr (unparse_data ty v) in
               logged_return (Item (hash, rest), qta - 1, ctxt)
           | Steps_to_quota, rest ->
               let steps = Script_int.of_int64 Uint32 (Int64.of_int qta) in
@@ -514,13 +514,13 @@ and execute ?log orig source ctxt storage script amount arg qta =
   let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
   let ret_type_full = Pair_t (ret_type, storage_type) in
   parse_lambda ctxt arg_type_full ret_type_full code >>=? fun lambda ->
-  parse_untagged_data ctxt arg_type arg >>=? fun arg ->
-  parse_untagged_data ctxt storage_type storage >>=? fun storage ->
+  parse_data ctxt arg_type arg >>=? fun arg ->
+  parse_data ctxt storage_type storage >>=? fun storage ->
   interp ?log qta orig source amount ctxt lambda ((amount, arg), storage)
   >>=? fun (ret, qta, ctxt) ->
   let ret, storage = ret in
-  return (unparse_untagged_data storage_type storage,
-          unparse_untagged_data ret_type ret,
+  return (unparse_data storage_type storage,
+          unparse_data ret_type ret,
           qta, ctxt)
 
 let trace orig source ctxt storage script amount arg qta =

@@ -1061,7 +1061,7 @@ for under/overflows.
      the global data and returns it to be stored and retrieved on the
      next transaction. These data are initialized by another
      parameter. The calling convention for the code is as follows:
-     (Pair (Pair amount arg) globals)) -> (Pair ret globals), as
+     `(Pair (Pair amount arg) globals)) -> (Pair ret globals)`, as
      extrapolable from the instruction type. The first parameters are
      the manager, optional delegate, then spendable and delegatable
      flags and finally the initial amount taken from the currently
@@ -1154,21 +1154,13 @@ for under/overflows.
 VIII - Concrete syntax
 ----------------------
 
-The structure of the concrete language is extremely simple. An
-expression in the language can only be one of the three following
-constructs.
+The concrete language is very close to the formal notation of the
+specification. Its structure is extremely simple: an expression in the
+language can only be one of the three following constructs.
 
-  1. A constant.
+  1. A constant (integer or string).
   2. The application of a primitive to a sequence of expressions.
   3. A sequence of expressions.
-
-As in Python or Haskell, the concrete syntax of the language is
-indentation sensitive. The elements of a syntactical block, such as
-all the elements of a sequence, or all the parameters of a primitive,
-must be written with the exact same left margin in the program source
-code. This is unlike in C-like languages, where blocks are delimited
-with braces and the margin is ignored by the compiled. The exact
-parsing policy is described just after.
 
 ### Constants
 
@@ -1181,29 +1173,19 @@ There are two kinds of constants:
      characters can be escaped by 3 digits decimal codes `\ddd` or
      2 digit hexadecimal codes `\xHH`.
 
-All domain specific constants are strings:
-
-  - `tez` amounts are written using the same notation as JSON schemas
-    and the command line client: thousands are optionally separated by
-    comas, and centiles, if present, must be prefixed by a period.
-     - in regexp form: `([0-9]{1,3}(,[0-9]{3})+)|[0-9]+(\.[0.9]{2})?`
-     - `"1234567"`      means 123456700 tez centiles
-     - `"1,234,567"`    means 123456700 tez centiles
-     - `"1234567.89"`   means 123456789 tez centiles
-     - `"1,234,567.00"` means 123456789 tez centiles
-     - `"1234,567"`     is invalid
-     - `"1,234,567."`   is invalid
-     - `"1,234,567.0"`  is invalid
-  - `timestamp`s are written using `RFC 339` notation.
-  - `contract`s are the raw strings returned by JSON RPCs or the command
-    line interface and cannot be forged by hand so their format is of
-    no interest here.
-  - `key`s are `Sha256` hashes of `ed25519` public keys encoded in
-    `base48` format with the following custom alphabet:
-    `"eXMNE9qvHPQDdcFx5J86rT7VRm2atAypGhgLfbS3CKjnksB4"`.
-  - `signature`s are `ed25519` signatures as a series of hex-encoded bytes.
-
 ### Primitive applications
+
+In the specification, primitive applications always luckily fit on a
+single line. In this case, the concrete syntax is exactly the formal
+notation. However, it is sometimes necessary to break lines in a real
+program, which can be done as follows.
+
+As in Python or Haskell, the concrete syntax of the language is
+indentation sensitive. The elements of a syntactical block, such as
+all the elements of a sequence, or all the parameters of a primitive,
+must be written with the exact same left margin in the program source
+code. This is unlike in C-like languages, where blocks are delimited
+with braces and the margin is ignored by the compiled.
 
 The simplest form requires to break the line after the primitive name
 and after every argument. Argument must be indented by at least one
@@ -1271,10 +1253,61 @@ example is:
 
 ### Sequences
 
-Successive instructions can be grouped as a single one by grouping
-them inside braces, separated by semicolons. To prevent errors,
-control flow primitives that take instructions as parameters require
-sequences in the concrete syntax.
+Successive expression can be grouped as a single sequence expression
+using braces delimiters and semicolon separators.
+
+    { expr1 ; expr2 ; expr3 ; expr4 }
+
+A sequence block can be split on several lines. In this situation, the
+whole block, including the closing brace, must be indented with
+respect to the first instruction.
+
+    { expr1 ; expr2
+      expr3 ; expr4 }
+
+Blocks can be passed as argument to a primitive.
+
+
+    PRIM arg1 arg2
+      { arg3_expr1 ; arg3_expr2
+        arg3_expr3 ; arg3_expr4 }
+
+
+### Conventions
+
+The concrete syntax follows the same lexical conventions as the
+specification: instructions are represented by uppercase identifiers,
+type constructors by lowercase identifiers, and constant constructors
+are Capitalised.
+
+Lists can be written in a single shot instead of a succession of `Cons`
+
+    (List 1 2 3) = (Cons 1 (Cons 2 (Cons 3 Nil)))
+
+All domain specific constants are strings with specific formats:
+
+  - `tez` amounts are written using the same notation as JSON schemas
+    and the command line client: thousands are optionally separated by
+    comas, and centiles, if present, must be prefixed by a period.
+     - in regexp form: `([0-9]{1,3}(,[0-9]{3})+)|[0-9]+(\.[0.9]{2})?`
+     - `"1234567"`      means 123456700 tez centiles
+     - `"1,234,567"`    means 123456700 tez centiles
+     - `"1234567.89"`   means 123456789 tez centiles
+     - `"1,234,567.00"` means 123456789 tez centiles
+     - `"1234,567"`     is invalid
+     - `"1,234,567."`   is invalid
+     - `"1,234,567.0"`  is invalid
+  - `timestamp`s are written using `RFC 339` notation.
+  - `contract`s are the raw strings returned by JSON RPCs or the command
+    line interface and cannot be forged by hand so their format is of
+    no interest here.
+  - `key`s are `Sha256` hashes of `ed25519` public keys encoded in
+    `base48` format with the following custom alphabet:
+    `"eXMNE9qvHPQDdcFx5J86rT7VRm2atAypGhgLfbS3CKjnksB4"`.
+  - `signature`s are `ed25519` signatures as a series of hex-encoded bytes.
+
+To prevent errors, control flow primitives that take instructions as
+parameters require sequences in the concrete syntax.
 
     IF { instr1_true ; instr2_true ; ... } { instr1_false ; instr2_false ; ... }
 
@@ -1282,78 +1315,13 @@ sequences in the concrete syntax.
       { instr1_true ; instr2_true ; ... }
       { instr1_false ; instr2_false ; ... }
 
-A sequence block can be split on several lines. In this situation, the
-whole block, including the closing brace, must be indented with
-respect to the first instruction.
+### Main program structure
 
-    LAMBDA t_arg t_ret
-      { instr1 ; instr2
-        instr3 ; instr4 }
+The toplevel of a smart contract file must be an undelimited sequence
+of four primitive applications (in no particular order) that provide
+its `parameter`, `return` and `storage` types, as well as its `code`.
 
-### Lexical conventions
-
-Instructions are represented by uppercase identifiers, type
-constructor are lowercase identifiers and constant constructors are
-Capitalised.
-
-  * Types, in lowercase, in prefixed notation as in this specification:
-
-        string
-
-        pair string (pair int8 tez)
-
-        lambda int8 int16
-
-    Of course, types can be split over multiple lines using the
-    common indented notation.
-
-        map
-          string
-          uint32
-
-  * Constants are built using constructors (starting with a capital)
-    followed by the actual value.
-
-        Int8 1
-
-    Compound constants such as lists, in order not to repeat the same
-    constant constructor for each element, take the type(s) of inner
-    values as first argument(s), and then the values without their
-    constructors.
-
-        List int8 1 2 3 4 5
-
-        Pair int8 int16 1 2
-
-    For constructors whose type cannot be completely deduced fron a
-    single value, the free type variables must be specified. For this,
-    some constant constructors take extra types arguments as follows.
-
-        List int8
-
-        None tez
-
-        Left (Int8 3) int16
-
-        Right int16 (Int8 3)
-
-    When the type is already completely specified, by a parent
-    constructor or as in the instruction PUSH, these annotations must
-    be omitted.
-
-        Pair int8 (list int16) 1 (List 2 3)
-
-        Pair (option (pair unit int8)) unit
-          None
-          Unit
-
-        Pair (or int8 string) (or int8 string)
-          Left 3
-          Right "text"
-
-  * Instructions, in uppercase:
-
-        ADD
+See the next section for a concrete example.
 
 ### Comments
 
@@ -1361,8 +1329,8 @@ A hash sign (`#`) anywhere outside of a string literal will make the
 rest of the line (and itself) completely ignored, as in the following
 example.
 
-    PUSH (Int8 1) # pushes 1
-    PUSH (Int8 2) # pushes 2
+    PUSH int8 1 # pushes 1
+    PUSH int8 2 # pushes 2
     ADD         # computes 2 + 1
 
 IX - Examples
@@ -1386,7 +1354,14 @@ contract of such a type must take a `unit` argument, an amount in `tez`,
 and transform a unit global storage, and must thus be of type `(lambda
 (pair (pair tez unit) unit) (pair unit unit))`.
 
-Such a minimal contract is thus `{ CDR ; UNIT ; PAIR }`.
+Such a minimal contract code is thus `{ CDR ; UNIT ; PAIR }`.
+
+A valid contract source file would be as follows.
+
+    code { CDR ; UNIT ; PAIR }
+    storage unit
+    parameter unit
+    return unit
 
 ### Reservoir contract
 
@@ -1435,11 +1410,11 @@ its code is
          COMPARE ; LE
          IF { } # nothing to do
             { DUP ; CDDDR # B
-              BALANCE ; PUSH Unit ; TRANSFER_TOKENS ; DROP } }
+              BALANCE ; UNIT ; TRANSFER_TOKENS ; DROP } }
        { DUP ; CDDAR ; # A
          BALANCE ;
-         PUSH Unit ; TRANSFER_TOKENS ; DROP }
-    CDR ; PUSH Unit ; PAIR
+         UNIT ; TRANSFER_TOKENS ; DROP }
+    CDR ; UNIT ; PAIR
 
 ### Reservoir contract (variant with broker and status)
 
@@ -1468,7 +1443,7 @@ example and must be updated according to the actual Tezos minmal
 value for contract balance.
 
     DUP ; CDAR # S
-    PUSH (String "open") ;
+    PUSH string "open" ;
     COMPARE ; NEQ ;
     IF { FAIL ; CDR } # on "success", "timeout" or a bad init value
        { DUP ; CDDAR ; # T
@@ -1476,7 +1451,7 @@ value for contract balance.
          COMPARE ; LT ;
          IF { # Before timeout
               # We compute ((1 + P) + N) tez for keeping the contract alive
-              PUSH (Tez "1.00") ;
+              PUSH tez "1.00" ;
               DIP { DUP ; CDDDAAR } ; ADD ; # P
               DIP { DUP ; CDDDADR } ; ADD ; # N
               # We compare to the cumulated amount
@@ -1488,32 +1463,32 @@ value for contract balance.
                  { # We transfer the fee to the broker
                    DUP ; CDDDAAR ; # P
                    DIP { DUP ; CDDDDAR } # A
-                   PUSH Unit ; TRANSFER_TOKENS ; DROP ;
+                   UNIT ; TRANSFER_TOKENS ; DROP ;
                    # We transfer the rest to the destination
                    DUP ; CDDDADR ; # N
                    DIP { DUP ; CDDDDDR } # B
-                   PUSH Unit ; TRANSFER_TOKENS ; DROP ;
+                   UNIT ; TRANSFER_TOKENS ; DROP ;
                    # We update the global
-                   CDR ; CDR ; PUSH (String "success") ; PAIR } }
+                   CDR ; CDR ; PUSH string "success" ; PAIR } }
             { # After timeout
               # We try to transfer P tez to A
-              PUSH (Tez "1.00") ; BALANCE ; SUB ; # available
+              PUSH tez "1.00" ; BALANCE ; SUB ; # available
               DIP { DUP ; CDDDAAR } ;# P
               COMPARE ; LT ; # available < P
-              IF { PUSH (Tez "1.00") ; BALANCE ; SUB ; # available
+              IF { PUSH tez "1.00" ; BALANCE ; SUB ; # available
                    DIP { DUP ; CDDDDAR } # A
-                   PUSH Unit ; TRANSFER_TOKENS ; DROP }
+                   UNIT ; TRANSFER_TOKENS ; DROP }
                  { DUP ; CDDDAAR ; # P
                    DIP { DUP ; CDDDDAR } # A
-                   PUSH Unit ; TRANSFER_TOKENS ; DROP }
+                   UNIT ; TRANSFER_TOKENS ; DROP }
               # We transfer the rest to B
-              PUSH (Tez "1.00") ; BALANCE ; SUB ; # available
+              PUSH tez "1.00" ; BALANCE ; SUB ; # available
               DIP { DUP ; CDDDDDR } # B
-              PUSH Unit ; TRANSFER_TOKENS ; DROP ;
+              UNIT ; TRANSFER_TOKENS ; DROP ;
               # We update the global
-              CDR ; CDR ; PUSH (String "timeout") ; PAIR } }
+              CDR ; CDR ; PUSH string "timeout" ; PAIR } }
     # return Unit
-    PUSH Unit ; PAIR
+    UNIT ; PAIR
 
 ### Forward contract
 
@@ -1613,65 +1588,65 @@ with the minimum amount, set to `(Tez "1.00")`.
 The code of the contract is thus as follows.
 
     DUP ; CDDADDR ; # Z
-    PUSH (Uint64 86400) ; SWAP ; ADD ; # one day in second
+    PUSH uint64 86400 ; SWAP ; ADD ; # one day in second
     NOW ; COMPARE ; LT ;
     IF { # Before Z + 24
          DUP ; CADR ; # we must receive (Left "buyer") or (Left "seller")
          IF_LEFT
-           { DUP ; PUSH (String "buyer") ; COMPARE ; EQ ;
+           { DUP ; PUSH string "buyer" ; COMPARE ; EQ ;
              IF { DROP ;
                   DUP ; CDADAR ; # amount already versed by the buyer
                   DIP { DUP ; CAAR } ; ADD ; # transaction
                   #  then we rebuild the globals
                   DIP { DUP ; CDADDR } ; PAIR ; # seller amount
-                  PUSH (Uint32 0) ; PAIR ; # delivery counter at 0
+                  PUSH uint32 0 ; PAIR ; # delivery counter at 0
                   DIP { CDDR } ; PAIR ; # parameters
                   # and return Unit
-                  PUSH Unit ; PAIR }
-                { PUSH (String "seller") ; COMPARE ; EQ ;
+                  UNIT ; PAIR }
+                { PUSH string "seller" ; COMPARE ; EQ ;
                   IF { DUP ; CDADDR ; # amount already versed by the seller
                        DIP { DUP ; CAAR } ; ADD ; # transaction
                        #  then we rebuild the globals
                        DIP { DUP ; CDADAR } ; SWAP ; PAIR ; # buyer amount
-                       PUSH (Uint32 0) ; PAIR ; # delivery counter at 0
+                       PUSH uint32 0 ; PAIR ; # delivery counter at 0
                        DIP { CDDR } ; PAIR ; # parameters
                        # and return Unit
-                       PUSH Unit ; PAIR }
-                     { FAIL ; CDR ; PUSH Unit ; PAIR }}} # (Left _)
-           { FAIL ; DROP ; CDR ; PUSH Unit ; PAIR }} # (Right _)
+                       UNIT ; PAIR }
+                     { FAIL ; CDR ; UNIT ; PAIR }}} # (Left _)
+           { FAIL ; DROP ; CDR ; UNIT ; PAIR }} # (Right _)
        { # After Z + 24
          # test if the required amount is reached
          DUP ; CDDAAR ; # Q
          DIP { DUP ; CDDDADR } ; MUL ; # C
-         PUSH (Uint8 2) ; MUL ;
-         PUSH (Tez "1.00") ; ADD ;
+         PUSH uint8 2 ; MUL ;
+         PUSH tez "1.00" ; ADD ;
          BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C) + 1
          IF { # refund the parties
               DUP ; CDADAR ; # amount versed by the buyer
               DIP { DUP ; CDDDDAAR } # B
-              PUSH Unit ; TRANSFER_TOKENS ; DROP
+              UNIT ; TRANSFER_TOKENS ; DROP
               DUP ; CDADDR ; # amount versed by the seller
               DIP { DUP ; CDDDDADR } # S
-              PUSH Unit ; TRANSFER_TOKENS ; DROP
+              UNIT ; TRANSFER_TOKENS ; DROP
               BALANCE ; # bonus to the warehouse to destroy the account
               DIP { DUP ; CDDDDDR } # W
-              PUSH Unit ; TRANSFER_TOKENS ; DROP
+              UNIT ; TRANSFER_TOKENS ; DROP
               # return unit, don't change the global
               # since the contract will be destroyed
-              CDR ; PUSH Unit ; PAIR }
+              CDR ; UNIT ; PAIR }
             { # otherwise continue
               DUP ; CDDADAR # T
               NOW ; COMPARE ; LT
-              IF { FAIL ; CDR ; PUSH Unit ; PAIR } # Between Z + 24 and T
+              IF { FAIL ; CDR ; UNIT ; PAIR } # Between Z + 24 and T
                  { # after T
                    DUP ; CDDADAR # T
-                   PUSH (Uint64 86400) ; ADD # one day in second
+                   PUSH uint64 86400 ; ADD # one day in second
                    NOW ; COMPARE ; LT
                    IF { # Between T and T + 24
                         # we only accept transactions from the buyer
                         DUP ; CADR ; # we must receive (Left "buyer")
                         IF_LEFT
-                          { PUSH (String "buyer") ; COMPARE ; EQ ;
+                          { PUSH string "buyer" ; COMPARE ; EQ ;
                             IF { DUP ; CDADAR ; # amount already versed by the buyer
                                  DIP { DUP ; CAAR } ; ADD ; # transaction
                                  # The amount must not exceed Q * K
@@ -1682,12 +1657,12 @@ The code of the contract is thus as follows.
                                        IF { FAIL } { } } ; # abort or continue
                                  #  then we rebuild the globals
                                  DIP { DUP ; CDADDR } ; PAIR ; # seller amount
-                                 PUSH (Uint32 0) ; PAIR ; # delivery counter at 0
+                                 PUSH uint32 0 ; PAIR ; # delivery counter at 0
                                  DIP { CDDR } ; PAIR ; # parameters
                                  # and return Unit
-                                 PUSH Unit ; PAIR }
-                               { FAIL ; CDR ; PUSH Unit ; PAIR }} # (Left _)
-                          { FAIL ; DROP ; CDR ; PUSH Unit ; PAIR }} # (Right _)
+                                 UNIT ; PAIR }
+                               { FAIL ; CDR ; UNIT ; PAIR }} # (Left _)
+                          { FAIL ; DROP ; CDR ; UNIT ; PAIR }} # (Right _)
                       { # After T + 24
                         # test if the required payment is reached
                         DUP ; CDDAAR ; # Q
@@ -1697,13 +1672,13 @@ The code of the contract is thus as follows.
                         IF { # not reached, pay the seller and destroy the contract
                              BALANCE ;
                              DIP { DUP ; CDDDDADR } # S
-                             PUSH Unit ; TRANSFER_TOKENS ; DROP ;
+                             UNIT ; TRANSFER_TOKENS ; DROP ;
                              # and return Unit
-                             CDR ; PUSH Unit ; PAIR }
+                             CDR ; UNIT ; PAIR }
                            { # otherwise continue
                              DUP ; CDDADAR # T
-                             PUSH (Uint64 86400) ; ADD ;
-                             PUSH (Uint64 86400) ; ADD ; # two days in second
+                             PUSH uint64 86400 ; ADD ;
+                             PUSH uint64 86400 ; ADD ; # two days in second
                              NOW ; COMPARE ; LT
                              IF { # Between T + 24 and T + 48
                                   # We accept only delivery notifications, from W
@@ -1713,13 +1688,13 @@ The code of the contract is thus as follows.
                                   IF { FAIL } {} # fail if not the warehouse
                                   DUP ; CADR ; # we must receive (Right amount)
                                   IF_LEFT
-                                    { FAIL ; DROP ; CDR ; PUSH Unit ; PAIR } # (Left _)
+                                    { FAIL ; DROP ; CDR ; UNIT ; PAIR } # (Left _)
                                     { # We increment the counter
                                       DIP { DUP ; CDAAR } ; ADD ;
                                       # And rebuild the globals in advance
                                       DIP { DUP ; CDADR } ; PAIR ;
                                       DIP CDDR ; PAIR ;
-                                      PUSH Unit ; PAIR ;
+                                      UNIT ; PAIR ;
                                       # We test if enough have been delivered
                                       DUP ; CDAAR ;
                                       DIP { DUP ; CDDAAR } ;
@@ -1728,13 +1703,13 @@ The code of the contract is thus as follows.
                                          { # Transfer all the money to the seller
                                            BALANCE ; # and destroy the contract
                                            DIP { DUP ; CDDDDADR } # S
-                                           PUSH Unit ; TRANSFER_TOKENS ; DROP }}}
+                                           UNIT ; TRANSFER_TOKENS ; DROP }}}
                                 { # after T + 48, transfer everything to the buyer
                                   BALANCE ; # and destroy the contract
                                   DIP { DUP ; CDDDDAAR } # B
-                                  PUSH Unit ; TRANSFER_TOKENS ; DROP ;
+                                  UNIT ; TRANSFER_TOKENS ; DROP ;
                                   # and return unit
-                                  CDR ; PUSH Unit ; PAIR }}}}}}
+                                  CDR ; UNIT ; PAIR }}}}}}
 
 X - Full grammar
 ----------------
@@ -1750,21 +1725,21 @@ X - Full grammar
       | Unit
       | True
       | False
-      | Pair <untagged data> <untagged data>
-      | Left <untagged data>
-      | Right <untagged data>
-      | Some <untagged data>
+      | Pair <data> <data>
+      | Left <data>
+      | Right <data>
+      | Some <data>
       | None
-      | List <untagged data> ...
-      | Set <untagged data> ...
-      | Map (Item <untagged data> <untagged data>) ...
+      | List <data> ...
+      | Set <data> ...
+      | Map (Item <data> <data>) ...
       | instruction
     <instruction> ::=
       | { <instruction> ... }
       | DROP
       | DUP
       | SWAP
-      | PUSH <tagged data>
+      | PUSH <type> <data>
       | SOME
       | NONE <type>
       | IF_NONE { <instruction> ... } { <instruction> ... }

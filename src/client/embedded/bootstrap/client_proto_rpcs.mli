@@ -149,10 +149,7 @@ module Helpers : sig
   val typecheck_code:
     Client_commands.context ->
     block -> Script.code -> Script_ir_translator.type_map tzresult Lwt.t
-  val typecheck_tagged_data:
-    Client_commands.context ->
-    block -> Script.expr -> unit tzresult Lwt.t
-  val typecheck_untagged_data:
+  val typecheck_data:
     Client_commands.context ->
     block -> Script.expr * Script.expr -> unit tzresult Lwt.t
   val hash_data:
