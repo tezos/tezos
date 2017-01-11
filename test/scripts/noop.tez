@@ -1,7 +1,7 @@
-parameter void
+parameter unit
 code
   { # This is a noop contract
-    CDR ; PUSH VOID ; PAIR
+    CDR ; UNIT ; PAIR
   }
-return void
-storage VOID
+return unit
+storage unit
