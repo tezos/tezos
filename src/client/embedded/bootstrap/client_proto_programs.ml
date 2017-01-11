@@ -210,9 +210,9 @@ let commands () =
       (prefixes [ "run" ; "program" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
-       @@ Cli_entries.param ~name:"storage" ~desc:"the untagged storage data" parse_data
+       @@ Cli_entries.param ~name:"storage" ~desc:"the storage data" parse_data
        @@ prefixes [ "and" ; "input" ]
-       @@ Cli_entries.param ~name:"storage" ~desc:"the untagged input data" parse_data
+       @@ Cli_entries.param ~name:"storage" ~desc:"the input data" parse_data
        @@ stop)
       (fun program storage input cctxt ->
          let open Data_encoding in
@@ -274,7 +274,7 @@ let commands () =
          | Error errs ->
              pp_print_error Format.err_formatter errs ;
              cctxt.error "ill-typed program") ;
-    command ~group ~desc: "ask the node to typecheck a tagged data expression"
+    command ~group ~desc: "ask the node to typecheck a data expression"
       (prefixes [ "typecheck" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck" parse_data
        @@ prefixes [ "against" ; "type" ]
@@ -282,7 +282,7 @@ let commands () =
        @@ stop)
       (fun data exp_ty cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.typecheck_untagged_data cctxt
+         Client_proto_rpcs.Helpers.typecheck_data cctxt
            (block ()) (data, exp_ty) >>= function
          | Ok () ->
              cctxt.message "Well typed"
@@ -290,7 +290,7 @@ let commands () =
              pp_print_error Format.err_formatter errs ;
              cctxt.error "ill-typed data") ;
     command ~group
-      ~desc: "ask the node to compute the hash of an untagged data expression \
+      ~desc: "ask the node to compute the hash of a data expression \
               using the same algorithm as script instruction H"
       (prefixes [ "hash" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to hash" parse_data
@@ -305,7 +305,7 @@ let commands () =
              pp_print_error Format.err_formatter errs ;
              cctxt.error "ill-formed data") ;
     command ~group
-      ~desc: "ask the node to compute the hash of an untagged data expression \
+      ~desc: "ask the node to compute the hash of a data expression \
               using the same algorithm as script instruction H, sign it using \
               a given secret key, and display it using the format expected by \
               script instruction CHECK_SIGNATURE"
