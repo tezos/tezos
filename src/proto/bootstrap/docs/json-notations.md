@@ -19,7 +19,7 @@ introspecting the node, returning the current state of the storage.
         "retType": /* type */,
         "storageType": /* type */ },
       "storage":
-      { "storage": /* tagged data */,
+      { "storage": /* data */,
         "storageType": /* type */ } }
 
 All the sub fields contain expressions in a common meta JSON format
@@ -61,7 +61,8 @@ application of a primitive.
 
         "name"
 
-    The name of the primitive is expected to be in lowercase.
+    The name of the primitive must respect the same case policy as the
+    concrete sytax.
 
 ### Examples
 
@@ -69,56 +70,19 @@ Originating a contract with a script that does nothing can be done
 with the following JSON script description.
 
     { "code":
-      { "code": [ "cdr",
-                  { "push": [ "void" ] }
-                  "pair" ],
-        "argType": "void",
-        "retType": "void",
-        "storageType": "void" },
+      { "code": [ "CDR",
+                  { "PUSH": [ "uint8", { "int": "3" } ] }
+                  "PAIR" ],
+        "argType": "unit",
+        "retType": "uint8",
+        "storageType": "unit" },
       "storage":
-      { "storage": "void",
-        "storageType": "void" } }
+      { "storage": "unit",
+        "storageType": "unit" } }
 
 ### Full grammar
 
-    /* tagged data */ ::=
-      | { "int8": [ /* int constant */ ] }
-      | { "int16": [ /* int constant */ ] }
-      | { "int32": [ /* int constant */ ] }
-      | { "int64": [ /* int constant */ ] }
-      | { "uint8": [ /* int constant */ ] }
-      | { "uint16": [ /* int constant */ ] }
-      | { "uint32": [ /* int constant */ ] }
-      | { "uint64": [ /* int constant */ ] }
-      | "void"
-      | "true"
-      | "false"
-      | /* string constant */
-      | /* float constant */
-      | { "timestamp": [ /* timestamp constant */ ] }
-      | { "signature": [ /* signature constant */ ] }
-      | { "tez": [ /* tez constant */ ] }
-      | { "key": [ /* key constant */ ] }
-      | { "left": [ /* tagged data */, /* type */ ] }
-      | { "right": [ /* type */, /* tagged data */ ] }
-      | { "or": [ /* type */, /* type */, /* untagged data */ ] }
-      | { "some": [ /* tagged data */ ] }
-      | { "some": [ /* type */, /* untagged data */ ] }
-      | { "none": [ /* type */ ] }
-      | { "option": [ /* type */, /* untagged data */ ] }
-      | { "pair": [ /* tagged data */, /* tagged data */ ] }
-      | { "pair": [ /* type */,
-                    /* type */,
-                    /* untagged data */,
-                    /* untagged data */ ] }
-      | { "list": [ /* type */, /* untagged data */ ... ] }
-      | { "set": [ /* comparable type */, /* untagged data */ ... ] }
-      | { "map": [ /* comparable type */,
-                   /* type */,
-                   { "item": [ /* untagged data */, /* untagged data */ ] } ... ] }
-      | { "contract": [ /* type */, /* type */, /* contract constant */ ] }
-      | { "lambda": [ /* type */, /* type */, [ /* instruction */ ... ] ] }
-    /* untagged data */ ::=
+    /* data */ ::=
       | /* int constant */
       | /* string constant */
       | /* float constant */
@@ -127,94 +91,94 @@ with the following JSON script description.
       | /* key constant */
       | /* tez constant */
       | /* contract constant */
-      | "void"
-      | "true"
-      | "false"
-      | { "pair": [ /* untagged data */, /* untagged data */ ] }
-      | { "left": [ /* untagged data */ ] }
-      | { "right": [ /* untagged data */ ] }
-      | { "some": [ /* untagged data */ ] }
-      | "none"
-      | { "list": [ /* untagged data */ ... ] }
-      | { "set": [ /* untagged data */ ... ] }
-      | { "map": [ { "item": [ /* untagged data */, /* untagged data */ ] } ... ] }
+      | "Unit"
+      | "True"
+      | "False"
+      | { "Pair": [ /* data */, /* data */ ] }
+      | { "Left": [ /* data */ ] }
+      | { "Right": [ /* data */ ] }
+      | { "Some": [ /* data */ ] }
+      | "None"
+      | { "List": [ /* data */ ... ] }
+      | { "Set": [ /* data */ ... ] }
+      | { "Map": [ { "item": [ /* data */, /* data */ ] } ... ] }
     /* instruction */ ::=
       | [ /* instruction */ ... ]
-      | "drop"
-      | "dup"
-      | "swap"
-      | { "push": [ /* tagged data */ ] }
-      | "some"
-      | { "none": [ /* type */ ] }
-      | { "if_none": [ [ /* instruction */ ... ], [ /* instruction */ ... ] ] }
-      | "pair"
-      | "car"
-      | "cdr"
-      | { "left": [ /* type */ ] }
-      | { "right": [ /* type */ ] }
-      | { "if_left": [ [ /* instruction */ ... ], [ /* instruction */ ... ] ] }
-      | { "nil": [ /* type */ ] }
-      | "cons"
-      | { "if_cons": [ [ /* instruction */ ... ], [ /* instruction */ ... ] ] }
-      | { "empty_set": [ /* type */ ] }
-      | { "empty_map": [ /* comparable type */, /* type */ ] }
-      | "map"
-      | "reduce"
-      | "mem"
-      | "get"
-      | "update"
-      | { "if": [ [ /* instruction */ ... ], [ /* instruction */ ... ] ] }
-      | { "loop": [ [ /* instruction */ ... ] ] }
-      | { "lambda": [ /* type */, /* type */, [ /* instruction */ ... ] ] }
-      | "exec"
-      | { "dip": [ [ /* instruction */ ... ] ] }
-      | "fail"
-      | "nop"
-      | "concat"
-      | "add"
-      | "sub"
-      | "mul"
-      | "div"
-      | "abs"
-      | "neg"
-      | "mod"
-      | "lsl"
-      | "lsr"
-      | "or"
-      | "and"
-      | "xor"
-      | "not"
-      | "compare"
-      | "eq"
-      | "neq"
-      | "lt"
-      | "gt"
-      | "le"
-      | "ge"
-      | "cast"
-      | "checked_abs"
-      | "checked_neg"
-      | "checked_add"
-      | "checked_sub"
-      | "checked_mul"
-      | "checked_cast"
-      | "floor"
-      | "ceil"
-      | "inf"
-      | "nan"
-      | "isnan"
-      | "nanan"
-      | "manager"
-      | "transfer_funds"
-      | "create_account"
-      | "create_contract"
-      | "now"
-      | "amount"
-      | "balance"
-      | "check_signature"
-      | "h"
-      | "steps_to_quota"
-      | { "source": [ /* type */, /* type */ ] }
+      | "DROP"
+      | "DUP"
+      | "SWAP"
+      | { "PUSH": [ /* type */ /* data */ ] }
+      | "SOME"
+      | { "NONE": [ /* type */ ] }
+      | { "IF_NONE": [ [ /* instruction */ ... ], [ /* instruction */ ... ] ] }
+      | "PAIR"
+      | "CAR"
+      | "CDR"
+      | { "LEFT": [ /* type */ ] }
+      | { "RIGHT": [ /* type */ ] }
+      | { "IF_LEFT": [ [ /* instruction */ ... ], [ /* instruction */ ... ] ] }
+      | { "NIL": [ /* type */ ] }
+      | "CONS"
+      | { "IF_CONS": [ [ /* instruction */ ... ], [ /* instruction */ ... ] ] }
+      | { "EMPTY_SET": [ /* type */ ] }
+      | { "EMPTY_MAP": [ /* comparable type */, /* type */ ] }
+      | "MAP"
+      | "REDUCE"
+      | "MEM"
+      | "GET"
+      | "UPDATE"
+      | { "IF": [ [ /* instruction */ ... ], [ /* instruction */ ... ] ] }
+      | { "LOOP": [ [ /* instruction */ ... ] ] }
+      | { "LAMBDA": [ /* type */, /* type */, [ /* instruction */ ... ] ] }
+      | "EXEC"
+      | { "DIP": [ [ /* instruction */ ... ] ] }
+      | "FAIL"
+      | "NOP"
+      | "CONCAT"
+      | "ADD"
+      | "SUB"
+      | "MUL"
+      | "DIV"
+      | "ABS"
+      | "NEG"
+      | "MOD"
+      | "LSL"
+      | "LSR"
+      | "OR"
+      | "AND"
+      | "XOR"
+      | "NOT"
+      | "COMPARE"
+      | "EQ"
+      | "NEQ"
+      | "LT"
+      | "GT"
+      | "LE"
+      | "GE"
+      | "CAST"
+      | "CHECKED_ABS"
+      | "CHECKED_NEG"
+      | "CHECKED_ADD"
+      | "CHECKED_SUB"
+      | "CHECKED_MUL"
+      | "CHECKED_CAST"
+      | "FLOOR"
+      | "CEIL"
+      | "INF"
+      | "NAN"
+      | "ISNAN"
+      | "NANAN"
+      | "MANAGER"
+      | "TRANSFER_FUNDS"
+      | "CREATE_ACCOUNT"
+      | "CREATE_CONTRACT"
+      | "NOW"
+      | "AMOUNT"
+      | "BALANCE"
+      | "CHECK_SIGNATURE"
+      | "H"
+      | "STEPS_TO_QUOTA"
+      | { "SOURCE": [ /* type */, /* type */ ] }
     /* type */ ::=
       | "int8"
       | "int16"
@@ -224,7 +188,7 @@ with the following JSON script description.
       | "uint16"
       | "uint32"
       | "uint64"
-      | "void"
+      | "unit"
       | "string"
       | "float"
       | "tez"
@@ -237,7 +201,7 @@ with the following JSON script description.
       | { "set": [ /* comparable type */ ] }
       | { "contract": [ /* type */, /* type */ ] }
       | { "pair": [ /* type */, /* type */ ] }
-      | { "union": [ /* type */, /* type */ ] }
+      | { "or": [ /* type */, /* type */ ] }
       | { "lambda": [ /* type */, /* type */ ] }
       | { "map": [ /* comparable type */, /* type */ ] }
     /* comparable type */ ::=
