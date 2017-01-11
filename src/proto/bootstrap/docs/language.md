@@ -539,11 +539,11 @@ combinators, and also for branching.
 
    * `IF{EQ|NEQ|LT|GT|LE|GE} bt bf`
 
-        > IFCMP(\op) ; C / S   =>   (\op) ; IF bt bf ; C / S
+        > IF(\op) ; C / S   =>   (\op) ; IF bt bf ; C / S
 
    * `IFCMP{EQ|NEQ|LT|GT|LE|GE} bt bf`
 
-        > IFCMP(\op) ; C / S   =>   COMPARE ; IF(\op) bt bf ; C / S
+        > IFCMP(\op) ; C / S   =>   COMPARE ; (\op) ; IF bt bf ; C / S
 
 
 V - Operations
