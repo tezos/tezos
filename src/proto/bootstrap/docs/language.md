@@ -1,9 +1,29 @@
-Tezos Contract Script Language Specification
-============================================
+Michelson: the language of Smart Contracts in Tezos
+===================================================
 
 The language is stack based, with high level data types and primitives
-and scrict static type checking. Its design is insipired by Forth,
-Scheme, ML and Cat.
+and strict static type checking. Its design cherry picks traits from
+several language families. Vigilant readers will notice direct
+references to Forth, Scheme, ML and Cat.
+
+A Michelson program is a series of instructions that are run in
+sequence: each instruction receives as input the stack resulting of
+the previous instruction, and rewrites it for the next one. The stack
+contains both immediate values and heap allocated structures. All
+values are immutable and garbage collected.
+
+A Michelson program receives as input a single element stack
+containing an input value and the contents of a storage space. It must
+return a single element stack containing an output value and the new
+contents of the storage space. Alternatively, a Michelson program can
+fail, explicitly using a specific opcode, or because something went
+wrong that could not be caught by the type system (e.g. division by
+zero, gas exhaustion).
+
+The types of the input, output and storage are fixed and monomorphic,
+and the program is typechecked before being introduced into the
+system. No smart contract execution can fail because an instruction
+has been executed on a stack of unexpected length or contents.
 
 This specification gives the complete instruction set, type system and
 semantics of the language. It is meant as a precise reference manual,
@@ -11,14 +31,13 @@ not an easy introduction. Even though, some examples are provided at
 the end of the document and can be read first or at the same time as
 the specification.
 
-
 Table of contents
 -----------------
 
-  * I - Type system
-  * II - Semantics
-  * III - Core instructions
-  * IV - Data types
+  * I - Semantics
+  * II - Type system
+  * III - Core data types
+  * IV - Core instructions
   * V - Operations
   * VI - Domain specific data types
   * VII - Domain specific operations
@@ -27,191 +46,443 @@ Table of contents
   * X - Full grammar
   * XI - Reference implementation
 
-I - Type system
----------------
+I - Semantics
+-------------
 
-The types `T` of values in the stack are written using notations
+This specification gives a detailed formal semantics of the Michelson
+language. It explains in a symbolic way the computation performed by
+the Michelson interpreter on a given program and initial stack to
+produce the corresponding resulting stack. The Michelson interpreter
+is a pure function: it only builds a result stack from the elements of
+an initial one, without affecting its environment. This semantics is
+then naturally given in what is called a big step form: a symbolic
+definition of a recursive reference interpreter. This definition takes
+the form of a list of rules that cover all the possible inputs of the
+interpreter (program and stack), and describe the computation of the
+corresponding resulting stacks.
 
-  * `bool`, `string`, `void`, `u?int{8|16|32|64}`,
-    the core primitive types,
-  * `identifier` for a primitive data-type,
-  * `T identifier` for a parametric data-type with one parameter type `T`,
-  * `identifier T_0 ... T_n` for a parametric data-type with several
-    parameters,
-  * `'a` for a type variable,
-  * `_` for an anonymous type variable,
-  * `[ P ]` for a code quotation whose program type is `P`,
-  * `lambda T_arg T_ret` is a shortcut for `[ T_arg :: [] -> T_ret :: []]`.
-  * other specific notations for compound types, described later.
+### Rules form and selection
+
+The rules have the main following form.
+
+    > (syntax pattern) / (initial stack pattern) => (result stack pattern)
+      iff (conditions)
+      where (recursions)
+
+The left hand side of the `=>` sign is used for selecting the
+rule. Given a program and an initial stack, one (and only one) rule
+can be selected using the following process. First, the toplevel
+structure of the program must match the syntax pattern. This is quite
+simple since there is only a few non trivial patterns to deal with
+instruction sequences, and the rest is made of trivial pattern that
+match one specific instruction. Then, the initial stack must match the
+initial stack pattern. Finally, some rules add extra conditions over
+the values in the stack that follow the `iff` keyword. Sometimes,
+several rules may apply in a given context. In this case, the one that
+appears first in this specification is to be selected. If no rule
+applies, the result is equivalent to the one for the explicit `FAIL`
+instruction. This case does not happen on well-typed programs, as
+explained in the next section.
+
+The right hand side describes the result of the interpreter if the
+rule applies. It consists in a stack pattern, whose part are either
+constants, or elements of the context (program and initial stack) that
+have been named on the left hand side of the `=>` sign.
+
+### Recursive rules (big step form)
+
+Sometimes, the result of interpreting a program is derived from the
+result of interpreting another one (as in conditionals or function
+calls). In these cases, the rule contains a clause of the following
+form.
+
+    where (intermediate program) / (intermediate stack) => (partial result)
+
+This means that this rules applies in case interpreting the
+intermediate state on the left gives the pattern on the right.
+
+The left hand sign of the `=>` sign is constructed from elements of
+the initial state or other partial results, and the right hand side
+identify parts that can be used to build the result stack of the rule.
+
+If the partial result pattern does not actually match the result of
+the interpretation, then the result of the whole rule is equivalent to
+the one for the explicit `FAIL` instruction. Again, this case does not
+happen on well-typed programs, as explained in the next section.
+
+### Format of patterns
+
+Code patterns are of one of the following syntactical forms.
+
+  * `INSTR` (an uppercase identifier) is a simple instruction
+    (e.g. `DROP`);
+  * `INSTR (arg) ...` is a compound instruction,
+    whose arguments can be code, data or type patterns
+    (e.g. `PUSH uint8 3`) ;
+  * `{ (instr) ; ... }` is a possibly empty sequence of instructions,
+    (e.g. `IF { SWAP ; DROP } { DROP }`),
+    nested sequences can drop the braces ;
+  * `name` is a pattern that matches any program and names a part of
+    the matched program that can be used to build the result ;
+  * `_` is a pattern that matches any instruction.
+
+Stack patterns are of one of the following syntactical forms.
+
+  * `[FAIL]` is the special failed state ;
+  * `[]` is the empty stack ;
+  * `(top) : (rest)` is a stack whose top element is matched by the
+    data pattern `(top)` on the left, and whose remaining elements are
+    matched by the stack pattern `(rest)` on the right
+    (e.g. `x : y : rest`) ;
+  * `name` is a pattern that matches any stack and names it in order
+    to use it to build the result ;
+  * `_` is a pattern that matches any stack.
+
+Data patterns are of one of the following syntactical forms.
+
+  * integer literals,
+    (e.g. `3`) ;
+  * string literals,
+    (e.g. `"contents"`) ;
+  * `Tag` (capitalized) is a symbolic constant,
+    (e.g. `Unit`, `True`, `False`) ;
+  * `(Tag (arg) ...)` tagged constructed data,
+    (e.g. `(Pair 3 4)`) ;
+  * a code pattern for first class code values ;
+  * `name` to name a value in order to use it to build the result ;
+  * `_` to match any value.
+
+The domain of instruction names, symbolic constants and data
+constructors is fixed by this specification. Michelson does not let
+the programmer introduce its own types.
+
+Be aware that the syntax used in the specification may differ a bit
+from the concrete syntax, which is presented in Section VIII. In
+particular, some instructions are annotated with types that are not
+present in the concrete language because they are synthesized by the
+typechecker.
+
+### Shortcuts
+
+Sometimes, it is easier to think (and shorter to write) in terms of
+program rewriting than in terms of big step semantics. When it is the
+case, and when both are equivalents, we write rules of the form:
+
+    p / S   =>   S''
+    where   p' / S'   =>   S''
+
+using the following shortcut:
+
+    p / S   =>   p' / S'
+
+The concrete language also has some syntax sugar to group some common
+sequences of operations as one. This is described in this
+specification using a simple regular expression style recursive
+instruction rewriting.
+
+II - Introduction to the type system and notations
+--------------------------------------------------
+
+This specification describes a type system for Michelson. To make
+things clear, in particular to readers that are not accustomed to
+reading formal programming language specifications, it does not give a
+typechecking or inference algorithm. It only gives an intentional
+definition of what we consider to be well-typed programs. For each
+syntactical form, it describes the stacks that are considered
+well-typed inputs, and the resulting outputs.
+
+The type system is sound, meaning that if a program can be given a
+type, then if run on a well-typed input stack, the interpreter will
+never apply an interpretation rule on a stack of unexpected length or
+contents. Also, it will never reach a state where it cannot select an
+appropriate rule to continue the execution. Well-typed programs do not
+block, and do not go wrong.
+
+### Type notations
+
+The specification introduces notations for the types of values, terms
+and stacks. Appart from a subset of value types that appear in the
+form of type annotations in some places througout the language, it is
+important to understand that this type language only exists in the
+specification.
+
+A stack type can be written:
+
+  * `[]` for the empty stack ;
+  * `(top) : (rest)` for the stack whose first value has type `(top)`
+    and queue has stack type `(rest)`.
 
 Instructions, programs and primitives of the language are also typed,
-their types `P` are written using the following notation, where `S`
-the type of a stack.
+their types are written:
 
-    :: S before   ->   S after
+    (type of stack before) -> (type of stack after)
 
-A stack type `S` can be written
+The types of values in the stack are written:
 
-  * `[]` for the empty stack,
-  * `T_top : S_rest` for the stack whose first value has type `Ttop` and queue `Srest`,
+  * `identifier` for a primitive data-type
+    (e.g. `bool`),
+  * `identifier (arg)` for a parametric data-type with one parameter type `(arg)`
+    (e.g. `list uint8`),
+  * `identifier (arg) ...` for a parametric data-type with several parameters
+    (e.g. `map string uint8`),
+  * `[ (type of stack before) -> (type of stack after) ]` for a code quotation,
+    (e.g. `[ uint8 : uint8 : [] -> uint8 : [] ]`),
+  * `lambda (arg) (ret)` is a shortcut for `[ (arg) : [] -> (ret) : [] ]`.
+
+### Meta type variables
+
+The typing rules introduce meta type variables. To be clear, this has
+nothing to do with polymorphism, which Michelson does not have. These
+variables only live at the specification level, and are used to
+express the consistency between the parts of the program. For
+instance, the typing rule for the `IF` construct introduces meta
+variables to express that both branches must have the same type.
+
+Here are the notations for meta type variables:
+
+  * `'a` for a type variable,
   * `'A` for a stack type variable,
-  * `_` for an anonymous stack type variable.
+  * `_` for an anonymous type or stack type variable.
+
+### Typing rules
+
+The system is syntax directed, which means here that it defines a
+single typing rule for each syntax construct. A typing rule restricts
+the type of input stacks that are authorized for this syntax
+construct, links the output type to the input type, and links both of
+them to the subexpressions when needed, using meta type variables.
+
+Typing rules are of the form:
+
+    (syntax pattern)
+    :: (type of stack before) -> (type of stack after) [rule-name]
+       iff (premisses)
+
+Where premisses are typing requirements over subprograms or values in
+the stack, both of the form `(x) :: (type)`, meaning that value `(x)`
+must have type `(type)`.
+
+A program is shown well-typed if one can find an instance of a rule
+that applies to the toplevel program expression, with all meta type
+variables replaced by non variable type expressions, and of which all
+type requirements in the premisses can be proven well-typed in the
+same manner. For the reader unfamiliar with formal type systems, this
+is called building a typing derivation.
+
+Here is an example typing derivation on a small program that computes
+`x+5/10` for a given input `x`, obtained by instanciating the typing
+rules for instructions `PUSH`, `ADD` and for the sequence, as found in
+the next sections. When instanciating, we replace the `iff` with `by`.
+
+    { PUSH uint8 5 ; ADD ; PUSH uint8 10 ; SWAP ; DIV }
+    :: [ uint8 : [] -> uint8 : [] ]
+       by { PUSH uint8 5 ; ADD }
+          :: [ uint8 : [] -> uint8 : [] ]
+             by PUSH uint8 5
+                :: [ uint8 : [] -> uint8 : uint8 : [] ]
+                   by 5 :: uint8
+            and ADD
+                :: [ uint8 : uint8 : [] -> uint8 : [] ]
+      and { PUSH uint8 10 ; SWAP ; DIV }
+          :: [ uint8 : [] -> uint8 : [] ]
+             by PUSH uint8 10
+                :: [ uint8 : [] -> uint8 : uint8 : [] ]
+                   by 10 :: uint8
+            and { SWAP ; DIV }
+                :: [ uint8 : uint8 : [] -> uint8 : [] ]
+                   by SWAP
+                      :: [ uint8 : uint8 : [] -> uint8 : uint8 : [] ]
+                  and DIV
+                      :: [ uint8 : uint8 : [] -> uint8 : [] ]
+
+Producing such a typing derivation can be done in a number of manners,
+such as unification or abstract interpretation. In the implementation
+of Michelson, this is done by performing a recursive symbolic
+evaluation of the program on an abstract stack representing the input
+type provided by the programmer, and checking that the resulting
+symbolic stack is consistent with the expected result, also provided
+by the programmer.
+
+### Side note
+
+As with most type systems, it is incomplete. There are programs that
+cannot be given a type in this type system, yet that would not go
+wrong if executed. This is a necessary compromise to make the type
+system usable. Also, it is important to remember that the
+implementation of Michelson does not accept as many programs as the
+type system describes as well-typed. This is because the
+implementation uses a simple single pass typechecking algorithm, and
+does not handle any form of polymorphism.
 
 
-II - Semantics
---------------
+III - Core data types and notations
+-----------------------------------
 
-The instructions are specified as follows, giving their mnemonic, type
-in the previously defined syntax, and small step semantics as a list
-of rewriting rules of the form
+   * `string`, `u?int{8|16|32|64}`:
+     The core primitive constant types.
 
-    > pre state => result state
+   * `bool`:
+     The type for booleans whose values are `True` and `False`
 
-where the preconditions of all rules are to be read in order, the first
-match selecting the behaviour of the instruction, so that the choice
-is deterministic. Only the valid pre states are described, any other
-cannot happen thanks to static typing.
+   * `unit`:
+     The type whose only value is `Unit`, to use as a placeholder when
+     some result or parameter is non necessary. For instance, when the
+     only goal of a contract is to update its storage.
 
+   * `list (t)`:
+     A single, immutable, homogeneous linked list, whose elements are
+     of type `(t)`, and that we note `Nil` for the empty list or
+     `(Cons (head) (tail))`.
 
-The pre and post result states are described as
+   * `pair (l) (r)`:
+     A pair of values `a` and `b` of types `(l)` and `(r)`, that we
+     write `(Pair a b)`.
 
-  * pairs `code / stack` for stack manipulation primitives,
-  * triples `code / stack / memory` for primitives that also manipulate memory,
-  * `[FAIL]` for a fatal failure state.
+   * `option (t)`:
+     Optional value of type `(t)` that we note `None` or `(Some v)`.
 
-The notations used are
+   * `or (l) (r)`:
+     A union of two types: a value holding either a value `a` of type
+     `(l)` or a value `b` of type `(r)`, that we write `(Left a)` or
+     `(Right b)`.
 
-  * `;` to represent the concatenation of instructions or sequences,
-  * `[]` for the empty code sequence,
-  * `top : tail` for stack consing, as in types,
-  * `identifier` for variable stack and code elements,
-  * `<identifier>` for variable memory locations,
-  * `_` for elements whose value does not affect the semantics.
+   * `set (t)`:
+     Immutable sets of values of type `(t)` that we note
+     `(Set (item) ...)`.
 
-The memory is described as a relation between locations and constants of
-the form `variable = constant, ...`.
-
-The constants are of one of the following forms.
-
-  * integers with their sign and size, e.g. `(Uint8 3)`,
-  * `Void`, the unique value of type `void`
-  * booleans `True` and `False`,
-  * string literals, as in `(String "contents")`,
-  * structured constants of compound types described later.
+   * `map (k) (t)`:
+     Immutable maps from keys of type `(k)` of values of type `(t)`
+     that we note `(Map (Item (key) (value)) ...)`.
 
 
-III - Core instructions
------------------------
+IV - Core instructions
+----------------------
 
 ### Control structures
 
-   * `(I :: [ 'A -> 'B ]) ; (C :: [ 'B -> 'C ])`: Sequence operator.
+   * `FAIL`:
+     Explicitly abort the current program.
+
+        :: _   ->  _
+
+     This special instruction is callable in any context, since it
+     does not use its input stack (first rule below), and makes the
+     output useless since all subsequent instruction will simply
+     ignore their usual semantics to propagate the failure up to the
+     main result (second rule below). Its type is thus completely
+     generic.
+
+        > FAIL / _   =>  [FAIL]
+        > _ / [FAIL]    =>   [FAIL]
+
+   * `{ I ; C }`:
+     Sequence.
 
         :: 'A   ->   'C
+           iff   I :: [ 'A -> 'B ]
+                 C :: [ 'B -> 'C ]
 
-        > I ; C / SA   =>   C / SB   iff   I / SA   =>   [] / SB
+        > I ; C / SA    =>   SC
+          where   I / SA   =>   SB
+            and   C / SB   =>   SC
 
-   * `IF bt bf`: Conditional branching.
+   * `IF bt bf`:
+     Conditional branching.
 
         :: bool : 'A   ->   'B
            iff   bt :: [ 'A -> 'B ]
                  bf :: [ 'A -> 'B ]
 
-        > IF ; C / True : S    =>    bt ; C / S
-        > IF ; C / False : S   =>    bf ; C / S
+        > IF bt bf / True : S    =>    bt / S
+        > IF bt bf / False : S   =>    bf / S
 
-   * `LOOP body`: A generic loop.
+   * `LOOP body`:
+     A generic loop.
 
         :: bool : 'A   ->   'A
            iff   body :: [ 'A -> bool : 'A ]
 
-        > LOOP body ; C / True : S    =>    body ; LOOP body ; C / S
-        > LOOP body ; C / False : S   =>    C / S
+        > LOOP body / True : S    =>    body ; LOOP body / S
+        > LOOP body / False : S   =>    S
 
-   * `DIP code`: Runs code protecting the top of the stack.
+   * `DIP code`:
+     Runs code protecting the top of the stack.
 
         :: 'b : 'A   ->   'b : 'C
            iff   code :: [ 'A -> 'C ]
 
-        > DIP code ; C / x : S   =>   code ; PUSH x ; C / S
+        > DIP code / x : S   =>   x : S'
+          where    code / S   =>   S'
 
-   * `DII+P code`: A sugar syntax for working deeper in the stack.
+   * `DII+P code`:
+     A syntactic sugar for working deeper in the stack.
 
-        > DII(\rest)P code ; C / S   =>   DIP (DI(\rest)P code) ; C / S
+        > DII(\rest=I*)P code / S   =>   DIP (DI(\rest)P code) / S
 
-   * `LAMBDA 'a 'b code`: Push a function onto the stack.
-
-        :: 'C   ->   lambda 'a 'b : 'C
-           iff   code :: lambda 'a 'b
-
-        > LAMBDA 'a 'b code ; C / S   =>   C / code : S
-
-   * `EXEC`: Execute a function from the stack.
+   * `EXEC`:
+     Execute a function from the stack.
 
         :: 'a : lambda 'a 'b : 'C   ->   'b : 'C
 
-        > EXEC ; C / a : f : S   =>   f ; C / a : S
+        > EXEC / a : f : S   =>   r : S
+          where f / a : []   =>   r : []
 
 ### Stack operations
 
-   * `DROP`: Drop the top element of the stack.
+   * `DROP`:
+     Drop the top element of the stack.
 
         :: _ : 'A   ->   'A
 
-        > DROP ; C / _ : S   =>   C / S
+        > DROP / _ : S   =>   S
 
-   * `DUP`: Duplicate the top of the stack.
+   * `DUP`:
+     Duplicate the top of the stack.
 
         :: 'a : 'A   ->   'a : 'a : 'A
 
-        > DUP ; C / x : S   =>   C / x : x : S
+        > DUP / x : S   =>   x : x : S
 
-   * `DUP n`: Duplicate the `n`th element of the stack.
+   * `DUU+P`:
+     A syntactic sugar for duplicating the `n`th element of the stack.
 
-        > DUP (n > 0) ; C / S   =>   DIP { DUP (n - 1) } ; SWAP ; C / S
-        > DUP 0 ; C / S   =>   DUP ; C / S
+        > DUU(\rest=U*)P / S   =>   DIP (DU(\rest)P) ; SWAP / S
 
-     This variant of `DUP` with an optional argument is syntactic
-     sugar for combining `DIP`, `SWAP` and `DUP` in order to access
-     elements in the stack by their depth, `DUP 0` being equivqlent to
-     a simple `DUP`.
-
-   * `SWAP`: Exchange the top two elements of the stack.
+   * `SWAP`:
+     Exchange the top two elements of the stack.
 
         :: 'a : 'b : 'A   ->   'b : 'a : 'A
 
-        > SWAP ; C / x : y : S   =>   C / y : x : S
+        > SWAP / x : y : S   =>   y : x : S
 
-   * `PUSH x`: Push a value onto the stack.
+   * `PUSH 'a x`:
+     Push a constant value of a given type onto the stack.
 
 
         :: 'A   ->   'a : 'A
            iff   x :: 'a
 
-        > PUSH x ; C / S   =>   C / x : S
+        > PUSH 'a x / S   =>   x : S
 
-   * `DROP`: Drop the top element of the stack.
+   * `UNIT`:
+     Push a unit value onto the stack.
 
-        :: _ : 'A   ->   'A
+        :: 'A   ->   unit : 'A
 
-        > DROP ; C / _ : S   =>   C / S
-
-   * `VOID`: Push a void value onto the stack.
-
-        :: 'A   ->   void : 'A
-
-        > VOID ; C / S   =>   C / () : S
+        > UNIT / S   =>   Unit : S
 
 ### Generic comparison
 
-Comparison only works on a class of types that we call comparable.  A
-`COMPARE` operation is defined in an ad hoc way for each comparable
-type, but the result of compare is always an `int64`, which can in turn
-be checked in a generic manner using the following combinators. The
-result of `COMPARE` is `0` if the compared values are equal, negative if
-the first is less than the second, and positive otherwise.
+Comparison only works on a class of types that we call comparable.
+A `COMPARE` operation is defined in an ad hoc way for each comparable
+type, but the result of compare is always an `int64`, which can in
+turn be checked in a generic manner using the following
+combinators. The result of `COMPARE` is `0` if the compared values are
+equal, negative if the first is less than the second, and positive
+otherwise.
 
-   * `EQ`: Checks that the top if the stack EQuals zero.
+   * `EQ`:
+     Checks that the top of the stack EQuals zero.
 
         :: int64 : 'S   ->   bool : 'S
 
@@ -219,35 +490,40 @@ the first is less than the second, and positive otherwise.
         > EQ ; C / _ : S           =>   C / False : S
 
 
-   * `NEQ`: Checks that the top if the stack does Not EQual zero.
+   * `NEQ`:
+     Checks that the top of the stack does Not EQual zero.
 
         :: int64 : 'S   ->   bool : 'S
 
         > NEQ ; C / Int64 (0) : S   =>   C / False : S
         > NEQ ; C / _ : S           =>   C / True : S
 
-   * `LT`: Checks that the top if the stack is Less Than zero.
+   * `LT`:
+     Checks that the top of the stack is Less Than zero.
 
         :: int64 : 'S   ->   bool : 'S
 
         > LT ; C / Int64 (v) : S   =>   C / True : S   iff  v < 0
         > LT ; C / _ : S           =>   C / False : S
 
-   * `GT`: Checks that the top if the stack is Greater Than zero.
+   * `GT`:
+     Checks that the top of the stack is Greater Than zero.
 
         :: int64 : 'S   ->   bool : 'S
 
         > GT ; C / Int64 (v) : S   =>   C / True : S   iff  v > 0
         > GT ; C / _ : S           =>   C / False : S
 
-   * `LE`: Checks that the top if the stack is Less Than of Equal to zero.
+   * `LE`:
+     Checks that the top of the stack is Less Than of Equal to zero.
 
         :: int64 : 'S   ->   bool : 'S
 
         > LE ; C / Int64 (v) : S   =>   C / True : S   iff  v <= 0
         > LE ; C / _ : S           =>   C / False : S
 
-   * `GE`: Checks that the top if the stack is Greater Than of Equal to zero.
+   * `GE`:
+     Checks that the top of the stack is Greater Than of Equal to zero.
 
         :: int64 : 'S   ->   bool : 'S
 
@@ -268,31 +544,6 @@ combinators, and also for branching.
    * `IFCMP{EQ|NEQ|LT|GT|LE|GE} bt bf`
 
         > IFCMP(\op) ; C / S   =>   COMPARE ; IF(\op) bt bf ; C / S
-
-
-IV - Data types
----------------
-
-   * `bool`, `string`, `void`, `u?int{8|16|32|64}`:
-     The core primitive types.
-
-   * `list 'a`:
-     A single, immutable, homogeneous linked list, whose elements are
-     of type 'a, and that we note Nil for the empty list or
-     (Cons head tail).
-
-   * `pair 'a 'b`:
-     A pair of values a and b of types 'a and 'b, that we write (Pair a b).
-
-   * `option 'a`:
-     Optional value that we note (None) or (Some v).
-
-   * `or 'a 'b`:
-     A union of two types, a value holding either a value a of type 'a
-     or a value b of type 'b, that we write (Left a) or (Right b).
-
-   * `set 'a`, `map 'a 'b`:
-     Immutable map and sets.
 
 
 V - Operations
@@ -353,7 +604,7 @@ of bits for a given integer type (e.g. `bits (int8) = 8`).
 
    * `NEG`
 
-        :: t : 'S   ->   t : 'S   where   t in int{8|16|32|64}
+        :: t : 'S   ->   t : 'S   for   t in int{8|16|32|64}
 
         > NEG ; C / t (x) : S   =>   C / t (-x) : S
 
@@ -361,7 +612,7 @@ of bits for a given integer type (e.g. `bits (int8) = 8`).
 
    * `ABS`
 
-        :: t : 'S   ->   t : 'S   where   t in int{8|16|32|64}
+        :: t : 'S   ->   t : 'S   for   t in int{8|16|32|64}
 
         > ABS ; C / t (x) : S   =>   C / t (abs (x)) : S
 
@@ -369,7 +620,7 @@ of bits for a given integer type (e.g. `bits (int8) = 8`).
 
    * `ADD`
 
-        :: t : t : 'S   ->   t : 'S   where   t in u?int{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
 
         > ADD ; C / t (x) : t (y) : S   =>   C / t (x + y) : S
 
@@ -377,37 +628,37 @@ of bits for a given integer type (e.g. `bits (int8) = 8`).
 
    * `SUB`
 
-        :: t : t : 'S   ->   t : 'S   where   t in u?int{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
 
-        > SUB ; C / t (x) : t (y) : S   =>   C / t (x + y) : S
+        > SUB ; C / t (x) : t (y) : S   =>   C / t (x - y) : S
 
      With cycling semantics for overflows.
 
    * `MUL`
 
-        :: t : t : 'S   ->   t : 'S   where   t in u?int{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
 
-        > MUL ; C / t (x) : t (y) : S   =>   C / t (x + y) : S
+        > MUL ; C / t (x) : t (y) : S   =>   C / t (x * y) : S
 
      Unckeched for overflows.
 
    * `DIV`
 
-        :: t : t : 'S   ->   t : 'S   where   t in u?int{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
 
         > DIV ; C / t (x) : t (0) : S   =>   C / [FAIL]
         > DIV ; C / t (x) : t (y) : S   =>   C / t (x / y) : S
 
    * `MOD`
 
-        :: t : t : 'S   ->   t : 'S   where   t in u?int{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
 
         > MOD ; C / t (x) : t (0) : S   =>   C / [FAIL]
         > MOD ; C / t (x) : t (y) : S   =>   C / t (x % y) : S
 
    * `CAST t_to` where `t_to in u?int{8|16|32|64}`
 
-        :: t_from : 'S   ->   t_to : 'S   where   t_from in u?int{8|16|32|64}
+        :: t_from : 'S   ->   t_to : 'S   for   t_from in u?int{8|16|32|64}
 
         > CAST t_to ; C / t_from (x) : S   =>   C / t_to (x) : S
 
@@ -415,42 +666,42 @@ Alternative operators are defined that check for overflows.
 
    * `CHECKED_NEG`
 
-        :: t : 'S   ->   t : 'S   where   t in int{8|16|32|64}
+        :: t : 'S   ->   t : 'S   for   t in int{8|16|32|64}
 
         > CHECKED_NEG ; C / t (x) : S   =>   [FAIL] on overflow
         > CHECKED_NEG ; C / t (x) : S   =>   C / t (-x) : S
 
    * `CHECKED_ABS`
 
-        :: t : 'S   ->   t : 'S   where   t in int{8|16|32|64}
+        :: t : 'S   ->   t : 'S   for   t in int{8|16|32|64}
 
         > CHECKED_ABS ; C / t (x) : S   =>   [FAIL] on overflow
         > CHECKED_ABS ; C / t (x) : S   =>   C / t (abs (x)) : S
 
    * `CHECKED_ADD`
 
-        :: t : t : 'S   ->   t : 'S   where   t in u?int{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
 
         > CHECKED_ADD ; C / t (x) : t (y) : S   =>   [FAIL] on overflow
         > CHECKED_ADD ; C / t (x) : t (y) : S   =>   C / t (x + y) : S
 
    * `CHECKED_SUB`
 
-        :: t : t : 'S   ->   t : 'S   where   t in u?int{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
 
         > CHECKED_SUB ; C / t (x) : t (y) : S   =>   [FAIL] on overflow
         > CHECKED_SUB ; C / t (x) : t (y) : S   =>   C / t (x - y) : S
 
    * `CHECKED_MUL`
 
-        :: t : t : 'S   ->   t : 'S   where   t in u?int{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
 
         > CHECKED_MUL ; C / t (x) : t (y) : S   =>   [FAIL] on overflow
         > CHECKED_MUL ; C / t (x) : t (y) : S   =>   C / t (x * y) : S
 
    * `CHECKED_CAST t_to` where `t_to in u?int{8|16|32|64}`
 
-        :: t_from : 'S   ->   t_to : 'S   where   t_from in u?int{8|16|32|64}
+        :: t_from : 'S   ->   t_to : 'S   for   t_from in u?int{8|16|32|64}
 
         > CHECKED_CAST t_to ; C / t_from (x) : S   =>   C / t_to (x) : S
           iff   t_from (x) = t_to (x)
@@ -460,31 +711,31 @@ Bitwise logical operators are also available on unsigned integers.
 
    * `OR`
 
-        :: t : t : 'S   ->   t : 'S   where   t in uint{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
 
         > OR ; C / t (x) : t (y) : S   =>   C / t (x | y) : S
 
    * `AND`
 
-        :: t : t : 'S   ->   t : 'S   where   t in uint{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
 
         > AND ; C / t (x) : t (y) : S   =>   C / t (x & y) : S
 
    * `XOR`
 
-        :: t : t : 'S   ->   t : 'S   where   t in uint{8|16|32|64}
+        :: t : t : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
 
         > XOR ; C / t (x) : t (y) : S   =>   C / t (x ^ y) : S
 
    * `NOT`
 
-        :: t : 'S   ->   t : 'S   where   t in uint{8|16|32|64}
+        :: t : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
 
         > NOT ; C / t (x) : S   =>   C / t (~x) : S
 
    * `LSL`
 
-        :: t : uint8 (s) : 'S   ->   t : 'S   where   t in uint{8|16|32|64}
+        :: t : uint8 (s) : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
 
         > LSL ; C / t (x) : uint8 (s) : S   =>   C / t (x << s) : S
           iff   s <= bits (t)
@@ -492,16 +743,16 @@ Bitwise logical operators are also available on unsigned integers.
 
    * `LSR`
 
-        :: t : uint8 (s) : 'S   ->   t : 'S   where   t in uint{8|16|32|64}
+        :: t : uint8 (s) : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
 
         > LSR ; C / t (x) : uint8 (s) : S   =>   C / t (x >>> s) : S
           iff   s <= bits (t)
         > LSR ; C / t (x) : uint8 (s) : S   =>   [FAIL]
 
    * `COMPARE`:
-     Integer comparison (signed or unsigned according to the type)
+     Integer comparison (signed or unsigned according to the type).
 
-        :: t : t : 'S   ->   int64 : 'S   where   t in uint{8|16|32|64}
+        :: t : t : 'S   ->   int64 : 'S   for   t in uint{8|16|32|64}
 
 ### Operations on strings
 
@@ -531,9 +782,8 @@ constants as is, concatenate them and use them as keys.
    * `P(A*AI)+R`:
      A syntactic sugar for building nested pairs in bulk.
 
-        > PA{N}AI(\rest)R ; C / S   =>   DIP (PA{n-1}AIR) ; P(\rest)R ; C / S
-        > PAIR ; C / S             =>   PAIR ; C / S
-        > PR ; C / S               =>   C / S
+        > P(\fst=A*)AI(\rest=(A*AI)+)R ; C / S  =>  P(\fst)AIR ; P(\rest)R ; C / S
+        > PA(\rest=A*)AIR ; C / S  =>   DIP (P(\rest)AIR) ; C / S
 
    * `CAR`:
      Access the left part of a pair.
@@ -550,11 +800,10 @@ constants as is, concatenate them and use them as keys.
         > Car ; C / (Pair _ b) : S   =>   C / b : S
 
    * `C[AD]+R`:
-     A sugary syntax for accessing fields in nested pairs.
+     A syntactic sugar for accessing fields in nested pairs.
 
-        > CA(\rest)R ; C / S   =>   CAR ; C(\rest)R ; C / S
-        > CD(\rest)R ; C / S   =>   CDR ; C(\rest)R ; C / S
-        > CR ; C / S          =>   C / S
+        > CA(\rest=[AD]+)R ; C / S   =>   CAR ; C(\rest)R ; C / S
+        > CD(\rest=[AD]+)R ; C / S   =>   CDR ; C(\rest)R ; C / S
 
 ### Operations on sets
 
@@ -771,22 +1020,22 @@ for under/overflows.
 
         :: tez : tez : 'S   ->   tez : 'S
 
-        > Add ; C / x : y : S   =>   [FAIL]   on overflow
-        > Add ; C / x : y : S   =>   C / (x + y) : S
+        > ADD ; C / x : y : S   =>   [FAIL]   on overflow
+        > ADD ; C / x : y : S   =>   C / (x + y) : S
 
    * `SUB`:
 
         :: tez : tez : 'S   ->   tez : 'S
 
-        > Sub ; C / x : y : S   =>   [FAIL]   iff   x < y
-        > Sub ; C / x : y : S   =>   C / (x - y) : S
+        > SUB ; C / x : y : S   =>   [FAIL]   iff   x < y
+        > SUB ; C / x : y : S   =>   C / (x - y) : S
 
    * `MUL`
 
         :: tez : u?int{8|16|32|64} : 'S   ->   tez : 'S
 
-        > Mul ; C / x : y : S   =>   [FAIL]   on overflow
-        > Mul ; C / x : y : S   =>   C / (x * y) : S
+        > MUL ; C / x : y : S   =>   [FAIL]   on overflow
+        > MUL ; C / x : y : S   =>   C / (x * y) : S
 
    * `COMPARE`:
 
@@ -822,7 +1071,7 @@ for under/overflows.
    * `CREATE_ACCOUNT`:
      Forge an account (a contract without code).
 
-        :: key : key? : bool : tez : 'S   ->   contract void void : 'S
+        :: key : key? : bool : tez : 'S   ->   contract unit unit : 'S
 
      Take as argument the manager, optional delegate, the delegatable
      flag and finally the initial amount taken from the currently
@@ -834,7 +1083,7 @@ for under/overflows.
         :: 'p : tez : contract 'p 'r : 'g : []   ->   'r : 'g : []
 
      The parameter and return value must be consistent with the ones
-     expected by the contract, void for an account. To preserve the
+     expected by the contract, unit for an account. To preserve the
      global consistency of the system, the current contract's storage
      must be updated before passing the control to another script. For
      this, the script must put the partially updated storage on the
@@ -883,13 +1132,6 @@ for under/overflows.
      execution (does not change during the execution of the contract).
 
         :: 'S   ->   timestamp :: 'S
-
-   * `FAIL`:
-     Explicitly abort the current transaction (and all of its parents).
-
-        :: _   ->  _
-
-        > FAIL ; _ / _   =>  [FAIL]
 
 ### Cryptographic primitives
 
@@ -1101,9 +1343,9 @@ Capitalised.
 
         Pair int8 (list int16) 1 (List 2 3)
 
-        Pair (option (pair void int8)) void
+        Pair (option (pair unit int8)) unit
           None
-          Void
+          Unit
 
         Pair (or int8 string) (or int8 string)
           Left 3
@@ -1139,12 +1381,12 @@ returns a value, hence the complete calling convention above.
 ### Empty contract
 
 Because of the calling convention, the empty sequence is not a valid
-contract of type `(contract void void)`. The code for building a
-contract of such a type must take a `void` argument, an amount in `tez`,
-and transform a void global storage, and must thus be of type `(lambda
-(pair (pair tez void) void) (pair void void))`.
+contract of type `(contract unit unit)`. The code for building a
+contract of such a type must take a `unit` argument, an amount in `tez`,
+and transform a unit global storage, and must thus be of type `(lambda
+(pair (pair tez unit) unit) (pair unit unit))`.
 
-Such a minimal contract is thus `{ CDR ; VOID ; PAIR }`.
+Such a minimal contract is thus `{ CDR ; UNIT ; PAIR }`.
 
 ### Reservoir contract
 
@@ -1163,25 +1405,25 @@ Hence, the global data of the contract has the following type
     'g =
       pair
         pair timestamp tez
-        pair (contract void void) (contract void void)
+        pair (contract unit unit) (contract unit unit)
 
 Following the contract calling convention, the code is a lambda of type
 
     lambda
-      pair (pair tez void) 'g
-      pair void 'g
+      pair (pair tez unit) 'g
+      pair unit 'g
 
 writen as
 
     lambda
-      pair (pair tez void)
+      pair (pair tez unit)
         pair
           pair timestamp tez
-          pair (contract void void) (contract void void)
-      pair void
+          pair (contract unit unit) (contract unit unit)
+      pair unit
         pair
           pair timestamp tez
-          pair (contract void void) (contract void void)
+          pair (contract unit unit) (contract unit unit)
 
 its code is
 
@@ -1193,11 +1435,11 @@ its code is
          COMPARE ; LE
          IF { } # nothing to do
             { DUP ; CDDDR # B
-              BALANCE ; PUSH Void ; TRANSFER_TOKENS ; DROP } }
+              BALANCE ; PUSH Unit ; TRANSFER_TOKENS ; DROP } }
        { DUP ; CDDAR ; # A
          BALANCE ;
-         PUSH Void ; TRANSFER_TOKENS ; DROP }
-    CDR ; PUSH Void ; PAIR
+         PUSH Unit ; TRANSFER_TOKENS ; DROP }
+    CDR ; PUSH Unit ; PAIR
 
 ### Reservoir contract (variant with broker and status)
 
@@ -1246,11 +1488,11 @@ value for contract balance.
                  { # We transfer the fee to the broker
                    DUP ; CDDDAAR ; # P
                    DIP { DUP ; CDDDDAR } # A
-                   PUSH Void ; TRANSFER_TOKENS ; DROP ;
+                   PUSH Unit ; TRANSFER_TOKENS ; DROP ;
                    # We transfer the rest to the destination
                    DUP ; CDDDADR ; # N
                    DIP { DUP ; CDDDDDR } # B
-                   PUSH Void ; TRANSFER_TOKENS ; DROP ;
+                   PUSH Unit ; TRANSFER_TOKENS ; DROP ;
                    # We update the global
                    CDR ; CDR ; PUSH (String "success") ; PAIR } }
             { # After timeout
@@ -1260,18 +1502,18 @@ value for contract balance.
               COMPARE ; LT ; # available < P
               IF { PUSH (Tez "1.00") ; BALANCE ; SUB ; # available
                    DIP { DUP ; CDDDDAR } # A
-                   PUSH Void ; TRANSFER_TOKENS ; DROP }
+                   PUSH Unit ; TRANSFER_TOKENS ; DROP }
                  { DUP ; CDDDAAR ; # P
                    DIP { DUP ; CDDDDAR } # A
-                   PUSH Void ; TRANSFER_TOKENS ; DROP }
+                   PUSH Unit ; TRANSFER_TOKENS ; DROP }
               # We transfer the rest to B
               PUSH (Tez "1.00") ; BALANCE ; SUB ; # available
               DIP { DUP ; CDDDDDR } # B
-              PUSH Void ; TRANSFER_TOKENS ; DROP ;
+              PUSH Unit ; TRANSFER_TOKENS ; DROP ;
               # We update the global
               CDR ; CDR ; PUSH (String "timeout") ; PAIR } }
-    # return Void
-    PUSH Void ; PAIR
+    # return Unit
+    PUSH Unit ; PAIR
 
 ### Forward contract
 
@@ -1284,12 +1526,19 @@ peas, and the accounts of the buyer `B`, the seller `S` and the warehouse
 These parameters as grouped in the global storage as follows:
 
     Pair
-      (pair uint32 (pair timestamp timestamp))
+      Pair (Pair Q (Pair T Z))
+      Pair
+        (Pair K C)
+        (Pair (Pair B S) W)
+
+of type
+
+    pair
+      pair uint32 (pair timestamp timestamp)
       pair
         pair tez tez
         pair (pair account account) account
-      Pair (Pair Q (Pair T Z))
-      Pair (Pair K C) (Pair (Pair B S) W)
+
 
 The 24 hours after timestamp `Z` are for the buyer and seller to store
 their collateral `(Q * C)`. For this, the contract takes a string as
@@ -1322,16 +1571,22 @@ Hence, the global storage is a pair, with the counters on the left,
 and the constant parameters on the right, initially as follows.
 
     Pair
+      Pair 0 (Pair 0_00 0_00)
+      Pair
+        Pair (Pair Q (Pair T Z))
+        Pair
+          (Pair K C)
+          (Pair (Pair B S) W)
+
+of type
+
+    pair
       pair unit32 (pair tez tez)
       pair
         pair uint32 (pair timestamp timestamp)
         pair
           pair tez tez
           pair (pair account account) account
-      Pair 0 (Pair 0_00 0_00)
-      Pair
-        Pair (Pair Q (Pair T Z))
-        Pair (Pair K C) (Pair (Pair B S) W)
 
 The parameter of the transaction will be either a transfer from the
 buyer or the seller or a delivery notification from the warehouse of
@@ -1352,7 +1607,7 @@ At the beginning of the transaction:
     the amount versed by the seller via a CDADDR
     the argument via a CADR
 
-The contract returns a void value, and we assume that it is created
+The contract returns a unit value, and we assume that it is created
 with the minimum amount, set to `(Tez "1.00")`.
 
 The code of the contract is thus as follows.
@@ -1371,8 +1626,8 @@ The code of the contract is thus as follows.
                   DIP { DUP ; CDADDR } ; PAIR ; # seller amount
                   PUSH (Uint32 0) ; PAIR ; # delivery counter at 0
                   DIP { CDDR } ; PAIR ; # parameters
-                  # and return Void
-                  PUSH Void ; PAIR }
+                  # and return Unit
+                  PUSH Unit ; PAIR }
                 { PUSH (String "seller") ; COMPARE ; EQ ;
                   IF { DUP ; CDADDR ; # amount already versed by the seller
                        DIP { DUP ; CAAR } ; ADD ; # transaction
@@ -1380,10 +1635,10 @@ The code of the contract is thus as follows.
                        DIP { DUP ; CDADAR } ; SWAP ; PAIR ; # buyer amount
                        PUSH (Uint32 0) ; PAIR ; # delivery counter at 0
                        DIP { CDDR } ; PAIR ; # parameters
-                       # and return Void
-                       PUSH Void ; PAIR }
-                     { FAIL ; CDR ; PUSH Void ; PAIR }}} # (Left _)
-           { FAIL ; DROP ; CDR ; PUSH Void ; PAIR }} # (Right _)
+                       # and return Unit
+                       PUSH Unit ; PAIR }
+                     { FAIL ; CDR ; PUSH Unit ; PAIR }}} # (Left _)
+           { FAIL ; DROP ; CDR ; PUSH Unit ; PAIR }} # (Right _)
        { # After Z + 24
          # test if the required amount is reached
          DUP ; CDDAAR ; # Q
@@ -1394,20 +1649,20 @@ The code of the contract is thus as follows.
          IF { # refund the parties
               DUP ; CDADAR ; # amount versed by the buyer
               DIP { DUP ; CDDDDAAR } # B
-              PUSH Void ; TRANSFER_TOKENS ; DROP
+              PUSH Unit ; TRANSFER_TOKENS ; DROP
               DUP ; CDADDR ; # amount versed by the seller
               DIP { DUP ; CDDDDADR } # S
-              PUSH Void ; TRANSFER_TOKENS ; DROP
+              PUSH Unit ; TRANSFER_TOKENS ; DROP
               BALANCE ; # bonus to the warehouse to destroy the account
               DIP { DUP ; CDDDDDR } # W
-              PUSH Void ; TRANSFER_TOKENS ; DROP
-              # return void, don't change the global
+              PUSH Unit ; TRANSFER_TOKENS ; DROP
+              # return unit, don't change the global
               # since the contract will be destroyed
-              CDR ; PUSH Void ; PAIR }
+              CDR ; PUSH Unit ; PAIR }
             { # otherwise continue
               DUP ; CDDADAR # T
               NOW ; COMPARE ; LT
-              IF { FAIL ; CDR ; PUSH Void ; PAIR } # Between Z + 24 and T
+              IF { FAIL ; CDR ; PUSH Unit ; PAIR } # Between Z + 24 and T
                  { # after T
                    DUP ; CDDADAR # T
                    PUSH (Uint64 86400) ; ADD # one day in second
@@ -1429,10 +1684,10 @@ The code of the contract is thus as follows.
                                  DIP { DUP ; CDADDR } ; PAIR ; # seller amount
                                  PUSH (Uint32 0) ; PAIR ; # delivery counter at 0
                                  DIP { CDDR } ; PAIR ; # parameters
-                                 # and return Void
-                                 PUSH Void ; PAIR }
-                               { FAIL ; CDR ; PUSH Void ; PAIR }} # (Left _)
-                          { FAIL ; DROP ; CDR ; PUSH Void ; PAIR }} # (Right _)
+                                 # and return Unit
+                                 PUSH Unit ; PAIR }
+                               { FAIL ; CDR ; PUSH Unit ; PAIR }} # (Left _)
+                          { FAIL ; DROP ; CDR ; PUSH Unit ; PAIR }} # (Right _)
                       { # After T + 24
                         # test if the required payment is reached
                         DUP ; CDDAAR ; # Q
@@ -1442,9 +1697,9 @@ The code of the contract is thus as follows.
                         IF { # not reached, pay the seller and destroy the contract
                              BALANCE ;
                              DIP { DUP ; CDDDDADR } # S
-                             PUSH Void ; TRANSFER_TOKENS ; DROP ;
-                             # and return Void
-                             CDR ; PUSH Void ; PAIR }
+                             PUSH Unit ; TRANSFER_TOKENS ; DROP ;
+                             # and return Unit
+                             CDR ; PUSH Unit ; PAIR }
                            { # otherwise continue
                              DUP ; CDDADAR # T
                              PUSH (Uint64 86400) ; ADD ;
@@ -1453,18 +1708,18 @@ The code of the contract is thus as follows.
                              IF { # Between T + 24 and T + 48
                                   # We accept only delivery notifications, from W
                                   DUP ; CDDDDDR ; MANAGER ; # W
-                                  SOURCE void void ; MANAGER ;
+                                  SOURCE unit unit ; MANAGER ;
                                   COMPARE ; NEQ ;
                                   IF { FAIL } {} # fail if not the warehouse
                                   DUP ; CADR ; # we must receive (Right amount)
                                   IF_LEFT
-                                    { FAIL ; DROP ; CDR ; PUSH Void ; PAIR } # (Left _)
+                                    { FAIL ; DROP ; CDR ; PUSH Unit ; PAIR } # (Left _)
                                     { # We increment the counter
                                       DIP { DUP ; CDAAR } ; ADD ;
                                       # And rebuild the globals in advance
                                       DIP { DUP ; CDADR } ; PAIR ;
                                       DIP CDDR ; PAIR ;
-                                      PUSH Void ; PAIR ;
+                                      PUSH Unit ; PAIR ;
                                       # We test if enough have been delivered
                                       DUP ; CDAAR ;
                                       DIP { DUP ; CDDAAR } ;
@@ -1473,49 +1728,18 @@ The code of the contract is thus as follows.
                                          { # Transfer all the money to the seller
                                            BALANCE ; # and destroy the contract
                                            DIP { DUP ; CDDDDADR } # S
-                                           PUSH Void ; TRANSFER_TOKENS ; DROP }}}
+                                           PUSH Unit ; TRANSFER_TOKENS ; DROP }}}
                                 { # after T + 48, transfer everything to the buyer
                                   BALANCE ; # and destroy the contract
                                   DIP { DUP ; CDDDDAAR } # B
-                                  PUSH Void ; TRANSFER_TOKENS ; DROP ;
-                                  # and return void
-                                  CDR ; PUSH Void ; PAIR }}}}}}
+                                  PUSH Unit ; TRANSFER_TOKENS ; DROP ;
+                                  # and return unit
+                                  CDR ; PUSH Unit ; PAIR }}}}}}
 
 X - Full grammar
 ----------------
 
-    <tagged data> ::=
-      | <string constant>
-      | Int8 <int constant>
-      | Int16 <int constant>
-      | Int32 <int constant>
-      | Int64 <int constant>
-      | Uint8 <int constant>
-      | Uint16 <int constant>
-      | Uint32 <int constant>
-      | Uint64 <int constant>
-      | Void
-      | True
-      | False
-      | Timestamp <timestamp string constant>
-      | Signature <signature string constant>
-      | Tez <tez string constant>
-      | Key <key string constant>
-      | Left <tagged data> <type>
-      | Right <type> <tagged data>
-      | Or <type> <type> <untagged data>
-      | Some <tagged data>
-      | Some <type> <untagged data>
-      | None <type>
-      | Option <type> <untagged data>
-      | Pair <tagged data> <tagged data>
-      | Pair <type> <type> <untagged data> <untagged data>
-      | List <type> <untagged data> ...
-      | Set <comparable type> <untagged data> ...
-      | Map <comparable type> <type> (Item <untagged data> <untagged data>) ...
-      | Contract <type> <type> <contract string constant>
-      | Lambda <type> <type> { <instruction> ... }
-    <untagged data> ::=
+    <data> ::=
       | <int constant>
       | <string constant>
       | <timestamp string constant>
@@ -1523,7 +1747,7 @@ X - Full grammar
       | <key string constant>
       | <tez string constant>
       | <contract string constant>
-      | Void
+      | Unit
       | True
       | False
       | Pair <untagged data> <untagged data>
@@ -1534,6 +1758,7 @@ X - Full grammar
       | List <untagged data> ...
       | Set <untagged data> ...
       | Map (Item <untagged data> <untagged data>) ...
+      | instruction
     <instruction> ::=
       | { <instruction> ... }
       | DROP
@@ -1620,7 +1845,7 @@ X - Full grammar
       | uint16
       | uint32
       | uint64
-      | void
+      | unit
       | string
       | tez
       | bool
@@ -1632,7 +1857,7 @@ X - Full grammar
       | set <comparable type>
       | contract <type> <type>
       | pair <type> <type>
-      | union <type> <type>
+      | or <type> <type>
       | lambda <type> <type>
       | map <comparable type> <type>
     <comparable type> ::=
@@ -1688,7 +1913,7 @@ The language is implemented in OCaml as follows:
     grammar described in section X by pattern matching, producing the
     well-typed, corresponding GADT expressions. It is mostly a
     checker, not a full inferer, and thus takes some annotations
-    (basically the inpout and output of the program, of lambdas and of
+    (basically the input and output of the program, of lambdas and of
     uninitialized maps and sets). It works by performing a
     symbolic evaluation of the program, transforming a symbolic
     stack. It only needs one pass over the whole program.
