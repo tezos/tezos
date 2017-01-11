@@ -441,190 +441,7 @@ let comparable_ty_of_ty
   | Timestamp_t -> ok Timestamp_key
   | ty -> error (Incomparable_type (Ty ty))
 
-type ex_tagged_data = Ex : 'a ty * 'a -> ex_tagged_data
-
-let rec parse_tagged_data
-  : context -> Script.expr -> ex_tagged_data tzresult Lwt.t
-  = fun ctxt script_data ->
-    match script_data with
-    | Prim (_, "Unit", []) ->
-        return @@ Ex (Unit_t, ())
-    | Prim (loc, "Unit", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Unit", 0, List.length l)
-    | String (_, v) ->
-        return @@ Ex (String_t, v)
-    | Prim (_, "String", [ arg ]) ->
-        parse_untagged_data ctxt String_t arg >>=? fun v ->
-        return @@ Ex (String_t, v)
-    | Prim (loc, "String", l) ->
-        fail @@ Invalid_arity (loc, Constant, "String", 1, List.length l)
-    | Prim (_, "True", []) ->
-        return @@ Ex (Bool_t, true)
-    | Prim (loc, "True", l) ->
-        fail @@ Invalid_arity (loc, Constant, "True", 0, List.length l)
-    | Prim (_, "False", []) ->
-        return @@ Ex (Bool_t, false)
-    | Prim (loc, "False", l) ->
-        fail @@ Invalid_arity (loc, Constant, "False", 0, List.length l)
-    | Prim (_, "Bool", [ arg ]) ->
-        parse_untagged_data ctxt Bool_t arg >>=? fun v ->
-        return @@ Ex (Bool_t, v)
-    | Prim (loc, "Bool", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Bool", 1, List.length l)
-    | Prim (_, "Timestamp", [ arg ]) ->
-        parse_untagged_data ctxt Timestamp_t arg >>=? fun v ->
-        return @@ Ex (Timestamp_t, v)
-    | Prim (loc, "Timestamp", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Timestamp", 1, List.length l)
-    | Prim (_, "Signature", [ arg ]) ->
-        parse_untagged_data ctxt Signature_t arg >>=? fun v ->
-        return @@ Ex (Signature_t, v)
-    | Prim (loc, "Signature", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Signature", 1, List.length l)
-    | Prim (_, "Tez", [ arg ]) ->
-        parse_untagged_data ctxt Tez_t arg >>=? fun v ->
-        return @@ Ex (Tez_t, v)
-    | Prim (loc, "Tez", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Tez", 1, List.length l)
-    | Prim (_, "Key", [ arg ]) ->
-        parse_untagged_data ctxt Key_t arg >>=? fun v ->
-        return @@ Ex (Key_t, v)
-    | Prim (loc, "Key", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Key", 1, List.length l)
-    | Prim (_, "Int8", [ arg ]) ->
-        parse_untagged_data ctxt (Int_t Int8) arg >>=? fun v ->
-        return @@ Ex (Int_t Int8, v)
-    | Prim (loc, "Int8", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Int8", 1, List.length l)
-    | Prim (_, "Int16", [ arg ]) ->
-        parse_untagged_data ctxt (Int_t Int16) arg >>=? fun v ->
-        return @@ Ex (Int_t Int16, v)
-    | Prim (loc, "Int16", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Int16", 1, List.length l)
-    | Prim (_, "Int32", [ arg ]) ->
-        parse_untagged_data ctxt (Int_t Int32) arg >>=? fun v ->
-        return @@ Ex (Int_t Int32, v)
-    | Prim (loc, "Int32", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Int32", 1, List.length l)
-    | Prim (_, "Int64", [ arg ]) ->
-        parse_untagged_data ctxt (Int_t Int64) arg >>=? fun v ->
-        return @@ Ex (Int_t Int64, v)
-    | Prim (loc, "Int64", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Int64", 1, List.length l)
-    | Prim (_, "Uint8", [ arg ]) ->
-        parse_untagged_data ctxt (Int_t Uint8) arg >>=? fun v ->
-        return @@ Ex (Int_t Uint8, v)
-    | Prim (loc, "Uint8", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Uint8", 1, List.length l)
-    | Prim (_, "Uint16", [ arg ]) ->
-        parse_untagged_data ctxt (Int_t Uint16) arg >>=? fun v ->
-        return @@ Ex (Int_t Uint16, v)
-    | Prim (loc, "Uint16", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Uint16", 1, List.length l)
-    | Prim (_, "Uint32", [ arg ]) ->
-        parse_untagged_data ctxt (Int_t Uint32) arg >>=? fun v ->
-        return @@ Ex (Int_t Uint32, v)
-    | Prim (loc, "Uint32", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Uint32", 1, List.length l)
-    | Prim (_, "Uint64", [ arg ]) ->
-        parse_untagged_data ctxt (Int_t Uint64) arg >>=? fun v ->
-        return @@ Ex (Int_t Uint64, v)
-    | Prim (loc, "Uint64", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Uint64", 1, List.length l)
-    | Prim (_, "Left", [ l; tr ]) ->
-        parse_ty tr >>=? fun (Ex tr) ->
-        parse_tagged_data ctxt l >>=? fun (Ex (tl, l)) ->
-        return @@ Ex (Union_t (tl, tr), L l)
-    | Prim (loc, "Left", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Left", 2, List.length l)
-    | Prim (_, "Right", [ tl; r ]) ->
-        parse_ty tl >>=? fun (Ex tl) ->
-        parse_tagged_data ctxt r >>=? fun (Ex (tr, r)) ->
-        return @@ Ex (Union_t (tl, tr), R r)
-    | Prim (loc, "Right", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Right", 2, List.length l)
-    | Prim (_, "Or", [ tl; tr; arg ]) ->
-        parse_ty tl >>=? fun (Ex tl) ->
-        parse_ty tr >>=? fun (Ex tr) ->
-        parse_untagged_data ctxt (Union_t (tl, tr)) arg >>=? fun v ->
-        return @@ Ex (Union_t (tl, tr), v)
-    | Prim (loc, "Or", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Or", 3, List.length l)
-    | Prim (_, "Some", [ r ]) ->
-        parse_tagged_data ctxt r >>=? fun (Ex (tr, r)) ->
-        return @@ Ex (Option_t tr, Some r)
-    | Prim (_, "Some", [ tr; r ]) ->
-        parse_ty tr >>=? fun (Ex tr) ->
-        parse_untagged_data ctxt tr r >>=? fun r ->
-        return @@ Ex (Option_t tr, Some r)
-    | Prim (loc, "Some", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Some", 1, List.length l)
-    | Prim (_, "None", [ tr ]) ->
-        parse_ty tr >>=? fun (Ex tr) ->
-        return @@ Ex (Option_t tr, None)
-    | Prim (loc, "None", l) ->
-        fail @@ Invalid_arity (loc, Constant, "None", 1, List.length l)
-    | Prim (_, "Option", [ tr; r ]) ->
-        parse_ty tr >>=? fun (Ex tr) ->
-        parse_untagged_data ctxt (Option_t tr) r >>=? fun r ->
-        return @@ Ex (Option_t tr, r)
-    | Prim (loc, "Option", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Option", 2, List.length l)
-    | Prim (_, "Pair", [ tl; tr; l; r ]) ->
-        parse_ty tl >>=? fun (Ex tl) ->
-        parse_ty tr >>=? fun (Ex tr) ->
-        parse_untagged_data ctxt tl l >>=? fun l ->
-        parse_untagged_data ctxt tr r >>=? fun r ->
-        return @@ Ex (Pair_t (tl, tr), (l, r))
-    | Prim (_, "Pair", [ l; r ]) ->
-        parse_tagged_data ctxt l >>=? fun (Ex (tl, l)) ->
-        parse_tagged_data ctxt r >>=? fun (Ex (tr, r)) ->
-        return @@ Ex (Pair_t (tl, tr), (l, r))
-    | Prim (loc, "Pair", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Pair", 4, List.length l)
-    | Prim (loc, "List", t :: items) ->
-        parse_ty t >>=? fun (Ex t) ->
-        parse_untagged_data ctxt
-          (List_t t) (Prim (loc, "List", items)) >>=? fun l ->
-        return @@ Ex (List_t t, l)
-    | Prim (loc, "List", l) ->
-        fail @@ Invalid_arity (loc, Constant, "List", 1, List.length l)
-    | Prim (loc, "Set", t :: items) ->
-        parse_comparable_ty t >>=? fun (Ex t) ->
-        parse_untagged_data ctxt
-          (Set_t t) (Prim (loc, "Set", items)) >>=? fun l ->
-        return @@ Ex (Set_t t, l)
-    | Prim (loc, "Set", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Set", 1, List.length l)
-    | Prim (loc, "Map", kt :: vt :: items) ->
-        parse_comparable_ty kt >>=? fun (Ex kt) ->
-        parse_ty vt >>=? fun (Ex vt) ->
-        parse_untagged_data ctxt
-          (Map_t (kt, vt)) (Prim (loc, "Map", items)) >>=? fun l ->
-        return @@ Ex (Map_t (kt, vt), l)
-    | Prim (loc, "Map", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Map", 2, List.length l)
-    | Prim (_, "Contract", [ at; rt; c ]) ->
-        parse_ty at >>=? fun (Ex at) ->
-        parse_ty rt >>=? fun (Ex rt) ->
-        parse_untagged_data ctxt (Contract_t (at, rt)) c >>=? fun l ->
-        return @@ Ex (Contract_t (at, rt), l)
-    | Prim (loc, "Contract", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Contract", 3, List.length l)
-    | Prim (loc, "Lambda", [ at ; rt ; code ]) ->
-        expect_sequence_parameter loc Constant "Lambda" 2 code >>=? fun () ->
-        parse_ty at >>=? fun (Ex at) ->
-        parse_ty rt >>=? fun (Ex rt) ->
-        parse_untagged_data ctxt (Lambda_t (at, rt)) code >>=? fun l ->
-        return @@ Ex (Lambda_t (at, rt), l)
-    | Prim (loc, "Lambda", l) ->
-        fail @@ Invalid_arity (loc, Constant, "Lambda", 3, List.length l)
-    | Prim (loc, name, _) ->
-        fail @@ Invalid_primitive (loc, Constant, name)
-    | Seq (loc, _) | Int (loc, _) ->
-        fail @@ Invalid_expression_kind loc
-
-and parse_untagged_data
+let rec parse_data
   : type a. context -> a ty -> Script.expr -> a tzresult Lwt.t
   = fun ctxt ty script_data ->
     match ty, script_data with
@@ -704,8 +521,8 @@ and parse_untagged_data
         fail @@ Invalid_constant (loc, "contract")
     (* Pairs *)
     | Pair_t (ta, tb), Prim (_, "Pair", [ va; vb ]) ->
-        parse_untagged_data ctxt ta va >>=? fun va ->
-        parse_untagged_data ctxt tb vb >>=? fun vb ->
+        parse_data ctxt ta va >>=? fun va ->
+        parse_data ctxt tb vb >>=? fun vb ->
         return (va, vb)
     | Pair_t _, Prim (loc, "Pair", l) ->
         fail @@ Invalid_arity (loc, Constant, "Pair", 2, List.length l)
@@ -713,12 +530,12 @@ and parse_untagged_data
         fail @@ Invalid_constant (loc, "pair")
     (* Unions *)
     | Union_t (tl, _), Prim (_, "Left", [ v ]) ->
-        parse_untagged_data ctxt tl v >>=? fun v ->
+        parse_data ctxt tl v >>=? fun v ->
         return (L v)
     | Union_t _, Prim (loc, "Left", l) ->
         fail @@ Invalid_arity (loc, Constant, "Left", 1, List.length l)
     | Union_t (_, tr), Prim (_, "Right", [ v ]) ->
-        parse_untagged_data ctxt tr v >>=? fun v ->
+        parse_data ctxt tr v >>=? fun v ->
         return (R v)
     | Union_t _, Prim (loc, "Right", l) ->
         fail @@ Invalid_arity (loc, Constant, "Right", 1, List.length l)
@@ -731,7 +548,7 @@ and parse_untagged_data
         fail @@ Invalid_constant (loc, "lambda")
     (* Options *)
     | Option_t t, Prim (_, "Some", [ v ]) ->
-        parse_untagged_data ctxt t v >>=? fun v ->
+        parse_data ctxt t v >>=? fun v ->
         return (Some v)
     | Option_t _, Prim (loc, "Some", l) ->
         fail @@ Invalid_arity (loc, Constant, "Some", 1, List.length l)
@@ -745,7 +562,7 @@ and parse_untagged_data
     | List_t t, Prim (_, "List", vs) ->
         fold_left_s
           (fun rest v ->
-             parse_untagged_data ctxt t v >>=? fun v ->
+             parse_data ctxt t v >>=? fun v ->
              return (v :: rest))
           [] vs
     | List_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
@@ -754,7 +571,7 @@ and parse_untagged_data
     | Set_t t, Prim (_, "Set", vs) ->
         fold_left_s
           (fun acc v ->
-             parse_untagged_comparable_data ctxt t v >>=? fun v ->
+             parse_comparable_data ctxt t v >>=? fun v ->
              return (set_update v true acc))
           (empty_set t) vs
     | Set_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
@@ -764,8 +581,8 @@ and parse_untagged_data
         fold_left_s
           (fun acc -> function
              | Prim (_, "Item", [ k; v ]) ->
-                 parse_untagged_comparable_data ctxt tk k >>=? fun k ->
-                 parse_untagged_data ctxt tv v >>=? fun v ->
+                 parse_comparable_data ctxt tk k >>=? fun k ->
+                 parse_data ctxt tv v >>=? fun v ->
                  return (map_update k (Some v) acc)
              | Prim (loc, "Item", l) ->
                  fail @@ Invalid_arity (loc, Constant, "Item", 2, List.length l)
@@ -775,10 +592,10 @@ and parse_untagged_data
     | Map_t _, (Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _)) ->
         fail @@ Invalid_constant (loc, "map")
 
-and parse_untagged_comparable_data
+and parse_comparable_data
   : type a. context -> a comparable_ty -> Script.expr -> a tzresult Lwt.t
   = fun ctxt ty script_data ->
-    parse_untagged_data ctxt (ty_of_comparable_ty ty) script_data
+    parse_data ctxt (ty_of_comparable_ty ty) script_data
 
 and parse_lambda
   : type arg ret storage. context ->
@@ -817,9 +634,10 @@ and parse_instr
     | Prim (loc, "SWAP", []),
       Item_t (v,  Item_t (w, rest)) ->
         return (typed loc (Swap, Item_t (w, Item_t (v, rest))))
-    | Prim (loc, "PUSH", [ td ]),
+    | Prim (loc, "PUSH", [ t ; d ]),
       stack ->
-        parse_tagged_data ctxt td >>=? fun (Ex (t, v)) ->
+        parse_ty t >>=? fun (Ex t) ->
+        parse_data ctxt t d >>=? fun v ->
         return (typed loc (Const v, Item_t (t, stack)))
     (* options *)
     | Prim (loc, "SOME", []),
@@ -1497,7 +1315,7 @@ let rec unparse_ty
       let tr = unparse_ty utr in
       Prim (-1, "map", [ ta; tr ])
 
-let rec unparse_untagged_data
+let rec unparse_data
   : type a. a ty -> a -> Script.expr
   = fun ty a -> match ty, a with
     | Unit_t, () ->
@@ -1524,29 +1342,29 @@ let rec unparse_untagged_data
     | Key_t, k ->
         String (-1, Ed25519.Public_key_hash.to_b48check k)
     | Pair_t (tl, tr), (l, r) ->
-        let l = unparse_untagged_data tl l in
-        let r = unparse_untagged_data tr r in
+        let l = unparse_data tl l in
+        let r = unparse_data tr r in
         Prim (-1, "Pair", [ l; r ])
     | Union_t (tl, _), L l ->
-        let l = unparse_untagged_data tl l in
+        let l = unparse_data tl l in
         Prim (-1, "Left", [ l ])
     | Union_t (_, tr), R r ->
-        let r = unparse_untagged_data tr r in
+        let r = unparse_data tr r in
         Prim (-1, "Right", [ r ])
     | Option_t t, Some v ->
-        let v = unparse_untagged_data t v in
+        let v = unparse_data t v in
         Prim (-1, "Some", [ v ])
     | Option_t _, None ->
         Prim (-1, "None", [])
     | List_t t, items ->
-        let items = List.map (unparse_untagged_data t) items in
+        let items = List.map (unparse_data t) items in
         Prim (-1, "List", items)
     | Set_t t, set ->
         let t = ty_of_comparable_ty t in
         let items =
           set_fold
             (fun item acc ->
-               unparse_untagged_data t item :: acc )
+               unparse_data t item :: acc )
             set [] in
         Prim (-1, "Set", items)
     | Map_t (kt, vt), map ->
@@ -1554,91 +1372,13 @@ let rec unparse_untagged_data
         let items =
           map_fold (fun k v acc ->
               Prim (-1, "Item",
-                    [ unparse_untagged_data kt k;
-                      unparse_untagged_data vt v ])
+                    [ unparse_data kt k;
+                      unparse_data vt v ])
               :: acc)
             map [] in
         Prim (-1, "Map", items)
     | Lambda_t _, Lam (_, original_code) ->
         original_code
-
-let rec unparse_tagged_data
-  : type a. a ty -> a -> Script.expr
-  = fun ty a -> match ty, a with
-    | Unit_t, () ->
-        Prim (-1, "Unit", [])
-    | Int_t k, v ->
-        Prim (-1, string_of_int_kind k, [ String (-1, Int64.to_string (to_int64 k v))])
-    | String_t, s ->
-        Prim (-1, "String", [ String (-1, s) ])
-    | Bool_t, true ->
-        Prim (-1, "Bool", [ Prim (-1, "True", []) ])
-    | Bool_t, false ->
-        Prim (-1, "Bool", [ Prim (-1, "False", []) ])
-    | Timestamp_t, t ->
-        Prim (-1, "Timestamp", [ String (-1, Timestamp.to_notation t) ])
-    | Contract_t (ta, tr), (_, _, c)  ->
-        let ta = unparse_ty ta in
-        let tr = unparse_ty tr in
-        Prim (-1, "Contract", [ ta; tr; String (-1, Contract.to_b48check c) ])
-    | Signature_t, s ->
-        let text =
-          Hex_encode.hex_encode
-            (MBytes.to_string (Data_encoding.Binary.to_bytes Ed25519.signature_encoding s)) in
-        Prim (-1, "Signature", [ String (-1, text) ])
-    | Tez_t, v ->
-        Prim (-1, "Tez", [ String (-1, Tez.to_string v) ])
-    | Key_t, k ->
-        Prim (-1, "Key", [ String (-1, Ed25519.Public_key_hash.to_b48check k)])
-    | Pair_t (tl, tr), (l, r) ->
-        let l = unparse_untagged_data tl l in
-        let r = unparse_untagged_data tr r in
-        let tl = unparse_ty tl in
-        let tr = unparse_ty tr in
-        Prim (-1, "Pair", [ tl; tr; l; r ])
-    | Union_t (tl, tr), L l ->
-        let l = unparse_tagged_data tl l in
-        let tr = unparse_ty tr in
-        Prim (-1, "Left", [ l; tr ])
-    | Union_t (tl, tr), R r ->
-        let r = unparse_tagged_data tr r in
-        let tl = unparse_ty tl in
-        Prim (-1, "Right", [ tl; r ])
-    | Option_t t, Some v ->
-        let v = unparse_tagged_data t v in
-        Prim (-1, "Some", [ v ])
-    | Option_t t, None ->
-        let t = unparse_ty t in
-        Prim (-1, "None", [ t ])
-    | List_t t, items ->
-        let items = List.map (unparse_untagged_data t) items in
-        let t = unparse_ty t in
-        Prim (-1, "List", t :: items)
-    | Set_t t, set ->
-        let t = ty_of_comparable_ty t in
-        let items =
-          set_fold
-            (fun item acc ->
-               unparse_untagged_data t item :: acc )
-            set [] in
-        let t = unparse_ty t in
-        Prim (-1, "Set", t :: items)
-    | Map_t (kt, vt), map ->
-        let kt = ty_of_comparable_ty kt in
-        let items =
-          map_fold (fun k v acc ->
-              Prim (-1, "Item",
-                    [ unparse_untagged_data kt k;
-                      unparse_untagged_data vt v ])
-              :: acc)
-            map [] in
-        let kt = unparse_ty kt in
-        let vt = unparse_ty vt in
-        Prim (-1, "Map", kt :: vt :: items)
-    | Lambda_t (ta, tr), Lam (_, original_code) ->
-        let ta = unparse_ty ta in
-        let tr = unparse_ty tr in
-        Prim (-1, "Lambda", [ ta; tr; original_code ])
 
 type ex_script = Ex : ('a, 'b, 'c) script -> ex_script
 
@@ -1650,7 +1390,7 @@ let parse_script
     parse_ty storage_type >>=? fun (Ex storage_type) ->
     let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
     let ret_type_full = Pair_t (ret_type, storage_type) in
-    parse_untagged_data ctxt storage_type storage >>=? fun storage ->
+    parse_data ctxt storage_type storage >>=? fun storage ->
     parse_lambda ctxt ~storage_type arg_type_full ret_type_full code >>=? fun code ->
     return (Ex { code; arg_type; ret_type; storage; storage_type })
 
@@ -1720,15 +1460,9 @@ let typecheck_code
     >>=? fun (Lam (descr,_)) ->
     return (type_map descr)
 
-let typecheck_tagged_data
-  : context -> Script.expr -> unit tzresult Lwt.t
-  = fun ctxt data ->
-    parse_tagged_data ctxt data >>=? fun (Ex _) ->
-    return ()
-
-let typecheck_untagged_data
+let typecheck_data
   : context -> Script.expr * Script.expr -> unit tzresult Lwt.t
   = fun ctxt (data, exp_ty) ->
     parse_ty exp_ty >>=? fun (Ex exp_ty) ->
-    parse_untagged_data ctxt exp_ty data >>=? fun _ ->
+    parse_data ctxt exp_ty data >>=? fun _ ->
     return ()

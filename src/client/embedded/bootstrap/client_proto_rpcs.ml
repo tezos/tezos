@@ -140,11 +140,8 @@ module Helpers = struct
     call_error_service1 cctxt Services.Helpers.trace_code
       block (code, storage, input, None, None)
 
-  let typecheck_tagged_data cctxt =
-    call_error_service1 cctxt Services.Helpers.typecheck_tagged_data
-
-  let typecheck_untagged_data cctxt =
-    call_error_service1 cctxt Services.Helpers.typecheck_untagged_data
+  let typecheck_data cctxt =
+    call_error_service1 cctxt Services.Helpers.typecheck_data
 
   let hash_data cctxt =
     call_error_service1 cctxt Services.Helpers.hash_data
