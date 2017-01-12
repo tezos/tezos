@@ -39,6 +39,402 @@ let report_parse_error cctxt _prefix exn _lexbuf =
   | exn ->
       cctxt.Client_commands.error "%s" @@ Printexc.to_string exn
 
+let print_location_mark ppf = function
+  | None -> ()
+  | Some l -> Format.fprintf ppf " /* %d */" l
+
+let no_locations _ = None
+
+let rec print_expr_unwrapped locations ppf = function
+  | Script.Prim (loc, name, []) ->
+      begin match locations loc with
+        | None -> Format.fprintf ppf "%s" name
+        | Some _ as l -> Format.fprintf ppf "(%s%a)" name print_location_mark l
+      end
+  | Script.Prim (loc, name, args) ->
+      Format.fprintf ppf "@[<hov 2>%s%a@ %a@]"
+        name print_location_mark (locations loc)
+        (Format.pp_print_list
+           ~pp_sep: Format.pp_print_space
+           (print_expr locations))
+        args
+  | Script.Seq (loc, []) ->
+      begin match locations loc with
+        | None -> Format.fprintf ppf "{}"
+        | Some _ as l -> Format.fprintf ppf "{%a }" print_location_mark l
+      end
+  | Script.Seq (loc, exprs) ->
+      begin match locations loc with
+        | None -> Format.fprintf ppf "@[<hv 2>{ "
+        | Some _ as l -> Format.fprintf ppf "@[<hv 2>{%a@ " print_location_mark l
+      end ;
+      Format.fprintf ppf "%a@] }"
+        (Format.pp_print_list
+           ~pp_sep: (fun ppf () -> Format.fprintf ppf " ;@ ")
+           (print_expr_unwrapped locations))
+        exprs
+  | Script.Int (loc, n) ->
+      Format.fprintf ppf "%s%a" n print_location_mark (locations loc)
+  | Script.String (loc, s) ->
+      Format.fprintf ppf "%S%a" s print_location_mark (locations loc)
+
+and print_expr locations ppf = function
+  | Script.Prim (_, _, _ :: _) as expr ->
+      Format.fprintf ppf "(%a)" (print_expr_unwrapped locations) expr
+  | expr -> print_expr_unwrapped locations ppf expr
+
+let print_typed_code locations ppf (expr, type_map) =
+  let print_stack ppf = function
+    | [] -> Format.fprintf ppf "[]"
+    | more ->
+        Format.fprintf ppf "@[<hov 2>[ %a ]@]"
+          (Format.pp_print_list
+             ~pp_sep: (fun ppf () -> Format.fprintf ppf " :@ ")
+             (print_expr_unwrapped no_locations))
+          more in
+  let rec print_typed_code_unwrapped ppf expr =
+    match expr with
+    | Script.Prim (loc, name, []) ->
+        Format.fprintf ppf "%s%a"
+          name print_location_mark (locations loc)
+    | Script.Prim (loc, name, args) ->
+        Format.fprintf ppf "@[<hov 2>%s%a@ %a@]"
+          name print_location_mark (locations loc)
+          (Format.pp_print_list
+             ~pp_sep: Format.pp_print_space
+             print_typed_code)
+          args
+    | Script.Seq (loc, []) ->
+        begin match List.assoc loc type_map with
+          | exception Not_found -> Format.fprintf ppf "{}"
+          | (first, _) ->
+              match locations loc with
+              | None ->
+                  Format.fprintf ppf "{} /* %a */"
+                    print_stack first
+              | Some _ as l ->
+                  Format.fprintf ppf "{%a %a }"
+                    print_location_mark l print_stack first
+        end
+    | Script.Seq (loc, exprs) ->
+        begin match locations loc with
+          | None ->
+              Format.fprintf ppf "@[<v 2>{ "
+          | Some _ as l ->
+              Format.fprintf ppf "@[<v 2>{%a@,"
+                print_location_mark l
+        end ;
+        let rec loop = function
+          | [] -> assert false
+          | [ Script.Int (loc, _) | String (loc, _) | Prim (loc, _, _) as expr ] ->
+              begin match List.assoc loc type_map with
+                | exception Not_found ->
+                    Format.fprintf ppf "%a }@]"
+                      print_typed_code_unwrapped expr
+                | (before, after) ->
+                    Format.fprintf ppf "/* %a */@,%a@,/* %a */ }@]"
+                      print_stack before
+                      print_typed_code_unwrapped expr
+                      print_stack after
+              end ;
+          | Script.Int (loc, _) | String (loc, _) | Prim (loc, _, _) as expr :: rest ->
+              begin match List.assoc loc type_map with
+                | exception Not_found ->
+                    Format.fprintf ppf "%a ;@,"
+                      print_typed_code_unwrapped expr ;
+                    loop rest
+                | (before, _) ->
+                    Format.fprintf ppf "/* %a */@,%a ;@,"
+                      print_stack before
+                      print_typed_code_unwrapped expr ;
+                    loop rest
+              end ;
+          | [ Seq (_, _) as expr ] ->
+              Format.fprintf ppf "%a }@]"
+                print_typed_code_unwrapped expr
+          | Seq (_, _) as expr :: rest ->
+              Format.fprintf ppf "%a@,"
+                print_typed_code_unwrapped expr ;
+              loop rest in
+        loop exprs ;
+    | Script.Int (loc, n) ->
+        Format.fprintf ppf "%s%a" n print_location_mark (locations loc)
+    | Script.String (loc, s) ->
+        Format.fprintf ppf "%S%a" s print_location_mark (locations loc)
+  and print_typed_code ppf = function
+    | Script.Prim (_, _, _ :: _) as expr ->
+        Format.fprintf ppf "(%a)" print_typed_code_unwrapped expr
+    | expr -> print_typed_code_unwrapped ppf expr in
+  print_typed_code_unwrapped ppf expr
+
+let print_program locations ppf ((c : Script.code), type_map) =
+  Format.fprintf ppf
+    "@[<v 0>@[<hov 2>storage@ %a ;@]@,\
+     @[<hov 2>parameter@ %a ;@]@,\
+     @[<hov 2>return@ %a ;@]@,\
+     @[<hov 2>code@ %a@]@]"
+    (print_expr no_locations) c.storage_type
+    (print_expr no_locations) c.arg_type
+    (print_expr no_locations) c.ret_type
+    (print_typed_code locations) (c.code, type_map)
+
+let report_typechecking_errors cctxt errs =
+  let open Client_commands in
+  let open Script_typed_ir in
+  let open Script_ir_translator in
+  let rec print_ty (type t) ppf (ty : t ty) =
+    let expr = unparse_ty ty in
+    print_expr no_locations ppf expr in
+  let rec print_stack_ty (type t) ?(depth = max_int) ppf (s : t stack_ty) =
+    let rec loop
+      : type t. int -> Format.formatter -> t stack_ty -> unit
+      = fun depth ppf -> function
+        | Empty_t -> ()
+        | _ when depth <= 0 ->
+            Format.fprintf ppf "..."
+        | Item_t (last, Empty_t) ->
+            Format.fprintf ppf "%a"
+              print_ty last
+        | Item_t (last, rest) ->
+            Format.fprintf ppf "%a :@ %a"
+              print_ty last (loop (depth - 1)) rest in
+    match s with
+    | Empty_t ->
+        Format.fprintf ppf "[]"
+    | sty ->
+        Format.fprintf ppf "@[<hov 2>[ %a ]@]" (loop depth) sty in
+  let rec print_enumeration ppf = function
+    | [ single ] ->
+        Format.fprintf ppf "%a"
+          Format.pp_print_text single
+    | [ prev ; last ] ->
+        Format.fprintf ppf "%a@ or@ %a"
+          Format.pp_print_text prev Format.pp_print_text last
+    | first :: rest ->
+        Format.fprintf ppf "%a,@ %a"
+          Format.pp_print_text first print_enumeration rest
+    | [] -> assert false in
+  let rec collect_locations acc = function
+    | (Ill_typed_data (_, _, _)
+      | Ill_formed_type (_, _)
+      | Ill_typed_contract (_, _, _, _)) :: _
+    | [] ->
+        let assoc, _ =
+          List.fold_left
+            (fun (acc, i) l ->
+               if List.mem_assoc l acc then
+                 (acc, i)
+               else
+                 ((l, i) :: acc, i + 1))
+            ([], 1) acc in
+        (fun l -> try Some (List.assoc l assoc) with Not_found -> None)
+    | (Invalid_arity (loc, _, _, _)
+      | Invalid_namespace (loc, _, _, _)
+      | Invalid_primitive (loc, _, _)
+      | Invalid_case (loc, _)
+      | Invalid_kind (loc, _, _)
+      | Fail_not_in_tail_position loc
+      | Undefined_cast (loc, _, _)
+      | Undefined_binop (loc, _, _, _)
+      | Undefined_unop (loc, _, _)
+      | Bad_return (loc, _, _)
+      | Bad_stack (loc, _, _, _)
+      | Unmatched_branches (loc, _, _)
+      | Transfer_in_lambda loc
+      | Invalid_constant (loc, _, _)
+      | Invalid_contract (loc, _)
+      | Comparable_type_expected (loc, _)) :: rest ->
+        collect_locations (loc :: acc) rest
+    | _ :: rest -> collect_locations acc rest in
+  let print_typechecking_error locations err =
+    let print_loc ppf loc =
+      match locations loc with
+      | None ->
+          Format.fprintf ppf "At (unmarked) location %d, " loc
+      | Some loc ->
+          Format.fprintf ppf "At mark /* %d */, " loc in
+    match err with
+    | Ill_typed_data (name, expr, ty) ->
+        cctxt.warning
+          "@[<hv 0>@[<hov 2>Ill typed %adata:@ %a@]@ \
+           @[<hov 2>is not an expression of type@ %a@]@]"
+          (fun ppf -> function
+             | None -> ()
+             | Some s -> Format.fprintf ppf "%s " s)
+          name
+          (print_expr locations) expr
+          print_ty ty
+    | Ill_formed_type (name, expr) ->
+        cctxt.warning
+          "@[<hov 2>Ill formed type %aexpression@ %a@]"
+          (fun ppf -> function
+             | None -> ()
+             | Some s -> Format.fprintf ppf "%s " s)
+          name
+          (print_expr locations) expr
+    | Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty) ->
+        cctxt.warning
+          "@[<v 2>Ill typed contract:@ %a@]"
+          (print_program locations)
+          ({ Script.storage_type = unparse_ty storage_ty ;
+             arg_type = unparse_ty arg_ty ;
+             ret_type = unparse_ty ret_ty ;
+             code = expr }, [])
+    | Invalid_arity (loc, name, exp, got) ->
+        cctxt.warning
+          "%aprimitive %s expects %d arguments but is given %d."
+          print_loc loc name exp got
+    | Invalid_namespace (loc, name, exp, got) ->
+        let human_namespace = function
+          | Instr_namespace -> ("an", "instruction")
+          | Type_namespace -> ("a", "type name")
+          | Constant_namespace -> ("a", "constant constructor") in
+        cctxt.warning
+          "@[%aunexpected %s %s, only@ %s@ %s@ can@ be@ used@ here."
+          print_loc loc
+          (snd (human_namespace got))
+          name
+          (fst (human_namespace exp)) (snd (human_namespace exp))
+    | Invalid_primitive (loc, exp, got) ->
+        cctxt.warning
+          "@[%ainvalid primitive %s, only@ %a@ can@ be@ used@ here."
+          print_loc loc
+          got
+          print_enumeration exp
+    | Invalid_case (loc, name) ->
+        cctxt.warning
+          "%a%s is not a valid primitive name."
+          print_loc loc
+          name
+    | Invalid_kind (loc, exp, got) ->
+        let human_kind = function
+          | Seq_kind -> ("a", "sequence")
+          | Prim_kind -> ("a", "primitive")
+          | Int_kind -> ("an", "int")
+          | String_kind -> ("a", "string") in
+        cctxt.warning
+          "@[%aunexpected %s, only@ %a@ can@ be@ used@ here."
+          print_loc loc
+          (snd (human_kind got))
+          print_enumeration
+          (List.map (fun k -> let (a, n) = human_kind k in a ^ " " ^ n) exp)
+    | Fail_not_in_tail_position loc ->
+        cctxt.warning
+          "%aThe FAIL instruction must appear in a tail position."
+          print_loc loc
+    | Undefined_cast (loc, tya, tyb) ->
+        cctxt.warning
+          "@[<hov 0>@[<hov 2>%atype cast is undefined from@ %a@]@ \
+           @[<hov 2>to@ %a.@]@]"
+          print_loc loc
+          print_ty tya
+          print_ty tyb
+    | Undefined_binop (loc, name, tya, tyb) ->
+        cctxt.warning
+          "@[<hov 0>@[<hov 2>%aoperator %s is undefined between@ %a@]@ \
+           @[<hov 2>and@ %a.@]@]"
+          print_loc loc
+          name
+          print_ty tya
+          print_ty tyb
+    | Undefined_unop (loc, name, ty) ->
+        cctxt.warning
+          "@[<hov 0>@[<hov 2>%aoperator %s is undefined on@ %a@]@]"
+          print_loc loc
+          name
+          print_ty ty
+    | Bad_return (loc, got, exp) ->
+        cctxt.warning
+          "@[<v 2>%awrong stack type at end of body:@,\
+           - @[<hov>expected return stack type:@ %a,@]@,\
+           - @[<hov>actual stack type:@ %a.@]@]"
+          print_loc loc
+          (fun ppf -> print_stack_ty ppf) (Item_t (exp, Empty_t))
+          (fun ppf -> print_stack_ty ppf) got
+    | Bad_stack (loc, name, depth, sty) ->
+        cctxt.warning
+          "@[<hov 2>%awrong stack type for instruction %s:@ %a.@]"
+          print_loc loc name (print_stack_ty ~depth) sty
+    | Unmatched_branches (loc, sta, stb) ->
+        cctxt.warning
+          "@[<v 2>%atwo branches don't end with the same stack type:@,\
+           - @[<hov>first stack type:@ %a,@]@,\
+           - @[<hov>other stack type:@ %a.@]@]"
+          print_loc loc
+          (fun ppf -> print_stack_ty ppf) sta
+          (fun ppf -> print_stack_ty ppf) stb
+    | Transfer_in_lambda loc ->
+        cctxt.warning
+          "%aThe TRANSFER_TOKENS instruction cannot appear in a lambda."
+          print_loc loc
+    | Bad_stack_length ->
+        cctxt.warning
+          "Bad stack length."
+    | Bad_stack_item lvl ->
+        cctxt.warning
+          "Bad stack item %d ."
+          lvl
+    | Invalid_constant (loc, got, exp) ->
+        cctxt.warning
+          "@[<hov 0>@[<hov 2>%avalue@ %a@]@ \
+           @[<hov 2>is invalid for type@ %a.@]@]"
+          print_loc loc
+          (fun ppf -> print_expr no_locations ppf) got
+          print_ty exp
+    | Invalid_contract (loc, contract) ->
+        cctxt.warning
+          "%ainvalid contract %a."
+          print_loc loc Contract.pp contract
+    | Comparable_type_expected (loc, ty) ->
+        cctxt.warning "%acomparable type expected."
+          print_loc loc >>= fun () ->
+        cctxt.warning "@[<hov 0>@[<hov 2>Type@ %a@]@ is not comparable.@]"
+          print_ty ty
+    | Bad_sign ty ->
+        begin match ty with
+          | Int_t kind ->
+              let signed = match kind with
+                | Script_int.Int8 -> true
+                | Script_int.Int16 -> true
+                | Script_int.Int32 -> true
+                | Script_int.Int64 -> true
+                | Script_int.Uint8 -> false
+                | Script_int.Uint16 -> false
+                | Script_int.Uint32 -> false
+                | Script_int.Uint64 -> false in
+              if signed then
+                cctxt.warning "Unsigned integer type expected."
+              else
+                cctxt.warning "Signed integer type expected."
+          | _ -> assert false
+        end
+    | Inconsistent_types (tya, tyb) ->
+        cctxt.warning
+          "@[<hov 0>@[<hov 2>Type@ %a@]@ \
+           @[<hov 2>is not compatible with type@ %a.@]@]"
+          print_ty tya print_ty tyb
+    | err ->
+        cctxt.warning "%a"
+          Local_environment.Environment.Error_monad.pp_print_error [ err ] in
+  let rec print_typechecking_error_trace locations errs =
+    let locations = match errs with
+      | (Ill_typed_data (_, _, _)
+        | Ill_formed_type (_, _)
+        | Ill_typed_contract (_, _, _, _)) :: rest ->
+          collect_locations [] rest
+      | _ -> locations in
+    match errs with
+    | [] -> Lwt.return ()
+    | err :: errs ->
+        print_typechecking_error locations err >>= fun () ->
+        print_typechecking_error_trace locations errs in
+  Lwt_list.iter_s
+    (function
+      | Ecoproto_error errs ->
+          print_typechecking_error_trace no_locations errs
+      | err -> cctxt.warning "%a" pp_print_error [ err ])
+    errs
+
 let parse_program cctxt s =
   let lexbuf = Lexing.from_string s in
   try
@@ -56,48 +452,6 @@ let parse_program cctxt s =
       )
   with
   | exn -> report_parse_error cctxt "program: " exn lexbuf
-
-let rec print_ir locations ppf node =
-  let open Script in
-  let rec do_seq = function
-    | [] -> assert false
-    | [ last ] -> Format.fprintf ppf "%a }@]" (print_ir locations) last
-    | fst :: rest -> Format.fprintf ppf "%a ;@ " (print_ir locations) fst ; do_seq rest in
-  let rec do_args = function
-    | [] -> assert false
-    | [ last ] -> Format.fprintf ppf "%a@]" (print_ir locations) last
-    | fst :: rest -> Format.fprintf ppf "%a@," (print_ir locations) fst ; do_args rest in
-  let print_location ppf loc =
-    if locations loc then begin
-      Format.fprintf ppf " /* %d */" loc
-  end in
-  match node with
-  | String (_, s) -> Format.fprintf ppf "%S" s
-  | Int (_, s) -> Format.fprintf ppf "%s" s
-  | Seq (_, [ one ]) -> print_ir locations ppf one
-  | Seq (_, []) -> Format.fprintf ppf "{}" ;
-  | Seq (_, seq) ->
-      Format.fprintf ppf "{ @[<v>" ;
-      do_seq seq
-  | Prim (loc, name, []) ->
-      Format.fprintf ppf "%s%a" name print_location loc
-  | Prim (loc, name, seq) ->
-      Format.fprintf ppf "@[<v 2>%s%a@," name print_location loc;
-      do_args seq
-
-let print_program locations ppf c =
-  Format.fprintf ppf
-    "@[<v 2>storage@,%a@]@."
-    (print_ir (fun _ -> false)) (c : Script.code).Script.storage_type ;
-  Format.fprintf ppf
-    "@[<v 2>parameter@,%a@]@."
-    (print_ir (fun _ -> false)) (c : Script.code).Script.arg_type ;
-  Format.fprintf ppf
-    "@[<v 2>return@,%a@]@."
-    (print_ir (fun _ -> false)) (c : Script.code).Script.ret_type ;
-  Format.fprintf ppf
-    "@[<v 2>code@,%a@]"
-    (print_ir locations) (c : Script.code).Script.code
 
 let parse_data cctxt s =
   let lexbuf = Lexing.from_string s in
@@ -160,7 +514,7 @@ module Program = Client_aliases.Alias (struct
     type t = Script.code
     let encoding = Script.code_encoding
     let of_source cctxt s = parse_program cctxt s
-    let to_source _ p = Lwt.return (Format.asprintf "%a" (print_program (fun _ -> false)) p)
+    let to_source _ p = Lwt.return (Format.asprintf "%a" (print_program no_locations) (p, []))
     let name = "program"
   end)
 
@@ -221,28 +575,28 @@ let commands () =
              (block ()) program (storage, input) >>= function
            | Ok (storage, output, trace) ->
                cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
-                 (print_ir (fun _ -> false)) storage
-                 (print_ir (fun _ -> false)) output
+                 (print_expr no_locations) storage
+                 (print_expr no_locations) output
                  (Format.pp_print_list
                     (fun ppf (loc, gas, stack) ->
                        Format.fprintf ppf
                          "- @[<v 0>location: %d (remaining gas: %d)@,[ @[<v 0>%a ]@]@]"
                          loc gas
-                         (Format.pp_print_list (print_ir (fun _ -> false)))
+                         (Format.pp_print_list (print_expr no_locations))
                          stack))
                  trace
            | Error errs ->
-               pp_print_error Format.err_formatter errs ;
+               cctxt.warning "%a" pp_print_error errs >>= fun () ->
                cctxt.error "error running program"
          else
            Client_proto_rpcs.Helpers.run_code cctxt
              (block ()) program (storage, input) >>= function
            | Ok (storage, output) ->
                cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
-                 (print_ir (fun _ -> false)) storage
-                 (print_ir (fun _ -> false)) output
+                 (print_expr no_locations) storage
+                 (print_expr no_locations) output
            | Error errs ->
-               pp_print_error Format.err_formatter errs ;
+               cctxt.warning "%a" pp_print_error errs >>= fun () ->
                cctxt.error "error running program") ;
     command ~group ~desc: "ask the node to typecheck a program"
       ~args: [ show_types_arg ]
@@ -255,24 +609,11 @@ let commands () =
          | Ok type_map ->
              let type_map, program = unexpand_macros type_map program in
              cctxt.message "Well typed" >>= fun () ->
-             if !show_types then begin
-               cctxt.message "%a"
-                 (print_program (fun l -> List.mem_assoc l type_map))
-                 program >>= fun () ->
-               Lwt_list.iter_s
-                 (fun (loc, (before, after)) ->
-                    cctxt.message
-                      "%3d@[<v 0> : [ @[<v 0>%a ]@]@,-> [ @[<v 0>%a ]@]@]"
-                      loc
-                      (Format.pp_print_list (print_ir (fun _ -> false)))
-                      before
-                      (Format.pp_print_list (print_ir (fun _ -> false)))
-                      after)
-                 (List.sort compare type_map)
-             end
+             if !show_types then
+               cctxt.message "%a" (print_program no_locations) (program, type_map)
              else Lwt.return ()
          | Error errs ->
-             pp_print_error Format.err_formatter errs ;
+             report_typechecking_errors cctxt errs >>= fun () ->
              cctxt.error "ill-typed program") ;
     command ~group ~desc: "ask the node to typecheck a data expression"
       (prefixes [ "typecheck" ; "data" ]
@@ -287,7 +628,7 @@ let commands () =
          | Ok () ->
              cctxt.message "Well typed"
          | Error errs ->
-             pp_print_error Format.err_formatter errs ;
+             report_typechecking_errors cctxt errs >>= fun () ->
              cctxt.error "ill-typed data") ;
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
@@ -302,7 +643,7 @@ let commands () =
          | Ok hash ->
              cctxt.message "%S" hash
          | Error errs ->
-             pp_print_error Format.err_formatter errs ;
+             cctxt.warning "%a" pp_print_error errs  >>= fun () ->
              cctxt.error "ill-formed data") ;
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
@@ -326,6 +667,6 @@ let commands () =
                 Data_encoding.Binary.to_bytes Ed25519.signature_encoding |>
                 Hex_encode.hex_of_bytes)
          | Error errs ->
-             pp_print_error Format.err_formatter errs ;
+             cctxt.warning "%a" pp_print_error errs >>= fun () ->
              cctxt.error "ill-formed data") ;
   ]
