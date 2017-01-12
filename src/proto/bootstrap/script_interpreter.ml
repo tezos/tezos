@@ -508,9 +508,9 @@ let rec interp
 and execute ?log orig source ctxt storage script amount arg qta =
   let { Script.storage ; storage_type } = storage in
   let { Script.code ; arg_type ; ret_type } = script in
-  parse_ty arg_type >>=? fun (Ex arg_type) ->
-  parse_ty ret_type >>=? fun (Ex ret_type) ->
-  parse_ty storage_type >>=? fun (Ex storage_type) ->
+  (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
+  (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
+  (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
   let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
   let ret_type_full = Pair_t (ret_type, storage_type) in
   parse_lambda ctxt arg_type_full ret_type_full code >>=? fun lambda ->
