@@ -33,8 +33,33 @@ module Secret_key = Client_aliases.Alias (struct
     let name = "secret key"
   end)
 
-let gen_keys cctxt name =
-  let secret_key, public_key = Sodium.Sign.random_keypair () in
+module Seed = struct
+
+  let to_hex s =
+    Sodium.Sign.Bytes.of_seed s
+    |> Bytes.to_string
+    |> Hex_encode.hex_encode
+
+  let of_hex s =
+    Hex_encode.hex_decode s
+    |> Bytes.of_string
+    |> Sodium.Sign.Bytes.to_seed
+
+  let generate () =
+    (* Seed is 32 bytes long *)
+    Sodium.Random.Bytes.generate Sodium.Sign.seed_size
+    |> Sodium.Sign.Bytes.to_seed
+
+  let extract =
+    Sodium.Sign.secret_key_to_seed
+end
+
+let gen_keys ?seed cctxt name =
+  let seed =
+    match seed with
+    | None -> Seed.generate ()
+    | Some s -> s in
+  let secret_key, public_key = Sodium.Sign.seed_keypair seed in
   Secret_key.add cctxt name secret_key >>= fun () ->
   Public_key.add cctxt name public_key >>= fun () ->
   Public_key_hash.add cctxt name (Ed25519.Public_key.hash public_key) >>= fun () ->
@@ -65,6 +90,13 @@ let get_keys cctxt =
     end
   end
 
+let list_keys cctxt =
+  Public_key_hash.load cctxt >>= fun l ->
+  Lwt_list.map_s (fun (name, pkh) ->
+      Public_key.mem cctxt name >>= fun pkm ->
+      Secret_key.mem cctxt name >>= fun pks ->
+      Lwt.return (name, pkh, pkm, pks))
+    l
 
 let group =
   { Cli_entries.name = "keys" ;
@@ -114,10 +146,8 @@ let commands () =
     command ~group ~desc: "list all public key hashes and associated keys"
       (fixed [ "list" ; "known" ; "identities" ])
       (fun cctxt ->
-         Public_key_hash.load cctxt >>= fun l ->
-         Lwt_list.iter_s (fun (name, pkh) ->
-             Public_key.mem cctxt name >>= fun pkm ->
-             Secret_key.mem cctxt name >>= fun pks ->
+         list_keys cctxt >>= fun l ->
+         Lwt_list.iter_s (fun (name, pkh, pkm, pks) ->
              Public_key_hash.to_source cctxt pkh >>= fun v ->
              cctxt.message "%s: %s%s%s" name v
                (if pkm then " (public key known)" else "")
