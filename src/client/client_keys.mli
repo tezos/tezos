@@ -14,6 +14,13 @@ module Public_key_hash :
 module Public_key : Client_aliases.Alias with type t = Ed25519.Public_key.t
 module Secret_key : Client_aliases.Alias with type t = Ed25519.Secret_key.t
 
+module Seed : sig
+  val to_hex : Sodium.Sign.seed -> string
+  val of_hex : string -> Sodium.Sign.seed
+  val generate : unit -> Sodium.Sign.seed
+  val extract : Secret_key.t -> Sodium.Sign.seed
+end
+
 val get_key:
   Client_commands.context ->
   Public_key_hash.t ->
@@ -22,5 +29,15 @@ val get_key:
 val get_keys:
   Client_commands.context ->
   ( string * Public_key_hash.t * Public_key.t * Secret_key.t ) list Lwt.t
+
+val list_keys:
+  Client_commands.context ->
+  (string * Public_key_hash.t * bool * bool) list Lwt.t
+
+val gen_keys:
+  ?seed: Sodium.Sign.seed ->
+  Client_commands.context ->
+  string ->
+  unit Lwt.t
 
 val commands: unit -> Client_commands.command list
