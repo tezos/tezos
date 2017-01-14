@@ -1,29 +1,30 @@
 
-module Param = struct
+type net_id = Store.net_id
 
-  type net_id = Store.net_id
+type msg =
+  | Discover_blocks of net_id * Block_hash.t list (* Block locator *)
+  | Block_inventory of net_id * Block_hash.t list
 
-  type msg =
+  | Get_blocks of Block_hash.t list
+  | Block of MBytes.t
 
-    | Discover_blocks of net_id * Block_hash.t list (* Block locator *)
-    | Block_inventory of net_id * Block_hash.t list
+  | Current_operations of net_id
+  | Operation_inventory of net_id * Operation_hash.t list
 
-    | Get_blocks of Block_hash.t list
-    | Block of MBytes.t
+  | Get_operations of Operation_hash.t list
+  | Operation of MBytes.t
 
-    | Current_operations of net_id
-    | Operation_inventory of net_id * Operation_hash.t list
+  | Get_protocols of Protocol_hash.t list
+  | Protocol of MBytes.t
 
-    | Get_operations of Operation_hash.t list
-    | Operation of MBytes.t
+module Message = struct
 
-    | Get_protocols of Protocol_hash.t list
-    | Protocol of MBytes.t
+  type t = msg
 
-  let encodings =
+  let encoding =
     let open Data_encoding in
     let case ?max_length ~tag encoding unwrap wrap =
-      P2p.Encoding { tag; encoding; wrap; unwrap; max_length } in
+      P2p_connection_pool.Encoding { tag; encoding; wrap; unwrap; max_length } in
     [
       case ~tag:0x10 (tup2 Block_hash.encoding (list Block_hash.encoding))
         (function
@@ -71,13 +72,8 @@ module Param = struct
         (fun proto -> Protocol proto);
     ]
 
-  type metadata = unit
-  let initial_metadata = ()
-  let metadata_encoding = Data_encoding.empty
-  let score () = 0.
-
   let supported_versions =
-    let open P2p in
+    let open P2p.Version in
     [ { name = "TEZOS" ;
         major = 0 ;
         minor = 0 ;
@@ -86,5 +82,15 @@ module Param = struct
 
 end
 
-include Param
-include P2p.Make(Param)
+type metadata = unit
+
+module Metadata = struct
+  type t = metadata
+  let initial = ()
+  let encoding = Data_encoding.empty
+  let score () = 0.
+end
+
+include Message
+include (Metadata : module type of Metadata with type t := metadata)
+include P2p.Make(Message)(Metadata)

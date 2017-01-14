@@ -336,13 +336,13 @@ NODE_IMPLS := \
 NODE_PACKAGES := \
   $(COMPILER_PACKAGES) \
   calendar \
+  cmdliner \
   cohttp.lwt \
   dynlink \
   git \
   ipv6-multicast \
   irmin.unix \
   ocplib-resto.directory \
-  cmdliner \
 
 
 EMBEDDED_NODE_PROTOCOLS := \
