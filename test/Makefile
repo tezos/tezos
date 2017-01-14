@@ -5,6 +5,7 @@ TESTS := \
   basic basic.sh \
   p2p-io-scheduler \
   p2p-connection \
+  p2p-connection-pool
 
 all: test
 
@@ -196,6 +197,11 @@ build-test-p2p-connection: test-p2p-connection
 run-test-p2p-connection:
 	./test-p2p-connection
 
+.PHONY:build-test-p2p-connection-pool run-test-p2p-connection-pool
+build-test-p2p-connection-pool: test-p2p-connection-pool
+run-test-p2p-connection-pool:
+	./test-p2p-connection-pool --clients 10 --repeat 5
+
 TEST_P2P_IO_SCHEDULER_IMPLS = \
   lib/process.ml \
   test_p2p_io_scheduler.ml
@@ -203,6 +209,10 @@ TEST_P2P_IO_SCHEDULER_IMPLS = \
 TEST_P2P_CONNECTION_IMPLS = \
   lib/process.ml \
   test_p2p_connection.ml
+
+TEST_P2P_CONNECTION_POOL_IMPLS = \
+  lib/process.ml \
+  test_p2p_connection_pool.ml
 
 ${TEST_P2P_IO_SCHEDULER_IMPLS:.ml=.cmx}: ${NODELIB}
 test-p2p-io-scheduler: ${NODELIB} ${TEST_P2P_IO_SCHEDULER_IMPLS:.ml=.cmx}
@@ -212,9 +222,14 @@ ${TEST_P2P_CONNECTION_IMPLS:.ml=.cmx}: ${NODELIB}
 test-p2p-connection: ${NODELIB} ${TEST_P2P_CONNECTION_IMPLS:.ml=.cmx}
 	ocamlfind ocamlopt -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
+${TEST_P2P_CONNECTION_POOL_IMPLS:.ml=.cmx}: ${NODELIB}
+test-p2p-connection-pool: ${NODELIB} ${TEST_P2P_CONNECTION_POOL_IMPLS:.ml=.cmx}
+	ocamlfind ocamlopt -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
 clean::
 	-rm -f test-p2p-io_scheduler
 	-rm -f test-p2p-connection
+	-rm -f test-p2p-connection-pool
 
 ############################################################################
 ## lwt pipe test program
