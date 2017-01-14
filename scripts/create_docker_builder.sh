@@ -9,6 +9,8 @@ image_name=${1:=tezos_build}
 ocaml_version=${2:=alpine_ocaml-4.03.0}
 image_version=$3
 
+docker pull ocaml/opam:${ocaml_version}
+
 cp ${cur_dir}/install_build_deps.sh ${dir}
 cp ${cur_dir}/../src/tezos-deps.opam ${dir}
 cat > ${dir}/Dockerfile <<EOF
