@@ -263,6 +263,8 @@ NODE_LIB_INTFS := \
   node/net/p2p_connection_pool_types.mli \
   node/net/p2p_connection_pool.mli \
   node/net/p2p_welcome.mli \
+  node/net/p2p_discovery.mli \
+  node/net/p2p_maintenance.mli \
   node/net/p2p.mli \
   node/net/RPC_server.mli \
   \
@@ -299,6 +301,8 @@ NODE_LIB_IMPLS := \
   node/net/p2p_connection_pool_types.ml \
   node/net/p2p_connection_pool.ml \
   node/net/p2p_welcome.ml \
+  node/net/p2p_discovery.ml \
+  node/net/p2p_maintenance.ml \
   node/net/p2p.ml \
   \
   node/net/RPC_server.ml \
@@ -335,6 +339,7 @@ NODE_PACKAGES := \
   cohttp.lwt \
   dynlink \
   git \
+  ipv6-multicast \
   irmin.unix \
   ocplib-resto.directory \
   cmdliner \
