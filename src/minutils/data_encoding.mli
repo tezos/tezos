@@ -236,4 +236,7 @@ module Binary : sig
   val to_bytes : 'a encoding -> 'a -> MBytes.t
   val of_bytes : 'a encoding -> MBytes.t -> 'a option
 
+  val fixed_length : 'a encoding -> int option
+  val fixed_length_exn : 'a encoding -> int
+
 end
