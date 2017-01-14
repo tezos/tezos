@@ -40,6 +40,7 @@
 /test/test-basic
 /test/test-data-encoding
 /test/test-p2p-io-scheduler
+/test/test-p2p-connection
 /test/LOG
 
 *~
