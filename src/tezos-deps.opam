@@ -21,6 +21,7 @@ depends: [
   "conduit"
   "git"
   "git-unix"
+  "ipv6-multicast"
   "irmin-watcher" (* for `irmin.unix` *)
   "irmin" {>= "0.12" }
   "lwt" {>= "2.7.0" }
