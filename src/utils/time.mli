@@ -9,6 +9,10 @@
 
 type t
 
+val min_value : t
+val epoch : t
+val max_value : t
+
 val add : t -> int64 -> t
 val diff : t -> t -> int64
 
@@ -46,3 +50,7 @@ type 'a timed_data = {
 val make_timed : 'a -> 'a timed_data
 
 val timed_encoding : 'a Data_encoding.t -> 'a timed_data Data_encoding.t
+
+module Set : Set.S with type elt = t
+module Map : Map.S with type key = t
+module Table : Hashtbl.S with type key = t
