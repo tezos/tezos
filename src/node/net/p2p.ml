@@ -514,10 +514,10 @@ module Make (P: PARAMS) = struct
       let crypt buf =
         let nonce = get_nonce remote_nonce in
         Crypto_box.box my_secret_key public_key buf nonce in
-      let writer = Lwt_pipe.create 2 in
+      let writer = Lwt_pipe.create ~size:2 () in
       let send p = Lwt_pipe.push writer p in
       let try_send p = Lwt_pipe.push_now writer p in
-      let reader = Lwt_pipe.create 2 in
+      let reader = Lwt_pipe.create ~size:2 () in
       let total_sent () = !sent in
       let total_recv () = !received in
       let current_inflow () = received_ema#get in
@@ -763,9 +763,9 @@ module Make (P: PARAMS) = struct
     (* a non exception-based cancelation mechanism *)
     let cancelation, cancel, on_cancel = Lwt_utils.canceler () in
     (* create the internal event pipe *)
-    let events = Lwt_pipe.create 100 in
+    let events = Lwt_pipe.create ~size:100 () in
     (* create the external message pipe *)
-    let messages = Lwt_pipe.create 100 in
+    let messages = Lwt_pipe.create ~size:100 () in
     (* fill the known peers pools from last time *)
     Data_encoding_ezjsonm.read_file config.peers_file >>= fun res ->
     let known_peers, black_list, my_gid,
