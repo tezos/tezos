@@ -3,7 +3,8 @@ TESTS := \
   data-encoding \
   store context state \
   basic basic.sh \
-  p2p-io-scheduler
+  p2p-io-scheduler \
+  p2p-connection \
 
 all: test
 
@@ -182,7 +183,7 @@ clean::
 ############################################################################
 ## p2p test program
 
-.PHONY:build-test-io_schduler
+.PHONY:build-test-p2p-io-scheduler run-test-p2p-io-scheduler
 build-test-p2p-io-scheduler: test-p2p-io-scheduler
 run-test-p2p-io-scheduler:
 	./test-p2p-io-scheduler \
@@ -190,16 +191,30 @@ run-test-p2p-io-scheduler:
 	   --max-upload-speed $$((1 << 18)) \
 	   --max-download-speed $$((1 << 20))
 
+.PHONY:build-test-p2p-connection run-test-p2p-connection
+build-test-p2p-connection: test-p2p-connection
+run-test-p2p-connection:
+	./test-p2p-connection
+
 TEST_P2P_IO_SCHEDULER_IMPLS = \
   lib/process.ml \
   test_p2p_io_scheduler.ml
+
+TEST_P2P_CONNECTION_IMPLS = \
+  lib/process.ml \
+  test_p2p_connection.ml
 
 ${TEST_P2P_IO_SCHEDULER_IMPLS:.ml=.cmx}: ${NODELIB}
 test-p2p-io-scheduler: ${NODELIB} ${TEST_P2P_IO_SCHEDULER_IMPLS:.ml=.cmx}
 	ocamlfind ocamlopt -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
+${TEST_P2P_CONNECTION_IMPLS:.ml=.cmx}: ${NODELIB}
+test-p2p-connection: ${NODELIB} ${TEST_P2P_CONNECTION_IMPLS:.ml=.cmx}
+	ocamlfind ocamlopt -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
 clean::
-	rm -f test-p2p-io_scheduler
+	-rm -f test-p2p-io_scheduler
+	-rm -f test-p2p-connection
 
 ############################################################################
 ## lwt pipe test program
