@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module V6 = Ipaddr.V6
+
 open Error_monad
 open Logging.Node.Main
 
@@ -54,15 +56,15 @@ type cfg = {
     min_connections : int ;
     max_connections : int ;
     expected_connections : int ;
-    net_addr : Ipaddr.t ;
+    net_addr : V6.t ;
     net_port : int ;
-    local_discovery : int option ;
-    peers : (Ipaddr.t * int) list ;
+    (* local_discovery : (string * int) option ; *)
+    peers : (V6.t * int) list ;
     peers_cache : string ;
     closed : bool ;
 
     (* rpc *)
-    rpc_addr : (Ipaddr.t * int) option ;
+    rpc_addr : (V6.t * int) option ;
     cors_origins : string list ;
     cors_headers : string list ;
     rpc_crt : string option ;
@@ -88,9 +90,9 @@ let default_cfg_of_base_dir base_dir = {
   min_connections = 4 ;
   max_connections = 400 ;
   expected_connections = 20 ;
-  net_addr = Ipaddr.(V6 V6.unspecified) ;
+  net_addr = V6.unspecified ;
   net_port = 9732 ;
-  local_discovery = None ;
+  (* local_discovery = None ; *)
   peers = [] ;
   closed = false ;
   peers_cache = base_dir // "peers_cache" ;
@@ -130,15 +132,20 @@ let sockaddr_of_string str =
       let addr, port = String.sub str 0 pos, String.sub str (pos+1) (len - pos - 1) in
       match Ipaddr.of_string_exn addr, int_of_string port with
       | exception Failure _ -> `Error "not a sockaddr"
-      | ip, port -> `Ok (ip, port)
+      | V4 ipv4, port -> `Ok (Ipaddr.v6_of_v4 ipv4, port)
+      | V6 ipv6, port -> `Ok (ipv6, port)
 
 let sockaddr_of_string_exn str =
   match sockaddr_of_string str with
   | `Ok saddr -> saddr
   | `Error msg -> invalid_arg msg
 
-let pp_sockaddr fmt (ip, port) = Format.fprintf fmt "%a:%d" Ipaddr.pp_hum ip port
+let pp_sockaddr fmt (ip, port) = Format.fprintf fmt "%a:%d" V6.pp_hum ip port
 let string_of_sockaddr saddr = Format.asprintf "%a" pp_sockaddr saddr
+
+let mcast_params_of_string s = match Utils.split ':' s with
+  | [iface; port] -> iface, int_of_string port
+  | _ -> invalid_arg "mcast_params_of_string"
 
 module Cfg_file = struct
   open Data_encoding
@@ -150,12 +157,12 @@ module Cfg_file = struct
       (opt "protocol" string)
 
   let net =
-    obj8
+    obj7
       (opt "min-connections" uint16)
       (opt "max-connections" uint16)
       (opt "expected-connections" uint16)
       (opt "addr" string)
-      (opt "local-discovery" uint16)
+      (* (opt "local-discovery" string) *)
       (opt "peers" (list string))
       (dft "closed" bool false)
       (opt "peers-cache" string)
@@ -174,21 +181,29 @@ module Cfg_file = struct
     conv
       (fun { store ; context ; protocol ;
              min_connections ; max_connections ; expected_connections ;
-             net_addr ; net_port ; local_discovery ; peers ;
+             net_addr ; net_port ;
+             (* local_discovery ; *)
+             peers ;
              closed ; peers_cache ; rpc_addr ; cors_origins ; cors_headers ; log_output } ->
         let net_addr = string_of_sockaddr (net_addr, net_port) in
+        (* let local_discovery = Utils.map_option local_discovery *)
+            (* ~f:(fun (iface, port) -> iface ^ ":" ^ string_of_int port) *)
+        (* in *)
         let rpc_addr = Utils.map_option string_of_sockaddr rpc_addr in
         let peers = ListLabels.map peers ~f:string_of_sockaddr in
         let log_output = string_of_log log_output in
         ((Some store, Some context, Some protocol),
          (Some min_connections, Some max_connections, Some expected_connections,
-          Some net_addr, local_discovery, Some peers, closed, Some peers_cache),
+          Some net_addr,
+          (* local_discovery, *)
+          Some peers, closed, Some peers_cache),
          (rpc_addr, cors_origins, cors_headers),
          Some log_output))
       (fun (
          (store, context, protocol),
          (min_connections, max_connections, expected_connections, net_addr,
-          local_discovery, peers, closed, peers_cache),
+          (* local_discovery, *)
+          peers, closed, peers_cache),
          (rpc_addr, cors_origins, cors_headers),
          log_output) ->
          let open Utils in
@@ -205,11 +220,14 @@ module Cfg_file = struct
          let min_connections = unopt default_cfg.min_connections min_connections in
          let max_connections = unopt default_cfg.max_connections max_connections in
          let expected_connections = unopt default_cfg.expected_connections expected_connections in
+         (* let local_discovery = map_option local_discovery ~f:mcast_params_of_string in *)
          { default_cfg with
            store ; context ; protocol ;
-           min_connections; max_connections; expected_connections;
-           net_addr; net_port ; local_discovery; peers; closed; peers_cache;
-           rpc_addr; cors_origins ; cors_headers ; log_output
+           min_connections ; max_connections ; expected_connections ;
+           net_addr ; net_port ;
+           (* local_discovery ; *)
+           peers ; closed ; peers_cache ;
+           rpc_addr ; cors_origins ; cors_headers ; log_output ;
          }
       )
       (obj4
@@ -266,9 +284,9 @@ module Cmdline = struct
   let net_addr =
     let doc = "The TCP address and port at which this instance can be reached." in
     Arg.(value & opt (some sockaddr_converter) None & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["net-addr"])
-  let local_discovery =
-    let doc = "Automatic discovery of peers on the local network." in
-    Arg.(value & opt (some int) None & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["local-discovery"])
+  (* let local_discovery = *)
+    (* let doc = "Automatic discovery of peers on the local network." in *)
+    (* Arg.(value & opt (some @@ pair string int) None & info ~docs:"NETWORK" ~doc ~docv:"IFACE:PORT" ["local-discovery"]) *)
   let peers =
     let doc = "A peer to bootstrap the network from. Can be used several times to add several peers." in
     Arg.(value & opt_all sockaddr_converter [] & info ~docs:"NETWORK" ~doc ~docv:"ADDR:PORT" ["peer"])
@@ -298,7 +316,9 @@ module Cmdline = struct
 
   let parse base_dir config_file sandbox sandbox_param log_level
       min_connections max_connections expected_connections
-      net_saddr local_discovery peers closed rpc_addr tls cors_origins cors_headers reset_cfg update_cfg =
+      net_saddr
+      (* local_discovery *)
+      peers closed rpc_addr tls cors_origins cors_headers reset_cfg update_cfg =
 
     let base_dir = Utils.(unopt (unopt default_cfg.base_dir base_dir) sandbox) in
     let config_file = Utils.(unopt ((unopt base_dir sandbox) // "config")) config_file in
@@ -340,7 +360,7 @@ module Cmdline = struct
         expected_connections = Utils.unopt cfg.expected_connections expected_connections ;
         net_addr = (match net_saddr with None -> cfg.net_addr | Some (addr, _) -> addr) ;
         net_port = (match net_saddr with None -> cfg.net_port | Some (_, port) -> port) ;
-        local_discovery = Utils.first_some local_discovery cfg.local_discovery ;
+        (* local_discovery = Utils.first_some local_discovery cfg.local_discovery ; *)
         peers = (match peers with [] -> cfg.peers | _ -> peers) ;
         closed = closed || cfg.closed ;
         rpc_addr = Utils.first_some rpc_addr cfg.rpc_addr ;
@@ -359,7 +379,9 @@ module Cmdline = struct
     ret (const parse $ base_dir $ config_file
                      $ sandbox $ sandbox_param $ v
                      $ min_connections $ max_connections $ expected_connections
-                     $ net_addr $ local_discovery $ peers $ closed
+                     $ net_addr
+                     (* $ local_discovery *)
+                     $ peers $ closed
                      $ rpc_addr $ rpc_tls $ cors_origins $ cors_headers
                      $ reset_config $ update_config
       ),
@@ -391,10 +413,11 @@ let init_logger { log_output ; log_level } =
   | `Null -> Logging.init Null
   | `Syslog -> Logging.init Syslog
 
-let init_node { sandbox ; sandbox_param ;
-                store ; context ;
-                min_connections ; max_connections ; expected_connections ;
-                net_port ; peers ; peers_cache ; local_discovery ; closed } =
+let init_node
+    { sandbox ; sandbox_param ;
+      store ; context ;
+      min_connections ; max_connections ; expected_connections ;
+      net_port ; peers ; peers_cache ; closed } =
   let patch_context json ctxt =
     let module Proto = (val Updater.get_exn genesis_protocol) in
     Lwt.catch
@@ -428,20 +451,48 @@ let init_node { sandbox ; sandbox_param ;
     match sandbox with
     | Some _ -> None
     | None ->
+        (* TODO add parameters... *)
+        let authentification_timeout = 5.
+        and backlog = 20
+        and max_incoming_connections = 20
+        and max_download_speed = None
+        and max_upload_speed = None
+        and read_buffer_size = 1 lsl 14
+        and read_queue_size = None
+        and write_queue_size = None
+        and incoming_app_message_queue_size = None
+        and incoming_message_queue_size = None
+        and outgoing_message_queue_size = None in
         let limits =
-          { max_message_size = 10_000 ;
-            peer_answer_timeout = 5. ;
-            expected_connections ;
+          { authentification_timeout ;
             min_connections ;
+            expected_connections ;
             max_connections ;
-            blacklist_time = 30. }
+            backlog ;
+            max_incoming_connections ;
+            max_download_speed ;
+            max_upload_speed ;
+            read_buffer_size ;
+            read_queue_size ;
+            write_queue_size ;
+            incoming_app_message_queue_size ;
+            incoming_message_queue_size ;
+            outgoing_message_queue_size ;
+          }
         in
+        (* TODO add parameters... *)
+        let identity = P2p.Identity.generate Crypto_box.default_target
+        and listening_addr = None
+        and proof_of_work_target = Crypto_box.default_target in
         let config =
-          { incoming_port = Some net_port ;
-            discovery_port = local_discovery ;
-            known_peers = peers ;
+          { listening_port = Some net_port ;
+            listening_addr ;
+            identity ;
+            trusted_points = peers ;
             peers_file = peers_cache ;
-            closed_network = closed }
+            closed_network = closed ;
+            proof_of_work_target ;
+          }
         in
         Some (config, limits) in
   Node.create
@@ -458,7 +509,7 @@ let init_rpc { rpc_addr ; rpc_crt; rpc_key ; cors_origins ; cors_headers } node 
       lwt_log_notice "Starting the RPC server listening on port %d (TLS enabled)." port >>= fun () ->
       let dir = Node_rpc.build_rpc_directory node in
       let mode = `TLS (`Crt_file_path crt, `Key_file_path key, `No_password, `Port port) in
-      let host = Ipaddr.to_string addr in
+      let host = Ipaddr.V6.to_string addr in
       let () =
         let old_hook = !Lwt.async_exception_hook in
         Lwt.async_exception_hook := function
