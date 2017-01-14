@@ -93,12 +93,15 @@ let filter_valid_endorsement cctxt { hash; content } =
 let monitor_endorsement cctxt =
   monitor cctxt ~contents:true ~check:true () >>= fun ops_stream ->
   let endorsement_stream, push = Lwt_stream.create () in
-  Lwt_stream.on_termination ops_stream (fun () -> push None) ;
-  Lwt.async (fun () ->
-      Lwt_stream.iter_p
-        (Lwt_list.iter_p (fun e ->
-             filter_valid_endorsement cctxt e >>= function
-             | None -> Lwt.return_unit
-             | Some e -> push (Some e) ; Lwt.return_unit))
-        ops_stream) ;
+  Lwt.async begin fun () ->
+    Lwt_stream.closed ops_stream >|= fun () -> push None
+  end;
+  Lwt.async begin fun () ->
+    Lwt_stream.iter_p
+      (Lwt_list.iter_p (fun e ->
+           filter_valid_endorsement cctxt e >>= function
+           | None -> Lwt.return_unit
+           | Some e -> push (Some e) ; Lwt.return_unit))
+      ops_stream
+  end ;
   Lwt.return endorsement_stream
