@@ -260,6 +260,9 @@ NODE_LIB_INTFS := \
   node/net/p2p_types.mli \
   node/net/p2p_io_scheduler.mli \
   node/net/p2p_connection.mli \
+  node/net/p2p_connection_pool_types.mli \
+  node/net/p2p_connection_pool.mli \
+  node/net/p2p_welcome.mli \
   node/net/p2p.mli \
   node/net/RPC_server.mli \
   \
@@ -293,6 +296,9 @@ NODE_LIB_IMPLS := \
   node/net/p2p_types.ml \
   node/net/p2p_io_scheduler.ml \
   node/net/p2p_connection.ml \
+  node/net/p2p_connection_pool_types.ml \
+  node/net/p2p_connection_pool.ml \
+  node/net/p2p_welcome.ml \
   node/net/p2p.ml \
   \
   node/net/RPC_server.ml \
