@@ -76,7 +76,7 @@ ${NODELIB} ${CLIENTLIB}:
 .PHONY: build-test run-test test
 build-test: ${addprefix build-test-,${TESTS}}
 run-test:
-	@$(patsubst %,${MAKE} run-test-% ; , ${TESTS}) \
+	@$(patsubst %,${MAKE} run-test-% && , ${TESTS}) \
 	  echo && echo "Success" && echo
 test:
 	@${MAKE} --no-print-directory build-test
@@ -290,6 +290,14 @@ COVERAGESRCDIR= \
 bisect:
 	bisect-ppx-report $(COVERAGESRCDIR) \
           -ignore-missing-files -html reports bisect*.out
+
+#####
+
+lib/assert.cmx: lib/assert.cmi
+lib/assert.cmi: ../src/node/db/persist.cmi
+
+lib/process.cmx: lib/process.cmi
+lib/test.cmx: lib/test.cmi
 
 ############################################################################
 ## Generic rules
