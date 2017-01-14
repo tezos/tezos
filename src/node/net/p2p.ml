@@ -486,24 +486,12 @@ module Make (P: PARAMS) = struct
 
     (* Them we can build the net object and launch the worker. *)
     and connected buf local_nonce version gid public_key nonce listening_port =
-      let feed_ma ?(freq=1.) ma counter =
-        let rec inner old_received =
-          Lwt_unix.sleep freq >>= fun () ->
-          let received = !counter in
-          ma#add_int (received - old_received);
-          inner received in
-        Lwt.async (fun () -> Lwt.pick [cancelation (); inner !counter])
-      in
       (* net object state *)
       let last = ref (Unix.gettimeofday ()) in
       let local_nonce = ref local_nonce in
       let remote_nonce = ref nonce in
       let received = ref 0 in
       let sent = ref 0 in
-      let received_ema = new Moving_average.ema ~init:0. ~alpha:0.2 () in
-      let sent_ema = new Moving_average.ema ~init:0. ~alpha:0.2 () in
-      feed_ma received_ema received ;
-      feed_ma sent_ema sent ;
       (* net object callbaks *)
       let last_seen () = !last in
       let get_nonce nonce =
@@ -520,8 +508,8 @@ module Make (P: PARAMS) = struct
       let reader = Lwt_pipe.create ~size:2 () in
       let total_sent () = !sent in
       let total_recv () = !received in
-      let current_inflow () = received_ema#get in
-      let current_outflow () = sent_ema#get in
+      let current_inflow () = 0. in
+      let current_outflow () = 0. in
       (* net object construction *)
       let peer = { gid ; public_key ; point = (addr, port) ;
                    listening_port ; version ; last_seen ;
