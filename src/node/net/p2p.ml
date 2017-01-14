@@ -581,7 +581,7 @@ module Make (P: PARAMS) = struct
         "(%a) connection handler for %a:%d"
         pp_gid my_gid Ipaddr.pp_hum addr port in
     ignore (Lwt_utils.worker worker_name
-              ~safe:true ~run:(fun () -> connect buf) ~cancel) ;
+              ~run:(fun () -> connect buf) ~cancel) ;
     (* return the canceler *)
     cancel
 
