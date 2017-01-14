@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
 exception Exit
 
 let termination_thread, exit_wakener = Lwt.wait ()
@@ -18,6 +17,12 @@ let () =
     (function
       | Exit -> ()
       | exn ->
-          Printf.eprintf "Uncaught (asynchronous) exception: %S\n%s\n%!"
-            (Printexc.to_string exn) (Printexc.get_backtrace ());
+          Format.eprintf
+            "@[Uncaught (asynchronous) exception (%d):@ %a@]"
+            (Unix.getpid ())
+            Error_monad.pp_exn exn ;
+          let backtrace = Printexc.get_backtrace () in
+          if String.length backtrace <> 0 then
+            Format.eprintf "\n%s" backtrace ;
+          Format.eprintf "@." ;
           Lwt.wakeup exit_wakener 1)
