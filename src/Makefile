@@ -163,6 +163,7 @@ UTILS_LIB_INTFS := \
   utils/lwt_pipe.mli \
   utils/IO.mli \
   utils/moving_average.mli \
+  utils/ring.mli \
 
 UTILS_LIB_IMPLS := \
   utils/base48.ml \
@@ -179,6 +180,7 @@ UTILS_LIB_IMPLS := \
   utils/lwt_pipe.ml \
   utils/IO.ml \
   utils/moving_average.ml \
+  utils/ring.ml \
 
 UTILS_PACKAGES := \
   ${MINUTILS_PACKAGES} \
