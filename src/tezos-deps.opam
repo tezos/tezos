@@ -18,21 +18,22 @@ depends: [
   "calendar"
   "cohttp" {>= "0.21" }
   "config-file"
-  "conduit" {= "0.14.0" } # Version 0.14.1 doas not compile with `ssl` (17/01/02)
+  "conduit"
   "git"
   "git-unix"
   "irmin-watcher" (* for `irmin.unix` *)
-  "irmin" {>= "0.12"}
+  "irmin" {>= "0.12" }
+  "lwt" {>= "2.7.0" }
+  "lwt_ssl"
   "menhir"
-  "ocp-ocamlres" {>= "dev"}
+  "ocp-ocamlres" {>= "dev" }
   "ocplib-endian"
   "ocplib-json-typed"
-  "ocplib-resto" {>= "dev"}
+  "ocplib-resto" {>= "dev" }
   "reactiveData"
   "tyxml"
   "js_of_ocaml"
-  "sodium" {>= "0.3.0"}
-  "ssl"
+  "sodium" {>= "0.3.0" }
   "kaputt" # { test }
   "bisect_ppx" # { test }
 ]
