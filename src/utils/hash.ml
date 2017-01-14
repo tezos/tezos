@@ -254,7 +254,7 @@ module Hash_map (Hash : HASH) = struct
       Data_encoding.(list (tup2 Hash.encoding arg_encoding))
 end
 
-module Hash_table (Hash : HASH)
+module Hash_table (Hash : MINIMAL_HASH)
   : Hashtbl.S with type key = Hash.t
   = Hashtbl.Make (struct
     type t = Hash.t
