@@ -39,6 +39,7 @@ PACKAGES := \
   dynlink \
   ezjsonm \
   git \
+  ipv6-multicast \
   irmin.unix \
   lwt \
   lwt.unix \
