@@ -30,7 +30,7 @@ let log_f
     Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter format
   else
     Format.kasprintf
-      (Lwt_log.log ?exn ~section ?location ?logger ~level)
+      (fun msg -> Lwt_log.log ?exn ~section ?location ?logger ~level msg)
       format
 
 let ign_log_f
@@ -39,8 +39,7 @@ let ign_log_f
     Format.ikfprintf (fun _ -> ()) Format.std_formatter format
   else
     Format.kasprintf
-      (fun s ->
-         Lwt_log.ign_log ?exn ~section ?location ?logger ~level s)
+      (fun msg -> Lwt_log.ign_log ?exn ~section ?location ?logger ~level msg)
       format
 
 module Make(S : sig val name: string end) : LOG = struct
@@ -87,8 +86,10 @@ module Client = struct
 end
 module Webclient = Make(struct let name = "webclient" end)
 
+let template = "$(date) $(name)[$(pid)]: $(message)"
+
 let default_logger () =
-  Lwt_log.channel ~close_mode:`Keep ~channel:Lwt_io.stderr ()
+  Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stderr ()
 
 type kind =
   | Null
@@ -96,6 +97,7 @@ type kind =
   | Stderr
   | File of string
   | Syslog
+  | Manual of Lwt_log.logger
 
 let init kind =
   let logger =
@@ -103,12 +105,13 @@ let init kind =
     | Stderr ->
         default_logger ()
     | Stdout ->
-        Lwt_log.channel ~close_mode:`Keep ~channel:Lwt_io.stdout ()
+        Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stdout ()
     | File file_name ->
-        Lwt_main.run (Lwt_log.file ~file_name ())
+        Lwt_main.run (Lwt_log.file ~file_name ~template ())
     | Null ->
         Lwt_log.null
     | Syslog ->
         Printf.eprintf "Warning: log_kind \"syslog\" not yet implemented.\n%!";
-        default_logger () in
+        default_logger ()
+    | Manual logger -> logger in
   Lwt_log.default := logger
