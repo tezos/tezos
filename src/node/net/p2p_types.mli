@@ -7,18 +7,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t
+module Canceler = Lwt_utils.Canceler
 
-val create: init:int -> alpha:float -> t
-val destroy: t -> unit
 
-val add: t -> int -> unit
+(** Bandwidth usage statistics *)
 
-val on_update: (unit -> unit) -> unit
-val updated: unit Lwt_condition.t
+module Stat : sig
 
-type stat = {
-  total: int ;
-  average: int ;
-}
-val stat: t -> stat
+  type t = {
+    total_sent : int ;
+    total_recv : int ;
+    current_inflow : int ;
+    current_outflow : int ;
+  }
+
+  val pp: Format.formatter -> t -> unit
+
+end

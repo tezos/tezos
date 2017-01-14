@@ -39,7 +39,7 @@
 /test/test-context
 /test/test-basic
 /test/test-data-encoding
-/test/test-p2p
+/test/test-p2p-io-scheduler
 /test/LOG
 
 *~

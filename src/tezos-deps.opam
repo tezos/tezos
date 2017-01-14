@@ -26,6 +26,7 @@ depends: [
   "lwt" {>= "2.7.0" }
   "lwt_ssl"
   "menhir"
+  "mtime"
   "ocp-ocamlres" {>= "dev" }
   "ocplib-endian"
   "ocplib-json-typed"
