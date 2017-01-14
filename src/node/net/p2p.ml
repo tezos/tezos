@@ -773,7 +773,7 @@ module Make (P: PARAMS) = struct
       let init_peers () =
         let my_gid =
           fresh_gid () in
-        let (my_secret_key, my_public_key) =
+        let (my_secret_key, my_public_key, _) =
           Crypto_box.random_keypair () in
         let my_proof_of_work =
           Crypto_box.generate_proof_of_work

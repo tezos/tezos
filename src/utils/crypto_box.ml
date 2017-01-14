@@ -18,12 +18,30 @@ type nonce = Sodium.Box.nonce
 type target = int64 list (* used as unsigned intergers... *)
 exception TargetNot256Bit
 
-let random_keypair = Sodium.Box.random_keypair
+module Public_key_hash = Hash.Make_Blake2B (Base48) (struct
+    let name = "Crypto_box.Public_key_hash"
+    let title = "A Cryptobox public key ID"
+    let b48check_prefix = Base48.Prefix.cryptobox_public_key_hash
+    let size = Some 16
+  end)
+
+let hash pk =
+  Public_key_hash.hash_bytes [Sodium.Box.Bigbytes.of_public_key pk]
+
+let random_keypair () =
+  let sk, pk = Sodium.Box.random_keypair () in
+  sk, pk, hash pk
 let random_nonce = Sodium.Box.random_nonce
 let increment_nonce = Sodium.Box.increment_nonce
 let box = Sodium.Box.Bigbytes.box
 let box_open sk pk msg nonce =
   try Some (Sodium.Box.Bigbytes.box_open sk pk msg nonce) with
+    | Sodium.Verification_failure -> None
+
+let precompute = Sodium.Box.precompute
+let fast_box = Sodium.Box.Bigbytes.fast_box
+let fast_box_open ck msg nonce =
+  try Some (Sodium.Box.Bigbytes.fast_box_open ck msg nonce) with
     | Sodium.Verification_failure -> None
 
 let make_target target =

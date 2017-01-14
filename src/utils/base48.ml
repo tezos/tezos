@@ -230,6 +230,7 @@ module Prefix = struct
   let operation_hash = "\001"
   let protocol_hash = "\002"
   let ed25519_public_key_hash = "\003"
+  let cryptobox_public_key_hash = "\004"
   let ed25519_public_key = "\012"
   let ed25519_secret_key = "\013"
   let ed25519_signature = "\014"
