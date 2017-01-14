@@ -174,6 +174,11 @@ module Make() = struct
 
   let fail s = Lwt.return (Error [ s ])
 
+  let protect ~on_error t =
+    t >>= function
+    | Ok res -> return res
+    | Error err -> on_error err
+
   let (>>?) v f =
     match v with
     | Error _ as err -> err
@@ -286,6 +291,9 @@ module Make() = struct
   let fail_unless cond exn =
     if cond then return () else fail exn
 
+  let unless cond f =
+    if cond then return () else f ()
+
   let pp_print_error ppf errors =
     Format.fprintf ppf "@[<v 2>Error, dumping error stack:@,%a@]@."
       (Format.pp_print_list pp)
@@ -332,15 +340,20 @@ let error_exn s = Error [ Exn s ]
 let trace_exn exn f = trace (Exn exn) f
 let record_trace_exn exn f = record_trace (Exn exn) f
 
+let pp_exn ppf exn = pp ppf (Exn exn)
+
 let () =
   register_error_kind
     `Temporary
     ~id:"failure"
     ~title:"Generic error"
     ~description:"Unclassified error"
+    ~pp:Format.pp_print_string
     Data_encoding.(obj1 (req "msg" string))
     (function
       | Exn (Failure msg) -> Some msg
+      | Exn (Unix.Unix_error (err, fn, _)) ->
+          Some ("Unix error in " ^ fn ^ ": " ^ Unix.error_message err)
       | Exn exn -> Some (Printexc.to_string exn)
       | _ -> None)
     (fun msg -> Exn (Failure msg))
