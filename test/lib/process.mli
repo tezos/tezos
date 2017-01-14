@@ -1,24 +1,15 @@
 (**************************************************************************)
 (*                                                                        *)
-(*    Copyright (c) 2014 - 2016.                                          *)
+(*    Copyright (c) 2014 - 2017.                                          *)
 (*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
 (*                                                                        *)
 (*    All rights reserved. No warranty, explicit or implicit, provided.   *)
 (*                                                                        *)
 (**************************************************************************)
 
-type t
+open Error_monad
+exception Exited of int
 
-val create: init:int -> alpha:float -> t
-val destroy: t -> unit
-
-val add: t -> int -> unit
-
-val on_update: (unit -> unit) -> unit
-val updated: unit Lwt_condition.t
-
-type stat = {
-  total: int ;
-  average: int ;
-}
-val stat: t -> stat
+val detach: ?prefix:string -> (unit -> unit Lwt.t) -> unit Lwt.t
+val handle_error: (unit -> (unit, error list) result Lwt.t) -> unit Lwt.t
+val wait: unit Lwt.t list -> unit Lwt.t

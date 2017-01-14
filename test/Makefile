@@ -1,5 +1,9 @@
 
-TESTS :=  data-encoding store context state basic basic.sh
+TESTS := \
+  data-encoding \
+  store context state \
+  basic basic.sh \
+  p2p-io-scheduler
 
 all: test
 
@@ -36,6 +40,7 @@ PACKAGES := \
   irmin.unix \
   lwt \
   lwt.unix \
+  mtime.os \
   ocplib-endian \
   ocplib-ocamlres \
   ocplib-json-typed.bson \
@@ -66,7 +71,7 @@ ${NODELIB} ${CLIENTLIB}:
 	${MAKE} -C ../src $@
 
 .PHONY: build-test run-test test
-build-test: ${addprefix build-test-,${TESTS}} test-p2p
+build-test: ${addprefix build-test-,${TESTS}}
 run-test:
 	@$(patsubst %,${MAKE} run-test-% ; , ${TESTS}) \
 	  echo && echo "Success" && echo
@@ -177,13 +182,35 @@ clean::
 ############################################################################
 ## p2p test program
 
-TEST_P2P_INTFS =
+.PHONY:build-test-io_schduler
+build-test-p2p-io-scheduler: test-p2p-io-scheduler
+run-test-p2p-io-scheduler:
+	./test-p2p-io-scheduler \
+	   --delay 20 --clients 8 \
+	   --max-upload-speed $$((1 << 18)) \
+	   --max-download-speed $$((1 << 20))
 
-TEST_P2P_IMPLS = \
-  test_p2p.ml
+TEST_P2P_IO_SCHEDULER_IMPLS = \
+  lib/process.ml \
+  test_p2p_io_scheduler.ml
+
+${TEST_P2P_IO_SCHEDULER_IMPLS:.ml=.cmx}: ${NODELIB}
+test-p2p-io-scheduler: ${NODELIB} ${TEST_P2P_IO_SCHEDULER_IMPLS:.ml=.cmx}
+	ocamlfind ocamlopt -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	rm -f test-p2p-io_scheduler
+
+############################################################################
+## lwt pipe test program
+
+build-test-lwt-pipe: test-lwt-pipe
+
+TEST_PIPE_IMPLS = \
+  test_lwt_pipe.ml
 
 ${TEST_BASIC_IMPLS:.ml=.cmx}: ${NODELIB}
-test-p2p: ${NODELIB} ${TEST_P2P_IMPLS:.ml=.cmx}
+test-lwt-pipe: ${NODELIB} ${TEST_PIPE_IMPLS:.ml=.cmx}
 	ocamlfind ocamlopt -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
 clean::
