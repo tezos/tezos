@@ -13,41 +13,30 @@ val bootstrap : config:config -> limits:limits -> net Lwt.t
 (** A maintenance operation : try and reach the ideal number of peers *)
 val maintain : net -> unit Lwt.t
 
-(** Voluntarily drop some peers and replace them by new buddies *)
+(** Voluntarily drop some connections and replace them by new buddies *)
 val roll : net -> unit Lwt.t
 
 (** Close all connections properly *)
 val shutdown : net -> unit Lwt.t
 
 (** A connection to a peer *)
-type peer
+type connection
 
-(** Access the domain of active peers *)
-val peers : net -> peer list
+(** Access the domain of active connections *)
+val connections : net -> connection list
 
-(** Return the active peer with identity [gid] *)
-val find_peer : net -> gid -> peer option
+(** Return the active connection with identity [gid] *)
+val find_connection : net -> Gid.t -> connection option
 
-type peer_info = {
-  gid : gid ;
-  addr : addr ;
-  port : port ;
-  version : version ;
-  total_sent : int ;
-  total_recv : int ;
-  current_inflow : float ;
-  current_outflow : float ;
-}
-
-(** Access the info of an active peer, if available *)
-val peer_info : net -> peer -> peer_info
+(** Access the info of an active connection. *)
+val connection_info : net -> connection -> Connection_info.t
 
 (** Accessors for meta information about a global identifier *)
 
 type metadata = unit
 
-val get_metadata : net -> gid -> metadata option
-val set_metadata : net -> gid -> metadata -> unit
+val get_metadata : net -> Gid.t -> metadata option
+val set_metadata : net -> Gid.t -> metadata -> unit
 
 type net_id = Store.net_id
 
@@ -68,23 +57,28 @@ type msg =
   | Get_protocols of Protocol_hash.t list
   | Protocol of MBytes.t
 
-(** Wait for a payload from any peer in the network *)
-val recv : net -> (peer * msg) Lwt.t
+(** Wait for a payload from any connection in the network *)
+val recv : net -> (connection * msg) Lwt.t
 
-(** [send net peer msg] is a thread that returns when [msg] has been
+(** [send net conn msg] is a thread that returns when [msg] has been
     successfully enqueued in the send queue. *)
-val send : net -> peer -> msg -> unit Lwt.t
+val send : net -> connection -> msg -> unit Lwt.t
 
-(** [try_send net peer msg] is [true] if [msg] has been added to the
+(** [try_send net conn msg] is [true] if [msg] has been added to the
     send queue for [peer], [false] otherwise *)
-val try_send : net -> peer -> msg -> bool
+val try_send : net -> connection -> msg -> bool
 
 (** Send a payload to all peers *)
 val broadcast : net -> msg -> unit
 
-(** Shutdown the connection to all peers at this address and stop the
-    communications with this machine for [duration] seconds *)
-val blacklist : net -> gid -> unit
-
-(** Keep a connection to this pair as often as possible *)
-val whitelist : net -> gid -> unit
+(**/**)
+module Raw : sig
+  type 'a t =
+    | Bootstrap
+    | Advertise of P2p_types.Point.t list
+    | Message of 'a
+    | Disconnect
+  type message = msg t
+  val encoding: message Data_encoding.t
+  val supported_versions: P2p_types.Version.t list
+end
