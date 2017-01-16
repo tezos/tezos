@@ -1,4 +1,6 @@
 
+open P2p
+
 type net_id = Store.net_id
 
 type msg =
@@ -24,7 +26,7 @@ module Message = struct
   let encoding =
     let open Data_encoding in
     let case ?max_length ~tag encoding unwrap wrap =
-      P2p_connection_pool.Encoding { tag; encoding; wrap; unwrap; max_length } in
+      P2p.Encoding { tag; encoding; wrap; unwrap; max_length } in
     [
       case ~tag:0x10 (tup2 Block_hash.encoding (list Block_hash.encoding))
         (function
@@ -91,6 +93,44 @@ module Metadata = struct
   let score () = 0.
 end
 
-include Message
-include (Metadata : module type of Metadata with type t := metadata)
-include P2p.Make(Message)(Metadata)
+
+let meta_cfg : _ P2p.meta_config = {
+  P2p.encoding = Metadata.encoding ;
+  initial = Metadata.initial ;
+}
+
+and msg_cfg : _ P2p.message_config = {
+  encoding = Message.encoding ;
+  versions = Message.supported_versions ;
+}
+
+type net = (Message.t, Metadata.t) P2p.net
+
+let bootstrap ~config ~limits =
+  P2p.bootstrap ~config ~limits meta_cfg msg_cfg
+
+let broadcast = P2p.broadcast
+let try_send = P2p.try_send
+let recv = P2p.recv_any
+let send = P2p.send
+let set_metadata = P2p.set_metadata
+let get_metadata = P2p.get_metadata
+let connection_info = P2p.connection_info
+let find_connection = P2p.find_connection
+let connections = P2p.connections
+type connection = (Message.t, Metadata.t) P2p.connection
+let shutdown = P2p.shutdown
+let roll = P2p.roll
+let maintain = P2p.maintain
+let faked_network = P2p.faked_network
+
+module Raw = struct
+  type 'a t = 'a P2p.Raw.t =
+    | Bootstrap
+    | Advertise of Point.t list
+    | Message of 'a
+    | Disconnect
+  type message = Message.t t
+  let encoding = P2p.Raw.encoding msg_cfg.encoding
+  let supported_versions = msg_cfg.versions
+end
