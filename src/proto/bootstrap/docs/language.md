@@ -1432,12 +1432,12 @@ The complete source `reservoir.tz` is:
 
 We basically want the same contract as the previous one, but instead
 of destroying it, we want to keep it alive, storing a flag `S` so that
-we can afterwards if the tokens have been transfered to `A` or `B`. We also
-want the broker `A` to get some fee `P` in any case.
+we can tell afterwards if the tokens have been transfered to `A` or `B`.
+We also want a broker `X` to get some fee `P` in any case.
 
-We thus add variables `P` and `S`  to the global data of the contract,
-which becomes `(Pair (S, Pair (T, Pair (Pair P N) (Pair A B))))`.  `P`
-is the  fee for broker  `A`, `S` is the  state, as a  string `"open"`,
+We thus add variables `P` and `S` and `X` to the global data of the
+contract, now `(Pair (S, Pair (T, Pair (Pair P N) (Pair X (Pair A B)))))`.
+`P` is the  fee for broker  `A`, `S` is the  state, as a  string `"open"`,
 `"timeout"` or `"success"`.
 
 At the beginning of the transaction:
@@ -1446,61 +1446,78 @@ At the beginning of the transaction:
      T               via a CDDAR
      P               via a CDDDAAR
      N               via a CDDDADR
-     A               via a CDDDDAR
-     B               via a CDDDDDR
+     X               via a CDDDDAR
+     A               via a CDDDDDAR
+     B               via a CDDDDDDR
 
 For the contract to stay alive, we test that all least `(Tez "1.00")` is
 still available after each transaction. This value is given as an
 example and must be updated according to the actual Tezos minmal
 value for contract balance.
 
-    DUP ; CDAR # S
-    PUSH string "open" ;
-    COMPARE ; NEQ ;
-    IF { FAIL ; CDR } # on "success", "timeout" or a bad init value
-       { DUP ; CDDAR ; # T
-         NOW ;
-         COMPARE ; LT ;
-         IF { # Before timeout
-              # We compute ((1 + P) + N) tez for keeping the contract alive
-              PUSH tez "1.00" ;
-              DIP { DUP ; CDDDAAR } ; ADD ; # P
-              DIP { DUP ; CDDDADR } ; ADD ; # N
-              # We compare to the cumulated amount
-              BALANCE ;
-              COMPARE; LT ;
-              IF { # Not enough cash, we accept the transaction
-                   # and leave the global
-                   CDR }
-                 { # We transfer the fee to the broker
-                   DUP ; CDDDAAR ; # P
-                   DIP { DUP ; CDDDDAR } # A
-                   UNIT ; TRANSFER_TOKENS ; DROP ;
-                   # We transfer the rest to the destination
-                   DUP ; CDDDADR ; # N
-                   DIP { DUP ; CDDDDDR } # B
-                   UNIT ; TRANSFER_TOKENS ; DROP ;
-                   # We update the global
-                   CDR ; CDR ; PUSH string "success" ; PAIR } }
-            { # After timeout
-              # We try to transfer P tez to A
-              PUSH tez "1.00" ; BALANCE ; SUB ; # available
-              DIP { DUP ; CDDDAAR } ;# P
-              COMPARE ; LT ; # available < P
-              IF { PUSH tez "1.00" ; BALANCE ; SUB ; # available
-                   DIP { DUP ; CDDDDAR } # A
-                   UNIT ; TRANSFER_TOKENS ; DROP }
-                 { DUP ; CDDDAAR ; # P
-                   DIP { DUP ; CDDDDAR } # A
-                   UNIT ; TRANSFER_TOKENS ; DROP }
-              # We transfer the rest to B
-              PUSH tez "1.00" ; BALANCE ; SUB ; # available
-              DIP { DUP ; CDDDDDR } # B
-              UNIT ; TRANSFER_TOKENS ; DROP ;
-              # We update the global
-              CDR ; CDR ; PUSH string "timeout" ; PAIR } }
-    # return Unit
-    UNIT ; PAIR
+The complete source `scrutable_reservoir.tz` is:
+
+    parameter timestamp ;
+    storage
+      pair
+        string # S
+        pair
+          timestamp # T
+          pair
+            (pair tez tez) ; # P N
+            pair
+              (contract unit unit) # X
+              pair (contract unit unit) (contract unit unit) ; # A B
+    return unit ;
+    code
+      { DUP ; CDAR # S
+        PUSH string "open" ;
+        COMPARE ; NEQ ;
+        IF { FAIL } # on "success", "timeout" or a bad init value
+           { DUP ; CDDAR ; # T
+             NOW ;
+             COMPARE ; LT ;
+             IF { # Before timeout
+                  # We compute ((1 + P) + N) tez for keeping the contract alive
+                  PUSH tez "1.00" ;
+                  DIP { DUP ; CDDDAAR } ; ADD ; # P
+                  DIP { DUP ; CDDDADR } ; ADD ; # N
+                  # We compare to the cumulated amount
+                  BALANCE ;
+                  COMPARE; LT ;
+                  IF { # Not enough cash, we just accept the transaction
+                       # and leave the global untouched
+                       CDR }
+                     { # Enough cash, successful ending
+                       # We update the global
+                       CDDR ; PUSH string "success" ; PAIR ;
+                       # We transfer the fee to the broker
+                       DUP ; CDDAAR ; # P
+                       DIP { DUP ; CDDDAR } # X
+                       UNIT ; TRANSFER_TOKENS ; DROP ;
+                       # We transfer the rest to A
+                       DUP ; CDDADR ; # N
+                       DIP { DUP ; CDDDDAR } # A
+                       UNIT ; TRANSFER_TOKENS ; DROP } }
+                { # After timeout, we refund
+                  # We update the global
+                  CDDR ; PUSH string "timeout" ; PAIR ;
+                  # We try to transfer the fee to the broker
+                  PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                  DIP { DUP ; CDDAAR } ; # P
+                  COMPARE ; LT ; # available < P
+                  IF { PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                       DIP { DUP ; CDDDAR } # X
+                       UNIT ; TRANSFER_TOKENS ; DROP }
+                     { DUP ; CDDAAR ; # P
+                       DIP { DUP ; CDDDAR } # X
+                       UNIT ; TRANSFER_TOKENS ; DROP }
+                  # We transfer the rest to B
+                  PUSH tez "1.00" ; BALANCE ; SUB ; # available
+                  DIP { DUP ; CDDDDDR } # B
+                  UNIT ; TRANSFER_TOKENS ; DROP } }
+        # return Unit
+        UNIT ; PAIR }
 
 ### Forward contract
 
