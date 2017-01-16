@@ -29,6 +29,24 @@ module Connection_info = P2p_types.Connection_info
 
 module Stat = P2p_types.Stat
 
+type 'meta meta_config = {
+  encoding : 'meta Data_encoding.t;
+  initial : 'meta;
+}
+
+type 'msg app_message_encoding = Encoding : {
+    tag: int ;
+    encoding: 'a Data_encoding.t ;
+    wrap: 'a -> 'msg ;
+    unwrap: 'msg -> 'a option ;
+    max_length: int option ;
+  } -> 'msg app_message_encoding
+
+type 'msg message_config = {
+  encoding : 'msg app_message_encoding list ;
+  versions : Version.t list;
+}
+
 (** Network configuration *)
 type config = {
 
@@ -98,91 +116,78 @@ type limits = {
 
 }
 
+type ('msg, 'meta) t
+type ('msg, 'meta) net = ('msg, 'meta) t
 
-(** Type of message used by higher layers *)
-module type MESSAGE = sig
-  type t
-  val encoding : t P2p_connection_pool.encoding list
-  (** High level protocol(s) talked by the peer. When two peers
-      initiate a connection, they exchange their list of supported
-      versions. The chosen one, if any, is the maximum common one (in
-      lexicographic order) *)
-  val supported_versions : Version.t list
+(** A faked p2p layer, which do not initiate any connection
+    nor open any listening socket *)
+val faked_network : ('msg, 'meta) net
+
+(** Main network initialisation function *)
+val bootstrap :
+  config:config -> limits:limits ->
+  'meta meta_config -> 'msg message_config ->  ('msg, 'meta) net Lwt.t
+
+(** Return one's gid *)
+val gid : ('msg, 'meta) net -> Gid.t
+
+(** A maintenance operation : try and reach the ideal number of peers *)
+val maintain : ('msg, 'meta) net -> unit Lwt.t
+
+(** Voluntarily drop some peers and replace them by new buddies *)
+val roll : ('msg, 'meta) net -> unit Lwt.t
+
+(** Close all connections properly *)
+val shutdown : ('msg, 'meta) net -> unit Lwt.t
+
+(** A connection to a peer *)
+type ('msg, 'meta) connection
+
+(** Access the domain of active peers *)
+val connections : ('msg, 'meta) net -> ('msg, 'meta) connection list
+
+(** Return the active peer with identity [gid] *)
+val find_connection : ('msg, 'meta) net -> Gid.t -> ('msg, 'meta) connection option
+
+(** Access the info of an active peer, if available *)
+val connection_info :
+  ('msg, 'meta) net -> ('msg, 'meta) connection -> Connection_info.t
+val connection_stat :
+  ('msg, 'meta) net -> ('msg, 'meta) connection -> Stat.t
+val global_stat : ('msg, 'meta) net -> Stat.t
+
+(** Accessors for meta information about a global identifier *)
+val get_metadata : ('msg, 'meta) net -> Gid.t -> 'meta option
+val set_metadata : ('msg, 'meta) net -> Gid.t -> 'meta -> unit
+
+(** Wait for a message from a given connection. *)
+val recv :
+  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg tzresult Lwt.t
+
+(** Wait for a message from any active connections. *)
+val recv_any :
+  ('msg, 'meta) net -> (('msg, 'meta) connection * 'msg) Lwt.t
+
+(** [send net peer msg] is a thread that returns when [msg] has been
+    successfully enqueued in the send queue. *)
+val send :
+  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg -> unit Lwt.t
+
+(** [try_send net peer msg] is [true] if [msg] has been added to the
+    send queue for [peer], [false] otherwise *)
+val try_send :
+  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg -> bool
+
+(** Send a message to all peers *)
+val broadcast : ('msg, 'meta) net -> 'msg -> unit
+
+(**/**)
+module Raw : sig
+  type 'a t =
+    | Bootstrap
+    | Advertise of P2p_types.Point.t list
+    | Message of 'a
+    | Disconnect
+  val encoding: 'msg app_message_encoding list -> 'msg t Data_encoding.t
 end
 
-(** Type of metadata associated to an identity *)
-module type METADATA = sig
-  type t
-  val initial : t
-  val encoding : t Data_encoding.t
-  val score : t -> float
-end
-
-module Make (Message : MESSAGE) (Metadata : METADATA) : sig
-
-  type net
-
-  (** A faked p2p layer, which do not initiate any connection
-      nor open any listening socket *)
-  val faked_network : net
-
-  (** Main network initialisation function *)
-  val bootstrap : config:config -> limits:limits -> net Lwt.t
-
-  (** Return one's gid *)
-  val gid : net -> Gid.t
-
-  (** A maintenance operation : try and reach the ideal number of peers *)
-  val maintain : net -> unit Lwt.t
-
-  (** Voluntarily drop some peers and replace them by new buddies *)
-  val roll : net -> unit Lwt.t
-
-  (** Close all connections properly *)
-  val shutdown : net -> unit Lwt.t
-
-  (** A connection to a peer *)
-  type connection
-
-  (** Access the domain of active peers *)
-  val connections : net -> connection list
-
-  (** Return the active peer with identity [gid] *)
-  val find_connection : net -> Gid.t -> connection option
-
-  (** Access the info of an active peer, if available *)
-  val connection_info : net -> connection -> Connection_info.t
-  val connection_stat : net -> connection -> Stat.t
-  val global_stat : net -> Stat.t
-
-  (** Accessors for meta information about a global identifier *)
-  val get_metadata : net -> Gid.t -> Metadata.t option
-  val set_metadata : net -> Gid.t -> Metadata.t -> unit
-
-  (** Wait for a message from any peer in the network *)
-  val recv : net -> (connection * Message.t) Lwt.t
-
-  (** [send net peer msg] is a thread that returns when [msg] has been
-      successfully enqueued in the send queue. *)
-  val send : net -> connection -> Message.t -> unit Lwt.t
-
-  (** [try_send net peer msg] is [true] if [msg] has been added to the
-      send queue for [peer], [false] otherwise *)
-  val try_send : net -> connection -> Message.t -> bool
-
-  (** Send a message to all peers *)
-  val broadcast : net -> Message.t -> unit
-
-  (**/**)
-  module Raw : sig
-    type 'a t =
-      | Bootstrap
-      | Advertise of P2p_types.Point.t list
-      | Message of 'a
-      | Disconnect
-    type message = Message.t t
-    val encoding: message Data_encoding.t
-    val supported_versions: P2p_types.Version.t list
-  end
-
-end

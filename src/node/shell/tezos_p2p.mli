@@ -75,10 +75,10 @@ val broadcast : net -> msg -> unit
 module Raw : sig
   type 'a t =
     | Bootstrap
-    | Advertise of P2p_types.Point.t list
+    | Advertise of Point.t list
     | Message of 'a
     | Disconnect
   type message = msg t
   val encoding: message Data_encoding.t
-  val supported_versions: P2p_types.Version.t list
+  val supported_versions: Version.t list
 end
