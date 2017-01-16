@@ -1524,8 +1524,7 @@ The complete source `scrutable_reservoir.tz` is:
 We want to write a forward contract on dried peas. The contract takes
 as global data the tons of peas `Q`, the expected delivery date `T`, the
 contract agreement date `Z`, a strike `K`, a collateral `C` per ton of dried
-peas, and the accounts of the buyer `B`, the seller `S` and the warehouse
-`W`.
+peas, and the accounts of the buyer `B`, the seller `S` and the warehouse `W`.
 
 These parameters as grouped in the global storage as follows:
 
@@ -1614,131 +1613,148 @@ At the beginning of the transaction:
 The contract returns a unit value, and we assume that it is created
 with the minimum amount, set to `(Tez "1.00")`.
 
-The code of the contract is thus as follows.
+The complete source `forward.tz` is:
 
-    DUP ; CDDADDR ; # Z
-    PUSH uint64 86400 ; SWAP ; ADD ; # one day in second
-    NOW ; COMPARE ; LT ;
-    IF { # Before Z + 24
-         DUP ; CADR ; # we must receive (Left "buyer") or (Left "seller")
-         IF_LEFT
-           { DUP ; PUSH string "buyer" ; COMPARE ; EQ ;
-             IF { DROP ;
-                  DUP ; CDADAR ; # amount already versed by the buyer
-                  DIP { DUP ; CAAR } ; ADD ; # transaction
-                  #  then we rebuild the globals
-                  DIP { DUP ; CDADDR } ; PAIR ; # seller amount
-                  PUSH uint32 0 ; PAIR ; # delivery counter at 0
-                  DIP { CDDR } ; PAIR ; # parameters
-                  # and return Unit
+    parameter (or string uint32) ;
+    return unit ;
+    storage
+      pair
+        pair uint32 (pair tez tez) # counter from_buyer from_seller
+        pair
+          pair uint32 (pair timestamp timestamp) # Q T Z
+          pair
+            pair tez tez # K C
+            pair
+              pair (contract unit unit) (contract unit unit) # B S
+              (contract unit unit); # W
+    code
+      { DUP ; CDDADDR ; # Z
+        PUSH uint64 86400 ; SWAP ; ADD ; # one day in second
+        NOW ; COMPARE ; LT ;
+        IF { # Before Z + 24
+             DUP ; CADR ; # we must receive (Left "buyer") or (Left "seller")
+             IF_LEFT
+               { DUP ; PUSH string "buyer" ; COMPARE ; EQ ;
+                 IF { DROP ;
+                      DUP ; CDADAR ; # amount already versed by the buyer
+                      DIP { DUP ; CAAR } ; ADD ; # transaction
+                      #  then we rebuild the globals
+                      DIP { DUP ; CDADDR } ; PAIR ; # seller amount
+                      PUSH uint32 0 ; PAIR ; # delivery counter at 0
+                      DIP { CDDR } ; PAIR ; # parameters
+                      # and return Unit
+                      UNIT ; PAIR }
+                    { PUSH string "seller" ; COMPARE ; EQ ;
+                      IF { DUP ; CDADDR ; # amount already versed by the seller
+                           DIP { DUP ; CAAR } ; ADD ; # transaction
+                           #  then we rebuild the globals
+                           DIP { DUP ; CDADAR } ; SWAP ; PAIR ; # buyer amount
+                           PUSH uint32 0 ; PAIR ; # delivery counter at 0
+                           DIP { CDDR } ; PAIR ; # parameters
+                           # and return Unit
+                           UNIT ; PAIR }
+                         { FAIL } } } # (Left _)
+               { FAIL } } # (Right _)
+           { # After Z + 24
+             # test if the required amount is reached
+             DUP ; CDDAAR ; # Q
+             DIP { DUP ; CDDDADR } ; MUL ; # C
+             PUSH uint8 2 ; MUL ;
+             PUSH tez "1.00" ; ADD ;
+             BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C) + 1
+             IF { # refund the parties
+                  CDR ; DUP ; CADAR ; # amount versed by the buyer
+                  DIP { DUP ; CDDDAAR } # B
+                  UNIT ; TRANSFER_TOKENS ; DROP
+                  DUP ; CADDR ; # amount versed by the seller
+                  DIP { DUP ; CDDDADR } # S
+                  UNIT ; TRANSFER_TOKENS ; DROP
+                  BALANCE ; # bonus to the warehouse to destroy the account
+                  DIP { DUP ; CDDDDR } # W
+                  UNIT ; TRANSFER_TOKENS ; DROP
+                  # return unit, don't change the global
+                  # since the contract will be destroyed
                   UNIT ; PAIR }
-                { PUSH string "seller" ; COMPARE ; EQ ;
-                  IF { DUP ; CDADDR ; # amount already versed by the seller
-                       DIP { DUP ; CAAR } ; ADD ; # transaction
-                       #  then we rebuild the globals
-                       DIP { DUP ; CDADAR } ; SWAP ; PAIR ; # buyer amount
-                       PUSH uint32 0 ; PAIR ; # delivery counter at 0
-                       DIP { CDDR } ; PAIR ; # parameters
-                       # and return Unit
-                       UNIT ; PAIR }
-                     { FAIL ; CDR ; UNIT ; PAIR }}} # (Left _)
-           { FAIL ; DROP ; CDR ; UNIT ; PAIR }} # (Right _)
-       { # After Z + 24
-         # test if the required amount is reached
-         DUP ; CDDAAR ; # Q
-         DIP { DUP ; CDDDADR } ; MUL ; # C
-         PUSH uint8 2 ; MUL ;
-         PUSH tez "1.00" ; ADD ;
-         BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C) + 1
-         IF { # refund the parties
-              DUP ; CDADAR ; # amount versed by the buyer
-              DIP { DUP ; CDDDDAAR } # B
-              UNIT ; TRANSFER_TOKENS ; DROP
-              DUP ; CDADDR ; # amount versed by the seller
-              DIP { DUP ; CDDDDADR } # S
-              UNIT ; TRANSFER_TOKENS ; DROP
-              BALANCE ; # bonus to the warehouse to destroy the account
-              DIP { DUP ; CDDDDDR } # W
-              UNIT ; TRANSFER_TOKENS ; DROP
-              # return unit, don't change the global
-              # since the contract will be destroyed
-              CDR ; UNIT ; PAIR }
-            { # otherwise continue
-              DUP ; CDDADAR # T
-              NOW ; COMPARE ; LT
-              IF { FAIL ; CDR ; UNIT ; PAIR } # Between Z + 24 and T
-                 { # after T
-                   DUP ; CDDADAR # T
-                   PUSH uint64 86400 ; ADD # one day in second
-                   NOW ; COMPARE ; LT
-                   IF { # Between T and T + 24
-                        # we only accept transactions from the buyer
-                        DUP ; CADR ; # we must receive (Left "buyer")
-                        IF_LEFT
-                          { PUSH string "buyer" ; COMPARE ; EQ ;
-                            IF { DUP ; CDADAR ; # amount already versed by the buyer
-                                 DIP { DUP ; CAAR } ; ADD ; # transaction
-                                 # The amount must not exceed Q * K
-                                 DUP ;
-                                 DIIP { DUP ; CDDAAR ; # Q
-                                        DIP { DUP ; CDDDAAR } ; MUL ; } ; # K
-                                 DIP { COMPARE ; GT ; # new amount > Q * K
-                                       IF { FAIL } { } } ; # abort or continue
-                                 #  then we rebuild the globals
-                                 DIP { DUP ; CDADDR } ; PAIR ; # seller amount
-                                 PUSH uint32 0 ; PAIR ; # delivery counter at 0
-                                 DIP { CDDR } ; PAIR ; # parameters
+                { # otherwise continue
+                  DUP ; CDDADAR # T
+                  NOW ; COMPARE ; LT
+                  IF { FAIL } # Between Z + 24 and T
+                     { # after T
+                       DUP ; CDDADAR # T
+                       PUSH uint64 86400 ; ADD # one day in second
+                       NOW ; COMPARE ; LT
+                       IF { # Between T and T + 24
+                            # we only accept transactions from the buyer
+                            DUP ; CADR ; # we must receive (Left "buyer")
+                            IF_LEFT
+                              { PUSH string "buyer" ; COMPARE ; EQ ;
+                                IF { DUP ; CDADAR ; # amount already versed by the buyer
+                                     DIP { DUP ; CAAR } ; ADD ; # transaction
+                                     # The amount must not exceed Q * K
+                                     DUP ;
+                                     DIIP { DUP ; CDDAAR ; # Q
+                                            DIP { DUP ; CDDDAAR } ; MUL ; } ; # K
+                                     DIP { COMPARE ; GT ; # new amount > Q * K
+                                           IF { FAIL } { } } ; # abort or continue
+                                     #  then we rebuild the globals
+                                     DIP { DUP ; CDADDR } ; PAIR ; # seller amount
+                                     PUSH uint32 0 ; PAIR ; # delivery counter at 0
+                                     DIP { CDDR } ; PAIR ; # parameters
+                                     # and return Unit
+                                     UNIT ; PAIR }
+                                   { FAIL } } # (Left _)
+                              { FAIL } } # (Right _)
+                          { # After T + 24
+                            # test if the required payment is reached
+                            DUP ; CDDAAR ; # Q
+                            DIP { DUP ; CDDDAAR } ; MUL ; # K
+                            DIP { DUP ; CDADAR } ; # amount already versed by the buyer
+                            COMPARE ; NEQ ;
+                            IF { # not reached, pay the seller and destroy the contract
+                                 BALANCE ;
+                                 DIP { DUP ; CDDDDADR } # S
+                                 DIIP { CDR } ;
+                                 UNIT ; TRANSFER_TOKENS ; DROP ;
                                  # and return Unit
                                  UNIT ; PAIR }
-                               { FAIL ; CDR ; UNIT ; PAIR }} # (Left _)
-                          { FAIL ; DROP ; CDR ; UNIT ; PAIR }} # (Right _)
-                      { # After T + 24
-                        # test if the required payment is reached
-                        DUP ; CDDAAR ; # Q
-                        DIP { DUP ; CDDDAAR } ; MUL ; # K
-                        DIP { DUP ; CDADAR } ; # amount already versed by the buyer
-                        COMPARE ; NEQ ;
-                        IF { # not reached, pay the seller and destroy the contract
-                             BALANCE ;
-                             DIP { DUP ; CDDDDADR } # S
-                             UNIT ; TRANSFER_TOKENS ; DROP ;
-                             # and return Unit
-                             CDR ; UNIT ; PAIR }
-                           { # otherwise continue
-                             DUP ; CDDADAR # T
-                             PUSH uint64 86400 ; ADD ;
-                             PUSH uint64 86400 ; ADD ; # two days in second
-                             NOW ; COMPARE ; LT
-                             IF { # Between T + 24 and T + 48
-                                  # We accept only delivery notifications, from W
-                                  DUP ; CDDDDDR ; MANAGER ; # W
-                                  SOURCE unit unit ; MANAGER ;
-                                  COMPARE ; NEQ ;
-                                  IF { FAIL } {} # fail if not the warehouse
-                                  DUP ; CADR ; # we must receive (Right amount)
-                                  IF_LEFT
-                                    { FAIL ; DROP ; CDR ; UNIT ; PAIR } # (Left _)
-                                    { # We increment the counter
-                                      DIP { DUP ; CDAAR } ; ADD ;
-                                      # And rebuild the globals in advance
-                                      DIP { DUP ; CDADR } ; PAIR ;
-                                      DIP CDDR ; PAIR ;
-                                      UNIT ; PAIR ;
-                                      # We test if enough have been delivered
-                                      DUP ; CDAAR ;
-                                      DIP { DUP ; CDDAAR } ;
-                                      COMPARE ; LT ; # counter < Q
-                                      IF { } # wait for more
-                                         { # Transfer all the money to the seller
-                                           BALANCE ; # and destroy the contract
-                                           DIP { DUP ; CDDDDADR } # S
-                                           UNIT ; TRANSFER_TOKENS ; DROP }}}
-                                { # after T + 48, transfer everything to the buyer
-                                  BALANCE ; # and destroy the contract
-                                  DIP { DUP ; CDDDDAAR } # B
-                                  UNIT ; TRANSFER_TOKENS ; DROP ;
-                                  # and return unit
-                                  CDR ; UNIT ; PAIR }}}}}}
+                               { # otherwise continue
+                                 DUP ; CDDADAR # T
+                                 PUSH uint64 86400 ; ADD ;
+                                 PUSH uint64 86400 ; ADD ; # two days in second
+                                 NOW ; COMPARE ; LT
+                                 IF { # Between T + 24 and T + 48
+                                      # We accept only delivery notifications, from W
+                                      DUP ; CDDDDDR ; MANAGER ; # W
+                                      SOURCE unit unit ; MANAGER ;
+                                      COMPARE ; NEQ ;
+                                      IF { FAIL } {} # fail if not the warehouse
+                                      DUP ; CADR ; # we must receive (Right amount)
+                                      IF_LEFT
+                                        { FAIL } # (Left _)
+                                        { # We increment the counter
+                                          DIP { DUP ; CDAAR } ; ADD ;
+                                          # And rebuild the globals in advance
+                                          DIP { DUP ; CDADR } ; PAIR ;
+                                          DIP { CDDR } ; PAIR ;
+                                          UNIT ; PAIR ;
+                                          # We test if enough have been delivered
+                                          DUP ; CDAAR ;
+                                          DIP { DUP ; CDDAAR } ;
+                                          COMPARE ; LT ; # counter < Q
+                                          IF { CDR } # wait for more
+                                             { # Transfer all the money to the seller
+                                               BALANCE ; # and destroy the contract
+                                               DIP { DUP ; CDDDDADR } # S
+                                               DIIP { CDR } ;
+                                               UNIT ; TRANSFER_TOKENS ; DROP } } ;
+                                      UNIT ; PAIR }
+                                    { # after T + 48, transfer everything to the buyer
+                                      BALANCE ; # and destroy the contract
+                                      DIP { DUP ; CDDDDAAR } # B
+                                      DIIP { CDR } ;
+                                      UNIT ; TRANSFER_TOKENS ; DROP ;
+                                      # and return unit
+                                      UNIT ; PAIR } } } } } } }
 
 X - Full grammar
 ----------------
