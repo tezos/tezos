@@ -1400,21 +1400,33 @@ writen as
           pair timestamp tez
           pair (contract unit unit) (contract unit unit)
 
-its code is
+The complete source `reservoir.tz` is:
 
-    DUP ; CDAAR # T
-    NOW
-    COMPARE ; LE
-    IF { DUP ; CDADR # N
-         BALANCE
-         COMPARE ; LE
-         IF { } # nothing to do
-            { DUP ; CDDDR # B
-              BALANCE ; UNIT ; TRANSFER_TOKENS ; DROP } }
-       { DUP ; CDDAR ; # A
-         BALANCE ;
-         UNIT ; TRANSFER_TOKENS ; DROP }
-    CDR ; UNIT ; PAIR
+    parameter timestamp ;
+    storage
+      pair
+        (pair timestamp tez) # T N
+        (pair (contract unit unit) (contract unit unit)) ; # A B
+    return unit ;
+    code
+      { DUP ; CDAAR ; # T
+        NOW ;
+        COMPARE ; LE ;
+        IF { DUP ; CDADR ; # N
+             BALANCE ;
+             COMPARE ; LE ;
+             IF { CDR ; UNIT ; PAIR }
+                { DUP ; CDDDR ; # B
+                  BALANCE ; UNIT ;
+                  DIIIP { CDR } ;
+                  TRANSFER_TOKENS ;
+                  PAIR } }
+           { DUP ; CDDAR ; # A
+             BALANCE ;
+             UNIT ;
+             DIIIP { CDR } ;
+             TRANSFER_TOKENS ;
+             PAIR } }
 
 ### Reservoir contract (variant with broker and status)
 
