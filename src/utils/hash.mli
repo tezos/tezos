@@ -103,7 +103,7 @@ module Hash_map (Hash : HASH) : sig
 end
 
 (** Builds a Hashtbl using some Hash type as keys. *)
-module Hash_table (Hash : HASH) : Hashtbl.S with type key = Hash.t
+module Hash_table (Hash : MINIMAL_HASH) : Hashtbl.S with type key = Hash.t
 
 (** {2 Predefined Hashes } ****************************************************)
 

@@ -1,26 +1,29 @@
 
-module Param = struct
+open P2p
 
-  type net_id = Store.net_id
+type net_id = Store.net_id
 
-  type msg =
+type msg =
+  | Discover_blocks of net_id * Block_hash.t list (* Block locator *)
+  | Block_inventory of net_id * Block_hash.t list
 
-    | Discover_blocks of net_id * Block_hash.t list (* Block locator *)
-    | Block_inventory of net_id * Block_hash.t list
+  | Get_blocks of Block_hash.t list
+  | Block of MBytes.t
 
-    | Get_blocks of Block_hash.t list
-    | Block of MBytes.t
+  | Current_operations of net_id
+  | Operation_inventory of net_id * Operation_hash.t list
 
-    | Current_operations of net_id
-    | Operation_inventory of net_id * Operation_hash.t list
+  | Get_operations of Operation_hash.t list
+  | Operation of MBytes.t
 
-    | Get_operations of Operation_hash.t list
-    | Operation of MBytes.t
+  | Get_protocols of Protocol_hash.t list
+  | Protocol of MBytes.t
 
-    | Get_protocols of Protocol_hash.t list
-    | Protocol of MBytes.t
+module Message = struct
 
-  let encodings =
+  type t = msg
+
+  let encoding =
     let open Data_encoding in
     let case ?max_length ~tag encoding unwrap wrap =
       P2p.Encoding { tag; encoding; wrap; unwrap; max_length } in
@@ -71,13 +74,8 @@ module Param = struct
         (fun proto -> Protocol proto);
     ]
 
-  type metadata = unit
-  let initial_metadata = ()
-  let metadata_encoding = Data_encoding.empty
-  let score () = 0.
-
   let supported_versions =
-    let open P2p in
+    let open P2p.Version in
     [ { name = "TEZOS" ;
         major = 0 ;
         minor = 0 ;
@@ -86,5 +84,53 @@ module Param = struct
 
 end
 
-include Param
-include P2p.Make(Param)
+type metadata = unit
+
+module Metadata = struct
+  type t = metadata
+  let initial = ()
+  let encoding = Data_encoding.empty
+  let score () = 0.
+end
+
+
+let meta_cfg : _ P2p.meta_config = {
+  P2p.encoding = Metadata.encoding ;
+  initial = Metadata.initial ;
+}
+
+and msg_cfg : _ P2p.message_config = {
+  encoding = Message.encoding ;
+  versions = Message.supported_versions ;
+}
+
+type net = (Message.t, Metadata.t) P2p.net
+
+let bootstrap ~config ~limits =
+  P2p.bootstrap ~config ~limits meta_cfg msg_cfg
+
+let broadcast = P2p.broadcast
+let try_send = P2p.try_send
+let recv = P2p.recv_any
+let send = P2p.send
+let set_metadata = P2p.set_metadata
+let get_metadata = P2p.get_metadata
+let connection_info = P2p.connection_info
+let find_connection = P2p.find_connection
+let connections = P2p.connections
+type connection = (Message.t, Metadata.t) P2p.connection
+let shutdown = P2p.shutdown
+let roll = P2p.roll
+let maintain = P2p.maintain
+let faked_network = P2p.faked_network
+
+module Raw = struct
+  type 'a t = 'a P2p.Raw.t =
+    | Bootstrap
+    | Advertise of Point.t list
+    | Message of 'a
+    | Disconnect
+  type message = Message.t t
+  let encoding = P2p.Raw.encoding msg_cfg.encoding
+  let supported_versions = msg_cfg.versions
+end

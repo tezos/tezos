@@ -8,8 +8,7 @@
 (**************************************************************************)
 
 open Format
-open Lwt
-open Tezos_p2p
+include Logging.Make(struct let name = "attacker" end)
 
 module Proto = Client_embedded_proto_bootstrap
 module Ed25519 = Proto.Local_environment.Environment.Ed25519
@@ -104,141 +103,170 @@ let ballot_forged period prop vote =
       operations = [ballot] }) in
   forge { net_id = network } op
 
+let identity = P2p_types.Identity.generate Crypto_box.default_target
+
 (* connect to the network, run an action and then disconnect *)
 let try_action addr port action =
-  let limits : P2p.limits = {
-      max_message_size = 1 lsl 16 ;
-      peer_answer_timeout = 10. ;
-      expected_connections = 1;
-      min_connections = 1 ;
-      max_connections = 1 ;
-      blacklist_time = 0. ;
-    } in
-  let config : P2p.config = {
-      incoming_port = None ;
-      discovery_port = None ;
-      known_peers = [(addr, port)] ;
-      peers_file = Filename.temp_file "peers_file" ".txt";
-      closed_network = true ;
-    } in
-  bootstrap ~config ~limits >>= fun net ->
-  let peer =
-    match peers net with
-    | [peer] -> peer
-    | _ -> Pervasives.failwith "" in
-  action net peer >>= fun () -> shutdown net
+  let socket = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
+  let uaddr = Ipaddr_unix.V6.to_inet_addr addr in
+  Lwt_unix.connect socket (Lwt_unix.ADDR_INET (uaddr, port)) >>= fun () ->
+  let io_sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 14) () in
+  let conn = P2p_io_scheduler.register io_sched socket in
+  P2p_connection.authenticate
+    ~proof_of_work_target:Crypto_box.default_target
+    ~incoming:false
+    conn
+    (addr, port)
+    identity Tezos_p2p.Raw.supported_versions >>=? fun (_, auth_fd) ->
+  P2p_connection.accept auth_fd Tezos_p2p.Raw.encoding >>= function
+  | Error _ -> failwith "Connection rejected by peer."
+  | Ok conn ->
+      action conn >>=? fun () ->
+      P2p_connection.close conn >>= fun () ->
+      return ()
 
 let replicate n x =
   let rec replicate_acc acc n x =
     if n <= 0 then acc else replicate_acc (x :: acc) (n-1) x in
   replicate_acc [] n x
 
-let request_block_times block_hash n net peer =
-  let open Block_hash in
-  let () = printf "requesting %a block %a times\n"
-    pp_short block_hash pp_print_int n in
-  let block_hashes = replicate n block_hash in
-  send net peer (Get_blocks block_hashes)
+let send conn (msg : Tezos_p2p.msg) =
+  P2p_connection.write conn (Tezos_p2p.Raw.Message msg)
 
-let request_op_times op_signed n net peer =
+let request_block_times block_hash n conn =
+  let open Block_hash in
+  lwt_log_notice
+    "requesting %a block %d times"
+    pp_short block_hash n >>= fun () ->
+  let block_hashes = replicate n block_hash in
+  send conn (Get_blocks block_hashes)
+
+let request_op_times op_signed n conn =
   let open Operation_hash in
   let op_hash = hash_bytes [op_signed] in
-  let () = printf "sending %a transaction\n" pp_short op_hash in
-  send net peer (Operation op_signed) >>= fun () ->
-  let () = printf "requesting %a transaction %a times\n"
-    pp_short op_hash pp_print_int n in
+  lwt_log_notice "sending %a transaction" pp_short op_hash >>= fun () ->
+  send conn (Operation op_signed) >>=? fun () ->
+  lwt_log_notice
+    "requesting %a transaction %d times"
+    pp_short op_hash n  >>= fun () ->
   let op_hashes = replicate n op_hash in
-  send net peer (Get_operations op_hashes)
+  send conn (Get_operations op_hashes)
 
-let send_block_size n net peer =
+let send_block_size n conn =
   let bytes = MBytes.create n in
   let open Block_hash in
-  let () = printf "propagating fake %a byte block %a\n"
-    pp_print_int n pp_short (hash_bytes [bytes]) in
-  send net peer (Block bytes)
+  lwt_log_notice
+    "propagating fake %d byte block %a" n pp_short (hash_bytes [bytes]) >>= fun () ->
+  send conn (Block bytes)
 
-let send_protocol_size n net peer =
+let send_protocol_size n conn =
   let bytes = MBytes.create n in
   let open Protocol_hash in
-  let () = printf "propagating fake %a byte protocol %a\n"
-    pp_print_int n pp_short (hash_bytes [bytes]) in
-  send net peer (Protocol bytes)
+  lwt_log_notice
+    "propagating fake %d byte protocol %a"
+    n pp_short (hash_bytes [bytes]) >>= fun () ->
+  send conn (Protocol bytes)
 
-let send_operation_size n net peer =
+let send_operation_size n conn =
   let op_faked = MBytes.create n in
   let op_hashed = Operation_hash.hash_bytes [op_faked] in
-  let () = printf "propagating fake %a byte operation %a\n"
-      pp_print_int n Operation_hash.pp_short op_hashed in
-  send net peer (Operation op_faked) >>= fun () ->
+  lwt_log_notice
+    "propagating fake %d byte operation %a"
+    n Operation_hash.pp_short op_hashed >>= fun () ->
+  send conn (Operation op_faked) >>=? fun () ->
   let block = signed (block_forged [op_hashed]) in
   let block_hashed = Block_hash.hash_bytes [block] in
-  let () = printf "propagating block %a with operation\n"
-      Block_hash.pp_short block_hashed in
-  send net peer (Block block)
+  lwt_log_notice
+    "propagating block %a with operation"
+    Block_hash.pp_short block_hashed >>= fun () ->
+  send conn (Block block)
 
-let send_operation_bad_signature () net peer =
+let send_operation_bad_signature () conn =
   let open Operation_hash in
   let signed_wrong_op = signed_wrong (tx_forged 5L 1L) in
   let hashed_wrong_op = hash_bytes [signed_wrong_op] in
-  let () = printf "propagating operation %a with wrong signature\n"
-    pp_short hashed_wrong_op in
-  send net peer (Operation signed_wrong_op) >>= fun () ->
+  lwt_log_notice
+    "propagating operation %a with wrong signature"
+    pp_short hashed_wrong_op >>= fun () ->
+  send conn (Operation signed_wrong_op) >>=? fun () ->
   let block = signed (block_forged [hashed_wrong_op]) in
   let block_hashed = Block_hash.hash_bytes [block] in
-  let () = printf "propagating block %a with operation\n"
-      Block_hash.pp_short block_hashed in
-  send net peer (Block block)
+  lwt_log_notice
+    "propagating block %a with operation"
+    Block_hash.pp_short block_hashed >>= fun () ->
+  send conn (Block block)
 
-let send_block_bad_signature () net peer =
+let send_block_bad_signature () conn =
   let open Block_hash in
   let signed_wrong_block = signed_wrong (block_forged []) in
-  let () = printf "propagating block %a with wrong signature\n"
-      pp_short (hash_bytes [signed_wrong_block]) in
-  send net peer (Block signed_wrong_block)
+  lwt_log_notice
+    "propagating block %a with wrong signature"
+    pp_short (hash_bytes [signed_wrong_block]) >>= fun () ->
+  send conn (Block signed_wrong_block)
 
-let double_spend () net peer =
+let double_spend () conn =
   let spend account =
     let op_signed = signed (tx_forged ~dest:account 199999999L 1L) in
     let op_hashed = Operation_hash.hash_bytes [op_signed] in
     let block_signed = signed (block_forged [op_hashed]) in
     let block_hashed = Block_hash.hash_bytes [block_signed] in
-    let () = printf "propagating operation %a\n"
-        Operation_hash.pp_short op_hashed in
-    send net peer (Operation op_signed) >>= fun () ->
-    let () = printf "propagating block %a\n"
-        Block_hash.pp_short block_hashed in
-    send net peer (Block block_signed) in
-  spend destination_account <&> spend another_account
+    lwt_log_notice
+      "propagating operation %a"
+      Operation_hash.pp_short op_hashed >>= fun () ->
+    send conn (Operation op_signed) >>=? fun () ->
+    lwt_log_notice
+      "propagating block %a"
+      Block_hash.pp_short block_hashed >>= fun () ->
+    send conn (Block block_signed) in
+  spend destination_account >>=? fun () ->
+  spend another_account
 
-let long_chain n net peer =
-  let () = printf "propogating %a blocks\n"
-    pp_print_int n in
+let long_chain n conn =
+  lwt_log_notice "propogating %d blocks" n >>= fun () ->
   let prev_ref = ref genesis_block_hashed in
-  let rec loop k = if k < 1 then return_unit else
+  let rec loop k =
+    if k < 1 then
+      return ()
+    else
       let block = signed (block_forged ~prev:!prev_ref []) in
-      let () = prev_ref := Block_hash.hash_bytes [block] in
-      send net peer (Block block) >>= fun () -> loop (k-1) in
+      prev_ref := Block_hash.hash_bytes [block] ;
+      send conn (Block block) >>=? fun () ->
+      loop (k-1) in
   loop n
 
-let lots_transactions amount fee n net peer =
+let lots_transactions amount fee n conn =
   let signed_op = signed (tx_forged amount fee) in
-  let rec loop k = if k < 1 then return_unit else
-      send net peer (Operation signed_op) >>= fun () -> loop (k-1) in
+  let rec loop k =
+    if k < 1 then
+      return ()
+    else
+      send conn (Operation signed_op) >>=? fun () ->
+      loop (k-1) in
   let ops = replicate n (Operation_hash.hash_bytes [signed_op]) in
   let signed_block = signed (block_forged ops) in
-  let () = printf "propogating %a transactions\n"
-      pp_print_int n in
-  loop n >>= fun () ->
-  let () = printf "propagating block %a with wrong signature\n"
-    Block_hash.pp_short (Block_hash.hash_bytes [signed_block]) in
-  send net peer (Block signed_block)
+  lwt_log_notice "propogating %d transactions" n >>= fun () ->
+  loop n >>=? fun () ->
+  lwt_log_notice
+    "propagating block %a with wrong signature"
+    Block_hash.pp_short (Block_hash.hash_bytes [signed_block]) >>= fun () ->
+  send conn (Block signed_block)
 
 let main () =
-  let addr = Ipaddr.V4 Ipaddr.V4.localhost in
+  let addr = Ipaddr.V6.localhost in
   let port = 9732 in
   let run_action action = try_action addr port action in
-  let run_cmd_unit lwt = Arg.Unit (fun () -> Lwt_main.run (lwt ())) in
-  let run_cmd_int_suffix lwt = Arg.String (fun str ->
+  let run_cmd_unit lwt =
+    Arg.Unit begin fun () ->
+      Lwt_main.run begin
+        lwt () >>= function
+        | Ok () -> Lwt.return_unit
+        | Error err ->
+            lwt_log_error "Error: %a" pp_print_error err >>= fun () ->
+            Lwt.return_unit
+      end
+    end in
+  let run_cmd_int_suffix lwt =
+    Arg.String begin fun str ->
       let last = str.[String.length str - 1] in
       let init = String.sub str 0 (String.length str - 1) in
       let n =
@@ -249,7 +277,14 @@ let main () =
         else if last == 'g' || last == 'G'
         then int_of_string init * 1 lsl 30
         else int_of_string str in
-      Lwt_main.run (lwt n)) in
+      Lwt_main.run begin
+        lwt n >>= function
+        | Ok () -> Lwt.return_unit
+        | Error err ->
+            lwt_log_error "Error: %a" pp_print_error err >>= fun () ->
+            Lwt.return_unit
+      end
+    end in
   let cmds =
     [( "-1",
        run_cmd_int_suffix (run_action << request_block_times genesis_block_hashed),

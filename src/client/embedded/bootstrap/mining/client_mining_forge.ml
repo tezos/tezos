@@ -198,7 +198,7 @@ end = struct
 
   let lock = Lwt_mutex.create ()
 
-  let get_block cctxt level =
+  let get_block _cctxt level =
     Lwt_mutex.with_lock lock
       (fun () ->
          load () >>=? fun map ->

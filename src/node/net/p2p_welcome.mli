@@ -7,22 +7,21 @@
 (*                                                                        *)
 (**************************************************************************)
 
-exception Exit
+open P2p_types
 
-let termination_thread, exit_wakener = Lwt.wait ()
-let exit x = Lwt.wakeup exit_wakener x; raise Exit
+(** Welcome worker. Accept incoming connections and add them to its
+    connection pool. *)
 
-let () =
-  Lwt.async_exception_hook :=
-    (function
-      | Exit -> ()
-      | exn ->
-          Format.eprintf
-            "@[Uncaught (asynchronous) exception (%d):@ %a@]"
-            (Unix.getpid ())
-            Error_monad.pp_exn exn ;
-          let backtrace = Printexc.get_backtrace () in
-          if String.length backtrace <> 0 then
-            Format.eprintf "\n%s" backtrace ;
-          Format.eprintf "@." ;
-          Lwt.wakeup exit_wakener 1)
+type t
+(** Type of a welcome worker, parametrized like a
+    [P2p_connection_pool.pool]. *)
+
+val run:
+  backlog:int ->
+  ('msg, 'meta) P2p_connection_pool.t ->
+  ?addr:addr -> port -> t Lwt.t
+(** [run ~backlog ~addr pool port] returns a running welcome worker
+    feeding [pool] listening at [(addr, port)]. [backlog] is the
+    argument passed to [Lwt_unix.accept]. *)
+
+val shutdown: t -> unit Lwt.t

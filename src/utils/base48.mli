@@ -37,6 +37,9 @@ module Prefix : sig
   val ed25519_public_key_hash: string
     (** Prefix for Ed25519 public key hashes: "\003". *)
 
+  val cryptobox_public_key_hash: string
+    (** Prefix for Ed25519 public key hashes: "\004". *)
+
   val ed25519_public_key: string
     (** Prefix for Ed25519 public key: "\012". *)
 

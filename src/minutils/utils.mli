@@ -22,6 +22,7 @@ val map_option: f:('a -> 'b) -> 'a option -> 'b option
 val apply_option: f:('a -> 'b option) -> 'a option -> 'b option
 val iter_option: f:('a -> unit) -> 'a option -> unit
 val unopt: 'a -> 'a option -> 'a
+val unopt_map: f:('a -> 'b) -> default:'b -> 'a option -> 'b
 val unopt_list: 'a option list -> 'a list
 val first_some: 'a option -> 'a option -> 'a option
 
@@ -34,6 +35,11 @@ val remove_prefix: prefix:string -> string -> string option
 
 val filter_map: ('a -> 'b option) -> 'a list -> 'b list
 
+(** [list_rev_sub l n] is (List.rev l) capped to max n elements *)
+val list_rev_sub : 'a list -> int -> 'a list
+(** [list_sub l n] is l capped to max n elements *)
+val list_sub: 'a list -> int -> 'a list
+
 val finalize: (unit -> 'a) -> (unit -> unit) -> 'a
 
 val read_file: ?bin:bool -> string -> string
@@ -41,3 +47,20 @@ val write_file: ?bin:bool -> string -> string -> unit
 
 (** Compose functions from right to left. *)
 val (<<) : ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
+
+(** Sequence: [i--j] is the sequence [i;i+1;...;j-1;j] *)
+val (--) : int -> int -> int list
+
+(** [take_n n l] returns the [n] first elements of [n]. When [compare]
+    is provided, it returns the [n] greatest element of [l]. *)
+val take_n: ?compare:('a -> 'a -> int) -> int -> 'a list -> 'a list
+
+(** Bounded sequence: keep only the [n] greatest elements. *)
+module Bounded(E: Set.OrderedType) : sig
+  type t
+  val create: int -> t
+  val insert: E.t -> t -> unit
+  val get: t -> E.t list
+end
+
+val select: int -> 'a list -> 'a * 'a list
