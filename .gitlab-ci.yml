@@ -107,6 +107,36 @@ test:data-encoding:
     - build
     - build:test
 
+test:p2p-io-scheduler:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test run-test-p2p-io-scheduler
+  dependencies:
+    - build
+    - build:test
+
+test:p2p-connection:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test run-test-p2p-connection
+  dependencies:
+    - build
+    - build:test
+
+test:p2p-connection-pool:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test run-test-p2p-connection-pool
+  dependencies:
+    - build
+    - build:test
+
 expurge:
   stage: expurge
   tags:

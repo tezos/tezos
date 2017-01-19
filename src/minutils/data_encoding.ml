@@ -1178,4 +1178,14 @@ let rec length : type x. x t -> x -> int = fun e ->
   let to_bytes = to_bytes
 
   let length = length
+
+  let fixed_length e =
+    match classify e with
+    | `Fixed n -> Some n
+    | `Dynamic | `Variable -> None
+  let fixed_length_exn e =
+    match fixed_length e with
+    | Some n -> n
+    | None -> invalid_arg "Data_encoding.Binary.fixed_length_exn"
+
 end

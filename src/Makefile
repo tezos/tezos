@@ -101,7 +101,7 @@ clean::
 
 MINUTILS_LIB_INTFS := \
   minutils/mBytes.mli \
-	minutils/hex_encode.mli \
+  minutils/hex_encode.mli \
   minutils/utils.mli \
   minutils/compare.mli \
   minutils/data_encoding.mli \
@@ -163,6 +163,7 @@ UTILS_LIB_INTFS := \
   utils/lwt_pipe.mli \
   utils/IO.mli \
   utils/moving_average.mli \
+  utils/ring.mli \
 
 UTILS_LIB_IMPLS := \
   utils/base48.ml \
@@ -179,12 +180,14 @@ UTILS_LIB_IMPLS := \
   utils/lwt_pipe.ml \
   utils/IO.ml \
   utils/moving_average.ml \
+  utils/ring.ml \
 
 UTILS_PACKAGES := \
   ${MINUTILS_PACKAGES} \
   base64 \
   calendar \
   ezjsonm \
+  mtime.os \
   sodium \
   zarith \
   $(COVERAGEPKG) \
@@ -254,6 +257,14 @@ clean::
 
 NODE_LIB_INTFS := \
   \
+  node/net/p2p_types.mli \
+  node/net/p2p_io_scheduler.mli \
+  node/net/p2p_connection.mli \
+  node/net/p2p_connection_pool_types.mli \
+  node/net/p2p_connection_pool.mli \
+  node/net/p2p_welcome.mli \
+  node/net/p2p_discovery.mli \
+  node/net/p2p_maintenance.mli \
   node/net/p2p.mli \
   node/net/RPC_server.mli \
   \
@@ -284,7 +295,16 @@ NODE_LIB_IMPLS := \
   \
   compiler/node_compiler_main.ml \
   \
+  node/net/p2p_types.ml \
+  node/net/p2p_io_scheduler.ml \
+  node/net/p2p_connection.ml \
+  node/net/p2p_connection_pool_types.ml \
+  node/net/p2p_connection_pool.ml \
+  node/net/p2p_welcome.ml \
+  node/net/p2p_discovery.ml \
+  node/net/p2p_maintenance.ml \
   node/net/p2p.ml \
+  \
   node/net/RPC_server.ml \
   \
   node/updater/fitness.ml \
@@ -316,12 +336,13 @@ NODE_IMPLS := \
 NODE_PACKAGES := \
   $(COMPILER_PACKAGES) \
   calendar \
+  cmdliner \
   cohttp.lwt \
   dynlink \
   git \
+  ipv6-multicast \
   irmin.unix \
   ocplib-resto.directory \
-  cmdliner \
 
 
 EMBEDDED_NODE_PROTOCOLS := \
@@ -592,9 +613,7 @@ NO_DEPS := \
 compiler/embedded_cmis.cmx compiler/embedded_cmis.cmi: OPENED_MODULES=
 
 ifneq ($(MAKECMDGOALS),clean)
-ifneq ($(MAKECMDGOALS),build-deps)
 include .depend
-endif
 endif
 DEPENDS := $(filter-out $(NO_DEPS), \
   $(MINUTILS_LIB_INTFS) $(MINUTILS_LIB_IMPLS) \

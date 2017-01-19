@@ -12,7 +12,7 @@ module LC = Lwt_condition
 open Lwt.Infix
 open Logging.Core
 
-let may f = function
+let may ~f = function
   | None -> Lwt.return_unit
   | Some x -> f x
 
@@ -39,10 +39,13 @@ let canceler ()
     else begin
       canceling := true ;
       LC.broadcast cancelation () ;
-      !cancel_hook () >>= fun () ->
-      canceled := true ;
-      LC.broadcast cancelation_complete () ;
-      Lwt.return ()
+      Lwt.finalize
+        !cancel_hook
+        (fun () ->
+           canceled := true ;
+           LC.broadcast cancelation_complete () ;
+           Lwt.return ()) >>= fun () ->
+      Lwt.return_unit
     end
   in
   let on_cancel cb =
@@ -54,6 +57,53 @@ let canceler ()
     else LC.wait cancelation
   in
   cancelation, cancel, on_cancel
+
+module Canceler = struct
+
+  type t = {
+    cancelation: unit Lwt_condition.t ;
+    cancelation_complete: unit Lwt_condition.t ;
+    mutable cancel_hook: unit -> unit Lwt.t ;
+    mutable canceling: bool ;
+    mutable canceled: bool ;
+  }
+
+  let create () =
+    let cancelation = LC.create () in
+    let cancelation_complete = LC.create () in
+    { cancelation ; cancelation_complete ;
+      cancel_hook = (fun () -> Lwt.return ()) ;
+      canceling = false ;
+      canceled = false ;
+    }
+
+  let cancel st =
+    if st.canceled then
+      Lwt.return ()
+    else if st.canceling then
+      LC.wait st.cancelation_complete
+    else begin
+      st.canceling <- true ;
+      LC.broadcast st.cancelation () ;
+      Lwt.finalize
+        st.cancel_hook
+        (fun () ->
+           st.canceled <- true ;
+           LC.broadcast st.cancelation_complete () ;
+           Lwt.return ())
+    end
+
+  let on_cancel st cb =
+    let hook = st.cancel_hook in
+    st.cancel_hook <- (fun () -> hook () >>= cb)
+
+  let cancelation st =
+    if st.canceling then Lwt.return ()
+    else LC.wait st.cancelation
+
+  let canceled st = st.canceling
+
+end
 
 type trigger =
   | Absent
@@ -114,12 +164,11 @@ let queue () : ('a -> unit) * (unit -> 'a list Lwt.t) =
   queue, wait
 
 (* A worker launcher, takes a cancel callback to call upon *)
-let worker ?(safe=false) name ~run ~cancel =
+let worker name ~run ~cancel =
   let stop = LC.create () in
   let fail e =
     log_error "%s worker failed with %s" name (Printexc.to_string e) ;
-    cancel () >>= fun () ->
-    if safe then Lwt.return_unit else Lwt.fail e
+    cancel ()
   in
   let waiter = LC.wait stop in
   log_info "%s worker started" name ;
@@ -263,6 +312,17 @@ let write_mbytes ?(pos=0) ?len descr buf =
       | nb_written -> inner (pos + nb_written) (len - nb_written) in
   inner pos len
 
+let write_bytes ?(pos=0) ?len descr buf =
+  let len = match len with None -> Bytes.length buf - pos | Some l -> l in
+  let rec inner pos len =
+    if len = 0 then
+      Lwt.return_unit
+    else
+      Lwt_unix.write descr buf pos len >>= function
+      | 0 -> Lwt.fail End_of_file (* other endpoint cleanly closed its connection *)
+      | nb_written -> inner (pos + nb_written) (len - nb_written) in
+  inner pos len
+
 let (>>=) = Lwt.bind
 
 let remove_dir dir =
@@ -297,3 +357,49 @@ let create_file ?(perm = 0o644) name content =
   Lwt_unix.openfile name Unix.([O_TRUNC; O_CREAT; O_WRONLY]) perm >>= fun fd ->
   Lwt_unix.write_string fd content 0 (String.length content) >>= fun _ ->
   Lwt_unix.close fd
+
+let safe_close fd =
+  Lwt.catch
+    (fun () -> Lwt_unix.close fd)
+    (fun _ -> Lwt.return_unit)
+
+open Error_monad
+
+type error += Canceled
+
+let protect ?on_error ?canceler t =
+  let cancelation =
+    match canceler with
+    | None -> never_ending
+    | Some canceler ->
+        ( Canceler.cancelation canceler >>= fun () ->
+          fail Canceled ) in
+  let res =
+    Lwt.pick [ cancelation ;
+               Lwt.catch t (fun exn -> fail (Exn exn)) ] in
+  res >>= function
+  | Ok _ -> res
+  | Error err ->
+      let canceled =
+        Utils.unopt_map canceler ~default:false ~f:Canceler.canceled in
+      let err = if canceled then [Canceled] else err in
+      match on_error with
+      | None -> Lwt.return (Error err)
+      | Some on_error -> on_error err
+
+type error += Timeout
+
+let with_timeout ?(canceler = Canceler.create ()) timeout f =
+  let t = Lwt_unix.sleep timeout in
+  Lwt.choose [
+    (t >|= fun () -> None) ;
+    (f canceler >|= fun x -> Some x)
+  ] >>= function
+  | Some x when Lwt.state t = Lwt.Sleep ->
+      Lwt.cancel t ;
+      Lwt.return x
+  | _ ->
+      Canceler.cancel canceler >>= fun () ->
+      fail Timeout
+
+

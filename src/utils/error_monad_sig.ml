@@ -100,6 +100,12 @@ module type S = sig
   (** Erroneous return on failed assertion *)
   val fail_unless : bool -> error -> unit tzresult Lwt.t
 
+  val unless : bool -> (unit -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+
+  val protect :
+    on_error: (error list -> 'a tzresult Lwt.t) ->
+    'a tzresult Lwt.t -> 'a tzresult Lwt.t
+
   (** {2 In-monad list iterators} ********************************************)
 
   (** A {!List.iter} in the monad *)
