@@ -49,6 +49,8 @@ if ! [ -z "$pin" ]; then
     opam pin --yes add --no-action --dev-repo ocp-ocamlres
     opam pin --yes add --no-action --dev-repo ocplib-json-typed
     opam pin --yes add --no-action --dev-repo ocplib-resto
+    ## Ouch, that's an awfull (temporary) hack...
+    EDITOR='sed -i "s|\"ocamlfind\"|\"ocamlfind\"\ndepopts: \"camlp4\"|"' opam pin add typerex-build 1.99.17-beta --edit --no-action
     ## Force opam to take account of the new `tezos-deps.opam`
     opam pin --yes remove tezos-deps
     opam pin --yes add --no-action tezos-deps src

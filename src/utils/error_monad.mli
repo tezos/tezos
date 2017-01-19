@@ -29,6 +29,7 @@ val failwith :
 val error_exn : exn -> 'a tzresult
 val record_trace_exn : exn -> 'a tzresult -> 'a tzresult
 val trace_exn : exn -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+val pp_exn : Format.formatter -> exn -> unit
 
 type error += Exn of exn
 type error += Unclassified of string

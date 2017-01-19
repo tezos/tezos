@@ -59,6 +59,10 @@ let unopt x = function
   | None -> x
   | Some x -> x
 
+let unopt_map ~f ~default = function
+  | None -> default
+  | Some x -> f x
+
 let unopt_list l =
   let may_cons xs x = match x with None -> xs | Some x -> x :: xs in
   List.rev @@ List.fold_left may_cons [] l
@@ -71,6 +75,13 @@ let first_some a b = match a, b with
 let filter_map f l =
   let may_cons xs x = match f x with None -> xs | Some x -> x :: xs in
   List.rev @@ List.fold_left may_cons [] l
+
+let list_rev_sub l n =
+  ListLabels.fold_left l ~init:(n, []) ~f:begin fun (n, l) elt ->
+    if n <= 0 then (n, l) else (n - 1, elt :: l)
+  end |> snd
+
+let list_sub l n = list_rev_sub l n |> List.rev
 
 let display_paragraph ppf description =
   Format.fprintf ppf "@[%a@]"
@@ -111,3 +122,68 @@ let write_file ?(bin=false) fn contents =
     (fun () -> close_out oc)
 
 let (<<) g f = fun a -> g (f a)
+
+let rec (--) i j =
+  let rec loop acc j =
+    if j < i then acc else loop (j :: acc) (pred j) in
+  loop [] j
+
+let take_n_unsorted n l =
+  let rec loop acc n = function
+    | [] -> l
+    | _ when n <= 0 -> List.rev acc
+    | x :: xs -> loop (x :: acc) (pred n) xs in
+  loop [] n l
+
+module Bounded(E: Set.OrderedType) = struct
+
+  (* TODO one day replace list by an heap array *)
+
+  type t = {
+    bound : int ;
+    mutable size : int ;
+    mutable data : E.t list ;
+  }
+  let create bound = { bound ; size = 0 ; data = [] }
+
+  let rec push x = function
+    | [] -> [x]
+    | (y :: xs) as ys ->
+        let c = compare x y in
+        if c < 0 then x :: ys else if c = 0 then ys else y :: push x xs
+
+  let replace x xs =
+    match xs with
+    | y :: xs when compare x y > 0 ->
+        push x xs
+    | xs -> xs
+
+  let insert x t =
+    if t.size < t.bound then begin
+      t.size <- t.size + 1 ;
+      t.data <- push x t.data
+    end else if E.compare (List.hd t.data) x < 0 then
+      t.data <- replace x t.data
+
+  let get { data } = data
+
+end
+
+let take_n_sorted (type a) compare n l =
+  let module B = Bounded(struct type t = a let compare = compare end) in
+  let t = B.create n in
+  List.iter (fun x -> B.insert x t) l ;
+  B.get t
+
+let take_n ?compare n l =
+  match compare with
+  | None -> take_n_unsorted n l
+  | Some compare -> take_n_sorted compare n l
+
+let select n l =
+  let rec loop n acc = function
+    | [] -> invalid_arg "Utils.select"
+    | x :: xs when n <= 0 -> x, List.rev_append acc xs
+    | x :: xs -> loop (pred n) (x :: acc) xs
+  in
+  loop n [] l

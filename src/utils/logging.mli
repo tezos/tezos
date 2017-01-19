@@ -54,5 +54,6 @@ type kind =
   | Stderr
   | File of string
   | Syslog
+  | Manual of Lwt_log.logger
 
 val init: kind -> unit

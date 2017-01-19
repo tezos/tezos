@@ -23,6 +23,7 @@ FLG -w -30
 FLG -w -40
 PKG base64
 PKG calendar
+PKG cmdliner
 PKG cohttp
 PKG compiler-libs.optcomp
 PKG conduit
@@ -31,14 +32,16 @@ PKG cstruct
 PKG dynlink
 PKG ezjsonm
 PKG git
+PKG ipv6-multicast
 PKG irmin
 PKG lwt
+PKG mtime.os
 PKG ocplib-endian
 PKG ocplib-json-typed
 PKG ocplib-ocamlres
 PKG ocplib-resto.directory
 PKG result
 PKG sodium
+PKG ssl
 PKG unix
 PKG zarith
-PKG cmdliner

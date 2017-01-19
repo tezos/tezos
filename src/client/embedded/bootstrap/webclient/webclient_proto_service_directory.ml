@@ -15,7 +15,7 @@ let cctxt = Client_commands.ignore_context
 
 let root =
   let root =
-    RPC.register RPC.empty Services.contracts @@ fun block () ->
+    RPC.register RPC.empty Services.contracts @@ fun _block () ->
     Client_proto_contracts.RawContractAlias.load cctxt >>= fun list ->
     let (names, _) = List.split list in
     RPC.Answer.return names in
