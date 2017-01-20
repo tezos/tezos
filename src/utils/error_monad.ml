@@ -16,10 +16,12 @@ type error_category = [ `Branch | `Temporary | `Permanent ]
 type 'err full_error_category =
   [ error_category | `Wrapped of 'err -> error_category ]
 
-let json_pp encoding ppf x =
+let json_pp id encoding ppf x =
+  let encoding =
+    Data_encoding.(merge_objs (obj1 (req "id" string)) encoding) in
   Format.pp_print_string ppf @@
   Data_encoding_ezjsonm.to_string @@
-  Data_encoding.Json.(construct encoding x)
+  Data_encoding.Json.(construct encoding (id, x))
 
 module Make() = struct
 
@@ -74,7 +76,7 @@ module Make() = struct
                    category ;
                    from_error ;
                    encoding_case ;
-                   pp = Utils.unopt (json_pp encoding) pp } :: !error_kinds
+                   pp = Utils.unopt (json_pp name encoding) pp } :: !error_kinds
 
   let register_wrapped_error_kind
       category ~id ~title ~description ?pp
