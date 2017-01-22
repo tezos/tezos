@@ -1,10 +1,14 @@
 #! /bin/sh
 
-OCAML_VERSION=4.03.0
-if [ "$(ocaml -vnum)" != "$OCAML_VERSION" ]; then
+script_dir="$(dirname "$(readlink -f "$0")")"
+src_dir="$(dirname "$script_dir")"
+
+. "$script_dir/version.sh"
+
+if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
   echo ;
   echo "   Unexpected compiler version ($(ocaml -vnum))";
-  echo "   You should use ocaml-$OCAML_VERSION.";
+  echo "   You should use ocaml-$ocaml_version.";
   echo ;
   exit 1;
 fi

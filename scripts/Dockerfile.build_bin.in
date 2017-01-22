@@ -1,13 +1,7 @@
-FROM tezos_build:$base_image
+FROM $base_name:$base_version
 
-ADD tezos /home/opam/tezos
-ENV HOME /home/opam
-WORKDIR $HOME/tezos
-RUN sudo HOME="$HOME" opam config exec -- make clean && \
-    sudo rm -fr ~/.opam/log && \
-    sudo chown -R opam /home/opam
-RUN opam config exec -- make
-RUN mkdir -p ~/bin && \
-    (cp tezos-client tezos-node tezos-protocol-compiler tezos-webclient ~/bin || true)
-
-WORKDIR $HOME/bin
+COPY . /home/opam/tezos
+RUN sudo chown -R opam /home/opam/tezos && \
+    opam config exec -- make -C tezos -j4 && \
+    mkdir bin && \
+    cp tezos/tezos-* bin
