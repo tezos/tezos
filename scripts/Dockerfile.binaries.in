@@ -1,20 +1,24 @@
-FROM alpine:3.4
-# FIXME: I'm currently guessing the version of alpine that the opam image we've
-# built the tezos binaries on is based on. if that becomes newer (e.g. alpine
-# 3.5), the binaries built on that version of alpine could (will) depend on
-# library symbols that won't be in alpine 3.4
+FROM alpine:$alpine_version
 
-LABEL distro_style="apk" distro="alpine" distro_long="alpine-3.4" arch="x86_64" operatingsystem="linux"
+LABEL distro_style="apk" distro="alpine" distro_long="alpine-$alpine_version" arch="x86_64" operatingsystem="linux"
 
 RUN apk update && \
     apk upgrade && \
-    apk add sudo bash libsodium gmp && \
+    apk add sudo bash libssl1.0 libsodium gmp && \
+    rm -f /var/cache/apk/* && \
     adduser -S tezos && \
     echo 'tezos ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/tezos && \
     chmod 440 /etc/sudoers.d/tezos && \
     chown root:root /etc/sudoers.d/tezos && \
-    sed -i.bak 's/^Defaults.*requiretty//g' /etc/sudoers
+    sed -i 's/^Defaults.*requiretty//g' /etc/sudoers
 USER tezos
 
-ADD built-bin /usr/local/bin
+COPY . /home/tezos
 WORKDIR /home/tezos
+
+RUN sudo chown root:root bin/* && \
+    sudo chmod a+rx bin/* && \
+    sudo mv bin/* /usr/local/bin && \
+    rmdir bin
+
+ENTRYPOINT [ "/bin/bash" ]
