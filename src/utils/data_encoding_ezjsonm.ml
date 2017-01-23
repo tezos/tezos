@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
+
 let to_root = function
   | `O ctns -> `O ctns
   | `A ctns -> `A ctns
@@ -35,22 +37,21 @@ let from_stream (stream: string Lwt_stream.t) =
 
 let write_file file json =
   let json = to_root json in
-  let open Lwt in
-  catch
-    (fun () ->
-       Lwt_io.(with_file ~mode:Output file (fun chan ->
-           let str = to_string json in
-           write chan str >>= fun _ ->
-           return true)))
-    (fun _ -> return false)
+  protect begin fun () ->
+    Lwt_io.with_file ~mode:Output file begin fun chan ->
+      let str = to_string json in
+      Lwt_io.write chan str >>= fun _ ->
+      return ()
+    end
+  end
 
 let read_file file =
-  let open Lwt in
-  catch
-    (fun () ->
-       Lwt_io.(with_file ~mode:Input file (fun chan ->
-           read chan >>= fun str ->
-           return (Some (Ezjsonm.from_string str :> Data_encoding.json)))))
-    (fun _ ->
-       (* TODO log error or use Error_monad. *)
-       return None)
+  protect begin fun () ->
+    Lwt_io.with_file ~mode:Input file begin fun chan ->
+      Lwt_io.read chan >>= fun str ->
+      return (Ezjsonm.from_string str :> Data_encoding.json)
+    end
+  end
+
+let () =
+  Error_monad.json_to_string := to_string

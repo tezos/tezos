@@ -238,8 +238,8 @@ module Cfg_file = struct
 
   let read fp =
     Data_encoding_ezjsonm.read_file fp >|= function
-    | None -> None
-    | Some json -> Some (Data_encoding.Json.destruct t json)
+    | Error _ -> None
+    | Ok json -> Some (Data_encoding.Json.destruct t json)
 
   let from_json json = Data_encoding.Json.destruct t json
   let write out cfg =
@@ -439,12 +439,12 @@ let init_node
         | None -> Lwt.return (Some (patch_context None))
         | Some file ->
             Data_encoding_ezjsonm.read_file file >>= function
-            | None ->
+            | Error _ ->
                 lwt_warn
                   "Can't parse sandbox parameters. (%s)" file >>= fun () ->
                 Lwt.return (Some (patch_context None))
-            | Some _ as json ->
-                Lwt.return (Some (patch_context json))
+            | Ok json ->
+                Lwt.return (Some (patch_context (Some json)))
   end >>= fun patch_context ->
   let net_params =
     let open P2p in

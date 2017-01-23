@@ -110,11 +110,11 @@ let test_json testdir =
   let f_str = to_string v in
   Assert.equal_string  ~msg:__LOC__ f_str "[\n  42\n]";
   read_file (testdir // "NONEXISTINGFILE") >>= fun rf ->
-  Assert.is_none ~msg:__LOC__ rf;
+  Assert.is_error ~msg:__LOC__ rf ;
   write_file file v >>= fun success ->
-  Assert.is_true ~msg:__LOC__ success;
+  Assert.is_ok ~msg:__LOC__ success ;
   read_file file >>= fun opt ->
-  Assert.is_some ~msg:__LOC__ opt;
+  Assert.is_ok ~msg:__LOC__ opt ;
   Lwt.return ()
 
 type t = A of int | B of string | C of int | D of string | E
@@ -269,8 +269,8 @@ let test_json_input testdir =
 |}
     in
     Data_encoding_ezjsonm.read_file file >>= function
-      None -> Assert.fail_msg "Cannot parse \"good.json\"."
-    | Some json ->
+    | Error _ -> Assert.fail_msg "Cannot parse \"good.json\"."
+    | Ok json ->
         let (id, value, popup) = Json.destruct enc json in
         Assert.equal_string ~msg:__LOC__ "file" id;
         Assert.equal_string ~msg:__LOC__ "File" value;
@@ -295,8 +295,8 @@ let test_json_input testdir =
 |}
     in
     Data_encoding_ezjsonm.read_file file >>= function
-      None -> Assert.fail_msg "Cannot parse \"unknown.json\"."
-    | Some json ->
+    | Error _ -> Assert.fail_msg "Cannot parse \"unknown.json\"."
+    | Ok json ->
         Assert.test_fail ~msg:__LOC__
           (fun () -> ignore (Json.destruct enc json))
           (function
