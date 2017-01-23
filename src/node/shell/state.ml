@@ -699,7 +699,8 @@ module Valid_block = struct
           (* TODO check coherency: test_protocol. *)
           Lwt.return res
       | None ->
-          let test_protocol = Utils.unopt genesis.protocol test_protocol in
+          let test_protocol =
+            Utils.unopt ~default:genesis.protocol test_protocol in
           Context.create_genesis_context
             vstate.index genesis test_protocol >>= fun _context ->
           Block.db_store vstate.block_db genesis.block {

@@ -394,9 +394,9 @@ let build_rpc_directory node =
   let dir =
     let implementation (net_id, pred, time, fitness, operations, header) =
       Node.RPC.block_info node (`Head 0) >>= fun bi ->
-      let timestamp = Utils.unopt (Time.now ()) time in
-      let net_id = Utils.unopt bi.net net_id in
-      let predecessor = Utils.unopt bi.hash pred in
+      let timestamp = Utils.unopt ~default:(Time.now ()) time in
+      let net_id = Utils.unopt ~default:bi.net net_id in
+      let predecessor = Utils.unopt ~default:bi.hash pred in
       let res =
         Store.Block.to_bytes {
           shell = { net_id ; predecessor ; timestamp ; fitness ; operations } ;

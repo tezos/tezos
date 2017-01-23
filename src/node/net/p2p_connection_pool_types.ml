@@ -451,7 +451,7 @@ module Gid_info = struct
       let enc = Data_encoding.list (encoding metadata_encoding) in
       Data_encoding_ezjsonm.read_file path >|=
       map_option ~f:(Data_encoding.Json.destruct enc) >|=
-      unopt []
+      unopt ~default:[]
 
     let save path metadata_encoding peers =
       let open Data_encoding in

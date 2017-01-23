@@ -524,7 +524,7 @@ let inject_block =
          (fun (block, blocking, force) ->
             (block, Some blocking, force))
          (fun (block, blocking, force) ->
-            (block, Utils.unopt true blocking, force))
+            (block, Utils.unopt ~default:true blocking, force))
          (obj3
             (req "data" bytes)
             (opt "blocking"
@@ -557,7 +557,7 @@ let inject_operation =
     ~input:
       (conv
          (fun (block, blocking, force) -> (block, Some blocking, force))
-         (fun (block, blocking, force) -> (block, unopt true blocking, force))
+         (fun (block, blocking, force) -> (block, unopt ~default:true blocking, force))
          (obj3
             (req "signedOperationContents"
                (describe ~title: "Tezos signed operation (hex encoded)"
@@ -611,7 +611,7 @@ let inject_protocol =
     ~input:
       (conv
          (fun (proto, blocking, force) -> (rpc_of_proto proto, Some blocking, force))
-         (fun (proto, blocking, force) -> (proto_of_rpc proto, unopt true blocking, force))
+         (fun (proto, blocking, force) -> (proto_of_rpc proto, unopt ~default:true blocking, force))
          (obj3
             (req "protocol"
                (describe ~title: "Tezos protocol"
