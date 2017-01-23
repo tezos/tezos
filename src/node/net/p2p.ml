@@ -261,9 +261,8 @@ type ('msg, 'meta) t = {
 }
 type ('msg, 'meta) net = ('msg, 'meta) t
 
-let bootstrap ~config ~limits meta_cfg msg_cfg =
+let create ~config ~limits meta_cfg msg_cfg =
   Real.create ~config ~limits meta_cfg msg_cfg  >>= fun net ->
-  Real.maintain net () >>= fun () ->
   Lwt.return {
     gid = Real.gid net ;
     maintain = Real.maintain net ;

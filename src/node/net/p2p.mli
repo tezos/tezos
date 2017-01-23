@@ -124,7 +124,7 @@ type ('msg, 'meta) net = ('msg, 'meta) t
 val faked_network : ('msg, 'meta) net
 
 (** Main network initialisation function *)
-val bootstrap :
+val create :
   config:config -> limits:limits ->
   'meta meta_config -> 'msg message_config ->  ('msg, 'meta) net Lwt.t
 
