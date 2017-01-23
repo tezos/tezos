@@ -256,10 +256,10 @@ module Gid_info : sig
   module File : sig
     val load :
       string -> 'meta Data_encoding.t ->
-      ('conn, 'meta) gid_info list Lwt.t
+      ('conn, 'meta) gid_info list tzresult Lwt.t
     val save :
       string -> 'meta Data_encoding.t ->
-      ('conn, 'meta) gid_info list -> bool Lwt.t
+      ('conn, 'meta) gid_info list -> unit tzresult Lwt.t
   end
 
 end
