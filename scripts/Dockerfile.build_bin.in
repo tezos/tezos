@@ -1,0 +1,7 @@
+FROM $base_name:$base_version
+
+COPY . /home/opam/tezos
+RUN sudo chown -R opam /home/opam/tezos && \
+    opam config exec -- make -C tezos -j4 && \
+    mkdir bin && \
+    cp tezos/tezos-* bin

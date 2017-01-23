@@ -1,10 +1,10 @@
 variables:
-  ocaml_image: alpine_ocaml-4.03.0
-  build_image_name: ocp_tezos_build
+  image_name: ocp_tezos
+  image_id: ${CI_BUILD_REF_NAME}
+  build_image_name: ${image_name}_build_deps
   build_image_id: ${CI_BUILD_REF}
-  build_image: ${build_image_name}:${ocaml_image}
 
-image: ${build_image}_${build_image_id}
+image: ${build_image_name}:${build_image_id}
 
 stages:
   - build_deps
@@ -21,8 +21,8 @@ build_deps:
   tags:
     - docker_builder
   script:
-    - ./scripts/create_docker_builder.sh
-        ${build_image_name} ${ocaml_image} "_${build_image_id}"
+    - ./scripts/create_build_deps_docker_image.sh
+        ${build_image_name} ${build_image_id}
 
 build:
   stage: build
@@ -137,15 +137,29 @@ test:p2p-connection-pool:
     - build
     - build:test
 
-expurge:
-  stage: expurge
+publish:docker:
+  stage: publish
+  image: ocp:docker
+  tags:
+    - docker_builder
+  script:
+    - ./scripts/create_docker_image.sh ${image_name} ${build_image_id}
+    - docker tag ${image_name}:${build_image_id}
+        "$CI_REGISTRY_IMAGE:$CI_BUILD_REF_NAME"
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
+    - docker push "$CI_REGISTRY_IMAGE:$CI_BUILD_REF_NAME"
+    - docker rmi "$CI_REGISTRY_IMAGE:$CI_BUILD_REF_NAME"
+
+publish:github:
+  image: ocaml/opam
+  stage: publish
   tags:
     - tezos_builder
   only:
     - master@tezos/tezos
   script:
     - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - echo "${CI_PK_GITLAB}" > ~/.ssh/id_rsa
+    - echo "${CI_PK_GITHUB}" > ~/.ssh/id_rsa
     - chmod 400 ~/.ssh/id_rsa
     - rm -fr .git/refs/original
     - git filter-branch --prune-empty --index-filter
@@ -162,23 +176,7 @@ expurge:
                export GIT_AUTHOR_EMAIL="contact@tezos.com" ;
              fi'
          HEAD
-    - git tag ${CI_BUILD_REF}_expurged
-    - git push git@gitlab.ocamlpro.com:${CI_PROJECT_PATH}.git
-               -f --tags HEAD:master-expurged
-
-publish:github:
-  image: ocaml/opam:${ocaml_image}
-  stage: publish
-  tags:
-    - tezos_builder
-  only:
-    - master@tezos/tezos
-  script:
-    - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - echo "${CI_PK_GITHUB}" > ~/.ssh/id_rsa
-    - chmod 400 ~/.ssh/id_rsa
-    - git reset ${CI_BUILD_REF}_expurged
-    - git push git@github.com:tezos/tezos.git -f HEAD:master
+    - git push git@github.com:OCamlPro/tezos.git -f HEAD:master
 
 cleanup:
   stage: cleanup
@@ -186,7 +184,7 @@ cleanup:
   tags:
     - docker_builder
   script:
-    - docker tag ${build_image}_${build_image_id}
-                 ${build_image}_${CI_PROJECT_NAMESPACE}_${CI_BUILD_REF_NAME}
-    - docker rmi ${build_image}_${build_image_id}
+    - docker tag ${build_image_name}:${build_image_id}
+                 ${build_image_name}:${CI_PROJECT_NAMESPACE}_${CI_BUILD_REF_NAME}
+    - docker rmi ${build_image_name}:${build_image_id}
   when: always
