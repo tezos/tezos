@@ -14,14 +14,13 @@ open Error_monad
 open P2p_types
 include Logging.Make (struct let name = "test-p2p-connection" end)
 
-let proof_of_work_target =
-  Crypto_box.make_target [Int64.shift_left 1L 48]
+let proof_of_work_target = Crypto_box.make_target 16.
 let id1 = Identity.generate proof_of_work_target
 let id2 = Identity.generate proof_of_work_target
 
 let id0 =
   (* Luckilly, this will be an insuficient proof of work! *)
-  Identity.generate (Crypto_box.make_target [])
+  Identity.generate (Crypto_box.make_target 0.)
 
 let versions = Version.[{ name = "TEST" ; minor = 0 ; major = 0 }]
 
