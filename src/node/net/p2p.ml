@@ -224,7 +224,7 @@ end
 
 module Fake = struct
 
-  let id = Identity.generate Crypto_box.default_target
+  let id = Identity.generate (Crypto_box.make_target 0.)
   let empty_stat = {
     Stat.total_sent = 0 ;
     total_recv = 0 ;
