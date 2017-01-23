@@ -50,8 +50,8 @@ let fork_node () =
     Unix.create_process
       Filename.(concat (dirname (Sys.getcwd ())) "tezos-node")
       [| "tezos-node" ;
-         "--sandbox"; data_dir ;
-         "--sandbox-param"; "./sandbox.json";
+         "--base-dir"; data_dir ;
+         "--sandbox"; "./sandbox.json";
          "--rpc-addr"; ":::8732" |]
       null_fd log_fd log_fd in
   Printf.printf "Created node, pid: %d, log: %s\n%!" pid log_file_name ;
