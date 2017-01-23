@@ -555,25 +555,23 @@ let inject_operation =
        RPCs ubder /blocks/prevalidation for more details on the \
        prevalidation context."
     ~input:
-      (conv
-         (fun (block, blocking, force) -> (block, Some blocking, force))
-         (fun (block, blocking, force) -> (block, unopt ~default:true blocking, force))
-         (obj3
-            (req "signedOperationContents"
-               (describe ~title: "Tezos signed operation (hex encoded)"
-                  bytes))
-            (opt "blocking"
-               (describe
-                  ~description:
-                    "Should the RPC wait for the operation to be \
-                     (pre-)validated before to answer. (default: true)"
-                  bool))
-            (opt "force"
-               (describe
-                  ~description:
-                    "Should we inject operation that are \"branch_refused\" \
-                     or \"branch_delayed\". (default: false)"
-                  bool))))
+      (obj3
+         (req "signedOperationContents"
+            (describe ~title: "Tezos signed operation (hex encoded)"
+               bytes))
+         (dft "blocking"
+            (describe
+               ~description:
+                 "Should the RPC wait for the operation to be \
+                  (pre-)validated before to answer. (default: true)"
+               bool)
+            true)
+         (opt "force"
+            (describe
+               ~description:
+                 "Should we inject operation that are \"branch_refused\" \
+                  or \"branch_delayed\". (default: false)"
+               bool)))
     ~output:
       (Error.wrap @@
        describe
@@ -582,21 +580,6 @@ let inject_operation =
     RPC.Path.(root / "inject_operation")
 
 let inject_protocol =
-  let proto =
-    (list
-       (obj3
-          (req "name"
-             (describe ~title:"OCaml module name"
-                string))
-          (opt "interface"
-             (describe
-                ~description:"Content of the .mli file"
-                string))
-          (req "implementation"
-             (describe
-                ~description:"Content of the .ml file"
-                string))))
-  in
   let proto_of_rpc =
     List.map (fun (name, interface, implementation) ->
         { Tezos_compiler.Protocol.name; interface; implementation })
@@ -605,28 +588,44 @@ let inject_protocol =
     List.map (fun { Tezos_compiler.Protocol.name; interface; implementation } ->
                 (name, interface, implementation))
   in
+  let proto =
+    conv
+      rpc_of_proto
+      proto_of_rpc
+      (list
+         (obj3
+            (req "name"
+               (describe ~title:"OCaml module name"
+                  string))
+            (opt "interface"
+               (describe
+                  ~description:"Content of the .mli file"
+                  string))
+            (req "implementation"
+               (describe
+                  ~description:"Content of the .ml file"
+                  string))))
+  in
   RPC.service
     ~description:
       "Inject a protocol in node. Returns the ID of the protocol."
     ~input:
-      (conv
-         (fun (proto, blocking, force) -> (rpc_of_proto proto, Some blocking, force))
-         (fun (proto, blocking, force) -> (proto_of_rpc proto, unopt ~default:true blocking, force))
-         (obj3
-            (req "protocol"
-               (describe ~title: "Tezos protocol"
-                  proto))
-            (opt "blocking"
-               (describe
-                  ~description:
-                    "Should the RPC wait for the protocol to be \
-                     validated before to answer. (default: true)"
-                  bool))
-            (opt "force"
-               (describe
-                  ~description:
-                    "Should we inject protocol that is invalid. (default: false)"
-                  bool))))
+      (obj3
+         (req "protocol"
+            (describe ~title: "Tezos protocol"
+               proto))
+         (dft "blocking"
+            (describe
+               ~description:
+                 "Should the RPC wait for the protocol to be \
+                  validated before to answer. (default: true)"
+               bool)
+            true)
+         (opt "force"
+            (describe
+               ~description:
+                 "Should we inject protocol that is invalid. (default: false)"
+               bool)))
     ~output:
       (Error.wrap @@
        describe
