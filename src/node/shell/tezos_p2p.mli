@@ -8,7 +8,7 @@ type net
 val faked_network : net
 
 (** Main network initialisation function *)
-val bootstrap : config:config -> limits:limits -> net Lwt.t
+val create : config:config -> limits:limits -> net Lwt.t
 
 (** A maintenance operation : try and reach the ideal number of peers *)
 val maintain : net -> unit Lwt.t

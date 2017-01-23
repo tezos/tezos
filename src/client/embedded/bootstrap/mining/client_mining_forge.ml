@@ -171,9 +171,9 @@ end = struct
     let filename = filename () in
     if not (Sys.file_exists filename) then return LevelMap.empty else
       Data_encoding_ezjsonm.read_file filename >>= function
-      | None ->
+      | Error _ ->
           failwith "couldn't to read the block file"
-      | Some json ->
+      | Ok json ->
           match Data_encoding.Json.destruct encoding json with
           | exception _ -> (* TODO print_error *)
               failwith "didn't understand the block file"
@@ -189,8 +189,8 @@ end = struct
          let filename = filename () in
          let json = Data_encoding.Json.construct encoding map in
          Data_encoding_ezjsonm.write_file filename json >>= function
-         | false -> failwith "Json.write_file"
-         | true -> return ())
+         | Error _ -> failwith "Json.write_file"
+         | Ok () -> return ())
       (fun exn ->
          Error_monad.failwith
            "could not write the block file: %s."

@@ -16,8 +16,8 @@ val increment_nonce : ?step:int -> nonce -> nonce
 val nonce_encoding : nonce Data_encoding.t
 
 type target
-val make_target : (* unsigned *) Int64.t list -> target
 val default_target : target
+val make_target : float -> target
 
 type secret_key
 type public_key
@@ -38,5 +38,5 @@ val fast_box        : channel_key -> MBytes.t -> nonce -> MBytes.t
 val fast_box_open   : channel_key -> MBytes.t -> nonce -> MBytes.t option
 
 val check_proof_of_work : public_key -> nonce -> target -> bool
-val generate_proof_of_work : public_key -> target -> nonce
+val generate_proof_of_work : ?max:int -> public_key -> target -> nonce
 

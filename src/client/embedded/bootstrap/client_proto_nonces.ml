@@ -29,8 +29,9 @@ let load cctxt =
     Lwt.return []
   else
     Data_encoding_ezjsonm.read_file filename >>= function
-    | None -> cctxt.Client_commands.error "couldn't to read the nonces file"
-    | Some json ->
+    | Error _ ->
+        cctxt.Client_commands.error "couldn't to read the nonces file"
+    | Ok json ->
         match Data_encoding.Json.destruct encoding json with
         | exception _ -> (* TODO print_error *)
             cctxt.Client_commands.error "didn't understand the nonces file"
@@ -51,8 +52,8 @@ let save cctxt list =
        let filename = filename () in
        let json = Data_encoding.Json.construct encoding list in
        Data_encoding_ezjsonm.write_file filename json >>= function
-       | false -> failwith "Json.write_file"
-       | true -> return ())
+       | Error _ -> failwith "Json.write_file"
+       | Ok () -> return ())
     (fun exn ->
        cctxt.Client_commands.error
          "could not write the nonces file: %s." (Printexc.to_string exn))
