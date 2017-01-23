@@ -5,8 +5,8 @@ set -e
 DIR=$(dirname "$0")
 cd "${DIR}"
 
-DATA_DIR=$(mktemp -d /tmp/tezos_node.XXXXXXXXXX)
-CLIENT_DIR=$(mktemp -d /tmp/tezos_client.XXXXXXXXXX)
+DATA_DIR="$(mktemp -td tezos_node.XXXXXXXXXX)"
+CLIENT_DIR="$(mktemp -td tezos_client.XXXXXXXXXX)"
 
 cleanup() {
     rm -fr ${DATA_DIR} ${CLIENT_DIR}
@@ -17,8 +17,8 @@ trap cleanup EXIT QUIT INT
 NODE=../tezos-node
 CLIENT="../tezos-client -base-dir ${CLIENT_DIR}"
 
-CUSTOM_PARAM="--sandbox-param ./sandbox.json"
-${NODE} --sandbox "${DATA_DIR}" ${CUSTOM_PARAM} --rpc-addr :::8732 > LOG 2>&1 &
+CUSTOM_PARAM="--sandbox ./sandbox.json"
+${NODE} --base-dir "${DATA_DIR}" ${CUSTOM_PARAM} --rpc-addr :::8732 > LOG 2>&1 &
 NODE_PID="$!"
 
 sleep 3

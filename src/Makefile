@@ -65,7 +65,7 @@ node/updater/proto_environment.cmi: \
 	@echo OCAMLOPT ${TARGET} $@
 	@$(OCAMLOPT) -nopervasives -nostdlib -opaque -I tmp -I node/updater -c $<
 
-clean::
+partial-clean::
 	rm -f node/updater/proto_environment.mli
 	rm -f node/updater/environment_gen
 
@@ -91,7 +91,7 @@ compiler/embedded_cmis.cmx: compiler/embedded_cmis.cmi
 compiler/embedded_cmis.ml: ${EMBEDDED_PROTOCOL_LIB_CMIS}
 	@echo OCAMLRES ${TARGET} $(notdir $@)
 	@$(OCAMLRES) -format ocaml -o $@ $^
-clean::
+partial-clean::
 	rm -f compiler/embedded_cmis.ml
 	rm -rf tmp
 
@@ -168,12 +168,12 @@ UTILS_LIB_INTFS := \
 UTILS_LIB_IMPLS := \
   utils/base48.ml \
   utils/cli_entries.ml \
+  utils/error_monad_sig.ml \
+  utils/error_monad.ml \
   utils/data_encoding_ezjsonm.ml \
   utils/time.ml \
   utils/hash.ml \
   utils/crypto_box.ml \
-  utils/error_monad_sig.ml \
-  utils/error_monad.ml \
   utils/lwt_exit.ml \
   utils/logging.ml \
   utils/lwt_utils.ml \
@@ -368,7 +368,7 @@ ${TZNODE}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa ${EMBEDDED_NODE_PROT
 	@echo LINK $(notdir $@)
 	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
-clean::
+partial-clean::
 	-rm -f proto/*.cm* proto/*.a
 
 ## Embedded protocol modules
@@ -398,8 +398,6 @@ proto/client_embedded_proto_%.cmxa: \
 	   -build-dir client/embedded/$*/_tzbuild \
 	   $(addprefix -I , ${CLIENT_PROTO_INCLUDES}) \
 	   $@ proto/$*
-
-
 
 clean::
 	rm -f ${TZNODE}
@@ -529,7 +527,7 @@ client/embedded/webclient_%.cmx: \
   $$(shell find client/embedded/%/webclient/static/)
 	@$(MAKE) -C client/embedded/$* ../webclient_$*.cmx
 
-clean::
+partial-clean::
 	-for d in $$(ls -d client/embedded/*/) ; do make clean -C $$d ; done
 	-rm -f client/embedded/*.cm* client/embedded/*.o
 
@@ -601,8 +599,9 @@ clean::
 
 ## Cleaning
 
-.PHONY: clean
-clean::
+.PHONY: clean partial-clean
+clean:: partial-clean
+partial-clean::
 	-find \( -name \*.cm\* -or -name \*.cmp -or -name \*.out -or -name \*~ -or -name \*.o -or -name \*.a \) -delete
 
 ## Dependencies
@@ -652,6 +651,6 @@ compiler/tezos_compiler.cmo compiler/tezos_compiler.cmx: \
 	@echo OCAMLDEP ${TARGET} $(notdir $^)
 	@$(OCAMLDEP) $(INCLUDES) $^ > $@
 
-clean::
+partial-clean::
 	-rm -f .depend
 	-find \( -name \*.mli.deps -or -name \*.ml.deps \) -delete

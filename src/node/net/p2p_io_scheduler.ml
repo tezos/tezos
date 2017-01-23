@@ -147,7 +147,7 @@ module Scheduler(IO : IO) = struct
       canceler = Canceler.create () ;
       worker = Lwt.return_unit ;
       counter = Moving_average.create ~init:0 ~alpha ;
-      max_speed ; quota = unopt 0 max_speed ;
+      max_speed ; quota = unopt ~default:0 max_speed ;
       quota_updated = Lwt_condition.create () ;
       readys = Lwt_condition.create () ;
       readys_high = Queue.create () ;
@@ -358,9 +358,9 @@ let write_now { write_queue } msg = Lwt_pipe.push_now write_queue msg
 
 let read_from conn ?pos ?len buf msg =
   let maxlen = MBytes.length buf in
-  let pos = unopt 0 pos in
+  let pos = unopt ~default:0 pos in
   assert (0 <= pos && pos < maxlen) ;
-  let len = unopt (maxlen - pos) len in
+  let len = unopt ~default:(maxlen - pos) len in
   assert (len <= maxlen - pos) ;
   match msg with
   | Ok msg ->
@@ -400,8 +400,8 @@ let read conn ?pos ?len buf =
 
 let read_full conn ?pos ?len buf =
   let maxlen = MBytes.length buf in
-  let pos = unopt 0 pos in
-  let len = unopt (maxlen - pos) len in
+  let pos = unopt ~default:0 pos in
+  let len = unopt ~default:(maxlen - pos) len in
   assert (0 <= pos && pos < maxlen) ;
   assert (len <= maxlen - pos) ;
   let rec loop pos len =

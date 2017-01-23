@@ -16,12 +16,15 @@ type error_category = [ `Branch | `Temporary | `Permanent ]
 type 'err full_error_category =
   [ error_category | `Wrapped of 'err -> error_category ]
 
+(* HACK: forward reference from [Data_encoding_ezjsonm] *)
+let json_to_string = ref (fun _ -> "")
+
 let json_pp id encoding ppf x =
+  Format.pp_print_string ppf @@
+  !json_to_string @@
   let encoding =
     Data_encoding.(merge_objs (obj1 (req "id" string)) encoding) in
-  Format.pp_print_string ppf @@
-  Data_encoding_ezjsonm.to_string @@
-  Data_encoding.Json.(construct encoding (id, x))
+  Data_encoding.Json.construct encoding (id, x)
 
 module Make() = struct
 
@@ -76,7 +79,7 @@ module Make() = struct
                    category ;
                    from_error ;
                    encoding_case ;
-                   pp = Utils.unopt (json_pp name encoding) pp } :: !error_kinds
+                   pp = Utils.unopt ~default:(json_pp name encoding) pp } :: !error_kinds
 
   let register_wrapped_error_kind
       category ~id ~title ~description ?pp
@@ -175,11 +178,6 @@ module Make() = struct
   let ok v = Ok v
 
   let fail s = Lwt.return (Error [ s ])
-
-  let protect ~on_error t =
-    t >>= function
-    | Ok res -> return res
-    | Error err -> on_error err
 
   let (>>?) v f =
     match v with
@@ -327,6 +325,11 @@ let () =
   error_kinds :=
     Error_kind { id; from_error ; category; encoding_case ; pp } :: !error_kinds
 
+let protect ~on_error t =
+  t  >>= function
+  | Ok res -> return res
+  | Error err -> on_error err
+
 end
 
 include Make()
@@ -341,6 +344,14 @@ let error s = Error [ s ]
 let error_exn s = Error [ Exn s ]
 let trace_exn exn f = trace (Exn exn) f
 let record_trace_exn exn f = record_trace (Exn exn) f
+
+let protect ?on_error t =
+  Lwt.catch t (fun exn -> fail (Exn exn)) >>= function
+  | Ok res -> return res
+  | Error err ->
+      match on_error with
+      | Some f -> f err
+      | None -> Lwt.return (Error err)
 
 let pp_exn ppf exn = pp ppf (Exn exn)
 
