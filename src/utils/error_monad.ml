@@ -74,7 +74,7 @@ module Make() = struct
                    category ;
                    from_error ;
                    encoding_case ;
-                   pp = Utils.unopt (json_pp encoding) pp } :: !error_kinds
+                   pp = Utils.unopt ~default:(json_pp encoding) pp } :: !error_kinds
 
   let register_wrapped_error_kind
       category ~id ~title ~description ?pp
