@@ -126,7 +126,7 @@ let run_net config repeat points addr port =
 
 let make_net points repeat n =
   let point, points = Utils.select n points in
-  let proof_of_work_target = Crypto_box.make_target [] in
+  let proof_of_work_target = Crypto_box.make_target 0. in
   let identity = Identity.generate proof_of_work_target in
   let config = P2p_connection_pool.{
     identity ;
