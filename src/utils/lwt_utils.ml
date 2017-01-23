@@ -346,12 +346,14 @@ let remove_dir dir =
     Lwt.return ()
 
 let rec create_dir ?(perm = 0o755) dir =
-  if Sys.file_exists dir then
-    Lwt.return ()
-  else begin
-    create_dir (Filename.dirname dir) >>= fun () ->
-    Lwt_unix.mkdir dir perm
-  end
+  Lwt_unix.file_exists dir >>= function
+  | false ->
+      create_dir (Filename.dirname dir) >>= fun () ->
+      Lwt_unix.mkdir dir perm
+  | true ->
+      Lwt_unix.stat dir >>= function
+      | {st_kind = S_DIR} -> Lwt.return_unit
+      | _ -> failwith "Not a directory"
 
 let create_file ?(perm = 0o644) name content =
   Lwt_unix.openfile name Unix.([O_TRUNC; O_CREAT; O_WRONLY]) perm >>= fun fd ->
@@ -402,4 +404,6 @@ let with_timeout ?(canceler = Canceler.create ()) timeout f =
       Canceler.cancel canceler >>= fun () ->
       fail Timeout
 
+let unless cond f =
+  if cond then Lwt.return () else f ()
 
