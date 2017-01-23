@@ -449,7 +449,7 @@ module Gid_info = struct
 
     let load path metadata_encoding =
       let enc = Data_encoding.list (encoding metadata_encoding) in
-      if Sys.file_exists path then
+      if path <> "/dev/null" && Sys.file_exists path then
         Data_encoding_ezjsonm.read_file path >>=? fun json ->
         return (Data_encoding.Json.destruct enc json)
       else

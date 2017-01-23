@@ -215,9 +215,17 @@ let init_p2p net_params =
       Lwt.async (fun () -> Tezos_p2p.maintain p2p) ;
       Lwt.return p2p
 
+type config = {
+  genesis: Store.genesis ;
+  store_root: string ;
+  context_root: string ;
+  test_protocol: Protocol_hash.t option ;
+  patch_context: (Context.t -> Context.t Lwt.t) option ;
+  p2p: (P2p.config * P2p.limits) option ;
+}
 
-let create
-    ~genesis ~store_root ~context_root ?test_protocol ?patch_context net_params =
+let create { genesis ; store_root ; context_root ;
+             test_protocol ; patch_context ; p2p = net_params } =
   lwt_debug "-> Node.create" >>= fun () ->
   init_p2p net_params >>= fun p2p ->
   lwt_log_info "reading state..." >>= fun () ->
