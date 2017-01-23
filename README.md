@@ -61,7 +61,7 @@ Running the node in a sandbox
 To run a single instance of a Tezos node in sandbox mode:
 
 ```
-./tezos-node --sandbox /path/to/a/custom/data/dir --rpc-addr :::8732
+./tezos-node --sandbox --rpc-addr :::8732
 ```
 
 This "sandboxed" node will not participate in the P2P network, but will accept
@@ -77,20 +77,22 @@ test network. Use the following command to run a node that will accept incoming
 connections:
 
 ```
-./tezos-node
+./tezos-node --generate-identity --expected-pow 24.
 ```
 
-The node will listen to connections coming in on `0.0.0.0:9732` (and
-`[::]:9732`). All used data is stored at `$HOME/.tezos-node/`. For example,
-the default configuration file is at `$HOME/.tezos-node/config`.
+This will first generate a new node identity and compute the associated stamp
+of proof-of-work. Then, the node will listen to connections coming in on
+`0.0.0.0:9732` (and`[::]:9732`). All used data is stored at
+`$HOME/.tezos-node/`. For example, the default configuration file is
+at `$HOME/.tezos-node/config.json`.
 
 To run multiple nodes on the same machine, you can duplicate and edit
-`$HOME/.tezos-node/config` while making sure they don't share paths to the
+`$HOME/.tezos-node/config.json` while making sure they don't share paths to the
 database or any other data file (cf. options `db.store` ; `db.context` ;
-`net.peers` and `protocol.dir`).
+`db.protocol`, `net.peers-metadata` and `net.identity`).
 
 You could also let Tezos generate a config file by specifying options on the
-command line. For instance, if `$dir/config` does not exist, the following
+command line. For instance, if `$dir/config.json` does not exist, the following
 command will generate it and replace the default values with the values from
 the command line:
 
@@ -102,20 +104,23 @@ The Tezos server has a built-in mechanism to discover peers on the local
 network (using UDP packets broadcasted on port 7732).
 
 If this mechanism is not sufficient, one can provide Tezos with a list of
-initial peers, either by editing the option `net.bootstrap.peers` in the
-`config` file, or by specifying a command line parameter:
+initial peers, either by editing the option `net.bootstrap-peers` in the
+`config.json` file, or by specifying a command line parameter:
 
 ```
 ./tezos-node --base-dir "$dir" --net-addr 127.0.0.1:2023 \
              --peer 127.0.0.1:2021 --peer 127.0.0.1:2022
 ```
 
-If `"$dir"/config` exists, the command line options override those read in the
-config file. Tezos won't modify the content of an existing `"$dir"/config`
-file.
+If `"$dir"/config.json` exists, the command line options override those
+read in the config file. By default, Tezos won't modify the content of an
+existing `"$dir"/config.json` file. But, you may explicit ask the node
+to reset or to update the file according to the command line parameters
+with the following commands line:
 
 ```
-./tezos-node --config-file "$dir"/config
+./tezos-node --reset-config --base-dir "$dir" --net-addr 127.0.0.1:9733
+./tezos-node --update-config --base-dir "$dir" --net-addr 127.0.0.1:9734
 ```
 
 
@@ -129,7 +134,7 @@ Typically, if you are not trying to run a local network and just want to
 explore the RPC, you would run:
 
 ```
-./tezos-node --sandbox /path/to/a/custom/data/dir --rpc-addr :::8732
+./tezos-node --sandbox --rpc-addr :::8732
 ```
 
 The RPC interface is self-documented and the `tezos-client` executable is able
@@ -151,7 +156,7 @@ You might also want the JSON schema describing the expected input and output of
 a RPC. For instance:
 
 ```
-./tezos-client rpc schema /block/genesis/hash
+./tezos-client rpc schema /blocks/genesis/hash
 ```
 
 Note: you can get the same information, but as a raw JSON object, with a simple
