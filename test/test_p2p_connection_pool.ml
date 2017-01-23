@@ -182,6 +182,7 @@ let spec = Arg.[
 
 let main () =
   let open Utils in
+  Logging.init Stderr >>= fun () ->
   let anon_fun num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
@@ -191,7 +192,5 @@ let main () =
 
 let () =
   Sys.catch_break true ;
-  try
-    Logging.init Stderr ;
-    Lwt_main.run @@ main ()
+  try Lwt_main.run @@ main ()
   with _ -> ()
