@@ -51,9 +51,9 @@ end = struct
     let filename = filename () in
     if not (Sys.file_exists filename) then return LevelMap.empty else
       Data_encoding_ezjsonm.read_file filename >>= function
-      | None ->
+      | Error _ ->
           cctxt.Client_commands.error "couldn't to read the endorsement file"
-      | Some json ->
+      | Ok json ->
           match Data_encoding.Json.destruct encoding json with
           | exception _ -> (* TODO print_error *)
               cctxt.Client_commands.error "didn't understand the endorsement file"
@@ -69,8 +69,8 @@ end = struct
          let filename = filename () in
          let json = Data_encoding.Json.construct encoding map in
          Data_encoding_ezjsonm.write_file filename json >>= function
-         | false -> failwith "Json.write_file"
-         | true -> return ())
+         | Error _ -> failwith "Json.write_file"
+         | Ok () -> return ())
       (fun exn ->
          cctxt.Client_commands.error "could not write the endorsement file: %s."
            (Printexc.to_string exn))
