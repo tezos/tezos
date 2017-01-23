@@ -170,8 +170,8 @@ let max_download_speed = ref None
 let max_upload_speed = ref None
 
 let read_buffer_size = ref (1 lsl 14)
-let read_queue_size = ref (Some (4096 * 16))
-let write_queue_size = ref (Some (4096 * 16))
+let read_queue_size = ref (Some (1 lsl 14))
+let write_queue_size = ref (Some (1 lsl 14))
 
 let delay = ref 60.
 let clients = ref 8
