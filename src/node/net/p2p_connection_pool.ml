@@ -248,12 +248,13 @@ let active_connections pool = Gid.Table.length pool.connected_gids
 let create_connection pool conn id_point pi gi =
   let gid = Gid_info.gid gi in
   let canceler = Canceler.create () in
-  let size = map_option pool.config.incoming_app_message_queue_size
-      ~f:(fun qs -> qs, fun (size, _) -> (Sys.word_size / 8) * (11 + size))
-  in
+  let size =
+    map_option pool.config.incoming_app_message_queue_size
+      ~f:(fun qs -> qs, fun (size, _) -> (Sys.word_size / 8) * 11 + size) in
   let messages = Lwt_pipe.create ?size () in
   let callback =
-    { Answerer.message = (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
+    { Answerer.message =
+        (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
       advertise = register_new_points pool gid ;
       bootstrap = list_known_points pool gid ;
     } in

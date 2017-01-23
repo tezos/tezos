@@ -21,7 +21,8 @@ type 'a t =
   }
 
 let create ?size () =
-  let max_size, compute_size = match size with
+  let max_size, compute_size =
+    match size with
     | None -> max_int, (fun _ -> 0)
     | Some (max_size, compute_size) ->
         max_size, (fun e -> 4 * (Sys.word_size / 8) + compute_size e) in
@@ -77,16 +78,15 @@ exception Closed
 
 let rec push ({ closed ; queue ; current_size ;
                 max_size ; compute_size} as q) elt =
-  if closed then Lwt.fail Closed
-  else
-    let elt_size = compute_size elt in
-  if current_size + elt_size < max_size then begin
+  let elt_size = compute_size elt in
+  if closed then
+    Lwt.fail Closed
+  else if current_size + elt_size < max_size || Queue.is_empty queue then begin
     Queue.push (elt_size, elt) queue ;
     q.current_size <- current_size + elt_size ;
     notify_push q ;
     Lwt.return_unit
-  end
-  else
+  end else
     wait_pop q >>= fun () ->
     push q elt
 
@@ -95,7 +95,7 @@ let rec push_now ({ closed ; queue ; compute_size ;
                   } as q) elt =
   if closed then raise Closed ;
   let elt_size = compute_size elt in
-  (current_size + elt_size < max_size)
+  (current_size + elt_size < max_size || Queue.is_empty queue)
   && begin
     Queue.push (elt_size, elt) queue ;
     q.current_size <- current_size + elt_size ;

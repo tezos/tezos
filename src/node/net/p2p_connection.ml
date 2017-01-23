@@ -10,8 +10,6 @@
 (* TODO encode/encrypt before to push into the writer pipe. *)
 (* TODO patch Sodium.Box to avoid allocation of the encrypted buffer.*)
 (* TODO patch Data_encoding for continuation-based binary writer/reader. *)
-(* TODO use queue bound by memory size of its elements, not by the
-        number of elements. *)
 (* TODO test `close ~wait:true`. *)
 (* TODO nothing in welcoming message proves that the incoming peer is
         the owner of the public key... only the first message will
@@ -247,6 +245,11 @@ module Reader = struct
         Lwt.return_unit
 
   let run ?size conn encoding canceler =
+    let compute_size = function
+      | Ok (size, _) -> (Sys.word_size / 8) * 11 + size
+      | Error _ -> 0 (* we push Error only when we close the socket,
+                        we don't fear memory leaks in that case... *) in
+    let size = map_option size ~f:(fun max -> (max, compute_size)) in
     let st =
       { canceler ; conn ; encoding ;
         messages = Lwt_pipe.create ?size () ;
@@ -303,6 +306,13 @@ module Writer = struct
         Lwt.return_unit
 
   let run ?size conn encoding canceler =
+    let compute_size = function
+      | msg, None ->
+          10 * (Sys.word_size / 8) + Data_encoding.Binary.length encoding msg
+      | msg, Some _ ->
+          18 * (Sys.word_size / 8) + Data_encoding.Binary.length encoding msg
+    in
+    let size = map_option size ~f:(fun max -> max, compute_size) in
     let st =
       { canceler ; conn ; encoding ;
         messages = Lwt_pipe.create ?size () ;
@@ -350,24 +360,9 @@ let accept
   let canceler = Canceler.create () in
   let conn = { fd ; info ; cryptobox_data } in
   let reader =
-    let compute_size = function
-      | Ok (size, _) -> (Sys.word_size / 8) * 11 + size
-      | Error err -> (Sys.word_size / 8) * (3 + 3 * (List.length err))
-    in
-    let size = map_option incoming_message_queue_size
-        ~f:(fun qs -> (qs, compute_size)) in
-    Reader.run ?size conn encoding canceler
+    Reader.run ?size:incoming_message_queue_size conn encoding canceler
   and writer =
-    let compute_size = function
-      | msg, None ->
-          10 * (Sys.word_size / 8) + Data_encoding.Binary.length encoding msg
-      | msg, Some _ ->
-          18 * (Sys.word_size / 8) + Data_encoding.Binary.length encoding msg
-    in
-    let size = map_option outgoing_message_queue_size
-        ~f:(fun qs -> qs, compute_size)
-    in
-    Writer.run ?size conn encoding canceler in
+    Writer.run ?size:outgoing_message_queue_size conn encoding canceler in
   let conn = { conn ; reader ; writer } in
   Canceler.on_cancel canceler begin fun () ->
     P2p_io_scheduler.close fd >>= fun _ ->
