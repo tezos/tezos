@@ -9,13 +9,16 @@
 
 module StringMap = Map.Make (String)
 
-let split delim ?(limit = max_int) path =
+let split delim ?(dup = true) ?(limit = max_int) path =
   let l = String.length path in
   let rec do_slashes acc limit i =
     if i >= l then
       List.rev acc
     else if String.get path i = delim then
-      do_slashes acc limit (i + 1)
+      if dup then
+        do_slashes acc limit (i + 1)
+      else
+        do_split acc limit (i + 1)
     else
       do_split acc limit i
   and do_split acc limit i =
@@ -55,8 +58,8 @@ let iter_option ~f = function
   | None -> ()
   | Some x -> f x
 
-let unopt x = function
-  | None -> x
+let unopt ~default = function
+  | None -> default
   | Some x -> x
 
 let unopt_map ~f ~default = function
@@ -85,8 +88,16 @@ let list_sub l n = list_rev_sub l n |> List.rev
 
 let display_paragraph ppf description =
   Format.fprintf ppf "@[%a@]"
-    (fun ppf words -> List.iter (Format.fprintf ppf "%s@ ") words)
-    (split ' ' description)
+    (Format.pp_print_list ~pp_sep:Format.pp_print_newline
+       (fun ppf line ->
+          Format.pp_print_list ~pp_sep:Format.pp_print_space
+            (fun ppf w ->
+               (* replace &nbsp; by real spaces... *)
+               Format.fprintf ppf "%s@ "
+                 (Stringext.replace_all ~pattern:"\xC2\xA0" ~with_:" " w))
+            ppf
+            (split ' ' line)))
+    (split ~dup:false '\n' description)
 
 let rec remove_elem_from_list nb = function
   | [] -> []
@@ -127,6 +138,8 @@ let rec (--) i j =
   let rec loop acc j =
     if j < i then acc else loop (j :: acc) (pred j) in
   loop [] j
+
+let rec repeat n x = if n <= 0 then [] else x :: repeat (pred n) x
 
 let take_n_unsorted n l =
   let rec loop acc n = function

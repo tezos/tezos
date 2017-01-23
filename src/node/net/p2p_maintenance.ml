@@ -79,6 +79,7 @@ let rec try_to_contact
     let contactable =
       connectable st start_time max_to_contact in
     if contactable = [] then
+      Lwt_unix.yield () >>= fun () ->
       Lwt.return_false
     else
       List.fold_left
@@ -111,11 +112,11 @@ let rec maintain st =
 and too_few_connections st n_connected =
   let Pool pool = st.pool in
   (* too few connections, try and contact many peers *)
-  lwt_debug "Too few connections (%d)" n_connected >>= fun () ->
+  lwt_log_notice "Too few connections (%d)" n_connected >>= fun () ->
   let min_to_contact = st.bounds.min_target - n_connected in
   let max_to_contact = st.bounds.max_target - n_connected in
-  try_to_contact st min_to_contact max_to_contact >>= fun continue ->
-  if not continue then begin
+  try_to_contact st min_to_contact max_to_contact >>= fun success ->
+  if success then begin
     maintain st
   end else begin
     (* not enough contacts, ask the pals of our pals,

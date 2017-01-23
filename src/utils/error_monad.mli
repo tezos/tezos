@@ -26,6 +26,10 @@ val failwith :
   ('a, Format.formatter, unit, 'b tzresult Lwt.t) format4 ->
   'a
 
+val protect :
+  ?on_error: (error list -> 'a tzresult Lwt.t) ->
+  (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
+
 val error_exn : exn -> 'a tzresult
 val record_trace_exn : exn -> 'a tzresult -> 'a tzresult
 val trace_exn : exn -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
@@ -35,3 +39,6 @@ type error += Exn of exn
 type error += Unclassified of string
 
 module Make() : Error_monad_sig.S
+
+(**/**)
+val json_to_string : (Data_encoding.json -> string) ref

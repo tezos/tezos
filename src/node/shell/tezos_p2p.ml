@@ -106,8 +106,8 @@ and msg_cfg : _ P2p.message_config = {
 
 type net = (Message.t, Metadata.t) P2p.net
 
-let bootstrap ~config ~limits =
-  P2p.bootstrap ~config ~limits meta_cfg msg_cfg
+let create ~config ~limits =
+  P2p.create ~config ~limits meta_cfg msg_cfg
 
 let broadcast = P2p.broadcast
 let try_send = P2p.try_send

@@ -48,12 +48,34 @@ module Webclient : LOG
 
 module Make(S: sig val name: string end) : LOG
 
+type level = Lwt_log_core.level =
+  | Debug
+      (** Debugging message. They can be automatically removed by the
+          syntax extension. *)
+  | Info
+      (** Informational message. Suitable to be displayed when the
+          program is in verbose mode. *)
+  | Notice
+      (** Same as {!Info}, but is displayed by default. *)
+  | Warning
+      (** Something strange happend *)
+  | Error
+      (** An error message, which should not means the end of the
+          program. *)
+  | Fatal
+
+type template = Lwt_log.template
+val default_template : template
+
+val level_encoding : level Data_encoding.t
+
 type kind =
   | Null
   | Stdout
   | Stderr
   | File of string
-  | Syslog
-  | Manual of Lwt_log.logger
+  | Syslog of Lwt_log.syslog_facility
 
-val init: kind -> unit
+val kind_encoding : kind Data_encoding.t
+
+val init: ?template:template -> kind -> unit Lwt.t
