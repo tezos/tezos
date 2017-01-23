@@ -207,19 +207,19 @@ module Cfg_file = struct
          (rpc_addr, cors_origins, cors_headers),
          log_output) ->
          let open Utils in
-         let store = unopt default_cfg.store store in
-         let context = unopt default_cfg.context context in
-         let protocol = unopt default_cfg.protocol protocol in
+         let store = unopt ~default:default_cfg.store store in
+         let context = unopt ~default:default_cfg.context context in
+         let protocol = unopt ~default:default_cfg.protocol protocol in
          let net_addr = map_option sockaddr_of_string_exn net_addr in
-         let net_addr, net_port = unopt (default_cfg.net_addr, default_cfg.net_port) net_addr in
+         let net_addr, net_port = unopt ~default:(default_cfg.net_addr, default_cfg.net_port) net_addr in
          let rpc_addr = map_option sockaddr_of_string_exn rpc_addr in
-         let peers = unopt [] peers in
+         let peers = unopt ~default:[] peers in
          let peers = ListLabels.map peers ~f:sockaddr_of_string_exn in
-         let peers_cache = unopt default_cfg.peers_cache peers_cache in
-         let log_output = unopt default_cfg.log_output (map_option log_of_string log_output) in
-         let min_connections = unopt default_cfg.min_connections min_connections in
-         let max_connections = unopt default_cfg.max_connections max_connections in
-         let expected_connections = unopt default_cfg.expected_connections expected_connections in
+         let peers_cache = unopt ~default:default_cfg.peers_cache peers_cache in
+         let log_output = unopt ~default:default_cfg.log_output (map_option log_of_string log_output) in
+         let min_connections = unopt ~default:default_cfg.min_connections min_connections in
+         let max_connections = unopt ~default:default_cfg.max_connections max_connections in
+         let expected_connections = unopt ~default:default_cfg.expected_connections expected_connections in
          (* let local_discovery = map_option local_discovery ~f:mcast_params_of_string in *)
          { default_cfg with
            store ; context ; protocol ;
@@ -320,8 +320,8 @@ module Cmdline = struct
       (* local_discovery *)
       peers closed rpc_addr tls cors_origins cors_headers reset_cfg update_cfg =
 
-    let base_dir = Utils.(unopt (unopt default_cfg.base_dir base_dir) sandbox) in
-    let config_file = Utils.(unopt ((unopt base_dir sandbox) // "config")) config_file in
+    let base_dir = Utils.(unopt ~default:(unopt ~default:default_cfg.base_dir base_dir) sandbox) in
+    let config_file = Utils.(unopt ~default:((unopt ~default:base_dir sandbox) // "config")) config_file in
     let no_config () =
       warn "Found no config file at %s" config_file;
       warn "Using factory defaults";
@@ -355,9 +355,9 @@ module Cmdline = struct
         sandbox = Utils.first_some sandbox cfg.sandbox ;
         sandbox_param = Utils.first_some sandbox_param cfg.sandbox_param ;
         log_level = Utils.first_some log_level cfg.log_level ;
-        min_connections = Utils.unopt cfg.min_connections min_connections ;
-        max_connections = Utils.unopt cfg.max_connections max_connections ;
-        expected_connections = Utils.unopt cfg.expected_connections expected_connections ;
+        min_connections = Utils.unopt ~default:cfg.min_connections min_connections ;
+        max_connections = Utils.unopt ~default:cfg.max_connections max_connections ;
+        expected_connections = Utils.unopt ~default:cfg.expected_connections expected_connections ;
         net_addr = (match net_saddr with None -> cfg.net_addr | Some (addr, _) -> addr) ;
         net_port = (match net_saddr with None -> cfg.net_port | Some (_, port) -> port) ;
         (* local_discovery = Utils.first_some local_discovery cfg.local_discovery ; *)

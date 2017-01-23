@@ -39,7 +39,7 @@ let incr_fitness fitness =
     | [ _ ; fitness ] ->
         Pervasives.(
           Data_encoding.Binary.of_bytes Data_encoding.int64 fitness
-          |> Utils.unopt 0L
+          |> Utils.unopt ~default:0L
           |> Int64.succ
           |> Data_encoding.Binary.to_bytes Data_encoding.int64
         )

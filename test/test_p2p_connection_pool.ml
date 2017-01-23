@@ -158,7 +158,7 @@ let make_net points repeat n =
 let addr = ref Ipaddr.V6.localhost
 let port = ref (1024 + Random.int 8192)
 let clients = ref 10
-let repeat = ref 5
+let repeat_connections = ref 5
 
 let spec = Arg.[
 
@@ -169,7 +169,8 @@ let spec = Arg.[
 
     "--clients", Set_int clients,  " Number of concurrent clients." ;
 
-    "--repeat", Set_int repeat,  " Number of connections/disconnections." ;
+    "--repeat", Set_int repeat_connections,
+    " Number of connections/disconnections." ;
 
     "-v", Unit (fun () -> Lwt_log_core.(add_rule "p2p.connection-pool" Info)),
     " Log up to info msgs" ;
@@ -186,7 +187,7 @@ let main () =
   Arg.parse spec anon_fun usage_msg ;
   let ports = !port -- (!port + !clients - 1) in
   let points = List.map (fun port -> !addr, port) ports in
-  Lwt_list.iter_p (make_net points !repeat) (0 -- (!clients - 1))
+  Lwt_list.iter_p (make_net points !repeat_connections) (0 -- (!clients - 1))
 
 let () =
   Sys.catch_break true ;
