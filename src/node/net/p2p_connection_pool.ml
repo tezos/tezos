@@ -634,16 +634,16 @@ let create config meta_config message_config io_sched =
     events ;
   } in
   List.iter (Points.set_trusted pool) config.trusted_points ;
-  Lwt.catch
-    (fun () ->
-       Gid_info.File.load config.peers_file meta_config.encoding)
-    (fun _ ->
-       (* TODO log error *)
-       Lwt.return_nil) >>= fun gids ->
-  List.iter
-    (fun gi -> Gid.Table.add pool.known_gids (Gid_info.gid gi) gi)
-    gids ;
-  Lwt.return pool
+  Gid_info.File.load config.peers_file meta_config.encoding >>= function
+  | Ok gids ->
+      List.iter
+        (fun gi -> Gid.Table.add pool.known_gids (Gid_info.gid gi) gi)
+        gids ;
+      Lwt.return pool
+  | Error err ->
+      log_error "@[Failed to parsed peers file:@ %a@]"
+        pp_print_error err ;
+      Lwt.return pool
 
 let destroy pool =
   Point.Table.fold (fun _point pi acc ->

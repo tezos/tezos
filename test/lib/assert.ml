@@ -14,6 +14,16 @@ include Kaputt.Assertion
 
 let format_msg = function None -> None | Some msg -> Some (msg ^ "\n")
 
+let is_error ?(msg="") x =
+  match x with
+  | Error _ -> ()
+  | Ok _ -> fail "Error _" "Ok _" msg
+
+let is_ok ?(msg="") x =
+  match x with
+  | Ok _ -> ()
+  | Error _ -> fail "Ok _" "Error _" msg
+
 let equal_persist_list ?msg l1 l2 =
   let msg = format_msg msg in
   let pr_persist l =

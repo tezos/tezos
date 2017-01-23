@@ -168,12 +168,12 @@ UTILS_LIB_INTFS := \
 UTILS_LIB_IMPLS := \
   utils/base48.ml \
   utils/cli_entries.ml \
+  utils/error_monad_sig.ml \
+  utils/error_monad.ml \
   utils/data_encoding_ezjsonm.ml \
   utils/time.ml \
   utils/hash.ml \
   utils/crypto_box.ml \
-  utils/error_monad_sig.ml \
-  utils/error_monad.ml \
   utils/lwt_exit.ml \
   utils/logging.ml \
   utils/lwt_utils.ml \

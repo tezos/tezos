@@ -15,7 +15,7 @@ type secret_key = Sodium.Box.secret_key
 type public_key = Sodium.Box.public_key
 type channel_key = Sodium.Box.channel_key
 type nonce = Sodium.Box.nonce
-type target = int64 list (* used as unsigned intergers... *)
+type target = Z.t
 exception TargetNot256Bit
 
 module Public_key_hash = Hash.Make_Blake2B (Base48) (struct
@@ -44,24 +44,29 @@ let fast_box_open ck msg nonce =
   try Some (Sodium.Box.Bigbytes.fast_box_open ck msg nonce) with
     | Sodium.Verification_failure -> None
 
-let make_target target =
-  if List.length target > 8 then raise TargetNot256Bit ;
-  target
-
-(* Compare a SHA256 hash to a 256bits-target prefix.
-   The prefix is a list of "unsigned" int64. *)
 let compare_target hash target =
-  let hash = Hash.Generic_hash.to_string hash in
-  let rec check offset = function
-    | [] -> true
-    | x :: xs ->
-        Compare.Uint64.(EndianString.BigEndian.get_int64 hash offset <= x)
-        && check (offset + 8) xs in
-  check 0 target
+  let hash = Z.of_bits (Hash.Generic_hash.to_string hash) in
+  Z.compare hash target <= 0
 
-let default_target =
-  (* FIXME we use an easy target until we allow custom configuration. *)
-  [ Int64.shift_left 1L 48 ]
+let make_target f =
+  if f < 0. || 256. < f then invalid_arg "Cryptobox.target_of_float" ;
+  let frac, shift = modf f in
+  let shift = int_of_float shift in
+  let m =
+    Z.of_int64 @@
+    if frac = 0. then
+      Int64.(pred (shift_left 1L 54))
+    else
+      Int64.of_float (2. ** (54. -. frac))
+  in
+  if shift < 202 then
+    Z.logor
+      (Z.shift_left m (202 - shift))
+      (Z.pred @@ Z.shift_left Z.one (202 - shift))
+  else
+    Z.shift_right m (shift - 202)
+
+let default_target = make_target 24.
 
 let check_proof_of_work pk nonce target =
   let hash =
@@ -71,11 +76,18 @@ let check_proof_of_work pk nonce target =
     ] in
   compare_target hash target
 
-let generate_proof_of_work pk target =
-  let rec loop nonce =
-    if check_proof_of_work pk nonce target then nonce
-    else loop (increment_nonce nonce) in
-  loop (random_nonce ())
+let generate_proof_of_work ?max pk target =
+  let may_interupt =
+    match max with
+    | None -> (fun _ -> ())
+    | Some max -> (fun cpt -> if max < cpt then raise Not_found) in
+  let rec loop nonce cpt =
+    may_interupt cpt ;
+    if check_proof_of_work pk nonce target then
+      nonce
+    else
+      loop (increment_nonce nonce) (cpt + 1) in
+  loop (random_nonce ()) 0
 
 let public_key_encoding =
   let open Data_encoding in

@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
+
 (** Read a JSON document from a string. *)
 val from_string : string -> (Data_encoding.json, string) result
 
@@ -20,7 +22,7 @@ val from_stream : string Lwt_stream.t -> (Data_encoding.json, string) result Lwt
 val to_string : Data_encoding.json -> string
 
 (** Loads a JSON file in memory *)
-val read_file : string -> Data_encoding.json option Lwt.t
+val read_file : string -> Data_encoding.json tzresult Lwt.t
 
 (** (Over)write a JSON file from in memory data *)
-val write_file : string -> Data_encoding.json -> bool Lwt.t
+val write_file : string -> Data_encoding.json -> unit tzresult Lwt.t

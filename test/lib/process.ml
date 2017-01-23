@@ -19,11 +19,8 @@ let detach ?(prefix = "") f =
   | 0 ->
       Random.self_init () ;
       let template = Format.asprintf "%s$(section): $(message)" prefix in
-      let logger =
-        Lwt_log.channel
-          ~template ~close_mode:`Keep ~channel:Lwt_io.stderr () in
-      Logging.init (Manual logger) ;
       Lwt_main.run begin
+        Logging.init ~template Stderr >>= fun () ->
         lwt_log_notice "PID: %d" (Unix.getpid ()) >>= fun () ->
         f ()
       end ;
