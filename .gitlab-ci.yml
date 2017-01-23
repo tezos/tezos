@@ -176,7 +176,7 @@ publish:github:
                export GIT_AUTHOR_EMAIL="contact@tezos.com" ;
              fi'
          HEAD
-    - git push git@github.com:OCamlPro/tezos.git -f HEAD:master
+    - git push git@github.com:tezos/tezos.git -f HEAD:master
 
 cleanup:
   stage: cleanup
