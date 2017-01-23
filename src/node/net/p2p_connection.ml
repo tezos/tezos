@@ -32,6 +32,7 @@ type error += Rejected
 type error += Decoding_error
 type error += Myself of Id_point.t
 type error += Not_enough_proof_of_work of Gid.t
+type error += Invalid_auth
 
 module Crypto = struct
 
@@ -336,9 +337,12 @@ let accept
   Lwt_utils.protect begin fun () ->
     Ack.write fd cryptobox_data Ack >>=? fun () ->
     Ack.read fd cryptobox_data
-  end ~on_error:begin fun _ ->
+  end ~on_error:begin fun err ->
     P2p_io_scheduler.close fd >>= fun _ ->
-    fail Rejected
+    match err with
+    | [ P2p_io_scheduler.Connection_closed ] -> fail Rejected
+    | [ Decipher_error ] -> fail Invalid_auth
+    | err -> Lwt.return (Error err)
   end >>=? fun accepted ->
   fail_unless accepted Rejected >>=? fun () ->
   let canceler = Canceler.create () in
