@@ -211,7 +211,10 @@ let init_p2p net_params =
       Lwt.return Tezos_p2p.faked_network
   | Some (config, limits) ->
       lwt_log_notice "bootstraping network..." >>= fun () ->
-      Tezos_p2p.bootstrap config limits
+      Tezos_p2p.create config limits >>= fun p2p ->
+      Lwt.async (fun () -> Tezos_p2p.maintain p2p) ;
+      Lwt.return p2p
+
 
 let create
     ~genesis ~store_root ~context_root ?test_protocol ?patch_context net_params =
@@ -234,11 +237,12 @@ let create
   end >>=? fun global_net ->
   Validator.activate validator global_net >>= fun global_validator ->
   let cleanup () =
+    Tezos_p2p.shutdown p2p >>= fun () ->
     Lwt.join [ Validator.shutdown validator ;
                Discoverer.shutdown discoverer ] >>= fun () ->
     State.store state
   in
-
+  let canceler = Lwt_utils.Canceler.create () in
   lwt_log_info "starting worker..." >>= fun () ->
   let worker =
     let handle_msg peer msg =
@@ -249,22 +253,23 @@ let create
       Lwt.return_unit
     in
     let rec worker_loop () =
-      Tezos_p2p.recv p2p >>= fun (peer, msg) ->
+      Lwt_utils.protect ~canceler begin fun () ->
+        Tezos_p2p.recv p2p >>= return
+      end >>=? fun (peer, msg) ->
       handle_msg peer msg >>= fun () ->
       worker_loop () in
-    Lwt.catch
-      worker_loop
-      (function
-        | Queue.Empty -> cleanup ()
-        | exn ->
-            lwt_log_error "unexpected exception in worker\n%s"
-              (Printexc.to_string exn) >>= fun () ->
-            Tezos_p2p.shutdown p2p >>= fun () ->
-            cleanup ())
+    worker_loop () >>= function
+    | Error [Lwt_utils.Canceled] | Ok () ->
+        cleanup ()
+    | Error err ->
+        lwt_log_error
+          "@[Unexpected error in worker@ %a@]"
+          pp_print_error err >>= fun () ->
+        cleanup ()
   in
   let shutdown () =
     lwt_log_info "stopping worker..." >>= fun () ->
-    Tezos_p2p.shutdown p2p >>= fun () ->
+    Lwt_utils.Canceler.cancel canceler >>= fun () ->
     worker >>= fun () ->
     lwt_log_info "stopped"
   in
