@@ -315,6 +315,12 @@ let create
 
 exception Closed
 
+let read_size_fun = function
+  | Ok buf -> (Sys.word_size / 8) * 8 + MBytes.length buf
+  | Error exns -> (Sys.word_size / 8) * (1 + 3 * (List.length exns))
+
+let write_size_fun mbytes = (Sys.word_size / 8) * 6 + MBytes.length mbytes
+
 let register =
   let cpt = ref 0 in
   fun st conn ->
@@ -324,8 +330,10 @@ let register =
   end else begin
     let id = incr cpt; !cpt in
     let canceler = Canceler.create () in
-    let read_queue = Lwt_pipe.create ?size:st.read_queue_size ()
-    and write_queue = Lwt_pipe.create ?size:st.write_queue_size () in
+    let read_size_arg = map_option st.read_queue_size ~f:(fun v -> v, read_size_fun) in
+    let write_size_arg = map_option st.write_queue_size ~f:(fun v -> v, write_size_fun) in
+    let read_queue = Lwt_pipe.create ?size:read_size_arg () in
+    let write_queue = Lwt_pipe.create ?size:write_size_arg () in
     let read_conn =
       ReadScheduler.create_connection
         st.read_scheduler (conn, st.read_buffer_size) read_queue canceler id

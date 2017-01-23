@@ -218,7 +218,7 @@ module Reader = struct
     canceler: Canceler.t ;
     conn: connection ;
     encoding: 'msg Data_encoding.t ;
-    messages: 'msg tzresult Lwt_pipe.t ;
+    messages: (int * 'msg) tzresult Lwt_pipe.t ;
     mutable worker: unit Lwt.t ;
   }
 
@@ -229,13 +229,15 @@ module Reader = struct
     Lwt_unix.yield () >>= fun () ->
     Lwt_utils.protect ~canceler:st.canceler begin fun () ->
       Crypto.read_chunk st.conn.fd st.conn.cryptobox_data >>=? fun buf ->
-      read_message st buf
+      let size = 6 * (Sys.word_size / 8) + MBytes.length buf in
+      read_message st buf >>|? fun msg ->
+      size, msg
     end >>= function
-    | Ok None ->
+    | Ok (_, None) ->
         Lwt_pipe.push st.messages (Error [Decoding_error]) >>= fun () ->
         worker_loop st
-    | Ok (Some msg) ->
-        Lwt_pipe.push st.messages (Ok msg) >>= fun () ->
+    | Ok (size, Some msg) ->
+        Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
         worker_loop st
     | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
         Lwt.return_unit
@@ -348,9 +350,24 @@ let accept
   let canceler = Canceler.create () in
   let conn = { fd ; info ; cryptobox_data } in
   let reader =
-    Reader.run ?size:incoming_message_queue_size conn encoding canceler
+    let compute_size = function
+      | Ok (size, _) -> (Sys.word_size / 8) * 11 + size
+      | Error err -> (Sys.word_size / 8) * (3 + 3 * (List.length err))
+    in
+    let size = map_option incoming_message_queue_size
+        ~f:(fun qs -> (qs, compute_size)) in
+    Reader.run ?size conn encoding canceler
   and writer =
-    Writer.run ?size:outgoing_message_queue_size conn encoding canceler in
+    let compute_size = function
+      | msg, None ->
+          10 * (Sys.word_size / 8) + Data_encoding.Binary.length encoding msg
+      | msg, Some _ ->
+          18 * (Sys.word_size / 8) + Data_encoding.Binary.length encoding msg
+    in
+    let size = map_option outgoing_message_queue_size
+        ~f:(fun qs -> qs, compute_size)
+    in
+    Writer.run ?size conn encoding canceler in
   let conn = { conn ; reader ; writer } in
   Canceler.on_cancel canceler begin fun () ->
     P2p_io_scheduler.close fd >>= fun _ ->
@@ -367,10 +384,6 @@ let catch_closed_pipe f =
     | exn -> fail (Exn exn)
   end
 
-let is_writable { writer } =
-  not (Lwt_pipe.is_full writer.messages)
-let wait_writable { writer } =
-  Lwt_pipe.not_full writer.messages
 let write { writer } msg =
   catch_closed_pipe begin fun () ->
     Lwt_pipe.push writer.messages (msg, None) >>= return
