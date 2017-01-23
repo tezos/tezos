@@ -83,11 +83,17 @@ let simple_msg =
 
 let is_rejected = function
   | Error [P2p_connection.Rejected] -> true
-  | Ok _ | Error _ -> false
+  | Ok _ -> false
+  | Error err ->
+      log_notice "Error: %a" pp_print_error err ;
+      false
 
 let is_connection_closed = function
   | Error [P2p_io_scheduler.Connection_closed] -> true
-  | Ok _ | Error _ -> false
+  | Ok _ -> false
+  | Error err ->
+      log_notice "Error: %a" pp_print_error err ;
+      false
 
 let bytes_encoding = Data_encoding.Variable.bytes
 
