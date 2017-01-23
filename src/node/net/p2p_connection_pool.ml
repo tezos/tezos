@@ -65,7 +65,7 @@ module Answerer = struct
   type 'msg callback = {
     bootstrap: unit -> Point.t list Lwt.t ;
     advertise: Point.t list -> unit Lwt.t ;
-    message: 'msg -> unit Lwt.t ;
+    message: int -> 'msg -> unit Lwt.t ;
   }
 
   type 'msg t = {
@@ -80,7 +80,7 @@ module Answerer = struct
     Lwt_utils.protect ~canceler:st.canceler begin fun () ->
       P2p_connection.read st.conn
     end >>= function
-    | Ok Bootstrap -> begin
+    | Ok (_, Bootstrap) -> begin
         st.callback.bootstrap () >>= function
         | [] ->
             worker_loop st
@@ -93,13 +93,13 @@ module Answerer = struct
                 Canceler.cancel st.canceler >>= fun () ->
                 Lwt.return_unit
       end
-    | Ok (Advertise points) ->
+    | Ok (_, Advertise points) ->
         st.callback.advertise points >>= fun () ->
         worker_loop st
-    | Ok (Message msg) ->
-        st.callback.message msg >>= fun () ->
+    | Ok (size, Message msg) ->
+        st.callback.message size msg >>= fun () ->
         worker_loop st
-    | Ok Disconnect | Error [P2p_io_scheduler.Connection_closed] ->
+    | Ok (_, Disconnect) | Error [P2p_io_scheduler.Connection_closed] ->
         Canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
     | Error [Lwt_utils.Canceled] ->
@@ -181,7 +181,7 @@ and events = {
 
 and ('msg, 'meta) connection = {
   canceler : Canceler.t ;
-  messages : 'msg Lwt_pipe.t ;
+  messages : (int * 'msg) Lwt_pipe.t ;
   conn : 'msg Message.t P2p_connection.t ;
   gid_info : (('msg, 'meta) connection, 'meta) Gid_info.t ;
   point_info : ('msg, 'meta) connection Point_info.t option ;
@@ -248,10 +248,12 @@ let active_connections pool = Gid.Table.length pool.connected_gids
 let create_connection pool conn id_point pi gi =
   let gid = Gid_info.gid gi in
   let canceler = Canceler.create () in
-  let messages =
-    Lwt_pipe.create ?size:pool.config.incoming_app_message_queue_size () in
+  let size = map_option pool.config.incoming_app_message_queue_size
+      ~f:(fun qs -> qs, fun (size, _) -> (Sys.word_size / 8) * (11 + size))
+  in
+  let messages = Lwt_pipe.create ?size () in
   let callback =
-    { Answerer.message = Lwt_pipe.push messages ;
+    { Answerer.message = (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
       advertise = register_new_points pool gid ;
       bootstrap = list_known_points pool gid ;
     } in
@@ -471,7 +473,7 @@ let accept pool fd point =
 
 let read { messages } =
   Lwt.catch
-    (fun () -> Lwt_pipe.pop messages >>= return)
+    (fun () -> Lwt_pipe.pop messages >>= fun ( _, msg) -> return msg)
     (fun _ (* Closed *) -> fail P2p_io_scheduler.Connection_closed)
 
 let is_readable { messages } =
