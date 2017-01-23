@@ -41,7 +41,7 @@ val create:
 (** [create ~max_upload_speed ~max_download_speed ~read_queue_size
     ~write_queue_size ()] is an IO scheduler with specified (global)
     max upload (resp. download) speed, and specified read
-    (resp. write) queue sizes for connections. *)
+    (resp. write) queue sizes (in bytes) for connections. *)
 
 val register: t -> Lwt_unix.file_descr -> connection
 (** [register sched fd] is a [connection] managed by [sched]. *)

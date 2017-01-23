@@ -14,17 +14,14 @@
 type 'a t
 (** Type of queues holding values of type ['a]. *)
 
-val create : ?size:int -> unit -> 'a t
-(** [create ~size] is an empty queue that can hold max [size]
-    elements. *)
+val create : ?size:(int * ('a -> int)) -> unit -> 'a t
+(** [create ~size:(max_size, compute_size)] is an empty queue that can
+    hold max [size] bytes of data, using [compute_size] to compute the
+    size of a datum. *)
 
 val push : 'a t -> 'a -> unit Lwt.t
 (** [push q v] is a thread that blocks while [q] contains more
     than [size] elements, then adds [v] at the end of [q]. *)
-
-val pop_all : 'a t -> 'a Queue.t Lwt.t
-(** [pop' q] is a thread that returns all elements in [q] or waits
-    till there is at least one element in [q]. *)
 
 val pop : 'a t -> 'a Lwt.t
 (** [pop q] is a thread that blocks while [q] is empty, then
@@ -48,10 +45,6 @@ val push_now_exn : 'a t -> 'a -> unit
 (** [push_now q v] adds [v] at the ends of [q] immediately or
     raise [Full] if [q] is currently full. *)
 
-val pop_all_now : 'a t -> 'a Queue.t
-(** [pop_all_now q] is a copy of [q]'s internal queue, that may be
-    empty. *)
-
 val pop_now : 'a t -> 'a option
 (** [pop_now q] maybe removes and returns the first element in [q] if
     [q] contains at least one element. *)
@@ -68,17 +61,8 @@ val length : 'a t -> int
 val is_empty : 'a t -> bool
 (** [is_empty q] is [true] if [q] is empty, [false] otherwise. *)
 
-val is_full : 'a t -> bool
-(** [is_full q] is [true] if [q] is full, [false] otherwise. *)
-
 val empty : 'a t -> unit Lwt.t
 (** [empty q] returns when [q] becomes empty. *)
-
-val full : 'a t -> unit Lwt.t
-(** [full q] returns when [q] becomes full. *)
-
-val not_full : 'a t -> unit Lwt.t
-(** [not_full q] returns when [q] stop being full. *)
 
 val iter : 'a t -> f:('a -> unit Lwt.t) -> unit Lwt.t
 (** [iter q ~f] pops all elements of [q] and applies [f] on them. *)

@@ -161,14 +161,14 @@ let client addr port =
   (* let's exchange a simple message. *)
   connect sched addr port id2 >>=? fun auth_fd ->
   P2p_connection.accept auth_fd bytes_encoding >>=? fun conn ->
-  P2p_connection.read conn >>=? fun msg ->
+  P2p_connection.read conn >>=? fun (msg_size, msg) ->
   assert (MBytes.compare simple_msg msg = 0) ;
   P2p_connection.close conn >>= fun _stat ->
   lwt_log_notice "Simple OK" >>= fun () ->
   (* let's detect a closed connection on `read`. *)
   connect sched addr port id2 >>=? fun auth_fd ->
   P2p_connection.accept auth_fd bytes_encoding >>=? fun conn ->
-  P2p_connection.read conn >>=? fun msg ->
+  P2p_connection.read conn >>=? fun (msg_size, msg) ->
   assert (MBytes.compare simple_msg msg = 0) ;
   P2p_connection.read conn >>= fun msg ->
   assert (is_connection_closed msg) ;

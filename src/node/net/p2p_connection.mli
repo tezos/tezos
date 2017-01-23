@@ -71,14 +71,6 @@ val accept:
 
 (** {2 Output functions} *)
 
-val is_writable: 'msg t -> bool
-(** [is_writable conn] is [true] iff [conn] internal write queue is
-    not full. *)
-
-val wait_writable: 'msg t -> unit Lwt.t
-(** (Cancelable) [wait_writable conn] returns when [conn]'s internal
-    write queue becomes writable (i.e. not full). *)
-
 val write: 'msg t -> 'msg -> unit tzresult Lwt.t
 (** [write conn msg] returns when [msg] has successfully been added to
     [conn]'s internal write queue or fails with a corresponding
@@ -103,12 +95,12 @@ val wait_readable: 'msg t -> unit tzresult Lwt.t
 (** (Cancelable) [wait_readable conn] returns when [conn]'s internal
     read queue becomes readable (i.e. not empty). *)
 
-val read: 'msg t -> 'msg tzresult Lwt.t
+val read: 'msg t -> (int * 'msg) tzresult Lwt.t
 (** [read conn msg] returns when [msg] has successfully been popped
     from [conn]'s internal read queue or fails with a corresponding
     error. *)
 
-val read_now: 'msg t -> 'msg tzresult option
+val read_now: 'msg t -> (int * 'msg) tzresult option
 (** [read_now conn msg] is [Some msg] if [conn]'s internal read queue
     is not empty, [None] if it is empty, or fails with a correponding
     error otherwise. *)

@@ -10,8 +10,6 @@
 (* TODO encode/encrypt before to push into the writer pipe. *)
 (* TODO patch Sodium.Box to avoid allocation of the encrypted buffer.*)
 (* TODO patch Data_encoding for continuation-based binary writer/reader. *)
-(* TODO use queue bound by memory size of its elements, not by the
-        number of elements. *)
 (* TODO test `close ~wait:true`. *)
 (* TODO nothing in welcoming message proves that the incoming peer is
         the owner of the public key... only the first message will
@@ -218,7 +216,7 @@ module Reader = struct
     canceler: Canceler.t ;
     conn: connection ;
     encoding: 'msg Data_encoding.t ;
-    messages: 'msg tzresult Lwt_pipe.t ;
+    messages: (int * 'msg) tzresult Lwt_pipe.t ;
     mutable worker: unit Lwt.t ;
   }
 
@@ -229,13 +227,15 @@ module Reader = struct
     Lwt_unix.yield () >>= fun () ->
     Lwt_utils.protect ~canceler:st.canceler begin fun () ->
       Crypto.read_chunk st.conn.fd st.conn.cryptobox_data >>=? fun buf ->
-      read_message st buf
+      let size = 6 * (Sys.word_size / 8) + MBytes.length buf in
+      read_message st buf >>|? fun msg ->
+      size, msg
     end >>= function
-    | Ok None ->
+    | Ok (_, None) ->
         Lwt_pipe.push st.messages (Error [Decoding_error]) >>= fun () ->
         worker_loop st
-    | Ok (Some msg) ->
-        Lwt_pipe.push st.messages (Ok msg) >>= fun () ->
+    | Ok (size, Some msg) ->
+        Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
         worker_loop st
     | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
         Lwt.return_unit
@@ -245,6 +245,11 @@ module Reader = struct
         Lwt.return_unit
 
   let run ?size conn encoding canceler =
+    let compute_size = function
+      | Ok (size, _) -> (Sys.word_size / 8) * 11 + size
+      | Error _ -> 0 (* we push Error only when we close the socket,
+                        we don't fear memory leaks in that case... *) in
+    let size = map_option size ~f:(fun max -> (max, compute_size)) in
     let st =
       { canceler ; conn ; encoding ;
         messages = Lwt_pipe.create ?size () ;
@@ -301,6 +306,13 @@ module Writer = struct
         Lwt.return_unit
 
   let run ?size conn encoding canceler =
+    let compute_size = function
+      | msg, None ->
+          10 * (Sys.word_size / 8) + Data_encoding.Binary.length encoding msg
+      | msg, Some _ ->
+          18 * (Sys.word_size / 8) + Data_encoding.Binary.length encoding msg
+    in
+    let size = map_option size ~f:(fun max -> max, compute_size) in
     let st =
       { canceler ; conn ; encoding ;
         messages = Lwt_pipe.create ?size () ;
@@ -367,10 +379,6 @@ let catch_closed_pipe f =
     | exn -> fail (Exn exn)
   end
 
-let is_writable { writer } =
-  not (Lwt_pipe.is_full writer.messages)
-let wait_writable { writer } =
-  Lwt_pipe.not_full writer.messages
 let write { writer } msg =
   catch_closed_pipe begin fun () ->
     Lwt_pipe.push writer.messages (msg, None) >>= return
