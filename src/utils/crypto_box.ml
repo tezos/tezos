@@ -71,11 +71,18 @@ let check_proof_of_work pk nonce target =
     ] in
   compare_target hash target
 
-let generate_proof_of_work pk target =
-  let rec loop nonce =
-    if check_proof_of_work pk nonce target then nonce
-    else loop (increment_nonce nonce) in
-  loop (random_nonce ())
+let generate_proof_of_work ?max pk target =
+  let may_interupt =
+    match max with
+    | None -> (fun _ -> ())
+    | Some max -> (fun cpt -> if max < cpt then raise Not_found) in
+  let rec loop nonce cpt =
+    may_interupt cpt ;
+    if check_proof_of_work pk nonce target then
+      nonce
+    else
+      loop (increment_nonce nonce) (cpt + 1) in
+  loop (random_nonce ()) 0
 
 let public_key_encoding =
   let open Data_encoding in
