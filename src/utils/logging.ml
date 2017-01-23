@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Lwt.Infix
+
 module type LOG = sig
 
   val debug: ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -86,32 +88,134 @@ module Client = struct
 end
 module Webclient = Make(struct let name = "webclient" end)
 
-let template = "$(date) $(name)[$(pid)]: $(message)"
-
-let default_logger () =
-  Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stderr ()
+type template = Lwt_log.template
+let default_template = "$(date) - $(section): $(message)"
 
 type kind =
   | Null
   | Stdout
   | Stderr
   | File of string
-  | Syslog
-  | Manual of Lwt_log.logger
+  | Syslog of Lwt_log.syslog_facility
 
-let init kind =
-  let logger =
+let kind_encoding =
+  let open Data_encoding in
+  conv
+    (function
+      | Null -> "/dev/null"
+      | Stdout -> "stdout"
+      | Stderr -> "stderr"
+      | File fp -> fp
+      | Syslog `Auth -> "syslog:auth"
+      | Syslog `Authpriv -> "syslog:authpriv"
+      | Syslog `Cron -> "syslog:cron"
+      | Syslog `Daemon -> "syslog:daemon"
+      | Syslog `FTP -> "syslog:ftp"
+      | Syslog `Kernel -> "syslog:kernel"
+      | Syslog `Local0 -> "syslog:local0"
+      | Syslog `Local1 -> "syslog:local1"
+      | Syslog `Local2 -> "syslog:local2"
+      | Syslog `Local3 -> "syslog:local3"
+      | Syslog `Local4 -> "syslog:local4"
+      | Syslog `Local5 -> "syslog:local5"
+      | Syslog `Local6 -> "syslog:local6"
+      | Syslog `Local7 -> "syslog:local7"
+      | Syslog `LPR -> "syslog:lpr"
+      | Syslog `Mail -> "syslog:mail"
+      | Syslog `News -> "syslog:news"
+      | Syslog `Syslog -> "syslog:syslog"
+      | Syslog `User -> "syslog:user"
+      | Syslog `UUCP -> "syslog:uucp"
+      | Syslog `NTP -> "syslog:ntp"
+      | Syslog `Security -> "syslog:security"
+      | Syslog `Console -> "syslog:console")
+    (function
+      | "/dev/null" | "null" -> Null
+      | "stdout" -> Stdout
+      | "stderr" -> Stderr
+      | "syslog:auth" -> Syslog `Auth
+      | "syslog:authpriv" -> Syslog `Authpriv
+      | "syslog:cron" -> Syslog `Cron
+      | "syslog:daemon" -> Syslog `Daemon
+      | "syslog:ftp" -> Syslog `FTP
+      | "syslog:kernel" -> Syslog `Kernel
+      | "syslog:local0" -> Syslog `Local0
+      | "syslog:local1" -> Syslog `Local1
+      | "syslog:local2" -> Syslog `Local2
+      | "syslog:local3" -> Syslog `Local3
+      | "syslog:local4" -> Syslog `Local4
+      | "syslog:local5" -> Syslog `Local5
+      | "syslog:local6" -> Syslog `Local6
+      | "syslog:local7" -> Syslog `Local7
+      | "syslog:lpr" -> Syslog `LPR
+      | "syslog:mail" -> Syslog `Mail
+      | "syslog:news" -> Syslog `News
+      | "syslog:syslog" -> Syslog `Syslog
+      | "syslog:user" -> Syslog `User
+      | "syslog:uucp" -> Syslog `UUCP
+      | "syslog:ntp" -> Syslog `NTP
+      | "syslog:security" -> Syslog `Security
+      | "syslog:console" -> Syslog `Console
+      (* | s when start_with "syslog:" FIXME error or warning. *)
+      | fp ->
+          (* TODO check absolute path *)
+          File fp)
+    string
+
+
+let init ?(template = default_template) kind =
+  begin
     match kind with
     | Stderr ->
-        default_logger ()
+        Lwt.return @@
+        Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stderr ()
     | Stdout ->
+        Lwt.return @@
         Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stdout ()
     | File file_name ->
-        Lwt_main.run (Lwt_log.file ~file_name ~template ())
+        Lwt_log.file ~file_name ~template ()
     | Null ->
+        Lwt.return @@
         Lwt_log.null
-    | Syslog ->
-        Printf.eprintf "Warning: log_kind \"syslog\" not yet implemented.\n%!";
-        default_logger ()
-    | Manual logger -> logger in
-  Lwt_log.default := logger
+    | Syslog facility ->
+        Lwt.return @@
+        Lwt_log.syslog ~template ~facility ()
+  end >>= fun logger ->
+  Lwt_log.default := logger ;
+  Lwt.return_unit
+
+type level = Lwt_log_core.level =
+  | Debug
+      (** Debugging message. They can be automatically removed by the
+          syntax extension. *)
+  | Info
+      (** Informational message. Suitable to be displayed when the
+          program is in verbose mode. *)
+  | Notice
+      (** Same as {!Info}, but is displayed by default. *)
+  | Warning
+      (** Something strange happend *)
+  | Error
+      (** An error message, which should not means the end of the
+          program. *)
+  | Fatal
+
+let level_encoding =
+  let open Data_encoding in
+  conv
+    (function
+      | Fatal -> "fatal"
+      | Error -> "error"
+      | Warning -> "warning"
+      | Notice -> "notice"
+      | Info -> "info"
+      | Debug -> "debug")
+    (function
+      | "error" -> Error
+      | "warn" -> Warning
+      | "notice" -> Notice
+      | "info" -> Info
+      | "debug" -> Debug
+      | "fatal" -> Fatal
+      | _ -> invalid_arg "Logging.level")
+    string
