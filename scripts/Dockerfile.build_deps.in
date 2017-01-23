@@ -1,0 +1,8 @@
+FROM ocaml/opam:alpine-$alpine_version_ocaml-$ocaml_version
+
+COPY scripts/install_build_deps.sh scripts/version.sh scripts/
+COPY src/tezos-deps.opam src/
+RUN sudo apk add libsodium-dev && \
+    opam config exec -- ./scripts/install_build_deps.sh all \
+    rm -fr ~/.opam/log/ \
+           "$(opam config exec -- ocamlfind query stdlib)"/topdirs.cmi
