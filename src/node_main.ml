@@ -411,7 +411,7 @@ let init_logger { log_output ; log_level } =
   | `Stderr -> Logging.init Stderr
   | `File fp -> Logging.init (File fp)
   | `Null -> Logging.init Null
-  | `Syslog -> Logging.init Syslog
+  | `Syslog -> Logging.init (Syslog `Local1)
 
 let init_node
     { sandbox ; sandbox_param ;
@@ -533,7 +533,7 @@ let init_signal () =
 let main cfg =
   Random.self_init () ;
   Sodium.Random.stir () ;
-  init_logger cfg;
+  init_logger cfg >>= fun () ->
   Updater.init cfg.protocol;
   lwt_log_notice "Starting the Tezos node..." >>= fun () ->
   init_node cfg >>=? fun node ->
