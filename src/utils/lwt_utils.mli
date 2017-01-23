@@ -67,3 +67,5 @@ val with_timeout:
   ?canceler:Canceler.t ->
   float -> (Canceler.t -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
+val unless: bool -> (unit -> unit Lwt.t) -> unit Lwt.t
+

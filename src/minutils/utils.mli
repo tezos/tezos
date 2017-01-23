@@ -16,12 +16,12 @@ val split_path: string -> string list
 (** Splits a string on a delimier character, grouping multiple
     delimiters, and ignoring delimiters at the beginning and end of
     string, if [limit] is passed, stops after [limit] split(s). *)
-val split: char -> ?limit: int -> string -> string list
+val split: char -> ?dup:bool -> ?limit: int -> string -> string list
 
 val map_option: f:('a -> 'b) -> 'a option -> 'b option
 val apply_option: f:('a -> 'b option) -> 'a option -> 'b option
 val iter_option: f:('a -> unit) -> 'a option -> unit
-val unopt: 'a -> 'a option -> 'a
+val unopt: default:'a -> 'a option -> 'a
 val unopt_map: f:('a -> 'b) -> default:'b -> 'a option -> 'b
 val unopt_list: 'a option list -> 'a list
 val first_some: 'a option -> 'a option -> 'a option
@@ -50,6 +50,8 @@ val (<<) : ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
 
 (** Sequence: [i--j] is the sequence [i;i+1;...;j-1;j] *)
 val (--) : int -> int -> int list
+
+val repeat: int -> 'a -> 'a list
 
 (** [take_n n l] returns the [n] first elements of [n]. When [compare]
     is provided, it returns the [n] greatest element of [l]. *)

@@ -8,7 +8,11 @@
 (**************************************************************************)
 
 open Hash
+open Error_monad
 include (module type of struct include Kaputt.Assertion end)
+
+val is_ok : ?msg:string -> 'a tzresult -> unit
+val is_error : ?msg:string -> 'a tzresult -> unit
 
 val fail_msg : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
