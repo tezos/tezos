@@ -97,6 +97,7 @@ end
 let meta_cfg : _ P2p.meta_config = {
   P2p.encoding = Metadata.encoding ;
   initial = Metadata.initial ;
+  score = Metadata.score
 }
 
 and msg_cfg : _ P2p.message_config = {
