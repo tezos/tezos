@@ -68,6 +68,10 @@ let default_net_limits : P2p.limits = {
   incoming_app_message_queue_size = None ;
   incoming_message_queue_size = None ;
   outgoing_message_queue_size = None ;
+  known_points_history_size = 500 ;
+  known_gids_history_size = 500 ;
+  max_known_points = Some (400, 300) ;
+  max_known_gids = Some (400, 300) ;
 }
 
 let default_net = {
@@ -108,49 +112,68 @@ let limit : P2p.limits Data_encoding.t =
            max_download_speed ; max_upload_speed ;
            read_buffer_size ; read_queue_size ; write_queue_size ;
            incoming_app_message_queue_size ;
-           incoming_message_queue_size ; outgoing_message_queue_size } ->
+           incoming_message_queue_size ; outgoing_message_queue_size ;
+           known_points_history_size ; known_gids_history_size ;
+           max_known_points ; max_known_gids ;
+         } ->
       ( ( authentification_timeout, min_connections, expected_connections,
           max_connections, backlog, max_incoming_connections,
           max_download_speed, max_upload_speed) ,
         ( read_buffer_size, read_queue_size, write_queue_size,
           incoming_app_message_queue_size,
-          incoming_message_queue_size, outgoing_message_queue_size )))
+          incoming_message_queue_size, outgoing_message_queue_size,
+          known_points_history_size, known_gids_history_size,
+          max_known_points, max_known_gids
+        )))
     (fun ( ( authentification_timeout, min_connections, expected_connections,
              max_connections, backlog, max_incoming_connections,
              max_download_speed, max_upload_speed) ,
            ( read_buffer_size, read_queue_size, write_queue_size,
              incoming_app_message_queue_size,
-             incoming_message_queue_size, outgoing_message_queue_size ) ) ->
+             incoming_message_queue_size, outgoing_message_queue_size,
+             known_points_history_size, known_gids_history_size,
+             max_known_points, max_known_gids
+           ) ) ->
       { authentification_timeout ; min_connections ; expected_connections ;
         max_connections ; backlog ; max_incoming_connections ;
         max_download_speed ; max_upload_speed ;
         read_buffer_size ; read_queue_size ; write_queue_size ;
         incoming_app_message_queue_size ;
-        incoming_message_queue_size ; outgoing_message_queue_size })
+        incoming_message_queue_size ; outgoing_message_queue_size ;
+        known_points_history_size ; known_gids_history_size ;
+        max_known_points ; max_known_gids
+      })
     (merge_objs
        (obj8
           (dft "authentification-timeout"
              float default_net_limits.authentification_timeout)
-          (dft "min-connections" int31
+          (dft "min-connections" uint16
              default_net_limits.min_connections)
-          (dft "expected-connections" int31
+          (dft "expected-connections" uint16
              default_net_limits.expected_connections)
-          (dft "max-connections" int31
+          (dft "max-connections" uint16
              default_net_limits.max_connections)
-          (dft "backlog" int31
+          (dft "backlog" uint8
              default_net_limits.backlog)
-          (dft "max-incoming-connections" int31
+          (dft "max-incoming-connections" uint8
              default_net_limits.max_incoming_connections)
           (opt "max-download-speed" int31)
           (opt "max-upload-speed" int31))
-       (obj6
+       (obj10
           (dft "read-buffer-size" int31
              default_net_limits.read_buffer_size)
           (opt "read-queue-size" int31)
           (opt "write-queue-size" int31)
           (opt "incoming-app-message-queue-size" int31)
           (opt "incoming-message-queue-size" int31)
-          (opt "outgoing-message-queue-size" int31)))
+          (opt "outgoing-message-queue-size" int31)
+          (dft "known_points_history_size" uint16
+             default_net_limits.known_points_history_size)
+          (dft "known_gids_history_size" uint16
+             default_net_limits.known_points_history_size)
+          (opt "max_known_points" (tup2 uint16 uint16))
+          (opt "max_known_gids" (tup2 uint16 uint16))
+       ))
 
 let net =
   let open Data_encoding in
@@ -241,6 +264,7 @@ let update
     ?max_connections
     ?max_download_speed
     ?max_upload_speed
+    ?peer_table_size
     ?expected_pow
     ?bootstrap_peers
     ?listen_addr
@@ -251,6 +275,8 @@ let update
     ?rpc_tls
     ?log_output
     cfg =
+  let peer_table_size =
+    map_option peer_table_size ~f:(fun i -> i, i / 4 * 3) in
   let unopt_list ~default = function
     | [] -> default
     | l -> l in
@@ -274,6 +300,12 @@ let update
     max_upload_speed =
       Utils.first_some
         max_upload_speed cfg.net.limits.max_upload_speed ;
+    max_known_points =
+      Utils.first_some
+        peer_table_size cfg.net.limits.max_known_points ;
+    max_known_gids =
+      Utils.first_some
+        peer_table_size cfg.net.limits.max_known_gids ;
   } in
   let net : net = {
     expected_pow =

@@ -283,14 +283,15 @@ module Gid_info = struct
 
   type ('conn, 'meta) t = {
     gid : Gid.t ;
+    created : Time.t ;
     mutable state : 'conn state ;
     mutable metadata : 'meta ;
     mutable trusted : bool ;
+    events : Event.t Ring.t ;
     mutable last_failed_connection : (Id_point.t * Time.t) option ;
     mutable last_rejected_connection : (Id_point.t * Time.t) option ;
     mutable last_established_connection : (Id_point.t * Time.t) option ;
     mutable last_disconnection : (Id_point.t * Time.t) option ;
-    events : Event.t Ring.t ;
   }
   type ('conn, 'meta) gid_info = ('conn, 'meta) t
 
@@ -298,42 +299,44 @@ module Gid_info = struct
 
   let log_size = 100
 
-  let create ?(trusted = false) ~metadata gid =
+  let create ?(created = Time.now ()) ?(trusted = false) ~metadata gid =
     { gid ;
+      created ;
       state = Disconnected ;
       metadata ;
       trusted ;
-      events = Ring.create log_size ;
       last_failed_connection = None ;
       last_rejected_connection = None ;
       last_established_connection = None ;
       last_disconnection = None ;
+      events = Ring.create log_size ;
     }
 
   let encoding metadata_encoding =
     let open Data_encoding in
     conv
-      (fun { gid ; trusted ; metadata ; events ;
+      (fun { gid ; trusted ; metadata ; events ; created ;
            last_failed_connection ; last_rejected_connection ;
            last_established_connection ; last_disconnection } ->
-         (gid, trusted, metadata, Ring.elements events,
+         (gid, created, trusted, metadata, Ring.elements events,
           last_failed_connection, last_rejected_connection,
           last_established_connection, last_disconnection))
-      (fun (gid, trusted, metadata, event_list,
+      (fun (gid, created, trusted, metadata, event_list,
           last_failed_connection, last_rejected_connection,
           last_established_connection, last_disconnection) ->
          let info = create ~trusted ~metadata gid in
          let events = Ring.create log_size in
          Ring.add_list info.events event_list ;
-         { state = Disconnected ;
-           trusted ; gid ; metadata ; events ;
+         { gid ; created ; state = Disconnected ;
+           trusted ; metadata ; events ;
            last_failed_connection ;
            last_rejected_connection ;
            last_established_connection ;
            last_disconnection ;
          })
-      (obj8
+      (obj9
          (req "gid" Gid.encoding)
+         (req "created" Time.encoding)
          (dft "trusted" bool false)
          (req "metadata" metadata_encoding)
          (dft "events" (list Event.encoding) [])
@@ -347,6 +350,7 @@ module Gid_info = struct
             (tup2 Id_point.encoding Time.encoding)))
 
   let gid { gid } = gid
+  let created { created } = created
   let metadata { metadata } = metadata
   let set_metadata gi metadata = gi.metadata <- metadata
   let trusted { trusted } = trusted
