@@ -141,7 +141,7 @@ module Cfg_file = struct
     expected_pow = 24. ;
     bootstrap_peers  = [] ;
     peers_metadata = base_dir // "peers.json" ;
-    listen_addr  = Some (V6.unspecified, 8732) ;
+    listen_addr  = Some (V6.unspecified, 9732) ;
     closed  = false ;
     limits = default_net_limits ;
   }
