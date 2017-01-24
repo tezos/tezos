@@ -33,6 +33,7 @@ type metadata = unit
 let meta_config : metadata P2p_connection_pool.meta_config = {
   encoding = Data_encoding.empty ;
   initial = () ;
+  score = fun () -> 0. ;
 }
 
 let rec connect ~timeout pool point =
@@ -128,6 +129,7 @@ let make_net points repeat n =
   let point, points = Utils.select n points in
   let proof_of_work_target = Crypto_box.make_target 0. in
   let identity = Identity.generate proof_of_work_target in
+  let nb_points = List.length points in
   let config = P2p_connection_pool.{
     identity ;
     proof_of_work_target ;
@@ -135,13 +137,17 @@ let make_net points repeat n =
     peers_file = "/dev/null" ;
     closed_network = true ;
     listening_port = Some (snd point) ;
-    min_connections = List.length points ;
-    max_connections = List.length points ;
-    max_incoming_connections = List.length points ;
+    min_connections = nb_points ;
+    max_connections = nb_points ;
+    max_incoming_connections = nb_points ;
     authentification_timeout = 2. ;
     incoming_app_message_queue_size = None ;
     incoming_message_queue_size = None ;
     outgoing_message_queue_size = None ;
+    known_gids_history_size = 100 ;
+    known_points_history_size = 100 ;
+    max_known_points = None ;
+    max_known_gids = None ;
     } in
   Process.detach
     ~prefix:(Format.asprintf "%a " Gid.pp identity.gid)
