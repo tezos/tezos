@@ -1,7 +1,6 @@
 #! /bin/sh
 
 set -e
-set -x
 
 script_dir="$(dirname "$(readlink -f "$0")")"
 src_dir="$(dirname "$script_dir")"
