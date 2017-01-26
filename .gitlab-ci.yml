@@ -153,7 +153,7 @@ publish:docker:
     - docker push "$private_image_id:$CI_BUILD_REF_NAME"
     - docker rmi "$private_image_id:$CI_BUILD_REF_NAME"
     - if [ "$CI_PROJECT_PATH" = "tezos/tezos" -a "$CI_BUILD_REF_NAME" = "master" ]; then
-        mkdir ~/.docker ;
+        mkdir -p ~/.docker ;
         echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
         docker tag ${image_name}:${build_image_id} ${public_image_id} ;
         docker push ${public_image_id} ;
