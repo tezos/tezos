@@ -1,4 +1,7 @@
 .git
+.gitignore
+.gitlab-ci.yml
+
 
 tezos-node
 tezos-protocol-compiler

@@ -3,6 +3,9 @@ variables:
   image_id: ${CI_BUILD_REF_NAME}
   build_image_name: ${image_name}_build_deps
   build_image_id: ${CI_BUILD_REF}
+  private_registry: registry.ocamlpro.com:8443
+  private_image_id: $private_registry/${CI_PROJECT_PATH}
+  public_image_id: docker.io/tezosledger/tezos:latest
 
 image: ${build_image_name}:${build_image_id}
 
@@ -141,14 +144,21 @@ publish:docker:
   stage: publish
   image: ocp:docker
   tags:
-    - docker_builder
+    - public_docker_builder
   script:
     - ./scripts/create_docker_image.sh ${image_name} ${build_image_id}
     - docker tag ${image_name}:${build_image_id}
-        "$CI_REGISTRY_IMAGE:$CI_BUILD_REF_NAME"
-    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $CI_REGISTRY
-    - docker push "$CI_REGISTRY_IMAGE:$CI_BUILD_REF_NAME"
-    - docker rmi "$CI_REGISTRY_IMAGE:$CI_BUILD_REF_NAME"
+        "$private_image_id:$CI_BUILD_REF_NAME"
+    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $private_registry
+    - docker push "$private_image_id:$CI_BUILD_REF_NAME"
+    - docker rmi "$private_image_id:$CI_BUILD_REF_NAME"
+    - if [ "$CI_PROJECT_PATH" = "tezos/tezos" -a "$CI_BUILD_REF_NAME" = "master" ]; then
+        mkdir ~/.docker ;
+        echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
+        docker tag ${image_name}:${build_image_id} ${public_image_id} ;
+        docker push ${public_image_id} ;
+        docker rmi ${public_image_id} ;
+      fi
 
 publish:github:
   image: ocaml/opam
@@ -188,3 +198,4 @@ cleanup:
                  ${build_image_name}:${CI_PROJECT_NAMESPACE}_${CI_BUILD_REF_NAME}
     - docker rmi ${build_image_name}:${build_image_id}
   when: always
+  allow_failure: true
