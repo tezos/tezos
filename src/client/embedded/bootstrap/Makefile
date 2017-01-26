@@ -33,7 +33,7 @@ WEBCLIENT_IMPLS := \
 
 SOURCE_DIRECTORIES := webclient/shared webclient/browser webclient
 
--include mining/Makefile
+-include baker/Makefile
 
 JS_IMPLS := \
   webclient/shared/webclient_proto_services.ml \
@@ -66,8 +66,8 @@ clean::
 	-rm -f webclient/webclient_proto_static.ml
 	-rm -f webclient/*/*.cm* webclient/*/*~ webclient/*/*.o webclient/*/*.a
 	-rm -f webclient/*/*.deps webclient/*/*.deps.byte
-	-rm -f mining/*.cm* mining/*~ mining/*.o mining/*.a
-	-rm -f mining/*.deps mining/*.deps.byte
+	-rm -f baker/*.cm* baker/*~ baker/*.o baker/*.a
+	-rm -f baker/*.deps baker/*.deps.byte
 
 .INTERMEDIATE: webclient/browser/main.byte
 
