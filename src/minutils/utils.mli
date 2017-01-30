@@ -45,6 +45,25 @@ val list_rev_sub : 'a list -> int -> 'a list
 val list_sub: 'a list -> int -> 'a list
 val list_hd_opt: 'a list -> 'a option
 
+(** [merge_filter_list2 ~compare ~f l1 l2] merges two lists ordered by [compare]
+    and whose items can be merged with [f]. Item is discarded or kept whether
+    [f] returns [Some] or [None] *)
+val merge_filter_list2 :
+  ?finalize:('a list -> 'a list) ->
+  ?compare:('a -> 'a -> int) ->
+  ?f:('a option -> 'a option -> 'a option) ->
+  'a list -> 'a list ->
+  'a list
+
+(** [merge_list2 ~compare ~f l1 l2] merges two lists ordered by [compare] and
+    whose items can be merged with [f] *)
+val merge_list2 :
+  ?finalize:('a list -> 'a list) ->
+  ?compare:('a -> 'a -> int) ->
+  ?f:('a -> 'a -> 'a) ->
+  'a list -> 'a list ->
+  'a list
+
 val finalize: (unit -> 'a) -> (unit -> unit) -> 'a
 
 val read_file: ?bin:bool -> string -> string

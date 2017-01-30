@@ -66,8 +66,9 @@ let unopt_map ~f ~default = function
   | None -> default
   | Some x -> f x
 
+let may_cons xs x = match x with None -> xs | Some x -> x :: xs
+
 let unopt_list l =
-  let may_cons xs x = match x with None -> xs | Some x -> x :: xs in
   List.rev @@ List.fold_left may_cons [] l
 
 let first_some a b = match a, b with
@@ -76,8 +77,7 @@ let first_some a b = match a, b with
   | Some v, _ -> Some v
 
 let filter_map f l =
-  let may_cons xs x = match f x with None -> xs | Some x -> x :: xs in
-  List.rev @@ List.fold_left may_cons [] l
+  List.rev @@ List.fold_left (fun acc x -> may_cons acc (f x)) [] l
 
 let list_rev_sub l n =
   ListLabels.fold_left l ~init:(n, []) ~f:begin fun (n, l) elt ->
@@ -89,6 +89,34 @@ let list_sub l n = list_rev_sub l n |> List.rev
 let list_hd_opt = function
   | [] -> None
   | h :: _ -> Some h
+
+let merge_filter_list2
+    ?(finalize = List.rev) ?(compare = compare)
+    ?(f = first_some)
+    l1 l2 =
+  let sort = List.sort compare in
+  let rec merge_aux acc = function
+    | [], [] -> finalize acc
+    | r1, [] -> finalize acc @ (filter_map (fun x1 -> f (Some x1) None) r1)
+    | [], r2 -> finalize acc @ (filter_map (fun x2 -> f None (Some x2)) r2)
+    | ((h1 :: t1) as r1), ((h2 :: t2) as r2) ->
+      if compare h1 h2 > 0 then
+        merge_aux (may_cons acc (f None (Some h2))) (r1, t2)
+      else if compare h1 h2 < 0 then
+        merge_aux (may_cons acc (f (Some h1) None)) (t1, r2)
+      else (* m1 = m2 *)
+        merge_aux (may_cons acc (f (Some h1) (Some h2))) (t1, t2)
+  in
+  merge_aux [] (sort l1, sort l2)
+
+let merge_list2 ?finalize ?compare ?(f = fun x1 _x1 -> x1) l1 l2 =
+  merge_filter_list2 ?finalize ?compare
+    ~f:(fun x1 x2 -> match x1, x2 with
+        | None, None -> assert false
+        | Some x1, None -> Some x1
+        | None, Some x2 -> Some x2
+        | Some x1, Some x2 -> Some (f x1 x2))
+    l1 l2
 
 let display_paragraph ppf description =
   Format.fprintf ppf "@[%a@]"
