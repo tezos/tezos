@@ -44,11 +44,12 @@ let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
   let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
   Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
   Lwt_unix.Versioned.bind_2
-    main_socket (Point.to_sockaddr (addr, port)) >>= fun () ->
+    main_socket
+    Unix.(ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port)) >>= fun () ->
   Lwt_unix.listen main_socket backlog ;
   Lwt.return main_socket
 
-let run ~backlog pool ?addr port =
+let run ~backlog pool ?addr port  =
   Lwt.catch begin fun () ->
     create_listening_socket
       ~backlog ?addr port >>= fun socket ->

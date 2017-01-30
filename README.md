@@ -61,7 +61,7 @@ Running the node in a sandbox
 To run a single instance of a Tezos node in sandbox mode:
 
 ```
-./tezos-node --sandbox --rpc-addr :::8732
+./tezos-node run --sandbox --rpc-addr localhost:8732
 ```
 
 This "sandboxed" node will not participate in the P2P network, but will accept
@@ -77,12 +77,12 @@ test network. Use the following command to run a node that will accept incoming
 connections:
 
 ```
-./tezos-node --generate-identity --expected-pow 24.
+./tezos-node identity generate 24.
 ```
 
-This will first generate a new node identity and compute the associated stamp
-of proof-of-work. Then, the node will listen to connections coming in on
-`0.0.0.0:9732` (and`[::]:9732`). All used data is stored at
+This will first generate a new node identity and compute the
+associated stamp of proof-of-work. Then, the node will listen to
+connections coming in on `[::]:9732`. All used data is stored at
 `$HOME/.tezos-node/`. For example, the default configuration file is
 at `$HOME/.tezos-node/config.json`.
 
@@ -97,7 +97,7 @@ command will generate it and replace the default values with the values from
 the command line:
 
 ```
-./tezos-node --base-dir "$dir" --net-addr 127.0.0.1:9733
+./tezos-node run --data-dir "$dir" --net-addr localhost:9733
 ```
 
 The Tezos server has a built-in mechanism to discover peers on the local
@@ -108,8 +108,9 @@ initial peers, either by editing the option `net.bootstrap-peers` in the
 `config.json` file, or by specifying a command line parameter:
 
 ```
-./tezos-node --base-dir "$dir" --net-addr 127.0.0.1:2023 \
-             --peer 127.0.0.1:2021 --peer 127.0.0.1:2022
+./tezos-node run \
+             --data-dir "$dir" --net-addr localhost:2023 \
+             --peer localhost:2021 --peer localhost:2022
 ```
 
 If `"$dir"/config.json` exists, the command line options override those
@@ -119,9 +120,153 @@ to reset or to update the file according to the command line parameters
 with the following commands line:
 
 ```
-./tezos-node --reset-config --base-dir "$dir" --net-addr 127.0.0.1:9733
-./tezos-node --update-config --base-dir "$dir" --net-addr 127.0.0.1:9734
+./tezos-node config reset --data-dir "$dir" --net-addr localhost:9733
+./tezos-node config update --data-dir "$dir" --net-addr localhost:9734
 ```
+
+Configuration options
+---------------------
+
+Here is an example configuration file with all parameters
+specified. Most of the time it uses default values, except for cases
+where the default is not explanatory enough (i.e. "bootstrap-peers" is
+an empty list by default). Comments are not allowed in JSON, so this
+configuration file would not parse. They are just provided here to
+help writing your own configuration file if needed.
+
+
+```
+{
+
+  /* Location of the data dir on disk. */
+
+  "data-dir": "/home/tezos/my_data_dir"
+
+  /* Configuration of net parameters */
+
+  "net": {
+
+    /* Floating point number between 0 and 256 that represents a
+    difficulty, 24 signifies for example that at least 24 leading
+    zeroes are expected in the hash. */
+
+    "expected-proof-of-work": 24.5,
+
+    /* List of hosts. Tezos can connect to both IPv6 and IPv4
+    hosts. If the port is not specified, default port 9732 will be
+    assumed. */
+
+    "bootstrap-peers": ["::1:10732", "::ffff:192.168.1.3:9733", "mynode.tezos.com"],
+
+    /* Specify if the network is closed or not. A closed network
+    allows only peers listed in "bootstrap-peers". */
+
+    "closed": false,
+
+    /* Network limits */
+
+    "limits": {
+
+      /* Delay granted to a peer to perform authentication, in
+      seconds. */
+
+      "authentication-timeout": 5,
+
+      /* Strict minimum number of connections (triggers an urgent
+      maintenance). */
+
+      "min-connections": 50,
+
+      /* Targeted number of connections to reach when bootstraping /
+      maintaining. */
+
+      "expected-connections": 100,
+
+      /* Maximum number of connections (exceeding peers are
+      disconnected). */
+
+      "max-connections": 200,
+
+      /* Number above which pending incoming connections are
+      immediately rejected. */
+
+      "backlog": 20,
+
+      /* Maximum allowed number of incoming connections that are
+      pending authentication. */
+
+      "max-incoming-connections": 20,
+
+      /* Max download and upload speeds in KiB/s. */
+
+      "max-download-speed": 1024,
+      "max-upload-speed": 1024,
+
+      /* Size of the buffer passed to read(2). */
+
+      "read-buffer-size": 16384,
+    }
+  },
+
+  /* Configuration of rpc parameters */
+
+  "rpc": {
+
+    /* Host to listen to. If the port is not specified, the default
+    port 8732 will be assumed. */
+
+    "listen-addr": "localhost:8733",
+
+    /* Cross Origin Resource Sharing parameters, see
+    https://en.wikipedia.org/wiki/Cross-origin_resource_sharing. */
+
+    "cors-origin": [],
+    "cors-headers": [],
+
+    /* Certificate and key files (necessary when TLS is used). */
+
+    "crt": "tezos-node.crt",
+    "key": "tezos-node.key"
+  },
+
+  /* Configuration of log parameters */
+
+  "log": {
+
+    /* Output for the logging function. Either "stdout", "stderr" or
+    the name of a log file . */
+
+    "output": "tezos-node.log",
+
+    /* Verbosity level: one of 'fatal', 'error', 'warn', 'notice',
+    'info', 'debug'. */
+
+    "level": "info",
+
+    /* Fine-grained logging instructions. Same format as described in
+    `tezos-node run --help`, DEBUG section. In the example below,
+    sections "net" and all sections starting by "client" will have
+    their messages logged up to the debug level, whereas the rest of
+    log sections will be logged up to the notice level. */
+
+    "rules": "client* -> debug, net -> debug, * -> notice",
+
+    /* Format for the log file, see
+    http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates. */
+
+    "template": "$(date) - $(section): $(message)"
+  }
+}
+```
+
+Debugging
+---------
+
+It is possible to set independant log levels for different logging
+sections in Tezos, as well as specifying an output file for
+logging. See the description of log parameters above as well as
+documentation under the DEBUG section diplayed by `tezos-node run
+--help'.
 
 
 JSON/RPC interface
@@ -134,7 +279,7 @@ Typically, if you are not trying to run a local network and just want to
 explore the RPC, you would run:
 
 ```
-./tezos-node --sandbox --rpc-addr :::8732
+./tezos-node run --sandbox --rpc-addr localhost
 ```
 
 The RPC interface is self-documented and the `tezos-client` executable is able
@@ -163,9 +308,9 @@ Note: you can get the same information, but as a raw JSON object, with a simple
 HTTP request:
 
 ```
-wget --post-data '{ "recursive": true }' -O - http://127.0.0.1:8732/describe
-wget --post-data '{ "recursive": true }' -O - http://127.0.0.1:8732/describe/blocks/genesis
-wget -O - http://127.0.0.1:8732/describe/blocks/genesis/hash
+wget --post-data '{ "recursive": true }' -O - http://localhost:8732/describe
+wget --post-data '{ "recursive": true }' -O - http://localhost:8732/describe/blocks/genesis
+wget -O - http://localhost:8732/describe/blocks/genesis/hash
 ```
 
 

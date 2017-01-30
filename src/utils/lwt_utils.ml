@@ -407,3 +407,70 @@ let with_timeout ?(canceler = Canceler.create ()) timeout f =
 let unless cond f =
   if cond then Lwt.return () else f ()
 
+module Lock_file = struct
+  let create_inner
+      lock_command
+      ?(close_on_exec=true)
+      ?(unlink_on_exit=false) fn =
+    protect begin fun () ->
+      Lwt_unix.openfile fn Unix.[O_CREAT ; O_WRONLY; O_TRUNC] 0o644 >>= fun fd ->
+      if close_on_exec then Lwt_unix.set_close_on_exec fd ;
+      Lwt_unix.lockf fd lock_command 0 >>= fun () ->
+      if unlink_on_exit then
+        Lwt_main.at_exit (fun () -> Lwt_unix.unlink fn) ;
+      let pid_str = string_of_int @@ Unix.getpid () in
+      Lwt_unix.write_string fd pid_str 0 (String.length pid_str) >>= fun _ ->
+      return ()
+    end
+
+  let create = create_inner Unix.F_TLOCK
+
+  let blocking_create
+      ?timeout
+      ?(close_on_exec=true)
+      ?(unlink_on_exit=false) fn =
+    let create () =
+      create_inner Unix.F_LOCK ~close_on_exec ~unlink_on_exit fn in
+    match timeout with
+    | None -> create ()
+    | Some duration -> with_timeout duration (fun _ -> create ())
+
+  let is_locked fn =
+    if not @@ Sys.file_exists fn then return false else
+      protect begin fun () ->
+        Lwt_unix.openfile fn [Unix.O_RDONLY] 0o644 >>= fun fd ->
+        Lwt.finalize (fun () ->
+            Lwt.try_bind
+              (fun () -> Lwt_unix.(lockf fd F_TEST 0))
+              (fun () -> return false)
+              (fun _ -> return true))
+          (fun () -> Lwt_unix.close fd)
+      end
+
+  let get_pid fn =
+    let open Lwt_io in
+    protect begin fun () ->
+      with_file ~mode:Input fn begin fun ic ->
+        read ic >>= fun content ->
+        return (int_of_string content)
+      end
+    end
+end
+
+let of_sockaddr = function
+  | Unix.ADDR_UNIX _ -> None
+  | Unix.ADDR_INET (addr, port) ->
+      match Ipaddr_unix.of_inet_addr addr with
+      | V4 addr -> Some (Ipaddr.v6_of_v4 addr, port)
+      | V6 addr -> Some (addr, port)
+
+let getaddrinfo ~passive ~node ~service =
+  let open Lwt_unix in
+  getaddrinfo node service
+    ( AI_SOCKTYPE SOCK_STREAM ::
+      (if passive then [AI_PASSIVE] else []) ) >>= fun addr ->
+  let points =
+    Utils.filter_map
+      (fun { ai_addr } -> of_sockaddr ai_addr)
+      addr in
+  Lwt.return points

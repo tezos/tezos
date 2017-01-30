@@ -83,7 +83,8 @@ type port = int
 module Point = struct
 
   module T = struct
-  (* A net point (address x port). *)
+
+    (* A net point (address x port). *)
     type t = addr * port
     let compare (a1, p1) (a2, p2) =
       match Ipaddr.V6.compare a1 a2 with
@@ -92,7 +93,11 @@ module Point = struct
     let equal p1 p2 = compare p1 p2 = 0
     let hash = Hashtbl.hash
     let pp ppf (addr, port) =
-      Format.fprintf ppf "[%a]:%d" Ipaddr.V6.pp_hum addr port
+      match Ipaddr.v4_of_v6 addr with
+      | Some addr ->
+          Format.fprintf ppf "%a:%d" Ipaddr.V4.pp_hum addr port
+      | None ->
+          Format.fprintf ppf "[%a]:%d" Ipaddr.V6.pp_hum addr port
     let pp_opt ppf = function
       | None -> Format.pp_print_string ppf "none"
       | Some point -> pp ppf point
@@ -100,16 +105,29 @@ module Point = struct
     let is_local (addr, _) = Ipaddr.V6.is_private addr
     let is_global (addr, _) = not @@ Ipaddr.V6.is_private addr
 
-    let to_sockaddr (addr, port) = Unix.(ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port))
+    let of_string str =
+      match String.rindex str ':' with
+      | exception Not_found -> `Error "not a valid node address (ip:port)"
+      | pos ->
+          let len = String.length str in
+          let addr, port =
+            String.sub str 0 pos, String.sub str (pos+1) (len - pos - 1) in
+          let addr = if addr = "" || addr = "_" then "[::]" else addr in
+          match Ipaddr.of_string_exn addr, int_of_string port with
+          | exception Failure _ -> `Error "not a valid node address (ip:port)"
+          | V4 ipv4, port -> `Ok (Ipaddr.v6_of_v4 ipv4, port)
+          | V6 ipv6, port -> `Ok (ipv6, port)
+
+    let of_string_exn str =
+      match of_string str with
+      | `Ok saddr -> saddr
+      | `Error msg -> invalid_arg msg
+
+    let to_string saddr = Format.asprintf "%a" pp saddr
 
     let encoding =
-      let open Data_encoding in
-      conv
-        (fun (addr, port) -> Ipaddr.V6.to_string addr, port)
-        (fun (addr, port) -> Ipaddr.V6.of_string_exn addr, port)
-        (obj2
-           (req "addr" string)
-           (req "port" int16))
+      Data_encoding.conv to_string of_string_exn Data_encoding.string
+
   end
 
   include T
@@ -127,6 +145,7 @@ end
 module Id_point = struct
 
   module T = struct
+
     (* A net point (address x port). *)
     type t = addr * port option
     let empty = Ipaddr.V6.unspecified, None
@@ -157,6 +176,7 @@ module Id_point = struct
         (obj2
            (req "addr" string)
            (opt "port" int16))
+
   end
 
   include T

@@ -69,13 +69,21 @@ val default_template : template
 
 val level_encoding : level Data_encoding.t
 
-type kind =
-  | Null
-  | Stdout
-  | Stderr
-  | File of string
-  | Syslog of Lwt_log.syslog_facility
+module Output : sig
+  type t =
+    | Null
+    | Stdout
+    | Stderr
+    | File of string
+    | Syslog of Lwt_log.syslog_facility
 
-val kind_encoding : kind Data_encoding.t
+  val encoding : t Data_encoding.t
+  val of_string : string -> t option
+  val to_string : t -> string
+  val pp : Format.formatter -> t -> unit
+end
 
-val init: ?template:template -> kind -> unit Lwt.t
+
+val init: ?template:template -> Output.t -> unit Lwt.t
+
+val sections : string list ref

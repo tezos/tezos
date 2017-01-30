@@ -6,6 +6,8 @@ S node/shell
 B node/shell
 S node/db
 B node/db
+S node/main
+B node/main
 S minutils
 B minutils
 S utils
