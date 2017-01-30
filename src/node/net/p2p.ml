@@ -29,8 +29,8 @@ type 'msg message_config = 'msg P2p_connection_pool.message_config = {
 }
 
 type config = {
-  listening_port : port option ;
-  listening_addr : addr option ;
+  listening_port : port option;
+  listening_addr : addr option;
   trusted_points : Point.t list ;
   peers_file : string ;
   closed_network : bool ;
@@ -62,10 +62,14 @@ type limits = {
 }
 
 let create_scheduler limits =
+  let max_upload_speed =
+    map_option limits.max_upload_speed ~f:(( * ) 1024) in
+  let max_download_speed =
+    map_option limits.max_upload_speed ~f:(( * ) 1024) in
   P2p_io_scheduler.create
     ~read_buffer_size:limits.read_buffer_size
-    ?max_upload_speed:limits.max_upload_speed
-    ?max_download_speed:limits.max_download_speed
+    ?max_upload_speed
+    ?max_download_speed
     ?read_queue_size:limits.read_queue_size
     ?write_queue_size:limits.write_queue_size
     ()
@@ -123,7 +127,8 @@ let may_create_welcome_worker config limits pool =
   | Some port ->
       P2p_welcome.run
         ~backlog:limits.backlog pool
-        ?addr:config.listening_addr port >>= fun w ->
+        ?addr:config.listening_addr
+        port >>= fun w ->
       Lwt.return (Some w)
 
 type ('msg, 'meta) connection = ('msg, 'meta) P2p_connection_pool.connection

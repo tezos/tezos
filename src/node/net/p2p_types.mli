@@ -50,10 +50,10 @@ module Point : sig
   val compare : t -> t -> int
   val pp : Format.formatter -> t -> unit
   val pp_opt : Format.formatter -> t option -> unit
+  val of_string : string -> [> `Error of string | `Ok of addr * port ]
   val encoding : t Data_encoding.t
   val is_local : t -> bool
   val is_global : t -> bool
-  val to_sockaddr : t -> Unix.sockaddr
   module Map : Map.S with type key = t
   module Set : Set.S with type elt = t
   module Table : Hashtbl.S with type key = t

@@ -124,14 +124,14 @@ let get hash =
 
 (** Compiler *)
 
-let basedir = ref None
-let get_basedir () =
-  match !basedir with
+let datadir = ref None
+let get_datadir () =
+  match !datadir with
   | None -> fatal_error "not initialized"
   | Some m -> m
 
 let init dir =
-  basedir := Some dir
+  datadir := Some dir
 
 type component = Tezos_compiler.Protocol.component = {
   name : string ;
@@ -164,10 +164,10 @@ let extract dirname hash units =
     (List.map (fun {name} -> String.capitalize_ascii name) units)
 
 let do_compile hash units =
-  let basedir = get_basedir () in
-  let source_dir = basedir // Protocol_hash.to_short_b48check hash // "src" in
-  let log_file = basedir // Protocol_hash.to_short_b48check hash // "LOG" in
-  let plugin_file = basedir // Protocol_hash.to_short_b48check hash //
+  let datadir = get_datadir () in
+  let source_dir = datadir // Protocol_hash.to_short_b48check hash // "src" in
+  let log_file = datadir // Protocol_hash.to_short_b48check hash // "LOG" in
+  let plugin_file = datadir // Protocol_hash.to_short_b48check hash //
                     Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp hash
   in
   create_files source_dir units >>= fun _files ->

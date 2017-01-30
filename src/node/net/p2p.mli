@@ -87,7 +87,7 @@ type limits = {
   (** Strict minimum number of connections (triggers an urgent maintenance) *)
 
   expected_connections : int ;
-  (** Targeted number of connections to reach when bootstraping / maitening *)
+  (** Targeted number of connections to reach when bootstraping / maintaining *)
 
   max_connections : int ;
   (** Maximum number of connections (exceeding peers are disconnected) *)
@@ -96,7 +96,7 @@ type limits = {
   (** Argument of [Lwt_unix.accept].*)
 
   max_incoming_connections : int ;
-  (** Maximum not-yet-authentified incoming connections. *)
+  (** Maximum not-yet-authenticated incoming connections. *)
 
   max_download_speed : int option ;
   (** Hard-limit in the number of bytes received per second. *)
