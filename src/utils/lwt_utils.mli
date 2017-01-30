@@ -69,3 +69,23 @@ val with_timeout:
 
 val unless: bool -> (unit -> unit Lwt.t) -> unit Lwt.t
 
+module Lock_file : sig
+  val create :
+    ?close_on_exec:bool ->
+    ?unlink_on_exit:bool ->
+    string -> unit tzresult Lwt.t
+
+  val blocking_create :
+    ?timeout:float ->
+    ?close_on_exec:bool ->
+    ?unlink_on_exit:bool ->
+    string -> unit tzresult Lwt.t
+
+  val is_locked : string -> bool tzresult Lwt.t
+  val get_pid : string -> int tzresult Lwt.t
+end
+
+val getaddrinfo:
+  passive:bool ->
+  node:string -> service:string ->
+  (Ipaddr.V6.t * int) list Lwt.t

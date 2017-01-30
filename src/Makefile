@@ -187,6 +187,7 @@ UTILS_PACKAGES := \
   base64 \
   calendar \
   ezjsonm \
+  ipaddr.unix \
   mtime.os \
   sodium \
   zarith \
@@ -330,7 +331,21 @@ NODE_LIB_IMPLS := \
   node/shell/node.ml \
   node/shell/node_rpc.ml \
 
+NODE_INTFS := \
+  node/main/node_identity_file.mli \
+  node/main/node_config_file.mli \
+  node/main/node_shared_arg.mli \
+  node/main/node_run_command.mli \
+  node/main/node_config_command.mli \
+  node/main/node_identity_command.mli \
+
 NODE_IMPLS := \
+  node/main/node_identity_file.ml \
+  node/main/node_config_file.ml \
+  node/main/node_shared_arg.ml \
+  node/main/node_run_command.ml \
+  node/main/node_config_command.ml \
+  node/main/node_identity_command.ml \
   node_main.ml \
 
 NODE_PACKAGES := \
@@ -351,11 +366,12 @@ EMBEDDED_NODE_PROTOCOLS := \
 
 NODE_OBJS := \
   ${NODE_IMPLS:.ml=.cmx} ${NODE_IMPLS:.ml=.ml.deps} \
+  ${NODE_INTFS:.mli=.cmi} ${NODE_INTFS:.mli=.mli.deps} \
   ${NODE_LIB_IMPLS:.ml=.cmx} ${NODE_LIB_IMPLS:.ml=.ml.deps} \
   ${NODE_LIB_INTFS:.mli=.cmi} ${NODE_LIB_INTFS:.mli=.mli.deps} \
   ${TZNODE}
 ${NODE_OBJS}: PACKAGES=${NODE_PACKAGES}
-${NODE_OBJS}: SOURCE_DIRECTORIES=minutils utils compiler node/db node/net node/updater node/shell
+${NODE_OBJS}: SOURCE_DIRECTORIES=minutils utils compiler node/db node/net node/updater node/shell node/main
 ${NODE_OBJS}: TARGET="(node.cmxa)"
 ${NODE_OBJS}: OPENED_MODULES=Error_monad Hash Utils
 

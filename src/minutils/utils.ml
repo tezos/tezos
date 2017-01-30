@@ -86,6 +86,10 @@ let list_rev_sub l n =
 
 let list_sub l n = list_rev_sub l n |> List.rev
 
+let list_hd_opt = function
+  | [] -> None
+  | h :: _ -> Some h
+
 let display_paragraph ppf description =
   Format.fprintf ppf "@[%a@]"
     (Format.pp_print_list ~pp_sep:Format.pp_print_newline
@@ -200,3 +204,50 @@ let select n l =
     | x :: xs -> loop (pred n) (x :: acc) xs
   in
   loop n [] l
+
+
+let mem_char s c =
+  match String.index s c with
+  | exception Not_found -> false
+  | _ -> true
+
+let check_port port =
+  if mem_char port '[' || mem_char port ']' || mem_char port ':' then
+    invalid_arg "Utils.parse_addr_port (invalid character in port)"
+
+let parse_addr_port s =
+  let len = String.length s in
+  if len = 0 then
+    ("", "")
+  else if s.[0] = '[' then begin (* inline IPv6 *)
+    match String.rindex s ']' with
+    | exception Not_found ->
+        invalid_arg "Utils.parse_addr_port (missing ']')"
+    | pos ->
+        let addr = String.sub s 1 (pos - 1) in
+        let port =
+          if pos = len - 1 then
+            ""
+          else if s.[pos+1] <> ':' then
+            invalid_arg "Utils.parse_addr_port (unexpected char after ']')"
+          else
+            String.sub s (pos + 2) (len - pos - 2) in
+        check_port port ;
+        addr, port
+  end else begin
+    match String.rindex s ']' with
+    | _pos ->
+        invalid_arg "Utils.parse_addr_port (unexpected char ']')"
+    | exception Not_found ->
+        match String.index s ':' with
+        | exception _ -> s, ""
+        | pos ->
+            match String.index_from s (pos+1) ':'  with
+            | exception _ ->
+                let addr = String.sub s 0 pos in
+                let port = String.sub s (pos + 1) (len - pos - 1) in
+                check_port port ;
+                addr, port
+            | _pos ->
+                invalid_arg "split_url_port: IPv6 addresses must be bracketed"
+  end

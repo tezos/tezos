@@ -39,6 +39,7 @@ val filter_map: ('a -> 'b option) -> 'a list -> 'b list
 val list_rev_sub : 'a list -> int -> 'a list
 (** [list_sub l n] is l capped to max n elements *)
 val list_sub: 'a list -> int -> 'a list
+val list_hd_opt: 'a list -> 'a option
 
 val finalize: (unit -> 'a) -> (unit -> unit) -> 'a
 
@@ -66,3 +67,7 @@ module Bounded(E: Set.OrderedType) : sig
 end
 
 val select: int -> 'a list -> 'a * 'a list
+
+(** [split_url_port uri] is (node, service) where [node] is the DNS or
+    IP and service is the optional port number or service name. *)
+val parse_addr_port: string -> string * string

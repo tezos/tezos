@@ -295,9 +295,15 @@ module Make() = struct
     if cond then return () else f ()
 
   let pp_print_error ppf errors =
-    Format.fprintf ppf "@[<v 2>Error, dumping error stack:@,%a@]@."
-      (Format.pp_print_list pp)
-      (List.rev errors)
+    match errors with
+    | [] ->
+        Format.fprintf ppf "Unknown error@."
+    | [error] ->
+        Format.fprintf ppf "@[<v 2>Error:@ %a@]@." pp error
+    | errors ->
+        Format.fprintf ppf "@[<v 2>Error, dumping error stack:@,%a@]@."
+          (Format.pp_print_list pp)
+          (List.rev errors)
 
 type error += Unclassified of string
 

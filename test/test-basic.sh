@@ -18,7 +18,7 @@ NODE=../tezos-node
 CLIENT="../tezos-client -base-dir ${CLIENT_DIR}"
 
 CUSTOM_PARAM="--sandbox ./sandbox.json"
-${NODE} --base-dir "${DATA_DIR}" ${CUSTOM_PARAM} --rpc-addr :::8732 > LOG 2>&1 &
+${NODE} run --data-dir "${DATA_DIR}" ${CUSTOM_PARAM} --rpc-addr "[::]:8732" > LOG 2>&1 &
 NODE_PID="$!"
 
 sleep 3
