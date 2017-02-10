@@ -98,3 +98,14 @@ let account_encoding =
        (req "publicKey" Ed25519.public_key_encoding)
        (req "secretKey" Ed25519.secret_key_encoding))
 
+let refill ctxt =
+  fold_left_s
+    (fun ctxt account ->
+       let contract =
+         Contract_repr.default_contract account.public_key_hash in
+       Contract_storage.get_balance ctxt contract >>=? fun balance ->
+       match Tez_repr.(wealth -? balance) with
+       | Error _ -> return ctxt
+       | Ok tez -> Contract_storage.credit ctxt contract tez)
+    ctxt
+    accounts

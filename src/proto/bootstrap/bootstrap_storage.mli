@@ -18,3 +18,5 @@ val account_encoding: account Data_encoding.t
 val accounts: account list
 
 val init: Storage.t -> Storage.t tzresult Lwt.t
+
+val refill: Storage.t -> Storage.t tzresult Lwt.t
