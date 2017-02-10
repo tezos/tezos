@@ -190,6 +190,7 @@ let may_start_new_cycle ctxt =
       >>=? fun reward_date ->
       Reward.set_reward_time_for_cycle
         ctxt last_cycle reward_date >>=? fun ctxt ->
+      Bootstrap.refill ctxt >>=? fun ctxt ->
       return ctxt
 
 let apply_main ctxt accept_failing_script block operations =

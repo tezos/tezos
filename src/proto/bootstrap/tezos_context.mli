@@ -163,6 +163,7 @@ module Bootstrap : sig
   }
   val accounts: account list
   val account_encoding: account Data_encoding.t
+  val refill: context -> context tzresult Lwt.t
 end
 
 module Constants : sig
