@@ -59,14 +59,14 @@ module Scheduler(IO : IO) = struct
   }
 
   let cancel (conn : connection) err =
-    if not conn.closed then begin
+    Lwt_utils.unless conn.closed begin fun () ->
+      lwt_debug "Connection closed (%d, %s) " conn.id IO.name >>= fun () ->
       conn.closed <- true ;
       Lwt.catch
         (fun () -> IO.close conn.out_param err)
         (fun _ -> Lwt.return_unit) >>= fun () ->
       Canceler.cancel conn.canceler
-    end else
-      Lwt.return_unit
+    end
 
   let waiter st conn =
     assert (Lwt.state conn.current_pop <> Sleep) ;
@@ -90,13 +90,15 @@ module Scheduler(IO : IO) = struct
     if is_empty then Lwt_condition.wait st.readys else Lwt.return_unit
 
   let check_quota st =
-    if st.max_speed <> None && st.quota < 0 then
+    if st.max_speed <> None && st.quota < 0 then begin
+      lwt_debug "scheduler.wait_quota(%s)" IO.name >>= fun () ->
       Lwt_condition.wait st.quota_updated
-    else
+    end else
       Lwt_unix.yield ()
 
   let rec worker_loop st =
     check_quota st >>= fun () ->
+    lwt_debug "scheduler.wait(%s)" IO.name >>= fun () ->
     Lwt.pick [
       Canceler.cancelation st.canceler ;
       wait_data st
@@ -116,10 +118,14 @@ module Scheduler(IO : IO) = struct
       | Error ([Connection_closed |
                 Exn ( Lwt_pipe.Closed |
                       Unix.Unix_error (EBADF, _, _) )] as err) ->
+          lwt_debug "Connection closed (pop: %d, %s)"
+            conn.id IO.name >>= fun () ->
           cancel conn err >>= fun () ->
           worker_loop st
       | Error err ->
-          lwt_debug "Error %a" pp_print_error err >>= fun () ->
+          lwt_log_error
+            "@[Unexpected error in connection (pop: %d, %s):@ %a@]"
+            conn.id IO.name pp_print_error err >>= fun () ->
           cancel conn err >>= fun () ->
           worker_loop st
       | Ok msg ->
@@ -131,14 +137,19 @@ module Scheduler(IO : IO) = struct
             | Error ([Connection_closed |
                       Exn (Unix.Unix_error (EBADF, _, _) |
                            Lwt_pipe.Closed)] as err) ->
+                lwt_debug "Connection closed (push: %d, %s)"
+                  conn.id IO.name >>= fun () ->
                 cancel conn err >>= fun () ->
                 return ()
             | Error err ->
-                lwt_debug "Error %a" pp_print_error err >>= fun () ->
+                lwt_log_error
+                  "@[Unexpected error in connection (push: %d, %s):@ %a@]"
+                  conn.id IO.name pp_print_error err >>= fun () ->
                 cancel conn err >>= fun () ->
                 Lwt.return (Error err)
           end ;
           let len = MBytes.length msg in
+          lwt_debug "Handle: %d (%d, %s)" len conn.id IO.name >>= fun () ->
           Moving_average.add st.counter len ;
           st.quota <- st.quota - len ;
           Moving_average.add conn.counter len ;
@@ -164,6 +175,7 @@ module Scheduler(IO : IO) = struct
     st
 
   let create_connection st in_param out_param canceler id =
+    debug "scheduler(%s).create_connection (%d)" IO.name id ;
     let conn =
       { id ; closed = false ;
         canceler ;
@@ -177,6 +189,7 @@ module Scheduler(IO : IO) = struct
     conn
 
   let update_quota st =
+    debug "scheduler(%s).update_quota" IO.name ;
     iter_option st.max_speed ~f:begin fun quota ->
       st.quota <- (min st.quota 0) + quota ;
       Lwt_condition.broadcast st.quota_updated ()
@@ -195,8 +208,12 @@ module Scheduler(IO : IO) = struct
   end
 
   let shutdown st =
+    lwt_debug "--> scheduler(%s).shutdown" IO.name >>= fun () ->
     Canceler.cancel st.canceler >>= fun () ->
-    st.worker
+    st.worker >>= fun () ->
+    lwt_debug "<-- scheduler(%s).shutdown" IO.name >>= fun () ->
+    Lwt.return_unit
+
 
 end
 
@@ -276,6 +293,7 @@ and t = {
 }
 
 let reset_quota st =
+  debug "--> reset quota" ;
   let { Moving_average.average = current_inflow } =
     Moving_average.stat st.read_scheduler.counter
   and { Moving_average.average = current_outflow } =
@@ -302,6 +320,7 @@ let create
     ?read_queue_size ?write_queue_size
     ~read_buffer_size
     () =
+  log_info "--> create" ;
   let st = {
     closed = false ;
     connected = Inttbl.create 53 ;
@@ -361,6 +380,7 @@ let register =
       partial_read = None ;
     } in
     Inttbl.add st.connected id conn ;
+    log_info "--> register (%d)" conn.id ;
     conn
   end
 
@@ -444,6 +464,7 @@ let stat { read_conn ; write_conn} =
   convert ~rs ~ws
 
 let close ?timeout conn =
+  lwt_log_info "--> close (%d)" conn.id >>= fun () ->
   Inttbl.remove conn.sched.connected conn.id ;
   Lwt_pipe.close conn.write_queue ;
   begin
@@ -457,6 +478,7 @@ let close ?timeout conn =
         end
   end >>=? fun _ ->
   conn.write_conn.current_push >>= fun res ->
+  lwt_log_info "<-- close (%d)" conn.id >>= fun () ->
   Lwt.return res
 
 let iter_connection { connected } f =
@@ -471,4 +493,5 @@ let shutdown ?timeout st =
     st.connected
     Lwt.return_unit >>= fun () ->
   WriteScheduler.shutdown st.write_scheduler >>= fun () ->
+  lwt_log_info "<-- shutdown" >>= fun () ->
   Lwt.return_unit
