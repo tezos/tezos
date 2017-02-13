@@ -178,15 +178,24 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
                         Cohttp_lwt_body.empty)
         | e -> Lwt.fail e)
   and conn_closed (_, con) =
-    log_info "connection close %s" (Cohttp.Connection.to_string con) ;
+    log_info "connection closed %s" (Cohttp.Connection.to_string con) ;
     shutdown_stream con  in
   Conduit_lwt_unix.init ~src:host () >>= fun ctx ->
   let ctx = Cohttp_lwt_unix_net.init ~ctx () in
   let stop = cancelation () in
-  let _server =
-    Server.create
-      ~stop ~ctx ~mode
-      (Server.make ~callback ~conn_closed ()) in
+  Lwt.async
+    (fun () ->
+       Lwt.catch
+         (fun () ->
+            Server.create
+              ~stop ~ctx ~mode
+              (Server.make ~callback ~conn_closed ()))
+         (function
+           | Unix.Unix_error (Unix.EADDRINUSE, "bind", _) ->
+               lwt_log_error "RPC server port already taken, \
+                              the node will be shutdown" >>= fun () ->
+               Lwt_exit.exit 1
+           | exn -> Lwt.fail exn)) ;
   let shutdown () =
     canceler () >>= fun () ->
     lwt_log_info "server not really stopped (cohttp bug)" >>= fun () ->
