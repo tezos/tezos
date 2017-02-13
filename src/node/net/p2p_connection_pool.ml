@@ -478,9 +478,12 @@ let accept pool fd point =
 
 (***************************************************************************)
 
-let read { messages } =
+let read { messages ; conn } =
   Lwt.catch
-    (fun () -> Lwt_pipe.pop messages >>= fun ( _, msg) -> return msg)
+    (fun () -> Lwt_pipe.pop messages >>= fun (s, msg) ->
+      lwt_debug "%d bytes message popped from queue %a\027[0m"
+        s Connection_info.pp (P2p_connection.info conn) >>= fun () ->
+      return msg)
     (fun _ (* Closed *) -> fail P2p_io_scheduler.Connection_closed)
 
 let is_readable { messages } =
