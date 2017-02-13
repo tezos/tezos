@@ -21,6 +21,7 @@ let initialize (ctxt:Context.t) =
   Fitness_storage.init store >>=? fun store ->
   Level_storage.init store >>=? fun store ->
   Roll_storage.init store >>=? fun store ->
+  Nonce_storage.init store >>=? fun store ->
   Seed_storage.init store >>=? fun store ->
   Contract_storage.init store >>=? fun store ->
   Reward_storage.init store >>=? fun store ->

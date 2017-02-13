@@ -65,3 +65,6 @@ let get c level = Storage.Seed.Nonce.get c level
 let of_bytes = Seed_repr.make_nonce
 let hash = Seed_repr.hash
 let check_hash = Seed_repr.check_hash
+
+let init c =
+  Storage.Seed.Nonce.init c Level_repr.root (Revealed Seed_repr.initial_nonce_0)

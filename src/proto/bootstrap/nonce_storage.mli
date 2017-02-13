@@ -41,3 +41,6 @@ val get: Storage.t -> Level_repr.t -> status tzresult Lwt.t
 val of_bytes: MBytes.t -> nonce tzresult
 val hash: nonce -> Nonce_hash.t
 val check_hash: nonce -> Nonce_hash.t -> bool
+
+val init:
+  Storage.t -> Storage.t tzresult Lwt.t
