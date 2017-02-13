@@ -29,6 +29,8 @@ module type IO = sig
   val close: out_param -> error list -> unit Lwt.t
 end
 
+type error += Connection_closed
+
 module Scheduler(IO : IO) = struct
 
   type t = {
@@ -111,8 +113,9 @@ module Scheduler(IO : IO) = struct
       match msg with
       | Error [Lwt_utils.Canceled] ->
           worker_loop st
-      | Error ([Exn (Lwt_pipe.Closed |
-                     Unix.Unix_error (EBADF, _, _))] as err) ->
+      | Error ([Connection_closed |
+                Exn ( Lwt_pipe.Closed |
+                      Unix.Unix_error (EBADF, _, _) )] as err) ->
           cancel conn err >>= fun () ->
           worker_loop st
       | Error err ->
@@ -125,7 +128,8 @@ module Scheduler(IO : IO) = struct
             | Ok ()
             | Error [Lwt_utils.Canceled] ->
                 return ()
-            | Error ([Exn (Unix.Unix_error (EBADF, _, _) |
+            | Error ([Connection_closed |
+                      Exn (Unix.Unix_error (EBADF, _, _) |
                            Lwt_pipe.Closed)] as err) ->
                 cancel conn err >>= fun () ->
                 return ()
@@ -196,8 +200,6 @@ module Scheduler(IO : IO) = struct
 
 end
 
-type error += Connection_closed
-
 module ReadScheduler = Scheduler(struct
     let name = "io_scheduler(read)"
     type in_param = Lwt_unix.file_descr * int
@@ -239,6 +241,7 @@ module WriteScheduler = Scheduler(struct
         (fun () ->
            Lwt_utils.write_mbytes fd buf >>= return)
         (function
+          | Unix.Unix_error(Unix.ECONNRESET, _, _)
           | Unix.Unix_error(Unix.EPIPE, _, _)
           | Lwt.Canceled
           | End_of_file ->
@@ -440,21 +443,32 @@ let stat { read_conn ; write_conn} =
   and ws = Moving_average.stat write_conn.counter in
   convert ~rs ~ws
 
-let close conn =
+let close ?timeout conn =
   Inttbl.remove conn.sched.connected conn.id ;
   Lwt_pipe.close conn.write_queue ;
-  Canceler.cancelation conn.canceler >>= fun () ->
+  begin
+    match timeout with
+    | None ->
+        return (Canceler.cancelation conn.canceler)
+    | Some timeout ->
+        Lwt_utils.with_timeout
+          ~canceler:conn.canceler timeout begin fun canceler ->
+          return (Canceler.cancelation canceler)
+        end
+  end >>=? fun _ ->
   conn.write_conn.current_push >>= fun res ->
   Lwt.return res
 
 let iter_connection { connected } f =
   Inttbl.iter f connected
 
-let shutdown st =
+let shutdown ?timeout st =
+  lwt_log_info "--> shutdown" >>= fun () ->
   st.closed <- true ;
   ReadScheduler.shutdown st.read_scheduler >>= fun () ->
-  WriteScheduler.shutdown st.write_scheduler >>= fun () ->
   Inttbl.fold
-    (fun _gid conn acc -> close conn >>= fun _ -> acc)
+    (fun _gid conn acc -> close ?timeout conn >>= fun _ -> acc)
     st.connected
-    Lwt.return_unit
+    Lwt.return_unit >>= fun () ->
+  WriteScheduler.shutdown st.write_scheduler >>= fun () ->
+  Lwt.return_unit

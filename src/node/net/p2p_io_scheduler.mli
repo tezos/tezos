@@ -83,11 +83,11 @@ val iter_connection: t -> (int -> connection -> unit) -> unit
 (** [iter_connection sched f] applies [f] on each connection managed
     by [sched]. *)
 
-val close: connection -> unit tzresult Lwt.t
+val close: ?timeout:float -> connection -> unit tzresult Lwt.t
 (** [close conn] cancels [conn] and returns after any pending data has
     been sent. *)
 
-val shutdown: t -> unit Lwt.t
+val shutdown: ?timeout:float -> t -> unit Lwt.t
 (** [shutdown sched] returns after all connections managed by [sched]
     have been closed and [sched]'s inner worker has successfully
     canceled. *)

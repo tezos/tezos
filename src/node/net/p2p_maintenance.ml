@@ -57,7 +57,7 @@ let connectable st start_time expected =
       | Disconnected -> begin
           match Point_info.last_miss pi with
           | Some last when Time.(start_time < last)
-                        && not (Point_info.greylisted ~now pi) -> ()
+                        || Point_info.greylisted ~now pi -> ()
           | last ->
               Bounded_point_info.insert (last, point) acc
         end
