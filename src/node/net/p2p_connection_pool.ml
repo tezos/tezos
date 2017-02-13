@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* TODO check version negotiation *)
-
 (* TODO Test cancelation of a (pending) connection *)
 
 (* TODO do not recompute list_known_points at each requests...  but
@@ -177,6 +175,7 @@ and events = {
   too_few_connections : unit Lwt_condition.t ;
   too_many_connections : unit Lwt_condition.t ;
   new_point : unit Lwt_condition.t ;
+  new_connection : unit Lwt_condition.t ;
 }
 
 and ('msg, 'meta) connection = {
@@ -245,7 +244,7 @@ let list_known_points pool _gid () =
 
 let active_connections pool = Gid.Table.length pool.connected_gids
 
-let create_connection pool conn id_point pi gi =
+let create_connection pool conn id_point pi gi _version =
   let gid = Gid_info.gid gi in
   let canceler = Canceler.create () in
   let size =
@@ -268,6 +267,7 @@ let create_connection pool conn id_point pi gi =
   end ;
   Gid_info.State.set_running gi id_point conn ;
   Gid.Table.add pool.connected_gids gid gi ;
+  Lwt_condition.broadcast pool.events.new_connection () ;
   Canceler.on_cancel canceler begin fun () ->
     lwt_debug "Disconnect: %a (%a)"
       Gid.pp gid Id_point.pp id_point >>= fun () ->
@@ -338,6 +338,9 @@ let authenticate pool ?pi canceler fd point =
     | None, None -> None
     | Some _ as pi, _ | _, (Some _ as pi) -> pi in
   let gi = register_peer pool info.gid in
+  let acceptable_versions =
+    Version.common info.versions pool.message_config.versions
+  in
   let acceptable_point =
     unopt_map connection_pi
       ~default:(not pool.config.closed_network)
@@ -359,47 +362,49 @@ let authenticate pool ?pi canceler fd point =
     | Disconnected -> true
   in
   if incoming then Point.Table.remove pool.incoming point ;
-  if not acceptable_gid || not acceptable_point then begin
-    lwt_debug "authenticate: %a -> kick %a point: %B gid: %B"
-      Point.pp point
-      Connection_info.pp info
-      acceptable_point acceptable_gid >>= fun () ->
-    P2p_connection.kick auth_fd >>= fun () ->
-    if not incoming then begin
-      iter_option ~f:Point_info.State.set_disconnected pi ;
-      (* FIXME Gid_info.State.set_disconnected ~requested:true gi ; *)
-    end ;
-    fail (Rejected info.gid)
-  end else begin
-    iter_option connection_pi
-      ~f:(fun pi -> Point_info.State.set_accepted pi info.gid canceler) ;
-    Gid_info.State.set_accepted gi info.id_point canceler ;
-    lwt_debug "authenticate: %a -> accept %a"
-      Point.pp point
-      Connection_info.pp info >>= fun () ->
-    Lwt_utils.protect ~canceler begin fun () ->
-      P2p_connection.accept
-        ?incoming_message_queue_size:pool.config.incoming_message_queue_size
-        ?outgoing_message_queue_size:pool.config.outgoing_message_queue_size
-        auth_fd pool.encoding >>= fun conn ->
-      lwt_debug "authenticate: %a -> Connected %a"
+  match acceptable_versions with
+  | Some version when acceptable_gid && acceptable_point -> begin
+      iter_option connection_pi
+        ~f:(fun pi -> Point_info.State.set_accepted pi info.gid canceler) ;
+      Gid_info.State.set_accepted gi info.id_point canceler ;
+      lwt_debug "authenticate: %a -> accept %a"
         Point.pp point
         Connection_info.pp info >>= fun () ->
-      Lwt.return conn
-    end ~on_error: begin fun err ->
-      lwt_debug "authenticate: %a -> rejected %a"
+      Lwt_utils.protect ~canceler begin fun () ->
+        P2p_connection.accept
+          ?incoming_message_queue_size:pool.config.incoming_message_queue_size
+          ?outgoing_message_queue_size:pool.config.outgoing_message_queue_size
+          auth_fd pool.encoding >>= fun conn ->
+        lwt_debug "authenticate: %a -> Connected %a"
+          Point.pp point
+          Connection_info.pp info >>= fun () ->
+        Lwt.return conn
+      end ~on_error: begin fun err ->
+        lwt_debug "authenticate: %a -> rejected %a"
+          Point.pp point
+          Connection_info.pp info >>= fun () ->
+        iter_option connection_pi ~f:Point_info.State.set_disconnected;
+        Gid_info.State.set_disconnected gi ;
+        Lwt.return (Error err)
+      end >>=? fun conn ->
+      let id_point =
+        match info.id_point, map_option Point_info.point pi with
+        | (addr, _), Some (_, port) -> addr, Some port
+        | id_point, None ->  id_point in
+      return (create_connection pool conn id_point connection_pi gi version)
+    end
+  | _ -> begin
+      lwt_debug "authenticate: %a -> kick %a point: %B gid: %B"
         Point.pp point
-        Connection_info.pp info >>= fun () ->
-      iter_option connection_pi ~f:Point_info.State.set_disconnected;
-      Gid_info.State.set_disconnected gi ;
-      Lwt.return (Error err)
-    end >>=? fun conn ->
-    let id_point =
-      match info.id_point, map_option Point_info.point pi with
-      | (addr, _), Some (_, port) -> addr, Some port
-      | id_point, None ->  id_point in
-    return (create_connection pool conn id_point connection_pi gi)
-  end
+        Connection_info.pp info
+        acceptable_point acceptable_gid >>= fun () ->
+      P2p_connection.kick auth_fd >>= fun () ->
+      if not incoming then begin
+        iter_option ~f:Point_info.State.set_disconnected pi ;
+        (* FIXME Gid_info.State.set_disconnected ~requested:true gi ; *)
+      end ;
+      fail (Rejected info.gid)
+    end
 
 type error += Pending_connection
 type error += Connected
@@ -437,6 +442,7 @@ let raw_connect canceler pool point =
   end ~on_error: begin fun err ->
     lwt_debug "connect: %a -> disconnect" Point.pp point >>= fun () ->
     Point_info.State.set_disconnected pi ;
+    Lwt_utils.safe_close fd >>= fun () ->
     match err with
     | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
         fail Connection_refused
@@ -604,6 +610,8 @@ module Events = struct
     Lwt_condition.wait pool.events.too_many_connections
   let new_point pool =
     Lwt_condition.wait pool.events.new_point
+  let new_connection pool =
+    Lwt_condition.wait pool.events.new_connection
 end
 
 
@@ -623,6 +631,7 @@ let create config meta_config message_config io_sched =
     too_few_connections = Lwt_condition.create () ;
     too_many_connections = Lwt_condition.create () ;
     new_point = Lwt_condition.create () ;
+    new_connection = Lwt_condition.create () ;
   } in
   let pool = {
     config ; meta_config ; message_config ;
