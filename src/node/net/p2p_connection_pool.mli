@@ -131,6 +131,7 @@ module Events : sig
   val too_few_connections: ('msg, 'meta) pool -> unit Lwt.t
   val too_many_connections: ('msg, 'meta) pool -> unit Lwt.t
   val new_point: ('msg, 'meta) pool -> unit Lwt.t
+  val new_connection: ('msg, 'meta) pool -> unit Lwt.t
 end
 
 (** {1 Connections management} *)

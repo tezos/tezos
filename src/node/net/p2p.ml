@@ -176,7 +176,7 @@ module Real = struct
     P2p_maintenance.shutdown net.maintenance >>= fun () ->
     Lwt_utils.may ~f:P2p_discovery.shutdown net.discoverer >>= fun () ->
     P2p_connection_pool.destroy net.pool >>= fun () ->
-    P2p_io_scheduler.shutdown net.io_sched
+    P2p_io_scheduler.shutdown ~timeout:3.0 net.io_sched
 
   let connections { pool } () =
     P2p_connection_pool.fold_connections pool
@@ -200,18 +200,24 @@ module Real = struct
   let rec recv_any net () =
     let pipes =
       P2p_connection_pool.fold_connections
-        net.pool ~init:[] ~f:begin fun _gid conn acc ->
+        net.pool ~init:[]
+        ~f:begin fun _gid conn acc ->
         (P2p_connection_pool.is_readable conn >>= function
-          | Ok () -> Lwt.return conn
+          | Ok () -> Lwt.return (Some conn)
           | Error _ -> Lwt_utils.never_ending) :: acc
       end in
-    Lwt.pick pipes >>= fun conn ->
-    P2p_connection_pool.read conn >>= function
-    | Ok msg ->
-        Lwt.return (conn, msg)
-    | Error _ ->
-        Lwt_unix.yield () >>= fun () ->
-        recv_any net ()
+    Lwt.pick (
+      ( P2p_connection_pool.Events.new_connection net.pool >>= fun () ->
+        Lwt.return_none )::
+      pipes) >>= function
+    | None -> recv_any net ()
+    | Some conn ->
+        P2p_connection_pool.read conn >>= function
+        | Ok msg ->
+            Lwt.return (conn, msg)
+        | Error _ ->
+            Lwt_unix.yield () >>= fun () ->
+            recv_any net ()
 
   let send _net c m =
     P2p_connection_pool.write c m >>= function
