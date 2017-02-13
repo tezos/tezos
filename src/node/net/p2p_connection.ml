@@ -228,6 +228,8 @@ module Reader = struct
     Lwt_utils.protect ~canceler:st.canceler begin fun () ->
       Crypto.read_chunk st.conn.fd st.conn.cryptobox_data >>=? fun buf ->
       let size = 6 * (Sys.word_size / 8) + MBytes.length buf in
+      lwt_debug "reading %d bytes from %a"
+        size Connection_info.pp st.conn.info >>= fun () ->
       read_message st buf >>|? fun msg ->
       size, msg
     end >>= function
@@ -238,6 +240,8 @@ module Reader = struct
         Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
         worker_loop st
     | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
+      lwt_debug "connection closed to %a"
+        Connection_info.pp st.conn.info >>= fun () ->
         Lwt.return_unit
     | Error _ as err ->
         Lwt_pipe.push st.messages err >>= fun () ->
@@ -290,6 +294,8 @@ module Writer = struct
     Lwt_utils.protect ~canceler:st.canceler begin fun () ->
       Lwt_pipe.pop st.messages >>= fun (msg, wakener) ->
       encode_message st msg >>=? fun buf ->
+      lwt_debug "writing %d bytes to %a"
+        (MBytes.length buf) Connection_info.pp st.conn.info >>= fun () ->
       Crypto.write_chunk st.conn.fd st.conn.cryptobox_data buf >>= fun res ->
       iter_option wakener ~f:(fun u -> Lwt.wakeup_later u res) ;
       Lwt.return res
@@ -297,10 +303,12 @@ module Writer = struct
     | Ok () ->
         worker_loop st
     | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
+        lwt_debug "connection closed to %a"
+          Connection_info.pp st.conn.info >>= fun () ->
         Lwt.return_unit
     | Error err ->
         lwt_log_error
-          "@[<v 2>Error while writing to %a@ %a@]"
+          "@[<v 2>error writing to %a@ %a@]"
           Connection_info.pp st.conn.info pp_print_error err >>= fun () ->
         Canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit

@@ -9,6 +9,8 @@
 
 include P2p_types
 
+include Logging.Make(struct let name = "p2p" end)
+
 type 'meta meta_config = 'meta P2p_connection_pool.meta_config = {
   encoding : 'meta Data_encoding.t;
   initial : 'meta;
@@ -195,7 +197,11 @@ module Real = struct
     P2p_connection_pool.Gids.get_metadata pool conn
 
   let rec recv _net conn =
-    P2p_connection_pool.read conn
+    P2p_connection_pool.read conn >>=? fun msg ->
+    lwt_debug "message read from %a"
+      Connection_info.pp
+      (P2p_connection_pool.connection_info conn) >>= fun () ->
+    return msg
 
   let rec recv_any net () =
     let pipes =
@@ -214,22 +220,48 @@ module Real = struct
     | Some conn ->
         P2p_connection_pool.read conn >>= function
         | Ok msg ->
+            lwt_debug "message read from %a"
+              Connection_info.pp
+              (P2p_connection_pool.connection_info conn) >>= fun () ->
             Lwt.return (conn, msg)
         | Error _ ->
+            lwt_debug "error reading message from %a"
+              Connection_info.pp
+              (P2p_connection_pool.connection_info conn) >>= fun () ->
             Lwt_unix.yield () >>= fun () ->
             recv_any net ()
 
-  let send _net c m =
-    P2p_connection_pool.write c m >>= function
-    | Ok () -> Lwt.return_unit
-    | Error _ -> Lwt.fail End_of_file (* temporary *)
+  let send _net conn m =
+    P2p_connection_pool.write conn m >>= function
+    | Ok () ->
+        lwt_debug "message sent to %a"
+          Connection_info.pp
+          (P2p_connection_pool.connection_info conn) >>= fun () ->
+        Lwt.return_unit
+    | Error _ ->
+        lwt_debug "error sending message from %a"
+          Connection_info.pp
+          (P2p_connection_pool.connection_info conn) >>= fun () ->
+        Lwt.fail End_of_file (* temporary *)
 
-  let try_send _net c v =
-    match P2p_connection_pool.write_now c v with
-    | Ok v -> v
-    | Error _ -> false
+  let try_send _net conn v =
+    match P2p_connection_pool.write_now conn v with
+    | Ok v ->
+        Lwt.ignore_result
+          (lwt_debug "message trysent to %a"
+             Connection_info.pp
+             (P2p_connection_pool.connection_info conn)) ;
+        v
+    | Error _ ->
+        Lwt.ignore_result
+          (lwt_debug "error trysending message to %a"
+             Connection_info.pp
+             (P2p_connection_pool.connection_info conn)) ;
+        false
 
-  let broadcast { pool } msg = P2p_connection_pool.write_all pool msg
+  let broadcast { pool } msg =
+    P2p_connection_pool.write_all pool msg ;
+    Lwt.ignore_result (lwt_debug "message broadcasted")
 
 end
 
