@@ -71,7 +71,8 @@ val nonce_hash_key_part : Nonce_hash.t -> string list
 
 (** {2 Predefined nonce} *****************************************************)
 
-val initial_nonce_0 : Nonce_hash.t
+val initial_nonce_0 : nonce
+val initial_nonce_hash_0 : Nonce_hash.t
 
 (** {2 Serializers} **********************************************************)
 
