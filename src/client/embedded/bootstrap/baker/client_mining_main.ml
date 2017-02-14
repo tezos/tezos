@@ -86,19 +86,9 @@ let reveal_block_nonces cctxt ?force block_hashes =
 
 let reveal_nonces cctxt ?force () =
   let block = Client_proto_args.block () in
-  Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
-  let cur_cycle = level.cycle in
-  get_predecessor_cycle cctxt cur_cycle >>= fun cycle ->
-  Client_mining_blocks.blocks_from_cycle cctxt block cycle >>=? fun block_infos ->
-  map_filter_s (fun (bi : Client_mining_blocks.block_info) ->
-      Client_proto_nonces.find cctxt bi.hash >>= function
-      | None -> return None
-      | Some nonce ->
-          cctxt.warning "Found nonce for %a (level: %a)@."
-            Block_hash.pp_short bi.hash Level.pp bi.level >>= fun () ->
-          return (Some (bi.hash, (bi.level.level, nonce))))
-    block_infos >>=? fun blocks ->
-   do_reveal cctxt ?force block blocks
+  Client_mining_forge.get_unrevealed_nonces
+    cctxt ?force block >>=? fun nonces ->
+  do_reveal cctxt ?force block nonces
 
 open Client_proto_args
 

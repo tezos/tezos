@@ -280,7 +280,44 @@ let compute_timeout { future_slots } =
       else
         Lwt_unix.sleep (Int64.to_float delay)
 
-let insert_block cctxt ?max_priority state (bi: Client_mining_blocks.block_info) =
+let get_unrevealed_nonces cctxt ?(force = false) block =
+  Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
+  let cur_cycle = level.cycle in
+  match Cycle.pred cur_cycle with
+  | None -> return []
+  | Some cycle ->
+      Client_mining_blocks.blocks_from_cycle
+        cctxt block cycle >>=? fun block_infos ->
+      map_filter_s (fun (bi : Client_mining_blocks.block_info) ->
+          Client_proto_nonces.find cctxt bi.hash >>= function
+          | None -> return None
+          | Some nonce ->
+              if force then
+                return (Some (bi.hash, (bi.level.level, nonce)))
+              else
+                Client_proto_rpcs.Context.Nonce.get
+                  cctxt block bi.level.level >>=? function
+                | Missing nonce_hash
+                  when Nonce.check_hash nonce nonce_hash ->
+                    cctxt.warning "Found nonce for %a (level: %a)@."
+                      Block_hash.pp_short bi.hash
+                      Level.pp bi.level >>= fun () ->
+                    return (Some (bi.hash, (bi.level.level, nonce)))
+                | Missing _nonce_hash ->
+                    cctxt.error "Incoherent nonce for level %a"
+                      Raw_level.pp bi.level.level >>= fun () ->
+                    return None
+                | Forgotten -> return None
+                | Revealed _ -> return None)
+        block_infos
+
+let insert_block
+    cctxt ?max_priority state (bi: Client_mining_blocks.block_info) =
+  begin
+    get_unrevealed_nonces cctxt (`Hash bi.hash) >>=? fun nonces ->
+    Client_mining_revelation.forge_seed_nonce_revelation
+      cctxt ~force:true (`Hash bi.hash) (List.map snd nonces)
+  end >>= fun _ignore_error ->
   if Fitness.compare state.best_fitness bi.fitness < 0 then
     state.best_fitness <- bi.fitness ;
   get_mining_slot cctxt ?max_priority bi state.delegates >>= function
