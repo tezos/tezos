@@ -44,12 +44,12 @@ let fold ctxt ~f init =
 
 let freeze_rolls_for_cycle ctxt cycle =
   fold ctxt (ctxt, Roll_repr.first)
-    ~f:(fun roll contract (ctxt, promoted_roll as acc) ->
+    ~f:(fun _roll contract (ctxt, promoted_roll as acc) ->
         get_contract_delegate ctxt contract >>=? function
         | None -> return acc
         | Some delegate ->
             Storage.Roll.Owner_for_cycle.init
-              ctxt (cycle, roll) delegate >>=? fun ctxt ->
+              ctxt (cycle, promoted_roll) delegate >>=? fun ctxt ->
             return (ctxt, Roll_repr.succ promoted_roll))
   >>=? fun (ctxt, last_promoted_roll) ->
   Storage.Roll.Last_for_cycle.init ctxt cycle last_promoted_roll
