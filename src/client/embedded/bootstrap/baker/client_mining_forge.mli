@@ -52,3 +52,9 @@ val create:
   Client_mining_blocks.block_info list Lwt_stream.t ->
   Client_mining_operations.valid_endorsement Lwt_stream.t ->
   unit Lwt.t
+
+val get_unrevealed_nonces:
+  Client_commands.context ->
+  ?force:bool ->
+  Client_proto_rpcs.block ->
+  (Block_hash.t * (Raw_level.t * Nonce.t)) list tzresult Lwt.t

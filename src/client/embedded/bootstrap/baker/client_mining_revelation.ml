@@ -24,29 +24,9 @@ let inject_seed_nonce_revelation cctxt block ?force ?wait nonces =
 
 type Error_monad.error += Bad_revelation
 
-let forge_seed_nonce_revelation cctxt
-    block ?(force = false) redempted_nonces =
-  begin
-    if force then return redempted_nonces else
-    map_filter_s (fun (level, nonce) ->
-          Client_proto_rpcs.Context.Nonce.get cctxt block level >>=? function
-          | Forgotten ->
-              cctxt.message "Too late revelation for level %a"
-                Raw_level.pp level >>= fun () ->
-              return None
-          | Revealed _ ->
-              cctxt.message "Ignoring previously-revealed nonce for level %a"
-                Raw_level.pp level >>= fun () ->
-              return None
-          | Missing nonce_hash ->
-              if Nonce.check_hash nonce nonce_hash then
-                return (Some (level, nonce))
-              else
-                lwt_log_error "Incoherent nonce for level %a"
-                  Raw_level.pp level >>= fun () ->
-                return None)
-      redempted_nonces
-  end >>=? fun nonces ->
+let forge_seed_nonce_revelation
+    (cctxt: Client_commands.context)
+    block ?(force = false) nonces =
   match nonces with
   | [] ->
       cctxt.message "No nonce to reveal" >>= fun () ->
