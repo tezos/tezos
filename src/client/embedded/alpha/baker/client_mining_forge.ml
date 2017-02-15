@@ -282,7 +282,7 @@ let create_state genesis delegates best =
 let drop_old_slots ~before state =
   state.future_slots <-
     List.filter
-      (fun (t, _slot) -> Time.compare t before < 0)
+      (fun (t, _slot) -> Time.compare before t <= 0)
       state.future_slots
 
 let compute_timeout { future_slots } =
@@ -338,8 +338,11 @@ let insert_block
     Client_mining_revelation.forge_seed_nonce_revelation
       cctxt ~force:true (`Hash bi.hash) (List.map snd nonces)
   end >>= fun _ignore_error ->
-  if Fitness.compare state.best.fitness bi.fitness < 0 then
+  if Fitness.compare state.best.fitness bi.fitness < 0 then begin
     state.best <- bi ;
+    drop_old_slots
+      ~before:(Time.add state.best.timestamp (-1800L)) state ;
+  end ;
   get_mining_slot cctxt ?max_priority bi state.delegates >>= function
   | None ->
       lwt_debug
@@ -351,9 +354,6 @@ let insert_block
         Time.pp_hum timestamp
         name
         Block_hash.pp_short bi.hash >>= fun () ->
-      if Time.compare bi.timestamp state.best.timestamp = 0 then
-        drop_old_slots
-          ~before:(Time.add state.best.timestamp (-1800L)) state ;
       state.future_slots <- insert_mining_slot slot state.future_slots ;
       Lwt.return_unit
 

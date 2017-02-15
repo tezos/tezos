@@ -176,7 +176,7 @@ let forge_endorsement cctxt
 
 type state = {
   delegates: public_key_hash list ;
-  mutable best_fitness: Fitness.t ;
+  mutable best: Client_mining_blocks.block_info ;
   mutable to_endorse: endorsement list ;
   delay: int64;
 }
@@ -187,9 +187,9 @@ and endorsement = {
   slot: int;
 }
 
-let create_state delegates best_fitness delay =
+let create_state delegates best delay =
   { delegates ;
-    best_fitness ;
+    best ;
     to_endorse = [] ;
     delay ;
   }
@@ -199,6 +199,12 @@ let rec insert ({time} as e) = function
   | ({time = time'} :: _) as l when Time.compare time time' < 0 ->
       e :: l
   | e' :: l -> e' :: insert e l
+
+let drop_old_endorsement ~before state =
+  state.to_endorse <-
+    List.filter
+      (fun { block } -> Fitness.compare before block.fitness <= 0)
+      state.to_endorse
 
 let schedule_endorsements cctxt state bis =
   let may_endorse (block: Client_mining_blocks.block_info) delegate time =
@@ -212,6 +218,10 @@ let schedule_endorsements cctxt state bis =
       Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->
     iter_p
       (fun slot ->
+         if Fitness.compare state.best.fitness block.fitness < 0 then begin
+           state.best <- block ;
+           drop_old_endorsement ~before:block.fitness state ;
+         end ;
          previously_endorsed_slot cctxt level slot >>=? function
          | true ->
              lwt_debug "slot %d: previously endorsed." slot >>= fun () ->
@@ -284,7 +294,7 @@ let pop_endorsements state =
 let endorse cctxt state =
   let to_endorse = pop_endorsements state in
   iter_p
-    (fun {delegate;block;slot} ->
+    (fun { delegate ; block ; slot } ->
        let hash = block.hash in
        let b = `Hash hash in
        let level = Raw_level.succ block.level.level in
@@ -322,7 +332,7 @@ let create cctxt ~delay contracts block_stream =
   Lwt_stream.get block_stream >>= function
   | None | Some [] ->
       cctxt.Client_commands.error "Can't fetch the current block head."
-  | Some ({ Client_mining_blocks.fitness } :: _ as initial_heads) ->
+  | Some (bi :: _ as initial_heads) ->
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with
@@ -331,7 +341,7 @@ let create cctxt ~delay contracts block_stream =
             last_get_block := Some t ;
             t
         | Some t -> t in
-      let state = create_state contracts fitness (Int64.of_int delay) in
+      let state = create_state contracts bi (Int64.of_int delay) in
       let rec worker_loop () =
         let timeout = compute_timeout state in
         Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
