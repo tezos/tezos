@@ -19,8 +19,10 @@ let generate_seed_nonce () =
   | Error _ -> assert false
   | Ok nonce -> nonce
 
-let rec compute_stamp cctxt block delegate_sk shell mining_slot seed_nonce_hash =
-  Client_proto_rpcs.Constants.stamp_threshold cctxt block >>=? fun stamp_threshold ->
+let rec compute_stamp
+    cctxt block delegate_sk shell mining_slot seed_nonce_hash =
+  Client_proto_rpcs.Constants.stamp_threshold
+    cctxt block >>=? fun stamp_threshold ->
   let rec loop () =
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
     let unsigned_header =
@@ -81,7 +83,8 @@ let forge_block cctxt block
   begin
     match operations with
     | None ->
-        Client_node_rpcs.Blocks.pending_operations cctxt block >|= fun (ops, pendings) ->
+        Client_node_rpcs.Blocks.pending_operations
+          cctxt block >|= fun (ops, pendings) ->
         Operation_hash.Set.elements @@
         Operation_hash.Set.union (Updater.operations ops) pendings
     | Some operations -> Lwt.return operations
@@ -89,7 +92,8 @@ let forge_block cctxt block
   begin
     match priority with
     | Some prio -> begin
-        Client_proto_rpcs.Helpers.minimal_time cctxt block ~prio () >>=? fun time ->
+        Client_proto_rpcs.Helpers.minimal_time
+          cctxt block ~prio () >>=? fun time ->
         return (prio, Some time)
       end
     | None ->
@@ -121,7 +125,8 @@ let forge_block cctxt block
           return (Some timestamp)
   end >>=? fun timestamp ->
   let request = List.length operations in
-  Client_node_rpcs.Blocks.preapply cctxt block ?timestamp ~sort operations >>=?
+  Client_node_rpcs.Blocks.preapply
+    cctxt block ?timestamp ~sort operations >>=?
   fun { operations ; fitness ; timestamp } ->
   let valid = List.length operations.applied in
   lwt_log_info "Found %d valid operations (%d refused) for timestamp %a"
@@ -159,7 +164,10 @@ end = struct
     let open Data_encoding in
     conv
       (fun x -> LevelMap.bindings x)
-      (fun l -> List.fold_left (fun x (y, z) -> LevelMap.add y z x) LevelMap.empty l)
+      (fun l ->
+         List.fold_left
+           (fun x (y, z) -> LevelMap.add y z x)
+           LevelMap.empty l)
       (list (obj2
                (req "level" Raw_level.encoding)
                (req "blocks" (list Block_hash.encoding))))
@@ -243,14 +251,17 @@ let get_mining_slot cctxt
            Lwt.return (Some (Utils.filter_map convert slots)))
     delegates >>= fun slots ->
   let sorted_slots =
-    List.sort (fun (t1,_) (t2,_) -> Time.compare t1 t2) (List.flatten slots) in
+    List.sort
+      (fun (t1,_) (t2,_) -> Time.compare t1 t2)
+      (List.flatten slots) in
   match sorted_slots with
   | [] -> Lwt.return None
   | slot :: _ -> Lwt.return (Some slot)
 
 let rec insert_mining_slot slot = function
   | [] -> [slot]
-  | ((timestamp,_) :: _) as slots when Time.(fst slot < timestamp) -> slot :: slots
+  | ((timestamp,_) :: _) as slots when Time.(fst slot < timestamp) ->
+      slot :: slots
   | slot' :: slots -> slot' :: insert_mining_slot slot slots
 
 type state = {
@@ -271,7 +282,7 @@ let create_state genesis delegates best =
 let drop_old_slots ~before state =
   state.future_slots <-
     List.filter
-      (fun (t, slot) -> Time.compare t before < 0)
+      (fun (t, _slot) -> Time.compare t before < 0)
       state.future_slots
 
 let compute_timeout { future_slots } =
@@ -341,7 +352,8 @@ let insert_block
         name
         Block_hash.pp_short bi.hash >>= fun () ->
       if Time.compare bi.timestamp state.best.timestamp = 0 then
-        drop_old_slots ~before: (Time.add state.best.timestamp (-1800L)) state ;
+        drop_old_slots
+          ~before:(Time.add state.best.timestamp (-1800L)) state ;
       state.future_slots <- insert_mining_slot slot state.future_slots ;
       Lwt.return_unit
 
@@ -431,13 +443,16 @@ let mine cctxt state =
       lwt_debug "No valid candidates." >>= fun () ->
       return ()
 
-let create cctxt ?max_priority delegates
-    (block_stream: Client_mining_blocks.block_info list Lwt_stream.t)
-    (endorsement_stream: Client_mining_operations.valid_endorsement Lwt_stream.t) =
+let create
+    cctxt ?max_priority delegates
+    (block_stream:
+       Client_mining_blocks.block_info list Lwt_stream.t)
+    (endorsement_stream:
+       Client_mining_operations.valid_endorsement Lwt_stream.t) =
   Lwt_stream.get block_stream >>= function
   | None | Some [] ->
       cctxt.Client_commands.error "Can't fetch the current block head."
-  | Some ({ Client_mining_blocks.fitness } as bi :: _ as initial_heads) ->
+  | Some (bi :: _ as initial_heads) ->
       Client_node_rpcs.Blocks.hash cctxt `Genesis >>= fun genesis_hash ->
       let last_get_block = ref None in
       let get_block () =
