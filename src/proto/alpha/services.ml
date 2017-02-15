@@ -415,7 +415,10 @@ module Helpers = struct
       ~description: "Levels of a cycle"
       ~input: empty
       ~output: (wrap_tzerror @@
-                describe ~title: "levels of a cycle" (list Level.encoding))
+                describe ~title: "levels of a cycle"
+                  (obj2
+                     (req "first" Raw_level.encoding)
+                     (req "last" Raw_level.encoding)))
       RPC.Path.(custom_root / "helpers" / "levels" /: Cycle.arg)
 
   module Rights = struct

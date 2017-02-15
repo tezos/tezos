@@ -95,7 +95,7 @@ let monitor_endorsement cctxt =
   let endorsement_stream, push = Lwt_stream.create () in
   Lwt.async begin fun () ->
     Lwt_stream.closed ops_stream >|= fun () -> push None
-  end;
+  end ;
   Lwt.async begin fun () ->
     Lwt_stream.iter_p
       (Lwt_list.iter_p (fun e ->

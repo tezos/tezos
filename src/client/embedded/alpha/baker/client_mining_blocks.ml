@@ -69,21 +69,11 @@ let blocks_from_cycle cctxt block cycle =
     | `Prevalidation -> `Head 0
     | `Test_prevalidation -> `Test_head 0
     | _ -> block in
-  Client_node_rpcs.Blocks.hash cctxt block >>= fun block_hash ->
   Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
-  Client_proto_rpcs.Helpers.levels cctxt block cycle >>=? fun block_levels ->
-  begin
-    match List.sort Level.compare block_levels with
-    | [] -> failwith "Internal error"
-    | hd :: _ -> return hd
-  end >>=? fun min_level ->
-  let length = 1 + Int32.to_int (Level.diff level min_level) in
-  begin
-    Client_node_rpcs.Blocks.list cctxt ~length ~heads:[block_hash] () >>= function
-    | [] | _::_::_ -> failwith "Unexpected RPC result"
-    | [blocks] -> return blocks
-  end >>=? fun block_infos ->
-  let block_infos =
-    Utils.remove_elem_from_list (length - List.length block_levels) block_infos in
-  map_s (convert_block_info_err cctxt) block_infos >>=? fun block_res ->
-  return block_res
+  Client_proto_rpcs.Helpers.levels cctxt block cycle >>=? fun (first, last) ->
+  let length = Int32.to_int (Raw_level.diff level.level first) in
+  Client_node_rpcs.Blocks.predecessors cctxt block length >>= fun blocks ->
+  let blocks =
+    Utils.remove_elem_from_list
+      (length - (1 + Int32.to_int (Raw_level.diff last first))) blocks in
+  return blocks

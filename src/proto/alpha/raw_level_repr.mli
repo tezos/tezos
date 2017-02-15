@@ -17,6 +17,8 @@ include Compare.S with type t := raw_level
 val to_int32: raw_level -> int32
 val of_int32_exn: int32 -> raw_level
 
+val diff: raw_level -> raw_level -> int32
+
 val root: raw_level
 
 val succ: raw_level -> raw_level
