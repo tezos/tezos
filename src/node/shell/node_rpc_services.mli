@@ -44,6 +44,8 @@ module Blocks : sig
     (unit, unit * block, unit, net) RPC.service
   val predecessor:
     (unit, unit * block, unit, Block_hash.t) RPC.service
+  val predecessors:
+    (unit, unit * block , int, Block_hash.t list) RPC.service
   val hash:
     (unit, unit * block, unit, Block_hash.t) RPC.service
   val timestamp:

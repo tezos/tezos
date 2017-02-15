@@ -43,6 +43,9 @@ module RPC : sig
     t -> (block_info Lwt_stream.t * Watcher.stopper)
   val heads: t -> block_info Block_hash.Map.t Lwt.t
 
+  val predecessors:
+    t -> int -> Block_hash.t -> Block_hash.t list Lwt.t
+
   val list:
     t -> int -> Block_hash.t list -> block_info list list Lwt.t
 

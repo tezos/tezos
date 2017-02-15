@@ -42,6 +42,13 @@ let register_bi_dir node dir =
     RPC.register1 dir
       Services.Blocks.predecessor implementation in
   let dir =
+    let implementation b len =
+      Node.RPC.block_info node b >>= fun bi ->
+      Node.RPC.predecessors node len bi.hash >>= fun hashes ->
+      RPC.Answer.return hashes in
+    RPC.register1 dir
+      Services.Blocks.predecessors implementation in
+  let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC.Answer.return bi.fitness in
@@ -367,7 +374,8 @@ let get_protocols node hash () =
 
 let build_rpc_directory node =
   let dir = RPC.empty in
-  let dir = RPC.register0 dir Services.Blocks.list (list_blocks node) in
+  let dir =
+    RPC.register0 dir Services.Blocks.list (list_blocks node) in
   let dir = register_bi_dir node dir in
   let dir =
     let implementation block =
