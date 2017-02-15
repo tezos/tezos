@@ -309,11 +309,25 @@ let call url cctxt =
           cctxt.error "%s" msg
       | Ok json ->
           Client_node_rpcs.get_json cctxt args json >>= fun json ->
-          cctxt.message "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
+          cctxt.message
+            "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
     end
   | _ ->
       cctxt.message
         "No service found at this URL (but this is a valid prefix)\n%!"
+
+let call_with_json url json (cctxt: Client_commands.context) =
+  let args = Utils.split '/' url in
+  match Data_encoding_ezjsonm.from_string json with
+  | Error err ->
+      cctxt.error
+        "Failed to parse the proviede json: %s\n%!"
+        err
+  | Ok json ->
+      let open RPC.Description in
+      Client_node_rpcs.get_json cctxt args json >>= fun json ->
+      cctxt.message
+        "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
 
 let group =
   { Cli_entries.name = "rpc" ;
@@ -337,5 +351,9 @@ let commands = [
     schema ;
   command ~group ~desc: "call an RPC (low level command for advanced users)"
     (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
-    call
+    call ;
+  command ~group ~desc: "call an RPC (low level command for advanced users)"
+    (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL"
+     @@ prefix "with" @@ string ~name:"" ~desc:"" @@ stop)
+    call_with_json
 ]
