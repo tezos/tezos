@@ -35,7 +35,10 @@ end = struct
     let open Data_encoding in
     conv
       (fun x -> LevelMap.bindings x)
-      (fun l -> List.fold_left (fun x (y, z) -> LevelMap.add y z x) LevelMap.empty l)
+      (fun l ->
+         List.fold_left
+           (fun x (y, z) -> LevelMap.add y z x)
+           LevelMap.empty l)
       (list (obj2
                (req "level" Raw_level.encoding)
                (req "endorsement"
@@ -52,11 +55,13 @@ end = struct
     if not (Sys.file_exists filename) then return LevelMap.empty else
       Data_encoding_ezjsonm.read_file filename >>= function
       | Error _ ->
-          cctxt.Client_commands.error "couldn't to read the endorsement file"
+          cctxt.Client_commands.error
+            "couldn't to read the endorsement file"
       | Ok json ->
           match Data_encoding.Json.destruct encoding json with
           | exception _ -> (* TODO print_error *)
-              cctxt.Client_commands.error "didn't understand the endorsement file"
+              cctxt.Client_commands.error
+                "didn't understand the endorsement file"
           | map ->
               return map
 
@@ -72,7 +77,8 @@ end = struct
          | Error _ -> failwith "Json.write_file"
          | Ok () -> return ())
       (fun exn ->
-         cctxt.Client_commands.error "could not write the endorsement file: %s."
+         cctxt.Client_commands.error
+           "could not write the endorsement file: %s."
            (Printexc.to_string exn))
 
   let lock = Lwt_mutex.create ()
@@ -122,7 +128,8 @@ let inject_endorsement cctxt
     ~slot:slot
     () >>=? fun bytes ->
   let signed_bytes = Ed25519.append_signature src_sk bytes in
-  Client_node_rpcs.inject_operation cctxt ?force ?wait signed_bytes >>=? fun oph ->
+  Client_node_rpcs.inject_operation
+    cctxt ?force ?wait signed_bytes >>=? fun oph ->
   State.record_endorsement cctxt level block_hash slot oph >>=? fun () ->
   return oph
 
@@ -151,11 +158,15 @@ let forge_endorsement cctxt
     match slot with
     | Some slot -> return slot
     | None ->
-        get_signing_slots cctxt ?max_priority block src_pkh level >>=? function
+        get_signing_slots
+          cctxt ?max_priority block src_pkh level >>=? function
         | slot::_ -> return slot
         | [] -> cctxt.error "No slot found at level %a" Raw_level.pp level
   end >>=? fun slot ->
-  (if force then return () else check_endorsement cctxt level slot) >>=? fun () ->
+  begin
+    if force then return ()
+    else check_endorsement cctxt level slot
+  end >>=? fun () ->
   inject_endorsement cctxt
     block level ~wait:true ~force
     src_sk src_pk slot
@@ -210,7 +221,8 @@ let schedule_endorsements cctxt state bis =
                let same_slot e =
                  e.block.level = block.level && e.slot = slot in
                let old = List.find same_slot state.to_endorse in
-               if Fitness.compare old.block.fitness block.fitness < 0 then begin
+               if Fitness.compare old.block.fitness block.fitness < 0
+               then begin
                  lwt_log_info
                    "Schedule endorsement for block %a \
                  \ (level %a, slot %d, time %a) (replace block %a)"
@@ -223,10 +235,14 @@ let schedule_endorsements cctxt state bis =
                  state.to_endorse <-
                    insert
                      { time ; delegate ; block ; slot }
-                     (List.filter (fun e -> not (same_slot e)) state.to_endorse) ;
+                     (List.filter
+                        (fun e -> not (same_slot e))
+                        state.to_endorse) ;
                  return ()
                end else begin
-                 lwt_debug "slot %d: better pending endorsement" slot >>= fun () ->
+                 lwt_debug
+                   "slot %d: better pending endorsement"
+                   slot >>= fun () ->
                  return ()
                end
              with Not_found ->
