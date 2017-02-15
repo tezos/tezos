@@ -55,7 +55,6 @@ let start_new_voting_cycle ctxt =
       match select_winning_proposal proposals with
       | None ->
           Vote.freeze_listings ctxt >>=? fun ctxt ->
-          Vote.clear_current_proposal ctxt >>=? fun ctxt ->
           return ctxt
       | Some proposal ->
           Vote.set_current_proposal ctxt proposal >>=? fun ctxt ->
