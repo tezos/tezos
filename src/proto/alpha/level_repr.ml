@@ -20,6 +20,13 @@ type level = t
 
 let pp ppf { level } = Raw_level_repr.pp ppf level
 
+let pp_full ppf l =
+  Format.fprintf ppf
+    "%a (cycle %a.%ld) (vote %a.%ld)"
+    Raw_level_repr.pp l.level
+    Cycle_repr.pp l.cycle l.cycle_position
+    Voting_period_repr.pp l.voting_period l.voting_period_position
+
 let encoding =
   let open Data_encoding in
   conv

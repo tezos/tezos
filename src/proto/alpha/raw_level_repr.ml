@@ -32,6 +32,8 @@ let pred l =
   then None
   else Some (Int32.pred l)
 
+let diff = Int32.sub
+
 let to_int32 l = l
 let of_int32_exn l =
   if Compare.Int32.(l >= 0l)

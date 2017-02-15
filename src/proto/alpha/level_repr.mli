@@ -18,6 +18,7 @@ type t = private {
 type level = t
 val encoding: level Data_encoding.t
 val pp: Format.formatter -> level -> unit
+val pp_full: Format.formatter -> level -> unit
 include Compare.S with type t := level
 
 val root: level
