@@ -59,6 +59,9 @@ module Blocks : sig
   val predecessor:
     Client_commands.context ->
     block -> Block_hash.t Lwt.t
+  val predecessors:
+    Client_commands.context ->
+    block -> int -> Block_hash.t list Lwt.t
   val hash:
     Client_commands.context ->
     block -> Block_hash.t Lwt.t

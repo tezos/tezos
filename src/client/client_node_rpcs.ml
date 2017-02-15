@@ -178,6 +178,7 @@ module Blocks = struct
   }
   let net cctxt h = call_service1 cctxt Services.Blocks.net h ()
   let predecessor cctxt h = call_service1 cctxt Services.Blocks.predecessor h ()
+  let predecessors cctxt h l = call_service1 cctxt Services.Blocks.predecessors h l
   let hash cctxt h = call_service1 cctxt Services.Blocks.hash h ()
   let timestamp cctxt h = call_service1 cctxt Services.Blocks.timestamp h ()
   let fitness cctxt h = call_service1 cctxt Services.Blocks.fitness h ()

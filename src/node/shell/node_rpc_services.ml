@@ -194,6 +194,15 @@ module Blocks = struct
       ~output: (obj1 (req "predecessor" Block_hash.encoding))
       RPC.Path.(block_path / "predecessor")
 
+  let predecessors =
+    RPC.service
+      ~description:
+        "...."
+      ~input: (obj1 (req "length" Data_encoding.uint16))
+      ~output: (obj1
+                  (req "blocks" (Data_encoding.list Block_hash.encoding)))
+      RPC.Path.(block_path / "predecessors")
+
   let hash =
     RPC.service
       ~description:"Returns the block's id."
@@ -377,8 +386,6 @@ module Blocks = struct
       ~input: list_param_encoding
       ~output: (obj1 (req "blocks" (list (list block_info_encoding))))
       RPC.Path.(root / "blocks")
-
-
 
 end
 

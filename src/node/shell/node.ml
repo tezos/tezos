@@ -432,10 +432,28 @@ module RPC = struct
         Block_hash.Map.empty (test_heads @ heads) in
     Lwt.return map
 
-  let predecessors net_state ignored len head =
+  let predecessors node len head =
+    let rec loop net_db acc len hash (block: State.Block_header.t) =
+      if Block_hash.equal block.shell.predecessor hash then
+        Lwt.return (List.rev acc)
+      else begin
+        if len = 0 then
+          Lwt.return (List.rev acc)
+        else
+          let hash = block.shell.predecessor in
+          Distributed_db.Block_header.read_exn net_db hash >>= fun block ->
+          loop net_db (hash :: acc) (len-1) hash block
+      end in
+    try
+      Distributed_db.read_block_exn
+        node.distributed_db head >>= fun (net_db, block) ->
+      loop net_db [] len head block
+    with Not_found -> Lwt.return_nil
+
+  let predecessors_bi state ignored len head =
     try
       let rec loop acc len hash =
-        State.Valid_block.read_exn net_state hash >>= fun block ->
+        State.Valid_block.read_exn state hash >>= fun block ->
         let bi = convert block in
         if Block_hash.equal bi.predecessor hash then
           Lwt.return (List.rev (bi :: acc))
@@ -455,7 +473,7 @@ module RPC = struct
          Distributed_db.read_block_exn
            node.distributed_db head >>= fun (net_db, _block) ->
          let net_state = Distributed_db.state net_db in
-         predecessors net_state ignored len head >|= fun predecessors ->
+         predecessors_bi net_state ignored len head >|= fun predecessors ->
          let ignored =
            List.fold_right
              (fun x s -> Block_hash.Set.add x.hash s)
@@ -463,8 +481,8 @@ module RPC = struct
          ignored, predecessors :: acc
       )
       (Block_hash.Set.empty, [])
-      heads >|= fun (_, blocks) ->
-    List.rev blocks
+      heads >>= fun (_, blocks) ->
+    Lwt.return (List.rev blocks)
 
   let block_watcher node =
     let stream, shutdown = Distributed_db.watch_block node.distributed_db in
