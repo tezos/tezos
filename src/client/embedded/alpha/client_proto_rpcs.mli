@@ -162,7 +162,7 @@ module Helpers : sig
     block -> ?offset:int32 -> Raw_level.t -> Level.t tzresult Lwt.t
   val levels:
     Client_commands.context ->
-    block -> Cycle.t -> Level.t list tzresult Lwt.t
+    block -> Cycle.t -> (Raw_level.t * Raw_level.t) tzresult Lwt.t
 
   module Rights : sig
     type slot = Raw_level.t * int * Time.t option

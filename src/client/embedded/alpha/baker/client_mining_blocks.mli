@@ -34,4 +34,4 @@ val blocks_from_cycle:
   Client_commands.context ->
   Client_node_rpcs.Blocks.block ->
   Cycle.t ->
-  block_info list tzresult Lwt.t
+  Block_hash.t list tzresult Lwt.t

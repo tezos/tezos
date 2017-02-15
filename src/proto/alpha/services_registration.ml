@@ -263,7 +263,10 @@ let compute_level ctxt raw offset =
 let () = register2 Services.Helpers.level compute_level
 
 let levels ctxt cycle () =
-  return (Level.levels_in_cycle ctxt cycle)
+  let levels = Level.levels_in_cycle ctxt cycle in
+  let first = List.hd (List.rev levels) in
+  let last = List.hd levels in
+  return (first.level, last.level)
 
 let () = register2 Services.Helpers.levels levels
 

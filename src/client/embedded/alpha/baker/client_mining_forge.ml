@@ -307,29 +307,31 @@ let get_unrevealed_nonces cctxt ?(force = false) block =
   | None -> return []
   | Some cycle ->
       Client_mining_blocks.blocks_from_cycle
-        cctxt block cycle >>=? fun block_infos ->
-      map_filter_s (fun (bi : Client_mining_blocks.block_info) ->
-          Client_proto_nonces.find cctxt bi.hash >>= function
+        cctxt block cycle >>=? fun blocks ->
+      map_filter_s (fun hash ->
+          Client_proto_nonces.find cctxt hash >>= function
           | None -> return None
           | Some nonce ->
+              Client_proto_rpcs.Context.level
+                cctxt (`Hash hash) >>=? fun level ->
               if force then
-                return (Some (bi.hash, (bi.level.level, nonce)))
+                return (Some (hash, (level.level, nonce)))
               else
                 Client_proto_rpcs.Context.Nonce.get
-                  cctxt block bi.level.level >>=? function
+                  cctxt block level.level >>=? function
                 | Missing nonce_hash
                   when Nonce.check_hash nonce nonce_hash ->
                     cctxt.warning "Found nonce for %a (level: %a)@."
-                      Block_hash.pp_short bi.hash
-                      Level.pp bi.level >>= fun () ->
-                    return (Some (bi.hash, (bi.level.level, nonce)))
+                      Block_hash.pp_short hash
+                      Level.pp level >>= fun () ->
+                    return (Some (hash, (level.level, nonce)))
                 | Missing _nonce_hash ->
                     cctxt.error "Incoherent nonce for level %a"
-                      Raw_level.pp bi.level.level >>= fun () ->
+                      Raw_level.pp level.level >>= fun () ->
                     return None
                 | Forgotten -> return None
                 | Revealed _ -> return None)
-        block_infos
+        blocks
 
 let insert_block
     cctxt ?max_priority state (bi: Client_mining_blocks.block_info) =

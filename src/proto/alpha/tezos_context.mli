@@ -79,6 +79,8 @@ module Raw_level : sig
   type raw_level = t
   val arg: raw_level RPC.Arg.arg
 
+  val diff: raw_level -> raw_level -> int32
+
   val root: raw_level
   val succ: raw_level -> raw_level
   val pred: raw_level -> raw_level option
@@ -229,6 +231,7 @@ module Level : sig
     voting_period_position: int32 ;
   }
   include BASIC_DATA with type t := t
+  val pp_full: Format.formatter -> t -> unit
   type level = t
 
   val root: level
