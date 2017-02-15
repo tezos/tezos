@@ -256,17 +256,23 @@ let rec insert_mining_slot slot = function
 type state = {
   genesis: Block_hash.t ;
   delegates: public_key_hash list ;
-  mutable best_fitness: Fitness.t ;
+  mutable best: Client_mining_blocks.block_info ;
   mutable future_slots:
     (Time.t * (Client_mining_blocks.block_info * int * public_key_hash)) list ;
 }
 
-let create_state genesis delegates best_fitness =
+let create_state genesis delegates best =
   { genesis ;
     delegates ;
-    best_fitness ;
+    best ;
     future_slots = [] ;
   }
+
+let drop_old_slots ~before state =
+  state.future_slots <-
+    List.filter
+      (fun (t, slot) -> Time.compare t before < 0)
+      state.future_slots
 
 let compute_timeout { future_slots } =
   match future_slots with
@@ -276,7 +282,10 @@ let compute_timeout { future_slots } =
       let now = Time.now () in
       let delay = Time.diff timestamp now in
       if delay <= 0L then
-        Lwt.return_unit
+        if delay <= -1800L then
+          Lwt_unix.sleep 10.
+        else
+          Lwt.return_unit
       else
         Lwt_unix.sleep (Int64.to_float delay)
 
@@ -318,8 +327,8 @@ let insert_block
     Client_mining_revelation.forge_seed_nonce_revelation
       cctxt ~force:true (`Hash bi.hash) (List.map snd nonces)
   end >>= fun _ignore_error ->
-  if Fitness.compare state.best_fitness bi.fitness < 0 then
-    state.best_fitness <- bi.fitness ;
+  if Fitness.compare state.best.fitness bi.fitness < 0 then
+    state.best <- bi ;
   get_mining_slot cctxt ?max_priority bi state.delegates >>= function
   | None ->
       lwt_debug
@@ -331,6 +340,8 @@ let insert_block
         Time.pp_hum timestamp
         name
         Block_hash.pp_short bi.hash >>= fun () ->
+      if Time.compare bi.timestamp state.best.timestamp = 0 then
+        drop_old_slots ~before: (Time.add state.best.timestamp (-1800L)) state ;
       state.future_slots <- insert_mining_slot slot state.future_slots ;
       Lwt.return_unit
 
@@ -391,7 +402,7 @@ let mine cctxt state =
       (Utils.unopt_list candidates) in
   match candidates with
   | (bi, priority, fitness, timestamp, operations, delegate) :: _
-    when Fitness.compare state.best_fitness fitness < 0 -> begin
+    when Fitness.compare state.best.fitness fitness < 0 -> begin
       let level = Raw_level.succ bi.level.level in
       lwt_log_info
         "Select candidate block after %a (slot %d) fitness: %a"
@@ -426,7 +437,7 @@ let create cctxt ?max_priority delegates
   Lwt_stream.get block_stream >>= function
   | None | Some [] ->
       cctxt.Client_commands.error "Can't fetch the current block head."
-  | Some ({ Client_mining_blocks.fitness } :: _ as initial_heads) ->
+  | Some ({ Client_mining_blocks.fitness } as bi :: _ as initial_heads) ->
       Client_node_rpcs.Blocks.hash cctxt `Genesis >>= fun genesis_hash ->
       let last_get_block = ref None in
       let get_block () =
@@ -444,7 +455,7 @@ let create cctxt ?max_priority delegates
             last_get_endorsement := Some t ;
             t
         | Some t -> t in
-      let state = create_state genesis_hash delegates fitness in
+      let state = create_state genesis_hash delegates bi in
       insert_blocks cctxt ?max_priority state initial_heads >>= fun () ->
       let rec worker_loop () =
         let timeout = compute_timeout state in
