@@ -9,29 +9,21 @@
 
 open Tezos_hash
 
-type descr = {
-  manager: Ed25519.Public_key_hash.t ;
-  delegate: Ed25519.Public_key_hash.t option ;
-  spendable: bool ;
-  delegatable: bool ;
-  script: Script_repr.t ;
-}
-
 type t =
   | Default of Ed25519.Public_key_hash.t
-  | Hash of Contract_hash.t
+  | Originated of Contract_hash.t
 type contract = t
 
 type error += Invalid_contract_notation of string
 
 let to_b58check = function
   | Default pbk -> Ed25519.Public_key_hash.to_b58check pbk
-  | Hash h -> Contract_hash.to_b58check h
+  | Originated h -> Contract_hash.to_b58check h
 
 let of_b58check s =
   match Base58.decode s with
   | Some (Ed25519.Public_key_hash.Hash h) -> ok (Default h)
-  | Some (Contract_hash.Hash h) -> ok (Hash h)
+  | Some (Contract_hash.Hash h) -> ok (Originated h)
   | _ -> error (Invalid_contract_notation s)
 
 let encoding =
@@ -52,8 +44,8 @@ let encoding =
             (function Default k -> Some k | _ -> None)
             (fun k -> Default k) ;
           case ~tag:1 Contract_hash.encoding
-            (function Hash k -> Some k | _ -> None)
-            (fun k -> Hash k) ;
+            (function Originated k -> Some k | _ -> None)
+            (fun k -> Originated k) ;
         ])
     ~json:
       (conv
@@ -84,33 +76,46 @@ let default_contract id = Default id
 
 let is_default = function
   | Default m -> Some m
-  | Hash _ -> None
+  | Originated _ -> None
 
-let descr_encoding =
+
+type origination_nonce =
+  { operation_hash: Operation_hash.t ;
+    origination_index: int32 }
+
+let origination_nonce_encoding =
   let open Data_encoding in
   conv
-    (fun { manager; delegate; spendable; delegatable; script } ->
-       (manager, delegate, spendable, delegatable, script))
-    (fun (manager, delegate, spendable, delegatable, script) ->
-       { manager; delegate; spendable; delegatable; script })
-    (obj5
-       (req "manager" Ed25519.Public_key_hash.encoding)
-       (opt "delegate" Ed25519.Public_key_hash.encoding)
-       (dft "spendable" bool false)
-       (dft "delegatable" bool false)
-       (req "script" Script_repr.encoding))
+    (fun { operation_hash ; origination_index } ->
+       (operation_hash, origination_index))
+    (fun (operation_hash, origination_index) ->
+       { operation_hash ; origination_index }) @@
+  obj2
+    (req "operation" Operation_hash.encoding)
+    (dft "index" int32 0l)
 
-let generic_contract ~manager ~delegate ~spendable ~delegatable ~script =
-  match delegate, spendable, delegatable, script with
-  | Some delegate, true, false, Script_repr.No_script
-    when Ed25519.Public_key_hash.equal manager delegate ->
-      default_contract manager
-  | _ ->
-      let data =
-        Data_encoding.Binary.to_bytes
-          descr_encoding
-          { manager; delegate; spendable; delegatable; script } in
-      Hash (Contract_hash.hash_bytes [data])
+let originated_contract nonce =
+  let data =
+    Data_encoding.Binary.to_bytes origination_nonce_encoding nonce in
+  Originated (Contract_hash.hash_bytes [data])
+
+let originated_contracts ({ origination_index } as origination_nonce) =
+  let rec contracts acc origination_index =
+    if Compare.Int32.(origination_index < 0l) then
+      acc
+    else
+      let origination_nonce =
+        { origination_nonce with origination_index } in
+      let acc = originated_contract origination_nonce :: acc in
+      contracts acc (Int32.pred origination_index) in
+  contracts [] (Int32.pred origination_index)
+
+let initial_origination_nonce operation_hash =
+  { operation_hash ; origination_index = 0l }
+
+let incr_origination_nonce nonce =
+  let origination_index = Int32.succ nonce.origination_index in
+  { nonce with origination_index }
 
 let arg =
   let construct = to_b58check in
@@ -129,10 +134,10 @@ let compare l1 l2 =
   match l1, l2 with
   | Default pkh1, Default pkh2 ->
       Ed25519.Public_key_hash.compare pkh1 pkh2
-  | Hash h1, Hash h2 ->
+  | Originated h1, Originated h2 ->
       Contract_hash.compare h1 h2
-  | Default _, Hash _ -> -1
-  | Hash _, Default _ -> 1
+  | Default _, Originated _ -> -1
+  | Originated _, Default _ -> 1
 let (=) l1 l2 = Compare.Int.(=) (compare l1 l2) 0
 let (<>) l1 l2 = Compare.Int.(<>) (compare l1 l2) 0
 let (>) l1 l2 = Compare.Int.(>) (compare l1 l2) 0

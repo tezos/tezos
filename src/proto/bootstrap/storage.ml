@@ -97,7 +97,7 @@ module Key = struct
       match c with
       | Contract_repr.Default k ->
           pubkey_contract @@ Ed25519.Public_key_hash.to_path k @ l
-      | Contract_repr.Hash h ->
+      | Contract_repr.Originated h ->
           generic_contract @@ Contract_hash.to_path h @ l
     let roll_list c = contract_store c ["roll_list"]
     let change c = contract_store c ["change"]

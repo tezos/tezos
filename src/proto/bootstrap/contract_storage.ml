@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Contract_repr
-
 type error +=
   | Insert_coin of Contract_repr.contract (* TODO: doc *)
   | Initial_amount_too_low (* TODO: doc *)
@@ -82,11 +80,10 @@ let create_base c contract ~balance ~manager ~delegate ~script ~spendable ~deleg
   Storage.Contract.Set.add c contract >>=? fun c ->
   Lwt.return (Ok (c, contract))
 
-let create c ~balance ~manager ~delegate ~script ~spendable ~delegatable =
-  let contract =
-    Contract_repr.generic_contract ~manager ~delegate
-      ~script ~spendable ~delegatable in
-  create_base c contract ~balance ~manager ~delegate ~script ~spendable ~delegatable
+let create c nonce ~balance ~manager ~delegate ~script ~spendable ~delegatable =
+  let contract = Contract_repr.originated_contract nonce in
+  create_base c contract ~balance ~manager ~delegate ~script ~spendable ~delegatable >>=? fun (ctxt, contract) ->
+  return (ctxt, contract, Contract_repr.incr_origination_nonce nonce)
 
 let create_default c manager ~balance =
   let contract = Contract_repr.default_contract manager in
@@ -201,14 +198,6 @@ let is_spendable c contract =
     end
   | Some v -> return v
 
-let get_descr c contract =
-  get_manager c contract >>=? fun manager ->
-  get_delegate_opt c contract >>=? fun delegate ->
-  is_spendable c contract >>=? fun spendable ->
-  is_delegatable c contract >>=? fun delegatable ->
-  get_script c contract >>=? fun script ->
-  return { manager ; delegate ; spendable ; delegatable ; script }
-
 let set_delegate c contract delegate =
   (* A contract delegate can be set only if the contract is delegatable *)
   Storage.Contract.Delegatable.get c contract >>=? fun delegatable ->
@@ -300,10 +289,10 @@ let spend c contract amount =
   then fail Unspendable_contract
   else unconditional_spend c contract amount
 
-let originate c ~balance ~manager ~script ~delegate ~spendable ~delegatable  =
+let originate c nonce ~balance ~manager ~script ~delegate ~spendable ~delegatable  =
   check_fee script balance >>=? fun possible ->
   fail_unless possible Initial_amount_too_low >>=? fun () ->
-  create c ~balance ~manager ~delegate ~script ~spendable ~delegatable
+  create c nonce ~balance ~manager ~delegate ~script ~spendable ~delegatable
 
 let init c =
   Storage.Contract.Global_counter.init c 0l

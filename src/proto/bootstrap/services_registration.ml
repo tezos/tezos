@@ -181,7 +181,23 @@ let minimal_timestamp ctxt prio =
 let () = register1 Services.Helpers.minimal_timestamp minimal_timestamp
 
 let () =
-  let run_parameters ctxt (script, storage, input, amount, contract) =
+  (* ctxt accept_failing_script miner_contract pred_block block_prio operation *)
+  register1 Services.Helpers.apply_operation
+    (fun ctxt (pred_block, hash, forged_operation, signature) ->
+       match Data_encoding.Binary.of_bytes
+               Operation.unsigned_operation_encoding
+               forged_operation with
+       | None -> Error_monad.fail Operation.Cannot_parse_operation
+       | Some (shell, contents) ->
+           let operation = { hash ; shell ; contents ; signature } in
+           Tezos_context.Level.current ctxt >>=? fun level ->
+           Mining.mining_priorities ctxt level >>=? fun (Misc.LCons (miner_pkh, _)) ->
+           let miner_contract = Contract.default_contract miner_pkh in
+           let block_prio = 0l in
+           Apply.apply_operation ctxt false (Some miner_contract) pred_block block_prio operation
+           >>=? fun (_ctxt, contracts) ->
+           Error_monad.return contracts) ;
+  let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =
     let amount =
       match amount with
       | Some amount -> amount
@@ -199,26 +215,34 @@ let () =
       { storage ; storage_type = (script : Script.code).storage_type } in
     let qta =
       Constants.instructions_per_transaction ctxt in
-    (script, storage, input, amount, contract, qta) in
+    let origination_nonce =
+      match origination_nonce with
+      | Some origination_nonce -> origination_nonce
+      | None ->
+          Contract.initial_origination_nonce
+            (Operation_hash.hash_string [ "FAKE " ; "FAKE" ; "FAKE" ]) in
+    (script, storage, input, amount, contract, qta, origination_nonce) in
   register1 Services.Helpers.run_code
     (fun ctxt parameters ->
-       let (script, storage, input, amount, contract, qta) =
+       let (script, storage, input, amount, contract, qta, origination_nonce) =
          run_parameters ctxt parameters in
        Script_interpreter.execute
+         origination_nonce
          contract (* transaction initiator *)
          contract (* script owner *)
          ctxt storage script amount input
-         qta >>=? fun (sto, ret, _qta, _ctxt) ->
+         qta >>=? fun (sto, ret, _qta, _ctxt, _) ->
        Error_monad.return (sto, ret)) ;
   register1 Services.Helpers.trace_code
     (fun ctxt parameters ->
-       let (script, storage, input, amount, contract, qta) =
+       let (script, storage, input, amount, contract, qta, origination_nonce) =
          run_parameters ctxt parameters in
        Script_interpreter.trace
+         origination_nonce
          contract (* transaction initiator *)
          contract (* script owner *)
          ctxt storage script amount input
-         qta >>=? fun ((sto, ret, _qta, _ctxt), trace) ->
+         qta >>=? fun ((sto, ret, _qta, _ctxt, _), trace) ->
        Error_monad.return (sto, ret, trace))
 
 let () =
@@ -401,29 +425,8 @@ let operation_public_key ctxt = function
       | None -> return (Some public_key)
       | Some _ -> return None
 
-let get_contracts ctxt op =
-  match op with
-  | Anonymous_operations _
-  | Sourced_operations (Delegate_operations _) -> return (ctxt, None)
-  | Sourced_operations (Manager_operations { operations }) ->
-      fold_left_s
-        (fun (ctxt, contracts) operation ->
-           match operation with
-           | Origination { manager ; delegate ; script ;
-                           spendable ; delegatable ; credit } ->
-               Contract.originate ctxt
-                 ~balance:credit ~manager ~delegate
-                 ~spendable ~delegatable ~script >>=? fun (ctxt, contract) ->
-               return (ctxt, contract :: contracts)
-           | _ -> return (ctxt, contracts))
-        (ctxt, []) operations >>=? fun (ctxt, contracts) ->
-      match contracts with
-      | [] -> return (ctxt, None)
-      | _ -> return (ctxt, Some (List.rev contracts))
-
-let forge_operations ctxt (shell, proto) =
-  get_contracts ctxt proto >>=? fun (_ctxt, contracts) ->
-  return (Operation.forge shell proto, contracts)
+let forge_operations _ctxt (shell, proto) =
+  return (Operation.forge shell proto)
 
 let () = register1 Services.Helpers.Forge.operations forge_operations
 
