@@ -32,6 +32,7 @@ module Stat = P2p_types.Stat
 type 'meta meta_config = {
   encoding : 'meta Data_encoding.t;
   initial : 'meta;
+  score : 'meta -> float
 }
 
 type 'msg app_message_encoding = Encoding : {
@@ -114,6 +115,13 @@ type limits = {
   outgoing_message_queue_size : int option ;
   (** Various bounds for internal queues. *)
 
+  known_gids_history_size : int ;
+  known_points_history_size : int ;
+  (** Size of circular log buffers, in number of events recorded. *)
+
+  max_known_gids : (int * int) option ;
+  max_known_points : (int * int) option ;
+  (** Optional limitation of internal hashtables (max, target) *)
 }
 
 type ('msg, 'meta) t
