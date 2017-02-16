@@ -144,11 +144,16 @@ type config = {
   incoming_message_queue_size : int option ;
   outgoing_message_queue_size : int option ;
 
+  known_gids_history_size : int ;
+  known_points_history_size : int ;
+  max_known_points : (int * int) option ; (* max, gc target *)
+  max_known_gids : (int * int) option ; (* max, gc target *)
 }
 
 type 'meta meta_config = {
   encoding : 'meta Data_encoding.t;
   initial : 'meta;
+  score : 'meta -> float;
 }
 
 type 'msg message_config = {
@@ -190,19 +195,81 @@ and ('msg, 'meta) connection = {
 
 type ('msg, 'meta) pool = ('msg, 'meta) t
 
+module GcPointSet = Utils.Bounded(struct
+    type t = Time.t * Point.t
+    let compare (x, _) (y, _) = - (Time.compare x y)
+  end)
+
+let gc_points { config = { max_known_points } ; known_points } =
+  match max_known_points with
+  | None -> ()
+  | Some (_, target) ->
+      let now = Time.now () in (* TODO: maybe time of discovery? *)
+      let table = GcPointSet.create target in
+      Point.Table.iter (fun p pi ->
+          if Point_info.State.is_disconnected pi then
+            let time =
+              match Point_info.last_miss pi with
+              | None -> now
+              | Some t -> t in
+            GcPointSet.insert (time, p) table
+        ) known_points ;
+      let to_remove = GcPointSet.get table in
+      ListLabels.iter to_remove ~f:begin fun (_, p) ->
+        Point.Table.remove known_points p
+      end
+
 let register_point pool ?trusted (addr, port as point) =
   match Point.Table.find pool.known_points point with
   | exception Not_found ->
       let pi = Point_info.create ?trusted addr port in
+      iter_option pool.config.max_known_points ~f:begin fun (max, _) ->
+        if Point.Table.length pool.known_points >= max then gc_points pool
+      end ;
       Point.Table.add pool.known_points point pi ;
       pi
   | pi -> pi
+
+
+(* Bounded table used to garbage collect gid infos when needed. The
+   strategy used is to remove the info of the gid with the lowest
+   score first. In case of equality, the info of the most recent added
+   gid is removed. The rationale behind this choice is that in the
+   case of a flood attack, the newly added infos will probably belong
+   to gids with the same (low) score and removing the most recent ones
+   ensure that older (and probably legit) gid infos are kept. *)
+module GcGidSet = Utils.Bounded(struct
+    type t = float * Time.t * Gid.t
+    let compare (s, t, _) (s', t', _) =
+      let score_cmp = Pervasives.compare s s' in
+      if score_cmp = 0 then Time.compare t t' else - score_cmp
+  end)
+
+let gc_gids { meta_config = { score } ;
+              config = { max_known_gids } ;
+              known_gids ; } =
+  match max_known_gids with
+  | None -> ()
+  | Some (_, target) ->
+      let table = GcGidSet.create target in
+      Gid.Table.iter (fun gid gid_info ->
+          let created = Gid_info.created gid_info in
+          let score = score @@ Gid_info.metadata gid_info in
+          GcGidSet.insert (score, created, gid) table
+        ) known_gids ;
+      let to_remove = GcGidSet.get table in
+      ListLabels.iter to_remove ~f:begin fun (_, _, gid) ->
+        Gid.Table.remove known_gids gid
+      end
 
 let register_peer pool gid =
   match Gid.Table.find pool.known_gids gid with
   | exception Not_found ->
       Lwt_condition.broadcast pool.events.new_point () ;
       let peer = Gid_info.create gid ~metadata:pool.meta_config.initial in
+      iter_option pool.config.max_known_gids ~f:begin fun (max, _) ->
+        if Gid.Table.length pool.known_gids >= max then gc_gids pool
+      end ;
       Gid.Table.add pool.known_gids gid peer ;
       peer
   | peer -> peer

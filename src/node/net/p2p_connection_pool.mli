@@ -92,11 +92,28 @@ type config = {
   outgoing_message_queue_size : int option ;
   (** Size of the outgoing message queue internal to a peer's Writer
       (See [P2p_connection.accept]). *)
+
+  known_gids_history_size : int ;
+  (** Size of the known gids log buffer (default: 50) *)
+  known_points_history_size : int ;
+  (** Size of the known points log buffer (default: 50) *)
+
+  max_known_points : (int * int) option ;
+  (** Parameters for the the garbage collection of known points. If
+      None, no garbage collection is performed. Otherwise, the first
+      integer of the couple limits the size of the "known points"
+      table. When this number is reached, the table is expurged from
+      disconnected points, older first, to try to reach the amount of
+      connections indicated by the second integer. *)
+
+  max_known_gids : (int * int) option ;
+  (** Like [max_known_points], but for known gids. *)
 }
 
 type 'meta meta_config = {
   encoding : 'meta Data_encoding.t;
   initial : 'meta;
+  score : 'meta -> float;
 }
 
 type 'msg message_config = {

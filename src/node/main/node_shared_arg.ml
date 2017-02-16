@@ -20,6 +20,7 @@ type t = {
   max_connections: int option ;
   max_download_speed: int option ;
   max_upload_speed: int option ;
+  peer_table_size: int option ;
   expected_pow: float option ;
   peers: string list ;
   no_bootstrap_peers: bool ;
@@ -35,6 +36,7 @@ type t = {
 let wrap
     data_dir config_file
     connections max_download_speed max_upload_speed
+    peer_table_size
     listen_addr peers no_bootstrap_peers closed expected_pow
     rpc_listen_addr rpc_tls
     cors_origins cors_headers log_output =
@@ -74,6 +76,7 @@ let wrap
     cors_headers ;
     rpc_tls ;
     log_output ;
+    peer_table_size ;
   }
 
 module Manpage = struct
@@ -147,6 +150,13 @@ module Term = struct
     Arg.(value & opt (some int) None &
          info ~docs ~doc ~docv:"NUM" ["max-upload-speed"])
 
+  let peer_table_size =
+    let doc = "Maximum size of internal peer tables, \
+               used to store metadata/logs about a peer or about a \
+               to-be-authenticated host:port couple." in
+    Arg.(value & opt (some int) None &
+         info ~docs ~doc ~docv:"NUM" ["peer-table-size"])
+
   let listen_addr =
     let doc =
       "The TCP address and port at which this instance can be reached." in
@@ -214,6 +224,7 @@ module Term = struct
     const wrap $ data_dir $ config_file
     $ connections
     $ max_download_speed $ max_upload_speed
+    $ peer_table_size
     $ listen_addr $ peers $ no_bootstrap_peers $ closed $ expected_pow
     $ rpc_listen_addr $ rpc_tls
     $ cors_origins $ cors_headers
@@ -231,6 +242,7 @@ let read_and_patch_config_file args =
   let { data_dir ;
         min_connections ; expected_connections ; max_connections ;
         max_download_speed ; max_upload_speed ;
+        peer_table_size ;
         expected_pow ;
         peers ; no_bootstrap_peers ;
         listen_addr ; closed ;
@@ -245,6 +257,6 @@ let read_and_patch_config_file args =
   return @@
   Node_config_file.update
     ?data_dir ?min_connections ?expected_connections ?max_connections
-    ?max_download_speed ?max_upload_speed ?expected_pow
+    ?max_download_speed ?max_upload_speed ?peer_table_size ?expected_pow
     ~bootstrap_peers ?listen_addr ?rpc_listen_addr
     ~closed ~cors_origins ~cors_headers ?rpc_tls ?log_output cfg

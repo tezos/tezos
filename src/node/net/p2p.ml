@@ -14,6 +14,7 @@ include Logging.Make(struct let name = "p2p" end)
 type 'meta meta_config = 'meta P2p_connection_pool.meta_config = {
   encoding : 'meta Data_encoding.t;
   initial : 'meta;
+  score : 'meta -> float
 }
 
 type 'msg app_message_encoding = 'msg P2p_connection_pool.encoding =
@@ -61,6 +62,10 @@ type limits = {
   incoming_message_queue_size : int option ;
   outgoing_message_queue_size : int option ;
 
+  known_gids_history_size : int ;
+  known_points_history_size : int ;
+  max_known_gids : (int * int) option ;
+  max_known_points : (int * int) option ;
 }
 
 let create_scheduler limits =
@@ -91,6 +96,10 @@ let create_connection_pool config limits meta_cfg msg_cfg io_sched =
     incoming_app_message_queue_size = limits.incoming_app_message_queue_size ;
     incoming_message_queue_size = limits.incoming_message_queue_size ;
     outgoing_message_queue_size = limits.outgoing_message_queue_size ;
+    known_gids_history_size = limits.known_gids_history_size ;
+    known_points_history_size = limits.known_points_history_size ;
+    max_known_points = limits.max_known_points ;
+    max_known_gids = limits.max_known_gids ;
   }
   in
   let pool =

@@ -58,6 +58,12 @@ module Point_info : sig
 
   val last_miss :
     'conn point_info -> Time.t option
+  (** [last_miss pi] is the most recent of:
+
+      * last failed connection
+      * last rejected connection
+      * last disconnection
+  *)
 
   val greylisted :
     ?now:Time.t -> 'conn point_info -> bool
@@ -145,6 +151,7 @@ module Gid_info : sig
   val compare : ('conn, 'meta) t -> ('conn, 'meta) t -> int
 
   val create :
+    ?created:Time.t ->
     ?trusted:bool ->
     metadata:'meta ->
     Gid.t -> ('conn, 'meta) gid_info
@@ -153,6 +160,7 @@ module Gid_info : sig
 
   val gid : ('conn, 'meta) gid_info -> Gid.t
 
+  val created : ('conn, 'meta) gid_info -> Time.t
   val metadata : ('conn, 'meta) gid_info -> 'meta
   val set_metadata : ('conn, 'meta) gid_info -> 'meta -> unit
 
