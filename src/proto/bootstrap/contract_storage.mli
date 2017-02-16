@@ -32,7 +32,6 @@ val increment_counter: Storage.t -> Contract_repr.t -> Storage.t tzresult Lwt.t
 val is_delegatable : Storage.t -> Contract_repr.t -> bool tzresult Lwt.t
 val is_spendable : Storage.t -> Contract_repr.t -> bool tzresult Lwt.t
 
-val get_descr: Storage.t -> Contract_repr.t -> Contract_repr.descr tzresult Lwt.t
 val get_manager: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t tzresult Lwt.t
 val get_delegate: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t tzresult Lwt.t
 val get_delegate_opt: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option tzresult Lwt.t
@@ -64,13 +63,14 @@ val issue :
 
 val originate :
   Storage.t ->
+  Contract_repr.origination_nonce ->
   balance:Tez_repr.t ->
   manager:Ed25519.Public_key_hash.t ->
   script:Script_repr.t ->
   delegate:Ed25519.Public_key_hash.t option ->
   spendable:bool ->
   delegatable:bool ->
-  (Storage.t * Contract_repr.t) tzresult Lwt.t
+  (Storage.t * Contract_repr.t * Contract_repr.origination_nonce) tzresult Lwt.t
 
 val init :
   Storage.t -> Storage.t tzresult Lwt.t

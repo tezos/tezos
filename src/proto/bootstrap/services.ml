@@ -328,12 +328,13 @@ module Helpers = struct
       RPC.Path.(custom_root / "helpers" / "minimal_timestamp")
 
   let run_code_input_encoding =
-    (obj5
+    (obj6
        (req "script" Script.code_encoding)
        (req "storage" Script.expr_encoding)
        (req "input" Script.expr_encoding)
        (opt "amount" Tez.encoding)
-       (opt "contract" Contract.encoding))
+       (opt "contract" Contract.encoding)
+       (opt "origination_nonce" Contract.origination_nonce_encoding))
 
   let run_code custom_root =
     RPC.service
@@ -344,6 +345,19 @@ module Helpers = struct
                      (req "storage" Script.expr_encoding)
                      (req "output" Script.expr_encoding)))
       RPC.Path.(custom_root / "helpers" / "run_code")
+
+  let apply_operation custom_root =
+    RPC.service
+      ~description: "Applies an operation in the current context"
+      ~input: (obj4
+                 (req "pred_block" Block_hash.encoding)
+                 (req "operation_hash" Operation_hash.encoding)
+                 (req "forged_operation" bytes)
+                 (opt "signature" Ed25519.signature_encoding))
+      ~output: (wrap_tzerror
+                  (obj1 (req "contracts" (list Contract.encoding))))
+      RPC.Path.(custom_root / "helpers" / "apply_operation")
+
 
   let trace_code custom_root =
     RPC.service
@@ -541,11 +555,9 @@ module Helpers = struct
         ~input: Operation.unsigned_operation_encoding
         ~output:
           (wrap_tzerror @@
-           (obj2
+           (obj1
               (req "operation" @@
-               describe ~title: "hex encoded operation" bytes)
-              (opt "contracts" @@
-               describe ~title: "new contracts" (list Contract.encoding))))
+               describe ~title: "hex encoded operation" bytes)))
         RPC.Path.(custom_root / "helpers" / "forge" / "operations" )
 
     let block custom_root =

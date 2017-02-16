@@ -135,6 +135,10 @@ module Helpers : sig
   val minimal_time:
     Client_commands.context ->
     block -> ?prio:int -> unit -> Time.t tzresult Lwt.t
+  val apply_operation:
+    Client_commands.context ->
+    block -> Block_hash.t -> Operation_hash.t -> MBytes.t -> MBytes.t option ->
+    (Contract.t list) tzresult Lwt.t
   val run_code:
     Client_commands.context ->
     block -> Script.code ->
@@ -188,7 +192,7 @@ module Helpers : sig
         counter:int32 ->
         fee:Tez.t ->
         manager_operation list ->
-        (MBytes.t * Contract.t list) tzresult Lwt.t
+        MBytes.t tzresult Lwt.t
       val transaction:
         Client_commands.context ->
         block ->
@@ -216,7 +220,7 @@ module Helpers : sig
         ?script:(Script.code * Script.storage) ->
         fee:Tez.t->
         unit ->
-        (Contract.t * MBytes.t) tzresult Lwt.t
+        MBytes.t tzresult Lwt.t
       val issuance:
         Client_commands.context ->
         block ->

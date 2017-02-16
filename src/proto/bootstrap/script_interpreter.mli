@@ -17,13 +17,17 @@ type error += Division_by_zero of Script.location
 (* calling convention :
    ((amount, arg), globals)) -> (ret, globals) *)
 
-val execute: Contract.t -> Contract.t -> Tezos_context.t ->
+val execute:
+  Contract.origination_nonce ->
+  Contract.t -> Contract.t -> Tezos_context.t ->
   Script.storage -> Script.code -> Tez.t ->
   Script.expr -> int ->
-  (Script.expr * Script.expr * int * context) tzresult Lwt.t
+  (Script.expr * Script.expr * int * context * Contract.origination_nonce) tzresult Lwt.t
 
-val trace: Contract.t -> Contract.t -> Tezos_context.t ->
+val trace:
+  Contract.origination_nonce ->
+  Contract.t -> Contract.t -> Tezos_context.t ->
   Script.storage -> Script.code -> Tez.t ->
   Script.expr -> int ->
-  ((Script.expr * Script.expr * int * context) *
+  ((Script.expr * Script.expr * int * context * Contract.origination_nonce) *
    (Script.location * int * Script.expr list) list) tzresult Lwt.t

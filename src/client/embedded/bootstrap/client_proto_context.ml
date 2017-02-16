@@ -76,17 +76,39 @@ let transfer cctxt
   Client_proto_rpcs.Helpers.Forge.Manager.transaction cctxt block
     ~net ~source ~sourcePubKey:src_pk ~counter ~amount
     ~destination ?parameters ~fee () >>=? fun bytes ->
-  cctxt.message "Forged the raw transaction frame." >>= fun () ->
-  let signed_bytes = Ed25519.append_signature src_sk bytes in
-  Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun oph ->
-  cctxt.answer "Operation successfully injected in the node." >>= fun () ->
-  cctxt.answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
-  return ()
+  cctxt.Client_commands.message "Forged the raw origination frame." >>= fun () ->
+  Client_node_rpcs.Blocks.predecessor cctxt block >>= fun predecessor ->
+  let signature = Ed25519.sign src_sk bytes in
+  let signed_bytes = MBytes.concat bytes signature in
+  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
+  Client_proto_rpcs.Helpers.apply_operation cctxt block
+    predecessor oph bytes (Some signature) >>=? fun contracts ->
+  Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun injected_oph ->
+  assert (Operation_hash.equal oph injected_oph) ;
+  cctxt.message "Operation successfully injected in the node." >>= fun () ->
+  cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
+  return contracts
+
+let originate cctxt ?force ~block ~src_sk bytes =
+  cctxt.Client_commands.message "Forged the raw origination frame." >>= fun () ->
+  Client_node_rpcs.Blocks.predecessor cctxt block >>= fun predecessor ->
+  let signature = Ed25519.sign src_sk bytes in
+  let signed_bytes = MBytes.concat bytes signature in
+  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
+  Client_proto_rpcs.Helpers.apply_operation cctxt block
+    predecessor oph bytes (Some signature) >>=? function
+  | [ contract ] ->
+      Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun injected_oph ->
+      assert (Operation_hash.equal oph injected_oph) ;
+      cctxt.message "Operation successfully injected in the node." >>= fun () ->
+      cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
+      return contract
+  | contracts ->
+      cctxt.error "The origination introduced %d contracts instead of one." (List.length contracts)
 
 let originate_account cctxt
     block ?force
     ~source ~src_pk ~src_sk ~manager_pkh ?delegatable ?spendable ?delegate ~balance ~fee () =
-  let open Cli_entries in
   Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
   Client_proto_rpcs.Context.Contract.counter cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
@@ -95,19 +117,13 @@ let originate_account cctxt
   Client_proto_rpcs.Helpers.Forge.Manager.origination cctxt block
     ~net ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ?spendable
-    ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun (contract, bytes) ->
-  cctxt.message "Forged the raw origination frame." >>= fun () ->
-  let signed_bytes = Ed25519.append_signature src_sk bytes in
-  Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun oph ->
-  cctxt.message "Operation successfully injected in the node." >>= fun () ->
-  cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
-  return contract
+    ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
+  originate cctxt ?force ~block ~src_sk bytes
 
 let originate_contract cctxt
     block ?force
     ~source ~src_pk ~src_sk ~manager_pkh ~balance ?delegatable ?delegatePubKey
     ~(code:Script.code) ~init ~fee () =
-  let open Cli_entries in
   Client_proto_programs.parse_data cctxt init >>= fun storage ->
   let init = Script.{ storage ; storage_type = code.storage_type } in
   Client_proto_rpcs.Context.Contract.counter cctxt block source >>=? fun pcounter ->
@@ -119,13 +135,8 @@ let originate_contract cctxt
     ~net ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ~spendable:!spendable
     ?delegatable ?delegatePubKey
-    ~script:(code, init) ~fee () >>=? fun (contract, bytes) ->
-  cctxt.message "Forged the raw origination frame." >>= fun () ->
-  let signed_bytes = Ed25519.append_signature src_sk bytes in
-  Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun oph ->
-  cctxt.message "Operation successfully injected in the node." >>= fun () ->
-  cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
-  return contract
+    ~script:(code, init) ~fee () >>=? fun bytes ->
+  originate cctxt ?force ~block ~src_sk bytes
 
 let group =
   { Cli_entries.name = "context" ;
@@ -248,9 +259,13 @@ let commands () =
        @@ stop)
       (fun amount (_, source) (_, destination) cctxt ->
          (Client_proto_contracts.get_manager cctxt (block ()) source >>=? fun src_pkh ->
-         Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
-         cctxt.message "Got the source's manager keys (%s)." src_name >>= fun () ->
-         transfer cctxt (block ()) ~force:!force
-           ~source ~src_pk ~src_sk ~destination ?arg:!arg ~amount ~fee:!fee ()) >>=
+          Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
+          cctxt.message "Got the source's manager keys (%s)." src_name >>= fun () ->
+          (transfer cctxt (block ()) ~force:!force
+             ~source ~src_pk ~src_sk ~destination ?arg:!arg ~amount ~fee:!fee ()) >>=? fun contracts ->
+          Lwt_list.iter_s
+            (fun c -> cctxt.message "New contract %a originated from a smart contract."
+                Contract.pp c)
+            contracts >>= fun () -> return ()) >>=
          Client_proto_rpcs.handle_error cctxt)
   ]

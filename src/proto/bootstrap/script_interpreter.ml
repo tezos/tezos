@@ -75,23 +75,24 @@ let rec unparse_stack
 let rec interp
   : type p r.
     ?log: (Script.location * int * Script.expr list) list ref ->
-    int -> Contract.t -> Contract.t -> Tez.t ->
-    context -> (p, r) lambda -> p -> (r * int * context) tzresult Lwt.t
-  = fun ?log qta orig source amount ctxt (Lam (code, _)) arg ->
+    Contract.origination_nonce -> int -> Contract.t -> Contract.t -> Tez.t ->
+    context -> (p, r) lambda -> p ->
+    (r * int * context * Contract.origination_nonce) tzresult Lwt.t
+  = fun ?log origination qta orig source amount ctxt (Lam (code, _)) arg ->
     let rec step
       : type b a.
-        int -> context -> (b, a) descr -> b stack ->
-        (a stack * int * context) tzresult Lwt.t =
-      fun qta ctxt ({ instr ; loc } as descr) stack ->
+        Contract.origination_nonce -> int -> context -> (b, a) descr -> b stack ->
+        (a stack * int * context * Contract.origination_nonce) tzresult Lwt.t =
+      fun origination qta ctxt ({ instr ; loc } as descr) stack ->
         if Compare.Int.(qta <= 0) then
           fail Quota_exceeded
         else
-          let logged_return ((ret, qta, _) as res) =
+          let logged_return ?(origination = origination) (ret, qta, ctxt) =
             match log with
-            | None -> return res
+            | None -> return (ret, qta, ctxt, origination)
             | Some log ->
                 log := (descr.loc, qta, unparse_stack (ret, descr.aft)) :: !log ;
-                return res in
+                return (ret, qta, ctxt, origination) in
           match instr, stack with
           (* stack ops *)
           | Drop, Item (_, rest) ->
@@ -108,9 +109,9 @@ let rec interp
           | Cons_none _, rest ->
               logged_return (Item (None, rest), qta - 1, ctxt)
           | If_none (bt, _), Item (None, rest) ->
-              step qta ctxt bt rest
+              step origination qta ctxt bt rest
           | If_none (_, bf), Item (Some v, rest) ->
-              step qta ctxt bf (Item (v, rest))
+              step origination qta ctxt bf (Item (v, rest))
           (* pairs *)
           | Cons_pair, Item (a, Item (b, rest)) ->
               logged_return (Item ((a, b), rest), qta - 1, ctxt)
@@ -124,33 +125,33 @@ let rec interp
           | Right, Item (v, rest) ->
               logged_return (Item (R v, rest), qta - 1, ctxt)
           | If_left (bt, _), Item (L v, rest) ->
-              step qta ctxt bt (Item (v, rest))
+              step origination qta ctxt bt (Item (v, rest))
           | If_left (_, bf), Item (R v, rest) ->
-              step qta ctxt bf (Item (v, rest))
+              step origination qta ctxt bf (Item (v, rest))
           (* lists *)
           | Cons_list, Item (hd, Item (tl, rest)) ->
               logged_return (Item (hd :: tl, rest), qta - 1, ctxt)
           | Nil, rest ->
               logged_return (Item ([], rest), qta - 1, ctxt)
           | If_cons (_, bf), Item ([], rest) ->
-              step qta ctxt bf rest
+              step origination qta ctxt bf rest
           | If_cons (bt, _), Item (hd :: tl, rest) ->
-              step qta ctxt bt (Item (hd, Item (tl, rest)))
+              step origination qta ctxt bt (Item (hd, Item (tl, rest)))
           | List_map, Item (lam, Item (l, rest)) ->
-              fold_left_s (fun (tail, qta, ctxt) arg ->
-                  interp ?log qta orig source amount ctxt lam arg
-                  >>=? fun (ret, qta, ctxt) ->
-                  return (ret :: tail, qta, ctxt))
-                ([], qta, ctxt) l >>=? fun (res, qta, ctxt) ->
-              logged_return (Item (res, rest), qta, ctxt)
+              fold_left_s (fun (tail, qta, ctxt, origination) arg ->
+                  interp ?log origination qta orig source amount ctxt lam arg
+                  >>=? fun (ret, qta, ctxt, origination) ->
+                  return (ret :: tail, qta, ctxt, origination))
+                ([], qta, ctxt, origination) l >>=? fun (res, qta, ctxt, origination) ->
+              logged_return ~origination (Item (res, rest), qta, ctxt)
           | List_reduce, Item (lam, Item (l, Item (init, rest))) ->
               fold_left_s
-                (fun (partial, qta, ctxt) arg ->
-                   interp ?log qta orig source amount ctxt lam (arg, partial)
-                   >>=? fun (partial, qta, ctxt) ->
-                   return (partial, qta, ctxt))
-                (init, qta, ctxt) l >>=? fun (res, qta, ctxt) ->
-              logged_return (Item (res, rest), qta, ctxt)
+                (fun (partial, qta, ctxt, origination) arg ->
+                   interp ?log origination qta orig source amount ctxt lam (arg, partial)
+                   >>=? fun (partial, qta, ctxt, origination) ->
+                   return (partial, qta, ctxt, origination))
+                (init, qta, ctxt, origination) l >>=? fun (res, qta, ctxt, origination) ->
+              logged_return ~origination (Item (res, rest), qta, ctxt)
           (* sets *)
           | Empty_set t, rest ->
               logged_return (Item (empty_set t, rest), qta - 1, ctxt)
@@ -158,22 +159,22 @@ let rec interp
               let items =
                 List.rev (set_fold (fun e acc -> e :: acc) set []) in
               fold_left_s
-                (fun (res, qta, ctxt) arg ->
-                   interp ?log qta orig source amount ctxt lam arg >>=?
-                   fun (ret, qta, ctxt) ->
-                   return (set_update ret true res, qta, ctxt))
-                (empty_set t, qta, ctxt) items >>=? fun (res, qta, ctxt) ->
-              logged_return (Item (res, rest), qta, ctxt)
+                (fun (res, qta, ctxt, origination) arg ->
+                   interp ?log origination qta orig source amount ctxt lam arg >>=?
+                   fun (ret, qta, ctxt, origination) ->
+                   return (set_update ret true res, qta, ctxt, origination))
+                (empty_set t, qta, ctxt, origination) items >>=? fun (res, qta, ctxt, origination) ->
+              logged_return ~origination (Item (res, rest), qta, ctxt)
           | Set_reduce, Item (lam, Item (set, Item (init, rest))) ->
               let items =
                 List.rev (set_fold (fun e acc -> e :: acc) set []) in
               fold_left_s
-                (fun (partial, qta, ctxt) arg ->
-                   interp ?log qta orig source amount ctxt lam (arg, partial)
-                   >>=? fun (partial, qta, ctxt) ->
-                   return (partial, qta, ctxt))
-                (init, qta, ctxt) items >>=? fun (res, qta, ctxt) ->
-              logged_return (Item (res, rest), qta, ctxt)
+                (fun (partial, qta, ctxt, origination) arg ->
+                   interp ?log origination qta orig source amount ctxt lam (arg, partial)
+                   >>=? fun (partial, qta, ctxt, origination) ->
+                   return (partial, qta, ctxt, origination))
+                (init, qta, ctxt, origination) items >>=? fun (res, qta, ctxt, origination) ->
+              logged_return ~origination (Item (res, rest), qta, ctxt)
           | Set_mem, Item (v, Item (set, rest)) ->
               logged_return (Item (set_mem v set, rest), qta - 1, ctxt)
           | Set_update, Item (v, Item (presence, Item (set, rest))) ->
@@ -185,22 +186,22 @@ let rec interp
               let items =
                 List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
               fold_left_s
-                (fun (acc, qta, ctxt) (k, v) ->
-                   interp ?log qta orig source amount ctxt lam (k, v)
-                   >>=? fun (ret, qta, ctxt) ->
-                   return (map_update k (Some ret) acc, qta, ctxt))
-                (empty_map (map_key_ty map), qta, ctxt) items >>=? fun (res, qta, ctxt) ->
-              logged_return (Item (res, rest), qta, ctxt)
+                (fun (acc, qta, ctxt, origination) (k, v) ->
+                   interp ?log origination qta orig source amount ctxt lam (k, v)
+                   >>=? fun (ret, qta, ctxt, origination) ->
+                   return (map_update k (Some ret) acc, qta, ctxt, origination))
+                (empty_map (map_key_ty map), qta, ctxt, origination) items >>=? fun (res, qta, ctxt, origination) ->
+              logged_return ~origination (Item (res, rest), qta, ctxt)
           | Map_reduce, Item (lam, Item (map, Item (init, rest))) ->
               let items =
                 List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
               fold_left_s
-                (fun (partial, qta, ctxt) arg ->
-                   interp ?log qta orig source amount ctxt lam (arg, partial)
-                   >>=? fun (partial, qta, ctxt) ->
-                   return (partial, qta, ctxt))
-                (init, qta, ctxt) items >>=? fun (res, qta, ctxt) ->
-              logged_return (Item (res, rest), qta, ctxt)
+                (fun (partial, qta, ctxt, origination) arg ->
+                   interp ?log origination qta orig source amount ctxt lam (arg, partial)
+                   >>=? fun (partial, qta, ctxt, origination) ->
+                   return (partial, qta, ctxt, origination))
+                (init, qta, ctxt, origination) items >>=? fun (res, qta, ctxt, origination) ->
+              logged_return ~origination (Item (res, rest), qta, ctxt)
           | Map_mem, Item (v, Item (map, rest)) ->
               logged_return (Item (map_mem v map, rest), qta - 1, ctxt)
           | Map_get, Item (v, Item (map, rest)) ->
@@ -307,25 +308,25 @@ let rec interp
               logged_return (Item (Script_int.lognot kind x, rest), qta - 1, ctxt)
           (* control *)
           | Seq (hd, tl), stack ->
-              step qta ctxt hd stack >>=? fun (trans, qta, ctxt) ->
-              step qta ctxt tl trans
+              step origination qta ctxt hd stack >>=? fun (trans, qta, ctxt, origination) ->
+              step origination qta ctxt tl trans
           | If (bt, _), Item (true, rest) ->
-              step qta ctxt bt rest
+              step origination qta ctxt bt rest
           | If (_, bf), Item (false, rest) ->
-              step qta ctxt bf rest
+              step origination qta ctxt bf rest
           | Loop body, Item (true, rest) ->
-              step qta ctxt body rest >>=? fun (trans, qta, ctxt) ->
-              step (qta - 1) ctxt descr trans
+              step origination qta ctxt body rest >>=? fun (trans, qta, ctxt, origination) ->
+              step origination (qta - 1) ctxt descr trans
           | Loop _, Item (false, rest) ->
               logged_return (rest, qta, ctxt)
           | Dip b, Item (ign, rest) ->
-              step qta ctxt b rest >>=? fun (res, qta, ctxt) ->
-              logged_return (Item (ign, res), qta, ctxt)
+              step origination qta ctxt b rest >>=? fun (res, qta, ctxt, origination) ->
+              logged_return ~origination (Item (ign, res), qta, ctxt)
           | Exec, Item (arg, Item (lam, rest)) ->
-              interp ?log qta orig source amount ctxt lam arg >>=? fun (res, qta, ctxt) ->
-              logged_return (Item (res, rest), qta - 1, ctxt)
+              interp ?log origination qta orig source amount ctxt lam arg >>=? fun (res, qta, ctxt, origination) ->
+              logged_return ~origination (Item (res, rest), qta - 1, ctxt)
           | Lambda lam, rest ->
-              logged_return (Item (lam, rest), qta - 1, ctxt)
+              logged_return ~origination (Item (lam, rest), qta - 1, ctxt)
           | Fail, _ ->
               fail (Reject loc)
           | Nop, stack ->
@@ -403,23 +404,23 @@ let rec interp
                     (* we see non scripted contracts as (unit, unit) contract *)
                     Lwt.return (ty_eq tp Unit_t |>
                                 record_trace (Invalid_contract (loc, destination))) >>=? fun (Eq _) ->
-                    return (ctxt, qta)
+                    return (ctxt, qta, origination)
                 | Script { code ; storage } ->
                     let p = unparse_data tp p in
-                    execute source destination ctxt storage code amount p qta
-                    >>=? fun (csto, ret, qta, ctxt) ->
+                    execute origination source destination ctxt storage code amount p qta
+                    >>=? fun (csto, ret, qta, ctxt, origination) ->
                     Contract.update_script_storage
                       ctxt destination csto >>=? fun ctxt ->
                     trace
                       (Invalid_contract (loc, destination))
                       (parse_data ctxt Unit_t ret) >>=? fun () ->
-                    return (ctxt, qta)
-              end >>=? fun (ctxt, qta) ->
+                    return (ctxt, qta, origination)
+              end >>=? fun (ctxt, qta, origination) ->
               Contract.get_script ctxt source >>=? (function
                   | No_script -> assert false
                   | Script { storage = { storage } } ->
                       parse_data ctxt storage_type storage >>=? fun sto ->
-                      logged_return (Item ((), Item (sto, Empty)), qta - 1, ctxt))
+                      logged_return ~origination (Item ((), Item (sto, Empty)), qta - 1, ctxt))
             end
           | Transfer_tokens storage_type,
             Item (p, Item (amount, Item ((tp, tr, destination), Item (sto, Empty)))) -> begin
@@ -431,8 +432,8 @@ let rec interp
                   let sto = unparse_data storage_type sto in
                   Contract.update_script_storage ctxt source sto >>=? fun ctxt ->
                   let p = unparse_data tp p in
-                  execute source destination ctxt storage code amount p qta
-                  >>=? fun (sto, ret, qta, ctxt) ->
+                  execute origination source destination ctxt storage code amount p qta
+                  >>=? fun (sto, ret, qta, ctxt, origination) ->
                   Contract.update_script_storage
                     ctxt destination sto >>=? fun ctxt ->
                   trace
@@ -442,16 +443,17 @@ let rec interp
                       | No_script -> assert false
                       | Script { storage = { storage } } ->
                           parse_data ctxt storage_type storage >>=? fun sto ->
-                          logged_return (Item (v, Item (sto, Empty)), qta - 1, ctxt))
+                          logged_return ~origination (Item (v, Item (sto, Empty)), qta - 1, ctxt))
             end
           | Create_account,
             Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
               Contract.unconditional_spend ctxt source credit >>=? fun ctxt ->
               Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
               Contract.originate ctxt
+                origination
                 ~manager ~delegate ~balance
-                ~script:No_script ~spendable:true ~delegatable >>=? fun (ctxt, contract) ->
-              logged_return (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
+                ~script:No_script ~spendable:true ~delegatable >>=? fun (ctxt, contract, origination) ->
+              logged_return ~origination (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
           | Create_contract (g, p, r),
             Item (manager, Item (delegate, Item (delegatable, Item (credit,
                                                                     Item (Lam (_, code), Item (init, rest)))))) ->
@@ -468,10 +470,11 @@ let rec interp
               Contract.unconditional_spend ctxt source credit >>=? fun ctxt ->
               Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
               Contract.originate ctxt
+                origination
                 ~manager ~delegate ~balance
                 ~script:(Script { code ; storage }) ~spendable:true ~delegatable
-              >>=? fun (ctxt, contract) ->
-              logged_return (Item ((p, r, contract), rest), qta - 1, ctxt)
+              >>=? fun (ctxt, contract, origination) ->
+              logged_return ~origination (Item ((p, r, contract), rest), qta - 1, ctxt)
           | Balance, rest ->
               Contract.get_balance ctxt source >>=? fun balance ->
               logged_return (Item (balance, rest), qta - 1, ctxt)
@@ -500,12 +503,12 @@ let rec interp
       | Some log ->
           log := (code.loc, qta, unparse_stack (stack, code.bef)) :: !log
     end ;
-    step qta ctxt code stack >>=? fun (Item (ret, Empty), qta, ctxt) ->
-    return (ret, qta, ctxt)
+    step origination qta ctxt code stack >>=? fun (Item (ret, Empty), qta, ctxt, origination) ->
+    return (ret, qta, ctxt, origination)
 
 (* ---- contract handling ---------------------------------------------------*)
 
-and execute ?log orig source ctxt storage script amount arg qta =
+and execute ?log origination orig source ctxt storage script amount arg qta =
   let { Script.storage ; storage_type } = storage in
   let { Script.code ; arg_type ; ret_type } = script in
   (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
@@ -516,16 +519,16 @@ and execute ?log orig source ctxt storage script amount arg qta =
   parse_lambda ctxt arg_type_full ret_type_full code >>=? fun lambda ->
   parse_data ctxt arg_type arg >>=? fun arg ->
   parse_data ctxt storage_type storage >>=? fun storage ->
-  interp ?log qta orig source amount ctxt lambda ((amount, arg), storage)
-  >>=? fun (ret, qta, ctxt) ->
+  interp ?log origination qta orig source amount ctxt lambda ((amount, arg), storage)
+  >>=? fun (ret, qta, ctxt, origination) ->
   let ret, storage = ret in
   return (unparse_data storage_type storage,
           unparse_data ret_type ret,
-          qta, ctxt)
+          qta, ctxt, origination)
 
-let trace orig source ctxt storage script amount arg qta =
+let trace origination orig source ctxt storage script amount arg qta =
   let log = ref [] in
-  execute ~log orig source ctxt storage script amount arg qta >>=? fun res ->
+  execute ~log origination orig source ctxt storage script amount arg qta >>=? fun res ->
   return (res, List.rev !log)
 
 let execute orig source ctxt storage script amount arg qta =
