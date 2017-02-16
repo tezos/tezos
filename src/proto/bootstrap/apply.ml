@@ -48,14 +48,15 @@ let rec is_reject = function
 type error += Non_scripted_contract_with_parameter
 type error += Scripted_contract_without_paramater
 
-let apply_manager_operation_content ctxt accept_failing_script source = function
+let apply_manager_operation_content ctxt origination_nonce accept_failing_script source = function
   | Transaction { amount ; parameters ; destination } -> begin
       Contract.spend ctxt source amount >>=? fun ctxt ->
       Contract.credit ctxt destination amount >>=? fun ctxt ->
       Contract.get_script ctxt destination >>=? function
       | No_script -> begin
           match parameters with
-          | None | Some (Prim (_, "Unit", [])) -> return ctxt
+          | None | Some (Prim (_, "Unit", [])) ->
+              return (ctxt, origination_nonce)
           | Some _ -> fail Non_scripted_contract_with_parameter
         end
       | Script { code ; storage } ->
@@ -63,18 +64,19 @@ let apply_manager_operation_content ctxt accept_failing_script source = function
           | None -> fail Scripted_contract_without_paramater
           | Some parameters ->
               Script_interpreter.execute
+                origination_nonce
                 source destination ctxt storage code amount parameters
                 (Constants.instructions_per_transaction ctxt)
               >>= function
-              | Ok (storage_res, _res, _steps, ctxt) ->
+              | Ok (storage_res, _res, _steps, ctxt, origination_nonce) ->
                   (* TODO: pay for the steps and the storage diff:
                      update_script_storage checks the storage cost *)
                   Contract.update_script_storage
                     ctxt destination storage_res >>=? fun ctxt ->
-                  return ctxt
+                  return (ctxt, origination_nonce)
               | Error err ->
                   if accept_failing_script && is_reject err then
-                    return ctxt
+                    return (ctxt, origination_nonce)
                   else
                     Lwt.return (Error err)
     end
@@ -94,16 +96,19 @@ let apply_manager_operation_content ctxt accept_failing_script source = function
       Contract.spend ctxt source credit >>=? fun ctxt ->
       Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
       Contract.originate ctxt
+        origination_nonce
         ~manager ~delegate ~balance
-        ~script ~spendable ~delegatable >>=? fun (ctxt, _) ->
-      return ctxt
+        ~script ~spendable ~delegatable >>=? fun (ctxt, _, origination_nonce) ->
+      return (ctxt, origination_nonce)
   | Issuance { asset = (asset, key); amount } ->
-      Contract.issue ctxt source asset key amount
+      Contract.issue ctxt source asset key amount >>=? fun ctxt ->
+      return (ctxt, origination_nonce)
       (* TODO: pay for the storage diff *)
   | Delegation delegate ->
       Contract.is_delegatable ctxt source >>=? fun delegatable ->
       fail_unless delegatable Contract_not_delegatable >>=? fun () ->
-      Contract.set_delegate ctxt source delegate
+      Contract.set_delegate ctxt source delegate >>=? fun ctxt ->
+      return (ctxt, origination_nonce)
 
 let check_signature_and_update_public_key ctxt id public_key op =
   begin
@@ -118,7 +123,8 @@ let check_signature_and_update_public_key ctxt id public_key op =
 
 (* TODO document parameters *)
 let apply_sourced_operation
-    ctxt accept_failing_script miner_contract pred_block block_prio operation ops =
+    ctxt accept_failing_script miner_contract pred_block block_prio
+    operation origination_nonce ops =
   match ops with
   | Manager_operations { source ; public_key ; fee ; counter ; operations = contents } ->
       Contract.get_manager ctxt source >>=? fun manager ->
@@ -132,10 +138,10 @@ let apply_sourced_operation
        | None -> return ctxt
        | Some contract ->
            Contract.credit ctxt contract fee) >>=? fun ctxt ->
-      fold_left_s (fun ctxt content ->
-          apply_manager_operation_content ctxt accept_failing_script source content)
-        ctxt contents >>=? fun ctxt ->
-      return ctxt
+      fold_left_s (fun (ctxt, origination_nonce) content ->
+          apply_manager_operation_content ctxt origination_nonce
+            accept_failing_script source content)
+        (ctxt, origination_nonce) contents
   | Delegate_operations { source ; operations = contents } ->
       let delegate = Ed25519.hash source in
       check_signature_and_update_public_key
@@ -146,7 +152,7 @@ let apply_sourced_operation
           apply_delegate_operation_content
             ctxt delegate pred_block block_prio content)
         ctxt contents >>=? fun ctxt ->
-      return ctxt
+      return (ctxt, origination_nonce)
 
 let apply_anonymous_operation ctxt miner_contract kind =
   match kind with
@@ -167,11 +173,14 @@ let apply_operation
   | Anonymous_operations ops ->
       fold_left_s
         (fun ctxt -> apply_anonymous_operation ctxt miner_contract)
-        ctxt ops
+        ctxt ops >>=? fun ctxt ->
+      return (ctxt, [])
   | Sourced_operations op ->
+      let origination_nonce = Contract.initial_origination_nonce operation.hash in
       apply_sourced_operation
         ctxt accept_failing_script miner_contract pred_block block_prio
-        operation op
+        operation origination_nonce op >>=? fun (ctxt, origination_nonce) ->
+      return (ctxt, Contract.originated_contracts origination_nonce)
 
 let may_start_new_cycle ctxt =
   Mining.dawn_of_a_new_cycle ctxt >>=? function
@@ -210,7 +219,8 @@ let apply_main ctxt accept_failing_script block operations =
       apply_operation
         ctxt accept_failing_script
         (Some (Contract.default_contract delegate_pkh))
-        block.shell.predecessor priority operation)
+        block.shell.predecessor priority operation
+      >>=? fun (ctxt, _contracts) -> return ctxt)
     ctxt operations >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
   let reward =
@@ -279,7 +289,7 @@ let prevalidate ctxt pred_block sort operations =
     (Lwt_list.fold_left_s
        (fun (ctxt, r) op ->
           apply_operation ctxt false None pred_block 0l op >>= function
-          | Ok ctxt ->
+          | Ok (ctxt, _contracts) ->
               let applied = op.hash :: r.Updater.applied in
               Lwt.return (ctxt, { r with Updater.applied} )
           | Error errors ->

@@ -132,13 +132,17 @@ module Helpers = struct
   let typecheck_code cctxt =
     call_error_service1 cctxt Services.Helpers.typecheck_code
 
+  let apply_operation cctxt block pred_block hash forged_operation signature =
+    call_error_service1 cctxt Services.Helpers.apply_operation
+      block (pred_block, hash, forged_operation, signature)
+
   let run_code cctxt block code (storage, input) =
     call_error_service1 cctxt Services.Helpers.run_code
-      block (code, storage, input, None, None)
+      block (code, storage, input, None, None, None)
 
   let trace_code cctxt block code (storage, input) =
     call_error_service1 cctxt Services.Helpers.trace_code
-      block (code, storage, input, None, None)
+      block (code, storage, input, None, None, None)
 
   let typecheck_data cctxt =
     call_error_service1 cctxt Services.Helpers.typecheck_data
@@ -180,16 +184,11 @@ module Helpers = struct
                                counter ; operations ; fee } in
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
            ({net_id=net}, Sourced_operations ops))
-        >>=? fun (bytes, contracts) ->
-        return (bytes, match contracts with None -> [] | Some l -> l)
       let transaction cctxt
           block ~net ~source ?sourcePubKey ~counter
           ~amount ~destination ?parameters ~fee ()=
         operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[Transaction { amount ; parameters ; destination }]
-        >>=? fun (bytes, contracts) ->
-        assert (contracts = []) ;
-        return bytes
       let origination cctxt
           block ~net
           ~source ?sourcePubKey ~counter
@@ -207,24 +206,14 @@ module Helpers = struct
                           delegatable ;
                           credit = balance }
           ]
-        >>=? fun (bytes, contracts) ->
-        match contracts with
-        | [contract] -> return (contract, bytes)
-        | _ -> assert false
       let issuance cctxt
           block ~net ~source ?sourcePubKey ~counter ~assetType ~quantity ~fee ()=
         operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[Issuance { asset = assetType ; amount = quantity }]
-        >>=? fun (bytes, contracts) ->
-        assert (contracts = []) ;
-        return bytes
       let delegation cctxt
           block ~net ~source ?sourcePubKey ~counter ~fee delegate =
         operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[Delegation delegate]
-        >>=? fun (bytes, contracts) ->
-        assert (contracts = []) ;
-        return bytes
     end
     module Delegate = struct
       let operations cctxt
@@ -232,8 +221,6 @@ module Helpers = struct
         let ops = Delegate_operations { source ; operations } in
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
            ({net_id=net}, Sourced_operations ops))
-        >>=? fun (hash, _contracts) ->
-        return hash
       let endorsement cctxt
           b ~net ~source ~block ~slot () =
         operations cctxt b ~net ~source
@@ -243,8 +230,6 @@ module Helpers = struct
       let operations cctxt block ~net operations =
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
            ({net_id=net}, Anonymous_operations operations))
-        >>=? fun (hash, _contracts) ->
-        return hash
       let seed_nonce_revelation cctxt
           block ~net ~level ~nonce () =
         operations cctxt block ~net [Seed_nonce_revelation { level ; nonce }]

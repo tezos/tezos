@@ -143,10 +143,13 @@ let main () =
   let bootstrap = List.hd bootstrap_accounts in
   create_account "foo" >>= fun foo ->
   create_account "bar" >>= fun bar ->
-  transfer ~src:bootstrap ~target:foo 1000_00L >>=? fun () ->
-  transfer ~src:bootstrap ~target:bar 2000_00L >>=? fun () ->
+  transfer ~src:bootstrap ~target:foo 1000_00L >>=? fun contracts ->
+  Assert.equal_int ~msg:__LOC__ 0 (List.length contracts) ;
+  transfer ~src:bootstrap ~target:bar 2000_00L >>=? fun contracts ->
+  Assert.equal_int ~msg:__LOC__ 0 (List.length contracts) ;
   check_balance foo 1000_00L >>=? fun () ->
-  transfer ~src:bar ~target:foo 999_95L >>=? fun () ->
+  transfer ~src:bar ~target:foo 999_95L >>=? fun contracts ->
+  Assert.equal_int ~msg:__LOC__ 0 (List.length contracts) ;
   check_balance foo 1999_95L >>=? fun () ->
   check_balance bar 1000_00L >>=? fun () ->
   should_fail

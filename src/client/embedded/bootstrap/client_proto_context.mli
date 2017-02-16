@@ -18,7 +18,7 @@ val transfer:
   ?arg:string ->
   amount:Tez.t ->
   fee:Tez.t ->
-  unit -> unit tzresult Lwt.t
+  unit -> Contract.t list tzresult Lwt.t
 
 val originate_account:
   Client_commands.context ->

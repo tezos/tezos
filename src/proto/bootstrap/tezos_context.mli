@@ -317,17 +317,14 @@ module Contract : sig
   val exists: context -> contract -> bool tzresult Lwt.t
   val list: context -> contract list tzresult Lwt.t
 
-  type descr = {
-    manager: public_key_hash ;
-    delegate: public_key_hash option ;
-    spendable: bool ;
-    delegatable: bool ;
-    script: Script.t ;
-  }
-  val descr_encoding: descr Data_encoding.t
+  type origination_nonce
 
-  val get_descr:
-    context -> contract -> descr tzresult Lwt.t
+  val origination_nonce_encoding : origination_nonce Data_encoding.t
+  val originated_contract : origination_nonce -> contract
+  val originated_contracts : origination_nonce -> contract list
+
+  val initial_origination_nonce : Operation_hash.t -> origination_nonce
+
   val get_manager:
     context -> contract -> public_key_hash tzresult Lwt.t
   val get_delegate:
@@ -355,12 +352,13 @@ module Contract : sig
 
   val originate:
     context ->
+    origination_nonce ->
     balance: Tez.t ->
     manager: public_key_hash ->
     script: Script.t ->
     delegate: public_key_hash option ->
     spendable: bool ->
-    delegatable: bool -> (context * contract) tzresult Lwt.t
+    delegatable: bool -> (context * contract * origination_nonce) tzresult Lwt.t
 
   type error += Too_low_balance
 
