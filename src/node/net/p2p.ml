@@ -222,7 +222,7 @@ module Real = struct
           | Error _ -> Lwt_utils.never_ending) :: acc
       end in
     Lwt.pick (
-      ( P2p_connection_pool.Events.new_connection net.pool >>= fun () ->
+      ( P2p_connection_pool.PoolEvent.wait_new_connection net.pool >>= fun () ->
         Lwt.return_none )::
       pipes) >>= function
     | None -> recv_any net ()
@@ -311,6 +311,7 @@ type ('msg, 'meta) t = {
   send : ('msg, 'meta) connection -> 'msg -> unit Lwt.t ;
   try_send : ('msg, 'meta) connection -> 'msg -> bool ;
   broadcast : 'msg -> unit ;
+  pool : ('msg, 'meta) P2p_connection_pool.t option ;
 }
 type ('msg, 'meta) net = ('msg, 'meta) t
 
@@ -333,6 +334,7 @@ let create ~config ~limits meta_cfg msg_cfg =
     send = Real.send net ;
     try_send = Real.try_send net ;
     broadcast = Real.broadcast net ;
+    pool = Some net.pool ;
   }
 
 let faked_network = {
@@ -352,6 +354,7 @@ let faked_network = {
   send = (fun _ _ -> Lwt_utils.never_ending) ;
   try_send = (fun _ _ -> false) ;
   broadcast = ignore ;
+  pool = None
 }
 
 let gid net = net.gid
@@ -378,4 +381,331 @@ module Raw = struct
     | Message of 'a
     | Disconnect
   let encoding = P2p_connection_pool.Message.encoding
+end
+
+module RPC = struct
+
+  let stat net =
+    match net.pool with
+    | None -> Stat.empty
+    | Some pool -> P2p_connection_pool.pool_stat pool
+
+  module Event = P2p_connection_pool.LogEvent
+
+  let watch net =
+    match net.pool with
+    | None -> Watcher.create_fake_stream ()
+    | Some pool -> P2p_connection_pool.watch pool
+
+  let connect net point timeout =
+    match net.pool with
+    | None -> fail (Unclassified "fake net")
+    | Some pool ->
+        P2p_connection_pool.connect ~timeout pool point >>|? ignore
+
+  module Connection = struct
+    let info net gid =
+      match net.pool with
+      | None -> None
+      | Some pool ->
+          map_option
+            (P2p_connection_pool.Gids.find_connection pool gid)
+            ~f:P2p_connection_pool.connection_info
+
+    let kick net gid wait =
+      match net.pool with
+      | None -> Lwt.return_unit
+      | Some pool ->
+          match P2p_connection_pool.Gids.find_connection pool gid with
+          | None -> Lwt.return_unit
+          | Some conn -> P2p_connection_pool.disconnect ~wait conn
+
+    let list net =
+      match net.pool with
+      | None -> []
+      | Some pool ->
+          P2p_connection_pool.fold_connections
+            pool ~init:[]
+            ~f:begin fun _gid c acc ->
+              P2p_connection_pool.connection_info c :: acc
+            end
+
+    let count net =
+      match net.pool with
+      | None -> 0
+      | Some pool -> P2p_connection_pool.active_connections pool
+  end
+
+  module Point = struct
+    type state =
+      | Requested
+      | Accepted
+      | Running
+      | Disconnected
+
+    let state_encoding =
+      let open Data_encoding in
+      string_enum [
+        "requested", Requested ;
+        "accepted", Accepted ;
+        "running", Running ;
+        "disconnected", Disconnected ;
+      ]
+
+    type info = {
+      trusted : bool ;
+      greylisted_end : Time.t ;
+      state : state ;
+      gid : Gid.t option ;
+      last_failed_connection : Time.t option ;
+      last_rejected_connection : (Gid.t * Time.t) option ;
+      last_established_connection : (Gid.t * Time.t) option ;
+      last_disconnection : (Gid.t * Time.t) option ;
+      last_seen : (Gid.t * Time.t) option ;
+      last_miss : Time.t option ;
+    }
+
+    let info_encoding =
+      let open Data_encoding in
+      conv
+        (fun { trusted ; greylisted_end ; state ; gid ;
+               last_failed_connection ; last_rejected_connection ;
+               last_established_connection ; last_disconnection ;
+               last_seen ; last_miss ;
+             } ->
+          (trusted, greylisted_end, state, gid,
+           last_failed_connection, last_rejected_connection,
+           last_established_connection, last_disconnection,
+           last_seen, last_miss)
+        )
+        (fun (trusted, greylisted_end, state, gid,
+              last_failed_connection, last_rejected_connection,
+              last_established_connection, last_disconnection,
+              last_seen, last_miss) ->
+          { trusted ; greylisted_end ; state ; gid ;
+            last_failed_connection ; last_rejected_connection ;
+            last_established_connection ; last_disconnection ;
+            last_seen ; last_miss ;
+          }
+        )
+        (obj10
+           (req "trusted" bool)
+           (dft "greylisted_end" Time.encoding Time.epoch)
+           (req "state" state_encoding)
+           (opt "gid" Gid.encoding)
+           (opt "last_failed_connection" Time.encoding)
+           (opt "last_rejected_connection" (tup2 Gid.encoding Time.encoding))
+           (opt "last_established_connection" (tup2 Gid.encoding Time.encoding))
+           (opt "last_disconnection" (tup2 Gid.encoding Time.encoding))
+           (opt "last_seen" (tup2 Gid.encoding Time.encoding))
+           (opt "last_miss" Time.encoding))
+
+    let info_of_point_info i =
+      let open P2p_connection_pool in
+      let open P2p_connection_pool_types in
+      let state, gid = match Point_info.State.get i with
+        | Requested _ -> Requested, None
+        | Accepted { current_gid } -> Accepted, Some current_gid
+        | Running { current_gid } -> Running, Some current_gid
+        | Disconnected -> Disconnected, None in
+      Point_info.{
+        trusted = trusted i ;
+        state ; gid ;
+        greylisted_end = greylisted_end i ;
+        last_failed_connection = last_failed_connection i ;
+        last_rejected_connection = last_rejected_connection i ;
+        last_established_connection = last_established_connection i ;
+        last_disconnection = last_disconnection i ;
+        last_seen = last_seen i ;
+        last_miss = last_miss i ;
+      }
+
+    let info net point =
+      match net.pool with
+      | None -> None
+      | Some pool ->
+          map_option
+            (P2p_connection_pool.Points.info pool point)
+            ~f:info_of_point_info
+
+    module Event = P2p_connection_pool_types.Point_info.Event
+
+    let events ?(max=max_int) ?(rev=false) net point =
+      match net.pool with
+      | None -> []
+      | Some pool ->
+          unopt_map
+            (P2p_connection_pool.Points.info pool point)
+            ~default:[]
+            ~f:begin fun pi ->
+              let evts =
+                P2p_connection_pool_types.Point_info.fold_events
+                  pi ~init:[] ~f:(fun a e -> e :: a) in
+              (if rev then list_rev_sub else list_sub) evts max
+            end
+
+    let watch net point =
+      match net.pool with
+      | None -> raise Not_found
+      | Some pool ->
+          match P2p_connection_pool.Points.info pool point with
+          | None -> raise Not_found
+          | Some pi -> P2p_connection_pool_types.Point_info.watch pi
+
+    let infos ?(restrict=[]) net =
+      match net.pool with
+      | None -> []
+      | Some pool ->
+          P2p_connection_pool.Points.fold_known
+            pool ~init:[]
+            ~f:begin fun point i a ->
+              let info = info_of_point_info i in
+              match restrict with
+              | [] -> (point, info) :: a
+              | _ when List.mem info.state restrict -> (point, info) :: a
+              | _ -> a
+            end
+
+  end
+
+  module Gid = struct
+    type state =
+      | Accepted
+      | Running
+      | Disconnected
+
+    let state_encoding =
+      let open Data_encoding in
+      string_enum [
+        "accepted", Accepted ;
+        "running", Running ;
+        "disconnected", Disconnected ;
+      ]
+
+    type info = {
+      score : float ;
+      trusted : bool ;
+      state : state ;
+      id_point : Id_point.t option ;
+      stat : Stat.t ;
+      last_failed_connection : (Id_point.t * Time.t) option ;
+      last_rejected_connection : (Id_point.t * Time.t) option ;
+      last_established_connection : (Id_point.t * Time.t) option ;
+      last_disconnection : (Id_point.t * Time.t) option ;
+      last_seen : (Id_point.t * Time.t) option ;
+      last_miss : (Id_point.t * Time.t) option ;
+    }
+
+    let info_encoding =
+      let open Data_encoding in
+      conv
+        (fun (
+           { score ; trusted ; state ; id_point ; stat ;
+             last_failed_connection ; last_rejected_connection ;
+             last_established_connection ; last_disconnection ;
+             last_seen ; last_miss }) ->
+           ((score, trusted, state, id_point, stat),
+            (last_failed_connection, last_rejected_connection,
+             last_established_connection, last_disconnection,
+             last_seen, last_miss)))
+        (fun ((score, trusted, state, id_point, stat),
+              (last_failed_connection, last_rejected_connection,
+               last_established_connection, last_disconnection,
+               last_seen, last_miss)) ->
+          { score ; trusted ; state ; id_point ; stat ;
+            last_failed_connection ; last_rejected_connection ;
+            last_established_connection ; last_disconnection ;
+            last_seen ; last_miss })
+        (merge_objs
+           (obj5
+              (req "score" float)
+              (req "trusted" bool)
+              (req "state" state_encoding)
+              (opt "id_point" Id_point.encoding)
+              (req "stat" Stat.encoding))
+           (obj6
+              (opt "last_failed_connection" (tup2 Id_point.encoding Time.encoding))
+              (opt "last_rejected_connection" (tup2 Id_point.encoding Time.encoding))
+              (opt "last_established_connection" (tup2 Id_point.encoding Time.encoding))
+              (opt "last_disconnection" (tup2 Id_point.encoding Time.encoding))
+              (opt "last_seen" (tup2 Id_point.encoding Time.encoding))
+              (opt "last_miss" (tup2 Id_point.encoding Time.encoding))))
+
+    let info_of_gid_info pool i =
+      let open P2p_connection_pool in
+      let open P2p_connection_pool_types in
+      let state, id_point = match Gid_info.State.get i with
+        | Accepted { current_point } -> Accepted, Some current_point
+        | Running { current_point } -> Running, Some current_point
+        | Disconnected -> Disconnected, None
+      in
+      let gid = Gid_info.gid i in
+      let meta = Gid_info.metadata i in
+      let score = P2p_connection_pool.score pool meta in
+      let stat =
+        match P2p_connection_pool.Gids.find_connection pool gid with
+        | None -> Stat.empty
+        | Some conn -> P2p_connection_pool.connection_stat conn
+      in Gid_info.{
+          score ;
+          trusted = trusted i ;
+          state ;
+          id_point ;
+          stat ;
+          last_failed_connection = last_failed_connection i ;
+          last_rejected_connection = last_rejected_connection i ;
+          last_established_connection = last_established_connection i ;
+          last_disconnection = last_disconnection i ;
+          last_seen = last_seen i ;
+          last_miss = last_miss i ;
+        }
+
+    let info net gid =
+      match net.pool with
+      | None -> None
+      | Some pool -> begin
+          match P2p_connection_pool.Gids.info pool gid with
+          | Some info -> Some (info_of_gid_info pool info)
+          | None -> None
+        end
+
+    module Event = P2p_connection_pool_types.Gid_info.Event
+
+    let events ?(max=max_int) ?(rev=false) net gid =
+      match net.pool with
+      | None -> []
+      | Some pool ->
+          unopt_map
+            (P2p_connection_pool.Gids.info pool gid)
+            ~default:[]
+            ~f:begin fun gi ->
+              let evts = P2p_connection_pool_types.Gid_info.fold_events gi
+                  ~init:[] ~f:(fun a e -> e :: a) in
+              (if rev then list_rev_sub else list_sub) evts max
+            end
+
+    let watch net gid =
+      match net.pool with
+      | None -> raise Not_found
+      | Some pool ->
+          match P2p_connection_pool.Gids.info pool gid with
+          | None -> raise Not_found
+          | Some gi -> P2p_connection_pool_types.Gid_info.watch gi
+
+    let infos ?(restrict=[]) net =
+      match net.pool with
+      | None -> []
+      | Some pool ->
+          P2p_connection_pool.Gids.fold_known pool
+            ~init:[]
+            ~f:begin fun gid i a ->
+              let info = info_of_gid_info pool i in
+              match restrict with
+              | [] -> (gid, info) :: a
+              | _ when List.mem info.state restrict -> (gid, info) :: a
+              | _ -> a
+            end
+
+  end
+
 end

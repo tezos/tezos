@@ -66,12 +66,12 @@ type config = {
 
   min_connections : int ;
   (** Strict minimum number of connections
-      (triggers [Event.too_few_connections]). *)
+      (triggers [LogEvent.too_few_connections]). *)
 
   max_connections : int ;
   (** Max number of connections. If it's reached, [connect] and
       [accept] will fail, i.e. not add more connections
-      (also triggers [Event.too_many_connections]). *)
+      (also triggers [LogEvent.too_many_connections]). *)
 
   max_incoming_connections : int ;
   (** Max not-yet-authentified incoming connections.
@@ -142,14 +142,75 @@ val pool_stat: ('msg, 'meta) pool -> Stat.t
 (** [pool_stat pool] is a snapshot of current bandwidth usage for the
     entire [pool]. *)
 
+val score: ('msg, 'meta) pool -> 'meta -> float
+(** [score pool meta] is the floating-point score of [meta] using
+    [pool]'s metrics. *)
+
 (** {2 Pool events} *)
 
-module Events : sig
-  val too_few_connections: ('msg, 'meta) pool -> unit Lwt.t
-  val too_many_connections: ('msg, 'meta) pool -> unit Lwt.t
-  val new_point: ('msg, 'meta) pool -> unit Lwt.t
-  val new_connection: ('msg, 'meta) pool -> unit Lwt.t
+module PoolEvent : sig
+  val wait_too_few_connections: ('msg, 'meta) pool -> unit Lwt.t
+  (** [wait_too_few_connections pool] is determined when the number of
+      connections drops below the desired level. *)
+
+  val wait_too_many_connections: ('msg, 'meta) pool -> unit Lwt.t
+  (** [wait_too_many_connections pool] is determined when the number of
+      connections exceeds the desired level. *)
+
+  val wait_new_peer: ('msg, 'meta) pool -> unit Lwt.t
+  (** [wait_new_peer pool] is determined when a new peer
+      (i.e. authentication successful) gets added to the pool. *)
+
+  val wait_new_connection: ('msg, 'meta) pool -> unit Lwt.t
+  (** [wait_new_connection pool] is determined when a new connection is
+      succesfully established in the pool. *)
 end
+
+module LogEvent : sig
+  type t =
+    (** Pool-level events *)
+
+    | Too_few_connections
+    | Too_many_connections
+
+    | New_point of Point.t
+    | New_peer of Gid.t
+
+    (** Connection-level events *)
+
+    | Incoming_connection of Point.t
+    (** We accept(2)-ed an incoming connection *)
+    | Outgoing_connection of Point.t
+    (** We connect(2)-ed to a remote endpoint *)
+    | Authentication_failed of Point.t
+    (** Remote point failed authentication *)
+
+    | Accepting_request of Point.t * Id_point.t * Gid.t
+    (** We accepted a connection after authentifying the remote peer. *)
+    | Rejecting_request of Point.t * Id_point.t * Gid.t
+    (** We rejected a connection after authentifying the remote peer. *)
+    | Request_rejected of Point.t * (Id_point.t * Gid.t) option
+    (** The remote peer rejected our connection. *)
+
+    | Connection_established of Id_point.t * Gid.t
+    (** We succesfully established a authentified connection. *)
+
+    | Disconnection of Gid.t
+    (** We decided to close the connection. *)
+    | External_disconnection of Gid.t
+    (** The connection was closed for external reason. *)
+
+    | Gc_points
+    (** Garbage correction of known point table has been triggered. *)
+    | Gc_gids
+    (** Garbage correction of known gids table has been triggered. *)
+
+  val encoding : t Data_encoding.t
+end
+
+val watch: ('msg, 'meta) pool -> LogEvent.t Lwt_stream.t * Watcher.stopper
+(** [watch pool] is a [stream, close] a [stream] of events and a
+    [close] function for this stream. *)
 
 (** {1 Connections management} *)
 
@@ -241,6 +302,7 @@ module Gids : sig
 
   val get_metadata: ('msg, 'meta) pool -> Gid.t -> 'meta option
   val set_metadata: ('msg, 'meta) pool -> Gid.t -> 'meta -> unit
+  val get_score: ('msg, 'meta) pool -> Gid.t -> float option
 
   val get_trusted: ('msg, 'meta) pool -> Gid.t -> bool
   val set_trusted: ('msg, 'meta) pool -> Gid.t -> unit

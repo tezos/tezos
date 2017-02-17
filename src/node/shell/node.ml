@@ -7,9 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Lwt.Infix
 open Logging.Node.Worker
-
-let (>|=) = Lwt.(>|=)
 
 let inject_operation validator ?force bytes =
   let t =
@@ -186,6 +185,7 @@ type t = {
     ?force:bool -> MBytes.t -> (Operation_hash.t * unit tzresult Lwt.t) Lwt.t ;
   inject_protocol:
     ?force:bool -> Store.protocol -> (Protocol_hash.t * unit tzresult Lwt.t) Lwt.t ;
+  p2p: Tezos_p2p.net ; (* For P2P RPCs *)
   shutdown: unit -> unit Lwt.t ;
 }
 
@@ -290,6 +290,7 @@ let create { genesis ; store_root ; context_root ;
     inject_block = inject_block state validator ;
     inject_operation = inject_operation validator ;
     inject_protocol = inject_protocol state ;
+    p2p ;
     shutdown ;
   }
 
@@ -593,4 +594,56 @@ module RPC = struct
     Validator.fetch_block net_v block >>=? fun _ ->
     return ()
 
+  module Network = struct
+    let stat (node : t) =
+      Tezos_p2p.RPC.stat node.p2p
+
+    let watch (node : t) =
+      Tezos_p2p.RPC.watch node.p2p
+
+    let connect (node : t) =
+      Tezos_p2p.RPC.connect node.p2p
+
+    module Connection = struct
+      let info (node : t) =
+        Tezos_p2p.RPC.Connection.info node.p2p
+
+      let kick (node : t) =
+        Tezos_p2p.RPC.Connection.kick node.p2p
+
+      let list (node : t) =
+        Tezos_p2p.RPC.Connection.list node.p2p
+
+      let count (node : t) =
+        Tezos_p2p.RPC.Connection.count node.p2p
+    end
+
+    module Point = struct
+      let info (node : t) =
+        Tezos_p2p.RPC.Point.info node.p2p
+
+      let infos (node : t) restrict =
+        Tezos_p2p.RPC.Point.infos ~restrict node.p2p
+
+      let events (node : t) =
+        Tezos_p2p.RPC.Point.events node.p2p
+
+      let watch (node : t) =
+        Tezos_p2p.RPC.Point.watch node.p2p
+    end
+
+    module Gid = struct
+      let info (node : t) =
+        Tezos_p2p.RPC.Gid.info node.p2p
+
+      let infos (node : t) restrict =
+        Tezos_p2p.RPC.Gid.infos ~restrict node.p2p
+
+      let events (node : t) =
+        Tezos_p2p.RPC.Gid.events node.p2p
+
+      let watch (node : t) =
+        Tezos_p2p.RPC.Gid.watch node.p2p
+    end
+  end
 end
