@@ -45,10 +45,17 @@ end
 module Stat = struct
 
   type t = {
-    total_sent : int ;
-    total_recv : int ;
+    total_sent : int64 ;
+    total_recv : int64 ;
     current_inflow : int ;
     current_outflow : int ;
+  }
+
+  let empty = {
+    total_sent = 0L ;
+    total_recv = 0L ;
+    current_inflow = 0 ;
+    current_outflow = 0 ;
   }
 
   let print_size ppf sz =

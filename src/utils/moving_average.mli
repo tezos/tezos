@@ -18,7 +18,7 @@ val on_update: (unit -> unit) -> unit
 val updated: unit Lwt_condition.t
 
 type stat = {
-  total: int ;
+  total: int64 ;
   average: int ;
 }
 val stat: t -> stat
