@@ -119,6 +119,46 @@ module Protocols : sig
      list_param, (Protocol_hash.t * Store.protocol option) list) RPC.service
 end
 
+module Network : sig
+  val stat :
+    (unit, unit, unit, P2p.Stat.t) RPC.service
+
+  val events :
+    (unit, unit, unit, P2p.RPC.Event.t) RPC.service
+
+  val connect :
+    (unit, unit * P2p.Point.t, float, unit tzresult) RPC.service
+
+  module Connection : sig
+    val list :
+      (unit, unit, unit, P2p.Connection_info.t list) RPC.service
+    val info :
+      (unit, unit * P2p.Gid.t, unit, P2p.Connection_info.t option) RPC.service
+    val kick :
+      (unit, unit * P2p.Gid.t, bool, unit) RPC.service
+  end
+
+  module Point : sig
+    val infos :
+      (unit, unit, P2p.RPC.Point.state list,
+       (P2p.Point.t * P2p.RPC.Point.info) list) RPC.service
+    val info :
+      (unit, unit * P2p.Point.t, unit, P2p.RPC.Point.info option) RPC.service
+    val events :
+      (unit, unit * P2p.Point.t, bool, P2p.RPC.Point.Event.t list) RPC.service
+  end
+
+  module Gid : sig
+    val infos :
+      (unit, unit, P2p.RPC.Gid.state list,
+       (P2p.Gid.t * P2p.RPC.Gid.info) list) RPC.service
+    val info :
+      (unit, unit * P2p.Gid.t, unit, P2p.RPC.Gid.info option) RPC.service
+    val events :
+      (unit, unit * P2p.Gid.t, bool, P2p.RPC.Gid.Event.t list) RPC.service
+  end
+end
+
 val forge_block:
   (unit, unit,
    Updater.net_id option * Block_hash.t option * Time.t option *

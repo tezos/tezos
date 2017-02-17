@@ -82,3 +82,38 @@ module Raw : sig
   val encoding: message Data_encoding.t
   val supported_versions: Version.t list
 end
+
+module RPC : sig
+  val stat : net -> Stat.t
+
+  module Event = P2p_connection_pool.LogEvent
+  val watch : net -> Event.t Lwt_stream.t * Watcher.stopper
+  val connect : net -> Point.t -> float -> unit tzresult Lwt.t
+
+  module Connection : sig
+    val info : net -> Gid.t -> Connection_info.t option
+    val kick : net -> Gid.t -> bool -> unit Lwt.t
+    val list : net -> Connection_info.t list
+    val count : net -> int
+  end
+
+  module Point : sig
+    open P2p.RPC.Point
+    module Event = Event
+
+    val info : net -> Point.t -> info option
+    val events : ?max:int -> ?rev:bool -> net -> Point.t -> Event.t list
+    val infos : ?restrict:state list -> net -> (Point.t * info) list
+    val watch : net -> Point.t -> Event.t Lwt_stream.t * Watcher.stopper
+  end
+
+  module Gid : sig
+    open P2p.RPC.Gid
+    module Event = Event
+
+    val info : net -> Gid.t -> info option
+    val events : ?max:int -> ?rev:bool -> net -> Gid.t -> Event.t list
+    val infos : ?restrict:state list -> net -> (Gid.t * info) list
+    val watch : net -> Gid.t -> Event.t Lwt_stream.t * Watcher.stopper
+  end
+end

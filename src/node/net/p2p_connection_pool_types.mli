@@ -68,6 +68,8 @@ module Point_info : sig
   val greylisted :
     ?now:Time.t -> 'conn point_info -> bool
 
+  val greylisted_end : 'conn point_info -> Time.t
+
   val point : 'conn point_info -> Point.t
 
   module State : sig
@@ -130,10 +132,14 @@ module Point_info : sig
       timestamp : Time.t ;
     }
 
+    val encoding : t Data_encoding.t
   end
 
   val fold_events :
     'conn point_info -> init:'a -> f:('a -> Event.t -> 'a) -> 'a
+
+  val watch :
+    'conn point_info -> Event.t Lwt_stream.t * Watcher.stopper
 
   val log_incoming_rejection :
     ?timestamp:Time.t -> 'conn point_info -> Gid.t -> unit
@@ -252,10 +258,14 @@ module Gid_info : sig
       point : Id_point.t ;
     }
 
+    val encoding : t Data_encoding.t
   end
 
   val fold_events :
     ('conn, 'meta) gid_info -> init:'a -> f:('a -> Event.t -> 'a) -> 'a
+
+  val watch :
+    ('conn, 'meta) gid_info -> Event.t Lwt_stream.t * Watcher.stopper
 
   val log_incoming_rejection :
     ?timestamp:Time.t ->

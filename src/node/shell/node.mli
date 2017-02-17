@@ -80,6 +80,36 @@ module RPC : sig
   val complete:
     t -> ?block:block -> string -> string list Lwt.t
 
+  module Network : sig
+    val stat : t -> P2p.Stat.t
+    val watch : t -> P2p.RPC.Event.t Lwt_stream.t * Watcher.stopper
+    val connect : t -> P2p.Point.t -> float -> unit tzresult Lwt.t
+
+    module Connection : sig
+      val info : t -> P2p.Gid.t -> P2p.Connection_info.t option
+      val kick : t -> P2p.Gid.t -> bool -> unit Lwt.t
+      val list : t -> P2p.Connection_info.t list
+      val count : t -> int
+    end
+
+    module Gid : sig
+      val infos : t ->
+        P2p.RPC.Gid.state list -> (P2p.Gid.t * P2p.RPC.Gid.info) list
+      val info : t -> P2p.Gid.t -> P2p.RPC.Gid.info option
+      val events : t -> P2p.Gid.t -> P2p.RPC.Gid.Event.t list
+      val watch : t -> P2p.Gid.t ->
+        P2p.RPC.Gid.Event.t Lwt_stream.t * Watcher.stopper
+    end
+
+    module Point : sig
+      val infos : t ->
+        P2p.RPC.Point.state list -> (P2p.Point.t * P2p.RPC.Point.info) list
+      val info : t -> P2p.Point.t -> P2p.RPC.Point.info option
+      val events : t -> P2p.Point.t -> P2p.RPC.Point.Event.t list
+      val watch : t -> P2p.Point.t ->
+        P2p.RPC.Point.Event.t Lwt_stream.t * Watcher.stopper
+    end
+  end
 end
 
 val shutdown: t -> unit Lwt.t

@@ -97,7 +97,7 @@ end
 let meta_cfg : _ P2p.meta_config = {
   P2p.encoding = Metadata.encoding ;
   initial = Metadata.initial ;
-  score = Metadata.score
+  score = Metadata.score ;
 }
 
 and msg_cfg : _ P2p.message_config = {
@@ -106,6 +106,7 @@ and msg_cfg : _ P2p.message_config = {
 }
 
 type net = (Message.t, Metadata.t) P2p.net
+type pool = (Message.t, Metadata.t) P2p_connection_pool.t
 
 let create ~config ~limits =
   P2p.create ~config ~limits meta_cfg msg_cfg
@@ -134,4 +135,41 @@ module Raw = struct
   type message = Message.t t
   let encoding = P2p.Raw.encoding msg_cfg.encoding
   let supported_versions = msg_cfg.versions
+end
+
+module RPC = struct
+  let stat net = P2p.RPC.stat net
+
+  module Event = P2p.RPC.Event
+
+  let watch = P2p.RPC.watch
+
+  let connect = P2p.RPC.connect
+
+  module Connection = struct
+    let info = P2p.RPC.Connection.info
+    let kick = P2p.RPC.Connection.kick
+    let list = P2p.RPC.Connection.list
+    let count = P2p.RPC.Connection.count
+  end
+
+  module Point = struct
+    type info = P2p.RPC.Point.info
+    module Event = P2p_connection_pool_types.Point_info.Event
+
+    let info = P2p.RPC.Point.info
+    let events = P2p.RPC.Point.events
+    let infos = P2p.RPC.Point.infos
+    let watch = P2p.RPC.Point.watch
+  end
+
+  module Gid = struct
+    type info = P2p.RPC.Gid.info
+    module Event = P2p_connection_pool_types.Gid_info.Event
+
+    let info = P2p.RPC.Gid.info
+    let events = P2p.RPC.Gid.events
+    let infos = P2p.RPC.Gid.infos
+    let watch = P2p.RPC.Gid.watch
+  end
 end

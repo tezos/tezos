@@ -189,6 +189,94 @@ val try_send :
 (** Send a message to all peers *)
 val broadcast : ('msg, 'meta) net -> 'msg -> unit
 
+module RPC : sig
+
+  val stat : ('msg, 'meta) net -> Stat.t
+
+  module Event = P2p_connection_pool.LogEvent
+
+  val watch : ('msg, 'meta) net -> Event.t Lwt_stream.t * Watcher.stopper
+  val connect : ('msg, 'meta) net -> Point.t -> float -> unit tzresult Lwt.t
+
+  module Connection : sig
+    val info : ('msg, 'meta) net -> Gid.t -> Connection_info.t option
+    val kick : ('msg, 'meta) net -> Gid.t -> bool -> unit Lwt.t
+    val list : ('msg, 'meta) net -> Connection_info.t list
+    val count : ('msg, 'meta) net -> int
+  end
+
+  module Point : sig
+
+    type state =
+      | Requested
+      | Accepted
+      | Running
+      | Disconnected
+
+    val state_encoding : state Data_encoding.t
+
+    type info = {
+      trusted : bool ;
+      greylisted_end : Time.t ;
+      state : state ;
+      gid : Gid.t option ;
+      last_failed_connection : Time.t option ;
+      last_rejected_connection : (Gid.t * Time.t) option ;
+      last_established_connection : (Gid.t * Time.t) option ;
+      last_disconnection : (Gid.t * Time.t) option ;
+      last_seen : (Gid.t * Time.t) option ;
+      last_miss : Time.t option ;
+    }
+
+    val info_encoding : info Data_encoding.t
+
+    module Event = P2p_connection_pool_types.Point_info.Event
+
+    val info :
+      ('msg, 'meta) net -> Point.t -> info option
+    val infos :
+      ?restrict:state list -> ('msg, 'meta) net -> (Point.t * info) list
+    val events :
+      ?max:int -> ?rev:bool -> ('msg, 'meta) net -> Point.t -> Event.t list
+    val watch :
+      ('msg, 'meta) net -> Point.t -> Event.t Lwt_stream.t * Watcher.stopper
+  end
+
+  module Gid : sig
+
+    type state =
+      | Accepted
+      | Running
+      | Disconnected
+
+    val state_encoding : state Data_encoding.t
+
+    type info = {
+      score : float ;
+      trusted : bool ;
+      state : state ;
+      id_point : Id_point.t option ;
+      stat : Stat.t ;
+      last_failed_connection : (Id_point.t * Time.t) option ;
+      last_rejected_connection : (Id_point.t * Time.t) option ;
+      last_established_connection : (Id_point.t * Time.t) option ;
+      last_disconnection : (Id_point.t * Time.t) option ;
+      last_seen : (Id_point.t * Time.t) option ;
+      last_miss : (Id_point.t * Time.t) option ;
+    }
+    val info_encoding : info Data_encoding.t
+
+    module Event = P2p_connection_pool_types.Gid_info.Event
+
+    val info : ('msg, 'meta) net -> Gid.t -> info option
+    val infos : ?restrict:state list -> ('msg, 'meta) net -> (Gid.t * info) list
+    val events : ?max:int -> ?rev:bool -> ('msg, 'meta) net -> Gid.t -> Event.t list
+    val watch : ('msg, 'meta) net -> Gid.t -> Event.t Lwt_stream.t * Watcher.stopper
+
+  end
+
+end
+
 (**/**)
 module Raw : sig
   type 'a t =
