@@ -18,7 +18,7 @@ module Inttbl = Hashtbl.Make(struct
 type t = {
   id: int;
   alpha: int ;
-  mutable total: int ;
+  mutable total: int64 ;
   mutable current: int ;
   mutable average: int ;
 }
@@ -66,19 +66,19 @@ let create =
     incr cpt ;
     assert (0. < alpha && alpha <= 1.) ;
     let alpha = int_of_float (1000. *. alpha) in
-    let c = { id ; alpha ; total = 0 ; current = 0 ; average = init } in
+    let c = { id ; alpha ; total = 0L ; current = 0 ; average = init } in
     Inttbl.add counters id c ;
     c
 
 let add c x =
-  c.total <- c.total + x ;
+  c.total <- Int64.(add c.total (of_int x)) ;
   c.current <- c.current + x
 
 let destroy c =
   Inttbl.remove counters c.id
 
 type stat = {
-  total: int ;
+  total: int64 ;
   average: int ;
 }
 

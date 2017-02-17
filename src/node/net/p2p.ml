@@ -272,14 +272,15 @@ module Real = struct
     P2p_connection_pool.write_all pool msg ;
     Lwt.ignore_result (lwt_debug "message broadcasted")
 
+  let pool { pool } = pool
 end
 
 module Fake = struct
 
   let id = Identity.generate (Crypto_box.make_target 0.)
   let empty_stat = {
-    Stat.total_sent = 0 ;
-    total_recv = 0 ;
+    Stat.total_sent = 0L ;
+    total_recv = 0L ;
     current_inflow = 0 ;
     current_outflow = 0 ;
   }
