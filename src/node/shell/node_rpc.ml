@@ -442,6 +442,95 @@ let build_rpc_directory node =
     RPC.register2 dir Services.Blocks.complete
       (fun block s () ->
          Node.RPC.complete node ~block s >>= RPC.Answer.return) in
+
+  (* Network : Global *)
+
+  let dir =
+    let implementation () =
+      Node.RPC.Network.stat node |> RPC.Answer.return in
+    RPC.register0 dir Services.Network.stat implementation in
+  let dir =
+    let implementation () =
+      let stream, stopper = Node.RPC.Network.watch node in
+      let shutdown () = Watcher.shutdown stopper in
+      let next () = Lwt_stream.get stream in
+        RPC.Answer.return_stream { next ; shutdown } in
+    RPC.register0 dir Services.Network.events implementation in
+  let dir =
+    let implementation point timeout =
+      Node.RPC.Network.connect node point timeout >>= RPC.Answer.return in
+    RPC.register1 dir Services.Network.connect implementation in
+
+  (* Network : Connection *)
+
+  let dir =
+    let implementation gid () =
+      Node.RPC.Network.Connection.info node gid |> RPC.Answer.return in
+    RPC.register1 dir Services.Network.Connection.info implementation in
+  let dir =
+    let implementation gid wait =
+      Node.RPC.Network.Connection.kick node gid wait >>= RPC.Answer.return in
+    RPC.register1 dir Services.Network.Connection.kick implementation in
+  let dir =
+    let implementation () =
+      Node.RPC.Network.Connection.list node |> RPC.Answer.return in
+    RPC.register0 dir Services.Network.Connection.list implementation in
+
+  (* Network : Gid *)
+
+  let dir =
+    let implementation state =
+      Node.RPC.Network.Gid.infos node state |> RPC.Answer.return in
+    RPC.register0 dir Services.Network.Gid.infos implementation in
+  let dir =
+    let implementation gid () =
+      Node.RPC.Network.Gid.info node gid |> RPC.Answer.return in
+    RPC.register1 dir Services.Network.Gid.info implementation in
+  let dir =
+    let implementation gid monitor =
+      if monitor then
+        let stream, stopper = Node.RPC.Network.Gid.watch node gid in
+        let shutdown () = Watcher.shutdown stopper in
+        let first_request = ref true in
+        let next () =
+          if not !first_request then begin
+            Lwt_stream.get stream >|= map_option ~f:(fun i -> [i])
+          end else begin
+            first_request := false ;
+            Lwt.return_some @@ Node.RPC.Network.Gid.events node gid
+          end in
+        RPC.Answer.return_stream { next ; shutdown }
+      else
+      Node.RPC.Network.Gid.events node gid |> RPC.Answer.return in
+    RPC.register1 dir Services.Network.Gid.events implementation in
+
+  (* Network : Point *)
+
+  let dir =
+    let implementation state =
+      Node.RPC.Network.Point.infos node state |> RPC.Answer.return in
+    RPC.register0 dir Services.Network.Point.infos implementation in
+  let dir =
+    let implementation point () =
+      Node.RPC.Network.Point.info node point |> RPC.Answer.return in
+    RPC.register1 dir Services.Network.Point.info implementation in
+  let dir =
+    let implementation point monitor =
+      if monitor then
+        let stream, stopper = Node.RPC.Network.Point.watch node point in
+        let shutdown () = Watcher.shutdown stopper in
+        let first_request = ref true in
+        let next () =
+          if not !first_request then begin
+            Lwt_stream.get stream >|= map_option ~f:(fun i -> [i])
+          end else begin
+            first_request := false ;
+            Lwt.return_some @@ Node.RPC.Network.Point.events node point
+          end in
+        RPC.Answer.return_stream { next ; shutdown }
+      else
+        Node.RPC.Network.Point.events node point |> RPC.Answer.return in
+    RPC.register1 dir Services.Network.Point.events implementation in
   let dir =
     RPC.register_describe_directory_service dir Services.describe in
   dir

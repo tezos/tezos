@@ -30,11 +30,55 @@ module Point_info = struct
       | Disconnection of Gid.t
       | External_disconnection of Gid.t
 
+    let kind_encoding =
+      let open Data_encoding in
+      let branch_encoding name obj =
+        conv (fun x -> (), x) (fun ((), x) -> x)
+          (merge_objs
+             (obj1 (req "event" (constant name))) obj) in
+      union ~tag_size:`Uint8 [
+        case ~tag:0 (branch_encoding "outgoing_request" empty)
+          (function Outgoing_request -> Some () | _ -> None)
+          (fun () -> Outgoing_request) ;
+        case ~tag:1 (branch_encoding "accepting_request"
+                       (obj1 (req "gid" Gid.encoding)))
+          (function Accepting_request gid -> Some gid | _ -> None)
+          (fun gid -> Accepting_request gid) ;
+        case ~tag:2 (branch_encoding "rejecting_request"
+                       (obj1 (req "gid" Gid.encoding)))
+          (function Rejecting_request gid -> Some gid | _ -> None)
+          (fun gid -> Rejecting_request gid) ;
+        case ~tag:3 (branch_encoding "request_rejected"
+                       (obj1 (opt "gid" Gid.encoding)))
+          (function Request_rejected gid -> Some gid | _ -> None)
+          (fun gid -> Request_rejected gid) ;
+        case ~tag:4 (branch_encoding "rejecting_request"
+                       (obj1 (req "gid" Gid.encoding)))
+          (function Connection_established gid -> Some gid | _ -> None)
+          (fun gid -> Connection_established gid) ;
+        case ~tag:5 (branch_encoding "rejecting_request"
+                       (obj1 (req "gid" Gid.encoding)))
+          (function Disconnection gid -> Some gid | _ -> None)
+          (fun gid -> Disconnection gid) ;
+        case ~tag:6 (branch_encoding "rejecting_request"
+                       (obj1 (req "gid" Gid.encoding)))
+          (function External_disconnection gid -> Some gid | _ -> None)
+          (fun gid -> External_disconnection gid) ;
+      ]
+
     type t = {
       kind : kind ;
       timestamp : Time.t ;
     }
 
+    let encoding =
+      let open Data_encoding in
+      conv
+        (fun { kind ; timestamp ; } -> (kind, timestamp))
+        (fun (kind, timestamp) -> { kind ; timestamp ; })
+        (obj2
+           (req "kind" kind_encoding)
+           (req "timestamp" Time.encoding))
   end
 
   type greylisting_config = {
@@ -55,6 +99,7 @@ module Point_info = struct
     mutable greylisting_delay : float ;
     mutable greylisting_end : Time.t ;
     events : Event.t Ring.t ;
+    watchers : Event.t Watcher.input ;
   }
   type 'data point_info = 'data t
 
@@ -81,7 +126,8 @@ module Point_info = struct
     events = Ring.create log_size ;
     greylisting = greylisting_config ;
     greylisting_delay = 1. ;
-    greylisting_end = Time.now () ;
+    greylisting_end = Time.epoch ;
+    watchers = Watcher.create_input () ;
   }
 
   let point s = s.point
@@ -94,6 +140,7 @@ module Point_info = struct
   let last_rejected_connection s = s.last_rejected_connection
   let greylisted ?(now = Time.now ()) s =
     Time.compare now s.greylisting_end <= 0
+  let greylisted_end s = s.greylisting_end
 
   let recent a1 a2 =
     match a1, a2 with
@@ -118,8 +165,12 @@ module Point_info = struct
 
   let fold_events { events } ~init ~f = Ring.fold events ~init ~f
 
-  let log { events } ?(timestamp = Time.now ()) kind =
-    Ring.add events { kind ; timestamp }
+  let watch { watchers } = Watcher.create_stream watchers
+
+  let log { events ; watchers } ?(timestamp = Time.now ()) kind =
+    let event = { Event.kind ; timestamp } in
+    Ring.add events event ;
+    Watcher.notify watchers event
 
   let log_incoming_rejection ?timestamp point_info gid =
     log point_info ?timestamp (Rejecting_request gid)
@@ -287,11 +338,12 @@ module Gid_info = struct
     mutable state : 'conn state ;
     mutable metadata : 'meta ;
     mutable trusted : bool ;
-    events : Event.t Ring.t ;
     mutable last_failed_connection : (Id_point.t * Time.t) option ;
     mutable last_rejected_connection : (Id_point.t * Time.t) option ;
     mutable last_established_connection : (Id_point.t * Time.t) option ;
     mutable last_disconnection : (Id_point.t * Time.t) option ;
+    events : Event.t Ring.t ;
+    watchers : Event.t Watcher.input ;
   }
   type ('conn, 'meta) gid_info = ('conn, 'meta) t
 
@@ -310,6 +362,7 @@ module Gid_info = struct
       last_established_connection = None ;
       last_disconnection = None ;
       events = Ring.create log_size ;
+      watchers = Watcher.create_input () ;
     }
 
   let encoding metadata_encoding =
@@ -327,12 +380,14 @@ module Gid_info = struct
          let info = create ~trusted ~metadata gid in
          let events = Ring.create log_size in
          Ring.add_list info.events event_list ;
-         { gid ; created ; state = Disconnected ;
-           trusted ; metadata ; events ;
+         { state = Disconnected ;
+           trusted ; gid ; metadata ; created ;
            last_failed_connection ;
            last_rejected_connection ;
            last_established_connection ;
            last_disconnection ;
+           events ;
+           watchers = Watcher.create_input () ;
          })
       (obj9
          (req "gid" Gid.encoding)
@@ -373,8 +428,12 @@ module Gid_info = struct
       s.last_failed_connection
       (recent s.last_rejected_connection s.last_disconnection)
 
-  let log { events } ?(timestamp = Time.now ()) point kind =
-    Ring.add events { kind ; timestamp ; point }
+  let log { events ; watchers } ?(timestamp = Time.now ()) point kind =
+    let event = { Event.kind ; timestamp ; point } in
+    Ring.add events event ;
+    Watcher.notify watchers event
+
+  let watch { watchers } = Watcher.create_stream watchers
 
   let log_incoming_rejection ?timestamp gid_info point =
     log gid_info ?timestamp point Rejecting_request

@@ -125,6 +125,124 @@ module Answerer = struct
 
 end
 
+module LogEvent = struct
+  type t =
+    | Too_few_connections
+    | Too_many_connections
+    | New_point of Point.t
+    | New_peer of Gid.t
+    | Incoming_connection of Point.t
+    | Outgoing_connection of Point.t
+    | Authentication_failed of Point.t
+    | Accepting_request of Point.t * Id_point.t * Gid.t
+    | Rejecting_request of Point.t * Id_point.t * Gid.t
+    | Request_rejected of Point.t * (Id_point.t * Gid.t) option
+    | Connection_established of Id_point.t * Gid.t
+    | Disconnection of Gid.t
+    | External_disconnection of Gid.t
+
+    | Gc_points
+    | Gc_gids
+
+  let encoding =
+    let open Data_encoding in
+    let branch_encoding name obj =
+      conv (fun x -> (), x) (fun ((), x) -> x)
+        (merge_objs
+           (obj1 (req "event" (constant name))) obj) in
+    union ~tag_size:`Uint8 [
+      case ~tag:0 (branch_encoding "too_few_connections" empty)
+        (function Too_few_connections -> Some () | _ -> None)
+        (fun () -> Too_few_connections) ;
+      case ~tag:1 (branch_encoding "too_many_connections" empty)
+        (function Too_many_connections -> Some () | _ -> None)
+        (fun () -> Too_many_connections) ;
+      case ~tag:2 (branch_encoding "new_point"
+                     (obj1 (req "point" Point.encoding)))
+        (function New_point p -> Some p | _ -> None)
+        (fun p -> New_point p) ;
+      case ~tag:3 (branch_encoding "new_peer"
+                     (obj1 (req "gid" Gid.encoding)))
+        (function New_peer p -> Some p | _ -> None)
+        (fun p -> New_peer p) ;
+      case ~tag:4 (branch_encoding "incoming_connection"
+                     (obj1 (req "point" Point.encoding)))
+        (function Incoming_connection p -> Some p | _ -> None)
+        (fun p -> Incoming_connection p) ;
+      case ~tag:5 (branch_encoding "outgoing_connection"
+                     (obj1 (req "point" Point.encoding)))
+        (function Outgoing_connection p -> Some p | _ -> None)
+        (fun p -> Outgoing_connection p) ;
+      case ~tag:6 (branch_encoding "authentication_failed"
+                     (obj1 (req "point" Point.encoding)))
+        (function Authentication_failed p -> Some p | _ -> None)
+        (fun p -> Authentication_failed p) ;
+      case ~tag:7 (branch_encoding "accepting_request"
+                     (obj3
+                        (req "point" Point.encoding)
+                        (req "id_point" Id_point.encoding)
+                        (req "gid" Gid.encoding)))
+        (function Accepting_request (p, id_p, g) -> Some (p, id_p, g) | _ -> None)
+        (fun (p, id_p, g) -> Accepting_request (p, id_p, g)) ;
+      case ~tag:8 (branch_encoding "rejecting_request"
+                     (obj3
+                        (req "point" Point.encoding)
+                        (req "id_point" Id_point.encoding)
+                        (req "gid" Gid.encoding)))
+        (function Rejecting_request (p, id_p, g) -> Some (p, id_p, g) | _ -> None)
+        (fun (p, id_p, g) -> Rejecting_request (p, id_p, g)) ;
+      case ~tag:9 (branch_encoding "request_rejected"
+                     (obj2
+                        (req "point" Point.encoding)
+                        (opt "identity" (tup2 Id_point.encoding Gid.encoding))))
+        (function Request_rejected (p, id) -> Some (p, id) | _ -> None)
+        (fun (p, id) -> Request_rejected (p, id)) ;
+      case ~tag:10 (branch_encoding "connection_established"
+                      (obj2
+                         (req "id_point" Id_point.encoding)
+                         (req "gid" Gid.encoding)))
+        (function Connection_established (id_p, g) -> Some (id_p, g) | _ -> None)
+        (fun (id_p, g) -> Connection_established (id_p, g)) ;
+      case ~tag:11 (branch_encoding "disconnection"
+                      (obj1 (req "gid" Gid.encoding)))
+        (function Disconnection g -> Some g | _ -> None)
+        (fun g -> Disconnection g) ;
+      case ~tag:12 (branch_encoding "external_disconnection"
+                      (obj1 (req "gid" Gid.encoding)))
+        (function External_disconnection g -> Some g | _ -> None)
+        (fun g -> External_disconnection g) ;
+      case ~tag:13 (branch_encoding "gc_points" empty)
+        (function Gc_points -> Some () | _ -> None)
+        (fun () -> Gc_points) ;
+      case ~tag:14 (branch_encoding "gc_gids" empty)
+        (function Gc_gids -> Some () | _ -> None)
+        (fun () -> Gc_gids) ;
+    ]
+
+  let log watcher event = Watcher.notify watcher event
+
+  let too_few_connections watcher = log watcher Too_few_connections
+  let too_many_connections watcher = log watcher Too_many_connections
+  let new_point watcher ~point = log watcher (New_point point)
+  let new_peer watcher ~gid = log watcher (New_peer gid)
+  let incoming_connection watcher ~point = log watcher (Incoming_connection point)
+  let outgoing_connection  watcher ~point = log watcher (Outgoing_connection point)
+  let authentication_failed watcher ~point = log watcher (Authentication_failed point)
+  let accepting_request watcher ~id_point ~point ~gid =
+    log watcher (Accepting_request (point, id_point, gid))
+  let rejecting_request watcher ~id_point ~point ~gid =
+    log watcher (Rejecting_request (point, id_point, gid))
+  let request_rejected watcher ?credentials ~point =
+    log watcher (Request_rejected (point, credentials))
+  let connection_established watcher ~id_point ~gid =
+    log watcher (Connection_established (id_point, gid))
+  let disconnection watcher ~is_external ~gid =
+    log watcher (if is_external then External_disconnection gid
+              else Disconnection gid)
+  let gc_points watcher = log watcher Gc_points
+  let gc_gids watcher = log watcher Gc_gids
+end
+
 type config = {
 
   identity : Identity.t ;
@@ -174,12 +292,14 @@ type ('msg, 'meta) t = {
   io_sched : P2p_io_scheduler.t ;
   encoding : 'msg Message.t Data_encoding.t ;
   events : events ;
+  watcher : LogEvent.t Watcher.input ;
 }
+
 
 and events = {
   too_few_connections : unit Lwt_condition.t ;
   too_many_connections : unit Lwt_condition.t ;
-  new_point : unit Lwt_condition.t ;
+  new_peer : unit Lwt_condition.t ;
   new_connection : unit Lwt_condition.t ;
 }
 
@@ -195,12 +315,25 @@ and ('msg, 'meta) connection = {
 
 type ('msg, 'meta) pool = ('msg, 'meta) t
 
+module PoolEvent = struct
+  let wait_too_few_connections pool =
+    Lwt_condition.wait pool.events.too_few_connections
+  let wait_too_many_connections pool =
+    Lwt_condition.wait pool.events.too_many_connections
+  let wait_new_peer pool =
+    Lwt_condition.wait pool.events.new_peer
+  let wait_new_connection pool =
+    Lwt_condition.wait pool.events.new_connection
+end
+
+let watch { watcher } = Watcher.create_stream watcher
+
 module GcPointSet = Utils.Bounded(struct
     type t = Time.t * Point.t
     let compare (x, _) (y, _) = - (Time.compare x y)
   end)
 
-let gc_points { config = { max_known_points } ; known_points } =
+let gc_points ({ config = { max_known_points } ; known_points } as pool) =
   match max_known_points with
   | None -> ()
   | Some (_, target) ->
@@ -217,7 +350,8 @@ let gc_points { config = { max_known_points } ; known_points } =
       let to_remove = GcPointSet.get table in
       ListLabels.iter to_remove ~f:begin fun (_, p) ->
         Point.Table.remove known_points p
-      end
+      end ;
+      LogEvent.gc_points pool.watcher
 
 let register_point pool ?trusted (addr, port as point) =
   match Point.Table.find pool.known_points point with
@@ -227,6 +361,7 @@ let register_point pool ?trusted (addr, port as point) =
         if Point.Table.length pool.known_points >= max then gc_points pool
       end ;
       Point.Table.add pool.known_points point pi ;
+      LogEvent.new_point pool.watcher point ;
       pi
   | pi -> pi
 
@@ -245,9 +380,9 @@ module GcGidSet = Utils.Bounded(struct
       if score_cmp = 0 then Time.compare t t' else - score_cmp
   end)
 
-let gc_gids { meta_config = { score } ;
+let gc_gids ({ meta_config = { score } ;
               config = { max_known_gids } ;
-              known_gids ; } =
+              known_gids ; } as pool) =
   match max_known_gids with
   | None -> ()
   | Some (_, target) ->
@@ -260,17 +395,19 @@ let gc_gids { meta_config = { score } ;
       let to_remove = GcGidSet.get table in
       ListLabels.iter to_remove ~f:begin fun (_, _, gid) ->
         Gid.Table.remove known_gids gid
-      end
+      end ;
+      LogEvent.gc_gids pool.watcher
 
 let register_peer pool gid =
   match Gid.Table.find pool.known_gids gid with
   | exception Not_found ->
-      Lwt_condition.broadcast pool.events.new_point () ;
+      Lwt_condition.broadcast pool.events.new_peer () ;
       let peer = Gid_info.create gid ~metadata:pool.meta_config.initial in
       iter_option pool.config.max_known_gids ~f:begin fun (max, _) ->
         if Gid.Table.length pool.known_gids >= max then gc_gids pool
       end ;
       Gid.Table.add pool.known_gids gid peer ;
+      LogEvent.new_peer pool.watcher gid ;
       peer
   | peer -> peer
 
@@ -329,9 +466,11 @@ let create_connection pool conn id_point pi gi _version =
     { conn ; point_info = pi ; gid_info = gi ;
       messages ; canceler ; answerer ; wait_close = false } in
   iter_option pi ~f:begin fun pi ->
+    let point = Point_info.point pi in
     Point_info.State.set_running pi gid conn ;
-    Point.Table.add pool.connected_points (Point_info.point pi) pi ;
+    Point.Table.add pool.connected_points point pi ;
   end ;
+  LogEvent.connection_established pool.watcher ~id_point ~gid ;
   Gid_info.State.set_running gi id_point conn ;
   Gid.Table.add pool.connected_gids gid gi ;
   Lwt_condition.broadcast pool.events.new_connection () ;
@@ -339,17 +478,22 @@ let create_connection pool conn id_point pi gi _version =
     lwt_debug "Disconnect: %a (%a)"
       Gid.pp gid Id_point.pp id_point >>= fun () ->
     iter_option ~f:Point_info.State.set_disconnected pi;
+    LogEvent.disconnection pool.watcher ~is_external:false ~gid ;
     Gid_info.State.set_disconnected gi ;
     iter_option pi ~f:begin fun pi ->
       Point.Table.remove pool.connected_points (Point_info.point pi) ;
     end ;
     Gid.Table.remove pool.connected_gids gid ;
-    if pool.config.max_connections <= active_connections pool then
+    if pool.config.max_connections <= active_connections pool then begin
       Lwt_condition.broadcast pool.events.too_many_connections () ;
+      LogEvent.too_many_connections pool.watcher ;
+    end ;
     P2p_connection.close ~wait:conn.wait_close conn.conn
   end ;
-  if active_connections pool < pool.config.min_connections then
+  if active_connections pool < pool.config.min_connections then begin
     Lwt_condition.broadcast pool.events.too_few_connections () ;
+    LogEvent.too_few_connections pool.watcher ;
+  end ;
   conn
 
 let disconnect ?(wait = false) conn =
@@ -379,18 +523,21 @@ let authenticate pool ?pi canceler fd point =
       ?listening_port:pool.config.listening_port
       pool.config.identity pool.message_config.versions
   end ~on_error: begin fun err ->
+    (* Authentication incorrect! *)
     (* TODO do something when the error is Not_enough_proof_of_work ?? *)
     lwt_debug "authenticate: %a%s -> failed %a"
       Point.pp point
       (if incoming then " incoming" else "")
       pp_print_error err >>= fun () ->
     may_register_my_id_point pool err ;
+    LogEvent.authentication_failed pool.watcher ~point ;
     if incoming then
       Point.Table.remove pool.incoming point
     else
       iter_option Point_info.State.set_disconnected pi ;
     Lwt.return (Error err)
   end >>=? fun (info, auth_fd) ->
+  (* Authentication correct! *)
   lwt_debug "authenticate: %a -> auth %a"
     Point.pp point
     Connection_info.pp info >>= fun () ->
@@ -428,9 +575,12 @@ let authenticate pool ?pi canceler fd point =
     | Running _ -> false
     | Disconnected -> true
   in
-  if incoming then Point.Table.remove pool.incoming point ;
+  if incoming then
+    Point.Table.remove pool.incoming point ;
   match acceptable_versions with
   | Some version when acceptable_gid && acceptable_point -> begin
+      LogEvent.accepting_request pool.watcher
+        ~id_point:info.id_point ~point ~gid:info.gid ;
       iter_option connection_pi
         ~f:(fun pi -> Point_info.State.set_accepted pi info.gid canceler) ;
       Gid_info.State.set_accepted gi info.id_point canceler ;
@@ -447,6 +597,9 @@ let authenticate pool ?pi canceler fd point =
           Connection_info.pp info >>= fun () ->
         Lwt.return conn
       end ~on_error: begin fun err ->
+        if incoming then
+          LogEvent.request_rejected pool.watcher
+            ~credentials:(info.id_point, info.gid) ~point ;
         lwt_debug "authenticate: %a -> rejected %a"
           Point.pp point
           Connection_info.pp info >>= fun () ->
@@ -461,6 +614,8 @@ let authenticate pool ?pi canceler fd point =
       return (create_connection pool conn id_point connection_pi gi version)
     end
   | _ -> begin
+      LogEvent.rejecting_request pool.watcher
+        ~id_point:info.id_point ~point ~gid:info.gid ;
       lwt_debug "authenticate: %a -> kick %a point: %B gid: %B"
         Point.pp point
         Connection_info.pp info
@@ -504,6 +659,7 @@ let raw_connect canceler pool point =
     Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
   lwt_debug "connect: %a" Point.pp point >>= fun () ->
   Lwt_utils.protect ~canceler begin fun () ->
+    LogEvent.outgoing_connection pool.watcher ~point ;
     Lwt_unix.connect fd uaddr >>= fun () ->
     return ()
   end ~on_error: begin fun err ->
@@ -530,6 +686,7 @@ let connect ~timeout pool point =
   end
 
 let accept pool fd point =
+  LogEvent.incoming_connection pool.watcher ~point ;
   if pool.config.max_incoming_connections <= Point.Table.length pool.incoming
   || pool.config.max_connections <= active_connections pool then
     Lwt.async (fun () -> Lwt_utils.safe_close fd)
@@ -598,6 +755,10 @@ module Gids = struct
 
   let get_metadata pool gid =
     try Some (Gid_info.metadata (Gid.Table.find pool.known_gids gid))
+    with Not_found -> None
+
+  let get_score pool gid =
+    try Some (pool.meta_config.score @@ Gid_info.metadata (Gid.Table.find pool.known_gids gid))
     with Not_found -> None
 
   let set_metadata pool gid data =
@@ -673,23 +834,13 @@ module Points = struct
 
 end
 
-module Events = struct
-  let too_few_connections pool =
-    Lwt_condition.wait pool.events.too_few_connections
-  let too_many_connections pool =
-    Lwt_condition.wait pool.events.too_many_connections
-  let new_point pool =
-    Lwt_condition.wait pool.events.new_point
-  let new_connection pool =
-    Lwt_condition.wait pool.events.new_connection
-end
-
-
 let connection_stat { conn } =
   P2p_connection.stat conn
 
 let pool_stat { io_sched } =
   P2p_io_scheduler.global_stat io_sched
+
+let score { meta_config = { score }} meta = score meta
 
 let connection_info { conn } =
   P2p_connection.info conn
@@ -700,7 +851,7 @@ let create config meta_config message_config io_sched =
   let events = {
     too_few_connections = Lwt_condition.create () ;
     too_many_connections = Lwt_condition.create () ;
-    new_point = Lwt_condition.create () ;
+    new_peer = Lwt_condition.create () ;
     new_connection = Lwt_condition.create () ;
   } in
   let pool = {
@@ -714,6 +865,7 @@ let create config meta_config message_config io_sched =
     io_sched ;
     encoding = Message.encoding message_config.encoding ;
     events ;
+    watcher = Watcher.create_input () ;
   } in
   List.iter (Points.set_trusted pool) config.trusted_points ;
   Gid_info.File.load config.peers_file meta_config.encoding >>= function

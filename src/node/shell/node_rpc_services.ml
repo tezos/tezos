@@ -484,6 +484,114 @@ module Protocols = struct
       RPC.Path.(root / "protocols")
 end
 
+module Network = struct
+  open P2p_types
+  let (gid_arg : P2p_types.Gid.t RPC.Arg.arg) =
+    RPC.Arg.make
+      ~name:"gid"
+      ~descr:"A network global identifier, also known as an identity."
+      ~destruct:(fun s -> try
+                    Ok (Crypto_box.Public_key_hash.of_b58check s)
+                  with Failure msg -> Error msg)
+      ~construct:Crypto_box.Public_key_hash.to_b58check
+      ()
+
+  let point_arg =
+    RPC.Arg.make
+      ~name:"point"
+      ~descr:"A network point (ipv4:port or [ipv6]:port)."
+      ~destruct:Point.of_string
+      ~construct:Point.to_string
+      ()
+
+  let stat =
+    RPC.service
+      ~description:"Global network bandwidth statistics in B/s."
+      ~input: empty
+      ~output: P2p.Stat.encoding
+      RPC.Path.(root / "network" / "stat")
+
+  let events =
+    RPC.service
+      ~description:"Stream of all network events"
+      ~input: empty
+      ~output: P2p.RPC.Event.encoding
+      RPC.Path.(root / "network" / "log")
+
+  let connect =
+    RPC.service
+      ~description:"Connect to a peer"
+      ~input: (obj1 (dft "timeout" float 5.))
+      ~output: (Error.wrap @@ empty)
+      RPC.Path.(root / "network" / "connect" /: point_arg)
+
+  let monitor_encoding = obj1 (dft "monitor" bool false)
+
+  module Connection = struct
+    let list =
+      RPC.service
+        ~input: empty
+        ~output: (list P2p.Connection_info.encoding)
+        RPC.Path.(root / "network" / "connection")
+
+    let info =
+      RPC.service
+        ~input: empty
+        ~output: (option P2p.Connection_info.encoding)
+        RPC.Path.(root / "network" / "connection" /: gid_arg)
+
+    let kick =
+      RPC.service
+        ~input: (obj1 (req "wait" bool))
+        ~output: empty
+        RPC.Path.(root / "network" / "connection" /: gid_arg / "kick")
+  end
+
+  module Point = struct
+    let infos =
+      let filter =
+        obj1 (dft "filter" (list P2p.RPC.Point.state_encoding) []) in
+      RPC.service
+        ~input: filter
+        ~output: (list (tup2 P2p.Point.encoding P2p.RPC.Point.info_encoding))
+        RPC.Path.(root / "network" / "point")
+
+    let info =
+      RPC.service
+        ~input: empty
+        ~output: (option P2p.RPC.Point.info_encoding)
+        RPC.Path.(root / "network" / "point" /: point_arg)
+
+    let events =
+      RPC.service
+        ~input: monitor_encoding
+        ~output: (list P2p.RPC.Point.Event.encoding)
+        RPC.Path.(root / "network" / "point" /: point_arg / "log")
+  end
+
+  module Gid = struct
+    let infos =
+      let filter =
+        obj1 (dft "filter" (list P2p.RPC.Gid.state_encoding) []) in
+      RPC.service
+        ~input: filter
+        ~output: (list (tup2 P2p.Gid.encoding P2p.RPC.Gid.info_encoding))
+        RPC.Path.(root / "network" / "gid")
+
+    let info =
+      RPC.service
+        ~input: empty
+        ~output: (option P2p.RPC.Gid.info_encoding)
+        RPC.Path.(root / "network" / "gid" /: gid_arg)
+
+    let events =
+      RPC.service
+        ~input: monitor_encoding
+        ~output: (list P2p.RPC.Gid.Event.encoding)
+        RPC.Path.(root / "network" / "gid" /: gid_arg / "log")
+  end
+end
+
 let forge_block =
   RPC.service
     ~description: "Forge a block header"

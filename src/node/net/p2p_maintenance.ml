@@ -125,7 +125,7 @@ and too_few_connections st n_connected =
     P2p_connection_pool.broadcast_bootstrap_msg pool ;
     Lwt_utils.protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
-        P2p_connection_pool.Events.new_point pool ;
+        P2p_connection_pool.PoolEvent.wait_new_peer pool ;
         Lwt_unix.sleep 5.0 (* TODO exponential back-off ??
                                    or wait for the existence of a
                                    non grey-listed peer ?? *)
@@ -154,8 +154,8 @@ let rec worker_loop st =
       Lwt.pick [
         Lwt_unix.sleep 120. ; (* every two minutes *)
         Lwt_condition.wait st.please_maintain ; (* when asked *)
-        P2p_connection_pool.Events.too_few_connections pool ; (* limits *)
-        P2p_connection_pool.Events.too_many_connections pool
+        P2p_connection_pool.PoolEvent.wait_too_few_connections pool ; (* limits *)
+        P2p_connection_pool.PoolEvent.wait_too_many_connections pool
       ] >>= fun () ->
       return ()
     end >>=? fun () ->
