@@ -60,12 +60,38 @@ module Stat = struct
     else
       Format.fprintf ppf "%.2f MiB" (ratio 20)
 
+  let print_size64 ppf sz =
+    let open Int64 in
+    let ratio n = (to_float sz /. float_of_int (1 lsl n)) in
+    if sz < shift_left 1L 10 then
+      Format.fprintf ppf "%Ld B" sz
+    else if sz < shift_left 1L 20 then
+      Format.fprintf ppf "%.2f kiB" (ratio 10)
+    else if sz < shift_left 1L 30 then
+      Format.fprintf ppf "%.2f MiB" (ratio 20)
+    else if sz < shift_left 1L 40 then
+      Format.fprintf ppf "%.2f GiB" (ratio 30)
+    else
+      Format.fprintf ppf "%.2f TiB" (ratio 40)
+
   let pp ppf stat =
     Format.fprintf ppf
       "sent: %a (%a/s) recv: %a (%a/s)"
-      print_size stat.total_sent print_size stat.current_outflow
-      print_size stat.total_recv print_size stat.current_inflow
+      print_size64 stat.total_sent print_size stat.current_outflow
+      print_size64 stat.total_recv print_size stat.current_inflow
 
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun { total_sent ; total_recv ; current_inflow ; current_outflow } ->
+         (total_sent, total_recv, current_inflow, current_outflow))
+      (fun (total_sent, total_recv, current_inflow, current_outflow) ->
+         { total_sent ; total_recv ; current_inflow ; current_outflow })
+      (obj4
+         (req "total_sent" int64)
+         (req "total_recv" int64)
+         (req "current_inflow" int31)
+         (req "current_outflow" int31))
 end
 
 module Gid = struct
@@ -105,23 +131,20 @@ module Point = struct
     let is_local (addr, _) = Ipaddr.V6.is_private addr
     let is_global (addr, _) = not @@ Ipaddr.V6.is_private addr
 
-    let of_string str =
-      match String.rindex str ':' with
-      | exception Not_found -> `Error "not a valid node address (ip:port)"
-      | pos ->
-          let len = String.length str in
-          let addr, port =
-            String.sub str 0 pos, String.sub str (pos+1) (len - pos - 1) in
-          let addr = if addr = "" || addr = "_" then "[::]" else addr in
-          match Ipaddr.of_string_exn addr, int_of_string port with
-          | exception Failure _ -> `Error "not a valid node address (ip:port)"
-          | V4 ipv4, port -> `Ok (Ipaddr.v6_of_v4 ipv4, port)
-          | V6 ipv6, port -> `Ok (ipv6, port)
-
     let of_string_exn str =
-      match of_string str with
-      | `Ok saddr -> saddr
-      | `Error msg -> invalid_arg msg
+      let addr, port = Utils.parse_addr_port str in
+      let port = int_of_string port in
+      if port < 0 && port > 1 lsl 16 - 1 then
+        invalid_arg "port must be between 0 and 65535" ;
+      match Ipaddr.of_string_exn addr with
+      | V4 addr -> Ipaddr.v6_of_v4 addr, port
+      | V6 addr -> addr, port
+
+    let of_string str =
+      try Ok (of_string_exn str) with
+      | Invalid_argument s -> Error s
+      | Failure s -> Error s
+      | _ -> Error "Point.of_string"
 
     let to_string saddr = Format.asprintf "%a" pp saddr
 
@@ -164,18 +187,27 @@ module Id_point = struct
     let pp_opt ppf = function
       | None -> Format.pp_print_string ppf "none"
       | Some point -> pp ppf point
+    let to_string t = Format.asprintf "%a" pp t
 
     let is_local (addr, _) = Ipaddr.V6.is_private addr
     let is_global (addr, _) = not @@ Ipaddr.V6.is_private addr
 
+    let of_point (addr, port) = addr, Some port
+    let to_point = function
+      | _, None -> None
+      | addr, Some port -> Some (addr, port)
+    let to_point_exn = function
+      | _, None -> invalid_arg "to_point_exn"
+      | addr, Some port -> addr, port
+
     let encoding =
       let open Data_encoding in
       conv
-        (fun (addr, port) -> Ipaddr.V6.to_bytes addr, port)
-        (fun (addr, port) -> Ipaddr.V6.of_bytes_exn addr, port)
+        (fun (addr, port) -> Ipaddr.V6.to_string addr, port)
+        (fun (addr, port) -> Ipaddr.V6.of_string_exn addr, port)
         (obj2
            (req "addr" string)
-           (opt "port" int16))
+           (opt "port" uint16))
 
   end
 
@@ -273,6 +305,20 @@ module Connection_info = struct
     remote_socket_port : port;
     versions : Version.t list ;
   }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun { incoming ; gid ; id_point ; remote_socket_port ; versions } ->
+         (incoming, gid, id_point, remote_socket_port, versions))
+      (fun (incoming, gid, id_point, remote_socket_port, versions) ->
+         { incoming ; gid ; id_point ; remote_socket_port ; versions })
+      (obj5
+         (req "incoming" bool)
+         (req "gid" Gid.encoding)
+         (req "id_point" Id_point.encoding)
+         (req "remote_socket_port" uint16)
+         (req "versions" (list Version.encoding)))
 
   let pp ppf
       { incoming ; id_point = (remote_addr, remote_port) ; gid } =
