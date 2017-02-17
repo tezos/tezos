@@ -271,18 +271,16 @@ let list_blocks
         requested_blocks in
     RPC.Answer.return infos
   else begin
-    Node.RPC.valid_block_watcher node >>= fun (bi_stream, shutdown) ->
-    let stream, shutdown =
+    Node.RPC.valid_block_watcher node >>= fun (bi_stream, stopper) ->
+    let stream =
       match delay with
       | None ->
-          Lwt_stream.map (fun bi -> [[filter_bi include_ops bi]]) bi_stream,
-          shutdown
+          Lwt_stream.map (fun bi -> [[filter_bi include_ops bi]]) bi_stream
       | Some delay ->
           let filtering = heads <> None in
           create_delayed_stream
-            ~filtering ~include_ops requested_heads bi_stream delay,
-          shutdown
-    in
+            ~filtering ~include_ops requested_heads bi_stream delay in
+    let shutdown () = Watcher.shutdown stopper in
     let first_request = ref true in
     let next () =
       if not !first_request then begin
@@ -313,7 +311,8 @@ let list_operations node {Services.Operations.monitor; contents} =
   if not monitor then
     RPC.Answer.return operations
   else
-    let stream, shutdown = Node.RPC.operation_watcher node in
+    let stream, stopper = Node.RPC.operation_watcher node in
+    let shutdown () = Watcher.shutdown stopper in
     let first_request = ref true in
     let next () =
       if not !first_request then
@@ -349,7 +348,8 @@ let list_protocols node {Services.Protocols.monitor; contents} =
   if not monitor then
     RPC.Answer.return protocols
   else
-    let stream, shutdown = Node.RPC.protocol_watcher node in
+    let stream, stopper = Node.RPC.protocol_watcher node in
+    let shutdown () = Watcher.shutdown stopper in
     let first_request = ref true in
     let next () =
       if not !first_request then

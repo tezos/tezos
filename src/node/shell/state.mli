@@ -124,7 +124,7 @@ module Operation : sig
   (** Create a stream of all the newly locally-stored operations.
       The returned function allows to terminate the stream. *)
   val create_watcher:
-      state -> (key * operation) Lwt_stream.t * (unit -> unit)
+      state -> (key * operation) Lwt_stream.t * Watcher.stopper
 
 end
 
@@ -189,7 +189,7 @@ module Block : sig
   (** Create a stream of all the newly locally-stored blocks.
       The returned function allows to terminate the stream. *)
   val create_watcher:
-    state -> (Block_hash.t * block) Lwt_stream.t * (unit -> unit)
+    state -> (Block_hash.t * block) Lwt_stream.t * Watcher.stopper
 
   (** If [h1] is an ancestor of [h2] in the current [state],
       then [path state h1 h2] returns the chain of block from
@@ -297,7 +297,7 @@ module Valid_block : sig
 
   (** Create a stream of all the newly validated blocks.
       The returned function allows to terminate the stream. *)
-  val create_watcher: state -> (valid_block Lwt_stream.t * (unit -> unit)) Lwt.t
+  val create_watcher: state -> (valid_block Lwt_stream.t * Watcher.stopper) Lwt.t
 
   (** If [h1] is an ancestor of [h2] in the current [state],
       then [path state h1 h2] returns the chain of block from
@@ -410,7 +410,7 @@ module Protocol : sig
   (** Create a stream of all the newly locally-stored protocols.
       The returned function allows to terminate the stream. *)
   val create_watcher:
-    state -> (key * protocol) Lwt_stream.t * (unit -> unit)
+    state -> (key * protocol) Lwt_stream.t * Watcher.stopper
 
   val keys: state -> key list Lwt.t
 end

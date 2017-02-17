@@ -46,29 +46,6 @@ let () =
     (function Unknown_network x -> Some x | _ -> None)
     (fun x -> Unknown_network x) ;
 
-module Watcher = struct
-
-  type 'a t = {
-    id: int ;
-    push: ('a option -> unit) ;
-  }
-
-  let notify watchers info =
-    List.iter (fun w -> w.push (Some info)) watchers
-
-  let create_stream watchers =
-    let cpt = ref 0 in
-    fun () ->
-      let id = incr cpt ; !cpt in
-      let stream, push = Lwt_stream.create () in
-      watchers := { id ; push } :: !watchers ;
-      let unregister () =
-        push None ;
-        watchers := List.filter (fun w -> w.id <> id) !watchers in
-      stream, unregister
-
-end
-
 (** *)
 
 type net_id = Store.net_id = Net of Block_hash.t
@@ -78,13 +55,11 @@ type t = {
   nets: net Block_hash_table.t ;
   store: Store.store ;
   block_db: Db_proxy.Block.t ;
-  block_watchers: (Block_hash.t * Store.block) Watcher.t list ref ;
+  block_watchers: (Block_hash.t * Store.block) Watcher.input ;
   operation_db: Db_proxy.Operation.t ;
-  operation_watchers:
-    (Operation_hash.t * Store.operation) Watcher.t list ref ;
+  operation_watchers: (Operation_hash.t * Store.operation) Watcher.input ;
   protocol_db: Db_proxy.Protocol.t ;
-  protocol_watchers:
-    (Protocol_hash.t * Store.protocol) Watcher.t list ref ;
+  protocol_watchers: (Protocol_hash.t * Store.protocol) Watcher.input ;
   valid_block_state: valid_block_state Persist.shared_ref ;
 }
 
@@ -101,7 +76,7 @@ and valid_block_state = {
   ttl: Int64.t ;
   index: Context.index ;
   block_db: Db_proxy.Block.t ;
-  watchers: valid_block Watcher.t list ref ;
+  watchers: valid_block Watcher.input ;
 }
 
 and blockchain_state = {
@@ -227,7 +202,7 @@ module Operation = struct
           Db_proxy.Operation.store t.operation_db h (Time.make_timed (Ok op))
           >>= function
           | true ->
-              Watcher.notify !(t.operation_watchers) (h, op) ;
+              Watcher.notify t.operation_watchers (h, op) ;
               return (Some (h, op))
           | false ->
               return None
@@ -244,7 +219,7 @@ module Operation = struct
   let invalid state =
     Persist.use state.store.global_store InvalidOperations.read
 
-  let create_watcher t = Watcher.create_stream t.operation_watchers ()
+  let create_watcher t = Watcher.create_stream t.operation_watchers
 
 end
 
@@ -285,7 +260,7 @@ module Protocol = struct
         Db_proxy.Protocol.store t.protocol_db h (Time.make_timed (Ok proto))
         >>= function
         | true ->
-            Watcher.notify !(t.protocol_watchers) (h, proto) ;
+            Watcher.notify t.protocol_watchers (h, proto) ;
             return (Some (h, proto))
         | false ->
             return None
@@ -302,7 +277,7 @@ module Protocol = struct
   let invalid state =
     Persist.use state.store.global_store InvalidProtocols.read
 
-  let create_watcher t = Watcher.create_stream t.protocol_watchers ()
+  let create_watcher t = Watcher.create_stream t.protocol_watchers
 
   let keys { protocol_db } = Db_proxy.Protocol.keys protocol_db
 
@@ -429,10 +404,10 @@ module Block = struct
               Persist.update t.store.global_store (fun store ->
                   PostponedBlocks.set store h >>= fun store ->
                   Lwt.return (Some store)) >>= fun _ ->
-              Watcher.notify !(t.block_watchers) (h, b) ;
+              Watcher.notify t.block_watchers (h, b) ;
               return (Some (h, b))
           | false -> return None
-  let create_watcher t = Watcher.create_stream t.block_watchers ()
+  let create_watcher t = Watcher.create_stream t.block_watchers
 
   let check_block state h =
     known state h >>= function
@@ -604,8 +579,8 @@ module Valid_block = struct
     let ttl = Int64.of_int ttl in
     Lwt.return
       (Persist.share { global_store = store ;
-                       block_db ; index ;
-                       ttl ; watchers = ref []  })
+                       block_db ; index ; ttl ;
+                       watchers = Watcher.create_input () })
 
   let locked_valid vstate h =
     Context.checkout vstate.index h >>= function
@@ -688,7 +663,7 @@ module Valid_block = struct
                       Store.Block_valid_succs.set
                         store block.shell.predecessor successors >>= fun () ->
                       Lwt.return (Some store)) >>= fun _ ->
-                  Watcher.notify !(vstate.watchers) valid_block ;
+                  Watcher.notify vstate.watchers valid_block ;
                   Lwt.return (Ok valid_block)
                 end
 
@@ -837,7 +812,7 @@ module Valid_block = struct
 
   let create_watcher state =
     use state (fun vstate ->
-        Lwt.return (Watcher.create_stream vstate.watchers ()))
+        Lwt.return (Watcher.create_stream vstate.watchers))
 
   module Store = struct
     type t = valid_block_state
@@ -1309,10 +1284,10 @@ let read
     active_net = [] ;
     nets = Block_hash_table.create 7 ;
     operation_db ;
-    operation_watchers = ref [] ;
+    operation_watchers = Watcher.create_input () ;
     protocol_db ;
-    protocol_watchers = ref [] ;
-    block_db ; block_watchers = ref [] ;
+    protocol_watchers = Watcher.create_input () ;
+    block_db ; block_watchers = Watcher.create_input () ;
     valid_block_state ;
   }
   in
