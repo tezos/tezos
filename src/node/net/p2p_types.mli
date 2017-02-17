@@ -50,7 +50,9 @@ module Point : sig
   val compare : t -> t -> int
   val pp : Format.formatter -> t -> unit
   val pp_opt : Format.formatter -> t option -> unit
-  val of_string : string -> [> `Error of string | `Ok of addr * port ]
+  val of_string_exn : string -> t
+  val of_string : string -> (t, string) result
+  val to_string : t -> string
   val encoding : t Data_encoding.t
   val is_local : t -> bool
   val is_global : t -> bool
@@ -67,9 +69,13 @@ module Id_point : sig
   val equal : t -> t -> bool
   val pp : Format.formatter -> t -> unit
   val pp_opt : Format.formatter -> t option -> unit
+  val to_string : t -> string
   val encoding : t Data_encoding.t
   val is_local : t -> bool
   val is_global : t -> bool
+  val of_point : Point.t -> t
+  val to_point : t -> Point.t option
+  val to_point_exn : t -> Point.t
   module Map : Map.S with type key = t
   module Set : Set.S with type elt = t
   module Table : Hashtbl.S with type key = t
@@ -108,14 +114,15 @@ end
 module Stat : sig
 
   type t = {
-    total_sent : int ;
-    total_recv : int ;
+    total_sent : int64 ;
+    total_recv : int64 ;
     current_inflow : int ;
     current_outflow : int ;
   }
 
+  val empty : t
   val pp: Format.formatter -> t -> unit
-
+  val encoding : t Data_encoding.t
 end
 
 (** Information about a connection *)
@@ -131,5 +138,6 @@ module Connection_info : sig
   }
 
   val pp: Format.formatter -> t -> unit
+  val encoding : t Data_encoding.t
 
 end
