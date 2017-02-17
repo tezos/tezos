@@ -164,6 +164,7 @@ UTILS_LIB_INTFS := \
   utils/IO.mli \
   utils/moving_average.mli \
   utils/ring.mli \
+  utils/watcher.mli \
 
 UTILS_LIB_IMPLS := \
   utils/base58.ml \
@@ -181,6 +182,7 @@ UTILS_LIB_IMPLS := \
   utils/IO.ml \
   utils/moving_average.ml \
   utils/ring.ml \
+  utils/watcher.ml \
 
 UTILS_PACKAGES := \
   ${MINUTILS_PACKAGES} \
