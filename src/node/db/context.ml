@@ -82,7 +82,7 @@ let invalid_context_key = ["invalid_context"]
 
 let exists (module GitStore : STORE) key =
   GitStore.of_branch_id
-    Irmin.Task.none (Block_hash.to_b48check key) GitStore.local_repo >>= fun t ->
+    Irmin.Task.none (Block_hash.to_b58check key) GitStore.local_repo >>= fun t ->
   let store = t () in
   GitStore.read store genesis_block_key >>= function
   | Some _ ->
@@ -102,7 +102,7 @@ let checkout ((module GitStore : STORE) as index) key =
     Lwt.return None
   else
     GitStore.of_branch_id
-      Irmin.Task.none (Block_hash.to_b48check key) GitStore.local_repo >>= fun t ->
+      Irmin.Task.none (Block_hash.to_b58check key) GitStore.local_repo >>= fun t ->
     let store = t () in
     GitStore.FunView.of_path store [] >>= fun v ->
     lwt_debug "<- Context.checkout %a OK"
@@ -142,7 +142,7 @@ let commit (module GitStore : STORE) block key (module View : VIEW) =
   let task =
     Irmin.Task.create
       ~date:(Time.to_seconds block.Store.shell.timestamp) ~owner:"tezos" in
-  GitStore.clone task View.s (Block_hash.to_b48check key) >>= function
+  GitStore.clone task View.s (Block_hash.to_b58check key) >>= function
   | `Empty_head -> Lwt.fail (Empty_head (GitStore.path, key))
   | `Duplicated_branch -> Lwt.fail (Preexistent_context (GitStore.path, key))
   | `Ok store ->
@@ -157,13 +157,13 @@ let commit_invalid (module GitStore : STORE) block key exns =
     Irmin.Task.create
       ~date:(Time.to_seconds block.Store.shell.timestamp) ~owner:"tezos" in
   GitStore.of_branch_id
-    task (Block_hash.to_b48check key) GitStore.local_repo >>= fun t ->
+    task (Block_hash.to_b58check key) GitStore.local_repo >>= fun t ->
       let msg =
         Format.asprintf "%a %a"
           Fitness.pp block.shell.fitness
           Block_hash.pp_short key in
   let store = t msg in
-  GitStore.clone Irmin.Task.none store (Block_hash.to_b48check key) >>= function
+  GitStore.clone Irmin.Task.none store (Block_hash.to_b58check key) >>= function
   | `Empty_head ->
       GitStore.update store invalid_context_key
         (MBytes.of_string @@ Data_encoding_ezjsonm.to_string @@
@@ -257,7 +257,7 @@ let init ?patch_context ~root =
 
 let create_genesis_context (module GitStore : STORE) genesis test_protocol =
   GitStore.of_branch_id
-    Irmin.Task.none (Block_hash.to_b48check genesis.Store.block)
+    Irmin.Task.none (Block_hash.to_b58check genesis.Store.block)
     GitStore.local_repo >>= fun t ->
   let store = t () in
   GitStore.FunView.of_path store [] >>= fun v ->

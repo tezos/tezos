@@ -177,9 +177,9 @@ module Context = struct
   module Key = struct
 
     let public_key_hash_arg =
-      let construct = Ed25519.Public_key_hash.to_b48check in
+      let construct = Ed25519.Public_key_hash.to_b58check in
       let destruct hash =
-        match Ed25519.Public_key_hash.of_b48check hash with
+        match Ed25519.Public_key_hash.of_b58check hash with
         | exception _ -> Error "Cannot parse public key hash"
         | public_key_hash -> Ok public_key_hash in
       RPC.Arg.make

@@ -34,7 +34,7 @@ let equal_persist_list ?msg l1 l2 =
 
 let equal_block_hash_list ?msg l1 l2 =
   let msg = format_msg msg in
-  let pr_block_hash = Block_hash.to_short_b48check in
+  let pr_block_hash = Block_hash.to_short_b58check in
   Assert.make_equal_list ?msg Block_hash.equal pr_block_hash l1 l2
 
 let equal_string_list ?msg l1 l2 =

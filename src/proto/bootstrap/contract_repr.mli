@@ -40,9 +40,9 @@ val generic_contract :
 
 type error += Invalid_contract_notation of string
 
-val to_b48check: contract -> string
+val to_b58check: contract -> string
 
-val of_b48check: string -> contract tzresult
+val of_b58check: string -> contract tzresult
 
 (** {2 Serializers} ***********************************************************)
 

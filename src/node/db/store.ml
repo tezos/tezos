@@ -742,11 +742,11 @@ let net_destroy ~root { net_genesis } =
 
 let init root =
   raw_init ~root:(Filename.concat root "global") () >>= fun t ->
-  Base48.register_resolver
-    Block_hash.b48check_encoding
+  Base58.register_resolver
+    Block_hash.b58check_encoding
     (fun s -> Block_resolver.resolve t s);
-  Base48.register_resolver
-    Operation_hash.b48check_encoding
+  Base58.register_resolver
+    Operation_hash.b58check_encoding
     (fun s -> Operation_resolver.resolve t s);
   Lwt.return
     { block = Persist.share t ;

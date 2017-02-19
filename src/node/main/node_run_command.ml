@@ -13,11 +13,11 @@ let genesis = {
   Store.time =
     Time.of_notation_exn "2016-11-01T00:00:00Z" ;
   block =
-    Block_hash.of_b48check
-      "grHGHkVfgJb5gPaRd5AtQsa65g9GyLcXgQsHbSnQ5SD5DEp2ctqck" ;
+    Block_hash.of_b58check
+      "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z" ;
   protocol =
-    Protocol_hash.of_b48check
-      "4p64VagsbXchSF88eaPy5XrkqMLEjBCaSnaGv2vQkhv8e37Nnqmrd" ;
+    Protocol_hash.of_b58check
+      "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" ;
 }
 
 let (//) = Filename.concat

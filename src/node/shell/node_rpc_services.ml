@@ -102,7 +102,7 @@ module Blocks = struct
       | ["test_prevalidation"] -> Ok `Test_prevalidation
       | ["head"; n] -> Ok (`Head (int_of_string n))
       | ["test_head"; n] -> Ok (`Test_head (int_of_string n))
-      | [h] -> Ok (`Hash (Block_hash.of_b48check h))
+      | [h] -> Ok (`Hash (Block_hash.of_b58check h))
       | _ -> raise Exit
     with _ -> Error "Cannot parse block identifier."
 
@@ -124,7 +124,7 @@ module Blocks = struct
       | `Test_head 0 -> "test_head"
       | `Test_head n -> Printf.sprintf "test_head~%d" n
       | `Test_prevalidation -> "test_prevalidation"
-      | `Hash h -> Block_hash.to_b48check h in
+      | `Hash h -> Block_hash.to_b58check h in
     let destruct = parse_block in
     RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
@@ -297,7 +297,7 @@ module Blocks = struct
       and construct s = s in
       RPC.Arg.make ~name:"prefix" ~destruct ~construct () in
     RPC.service
-      ~description: "Try to complete a prefix of a Base48Check-encoded data. \
+      ~description: "Try to complete a prefix of a Base58Check-encoded data. \
                      This RPC is actually able to complete hashes of \
                      block, operations, public_keys and contracts."
       ~input: empty
@@ -388,9 +388,9 @@ module Operations = struct
     let name = "operation_id" in
     let descr =
       "A operation identifier in hexadecimal." in
-    let construct = Operation_hash.to_b48check in
+    let construct = Operation_hash.to_b58check in
     let destruct h =
-      try Ok (Operation_hash.of_b48check h)
+      try Ok (Operation_hash.of_b58check h)
       with _ -> Error "Can't parse hash" in
     RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
@@ -439,9 +439,9 @@ module Protocols = struct
     let name = "protocol_id" in
     let descr =
       "A protocol identifier in hexadecimal." in
-    let construct = Protocol_hash.to_b48check in
+    let construct = Protocol_hash.to_b58check in
     let destruct h =
-      try Ok (Protocol_hash.of_b48check h)
+      try Ok (Protocol_hash.of_b58check h)
       with _ -> Error "Can't parse hash" in
     RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
@@ -639,7 +639,7 @@ let complete =
     and construct s = s in
     RPC.Arg.make ~name:"prefix" ~destruct ~construct () in
   RPC.service
-    ~description: "Try to complete a prefix of a Base48Check-encoded data. \
+    ~description: "Try to complete a prefix of a Base58Check-encoded data. \
                    This RPC is actually able to complete hashes of \
                    block and hashes of operations."
     ~input: empty

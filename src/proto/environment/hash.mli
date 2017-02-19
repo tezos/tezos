@@ -40,14 +40,14 @@ module type HASH = sig
 
   include MINIMAL_HASH
 
-  val of_b48check: string -> t
-  val to_b48check: t -> string
-  val to_short_b48check: t -> string
+  val of_b58check: string -> t
+  val to_b58check: t -> string
+  val to_short_b58check: t -> string
   val encoding: t Data_encoding.t
   val pp: Format.formatter -> t -> unit
   val pp_short: Format.formatter -> t -> unit
-  type Base48.data += Hash of t
-  val b48check_encoding: t Base48.encoding
+  type Base58.data += Hash of t
+  val b58check_encoding: t Base58.encoding
 
 end
 
@@ -65,7 +65,7 @@ end
 
 module type PrefixedName = sig
   include Name
-  val b48check_prefix : string
+  val b58check_prefix : string
 end
 
 (** Builds a new Hash type using Sha256. *)
@@ -75,10 +75,11 @@ module Make_Blake2B
     (Register : sig
        val register_encoding:
          prefix: string ->
+         length: int ->
          to_raw: ('a -> string) ->
          of_raw: (string -> 'a option) ->
-         wrap: ('a -> Base48.data) ->
-         'a Base48.encoding
+         wrap: ('a -> Base58.data) ->
+         'a Base58.encoding
      end)
     (Name : PrefixedName) : HASH
 

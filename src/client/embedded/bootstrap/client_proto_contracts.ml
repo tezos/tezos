@@ -13,11 +13,11 @@ module RawContractAlias = Client_aliases.Alias (struct
     type t = Contract.t
     let encoding = Contract.encoding
     let of_source _ s =
-      match Contract.of_b48check s with
+      match Contract.of_b58check s with
       | Error _ -> Lwt.fail (Failure "bad contract notation")
       | Ok s -> Lwt.return s
     let to_source _ s =
-      Lwt.return (Contract.to_b48check s)
+      Lwt.return (Contract.to_b58check s)
     let name = "contract"
   end)
 
@@ -75,14 +75,14 @@ module ContractAlias = struct
              Lwt.catch
                (fun () -> find cctxt s)
                (fun _ ->
-                  match Contract.of_b48check s with
+                  match Contract.of_b58check s with
                   | Error _ -> Lwt.fail (Failure "bad contract notation")
                   | Ok v -> Lwt.return (s, v)))
       next
 
    let name cctxt contract =
      rev_find cctxt contract >|= function
-     | None -> Contract.to_b48check contract
+     | None -> Contract.to_b58check contract
      | Some name -> name
 
 end
@@ -148,14 +148,14 @@ let commands  () =
       (fun cctxt ->
          RawContractAlias.load cctxt >>= fun list ->
          Lwt_list.iter_s (fun (n, v) ->
-             let v = Contract.to_b48check v in
+             let v = Contract.to_b58check v in
              cctxt.message "%s: %s" n v)
            list >>= fun () ->
          Client_keys.Public_key_hash.load cctxt >>= fun list ->
          Lwt_list.iter_s (fun (n, v) ->
              RawContractAlias.mem cctxt n >>= fun mem ->
              let p = if mem then "key:" else "" in
-             let v = Contract.to_b48check (Contract.default_contract v) in
+             let v = Contract.to_b58check (Contract.default_contract v) in
              cctxt.message "%s%s: %s" p n v)
            list >>= fun () ->
          Lwt.return ()) ;

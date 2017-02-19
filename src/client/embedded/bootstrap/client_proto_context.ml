@@ -54,7 +54,7 @@ let list_contracts cctxt block =
       let kind = match Contract.is_default h with
         | Some _ -> " (default)"
         | None -> "" in
-      cctxt.message "%s%s%s" (Contract.to_b48check h) kind nm >>= fun () ->
+      cctxt.message "%s%s%s" (Contract.to_b58check h) kind nm >>= fun () ->
       return ())
     contracts
 

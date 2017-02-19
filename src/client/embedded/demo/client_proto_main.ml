@@ -8,8 +8,8 @@
 (**************************************************************************)
 
 let protocol =
-  Protocol_hash.of_b48check
-    "2gagsSEvTKAHRjxAamgSdBNkv39VtNCqpaDXrrH4K8R4KQAAHrhe3"
+  Protocol_hash.of_b58check
+    "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
 let demo cctxt =
   let block = Client_config.block () in

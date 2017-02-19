@@ -31,7 +31,10 @@ val display_paragraph: Format.formatter -> string -> unit
 (** [remove nb list] remove the first [nb] elements from the list [list]. *)
 val remove_elem_from_list: int -> 'a list -> 'a list
 
+val has_prefix: prefix:string -> string -> bool
 val remove_prefix: prefix:string -> string -> string option
+val common_prefix: string -> string -> int
+
 
 val filter_map: ('a -> 'b option) -> 'a list -> 'b list
 
