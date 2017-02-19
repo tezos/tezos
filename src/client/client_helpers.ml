@@ -18,14 +18,14 @@ let unique_arg =
 let commands () = Cli_entries.[
     command
       ~desc: "Lookup for the possible completion of a \
-              given prefix of Base48Check-encoded hash. This actually \
+              given prefix of Base58Check-encoded hash. This actually \
               works only for blocks, operations, public key and contract \
               identifiers."
       ~args: [unique_arg]
       (prefixes [ "complete" ] @@
        string
          ~name: "prefix"
-         ~desc: "the prefix of the Base48Check-encoded hash to be completed" @@
+         ~desc: "the prefix of the Base58Check-encoded hash to be completed" @@
        stop)
       (fun prefix cctxt ->
          Client_node_rpcs.complete cctxt ~block:(block ()) prefix >>= fun completions ->

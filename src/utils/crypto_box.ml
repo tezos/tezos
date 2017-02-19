@@ -18,12 +18,15 @@ type nonce = Sodium.Box.nonce
 type target = Z.t
 exception TargetNot256Bit
 
-module Public_key_hash = Hash.Make_Blake2B (Base48) (struct
+module Public_key_hash = Hash.Make_Blake2B (Base58) (struct
     let name = "Crypto_box.Public_key_hash"
     let title = "A Cryptobox public key ID"
-    let b48check_prefix = Base48.Prefix.cryptobox_public_key_hash
+    let b58check_prefix = Base58.Prefix.cryptobox_public_key_hash
     let size = Some 16
   end)
+
+let () =
+  Base58.check_encoded_prefix Public_key_hash.b58check_encoding "id" 30
 
 let hash pk =
   Public_key_hash.hash_bytes [Sodium.Box.Bigbytes.of_public_key pk]

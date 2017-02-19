@@ -300,7 +300,7 @@ let rec unparse_data
     | Timestamp_t, t ->
         String (-1, Timestamp.to_notation t)
     | Contract_t _, (_, _, c)  ->
-        String (-1, Contract.to_b48check c)
+        String (-1, Contract.to_b58check c)
     | Signature_t, s ->
         let text =
           Hex_encode.hex_encode
@@ -309,7 +309,7 @@ let rec unparse_data
     | Tez_t, v ->
         String (-1, Tez.to_string v)
     | Key_t, k ->
-        String (-1, Ed25519.Public_key_hash.to_b48check k)
+        String (-1, Ed25519.Public_key_hash.to_b58check k)
     | Pair_t (tl, tr), (l, r) ->
         let l = unparse_data tl l in
         let r = unparse_data tr r in
@@ -671,7 +671,7 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ String_kind ; Int_kind ], kind expr)))
     (* IDs *)
     | Key_t, String (_, s) -> begin try
-          return (Ed25519.Public_key_hash.of_b48check s)
+          return (Ed25519.Public_key_hash.of_b58check s)
         with _ -> fail (error ())
       end
     | Key_t, expr ->
@@ -691,7 +691,7 @@ let rec parse_data
     (* Contracts *)
     | Contract_t (ty1, ty2), String (loc, s) ->
         traced @@
-        (Lwt.return (Contract.of_b48check s)) >>=? fun c ->
+        (Lwt.return (Contract.of_b58check s)) >>=? fun c ->
         parse_contract ctxt ty1 ty2 loc c >>=? fun _ ->
         return (ty1, ty2, c)
     | Contract_t _, expr ->

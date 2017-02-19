@@ -137,7 +137,7 @@ let code_encoding =
 
 let hash_expr data =
   let bytes = Data_encoding.Binary.to_bytes expr_encoding data in
-  Script_expr_hash.(hash_bytes [ bytes ] |> to_b48check)
+  Script_expr_hash.(hash_bytes [ bytes ] |> to_b58check)
 
 type t =
   | No_script

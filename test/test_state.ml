@@ -15,12 +15,12 @@ let (//) = Filename.concat
 (** Basic blocks *)
 
 let genesis_block =
-  Block_hash.of_b48check
-    "eeeeeeeeeeeeeeefcF2dFpTjGjPAxRM3TqDrKkJf7DdkNHpX3DmaD"
+  Block_hash.of_b58check
+    "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 
 let genesis_protocol =
-  Protocol_hash.of_b48check
-    "2gagsSEvTKAHRjxAamgSdBNkv39VtNCqpaDXrrH4K8R4KQAAHrhe3"
+  Protocol_hash.of_b58check
+    "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
 let genesis_time =
   Time.of_seconds 0L

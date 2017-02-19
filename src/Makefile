@@ -36,7 +36,7 @@ $(addprefix proto/environment/, \
   error_monad.mli \
   logging.mli \
   time.mli \
-  base48.mli \
+  base58.mli \
   hash.mli \
   ed25519.mli \
   persist.mli \
@@ -150,7 +150,7 @@ minutils.cma: ${MINUTILS_LIB_IMPLS:.ml=.cmo}
 ############################################################################
 
 UTILS_LIB_INTFS := \
-  utils/base48.mli \
+  utils/base58.mli \
   utils/cli_entries.mli \
   utils/data_encoding_ezjsonm.mli \
   utils/crypto_box.mli \
@@ -166,7 +166,7 @@ UTILS_LIB_INTFS := \
   utils/ring.mli \
 
 UTILS_LIB_IMPLS := \
-  utils/base48.ml \
+  utils/base58.ml \
   utils/cli_entries.ml \
   utils/error_monad_sig.ml \
   utils/error_monad.ml \
@@ -189,6 +189,7 @@ UTILS_PACKAGES := \
   ezjsonm \
   ipaddr.unix \
   mtime.os \
+  nocrypto \
   sodium \
   zarith \
   $(COVERAGEPKG) \

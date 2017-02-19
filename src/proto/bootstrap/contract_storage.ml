@@ -42,7 +42,7 @@ let () =
     ~pp:(fun ppf (contract, exp, found) ->
         Format.fprintf ppf
           "Unexpected counter %ld for contract %s (expected %ld)"
-          found (Contract_repr.to_b48check contract) exp)
+          found (Contract_repr.to_b58check contract) exp)
     Data_encoding.
       (obj3
          (req "contract" Contract_repr.encoding)
@@ -309,4 +309,4 @@ let init c =
   Storage.Contract.Global_counter.init c 0l
 
 let pp fmt c =
-  Format.pp_print_string fmt (Contract_repr.to_b48check c)
+  Format.pp_print_string fmt (Contract_repr.to_b58check c)

@@ -12,8 +12,8 @@ module Ed25519 = Environment.Ed25519
 module Public_key_hash = Client_aliases.Alias (struct
     type t = Ed25519.Public_key_hash.t
     let encoding = Ed25519.Public_key_hash.encoding
-    let of_source _ s = Lwt.return (Ed25519.Public_key_hash.of_b48check s)
-    let to_source _ p = Lwt.return (Ed25519.Public_key_hash.to_b48check p)
+    let of_source _ s = Lwt.return (Ed25519.Public_key_hash.of_b58check s)
+    let to_source _ p = Lwt.return (Ed25519.Public_key_hash.to_b58check p)
     let name = "public key hash"
   end)
 

@@ -42,6 +42,7 @@
 /test/test-p2p-io-scheduler
 /test/test-p2p-connection
 /test/test-p2p-connection-pool
+/test/generate_hash
 /test/LOG
 
 *~

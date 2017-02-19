@@ -266,19 +266,19 @@ let create_register_file client file hash packname modules =
   create_file file
     (Printf.sprintf
        "module Packed_protocol = struct\n\
-       \  let hash = (%s.Protocol_hash.of_b48check %S)\n\
+       \  let hash = (%s.Protocol_hash.of_b58check %S)\n\
        \  type error = %s.error = ..\n\
        \  type 'a tzresult = 'a %s.tzresult\n\
        \  include %s.%s\n\
        \  let error_encoding  = %s.error_encoding  ()\n\
        \  let classify_errors = %s.classify_errors\n\
        \  let pp = %s.pp\n\
-       \  let complete_b48prefix = %s.complete
+       \  let complete_b58prefix = %s.complete
        \ end\n\
        \ %s\n\
        "
        hash_module
-       (Protocol_hash.to_b48check hash)
+       (Protocol_hash.to_b58check hash)
        error_monad_module
        error_monad_module
        packname (String.capitalize_ascii unit)

@@ -8,8 +8,8 @@
 (**************************************************************************)
 
 let protocol =
-  Protocol_hash.of_b48check
-    "4p64VagsbXchSF88eaPy5XrkqMLEjBCaSnaGv2vQkhv8e37Nnqmrd"
+  Protocol_hash.of_b58check
+    "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 
 let () =
   Client_commands.register protocol @@

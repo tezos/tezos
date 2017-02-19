@@ -17,12 +17,12 @@ let (//) = Filename.concat
 (** Basic blocks *)
 
 let genesis_block =
-  Block_hash.of_b48check
-    "eeeeeeeeeeeeeeefcF2dFpTjGjPAxRM3TqDrKkJf7DdkNHpX3DmaD"
+  Block_hash.of_b58check
+    "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 
 let genesis_protocol =
-  Protocol_hash.of_b48check
-    "2gagsSEvTKAHRjxAamgSdBNkv39VtNCqpaDXrrH4K8R4KQAAHrhe3"
+  Protocol_hash.of_b58check
+    "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
 let genesis_time =
   Time.of_seconds 0L
@@ -121,12 +121,13 @@ let test_expand (s: Store.store) =
       Block.full_set s bh2 b2 >>= fun () ->
       Block.full_set s bh3 b3 >>= fun () ->
       Block.full_set s bh3' b3 >>= fun () ->
-      Base48.complete (Block_hash.to_short_b48check bh1) >>= fun res ->
-      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b48check bh1] ;
-      Base48.complete (Block_hash.to_short_b48check bh2) >>= fun res ->
-      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b48check bh2] ;
-      Base48.complete (Block_hash.to_short_b48check bh3) >>= fun res ->
-      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b48check bh3] ;
+      Base58.complete (Block_hash.to_short_b58check bh1) >>= fun res ->
+      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b58check bh1] ;
+      Base58.complete (Block_hash.to_short_b58check bh2) >>= fun res ->
+      Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b58check bh2] ;
+      Base58.complete (Block_hash.to_short_b58check bh3) >>= fun res ->
+      Assert.equal_string_list ~msg:__LOC__ res
+        [Block_hash.to_b58check bh3' ; Block_hash.to_b58check bh3] ;
       Lwt.return_unit)
 
 

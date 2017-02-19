@@ -308,8 +308,8 @@ module Contract : sig
   type contract = t
   val arg: contract RPC.Arg.arg
 
-  val to_b48check: contract -> string
-  val of_b48check: string -> contract tzresult
+  val to_b58check: contract -> string
+  val of_b58check: string -> contract tzresult
 
   val default_contract: public_key_hash -> contract
   val is_default: contract -> public_key_hash option

@@ -16,8 +16,7 @@ module type REGISTRED_PROTOCOL = sig
   val hash: Protocol_hash.t
   include Protocol.PROTOCOL with type error := error
                              and type 'a tzresult := 'a tzresult
-  val complete_b48prefix :
-    ?alphabet:string -> Context.t -> string -> string list Lwt.t
+  val complete_b58prefix : Context.t -> string -> string list Lwt.t
 end
 
 type net_id = Store.net_id = Net of Block_hash.t
@@ -158,16 +157,16 @@ let create_files dir units =
   Lwt.return files
 
 let extract dirname hash units =
-  let source_dir = dirname // Protocol_hash.to_short_b48check hash // "src" in
+  let source_dir = dirname // Protocol_hash.to_short_b58check hash // "src" in
   create_files source_dir units >|= fun _files ->
   Tezos_compiler.Meta.to_file source_dir ~hash
     (List.map (fun {name} -> String.capitalize_ascii name) units)
 
 let do_compile hash units =
   let datadir = get_datadir () in
-  let source_dir = datadir // Protocol_hash.to_short_b48check hash // "src" in
-  let log_file = datadir // Protocol_hash.to_short_b48check hash // "LOG" in
-  let plugin_file = datadir // Protocol_hash.to_short_b48check hash //
+  let source_dir = datadir // Protocol_hash.to_short_b58check hash // "src" in
+  let log_file = datadir // Protocol_hash.to_short_b58check hash // "LOG" in
+  let plugin_file = datadir // Protocol_hash.to_short_b58check hash //
                     Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp hash
   in
   create_files source_dir units >>= fun _files ->
