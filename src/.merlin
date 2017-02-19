@@ -38,6 +38,7 @@ PKG ipv6-multicast
 PKG irmin
 PKG lwt
 PKG mtime.os
+PKG nocrypto
 PKG ocplib-endian
 PKG ocplib-json-typed
 PKG ocplib-ocamlres

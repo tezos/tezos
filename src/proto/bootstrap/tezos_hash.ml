@@ -8,48 +8,55 @@
 (**************************************************************************)
 
 module Prefix = struct
-  let make x =
-    assert (Compare.String.(Base48.Prefix.protocol_prefix = "\015")) ;
-    String.make 1 (char_of_int ((x lsl 4) lor 15))
-  let public_key_hash = make 0
-  let contract_hash = make 1
-  let nonce_hash = make 2
-  let script_expr_hash = make 3
-  let random_state_hash = make 15 (* never used... *)
+
+  (* 20 *)
+  let contract_hash = "\003\099\029" (* TZ(36) *)
+
+  (* 32 *)
+  let nonce_hash = "\069\220\169" (* nce(53) *)
+  let script_expr_hash = "\013\044\064\027" (* expr(54) *)
+  let random_state_hash = "\076\064\204" (* rng(53): never used... *)
+
 end
 
-module State_hash = Hash.Make_Blake2B(Base48)(struct
+module State_hash = Hash.Make_Blake2B(Base58)(struct
     let name = "random"
     let title = "A random generation state"
-    let b48check_prefix = Prefix.random_state_hash
+    let b58check_prefix = Prefix.random_state_hash
     let size = None
   end)
 module State_hash_set = Hash_set(State_hash)
 module State_hash_map = Hash_map(State_hash)
 
-module Nonce_hash = Hash.Make_Blake2B(Base48)(struct
+module Nonce_hash = Hash.Make_Blake2B(Base58)(struct
     let name = "cycle_nonce"
     let title = "A nonce hash"
-    let b48check_prefix = Prefix.nonce_hash
+    let b58check_prefix = Prefix.nonce_hash
     let size = None
   end)
 module Nonce_hash_set = Hash_set(Nonce_hash)
 module Nonce_hash_map = Hash_map(Nonce_hash)
 
-module Script_expr_hash = Hash.Make_Blake2B(Base48)(struct
+module Script_expr_hash = Hash.Make_Blake2B(Base58)(struct
     let name = "script_expr"
     let title = "A script expression ID"
-    let b48check_prefix = Prefix.script_expr_hash
+    let b58check_prefix = Prefix.script_expr_hash
     let size = None
   end)
 module Script_expr_hash_set = Hash_set(Script_expr_hash)
 module Script_expr_hash_map = Hash_map(Script_expr_hash)
 
-module Contract_hash = Hash.Make_Blake2B(Base48)(struct
+module Contract_hash = Hash.Make_Blake2B(Base58)(struct
     let name = "Contract_hash"
     let title = "A contract ID"
-    let b48check_prefix = Prefix.contract_hash
+    let b58check_prefix = Prefix.contract_hash
     let size = Some 20
   end)
 module Contract_hash_set = Hash_set(Contract_hash)
 module Contract_hash_map = Hash_map(Contract_hash)
+
+let () =
+  Base58.check_encoded_prefix Contract_hash.b58check_encoding "TZ1" 36 ;
+  Base58.check_encoded_prefix Script_expr_hash.b58check_encoding "expr" 54 ;
+  Base58.check_encoded_prefix Nonce_hash.b58check_encoding "nce" 53 ;
+  Base58.check_encoded_prefix State_hash.b58check_encoding "rng" 53

@@ -293,6 +293,12 @@ bisect:
 
 #####
 
+generate_hash: ../src/minutils/utils.cmx ../src/minutils/compare.cmx ../src/minutils/mBytes.cmx ../src/utils/base58.cmx ../src/minutils/hex_encode.cmx ../src/minutils/data_encoding.cmx ../src/utils/cli_entries.cmx ../src/utils/hash.cmx generate_hash.ml
+	ocamlfind ocamlopt -o $@ -linkpkg -package cstruct -package zarith -package ezjsonm -package sodium -package ocplib-json-typed.bson -package lwt.unix -package nocrypto -I ../src/utils/ -I ../src/minutils $^
+
+
+#####
+
 lib/assert.cmx: lib/assert.cmi
 lib/assert.cmi: ../src/node/db/persist.cmi
 

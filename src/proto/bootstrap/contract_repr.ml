@@ -24,12 +24,12 @@ type contract = t
 
 type error += Invalid_contract_notation of string
 
-let to_b48check = function
-  | Default pbk -> Ed25519.Public_key_hash.to_b48check pbk
-  | Hash h -> Contract_hash.to_b48check h
+let to_b58check = function
+  | Default pbk -> Ed25519.Public_key_hash.to_b58check pbk
+  | Hash h -> Contract_hash.to_b58check h
 
-let of_b48check s =
-  match Base48.decode s with
+let of_b58check s =
+  match Base58.decode s with
   | Some (Ed25519.Public_key_hash.Hash h) -> ok (Default h)
   | Some (Contract_hash.Hash h) -> ok (Hash h)
   | _ -> error (Invalid_contract_notation s)
@@ -57,9 +57,9 @@ let encoding =
         ])
     ~json:
       (conv
-         to_b48check
+         to_b58check
          (fun s ->
-            match of_b48check s with
+            match of_b58check s with
             | Ok s -> s
             | Error _ -> Json.cannot_destruct "Invalid contract notation.")
          string)
@@ -113,13 +113,13 @@ let generic_contract ~manager ~delegate ~spendable ~delegatable ~script =
       Hash (Contract_hash.hash_bytes [data])
 
 let arg =
-  let construct = to_b48check in
+  let construct = to_b58check in
   let destruct hash =
-    match of_b48check hash with
+    match of_b58check hash with
     | Error _ -> Error "Cannot parse contract id"
     | Ok contract -> Ok contract in
   RPC.Arg.make
-    ~descr: "A contract identifier encoded in b48check."
+    ~descr: "A contract identifier encoded in b58check."
     ~name: "contract_id"
     ~construct
     ~destruct

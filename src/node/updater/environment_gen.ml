@@ -55,8 +55,7 @@ module type PACKED_PROTOCOL = sig
   val error_encoding : error Data_encoding.t
   val classify_errors : error list -> [ `Branch | `Temporary | `Permanent ]
   val pp : Format.formatter -> error -> unit
-  val complete_b48prefix :
-    ?alphabet:string -> Context.t -> string -> string list Lwt.t
+  val complete_b58prefix : Context.t -> string -> string list Lwt.t
 end
 val __cast: (module PACKED_PROTOCOL) -> (module Protocol.PACKED_PROTOCOL)
 |}

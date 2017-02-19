@@ -19,7 +19,7 @@ let commands () =
     else
       Lwt.fail_with (dn ^ " is not a directory") in
   let check_hash _ ph =
-    Lwt.wrap1 Protocol_hash.of_b48check ph in
+    Lwt.wrap1 Protocol_hash.of_b58check ph in
   [
     command ~group ~desc: "list known protocols"
       (prefixes [ "list" ; "protocols" ] stop)

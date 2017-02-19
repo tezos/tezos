@@ -108,6 +108,11 @@ let rec remove_elem_from_list nb = function
   | l when nb <= 0 -> l
   | _ :: tl -> remove_elem_from_list (nb - 1) tl
 
+let has_prefix ~prefix s =
+  let x = String.length prefix in
+  let n = String.length s in
+  n >= x && String.sub s 0 x = prefix
+
 let remove_prefix ~prefix s =
   let x = String.length prefix in
   let n = String.length s in
@@ -115,6 +120,16 @@ let remove_prefix ~prefix s =
     Some (String.sub s x (n - x))
   else
     None
+
+let common_prefix s1 s2 =
+  let last = min (String.length s1) (String.length s2) in
+  let rec loop i =
+    if last <= i then last
+    else if s1.[i] = s2.[i] then
+      loop (i+1)
+    else
+      i in
+  loop 0
 
 let finalize f g = try let res = f () in g (); res with exn -> g (); raise exn
 

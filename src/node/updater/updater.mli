@@ -68,8 +68,7 @@ module type REGISTRED_PROTOCOL = sig
   (* exception Ecoproto_error of error list *)
   include Protocol.PROTOCOL with type error := error
                              and type 'a tzresult := 'a tzresult
-  val complete_b48prefix :
-    ?alphabet:string -> Context.t -> string -> string list Lwt.t
+  val complete_b58prefix : Context.t -> string -> string list Lwt.t
 end
 
 type component = Tezos_compiler.Protocol.component = {

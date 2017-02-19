@@ -57,14 +57,14 @@ module type HASH = sig
 
   include MINIMAL_HASH
 
-  val of_b48check: string -> t
-  val to_b48check: t -> string
-  val to_short_b48check: t -> string
+  val of_b58check: string -> t
+  val to_b58check: t -> string
+  val to_short_b58check: t -> string
   val encoding: t Data_encoding.t
   val pp: Format.formatter -> t -> unit
   val pp_short: Format.formatter -> t -> unit
-  type Base48.data += Hash of t
-  val b48check_encoding: t Base48.encoding
+  type Base58.data += Hash of t
+  val b58check_encoding: t Base58.encoding
 
 end
 
@@ -76,7 +76,7 @@ end
 
 module type PrefixedName = sig
   include Name
-  val b48check_prefix: string
+  val b58check_prefix: string
 end
 
 (*-- Type specific Hash builder ---------------------------------------------*)
@@ -188,31 +188,34 @@ end
 module Make_Blake2B (R : sig
     val register_encoding:
       prefix: string ->
+      length:int ->
       to_raw: ('a -> string) ->
       of_raw: (string -> 'a option) ->
-      wrap: ('a -> Base48.data) ->
-      'a Base48.encoding
+      wrap: ('a -> Base58.data) ->
+      'a Base58.encoding
   end) (K : PrefixedName) = struct
 
   include Make_minimal_Blake2B(K)
 
   (* Serializers *)
 
-  type Base48.data += Hash of t
+  type Base58.data += Hash of t
 
-  let b48check_encoding =
+  let b58check_encoding =
     R.register_encoding
-      ~prefix: K.b48check_prefix
+      ~prefix: K.b58check_prefix
+      ~length:size
       ~wrap: (fun s -> Hash s)
       ~of_raw:(fun h -> Some (of_string h)) ~to_raw:to_string
 
-  let of_b48check s =
-    match Base48.simple_decode b48check_encoding s with
+  let of_b58check s =
+    match Base58.simple_decode b58check_encoding s with
     | Some x -> x
     | None -> Format.kasprintf failwith "Unexpected hash (%s)" K.name
-  let to_b48check s = Base48.simple_encode b48check_encoding s
+  let to_b58check s = Base58.simple_encode b58check_encoding s
 
-  let to_short_b48check s = String.sub (to_b48check s) 0 12
+  let to_short_b58check s =
+    String.sub (to_b58check s) 0 (10 + 2 * String.length K.b58check_prefix)
 
   let encoding =
     let open Data_encoding in
@@ -220,17 +223,17 @@ module Make_Blake2B (R : sig
       ~binary:
         (conv to_bytes of_bytes (Fixed.bytes size))
       ~json:
-        (describe ~title: (K.title ^ " (Base48Check-encoded Sha256)") @@
-         conv to_b48check (Data_encoding.Json.wrap_error of_b48check) string)
+        (describe ~title: (K.title ^ " (Base58Check-encoded Sha256)") @@
+         conv to_b58check (Data_encoding.Json.wrap_error of_b58check) string)
 
   let param ?(name=K.name) ?(desc=K.title) t =
-    Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b48check str)) t
+    Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check str)) t
 
   let pp ppf t =
-    Format.pp_print_string ppf (to_b48check t)
+    Format.pp_print_string ppf (to_b58check t)
 
   let pp_short ppf t =
-    Format.pp_print_string ppf (to_short_b48check t)
+    Format.pp_print_string ppf (to_short_b58check t)
 
 end
 
@@ -268,10 +271,10 @@ module Hash_table (Hash : MINIMAL_HASH)
 (*-- Pre-instanciated hashes ------------------------------------------------*)
 
 module Block_hash =
-  Make_Blake2B (Base48) (struct
+  Make_Blake2B (Base58) (struct
     let name = "Block_hash"
     let title = "A Tezos block ID"
-    let b48check_prefix = Base48.Prefix.block_hash
+    let b58check_prefix = Base58.Prefix.block_hash
     let size = None
   end)
 
@@ -280,10 +283,10 @@ module Block_hash_map = Hash_map (Block_hash)
 module Block_hash_table = Hash_table (Block_hash)
 
 module Operation_hash =
-  Make_Blake2B (Base48) (struct
+  Make_Blake2B (Base58) (struct
     let name = "Operation_hash"
     let title = "A Tezos operation ID"
-    let b48check_prefix = Base48.Prefix.operation_hash
+    let b58check_prefix = Base58.Prefix.operation_hash
     let size = None
    end)
 
@@ -292,10 +295,10 @@ module Operation_hash_map = Hash_map (Operation_hash)
 module Operation_hash_table = Hash_table (Operation_hash)
 
 module Protocol_hash =
-  Make_Blake2B (Base48) (struct
+  Make_Blake2B (Base58) (struct
     let name = "Protocol_hash"
     let title = "A Tezos protocol ID"
-    let b48check_prefix = Base48.Prefix.protocol_hash
+    let b58check_prefix = Base58.Prefix.protocol_hash
     let size = None
   end)
 
@@ -310,3 +313,7 @@ module Generic_hash =
     let size = None
   end)
 
+let () =
+  Base58.check_encoded_prefix Block_hash.b58check_encoding "B" 51 ;
+  Base58.check_encoded_prefix Operation_hash.b58check_encoding "o" 51 ;
+  Base58.check_encoded_prefix Protocol_hash.b58check_encoding "P" 51

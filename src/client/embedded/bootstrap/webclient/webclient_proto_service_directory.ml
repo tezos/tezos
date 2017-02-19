@@ -22,5 +22,5 @@ let root =
   let root =
     RPC.register root Services.hash @@ fun block () ->
     Client_node_rpcs.(call_service1 cctxt Node_rpc_services.Blocks.hash block ()) >>= fun res ->
-    RPC.Answer.return (Hash.Block_hash.to_b48check res) in
+    RPC.Answer.return (Hash.Block_hash.to_b58check res) in
   root

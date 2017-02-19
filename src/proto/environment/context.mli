@@ -9,7 +9,6 @@ val get_genesis_time: t -> Time.t Lwt.t
 val get_genesis_block: t -> Block_hash.t Lwt.t
 
 val register_resolver:
-  'a Base48.encoding -> (t -> string -> 'a list Lwt.t) -> unit
+  'a Base58.encoding -> (t -> string -> 'a list Lwt.t) -> unit
 
-val complete:
-  ?alphabet:string -> t -> string -> string list Lwt.t
+val complete: t -> string -> string list Lwt.t

@@ -25,12 +25,15 @@ module Ed25519 = struct
   let append_signature key msg =
     MBytes.concat msg (sign key msg)
 
-  module Public_key_hash = Hash.Make_Blake2B(Base48)(struct
+  module Public_key_hash = Hash.Make_Blake2B(Base58)(struct
       let name = "Ed25519.Public_key_hash"
       let title = "An Ed25519 public key ID"
-      let b48check_prefix = Base48.Prefix.ed25519_public_key_hash
+      let b58check_prefix = Base58.Prefix.ed25519_public_key_hash
       let size = Some 20
     end)
+
+  let () =
+    Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz1" 36
 
   let hash v =
     Public_key_hash.hash_bytes
@@ -40,46 +43,54 @@ module Ed25519 = struct
     let secret, pub = Sodium.Sign.random_keypair () in
     (hash pub, pub, secret)
 
-  type Base48.data +=
+  type Base58.data +=
     | Public_key of public_key
     | Secret_key of secret_key
     | Signature of signature
 
-  let b48check_public_key_encoding =
-    Base48.register_encoding
-      ~prefix: Base48.Prefix.ed25519_public_key
+  let b58check_public_key_encoding =
+    Base58.register_encoding
+      ~prefix: Base58.Prefix.ed25519_public_key
+      ~length:Sodium.Sign.public_key_size
       ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_public_key x))
       ~of_raw:(fun x ->
           try Some (Sodium.Sign.Bytes.to_public_key (Bytes.of_string x))
           with _ -> None)
       ~wrap:(fun x -> Public_key x)
 
-  let b48check_secret_key_encoding =
-    Base48.register_encoding
-      ~prefix: Base48.Prefix.ed25519_secret_key
+  let b58check_secret_key_encoding =
+    Base58.register_encoding
+      ~prefix: Base58.Prefix.ed25519_secret_key
+      ~length:Sodium.Sign.secret_key_size
       ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_secret_key x))
       ~of_raw:(fun x ->
           try Some (Sodium.Sign.Bytes.to_secret_key (Bytes.of_string x))
           with _ -> None)
       ~wrap:(fun x -> Secret_key x)
 
-  let b48check_signature_encoding =
-    Base48.register_encoding
-      ~prefix: Base48.Prefix.ed25519_signature
+  let b58check_signature_encoding =
+    Base58.register_encoding
+      ~prefix: Base58.Prefix.ed25519_signature
+      ~length:Sodium.Sign.signature_size
       ~to_raw:MBytes.to_string
       ~of_raw:(fun s -> Some (MBytes.of_string s))
       ~wrap:(fun x -> Signature x)
+
+  let () =
+    Base58.check_encoded_prefix b58check_public_key_encoding "edpk" 54 ;
+    Base58.check_encoded_prefix b58check_secret_key_encoding "edsk" 98 ;
+    Base58.check_encoded_prefix b58check_signature_encoding "edsig" 99
 
   let public_key_encoding =
     let open Data_encoding in
     splitted
       ~json:
         (describe
-           ~title: "An Ed25519 public key (Base48Check encoded)" @@
+           ~title: "An Ed25519 public key (Base58Check encoded)" @@
          conv
-           (fun s -> Base48.simple_encode b48check_public_key_encoding s)
+           (fun s -> Base58.simple_encode b58check_public_key_encoding s)
            (fun s ->
-              match Base48.simple_decode b48check_public_key_encoding s with
+              match Base58.simple_decode b58check_public_key_encoding s with
               | Some x -> x
               | None -> Data_encoding.Json.cannot_destruct
                           "Ed25519 public key: unexpected prefix.")
@@ -95,11 +106,11 @@ module Ed25519 = struct
     splitted
       ~json:
         (describe
-           ~title: "An Ed25519 secret key (Base48Check encoded)" @@
+           ~title: "An Ed25519 secret key (Base58Check encoded)" @@
          conv
-           (fun s -> Base48.simple_encode b48check_secret_key_encoding s)
+           (fun s -> Base58.simple_encode b58check_secret_key_encoding s)
            (fun s ->
-              match Base48.simple_decode b48check_secret_key_encoding s with
+              match Base58.simple_decode b58check_secret_key_encoding s with
               | Some x -> x
               | None -> Data_encoding.Json.cannot_destruct
                           "Ed25519 secret key: unexpected prefix.")
@@ -115,11 +126,11 @@ module Ed25519 = struct
     splitted
       ~json:
         (describe
-           ~title: "An Ed25519 signature (Base48Check encoded)" @@
+           ~title: "An Ed25519 signature (Base58Check encoded)" @@
          conv
-           (fun s -> Base48.simple_encode b48check_signature_encoding s)
+           (fun s -> Base58.simple_encode b58check_signature_encoding s)
            (fun s ->
-              match Base48.simple_decode b48check_signature_encoding s with
+              match Base58.simple_decode b58check_signature_encoding s with
               | Some x -> x
               | None -> Data_encoding.Json.cannot_destruct
                           "Ed25519 signature: unexpected prefix.")
@@ -171,14 +182,17 @@ module Make(Param : sig val name: string end)() = struct
     include Error_monad.Make()
   end
   module Logging = Logging.Make(Param)
-  module Base48 = struct
-    include Base48
+  module Base58 = struct
+    include Base58
+    let simple_encode enc s = simple_encode enc s
+    let simple_decode enc s = simple_decode enc s
     include Make(struct type context = Context.t end)
+    let decode s = decode s
   end
   module Context = struct
     include Context
-    let register_resolver = Base48.register_resolver
-    let complete = Base48.complete
+    let register_resolver = Base58.register_resolver
+    let complete ctxt s = Base58.complete ctxt s
   end
 
   module type PACKED_PROTOCOL = sig
@@ -187,8 +201,7 @@ module Make(Param : sig val name: string end)() = struct
     val error_encoding : error Data_encoding.t
     val classify_errors : error list -> [ `Branch | `Temporary | `Permanent ]
     val pp : Format.formatter -> error -> unit
-    val complete_b48prefix :
-      ?alphabet:string -> Context.t -> string -> string list Lwt.t
+    val complete_b58prefix : Context.t -> string -> string list Lwt.t
   end
 
 end
