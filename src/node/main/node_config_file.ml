@@ -69,9 +69,9 @@ let default_net_limits : P2p.limits = {
   incoming_message_queue_size = None ;
   outgoing_message_queue_size = None ;
   known_points_history_size = 500 ;
-  known_gids_history_size = 500 ;
+  known_peer_ids_history_size = 500 ;
   max_known_points = Some (400, 300) ;
-  max_known_gids = Some (400, 300) ;
+  max_known_peer_ids = Some (400, 300) ;
 }
 
 let default_net = {
@@ -113,8 +113,8 @@ let limit : P2p.limits Data_encoding.t =
            read_buffer_size ; read_queue_size ; write_queue_size ;
            incoming_app_message_queue_size ;
            incoming_message_queue_size ; outgoing_message_queue_size ;
-           known_points_history_size ; known_gids_history_size ;
-           max_known_points ; max_known_gids ;
+           known_points_history_size ; known_peer_ids_history_size ;
+           max_known_points ; max_known_peer_ids ;
          } ->
       ( ( authentification_timeout, min_connections, expected_connections,
           max_connections, backlog, max_incoming_connections,
@@ -122,8 +122,8 @@ let limit : P2p.limits Data_encoding.t =
         ( read_buffer_size, read_queue_size, write_queue_size,
           incoming_app_message_queue_size,
           incoming_message_queue_size, outgoing_message_queue_size,
-          known_points_history_size, known_gids_history_size,
-          max_known_points, max_known_gids
+          known_points_history_size, known_peer_ids_history_size,
+          max_known_points, max_known_peer_ids
         )))
     (fun ( ( authentification_timeout, min_connections, expected_connections,
              max_connections, backlog, max_incoming_connections,
@@ -131,8 +131,8 @@ let limit : P2p.limits Data_encoding.t =
            ( read_buffer_size, read_queue_size, write_queue_size,
              incoming_app_message_queue_size,
              incoming_message_queue_size, outgoing_message_queue_size,
-             known_points_history_size, known_gids_history_size,
-             max_known_points, max_known_gids
+             known_points_history_size, known_peer_ids_history_size,
+             max_known_points, max_known_peer_ids
            ) ) ->
       { authentification_timeout ; min_connections ; expected_connections ;
         max_connections ; backlog ; max_incoming_connections ;
@@ -140,8 +140,8 @@ let limit : P2p.limits Data_encoding.t =
         read_buffer_size ; read_queue_size ; write_queue_size ;
         incoming_app_message_queue_size ;
         incoming_message_queue_size ; outgoing_message_queue_size ;
-        known_points_history_size ; known_gids_history_size ;
-        max_known_points ; max_known_gids
+        known_points_history_size ; known_peer_ids_history_size ;
+        max_known_points ; max_known_peer_ids
       })
     (merge_objs
        (obj8
@@ -169,10 +169,10 @@ let limit : P2p.limits Data_encoding.t =
           (opt "outgoing-message-queue-size" int31)
           (dft "known_points_history_size" uint16
              default_net_limits.known_points_history_size)
-          (dft "known_gids_history_size" uint16
+          (dft "known_peer_ids_history_size" uint16
              default_net_limits.known_points_history_size)
           (opt "max_known_points" (tup2 uint16 uint16))
-          (opt "max_known_gids" (tup2 uint16 uint16))
+          (opt "max_known_peer_ids" (tup2 uint16 uint16))
        ))
 
 let net =
@@ -303,9 +303,9 @@ let update
     max_known_points =
       Utils.first_some
         peer_table_size cfg.net.limits.max_known_points ;
-    max_known_gids =
+    max_known_peer_ids =
       Utils.first_some
-        peer_table_size cfg.net.limits.max_known_gids ;
+        peer_table_size cfg.net.limits.max_known_peer_ids ;
   } in
   let net : net = {
     expected_pow =

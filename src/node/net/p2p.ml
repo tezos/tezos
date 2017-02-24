@@ -62,9 +62,9 @@ type limits = {
   incoming_message_queue_size : int option ;
   outgoing_message_queue_size : int option ;
 
-  known_gids_history_size : int ;
+  known_peer_ids_history_size : int ;
   known_points_history_size : int ;
-  max_known_gids : (int * int) option ;
+  max_known_peer_ids : (int * int) option ;
   max_known_points : (int * int) option ;
 }
 
@@ -96,10 +96,10 @@ let create_connection_pool config limits meta_cfg msg_cfg io_sched =
     incoming_app_message_queue_size = limits.incoming_app_message_queue_size ;
     incoming_message_queue_size = limits.incoming_message_queue_size ;
     outgoing_message_queue_size = limits.outgoing_message_queue_size ;
-    known_gids_history_size = limits.known_gids_history_size ;
+    known_peer_ids_history_size = limits.known_peer_ids_history_size ;
     known_points_history_size = limits.known_points_history_size ;
     max_known_points = limits.max_known_points ;
-    max_known_gids = limits.max_known_gids ;
+    max_known_peer_ids = limits.max_known_peer_ids ;
   }
   in
   let pool =
@@ -173,7 +173,7 @@ module Real = struct
       welcome ;
     }
 
-  let gid { config } = config.identity.gid
+  let peer_id { config } = config.identity.peer_id
 
   let maintain { maintenance } () =
     P2p_maintenance.maintain maintenance
@@ -191,9 +191,9 @@ module Real = struct
 
   let connections { pool } () =
     P2p_connection_pool.fold_connections pool
-      ~init:[] ~f:(fun _gid c acc -> c :: acc)
-  let find_connection { pool } gid =
-    P2p_connection_pool.Gids.find_connection pool gid
+      ~init:[] ~f:(fun _peer_id c acc -> c :: acc)
+  let find_connection { pool } peer_id =
+    P2p_connection_pool.Peer_ids.find_connection pool peer_id
   let connection_info _net conn =
     P2p_connection_pool.connection_info conn
   let connection_stat _net conn =
@@ -201,9 +201,9 @@ module Real = struct
   let global_stat { pool } () =
     P2p_connection_pool.pool_stat pool
   let set_metadata { pool } conn meta =
-    P2p_connection_pool.Gids.set_metadata pool conn meta
+    P2p_connection_pool.Peer_ids.set_metadata pool conn meta
   let get_metadata { pool } conn =
-    P2p_connection_pool.Gids.get_metadata pool conn
+    P2p_connection_pool.Peer_ids.get_metadata pool conn
 
   let rec recv _net conn =
     P2p_connection_pool.read conn >>=? fun msg ->
@@ -216,7 +216,7 @@ module Real = struct
     let pipes =
       P2p_connection_pool.fold_connections
         net.pool ~init:[]
-        ~f:begin fun _gid conn acc ->
+        ~f:begin fun _peer_id conn acc ->
         (P2p_connection_pool.is_readable conn >>= function
           | Ok () -> Lwt.return (Some conn)
           | Error _ -> Lwt_utils.never_ending) :: acc
@@ -286,7 +286,7 @@ module Fake = struct
   }
   let connection_info = {
     Connection_info.incoming = false ;
-    gid = id.gid ;
+    peer_id = id.peer_id ;
     id_point = (Ipaddr.V6.unspecified, None) ;
     remote_socket_port = 0 ;
     versions = [] ;
@@ -295,17 +295,17 @@ module Fake = struct
 end
 
 type ('msg, 'meta) t = {
-  gid : Gid.t ;
+  peer_id : Peer_id.t ;
   maintain : unit -> unit Lwt.t ;
   roll : unit -> unit Lwt.t ;
   shutdown : unit -> unit Lwt.t ;
   connections : unit -> ('msg, 'meta) connection list ;
-  find_connection : Gid.t -> ('msg, 'meta) connection option ;
+  find_connection : Peer_id.t -> ('msg, 'meta) connection option ;
   connection_info : ('msg, 'meta) connection -> Connection_info.t ;
   connection_stat : ('msg, 'meta) connection -> Stat.t ;
   global_stat : unit -> Stat.t ;
-  get_metadata : Gid.t -> 'meta option ;
-  set_metadata : Gid.t -> 'meta -> unit ;
+  get_metadata : Peer_id.t -> 'meta option ;
+  set_metadata : Peer_id.t -> 'meta -> unit ;
   recv : ('msg, 'meta) connection -> 'msg tzresult Lwt.t ;
   recv_any : unit -> (('msg, 'meta) connection * 'msg) Lwt.t ;
   send : ('msg, 'meta) connection -> 'msg -> unit Lwt.t ;
@@ -318,7 +318,7 @@ type ('msg, 'meta) net = ('msg, 'meta) t
 let create ~config ~limits meta_cfg msg_cfg =
   Real.create ~config ~limits meta_cfg msg_cfg  >>= fun net ->
   Lwt.return {
-    gid = Real.gid net ;
+    peer_id = Real.peer_id net ;
     maintain = Real.maintain net ;
     roll = Real.roll net  ;
     shutdown = Real.shutdown net  ;
@@ -338,7 +338,7 @@ let create ~config ~limits meta_cfg msg_cfg =
   }
 
 let faked_network = {
-  gid = Fake.id.gid ;
+  peer_id = Fake.id.peer_id ;
   maintain = Lwt.return ;
   roll = Lwt.return ;
   shutdown = Lwt.return ;
@@ -357,7 +357,7 @@ let faked_network = {
   pool = None
 }
 
-let gid net = net.gid
+let peer_id net = net.peer_id
 let maintain net = net.maintain ()
 let roll net = net.roll ()
 let shutdown net = net.shutdown ()
@@ -404,19 +404,19 @@ module RPC = struct
         P2p_connection_pool.connect ~timeout pool point >>|? ignore
 
   module Connection = struct
-    let info net gid =
+    let info net peer_id =
       match net.pool with
       | None -> None
       | Some pool ->
           map_option
-            (P2p_connection_pool.Gids.find_connection pool gid)
+            (P2p_connection_pool.Peer_ids.find_connection pool peer_id)
             ~f:P2p_connection_pool.connection_info
 
-    let kick net gid wait =
+    let kick net peer_id wait =
       match net.pool with
       | None -> Lwt.return_unit
       | Some pool ->
-          match P2p_connection_pool.Gids.find_connection pool gid with
+          match P2p_connection_pool.Peer_ids.find_connection pool peer_id with
           | None -> Lwt.return_unit
           | Some conn -> P2p_connection_pool.disconnect ~wait conn
 
@@ -426,7 +426,7 @@ module RPC = struct
       | Some pool ->
           P2p_connection_pool.fold_connections
             pool ~init:[]
-            ~f:begin fun _gid c acc ->
+            ~f:begin fun _peer_id c acc ->
               P2p_connection_pool.connection_info c :: acc
             end
 
@@ -456,33 +456,33 @@ module RPC = struct
       trusted : bool ;
       greylisted_end : Time.t ;
       state : state ;
-      gid : Gid.t option ;
+      peer_id : Peer_id.t option ;
       last_failed_connection : Time.t option ;
-      last_rejected_connection : (Gid.t * Time.t) option ;
-      last_established_connection : (Gid.t * Time.t) option ;
-      last_disconnection : (Gid.t * Time.t) option ;
-      last_seen : (Gid.t * Time.t) option ;
+      last_rejected_connection : (Peer_id.t * Time.t) option ;
+      last_established_connection : (Peer_id.t * Time.t) option ;
+      last_disconnection : (Peer_id.t * Time.t) option ;
+      last_seen : (Peer_id.t * Time.t) option ;
       last_miss : Time.t option ;
     }
 
     let info_encoding =
       let open Data_encoding in
       conv
-        (fun { trusted ; greylisted_end ; state ; gid ;
+        (fun { trusted ; greylisted_end ; state ; peer_id ;
                last_failed_connection ; last_rejected_connection ;
                last_established_connection ; last_disconnection ;
                last_seen ; last_miss ;
              } ->
-          (trusted, greylisted_end, state, gid,
+          (trusted, greylisted_end, state, peer_id,
            last_failed_connection, last_rejected_connection,
            last_established_connection, last_disconnection,
            last_seen, last_miss)
         )
-        (fun (trusted, greylisted_end, state, gid,
+        (fun (trusted, greylisted_end, state, peer_id,
               last_failed_connection, last_rejected_connection,
               last_established_connection, last_disconnection,
               last_seen, last_miss) ->
-          { trusted ; greylisted_end ; state ; gid ;
+          { trusted ; greylisted_end ; state ; peer_id ;
             last_failed_connection ; last_rejected_connection ;
             last_established_connection ; last_disconnection ;
             last_seen ; last_miss ;
@@ -492,25 +492,25 @@ module RPC = struct
            (req "trusted" bool)
            (dft "greylisted_end" Time.encoding Time.epoch)
            (req "state" state_encoding)
-           (opt "gid" Gid.encoding)
+           (opt "peer_id" Peer_id.encoding)
            (opt "last_failed_connection" Time.encoding)
-           (opt "last_rejected_connection" (tup2 Gid.encoding Time.encoding))
-           (opt "last_established_connection" (tup2 Gid.encoding Time.encoding))
-           (opt "last_disconnection" (tup2 Gid.encoding Time.encoding))
-           (opt "last_seen" (tup2 Gid.encoding Time.encoding))
+           (opt "last_rejected_connection" (tup2 Peer_id.encoding Time.encoding))
+           (opt "last_established_connection" (tup2 Peer_id.encoding Time.encoding))
+           (opt "last_disconnection" (tup2 Peer_id.encoding Time.encoding))
+           (opt "last_seen" (tup2 Peer_id.encoding Time.encoding))
            (opt "last_miss" Time.encoding))
 
     let info_of_point_info i =
       let open P2p_connection_pool in
       let open P2p_connection_pool_types in
-      let state, gid = match Point_info.State.get i with
+      let state, peer_id = match Point_info.State.get i with
         | Requested _ -> Requested, None
-        | Accepted { current_gid } -> Accepted, Some current_gid
-        | Running { current_gid } -> Running, Some current_gid
+        | Accepted { current_peer_id } -> Accepted, Some current_peer_id
+        | Running { current_peer_id } -> Running, Some current_peer_id
         | Disconnected -> Disconnected, None in
       Point_info.{
         trusted = trusted i ;
-        state ; gid ;
+        state ; peer_id ;
         greylisted_end = greylisted_end i ;
         last_failed_connection = last_failed_connection i ;
         last_rejected_connection = last_rejected_connection i ;
@@ -568,7 +568,7 @@ module RPC = struct
 
   end
 
-  module Gid = struct
+  module Peer_id = struct
     type state =
       | Accepted
       | Running
@@ -631,22 +631,22 @@ module RPC = struct
               (opt "last_seen" (tup2 Id_point.encoding Time.encoding))
               (opt "last_miss" (tup2 Id_point.encoding Time.encoding))))
 
-    let info_of_gid_info pool i =
+    let info_of_peer_info pool i =
       let open P2p_connection_pool in
       let open P2p_connection_pool_types in
-      let state, id_point = match Gid_info.State.get i with
+      let state, id_point = match Peer_info.State.get i with
         | Accepted { current_point } -> Accepted, Some current_point
         | Running { current_point } -> Running, Some current_point
         | Disconnected -> Disconnected, None
       in
-      let gid = Gid_info.gid i in
-      let meta = Gid_info.metadata i in
+      let peer_id = Peer_info.peer_id i in
+      let meta = Peer_info.metadata i in
       let score = P2p_connection_pool.score pool meta in
       let stat =
-        match P2p_connection_pool.Gids.find_connection pool gid with
+        match P2p_connection_pool.Peer_ids.find_connection pool peer_id with
         | None -> Stat.empty
         | Some conn -> P2p_connection_pool.connection_stat conn
-      in Gid_info.{
+      in Peer_info.{
           score ;
           trusted = trusted i ;
           state ;
@@ -660,49 +660,49 @@ module RPC = struct
           last_miss = last_miss i ;
         }
 
-    let info net gid =
+    let info net peer_id =
       match net.pool with
       | None -> None
       | Some pool -> begin
-          match P2p_connection_pool.Gids.info pool gid with
-          | Some info -> Some (info_of_gid_info pool info)
+          match P2p_connection_pool.Peer_ids.info pool peer_id with
+          | Some info -> Some (info_of_peer_info pool info)
           | None -> None
         end
 
-    module Event = P2p_connection_pool_types.Gid_info.Event
+    module Event = P2p_connection_pool_types.Peer_info.Event
 
-    let events ?(max=max_int) ?(rev=false) net gid =
+    let events ?(max=max_int) ?(rev=false) net peer_id =
       match net.pool with
       | None -> []
       | Some pool ->
           unopt_map
-            (P2p_connection_pool.Gids.info pool gid)
+            (P2p_connection_pool.Peer_ids.info pool peer_id)
             ~default:[]
             ~f:begin fun gi ->
-              let evts = P2p_connection_pool_types.Gid_info.fold_events gi
+              let evts = P2p_connection_pool_types.Peer_info.fold_events gi
                   ~init:[] ~f:(fun a e -> e :: a) in
               (if rev then list_rev_sub else list_sub) evts max
             end
 
-    let watch net gid =
+    let watch net peer_id =
       match net.pool with
       | None -> raise Not_found
       | Some pool ->
-          match P2p_connection_pool.Gids.info pool gid with
+          match P2p_connection_pool.Peer_ids.info pool peer_id with
           | None -> raise Not_found
-          | Some gi -> P2p_connection_pool_types.Gid_info.watch gi
+          | Some gi -> P2p_connection_pool_types.Peer_info.watch gi
 
     let infos ?(restrict=[]) net =
       match net.pool with
       | None -> []
       | Some pool ->
-          P2p_connection_pool.Gids.fold_known pool
+          P2p_connection_pool.Peer_ids.fold_known pool
             ~init:[]
-            ~f:begin fun gid i a ->
-              let info = info_of_gid_info pool i in
+            ~f:begin fun peer_id i a ->
+              let info = info_of_peer_info pool i in
               match restrict with
-              | [] -> (gid, info) :: a
-              | _ when List.mem info.state restrict -> (gid, info) :: a
+              | [] -> (peer_id, info) :: a
+              | _ when List.mem info.state restrict -> (peer_id, info) :: a
               | _ -> a
             end
 

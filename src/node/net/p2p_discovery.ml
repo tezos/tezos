@@ -20,19 +20,19 @@ let inet_addr = Unix.inet_addr_of_string "ff0e::54:455a:3053"
 module Message = struct
 
   let encoding =
-    Data_encoding.(tup3 (Fixed.string 10) Gid.encoding int16)
+    Data_encoding.(tup3 (Fixed.string 10) Peer_id.encoding int16)
 
   let length = Data_encoding.Binary.fixed_length_exn encoding
 
-  let make gid port =
-    Data_encoding.Binary.to_bytes encoding ("DISCOMAGIC", gid, port)
+  let make peer_id port =
+    Data_encoding.Binary.to_bytes encoding ("DISCOMAGIC", peer_id, port)
 
 end
 
 (* Sends discover messages into space in an exponentially delayed loop,
    restartable using a condition *)
-let sender sock saddr my_gid inco_port cancelation restart =
-  let buf = Message.make my_gid inco_port in
+let sender sock saddr my_peer_id inco_port cancelation restart =
+  let buf = Message.make my_peer_id inco_port in
   let rec loop delay n =
     Lwt.catch
       (fun () ->
@@ -40,7 +40,7 @@ let sender sock saddr my_gid inco_port cancelation restart =
          Lwt.return_unit)
         (fun exn ->
           lwt_debug "(%a) error broadcasting a discovery request: %a"
-            Gid.pp my_gid Error_monad.pp (Exn exn)) >>= fun () ->
+            Peer_id.pp my_peer_id Error_monad.pp (Exn exn)) >>= fun () ->
     Lwt.pick
       [ (Lwt_unix.sleep delay >>= fun () -> Lwt.return (Some (delay, n + 1))) ;
         (cancelation () >>= fun () -> Lwt.return_none) ;
@@ -66,7 +66,7 @@ module Answerer = struct
 
   (* Launch an answer machine for the discovery mechanism, takes a
      callback to fill the answers and returns a canceler function *)
-  let answerer sock my_gid cancelation callback =
+  let answerer sock my_peer_id cancelation callback =
     (* the answering function *)
     let buf = MBytes.create Message.length in
     let rec step () =
@@ -78,8 +78,8 @@ module Answerer = struct
       | Some (len', Lwt_unix.ADDR_INET (remote_addr, _mcast_port))
         when len' = Message.length -> begin
           match (Data_encoding.Binary.of_bytes Message.encoding buf) with
-          | Some ("DISCOMAGIC", remote_gid, remote_inco_port)
-            when remote_gid <> my_gid ->
+          | Some ("DISCOMAGIC", remote_peer_id, remote_inco_port)
+            when remote_peer_id <> my_peer_id ->
               Lwt.catch
                 (fun () -> callback ~remote_addr ~remote_inco_port)
                 (fun exn ->
@@ -101,8 +101,8 @@ module Answerer = struct
     Lwt.catch
       (fun () ->
          Lwt_utils.worker
-           (Format.asprintf "(%a) discovery answerer" Gid.pp my_gid)
-           (fun () -> answerer fd my_gid cancelation callback)
+           (Format.asprintf "(%a) discovery answerer" Peer_id.pp my_peer_id)
+           (fun () -> answerer fd my_peer_id cancelation callback)
            cancel)
       (fun exn ->
          lwt_log_error "Discovery answerer not started: %a"
@@ -117,9 +117,9 @@ let discovery_sender =
         (fun () ->
            let sender () =
              Discovery.sender fd
-               saddr my_gid inco_port cancelation restart_discovery in
+               saddr my_peer_id inco_port cancelation restart_discovery in
            Lwt_utils.worker
-             (Format.asprintf "(%a) discovery sender" Gid.pp my_gid)
+             (Format.asprintf "(%a) discovery sender" Peer_id.pp my_peer_id)
              sender cancel)
         (fun exn ->
            lwt_log_error "Discovery sender not started: %a"

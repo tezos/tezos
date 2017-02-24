@@ -25,8 +25,8 @@ type connection
 (** Access the domain of active connections *)
 val connections : net -> connection list
 
-(** Return the active connection with identity [gid] *)
-val find_connection : net -> Gid.t -> connection option
+(** Return the active connection with identity [peer_id] *)
+val find_connection : net -> Peer_id.t -> connection option
 
 (** Access the info of an active connection. *)
 val connection_info : net -> connection -> Connection_info.t
@@ -35,8 +35,8 @@ val connection_info : net -> connection -> Connection_info.t
 
 type metadata = unit
 
-val get_metadata : net -> Gid.t -> metadata option
-val set_metadata : net -> Gid.t -> metadata -> unit
+val get_metadata : net -> Peer_id.t -> metadata option
+val set_metadata : net -> Peer_id.t -> metadata -> unit
 
 type net_id = Store.net_id
 
@@ -91,8 +91,8 @@ module RPC : sig
   val connect : net -> Point.t -> float -> unit tzresult Lwt.t
 
   module Connection : sig
-    val info : net -> Gid.t -> Connection_info.t option
-    val kick : net -> Gid.t -> bool -> unit Lwt.t
+    val info : net -> Peer_id.t -> Connection_info.t option
+    val kick : net -> Peer_id.t -> bool -> unit Lwt.t
     val list : net -> Connection_info.t list
     val count : net -> int
   end
@@ -107,13 +107,13 @@ module RPC : sig
     val watch : net -> Point.t -> Event.t Lwt_stream.t * Watcher.stopper
   end
 
-  module Gid : sig
-    open P2p.RPC.Gid
+  module Peer_id : sig
+    open P2p.RPC.Peer_id
     module Event = Event
 
-    val info : net -> Gid.t -> info option
-    val events : ?max:int -> ?rev:bool -> net -> Gid.t -> Event.t list
-    val infos : ?restrict:state list -> net -> (Gid.t * info) list
-    val watch : net -> Gid.t -> Event.t Lwt_stream.t * Watcher.stopper
+    val info : net -> Peer_id.t -> info option
+    val events : ?max:int -> ?rev:bool -> net -> Peer_id.t -> Event.t list
+    val infos : ?restrict:state list -> net -> (Peer_id.t * info) list
+    val watch : net -> Peer_id.t -> Event.t Lwt_stream.t * Watcher.stopper
   end
 end

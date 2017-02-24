@@ -54,7 +54,7 @@ type config = {
 
   peers_file : string ;
   (** The path to the JSON file where the metadata associated to
-      gids are loaded / stored. *)
+      peer_ids are loaded / stored. *)
 
   closed_network : bool ;
   (** If [true], the only accepted connections are from peers whose
@@ -93,8 +93,8 @@ type config = {
   (** Size of the outgoing message queue internal to a peer's Writer
       (See [P2p_connection.accept]). *)
 
-  known_gids_history_size : int ;
-  (** Size of the known gids log buffer (default: 50) *)
+  known_peer_ids_history_size : int ;
+  (** Size of the known peer_ids log buffer (default: 50) *)
   known_points_history_size : int ;
   (** Size of the known points log buffer (default: 50) *)
 
@@ -106,8 +106,8 @@ type config = {
       disconnected points, older first, to try to reach the amount of
       connections indicated by the second integer. *)
 
-  max_known_gids : (int * int) option ;
-  (** Like [max_known_points], but for known gids. *)
+  max_known_peer_ids : (int * int) option ;
+  (** Like [max_known_points], but for known peer_ids. *)
 }
 
 type 'meta meta_config = {
@@ -174,7 +174,7 @@ module LogEvent : sig
     | Too_many_connections
 
     | New_point of Point.t
-    | New_peer of Gid.t
+    | New_peer of Peer_id.t
 
     (** Connection-level events *)
 
@@ -185,25 +185,25 @@ module LogEvent : sig
     | Authentication_failed of Point.t
     (** Remote point failed authentication *)
 
-    | Accepting_request of Point.t * Id_point.t * Gid.t
+    | Accepting_request of Point.t * Id_point.t * Peer_id.t
     (** We accepted a connection after authentifying the remote peer. *)
-    | Rejecting_request of Point.t * Id_point.t * Gid.t
+    | Rejecting_request of Point.t * Id_point.t * Peer_id.t
     (** We rejected a connection after authentifying the remote peer. *)
-    | Request_rejected of Point.t * (Id_point.t * Gid.t) option
+    | Request_rejected of Point.t * (Id_point.t * Peer_id.t) option
     (** The remote peer rejected our connection. *)
 
-    | Connection_established of Id_point.t * Gid.t
+    | Connection_established of Id_point.t * Peer_id.t
     (** We succesfully established a authentified connection. *)
 
-    | Disconnection of Gid.t
+    | Disconnection of Peer_id.t
     (** We decided to close the connection. *)
-    | External_disconnection of Gid.t
+    | External_disconnection of Peer_id.t
     (** The connection was closed for external reason. *)
 
     | Gc_points
     (** Garbage correction of known point table has been triggered. *)
-    | Gc_gids
-    (** Garbage correction of known gids table has been triggered. *)
+    | Gc_peer_ids
+    (** Garbage correction of known peer_ids table has been triggered. *)
 
   val encoding : t Data_encoding.t
 end
@@ -224,7 +224,7 @@ type ('msg, 'meta) connection
 type error += Pending_connection
 type error += Connected
 type error += Connection_refused
-type error += Rejected of Gid.t
+type error += Rejected of Peer_id.t
 type error += Too_many_connections
 type error += Closed_network
 
@@ -254,7 +254,7 @@ val connection_stat:  ('msg, 'meta) connection -> Stat.t
 val fold_connections:
   ('msg, 'meta) pool ->
   init:'a ->
-  f:(Gid.t ->  ('msg, 'meta) connection -> 'a -> 'a) ->
+  f:(Peer_id.t ->  ('msg, 'meta) connection -> 'a -> 'a) ->
   'a
 
 (** {1 I/O on connections} *)
@@ -291,36 +291,36 @@ val broadcast_bootstrap_msg:  ('msg, 'meta) pool -> unit
 (** [write_all pool msg] is [P2P_connection.write_now conn Bootstrap]
     for all member connections to [pool] in [Running] state. *)
 
-(** {1 Functions on [Gid]} *)
+(** {1 Functions on [Peer_id]} *)
 
-module Gids : sig
+module Peer_ids : sig
 
-  type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) Gid_info.t
+  type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) Peer_info.t
 
   val info:
-    ('msg, 'meta) pool -> Gid.t -> ('msg, 'meta) info option
+    ('msg, 'meta) pool -> Peer_id.t -> ('msg, 'meta) info option
 
-  val get_metadata: ('msg, 'meta) pool -> Gid.t -> 'meta option
-  val set_metadata: ('msg, 'meta) pool -> Gid.t -> 'meta -> unit
-  val get_score: ('msg, 'meta) pool -> Gid.t -> float option
+  val get_metadata: ('msg, 'meta) pool -> Peer_id.t -> 'meta option
+  val set_metadata: ('msg, 'meta) pool -> Peer_id.t -> 'meta -> unit
+  val get_score: ('msg, 'meta) pool -> Peer_id.t -> float option
 
-  val get_trusted: ('msg, 'meta) pool -> Gid.t -> bool
-  val set_trusted: ('msg, 'meta) pool -> Gid.t -> unit
-  val unset_trusted: ('msg, 'meta) pool -> Gid.t -> unit
+  val get_trusted: ('msg, 'meta) pool -> Peer_id.t -> bool
+  val set_trusted: ('msg, 'meta) pool -> Peer_id.t -> unit
+  val unset_trusted: ('msg, 'meta) pool -> Peer_id.t -> unit
 
   val find_connection:
-    ('msg, 'meta) pool -> Gid.t ->  ('msg, 'meta) connection option
+    ('msg, 'meta) pool -> Peer_id.t ->  ('msg, 'meta) connection option
 
   val fold_known:
     ('msg, 'meta) pool ->
     init:'a ->
-    f:(Gid.t ->  ('msg, 'meta) info -> 'a -> 'a) ->
+    f:(Peer_id.t ->  ('msg, 'meta) info -> 'a -> 'a) ->
     'a
 
   val fold_connected:
     ('msg, 'meta) pool ->
     init:'a ->
-    f:(Gid.t ->  ('msg, 'meta) info -> 'a -> 'a) ->
+    f:(Peer_id.t ->  ('msg, 'meta) info -> 'a -> 'a) ->
     'a
 
 end

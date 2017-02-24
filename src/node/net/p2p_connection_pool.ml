@@ -11,9 +11,9 @@
 
 (* TODO do not recompute list_known_points at each requests...  but
         only once in a while, e.g. every minutes or when a point
-        or the associated gid is blacklisted. *)
+        or the associated peer_id is blacklisted. *)
 
-(* TODO allow to track "requested gids" when we reconnect to a point. *)
+(* TODO allow to track "requested peer_ids" when we reconnect to a point. *)
 
 open P2p_types
 open P2p_connection_pool_types
@@ -130,19 +130,19 @@ module LogEvent = struct
     | Too_few_connections
     | Too_many_connections
     | New_point of Point.t
-    | New_peer of Gid.t
+    | New_peer of Peer_id.t
     | Incoming_connection of Point.t
     | Outgoing_connection of Point.t
     | Authentication_failed of Point.t
-    | Accepting_request of Point.t * Id_point.t * Gid.t
-    | Rejecting_request of Point.t * Id_point.t * Gid.t
-    | Request_rejected of Point.t * (Id_point.t * Gid.t) option
-    | Connection_established of Id_point.t * Gid.t
-    | Disconnection of Gid.t
-    | External_disconnection of Gid.t
+    | Accepting_request of Point.t * Id_point.t * Peer_id.t
+    | Rejecting_request of Point.t * Id_point.t * Peer_id.t
+    | Request_rejected of Point.t * (Id_point.t * Peer_id.t) option
+    | Connection_established of Id_point.t * Peer_id.t
+    | Disconnection of Peer_id.t
+    | External_disconnection of Peer_id.t
 
     | Gc_points
-    | Gc_gids
+    | Gc_peer_ids
 
   let encoding =
     let open Data_encoding in
@@ -162,7 +162,7 @@ module LogEvent = struct
         (function New_point p -> Some p | _ -> None)
         (fun p -> New_point p) ;
       case ~tag:3 (branch_encoding "new_peer"
-                     (obj1 (req "gid" Gid.encoding)))
+                     (obj1 (req "peer_id" Peer_id.encoding)))
         (function New_peer p -> Some p | _ -> None)
         (fun p -> New_peer p) ;
       case ~tag:4 (branch_encoding "incoming_connection"
@@ -181,42 +181,42 @@ module LogEvent = struct
                      (obj3
                         (req "point" Point.encoding)
                         (req "id_point" Id_point.encoding)
-                        (req "gid" Gid.encoding)))
+                        (req "peer_id" Peer_id.encoding)))
         (function Accepting_request (p, id_p, g) -> Some (p, id_p, g) | _ -> None)
         (fun (p, id_p, g) -> Accepting_request (p, id_p, g)) ;
       case ~tag:8 (branch_encoding "rejecting_request"
                      (obj3
                         (req "point" Point.encoding)
                         (req "id_point" Id_point.encoding)
-                        (req "gid" Gid.encoding)))
+                        (req "peer_id" Peer_id.encoding)))
         (function Rejecting_request (p, id_p, g) -> Some (p, id_p, g) | _ -> None)
         (fun (p, id_p, g) -> Rejecting_request (p, id_p, g)) ;
       case ~tag:9 (branch_encoding "request_rejected"
                      (obj2
                         (req "point" Point.encoding)
-                        (opt "identity" (tup2 Id_point.encoding Gid.encoding))))
+                        (opt "identity" (tup2 Id_point.encoding Peer_id.encoding))))
         (function Request_rejected (p, id) -> Some (p, id) | _ -> None)
         (fun (p, id) -> Request_rejected (p, id)) ;
       case ~tag:10 (branch_encoding "connection_established"
                       (obj2
                          (req "id_point" Id_point.encoding)
-                         (req "gid" Gid.encoding)))
+                         (req "peer_id" Peer_id.encoding)))
         (function Connection_established (id_p, g) -> Some (id_p, g) | _ -> None)
         (fun (id_p, g) -> Connection_established (id_p, g)) ;
       case ~tag:11 (branch_encoding "disconnection"
-                      (obj1 (req "gid" Gid.encoding)))
+                      (obj1 (req "peer_id" Peer_id.encoding)))
         (function Disconnection g -> Some g | _ -> None)
         (fun g -> Disconnection g) ;
       case ~tag:12 (branch_encoding "external_disconnection"
-                      (obj1 (req "gid" Gid.encoding)))
+                      (obj1 (req "peer_id" Peer_id.encoding)))
         (function External_disconnection g -> Some g | _ -> None)
         (fun g -> External_disconnection g) ;
       case ~tag:13 (branch_encoding "gc_points" empty)
         (function Gc_points -> Some () | _ -> None)
         (fun () -> Gc_points) ;
-      case ~tag:14 (branch_encoding "gc_gids" empty)
-        (function Gc_gids -> Some () | _ -> None)
-        (fun () -> Gc_gids) ;
+      case ~tag:14 (branch_encoding "gc_peer_ids" empty)
+        (function Gc_peer_ids -> Some () | _ -> None)
+        (fun () -> Gc_peer_ids) ;
     ]
 
   let log watcher event = Watcher.notify watcher event
@@ -224,23 +224,23 @@ module LogEvent = struct
   let too_few_connections watcher = log watcher Too_few_connections
   let too_many_connections watcher = log watcher Too_many_connections
   let new_point watcher ~point = log watcher (New_point point)
-  let new_peer watcher ~gid = log watcher (New_peer gid)
+  let new_peer watcher ~peer_id = log watcher (New_peer peer_id)
   let incoming_connection watcher ~point = log watcher (Incoming_connection point)
   let outgoing_connection  watcher ~point = log watcher (Outgoing_connection point)
   let authentication_failed watcher ~point = log watcher (Authentication_failed point)
-  let accepting_request watcher ~id_point ~point ~gid =
-    log watcher (Accepting_request (point, id_point, gid))
-  let rejecting_request watcher ~id_point ~point ~gid =
-    log watcher (Rejecting_request (point, id_point, gid))
+  let accepting_request watcher ~id_point ~point ~peer_id =
+    log watcher (Accepting_request (point, id_point, peer_id))
+  let rejecting_request watcher ~id_point ~point ~peer_id =
+    log watcher (Rejecting_request (point, id_point, peer_id))
   let request_rejected watcher ?credentials ~point =
     log watcher (Request_rejected (point, credentials))
-  let connection_established watcher ~id_point ~gid =
-    log watcher (Connection_established (id_point, gid))
-  let disconnection watcher ~is_external ~gid =
-    log watcher (if is_external then External_disconnection gid
-              else Disconnection gid)
+  let connection_established watcher ~id_point ~peer_id =
+    log watcher (Connection_established (id_point, peer_id))
+  let disconnection watcher ~is_external ~peer_id =
+    log watcher (if is_external then External_disconnection peer_id
+              else Disconnection peer_id)
   let gc_points watcher = log watcher Gc_points
-  let gc_gids watcher = log watcher Gc_gids
+  let gc_peer_ids watcher = log watcher Gc_peer_ids
 end
 
 type config = {
@@ -262,10 +262,10 @@ type config = {
   incoming_message_queue_size : int option ;
   outgoing_message_queue_size : int option ;
 
-  known_gids_history_size : int ;
+  known_peer_ids_history_size : int ;
   known_points_history_size : int ;
   max_known_points : (int * int) option ; (* max, gc target *)
-  max_known_gids : (int * int) option ; (* max, gc target *)
+  max_known_peer_ids : (int * int) option ; (* max, gc target *)
 }
 
 type 'meta meta_config = {
@@ -284,8 +284,8 @@ type ('msg, 'meta) t = {
   meta_config : 'meta meta_config ;
   message_config : 'msg message_config ;
   my_id_points : unit Point.Table.t ;
-  known_gids : (('msg, 'meta) connection, 'meta) Gid_info.t Gid.Table.t ;
-  connected_gids : (('msg, 'meta) connection, 'meta) Gid_info.t Gid.Table.t ;
+  known_peer_ids : (('msg, 'meta) connection, 'meta) Peer_info.t Peer_id.Table.t ;
+  connected_peer_ids : (('msg, 'meta) connection, 'meta) Peer_info.t Peer_id.Table.t ;
   known_points : ('msg, 'meta) connection Point_info.t Point.Table.t ;
   connected_points : ('msg, 'meta) connection Point_info.t Point.Table.t ;
   incoming : Canceler.t Point.Table.t ;
@@ -307,7 +307,7 @@ and ('msg, 'meta) connection = {
   canceler : Canceler.t ;
   messages : (int * 'msg) Lwt_pipe.t ;
   conn : 'msg Message.t P2p_connection.t ;
-  gid_info : (('msg, 'meta) connection, 'meta) Gid_info.t ;
+  peer_info : (('msg, 'meta) connection, 'meta) Peer_info.t ;
   point_info : ('msg, 'meta) connection Point_info.t option ;
   answerer : 'msg Answerer.t ;
   mutable wait_close : bool ;
@@ -366,57 +366,57 @@ let register_point pool ?trusted (addr, port as point) =
   | pi -> pi
 
 
-(* Bounded table used to garbage collect gid infos when needed. The
-   strategy used is to remove the info of the gid with the lowest
+(* Bounded table used to garbage collect peer_id infos when needed. The
+   strategy used is to remove the info of the peer_id with the lowest
    score first. In case of equality, the info of the most recent added
-   gid is removed. The rationale behind this choice is that in the
+   peer_id is removed. The rationale behind this choice is that in the
    case of a flood attack, the newly added infos will probably belong
-   to gids with the same (low) score and removing the most recent ones
-   ensure that older (and probably legit) gid infos are kept. *)
-module GcGidSet = Utils.Bounded(struct
-    type t = float * Time.t * Gid.t
+   to peer_ids with the same (low) score and removing the most recent ones
+   ensure that older (and probably legit) peer_id infos are kept. *)
+module GcPeer_idSet = Utils.Bounded(struct
+    type t = float * Time.t * Peer_id.t
     let compare (s, t, _) (s', t', _) =
       let score_cmp = Pervasives.compare s s' in
       if score_cmp = 0 then Time.compare t t' else - score_cmp
   end)
 
-let gc_gids ({ meta_config = { score } ;
-              config = { max_known_gids } ;
-              known_gids ; } as pool) =
-  match max_known_gids with
+let gc_peer_ids ({ meta_config = { score } ;
+              config = { max_known_peer_ids } ;
+              known_peer_ids ; } as pool) =
+  match max_known_peer_ids with
   | None -> ()
   | Some (_, target) ->
-      let table = GcGidSet.create target in
-      Gid.Table.iter (fun gid gid_info ->
-          let created = Gid_info.created gid_info in
-          let score = score @@ Gid_info.metadata gid_info in
-          GcGidSet.insert (score, created, gid) table
-        ) known_gids ;
-      let to_remove = GcGidSet.get table in
-      ListLabels.iter to_remove ~f:begin fun (_, _, gid) ->
-        Gid.Table.remove known_gids gid
+      let table = GcPeer_idSet.create target in
+      Peer_id.Table.iter (fun peer_id peer_info ->
+          let created = Peer_info.created peer_info in
+          let score = score @@ Peer_info.metadata peer_info in
+          GcPeer_idSet.insert (score, created, peer_id) table
+        ) known_peer_ids ;
+      let to_remove = GcPeer_idSet.get table in
+      ListLabels.iter to_remove ~f:begin fun (_, _, peer_id) ->
+        Peer_id.Table.remove known_peer_ids peer_id
       end ;
-      LogEvent.gc_gids pool.watcher
+      LogEvent.gc_peer_ids pool.watcher
 
-let register_peer pool gid =
-  match Gid.Table.find pool.known_gids gid with
+let register_peer pool peer_id =
+  match Peer_id.Table.find pool.known_peer_ids peer_id with
   | exception Not_found ->
       Lwt_condition.broadcast pool.events.new_peer () ;
-      let peer = Gid_info.create gid ~metadata:pool.meta_config.initial in
-      iter_option pool.config.max_known_gids ~f:begin fun (max, _) ->
-        if Gid.Table.length pool.known_gids >= max then gc_gids pool
+      let peer = Peer_info.create peer_id ~metadata:pool.meta_config.initial in
+      iter_option pool.config.max_known_peer_ids ~f:begin fun (max, _) ->
+        if Peer_id.Table.length pool.known_peer_ids >= max then gc_peer_ids pool
       end ;
-      Gid.Table.add pool.known_gids gid peer ;
-      LogEvent.new_peer pool.watcher gid ;
+      Peer_id.Table.add pool.known_peer_ids peer_id peer ;
+      LogEvent.new_peer pool.watcher peer_id ;
       peer
   | peer -> peer
 
-let register_new_point pool _gid point =
+let register_new_point pool _peer_id point =
   if not (Point.Table.mem pool.my_id_points point) then
     ignore (register_point pool point)
 
-let register_new_points pool gid points =
-  List.iter (register_new_point pool gid) points ;
+let register_new_points pool peer_id points =
+  List.iter (register_new_point pool peer_id) points ;
   Lwt.return_unit
 
 let compare_known_point_info p1 p2 =
@@ -439,17 +439,17 @@ let compare_known_point_info p1 p2 =
   | true, false -> 1
   | true, true -> compare_last_seen p2 p1
 
-let list_known_points pool _gid () =
+let list_known_points pool _peer_id () =
   let knowns =
     Point.Table.fold (fun _ pi acc -> pi :: acc) pool.known_points [] in
   let best_knowns =
     Utils.take_n ~compare:compare_known_point_info 50 knowns in
   Lwt.return (List.map Point_info.point best_knowns)
 
-let active_connections pool = Gid.Table.length pool.connected_gids
+let active_connections pool = Peer_id.Table.length pool.connected_peer_ids
 
 let create_connection pool conn id_point pi gi _version =
-  let gid = Gid_info.gid gi in
+  let peer_id = Peer_info.peer_id gi in
   let canceler = Canceler.create () in
   let size =
     map_option pool.config.incoming_app_message_queue_size
@@ -458,32 +458,32 @@ let create_connection pool conn id_point pi gi _version =
   let callback =
     { Answerer.message =
         (fun size msg -> Lwt_pipe.push messages (size, msg)) ;
-      advertise = register_new_points pool gid ;
-      bootstrap = list_known_points pool gid ;
+      advertise = register_new_points pool peer_id ;
+      bootstrap = list_known_points pool peer_id ;
     } in
   let answerer = Answerer.run conn canceler callback in
   let conn =
-    { conn ; point_info = pi ; gid_info = gi ;
+    { conn ; point_info = pi ; peer_info = gi ;
       messages ; canceler ; answerer ; wait_close = false } in
   iter_option pi ~f:begin fun pi ->
     let point = Point_info.point pi in
-    Point_info.State.set_running pi gid conn ;
+    Point_info.State.set_running pi peer_id conn ;
     Point.Table.add pool.connected_points point pi ;
   end ;
-  LogEvent.connection_established pool.watcher ~id_point ~gid ;
-  Gid_info.State.set_running gi id_point conn ;
-  Gid.Table.add pool.connected_gids gid gi ;
+  LogEvent.connection_established pool.watcher ~id_point ~peer_id ;
+  Peer_info.State.set_running gi id_point conn ;
+  Peer_id.Table.add pool.connected_peer_ids peer_id gi ;
   Lwt_condition.broadcast pool.events.new_connection () ;
   Canceler.on_cancel canceler begin fun () ->
     lwt_debug "Disconnect: %a (%a)"
-      Gid.pp gid Id_point.pp id_point >>= fun () ->
+      Peer_id.pp peer_id Id_point.pp id_point >>= fun () ->
     iter_option ~f:Point_info.State.set_disconnected pi;
-    LogEvent.disconnection pool.watcher ~is_external:false ~gid ;
-    Gid_info.State.set_disconnected gi ;
+    LogEvent.disconnection pool.watcher ~is_external:false ~peer_id ;
+    Peer_info.State.set_disconnected gi ;
     iter_option pi ~f:begin fun pi ->
       Point.Table.remove pool.connected_points (Point_info.point pi) ;
     end ;
-    Gid.Table.remove pool.connected_gids gid ;
+    Peer_id.Table.remove pool.connected_peer_ids peer_id ;
     if pool.config.max_connections <= active_connections pool then begin
       Lwt_condition.broadcast pool.events.too_many_connections () ;
       LogEvent.too_many_connections pool.watcher ;
@@ -501,9 +501,9 @@ let disconnect ?(wait = false) conn =
   Canceler.cancel conn.canceler >>= fun () ->
   conn.answerer.worker
 
-type error += Rejected of Gid.t
+type error += Rejected of Peer_id.t
 type error += Unexpected_point_state
-type error += Unexpected_gid_state
+type error += Unexpected_peer_id_state
 
 let may_register_my_id_point pool = function
   | [P2p_connection.Myself (addr, Some port)] ->
@@ -551,7 +551,7 @@ let authenticate pool ?pi canceler fd point =
     match pi, remote_pi with
     | None, None -> None
     | Some _ as pi, _ | _, (Some _ as pi) -> pi in
-  let gi = register_peer pool info.gid in
+  let gi = register_peer pool info.peer_id in
   let acceptable_versions =
     Version.common info.versions pool.message_config.versions
   in
@@ -567,8 +567,8 @@ let authenticate pool ?pi canceler fd point =
       | Accepted _ | Running _ -> false
     end
   in
-  let acceptable_gid =
-    match Gid_info.State.get gi with
+  let acceptable_peer_id =
+    match Peer_info.State.get gi with
     | Accepted _ ->
         (* TODO: in some circumstances cancel and accept... *)
         false
@@ -578,12 +578,12 @@ let authenticate pool ?pi canceler fd point =
   if incoming then
     Point.Table.remove pool.incoming point ;
   match acceptable_versions with
-  | Some version when acceptable_gid && acceptable_point -> begin
+  | Some version when acceptable_peer_id && acceptable_point -> begin
       LogEvent.accepting_request pool.watcher
-        ~id_point:info.id_point ~point ~gid:info.gid ;
+        ~id_point:info.id_point ~point ~peer_id:info.peer_id ;
       iter_option connection_pi
-        ~f:(fun pi -> Point_info.State.set_accepted pi info.gid canceler) ;
-      Gid_info.State.set_accepted gi info.id_point canceler ;
+        ~f:(fun pi -> Point_info.State.set_accepted pi info.peer_id canceler) ;
+      Peer_info.State.set_accepted gi info.id_point canceler ;
       lwt_debug "authenticate: %a -> accept %a"
         Point.pp point
         Connection_info.pp info >>= fun () ->
@@ -599,12 +599,12 @@ let authenticate pool ?pi canceler fd point =
       end ~on_error: begin fun err ->
         if incoming then
           LogEvent.request_rejected pool.watcher
-            ~credentials:(info.id_point, info.gid) ~point ;
+            ~credentials:(info.id_point, info.peer_id) ~point ;
         lwt_debug "authenticate: %a -> rejected %a"
           Point.pp point
           Connection_info.pp info >>= fun () ->
         iter_option connection_pi ~f:Point_info.State.set_disconnected;
-        Gid_info.State.set_disconnected gi ;
+        Peer_info.State.set_disconnected gi ;
         Lwt.return (Error err)
       end >>=? fun conn ->
       let id_point =
@@ -615,17 +615,17 @@ let authenticate pool ?pi canceler fd point =
     end
   | _ -> begin
       LogEvent.rejecting_request pool.watcher
-        ~id_point:info.id_point ~point ~gid:info.gid ;
-      lwt_debug "authenticate: %a -> kick %a point: %B gid: %B"
+        ~id_point:info.id_point ~point ~peer_id:info.peer_id ;
+      lwt_debug "authenticate: %a -> kick %a point: %B peer_id: %B"
         Point.pp point
         Connection_info.pp info
-        acceptable_point acceptable_gid >>= fun () ->
+        acceptable_point acceptable_peer_id >>= fun () ->
       P2p_connection.kick auth_fd >>= fun () ->
       if not incoming then begin
         iter_option ~f:Point_info.State.set_disconnected pi ;
-        (* FIXME Gid_info.State.set_disconnected ~requested:true gi ; *)
+        (* FIXME Peer_info.State.set_disconnected ~requested:true gi ; *)
       end ;
-      fail (Rejected info.gid)
+      fail (Rejected info.peer_id)
     end
 
 type error += Pending_connection
@@ -640,8 +640,8 @@ let fail_unless_disconnected_point pi =
   | Requested _ | Accepted _ -> fail Pending_connection
   | Running _ -> fail Connected
 
-let fail_unless_disconnected_gid gi =
-  match Gid_info.State.get gi with
+let fail_unless_disconnected_peer_id gi =
+  match Peer_info.State.get gi with
   | Disconnected -> return ()
   | Accepted _ -> fail Pending_connection
   | Running _ -> fail Connected
@@ -725,76 +725,76 @@ let write_now { conn } msg =
   P2p_connection.write_now conn (Message msg)
 
 let write_all pool msg =
-  Gid.Table.iter
-    (fun _gid gi ->
-       match Gid_info.State.get gi with
+  Peer_id.Table.iter
+    (fun _peer_id gi ->
+       match Peer_info.State.get gi with
        | Running { data = conn } ->
            ignore (write_now conn msg : bool tzresult )
        | _ -> ())
-    pool.connected_gids
+    pool.connected_peer_ids
 
 let broadcast_bootstrap_msg pool =
-  Gid.Table.iter
-    (fun _gid gi ->
-       match Gid_info.State.get gi with
+  Peer_id.Table.iter
+    (fun _peer_id gi ->
+       match Peer_info.State.get gi with
        | Running { data = { conn } } ->
            ignore (P2p_connection.write_now conn Bootstrap : bool tzresult )
        | _ -> ())
-    pool.connected_gids
+    pool.connected_peer_ids
 
 
 (***************************************************************************)
 
-module Gids = struct
+module Peer_ids = struct
 
-  type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) Gid_info.t
+  type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) Peer_info.t
 
-  let info { known_gids } point =
-    try Some (Gid.Table.find known_gids point)
+  let info { known_peer_ids } point =
+    try Some (Peer_id.Table.find known_peer_ids point)
     with Not_found -> None
 
-  let get_metadata pool gid =
-    try Some (Gid_info.metadata (Gid.Table.find pool.known_gids gid))
+  let get_metadata pool peer_id =
+    try Some (Peer_info.metadata (Peer_id.Table.find pool.known_peer_ids peer_id))
     with Not_found -> None
 
-  let get_score pool gid =
-    try Some (pool.meta_config.score @@ Gid_info.metadata (Gid.Table.find pool.known_gids gid))
+  let get_score pool peer_id =
+    try Some (pool.meta_config.score @@ Peer_info.metadata (Peer_id.Table.find pool.known_peer_ids peer_id))
     with Not_found -> None
 
-  let set_metadata pool gid data =
-    Gid_info.set_metadata (register_peer pool gid) data
+  let set_metadata pool peer_id data =
+    Peer_info.set_metadata (register_peer pool peer_id) data
 
-  let get_trusted pool gid =
-    try Gid_info.trusted (Gid.Table.find pool.known_gids gid)
+  let get_trusted pool peer_id =
+    try Peer_info.trusted (Peer_id.Table.find pool.known_peer_ids peer_id)
     with Not_found -> false
 
-  let set_trusted pool gid =
-    try Gid_info.set_trusted (register_peer pool gid)
+  let set_trusted pool peer_id =
+    try Peer_info.set_trusted (register_peer pool peer_id)
     with Not_found -> ()
 
-  let unset_trusted pool gid =
-    try Gid_info.unset_trusted (Gid.Table.find pool.known_gids gid)
+  let unset_trusted pool peer_id =
+    try Peer_info.unset_trusted (Peer_id.Table.find pool.known_peer_ids peer_id)
     with Not_found -> ()
 
-  let find_connection pool gid =
+  let find_connection pool peer_id =
     apply_option
-      (info pool gid)
+      (info pool peer_id)
       ~f:(fun p ->
-          match Gid_info.State.get p with
+          match Peer_info.State.get p with
           | Running { data } -> Some data
           | _ -> None)
 
   let fold_known pool ~init ~f =
-    Gid.Table.fold f pool.known_gids init
+    Peer_id.Table.fold f pool.known_peer_ids init
   let fold_connected pool ~init ~f =
-    Gid.Table.fold f pool.connected_gids init
+    Peer_id.Table.fold f pool.connected_peer_ids init
 
 end
 
 let fold_connections  pool ~init ~f =
-  Gids.fold_connected pool ~init ~f:begin fun gid gi acc ->
-    match Gid_info.State.get gi with
-    | Running { data } -> f gid data acc
+  Peer_ids.fold_connected pool ~init ~f:begin fun peer_id gi acc ->
+    match Peer_info.State.get gi with
+    | Running { data } -> f peer_id data acc
     | _ -> acc
   end
 
@@ -806,16 +806,16 @@ module Points = struct
     try Some (Point.Table.find known_points point)
     with Not_found -> None
 
-  let get_trusted pool gid =
-    try Point_info.trusted (Point.Table.find pool.known_points gid)
+  let get_trusted pool peer_id =
+    try Point_info.trusted (Point.Table.find pool.known_points peer_id)
     with Not_found -> false
 
-  let set_trusted pool gid =
-    try Point_info.set_trusted (register_point pool gid)
+  let set_trusted pool peer_id =
+    try Point_info.set_trusted (register_point pool peer_id)
     with Not_found -> ()
 
-  let unset_trusted pool gid =
-    try Point_info.unset_trusted (Point.Table.find pool.known_points gid)
+  let unset_trusted pool peer_id =
+    try Point_info.unset_trusted (Point.Table.find pool.known_points peer_id)
     with Not_found -> ()
 
   let find_connection pool point =
@@ -857,8 +857,8 @@ let create config meta_config message_config io_sched =
   let pool = {
     config ; meta_config ; message_config ;
     my_id_points = Point.Table.create 7 ;
-    known_gids = Gid.Table.create 53 ;
-    connected_gids = Gid.Table.create 53 ;
+    known_peer_ids = Peer_id.Table.create 53 ;
+    connected_peer_ids = Peer_id.Table.create 53 ;
     known_points = Point.Table.create 53 ;
     connected_points = Point.Table.create 53 ;
     incoming = Point.Table.create 53 ;
@@ -868,11 +868,11 @@ let create config meta_config message_config io_sched =
     watcher = Watcher.create_input () ;
   } in
   List.iter (Points.set_trusted pool) config.trusted_points ;
-  Gid_info.File.load config.peers_file meta_config.encoding >>= function
-  | Ok gids ->
+  Peer_info.File.load config.peers_file meta_config.encoding >>= function
+  | Ok peer_ids ->
       List.iter
-        (fun gi -> Gid.Table.add pool.known_gids (Gid_info.gid gi) gi)
-        gids ;
+        (fun gi -> Peer_id.Table.add pool.known_peer_ids (Peer_info.peer_id gi) gi)
+        peer_ids ;
       Lwt.return pool
   | Error err ->
       log_error "@[Failed to parsed peers file:@ %a@]"
@@ -888,14 +888,14 @@ let destroy pool =
           disconnect conn >>= fun () -> acc
       | Disconnected ->  acc)
     pool.known_points @@
-  Gid.Table.fold (fun _gid gi acc ->
-      match Gid_info.State.get gi with
+  Peer_id.Table.fold (fun _peer_id gi acc ->
+      match Peer_info.State.get gi with
       | Accepted { cancel } ->
           Canceler.cancel cancel >>= fun () -> acc
       | Running { data = conn } ->
           disconnect conn >>= fun () -> acc
       | Disconnected ->  acc)
-    pool.known_gids @@
+    pool.known_peer_ids @@
   Point.Table.fold (fun _point canceler acc ->
       Canceler.cancel canceler >>= fun () -> acc)
     pool.incoming Lwt.return_unit

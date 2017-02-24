@@ -85,7 +85,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
            Node_identity_file.default_name) >>=? fun identity ->
         lwt_log_notice
           "Peer's global id: %a"
-          P2p.Gid.pp identity.gid >>= fun () ->
+          P2p.Peer_id.pp identity.peer_id >>= fun () ->
         (* TODO "WARN" when pow is below our expectation. *)
         begin
           match config.net.listen_addr with

@@ -52,7 +52,7 @@ let default = {
   time_between_slots =
     Period_repr.of_seconds_exn
       (* One minute in seconds *)
-      60L ;
+      10L ;
   first_free_mining_slot = 16l ;
   max_signing_slot = 15 ;
   instructions_per_transaction = 16 * 1024 ;

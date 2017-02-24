@@ -29,7 +29,7 @@ type error += Encoding_error
 type error += Rejected
 type error += Decoding_error
 type error += Myself of Id_point.t
-type error += Not_enough_proof_of_work of Gid.t
+type error += Not_enough_proof_of_work of Peer_id.t
 type error += Invalid_auth
 
 module Crypto = struct
@@ -186,18 +186,19 @@ let authenticate
   let remote_listening_port =
     if incoming then msg.port else Some remote_socket_port in
   let id_point = remote_addr, remote_listening_port in
-  let remote_gid = Crypto_box.hash msg.public_key in
+  let remote_peer_id = Crypto_box.hash msg.public_key in
   fail_unless
-    (remote_gid <> identity.Identity.gid)
+    (remote_peer_id <> identity.Identity.peer_id)
     (Myself id_point) >>=? fun () ->
   fail_unless
     (Crypto_box.check_proof_of_work
        msg.public_key msg.proof_of_work_stamp proof_of_work_target)
-    (Not_enough_proof_of_work remote_gid) >>=? fun () ->
+    (Not_enough_proof_of_work remote_peer_id) >>=? fun () ->
   let channel_key =
     Crypto_box.precompute identity.Identity.secret_key msg.public_key in
   let info =
-    { Connection_info.gid = remote_gid ; versions = msg.versions ; incoming ;
+    { Connection_info.peer_id = remote_peer_id ;
+      versions = msg.versions ; incoming ;
       id_point ; remote_socket_port ;} in
   let cryptobox_data =
     { Crypto.channel_key ; local_nonce ;

@@ -163,13 +163,13 @@ module RPC = struct
     let watch = P2p.RPC.Point.watch
   end
 
-  module Gid = struct
-    type info = P2p.RPC.Gid.info
-    module Event = P2p_connection_pool_types.Gid_info.Event
+  module Peer_id = struct
+    type info = P2p.RPC.Peer_id.info
+    module Event = P2p_connection_pool_types.Peer_info.Event
 
-    let info = P2p.RPC.Gid.info
-    let events = P2p.RPC.Gid.events
-    let infos = P2p.RPC.Gid.infos
-    let watch = P2p.RPC.Gid.watch
+    let info = P2p.RPC.Peer_id.info
+    let events = P2p.RPC.Peer_id.events
+    let infos = P2p.RPC.Peer_id.infos
+    let watch = P2p.RPC.Peer_id.watch
   end
 end

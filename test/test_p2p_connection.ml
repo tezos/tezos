@@ -74,7 +74,7 @@ let connect sched addr port id =
     ~proof_of_work_target
     ~incoming:false fd (addr, port) id versions >>=? fun (info, auth_fd) ->
   assert (not info.incoming) ;
-  assert (Gid.compare info.gid id1.gid = 0) ;
+  assert (Peer_id.compare info.peer_id id1.peer_id = 0) ;
   return auth_fd
 
 let simple_msg =
@@ -108,7 +108,7 @@ let server main_socket =
   accept sched main_socket >>=? fun (info, auth_fd) ->
   lwt_log_notice "Kick" >>= fun () ->
   assert (info.incoming) ;
-  assert (Gid.compare info.gid id2.gid = 0) ;
+  assert (Peer_id.compare info.peer_id id2.peer_id = 0) ;
   P2p_connection.kick auth_fd >>= fun () ->
   lwt_log_notice "Kick OK" >>= fun () ->
   (* Let's be rejected. *)
