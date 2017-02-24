@@ -5,6 +5,8 @@
 /tezos-webclient
 /tezos-attacker
 
+/src/.ocamlinit.utils
+/src/.ocamlinit.node
 /src/Makefile.local
 
 /src/webclient_static.ml

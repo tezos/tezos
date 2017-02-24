@@ -65,6 +65,8 @@ node/updater/proto_environment.cmi: \
 	@echo OCAMLOPT ${TARGET} $@
 	@$(OCAMLOPT) -nopervasives -nostdlib -opaque -I tmp -I node/updater -c $<
 
+node/updater/protocol.cmi: node/updater/protocol.cmx
+
 partial-clean::
 	rm -f node/updater/proto_environment.mli
 	rm -f node/updater/environment_gen
@@ -190,6 +192,7 @@ UTILS_PACKAGES := \
   calendar \
   ezjsonm \
   ipaddr.unix \
+  lwt.unix \
   mtime.os \
   nocrypto \
   sodium \
@@ -207,6 +210,12 @@ ${UTILS_OBJS}: OPENED_MODULES=
 utils.cmxa: ${UTILS_LIB_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
 	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
+
+utils.top: DEVFLAGS=
+utils.top:
+	( $(patsubst %, echo "#require \"%\";;" ; ,${UTILS_PACKAGES}) ) > .ocamlinit.utils
+	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS}) ) >> .ocamlinit.utils
+	utop -init .ocamlinit.utils ${OCAMLFLAGS}
 
 ############################################################################
 ## Node protocol compiler (also embedded in the main program)
@@ -280,7 +289,6 @@ NODE_LIB_INTFS := \
   node/db/store.mli \
   node/db/db_proxy.mli \
   \
-  node/updater/protocol.mli \
   node/updater/updater.mli \
   node/updater/proto_environment.mli \
   node/updater/register.mli \
@@ -319,6 +327,7 @@ NODE_LIB_IMPLS := \
   node/db/context.ml \
   node/db/db_proxy.ml \
   \
+  node/updater/protocol.ml \
   node/updater/updater.ml \
   node/updater/environment.ml \
   node/updater/proto_environment.ml \
@@ -389,6 +398,14 @@ ${TZNODE}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa ${EMBEDDED_NODE_PROT
 
 partial-clean::
 	-rm -f proto/*.cm* proto/*.a
+
+node.top: DEVFLAGS=
+node.top: ${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS} ${COMPILER_LIB_IMPLS} ${NODE_LIB_IMPLS}
+	( $(patsubst %, echo "#require \"%\";;" ; ,${NODE_PACKAGES}) ) > .ocamlinit.node
+	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS}) ) >> .ocamlinit.node
+	( $(patsubst %, echo "open %;;" ; ,Error_monad Hash Utils) ) >> .ocamlinit.node
+	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${COMPILER_LIB_IMPLS} ${NODE_LIB_IMPLS}) ) >> .ocamlinit.node
+	utop -init .ocamlinit.node ${OCAMLFLAGS}
 
 ## Embedded protocol modules
 
