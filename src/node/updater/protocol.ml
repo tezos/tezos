@@ -13,21 +13,21 @@
     by length and then by contents lexicographically. *)
 type fitness = Fitness.fitness
 
-type net_id = Store.net_id = Net of Block_hash.t
+module Net_id = Store.Net_id
 
 (** The version agnostic toplevel structure of operations. *)
-type shell_operation = Store.shell_operation = {
-  net_id: net_id ;
+type shell_operation = Store.Operation.shell_header = {
+  net_id: Net_id.t ;
 }
 
-type raw_operation = Store.operation = {
+type raw_operation = Store.Operation.t = {
   shell: shell_operation ;
   proto: MBytes.t ;
 }
 
 (** The version agnostic toplevel structure of blocks. *)
-type shell_block = Store.shell_block =
-  { net_id: net_id ;
+type shell_block = Store.Block_header.shell_header =
+  { net_id: Net_id.t ;
     (** The genesis of the chain this block belongs to. *)
     predecessor: Block_hash.t ;
     (** The preceding block in the chain. *)
@@ -41,7 +41,7 @@ type shell_block = Store.shell_block =
     (** The sequence of operations. *)
   }
 
-type raw_block = Store.block = {
+type raw_block = Store.Block_header.t = {
   shell: shell_block ;
   proto: MBytes.t ;
 }
@@ -51,14 +51,14 @@ type raw_block = Store.block = {
 type 'error preapply_result =
   { applied: Operation_hash.t list;
     (** Operations that where successfully applied. *)
-    refused: 'error list Operation_hash_map.t;
+    refused: 'error list Operation_hash.Map.t;
     (** Operations which triggered a context independent, unavoidable
         error (e.g. invalid signature). *)
-    branch_refused: 'error list Operation_hash_map.t;
+    branch_refused: 'error list Operation_hash.Map.t;
     (** Operations which triggered an error that might not arise in a
         different context (e.g. past account counter, insufficent
         balance). *)
-    branch_delayed: 'error list Operation_hash_map.t;
+    branch_delayed: 'error list Operation_hash.Map.t;
     (** Operations which triggered an error that might not arise in a
         future update of this context (e.g. futur account counter). *) }
 
