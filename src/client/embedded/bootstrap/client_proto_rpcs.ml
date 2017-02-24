@@ -46,8 +46,8 @@ module Constants = struct
     call_error_service1 cctxt Services.Constants.voting_period_length block ()
   let time_before_reward cctxt block =
     call_error_service1 cctxt Services.Constants.time_before_reward block ()
-  let time_between_slots cctxt block =
-    call_error_service1 cctxt Services.Constants.time_between_slots block ()
+  let slot_durations cctxt block =
+    call_error_service1 cctxt Services.Constants.slot_durations block ()
   let first_free_mining_slot cctxt block =
     call_error_service1 cctxt Services.Constants.first_free_mining_slot block ()
   let max_signing_slot cctxt block =
