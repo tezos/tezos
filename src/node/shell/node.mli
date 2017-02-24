@@ -86,19 +86,19 @@ module RPC : sig
     val connect : t -> P2p.Point.t -> float -> unit tzresult Lwt.t
 
     module Connection : sig
-      val info : t -> P2p.Gid.t -> P2p.Connection_info.t option
-      val kick : t -> P2p.Gid.t -> bool -> unit Lwt.t
+      val info : t -> P2p.Peer_id.t -> P2p.Connection_info.t option
+      val kick : t -> P2p.Peer_id.t -> bool -> unit Lwt.t
       val list : t -> P2p.Connection_info.t list
       val count : t -> int
     end
 
-    module Gid : sig
+    module Peer_id : sig
       val infos : t ->
-        P2p.RPC.Gid.state list -> (P2p.Gid.t * P2p.RPC.Gid.info) list
-      val info : t -> P2p.Gid.t -> P2p.RPC.Gid.info option
-      val events : t -> P2p.Gid.t -> P2p.RPC.Gid.Event.t list
-      val watch : t -> P2p.Gid.t ->
-        P2p.RPC.Gid.Event.t Lwt_stream.t * Watcher.stopper
+        P2p.RPC.Peer_id.state list -> (P2p.Peer_id.t * P2p.RPC.Peer_id.info) list
+      val info : t -> P2p.Peer_id.t -> P2p.RPC.Peer_id.info option
+      val events : t -> P2p.Peer_id.t -> P2p.RPC.Peer_id.Event.t list
+      val watch : t -> P2p.Peer_id.t ->
+        P2p.RPC.Peer_id.Event.t Lwt_stream.t * Watcher.stopper
     end
 
     module Point : sig

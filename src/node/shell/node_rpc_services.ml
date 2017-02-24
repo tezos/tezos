@@ -486,9 +486,9 @@ end
 
 module Network = struct
   open P2p_types
-  let (gid_arg : P2p_types.Gid.t RPC.Arg.arg) =
+  let (peer_id_arg : P2p_types.Peer_id.t RPC.Arg.arg) =
     RPC.Arg.make
-      ~name:"gid"
+      ~name:"peer_id"
       ~descr:"A network global identifier, also known as an identity."
       ~destruct:(fun s -> try
                     Ok (Crypto_box.Public_key_hash.of_b58check s)
@@ -538,13 +538,13 @@ module Network = struct
       RPC.service
         ~input: empty
         ~output: (option P2p.Connection_info.encoding)
-        RPC.Path.(root / "network" / "connection" /: gid_arg)
+        RPC.Path.(root / "network" / "connection" /: peer_id_arg)
 
     let kick =
       RPC.service
         ~input: (obj1 (req "wait" bool))
         ~output: empty
-        RPC.Path.(root / "network" / "connection" /: gid_arg / "kick")
+        RPC.Path.(root / "network" / "connection" /: peer_id_arg / "kick")
   end
 
   module Point = struct
@@ -569,26 +569,26 @@ module Network = struct
         RPC.Path.(root / "network" / "point" /: point_arg / "log")
   end
 
-  module Gid = struct
+  module Peer_id = struct
     let infos =
       let filter =
-        obj1 (dft "filter" (list P2p.RPC.Gid.state_encoding) []) in
+        obj1 (dft "filter" (list P2p.RPC.Peer_id.state_encoding) []) in
       RPC.service
         ~input: filter
-        ~output: (list (tup2 P2p.Gid.encoding P2p.RPC.Gid.info_encoding))
-        RPC.Path.(root / "network" / "gid")
+        ~output: (list (tup2 P2p.Peer_id.encoding P2p.RPC.Peer_id.info_encoding))
+        RPC.Path.(root / "network" / "peer_id")
 
     let info =
       RPC.service
         ~input: empty
-        ~output: (option P2p.RPC.Gid.info_encoding)
-        RPC.Path.(root / "network" / "gid" /: gid_arg)
+        ~output: (option P2p.RPC.Peer_id.info_encoding)
+        RPC.Path.(root / "network" / "peer_id" /: peer_id_arg)
 
     let events =
       RPC.service
         ~input: monitor_encoding
-        ~output: (list P2p.RPC.Gid.Event.encoding)
-        RPC.Path.(root / "network" / "gid" /: gid_arg / "log")
+        ~output: (list P2p.RPC.Peer_id.Event.encoding)
+        RPC.Path.(root / "network" / "peer_id" /: peer_id_arg / "log")
   end
 end
 

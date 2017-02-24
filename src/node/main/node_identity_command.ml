@@ -15,7 +15,7 @@ let identity_file data_dir = data_dir // Node_identity_file.default_name
 
 let show { Node_config_file.data_dir } =
   Node_identity_file.read (identity_file data_dir) >>=? fun id ->
-  Format.printf "Gid: %a.@." P2p_types.Gid.pp id.gid ;
+  Format.printf "Peer_id: %a.@." P2p_types.Peer_id.pp id.peer_id ;
   return ()
 
 let generate { Node_config_file.data_dir ; net } =
@@ -30,15 +30,15 @@ let generate { Node_config_file.data_dir ; net } =
     Node_identity_file.write identity_file id >>=? fun () ->
     Format.eprintf
       "Stored the new identity (%a) into '%s'.@."
-      P2p.Gid.pp id.gid identity_file ;
+      P2p.Peer_id.pp id.peer_id identity_file ;
     return ()
 
 let check { Node_config_file.data_dir ; net = { expected_pow } } =
   Node_identity_file.read
     ~expected_pow (identity_file data_dir) >>=? fun id ->
   Format.printf
-    "Gid: %a. Proof of work is higher than %.2f.@."
-    P2p_types.Gid.pp id.gid expected_pow ;
+    "Peer_id: %a. Proof of work is higher than %.2f.@."
+    P2p_types.Peer_id.pp id.peer_id expected_pow ;
   return ()
 
 (** Main *)

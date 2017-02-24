@@ -101,7 +101,7 @@ module Stat = struct
          (req "current_outflow" int31))
 end
 
-module Gid = struct
+module Peer_id = struct
   include Crypto_box.Public_key_hash
   let pp = pp_short
   module Map = Map.Make (Crypto_box.Public_key_hash)
@@ -162,10 +162,6 @@ module Point = struct
 
   include T
 
-  (* Run-time point-or-gid indexed storage, one point is bound to at
-     most one gid, which is the invariant we want to keep both for the
-     connected peers table and the known peers one *)
-
   module Map = Map.Make (T)
   module Set = Set.Make (T)
   module Table = Hashtbl.Make (T)
@@ -220,10 +216,6 @@ module Id_point = struct
 
   include T
 
-  (* Run-time point-or-gid indexed storage, one point is bound to at
-     most one gid, which is the invariant we want to keep both for the
-     connected peers table and the known peers one *)
-
   module Map = Map.Make (T)
   module Set = Set.Make (T)
   module Table = Hashtbl.Make (T)
@@ -233,7 +225,7 @@ end
 module Identity = struct
 
   type t = {
-    gid : Gid.t ;
+    peer_id : Peer_id.t ;
     public_key : Crypto_box.public_key ;
     secret_key : Crypto_box.secret_key ;
     proof_of_work_stamp : Crypto_box.nonce ;
@@ -245,18 +237,18 @@ module Identity = struct
       (fun { public_key ; secret_key ; proof_of_work_stamp } ->
          (public_key, secret_key, proof_of_work_stamp))
       (fun (public_key, secret_key, proof_of_work_stamp) ->
-         let gid = Crypto_box.hash public_key in
-         { gid ; public_key ; secret_key ; proof_of_work_stamp })
+         let peer_id = Crypto_box.hash public_key in
+         { peer_id ; public_key ; secret_key ; proof_of_work_stamp })
       (obj3
          (req "public_key" Crypto_box.public_key_encoding)
          (req "secret_key" Crypto_box.secret_key_encoding)
          (req "proof_of_work_stamp" Crypto_box.nonce_encoding))
 
   let generate ?max target =
-    let secret_key, public_key, gid = Crypto_box.random_keypair () in
+    let secret_key, public_key, peer_id = Crypto_box.random_keypair () in
     let proof_of_work_stamp =
       Crypto_box.generate_proof_of_work ?max public_key target in
-    { gid ; public_key ; secret_key ; proof_of_work_stamp }
+    { peer_id ; public_key ; secret_key ; proof_of_work_stamp }
 
   let animation = [|
     "|.....|" ;
@@ -307,7 +299,7 @@ module Connection_info = struct
 
   type t = {
     incoming : bool;
-    gid : Gid.t;
+    peer_id : Peer_id.t;
     id_point : Id_point.t;
     remote_socket_port : port;
     versions : Version.t list ;
@@ -316,26 +308,26 @@ module Connection_info = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun { incoming ; gid ; id_point ; remote_socket_port ; versions } ->
-         (incoming, gid, id_point, remote_socket_port, versions))
-      (fun (incoming, gid, id_point, remote_socket_port, versions) ->
-         { incoming ; gid ; id_point ; remote_socket_port ; versions })
+      (fun { incoming ; peer_id ; id_point ; remote_socket_port ; versions } ->
+         (incoming, peer_id, id_point, remote_socket_port, versions))
+      (fun (incoming, peer_id, id_point, remote_socket_port, versions) ->
+         { incoming ; peer_id ; id_point ; remote_socket_port ; versions })
       (obj5
          (req "incoming" bool)
-         (req "gid" Gid.encoding)
+         (req "peer_id" Peer_id.encoding)
          (req "id_point" Id_point.encoding)
          (req "remote_socket_port" uint16)
          (req "versions" (list Version.encoding)))
 
   let pp ppf
-      { incoming ; id_point = (remote_addr, remote_port) ; gid } =
+      { incoming ; id_point = (remote_addr, remote_port) ; peer_id } =
     Format.fprintf ppf "%a:%a {%a}%s"
       Ipaddr.V6.pp_hum remote_addr
       (fun ppf port ->
          match port with
          | None -> Format.pp_print_string ppf "??"
          | Some port -> Format.pp_print_int ppf port) remote_port
-      Gid.pp gid
+      Peer_id.pp peer_id
       (if incoming then " (incoming)" else "")
 
 end

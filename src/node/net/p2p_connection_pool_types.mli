@@ -41,14 +41,14 @@ module Point_info : sig
   val last_failed_connection :
     'conn point_info -> Time.t option
   val last_rejected_connection :
-    'conn point_info -> (Gid.t * Time.t) option
+    'conn point_info -> (Peer_id.t * Time.t) option
   val last_established_connection :
-    'conn point_info -> (Gid.t * Time.t) option
+    'conn point_info -> (Peer_id.t * Time.t) option
   val last_disconnection :
-    'conn point_info -> (Gid.t * Time.t) option
+    'conn point_info -> (Peer_id.t * Time.t) option
 
   val last_seen :
-    'conn point_info -> (Gid.t * Time.t) option
+    'conn point_info -> (Peer_id.t * Time.t) option
   (** [last_seen pi] is the most recent of:
 
       * last established connection
@@ -77,11 +77,11 @@ module Point_info : sig
     type 'conn t =
       | Requested of { cancel: Canceler.t }
         (** We initiated a connection. *)
-      | Accepted of { current_gid: Gid.t ;
+      | Accepted of { current_peer_id: Peer_id.t ;
                       cancel: Canceler.t }
         (** We accepted a incoming connection. *)
       | Running of { data: 'conn ;
-                     current_gid: Gid.t }
+                     current_peer_id: Peer_id.t }
         (** Successfully authentificated connection, normal business. *)
       | Disconnected
         (** No connection established currently. *)
@@ -99,10 +99,10 @@ module Point_info : sig
 
     val set_accepted :
       ?timestamp:Time.t ->
-      'conn point_info -> Gid.t -> Canceler.t -> unit
+      'conn point_info -> Peer_id.t -> Canceler.t -> unit
 
     val set_running :
-      ?timestamp:Time.t -> 'conn point_info -> Gid.t -> 'conn -> unit
+      ?timestamp:Time.t -> 'conn point_info -> Peer_id.t -> 'conn -> unit
 
     val set_disconnected :
       ?timestamp:Time.t -> ?requested:bool -> 'conn point_info -> unit
@@ -114,17 +114,17 @@ module Point_info : sig
     type kind =
       | Outgoing_request
         (** We initiated a connection. *)
-      | Accepting_request of Gid.t
+      | Accepting_request of Peer_id.t
         (** We accepted a connection after authentifying the remote peer. *)
-      | Rejecting_request of Gid.t
+      | Rejecting_request of Peer_id.t
         (** We rejected a connection after authentifying the remote peer. *)
-      | Request_rejected of Gid.t option
+      | Request_rejected of Peer_id.t option
         (** The remote peer rejected our connection. *)
-      | Connection_established of Gid.t
+      | Connection_established of Peer_id.t
         (** We succesfully established a authentified connection. *)
-      | Disconnection of Gid.t
+      | Disconnection of Peer_id.t
         (** We decided to close the connection. *)
-      | External_disconnection of Gid.t
+      | External_disconnection of Peer_id.t
         (** The connection was closed for external reason. *)
 
     type t = {
@@ -142,17 +142,17 @@ module Point_info : sig
     'conn point_info -> Event.t Lwt_stream.t * Watcher.stopper
 
   val log_incoming_rejection :
-    ?timestamp:Time.t -> 'conn point_info -> Gid.t -> unit
+    ?timestamp:Time.t -> 'conn point_info -> Peer_id.t -> unit
 
 end
 
 
-(** Gid info: current and historical information about a gid *)
+(** Peer_id info: current and historical information about a peer_id *)
 
-module Gid_info : sig
+module Peer_info : sig
 
   type ('conn, 'meta) t
-  type ('conn, 'meta) gid_info = ('conn, 'meta) t
+  type ('conn, 'meta) peer_info = ('conn, 'meta) t
 
   val compare : ('conn, 'meta) t -> ('conn, 'meta) t -> int
 
@@ -160,31 +160,31 @@ module Gid_info : sig
     ?created:Time.t ->
     ?trusted:bool ->
     metadata:'meta ->
-    Gid.t -> ('conn, 'meta) gid_info
-  (** [create ~trusted ~meta gid] is a freshly minted gid info for
-      [gid]. *)
+    Peer_id.t -> ('conn, 'meta) peer_info
+  (** [create ~trusted ~meta peer_id] is a freshly minted peer_id info for
+      [peer_id]. *)
 
-  val gid : ('conn, 'meta) gid_info -> Gid.t
+  val peer_id : ('conn, 'meta) peer_info -> Peer_id.t
 
-  val created : ('conn, 'meta) gid_info -> Time.t
-  val metadata : ('conn, 'meta) gid_info -> 'meta
-  val set_metadata : ('conn, 'meta) gid_info -> 'meta -> unit
+  val created : ('conn, 'meta) peer_info -> Time.t
+  val metadata : ('conn, 'meta) peer_info -> 'meta
+  val set_metadata : ('conn, 'meta) peer_info -> 'meta -> unit
 
-  val trusted : ('conn, 'meta) gid_info -> bool
-  val set_trusted : ('conn, 'meta) gid_info -> unit
-  val unset_trusted : ('conn, 'meta) gid_info -> unit
+  val trusted : ('conn, 'meta) peer_info -> bool
+  val set_trusted : ('conn, 'meta) peer_info -> unit
+  val unset_trusted : ('conn, 'meta) peer_info -> unit
 
   val last_failed_connection :
-    ('conn, 'meta) gid_info -> (Id_point.t * Time.t) option
+    ('conn, 'meta) peer_info -> (Id_point.t * Time.t) option
   val last_rejected_connection :
-    ('conn, 'meta) gid_info -> (Id_point.t * Time.t) option
+    ('conn, 'meta) peer_info -> (Id_point.t * Time.t) option
   val last_established_connection :
-    ('conn, 'meta) gid_info -> (Id_point.t * Time.t) option
+    ('conn, 'meta) peer_info -> (Id_point.t * Time.t) option
   val last_disconnection :
-    ('conn, 'meta) gid_info -> (Id_point.t * Time.t) option
+    ('conn, 'meta) peer_info -> (Id_point.t * Time.t) option
 
   val last_seen :
-    ('conn, 'meta) gid_info -> (Id_point.t * Time.t) option
+    ('conn, 'meta) peer_info -> (Id_point.t * Time.t) option
   (** [last_seen gi] is the most recent of:
 
       * last established connection
@@ -193,7 +193,7 @@ module Gid_info : sig
   *)
 
   val last_miss :
-    ('conn, 'meta) gid_info -> (Id_point.t * Time.t) option
+    ('conn, 'meta) peer_info -> (Id_point.t * Time.t) option
   (** [last_miss gi] is the most recent of:
 
       * last failed connection
@@ -217,22 +217,22 @@ module Gid_info : sig
 
     val pp : Format.formatter -> 'conn t -> unit
 
-    val get : ('conn, 'meta) gid_info -> 'conn state
+    val get : ('conn, 'meta) peer_info -> 'conn state
 
-    val is_disconnected : ('conn, 'meta) gid_info -> bool
+    val is_disconnected : ('conn, 'meta) peer_info -> bool
 
     val set_accepted :
       ?timestamp:Time.t ->
-      ('conn, 'meta) gid_info -> Id_point.t -> Canceler.t -> unit
+      ('conn, 'meta) peer_info -> Id_point.t -> Canceler.t -> unit
 
     val set_running :
       ?timestamp:Time.t ->
-      ('conn, 'meta) gid_info -> Id_point.t -> 'conn -> unit
+      ('conn, 'meta) peer_info -> Id_point.t -> 'conn -> unit
 
     val set_disconnected :
       ?timestamp:Time.t ->
       ?requested:bool ->
-      ('conn, 'meta) gid_info -> unit
+      ('conn, 'meta) peer_info -> unit
 
   end
 
@@ -262,22 +262,22 @@ module Gid_info : sig
   end
 
   val fold_events :
-    ('conn, 'meta) gid_info -> init:'a -> f:('a -> Event.t -> 'a) -> 'a
+    ('conn, 'meta) peer_info -> init:'a -> f:('a -> Event.t -> 'a) -> 'a
 
   val watch :
-    ('conn, 'meta) gid_info -> Event.t Lwt_stream.t * Watcher.stopper
+    ('conn, 'meta) peer_info -> Event.t Lwt_stream.t * Watcher.stopper
 
   val log_incoming_rejection :
     ?timestamp:Time.t ->
-    ('conn, 'meta) gid_info -> Id_point.t -> unit
+    ('conn, 'meta) peer_info -> Id_point.t -> unit
 
   module File : sig
     val load :
       string -> 'meta Data_encoding.t ->
-      ('conn, 'meta) gid_info list tzresult Lwt.t
+      ('conn, 'meta) peer_info list tzresult Lwt.t
     val save :
       string -> 'meta Data_encoding.t ->
-      ('conn, 'meta) gid_info list -> unit tzresult Lwt.t
+      ('conn, 'meta) peer_info list -> unit tzresult Lwt.t
   end
 
 end

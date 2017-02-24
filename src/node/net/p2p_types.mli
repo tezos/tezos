@@ -24,11 +24,11 @@ module Version : sig
 end
 
 
-(** Gid, i.e. persistent peer identifier *)
+(** Peer_id, i.e. persistent peer identifier *)
 
-module Gid : sig
+module Peer_id : sig
   type t = Crypto_box.Public_key_hash.t
-  (** Type of a gid, a public key hash. *)
+  (** Type of a peer_id, a public key hash. *)
 
   val compare : t -> t -> int
   val equal : t -> t -> bool
@@ -86,12 +86,12 @@ end
 
 module Identity : sig
   type t = {
-    gid : Gid.t ;
+    peer_id : Peer_id.t ;
     public_key : Crypto_box.public_key ;
     secret_key : Crypto_box.secret_key ;
     proof_of_work_stamp : Crypto_box.nonce ;
   }
-  (** Type of an identity, comprising a gid, a crypto keypair, and a
+  (** Type of an identity, comprising a peer_id, a crypto keypair, and a
       proof of work stamp with enough difficulty so that the network
       accept this identity as genuine. *)
 
@@ -131,7 +131,7 @@ module Connection_info : sig
 
   type t = {
     incoming : bool;
-    gid : Gid.t;
+    peer_id : Peer_id.t;
     id_point : Id_point.t;
     remote_socket_port : port;
     versions : Version.t list ;

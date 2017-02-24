@@ -144,13 +144,13 @@ let make_net points repeat n =
     incoming_app_message_queue_size = None ;
     incoming_message_queue_size = None ;
     outgoing_message_queue_size = None ;
-    known_gids_history_size = 100 ;
+    known_peer_ids_history_size = 100 ;
     known_points_history_size = 100 ;
     max_known_points = None ;
-    max_known_gids = None ;
+    max_known_peer_ids = None ;
     } in
   Process.detach
-    ~prefix:(Format.asprintf "%a " Gid.pp identity.gid)
+    ~prefix:(Format.asprintf "%a " Peer_id.pp identity.peer_id)
     begin fun () ->
       run_net config repeat points (fst point) (snd point) >>= function
       | Ok () -> Lwt.return_unit
