@@ -233,8 +233,6 @@ module MakeResolvers(R: sig
       (resolver : R.context -> string -> a list Lwt.t) =
     resolvers := Resolver { encoding ; resolver } :: !resolvers
 
-  type context = R.context
-
   let partial_decode ?(alphabet=Alphabet.default) request len =
     let zero = alphabet.encode.[0] in
     let last = alphabet.encode.[base-1] in
