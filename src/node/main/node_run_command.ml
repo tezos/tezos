@@ -17,7 +17,7 @@ let genesis : State.Net.genesis = {
       "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z" ;
   protocol =
     Protocol_hash.of_b58check
-      "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" ;
+      "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
 }
 
 let (//) = Filename.concat
