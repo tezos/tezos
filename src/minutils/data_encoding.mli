@@ -161,7 +161,8 @@ val assoc : 'a encoding -> (string * 'a) list encoding
 
 type 't case
 val case :
-  ?tag:int -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
+  ?tag:int ->
+  'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 val union :
   ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
 

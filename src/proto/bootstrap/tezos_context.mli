@@ -18,12 +18,8 @@ type t
 type context = t
 
 module Contract_hash = Tezos_hash.Contract_hash
-module Contract_hash_set = Tezos_hash.Contract_hash_set
-module Contract_hash_map = Tezos_hash.Contract_hash_map
 
 module Nonce_hash = Tezos_hash.Nonce_hash
-module Nonce_hash_set = Tezos_hash.Nonce_hash_set
-module Nonce_hash_map = Tezos_hash.Nonce_hash_map
 
 type public_key = Ed25519.public_key
 type public_key_hash = Ed25519.Public_key_hash.t
@@ -392,7 +388,7 @@ module Vote : sig
     context -> Protocol_hash.t -> public_key_hash ->
     context tzresult Lwt.t
   val get_proposals:
-    context -> int32 Protocol_hash_map.t tzresult Lwt.t
+    context -> int32 Protocol_hash.Map.t tzresult Lwt.t
   val clear_proposals: context -> context tzresult Lwt.t
 
   val freeze_listings: context -> context tzresult Lwt.t

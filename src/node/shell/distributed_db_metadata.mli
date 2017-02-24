@@ -7,8 +7,5 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type worker
-
-val create_worker: Tezos_p2p.net -> State.t -> worker
-
-val shutdown: worker -> unit Lwt.t
+type t = unit
+val cfg : t P2p.meta_config

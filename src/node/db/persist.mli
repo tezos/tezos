@@ -28,7 +28,6 @@ module type STORE = sig
   val del: t -> key -> t Lwt.t
   val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
-  val keys: t -> key list Lwt.t
 end
 
 (** Projection of OCaml keys of some abstract type to concrete storage
@@ -57,8 +56,6 @@ module type BYTES_STORE = sig
   val del: t -> key -> t Lwt.t
   val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
-
-  val keys : t -> key list Lwt.t
 end
 
 module MakeBytesStore (S : STORE) (K : KEY) :
@@ -86,8 +83,6 @@ module type TYPED_STORE = sig
   val get: t -> key -> value option Lwt.t
   val set: t -> key -> value -> t Lwt.t
   val del: t -> key -> t Lwt.t
-
-  val keys: t -> key list Lwt.t (** Not always relevant, BEWARE! *)
 end
 
 (** Gives a typed view of a store (values of a given type stored under
@@ -176,57 +171,6 @@ module MakeBufferedPersistentMap
     and type value := C.t
     and module Map := Map
 
-(** {2 Imperative overlays} **************************************************)
-
-type 'a shared_ref
-val share : 'a -> 'a shared_ref
-val update : 'a shared_ref -> ('a -> 'a option Lwt.t) -> bool Lwt.t
-val update_with_res :
-  'a shared_ref -> ('a -> ('a option * 'b) Lwt.t) -> (bool * 'b) Lwt.t
-val use : 'a shared_ref -> ('a -> 'b Lwt.t) -> 'b Lwt.t
-
-module type IMPERATIVE_PROXY = sig
-  module Store : TYPED_STORE
-
-  type t
-  type rdata
-  type state
-  val create: state -> Store.t shared_ref -> t
-  val known: t -> Store.key -> bool Lwt.t
-  val read: t -> Store.key -> Store.value option Lwt.t
-  val store: t -> Store.key -> Store.value -> bool Lwt.t
-  val update: t -> Store.key -> Store.value -> bool Lwt.t
-  val remove: t -> Store.key -> bool Lwt.t
-  val prefetch: t -> rdata -> Store.key -> unit
-  val fetch: t -> rdata -> Store.key -> Store.value Lwt.t
-  val pending: t -> Store.key -> bool
-  val shutdown: t -> unit Lwt.t
-
-  val keys: t -> Store.key list Lwt.t
-end
-
-module type IMPERATIVE_PROXY_SCHEDULER = sig
-  module Store : TYPED_STORE
-  type state
-  type rdata
-  type data
-
-  val name : string
-  val init_request :
-    state -> Store.key -> data Lwt.t
-  val request :
-    state ->
-    get:(rdata -> Store.key -> Store.value Lwt.t) ->
-    set:(Store.key -> Store.value -> unit Lwt.t) ->
-    (Store.key * data * rdata) list -> float
-end
-
-module MakeImperativeProxy
-    (Store : TYPED_STORE)
-    (Table : Hashtbl.S with type key = Store.key)
-    (Scheduler : IMPERATIVE_PROXY_SCHEDULER with module Store := Store)
-  : IMPERATIVE_PROXY with module Store := Store and type state = Scheduler.state
-                                                and type rdata = Scheduler.rdata
 
 (** {2 Predefined Instances} *************************************************)
 

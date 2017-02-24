@@ -1,14 +1,6 @@
-(**************************************************************************)
-(*                                                                        *)
-(*    Copyright (c) 2014 - 2016.                                          *)
-(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
-(*                                                                        *)
-(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
-(*                                                                        *)
-(**************************************************************************)
-
-(*
+(* For this source file only.
  * Copyright (c) 2013-2014 Thomas Gazagnaire <thomas@gazagnaire.org>
+ * Copyright (c) 2016 Dynamic Ledger Solutions, Inc. <contact@tezos.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,17 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-let (>>=) = Lwt.(>>=)
-let (>|=) = Lwt.(>|=)
-let (//) = Filename.concat
-
-exception Error of string
-
-let error =
-  Printf.ksprintf
-    (fun str ->
-       Printf.eprintf "fatal: %s\n%!" str;
-       Lwt.fail (Error str))
+open Error_monad
 
 let mkdir dir =
   let safe_mkdir dir =
@@ -49,12 +31,12 @@ let mkdir dir =
 
 let check_dir root =
   if Sys.file_exists root && not (Sys.is_directory root) then
-    error "%s is not a directory!" root
+    failwith "%s is not a directory!" root
   else begin
     let mkdir dir =
       if not (Sys.file_exists dir) then mkdir dir in
     mkdir root;
-    Lwt.return_unit
+    return ()
   end
 
 let files = Lwt_pool.create 50 (fun () -> Lwt.return_unit)
@@ -90,7 +72,8 @@ let with_file_out file ba =
   mkdir (Filename.dirname file);
   with_file
     (fun () ->
-       Lwt_unix.(openfile file [O_RDWR; O_NONBLOCK; O_CREAT] 0o644) >>= fun fd ->
+       Lwt_unix.(openfile file
+                   [O_RDWR; O_NONBLOCK; O_CREAT] 0o644) >>= fun fd ->
        try
          write_bigstring fd ba >>= fun r ->
          Lwt_unix.close fd >>= fun () ->
@@ -99,58 +82,51 @@ let with_file_out file ba =
          Lwt_unix.close fd >>= fun () ->
          Lwt.fail e)
 
-let remove_file file =
-  if Sys.file_exists file then Unix.unlink file;
-  Lwt.return_unit
-
 let is_directory f =
   try Sys.is_directory f with _ -> false
 
-let list_files root =
-  let files = Lwt_unix.files_of_directory root in
-  Lwt_stream.fold_s
-    (fun file accu ->
-       if file = "." || file = ".." then
-         Lwt.return accu
-       else
-         Lwt.return (file :: accu))
-    files [] >>= fun l ->
-  Lwt.return (List.sort compare l)
+let is_empty dir =
+  Lwt_unix.opendir dir >>= fun hdir ->
+  Lwt_unix.readdir_n hdir 3 >>= fun files ->
+  let res = Array.length files = 2 in
+  Lwt_unix.closedir hdir >>= fun () ->
+  Lwt.return res
 
-let rec_files root =
-  let rec aux accu dir =
-    let files = Lwt_unix.files_of_directory (root // dir) in
+let rec cleanup_dir dir =
+  Lwt_unix.file_exists dir >>= function
+  | true ->
+      is_empty dir >>= fun empty ->
+      if empty && dir <> "/" then begin
+        Lwt_unix.rmdir dir >>= fun () ->
+        cleanup_dir (Filename.dirname dir)
+      end else
+        Lwt.return_unit
+  | false ->
+      Lwt.return_unit
+
+let remove_file ?(cleanup = false) file =
+  Lwt_unix.file_exists file >>= function
+  | true ->
+      Lwt_unix.unlink file >>= fun () ->
+      if cleanup then
+        Lwt.catch
+          (fun () -> cleanup_dir (Filename.dirname file))
+          (fun _ -> Lwt.return_unit)
+      else
+        Lwt.return_unit
+  | false ->
+      Lwt.return_unit
+
+let fold root ~init ~f =
+  if is_directory root then begin
+    let files = Lwt_unix.files_of_directory root in
     Lwt_stream.fold_s
-      (fun file accu ->
+      (fun file acc ->
          if file = "." || file = ".." then
-           Lwt.return accu
+           Lwt.return acc
          else
-           let file = if dir = "" then file else dir // file in
-           if is_directory (root // file) then
-             aux accu file
-           else
-             Lwt.return (file :: accu))
-      files accu in
-  aux [] ""
+           f file acc)
+      files init
+  end else
+    Lwt.return init
 
-let remove_rec root =
-  let rec aux dir =
-    let files = Lwt_unix.files_of_directory (root // dir) in
-    Lwt_stream.iter_s
-      (fun file ->
-         if file = "." || file = ".." then
-           Lwt.return_unit
-         else
-           let file = if dir = "" then file else dir // file in
-           if is_directory (root // file) then begin
-             aux file >>= fun () ->
-             Lwt.return_unit
-           end else begin
-             Unix.unlink (root // file) ;
-             Lwt.return_unit
-           end)
-      files >>= fun () ->
-    Unix.rmdir (root // dir) ;
-    Lwt.return_unit
-  in
-  if Sys.file_exists root then aux "" else Lwt.return_unit

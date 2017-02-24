@@ -24,7 +24,7 @@ module Blocks : sig
   val blocks_arg : block RPC.Arg.arg
 
   val parse_block: string -> (block, string) result
-  type net = Store.net_id = Net of Block_hash.t
+  type net = State.Net_id.t = Id of Block_hash.t
 
   type block_info = {
     hash: Block_hash.t ;
@@ -60,7 +60,7 @@ module Blocks : sig
     (unit, unit * block, unit, (net * Time.t) option) RPC.service
   val pending_operations:
     (unit, unit * block, unit,
-     error Updater.preapply_result * Hash.Operation_hash_set.t) RPC.service
+     error Updater.preapply_result * Hash.Operation_hash.Set.t) RPC.service
 
   type list_param = {
     operations: bool option ;
@@ -95,28 +95,27 @@ end
 
 module Operations : sig
   val bytes:
-    (unit, unit * Operation_hash.t, unit,
-     Store.operation tzresult Time.timed_data) RPC.service
+    (unit, unit * Operation_hash.t, unit, State.Operation.t) RPC.service
   type list_param = {
     contents: bool option ;
     monitor: bool option ;
   }
   val list:
     (unit, unit,
-     list_param, (Operation_hash.t * Store.operation option) list) RPC.service
+     list_param, (Operation_hash.t * Store.Operation.t option) list) RPC.service
 end
 
 module Protocols : sig
   val bytes:
-    (unit, unit * Protocol_hash.t, unit,
-     Store.protocol tzresult Time.timed_data) RPC.service
+    (unit, unit * Protocol_hash.t, unit, Tezos_compiler.Protocol.t) RPC.service
   type list_param = {
     contents: bool option ;
     monitor: bool option ;
   }
   val list:
     (unit, unit,
-     list_param, (Protocol_hash.t * Store.protocol option) list) RPC.service
+     list_param,
+     (Protocol_hash.t * Tezos_compiler.Protocol.t option) list) RPC.service
 end
 
 module Network : sig
@@ -161,7 +160,7 @@ end
 
 val forge_block:
   (unit, unit,
-   Updater.net_id option * Block_hash.t option * Time.t option *
+   Updater.Net_id.t option * Block_hash.t option * Time.t option *
    Fitness.fitness * Operation_hash.t list * MBytes.t,
    MBytes.t) RPC.service
 
@@ -179,7 +178,8 @@ val inject_operation:
 
 val inject_protocol:
   (unit, unit,
-   (Store.protocol * bool * bool option), Protocol_hash.t tzresult) RPC.service
+   (Tezos_compiler.Protocol.t * bool * bool option),
+   Protocol_hash.t tzresult) RPC.service
 
 val complete: (unit, unit * string, unit, string list) RPC.service
 

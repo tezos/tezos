@@ -20,7 +20,7 @@ let select_winning_proposal proposals =
           Some ([proposal], vote)
         else
           previous in
-  match Protocol_hash_map.fold merge proposals None with
+  match Protocol_hash.Map.fold merge proposals None with
   | None -> None
   | Some ([proposal], _) -> Some proposal
   | Some _ -> None (* in case of a tie, lets do nothing. *)

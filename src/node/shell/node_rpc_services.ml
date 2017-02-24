@@ -54,10 +54,10 @@ module Blocks = struct
     | `Hash of Block_hash.t
     ]
 
-  type net = Store.net_id = Net of Block_hash.t
+  type net = State.Net_id.t = Id of Block_hash.t
 
   let net_encoding =
-    conv (fun (Net id) -> id) (fun id -> Net id) Block_hash.encoding
+    conv (fun (Id id) -> id) (fun id -> Id id) Block_hash.encoding
 
   type block_info = {
     hash: Block_hash.t ;
@@ -254,22 +254,22 @@ module Blocks = struct
            (fun ({ Updater.applied; branch_delayed ; branch_refused },
                  unprocessed) ->
              (applied,
-              Operation_hash_map.bindings branch_delayed,
-              Operation_hash_map.bindings branch_refused,
-              Operation_hash_set.elements unprocessed))
+              Operation_hash.Map.bindings branch_delayed,
+              Operation_hash.Map.bindings branch_refused,
+              Operation_hash.Set.elements unprocessed))
            (fun (applied, branch_delayed, branch_refused, unprocessed) ->
-              ({ Updater.applied ; refused = Operation_hash_map.empty ;
+              ({ Updater.applied ; refused = Operation_hash.Map.empty ;
                  branch_refused =
                    List.fold_right
-                     (fun (k, o) -> Operation_hash_map.add k o)
-                     branch_refused  Operation_hash_map.empty ;
+                     (fun (k, o) -> Operation_hash.Map.add k o)
+                     branch_refused  Operation_hash.Map.empty ;
                  branch_delayed =
                    List.fold_right
-                     (fun (k, o) -> Operation_hash_map.add k o)
-                     branch_delayed  Operation_hash_map.empty ;
+                     (fun (k, o) -> Operation_hash.Map.add k o)
+                     branch_delayed  Operation_hash.Map.empty ;
                },
-               List.fold_right Operation_hash_set.add
-                 unprocessed Operation_hash_set.empty))
+               List.fold_right Operation_hash.Set.add
+                 unprocessed Operation_hash.Set.empty))
            (obj4
               (req "applied" (list Operation_hash.encoding))
               (req "branch_delayed"
@@ -400,9 +400,7 @@ module Operations = struct
       ~output:
         (obj1 (req "data"
                  (describe ~title: "Tezos signed operation (hex encoded)"
-                    (Time.timed_encoding @@
-                     Error.wrap @@
-                     Updater.raw_operation_encoding))))
+                    (Updater.raw_operation_encoding))))
       RPC.Path.(root / "operations" /: operations_arg)
 
   type list_param = {
@@ -451,9 +449,7 @@ module Protocols = struct
       ~output:
         (obj1 (req "data"
                  (describe ~title: "Tezos protocol"
-                    (Time.timed_encoding @@
-                     Error.wrap @@
-                     Store.protocol_encoding))))
+                    (Store.Protocol.encoding))))
       RPC.Path.(root / "protocols" /: protocols_arg)
 
   type list_param = {
@@ -479,7 +475,7 @@ module Protocols = struct
                  (obj2
                     (req "hash" Protocol_hash.encoding)
                     (opt "contents"
-                       (dynamic_size Store.protocol_encoding)))
+                       (dynamic_size Store.Protocol.encoding)))
               )))
       RPC.Path.(root / "protocols")
 end
@@ -616,7 +612,7 @@ let forge_block =
     ~description: "Forge a block header"
     ~input:
       (obj6
-         (opt "net_id" Updater.net_id_encoding)
+         (opt "net_id" Updater.Net_id.encoding)
          (opt "predecessor" Block_hash.encoding)
          (opt "timestamp" Time.encoding)
          (req "fitness" Fitness.encoding)

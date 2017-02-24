@@ -56,9 +56,9 @@ let preapply context _block_pred _timestamp _sort operations =
     (Ok
        (context,
         { Updater.applied = List.map (fun h -> h) operations;
-          refused = Operation_hash_map.empty;
-          branch_delayed = Operation_hash_map.empty;
-          branch_refused = Operation_hash_map.empty;
+          refused = Operation_hash.Map.empty;
+          branch_delayed = Operation_hash.Map.empty;
+          branch_refused = Operation_hash.Map.empty;
         }))
 
 let rpc_services = Services.rpc_services

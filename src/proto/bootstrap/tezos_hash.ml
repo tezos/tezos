@@ -25,8 +25,6 @@ module State_hash = Hash.Make_Blake2B(Base58)(struct
     let b58check_prefix = Prefix.random_state_hash
     let size = None
   end)
-module State_hash_set = Hash_set(State_hash)
-module State_hash_map = Hash_map(State_hash)
 
 module Nonce_hash = Hash.Make_Blake2B(Base58)(struct
     let name = "cycle_nonce"
@@ -34,8 +32,6 @@ module Nonce_hash = Hash.Make_Blake2B(Base58)(struct
     let b58check_prefix = Prefix.nonce_hash
     let size = None
   end)
-module Nonce_hash_set = Hash_set(Nonce_hash)
-module Nonce_hash_map = Hash_map(Nonce_hash)
 
 module Script_expr_hash = Hash.Make_Blake2B(Base58)(struct
     let name = "script_expr"
@@ -43,8 +39,6 @@ module Script_expr_hash = Hash.Make_Blake2B(Base58)(struct
     let b58check_prefix = Prefix.script_expr_hash
     let size = None
   end)
-module Script_expr_hash_set = Hash_set(Script_expr_hash)
-module Script_expr_hash_map = Hash_map(Script_expr_hash)
 
 module Contract_hash = Hash.Make_Blake2B(Base58)(struct
     let name = "Contract_hash"
@@ -52,8 +46,6 @@ module Contract_hash = Hash.Make_Blake2B(Base58)(struct
     let b58check_prefix = Prefix.contract_hash
     let size = Some 20
   end)
-module Contract_hash_set = Hash_set(Contract_hash)
-module Contract_hash_map = Hash_map(Contract_hash)
 
 let () =
   Base58.check_encoded_prefix Contract_hash.b58check_encoding "TZ1" 36 ;

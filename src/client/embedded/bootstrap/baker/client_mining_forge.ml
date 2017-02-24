@@ -44,7 +44,7 @@ let inject_block cctxt block
   let seed_nonce_hash = Nonce.hash seed_nonce in
   Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
   let shell =
-    { Store.net_id = bi.net ; predecessor = bi.hash ;
+    { Store.Block_header.net_id = bi.net ; predecessor = bi.hash ;
       timestamp ; fitness ; operations } in
   let slot = level.level, Int32.of_int priority in
   compute_stamp cctxt block
@@ -82,8 +82,8 @@ let forge_block cctxt block
     match operations with
     | None ->
         Client_node_rpcs.Blocks.pending_operations cctxt block >|= fun (ops, pendings) ->
-        Operation_hash_set.elements @@
-        Operation_hash_set.union (Updater.operations ops) pendings
+        Operation_hash.Set.elements @@
+        Operation_hash.Set.union (Updater.operations ops) pendings
     | Some operations -> Lwt.return operations
   end >>= fun operations ->
   begin
@@ -129,9 +129,9 @@ let forge_block cctxt block
     Time.pp_hum timestamp >>= fun () ->
   lwt_log_info "Computed fitness %a" Fitness.pp fitness >>= fun () ->
   if best_effort
-     || ( Operation_hash_map.is_empty operations.refused
-          && Operation_hash_map.is_empty operations.branch_refused
-          && Operation_hash_map.is_empty operations.branch_delayed ) then
+     || ( Operation_hash.Map.is_empty operations.refused
+          && Operation_hash.Map.is_empty operations.branch_refused
+          && Operation_hash.Map.is_empty operations.branch_delayed ) then
     inject_block cctxt ?force ~src_sk
        ~priority ~timestamp ~fitness ~seed_nonce block operations.applied
   else
@@ -365,7 +365,7 @@ let mine cctxt state =
        Client_node_rpcs.Blocks.pending_operations cctxt
          block >>= fun (res, ops) ->
        let operations =
-         let open Operation_hash_set in
+         let open Operation_hash.Set in
          elements (union ops (Updater.operations res)) in
        let request = List.length operations in
        Client_node_rpcs.Blocks.preapply cctxt block

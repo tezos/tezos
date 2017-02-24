@@ -21,7 +21,7 @@ val make_target : float -> target
 
 type secret_key
 type public_key
-module Public_key_hash : Hash.HASH
+module Public_key_hash : Hash.INTERNAL_HASH
 type channel_key
 
 val public_key_encoding : public_key Data_encoding.t

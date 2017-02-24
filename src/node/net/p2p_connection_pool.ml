@@ -293,6 +293,8 @@ type ('msg, 'meta) t = {
   encoding : 'msg Message.t Data_encoding.t ;
   events : events ;
   watcher : LogEvent.t Watcher.input ;
+  mutable new_connection_hook :
+    (Peer_id.t -> ('msg, 'meta) connection -> unit) list ;
 }
 
 
@@ -490,6 +492,7 @@ let create_connection pool conn id_point pi gi _version =
     end ;
     P2p_connection.close ~wait:conn.wait_close conn.conn
   end ;
+  List.iter (fun f -> f peer_id conn) pool.new_connection_hook ;
   if active_connections pool < pool.config.min_connections then begin
     Lwt_condition.broadcast pool.events.too_few_connections () ;
     LogEvent.too_few_connections pool.watcher ;
@@ -525,7 +528,7 @@ let authenticate pool ?pi canceler fd point =
   end ~on_error: begin fun err ->
     (* Authentication incorrect! *)
     (* TODO do something when the error is Not_enough_proof_of_work ?? *)
-    lwt_debug "authenticate: %a%s -> failed %a"
+    lwt_debug "@[authenticate: %a%s -> failed@ %a@]"
       Point.pp point
       (if incoming then " incoming" else "")
       pp_print_error err >>= fun () ->
@@ -786,6 +789,7 @@ module Peer_ids = struct
 
   let fold_known pool ~init ~f =
     Peer_id.Table.fold f pool.known_peer_ids init
+
   let fold_connected pool ~init ~f =
     Peer_id.Table.fold f pool.connected_peer_ids init
 
@@ -866,6 +870,7 @@ let create config meta_config message_config io_sched =
     encoding = Message.encoding message_config.encoding ;
     events ;
     watcher = Watcher.create_input () ;
+    new_connection_hook = [] ;
   } in
   List.iter (Points.set_trusted pool) config.trusted_points ;
   Peer_info.File.load config.peers_file meta_config.encoding >>= function
@@ -899,3 +904,6 @@ let destroy pool =
   Point.Table.fold (fun _point canceler acc ->
       Canceler.cancel canceler >>= fun () -> acc)
     pool.incoming Lwt.return_unit
+
+let on_new_connection pool f =
+  pool.new_connection_hook <- f :: pool.new_connection_hook

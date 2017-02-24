@@ -19,24 +19,22 @@ module type REGISTRED_PROTOCOL = sig
   val complete_b58prefix : Context.t -> string -> string list Lwt.t
 end
 
-type net_id = Store.net_id = Net of Block_hash.t
+module Net_id = Store.Net_id
 
-let net_id_encoding = Store.net_id_encoding
-
-type shell_operation = Store.shell_operation = {
-  net_id: net_id ;
+type shell_operation = Store.Operation.shell_header = {
+  net_id: Net_id.t ;
 }
-let shell_operation_encoding = Store.shell_operation_encoding
+let shell_operation_encoding = Store.Operation.shell_header_encoding
 
-type raw_operation = Store.operation = {
+type raw_operation = Store.Operation.t = {
   shell: shell_operation ;
   proto: MBytes.t ;
 }
-let raw_operation_encoding = Store.operation_encoding
+let raw_operation_encoding = Store.Operation.encoding
 
 (** The version agnostic toplevel structure of blocks. *)
-type shell_block = Store.shell_block = {
-  net_id: net_id ;
+type shell_block = Store.Block_header.shell_header = {
+  net_id: Net_id.t ;
   (** The genesis of the chain this block belongs to. *)
   predecessor: Block_hash.t ;
   (** The preceding block in the chain. *)
@@ -49,43 +47,43 @@ type shell_block = Store.shell_block = {
   operations: Operation_hash.t list ;
   (** The sequence of operations. *)
 }
-let shell_block_encoding = Store.shell_block_encoding
+let shell_block_encoding = Store.Block_header.shell_header_encoding
 
-type raw_block = Store.block = {
+type raw_block = Store.Block_header.t = {
   shell: shell_block ;
   proto: MBytes.t ;
 }
-let raw_block_encoding = Store.block_encoding
+let raw_block_encoding = Store.Block_header.encoding
 
 type 'error preapply_result = 'error Protocol.preapply_result = {
   applied: Operation_hash.t list;
-  refused: 'error list Operation_hash_map.t;
-  branch_refused: 'error list Operation_hash_map.t;
-  branch_delayed: 'error list Operation_hash_map.t;
+  refused: 'error list Operation_hash.Map.t;
+  branch_refused: 'error list Operation_hash.Map.t;
+  branch_delayed: 'error list Operation_hash.Map.t;
 }
 
 let empty_result = {
   applied = [] ;
-  refused = Operation_hash_map.empty ;
-  branch_refused = Operation_hash_map.empty ;
-  branch_delayed = Operation_hash_map.empty ;
+  refused = Operation_hash.Map.empty ;
+  branch_refused = Operation_hash.Map.empty ;
+  branch_delayed = Operation_hash.Map.empty ;
 }
 
 let map_result f r = {
   applied = r.applied;
-  refused = Operation_hash_map.map f r.refused ;
-  branch_refused = Operation_hash_map.map f r.branch_refused ;
-  branch_delayed = Operation_hash_map.map f r.branch_delayed ;
+  refused = Operation_hash.Map.map f r.refused ;
+  branch_refused = Operation_hash.Map.map f r.branch_refused ;
+  branch_delayed = Operation_hash.Map.map f r.branch_delayed ;
 }
 
 let preapply_result_encoding error_encoding =
   let open Data_encoding in
   let refused_encoding = tup2 Operation_hash.encoding error_encoding in
-  let build_list map = Operation_hash_map.bindings map in
+  let build_list map = Operation_hash.Map.bindings map in
   let build_map list =
     List.fold_right
-      (fun (k, e) m -> Operation_hash_map.add k e m)
-      list Operation_hash_map.empty in
+      (fun (k, e) m -> Operation_hash.Map.add k e m)
+      list Operation_hash.Map.empty in
   conv
     (fun { applied ; refused ; branch_refused ; branch_delayed } ->
        (applied, build_list refused,
@@ -104,7 +102,7 @@ let preapply_result_encoding error_encoding =
 
 (** Version table *)
 
-module VersionTable = Protocol_hash_table
+module VersionTable = Protocol_hash.Table
 
 let versions : ((module REGISTRED_PROTOCOL)) VersionTable.t =
   VersionTable.create 20
@@ -208,14 +206,14 @@ let compile hash units =
 let operations t =
   let ops =
     List.fold_left
-      (fun acc x -> Operation_hash_set.add x acc)
-      Operation_hash_set.empty t.applied in
+      (fun acc x -> Operation_hash.Set.add x acc)
+      Operation_hash.Set.empty t.applied in
   let ops =
-    Operation_hash_map.fold
-      (fun x _ acc -> Operation_hash_set.add x acc)
+    Operation_hash.Map.fold
+      (fun x _ acc -> Operation_hash.Set.add x acc)
       t.branch_delayed ops in
   let ops =
-    Operation_hash_map.fold
-      (fun x _ acc -> Operation_hash_set.add x acc)
+    Operation_hash.Map.fold
+      (fun x _ acc -> Operation_hash.Set.add x acc)
       t.branch_refused ops in
   ops

@@ -152,8 +152,6 @@ let describe cctxt ?recurse path =
   get_json cctxt (prefix @ path) arg >>=
   parse_answer cctxt Services.describe prefix
 
-type net = Services.Blocks.net = Net of Block_hash.t
-
 module Blocks = struct
   type block = Services.Blocks.block
 
@@ -164,9 +162,9 @@ module Blocks = struct
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
     operations: Operation_hash.t list option ;
-    net: net ;
+    net: Updater.Net_id.t ;
     test_protocol: Protocol_hash.t option ;
-    test_network: (net * Time.t) option ;
+    test_network: (Updater.Net_id.t * Time.t) option ;
   }
   type preapply_param = Services.Blocks.preapply_param = {
     operations: Operation_hash.t list ;

@@ -10,7 +10,7 @@
 type t
 
 type config = {
-  genesis: Store.genesis ;
+  genesis: State.Net.genesis ;
   store_root: string ;
   context_root: string ;
   test_protocol: Protocol_hash.t option ;
@@ -26,19 +26,22 @@ module RPC : sig
   type block_info = Node_rpc_services.Blocks.block_info
 
   val inject_block:
-    t -> ?force:bool -> MBytes.t -> (Block_hash.t * unit tzresult Lwt.t) Lwt.t
+    t -> ?force:bool -> MBytes.t ->
+    (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
   val inject_operation:
-    t -> ?force:bool -> MBytes.t -> (Operation_hash.t * unit tzresult Lwt.t) Lwt.t
+    t -> ?force:bool -> MBytes.t ->
+    (Operation_hash.t * unit tzresult Lwt.t) Lwt.t
   val inject_protocol:
-    t -> ?force:bool -> Store.protocol -> (Protocol_hash.t * unit tzresult Lwt.t) Lwt.t
+    t -> ?force:bool -> Tezos_compiler.Protocol.t ->
+    (Protocol_hash.t * unit tzresult Lwt.t) Lwt.t
 
   val raw_block_info:
     t -> Block_hash.t -> block_info Lwt.t
   val block_watcher:
     t -> block_info Lwt_stream.t * Watcher.stopper
   val valid_block_watcher:
-    t -> (block_info Lwt_stream.t * Watcher.stopper) Lwt.t
-  val heads: t -> block_info Block_hash_map.t Lwt.t
+    t -> (block_info Lwt_stream.t * Watcher.stopper)
+  val heads: t -> block_info Block_hash.Map.t Lwt.t
 
   val list:
     t -> int -> Block_hash.t list -> block_info list list Lwt.t
@@ -49,19 +52,19 @@ module RPC : sig
   val operations:
     t -> block -> Operation_hash.t list Lwt.t
   val operation_content:
-    t -> Operation_hash.t -> Store.operation tzresult Time.timed_data option Lwt.t
+    t -> Operation_hash.t -> Store.Operation.t option Lwt.t
   val operation_watcher:
-    t -> (Operation_hash.t * Store.operation) Lwt_stream.t * Watcher.stopper
+    t -> (Operation_hash.t * Store.Operation.t) Lwt_stream.t * Watcher.stopper
 
   val pending_operations:
-    t -> block -> (error Updater.preapply_result * Operation_hash_set.t) Lwt.t
+    t -> block -> (error Updater.preapply_result * Operation_hash.Set.t) Lwt.t
 
   val protocols:
     t -> Protocol_hash.t list Lwt.t
   val protocol_content:
-    t -> Protocol_hash.t -> Store.protocol tzresult Time.timed_data option Lwt.t
+    t -> Protocol_hash.t -> Tezos_compiler.Protocol.t tzresult Lwt.t
   val protocol_watcher:
-    t -> (Protocol_hash.t * Store.protocol) Lwt_stream.t * Watcher.stopper
+    t -> (Protocol_hash.t * Tezos_compiler.Protocol.t) Lwt_stream.t * Watcher.stopper
 
   val context_dir:
     t -> block -> 'a RPC.directory option Lwt.t
@@ -72,7 +75,7 @@ module RPC : sig
     Operation_hash.t list ->
     (Protocol.fitness * error Updater.preapply_result) tzresult Lwt.t
 
-  val validate: t -> State.net_id -> Block_hash.t -> unit tzresult Lwt.t
+  val validate: t -> State.Net_id.t -> Block_hash.t -> unit tzresult Lwt.t
 
   val context_dir:
     t -> block -> 'a RPC.directory option Lwt.t

@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Hash
+
 (** Low-level part of the [Updater]. *)
 
 module Meta : sig
@@ -15,21 +17,25 @@ module Meta : sig
 end
 
 module Protocol : sig
-  type component = {
-    name : string;
-    interface : string option;
-    implementation : string;
-  }
-  val find_component : Lwt_io.file_name -> string -> component
-  val component_encoding : component Data_encoding.encoding
 
   type t = component list
-  val encoding : t Data_encoding.encoding
-  val to_bytes : t -> MBytes.t
-  val of_bytes : MBytes.t -> t option
-  val hash : t -> Hash.Protocol_hash.t
 
-  val of_dir : Lwt_io.file_name -> t
+  and component = {
+    name: string ;
+    interface: string option ;
+    implementation: string ;
+  }
+
+  type protocol = t
+
+  val compare: protocol -> protocol -> int
+  val equal: protocol -> protocol -> bool
+
+  val hash: protocol -> Protocol_hash.t
+  val encoding: protocol Data_encoding.encoding
+
+  val of_dir: Lwt_io.file_name -> protocol
+
 end
 
 val main: unit -> unit

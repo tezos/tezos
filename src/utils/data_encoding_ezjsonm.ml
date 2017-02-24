@@ -30,9 +30,8 @@ let from_stream (stream: string Lwt_stream.t) =
          let json = Ezjsonm.from_string !buffer in
          buffer := "" ;
          Some (Ok json)
-       with Ezjsonm.Parse_error (_, msg) ->
-         if String.length str = 32 * 1024 then None
-         else Some (Error msg))
+       with Ezjsonm.Parse_error _ ->
+         None)
     stream
 
 let write_file file json =
