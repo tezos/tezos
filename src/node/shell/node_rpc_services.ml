@@ -485,7 +485,9 @@ module Protocols = struct
 end
 
 module Network = struct
+
   open P2p_types
+
   let (peer_id_arg : P2p_types.Peer_id.t RPC.Arg.arg) =
     RPC.Arg.make
       ~name:"peer_id"
@@ -528,8 +530,10 @@ module Network = struct
   let monitor_encoding = obj1 (dft "monitor" bool false)
 
   module Connection = struct
+
     let list =
       RPC.service
+        ~description:"List the running P2P connection."
         ~input: empty
         ~output: (list P2p.Connection_info.encoding)
         RPC.Path.(root / "network" / "connection")
@@ -538,58 +542,73 @@ module Network = struct
       RPC.service
         ~input: empty
         ~output: (option P2p.Connection_info.encoding)
+        ~description:"Details about the current P2P connection to the given peer."
         RPC.Path.(root / "network" / "connection" /: peer_id_arg)
 
     let kick =
       RPC.service
         ~input: (obj1 (req "wait" bool))
         ~output: empty
+        ~description:"Forced close of the current P2P connection to the given peer."
         RPC.Path.(root / "network" / "connection" /: peer_id_arg / "kick")
+
   end
 
   module Point = struct
+
     let infos =
       let filter =
         obj1 (dft "filter" (list P2p.RPC.Point.state_encoding) []) in
       RPC.service
         ~input: filter
         ~output: (list (tup2 P2p.Point.encoding P2p.RPC.Point.info_encoding))
+        ~description:"List the pool of known `IP:port` \
+                      used for establishing P2P connections ."
         RPC.Path.(root / "network" / "point")
 
     let info =
       RPC.service
         ~input: empty
         ~output: (option P2p.RPC.Point.info_encoding)
+        ~description: "Details about a given `IP:addr`."
         RPC.Path.(root / "network" / "point" /: point_arg)
 
     let events =
       RPC.service
         ~input: monitor_encoding
         ~output: (list P2p.RPC.Point.Event.encoding)
+        ~description: "Monitor network events related to an `IP:addr`."
         RPC.Path.(root / "network" / "point" /: point_arg / "log")
+
   end
 
   module Peer_id = struct
+
     let infos =
       let filter =
         obj1 (dft "filter" (list P2p.RPC.Peer_id.state_encoding) []) in
       RPC.service
         ~input: filter
         ~output: (list (tup2 P2p.Peer_id.encoding P2p.RPC.Peer_id.info_encoding))
+        ~description:"List the peers the node ever met."
         RPC.Path.(root / "network" / "peer_id")
 
     let info =
       RPC.service
         ~input: empty
         ~output: (option P2p.RPC.Peer_id.info_encoding)
+        ~description:"Details about a given peer."
         RPC.Path.(root / "network" / "peer_id" /: peer_id_arg)
 
     let events =
       RPC.service
         ~input: monitor_encoding
         ~output: (list P2p.RPC.Peer_id.Event.encoding)
+        ~description:"Monitor network events related to a given peer."
         RPC.Path.(root / "network" / "peer_id" /: peer_id_arg / "log")
+
   end
+
 end
 
 let forge_block =

@@ -217,7 +217,7 @@ module RPC : sig
 
     type info = {
       trusted : bool ;
-      greylisted_end : Time.t ;
+      greylisted_until : Time.t ;
       state : state ;
       peer_id : Peer_id.t option ;
       last_failed_connection : Time.t option ;

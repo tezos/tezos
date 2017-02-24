@@ -35,7 +35,7 @@ module Point_info = struct
       let branch_encoding name obj =
         conv (fun x -> (), x) (fun ((), x) -> x)
           (merge_objs
-             (obj1 (req "event" (constant name))) obj) in
+             (obj1 (req "event_kind" (constant name))) obj) in
       union ~tag_size:`Uint8 [
         case ~tag:0 (branch_encoding "outgoing_request" empty)
           (function Outgoing_request -> Some () | _ -> None)
@@ -140,7 +140,7 @@ module Point_info = struct
   let last_rejected_connection s = s.last_rejected_connection
   let greylisted ?(now = Time.now ()) s =
     Time.compare now s.greylisting_end <= 0
-  let greylisted_end s = s.greylisting_end
+  let greylisted_until s = s.greylisting_end
 
   let recent a1 a2 =
     match a1, a2 with
