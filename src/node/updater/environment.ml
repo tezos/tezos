@@ -76,6 +76,28 @@ module Ed25519 = struct
       ~of_raw:(fun s -> Some (MBytes.of_string s))
       ~wrap:(fun x -> Signature x)
 
+  let public_key_of_b58check s =
+    match Base58.simple_decode b58check_public_key_encoding s with
+    | Some x -> x
+    | None -> Pervasives.failwith "Unexpected hash (ed25519 public key)"
+  let b58check_of_public_key s = Base58.simple_encode b58check_public_key_encoding s
+
+  let secret_key_of_b58check s =
+    match Base58.simple_decode b58check_secret_key_encoding s with
+    | Some x -> x
+    | None -> Pervasives.failwith "Unexpected hash (ed25519 secret key)"
+  let b58check_of_secret_key s = Base58.simple_encode b58check_secret_key_encoding s
+
+  let signature_of_b58check s =
+    match Base58.simple_decode b58check_signature_encoding s with
+    | Some x -> x
+    | None -> Pervasives.failwith "Unexpected hash (ed25519 signature)"
+  let b58check_of_signature s = Base58.simple_encode b58check_signature_encoding s
+
+  let public_key_of_bytes s = Sodium.Sign.Bytes.to_public_key s
+  let secret_key_of_bytes s = Sodium.Sign.Bytes.to_secret_key s
+  let signature_of_bytes s = Sodium.Sign.Bytes.to_signature s
+
   let () =
     Base58.check_encoded_prefix b58check_public_key_encoding "edpk" 54 ;
     Base58.check_encoded_prefix b58check_secret_key_encoding "edsk" 98 ;
