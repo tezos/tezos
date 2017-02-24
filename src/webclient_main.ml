@@ -42,7 +42,7 @@ let block_protocol cctxt block =
          "\n\
           The connection to the RPC server failed, \
           using the default protocol version.\n" >>= fun () ->
-       Lwt.return Client_bootstrap.Client_proto_main.protocol)
+       Lwt.return Client_alpha.Client_proto_main.protocol)
 
 let eval_command argv =
   let cctxt, result = make_context () in

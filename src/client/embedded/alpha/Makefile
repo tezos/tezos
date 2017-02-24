@@ -1,5 +1,5 @@
 
-PROTO_VERSION := bootstrap
+PROTO_VERSION := alpha
 
 CLIENT_INTFS := \
   concrete_parser.mli \
