@@ -101,13 +101,7 @@ module Stat = struct
          (req "current_outflow" int31))
 end
 
-module Peer_id = struct
-  include Crypto_box.Public_key_hash
-  let pp = pp_short
-  module Map = Map.Make (Crypto_box.Public_key_hash)
-  module Set = Set.Make (Crypto_box.Public_key_hash)
-  module Table = Hash.Hash_table (Crypto_box.Public_key_hash)
-end
+module Peer_id = Crypto_box.Public_key_hash
 
 (* public types *)
 type addr = Ipaddr.V6.t

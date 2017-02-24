@@ -33,6 +33,7 @@ module Peer_id : sig
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val pp : Format.formatter -> t -> unit
+  val pp_short : Format.formatter -> t -> unit
   val encoding : t Data_encoding.t
   module Map : Map.S with type key = t
   module Set : Set.S with type elt = t

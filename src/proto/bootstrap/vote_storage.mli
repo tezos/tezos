@@ -12,7 +12,7 @@ val record_proposal:
   Storage.t tzresult Lwt.t
 
 val get_proposals:
-  Storage.t -> int32 Protocol_hash_map.t tzresult Lwt.t
+  Storage.t -> int32 Protocol_hash.Map.t tzresult Lwt.t
 
 val clear_proposals: Storage.t -> Storage.t tzresult Lwt.t
 

@@ -41,6 +41,8 @@ let compare f1 f2 =
   let len = compare (List.length f1) (List.length f2) in
   if len = 0 then compare_rec f1 f2 else len
 
+let equal f1 f2 = compare f1 f2 = 0
+
 let rec pp fmt = function
   | [] -> ()
   | [f] -> Format.fprintf fmt "%s" (Hex_encode.hex_of_bytes f)

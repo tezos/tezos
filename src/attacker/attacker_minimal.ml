@@ -17,6 +17,7 @@ module Ed25519 = Proto.Local_environment.Environment.Ed25519
 let genesis_block_hashed = Block_hash.of_b58check
     "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 let network = Store.Net genesis_block_hashed
+let network = Store.Net_id.Id genesis_block_hashed
 
 (* the bootstrap accounts and actions like signing to do with them *)
 let source_account = List.nth Proto.Bootstrap_storage.accounts 4
@@ -32,7 +33,7 @@ let block_forged ?prev ops =
     [ MBytes.of_string Proto.Constants_repr.version_number ;
       Proto.Fitness_repr.int64_to_bytes x ] in
   let pred = match prev with None -> genesis_block_hashed | Some x -> x in
-  let block ops = Store.{ net_id = network ;
+  let block ops = Store.Block_header.{ net_id = network ;
                       predecessor = pred ;
                       timestamp = Time.now () ;
                       fitness = from_int64 1L;
@@ -117,8 +118,8 @@ let try_action addr port action =
     ~incoming:false
     conn
     (addr, port)
-    identity Tezos_p2p.Raw.supported_versions >>=? fun (_, auth_fd) ->
-  P2p_connection.accept auth_fd Tezos_p2p.Raw.encoding >>= function
+    identity Distributed_db.Raw.supported_versions >>=? fun (_, auth_fd) ->
+  P2p_connection.accept auth_fd Distributed_db.Raw.encoding >>= function
   | Error _ -> failwith "Connection rejected by peer."
   | Ok conn ->
       action conn >>=? fun () ->
@@ -130,8 +131,8 @@ let replicate n x =
     if n <= 0 then acc else replicate_acc (x :: acc) (n-1) x in
   replicate_acc [] n x
 
-let send conn (msg : Tezos_p2p.msg) =
-  P2p_connection.write conn (Tezos_p2p.Raw.Message msg)
+let send conn (msg : Distributed_db.Message.t) =
+  P2p_connection.write conn (P2p.Raw.Message msg)
 
 let request_block_times block_hash n conn =
   let open Block_hash in
@@ -139,7 +140,7 @@ let request_block_times block_hash n conn =
     "requesting %a block %d times"
     pp_short block_hash n >>= fun () ->
   let block_hashes = replicate n block_hash in
-  send conn (Get_blocks block_hashes)
+  send conn (Get_block_headers (network, block_hashes))
 
 let request_op_times op_signed n conn =
   let open Operation_hash in

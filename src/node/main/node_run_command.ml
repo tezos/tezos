@@ -9,8 +9,8 @@
 
 open Logging.Node.Main
 
-let genesis = {
-  Store.time =
+let genesis : State.Net.genesis = {
+  time =
     Time.of_notation_exn "2016-11-01T00:00:00Z" ;
   block =
     Block_hash.of_b58check

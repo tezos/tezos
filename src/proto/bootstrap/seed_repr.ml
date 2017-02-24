@@ -25,7 +25,7 @@ let state_hash_encoding =
   let open Data_encoding in
   conv
     State_hash.to_bytes
-    State_hash.of_bytes
+    State_hash.of_bytes_exn
     (Fixed.bytes Nonce_hash.size)
 
 let seed_encoding =

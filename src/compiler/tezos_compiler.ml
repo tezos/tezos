@@ -126,6 +126,7 @@ module Meta = struct
 end
 
 module Protocol = struct
+
   type component = {
     name: string;
     interface: string option;
@@ -143,7 +144,11 @@ module Protocol = struct
          (req "implementation" string))
 
   type t = component list
+  type protocol = t
   let encoding = Data_encoding.list component_encoding
+
+  let compare = Pervasives.compare
+  let equal = (=)
 
   let to_bytes v = Data_encoding.Binary.to_bytes encoding v
   let of_bytes b = Data_encoding.Binary.of_bytes encoding b

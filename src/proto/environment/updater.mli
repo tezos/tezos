@@ -2,11 +2,13 @@
 
 open Hash
 
-type net_id
-val net_id_encoding: net_id Data_encoding.t
+module Net_id : sig
+  type t
+  val encoding : t Data_encoding.t
+end
 
 type shell_operation = {
-  net_id: net_id ;
+  net_id: Net_id.t ;
 }
 val shell_operation_encoding: shell_operation Data_encoding.t
 
@@ -18,7 +20,7 @@ type raw_operation = {
 
 (** The version agnostic toplevel structure of blocks. *)
 type shell_block = {
-  net_id: net_id ;
+  net_id: Net_id.t ;
   (** The genesis of the chain this block belongs to. *)
   predecessor: Block_hash.t ;
   (** The preceding block in the chain. *)
@@ -43,14 +45,14 @@ type raw_block = {
 type 'error preapply_result =
   { applied: Operation_hash.t list;
     (** Operations that where successfully applied. *)
-    refused: 'error list Operation_hash_map.t;
+    refused: 'error list Operation_hash.Map.t;
     (** Operations which triggered a context independent, unavoidable
         error (e.g. invalid signature). *)
-    branch_refused: 'error list Operation_hash_map.t;
+    branch_refused: 'error list Operation_hash.Map.t;
     (** Operations which triggered an error that might not arise in a
         different context (e.g. past account counter, insufficent
         balance). *)
-    branch_delayed: 'error list Operation_hash_map.t;
+    branch_delayed: 'error list Operation_hash.Map.t;
     (** Operations which triggered an error that might not arise in a
         future update of this context (e.g. futur account counter). *) }
 
@@ -132,7 +134,7 @@ type component = {
 
 (** Takes a version hash, a list of OCaml components in compilation
     order. The last element must be named [protocol] and respect the
-    [protocol.mli] interface. Tries to compile it and returns true
+    [protocol.ml] interface. Tries to compile it and returns true
     if the operation was successful. *)
 val compile : Protocol_hash.t -> component list -> bool Lwt.t
 

@@ -27,21 +27,23 @@ let genesis_protocol =
 let genesis_time =
   Time.of_seconds 0L
 
-let genesis = {
-  Store.time = genesis_time ;
+let genesis : State.Net.genesis = {
+  time = genesis_time ;
   block = genesis_block ;
   protocol = genesis_protocol ;
 }
 
+let net_id = State.Net_id.Id genesis_block
+
 (** Context creation *)
 
 let block2 =
-  Block_hash.of_hex
+  Block_hash.of_hex_exn
     "2222222222222222222222222222222222222222222222222222222222222222"
 
-let faked_block : Store.block = {
+let faked_block : Store.Block_header.t = {
   shell = {
-    net_id = Net genesis_block ;
+    net_id ;
     predecessor = genesis_block ;
     operations = [] ;
     fitness = [] ;
@@ -52,52 +54,55 @@ let faked_block : Store.block = {
 
 let create_block2 idx =
   checkout idx genesis_block >>= function
-  | None | Some (Error _) ->
+  | None ->
       Assert.fail_msg "checkout genesis_block"
-  | Some (Ok ctxt) ->
+  | Some ctxt ->
       set ctxt ["a"; "b"] (MBytes.of_string "Novembre") >>= fun ctxt ->
       set ctxt ["a"; "c"] (MBytes.of_string "Juin") >>= fun ctxt ->
       set ctxt ["version";] (MBytes.of_string "0.0") >>= fun ctxt ->
-      commit idx faked_block block2 ctxt
+      commit faked_block block2 ctxt
 
 let block3a =
-  Block_hash.of_hex
+  Block_hash.of_hex_exn
     "3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a"
 
 let create_block3a idx =
   checkout idx block2 >>= function
-  | None | Some (Error _) ->
+  | None  ->
       Assert.fail_msg "checkout block2"
-  | Some (Ok ctxt) ->
+  | Some ctxt ->
       del ctxt ["a"; "b"] >>= fun ctxt ->
       set ctxt ["a"; "d"] (MBytes.of_string "Mars") >>= fun ctxt ->
-      commit idx faked_block block3a ctxt
+      commit faked_block block3a ctxt
 
 let block3b =
-  Block_hash.of_hex
+  Block_hash.of_hex_exn
     "3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b"
 
 let block3c =
-  Block_hash.of_hex
+  Block_hash.of_hex_exn
     "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c"
 
 let create_block3b idx =
   checkout idx block2 >>= function
-  | None | Some (Error _) ->
+  | None ->
       Assert.fail_msg "checkout block3b"
-  | Some (Ok ctxt) ->
+  | Some ctxt ->
       del ctxt ["a"; "c"] >>= fun ctxt ->
       set ctxt ["a"; "d"] (MBytes.of_string "Février") >>= fun ctxt ->
-      commit idx faked_block block3b ctxt
+      commit faked_block block3b ctxt
 
 let wrap_context_init f base_dir =
   let root = base_dir // "context" in
   Context.init root >>= fun idx ->
-  Context.create_genesis_context idx genesis genesis_protocol >>= fun _ ->
+  Context.commit_genesis idx
+    ~id:genesis.block
+    ~time:genesis.time
+    ~protocol:genesis.protocol
+    ~test_protocol:genesis.protocol >>= fun _ ->
   create_block2 idx >>= fun () ->
   create_block3a idx >>= fun () ->
   create_block3b idx >>= fun () ->
-  commit_invalid idx faked_block block3c [Error_monad.Unclassified "TEST"] >>= fun () ->
   f idx
 
 (** Simple test *)
@@ -108,9 +113,9 @@ let c = function
 
 let test_simple idx =
   checkout idx block2 >>= function
-  | None | Some (Error _) ->
+  | None ->
       Assert.fail_msg "checkout block2"
-  | Some (Ok ctxt) ->
+  | Some ctxt ->
       get ctxt ["version"] >>= fun version ->
       Assert.equal_string_option ~msg:__LOC__ (c version) (Some "0.0") ;
       get ctxt ["a";"b"] >>= fun novembre ->
@@ -121,9 +126,9 @@ let test_simple idx =
 
 let test_continuation idx =
   checkout idx block3a >>= function
-  | None | Some (Error _) ->
+  | None  ->
       Assert.fail_msg "checkout block3a"
-  | Some (Ok ctxt) ->
+  | Some ctxt ->
       get ctxt ["version"] >>= fun version ->
       Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
       get ctxt ["a";"b"] >>= fun novembre ->
@@ -136,9 +141,9 @@ let test_continuation idx =
 
 let test_fork idx =
   checkout idx block3b >>= function
-  | None | Some (Error _) ->
+  | None  ->
       Assert.fail_msg "checkout block3b"
-  | Some (Ok ctxt) ->
+  | Some ctxt ->
       get ctxt ["version"] >>= fun version ->
       Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
       get ctxt ["a";"b"] >>= fun novembre ->
@@ -151,9 +156,9 @@ let test_fork idx =
 
 let test_replay idx =
   checkout idx genesis_block >>= function
-  | None | Some (Error _) ->
+  | None  ->
       Assert.fail_msg "checkout genesis_block"
-  | Some (Ok ctxt0) ->
+  | Some ctxt0 ->
       set ctxt0 ["version"] (MBytes.of_string "0.0") >>= fun ctxt1 ->
       set ctxt1 ["a"; "b"] (MBytes.of_string "Novembre") >>= fun ctxt2 ->
       set ctxt2 ["a"; "c"] (MBytes.of_string "Juin") >>= fun ctxt3 ->
@@ -174,9 +179,9 @@ let test_replay idx =
 
 let test_list idx =
   checkout idx genesis_block >>= function
-  | None | Some (Error _) ->
+  | None ->
       Assert.fail_msg "checkout genesis_block"
-  | Some (Ok ctxt) ->
+  | Some ctxt ->
       set ctxt ["a"; "b"] (MBytes.of_string "Novembre") >>= fun ctxt ->
       set ctxt ["a"; "c"] (MBytes.of_string "Juin") >>= fun ctxt ->
       set ctxt ["a"; "d"; "e"] (MBytes.of_string "Septembre") >>= fun ctxt ->
@@ -198,19 +203,6 @@ let test_list idx =
         [["a"; "b"]; ["a"; "c"]; ["a"; "d"]; ["g"; "h"]] l ;
       Lwt.return ()
 
-let test_invalid idx =
-  checkout idx block3c >>= function
-  | Some (Error [exn]) ->
-      Assert.equal_error_monad
-        ~msg:__LOC__(Error_monad.Unclassified "TEST") exn ;
-      Lwt.return_unit
-  | Some (Error _) ->
-      Assert.fail_msg "checkout unexpected error in block3c"
-  | Some (Ok _) ->
-      Assert.fail_msg "checkout valid block3c"
-  | None ->
-      Assert.fail_msg "checkout absent block3c"
-
 
 (******************************************************************************)
 
@@ -220,7 +212,6 @@ let tests : (string * (index -> unit Lwt.t)) list = [
   "fork", test_fork ;
   "replay", test_replay ;
   "list", test_list ;
-  "invalid", test_invalid ;
 ]
 
 let () =

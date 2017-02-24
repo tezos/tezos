@@ -38,19 +38,34 @@ module type MINIMAL_HASH = sig
   val size: int (* in bytes *)
   val compare: t -> t -> int
   val equal: t -> t -> bool
-  val of_hex: string -> t
+
   val to_hex: t -> string
-  val of_string: string -> t
+  val of_hex: string -> t option
+  val of_hex_exn: string -> t
+
   val to_string: t -> string
+  val of_string: string -> t option
+  val of_string_exn: string -> t
+
   val to_bytes: t -> MBytes.t
-  val of_bytes: MBytes.t -> t
+  val of_bytes: MBytes.t -> t option
+  val of_bytes_exn: MBytes.t -> t
+
   val read: MBytes.t -> int -> t
   val write: MBytes.t -> int -> t -> unit
-  val to_path: t -> string list
-  val of_path: string list -> t
-  val prefix_path: string -> string list
-  val path_len: int
 
+  val to_path: t -> string list
+  val of_path: string list -> t option
+  val of_path_exn: string list -> t
+
+  val prefix_path: string -> string list
+  val path_length: int
+
+end
+
+module type INTERNAL_MINIMAL_HASH = sig
+  include MINIMAL_HASH
+  module Table : Hashtbl.S with type key = t
 end
 
 module type HASH = sig
@@ -66,6 +81,21 @@ module type HASH = sig
   type Base58.data += Hash of t
   val b58check_encoding: t Base58.encoding
 
+  module Set : sig
+    include Set.S with type elt = t
+    val encoding: t Data_encoding.t
+  end
+
+  module Map : sig
+    include Map.S with type key = t
+    val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
+  end
+
+end
+
+module type INTERNAL_HASH = sig
+  include HASH
+  module Table : Hashtbl.S with type key = t
 end
 
 module type Name = sig
@@ -93,32 +123,43 @@ module Make_minimal_Blake2B (K : Name) = struct
     | Some x -> x
 
   let of_string s =
-    if String.length s <> size then begin
-      let msg =
-        Printf.sprintf "%s.of_string: wrong string size (%d)"
-          K.name (String.length s) in
-      raise (Invalid_argument msg)
-    end ;
-    Sodium.Generichash.Bytes.to_hash (Bytes.of_string s)
+    if String.length s <> size then
+      None
+    else
+      Some (Sodium.Generichash.Bytes.to_hash (Bytes.of_string s))
+  let of_string_exn s =
+    match of_string s with
+    | None ->
+        let msg =
+          Printf.sprintf "%s.of_string: wrong string size (%d)"
+            K.name (String.length s) in
+        raise (Invalid_argument msg)
+    | Some h -> h
   let to_string s = Bytes.to_string (Sodium.Generichash.Bytes.of_hash s)
 
   let of_hex s = of_string (Hex_encode.hex_decode s)
+  let of_hex_exn s = of_string_exn (Hex_encode.hex_decode s)
   let to_hex s = Hex_encode.hex_encode (to_string s)
 
   let compare = Sodium.Generichash.compare
   let equal x y = compare x y = 0
 
   let of_bytes b =
-    if MBytes.length b <> size then begin
-      let msg =
-        Printf.sprintf "%s.of_bytes: wrong string size (%d)"
-          K.name (MBytes.length b) in
-      raise (Invalid_argument msg)
-    end ;
-    Sodium.Generichash.Bigbytes.to_hash b
+    if MBytes.length b <> size then
+      None
+    else
+      Some (Sodium.Generichash.Bigbytes.to_hash b)
+  let of_bytes_exn b =
+    match of_bytes b with
+    | None ->
+        let msg =
+          Printf.sprintf "%s.of_bytes: wrong string size (%d)"
+            K.name (MBytes.length b) in
+        raise (Invalid_argument msg)
+    | Some h -> h
   let to_bytes = Sodium.Generichash.Bigbytes.of_hash
 
-  let read src off = of_bytes @@ MBytes.sub src off size
+  let read src off = of_bytes_exn @@ MBytes.sub src off size
   let write dst off h = MBytes.blit (to_bytes h) 0 dst off size
 
   let hash_bytes l =
@@ -135,8 +176,6 @@ module Make_minimal_Blake2B (K : Name) = struct
       l ;
     final state
 
-  module Set = Set.Make(struct type nonrec t = t let compare = compare end)
-
   let fold_read f buf off len init =
     let last = off + len * size in
     if last > MBytes.length buf then
@@ -150,19 +189,7 @@ module Make_minimal_Blake2B (K : Name) = struct
     in
     loop init off
 
-  module Map = Map.Make(struct type nonrec t = t let compare = compare end)
-  module Table =
-    Hashtbl.Make(struct
-      type nonrec t = t
-      let hash s =
-        Int64.to_int
-          (EndianString.BigEndian.get_int64
-             (Bytes.unsafe_to_string (Sodium.Generichash.Bytes.of_hash s))
-             0)
-      let equal = equal
-    end)
-
-  let path_len = 6
+  let path_length = 6
   let to_path key =
     let key = to_hex key in
     [ String.sub key 0 2 ; String.sub key 2 2 ;
@@ -171,6 +198,9 @@ module Make_minimal_Blake2B (K : Name) = struct
   let of_path path =
     let path = String.concat "" path in
     of_hex path
+  let of_path_exn path =
+    let path = String.concat "" path in
+    of_hex_exn path
 
   let prefix_path p =
     let p = Hex_encode.hex_encode p in
@@ -182,6 +212,18 @@ module Make_minimal_Blake2B (K : Name) = struct
     and p5 = if len >= 10 then String.sub p 8 2 else ""
     and p6 = if len > 10 then String.sub p 10 (len - 10) else "" in
     [ p1 ; p2 ; p3 ; p4 ; p5 ; p6 ]
+
+  module Table = struct
+    include Hashtbl.Make(struct
+      type nonrec t = t
+      let hash s =
+        Int64.to_int
+          (EndianString.BigEndian.get_int64
+             (Bytes.unsafe_to_string (Sodium.Generichash.Bytes.of_hash s))
+             0)
+      let equal = equal
+    end)
+  end
 
 end
 
@@ -206,7 +248,7 @@ module Make_Blake2B (R : sig
       ~prefix: K.b58check_prefix
       ~length:size
       ~wrap: (fun s -> Hash s)
-      ~of_raw:(fun h -> Some (of_string h)) ~to_raw:to_string
+      ~of_raw:(fun h -> of_string h) ~to_raw:to_string
 
   let of_b58check s =
     match Base58.simple_decode b58check_encoding s with
@@ -221,7 +263,7 @@ module Make_Blake2B (R : sig
     let open Data_encoding in
     splitted
       ~binary:
-        (conv to_bytes of_bytes (Fixed.bytes size))
+        (conv to_bytes of_bytes_exn (Fixed.bytes size))
       ~json:
         (describe ~title: (K.title ^ " (Base58Check-encoded Sha256)") @@
          conv to_b58check (Data_encoding.Json.wrap_error of_b58check) string)
@@ -234,6 +276,24 @@ module Make_Blake2B (R : sig
 
   let pp_short ppf t =
     Format.pp_print_string ppf (to_short_b58check t)
+
+  module Set = struct
+    include Set.Make(struct type nonrec t = t let compare = compare end)
+    let encoding =
+      Data_encoding.conv
+        elements
+        (fun l -> List.fold_left (fun m x -> add x m) empty l)
+        Data_encoding.(list encoding)
+  end
+
+  module Map = struct
+    include Map.Make(struct type nonrec t = t let compare = compare end)
+    let encoding arg_encoding =
+      Data_encoding.conv
+        bindings
+        (fun l -> List.fold_left (fun m (k,v) -> add k v m) empty l)
+        Data_encoding.(list (tup2 encoding arg_encoding))
+  end
 
 end
 
@@ -278,10 +338,6 @@ module Block_hash =
     let size = None
   end)
 
-module Block_hash_set = Hash_set (Block_hash)
-module Block_hash_map = Hash_map (Block_hash)
-module Block_hash_table = Hash_table (Block_hash)
-
 module Operation_hash =
   Make_Blake2B (Base58) (struct
     let name = "Operation_hash"
@@ -290,10 +346,6 @@ module Operation_hash =
     let size = None
    end)
 
-module Operation_hash_set = Hash_set (Operation_hash)
-module Operation_hash_map = Hash_map (Operation_hash)
-module Operation_hash_table = Hash_table (Operation_hash)
-
 module Protocol_hash =
   Make_Blake2B (Base58) (struct
     let name = "Protocol_hash"
@@ -301,10 +353,6 @@ module Protocol_hash =
     let b58check_prefix = Base58.Prefix.protocol_hash
     let size = None
   end)
-
-module Protocol_hash_set = Hash_set (Protocol_hash)
-module Protocol_hash_map = Hash_map (Protocol_hash)
-module Protocol_hash_table = Hash_table (Protocol_hash)
 
 module Generic_hash =
   Make_minimal_Blake2B (struct

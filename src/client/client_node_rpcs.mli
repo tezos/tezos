@@ -7,15 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type net = State.net_id = Net of Block_hash.t
-
 val errors:
   Client_commands.context ->
   Json_schema.schema Lwt.t
 
 val forge_block:
   Client_commands.context ->
-  ?net:Updater.net_id ->
+  ?net:Updater.Net_id.t ->
   ?predecessor:Block_hash.t ->
   ?timestamp:Time.t ->
   Fitness.fitness ->
@@ -25,7 +23,7 @@ val forge_block:
 
 val validate_block:
   Client_commands.context ->
-  net -> Block_hash.t ->
+  Updater.Net_id.t -> Block_hash.t ->
   unit tzresult Lwt.t
 
 val inject_block:
@@ -57,7 +55,7 @@ module Blocks : sig
 
   val net:
     Client_commands.context ->
-    block -> net Lwt.t
+    block -> Updater.Net_id.t Lwt.t
   val predecessor:
     Client_commands.context ->
     block -> Block_hash.t Lwt.t
@@ -81,11 +79,11 @@ module Blocks : sig
     block -> Protocol_hash.t option Lwt.t
   val test_network:
     Client_commands.context ->
-    block -> (net * Time.t) option Lwt.t
+    block -> (Updater.Net_id.t * Time.t) option Lwt.t
 
   val pending_operations:
     Client_commands.context ->
-    block -> (error Updater.preapply_result * Operation_hash_set.t) Lwt.t
+    block -> (error Updater.preapply_result * Operation_hash.Set.t) Lwt.t
 
   type block_info = {
     hash: Block_hash.t ;
@@ -94,9 +92,9 @@ module Blocks : sig
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
     operations: Operation_hash.t list option ;
-    net: net ;
+    net: Updater.Net_id.t ;
     test_protocol: Protocol_hash.t option ;
-    test_network: (net * Time.t) option ;
+    test_network: (Updater.Net_id.t * Time.t) option ;
   }
 
   val info:
@@ -134,18 +132,18 @@ module Operations : sig
   val monitor:
     Client_commands.context ->
     ?contents:bool -> unit ->
-    (Operation_hash.t * Store.operation option) list Lwt_stream.t Lwt.t
+    (Operation_hash.t * Store.Operation.t option) list Lwt_stream.t Lwt.t
 end
 
 module Protocols : sig
   val bytes:
     Client_commands.context ->
-    Protocol_hash.t -> Store.protocol tzresult Time.timed_data Lwt.t
+    Protocol_hash.t -> Store.Protocol.t Lwt.t
 
   val list:
     Client_commands.context ->
     ?contents:bool -> unit ->
-    (Protocol_hash.t * Store.protocol option) list Lwt.t
+    (Protocol_hash.t * Store.Protocol.t option) list Lwt.t
 end
 
 val complete:

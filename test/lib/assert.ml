@@ -55,23 +55,35 @@ let equal_error_monad ?msg exn1 exn2 =
     | Error_monad.Unclassified err -> err in
   Assert.equal ?msg ~prn exn1 exn2
 
+let equal_block_set ?msg set1 set2 =
+  let msg = format_msg msg in
+  let b1 = Block_hash.Set.elements set1
+  and b2 = Block_hash.Set.elements set2 in
+  Assert.make_equal_list ?msg
+    (fun h1 h2 -> Block_hash.equal h1 h2)
+    Block_hash.to_string
+    b1 b2
+
 let equal_block_map ?msg ~eq map1 map2 =
   let msg = format_msg msg in
-  let open Hash in
-  let module BlockMap = Hash_map(Block_hash) in
-  Assert.equal ?msg ~eq map1 map2
+  let b1 = Block_hash.Map.bindings map1
+  and b2 = Block_hash.Map.bindings map2 in
+  Assert.make_equal_list ?msg
+    (fun (h1, b1) (h2, b2) -> Block_hash.equal h1 h2 && eq b1 b2)
+    (fun (h1, _) -> Block_hash.to_string h1)
+    b1 b2
 
 let equal_operation ?msg op1 op2 =
   let msg = format_msg msg in
   let eq op1 op2 =
     match op1, op2 with
     | None, None -> true
-    | Some (h1, op1), Some (h2, op2) ->
-        Hash.Operation_hash.equal h1 h2 && op1 = op2
+    | Some op1, Some op2 ->
+        Store.Operation.equal op1 op2
     | _ -> false in
   let prn = function
     | None -> "none"
-    | Some (h, op) -> Hash.Operation_hash.to_hex h in
+    | Some op -> Hash.Operation_hash.to_hex (Store.Operation.hash op) in
   Assert.equal ?msg ~prn ~eq op1 op2
 
 let equal_block ?msg st1 st2 =
@@ -79,12 +91,12 @@ let equal_block ?msg st1 st2 =
   let eq st1 st2 =
     match st1, st2 with
     | None, None -> true
-    | Some (h1, st1), Some (h2, st2) ->
-        Hash.Block_hash.equal h1 h2 && st1 = st2
+    | Some st1, Some st2 -> Store.Block_header.equal st1 st2
     | _ -> false in
   let prn = function
     | None -> "none"
-    | Some (h, st) -> Hash.Block_hash.to_hex h in
+    | Some st ->
+        Hash.Block_hash.to_hex (Store.Block_header.hash st) in
   Assert.equal ?msg ~prn ~eq st1 st2
 
 let equal_result ?msg r1 r2 ~equal_ok ~equal_err =

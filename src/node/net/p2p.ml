@@ -246,31 +246,42 @@ module Real = struct
         lwt_debug "message sent to %a"
           Connection_info.pp
           (P2p_connection_pool.connection_info conn) >>= fun () ->
-        Lwt.return_unit
-    | Error _ ->
-        lwt_debug "error sending message from %a"
+        return ()
+    | Error err ->
+        lwt_debug "error sending message from %a: %a"
           Connection_info.pp
-          (P2p_connection_pool.connection_info conn) >>= fun () ->
-        Lwt.fail End_of_file (* temporary *)
+          (P2p_connection_pool.connection_info conn)
+          pp_print_error err >>= fun () ->
+        Lwt.return (Error err)
 
   let try_send _net conn v =
     match P2p_connection_pool.write_now conn v with
     | Ok v ->
-        Lwt.ignore_result
-          (lwt_debug "message trysent to %a"
-             Connection_info.pp
-             (P2p_connection_pool.connection_info conn)) ;
+        debug "message trysent to %a"
+          Connection_info.pp
+          (P2p_connection_pool.connection_info conn) ;
         v
-    | Error _ ->
-        Lwt.ignore_result
-          (lwt_debug "error trysending message to %a"
-             Connection_info.pp
-             (P2p_connection_pool.connection_info conn)) ;
+    | Error err ->
+        debug "error trysending message to %a@ %a"
+          Connection_info.pp
+          (P2p_connection_pool.connection_info conn)
+          pp_print_error err ;
         false
 
   let broadcast { pool } msg =
     P2p_connection_pool.write_all pool msg ;
-    Lwt.ignore_result (lwt_debug "message broadcasted")
+    debug "message broadcasted"
+
+  let fold_connections { pool } ~init ~f =
+    P2p_connection_pool.fold_connections pool ~init ~f
+
+  let iter_connections { pool } f =
+    P2p_connection_pool.fold_connections pool
+      ~init:()
+      ~f:(fun gid conn () -> f gid conn)
+
+  let on_new_connection { pool } f =
+    P2p_connection_pool.on_new_connection pool f
 
   let pool { pool } = pool
 end
@@ -308,10 +319,14 @@ type ('msg, 'meta) t = {
   set_metadata : Peer_id.t -> 'meta -> unit ;
   recv : ('msg, 'meta) connection -> 'msg tzresult Lwt.t ;
   recv_any : unit -> (('msg, 'meta) connection * 'msg) Lwt.t ;
-  send : ('msg, 'meta) connection -> 'msg -> unit Lwt.t ;
+  send : ('msg, 'meta) connection -> 'msg -> unit tzresult Lwt.t ;
   try_send : ('msg, 'meta) connection -> 'msg -> bool ;
   broadcast : 'msg -> unit ;
   pool : ('msg, 'meta) P2p_connection_pool.t option ;
+  fold_connections :
+    'a. init:'a -> f:(Peer_id.t -> ('msg, 'meta) connection -> 'a -> 'a) -> 'a ;
+  iter_connections : (Peer_id.t -> ('msg, 'meta) connection -> unit) -> unit ;
+  on_new_connection : (Peer_id.t -> ('msg, 'meta) connection -> unit) -> unit ;
 }
 type ('msg, 'meta) net = ('msg, 'meta) t
 
@@ -335,6 +350,9 @@ let create ~config ~limits meta_cfg msg_cfg =
     try_send = Real.try_send net ;
     broadcast = Real.broadcast net ;
     pool = Some net.pool ;
+    fold_connections = (fun ~init ~f -> Real.fold_connections net ~init ~f) ;
+    iter_connections = Real.iter_connections net ;
+    on_new_connection = Real.on_new_connection net ;
   }
 
 let faked_network = {
@@ -351,8 +369,11 @@ let faked_network = {
   set_metadata = (fun _ _ -> ()) ;
   recv = (fun _ -> Lwt_utils.never_ending) ;
   recv_any = (fun () -> Lwt_utils.never_ending) ;
-  send = (fun _ _ -> Lwt_utils.never_ending) ;
+  send = (fun _ _ -> fail P2p_connection_pool.Connection_closed) ;
   try_send = (fun _ _ -> false) ;
+  fold_connections = (fun ~init ~f:_ -> init) ;
+  iter_connections = (fun _f -> ()) ;
+  on_new_connection = (fun _f -> ()) ;
   broadcast = ignore ;
   pool = None
 }
@@ -373,6 +394,9 @@ let recv_any net = net.recv_any ()
 let send net = net.send
 let try_send net = net.try_send
 let broadcast net = net.broadcast
+let fold_connections net = net.fold_connections
+let iter_connections net = net.iter_connections
+let on_new_connection net = net.on_new_connection
 
 module Raw = struct
   type 'a t = 'a P2p_connection_pool.Message.t =

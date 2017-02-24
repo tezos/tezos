@@ -25,7 +25,7 @@ let monitor cctxt ?contents ?check () =
       (fun (hash, bytes) ->
          match bytes with
          | None -> Lwt.return (Some { hash; content = None })
-         | Some ({ Store.shell ; proto } : Updater.raw_operation) ->
+         | Some ({ Store.Operation.shell ; proto } : Updater.raw_operation) ->
              Client_proto_rpcs.Helpers.Parse.operations cctxt
                `Prevalidation ?check shell proto >>= function
              | Ok proto -> Lwt.return (Some { hash ; content = Some (shell, proto) })

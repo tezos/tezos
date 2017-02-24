@@ -21,18 +21,28 @@ module type MINIMAL_HASH = sig
   val size: int (* in bytes *)
   val compare: t -> t -> int
   val equal: t -> t -> bool
-  val of_hex: string -> t
+
   val to_hex: t -> string
-  val of_string: string -> t
+  val of_hex: string -> t option
+  val of_hex_exn: string -> t
+
   val to_string: t -> string
+  val of_string: string -> t option
+  val of_string_exn: string -> t
+
   val to_bytes: t -> MBytes.t
-  val of_bytes: MBytes.t -> t
+  val of_bytes: MBytes.t -> t option
+  val of_bytes_exn: MBytes.t -> t
+
   val read: MBytes.t -> int -> t
   val write: MBytes.t -> int -> t -> unit
+
   val to_path: t -> string list
-  val of_path: string list -> t
+  val of_path: string list -> t option
+  val of_path_exn: string list -> t
+
   val prefix_path: string -> string list
-  val path_len: int
+  val path_length: int
 
 end
 
@@ -48,6 +58,16 @@ module type HASH = sig
   val pp_short: Format.formatter -> t -> unit
   type Base58.data += Hash of t
   val b58check_encoding: t Base58.encoding
+
+  module Set : sig
+    include Set.S with type elt = t
+    val encoding: t Data_encoding.t
+  end
+
+  module Map : sig
+    include Map.S with type key = t
+    val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
+  end
 
 end
 
@@ -83,31 +103,13 @@ module Make_Blake2B
      end)
     (Name : PrefixedName) : HASH
 
-(** Builds a Set of values of some Hash type. *)
-module Hash_set (Hash : HASH) : sig
-  include Set.S with type elt = Hash.t
-  val encoding: t Data_encoding.t
-end
-
-(** Builds a Map using some Hash type as keys. *)
-module Hash_map (Hash : HASH) : sig
-  include Map.S with type key = Hash.t
-  val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
-end
-
 (** {2 Predefined Hashes } ****************************************************)
 
 (** Blocks hashes / IDs. *)
 module Block_hash : HASH
-module Block_hash_set : Set.S with type elt = Block_hash.t
-module Block_hash_map : module type of Hash_map (Block_hash)
 
 (** Operations hashes / IDs. *)
 module Operation_hash : HASH
-module Operation_hash_set : Set.S with type elt = Operation_hash.t
-module Operation_hash_map : module type of Hash_map (Operation_hash)
 
 (** Protocol versions / source hashes. *)
 module Protocol_hash : HASH
-module Protocol_hash_set : Set.S with type elt = Protocol_hash.t
-module Protocol_hash_map : module type of Hash_map (Protocol_hash)

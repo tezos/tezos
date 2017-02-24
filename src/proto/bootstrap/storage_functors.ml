@@ -207,8 +207,9 @@ module Make_data_set_storage (P : Single_data_description) = struct
         let title = ("A " ^ P.name ^ "key")
         let size = None
       end)
+    let of_path = of_path_exn
     let prefix = P.key
-    let length = path_len
+    let length = path_length
   end
 
   module HashTbl =
@@ -349,13 +350,14 @@ end
 module Make_iterable_data_storage (H: HASH) (P: Single_data_description) =
   Raw_make_iterable_data_storage(struct
     include H
+    let of_path = H.of_path_exn
     let prefix = P.key
-    let length = path_len
+    let length = path_length
   end)(P)
 
 let register_resolvers (module H : Hash.HASH) prefixes =
 
-  let module Set = Hash_set(H) in
+  let module Set = H.Set in
 
   let resolvers =
     List.map
