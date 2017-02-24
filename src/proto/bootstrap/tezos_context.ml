@@ -56,9 +56,9 @@ module Constants = struct
   let time_before_reward c =
     let constants = Storage.constants c in
     constants.time_before_reward
-  let time_between_slots c =
+  let slot_durations c =
     let constants = Storage.constants c in
-    constants.time_between_slots
+    constants.slot_durations
   let first_free_mining_slot c =
     let constants = Storage.constants c in
     constants.first_free_mining_slot

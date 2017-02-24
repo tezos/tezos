@@ -181,7 +181,7 @@ module Constants : sig
   val cycle_length: context -> int32
   val voting_period_length: context -> int32
   val time_before_reward: context -> Period.t
-  val time_between_slots: context -> Period.t
+  val slot_durations: context -> Period.t list
   val first_free_mining_slot: context -> int32
   val max_signing_slot: context -> int
   val instructions_per_transaction: context -> int

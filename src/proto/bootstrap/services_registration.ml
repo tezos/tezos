@@ -53,10 +53,10 @@ let time_before_reward ctxt =
 
 let () = register0 Services.Constants.time_before_reward time_before_reward
 
-let time_between_slots ctxt =
-  return @@ Constants.time_between_slots ctxt
+let slot_durations ctxt =
+  return @@ Constants.slot_durations ctxt
 
-let () = register0 Services.Constants.time_between_slots time_between_slots
+let () = register0 Services.Constants.slot_durations slot_durations
 
 let first_free_mining_slot ctxt =
   return @@ Constants.first_free_mining_slot ctxt

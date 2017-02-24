@@ -60,12 +60,12 @@ module Constants = struct
                 describe ~title: "time before reward" Period.encoding)
       RPC.Path.(custom_root / "constants" / "time_before_reward")
 
-  let time_between_slots custom_root =
+  let slot_durations custom_root =
     RPC.service
-      ~description: "Time between slots"
+      ~description: "Slot durations"
       ~input: empty
       ~output: (wrap_tzerror @@
-                describe ~title: "time between slots" Period.encoding)
+                describe ~title: "time between slots" (list Period.encoding))
       RPC.Path.(custom_root / "constants" / "time_between_slots")
 
   let first_free_mining_slot custom_root =
