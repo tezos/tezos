@@ -190,6 +190,7 @@ let may_start_new_cycle ctxt =
         match Cycle.pred new_cycle with
         | None -> assert false
         | Some last_cycle -> last_cycle in
+      Bootstrap.refill ctxt >>=? fun ctxt ->
       Seed.clear_cycle ctxt last_cycle >>=? fun ctxt ->
       Seed.compute_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
       Roll.clear_cycle ctxt last_cycle >>=? fun ctxt ->
@@ -199,7 +200,6 @@ let may_start_new_cycle ctxt =
       >>=? fun reward_date ->
       Reward.set_reward_time_for_cycle
         ctxt last_cycle reward_date >>=? fun ctxt ->
-      Bootstrap.refill ctxt >>=? fun ctxt ->
       return ctxt
 
 let apply_main ctxt accept_failing_script block operations =
