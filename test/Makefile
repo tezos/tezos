@@ -273,8 +273,8 @@ COVERAGESRCDIR= \
   -I ../src \
   -I ../src/client \
   -I ../src/client/embedded \
-  -I ../src/client/embedded/bootstrap \
-  -I ../src/client/embedded/bootstrap/mining \
+  -I ../src/client/embedded/alpha \
+  -I ../src/client/embedded/alpha/mining \
   -I ../src/compiler \
   -I ../src/node \
   -I ../src/node/db \
@@ -282,7 +282,7 @@ COVERAGESRCDIR= \
   -I ../src/node/net \
   -I ../src/node/shell \
   -I ../src/proto \
-  -I ../src/proto/bootstrap \
+  -I ../src/proto/alpha \
   -I ../src/proto/demo \
   -I ../src/minutils \
   -I ../src/utils

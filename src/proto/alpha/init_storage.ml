@@ -10,7 +10,7 @@
 let version_key = ["version"]
 (* This key should always be populated for every version of the
    protocol.  It's absence meaning that the context is empty. *)
-let version_value = "genesis"
+let version_value = "alpha"
 
 (* This is the genesis protocol: initialise the state *)
 let initialize (ctxt:Context.t) =
