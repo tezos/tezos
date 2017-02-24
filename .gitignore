@@ -21,6 +21,7 @@
 /src/client/embedded/**/_tzbuild
 
 /src/client/embedded/demo/.depend
+/src/client/embedded/genesis/.depend
 
 /src/client/embedded/alpha/.depend
 /src/client/embedded/alpha/concrete_lexer.ml

@@ -32,3 +32,5 @@ val public_key_encoding : public_key Data_encoding.t
 val secret_key_encoding : secret_key Data_encoding.t
 
 val signature_encoding : signature Data_encoding.t
+
+val public_key_of_bytes : Bytes.t -> public_key
