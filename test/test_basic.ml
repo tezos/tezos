@@ -7,8 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_embedded_proto_bootstrap
-open Client_bootstrap
+open Client_embedded_proto_alpha
+open Client_alpha
 open Tezos_context
 open Error_monad
 open Hash

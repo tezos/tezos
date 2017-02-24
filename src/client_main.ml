@@ -50,7 +50,7 @@ let main () =
                | exn -> Printexc.to_string exn) >>= fun () ->
             cctxt.warning
               "Using the default protocol version." >>= fun () ->
-            Lwt.return Client_bootstrap.Client_proto_main.protocol)
+            Lwt.return Client_alpha.Client_proto_main.protocol)
        >>= fun version ->
        let commands =
          Client_generic_rpcs.commands @
