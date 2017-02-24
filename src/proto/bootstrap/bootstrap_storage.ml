@@ -99,12 +99,23 @@ let account_encoding =
        (req "secretKey" Ed25519.secret_key_encoding))
 
 let refill ctxt =
+  (* Unefficient HACK for tha alphanet only... *)
+  Contract_storage.list ctxt >>=? fun contracts ->
+  List.fold_left
+    (fun total contract ->
+       Contract_storage.get_balance ctxt contract >>=? fun balance ->
+       total >>=? fun total -> Lwt.return Tez_repr.(total +? balance))
+    (return Tez_repr.zero) contracts >>=? fun total ->
+  (* The 5 bootstrap accounts should have at least 1/2 of the total amount
+     of tokens. *)
+  let min_balance =
+    Tez_repr.(total / 2L / (Int64.of_int (List.length accounts))) in
   fold_left_s
     (fun ctxt account ->
        let contract =
          Contract_repr.default_contract account.public_key_hash in
        Contract_storage.get_balance ctxt contract >>=? fun balance ->
-       match Tez_repr.(wealth -? balance) with
+       match Tez_repr.(min_balance -? balance) with
        | Error _ -> return ctxt
        | Ok tez -> Contract_storage.credit ctxt contract tez)
     ctxt
