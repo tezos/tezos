@@ -7,223 +7,221 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Tezos - Simple imperative (key x value) store *)
+open Store_sigs
 
-type key = string list
-type value = MBytes.t
-
-module type TYPED_IMPERATIVE_STORE = sig
-  type t
-  type key
-  type value
-  val mem: t -> key -> bool Lwt.t
-  val get: t -> key -> value option Lwt.t
-  val get_exn: t -> key -> value Lwt.t
-  val set: t -> key -> value -> unit Lwt.t
-  val del: t -> key -> unit Lwt.t
-  val keys: t -> key list Lwt.t
-end
-
-module type IMPERATIVE_STORE = sig
-  type t
-  val mem: t -> key -> bool Lwt.t
-  val dir_mem: t -> key -> bool Lwt.t
-  val get: t -> key -> value option Lwt.t
-  val get_exn: t -> key -> value Lwt.t
-  val set: t -> key -> value -> unit Lwt.t
-  val del: t -> key -> unit Lwt.t
-  val list: t -> key list -> key list Lwt.t
-  val remove_rec: t -> key -> unit Lwt.t
-end
-
-(** A generic (key x value) store. *)
-type generic_store
-type block_store
-type blockchain_store
-type operation_store
-type protocol_store
-
-type store = private {
-  block: block_store Persist.shared_ref ;
-  blockchain: blockchain_store Persist.shared_ref ;
-  operation: operation_store Persist.shared_ref ;
-  protocol: protocol_store Persist.shared_ref ;
-  global_store: generic_store Persist.shared_ref ;
-  net_init: ?expiration:Time.t -> genesis -> net_store Lwt.t ;
-  net_read: net_id -> net_store tzresult Lwt.t ;
-  net_destroy: net_store -> unit Lwt.t ;
-}
-
-and net_store = private {
-  net_genesis: genesis ;
-  net_expiration: Time.t option ;
-  net_store: generic_store Persist.shared_ref ;
-}
-
-and genesis = {
-  time: Time.t ;
-  block: Block_hash.t ;
-  protocol: Protocol_hash.t ;
-}
-
-and net_id = Net of Block_hash.t
-
-val net_id_encoding: net_id Data_encoding.t
-val pp_net_id: Format.formatter -> net_id -> unit
+type t
+type global_store = t
 
 (** Open or initialize a store at a given path. *)
-val init: string -> store Lwt.t
+val init: string -> t tzresult Lwt.t
 
-(** Lwt exn returned when function keys is not implemented *)
-val undefined_key_fn : 'a Lwt.t
 
-(** {2 Generic interface} ****************************************************)
+(** {2 Net store} ************************************************************)
 
-(** The generic primitives do work on the direct root, but in a
-    "data/" subdirectory and do not colide with following block and
-    operation specific functions. *)
-include IMPERATIVE_STORE with type t = generic_store
+module Net_id : sig
 
-(** {2 Types} ****************************************************************)
+  type t = Id of Block_hash.t
+  type net_id = t
+  val encoding: net_id Data_encoding.t
+  val pp: Format.formatter -> net_id -> unit
+  val compare: net_id -> net_id -> int
+  val equal: net_id -> net_id -> bool
 
-(** Raw operations in the database (partially parsed).
-    See [State.Operation.t] for detailled description. *)
-type shell_operation = {
-  net_id: net_id ;
-}
-type operation = {
-  shell: shell_operation ;
-  proto: MBytes.t ;
-}
+  val of_bytes_exn: MBytes.t -> net_id
+  val to_bytes: net_id -> MBytes.t
 
-val shell_operation_encoding: shell_operation Data_encoding.t
-val operation_encoding: operation Data_encoding.t
-
-(** Raw blocks in the database (partially parsed). *)
-type shell_block = {
-  net_id: net_id ;
-  predecessor: Block_hash.t ;
-  timestamp: Time.t ;
-  fitness: MBytes.t list ;
-  operations: Operation_hash.t list ;
-}
-type block = {
-  shell: shell_block ;
-  proto: MBytes.t ;
-}
-val shell_block_encoding: shell_block Data_encoding.t
-val block_encoding: block Data_encoding.t
-
-type protocol = Tezos_compiler.Protocol.t
-val protocol_encoding: protocol Data_encoding.t
-
-(** {2 Block and operations store} ********************************************)
-
-module Block : sig
-
-  val of_bytes: MBytes.t -> block option
-  val to_bytes: block -> MBytes.t
-  val hash: block -> Block_hash.t
-
-  include TYPED_IMPERATIVE_STORE
-    with type t = block_store
-     and type key = Block_hash.t
-     and type value =
-           Block_hash.t * block Time.timed_data option Lwt.t Lazy.t
-
-  val compare: block -> block -> int
-  val equal: block -> block -> bool
-
-  val raw_get: t -> Block_hash.t -> MBytes.t option Lwt.t
-  val full_get: t -> Block_hash.t -> block Time.timed_data option Lwt.t
-
-  val full_set: t -> Block_hash.t -> block Time.timed_data -> unit Lwt.t
+  module Set : Set.S with type elt = t
+  module Map : Map.S with type key = t
+  module Table : Hashtbl.S with type key = t
 
 end
 
-module Block_valid_succs : TYPED_IMPERATIVE_STORE
-  with type t = generic_store
-   and type key = Block_hash.t
-   and type value = Block_hash_set.t
+module Net : sig
 
-module Block_invalid_succs : TYPED_IMPERATIVE_STORE
-  with type t = generic_store
-   and type key = Block_hash.t
-   and type value = Block_hash_set.t
+  val list: global_store -> Net_id.t list Lwt.t
+  val destroy: global_store -> Net_id.t -> unit Lwt.t
 
-module Blockchain : TYPED_IMPERATIVE_STORE
-  with type t = blockchain_store
-   and type key = Block_hash.t
-   and type value = Time.t
+  type store
+  val get: global_store -> Net_id.t -> store
 
-module Blockchain_succ : TYPED_IMPERATIVE_STORE
-  with type t = blockchain_store
-   and type key = Block_hash.t
-   and type value = Block_hash.t
+  module Genesis_time : SINGLE_STORE
+    with type t := store
+     and type value := Time.t
 
-module Blockchain_test_succ : TYPED_IMPERATIVE_STORE
-  with type t = blockchain_store
-   and type key = Block_hash.t
-   and type value = Block_hash.t
+  module Genesis_protocol : SINGLE_STORE
+    with type t := store
+     and type value := Protocol_hash.t
+
+  module Genesis_test_protocol : SINGLE_STORE
+    with type t := store
+     and type value := Protocol_hash.t
+
+  module Expiration : SINGLE_STORE
+    with type t := store
+     and type value := Time.t
+
+  module Forked_network_ttl : SINGLE_STORE
+    with type t := store
+     and type value := Int64.t
+
+end
+
+
+(** {2 Chain data} ***********************************************************)
+
+module Chain : sig
+
+  type store
+  val get: Net.store -> store
+
+  module Current_head : SINGLE_STORE
+    with type t := store
+     and type value := Block_hash.t
+
+  module Known_heads : BUFFERED_SET_STORE
+    with type t := store
+     and type elt := Block_hash.t
+     and module Set := Block_hash.Set
+
+  module Valid_successors : BUFFERED_SET_STORE
+    with type t = store * Block_hash.t
+     and type elt := Block_hash.t
+     and module Set := Block_hash.Set
+
+  module Invalid_successors : BUFFERED_SET_STORE
+    with type t = store * Block_hash.t
+     and type elt := Block_hash.t
+     and module Set := Block_hash.Set
+
+  module Successor_in_chain : SINGLE_STORE
+    with type t = store * Block_hash.t
+     and type value := Block_hash.t
+
+  module In_chain_insertion_time : SINGLE_STORE
+    with type t = store * Block_hash.t
+     and type value := Time.t
+
+end
+
+
+(** {2 Generic signature} *****************************************************)
+
+(** Generic signature for Operations, Block_header, and Protocol "tracked"
+    contents (i.e. with 'discovery_time', 'validtity', ...) *)
+module type DATA_STORE = sig
+
+  type store
+  type key
+  type key_set
+  type value
+
+  val encoding: value Data_encoding.t
+
+  val compare: value -> value -> int
+  val equal: value -> value -> bool
+
+  val hash: value -> key
+  val hash_raw: MBytes.t -> key
+
+  module Discovery_time : MAP_STORE
+    with type t := store
+     and type key := key
+     and type value := Time.t
+
+  module Contents : SINGLE_STORE
+    with type t = store * key
+     and type value := value
+
+  module RawContents : SINGLE_STORE
+    with type t = store * key
+     and type value := MBytes.t
+
+  module Validation_time : SINGLE_STORE
+    with type t = store * key
+     and type value := Time.t
+
+  module Errors : MAP_STORE
+    with type t := store
+     and type key := key
+     and type value = error list
+
+  module Pending : BUFFERED_SET_STORE
+    with type t = store
+     and type elt := key
+     and type Set.t = key_set
+
+end
+
+
+(** {2 Operation store} *****************************************************)
 
 module Operation : sig
 
-  val of_bytes: MBytes.t -> operation option
-  val to_bytes: operation -> MBytes.t
+  type shell_header = {
+    net_id: Net_id.t ;
+  }
+  val shell_header_encoding: shell_header Data_encoding.t
 
-  (** Computes the hash of a raw operation
-      (including both abstract and parsed parts) *)
-  val hash: operation -> Operation_hash.t
+  type t = {
+    shell: shell_header ;
+    proto: MBytes.t ;
+  }
 
-  include TYPED_IMPERATIVE_STORE
-    with type t = operation_store
+  type store
+  val get: Net.store -> store
+
+  include DATA_STORE
+    with type store := store
      and type key = Operation_hash.t
-     and type value = operation tzresult Time.timed_data
-
-  val compare: operation -> operation -> int
-  val equal: operation -> operation -> bool
-
-  val raw_get: t -> Operation_hash.t -> MBytes.t option Lwt.t
+     and type value = t
+     and type key_set = Operation_hash.Set.t
 
 end
+
+
+(** {2 Block header store} **************************************************)
+
+module Block_header : sig
+
+  type shell_header = {
+    net_id: Net_id.t ;
+    predecessor: Block_hash.t ;
+    timestamp: Time.t ;
+    fitness: MBytes.t list ;
+    operations: Operation_hash.t list ;
+  }
+  val shell_header_encoding: shell_header Data_encoding.t
+
+  type t = {
+    shell: shell_header ;
+    proto: MBytes.t ;
+  }
+
+  type store
+  val get: Net.store -> store
+
+  include DATA_STORE
+    with type store := store
+     and type key = Block_hash.t
+     and type value = t
+     and type key_set = Block_hash.Set.t
+
+end
+
+
+(** {2 Protocol store} ******************************************************)
 
 module Protocol : sig
-  val of_bytes: MBytes.t -> Tezos_compiler.Protocol.t option
-  val to_bytes: Tezos_compiler.Protocol.t -> MBytes.t
-  val hash: Tezos_compiler.Protocol.t -> Protocol_hash.t
 
-  include TYPED_IMPERATIVE_STORE
-    with type t = protocol_store
+  type t = Tezos_compiler.Protocol.t
+
+  type store
+  val get: global_store -> store
+
+  include DATA_STORE
+    with type store := store
      and type key = Protocol_hash.t
-     and type value = Tezos_compiler.Protocol.t tzresult Time.timed_data
+     and type value = t
+     and type key_set = Protocol_hash.Set.t
 
-  val raw_get: t -> Protocol_hash.t -> MBytes.t option Lwt.t
 end
-
-(**/**) (* For testing only *)
-
-(* module LwtUnixStore : sig *)
-  (* include Persist.STORE with type t = generic_store *)
-  (* val init : string -> t Lwt.t *)
-(* end *)
-
-module IrminPath = Irmin.Path.String_list
-module MBytesContent : Irmin.Contents.S with type t = MBytes.t
-                                         and module Path = IrminPath
-
-module Faked_functional_operation :
-  Persist.TYPED_STORE with type t = Operation.t
-                       and type value = Operation.value
-                       and type key = Operation.key
-
-module Faked_functional_block :
-  Persist.TYPED_STORE with type t = Block.t
-                       and type value = Block.value
-                       and type key = Block.key
-
-module Faked_functional_protocol :
-  Persist.TYPED_STORE with type t = Protocol.t
-                       and type value = Protocol.value
-                       and type key = Protocol.key
-
-module Faked_functional_store : Persist.STORE with type t = t

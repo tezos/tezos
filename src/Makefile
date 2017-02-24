@@ -8,7 +8,7 @@ TZCLIENT=../tezos-client
 TZWEBCLIENT=../tezos-webclient
 TZATTACKER=../tezos-attacker
 
-all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT} ${TZWEBCLIENT} ${TZATTACKER}
+all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT} ${TZWEBCLIENT} # ${TZATTACKER}
 
 
 ############################################################################
@@ -283,22 +283,26 @@ NODE_LIB_INTFS := \
   \
   node/updater/fitness.mli \
   \
+  node/db/raw_store.mli \
+  node/db/store_helpers.mli \
+  node/db/store.mli \
+  \
   node/db/ir_funview.mli \
   node/db/persist.mli \
   node/db/context.mli \
-  node/db/store.mli \
-  node/db/db_proxy.mli \
   \
   node/updater/updater.mli \
   node/updater/proto_environment.mli \
   node/updater/register.mli \
   \
-  node/shell/tezos_p2p.mli \
   node/shell/state.mli \
+  node/shell/distributed_db_functors.mli \
+  node/shell/distributed_db_message.mli \
+  node/shell/distributed_db_metadata.mli \
+  node/shell/distributed_db.mli \
   node/shell/prevalidator.mli \
   node/shell/validator.mli \
   \
-  node/shell/discoverer.mli \
   node/shell/node_rpc_services.mli \
   node/shell/node.mli \
   node/shell/node_rpc.mli \
@@ -321,11 +325,14 @@ NODE_LIB_IMPLS := \
   \
   node/updater/fitness.ml \
   \
+  node/db/store_sigs.ml \
+  node/db/raw_store.ml \
+  node/db/store_helpers.ml \
+  node/db/store.ml \
+  \
   node/db/ir_funview.ml \
   node/db/persist.ml \
-  node/db/store.ml \
   node/db/context.ml \
-  node/db/db_proxy.ml \
   \
   node/updater/protocol.ml \
   node/updater/updater.ml \
@@ -333,12 +340,14 @@ NODE_LIB_IMPLS := \
   node/updater/proto_environment.ml \
   node/updater/register.ml \
   \
-  node/shell/tezos_p2p.ml \
   node/shell/state.ml \
+  node/shell/distributed_db_functors.ml \
+  node/shell/distributed_db_message.ml \
+  node/shell/distributed_db_metadata.ml \
+  node/shell/distributed_db.ml \
   node/shell/prevalidator.ml \
   node/shell/validator.ml \
   \
-  node/shell/discoverer.ml \
   node/shell/node_rpc_services.ml \
   node/shell/node.ml \
   node/shell/node_rpc.ml \

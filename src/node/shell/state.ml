@@ -9,11 +9,15 @@
 
 open Logging.Node.State
 
+module Net_id = Store.Net_id
+
 type error +=
   | Invalid_fitness of Fitness.fitness * Fitness.fitness
+  | Unknown_network of Net_id.t
+  | Unknown_operation of Operation_hash.t
+  | Unknown_block of Block_hash.t
+  | Unknown_context of Block_hash.t
   | Unknown_protocol of Protocol_hash.t
-  | Inactive_network of Store.net_id
-  | Unknown_network of Store.net_id
   | Cannot_parse
 
 let () =
@@ -40,55 +44,63 @@ let () =
     ~id:"state.unknown_network"
     ~title:"Unknown network"
     ~description:"TODO"
-    ~pp:(fun ppf (Store.Net id) ->
-        Format.fprintf ppf "Unknown network %a" Block_hash.pp_short id)
-    Data_encoding.(obj1 (req "net" Updater.net_id_encoding))
+    ~pp:(fun ppf id ->
+        Format.fprintf ppf "Unknown network %a" Net_id.pp id)
+    Data_encoding.(obj1 (req "net" Updater.Net_id.encoding))
     (function Unknown_network x -> Some x | _ -> None)
     (fun x -> Unknown_network x) ;
 
 (** *)
 
-type net_id = Store.net_id = Net of Block_hash.t
+module Shared : sig
+  type 'a t
+  val create: 'a -> 'a t
+  val use: 'a t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+end = struct
+  type 'a t = {
+    data: 'a ;
+    lock: Lwt_mutex.t ;
+  }
+  let create data = { data ; lock = Lwt_mutex.create () }
+  let use { data ; lock } f =
+    Lwt_mutex.with_lock lock (fun () -> f data)
+end
 
-type t = {
-  mutable active_net: net list ;
-  nets: net Block_hash_table.t ;
-  store: Store.store ;
-  block_db: Db_proxy.Block.t ;
-  block_watchers: (Block_hash.t * Store.block) Watcher.input ;
-  operation_db: Db_proxy.Operation.t ;
-  operation_watchers: (Operation_hash.t * Store.operation) Watcher.input ;
-  protocol_db: Db_proxy.Protocol.t ;
-  protocol_watchers: (Protocol_hash.t * Store.protocol) Watcher.input ;
-  valid_block_state: valid_block_state Persist.shared_ref ;
+type global_state = {
+  global_data: global_data Shared.t ;
+  protocol_store: Store.Protocol.store Shared.t ;
 }
 
-and state = t
+and global_data = {
+  nets: net Net_id.Table.t ;
+  global_store: Store.t ;
+  init_index: Net_id.t -> Context.index Lwt.t ;
+}
 
 and net = {
-  state: state ;
-  net_store: Store.net_store ;
-  blockchain_state: blockchain_state Persist.shared_ref ;
+  state: net_state Shared.t ;
+  genesis: genesis ;
+  expiration: Time.t option ;
+  forked_network_ttl: Int64.t option ;
+  operation_store: Store.Operation.store Shared.t ;
+  block_header_store: Store.Block_header.store Shared.t ;
+  valid_block_watcher: valid_block Watcher.input ;
 }
 
-and valid_block_state = {
-  global_store: Store.generic_store Persist.shared_ref ;
-  ttl: Int64.t ;
-  index: Context.index ;
-  block_db: Db_proxy.Block.t ;
-  watchers: valid_block Watcher.input ;
+and genesis = {
+  time: Time.t ;
+  block: Block_hash.t ;
+  protocol: Protocol_hash.t ;
 }
 
-and blockchain_state = {
-  genesis_block: valid_block ;
-  current_head: valid_block ;
-  current_protocol: (module Updater.REGISTRED_PROTOCOL) ;
-  mempool: Operation_hash_set.t ;
-  blockchain_store: Store.blockchain_store Persist.shared_ref ;
+and net_state = {
+  mutable current_head: valid_block ;
+  chain_store: Store.Chain.store ;
+  context_index: Context.index ;
 }
 
 and valid_block = {
-  net_id: net_id ;
+  net_id: Net_id.t ;
   hash: Block_hash.t ;
   pred: Block_hash.t ;
   timestamp: Time.t ;
@@ -99,236 +111,444 @@ and valid_block = {
   protocol: (module Updater.REGISTRED_PROTOCOL) option ;
   test_protocol_hash: Protocol_hash.t ;
   test_protocol: (module Updater.REGISTRED_PROTOCOL) option ;
-  test_network: (net_id * Time.t) option ;
+  test_network: (Net_id.t * Time.t) option ;
   context: Context.t ;
-  successors: Block_hash_set.t ;
-  invalid_successors: Block_hash_set.t ;
+  successors: Block_hash.Set.t ;
+  invalid_successors: Block_hash.Set.t ;
+  shell_header: Store.Block_header.shell_header ;
 }
 
-module KnownHeads_key = struct
-  include Block_hash
-  let prefix = ["state"; "known_heads"]
-  let length = path_len
+let build_valid_block
+    hash shell_header context discovery_time successors invalid_successors =
+  Context.get_protocol context >>= fun protocol_hash ->
+  Context.get_test_protocol context >>= fun test_protocol_hash ->
+  Context.get_test_network context >>= fun test_network ->
+  Context.get_test_network_expiration
+    context >>= fun test_network_expiration ->
+  let test_network =
+    match test_network, test_network_expiration with
+    | None, _ | _, None -> None
+    | Some net_id, Some time -> Some (net_id, time) in
+  let protocol = Updater.get protocol_hash in
+  let test_protocol = Updater.get test_protocol_hash in
+  let valid_block = {
+    net_id = shell_header.Store.Block_header.net_id ;
+    hash ;
+    pred = shell_header.predecessor ;
+    timestamp = shell_header.timestamp ;
+    discovery_time ;
+    operations = shell_header.operations ;
+    fitness = shell_header.fitness ;
+    protocol_hash ;
+    protocol ;
+    test_protocol_hash ;
+    test_protocol ;
+    test_network ;
+    context ;
+    successors ;
+    invalid_successors ;
+    shell_header ;
+  } in
+  Lwt.return valid_block
+
+type t = global_state
+
+module type DATA_STORE = sig
+
+  type store
+  type key
+  type value
+
+  val known: store -> key -> bool Lwt.t
+
+  (** Read a value in the local database. *)
+  val read: store -> key -> value tzresult Lwt.t
+  val read_opt: store -> key -> value option Lwt.t
+  val read_exn: store -> key -> value Lwt.t
+
+  (** Read a value in the local database (without parsing). *)
+  val read_raw: store -> key -> MBytes.t tzresult Lwt.t
+  val read_raw_opt: store -> key -> MBytes.t option Lwt.t
+  val read_raw_exn: store -> key -> MBytes.t Lwt.t
+
+  (** Read data discovery time (the time when `store` was called). *)
+  val read_discovery_time: store -> key -> Time.t tzresult Lwt.t
+  val read_discovery_time_opt: store -> key -> Time.t option Lwt.t
+  val read_discovery_time_exn: store -> key -> Time.t Lwt.t
+
+  val store: store -> value -> bool Lwt.t
+  val store_raw: store -> key -> MBytes.t -> value option tzresult Lwt.t
+  val remove: store -> key -> bool Lwt.t
+
 end
-module KnownHeads =
-  Persist.MakeBufferedPersistentSet
-    (Store.Faked_functional_store) (KnownHeads_key) (Block_hash_set)
 
-module KnownNets_key = struct
-  include Block_hash
-  let prefix = ["state"; "known_nets"]
-  let length = path_len
+module type INTERNAL_DATA_STORE = sig
+
+  include DATA_STORE
+
+  val read_full: store -> key -> value tzresult Time.timed_data option Lwt.t
+
+  val mark_valid: store -> key -> bool Lwt.t
+  val mark_invalid: store -> key -> error list -> bool Lwt.t
+  val unmark: store -> key -> bool Lwt.t
+
+  val pending: store -> key -> bool Lwt.t
+  val valid: store -> key -> bool Lwt.t
+  val invalid: store -> key -> error list option Lwt.t
+
+  type key_set
+  val list_invalid: store -> key_set Lwt.t
+  val list_pending: store -> key_set Lwt.t
+
+  val list: store -> key_set Lwt.t
+
 end
-module KnownNets =
-  Persist.MakeBufferedPersistentSet
-    (Store.Faked_functional_store) (KnownNets_key) (Block_hash_set)
 
-module InvalidOperations_key = struct
-  include Operation_hash
-  let prefix = ["state"; "invalid_operations"]
-  let length = path_len
-end
-module InvalidOperations =
-  Persist.MakeBufferedPersistentSet
-    (Store.Faked_functional_store) (InvalidOperations_key) (Operation_hash_set)
+let wrap_not_found f s k =
+  f s k >>= function
+  | None -> Lwt.fail Not_found
+  | Some v -> Lwt.return v
 
-module InvalidProtocols_key = struct
-  include Protocol_hash
-  let prefix = ["state"; "invalid_protocols"]
-  let length = path_len
-end
-module InvalidProtocols =
-  Persist.MakeBufferedPersistentSet
-    (Store.Faked_functional_store) (InvalidProtocols_key) (Protocol_hash_set)
+module Make_data_store
+    (S : Store.DATA_STORE)
+    (U : sig
+       type store
+       val use: store -> (S.store -> 'a Lwt.t) -> 'a Lwt.t
+       val unknown: S.key -> 'a tzresult Lwt.t
+     end)
+    (Set : Set.S with type elt = S.key and type t = S.key_set) : sig
+  include INTERNAL_DATA_STORE with type store = U.store
+                               and type key = S.key
+                               and type key_set := Set.t
+                               and type value = S.value
+  module Locked : INTERNAL_DATA_STORE with type store = S.store
+                                       and type key = S.key
+                                       and type key_set := Set.t
+                                       and type value = S.value
+end = struct
 
-module InvalidBlocks_key = struct
-  include Block_hash
-  let prefix = ["state"; "invalid_blocks"]
-  let length = path_len
-end
-module InvalidBlocks =
-  Persist.MakeBufferedPersistentSet
-    (Store.Faked_functional_store) (InvalidBlocks_key) (Block_hash_set)
+  type store = U.store
+  type value = S.value
+  type key = S.key
+  type key_set = Set.t
 
-module PostponedBlocks_key = struct
-  include Block_hash
-  let prefix = ["state"; "postponed_blocks"]
-  let length = path_len
-end
-module PostponedBlocks =
-  Persist.MakeBufferedPersistentSet
-    (Store.Faked_functional_store) (PostponedBlocks_key) (Block_hash_set)
+  let of_bytes = Data_encoding.Binary.of_bytes S.encoding
+  let to_bytes = Data_encoding.Binary.to_bytes S.encoding
 
-let net_is_active { active_net } net_id =
-  let same_id (Net id) { net_store = { net_genesis = { block } } } =
-    Block_hash.equal id block in
-  List.exists (same_id net_id) active_net
+  (* FIXME Document and check with a clear mind the invariant in the
+           storage... *)
 
-module Operation = struct
-  type key = Store.Operation.key
-  type shell_header = Store.shell_operation = {
-    net_id: net_id ;
-  }
-  type t = Store.operation = {
-    shell: shell_header ;
-    proto: MBytes.t ;
-  }
-  type operation = t
-  exception Invalid of key * error list
-  let of_bytes = Store.Operation.of_bytes
-  let to_bytes = Store.Operation.to_bytes
-  let known t k = Db_proxy.Operation.known t.operation_db k
-  let read t k = Db_proxy.Operation.read t.operation_db k
-  let read_exn t k =
-    Db_proxy.Operation.read t.operation_db k >>= function
-    | None -> Lwt.fail Not_found
-    | Some { data = Error e } -> Lwt.fail (Invalid (k, e))
-    | Some { data = Ok data ; time }  -> Lwt.return { Time.data ; time }
-  let hash = Store.Operation.hash
-  let raw_read t k =
-    Persist.use t.store.Store.operation
-      (fun store -> Store.Operation.raw_get store k)
-  let prefetch t net_id ks =
-    List.iter (Db_proxy.Operation.prefetch t.operation_db net_id) ks
-  let fetch t net_id k = Db_proxy.Operation.fetch t.operation_db net_id k
-  let store t bytes =
-    match of_bytes bytes with
-    | None -> fail Cannot_parse
-    | Some op ->
-        if not (net_is_active t op.shell.net_id) then
-          fail (Inactive_network op.shell.net_id)
+  module Locked = struct
+    type store = S.store
+    type value = S.value
+    type key = S.key
+    type key_set = Set.t
+    let known s k = S.Discovery_time.known s k
+    let read s k = S.Contents.read (s, k)
+    let read_opt s k = S.Contents.read_opt (s, k)
+    let read_exn s k = S.Contents.read_exn (s, k)
+    let read_raw s k = S.RawContents.read (s, k)
+    let read_raw_opt s k = S.RawContents.read_opt (s, k)
+    let read_raw_exn s k = S.RawContents.read_exn (s, k)
+    let read_discovery_time s k = S.Discovery_time.read s k
+    let read_discovery_time_opt s k = S.Discovery_time.read_opt s k
+    let read_discovery_time_exn s k = S.Discovery_time.read_exn s k
+    let read_full s k =
+      S.Discovery_time.read_opt s k >>= function
+      | None -> Lwt.return_none
+      | Some time ->
+          S.Errors.read_opt s k >>= function
+          | Some exns -> Lwt.return (Some { Time.data = Error exns ; time })
+          | None ->
+              S.Contents.read_opt (s, k) >>= function
+              | None -> Lwt.return_none
+              | Some v -> Lwt.return (Some { Time.data = Ok v ; time })
+    let store s v =
+      let bytes = Data_encoding.Binary.to_bytes S.encoding v in
+      let k = S.hash_raw bytes in
+      S.Discovery_time.known s k >>= function
+      | true -> Lwt.return_false
+      | false ->
+          let time = Time.now () in
+          S.RawContents.store (s, k) bytes >>= fun () ->
+          S.Discovery_time.store s k time >>= fun () ->
+          S.Pending.store s k >>= fun () ->
+          Lwt.return_true
+    let store_raw s k b =
+      S.Discovery_time.known s k >>= function
+      | true -> return None
+      | false ->
+          match Data_encoding.Binary.of_bytes S.encoding b with
+          | None ->
+              S.Errors.store s k [Cannot_parse] >>= fun () ->
+              fail Cannot_parse
+          | Some v ->
+              let time = Time.now () in
+              S.RawContents.store (s, k) b >>= fun () ->
+              S.Discovery_time.store s k time >>= fun () ->
+              return (Some v)
+    let remove s k =
+      S.Discovery_time.known s k >>= function
+      | false -> Lwt.return_false
+      | true ->
+          S.Discovery_time.remove s k >>= fun () ->
+          S.Contents.remove (s, k) >>= fun () ->
+          S.Validation_time.remove (s, k) >>= fun () ->
+          S.Errors.remove s k >>= fun () ->
+          S.Pending.remove s k >>= fun () ->
+          Lwt.return_true
+    let pending s k = S.Pending.known s k
+    let valid s k =
+      S.Validation_time.known (s, k) >>= fun validated ->
+      S.Errors.known s k >>= fun invalid ->
+      Lwt.return (validated && not invalid)
+    let invalid s k =
+      S.Validation_time.known (s, k) >>= fun validated ->
+      if validated then
+        S.Errors.read_opt s k
+      else
+        Lwt.return None
+    let mark_valid s k =
+      S.Pending.known s k >>= fun pending ->
+      if not pending then
+        Lwt.return_false
+      else
+        S.Pending.remove s k >>= fun () ->
+        S.Validation_time.store (s, k) (Time.now ()) >>= fun () ->
+        Lwt.return_true
+    let mark_invalid s k e =
+      S.Discovery_time.known s k >>= fun pending ->
+      if not pending then
+        let now = Time.now () in
+        S.Discovery_time.store s k now >>= fun () ->
+        S.Validation_time.store (s, k) now >>= fun () ->
+        S.Errors.store s k e >>= fun () ->
+        Lwt.return_true
+      else
+        S.Errors.known s k >>= fun invalid ->
+        if invalid then
+          Lwt.return_false
         else
-          let h = hash op in
-          Db_proxy.Operation.store t.operation_db h (Time.make_timed (Ok op))
-          >>= function
-          | true ->
-              Watcher.notify t.operation_watchers (h, op) ;
-              return (Some (h, op))
-          | false ->
-              return None
-  let mark_invalid t k e =
-    Db_proxy.Operation.update t.operation_db k (Time.make_timed (Error e))
-    >>= function
-    | true ->
-        Persist.update t.store.global_store (fun store ->
-            InvalidOperations.set store k >>= fun store ->
-            Lwt.return (Some store)) >>= fun _ ->
-        Lwt.return true
-    | false -> Lwt.return false
+          S.Pending.remove s k >>= fun () ->
+          S.Validation_time.store (s, k) (Time.now ()) >>= fun () ->
+          S.Errors.store s k e >>= fun () ->
+          Lwt.return_true
+    let list_invalid s =
+      S.Errors.fold_keys s ~init:Set.empty
+        ~f:(fun k acc -> Lwt.return (Set.add k acc))
+    let unmark s k =
+      S.Pending.known s k >>= fun pending ->
+      if not pending then
+        S.Validation_time.remove (s, k) >>= fun () ->
+        S.Errors.remove s k >>= fun () ->
+        S.Pending.store s k >>= fun () ->
+        Lwt.return_true
+      else
+        Lwt.return_false
+    let list_pending = S.Pending.read_all
+    let list s =
+      S.Discovery_time.fold_keys s ~init:Set.empty
+        ~f:(fun k acc -> Lwt.return (Set.add k acc))
+  end
 
-  let invalid state =
-    Persist.use state.store.global_store InvalidOperations.read
+  let atomic1 f s = U.use s f
+  let atomic2 f s k = U.use s (fun s -> f s k)
+  let atomic3 f s k v = U.use s (fun s -> f s k v)
 
-  let create_watcher t = Watcher.create_stream t.operation_watchers
-
-end
-
-module Protocol = struct
-  type key = Store.Protocol.key
-
-  type component = Tezos_compiler.Protocol.component = {
-    name: string;
-    interface: string option;
-    implementation: string
-  }
-
-  type t = Store.protocol
-
-  type protocol = t
-  exception Invalid of key * error list
-  let of_bytes = Store.Protocol.of_bytes
-  let to_bytes = Store.Protocol.to_bytes
-  let known t k = Db_proxy.Protocol.known t.protocol_db k
-  let read t k = Db_proxy.Protocol.read t.protocol_db k
-  let read_exn t k =
-    Db_proxy.Protocol.read t.protocol_db k >>= function
-    | None -> Lwt.fail Not_found
-    | Some { data = Error e } -> Lwt.fail (Invalid (k, e))
-    | Some { data = Ok data ; time }  -> Lwt.return { Time.data ; time }
-  let hash = Store.Protocol.hash
-  let raw_read t k =
-    Persist.use t.store.Store.protocol
-      (fun store -> Store.Protocol.raw_get store k)
-  let prefetch t net_id ks =
-    List.iter (Db_proxy.Protocol.prefetch t.protocol_db net_id) ks
-  let fetch t net_id k = Db_proxy.Protocol.fetch t.protocol_db net_id k
-  let store t bytes =
-    match of_bytes bytes with
-    | None -> fail Cannot_parse
-    | Some proto ->
-        let h = hash proto in
-        Db_proxy.Protocol.store t.protocol_db h (Time.make_timed (Ok proto))
-        >>= function
-        | true ->
-            Watcher.notify t.protocol_watchers (h, proto) ;
-            return (Some (h, proto))
-        | false ->
-            return None
-  let mark_invalid t k e =
-    Db_proxy.Protocol.update t.protocol_db k (Time.make_timed (Error e))
-    >>= function
-    | true ->
-        Persist.update t.store.global_store (fun store ->
-            InvalidProtocols.set store k >>= fun store ->
-            Lwt.return (Some store)) >>= fun _ ->
-        Lwt.return true
-    | false -> Lwt.return false
-
-  let invalid state =
-    Persist.use state.store.global_store InvalidProtocols.read
-
-  let create_watcher t = Watcher.create_stream t.protocol_watchers
-
-  let keys { protocol_db } = Db_proxy.Protocol.keys protocol_db
+  let known = atomic2 Locked.known
+  let read = atomic2 Locked.read
+  let read_opt = atomic2 Locked.read_opt
+  let read_exn = atomic2 Locked.read_exn
+  let read_raw  = atomic2 Locked.read_raw
+  let read_raw_opt = atomic2 Locked.read_raw_opt
+  let read_raw_exn = atomic2 Locked.read_raw_exn
+  let read_full = atomic2 Locked.read_full
+  let read_discovery_time = atomic2 Locked.read_discovery_time
+  let read_discovery_time_opt = atomic2 Locked.read_discovery_time_opt
+  let read_discovery_time_exn = atomic2 Locked.read_discovery_time_exn
+  let store = atomic2 Locked.store
+  let store_raw = atomic3 Locked.store_raw
+  let remove = atomic2 Locked.remove
+  let mark_valid = atomic2 Locked.mark_valid
+  let mark_invalid = atomic3 Locked.mark_invalid
+  let unmark = atomic2 Locked.unmark
+  let pending = atomic2 Locked.pending
+  let valid = atomic2 Locked.valid
+  let invalid = atomic2 Locked.invalid
+  let list_invalid = atomic1 Locked.list_invalid
+  let list_pending = atomic1 Locked.list_pending
+  let list = atomic1 Locked.list
 
 end
 
-let iter_predecessors
-    (type t)
-    (compare: t -> t -> int)
-    (predecessor: state -> t -> t option Lwt.t)
-    (date: t -> Time.t)
-    (fitness: t -> Fitness.fitness)
-    state ?max ?min_fitness ?min_date heads ~f =
-  let module Local = struct exception Exit end in
-  let pop, push =
-    (* Poor-man priority queue *)
-    let queue : t list ref = ref [] in
-    let pop () =
-      match !queue with
-      | [] -> None
-      | b :: bs -> queue := bs ; Some b in
-    let push b =
-      let rec loop = function
-        | [] -> [b]
-        | b' :: bs' as bs ->
-            let cmp = compare b b' in
-            if cmp = 0 then
-              bs
-            else if cmp < 0 then
-              b' :: loop bs'
+module Raw_operation =
+  Make_data_store
+    (Store.Operation)
+    (struct
+      type store = Store.Operation.store Shared.t
+      let use s = Shared.use s
+      let unknown k = fail (Unknown_operation k)
+    end)
+    (Operation_hash.Set)
+
+module Raw_block_header = struct
+
+  include
+    Make_data_store
+      (Store.Block_header)
+      (struct
+        type store = Store.Block_header.store Shared.t
+        let use s = Shared.use s
+        let unknown k = fail (Unknown_block k)
+      end)
+      (Block_hash.Set)
+
+  let read_pred store k =
+    read_opt store k >>= function
+    | None -> Lwt.return_none
+    | Some { shell = { predecessor } } ->
+        if Block_hash.equal predecessor k then
+          Lwt.return_none
+        else
+          Lwt.return (Some predecessor)
+  let read_pred_exn = wrap_not_found read_pred
+
+  let store_genesis store genesis =
+    let shell : Store.Block_header.shell_header = {
+      net_id = Id genesis.block;
+      predecessor = genesis.block ;
+      timestamp = genesis.time ;
+      fitness = [] ;
+      operations = [] ;
+    } in
+    let bytes =
+      Data_encoding.Binary.to_bytes Store.Block_header.encoding {
+        shell ;
+        proto = MBytes.create 0 ;
+      } in
+    Locked.store_raw store genesis.block bytes >>= fun _created ->
+    Lwt.return shell
+
+  let store_testnet_genesis store genesis =
+    let shell : Store.Block_header.shell_header = {
+      net_id = Id genesis.block;
+      predecessor = genesis.block ;
+      timestamp = genesis.time ;
+      fitness = [] ;
+      operations = [] ;
+    } in
+    let bytes =
+      Data_encoding.Binary.to_bytes Store.Block_header.encoding {
+        shell ;
+        proto = MBytes.create 0 ;
+      } in
+    Locked.store_raw store genesis.block bytes >>= fun _created ->
+    Lwt.return shell
+  
+end
+
+module Raw_helpers = struct
+
+  let path store h1 h2 =
+    let rec loop acc h =
+      if Block_hash.equal h h1 then
+        Lwt.return (Some acc)
+      else
+        Raw_block_header.read_opt store h >>= function
+        | Some { shell = header }
+          when not (Block_hash.equal header.predecessor h) ->
+            loop ((h, header) :: acc) header.predecessor
+        | Some _ | None -> Lwt.return_none in
+    loop [] h2
+
+  let rec common_ancestor store hash1 header1 hash2 header2 =
+    if Block_hash.equal hash1 hash2 then
+      Lwt.return (Some (hash1, header1))
+    else if
+      Time.compare
+        header1.Store.Block_header.timestamp
+        header2.Store.Block_header.timestamp <= 0
+    then begin
+      if Block_hash.equal header2.predecessor hash2 then
+        Lwt.return_none
+      else
+        let hash2 = header2.predecessor in
+        Raw_block_header.read_opt store hash2 >>= function
+        | Some { shell = header2 } ->
+            common_ancestor store hash1 header1 hash2 header2
+        | None -> Lwt.return_none
+    end else begin
+      if Block_hash.equal header1.predecessor hash1 then
+        Lwt.return_none
+      else
+        let hash1 = header1.predecessor in
+        Raw_block_header.read_opt store hash1 >>= function
+        | Some { shell = header1 } ->
+            common_ancestor store hash1 header1 hash2 header2
+        | None -> Lwt.return_none
+    end
+
+  let block_locator store sz h =
+    let rec loop acc sz step cpt h =
+      if sz = 0 then Lwt.return (List.rev acc) else
+        Raw_block_header.read_pred store h >>= function
+        | None -> Lwt.return (List.rev (h :: acc))
+        | Some pred ->
+            if cpt = 0 then
+              loop (h :: acc) (sz - 1) (step * 2) (step * 20 - 1) pred
+            else if cpt mod step = 0 then
+              loop (h :: acc) (sz - 1) step (cpt - 1) pred
             else
-              b :: bs in
-      queue := loop !queue in
-    pop, push in
-  let check_count =
-    match max with
-    | None -> (fun () -> ())
-    | Some max ->
-        let cpt = ref 0 in
-        fun () ->
-          if !cpt >= max then raise Local.Exit ;
-          incr cpt in
-  let check_fitness =
-    match min_fitness with
-    | None -> (fun _ -> true)
-    | Some min_fitness ->
-        (fun b -> Fitness.compare min_fitness (fitness b) <= 0) in
-  let check_date =
-    match min_date with
-    | None -> (fun _ -> true)
-    | Some min_date ->  (fun b -> Time.compare min_date (date b) <= 0) in
-  let rec loop () =
+              loop acc sz step (cpt - 1) pred in
+    loop [] sz 1 9 h
+
+  let iter_predecessors
+      (type state)
+      (type t)
+      (compare: t -> t -> int)
+      (predecessor: state -> t -> t option Lwt.t)
+      (date: t -> Time.t)
+      (fitness: t -> Fitness.fitness)
+      state ?max ?min_fitness ?min_date heads ~f =
+    let module Local = struct exception Exit end in
+    let pop, push =
+      (* Poor-man priority queue *)
+      let queue : t list ref = ref [] in
+      let pop () =
+        match !queue with
+        | [] -> None
+        | b :: bs -> queue := bs ; Some b in
+      let push b =
+        let rec loop = function
+          | [] -> [b]
+          | b' :: bs' as bs ->
+              let cmp = compare b b' in
+              if cmp = 0 then
+                bs
+              else if cmp < 0 then
+                b' :: loop bs'
+              else
+                b :: bs in
+        queue := loop !queue in
+      pop, push in
+    let check_count =
+      match max with
+      | None -> (fun () -> ())
+      | Some max ->
+          let cpt = ref 0 in
+          fun () ->
+            if !cpt >= max then raise Local.Exit ;
+            incr cpt in
+    let check_fitness =
+      match min_fitness with
+      | None -> (fun _ -> true)
+      | Some min_fitness ->
+          (fun b -> Fitness.compare min_fitness (fitness b) <= 0) in
+    let check_date =
+      match min_date with
+      | None -> (fun _ -> true)
+      | Some min_date ->  (fun b -> Time.compare min_date (date b) <= 0) in
+    let rec loop () =
       match pop () with
       | None -> return ()
       | Some b ->
@@ -342,166 +562,206 @@ let iter_predecessors
     List.iter push heads ;
     try loop () with Local.Exit -> return ()
 
-module Block = struct
+end
 
-  type shell_header = Store.shell_block = {
-    net_id: net_id ;
+module Block_header = struct
+
+  type shell_header = Store.Block_header.shell_header = {
+    net_id: Net_id.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     fitness: MBytes.t list ;
     operations: Operation_hash.t list ;
   }
-  type t = Store.block = {
+
+  type t = Store.Block_header.t = {
     shell: shell_header ;
     proto: MBytes.t ;
   }
-  type block = t
-  let of_bytes = Store.Block.of_bytes
-  let to_bytes = Store.Block.to_bytes
 
-  let known t k = Db_proxy.Block.known t.block_db k
-  let db_read db k =
-    Db_proxy.Block.read db k >>= function
-    | None -> Lwt.return_none
-    | Some (_, lazy block) -> block
-  let read t k = db_read t.block_db k
-  let read_exn t k =
-    read t k >>= function
-    | None -> Lwt.fail Not_found
-    | Some { data = data ; time }  -> Lwt.return { Time.data ; time }
-  let hash = Store.Block.hash
-  let raw_read t k =
-    Persist.use t.store.Store.block
-      (fun store -> Store.Block.raw_get store k)
-  let read_pred t k =
-    Db_proxy.Block.read t.block_db k >>= function
-    | None -> Lwt.return_none
-    | Some (pred, _) -> Lwt.return (Some pred)
-  let read_pred_exn t k =
-    read_pred t k >>= function
-    | None -> Lwt.fail Not_found
-    | Some pred -> Lwt.return pred
-  let prefetch t net_id ks =
-    List.iter (Db_proxy.Block.prefetch t.block_db net_id) ks
-  let fetch t net_id k =
-    Db_proxy.Block.fetch t.block_db net_id k >>= fun (_, lazy block) ->
-    block >>= function
-    | None -> assert false
-    | Some block -> Lwt.return block
-  let db_store db k (v: Store.block) =
-    Db_proxy.Block.store db k
-      (v.shell.predecessor, lazy (Lwt.return (Some (Time.make_timed v))))
-  let store t bytes =
-    match of_bytes bytes with
-    | None -> fail Cannot_parse
-    | Some b ->
-        if not (net_is_active t b.shell.net_id) then
-          fail (Inactive_network b.shell.net_id)
-        else
-          let h = hash b in
-          db_store t.block_db h b >>= function
-          | true ->
-              Persist.update t.store.global_store (fun store ->
-                  PostponedBlocks.set store h >>= fun store ->
-                  Lwt.return (Some store)) >>= fun _ ->
-              Watcher.notify t.block_watchers (h, b) ;
-              return (Some (h, b))
-          | false -> return None
-  let create_watcher t = Watcher.create_stream t.block_watchers
+  type block_header = t
 
-  let check_block state h =
-    known state h >>= function
-    | true -> return ()
-    | false -> failwith "Unknown block"
+  include
+    Make_data_store
+      (Store.Block_header)
+      (struct
+        type store = net
+        let use s = Shared.use s.block_header_store
+        let unknown k = fail (Unknown_block k)
+      end)
+      (Block_hash.Set)
 
-  let path state h1 h2 =
-    trace_exn (Failure "State.path") begin
-      check_block state h1 >>=? fun () ->
-      check_block state h2 >>=? fun () ->
-      let rec loop acc h =
-        if Block_hash.equal h h1 then
-          return acc
-        else
-          read_pred state h >>= function
-          | None -> failwith "not an ancestor"
-          | Some pred ->
-              loop (h :: acc) pred in
-      loop [] h2
+  let read_pred_opt store k =
+    read_opt store k >>= function
+    | Some { shell = { predecessor } }
+      when not (Block_hash.equal predecessor k) ->
+        Lwt.return (Some predecessor)
+    | Some _ | None -> Lwt.return_none
+  let read_pred_exn = wrap_not_found read_pred_opt
+
+  let mark_invalid net hash errors =
+    mark_invalid net hash errors >>= fun marked ->
+    if not marked then
+      Lwt.return_false
+    else begin
+      Raw_block_header.read_opt net.block_header_store hash >>= function
+      | Some { shell = { predecessor } } ->
+          Shared.use net.state begin fun state ->
+            Store.Chain.Valid_successors.remove
+              (state.chain_store, predecessor) hash >>= fun () ->
+            Store.Chain.Invalid_successors.store
+              (state.chain_store, predecessor) hash
+          end >>= fun () ->
+          Lwt.return_true
+      | None ->
+          Lwt.return_true
     end
 
-  let common_ancestor state h1 h2 =
-    trace_exn (Failure "State.common_ancestor") begin
-      check_block state h1 >>=? fun () ->
-      check_block state h2 >>=? fun () ->
-      let queue = Queue.create () in
-      let rec visit seen =
-        let h = Queue.pop queue in
-        if Block_hash_set.mem h seen then
-          return h
+  module Helpers = struct
+
+    let check_block state h =
+      known state h >>= function
+      | true -> return ()
+      | false -> failwith "Unknown block %a" Block_hash.pp_short h
+
+    let path state h1 h2 =
+      trace_exn (Failure "State.path") begin
+        check_block state h1 >>=? fun () ->
+        check_block state h2 >>=? fun () ->
+        Raw_helpers.path state.block_header_store h1 h2 >>= function
+        | None -> failwith "not an ancestor"
+        | Some x -> return x
+      end
+
+    let common_ancestor state hash1 hash2 =
+      trace_exn (Failure "State.common_ancestor") begin
+        read_opt state hash1 >>= function
+        | None -> failwith "Unknown_block %a" Block_hash.pp_short hash1
+        | Some { shell = header1 } ->
+            read_opt state hash2 >>= function
+            | None -> failwith "Unknown_block %a" Block_hash.pp_short hash1
+            | Some { shell = header2 } ->
+                Raw_helpers.common_ancestor state.block_header_store
+                  hash1 header1 hash2 header2 >>= function
+                | None -> failwith "No common ancestor found"
+                | Some (hash, header) -> return (hash, header)
+      end
+
+    let block_locator state sz h =
+      trace_exn (Failure "State.block_locator") begin
+        check_block state h >>=? fun () ->
+        Raw_helpers.block_locator
+          state.block_header_store sz h >>= fun locator ->
+        return locator
+      end
+
+    let iter_predecessors =
+      let compare b1 b2 =
+        match Fitness.compare b1.shell.fitness b2.shell.fitness with
+        | 0 -> begin
+            match Time.compare b1.shell.timestamp b2.shell.timestamp with
+            | 0 ->
+                Block_hash.compare
+                  (Store.Block_header.hash b1) (Store.Block_header.hash b2)
+            | res -> res
+          end
+        | res -> res in
+      let predecessor net b =
+        if Block_hash.equal net.genesis.block b.shell.predecessor then
+          Lwt.return_none
         else
-          let seen = Block_hash_set.add h seen in
-          read_pred state h >>= function
-          | None -> failwith ".."
-          | Some pred ->
-              if not (Block_hash.equal pred h) then
-                Queue.push pred queue;
-              visit seen
-      in
-      Queue.push h1 queue;
-      Queue.push h2 queue;
-      Lwt.catch
-        (fun () -> visit Block_hash_set.empty)
-        (function exn -> Lwt.return (error_exn exn))
-    end
+          Raw_block_header.read_opt
+            net.block_header_store b.shell.predecessor in
+      Raw_helpers.iter_predecessors compare predecessor
+        (fun b -> b.shell.timestamp) (fun b -> b.shell.fitness)
 
-  let rec block_locator_loop state acc sz step cpt h =
-    if sz = 0 then Lwt.return (List.rev acc) else
-    read_pred state h >>= function
-    | None -> Lwt.return (List.rev (h :: acc))
-    | Some pred ->
-        if cpt = 0 then
-          block_locator_loop state
-            (h :: acc) (sz - 1) (step * 2) (step * 20 - 1) pred
-        else if cpt mod step = 0 then
-          block_locator_loop state (h :: acc) (sz - 1) step (cpt - 1) pred
-        else
-          block_locator_loop state acc sz step (cpt - 1) pred
-
-  let block_locator state sz h =
-    trace_exn (Failure "State.block_locator") begin
-      check_block state h >>=? fun () ->
-      block_locator_loop state [] sz 1 9 h >>= fun locator ->
-      return locator
-    end
-
-  let iter_predecessors =
-    let compare b1 b2 =
-      match Fitness.compare b1.shell.fitness b2.shell.fitness with
-      | 0 -> begin
-          match Time.compare b1.shell.timestamp b2.shell.timestamp with
-          | 0 -> Block_hash.compare (hash b1) (hash b2)
-          | res -> res
-        end
-      | res -> res in
-    let predecessor state b =
-      read state b.shell.predecessor >|= function
-      | None -> None
-      | Some { data } ->
-          if Block_hash.equal data.shell.predecessor b.shell.predecessor
-             && Block_hash.equal (hash b) b.shell.predecessor
-          then
-            None
-          else
-            Some data in
-    iter_predecessors compare predecessor
-      (fun b -> b.shell.timestamp) (fun b -> b.shell.fitness)
+  end
 
 end
+
+module Raw_net = struct
+
+  let build
+    ~genesis
+    ~genesis_block
+    ~expiration
+    ~forked_network_ttl
+    context_index
+    chain_store
+    block_header_store
+    operation_store =
+  let net_state = {
+    current_head = genesis_block ;
+    chain_store ;
+    context_index ;
+  } in
+  let net = {
+    state = Shared.create net_state ;
+    genesis ;
+    expiration ;
+    operation_store = Shared.create operation_store ;
+    forked_network_ttl  ;
+    block_header_store = Shared.create block_header_store ;
+    valid_block_watcher = Watcher.create_input ();
+  } in
+  net
+
+  let locked_create
+      data
+      ?initial_context ?forked_network_ttl
+      ?test_protocol ?expiration genesis =
+    let net_store =
+      Store.Net.get data.global_store (Store.Net_id.Id genesis.block) in
+    let operation_store = Store.Operation.get net_store
+    and block_header_store = Store.Block_header.get net_store
+    and chain_store = Store.Chain.get net_store in
+    Store.Net.Genesis_time.store net_store genesis.time >>= fun () ->
+    Store.Net.Genesis_protocol.store net_store genesis.protocol >>= fun () ->
+    let test_protocol = Utils.unopt ~default:genesis.protocol test_protocol in
+    Store.Net.Genesis_test_protocol.store net_store test_protocol >>= fun () ->
+    Store.Chain.Current_head.store chain_store genesis.block >>= fun () ->
+    Store.Chain.Known_heads.store chain_store genesis.block >>= fun () ->
+    data.init_index (Id genesis.block) >>= fun context_index ->
+    begin
+      match expiration with
+      | None -> Lwt.return_unit
+      | Some time -> Store.Net.Expiration.store net_store time
+    end >>= fun () ->
+    Raw_block_header.store_genesis
+      block_header_store genesis >>= fun shell ->
+    begin
+      match initial_context with
+      | None ->
+          Context.commit_genesis
+            context_index
+            ~id:genesis.block
+            ~time:genesis.time
+            ~protocol:genesis.protocol
+            ~test_protocol
+      | Some context ->
+          Lwt.return context
+    end >>= fun context ->
+    build_valid_block
+      genesis.block shell context genesis.time
+      Block_hash.Set.empty Block_hash.Set.empty >>= fun genesis_block ->
+    Lwt.return @@
+    build
+      ~genesis
+      ~genesis_block
+      ~expiration
+      ~forked_network_ttl
+      context_index
+      chain_store
+      block_header_store
+      operation_store
+
+end
+
 
 module Valid_block = struct
 
   type t = valid_block = {
-    net_id: net_id ;
+    net_id: Net_id.t ;
     hash: Block_hash.t ;
     pred: Block_hash.t ;
     timestamp: Time.t ;
@@ -512,600 +772,350 @@ module Valid_block = struct
     protocol: (module Updater.REGISTRED_PROTOCOL) option ;
     test_protocol_hash: Protocol_hash.t ;
     test_protocol: (module Updater.REGISTRED_PROTOCOL) option ;
-    test_network: (net_id * Time.t) option ;
+    test_network: (Net_id.t * Time.t) option ;
     context: Context.t ;
-    successors: Block_hash_set.t ;
-    invalid_successors: Block_hash_set.t ;
+    successors: Block_hash.Set.t ;
+    invalid_successors: Block_hash.Set.t ;
+    shell_header: Store.Block_header.shell_header ;
   }
   type valid_block = t
 
-  let use state f = Persist.use state.valid_block_state f
-  let update state f = Persist.update state.valid_block_state f
-  let update_with_res state f = Persist.update_with_res state.valid_block_state f
+  module Locked = struct
 
-  let raw_read' { Time.data = { Store.shell = block } ;
-                  time = discovery_time } successors invalid_successors index hash =
-    Context.checkout index hash >>= function
-    | (None | Some (Error _)) as e -> Lwt.return e
-    | Some (Ok context) ->
-        Context.get_protocol context >>= fun protocol_hash ->
-        Context.get_test_protocol context >>= fun test_protocol_hash ->
-        Context.get_test_network context >>= fun test_network ->
-        Context.get_test_network_expiration
-          context >>= fun test_network_expiration ->
-        let test_network =
-          match test_network, test_network_expiration with
-          | None, _ | _, None -> None
-          | Some net_id, Some time -> Some (net_id, time) in
-        let protocol = Updater.get protocol_hash in
-        let test_protocol = Updater.get test_protocol_hash in
-        let valid_block = {
-          net_id = block.net_id ;
-          hash ;
-          pred = block.predecessor ;
-          timestamp = block.timestamp ;
-          discovery_time ;
-          operations = block.operations ;
-          fitness = block.fitness ;
-          protocol_hash ;
-          protocol ;
-          test_protocol_hash ;
-          test_protocol ;
-          test_network ;
-          context ;
-          successors ;
-          invalid_successors ;
-        } in
-        Lwt.return (Some (Ok valid_block))
+    let known { context_index } hash =
+      Context.exists context_index hash
 
-  let raw_read store block_db index hash =
-    Block.db_read block_db hash >>= function
-    | None ->
-        (* TODO handle internal error... *)
-        Lwt.return_none
-    | Some block ->
-        Persist.use store (fun store ->
-            Store.Block_valid_succs.get store hash >|= function
-            | None -> Block_hash_set.empty
-            | Some set -> set) >>= fun valid_successors ->
-        Persist.use store (fun store ->
-            Store.Block_invalid_succs.get store hash >|= function
-            | None -> Block_hash_set.empty
-            | Some set -> set) >>= fun invalid_successors ->
-        raw_read' block valid_successors invalid_successors index hash
-
-  let create ?patch_context ~context_root store block_db ttl =
-    Context.init ?patch_context ~root:context_root >>= fun index ->
-    let ttl = Int64.of_int ttl in
-    Lwt.return
-      (Persist.share { global_store = store ;
-                       block_db ; index ; ttl ;
-                       watchers = Watcher.create_input () })
-
-  let locked_valid vstate h =
-    Context.checkout vstate.index h >>= function
-    | None | Some (Error _) -> Lwt.return_false
-    | Some (Ok _) -> Lwt.return true
-
-  let locked_known vstate h = Context.exists vstate.index h
-
-  exception Invalid of Block_hash.t * error list
-
-  let locked_read (vstate: valid_block_state) hash =
-    raw_read vstate.global_store vstate.block_db vstate.index hash
-
-  let locked_read_exn vstate hash =
-    locked_read vstate hash >>= function
-    | None -> Lwt.fail Not_found
-    | Some (Error e) -> Lwt.fail (Invalid (hash, e))
-    | Some (Ok data) -> Lwt.return data
-
-  let locked_store vstate hash context =
-    Context.exists vstate.index hash >>= function
-    | true -> Lwt.return (Error []) (* TODO fail ?? *)
-    | false ->
-        Block.db_read vstate.block_db hash >>= function
-        | None -> assert false
-        | Some { data = block } ->
-            Context.get_protocol context >>= fun protocol_hash ->
-            match Updater.get protocol_hash with
-            | None ->
-                lwt_log_error
-                  "State.Validated_block: unknown protocol (%a)"
-                  Protocol_hash.pp_short protocol_hash >>= fun () ->
-                Lwt.return (Error [Unknown_protocol protocol_hash])
-            | Some (module Proto) ->
-                Proto.fitness context >>= fun fitness ->
-                if Fitness.compare fitness block.Store.shell.fitness <> 0
-                then begin
-                  let err = Invalid_fitness (block.Store.shell.fitness, fitness) in
-                  Context.commit_invalid
-                    vstate.index block hash [err] >>= fun () ->
-                  Lwt.return (Error [err])
-                end else begin
-                  Context.read_and_reset_fork_test_network
-                    context >>= fun (fork, context) ->
-                  begin
-                    if fork then begin
-                      let eol = Time.(add block.shell.timestamp vstate.ttl) in
-                      Context.set_test_network
-                        context (Net hash) >>= fun context ->
-                      Context.set_test_network_expiration context
-                        eol >>= fun context ->
-                      lwt_log_notice "Fork test network for %a (eol: %a)"
-                        Block_hash.pp_short hash Time.pp_hum eol >>= fun () ->
-                      Lwt.return context
-                    end else begin
-                      Context.get_test_network_expiration context >>= function
-                      | Some eol when Time.(eol <= now ()) ->
-                          lwt_log_notice
-                            "Stop test network for %a (eol: %a, now: %a)"
-                            Block_hash.pp_short hash
-                            Time.pp_hum eol Time.pp_hum (Time.now ())
-                          >>= fun () ->
-                          Context.del_test_network context >>= fun context ->
-                          Context.del_test_network_expiration context
-                      | None | Some _ -> Lwt.return context
-                    end
-                  end >>= fun context ->
-                  Context.commit vstate.index block hash context >>= fun () ->
-                  locked_read_exn vstate hash >>= fun valid_block ->
-                  Persist.update vstate.global_store (fun store ->
-                      KnownHeads.del store block.shell.predecessor >>= fun store ->
-                      KnownHeads.set store hash >>= fun store ->
-                      PostponedBlocks.del store hash >>= fun store ->
-                      begin
-                        Store.Block_valid_succs.get
-                          store block.shell.predecessor >|= function
-                        | None -> Block_hash_set.singleton hash
-                        | Some set -> Block_hash_set.add hash set
-                      end >>= fun successors ->
-                      Store.Block_valid_succs.set
-                        store block.shell.predecessor successors >>= fun () ->
-                      Lwt.return (Some store)) >>= fun _ ->
-                  Watcher.notify vstate.watchers valid_block ;
-                  Lwt.return (Ok valid_block)
-                end
-
-  let create_genesis_block state (genesis: Store.genesis) test_protocol =
-    use state (fun vstate ->
-      locked_read vstate genesis.block >>= function
-      | Some res ->
-          (* TODO check coherency: test_protocol. *)
-          Lwt.return res
+    let raw_read block time chain_store context_index hash =
+      Context.checkout context_index hash >>= function
       | None ->
-          let test_protocol =
-            Utils.unopt ~default:genesis.protocol test_protocol in
-          Context.create_genesis_context
-            vstate.index genesis test_protocol >>= fun _context ->
-          Block.db_store vstate.block_db genesis.block {
-            shell = {
-              net_id = Net genesis.block ;
-              predecessor = genesis.block ;
-              timestamp = genesis.time ;
-              fitness = [] ;
-              operations = [] ;
-            } ;
-            proto = MBytes.create 0 ;
-          } >>= fun _ ->
-          locked_read vstate genesis.block >>= function
-          | None -> failwith ""
-          | Some (Error _ as err) -> Lwt.return err
-          | Some (Ok valid_block) ->
-              Persist.update vstate.global_store (fun store ->
-                  KnownHeads.set store valid_block.hash >>= fun store ->
-                  Lwt.return (Some store)) >>= fun _ ->
-              return valid_block)
+          fail (Unknown_context hash)
+      | Some context ->
+          Store.Chain.Valid_successors.read_all (chain_store, hash)
+          >>= fun successors ->
+          Store.Chain.Invalid_successors.read_all (chain_store, hash)
+          >>= fun invalid_successors ->
+          build_valid_block hash block context time successors invalid_successors >>= fun block ->
+          return block
 
-  let locked_store_invalid vstate hash exns =
-    Context.exists vstate.index hash >>= function
-    | true -> Lwt.return false (* TODO fail ?? *)
-    | false ->
-        Block.db_read vstate.block_db hash >>= function
-        | None -> assert false
-        | Some { data = block } ->
-            Context.commit_invalid vstate.index block hash exns >>= fun () ->
-            Persist.update vstate.global_store (fun store ->
-                InvalidBlocks.set store hash >>= fun store ->
-                begin
-                  Store.Block_invalid_succs.get
-                    store block.shell.predecessor >|= function
-                  | None -> Block_hash_set.singleton hash
-                  | Some set -> Block_hash_set.add hash set
-                end >>= fun successors ->
-                Store.Block_invalid_succs.set
-                  store block.shell.predecessor successors >>= fun () ->
-                Lwt.return (Some store)) >>= fun _ ->
-            Lwt.return true
+    let raw_read_exn block time chain_store context_index hash =
+      raw_read block time chain_store context_index hash >>= function
+      | Error _ -> Lwt.fail Not_found
+      | Ok data -> Lwt.return data
 
-  let get_store { valid_block_state } = valid_block_state
+    let read net net_state hash =
+      Block_header.read_full net hash >>= function
+      | None | Some { Time.data = Error _ } ->
+          fail (Unknown_block hash)
+      | Some { Time.data = Ok block ; time } ->
+          raw_read block.shell
+            time net_state.chain_store net_state.context_index hash
 
-  let valid state h =
-    use state (fun vstate -> locked_valid vstate h)
-  let known state h =
-    use state (fun vstate -> locked_known vstate h)
-  let read state hash =
-    use state (fun vstate -> locked_read vstate hash)
-  let read_exn state hash =
-    use state (fun vstate -> locked_read_exn vstate hash)
-  let store state hash context =
-    use state
-      (fun vstate -> locked_store vstate hash context) >>= fun block ->
-    Lwt.return block
-  let store_invalid state hash exns =
-    use state (fun vstate -> locked_store_invalid vstate hash exns)
+    let read_opt net net_state hash =
+      read net net_state hash >>= function
+      | Error _ -> Lwt.return_none
+      | Ok data -> Lwt.return (Some data)
 
-  let known_heads state =
-    use state (fun vstate ->
-        Persist.use vstate.global_store KnownHeads.read >>= fun heads ->
-        let elements = Block_hash_set.elements heads in
-        Lwt_list.fold_left_s
-          (fun set hash ->
-             Block.db_read vstate.block_db hash >>= function
-           | None -> Lwt.return set
-           | Some block ->
-               Persist.use vstate.global_store (fun store ->
-                   begin
-                     Store.Block_invalid_succs.get
-                       store block.data.shell.predecessor >|= function
-                     | None -> Block_hash_set.singleton hash
-                     | Some set -> set
-                   end) >>= fun invalid_successors ->
-               raw_read' block Block_hash_set.empty
-                 invalid_successors vstate.index hash >>= function
-               | Some (Ok bl) -> Lwt.return (Block_hash_map.add hash bl set)
-               | None | Some (Error _) ->
-                   lwt_log_error
-                     "Error while reading \"known_heads\". Ignoring %a."
-                     Block_hash.pp_short hash >>= fun () ->
-                   Lwt.return set)
-          Block_hash_map.empty
-          elements)
+    let read_exn net net_state hash =
+      read net net_state hash >>= function
+      | Error _ -> Lwt.fail Not_found
+      | Ok data -> Lwt.return data
 
-  let postponed state =
-    use state (fun vstate ->
-        Persist.use vstate.global_store PostponedBlocks.read)
+    let store
+        block_header_store
+        (net_state: net_state)
+        valid_block_watcher
+        hash context ttl =
+      (* Read the block header. *)
+      Raw_block_header.Locked.read
+        block_header_store hash >>=? fun block ->
+      Raw_block_header.Locked.read_discovery_time
+        block_header_store hash >>=? fun discovery_time ->
+      begin (* Load the associated version of the economical protocol . *)
+        Context.get_protocol context >>= fun protocol_hash ->
+        match Updater.get protocol_hash with
+        | None ->
+            lwt_log_error
+              "State.Validated_block: unknown protocol (%a)"
+              Protocol_hash.pp_short protocol_hash >>= fun () ->
+            fail (Unknown_protocol protocol_hash)
+        | Some proto -> return proto
+      end >>=? fun (module Proto) ->
+      (* Check fitness coherency. *)
+      Proto.fitness context >>= fun fitness ->
+      fail_unless
+        (Fitness.equal fitness block.Store.Block_header.shell.fitness)
+        (Invalid_fitness
+           (block.Store.Block_header.shell.fitness, fitness)) >>=? fun () ->
+      begin (* Patch context about the associated test network. *)
+        Context.read_and_reset_fork_test_network
+          context >>= fun (fork, context) ->
+        if fork then
+          match ttl with
+          | None ->
+              (* Ignore fork on forked networks. *)
+              Context.del_test_network context >>= fun context ->
+              Context.del_test_network_expiration context
+          | Some ttl ->
+              let eol = Time.(add block.shell.timestamp ttl) in
+              Context.set_test_network
+                context (Store.Net_id.Id hash) >>= fun context ->
+              Context.set_test_network_expiration
+                context eol >>= fun context ->
+              Lwt.return context
+        else
+          Context.get_test_network_expiration context >>= function
+          | Some eol when Time.(eol <= now ()) ->
+              Context.del_test_network context >>= fun context ->
+              Context.del_test_network_expiration context
+          | None | Some _ ->
+              Lwt.return context
+      end >>= fun context ->
+      Raw_block_header.Locked.mark_valid
+        block_header_store hash >>= fun _marked ->
+      (* TODO fail if the block was previsouly stored ... ??? *)
+      (* Let's commit the context. *)
+      Context.commit block hash context >>= fun () ->
+      (* Update the chain state. *)
+      let store = net_state.chain_store in
+      let predecessor = block.shell.predecessor in
+      Store.Chain.Known_heads.remove store predecessor >>= fun () ->
+      Store.Chain.Known_heads.store store hash >>= fun () ->
+      Store.Chain.Valid_successors.store
+        (store, predecessor) hash >>= fun () ->
+      (* Build the `valid_block` value. *)
+      raw_read_exn
+        block.shell discovery_time
+        net_state.chain_store net_state.context_index hash >>= fun valid_block ->
+      Watcher.notify valid_block_watcher valid_block ;
+      Lwt.return (Ok valid_block)
 
-  let invalid state =
-    use state (fun vstate ->
-        Persist.use vstate.global_store InvalidBlocks.read)
-
-  let path state b1 b2 =
-    let rec loop acc b =
-      if Block_hash.equal b.hash b1.hash then
-        Lwt.return (Some acc)
-      else
-        read state b.pred >>= function
-        | None -> Lwt.return None
-        | Some (Error _) -> assert false
-        | Some (Ok pred) -> loop (b :: acc) pred in
-    loop [] b2
-
-  let common_ancestor state b1 b2 =
-    let queue = Queue.create () in
-    let rec visit seen =
-      let b = Queue.pop queue in
-      if Block_hash_set.mem b.hash seen then
-        Lwt.return b
-      else
-        let seen = Block_hash_set.add b.hash seen in
-        read state b.pred >>= function
-        | None -> visit seen
-        | Some (Error _) -> assert false
-        | Some (Ok pred) ->
-            if not (Block_hash.equal pred.hash b.hash) then
-              Queue.push pred queue;
-            visit seen
-    in
-    Queue.push b1 queue;
-    Queue.push b2 queue;
-    visit Block_hash_set.empty
-
-  let block_locator state sz b =
-    Block.block_locator_loop state [] sz 1 9 b.hash
-
-  let new_blocks state cur_block new_block =
-    common_ancestor state cur_block new_block >>= fun ancestor ->
-    path state ancestor new_block >>= function
-    | None -> assert false
-    | Some path -> Lwt.return (ancestor, path)
-
-  let create_watcher state =
-    use state (fun vstate ->
-        Lwt.return (Watcher.create_stream vstate.watchers))
-
-  module Store = struct
-    type t = valid_block_state
-    type key = Block_hash.t
-    type value = Context.t tzresult
-    let mem vstate h = locked_known vstate h
-    let del _ _ = assert false (* unused *)
-    let get vstate hash =
-      locked_read vstate hash >>= function
-      | None -> Lwt.return None
-      | Some (Ok { context }) -> Lwt.return (Some (Ok context))
-      | Some (Error exns) -> Lwt.return (Some (Error exns))
-    let set vstate hash = function
-      | Ok context -> begin
-          locked_store vstate hash context >>= fun _ ->
-          Lwt.return vstate
-        end
-      | Error exns ->
-          locked_store_invalid vstate hash exns >>= fun _changed ->
-          Lwt.return vstate
-
-    let keys _ = Store.undefined_key_fn
   end
 
-  let iter_predecessors =
-    let compare b1 b2 =
-      match Fitness.compare b1.fitness b2.fitness with
-      | 0 -> begin
-          match Time.compare b1.timestamp b2.timestamp with
-          | 0 -> Block_hash.compare b1.hash b2.hash
-          | res -> res
-        end
-      | res -> res in
-    let predecessor state b =
-      if Block_hash.equal b.hash b.pred then
-        Lwt.return None
+  let atomic1 f net = Shared.use net.state f
+  let atomic2 f net k = Shared.use net.state (fun s -> f s k)
+  let atomic3 f net k v = Shared.use net.state (fun s -> f s k v)
+
+  let known = atomic2 Locked.known
+  let read net hash =
+    Shared.use net.state begin fun state ->
+      Locked.read net state hash
+    end
+  let read_opt net hash =
+    read net hash >>= function
+    | Error _ -> Lwt.return_none
+    | Ok b -> Lwt.return (Some b)
+  let read_exn net hash =
+    read net hash >>= function
+    | Error _ -> Lwt.fail Not_found
+    | Ok b -> Lwt.return b
+
+  let store net hash context =
+    Shared.use net.state begin fun net_state ->
+      Shared.use net.block_header_store begin fun block_header_store ->
+          Context.exists net_state.context_index hash >>= function
+          | true -> return None (* Previously stored context. *)
+          | false ->
+              Raw_block_header.Locked.invalid
+                block_header_store hash >>= function
+              | Some _ -> return None (* Previously invalidated block. *)
+              | None ->
+                  Locked.store
+                    block_header_store net_state net.valid_block_watcher
+                    hash context net.forked_network_ttl >>=? fun valid_block ->
+                  return (Some valid_block)
+      end
+    end
+
+  let watcher net =
+    Watcher.create_stream net.valid_block_watcher
+
+  let fork_testnet state net block expiration =
+    assert (Net_id.equal block.net_id (Net_id.Id net.genesis.block)) ;
+    let hash = Block_hash.hash_bytes [Block_hash.to_bytes block.hash] in
+    let genesis : genesis = {
+      block = hash ;
+      time = Time.add block.timestamp 1L ;
+      protocol = block.test_protocol_hash ;
+    } in
+    Shared.use state.global_data begin fun data ->
+      if Net_id.Table.mem data.nets (Net_id.Id hash) then
+        failwith "...FIXME"
       else
-        read state b.pred >|= function
-        | None | Some (Error _) -> None
-        | Some (Ok b) -> Some b in
-    iter_predecessors compare predecessor
-      (fun b -> b.timestamp) (fun b -> b.fitness)
+        Context.init_test_network block.context
+          ~time:genesis.time
+          ~genesis:genesis.block >>=? fun initial_context ->
+        Raw_net.locked_create data
+          ~initial_context
+          ~expiration
+          genesis >>= fun net ->
+        return net
+    end
 
-end
+  module Helpers = struct
 
-module Blockchain = struct
+    let path net b1 b2 =
+      let net_id = Store.Net_id.Id net.genesis.block in
+      if not ( Store.Net_id.equal b1.net_id net_id
+               && Store.Net_id.equal b2.net_id net_id ) then
+        invalid_arg "State.path" ;
+      Raw_helpers.path net.block_header_store b1.hash b2.hash >>= function
+      | None -> Lwt.return_none
+      | Some blocks ->
+          Lwt_list.map_p
+            (fun (hash, _header) -> read_exn net hash) blocks >>= fun path ->
+          Lwt.return (Some path)
 
-  let use state f = Persist.use state.blockchain_state f
-  let update state f = Persist.update state.blockchain_state f
+    let common_ancestor net b1 b2 =
+      let net_id = Store.Net_id.Id net.genesis.block in
+      if not ( Store.Net_id.equal b1.net_id net_id
+               && Store.Net_id.equal b2.net_id net_id ) then
+        invalid_arg "State.path" ;
+      Raw_helpers.common_ancestor net.block_header_store
+        b1.hash b1.shell_header b2.hash b2.shell_header >>= function
+      | None -> assert false (* The blocks are known valid. *)
+      | Some (hash, _header) -> read_exn net hash
 
-  let read_state, store_state =
-    let current_block_key = ["current_block"] in
-    let module Mempool_key = struct
-      include Operation_hash
-      let prefix = ["mempool"]
-      let length = path_len
-    end in
-    let module Mempool =
-      Persist.MakeBufferedPersistentSet
-        (Store.Faked_functional_store) (Mempool_key) (Operation_hash_set) in
-    let read genesis gstore sstore (vstate: valid_block_state) =
-      begin
-        Valid_block.locked_read vstate genesis.Store.block >>= function
-        | None | Some (Error _) -> fatal_error ""
-        | Some (Ok genesis_block) ->
-            match genesis_block.test_network with
-            | None -> Lwt.return genesis_block
-            | Some _ ->
-                let context = genesis_block.context in
-                Context.del_test_network context >>= fun context ->
-                Context.set_protocol
-                  context genesis_block.test_protocol_hash >>= fun context ->
-                Lwt.return
-                  { genesis_block with
-                    net_id = Net genesis_block.hash ;
-                    context ;
-                    protocol = genesis_block.test_protocol ;
-                    protocol_hash = genesis_block.test_protocol_hash ;
-                    test_network = None ;
-                  }
-      end >>= fun genesis_block ->
-      begin
-        Persist.use gstore (fun store ->
-            Store.get store current_block_key) >>= function
-        | None -> Lwt.return genesis.Store.block
-        | Some current_block -> Lwt.return (Block_hash.of_bytes current_block)
-      end >>= fun current_head_hash ->
-      begin
-        if Block_hash.equal current_head_hash genesis_block.hash then
-          Lwt.return genesis_block
-        else
-          Valid_block.locked_read vstate current_head_hash >>= function
-          | None -> fatal_error "Internal error while loading the current block."
-          | Some (Error exn) ->
-              fatal_error
-                "@[<v 2>Internal error while loading the current block:@ %a@]"
-                (fun ppf -> Error_monad.pp_print_error ppf) exn
-          | Some (Ok current_head) ->
-              Lwt.return current_head
-      end >>= fun current_head ->
-      Persist.use gstore Mempool.read >>= fun mempool ->
-      let current_protocol =
-        match current_head.protocol with
-        | None -> fatal_error "Protocol version for the current head is unknown"
-        | Some protocol -> protocol in
-      Lwt.return
-        (Persist.share { current_head ; current_protocol ; genesis_block ;
-                         mempool ; blockchain_store = sstore })
-    in
-    let store net { current_head ; mempool } =
-      Persist.update net.net_store.net_store (fun store ->
-          Store.set store current_block_key
-            (Block_hash.to_bytes current_head.hash) >>= fun () ->
-          Mempool.write store mempool >>= fun store ->
-          Lwt.return (Some store)) >>= fun _ ->
-      Lwt.return_unit
-    in
-  (read, store)
+    let block_locator state sz b =
+      Raw_helpers.block_locator state.block_header_store sz b.hash
 
-  let locked_head bstate = Lwt.return bstate.current_head
-
-  let locked_protocol bstate = Lwt.return bstate.current_protocol
-
-  let locked_mem (bstate : blockchain_state) store h =
-    let genesis = bstate.genesis_block.hash in
-    if Block_hash.equal genesis h then
-      Lwt.return true
-    else
-      Store.Blockchain.mem store h
-
-  let genesis net =
-    use net (fun vstate -> Lwt.return vstate.genesis_block)
-
-  let head net = use net locked_head
-  let protocol net = use net locked_protocol
-  let mem net h =
-    use net (fun bstate ->
-        Persist.use bstate.blockchain_store (fun store ->
-            locked_mem bstate store h))
-
-  let find_new net hist sz =
-    let rec path net_id store sz acc h =
-      if sz <= 0 then return (List.rev acc)
-      else
-        Store.Blockchain_succ.get store h >>= function
-        | None -> return (List.rev acc)
-        | Some s -> path net_id store (sz-1) (s :: acc) s
-    in
-    let rec common_ancestor (bstate: blockchain_state) store hist =
-      match hist with
-      | [] ->
-          Lwt.return bstate.genesis_block.hash
-      | h :: hist ->
-          locked_mem bstate store h >>= function
-          | false -> common_ancestor bstate store hist
-          | true -> Lwt.return h in
-    use net (fun bstate ->
-        Persist.use bstate.blockchain_store
-          (fun store ->
-             common_ancestor bstate store hist >>= fun ancestor ->
-             let net_id = Net bstate.genesis_block.hash in
-             if Block_hash.equal ancestor bstate.genesis_block.hash then
-               Store.Blockchain_test_succ.get store ancestor >>= function
-               | None ->
-                   if Block_hash.equal ancestor bstate.current_head.hash then
-                     return []
-                   else
-                     return [ancestor]
-               | Some s -> path net_id store (sz-1) [ancestor] s
-             else
-               path net_id store sz [] ancestor
-          ))
-
-  let pop_block state bstate =
-    lwt_debug "pop_block %a"
-      Block_hash.pp_short bstate.current_head.hash >>= fun () ->
-    Valid_block.read_exn state bstate.current_head.pred >>= fun pred_block ->
-    Persist.use bstate.blockchain_store (fun sstore ->
-        Store.Blockchain.del sstore bstate.current_head.hash >>= fun () ->
-        if Block_hash.equal pred_block.hash bstate.genesis_block.hash then
-          Store.Blockchain_test_succ.del sstore pred_block.hash
-        else
-          Store.Blockchain_succ.del sstore pred_block.hash) >>= fun () ->
-    let mempool =
-      List.fold_left
-        (fun mempool h -> Operation_hash_set.add h mempool)
-        bstate.mempool bstate.current_head.operations in
-    Lwt.return { bstate with current_head = pred_block ; mempool }
-
-  let rec pop_blocks state bstate ancestor =
-    if not (Block_hash.equal bstate.current_head.hash ancestor) then begin
-      pop_block state bstate >>= fun bstate ->
-      pop_blocks state bstate ancestor
-    end else
-      Lwt.return bstate
-
-  let push_block time (bstate: blockchain_state) (block: valid_block) =
-    lwt_debug "push_block %a" Block_hash.pp_short block.hash >>= fun () ->
-    Persist.use bstate.blockchain_store (fun sstore ->
-        Store.Blockchain.set sstore block.hash time >>= fun () ->
-        if Block_hash.equal block.pred bstate.genesis_block.hash then
-          Store.Blockchain_test_succ.set sstore block.pred block.hash
-        else
-          Store.Blockchain_succ.set sstore block.pred block.hash) >>= fun () ->
-    let mempool =
-      List.fold_left
-        (fun mempool h -> Operation_hash_set.remove h mempool)
-        bstate.mempool block.operations in
-    Lwt.return { bstate with current_head = block ; mempool }
-
-  let locked_set_head net bstate block =
-    let Net net_id = block.net_id in
-    if not (Block_hash.equal net_id net.net_store.net_genesis.block) then
-      invalid_arg "State.Blockchain.set_head" ;
-    lwt_debug "set_head %a" Block_hash.pp_short block.hash >>= fun () ->
-    let current_protocol =
-      match block.protocol with
-      | None ->
-          fatal_error "Protocol version for the new head is unknown"
-      | Some protocol -> protocol in
-    Valid_block.new_blocks
-      net.state bstate.current_head block >>= fun (ancestor, path) ->
-    pop_blocks net.state bstate ancestor.hash >>= fun bstate ->
-    let time = Time.now () in
-    Lwt_list.fold_left_s
-      (push_block time) bstate path >>= fun bstate ->
-    let bstate = { bstate with current_protocol } in
-    store_state net bstate >>= fun () ->
-    Lwt.return (Some bstate)
-
-  let set_head net block =
-    update net (fun bstate -> locked_set_head net bstate block) >>= fun _ ->
-    Lwt.return_unit
-
-  let test_and_set_head net ~old block =
-    update net (fun bstate ->
-        if not (Block_hash.equal bstate.current_head.hash old.hash) then
+    let iter_predecessors =
+      let compare b1 b2 =
+        match Fitness.compare b1.fitness b2.fitness with
+        | 0 -> begin
+            match Time.compare b1.timestamp b2.timestamp with
+            | 0 -> Block_hash.compare b1.hash b2.hash
+            | res -> res
+          end
+        | res -> res in
+      let predecessor state b =
+        if Block_hash.equal b.hash b.pred then
           Lwt.return None
         else
-          locked_set_head net bstate block)
+          read_opt state b.pred in
+      Raw_helpers.iter_predecessors compare predecessor
+        (fun b -> b.timestamp) (fun b -> b.fitness)
 
-end
+  end
 
-module Mempool = struct
+  let known_heads net =
+    Shared.use net.state begin fun net_state ->
+      Store.Chain.Known_heads.elements net_state.chain_store >>= fun hashes ->
+      Lwt_list.map_p (Locked.read_exn net net_state) hashes
+    end
 
-  let use = Blockchain.use
-  let update = Blockchain.update
+  module Current = struct
 
-  let get net =
-    use net (fun bstate -> Lwt.return bstate.mempool)
+    let genesis net = read_exn net net.genesis.block
 
-  let add net h =
-    update net (fun bstate ->
-        if Operation_hash_set.mem h bstate.mempool then
-          Lwt.return_none
-        else begin
-          let bstate =
-            { bstate with
-              mempool = Operation_hash_set.add h bstate.mempool } in
-          Lwt.return (Some bstate)
-        end)
+    let head net =
+      Shared.use net.state begin fun { current_head } ->
+        Lwt.return current_head
+      end
 
-  let remove net h =
-    update net (fun bstate ->
-        if Operation_hash_set.mem h bstate.mempool then begin
-          let bstate =
-            { bstate with
-              mempool = Operation_hash_set.remove h bstate.mempool } in
-          Lwt.return (Some bstate)
-        end else
-          Lwt.return_none)
+    let protocol net =
+      Shared.use net.state begin fun { current_head } ->
+        match current_head.protocol with
+        | None -> assert false (* TODO PROPER ERROR *)
+        | Some proto -> Lwt.return proto
+      end
 
-  let for_block net block =
-    let rec pop acc ancestor block =
-      if Block_hash.equal ancestor.hash block.hash then
-        Lwt.return acc
-      else begin
-        let acc =
-          let add acc x = Operation_hash_set.add x acc in
-          List.fold_left add acc block.operations in
-        Valid_block.read_exn net.state block.pred >>= fun pred ->
-        pop acc ancestor pred
-      end in
-    use net (fun bstate ->
-        Valid_block.new_blocks
-          net.state bstate.current_head block >>= fun (ancestor, path) ->
-        pop bstate.mempool ancestor bstate.current_head >|= fun ops ->
-        List.fold_left
-          (fun ops (b: valid_block) ->
-             let del acc x = Operation_hash_set.remove x acc in
-             List.fold_left del ops b.operations)
-          ops
-          path)
+    let mem net hash =
+      Shared.use net.state begin fun { chain_store } ->
+        Store.Chain.In_chain_insertion_time.known (chain_store, hash)
+      end
+
+    let find_new net hist sz =
+      let rec common_ancestor hist =
+        match hist with
+        | [] -> Lwt.return net.genesis.block
+        | h :: hist ->
+            mem net h >>= function
+            | false -> common_ancestor hist
+            | true -> Lwt.return h in
+      let rec path sz acc h =
+        if sz <= 0 then return (List.rev acc)
+        else
+          Shared.use net.state begin fun { chain_store } ->
+            Store.Chain.Successor_in_chain.read_opt (chain_store, h)
+          end >>= function
+          | None -> return (List.rev acc)
+          | Some s -> path (sz-1) (s :: acc) s in
+      common_ancestor hist >>= fun ancestor ->
+      path sz [] ancestor
+
+    let new_blocks store old_block new_block =
+      Raw_helpers.common_ancestor store
+        old_block.hash old_block.shell_header
+        new_block.hash new_block.shell_header >>= function
+      | None -> assert false (* valid block *)
+      | Some (ancestor, _header) ->
+          Raw_helpers.path store ancestor new_block.hash >>= function
+          | None -> assert false (* valid block *)
+          | Some path -> Lwt.return (ancestor, path)
+
+    let locked_set_head block_header_store operation_store state block =
+      let rec pop_blocks ancestor hash =
+        if Block_hash.equal hash ancestor then
+          Lwt.return_unit
+        else
+          lwt_debug "pop_block %a" Block_hash.pp_short hash >>= fun () ->
+          Raw_block_header.read_exn
+            block_header_store hash >>= fun { shell } ->
+          Lwt_list.iter_p
+            (fun h ->
+               Raw_operation.Locked.unmark operation_store h >>= fun _ ->
+               Lwt.return_unit)
+            shell.operations >>= fun () ->
+          Store.Chain.In_chain_insertion_time.remove
+            (state.chain_store, hash) >>= fun () ->
+          Store.Chain.Successor_in_chain.remove
+            (state.chain_store, shell.predecessor) >>= fun () ->
+          pop_blocks ancestor shell.predecessor
+      in
+      let push_block time (hash, shell) =
+        lwt_debug "push_block %a" Block_hash.pp_short hash >>= fun () ->
+        Store.Chain.In_chain_insertion_time.store
+          (state.chain_store, hash) time >>= fun () ->
+        Store.Chain.Successor_in_chain.store
+          (state.chain_store,
+           shell.Store.Block_header.predecessor) hash >>= fun () ->
+        Lwt_list.iter_p
+          (fun h ->
+             Raw_operation.Locked.mark_valid operation_store h >>= fun _ ->
+            Lwt.return_unit)
+          shell.operations
+      in
+      let time = Time.now () in
+      new_blocks
+        block_header_store state.current_head block >>= fun (ancestor, path) ->
+      pop_blocks ancestor state.current_head.hash >>= fun () ->
+      Lwt_list.iter_p (push_block time) path >>= fun () ->
+      state.current_head <- block ;
+      Store.Chain.Current_head.store state.chain_store block.hash
+
+    let set_head net block =
+      Shared.use net.state begin fun state ->
+        Shared.use net.operation_store begin fun operation_store ->
+          locked_set_head net.block_header_store operation_store state block
+        end
+      end
+
+    let test_and_set_head net ~old block =
+      Shared.use net.state begin fun state ->
+        if not (Block_hash.equal state.current_head.hash old.hash) then
+          Lwt.return_false
+        else
+          Shared.use net.operation_store begin fun operation_store ->
+            locked_set_head
+              net.block_header_store operation_store state block >>= fun () ->
+            Lwt.return_true
+          end
+      end
+
+    let new_blocks net ~from_block ~to_block =
+      new_blocks net.block_header_store from_block to_block
+
+  end
 
 end
 
@@ -1114,126 +1124,106 @@ module Net = struct
   type t = net
   type net = t
 
-  module Blockchain = Blockchain
-  module Mempool = Mempool
+  type nonrec genesis = genesis ={
+    time: Time.t ;
+    block: Block_hash.t ;
+    protocol: Protocol_hash.t ;
+  }
+  let genesis_encoding =
+    let open Data_encoding in
+    conv
+      (fun { time ; block ; protocol } -> (time, block, protocol))
+      (fun (time, block, protocol) -> { time ; block ; protocol })
+      (obj3
+         (req "timestamp" Time.encoding)
+         (req "block" Block_hash.encoding)
+         (req "protocol" Protocol_hash.encoding))
 
-  let raw_create state (net_store : Store.net_store) =
-    Persist.use state.valid_block_state (fun vstate ->
-        Blockchain.read_state
-          net_store.net_genesis
-          net_store.net_store
-          state.store.blockchain vstate)
-    >|= fun blockchain_state ->
-    { state ; net_store ; blockchain_state }
+  let create state ?test_protocol ?forked_network_ttl genesis =
+    let forked_network_ttl = map_option Int64.of_int forked_network_ttl in
+    Shared.use state.global_data begin fun data ->
+      if Net_id.Table.mem data.nets (Net_id.Id genesis.block) then
+        Pervasives.failwith "State.Net.create"
+      else
+        Raw_net.locked_create data
+          ?test_protocol ?forked_network_ttl genesis >>= fun net ->
+        Net_id.Table.add data.nets (Net_id.Id genesis.block) net ;
+        Lwt.return net
+    end
 
-  let read_state, store_state =
-    let read state store =
-      Persist.use store.Store.global_store KnownNets.read >>= fun nets ->
-      let elements = Block_hash_set.elements nets in
-      Lwt_list.iter_p
-        (fun hash ->
-           store.net_read (Net hash) >>= function
-           | Error err ->
-               lwt_log_error "@[<v 2>Error while loading net:@ %a@]"
-                 Error_monad.pp_print_error err
-           | Ok net_store ->
-               raw_create state net_store >>= fun net ->
-               Block_hash_table.add state.nets hash net ;
-               Lwt.return ()
-        )
-        elements
-    in
-    let store { store = { global_store }; nets } =
-      Persist.update global_store
-        (fun store ->
-           let nets =
-             Block_hash_table.fold
-               (fun h _ s -> Block_hash_set.add h s)
-               nets Block_hash_set.empty in
-           KnownNets.write store nets >>= fun store ->
-           Lwt.return (Some store)) >>= fun _ ->
-      Lwt.return_unit in
-    (read, store)
+  let locked_read data (Net_id.Id genesis_hash as id) =
+    let net_store = Store.Net.get data.global_store id in
+    let operation_store = Store.Operation.get net_store
+    and block_header_store = Store.Block_header.get net_store
+    and chain_store = Store.Chain.get net_store in
+    Store.Net.Genesis_time.read net_store >>=? fun time ->
+    Store.Net.Genesis_protocol.read net_store >>=? fun protocol ->
+    Store.Net.Expiration.read_opt net_store >>= fun expiration ->
+    Store.Net.Forked_network_ttl.read_opt net_store >>= fun forked_network_ttl ->
+    let genesis = { time ; protocol ; block = genesis_hash } in
+    Store.Chain.Current_head.read chain_store >>=? fun genesis_hash ->
+    data.init_index id >>= fun context_index ->
+    Block_header.Locked.read block_header_store
+      genesis_hash >>=? fun genesis_shell_header ->
+    Block_header.Locked.read_discovery_time block_header_store
+      genesis_hash >>=? fun genesis_discovery_time ->
+    Valid_block.Locked.raw_read
+      genesis_shell_header.shell genesis_discovery_time
+      chain_store context_index genesis_hash >>=? fun genesis_block ->
+    return @@
+    Raw_net.build
+      ~genesis
+      ~genesis_block
+      ~expiration
+      ~forked_network_ttl
+      context_index
+      chain_store
+      block_header_store
+      operation_store
 
-  let state { state } = state
-  let active { active_net } = active_net
-  let get { nets } (Net b) =
-    try ok (Block_hash_table.find nets b)
-    with Not_found -> error (Unknown_network (Net b))
-  let all { nets } =
-    Block_hash_table.fold (fun _ net acc -> net :: acc) nets []
-  let id { net_store = { net_genesis = { block } } } = Net block
-  let expiration { net_store = { net_expiration } } = net_expiration
-  let same_id (Net id') net =
-    let Net id = id net in
-    Block_hash.equal id id'
-  let is_active { active_net } net_id =
-    List.exists (same_id net_id) active_net
-  let activate net =
-    let s = net.state in
-    let net_id = id net in
-    if not (List.exists (same_id net_id) s.active_net) then
-    s.active_net <- net :: s.active_net
-  let deactivate net =
-    let s = net.state in
-    let net_id = id net in
-    s.active_net <-
-      List.filter (fun net -> not (same_id net_id net)) s.active_net
+  let locked_read_all data =
+    Store.Net.list data.global_store >>= fun ids ->
+    iter_p
+      (fun id ->
+         locked_read data id >>=? fun net ->
+         Net_id.Table.add data.nets id net ;
+         return ())
+      ids
 
-  let create state ?expiration ?test_protocol net_genesis =
-    Valid_block.create_genesis_block
-      state net_genesis test_protocol >>=? fun _ ->
-    state.store.net_init ?expiration net_genesis >>= fun net_store ->
-    raw_create state net_store >>= fun net ->
-    store_state state >>= fun () ->
-    Block_hash_table.add state.nets net_genesis.block net ;
-    return net
+  let read_all state =
+    Shared.use state.global_data begin fun data ->
+      locked_read_all data
+    end
 
-  let cleanup_blocks_and_operations net =
-    let Net net_id = id net in
-    let same_id (Net id) = Block_hash.equal net_id id in
-    let cleanup_operation h =
-      ignore @@
-      Persist.use net.state.store.operation (fun store ->
-          Store.Operation.del store h) in
-    let rec cleanup_block h =
-      Block.read net.state h >>= function
-      | Some b when same_id b.data.shell.net_id ->
-          Persist.use net.state.store.block (fun store ->
-              Store.Block.del store h) >>= fun () ->
-          List.iter cleanup_operation b.data.shell.operations ;
-          cleanup_block b.data.shell.predecessor ;
-      | None | Some _ -> Lwt.return_unit in
-    Mempool.get net >>= fun ops ->
-    Operation_hash_set.iter cleanup_operation ops ;
-    Valid_block.postponed net.state >>= fun postponed ->
-    Block_hash_set.iter (fun h -> ignore (cleanup_block h)) postponed ;
-    Valid_block.known_heads net.state >>= fun known_heads ->
-    Block_hash_map.iter
-      (fun _ v ->
-         if same_id v.net_id then
-           ignore @@ begin
-             Persist.use net.state.store.block (fun store ->
-                 Store.Block.del store v.hash) >>= fun () ->
-             cleanup_block v.pred
-           end)
-      known_heads ;
-    Lwt.return_unit
+  let get state id =
+    Shared.use state.global_data begin fun data ->
+      try return (Net_id.Table.find data.nets id)
+      with Not_found -> fail (Unknown_network id)
+    end
 
-  let destroy net =
-    lwt_debug "destroy %a" Store.pp_net_id (id net) >>= fun () ->
-    let Net net_genesis as net_id = id net in
-    Block_hash_table.remove net.state.nets net_genesis ;
-    net.state.active_net <-
-      List.filter (fun net -> id net <> net_id) net.state.active_net ;
-    store_state net.state >>= fun () ->
-    net.state.store.net_destroy net.net_store >>= fun () ->
-    Lwt.async (fun () -> cleanup_blocks_and_operations net);
-    Lwt.return_unit
+  let all state =
+    Shared.use state.global_data begin fun { nets } ->
+      Lwt.return @@
+      Net_id.Table.fold (fun _ net acc -> net :: acc) nets []
+    end
+
+  let id { genesis = { block } } = Net_id.Id block
+  let genesis { genesis } = genesis
+  let expiration { expiration } = expiration
+  let forked_network_ttl { forked_network_ttl } = forked_network_ttl
+
+  let destroy state net =
+    lwt_debug "destroy %a" Net_id.pp (id net) >>= fun () ->
+    Shared.use state.global_data begin fun { global_store ; nets } ->
+      Net_id.Table.remove nets (id net) ;
+      Store.Net.destroy global_store (id net) >>= fun () ->
+      Lwt.return_unit
+    end
 
 end
 
 
+(*
 let () =
   let open Data_encoding in
   register_error_kind `Permanent
@@ -1263,49 +1253,64 @@ let () =
             | _ -> None)
     (fun block_hash -> Exn (Valid_block.Invalid (block_hash, [(* TODO *)])))
 
-(** Whole protocol state : read and store. *)
+*)
+
+module Operation = struct
+
+  type shell_header = Store.Operation.shell_header = {
+    net_id: Net_id.t ;
+  }
+
+  type t = Store.Operation.t = {
+    shell: shell_header ;
+    proto: MBytes.t ;
+  }
+
+  include Make_data_store
+      (Store.Operation)
+      (struct
+        type store = net
+        let use s = Shared.use s.operation_store
+        let unknown k = fail (Unknown_operation k)
+      end)
+      (Operation_hash.Set)
+
+  let in_chain = valid
+
+end
+
+module Protocol = struct
+
+  type t = Store.Protocol.t
+
+  include Make_data_store
+      (Store.Protocol)
+      (struct
+        type store = global_state
+        let use s = Shared.use s.protocol_store
+        let unknown k = fail (Unknown_protocol k)
+      end)
+      (Protocol_hash.Set)
+
+  (* TODO somehow export `mark_invalid`. *)
+
+end
 
 let read
-    ~request_operations ~request_blocks ~request_protocols
-    ~store_root ~context_root ~ttl ?patch_context () =
-  Store.init store_root >>= fun store ->
-  lwt_log_info "Initialising the distributed database..." >>= fun () ->
-  let operation_db =
-    Db_proxy.Operation.create { request_operations } store.operation in
-  let protocol_db =
-    Db_proxy.Protocol.create { request_protocols } store.protocol in
-  let block_db =
-    Db_proxy.Block.create { request_blocks } store.block in
-  Valid_block.create
-    ?patch_context ~context_root
-    store.global_store block_db ttl >>= fun valid_block_state ->
-  let rec state = {
-    store ;
-    active_net = [] ;
-    nets = Block_hash_table.create 7 ;
-    operation_db ;
-    operation_watchers = Watcher.create_input () ;
-    protocol_db ;
-    protocol_watchers = Watcher.create_input () ;
-    block_db ; block_watchers = Watcher.create_input () ;
-    valid_block_state ;
-  }
-  in
-  Net.read_state state store >>= fun _nets ->
-  Lwt.return state
-
-let store state =
-  let nets =
-    Block_hash_table.fold (fun _ net acc -> net :: acc) state.nets [] in
-  Net.store_state state >>= fun () ->
-  Lwt_list.iter_s
-    (fun net ->
-       Blockchain.use net
-         (fun bstate -> Blockchain.store_state net bstate))
-    nets
-
-let shutdown state =
-  Lwt.join [ Db_proxy.Operation.shutdown state.operation_db ;
-             Db_proxy.Block.shutdown state.block_db ;
-           ] >>= fun () ->
-  store state
+  ?patch_context
+  ~store_root
+  ~context_root
+  () =
+  Store.init store_root >>=? fun store ->
+  Context.init ?patch_context ~root:context_root >>= fun context_index ->
+  let global_data = {
+    nets = Net_id.Table.create 17 ;
+    global_store = store ;
+    init_index = (fun _ -> Lwt.return context_index) ;
+  } in
+  let state = {
+    global_data = Shared.create global_data ;
+    protocol_store = Shared.create @@ Store.Protocol.get store ;
+  } in
+  Net.read_all state >>=? fun () ->
+  return state

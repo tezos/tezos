@@ -32,18 +32,23 @@ val equal_string_option : ?msg:string -> string option -> string option -> unit
 val equal_error_monad :
   ?msg:string -> Error_monad.error -> Error_monad.error -> unit
 
-val equal_block_map : ?msg:string -> eq:('a -> 'a -> bool) -> 'a -> 'a -> unit
+val equal_block_set :
+  ?msg:string -> Block_hash.Set.t -> Block_hash.Set.t -> unit
+
+val equal_block_map :
+  ?msg:string -> eq:('a -> 'a -> bool) ->
+  'a Block_hash.Map.t -> 'a Block_hash.Map.t -> unit
 
 val equal_operation :
   ?msg:string ->
-  (Operation_hash.t * State.Operation.operation) option ->
-  (Operation_hash.t * State.Operation.operation) option ->
+  State.Operation.t option ->
+  State.Operation.t option ->
   unit
 
 val equal_block :
   ?msg:string ->
-  (Block_hash.t * Store.block) option ->
-  (Block_hash.t * Store.block) option ->
+  Store.Block_header.t option ->
+  Store.Block_header.t option ->
   unit
 
 val equal_result :

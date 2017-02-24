@@ -7,13 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type fitness = MBytes.t list
+type t = unit
+let initial = ()
+let encoding = Data_encoding.empty
+let score () = 0.
 
-val compare: fitness -> fitness -> int
-val equal: fitness -> fitness -> bool
-val pp: Format.formatter -> fitness -> unit
-val to_string: fitness -> string
-
-val encoding: fitness Data_encoding.
-                        t
-
+let cfg : _ P2p.meta_config = { encoding ; initial ; score }

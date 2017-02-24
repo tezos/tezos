@@ -50,11 +50,10 @@ let commands () =
        @@ param ~name:"protocol hash" ~desc:"" check_hash
        @@ stop)
       (fun ph cctxt ->
-         Client_node_rpcs.Protocols.bytes cctxt ph >>= fun { data } -> match data with
-         | Ok proto ->
-             Updater.extract "" ph proto >>= fun () ->
-             cctxt.message "Extracted protocol %a" Protocol_hash.pp_short ph
-         | Error err ->
-             cctxt.error "Error while dumping protocol %a: %a"
-               Protocol_hash.pp_short ph Error_monad.pp_print_error err);
+         Client_node_rpcs.Protocols.bytes cctxt ph >>= fun proto ->
+         Updater.extract "" ph proto >>= fun () ->
+         cctxt.message "Extracted protocol %a" Protocol_hash.pp_short ph) ;
+         (* | Error err -> *)
+             (* cctxt.error "Error while dumping protocol %a: %a" *)
+               (* Protocol_hash.pp_short ph Error_monad.pp_print_error err); *)
   ]

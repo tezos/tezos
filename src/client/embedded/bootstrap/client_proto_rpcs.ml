@@ -16,7 +16,6 @@ let handle_error cctxt = function
       pp_print_error Format.err_formatter exns ;
       cctxt.Client_commands.error "%s" "cannot continue"
 
-type net = State.net_id = Net of Block_hash.t
 type block = [
   | `Genesis
   | `Head of int | `Prevalidation

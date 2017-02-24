@@ -179,7 +179,7 @@ val recv_any :
 (** [send net peer msg] is a thread that returns when [msg] has been
     successfully enqueued in the send queue. *)
 val send :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg -> unit Lwt.t
+  ('msg, 'meta) net -> ('msg, 'meta) connection -> 'msg -> unit tzresult Lwt.t
 
 (** [try_send net peer msg] is [true] if [msg] has been added to the
     send queue for [peer], [false] otherwise *)
@@ -280,6 +280,18 @@ module RPC : sig
   end
 
 end
+
+val fold_connections :
+  ('msg, 'meta) net ->
+  init:'a -> f:(Peer_id.t -> ('msg, 'meta) connection -> 'a -> 'a) -> 'a
+
+val iter_connections :
+  ('msg, 'meta) net ->
+  (Peer_id.t -> ('msg, 'meta) connection -> unit) -> unit
+
+val on_new_connection :
+  ('msg, 'meta) net ->
+  (Peer_id.t -> ('msg, 'meta) connection -> unit) -> unit
 
 (**/**)
 module Raw : sig

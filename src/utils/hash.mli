@@ -30,19 +30,34 @@ module type MINIMAL_HASH = sig
   val size: int (* in bytes *)
   val compare: t -> t -> int
   val equal: t -> t -> bool
-  val of_hex: string -> t
+
   val to_hex: t -> string
-  val of_string: string -> t
+  val of_hex: string -> t option
+  val of_hex_exn: string -> t
+
   val to_string: t -> string
+  val of_string: string -> t option
+  val of_string_exn: string -> t
+
   val to_bytes: t -> MBytes.t
-  val of_bytes: MBytes.t -> t
+  val of_bytes: MBytes.t -> t option
+  val of_bytes_exn: MBytes.t -> t
+
   val read: MBytes.t -> int -> t
   val write: MBytes.t -> int -> t -> unit
-  val to_path: t -> string list
-  val of_path: string list -> t
-  val prefix_path: string -> string list
-  val path_len: int
 
+  val to_path: t -> string list
+  val of_path: string list -> t option
+  val of_path_exn: string list -> t
+
+  val prefix_path: string -> string list
+  val path_length: int
+
+end
+
+module type INTERNAL_MINIMAL_HASH = sig
+  include MINIMAL_HASH
+  module Table : Hashtbl.S with type key = t
 end
 
 module type HASH = sig
@@ -58,6 +73,21 @@ module type HASH = sig
   type Base58.data += Hash of t
   val b58check_encoding: t Base58.encoding
 
+  module Set : sig
+    include Set.S with type elt = t
+    val encoding: t Data_encoding.t
+  end
+
+  module Map : sig
+    include Map.S with type key = t
+    val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
+  end
+
+end
+
+module type INTERNAL_HASH = sig
+  include HASH
+  module Table : Hashtbl.S with type key = t
 end
 
 (** {2 Building Hashes} *******************************************************)
@@ -78,7 +108,7 @@ module type PrefixedName = sig
 end
 
 (** Builds a new Hash type using Sha256. *)
-module Make_minimal_Blake2B (Name : Name) : MINIMAL_HASH
+module Make_minimal_Blake2B (Name : Name) : INTERNAL_MINIMAL_HASH
 module Make_Blake2B
     (Register : sig
        val register_encoding:
@@ -89,28 +119,13 @@ module Make_Blake2B
          wrap: ('a -> Base58.data) ->
          'a Base58.encoding
      end)
-    (Name : PrefixedName) : HASH
-
-(** Builds a Set of values of some Hash type. *)
-module Hash_set (Hash : HASH) : sig
-  include Set.S with type elt = Hash.t
-  val encoding: t Data_encoding.t
-end
-
-(** Builds a Map using some Hash type as keys. *)
-module Hash_map (Hash : HASH) : sig
-  include Map.S with type key = Hash.t
-  val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
-end
-
-(** Builds a Hashtbl using some Hash type as keys. *)
-module Hash_table (Hash : MINIMAL_HASH) : Hashtbl.S with type key = Hash.t
+    (Name : PrefixedName) : INTERNAL_HASH
 
 (** {2 Predefined Hashes } ****************************************************)
 
 (** Blocks hashes / IDs. *)
 module Block_hash : sig
-  include HASH
+  include INTERNAL_HASH
   val param :
     ?name:string ->
     ?desc:string ->
@@ -118,20 +133,10 @@ module Block_hash : sig
     (t -> 'a, 'arg, 'ret) Cli_entries.params
 end
 
-module Block_hash_set : module type of Hash_set (Block_hash)
-module Block_hash_map : module type of Hash_map (Block_hash)
-module Block_hash_table : module type of Hash_table (Block_hash)
-
 (** Operations hashes / IDs. *)
-module Operation_hash : HASH
-module Operation_hash_set : Set.S with type elt = Operation_hash.t
-module Operation_hash_map : module type of Hash_map (Operation_hash)
-module Operation_hash_table : module type of Hash_table (Operation_hash)
+module Operation_hash : INTERNAL_HASH
 
 (** Protocol versions / source hashes. *)
-module Protocol_hash : HASH
-module Protocol_hash_set : module type of Hash_set (Protocol_hash)
-module Protocol_hash_map : module type of Hash_map (Protocol_hash)
-module Protocol_hash_table : module type of Hash_table (Protocol_hash)
+module Protocol_hash : INTERNAL_HASH
 
-module Generic_hash : MINIMAL_HASH
+module Generic_hash : INTERNAL_MINIMAL_HASH

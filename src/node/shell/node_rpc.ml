@@ -120,27 +120,27 @@ let create_delayed_stream
   let stream, push = Lwt_stream.create  () in
   let current_blocks =
     ref (List.fold_left
-           (fun acc h -> Block_hash_set.add h acc)
-           Block_hash_set.empty requested_heads) in
+           (fun acc h -> Block_hash.Set.add h acc)
+           Block_hash.Set.empty requested_heads) in
   let next_future_block, is_futur_block,
       insert_future_block, pop_future_block =
     let future_blocks = ref [] in (* FIXME *)
-    let future_blocks_set = ref Block_hash_set.empty in
+    let future_blocks_set = ref Block_hash.Set.empty in
     let next () =
       match !future_blocks with
       | [] -> None
       | bi :: _ -> Some bi
-    and mem hash = Block_hash_set.mem hash !future_blocks_set
+    and mem hash = Block_hash.Set.mem hash !future_blocks_set
     and insert bi =
       future_blocks := insert_future_block bi !future_blocks ;
       future_blocks_set :=
-        Block_hash_set.add bi.hash !future_blocks_set
+        Block_hash.Set.add bi.hash !future_blocks_set
     and pop time =
       match !future_blocks with
       | {timestamp} as bi :: rest when Time.(timestamp <= time) ->
           future_blocks := rest ;
           future_blocks_set :=
-            Block_hash_set.remove bi.hash !future_blocks_set ;
+            Block_hash.Set.remove bi.hash !future_blocks_set ;
         Some bi
       | _ -> None in
     next, mem, insert, pop in
@@ -168,7 +168,7 @@ let create_delayed_stream
           lwt_debug "WWW worker_loop Some" >>= fun () ->
           begin
             if not filtering
-            || Block_hash_set.mem bi.predecessor !current_blocks
+            || Block_hash.Set.mem bi.predecessor !current_blocks
             || is_futur_block bi.predecessor
             then begin
               let time = Time.(add (now ()) (Int64.of_int ~-delay)) in
@@ -177,8 +177,8 @@ let create_delayed_stream
                 Lwt.return_unit
               end else begin
                 current_blocks :=
-                  Block_hash_set.remove bi.predecessor !current_blocks
-                  |> Block_hash_set.add bi.hash ;
+                  Block_hash.Set.remove bi.predecessor !current_blocks
+                  |> Block_hash.Set.add bi.hash ;
                 push (Some [[filter_bi include_ops bi]]) ;
                 Lwt.return_unit
               end
@@ -219,7 +219,7 @@ let list_blocks
     match heads with
     | None ->
         Node.RPC.heads node >>= fun heads ->
-        let heads = List.map snd (Block_hash_map.bindings heads) in
+        let heads = List.map snd (Block_hash.Map.bindings heads) in
         let heads =
           match min_date with
           | None -> heads
@@ -271,7 +271,7 @@ let list_blocks
         requested_blocks in
     RPC.Answer.return infos
   else begin
-    Node.RPC.valid_block_watcher node >>= fun (bi_stream, stopper) ->
+    let (bi_stream, stopper) = Node.RPC.valid_block_watcher node in
     let stream =
       match delay with
       | None ->
@@ -301,10 +301,8 @@ let list_operations node {Services.Operations.monitor; contents} =
   Lwt_list.map_p
     (fun hash ->
        if include_ops then
-         Node.RPC.operation_content node hash >>= function
-         | None | Some { Time.data = Error _ } -> Lwt.return (hash, None)
-         | Some { Time.data = Ok bytes }->
-             Lwt.return (hash, Some bytes)
+         Node.RPC.operation_content node hash >>= fun op ->
+         Lwt.return (hash, op)
        else
          Lwt.return (hash, None))
     operations >>= fun operations ->
@@ -339,9 +337,8 @@ let list_protocols node {Services.Protocols.monitor; contents} =
     (fun hash ->
        if include_contents then
          Node.RPC.protocol_content node hash >>= function
-         | None | Some { Time.data = Error _ } -> Lwt.return (hash, None)
-         | Some { Time.data = Ok bytes }->
-             Lwt.return (hash, Some bytes)
+         | Error _  -> Lwt.return (hash, None)
+         | Ok bytes -> Lwt.return (hash, Some bytes)
        else
          Lwt.return (hash, None))
     protocols >>= fun protocols ->
@@ -365,8 +362,8 @@ let list_protocols node {Services.Protocols.monitor; contents} =
 
 let get_protocols node hash () =
   Node.RPC.protocol_content node hash >>= function
-  | Some bytes -> RPC.Answer.return bytes
-  | None -> raise Not_found
+  | Ok bytes -> RPC.Answer.return bytes
+  | Error _ -> raise Not_found
 
 let build_rpc_directory node =
   let dir = RPC.empty in
@@ -398,7 +395,7 @@ let build_rpc_directory node =
       let net_id = Utils.unopt ~default:bi.net net_id in
       let predecessor = Utils.unopt ~default:bi.hash pred in
       let res =
-        Store.Block.to_bytes {
+        Data_encoding.Binary.to_bytes Store.Block_header.encoding {
           shell = { net_id ; predecessor ; timestamp ; fitness ; operations } ;
           proto = header ;
         } in
@@ -411,8 +408,8 @@ let build_rpc_directory node =
     RPC.register0 dir Services.validate_block implementation in
   let dir =
     let implementation (block, blocking, force) =
-      Node.RPC.inject_block node ?force block >>= fun (hash, wait) ->
       begin
+        Node.RPC.inject_block node ?force block >>=? fun (hash, wait) ->
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end >>= RPC.Answer.return in
     RPC.register0 dir Services.inject_block implementation in

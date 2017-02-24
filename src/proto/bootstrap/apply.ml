@@ -248,9 +248,9 @@ let apply ctxt accept_failing_script block operations =
 
 let empty_result =
   { Updater.applied = [];
-    refused = Operation_hash_map.empty;
-    branch_refused = Operation_hash_map.empty;
-    branch_delayed = Operation_hash_map.empty;
+    refused = Operation_hash.Map.empty;
+    branch_refused = Operation_hash.Map.empty;
+    branch_delayed = Operation_hash.Map.empty;
   }
 
 let compare_operations op1 op2 =
@@ -276,9 +276,9 @@ let merge_result r r' =
     | Some x, None -> Some x
     | _, Some y -> Some y in
   { applied = r.applied @ r'.applied ;
-    refused = Operation_hash_map.merge merge r.refused r'.refused ;
+    refused = Operation_hash.Map.merge merge r.refused r'.refused ;
     branch_refused =
-      Operation_hash_map.merge merge r.branch_refused r'.branch_refused ;
+      Operation_hash.Map.merge merge r.branch_refused r'.branch_refused ;
     branch_delayed = r'.branch_delayed ;
   }
 
@@ -296,15 +296,15 @@ let prevalidate ctxt pred_block sort operations =
               match classify_errors errors with
               | `Branch ->
                   let branch_refused =
-                    Operation_hash_map.add op.hash errors r.Updater.branch_refused in
+                    Operation_hash.Map.add op.hash errors r.Updater.branch_refused in
                   Lwt.return (ctxt, { r with Updater.branch_refused })
               | `Permanent ->
                   let refused =
-                    Operation_hash_map.add op.hash errors r.Updater.refused in
+                    Operation_hash.Map.add op.hash errors r.Updater.refused in
                   Lwt.return (ctxt, { r with Updater.refused })
               | `Temporary ->
                   let branch_delayed =
-                    Operation_hash_map.add op.hash errors r.Updater.branch_delayed in
+                    Operation_hash.Map.add op.hash errors r.Updater.branch_delayed in
                   Lwt.return (ctxt, { r with Updater.branch_delayed }))
        (ctxt, empty_result)
        operations >>= fun (ctxt, r) ->
@@ -312,7 +312,7 @@ let prevalidate ctxt pred_block sort operations =
      | _ :: _ when sort ->
          let rechecked_operations =
            List.filter
-             (fun op -> Operation_hash_map.mem op.hash r.Updater.branch_delayed)
+             (fun op -> Operation_hash.Map.mem op.hash r.Updater.branch_delayed)
              operations in
          loop ctxt rechecked_operations >>=? fun (ctxt, r') ->
          return (ctxt, merge_result r r')

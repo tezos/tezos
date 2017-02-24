@@ -91,18 +91,18 @@ let tls = in_both_groups @@
 
 (* Version specific options *)
 
-let contextual_options : (unit -> unit) ref Protocol_hash_table.t =
-  Protocol_hash_table.create 7
+let contextual_options : (unit -> unit) ref Protocol_hash.Table.t =
+  Protocol_hash.Table.create 7
 
 let register_config_option version option =
   let callback () =
     file_group # add option ;
     cli_group # add option in
   try
-    let cont = Protocol_hash_table.find contextual_options version in
+    let cont = Protocol_hash.Table.find contextual_options version in
     cont := fun () -> callback () ; !cont ()
   with Not_found ->
-    Protocol_hash_table.add contextual_options version (ref callback)
+    Protocol_hash.Table.add contextual_options version (ref callback)
 
 (* Entry point *)
 
@@ -115,7 +115,7 @@ let parse_args ?version usage dispatcher argv cctxt =
          | None -> ()
          | Some version ->
              try
-               !(Protocol_hash_table.find contextual_options version) ()
+               !(Protocol_hash.Table.find contextual_options version) ()
              with Not_found -> () end ;
        let anon dispatch n = match dispatch (`Arg n) with
          | `Nop -> ()

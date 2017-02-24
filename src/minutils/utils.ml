@@ -108,6 +108,13 @@ let rec remove_elem_from_list nb = function
   | l when nb <= 0 -> l
   | _ :: tl -> remove_elem_from_list (nb - 1) tl
 
+let rec split_list_at n l =
+  let rec split n acc = function
+  | [] -> List.rev acc, []
+  | l when n <= 0 -> List.rev acc, l
+  | hd :: tl -> split (n - 1) (hd :: acc) tl in
+  split n [] l
+
 let has_prefix ~prefix s =
   let x = String.length prefix in
   let n = String.length s in

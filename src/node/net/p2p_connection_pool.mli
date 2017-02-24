@@ -257,6 +257,10 @@ val fold_connections:
   f:(Peer_id.t ->  ('msg, 'meta) connection -> 'a -> 'a) ->
   'a
 
+val on_new_connection:
+  ('msg, 'meta) pool ->
+  (Peer_id.t -> ('msg, 'meta) connection -> unit) -> unit
+
 (** {1 I/O on connections} *)
 
 type error += Connection_closed

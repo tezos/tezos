@@ -15,12 +15,14 @@ let make_test ~title test =
   Test.add_simple_test ~title (fun () -> Lwt_main.run (test ()))
 
 let rec remove_dir dir =
-  Array.iter (fun file ->
-      let f = Filename.concat dir file in
-      if Sys.is_directory f then remove_dir f
-      else Sys.remove f)
-    (Sys.readdir dir);
-  Unix.rmdir dir
+  if Sys.file_exists dir then begin
+    Array.iter (fun file ->
+        let f = Filename.concat dir file in
+        if Sys.is_directory f then remove_dir f
+        else Sys.remove f)
+      (Sys.readdir dir);
+    Unix.rmdir dir
+  end
 
 let output name res =
   let open Kaputt in
@@ -104,7 +106,7 @@ let run prefix tests =
            (fun () ->
               let finalise () =
                 if keep_dir then
-                  Format.eprintf "Data saved kept "
+                  Format.eprintf "Kept data dir %s@." base_dir
                 else
                   remove_dir base_dir
               in

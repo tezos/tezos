@@ -7,13 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type fitness = MBytes.t list
+open Store_sigs
 
-val compare: fitness -> fitness -> int
-val equal: fitness -> fitness -> bool
-val pp: Format.formatter -> fitness -> unit
-val to_string: fitness -> string
+include STORE
 
-val encoding: fitness Data_encoding.
-                        t
+val init: string -> t tzresult Lwt.t
 

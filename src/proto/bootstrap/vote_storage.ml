@@ -11,12 +11,12 @@ let record_proposal ctxt delegate proposal =
   Storage.Vote.Proposals.add ctxt (delegate, proposal)
 
 let get_proposals ctxt =
-  Storage.Vote.Proposals.fold ctxt Protocol_hash_map.empty
+  Storage.Vote.Proposals.fold ctxt Protocol_hash.Map.empty
     ~f:(fun (proposal, _delegate) acc ->
         let previous =
-          try Protocol_hash_map.find proposal acc
+          try Protocol_hash.Map.find proposal acc
           with Not_found -> 0l in
-        Lwt.return (Protocol_hash_map.add proposal (Int32.succ previous) acc))
+        Lwt.return (Protocol_hash.Map.add proposal (Int32.succ previous) acc))
 
 let clear_proposals ctxt =
   Storage.Vote.Proposals.clear ctxt

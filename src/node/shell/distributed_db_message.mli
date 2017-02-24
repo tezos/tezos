@@ -7,17 +7,26 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
+module Net_id = Store.Net_id
 
-val mkdir: string -> unit
+type t =
 
-val check_dir: string -> unit tzresult Lwt.t
-val is_directory: string -> bool
+  | Get_current_branch of Net_id.t
+  | Current_branch of Net_id.t * Block_hash.t list (* Block locator *)
+  | Deactivate of Net_id.t
 
-val with_file_in: string -> (MBytes.t -> 'a Lwt.t) -> 'a Lwt.t
-val with_file_out: string -> MBytes.t -> unit Lwt.t
+  | Get_current_head of Net_id.t
+  | Current_head of Net_id.t * Block_hash.t * Operation_hash.t list
 
-val remove_file: ?cleanup:bool -> string -> unit Lwt.t
+  | Get_block_headers of Net_id.t * Block_hash.t list
+  | Block_header of Store.Block_header.t
 
-val fold: string -> init:'a -> f:(string -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  | Get_operations of Net_id.t * Operation_hash.t list
+  | Operation of Store.Operation.t
 
+  | Get_protocols of Protocol_hash.t list
+  | Protocol of Tezos_compiler.Protocol.t
+
+val cfg : t P2p.message_config
+
+val pp_json : Format.formatter -> t -> unit

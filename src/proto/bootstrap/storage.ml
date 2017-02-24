@@ -489,7 +489,7 @@ module Rewards = struct
     Raw_make_iterable_data_storage(struct
       type t = Ed25519.Public_key_hash.t * Cycle_repr.t
       let prefix = Key.rewards
-      let length = Ed25519.Public_key_hash.path_len + 1
+      let length = Ed25519.Public_key_hash.path_length + 1
       let to_path (pkh, c) =
         Ed25519.Public_key_hash.to_path pkh @
         [Int32.to_string (Cycle_repr.to_int32 c)]
@@ -497,7 +497,7 @@ module Rewards = struct
         match List.rev p with
         | [] -> assert false
         | cycle :: rev_pkh ->
-            (Ed25519.Public_key_hash.of_path (List.rev rev_pkh),
+            (Ed25519.Public_key_hash.of_path_exn (List.rev rev_pkh),
              Cycle_repr.of_int32_exn @@ Int32.of_string cycle)
       let compare (pkh1, c1) (pkh2, c2) =
         let cmp1 = Ed25519.Public_key_hash.compare pkh1 pkh2 in
