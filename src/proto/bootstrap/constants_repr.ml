@@ -35,7 +35,7 @@ type constants = {
   cycle_length: int32 ;
   voting_period_length: int32 ;
   time_before_reward: Period_repr.t ;
-  time_between_slots: Period_repr.t ;
+  slot_durations: Period_repr.t list ;
   first_free_mining_slot: int32 ;
   max_signing_slot: int ;
   instructions_per_transaction: int ;
@@ -49,10 +49,8 @@ let default = {
     Period_repr.of_seconds_exn
     (* One year in seconds *)
     Int64.(mul 365L (mul 24L 3600L)) ;
-  time_between_slots =
-    Period_repr.of_seconds_exn
-      (* One minute in seconds *)
-      10L ;
+  slot_durations =
+    List.map Period_repr.of_seconds_exn [ 60L ] ;
   first_free_mining_slot = 16l ;
   max_signing_slot = 15 ;
   instructions_per_transaction = 16 * 1024 ;
@@ -71,38 +69,37 @@ let constants_encoding =
   (* let open Data_encoding in *)
   Data_encoding.conv
     (fun c ->
-       let open Compare in
+       let module Compare_slot_durations = Compare.List (Period_repr) in
        let cycle_length =
-         opt Int32.(=)
+         opt Compare.Int32.(=)
            default.cycle_length c.cycle_length
        and voting_period_length =
-         opt Int32.(=)
+         opt Compare.Int32.(=)
            default.voting_period_length c.voting_period_length
        and time_before_reward =
          map_option Period_repr.to_seconds @@
          opt Period_repr.(=)
            default.time_before_reward c.time_before_reward
-       and time_between_slots =
-         map_option Period_repr.to_seconds @@
-         opt Period_repr.(=)
-           default.time_between_slots c.time_between_slots
+       and slot_durations =
+         opt Compare_slot_durations.(=)
+           default.slot_durations c.slot_durations
        and first_free_mining_slot =
-         opt Int32.(=)
+         opt Compare.Int32.(=)
            default.first_free_mining_slot c.first_free_mining_slot
        and max_signing_slot =
-         opt Int.(=)
+         opt Compare.Int.(=)
            default.max_signing_slot c.max_signing_slot
        and instructions_per_transaction =
-         opt Int.(=)
+         opt Compare.Int.(=)
            default.instructions_per_transaction c.instructions_per_transaction
        and proof_of_work_threshold =
-         opt Int64.(=)
+         opt Compare.Int64.(=)
            default.proof_of_work_threshold c.proof_of_work_threshold
        in
        ( cycle_length,
          voting_period_length,
          time_before_reward,
-         time_between_slots,
+         slot_durations,
          first_free_mining_slot,
          max_signing_slot,
          instructions_per_transaction,
@@ -111,7 +108,7 @@ let constants_encoding =
     (fun ( cycle_length,
            voting_period_length,
            time_before_reward,
-           time_between_slots,
+           slot_durations,
            first_free_mining_slot,
            max_signing_slot,
            instructions_per_transaction,
@@ -124,9 +121,9 @@ let constants_encoding =
         time_before_reward =
           unopt default.time_before_reward @@
           map_option Period_repr.of_seconds_exn time_before_reward ;
-        time_between_slots =
-          unopt default.time_between_slots @@
-          map_option Period_repr.of_seconds_exn time_between_slots ;
+        slot_durations =
+          unopt default.slot_durations @@
+          slot_durations ;
         first_free_mining_slot =
           unopt default.first_free_mining_slot first_free_mining_slot ;
         max_signing_slot =
@@ -141,7 +138,7 @@ let constants_encoding =
         (opt "cycle_length" int32)
         (opt "voting_period_length" int32)
         (opt "time_before_reward" int64)
-        (opt "time_between_slots" int64)
+        (opt "slot_durations" (list Period_repr.encoding))
         (opt "first_free_mining_slot" int32)
         (opt "max_signing_slot" int31)
         (opt "instructions_per_transaction" int31)

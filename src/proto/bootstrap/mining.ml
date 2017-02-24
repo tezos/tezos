@@ -17,13 +17,25 @@ type error +=
   | Cannot_pay_endorsement_bond
   | Bad_slot
   | Bad_delegate
+  | Invalid_slot_durations_constant
 
 let minimal_time c priority =
   Timestamp.get_current c >>=? fun prev_timestamp ->
+  let rec cumsum_slot_durations acc durations p =
+    if Compare.Int32.(=) p 0l then
+      ok acc
+    else match durations with
+      | [] -> Error_monad.error Invalid_slot_durations_constant
+      | [ last ] ->
+         Period.mult p last >>? fun period ->
+         Timestamp.(acc +? period)
+      | first :: durations ->
+         Timestamp.(acc +? first) >>? fun acc ->
+         let p = Int32.pred p in
+         cumsum_slot_durations acc durations p in
   Lwt.return
-    (Period.mult (Int32.succ priority)
-       (Constants.time_between_slots c)) >>=? fun period ->
-  Lwt.return Timestamp.(prev_timestamp +? period)
+    (cumsum_slot_durations
+       prev_timestamp (Constants.slot_durations c) priority)
 
 let check_timestamp c priority timestamp =
   minimal_time c priority >>=? fun minimal_time ->

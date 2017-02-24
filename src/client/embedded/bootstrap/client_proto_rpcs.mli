@@ -35,9 +35,9 @@ module Constants : sig
   val time_before_reward:
     Client_commands.context ->
     block -> Period.t tzresult Lwt.t
-  val time_between_slots:
+  val slot_durations:
     Client_commands.context ->
-    block -> Period.t tzresult Lwt.t
+    block -> (Period.t list) tzresult Lwt.t
   val first_free_mining_slot:
     Client_commands.context ->
     block -> int32 tzresult Lwt.t
