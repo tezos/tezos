@@ -201,9 +201,9 @@ module LogEvent : sig
     (** The connection was closed for external reason. *)
 
     | Gc_points
-    (** Garbage correction of known point table has been triggered. *)
+    (** Garbage collection of known point table has been triggered. *)
     | Gc_peer_ids
-    (** Garbage correction of known peer_ids table has been triggered. *)
+    (** Garbage collection of known peer_ids table has been triggered. *)
 
   val encoding : t Data_encoding.t
 end
