@@ -133,9 +133,9 @@ module Network : sig
     val list :
       (unit, unit, unit, P2p.Connection_info.t list) RPC.service
     val info :
-      (unit, unit * P2p.Gid.t, unit, P2p.Connection_info.t option) RPC.service
+      (unit, unit * P2p.Peer_id.t, unit, P2p.Connection_info.t option) RPC.service
     val kick :
-      (unit, unit * P2p.Gid.t, bool, unit) RPC.service
+      (unit, unit * P2p.Peer_id.t, bool, unit) RPC.service
   end
 
   module Point : sig
@@ -148,14 +148,14 @@ module Network : sig
       (unit, unit * P2p.Point.t, bool, P2p.RPC.Point.Event.t list) RPC.service
   end
 
-  module Gid : sig
+  module Peer_id : sig
     val infos :
-      (unit, unit, P2p.RPC.Gid.state list,
-       (P2p.Gid.t * P2p.RPC.Gid.info) list) RPC.service
+      (unit, unit, P2p.RPC.Peer_id.state list,
+       (P2p.Peer_id.t * P2p.RPC.Peer_id.info) list) RPC.service
     val info :
-      (unit, unit * P2p.Gid.t, unit, P2p.RPC.Gid.info option) RPC.service
+      (unit, unit * P2p.Peer_id.t, unit, P2p.RPC.Peer_id.info option) RPC.service
     val events :
-      (unit, unit * P2p.Gid.t, bool, P2p.RPC.Gid.Event.t list) RPC.service
+      (unit, unit * P2p.Peer_id.t, bool, P2p.RPC.Peer_id.Event.t list) RPC.service
   end
 end
 

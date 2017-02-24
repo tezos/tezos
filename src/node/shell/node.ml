@@ -632,18 +632,18 @@ module RPC = struct
         Tezos_p2p.RPC.Point.watch node.p2p
     end
 
-    module Gid = struct
+    module Peer_id = struct
       let info (node : t) =
-        Tezos_p2p.RPC.Gid.info node.p2p
+        Tezos_p2p.RPC.Peer_id.info node.p2p
 
       let infos (node : t) restrict =
-        Tezos_p2p.RPC.Gid.infos ~restrict node.p2p
+        Tezos_p2p.RPC.Peer_id.infos ~restrict node.p2p
 
       let events (node : t) =
-        Tezos_p2p.RPC.Gid.events node.p2p
+        Tezos_p2p.RPC.Peer_id.events node.p2p
 
       let watch (node : t) =
-        Tezos_p2p.RPC.Gid.watch node.p2p
+        Tezos_p2p.RPC.Peer_id.watch node.p2p
     end
   end
 end

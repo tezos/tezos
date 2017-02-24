@@ -13,22 +13,22 @@ module Point_info = struct
 
   type 'data state =
     | Requested of { cancel: Canceler.t }
-    | Accepted of { current_gid: Gid.t ;
+    | Accepted of { current_peer_id: Peer_id.t ;
                     cancel: Canceler.t }
     | Running of { data: 'data ;
-                   current_gid: Gid.t }
+                   current_peer_id: Peer_id.t }
     | Disconnected
 
   module Event = struct
 
     type kind =
       | Outgoing_request
-      | Accepting_request of Gid.t
-      | Rejecting_request of Gid.t
-      | Request_rejected of Gid.t option
-      | Connection_established of Gid.t
-      | Disconnection of Gid.t
-      | External_disconnection of Gid.t
+      | Accepting_request of Peer_id.t
+      | Rejecting_request of Peer_id.t
+      | Request_rejected of Peer_id.t option
+      | Connection_established of Peer_id.t
+      | Disconnection of Peer_id.t
+      | External_disconnection of Peer_id.t
 
     let kind_encoding =
       let open Data_encoding in
@@ -41,29 +41,29 @@ module Point_info = struct
           (function Outgoing_request -> Some () | _ -> None)
           (fun () -> Outgoing_request) ;
         case ~tag:1 (branch_encoding "accepting_request"
-                       (obj1 (req "gid" Gid.encoding)))
-          (function Accepting_request gid -> Some gid | _ -> None)
-          (fun gid -> Accepting_request gid) ;
+                       (obj1 (req "peer_id" Peer_id.encoding)))
+          (function Accepting_request peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> Accepting_request peer_id) ;
         case ~tag:2 (branch_encoding "rejecting_request"
-                       (obj1 (req "gid" Gid.encoding)))
-          (function Rejecting_request gid -> Some gid | _ -> None)
-          (fun gid -> Rejecting_request gid) ;
+                       (obj1 (req "peer_id" Peer_id.encoding)))
+          (function Rejecting_request peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> Rejecting_request peer_id) ;
         case ~tag:3 (branch_encoding "request_rejected"
-                       (obj1 (opt "gid" Gid.encoding)))
-          (function Request_rejected gid -> Some gid | _ -> None)
-          (fun gid -> Request_rejected gid) ;
+                       (obj1 (opt "peer_id" Peer_id.encoding)))
+          (function Request_rejected peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> Request_rejected peer_id) ;
         case ~tag:4 (branch_encoding "rejecting_request"
-                       (obj1 (req "gid" Gid.encoding)))
-          (function Connection_established gid -> Some gid | _ -> None)
-          (fun gid -> Connection_established gid) ;
+                       (obj1 (req "peer_id" Peer_id.encoding)))
+          (function Connection_established peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> Connection_established peer_id) ;
         case ~tag:5 (branch_encoding "rejecting_request"
-                       (obj1 (req "gid" Gid.encoding)))
-          (function Disconnection gid -> Some gid | _ -> None)
-          (fun gid -> Disconnection gid) ;
+                       (obj1 (req "peer_id" Peer_id.encoding)))
+          (function Disconnection peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> Disconnection peer_id) ;
         case ~tag:6 (branch_encoding "rejecting_request"
-                       (obj1 (req "gid" Gid.encoding)))
-          (function External_disconnection gid -> Some gid | _ -> None)
-          (fun gid -> External_disconnection gid) ;
+                       (obj1 (req "peer_id" Peer_id.encoding)))
+          (function External_disconnection peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> External_disconnection peer_id) ;
       ]
 
     type t = {
@@ -92,9 +92,9 @@ module Point_info = struct
     mutable trusted : bool ;
     mutable state : 'data state ;
     mutable last_failed_connection : Time.t option ;
-    mutable last_rejected_connection : (Gid.t * Time.t) option ;
-    mutable last_established_connection : (Gid.t * Time.t) option ;
-    mutable last_disconnection : (Gid.t * Time.t) option ;
+    mutable last_rejected_connection : (Peer_id.t * Time.t) option ;
+    mutable last_established_connection : (Peer_id.t * Time.t) option ;
+    mutable last_disconnection : (Peer_id.t * Time.t) option ;
     greylisting : greylisting_config ;
     mutable greylisting_delay : float ;
     mutable greylisting_end : Time.t ;
@@ -172,27 +172,27 @@ module Point_info = struct
     Ring.add events event ;
     Watcher.notify watchers event
 
-  let log_incoming_rejection ?timestamp point_info gid =
-    log point_info ?timestamp (Rejecting_request gid)
+  let log_incoming_rejection ?timestamp point_info peer_id =
+    log point_info ?timestamp (Rejecting_request peer_id)
 
   module State = struct
 
     type 'data t = 'data state =
       | Requested of { cancel: Canceler.t }
-      | Accepted of { current_gid: Gid.t ;
+      | Accepted of { current_peer_id: Peer_id.t ;
                       cancel: Canceler.t }
       | Running of { data: 'data ;
-                     current_gid: Gid.t }
+                     current_peer_id: Peer_id.t }
       | Disconnected
     type 'data state = 'data t
 
     let pp ppf = function
       | Requested _ ->
           Format.fprintf ppf "requested"
-      | Accepted { current_gid } ->
-          Format.fprintf ppf "accepted %a" Gid.pp current_gid
-      | Running { current_gid } ->
-          Format.fprintf ppf "running %a" Gid.pp current_gid
+      | Accepted { current_peer_id } ->
+          Format.fprintf ppf "accepted %a" Peer_id.pp current_peer_id
+      | Running { current_peer_id } ->
+          Format.fprintf ppf "running %a" Peer_id.pp current_peer_id
       | Disconnected ->
           Format.fprintf ppf "disconnected"
 
@@ -215,29 +215,29 @@ module Point_info = struct
 
     let set_accepted
         ?(timestamp = Time.now ())
-        point_info current_gid cancel =
+        point_info current_peer_id cancel =
       (* log_notice "SET_ACCEPTED %a@." Point.pp point_info.point ; *)
       assert begin
         match point_info.state with
         | Accepted _ | Running _ -> false
         | Requested _ | Disconnected -> true
       end ;
-      point_info.state <- Accepted { current_gid ; cancel } ;
-      log point_info ~timestamp (Accepting_request current_gid)
+      point_info.state <- Accepted { current_peer_id ; cancel } ;
+      log point_info ~timestamp (Accepting_request current_peer_id)
 
     let set_running
         ?(timestamp = Time.now ())
-        point_info gid data =
+        point_info peer_id data =
       assert begin
         match point_info.state with
-        | Disconnected -> true (* request to unknown gid. *)
+        | Disconnected -> true (* request to unknown peer_id. *)
         | Running _ -> false
-        | Accepted { current_gid } -> Gid.equal gid current_gid
+        | Accepted { current_peer_id } -> Peer_id.equal peer_id current_peer_id
         | Requested _ -> true
       end ;
-      point_info.state <- Running { data ; current_gid = gid } ;
-      point_info.last_established_connection <- Some (gid, timestamp) ;
-      log point_info ~timestamp (Connection_established gid)
+      point_info.state <- Running { data ; current_peer_id = peer_id } ;
+      point_info.last_established_connection <- Some (peer_id, timestamp) ;
+      log point_info ~timestamp (Connection_established peer_id)
 
     let set_greylisted timestamp point_info =
       point_info.greylisting_end <-
@@ -255,21 +255,21 @@ module Point_info = struct
             set_greylisted timestamp point_info ;
             point_info.last_failed_connection <- Some timestamp ;
             Request_rejected None
-        | Accepted { current_gid } ->
+        | Accepted { current_peer_id } ->
             set_greylisted timestamp point_info ;
             point_info.last_rejected_connection <-
-              Some (current_gid, timestamp) ;
-            Request_rejected (Some current_gid)
-        | Running { current_gid } ->
+              Some (current_peer_id, timestamp) ;
+            Request_rejected (Some current_peer_id)
+        | Running { current_peer_id } ->
             point_info.greylisting_delay <-
               float_of_int point_info.greylisting.initial_delay ;
             point_info.greylisting_end <-
               Time.add timestamp
                 (Int64.of_int point_info.greylisting.disconnection_delay) ;
-            point_info.last_disconnection <- Some (current_gid, timestamp) ;
+            point_info.last_disconnection <- Some (current_peer_id, timestamp) ;
             if requested
-            then Disconnection current_gid
-            else External_disconnection current_gid
+            then Disconnection current_peer_id
+            else External_disconnection current_peer_id
         | Disconnected ->
             assert false
       in
@@ -280,7 +280,7 @@ module Point_info = struct
 
 end
 
-module Gid_info = struct
+module Peer_info = struct
 
   type 'data state =
     | Accepted of { current_point: Id_point.t ;
@@ -333,7 +333,7 @@ module Gid_info = struct
   end
 
   type ('conn, 'meta) t = {
-    gid : Gid.t ;
+    peer_id : Peer_id.t ;
     created : Time.t ;
     mutable state : 'conn state ;
     mutable metadata : 'meta ;
@@ -345,14 +345,14 @@ module Gid_info = struct
     events : Event.t Ring.t ;
     watchers : Event.t Watcher.input ;
   }
-  type ('conn, 'meta) gid_info = ('conn, 'meta) t
+  type ('conn, 'meta) peer_info = ('conn, 'meta) t
 
-  let compare gi1 gi2 = Gid.compare gi1.gid gi2.gid
+  let compare gi1 gi2 = Peer_id.compare gi1.peer_id gi2.peer_id
 
   let log_size = 100
 
-  let create ?(created = Time.now ()) ?(trusted = false) ~metadata gid =
-    { gid ;
+  let create ?(created = Time.now ()) ?(trusted = false) ~metadata peer_id =
+    { peer_id ;
       created ;
       state = Disconnected ;
       metadata ;
@@ -368,20 +368,20 @@ module Gid_info = struct
   let encoding metadata_encoding =
     let open Data_encoding in
     conv
-      (fun { gid ; trusted ; metadata ; events ; created ;
+      (fun { peer_id ; trusted ; metadata ; events ; created ;
            last_failed_connection ; last_rejected_connection ;
            last_established_connection ; last_disconnection } ->
-         (gid, created, trusted, metadata, Ring.elements events,
+         (peer_id, created, trusted, metadata, Ring.elements events,
           last_failed_connection, last_rejected_connection,
           last_established_connection, last_disconnection))
-      (fun (gid, created, trusted, metadata, event_list,
+      (fun (peer_id, created, trusted, metadata, event_list,
           last_failed_connection, last_rejected_connection,
           last_established_connection, last_disconnection) ->
-         let info = create ~trusted ~metadata gid in
+         let info = create ~trusted ~metadata peer_id in
          let events = Ring.create log_size in
          Ring.add_list info.events event_list ;
          { state = Disconnected ;
-           trusted ; gid ; metadata ; created ;
+           trusted ; peer_id ; metadata ; created ;
            last_failed_connection ;
            last_rejected_connection ;
            last_established_connection ;
@@ -390,7 +390,7 @@ module Gid_info = struct
            watchers = Watcher.create_input () ;
          })
       (obj9
-         (req "gid" Gid.encoding)
+         (req "peer_id" Peer_id.encoding)
          (req "created" Time.encoding)
          (dft "trusted" bool false)
          (req "metadata" metadata_encoding)
@@ -404,7 +404,7 @@ module Gid_info = struct
          (opt "last_disconnection"
             (tup2 Id_point.encoding Time.encoding)))
 
-  let gid { gid } = gid
+  let peer_id { peer_id } = peer_id
   let created { created } = created
   let metadata { metadata } = metadata
   let set_metadata gi metadata = gi.metadata <- metadata
@@ -435,8 +435,8 @@ module Gid_info = struct
 
   let watch { watchers } = Watcher.create_stream watchers
 
-  let log_incoming_rejection ?timestamp gid_info point =
-    log gid_info ?timestamp point Rejecting_request
+  let log_incoming_rejection ?timestamp peer_info point =
+    log peer_info ?timestamp point Rejecting_request
 
   module State = struct
 
@@ -465,46 +465,46 @@ module Gid_info = struct
 
     let set_accepted
         ?(timestamp = Time.now ())
-        gid_info current_point cancel =
+        peer_info current_point cancel =
       assert begin
-        match gid_info.state with
+        match peer_info.state with
         | Accepted _ | Running _ -> false
         | Disconnected -> true
       end ;
-      gid_info.state <- Accepted { current_point ; cancel } ;
-      log gid_info ~timestamp current_point Accepting_request
+      peer_info.state <- Accepted { current_point ; cancel } ;
+      log peer_info ~timestamp current_point Accepting_request
 
     let set_running
         ?(timestamp = Time.now ())
-        gid_info point data =
+        peer_info point data =
       assert begin
-        match gid_info.state with
-        | Disconnected -> true (* request to unknown gid. *)
+        match peer_info.state with
+        | Disconnected -> true (* request to unknown peer_id. *)
         | Running _ -> false
         | Accepted { current_point } ->
             Id_point.equal point current_point
       end ;
-      gid_info.state <- Running { data ; current_point = point } ;
-      gid_info.last_established_connection <- Some (point, timestamp) ;
-      log gid_info ~timestamp point Connection_established
+      peer_info.state <- Running { data ; current_point = point } ;
+      peer_info.last_established_connection <- Some (point, timestamp) ;
+      log peer_info ~timestamp point Connection_established
 
     let set_disconnected
-        ?(timestamp = Time.now ()) ?(requested = false) gid_info =
+        ?(timestamp = Time.now ()) ?(requested = false) peer_info =
       let current_point, (event : Event.kind) =
-        match gid_info.state with
+        match peer_info.state with
         | Accepted { current_point } ->
-            gid_info.last_rejected_connection <-
+            peer_info.last_rejected_connection <-
               Some (current_point, timestamp) ;
             current_point, Request_rejected
         | Running { current_point } ->
-            gid_info.last_disconnection <-
+            peer_info.last_disconnection <-
               Some (current_point, timestamp) ;
             current_point,
             if requested then Disconnection else External_disconnection
         | Disconnected -> assert false
       in
-      gid_info.state <- Disconnected ;
-      log gid_info ~timestamp current_point event
+      peer_info.state <- Disconnected ;
+      log peer_info ~timestamp current_point event
 
   end
 

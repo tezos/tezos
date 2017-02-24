@@ -25,7 +25,7 @@ type error += Encoding_error
 type error += Decoding_error
 type error += Rejected
 type error += Myself of Id_point.t
-type error += Not_enough_proof_of_work of Gid.t
+type error += Not_enough_proof_of_work of Peer_id.t
 type error += Invalid_auth
 
 type authenticated_fd

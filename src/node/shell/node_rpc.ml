@@ -464,32 +464,32 @@ let build_rpc_directory node =
   (* Network : Connection *)
 
   let dir =
-    let implementation gid () =
-      Node.RPC.Network.Connection.info node gid |> RPC.Answer.return in
+    let implementation peer_id () =
+      Node.RPC.Network.Connection.info node peer_id |> RPC.Answer.return in
     RPC.register1 dir Services.Network.Connection.info implementation in
   let dir =
-    let implementation gid wait =
-      Node.RPC.Network.Connection.kick node gid wait >>= RPC.Answer.return in
+    let implementation peer_id wait =
+      Node.RPC.Network.Connection.kick node peer_id wait >>= RPC.Answer.return in
     RPC.register1 dir Services.Network.Connection.kick implementation in
   let dir =
     let implementation () =
       Node.RPC.Network.Connection.list node |> RPC.Answer.return in
     RPC.register0 dir Services.Network.Connection.list implementation in
 
-  (* Network : Gid *)
+  (* Network : Peer_id *)
 
   let dir =
     let implementation state =
-      Node.RPC.Network.Gid.infos node state |> RPC.Answer.return in
-    RPC.register0 dir Services.Network.Gid.infos implementation in
+      Node.RPC.Network.Peer_id.infos node state |> RPC.Answer.return in
+    RPC.register0 dir Services.Network.Peer_id.infos implementation in
   let dir =
-    let implementation gid () =
-      Node.RPC.Network.Gid.info node gid |> RPC.Answer.return in
-    RPC.register1 dir Services.Network.Gid.info implementation in
+    let implementation peer_id () =
+      Node.RPC.Network.Peer_id.info node peer_id |> RPC.Answer.return in
+    RPC.register1 dir Services.Network.Peer_id.info implementation in
   let dir =
-    let implementation gid monitor =
+    let implementation peer_id monitor =
       if monitor then
-        let stream, stopper = Node.RPC.Network.Gid.watch node gid in
+        let stream, stopper = Node.RPC.Network.Peer_id.watch node peer_id in
         let shutdown () = Watcher.shutdown stopper in
         let first_request = ref true in
         let next () =
@@ -497,12 +497,12 @@ let build_rpc_directory node =
             Lwt_stream.get stream >|= map_option ~f:(fun i -> [i])
           end else begin
             first_request := false ;
-            Lwt.return_some @@ Node.RPC.Network.Gid.events node gid
+            Lwt.return_some @@ Node.RPC.Network.Peer_id.events node peer_id
           end in
         RPC.Answer.return_stream { next ; shutdown }
       else
-      Node.RPC.Network.Gid.events node gid |> RPC.Answer.return in
-    RPC.register1 dir Services.Network.Gid.events implementation in
+      Node.RPC.Network.Peer_id.events node peer_id |> RPC.Answer.return in
+    RPC.register1 dir Services.Network.Peer_id.events implementation in
 
   (* Network : Point *)
 

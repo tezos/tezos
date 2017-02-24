@@ -489,7 +489,7 @@ let shutdown ?timeout st =
   st.closed <- true ;
   ReadScheduler.shutdown st.read_scheduler >>= fun () ->
   Inttbl.fold
-    (fun _gid conn acc -> close ?timeout conn >>= fun _ -> acc)
+    (fun _peer_id conn acc -> close ?timeout conn >>= fun _ -> acc)
     st.connected
     Lwt.return_unit >>= fun () ->
   WriteScheduler.shutdown st.write_scheduler >>= fun () ->
