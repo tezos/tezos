@@ -68,7 +68,7 @@ module Point_info : sig
   val greylisted :
     ?now:Time.t -> 'conn point_info -> bool
 
-  val greylisted_end : 'conn point_info -> Time.t
+  val greylisted_until : 'conn point_info -> Time.t
 
   val point : 'conn point_info -> Point.t
 

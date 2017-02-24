@@ -454,7 +454,7 @@ module RPC = struct
 
     type info = {
       trusted : bool ;
-      greylisted_end : Time.t ;
+      greylisted_until : Time.t ;
       state : state ;
       peer_id : Peer_id.t option ;
       last_failed_connection : Time.t option ;
@@ -468,21 +468,21 @@ module RPC = struct
     let info_encoding =
       let open Data_encoding in
       conv
-        (fun { trusted ; greylisted_end ; state ; peer_id ;
+        (fun { trusted ; greylisted_until ; state ; peer_id ;
                last_failed_connection ; last_rejected_connection ;
                last_established_connection ; last_disconnection ;
                last_seen ; last_miss ;
              } ->
-          (trusted, greylisted_end, state, peer_id,
+          (trusted, greylisted_until, state, peer_id,
            last_failed_connection, last_rejected_connection,
            last_established_connection, last_disconnection,
            last_seen, last_miss)
         )
-        (fun (trusted, greylisted_end, state, peer_id,
+        (fun (trusted, greylisted_until, state, peer_id,
               last_failed_connection, last_rejected_connection,
               last_established_connection, last_disconnection,
               last_seen, last_miss) ->
-          { trusted ; greylisted_end ; state ; peer_id ;
+          { trusted ; greylisted_until ; state ; peer_id ;
             last_failed_connection ; last_rejected_connection ;
             last_established_connection ; last_disconnection ;
             last_seen ; last_miss ;
@@ -490,7 +490,7 @@ module RPC = struct
         )
         (obj10
            (req "trusted" bool)
-           (dft "greylisted_end" Time.encoding Time.epoch)
+           (dft "greylisted_until" Time.encoding Time.epoch)
            (req "state" state_encoding)
            (opt "peer_id" Peer_id.encoding)
            (opt "last_failed_connection" Time.encoding)
@@ -511,7 +511,7 @@ module RPC = struct
       Point_info.{
         trusted = trusted i ;
         state ; peer_id ;
-        greylisted_end = greylisted_end i ;
+        greylisted_until = greylisted_until i ;
         last_failed_connection = last_failed_connection i ;
         last_rejected_connection = last_rejected_connection i ;
         last_established_connection = last_established_connection i ;
@@ -621,7 +621,7 @@ module RPC = struct
               (req "score" float)
               (req "trusted" bool)
               (req "state" state_encoding)
-              (opt "id_point" Id_point.encoding)
+              (opt "reachable_at" Id_point.encoding)
               (req "stat" Stat.encoding))
            (obj6
               (opt "last_failed_connection" (tup2 Id_point.encoding Time.encoding))
