@@ -42,7 +42,7 @@ module Forge = struct
               (req "net_id" Updater.Net_id.encoding)
               (req "predecessor" Block_hash.encoding)
               (req "timestamp" Time.encoding)
-              (req "fitness" Data_encoding.int64))
+              (req "fitness" Fitness.encoding))
            Data.Command.encoding)
       ~output: (obj1 (req "payload" bytes))
       RPC.Path.(custom_root / "helpers" / "forge" / "block")
@@ -60,7 +60,6 @@ let rpc_services : Context.t RPC.directory =
       dir
       (Forge.block RPC.Path.root)
       (fun _ctxt ((net_id, predecessor, timestamp, fitness), command) ->
-         let fitness = [ MBytes.of_string "\000" ; int64_to_bytes fitness ] in
          let shell = { Updater.net_id ; predecessor ; timestamp ;
                        fitness ; operations = [] } in
          let bytes = Data.Command.forge shell command in

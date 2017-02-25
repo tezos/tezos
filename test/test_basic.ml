@@ -82,9 +82,11 @@ let genesis_sk =
     "edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z"
 
 let switch_protocol () =
+  let fitness =
+    Client_embedded_proto_alpha.Fitness_repr.from_int64 0L in
   Client_genesis.Client_proto_main.mine cctxt `Genesis
     (Activate Client_alpha.Client_proto_main.protocol)
-    0L genesis_sk
+    fitness genesis_sk
 
 let bootstrap_accounts () =
   Client_proto_rpcs.Constants.bootstrap cctxt (`Head 0)

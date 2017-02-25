@@ -11,5 +11,7 @@ val mine:
   Client_commands.context ->
   Client_node_rpcs.Blocks.block ->
   Data.Command.t ->
-  int64 -> Sodium.secret Sodium.Sign.key -> unit tzresult Lwt.t
+  Fitness.fitness ->
+  Environment.Ed25519.secret_key ->
+  unit tzresult Lwt.t
 
