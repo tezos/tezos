@@ -100,13 +100,6 @@ end = struct
 
 end
 
-let get_block_hash cctxt = function
-  | `Hash hash -> Lwt.return hash
-  | `Genesis | `Head _ | `Test_head _ as block ->
-      Client_node_rpcs.Blocks.hash cctxt block
-  | `Prevalidation -> Client_node_rpcs.Blocks.hash cctxt (`Head 0)
-  | `Test_prevalidation -> Client_node_rpcs.Blocks.hash cctxt (`Test_head 0)
-
 let get_signing_slots cctxt ?max_priority block delegate level =
   Client_proto_rpcs.Helpers.Rights.endorsement_rights_for_delegate cctxt
     ?max_priority ~first_level:level ~last_level:level
@@ -119,7 +112,7 @@ let get_signing_slots cctxt ?max_priority block delegate level =
 let inject_endorsement cctxt
     block level ?wait ?force
     src_sk source slot =
-  get_block_hash cctxt block >>= fun block_hash ->
+  Client_blocks.get_block_hash cctxt block >>= fun block_hash ->
   Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
   Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt
     block
