@@ -14,7 +14,8 @@ open Error_monad
 open Hash
 
 let () =
-  Random.self_init ()
+  Random.self_init () ;
+  Unix.chdir (Filename.dirname Sys.executable_name)
 
 let cctxt =
   let log channel msg = match channel with
@@ -76,8 +77,17 @@ type account = {
   contract : Contract.t ;
 }
 
+let genesis_sk =
+  Environment.Ed25519.secret_key_of_b58check
+    "edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z"
+
+let switch_protocol () =
+  Client_genesis.Client_proto_main.mine cctxt `Genesis
+    (Activate Client_alpha.Client_proto_main.protocol)
+    0L genesis_sk
+
 let bootstrap_accounts () =
-  Client_proto_rpcs.Constants.bootstrap cctxt `Genesis
+  Client_proto_rpcs.Constants.bootstrap cctxt (`Head 0)
   >>= fun accounts ->
   let cpt = ref 0 in
   Lwt.return
@@ -133,12 +143,13 @@ let mine contract =
   return ()
 
 let ecoproto_error f = function
-  | Register_client_embedded_proto_bootstrap.Ecoproto_error errors ->
+  | Register_client_embedded_proto_alpha.Ecoproto_error errors ->
       List.exists f errors
   | _ -> false
 
 let main () =
   fork_node () ;
+  switch_protocol () >>=? fun () ->
   bootstrap_accounts () >>= fun bootstrap_accounts ->
   let bootstrap = List.hd bootstrap_accounts in
   create_account "foo" >>= fun foo ->

@@ -155,7 +155,8 @@ let commands () =
     command ~group ~desc: "get the bootstrap keys and bootstrap contract handle"
       (fixed [ "bootstrap" ])
       (fun cctxt ->
-         Client_proto_rpcs.Constants.bootstrap cctxt `Genesis >>= fun accounts ->
+         let block = Client_config.block () in
+         Client_proto_rpcs.Constants.bootstrap cctxt block >>= fun accounts ->
          let cpt = ref 0 in
          Lwt_list.iter_s
            (fun { Bootstrap.public_key_hash = pkh ;

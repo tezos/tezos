@@ -18,21 +18,16 @@ let call_service1 cctxt s block a1 =
 let call_error_service1 cctxt s block a1 =
   call_service1 cctxt s block a1 >|= wrap_error
 
-let forge_block cctxt command block net_id pred_blk hash fitness =
+let forge_block
+    cctxt block net_id ?(timestamp = Time.now ()) command fitness =
+  Client_blocks.get_block_hash cctxt block >>= fun pred ->
   call_service1 cctxt
     Services.Forge.block block
-    (net_id, pred_blk, (Time.now ()),
-     { Types.Block.command ; hash ; fitness })
+    ((net_id, pred, timestamp, fitness), command)
 
-let mine cctxt command proto_hash fitness seckey =
-  let block =
-    match Client_config.block () with
-    | `Prevalidation -> `Head 0
-    | `Test_prevalidation -> `Test_head 0
-    | b -> b in
-  Client_node_rpcs.Blocks.info cctxt block >>= fun bi ->
-  forge_block
-    cctxt command block bi.net bi.hash proto_hash fitness >>= fun blk ->
+let mine cctxt block command fitness seckey =
+  Client_blocks.get_block_info cctxt block >>= fun bi ->
+  forge_block cctxt block bi.net command fitness >>= fun blk ->
   let signed_blk = Environment.Ed25519.append_signature seckey blk in
   Client_node_rpcs.inject_block cctxt ~wait:true signed_blk >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
@@ -63,7 +58,8 @@ let commands () =
         stop
     end
       (fun hash fitness seckey cctxt ->
-         mine cctxt Activate hash fitness seckey >>= handle_error cctxt)
+         let block = Client_config.block () in
+         mine cctxt block (Activate hash) fitness seckey >>= handle_error cctxt)
     ;
     command ~desc: "Fork a test protocol" begin
       prefixes [ "fork" ; "test" ; "protocol" ] @@
@@ -80,7 +76,8 @@ let commands () =
         stop
     end
       (fun hash fitness seckey cctxt ->
-         mine cctxt Activate_testnet hash fitness seckey >>= handle_error cctxt) ;
+         let block = Client_config.block () in
+         mine cctxt block (Activate_testnet hash) fitness seckey >>= handle_error cctxt) ;
   ]
 
 let () =
