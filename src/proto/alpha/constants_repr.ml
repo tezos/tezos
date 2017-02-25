@@ -96,24 +96,22 @@ let constants_encoding =
          opt Compare.Int64.(=)
            default.proof_of_work_threshold c.proof_of_work_threshold
        in
-       ( cycle_length,
-         voting_period_length,
-         time_before_reward,
-         slot_durations,
-         first_free_mining_slot,
-         max_signing_slot,
-         instructions_per_transaction,
-         proof_of_work_threshold
-       ) )
-    (fun ( cycle_length,
-           voting_period_length,
-           time_before_reward,
-           slot_durations,
-           first_free_mining_slot,
-           max_signing_slot,
-           instructions_per_transaction,
-           proof_of_work_threshold
-         ) ->
+       (( cycle_length,
+          voting_period_length,
+          time_before_reward,
+          slot_durations,
+          first_free_mining_slot,
+          max_signing_slot,
+          instructions_per_transaction,
+          proof_of_work_threshold ), ()) )
+    (fun (( cycle_length,
+            voting_period_length,
+            time_before_reward,
+            slot_durations,
+            first_free_mining_slot,
+            max_signing_slot,
+            instructions_per_transaction,
+            proof_of_work_threshold ), ()) ->
       { cycle_length =
           unopt default.cycle_length cycle_length ;
         voting_period_length =
@@ -133,17 +131,18 @@ let constants_encoding =
         proof_of_work_threshold =
           unopt default.proof_of_work_threshold proof_of_work_threshold ;
       } )
-    Data_encoding.(
-      obj8
-        (opt "cycle_length" int32)
-        (opt "voting_period_length" int32)
-        (opt "time_before_reward" int64)
-        (opt "slot_durations" (list Period_repr.encoding))
-        (opt "first_free_mining_slot" int32)
-        (opt "max_signing_slot" int31)
-        (opt "instructions_per_transaction" int31)
-        (opt "proof_of_work_threshold" int64)
-    )
+     Data_encoding.(
+       merge_objs
+         (obj8
+            (opt "cycle_length" int32)
+            (opt "voting_period_length" int32)
+            (opt "time_before_reward" int64)
+            (opt "slot_durations" (list Period_repr.encoding))
+            (opt "first_free_mining_slot" int32)
+            (opt "max_signing_slot" int31)
+            (opt "instructions_per_transaction" int31)
+            (opt "proof_of_work_threshold" int64))
+         unit)
 
 type error += Constant_read of exn
 
