@@ -25,6 +25,7 @@ val splitted : json:'a encoding -> binary:'a encoding -> 'a encoding
 
 val null : unit encoding
 val empty : unit encoding
+val unit : unit encoding
 val constant : string -> unit encoding
 val int8 : int encoding
 val int16 : int encoding
@@ -219,6 +220,7 @@ end
 module Binary : sig
 
   val length : 'a encoding -> 'a -> int
+  val fixed_length : 'a encoding -> int option
   val read : 'a encoding -> MBytes.t -> int -> int -> (int * 'a) option
   val write : 'a encoding -> 'a -> MBytes.t -> int -> int option
   val to_bytes : 'a encoding -> 'a -> MBytes.t
