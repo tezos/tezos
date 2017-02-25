@@ -33,6 +33,7 @@ val splitted : json:'a encoding -> binary:'a encoding -> 'a encoding
 
 val null : unit encoding
 val empty : unit encoding
+val unit : unit encoding
 val constant : string -> unit encoding
 val int8 : int encoding
 val uint8 : int encoding

@@ -427,6 +427,7 @@ module Encoding = struct
 
   let null = make @@ Null
   let empty = make @@ Empty
+  let unit = make @@ Ignore
   let constant s = make @@ Constant s
   let bool = make @@ Bool
   let int8 = make @@ Int8
