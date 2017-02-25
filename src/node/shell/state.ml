@@ -22,7 +22,7 @@ type error +=
 
 let () =
   Error_monad.register_error_kind
-    `Temporary
+    `Permanent
     ~id:"state.invalid_fitness"
     ~title:"Invalid fitness"
     ~description:"The computed fitness differs from the fitness found \
@@ -830,18 +830,8 @@ module Valid_block = struct
         block_header_store hash >>=? fun block ->
       Raw_block_header.Locked.read_discovery_time
         block_header_store hash >>=? fun discovery_time ->
-      begin (* Load the associated version of the economical protocol . *)
-        Context.get_protocol context >>= fun protocol_hash ->
-        match Updater.get protocol_hash with
-        | None ->
-            lwt_log_error
-              "State.Validated_block: unknown protocol (%a)"
-              Protocol_hash.pp_short protocol_hash >>= fun () ->
-            fail (Unknown_protocol protocol_hash)
-        | Some proto -> return proto
-      end >>=? fun (module Proto) ->
       (* Check fitness coherency. *)
-      Proto.fitness context >>= fun fitness ->
+      Context.get_fitness context >>= fun fitness ->
       fail_unless
         (Fitness.equal fitness block.Store.Block_header.shell.fitness)
         (Invalid_fitness

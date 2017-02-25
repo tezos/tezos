@@ -40,10 +40,10 @@ $(addprefix proto/environment/, \
   hash.mli \
   ed25519.mli \
   persist.mli \
+  fitness.mli \
   context.mli \
   RPC.mli \
   \
-  fitness.mli \
   updater.mli \
 )
 

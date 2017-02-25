@@ -253,11 +253,10 @@ module Fitness : sig
   include (module type of Fitness)
   type t = fitness
 
-  val get: context -> fitness tzresult Lwt.t
   val increase: context -> context tzresult Lwt.t
 
-  val raw_get: context -> int64 tzresult Lwt.t
-  val raw_read: fitness -> int64 tzresult Lwt.t
+  val get: context -> int64 tzresult Lwt.t
+  val to_int64: fitness -> int64 tzresult Lwt.t
 
 end
 

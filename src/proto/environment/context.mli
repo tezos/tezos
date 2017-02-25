@@ -5,6 +5,9 @@ open Hash
 
 include Persist.STORE
 
+val get_fitness: t -> Fitness.fitness Lwt.t
+val set_fitness: t -> Fitness.fitness -> t Lwt.t
+
 val get_genesis_time: t -> Time.t Lwt.t
 val get_genesis_block: t -> Block_hash.t Lwt.t
 

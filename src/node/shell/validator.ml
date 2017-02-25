@@ -187,8 +187,8 @@ module Validation_scheduler = struct
         | Ok new_context ->
             (* The sanity check `set_context` detects differences
                between the computed fitness and the fitness announced
-               in the block header. When distinct `Valid_block.read`
-               will return an error. *)
+               in the block header. Then `Valid_block.read` will
+               return an error. *)
             set_context hash (Ok new_context) >>= fun () ->
             State.Valid_block.read state hash >>= function
             | Error err ->
