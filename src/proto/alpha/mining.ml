@@ -186,8 +186,8 @@ let max_fitness_gap ctxt =
 type error += Invalid_fitness_gap
 
 let check_fitness_gap ctxt (block : Block.header)  =
-  Fitness.raw_get ctxt >>=? fun current_fitness ->
-  Fitness.raw_read block.shell.fitness >>=? fun announced_fitness ->
+  Fitness.get ctxt >>=? fun current_fitness ->
+  Fitness.to_int64 block.shell.fitness >>=? fun announced_fitness ->
   let gap = Int64.sub announced_fitness current_fitness in
   if Compare.Int64.(gap <= 0L || max_fitness_gap ctxt < gap) then
     fail Invalid_fitness_gap

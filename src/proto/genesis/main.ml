@@ -39,7 +39,6 @@ let max_number_of_operations = 0
 
 type block = {
   shell: Updater.shell_block ;
-  fitness: Int64.t ;
   command: Data.Command.t ;
   signature: Ed25519.signature ;
 }
@@ -52,9 +51,7 @@ let max_block_length =
 let parse_block { Updater.shell ; proto } : block tzresult =
   match Data_encoding.Binary.of_bytes Data.Command.signed_encoding proto with
   | None -> Error [Parsing_error]
-  | Some (command, signature) ->
-      Data.Fitness.to_int64 shell.fitness >>? fun fitness ->
-      Ok { shell ; fitness ; command ; signature }
+  | Some (command, signature) -> Ok { shell ; command ; signature }
 
 let check_signature ctxt { shell ; command ; signature } =
   let bytes = Data.Command.forge shell command in
@@ -63,14 +60,10 @@ let check_signature ctxt { shell ; command ; signature } =
     (Ed25519.check_signature public_key signature bytes)
     Invalid_signature
 
-let fitness ctxt =
-  Data.Fitness.get ctxt >>= fun fitness ->
-  Lwt.return (Data.Fitness.from_int64 fitness)
-
 let apply ctxt header _ops =
   check_signature ctxt header >>=? fun () ->
   Data.Init.may_initialize ctxt >>=? fun ctxt ->
-  Data.Fitness.set ctxt header.fitness >>= fun ctxt ->
+  Context.set_fitness ctxt header.shell.fitness >>= fun ctxt ->
   match header.command with
   | Activate hash ->
       Updater.activate ctxt hash >>= fun ctxt ->

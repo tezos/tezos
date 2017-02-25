@@ -30,14 +30,6 @@ let max_block_length =
 
 let rpc_services = Services_registration.rpc_services
 
-let fitness ctxt =
-  begin
-    Tezos_context.init ctxt >>=? fun ctxt ->
-    Tezos_context.Fitness.get ctxt
-  end >|= function
-  | Ok fitness -> fitness
-  | Error _ -> []
-
 let apply ctxt header ops = Apply.apply ctxt true header ops
 
 let preapply = Apply.preapply
