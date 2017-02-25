@@ -19,10 +19,12 @@ let initialize ~from_genesis (ctxt:Context.t) =
   Storage.prepare ctxt >>=? fun store ->
   Storage.get_genesis_time store >>= fun time ->
   Storage.Current_timestamp.init_set store time >>=? fun store ->
-  (if from_genesis then
-     return store
-   else
-     Fitness_storage.init store) >>=? fun store ->
+  begin
+    if from_genesis then
+      return store
+    else
+      Fitness_storage.init store
+  end >>=? fun store ->
   Level_storage.init store >>=? fun store ->
   Roll_storage.init store >>=? fun store ->
   Nonce_storage.init store >>=? fun store ->

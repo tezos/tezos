@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Types
-
 let error_encoding =
   let open Data_encoding in
   describe
@@ -39,11 +37,13 @@ module Forge = struct
     RPC.service
       ~description: "Forge a block"
       ~input:
-        (obj4
-           (req "net_id" Updater.net_id_encoding)
-           (req "predecessor" Block_hash.encoding)
-           (req "timestamp" Time.encoding)
-           (req "block" Block.encoding))
+        (merge_objs
+           (obj4
+              (req "net_id" Updater.Net_id.encoding)
+              (req "predecessor" Block_hash.encoding)
+              (req "timestamp" Time.encoding)
+              (req "fitness" Data_encoding.int64))
+           Data.Command.encoding)
       ~output: (obj1 (req "payload" bytes))
       RPC.Path.(custom_root / "helpers" / "forge" / "block")
 end
@@ -54,13 +54,10 @@ let rpc_services : Context.t RPC.directory =
     RPC.register
       dir
       (Forge.block RPC.Path.root)
-      (fun _ctxt (net_id, predecessor, timestamp, block) ->
-         let fitness = Fitness.header_fitness block.fitness in
+      (fun _ctxt ((net_id, predecessor, timestamp, fitness), command) ->
+         let fitness = Data.Fitness.from_int64 fitness in
          let shell = { Updater.net_id ; predecessor ; timestamp ;
                        fitness ; operations = [] } in
-         RPC.Answer.return
-           (Data_encoding.Binary.to_bytes
-              (Data_encoding.tup2 Updater.shell_block_encoding Block.encoding)
-              (shell, block)))
-  in
+         let bytes = Data.Command.forge shell command in
+         RPC.Answer.return bytes) in
   dir

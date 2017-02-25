@@ -1,4 +1,4 @@
 {
     "hash": "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im",
-    "modules": ["Error", "Types", "Services", "Main"]
+    "modules": ["Data", "Services", "Main"]
 }

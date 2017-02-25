@@ -1,4 +1,6 @@
 {
+    "genesis_pubkey":
+       "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
     "slot_durations" : [ 10 ; 5 ],
     "cycle_length" : 128,
     "first_free_mining_slot" : 4
