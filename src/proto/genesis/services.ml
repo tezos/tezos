@@ -48,6 +48,11 @@ module Forge = struct
       RPC.Path.(custom_root / "helpers" / "forge" / "block")
 end
 
+let int64_to_bytes i =
+  let b = MBytes.create 8 in
+  MBytes.set_int64 b 0 i;
+  b
+
 let rpc_services : Context.t RPC.directory =
   let dir = RPC.empty in
   let dir =
@@ -55,7 +60,7 @@ let rpc_services : Context.t RPC.directory =
       dir
       (Forge.block RPC.Path.root)
       (fun _ctxt ((net_id, predecessor, timestamp, fitness), command) ->
-         let fitness = Data.Fitness.from_int64 fitness in
+         let fitness = [ MBytes.of_string "\000" ; int64_to_bytes fitness ] in
          let shell = { Updater.net_id ; predecessor ; timestamp ;
                        fitness ; operations = [] } in
          let bytes = Data.Command.forge shell command in

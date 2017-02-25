@@ -18,6 +18,10 @@ type t = Storage_functors.context
 
 type error += Invalid_sandbox_parameter
 
+let get_fitness (c, _) = Context.get_fitness c
+let set_fitness (c, csts) v =
+  Context.set_fitness c v >>= fun c -> Lwt.return (c, csts)
+
 let get_sandboxed c =
   Context.get c sandboxed_key >>= function
   | None -> return None

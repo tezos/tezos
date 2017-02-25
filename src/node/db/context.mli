@@ -64,5 +64,8 @@ val fork_test_network: context -> context Lwt.t
 val get_genesis_time: context -> Time.t Lwt.t
 val get_genesis_block: context -> Block_hash.t Lwt.t
 
+val set_fitness: context -> Fitness.fitness -> context Lwt.t
+val get_fitness: context -> Fitness.fitness Lwt.t
+
 val init_test_network:
   context ->  time:Time.t -> genesis:Block_hash.t -> context tzresult Lwt.t

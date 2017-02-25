@@ -62,6 +62,7 @@ let genesis_block_key = ["genesis";"block"]
 let genesis_protocol_key = ["genesis";"protocol"]
 let genesis_time_key = ["genesis";"time"]
 let current_protocol_key = ["protocol"]
+let current_fitness_key = ["fitness"]
 let current_test_protocol_key = ["test_protocol"]
 let current_test_network_key = ["test_network"]
 let current_test_network_expiration_key = ["test_network_expiration"]
@@ -195,6 +196,8 @@ let commit_genesis index ~id:block ~time ~protocol ~test_protocol =
     (MBytes.of_string (Time.to_notation time)) >>= fun view ->
   GitStore.FunView.set view current_protocol_key
     (Protocol_hash.to_bytes protocol) >>= fun view ->
+  GitStore.FunView.set view current_fitness_key
+    (Data_encoding.Binary.to_bytes Fitness.encoding []) >>= fun view ->
   GitStore.FunView.set view current_test_protocol_key
     (Protocol_hash.to_bytes test_protocol) >>= fun view ->
   let ctxt = { index ; store ; view } in
@@ -210,6 +213,17 @@ let get_protocol v =
   | Some data -> Lwt.return (Protocol_hash.of_bytes_exn data)
 let set_protocol v key =
   raw_set v current_protocol_key (Protocol_hash.to_bytes key)
+
+let get_fitness v =
+  raw_get v current_fitness_key >>= function
+  | None -> assert false
+  | Some data ->
+      match Data_encoding.Binary.of_bytes Fitness.encoding data with
+      | None -> assert false
+      | Some data -> Lwt.return data
+let set_fitness v data =
+  raw_set v current_fitness_key
+    (Data_encoding.Binary.to_bytes Fitness.encoding data)
 
 let get_test_protocol v =
   raw_get v current_test_protocol_key >>= function

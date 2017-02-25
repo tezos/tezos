@@ -261,8 +261,7 @@ module RPC = struct
         let net_state = Validator.net_state validator in
         State.Valid_block.Current.head net_state >>= fun head ->
         let ctxt = Prevalidator.context pv in
-        let (module Proto) = Prevalidator.protocol pv in
-        Proto.fitness ctxt >|= fun fitness ->
+        Context.get_fitness ctxt >|= fun fitness ->
         { (convert head) with
           hash = prevalidation_hash ;
           fitness ;
@@ -387,11 +386,11 @@ module RPC = struct
       match protocol with
       | None -> failwith "Unknown protocol version"
       | Some protocol -> return protocol
-    end >>=? function (module Proto) as protocol ->
-      let net_db = Validator.net_db node.global_validator in
+    end >>=? fun ((module Proto) as protocol) ->
+    let net_db = Validator.net_db node.global_validator in
     Prevalidator.preapply
       net_db context protocol hash timestamp sort ops >>=? fun (ctxt, r) ->
-    Proto.fitness ctxt >>= fun fitness ->
+    Context.get_fitness ctxt >>= fun fitness ->
     return (fitness, r)
 
   let complete node ?block str =

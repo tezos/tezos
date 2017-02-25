@@ -53,51 +53,6 @@ module Command = struct
 
 end
 
-module Fitness = struct
-
-  let fitness_key = ["v1";"store";"fitness"]
-
-  let get ctxt =
-    Context.get ctxt fitness_key >>= function
-    | None -> Lwt.return 0L
-    | Some b ->
-        match Data_encoding.Binary.of_bytes Data_encoding.int64 b with
-        | None -> Lwt.return 0L
-        | Some v -> Lwt.return v
-
-  let set ctxt v =
-    Context.set ctxt fitness_key @@
-    Data_encoding.Binary.to_bytes Data_encoding.int64 v
-
-  type error += Invalid_fitness
-
-  let int64_to_bytes i =
-    let b = MBytes.create 8 in
-    MBytes.set_int64 b 0 i;
-    b
-
-  let int64_of_bytes b =
-    if Compare.Int.(MBytes.length b <> 8) then
-      Error [Invalid_fitness]
-    else
-      Ok (MBytes.get_int64 b 0)
-
-  let version_number = "\000"
-
-  let from_int64 fitness =
-    [ MBytes.of_string version_number ;
-      int64_to_bytes fitness ]
-
-  let to_int64 = function
-    | [ version ;
-        fitness ]
-      when Compare.String.
-             (MBytes.to_string version = version_number) ->
-        int64_of_bytes fitness
-    | _ -> Error [Invalid_fitness]
-
-end
-
 module Pubkey = struct
 
   let pubkey_key = ["genesis_key"]

@@ -9,7 +9,6 @@
 
 type error += Invalid_fitness
 
-
 let int64_to_bytes i =
   let b = MBytes.create 8 in
   MBytes.set_int64 b 0 i;
@@ -22,9 +21,8 @@ let int64_of_bytes b =
     return (MBytes.get_int64 b 0)
 
 let from_int64 fitness =
-  return
-    [ MBytes.of_string Constants_repr.version_number ;
-      int64_to_bytes fitness ]
+  [ MBytes.of_string Constants_repr.version_number ;
+    int64_to_bytes fitness ]
 
 let to_int64 = function
   | [ version ;
@@ -32,4 +30,5 @@ let to_int64 = function
     when Compare.String.
            (MBytes.to_string version = Constants_repr.version_number) ->
       int64_of_bytes fitness
+  | [] -> return 0L
   | _ -> fail Invalid_fitness

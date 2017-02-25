@@ -34,6 +34,9 @@ val recover : t -> Context.t
 val get_sandboxed : Context.t -> Data_encoding.json option tzresult Lwt.t
 val set_sandboxed : Context.t -> Data_encoding.json -> Context.t Lwt.t
 
+val get_fitness : t -> Fitness.fitness Lwt.t
+val set_fitness : t -> Fitness.fitness -> t Lwt.t
+
 val get_prevalidation : t -> bool Lwt.t
 val set_prevalidation : t -> t Lwt.t
 
@@ -51,12 +54,6 @@ module Current_level : Single_data_storage
 (** The level of the current block *)
 module Current_timestamp : Single_data_storage
   with type value = Time.t
-   and type context := t
-
-(** The fitness of the current block, which is the number of ancestor
-    blocks in the chain as an [int64] *)
-module Current_fitness : Single_data_storage
-  with type value = int64
    and type context := t
 
 module Roll : sig

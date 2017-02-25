@@ -117,10 +117,6 @@ module type PROTOCOL = sig
     Context.t -> Block_hash.t -> Time.t -> bool -> operation list ->
     (Context.t * error preapply_result) tzresult Lwt.t
 
-  (** The context rating function to determine the winning block chain. *)
-  val fitness :
-    Context.t -> fitness Lwt.t
-
   (** The list of remote procedures exported by this implementation *)
   val rpc_services : Context.t RPC.directory
 
