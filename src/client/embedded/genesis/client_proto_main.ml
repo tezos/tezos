@@ -59,6 +59,8 @@ let commands () =
     end
       (fun hash fitness seckey cctxt ->
          let block = Client_config.block () in
+         let fitness =
+           Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
          mine cctxt block (Activate hash) fitness seckey >>= handle_error cctxt)
     ;
     command ~desc: "Fork a test protocol" begin
@@ -77,6 +79,8 @@ let commands () =
     end
       (fun hash fitness seckey cctxt ->
          let block = Client_config.block () in
+         let fitness =
+           Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
          mine cctxt block (Activate_testnet hash) fitness seckey >>= handle_error cctxt) ;
   ]
 
