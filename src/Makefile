@@ -469,6 +469,7 @@ CLIENT_LIB_IMPLS := \
   client/client_aliases.ml \
   client/client_keys.ml \
   client/client_protocols.ml \
+  client/client_blocks.ml \
 
 WEBCLIENT_LIB_INTFS := \
 
