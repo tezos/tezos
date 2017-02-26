@@ -183,7 +183,8 @@ module Validation_scheduler = struct
             set_context hash error >>= fun () ->
             lwt_warn "Failed to validate block %a."
               Block_hash.pp_short hash >>= fun () ->
-            lwt_debug "%a" Error_monad.pp_print_error exns
+            lwt_debug "%a" Error_monad.pp_print_error exns >>= fun () ->
+            Lwt.return_unit
         | Ok new_context ->
             (* The sanity check `set_context` detects differences
                between the computed fitness and the fitness announced
@@ -290,7 +291,7 @@ module Context_db = struct
             (fun () ->
                data >>= fun data ->
                let state = `Inited data in
-               Block_hash.Table.add tbl hash { validator ; state ; wakener } ;
+               Block_hash.Table.replace tbl hash { validator ; state ; wakener } ;
                worker_trigger () ;
                Lwt.return_unit) ;
           waiter
@@ -328,18 +329,28 @@ module Context_db = struct
         match data with
         | Ok data ->
             Distributed_db.Block_header.commit vstate.db hash >>= fun () ->
-            State.Valid_block.store state hash data >>= fun block ->
-            Lwt.return (block <> Ok None)
+            begin
+              State.Valid_block.store state hash data >>=? function
+              | None ->
+                  State.Valid_block.read state hash >>=? fun block ->
+                  return (Ok block, false)
+              | Some block ->
+                  return (Ok block, true)
+            end
         | Error err ->
-            State.Block_header.mark_invalid state hash err
-      end >>= fun changed ->
-      try
-        State.Valid_block.read state hash >>= fun block ->
-        let wakener = (Block_hash.Table.find tbl hash).wakener in
-        Block_hash.Table.remove tbl hash;
-        Lwt.wakeup wakener block ;
-        Lwt.return changed
-      with Not_found -> Lwt.return changed
+            State.Block_header.mark_invalid state hash err >>= fun changed ->
+            return (Error err, changed)
+      end >>= function
+      | Ok (block, changed) ->
+          let wakener = (Block_hash.Table.find tbl hash).wakener in
+          Block_hash.Table.remove tbl hash;
+          Lwt.wakeup wakener block ;
+          Lwt.return changed
+      | Error _ as err ->
+          let wakener = (Block_hash.Table.find tbl hash).wakener in
+          Block_hash.Table.remove tbl hash;
+          Lwt.wakeup wakener err ;
+          Lwt.return false
 
     let create vstate =
       let tbl = Block_hash.Table.create 50 in
@@ -456,9 +467,7 @@ let rec create_validator ?parent worker state db net =
     Lwt.return_unit
 
   and fetch_block hash =
-    Context_db.fetch proxy v hash >>=? fun _context ->
-    State.Valid_block.read_exn net hash >>= fun block ->
-    return block
+    Context_db.fetch proxy v hash
 
   and create_child block =
     begin
