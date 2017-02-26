@@ -104,7 +104,15 @@ module Make() = struct
           List.map
             (fun (Error_kind { encoding_case }) -> encoding_case )
             !error_kinds in
-        let encoding = Data_encoding.union cases in
+        let json_encoding = Data_encoding.union cases in
+        let encoding =
+          Data_encoding.splitted
+            ~json:json_encoding
+            ~binary:
+              (Data_encoding.conv
+                 (Data_encoding.Json.construct json_encoding)
+                 (Data_encoding.Json.destruct json_encoding)
+                 Data_encoding.json) in
         error_encoding_cache := Some encoding ;
         encoding
     | Some encoding -> encoding
