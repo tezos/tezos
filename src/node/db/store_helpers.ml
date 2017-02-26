@@ -15,7 +15,12 @@ module Make_value (V : ENCODED_VALUE) = struct
     match Data_encoding.Binary.of_bytes V.encoding b with
     | None -> generic_error "Cannot parse data" (* TODO personalize *)
     | Some v -> ok v
-  let to_bytes = Data_encoding.Binary.to_bytes V.encoding
+  let to_bytes v =
+    try Data_encoding.Binary.to_bytes V.encoding v
+    with exn ->
+      Logging.Node.State.log_error
+        "Exception while serializing value %a" pp_exn exn ;
+      MBytes.create 0
 end
 
 module Make_single_store (S : STORE) (N : NAME) (V : VALUE) = struct
