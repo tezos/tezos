@@ -47,55 +47,98 @@ $(addprefix proto/environment/, \
   updater.mli \
 )
 
-.INTERMEDIATE: node/updater/environment_gen
+.INTERMEDIATE: compiler/environment_gen
 .SECONDARY: node/updater/proto_environment.mli
 
-node/updater/environment_gen: node/updater/environment_gen.ml
+compiler/environment_gen: compiler/environment_gen.ml
 	@echo LINK $(notdir $@)
 	@$(OCAMLOPT) -o $@ $^
 
 node/updater/proto_environment.mli: \
-	node/updater/environment_gen $(PROTOCOL_ENV_INTFS)
+	compiler/environment_gen $(PROTOCOL_ENV_INTFS)
 	@echo GENERATING $(notdir $@)
-	@node/updater/environment_gen node/updater/proto_environment.mli \
+	@compiler/environment_gen node/updater/proto_environment.mli \
 	  $(PROTOCOL_ENV_INTFS)
 
-node/updater/proto_environment.cmi: \
-  node/updater/proto_environment.mli node/updater/protocol.cmi
-	@echo OCAMLOPT ${TARGET} $@
-	@$(OCAMLOPT) -nopervasives -nostdlib -opaque -I tmp -I node/updater -c $<
+compiler/sigs/proto_environment.mli: node/updater/proto_environment.mli
 
-node/updater/protocol.cmi: node/updater/protocol.cmx
+compiler/sigs/proto_environment.cmi: \
+  compiler/sigs/proto_environment.mli compiler/sigs/protocol.cmi \
+  compiler/sigs/camlinternalFormatBasics.cmi
+	@echo OCAMLOPT ${TARGET} $@
+	@$(OCAMLOPT) -nopervasives -nostdlib -opaque -I tmp -I compiler/sigs -c $<
 
 partial-clean::
 	rm -f node/updater/proto_environment.mli
-	rm -f node/updater/environment_gen
+	rm -f compiler/environment_gen
 
 ############################################################################
 ## Protocol environment
 ############################################################################
 
 
-EMBEDDED_PROTOCOL_LIB_CMIS := \
-  tmp/camlinternalFormatBasics.cmi \
-  node/updater/proto_environment.cmi \
-  node/updater/register.cmi
+COMPILER_EMBEDDED_CMIS := \
+  compiler/sigs/camlinternalFormatBasics.cmi \
+  compiler/sigs/proto_environment.cmi \
+  compiler/sigs/register.cmi
 
-node/updater/register.cmi: EXTRA_OCAMLFLAGS = -opaque
-node/updater/environment.cmi: node/updater/environment.cmx
+compiler/sigs/register.cmi: EXTRA_OCAMLFLAGS = -opaque
 
-tmp/camlinternalFormatBasics.cmi:
-	mkdir -p tmp
+COMPILER_PRECOMPILED_INTFS := \
+  compiler/sigs/tezos_compiler.mli \
+  compiler/sigs/fitness.mli \
+  compiler/sigs/persist.mli \
+  compiler/sigs/store_sigs.mli \
+  compiler/sigs/store.mli \
+  compiler/sigs/context.mli \
+  compiler/sigs/protocol.mli \
+  compiler/sigs/proto_environment.mli \
+  compiler/sigs/register.mli
+
+COMPILER_PRECOMPILED_OBJS := \
+  ${COMPILER_PRECOMPILED_INTFS:.mli=.cmi} \
+  ${COMPILER_PRECOMPILED_INTFS:.mli=.mli.deps}
+
+${COMPILER_PRECOMPILED_OBJS}: PACKAGES=${MINUTILS_PACKAGES} ${UTILS_PACKAGES}
+${COMPILER_PRECOMPILED_OBJS}: SOURCE_DIRECTORIES=minutils utils compiler/sigs/
+${COMPILER_PRECOMPILED_OBJS}: TARGET="(embedded_cmis.cmx)"
+${COMPILER_PRECOMPILED_OBJS}: OPENED_MODULES=Error_monad Hash Utils
+
+compiler/sigs/camlinternalFormatBasics.cmi:
 	ln -sf $(shell ocamlc -where)/camlinternalFormatBasics.cmi $@
 
 .INTERMEDIATE: compiler/embedded_cmis.ml
 compiler/embedded_cmis.cmx: compiler/embedded_cmis.cmi
-compiler/embedded_cmis.ml: ${EMBEDDED_PROTOCOL_LIB_CMIS}
+
+compiler/embedded_cmis.ml: ${COMPILER_EMBEDDED_CMIS}
 	@echo OCAMLRES ${TARGET} $(notdir $@)
 	@$(OCAMLRES) -format ocaml -o $@ $^
+
 partial-clean::
 	rm -f compiler/embedded_cmis.ml
-	rm -rf tmp
+	rm -rf compiler/sigs
+
+compiler/tezos_compiler.cmi: compiler/sigs/tezos_compiler.cmi
+	@cp -a compiler/sigs/tezos_compiler.cmi compiler
+
+node/updater/fitness.cmi: compiler/sigs/fitness.cmi
+	@cp -a compiler/sigs/fitness.cmi node/updater
+node/updater/protocol.cmi: compiler/sigs/protocol.cmi
+	@cp -a compiler/sigs/protocol.cmi node/updater
+node/updater/proto_environment.cmi: compiler/sigs/proto_environment.cmi
+	@cp -a compiler/sigs/proto_environment.cmi node/updater
+node/updater/register.cmi: compiler/sigs/register.cmi
+	@cp -a compiler/sigs/register.cmi node/updater
+
+node/db/persist.cmi: compiler/sigs/persist.cmi
+	@cp -a compiler/sigs/persist.cmi node/db
+node/db/store_sigs.cmi: compiler/sigs/store_sigs.cmi
+	@cp -a compiler/sigs/store_sigs.cmi node/db
+node/db/store.cmi: compiler/sigs/store.cmi
+	@cp -a compiler/sigs/store.cmi node/db
+node/db/context.cmi: compiler/sigs/context.cmi
+	@cp -a compiler/sigs/context.cmi node/db
+
 
 ############################################################################
 ## Minimal utils library compatible with js_of_ocaml
@@ -283,6 +326,7 @@ NODE_LIB_INTFS := \
   \
   node/updater/fitness.mli \
   \
+  node/db/store_sigs.mli \
   node/db/raw_store.mli \
   node/db/store_helpers.mli \
   node/db/store.mli \
@@ -325,8 +369,8 @@ NODE_LIB_IMPLS := \
   \
   node/updater/fitness.ml \
   \
-  node/db/store_sigs.ml \
   node/db/raw_store.ml \
+  node/db/store_sigs.mli \
   node/db/store_helpers.ml \
   node/db/store.ml \
   \
@@ -334,7 +378,7 @@ NODE_LIB_IMPLS := \
   node/db/persist.ml \
   node/db/context.ml \
   \
-  node/updater/protocol.ml \
+  node/updater/protocol.mli \
   node/updater/updater.ml \
   node/updater/environment.ml \
   node/updater/proto_environment.ml \
@@ -396,6 +440,8 @@ ${NODE_OBJS}: SOURCE_DIRECTORIES=minutils utils compiler node/db node/net node/u
 ${NODE_OBJS}: TARGET="(node.cmxa)"
 ${NODE_OBJS}: OPENED_MODULES=Error_monad Hash Utils
 
+node/updater/environment.cmi: node/updater/environment.cmx
+
 node.cmxa: ${NODE_LIB_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
 	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
@@ -416,34 +462,6 @@ node.top: ${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS} ${COMPILER_LIB_IMPLS} ${NODE_
 	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${COMPILER_LIB_IMPLS} ${NODE_LIB_IMPLS}) ) >> .ocamlinit.node
 	utop -init .ocamlinit.node ${OCAMLFLAGS}
 
-## Embedded protocol modules
-
-.SECONDEXPANSION:
-proto/embedded_proto_%.cmxa: \
-  ${TZCOMPILER} \
-  proto/%/TEZOS_PROTOCOL \
-  $$(wildcard proto/%/*.ml) \
-  $$(wildcard proto/%/*.mli)
-	@${TZCOMPILER} -static ${DEVFLAGS} \
-	    -build-dir proto/$*/_tzbuild \
-	    $@ proto/$*/
-
-CLIENT_PROTO_INCLUDES := \
-  minutils utils node/updater node/db node/net node/shell client \
-  $(shell ocamlfind query lwt ocplib-json-typed sodium)
-
-proto/client_embedded_proto_%.cmxa: \
-  ${TZCOMPILER} \
-  node/updater/environment.cmi \
-  node/updater/environment.cmx \
-  proto/%/TEZOS_PROTOCOL \
-  $$(wildcard proto/%/*.ml) \
-  $$(wildcard proto/%/*.mli)
-	@./${TZCOMPILER} -static -client ${DEVFLAGS} \
-	   -build-dir client/embedded/$*/_tzbuild \
-	   $(addprefix -I , ${CLIENT_PROTO_INCLUDES}) \
-	   $@ proto/$*
-
 clean::
 	rm -f ${TZNODE}
 
@@ -459,6 +477,7 @@ CLIENT_LIB_INTFS := \
   client/client_aliases.mli \
   client/client_keys.mli \
   client/client_protocols.mli \
+  client/client_blocks.mli \
 
 CLIENT_LIB_IMPLS := \
   client/client_commands.ml \
@@ -550,7 +569,7 @@ ${TZWEBCLIENT}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa \
 	@echo LINK $(notdir $@)
 	@${OCAMLOPT} -linkpkg ${OCAMLFLAGS} -o $@ $^
 
-webclient_static.ml: $$(shell find  webclient_static/)
+webclient_static.ml: $(shell find  webclient_static/)
 	ocp-ocamlres webclient_static -o $@
 
 clean::
@@ -625,8 +644,6 @@ ${TZATTACKER}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa \
 clean::
 	-rm -f ${TZATTACKER}
 
-
-
 ############################################################################
 ## Generic rules
 ############################################################################
@@ -663,6 +680,7 @@ endif
 DEPENDS := $(filter-out $(NO_DEPS), \
   $(MINUTILS_LIB_INTFS) $(MINUTILS_LIB_IMPLS) \
   $(UTILS_LIB_INTFS) $(UTILS_LIB_IMPLS) \
+  ${COMPILER_PRECOMPILED_INTFS} \
   $(COMPILER_LIB_INTFS) $(COMPILER_LIB_IMPLS) \
   $(COMPILER_INTFS) $(COMPILER_IMPLS) \
   $(NODE_LIB_INTFS) $(NODE_LIB_IMPLS) \
@@ -700,3 +718,34 @@ compiler/tezos_compiler.cmo compiler/tezos_compiler.cmx: \
 partial-clean::
 	-rm -f .depend
 	-find \( -name \*.mli.deps -or -name \*.ml.deps \) -delete
+
+
+## Embedded protocol modules
+
+.SECONDEXPANSION:
+proto/embedded_proto_%.cmxa: \
+  ${TZCOMPILER} \
+  proto/%/TEZOS_PROTOCOL \
+  $$(wildcard proto/%/*.ml) \
+  $$(wildcard proto/%/*.mli)
+	@${TZCOMPILER} -static ${DEVFLAGS} \
+	    -build-dir proto/$*/_tzbuild \
+	    $@ proto/$*/
+
+CLIENT_PROTO_INCLUDES := \
+  minutils utils node/updater node/db node/net node/shell client \
+  $(shell ocamlfind query lwt ocplib-json-typed sodium)
+
+proto/client_embedded_proto_%.cmxa: \
+  ${TZCOMPILER} \
+  node/updater/environment.cmi \
+  node/updater/environment.cmx \
+  proto/%/TEZOS_PROTOCOL \
+  $$(wildcard proto/%/*.ml) \
+  $$(wildcard proto/%/*.mli)
+	@./${TZCOMPILER} -static -client ${DEVFLAGS} \
+	   -build-dir client/embedded/$*/_tzbuild \
+	   $(addprefix -I , ${CLIENT_PROTO_INCLUDES}) \
+	   $@ proto/$*
+
+proto/client_embedded_proto_genesis.cmxa: proto/client_embedded_proto_alpha.cmxa
