@@ -153,6 +153,17 @@ let apply_sourced_operation
             ctxt delegate pred_block block_prio content)
         ctxt contents >>=? fun ctxt ->
       return (ctxt, origination_nonce)
+  | Dictator_operation (Activate hash) ->
+      let dictator_pubkey = Constants.dictator_pubkey ctxt in
+      Operation.check_signature dictator_pubkey operation >>=? fun () ->
+      activate ctxt hash >>= fun ctxt ->
+      return (ctxt, origination_nonce)
+  | Dictator_operation (Activate_testnet hash) ->
+      let dictator_pubkey = Constants.dictator_pubkey ctxt in
+      Operation.check_signature dictator_pubkey operation >>=? fun () ->
+      set_test_protocol ctxt hash >>= fun ctxt ->
+      fork_test_network ctxt >>= fun ctxt ->
+      return (ctxt, origination_nonce)
 
 let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
   match kind with
@@ -282,9 +293,12 @@ let compare_operations op1 op2 =
   | Sourced_operations _, Anonymous_operations _ -> 1
   | Sourced_operations op1, Sourced_operations op2 ->
       match op1, op2 with
-      | Delegate_operations _, Manager_operations _ -> -1
-      | Manager_operations _, Delegate_operations _ -> 1
+      | Delegate_operations _, (Manager_operations _ | Dictator_operation _) -> -1
+      | Manager_operations _, Dictator_operation _ -> -1
+      | Dictator_operation _, Manager_operations _ -> 1
+      | (Manager_operations _ | Dictator_operation _), Delegate_operations _ -> 1
       | Delegate_operations _, Delegate_operations _ -> 0
+      | Dictator_operation _, Dictator_operation _ -> 0
       | Manager_operations op1, Manager_operations op2 -> begin
           (* Manager operations with smaller counter are pre-validated first. *)
           Int32.compare op1.counter op2.counter

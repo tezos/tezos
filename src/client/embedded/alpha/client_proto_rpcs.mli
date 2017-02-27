@@ -238,6 +238,26 @@ module Helpers : sig
         public_key_hash option ->
         MBytes.t tzresult Lwt.t
     end
+    module Dictator : sig
+      val operation:
+        Client_commands.context ->
+        block ->
+        net:Updater.Net_id.t ->
+        dictator_operation ->
+        MBytes.t tzresult Lwt.t
+      val activate:
+        Client_commands.context ->
+        block ->
+        net:Updater.Net_id.t ->
+        Protocol_hash.t ->
+        MBytes.t tzresult Lwt.t
+      val activate_testnet:
+        Client_commands.context ->
+        block ->
+        net:Updater.Net_id.t ->
+        Protocol_hash.t ->
+        MBytes.t tzresult Lwt.t
+    end
     module Delegate : sig
       val operations:
         Client_commands.context ->
