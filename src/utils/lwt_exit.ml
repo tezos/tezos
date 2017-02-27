@@ -16,11 +16,6 @@ let () =
   Lwt.async_exception_hook :=
     (function
       | Exit -> ()
-      (* BEGIN HACK
-         ignore error unhandled by cohttp (until PR129 is merged) *)
-      | Unix.Unix_error(Unix.ECONNRESET, _, _)
-      | Unix.Unix_error(Unix.EPIPE, _, _) -> ()
-      (* END HACK *)
       | exn ->
           Format.eprintf
             "@[Uncaught (asynchronous) exception (%d):@ %a@]"
