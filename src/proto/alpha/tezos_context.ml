@@ -70,6 +70,9 @@ module Constants = struct
   let proof_of_work_threshold c =
     let constants = Storage.constants c in
     constants.proof_of_work_threshold
+  let dictator_pubkey c =
+    let constants = Storage.constants c in
+    constants.dictator_pubkey
 end
 
 module Public_key = struct

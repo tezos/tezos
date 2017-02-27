@@ -466,6 +466,10 @@ let check_signature ctxt signature shell contents =
   | Sourced_operations (Delegate_operations { source }) ->
       Operation.check_signature source
         { signature ; shell ; contents ; hash = dummy_hash }
+  | Sourced_operations (Dictator_operation _) ->
+     let key = Constants.dictator_pubkey ctxt in
+     Operation.check_signature key
+       { signature ; shell ; contents ; hash = dummy_hash }
 
 let parse_operations ctxt (shell, bytes, check) =
   Operation.parse_proto bytes >>=? fun (proto, signature) ->

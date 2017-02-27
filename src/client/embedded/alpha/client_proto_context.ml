@@ -148,6 +148,19 @@ let faucet cctxt block ?force ~manager_pkh () =
     ~net ~id:manager_pkh () >>=? fun bytes ->
   originate cctxt ?force ~block bytes
 
+let dictate cctxt block command seckey =
+  Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
+  Client_proto_rpcs.Helpers.Forge.Dictator.operation
+    cctxt block ~net command >>=? fun bytes ->
+  let signature = Ed25519.sign seckey bytes in
+  let signed_bytes = MBytes.concat bytes signature in
+  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
+  Client_node_rpcs.inject_operation cctxt ~wait:true signed_bytes >>=? fun injected_oph ->
+  assert (Operation_hash.equal oph injected_oph) ;
+  cctxt.message "Operation successfully injected in the node." >>= fun () ->
+  cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
+  return ()
+
 let group =
   { Cli_entries.name = "context" ;
     title = "Block contextual commands (see option -block)" }
@@ -275,5 +288,33 @@ let commands () =
             (fun c -> cctxt.message "New contract %a originated from a smart contract."
                 Contract.pp c)
             contracts >>= fun () -> return ()) >>=
-         Client_proto_rpcs.handle_error cctxt)
+         Client_proto_rpcs.handle_error cctxt) ;
+    command ~desc: "Activate a protocol" begin
+      prefixes [ "activate" ; "protocol" ] @@
+      param ~name:"version" ~desc:"Protocol version (b58check)"
+        (fun _ p -> Lwt.return @@ Protocol_hash.of_b58check p) @@
+      prefixes [ "with" ; "key" ] @@
+      param ~name:"password" ~desc:"Dictator's key"
+        (fun _ key ->
+           Lwt.return (Environment.Ed25519.Secret_key.of_b58check key))
+        stop
+    end
+      (fun hash seckey cctxt ->
+         let block = Client_config.block () in
+         dictate cctxt block (Activate hash) seckey >>=
+         Client_proto_rpcs.handle_error cctxt) ;
+    command ~desc: "Fork a test protocol" begin
+      prefixes [ "fork" ; "test" ; "protocol" ] @@
+      param ~name:"version" ~desc:"Protocol version (b58check)"
+        (fun _ p -> Lwt.return (Protocol_hash.of_b58check p)) @@
+      prefixes [ "with" ; "key" ] @@
+      param ~name:"password" ~desc:"Dictator's key"
+        (fun _ key ->
+           Lwt.return (Environment.Ed25519.Secret_key.of_b58check key))
+        stop
+    end
+      (fun hash seckey cctxt ->
+         let block = Client_config.block () in
+         dictate cctxt block (Activate_testnet hash) seckey >>=
+         Client_proto_rpcs.handle_error cctxt) ;
   ]
