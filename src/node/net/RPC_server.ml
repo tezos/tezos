@@ -183,23 +183,21 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
   Conduit_lwt_unix.init ~src:host () >>= fun ctx ->
   let ctx = Cohttp_lwt_unix_net.init ~ctx () in
   let stop = cancelation () in
-  Lwt.async
-    (fun () ->
-       Lwt.catch
-         (fun () ->
-            Server.create
-              ~stop ~ctx ~mode
-              (Server.make ~callback ~conn_closed ()))
-         (function
-           | Unix.Unix_error (Unix.EADDRINUSE, "bind", _) ->
-               lwt_log_error "RPC server port already taken, \
-                              the node will be shutdown" >>= fun () ->
-               Lwt_exit.exit 1
-           | exn -> Lwt.fail exn)) ;
+  let on_exn = function
+    | Unix.Unix_error (Unix.EADDRINUSE, "bind", _) ->
+        log_error "RPC server port already taken, \
+                       the node will be shutdown" ;
+        Lwt_exit.exit 1
+    | Unix.Unix_error (ECONNRESET, _, _)
+    | Unix.Unix_error (EPIPE, _, _)  -> ()
+    | exn -> !Lwt.async_exception_hook exn
+  in
+  let server =
+    Server.create ~stop ~ctx ~mode ~on_exn
+      (Server.make ~callback ~conn_closed ()) in
   let shutdown () =
     canceler () >>= fun () ->
-    lwt_log_info "server not really stopped (cohttp bug)" >>= fun () ->
-    Lwt.return () (* server *) (* FIXME: bug in cohttp *) in
+    server in
   Lwt.return { shutdown ; root }
 
 let root_service { root } = root
