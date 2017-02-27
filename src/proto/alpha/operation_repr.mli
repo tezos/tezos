@@ -42,6 +42,7 @@ and sourced_operations =
       source: Ed25519.Public_key.t ;
       operations: delegate_operation list ;
     }
+  | Dictator_operation of dictator_operation
 
 and manager_operation =
   | Transaction of {
@@ -77,6 +78,10 @@ and delegate_operation =
       proposal: Protocol_hash.t ;
       ballot: Vote_repr.ballot ;
     }
+
+and dictator_operation =
+  | Activate of Protocol_hash.t
+  | Activate_testnet of Protocol_hash.t
 
 and counter = Int32.t
 

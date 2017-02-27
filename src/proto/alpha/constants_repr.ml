@@ -43,6 +43,7 @@ type constants = {
   instructions_per_transaction: int ;
   proof_of_work_threshold: int64 ;
   bootstrap_keys: Ed25519.Public_key.t list ;
+  dictator_pubkey: Ed25519.Public_key.t ;
 }
 
 let read_public_key s =
@@ -69,7 +70,10 @@ let default = {
       "9c328bddf6249bbe550121076194d99bbe60e5b1e144da4f426561b5d3bbc6ab" ;
       "a3db517734e07ace089ad0a2388e7276fb9b114bd79259dd5c93b0c33d57d6a2" ;
       "6d2d52e62f1d48f3cf9badbc90cfe5f3aa600194bf21eda44b8e64698a82d341" ;
-    ]
+    ] ;
+  dictator_pubkey =
+    read_public_key
+      "4d5373455738070434f214826d301a1c206780d7f789fcbf94c2149b2e0718cc";
 }
 
 let opt (=) def v = if def = v then None else Some v
@@ -113,6 +117,9 @@ let constants_encoding =
        and bootstrap_keys =
          opt Compare_keys.(=)
            default.bootstrap_keys c.bootstrap_keys
+       and dictator_pubkey =
+         opt Ed25519.Public_key.(=)
+           default.dictator_pubkey c.dictator_pubkey
        in
        (( cycle_length,
           voting_period_length,
@@ -122,7 +129,8 @@ let constants_encoding =
           max_signing_slot,
           instructions_per_transaction,
           proof_of_work_threshold,
-          bootstrap_keys), ()) )
+          bootstrap_keys,
+          dictator_pubkey), ()) )
     (fun (( cycle_length,
             voting_period_length,
             time_before_reward,
@@ -131,7 +139,8 @@ let constants_encoding =
             max_signing_slot,
             instructions_per_transaction,
             proof_of_work_threshold,
-            bootstrap_keys), ()) ->
+            bootstrap_keys,
+            dictator_pubkey), ()) ->
       { cycle_length =
           unopt default.cycle_length cycle_length ;
         voting_period_length =
@@ -152,10 +161,12 @@ let constants_encoding =
           unopt default.proof_of_work_threshold proof_of_work_threshold ;
         bootstrap_keys =
           unopt default.bootstrap_keys bootstrap_keys ;
+        dictator_pubkey =
+          unopt default.dictator_pubkey dictator_pubkey ;
       } )
      Data_encoding.(
        merge_objs
-         (obj9
+         (obj10
             (opt "cycle_length" int32)
             (opt "voting_period_length" int32)
             (opt "time_before_reward" int64)
@@ -164,7 +175,8 @@ let constants_encoding =
             (opt "max_signing_slot" int31)
             (opt "instructions_per_transaction" int31)
             (opt "proof_of_work_threshold" int64)
-            (opt "bootstrap_keys" (list Ed25519.Public_key.encoding)))
+            (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
+            (opt "dictator_pubkey" Ed25519.Public_key.encoding))
          unit)
 
 type error += Constant_read of exn

@@ -183,6 +183,7 @@ module Constants : sig
   val max_signing_slot: context -> int
   val instructions_per_transaction: context -> int
   val proof_of_work_threshold: context -> int64
+  val dictator_pubkey: context -> Ed25519.Public_key.t
 
 end
 
@@ -459,6 +460,7 @@ and sourced_operations =
       source: public_key ;
       operations: delegate_operation list ;
     }
+  | Dictator_operation of dictator_operation
 
 and manager_operation =
   | Transaction of {
@@ -494,6 +496,10 @@ and delegate_operation =
       proposal: Protocol_hash.t ;
       ballot: Vote.ballot ;
     }
+
+and dictator_operation =
+  | Activate of Protocol_hash.t
+  | Activate_testnet of Protocol_hash.t
 
 and counter = Int32.t
 

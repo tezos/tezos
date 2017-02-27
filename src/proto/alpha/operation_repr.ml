@@ -42,6 +42,7 @@ and sourced_operations =
       source: Ed25519.Public_key.t ;
       operations: delegate_operation list ;
     }
+  | Dictator_operation of dictator_operation
 
 and manager_operation =
   | Transaction of {
@@ -77,6 +78,10 @@ and delegate_operation =
       proposal: Protocol_hash.t ;
       ballot: Vote_repr.ballot ;
     }
+
+and dictator_operation =
+  | Activate of Protocol_hash.t
+  | Activate_testnet of Protocol_hash.t
 
 and counter = Int32.t
 
@@ -236,11 +241,40 @@ module Encoding = struct
         | _ -> None)
       (fun (source, operations) -> Delegate_operations { source ; operations })
 
+  let dictator_kind_encoding =
+    let mk_case name args =
+      let open Data_encoding in
+      conv
+        (fun o -> ((), o))
+        (fun ((), o) -> o)
+        (merge_objs
+           (obj1 (req "network" (constant name)))
+           args) in
+    let open Data_encoding in
+    union ~tag_size:`Uint8 [
+      case ~tag:0
+        (mk_case "activate"
+           (obj1 (req "hash" Protocol_hash.encoding)))
+        (function (Activate hash) -> Some hash | _ -> None)
+        (fun hash -> Activate hash) ;
+      case ~tag:1
+        (mk_case "activate_testnet"
+           (obj1 (req "hash" Protocol_hash.encoding)))
+        (function (Activate_testnet hash) -> Some hash | _ -> None)
+        (fun hash -> Activate_testnet hash) ;
+    ]
+
+  let dictator_kind_case tag =
+    case ~tag dictator_kind_encoding
+      (function Dictator_operation op -> Some op | _ -> None)
+      (fun op -> Dictator_operation op)
+
   let signed_operations_case tag =
     case ~tag
       (union [
           manager_kind_case 0 ;
           delegate_kind_case 1 ;
+          dictator_kind_case 2 ;
         ])
       (function Sourced_operations ops -> Some ops | _ -> None)
       (fun ops -> Sourced_operations ops)

@@ -236,6 +236,19 @@ module Helpers = struct
         operations cctxt b ~net ~source
           Tezos_context.[Endorsement { block ; slot }]
     end
+    module Dictator = struct
+      let operation cctxt
+          block ~net operation =
+        let op = Dictator_operation operation in
+        (call_error_service1 cctxt Services.Helpers.Forge.operations block
+           ({net_id=net}, Sourced_operations op))
+      let activate cctxt
+          b ~net hash =
+          operation cctxt b ~net (Activate hash)
+      let activate_testnet cctxt
+          b ~net hash =
+          operation cctxt b ~net (Activate_testnet hash)
+    end
     module Anonymous = struct
       let operations cctxt block ~net operations =
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
