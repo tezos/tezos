@@ -11,6 +11,8 @@ TZATTACKER=../tezos-attacker
 all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT} ${TZWEBCLIENT} # ${TZATTACKER}
 
 
+NODEPS :=
+
 ############################################################################
 ## Protocol environment
 ############################################################################
@@ -116,10 +118,20 @@ compiler/embedded_cmis.ml: ${COMPILER_EMBEDDED_CMIS}
 
 partial-clean::
 	rm -f compiler/embedded_cmis.ml
-	rm -rf compiler/sigs
 
 compiler/tezos_compiler.cmi: compiler/sigs/tezos_compiler.cmi
 	@cp -a compiler/sigs/tezos_compiler.cmi compiler
+
+NO_DEPS += \
+  node/updater/fitness.mli \
+  node/updater/protocol.mli \
+  node/updater/proto_environment.mli \
+  node/updater/register.mli \
+  node/db/persist.mli \
+  node/db/store_sigs.mli \
+  node/db/store_sigs.mli \
+  node/db/store.mli \
+  node/db/context.mli
 
 node/updater/fitness.cmi: compiler/sigs/fitness.cmi
 	@cp -a compiler/sigs/fitness.cmi node/updater
@@ -328,6 +340,7 @@ NODE_LIB_INTFS := \
   \
   node/db/store_sigs.mli \
   node/db/raw_store.mli \
+  node/db/store_sigs.mli \
   node/db/store_helpers.mli \
   node/db/store.mli \
   \
@@ -335,6 +348,7 @@ NODE_LIB_INTFS := \
   node/db/persist.mli \
   node/db/context.mli \
   \
+  node/updater/protocol.mli \
   node/updater/updater.mli \
   node/updater/proto_environment.mli \
   node/updater/register.mli \
@@ -351,7 +365,7 @@ NODE_LIB_INTFS := \
   node/shell/node.mli \
   node/shell/node_rpc.mli \
 
-NODE_LIB_IMPLS := \
+FULL_NODE_LIB_IMPLS := \
   \
   compiler/node_compiler_main.ml \
   \
@@ -396,6 +410,8 @@ NODE_LIB_IMPLS := \
   node/shell/node.ml \
   node/shell/node_rpc.ml \
 
+NODE_LIB_IMPLS := $(filter-out ${NODE_LIB_INTFS}, ${FULL_NODE_LIB_IMPLS})
+
 NODE_INTFS := \
   node/main/node_identity_file.mli \
   node/main/node_config_file.mli \
@@ -427,7 +443,8 @@ NODE_PACKAGES := \
 
 EMBEDDED_NODE_PROTOCOLS := \
   $(patsubst proto/%/,proto/embedded_proto_%.cmxa, \
-  $(filter-out proto/environment/,$(shell ls -d proto/*/)))
+  $(filter-out proto/environment/, \
+	$(subst TEZOS_PROTOCOL,,$(shell ls proto/*/TEZOS_PROTOCOL))))
 
 NODE_OBJS := \
   ${NODE_IMPLS:.ml=.cmx} ${NODE_IMPLS:.ml=.ml.deps} \
@@ -455,11 +472,11 @@ partial-clean::
 	-rm -f proto/*.cm* proto/*.a
 
 node.top: DEVFLAGS=
-node.top: ${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS} ${COMPILER_LIB_IMPLS} ${NODE_LIB_IMPLS}
+node.top: ${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS} ${COMPILER_LIB_IMPLS} ${FULL_NODE_LIB_IMPLS}
 	( $(patsubst %, echo "#require \"%\";;" ; ,${NODE_PACKAGES}) ) > .ocamlinit.node
 	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS}) ) >> .ocamlinit.node
 	( $(patsubst %, echo "open %;;" ; ,Error_monad Hash Utils) ) >> .ocamlinit.node
-	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${COMPILER_LIB_IMPLS} ${NODE_LIB_IMPLS}) ) >> .ocamlinit.node
+	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${COMPILER_LIB_IMPLS} ${FULL_NODE_LIB_IMPLS}) ) >> .ocamlinit.node
 	utop -init .ocamlinit.node ${OCAMLFLAGS}
 
 clean::
@@ -574,6 +591,7 @@ webclient_static.ml: $(shell find  webclient_static/)
 
 clean::
 	-rm -f ${TZCLIENT} $(TZWEBCLIENT)
+	-rm -f webclient_static.ml
 
 ## Embedded client protocol modules
 
@@ -582,14 +600,14 @@ clean::
 client/embedded/client_%.cmx: \
   $(patsubst %.ml, %.cmx, $(NODE_LIB_IMPLS) $(CLIENT_LIB_IMPLS)) \
   proto/client_embedded_proto_%.cmxa \
-  $$(shell find client/embedded/% -name \*.ml -or -name \*.mli)
+  $$(shell find client/embedded/% -name webclient -prune -name \*.ml -or -name \*.mli)
 	@$(MAKE) -C client/embedded/$* ../client_$*.cmx
 
 client/embedded/webclient_%.cmx: \
   client/embedded/client_%.cmx \
 	minutils.cma \
-  $$(shell find client/embedded/%/webclient -name \*.ml -or -name \*.mli) \
-  $$(shell find client/embedded/%/webclient/static/)
+  $$(shell find client/embedded/%/webclient -name \*.ml -or -name \*.mli 2>/dev/null) \
+  $$(shell find client/embedded/%/webclient/static/ 2>/dev/null)
 	@$(MAKE) -C client/embedded/$* ../webclient_$*.cmx
 
 partial-clean::
@@ -669,7 +687,7 @@ partial-clean::
 
 ## Dependencies
 
-NO_DEPS := \
+NO_DEPS += \
    compiler/embedded_cmis.ml \
    compiler/embedded_cmis.mli
 compiler/embedded_cmis.cmx compiler/embedded_cmis.cmi: OPENED_MODULES=
@@ -718,6 +736,7 @@ compiler/tezos_compiler.cmo compiler/tezos_compiler.cmx: \
 partial-clean::
 	-rm -f .depend
 	-find \( -name \*.mli.deps -or -name \*.ml.deps \) -delete
+	-find \( -name \*.mli.deps.byte -or -name \*.ml.deps.byte \) -delete
 
 
 ## Embedded protocol modules
@@ -749,3 +768,10 @@ proto/client_embedded_proto_%.cmxa: \
 	   $@ proto/$*
 
 proto/client_embedded_proto_genesis.cmxa: proto/client_embedded_proto_alpha.cmxa
+
+clean::
+	-rm -rf $(patsubst proto/embedded_proto_%.cmxa,proto/%/_tzbuild, \
+		   ${EMBEDDED_NODE_PROTOCOLS})
+	-rm -f $(patsubst proto/client_embedded_proto_%.cmxa, \
+	                proto/register_client_embedded_proto_%.ml, \
+			${EMBEDDED_CLIENT_PROTOCOLS})

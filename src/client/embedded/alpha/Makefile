@@ -68,6 +68,8 @@ clean::
 	-rm -f webclient/*/*.deps webclient/*/*.deps.byte
 	-rm -f baker/*.cm* baker/*~ baker/*.o baker/*.a
 	-rm -f baker/*.deps baker/*.deps.byte
+	-rm -f concrete_lexer.ml concrete_parser.ml concrete_parser.mli
+	-rm -f webclient/static/main.js
 
 .INTERMEDIATE: webclient/browser/main.byte
 
