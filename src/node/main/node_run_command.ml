@@ -158,7 +158,8 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
 
 let init_signal () =
   let handler id = try Lwt_exit.exit id with _ -> () in
-  ignore (Lwt_unix.on_signal Sys.sigint handler : Lwt_unix.signal_handler_id)
+  ignore (Lwt_unix.on_signal Sys.sigint handler : Lwt_unix.signal_handler_id) ;
+  ignore (Lwt_unix.on_signal Sys.sigterm handler : Lwt_unix.signal_handler_id)
 
 let run ?verbosity ?sandbox (config : Node_config_file.t) =
   Lwt_utils.create_dir config.data_dir >>= fun () ->
