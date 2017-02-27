@@ -12,7 +12,7 @@
 /src/webclient_static.ml
 /src/.depend
 
-/src/node/updater/environment_gen
+/src/compiler/environment_gen
 /src/node/updater/proto_environment.mli
 /src/compiler/embedded_cmis.ml
 
