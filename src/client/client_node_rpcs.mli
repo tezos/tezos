@@ -149,6 +149,9 @@ module Protocols : sig
     (Protocol_hash.t * Store.Protocol.t option) list Lwt.t
 end
 
+val bootstrapped:
+  Client_commands.context -> (Block_hash.t * Time.t) Lwt_stream.t Lwt.t
+
 val complete:
   Client_commands.context ->
   ?block:Blocks.block -> string -> string list Lwt.t

@@ -141,6 +141,8 @@ let inject_operation cctxt ?(wait = true) ?force operation =
   call_service0 cctxt Services.inject_operation (operation, wait, force)
 let inject_protocol cctxt ?(wait = true) ?force protocol =
   call_service0 cctxt Services.inject_protocol (protocol, wait, force)
+let bootstrapped cctxt =
+  call_streamed_service0 cctxt Services.bootstrapped ()
 let complete cctxt ?block prefix =
   match block with
   | None ->

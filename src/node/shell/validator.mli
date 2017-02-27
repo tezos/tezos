@@ -34,4 +34,8 @@ val inject_block:
 val prevalidator: t -> Prevalidator.t
 val test_validator: t -> (t * Distributed_db.net) option
 
-val watcher: worker -> State.Valid_block.t Lwt_stream.t * Watcher.stopper
+val watcher: t -> State.Valid_block.t Lwt_stream.t * Watcher.stopper
+val new_head_watcher: t -> State.Valid_block.t Lwt_stream.t * Watcher.stopper
+val global_watcher: worker -> State.Valid_block.t Lwt_stream.t * Watcher.stopper
+
+val bootstrapped: t -> unit Lwt.t
