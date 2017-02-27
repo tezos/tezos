@@ -437,7 +437,12 @@ let build_rpc_directory node =
     RPC.register0 dir Services.inject_protocol implementation in
   let dir =
     let implementation () =
-      RPC.Answer.return Data_encoding.Json.(schema (Error_monad.error_encoding ())) in
+      RPC.Answer.return_stream (Node.RPC.bootstrapped node) in
+    RPC.register0 dir Services.bootstrapped implementation in
+  let dir =
+    let implementation () =
+      RPC.Answer.return
+        Data_encoding.Json.(schema (Error_monad.error_encoding ())) in
     RPC.register0 dir Services.Error.service implementation in
   let dir =
     RPC.register1 dir Services.complete

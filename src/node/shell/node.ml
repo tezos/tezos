@@ -50,9 +50,9 @@ type t = {
   state: State.t ;
   distributed_db: Distributed_db.t ;
   validator: Validator.worker ;
-  global_db: Distributed_db.net ;
-  global_net: State.Net.t ;
-  global_validator: Validator.t ;
+  mainnet_db: Distributed_db.net ;
+  mainnet_net: State.Net.t ;
+  mainnet_validator: Validator.t ;
   inject_block:
     ?force:bool -> MBytes.t ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t ;
@@ -99,9 +99,9 @@ let create { genesis ; store_root ; context_root ;
   State.Net.create state
     ?test_protocol
     ~forked_network_ttl:(48 * 3600) (* 2 days *)
-    genesis >>= fun global_net ->
-  Validator.activate validator global_net >>= fun global_validator ->
-  let global_db = Validator.net_db global_validator in
+    genesis >>= fun mainnet_net ->
+  Validator.activate validator mainnet_net >>= fun mainnet_validator ->
+  let mainnet_db = Validator.net_db mainnet_validator in
   let shutdown () =
     P2p.shutdown p2p >>= fun () ->
     Validator.shutdown validator >>= fun () ->
@@ -111,9 +111,9 @@ let create { genesis ; store_root ; context_root ;
     state ;
     distributed_db ;
     validator ;
-    global_db ;
-    global_net ;
-    global_validator ;
+    mainnet_db ;
+    mainnet_net ;
+    mainnet_validator ;
     inject_block = inject_block validator ;
     inject_operation = inject_operation validator ;
     inject_protocol = inject_protocol state ;
@@ -181,16 +181,16 @@ module RPC = struct
 
   let get_net node = function
     | `Genesis | `Head _ | `Prevalidation ->
-        node.global_validator, node.global_db
+        node.mainnet_validator, node.mainnet_db
     | `Test_head _ | `Test_prevalidation ->
-        match Validator.test_validator node.global_validator with
+        match Validator.test_validator node.mainnet_validator with
         | None -> raise Not_found
         | Some v -> v
 
   let get_validator node = function
-    | `Genesis | `Head _ | `Prevalidation -> node.global_validator
+    | `Genesis | `Head _ | `Prevalidation -> node.mainnet_validator
     | `Test_head _ | `Test_prevalidation ->
-        match Validator.test_validator node.global_validator with
+        match Validator.test_validator node.mainnet_validator with
         | None -> raise Not_found
         | Some (v, _) -> v
 
@@ -198,16 +198,16 @@ module RPC = struct
     Distributed_db.read_block_exn
       node.distributed_db hash >>= fun (_net_db, block) ->
     if State.Net_id.equal
-        (State.Net.id node.global_net)
+        (State.Net.id node.mainnet_net)
         block.shell.net_id then
-      Lwt.return (Some (node.global_validator, node.global_db))
+      Lwt.return (Some (node.mainnet_validator, node.mainnet_db))
     else
-      match Validator.test_validator node.global_validator with
+      match Validator.test_validator node.mainnet_validator with
       | Some (test_validator, net_db)
         when State.Net_id.equal
             (State.Net.id (Validator.net_state test_validator))
             block.shell.net_id ->
-          Lwt.return (Some (node.global_validator, net_db))
+          Lwt.return (Some (node.mainnet_validator, net_db))
       | _ -> Lwt.return_none
 
   let read_valid_block node h =
@@ -246,7 +246,7 @@ module RPC = struct
   let block_info node (block: block) =
     match block with
     | `Genesis ->
-        State.Valid_block.Current.genesis node.global_net >|= convert
+        State.Valid_block.Current.genesis node.mainnet_net >|= convert
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
         let net_db = Validator.net_db validator in
@@ -271,7 +271,7 @@ module RPC = struct
   let get_context node block =
     match block with
     | `Genesis ->
-        State.Valid_block.Current.genesis node.global_net >>= fun block ->
+        State.Valid_block.Current.genesis node.mainnet_net >>= fun block ->
         Lwt.return (Some block.context)
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
@@ -293,7 +293,7 @@ module RPC = struct
   let operations node block =
     match block with
     | `Genesis ->
-        State.Valid_block.Current.genesis node.global_net >>= fun { operations } ->
+        State.Valid_block.Current.genesis node.mainnet_net >>= fun { operations } ->
         Lwt.return operations
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
@@ -334,7 +334,7 @@ module RPC = struct
         Prevalidator.pending ~block:b prevalidator >|= fun ops ->
         Updater.empty_result, ops
     | `Genesis ->
-        let net = node.global_net in
+        let net = node.mainnet_net in
         State.Valid_block.Current.genesis net >>= fun b ->
         let validator = get_validator node `Genesis in
         let prevalidator = Validator.prevalidator validator in
@@ -363,7 +363,7 @@ module RPC = struct
     begin
       match block with
       | `Genesis ->
-          let net = node.global_net in
+          let net = node.mainnet_net in
           State.Valid_block.Current.genesis net >>= return
       | ( `Head 0 | `Prevalidation
         | `Test_head 0 | `Test_prevalidation ) as block ->
@@ -387,7 +387,7 @@ module RPC = struct
       | None -> failwith "Unknown protocol version"
       | Some protocol -> return protocol
     end >>=? fun ((module Proto) as protocol) ->
-    let net_db = Validator.net_db node.global_validator in
+    let net_db = Validator.net_db node.mainnet_validator in
     Prevalidator.preapply
       net_db context protocol hash timestamp sort ops >>=? fun (ctxt, r) ->
     Context.get_fitness ctxt >>= fun fitness ->
@@ -417,9 +417,9 @@ module RPC = struct
         Lwt.return (Some (RPC.map (fun _ -> ()) dir))
 
   let heads node =
-    State.Valid_block.known_heads node.global_net >>= fun heads ->
+    State.Valid_block.known_heads node.mainnet_net >>= fun heads ->
     begin
-      match Validator.test_validator node.global_validator with
+      match Validator.test_validator node.mainnet_validator with
       | None -> Lwt.return_nil
       | Some (_, net_db) ->
           State.Valid_block.known_heads (Distributed_db.state net_db)
@@ -492,7 +492,7 @@ module RPC = struct
     shutdown
 
   let valid_block_watcher node =
-    let stream, shutdown = Validator.watcher node.validator in
+    let stream, shutdown = Validator.global_watcher node.validator in
     Lwt_stream.map (fun block -> convert block) stream,
     shutdown
 
@@ -507,7 +507,27 @@ module RPC = struct
     Validator.fetch_block net_v block >>=? fun _ ->
     return ()
 
+  let bootstrapped node =
+    let block_stream, stopper =
+      Validator.new_head_watcher node.mainnet_validator in
+    let first_run = ref true in
+    let rec next () =
+      if !first_run then begin
+        first_run := false ;
+        State.Valid_block.Current.head node.mainnet_net >>= fun head ->
+        Lwt.return (Some (head.hash, head.timestamp))
+      end else begin
+        Lwt.pick [
+          ( Lwt_stream.get block_stream >|=
+            map_option ~f:(fun b -> (b.State.Valid_block.hash, b.timestamp)) ) ;
+          (Validator.bootstrapped node.mainnet_validator >|= fun () -> None) ;
+        ]
+      end in
+    let shutdown () = Watcher.shutdown stopper in
+    RPC.Answer.{ next ; shutdown }
+
   module Network = struct
+
     let stat (node : t) =
       P2p.RPC.stat node.p2p
 
@@ -518,6 +538,7 @@ module RPC = struct
       P2p.RPC.connect node.p2p
 
     module Connection = struct
+
       let info (node : t) =
         P2p.RPC.Connection.info node.p2p
 
@@ -529,9 +550,11 @@ module RPC = struct
 
       let count (node : t) =
         P2p.RPC.Connection.count node.p2p
+
     end
 
     module Point = struct
+
       let info (node : t) =
         P2p.RPC.Point.info node.p2p
 
@@ -543,9 +566,11 @@ module RPC = struct
 
       let watch (node : t) =
         P2p.RPC.Point.watch node.p2p
+
     end
 
     module Peer_id = struct
+
       let info (node : t) =
         P2p.RPC.Peer_id.info node.p2p
 
@@ -557,6 +582,9 @@ module RPC = struct
 
       let watch (node : t) =
         P2p.RPC.Peer_id.watch node.p2p
+
     end
+
   end
+
 end

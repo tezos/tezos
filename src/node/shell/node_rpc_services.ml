@@ -763,6 +763,15 @@ let inject_protocol =
        (obj1 (req "injectedProtocol" Protocol_hash.encoding)))
     RPC.Path.(root / "inject_protocol")
 
+let bootstrapped =
+  RPC.service
+    ~description:""
+    ~input: empty
+    ~output: (obj2
+                (req "block" Block_hash.encoding)
+                (req "timestamp" Time.encoding))
+    RPC.Path.(root / "bootstrapped")
+
 let complete =
   let prefix_arg =
     let destruct s = Ok s

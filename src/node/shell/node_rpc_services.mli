@@ -183,6 +183,8 @@ val inject_protocol:
    (Tezos_compiler.Protocol.t * bool * bool option),
    Protocol_hash.t tzresult) RPC.service
 
+val bootstrapped: (unit, unit, unit, Block_hash.t * Time.t) RPC.service
+
 val complete: (unit, unit * string, unit, string list) RPC.service
 
 val describe:
