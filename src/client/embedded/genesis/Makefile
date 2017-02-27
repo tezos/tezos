@@ -8,3 +8,5 @@ CLIENT_INTFS = \
   client_proto_main.mli
 
 include ../Makefile.shared
+
+${OBJS}: ../../../proto/client_embedded_proto_alpha.cmxa
