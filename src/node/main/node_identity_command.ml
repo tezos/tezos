@@ -24,7 +24,7 @@ let generate { Node_config_file.data_dir ; net } =
     fail (Node_identity_file.Existent_identity_file identity_file)
   else
     let target = Crypto_box.make_target net.expected_pow in
-    Format.eprintf "Generating a new identity... " ;
+    Format.eprintf "Generating a new identity... (level: %.2f) " net.expected_pow ;
     let id =
       P2p.Identity.generate_with_animation Format.err_formatter target in
     Node_identity_file.write identity_file id >>=? fun () ->
@@ -52,7 +52,12 @@ module Term = struct
       begin
         match data_dir, config_file with
         | None, None ->
-            return Node_config_file.default_config
+            let default_config =
+              Node_config_file.default_data_dir // "config.json" in
+            if Sys.file_exists default_config then
+              Node_config_file.read default_config
+            else
+              return Node_config_file.default_config
         | None, Some config_file ->
             Node_config_file.read config_file
         | Some data_dir, None ->
