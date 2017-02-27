@@ -86,7 +86,11 @@ module RPC : sig
   val complete:
     t -> ?block:block -> string -> string list Lwt.t
 
+  val bootstrapped:
+    t -> (Block_hash.t * Time.t) RPC.Answer.stream
+
   module Network : sig
+
     val stat : t -> P2p.Stat.t
     val watch : t -> P2p.RPC.Event.t Lwt_stream.t * Watcher.stopper
     val connect : t -> P2p.Point.t -> float -> unit tzresult Lwt.t
@@ -115,7 +119,9 @@ module RPC : sig
       val watch : t -> P2p.Point.t ->
         P2p.RPC.Point.Event.t Lwt_stream.t * Watcher.stopper
     end
+
   end
+
 end
 
 val shutdown: t -> unit Lwt.t

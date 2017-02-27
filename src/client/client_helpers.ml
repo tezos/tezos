@@ -34,5 +34,19 @@ let commands () = Cli_entries.[
          | _ :: _ :: _ when !unique -> Pervasives.exit 3
          | completions ->
              List.iter print_endline completions ;
-             Lwt.return_unit)
+             Lwt.return_unit) ;
+    command
+      ~desc: "Wait for the node to be bootstrapped."
+      ~args: []
+      (prefixes [ "bootstrapped" ] @@
+       stop)
+      (fun cctxt ->
+         Client_node_rpcs.bootstrapped cctxt >>= fun stream ->
+         Lwt_stream.iter_s (fun (hash, time) ->
+             cctxt.message "Current head: %a (%a)"
+               Block_hash.pp_short hash
+               Time.pp_hum time
+           ) stream >>= fun () ->
+         cctxt.answer "Bootstrapped."
+)
   ]

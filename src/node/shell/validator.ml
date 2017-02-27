@@ -34,6 +34,9 @@ and t = {
   create_child: State.Valid_block.t -> unit tzresult Lwt.t ;
   test_validator: unit -> (t * Distributed_db.net) option ;
   shutdown: unit -> unit Lwt.t ;
+  valid_block_input: State.Valid_block.t Watcher.input ;
+  new_head_input: State.Valid_block.t Watcher.input ;
+  bootstrapped: unit Lwt.t ;
 }
 
 let net_state { net } = net
@@ -50,6 +53,7 @@ let test_validator w = w.test_validator ()
 
 let fetch_block v = v.fetch_block
 let prevalidator v = v.prevalidator
+let bootstrapped v = v.bootstrapped
 
 (** Current block computation *)
 
@@ -83,6 +87,7 @@ let rec may_set_head v (block: State.Valid_block.t) =
         Distributed_db.broadcast_head v.net_db block.hash [] ;
         Prevalidator.flush v.prevalidator block ;
         may_change_test_network v block >>= fun () ->
+        Watcher.notify v.new_head_input block ;
         lwt_log_notice "update current head %a %a %a(%t)"
           Block_hash.pp_short block.hash
           Fitness.pp block.fitness
@@ -202,6 +207,7 @@ module Validation_scheduler = struct
                   "validation of %a: reevaluate current block"
                   Block_hash.pp_short hash >>= fun () ->
                 Watcher.notify v.worker.valid_block_input block ;
+                Watcher.notify v.valid_block_input block ;
                 may_set_head v block
 
   let request state ~get ~set pendings =
@@ -444,6 +450,28 @@ let rec create_validator ?parent worker state db net =
     ]
   in
 
+  let valid_block_input = Watcher.create_input () in
+  let new_head_input = Watcher.create_input () in
+
+  let bootstrapped =
+    (* TODO improve by taking current peers count and current
+       locators into account... *)
+    let stream, stopper =
+      Watcher.create_stream valid_block_input in
+    let rec wait () =
+      Lwt.pick [ ( Lwt_stream.get stream ) ;
+                 ( Lwt_unix.sleep 30. >|= fun () -> None) ] >>= function
+      | Some block
+        when Time.(block.State.Valid_block.timestamp < add (Time.now ()) (-60L)) ->
+          wait ()
+      | Some _ | None -> Lwt.return_unit in
+    let t =
+      wait () >>= fun () ->
+      Watcher.shutdown stopper ;
+      Lwt.return_unit in
+    Lwt.no_cancel t
+  in
+
   let rec v = {
     net ;
     worker ;
@@ -456,6 +484,9 @@ let rec create_validator ?parent worker state db net =
     fetch_block ;
     create_child ;
     test_validator ;
+    bootstrapped ;
+    new_head_input ;
+    valid_block_input ;
   }
 
   and notify_block hash block =
@@ -657,4 +688,11 @@ let create_worker state db =
 
   worker
 
-let watcher { valid_block_input } = Watcher.create_stream valid_block_input
+let new_head_watcher ({ new_head_input } : t) =
+  Watcher.create_stream new_head_input
+
+let watcher ({ valid_block_input } : t) =
+  Watcher.create_stream valid_block_input
+
+let global_watcher ({ valid_block_input } : worker) =
+  Watcher.create_stream valid_block_input
