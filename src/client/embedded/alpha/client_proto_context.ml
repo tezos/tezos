@@ -89,14 +89,16 @@ let transfer cctxt
   cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return contracts
 
-let originate cctxt ?force ~block ~src_sk bytes =
+let originate cctxt ?force ~block ?signature bytes =
   cctxt.Client_commands.message "Forged the raw origination frame." >>= fun () ->
+  let signed_bytes =
+    match signature with
+    | None -> bytes
+    | Some signature -> MBytes.concat bytes signature in
   Client_node_rpcs.Blocks.predecessor cctxt block >>= fun predecessor ->
-  let signature = Ed25519.sign src_sk bytes in
-  let signed_bytes = MBytes.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_proto_rpcs.Helpers.apply_operation cctxt block
-    predecessor oph bytes (Some signature) >>=? function
+    predecessor oph bytes signature >>=? function
   | [ contract ] ->
       Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun injected_oph ->
       assert (Operation_hash.equal oph injected_oph) ;
@@ -118,7 +120,8 @@ let originate_account cctxt
     ~net ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ?spendable
     ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
-  originate cctxt ?force ~block ~src_sk bytes
+  let signature = Ed25519.sign src_sk bytes in
+  originate cctxt ?force ~block ~signature bytes
 
 let originate_contract cctxt
     block ?force
@@ -136,7 +139,14 @@ let originate_contract cctxt
     ~counter ~balance ~spendable:!spendable
     ?delegatable ?delegatePubKey
     ~script:(code, init) ~fee () >>=? fun bytes ->
-  originate cctxt ?force ~block ~src_sk bytes
+  let signature = Ed25519.sign src_sk bytes in
+  originate cctxt ?force ~block ~signature bytes
+
+let faucet cctxt block ?force ~manager_pkh () =
+  Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
+  Client_proto_rpcs.Helpers.Forge.Anonymous.faucet cctxt block
+    ~net ~id:manager_pkh () >>=? fun bytes ->
+  originate cctxt ?force ~block bytes
 
 let group =
   { Cli_entries.name = "context" ;
@@ -245,6 +255,20 @@ let commands () =
             ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
             ~delegatable:!delegatable ?delegatePubKey:delegate ~code ~init:!init
             ()) >>= Client_proto_rpcs.handle_error cctxt >>= fun contract ->
+         RawContractAlias.add cctxt neu contract) ;
+    command ~group ~desc: "open a new (free) account"
+      ~args: ([ fee_arg ; delegate_arg ; force_arg ]
+              @ delegatable_args @ spendable_args)
+      (prefixes [ "originate" ; "free" ; "account" ]
+       @@ RawContractAlias.fresh_alias_param
+         ~name: "new" ~desc: "name of the new contract"
+       @@ prefix "for"
+       @@ Public_key_hash.alias_param
+         ~name: "mgr" ~desc: "manager of the new contract"
+       @@ stop)
+      (fun neu (_, manager) cctxt ->
+         check_contract cctxt neu >>= fun () ->
+         faucet cctxt (block ()) ~force:!force ~manager_pkh:manager () >>= Client_proto_rpcs.handle_error cctxt >>= fun contract ->
          RawContractAlias.add cctxt neu contract) ;
     command ~group ~desc: "transfer tokens"
       ~args: [ fee_arg ; arg_arg ; force_arg ]

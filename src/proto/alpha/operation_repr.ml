@@ -25,6 +25,10 @@ and anonymous_operation =
       level: Raw_level_repr.t ;
       nonce: Seed_repr.nonce ;
     }
+  | Faucet of {
+      id: Ed25519.Public_key_hash.t ;
+      nonce: MBytes.t ;
+    }
 
 and sourced_operations =
   | Manager_operations of {
@@ -251,9 +255,23 @@ module Encoding = struct
     case ~tag seed_nonce_revelation_encoding
       (function
         | Seed_nonce_revelation { level ; nonce } -> Some ((), level, nonce)
-        (* | _ -> None *)
+        | _ -> None
       )
       (fun ((), level, nonce) -> Seed_nonce_revelation { level ; nonce })
+
+  let faucet_encoding =
+    (obj3
+       (req "kind" (constant "faucet"))
+       (req "id" Ed25519.Public_key_hash.encoding)
+       (req "nonce" (Fixed.bytes 16)))
+
+  let faucet_case tag =
+    case ~tag faucet_encoding
+      (function
+        | Faucet { id ; nonce } -> Some ((), id, nonce)
+        | _ -> None
+      )
+      (fun ((), id, nonce) -> Faucet { id ; nonce })
 
   let unsigned_operation_case tag =
     case ~tag
@@ -262,6 +280,7 @@ module Encoding = struct
             (list
                (union [
                    seed_nonce_revelation_case 0 ;
+                   faucet_case 1 ;
                  ]))))
       (function Anonymous_operations ops -> Some ops | _ -> None)
       (fun ops -> Anonymous_operations ops)

@@ -25,6 +25,10 @@ and anonymous_operation =
       level: Raw_level_repr.t ;
       nonce: Seed_repr.nonce ;
     }
+  | Faucet of {
+      id: Ed25519.Public_key_hash.t ;
+      nonce: MBytes.t ;
+    }
 
 and sourced_operations =
   | Manager_operations of {

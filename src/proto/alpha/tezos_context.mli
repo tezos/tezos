@@ -175,6 +175,7 @@ module Constants : sig
   val origination_burn: Tez.t
   val mining_bond_cost: Tez.t
   val endorsement_bond_cost: Tez.t
+  val faucet_credit: Tez.t
 
   val cycle_length: context -> int32
   val voting_period_length: context -> int32
@@ -443,6 +444,10 @@ and anonymous_operation =
   | Seed_nonce_revelation of {
       level: Raw_level.t ;
       nonce: Nonce.t ;
+    }
+  | Faucet of {
+      id: Ed25519.Public_key_hash.t ;
+      nonce: MBytes.t ;
     }
 
 and sourced_operations =

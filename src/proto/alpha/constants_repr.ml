@@ -30,6 +30,8 @@ let mining_reward =
   Tez_repr.of_cents_exn 150_00L
 let endorsement_reward =
   Tez_repr.of_cents_exn 150_00L
+let faucet_credit =
+  Tez_repr.of_cents_exn 100_000_00L
 
 type constants = {
   cycle_length: int32 ;
