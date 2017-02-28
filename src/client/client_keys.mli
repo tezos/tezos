@@ -19,5 +19,8 @@ val get_key:
   Public_key_hash.t ->
   ( string * Public_key.t * Secret_key.t ) tzresult Lwt.t
 
+val get_keys:
+  Client_commands.context ->
+  ( string * Public_key_hash.t * Public_key.t * Secret_key.t ) list Lwt.t
 
 val commands: unit -> Client_commands.command list

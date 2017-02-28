@@ -7,6 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+let genesis =
+  Block_hash.of_b58check
+    "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
+
 let get_block_hash cctxt = function
   | `Hash hash -> Lwt.return hash
   | `Genesis | `Head _ | `Test_head _ as block ->

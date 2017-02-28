@@ -200,6 +200,11 @@ let rec insert ({time} as e) = function
       e :: l
   | e' :: l -> e' :: insert e l
 
+let get_delegates cctxt state =
+  match state.delegates with
+  | [] -> Client_keys.get_keys cctxt >|= List.map (fun (_,pkh,_,_) -> pkh)
+  | _ :: _ as delegates -> Lwt.return delegates
+
 let drop_old_endorsement ~before state =
   state.to_endorse <-
     List.filter
@@ -268,12 +273,13 @@ let schedule_endorsements cctxt state bis =
                return ())
       slots in
   let time = Time.(add (now ()) state.delay) in
+  get_delegates cctxt state >>= fun delegates ->
   iter_p
     (fun delegate ->
        iter_p
          (fun bi -> may_endorse bi delegate time)
          bis)
-    state.delegates >>= function
+    delegates >>= function
   | Error exns ->
       lwt_log_error
         "@[<v 2>Error(s) while scheduling endorsements@,%a@]"

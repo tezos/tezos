@@ -50,8 +50,7 @@ let compare (bi1 : block_info) (bi2 : block_info) =
   | x -> x
 
 let sort_blocks cctxt ?(compare = compare) blocks =
-  Lwt_list.map_p (convert_block_info cctxt) blocks >|= fun blocks ->
-  let blocks = Utils.unopt_list blocks in
+  Lwt_list.filter_map_p (convert_block_info cctxt) blocks >|= fun blocks ->
   List.sort compare blocks
 
 let monitor cctxt

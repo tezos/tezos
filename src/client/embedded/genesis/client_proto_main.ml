@@ -52,10 +52,9 @@ let commands () =
         ~desc:"Hardcoded fitness of the first block (integer)"
         (fun _ p -> Lwt.return (Int64.of_string p)) @@
       prefixes [ "and" ; "key" ] @@
-      param ~name:"password" ~desc:"Dictator's key"
-        (fun _ key ->
-           Lwt.return (Environment.Ed25519.Secret_key.of_b58check key))
-        stop
+      Client_keys.Secret_key.source_param
+        ~name:"password" ~desc:"Dictator's key" @@
+      stop
     end
       (fun hash fitness seckey cctxt ->
          let block = Client_config.block () in

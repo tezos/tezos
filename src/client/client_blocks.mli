@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+val genesis: Block_hash.t
+
 val get_block_hash:
   Client_commands.context ->
   Client_node_rpcs.Blocks.block ->
