@@ -16,6 +16,10 @@ val notify_block: worker -> Block_hash.t -> State.Block_header.t -> unit Lwt.t
 
 type t
 
+type error +=
+   | Non_increasing_timestamp
+   | Non_increasing_fitness
+
 val activate: worker -> State.Net.t -> t Lwt.t
 val get: worker -> State.Net_id.t -> t tzresult Lwt.t
 val get_exn: worker -> State.Net_id.t -> t Lwt.t
