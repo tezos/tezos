@@ -5,8 +5,8 @@ S mining
 B mining
 S ../../../proto
 B ../../../proto
-S ../../../proto/bootstrap
+S ../../../proto/alpha
 B _tzbuild
-FLG -open Client_embedded_proto_bootstrap
-FLG -open Register_client_embedded_proto_bootstrap
+FLG -open Client_embedded_proto_alpha
+FLG -open Register_client_embedded_proto_alpha
 FLG -open Tezos_context
