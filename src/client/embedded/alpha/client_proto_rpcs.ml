@@ -27,12 +27,20 @@ let call_service1 cctxt s block a1 =
   Client_node_rpcs.call_service1 cctxt
     (s Node_rpc_services.Blocks.proto_path) block a1
 let call_error_service1 cctxt s block a1 =
-  call_service1 cctxt s block a1 >|= wrap_error
+  Lwt.catch begin fun () ->
+    call_service1 cctxt s block a1 >|= wrap_error
+  end begin fun exn ->
+    Lwt.return (Error [Exn exn])
+  end
 let call_service2 cctxt s block a1 a2 =
   Client_node_rpcs.call_service2 cctxt
     (s Node_rpc_services.Blocks.proto_path) block a1 a2
 let call_error_service2 cctxt s block a1 a2 =
-  call_service2 cctxt s block a1 a2 >|= wrap_error
+  Lwt.catch begin fun () ->
+    call_service2 cctxt s block a1 a2 >|= wrap_error
+  end begin fun exn ->
+    Lwt.return (Error [Exn exn])
+  end
 
 module Constants = struct
   let errors cctxt block =
@@ -58,7 +66,12 @@ end
 module Context = struct
 
   let level cctxt block =
-    call_error_service1 cctxt Services.Context.level block ()
+    match block with
+    | `Genesis -> return Level.root
+    | `Hash h when Block_hash.equal Client_blocks.genesis h ->
+        return Level.root
+    | _ -> call_error_service1 cctxt Services.Context.level block ()
+
   let next_level cctxt block =
     call_error_service1 cctxt Services.Context.next_level block ()
 

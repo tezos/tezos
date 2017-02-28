@@ -53,6 +53,19 @@ let get_key cctxt pkh =
       Secret_key.find cctxt n >>= fun sk ->
       return (n, pk, sk)
 
+let get_keys cctxt =
+  Secret_key.load cctxt >>=
+  Lwt_list.filter_map_p begin fun (name, sk) ->
+    Lwt.catch begin fun () ->
+      Public_key.find cctxt name >>= fun pk ->
+      Public_key_hash.find cctxt name >>= fun pkh ->
+      Lwt.return (Some (name, pkh, pk, sk))
+    end begin fun _ ->
+      Lwt.return_none
+    end
+  end
+
+
 let group =
   { Cli_entries.name = "keys" ;
     title = "Commands for managing cryptographic keys" }
