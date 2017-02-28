@@ -13,7 +13,7 @@ type operation = {
   hash: Operation_hash.t ;
   shell: Updater.shell_operation ;
   contents: proto_operation ;
-  signature: Ed25519.signature option ;
+  signature: Ed25519.Signature.t option ;
 }
 
 and proto_operation =
@@ -33,13 +33,13 @@ and anonymous_operation =
 and sourced_operations =
   | Manager_operations of {
       source: Contract_repr.contract ;
-      public_key: Ed25519.public_key option ;
+      public_key: Ed25519.Public_key.t option ;
       fee: Tez_repr.tez ;
       counter: counter ;
       operations: manager_operation list ;
     }
   | Delegate_operations of {
-      source: Ed25519.public_key ;
+      source: Ed25519.Public_key.t ;
       operations: delegate_operation list ;
     }
 
@@ -152,7 +152,7 @@ module Encoding = struct
   let manager_kind_encoding =
     (obj5
        (req "source" Contract_repr.encoding)
-       (opt "public_key" Ed25519.public_key_encoding)
+       (opt "public_key" Ed25519.Public_key.encoding)
        (req "fee" Tez_repr.encoding)
        (req "counter" int32)
        (req "operations"
@@ -220,7 +220,7 @@ module Encoding = struct
 
   let delegate_kind_encoding =
     (obj2
-       (req "source" Ed25519.public_key_encoding)
+       (req "source" Ed25519.Public_key.encoding)
        (req "operations"
           (list (union [
                endorsement_case 0 ;
@@ -299,7 +299,7 @@ module Encoding = struct
   let signed_proto_operation_encoding =
     merge_objs
       proto_operation_encoding
-      (obj1 (varopt "signature" Ed25519.signature_encoding))
+      (obj1 (varopt "signature" Ed25519.Signature.encoding))
 
 end
 
@@ -332,7 +332,7 @@ let check_signature key { shell ; contents ; signature }  =
       fail Missing_signature
   | Sourced_operations _, Some signature ->
       let unsigned_operation = forge shell contents in
-      if Ed25519.check_signature key signature unsigned_operation then
+      if Ed25519.Signature.check key signature unsigned_operation then
         return ()
       else
         fail Invalid_signature

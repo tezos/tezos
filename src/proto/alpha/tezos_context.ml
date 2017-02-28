@@ -38,10 +38,10 @@ module Cycle = Cycle_repr
 module Script_int = Script_int_repr
 module Script = Script_repr
 
-type public_key = Ed25519.public_key
+type public_key = Ed25519.Public_key.t
 type public_key_hash = Ed25519.Public_key_hash.t
-type secret_key = Ed25519.secret_key
-type signature = Ed25519.signature
+type secret_key = Ed25519.Secret_key.t
+type signature = Ed25519.Signature.t
 
 include Tezos_hash
 

@@ -28,7 +28,7 @@ let forge_block
 let mine cctxt block command fitness seckey =
   Client_blocks.get_block_info cctxt block >>= fun bi ->
   forge_block cctxt block bi.net command fitness >>= fun blk ->
-  let signed_blk = Environment.Ed25519.append_signature seckey blk in
+  let signed_blk = Environment.Ed25519.Signature.append seckey blk in
   Client_node_rpcs.inject_block cctxt ~wait:true signed_blk >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()
@@ -54,7 +54,7 @@ let commands () =
       prefixes [ "and" ; "key" ] @@
       param ~name:"password" ~desc:"Dictator's key"
         (fun _ key ->
-           Lwt.return (Environment.Ed25519.secret_key_of_b58check key))
+           Lwt.return (Environment.Ed25519.Secret_key.of_b58check key))
         stop
     end
       (fun hash fitness seckey cctxt ->
@@ -74,7 +74,7 @@ let commands () =
       prefixes [ "and" ; "key" ] @@
       param ~name:"password" ~desc:"Dictator's key"
         (fun _ key ->
-           Lwt.return (Environment.Ed25519.secret_key_of_b58check key))
+           Lwt.return (Environment.Ed25519.Secret_key.of_b58check key))
         stop
     end
       (fun hash fitness seckey cctxt ->

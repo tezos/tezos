@@ -25,12 +25,18 @@ sleep 3
 
 ${CLIENT} list versions
 
+${CLIENT} add identity bootstrap1 tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+${CLIENT} add public key bootstrap1 edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav
+${CLIENT} add secret key bootstrap1 edskRuR1azSfboG86YPTyxrQgosh5zChf5bVDmptqLTb5EuXAm9rsnDYfTKhq7rDQujdn5WWzwUMeV3agaZ6J2vPQT58jJAJPi
+${CLIENT} add identity bootstrap2 tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN
+${CLIENT} add identity bootstrap3 tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU
+${CLIENT} add identity bootstrap4 tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv
+${CLIENT} add identity bootstrap5 tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv
+
 ${CLIENT} activate \
           protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
           with fitness 1 \
           and key edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z
-
-${CLIENT} bootstrap
 
 KEY1=foo
 KEY2=bar

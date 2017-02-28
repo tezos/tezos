@@ -29,7 +29,7 @@ let rec compute_stamp
       Tezos_context.Block.forge_header
         shell { mining_slot ; seed_nonce_hash ; proof_of_work_nonce } in
     let signed_header =
-      Ed25519.append_signature delegate_sk unsigned_header in
+      Ed25519.Signature.append delegate_sk unsigned_header in
     let block_hash = Block_hash.hash_bytes [signed_header] in
     if Mining.check_hash block_hash stamp_threshold then
       proof_of_work_nonce
@@ -63,7 +63,7 @@ let inject_block cctxt block
     ~seed_nonce_hash
     ~proof_of_work_nonce
     () >>=? fun unsigned_header ->
-  let signed_header = Ed25519.append_signature src_sk unsigned_header in
+  let signed_header = Ed25519.Signature.append src_sk unsigned_header in
   Client_node_rpcs.inject_block cctxt
     ~wait:true ?force signed_header >>=? fun block_hash ->
   return block_hash

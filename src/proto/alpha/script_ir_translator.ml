@@ -304,7 +304,7 @@ let rec unparse_data
     | Signature_t, s ->
         let text =
           Hex_encode.hex_encode
-            (MBytes.to_string (Data_encoding.Binary.to_bytes Ed25519.signature_encoding s)) in
+            (MBytes.to_string (Data_encoding.Binary.to_bytes Ed25519.Signature.encoding s)) in
         String (-1, text)
     | Tez_t, v ->
         String (-1, Tez.to_string v)
@@ -679,7 +679,7 @@ let rec parse_data
     (* Signatures *)
     | Signature_t, String (_, s) -> begin try
           match Data_encoding.Binary.of_bytes
-                  Ed25519.signature_encoding
+                  Ed25519.Signature.encoding
                   (MBytes.of_string (Hex_encode.hex_decode s)) with
           | Some s -> return s
           | None -> raise Not_found

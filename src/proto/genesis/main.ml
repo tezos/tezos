@@ -40,7 +40,7 @@ let max_number_of_operations = 0
 type block = {
   shell: Updater.shell_block ;
   command: Data.Command.t ;
-  signature: Ed25519.signature ;
+  signature: Ed25519.Signature.t ;
 }
 
 let max_block_length =
@@ -57,7 +57,7 @@ let check_signature ctxt { shell ; command ; signature } =
   let bytes = Data.Command.forge shell command in
   Data.Pubkey.get_pubkey ctxt >>= fun public_key ->
   fail_unless
-    (Ed25519.check_signature public_key signature bytes)
+    (Ed25519.Signature.check public_key signature bytes)
     Invalid_signature
 
 let apply ctxt header _ops =

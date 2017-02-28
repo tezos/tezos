@@ -218,7 +218,7 @@ end
 
 module Public_key : Iterable_data_storage
   with type key = Ed25519.Public_key_hash.t
-   and type value = Ed25519.public_key
+   and type value = Ed25519.Public_key.t
    and type context := t
 
 (** Seed *)

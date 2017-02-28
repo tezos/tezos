@@ -12,6 +12,6 @@ val mine:
   Client_node_rpcs.Blocks.block ->
   Data.Command.t ->
   Fitness.fitness ->
-  Environment.Ed25519.secret_key ->
+  Environment.Ed25519.Secret_key.t ->
   unit tzresult Lwt.t
 

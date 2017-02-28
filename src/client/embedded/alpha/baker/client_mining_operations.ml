@@ -54,7 +54,7 @@ let filter_valid_endorsement cctxt { hash; content } =
   | Some (_, Sourced_operations (Manager_operations _ )) ->
       Lwt.return_none
   | Some ({net_id}, Sourced_operations (Delegate_operations { source ; operations })) ->
-      let source = Ed25519.hash source in
+      let source = Ed25519.Public_key.hash source in
       let endorsements =
         Utils.unopt_list @@ List.map
           (function
