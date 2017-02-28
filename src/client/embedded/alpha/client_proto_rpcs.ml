@@ -35,8 +35,6 @@ let call_error_service2 cctxt s block a1 a2 =
   call_service2 cctxt s block a1 a2 >|= wrap_error
 
 module Constants = struct
-  let bootstrap cctxt block =
-    call_service1 cctxt Services.Constants.bootstrap block ()
   let errors cctxt block =
     call_service1 cctxt Services.Constants.errors block ()
   let cycle_length cctxt block =

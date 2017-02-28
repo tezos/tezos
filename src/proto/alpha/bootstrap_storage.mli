@@ -9,13 +9,12 @@
 
 type account = {
   public_key_hash : Ed25519.Public_key_hash.t ;
-  public_key : Ed25519.public_key ;
-  secret_key : Ed25519.secret_key ;
+  public_key : Ed25519.Public_key.t ;
 }
 
 val account_encoding: account Data_encoding.t
 
-val accounts: account list
+val accounts: Storage.t -> account list
 
 val init: Storage.t -> Storage.t tzresult Lwt.t
 

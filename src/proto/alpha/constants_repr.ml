@@ -42,7 +42,11 @@ type constants = {
   max_signing_slot: int ;
   instructions_per_transaction: int ;
   proof_of_work_threshold: int64 ;
+  bootstrap_keys: Ed25519.Public_key.t list ;
 }
+
+let read_public_key s =
+  Ed25519.Public_key.of_bytes (Bytes.of_string (Hex_encode.hex_decode s))
 
 let default = {
   cycle_length = 2048l ;
@@ -58,6 +62,14 @@ let default = {
   instructions_per_transaction = 16 * 1024 ;
   proof_of_work_threshold =
     Int64.(lognot (sub (shift_left 1L 56) 1L)) ;
+  bootstrap_keys =
+    List.map read_public_key [
+      "dd5d3536916765fd00a8cd402bddd34e87b49ae5159c43b8feecfd9f06b267d2" ;
+      "ce09f1c6b91d48cdd9f2aa98daf780f07353c759866c7dfbe50eb023bde51629" ;
+      "9c328bddf6249bbe550121076194d99bbe60e5b1e144da4f426561b5d3bbc6ab" ;
+      "a3db517734e07ace089ad0a2388e7276fb9b114bd79259dd5c93b0c33d57d6a2" ;
+      "6d2d52e62f1d48f3cf9badbc90cfe5f3aa600194bf21eda44b8e64698a82d341" ;
+    ]
 }
 
 let opt (=) def v = if def = v then None else Some v
@@ -72,6 +84,7 @@ let constants_encoding =
   Data_encoding.conv
     (fun c ->
        let module Compare_slot_durations = Compare.List (Period_repr) in
+       let module Compare_keys = Compare.List (Ed25519.Public_key) in
        let cycle_length =
          opt Compare.Int32.(=)
            default.cycle_length c.cycle_length
@@ -97,6 +110,9 @@ let constants_encoding =
        and proof_of_work_threshold =
          opt Compare.Int64.(=)
            default.proof_of_work_threshold c.proof_of_work_threshold
+       and bootstrap_keys =
+         opt Compare_keys.(=)
+           default.bootstrap_keys c.bootstrap_keys
        in
        (( cycle_length,
           voting_period_length,
@@ -105,7 +121,8 @@ let constants_encoding =
           first_free_mining_slot,
           max_signing_slot,
           instructions_per_transaction,
-          proof_of_work_threshold ), ()) )
+          proof_of_work_threshold,
+          bootstrap_keys), ()) )
     (fun (( cycle_length,
             voting_period_length,
             time_before_reward,
@@ -113,7 +130,8 @@ let constants_encoding =
             first_free_mining_slot,
             max_signing_slot,
             instructions_per_transaction,
-            proof_of_work_threshold ), ()) ->
+            proof_of_work_threshold,
+            bootstrap_keys), ()) ->
       { cycle_length =
           unopt default.cycle_length cycle_length ;
         voting_period_length =
@@ -132,10 +150,12 @@ let constants_encoding =
           unopt default.instructions_per_transaction instructions_per_transaction ;
         proof_of_work_threshold =
           unopt default.proof_of_work_threshold proof_of_work_threshold ;
+        bootstrap_keys =
+          unopt default.bootstrap_keys bootstrap_keys ;
       } )
      Data_encoding.(
        merge_objs
-         (obj8
+         (obj9
             (opt "cycle_length" int32)
             (opt "voting_period_length" int32)
             (opt "time_before_reward" int64)
@@ -143,7 +163,8 @@ let constants_encoding =
             (opt "first_free_mining_slot" int32)
             (opt "max_signing_slot" int31)
             (opt "instructions_per_transaction" int31)
-            (opt "proof_of_work_threshold" int64))
+            (opt "proof_of_work_threshold" int64)
+            (opt "bootstrap_keys" (list Ed25519.Public_key.encoding)))
          unit)
 
 type error += Constant_read of exn

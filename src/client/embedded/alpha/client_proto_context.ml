@@ -162,23 +162,6 @@ let commands () =
       (fun cctxt ->
          list_contracts cctxt (block ()) >>= fun res ->
          Client_proto_rpcs.handle_error cctxt res) ;
-    command ~group ~desc: "get the bootstrap keys and bootstrap contract handle"
-      (fixed [ "bootstrap" ])
-      (fun cctxt ->
-         let block = Client_config.block () in
-         Client_proto_rpcs.Constants.bootstrap cctxt block >>= fun accounts ->
-         let cpt = ref 0 in
-         Lwt_list.iter_s
-           (fun { Bootstrap.public_key_hash = pkh ;
-                  public_key = pk ; secret_key = sk } ->
-             incr cpt ;
-             let name = Printf.sprintf "bootstrap%d" !cpt in
-             Public_key_hash.add cctxt name pkh >>= fun () ->
-             Public_key.add cctxt name pk >>= fun () ->
-             Secret_key.add cctxt name sk >>= fun () ->
-             cctxt.message "Bootstrap keys added under the name '%s'." name)
-           accounts >>= fun () ->
-         Lwt.return_unit) ;
     command ~group ~desc: "get the balance of a contract"
       (prefixes [ "get" ; "balance" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"

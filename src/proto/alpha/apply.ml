@@ -143,7 +143,7 @@ let apply_sourced_operation
             accept_failing_script source content)
         (ctxt, origination_nonce) contents
   | Delegate_operations { source ; operations = contents } ->
-      let delegate = Ed25519.hash source in
+      let delegate = Ed25519.Public_key.hash source in
       check_signature_and_update_public_key
         ctxt delegate (Some source) operation >>=? fun ctxt ->
     (* TODO, see how to extract the public key hash after this operation to

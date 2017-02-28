@@ -409,10 +409,10 @@ end
 module Public_key =
   Make_iterable_data_storage (Ed25519.Public_key_hash)
     (struct
-      type value = Ed25519.public_key
+      type value = Ed25519.Public_key.t
       let key = Key.public_keys
       let name = "public keys"
-      let encoding = Ed25519.public_key_encoding
+      let encoding = Ed25519.Public_key.encoding
     end)
 
 (** Seed *)

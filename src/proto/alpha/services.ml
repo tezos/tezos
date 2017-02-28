@@ -107,13 +107,6 @@ module Constants = struct
       ~output: json_schema
       RPC.Path.(custom_root / "constants" / "errors")
 
-  let bootstrap custom_root =
-    RPC.service
-      ~description: "Hardcoded predefined keys and contract"
-      ~input: empty
-      ~output: (list Bootstrap.account_encoding)
-      RPC.Path.(custom_root / "constants" / "bootstrap_keys")
-
 end
 
 module Context = struct
@@ -192,7 +185,7 @@ module Context = struct
     let pk_encoding =
       (obj2
          (req "hash" Ed25519.Public_key_hash.encoding)
-         (req "public_key" Ed25519.public_key_encoding))
+         (req "public_key" Ed25519.Public_key.encoding))
 
     let list custom_root =
       RPC.service
@@ -353,7 +346,7 @@ module Helpers = struct
                  (req "pred_block" Block_hash.encoding)
                  (req "operation_hash" Operation_hash.encoding)
                  (req "forged_operation" bytes)
-                 (opt "signature" Ed25519.signature_encoding))
+                 (opt "signature" Ed25519.Signature.encoding))
       ~output: (wrap_tzerror
                   (obj1 (req "contracts" (list Contract.encoding))))
       RPC.Path.(custom_root / "helpers" / "apply_operation")

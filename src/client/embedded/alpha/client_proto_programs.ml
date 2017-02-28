@@ -664,7 +664,7 @@ let commands () =
              cctxt.message "Hash: %S@.Signature: %S"
                hash
                (signature |>
-                Data_encoding.Binary.to_bytes Ed25519.signature_encoding |>
+                Data_encoding.Binary.to_bytes Ed25519.Signature.encoding |>
                 Hex_encode.hex_of_bytes)
          | Error errs ->
              cctxt.warning "%a" pp_print_error errs >>= fun () ->

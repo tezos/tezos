@@ -21,9 +21,6 @@ module Constants : sig
   val errors:
     Client_commands.context ->
     block -> Json_schema.schema Lwt.t
-  val bootstrap:
-    Client_commands.context ->
-    block -> Bootstrap.account list Lwt.t
   val cycle_length:
     Client_commands.context ->
     block -> int32 tzresult Lwt.t

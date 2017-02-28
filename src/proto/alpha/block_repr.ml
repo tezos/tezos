@@ -15,7 +15,7 @@ open Tezos_hash
 type header = {
   shell: Updater.shell_block ;
   proto: proto_header ;
-  signature: Ed25519.signature ;
+  signature: Ed25519.Signature.t ;
 }
 
 and proto_header = {
@@ -45,7 +45,7 @@ let signed_proto_header_encoding =
   let open Data_encoding in
   merge_objs
     proto_header_encoding
-    (obj1 (req "signature" Ed25519.signature_encoding))
+    (obj1 (req "signature" Ed25519.Signature.encoding))
 
 let unsigned_header_encoding =
   let open Data_encoding in

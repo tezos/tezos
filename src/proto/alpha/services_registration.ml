@@ -87,10 +87,6 @@ let () =
     (fun () ->
        Lwt.return (Data_encoding.Json.(schema (error_encoding ()))))
 
-let () =
-  register1_noctxt Services.Constants.bootstrap
-    (fun () -> Lwt.return Bootstrap.accounts)
-
 (*-- Context -----------------------------------------------------------------*)
 
 let level ctxt =
@@ -210,7 +206,7 @@ let () =
       | Some contract -> contract
       | None ->
           Contract.default_contract
-            (List.hd Bootstrap.accounts).Bootstrap.public_key_hash in
+            (List.hd (Bootstrap.accounts ctxt)).Bootstrap.public_key_hash in
     let storage : Script.storage =
       { storage ; storage_type = (script : Script.code).storage_type } in
     let qta =
@@ -423,7 +419,7 @@ let () =
 let operation_public_key ctxt = function
   | None -> return None
   | Some public_key ->
-      let hash = Ed25519.hash public_key in
+      let hash = Ed25519.Public_key.hash public_key in
       Public_key.get_option ctxt hash >>=? function
       | None -> return (Some public_key)
       | Some _ -> return None

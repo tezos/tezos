@@ -13,7 +13,7 @@ open Tezos_hash
 type header = {
   shell: Updater.shell_block ;
   proto: proto_header ;
-  signature: Ed25519.signature ;
+  signature: Ed25519.Signature.t ;
 }
 
 and proto_header = {
