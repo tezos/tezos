@@ -333,10 +333,23 @@ let get_unrevealed_nonces cctxt ?(force = false) block =
                 | Revealed _ -> return None)
         blocks
 
+let safe_get_unrevealed_nonces cctxt block =
+  get_unrevealed_nonces cctxt block >>= function
+  | Ok r -> Lwt.return r
+  | Error err ->
+      lwt_warn "Cannot read nonces: %a@." pp_print_error err >>= fun () ->
+      Lwt.return []
+
+
+let get_delegates cctxt state =
+  match state.delegates with
+  | [] -> Client_keys.get_keys cctxt >|= List.map (fun (_,pkh,_,_) -> pkh)
+  | _ :: _ as delegates -> Lwt.return delegates
+
 let insert_block
     cctxt ?max_priority state (bi: Client_mining_blocks.block_info) =
   begin
-    get_unrevealed_nonces cctxt (`Hash bi.hash) >>=? fun nonces ->
+    safe_get_unrevealed_nonces cctxt (`Hash bi.hash) >>= fun nonces ->
     Client_mining_revelation.forge_seed_nonce_revelation
       cctxt ~force:true (`Hash bi.hash) (List.map snd nonces)
   end >>= fun _ignore_error ->
@@ -345,7 +358,8 @@ let insert_block
     drop_old_slots
       ~before:(Time.add state.best.timestamp (-1800L)) state ;
   end ;
-  get_mining_slot cctxt ?max_priority bi state.delegates >>= function
+  get_delegates cctxt state >>= fun delegates ->
+  get_mining_slot cctxt ?max_priority bi delegates >>= function
   | None ->
       lwt_debug
         "Can't compute slot for %a" Block_hash.pp_short bi.hash >>= fun () ->
