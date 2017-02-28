@@ -93,9 +93,7 @@ end
 
 module Init = struct
 
-  type error +=
-  | Incompatible_protocol_version
-  | Decreasing_fitness
+  type error += Incompatible_protocol_version
 
   let version_key = ["version"]
 
