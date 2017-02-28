@@ -1,36 +1,66 @@
 (** Tezos - Ed25519 cryptography *)
 
 
-(** {2 Signature} ************************************************************)
-
-(** An Ed25519 public key *)
-type public_key
-
-(** An Ed25519 secret key *)
-type secret_key
-
-(** The result of signing a sequence of bytes with a secret key *)
-type signature
-
-(** Signs a sequence of bytes with a secret key *)
-val sign : secret_key -> MBytes.t -> signature
-
-(** Checks a signature *)
-val check_signature : public_key -> signature -> MBytes.t -> bool
-
 (** {2 Hashed public keys for user ID} ***************************************)
 
 module Public_key_hash : Hash.HASH
 
-(** Hashes an Ed25519 public key *)
-val hash : public_key -> Public_key_hash.t
 
-(** {2 Serializers} **********************************************************)
+(** {2 Signature} ************************************************************)
 
-val public_key_encoding : public_key Data_encoding.t
+module Public_key : sig
 
-val secret_key_encoding : secret_key Data_encoding.t
+  include Compare.S
+  val encoding: t Data_encoding.t
 
-val signature_encoding : signature Data_encoding.t
+  val hash: t -> Public_key_hash.t
 
-val public_key_of_bytes : Bytes.t -> public_key
+  type Base58.data +=
+    | Public_key of t
+
+  val of_b58check: string -> t
+  val to_b58check: t -> string
+
+  val of_bytes: Bytes.t -> t
+
+end
+
+module Secret_key : sig
+
+  type t
+  val encoding: t Data_encoding.t
+
+  type Base58.data +=
+    | Secret_key of t
+
+  val of_b58check: string -> t
+  val to_b58check: t -> string
+
+  val of_bytes: Bytes.t -> t
+
+end
+
+module Signature : sig
+
+  type t
+  val encoding: t Data_encoding.t
+
+  type Base58.data +=
+    | Signature of t
+
+  val of_b58check: string -> t
+  val to_b58check: t -> string
+
+  val of_bytes: Bytes.t -> t
+
+  (** Checks a signature *)
+  val check: Public_key.t -> t -> MBytes.t -> bool
+
+  (** Append a signature *)
+  val append: Secret_key.t -> MBytes.t -> MBytes.t
+
+end
+
+val sign: Secret_key.t -> MBytes.t -> Signature.t
+
+val generate_key: unit -> (Public_key_hash.t * Public_key.t * Secret_key.t)

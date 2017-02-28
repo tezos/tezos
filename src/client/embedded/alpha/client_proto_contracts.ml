@@ -104,7 +104,7 @@ let get_delegate cctxt block source =
 let may_check_key sourcePubKey sourcePubKeyHash =
   match sourcePubKey with
   | Some sourcePubKey ->
-      if not (Ed25519.Public_key_hash.equal (Ed25519.hash sourcePubKey) sourcePubKeyHash)
+      if not (Ed25519.Public_key_hash.equal (Ed25519.Public_key.hash sourcePubKey) sourcePubKeyHash)
       then
         failwith "Invalid public key in `client_proto_endorsement`"
       else

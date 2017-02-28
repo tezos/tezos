@@ -484,7 +484,7 @@ let rec interp
           | Check_signature, Item (key, Item ((signature, message), rest)) ->
               Public_key.get ctxt key >>=? fun key ->
               let message = MBytes.of_string message in
-              let res = Ed25519.check_signature key signature message in
+              let res = Ed25519.Signature.check key signature message in
               logged_return (Item (res, rest), qta - 1, ctxt)
           | H ty, Item (v, rest) ->
               let hash = Script.hash_expr (unparse_data ty v) in

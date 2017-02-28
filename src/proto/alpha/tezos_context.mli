@@ -21,10 +21,10 @@ module Contract_hash = Tezos_hash.Contract_hash
 
 module Nonce_hash = Tezos_hash.Nonce_hash
 
-type public_key = Ed25519.public_key
+type public_key = Ed25519.Public_key.t
 type public_key_hash = Ed25519.Public_key_hash.t
-type secret_key = Ed25519.secret_key
-type signature = Ed25519.signature
+type secret_key = Ed25519.Secret_key.t
+type signature = Ed25519.Signature.t
 
 module Tez : sig
 
@@ -157,9 +157,8 @@ module Bootstrap : sig
   type account = {
     public_key_hash: public_key_hash ;
     public_key: public_key ;
-    secret_key: secret_key ;
   }
-  val accounts: account list
+  val accounts: context -> account list
   val account_encoding: account Data_encoding.t
   val refill: context -> context tzresult Lwt.t
 end
@@ -528,7 +527,7 @@ module Block : sig
   type header = {
     shell: Updater.shell_block ;
     proto: proto_header ;
-    signature: Ed25519.signature ;
+    signature: Ed25519.Signature.t ;
   }
 
   and proto_header = {

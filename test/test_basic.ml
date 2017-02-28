@@ -78,8 +78,39 @@ type account = {
 }
 
 let genesis_sk =
-  Environment.Ed25519.secret_key_of_b58check
+  Environment.Ed25519.Secret_key.of_b58check
     "edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z"
+
+let bootstrap1_pk =
+  Environment.Ed25519.Public_key.of_b58check
+    "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
+let bootstrap2_pk =
+  Environment.Ed25519.Public_key.of_b58check
+    "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9"
+let bootstrap3_pk =
+  Environment.Ed25519.Public_key.of_b58check
+    "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV"
+let bootstrap4_pk =
+  Environment.Ed25519.Public_key.of_b58check
+    "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU"
+let bootstrap5_pk =
+  Environment.Ed25519.Public_key.of_b58check
+    "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
+let bootstrap1_sk =
+  Environment.Ed25519.Secret_key.of_b58check
+    "edskRuR1azSfboG86YPTyxrQgosh5zChf5bVDmptqLTb5EuXAm9rsnDYfTKhq7rDQujdn5WWzwUMeV3agaZ6J2vPQT58jJAJPi"
+let bootstrap2_sk =
+  Environment.Ed25519.Secret_key.of_b58check
+    "edskRkJz4Rw2rM5NtabEWMbbg2bF4b1nfFajaqEuEk4SgU7eeDbym9gVQtBTbYo32WUg2zb5sNBkD1whRN7zX43V9bftBbtaKc"
+let bootstrap3_sk =
+  Environment.Ed25519.Secret_key.of_b58check
+    "edskS3qsqsNgdjUqeMsVcEwBn8dkZ5iDRz6aF21KhcCtRiAkWBypUSbicccR4Vgqm9UdW2Vabuos6seezqgbXTrmcbLUG4rdAC"
+let bootstrap4_sk =
+  Environment.Ed25519.Secret_key.of_b58check
+    "edskRg9qcPqaVQa6jXWNMU5p71tseSuR7NzozgqZ9URsVDi81wTyPJdFSBdeakobyHUi4Xgu61jgKRQvkhXrPmEdEUfiqfiJFL"
+let bootstrap5_sk =
+  Environment.Ed25519.Secret_key.of_b58check
+    "edskS7rLN2Df3nbS1EYvwJbWo4umD7yPM1SUeX7gp1WhCVpMFXjcCyM58xs6xsnTsVqHQmJQ2RxoAjJGedWfvFmjQy6etA3dgZ"
 
 let switch_protocol () =
   let fitness =
@@ -89,21 +120,24 @@ let switch_protocol () =
     fitness genesis_sk
 
 let bootstrap_accounts () =
-  Client_proto_rpcs.Constants.bootstrap cctxt (`Head 0)
-  >>= fun accounts ->
   let cpt = ref 0 in
   Lwt.return
     (List.map
-       (fun { Bootstrap.public_key_hash ; public_key ; secret_key } ->
+       (fun (public_key, secret_key) ->
           incr cpt ;
           let name = Printf.sprintf "bootstrap%d" !cpt in
+          let public_key_hash = Environment.Ed25519.Public_key.hash public_key in
           { name ; contract = Contract.default_contract public_key_hash;
             public_key_hash ; public_key ; secret_key })
-       accounts)
+       [ bootstrap1_pk, bootstrap1_sk;
+         bootstrap2_pk, bootstrap2_sk;
+         bootstrap3_pk, bootstrap3_sk;
+         bootstrap4_pk, bootstrap4_sk;
+         bootstrap5_pk, bootstrap5_sk; ])
 
 let create_account name =
   let secret_key, public_key = Sodium.Sign.random_keypair () in
-  let public_key_hash = Environment.Ed25519.hash public_key in
+  let public_key_hash = Environment.Ed25519.Public_key.hash public_key in
   let contract = Contract.default_contract public_key_hash in
   Lwt.return { name ; contract ; public_key_hash ; public_key ; secret_key }
 

@@ -9,22 +9,6 @@
 
 module Ed25519 = struct
 
-  type secret_key = Sodium.Sign.secret_key
-  type public_key = Sodium.Sign.public_key
-  type signature = MBytes.t
-
-  let sign key msg =
-    Sodium.Sign.Bigbytes.(of_signature @@ sign_detached key msg)
-
-  let check_signature public_key signature msg =
-    try
-      Sodium.Sign.Bigbytes.(verify public_key (to_signature signature) msg) ;
-      true
-    with _ -> false
-
-  let append_signature key msg =
-    MBytes.concat msg (sign key msg)
-
   module Public_key_hash = Hash.Make_Blake2B(Base58)(struct
       let name = "Ed25519.Public_key_hash"
       let title = "An Ed25519 public key ID"
@@ -35,129 +19,178 @@ module Ed25519 = struct
   let () =
     Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz1" 36
 
-  let hash v =
-    Public_key_hash.hash_bytes
-      [ Sodium.Sign.Bigbytes.of_public_key v ]
+  module Public_key = struct
+
+    type t = Sodium.Sign.public_key
+    let compare = Sodium.Sign.compare_public_keys
+    let (=) xs ys = compare xs ys = 0
+    let (<>) xs ys = compare xs ys <> 0
+    let (<) xs ys = compare xs ys < 0
+    let (<=) xs ys = compare xs ys <= 0
+    let (>=) xs ys = compare xs ys >= 0
+    let (>) xs ys = compare xs ys > 0
+    let max x y = if x >= y then x else y
+    let min x y = if x <= y then x else y
+
+    type Base58.data +=
+      | Public_key of t
+
+    let b58check_encoding =
+      Base58.register_encoding
+        ~prefix: Base58.Prefix.ed25519_public_key
+        ~length:Sodium.Sign.public_key_size
+        ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_public_key x))
+        ~of_raw:(fun x ->
+            try Some (Sodium.Sign.Bytes.to_public_key (Bytes.of_string x))
+            with _ -> None)
+        ~wrap:(fun x -> Public_key x)
+
+    let of_b58check s =
+      match Base58.simple_decode b58check_encoding s with
+      | Some x -> x
+      | None -> Pervasives.failwith "Unexpected hash (ed25519 public key)"
+    let to_b58check s = Base58.simple_encode b58check_encoding s
+
+    let of_bytes s = Sodium.Sign.Bytes.to_public_key s
+
+    let () =
+      Base58.check_encoded_prefix b58check_encoding "edpk" 54
+
+    let encoding =
+      let open Data_encoding in
+      splitted
+        ~json:
+          (describe
+             ~title: "An Ed25519 public key (Base58Check encoded)" @@
+           conv
+             (fun s -> Base58.simple_encode b58check_encoding s)
+             (fun s ->
+                match Base58.simple_decode b58check_encoding s with
+                | Some x -> x
+                | None -> Data_encoding.Json.cannot_destruct
+                            "Ed25519 public key: unexpected prefix.")
+             string)
+        ~binary:
+          (conv
+             Sodium.Sign.Bigbytes.of_public_key
+             Sodium.Sign.Bigbytes.to_public_key
+             bytes)
+
+    let hash v =
+      Public_key_hash.hash_bytes
+        [ Sodium.Sign.Bigbytes.of_public_key v ]
+
+  end
+
+  module Secret_key = struct
+
+    type t = Sodium.Sign.secret_key
+
+    type Base58.data +=
+      | Secret_key of t
+
+    let b58check_encoding =
+      Base58.register_encoding
+        ~prefix: Base58.Prefix.ed25519_secret_key
+        ~length:Sodium.Sign.secret_key_size
+        ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_secret_key x))
+        ~of_raw:(fun x ->
+            try Some (Sodium.Sign.Bytes.to_secret_key (Bytes.of_string x))
+            with _ -> None)
+        ~wrap:(fun x -> Secret_key x)
+
+    let of_b58check s =
+      match Base58.simple_decode b58check_encoding s with
+      | Some x -> x
+      | None -> Pervasives.failwith "Unexpected hash (ed25519 secret key)"
+    let to_b58check s = Base58.simple_encode b58check_encoding s
+
+    let of_bytes s = Sodium.Sign.Bytes.to_secret_key s
+
+    let () =
+      Base58.check_encoded_prefix b58check_encoding "edsk" 98
+
+    let encoding =
+      let open Data_encoding in
+      splitted
+        ~json:
+          (describe
+             ~title: "An Ed25519 secret key (Base58Check encoded)" @@
+           conv
+             (fun s -> Base58.simple_encode b58check_encoding s)
+             (fun s ->
+                match Base58.simple_decode b58check_encoding s with
+                | Some x -> x
+                | None -> Data_encoding.Json.cannot_destruct
+                            "Ed25519 secret key: unexpected prefix.")
+             string)
+        ~binary:
+          (conv
+             Sodium.Sign.Bigbytes.of_secret_key
+             Sodium.Sign.Bigbytes.to_secret_key
+             bytes)
+
+  end
+
+  let sign key msg =
+    Sodium.Sign.Bigbytes.(of_signature @@ sign_detached key msg)
+
+  module Signature = struct
+
+    type t = MBytes.t
+
+    type Base58.data +=
+      | Signature of t
+
+    let b58check_encoding =
+      Base58.register_encoding
+        ~prefix: Base58.Prefix.ed25519_signature
+        ~length:Sodium.Sign.signature_size
+        ~to_raw:MBytes.to_string
+        ~of_raw:(fun s -> Some (MBytes.of_string s))
+        ~wrap:(fun x -> Signature x)
+
+    let of_b58check s =
+      match Base58.simple_decode b58check_encoding s with
+      | Some x -> x
+      | None -> Pervasives.failwith "Unexpected hash (ed25519 signature)"
+    let to_b58check s = Base58.simple_encode b58check_encoding s
+
+    let of_bytes s = MBytes.of_string (Bytes.to_string s)
+
+    let () =
+      Base58.check_encoded_prefix b58check_encoding "edsig" 99
+
+    let encoding =
+      let open Data_encoding in
+      splitted
+        ~json:
+          (describe
+             ~title: "An Ed25519 signature (Base58Check encoded)" @@
+           conv
+             (fun s -> Base58.simple_encode b58check_encoding s)
+             (fun s ->
+                match Base58.simple_decode b58check_encoding s with
+                | Some x -> x
+                | None -> Data_encoding.Json.cannot_destruct
+                            "Ed25519 signature: unexpected prefix.")
+             string)
+        ~binary: (Fixed.bytes 64)
+
+    let check public_key signature msg =
+      try
+        Sodium.Sign.Bigbytes.(verify public_key (to_signature signature) msg) ;
+        true
+      with _ -> false
+
+    let append key msg =
+      MBytes.concat msg (sign key msg)
+
+  end
 
   let generate_key () =
     let secret, pub = Sodium.Sign.random_keypair () in
-    (hash pub, pub, secret)
-
-  type Base58.data +=
-    | Public_key of public_key
-    | Secret_key of secret_key
-    | Signature of signature
-
-  let b58check_public_key_encoding =
-    Base58.register_encoding
-      ~prefix: Base58.Prefix.ed25519_public_key
-      ~length:Sodium.Sign.public_key_size
-      ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_public_key x))
-      ~of_raw:(fun x ->
-          try Some (Sodium.Sign.Bytes.to_public_key (Bytes.of_string x))
-          with _ -> None)
-      ~wrap:(fun x -> Public_key x)
-
-  let b58check_secret_key_encoding =
-    Base58.register_encoding
-      ~prefix: Base58.Prefix.ed25519_secret_key
-      ~length:Sodium.Sign.secret_key_size
-      ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_secret_key x))
-      ~of_raw:(fun x ->
-          try Some (Sodium.Sign.Bytes.to_secret_key (Bytes.of_string x))
-          with _ -> None)
-      ~wrap:(fun x -> Secret_key x)
-
-  let b58check_signature_encoding =
-    Base58.register_encoding
-      ~prefix: Base58.Prefix.ed25519_signature
-      ~length:Sodium.Sign.signature_size
-      ~to_raw:MBytes.to_string
-      ~of_raw:(fun s -> Some (MBytes.of_string s))
-      ~wrap:(fun x -> Signature x)
-
-  let public_key_of_b58check s =
-    match Base58.simple_decode b58check_public_key_encoding s with
-    | Some x -> x
-    | None -> Pervasives.failwith "Unexpected hash (ed25519 public key)"
-  let b58check_of_public_key s = Base58.simple_encode b58check_public_key_encoding s
-
-  let secret_key_of_b58check s =
-    match Base58.simple_decode b58check_secret_key_encoding s with
-    | Some x -> x
-    | None -> Pervasives.failwith "Unexpected hash (ed25519 secret key)"
-  let b58check_of_secret_key s = Base58.simple_encode b58check_secret_key_encoding s
-
-  let signature_of_b58check s =
-    match Base58.simple_decode b58check_signature_encoding s with
-    | Some x -> x
-    | None -> Pervasives.failwith "Unexpected hash (ed25519 signature)"
-  let b58check_of_signature s = Base58.simple_encode b58check_signature_encoding s
-
-  let public_key_of_bytes s = Sodium.Sign.Bytes.to_public_key s
-  let secret_key_of_bytes s = Sodium.Sign.Bytes.to_secret_key s
-  let signature_of_bytes s = Sodium.Sign.Bytes.to_signature s
-
-  let () =
-    Base58.check_encoded_prefix b58check_public_key_encoding "edpk" 54 ;
-    Base58.check_encoded_prefix b58check_secret_key_encoding "edsk" 98 ;
-    Base58.check_encoded_prefix b58check_signature_encoding "edsig" 99
-
-  let public_key_encoding =
-    let open Data_encoding in
-    splitted
-      ~json:
-        (describe
-           ~title: "An Ed25519 public key (Base58Check encoded)" @@
-         conv
-           (fun s -> Base58.simple_encode b58check_public_key_encoding s)
-           (fun s ->
-              match Base58.simple_decode b58check_public_key_encoding s with
-              | Some x -> x
-              | None -> Data_encoding.Json.cannot_destruct
-                          "Ed25519 public key: unexpected prefix.")
-           string)
-      ~binary:
-        (conv
-           Sodium.Sign.Bigbytes.of_public_key
-           Sodium.Sign.Bigbytes.to_public_key
-           bytes)
-
-  let secret_key_encoding =
-    let open Data_encoding in
-    splitted
-      ~json:
-        (describe
-           ~title: "An Ed25519 secret key (Base58Check encoded)" @@
-         conv
-           (fun s -> Base58.simple_encode b58check_secret_key_encoding s)
-           (fun s ->
-              match Base58.simple_decode b58check_secret_key_encoding s with
-              | Some x -> x
-              | None -> Data_encoding.Json.cannot_destruct
-                          "Ed25519 secret key: unexpected prefix.")
-           string)
-      ~binary:
-        (conv
-           Sodium.Sign.Bigbytes.of_secret_key
-           Sodium.Sign.Bigbytes.to_secret_key
-           bytes)
-
-  let signature_encoding =
-    let open Data_encoding in
-    splitted
-      ~json:
-        (describe
-           ~title: "An Ed25519 signature (Base58Check encoded)" @@
-         conv
-           (fun s -> Base58.simple_encode b58check_signature_encoding s)
-           (fun s ->
-              match Base58.simple_decode b58check_signature_encoding s with
-              | Some x -> x
-              | None -> Data_encoding.Json.cannot_destruct
-                          "Ed25519 signature: unexpected prefix.")
-           string)
-      ~binary: (Fixed.bytes 64)
+    (Public_key.hash pub, pub, secret)
 
 end
 

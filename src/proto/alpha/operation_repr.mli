@@ -13,7 +13,7 @@ type operation = {
   hash: Operation_hash.t ;
   shell: Updater.shell_operation ;
   contents: proto_operation ;
-  signature: Ed25519.signature option ;
+  signature: Ed25519.Signature.t option ;
 }
 
 and proto_operation =
@@ -33,13 +33,13 @@ and anonymous_operation =
 and sourced_operations =
   | Manager_operations of {
       source: Contract_repr.contract ;
-      public_key: Ed25519.public_key option ;
+      public_key: Ed25519.Public_key.t option ;
       fee: Tez_repr.tez ;
       counter: counter ;
       operations: manager_operation list ;
     }
   | Delegate_operations of {
-      source: Ed25519.public_key ;
+      source: Ed25519.Public_key.t ;
       operations: delegate_operation list ;
     }
 
@@ -87,11 +87,11 @@ val parse:
 
 val parse_proto:
   MBytes.t ->
-  (proto_operation * Ed25519.signature option) tzresult Lwt.t
+  (proto_operation * Ed25519.Signature.t option) tzresult Lwt.t
 
 type error += Invalid_signature
 val check_signature:
-  Ed25519.public_key -> operation -> unit tzresult Lwt.t
+  Ed25519.Public_key.t -> operation -> unit tzresult Lwt.t
 
 val forge: Updater.shell_operation -> proto_operation -> MBytes.t
 

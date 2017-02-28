@@ -154,7 +154,7 @@ let check_header_hash {Block.shell;proto;signature} stamp_threshold =
     Block_hash.hash_bytes [
       Data_encoding.Binary.to_bytes
         (Data_encoding.tup2
-           Block.unsigned_header_encoding Ed25519.signature_encoding)
+           Block.unsigned_header_encoding Ed25519.Signature.encoding)
         ((shell, proto), signature)] in
   check_hash hash stamp_threshold
 
@@ -173,7 +173,7 @@ let check_signature ctxt block id =
   Public_key.get ctxt id >>=? fun key ->
   let check_signature key { Block.proto ; shell ; signature } =
     let unsigned_header = Block.forge_header shell proto in
-    Ed25519.check_signature key signature unsigned_header in
+    Ed25519.Signature.check key signature unsigned_header in
   if check_signature key block then
     return ()
   else

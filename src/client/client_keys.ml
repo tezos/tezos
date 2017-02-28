@@ -18,26 +18,18 @@ module Public_key_hash = Client_aliases.Alias (struct
   end)
 
 module Public_key = Client_aliases.Alias (struct
-    type t = Ed25519.public_key
-    let encoding = Ed25519.public_key_encoding
-    let of_source _ s =
-      Lwt.return (Sodium.Sign.Bytes.to_public_key
-                (Bytes.of_string B64.(decode ~alphabet:uri_safe_alphabet s)))
-    let to_source _ p =
-      Lwt.return B64.(encode ~alphabet:uri_safe_alphabet
-                    (Bytes.to_string (Sodium.Sign.Bytes.of_public_key p)))
+    type t = Ed25519.Public_key.t
+    let encoding = Ed25519.Public_key.encoding
+    let of_source _ s = Lwt.return (Ed25519.Public_key.of_b58check s)
+    let to_source _ p = Lwt.return (Ed25519.Public_key.to_b58check p)
     let name = "public key"
   end)
 
 module Secret_key = Client_aliases.Alias (struct
-    type t = Ed25519.secret_key
-    let encoding = Ed25519.secret_key_encoding
-    let of_source _ s =
-      Lwt.return (Sodium.Sign.Bytes.to_secret_key
-                (Bytes.of_string B64.(decode ~alphabet:uri_safe_alphabet s)))
-    let to_source _ p =
-      Lwt.return B64.(encode ~alphabet:uri_safe_alphabet
-                    (Bytes.to_string (Sodium.Sign.Bytes.of_secret_key p)))
+    type t = Ed25519.Secret_key.t
+    let encoding = Ed25519.Secret_key.encoding
+    let of_source _ s = Lwt.return (Ed25519.Secret_key.of_b58check s)
+    let to_source _ p = Lwt.return (Ed25519.Secret_key.to_b58check p)
     let name = "secret key"
   end)
 
@@ -45,13 +37,13 @@ let gen_keys cctxt name =
   let secret_key, public_key = Sodium.Sign.random_keypair () in
   Secret_key.add cctxt name secret_key >>= fun () ->
   Public_key.add cctxt name public_key >>= fun () ->
-  Public_key_hash.add cctxt name (Ed25519.hash public_key) >>= fun () ->
+  Public_key_hash.add cctxt name (Ed25519.Public_key.hash public_key) >>= fun () ->
   cctxt.message "I generated a brand new pair of keys under the name '%s'." name
 
 let check_keys_consistency pk sk =
   let message = MBytes.of_string "Voulez-vous coucher avec moi, ce soir ?" in
   let signature = Ed25519.sign sk message in
-  Ed25519.check_signature pk signature message
+  Ed25519.Signature.check pk signature message
 
 let get_key cctxt pkh =
   Public_key_hash.rev_find cctxt pkh >>= function
@@ -97,7 +89,7 @@ let commands () =
        @@ Public_key.source_param
        @@ stop)
       (fun name key cctxt ->
-         Public_key_hash.add cctxt name (Ed25519.hash key) >>= fun () ->
+         Public_key_hash.add cctxt name (Ed25519.Public_key.hash key) >>= fun () ->
          Public_key.add cctxt name key) ;
     command ~group ~desc: "add an ID a public key hash to the wallet"
       (prefixes [ "add" ; "identity" ]
