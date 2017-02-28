@@ -154,7 +154,7 @@ let apply_sourced_operation
         ctxt contents >>=? fun ctxt ->
       return (ctxt, origination_nonce)
 
-let apply_anonymous_operation ctxt miner_contract kind =
+let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
   match kind with
   | Seed_nonce_revelation { level ; nonce } ->
       let level = Level.from_raw ctxt level in
@@ -162,19 +162,37 @@ let apply_anonymous_operation ctxt miner_contract kind =
                                               reward_amount) ->
       Reward.record ctxt
         delegate_to_reward level.cycle reward_amount >>=? fun ctxt ->
-      (match miner_contract with
-       | None -> return ctxt
-       | Some contract ->
-           Contract.credit ctxt contract Constants.seed_nonce_revelation_tip)
+      begin
+        match miner_contract with
+        | None -> return (ctxt, origination_nonce)
+        | Some contract ->
+            Contract.credit
+              ctxt contract Constants.seed_nonce_revelation_tip >>=? fun ctxt ->
+            return (ctxt, origination_nonce)
+      end
+  | Faucet { id = manager } ->
+      (* Free tez for all! *)
+      begin
+        match miner_contract with
+        | None -> return None
+        | Some contract -> Contract.get_delegate_opt ctxt contract
+      end >>=? fun delegate ->
+      Contract.originate ctxt
+        origination_nonce
+        ~manager ~delegate ~balance:Constants.faucet_credit ~script:No_script
+        ~spendable:true ~delegatable:true >>=? fun (ctxt, _, origination_nonce) ->
+      return (ctxt, origination_nonce)
 
 let apply_operation
     ctxt accept_failing_script miner_contract pred_block block_prio operation =
   match operation.contents with
   | Anonymous_operations ops ->
+      let origination_nonce = Contract.initial_origination_nonce operation.hash in
       fold_left_s
-        (fun ctxt -> apply_anonymous_operation ctxt miner_contract)
-        ctxt ops >>=? fun ctxt ->
-      return (ctxt, [])
+        (fun (ctxt, origination_nonce) ->
+           apply_anonymous_operation ctxt miner_contract origination_nonce)
+        (ctxt, origination_nonce) ops >>=? fun (ctxt, origination_nonce) ->
+      return (ctxt, Contract.originated_contracts origination_nonce)
   | Sourced_operations op ->
       let origination_nonce = Contract.initial_origination_nonce operation.hash in
       apply_sourced_operation

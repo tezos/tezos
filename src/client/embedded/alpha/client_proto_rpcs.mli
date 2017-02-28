@@ -272,6 +272,12 @@ module Helpers : sig
         level:Raw_level.t ->
         nonce:Nonce.t ->
         unit -> MBytes.t tzresult Lwt.t
+      val faucet:
+        Client_commands.context ->
+        block ->
+        net:Updater.Net_id.t ->
+        id:public_key_hash ->
+        unit -> MBytes.t tzresult Lwt.t
     end
     val block:
       Client_commands.context ->
