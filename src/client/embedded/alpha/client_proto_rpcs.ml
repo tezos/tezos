@@ -232,6 +232,10 @@ module Helpers = struct
       let seed_nonce_revelation cctxt
           block ~net ~level ~nonce () =
         operations cctxt block ~net [Seed_nonce_revelation { level ; nonce }]
+      let faucet cctxt
+          block ~net ~id () =
+        let nonce = Sodium.Random.Bigbytes.generate 16 in
+        operations cctxt block ~net [Faucet { id ; nonce }]
     end
     let block cctxt
         block ~net ~predecessor ~timestamp ~fitness ~operations
