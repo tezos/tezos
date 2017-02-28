@@ -102,7 +102,10 @@ let rec may_set_head v (block: State.Valid_block.t) =
 
 (** Block validation *)
 
-type error += Invalid_operation of Operation_hash.t
+type error +=
+   | Invalid_operation of Operation_hash.t
+   | Non_increasing_timestamp
+   | Non_increasing_fitness
 
 let apply_block net db
     (pred: State.Valid_block.t) hash (block: State.Block_header.t) =
@@ -124,6 +127,18 @@ let apply_block net db
     | Some eol when Time.(eol <= block.shell.timestamp) ->
         failwith "This test network expired..."
     | None | Some _ -> return ()
+  end >>=? fun () ->
+  begin
+    if Time.(pred.timestamp >= block.shell.timestamp) then
+      fail Non_increasing_timestamp
+    else
+      return ()
+  end >>=? fun () ->
+  begin
+    if Fitness.compare pred.fitness block.shell.fitness >= 0 then
+      fail Non_increasing_fitness
+    else
+      return ()
   end >>=? fun () ->
   begin
     match pred.protocol with
