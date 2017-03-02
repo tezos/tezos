@@ -929,7 +929,7 @@ module Valid_block = struct
     } in
     Shared.use state.global_data begin fun data ->
       if Net_id.Table.mem data.nets (Net_id.Id hash) then
-        failwith "...FIXME"
+        assert false (* This would mean a block is validated twice... *)
       else
         Context.init_test_network block.context
           ~time:genesis.time
