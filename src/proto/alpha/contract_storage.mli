@@ -8,17 +8,15 @@
 (**************************************************************************)
 
 type error +=
-  | Insert_coin of Contract_repr.t
-  | Initial_amount_too_low
-  | Failure of string
-  | Invalid_counter of Contract_repr.t * int32 * int32
-  | Code_without_storage
-  | Unspendable_contract
+  | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t
+  | Initial_amount_too_low of Tez_repr.t * Tez_repr.t
+  | Counter_in_the_past of Contract_repr.contract * int32 * int32
+  | Counter_in_the_future of Contract_repr.contract * int32 * int32
+  | Unspendable_contract of Contract_repr.contract
   | Non_existing_contract
   | No_delegate
   | Undelagatable_contract
-  | Scriptless_contract
-  | Too_low_balance
+  | Failure of string
 
 val delete : Storage.t -> Contract_repr.t -> Storage.t tzresult Lwt.t
 

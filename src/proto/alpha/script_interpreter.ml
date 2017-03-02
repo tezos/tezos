@@ -466,7 +466,7 @@ let rec interp
               Lwt.return Tez.(script_fee +?
                               Constants.origination_burn) >>=? fun total_fee ->
               fail_unless Tez.(credit > total_fee)
-                Contract.Initial_amount_too_low >>=? fun () ->
+                (Contract.Initial_amount_too_low (total_fee, credit)) >>=? fun () ->
               Contract.unconditional_spend ctxt source credit >>=? fun ctxt ->
               Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
               Contract.originate ctxt
