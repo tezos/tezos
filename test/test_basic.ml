@@ -200,7 +200,7 @@ let main () =
   check_balance foo 1999_95L >>=? fun () ->
   check_balance bar 1000_00L >>=? fun () ->
   should_fail
-    (ecoproto_error (function Contract.Too_low_balance -> true | _ -> false))
+    (ecoproto_error (function Contract.Balance_too_low _ -> true | _ -> false))
   @@ transfer ~src:bar ~target:foo 1000_00L >>=? fun () ->
   mine bootstrap
 

@@ -344,8 +344,7 @@ module Contract : sig
   val set_delegate:
     context -> contract -> public_key_hash option -> context tzresult Lwt.t
 
-  type error +=
-    | Initial_amount_too_low
+  type error += Initial_amount_too_low of Tez.t * Tez.t
 
   val originate:
     context ->
@@ -357,7 +356,7 @@ module Contract : sig
     spendable: bool ->
     delegatable: bool -> (context * contract * origination_nonce) tzresult Lwt.t
 
-  type error += Too_low_balance
+  type error += Balance_too_low of contract * Tez.t * Tez.t
 
   val spend:
     context -> contract -> Tez.t -> context tzresult Lwt.t

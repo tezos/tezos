@@ -8,46 +8,96 @@
 (**************************************************************************)
 
 type error +=
-  | Insert_coin of Contract_repr.contract (* TODO: doc *)
-  | Initial_amount_too_low (* TODO: doc *)
+  | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t
+  | Initial_amount_too_low of Tez_repr.t * Tez_repr.t
+  | Counter_in_the_past of Contract_repr.contract * int32 * int32
+  | Counter_in_the_future of Contract_repr.contract * int32 * int32
+  | Unspendable_contract of Contract_repr.contract
+  | Non_existing_contract (* TODO: DOC *)
+  | No_delegate (* TODO: DOC *)
+  | Undelagatable_contract (* TODO: DOC *)
   | Failure of string
-  | Invalid_counter of Contract_repr.contract * int32 * int32
-  | Code_without_storage
-  | Unspendable_contract
-  | Non_existing_contract
-  | No_delegate
-  | Undelagatable_contract
-  | Scriptless_contract
-  | Too_low_balance
 
 let () =
   register_error_kind
+    `Permanent
+    ~id:"contract.failure"
+    ~title:"Contract storage failure"
+    ~description:"Unexpected contract storage error"
+    ~pp:(fun ppf s -> Format.fprintf ppf "Contract_storage.Failure %S" s)
+    Data_encoding.(obj1 (req "message" string))
+    (function Failure s -> Some s | _ -> None)
+    (fun s -> Failure s) ;
+  register_error_kind
+    `Permanent
+    ~id:"contract.initial_amount_too_low"
+    ~title:"Initial amount too low"
+    ~description:"Not enough tokens provided for an origination"
+    ~pp:(fun ppf (r, p) ->
+        Format.fprintf ppf "Initial amount too low (required %a but provided %a)"
+          Tez_repr.pp r Tez_repr.pp p)
+    Data_encoding.(obj2
+                     (req "required" Tez_repr.encoding)
+                     (req "provided" Tez_repr.encoding))
+    (function Initial_amount_too_low (r, p)   -> Some (r, p) | _ -> None)
+    (fun (r, p) -> Initial_amount_too_low (r, p)) ;
+  register_error_kind
     `Branch
-    ~id:"contract.too_low_balance"
+    ~id:"contract.unspendable_contract"
+    ~title:"Unspendable contract"
+    ~description:"An operation tried to spend tokens from an unspendable contract"
+    ~pp:(fun ppf c ->
+        Format.fprintf ppf "The tokens of contract %s can only be spent by its script"
+          (Contract_repr.to_b58check c))
+    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
+    (function Unspendable_contract c   -> Some c | _ -> None)
+    (fun c -> Unspendable_contract c) ;
+  register_error_kind
+    `Temporary
+    ~id:"contract.balance_too_low"
     ~title:"Too low balance"
-    ~description:"TODO"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Too low balance")
-    Data_encoding.empty
-    (function Too_low_balance -> Some () | _ -> None)
-    (fun () -> Too_low_balance)
-
-let () =
+    ~description:"An operation tried to spend more tokens than the contract has"
+    ~pp:(fun ppf (c, b, a) ->
+        Format.fprintf ppf "Balance of contract %s too low (%a) to spend %a"
+          (Contract_repr.to_b58check c) Tez_repr.pp b Tez_repr.pp a)
+    Data_encoding.(obj3
+                     (req "contract" Contract_repr.encoding)
+                     (req "balance" Tez_repr.encoding)
+                     (req "amount" Tez_repr.encoding))
+    (function Balance_too_low (c, b, a)   -> Some (c, b, a) | _ -> None)
+    (fun (c, b, a) -> Balance_too_low (c, b, a)) ;
   register_error_kind
-    `Branch
-    ~id:"contract.invalid_counter"
-    ~title:"Invalid counter in a manager operation"
-    ~description:"TODO"
+    `Temporary
+    ~id:"contract.counter_in_the_future"
+    ~title:"Invalid counter (not yet reached) in a manager operation"
+    ~description:"An operation assumed a contract counter in the future"
     ~pp:(fun ppf (contract, exp, found) ->
         Format.fprintf ppf
-          "Unexpected counter %ld for contract %s (expected %ld)"
+          "Counter %ld not yet reached for contract %s (expected %ld)"
           found (Contract_repr.to_b58check contract) exp)
     Data_encoding.
       (obj3
          (req "contract" Contract_repr.encoding)
          (req "expected" int32)
          (req "found" int32))
-    (function Invalid_counter (c, x, y) -> Some (c, x, y) | _ -> None)
-    (fun (c, x, y) -> Invalid_counter (c, x, y))
+    (function Counter_in_the_future (c, x, y) -> Some (c, x, y) | _ -> None)
+    (fun (c, x, y) -> Counter_in_the_future (c, x, y)) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.counter_in_the_past"
+    ~title:"Invalid counter (already used) in a manager operation"
+    ~description:"An operation assumed a contract counter in the past"
+    ~pp:(fun ppf (contract, exp, found) ->
+        Format.fprintf ppf
+          "Counter %ld already used for contract %s (expected %ld)"
+          found (Contract_repr.to_b58check contract) exp)
+    Data_encoding.
+      (obj3
+         (req "contract" Contract_repr.encoding)
+         (req "expected" int32)
+         (req "found" int32))
+    (function Counter_in_the_past (c, x, y) -> Some (c, x, y) | _ -> None)
+    (fun (c, x, y) -> Counter_in_the_past (c, x, y))
 
 let failwith msg = fail (Failure msg)
 
@@ -118,10 +168,13 @@ let list c =
 
 let check_counter_increment c contract counter =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
-  if Compare.Int32.(Int32.succ contract_counter = counter)
+  let expected = Int32.succ contract_counter in
+  if Compare.Int32.(expected = counter)
   then return ()
+  else if Compare.Int32.(expected > counter) then
+    fail (Counter_in_the_past (contract, expected, counter))
   else
-    fail (Invalid_counter (contract, Int32.succ contract_counter, counter))
+    fail (Counter_in_the_future (contract, expected, counter))
 
 let increment_counter c contract =
   Storage.Contract.Global_counter.get c >>=? fun global_counter ->
@@ -135,7 +188,7 @@ let get_script c contract =
   match code, storage with
   | None, None -> return Script_repr.No_script
   | Some code, Some storage -> return (Script_repr.Script { code ; storage })
-  | None, Some _ | Some _, None -> fail Code_without_storage
+  | None, Some _ | Some _, None -> failwith "get_script"
 
 let get_counter c contract =
   Storage.Contract.Counter.get_option c contract >>=? function
@@ -211,16 +264,14 @@ let set_delegate c contract delegate =
     | Some delegate ->
         Storage.Contract.Delegate.init_set c contract delegate
 
-(** Verify that the balance is high enouth for the used memory *)
-let check_fee script balance =
-  (match script with
-   | Script_repr.No_script -> return Constants_repr.minimal_contract_balance
-   | Script { code ; storage } ->
-       let storage_fee = Script_repr.storage_cost storage in
-       let code_fee = Script_repr.code_cost code in
-       Lwt.return Tez_repr.(code_fee +? storage_fee) >>=? fun script_fee ->
-       Lwt.return Tez_repr.(Constants_repr.minimal_contract_balance +? script_fee)) >>=? fun fee ->
-  return Tez_repr.(fee <= balance)
+let script_storage_fee script =
+  match script with
+  | Script_repr.No_script -> return Constants_repr.minimal_contract_balance
+  | Script { code ; storage } ->
+     let storage_fee = Script_repr.storage_cost storage in
+     let code_fee = Script_repr.code_cost code in
+     Lwt.return Tez_repr.(code_fee +? storage_fee) >>=? fun script_fee ->
+     Lwt.return Tez_repr.(Constants_repr.minimal_contract_balance +? script_fee)
 
 let update_script_storage c contract storage =
   let open Script_repr in
@@ -230,22 +281,23 @@ let update_script_storage c contract storage =
       return c
   | Some balance ->
       get_script c contract >>=? function
-      | No_script -> fail Scriptless_contract
+      | No_script -> failwith "update_script_storage"
       | Script { code ; storage = { storage_type } } ->
-          check_fee
-            (Script_repr.Script { code ; storage = { storage; storage_type }}) balance >>=? fun ok ->
-          fail_unless ok (Insert_coin contract) >>=? fun () ->
-          Storage.Contract.Storage.set c contract { storage; storage_type }
+         script_storage_fee
+           (Script_repr.Script { code ; storage = { storage; storage_type }}) >>=? fun fee ->
+         fail_unless Tez_repr.(balance > fee)
+           (Balance_too_low (contract, balance, fee)) >>=? fun () ->
+         Storage.Contract.Storage.set c contract { storage; storage_type }
 
 let unconditional_spend c contract amount =
   Storage.Contract.Balance.get c contract >>=? fun balance ->
   match Tez_repr.(balance - amount) with
   | None ->
-      fail Too_low_balance
+      fail (Balance_too_low (contract, balance, amount))
   | Some new_balance ->
       get_script c contract >>=? fun script ->
-      check_fee script new_balance >>=? fun keep_contract ->
-      if keep_contract then
+      script_storage_fee script >>=? fun fee ->
+      if Tez_repr.(fee <= new_balance) then
         Storage.Contract.Balance.set c contract new_balance >>=? fun c ->
         Roll_storage.Contract.remove_amount c contract amount
       else
@@ -286,12 +338,13 @@ let issue c contract asset key quantity =
 let spend c contract amount =
   Storage.Contract.Spendable.get c contract >>=? fun spendable ->
   if not spendable
-  then fail Unspendable_contract
+  then fail (Unspendable_contract contract)
   else unconditional_spend c contract amount
 
 let originate c nonce ~balance ~manager ~script ~delegate ~spendable ~delegatable  =
-  check_fee script balance >>=? fun possible ->
-  fail_unless possible Initial_amount_too_low >>=? fun () ->
+  script_storage_fee script >>=? fun fee ->
+  fail_unless Tez_repr.(balance > fee)
+    (Initial_amount_too_low (fee, balance)) >>=? fun () ->
   create c nonce ~balance ~manager ~delegate ~script ~spendable ~delegatable
 
 let init c =
