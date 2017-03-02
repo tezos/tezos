@@ -89,6 +89,16 @@ type config = {
   p2p: (P2p.config * P2p.limits) option ;
 }
 
+let may_create_net state ?test_protocol genesis =
+  State.Net.get state (State.Net_id.Id genesis.State.Net.block) >>= function
+  | Ok net -> Lwt.return net
+  | Error _ ->
+      State.Net.create state
+        ?test_protocol
+        ~forked_network_ttl:(48 * 3600) (* 2 days *)
+        genesis
+
+
 let create { genesis ; store_root ; context_root ;
              test_protocol ; patch_context ; p2p = net_params } =
   init_p2p net_params >>= fun p2p ->
@@ -96,10 +106,7 @@ let create { genesis ; store_root ; context_root ;
     ~store_root ~context_root ?patch_context () >>=? fun state ->
   let distributed_db = Distributed_db.create state p2p in
   let validator = Validator.create_worker state distributed_db in
-  State.Net.create state
-    ?test_protocol
-    ~forked_network_ttl:(48 * 3600) (* 2 days *)
-    genesis >>= fun mainnet_net ->
+  may_create_net state ?test_protocol genesis >>= fun mainnet_net ->
   Validator.activate validator mainnet_net >>= fun mainnet_validator ->
   let mainnet_db = Validator.net_db mainnet_validator in
   let shutdown () =
