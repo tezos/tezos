@@ -103,7 +103,7 @@ module RPC : sig
     end
 
     module Peer_id : sig
-      val infos : t ->
+      val list : t ->
         P2p.RPC.Peer_id.state list -> (P2p.Peer_id.t * P2p.RPC.Peer_id.info) list
       val info : t -> P2p.Peer_id.t -> P2p.RPC.Peer_id.info option
       val events : t -> P2p.Peer_id.t -> P2p.RPC.Peer_id.Event.t list
@@ -112,7 +112,7 @@ module RPC : sig
     end
 
     module Point : sig
-      val infos : t ->
+      val list : t ->
         P2p.RPC.Point.state list -> (P2p.Point.t * P2p.RPC.Point.info) list
       val info : t -> P2p.Point.t -> P2p.RPC.Point.info option
       val events : t -> P2p.Point.t -> P2p.RPC.Point.Event.t list

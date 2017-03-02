@@ -54,6 +54,7 @@ let main () =
        >>= fun version ->
        let commands =
          Client_generic_rpcs.commands @
+         Client_network.commands () @
          Client_keys.commands () @
          Client_protocols.commands () @
          Client_helpers.commands () @
