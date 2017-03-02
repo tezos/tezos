@@ -152,6 +152,17 @@ end
 val bootstrapped:
   Client_commands.context -> (Block_hash.t * Time.t) Lwt_stream.t Lwt.t
 
+module Network : sig
+  val stat:
+    Client_commands.context -> P2p_types.Stat.t Lwt.t
+  val connections:
+    Client_commands.context -> P2p_types.Connection_info.t list Lwt.t
+  val peers:
+    Client_commands.context -> (P2p.Peer_id.t * P2p.RPC.Peer_id.info) list Lwt.t
+  val points:
+    Client_commands.context -> (P2p.Point.t * P2p.RPC.Point.info) list Lwt.t
+end
+
 val complete:
   Client_commands.context ->
   ?block:Blocks.block -> string -> string list Lwt.t

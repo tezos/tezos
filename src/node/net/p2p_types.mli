@@ -19,6 +19,7 @@ module Version : sig
   }
   (** Type of a protocol version. *)
 
+  val pp : Format.formatter -> t -> unit
   val encoding : t Data_encoding.t
   val common: t list -> t list -> t option
 end
@@ -35,6 +36,7 @@ module Peer_id : sig
   val pp : Format.formatter -> t -> unit
   val pp_short : Format.formatter -> t -> unit
   val encoding : t Data_encoding.t
+  val of_string_exn : string -> t
   module Map : Map.S with type key = t
   module Set : Set.S with type elt = t
   module Table : Hashtbl.S with type key = t

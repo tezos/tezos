@@ -559,16 +559,6 @@ module Network = struct
 
   module Point = struct
 
-    let infos =
-      let filter =
-        obj1 (dft "filter" (list P2p.RPC.Point.state_encoding) []) in
-      RPC.service
-        ~input: filter
-        ~output: (list (tup2 P2p.Point.encoding P2p.RPC.Point.info_encoding))
-        ~description:"List the pool of known `IP:port` \
-                      used for establishing P2P connections ."
-        RPC.Path.(root / "network" / "point")
-
     let info =
       RPC.service
         ~input: empty
@@ -583,18 +573,19 @@ module Network = struct
         ~description: "Monitor network events related to an `IP:addr`."
         RPC.Path.(root / "network" / "point" /: point_arg / "log")
 
+    let list =
+      let filter =
+        obj1 (dft "filter" (list P2p.RPC.Point.state_encoding) []) in
+      RPC.service
+        ~input: filter
+        ~output: (list (tup2 P2p.Point.encoding P2p.RPC.Point.info_encoding))
+        ~description:"List the pool of known `IP:port` \
+                      used for establishing P2P connections ."
+        RPC.Path.(root / "network" / "point")
+
   end
 
   module Peer_id = struct
-
-    let infos =
-      let filter =
-        obj1 (dft "filter" (list P2p.RPC.Peer_id.state_encoding) []) in
-      RPC.service
-        ~input: filter
-        ~output: (list (tup2 P2p.Peer_id.encoding P2p.RPC.Peer_id.info_encoding))
-        ~description:"List the peers the node ever met."
-        RPC.Path.(root / "network" / "peer_id")
 
     let info =
       RPC.service
@@ -609,6 +600,15 @@ module Network = struct
         ~output: (list P2p.RPC.Peer_id.Event.encoding)
         ~description:"Monitor network events related to a given peer."
         RPC.Path.(root / "network" / "peer_id" /: peer_id_arg / "log")
+
+    let list =
+      let filter =
+        obj1 (dft "filter" (list P2p.RPC.Peer_id.state_encoding) []) in
+      RPC.service
+        ~input: filter
+        ~output: (list (tup2 P2p.Peer_id.encoding P2p.RPC.Peer_id.info_encoding))
+        ~description:"List the peers the node ever met."
+        RPC.Path.(root / "network" / "peer_id")
 
   end
 
