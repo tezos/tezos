@@ -274,8 +274,8 @@ let empty_result =
 let compare_operations op1 op2 =
   match op1.contents, op2.contents with
   | Anonymous_operations _, Anonymous_operations _ -> 0
-  | Anonymous_operations _, Sourced_operations _ -> 1
-  | Sourced_operations _, Anonymous_operations _ -> -1
+  | Anonymous_operations _, Sourced_operations _ -> -1
+  | Sourced_operations _, Anonymous_operations _ -> 1
   | Sourced_operations op1, Sourced_operations op2 ->
       match op1, op2 with
       | Delegate_operations _, Manager_operations _ -> -1
@@ -293,7 +293,7 @@ let merge_result r r' =
     | None, None -> None
     | Some x, None -> Some x
     | _, Some y -> Some y in
-  { applied = r.applied @ r'.applied ;
+  { applied = r'.applied @ r.applied ;
     refused = Operation_hash.Map.merge merge r.refused r'.refused ;
     branch_refused =
       Operation_hash.Map.merge merge r.branch_refused r'.branch_refused ;
