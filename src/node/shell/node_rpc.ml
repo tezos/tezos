@@ -490,8 +490,8 @@ let build_rpc_directory node =
 
   let dir =
     let implementation state =
-      Node.RPC.Network.Peer_id.infos node state |> RPC.Answer.return in
-    RPC.register0 dir Services.Network.Peer_id.infos implementation in
+      Node.RPC.Network.Peer_id.list node state |> RPC.Answer.return in
+    RPC.register0 dir Services.Network.Peer_id.list implementation in
   let dir =
     let implementation peer_id () =
       Node.RPC.Network.Peer_id.info node peer_id |> RPC.Answer.return in
@@ -518,8 +518,8 @@ let build_rpc_directory node =
 
   let dir =
     let implementation state =
-      Node.RPC.Network.Point.infos node state |> RPC.Answer.return in
-    RPC.register0 dir Services.Network.Point.infos implementation in
+      Node.RPC.Network.Point.list node state |> RPC.Answer.return in
+    RPC.register0 dir Services.Network.Point.list implementation in
   let dir =
     let implementation point () =
       Node.RPC.Network.Point.info node point |> RPC.Answer.return in

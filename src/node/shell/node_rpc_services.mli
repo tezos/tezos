@@ -140,7 +140,7 @@ module Network : sig
   end
 
   module Point : sig
-    val infos :
+    val list :
       (unit, unit, P2p.RPC.Point.state list,
        (P2p.Point.t * P2p.RPC.Point.info) list) RPC.service
     val info :
@@ -150,7 +150,7 @@ module Network : sig
   end
 
   module Peer_id : sig
-    val infos :
+    val list :
       (unit, unit, P2p.RPC.Peer_id.state list,
        (P2p.Peer_id.t * P2p.RPC.Peer_id.info) list) RPC.service
     val info :

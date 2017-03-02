@@ -218,3 +218,14 @@ module Protocols = struct
   let list cctxt ?contents () =
     call_service0 cctxt Services.Protocols.list { contents; monitor = Some false }
 end
+
+module Network = struct
+  let stat cctxt =
+    call_service0 cctxt Services.Network.stat ()
+  let connections cctxt =
+    call_service0 cctxt Services.Network.Connection.list ()
+  let peers cctxt =
+    call_service0 cctxt Services.Network.Peer_id.list []
+  let points cctxt =
+    call_service0 cctxt Services.Network.Point.list []
+end

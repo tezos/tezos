@@ -461,26 +461,60 @@ module RPC = struct
   end
 
   module Point = struct
+    include Point
+
     type state =
       | Requested
-      | Accepted
-      | Running
+      | Accepted of Peer_id.t
+      | Running of Peer_id.t
       | Disconnected
+
+    let peer_id_of_state = function
+      | Requested -> None
+      | Accepted pi -> Some pi
+      | Running pi -> Some pi
+      | Disconnected -> None
+
+    let state_of_state_peerid state pi = match state, pi with
+      | Requested, _ -> Requested
+      | Accepted _, Some pi -> Accepted pi
+      | Running _, Some pi -> Running pi
+      | Disconnected, _ -> Disconnected
+      | _ -> invalid_arg "state_of_state_peerid"
+
+    let pp_state_digram ppf = function
+      | Requested -> Format.fprintf ppf "⚎"
+      | Accepted _ -> Format.fprintf ppf "⚍"
+      | Running _ -> Format.fprintf ppf "⚌"
+      | Disconnected -> Format.fprintf ppf "⚏"
 
     let state_encoding =
       let open Data_encoding in
-      string_enum [
-        "requested", Requested ;
-        "accepted", Accepted ;
-        "running", Running ;
-        "disconnected", Disconnected ;
+      let branch_encoding name obj =
+        conv (fun x -> (), x) (fun ((), x) -> x)
+          (merge_objs
+             (obj1 (req "event_kind" (constant name))) obj) in
+      union ~tag_size:`Uint8 [
+        case ~tag:0 (branch_encoding "requested" empty)
+          (function Requested -> Some () | _ -> None)
+          (fun () -> Requested) ;
+        case ~tag:1 (branch_encoding "accepted"
+                       (obj1 (req "peer_id" Peer_id.encoding)))
+          (function Accepted peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> Accepted peer_id) ;
+        case ~tag:2 (branch_encoding "running"
+                       (obj1 (req "peer_id" Peer_id.encoding)))
+          (function Running peer_id -> Some peer_id | _ -> None)
+          (fun peer_id -> Running peer_id) ;
+        case ~tag:3 (branch_encoding "disconnected" empty)
+          (function Disconnected -> Some () | _ -> None)
+          (fun () -> Disconnected) ;
       ]
 
     type info = {
       trusted : bool ;
       greylisted_until : Time.t ;
       state : state ;
-      peer_id : Peer_id.t option ;
       last_failed_connection : Time.t option ;
       last_rejected_connection : (Peer_id.t * Time.t) option ;
       last_established_connection : (Peer_id.t * Time.t) option ;
@@ -492,26 +526,24 @@ module RPC = struct
     let info_encoding =
       let open Data_encoding in
       conv
-        (fun { trusted ; greylisted_until ; state ; peer_id ;
+        (fun { trusted ; greylisted_until ; state ;
                last_failed_connection ; last_rejected_connection ;
                last_established_connection ; last_disconnection ;
-               last_seen ; last_miss ;
-             } ->
+               last_seen ; last_miss } ->
+          let peer_id = peer_id_of_state state in
           (trusted, greylisted_until, state, peer_id,
            last_failed_connection, last_rejected_connection,
            last_established_connection, last_disconnection,
-           last_seen, last_miss)
-        )
+           last_seen, last_miss))
         (fun (trusted, greylisted_until, state, peer_id,
               last_failed_connection, last_rejected_connection,
               last_established_connection, last_disconnection,
               last_seen, last_miss) ->
-          { trusted ; greylisted_until ; state ; peer_id ;
+          let state = state_of_state_peerid state peer_id in
+          { trusted ; greylisted_until ; state ;
             last_failed_connection ; last_rejected_connection ;
             last_established_connection ; last_disconnection ;
-            last_seen ; last_miss ;
-          }
-        )
+            last_seen ; last_miss })
         (obj10
            (req "trusted" bool)
            (dft "greylisted_until" Time.encoding Time.epoch)
@@ -527,14 +559,14 @@ module RPC = struct
     let info_of_point_info i =
       let open P2p_connection_pool in
       let open P2p_connection_pool_types in
-      let state, peer_id = match Point_info.State.get i with
-        | Requested _ -> Requested, None
-        | Accepted { current_peer_id } -> Accepted, Some current_peer_id
-        | Running { current_peer_id } -> Running, Some current_peer_id
-        | Disconnected -> Disconnected, None in
+      let state = match Point_info.State.get i with
+        | Requested _ -> Requested
+        | Accepted { current_peer_id } -> Accepted current_peer_id
+        | Running { current_peer_id } -> Running current_peer_id
+        | Disconnected -> Disconnected in
       Point_info.{
         trusted = trusted i ;
-        state ; peer_id ;
+        state ;
         greylisted_until = greylisted_until i ;
         last_failed_connection = last_failed_connection i ;
         last_rejected_connection = last_rejected_connection i ;
@@ -576,7 +608,7 @@ module RPC = struct
           | None -> raise Not_found
           | Some pi -> P2p_connection_pool_types.Point_info.watch pi
 
-    let infos ?(restrict=[]) net =
+    let list ?(restrict=[]) net =
       match net.pool with
       | None -> []
       | Some pool ->
@@ -593,10 +625,17 @@ module RPC = struct
   end
 
   module Peer_id = struct
+    include Peer_id
+
     type state =
       | Accepted
       | Running
       | Disconnected
+
+    let pp_state_digram ppf = function
+      | Accepted -> Format.fprintf ppf "⚎"
+      | Running -> Format.fprintf ppf "⚌"
+      | Disconnected -> Format.fprintf ppf "⚏"
 
     let state_encoding =
       let open Data_encoding in
@@ -716,7 +755,7 @@ module RPC = struct
           | None -> raise Not_found
           | Some gi -> P2p_connection_pool_types.Peer_info.watch gi
 
-    let infos ?(restrict=[]) net =
+    let list ?(restrict=[]) net =
       match net.pool with
       | None -> []
       | Some pool ->

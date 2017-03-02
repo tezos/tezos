@@ -206,20 +206,21 @@ module RPC : sig
   end
 
   module Point : sig
+    include module type of Point
 
     type state =
       | Requested
-      | Accepted
-      | Running
+      | Accepted of Peer_id.t
+      | Running of Peer_id.t
       | Disconnected
 
+    val pp_state_digram : Format.formatter -> state -> unit
     val state_encoding : state Data_encoding.t
 
     type info = {
       trusted : bool ;
       greylisted_until : Time.t ;
       state : state ;
-      peer_id : Peer_id.t option ;
       last_failed_connection : Time.t option ;
       last_rejected_connection : (Peer_id.t * Time.t) option ;
       last_established_connection : (Peer_id.t * Time.t) option ;
@@ -234,7 +235,7 @@ module RPC : sig
 
     val info :
       ('msg, 'meta) net -> Point.t -> info option
-    val infos :
+    val list :
       ?restrict:state list -> ('msg, 'meta) net -> (Point.t * info) list
     val events :
       ?max:int -> ?rev:bool -> ('msg, 'meta) net -> Point.t -> Event.t list
@@ -243,12 +244,14 @@ module RPC : sig
   end
 
   module Peer_id : sig
+    include module type of Peer_id
 
     type state =
       | Accepted
       | Running
       | Disconnected
 
+    val pp_state_digram : Format.formatter -> state -> unit
     val state_encoding : state Data_encoding.t
 
     type info = {
@@ -270,7 +273,7 @@ module RPC : sig
 
     val info :
       ('msg, 'meta) net -> Peer_id.t -> info option
-    val infos :
+    val list :
       ?restrict:state list -> ('msg, 'meta) net -> (Peer_id.t * info) list
     val events :
       ?max:int -> ?rev:bool -> ('msg, 'meta) net -> Peer_id.t -> Event.t list

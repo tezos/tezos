@@ -18,6 +18,9 @@ module Version = struct
     minor : int ;
   }
 
+  let pp ppf { name ; major ; minor } =
+    Format.fprintf ppf "%s.%d.%d" name major minor
+
   let encoding =
     let open Data_encoding in
     conv
@@ -83,7 +86,7 @@ module Stat = struct
 
   let pp ppf stat =
     Format.fprintf ppf
-      "sent: %a (%a/s) recv: %a (%a/s)"
+      "↗ %a (%a/s) ↘ %a (%a/s)"
       print_size64 stat.total_sent print_size stat.current_outflow
       print_size64 stat.total_recv print_size stat.current_inflow
 
@@ -314,14 +317,15 @@ module Connection_info = struct
          (req "versions" (list Version.encoding)))
 
   let pp ppf
-      { incoming ; id_point = (remote_addr, remote_port) ; peer_id } =
-    Format.fprintf ppf "%a:%a {%a}%s"
-      Ipaddr.V6.pp_hum remote_addr
-      (fun ppf port ->
-         match port with
-         | None -> Format.pp_print_string ppf "??"
-         | Some port -> Format.pp_print_int ppf port) remote_port
+      { incoming ; id_point = (remote_addr, remote_port) ;
+        remote_socket_port ; peer_id ; versions } =
+    let version = List.hd versions in
+    let point = match remote_port with
+      | None -> remote_addr, remote_socket_port
+      | Some port -> remote_addr, port in
+    Format.fprintf ppf "%s %a %a (%a)"
+      (if incoming then "↘" else "↗")
       Peer_id.pp peer_id
-      (if incoming then " (incoming)" else "")
-
+      Point.pp point
+      Version.pp version
 end

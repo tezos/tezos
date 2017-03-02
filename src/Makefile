@@ -495,6 +495,7 @@ CLIENT_LIB_INTFS := \
   client/client_keys.mli \
   client/client_protocols.mli \
   client/client_blocks.mli \
+  client/client_network.mli \
 
 CLIENT_LIB_IMPLS := \
   client/client_commands.ml \
@@ -506,6 +507,7 @@ CLIENT_LIB_IMPLS := \
   client/client_keys.ml \
   client/client_protocols.ml \
   client/client_blocks.ml \
+  client/client_network.ml \
 
 WEBCLIENT_LIB_INTFS := \
 

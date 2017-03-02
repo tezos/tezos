@@ -565,8 +565,8 @@ module RPC = struct
       let info (node : t) =
         P2p.RPC.Point.info node.p2p
 
-      let infos (node : t) restrict =
-        P2p.RPC.Point.infos ~restrict node.p2p
+      let list (node : t) restrict =
+        P2p.RPC.Point.list ~restrict node.p2p
 
       let events (node : t) =
         P2p.RPC.Point.events node.p2p
@@ -581,8 +581,8 @@ module RPC = struct
       let info (node : t) =
         P2p.RPC.Peer_id.info node.p2p
 
-      let infos (node : t) restrict =
-        P2p.RPC.Peer_id.infos ~restrict node.p2p
+      let list (node : t) restrict =
+        P2p.RPC.Peer_id.list ~restrict node.p2p
 
       let events (node : t) =
         P2p.RPC.Peer_id.events node.p2p
