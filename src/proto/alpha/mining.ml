@@ -19,8 +19,23 @@ type error +=
   | Bad_delegate
   | Invalid_slot_durations_constant
 
-let minimal_time c priority =
-  Timestamp.get_current c >>=? fun prev_timestamp ->
+let () =
+  register_error_kind
+    `Branch
+    ~id:"mining.too_early"
+    ~title:"Block forged too early"
+    ~description:"The block timestamp is before the first slot \
+                  for this miner at this level"
+    ~pp:(fun ppf (r, p) ->
+      Format.fprintf ppf "Block forged too early (%a is before %a)"
+                     Time.pp_hum p Time.pp_hum r)
+    Data_encoding.(obj2
+                     (req "minimal" Time.encoding)
+                     (req "provided" Time.encoding))
+    (function Too_early (r, p)   -> Some (r, p) | _ -> None)
+    (fun (r, p) -> Too_early (r, p))
+
+let minimal_time c priority pred_timestamp =
   let rec cumsum_slot_durations acc durations p =
     if Compare.Int32.(=) p 0l then
       ok acc
@@ -35,23 +50,24 @@ let minimal_time c priority =
          cumsum_slot_durations acc durations p in
   Lwt.return
     (cumsum_slot_durations
-       prev_timestamp (Constants.slot_durations c) priority)
+       pred_timestamp (Constants.slot_durations c) priority)
 
-let check_timestamp c priority timestamp =
-  minimal_time c priority >>=? fun minimal_time ->
+let check_timestamp c priority pred_timestamp =
+  minimal_time c priority pred_timestamp >>=? fun minimal_time ->
+  Tezos_context.Timestamp.get_current c >>= fun timestamp ->
   fail_unless Timestamp.(minimal_time <= timestamp)
     (Too_early (minimal_time, timestamp))
 
 let check_mining_rights c
-    { Block.shell = { timestamp } ;
-      proto = { mining_slot = (raw_level, priority) } } =
+    { Block.proto = { mining_slot = (raw_level, priority) } }
+    pred_timestamp =
   Level.current c >>=? fun current_level ->
   fail_unless
     Raw_level.(raw_level = current_level.level)
     (Invalid_level (current_level.Level.level, raw_level)) >>=? fun () ->
   let level = Level.from_raw c raw_level in
   Roll.mining_rights_owner c level ~priority >>=? fun delegate ->
-  check_timestamp c priority timestamp >>=? fun () ->
+  check_timestamp c priority pred_timestamp >>=? fun () ->
   return delegate
 
 let pay_mining_bond c

@@ -56,7 +56,7 @@ let pay_rewards_for_cycle c cycle =
                 amount)
 
 let pay_due_rewards c =
-  Storage.Current_timestamp.get c >>=? fun timestamp ->
+  Storage.get_timestamp c >>= fun timestamp ->
   let rec loop c cycle =
     Storage.Rewards.Date.get_option c cycle >>=? function
     | None ->

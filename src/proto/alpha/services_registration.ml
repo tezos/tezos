@@ -174,7 +174,11 @@ let minimal_timestamp ctxt prio =
   let prio = match prio with None -> 0l | Some p -> Int32.of_int p in
   Mining.minimal_time ctxt prio
 
-let () = register1 Services.Helpers.minimal_timestamp minimal_timestamp
+let () = register1
+           Services.Helpers.minimal_timestamp
+           (fun ctxt slot ->
+             Tezos_context.Timestamp.get_current ctxt >>= fun timestamp ->
+             minimal_timestamp ctxt slot timestamp)
 
 let () =
   (* ctxt accept_failing_script miner_contract pred_block block_prio operation *)
@@ -299,10 +303,11 @@ let () =
          Lwt_list.filter_map_p (fun x -> x) @@
          List.mapi
            (fun prio c ->
+             Tezos_context.Timestamp.get_current ctxt >>= fun timestamp ->
               Mining.minimal_time
-                ctxt (Int32.of_int prio) >>= function
+                ctxt (Int32.of_int prio) timestamp >>= function
               | Error _ -> Lwt.return None
-              | Ok timestamp -> Lwt.return (Some (c, timestamp)))
+              | Ok minimal_timestamp -> Lwt.return (Some (c, minimal_timestamp)))
            slots
        end >>= fun timed_slots ->
        return (raw_level, timed_slots))
@@ -336,7 +341,8 @@ let mining_rights_for_delegate
       let raw_level = level.level in
       Lwt_list.map_p
         (fun priority ->
-           Mining.minimal_time ctxt priority >>= function
+          Tezos_context.Timestamp.get_current ctxt >>= fun timestamp ->
+           Mining.minimal_time ctxt priority timestamp >>= function
            | Ok time -> Lwt.return (raw_level, Int32.to_int priority, Some time)
                | Error _ -> Lwt.return (raw_level, Int32.to_int priority, None))
         priorities >>= fun priorities ->

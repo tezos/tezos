@@ -479,7 +479,7 @@ let rec interp
               Contract.get_balance ctxt source >>=? fun balance ->
               logged_return (Item (balance, rest), qta - 1, ctxt)
           | Now, rest ->
-              Timestamp.get_current ctxt >>=? fun now ->
+              Timestamp.get_current ctxt >>= fun now ->
               logged_return (Item (now, rest), qta - 1, ctxt)
           | Check_signature, Item (key, Item ((signature, message), rest)) ->
               Public_key.get ctxt key >>=? fun key ->

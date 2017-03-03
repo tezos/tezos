@@ -22,6 +22,10 @@ let get_fitness (c, _) = Context.get_fitness c
 let set_fitness (c, csts) v =
   Context.set_fitness c v >>= fun c -> Lwt.return (c, csts)
 
+let get_timestamp (c, _) = Context.get_timestamp c
+let set_commit_message (c, csts) msg =
+  Context.set_commit_message c msg >>= fun c -> Lwt.return (c, csts)
+
 let get_sandboxed c =
   Context.get c sandboxed_key >>= function
   | None -> return None
@@ -56,7 +60,6 @@ module Key = struct
   let store_root tail = version :: "store" :: tail
 
   let current_level = store_root ["level"]
-  let current_timestamp = store_root ["timestamp"]
   let current_fitness = store_root ["fitness"]
 
   let global_counter = store_root ["global_counter"]
@@ -137,14 +140,6 @@ module Current_level =
     let name = "level"
     let key = Key.current_level
     let encoding = Raw_level_repr.encoding
-  end)
-
-module Current_timestamp =
-  Make_single_data_storage(struct
-    type value = Time_repr.t
-    let name = "timestamp"
-    let key = Key.current_timestamp
-    let encoding = Time_repr.encoding
   end)
 
 module Current_fitness =
@@ -514,9 +509,6 @@ module Rewards = struct
     end)
 
 end
-
-let get_genesis_block (c, _) = Context.get_genesis_block c
-let get_genesis_time (c, _) = Context.get_genesis_time c
 
 let activate (c, constants) h =
   Updater.activate c h >>= fun c -> Lwt.return (c, constants)

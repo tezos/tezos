@@ -17,10 +17,12 @@ let max_operation_data_length =
   Tezos_context.Operation.max_operation_data_length
 
 type block =
-  Tezos_context.Block.header
+  { header : Tezos_context.Block.header ;
+    pred_timestamp : Time.t }
 
-let parse_block =
-  Tezos_context.Block.parse_header
+let parse_block raw_header pred_timestamp =
+  Tezos_context.Block.parse_header raw_header >>? fun header ->
+  Ok { header ; pred_timestamp }
 
 let max_number_of_operations =
   Tezos_context.Constants.max_number_of_operations
@@ -30,7 +32,8 @@ let max_block_length =
 
 let rpc_services = Services_registration.rpc_services
 
-let apply ctxt header ops = Apply.apply ctxt true header ops
+let apply ctxt block ops =
+  Apply.apply ctxt true block.header block.pred_timestamp ops
 
 let preapply = Apply.preapply
 

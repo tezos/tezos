@@ -213,23 +213,21 @@ let may_start_new_cycle ctxt =
       Seed.compute_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
       Roll.clear_cycle ctxt last_cycle >>=? fun ctxt ->
       Roll.freeze_rolls_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
-      Timestamp.get_current ctxt >>=? fun timestamp ->
+      Timestamp.get_current ctxt >>= fun timestamp ->
       Lwt.return (Timestamp.(timestamp +? (Constants.time_before_reward ctxt)))
       >>=? fun reward_date ->
       Reward.set_reward_time_for_cycle
         ctxt last_cycle reward_date >>=? fun ctxt ->
       return ctxt
 
-let apply_main ctxt accept_failing_script block operations =
+let apply_main ctxt accept_failing_script block pred_timestamp operations =
   (* read only checks *)
   Mining.check_proof_of_work_stamp ctxt block >>=? fun () ->
   Mining.check_fitness_gap ctxt block >>=? fun () ->
-  Mining.check_mining_rights ctxt block >>=? fun delegate_pkh ->
+  Mining.check_mining_rights ctxt block pred_timestamp >>=? fun delegate_pkh ->
   Mining.check_signature ctxt block delegate_pkh >>=? fun () ->
   (* automatic bonds payment *)
   Mining.pay_mining_bond ctxt block delegate_pkh >>=? fun ctxt ->
-  (* set timestamp *)
-  Timestamp.set_current ctxt block.shell.timestamp >>=? fun ctxt ->
   (* do effectful stuff *)
   Fitness.increase ctxt >>=? fun ctxt ->
   let priority = snd block.proto.mining_slot in
@@ -255,14 +253,20 @@ let apply_main ctxt accept_failing_script block operations =
 
 type error += Internal_error of string
 
-let apply ctxt accept_failing_script block operations =
+let apply ctxt accept_failing_script block pred_timestamp operations =
   (init ctxt >>=? fun ctxt ->
    get_prevalidation ctxt >>= function
    | true ->
        fail (Internal_error "we should not call `apply` after `preapply`!")
    | false ->
-       apply_main ctxt accept_failing_script block operations >>=? fun ctxt ->
-       finalize ctxt)
+      apply_main ctxt accept_failing_script block pred_timestamp operations >>=? fun ctxt ->
+      Level.current ctxt >>=? fun { level } ->
+      let level = Raw_level.diff level Raw_level.root in
+      Fitness.get ctxt >>=? fun fitness ->
+      let commit_message =
+        (* TODO: add more info ? *)
+        Format.asprintf "lvl %ld, fit %Ld" level fitness in
+      finalize ~commit_message ctxt)
 
 let empty_result =
   { Updater.applied = [];
@@ -338,7 +342,7 @@ let prevalidate ctxt pred_block sort operations =
          return (ctxt, r)) in
   loop ctxt operations
 
-let preapply ctxt pred_block timestamp sort operations =
+let preapply ctxt pred_block sort operations =
   let result =
     init ctxt >>=? fun ctxt ->
     begin
@@ -349,7 +353,6 @@ let preapply ctxt pred_block timestamp sort operations =
           Fitness.increase ctxt >>=? fun ctxt ->
           return ctxt
     end >>=? fun ctxt ->
-    Timestamp.set_current ctxt timestamp >>=? fun ctxt ->
     prevalidate ctxt pred_block sort operations >>=? fun (ctxt, r) ->
     (* TODO should accept failing script in the last round ?
             or: what should we export to let the miner decide *)

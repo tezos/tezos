@@ -143,14 +143,16 @@ let apply_block net db
   begin
     match pred.protocol with
     | None -> fail (State.Unknown_protocol pred.protocol_hash)
-    | Some p -> return (p, pred.context)
+    | Some p ->
+       Context.set_timestamp pred.context block.shell.timestamp >>= fun c ->
+       return (p, c)
   end >>=? fun ((module Proto), patched_context) ->
   lwt_debug "validation of %a: Proto %a"
     Block_hash.pp_short hash
     Protocol_hash.pp_short Proto.hash >>= fun () ->
   lwt_debug "validation of %a: parsing header..."
     Block_hash.pp_short hash >>= fun () ->
-  Lwt.return (Proto.parse_block block) >>=? fun parsed_header ->
+  Lwt.return (Proto.parse_block block pred.timestamp) >>=? fun parsed_header ->
   lwt_debug "validation of %a: parsing operations..."
     Block_hash.pp_short hash >>= fun () ->
   map2_s

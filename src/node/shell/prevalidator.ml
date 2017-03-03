@@ -28,7 +28,8 @@ let preapply
                Lwt.return_none
            | Ok p -> Lwt.return (Some p))
     ops >>= fun ops ->
-  Proto.preapply ctxt block timestamp sort (Utils.unopt_list ops) >>= function
+  Context.set_timestamp ctxt timestamp >>= fun ctxt ->
+  Proto.preapply ctxt block sort (Utils.unopt_list ops) >>= function
   | Ok (ctxt, r)  ->
       lwt_debug "<- prevalidate (%d/%d/%d/%d)"
         (List.length r.Updater.applied)
@@ -105,7 +106,8 @@ let create net_db =
   let timestamp = ref (Time.now ()) in
   begin
     let (module Proto) = protocol in
-    Proto.preapply head.context head.hash !timestamp false [] >|= function
+    Context.set_timestamp head.context !timestamp >>= fun ctxt ->
+    Proto.preapply ctxt head.hash false [] >|= function
     | Error _ -> ref head.context
     | Ok (ctxt, _) -> ref ctxt
   end >>= fun context ->
@@ -214,9 +216,9 @@ let create net_db =
                               (Proto.parse_operation h b
                                |> record_trace_exn (Invalid_operation h)))
                       (Operation_hash.Map.bindings ops) >>=? fun parsed_ops ->
+                    Context.set_timestamp !context (Time.now ()) >>= fun ctxt ->
                     Proto.preapply
-                      !context !head.hash (Time.now ())
-                      true parsed_ops >>=? fun (ctxt, res) ->
+                      ctxt !head.hash true parsed_ops >>=? fun (ctxt, res) ->
                     let register h =
                       let op = Operation_hash.Map.find h ops in
                       Distributed_db.Operation.inject
@@ -287,8 +289,10 @@ let create net_db =
                   timestamp := Time.now () ;
                   (* Tag the context as a prevalidation context. *)
                   let (module Proto) = new_protocol in
-                  Proto.preapply new_head.context
-                    new_head.hash !timestamp false [] >>= function
+                  Context.set_timestamp
+                    new_head.context !timestamp >>= fun ctxt ->
+                  Proto.preapply
+                    ctxt new_head.hash false [] >>= function
                   | Error _ -> set_context new_head.context
                   | Ok (ctxt, _) -> set_context ctxt)
             q >>= fun () ->
