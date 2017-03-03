@@ -17,8 +17,6 @@ let version_value = "alpha"
 let initialize ~from_genesis (ctxt:Context.t) =
   Context.set ctxt version_key (MBytes.of_string version_value) >>= fun ctxt ->
   Storage.prepare ctxt >>=? fun store ->
-  Storage.get_genesis_time store >>= fun time ->
-  Storage.Current_timestamp.init_set store time >>=? fun store ->
   begin
     if from_genesis then
       Lwt.return store

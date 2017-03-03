@@ -8,8 +8,8 @@ include Persist.STORE
 val get_fitness: t -> Fitness.fitness Lwt.t
 val set_fitness: t -> Fitness.fitness -> t Lwt.t
 
-val get_genesis_time: t -> Time.t Lwt.t
-val get_genesis_block: t -> Block_hash.t Lwt.t
+val get_timestamp: t -> Time.t Lwt.t
+val set_commit_message: t -> string -> t Lwt.t
 
 val register_resolver:
   'a Base58.encoding -> (t -> string -> 'a list Lwt.t) -> unit

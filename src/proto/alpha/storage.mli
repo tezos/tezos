@@ -37,6 +37,10 @@ val set_sandboxed : Context.t -> Data_encoding.json -> Context.t Lwt.t
 val get_fitness : t -> Fitness.fitness Lwt.t
 val set_fitness : t -> Fitness.fitness -> t Lwt.t
 
+val get_timestamp: t -> Time.t Lwt.t
+
+val set_commit_message: t -> string -> t Lwt.t
+
 val get_prevalidation : t -> bool Lwt.t
 val set_prevalidation : t -> t Lwt.t
 
@@ -49,11 +53,6 @@ open Storage_sigs
 (** The level of the current block *)
 module Current_level : Single_data_storage
   with type value = Raw_level_repr.t
-   and type context := t
-
-(** The level of the current block *)
-module Current_timestamp : Single_data_storage
-  with type value = Time.t
    and type context := t
 
 module Roll : sig
@@ -268,9 +267,6 @@ module Rewards : sig
      and type context := t
 
 end
-
-val get_genesis_time: t -> Time.t Lwt.t
-val get_genesis_block: t -> Block_hash.t Lwt.t
 
 val activate: t -> Protocol_hash.t -> t Lwt.t
 val set_test_protocol: t -> Protocol_hash.t -> t Lwt.t

@@ -48,7 +48,7 @@ let max_block_length =
   | None -> assert false
   | Some len -> len
 
-let parse_block { Updater.shell ; proto } : block tzresult =
+let parse_block { Updater.shell ; proto } _pred_timestamp : block tzresult =
   match Data_encoding.Binary.of_bytes Data.Command.signed_encoding proto with
   | None -> Error [Parsing_error]
   | Some (command, signature) -> Ok { shell ; command ; signature }
@@ -66,14 +66,20 @@ let apply ctxt header _ops =
   Context.set_fitness ctxt header.shell.fitness >>= fun ctxt ->
   match header.command with
   | Activate hash ->
+      let commit_message =
+        Format.asprintf "activate %a" Protocol_hash.pp_short hash in
+      Context.set_commit_message ctxt commit_message >>= fun ctxt ->
       Updater.activate ctxt hash >>= fun ctxt ->
       return ctxt
   | Activate_testnet hash ->
+      let commit_message =
+        Format.asprintf "activate testnet %a" Protocol_hash.pp_short hash in
+      Context.set_commit_message ctxt commit_message >>= fun ctxt ->
       Updater.set_test_protocol ctxt hash >>= fun ctxt ->
       Updater.fork_test_network ctxt >>= fun ctxt ->
       return ctxt
 
-let preapply ctxt _block_pred _timestamp _sort _ops =
+let preapply ctxt _block_pred _sort _ops =
   return ( ctxt,
            { Updater.applied = [] ;
              refused = Operation_hash.Map.empty ;

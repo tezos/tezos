@@ -58,21 +58,21 @@ type t = context
 
 (*-- Version Access and Update -----------------------------------------------*)
 
-let genesis_block_key = ["genesis";"block"]
-let genesis_protocol_key = ["genesis";"protocol"]
-let genesis_time_key = ["genesis";"time"]
 let current_protocol_key = ["protocol"]
 let current_fitness_key = ["fitness"]
+let current_timestamp_key = ["timestamp"]
 let current_test_protocol_key = ["test_protocol"]
 let current_test_network_key = ["test_network"]
 let current_test_network_expiration_key = ["test_network_expiration"]
 let current_fork_test_network_key = ["fork_test_network"]
 
+let transient_commit_message_key = ["message"]
+
 let exists { repo } key =
   GitStore.of_branch_id
     Irmin.Task.none (Block_hash.to_b58check key) repo >>= fun t ->
   let store = t () in
-  GitStore.read store genesis_block_key >>= function
+  GitStore.read store current_protocol_key >>= function
   | Some _ ->
       Lwt.return true
   | None ->
@@ -108,22 +108,58 @@ let exists index key =
     Block_hash.pp_short key exists >>= fun () ->
   Lwt.return exists
 
+let get_and_erase_commit_message ctxt =
+  GitStore.FunView.get ctxt.view transient_commit_message_key >>= function
+  | None -> Lwt.return (None, ctxt)
+  | Some bytes ->
+     GitStore.FunView.del ctxt.view transient_commit_message_key >>= fun view ->
+     Lwt.return (Some (MBytes.to_string bytes), { ctxt with view })
+let set_commit_message ctxt msg =
+  GitStore.FunView.set ctxt.view
+    transient_commit_message_key
+    (MBytes.of_string msg) >>= fun view ->
+  Lwt.return { ctxt with view }
+
+let get_fitness { view } =
+  GitStore.FunView.get view current_fitness_key >>= function
+  | None -> assert false
+  | Some data ->
+      match Data_encoding.Binary.of_bytes Fitness.encoding data with
+      | None -> assert false
+      | Some data -> Lwt.return data
+let set_fitness ctxt data =
+  GitStore.FunView.set ctxt.view current_fitness_key
+    (Data_encoding.Binary.to_bytes Fitness.encoding data) >>= fun view ->
+  Lwt.return { ctxt with view }
+
+let get_timestamp { view } =
+  GitStore.FunView.get view current_timestamp_key >>= function
+  | None -> assert false
+  | Some time ->
+     Lwt.return (Time.of_notation_exn (MBytes.to_string time))
+let set_timestamp ctxt time =
+  GitStore.FunView.set ctxt.view current_timestamp_key
+    (MBytes.of_string (Time.to_notation time)) >>= fun view ->
+  Lwt.return { ctxt with view }
+
 exception Preexistent_context of Block_hash.t
 exception Empty_head of Block_hash.t
 
-let commit block key context =
+let commit key context =
+  get_timestamp context >>= fun timestamp ->
+  get_fitness context >>= fun fitness ->
   let task =
-    Irmin.Task.create
-      ~date:(Time.to_seconds block.Store.Block_header.shell.timestamp)
-      ~owner:"tezos" in
+    Irmin.Task.create ~date:(Time.to_seconds timestamp) ~owner:"Tezos" in
   GitStore.clone task context.store (Block_hash.to_b58check key) >>= function
   | `Empty_head -> Lwt.fail (Empty_head key)
   | `Duplicated_branch -> Lwt.fail (Preexistent_context key)
   | `Ok store ->
-      let msg =
-        Format.asprintf "%a %a"
-          Fitness.pp block.shell.fitness
-          Block_hash.pp_short key in
+     get_and_erase_commit_message context >>= fun (msg, context) ->
+     let msg = match msg with
+       | None ->
+          Format.asprintf "%a %a"
+            Fitness.pp fitness Block_hash.pp_short key
+       | Some msg -> msg in
       GitStore.FunView.update_path (store msg) [] context.view
 
 
@@ -144,10 +180,7 @@ let dir_mem ctxt key =
   GitStore.FunView.dir_mem ctxt.view (data_key key) >>= fun v ->
   Lwt.return v
 
-let raw_get ctxt key =
-  GitStore.FunView.get ctxt.view key >>= function
-  | None -> Lwt.return_none
-  | Some bytes -> Lwt.return (Some bytes)
+let raw_get ctxt key = GitStore.FunView.get ctxt.view key
 let get t key = raw_get t (data_key key)
 
 let raw_set ctxt key data =
@@ -188,11 +221,7 @@ let commit_genesis index ~id:block ~time ~protocol ~test_protocol =
     index.repo >>= fun t ->
   let store = t () in
   GitStore.FunView.of_path store [] >>= fun view ->
-  GitStore.FunView.set view genesis_block_key
-    (Block_hash.to_bytes block) >>= fun view ->
-  GitStore.FunView.set view genesis_protocol_key
-    (Protocol_hash.to_bytes protocol) >>= fun view ->
-  GitStore.FunView.set view genesis_time_key
+  GitStore.FunView.set view current_timestamp_key
     (MBytes.of_string (Time.to_notation time)) >>= fun view ->
   GitStore.FunView.set view current_protocol_key
     (Protocol_hash.to_bytes protocol) >>= fun view ->
@@ -213,17 +242,6 @@ let get_protocol v =
   | Some data -> Lwt.return (Protocol_hash.of_bytes_exn data)
 let set_protocol v key =
   raw_set v current_protocol_key (Protocol_hash.to_bytes key)
-
-let get_fitness v =
-  raw_get v current_fitness_key >>= function
-  | None -> assert false
-  | Some data ->
-      match Data_encoding.Binary.of_bytes Fitness.encoding data with
-      | None -> assert false
-      | Some data -> Lwt.return data
-let set_fitness v data =
-  raw_set v current_fitness_key
-    (Data_encoding.Binary.to_bytes Fitness.encoding data)
 
 let get_test_protocol v =
   raw_get v current_test_protocol_key >>= function
@@ -260,23 +278,11 @@ let read_and_reset_fork_test_network v =
 let fork_test_network v =
   raw_set v current_fork_test_network_key (MBytes.of_string "fork")
 
-let get_genesis_block v =
-  raw_get v genesis_block_key >>= function
-  | None -> assert false
-  | Some block -> Lwt.return (Block_hash.of_bytes_exn block)
-
-let get_genesis_time v =
-  raw_get v genesis_time_key >>= function
-  | None -> assert false
-  | Some time -> Lwt.return (Time.of_notation_exn (MBytes.to_string time))
-
 let init_test_network v ~time ~genesis =
   get_test_protocol v >>= fun test_protocol ->
   del_test_network_expiration v >>= fun v ->
   set_protocol v test_protocol >>= fun v ->
-  raw_set v genesis_time_key
-    (MBytes.of_string (Time.to_notation time)) >>= fun v ->
-  raw_set v genesis_block_key (Block_hash.to_bytes genesis) >>= fun v ->
+  set_timestamp v time >>= fun v ->
   let task =
     Irmin.Task.create
       ~date:(Time.to_seconds time)

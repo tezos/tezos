@@ -864,7 +864,7 @@ module Valid_block = struct
         block_header_store hash >>= fun _marked ->
       (* TODO fail if the block was previsouly stored ... ??? *)
       (* Let's commit the context. *)
-      Context.commit block hash context >>= fun () ->
+      Context.commit hash context >>= fun () ->
       (* Update the chain state. *)
       let store = net_state.chain_store in
       let predecessor = block.shell.predecessor in

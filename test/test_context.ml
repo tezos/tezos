@@ -41,17 +41,6 @@ let block2 =
   Block_hash.of_hex_exn
     "2222222222222222222222222222222222222222222222222222222222222222"
 
-let faked_block : Store.Block_header.t = {
-  shell = {
-    net_id ;
-    predecessor = genesis_block ;
-    operations = [] ;
-    fitness = [] ;
-    timestamp = Time.of_seconds 0L ;
-  } ;
-  proto = MBytes.of_string "" ;
-}
-
 let create_block2 idx =
   checkout idx genesis_block >>= function
   | None ->
@@ -60,7 +49,7 @@ let create_block2 idx =
       set ctxt ["a"; "b"] (MBytes.of_string "Novembre") >>= fun ctxt ->
       set ctxt ["a"; "c"] (MBytes.of_string "Juin") >>= fun ctxt ->
       set ctxt ["version";] (MBytes.of_string "0.0") >>= fun ctxt ->
-      commit faked_block block2 ctxt
+      commit block2 ctxt
 
 let block3a =
   Block_hash.of_hex_exn
@@ -73,7 +62,7 @@ let create_block3a idx =
   | Some ctxt ->
       del ctxt ["a"; "b"] >>= fun ctxt ->
       set ctxt ["a"; "d"] (MBytes.of_string "Mars") >>= fun ctxt ->
-      commit faked_block block3a ctxt
+      commit block3a ctxt
 
 let block3b =
   Block_hash.of_hex_exn
@@ -90,7 +79,7 @@ let create_block3b idx =
   | Some ctxt ->
       del ctxt ["a"; "c"] >>= fun ctxt ->
       set ctxt ["a"; "d"] (MBytes.of_string "Février") >>= fun ctxt ->
-      commit faked_block block3b ctxt
+      commit block3b ctxt
 
 let wrap_context_init f base_dir =
   let root = base_dir // "context" in

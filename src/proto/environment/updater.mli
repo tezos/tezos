@@ -83,8 +83,9 @@ module type PROTOCOL = sig
       produce a pre-decomposed value of the high level, protocol defined
       {!block} type. It does not have access to the storage
       context. It may store the hash and raw bytes for later signature
-      verification by {!apply} or {!preapply}. *)
-  val parse_block : raw_block -> block tzresult
+      verification by {!apply} or {!preapply}. The timestamp of the
+      predecessor block is also provided for early delay checks. *)
+  val parse_block : raw_block -> Time.t -> block tzresult
 
   (** The parsing / preliminary validation function for
       operations. Similar to {!parse_block}. *)
@@ -100,14 +101,13 @@ module type PROTOCOL = sig
   (** The auxiliary protocol entry point that validates pending
       operations out of blocks. This function tries to apply the all
       operations in the given order, and returns which applications have
-      suceeded and which ones have failed. The first three parameters
-      are a context in which to apply the operations, the hash of the
-      preceding block and the date at which the operations are
-      executed. This function is used by the shell for accepting or
+      suceeded and which ones have failed. The first two parameters
+      are a context in which to apply the operations and the hash of the
+      preceding block. This function is used by the shell for accepting or
       dropping operations, as well as the mining client to check that a
       sequence of operations forms a valid block. *)
   val preapply :
-    Context.t -> Block_hash.t -> Time.t -> bool -> operation list ->
+    Context.t -> Block_hash.t -> bool -> operation list ->
     (Context.t * error preapply_result) tzresult Lwt.t
 
   (** The list of remote procedures exported by this implementation *)
