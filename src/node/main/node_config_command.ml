@@ -83,7 +83,7 @@ module Term = struct
     let open Cmdliner.Arg in
     let doc =
       "Operation to perform. \
-       Possible values: $(b,show), $(b,reset), $(b,init), $(b,save)." in
+       Possible values: $(b,show), $(b,reset), $(b,init), $(b,update)." in
     value & pos 0 (parser, printer) Show & info [] ~docv:"OPERATION" ~doc
 
   let term =
@@ -118,7 +118,7 @@ module Manpage = struct
     `P "$(b,init) is like reset but assumes that \
         no configuration file is present, \
         and will abort other otherwise." ;
-    `P "$(b,save) is the main option to edit the configuration file of Tezos. \
+    `P "$(b,update) is the main option to edit the configuration file of Tezos. \
         It will parse command line arguments and add or replace corresponding \
         entries in the Tezos configuration file."
   ]
