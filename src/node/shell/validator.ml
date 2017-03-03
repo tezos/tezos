@@ -20,6 +20,7 @@ type worker = {
   notify_block: Block_hash.t -> Store.Block_header.t -> unit Lwt.t ;
   shutdown: unit -> unit Lwt.t ;
   valid_block_input: State.Valid_block.t Watcher.input ;
+  db: Distributed_db.t ;
 }
 
 and t = {
@@ -75,11 +76,45 @@ let may_change_test_network v (block: State.Valid_block.t) =
   end else
     Lwt.return_unit
 
+let fetch_protocol v hash =
+  lwt_log_notice "Fetching protocol %a"
+    Protocol_hash.pp_short hash >>= fun () ->
+  Distributed_db.Protocol.fetch
+    v.worker.db hash >>= fun protocol ->
+  Updater.compile hash protocol >>= fun valid ->
+  if valid then begin
+    lwt_log_notice "Successfully compiled protocol %a"
+      Protocol_hash.pp_short hash >>= fun () ->
+    Distributed_db.Protocol.commit
+      v.worker.db hash >>= fun () ->
+    return true
+  end else begin
+    lwt_log_error "Failed to compile protocol %a"
+      Protocol_hash.pp_short hash >>= fun () ->
+    failwith "Cannot compile the protocol %a" Protocol_hash.pp_short hash
+  end
+
+let fetch_protocols v (block: State.Valid_block.t) =
+  let proto_updated =
+    match block.protocol with
+    | Some _ -> return false
+    | None -> fetch_protocol v block.protocol_hash
+  and test_proto_updated =
+    match block.test_protocol with
+    | Some _ -> return false
+    | None -> fetch_protocol v block.test_protocol_hash in
+  proto_updated >>=? fun proto_updated ->
+  test_proto_updated >>=? fun test_proto_updated ->
+  if test_proto_updated || proto_updated then
+    State.Valid_block.read_exn v.net block.hash >>= return
+  else
+    return block
+
 let rec may_set_head v (block: State.Valid_block.t) =
   State.Valid_block.Current.head v.net >>= fun head ->
   if Fitness.compare head.fitness block.fitness >= 0 then
     Lwt.return_unit
-  else
+  else begin
     State.Valid_block.Current.test_and_set_head v.net
       ~old:head block >>= function
     | false -> may_set_head v block
@@ -98,7 +133,7 @@ let rec may_set_head v (block: State.Valid_block.t) =
              else
                Format.fprintf ppf "changing branch") >>= fun () ->
         Lwt.return_unit
-
+  end
 
 (** Block validation *)
 
@@ -325,6 +360,7 @@ module Context_db = struct
                   Block_hash.pp_short hash >>= fun () ->
                 Watcher.notify v.worker.valid_block_input block ;
                 Watcher.notify v.valid_block_input block ;
+                fetch_protocols v block >>=? fun block ->
                 may_set_head v block >>= fun () ->
                 return block
 
@@ -686,6 +722,7 @@ let create_worker state db =
     inject_block ;
     shutdown ;
     valid_block_input ;
+    db ;
   }
 
   in
