@@ -40,7 +40,7 @@ exception Preexistent_context of Block_hash.t
 val exists: index -> Block_hash.t -> bool Lwt.t
 val checkout: index -> Block_hash.t -> context option Lwt.t
 val checkout_exn: index -> Block_hash.t -> context Lwt.t
-val commit: Store.Block_header.t -> Block_hash.t -> context -> unit Lwt.t
+val commit: Block_hash.t -> context -> unit Lwt.t
 
 (** {2 Predefined Fields} ****************************************************)
 
@@ -61,11 +61,13 @@ val del_test_network_expiration: context -> context Lwt.t
 val read_and_reset_fork_test_network: context -> (bool * context) Lwt.t
 val fork_test_network: context -> context Lwt.t
 
-val get_genesis_time: context -> Time.t Lwt.t
-val get_genesis_block: context -> Block_hash.t Lwt.t
-
 val set_fitness: context -> Fitness.fitness -> context Lwt.t
 val get_fitness: context -> Fitness.fitness Lwt.t
+
+val set_timestamp: context -> Time.t -> context Lwt.t
+val get_timestamp: context -> Time.t Lwt.t
+
+val set_commit_message: context -> string -> context Lwt.t
 
 val init_test_network:
   context ->  time:Time.t -> genesis:Block_hash.t -> context tzresult Lwt.t

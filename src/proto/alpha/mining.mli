@@ -14,7 +14,7 @@ open Misc
 val paying_priorities: context -> int32 list
 
 val minimal_time:
-  context -> int32 -> Time.t tzresult Lwt.t
+  context -> int32 -> Time.t -> Time.t tzresult Lwt.t
 
 val pay_mining_bond:
   context ->
@@ -25,13 +25,13 @@ val pay_mining_bond:
 val pay_endorsement_bond:
   context -> public_key_hash -> (context * Tez.t) tzresult Lwt.t
 
-(** [check_mining_rights] verifies that:
+(** [check_mining_rights ctxt block pred_timestamp] verifies that:
     * the contract that owned the roll at cycle start has the block signer as delegate.
     * the timestamp is coherent with the announced slot.
     * the bond have been payed if the slot is below [Constants.first_free_mining_slot].
 *)
 val check_mining_rights:
-  context -> Block.header -> public_key_hash tzresult Lwt.t
+  context -> Block.header -> Time.t -> public_key_hash tzresult Lwt.t
 
 (** [check_signing_rights c slot contract] verifies that:
     * the slot is valid;

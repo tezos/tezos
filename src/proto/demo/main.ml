@@ -15,7 +15,7 @@ type block = unit
 let max_block_length = 42
 let max_number_of_operations = 42
 
-let parse_block _ = Ok ()
+let parse_block _ _pred_timestamp = Ok ()
 let parse_operation h _ = Ok h
 
 module Fitness = struct
@@ -66,9 +66,13 @@ end
 
 let apply ctxt () _operations =
   Fitness.increase ctxt >>=? fun ctxt ->
+  Fitness.get ctxt >>=? fun fitness ->
+  let commit_message =
+    Format.asprintf "fitness <- %Ld" fitness in
+  Context.set_commit_message ctxt commit_message >>= fun ctxt ->
   return ctxt
 
-let preapply context _block_pred _timestamp _sort operations =
+let preapply context _block_pred _sort operations =
   Lwt.return
     (Ok
        (context,

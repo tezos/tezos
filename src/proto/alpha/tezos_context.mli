@@ -68,8 +68,7 @@ module Timestamp : sig
   val of_seconds: string -> time option
   val to_seconds: time -> string
 
-  val set_current: context -> Time.t -> context tzresult Lwt.t
-  val get_current: context -> Time.t tzresult Lwt.t
+  val get_current: context -> Time.t Lwt.t
 
 end
 
@@ -581,7 +580,7 @@ module Reward : sig
 end
 
 val init: Context.t -> context tzresult Lwt.t
-val finalize: context -> Context.t tzresult Lwt.t
+val finalize: ?commit_message:string -> context -> Context.t tzresult Lwt.t
 
 val configure_sandbox:
   Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t

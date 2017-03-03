@@ -19,12 +19,11 @@ end
 
 module Tez = Tez_repr
 module Period = Period_repr
+
 module Timestamp = struct
   include Time_repr
-  let get_current = Storage.Current_timestamp.get
-  let set_current = Storage.Current_timestamp.set
+  let get_current = Storage.get_timestamp
 end
-
 
 include Operation_repr
 module Operation = Operation_repr
@@ -121,7 +120,15 @@ end
 module Asset = Asset_repr
 
 let init = Init_storage.may_initialize
-let finalize c = return (Storage.recover c)
+
+let finalize ?commit_message c =
+  match commit_message with
+  | None ->
+     return (Storage.recover c)
+  | Some msg ->
+     Storage.set_commit_message c msg >>= fun c ->
+     return (Storage.recover c)
+
 let configure_sandbox = Init_storage.configure_sandbox
 let get_prevalidation = Storage.get_prevalidation
 let set_prevalidation = Storage.set_prevalidation

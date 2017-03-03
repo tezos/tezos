@@ -33,11 +33,11 @@ let register (module Proto : Protocol.PACKED_PROTOCOL) =
   let module V = struct
     include Proto
     include Make(Proto)
-    let parse_block d = parse_block d |> wrap_error
+    let parse_block d t = parse_block d t |> wrap_error
     let parse_operation h b = parse_operation h b |> wrap_error
     let apply c h ops = apply c h ops >|= wrap_error
-    let preapply c h t b ops =
-      (preapply c h t b ops >|= wrap_error) >>=? fun (ctxt, r) ->
+    let preapply c h b ops =
+      (preapply c h b ops >|= wrap_error) >>=? fun (ctxt, r) ->
       return (ctxt, Updater.map_result (fun l -> [Ecoproto_error l]) r)
     let configure_sandbox c j =
       configure_sandbox c j >|= wrap_error
