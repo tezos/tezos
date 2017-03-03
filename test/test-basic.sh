@@ -38,6 +38,8 @@ ${CLIENT} activate \
           with fitness 1 \
           and key edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z
 
+sleep 2
+
 KEY1=foo
 KEY2=bar
 
