@@ -117,7 +117,9 @@ let switch_protocol () =
     Client_embedded_proto_alpha.Fitness_repr.from_int64 0L in
   Client_genesis.Client_proto_main.mine cctxt `Genesis
     (Activate Client_alpha.Client_proto_main.protocol)
-    fitness genesis_sk
+    fitness genesis_sk >>=? fun () ->
+  Lwt_unix.sleep 2.0 >>= fun () ->
+  return ()
 
 let bootstrap_accounts () =
   let cpt = ref 0 in

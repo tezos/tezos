@@ -8,7 +8,7 @@
         "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU",
         "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
     ],
-    "slot_durations" : [ 10, 5 ],
+    "slot_durations" : [ 1, 0 ],
     "cycle_length" : 128,
     "first_free_mining_slot" : 4
 }
