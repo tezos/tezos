@@ -144,10 +144,7 @@ let read_file ?(bin=false) fn =
   let ic = (if bin then open_in_bin else open_in) fn in
   finalize (fun () ->
       let len = in_channel_length ic in
-      let buf = Bytes.create len in
-      let nb_read = input ic buf 0 len in
-      if nb_read <> len then failwith (Printf.sprintf "read_file: read %d, expected %d" nb_read len)
-      else Bytes.unsafe_to_string buf)
+      really_input_string ic len)
     (fun () -> close_in ic)
 
 let write_file ?(bin=false) fn contents =
