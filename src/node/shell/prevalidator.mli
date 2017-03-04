@@ -32,7 +32,7 @@ type t
 val create: Distributed_db.net -> t Lwt.t
 val shutdown: t -> unit Lwt.t
 
-val notify_operation: t -> P2p.Peer_id.t -> Operation_hash.t -> unit
+val notify_operations: t -> P2p.Peer_id.t -> Operation_hash.t list -> unit
 
 (** Conditionnaly inject a new operation in the node: the operation will
     be ignored when it is (strongly) refused This is the

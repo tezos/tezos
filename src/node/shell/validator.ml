@@ -580,7 +580,7 @@ let rec create_validator ?parent worker state db net =
           loop ()
       | `Head (gid, head, ops) ->
           Context_db.prefetch v session head ;
-          List.iter (Prevalidator.notify_operation prevalidator gid) ops ;
+          Prevalidator.notify_operations prevalidator gid ops ;
           loop ()
     in
     Lwt.catch loop
