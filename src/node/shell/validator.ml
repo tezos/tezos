@@ -504,7 +504,13 @@ let rec create_validator ?parent worker state db net =
       | Some block
         when Time.(block.State.Valid_block.timestamp < add (Time.now ()) (-60L)) ->
           wait ()
-      | Some _ | None -> Lwt.return_unit in
+      | _ ->
+          State.Valid_block.Current.head net >>= fun head ->
+          State.Valid_block.Current.genesis net >>= fun genesis ->
+          if Block_hash.equal head.hash genesis.hash then
+            wait ()
+          else
+            Lwt.return_unit in
     let t =
       wait () >>= fun () ->
       Watcher.shutdown stopper ;
