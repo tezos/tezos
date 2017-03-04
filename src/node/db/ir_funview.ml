@@ -577,8 +577,18 @@ module Make (S: Irmin.S) = struct
               | None   -> Lwt.return_none
               | Some n ->
                 match Node.read_succ n h with
-                | None       -> Lwt.return_none
-                | Some child -> aux child p
+                | None       ->
+                      Lwt.return_none
+                | Some child ->
+                    aux child p >>= function
+                    | None -> Lwt.return_none
+                    | Some child -> begin
+                        (* remove empty dirs *)
+                        Node.is_empty child >>= function
+                        | true  -> Lwt.return_none
+                        | false -> Lwt.return (Some child)
+                      end >>= fun child ->
+                        Node.with_succ view h child
         in
         aux n k >>= function
       | None -> Lwt.return t
