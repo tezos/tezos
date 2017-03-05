@@ -1,31 +1,24 @@
 variables:
-  image_name: ocp_tezos
-  image_id: ${CI_BUILD_REF_NAME}
-  build_image_name: ${image_name}_build_deps
-  build_image_id: ${CI_BUILD_REF}
-  private_registry: registry.ocamlpro.com:8443
-  private_image_id: $private_registry/${CI_PROJECT_PATH}
-  public_image_id: docker.io/tezosledger/tezos:latest
+  public_docker_image: docker.io/tezos/tezos
 
-image: ${build_image_name}:${build_image_id}
+image: ${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}_build_deps
 
 stages:
   - build_deps
   - build
-  - build_test
   - test
-  - expurge
+  - build_docker
   - publish
   - cleanup
 
 build_deps:
   stage: build_deps
-  image: ocp:docker
+  image: docker:latest
   tags:
     - docker_builder
   script:
     - ./scripts/create_build_deps_docker_image.sh
-        ${build_image_name} ${build_image_id}
+        ${CI_REGISTRY_IMAGE} ${CI_BUILD_REF}_build_deps
 
 build:
   stage: build
@@ -33,19 +26,8 @@ build:
     - tezos_builder
   script:
     - echo "PRODUCTION=yes" > src/Makefile.local
-    - make -j4
-  artifacts:
-    expire_in: 1 week
-    untracked: true
-
-build:test:
-  stage: build_test
-  tags:
-    - tezos_builder
-  script:
-    - make -C test build-test -j4
-  dependencies:
-    - build
+    - make -C src -j4
+    - make -C test -j4 build-test
   artifacts:
     expire_in: 1 week
     untracked: true
@@ -58,7 +40,6 @@ test:store:
     - make -C test run-test-store
   dependencies:
     - build
-    - build:test
 
 test:context:
   stage: test
@@ -68,7 +49,6 @@ test:context:
     - make -C test run-test-context
   dependencies:
     - build
-    - build:test
 
 test:state:
   stage: test
@@ -78,7 +58,6 @@ test:state:
     - make -C test run-test-state
   dependencies:
     - build
-    - build:test
 
 test:basic:
   stage: test
@@ -88,7 +67,6 @@ test:basic:
     - make -C test run-test-basic
   dependencies:
     - build
-    - build:test
 
 test:basic.sh:
   stage: test
@@ -98,7 +76,6 @@ test:basic.sh:
     - make -C test run-test-basic.sh
   dependencies:
     - build
-    - build:test
 
 test:data-encoding:
   stage: test
@@ -108,7 +85,6 @@ test:data-encoding:
     - make -C test run-test-data-encoding
   dependencies:
     - build
-    - build:test
 
 test:p2p-io-scheduler:
   stage: test
@@ -118,7 +94,6 @@ test:p2p-io-scheduler:
     - make -C test run-test-p2p-io-scheduler
   dependencies:
     - build
-    - build:test
 
 test:p2p-connection:
   stage: test
@@ -128,7 +103,6 @@ test:p2p-connection:
     - make -C test run-test-p2p-connection
   dependencies:
     - build
-    - build:test
 
 test:p2p-connection-pool:
   stage: test
@@ -138,27 +112,40 @@ test:p2p-connection-pool:
     - make -C test run-test-p2p-connection-pool
   dependencies:
     - build
-    - build:test
+
+build:docker:
+  stage: build_docker
+  image: docker:latest
+  tags:
+    - docker_builder
+  script:
+    - source scripts/version.sh
+    - sed scripts/Dockerfile.binaries.in
+          -e 's/$alpine_version/'"$alpine_version"'/g' > Dockerfile
+    - mkdir bin
+    - cp tezos-client tezos-node tezos-protocol-compiler bin/
+    - docker build -q -t "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}" .
+    - docker login -u gitlab-ci-token -p "$CI_BUILD_TOKEN" "${CI_REGISTRY}"
+    - docker tag "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}"
+                 "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}"
+    - docker push "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}"
+    - docker rmi "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}"
 
 publish:docker:
   stage: publish
-  image: ocp:docker
+  image: docker:latest
   tags:
-    - public_docker_builder
+    - docker_builder
+  only:
+    - master@tezos/tezos
+    - alphanet@tezos/tezos
   script:
-    - ./scripts/create_docker_image.sh ${image_name} ${build_image_id}
-    - docker tag ${image_name}:${build_image_id}
-        "$private_image_id:$CI_BUILD_REF_NAME"
-    - docker login -u gitlab-ci-token -p $CI_BUILD_TOKEN $private_registry
-    - docker push "$private_image_id:$CI_BUILD_REF_NAME"
-    - docker rmi "$private_image_id:$CI_BUILD_REF_NAME"
-    - if [ "$CI_PROJECT_PATH" = "tezos/tezos" -a "$CI_BUILD_REF_NAME" = "master" ]; then
-        mkdir -p ~/.docker ;
-        echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
-        docker tag ${image_name}:${build_image_id} ${public_image_id} ;
-        docker push ${public_image_id} ;
-        docker rmi ${public_image_id} ;
-      fi
+    - mkdir -p ~/.docker ;
+    - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
+    - docker tag "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}"
+                 "${public_docker_image}:${CI_BUILD_REF_NAME}"
+    - docker push "${public_docker_image}:${CI_BUILD_REF_NAME}"
+    - docker rmi "${public_docker_image}:${CI_BUILD_REF_NAME}"
 
 publish:github:
   image: ocaml/opam
@@ -190,12 +177,13 @@ publish:github:
 
 cleanup:
   stage: cleanup
-  image: ocp:docker
+  image: docker:latest
   tags:
     - docker_builder
   script:
-    - docker tag ${build_image_name}:${build_image_id}
-                 ${build_image_name}:${CI_PROJECT_NAMESPACE}_${CI_BUILD_REF_NAME}
-    - docker rmi ${build_image_name}:${build_image_id}
+    - docker tag "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}_build_deps"
+                 "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}_build_deps"
+    - docker rmi "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}_build_deps"
+    - docker rmi "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}"
   when: always
   allow_failure: true
