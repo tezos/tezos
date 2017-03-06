@@ -98,7 +98,8 @@ module Answer : sig
   }
 
   val ok: 'a -> 'a answer
-  val return: 'a -> 'a answer Lwt.t
+  val answer: ?code:int -> 'a -> 'a answer
+  val return: ?code:int -> 'a -> 'a answer Lwt.t
 
 end
 
