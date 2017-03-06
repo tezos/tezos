@@ -37,7 +37,7 @@ let () =
 
 let minimal_time c priority pred_timestamp =
   let rec cumsum_slot_durations acc durations p =
-    if Compare.Int32.(=) p 0l then
+    if Compare.Int32.(<=) p 0l then
       ok acc
     else match durations with
       | [] -> Error_monad.error Invalid_slot_durations_constant
@@ -50,7 +50,7 @@ let minimal_time c priority pred_timestamp =
          cumsum_slot_durations acc durations p in
   Lwt.return
     (cumsum_slot_durations
-       pred_timestamp (Constants.slot_durations c) priority)
+       pred_timestamp (Constants.slot_durations c) (Int32.succ priority))
 
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp >>=? fun minimal_time ->
