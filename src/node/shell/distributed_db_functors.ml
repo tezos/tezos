@@ -134,8 +134,8 @@ end = struct
 
   let commit s k =
     match Memory_table.find s.memory k with
-    | exception Not_found -> Lwt.return_unit (* TODO error ?? *)
-    | Pending _ -> Lwt.return_unit (* TODO error ?? *)
+    | exception Not_found -> Lwt.return_unit
+    | Pending _ -> assert false
     | Found v ->
         Disk_table.store s.disk v >>= fun _ ->
         Memory_table.remove s.memory k ;
