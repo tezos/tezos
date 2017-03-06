@@ -294,6 +294,9 @@ module Context_db = struct
               State.Valid_block.store net_state hash data >>=? function
               | None ->
                   State.Valid_block.read net_state hash >>=? fun block ->
+                  Lwt_list.iter_p (fun hash ->
+                      Distributed_db.Operation.commit net_db hash)
+                    block.operations >>= fun () ->
                   return (Ok block, false)
               | Some block ->
                   return (Ok block, true)
