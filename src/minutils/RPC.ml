@@ -98,7 +98,15 @@ module Description = struct
 
 end
 
-module Answer = RestoDirectory.Answer
+module Answer = struct
+
+  include RestoDirectory.Answer
+
+  let answer ?(code = 200) json = { code; body = Single json }
+  let return ?code json = Lwt.return (answer ?code json)
+
+end
+
 
 type step =
   | Static of string
