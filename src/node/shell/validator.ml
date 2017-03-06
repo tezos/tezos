@@ -299,6 +299,9 @@ module Context_db = struct
                     block.operations >>= fun () ->
                   return (Ok block, false)
               | Some block ->
+                  Lwt_list.iter_p (fun hash ->
+                      Distributed_db.Operation.commit net_db hash)
+                    block.operations >>= fun () ->
                   return (Ok block, true)
             end
         | Error err ->
@@ -388,9 +391,10 @@ module Context_db = struct
                    min_block block acc
                  else begin
                    Block_hash.Table.replace session.tbl hash { data with state = `Running begin
-                         process data.validator ~get_context ~set_context hash block >>= fun res ->
-                         Block_hash.Table.remove session.tbl hash ;
-                         Lwt.return res
+                       Lwt_main.yield () >>= fun () ->
+                       process data.validator ~get_context ~set_context hash block >>= fun res ->
+                       Block_hash.Table.remove session.tbl hash ;
+                       Lwt.return res
                      end } ;
                    acc
                  end)
