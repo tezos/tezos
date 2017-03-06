@@ -9,6 +9,7 @@
 
 val mine:
   Client_commands.context ->
+  ?timestamp: Time.t ->
   Client_node_rpcs.Blocks.block ->
   Data.Command.t ->
   Fitness.fitness ->
