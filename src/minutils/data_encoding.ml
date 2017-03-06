@@ -698,6 +698,17 @@ module Encoding = struct
         `Variable in
     make @@ Mu (kind, name, self)
 
+  let result ok_enc error_enc =
+    union
+      ~tag_size:`Uint8
+      [ case ~tag:1 ok_enc
+          (function Ok x -> Some x | Error _ -> None)
+          (fun x -> Ok x) ;
+        case ~tag:0 error_enc
+          (function Ok _ -> None | Error x -> Some x)
+          (fun x -> Error x) ;
+      ]
+
   let assoc enc =
     let json = Json_encoding.assoc (Json.get_json enc) in
     let binary = list (tup2 string enc) in
