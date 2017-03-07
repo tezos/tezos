@@ -51,6 +51,7 @@ let filter_valid_endorsement cctxt { hash; content } =
   match content with
   | None
   | Some (_, Anonymous_operations _)
+  | Some (_, Sourced_operations (Dictator_operation _ ))
   | Some (_, Sourced_operations (Manager_operations _ )) ->
       Lwt.return_none
   | Some ({net_id}, Sourced_operations (Delegate_operations { source ; operations })) ->
