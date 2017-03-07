@@ -7,4 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val run : string -> (string * (string -> unit Lwt.t)) list -> unit
+open Error_monad
+
+val run : string -> (string * (string -> unit tzresult Lwt.t)) list -> unit

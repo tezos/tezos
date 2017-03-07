@@ -31,6 +31,8 @@ let output name res =
   match res with
   | Passed ->
       Printf.fprintf out "Test '%s' ... passed\n" name
+  | Failed { Assertion.expected_value = "" ; actual_value = ""  ; message } ->
+      Printf.fprintf out "Test '%s' ... failed\n  %s \n" name message
   | Failed { Assertion.expected_value ; actual_value ; message = "" } ->
       if expected_value <> actual_value then
         Printf.fprintf out
@@ -111,8 +113,18 @@ let run prefix tests =
                   remove_dir base_dir
               in
               try
-                Lwt_main.run (f base_dir) ;
-                finalise ()
+                match Lwt_main.run (f base_dir) with
+                | Ok () -> finalise ()
+                | Error err ->
+                    finalise () ;
+                    Format.kasprintf
+                      (fun message ->
+                         raise @@
+                         Kaputt.Assertion.Failed
+                           { expected_value = "" ;
+                             actual_value = "" ;
+                             message })
+                      "%a" Error_monad.pp_print_error err
               with exn ->
                 finalise () ;
                 raise exn))
