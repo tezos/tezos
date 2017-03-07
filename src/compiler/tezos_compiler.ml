@@ -37,7 +37,7 @@ end
 let backend = (module Backend : Backend_intf.S)
 
 let warnings = "+a-4-6-7-9-29-40..42-44-45-48"
-let warn_error = "-a"
+let warn_error = "-a+8"
 
 let () =
   Clflags.unsafe_string := false ;
