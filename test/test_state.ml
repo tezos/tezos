@@ -215,10 +215,7 @@ let wrap_state_init f base_dir =
     build_example_tree net >>= fun (block, vblock, operation) ->
     f { state ; net ; block ; vblock ; operation ; init } >>=? fun s ->
     return ()
-  end >>= function
-  | Ok () -> Lwt.return_unit
-  | Error err ->
-      Lwt.return (Error_monad.pp_print_error Format.err_formatter err)
+  end
 
 let test_init (s: state) =
   return ()
