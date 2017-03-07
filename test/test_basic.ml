@@ -206,8 +206,7 @@ let main () =
   @@ transfer ~src:bar ~target:foo 1000_00L >>=? fun () ->
   mine bootstrap
 
-let tests =
-  [ "main", (fun _ -> main () >>= fun _ -> Lwt.return_unit) ]
+let tests = [ "main", fun _ -> main () ]
 
 let () =
   Test.run "basic." tests

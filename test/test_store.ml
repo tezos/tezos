@@ -39,7 +39,9 @@ let genesis = {
 let wrap_store_init f base_dir =
   let root = base_dir // "store" in
   Store.init root >>= function
-  | Ok store -> f store
+  | Ok store ->
+      f store >>= fun () ->
+      return ()
   | Error err ->
       Format.kasprintf Pervasives.failwith
         "@[Cannot initialize store:@ %a@]" pp_print_error err
@@ -47,7 +49,9 @@ let wrap_store_init f base_dir =
 let wrap_raw_store_init f base_dir =
   let root = base_dir // "store" in
   Raw_store.init root >>= function
-  | Ok store -> f store
+  | Ok store ->
+      f store >>= fun () ->
+      return ()
   | Error err ->
       Format.kasprintf Pervasives.failwith
         "@[Cannot initialize store:@ %a@]" pp_print_error err

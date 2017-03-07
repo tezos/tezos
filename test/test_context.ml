@@ -92,7 +92,8 @@ let wrap_context_init f base_dir =
   create_block2 idx >>= fun () ->
   create_block3a idx >>= fun () ->
   create_block3b idx >>= fun () ->
-  f idx
+  f idx >>= fun result ->
+  Error_monad.return result
 
 (** Simple test *)
 

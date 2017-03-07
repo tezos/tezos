@@ -1,6 +1,7 @@
 open Data_encoding
 open Context
 open Hash
+open Error_monad
 
 let (>>=) = Lwt.bind
 let (>|=) = Lwt.(>|=)
@@ -305,6 +306,10 @@ let test_json_input testdir =
         Lwt.return_unit
   end
 
+let wrap_test f base_dir =
+  f base_dir >>= fun result ->
+  return result
+
 let tests = [
   "simple", test_simple_values ;
   "json", test_json ;
@@ -315,4 +320,4 @@ let tests = [
 ]
 
 let () =
-  Test.run "data_encoding." tests
+  Test.run "data_encoding." (List.map (fun (s, f) -> s, wrap_test f) tests)
