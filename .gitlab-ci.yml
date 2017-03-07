@@ -142,7 +142,7 @@ publish:docker:
   script:
     - mkdir -p ~/.docker ;
     - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
-    - docker tag "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}"
+    - docker tag "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}"
                  "${public_docker_image}:${CI_BUILD_REF_NAME}"
     - docker push "${public_docker_image}:${CI_BUILD_REF_NAME}"
     - docker rmi "${public_docker_image}:${CI_BUILD_REF_NAME}"
