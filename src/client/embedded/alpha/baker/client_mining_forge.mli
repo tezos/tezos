@@ -8,6 +8,10 @@
 (**************************************************************************)
 
 val generate_seed_nonce: unit -> Nonce.t
+(** [generate_seed_nonce ()] is a random nonce that is typically used
+    in block headers. When baking, bakers generate random nonces whose
+    hash is commited in the block they bake. They will typically
+    reveal the aforementionned nonce during the next cycle. *)
 
 val inject_block:
   Client_commands.context ->
@@ -20,6 +24,11 @@ val inject_block:
   src_sk:secret_key ->
   Operation_hash.t list ->
   Block_hash.t tzresult Lwt.t
+(** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
+    ~seed_nonce ~src_sk ops] tries to inject a block in the node. If
+    [?force] is set, the fitness check will be bypassed. [priority]
+    will be used to compute the mining slot (level is
+    precomputed). [src_sk] is used to sign the block header. *)
 
 val forge_block:
   Client_commands.context ->
@@ -29,11 +38,10 @@ val forge_block:
   ?best_effort:bool ->
   ?sort:bool ->
   ?timestamp:Time.t ->
-  ?max_priority:int ->
-  ?priority:int ->
+  priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
   seed_nonce:Nonce.t ->
   src_sk:secret_key ->
-  public_key_hash ->
+  unit ->
   Block_hash.t tzresult Lwt.t
 
 module State : sig

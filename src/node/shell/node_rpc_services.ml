@@ -171,7 +171,7 @@ module Blocks = struct
 
   let info =
     RPC.service
-      ~description:"All the block informations."
+      ~description:"All the information about a block."
       ~input:
         (conv
            (fun x -> Some x)
@@ -648,7 +648,7 @@ let inject_block =
        contextual RPCs from the latest block \
        (e.g. '/blocks/head/context/preapply'). Returns the ID of the \
        block. By default, the RPC will wait for the block to be \
-       validated before to answer."
+       validated before answering."
     ~input:
       (conv
          (fun (block, blocking, force) ->
@@ -661,7 +661,7 @@ let inject_block =
                (describe
                   ~description:
                     "Should the RPC wait for the block to be \
-                  validated before to answer. (default: true)"
+                  validated before answering. (default: true)"
                   bool))
             (opt "force"
                (describe
@@ -681,7 +681,7 @@ let inject_operation =
        ID of the operation. The `signedOperationContents` should be \
        constructed using a contextual RPCs from the latest block \
        and signed by the client. By default, the RPC will wait for \
-       the operation to be (pre-)validated before to answer. See \
+       the operation to be (pre-)validated before answering. See \
        RPCs ubder /blocks/prevalidation for more details on the \
        prevalidation context."
     ~input:
@@ -693,7 +693,7 @@ let inject_operation =
             (describe
                ~description:
                  "Should the RPC wait for the operation to be \
-                  (pre-)validated before to answer. (default: true)"
+                  (pre-)validated before answering. (default: true)"
                bool)
             true)
          (opt "force"
@@ -748,7 +748,7 @@ let inject_protocol =
             (describe
                ~description:
                  "Should the RPC wait for the protocol to be \
-                  validated before to answer. (default: true)"
+                  validated before answering. (default: true)"
                bool)
             true)
          (opt "force"

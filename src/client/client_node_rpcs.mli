@@ -20,6 +20,11 @@ val forge_block:
   Operation_hash.t list ->
   MBytes.t ->
   MBytes.t Lwt.t
+(** [forge_block cctxt ?net ?predecessor ?timestamp fitness ops
+    proto_hdr] returns the serialization of a block header with
+    [proto_hdr] as protocol-specific part. The arguments [?net] and
+    [?predecessor] are infered from the current head of main network,
+    and [?timestamp] defaults to [Time.now ()]. *)
 
 val validate_block:
   Client_commands.context ->
@@ -31,6 +36,11 @@ val inject_block:
   ?wait:bool -> ?force:bool ->
   MBytes.t ->
   Block_hash.t tzresult Lwt.t
+(** [inject_block cctxt ?wait ?force raw_block] tries to inject
+    [raw_block] inside the node. If [?wait] is [true], [raw_block]
+    will be validated before the result is returned. If [?force] is
+    true, the block will be injected even on non strictly increasing
+    fitness. *)
 
 val inject_operation:
   Client_commands.context ->

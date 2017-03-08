@@ -15,6 +15,11 @@ val paying_priorities: context -> int32 list
 
 val minimal_time:
   context -> int32 -> Time.t -> Time.t tzresult Lwt.t
+(** [minimal_time ctxt priority pred_block_time] returns the minimal
+    time, given the predecessor block timestamp [pred_block_time],
+    after which a miner with priority [priority] is allowed to
+    mine. Fail with [Invalid_slot_durations_constant] if the minimal
+    time cannot be computed. *)
 
 val pay_mining_bond:
   context ->
@@ -47,10 +52,11 @@ val base_mining_reward: context -> priority:int32 -> Tez.t
 
 val endorsement_reward: block_priority:int32 -> Tez.t tzresult Lwt.t
 
-
-(** The contract owning rolls for the first mining priorities of a level. *)
 val mining_priorities:
   context -> Level.t -> public_key_hash lazy_list
+(** [mining_priorities ctxt level] is the lazy list of contract's
+    public key hashes that are allowed to mine for [level]. *)
+
 val endorsement_priorities:
   context -> Level.t -> public_key_hash lazy_list
 
@@ -60,6 +66,11 @@ val first_mining_priorities:
   public_key_hash ->
   Level.t ->
   int32 list tzresult Lwt.t
+(** [first_mining_priorities ctxt ?max_priority contract_hash level]
+    is a list of priorities of max [?max_priority] elements, where the
+    delegate of [contract_hash] is allowed to mine for [level]. If
+    [?max_priority] is [None], a sensible number of priorities is
+    returned. *)
 
 val first_endorsement_slots:
   context ->
