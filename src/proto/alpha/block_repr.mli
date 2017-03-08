@@ -37,4 +37,7 @@ val unsigned_header_encoding:
 
 val forge_header:
   Updater.shell_block -> proto_header -> MBytes.t
-
+(** [forge_header shell_hdr proto_hdr] is the binary serialization
+    (using [unsigned_header_encoding]) of a block header,
+    comprising both the shell and the protocol part of the header,
+    without the signature. *)

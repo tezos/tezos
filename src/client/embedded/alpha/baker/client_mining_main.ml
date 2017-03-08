@@ -23,8 +23,9 @@ let mine_block cctxt block ?force ?max_priority ?src_sk delegate =
   let seed_nonce = Client_mining_forge.generate_seed_nonce () in
   Client_mining_forge.forge_block cctxt
     ~timestamp:(Time.now ())
-    ?force ?max_priority
-    ~seed_nonce ~src_sk block delegate >>=? fun block_hash ->
+    ?force
+    ~seed_nonce ~src_sk block
+    ~priority:(`Auto (delegate, max_priority)) () >>=? fun block_hash ->
   Client_mining_forge.State.record_block cctxt level block_hash seed_nonce
   |> trace_exn (Failure "Error while recording block") >>=? fun () ->
   cctxt.message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->

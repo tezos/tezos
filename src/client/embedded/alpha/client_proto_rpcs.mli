@@ -51,9 +51,15 @@ module Context : sig
   val level:
     Client_commands.context ->
     block -> Level.t tzresult Lwt.t
+  (** [level cctxt blk] returns the (protocol view of the) level of
+      [blk]. *)
+
   val next_level:
     Client_commands.context ->
     block -> Level.t tzresult Lwt.t
+  (** [next_level cctxt blk] returns the (protocol view of the) level
+      of the successor of [blk]. *)
+
   module Nonce : sig
     val hash:
     Client_commands.context ->
@@ -130,6 +136,10 @@ module Helpers : sig
   val minimal_time:
     Client_commands.context ->
     block -> ?prio:int -> unit -> Time.t tzresult Lwt.t
+  (** [minimal_time cctxt blk ?prio ()] is the minimal acceptable
+      timestamp for the successor of [blk]. [?prio] defaults to
+      [0]. *)
+
   val apply_operation:
     Client_commands.context ->
     block -> Block_hash.t -> Operation_hash.t -> MBytes.t -> MBytes.t option ->
@@ -309,6 +319,17 @@ module Helpers : sig
       seed_nonce_hash:Nonce_hash.t ->
       proof_of_work_nonce:MBytes.t ->
       unit -> MBytes.t tzresult Lwt.t
+      (** [block cctxt root ~net ~predecessor ~timestamp ~fitness
+          ~operations ~level ~priority ~seed_nonce_hash
+          ~proof_of_work_nonce ()] returns the binary serialization of
+          a block header (comprising the shell and protocol-specific
+          part), rooted at [root], belonging to [net], with
+          predecessor [predecessor], [timestamp], [fitness],
+          associated operations [operations], level [level] (the
+          protocol cannot deduce it from [predecessor] on its own),
+          priority [priority] (the priority of this miner in the
+          mining queue associated to [level]), [seed_nonce_hash] (the
+          chosen seed that we will reveal in the next cycle). *)
   end
 
   module Parse : sig

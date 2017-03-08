@@ -344,7 +344,7 @@ let mining_rights_for_delegate
           Tezos_context.Timestamp.get_current ctxt >>= fun timestamp ->
            Mining.minimal_time ctxt priority timestamp >>= function
            | Ok time -> Lwt.return (raw_level, Int32.to_int priority, Some time)
-               | Error _ -> Lwt.return (raw_level, Int32.to_int priority, None))
+           | Error _ -> Lwt.return (raw_level, Int32.to_int priority, None))
         priorities >>= fun priorities ->
       return (priorities @ t)
   in
