@@ -69,6 +69,9 @@ module Timestamp : sig
   val to_seconds: time -> string
 
   val get_current: context -> Time.t Lwt.t
+  (** [get_current ctxt] returns the current timestamp of [ctxt]. When
+      [ctxt] is the context of a block, the block timestamp is used,
+      otherwise a timestamp is inferred otherwise. *)
 
 end
 

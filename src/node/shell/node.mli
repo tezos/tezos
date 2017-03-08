@@ -28,6 +28,11 @@ module RPC : sig
   val inject_block:
     t -> ?force:bool -> MBytes.t ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
+  (** [inject_block node ?force bytes] tries to insert [bytes]
+      (supposedly the serialization of a block header) inside
+      [node]. If [?force] is true, the block will be inserted even on
+      non strictly increasing fitness. *)
+
   val inject_operation:
     t -> ?force:bool -> MBytes.t ->
     (Operation_hash.t * unit tzresult Lwt.t) Lwt.t

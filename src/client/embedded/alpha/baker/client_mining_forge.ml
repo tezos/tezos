@@ -71,8 +71,9 @@ let inject_block cctxt block
 let forge_block cctxt block
     ?force
     ?operations ?(best_effort = operations = None) ?(sort = best_effort)
-    ?timestamp ?max_priority ?priority
-    ~seed_nonce ~src_sk src_pkh =
+    ?timestamp
+    ~priority
+    ~seed_nonce ~src_sk () =
   let block =
     match block with
     | `Prevalidation -> `Head 0
@@ -91,12 +92,12 @@ let forge_block cctxt block
   end >>= fun operations ->
   begin
     match priority with
-    | Some prio -> begin
+    | `Set prio -> begin
         Client_proto_rpcs.Helpers.minimal_time
           cctxt block ~prio () >>=? fun time ->
         return (prio, Some time)
       end
-    | None ->
+    | `Auto (src_pkh, max_priority) ->
         Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate cctxt
           ?max_priority
           ~first_level:level

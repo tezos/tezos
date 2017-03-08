@@ -177,7 +177,7 @@ let mine contract =
   let seed_nonce = Client_mining_forge.generate_seed_nonce () in
   Client_mining_forge.forge_block cctxt
     ~timestamp:(Time.now ()) ~seed_nonce ~src_sk:contract.secret_key
-    block contract.public_key_hash >>=? fun block_hash ->
+    block ~priority:(`Auto (contract.public_key_hash, None)) () >>=? fun block_hash ->
   return ()
 
 let ecoproto_error f = function
