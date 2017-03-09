@@ -1,8 +1,8 @@
 REC
 S .
 B .
-S mining
-B mining
+S baker
+B baker
 S ../../../proto
 B ../../../proto
 S ../../../proto/alpha
