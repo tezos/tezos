@@ -117,6 +117,8 @@ module Key = struct
     let counter c = contract_store c ["counter"]
     let code c = contract_store c ["code"]
     let storage c = contract_store c ["storage"]
+    let code_fees c = contract_store c ["code_fees"]
+    let storage_fees c = contract_store c ["storage_fees"]
   end
 
   module Vote = struct
@@ -328,6 +330,24 @@ module Contract = struct
       let name = "contract storage"
       let key = Key.Contract.storage
       let encoding = Script_repr.storage_encoding
+    end)
+
+  module Code_fees =
+    Make_indexed_data_storage(struct
+      type key = Contract_repr.t
+      type value = Tez_repr.t
+      let name = "contract code fees"
+      let key = Key.Contract.code_fees
+      let encoding = Tez_repr.encoding
+    end)
+
+  module Storage_fees =
+    Make_indexed_data_storage(struct
+      type key = Contract_repr.t
+      type value = Tez_repr.t
+      let name = "contract storage fees"
+      let key = Key.Contract.storage_fees
+      let encoding = Tez_repr.encoding
     end)
 
 end

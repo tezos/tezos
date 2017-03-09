@@ -174,6 +174,16 @@ module Contract : sig
      and type value = Script_repr.storage
      and type context := t
 
+  module Code_fees : Indexed_data_storage
+    with type key = Contract_repr.t
+     and type value = Tez_repr.t
+     and type context := t
+
+  module Storage_fees : Indexed_data_storage
+    with type key = Contract_repr.t
+     and type value = Tez_repr.t
+     and type context := t
+
 end
 
 (** Votes *)

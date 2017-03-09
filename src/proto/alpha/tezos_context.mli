@@ -126,11 +126,8 @@ module Script : sig
   }
 
   type t =
-    | No_script
-    | Script of {
-        code: code ;
-        storage: storage ;
-      }
+    { code : code ;
+      storage : storage }
 
   val location_encoding: location Data_encoding.t
   val expr_encoding: expr Data_encoding.t
@@ -138,10 +135,7 @@ module Script : sig
   val code_encoding: code Data_encoding.t
   val encoding: t Data_encoding.t
 
-  val storage_cost: storage -> Tez.t
-  val code_cost: code -> Tez.t
-
-  val hash_expr: expr -> string
+  val hash_expr : expr -> string
 
 end
 
@@ -316,6 +310,8 @@ module Contract : sig
   val is_default: contract -> public_key_hash option
 
   val exists: context -> contract -> bool tzresult Lwt.t
+  val must_exist: context -> contract -> unit tzresult Lwt.t
+
   val list: context -> contract list tzresult Lwt.t
 
   type origination_nonce
@@ -328,8 +324,6 @@ module Contract : sig
 
   val get_manager:
     context -> contract -> public_key_hash tzresult Lwt.t
-  val get_delegate:
-    context -> contract -> public_key_hash tzresult Lwt.t
   val get_delegate_opt:
     context -> contract -> public_key_hash option tzresult Lwt.t
   val is_delegatable:
@@ -337,7 +331,7 @@ module Contract : sig
   val is_spendable:
     context -> contract -> bool tzresult Lwt.t
   val get_script:
-    context -> contract -> Script.t tzresult Lwt.t
+    context -> contract -> (Script.t option) tzresult Lwt.t
 
   val get_counter: context -> contract -> int32 tzresult Lwt.t
   val get_balance:
@@ -348,14 +342,14 @@ module Contract : sig
   val set_delegate:
     context -> contract -> public_key_hash option -> context tzresult Lwt.t
 
-  type error += Initial_amount_too_low of Tez.t * Tez.t
+  type error += Initial_amount_too_low of contract * Tez.t * Tez.t
 
   val originate:
     context ->
     origination_nonce ->
     balance: Tez.t ->
     manager: public_key_hash ->
-    script: Script.t ->
+    ?script: (Script.t * (Tez.t * Tez.t)) ->
     delegate: public_key_hash option ->
     spendable: bool ->
     delegatable: bool -> (context * contract * origination_nonce) tzresult Lwt.t
@@ -364,7 +358,7 @@ module Contract : sig
 
   val spend:
     context -> contract -> Tez.t -> context tzresult Lwt.t
-  val unconditional_spend:
+  val spend_from_script:
     context -> contract -> Tez.t -> context tzresult Lwt.t
 
   val credit:
@@ -373,8 +367,8 @@ module Contract : sig
     context -> contract ->
     Asset.t -> public_key_hash -> Tez.t -> context tzresult Lwt.t
 
-  val update_script_storage:
-    context -> contract -> Script.expr -> context tzresult Lwt.t
+  val update_script_storage_and_fees:
+    context -> contract -> Tez.t -> Script.expr -> context tzresult Lwt.t
 
   val increment_counter:
     context -> contract -> context tzresult Lwt.t
@@ -474,7 +468,7 @@ and manager_operation =
   | Origination of {
       manager: public_key_hash ;
       delegate: public_key_hash option ;
-      script: Script.t ;
+      script: Script.t option ;
       spendable: bool ;
       delegatable: bool ;
       credit: Tez.t ;

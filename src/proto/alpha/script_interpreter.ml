@@ -13,6 +13,9 @@ open Script
 open Script_typed_ir
 open Script_ir_translator
 
+let dummy_code_fee = Tez.zero
+let dummy_storage_fee = Tez.zero
+
 (* ---- Run-time errors -----------------------------------------------------*)
 
 type error += Quota_exceeded
@@ -394,65 +397,64 @@ let rec interp
               logged_return (Item (manager, rest), qta - 1, ctxt)
           | Transfer_tokens storage_type,
             Item (p, Item (amount, Item ((tp, Unit_t, destination), Item (sto, Empty)))) -> begin
-              Contract.unconditional_spend ctxt source amount >>=? fun ctxt ->
+              Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
+              Lwt.return Tez.(amount -? Constants.origination_burn) >>=? fun amount ->
               Contract.credit ctxt destination amount >>=? fun ctxt ->
               Contract.get_script ctxt destination >>=? fun destination_script ->
               let sto = unparse_data storage_type sto in
-              Contract.update_script_storage ctxt source sto >>=? fun ctxt ->
+              Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto >>=? fun ctxt ->
               begin match destination_script with
-                | No_script ->
+                | None ->
                     (* we see non scripted contracts as (unit, unit) contract *)
                     Lwt.return (ty_eq tp Unit_t |>
                                 record_trace (Invalid_contract (loc, destination))) >>=? fun (Eq _) ->
                     return (ctxt, qta, origination)
-                | Script { code ; storage } ->
+                | Some { code ; storage } ->
                     let p = unparse_data tp p in
                     execute origination source destination ctxt storage code amount p qta
                     >>=? fun (csto, ret, qta, ctxt, origination) ->
-                    Contract.update_script_storage
-                      ctxt destination csto >>=? fun ctxt ->
+                    Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee csto >>=? fun ctxt ->
                     trace
                       (Invalid_contract (loc, destination))
                       (parse_data ctxt Unit_t ret) >>=? fun () ->
                     return (ctxt, qta, origination)
               end >>=? fun (ctxt, qta, origination) ->
               Contract.get_script ctxt source >>=? (function
-                  | No_script -> assert false
-                  | Script { storage = { storage } } ->
+                  | None -> assert false
+                  | Some { storage = { storage } } ->
                       parse_data ctxt storage_type storage >>=? fun sto ->
                       logged_return ~origination (Item ((), Item (sto, Empty)), qta - 1, ctxt))
             end
           | Transfer_tokens storage_type,
             Item (p, Item (amount, Item ((tp, tr, destination), Item (sto, Empty)))) -> begin
-              Contract.unconditional_spend ctxt source amount >>=? fun ctxt ->
+              Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
               Contract.credit ctxt destination amount >>=? fun ctxt ->
               Contract.get_script ctxt destination >>=? function
-              | No_script -> fail (Invalid_contract (loc, destination))
-              | Script { code ; storage } ->
+              | None -> fail (Invalid_contract (loc, destination))
+              | Some { code ; storage } ->
                   let sto = unparse_data storage_type sto in
-                  Contract.update_script_storage ctxt source sto >>=? fun ctxt ->
+                  Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto >>=? fun ctxt ->
                   let p = unparse_data tp p in
                   execute origination source destination ctxt storage code amount p qta
                   >>=? fun (sto, ret, qta, ctxt, origination) ->
-                  Contract.update_script_storage
-                    ctxt destination sto >>=? fun ctxt ->
+                  Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee sto >>=? fun ctxt ->
                   trace
                     (Invalid_contract (loc, destination))
                     (parse_data ctxt tr ret) >>=? fun v ->
                   Contract.get_script ctxt source >>=? (function
-                      | No_script -> assert false
-                      | Script { storage = { storage } } ->
+                      | None -> assert false
+                      | Some { storage = { storage } } ->
                           parse_data ctxt storage_type storage >>=? fun sto ->
                           logged_return ~origination (Item (v, Item (sto, Empty)), qta - 1, ctxt))
             end
           | Create_account,
             Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
-              Contract.unconditional_spend ctxt source credit >>=? fun ctxt ->
+              Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
               Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
               Contract.originate ctxt
                 origination
                 ~manager ~delegate ~balance
-                ~script:No_script ~spendable:true ~delegatable >>=? fun (ctxt, contract, origination) ->
+                ?script:None ~spendable:true ~delegatable >>=? fun (ctxt, contract, origination) ->
               logged_return ~origination (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
           | Create_contract (g, p, r),
             Item (manager, Item (delegate, Item (delegatable, Item (credit,
@@ -460,19 +462,13 @@ let rec interp
               let code, storage =
                 { code; arg_type = unparse_ty p; ret_type = unparse_ty r; storage_type =  unparse_ty g },
                 { storage = unparse_data g init; storage_type =  unparse_ty g } in
-              let storage_fee = Script.storage_cost storage in
-              let code_fee = Script.code_cost code in
-              Lwt.return Tez.(code_fee +? storage_fee) >>=? fun script_fee ->
-              Lwt.return Tez.(script_fee +?
-                              Constants.origination_burn) >>=? fun total_fee ->
-              fail_unless Tez.(credit > total_fee)
-                (Contract.Initial_amount_too_low (total_fee, credit)) >>=? fun () ->
-              Contract.unconditional_spend ctxt source credit >>=? fun ctxt ->
+              Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
               Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
               Contract.originate ctxt
                 origination
                 ~manager ~delegate ~balance
-                ~script:(Script { code ; storage }) ~spendable:true ~delegatable
+                ~script:({ code ; storage }, (dummy_code_fee, dummy_storage_fee))
+                ~spendable:true ~delegatable
               >>=? fun (ctxt, contract, origination) ->
               logged_return ~origination (Item ((p, r, contract), rest), qta - 1, ctxt)
           | Balance, rest ->

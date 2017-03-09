@@ -253,7 +253,7 @@ module Context = struct
       RPC.service
         ~description: "Access the code and data of the contract."
         ~input: empty
-        ~output: (wrap_tzerror Script.encoding)
+        ~output: (wrap_tzerror (option Script.encoding))
         RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "script")
 
     let assets custom_root =
@@ -268,7 +268,7 @@ module Context = struct
       balance: Tez.t ;
       spendable: bool ;
       delegate: bool * public_key_hash option ;
-      script: Script.t ;
+      script: Script.t option ;
       assets: Asset.Map.t ;
       counter: int32 ;
     }
@@ -291,7 +291,7 @@ module Context = struct
              (req "delegate" @@ obj2
                 (req "setable" bool)
                 (opt "value" Ed25519.Public_key_hash.encoding))
-             (dft "script" Script.encoding No_script)
+             (opt "script" Script.encoding)
              (req "assets" Asset.Map.encoding)
              (req "counter" int32))
         RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg)

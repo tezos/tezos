@@ -91,7 +91,7 @@ module Context : sig
       balance: Tez.t ;
       spendable: bool ;
       delegate: bool * public_key_hash option ;
-      script: Script.t ;
+      script: Script.t option ;
       assets: Asset.Map.t ;
       counter: int32 ;
     }
@@ -124,7 +124,7 @@ module Context : sig
       bool tzresult Lwt.t
     val script:
       Client_commands.context ->
-      block -> Contract.t -> Script.t tzresult Lwt.t
+      block -> Contract.t -> Script.t option tzresult Lwt.t
     val assets:
       Client_commands.context ->
       block -> Contract.t ->
@@ -222,7 +222,7 @@ module Helpers : sig
         ?spendable:bool ->
         ?delegatable:bool ->
         ?delegatePubKey: public_key_hash ->
-        ?script:(Script.code * Script.storage) ->
+        ?script:Script.t ->
         fee:Tez.t->
         unit ->
         MBytes.t tzresult Lwt.t

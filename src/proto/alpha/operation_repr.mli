@@ -53,7 +53,7 @@ and manager_operation =
   | Origination of {
       manager: Ed25519.Public_key_hash.t ;
       delegate: Ed25519.Public_key_hash.t option ;
-      script: Script_repr.t ;
+      script: Script_repr.t option ;
       spendable: bool ;
       delegatable: bool ;
       credit: Tez_repr.tez ;

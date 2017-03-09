@@ -12,7 +12,6 @@
 open Tezos_context
 
 type error += Bad_endorsement (* TODO: doc *)
-type error += Insert_coin (* TODO: doc *)
 type error += Contract_not_delegatable (* TODO: doc *)
 type error += Unimplemented
 type error += Invalid_voting_period
@@ -53,13 +52,13 @@ let apply_manager_operation_content ctxt origination_nonce accept_failing_script
       Contract.spend ctxt source amount >>=? fun ctxt ->
       Contract.credit ctxt destination amount >>=? fun ctxt ->
       Contract.get_script ctxt destination >>=? function
-      | No_script -> begin
+      | None -> begin
           match parameters with
           | None | Some (Prim (_, "Unit", [])) ->
               return (ctxt, origination_nonce)
           | Some _ -> fail Non_scripted_contract_with_parameter
         end
-      | Script { code ; storage } ->
+      | Some { code ; storage } ->
           match parameters with
           | None -> fail Scripted_contract_without_paramater
           | Some parameters ->
@@ -71,8 +70,9 @@ let apply_manager_operation_content ctxt origination_nonce accept_failing_script
               | Ok (storage_res, _res, _steps, ctxt, origination_nonce) ->
                   (* TODO: pay for the steps and the storage diff:
                      update_script_storage checks the storage cost *)
-                  Contract.update_script_storage
-                    ctxt destination storage_res >>=? fun ctxt ->
+                  Contract.update_script_storage_and_fees
+                    ctxt destination
+                    Script_interpreter.dummy_storage_fee storage_res >>=? fun ctxt ->
                   return (ctxt, origination_nonce)
               | Error err ->
                   if accept_failing_script && is_reject err then
@@ -81,24 +81,18 @@ let apply_manager_operation_content ctxt origination_nonce accept_failing_script
                     Lwt.return (Error err)
     end
   | Origination { manager ; delegate ; script ;
-                  spendable ; delegatable ; credit } -> begin
-      match script with
-      | No_script -> return ()
-      | Script { code ; storage } ->
-          Script_ir_translator.parse_script ctxt storage code >>=? fun _ ->
-          let storage_fee = Script.storage_cost storage in
-          let code_fee = Script.code_cost code in
-          Lwt.return Tez.(code_fee +? storage_fee) >>=? fun script_fee ->
-          Lwt.return Tez.(script_fee +? Constants.origination_burn) >>=? fun total_fee ->
-          fail_unless Tez.(credit > total_fee) Insert_coin >>=? fun () ->
-          return ()
-    end >>=? fun () ->
+                  spendable ; delegatable ; credit } ->
+      let script = match script with
+        | None -> None
+        | Some script ->
+            Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)) in
       Contract.spend ctxt source credit >>=? fun ctxt ->
       Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
       Contract.originate ctxt
         origination_nonce
         ~manager ~delegate ~balance
-        ~script ~spendable ~delegatable >>=? fun (ctxt, _, origination_nonce) ->
+        ?script
+        ~spendable ~delegatable >>=? fun (ctxt, _, origination_nonce) ->
       return (ctxt, origination_nonce)
   | Issuance { asset = (asset, key); amount } ->
       Contract.issue ctxt source asset key amount >>=? fun ctxt ->
@@ -127,6 +121,7 @@ let apply_sourced_operation
     operation origination_nonce ops =
   match ops with
   | Manager_operations { source ; public_key ; fee ; counter ; operations = contents } ->
+      Contract.must_exist ctxt source >>=? fun () ->
       Contract.get_manager ctxt source >>=? fun manager ->
       check_signature_and_update_public_key
         ctxt manager public_key operation >>=? fun ctxt ->
@@ -139,6 +134,7 @@ let apply_sourced_operation
        | Some contract ->
            Contract.credit ctxt contract fee) >>=? fun ctxt ->
       fold_left_s (fun (ctxt, origination_nonce) content ->
+          Contract.must_exist ctxt source >>=? fun () ->
           apply_manager_operation_content ctxt origination_nonce
             accept_failing_script source content)
         (ctxt, origination_nonce) contents
@@ -190,7 +186,7 @@ let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
       end >>=? fun delegate ->
       Contract.originate ctxt
         origination_nonce
-        ~manager ~delegate ~balance:Constants.faucet_credit ~script:No_script
+        ~manager ~delegate ~balance:Constants.faucet_credit ?script:None
         ~spendable:true ~delegatable:true >>=? fun (ctxt, _, origination_nonce) ->
       return (ctxt, origination_nonce)
 
