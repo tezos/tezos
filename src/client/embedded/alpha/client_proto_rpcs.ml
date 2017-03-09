@@ -108,7 +108,7 @@ module Context = struct
       balance: Tez.t ;
       spendable: bool ;
       delegate: bool * public_key_hash option ;
-      script: Script.t ;
+      script: Script.t option ;
       assets: Asset.Map.t ;
       counter: int32 ;
     }
@@ -180,10 +180,6 @@ module Helpers = struct
 
   module Forge = struct
 
-    let script_of_option = function
-      | None -> Script.No_script
-      | Some (code, storage) -> Script { code ; storage }
-
     open Operation
 
     module Manager = struct
@@ -206,7 +202,6 @@ module Helpers = struct
           ?(spendable = true)
           ?(delegatable = true)
           ?delegatePubKey ?script ~fee () =
-        let script = script_of_option script in
         operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[
             Origination { manager = managerPubKey ;

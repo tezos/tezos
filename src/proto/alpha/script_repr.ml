@@ -110,9 +110,6 @@ type storage =
   { storage : expr ;
     storage_type : expr }
 
-let storage_cost _ = Tez_repr.of_cents_exn 50L (* FIXME *)
-let code_cost _ = Tez_repr.of_cents_exn 50L (* FIXME *)
-
 open Data_encoding
 
 let storage_encoding =
@@ -140,22 +137,14 @@ let hash_expr data =
   Script_expr_hash.(hash_bytes [ bytes ] |> to_b58check)
 
 type t =
-  | No_script
-  | Script of {
-      code: code ;
-      storage: storage ;
-    }
+  { code : code ;
+    storage : storage }
 
 let encoding =
   let open Data_encoding in
-  union ~tag_size:`Uint8 [
-    case ~tag:0 empty
-      (function No_script -> Some () | _ -> None)
-      (fun () -> No_script) ;
-    case ~tag:1
-      (obj2
-         (req "code" code_encoding)
-         (req "storage" storage_encoding))
-      (function Script { code ; storage } -> Some (code, storage) | _ -> None)
-      (fun (code, storage) -> Script { code ; storage })
-  ]
+  conv
+    (function { code ; storage } -> (code, storage))
+    (fun (code, storage) -> { code ; storage })
+    (obj2
+       (req "code" code_encoding)
+       (req "storage" storage_encoding))

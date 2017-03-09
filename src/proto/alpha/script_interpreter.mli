@@ -14,6 +14,9 @@ type error += Overflow of Script.location
 type error += Reject of Script.location
 type error += Division_by_zero of Script.location
 
+val dummy_code_fee : Tez.t
+val dummy_storage_fee : Tez.t
+
 (* calling convention :
    ((amount, arg), globals)) -> (ret, globals) *)
 

@@ -76,13 +76,12 @@ let pay_mining_bond c
   if Compare.Int32.(priority >= Constants.first_free_mining_slot c)
   then return c
   else
-    Contract.unconditional_spend c
-      (Contract.default_contract id) Constants.mining_bond_cost
+    Contract.spend c (Contract.default_contract id) Constants.mining_bond_cost
     |> trace Cannot_pay_mining_bond
 
 let pay_endorsement_bond c id =
   let bond = Constants.endorsement_bond_cost in
-  Contract.unconditional_spend c (Contract.default_contract id) bond
+  Contract.spend c (Contract.default_contract id) bond
   |> trace Cannot_pay_endorsement_bond >>=? fun c ->
   return (c, bond)
 

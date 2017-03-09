@@ -1388,14 +1388,14 @@ and parse_contract
         trace
           (Invalid_contract (loc, contract)) @@
         Contract.get_script ctxt contract >>=? function
-        | No_script ->
+        | None ->
             Lwt.return
               (ty_eq arg Unit_t >>? fun (Eq _) ->
                ty_eq ret Unit_t >>? fun (Eq _) ->
                let contract : (arg, ret) typed_contract =
                  (arg, ret, contract) in
                ok contract)
-        | Script { code = { arg_type; ret_type} } ->
+        | Some { code = { arg_type; ret_type} } ->
             Lwt.return
               (parse_ty arg_type >>? fun (Ex_ty targ) ->
                parse_ty ret_type >>? fun (Ex_ty tret) ->

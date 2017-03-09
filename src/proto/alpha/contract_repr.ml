@@ -14,7 +14,7 @@ type t =
   | Originated of Contract_hash.t
 type contract = t
 
-type error += Invalid_contract_notation of string
+type error += Invalid_contract_notation of string (* `Permanent *)
 
 let to_b58check = function
   | Default pbk -> Ed25519.Public_key_hash.to_b58check pbk
@@ -26,17 +26,23 @@ let of_b58check s =
   | Some (Contract_hash.Hash h) -> ok (Originated h)
   | _ -> error (Invalid_contract_notation s)
 
+let pp ppf = function
+  | Default pbk -> Ed25519.Public_key_hash.pp ppf pbk
+  | Originated h -> Contract_hash.pp ppf h
+
+let pp_short ppf = function
+  | Default pbk -> Ed25519.Public_key_hash.pp_short ppf pbk
+  | Originated h -> Contract_hash.pp_short ppf h
+
 let encoding =
   let open Data_encoding in
   describe
     ~title:
       "A contract handle"
     ~description:
-      "A contract notation as given to a RPC or inside scripts. \
-       Contract handles can be written 'd<base64 encoded ID>d' \
-       for the default contract of some ID (public key hash) or \
-       'h<base64 encoded contract ID>h' for a created contract or account, \
-       as replied by the contract origination RPC." @@
+      "A contract notation as given to an RPC or inside scripts. \
+       Can be a base58 public key hash, representing the default contract \
+       of this identity, or a base58 originated contract hash." @@
   splitted
     ~binary:
       (union ~tag_size:`Uint8 [
@@ -60,14 +66,11 @@ let () =
   let open Data_encoding in
   register_error_kind
     `Permanent
-    ~id:"InvalidContractNotationError"
+    ~id:"contract.invalid_contract_notation"
     ~title: "Invalid contract notation"
+    ~pp: (fun ppf x -> Format.fprintf ppf "Invalid contract notation %S" x)
     ~description:
-      "A malformed contract notation was given to a RPC or by a script. \
-       Contract handles can be written 'd<base encoded ID>d' \
-       for the default contract of some ID (public key hash) or \
-       'h<base encoded contract ID>h' for a created contract or account, \
-       as replied by the contract origination RPC."
+      "A malformed contract notation was given to an RPC or in a script."
     (obj1 (req "notation" string))
     (function Invalid_contract_notation loc -> Some loc | _ -> None)
     (fun loc -> Invalid_contract_notation loc)
@@ -77,7 +80,6 @@ let default_contract id = Default id
 let is_default = function
   | Default m -> Some m
   | Originated _ -> None
-
 
 type origination_nonce =
   { operation_hash: Operation_hash.t ;
