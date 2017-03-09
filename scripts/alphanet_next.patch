@@ -1,0 +1,48 @@
+diff --git a/src/node/shell/distributed_db_message.ml b/src/node/shell/distributed_db_message.ml
+--- a/src/node/shell/distributed_db_message.ml
++++ b/src/node/shell/distributed_db_message.ml
+@@ -144,7 +144,7 @@ let encoding =
+ 
+ let versions =
+   let open P2p.Version in
+-  [ { name = "TEZOS_ALPHANET" ;
++  [ { name = "TEZOS_ALPHANET_NEXT" ;
+       major = 0 ;
+       minor = 5 ;
+     }
+diff --git a/scripts/alphanet.sh b/scripts/alphanet.sh
+--- a/scripts/alphanet.sh
++++ b/scripts/alphanet.sh
+@@ -21,15 +21,15 @@ fi
+ src_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+ cd "$src_dir"
+ 
+-default_port=9732
++default_port=19732
+ port="$default_port"
+ 
+-docker_image=docker.io/tezos/tezos:alphanet
+-docker_volume=tezos-alphanet-data$suffix
++docker_image=docker.io/tezos/tezos:alphanet_next
++docker_volume=tezos-alphanet-next-data$suffix
+ suffix=
+ 
+-data_dir="$HOME/.tezos-alphanet$suffix"
+-docker_container="tezos-alphanet$suffix"
++data_dir="$HOME/.tezos-alphanet-next$suffix"
++docker_container="tezos-alphanet-next$suffix"
+ 
+ 
+ ## Saving state ############################################################
+diff --git a/src/node/main/node_config_file.ml b/src/node/main/node_config_file.ml
+--- a/src/node/main/node_config_file.ml
++++ b/src/node/main/node_config_file.ml
+@@ -16,7 +16,7 @@ let home =
+   with Not_found -> "/root"
+ 
+ let default_data_dir = home // ".tezos-node"
+-let default_net_port = 9732
++let default_net_port = 19732
+ let default_rpc_port = 8732
+ 
+ type t = {
