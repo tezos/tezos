@@ -9,6 +9,7 @@ stages:
   - test
   - build_docker
   - publish
+  - deploy
   - cleanup
 
 build_deps:
@@ -156,12 +157,38 @@ build:docker:
   tags:
     - public_docker_builder
   script:
-    - ./scripts/create_docker_image.sh "${CI_REGISTRY_IMAGE}" "${CI_BUILD_REF}" .
+    - ./scripts/create_docker_image.sh
+        "${CI_REGISTRY_IMAGE}" "${CI_BUILD_REF}" .
     - docker login -u gitlab-ci-token -p "$CI_BUILD_TOKEN" "${CI_REGISTRY}"
     - docker tag "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}"
                  "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}"
     - docker push "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}"
     - docker rmi "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}"
+
+build:docker:alphanet:
+  stage: build_docker
+  image: docker:latest
+  tags:
+    - public_docker_builder
+  only:
+    - alphanet@tezos/tezos
+  script:
+    - patch -p1 < scripts/alphanet_constants.patch
+    - ./scripts/create_docker_image.sh
+        "${CI_REGISTRY_IMAGE}" "${CI_BUILD_REF}.patched" .
+
+build:docker:alphanet_next:
+  stage: build_docker
+  image: docker:latest
+  tags:
+    - public_docker_builder
+  only:
+    - master@tezos/tezos
+  script:
+    - patch -p1 < scripts/alphanet_constants.patch
+    - patch -p1 < scripts/alphanet_next.patch
+    - ./scripts/create_docker_image.sh
+        "${CI_REGISTRY_IMAGE}" "${CI_BUILD_REF}.patched" .
 
 publish:docker:
   stage: publish
@@ -170,7 +197,6 @@ publish:docker:
     - public_docker_builder
   only:
     - master@tezos/tezos
-    - alphanet@tezos/tezos
   script:
     - mkdir -p ~/.docker ;
     - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
@@ -178,6 +204,39 @@ publish:docker:
                  "${public_docker_image}:${CI_BUILD_REF_NAME}"
     - docker push "${public_docker_image}:${CI_BUILD_REF_NAME}"
     - docker rmi "${public_docker_image}:${CI_BUILD_REF_NAME}"
+
+publish:docker:alphanet:
+  stage: publish
+  image: docker:latest
+  tags:
+    - public_docker_builder
+  only:
+    - alphanet@tezos/tezos
+  script:
+    - mkdir -p ~/.docker ;
+    - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
+    - docker tag "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}.patched"
+                 "${public_docker_image}:alphanet"
+    - docker push "${public_docker_image}:alphanet"
+    - docker rmi "${public_docker_image}:alphanet"
+    - docker rmi "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}.patched"
+
+publish:docker:alphanet_next:
+  stage: publish
+  image: docker:latest
+  tags:
+    - public_docker_builder
+  only:
+    - master@tezos/tezos
+  script:
+    - mkdir -p ~/.docker ;
+    - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
+    - docker tag "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}.patched"
+                 "${public_docker_image}:alphanet_next"
+    - docker push "${public_docker_image}:alphanet_next"
+    - docker rmi "${public_docker_image}:alphanet_next"
+    - docker rmi "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}.patched"
+
 
 publish:github:
   image: ocaml/opam
@@ -195,7 +254,10 @@ publish:github:
          'git rm -r --cached --ignore-unmatch
             .gitlab-ci.yml
             "docs/proof of stake.md"
-            src/client/embedded/bootstrap/mining/'
+            src/client/embedded/bootstrap/mining/
+            scripts/alphanet.sh
+            scripts/alphanet_constants.patch
+            scripts/alphanet_next.patch'
           --env-filter
             'if [ $GIT_COMMIT != "f42e9d12ac75d2876a4cf600d44976b7090d4533" ] ; then
                export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" ;
@@ -206,6 +268,38 @@ publish:github:
              fi'
          HEAD
     - git push git@github.com:tezos/tezos.git -f HEAD:master
+
+deploy:alphanet:
+  image: ocaml/opam
+  stage: deploy
+  tags:
+    - tezos_builder
+  only:
+    - alphanet@tezos/tezos
+  script:
+    - echo "${CI_KH}" > ~/.ssh/known_hosts
+    - echo "${CI_PK_ALPHANET}" > ~/.ssh/id_ed25519
+    - chmod 400 ~/.ssh/id_ed25519
+    - ssh greg@zo.gbzm.fr
+    - ssh tezos@35.167.138.212
+    - ssh tezos@35.165.227.4
+  allow_failure: true
+
+deploy:alphanet_next:
+  image: ocaml/opam
+  stage: deploy
+  tags:
+    - tezos_builder
+  only:
+    - master@tezos/tezos
+  script:
+    - echo "${CI_KH}" > ~/.ssh/known_hosts
+    - echo "${CI_PK_ALPHANET_NEXT}" > ~/.ssh/id_ed25519
+    - chmod 400 ~/.ssh/id_ed25519
+    - ssh greg@zo.gbzm.fr
+    - ssh tezos@35.167.138.212
+    - ssh tezos@35.165.227.4
+  allow_failure: true
 
 cleanup:
   stage: cleanup

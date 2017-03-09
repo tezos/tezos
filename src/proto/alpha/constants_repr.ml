@@ -54,8 +54,8 @@ let default = {
   voting_period_length = 32768l ;
   time_before_reward =
     Period_repr.of_seconds_exn
-    (* One year in seconds *)
-    Int64.(mul 365L (mul 24L 3600L)) ;
+      (* One year in seconds *)
+      Int64.(mul 365L (mul 24L 3600L)) ;
   slot_durations =
     List.map Period_repr.of_seconds_exn [ 60L ] ;
   first_free_mining_slot = 16 ;

@@ -21,4 +21,17 @@ RUN sudo chown root:root bin/* && \
     sudo mv bin/* /usr/local/bin && \
     rmdir bin
 
-ENTRYPOINT [ "/bin/bash" ]
+RUN sudo cp scripts/docker_entrypoint.sh /usr/local/bin/tezos && \
+    sudo cp scripts/docker_entrypoint.inc.sh \
+            scripts/client_lib.inc.sh \
+            /usr/local/bin/ && \
+    sudo chmod a+rx /usr/local/bin/tezos
+
+RUN sudo mkdir -p /var/run/tezos && \
+    sudo chown tezos /var/run/tezos
+
+ENV EDITOR=vi
+
+VOLUME /var/run/tezos
+
+ENTRYPOINT [ "/usr/local/bin/tezos" ]
