@@ -17,13 +17,14 @@ depends: [
   "base-threads"
   "calendar"
   "cohttp" {>= "0.21" }
+  "cmdliner" {< "1.0.0"}
   "config-file"
   "conduit"
   "git"
   "git-unix"
   "ipv6-multicast"
   "irmin-watcher" (* for `irmin.unix` *)
-  "irmin" {>= "0.12" }
+  "irmin" {>= "0.12" & < "1.0" }
   "lwt" {>= "2.7.0" }
   "lwt_ssl"
   "menhir"
