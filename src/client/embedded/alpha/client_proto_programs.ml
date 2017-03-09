@@ -471,7 +471,7 @@ let parse_data_type cctxt s =
   with
   | exn -> report_parse_error cctxt "data_type: " exn lexbuf
 
-let unexpand_macros type_map program =
+let unexpand_macros type_map (program : Script.code) =
   let open Script in
   let rec caddr type_map acc = function
     | [] -> Some (List.rev acc)

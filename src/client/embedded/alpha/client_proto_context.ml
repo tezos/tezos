@@ -128,7 +128,7 @@ let originate_contract cctxt
     ~source ~src_pk ~src_sk ~manager_pkh ~balance ?delegatable ?delegatePubKey
     ~(code:Script.code) ~init ~fee () =
   Client_proto_programs.parse_data cctxt init >>= fun storage ->
-  let init = Script.{ storage ; storage_type = code.storage_type } in
+  let storage = Script.{ storage ; storage_type = code.storage_type } in
   Client_proto_rpcs.Context.Contract.counter cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   cctxt.message "Acquired the source's sequence counter (%ld -> %ld)."
@@ -138,7 +138,7 @@ let originate_contract cctxt
     ~net ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ~spendable:!spendable
     ?delegatable ?delegatePubKey
-    ~script:(code, init) ~fee () >>=? fun bytes ->
+    ~script:{ code ; storage } ~fee () >>=? fun bytes ->
   let signature = Ed25519.sign src_sk bytes in
   originate cctxt ?force ~block ~signature bytes
 

@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Tezos protocol 1234abc1212 - untyped script representation *)
-
 type location =
   int
 
@@ -29,19 +27,13 @@ type storage =
     storage_type : expr }
 
 type t =
-  | No_script
-  | Script of {
-      code: code ;
-      storage: storage ;
-    }
+  { code : code ;
+    storage : storage }
 
 val location_encoding : location Data_encoding.t
 val expr_encoding : expr Data_encoding.t
 val storage_encoding : storage Data_encoding.t
 val code_encoding : code Data_encoding.t
 val encoding : t Data_encoding.t
-
-val storage_cost : storage -> Tez_repr.tez
-val code_cost : code -> Tez_repr.tez
 
 val hash_expr : expr -> string
