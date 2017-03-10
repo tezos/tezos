@@ -7,22 +7,22 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Misc
-open Tezos_context
 
-type error +=
-  | Too_early of Timestamp.t * Timestamp.t
-  | Invalid_level of Raw_level.t * Raw_level.t
-  | Cannot_pay_mining_bond
-  | Cannot_pay_endorsement_bond
-  | Bad_slot
-  | Bad_delegate
-  | Invalid_slot_durations_constant
+open Tezos_context
+open Misc
+
+type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
+type error += Invalid_endorsement_slot of int * int (* `Permanent *)
+type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
+type error += Wrong_level of Raw_level.t * Raw_level.t (* `Permanent *)
+type error += Wrong_delegate of public_key_hash * public_key_hash (* `Permanent *)
+type error += Cannot_pay_mining_bond (* `Permanent *)
+type error += Cannot_pay_endorsement_bond (* `Permanent *)
 
 let () =
   register_error_kind
-    `Branch
-    ~id:"mining.too_early"
+    `Permanent
+    ~id:"mining.timestamp_too_early"
     ~title:"Block forged too early"
     ~description:"The block timestamp is before the first slot \
                   for this miner at this level"
@@ -30,17 +30,91 @@ let () =
       Format.fprintf ppf "Block forged too early (%a is before %a)"
                      Time.pp_hum p Time.pp_hum r)
     Data_encoding.(obj2
-                     (req "minimal" Time.encoding)
+                     (req "minimum" Time.encoding)
                      (req "provided" Time.encoding))
-    (function Too_early (r, p)   -> Some (r, p) | _ -> None)
-    (fun (r, p) -> Too_early (r, p))
+    (function Timestamp_too_early (r, p)   -> Some (r, p) | _ -> None)
+    (fun (r, p) -> Timestamp_too_early (r, p)) ;
+  register_error_kind
+    `Permanent
+    ~id:"mining.invalid_fitness_gap"
+    ~title:"Invalid fitness gap"
+    ~description:"The gap of fitness is out of bounds"
+    ~pp:(fun ppf (m, g) ->
+        Format.fprintf ppf
+          "The gap of fitness %Ld is not between 0 and %Ld" g m)
+    Data_encoding.(obj2
+                     (req "maximum" int64)
+                     (req "provided" int64))
+    (function Invalid_fitness_gap (m, g)   -> Some (m, g) | _ -> None)
+    (fun (m, g) -> Invalid_fitness_gap (m, g)) ;
+  register_error_kind
+    `Permanent
+    ~id:"mining.invalid_slot"
+    ~title:"Invalid slot"
+    ~description:"The mining slot is out of bounds"
+    ~pp:(fun ppf (m, g) ->
+        Format.fprintf ppf
+          "The mining slot %d is not between 0 and %d" g m)
+    Data_encoding.(obj2
+                     (req "maximum" int16)
+                     (req "provided" int16))
+    (function Invalid_endorsement_slot (m, g)   -> Some (m, g) | _ -> None)
+    (fun (m, g) -> Invalid_endorsement_slot (m, g)) ;
+  register_error_kind
+    `Permanent
+    ~id:"mining.wrong_level"
+    ~title:"Wrong level"
+    ~description:"The block level is not the expected one"
+    ~pp:(fun ppf (e, g) ->
+        Format.fprintf ppf
+          "The declared level %a is not %a"
+          Raw_level.pp g Raw_level.pp e)
+    Data_encoding.(obj2
+                     (req "expected" Raw_level.encoding)
+                     (req "provided" Raw_level.encoding))
+    (function Wrong_level (e, g)   -> Some (e, g) | _ -> None)
+    (fun (e, g) -> Wrong_level (e, g)) ;
+  register_error_kind
+    `Permanent
+    ~id:"mining.wrong_delegate"
+    ~title:"Wrong delegate"
+    ~description:"The block delegate is not the expected one"
+    ~pp:(fun ppf (e, g) ->
+        Format.fprintf ppf
+          "The declared delegate %a is not %a"
+          Ed25519.Public_key_hash.pp g Ed25519.Public_key_hash.pp e)
+    Data_encoding.(obj2
+                     (req "expected" Ed25519.Public_key_hash.encoding)
+                     (req "provided" Ed25519.Public_key_hash.encoding))
+    (function Wrong_delegate (e, g)   -> Some (e, g) | _ -> None)
+    (fun (e, g) -> Wrong_delegate (e, g)) ;
+  register_error_kind
+    `Permanent
+    ~id:"mining.cannot_pay_mining_bond"
+    ~title:"Cannot pay mining bond"
+    ~description:
+      "Impossible to take the required tokens on the miner's contract"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay the mining bond")
+    Data_encoding.unit
+    (function Cannot_pay_mining_bond -> Some () | _ -> None)
+    (fun () -> Cannot_pay_mining_bond) ;
+  register_error_kind
+    `Permanent
+    ~id:"mining.cannot_pay_endorsement_bond"
+    ~title:"Cannot pay endorsement bond"
+    ~description:
+      "Impossible to take the required tokens on the endorser's contract"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay the endorsement bond")
+    Data_encoding.unit
+    (function Cannot_pay_endorsement_bond -> Some () | _ -> None)
+    (fun () -> Cannot_pay_endorsement_bond)
 
 let minimal_time c priority pred_timestamp =
   let rec cumsum_slot_durations acc durations p =
     if Compare.Int32.(<=) p 0l then
       ok acc
     else match durations with
-      | [] -> Error_monad.error Invalid_slot_durations_constant
+      | [] -> cumsum_slot_durations acc [ Period.one_minute ] p
       | [ last ] ->
          Period.mult p last >>? fun period ->
          Timestamp.(acc +? period)
@@ -56,7 +130,7 @@ let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp >>=? fun minimal_time ->
   Tezos_context.Timestamp.get_current c >>= fun timestamp ->
   fail_unless Timestamp.(minimal_time <= timestamp)
-    (Too_early (minimal_time, timestamp))
+    (Timestamp_too_early (minimal_time, timestamp))
 
 let check_mining_rights c
     { Block.proto = { mining_slot = (raw_level, priority) } }
@@ -64,7 +138,7 @@ let check_mining_rights c
   Level.current c >>=? fun current_level ->
   fail_unless
     Raw_level.(raw_level = current_level.level)
-    (Invalid_level (current_level.Level.level, raw_level)) >>=? fun () ->
+    (Wrong_level (current_level.Level.level, raw_level)) >>=? fun () ->
   let level = Level.from_raw c raw_level in
   Roll.mining_rights_owner c level ~priority >>=? fun delegate ->
   check_timestamp c priority pred_timestamp >>=? fun () ->
@@ -86,12 +160,12 @@ let pay_endorsement_bond c id =
   return (c, bond)
 
 let check_signing_rights c slot delegate =
-  fail_unless Compare.Int.(slot <= Constants.max_signing_slot c)
-    Bad_slot >>=? fun () ->
+  fail_unless Compare.Int.(0 <= slot && slot <= Constants.max_signing_slot c)
+    (Invalid_endorsement_slot (Constants.max_signing_slot c, slot)) >>=? fun () ->
   Level.current c >>=? fun level ->
   Roll.endorsement_rights_owner c level ~slot >>=? fun owning_delegate ->
   fail_unless (Ed25519.Public_key_hash.equal owning_delegate delegate)
-    Bad_delegate
+    (Wrong_delegate (owning_delegate, delegate))
 
 let paying_priorities c =
   0l ---> Constants.first_free_mining_slot c
@@ -198,14 +272,12 @@ let max_fitness_gap ctxt =
   let slots = Int64.of_int (Constants.max_signing_slot ctxt + 1) in
   Int64.add slots 1L
 
-type error += Invalid_fitness_gap
-
-let check_fitness_gap ctxt (block : Block.header)  =
+let check_fitness_gap ctxt (block : Block.header) =
   Fitness.get ctxt >>=? fun current_fitness ->
   Fitness.to_int64 block.shell.fitness >>=? fun announced_fitness ->
   let gap = Int64.sub announced_fitness current_fitness in
   if Compare.Int64.(gap <= 0L || max_fitness_gap ctxt < gap) then
-    fail Invalid_fitness_gap
+    fail (Invalid_fitness_gap (max_fitness_gap ctxt, gap))
   else
     return ()
 

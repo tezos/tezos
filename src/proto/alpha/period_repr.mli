@@ -24,3 +24,7 @@ val of_seconds : int64 -> period tzresult
 val of_seconds_exn : int64 -> period
 
 val mult : int32 -> period -> period tzresult
+
+val one_second : period
+val one_minute : period
+val one_hour : period
