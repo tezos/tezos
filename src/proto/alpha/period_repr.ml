@@ -34,3 +34,6 @@ let mult i p =
   then error Invalid_arg
   else ok (Int64.mul (Int64.of_int32 i) p)
 
+let one_second = of_seconds_exn 1L
+let one_minute = of_seconds_exn 60L
+let one_hour = of_seconds_exn 3600L
