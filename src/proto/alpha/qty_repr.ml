@@ -7,57 +7,72 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module type QTY =
-  sig
-    val id:string
-  end
+module type QTY = sig
+  val id : string
+end
 
-module type S =
-  sig
-    type qty
-    val id : string
-    val zero : qty
-    val ( - ) : qty -> qty -> qty option
-    val ( -? ) : qty -> qty -> qty tzresult
-    val ( +? ) : qty -> qty -> qty tzresult
-    val ( *? ) : qty -> int64 -> qty tzresult
-    val ( / ) : qty -> int64 -> qty
-    val to_cents : qty -> int64
+module type S = sig
+  type qty
 
-    (** [of_cents n] is None if n is negative *)
-    val of_cents : int64 -> qty option
+  type error +=
+    | Addition_overflow of qty * qty (* `Temporary *)
+    | Substraction_underflow of qty * qty (* `Temporary *)
+    | Multiplication_overflow of qty * int64 (* `Temporary *)
+    | Negative_multiplicator of qty * int64 (* `Temporary *)
+    | Invalid_divisor of qty * int64 (* `Temporary *)
 
-    (** [of_cents_exn n] fails if n is negative.
-        It should only be used at toplevel for constants. *)
-    val of_cents_exn : int64 -> qty
+  val id : string
+  val zero : qty
+  val one_cent : qty
+  val fifty_cents : qty
+  val one : qty
 
-    (** It should only be used at toplevel for constants. *)
-    val add_exn : qty -> qty -> qty
+  val ( -? ) : qty -> qty -> qty tzresult
+  val ( +? ) : qty -> qty -> qty tzresult
+  val ( *? ) : qty -> int64 -> qty tzresult
+  val ( /? ) : qty -> int64 -> qty tzresult
 
-    val encoding : qty Data_encoding.t
+  val to_cents : qty -> int64
 
-    val to_int64 : qty -> int64
+  (** [of_cents n] is None if n is negative *)
+  val of_cents : int64 -> qty option
 
-    include Compare.S with type t := qty
+  (** [of_cents_exn n] fails if n is negative.
+      It should only be used at toplevel for constants. *)
+  val of_cents_exn : int64 -> qty
 
-    val pp: Format.formatter -> qty -> unit
+  (** It should only be used at toplevel for constants. *)
+  val add_exn : qty -> qty -> qty
 
-    val of_string: string -> qty option
-    val to_string: qty -> string
+  val encoding : qty Data_encoding.t
 
-  end
+  val to_int64 : qty -> int64
 
-type error +=
-  | Qty_overflow
-  | Negative_qty
-  | Negative_qty_multiplicator
+  include Compare.S with type t := qty
+
+  val pp: Format.formatter -> qty -> unit
+
+  val of_string: string -> qty option
+  val to_string: qty -> string
+
+end
 
 module Make (T: QTY) : S = struct
 
   type qty = int64 (* invariant: positive *)
 
+  type error +=
+    | Addition_overflow of qty * qty (* `Temporary *)
+    | Substraction_underflow of qty * qty (* `Temporary *)
+    | Multiplication_overflow of qty * int64 (* `Temporary *)
+    | Negative_multiplicator of qty * int64 (* `Temporary *)
+    | Invalid_divisor of qty * int64 (* `Temporary *)
+
   include Compare.Int64
   let zero = 0L
+  let one_cent = 1L
+  let fifty_cents = 50L
+  let one = 100L
   let id = T.id
 
   let of_cents t =
@@ -123,13 +138,13 @@ module Make (T: QTY) : S = struct
 
   let (-?) t1 t2 =
     match t1 - t2 with
-    | None -> error Negative_qty
+    | None -> error (Substraction_underflow (t1, t2))
     | Some v -> ok v
 
   let (+?) t1 t2 =
     let t = Int64.add t1 t2 in
     if t < t1
-    then error Qty_overflow
+    then error (Addition_overflow (t1, t2))
     else ok t
 
   let ( *? ) t m =
@@ -137,21 +152,27 @@ module Make (T: QTY) : S = struct
     let open Int64 in
     let rec step cur pow acc =
       if cur = 0L then
-	ok acc
+	      ok acc
       else
-	pow +? pow >>? fun npow ->
-	if logand cur 1L = 1L then
+	      pow +? pow >>? fun npow ->
+        if logand cur 1L = 1L then
           acc +? pow >>? fun nacc ->
           step (shift_right_logical cur 1) npow nacc
-	else
-          step (shift_right_logical cur 1) npow acc
-    in
+	      else
+          step (shift_right_logical cur 1) npow acc in
     if m < 0L then
-      error Negative_qty_multiplicator
+      error (Negative_multiplicator (t, m))
     else
-      step m t 0L
+      match step m t 0L with
+      | Ok res -> Ok res
+      | Error ([ Addition_overflow _ ] as errs) ->
+          Error (Multiplication_overflow (t, m) :: errs)
 
-  let (/) t1 t2 = Int64.div t1 t2
+  let ( /? ) t d =
+    if d <= 0L then
+      error (Invalid_divisor (t, d))
+    else
+      ok (Int64.div t d)
 
   let add_exn t1 t2 =
     let t = Int64.add t1 t2 in
@@ -173,5 +194,74 @@ module Make (T: QTY) : S = struct
     describe
       ~title: "Amount in centiles"
       (conv to_int64 (Json.wrap_error of_cents_exn) int64)
+
+  let () =
+    let open Data_encoding in
+    register_error_kind
+      `Temporary
+      ~id:(T.id ^ ".addition_overflow")
+      ~title:("Overflowing " ^ T.id ^ " addition")
+      ~pp: (fun ppf (opa, opb) ->
+          Format.fprintf ppf "Overflowing addition of %a %s and %a %s"
+            pp opa T.id pp opb T.id)
+      ~description:
+        ("An addition of two " ^ T.id ^ " amounts overflowed")
+      (obj1 (req "amounts" (tup2 encoding encoding)))
+      (function Addition_overflow (a, b) -> Some (a, b) | _ -> None)
+      (fun (a, b) -> Addition_overflow (a, b)) ;
+    register_error_kind
+      `Temporary
+      ~id:(T.id ^ ".substraction_underflow")
+      ~title:("Underflowing " ^ T.id ^ " substraction")
+      ~pp: (fun ppf (opa, opb) ->
+          Format.fprintf ppf "Underflowing substraction of %a %s and %a %s"
+            pp opa T.id pp opb T.id)
+      ~description:
+        ("An substraction of two " ^ T.id ^ " amounts underflowed")
+      (obj1 (req "amounts" (tup2 encoding encoding)))
+      (function Substraction_underflow (a, b) -> Some (a, b) | _ -> None)
+      (fun (a, b) -> Substraction_underflow (a, b)) ;
+    register_error_kind
+      `Temporary
+      ~id:(T.id ^ ".multiplication_overflow")
+      ~title:("Overflowing " ^ T.id ^ " multiplication")
+      ~pp: (fun ppf (opa, opb) ->
+          Format.fprintf ppf "Overflowing multiplication of %a %s and %Ld"
+            pp opa T.id opb)
+      ~description:
+        ("A multiplication of a " ^ T.id ^ " amount by an integer overflowed")
+      (obj2
+         (req "amount" encoding)
+         (req "multiplicator" int64))
+      (function Multiplication_overflow (a, b) -> Some (a, b) | _ -> None)
+      (fun (a, b) -> Multiplication_overflow (a, b)) ;
+    register_error_kind
+      `Temporary
+      ~id:(T.id ^ ".negative_multiplicator")
+      ~title:("Negative " ^ T.id ^ " multiplicator")
+      ~pp: (fun ppf (opa, opb) ->
+          Format.fprintf ppf "Multiplication of %a %s by negative integer %Ld"
+            pp opa T.id opb)
+      ~description:
+        ("Multiplication of a " ^ T.id ^ " amount by a negative integer")
+      (obj2
+         (req "amount" encoding)
+         (req "multiplicator" int64))
+      (function Negative_multiplicator (a, b) -> Some (a, b) | _ -> None)
+      (fun (a, b) -> Negative_multiplicator (a, b)) ;
+    register_error_kind
+      `Temporary
+      ~id:(T.id ^ ".invalid_divisor")
+      ~title:("Invalid " ^ T.id ^ " divisor")
+      ~pp: (fun ppf (opa, opb) ->
+          Format.fprintf ppf "Division of %a %s by non positive integer %Ld"
+            pp opa T.id opb)
+      ~description:
+        ("Multiplication of a " ^ T.id ^ " amount by a non positive integer")
+      (obj2
+         (req "amount" encoding)
+         (req "divisor" int64))
+      (function Invalid_divisor (a, b) -> Some (a, b) | _ -> None)
+      (fun (a, b) -> Invalid_divisor (a, b))
 
 end

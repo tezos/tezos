@@ -104,10 +104,9 @@ module Contract = struct
 
   let consume_roll_change c contract =
     Storage.Roll.Contract_change.get c contract >>=? fun change ->
-    match Tez_repr.(change - Constants_repr.roll_value) with
-    | None -> fail Consume_roll_change
-    | Some new_change ->
-        Storage.Roll.Contract_change.set c contract new_change
+    trace Consume_roll_change
+      (Lwt.return Tez_repr.(change -? Constants_repr.roll_value)) >>=? fun new_change ->
+    Storage.Roll.Contract_change.set c contract new_change
 
   let recover_roll_change c contract =
     Storage.Roll.Contract_change.get c contract >>=? fun change ->
@@ -170,28 +169,26 @@ module Contract = struct
     Lwt.return Tez_repr.(amount +? change) >>=? fun change ->
     Storage.Roll.Contract_change.set c contract change >>=? fun c ->
     let rec loop c change =
-      match Tez_repr.(change - Constants_repr.roll_value) with
-      | None -> Lwt.return (Ok c)
-      | Some change ->
-          create_roll_in_contract c contract >>=? fun c ->
-          loop c change in
+      if Tez_repr.(change < Constants_repr.roll_value) then
+        return c
+      else
+        Lwt.return Tez_repr.(change -? Constants_repr.roll_value) >>=? fun  change ->
+        create_roll_in_contract c contract >>=? fun c ->
+        loop c change in
     loop c change
 
   let remove_amount c contract amount =
     let rec loop c change =
       if Tez_repr.(amount <= change)
-      then Lwt.return (Ok (c, change))
+      then return (c, change)
       else
         pop_roll_from_contract c contract >>=? fun (_, c) ->
         Lwt.return Tez_repr.(change +? Constants_repr.roll_value) >>=? fun change ->
-        loop c change
-    in
+        loop c change in
     Storage.Roll.Contract_change.get c contract >>=? fun change ->
     loop c change >>=? fun (c, change) ->
-    match Tez_repr.(change - amount) with
-    | None -> assert false
-    | Some change ->
-        Storage.Roll.Contract_change.set c contract change
+    Lwt.return Tez_repr.(change -? amount) >>=? fun change ->
+    Storage.Roll.Contract_change.set c contract change
 
   let assert_empty c contract =
     Storage.Roll.Contract_change.get c contract >>=? fun change ->

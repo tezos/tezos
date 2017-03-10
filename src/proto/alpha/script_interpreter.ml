@@ -13,8 +13,8 @@ open Script
 open Script_typed_ir
 open Script_ir_translator
 
-let dummy_code_fee = Tez.zero
-let dummy_storage_fee = Tez.zero
+let dummy_code_fee = Tez.fifty_cents
+let dummy_storage_fee = Tez.fifty_cents
 
 (* ---- Run-time errors -----------------------------------------------------*)
 
