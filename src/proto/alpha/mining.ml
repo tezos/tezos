@@ -111,8 +111,8 @@ type error += Incorect_priority
 let endorsement_reward ~block_priority:prio =
   if Compare.Int32.(prio >= 0l)
   then
-    return
-      Tez.(Constants.endorsement_reward / (Int64.(succ (of_int32 prio))))
+    Lwt.return
+      Tez.(Constants.endorsement_reward /? (Int64.(succ (of_int32 prio))))
   else fail Incorect_priority
 
 let mining_priorities c level =

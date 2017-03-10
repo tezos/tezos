@@ -32,11 +32,14 @@ module Tez : sig
   type tez = t
 
   val zero: tez
-  val ( - ) : tez -> tez -> tez option
+  val one_cent : tez
+  val fifty_cents : tez
+  val one : tez
+
   val ( -? ) : tez -> tez -> tez tzresult
   val ( +? ) : tez -> tez -> tez tzresult
   val ( *? ) : tez -> int64 -> tez tzresult
-  val ( / ) : tez -> int64 -> tez
+  val ( /? ) : tez -> int64 -> tez tzresult
 
   val of_string: string -> tez option
   val to_string: tez -> string

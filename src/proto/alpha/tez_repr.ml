@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Qty_repr.Make (struct let id="tez" end)
+include Qty_repr.Make (struct let id = "tez" end)
 
 type t = qty
 type tez = qty
