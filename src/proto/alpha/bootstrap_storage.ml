@@ -59,13 +59,13 @@ let refill ctxt =
      of tokens. *)
   let accounts = accounts ctxt in
   let min_balance =
-    Tez_repr.(total / 2L / (Int64.of_int (List.length accounts))) in
+    Tez_repr.(total /? 2L >>? fun r -> r /? (Int64.of_int (List.length accounts))) in
   fold_left_s
     (fun ctxt account ->
        let contract =
          Contract_repr.default_contract account.public_key_hash in
        Contract_storage.get_balance ctxt contract >>=? fun balance ->
-       match Tez_repr.(min_balance -? balance) with
+       match Tez_repr.(min_balance >>? fun r -> r -? balance) with
        | Error _ -> return ctxt
        | Ok tez -> Contract_storage.credit ctxt contract tez)
     ctxt
