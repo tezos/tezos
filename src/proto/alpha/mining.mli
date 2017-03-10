@@ -11,6 +11,14 @@
 open Tezos_context
 open Misc
 
+type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
+type error += Invalid_endorsement_slot of int * int (* `Permanent *)
+type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
+type error += Wrong_level of Raw_level.t * Raw_level.t (* `Permanent *)
+type error += Wrong_delegate of public_key_hash * public_key_hash (* `Permanent *)
+type error += Cannot_pay_mining_bond (* `Permanent *)
+type error += Cannot_pay_endorsement_bond (* `Permanent *)
+
 val paying_priorities: context -> int32 list
 
 val minimal_time:
@@ -84,8 +92,6 @@ val check_signature:
 val check_hash: Block_hash.t -> int64 -> bool
 val check_proof_of_work_stamp:
   context -> Block.header -> unit tzresult Lwt.t
-
-type error += Invalid_fitness_gap
 
 val check_fitness_gap:
   context -> Block.header -> unit tzresult Lwt.t

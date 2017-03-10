@@ -57,6 +57,10 @@ module Period : sig
   val of_seconds: int64 -> period tzresult
   val mult: int32 -> period -> period tzresult
 
+  val one_second : period
+  val one_minute : period
+  val one_hour : period
+
 end
 
 module Timestamp : sig
