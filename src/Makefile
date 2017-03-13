@@ -8,7 +8,7 @@ TZCLIENT=../tezos-client
 TZWEBCLIENT=../tezos-webclient
 TZATTACKER=../tezos-attacker
 
-all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT} ${TZWEBCLIENT} # ${TZATTACKER}
+all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT} # ${TZWEBCLIENT} ${TZATTACKER}
 
 
 NODEPS :=
