@@ -124,6 +124,9 @@ module Network : sig
   val stat :
     (unit, unit, unit, P2p.Stat.t) RPC.service
 
+  val versions :
+    (unit, unit, unit, P2p.Version.t list) RPC.service
+
   val events :
     (unit, unit, unit, P2p.RPC.Event.t) RPC.service
 
