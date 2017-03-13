@@ -461,6 +461,10 @@ let build_rpc_directory node =
     RPC.register0 dir Services.Network.stat implementation in
   let dir =
     let implementation () =
+      RPC.Answer.return Distributed_db.Raw.supported_versions in
+    RPC.register0 dir Services.Network.versions implementation in
+  let dir =
+    let implementation () =
       let stream, stopper = Node.RPC.Network.watch node in
       let shutdown () = Watcher.shutdown stopper in
       let next () = Lwt_stream.get stream in

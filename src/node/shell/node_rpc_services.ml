@@ -509,6 +509,13 @@ module Network = struct
       ~construct:Point.to_string
       ()
 
+  let versions =
+    RPC.service
+      ~description:"Supported network layer versions."
+      ~input: empty
+      ~output: (list P2p.Version.encoding)
+      RPC.Path.(root / "network" / "versions")
+
   let stat =
     RPC.service
       ~description:"Global network bandwidth statistics in B/s."
