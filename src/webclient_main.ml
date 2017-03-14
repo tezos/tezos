@@ -69,9 +69,9 @@ let eval_command argv =
          | Arg.Bad help ->
              Format.asprintf "%s%!" help
          | Cli_entries.Command_not_found ->
-             Format.asprintf "Unkonwn command, try `-help`.\n%!"
+             Format.asprintf "Unknown command, try `-help`.\n%!"
          | Client_commands.Version_not_found ->
-             Format.asprintf "Unkonwn protocol version, try `list versions`.\n%!"
+             Format.asprintf "Unknown protocol version, try `list versions`.\n%!"
          | Cli_entries.Bad_argument (idx, _n, v) ->
              Format.asprintf "There's a problem with argument %d, %s.\n%!" idx v
          | Cli_entries.Command_failed message ->
