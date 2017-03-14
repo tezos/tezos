@@ -167,7 +167,8 @@ module Helpers = struct
     call_error_service2 cctxt Services.Helpers.levels block cycle ()
 
   module Rights = struct
-    type slot = Raw_level.t * int * Time.t option
+    type mining_slot = Raw_level.t * int * Time.t
+    type endorsement_slot = Raw_level.t * int
     let mining_rights_for_delegate cctxt
         b c ?max_priority ?first_level ?last_level () =
       call_error_service2 cctxt Services.Helpers.Rights.mining_rights_for_delegate

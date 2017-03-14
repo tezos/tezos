@@ -339,13 +339,12 @@ let mining_rights_for_delegate
       Mining.first_mining_priorities
         ctxt ~max_priority contract level >>=? fun priorities ->
       let raw_level = level.level in
-      Lwt_list.map_p
+      Error_monad.map_s
         (fun priority ->
           Tezos_context.Timestamp.get_current ctxt >>= fun timestamp ->
-           Mining.minimal_time ctxt priority timestamp >>= function
-           | Ok time -> Lwt.return (raw_level, Int32.to_int priority, Some time)
-           | Error _ -> Lwt.return (raw_level, Int32.to_int priority, None))
-        priorities >>= fun priorities ->
+           Mining.minimal_time ctxt priority timestamp >>=? fun time ->
+           return (raw_level, Int32.to_int priority, time))
+        priorities >>=? fun priorities ->
       return (priorities @ t)
   in
   loop min_level
@@ -410,7 +409,7 @@ let endorsement_rights_for_delegate
       let raw_level = level.level in
       let slots =
         List.rev_map
-          (fun slot -> (raw_level, Int32.to_int slot, None))
+          (fun slot -> (raw_level, Int32.to_int slot))
           slots in
       return (List.rev_append slots t)
   in
