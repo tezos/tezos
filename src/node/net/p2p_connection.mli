@@ -36,6 +36,8 @@ type 'msg t
 (** Type of an accepted connection, parametrized by the type of
     messages exchanged between peers. *)
 
+val equal: 'mst t -> 'msg t -> bool
+
 val pp : Format.formatter -> 'msg t -> unit
 val info: 'msg t -> Connection_info.t
 

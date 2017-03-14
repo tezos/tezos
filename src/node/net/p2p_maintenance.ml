@@ -29,7 +29,7 @@ type 'meta t = {
   disco: P2p_discovery.t option ;
   just_maintained: unit Lwt_condition.t ;
   please_maintain: unit Lwt_condition.t ;
-  mutable worker : unit Lwt.t ;
+  mutable maintain_worker : unit Lwt.t ;
 }
 
 (** Select [expected] points amongst the disconnected known points.
@@ -37,6 +37,7 @@ type 'meta t = {
     failed after [start_time]. It first selects points with the oldest
     last tentative. *)
 let connectable st start_time expected =
+  let Pool pool = st.pool in
   let now = Time.now () in
   let module Bounded_point_info =
     Utils.Bounded(struct
@@ -49,9 +50,7 @@ let connectable st start_time expected =
         | Some t1, Some t2 -> Time.compare t2 t1
     end) in
   let acc = Bounded_point_info.create expected in
-  let Pool pool = st.pool in
-  P2p_connection_pool.Points.fold_known
-    pool ~init:()
+  P2p_connection_pool.Points.fold_known pool ~init:()
     ~f:begin fun point pi () ->
       match Point_info.State.get pi with
       | Disconnected -> begin
@@ -125,7 +124,7 @@ and too_few_connections st n_connected =
     P2p_connection_pool.broadcast_bootstrap_msg pool ;
     Lwt_utils.protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
-        P2p_connection_pool.PoolEvent.wait_new_peer pool ;
+        P2p_connection_pool.Pool_event.wait_new_peer pool ;
         Lwt_unix.sleep 5.0 (* TODO exponential back-off ??
                                    or wait for the existence of a
                                    non grey-listed peer ?? *)
@@ -139,7 +138,7 @@ and too_many_connections st n_connected =
   (* too many connections, start the russian roulette *)
   let to_kill = n_connected - st.bounds.max_target in
   lwt_debug "Too many connections, will kill %d" to_kill >>= fun () ->
-  snd @@ P2p_connection_pool.fold_connections pool
+  snd @@ P2p_connection_pool.Connection.fold pool
     ~init:(to_kill, Lwt.return_unit)
     ~f:(fun _ conn (i, t) ->
         if i = 0 then (0, t)
@@ -148,36 +147,46 @@ and too_many_connections st n_connected =
   maintain st
 
 let rec worker_loop st =
+  let Pool pool = st.pool in
   begin
-    let Pool pool = st.pool in
     Lwt_utils.protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
         Lwt_unix.sleep 120. ; (* every two minutes *)
         Lwt_condition.wait st.please_maintain ; (* when asked *)
-        P2p_connection_pool.PoolEvent.wait_too_few_connections pool ; (* limits *)
-        P2p_connection_pool.PoolEvent.wait_too_many_connections pool
+        P2p_connection_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
+        P2p_connection_pool.Pool_event.wait_too_many_connections pool
       ] >>= fun () ->
       return ()
     end >>=? fun () ->
-    maintain st
+    let n_connected = P2p_connection_pool.active_connections pool in
+    if n_connected < st.bounds.min_threshold
+       || st.bounds.max_threshold < n_connected then
+      maintain st
+    else begin
+      P2p_connection_pool.send_swap_request pool ;
+      return ()
+    end
   end >>= function
   | Ok () -> worker_loop st
   | Error [Lwt_utils.Canceled] -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
-let run ?(connection_timeout = 5.) bounds pool disco =
+let run ~connection_timeout bounds pool disco =
   let canceler = Canceler.create () in
   let st = {
-    canceler ; connection_timeout ;
-    bounds ; pool = Pool pool ; disco ;
+    canceler ;
+    connection_timeout ;
+    bounds ;
+    pool = Pool pool ;
+    disco ;
     just_maintained = Lwt_condition.create () ;
     please_maintain = Lwt_condition.create () ;
-    worker = Lwt.return_unit ;
+    maintain_worker = Lwt.return_unit ;
   } in
-  st.worker <-
+  st.maintain_worker <-
     Lwt_utils.worker "maintenance"
       (fun () -> worker_loop st)
-      (fun () -> Canceler.cancel canceler);
+      (fun () -> Canceler.cancel canceler) ;
   st
 
 let maintain { just_maintained ; please_maintain } =
@@ -185,8 +194,12 @@ let maintain { just_maintained ; please_maintain } =
   Lwt_condition.broadcast please_maintain () ;
   wait
 
-let shutdown { canceler ; worker ; just_maintained } =
+let shutdown {
+    canceler ;
+    maintain_worker ;
+    just_maintained } =
   Canceler.cancel canceler >>= fun () ->
-  worker >>= fun () ->
+  maintain_worker >>= fun () ->
   Lwt_condition.broadcast just_maintained () ;
   Lwt.return_unit
+

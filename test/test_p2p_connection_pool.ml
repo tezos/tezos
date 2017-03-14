@@ -40,7 +40,7 @@ let rec connect ~timeout pool point =
   lwt_log_info "Connect to %a" Point.pp point >>= fun () ->
   P2p_connection_pool.connect pool point ~timeout >>= function
   | Error [P2p_connection_pool.Connected] -> begin
-      match P2p_connection_pool.Points.find_connection pool point with
+      match P2p_connection_pool.Connection.find_by_point pool point with
       | Some conn -> return conn
       | None -> failwith "Woops..."
     end
@@ -148,6 +148,7 @@ let make_net points repeat n =
     known_points_history_size = 100 ;
     max_known_points = None ;
     max_known_peer_ids = None ;
+    swap_linger = 0. ;
     } in
   Process.detach
     ~prefix:(Format.asprintf "%a " Peer_id.pp identity.peer_id)

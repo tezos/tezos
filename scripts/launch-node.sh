@@ -27,7 +27,7 @@ node="$src_dir/tezos-node"
 cleanup () {
     set +e
     echo Cleaning up...
-#    rm -rf "$data_dir"
+    rm -rf "$data_dir"
 }
 trap cleanup EXIT INT
 

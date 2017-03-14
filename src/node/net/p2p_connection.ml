@@ -206,10 +206,15 @@ let authenticate
   return (info, (fd, info, cryptobox_data))
 
 type connection = {
+  id : int ;
   info : Connection_info.t ;
   fd : P2p_io_scheduler.connection ;
   cryptobox_data : Crypto.data ;
 }
+
+let next_conn_id =
+  let cpt = ref 0 in
+  fun () -> incr cpt ;!cpt
 
 module Reader = struct
 
@@ -349,6 +354,9 @@ type 'msg t = {
   writer : 'msg Writer.t ;
 }
 
+let equal { conn = { id = id1 } } { conn = { id = id2 } } = id1 = id2
+
+
 let pp ppf { conn } = Connection_info.pp ppf conn.info
 let info { conn } = conn.info
 
@@ -367,7 +375,7 @@ let accept
   end >>=? fun accepted ->
   fail_unless accepted Rejected >>=? fun () ->
   let canceler = Canceler.create () in
-  let conn = { fd ; info ; cryptobox_data } in
+  let conn = { id = next_conn_id (); fd ; info ; cryptobox_data } in
   let reader =
     Reader.run ?size:incoming_message_queue_size conn encoding canceler
   and writer =

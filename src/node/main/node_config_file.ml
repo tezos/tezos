@@ -72,6 +72,7 @@ let default_net_limits : P2p.limits = {
   known_peer_ids_history_size = 500 ;
   max_known_points = Some (400, 300) ;
   max_known_peer_ids = Some (400, 300) ;
+  swap_linger = 30. ;
 }
 
 let default_net = {
@@ -115,10 +116,11 @@ let limit : P2p.limits Data_encoding.t =
            incoming_message_queue_size ; outgoing_message_queue_size ;
            known_points_history_size ; known_peer_ids_history_size ;
            max_known_points ; max_known_peer_ids ;
+           swap_linger ;
          } ->
       ( ( authentification_timeout, min_connections, expected_connections,
           max_connections, backlog, max_incoming_connections,
-          max_download_speed, max_upload_speed) ,
+          max_download_speed, max_upload_speed, swap_linger) ,
         ( read_buffer_size, read_queue_size, write_queue_size,
           incoming_app_message_queue_size,
           incoming_message_queue_size, outgoing_message_queue_size,
@@ -127,7 +129,7 @@ let limit : P2p.limits Data_encoding.t =
         )))
     (fun ( ( authentification_timeout, min_connections, expected_connections,
              max_connections, backlog, max_incoming_connections,
-             max_download_speed, max_upload_speed) ,
+             max_download_speed, max_upload_speed, swap_linger) ,
            ( read_buffer_size, read_queue_size, write_queue_size,
              incoming_app_message_queue_size,
              incoming_message_queue_size, outgoing_message_queue_size,
@@ -141,10 +143,9 @@ let limit : P2p.limits Data_encoding.t =
         incoming_app_message_queue_size ;
         incoming_message_queue_size ; outgoing_message_queue_size ;
         known_points_history_size ; known_peer_ids_history_size ;
-        max_known_points ; max_known_peer_ids
-      })
+        max_known_points ; max_known_peer_ids ; swap_linger })
     (merge_objs
-       (obj8
+       (obj9
           (dft "authentification-timeout"
              float default_net_limits.authentification_timeout)
           (dft "min-connections" uint16
@@ -158,7 +159,8 @@ let limit : P2p.limits Data_encoding.t =
           (dft "max-incoming-connections" uint8
              default_net_limits.max_incoming_connections)
           (opt "max-download-speed" int31)
-          (opt "max-upload-speed" int31))
+          (opt "max-upload-speed" int31)
+          (dft "swap-linger" float default_net_limits.swap_linger))
        (obj10
           (dft "read-buffer-size" int31
              default_net_limits.read_buffer_size)
