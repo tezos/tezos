@@ -111,8 +111,8 @@ let get_signing_slots cctxt ?max_priority block delegate level =
     ?max_priority ~first_level:level ~last_level:level
     block delegate () >>=? fun possibilities ->
   let slots =
-    List.map (fun (_,slot,_) -> slot)
-    @@ List.filter (fun (l, _, _) -> l = level) possibilities in
+    List.map (fun (_,slot) -> slot)
+    @@ List.filter (fun (l, _) -> l = level) possibilities in
   return slots
 
 let inject_endorsement cctxt
