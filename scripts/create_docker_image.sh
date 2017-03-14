@@ -25,8 +25,8 @@ cleanup () {
 trap cleanup EXIT INT
 
 sed scripts/Dockerfile.build_bin.in \
-    -e 's/$base_name/'"$build_deps_image_name"'/g' \
-    -e 's/$base_version/'"$image_version"'/g'  > Dockerfile
+    -e 's|$base_name|'"$build_deps_image_name"'|g' \
+    -e 's|$base_version|'"$image_version"'|g'  > Dockerfile
 
 echo Building tezos...
 tmp_image="$(docker build -q .)"
@@ -36,5 +36,5 @@ docker cp "$tmp_container":/home/opam/bin/ bin
 
 echo Building minimal docker image...
 sed scripts/Dockerfile.binaries.in \
-    -e 's/$alpine_version/'"$alpine_version"'/g' > Dockerfile
+    -e 's|$alpine_version|'"$alpine_version"'|g' > Dockerfile
 docker build -q -t "$image_name:$image_version" .

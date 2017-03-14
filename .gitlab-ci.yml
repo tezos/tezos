@@ -117,14 +117,9 @@ build:docker:
   stage: build_docker
   image: docker:latest
   tags:
-    - docker_builder
+    - public_docker_builder
   script:
-    - source scripts/version.sh
-    - sed scripts/Dockerfile.binaries.in
-          -e 's/$alpine_version/'"$alpine_version"'/g' > Dockerfile
-    - mkdir bin
-    - cp tezos-client tezos-node tezos-protocol-compiler bin/
-    - docker build -q -t "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}" .
+    - ./scripts/create_docker_image.sh "${CI_REGISTRY_IMAGE}" "${CI_BUILD_REF}" .
     - docker login -u gitlab-ci-token -p "$CI_BUILD_TOKEN" "${CI_REGISTRY}"
     - docker tag "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}"
                  "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}"
@@ -135,7 +130,7 @@ publish:docker:
   stage: publish
   image: docker:latest
   tags:
-    - docker_builder
+    - public_docker_builder
   only:
     - master@tezos/tezos
     - alphanet@tezos/tezos
@@ -184,6 +179,18 @@ cleanup:
     - docker tag "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}_build_deps"
                  "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF_NAME}_build_deps"
     - docker rmi "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}_build_deps"
+  when: always
+  allow_failure: true
+
+cleanup:public:
+  stage: cleanup
+  image: docker:latest
+  tags:
+    - public_docker_builder
+  only:
+    - master@tezos/tezos
+    - alphanet@tezos/tezos
+  script:
     - docker rmi "${CI_REGISTRY_IMAGE}:${CI_BUILD_REF}"
   when: always
   allow_failure: true
