@@ -151,9 +151,14 @@ let check_endorsement cctxt level slot =
 let forge_endorsement cctxt
     block ?(force = false)
     ~src_sk ?slot ?max_priority src_pk =
+  let block =
+    match block with
+    | `Prevalidation -> `Head 0
+    | `Test_prevalidation -> `Test_head 0
+    | _ -> block in
   let src_pkh = Ed25519.Public_key.hash src_pk in
-  Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
-  let level = Raw_level.succ @@ level.level in
+  Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
+  let level = Raw_level.succ level.level in
   begin
     match slot with
     | Some slot -> return slot
