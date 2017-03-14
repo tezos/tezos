@@ -108,6 +108,11 @@ type config = {
 
   max_known_peer_ids : (int * int) option ;
   (** Like [max_known_points], but for known peer_ids. *)
+
+  swap_linger : float ;
+  (** Peer swapping does not occur more than once during a timespan of
+      [spap_linger] seconds. *)
+
 }
 
 type 'meta meta_config = {
@@ -142,13 +147,12 @@ val pool_stat: ('msg, 'meta) pool -> Stat.t
 (** [pool_stat pool] is a snapshot of current bandwidth usage for the
     entire [pool]. *)
 
-val score: ('msg, 'meta) pool -> 'meta -> float
-(** [score pool meta] is the floating-point score of [meta] using
-    [pool]'s metrics. *)
+val send_swap_request: ('msg, 'meta) pool -> unit
 
 (** {2 Pool events} *)
 
-module PoolEvent : sig
+module Pool_event : sig
+
   val wait_too_few_connections: ('msg, 'meta) pool -> unit Lwt.t
   (** [wait_too_few_connections pool] is determined when the number of
       connections drops below the desired level. *)
@@ -164,53 +168,8 @@ module PoolEvent : sig
   val wait_new_connection: ('msg, 'meta) pool -> unit Lwt.t
   (** [wait_new_connection pool] is determined when a new connection is
       succesfully established in the pool. *)
+
 end
-
-module LogEvent : sig
-  type t =
-    (** Pool-level events *)
-
-    | Too_few_connections
-    | Too_many_connections
-
-    | New_point of Point.t
-    | New_peer of Peer_id.t
-
-    (** Connection-level events *)
-
-    | Incoming_connection of Point.t
-    (** We accept(2)-ed an incoming connection *)
-    | Outgoing_connection of Point.t
-    (** We connect(2)-ed to a remote endpoint *)
-    | Authentication_failed of Point.t
-    (** Remote point failed authentication *)
-
-    | Accepting_request of Point.t * Id_point.t * Peer_id.t
-    (** We accepted a connection after authentifying the remote peer. *)
-    | Rejecting_request of Point.t * Id_point.t * Peer_id.t
-    (** We rejected a connection after authentifying the remote peer. *)
-    | Request_rejected of Point.t * (Id_point.t * Peer_id.t) option
-    (** The remote peer rejected our connection. *)
-
-    | Connection_established of Id_point.t * Peer_id.t
-    (** We succesfully established a authentified connection. *)
-
-    | Disconnection of Peer_id.t
-    (** We decided to close the connection. *)
-    | External_disconnection of Peer_id.t
-    (** The connection was closed for external reason. *)
-
-    | Gc_points
-    (** Garbage collection of known point table has been triggered. *)
-    | Gc_peer_ids
-    (** Garbage collection of known peer_ids table has been triggered. *)
-
-  val encoding : t Data_encoding.t
-end
-
-val watch: ('msg, 'meta) pool -> LogEvent.t Lwt_stream.t * Watcher.stopper
-(** [watch pool] is a [stream, close] a [stream] of events and a
-    [close] function for this stream. *)
 
 (** {1 Connections management} *)
 
@@ -245,17 +204,30 @@ val disconnect:
 (** [disconnect conn] cleanly closes [conn] and returns after [conn]'s
     internal worker has returned. *)
 
-val connection_info: ('msg, 'meta) connection -> Connection_info.t
+module Connection : sig
 
-val connection_stat:  ('msg, 'meta) connection -> Stat.t
-(** [stat conn] is a snapshot of current bandwidth usage for
-    [conn]. *)
+  val info: ('msg, 'meta) connection -> Connection_info.t
 
-val fold_connections:
-  ('msg, 'meta) pool ->
-  init:'a ->
-  f:(Peer_id.t ->  ('msg, 'meta) connection -> 'a -> 'a) ->
-  'a
+  val stat:  ('msg, 'meta) connection -> Stat.t
+  (** [stat conn] is a snapshot of current bandwidth usage for
+      [conn]. *)
+
+  val fold:
+    ('msg, 'meta) pool ->
+    init:'a ->
+    f:(Peer_id.t ->  ('msg, 'meta) connection -> 'a -> 'a) ->
+    'a
+
+  val list:
+    ('msg, 'meta) pool -> (Peer_id.t * ('msg, 'meta) connection) list
+
+  val find_by_point:
+    ('msg, 'meta) pool -> Point.t ->  ('msg, 'meta) connection option
+
+  val find_by_peer_id:
+    ('msg, 'meta) pool -> Peer_id.t ->  ('msg, 'meta) connection option
+
+end
 
 val on_new_connection:
   ('msg, 'meta) pool ->
@@ -304,16 +276,13 @@ module Peer_ids : sig
   val info:
     ('msg, 'meta) pool -> Peer_id.t -> ('msg, 'meta) info option
 
-  val get_metadata: ('msg, 'meta) pool -> Peer_id.t -> 'meta option
+  val get_metadata: ('msg, 'meta) pool -> Peer_id.t -> 'meta
   val set_metadata: ('msg, 'meta) pool -> Peer_id.t -> 'meta -> unit
-  val get_score: ('msg, 'meta) pool -> Peer_id.t -> float option
+  val get_score: ('msg, 'meta) pool -> Peer_id.t -> float
 
   val get_trusted: ('msg, 'meta) pool -> Peer_id.t -> bool
   val set_trusted: ('msg, 'meta) pool -> Peer_id.t -> unit
   val unset_trusted: ('msg, 'meta) pool -> Peer_id.t -> unit
-
-  val find_connection:
-    ('msg, 'meta) pool -> Peer_id.t ->  ('msg, 'meta) connection option
 
   val fold_known:
     ('msg, 'meta) pool ->
@@ -342,9 +311,6 @@ module Points : sig
   val set_trusted: ('msg, 'meta) pool -> Point.t -> unit
   val unset_trusted: ('msg, 'meta) pool -> Point.t -> unit
 
-  val find_connection:
-    ('msg, 'meta) pool -> Point.t ->  ('msg, 'meta) connection option
-
   val fold_known:
     ('msg, 'meta) pool ->
     init:'a ->
@@ -359,6 +325,70 @@ module Points : sig
 
 end
 
+module Log_event : sig
+
+  type t =
+
+    (** Pool-level events *)
+
+    | Too_few_connections
+    | Too_many_connections
+
+    | New_point of Point.t
+    | New_peer of Peer_id.t
+
+    | Gc_points
+    (** Garbage collection of known point table has been triggered. *)
+    | Gc_peer_ids
+    (** Garbage collection of known peer_ids table has been triggered. *)
+
+    (** Connection-level events *)
+
+    | Incoming_connection of Point.t
+    (** We accept(2)-ed an incoming connection *)
+    | Outgoing_connection of Point.t
+    (** We connect(2)-ed to a remote endpoint *)
+    | Authentication_failed of Point.t
+    (** Remote point failed authentication *)
+
+    | Accepting_request of Point.t * Id_point.t * Peer_id.t
+    (** We accepted a connection after authentifying the remote peer. *)
+    | Rejecting_request of Point.t * Id_point.t * Peer_id.t
+    (** We rejected a connection after authentifying the remote peer. *)
+    | Request_rejected of Point.t * (Id_point.t * Peer_id.t) option
+    (** The remote peer rejected our connection. *)
+
+    | Connection_established of Id_point.t * Peer_id.t
+    (** We succesfully established a authentified connection. *)
+
+    | Swap_request_received of { source : Peer_id.t }
+    (** A swap request has been received. *)
+    | Swap_ack_received of { source : Peer_id.t }
+    (** A swap ack has been received *)
+    | Swap_request_sent of { source : Peer_id.t }
+    (** A swap request has been sent *)
+    | Swap_ack_sent of { source : Peer_id.t }
+    (** A swap ack has been sent *)
+    | Swap_request_ignored of { source : Peer_id.t }
+    (** A swap request has been ignored *)
+    | Swap_success of { source : Peer_id.t }
+    (** A swap operation has succeeded *)
+    | Swap_failure of { source : Peer_id.t }
+    (** A swap operation has failed *)
+
+    | Disconnection of Peer_id.t
+    (** We decided to close the connection. *)
+    | External_disconnection of Peer_id.t
+    (** The connection was closed for external reason. *)
+
+  val encoding : t Data_encoding.t
+
+end
+
+val watch: ('msg, 'meta) pool -> Log_event.t Lwt_stream.t * Watcher.stopper
+(** [watch pool] is a [stream, close] a [stream] of events and a
+    [close] function for this stream. *)
+
 (**/**)
 
 module Message : sig
@@ -366,6 +396,8 @@ module Message : sig
   type 'msg t =
     | Bootstrap
     | Advertise of Point.t list
+    | Swap_request of Point.t * Peer_id.t
+    | Swap_ack of Point.t * Peer_id.t
     | Message of 'msg
     | Disconnect
 

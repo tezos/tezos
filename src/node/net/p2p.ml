@@ -66,6 +66,9 @@ type limits = {
   known_points_history_size : int ;
   max_known_peer_ids : (int * int) option ;
   max_known_points : (int * int) option ;
+
+  swap_linger : float ;
+
 }
 
 let create_scheduler limits =
@@ -100,6 +103,7 @@ let create_connection_pool config limits meta_cfg msg_cfg io_sched =
     known_points_history_size = limits.known_points_history_size ;
     max_known_points = limits.max_known_points ;
     max_known_peer_ids = limits.max_known_peer_ids ;
+    swap_linger = limits.swap_linger ;
   }
   in
   let pool =
@@ -130,7 +134,8 @@ let create_maintenance_worker limits pool disco =
       limits.max_connections
   in
   P2p_maintenance.run
-    ~connection_timeout:limits.authentification_timeout bounds pool disco
+    ~connection_timeout:limits.authentification_timeout
+    bounds pool disco
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
@@ -190,14 +195,14 @@ module Real = struct
     P2p_io_scheduler.shutdown ~timeout:3.0 net.io_sched
 
   let connections { pool } () =
-    P2p_connection_pool.fold_connections pool
+    P2p_connection_pool.Connection.fold pool
       ~init:[] ~f:(fun _peer_id c acc -> c :: acc)
   let find_connection { pool } peer_id =
-    P2p_connection_pool.Peer_ids.find_connection pool peer_id
+    P2p_connection_pool.Connection.find_by_peer_id pool peer_id
   let connection_info _net conn =
-    P2p_connection_pool.connection_info conn
+    P2p_connection_pool.Connection.info conn
   let connection_stat _net conn =
-    P2p_connection_pool.connection_stat conn
+    P2p_connection_pool.Connection.stat conn
   let global_stat { pool } () =
     P2p_connection_pool.pool_stat pool
   let set_metadata { pool } conn meta =
@@ -209,12 +214,12 @@ module Real = struct
     P2p_connection_pool.read conn >>=? fun msg ->
     lwt_debug "message read from %a"
       Connection_info.pp
-      (P2p_connection_pool.connection_info conn) >>= fun () ->
+      (P2p_connection_pool.Connection.info conn) >>= fun () ->
     return msg
 
   let rec recv_any net () =
     let pipes =
-      P2p_connection_pool.fold_connections
+      P2p_connection_pool.Connection.fold
         net.pool ~init:[]
         ~f:begin fun _peer_id conn acc ->
         (P2p_connection_pool.is_readable conn >>= function
@@ -222,7 +227,7 @@ module Real = struct
           | Error _ -> Lwt_utils.never_ending) :: acc
       end in
     Lwt.pick (
-      ( P2p_connection_pool.PoolEvent.wait_new_connection net.pool >>= fun () ->
+      ( P2p_connection_pool.Pool_event.wait_new_connection net.pool >>= fun () ->
         Lwt.return_none )::
       pipes) >>= function
     | None -> recv_any net ()
@@ -231,12 +236,12 @@ module Real = struct
         | Ok msg ->
             lwt_debug "message read from %a"
               Connection_info.pp
-              (P2p_connection_pool.connection_info conn) >>= fun () ->
+              (P2p_connection_pool.Connection.info conn) >>= fun () ->
             Lwt.return (conn, msg)
         | Error _ ->
             lwt_debug "error reading message from %a"
               Connection_info.pp
-              (P2p_connection_pool.connection_info conn) >>= fun () ->
+              (P2p_connection_pool.Connection.info conn) >>= fun () ->
             Lwt_unix.yield () >>= fun () ->
             recv_any net ()
 
@@ -245,12 +250,12 @@ module Real = struct
     | Ok () ->
         lwt_debug "message sent to %a"
           Connection_info.pp
-          (P2p_connection_pool.connection_info conn) >>= fun () ->
+          (P2p_connection_pool.Connection.info conn) >>= fun () ->
         return ()
     | Error err ->
         lwt_debug "error sending message from %a: %a"
           Connection_info.pp
-          (P2p_connection_pool.connection_info conn)
+          (P2p_connection_pool.Connection.info conn)
           pp_print_error err >>= fun () ->
         Lwt.return (Error err)
 
@@ -259,12 +264,12 @@ module Real = struct
     | Ok v ->
         debug "message trysent to %a"
           Connection_info.pp
-          (P2p_connection_pool.connection_info conn) ;
+          (P2p_connection_pool.Connection.info conn) ;
         v
     | Error err ->
         debug "error trysending message to %a@ %a"
           Connection_info.pp
-          (P2p_connection_pool.connection_info conn)
+          (P2p_connection_pool.Connection.info conn)
           pp_print_error err ;
         false
 
@@ -273,10 +278,10 @@ module Real = struct
     debug "message broadcasted"
 
   let fold_connections { pool } ~init ~f =
-    P2p_connection_pool.fold_connections pool ~init ~f
+    P2p_connection_pool.Connection.fold pool ~init ~f
 
   let iter_connections { pool } f =
-    P2p_connection_pool.fold_connections pool
+    P2p_connection_pool.Connection.fold pool
       ~init:()
       ~f:(fun gid conn () -> f gid conn)
 
@@ -315,7 +320,7 @@ type ('msg, 'meta) t = {
   connection_info : ('msg, 'meta) connection -> Connection_info.t ;
   connection_stat : ('msg, 'meta) connection -> Stat.t ;
   global_stat : unit -> Stat.t ;
-  get_metadata : Peer_id.t -> 'meta option ;
+  get_metadata : Peer_id.t -> 'meta ;
   set_metadata : Peer_id.t -> 'meta -> unit ;
   recv : ('msg, 'meta) connection -> 'msg tzresult Lwt.t ;
   recv_any : unit -> (('msg, 'meta) connection * 'msg) Lwt.t ;
@@ -355,7 +360,7 @@ let create ~config ~limits meta_cfg msg_cfg =
     on_new_connection = Real.on_new_connection net ;
   }
 
-let faked_network = {
+let faked_network meta_config = {
   peer_id = Fake.id.peer_id ;
   maintain = Lwt.return ;
   roll = Lwt.return ;
@@ -365,7 +370,7 @@ let faked_network = {
   connection_info = (fun _ -> Fake.connection_info) ;
   connection_stat = (fun _ -> Fake.empty_stat) ;
   global_stat = (fun () -> Fake.empty_stat) ;
-  get_metadata = (fun _ -> None) ;
+  get_metadata = (fun _ -> meta_config.initial) ;
   set_metadata = (fun _ _ -> ()) ;
   recv = (fun _ -> Lwt_utils.never_ending) ;
   recv_any = (fun () -> Lwt_utils.never_ending) ;
@@ -402,6 +407,8 @@ module Raw = struct
   type 'a t = 'a P2p_connection_pool.Message.t =
     | Bootstrap
     | Advertise of P2p_types.Point.t list
+    | Swap_request of Point.t * Peer_id.t
+    | Swap_ack of Point.t * Peer_id.t
     | Message of 'a
     | Disconnect
   let encoding = P2p_connection_pool.Message.encoding
@@ -414,7 +421,7 @@ module RPC = struct
     | None -> Stat.empty
     | Some pool -> P2p_connection_pool.pool_stat pool
 
-  module Event = P2p_connection_pool.LogEvent
+  module Event = P2p_connection_pool.Log_event
 
   let watch net =
     match net.pool with
@@ -433,14 +440,14 @@ module RPC = struct
       | None -> None
       | Some pool ->
           map_option
-            (P2p_connection_pool.Peer_ids.find_connection pool peer_id)
-            ~f:P2p_connection_pool.connection_info
+            (P2p_connection_pool.Connection.find_by_peer_id pool peer_id)
+            ~f:P2p_connection_pool.Connection.info
 
     let kick net peer_id wait =
       match net.pool with
       | None -> Lwt.return_unit
       | Some pool ->
-          match P2p_connection_pool.Peer_ids.find_connection pool peer_id with
+          match P2p_connection_pool.Connection.find_by_peer_id pool peer_id with
           | None -> Lwt.return_unit
           | Some conn -> P2p_connection_pool.disconnect ~wait conn
 
@@ -448,10 +455,10 @@ module RPC = struct
       match net.pool with
       | None -> []
       | Some pool ->
-          P2p_connection_pool.fold_connections
+          P2p_connection_pool.Connection.fold
             pool ~init:[]
             ~f:begin fun _peer_id c acc ->
-              P2p_connection_pool.connection_info c :: acc
+              P2p_connection_pool.Connection.info c :: acc
             end
 
     let count net =
@@ -703,12 +710,11 @@ module RPC = struct
         | Disconnected -> Disconnected, None
       in
       let peer_id = Peer_info.peer_id i in
-      let meta = Peer_info.metadata i in
-      let score = P2p_connection_pool.score pool meta in
+      let score = Peer_ids.get_score pool peer_id in
       let stat =
-        match P2p_connection_pool.Peer_ids.find_connection pool peer_id with
+        match P2p_connection_pool.Connection.find_by_peer_id pool peer_id with
         | None -> Stat.empty
-        | Some conn -> P2p_connection_pool.connection_stat conn
+        | Some conn -> P2p_connection_pool.Connection.stat conn
       in Peer_info.{
           score ;
           trusted = trusted i ;

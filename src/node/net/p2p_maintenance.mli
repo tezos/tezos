@@ -34,7 +34,7 @@ type 'meta t
 (** Type of a maintenance worker. *)
 
 val run:
-  ?connection_timeout:float ->
+  connection_timeout:float ->
   bounds ->
   ('msg, 'meta) P2p_connection_pool.t ->
   P2p_discovery.t option ->

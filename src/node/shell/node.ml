@@ -70,7 +70,7 @@ let init_p2p net_params =
   match net_params with
   | None ->
       lwt_log_notice "P2P layer is disabled" >>= fun () ->
-      Lwt.return P2p.faked_network
+      Lwt.return (P2p.faked_network Distributed_db_metadata.cfg)
   | Some (config, limits) ->
       lwt_log_notice "bootstraping network..." >>= fun () ->
       P2p.create
