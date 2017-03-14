@@ -70,10 +70,10 @@ let main () =
         Format.eprintf "%s%!" help ;
         Lwt.return 1
     | Cli_entries.Command_not_found ->
-        Format.eprintf "Unkonwn command, try `-help`.\n%!" ;
+        Format.eprintf "Unknown command, try `-help`.\n%!" ;
         Lwt.return 1
     | Client_commands.Version_not_found ->
-        Format.eprintf "Unkonwn protocol version, try `list versions`.\n%!" ;
+        Format.eprintf "Unknown protocol version, try `list versions`.\n%!" ;
         Lwt.return 1
     | Cli_entries.Bad_argument (idx, _n, v) ->
         Format.eprintf "There's a problem with argument %d, %s.\n%!" idx v ;
