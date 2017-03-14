@@ -95,7 +95,7 @@ let forge_block cctxt block
     | `Set prio -> begin
         Client_proto_rpcs.Helpers.minimal_time
           cctxt block ~prio () >>=? fun time ->
-        return (prio, Some time)
+        return (prio, time)
       end
     | `Auto (src_pkh, max_priority) ->
         Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate cctxt
@@ -114,20 +114,19 @@ let forge_block cctxt block
     Raw_level.pp level priority >>= fun () ->
   begin
     match timestamp, minimal_timestamp with
-    | None, None -> failwith "Can't compute the expected timestamp"
-    | None, timestamp | timestamp, None -> return timestamp
-    | Some timestamp, Some minimal_timestamp ->
+    | None, timestamp -> return timestamp
+    | Some timestamp, minimal_timestamp ->
         if timestamp < minimal_timestamp then
           Error_monad.failwith
             "Proposed timestamp %a is earlier than minimal timestamp %a"
             Time.pp_hum timestamp
             Time.pp_hum minimal_timestamp
         else
-          return (Some timestamp)
+          return timestamp
   end >>=? fun timestamp ->
   let request = List.length operations in
   Client_node_rpcs.Blocks.preapply
-    cctxt block ?timestamp ~sort operations >>=?
+    cctxt block ~timestamp ~sort operations >>=?
   fun { operations ; fitness ; timestamp } ->
   let valid = List.length operations.applied in
   lwt_log_info "Found %d valid operations (%d refused) for timestamp %a"
@@ -245,11 +244,9 @@ let get_mining_slot cctxt
              pp_print_error errs ;
            Lwt.return_none
        | Ok slots ->
-           let convert = function
-             | (_,_,None) -> None
-             | (_lvl, slot, Some timestamp) ->
-                 Some (timestamp, (bi, slot, delegate)) in
-           Lwt.return (Some (Utils.filter_map convert slots)))
+           let convert = fun (_lvl, slot, timestamp) ->
+             (timestamp, (bi, slot, delegate)) in
+           Lwt.return (Some (List.map convert slots)))
     delegates >>= fun slots ->
   let sorted_slots =
     List.sort

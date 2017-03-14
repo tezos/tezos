@@ -172,18 +172,19 @@ module Helpers : sig
     block -> Cycle.t -> (Raw_level.t * Raw_level.t) tzresult Lwt.t
 
   module Rights : sig
-    type slot = Raw_level.t * int * Time.t option
+    type mining_slot = Raw_level.t * int * Time.t
+    type endorsement_slot = Raw_level.t * int
     val mining_rights_for_delegate:
       Client_commands.context ->
       block -> public_key_hash ->
       ?max_priority:int -> ?first_level:Raw_level.t ->
       ?last_level:Raw_level.t -> unit ->
-      (slot list) tzresult Lwt.t
+      (mining_slot list) tzresult Lwt.t
     val endorsement_rights_for_delegate:
       Client_commands.context ->
       block -> public_key_hash ->
       ?max_priority:int -> ?first_level:Raw_level.t -> ?last_level:Raw_level.t -> unit ->
-      (slot list) tzresult Lwt.t
+      (endorsement_slot list) tzresult Lwt.t
   end
 
   module Forge : sig

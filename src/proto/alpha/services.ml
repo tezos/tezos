@@ -422,11 +422,16 @@ module Helpers = struct
          (opt "first_level" Raw_level.encoding)
          (opt "last_level" Raw_level.encoding))
 
-    let slot_encoding =
+    let endorsement_slot_encoding =
+      (obj2
+         (req "level" Raw_level.encoding)
+         (req "priority" int31))
+
+    let mining_slot_encoding =
       (obj3
          (req "level" Raw_level.encoding)
          (req "priority" int31)
-         (opt "timestamp" Timestamp.encoding))
+         (req "timestamp" Timestamp.encoding))
 
     let mining_rights custom_root =
       RPC.service
@@ -472,7 +477,7 @@ module Helpers = struct
       RPC.service
         ~description: "Future mining rights for a given delegate."
         ~input: slots_range_encoding
-        ~output: (wrap_tzerror (Data_encoding.list slot_encoding))
+        ~output: (wrap_tzerror (Data_encoding.list mining_slot_encoding))
         RPC.Path.(custom_root / "helpers" / "rights"
                   / "mining" / "delegate" /: Context.Key.public_key_hash_arg )
 
@@ -526,7 +531,7 @@ module Helpers = struct
       RPC.service
         ~description: "Compute endorsement rights for a given delegate."
         ~input: slots_range_encoding
-        ~output: (wrap_tzerror @@ Data_encoding.list slot_encoding)
+        ~output: (wrap_tzerror @@ Data_encoding.list endorsement_slot_encoding)
         RPC.Path.(custom_root / "helpers" / "rights"
                   / "endorsement" / "delegate" /: Context.Key.public_key_hash_arg )
 
