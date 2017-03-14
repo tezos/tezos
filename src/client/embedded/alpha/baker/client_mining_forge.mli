@@ -43,6 +43,23 @@ val forge_block:
   src_sk:secret_key ->
   unit ->
   Block_hash.t tzresult Lwt.t
+(** [forge_block cctxt parent_blk ?force ?operations ?best_effort
+    ?sort ?timestamp ?max_priority ?priority ~seed_nonce ~src_sk
+    pk_hash] injects a block in the node. In addition of inject_block,
+    it will:
+
+    * Operations: If [?operations] is [None], it will get pending
+      operations and add them to the block. Otherwise, provided
+      operations will be used. In both cases, they will be validated.
+
+    * Mining priority: If [`Auto] is used, it will be computed from
+      the public key hash of the specified contract, optionally capped
+      to a maximum value.
+
+    * Timestamp: If [?timestamp] is set, and is compatible with the
+      computed mining priority, it will be used. Otherwise, it will be
+      set at the best mining priority.
+*)
 
 module State : sig
   val get_block:
