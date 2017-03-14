@@ -133,6 +133,7 @@ module Point_info : sig
     }
 
     val encoding : t Data_encoding.t
+
   end
 
   val fold_events :

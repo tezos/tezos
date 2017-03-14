@@ -122,6 +122,11 @@ type limits = {
   max_known_peer_ids : (int * int) option ;
   max_known_points : (int * int) option ;
   (** Optional limitation of internal hashtables (max, target) *)
+
+  swap_linger : float ;
+  (** Peer swapping does not occur more than once during a timespan of
+      [swap_linger] seconds. *)
+
 }
 
 type ('msg, 'meta) t
@@ -129,7 +134,7 @@ type ('msg, 'meta) net = ('msg, 'meta) t
 
 (** A faked p2p layer, which do not initiate any connection
     nor open any listening socket *)
-val faked_network : ('msg, 'meta) net
+val faked_network : 'meta meta_config -> ('msg, 'meta) net
 
 (** Main network initialisation function *)
 val create :
@@ -165,7 +170,7 @@ val connection_stat :
 val global_stat : ('msg, 'meta) net -> Stat.t
 
 (** Accessors for meta information about a global identifier *)
-val get_metadata : ('msg, 'meta) net -> Peer_id.t -> 'meta option
+val get_metadata : ('msg, 'meta) net -> Peer_id.t -> 'meta
 val set_metadata : ('msg, 'meta) net -> Peer_id.t -> 'meta -> unit
 
 (** Wait for a message from a given connection. *)
@@ -193,7 +198,7 @@ module RPC : sig
 
   val stat : ('msg, 'meta) net -> Stat.t
 
-  module Event = P2p_connection_pool.LogEvent
+  module Event = P2p_connection_pool.Log_event
 
   val watch : ('msg, 'meta) net -> Event.t Lwt_stream.t * Watcher.stopper
   val connect : ('msg, 'meta) net -> Point.t -> float -> unit tzresult Lwt.t
@@ -301,6 +306,8 @@ module Raw : sig
   type 'a t =
     | Bootstrap
     | Advertise of P2p_types.Point.t list
+    | Swap_request of Point.t * Peer_id.t
+    | Swap_ack of Point.t * Peer_id.t
     | Message of 'a
     | Disconnect
   val encoding: 'msg app_message_encoding list -> 'msg t Data_encoding.t
