@@ -48,7 +48,7 @@ This should produce three binaries:
 
 * `tezos-node`: the tezos daemon itself;
 * `tezos-client`: a minimal command-line client;
-* `tezos-protocol-compiler`: a protocol compiler used for developing new version of the economical protocol.
+* `tezos-protocol-compiler`: a protocol compiler used for developing new version of the economic protocol.
 
 Currently Tezos is being developed for Linux only. It should work on mac OS,
 but it has not been tested recently. A Windows port is in progress.
@@ -291,7 +291,7 @@ Shell:
 ```
 
 To get API attached to the "genesis" block, including the remote procedures
-provided by the associated economical protocol version:
+provided by the associated economic protocol version:
 
 ```
 ./tezos-client rpc list /blocks/genesis/
