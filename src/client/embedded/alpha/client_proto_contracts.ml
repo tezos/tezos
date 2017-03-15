@@ -87,6 +87,10 @@ module ContractAlias = struct
 
 end
 
+module Contract_tags = Client_tags.Tags (struct
+    let name = "contract"
+  end)
+
 let list_contracts cctxt =
   (* List contracts *)
   RawContractAlias.load cctxt >>= fun raw_contracts ->
@@ -163,16 +167,16 @@ let commands  () =
     command ~group ~desc: "lists all known contracts"
       (fixed [ "list" ; "known" ; "contracts" ])
       (fun cctxt ->
-        list_contracts cctxt >>= fun contracts ->
-        Lwt_list.iter_s (fun (prefix, alias, contract) ->
-            cctxt.message "%s%s: %s" prefix alias
-              (Contract.to_b58check contract))
-          contracts) ;
+         list_contracts cctxt >>= fun contracts ->
+         Lwt_list.iter_s (fun (prefix, alias, contract) ->
+             cctxt.message "%s%s: %s" prefix alias
+               (Contract.to_b58check contract))
+           contracts) ;
     command ~group ~desc: "forget all known contracts"
       (fixed [ "forget" ; "all" ; "contracts" ])
       (fun cctxt ->
          if not cctxt.config.force then
-            cctxt.Client_commands.error "this can only used with option -force true"
+           cctxt.Client_commands.error "this can only used with option -force true"
          else
            RawContractAlias.save cctxt []) ;
     command ~group ~desc: "display a contract from the wallet"
@@ -181,4 +185,34 @@ let commands  () =
        @@ stop)
       (fun (_, contract) cctxt ->
          cctxt.message "%a\n%!" Contract.pp contract) ;
+    command ~group ~desc: "tag a contract in the wallet"
+      (prefixes [ "tag" ; "contract" ]
+       @@ RawContractAlias.alias_param
+       @@ prefixes [ "with" ]
+       @@ Contract_tags.tag_param
+       @@ stop)
+      (fun (alias, _contract) new_tags cctxt ->
+         Contract_tags.find_opt cctxt alias >>= fun tags ->
+         let new_tags = match tags with
+           | None -> new_tags
+           | Some tags -> Utils.merge_list2 tags new_tags in
+         Contract_tags.update cctxt alias new_tags) ;
+    command ~group ~desc: "remove tag(s) from a contract in the wallet"
+      (prefixes [ "untag" ; "contract" ]
+       @@ RawContractAlias.alias_param
+       @@ prefixes [ "with" ]
+       @@ Contract_tags.tag_param
+       @@ stop)
+      (fun (alias, _contract) new_tags cctxt ->
+         Contract_tags.find_opt cctxt alias >>= fun tags ->
+         let new_tags = match tags with
+           | None -> []
+           | Some tags ->
+               Utils.merge_filter_list2
+                 ~f:(fun x1 x2 -> match x1, x2 with
+                     | None, None -> assert false
+                     | None, Some _ -> None
+                     | Some t1, Some t2 when t1 = t2 -> None
+                     | Some t1, _ -> Some t1) tags new_tags in
+         Contract_tags.update cctxt alias new_tags) ;
   ]
