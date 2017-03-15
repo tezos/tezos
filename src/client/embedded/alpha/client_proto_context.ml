@@ -35,7 +35,25 @@ let get_timestamp cctxt block =
 
 let list_contracts cctxt block =
   Client_proto_rpcs.Context.Contract.list cctxt block >>=? fun contracts ->
-  iter_s (fun h ->
+  map_s (fun h ->
+      begin match Contract.is_default h with
+        | Some m -> begin
+            Public_key_hash.rev_find cctxt m >|= function
+            | None -> ""
+            | Some nm -> nm
+          end
+        | None -> begin
+            RawContractAlias.rev_find cctxt h >|= function
+            | None -> ""
+            | Some nm -> nm
+          end
+      end >>= fun alias ->
+      return (alias, h, Contract.is_default h))
+    contracts
+
+let list_contract_labels cctxt block =
+  Client_proto_rpcs.Context.Contract.list cctxt block >>=? fun contracts ->
+  map_s (fun h ->
       begin match Contract.is_default h with
         | Some m -> begin
             Public_key_hash.rev_find cctxt m >>= function
@@ -54,9 +72,12 @@ let list_contracts cctxt block =
       let kind = match Contract.is_default h with
         | Some _ -> " (default)"
         | None -> "" in
-      cctxt.message "%s%s%s" (Contract.to_b58check h) kind nm >>= fun () ->
-      return ())
+      let h_b58 = Contract.to_b58check h in
+      return (nm, h_b58, kind))
     contracts
+
+let get_balance cctxt block contract =
+  Client_proto_rpcs.Context.Contract.balance cctxt block contract
 
 let transfer cctxt
     block ?force
@@ -174,16 +195,19 @@ let commands () =
     command ~group ~desc: "lists all non empty contracts of the block"
       (fixed [ "list" ; "contracts" ])
       (fun cctxt ->
-         list_contracts cctxt cctxt.config.block >>= fun res ->
-         Client_proto_rpcs.handle_error cctxt res) ;
+         list_contract_labels cctxt cctxt.config.block >>= fun res ->
+         Client_proto_rpcs.handle_error cctxt res >>= fun contracts ->
+         Lwt_list.iter_s (fun (alias, hash, kind) ->
+             cctxt.message "%s%s%s" hash kind alias)
+           contracts) ;
     command ~group ~desc: "get the balance of a contract"
       (prefixes [ "get" ; "balance" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       (fun (_, contract) cctxt ->
-         Client_proto_rpcs.Context.Contract.balance cctxt cctxt.config.block contract
+         get_balance cctxt cctxt.config.block contract
          >>= Client_proto_rpcs.handle_error cctxt >>= fun amount ->
-         cctxt.answer "%a %s" Tez.pp amount tez_sym);
+         cctxt.answer "%a %s" Tez.pp amount tez_sym) ;
     command ~group ~desc: "get the manager of a block"
       (prefixes [ "get" ; "manager" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
