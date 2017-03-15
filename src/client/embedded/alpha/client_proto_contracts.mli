@@ -32,6 +32,10 @@ module ContractAlias : sig
     Contract.t -> string Lwt.t
 end
 
+val list_contracts:
+  Client_commands.context ->
+  (string * string * Contract.t) list Lwt.t
+
 val get_manager:
   Client_commands.context ->
   Client_proto_rpcs.block ->

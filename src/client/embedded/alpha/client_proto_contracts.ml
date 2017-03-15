@@ -87,6 +87,22 @@ module ContractAlias = struct
 
 end
 
+let list_contracts cctxt =
+  (* List contracts *)
+  RawContractAlias.load cctxt >>= fun raw_contracts ->
+  Lwt_list.map_s (fun (n, v) ->
+      Lwt.return ("", n, v))
+    raw_contracts >>= fun contracts ->
+  Client_keys.Public_key_hash.load cctxt >>= fun keys ->
+  (* List accounts (default contracts of identities) *)
+  Lwt_list.map_s (fun (n, v) ->
+      RawContractAlias.mem cctxt n >>= fun mem ->
+      let p = if mem then "key:" else "" in
+      let v' = Contract.default_contract v in
+      Lwt.return (p, n, v'))
+    keys >>= fun accounts ->
+  Lwt.return (contracts @ accounts)
+
 let get_manager cctxt block source =
   match Contract.is_default source with
   | Some hash -> return hash
@@ -147,19 +163,11 @@ let commands  () =
     command ~group ~desc: "lists all known contracts"
       (fixed [ "list" ; "known" ; "contracts" ])
       (fun cctxt ->
-         RawContractAlias.load cctxt >>= fun list ->
-         Lwt_list.iter_s (fun (n, v) ->
-             let v = Contract.to_b58check v in
-             cctxt.message "%s: %s" n v)
-           list >>= fun () ->
-         Client_keys.Public_key_hash.load cctxt >>= fun list ->
-         Lwt_list.iter_s (fun (n, v) ->
-             RawContractAlias.mem cctxt n >>= fun mem ->
-             let p = if mem then "key:" else "" in
-             let v = Contract.to_b58check (Contract.default_contract v) in
-             cctxt.message "%s%s: %s" p n v)
-           list >>= fun () ->
-         Lwt.return ()) ;
+        list_contracts cctxt >>= fun contracts ->
+        Lwt_list.iter_s (fun (prefix, alias, contract) ->
+            cctxt.message "%s%s: %s" prefix alias
+              (Contract.to_b58check contract))
+          contracts) ;
     command ~group ~desc: "forget all known contracts"
       (fixed [ "forget" ; "all" ; "contracts" ])
       (fun cctxt ->
