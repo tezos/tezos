@@ -10,8 +10,6 @@
 let tez_sym =
   "\xEA\x9C\xA9"
 
-let block () = Client_config.block ()
-
 let tez_of_string s =
   match Tez.of_string s with
   | None -> invalid_arg "tez_of_string"

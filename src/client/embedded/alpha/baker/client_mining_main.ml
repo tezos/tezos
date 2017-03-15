@@ -32,10 +32,9 @@ let mine_block cctxt block ?force ?max_priority ?src_sk delegate =
   return ()
 
 let endorse_block cctxt ?force ?max_priority delegate =
-  let block = Client_proto_args.block () in
   Client_keys.get_key cctxt delegate >>=? fun (_src_name, src_pk, src_sk) ->
   Client_mining_endorsement.forge_endorsement cctxt
-    block ?force ?max_priority ~src_sk src_pk >>=? fun oph ->
+    cctxt.config.block ?force ?max_priority ~src_sk src_pk >>=? fun oph ->
   cctxt.answer "Operation successfully injected in the node." >>= fun () ->
   cctxt.answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return ()
@@ -59,7 +58,6 @@ let do_reveal cctxt ?force block blocks =
   return ()
 
 let reveal_block_nonces cctxt ?force block_hashes =
-  let block = Client_proto_args.block () in
   Lwt_list.filter_map_p
     (fun hash ->
        Lwt.catch
@@ -83,13 +81,12 @@ let reveal_block_nonces cctxt ?force block_hashes =
       | Some nonce ->
           return (Some (bi.hash, (bi.level.level, nonce))))
     block_infos >>=? fun blocks ->
-  do_reveal cctxt ?force block blocks
+  do_reveal cctxt ?force cctxt.config.block blocks
 
 let reveal_nonces cctxt ?force () =
-  let block = Client_proto_args.block () in
   Client_mining_forge.get_unrevealed_nonces
-    cctxt ?force block >>=? fun nonces ->
-  do_reveal cctxt ?force block nonces
+    cctxt ?force cctxt.config.block >>=? fun nonces ->
+  do_reveal cctxt ?force cctxt.config.block nonces
 
 open Client_proto_args
 
@@ -131,7 +128,7 @@ let commands () =
          ~name:"miner" ~desc: "name of the delegate owning the mining right"
        @@ stop)
       (fun (_, delegate) cctxt ->
-         mine_block cctxt (block ())
+         mine_block cctxt cctxt.config.block
            ~force:!force ?max_priority:!max_priority delegate >>=
          Client_proto_rpcs.handle_error cctxt) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation"

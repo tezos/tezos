@@ -48,8 +48,10 @@ let eval_command argv =
   let cctxt, result = make_context () in
   Lwt.catch
     (fun () ->
-       Client_config.preparse_args argv cctxt >>= fun block ->
-       block_protocol cctxt block >>= fun version ->
+       Client_config.preparse_args argv cctxt >>= fun config ->
+       let cctxt = { cctxt with config } in
+       block_protocol cctxt Client_commands.(cctxt.config.block)
+       >>= fun version ->
        let commands =
          Client_generic_rpcs.commands @
          Client_keys.commands () @
@@ -59,8 +61,8 @@ let eval_command argv =
        Client_config.parse_args ~version
          (Cli_entries.usage ~commands)
          (Cli_entries.inline_dispatch commands)
-         argv cctxt >>= fun command ->
-       command cctxt >>= fun () ->
+         argv cctxt >>= fun (command, config) ->
+       command Client_commands.({ cctxt with config }) >>= fun () ->
        Lwt.return (Ok (result ())))
     (fun exn ->
        let msg = match exn with
@@ -169,9 +171,13 @@ let http_proxy mode =
     Lwt.return (content_type, { RPC.Answer.code = 404 ; body }) in
   RPC_server.launch ~pre_hook ~post_hook mode root [] []
 
-let web_port = Client_config.in_both_groups @@
-  new Config_file.int_cp [ "web" ; "port" ] 8080
-    "The TCP port to point the web browser to."
+let webclient_args cfg =
+  let open Client_commands in
+  [
+    "-web-port", Arg.Int (fun x -> cfg := { !cfg with web_port = x }),
+      "The TCP port to point the web browser to.\n\
+       default: " ^ string_of_int Client_commands.(default_cfg.web_port);
+  ]
 
 (* Where all the user friendliness starts *)
 let () =
@@ -179,15 +185,18 @@ let () =
     (Lwt.catch
        (fun () ->
           Client_config.parse_args
+            ~extra:webclient_args
             (Cli_entries.usage ~commands: [])
             (fun () -> function
                | `Arg arg -> raise (Arg.Bad ("unexpected argument " ^ arg))
                | `End -> `Res (fun () -> Lwt.return ()))
-            Sys.argv Client_commands.ignore_context>>= fun _no_command ->
+            Sys.argv Client_commands.ignore_context
+          >>= fun (_no_command, config) ->
           Random.self_init () ;
           Sodium.Random.stir () ;
           (* TODO: add TLS? *)
-          http_proxy (`TCP (`Port web_port#get)) >>= fun _server ->
+          http_proxy (`TCP (`Port Client_commands.(config.web_port)))
+          >>= fun _server ->
           fst (Lwt.wait ()))
        (function
          | Arg.Help help ->

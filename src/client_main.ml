@@ -12,6 +12,8 @@
 open Lwt.Infix
 
 let cctxt =
+  (* TODO: set config as parameter? *)
+  let config = Client_commands.default_cfg in
   let startup =
     CalendarLib.Printer.Precise_Calendar.sprint
       "%Y-%m-%dT%H:%M:%SZ"
@@ -24,11 +26,12 @@ let cctxt =
         prerr_endline msg ;
         Lwt.return ()
     | log ->
-        Lwt_utils.create_dir Client_config.(base_dir#get // "logs" // log) >>= fun () ->
+        let (//) = Filename.concat in
+        Lwt_utils.create_dir (config.base_dir // "logs" // log) >>= fun () ->
         Lwt_io.with_file
           ~flags: Unix.[ O_APPEND ; O_CREAT ; O_WRONLY ]
           ~mode: Lwt_io.Output
-          Client_config.(base_dir#get // "logs" // log // startup)
+          Client_commands.(config.base_dir // "logs" // log // startup)
           (fun chan -> Lwt_io.write chan msg) in
   Client_commands.make_context log
 
@@ -37,9 +40,10 @@ let main () =
   Random.self_init () ;
   Sodium.Random.stir () ;
   Lwt.catch begin fun () ->
-    Client_config.preparse_args Sys.argv cctxt >>= fun block ->
+    Client_config.preparse_args Sys.argv cctxt >>= fun config ->
+    let cctxt = { cctxt with config } in
     Lwt.catch begin fun () ->
-      Client_node_rpcs.Blocks.protocol cctxt block >>= fun version ->
+      Client_node_rpcs.Blocks.protocol cctxt cctxt.config.block >>= fun version ->
       Lwt.return (Some version, Client_commands.commands_for_version version)
     end begin fun exn ->
       cctxt.warning
@@ -48,7 +52,7 @@ let main () =
          | Failure msg -> msg
          | exn -> Printexc.to_string exn) >>= fun () ->
       Lwt.return (None, [])
-    end >>= fun (version, commands_for_version)  ->
+    end >>= fun (_version, commands_for_version)  ->
     let commands =
       Client_generic_rpcs.commands @
       Client_network.commands () @
@@ -56,11 +60,11 @@ let main () =
       Client_protocols.commands () @
       Client_helpers.commands () @
       commands_for_version in
-    Client_config.parse_args ?version
+    Client_config.parse_args
       (Cli_entries.usage ~commands)
       (Cli_entries.inline_dispatch commands)
-      Sys.argv cctxt >>= fun command ->
-    command cctxt >>= fun () ->
+      Sys.argv cctxt >>= fun (command, config) ->
+    command { cctxt with config } >>= fun () ->
     Lwt.return 0
   end begin function
     | Arg.Help help ->

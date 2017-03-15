@@ -172,11 +172,11 @@ end = struct
                (req "level" Raw_level.encoding)
                (req "blocks" (list Block_hash.encoding))))
 
-  let filename () =
-    Client_config.(base_dir#get // "blocks")
+  let filename cctxt =
+    Client_commands.(Filename.concat cctxt.config.base_dir "blocks")
 
-  let load () =
-    let filename = filename () in
+  let load cctxt =
+    let filename = filename cctxt in
     if not (Sys.file_exists filename) then return LevelMap.empty else
       Data_encoding_ezjsonm.read_file filename >>= function
       | Error _ ->
@@ -188,13 +188,13 @@ end = struct
           | map ->
               return map
 
-  let save map =
+  let save cctxt map =
     Lwt.catch
       (fun () ->
-         let dirname = Client_config.base_dir#get in
+         let dirname = Client_commands.(cctxt.config.base_dir) in
          (if not (Sys.file_exists dirname) then Lwt_utils.create_dir dirname
           else Lwt.return ()) >>= fun () ->
-         let filename = filename () in
+         let filename = filename cctxt in
          let json = Data_encoding.Json.construct encoding map in
          Data_encoding_ezjsonm.write_file filename json >>= function
          | Error _ -> failwith "Json.write_file"
@@ -206,10 +206,10 @@ end = struct
 
   let lock = Lwt_mutex.create ()
 
-  let get_block _cctxt level =
+  let get_block cctxt level =
     Lwt_mutex.with_lock lock
       (fun () ->
-         load () >>=? fun map ->
+         load cctxt >>=? fun map ->
          try
            let blocks = LevelMap.find level map in
            return blocks
@@ -218,11 +218,11 @@ end = struct
   let record_block cctxt level hash nonce =
     Lwt_mutex.with_lock lock
       (fun () ->
-         load () >>=? fun map ->
+         load cctxt >>=? fun map ->
          let previous =
            try LevelMap.find level map
            with Not_found -> [] in
-         save
+         save cctxt
            (LevelMap.add level (hash :: previous) map)) >>=? fun () ->
     Client_proto_nonces.add cctxt hash nonce
 

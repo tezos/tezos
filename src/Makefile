@@ -290,7 +290,6 @@ COMPILER_IMPLS := \
 COMPILER_PACKAGES := \
   ${UTILS_PACKAGES} \
   compiler-libs.optcomp \
-  config-file \
   lwt.unix \
   ocplib-endian \
   ocplib-ocamlres \

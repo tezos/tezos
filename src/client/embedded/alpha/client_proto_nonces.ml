@@ -20,11 +20,11 @@ let encoding : t Data_encoding.t =
        (req "block" Block_hash.encoding)
        (req "nonce" Nonce.encoding))
 
-let filename () =
-  Client_config.(base_dir#get // "nonces")
+let filename cctxt =
+  Client_commands.(Filename.concat cctxt.config.base_dir "nonces")
 
 let load cctxt =
-  let filename = filename () in
+  let filename = filename cctxt in
   if not (Sys.file_exists filename) then
     Lwt.return []
   else
@@ -47,9 +47,9 @@ let check_dir dirname =
 let save cctxt list =
   Lwt.catch
     (fun () ->
-       let dirname = Client_config.base_dir#get in
+       let dirname = Client_commands.(cctxt.config.base_dir) in
        check_dir dirname >>= fun () ->
-       let filename = filename () in
+       let filename = filename cctxt in
        let json = Data_encoding.Json.construct encoding list in
        Data_encoding_ezjsonm.write_file filename json >>= function
        | Error _ -> failwith "Json.write_file"

@@ -24,9 +24,9 @@ let cpt = ref 0
 let make_request cctxt meth service json =
   incr cpt ;
   let cpt = !cpt in
-  let scheme = if Client_config.tls#get then "https" else "http" in
-  let host = Client_config.incoming_addr#get in
-  let port = Client_config.incoming_port#get in
+  let scheme = if cctxt.config.tls then "https" else "http" in
+  let host = cctxt.config.incoming_addr in
+  let port = cctxt.config.incoming_port in
   let path = String.concat "/" service in
   let uri = Uri.make ~scheme ~host ~port ~path () in
   let string_uri = Uri.to_string uri in
@@ -50,7 +50,7 @@ let get_streamed_json cctxt meth service json =
   let ansbody = Cohttp_lwt_body.to_stream ansbody in
   match code, ansbody with
   | #Cohttp.Code.success_status, ansbody ->
-      (if Client_config.print_timings#get then
+      (if cctxt.config.print_timings then
          cctxt.message "Request to /%s succeeded in %gs"
            (String.concat "/" service) time
        else Lwt.return ()) >>= fun () ->
@@ -64,7 +64,7 @@ let get_streamed_json cctxt meth service json =
                 Lwt.return None)
           (Data_encoding_ezjsonm.from_stream ansbody))
   | err, _ansbody ->
-      (if Client_config.print_timings#get then
+      (if cctxt.config.print_timings then
          cctxt.message "Request to /%s failed in %gs"
            (String.concat "/" service) time
        else Lwt.return ()) >>= fun () ->
@@ -78,7 +78,7 @@ let get_json cctxt meth service json =
   Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
   match code, ansbody with
   | #Cohttp.Code.success_status, ansbody -> begin
-      (if Client_config.print_timings#get then
+      (if cctxt.config.print_timings then
          cctxt.message "Request to /%s succeeded in %gs"
            (String.concat "/" service) time
        else Lwt.return ()) >>= fun () ->
@@ -89,7 +89,7 @@ let get_json cctxt meth service json =
         | Ok res -> Lwt.return res
     end
   | err, _ansbody ->
-      (if Client_config.print_timings#get then
+      (if cctxt.config.print_timings then
          cctxt.message "Request to /%s failed in %gs"
            (String.concat "/" service) time
        else Lwt.return ()) >>= fun () ->

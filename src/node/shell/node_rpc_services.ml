@@ -107,6 +107,15 @@ module Blocks = struct
       | _ -> raise Exit
     with _ -> Error "Cannot parse block identifier."
 
+  let to_string = function
+    | `Genesis -> "genesis"
+    | `Head 0 -> "head"
+    | `Head n -> Printf.sprintf "head~%d" n
+    | `Prevalidation -> "prevalidation"
+    | `Test_head 0 -> "test_head"
+    | `Test_head n -> Printf.sprintf "test_head~%d" n
+    | `Test_prevalidation -> "test_prevalidation"
+    | `Hash h -> Block_hash.to_b58check h
 
   let blocks_arg =
     let name = "block_id" in
@@ -117,15 +126,7 @@ module Blocks = struct
        'test_head' or 'test_prevalidation'. One might alse use 'head~N'
        to 'test_head~N', where N is an integer to denotes the Nth predecessors
        of 'head' or 'test_head'." in
-    let construct = function
-      | `Genesis -> "genesis"
-      | `Head 0 -> "head"
-      | `Head n -> Printf.sprintf "head~%d" n
-      | `Prevalidation -> "prevalidation"
-      | `Test_head 0 -> "test_head"
-      | `Test_head n -> Printf.sprintf "test_head~%d" n
-      | `Test_prevalidation -> "test_prevalidation"
-      | `Hash h -> Block_hash.to_b58check h in
+    let construct = to_string in
     let destruct = parse_block in
     RPC.Arg.make ~name ~descr ~construct ~destruct ()
 

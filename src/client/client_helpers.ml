@@ -28,7 +28,7 @@ let commands () = Cli_entries.[
          ~desc: "the prefix of the Base58Check-encoded hash to be completed" @@
        stop)
       (fun prefix cctxt ->
-         Client_node_rpcs.complete cctxt ~block:(block ()) prefix >>= fun completions ->
+         Client_node_rpcs.complete cctxt ~block:cctxt.config.block prefix >>= fun completions ->
          match completions with
          | [] -> Pervasives.exit 3
          | _ :: _ :: _ when !unique -> Pervasives.exit 3
