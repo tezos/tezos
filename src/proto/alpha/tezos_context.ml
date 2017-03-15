@@ -75,19 +75,7 @@ module Constants = struct
     constants.dictator_pubkey
 end
 
-module Public_key = struct
-
-  let get = Storage.Public_key.get
-  let get_option = Storage.Public_key.get_option
-  let set = Storage.Public_key.init_set
-  let remove = Storage.Public_key.remove
-
-  let list ctxt =
-    Storage.Public_key.fold ctxt [] ~f:(fun pk_h pk acc ->
-        Lwt.return @@ (pk_h, pk) :: acc) >>= fun res ->
-    return res
-
-end
+module Public_key = Public_key_storage
 
 module Voting_period = Voting_period_repr
 

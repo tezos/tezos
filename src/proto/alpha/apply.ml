@@ -109,7 +109,7 @@ let check_signature_and_update_public_key ctxt id public_key op =
     match public_key with
     | None -> return ctxt
     | Some public_key ->
-        Public_key.set ctxt id public_key
+        Public_key.reveal ctxt id public_key
   end >>=? fun ctxt ->
   Public_key.get ctxt id >>=? fun public_key ->
   Operation.check_signature public_key op >>=? fun () ->
