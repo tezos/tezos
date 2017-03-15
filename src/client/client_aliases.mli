@@ -46,9 +46,15 @@ module type Alias = sig
   val del :
     Client_commands.context ->
     string -> unit Lwt.t
+  val update :
+    Client_commands.context ->
+    string -> t -> unit Lwt.t
   val save :
     Client_commands.context ->
     (string * t) list -> unit Lwt.t
+  val of_source  :
+    Client_commands.context ->
+    string -> t Lwt.t
   val to_source  :
     Client_commands.context ->
     t -> string Lwt.t
