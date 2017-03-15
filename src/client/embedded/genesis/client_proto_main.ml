@@ -63,10 +63,10 @@ let commands () =
     end
       (fun hash fitness seckey cctxt ->
          let timestamp = !timestamp in
-         let block = Client_config.block () in
          let fitness =
            Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
-         mine cctxt ?timestamp block (Activate hash) fitness seckey >>=
+         mine cctxt ?timestamp cctxt.config.block
+           (Activate hash) fitness seckey >>=
          handle_error cctxt)
     ;
       command ~args ~desc: "Fork a test protocol" begin
@@ -85,10 +85,10 @@ let commands () =
     end
       (fun hash fitness seckey cctxt ->
          let timestamp = !timestamp in
-         let block = Client_config.block () in
          let fitness =
            Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
-         mine cctxt ?timestamp block (Activate_testnet hash) fitness seckey >>=
+         mine cctxt ?timestamp cctxt.config.block
+           (Activate_testnet hash) fitness seckey >>=
          handle_error cctxt) ;
   ]
 

@@ -34,7 +34,6 @@ PACKAGES := \
   calendar \
   cohttp.lwt \
   compiler-libs.optcomp \
-  config-file \
   cstruct \
   dynlink \
   ezjsonm \

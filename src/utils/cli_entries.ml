@@ -329,7 +329,11 @@ let usage
                with Not_found ->
                  (group, ref [ command ]) :: acc)
         [] commands in
-    List.map (fun (g, c) -> (g, List.rev !c)) grouped @
-    [ { name = "untitled" ; title = "Miscellaneous commands" },
-      List.rev !ungrouped ] in
+    let misc = match !ungrouped with
+      | [] -> []
+      | l ->
+          [ { name = "untitled" ; title = "Miscellaneous commands" },
+            List.rev l ]
+    in
+    List.map (fun (g, c) -> (g, List.rev !c)) grouped @ misc in
   Format.asprintf "%a" usage (by_group, options)

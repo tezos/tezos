@@ -104,6 +104,7 @@ let group =
 
 let commands () =
   let open Cli_entries in
+  let open Client_commands in
   [ command ~group ~desc: "generate a pair of keys"
       (prefixes [ "gen" ; "keys" ]
        @@ Secret_key.fresh_alias_param
@@ -117,7 +118,7 @@ let commands () =
       (fun name sk cctxt ->
          Lwt.catch (fun () ->
              Public_key.find cctxt name >>= fun pk ->
-             if check_keys_consistency pk sk || Client_config.force#get then
+             if check_keys_consistency pk sk || cctxt.config.force then
                Secret_key.add cctxt name sk
              else
                cctxt.error
@@ -156,7 +157,7 @@ let commands () =
     command ~group ~desc: "forget all keys"
       (fixed [ "forget" ; "all" ; "keys" ])
       (fun cctxt ->
-         if not Client_config.force#get then
+         if not cctxt.config.force then
            cctxt.Client_commands.error "this can only used with option -force true"
          else
            Public_key.save cctxt [] >>= fun () ->

@@ -131,6 +131,7 @@ let group =
 
 let commands  () =
   let open Cli_entries in
+  let open Client_commands in
   [
     command ~group ~desc: "add a contract to the wallet"
       (prefixes [ "remember" ; "contract" ]
@@ -162,7 +163,7 @@ let commands  () =
     command ~group ~desc: "forget all known contracts"
       (fixed [ "forget" ; "all" ; "contracts" ])
       (fun cctxt ->
-         if not Client_config.force#get then
+         if not cctxt.config.force then
             cctxt.Client_commands.error "this can only used with option -force true"
          else
            RawContractAlias.save cctxt []) ;

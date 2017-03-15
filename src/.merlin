@@ -29,7 +29,6 @@ PKG cmdliner
 PKG cohttp
 PKG compiler-libs.optcomp
 PKG conduit
-PKG config-file
 PKG cstruct
 PKG dynlink
 PKG ezjsonm
