@@ -75,17 +75,22 @@ end
 
 module Alias = functor (Entity : Entity) -> struct
 
+  open Client_commands
+
   let encoding =
     let open Data_encoding in
     list (obj2
             (req "name" string)
             (req "value" Entity.encoding))
 
-  let filename () =
-    Client_config.(base_dir#get // Entity.name ^ "s")
+  let dirname cctxt =
+    cctxt.config.base_dir
+
+  let filename cctxt =
+    Filename.concat (dirname cctxt) (Entity.name ^ "s")
 
   let load cctxt =
-    let filename = filename () in
+    let filename = filename cctxt in
     if not (Sys.file_exists filename) then return [] else
       Data_encoding_ezjsonm.read_file filename >>= function
       | Error _ ->
@@ -126,10 +131,10 @@ module Alias = functor (Entity : Entity) -> struct
   let save cctxt list =
     catch
       (fun () ->
-         let dirname = Client_config.base_dir#get in
+         let dirname = dirname cctxt in
          (if not (Sys.file_exists dirname) then Lwt_utils.create_dir dirname
           else return ()) >>= fun () ->
-         let filename = filename () in
+         let filename = filename cctxt in
          let json = Data_encoding.Json.construct encoding list in
          Data_encoding_ezjsonm.write_file filename json >>= function
          | Error _ -> fail (Failure "Json.write_file")
@@ -142,7 +147,7 @@ module Alias = functor (Entity : Entity) -> struct
   let add cctxt name value =
     let keep = ref false in
     load cctxt >>= fun list ->
-    (if not Client_config.force#get then
+    (if not cctxt.config.force then
        Lwt_list.iter_s (fun (n, v) ->
            if n = name && v = value then
              (keep := true ;
@@ -186,7 +191,7 @@ module Alias = functor (Entity : Entity) -> struct
     param ~name ~desc
       (fun cctxt s ->
          load cctxt >>= fun list ->
-         if not Client_config.force#get then
+         if not cctxt.config.force then
            Lwt_list.iter_s (fun (n, _v) ->
                if n = s then
                  cctxt.Client_commands.error

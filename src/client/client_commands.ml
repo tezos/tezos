@@ -10,8 +10,26 @@
 type ('a, 'b) lwt_format =
   ('a, Format.formatter, unit, 'b Lwt.t) format4
 
+type cfg = {
+  (* cli options *)
+  base_dir : string ;
+  config_file : string ;
+  print_timings : bool ;
+  force : bool ;
+  block : Node_rpc_services.Blocks.block ;
+
+  (* network options (cli and config file) *)
+  incoming_addr : string ;
+  incoming_port : int ;
+  tls : bool ;
+
+  (* webclient options *)
+  web_port : int ;
+}
+
 type context =
-  { error : 'a 'b. ('a, 'b) lwt_format -> 'a ;
+  { config : cfg ;
+    error : 'a 'b. ('a, 'b) lwt_format -> 'a ;
     warning : 'a. ('a, unit) lwt_format -> 'a ;
     message : 'a. ('a, unit) lwt_format -> 'a ;
     answer : 'a. ('a, unit) lwt_format -> 'a ;
@@ -19,7 +37,33 @@ type context =
 
 type command = (context, unit) Cli_entries.command
 
-let make_context log =
+(* Default config *)
+
+let (//) = Filename.concat
+
+let home =
+  try Sys.getenv "HOME"
+  with Not_found -> "/root"
+
+let default_base_dir = home // ".tezos-client"
+
+let default_cfg_of_base_dir base_dir = {
+  base_dir ;
+  config_file = base_dir // "config";
+  print_timings = false ;
+  force = false ;
+  block = `Prevalidation ;
+
+  incoming_addr = "127.0.0.1" ;
+  incoming_port = 8732 ;
+  tls = false ;
+
+  web_port = 8080 ;
+}
+
+let default_cfg = default_cfg_of_base_dir default_base_dir
+
+let make_context ?(config = default_cfg) log =
   let error fmt =
     Format.kasprintf
       (fun msg ->
@@ -39,7 +83,7 @@ let make_context log =
     Format.kasprintf
       (fun msg -> log name msg)
       fmt in
-  { error ; warning ; message ; answer ; log }
+  { config ; error ; warning ; message ; answer ; log }
 
 let ignore_context =
   make_context (fun _ _ -> Lwt.return ())

@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val block: unit -> Client_node_rpcs.Blocks.block
-
 val tez_sym: string
 
 val init_arg: string * Arg.spec * string

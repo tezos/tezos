@@ -167,20 +167,21 @@ let group =
 
 let commands () =
   let open Cli_entries in
+  let open Client_commands in
   [ command ~group ~desc: "access the timestamp of the block"
       (fixed [ "get" ; "timestamp" ])
-      (fun cctxt -> get_timestamp cctxt (block ())) ;
+      (fun cctxt -> get_timestamp cctxt cctxt.config.block) ;
     command ~group ~desc: "lists all non empty contracts of the block"
       (fixed [ "list" ; "contracts" ])
       (fun cctxt ->
-         list_contracts cctxt (block ()) >>= fun res ->
+         list_contracts cctxt cctxt.config.block >>= fun res ->
          Client_proto_rpcs.handle_error cctxt res) ;
     command ~group ~desc: "get the balance of a contract"
       (prefixes [ "get" ; "balance" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       (fun (_, contract) cctxt ->
-         Client_proto_rpcs.Context.Contract.balance cctxt (block ()) contract
+         Client_proto_rpcs.Context.Contract.balance cctxt cctxt.config.block contract
          >>= Client_proto_rpcs.handle_error cctxt >>= fun amount ->
          cctxt.answer "%a %s" Tez.pp amount tez_sym);
     command ~group ~desc: "get the manager of a block"
@@ -188,7 +189,7 @@ let commands () =
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       (fun (_, contract) cctxt ->
-         Client_proto_rpcs.Context.Contract.manager cctxt (block ()) contract
+         Client_proto_rpcs.Context.Contract.manager cctxt cctxt.config.block contract
          >>= Client_proto_rpcs.handle_error cctxt >>= fun manager ->
          Public_key_hash.rev_find cctxt manager >>= fun mn ->
          Public_key_hash.to_source cctxt manager >>= fun m ->
@@ -213,10 +214,11 @@ let commands () =
       (fun neu (_, manager) balance (_, source) cctxt ->
          check_contract cctxt neu >>= fun () ->
          get_delegate_pkh cctxt !delegate >>= fun delegate ->
-         (Client_proto_contracts.get_manager cctxt (block ()) source >>=? fun src_pkh ->
-          Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
+         (Client_proto_contracts.get_manager cctxt cctxt.config.block source >>=? fun src_pkh ->
+          Client_keys.get_key cctxt src_pkh
+          >>=? fun (src_name, src_pk, src_sk) ->
           cctxt.message "Got the source's manager keys (%s)." src_name >>= fun () ->
-          originate_account cctxt (block ()) ~force:!force
+          originate_account cctxt cctxt.config.block ~force:!force
             ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
             ~delegatable:!delegatable ~spendable:!spendable ?delegate:delegate
             ()) >>= Client_proto_rpcs.handle_error cctxt >>= fun contract ->
@@ -244,10 +246,11 @@ let commands () =
       (fun neu (_, manager) balance (_, source) code cctxt ->
          check_contract cctxt neu >>= fun () ->
          get_delegate_pkh cctxt !delegate >>= fun delegate ->
-         (Client_proto_contracts.get_manager cctxt (block ()) source >>=? fun src_pkh ->
-          Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
+         (Client_proto_contracts.get_manager cctxt cctxt.config.block source >>=? fun src_pkh ->
+          Client_keys.get_key cctxt src_pkh
+          >>=? fun (src_name, src_pk, src_sk) ->
           cctxt.message "Got the source's manager keys (%s)." src_name >>= fun () ->
-          originate_contract cctxt (block ()) ~force:!force
+          originate_contract cctxt cctxt.config.block ~force:!force
             ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
             ~delegatable:!delegatable ?delegatePubKey:delegate ~code ~init:!init
             ()) >>= Client_proto_rpcs.handle_error cctxt >>= fun contract ->
@@ -264,7 +267,7 @@ let commands () =
        @@ stop)
       (fun neu (_, manager) cctxt ->
          check_contract cctxt neu >>= fun () ->
-         faucet cctxt (block ()) ~force:!force ~manager_pkh:manager () >>= Client_proto_rpcs.handle_error cctxt >>= fun contract ->
+         faucet cctxt cctxt.config.block ~force:!force ~manager_pkh:manager () >>= Client_proto_rpcs.handle_error cctxt >>= fun contract ->
          RawContractAlias.add cctxt neu contract) ;
     command ~group ~desc: "transfer tokens"
       ~args: [ fee_arg ; arg_arg ; force_arg ]
@@ -279,10 +282,11 @@ let commands () =
          ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
       (fun amount (_, source) (_, destination) cctxt ->
-         (Client_proto_contracts.get_manager cctxt (block ()) source >>=? fun src_pkh ->
-          Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
+         (Client_proto_contracts.get_manager cctxt cctxt.config.block source >>=? fun src_pkh ->
+          Client_keys.get_key cctxt src_pkh
+          >>=? fun (src_name, src_pk, src_sk) ->
           cctxt.message "Got the source's manager keys (%s)." src_name >>= fun () ->
-          (transfer cctxt (block ()) ~force:!force
+          (transfer cctxt cctxt.config.block ~force:!force
              ~source ~src_pk ~src_sk ~destination ?arg:!arg ~amount ~fee:!fee ()) >>=? fun contracts ->
           Lwt_list.iter_s
             (fun c -> cctxt.message "New contract %a originated from a smart contract."
@@ -300,8 +304,7 @@ let commands () =
         stop
     end
       (fun hash seckey cctxt ->
-         let block = Client_config.block () in
-         dictate cctxt block (Activate hash) seckey >>=
+         dictate cctxt cctxt.config.block (Activate hash) seckey >>=
          Client_proto_rpcs.handle_error cctxt) ;
     command ~desc: "Fork a test protocol" begin
       prefixes [ "fork" ; "test" ; "protocol" ] @@
@@ -314,7 +317,6 @@ let commands () =
         stop
     end
       (fun hash seckey cctxt ->
-         let block = Client_config.block () in
-         dictate cctxt block (Activate_testnet hash) seckey >>=
+         dictate cctxt cctxt.config.block (Activate_testnet hash) seckey >>=
          Client_proto_rpcs.handle_error cctxt) ;
   ]

@@ -37,7 +37,7 @@ ${OBJS} ${OBJS_DEPS}: TARGET="(client_$(PROTO_VERSION).cmx)"
 ${OBJS}: EXTRA_OCAMLFLAGS = -for-pack Client_$(PROTO_VERSION)
 ../client_$(PROTO_VERSION).cmx: EXTRA_OCAMLFLAGS =
 ${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
-  PACKAGES=lwt ocplib-json-typed config-file sodium ocplib-ocamlres
+  PACKAGES=lwt ocplib-json-typed sodium ocplib-ocamlres
 ${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
   ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
 
@@ -52,7 +52,7 @@ ${WEBOBJS} ${WEBOBJS_DEPS}: OPENED_MODULES += Client_${PROTO_VERSION}
 ${WEBOBJS}: EXTRA_OCAMLFLAGS = -for-pack Webclient_$(PROTO_VERSION)
 ../client_$(PROTO_VERSION).cmx: EXTRA_OCAMLFLAGS =
 ${WEBOBJS} ${WEBOBJS_DEPS} ../webclient_$(PROTO_VERSION).cmx: \
-  PACKAGES=lwt ocplib-json-typed config-file sodium ocplib-ocamlres
+  PACKAGES=lwt ocplib-json-typed sodium ocplib-ocamlres
 ${WEBOBJS} ${WEBOBJS_DEPS} ../webclient_$(PROTO_VERSION).cmx: \
   ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
 ${WEBOBJS} ../webclient_$(PROTO_VERSION).cmx: \

@@ -24,6 +24,8 @@ module Blocks : sig
   val blocks_arg : block RPC.Arg.arg
 
   val parse_block: string -> (block, string) result
+  val to_string: block -> string
+
   type net = State.Net_id.t = Id of Block_hash.t
 
   type block_info = {

@@ -572,7 +572,7 @@ let commands () =
          let open Data_encoding in
          if !trace_stack then
            Client_proto_rpcs.Helpers.trace_code cctxt
-             (block ()) program (storage, input) >>= function
+             cctxt.config.block program (storage, input) >>= function
            | Ok (storage, output, trace) ->
                cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
                  (print_expr no_locations) storage
@@ -590,7 +590,7 @@ let commands () =
                cctxt.error "error running program"
          else
            Client_proto_rpcs.Helpers.run_code cctxt
-             (block ()) program (storage, input) >>= function
+             cctxt.config.block program (storage, input) >>= function
            | Ok (storage, output) ->
                cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
                  (print_expr no_locations) storage
@@ -605,7 +605,7 @@ let commands () =
        @@ stop)
       (fun program cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.typecheck_code cctxt (block ()) program >>= function
+         Client_proto_rpcs.Helpers.typecheck_code cctxt cctxt.config.block program >>= function
          | Ok type_map ->
              let type_map, program = unexpand_macros type_map program in
              cctxt.message "Well typed" >>= fun () ->
@@ -624,7 +624,7 @@ let commands () =
       (fun data exp_ty cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_data cctxt
-           (block ()) (data, exp_ty) >>= function
+           cctxt.config.block (data, exp_ty) >>= function
          | Ok () ->
              cctxt.message "Well typed"
          | Error errs ->
@@ -639,7 +639,7 @@ let commands () =
       (fun data cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.hash_data cctxt
-           (block ()) data >>= function
+           cctxt.config.block data >>= function
          | Ok hash ->
              cctxt.message "%S" hash
          | Error errs ->
@@ -658,7 +658,7 @@ let commands () =
       (fun data (_, key) cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.hash_data cctxt
-           (block ()) data >>= function
+           cctxt.config.block data >>= function
          | Ok hash ->
              let signature = Ed25519.sign key (MBytes.of_string hash) in
              cctxt.message "Hash: %S@.Signature: %S"

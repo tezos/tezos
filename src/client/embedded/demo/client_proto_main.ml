@@ -12,7 +12,7 @@ let protocol =
     "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
 let demo cctxt =
-  let block = Client_config.block () in
+  let block = Client_commands.(cctxt.config.block) in
   cctxt.Client_commands.message "Calling the 'echo' RPC." >>= fun () ->
   let msg = "test" in
   Client_proto_rpcs.echo cctxt block msg >>= fun reply ->
@@ -35,7 +35,7 @@ let demo cctxt =
 
 let mine cctxt =
   let block =
-    match Client_config.block () with
+    match Client_commands.(cctxt.config.block) with
     | `Prevalidation -> `Head 0
     | `Test_prevalidation -> `Test_head 0
     | b -> b in

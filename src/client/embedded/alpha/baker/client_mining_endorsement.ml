@@ -47,11 +47,11 @@ end = struct
                            (req "block" Block_hash.encoding)
                            (req "operation" Operation_hash.encoding))))))
 
-  let filename () =
-    Client_config.(base_dir#get // "endorsements")
+  let filename cctxt =
+    Client_commands.(Filename.concat cctxt.config.base_dir "endorsements")
 
   let load cctxt =
-    let filename = filename () in
+    let filename = filename cctxt in
     if not (Sys.file_exists filename) then return LevelMap.empty else
       Data_encoding_ezjsonm.read_file filename >>= function
       | Error _ ->
@@ -68,10 +68,10 @@ end = struct
   let save cctxt map =
     Lwt.catch
       (fun () ->
-         let dirname = Client_config.base_dir#get in
+         let dirname = Client_commands.(cctxt.config.base_dir) in
          (if not (Sys.file_exists dirname) then Lwt_utils.create_dir dirname
           else Lwt.return ()) >>= fun () ->
-         let filename = filename () in
+         let filename = filename cctxt in
          let json = Data_encoding.Json.construct encoding map in
          Data_encoding_ezjsonm.write_file filename json >>= function
          | Error _ -> failwith "Json.write_file"
