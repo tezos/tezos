@@ -9,7 +9,7 @@ type error_category =
   | `Permanent (** Errors that will happen no matter the context *)
   ]
 
-(** Custom error handling for economical protocols. *)
+(** Custom error handling for economic protocols. *)
 
 type error = ..
 
