@@ -38,6 +38,7 @@
         "Fitness_storage",
         "Vote_storage",
         "Init_storage",
+        "Public_key_storage",
 
         "Tezos_context",
 

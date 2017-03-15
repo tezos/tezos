@@ -197,7 +197,7 @@ module Public_key : sig
     context -> public_key_hash -> public_key tzresult Lwt.t
   val get_option:
     context -> public_key_hash -> public_key option tzresult Lwt.t
-  val set:
+  val reveal:
     context -> public_key_hash -> public_key -> context tzresult Lwt.t
   val remove:
     context -> public_key_hash -> context Lwt.t
