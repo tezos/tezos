@@ -18,10 +18,10 @@ module Make(Proto : Protocol.PACKED_PROTOCOL) = struct
     Error_monad.register_wrapped_error_kind
       (fun ecoerrors -> Proto.classify_errors ecoerrors)
       ~id ~title:"Error returned by the protocol"
-      ~description:"Wrapped error for the economical protocol."
+      ~description:"Wrapped error for the economic protocol."
       ~pp:(fun ppf ->
           Format.fprintf ppf
-            "@[<v 2>Economical error:@ %a@]"
+            "@[<v 2>Economic error:@ %a@]"
             (Format.pp_print_list Proto.pp))
       Data_encoding.(obj1 (req "ecoproto" (list Proto.error_encoding)))
       (function Ecoproto_error ecoerrors -> Some ecoerrors

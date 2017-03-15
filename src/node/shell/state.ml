@@ -1234,7 +1234,7 @@ let () =
     ~id: "invalidBlock"
     ~title: "Invalid block"
     ~description:
-      "The economical protocol refused to validate the block."
+      "The economic protocol refused to validate the block."
     ~pp:(fun ppf block_hash ->
         Format.fprintf ppf "Cannot validate the block %a"
           Block_hash.pp_short block_hash)

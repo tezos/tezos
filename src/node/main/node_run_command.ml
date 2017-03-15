@@ -212,7 +212,7 @@ module Term = struct
     let open Cmdliner in
     let doc =
       "Run the daemon in sandbox mode. P2P is disabled, and constants of \
-       the economical protocol can be altered with an optional JSON file. \
+       the economic protocol can be altered with an optional JSON file. \
        $(b,IMPORTANT): Using sandbox mode affects the node state and \
        subsequent runs of Tezos node must also use sandbox mode. \
        In order to run the node in normal mode afterwards, a full reset \

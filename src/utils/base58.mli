@@ -86,7 +86,7 @@ val register_resolver: 'a encoding -> (string -> 'a list Lwt.t) -> unit
     value provides at least [n/2] bytes of a prefix of the original value. *)
 val complete: ?alphabet:Alphabet.t -> string -> string list Lwt.t
 
-(** {1 Low-level: distinct registering function for economical protocol} *)
+(** {1 Low-level: distinct registering function for economic protocol} *)
 
 (** See [src/proto/environment/base48.mli]} for an inlined
     documentation. *)
