@@ -491,6 +491,7 @@ CLIENT_LIB_INTFS := \
   client/client_generic_rpcs.mli \
   client/client_helpers.mli \
   client/client_aliases.mli \
+  client/client_tags.mli \
   client/client_keys.mli \
   client/client_protocols.mli \
   client/client_blocks.mli \
@@ -503,6 +504,7 @@ CLIENT_LIB_IMPLS := \
   client/client_generic_rpcs.ml \
   client/client_helpers.ml \
   client/client_aliases.ml \
+  client/client_tags.ml \
   client/client_keys.ml \
   client/client_protocols.ml \
   client/client_blocks.ml \
