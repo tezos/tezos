@@ -35,11 +35,34 @@ module GitStore = struct
 
   module FunView = struct
     include Ir_funview.Make (Store)
-    type v = t
-    let get = read
-    let del = remove
-    let set = update
-    let list v k = Lwt_list.map_p (list v) k >|= List.flatten
+    type v = t * Lwt_utils.Idle_waiter.t
+    let get (t, w) k =
+      Lwt_utils.Idle_waiter.task w @@ fun () ->
+      read t k
+    let mem (t, w) k =
+      Lwt_utils.Idle_waiter.task w @@ fun () ->
+      mem t k
+    let dir_mem (t, w) k =
+      Lwt_utils.Idle_waiter.task w @@ fun () ->
+      dir_mem t k
+    let del (t, w) k =
+      Lwt_utils.Idle_waiter.task w @@ fun () ->
+      remove t k >>= fun t ->
+      Lwt.return (t, w)
+    let remove_rec (t, w) k =
+      Lwt_utils.Idle_waiter.task w @@ fun () ->
+      remove_rec t k >>= fun t ->
+      Lwt.return (t, w)
+    let set (t, w) k v =
+      Lwt_utils.Idle_waiter.task w @@ fun () ->
+      update t k v >>= fun t ->
+      Lwt.return (t, w)
+    let update_path db k (t, w) =
+      Lwt_utils.Idle_waiter.task w @@ fun () ->
+      update_path db k t
+    let list (t, w) k =
+      Lwt_utils.Idle_waiter.task w @@ fun () ->
+      Lwt_list.map_p (list t) k >|= List.flatten
   end
 
 end
@@ -48,11 +71,13 @@ type index = {
   path: string ;
   repo: GitStore.Repo.t ;
   patch_context: context -> context Lwt.t ;
+  mutable commits: int ;
+  repack_scheduler : Lwt_utils.Idle_waiter.t ;
 }
 and context = {
   index: index ;
   store: GitStore.t ;
-  view: GitStore.FunView.t ;
+  view: GitStore.FunView.v ;
 }
 type t = context
 
@@ -89,6 +114,7 @@ let checkout index key =
       Irmin.Task.none (Block_hash.to_b58check key) index.repo >>= fun t ->
     let store = t () in
     GitStore.FunView.of_path store [] >>= fun view ->
+    let view = (view, index.repack_scheduler) in
     let ctxt = { index ; store ; view } in
     index.patch_context ctxt >>= fun ctxt ->
     lwt_debug "<- Context.checkout %a OK"
@@ -160,8 +186,31 @@ let commit key context =
           Format.asprintf "%a %a"
             Fitness.pp fitness Block_hash.pp_short key
        | Some msg -> msg in
-      GitStore.FunView.update_path (store msg) [] context.view
-
+     GitStore.FunView.update_path (store msg) [] context.view >>= fun () ->
+     context.index.commits <- context.index.commits + 1 ;
+     if context.index.commits mod 200 = 0 then
+       Lwt_utils.Idle_waiter.force_idle
+         context.index.repack_scheduler
+         (fun () ->
+            lwt_debug "begin git repack" >>= fun () ->
+            let command =
+              "git",
+              [| "git" ; "-C" ; context.index.path ;
+                 "repack" ; "-a" ; "-d" |] in
+            let t0 = Unix.gettimeofday () in
+            Lwt_process.exec
+              ~stdout: `Dev_null ~stderr: `Dev_null
+              command >>= fun res ->
+            let dt = Unix.gettimeofday () -. t0 in
+            match res with
+            | WEXITED 0 ->
+                lwt_log_notice "git repack complete in %0.2f sec" dt
+            | WEXITED code | WSTOPPED code | WSIGNALED code ->
+                lwt_log_error "git repack failed with code %d after  %0.2f sec"
+                  code dt) >>= fun () ->
+       Lwt.return ()
+     else
+       Lwt.return ()
 
 (*-- Generic Store Primitives ------------------------------------------------*)
 
@@ -207,6 +256,8 @@ let init ?patch_context ~root =
   GitStore.Repo.create
     (Irmin_unix.Irmin_git.config ~root ~bare:true ()) >>= fun repo ->
   Lwt.return {
+    commits = 0 ;
+    repack_scheduler = Lwt_utils.Idle_waiter.create () ;
     path = root ;
     repo ;
     patch_context =
@@ -221,6 +272,7 @@ let commit_genesis index ~id:block ~time ~protocol ~test_protocol =
     index.repo >>= fun t ->
   let store = t () in
   GitStore.FunView.of_path store [] >>= fun view ->
+  let view = (view, index.repack_scheduler) in
   GitStore.FunView.set view current_timestamp_key
     (MBytes.of_string (Time.to_notation time)) >>= fun view ->
   GitStore.FunView.set view current_protocol_key
