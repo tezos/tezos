@@ -71,6 +71,20 @@ module type HASH = sig
 
 end
 
+module type MERKLE_TREE = sig
+  type elt
+  include HASH
+  val compute: elt list -> t
+  val empty: t
+  type path =
+    | Left of path * t
+    | Right of t * path
+    | Op
+  val compute_path: elt list -> int -> path
+  val check_path: path -> elt -> t * int
+  val path_encoding: path Data_encoding.t
+end
+
 (** {2 Building Hashes} *******************************************************)
 
 (** The parameters for creating a new Hash type using
@@ -110,6 +124,13 @@ module Block_hash : HASH
 
 (** Operations hashes / IDs. *)
 module Operation_hash : HASH
+
+(** List of operations hashes / IDs. *)
+module Operation_list_hash :
+  MERKLE_TREE with type elt = Operation_hash.t
+
+module Operation_list_list_hash :
+  MERKLE_TREE with type elt = Operation_list_hash.t
 
 (** Protocol versions / source hashes. *)
 module Protocol_hash : HASH
