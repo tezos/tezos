@@ -1,15 +1,26 @@
-(***********************************************************************)
-(*                                                                     *)
-(*                                OCaml                                *)
-(*                                                                     *)
-(*            Xavier Leroy, projet Cristal, INRIA Rocquencourt         *)
-(*                                                                     *)
-(*  Copyright 1996 Institut National de Recherche en Informatique et   *)
-(*  en Automatique.  All rights reserved.  This file is distributed    *)
-(*  under the terms of the GNU Library General Public License, with    *)
-(*  the special exception on linking described in file ../LICENSE.     *)
-(*                                                                     *)
-(***********************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+(* TEZOS CHANGES
+
+   * Import version 4.04.0
+   * Remove unsafe functions
+   * Remove deprecated functions (enforcing string immutability)
+   * Add binary data extraction functions
+
+*)
 
 (** String operations.
 
@@ -30,20 +41,6 @@
   substring of [s] if [len >= 0] and [start] and [start+len] are
   valid positions in [s].
 
-  OCaml strings used to be modifiable in place, for instance via the
-  {!String.set} and {!String.blit} functions described below. This
-  usage is deprecated and only possible when the compiler is put in
-  "unsafe-string" mode by giving the [-unsafe-string] command-line
-  option (which is currently the default for reasons of backward
-  compatibility). This is done by making the types [string] and
-  [bytes] (see module {!Bytes}) interchangeable so that functions
-  expecting byte sequences can also accept strings as arguments and
-  modify them.
-
-  All new code should avoid this feature and be compiled with the
-  [-safe-string] command-line option to enforce the separation between
-  the types [string] and [bytes].
-
  *)
 
 external length : string -> int = "%string_length"
@@ -55,25 +52,6 @@ external get : string -> int -> char = "%string_safe_get"
 
    Raise [Invalid_argument] if [n] not a valid index in [s]. *)
 
-
-external set : bytes -> int -> char -> unit = "%string_safe_set"
-  [@@ocaml.deprecated "Use Bytes.set instead."]
-(** [String.set s n c] modifies byte sequence [s] in place,
-   replacing the byte at index [n] with [c].
-   You can also write [s.[n] <- c] instead of [String.set s n c].
-
-   Raise [Invalid_argument] if [n] is not a valid index in [s].
-
-   @deprecated This is a deprecated alias of {!Bytes.set}.[ ] *)
-
-external create : int -> bytes = "caml_create_string"
-  [@@ocaml.deprecated "Use Bytes.create instead."]
-(** [String.create n] returns a fresh byte sequence of length [n].
-   The sequence is uninitialized and contains arbitrary bytes.
-
-   Raise [Invalid_argument] if [n < 0] or [n > ]{!Sys.max_string_length}.
-
-   @deprecated This is a deprecated alias of {!Bytes.create}.[ ] *)
 
 val make : int -> char -> string
 (** [String.make n c] returns a fresh string of length [n],
@@ -91,12 +69,6 @@ val init : int -> (int -> char) -> string
     @since 4.02.0
 *)
 
-val copy : string -> string [@@ocaml.deprecated]
-(** Return a copy of the given string.
-
-    @deprecated Because strings are immutable, it doesn't make much
-    sense to make identical copies of them. *)
-
 val sub : string -> int -> int -> string
 (** [String.sub s start len] returns a fresh string of length [len],
    containing the substring of [s] that starts at position [start] and
@@ -104,16 +76,6 @@ val sub : string -> int -> int -> string
 
    Raise [Invalid_argument] if [start] and [len] do not
    designate a valid substring of [s]. *)
-
-val fill : bytes -> int -> int -> char -> unit
-  [@@ocaml.deprecated "Use Bytes.fill instead."]
-(** [String.fill s start len c] modifies byte sequence [s] in place,
-   replacing [len] bytes with [c], starting at [start].
-
-   Raise [Invalid_argument] if [start] and [len] do not
-   designate a valid range of [s].
-
-   @deprecated This is a deprecated alias of {!Bytes.fill}.[ ] *)
 
 val blit : string -> int -> bytes -> int -> int -> unit
 (** Same as {!Bytes.blit_string}. *)
@@ -158,13 +120,20 @@ val trim : string -> string
 
 val escaped : string -> string
 (** Return a copy of the argument, with special characters
-   represented by escape sequences, following the lexical
-   conventions of OCaml.  If there is no special
-   character in the argument, return the original string itself,
-   not a copy. Its inverse function is Scanf.unescaped.
+    represented by escape sequences, following the lexical
+    conventions of OCaml.
+    All characters outside the ASCII printable range (32..126) are
+    escaped, as well as backslash and double-quote.
 
-   Raise [Invalid_argument] if the result is longer than
-   {!Sys.max_string_length} bytes. *)
+    If there is no special character in the argument that needs
+    escaping, return the original string itself, not a copy.
+
+    Raise [Invalid_argument] if the result is longer than
+    {!Sys.max_string_length} bytes.
+
+    The function {!Scanf.unescaped} is a left inverse of [escaped],
+    i.e. [Scanf.unescaped (escaped s) = s] for any string [s] (unless
+    [escape s] fails). *)
 
 val index : string -> char -> int
 (** [String.index s c] returns the index of the first
@@ -214,21 +183,25 @@ val rcontains_from : string -> int -> char -> bool
    Raise [Invalid_argument] if [stop < 0] or [stop+1] is not a valid
    position in [s]. *)
 
-val uppercase : string -> string
+val uppercase_ascii : string -> string
 (** Return a copy of the argument, with all lowercase letters
-   translated to uppercase, including accented letters of the ISO
-   Latin-1 (8859-1) character set. *)
+   translated to uppercase, using the US-ASCII character set.
+   @since 4.03.0 *)
 
-val lowercase : string -> string
+val lowercase_ascii : string -> string
 (** Return a copy of the argument, with all uppercase letters
-   translated to lowercase, including accented letters of the ISO
-   Latin-1 (8859-1) character set. *)
+   translated to lowercase, using the US-ASCII character set.
+   @since 4.03.0 *)
 
-val capitalize : string -> string
-(** Return a copy of the argument, with the first character set to uppercase. *)
+val capitalize_ascii : string -> string
+(** Return a copy of the argument, with the first character set to uppercase,
+   using the US-ASCII character set.
+   @since 4.03.0 *)
 
-val uncapitalize : string -> string
-(** Return a copy of the argument, with the first character set to lowercase. *)
+val uncapitalize_ascii : string -> string
+(** Return a copy of the argument, with the first character set to lowercase,
+   using the US-ASCII character set.
+   @since 4.03.0 *)
 
 type t = string
 (** An alias for the type of strings. *)
@@ -239,6 +212,24 @@ val compare: t -> t -> int
     allows the module [String] to be passed as argument to the functors
     {!Set.Make} and {!Map.Make}. *)
 
+val equal: t -> t -> bool
+(** The equal function for strings.
+    @since 4.03.0 *)
+
+val split_on_char: char -> string -> string list
+(** [String.split_on_char sep s] returns the list of all (possibly empty)
+    substrings of [s] that are delimited by the [sep] character.
+
+    The function's output is specified by the following invariants:
+
+    - The list is not empty.
+    - Concatenating its elements using [sep] as a separator returns a
+      string equal to the input ([String.concat (String.make 1 sep)
+      (String.split_on_char sep s) = s]).
+    - No string in the result contains the [sep] character.
+
+    @since 4.04.0
+*)
 
 (** Functions reading bytes  *)
 

@@ -13,6 +13,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* TEZOS CHANGES
+
+   * Import version 4.04.0
+   * Remove unsafe functions
+   * Remove deprecated functions
+
+*)
+
 (** Array operations. *)
 
 external length : 'a array -> int = "%array_length"
@@ -48,18 +56,10 @@ external make : int -> 'a -> 'a array = "caml_make_vect"
    If the value of [x] is a floating-point number, then the maximum
    size is only [Sys.max_array_length / 2].*)
 
-external create : int -> 'a -> 'a array = "caml_make_vect"
-  [@@ocaml.deprecated "Use Array.make instead."]
-(** @deprecated [Array.create] is an alias for {!Array.make}. *)
-
 external create_float: int -> float array = "caml_make_float_vect"
 (** [Array.create_float n] returns a fresh float array of length [n],
     with uninitialized data.
     @since 4.03 *)
-
-val make_float: int -> float array
-  [@@ocaml.deprecated "Use Array.create_float instead."]
-(** @deprecated [Array.make_float] is an alias for {!Array.create_float}. *)
 
 val init : int -> (int -> 'a) -> 'a array
 (** [Array.init n f] returns a fresh array of length [n],
@@ -83,10 +83,6 @@ val make_matrix : int -> int -> 'a -> 'a array array
    greater than [Sys.max_array_length].
    If the value of [e] is a floating-point number, then the maximum
    size is only [Sys.max_array_length / 2]. *)
-
-val create_matrix : int -> int -> 'a -> 'a array array
-  [@@ocaml.deprecated "Use Array.make_matrix instead."]
-(** @deprecated [Array.create_matrix] is an alias for {!Array.make_matrix}. *)
 
 val append : 'a array -> 'a array -> 'a array
 (** [Array.append v1 v2] returns a fresh array containing the
@@ -174,13 +170,15 @@ val fold_right : ('b -> 'a -> 'a) -> 'b array -> 'a -> 'a
 val iter2 : ('a -> 'b -> unit) -> 'a array -> 'b array -> unit
 (** [Array.iter2 f a b] applies function [f] to all the elements of [a]
    and [b].
-   Raise [Invalid_argument] if the arrays are not the same size. *)
+   Raise [Invalid_argument] if the arrays are not the same size.
+   @since 4.03.0 *)
 
 val map2 : ('a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
 (** [Array.map2 f a b] applies function [f] to all the elements of [a]
    and [b], and builds an array with the results returned by [f]:
    [[| f a.(0) b.(0); ...; f a.(Array.length a - 1) b.(Array.length b - 1)|]].
-   Raise [Invalid_argument] if the arrays are not the same size. *)
+   Raise [Invalid_argument] if the arrays are not the same size.
+   @since 4.03.0 *)
 
 
 (** {6 Array scanning} *)
@@ -189,20 +187,24 @@ val map2 : ('a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
 val for_all : ('a -> bool) -> 'a array -> bool
 (** [Array.for_all p [|a1; ...; an|]] checks if all elements of the array
    satisfy the predicate [p]. That is, it returns
-   [(p a1) && (p a2) && ... && (p an)]. *)
+   [(p a1) && (p a2) && ... && (p an)].
+   @since 4.03.0 *)
 
 val exists : ('a -> bool) -> 'a array -> bool
 (** [Array.exists p [|a1; ...; an|]] checks if at least one element of
     the array satisfies the predicate [p]. That is, it returns
-    [(p a1) || (p a2) || ... || (p an)]. *)
+    [(p a1) || (p a2) || ... || (p an)].
+    @since 4.03.0 *)
 
 val mem : 'a -> 'a array -> bool
 (** [mem a l] is true if and only if [a] is equal
-   to an element of [l]. *)
+   to an element of [l].
+   @since 4.03.0 *)
 
 val memq : 'a -> 'a array -> bool
 (** Same as {!Array.mem}, but uses physical equality instead of structural
-   equality to compare array elements. *)
+   equality to compare array elements.
+   @since 4.03.0 *)
 
 
 (** {6 Sorting} *)
@@ -249,11 +251,3 @@ val fast_sort : ('a -> 'a -> int) -> 'a array -> unit
     on typical input.
 *)
 
-
-(**/**)
-(** {6 Undocumented functions} *)
-
-(* The following is for system use only. Do not call directly. *)
-
-external unsafe_get : 'a array -> int -> 'a = "%array_unsafe_get"
-external unsafe_set : 'a array -> int -> 'a -> unit = "%array_unsafe_set"
