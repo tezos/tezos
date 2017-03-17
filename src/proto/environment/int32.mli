@@ -13,6 +13,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* TEZOS CHANGES
+
+   * Import version 4.04.0
+   * Remove deprecated functions
+
+*)
+
 (** 32-bit integers.
 
    This module provides operations on the type [int32]
@@ -167,10 +174,3 @@ val equal: t -> t -> bool
 (** The equal function for int32s.
     @since 4.03.0 *)
 
-(**/**)
-
-(** {6 Deprecated functions} *)
-
-external format : string -> int32 -> string = "caml_int32_format"
-(** Do not use this deprecated function.  Instead,
-   used {!Printf.sprintf} with a [%l...] format. *)

@@ -167,6 +167,7 @@ module Make (T: QTY) : S = struct
       | Ok res -> Ok res
       | Error ([ Addition_overflow _ ] as errs) ->
           Error (Multiplication_overflow (t, m) :: errs)
+      | Error errs -> Error errs
 
   let ( /? ) t d =
     if d <= 0L then
