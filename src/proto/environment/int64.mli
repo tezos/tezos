@@ -13,6 +13,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* TEZOS CHANGES
+
+   * Import version 4.04.0
+   * Remove deprecated functions
+
+*)
 (** 64-bit integers.
 
    This module provides operations on the type [int64] of
@@ -188,11 +194,3 @@ val compare: t -> t -> int
 val equal: t -> t -> bool
 (** The equal function for int64s.
     @since 4.03.0 *)
-
-(**/**)
-
-(** {6 Deprecated functions} *)
-
-external format : string -> int64 -> string = "caml_int64_format"
-(** Do not use this deprecated function.  Instead,
-   used {!Printf.sprintf} with a [%L...] format. *)

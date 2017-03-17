@@ -15,10 +15,10 @@
 
 (* TEZOS CHANGES
 
-   * import version 4.03.0
-   * Removed channel functions
-   * Removed toplevel effect based functions
-   * Removed deprecated functions
+   * Import version 4.04.0
+   * Remove channel functions
+   * Remove toplevel effect based functions
+   * Remove deprecated functions
 
 *)
 
@@ -83,15 +83,48 @@
    the evaluation order of printing commands.
 *)
 
+(** {6:tags Semantic Tags} *)
+
+type tag = string
+
+(** {6:meaning Changing the meaning of standard formatter pretty printing} *)
+
+(** The [Format] module is versatile enough to let you completely redefine
+  the meaning of pretty printing: you may provide your own functions to define
+  how to handle indentation, line splitting, and even printing of all the
+  characters that have to be printed! *)
+
+type formatter_out_functions = {
+  out_string : string -> int -> int -> unit;
+  out_flush : unit -> unit;
+  out_newline : unit -> unit;
+  out_spaces : int -> unit;
+}
+
+(** {6:tagsmeaning Changing the meaning of printing semantic tags} *)
+
+type formatter_tag_functions = {
+  mark_open_tag : tag -> string;
+  mark_close_tag : tag -> string;
+  print_open_tag : tag -> unit;
+  print_close_tag : tag -> unit;
+}
+(** The tag handling functions specific to a formatter:
+  [mark] versions are the 'tag marking' functions that associate a string
+  marker to a tag in order for the pretty-printing engine to flush
+  those markers as 0 length tokens in the output device of the formatter.
+  [print] versions are the 'tag printing' functions that can perform
+  regular printing when a tag is closed or opened. *)
+
 (** {6 Multiple formatted output} *)
 
-type formatter;;
+type formatter
 (** Abstract data corresponding to a pretty-printer (also called a
   formatter) and all its machinery.
 
   Defining new pretty-printers permits unrelated output of material in
   parallel on several output channels.
-  All the parameters of a pretty-printer are local to this pretty-printer:
+  All the parameters of a pretty-printer are local to a formatter:
   margin, maximum indentation limit, maximum number of boxes
   simultaneously opened, ellipsis, and so on, are specific to
   each pretty-printer and may be fixed independently.
@@ -153,6 +186,36 @@ val pp_get_max_boxes : formatter -> unit -> int
 val pp_over_max_boxes : formatter -> unit -> bool
 val pp_set_ellipsis_text : formatter -> string -> unit
 val pp_get_ellipsis_text : formatter -> unit -> string
+
+val pp_set_formatter_output_functions :
+  formatter -> (string -> int -> int -> unit) -> (unit -> unit) -> unit
+
+val pp_get_formatter_output_functions :
+  formatter -> unit -> (string -> int -> int -> unit) * (unit -> unit)
+
+val pp_set_formatter_tag_functions :
+  formatter -> formatter_tag_functions -> unit
+
+val pp_get_formatter_tag_functions :
+  formatter -> unit -> formatter_tag_functions
+
+val pp_set_formatter_out_functions :
+  formatter -> formatter_out_functions -> unit
+
+val pp_get_formatter_out_functions :
+  formatter -> unit -> formatter_out_functions
+(** These functions are the basic ones: usual functions
+   operating on the standard formatter are defined via partial
+   evaluation of these primitives. For instance,
+   [print_string] is equal to [pp_print_string std_formatter]. *)
+
+val pp_flush_formatter : formatter -> unit
+(** [pp_flush_formatter fmt] flushes [fmt]'s internal queue, ensuring that all
+    the printing and flushing actions have been performed. In addition, this
+    operation will close all boxes and reset the state of the formatter.
+
+    This will not flush [fmt]'s output. In most cases, the user may want to use
+    {!pp_print_flush} instead. *)
 
 (** {6 Convenience formatting functions.} *)
 

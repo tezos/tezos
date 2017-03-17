@@ -15,9 +15,12 @@
 
 (* TEZOS CHANGES
 
-   * import version 4.02.1
-   * Removed [channel], [exit], ...
-   * Removed polymorphic comparisons
+   * Import version 4.04.0
+   * Remove [channel], [exit], ...
+   * Remove polymorphic comparisons
+   * Remove non IEEE754-standardized functions on floats
+   * Remove deprecated functions
+
 *)
 
 
@@ -38,7 +41,7 @@
 external raise : exn -> 'a = "%raise"
 (** Raise the given exception value *)
 
-(* external raise_notrace : exn -> 'a = "%raise_notrace" *)
+external raise_notrace : exn -> 'a = "%raise_notrace"
 (** A faster version [raise] which does not record the backtrace.
     @since 4.02.0
 *)
@@ -46,7 +49,7 @@ external raise : exn -> 'a = "%raise"
 val invalid_arg : string -> 'a
 (** Raise exception [Invalid_argument] with the given string. *)
 
-(* val failwith : string -> 'a *)
+val failwith : string -> 'a
 (** Raise exception [Failure] with the given string. *)
 
 exception Exit
@@ -64,56 +67,72 @@ external ( && ) : bool -> bool -> bool = "%sequand"
    in [e1 && e2], [e1] is evaluated first, and if it returns [false],
    [e2] is not evaluated at all. *)
 
-external ( & ) : bool -> bool -> bool = "%sequand"
-(** @deprecated {!Pervasives.( && )} should be used instead. *)
 
 external ( || ) : bool -> bool -> bool = "%sequor"
 (** The boolean 'or'. Evaluation is sequential, left-to-right:
    in [e1 || e2], [e1] is evaluated first, and if it returns [true],
    [e2] is not evaluated at all. *)
 
-external ( or ) : bool -> bool -> bool = "%sequor"
-  [@@ocaml.deprecated "Use (||) instead."]
-(** @deprecated {!Pervasives.( || )} should be used instead.*)
-
 (** {6 Debugging} *)
 
 external __LOC__ : string = "%loc_LOC"
 (** [__LOC__] returns the location at which this expression appears in
     the file currently being parsed by the compiler, with the standard
-    error format of OCaml: "File %S, line %d, characters %d-%d" *)
+    error format of OCaml: "File %S, line %d, characters %d-%d".
+    @since 4.02.0
+*)
+
 external __FILE__ : string = "%loc_FILE"
 (** [__FILE__] returns the name of the file currently being
-    parsed by the compiler. *)
+    parsed by the compiler.
+    @since 4.02.0
+*)
+
 external __LINE__ : int = "%loc_LINE"
 (** [__LINE__] returns the line number at which this expression
-    appears in the file currently being parsed by the compiler. *)
+    appears in the file currently being parsed by the compiler.
+    @since 4.02.0
+*)
+
 external __MODULE__ : string = "%loc_MODULE"
 (** [__MODULE__] returns the module name of the file being
-    parsed by the compiler. *)
+    parsed by the compiler.
+    @since 4.02.0
+*)
+
 external __POS__ : string * int * int * int = "%loc_POS"
 (** [__POS__] returns a tuple [(file,lnum,cnum,enum)], corresponding
     to the location at which this expression appears in the file
     currently being parsed by the compiler. [file] is the current
     filename, [lnum] the line number, [cnum] the character position in
-    the line and [enum] the last character position in the line. *)
+    the line and [enum] the last character position in the line.
+    @since 4.02.0
+ *)
 
 external __LOC_OF__ : 'a -> string * 'a = "%loc_LOC"
 (** [__LOC_OF__ expr] returns a pair [(loc, expr)] where [loc] is the
     location of [expr] in the file currently being parsed by the
     compiler, with the standard error format of OCaml: "File %S, line
-    %d, characters %d-%d" *)
+    %d, characters %d-%d".
+    @since 4.02.0
+*)
+
 external __LINE_OF__ : 'a -> int * 'a = "%loc_LINE"
 (** [__LINE__ expr] returns a pair [(line, expr)], where [line] is the
     line number at which the expression [expr] appears in the file
-    currently being parsed by the compiler. *)
+    currently being parsed by the compiler.
+    @since 4.02.0
+ *)
+
 external __POS_OF__ : 'a -> (string * int * int * int) * 'a = "%loc_POS"
-(** [__POS_OF__ expr] returns a pair [(expr,loc)], where [loc] is a
+(** [__POS_OF__ expr] returns a pair [(loc,expr)], where [loc] is a
     tuple [(file,lnum,cnum,enum)] corresponding to the location at
     which the expression [expr] appears in the file currently being
     parsed by the compiler. [file] is the current filename, [lnum] the
     line number, [cnum] the character position in the line and [enum]
-    the last character position in the line. *)
+    the last character position in the line.
+    @since 4.02.0
+ *)
 
 (** {6 Composition operators} *)
 
@@ -556,5 +575,27 @@ type ('a, 'b, 'c, 'd) format4 = ('a, 'b, 'c, 'c, 'c, 'd) format6
 
 type ('a, 'b, 'c) format = ('a, 'b, 'c, 'c) format4
 
+val string_of_format : ('a, 'b, 'c, 'd, 'e, 'f) format6 -> string
+(** Converts a format string into a string. *)
 
+external format_of_string :
+  ('a, 'b, 'c, 'd, 'e, 'f) format6 ->
+  ('a, 'b, 'c, 'd, 'e, 'f) format6 = "%identity"
+(** [format_of_string s] returns a format string read from the string
+    literal [s].
+    Note: [format_of_string] can not convert a string argument that is not a
+    literal. If you need this functionality, use the more general
+    {!Scanf.format_from_string} function.
+*)
+
+val ( ^^ ) :
+  ('a, 'b, 'c, 'd, 'e, 'f) format6 ->
+  ('f, 'b, 'c, 'e, 'g, 'h) format6 ->
+  ('a, 'b, 'c, 'd, 'g, 'h) format6
+(** [f1 ^^ f2] catenates format strings [f1] and [f2]. The result is a
+  format string that behaves as the concatenation of format strings [f1] and
+  [f2]: in case of formatted output, it accepts arguments from [f1], then
+  arguments from [f2]; in case of formatted input, it returns results from
+  [f1], then results from [f2].
+*)
 
