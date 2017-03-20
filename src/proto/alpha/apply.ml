@@ -12,7 +12,6 @@
 open Tezos_context
 
 type error += Bad_endorsement (* TODO: doc *)
-type error += Contract_not_delegatable (* TODO: doc *)
 type error += Unimplemented
 type error += Invalid_voting_period
 
@@ -99,8 +98,6 @@ let apply_manager_operation_content ctxt origination_nonce accept_failing_script
       return (ctxt, origination_nonce)
       (* TODO: pay for the storage diff *)
   | Delegation delegate ->
-      Contract.is_delegatable ctxt source >>=? fun delegatable ->
-      fail_unless delegatable Contract_not_delegatable >>=? fun () ->
       Contract.set_delegate ctxt source delegate >>=? fun ctxt ->
       return (ctxt, origination_nonce)
 
