@@ -256,20 +256,12 @@ module Context = struct
         ~output: (wrap_tzerror (option Script.encoding))
         RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "script")
 
-    let assets custom_root =
-      RPC.service
-        ~description: "Access the assets of the contract."
-        ~input: empty
-        ~output: (wrap_tzerror Asset.Map.encoding)
-        RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "assets")
-
     type info = {
       manager: public_key_hash ;
       balance: Tez.t ;
       spendable: bool ;
       delegate: bool * public_key_hash option ;
       script: Script.t option ;
-      assets: Asset.Map.t ;
       counter: int32 ;
     }
 
@@ -280,11 +272,11 @@ module Context = struct
         ~output:
           (wrap_tzerror @@
            conv
-             (fun {manager;balance;spendable;delegate;script;assets;counter} ->
-                (manager,balance,spendable,delegate,script,assets,counter))
-             (fun (manager,balance,spendable,delegate,script,assets,counter) ->
-                {manager;balance;spendable;delegate;script;assets;counter}) @@
-           obj7
+             (fun {manager;balance;spendable;delegate;script;counter} ->
+                (manager,balance,spendable,delegate,script,counter))
+             (fun (manager,balance,spendable,delegate,script,counter) ->
+                {manager;balance;spendable;delegate;script;counter}) @@
+           obj6
              (req "manager" Ed25519.Public_key_hash.encoding)
              (req "balance" Tez.encoding)
              (req "spendable" bool)
@@ -292,7 +284,6 @@ module Context = struct
                 (req "setable" bool)
                 (opt "value" Ed25519.Public_key_hash.encoding))
              (opt "script" Script.encoding)
-             (req "assets" Asset.Map.encoding)
              (req "counter" int32))
         RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg)
 

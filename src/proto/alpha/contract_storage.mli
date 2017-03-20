@@ -34,7 +34,6 @@ val is_spendable : Storage.t -> Contract_repr.t -> bool tzresult Lwt.t
 val get_manager: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t tzresult Lwt.t
 val get_delegate_opt: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option tzresult Lwt.t
 val get_balance: Storage.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
-val get_assets: Storage.t -> Contract_repr.t -> Asset_repr.Map.t tzresult Lwt.t
 val get_counter: Storage.t -> Contract_repr.t -> int32 tzresult Lwt.t
 
 val get_script: Storage.t -> Contract_repr.t -> Script_repr.t option tzresult Lwt.t
@@ -51,9 +50,6 @@ val spend : Storage.t -> Contract_repr.t -> Tez_repr.t -> Storage.t tzresult Lwt
 
 (** decrease_balance even if the contract is not spendable *)
 val spend_from_script : Storage.t -> Contract_repr.t -> Tez_repr.t -> Storage.t tzresult Lwt.t
-
-val issue :
-  Storage.t -> Contract_repr.t ->  Asset_repr.t -> Ed25519.Public_key_hash.t -> Tez_repr.t -> Storage.t tzresult Lwt.t
 
 val originate :
   Storage.t ->

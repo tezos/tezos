@@ -155,7 +155,6 @@ let create_base c contract ~balance ~manager ~delegate ?script ~spendable ~deleg
   end >>=? fun c ->
   Storage.Contract.Spendable.init c contract spendable >>=? fun c ->
   Storage.Contract.Delegatable.init c contract delegatable >>=? fun c ->
-  Storage.Contract.Assets.init c contract Asset_repr.Map.empty >>=? fun c ->
   Storage.Contract.Counter.init c contract counter >>=? fun c ->
   (match script with
    | Some ({ Script_repr.code ; storage }, (code_fees, storage_fees)) ->
@@ -266,15 +265,6 @@ let get_balance c contract =
     end
   | Some v -> return v
 
-let get_assets c contract =
-  Storage.Contract.Assets.get_option c contract >>=? function
-  | None -> begin
-      match Contract_repr.is_default contract with
-      | Some _ -> return Asset_repr.Map.empty
-      | None -> failwith "get_assets"
-    end
-  | Some a -> return a
-
 let is_delegatable c contract =
   Storage.Contract.Delegatable.get_option c contract >>=? function
   | None -> begin
@@ -361,15 +351,6 @@ let credit c contract amount =
       Lwt.return Tez_repr.(amount +? balance) >>=? fun balance ->
       Storage.Contract.Balance.set c contract balance >>=? fun c ->
       Roll_storage.Contract.add_amount c contract amount
-
-let issue c contract asset key quantity =
-  Storage.Contract.Assets.get_option c contract >>=? function
-  | None ->
-     Lwt.return (Asset_repr.Map.add Asset_repr.Map.empty asset key quantity) >>=?
-     Storage.Contract.Assets.set c contract
-  | Some assets ->
-     Lwt.return (Asset_repr.Map.add assets asset key quantity) >>=?
-     Storage.Contract.Assets.set c contract
 
 let spend c contract amount =
   Storage.Contract.Spendable.get c contract >>=? fun spendable ->

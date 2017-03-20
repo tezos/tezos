@@ -148,16 +148,6 @@ module Script : sig
 
 end
 
-module Asset : sig
-  type t
-  type asset = t
-  val encoding: asset Data_encoding.t
-  module Map : sig
-    type t
-    val encoding: t Data_encoding.t
-  end
-end
-
 module Bootstrap : sig
   type account = {
     public_key_hash: public_key_hash ;
@@ -346,8 +336,6 @@ module Contract : sig
   val get_counter: context -> contract -> int32 tzresult Lwt.t
   val get_balance:
     context -> contract -> Tez.t tzresult Lwt.t
-  val get_assets:
-    context -> contract -> Asset.Map.t tzresult Lwt.t
 
   val set_delegate:
     context -> contract -> public_key_hash option -> context tzresult Lwt.t
@@ -373,9 +361,6 @@ module Contract : sig
 
   val credit:
     context -> contract -> Tez.t -> context tzresult Lwt.t
-  val issue:
-    context -> contract ->
-    Asset.t -> public_key_hash -> Tez.t -> context tzresult Lwt.t
 
   val update_script_storage_and_fees:
     context -> contract -> Tez.t -> Script.expr -> context tzresult Lwt.t
@@ -482,10 +467,6 @@ and manager_operation =
       spendable: bool ;
       delegatable: bool ;
       credit: Tez.t ;
-    }
-  | Issuance of {
-      asset: Asset.t * public_key_hash ;
-      amount: Tez.t ;
     }
   | Delegation of public_key_hash option
 

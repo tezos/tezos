@@ -132,11 +132,6 @@ module Contract : sig
      and type value = Tez_repr.t
      and type context := t
 
-  module Assets : Indexed_data_storage
-    with type key = Contract_repr.t
-     and type value = Asset_repr.Map.t
-     and type context := t
-
   (** The manager of a contract *)
   module Manager : Indexed_data_storage
     with type key = Contract_repr.t
