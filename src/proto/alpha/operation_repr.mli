@@ -81,7 +81,7 @@ and dictator_operation =
 
 and counter = Int32.t
 
-type error += Cannot_parse_operation
+type error += Cannot_parse_operation (* `Branch *)
 
 val parse:
   Operation_hash.t -> Updater.raw_operation -> operation tzresult
@@ -90,7 +90,9 @@ val parse_proto:
   MBytes.t ->
   (proto_operation * Ed25519.Signature.t option) tzresult Lwt.t
 
-type error += Invalid_signature
+type error += Missing_signature (* `Permanent *)
+type error += Invalid_signature (* `Permanent *)
+
 val check_signature:
   Ed25519.Public_key.t -> operation -> unit tzresult Lwt.t
 
