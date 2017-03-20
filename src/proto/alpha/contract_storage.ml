@@ -15,7 +15,7 @@ type error +=
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
-  | Undelagatable_contract of Contract_repr.contract (* `Permanent *)
+  | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
   | Failure of string (* `Permanent *)
 
 let () =
@@ -127,8 +127,8 @@ let () =
         Format.fprintf ppf "Contract %a is not delegatable"
           Contract_repr.pp contract)
     Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
-    (function Non_existing_contract c -> Some c | _ -> None)
-    (fun c -> Non_existing_contract c) ;
+    (function Non_delegatable_contract c -> Some c | _ -> None)
+    (fun c -> Non_delegatable_contract c) ;
   register_error_kind
     `Permanent
     ~id:"contract.failure"
@@ -295,16 +295,15 @@ let is_spendable c contract =
 
 let set_delegate c contract delegate =
   (* A contract delegate can be set only if the contract is delegatable *)
-  Storage.Contract.Delegatable.get c contract >>=? fun delegatable ->
-  if not delegatable
-  then fail (Undelagatable_contract contract)
-  else
-    match delegate with
-    | None ->
-        Storage.Contract.Delegate.remove c contract >>= fun c ->
-        return c
-    | Some delegate ->
-        Storage.Contract.Delegate.init_set c contract delegate
+  is_delegatable c contract >>=? function
+  | false -> fail (Non_delegatable_contract contract)
+  | true ->
+      match delegate with
+      | None ->
+          Storage.Contract.Delegate.remove c contract >>= fun c ->
+          return c
+      | Some delegate ->
+          Storage.Contract.Delegate.init_set c contract delegate
 
 let contract_fee c contract =
   Storage.Contract.Code_fees.get_option c contract >>=? fun code_fees ->
