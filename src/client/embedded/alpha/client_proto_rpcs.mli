@@ -92,7 +92,6 @@ module Context : sig
       spendable: bool ;
       delegate: bool * public_key_hash option ;
       script: Script.t option ;
-      assets: Asset.Map.t ;
       counter: int32 ;
     }
     val get:
@@ -125,10 +124,6 @@ module Context : sig
     val script:
       Client_commands.context ->
       block -> Contract.t -> Script.t option tzresult Lwt.t
-    val assets:
-      Client_commands.context ->
-      block -> Contract.t ->
-      Asset.Map.t tzresult Lwt.t
   end
 end
 
@@ -227,17 +222,6 @@ module Helpers : sig
         fee:Tez.t->
         unit ->
         MBytes.t tzresult Lwt.t
-      val issuance:
-        Client_commands.context ->
-        block ->
-        net:Updater.Net_id.t ->
-        source:Contract.t ->
-        ?sourcePubKey:public_key ->
-        counter:int32 ->
-        assetType:(Asset.t * public_key_hash) ->
-        quantity:Tez.t ->
-        fee:Tez.t ->
-        unit -> MBytes.t tzresult Lwt.t
       val delegation:
         Client_commands.context ->
         block ->

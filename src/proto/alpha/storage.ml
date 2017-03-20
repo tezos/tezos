@@ -108,7 +108,6 @@ module Key = struct
     let roll_list c = contract_store c ["roll_list"]
     let change c = contract_store c ["change"]
     let balance c = contract_store c ["balance"]
-    let assets c = contract_store c ["assets"]
     let manager c = contract_store c ["manager"]
     let spendable c = contract_store c ["spendable"]
     let delegatable c = contract_store c ["delegatable"]
@@ -248,16 +247,6 @@ module Contract = struct
       let name = "contract balance"
       let key = Key.Contract.balance
       let encoding = Tez_repr.encoding
-    end)
-
-  module Assets =
-    Make_indexed_data_storage(
-    struct
-      type key = Contract_repr.t
-      type value = Asset_repr.Map.t
-      let name = "contract assets"
-      let key = Key.Contract.assets
-      let encoding = Asset_repr.Map.encoding
     end)
 
   module Manager =

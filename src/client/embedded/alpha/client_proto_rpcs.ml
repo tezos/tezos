@@ -109,7 +109,6 @@ module Context = struct
       spendable: bool ;
       delegate: bool * public_key_hash option ;
       script: Script.t option ;
-      assets: Asset.Map.t ;
       counter: int32 ;
     }
     let get cctxt b c =
@@ -128,8 +127,6 @@ module Context = struct
       call_error_service2 cctxt Services.Context.Contract.delegatable b c ()
     let script cctxt b c =
       call_error_service2 cctxt Services.Context.Contract.script b c ()
-    let assets cctxt b c =
-      call_error_service2 cctxt Services.Context.Contract.assets b c ()
   end
 
 end
@@ -212,10 +209,6 @@ module Helpers = struct
                           delegatable ;
                           credit = balance }
           ]
-      let issuance cctxt
-          block ~net ~source ?sourcePubKey ~counter ~assetType ~quantity ~fee ()=
-        operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
-          Tezos_context.[Issuance { asset = assetType ; amount = quantity }]
       let delegation cctxt
           block ~net ~source ?sourcePubKey ~counter ~fee delegate =
         operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
