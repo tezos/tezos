@@ -15,7 +15,7 @@ type error +=
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
-  | Undelagatable_contract of Contract_repr.contract (* `Permanent *)
+  | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
   | Failure of string (* `Permanent *)
 
 val delete : Storage.t -> Contract_repr.t -> Storage.t tzresult Lwt.t
