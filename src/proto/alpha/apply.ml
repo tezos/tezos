@@ -85,11 +85,11 @@ let apply_manager_operation_content ctxt origination_nonce accept_failing_script
         | None -> None
         | Some script ->
             Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)) in
+      Contract.spend ctxt source Constants.origination_burn >>=? fun ctxt ->
       Contract.spend ctxt source credit >>=? fun ctxt ->
-      Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
       Contract.originate ctxt
         origination_nonce
-        ~manager ~delegate ~balance
+        ~manager ~delegate ~balance:credit
         ?script
         ~spendable ~delegatable >>=? fun (ctxt, _, origination_nonce) ->
       return (ctxt, origination_nonce)
