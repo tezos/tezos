@@ -19,7 +19,6 @@
         "Script_repr",
         "Contract_repr",
         "Roll_repr",
-        "Asset_repr",
         "Vote_repr",
         "Operation_repr",
         "Block_repr",

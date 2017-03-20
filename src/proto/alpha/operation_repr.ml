@@ -58,10 +58,6 @@ and manager_operation =
       delegatable: bool ;
       credit: Tez_repr.tez ;
     }
-  | Issuance of {
-      asset: Asset_repr.asset * Ed25519.Public_key_hash.t ;
-      amount: Tez_repr.tez ;
-    }
   | Delegation of Ed25519.Public_key_hash.t option
 
 and delegate_operation =
@@ -131,19 +127,6 @@ module Encoding = struct
          Origination
            {manager ; credit ; spendable ; delegatable ; delegate ; script })
 
-  let issuance_encoding =
-    (obj3
-       (req "kind" (constant "issuance"))
-       (req "asset" (tup2 Asset_repr.encoding Ed25519.Public_key_hash.encoding))
-       (req "quantity" Tez_repr.encoding))
-
-  let issuance_case tag =
-    case ~tag issuance_encoding
-      (function
-        | Issuance { asset ; amount } -> Some ((), asset, amount)
-        | _ -> None)
-      (fun ((), asset, amount) -> Issuance { asset ; amount })
-
   let delegation_encoding =
     (obj2
        (req "kind" (constant "delegation"))
@@ -164,8 +147,7 @@ module Encoding = struct
           (list (union ~tag_size:`Uint8 [
                transaction_case 0 ;
                origination_case 1 ;
-               issuance_case 2 ;
-               delegation_case 3 ;
+               delegation_case 2 ;
              ]))))
 
   let manager_kind_case tag =

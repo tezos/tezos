@@ -58,10 +58,6 @@ and manager_operation =
       delegatable: bool ;
       credit: Tez_repr.tez ;
     }
-  | Issuance of {
-      asset: Asset_repr.t * Ed25519.Public_key_hash.t ;
-      amount: Tez_repr.tez ;
-    }
   | Delegation of Ed25519.Public_key_hash.t option
 
 and delegate_operation =

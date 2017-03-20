@@ -93,10 +93,6 @@ let apply_manager_operation_content ctxt origination_nonce accept_failing_script
         ?script
         ~spendable ~delegatable >>=? fun (ctxt, _, origination_nonce) ->
       return (ctxt, origination_nonce)
-  | Issuance { asset = (asset, key); amount } ->
-      Contract.issue ctxt source asset key amount >>=? fun ctxt ->
-      return (ctxt, origination_nonce)
-      (* TODO: pay for the storage diff *)
   | Delegation delegate ->
       Contract.set_delegate ctxt source delegate >>=? fun ctxt ->
       return (ctxt, origination_nonce)

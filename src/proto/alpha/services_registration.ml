@@ -153,7 +153,6 @@ let () =
   register2' Services.Context.Contract.spendable Contract.is_spendable ;
   register2' Services.Context.Contract.delegatable Contract.is_delegatable ;
   register2' Services.Context.Contract.script Contract.get_script ;
-  register2' Services.Context.Contract.assets Contract.get_assets ;
   register2' Services.Context.Contract.get (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Contract.get_manager ctxt contract >>=? fun manager ->
@@ -162,10 +161,9 @@ let () =
       Contract.is_delegatable ctxt contract >>=? fun delegatable ->
       Contract.is_spendable ctxt contract >>=? fun spendable ->
       Contract.get_script ctxt contract >>=? fun script ->
-      Contract.get_assets ctxt contract >>=? fun assets ->
       return { Services.Context.Contract.manager ; balance ;
                spendable ; delegate = (delegatable, delegate) ;
-               script ; assets ; counter }) ;
+               script ; counter }) ;
   ()
 
 (*-- Helpers -----------------------------------------------------------------*)

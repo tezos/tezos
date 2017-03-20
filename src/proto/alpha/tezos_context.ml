@@ -108,8 +108,6 @@ module Fitness = struct
 
 end
 
-module Asset = Asset_repr
-
 let init = Init_storage.may_initialize
 
 let finalize ?commit_message c =
