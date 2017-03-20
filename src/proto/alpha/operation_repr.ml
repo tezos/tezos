@@ -321,6 +321,19 @@ end
 
 type error += Cannot_parse_operation
 
+let () =
+  register_error_kind
+    `Branch
+    ~id:"operation.cannot_parse"
+    ~title:"Cannot parse operation"
+    ~description:"The operation is ill-formed \
+                  or for another protocol version"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "The operation cannot be parsed")
+    Data_encoding.unit
+    (function Cannot_parse_operation -> Some () | _ -> None)
+    (fun () -> Cannot_parse_operation)
+
 let parse hash (op: Updater.raw_operation) =
   if not (Compare.Int.(MBytes.length op.proto <= Constants_repr.max_operation_data_length)) then
     error Cannot_parse_operation
@@ -333,9 +346,32 @@ let parse hash (op: Updater.raw_operation) =
         ok { hash ; shell ; contents ; signature }
     | None -> error Cannot_parse_operation
 
-type error +=
-  | Invalid_signature
-  | Missing_signature
+type error += Invalid_signature (* `Permanent *)
+type error += Missing_signature (* `Permanent *)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"operation.invalid_signature"
+    ~title:"Invalid operation signature"
+    ~description:"The operation signature is ill-formed \
+                  or has been made with the wrong public key"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "The operation signature is invalid")
+    Data_encoding.unit
+    (function Invalid_signature -> Some () | _ -> None)
+    (fun () -> Invalid_signature) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.missing_signature"
+    ~title:"Missing operation signature"
+    ~description:"The operation is of a kind that must be signed, \
+                  but the signature is missing"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "The operation requires a signature")
+    Data_encoding.unit
+    (function Missing_signature -> Some () | _ -> None)
+    (fun () -> Missing_signature)
 
 let forge shell proto =
   Data_encoding.Binary.to_bytes
