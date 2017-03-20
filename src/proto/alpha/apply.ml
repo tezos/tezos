@@ -11,15 +11,45 @@
 
 open Tezos_context
 
-type error += Bad_endorsement (* TODO: doc *)
-type error += Unimplemented
-type error += Invalid_voting_period
+type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
+type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
+
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"operation.wrong_endorsement_predecessor"
+    ~title:"Wrong endorsement predecessor"
+    ~description:"Trying to include an endorsement in a block \
+                  that is not the successor of the endorsed one"
+    ~pp:(fun ppf (e, p) ->
+        Format.fprintf ppf "Wrong predecessor %a, expected %a"
+          Block_hash.pp p Block_hash.pp e)
+    Data_encoding.(obj2
+                     (req "expected" Block_hash.encoding)
+                     (req "provided" Block_hash.encoding))
+    (function Wrong_endorsement_predecessor (e, p) -> Some (e, p) | _ -> None)
+    (fun (e, p) -> Wrong_endorsement_predecessor (e, p)) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.wrong_voting_period"
+    ~title:"Wrong voting period"
+    ~description:"Trying to onclude a proposal or ballot \
+                  meant for another voting period"
+    ~pp:(fun ppf (e, p) ->
+        Format.fprintf ppf "Wrong voting period %a, current is %a"
+          Voting_period.pp p Voting_period.pp e)
+    Data_encoding.(obj2
+                     (req "current" Voting_period.encoding)
+                     (req "provided" Voting_period.encoding))
+    (function Wrong_voting_period (e, p) -> Some (e, p) | _ -> None)
+    (fun (e, p) -> Wrong_voting_period (e, p))
 
 let apply_delegate_operation_content
     ctxt delegate pred_block block_priority = function
   | Endorsement { block ; slot } ->
       fail_unless
-        (Block_hash.equal block pred_block) Bad_endorsement >>=? fun () ->
+        (Block_hash.equal block pred_block)
+        (Wrong_endorsement_predecessor (pred_block, block)) >>=? fun () ->
       Mining.check_signing_rights ctxt slot delegate >>=? fun () ->
       Fitness.increase ctxt >>=? fun ctxt ->
       Mining.pay_endorsement_bond ctxt delegate >>=? fun (ctxt, bond) ->
@@ -30,12 +60,12 @@ let apply_delegate_operation_content
   | Proposals { period ; proposals } ->
       Level.current ctxt >>=? fun level ->
       fail_unless Voting_period.(level.voting_period = period)
-        Invalid_voting_period >>=? fun () ->
+        (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
       Amendment.record_proposals ctxt delegate proposals
   | Ballot { period ; proposal ; ballot } ->
       Level.current ctxt >>=? fun level ->
       fail_unless Voting_period.(level.voting_period = period)
-        Invalid_voting_period >>=? fun () ->
+        (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
       Amendment.record_ballot ctxt delegate proposal ballot
 
 let rec is_reject = function

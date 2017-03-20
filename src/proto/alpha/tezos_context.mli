@@ -493,14 +493,16 @@ and counter = Int32.t
 
 module Operation : sig
 
-  type error += Cannot_parse_operation
+  type error += Cannot_parse_operation (* `Branch *)
   val parse:
     Operation_hash.t -> Updater.raw_operation -> operation tzresult
 
   val parse_proto:
     MBytes.t -> (proto_operation * signature option) tzresult Lwt.t
 
-  type error += Invalid_signature
+  type error += Missing_signature (* `Permanent *)
+  type error += Invalid_signature (* `Permanent *)
+
   val check_signature: public_key -> operation -> unit tzresult Lwt.t
 
   val forge: Updater.shell_operation -> proto_operation -> MBytes.t
