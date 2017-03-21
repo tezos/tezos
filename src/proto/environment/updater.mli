@@ -16,6 +16,7 @@ type raw_operation = {
   shell: shell_operation ;
   proto: MBytes.t ;
 }
+val raw_operation_encoding: raw_operation Data_encoding.t
 
 
 (** The version agnostic toplevel structure of blocks. *)
