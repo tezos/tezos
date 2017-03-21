@@ -406,10 +406,7 @@ module Operations = struct
   let bytes =
     RPC.service
       ~input: empty
-      ~output:
-        (obj1 (req "data"
-                 (describe ~title: "Tezos signed operation (hex encoded)"
-                    (Updater.raw_operation_encoding))))
+      ~output: Updater.raw_operation_encoding
       RPC.Path.(root / "operations" /: operations_arg)
 
   type list_param = {
