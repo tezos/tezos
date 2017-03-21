@@ -334,7 +334,7 @@ module Helpers : sig
   end
 
   module Parse : sig
-    val operations:
+    val operation:
       Client_commands.context ->
       block -> ?check:bool -> Updater.shell_operation -> MBytes.t ->
       proto_operation tzresult Lwt.t

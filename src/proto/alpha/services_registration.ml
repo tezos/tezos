@@ -470,8 +470,9 @@ let check_signature ctxt signature shell contents =
      Operation.check_signature key
        { signature ; shell ; contents ; hash = dummy_hash }
 
-let parse_operations ctxt (shell, bytes, check) =
-  Operation.parse_proto bytes >>=? fun (proto, signature) ->
+let parse_operation ctxt
+    (({ shell ; proto } : Updater.raw_operation), check) =
+  Operation.parse_proto proto >>=? fun (proto, signature) ->
   begin
     match check with
     | Some true -> check_signature ctxt signature shell proto
@@ -479,7 +480,8 @@ let parse_operations ctxt (shell, bytes, check) =
   end >>=? fun () ->
   return proto
 
-let () = register1 Services.Helpers.Parse.operations parse_operations
+let () = register1 Services.Helpers.Parse.operation parse_operation
+
 
 (*****)
 
