@@ -63,4 +63,15 @@ val originate_contract:
   fee:Tez.t ->
   unit -> Contract.t tzresult Lwt.t
 
+val delegate_contract:
+  Client_commands.context ->
+  Client_proto_rpcs.block ->
+  ?force:bool ->
+  source:Contract.t ->
+  ?src_pk:public_key ->
+  manager_sk:secret_key ->
+  fee:Tez.t ->
+  public_key_hash option ->
+  unit tzresult Lwt.t
+
 val commands: unit -> Client_commands.command list
