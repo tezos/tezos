@@ -169,6 +169,35 @@ let faucet cctxt block ?force ~manager_pkh () =
     ~net ~id:manager_pkh () >>=? fun bytes ->
   originate cctxt ?force ~block bytes
 
+let delegate_contract cctxt
+    block ?force
+    ~source ?src_pk ~manager_sk
+    ~fee delegate_opt =
+  Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
+  Client_proto_rpcs.Context.Contract.counter cctxt block source
+  >>=? fun pcounter ->
+  let counter = Int32.succ pcounter in
+  cctxt.message "Acquired the source's sequence counter (%ld -> %ld)."
+    pcounter counter >>= fun () ->
+  Client_proto_rpcs.Helpers.Forge.Manager.delegation cctxt block
+    ~net ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
+  >>=? fun bytes ->
+  cctxt.Client_commands.message "Forged the raw origination frame." >>= fun () ->
+  Client_node_rpcs.Blocks.predecessor cctxt block >>= fun predecessor ->
+  let signature = Environment.Ed25519.sign manager_sk bytes in
+  let signed_bytes = MBytes.concat bytes signature in
+  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
+  Client_proto_rpcs.Helpers.apply_operation cctxt block
+    predecessor oph bytes (Some signature) >>=? function
+  | [] ->
+      Client_node_rpcs.inject_operation cctxt ?force signed_bytes >>=? fun injected_oph ->
+      assert (Operation_hash.equal oph injected_oph) ;
+      cctxt.message "Operation successfully injected in the node." >>= fun () ->
+      cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
+      return ()
+  | contracts ->
+      cctxt.error "The origination introduced %d contracts instead of one." (List.length contracts)
+
 let dictate cctxt block command seckey =
   Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
   Client_proto_rpcs.Helpers.Forge.Dictator.operation
