@@ -140,6 +140,7 @@ module RPC = struct
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
     operations: Operation_hash.t list option ;
+    data: MBytes.t option ;
     net: Node_rpc_services.Blocks.net ;
     test_protocol: Protocol_hash.t option ;
     test_network: (Node_rpc_services.Blocks.net * Time.t) option ;
@@ -152,19 +153,21 @@ module RPC = struct
     timestamp = block.timestamp ;
     protocol = Some block.protocol_hash ;
     operations = Some block.operations ;
+    data = Some block.proto_header ;
     net = block.net_id ;
     test_protocol = Some block.test_protocol_hash ;
     test_network = block.test_network ;
   }
 
-  let convert_block hash (block: State.Block_header.shell_header)  = {
-    net = block.net_id ;
+  let convert_block hash ({ shell ; proto }: State.Block_header.t)  = {
+    net = shell.net_id ;
     hash = hash ;
-    predecessor = block.predecessor ;
-    fitness = block.fitness ;
-    timestamp = block.timestamp ;
+    predecessor = shell.predecessor ;
+    fitness = shell.fitness ;
+    timestamp = shell.timestamp ;
     protocol = None ;
-    operations = Some block.operations ;
+    operations = Some shell.operations ;
+    data = Some proto ;
     test_protocol = None ;
     test_network = None ;
   }
@@ -494,7 +497,7 @@ module RPC = struct
   let block_watcher node =
     let stream, shutdown = Distributed_db.watch_block node.distributed_db in
     Lwt_stream.map
-      (fun (hash, block) -> convert_block hash block.Store.Block_header.shell)
+      (fun (hash, block) -> convert_block hash block)
       stream,
     shutdown
 

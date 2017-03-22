@@ -115,11 +115,11 @@ and valid_block = {
   context: Context.t ;
   successors: Block_hash.Set.t ;
   invalid_successors: Block_hash.Set.t ;
-  shell_header: Store.Block_header.shell_header ;
+  proto_header: MBytes.t ;
 }
 
 let build_valid_block
-    hash shell_header context discovery_time successors invalid_successors =
+    hash header context discovery_time successors invalid_successors =
   Context.get_protocol context >>= fun protocol_hash ->
   Context.get_test_protocol context >>= fun test_protocol_hash ->
   Context.get_test_network context >>= fun test_network ->
@@ -132,13 +132,13 @@ let build_valid_block
   let protocol = Updater.get protocol_hash in
   let test_protocol = Updater.get test_protocol_hash in
   let valid_block = {
-    net_id = shell_header.Store.Block_header.net_id ;
+    net_id = header.Store.Block_header.shell.net_id ;
     hash ;
-    pred = shell_header.predecessor ;
-    timestamp = shell_header.timestamp ;
+    pred = header.shell.predecessor ;
+    timestamp = header.shell.timestamp ;
     discovery_time ;
-    operations = shell_header.operations ;
-    fitness = shell_header.fitness ;
+    operations = header.shell.operations ;
+    fitness = header.shell.fitness ;
     protocol_hash ;
     protocol ;
     test_protocol_hash ;
@@ -147,7 +147,7 @@ let build_valid_block
     context ;
     successors ;
     invalid_successors ;
-    shell_header ;
+    proto_header = header.Store.Block_header.proto ;
   } in
   Lwt.return valid_block
 
@@ -421,13 +421,12 @@ module Raw_block_header = struct
       fitness = [] ;
       operations = [] ;
     } in
+    let header =
+      { Store.Block_header.shell ; proto = MBytes.create 0 } in
     let bytes =
-      Data_encoding.Binary.to_bytes Store.Block_header.encoding {
-        shell ;
-        proto = MBytes.create 0 ;
-      } in
+      Data_encoding.Binary.to_bytes Store.Block_header.encoding header in
     Locked.store_raw store genesis.block bytes >>= fun _created ->
-    Lwt.return shell
+    Lwt.return header
 
   let store_testnet_genesis store genesis =
     let shell : Store.Block_header.shell_header = {
@@ -728,7 +727,7 @@ module Raw_net = struct
       | Some time -> Store.Net.Expiration.store net_store time
     end >>= fun () ->
     Raw_block_header.store_genesis
-      block_header_store genesis >>= fun shell ->
+      block_header_store genesis >>= fun header ->
     begin
       match initial_context with
       | None ->
@@ -742,7 +741,7 @@ module Raw_net = struct
           Lwt.return context
     end >>= fun context ->
     build_valid_block
-      genesis.block shell context genesis.time
+      genesis.block header context genesis.time
       Block_hash.Set.empty Block_hash.Set.empty >>= fun genesis_block ->
     Lwt.return @@
     build
@@ -776,7 +775,7 @@ module Valid_block = struct
     context: Context.t ;
     successors: Block_hash.Set.t ;
     invalid_successors: Block_hash.Set.t ;
-    shell_header: Store.Block_header.shell_header ;
+    proto_header: MBytes.t ;
   }
   type valid_block = t
 
@@ -807,7 +806,7 @@ module Valid_block = struct
       | None | Some { Time.data = Error _ } ->
           fail (Unknown_block hash)
       | Some { Time.data = Ok block ; time } ->
-          raw_read block.shell
+          raw_read block
             time net_state.chain_store net_state.context_index hash
 
     let read_opt net net_state hash =
@@ -874,7 +873,7 @@ module Valid_block = struct
         (store, predecessor) hash >>= fun () ->
       (* Build the `valid_block` value. *)
       raw_read_exn
-        block.shell discovery_time
+        block discovery_time
         net_state.chain_store net_state.context_index hash >>= fun valid_block ->
       Watcher.notify valid_block_watcher valid_block ;
       Lwt.return (Ok valid_block)
@@ -960,8 +959,12 @@ module Valid_block = struct
       if not ( Store.Net_id.equal b1.net_id net_id
                && Store.Net_id.equal b2.net_id net_id ) then
         invalid_arg "State.path" ;
+      Raw_block_header.read_exn (* The blocks are known valid. *)
+        net.block_header_store b1.hash >>= fun { shell = header1 } ->
+      Raw_block_header.read_exn (* The blocks are known valid. *)
+        net.block_header_store b2.hash >>= fun { shell = header2 } ->
       Raw_helpers.common_ancestor net.block_header_store
-        b1.hash b1.shell_header b2.hash b2.shell_header >>= function
+        b1.hash header1 b2.hash header2 >>= function
       | None -> assert false (* The blocks are known valid. *)
       | Some (hash, _header) -> read_exn net hash
 
@@ -1034,9 +1037,13 @@ module Valid_block = struct
       path sz [] ancestor
 
     let new_blocks store old_block new_block =
+      Raw_block_header.read_exn (* valid block *)
+        store old_block.hash >>= fun { shell = old_header } ->
+      Raw_block_header.read_exn (* valid block *)
+        store new_block.hash >>= fun { shell = new_header } ->
       Raw_helpers.common_ancestor store
-        old_block.hash old_block.shell_header
-        new_block.hash new_block.shell_header >>= function
+        old_block.hash old_header
+        new_block.hash new_header >>= function
       | None -> assert false (* valid block *)
       | Some (ancestor, _header) ->
           Raw_helpers.path store ancestor new_block.hash >>= function
@@ -1158,7 +1165,7 @@ module Net = struct
     Block_header.Locked.read_discovery_time block_header_store
       genesis_hash >>=? fun genesis_discovery_time ->
     Valid_block.Locked.raw_read
-      genesis_shell_header.shell genesis_discovery_time
+      genesis_shell_header genesis_discovery_time
       chain_store context_index genesis_hash >>=? fun genesis_block ->
     return @@
     Raw_net.build

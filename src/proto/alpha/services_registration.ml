@@ -482,6 +482,11 @@ let parse_operation ctxt
 
 let () = register1 Services.Helpers.Parse.operation parse_operation
 
+let parse_block _ctxt raw_block =
+  Lwt.return (Block.parse_header raw_block) >>=? fun { proto } ->
+  return proto
+
+let () = register1 Services.Helpers.Parse.block parse_block
 
 (*****)
 

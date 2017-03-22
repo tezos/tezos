@@ -270,6 +270,10 @@ module Helpers = struct
       call_error_service1 cctxt
         Services.Helpers.Parse.operation block
         (({ shell ; proto } : Updater.raw_operation), check)
+    let block cctxt block shell proto =
+      call_error_service1 cctxt
+        Services.Helpers.Parse.block block
+        ({ shell ; proto } : Updater.raw_block)
   end
 
 end

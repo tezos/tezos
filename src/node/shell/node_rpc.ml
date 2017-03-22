@@ -12,8 +12,10 @@ open Logging.RPC
 
 module Services = Node_rpc_services
 
-let filter_bi include_ops (bi: Services.Blocks.block_info)  =
-  if include_ops then bi else { bi with operations = None }
+let filter_bi (operations, data) (bi: Services.Blocks.block_info)  =
+  let bi = if operations then bi else { bi with operations = None } in
+  let bi = if data then bi else { bi with data = None } in
+  bi
 
 let register_bi_dir node dir =
   let dir =
@@ -212,12 +214,11 @@ let create_delayed_stream
 
 let list_blocks
     node
-    { Services.Blocks.operations ; length ; heads ; monitor ; delay ;
+    { Services.Blocks.operations ; data ; length ; heads ; monitor ; delay ;
       min_date; min_heads} =
-  let include_ops = match operations with None -> false | Some x -> x in
   let len = match length with None -> 1 | Some x -> x in
   let monitor = match monitor with None -> false | Some x -> x in
-
+  let include_ops = (operations, data) in
   let time =
     match delay with
     | None -> None

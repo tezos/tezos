@@ -149,8 +149,9 @@ let build_example_tree net =
   let vtbl = Hashtbl.create 23 in
   let otbl = Hashtbl.create 23 in
   State.Valid_block.Current.genesis net >>= fun genesis ->
+  State.Block_header.read_exn net genesis.hash >>= fun genesis_header ->
   Hashtbl.add vtbl "Genesis" genesis ;
-  Hashtbl.add tbl "Genesis" (genesis.hash, { State.Block_header.shell = genesis.shell_header ; proto = MBytes.create 0 } ) ;
+  Hashtbl.add tbl "Genesis" (genesis.hash, genesis_header ) ;
   let chain = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ; "A6" ; "A7" ; "A8" ] in
   build_valid_chain net tbl vtbl otbl genesis chain >>= fun () ->
   let a3 = Hashtbl.find vtbl "A3" in
