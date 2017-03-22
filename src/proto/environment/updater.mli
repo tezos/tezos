@@ -40,6 +40,7 @@ type raw_block = {
   shell: shell_block ;
   proto: MBytes.t ;
 }
+val raw_block_encoding: raw_block Data_encoding.t
 
 (** Result of the {!PROTOCOL.preapply} function of the protocol for
     discriminating cacheable operations from droppable ones. *)

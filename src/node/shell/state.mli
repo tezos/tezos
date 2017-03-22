@@ -245,8 +245,8 @@ module Valid_block : sig
     successors: Block_hash.Set.t ;
     invalid_successors: Block_hash.Set.t ;
     (** The set of valid successors (including forked networks). *)
-    shell_header: Block_header.shell_header;
-    (** The oriignal header. *)
+    proto_header: MBytes.t;
+    (** The uninterpreted protocol dependent part of the header. *)
   }
   type valid_block = t
 

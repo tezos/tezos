@@ -338,6 +338,10 @@ module Helpers : sig
       Client_commands.context ->
       block -> ?check:bool -> Updater.shell_operation -> MBytes.t ->
       proto_operation tzresult Lwt.t
+    val block:
+      Client_commands.context ->
+      block -> Updater.shell_block -> MBytes.t ->
+      Block.proto_header tzresult Lwt.t
   end
 
 end
