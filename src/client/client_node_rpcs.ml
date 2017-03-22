@@ -164,6 +164,7 @@ module Blocks = struct
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
     operations: Operation_hash.t list option ;
+    data: MBytes.t option ;
     net: Updater.Net_id.t ;
     test_protocol: Protocol_hash.t option ;
     test_network: (Updater.Net_id.t * Time.t) option ;
@@ -192,17 +193,19 @@ module Blocks = struct
     call_service1 cctxt Services.Blocks.preapply h { operations ; sort ; timestamp }
   let pending_operations cctxt block =
     call_service1 cctxt Services.Blocks.pending_operations block ()
-  let info cctxt ?(operations = false) h =
-    call_service1 cctxt Services.Blocks.info h operations
+  let info cctxt ?(operations = true) ?(data = true) h =
+    call_service1 cctxt Services.Blocks.info h (operations, data)
   let complete cctxt block prefix =
     call_service2 cctxt Services.Blocks.complete block prefix ()
-  let list cctxt ?operations ?length ?heads ?delay ?min_date ?min_heads () =
+  let list cctxt ?(operations = false) ?(data = false)
+      ?length ?heads ?delay ?min_date ?min_heads () =
     call_service0 cctxt Services.Blocks.list
-      { operations; length ; heads ; monitor = Some false ; delay ;
+      { operations ; data ; length ; heads ; monitor = Some false ; delay ;
         min_date ; min_heads }
-  let monitor cctxt ?operations ?length ?heads ?delay ?min_date ?min_heads () =
+  let monitor cctxt ?(operations = false) ?(data = false)
+      ?length ?heads ?delay ?min_date ?min_heads () =
     call_streamed_service0 cctxt Services.Blocks.list
-      { operations; length ; heads ; monitor = Some true ; delay ;
+      { operations ; data ; length ; heads ; monitor = Some true ; delay ;
         min_date ; min_heads }
 end
 

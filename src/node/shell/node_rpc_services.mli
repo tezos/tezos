@@ -35,13 +35,14 @@ module Blocks : sig
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
     operations: Operation_hash.t list option ;
+    data: MBytes.t option ;
     net: net ;
     test_protocol: Protocol_hash.t option ;
     test_network: (net * Time.t) option ;
   }
 
   val info:
-    (unit, unit * block, bool, block_info) RPC.service
+    (unit, unit * block, bool * bool, block_info) RPC.service
   val net:
     (unit, unit * block, unit, net) RPC.service
   val predecessor:
@@ -67,7 +68,8 @@ module Blocks : sig
      error Updater.preapply_result * Hash.Operation_hash.Set.t) RPC.service
 
   type list_param = {
-    operations: bool option ;
+    operations: bool ;
+    data: bool ;
     length: int option ;
     heads: Block_hash.t list option ;
     monitor: bool option ;

@@ -67,6 +67,7 @@ module Blocks = struct
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
     operations: Operation_hash.t list option ;
+    data: MBytes.t option ;
     net: net ;
     test_protocol: Protocol_hash.t option ;
     test_network: (net * Time.t) option ;
@@ -75,23 +76,24 @@ module Blocks = struct
   let block_info_encoding =
     conv
       (fun { hash ; predecessor ; fitness ; timestamp ; protocol ; operations ;
-             net ; test_protocol ; test_network } ->
+             net ; test_protocol ; test_network ; data } ->
         (hash, predecessor, fitness, timestamp, protocol, operations,
-         net, test_protocol, test_network))
+         net, test_protocol, test_network, data))
       (fun (hash, predecessor, fitness, timestamp, protocol, operations,
-            net, test_protocol, test_network) ->
+            net, test_protocol, test_network, data) ->
         { hash ; predecessor ; fitness ; timestamp ; protocol ; operations ;
-          net ; test_protocol ; test_network })
-      (obj9
+          net ; test_protocol ; test_network  ; data })
+      (obj10
          (req "hash" Block_hash.encoding)
          (req "predecessor" Block_hash.encoding)
          (req "fitness" Fitness.encoding)
          (req "timestamp" Time.encoding)
          (opt "protocol" Protocol_hash.encoding)
          (opt "operations" (list Operation_hash.encoding))
-         (req "net" net_encoding)
+         (req "net_id" net_encoding)
          (opt "test_protocol" Protocol_hash.encoding)
-         (opt "test_network" (tup2 net_encoding Time.encoding)))
+         (opt "test_network" (tup2 net_encoding Time.encoding))
+         (opt "data" bytes))
 
   let parse_block s =
     try
@@ -175,10 +177,9 @@ module Blocks = struct
     RPC.service
       ~description:"All the information about a block."
       ~input:
-        (conv
-           (fun x -> Some x)
-           (function None -> false | Some x -> x)
-           (obj1 (opt "operations" bool)))
+        (obj2
+           (dft "operations" bool true)
+           (dft "data" bool true))
       ~output: block_info_encoding
       block_path
 
@@ -316,7 +317,8 @@ module Blocks = struct
       RPC.Path.(block_path / "complete" /: prefix_arg )
 
   type list_param = {
-    operations: bool option ;
+    operations: bool ;
+    data: bool ;
     length: int option ;
     heads: Block_hash.t list option ;
     monitor: bool option ;
@@ -326,19 +328,25 @@ module Blocks = struct
   }
   let list_param_encoding =
     conv
-      (fun { operations ; length ; heads ; monitor ;
+      (fun { operations ; data ; length ; heads ; monitor ;
              delay ; min_date ; min_heads } ->
-         (operations, length, heads, monitor, delay, min_date, min_heads))
-      (fun (operations, length, heads, monitor, delay, min_date, min_heads) ->
-         { operations ; length ; heads ; monitor ;
+        (operations, data, length, heads, monitor, delay, min_date, min_heads))
+      (fun (operations, data, length, heads, monitor, delay, min_date, min_heads) ->
+         { operations ; data ; length ; heads ; monitor ;
            delay ; min_date ; min_heads })
-      (obj7
-         (opt "operations"
+      (obj8
+         (dft "operations"
             (Data_encoding.describe
                ~description:
                  "Whether the resulting block informations should include the \
                   list of operations' hashes. Default false."
-               bool))
+               bool) false)
+         (dft "data"
+            (Data_encoding.describe
+               ~description:
+                 "Whether the resulting block informations should include the \
+                  raw protocol dependent data. Default false."
+               bool) false)
          (opt "length"
             (Data_encoding.describe
                ~description:

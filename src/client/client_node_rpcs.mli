@@ -105,6 +105,7 @@ module Blocks : sig
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
     operations: Operation_hash.t list option ;
+    data: MBytes.t option ;
     net: Updater.Net_id.t ;
     test_protocol: Protocol_hash.t option ;
     test_network: (Updater.Net_id.t * Time.t) option ;
@@ -112,17 +113,17 @@ module Blocks : sig
 
   val info:
     Client_commands.context ->
-    ?operations:bool -> block -> block_info Lwt.t
+    ?operations:bool -> ?data:bool -> block -> block_info Lwt.t
 
   val list:
     Client_commands.context ->
-    ?operations:bool -> ?length:int -> ?heads:Block_hash.t list ->
+    ?operations:bool -> ?data:bool -> ?length:int -> ?heads:Block_hash.t list ->
     ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
     unit -> block_info list list Lwt.t
 
   val monitor:
     Client_commands.context ->
-    ?operations:bool -> ?length:int -> ?heads:Block_hash.t list ->
+    ?operations:bool -> ?data:bool -> ?length:int -> ?heads:Block_hash.t list ->
     ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
     unit -> block_info list list Lwt_stream.t Lwt.t
 

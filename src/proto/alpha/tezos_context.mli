@@ -552,6 +552,9 @@ module Block : sig
 
   val parse_header: Updater.raw_block -> header tzresult
 
+  val proto_header_encoding:
+    proto_header Data_encoding.encoding
+
   val unsigned_header_encoding:
     (Updater.shell_block * proto_header) Data_encoding.encoding
 
