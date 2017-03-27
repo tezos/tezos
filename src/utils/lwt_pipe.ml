@@ -108,6 +108,10 @@ exception Full
 let push_now_exn q elt =
   if not (push_now q elt) then raise Full
 
+let safe_push_now q elt =
+  try push_now_exn q elt
+  with _ -> ()
+
 let rec pop ({ closed ; queue ; empty ; current_size } as q) =
   if not (Queue.is_empty queue) then
     let (elt_size, elt) = Queue.pop queue in
