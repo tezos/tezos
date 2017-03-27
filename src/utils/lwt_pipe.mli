@@ -45,6 +45,10 @@ val push_now_exn : 'a t -> 'a -> unit
 (** [push_now q v] adds [v] at the ends of [q] immediately or
     raise [Full] if [q] is currently full. *)
 
+val safe_push_now : 'a t -> 'a -> unit
+(** [safe_push_now q v] may adds [v] at the ends of [q]. It does
+    nothing if the queue is fulled or closed. *)
+
 val pop_now : 'a t -> 'a option
 (** [pop_now q] maybe removes and returns the first element in [q] if
     [q] contains at least one element. *)

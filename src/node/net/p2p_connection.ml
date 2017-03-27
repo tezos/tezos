@@ -236,21 +236,25 @@ module Reader = struct
       let size = 6 * (Sys.word_size / 8) + MBytes.length buf in
       lwt_debug "reading %d bytes from %a"
         size Connection_info.pp st.conn.info >>= fun () ->
-      read_message st buf >>|? fun msg ->
-      size, msg
+      read_message st buf >>=? fun msg ->
+      match msg with
+      | None ->
+          Lwt_pipe.push st.messages (Error [Decoding_error]) >>= fun () ->
+          return false
+      | Some msg ->
+          Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
+          return true
     end >>= function
-    | Ok (_, None) ->
-        Lwt_pipe.push st.messages (Error [Decoding_error]) >>= fun () ->
+    | Ok true ->
         worker_loop st
-    | Ok (size, Some msg) ->
-        Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
-        worker_loop st
+    | Ok false ->
+        Lwt.return_unit
     | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
       lwt_debug "connection closed to %a"
         Connection_info.pp st.conn.info >>= fun () ->
         Lwt.return_unit
     | Error _ as err ->
-        Lwt_pipe.push st.messages err >>= fun () ->
+        Lwt_pipe.safe_push_now st.messages err ;
         Canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
 
