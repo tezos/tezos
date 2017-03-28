@@ -40,11 +40,11 @@ module type DISTRIBUTED_DB = sig
   val known: t -> key -> bool Lwt.t
   val read: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
-  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> unit
-  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> value Lwt.t
   val commit: t -> key -> unit Lwt.t
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
+  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> unit
+  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> value Lwt.t
 end
 
 module Operation :

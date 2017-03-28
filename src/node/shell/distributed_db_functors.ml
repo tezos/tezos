@@ -7,19 +7,63 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module type DISTRIBUTED_DB = sig
+module type PARAMETRIZED_RO_DISTRIBUTED_DB = sig
+
   type t
   type key
   type value
+  type param
+
   val known: t -> key -> bool Lwt.t
   val read: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
-  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> unit
-  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> value Lwt.t
+
+  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
+  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
+
+end
+
+module type PARAMETRIZED_DISTRIBUTED_DB = sig
+
+  include PARAMETRIZED_RO_DISTRIBUTED_DB
+
   val commit: t -> key -> unit Lwt.t
   (* val commit_invalid: t -> key -> unit Lwt.t *) (* TODO *)
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
+
+end
+
+module type DISTRIBUTED_DB = sig
+
+  include PARAMETRIZED_DISTRIBUTED_DB with type param := unit
+
+  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> unit
+  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> value Lwt.t
+
+end
+
+module type DISK_TABLE = sig
+  type store
+  type key
+  type value
+  val known: store -> key -> bool Lwt.t
+  val read: store -> key -> value tzresult Lwt.t
+  val read_opt: store -> key -> value option Lwt.t
+  val read_exn: store -> key -> value Lwt.t
+  val store: store -> key -> value -> bool Lwt.t
+  val remove: store -> key -> bool Lwt.t
+end
+
+module type MEMORY_TABLE = sig
+  type 'a t
+  type key
+  val create: int -> 'a t
+  val find: 'a t -> key -> 'a
+  val add: 'a t -> key -> 'a -> unit
+  val replace: 'a t -> key -> 'a -> unit
+  val remove: 'a t -> key -> unit
+  val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 end
 
 module type SCHEDULER_EVENTS = sig
@@ -29,16 +73,27 @@ module type SCHEDULER_EVENTS = sig
   val notify: t -> P2p.Peer_id.t -> key -> unit
   val notify_unrequested: t -> P2p.Peer_id.t -> key -> unit
   val notify_duplicate: t -> P2p.Peer_id.t -> key -> unit
+  val notify_invalid: t -> P2p.Peer_id.t -> key -> unit
+end
+
+module type PRECHECK = sig
+  type key
+  type param
+  type value
+  val precheck: key -> param -> value -> bool
 end
 
 module Make_table
-    (Hash : HASH)
-    (Disk_table : State.DATA_STORE with type key := Hash.t)
-    (Memory_table : Hashtbl.S with type key := Hash.t)
-    (Scheduler : SCHEDULER_EVENTS with type key := Hash.t) : sig
+    (Hash : sig type t end)
+    (Disk_table : DISK_TABLE with type key := Hash.t)
+    (Memory_table : MEMORY_TABLE with type key := Hash.t)
+    (Scheduler : SCHEDULER_EVENTS with type key := Hash.t)
+    (Precheck : PRECHECK with type key := Hash.t
+                          and type value := Disk_table.value) : sig
 
-  include DISTRIBUTED_DB with type key = Hash.t
-                          and type value = Disk_table.value
+  include PARAMETRIZED_DISTRIBUTED_DB with type key = Hash.t
+                                       and type value = Disk_table.value
+                                       and type param = Precheck.param
   val create:
     ?global_input:(key * value) Watcher.input ->
     Scheduler.t -> Disk_table.store -> t
@@ -48,6 +103,7 @@ end = struct
 
   type key = Hash.t
   type value = Disk_table.value
+  type param = Precheck.param
 
   type t = {
     scheduler: Scheduler.t ;
@@ -58,7 +114,7 @@ end = struct
   }
 
   and status =
-    | Pending of value Lwt.u
+    | Pending of value Lwt.u * param
     | Found of value
 
   let known s k =
@@ -79,24 +135,23 @@ end = struct
     | Found v -> Lwt.return v
     | Pending _ -> Lwt.fail Not_found
 
-  let fetch s ?peer k =
+  let fetch s ?peer k param =
     match Memory_table.find s.memory k with
     | exception Not_found -> begin
         Disk_table.read_opt s.disk k >>= function
         | None ->
           let waiter, wakener = Lwt.wait () in
-          Memory_table.add s.memory k (Pending wakener) ;
+          Memory_table.add s.memory k (Pending (wakener, param)) ;
           Scheduler.request s.scheduler peer k ;
           waiter
         | Some v -> Lwt.return v
       end
-    | Pending w -> Lwt.waiter_of_wakener w
+    | Pending (w, _) -> Lwt.waiter_of_wakener w
     | Found v -> Lwt.return v
 
-  let prefetch s ?peer k = Lwt.ignore_result (fetch s ?peer k)
+  let prefetch s ?peer k param = Lwt.ignore_result (fetch s ?peer k param)
 
   let notify s p k v =
-    Scheduler.notify s.scheduler p k ;
     match Memory_table.find s.memory k with
     | exception Not_found -> begin
         Disk_table.known s.disk k >>= function
@@ -107,13 +162,19 @@ end = struct
             Scheduler.notify_unrequested s.scheduler p k ;
             Lwt.return_unit
       end
-    | Pending w ->
-        Memory_table.replace s.memory k (Found v) ;
-        Lwt.wakeup w v ;
-        iter_option s.global_input
-          ~f:(fun input -> Watcher.notify input (k, v)) ;
-        Watcher.notify s.input (k, v) ;
-        Lwt.return_unit
+    | Pending (w, param) ->
+        if not (Precheck.precheck k param v) then begin
+          Scheduler.notify_invalid s.scheduler p k ;
+          Lwt.return_unit
+        end else begin
+          Scheduler.notify s.scheduler p k ;
+          Memory_table.replace s.memory k (Found v) ;
+          Lwt.wakeup w v ;
+          iter_option s.global_input
+            ~f:(fun input -> Watcher.notify input (k, v)) ;
+          Watcher.notify s.input (k, v) ;
+          Lwt.return_unit
+        end
     | Found _ ->
         Scheduler.notify_duplicate s.scheduler p k ;
         Lwt.return_unit
@@ -137,7 +198,7 @@ end = struct
     | exception Not_found -> Lwt.return_unit
     | Pending _ -> assert false
     | Found v ->
-        Disk_table.store s.disk v >>= fun _ ->
+        Disk_table.store s.disk k v >>= fun _ ->
         Memory_table.remove s.memory k ;
         Lwt.return_unit
 
@@ -158,8 +219,8 @@ module type REQUEST = sig
 end
 
 module Make_request_scheduler
-    (Hash : HASH)
-    (Table : Hashtbl.S with type key := Hash.t)
+    (Hash : sig type t end)
+    (Table : MEMORY_TABLE with type key := Hash.t)
     (Request : REQUEST with type key := Hash.t) : sig
 
   type t
@@ -181,6 +242,7 @@ end = struct
   and event =
     | Request of P2p.Peer_id.t option * key
     | Notify of P2p.Peer_id.t * key
+    | Notify_invalid of P2p.Peer_id.t * key
     | Notify_duplicate of P2p.Peer_id.t * key
     | Notify_unrequested of P2p.Peer_id.t * key
 
@@ -188,6 +250,8 @@ end = struct
     t.push_to_worker (Request (p, k))
   let notify t p k =
     t.push_to_worker (Notify (p, k))
+  let notify_invalid t p k =
+    t.push_to_worker (Notify_invalid (p, k))
   let notify_duplicate t p k =
     t.push_to_worker (Notify_duplicate (p, k))
   let notify_unrequested t p k =
@@ -240,6 +304,7 @@ end = struct
     | Notify (_gid, key) ->
         Table.remove state.pending key ;
         Lwt.return_unit
+    | Notify_invalid _
     | Notify_unrequested _
     | Notify_duplicate _ ->
         (* TODO *)
