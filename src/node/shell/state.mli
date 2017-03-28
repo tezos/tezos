@@ -119,7 +119,7 @@ module type DATA_STORE = sig
       returns [false] when the value is already stored, or [true]
       otherwise. For a given value, only one call to `store` (or an
       equivalent call to `store_raw`) might return [true].  *)
-  val store: store -> value -> bool Lwt.t
+  val store: store -> key -> value -> bool Lwt.t
 
   (** Store a value in the local database (unparsed data).  It returns
       [Ok None] when the data is already stored, or [Ok (Some (hash,

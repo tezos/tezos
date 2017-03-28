@@ -33,7 +33,7 @@ let inject_protocol state ?force:_ proto =
           "Compilation failed (%a)"
           Protocol_hash.pp_short hash
     | true ->
-        State.Protocol.store state proto >>= function
+        State.Protocol.store state hash proto >>= function
         | false ->
             failwith
               "Previously registred protocol (%a)"
