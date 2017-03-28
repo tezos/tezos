@@ -21,13 +21,18 @@ type 'a request_param = {
 }
 
 module Make_raw
-    (Hash : HASH)
-    (Disk_table : State.DATA_STORE with type key := Hash.t)
-    (Memory_table : Hashtbl.S with type key := Hash.t)
+    (Hash : sig type t end)
+    (Disk_table :
+       Distributed_db_functors.DISK_TABLE with type key := Hash.t)
+    (Memory_table :
+       Distributed_db_functors.MEMORY_TABLE with type key := Hash.t)
     (Request_message : sig
        type param
        val forge : param -> Hash.t list -> Message.t
-     end) = struct
+     end)
+    (Precheck : Distributed_db_functors.PRECHECK
+     with type key := Hash.t
+      and type value := Disk_table.value) = struct
 
   type key = Hash.t
   type value = Disk_table.value
@@ -45,7 +50,7 @@ module Make_raw
       (Hash) (Memory_table) (Request)
   module Table =
     Distributed_db_functors.Make_table
-      (Hash) (Disk_table) (Memory_table) (Scheduler)
+      (Hash) (Disk_table) (Memory_table) (Scheduler) (Precheck)
 
   type t = {
     scheduler: Scheduler.t ;
@@ -62,23 +67,51 @@ module Make_raw
 
 end
 
+module No_precheck = struct
+  type param = unit
+  let precheck _ _ _ = true
+end
+
 module Raw_operation =
-  Make_raw (Operation_hash) (State.Operation) (Operation_hash.Table) (struct
-    type param = Net_id.t
-    let forge net_id keys = Message.Get_operations (net_id, keys)
-  end)
+  Make_raw
+    (Operation_hash)
+    (State.Operation)
+    (Operation_hash.Table)
+    (struct
+      type param = Net_id.t
+      let forge net_id keys = Message.Get_operations (net_id, keys)
+    end)
+    (No_precheck)
 
 module Raw_block_header =
-  Make_raw (Block_hash) (State.Block_header) (Block_hash.Table) (struct
-    type param = Net_id.t
-    let forge net_id keys = Message.Get_block_headers (net_id, keys)
+  Make_raw
+    (Block_hash)
+    (State.Block_header)
+    (Block_hash.Table)
+    (struct
+      type param = Net_id.t
+      let forge net_id keys = Message.Get_block_headers (net_id, keys)
+    end)
+    (No_precheck)
+
+module Operation_list_table =
+  Hashtbl.Make(struct
+    type t = Block_hash.t * int
+    let hash = Hashtbl.hash
+    let equal (b1, i1) (b2, i2) =
+      Block_hash.equal b1 b2 && i1 = i2
   end)
 
 module Raw_protocol =
-  Make_raw (Protocol_hash) (State.Protocol) (Protocol_hash.Table) (struct
-    type param = unit
-    let forge () keys = Message.Get_protocols keys
-  end)
+  Make_raw
+    (Protocol_hash)
+    (State.Protocol)
+    (Protocol_hash.Table)
+    (struct
+      type param = unit
+      let forge () keys = Message.Get_protocols keys
+    end)
+    (No_precheck)
 
 type callback = {
   notify_branch: P2p.Peer_id.t -> Block_hash.t list -> unit ;
@@ -403,10 +436,13 @@ let shutdown { p2p ; p2p_readers ; active_nets } =
   P2p.shutdown p2p >>= fun () ->
   Lwt.return_unit
 
-module type DISTRIBUTED_DB = Distributed_db_functors.DISTRIBUTED_DB
+module type PARAMETRIZED_DISTRIBUTED_DB =
+  Distributed_db_functors.PARAMETRIZED_DISTRIBUTED_DB
+module type DISTRIBUTED_DB =
+  Distributed_db_functors.DISTRIBUTED_DB
 
 module Make
-    (Table : DISTRIBUTED_DB)
+    (Table : PARAMETRIZED_DISTRIBUTED_DB with type param := unit)
     (Kind : sig
        type t
        val proj: t -> Table.t
@@ -417,8 +453,8 @@ module Make
   let known t k = Table.known (Kind.proj t) k
   let read t k = Table.read (Kind.proj t) k
   let read_exn t k = Table.read_exn (Kind.proj t) k
-  let prefetch t ?peer k = Table.prefetch (Kind.proj t) ?peer k
-  let fetch t ?peer k = Table.fetch (Kind.proj t) ?peer k
+  let prefetch t ?peer k = Table.prefetch (Kind.proj t) ?peer k ()
+  let fetch t ?peer k = Table.fetch (Kind.proj t) ?peer k ()
   let commit t k = Table.commit (Kind.proj t) k
   let inject t k v = Table.inject (Kind.proj t) k v
   let watch t = Table.watch (Kind.proj t)

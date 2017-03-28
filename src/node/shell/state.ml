@@ -176,7 +176,7 @@ module type DATA_STORE = sig
   val read_discovery_time_opt: store -> key -> Time.t option Lwt.t
   val read_discovery_time_exn: store -> key -> Time.t Lwt.t
 
-  val store: store -> value -> bool Lwt.t
+  val store: store -> key -> value -> bool Lwt.t
   val store_raw: store -> key -> MBytes.t -> value option tzresult Lwt.t
   val remove: store -> key -> bool Lwt.t
 
@@ -263,14 +263,12 @@ end = struct
               S.Contents.read_opt (s, k) >>= function
               | None -> Lwt.return_none
               | Some v -> Lwt.return (Some { Time.data = Ok v ; time })
-    let store s v =
-      let bytes = Data_encoding.Binary.to_bytes S.encoding v in
-      let k = S.hash_raw bytes in
+    let store s k v =
       S.Discovery_time.known s k >>= function
       | true -> Lwt.return_false
       | false ->
           let time = Time.now () in
-          S.RawContents.store (s, k) bytes >>= fun () ->
+          S.Contents.store (s, k) v >>= fun () ->
           S.Discovery_time.store s k time >>= fun () ->
           S.Pending.store s k >>= fun () ->
           Lwt.return_true
@@ -366,7 +364,7 @@ end = struct
   let read_discovery_time = atomic2 Locked.read_discovery_time
   let read_discovery_time_opt = atomic2 Locked.read_discovery_time_opt
   let read_discovery_time_exn = atomic2 Locked.read_discovery_time_exn
-  let store = atomic2 Locked.store
+  let store = atomic3 Locked.store
   let store_raw = atomic3 Locked.store_raw
   let remove = atomic2 Locked.remove
   let mark_valid = atomic2 Locked.mark_valid
@@ -443,7 +441,7 @@ module Raw_block_header = struct
       } in
     Locked.store_raw store genesis.block bytes >>= fun _created ->
     Lwt.return shell
-  
+
 end
 
 module Raw_helpers = struct
@@ -901,17 +899,17 @@ module Valid_block = struct
   let store net hash context =
     Shared.use net.state begin fun net_state ->
       Shared.use net.block_header_store begin fun block_header_store ->
-          Context.exists net_state.context_index hash >>= function
-          | true -> return None (* Previously stored context. *)
-          | false ->
-              Raw_block_header.Locked.invalid
-                block_header_store hash >>= function
-              | Some _ -> return None (* Previously invalidated block. *)
-              | None ->
-                  Locked.store
-                    block_header_store net_state net.valid_block_watcher
-                    hash context net.forked_network_ttl >>=? fun valid_block ->
-                  return (Some valid_block)
+        Context.exists net_state.context_index hash >>= function
+        | true -> return None (* Previously stored context. *)
+        | false ->
+            Raw_block_header.Locked.invalid
+              block_header_store hash >>= function
+            | Some _ -> return None (* Previously invalidated block. *)
+            | None ->
+                Locked.store
+                  block_header_store net_state net.valid_block_watcher
+                  hash context net.forked_network_ttl >>=? fun valid_block ->
+                return (Some valid_block)
       end
     end
 
