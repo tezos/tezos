@@ -60,7 +60,6 @@ module Key = struct
   let store_root tail = version :: "store" :: tail
 
   let current_level = store_root ["level"]
-  let current_fitness = store_root ["fitness"]
 
   let global_counter = store_root ["global_counter"]
 
@@ -142,14 +141,6 @@ module Current_level =
     let name = "level"
     let key = Key.current_level
     let encoding = Raw_level_repr.encoding
-  end)
-
-module Current_fitness =
-  Make_single_data_storage(struct
-    type value = int64
-    let name = "fitness"
-    let key = Key.current_fitness
-    let encoding = Data_encoding.int64
   end)
 
 (** Rolls *)
