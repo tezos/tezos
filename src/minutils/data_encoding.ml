@@ -876,8 +876,10 @@ let rec length : type x. x t -> x -> int = fun e ->
       MBytes.set_int64 buf ofs v;
       ofs + Size.int64
 
+    (** write a float64 (double) **)
     let float v buf ofs =
-      MBytes.set_float buf ofs v;
+      (*Here, float means float64, which is written using MBytes.set_double !!*)
+      MBytes.set_double buf ofs v;
       ofs + Size.float
 
     let fixed_kind_bytes length s buf ofs =
@@ -1035,7 +1037,7 @@ let rec length : type x. x t -> x -> int = fun e ->
 
     (** read a float64 (double) **)
     let float buf ofs _len =
-      (* Here, float means float64, which is read using MBytes.get_double !! *)
+      (*Here, float means float64, which is read using MBytes.get_double !!*)
       ofs + Size.float, MBytes.get_double buf ofs
 
     let int_of_int32 i =
