@@ -1033,8 +1033,10 @@ let rec length : type x. x t -> x -> int = fun e ->
     let int64 buf ofs _len =
       ofs + Size.int64, MBytes.get_int64 buf ofs
 
+    (** read a float64 (double) **)
     let float buf ofs _len =
-      ofs + Size.float, MBytes.get_float buf ofs
+      (* Here, float means float64, which is read using MBytes.get_double !! *)
+      ofs + Size.float, MBytes.get_double buf ofs
 
     let int_of_int32 i =
       let i' = Int32.to_int i in
