@@ -1077,10 +1077,12 @@ let rec length : type x. x t -> x -> int = fun e ->
 
     let list read buf ofs len =
       let rec loop acc ofs len =
+        assert (len >= 0);
         if len <= 0
         then ofs, List.rev acc
         else
           let ofs', v = read buf ofs len in
+          assert (ofs' > ofs);
           loop (v :: acc) ofs'  (len - (ofs' - ofs))
       in
       loop [] ofs len
