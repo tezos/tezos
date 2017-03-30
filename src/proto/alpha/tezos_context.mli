@@ -93,6 +93,7 @@ module Raw_level : sig
   val root: raw_level
   val succ: raw_level -> raw_level
   val pred: raw_level -> raw_level option
+  val to_int32: raw_level -> int32
 
 end
 
@@ -105,6 +106,7 @@ module Cycle : sig
   val root: cycle
   val succ: cycle -> cycle
   val pred: cycle -> cycle option
+  val to_int32: cycle -> int32
 
 end
 
@@ -222,6 +224,7 @@ module Voting_period : sig
     | Testing
     | Promotion_vote
   val kind_encoding: kind Data_encoding.encoding
+  val to_int32: voting_period -> int32
 
 end
 
