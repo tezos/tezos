@@ -283,23 +283,23 @@ module Block_header = struct
     net_id: Net_id.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
+    operations: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
-    operations: Operation_hash.t list ;
   }
 
   let shell_header_encoding =
     let open Data_encoding in
     conv
-      (fun { net_id ; predecessor ; timestamp ; fitness ; operations } ->
-         (net_id, predecessor, timestamp, fitness, operations))
-      (fun (net_id, predecessor, timestamp, fitness, operations) ->
-         { net_id ; predecessor ; timestamp ; fitness ; operations })
+      (fun { net_id ; predecessor ; timestamp ; operations ; fitness } ->
+         (net_id, predecessor, timestamp, operations, fitness))
+      (fun (net_id, predecessor, timestamp, operations, fitness) ->
+         { net_id ; predecessor ; timestamp ; operations ; fitness })
       (obj5
          (req "net_id" Net_id.encoding)
          (req "predecessor" Block_hash.encoding)
          (req "timestamp" Time.encoding)
-         (req "fitness" Fitness.encoding)
-         (req "operations" (list Operation_hash.encoding)))
+         (req "operations" Operation_list_list_hash.encoding)
+         (req "fitness" Fitness.encoding))
 
   module Encoding = struct
     type t = {
@@ -329,7 +329,7 @@ module Block_header = struct
           compare x y >> fun () -> list compare xs ys in
     Block_hash.compare b1.shell.predecessor b2.shell.predecessor >> fun () ->
     compare b1.proto b2.proto >> fun () ->
-    list Operation_hash.compare
+    Operation_list_list_hash.compare
       b1.shell.operations b2.shell.operations >> fun () ->
     Time.compare b1.shell.timestamp b2.shell.timestamp >> fun () ->
     list compare b1.shell.fitness b2.shell.fitness
@@ -348,6 +348,38 @@ module Block_header = struct
       (Block_hash)
       (Value)
       (Block_hash.Set)
+
+  module Operation_list_count =
+    Store_helpers.Make_single_store
+      (Indexed_store.Store)
+      (struct let name = ["operation_list_count"] end)
+      (Store_helpers.Make_value(struct
+         type t = int
+         let encoding = Data_encoding.int8
+       end))
+
+  module Operations_index =
+    Store_helpers.Make_indexed_substore
+      (Store_helpers.Make_substore
+         (Indexed_store.Store)
+         (struct let name = ["operations"] end))
+      (Store_helpers.Integer_index)
+
+  module Operation_list =
+    Operations_index.Make_map
+      (struct let name = ["list"] end)
+      (Store_helpers.Make_value(struct
+         type t = Operation_hash.t list
+         let encoding = Data_encoding.list Operation_hash.encoding
+       end))
+
+  module Operation_list_path =
+    Operations_index.Make_map
+      (struct let name = ["path"] end)
+      (Store_helpers.Make_value(struct
+         type t = Operation_list_list_hash.path
+         let encoding = Operation_list_list_hash.path_encoding
+       end))
 
 end
 

@@ -27,6 +27,10 @@ type t =
   | Get_protocols of Protocol_hash.t list
   | Protocol of Tezos_compiler.Protocol.t
 
+  | Get_operation_list of Net_id.t * (Block_hash.t * int) list
+  | Operation_list of Net_id.t * Block_hash.t * int *
+                      Operation_hash.t list * Operation_list_list_hash.path
+
 val cfg : t P2p.message_config
 
 val pp_json : Format.formatter -> t -> unit

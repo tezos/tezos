@@ -43,3 +43,5 @@ module Make_buffered_map
 module Make_indexed_substore (S : STORE) (I : INDEX)
   : INDEXED_STORE with type t = S.t
                    and type key = I.t
+
+module Integer_index : INDEX with type t = int

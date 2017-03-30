@@ -307,12 +307,13 @@ let list_operations node {Services.Operations.monitor; contents} =
   let include_ops = match contents with None -> false | Some x -> x in
   Node.RPC.operations node `Prevalidation >>= fun operations ->
   Lwt_list.map_p
-    (fun hash ->
-       if include_ops then
-         Node.RPC.operation_content node hash >>= fun op ->
-         Lwt.return (hash, op)
-       else
-         Lwt.return (hash, None))
+    (Lwt_list.map_p
+       (fun hash ->
+          if include_ops then
+            Node.RPC.operation_content node hash >>= fun op ->
+            Lwt.return (hash, op)
+          else
+            Lwt.return (hash, None)))
     operations >>= fun operations ->
   if not monitor then
     RPC.Answer.return operations
@@ -324,8 +325,8 @@ let list_operations node {Services.Operations.monitor; contents} =
       if not !first_request then
         Lwt_stream.get stream >>= function
         | None -> Lwt.return_none
-        | Some (h, op) when include_ops -> Lwt.return (Some [h, Some op])
-        | Some (h, _) -> Lwt.return (Some [h, None])
+        | Some (h, op) when include_ops -> Lwt.return (Some [[h, Some op]])
+        | Some (h, _) -> Lwt.return (Some [[h, None]])
       else begin
         first_request := false ;
         Lwt.return (Some operations)
@@ -416,9 +417,12 @@ let build_rpc_directory node =
       RPC.Answer.return res in
     RPC.register0 dir Services.validate_block implementation in
   let dir =
-    let implementation (block, blocking, force) =
+    let implementation
+        { Node_rpc_services.raw ; blocking ; force ; operations } =
       begin
-        Node.RPC.inject_block node ?force block >>=? fun (hash, wait) ->
+        Node.RPC.inject_block
+          node ~force
+          raw operations >>=? fun (hash, wait) ->
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end >>= RPC.Answer.return in
     RPC.register0 dir Services.inject_block implementation in

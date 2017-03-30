@@ -29,7 +29,7 @@ let mine cctxt ?timestamp block command fitness seckey =
   Client_blocks.get_block_info cctxt block >>= fun bi ->
   forge_block cctxt ?timestamp block bi.net command fitness >>= fun blk ->
   let signed_blk = Environment.Ed25519.Signature.append seckey blk in
-  Client_node_rpcs.inject_block cctxt signed_blk >>=? fun hash ->
+  Client_node_rpcs.inject_block cctxt signed_blk [[]] >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()
 
@@ -48,6 +48,7 @@ let commands () =
       "Set the timestamp of the block (and initial time of the chain)" ] in
   let open Cli_entries in
   [
+
     command ~args ~desc: "Activate a protocol" begin
       prefixes [ "activate" ; "protocol" ] @@
       param ~name:"version" ~desc:"Protocol version (b58check)"
@@ -60,16 +61,16 @@ let commands () =
       Client_keys.Secret_key.source_param
         ~name:"password" ~desc:"Dictator's key" @@
       stop
-    end
-      (fun hash fitness seckey cctxt ->
+    end begin fun hash fitness seckey cctxt ->
          let timestamp = !timestamp in
          let fitness =
            Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
          mine cctxt ?timestamp cctxt.config.block
            (Activate hash) fitness seckey >>=
-         handle_error cctxt)
-    ;
-      command ~args ~desc: "Fork a test protocol" begin
+         handle_error cctxt
+    end ;
+
+    command ~args ~desc: "Fork a test protocol" begin
       prefixes [ "fork" ; "test" ; "protocol" ] @@
       param ~name:"version" ~desc:"Protocol version (b58check)"
         (fun _ p -> Lwt.return (Protocol_hash.of_b58check p)) @@
@@ -80,16 +81,17 @@ let commands () =
       prefixes [ "and" ; "key" ] @@
       param ~name:"password" ~desc:"Dictator's key"
         (fun _ key ->
-           Lwt.return (Environment.Ed25519.Secret_key.of_b58check key))
-        stop
-    end
-      (fun hash fitness seckey cctxt ->
-         let timestamp = !timestamp in
-         let fitness =
-           Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
-         mine cctxt ?timestamp cctxt.config.block
-           (Activate_testnet hash) fitness seckey >>=
-         handle_error cctxt) ;
+           Lwt.return (Environment.Ed25519.Secret_key.of_b58check key)) @@
+      stop
+    end begin fun hash fitness seckey cctxt ->
+      let timestamp = !timestamp in
+      let fitness =
+        Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
+      mine cctxt ?timestamp cctxt.config.block
+        (Activate_testnet hash) fitness seckey >>=
+      handle_error cctxt
+    end ;
+
   ]
 
 let () =

@@ -62,6 +62,9 @@ let operation op =
   Data_encoding.Binary.to_bytes Store.Operation.encoding op
 
 let block state ?(operations = []) pred_hash pred name : Store.Block_header.t =
+  let operations =
+    Operation_list_list_hash.compute
+      [Operation_list_hash.compute operations] in
   let fitness = incr_fitness pred.Store.Block_header.shell.fitness in
   let timestamp = incr_timestamp pred.shell.timestamp in
   { shell = {
@@ -76,7 +79,7 @@ let build_chain state tbl otbl pred names =
     (fun (pred_hash, pred) name ->
        begin
          let oph, op, bytes = operation name in
-         State.Operation.store state op >>= fun created ->
+         State.Operation.store state oph op >>= fun created ->
          Assert.is_true ~msg:__LOC__ created ;
          State.Operation.read_opt state oph >>= fun op' ->
          Assert.equal_operation ~msg:__LOC__ (Some op) op' ;
@@ -84,9 +87,9 @@ let build_chain state tbl otbl pred names =
          Assert.is_true ~msg:__LOC__ store_invalid ;
          Hashtbl.add otbl name (oph, Error []) ;
          let block = block ~operations:[oph] state pred_hash pred name in
-         State.Block_header.store state block >>= fun created ->
-         Assert.is_true ~msg:__LOC__ created ;
          let hash = Store.Block_header.hash block in
+         State.Block_header.store state hash block >>= fun created ->
+         Assert.is_true ~msg:__LOC__ created ;
          State.Block_header.read_opt state hash >>= fun block' ->
          Assert.equal_block ~msg:__LOC__ (Some block) block' ;
          State.Block_header.mark_invalid state hash [] >>= fun store_invalid ->
@@ -104,6 +107,9 @@ let build_chain state tbl otbl pred names =
 
 let block state ?(operations = []) (pred: State.Valid_block.t) name
   : State.Block_header.t =
+  let operations =
+    Operation_list_list_hash.compute
+      [Operation_list_hash.compute operations] in
   let fitness = incr_fitness pred.fitness in
   let timestamp = incr_timestamp pred.timestamp in
   { shell = { net_id = pred.net_id ;
@@ -117,15 +123,16 @@ let build_valid_chain state tbl vtbl otbl pred names =
     (fun pred name ->
        begin
          let oph, op, bytes = operation name in
-         State.Operation.store state op >>= fun created ->
+         State.Operation.store state oph op >>= fun created ->
          Assert.is_true ~msg:__LOC__ created ;
          State.Operation.read_opt state oph >>= fun op' ->
          Assert.equal_operation ~msg:__LOC__ (Some op) op' ;
          Hashtbl.add otbl name (oph, Ok op) ;
          let block = block state ~operations:[oph] pred name in
-         State.Block_header.store state block >>= fun created ->
-         Assert.is_true ~msg:__LOC__ created ;
          let hash = Store.Block_header.hash block in
+         State.Block_header.store state hash block >>= fun created ->
+         Assert.is_true ~msg:__LOC__ created ;
+         State.Operation_list.store_all state hash [[oph]] >>= fun () ->
          State.Block_header.read_opt state hash >>= fun block' ->
          Assert.equal_block ~msg:__LOC__ (Some block) block' ;
          Hashtbl.add tbl name (hash, block) ;
@@ -162,7 +169,7 @@ let build_example_tree net =
   build_chain net tbl otbl b7 chain >>= fun () ->
   let pending_op = "PP" in
   let oph, op, bytes = operation pending_op in
-  State.Operation.store net op >>= fun _ ->
+  State.Operation.store net oph op >>= fun _ ->
   State.Operation.read_opt net oph >>= fun op' ->
   Assert.equal_operation ~msg:__LOC__ (Some op) op' ;
   Hashtbl.add otbl pending_op (oph, Ok op) ;

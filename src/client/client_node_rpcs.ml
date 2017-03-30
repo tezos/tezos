@@ -135,8 +135,9 @@ let forge_block cctxt ?net ?predecessor ?timestamp fitness ops header =
     (net, predecessor, timestamp, fitness, ops, header)
 let validate_block cctxt net block =
   call_service0 cctxt Services.validate_block (net, block)
-let inject_block cctxt ?(async = false) ?force block =
-  call_service0 cctxt Services.inject_block (block, not async, force)
+let inject_block cctxt ?(async = false) ?(force = false) raw operations =
+  call_service0 cctxt Services.inject_block
+    { raw ; blocking = not async ; force ; operations }
 let inject_operation cctxt ?(async = false) ?force operation =
   call_service0 cctxt Services.inject_operation (operation, not async, force)
 let inject_protocol cctxt ?(async = false) ?force protocol =
@@ -163,7 +164,8 @@ module Blocks = struct
     fitness: MBytes.t list ;
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
-    operations: Operation_hash.t list option ;
+    operations_hash: Operation_list_list_hash.t ;
+    operations: Operation_hash.t list list option ;
     data: MBytes.t option ;
     net: Updater.Net_id.t ;
     test_protocol: Protocol_hash.t option ;
