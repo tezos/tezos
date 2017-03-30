@@ -99,28 +99,39 @@ module Blocks : sig
 end
 
 module Operations : sig
-  val bytes:
-    (unit, unit * Operation_hash.t, unit, State.Operation.t) RPC.service
+
+  val contents:
+    (unit, unit * Operation_hash.t list,
+     unit, State.Operation.t list) RPC.service
+
+
   type list_param = {
     contents: bool option ;
     monitor: bool option ;
   }
+
   val list:
     (unit, unit,
-     list_param, (Operation_hash.t * Store.Operation.t option) list list) RPC.service
+     list_param,
+     (Operation_hash.t * Store.Operation.t option) list list) RPC.service
+
 end
 
 module Protocols : sig
-  val bytes:
+
+  val contents:
     (unit, unit * Protocol_hash.t, unit, Tezos_compiler.Protocol.t) RPC.service
+
   type list_param = {
     contents: bool option ;
     monitor: bool option ;
   }
+
   val list:
     (unit, unit,
      list_param,
      (Protocol_hash.t * Tezos_compiler.Protocol.t option) list) RPC.service
+
 end
 
 module Network : sig

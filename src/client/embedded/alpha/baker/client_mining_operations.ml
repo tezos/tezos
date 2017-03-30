@@ -22,19 +22,24 @@ let monitor cctxt ?contents ?check () =
   Client_node_rpcs.Operations.monitor cctxt ?contents () >>= fun ops_stream ->
   let convert ops =
     Lwt_list.filter_map_p
-      (fun (hash, bytes) ->
-         match bytes with
+      (fun (hash, op) ->
+         match op with
          | None -> Lwt.return (Some { hash; content = None })
-         | Some ({ Store.Operation.shell ; proto } : Updater.raw_operation) ->
-             Client_proto_rpcs.Helpers.Parse.operation cctxt
-               `Prevalidation ?check shell proto >>= function
-             | Ok proto -> Lwt.return (Some { hash ; content = Some (shell, proto) })
+         | Some op ->
+             Client_proto_rpcs.Helpers.Parse.operations cctxt
+               `Prevalidation ?check [op] >>= function
+             | Ok [proto] ->
+                 Lwt.return (Some { hash ; content = Some (op.shell, proto) })
+             | Ok _ ->
+                 lwt_log_error
+                   "@[<v 2>Error while parsing operations@[" >>= fun () ->
+                 Lwt.return None
              | Error err ->
                  lwt_log_error
                    "@[<v 2>Error while parsing operations@,%a@["
                    pp_print_error err >>= fun () ->
                  Lwt.return None)
-     (List.concat  ops)
+     (List.concat ops)
   in
   Lwt.return (Lwt_stream.map_s convert ops_stream)
 

@@ -144,14 +144,21 @@ module Blocks : sig
 end
 
 module Operations : sig
+
+  val contents:
+    Client_commands.context ->
+    Operation_hash.t list -> Store.Operation.t list Lwt.t
+
   val monitor:
     Client_commands.context ->
     ?contents:bool -> unit ->
     (Operation_hash.t * Store.Operation.t option) list list Lwt_stream.t Lwt.t
+
 end
 
 module Protocols : sig
-  val bytes:
+
+  val contents:
     Client_commands.context ->
     Protocol_hash.t -> Store.Protocol.t Lwt.t
 
@@ -159,6 +166,7 @@ module Protocols : sig
     Client_commands.context ->
     ?contents:bool -> unit ->
     (Protocol_hash.t * Store.Protocol.t option) list Lwt.t
+
 end
 
 val bootstrapped:

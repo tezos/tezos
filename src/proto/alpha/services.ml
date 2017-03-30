@@ -574,15 +574,16 @@ module Helpers = struct
 
   module Parse = struct
 
-    let operation custom_root =
+    let operations custom_root =
       RPC.service
-        ~description:"Parse an operation"
+        ~description:"Parse operations"
         ~input:
-          (merge_objs
-             Updater.raw_operation_encoding
-             (obj1 (opt "check_signature" bool)))
-        ~output: (wrap_tzerror Operation.proto_operation_encoding)
-        RPC.Path.(custom_root / "helpers" / "parse" / "operation" )
+          (obj2
+             (req "operations" (list (dynamic_size Updater.raw_operation_encoding)))
+             (opt "check_signature" bool))
+        ~output:
+          (wrap_tzerror (list Operation.proto_operation_encoding))
+        RPC.Path.(custom_root / "helpers" / "parse" / "operations" )
 
     let block custom_root =
       RPC.service
