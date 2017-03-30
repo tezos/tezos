@@ -318,10 +318,10 @@ module Helpers : sig
   end
 
   module Parse : sig
-    val operation:
+    val operations:
       Client_commands.context ->
-      block -> ?check:bool -> Updater.shell_operation -> MBytes.t ->
-      proto_operation tzresult Lwt.t
+      block -> ?check:bool -> Updater.raw_operation list ->
+      proto_operation list tzresult Lwt.t
     val block:
       Client_commands.context ->
       block -> Updater.shell_block -> MBytes.t ->

@@ -50,7 +50,7 @@ let commands () =
        @@ param ~name:"protocol hash" ~desc:"" check_hash
        @@ stop)
       (fun ph cctxt ->
-         Client_node_rpcs.Protocols.bytes cctxt ph >>= fun proto ->
+         Client_node_rpcs.Protocols.contents cctxt ph >>= fun proto ->
          Updater.extract "" ph proto >>= fun () ->
          cctxt.message "Extracted protocol %a" Protocol_hash.pp_short ph) ;
          (* | Error err -> *)

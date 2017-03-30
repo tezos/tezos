@@ -329,9 +329,8 @@ module RPC = struct
         | Some { operations } -> operations
 
   let operation_content node hash =
-    Distributed_db.read_operation node.distributed_db hash >>= function
-    | None -> Lwt.return_none
-    | Some (_, op) -> Lwt.return (Some op)
+    Distributed_db.read_operation node.distributed_db hash >>= fun op ->
+    Lwt.return (map_option ~f:snd op)
 
   let pending_operations node (block: block) =
     match block with
