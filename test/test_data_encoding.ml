@@ -18,7 +18,7 @@ let is_invalid_arg = function
   | Invalid_argument _ -> true
   | _ -> false
 
-let test_simple_json ?msg ?eq:(equal=Assert.equal) encoding value =
+let test_simple_json ?msg ?(equal=Assert.equal) encoding value =
     let json = Json.construct encoding value in
     let result = Json.destruct encoding json in
     equal ?msg value result
@@ -42,9 +42,9 @@ let test_bin_exn ?msg encoding value fail =
     Binary.of_bytes encoding bin in
   Assert.test_fail ?msg get_result fail
 
-let test_simple ~msg enc value =
-  test_simple_json ~msg:(msg ^ ": json") enc value ;
-  test_simple_bin ~msg:(msg ^ ": binary") enc value
+let test_simple ~msg ?(equal=Assert.equal) enc value =
+  test_simple_json ~msg:(msg ^ ": json") ~equal enc value ;
+  test_simple_bin ~msg:(msg ^ ": binary") ~equal enc value
 
 let test_simple_exn ~msg enc value =
   test_json_exn ~msg:(msg ^ ": json") enc value (fun _ -> true) ;
@@ -88,6 +88,14 @@ let test_simple_values _ =
   test_simple ~msg:__LOC__ string "tutu";
   test_simple ~msg:__LOC__ bytes (MBytes.of_string "titi");
   test_simple ~msg:__LOC__ float 42.;
+  test_simple ~msg:__LOC__ float max_float;
+  test_simple ~msg:__LOC__ float min_float;
+  test_simple ~msg:__LOC__ float (-. 0.);
+  test_simple ~msg:__LOC__ float (+. 0.);
+  test_simple ~msg:__LOC__ float infinity;
+  test_simple ~msg:__LOC__ float neg_infinity;
+  test_simple ~msg:__LOC__ float epsilon_float;
+  test_simple ~msg:__LOC__ ~equal:Assert.equal_float float nan;
   test_simple ~msg:__LOC__ (option string) (Some "thing");
   test_simple ~msg:__LOC__ (option string) None;
   let enum_enc =
