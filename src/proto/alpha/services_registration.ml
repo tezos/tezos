@@ -468,17 +468,18 @@ let check_signature ctxt signature shell contents =
      Operation.check_signature key
        { signature ; shell ; contents ; hash = dummy_hash }
 
-let parse_operation ctxt
-    (({ shell ; proto } : Updater.raw_operation), check) =
-  Operation.parse_proto proto >>=? fun (proto, signature) ->
-  begin
-    match check with
-    | Some true -> check_signature ctxt signature shell proto
-    | Some false | None -> return ()
-  end >>=? fun () ->
-  return proto
+let parse_operations ctxt (operations, check) =
+  map_s begin fun ({ shell ; proto } : Updater.raw_operation) ->
+    begin
+      Operation.parse_proto proto >>=? fun (proto, signature) ->
+      begin match check with
+      | Some true -> check_signature ctxt signature shell proto
+      | Some false | None -> return ()
+      end >>|? fun () -> proto
+    end
+  end operations
 
-let () = register1 Services.Helpers.Parse.operation parse_operation
+let () = register1 Services.Helpers.Parse.operations parse_operations
 
 let parse_block _ctxt raw_block =
   Lwt.return (Block.parse_header raw_block) >>=? fun { proto } ->

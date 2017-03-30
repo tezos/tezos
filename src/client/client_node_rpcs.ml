@@ -212,14 +212,16 @@ module Blocks = struct
 end
 
 module Operations = struct
+  let contents cctxt hashes =
+    call_service1 cctxt Services.Operations.contents hashes ()
   let monitor cctxt ?contents () =
     call_streamed_service0 cctxt Services.Operations.list
       { monitor = Some true ; contents }
 end
 
 module Protocols = struct
-  let bytes cctxt hash =
-    call_service1 cctxt Services.Protocols.bytes hash ()
+  let contents cctxt hash =
+    call_service1 cctxt Services.Protocols.contents hash ()
   let list cctxt ?contents () =
     call_service0 cctxt Services.Protocols.list { contents; monitor = Some false }
 end

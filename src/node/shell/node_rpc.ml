@@ -305,16 +305,17 @@ let list_blocks
 let list_operations node {Services.Operations.monitor; contents} =
   let monitor = match monitor with None -> false | Some x -> x in
   let include_ops = match contents with None -> false | Some x -> x in
-  Node.RPC.operations node `Prevalidation >>= fun operations ->
-  Lwt_list.map_p
-    (Lwt_list.map_p
-       (fun hash ->
-          if include_ops then
-            Node.RPC.operation_content node hash >>= fun op ->
-            Lwt.return (hash, op)
-          else
-            Lwt.return (hash, None)))
-    operations >>= fun operations ->
+  Node.RPC.operations node `Prevalidation >>= fun operationss ->
+  let fetch_operations_content operations =
+    if include_ops then
+      Lwt_list.map_s
+        (fun h ->
+           Node.RPC.operation_content node h >>= fun content ->
+           Lwt.return (h, content))
+        operations
+    else
+      Lwt.return @@ ListLabels.map operations ~f:(fun h -> h, None) in
+  Lwt_list.map_p fetch_operations_content operationss >>= fun operations ->
   if not monitor then
     RPC.Answer.return operations
   else
@@ -333,10 +334,14 @@ let list_operations node {Services.Operations.monitor; contents} =
       end in
     RPC.Answer.return_stream { next ; shutdown }
 
-let get_operations node hash () =
-  Node.RPC.operation_content node hash >>= function
-  | Some bytes -> RPC.Answer.return bytes
-  | None -> raise Not_found
+let get_operations node hashes () =
+  Lwt_list.map_p
+    (fun h ->
+       Node.RPC.operation_content node h >>= function
+       | None -> Lwt.fail Not_found
+       | Some h -> Lwt.return h)
+    hashes >>= fun ops ->
+  RPC.Answer.return ops
 
 let list_protocols node {Services.Protocols.monitor; contents} =
   let monitor = match monitor with None -> false | Some x -> x in
@@ -393,11 +398,11 @@ let build_rpc_directory node =
   let dir =
     RPC.register0 dir Services.Operations.list (list_operations node) in
   let dir =
-    RPC.register1 dir Services.Operations.bytes (get_operations node) in
+    RPC.register1 dir Services.Operations.contents (get_operations node) in
   let dir =
     RPC.register0 dir Services.Protocols.list (list_protocols node) in
   let dir =
-    RPC.register1 dir Services.Protocols.bytes (get_protocols node) in
+    RPC.register1 dir Services.Protocols.contents (get_protocols node) in
   let dir =
     let implementation (net_id, pred, time, fitness, operations, header) =
       Node.RPC.block_info node (`Head 0) >>= fun bi ->

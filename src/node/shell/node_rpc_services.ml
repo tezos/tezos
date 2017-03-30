@@ -408,16 +408,18 @@ module Operations = struct
     let name = "operation_id" in
     let descr =
       "A operation identifier in hexadecimal." in
-    let construct = Operation_hash.to_b58check in
+    let construct ops =
+      String.concat "," (List.map Operation_hash.to_b58check ops) in
     let destruct h =
-      try Ok (Operation_hash.of_b58check h)
+      let ops = split ',' h in
+      try Ok (List.map Operation_hash.of_b58check ops)
       with _ -> Error "Can't parse hash" in
     RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
-  let bytes =
+  let contents =
     RPC.service
       ~input: empty
-      ~output: Updater.raw_operation_encoding
+      ~output: (list (dynamic_size Updater.raw_operation_encoding))
       RPC.Path.(root / "operations" /: operations_arg)
 
   type list_param = {
@@ -435,6 +437,8 @@ module Operations = struct
 
   let list =
     RPC.service
+      ~description:
+        "List operations in the mempool."
       ~input: list_param_encoding
       ~output:
         (obj1
@@ -451,6 +455,7 @@ module Operations = struct
 end
 
 module Protocols = struct
+
   let protocols_arg =
     let name = "protocol_id" in
     let descr =
@@ -461,7 +466,7 @@ module Protocols = struct
       with _ -> Error "Can't parse hash" in
     RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
-  let bytes =
+  let contents =
     RPC.service
       ~input: empty
       ~output:
@@ -496,6 +501,7 @@ module Protocols = struct
                        (dynamic_size Store.Protocol.encoding)))
               )))
       RPC.Path.(root / "protocols")
+
 end
 
 module Network = struct
