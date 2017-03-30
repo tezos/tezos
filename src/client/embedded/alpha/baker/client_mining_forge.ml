@@ -65,7 +65,7 @@ let inject_block cctxt block
     () >>=? fun unsigned_header ->
   let signed_header = Ed25519.Signature.append src_sk unsigned_header in
   Client_node_rpcs.inject_block cctxt
-    ~wait:true ?force signed_header >>=? fun block_hash ->
+    ?force signed_header >>=? fun block_hash ->
   return block_hash
 
 let forge_block cctxt block

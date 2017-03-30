@@ -135,12 +135,12 @@ let forge_block cctxt ?net ?predecessor ?timestamp fitness ops header =
     (net, predecessor, timestamp, fitness, ops, header)
 let validate_block cctxt net block =
   call_service0 cctxt Services.validate_block (net, block)
-let inject_block cctxt ?(wait = true) ?force block =
-  call_service0 cctxt Services.inject_block (block, wait, force)
-let inject_operation cctxt ?(wait = true) ?force operation =
-  call_service0 cctxt Services.inject_operation (operation, wait, force)
-let inject_protocol cctxt ?(wait = true) ?force protocol =
-  call_service0 cctxt Services.inject_protocol (protocol, wait, force)
+let inject_block cctxt ?(async = false) ?force block =
+  call_service0 cctxt Services.inject_block (block, not async, force)
+let inject_operation cctxt ?(async = false) ?force operation =
+  call_service0 cctxt Services.inject_operation (operation, not async, force)
+let inject_protocol cctxt ?(async = false) ?force protocol =
+  call_service0 cctxt Services.inject_protocol (protocol, not async, force)
 let bootstrapped cctxt =
   call_streamed_service0 cctxt Services.bootstrapped ()
 let complete cctxt ?block prefix =

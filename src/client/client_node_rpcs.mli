@@ -33,24 +33,24 @@ val validate_block:
 
 val inject_block:
   Client_commands.context ->
-  ?wait:bool -> ?force:bool ->
+  ?async:bool -> ?force:bool ->
   MBytes.t ->
   Block_hash.t tzresult Lwt.t
-(** [inject_block cctxt ?wait ?force raw_block] tries to inject
-    [raw_block] inside the node. If [?wait] is [true], [raw_block]
+(** [inject_block cctxt ?async ?force raw_block] tries to inject
+    [raw_block] inside the node. If [?async] is [true], [raw_block]
     will be validated before the result is returned. If [?force] is
     true, the block will be injected even on non strictly increasing
     fitness. *)
 
 val inject_operation:
   Client_commands.context ->
-  ?wait:bool -> ?force:bool ->
+  ?async:bool -> ?force:bool ->
   MBytes.t ->
   Operation_hash.t tzresult Lwt.t
 
 val inject_protocol:
   Client_commands.context ->
-  ?wait:bool -> ?force:bool ->
+  ?async:bool -> ?force:bool ->
   Tezos_compiler.Protocol.t ->
   Protocol_hash.t tzresult Lwt.t
 
