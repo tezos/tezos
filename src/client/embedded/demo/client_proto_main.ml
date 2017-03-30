@@ -53,7 +53,7 @@ let mine cctxt =
   Client_node_rpcs.forge_block cctxt
     ~net:bi.net ~predecessor:bi.hash
     fitness [] (MBytes.create 0) >>= fun bytes ->
-  Client_node_rpcs.inject_block cctxt ~wait:true bytes >>=? fun hash ->
+  Client_node_rpcs.inject_block cctxt bytes >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()
 

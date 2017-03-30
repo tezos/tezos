@@ -11,7 +11,7 @@ val inject_seed_nonce_revelation:
   Client_commands.context ->
   Client_proto_rpcs.block ->
   ?force:bool ->
-  ?wait:bool ->
+  ?async:bool ->
   (Raw_level.t * Nonce.t) list ->
   Operation_hash.t tzresult Lwt.t
 

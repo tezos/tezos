@@ -29,7 +29,7 @@ let mine cctxt ?timestamp block command fitness seckey =
   Client_blocks.get_block_info cctxt block >>= fun bi ->
   forge_block cctxt ?timestamp block bi.net command fitness >>= fun blk ->
   let signed_blk = Environment.Ed25519.Signature.append seckey blk in
-  Client_node_rpcs.inject_block cctxt ~wait:true signed_blk >>=? fun hash ->
+  Client_node_rpcs.inject_block cctxt signed_blk >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()
 
