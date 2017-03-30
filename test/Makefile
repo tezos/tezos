@@ -1,5 +1,6 @@
 
 TESTS := \
+  merkle \
   data-encoding \
   store context state \
   basic basic.sh \
@@ -245,6 +246,29 @@ test-lwt-pipe: ${NODELIB} ${TEST_PIPE_IMPLS:.ml=.cmx}
 
 clean::
 	rm -f test-p2p
+
+############################################################################
+## Merkle test program
+
+.PHONY:build-test-merkle run-test-merkle
+build-test-merkle: test-merkle
+run-test-merkle:
+	./test-merkle
+
+TEST_MERKLE_INTFS =
+
+TEST_MERKLE_IMPLS = \
+  lib/assert.ml \
+  lib/test.ml \
+  test_merkle.ml
+
+${TEST_MERKLE_IMPLS:.ml=.cmx}: ${NODELIB}
+test-merkle: ${NODELIB} ${TEST_MERKLE_IMPLS:.ml=.cmx}
+	ocamlfind ocamlopt -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	rm -f test-merkle
+
 
 ############################################################################
 ## data encoding test program
