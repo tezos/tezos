@@ -128,3 +128,7 @@ let fail_msg fmt =
 let fail expected given fmt =
   Format.kasprintf (Assert.fail expected given) fmt
 
+let equal_float ?eq ?prn ?msg f1 f2 =
+  match classify_float f1, classify_float f2 with
+  | FP_nan, FP_nan -> ()
+  | _ -> equal ?eq ?prn ?msg f1 f2
