@@ -175,3 +175,22 @@ module Operation_list_list_hash :
 module Protocol_hash : INTERNAL_HASH
 
 module Generic_hash : INTERNAL_MINIMAL_HASH
+
+(**/**)
+
+module Generic_Merkle_tree (H : sig
+    type t
+    type elt
+    val encoding : t Data_encoding.t
+    val empty : t
+    val leaf : elt -> t
+    val node : t -> t -> t
+  end) : sig
+  val compute : H.elt list -> H.t
+  type path =
+    | Left of path * H.t
+    | Right of H.t * path
+    | Op
+  val compute_path: H.elt list -> int -> path
+  val check_path: path -> H.elt -> H.t * int
+end
