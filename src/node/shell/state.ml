@@ -12,7 +12,12 @@ open Logging.Node.State
 module Net_id = Store.Net_id
 
 type error +=
-  | Invalid_fitness of Fitness.fitness * Fitness.fitness
+  | Invalid_fitness of { block: Block_hash.t ;
+                         expected: Fitness.fitness ;
+                         found: Fitness.fitness }
+  | Invalid_operations of { block: Block_hash.t ;
+                            expected: Operation_list_list_hash.t ;
+                            found: Operation_hash.t list list }
   | Unknown_network of Net_id.t
   | Unknown_operation of Operation_hash.t
   | Unknown_block of Block_hash.t
@@ -27,18 +32,22 @@ let () =
     ~title:"Invalid fitness"
     ~description:"The computed fitness differs from the fitness found \
                  \ in the block header."
-    ~pp:(fun ppf (expected, found) ->
+    ~pp:(fun ppf (block, expected, found) ->
         Format.fprintf ppf
-          "@[<v 2>Invalid fitness@ \
+          "@[<v 2>Invalid fitness for block %a@ \
            \ expected %a@ \
           \ found %a"
+          Block_hash.pp_short block
           Fitness.pp expected
           Fitness.pp found)
-    Data_encoding.(obj2
+    Data_encoding.(obj3
+                     (req "block" Block_hash.encoding)
                      (req "expected" Fitness.encoding)
                      (req "found" Fitness.encoding))
-    (function Invalid_fitness (e, f) -> Some (e, f) | _ -> None)
-    (fun (e, f) -> Invalid_fitness (e, f)) ;
+    (function Invalid_fitness { block ; expected ; found } ->
+       Some (block, expected, found) | _ -> None)
+    (fun (block, expected, found) ->
+       Invalid_fitness { block ; expected ; found }) ;
   Error_monad.register_error_kind
     `Temporary
     ~id:"state.unknown_network"
@@ -105,7 +114,8 @@ and valid_block = {
   pred: Block_hash.t ;
   timestamp: Time.t ;
   fitness: Protocol.fitness ;
-  operations: Operation_hash.t list ;
+  operations_hash: Operation_list_list_hash.t ;
+  operations: Operation_hash.t list list ;
   discovery_time: Time.t ;
   protocol_hash: Protocol_hash.t ;
   protocol: (module Updater.REGISTRED_PROTOCOL) option ;
@@ -119,7 +129,8 @@ and valid_block = {
 }
 
 let build_valid_block
-    hash header context discovery_time successors invalid_successors =
+    hash header operations
+    context discovery_time successors invalid_successors =
   Context.get_protocol context >>= fun protocol_hash ->
   Context.get_test_protocol context >>= fun test_protocol_hash ->
   Context.get_test_network context >>= fun test_network ->
@@ -137,7 +148,8 @@ let build_valid_block
     pred = header.shell.predecessor ;
     timestamp = header.shell.timestamp ;
     discovery_time ;
-    operations = header.shell.operations ;
+    operations_hash = header.shell.operations ;
+    operations ;
     fitness = header.shell.fitness ;
     protocol_hash ;
     protocol ;
@@ -389,6 +401,121 @@ module Raw_operation =
     end)
     (Operation_hash.Set)
 
+module Raw_operation_list = struct
+
+  module Locked = struct
+
+    let known store (hash, ofs) =
+      Store.Block_header.Operation_list.known (store, hash) ofs
+    let read store (hash, ofs) =
+      Store.Block_header.Operation_list.read
+        (store, hash) ofs >>=? fun ops ->
+      Store.Block_header.Operation_list_path.read
+        (store, hash) ofs >>=? fun path ->
+      return (ops, path)
+    let read_opt store (hash, ofs) =
+      Store.Block_header.Operation_list.read_opt
+        (store, hash) ofs >>= function
+      | None -> Lwt.return_none
+      | Some ops ->
+          Store.Block_header.Operation_list_path.read_exn
+            (store, hash) ofs >>= fun path ->
+          Lwt.return (Some (ops, path))
+    let read_exn store (hash, ofs) =
+      read_opt store (hash, ofs) >>= function
+      | None -> Lwt.fail Not_found
+      | Some (ops, path) -> Lwt.return (ops, path)
+    let store store (hash, ofs) (ops, path) =
+      Store.Block_header.Operation_list.known
+        (store, hash) ofs >>= function
+      | false ->
+          Store.Block_header.Operation_list.store
+            (store, hash) ofs ops >>= fun () ->
+          Store.Block_header.Operation_list_path.store
+            (store, hash) ofs path >>= fun () ->
+          Lwt.return_true
+      | true ->
+          Lwt.return_false
+
+    let remove store (hash, ofs) =
+      Store.Block_header.Operation_list.known
+        (store, hash) ofs >>= function
+      | false ->
+          Lwt.return_false
+      | true ->
+          Store.Block_header.Operation_list.remove
+            (store, hash) ofs >>= fun () ->
+          Store.Block_header.Operation_list_path.remove
+            (store, hash) ofs >>= fun () ->
+          Lwt.return_true
+
+    let read_count store hash =
+      Store.Block_header.Operation_list_count.read (store, hash)
+
+    let read_count_opt store hash =
+      read_count store hash >>= function
+      | Ok cpt -> Lwt.return (Some cpt)
+      | Error _ -> Lwt.return_none
+
+    let read_count_exn store hash =
+      read_count store hash >>= function
+      | Ok cpt -> Lwt.return cpt
+      | Error _ -> Lwt.fail Not_found
+
+    let store_count store hash count =
+      Store.Block_header.Operation_list_count.store (store, hash) count
+
+    let read_all store hash =
+      Store.Block_header.Operation_list_count.read (store, hash)
+      >>=? fun operation_list_count ->
+      let rec read acc i =
+        if i <= 0 then return acc
+        else
+          Store.Block_header.Operation_list.read
+            (store, hash) (i-1) >>=? fun ops ->
+          read (ops :: acc) (i-1) in
+      read [] operation_list_count
+
+    let read_all_exn store hash =
+      read_all store hash >>= function
+      | Error _ -> Lwt.fail Not_found
+      | Ok ops -> Lwt.return ops
+
+    let store_all store hash op_hashes operations =
+      Store.Block_header.Operation_list_count.store (store, hash)
+        (List.length operations) >>= fun () ->
+      Lwt_list.iteri_p
+        (fun i ops ->
+           Store.Block_header.Operation_list.store
+             (store, hash) i ops >>= fun () ->
+           Store.Block_header.Operation_list_path.store
+             (store, hash) i
+             (Operation_list_list_hash.compute_path op_hashes i)
+           >>= fun () ->
+           Lwt.return_unit)
+        operations >>= fun () ->
+      Lwt.return_unit
+
+  end
+
+  let atomic1 f s = Shared.use s f
+  let atomic2 f s k = Shared.use s (fun s -> f s k)
+  let atomic3 f s k v = Shared.use s (fun s -> f s k v)
+  let atomic4 f s k v1 v2 = Shared.use s (fun s -> f s k v1 v2)
+
+  let known = atomic2 Locked.known
+  let read = atomic2 Locked.read
+  let read_opt = atomic2 Locked.read_opt
+  let read_exn = atomic2 Locked.read_exn
+  let store = atomic3 Locked.store
+  let remove = atomic2 Locked.remove
+
+  let store_all = atomic4 Locked.store_all
+  let read_all = atomic2 Locked.read_all
+  let read_all_exn = atomic2 Locked.read_all_exn
+
+end
+
 module Raw_block_header = struct
 
   include
@@ -417,13 +544,14 @@ module Raw_block_header = struct
       predecessor = genesis.block ;
       timestamp = genesis.time ;
       fitness = [] ;
-      operations = [] ;
+      operations = Operation_list_list_hash.empty ;
     } in
     let header =
       { Store.Block_header.shell ; proto = MBytes.create 0 } in
     let bytes =
       Data_encoding.Binary.to_bytes Store.Block_header.encoding header in
     Locked.store_raw store genesis.block bytes >>= fun _created ->
+    Raw_operation_list.Locked.store_all store genesis.block [] [] >>= fun () ->
     Lwt.return header
 
   let store_testnet_genesis store genesis =
@@ -432,7 +560,7 @@ module Raw_block_header = struct
       predecessor = genesis.block ;
       timestamp = genesis.time ;
       fitness = [] ;
-      operations = [] ;
+      operations = Operation_list_list_hash.empty ;
     } in
     let bytes =
       Data_encoding.Binary.to_bytes Store.Block_header.encoding {
@@ -440,6 +568,7 @@ module Raw_block_header = struct
         proto = MBytes.create 0 ;
       } in
     Locked.store_raw store genesis.block bytes >>= fun _created ->
+    Raw_operation_list.Locked.store_all store genesis.block [] [] >>= fun () ->
     Lwt.return shell
 
 end
@@ -567,8 +696,8 @@ module Block_header = struct
     net_id: Net_id.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
+    operations: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
-    operations: Operation_hash.t list ;
   }
 
   type t = Store.Block_header.t = {
@@ -595,6 +724,9 @@ module Block_header = struct
         Lwt.return (Some predecessor)
     | Some _ | None -> Lwt.return_none
   let read_pred_exn = wrap_not_found read_pred_opt
+
+  let read_operations s k =
+    Raw_operation_list.read_all s.block_header_store k
 
   let mark_invalid net hash errors =
     mark_invalid net hash errors >>= fun marked ->
@@ -676,6 +808,45 @@ module Block_header = struct
 
 end
 
+module Operation_list = struct
+
+  type store = net
+  type key = Block_hash.t * int
+  type value = Operation_hash.t list * Operation_list_list_hash.path
+
+  module Locked = Raw_operation_list.Locked
+
+  let atomic1 f s =
+    Shared.use s.block_header_store f
+  let atomic2 f s k =
+    Shared.use s.block_header_store (fun s -> f s k)
+  let atomic3 f s k v =
+    Shared.use s.block_header_store (fun s -> f s k v)
+  let atomic4 f s k v1 v2 =
+    Shared.use s.block_header_store (fun s -> f s k v1 v2)
+
+  let known = atomic2 Locked.known
+  let read = atomic2 Locked.read
+  let read_opt = atomic2 Locked.read_opt
+  let read_exn = atomic2 Locked.read_exn
+  let store = atomic3 Locked.store
+  let remove = atomic2 Locked.remove
+
+  let store_all s k v =
+    Shared.use s.block_header_store begin fun s ->
+      let h = List.map Operation_list_hash.compute v in
+      Locked.store_all s k h v
+    end
+  let read_all = atomic2 Locked.read_all
+  let read_all_exn = atomic2 Locked.read_all_exn
+
+  let read_count = atomic2 Locked.read_count
+  let read_count_opt = atomic2 Locked.read_count_opt
+  let read_count_exn = atomic2 Locked.read_count_exn
+  let store_count = atomic3 Locked.store_count
+
+end
+
 module Raw_net = struct
 
   let build
@@ -739,7 +910,7 @@ module Raw_net = struct
           Lwt.return context
     end >>= fun context ->
     build_valid_block
-      genesis.block header context genesis.time
+      genesis.block header [] context genesis.time
       Block_hash.Set.empty Block_hash.Set.empty >>= fun genesis_block ->
     Lwt.return @@
     build
@@ -763,7 +934,8 @@ module Valid_block = struct
     pred: Block_hash.t ;
     timestamp: Time.t ;
     fitness: Fitness.fitness ;
-    operations: Operation_hash.t list ;
+    operations_hash: Operation_list_list_hash.t ;
+    operations: Operation_hash.t list list ;
     discovery_time: Time.t ;
     protocol_hash: Protocol_hash.t ;
     protocol: (module Updater.REGISTRED_PROTOCOL) option ;
@@ -782,7 +954,7 @@ module Valid_block = struct
     let known { context_index } hash =
       Context.exists context_index hash
 
-    let raw_read block time chain_store context_index hash =
+    let raw_read block operations time chain_store context_index hash =
       Context.checkout context_index hash >>= function
       | None ->
           fail (Unknown_context hash)
@@ -791,11 +963,12 @@ module Valid_block = struct
           >>= fun successors ->
           Store.Chain.Invalid_successors.read_all (chain_store, hash)
           >>= fun invalid_successors ->
-          build_valid_block hash block context time successors invalid_successors >>= fun block ->
+          build_valid_block hash block operations
+            context time successors invalid_successors >>= fun block ->
           return block
 
-    let raw_read_exn block time chain_store context_index hash =
-      raw_read block time chain_store context_index hash >>= function
+    let raw_read_exn block operations time chain_store context_index hash =
+      raw_read block operations time chain_store context_index hash >>= function
       | Error _ -> Lwt.fail Not_found
       | Ok data -> Lwt.return data
 
@@ -804,7 +977,8 @@ module Valid_block = struct
       | None | Some { Time.data = Error _ } ->
           fail (Unknown_block hash)
       | Some { Time.data = Ok block ; time } ->
-          raw_read block
+          Block_header.read_operations net hash >>=? fun operations ->
+          raw_read block operations
             time net_state.chain_store net_state.context_index hash
 
     let read_opt net net_state hash =
@@ -832,7 +1006,10 @@ module Valid_block = struct
       fail_unless
         (Fitness.equal fitness block.Store.Block_header.shell.fitness)
         (Invalid_fitness
-           (block.Store.Block_header.shell.fitness, fitness)) >>=? fun () ->
+           { block = hash ;
+             expected = block.Store.Block_header.shell.fitness ;
+             found = fitness ;
+           }) >>=? fun () ->
       begin (* Patch context about the associated test network. *)
         Context.read_and_reset_fork_test_network
           context >>= fun (fork, context) ->
@@ -860,6 +1037,8 @@ module Valid_block = struct
       Raw_block_header.Locked.mark_valid
         block_header_store hash >>= fun _marked ->
       (* TODO fail if the block was previsouly stored ... ??? *)
+      Operation_list.Locked.read_all
+        block_header_store hash >>=? fun operations ->
       (* Let's commit the context. *)
       Context.commit hash context >>= fun () ->
       (* Update the chain state. *)
@@ -871,7 +1050,7 @@ module Valid_block = struct
         (store, predecessor) hash >>= fun () ->
       (* Build the `valid_block` value. *)
       raw_read_exn
-        block discovery_time
+        block operations discovery_time
         net_state.chain_store net_state.context_index hash >>= fun valid_block ->
       Watcher.notify valid_block_watcher valid_block ;
       Lwt.return (Ok valid_block)
@@ -1056,11 +1235,14 @@ module Valid_block = struct
           lwt_debug "pop_block %a" Block_hash.pp_short hash >>= fun () ->
           Raw_block_header.read_exn
             block_header_store hash >>= fun { shell } ->
+          Raw_operation_list.read_all_exn
+            block_header_store hash >>= fun operations ->
+          let operations = List.concat operations in
           Lwt_list.iter_p
             (fun h ->
                Raw_operation.Locked.unmark operation_store h >>= fun _ ->
                Lwt.return_unit)
-            shell.operations >>= fun () ->
+            operations >>= fun () ->
           Store.Chain.In_chain_insertion_time.remove
             (state.chain_store, hash) >>= fun () ->
           Store.Chain.Successor_in_chain.remove
@@ -1074,11 +1256,14 @@ module Valid_block = struct
         Store.Chain.Successor_in_chain.store
           (state.chain_store,
            shell.Store.Block_header.predecessor) hash >>= fun () ->
+          Raw_operation_list.read_all_exn
+            block_header_store hash >>= fun operations ->
+        let operations = List.concat operations in
         Lwt_list.iter_p
           (fun h ->
              Raw_operation.Locked.mark_valid operation_store h >>= fun _ ->
             Lwt.return_unit)
-          shell.operations
+          operations
       in
       let time = Time.now () in
       new_blocks
@@ -1163,7 +1348,7 @@ module Net = struct
     Block_header.Locked.read_discovery_time block_header_store
       genesis_hash >>=? fun genesis_discovery_time ->
     Valid_block.Locked.raw_read
-      genesis_shell_header genesis_discovery_time
+      genesis_shell_header [] genesis_discovery_time
       chain_store context_index genesis_hash >>=? fun genesis_block ->
     return @@
     Raw_net.build

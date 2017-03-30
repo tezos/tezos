@@ -40,11 +40,14 @@ let rec compute_stamp
 let inject_block cctxt block
     ?force
     ~priority ~timestamp ~fitness ~seed_nonce
-    ~src_sk operations =
+    ~src_sk operation_list =
   let block = match block with `Prevalidation -> `Head 0 | block -> block in
   Client_node_rpcs.Blocks.info cctxt block >>= fun bi ->
   let seed_nonce_hash = Nonce.hash seed_nonce in
   Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
+  let operations =
+    Operation_list_list_hash.compute
+      (List.map Operation_list_hash.compute operation_list) in
   let shell =
     { Store.Block_header.net_id = bi.net ; predecessor = bi.hash ;
       timestamp ; fitness ; operations } in
@@ -65,7 +68,7 @@ let inject_block cctxt block
     () >>=? fun unsigned_header ->
   let signed_header = Ed25519.Signature.append src_sk unsigned_header in
   Client_node_rpcs.inject_block cctxt
-    ?force signed_header >>=? fun block_hash ->
+    ?force signed_header operation_list >>=? fun block_hash ->
   return block_hash
 
 let forge_block cctxt block
@@ -138,7 +141,8 @@ let forge_block cctxt block
           && Operation_hash.Map.is_empty operations.branch_refused
           && Operation_hash.Map.is_empty operations.branch_delayed ) then
     inject_block cctxt ?force ~src_sk
-       ~priority ~timestamp ~fitness ~seed_nonce block operations.applied
+      ~priority ~timestamp ~fitness ~seed_nonce block
+      [operations.applied]
   else
     failwith "Cannot (fully) validate the given operations."
 
@@ -436,8 +440,9 @@ let mine cctxt state =
         Fitness.pp fitness >>= fun () ->
       let seed_nonce = generate_seed_nonce () in
       Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
-      inject_block cctxt ~force:true ~src_sk ~priority ~timestamp ~fitness ~seed_nonce
-        (`Hash bi.hash) operations.applied
+      inject_block cctxt
+        ~force:true ~src_sk ~priority ~timestamp ~fitness ~seed_nonce
+        (`Hash bi.hash) [operations.applied]
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
       State.record_block cctxt level block_hash seed_nonce
       |> trace_exn (Failure "Error while recording block") >>=? fun () ->

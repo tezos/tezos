@@ -314,7 +314,7 @@ module Helpers : sig
       predecessor:Block_hash.t ->
       timestamp:Time.t ->
       fitness:Fitness.t ->
-      operations:Operation_hash.t list ->
+      operations:Operation_list_list_hash.t ->
       level:Raw_level.t ->
       priority:int ->
       seed_nonce_hash:Nonce_hash.t ->

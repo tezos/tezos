@@ -26,7 +26,8 @@ module RPC : sig
   type block_info = Node_rpc_services.Blocks.block_info
 
   val inject_block:
-    t -> ?force:bool -> MBytes.t ->
+    t -> ?force:bool ->
+    MBytes.t -> Operation_hash.t list list ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
   (** [inject_block node ?force bytes] tries to insert [bytes]
       (supposedly the serialization of a block header) inside
@@ -58,7 +59,7 @@ module RPC : sig
     t -> block -> block_info Lwt.t
 
   val operations:
-    t -> block -> Operation_hash.t list Lwt.t
+    t -> block -> Operation_hash.t list list Lwt.t
   val operation_content:
     t -> Operation_hash.t -> Store.Operation.t option Lwt.t
   val operation_watcher:
