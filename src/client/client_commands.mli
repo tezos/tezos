@@ -11,20 +11,21 @@ type ('a, 'b) lwt_format =
   ('a, Format.formatter, unit, 'b Lwt.t) format4
 
 type cfg = {
-  (* cli options *)
-  base_dir : string ;
-  config_file : string ;
-  print_timings : bool ;
-  force : bool ;
-  block : Node_rpc_services.Blocks.block ;
 
-  (* network options (cli and config file) *)
-  incoming_addr : string ;
-  incoming_port : int ;
+  (* network options. *)
+  node_addr : string ;
+  node_port : int ;
   tls : bool ;
 
   (* webclient options *)
   web_port : int ;
+
+  (* misc options *)
+  base_dir : string ;
+  print_timings : bool ;
+  force : bool ;
+  block : Node_rpc_services.Blocks.block ;
+
 }
 
 type context =

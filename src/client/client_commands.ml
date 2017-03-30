@@ -11,20 +11,21 @@ type ('a, 'b) lwt_format =
   ('a, Format.formatter, unit, 'b Lwt.t) format4
 
 type cfg = {
-  (* cli options *)
-  base_dir : string ;
-  config_file : string ;
-  print_timings : bool ;
-  force : bool ;
-  block : Node_rpc_services.Blocks.block ;
 
-  (* network options (cli and config file) *)
-  incoming_addr : string ;
-  incoming_port : int ;
+  (* network options. *)
+  node_addr : string ;
+  node_port : int ;
   tls : bool ;
 
   (* webclient options *)
   web_port : int ;
+
+  (* misc options *)
+  base_dir : string ;
+  print_timings : bool ;
+  force : bool ;
+  block : Node_rpc_services.Blocks.block ;
+
 }
 
 type context =
@@ -41,25 +42,24 @@ type command = (context, unit) Cli_entries.command
 
 let (//) = Filename.concat
 
+let default_cfg_of_base_dir base_dir = {
+  base_dir ;
+  print_timings = false ;
+  force = false ;
+  block = `Prevalidation ;
+
+  node_addr = "127.0.0.1" ;
+  node_port = 8732 ;
+  tls = false ;
+
+  web_port = 8080 ;
+}
+
 let home =
   try Sys.getenv "HOME"
   with Not_found -> "/root"
 
 let default_base_dir = home // ".tezos-client"
-
-let default_cfg_of_base_dir base_dir = {
-  base_dir ;
-  config_file = base_dir // "config";
-  print_timings = false ;
-  force = false ;
-  block = `Prevalidation ;
-
-  incoming_addr = "127.0.0.1" ;
-  incoming_port = 8732 ;
-  tls = false ;
-
-  web_port = 8080 ;
-}
 
 let default_cfg = default_cfg_of_base_dir default_base_dir
 
