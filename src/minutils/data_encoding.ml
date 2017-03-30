@@ -1004,6 +1004,29 @@ let rec length : type x. x t -> x -> int = fun e ->
     assert(ofs = length);
     bytes
 
+  let to_bytes_list ?(copy_blocks=false) block_sz t v =
+    assert (block_sz > 0);
+    let bytes = to_bytes t v in   (* call to generic function to_bytes *)
+    let length = MBytes.length bytes in
+    if length <= block_sz then
+      [bytes] (* if the result fits in the given block_sz *)
+    else
+      let may_copy = if copy_blocks then MBytes.copy else fun t -> t in
+      let nb_full = length / block_sz in (* nb of blocks of size block_sz *)
+      let sz_full = nb_full * block_sz in (* size of the full part *)
+      let acc = (* eventually init acc with a non-full block *)
+        if sz_full = length then []
+        else [may_copy (MBytes.sub bytes sz_full (length - sz_full))]
+      in
+      let rec split_full_blocks curr_upper_limit acc =
+        let start = curr_upper_limit - block_sz in
+        assert (start >= 0);
+        (* copy the block [ start, curr_upper_limit [ of size block_sz *)
+        let acc = (may_copy (MBytes.sub bytes start block_sz)) :: acc in
+        if start = 0 then acc else split_full_blocks start acc
+      in
+      split_full_blocks sz_full acc
+
   (** Reader *)
 
   module Reader = struct
