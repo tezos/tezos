@@ -12,8 +12,6 @@ open Store_sigs
 type t = Raw_store.t
 type global_store = t
 
-let init = Raw_store.init
-
 (**************************************************************************
  * Net store under "net/"
  **************************************************************************)
@@ -184,6 +182,7 @@ module Make_data_store
     Store_helpers.Make_indexed_substore
       (Store_helpers.Make_substore (S) (struct let name = ["data"] end))
       (I)
+
   module Discovery_time =
     Indexed_store.Make_map
       (struct let name = ["discovery_time"] end)
@@ -213,6 +212,7 @@ module Make_data_store
       (Indexed_store.Store)
       (struct let name = ["validation_time"] end)
       (Store_helpers.Make_value(Time))
+
 end
 
 
@@ -269,6 +269,16 @@ module Operation = struct
       (Operation_hash)
       (Value)
       (Operation_hash.Set)
+
+  let register s =
+    Base58.register_resolver Operation_hash.b58check_encoding begin fun str ->
+      let pstr = Operation_hash.prefix_path str in
+      Net.Indexed_store.fold_indexes s ~init:[]
+        ~f:begin fun net acc ->
+          Indexed_store.resolve_index (s, net) pstr >>= fun l ->
+          Lwt.return (List.rev_append l acc)
+        end
+    end
 
 end
 
@@ -381,6 +391,16 @@ module Block_header = struct
          let encoding = Operation_list_list_hash.path_encoding
        end))
 
+  let register s =
+    Base58.register_resolver Block_hash.b58check_encoding begin fun str ->
+      let pstr = Block_hash.prefix_path str in
+      Net.Indexed_store.fold_indexes s ~init:[]
+        ~f:begin fun net acc ->
+          Indexed_store.resolve_index (s, net) pstr >>= fun l ->
+          Lwt.return (List.rev_append l acc)
+        end
+    end
+
 end
 
 
@@ -458,5 +478,19 @@ module Protocol = struct
       (Store_helpers.Make_value(Tezos_compiler.Protocol))
       (Protocol_hash.Set)
 
+  let register s =
+    Base58.register_resolver Protocol_hash.b58check_encoding begin fun str ->
+      let pstr = Protocol_hash.prefix_path str in
+      Indexed_store.resolve_index s pstr
+    end
+
+
 end
+
+let init dir =
+  Raw_store.init dir >>=? fun s ->
+  Block_header.register s ;
+  Operation.register s ;
+  Protocol.register s ;
+  return s
 
