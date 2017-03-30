@@ -32,7 +32,8 @@ val fetch_block:
   t -> Block_hash.t -> State.Valid_block.t tzresult Lwt.t
 
 val inject_block:
-  worker -> ?force:bool -> MBytes.t ->
+  worker -> ?force:bool ->
+  MBytes.t -> Operation_hash.t list list ->
   (Block_hash.t * State.Valid_block.t tzresult Lwt.t) tzresult Lwt.t
 
 val prevalidator: t -> Prevalidator.t

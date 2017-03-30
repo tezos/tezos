@@ -33,12 +33,12 @@ type shell_block = Store.Block_header.shell_header =
     (** The preceding block in the chain. *)
     timestamp: Time.t ;
     (** The date at which this block has been forged. *)
+    operations: Operation_list_list_hash.t ;
+    (** The sequence of operations. *)
     fitness: MBytes.t list ;
     (** The announced score of the block. As a sequence of sequences
         of unsigned bytes. Ordered by length and then by contents
         lexicographically. *)
-    operations: Operation_hash.t list ;
-    (** The sequence of operations. *)
   }
 
 type raw_block = Store.Block_header.t = {

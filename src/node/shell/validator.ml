@@ -15,7 +15,8 @@ type worker = {
   get_exn: State.Net_id.t -> t Lwt.t ;
   deactivate: t -> unit Lwt.t ;
   inject_block:
-    ?force:bool -> MBytes.t ->
+    ?force:bool ->
+    MBytes.t -> Operation_hash.t list list ->
     (Block_hash.t * State.Valid_block.t tzresult Lwt.t) tzresult Lwt.t ;
   notify_block: Block_hash.t -> Store.Block_header.t -> unit Lwt.t ;
   shutdown: unit -> unit Lwt.t ;
@@ -152,9 +153,11 @@ let apply_block net db
   >>= fun () ->
   lwt_log_info "validation of %a: looking for dependencies..."
     Block_hash.pp_short hash >>= fun () ->
+  Distributed_db.Operation_list.fetch
+    db (hash, 0) block.shell.operations >>= fun operation_hashes ->
   Lwt_list.map_p
     (fun op -> Distributed_db.Operation.fetch db op)
-    block.shell.operations >>= fun operations ->
+    operation_hashes >>= fun operations ->
   lwt_debug "validation of %a: found operations"
     Block_hash.pp_short hash >>= fun () ->
   begin (* Are we validating a block in an expired test network ? *)
@@ -194,7 +197,7 @@ let apply_block net db
     (fun op_hash raw ->
        Lwt.return (Proto.parse_operation op_hash raw)
        |> trace (Invalid_operation op_hash))
-    block.Store.Block_header.shell.operations
+    operation_hashes
     operations >>=? fun parsed_operations ->
   lwt_debug "validation of %a: applying block..."
     Block_hash.pp_short hash >>= fun () ->
@@ -290,22 +293,27 @@ module Context_db = struct
         match data with
         | Ok data ->
             Distributed_db.Block_header.commit net_db hash >>= fun () ->
+            Distributed_db.Operation_list.commit_all
+              net_db hash 1 >>= fun () ->
             begin
               State.Valid_block.store net_state hash data >>=? function
               | None ->
                   State.Valid_block.read net_state hash >>=? fun block ->
-                  Lwt_list.iter_p (fun hash ->
-                      Distributed_db.Operation.commit net_db hash)
+                  Lwt_list.iter_p
+                    (Lwt_list.iter_p (fun hash ->
+                         Distributed_db.Operation.commit net_db hash))
                     block.operations >>= fun () ->
                   return (Ok block, false)
               | Some block ->
-                  Lwt_list.iter_p (fun hash ->
-                      Distributed_db.Operation.commit net_db hash)
+                  Lwt_list.iter_p
+                    (Lwt_list.iter_p (fun hash ->
+                         Distributed_db.Operation.commit net_db hash))
                     block.operations >>= fun () ->
                   return (Ok block, true)
             end
         | Error err ->
-            State.Block_header.mark_invalid net_state hash err >>= fun changed ->
+            State.Block_header.mark_invalid
+              net_state hash err >>= fun changed ->
             return (Error err, changed)
       end >>= function
       | Ok (block, changed) ->
@@ -704,9 +712,25 @@ let create_worker state db =
         validators [] in
     Lwt.join (maintenance_worker :: validators) in
 
-  let inject_block ?(force = false) bytes =
-    Distributed_db.inject_block db bytes >>=? fun (hash, block) ->
+  let inject_block ?(force = false) bytes operations =
+    Distributed_db.inject_block db bytes operations >>=? fun (hash, block) ->
     get block.shell.net_id >>=? fun net ->
+(*
+    Lwt_list.filter_map_s
+      (fun bytes ->
+         let hash = Operation_hash.hash_bytes [bytes] in
+         match Data_encoding.
+         Distributed_db.Operation.inject net.net_db hash bytes >>= function
+         | false -> Lwt.return_none
+         | true ->
+             if List.exists
+                 (List.exists (Operation_hash.equal hash))
+                 operations then
+               Lwt.return (Some hash)
+             else
+               Lwt.return_none)
+      injected_operations >>= fun injected_operations ->
+*)
     let validation =
       State.Valid_block.Current.head net.net >>= fun head ->
       if force

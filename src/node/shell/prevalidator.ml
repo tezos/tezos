@@ -48,22 +48,26 @@ let list_pendings net_db ~from_block ~to_block old_mempool =
       Lwt.return mempool
     else
       Distributed_db.Block_header.read_exn net_db hash >>= fun { shell } ->
+      Distributed_db.Operation_list.read_all_exn
+        net_db hash >>= fun operations ->
       let mempool =
         List.fold_left
-          (fun mempool h -> Operation_hash.Set.add h mempool)
-          mempool shell.operations in
+          (List.fold_left (fun mempool h -> Operation_hash.Set.add h mempool))
+          mempool operations in
       pop_blocks ancestor shell.predecessor mempool
   in
-  let push_block mempool (_hash, shell) =
+  let push_block mempool (hash, _shell) =
+      Distributed_db.Operation_list.read_all_exn
+        net_db hash >|= fun operations ->
     List.fold_left
-      (fun mempool h -> Operation_hash.Set.remove h mempool)
-      mempool shell.Store.Block_header.operations
+      (List.fold_left (fun mempool h -> Operation_hash.Set.remove h mempool))
+      mempool operations
   in
   let net_state = Distributed_db.state net_db in
   State.Valid_block.Current.new_blocks
     net_state ~from_block ~to_block >>= fun (ancestor, path) ->
   pop_blocks ancestor from_block.hash old_mempool >>= fun mempool ->
-  let new_mempool = List.fold_left push_block mempool path in
+  Lwt_list.fold_left_s push_block mempool path >>= fun new_mempool ->
   Lwt.return new_mempool
 
 

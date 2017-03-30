@@ -17,7 +17,7 @@ val forge_block:
   ?predecessor:Block_hash.t ->
   ?timestamp:Time.t ->
   Fitness.fitness ->
-  Operation_hash.t list ->
+  Operation_list_list_hash.t ->
   MBytes.t ->
   MBytes.t Lwt.t
 (** [forge_block cctxt ?net ?predecessor ?timestamp fitness ops
@@ -34,7 +34,7 @@ val validate_block:
 val inject_block:
   Client_commands.context ->
   ?async:bool -> ?force:bool ->
-  MBytes.t ->
+  MBytes.t -> Operation_hash.t list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt ?async ?force raw_block] tries to inject
     [raw_block] inside the node. If [?async] is [true], [raw_block]
@@ -83,7 +83,7 @@ module Blocks : sig
     block -> MBytes.t list Lwt.t
   val operations:
     Client_commands.context ->
-    block -> Operation_hash.t list Lwt.t
+    block -> Operation_hash.t list list Lwt.t
   val protocol:
     Client_commands.context ->
     block -> Protocol_hash.t Lwt.t
@@ -104,7 +104,8 @@ module Blocks : sig
     fitness: MBytes.t list ;
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
-    operations: Operation_hash.t list option ;
+    operations_hash: Operation_list_list_hash.t ;
+    operations: Operation_hash.t list list option ;
     data: MBytes.t option ;
     net: Updater.Net_id.t ;
     test_protocol: Protocol_hash.t option ;
@@ -146,7 +147,7 @@ module Operations : sig
   val monitor:
     Client_commands.context ->
     ?contents:bool -> unit ->
-    (Operation_hash.t * Store.Operation.t option) list Lwt_stream.t Lwt.t
+    (Operation_hash.t * Store.Operation.t option) list list Lwt_stream.t Lwt.t
 end
 
 module Protocols : sig

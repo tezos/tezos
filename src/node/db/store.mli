@@ -187,8 +187,8 @@ module Block_header : sig
     net_id: Net_id.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
+    operations: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
-    operations: Operation_hash.t list ;
   }
   val shell_header_encoding: shell_header Data_encoding.t
 
@@ -205,6 +205,20 @@ module Block_header : sig
      and type key = Block_hash.t
      and type value = t
      and type key_set = Block_hash.Set.t
+
+  module Operation_list_count : SINGLE_STORE
+    with type t = store * Block_hash.t
+     and type value = int
+
+  module Operation_list : MAP_STORE
+    with type t = store * Block_hash.t
+     and type key = int
+     and type value = Operation_hash.t list
+
+  module Operation_list_path : MAP_STORE
+    with type t = store * Block_hash.t
+     and type key = int
+     and type value = Operation_list_list_hash.path
 
 end
 

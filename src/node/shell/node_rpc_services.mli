@@ -34,7 +34,8 @@ module Blocks : sig
     fitness: MBytes.t list ;
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
-    operations: Operation_hash.t list option ;
+    operations_hash: Operation_list_list_hash.t ;
+    operations: Operation_hash.t list list option ;
     data: MBytes.t option ;
     net: net ;
     test_protocol: Protocol_hash.t option ;
@@ -56,7 +57,7 @@ module Blocks : sig
   val fitness:
     (unit, unit * block, unit, MBytes.t list) RPC.service
   val operations:
-    (unit, unit * block, unit, Operation_hash.t list) RPC.service
+    (unit, unit * block, unit, Operation_hash.t list list) RPC.service
   val protocol:
     (unit, unit * block, unit, Protocol_hash.t) RPC.service
   val test_protocol:
@@ -108,7 +109,7 @@ module Operations : sig
   }
   val list:
     (unit, unit,
-     list_param, (Operation_hash.t * Store.Operation.t option) list) RPC.service
+     list_param, (Operation_hash.t * Store.Operation.t option) list list) RPC.service
 end
 
 module Protocols : sig
@@ -170,16 +171,21 @@ end
 val forge_block:
   (unit, unit,
    Updater.Net_id.t option * Block_hash.t option * Time.t option *
-   Fitness.fitness * Operation_hash.t list * MBytes.t,
+   Fitness.fitness * Operation_list_list_hash.t * MBytes.t,
    MBytes.t) RPC.service
 
 val validate_block:
   (unit, unit, Blocks.net * Block_hash.t, unit tzresult) RPC.service
 
+type inject_block_param = {
+  raw: MBytes.t ;
+  blocking: bool ;
+  force: bool ;
+  operations: Operation_hash.t list list ;
+}
+
 val inject_block:
-  (unit, unit,
-   (MBytes.t * bool * bool option),
-   Block_hash.t tzresult) RPC.service
+  (unit, unit, inject_block_param, Block_hash.t tzresult) RPC.service
 
 val inject_operation:
   (unit, unit,
