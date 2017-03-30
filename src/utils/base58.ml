@@ -253,19 +253,19 @@ module MakeResolvers(R: sig
               partial_decode ?alphabet request encoding.encoded_length in
             let len = String.length prefix in
             let ignored = String.length encoding.prefix in
-            if len <= ignored then
-              Lwt.return_nil
-            else begin
-              assert (String.sub prefix 0 ignored  = encoding.prefix) ;
-              let msg = String.sub prefix ignored (len - ignored) in
-              resolver context msg >|= fun msgs ->
-              filter_map
-                (fun msg ->
-                   let res = simple_encode encoding ?alphabet msg in
-                   Utils.remove_prefix ~prefix:request res |>
-                   Utils.map_option ~f:(fun _ -> res))
-                msgs
-            end in
+            let msg =
+              if len <= ignored then ""
+              else begin
+                assert (String.sub prefix 0 ignored  = encoding.prefix) ;
+                String.sub prefix ignored (len - ignored)
+              end in
+            resolver context msg >|= fun msgs ->
+            filter_map
+              (fun msg ->
+                 let res = simple_encode encoding ?alphabet msg in
+                 Utils.remove_prefix ~prefix:request res |>
+                 Utils.map_option ~f:(fun _ -> res))
+              msgs in
     find request !resolvers
 
 end

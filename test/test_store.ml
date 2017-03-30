@@ -146,7 +146,9 @@ let test_expand s =
   Base58.complete (Block_hash.to_short_b58check bh2) >>= fun res ->
   Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b58check bh2] ;
   Base58.complete (Block_hash.to_short_b58check bh3) >>= fun res ->
-  Assert.equal_string_list ~msg:__LOC__ res [Block_hash.to_b58check bh3] ;
+  Assert.equal_string_list ~msg:__LOC__
+    (List.sort String.compare res)
+    [Block_hash.to_b58check bh3' ; Block_hash.to_b58check bh3] ;
   Lwt.return_unit
 
 
@@ -431,7 +433,7 @@ let tests_raw : (string * (Raw_store.t -> unit Lwt.t)) list = [
 
 
 let tests : (string * (Store.t -> unit Lwt.t)) list = [
-  (* "expand", test_expand ; *) (* FIXME GRGR *)
+  "expand", test_expand ;
   "operation", test_operation ;
   "block", test_block ;
 ]
