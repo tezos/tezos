@@ -40,8 +40,7 @@ let main () =
   Random.self_init () ;
   Sodium.Random.stir () ;
   Lwt.catch begin fun () ->
-    Client_config.preparse_args Sys.argv cctxt >>= fun config ->
-    let cctxt = { cctxt with config } in
+    let parsed_config_file, block = Client_config.preparse_args Sys.argv in
     Lwt.catch begin fun () ->
       Client_node_rpcs.Blocks.protocol cctxt cctxt.config.block >>= fun version ->
       Lwt.return (Some version, Client_commands.commands_for_version version)
@@ -60,10 +59,21 @@ let main () =
       Client_protocols.commands () @
       Client_helpers.commands () @
       commands_for_version in
-    Client_config.parse_args
-      (Cli_entries.usage ~commands)
-      (Cli_entries.inline_dispatch commands)
-      Sys.argv cctxt >>= fun (command, config) ->
+    let (command, parsed_args) =
+      Client_config.parse_args
+        (Cli_entries.usage ~commands)
+        (Cli_entries.inline_dispatch commands)
+        Sys.argv in
+    let config : Client_commands.cfg = {
+      base_dir = parsed_config_file.base_dir ;
+      print_timings = parsed_args.print_timings ;
+      force = parsed_args.force ;
+      block ;
+      node_addr = parsed_config_file.node_addr ;
+      node_port = parsed_config_file.node_port ;
+      tls = parsed_config_file.tls ;
+      web_port = Client_commands.default_cfg.web_port ;
+    } in
     command { cctxt with config } >>= fun () ->
     Lwt.return 0
   end begin function

@@ -25,8 +25,8 @@ let make_request cctxt meth service json =
   incr cpt ;
   let cpt = !cpt in
   let scheme = if cctxt.config.tls then "https" else "http" in
-  let host = cctxt.config.incoming_addr in
-  let port = cctxt.config.incoming_port in
+  let host = cctxt.config.node_addr in
+  let port = cctxt.config.node_port in
   let path = String.concat "/" service in
   let uri = Uri.make ~scheme ~host ~port ~path () in
   let string_uri = Uri.to_string uri in
