@@ -119,7 +119,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
   let list t k = S.fold t k ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
   let resolve_index t prefix =
     let rec loop i prefix = function
-      | [] when i >= I.path_length -> begin
+      | [] when i = I.path_length -> begin
           match I.of_path prefix with
           | None -> assert false
           | Some path -> Lwt.return [path]
@@ -129,7 +129,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
           Lwt_list.map_p (function
               | `Key prefix | `Dir prefix -> loop (i+1) prefix []) prefixes
           >|= List.flatten
-      | [d] ->
+      | [d] when i = I.path_length - 1 ->
           if (i >= I.path_length) then invalid_arg "IO.resolve" ;
           list t prefix >>= fun prefixes ->
           Lwt_list.map_p (function
@@ -138,6 +138,11 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
                   | None -> Lwt.return_nil
                   | Some _ -> loop (i+1) prefix [])
             prefixes
+          >|= List.flatten
+      | "" :: ds ->
+          list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix -> loop (i+1) prefix ds) prefixes
           >|= List.flatten
       | d :: ds ->
           if (i >= I.path_length) then invalid_arg "IO.resolve" ;
