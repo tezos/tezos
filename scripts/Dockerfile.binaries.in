@@ -4,7 +4,7 @@ LABEL distro_style="apk" distro="alpine" distro_long="alpine-$alpine_version" ar
 
 RUN apk update && \
     apk upgrade && \
-    apk add sudo bash libssl1.0 libsodium gmp git && \
+    apk add sudo bash libssl1.0 libsodium libev gmp git && \
     rm -f /var/cache/apk/* && \
     adduser -S tezos && \
     echo 'tezos ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/tezos && \
