@@ -134,3 +134,5 @@ module Operation_list_list_hash :
 
 (** Protocol versions / source hashes. *)
 module Protocol_hash : HASH
+
+module Net_id : HASH

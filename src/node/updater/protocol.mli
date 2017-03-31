@@ -13,8 +13,6 @@
     by length and then by contents lexicographically. *)
 type fitness = Fitness.fitness
 
-module Net_id = Store.Net_id
-
 (** The version agnostic toplevel structure of operations. *)
 type shell_operation = Store.Operation.shell_header = {
   net_id: Net_id.t ;

@@ -305,9 +305,9 @@ let set_test_protocol v data =
 let get_test_network v =
   raw_get v current_test_network_key >>= function
   | None -> Lwt.return_none
-  | Some data -> Lwt.return (Some (Store.Net_id.of_bytes_exn data))
+  | Some data -> Lwt.return (Some (Net_id.of_bytes_exn data))
 let set_test_network v id =
-  raw_set v current_test_network_key (Store.Net_id.to_bytes id)
+  raw_set v current_test_network_key (Net_id.to_bytes id)
 let del_test_network v  = raw_del v current_test_network_key
 
 let get_test_network_expiration v =

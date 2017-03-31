@@ -11,8 +11,8 @@ open Logging.Node.Validator
 
 type worker = {
   activate: ?parent:t -> State.Net.t -> t Lwt.t ;
-  get: State.Net_id.t -> t tzresult Lwt.t ;
-  get_exn: State.Net_id.t -> t Lwt.t ;
+  get: Net_id.t -> t tzresult Lwt.t ;
+  get_exn: Net_id.t -> t Lwt.t ;
   deactivate: t -> unit Lwt.t ;
   inject_block:
     ?force:bool ->
@@ -67,7 +67,7 @@ let may_change_test_network v (block: State.Valid_block.t) =
     | None, Some _ -> true
     | Some (net_id, _), Some { net } ->
         let net_id' = State.Net.id net in
-        not (State.Net_id.equal net_id net_id') in
+        not (Net_id.equal net_id net_id') in
   if change then begin
     v.create_child block >>= function
     | Ok () -> Lwt.return_unit
@@ -149,7 +149,7 @@ let apply_block net db
   lwt_log_notice "validate block %a (after %a), net %a"
     Block_hash.pp_short hash
     Block_hash.pp_short block.shell.predecessor
-    State.Net_id.pp id
+    Net_id.pp id
   >>= fun () ->
   lwt_log_info "validation of %a: looking for dependencies..."
     Block_hash.pp_short hash >>= fun () ->
@@ -495,7 +495,7 @@ let rec create_validator ?parent worker state db net =
   let new_blocks = ref Lwt.return_unit in
 
   let shutdown () =
-    lwt_log_notice "shutdown %a" State.Net_id.pp net_id >>= fun () ->
+    lwt_log_notice "shutdown %a" Net_id.pp net_id >>= fun () ->
     Distributed_db.deactivate net_db >>= fun () ->
     Lwt_pipe.close queue ;
     Lwt.join [
@@ -611,27 +611,27 @@ let rec create_validator ?parent worker state db net =
 
   Lwt.return v
 
-type error += Unknown_network of State.Net_id.t
+type error += Unknown_network of Net_id.t
 
 let create_worker state db =
 
-  let validators : t Lwt.t State.Net_id.Table.t =
-    Store.Net_id.Table.create 7 in
+  let validators : t Lwt.t Net_id.Table.t =
+    Net_id.Table.create 7 in
 
   let valid_block_input = Watcher.create_input () in
 
-  let get_exn net = State.Net_id.Table.find validators net in
+  let get_exn net = Net_id.Table.find validators net in
   let get net =
     try get_exn net >>= fun v -> return v
     with Not_found -> fail (State.Unknown_network net) in
-  let remove net = State.Net_id.Table.remove validators net in
+  let remove net = Net_id.Table.remove validators net in
 
   let deactivate { net } =
     let id = State.Net.id net in
     get id >>= function
     | Error _ -> Lwt.return_unit
     | Ok v ->
-        lwt_log_notice "deactivate network %a" State.Net_id.pp id >>= fun () ->
+        lwt_log_notice "deactivate network %a" Net_id.pp id >>= fun () ->
         remove id ;
         v.shutdown ()
   in
@@ -650,7 +650,7 @@ let create_worker state db =
     let net_maintenance () =
       lwt_log_info "net maintenance" >>= fun () ->
       let time = Time.now () in
-      Store.Net_id.Table.fold
+      Net_id.Table.fold
         (fun _ v acc ->
            v >>= fun v ->
            acc >>= fun () ->
@@ -664,7 +664,7 @@ let create_worker state db =
            match State.Net.expiration net with
            | Some eol when Time.(eol <= time) ->
                lwt_log_notice "destroy network %a"
-                 State.Net_id.pp (State.Net.id net) >>= fun () ->
+                 Net_id.pp (State.Net.id net) >>= fun () ->
                State.Net.destroy state net
            | Some _ | None -> Lwt.return_unit)
         all_net >>= fun () ->
@@ -707,7 +707,7 @@ let create_worker state db =
   let shutdown () =
     cancel () >>= fun () ->
     let validators =
-      Store.Net_id.Table.fold
+      Net_id.Table.fold
         (fun _ (v: t Lwt.t) acc -> (v >>= fun v -> v.shutdown ()) :: acc)
         validators [] in
     Lwt.join (maintenance_worker :: validators) in
@@ -741,14 +741,14 @@ let create_worker state db =
     return (hash, validation) in
 
   let rec activate ?parent net =
+    let net_id = State.Net.id net in
     lwt_log_notice "activate network %a"
-      State.Net_id.pp (State.Net.id net) >>= fun () ->
+      Net_id.pp net_id >>= fun () ->
     State.Valid_block.Current.genesis net >>= fun genesis ->
-    let net_id = State.Net_id.Id genesis.hash in
     get net_id >>= function
     | Error _ ->
         let v = create_validator ?parent worker state db net in
-        Store.Net_id.Table.add validators net_id v ;
+        Net_id.Table.add validators net_id v ;
         v
     | Ok v -> Lwt.return v
 

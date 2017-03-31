@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Net_id = Store.Net_id
-
 type t =
 
   | Get_current_branch of Net_id.t
@@ -38,7 +36,7 @@ let encoding =
   [
     case ~tag:0x10
       (obj1
-         (req "get_current_branch" Store.Net_id.encoding))
+         (req "get_current_branch" Net_id.encoding))
       (function
         | Get_current_branch net_id -> Some net_id
         | _ -> None)

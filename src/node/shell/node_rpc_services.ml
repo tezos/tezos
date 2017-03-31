@@ -55,11 +55,6 @@ module Blocks = struct
     | `Hash of Block_hash.t
     ]
 
-  type net = State.Net_id.t = Id of Block_hash.t
-
-  let net_encoding =
-    conv (fun (Id id) -> id) (fun id -> Id id) Block_hash.encoding
-
   type block_info = {
     hash: Block_hash.t ;
     predecessor: Block_hash.t ;
@@ -69,9 +64,9 @@ module Blocks = struct
     operations_hash: Operation_list_list_hash.t ;
     operations: Operation_hash.t list list option ;
     data: MBytes.t option ;
-    net: net ;
+    net: Net_id.t ;
     test_protocol: Protocol_hash.t option ;
-    test_network: (net * Time.t) option ;
+    test_network: (Net_id.t * Time.t) option ;
   }
 
   let block_info_encoding =
@@ -99,9 +94,9 @@ module Blocks = struct
            (req "operations_hash" Operation_list_list_hash.encoding)
            (opt "operations" (list (list Operation_hash.encoding)))
            (opt "data" bytes)
-           (req "net" net_encoding)
+           (req "net" Net_id.encoding)
            (opt "test_protocol" Protocol_hash.encoding)
-           (opt "test_network" (tup2 net_encoding Time.encoding))))
+           (opt "test_network" (tup2 Net_id.encoding Time.encoding))))
 
   let parse_block s =
     try
@@ -195,7 +190,7 @@ module Blocks = struct
     RPC.service
       ~description:"Returns the net of the chain in which the block belongs."
       ~input: empty
-      ~output: (obj1 (req "net" net_encoding))
+      ~output: (obj1 (req "net" Net_id.encoding))
       RPC.Path.(block_path / "net")
 
   let predecessor =
@@ -260,7 +255,7 @@ module Blocks = struct
     RPC.service
       ~description:"Returns the associated test network."
       ~input: empty
-      ~output: (obj1 (opt "net" (tup2 net_encoding Time.encoding)))
+      ~output: (obj1 (opt "net" (tup2 Net_id.encoding Time.encoding)))
       RPC.Path.(block_path / "test_network")
 
   let pending_operations =
@@ -642,7 +637,7 @@ let forge_block =
     ~description: "Forge a block header"
     ~input:
       (obj6
-         (opt "net_id" Updater.Net_id.encoding)
+         (opt "net_id" Net_id.encoding)
          (opt "predecessor" Block_hash.encoding)
          (opt "timestamp" Time.encoding)
          (req "fitness" Fitness.encoding)
@@ -657,7 +652,7 @@ let validate_block =
       "Force the node to fetch and validate the given block hash."
     ~input:
       (obj2
-         (req "net" Blocks.net_encoding)
+         (req "net" Net_id.encoding)
          (req "hash" Block_hash.encoding))
     ~output:
       (Error.wrap @@ empty)

@@ -187,7 +187,7 @@ module Helpers : sig
       val operations:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -197,7 +197,7 @@ module Helpers : sig
       val transaction:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -209,7 +209,7 @@ module Helpers : sig
       val origination:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -225,7 +225,7 @@ module Helpers : sig
       val delegation:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -237,19 +237,19 @@ module Helpers : sig
       val operation:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         dictator_operation ->
         MBytes.t tzresult Lwt.t
       val activate:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         Protocol_hash.t ->
         MBytes.t tzresult Lwt.t
       val activate_testnet:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         Protocol_hash.t ->
         MBytes.t tzresult Lwt.t
     end
@@ -257,14 +257,14 @@ module Helpers : sig
       val operations:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         source:public_key ->
         delegate_operation list ->
         MBytes.t tzresult Lwt.t
       val endorsement:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         source:public_key ->
         block:Block_hash.t ->
         slot:int ->
@@ -274,27 +274,27 @@ module Helpers : sig
       val operations:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         anonymous_operation list ->
         MBytes.t tzresult Lwt.t
       val seed_nonce_revelation:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         level:Raw_level.t ->
         nonce:Nonce.t ->
         unit -> MBytes.t tzresult Lwt.t
       val faucet:
         Client_commands.context ->
         block ->
-        net:Updater.Net_id.t ->
+        net:Net_id.t ->
         id:public_key_hash ->
         unit -> MBytes.t tzresult Lwt.t
     end
     val block:
       Client_commands.context ->
       block ->
-      net:Updater.Net_id.t ->
+      net:Net_id.t ->
       predecessor:Block_hash.t ->
       timestamp:Time.t ->
       fitness:Fitness.t ->

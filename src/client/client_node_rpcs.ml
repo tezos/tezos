@@ -167,9 +167,9 @@ module Blocks = struct
     operations_hash: Operation_list_list_hash.t ;
     operations: Operation_hash.t list list option ;
     data: MBytes.t option ;
-    net: Updater.Net_id.t ;
+    net: Net_id.t ;
     test_protocol: Protocol_hash.t option ;
-    test_network: (Updater.Net_id.t * Time.t) option ;
+    test_network: (Net_id.t * Time.t) option ;
   }
   type preapply_param = Services.Blocks.preapply_param = {
     operations: Operation_hash.t list ;

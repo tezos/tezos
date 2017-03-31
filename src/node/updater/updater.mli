@@ -7,11 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Net_id : sig
-  type t = Store.Net_id.t
-  val encoding : t Data_encoding.t
-end
-
 type shell_operation = Store.Operation.shell_header = {
   net_id: Net_id.t ;
 }

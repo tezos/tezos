@@ -517,9 +517,150 @@ module Generic_hash =
     let size = None
   end)
 
+module Net_id = struct
+
+  type t = string
+  type net_id = t
+
+  let name = "Net_id"
+  let title = "Network identifier"
+
+  let size = 4
+
+  let of_block_hash bh =
+    MBytes.substring (Block_hash.to_bytes bh) 0 4
+
+  let hash_bytes l = of_block_hash (Block_hash.hash_bytes l)
+  let hash_string l = of_block_hash (Block_hash.hash_string l)
+
+  type Base58.data += Hash of t
+
+  let of_string s =
+    if String.length s <> size then None else Some s
+  let of_string_exn s =
+    match of_string s with
+    | None ->
+        let msg =
+          Printf.sprintf "%s.of_string: wrong string size (%d)"
+            name (String.length s) in
+        raise (Invalid_argument msg)
+    | Some h -> h
+  let to_string s = s
+
+  let of_hex s = of_string (Hex_encode.hex_decode s)
+  let of_hex_exn s = of_string_exn (Hex_encode.hex_decode s)
+  let to_hex s = Hex_encode.hex_encode (to_string s)
+
+  let compare = String.compare
+  let equal = String.equal
+
+  let of_bytes b =
+    if MBytes.length b <> size then
+      None
+    else
+      Some (MBytes.to_string b)
+  let of_bytes_exn b =
+    match of_bytes b with
+    | None ->
+        let msg =
+          Printf.sprintf "%s.of_bytes: wrong string size (%d)"
+            name (MBytes.length b) in
+        raise (Invalid_argument msg)
+    | Some h -> h
+  let to_bytes = MBytes.of_string
+
+  let read src off = of_bytes_exn @@ MBytes.sub src off size
+  let write dst off h = MBytes.blit (to_bytes h) 0 dst off size
+
+  let b58check_encoding =
+    Base58.register_encoding
+      ~prefix: Base58.Prefix.net_id
+      ~length: size
+      ~wrap: (fun s -> Hash s)
+      ~of_raw:of_string ~to_raw: (fun h -> h)
+
+  let of_b58check s =
+    match Base58.simple_decode b58check_encoding s with
+    | Some x -> x
+    | None -> Format.kasprintf failwith "Unexpected hash (%s)" name
+  let to_b58check s = Base58.simple_encode b58check_encoding s
+  let to_short_b58check = to_b58check
+
+  let encoding =
+    let open Data_encoding in
+    splitted
+      ~binary: (Fixed.string size)
+      ~json:
+        (describe ~title: (title ^ " (Base58Check-encoded Sha256)") @@
+         conv to_b58check (Data_encoding.Json.wrap_error of_b58check) string)
+
+  let param ?(name=name) ?(desc=title) t =
+    Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check str)) t
+
+  let pp ppf t =
+    Format.pp_print_string ppf (to_b58check t)
+
+  let pp_short ppf t =
+    Format.pp_print_string ppf (to_short_b58check t)
+
+  module Set = struct
+    include Set.Make(struct type nonrec t = t let compare = compare end)
+    let encoding =
+      Data_encoding.conv
+        elements
+        (fun l -> List.fold_left (fun m x -> add x m) empty l)
+        Data_encoding.(list encoding)
+  end
+
+  module Map = struct
+    include Map.Make(struct type nonrec t = t let compare = compare end)
+    let encoding arg_encoding =
+      Data_encoding.conv
+        bindings
+        (fun l -> List.fold_left (fun m (k,v) -> add k v m) empty l)
+        Data_encoding.(list (tup2 encoding arg_encoding))
+  end
+
+  let fold_read f buf off len init =
+    let last = off + len * size in
+    if last > MBytes.length buf then
+      invalid_arg "Hash.read_set: invalid size.";
+    let rec loop acc off =
+      if off >= last then
+        acc
+      else
+        let hash = read buf off in
+        loop (f hash acc) (off + size)
+    in
+    loop init off
+
+  let path_length = 1
+  let to_path key = [to_hex key]
+  let of_path path =
+    let path = String.concat "" path in
+    of_hex path
+  let of_path_exn path =
+    let path = String.concat "" path in
+    of_hex_exn path
+
+  let prefix_path p =
+    let p = Hex_encode.hex_encode p in
+    [ p ]
+
+  module Table = struct
+    include Hashtbl.Make(struct
+      type nonrec t = t
+      let hash = Hashtbl.hash
+      let equal = equal
+    end)
+  end
+
+end
+
 let () =
   Base58.check_encoded_prefix Block_hash.b58check_encoding "B" 51 ;
   Base58.check_encoded_prefix Operation_hash.b58check_encoding "o" 51 ;
   Base58.check_encoded_prefix Operation_list_hash.b58check_encoding "Lo" 52 ;
   Base58.check_encoded_prefix Operation_list_list_hash.b58check_encoding "LLo" 53 ;
-  Base58.check_encoded_prefix Protocol_hash.b58check_encoding "P" 51
+  Base58.check_encoded_prefix Protocol_hash.b58check_encoding "P" 51 ;
+  Base58.check_encoded_prefix Net_id.b58check_encoding "Net" 15
