@@ -33,7 +33,7 @@ let inject_protocol state ?force:_ proto =
           "Compilation failed (%a)"
           Protocol_hash.pp_short hash
     | true ->
-        State.Protocol.store state proto >>= function
+        State.Protocol.store state hash proto >>= function
         | false ->
             failwith
               "Previously registred protocol (%a)"
@@ -42,8 +42,10 @@ let inject_protocol state ?force:_ proto =
   in
   Lwt.return (hash, validation)
 
-let inject_block validator ?force bytes =
-  Validator.inject_block validator ?force bytes >>=? fun (hash, block) ->
+let inject_block validator ?force bytes operations =
+  Validator.inject_block
+    validator ?force
+    bytes operations >>=? fun (hash, block) ->
   return (hash, (block >>=? fun _ -> return ()))
 
 type t = {
@@ -54,7 +56,8 @@ type t = {
   mainnet_net: State.Net.t ;
   mainnet_validator: Validator.t ;
   inject_block:
-    ?force:bool -> MBytes.t ->
+    ?force:bool ->
+    MBytes.t -> Operation_hash.t list list ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t ;
   inject_operation:
     ?force:bool -> MBytes.t ->
@@ -139,7 +142,8 @@ module RPC = struct
     fitness: MBytes.t list ;
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
-    operations: Operation_hash.t list option ;
+    operations_hash: Operation_list_list_hash.t ;
+    operations: Operation_hash.t list list option ;
     data: MBytes.t option ;
     net: Node_rpc_services.Blocks.net ;
     test_protocol: Protocol_hash.t option ;
@@ -152,6 +156,7 @@ module RPC = struct
     fitness = block.fitness ;
     timestamp = block.timestamp ;
     protocol = Some block.protocol_hash ;
+    operations_hash = block.operations_hash ;
     operations = Some block.operations ;
     data = Some block.proto_header ;
     net = block.net_id ;
@@ -166,7 +171,8 @@ module RPC = struct
     fitness = shell.fitness ;
     timestamp = shell.timestamp ;
     protocol = None ;
-    operations = Some shell.operations ;
+    operations_hash = shell.operations ;
+    operations = None ;
     data = Some proto ;
     test_protocol = None ;
     test_network = None ;
@@ -316,7 +322,7 @@ module RPC = struct
         let validator, _net = get_net node block in
         let pv = Validator.prevalidator validator in
         let { Updater.applied }, _ = Prevalidator.operations pv in
-        Lwt.return applied
+        Lwt.return [applied]
     | `Hash hash->
         read_valid_block node hash >|= function
         | None -> []

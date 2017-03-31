@@ -360,3 +360,12 @@ module Make_buffered_map
       (fun k v acc -> let res = store s k v in acc >>= fun () -> res)
       map Lwt.return_unit
 end
+
+module Integer_index = struct
+  type t = int
+  let path_length = 1
+  let to_path x = [string_of_int x]
+  let of_path = function
+    | [x] -> begin try Some (int_of_string x) with _ -> None end
+    | _ -> None
+end

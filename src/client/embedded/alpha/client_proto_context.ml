@@ -104,7 +104,7 @@ let transfer cctxt
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_proto_rpcs.Helpers.apply_operation cctxt block
     predecessor oph bytes (Some signature) >>=? fun contracts ->
-  Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun injected_oph ->
+  Client_node_rpcs.inject_operation cctxt ?force signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
   cctxt.message "Operation successfully injected in the node." >>= fun () ->
   cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
@@ -121,7 +121,7 @@ let originate cctxt ?force ~block ?signature bytes =
   Client_proto_rpcs.Helpers.apply_operation cctxt block
     predecessor oph bytes signature >>=? function
   | [ contract ] ->
-      Client_node_rpcs.inject_operation cctxt ?force ~wait:true signed_bytes >>=? fun injected_oph ->
+      Client_node_rpcs.inject_operation cctxt ?force signed_bytes >>=? fun injected_oph ->
       assert (Operation_hash.equal oph injected_oph) ;
       cctxt.message "Operation successfully injected in the node." >>= fun () ->
       cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
@@ -176,7 +176,7 @@ let dictate cctxt block command seckey =
   let signature = Ed25519.sign seckey bytes in
   let signed_bytes = MBytes.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Client_node_rpcs.inject_operation cctxt ~wait:true signed_bytes >>=? fun injected_oph ->
+  Client_node_rpcs.inject_operation cctxt signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
   cctxt.message "Operation successfully injected in the node." >>= fun () ->
   cctxt.message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->

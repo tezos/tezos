@@ -98,6 +98,34 @@ module type INTERNAL_HASH = sig
   module Table : Hashtbl.S with type key = t
 end
 
+module type INTERNAL_MERKLE_TREE = sig
+  type elt
+  include INTERNAL_HASH
+  val compute: elt list -> t
+  val empty: t
+  type path =
+    | Left of path * t
+    | Right of t * path
+    | Op
+  val compute_path: elt list -> int -> path
+  val check_path: path -> elt -> t * int
+  val path_encoding: path Data_encoding.t
+end
+
+module type MERKLE_TREE = sig
+  type elt
+  include HASH
+  val compute: elt list -> t
+  val empty: t
+  type path =
+    | Left of path * t
+    | Right of t * path
+    | Op
+  val compute_path: elt list -> int -> path
+  val check_path: path -> elt -> t * int
+  val path_encoding: path Data_encoding.t
+end
+
 module type Name = sig
   val name: string
   val title:  string
@@ -297,36 +325,148 @@ module Make_Blake2B (R : sig
 
 end
 
-(*-- Hash sets and maps -----------------------------------------------------*)
+module Generic_Merkle_tree (H : sig
+    type t
+    type elt
+    val encoding : t Data_encoding.t
+    val empty : t
+    val leaf : elt -> t
+    val node : t -> t -> t
+  end) = struct
 
-module Hash_set (Hash : HASH) = struct
-  include Set.Make (Hash)
-  let encoding =
-    Data_encoding.conv
-      elements
-      (fun l -> List.fold_left (fun m x -> add x m) empty l)
-      Data_encoding.(list Hash.encoding)
+  let rec step a n =
+    let m = (n+1) / 2 in
+    for i = 0 to m - 1 do
+      a.(i) <- H.node a.(2*i) a.(2*i+1)
+    done ;
+    a.(m) <- H.node a.(n) a.(n) ;
+    if m = 1 then
+      a.(0)
+    else if m mod 2 = 0 then
+      step a m
+    else begin
+      a.(m+1) <- a.(m) ;
+      step a (m+1)
+    end
+
+  let empty = H.empty
+
+  let compute xs =
+    match xs with
+    | [] -> H.empty
+    | [x] -> H.leaf x
+    | _ :: _ :: _ ->
+        let last = Utils.list_last_exn xs in
+        let n = List.length xs in
+        let a = Array.make (n+1) (H.leaf last) in
+        List.iteri (fun i x -> a.(i) <- H.leaf x) xs ;
+        step a n
+
+  type path =
+    | Left of path * H.t
+    | Right of H.t * path
+    | Op
+
+  let rec step_path a n p j =
+    let m = (n+1) / 2 in
+    let p = if j mod 2 = 0 then Left (p, a.(j+1)) else Right (a.(j-1), p) in
+    for i = 0 to m - 1 do
+      a.(i) <- H.node a.(2*i) a.(2*i+1)
+    done ;
+    a.(m) <- H.node a.(n) a.(n) ;
+    if m = 1 then
+      p
+    else if m mod 2 = 0 then
+      step_path a m p (j/2)
+    else begin
+      a.(m+1) <- a.(m) ;
+      step_path a (m+1) p (j/2)
+    end
+
+  let compute_path xs i =
+    match xs with
+    | [] -> invalid_arg "compute_path"
+    | [_] -> Op
+    | _ :: _ :: _ ->
+        let last = Utils.list_last_exn xs in
+        let n = List.length xs in
+        if i < 0 || n <= i then invalid_arg "compute_path" ;
+        let a = Array.make (n+1) (H.leaf last) in
+        List.iteri (fun i x -> a.(i) <- H.leaf x) xs ;
+        step_path a n Op i
+
+  let rec check_path p h =
+    match p with
+    | Op ->
+        H.leaf h, 1, 0
+    | Left (p, r) ->
+        let l, s, pos = check_path p h in
+        H.node l r, s * 2, pos
+    | Right (l, p) ->
+        let r, s, pos = check_path p h in
+        H.node l r, s * 2, pos + s
+
+  let check_path p h =
+    let h, _, pos = check_path p h in
+    h, pos
+
+  let path_encoding =
+    let open Data_encoding in
+    mu "path"
+      (fun path_encoding ->
+         union [
+           case ~tag:240
+             (obj2
+                (req "path" path_encoding)
+                (req "right" H.encoding))
+             (function Left (p, r) -> Some (p, r) | _ -> None)
+             (fun (p, r) -> Left (p, r)) ;
+           case ~tag:15
+             (obj2
+                (req "left" H.encoding)
+                (req "path" path_encoding))
+             (function Right (r, p) -> Some (r, p) | _ -> None)
+             (fun (r, p) -> Right (r, p)) ;
+           case ~tag:0
+             unit
+             (function Op -> Some () | _ -> None)
+             (fun () -> Op)
+         ])
+
 end
 
-module Hash_map (Hash : HASH) = struct
-  include Map.Make (Hash)
-  let encoding arg_encoding =
-    Data_encoding.conv
-      bindings
-      (fun l -> List.fold_left (fun m (k,v) -> add k v m) empty l)
-      Data_encoding.(list (tup2 Hash.encoding arg_encoding))
-end
+module Make_merkle_tree
+    (R : sig
+       val register_encoding:
+         prefix: string ->
+         length:int ->
+         to_raw: ('a -> string) ->
+         of_raw: (string -> 'a option) ->
+         wrap: ('a -> Base58.data) ->
+         'a Base58.encoding
+     end)
+    (K : PrefixedName)
+    (Contents: sig
+       type t
+       val to_bytes: t -> MBytes.t
+     end) = struct
 
-module Hash_table (Hash : MINIMAL_HASH)
-  : Hashtbl.S with type key = Hash.t
-  = Hashtbl.Make (struct
-    type t = Hash.t
-    let equal = Hash.equal
-    let hash v =
-      let raw_hash = Hash.to_string v in
-      let int64_hash = EndianString.BigEndian.get_int64 raw_hash 0 in
-      Int64.to_int int64_hash
-  end)
+  include Make_Blake2B (R) (K)
+
+  type elt = Contents.t
+
+  let empty = hash_bytes []
+
+  include Generic_Merkle_tree(struct
+      type nonrec t = t
+      type nonrec elt = elt
+      let encoding = encoding
+      let empty = empty
+      let leaf x = hash_bytes [Contents.to_bytes x]
+      let node x y = hash_bytes [to_bytes x; to_bytes y]
+    end)
+
+end
 
 (*-- Pre-instanciated hashes ------------------------------------------------*)
 
@@ -344,7 +484,23 @@ module Operation_hash =
     let title = "A Tezos operation ID"
     let b58check_prefix = Base58.Prefix.operation_hash
     let size = None
-   end)
+  end)
+
+module Operation_list_hash =
+  Make_merkle_tree (Base58) (struct
+    let name = "Operation_list_hash"
+    let title = "A list of operations"
+    let b58check_prefix = Base58.Prefix.operation_list_hash
+    let size = None
+  end) (Operation_hash)
+
+module Operation_list_list_hash =
+  Make_merkle_tree (Base58) (struct
+    let name = "Operation_list_list_hash"
+    let title = "A list of list of operations"
+    let b58check_prefix = Base58.Prefix.operation_list_list_hash
+    let size = None
+  end) (Operation_list_hash)
 
 module Protocol_hash =
   Make_Blake2B (Base58) (struct
@@ -364,4 +520,6 @@ module Generic_hash =
 let () =
   Base58.check_encoded_prefix Block_hash.b58check_encoding "B" 51 ;
   Base58.check_encoded_prefix Operation_hash.b58check_encoding "o" 51 ;
+  Base58.check_encoded_prefix Operation_list_hash.b58check_encoding "Lo" 52 ;
+  Base58.check_encoded_prefix Operation_list_list_hash.b58check_encoding "LLo" 53 ;
   Base58.check_encoded_prefix Protocol_hash.b58check_encoding "P" 51

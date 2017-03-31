@@ -116,7 +116,7 @@ let get_signing_slots cctxt ?max_priority block delegate level =
   return slots
 
 let inject_endorsement cctxt
-    block level ?wait ?force
+    block level ?async ?force
     src_sk source slot =
   Client_blocks.get_block_hash cctxt block >>= fun block_hash ->
   Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
@@ -129,7 +129,7 @@ let inject_endorsement cctxt
     () >>=? fun bytes ->
   let signed_bytes = Ed25519.Signature.append src_sk bytes in
   Client_node_rpcs.inject_operation
-    cctxt ?force ?wait signed_bytes >>=? fun oph ->
+    cctxt ?force ?async signed_bytes >>=? fun oph ->
   State.record_endorsement cctxt level block_hash slot oph >>=? fun () ->
   return oph
 
@@ -173,7 +173,7 @@ let forge_endorsement cctxt
     else check_endorsement cctxt level slot
   end >>=? fun () ->
   inject_endorsement cctxt
-    block level ~wait:true ~force
+    block level ~force
     src_sk src_pk slot
 
 
@@ -316,7 +316,7 @@ let endorse cctxt state =
            lwt_debug "Endorsing %a for %s (slot %d)!"
              Block_hash.pp_short hash name slot >>= fun () ->
            inject_endorsement cctxt
-             b level ~wait:false ~force:true
+             b level ~async:true ~force:true
              sk pk slot >>=? fun oph ->
            cctxt.message
              "Injected endorsement for block '%a' \

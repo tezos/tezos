@@ -292,6 +292,8 @@ module Prefix = struct
   (* 32 *)
   let block_hash = "\001\052" (* B(51) *)
   let operation_hash = "\005\116" (* o(51) *)
+  let operation_list_hash = "\133\233" (* Lo(52) *)
+  let operation_list_list_hash = "\029\159\109" (* LLo(53) *)
   let protocol_hash = "\002\170" (* P(51) *)
 
   (* 20 *)

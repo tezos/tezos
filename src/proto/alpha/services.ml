@@ -570,7 +570,7 @@ module Helpers = struct
              (req "predecessor" Block_hash.encoding)
              (req "timestamp" Timestamp.encoding)
              (req "fitness" Fitness.encoding)
-             (req "operations" (list Operation_hash.encoding))
+             (req "operations" Operation_list_list_hash.encoding)
              (req "level" Raw_level.encoding)
              (req "priority" int31)
              (req "nonce_hash" Nonce_hash.encoding)

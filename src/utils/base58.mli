@@ -13,6 +13,8 @@ module Prefix : sig
 
   val block_hash: string
   val operation_hash: string
+  val operation_list_hash: string
+  val operation_list_list_hash: string
   val protocol_hash: string
   val ed25519_public_key_hash: string
   val cryptobox_public_key_hash: string

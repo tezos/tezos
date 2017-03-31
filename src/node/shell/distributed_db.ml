@@ -21,13 +21,18 @@ type 'a request_param = {
 }
 
 module Make_raw
-    (Hash : HASH)
-    (Disk_table : State.DATA_STORE with type key := Hash.t)
-    (Memory_table : Hashtbl.S with type key := Hash.t)
+    (Hash : sig type t end)
+    (Disk_table :
+       Distributed_db_functors.DISK_TABLE with type key := Hash.t)
+    (Memory_table :
+       Distributed_db_functors.MEMORY_TABLE with type key := Hash.t)
     (Request_message : sig
        type param
        val forge : param -> Hash.t list -> Message.t
-     end) = struct
+     end)
+    (Precheck : Distributed_db_functors.PRECHECK
+     with type key := Hash.t
+      and type value := Disk_table.value) = struct
 
   type key = Hash.t
   type value = Disk_table.value
@@ -45,7 +50,7 @@ module Make_raw
       (Hash) (Memory_table) (Request)
   module Table =
     Distributed_db_functors.Make_table
-      (Hash) (Disk_table) (Memory_table) (Scheduler)
+      (Hash) (Disk_table) (Memory_table) (Scheduler) (Precheck)
 
   type t = {
     scheduler: Scheduler.t ;
@@ -62,23 +67,71 @@ module Make_raw
 
 end
 
+module No_precheck = struct
+  type param = unit
+  let precheck _ _ _ = true
+end
+
 module Raw_operation =
-  Make_raw (Operation_hash) (State.Operation) (Operation_hash.Table) (struct
-    type param = Net_id.t
-    let forge net_id keys = Message.Get_operations (net_id, keys)
-  end)
+  Make_raw
+    (Operation_hash)
+    (State.Operation)
+    (Operation_hash.Table)
+    (struct
+      type param = Net_id.t
+      let forge net_id keys = Message.Get_operations (net_id, keys)
+    end)
+    (No_precheck)
 
 module Raw_block_header =
-  Make_raw (Block_hash) (State.Block_header) (Block_hash.Table) (struct
-    type param = Net_id.t
-    let forge net_id keys = Message.Get_block_headers (net_id, keys)
+  Make_raw
+    (Block_hash)
+    (State.Block_header)
+    (Block_hash.Table)
+    (struct
+      type param = Net_id.t
+      let forge net_id keys = Message.Get_block_headers (net_id, keys)
+    end)
+    (No_precheck)
+
+module Operation_list_table =
+  Hashtbl.Make(struct
+    type t = Block_hash.t * int
+    let hash = Hashtbl.hash
+    let equal (b1, i1) (b2, i2) =
+      Block_hash.equal b1 b2 && i1 = i2
   end)
 
+module Raw_operation_list =
+  Make_raw
+    (struct type t = Block_hash.t * int end)
+    (State.Operation_list)
+    (Operation_list_table)
+    (struct
+      type param = Net_id.t
+      let forge net_id keys =
+        Message.Get_operation_list (net_id, keys)
+    end)
+    (struct
+      type param = Operation_list_list_hash.t
+      let precheck (_block, expected_ofs) expected_hash (ops, path) =
+        let received_hash, received_ofs =
+          Operation_list_list_hash.check_path path
+            (Operation_list_hash.compute ops) in
+        received_ofs = expected_ofs &&
+        Operation_list_list_hash.compare expected_hash received_hash = 0
+    end)
+
 module Raw_protocol =
-  Make_raw (Protocol_hash) (State.Protocol) (Protocol_hash.Table) (struct
-    type param = unit
-    let forge () keys = Message.Get_protocols keys
-  end)
+  Make_raw
+    (Protocol_hash)
+    (State.Protocol)
+    (Protocol_hash.Table)
+    (struct
+      type param = unit
+      let forge () keys = Message.Get_protocols keys
+    end)
+    (No_precheck)
 
 type callback = {
   notify_branch: P2p.Peer_id.t -> Block_hash.t list -> unit ;
@@ -103,6 +156,7 @@ and net = {
   global_db: db ;
   operation_db: Raw_operation.t ;
   block_header_db: Raw_block_header.t ;
+  operation_list_db: Raw_operation_list.t ;
   callback: callback ;
   active_peers: P2p.Peer_id.Set.t ref ;
   active_connections: p2p_reader P2p.Peer_id.Table.t ;
@@ -266,6 +320,43 @@ module P2p_reader = struct
           global_db.protocol_db.table state.gid hash protocol >>= fun () ->
         Lwt.return_unit
 
+    | Get_operation_list (net_id, hashes) ->
+        may_handle state net_id @@ fun net_db ->
+        Lwt_list.iter_p
+          (fun (block, ofs as key) ->
+             Raw_operation_list.Table.read
+               net_db.operation_list_db.table key >>= function
+             | None -> Lwt.return_unit
+             | Some (ops, path) ->
+                 ignore @@
+                 P2p.try_send
+                   global_db.p2p state.conn
+                   (Operation_list (net_id, block, ofs, ops, path)) ;
+                 Lwt.return_unit)
+          hashes
+
+    | Operation_list (net_id, block, ofs, ops, path) ->
+        may_handle state net_id @@ fun net_db ->
+        (* TODO early detection of non-requested list. *)
+        let found_hash, found_ofs =
+          Operation_list_list_hash.check_path
+            path (Operation_list_hash.compute ops) in
+        if found_ofs <> ofs then
+          Lwt.return_unit
+        else
+          Raw_block_header.Table.read
+            net_db.block_header_db.table block >>= function
+          | None -> Lwt.return_unit
+          | Some bh ->
+              if Operation_list_list_hash.compare
+                   found_hash bh.shell.operations <> 0 then
+                Lwt.return_unit
+              else
+                Raw_operation_list.Table.notify
+                  net_db.operation_list_db.table state.gid
+                  (block, ofs) (ops, path) >>= fun () ->
+        Lwt.return_unit
+
   let rec worker_loop global_db state =
     Lwt_utils.protect ~canceler:state.canceler begin fun () ->
       P2p.recv global_db.p2p state.conn
@@ -353,8 +444,10 @@ let activate ~callback ({ p2p ; active_nets } as global_db) net =
       let block_header_db =
         Raw_block_header.create
           ~global_input:global_db.block_input p2p_request net in
+      let operation_list_db =
+        Raw_operation_list.create p2p_request net in
       let net = {
-        global_db ; operation_db ; block_header_db ;
+        global_db ; operation_db ; block_header_db ; operation_list_db ;
         net ; callback ; active_peers ;
         active_connections = P2p.Peer_id.Table.create 53 ;
       } in
@@ -403,10 +496,13 @@ let shutdown { p2p ; p2p_readers ; active_nets } =
   P2p.shutdown p2p >>= fun () ->
   Lwt.return_unit
 
-module type DISTRIBUTED_DB = Distributed_db_functors.DISTRIBUTED_DB
+module type PARAMETRIZED_DISTRIBUTED_DB =
+  Distributed_db_functors.PARAMETRIZED_DISTRIBUTED_DB
+module type DISTRIBUTED_DB =
+  Distributed_db_functors.DISTRIBUTED_DB
 
 module Make
-    (Table : DISTRIBUTED_DB)
+    (Table : PARAMETRIZED_DISTRIBUTED_DB with type param := unit)
     (Kind : sig
        type t
        val proj: t -> Table.t
@@ -417,8 +513,8 @@ module Make
   let known t k = Table.known (Kind.proj t) k
   let read t k = Table.read (Kind.proj t) k
   let read_exn t k = Table.read_exn (Kind.proj t) k
-  let prefetch t ?peer k = Table.prefetch (Kind.proj t) ?peer k
-  let fetch t ?peer k = Table.fetch (Kind.proj t) ?peer k
+  let prefetch t ?peer k = Table.prefetch (Kind.proj t) ?peer k ()
+  let fetch t ?peer k = Table.fetch (Kind.proj t) ?peer k ()
   let commit t k = Table.commit (Kind.proj t) k
   let inject t k v = Table.inject (Kind.proj t) k v
   let watch t = Table.watch (Kind.proj t)
@@ -442,7 +538,73 @@ module Protocol =
     let proj db = db.protocol_db.table
   end)
 
-let inject_block t bytes =
+module Operation_list = struct
+
+  type t = net
+  type key = Block_hash.t * int
+  type value = Operation_hash.t list
+  type param = Operation_list_list_hash.t
+
+  let proj net = net.operation_list_db.table
+
+  module Table = Raw_operation_list.Table
+
+  let known t k = Table.known (proj t) k
+  let read t k =
+    Table.read (proj t) k >>= function
+    | None -> Lwt.return_none
+    | Some (op, _) -> Lwt.return (Some op)
+  let read_exn t k = Table.read_exn (proj t) k >|= fst
+  let prefetch t ?peer k p = Table.prefetch (proj t) ?peer k p
+  let fetch t ?peer k p = Table.fetch (proj t) ?peer k p >|= fst
+
+  let rec do_read net block acc i =
+    if i <= 0 then
+      Lwt.return []
+    else
+      read_exn net (block, i-1) >>= fun ops ->
+      do_read net block (ops :: acc) (i-1)
+
+  let read_all_opt net block =
+    State.Operation_list.read_count_opt
+      net.net block >>= function
+    | None -> Lwt.return_none
+    | Some len -> do_read net block [] len >>= fun ops -> Lwt.return (Some ops)
+
+  let read_all_exn net block =
+    State.Operation_list.read_count_exn
+      net.net block >>= fun len ->
+    do_read net block [] len
+
+  let rec do_commit net block i =
+    if i <= 0 then
+      Lwt.return_unit
+    else
+      Raw_operation_list.Table.commit
+        net.operation_list_db.table (block, i-1) >>= fun () ->
+      do_commit net block (i-1)
+
+  let commit_all net block len =
+    State.Operation_list.store_count net.net block len >>= fun () ->
+    do_commit net block len
+
+  let inject_all net block opss =
+    State.Operation_list.read_count_opt net.net block >>= function
+    | Some _ -> Lwt.return_false
+    | None ->
+        let hashes = List.map Operation_list_hash.compute opss in
+        Lwt_list.mapi_p
+          (fun i ops ->
+             let path = Operation_list_list_hash.compute_path hashes i in
+             Raw_operation_list.Table.inject
+               net.operation_list_db.table
+               (block, i) (ops, path))
+          opss >>= fun injected ->
+        Lwt.return (List.for_all (fun x -> x) injected)
+
+end
+
+let inject_block t bytes operations =
   let hash = Block_hash.hash_bytes [bytes] in
   match
     Data_encoding.Binary.of_bytes Store.Block_header.encoding bytes
@@ -458,12 +620,44 @@ let inject_block t bytes =
           | true ->
               failwith "Previously injected block."
           | false ->
+              let computed_hash =
+                Operation_list_list_hash.compute
+                  (List.map Operation_list_hash.compute operations) in
+              fail_unless
+                (Operation_list_list_hash.compare
+                   computed_hash block.shell.operations = 0)
+                (Exn (Failure "Incoherent operation list")) >>=? fun () ->
               Raw_block_header.Table.inject
                 net_db.block_header_db.table hash block >>= function
               | false ->
                   failwith "Previously injected block."
               | true ->
+                  Operation_list.inject_all
+                    net_db hash operations >>= fun _ ->
                   return (hash, block)
+
+(*
+let inject_operation t bytes =
+  let hash = Operation_hash.hash_bytes [bytes] in
+  match Data_encoding.Binary.of_bytes Store.Operation.encoding bytes with
+  | None ->
+      failwith "Cannot parse operations."
+  | Some op ->
+      match get_net t op.shell.net_id with
+      | None ->
+          failwith "Unknown network."
+      | Some net_db ->
+          Operation.known net_db hash  >>= function
+          | true ->
+              failwith "Previously injected block."
+          | false ->
+              Raw_operation.Table.inject
+                net_db.operation_db.table hash op >>= function
+              | false ->
+                  failwith "Previously injected block."
+              | true ->
+                  return (hash, op)
+*)
 
 let broadcast_head net head mempool =
   let msg : Message.t =
