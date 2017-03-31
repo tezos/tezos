@@ -18,24 +18,6 @@ val init: string -> t tzresult Lwt.t
 
 (** {2 Net store} ************************************************************)
 
-module Net_id : sig
-
-  type t = Id of Block_hash.t
-  type net_id = t
-  val encoding: net_id Data_encoding.t
-  val pp: Format.formatter -> net_id -> unit
-  val compare: net_id -> net_id -> int
-  val equal: net_id -> net_id -> bool
-
-  val of_bytes_exn: MBytes.t -> net_id
-  val to_bytes: net_id -> MBytes.t
-
-  module Set : Set.S with type elt = t
-  module Map : Map.S with type key = t
-  module Table : Hashtbl.S with type key = t
-
-end
-
 module Net : sig
 
   val list: global_store -> Net_id.t list Lwt.t
@@ -43,6 +25,10 @@ module Net : sig
 
   type store
   val get: global_store -> Net_id.t -> store
+
+  module Genesis_hash : SINGLE_STORE
+    with type t := store
+     and type value := Block_hash.t
 
   module Genesis_time : SINGLE_STORE
     with type t := store

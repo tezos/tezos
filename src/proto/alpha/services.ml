@@ -557,7 +557,7 @@ module Helpers = struct
         ~description: "Forge a block header"
         ~input:
           (obj9
-             (req "net_id" Updater.Net_id.encoding)
+             (req "net_id" Net_id.encoding)
              (req "predecessor" Block_hash.encoding)
              (req "timestamp" Timestamp.encoding)
              (req "fitness" Fitness.encoding)

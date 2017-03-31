@@ -84,7 +84,7 @@ module RPC : sig
     Operation_hash.t list ->
     (Protocol.fitness * error Updater.preapply_result) tzresult Lwt.t
 
-  val validate: t -> State.Net_id.t -> Block_hash.t -> unit tzresult Lwt.t
+  val validate: t -> Net_id.t -> Block_hash.t -> unit tzresult Lwt.t
 
   val context_dir:
     t -> block -> 'a RPC.directory option Lwt.t

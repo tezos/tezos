@@ -20,8 +20,6 @@
 type t
 type global_state = t
 
-module Net_id = Store.Net_id
-
 (** Read the internal state of the node and initialize
     the blocks/operations/contexts databases. *)
 
@@ -42,7 +40,7 @@ type error +=
   | Invalid_operations of { block: Block_hash.t ;
                             expected: Operation_list_list_hash.t ;
                             found: Operation_hash.t list list }
-  | Unknown_network of Store.Net_id.t
+  | Unknown_network of Net_id.t
   | Unknown_operation of Operation_hash.t
   | Unknown_block of Block_hash.t
   | Unknown_protocol of Protocol_hash.t

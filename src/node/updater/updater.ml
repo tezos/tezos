@@ -19,8 +19,6 @@ module type REGISTRED_PROTOCOL = sig
   val complete_b58prefix : Context.t -> string -> string list Lwt.t
 end
 
-module Net_id = Store.Net_id
-
 type shell_operation = Store.Operation.shell_header = {
   net_id: Net_id.t ;
 }

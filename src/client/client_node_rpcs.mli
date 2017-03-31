@@ -13,7 +13,7 @@ val errors:
 
 val forge_block:
   Client_commands.context ->
-  ?net:Updater.Net_id.t ->
+  ?net:Net_id.t ->
   ?predecessor:Block_hash.t ->
   ?timestamp:Time.t ->
   Fitness.fitness ->
@@ -28,7 +28,7 @@ val forge_block:
 
 val validate_block:
   Client_commands.context ->
-  Updater.Net_id.t -> Block_hash.t ->
+  Net_id.t -> Block_hash.t ->
   unit tzresult Lwt.t
 
 val inject_block:
@@ -65,7 +65,7 @@ module Blocks : sig
 
   val net:
     Client_commands.context ->
-    block -> Updater.Net_id.t Lwt.t
+    block -> Net_id.t Lwt.t
   val predecessor:
     Client_commands.context ->
     block -> Block_hash.t Lwt.t
@@ -92,7 +92,7 @@ module Blocks : sig
     block -> Protocol_hash.t option Lwt.t
   val test_network:
     Client_commands.context ->
-    block -> (Updater.Net_id.t * Time.t) option Lwt.t
+    block -> (Net_id.t * Time.t) option Lwt.t
 
   val pending_operations:
     Client_commands.context ->
@@ -107,9 +107,9 @@ module Blocks : sig
     operations_hash: Operation_list_list_hash.t ;
     operations: Operation_hash.t list list option ;
     data: MBytes.t option ;
-    net: Updater.Net_id.t ;
+    net: Net_id.t ;
     test_protocol: Protocol_hash.t option ;
-    test_network: (Updater.Net_id.t * Time.t) option ;
+    test_network: (Net_id.t * Time.t) option ;
   }
 
   val info:

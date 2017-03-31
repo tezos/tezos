@@ -50,8 +50,8 @@ val set_protocol: context -> Protocol_hash.t -> context Lwt.t
 val get_test_protocol: context -> Protocol_hash.t Lwt.t
 val set_test_protocol: context -> Protocol_hash.t -> context Lwt.t
 
-val get_test_network: context -> Store.Net_id.t option Lwt.t
-val set_test_network: context -> Store.Net_id.t -> context Lwt.t
+val get_test_network: context -> Net_id.t option Lwt.t
+val set_test_network: context -> Net_id.t -> context Lwt.t
 val del_test_network: context -> context Lwt.t
 
 val get_test_network_expiration: context -> Time.t option Lwt.t

@@ -93,7 +93,7 @@ type config = {
 }
 
 let may_create_net state ?test_protocol genesis =
-  State.Net.get state (State.Net_id.Id genesis.State.Net.block) >>= function
+  State.Net.get state (Net_id.of_block_hash genesis.State.Net.block) >>= function
   | Ok net -> Lwt.return net
   | Error _ ->
       State.Net.create state
@@ -145,9 +145,9 @@ module RPC = struct
     operations_hash: Operation_list_list_hash.t ;
     operations: Operation_hash.t list list option ;
     data: MBytes.t option ;
-    net: Node_rpc_services.Blocks.net ;
+    net: Net_id.t ;
     test_protocol: Protocol_hash.t option ;
-    test_network: (Node_rpc_services.Blocks.net * Time.t) option ;
+    test_network: (Net_id.t * Time.t) option ;
  }
 
   let convert (block: State.Valid_block.t)  = {
@@ -213,14 +213,14 @@ module RPC = struct
   let get_validator_per_hash node hash =
     Distributed_db.read_block_exn
       node.distributed_db hash >>= fun (_net_db, block) ->
-    if State.Net_id.equal
+    if Net_id.equal
         (State.Net.id node.mainnet_net)
         block.shell.net_id then
       Lwt.return (Some (node.mainnet_validator, node.mainnet_db))
     else
       match Validator.test_validator node.mainnet_validator with
       | Some (test_validator, net_db)
-        when State.Net_id.equal
+        when Net_id.equal
             (State.Net.id (Validator.net_state test_validator))
             block.shell.net_id ->
           Lwt.return (Some (node.mainnet_validator, net_db))

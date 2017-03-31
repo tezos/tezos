@@ -33,7 +33,7 @@ let genesis : State.Net.genesis = {
   protocol = genesis_protocol ;
 }
 
-let net_id = State.Net_id.Id genesis_block
+let net_id = Net_id.of_block_hash genesis_block
 
 let incr_fitness fitness =
   let new_fitness =

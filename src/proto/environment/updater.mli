@@ -2,11 +2,6 @@
 
 open Hash
 
-module Net_id : sig
-  type t
-  val encoding : t Data_encoding.t
-end
-
 type shell_operation = {
   net_id: Net_id.t ;
 }

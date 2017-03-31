@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Net_id = State.Net_id
 module Message = Distributed_db_message
 module Metadata = Distributed_db_metadata
 

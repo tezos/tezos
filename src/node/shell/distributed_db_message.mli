@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Net_id = Store.Net_id
-
 type t =
 
   | Get_current_branch of Net_id.t
