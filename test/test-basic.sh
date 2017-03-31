@@ -9,8 +9,12 @@ DATA_DIR="$(mktemp -td tezos_node.XXXXXXXXXX)"
 CLIENT_DIR="$(mktemp -td tezos_client.XXXXXXXXXX)"
 
 cleanup() {
+    [ -z "${NODE_PID}" ] || kill -9 ${NODE_PID} || true
+    echo
+    echo "Node's log:"
+    echo
+    cat $DATA_DIR/LOG
     rm -fr ${DATA_DIR} ${CLIENT_DIR}
-    [ -z "${NODE_PID}" ] || kill -9 ${NODE_PID}
 }
 trap cleanup EXIT QUIT INT
 
@@ -18,10 +22,10 @@ NODE=../tezos-node
 CLIENT="../tezos-client -base-dir ${CLIENT_DIR}"
 
 CUSTOM_PARAM="--sandbox ./sandbox.json"
-${NODE} run --data-dir "${DATA_DIR}" ${CUSTOM_PARAM} --rpc-addr "[::]:8732" > LOG 2>&1 &
+${NODE} run --data-dir "${DATA_DIR}" ${CUSTOM_PARAM} --rpc-addr "[::]:8732" > "$DATA_DIR"/LOG 2>&1 &
 NODE_PID="$!"
 
-echo "Created node, pid: ${NODE_PID}, log: ./test/LOG"
+echo "Created node, pid: ${NODE_PID}, log: $DATA_DIR/LOG"
 
 sleep 3
 
