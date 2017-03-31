@@ -174,6 +174,11 @@ module Operation_list_list_hash :
 (** Protocol versions / source hashes. *)
 module Protocol_hash : INTERNAL_HASH
 
+module Net_id : sig
+  include INTERNAL_HASH
+  val of_block_hash: Block_hash.t -> t
+end
+
 module Generic_hash : INTERNAL_MINIMAL_HASH
 
 (**/**)

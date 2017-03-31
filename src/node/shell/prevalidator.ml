@@ -400,7 +400,7 @@ let inject_operation pv ?(force = false) (op: Store.Operation.t) =
         failwith "unexpected protocol result"
     end >>=? fun errors ->
     Lwt.return (Error errors) in
-  fail_unless (Store.Net_id.equal net_id op.shell.net_id)
+  fail_unless (Net_id.equal net_id op.shell.net_id)
     (Unclassified
        "Prevalidator.inject_operation: invalid network") >>=? fun () ->
   pv.prevalidate_operations force [op] >>=? function

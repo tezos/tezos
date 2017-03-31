@@ -26,8 +26,6 @@ module Blocks : sig
   val parse_block: string -> (block, string) result
   val to_string: block -> string
 
-  type net = State.Net_id.t = Id of Block_hash.t
-
   type block_info = {
     hash: Block_hash.t ;
     predecessor: Block_hash.t ;
@@ -37,15 +35,15 @@ module Blocks : sig
     operations_hash: Operation_list_list_hash.t ;
     operations: Operation_hash.t list list option ;
     data: MBytes.t option ;
-    net: net ;
+    net: Net_id.t ;
     test_protocol: Protocol_hash.t option ;
-    test_network: (net * Time.t) option ;
+    test_network: (Net_id.t * Time.t) option ;
   }
 
   val info:
     (unit, unit * block, bool * bool, block_info) RPC.service
   val net:
-    (unit, unit * block, unit, net) RPC.service
+    (unit, unit * block, unit, Net_id.t) RPC.service
   val predecessor:
     (unit, unit * block, unit, Block_hash.t) RPC.service
   val predecessors:
@@ -63,7 +61,7 @@ module Blocks : sig
   val test_protocol:
     (unit, unit * block, unit, Protocol_hash.t option) RPC.service
   val test_network:
-    (unit, unit * block, unit, (net * Time.t) option) RPC.service
+    (unit, unit * block, unit, (Net_id.t * Time.t) option) RPC.service
   val pending_operations:
     (unit, unit * block, unit,
      error Updater.preapply_result * Hash.Operation_hash.Set.t) RPC.service
@@ -170,12 +168,12 @@ end
 
 val forge_block:
   (unit, unit,
-   Updater.Net_id.t option * Block_hash.t option * Time.t option *
+   Net_id.t option * Block_hash.t option * Time.t option *
    Fitness.fitness * Operation_list_list_hash.t * MBytes.t,
    MBytes.t) RPC.service
 
 val validate_block:
-  (unit, unit, Blocks.net * Block_hash.t, unit tzresult) RPC.service
+  (unit, unit, Net_id.t * Block_hash.t, unit tzresult) RPC.service
 
 type inject_block_param = {
   raw: MBytes.t ;

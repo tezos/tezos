@@ -9,8 +9,6 @@
 
 open Logging.Node.State
 
-module Net_id = Store.Net_id
-
 type error +=
   | Invalid_fitness of { block: Block_hash.t ;
                          expected: Fitness.fitness ;
@@ -55,7 +53,7 @@ let () =
     ~description:"TODO"
     ~pp:(fun ppf id ->
         Format.fprintf ppf "Unknown network %a" Net_id.pp id)
-    Data_encoding.(obj1 (req "net" Updater.Net_id.encoding))
+    Data_encoding.(obj1 (req "net" Net_id.encoding))
     (function Unknown_network x -> Some x | _ -> None)
     (fun x -> Unknown_network x) ;
 
@@ -87,6 +85,7 @@ and global_data = {
 }
 
 and net = {
+  id: Net_id.t ;
   state: net_state Shared.t ;
   genesis: genesis ;
   expiration: Time.t option ;
@@ -540,7 +539,7 @@ module Raw_block_header = struct
 
   let store_genesis store genesis =
     let shell : Store.Block_header.shell_header = {
-      net_id = Id genesis.block;
+      net_id = Net_id.of_block_hash genesis.block;
       predecessor = genesis.block ;
       timestamp = genesis.time ;
       fitness = [] ;
@@ -556,7 +555,7 @@ module Raw_block_header = struct
 
   let store_testnet_genesis store genesis =
     let shell : Store.Block_header.shell_header = {
-      net_id = Id genesis.block;
+      net_id = Net_id.of_block_hash genesis.block;
       predecessor = genesis.block ;
       timestamp = genesis.time ;
       fitness = [] ;
@@ -864,6 +863,7 @@ module Raw_net = struct
     context_index ;
   } in
   let net = {
+    id = Net_id.of_block_hash genesis.block ;
     state = Shared.create net_state ;
     genesis ;
     expiration ;
@@ -878,18 +878,19 @@ module Raw_net = struct
       data
       ?initial_context ?forked_network_ttl
       ?test_protocol ?expiration genesis =
-    let net_store =
-      Store.Net.get data.global_store (Store.Net_id.Id genesis.block) in
+    let net_id = Net_id.of_block_hash genesis.block in
+    let net_store = Store.Net.get data.global_store net_id in
     let operation_store = Store.Operation.get net_store
     and block_header_store = Store.Block_header.get net_store
     and chain_store = Store.Chain.get net_store in
+    Store.Net.Genesis_hash.store net_store genesis.block >>= fun () ->
     Store.Net.Genesis_time.store net_store genesis.time >>= fun () ->
     Store.Net.Genesis_protocol.store net_store genesis.protocol >>= fun () ->
     let test_protocol = Utils.unopt ~default:genesis.protocol test_protocol in
     Store.Net.Genesis_test_protocol.store net_store test_protocol >>= fun () ->
     Store.Chain.Current_head.store chain_store genesis.block >>= fun () ->
     Store.Chain.Known_heads.store chain_store genesis.block >>= fun () ->
-    data.init_index (Id genesis.block) >>= fun context_index ->
+    data.init_index net_id >>= fun context_index ->
     begin
       match expiration with
       | None -> Lwt.return_unit
@@ -1022,7 +1023,7 @@ module Valid_block = struct
           | Some ttl ->
               let eol = Time.(add block.shell.timestamp ttl) in
               Context.set_test_network
-                context (Store.Net_id.Id hash) >>= fun context ->
+                context (Net_id.of_block_hash hash) >>= fun context ->
               Context.set_test_network_expiration
                 context eol >>= fun context ->
               Lwt.return context
@@ -1096,7 +1097,7 @@ module Valid_block = struct
     Watcher.create_stream net.valid_block_watcher
 
   let fork_testnet state net block expiration =
-    assert (Net_id.equal block.net_id (Net_id.Id net.genesis.block)) ;
+    assert (Net_id.equal block.net_id (Net_id.of_block_hash net.genesis.block)) ;
     let hash = Block_hash.hash_bytes [Block_hash.to_bytes block.hash] in
     let genesis : genesis = {
       block = hash ;
@@ -1104,7 +1105,7 @@ module Valid_block = struct
       protocol = block.test_protocol_hash ;
     } in
     Shared.use state.global_data begin fun data ->
-      if Net_id.Table.mem data.nets (Net_id.Id hash) then
+      if Net_id.Table.mem data.nets (Net_id.of_block_hash hash) then
         assert false (* This would mean a block is validated twice... *)
       else
         Context.init_test_network block.context
@@ -1120,9 +1121,9 @@ module Valid_block = struct
   module Helpers = struct
 
     let path net b1 b2 =
-      let net_id = Store.Net_id.Id net.genesis.block in
-      if not ( Store.Net_id.equal b1.net_id net_id
-               && Store.Net_id.equal b2.net_id net_id ) then
+      let net_id = Net_id.of_block_hash net.genesis.block in
+      if not ( Net_id.equal b1.net_id net_id
+               && Net_id.equal b2.net_id net_id ) then
         invalid_arg "State.path" ;
       Raw_helpers.path net.block_header_store b1.hash b2.hash >>= function
       | None -> Lwt.return_none
@@ -1132,9 +1133,9 @@ module Valid_block = struct
           Lwt.return (Some path)
 
     let common_ancestor net b1 b2 =
-      let net_id = Store.Net_id.Id net.genesis.block in
-      if not ( Store.Net_id.equal b1.net_id net_id
-               && Store.Net_id.equal b2.net_id net_id ) then
+      let net_id = Net_id.of_block_hash net.genesis.block in
+      if not ( Net_id.equal b1.net_id net_id
+               && Net_id.equal b2.net_id net_id ) then
         invalid_arg "State.path" ;
       Raw_block_header.read_exn (* The blocks are known valid. *)
         net.block_header_store b1.hash >>= fun { shell = header1 } ->
@@ -1304,7 +1305,7 @@ module Net = struct
   type t = net
   type net = t
 
-  type nonrec genesis = genesis ={
+  type nonrec genesis = genesis = {
     time: Time.t ;
     block: Block_hash.t ;
     protocol: Protocol_hash.t ;
@@ -1320,22 +1321,24 @@ module Net = struct
          (req "protocol" Protocol_hash.encoding))
 
   let create state ?test_protocol ?forked_network_ttl genesis =
+    let net_id = Net_id.of_block_hash genesis.block in
     let forked_network_ttl = map_option Int64.of_int forked_network_ttl in
     Shared.use state.global_data begin fun data ->
-      if Net_id.Table.mem data.nets (Net_id.Id genesis.block) then
+      if Net_id.Table.mem data.nets net_id then
         Pervasives.failwith "State.Net.create"
       else
         Raw_net.locked_create data
           ?test_protocol ?forked_network_ttl genesis >>= fun net ->
-        Net_id.Table.add data.nets (Net_id.Id genesis.block) net ;
+        Net_id.Table.add data.nets net_id net ;
         Lwt.return net
     end
 
-  let locked_read data (Net_id.Id genesis_hash as id) =
+  let locked_read data id =
     let net_store = Store.Net.get data.global_store id in
     let operation_store = Store.Operation.get net_store
     and block_header_store = Store.Block_header.get net_store
     and chain_store = Store.Chain.get net_store in
+    Store.Net.Genesis_hash.read net_store >>=? fun genesis_hash ->
     Store.Net.Genesis_time.read net_store >>=? fun time ->
     Store.Net.Genesis_protocol.read net_store >>=? fun protocol ->
     Store.Net.Expiration.read_opt net_store >>= fun expiration ->
@@ -1387,7 +1390,7 @@ module Net = struct
       Net_id.Table.fold (fun _ net acc -> net :: acc) nets []
     end
 
-  let id { genesis = { block } } = Net_id.Id block
+  let id { id } = id
   let genesis { genesis } = genesis
   let expiration { expiration } = expiration
   let forked_network_ttl { forked_network_ttl } = forked_network_ttl

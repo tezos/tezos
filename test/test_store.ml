@@ -58,7 +58,7 @@ let wrap_raw_store_init f base_dir =
 
 let test_init _ = Lwt.return_unit
 
-let net_id = State.Net_id.Id genesis_block
+let net_id = Net_id.of_block_hash genesis_block
 
 (** Operation store *)
 

@@ -21,8 +21,8 @@ type error +=
    | Non_increasing_fitness
 
 val activate: worker -> State.Net.t -> t Lwt.t
-val get: worker -> State.Net_id.t -> t tzresult Lwt.t
-val get_exn: worker -> State.Net_id.t -> t Lwt.t
+val get: worker -> Net_id.t -> t tzresult Lwt.t
+val get_exn: worker -> Net_id.t -> t Lwt.t
 val deactivate: t -> unit Lwt.t
 
 val net_state: t -> State.Net.t

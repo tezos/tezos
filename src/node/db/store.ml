@@ -16,45 +16,6 @@ type global_store = t
  * Net store under "net/"
  **************************************************************************)
 
-module Net_id = struct
-
-  module T = struct
-    type t = Id of Block_hash.t
-    type net_id = t
-
-    let encoding =
-      let open Data_encoding in
-      conv
-        (fun (Id net_id) -> net_id)
-        (fun net_id -> Id net_id)
-        Block_hash.encoding
-
-    let pp ppf (Id id) = Block_hash.pp_short ppf id
-    let compare (Id id1) (Id id2) = Block_hash.compare id1 id2
-    let equal (Id id1) (Id id2) = Block_hash.equal id1 id2
-    let hash (Id id) =
-      let raw_hash = Block_hash.to_string id in
-      let int64_hash = EndianString.BigEndian.get_int64 raw_hash 0 in
-      Int64.to_int int64_hash
-
-    let to_path (Id id) = Block_hash.to_path id
-    let of_path p =
-      match Block_hash.of_path p with
-      | None -> None
-      | Some id -> Some (Id id)
-    let path_length = Block_hash.path_length
-    let of_bytes_exn data = Id (Block_hash.of_bytes_exn data)
-    let to_bytes (Id id) = Block_hash.to_bytes id
-
-  end
-
-  include T
-  module Set = Set.Make(T)
-  module Map = Map.Make(T)
-  module Table = Hashtbl.Make(T)
-
-end
-
 module Net = struct
 
   type store = global_store * Net_id.t
@@ -69,6 +30,12 @@ module Net = struct
   let list t =
     Indexed_store.fold_indexes t ~init:[]
       ~f:(fun h acc -> Lwt.return (h :: acc))
+
+  module Genesis_hash =
+    Store_helpers.Make_single_store
+      (Indexed_store.Store)
+      (struct let name = ["genesis" ; "hash"] end)
+      (Store_helpers.Make_value(Block_hash))
 
   module Genesis_time =
     Store_helpers.Make_single_store
