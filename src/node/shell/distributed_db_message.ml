@@ -27,6 +27,10 @@ type t =
   | Get_protocols of Protocol_hash.t list
   | Protocol of Tezos_compiler.Protocol.t
 
+  | Get_operation_list of Net_id.t * (Block_hash.t * int) list
+  | Operation_list of Net_id.t * Block_hash.t * int *
+                      Operation_hash.t list * Operation_list_list_hash.path
+
 let encoding =
   let open Data_encoding in
   let case ?max_length ~tag encoding unwrap wrap =
@@ -34,7 +38,7 @@ let encoding =
   [
     case ~tag:0x10
       (obj1
-         (req "get_current_branch" Net_id.encoding))
+         (req "get_current_branch" Store.Net_id.encoding))
       (function
         | Get_current_branch net_id -> Some net_id
         | _ -> None)
@@ -117,6 +121,26 @@ let encoding =
       (obj1 (req "protocol" Store.Protocol.encoding))
       (function Protocol proto -> Some proto  | _ -> None)
       (fun proto -> Protocol proto);
+
+    case ~tag:0x50
+      (obj2
+         (req "net_id" Net_id.encoding)
+         (req "get_operation_list" (list (tup2 Block_hash.encoding int8))))
+      (function
+        | Get_operation_list (net_id, keys) -> Some (net_id, keys)
+        | _ -> None)
+      (fun (net_id, keys) -> Get_operation_list (net_id, keys));
+
+    case ~tag:0x51
+      (obj4
+         (req "net_id" Net_id.encoding)
+         (req "operation_list" (tup2 Block_hash.encoding int8))
+         (req "operations" (list Operation_hash.encoding))
+         (req "operation_list_path" Operation_list_list_hash.path_encoding))
+      (function Operation_list (net_id, block, ofs, ops, path) ->
+         Some (net_id, (block, ofs), ops, path) | _ -> None)
+      (fun (net_id, (block, ofs), ops, path) ->
+         Operation_list (net_id, block, ofs, ops, path)) ;
 
   ]
 

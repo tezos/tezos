@@ -44,6 +44,7 @@ val list_rev_sub : 'a list -> int -> 'a list
 (** [list_sub l n] is l capped to max n elements *)
 val list_sub: 'a list -> int -> 'a list
 val list_hd_opt: 'a list -> 'a option
+val list_last_exn: 'a list -> 'a
 
 (** [merge_filter_list2 ~compare ~f l1 l2] merges two lists ordered by [compare]
     and whose items can be merged with [f]. Item is discarded or kept whether

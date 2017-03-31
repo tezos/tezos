@@ -40,11 +40,11 @@ module type DISTRIBUTED_DB = sig
   val known: t -> key -> bool Lwt.t
   val read: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
-  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> unit
-  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> value Lwt.t
   val commit: t -> key -> unit Lwt.t
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
+  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> unit
+  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> value Lwt.t
 end
 
 module Operation :
@@ -62,11 +62,41 @@ module Protocol :
                   and type key := Protocol_hash.t
                   and type value := Tezos_compiler.Protocol.t
 
+module Operation_list : sig
+
+  type t = net
+  type key = Block_hash.t * int
+  type value = Operation_hash.t list
+  type param = Operation_list_list_hash.t
+
+  val known: t -> key -> bool Lwt.t
+  val read: t -> key -> value option Lwt.t
+  val read_exn: t -> key -> value Lwt.t
+  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
+  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
+
+  val read_all_opt:
+    net -> Block_hash.t -> Operation_hash.t list list option Lwt.t
+  val read_all_exn:
+    net -> Block_hash.t -> Operation_hash.t list list Lwt.t
+
+  val commit_all:
+    net -> Block_hash.t -> int -> unit Lwt.t
+  val inject_all:
+    net -> Block_hash.t -> Operation_hash.t list list -> bool Lwt.t
+
+end
+
 val broadcast_head:
   net -> Block_hash.t -> Operation_hash.t list -> unit
 
 val inject_block:
-  t -> MBytes.t -> (Block_hash.t * Store.Block_header.t) tzresult Lwt.t
+  t -> MBytes.t -> Operation_hash.t list list ->
+  (Block_hash.t * Store.Block_header.t) tzresult Lwt.t
+
+(* val inject_operation: *)
+  (* t -> MBytes.t -> *)
+  (* (Block_hash.t * Store.Operation.t) tzresult Lwt.t *)
 
 val read_block:
   t -> Block_hash.t -> (net * Store.Block_header.t) option Lwt.t

@@ -22,7 +22,7 @@ val inject_block:
   fitness:Fitness.t ->
   seed_nonce:Nonce.t ->
   src_sk:secret_key ->
-  Operation_hash.t list ->
+  Operation_hash.t list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
     ~seed_nonce ~src_sk ops] tries to inject a block in the node. If

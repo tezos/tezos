@@ -66,7 +66,8 @@ module Blocks = struct
     fitness: MBytes.t list ;
     timestamp: Time.t ;
     protocol: Protocol_hash.t option ;
-    operations: Operation_hash.t list option ;
+    operations_hash: Operation_list_list_hash.t ;
+    operations: Operation_hash.t list list option ;
     data: MBytes.t option ;
     net: net ;
     test_protocol: Protocol_hash.t option ;
@@ -75,25 +76,32 @@ module Blocks = struct
 
   let block_info_encoding =
     conv
-      (fun { hash ; predecessor ; fitness ; timestamp ; protocol ; operations ;
-             net ; test_protocol ; test_network ; data } ->
-        (hash, predecessor, fitness, timestamp, protocol, operations,
-         net, test_protocol, test_network, data))
-      (fun (hash, predecessor, fitness, timestamp, protocol, operations,
-            net, test_protocol, test_network, data) ->
-        { hash ; predecessor ; fitness ; timestamp ; protocol ; operations ;
-          net ; test_protocol ; test_network  ; data })
-      (obj10
-         (req "hash" Block_hash.encoding)
-         (req "predecessor" Block_hash.encoding)
-         (req "fitness" Fitness.encoding)
-         (req "timestamp" Time.encoding)
-         (opt "protocol" Protocol_hash.encoding)
-         (opt "operations" (list Operation_hash.encoding))
-         (req "net_id" net_encoding)
-         (opt "test_protocol" Protocol_hash.encoding)
-         (opt "test_network" (tup2 net_encoding Time.encoding))
-         (opt "data" bytes))
+      (fun { hash ; predecessor ; fitness ; timestamp ; protocol ;
+             operations_hash ; operations ; data ; net ;
+             test_protocol ; test_network } ->
+        ((hash, predecessor, fitness, timestamp, protocol),
+         (operations_hash, operations, data,
+          net, test_protocol, test_network)))
+      (fun ((hash, predecessor, fitness, timestamp, protocol),
+            (operations_hash, operations, data,
+             net, test_protocol, test_network)) ->
+        { hash ; predecessor ; fitness ; timestamp ; protocol ;
+          operations_hash ; operations ; data ; net ;
+          test_protocol ; test_network })
+      (merge_objs
+        (obj5
+           (req "hash" Block_hash.encoding)
+           (req "predecessor" Block_hash.encoding)
+           (req "fitness" Fitness.encoding)
+           (req "timestamp" Time.encoding)
+           (opt "protocol" Protocol_hash.encoding))
+        (obj6
+           (req "operations_hash" Operation_list_list_hash.encoding)
+           (opt "operations" (list (list Operation_hash.encoding)))
+           (opt "data" bytes)
+           (req "net" net_encoding)
+           (opt "test_protocol" Protocol_hash.encoding)
+           (opt "test_network" (tup2 net_encoding Time.encoding))))
 
   let parse_block s =
     try
@@ -231,7 +239,7 @@ module Blocks = struct
     RPC.service
       ~description:"List the block operations."
       ~input: empty
-      ~output: (obj1 (req "operations" (list Operation_hash.encoding)))
+      ~output: (obj1 (req "operations" (list (list Operation_hash.encoding))))
       RPC.Path.(block_path / "operations")
 
   let protocol =
@@ -437,11 +445,12 @@ module Operations = struct
         (obj1
            (req "operations"
               (list
-                 (obj2
-                    (req "hash" Operation_hash.encoding)
-                    (opt "contents"
-                       (dynamic_size Updater.raw_operation_encoding)))
-              )))
+                 (list
+                    (obj2
+                       (req "hash" Operation_hash.encoding)
+                       (opt "contents"
+                          (dynamic_size Updater.raw_operation_encoding)))
+              ))))
       RPC.Path.(root / "operations")
 
 end
@@ -637,7 +646,7 @@ let forge_block =
          (opt "predecessor" Block_hash.encoding)
          (opt "timestamp" Time.encoding)
          (req "fitness" Fitness.encoding)
-         (req "operations" (list Operation_hash.encoding))
+         (req "operations" Operation_list_list_hash.encoding)
          (req "header" bytes))
     ~output: (obj1 (req "block" bytes))
     RPC.Path.(root / "forge_block")
@@ -654,35 +663,50 @@ let validate_block =
       (Error.wrap @@ empty)
     RPC.Path.(root / "validate_block")
 
+type inject_block_param = {
+  raw: MBytes.t ;
+  blocking: bool ;
+  force: bool ;
+  operations: Operation_hash.t list list ;
+}
+
+let inject_block_param =
+  conv
+    (fun { raw ; blocking ; force ; operations } ->
+       (raw, blocking, force, operations))
+    (fun (raw, blocking, force, operations) ->
+       { raw ; blocking ; force ; operations })
+    (obj4
+       (req "data" bytes)
+       (dft "blocking"
+          (describe
+             ~description:
+               "Should the RPC wait for the block to be \
+                validated before answering. (default: true)"
+             bool)
+          true)
+       (dft "force"
+          (describe
+             ~description:
+               "Should we inject the block when its fitness is below \
+                the current head. (default: false)"
+             bool)
+          false)
+       (req "operations"
+          (describe
+             ~description:"..."
+             (list (list Operation_hash.encoding)))))
+
 let inject_block =
   RPC.service
     ~description:
       "Inject a block in the node and broadcast it. The `operations` \
-       embedded in `blockHeader` might pre-validated using a \
+       embedded in `blockHeader` might be pre-validated using a \
        contextual RPCs from the latest block \
        (e.g. '/blocks/head/context/preapply'). Returns the ID of the \
        block. By default, the RPC will wait for the block to be \
        validated before answering."
-    ~input:
-      (conv
-         (fun (block, blocking, force) ->
-            (block, Some blocking, force))
-         (fun (block, blocking, force) ->
-            (block, Utils.unopt ~default:true blocking, force))
-         (obj3
-            (req "data" bytes)
-            (opt "blocking"
-               (describe
-                  ~description:
-                    "Should the RPC wait for the block to be \
-                  validated before answering. (default: true)"
-                  bool))
-            (opt "force"
-               (describe
-                  ~description:
-                    "Should we inject the block when its fitness is below \
-                     the current head. (default: false)"
-                  bool))))
+    ~input: inject_block_param
     ~output:
       (Error.wrap @@
        (obj1 (req "block_hash" Block_hash.encoding)))
