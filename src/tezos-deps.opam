@@ -15,6 +15,7 @@ depends: [
   "ocamlfind" {build}
   "base-bigarray"
   "base-threads"
+  "conf-libev"
   "calendar"
   "cohttp" {>= "0.21" }
   "conduit"

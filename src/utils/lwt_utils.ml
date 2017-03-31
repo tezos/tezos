@@ -7,10 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** HACK waiting for Pierre.... *)
-let () = Lwt_unix.set_default_async_method Async_none
-(** END OF HACK waiting for Pierre.... *)
-
 module LC = Lwt_condition
 
 open Lwt.Infix
