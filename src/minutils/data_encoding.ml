@@ -42,6 +42,7 @@ module Size = struct
   let bool = 1
   let int8 = 1
   let uint8 = 1
+  let char = 1
   let int16 = 2
   let uint16 = 2
   let int31 = 4
@@ -847,7 +848,8 @@ let rec length : type x. x t -> x -> int = fun e ->
       ofs + Size.uint8
 
     let char v buf ofs =
-      uint8 (Char.code v) buf ofs
+      MBytes.set_char buf ofs v;
+      ofs + Size.char
 
     let bool v buf ofs =
       uint8 (if v then 255 else 0) buf ofs
@@ -1012,9 +1014,8 @@ let rec length : type x. x t -> x -> int = fun e ->
     let uint8 buf ofs _len =
       ofs + Size.uint8, MBytes.get_uint8 buf ofs
 
-    let char buf ofs len =
-      let ofs, v = int8 buf ofs len in
-      ofs, Char.chr v
+    let char buf ofs _len =
+      ofs + Size.char, MBytes.get_char buf ofs
 
     let bool buf ofs len =
       let ofs, v = int8 buf ofs len in
