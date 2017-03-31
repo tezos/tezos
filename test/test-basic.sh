@@ -21,6 +21,8 @@ CUSTOM_PARAM="--sandbox ./sandbox.json"
 ${NODE} run --data-dir "${DATA_DIR}" ${CUSTOM_PARAM} --rpc-addr "[::]:8732" > LOG 2>&1 &
 NODE_PID="$!"
 
+echo "Created node, pid: ${NODE_PID}, log: ./test/LOG"
+
 sleep 3
 
 ${CLIENT} list versions
