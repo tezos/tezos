@@ -36,7 +36,12 @@ val read:
 (** {2 Errors} **************************************************************)
 
 type error +=
-  | Invalid_fitness of Fitness.fitness * Fitness.fitness
+  | Invalid_fitness of { block: Block_hash.t ;
+                         expected: Fitness.fitness ;
+                         found: Fitness.fitness }
+  | Invalid_operations of { block: Block_hash.t ;
+                            expected: Operation_list_list_hash.t ;
+                            found: Operation_hash.t list list }
   | Unknown_network of Store.Net_id.t
   | Unknown_operation of Operation_hash.t
   | Unknown_block of Block_hash.t
@@ -119,7 +124,7 @@ module type DATA_STORE = sig
       returns [false] when the value is already stored, or [true]
       otherwise. For a given value, only one call to `store` (or an
       equivalent call to `store_raw`) might return [true].  *)
-  val store: store -> value -> bool Lwt.t
+  val store: store -> key -> value -> bool Lwt.t
 
   (** Store a value in the local database (unparsed data).  It returns
       [Ok None] when the data is already stored, or [Ok (Some (hash,
@@ -143,8 +148,8 @@ module Block_header : sig
     net_id: Net_id.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
+    operations: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
-    operations: Operation_hash.t list ;
   }
 
   type t = Store.Block_header.t = {
@@ -205,6 +210,31 @@ module Block_header : sig
 
 end
 
+module Operation_list : sig
+
+  type store = Net.t
+  type key = Block_hash.t * int
+  type value = Operation_hash.t list * Operation_list_list_hash.path
+
+  val known: store -> key -> bool Lwt.t
+  val read: store -> key -> value tzresult Lwt.t
+  val read_opt: store -> key -> value option Lwt.t
+  val read_exn: store -> key -> value Lwt.t
+  val store: store -> key -> value -> bool Lwt.t
+  val remove: store -> key -> bool Lwt.t
+
+  val read_count: store -> Block_hash.t -> int tzresult Lwt.t
+  val read_count_opt: store -> Block_hash.t -> int option Lwt.t
+  val read_count_exn: store -> Block_hash.t -> int Lwt.t
+  val store_count: store -> Block_hash.t -> int -> unit Lwt.t
+
+  val read_all:
+    store -> Block_hash.t -> Operation_hash.t list list tzresult Lwt.t
+  val store_all:
+    store -> Block_hash.t -> Operation_hash.t list  list -> unit Lwt.t
+
+end
+
 
 (** {2 Valid block} ***********************************************************)
 
@@ -223,8 +253,9 @@ module Valid_block : sig
     (** The date at which this block has been forged. *)
     fitness: Protocol.fitness ;
     (** The (validated) score of the block. *)
-    operations: Operation_hash.t list ;
-    (** The sequence of operations. *)
+    operations_hash: Operation_list_list_hash.t ;
+    operations: Operation_hash.t list list ;
+    (** The sequence of operations ans its (Merkle-)hash. *)
     discovery_time: Time.t ;
     (** The data at which the block was discorevered on the P2P network. *)
     protocol_hash: Protocol_hash.t ;

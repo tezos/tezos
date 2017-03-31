@@ -49,6 +49,20 @@ let read_opt s k =
 
 type error += Unknown of string list
 
+let () =
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"store.unkown_key"
+    ~title:"Unknown key in store"
+    ~description: ""
+    ~pp:(fun ppf key ->
+        Format.fprintf ppf
+          "@[<v 2>Unknown key %s@]"
+          (String.concat "/" key))
+    Data_encoding.(obj1 (req "key" (list string)))
+    (function Unknown key -> Some key | _ -> None)
+    (fun key -> Unknown key)
+
 let read t key =
   read_opt t key >>= function
   | None -> fail (Unknown key)

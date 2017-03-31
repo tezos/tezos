@@ -34,7 +34,7 @@ let monitor cctxt ?contents ?check () =
                    "@[<v 2>Error while parsing operations@,%a@["
                    pp_print_error err >>= fun () ->
                  Lwt.return None)
-      ops
+     (List.concat  ops)
   in
   Lwt.return (Lwt_stream.map_s convert ops_stream)
 

@@ -90,6 +90,11 @@ let list_hd_opt = function
   | [] -> None
   | h :: _ -> Some h
 
+let rec list_last_exn = function
+  | [] -> raise Not_found
+  | [x] -> x
+  | _ :: xs -> list_last_exn xs
+
 let merge_filter_list2
     ?(finalize = List.rev) ?(compare = compare)
     ?(f = first_some)

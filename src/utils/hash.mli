@@ -90,6 +90,34 @@ module type INTERNAL_HASH = sig
   module Table : Hashtbl.S with type key = t
 end
 
+module type INTERNAL_MERKLE_TREE = sig
+  type elt
+  include INTERNAL_HASH
+  val compute: elt list -> t
+  val empty: t
+  type path =
+    | Left of path * t
+    | Right of t * path
+    | Op
+  val compute_path: elt list -> int -> path
+  val check_path: path -> elt -> t * int
+  val path_encoding: path Data_encoding.t
+end
+
+module type MERKLE_TREE = sig
+  type elt
+  include HASH
+  val compute: elt list -> t
+  val empty: t
+  type path =
+    | Left of path * t
+    | Right of t * path
+    | Op
+  val compute_path: elt list -> int -> path
+  val check_path: path -> elt -> t * int
+  val path_encoding: path Data_encoding.t
+end
+
 (** {2 Building Hashes} *******************************************************)
 
 (** The parameters for creating a new Hash type using
@@ -136,7 +164,33 @@ end
 (** Operations hashes / IDs. *)
 module Operation_hash : INTERNAL_HASH
 
+(** List of operations hashes / IDs. *)
+module Operation_list_hash :
+  INTERNAL_MERKLE_TREE with type elt = Operation_hash.t
+
+module Operation_list_list_hash :
+  INTERNAL_MERKLE_TREE with type elt = Operation_list_hash.t
+
 (** Protocol versions / source hashes. *)
 module Protocol_hash : INTERNAL_HASH
 
 module Generic_hash : INTERNAL_MINIMAL_HASH
+
+(**/**)
+
+module Generic_Merkle_tree (H : sig
+    type t
+    type elt
+    val encoding : t Data_encoding.t
+    val empty : t
+    val leaf : elt -> t
+    val node : t -> t -> t
+  end) : sig
+  val compute : H.elt list -> H.t
+  type path =
+    | Left of path * H.t
+    | Right of H.t * path
+    | Op
+  val compute_path: H.elt list -> int -> path
+  val check_path: path -> H.elt -> H.t * int
+end

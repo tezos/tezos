@@ -50,9 +50,7 @@ let equal_string_option ?msg o1 o2 =
 
 let equal_error_monad ?msg exn1 exn2 =
   let msg = format_msg msg in
-  let prn exn = match exn with
-    | Error_monad.Exn err -> Printexc.to_string err
-    | Error_monad.Unclassified err -> err in
+  let prn err = Format.asprintf "%a" Error_monad.pp_print_error [err] in
   Assert.equal ?msg ~prn exn1 exn2
 
 let equal_block_set ?msg set1 set2 =
