@@ -876,8 +876,10 @@ let rec length : type x. x t -> x -> int = fun e ->
       MBytes.set_int64 buf ofs v;
       ofs + Size.int64
 
+    (** write a float64 (double) **)
     let float v buf ofs =
-      MBytes.set_float buf ofs v;
+      (*Here, float means float64, which is written using MBytes.set_double !!*)
+      MBytes.set_double buf ofs v;
       ofs + Size.float
 
     let fixed_kind_bytes length s buf ofs =
@@ -1033,8 +1035,10 @@ let rec length : type x. x t -> x -> int = fun e ->
     let int64 buf ofs _len =
       ofs + Size.int64, MBytes.get_int64 buf ofs
 
+    (** read a float64 (double) **)
     let float buf ofs _len =
-      ofs + Size.float, MBytes.get_float buf ofs
+      (*Here, float means float64, which is read using MBytes.get_double !!*)
+      ofs + Size.float, MBytes.get_double buf ofs
 
     let int_of_int32 i =
       let i' = Int32.to_int i in
@@ -1073,10 +1077,12 @@ let rec length : type x. x t -> x -> int = fun e ->
 
     let list read buf ofs len =
       let rec loop acc ofs len =
+        assert (len >= 0);
         if len <= 0
         then ofs, List.rev acc
         else
           let ofs', v = read buf ofs len in
+          assert (ofs' > ofs);
           loop (v :: acc) ofs'  (len - (ofs' - ofs))
       in
       loop [] ofs len

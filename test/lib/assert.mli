@@ -66,3 +66,7 @@ val test_fail :
   (unit -> 'a) ->
   (exn -> bool) ->
   unit
+
+val equal_float:
+  ?eq:(float -> float -> bool) ->
+  ?prn:(float -> string) -> ?msg:string -> float -> float -> unit
