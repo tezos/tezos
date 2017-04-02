@@ -530,7 +530,10 @@ module Block : sig
     proof_of_work_nonce: MBytes.t ;
   }
 
-  and mining_slot = Raw_level.t * Int32.t
+  and mining_slot = {
+    level: Raw_level.t ;
+    priority: Int32.t ;
+  }
 
   val mining_slot_encoding: mining_slot Data_encoding.encoding
 

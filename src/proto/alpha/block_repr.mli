@@ -22,7 +22,10 @@ and proto_header = {
   proof_of_work_nonce: MBytes.t ;
 }
 
-and mining_slot = Raw_level_repr.t * Int32.t
+and mining_slot = {
+  level: Raw_level_repr.t ;
+  priority: Int32.t ;
+}
 
 val mining_slot_encoding: mining_slot Data_encoding.encoding
 

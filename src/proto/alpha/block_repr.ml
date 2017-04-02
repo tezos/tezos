@@ -21,25 +21,35 @@ type header = {
 and proto_header = {
   mining_slot: mining_slot ;
   seed_nonce_hash: Nonce_hash.t ;
-  proof_of_work_nonce: MBytes.t ;}
+  proof_of_work_nonce: MBytes.t ;
+}
 
-and mining_slot = Raw_level_repr.t * Int32.t
+and mining_slot = {
+  level: Raw_level_repr.t ;
+  priority: Int32.t ;
+}
 
 let mining_slot_encoding =
   let open Data_encoding in
-  tup2 Raw_level_repr.encoding int32
+  conv
+    (fun { level ; priority } -> level, priority)
+    (fun (level, priority) -> { level ; priority })
+    (obj2
+       (req "level" Raw_level_repr.encoding)
+       (req "proprity" int32))
 
 let proto_header_encoding =
   let open Data_encoding in
   conv
     (fun { mining_slot ; seed_nonce_hash ; proof_of_work_nonce } ->
-       (mining_slot, seed_nonce_hash, proof_of_work_nonce))
-    (fun (mining_slot, seed_nonce_hash, proof_of_work_nonce) ->
+       (mining_slot, (seed_nonce_hash, proof_of_work_nonce)))
+    (fun (mining_slot, (seed_nonce_hash, proof_of_work_nonce)) ->
        { mining_slot ; seed_nonce_hash ; proof_of_work_nonce })
-    (obj3
-       (req "slot" mining_slot_encoding)
-       (req "seed_nonce_hash" Nonce_hash.encoding)
-       (req "proof_of_work_nonce" (Fixed.bytes Constants_repr.proof_of_work_nonce_size)))
+    (merge_objs
+       mining_slot_encoding
+       (obj2
+          (req "seed_nonce_hash" Nonce_hash.encoding)
+          (req "proof_of_work_nonce" (Fixed.bytes Constants_repr.proof_of_work_nonce_size))))
 
 let signed_proto_header_encoding =
   let open Data_encoding in
