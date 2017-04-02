@@ -133,7 +133,7 @@ let check_timestamp c priority pred_timestamp =
     (Timestamp_too_early (minimal_time, timestamp))
 
 let check_mining_rights c
-    { Block.proto = { mining_slot = (raw_level, priority) } }
+    { Block.proto = { mining_slot = { level = raw_level ; priority } } }
     pred_timestamp =
   Level.current c >>=? fun current_level ->
   fail_unless
@@ -145,7 +145,7 @@ let check_mining_rights c
   return delegate
 
 let pay_mining_bond c
-    { Block.proto = { mining_slot = (_raw_level, priority) } }
+    { Block.proto = { mining_slot = { priority} } }
     id =
   if Compare.Int32.(priority >= Constants.first_free_mining_slot c)
   then return c

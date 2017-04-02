@@ -436,7 +436,7 @@ let forge_block _ctxt
     (net_id, predecessor, timestamp, fitness, operations,
      raw_level, priority, seed_nonce_hash, proof_of_work_nonce) : MBytes.t tzresult Lwt.t =
   let priority = Int32.of_int priority in
-  let mining_slot = (raw_level, priority) in
+  let mining_slot = { Block.level = raw_level ; priority } in
   return (Block.forge_header
             { net_id ; predecessor ; timestamp ; fitness ; operations }
             { mining_slot ; seed_nonce_hash ; proof_of_work_nonce })

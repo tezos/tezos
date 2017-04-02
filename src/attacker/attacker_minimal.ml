@@ -50,7 +50,7 @@ let block_forged ?prev ops =
     | Ok nonce -> nonce in
   Block_repr.forge_header (block ops)
     Block_repr.{
-      mining_slot = Raw_level_repr.of_int32_exn 1l, 0l ;
+      mining_slot = {level = Raw_level_repr.of_int32_exn 1l ; priority = 0l } ;
       seed_nonce_hash = Proto.Nonce_storage.hash (generate_seed_nonce ());
       proof_of_work_nonce = generate_proof_of_work_nonce () ;
     }
