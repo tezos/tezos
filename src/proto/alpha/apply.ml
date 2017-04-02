@@ -260,7 +260,7 @@ let apply_main ctxt accept_failing_script block pred_timestamp operations =
   Mining.pay_mining_bond ctxt block delegate_pkh >>=? fun ctxt ->
   (* do effectful stuff *)
   Fitness.increase ctxt >>=? fun ctxt ->
-  let priority = snd block.proto.mining_slot in
+  let priority = block.proto.mining_slot.priority in
   fold_left_s (fun ctxt operation ->
       apply_operation
         ctxt accept_failing_script
@@ -269,9 +269,7 @@ let apply_main ctxt accept_failing_script block pred_timestamp operations =
       >>=? fun (ctxt, _contracts) -> return ctxt)
     ctxt operations >>=? fun ctxt ->
   (* end of level (from this point nothing should fail) *)
-  let reward =
-    Mining.base_mining_reward ctxt
-      ~priority:(snd block.proto.mining_slot) in
+  let reward = Mining.base_mining_reward ctxt ~priority in
   Nonce.record_hash ctxt
     delegate_pkh reward block.proto.seed_nonce_hash >>=? fun ctxt ->
   Reward.pay_due_rewards ctxt >>=? fun ctxt ->
