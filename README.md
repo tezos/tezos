@@ -11,7 +11,7 @@ See https://www.tezos.com/ for more information about the project.
 Build instructions
 ------------------
 
-To compile Tezos, you need an OCaml compiler (version 4.03.0) and all the
+To compile Tezos, you need an OCaml compiler (version 4.04.0) and all the
 libraries listed in `src/tezos-deps.opam`.
 
 The best way to install all dependencies is by first installing
@@ -23,7 +23,7 @@ configuration related to your project. This is necessary so that the project
 doesn't conflict with other OCaml projects or other versions of Tezos.
 
 ```
-opam switch tezos --alias-of 4.03.0
+opam switch tezos --alias-of 4.04.0
 ```
 
 Activate the new switch:
