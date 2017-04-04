@@ -348,8 +348,10 @@ let safe_get_unrevealed_nonces cctxt block =
 
 let get_delegates cctxt state =
   match state.delegates with
-  | [] -> Client_keys.get_keys cctxt >|= List.map (fun (_,pkh,_,_) -> pkh)
-  | _ :: _ as delegates -> Lwt.return delegates
+  | [] ->
+      Client_keys.get_keys cctxt >>=? fun keys ->
+      return (List.map (fun (_,pkh,_,_) -> pkh) keys)
+  | _ :: _ as delegates -> return delegates
 
 let insert_block
     cctxt ?max_priority state (bi: Client_mining_blocks.block_info) =
@@ -363,20 +365,20 @@ let insert_block
     drop_old_slots
       ~before:(Time.add state.best.timestamp (-1800L)) state ;
   end ;
-  get_delegates cctxt state >>= fun delegates ->
+  get_delegates cctxt state >>=? fun delegates ->
   get_mining_slot cctxt.rpc_config ?max_priority bi delegates >>= function
   | None ->
       lwt_debug
         "Can't compute slot for %a" Block_hash.pp_short bi.hash >>= fun () ->
-      Lwt.return_unit
+      return ()
   | Some ((timestamp, (_,_,delegate)) as slot) ->
-      Client_keys.Public_key_hash.name cctxt delegate >>= fun name ->
+      Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
       lwt_log_info "New mining slot at %a for %s after %a"
         Time.pp_hum timestamp
         name
         Block_hash.pp_short bi.hash >>= fun () ->
       state.future_slots <- insert_mining_slot slot state.future_slots ;
-      Lwt.return_unit
+      return ()
 
 let pop_mining_slots state =
   let now = Time.now () in
@@ -390,7 +392,12 @@ let pop_mining_slots state =
   slots
 
 let insert_blocks cctxt ?max_priority state bis =
-  Lwt_list.iter_s (insert_block cctxt ?max_priority state) bis
+  iter_s (insert_block cctxt ?max_priority state) bis >>= function
+  | Ok () ->
+      Lwt.return_unit
+  | Error err ->
+      Format.eprintf "Error: %a" pp_print_error err  ;
+      Lwt.return_unit
 
 let mine cctxt state =
   let slots = pop_mining_slots state in
@@ -402,7 +409,7 @@ let mine cctxt state =
            Time.now ()
          else
            timestamp in
-       Client_keys.Public_key_hash.name cctxt delegate >>= fun name ->
+       Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
        lwt_debug "Try mining after %a (slot %d) for %s (%a)"
          Block_hash.pp_short bi.hash
          prio name Time.pp_hum timestamp >>= fun () ->
@@ -437,7 +444,7 @@ let mine cctxt state =
   | (bi, priority, fitness, timestamp, operations, delegate) :: _
     when Fitness.compare state.best.fitness fitness < 0 -> begin
       let level = Raw_level.succ bi.level.level in
-      lwt_log_info
+      cctxt.message
         "Select candidate block after %a (slot %d) fitness: %a"
         Block_hash.pp_short bi.hash priority
         Fitness.pp fitness >>= fun () ->
@@ -449,7 +456,7 @@ let mine cctxt state =
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
       State.record_block cctxt level block_hash seed_nonce
       |> trace_exn (Failure "Error while recording block") >>=? fun () ->
-      Client_keys.Public_key_hash.name cctxt delegate >>= fun name ->
+      Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
       cctxt.message
         "Injected block %a for %s after %a \
         \ (level %a, slot %d, fitness %a, operations %d)"

@@ -28,11 +28,11 @@ val get_key:
 
 val get_keys:
   Client_commands.context ->
-  ( string * Public_key_hash.t * Public_key.t * Secret_key.t ) list Lwt.t
+  ( string * Public_key_hash.t * Public_key.t * Secret_key.t ) list tzresult Lwt.t
 
 val list_keys:
   Client_commands.context ->
-  (string * Public_key_hash.t * bool * bool) list Lwt.t
+  (string * Public_key_hash.t * bool * bool) list tzresult Lwt.t
 
 val gen_keys:
   ?seed: Sodium.Sign.seed ->

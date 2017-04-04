@@ -513,8 +513,11 @@ let unexpand_macros type_map (program : Script.code) =
 module Program = Client_aliases.Alias (struct
     type t = Script.code
     let encoding = Script.code_encoding
-    let of_source cctxt s = parse_program cctxt s
-    let to_source _ p = Lwt.return (Format.asprintf "%a" (print_program no_locations) (p, []))
+    let of_source cctxt s =
+      parse_program cctxt s >>= fun code ->
+      return code
+    let to_source _ p =
+      return (Format.asprintf "%a" (print_program no_locations) (p, []))
     let name = "program"
   end)
 
@@ -535,34 +538,36 @@ let commands () =
     Arg.Set trace_stack,
     "Show the stack after each step" in
   [
+
     command ~group ~desc: "lists all known programs"
       (fixed [ "list" ; "known" ; "programs" ])
-      (fun cctxt -> Program.load cctxt >>= fun list ->
-        Lwt_list.iter_s (fun (n, _) -> cctxt.message "%s" n) list >>= fun () ->
-        return ()) ;
+      (fun cctxt ->
+         Program.load cctxt >>=? fun list ->
+         Lwt_list.iter_s (fun (n, _) -> cctxt.message "%s" n) list >>= fun () ->
+         return ()) ;
+
     command ~group ~desc: "remember a program under some name"
       (prefixes [ "remember" ; "program" ]
        @@ Program.fresh_alias_param
        @@ Program.source_param
        @@ stop)
-      (fun name hash cctxt ->
-         Program.add cctxt name hash >>= fun () ->
-        return ()) ;
+      (fun name hash cctxt -> Program.add cctxt name hash) ;
+
     command ~group ~desc: "forget a remembered program"
       (prefixes [ "forget" ; "program" ]
        @@ Program.alias_param
        @@ stop)
-      (fun (name, _) cctxt ->
-         Program.del cctxt name >>= fun () ->
-        return ()) ;
+      (fun (name, _) cctxt -> Program.del cctxt name) ;
+
     command ~group ~desc: "display a program"
       (prefixes [ "show" ; "known" ; "program" ]
        @@ Program.alias_param
        @@ stop)
       (fun (_, program) cctxt ->
-         Program.to_source cctxt program >>= fun source ->
+         Program.to_source cctxt program >>=? fun source ->
          cctxt.message "%s\n" source >>= fun () ->
          return ()) ;
+
     command ~group ~desc: "ask the node to run a program"
       ~args: [ trace_stack_arg ]
       (prefixes [ "run" ; "program" ]
@@ -578,13 +583,16 @@ let commands () =
            Client_proto_rpcs.Helpers.trace_code cctxt.rpc_config
              cctxt.config.block program (storage, input) >>= function
            | Ok (storage, output, trace) ->
-               cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
+               cctxt.message
+                 "@[<v 0>@[<v 2>storage@,%a@]@,\
+                  @[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
                  (print_expr no_locations) storage
                  (print_expr no_locations) output
                  (Format.pp_print_list
                     (fun ppf (loc, gas, stack) ->
                        Format.fprintf ppf
-                         "- @[<v 0>location: %d (remaining gas: %d)@,[ @[<v 0>%a ]@]@]"
+                         "- @[<v 0>location: %d (remaining gas: %d)@,\
+                            [ @[<v 0>%a ]@]@]"
                          loc gas
                          (Format.pp_print_list (print_expr no_locations))
                          stack))
@@ -606,6 +614,7 @@ let commands () =
                cctxt.warning "%a" pp_print_error errs >>= fun () ->
                cctxt.error "error running program" >>= fun () ->
                return ()) ;
+
     command ~group ~desc: "ask the node to typecheck a program"
       ~args: [ show_types_arg ]
       (prefixes [ "typecheck" ; "program" ]
@@ -624,6 +633,7 @@ let commands () =
          | Error errs ->
              report_typechecking_errors cctxt errs >>= fun () ->
              cctxt.error "ill-typed program") ;
+
     command ~group ~desc: "ask the node to typecheck a data expression"
       (prefixes [ "typecheck" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck" parse_data
@@ -641,6 +651,7 @@ let commands () =
              report_typechecking_errors cctxt errs >>= fun () ->
              cctxt.error "ill-typed data" >>= fun () ->
              return ()) ;
+
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
               using the same algorithm as script instruction H"
@@ -658,6 +669,7 @@ let commands () =
              cctxt.warning "%a" pp_print_error errs  >>= fun () ->
              cctxt.error "ill-formed data" >>= fun () ->
              return ()) ;
+
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
               using the same algorithm as script instruction H, sign it using \
@@ -684,4 +696,5 @@ let commands () =
              cctxt.warning "%a" pp_print_error errs >>= fun () ->
              cctxt.error "ill-formed data" >>= fun () ->
              return ()) ;
+
   ]

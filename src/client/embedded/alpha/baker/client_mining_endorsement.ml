@@ -208,8 +208,11 @@ let rec insert ({time} as e) = function
 
 let get_delegates cctxt state =
   match state.delegates with
-  | [] -> Client_keys.get_keys cctxt >|= List.map (fun (_,pkh,_,_) -> pkh)
-  | _ :: _ as delegates -> Lwt.return delegates
+  | [] ->
+      Client_keys.get_keys cctxt >>=? fun keys ->
+      return (List.map (fun (_,pkh,_,_) -> pkh) keys)
+  | _ :: _ as delegates ->
+      return delegates
 
 let drop_old_endorsement ~before state =
   state.to_endorse <-
@@ -219,7 +222,7 @@ let drop_old_endorsement ~before state =
 
 let schedule_endorsements cctxt state bis =
   let may_endorse (block: Client_mining_blocks.block_info) delegate time =
-    Client_keys.Public_key_hash.name cctxt delegate >>= fun name ->
+    Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
     lwt_log_info "May endorse block %a for %s"
       Block_hash.pp_short block.hash name >>= fun () ->
     let b = `Hash block.hash in
@@ -279,13 +282,16 @@ let schedule_endorsements cctxt state bis =
                return ())
       slots in
   let time = Time.(add (now ()) state.delay) in
-  get_delegates cctxt state >>= fun delegates ->
+  get_delegates cctxt state >>=? fun delegates ->
   iter_p
     (fun delegate ->
        iter_p
          (fun bi -> may_endorse bi delegate time)
          bis)
-    delegates >>= function
+    delegates
+
+let schedule_endorsements cctxt state bis =
+  schedule_endorsements cctxt state bis >>= function
   | Error exns ->
       lwt_log_error
         "@[<v 2>Error(s) while scheduling endorsements@,%a@]"

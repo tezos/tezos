@@ -35,7 +35,12 @@ val protect :
 val error_exn : exn -> 'a tzresult
 val record_trace_exn : exn -> 'a tzresult -> 'a tzresult
 val trace_exn : exn -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
+val generic_trace :
+  ('a, Format.formatter, unit,
+   ('b, error list) result Lwt.t -> ('b, error list) result Lwt.t) format4 -> 'a
 val pp_exn : Format.formatter -> exn -> unit
+
+val failure : ('a, Format.formatter, unit, error) format4 -> 'a
 
 type error += Exn of exn
 type error += Unclassified of string
