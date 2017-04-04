@@ -10,8 +10,8 @@
 open Node_rpc_services
 
 val echo:
-  Client_commands.context ->
-  Blocks.block -> string -> string Lwt.t
+  Client_rpcs.config ->
+  Blocks.block -> string -> string tzresult Lwt.t
 val failing:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Blocks.block -> int -> unit tzresult Lwt.t

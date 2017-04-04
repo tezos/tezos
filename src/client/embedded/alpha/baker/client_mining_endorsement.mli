@@ -21,5 +21,5 @@ val create:
   Client_commands.context ->
   delay: int ->
   public_key_hash list ->
-  Client_mining_blocks.block_info list Lwt_stream.t ->
+  Client_mining_blocks.block_info list tzresult Lwt_stream.t ->
   unit Lwt.t

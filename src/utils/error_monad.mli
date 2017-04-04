@@ -19,7 +19,9 @@ type error_category =
 include Error_monad_sig.S
 
 (** Erroneous result (shortcut for generic errors) *)
-val generic_error : string -> 'a tzresult
+val generic_error :
+  ('a, Format.formatter, unit, 'b tzresult) format4 ->
+  'a
 
 (** Erroneous return (shortcut for generic errors) *)
 val failwith :

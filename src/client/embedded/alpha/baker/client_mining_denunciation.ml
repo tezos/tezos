@@ -24,9 +24,9 @@ let create cctxt endorsement_stream =
       (* (timeout >|= fun () -> `Timeout) ; *)
       (get_endorsement () >|= fun e -> `Endorsement e) ;
     ] >>= function
-    | `Endorsement None ->
+    | `Endorsement (None | Some (Error _)) ->
         Lwt.return_unit
-    | `Endorsement (Some e) ->
+    | `Endorsement (Some (Ok e)) ->
         last_get_endorsement := None ;
         Client_keys.Public_key_hash.name cctxt
           e.Client_mining_operations.source >>= fun source ->

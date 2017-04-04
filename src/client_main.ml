@@ -10,10 +10,10 @@
 (* Tezos Command line interface - Main Program *)
 
 open Lwt.Infix
+open Client_commands
+open Error_monad
 
-let cctxt =
-  (* TODO: set config as parameter? *)
-  let config = Client_commands.default_cfg in
+let cctxt config rpc_config =
   let startup =
     CalendarLib.Printer.Precise_Calendar.sprint
       "%Y-%m-%dT%H:%M:%SZ"
@@ -33,7 +33,7 @@ let cctxt =
           ~mode: Lwt_io.Output
           Client_commands.(config.base_dir // "logs" // log // startup)
           (fun chan -> Lwt_io.write chan msg) in
-  Client_commands.make_context log
+  Client_commands.make_context ~config ~rpc_config log
 
 (* Main (lwt) entry *)
 let main () =
@@ -41,16 +41,21 @@ let main () =
   Sodium.Random.stir () ;
   Lwt.catch begin fun () ->
     let parsed_config_file, block = Client_config.preparse_args Sys.argv in
-    Lwt.catch begin fun () ->
-      Client_node_rpcs.Blocks.protocol cctxt cctxt.config.block >>= fun version ->
-      Lwt.return (Some version, Client_commands.commands_for_version version)
-    end begin fun exn ->
-      cctxt.warning
-        "Failed to acquire the protocol version from the node: %s."
-        (match exn with
-         | Failure msg -> msg
-         | exn -> Printexc.to_string exn) >>= fun () ->
-      Lwt.return (None, [])
+    let rpc_config : Client_rpcs.config = {
+      Client_rpcs.default_config with
+      host = parsed_config_file.node_addr ;
+      port = parsed_config_file.node_port ;
+      tls = parsed_config_file.tls ;
+    } in
+    begin
+      Client_node_rpcs.Blocks.protocol rpc_config block >>= function
+      | Ok version ->
+          Lwt.return (Some version, Client_commands.commands_for_version version)
+      | Error err ->
+          Format.eprintf
+            "Failed to acquire the protocol version from the node: %a.@."
+            pp_print_error err ;
+          Lwt.return (None, [])
     end >>= fun (_version, commands_for_version)  ->
     let commands =
       Client_generic_rpcs.commands @
@@ -66,16 +71,23 @@ let main () =
         Sys.argv in
     let config : Client_commands.cfg = {
       base_dir = parsed_config_file.base_dir ;
-      print_timings = parsed_args.print_timings ;
       force = parsed_args.force ;
       block ;
-      node_addr = parsed_config_file.node_addr ;
-      node_port = parsed_config_file.node_port ;
-      tls = parsed_config_file.tls ;
       web_port = Client_commands.default_cfg.web_port ;
     } in
-    command { cctxt with config } >>= fun () ->
-    Lwt.return 0
+    let rpc_config =
+      if parsed_args.print_timings then
+        { rpc_config with
+          logger = Client_rpcs.timings_logger Format.err_formatter }
+      else
+        rpc_config
+    in
+    command (cctxt config rpc_config) >>= function
+    | Ok () ->
+        Lwt.return 0
+    | Error err ->
+        Format.eprintf "Error: %a@." pp_print_error err ;
+        Lwt.return 1
   end begin function
     | Arg.Help help ->
         Format.printf "%s%!" help ;
@@ -84,22 +96,22 @@ let main () =
         Format.eprintf "%s%!" help ;
         Lwt.return 1
     | Cli_entries.Command_not_found ->
-        Format.eprintf "Unknown command, try `-help`.\n%!" ;
+        Format.eprintf "Unknown command, try `-help`.@." ;
         Lwt.return 1
     | Client_commands.Version_not_found ->
-        Format.eprintf "Unknown protocol version, try `list versions`.\n%!" ;
+        Format.eprintf "Unknown protocol version, try `list versions`.@." ;
         Lwt.return 1
     | Cli_entries.Bad_argument (idx, _n, v) ->
-        Format.eprintf "There's a problem with argument %d, %s.\n%!" idx v ;
+        Format.eprintf "There's a problem with argument %d, %s.@." idx v ;
         Lwt.return 1
     | Cli_entries.Command_failed message ->
-        Format.eprintf "Command failed, %s.\n%!" message ;
+        Format.eprintf "Command failed, %s.@." message ;
         Lwt.return 1
     | Failure message ->
-        Format.eprintf "Fatal error: %s\n%!" message ;
+        Format.eprintf "Fatal error: %s@." message ;
         Lwt.return 1
     | exn ->
-        Format.printf "Fatal internal error: %s\n%!"
+        Format.printf "Fatal internal error: %s@."
           (Printexc.to_string exn) ;
         Lwt.return 1
   end

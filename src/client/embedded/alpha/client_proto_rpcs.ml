@@ -24,23 +24,21 @@ type block = [
 ]
 
 let call_service1 cctxt s block a1 =
-  Client_node_rpcs.call_service1 cctxt
+  Client_rpcs.call_service1 cctxt
     (s Node_rpc_services.Blocks.proto_path) block a1
 let call_error_service1 cctxt s block a1 =
-  Lwt.catch begin fun () ->
-    call_service1 cctxt s block a1 >|= wrap_error
-  end begin fun exn ->
-    Lwt.return (Error [Exn exn])
-  end
+  call_service1 cctxt s block a1 >>= function
+  | Ok (Error _ as err) -> Lwt.return (wrap_error err)
+  | Ok (Ok v) -> return v
+  | Error _ as err -> Lwt.return err
 let call_service2 cctxt s block a1 a2 =
-  Client_node_rpcs.call_service2 cctxt
+  Client_rpcs.call_service2 cctxt
     (s Node_rpc_services.Blocks.proto_path) block a1 a2
 let call_error_service2 cctxt s block a1 a2 =
-  Lwt.catch begin fun () ->
-    call_service2 cctxt s block a1 a2 >|= wrap_error
-  end begin fun exn ->
-    Lwt.return (Error [Exn exn])
-  end
+  call_service2 cctxt s block a1 a2 >>= function
+  | Ok (Error _ as err) -> Lwt.return (wrap_error err)
+  | Ok (Ok v) -> return v
+  | Error _ as err -> Lwt.return err
 
 module Constants = struct
   let errors cctxt block =

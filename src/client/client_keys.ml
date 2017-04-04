@@ -63,7 +63,8 @@ let gen_keys ?seed cctxt name =
   Secret_key.add cctxt name secret_key >>= fun () ->
   Public_key.add cctxt name public_key >>= fun () ->
   Public_key_hash.add cctxt name (Ed25519.Public_key.hash public_key) >>= fun () ->
-  cctxt.message "I generated a brand new pair of keys under the name '%s'." name
+  cctxt.message "I generated a brand new pair of keys under the name '%s'." name >>= fun () ->
+  return ()
 
 let check_keys_consistency pk sk =
   let message = MBytes.of_string "Voulez-vous coucher avec moi, ce soir ?" in
@@ -116,19 +117,22 @@ let commands () =
        @@ Secret_key.source_param
        @@ stop)
       (fun name sk cctxt ->
-         Lwt.catch (fun () ->
-             Public_key.find cctxt name >>= fun pk ->
-             if check_keys_consistency pk sk || cctxt.config.force then
-               Secret_key.add cctxt name sk
-             else
-               cctxt.error
-                 "public and secret keys '%s' don't correspond, \
-                  please don't use -force true" name)
-           (function
-             | Not_found ->
+         begin
+           Lwt.catch (fun () ->
+               Public_key.find cctxt name >>= fun pk ->
+               if check_keys_consistency pk sk || cctxt.config.force then
+                 Secret_key.add cctxt name sk
+               else
                  cctxt.error
-                   "no public key named '%s', add it before adding the secret key" name
-             | exn -> Lwt.fail exn)) ;
+                   "public and secret keys '%s' don't correspond, \
+                  please don't use -force true" name)
+             (function
+               | Not_found ->
+                   cctxt.error
+                     "no public key named '%s', add it before adding the secret key" name
+               | exn -> Lwt.fail exn)
+         end >>= fun () ->
+         return ()) ;
     command ~group ~desc: "add a public key to the wallet"
       (prefixes [ "add" ; "public" ; "key" ]
        @@ Public_key.fresh_alias_param
@@ -136,14 +140,16 @@ let commands () =
        @@ stop)
       (fun name key cctxt ->
          Public_key_hash.add cctxt name (Ed25519.Public_key.hash key) >>= fun () ->
-         Public_key.add cctxt name key) ;
+         Public_key.add cctxt name key >>= fun () ->
+         return ()) ;
     command ~group ~desc: "add an ID a public key hash to the wallet"
       (prefixes [ "add" ; "identity" ]
        @@ Public_key_hash.fresh_alias_param
        @@ Public_key_hash.source_param
        @@ stop)
       (fun name hash cctxt ->
-         Public_key_hash.add cctxt name hash) ;
+         Public_key_hash.add cctxt name hash >>= fun () ->
+         return ()) ;
     command ~group ~desc: "list all public key hashes and associated keys"
       (fixed [ "list" ; "known" ; "identities" ])
       (fun cctxt ->
@@ -153,14 +159,18 @@ let commands () =
              cctxt.message "%s: %s%s%s" name v
                (if pkm then " (public key known)" else "")
                (if pks then " (secret key known)" else ""))
-           l) ;
+           l >>= fun () ->
+         return ()) ;
     command ~group ~desc: "forget all keys"
       (fixed [ "forget" ; "all" ; "keys" ])
       (fun cctxt ->
-         if not cctxt.config.force then
-           cctxt.Client_commands.error "this can only used with option -force true"
-         else
-           Public_key.save cctxt [] >>= fun () ->
-           Secret_key.save cctxt [] >>= fun () ->
-           Public_key_hash.save cctxt []) ;
+         begin
+           if not cctxt.config.force then
+             cctxt.Client_commands.error "this can only used with option -force true"
+           else
+             Public_key.save cctxt [] >>= fun () ->
+             Secret_key.save cctxt [] >>= fun () ->
+             Public_key_hash.save cctxt []
+         end >>= fun () ->
+         return ()) ;
      ]

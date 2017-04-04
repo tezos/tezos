@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+
+open Client_commands
 open Logging.Client.Mining
 module Ed25519 = Environment.Ed25519
 
@@ -42,7 +44,7 @@ let inject_block cctxt block
     ~priority ~timestamp ~fitness ~seed_nonce
     ~src_sk operation_list =
   let block = match block with `Prevalidation -> `Head 0 | block -> block in
-  Client_node_rpcs.Blocks.info cctxt block >>= fun bi ->
+  Client_node_rpcs.Blocks.info cctxt block >>=? fun bi ->
   let seed_nonce_hash = Nonce.hash seed_nonce in
   Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
   let operations =
@@ -89,11 +91,11 @@ let forge_block cctxt block
     match operations with
     | None ->
         Client_node_rpcs.Blocks.pending_operations
-          cctxt block >|= fun (ops, pendings) ->
-        Operation_hash.Set.elements @@
-        Operation_hash.Set.union (Updater.operations ops) pendings
-    | Some operations -> Lwt.return operations
-  end >>= fun operations ->
+          cctxt block >>=? fun (ops, pendings) ->
+        return (Operation_hash.Set.elements @@
+                Operation_hash.Set.union (Updater.operations ops) pendings)
+    | Some operations -> return operations
+  end >>=? fun operations ->
   begin
     match priority with
     | `Set prio -> begin
@@ -304,24 +306,24 @@ let compute_timeout { future_slots } =
         Lwt_unix.sleep (Int64.to_float delay)
 
 let get_unrevealed_nonces cctxt ?(force = false) block =
-  Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
+  Client_proto_rpcs.Context.next_level cctxt.rpc_config block >>=? fun level ->
   let cur_cycle = level.cycle in
   match Cycle.pred cur_cycle with
   | None -> return []
   | Some cycle ->
       Client_mining_blocks.blocks_from_cycle
-        cctxt block cycle >>=? fun blocks ->
+        cctxt.rpc_config block cycle >>=? fun blocks ->
       map_filter_s (fun hash ->
           Client_proto_nonces.find cctxt hash >>= function
           | None -> return None
           | Some nonce ->
               Client_proto_rpcs.Context.level
-                cctxt (`Hash hash) >>=? fun level ->
+                cctxt.rpc_config (`Hash hash) >>=? fun level ->
               if force then
                 return (Some (hash, (level.level, nonce)))
               else
                 Client_proto_rpcs.Context.Nonce.get
-                  cctxt block level.level >>=? function
+                  cctxt.rpc_config block level.level >>=? function
                 | Missing nonce_hash
                   when Nonce.check_hash nonce nonce_hash ->
                     cctxt.warning "Found nonce for %a (level: %a)@."
@@ -362,7 +364,7 @@ let insert_block
       ~before:(Time.add state.best.timestamp (-1800L)) state ;
   end ;
   get_delegates cctxt state >>= fun delegates ->
-  get_mining_slot cctxt ?max_priority bi delegates >>= function
+  get_mining_slot cctxt.rpc_config ?max_priority bi delegates >>= function
   | None ->
       lwt_debug
         "Can't compute slot for %a" Block_hash.pp_short bi.hash >>= fun () ->
@@ -392,7 +394,7 @@ let insert_blocks cctxt ?max_priority state bis =
 
 let mine cctxt state =
   let slots = pop_mining_slots state in
-  Lwt_list.map_p
+  map_p
     (fun (timestamp, (bi, prio, delegate)) ->
        let block = `Hash bi.Client_mining_blocks.hash in
        let timestamp =
@@ -404,19 +406,19 @@ let mine cctxt state =
        lwt_debug "Try mining after %a (slot %d) for %s (%a)"
          Block_hash.pp_short bi.hash
          prio name Time.pp_hum timestamp >>= fun () ->
-       Client_node_rpcs.Blocks.pending_operations cctxt
-         block >>= fun (res, ops) ->
+       Client_node_rpcs.Blocks.pending_operations cctxt.rpc_config
+         block >>=? fun (res, ops) ->
        let operations =
          let open Operation_hash.Set in
          elements (union ops (Updater.operations res)) in
        let request = List.length operations in
-       Client_node_rpcs.Blocks.preapply cctxt block
+       Client_node_rpcs.Blocks.preapply cctxt.rpc_config block
          ~timestamp ~sort:true operations >>= function
        | Error errs ->
            lwt_log_error "Error while prevalidating operations:\n%a"
              pp_print_error
              errs >>= fun () ->
-           Lwt.return_none
+           return None
        | Ok { operations ; fitness ; timestamp } ->
            lwt_debug
              "Computed condidate block after %a (slot %d): %d/%d fitness: %a"
@@ -424,9 +426,9 @@ let mine cctxt state =
              (List.length operations.applied) request
              Fitness.pp fitness
            >>= fun () ->
-           Lwt.return
+           return
              (Some (bi, prio, fitness, timestamp, operations, delegate)))
-    slots >>= fun candidates ->
+    slots >>=? fun candidates ->
   let candidates =
     List.sort
       (fun (_,_,f1,_,_,_) (_,_,f2,_,_,_) -> ~- (Fitness.compare f1 f2))
@@ -441,7 +443,7 @@ let mine cctxt state =
         Fitness.pp fitness >>= fun () ->
       let seed_nonce = generate_seed_nonce () in
       Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
-      inject_block cctxt
+      inject_block cctxt.rpc_config
         ~force:true ~src_sk ~priority ~timestamp ~fitness ~seed_nonce
         (`Hash bi.hash) [operations.applied]
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
@@ -466,14 +468,14 @@ let mine cctxt state =
 let create
     cctxt ?max_priority delegates
     (block_stream:
-       Client_mining_blocks.block_info list Lwt_stream.t)
+       Client_mining_blocks.block_info list tzresult Lwt_stream.t)
     (endorsement_stream:
-       Client_mining_operations.valid_endorsement Lwt_stream.t) =
+       Client_mining_operations.valid_endorsement tzresult Lwt_stream.t) =
   Lwt_stream.get block_stream >>= function
-  | None | Some [] ->
+  | None | Some (Ok [] | Error _) ->
       cctxt.Client_commands.error "Can't fetch the current block head."
-  | Some (bi :: _ as initial_heads) ->
-      Client_node_rpcs.Blocks.hash cctxt `Genesis >>= fun genesis_hash ->
+  | Some (Ok (bi :: _ as initial_heads)) ->
+      Client_node_rpcs.Blocks.hash cctxt.rpc_config `Genesis >>=? fun genesis_hash ->
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with
@@ -498,10 +500,10 @@ let create
                      (get_block () >|= fun b -> `Hash b) ;
                      (get_endorsement () >|= fun e -> `Endorsement e) ;
                    ] >>= function
-        | `Hash None
-        | `Endorsement None ->
+        | `Hash (None | Some (Error _))
+        | `Endorsement (None | Some (Error _)) ->
             Lwt.return_unit
-        | `Hash (Some bis) -> begin
+        | `Hash (Some (Ok bis)) -> begin
             Lwt.cancel timeout ;
             last_get_block := None ;
             lwt_debug
@@ -514,7 +516,7 @@ let create
               insert_blocks cctxt ?max_priority state bis >>= fun () ->
               worker_loop ()
           end
-        | `Endorsement (Some e) ->
+        | `Endorsement (Some (Ok e)) ->
             Lwt.cancel timeout ;
             last_get_endorsement := None ;
             Client_keys.Public_key_hash.name cctxt
@@ -534,7 +536,8 @@ let create
             end >>= fun () ->
             worker_loop () in
   lwt_log_info "Starting mining daemon" >>= fun () ->
-  worker_loop ()
+  worker_loop () >>= fun () ->
+  return ()
 
 (* FIXME bug in ocamldep ?? *)
 open Level

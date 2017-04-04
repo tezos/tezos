@@ -38,6 +38,6 @@ val gen_keys:
   ?seed: Sodium.Sign.seed ->
   Client_commands.context ->
   string ->
-  unit Lwt.t
+  unit tzresult Lwt.t
 
 val commands: unit -> Client_commands.command list

@@ -12,4 +12,4 @@ val run:
   ?max_priority: int ->
   delay: int ->
   ?min_date: Time.t ->
-  public_key_hash list -> unit Lwt.t
+  public_key_hash list -> unit tzresult Lwt.t

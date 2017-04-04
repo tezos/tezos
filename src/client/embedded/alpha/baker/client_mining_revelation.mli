@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 val inject_seed_nonce_revelation:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   ?async:bool ->
