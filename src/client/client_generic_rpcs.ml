@@ -9,7 +9,8 @@
 
 (* Tezos Command line interface - Generic JSON RPC interface *)
 
-open Lwt
+open Lwt.Infix
+open Client_commands
 open Cli_entries
 open Json_schema
 
@@ -44,92 +45,92 @@ let fill_in input schema =
           | Some (m, `Inclusive) -> int_of_float m
           | Some (m, `Exclusive) -> int_of_float m - 1 in
         input.int minimum maximum title path >>= fun i ->
-        return (`Float (float i))
+        Lwt.return (`Float (float i))
     | Number _ ->
         input.float title path >>= fun f ->
-        return (`Float f)
+        Lwt.return (`Float f)
     | Boolean ->
         input.bool title path >>= fun f ->
-        return (`Bool f)
+        Lwt.return (`Bool f)
     | String _ ->
         input.string title path >>= fun f ->
-        return (`String f)
+        Lwt.return (`String f)
     | Combine ((One_of | Any_of), elts) ->
         let nb = List.length elts in
         input.int 0 (nb - 1) (Some "Select the schema to follow") path >>= fun n ->
         element path (List.nth elts n)
-    | Combine ((All_of | Not), _) -> fail Unsupported_construct
+    | Combine ((All_of | Not), _) ->  Lwt.fail Unsupported_construct
     | Def_ref name ->
-        return (`String (Json_query.json_pointer_of_path name))
+        Lwt.return (`String (Json_query.json_pointer_of_path name))
     | Id_ref _ | Ext_ref _ ->
-        fail Unsupported_construct
+        Lwt.fail Unsupported_construct
     | Array (elts, _) ->
         let rec fill_loop acc n ls =
           match ls with
-          | [] -> return acc
+          | [] -> Lwt.return acc
           | elt :: elts ->
               element (string_of_int n :: path) elt >>= fun json ->
               fill_loop (json :: acc) (succ n) elts
         in
         fill_loop [] 0 elts >>= fun acc ->
-        return (`A (List.rev acc))
+        Lwt.return (`A (List.rev acc))
     | Object { properties } ->
         let rec fill_loop acc ls =
           match ls with
-          | [] -> return acc
+          | [] -> Lwt.return acc
           | (n, elt, _, _) :: elts ->
               element (n :: path) elt >>= fun json ->
               fill_loop ((n, json) :: acc) elts
         in
         fill_loop [] properties >>= fun acc ->
-        return (`O (List.rev acc))
+        Lwt.return (`O (List.rev acc))
     | Monomorphic_array (elt, specs) ->
         let rec fill_loop acc min n max =
           if n > max then
-            return acc
+            Lwt.return acc
           else
             element (string_of_int n :: path) elt >>= fun json ->
-            (if n < min then return true else input.continue title path) >>= function
+            (if n < min then Lwt.return true else input.continue title path) >>= function
             | true -> fill_loop (json :: acc) min (succ n) max
-            | false -> return (json :: acc)
+            | false -> Lwt.return (json :: acc)
         in
         let max = match specs.max_items with None -> max_int | Some m -> m in
         fill_loop [] specs.min_items 0 max >>= fun acc ->
-        return (`A (List.rev acc))
-    | Any -> fail Unsupported_construct
-    | Dummy -> fail Unsupported_construct
-    | Null -> return `Null
+        Lwt.return (`A (List.rev acc))
+    | Any -> Lwt.fail Unsupported_construct
+    | Dummy -> Lwt.fail Unsupported_construct
+    | Null -> Lwt.return `Null
   in
   element [] (Json_schema.root schema)
 
 let random_fill_in schema =
-  let display _ = return () in
+  let display _ = Lwt.return () in
   let int min max _ _ =
     let max = Int64.of_int max
     and min = Int64.of_int min in
     let range = Int64.sub max min in
     let random_int64 = Int64.add (Random.int64 range) min in
-    return (Int64.to_int random_int64) in
-  let string _title _ = return "" in
-  let float _ _ = return (Random.float infinity) in
-  let bool _ _ = return (Random.int 2 = 0) in
-  let continue _ _ = return (Random.int 4 = 0) in
-  catch
+    Lwt.return (Int64.to_int random_int64) in
+  let string _title _ = Lwt.return "" in
+  let float _ _ = Lwt.return (Random.float infinity) in
+  let bool _ _ = Lwt.return (Random.int 2 = 0) in
+  let continue _ _ = Lwt.return (Random.int 4 = 0) in
+  Lwt.catch
     (fun () ->
        fill_in
          { int ; float ; string ; bool ; display ; continue }
          schema >>= fun json ->
-       return (Ok json))
+       Lwt.return (Ok json))
     (fun e ->
        let msg = Printf.sprintf "Fill-in failed %s\n%!" (Printexc.to_string e) in
-       return (Error msg))
+       Lwt.return (Error msg))
 
 let editor_fill_in schema =
   let tmp = Filename.temp_file "tezos_rpc_call_" ".json" in
   let rec init () =
     (* write a temp file with instructions *)
     random_fill_in schema >>= function
-    | Error msg -> return (Error msg)
+    | Error msg -> Lwt.return (Error msg)
     | Ok json ->
         Lwt_io.(with_file Output tmp (fun fp ->
             write_line fp (Data_encoding_ezjsonm.to_string json))) >>= fun () ->
@@ -139,30 +140,30 @@ let editor_fill_in schema =
     let editor_cmd =
       try let ed = Sys.getenv "EDITOR" in Lwt_process.shell (ed ^ " " ^ tmp)
       with Not_found ->
-        try let ed = Sys.getenv "VISUAL" in Lwt_process.shell (ed ^ " " ^ tmp)
-        with Not_found ->
-          if Sys.win32 then
-            (* TODO: I have no idea what I'm doing here *)
-            ("", [| "notepad.exe" ; tmp |])
-          else
-            (* TODO: vi on MacOSX ? *)
-            ("", [| "nano" ; tmp |])
+      try let ed = Sys.getenv "VISUAL" in Lwt_process.shell (ed ^ " " ^ tmp)
+      with Not_found ->
+        if Sys.win32 then
+          (* TODO: I have no idea what I'm doing here *)
+          ("", [| "notepad.exe" ; tmp |])
+        else
+          (* TODO: vi on MacOSX ? *)
+          ("", [| "nano" ; tmp |])
     in
     (Lwt_process.open_process_none editor_cmd) # status >>= function
     | Unix.WEXITED 0 ->
         reread () >>= fun json ->
         delete () >>= fun () ->
-        return json
+        Lwt.return json
     | Unix.WSIGNALED x | Unix.WSTOPPED x | Unix.WEXITED x ->
         let msg = Printf.sprintf "FAILED %d \n%!" x in
         delete () >>= fun () ->
-        return (Error msg)
+        Lwt.return (Error msg)
   and reread () =
     (* finally reread the file *)
     Lwt_io.(with_file Input tmp (fun fp -> read fp)) >>= fun text ->
     match Data_encoding_ezjsonm.from_string text with
-    | Ok r -> return (Ok r)
-    | Error msg -> return (Error (Printf.sprintf "bad input: %s" msg))
+    | Ok r -> Lwt.return (Ok r)
+    | Error msg -> Lwt.return (Error (Printf.sprintf "bad input: %s" msg))
   and delete () =
     (* and delete the temp file *)
     Lwt_unix.unlink tmp
@@ -194,7 +195,8 @@ let rec count =
 
 let list url cctxt =
   let args = Utils.split '/' url in
-  Client_node_rpcs.describe cctxt ~recurse:true args >>= fun tree ->
+  Client_node_rpcs.describe cctxt.rpc_config
+    ~recurse:true args >>=? fun tree ->
   let open RPC.Description in
   let collected_args = ref [] in
   let collect arg =
@@ -274,23 +276,26 @@ let list url cctxt =
   in
   cctxt.message "@ @[<v 2>Available services:@ @ %a@]@."
     display (args, args, tree) >>= fun () ->
-  if !collected_args <> [] then
+  if !collected_args <> [] then begin
     cctxt.message "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
-      (Format.pp_print_list display_arg) !collected_args
-  else Lwt.return ()
+      (Format.pp_print_list display_arg) !collected_args >>= fun () ->
+    return ()
+  end else return ()
 
 
 let schema url cctxt =
   let args = Utils.split '/' url in
   let open RPC.Description in
-  Client_node_rpcs.describe cctxt ~recurse:false args >>= function
+  Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
   | Static { service = Some { input ; output } } ->
       cctxt.message "Input schema:\n%s\nOutput schema:\n%s\n%!"
         (Data_encoding_ezjsonm.to_string (Json_schema.to_json input))
-        (Data_encoding_ezjsonm.to_string (Json_schema.to_json output))
+        (Data_encoding_ezjsonm.to_string (Json_schema.to_json output)) >>= fun () ->
+      return ()
   | _ ->
       cctxt.message
-        "No service found at this URL (but this is a valid prefix)\n%!"
+        "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
+      return ()
 
 let fill_in schema =
   let open Json_schema in
@@ -302,32 +307,36 @@ let fill_in schema =
 let call url cctxt =
   let args = Utils.split '/' url in
   let open RPC.Description in
-  Client_node_rpcs.describe cctxt ~recurse:false args >>= function
+  Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
   | Static { service = Some { input } } -> begin
       fill_in input >>= function
       | Error msg ->
-          cctxt.error "%s" msg
+          cctxt.error "%s" msg >>= fun () ->
+          return ()
       | Ok json ->
-          Client_node_rpcs.get_json cctxt `POST args json >>= fun json ->
+          Client_rpcs.get_json cctxt.rpc_config `POST args json >>=? fun json ->
           cctxt.message
-            "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
+            "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json) >>= fun () ->
+          return ()
     end
   | _ ->
       cctxt.message
-        "No service found at this URL (but this is a valid prefix)\n%!"
+        "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
+      return ()
 
 let call_with_json url json (cctxt: Client_commands.context) =
   let args = Utils.split '/' url in
   match Data_encoding_ezjsonm.from_string json with
   | Error err ->
       cctxt.error
-        "Failed to parse the proviede json: %s\n%!"
+        "Failed to parse the provided json: %s\n%!"
         err
   | Ok json ->
       let open RPC.Description in
-      Client_node_rpcs.get_json cctxt `POST args json >>= fun json ->
+      Client_rpcs.get_json cctxt.rpc_config `POST args json >>=? fun json ->
       cctxt.message
-        "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json)
+        "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json) >>= fun () ->
+      return ()
 
 let group =
   { Cli_entries.name = "rpc" ;
@@ -339,7 +348,8 @@ let commands = [
     (fun cctxt ->
        Lwt_list.iter_s
          (fun (ver, _) -> cctxt.Client_commands.message "%a" Protocol_hash.pp_short ver)
-         (Client_commands.get_versions ())) ;
+         (Client_commands.get_versions ()) >>= fun () ->
+       return ()) ;
   command ~group ~desc: "list available RPCs (low level command for advanced users)"
     (prefixes [ "rpc" ; "list" ] @@ stop)
     (list "/");

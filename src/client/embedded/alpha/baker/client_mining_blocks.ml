@@ -33,7 +33,7 @@ let convert_block_info_err cctxt
   return { hash ; predecessor ; fitness ; timestamp ; protocol ; level }
 
 let info cctxt ?operations block =
-  Client_node_rpcs.Blocks.info cctxt ?operations block >>= fun block ->
+  Client_node_rpcs.Blocks.info cctxt ?operations block >>=? fun block ->
   convert_block_info_err cctxt block
 
 let compare (bi1 : block_info) (bi2 : block_info) =
@@ -58,9 +58,11 @@ let monitor cctxt
     ?min_date ?min_heads ?compare () =
   Client_node_rpcs.Blocks.monitor cctxt
     ?operations ?length ?heads ?delay ?min_date ?min_heads
-    () >>= fun block_stream ->
-  let convert blocks = sort_blocks cctxt ?compare (List.flatten blocks) in
-  Lwt.return (Lwt_stream.map_s convert block_stream)
+    () >>=? fun block_stream ->
+  let convert blocks =
+    Lwt.return blocks >>=? fun blocks ->
+    sort_blocks cctxt ?compare (List.flatten blocks) >>= return in
+  return (Lwt_stream.map_s convert block_stream)
 
 let blocks_from_cycle cctxt block cycle =
   let block =
@@ -71,7 +73,7 @@ let blocks_from_cycle cctxt block cycle =
   Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
   Client_proto_rpcs.Helpers.levels cctxt block cycle >>=? fun (first, last) ->
   let length = Int32.to_int (Raw_level.diff level.level first) in
-  Client_node_rpcs.Blocks.predecessors cctxt block length >>= fun blocks ->
+  Client_node_rpcs.Blocks.predecessors cctxt block length >>=? fun blocks ->
   let blocks =
     Utils.remove_elem_from_list
       (length - (1 + Int32.to_int (Raw_level.diff last first))) blocks in

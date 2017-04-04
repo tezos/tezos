@@ -12,31 +12,27 @@ type ('a, 'b) lwt_format =
 
 type cfg = {
 
-  (* network options. *)
-  node_addr : string ;
-  node_port : int ;
-  tls : bool ;
-
   (* webclient options *)
   web_port : int ;
 
   (* misc options *)
   base_dir : string ;
-  print_timings : bool ;
   force : bool ;
   block : Node_rpc_services.Blocks.block ;
 
 }
 
-type context =
-  { config : cfg ;
-    error : 'a 'b. ('a, 'b) lwt_format -> 'a ;
-    warning : 'a. ('a, unit) lwt_format -> 'a ;
-    message : 'a. ('a, unit) lwt_format -> 'a ;
-    answer : 'a. ('a, unit) lwt_format -> 'a ;
-    log : 'a. string -> ('a, unit) lwt_format -> 'a }
+type context = {
+  rpc_config : Client_rpcs.config ;
+  config : cfg ;
+  error : 'a 'b. ('a, 'b) lwt_format -> 'a ;
+  warning : 'a. ('a, unit) lwt_format -> 'a ;
+  message : 'a. ('a, unit) lwt_format -> 'a ;
+  answer : 'a. ('a, unit) lwt_format -> 'a ;
+  log : 'a. string -> ('a, unit) lwt_format -> 'a ;
+}
 
-type command = (context, unit) Cli_entries.command
+type command = (context, unit tzresult) Cli_entries.command
 
 (* Default config *)
 
@@ -44,13 +40,8 @@ let (//) = Filename.concat
 
 let default_cfg_of_base_dir base_dir = {
   base_dir ;
-  print_timings = false ;
   force = false ;
   block = `Prevalidation ;
-
-  node_addr = "127.0.0.1" ;
-  node_port = 8732 ;
-  tls = false ;
 
   web_port = 8080 ;
 }
@@ -63,7 +54,10 @@ let default_base_dir = home // ".tezos-client"
 
 let default_cfg = default_cfg_of_base_dir default_base_dir
 
-let make_context ?(config = default_cfg) log =
+let make_context
+    ?(config = default_cfg)
+    ?(rpc_config = Client_rpcs.default_config)
+    log =
   let error fmt =
     Format.kasprintf
       (fun msg ->
@@ -83,7 +77,7 @@ let make_context ?(config = default_cfg) log =
     Format.kasprintf
       (fun msg -> log name msg)
       fmt in
-  { config ; error ; warning ; message ; answer ; log }
+  { config ; rpc_config ; error ; warning ; message ; answer ; log }
 
 let ignore_context =
   make_context (fun _ _ -> Lwt.return ())

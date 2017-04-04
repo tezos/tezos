@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Client_commands
+
 let group =
   { Cli_entries.name = "protocols" ;
     title = "Commands for managing protocols" }
@@ -24,8 +26,9 @@ let commands () =
     command ~group ~desc: "list known protocols"
       (prefixes [ "list" ; "protocols" ] stop)
       (fun cctxt ->
-         Client_node_rpcs.Protocols.list cctxt ~contents:false () >>= fun protos ->
-         Lwt_list.iter_s (fun (ph, _p) -> cctxt.message "%a" Protocol_hash.pp ph) protos
+         Client_node_rpcs.Protocols.list cctxt.rpc_config ~contents:false () >>=? fun protos ->
+         Lwt_list.iter_s (fun (ph, _p) -> cctxt.message "%a" Protocol_hash.pp ph) protos >>= fun () ->
+         return ()
       );
     command ~group ~desc: "inject a new protocol to the shell database"
       (prefixes [ "inject" ; "protocol" ]
@@ -35,24 +38,30 @@ let commands () =
          Lwt.catch
            (fun () ->
               let proto = Tezos_compiler.Protocol.of_dir dirname in
-              Client_node_rpcs.inject_protocol cctxt proto >>= function
+              Client_node_rpcs.inject_protocol cctxt.rpc_config proto >>= function
               | Ok hash ->
-                  cctxt.message "Injected protocol %a successfully" Protocol_hash.pp_short hash
+                  cctxt.message "Injected protocol %a successfully" Protocol_hash.pp_short hash >>= fun () ->
+                  return ()
+    
               | Error err ->
                   cctxt.error "Error while injecting protocol from %s: %a"
-                    dirname Error_monad.pp_print_error err)
+                    dirname Error_monad.pp_print_error err >>= fun () ->
+                  return ())
            (fun exn ->
               cctxt.error "Error while injecting protocol from %s: %a"
-                dirname Error_monad.pp_print_error [Error_monad.Exn exn])
+                dirname Error_monad.pp_print_error [Error_monad.Exn exn] >>= fun () ->
+              return ())
       );
     command ~group ~desc: "dump a protocol from the shell database"
       (prefixes [ "dump" ; "protocol" ]
        @@ param ~name:"protocol hash" ~desc:"" check_hash
        @@ stop)
       (fun ph cctxt ->
-         Client_node_rpcs.Protocols.contents cctxt ph >>= fun proto ->
+         Client_node_rpcs.Protocols.contents cctxt.rpc_config ph >>=? fun proto ->
          Updater.extract "" ph proto >>= fun () ->
-         cctxt.message "Extracted protocol %a" Protocol_hash.pp_short ph) ;
+         cctxt.message "Extracted protocol %a" Protocol_hash.pp_short ph >>= fun () ->
+         return ()
+    ) ;
          (* | Error err -> *)
              (* cctxt.error "Error while dumping protocol %a: %a" *)
                (* Protocol_hash.pp_short ph Error_monad.pp_print_error err); *)

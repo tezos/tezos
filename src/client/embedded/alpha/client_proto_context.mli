@@ -14,7 +14,7 @@ val list_contracts:
     list tzresult Lwt.t
 
 val get_balance:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   Contract.t ->
   Tez.t tzresult Lwt.t

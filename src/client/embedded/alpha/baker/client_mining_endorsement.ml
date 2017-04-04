@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 open Logging.Client.Endorsement
+open Client_commands
 open Cli_entries
 
 module Ed25519 = Environment.Ed25519
@@ -118,9 +119,9 @@ let get_signing_slots cctxt ?max_priority block delegate level =
 let inject_endorsement cctxt
     block level ?async ?force
     src_sk source slot =
-  Client_blocks.get_block_hash cctxt block >>= fun block_hash ->
-  Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
-  Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt
+  Client_blocks.get_block_hash cctxt.rpc_config block >>=? fun block_hash ->
+  Client_node_rpcs.Blocks.net cctxt.rpc_config block >>=? fun net ->
+  Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt.rpc_config
     block
     ~net
     ~source
@@ -129,7 +130,7 @@ let inject_endorsement cctxt
     () >>=? fun bytes ->
   let signed_bytes = Ed25519.Signature.append src_sk bytes in
   Client_node_rpcs.inject_operation
-    cctxt ?force ?async signed_bytes >>=? fun oph ->
+    cctxt.rpc_config ?force ?async signed_bytes >>=? fun oph ->
   State.record_endorsement cctxt level block_hash slot oph >>=? fun () ->
   return oph
 
@@ -157,14 +158,14 @@ let forge_endorsement cctxt
     | `Test_prevalidation -> `Test_head 0
     | _ -> block in
   let src_pkh = Ed25519.Public_key.hash src_pk in
-  Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
+  Client_proto_rpcs.Context.level cctxt.rpc_config block >>=? fun level ->
   let level = Raw_level.succ level.level in
   begin
     match slot with
     | Some slot -> return slot
     | None ->
         get_signing_slots
-          cctxt ?max_priority block src_pkh level >>=? function
+          cctxt.rpc_config ?max_priority block src_pkh level >>=? function
         | slot::_ -> return slot
         | [] -> cctxt.error "No slot found at level %a" Raw_level.pp level
   end >>=? fun slot ->
@@ -223,7 +224,7 @@ let schedule_endorsements cctxt state bis =
       Block_hash.pp_short block.hash name >>= fun () ->
     let b = `Hash block.hash in
     let level = Raw_level.succ block.level.level in
-    get_signing_slots cctxt b delegate level >>=? fun slots ->
+    get_signing_slots cctxt.rpc_config b delegate level >>=? fun slots ->
     lwt_debug "Found slots for %a/%s (%d)"
       Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->
     iter_p
@@ -341,9 +342,9 @@ let compute_timeout state =
 let create cctxt ~delay contracts block_stream =
   lwt_log_info "Starting endorsement daemon" >>= fun () ->
   Lwt_stream.get block_stream >>= function
-  | None | Some [] ->
+  | None | Some (Ok []) | Some (Error _) ->
       cctxt.Client_commands.error "Can't fetch the current block head."
-  | Some (bi :: _ as initial_heads) ->
+  | Some (Ok (bi :: _ as initial_heads)) ->
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with
@@ -357,9 +358,9 @@ let create cctxt ~delay contracts block_stream =
         let timeout = compute_timeout state in
         Lwt.choose [ (timeout >|= fun () -> `Timeout) ;
                      (get_block () >|= fun b -> `Hash b) ] >>= function
-        | `Hash None ->
+        | `Hash (None | Some (Error _)) ->
             Lwt.return_unit
-        | `Hash (Some bis) ->
+        | `Hash (Some (Ok bis)) ->
             Lwt.cancel timeout ;
             last_get_block := None ;
             schedule_endorsements cctxt state bis >>= fun () ->

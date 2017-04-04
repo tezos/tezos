@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 open Cli_entries
+open Client_commands
 open Client_proto_contracts
 
 let mine_block cctxt block ?force ?max_priority ?src_sk delegate =
@@ -18,10 +19,10 @@ let mine_block cctxt block ?force ?max_priority ?src_sk delegate =
         return src_sk
     | Some sk -> return sk
   end >>=? fun src_sk ->
-  Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
+  Client_proto_rpcs.Context.level cctxt.rpc_config block >>=? fun level ->
   let level = Raw_level.succ level.level in
   let seed_nonce = Client_mining_forge.generate_seed_nonce () in
-  Client_mining_forge.forge_block cctxt
+  Client_mining_forge.forge_block cctxt.rpc_config
     ~timestamp:(Time.now ())
     ?force
     ~seed_nonce ~src_sk block
@@ -62,7 +63,7 @@ let reveal_block_nonces cctxt ?force block_hashes =
     (fun hash ->
        Lwt.catch
          (fun () ->
-            Client_mining_blocks.info cctxt (`Hash hash) >>= function
+            Client_mining_blocks.info cctxt.rpc_config (`Hash hash) >>= function
             | Ok bi -> Lwt.return (Some bi)
             | Error _ ->
                 Lwt.fail Not_found)
@@ -119,8 +120,7 @@ let commands () =
        @@ stop)
       (fun (_, delegate) cctxt ->
          endorse_block cctxt
-           ~force:!force ?max_priority:!max_priority delegate >>=
-         Client_proto_rpcs.handle_error cctxt) ;
+           ~force:!force ?max_priority:!max_priority delegate) ;
     command ~group ~desc: "Forge and inject block using the delegate rights"
       ~args: [ max_priority_arg ; force_arg ]
       (prefixes [ "mine"; "for" ]
@@ -129,23 +129,20 @@ let commands () =
        @@ stop)
       (fun (_, delegate) cctxt ->
          mine_block cctxt cctxt.config.block
-           ~force:!force ?max_priority:!max_priority delegate >>=
-         Client_proto_rpcs.handle_error cctxt) ;
+           ~force:!force ?max_priority:!max_priority delegate) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation"
       ~args: [ force_arg ]
       (prefixes [ "reveal"; "nonce"; "for" ]
        @@ Cli_entries.seq_of_param Block_hash.param)
       (fun block_hashes cctxt ->
          reveal_block_nonces cctxt
-           ~force:!force block_hashes >>=
-         Client_proto_rpcs.handle_error cctxt) ;
+           ~force:!force block_hashes) ;
     command ~group ~desc: "Forge and inject redemption operations"
       ~args: [ force_arg ]
       (prefixes [ "reveal"; "nonces" ]
        @@ stop)
       (fun cctxt ->
-         reveal_nonces cctxt ~force:!force () >>=
-         Client_proto_rpcs.handle_error cctxt) ;
+         reveal_nonces cctxt ~force:!force ()) ;
   ]
 
 let () =

@@ -9,7 +9,7 @@
 
 (*  Tezos - Persistent structures on top of {!Store} or {!Context} *)
 
-open Lwt
+open Lwt.Infix
 
 (*-- Signatures --------------------------------------------------------------*)
 
@@ -142,7 +142,7 @@ module MakeBytesStore
 
   let list s l =
     S.list s (List.map to_path l) >>= fun res ->
-    return (List.map of_path res)
+    Lwt.return (List.map of_path res)
 
   let remove_rec s k =
     S.remove_rec s (to_path k)
@@ -161,8 +161,8 @@ module MakeTypedStore
   let mem = S.mem
   let get s k =
     S.get s k >>= function
-    | None -> return None
-    | Some v -> return (C.of_bytes v)
+    | None -> Lwt.return None
+    | Some v -> Lwt.return (C.of_bytes v)
   let set s k v = S.set s k (C.to_bytes v)
   let del = S.del
 

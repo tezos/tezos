@@ -15,11 +15,11 @@ let demo cctxt =
   let block = Client_commands.(cctxt.config.block) in
   cctxt.Client_commands.message "Calling the 'echo' RPC." >>= fun () ->
   let msg = "test" in
-  Client_proto_rpcs.echo cctxt block msg >>= fun reply ->
+  Client_proto_rpcs.echo cctxt.rpc_config block msg >>=? fun reply ->
   fail_unless (reply = msg) (Unclassified "...") >>=? fun () ->
   begin
     cctxt.message "Calling the 'failing' RPC." >>= fun () ->
-    Client_proto_rpcs.failing cctxt block 3 >>= function
+    Client_proto_rpcs.failing cctxt.rpc_config block 3 >>= function
     | Error [Ecoproto_error [Error.Demo_error 3]] ->
         return ()
     | _ -> failwith "..."
@@ -39,7 +39,7 @@ let mine cctxt =
     | `Prevalidation -> `Head 0
     | `Test_prevalidation -> `Test_head 0
     | b -> b in
-  Client_node_rpcs.Blocks.info cctxt block >>= fun bi ->
+  Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
   let fitness =
     match bi.fitness with
     | [ v ; b ] ->
@@ -50,10 +50,10 @@ let mine cctxt =
         Lwt.ignore_result
           (cctxt.message "Cannot parse fitness: %a" Fitness.pp bi.fitness);
         exit 2 in
-  Client_node_rpcs.forge_block cctxt
+  Client_node_rpcs.forge_block cctxt.rpc_config
     ~net:bi.net ~predecessor:bi.hash
-    fitness Operation_list_list_hash.empty (MBytes.create 0) >>= fun bytes ->
-  Client_node_rpcs.inject_block cctxt bytes [] >>=? fun hash ->
+    fitness Operation_list_list_hash.empty (MBytes.create 0) >>=? fun bytes ->
+  Client_node_rpcs.inject_block cctxt.rpc_config bytes [] >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()
 
@@ -70,16 +70,15 @@ let commands () =
   [
     command ~group ~desc: "A demo command"
       (fixed [ "demo" ])
-      (fun cctxt -> demo cctxt >>= handle_error cctxt) ;
+      (fun cctxt -> demo cctxt) ;
     command ~group ~desc: "A failing command"
       (fixed [ "fail" ])
-      (fun cctxt ->
+      (fun _cctxt ->
          Error.demo_error 101010
-         >|= wrap_error
-         >>= handle_error cctxt) ;
+         >|= wrap_error) ;
     command ~group ~desc: "Mine an empty block"
       (fixed [ "mine" ])
-      (fun cctxt -> mine cctxt >>= handle_error cctxt) ;
+      (fun cctxt -> mine cctxt) ;
   ]
 
 let () =

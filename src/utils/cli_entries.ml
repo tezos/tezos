@@ -9,7 +9,7 @@
 
 (* Tezos Command line interface - Command Line Parsing *)
 
-open Lwt
+open Lwt.Infix
 
 (* User catchable exceptions *)
 exception Command_not_found
@@ -70,7 +70,7 @@ let command ?group ?(args = []) ~desc params handler =
 
 (* Param combinators *)
 let string ~name ~desc next =
-  param name desc (fun _ s -> return s) next
+  param name desc (fun _ s -> Lwt.return s) next
 
 (* Command execution *)
 let exec
@@ -86,7 +86,7 @@ let exec
         let rec do_seq i acc = function
           | [] -> Lwt.return (List.rev acc)
           | p :: rest ->
-              catch
+              Lwt.catch
                 (fun () -> f last p)
                 (function
                   | Failure msg -> Lwt.fail (Bad_argument (i, p, msg))
@@ -98,7 +98,7 @@ let exec
     | Prefix (n, next), p :: rest when n = p ->
         exec (succ i) next cb rest
     | Param (_, _, f, next), p :: rest ->
-        catch
+        Lwt.catch
           (fun () -> f last p)
           (function
             | Failure msg -> Lwt.fail (Bad_argument (i, p, msg))

@@ -348,7 +348,8 @@ end
 
 include Make()
 
-let generic_error s = error (Unclassified s)
+let generic_error fmt =
+  Format.kasprintf (fun s -> error (Unclassified s)) fmt
 
 let failwith fmt =
   Format.kasprintf (fun s -> fail (Unclassified s)) fmt

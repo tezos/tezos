@@ -7,19 +7,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Client_rpcs
+
 val errors:
-  Client_commands.context ->
-  Json_schema.schema Lwt.t
+  config -> Json_schema.schema tzresult Lwt.t
 
 val forge_block:
-  Client_commands.context ->
+  config ->
   ?net:Net_id.t ->
   ?predecessor:Block_hash.t ->
   ?timestamp:Time.t ->
   Fitness.fitness ->
   Operation_list_list_hash.t ->
   MBytes.t ->
-  MBytes.t Lwt.t
+  MBytes.t tzresult Lwt.t
 (** [forge_block cctxt ?net ?predecessor ?timestamp fitness ops
     proto_hdr] returns the serialization of a block header with
     [proto_hdr] as protocol-specific part. The arguments [?net] and
@@ -27,12 +28,12 @@ val forge_block:
     and [?timestamp] defaults to [Time.now ()]. *)
 
 val validate_block:
-  Client_commands.context ->
+  config ->
   Net_id.t -> Block_hash.t ->
   unit tzresult Lwt.t
 
 val inject_block:
-  Client_commands.context ->
+  config ->
   ?async:bool -> ?force:bool ->
   MBytes.t -> Operation_hash.t list list ->
   Block_hash.t tzresult Lwt.t
@@ -43,13 +44,13 @@ val inject_block:
     fitness. *)
 
 val inject_operation:
-  Client_commands.context ->
+  config ->
   ?async:bool -> ?force:bool ->
   MBytes.t ->
   Operation_hash.t tzresult Lwt.t
 
 val inject_protocol:
-  Client_commands.context ->
+  config ->
   ?async:bool -> ?force:bool ->
   Tezos_compiler.Protocol.t ->
   Protocol_hash.t tzresult Lwt.t
@@ -64,39 +65,40 @@ module Blocks : sig
     ]
 
   val net:
-    Client_commands.context ->
-    block -> Net_id.t Lwt.t
+    config ->
+    block -> Net_id.t tzresult Lwt.t
   val predecessor:
-    Client_commands.context ->
-    block -> Block_hash.t Lwt.t
+    config ->
+    block -> Block_hash.t tzresult Lwt.t
   val predecessors:
-    Client_commands.context ->
-    block -> int -> Block_hash.t list Lwt.t
+    config ->
+    block -> int -> Block_hash.t list tzresult Lwt.t
   val hash:
-    Client_commands.context ->
-    block -> Block_hash.t Lwt.t
+    config ->
+    block -> Block_hash.t tzresult Lwt.t
   val timestamp:
-    Client_commands.context ->
-    block -> Time.t Lwt.t
+    config ->
+    block -> Time.t tzresult Lwt.t
   val fitness:
-    Client_commands.context ->
-    block -> MBytes.t list Lwt.t
+    config ->
+    block -> MBytes.t list tzresult Lwt.t
   val operations:
-    Client_commands.context ->
-    block -> Operation_hash.t list list Lwt.t
+    config ->
+    block -> Operation_hash.t list list tzresult Lwt.t
   val protocol:
-    Client_commands.context ->
-    block -> Protocol_hash.t Lwt.t
+    config ->
+    block -> Protocol_hash.t tzresult Lwt.t
   val test_protocol:
-    Client_commands.context ->
-    block -> Protocol_hash.t option Lwt.t
+    config ->
+    block -> Protocol_hash.t option tzresult Lwt.t
   val test_network:
-    Client_commands.context ->
-    block -> (Net_id.t * Time.t) option Lwt.t
+    config ->
+    block -> (Net_id.t * Time.t) option tzresult Lwt.t
 
   val pending_operations:
-    Client_commands.context ->
-    block -> (error Updater.preapply_result * Operation_hash.Set.t) Lwt.t
+    config ->
+    block ->
+    (error Updater.preapply_result * Operation_hash.Set.t) tzresult Lwt.t
 
   type block_info = {
     hash: Block_hash.t ;
@@ -113,20 +115,20 @@ module Blocks : sig
   }
 
   val info:
-    Client_commands.context ->
-    ?operations:bool -> ?data:bool -> block -> block_info Lwt.t
+    config ->
+    ?operations:bool -> ?data:bool -> block -> block_info tzresult Lwt.t
 
   val list:
-    Client_commands.context ->
+    config ->
     ?operations:bool -> ?data:bool -> ?length:int -> ?heads:Block_hash.t list ->
     ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
-    unit -> block_info list list Lwt.t
+    unit -> block_info list list tzresult Lwt.t
 
   val monitor:
-    Client_commands.context ->
+    config ->
     ?operations:bool -> ?data:bool -> ?length:int -> ?heads:Block_hash.t list ->
     ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
-    unit -> block_info list list Lwt_stream.t Lwt.t
+    unit -> block_info list list tzresult Lwt_stream.t tzresult Lwt.t
 
   type preapply_result = {
     operations: error Updater.preapply_result ;
@@ -135,7 +137,7 @@ module Blocks : sig
   }
 
   val preapply:
-    Client_commands.context ->
+    config ->
     block ->
     ?timestamp:Time.t ->
     ?sort:bool ->
@@ -146,63 +148,54 @@ end
 module Operations : sig
 
   val contents:
-    Client_commands.context ->
-    Operation_hash.t list -> Store.Operation.t list Lwt.t
+    config ->
+    Operation_hash.t list -> Store.Operation.t list tzresult Lwt.t
 
   val monitor:
-    Client_commands.context ->
+    config ->
     ?contents:bool -> unit ->
-    (Operation_hash.t * Store.Operation.t option) list list Lwt_stream.t Lwt.t
+    (Operation_hash.t * Store.Operation.t option) list list tzresult
+      Lwt_stream.t tzresult Lwt.t
 
 end
 
 module Protocols : sig
 
   val contents:
-    Client_commands.context ->
-    Protocol_hash.t -> Store.Protocol.t Lwt.t
+    config ->
+    Protocol_hash.t -> Store.Protocol.t tzresult Lwt.t
 
   val list:
-    Client_commands.context ->
+    config ->
     ?contents:bool -> unit ->
-    (Protocol_hash.t * Store.Protocol.t option) list Lwt.t
+    (Protocol_hash.t * Store.Protocol.t option) list tzresult Lwt.t
 
 end
 
 val bootstrapped:
-  Client_commands.context -> (Block_hash.t * Time.t) Lwt_stream.t Lwt.t
+  config -> (Block_hash.t * Time.t) tzresult Lwt_stream.t tzresult Lwt.t
 
 module Network : sig
+
   val stat:
-    Client_commands.context -> P2p_types.Stat.t Lwt.t
+    config -> P2p_types.Stat.t tzresult Lwt.t
+
   val connections:
-    Client_commands.context -> P2p_types.Connection_info.t list Lwt.t
+    config -> P2p_types.Connection_info.t list tzresult Lwt.t
+
   val peers:
-    Client_commands.context -> (P2p.Peer_id.t * P2p.RPC.Peer_id.info) list Lwt.t
+    config -> (P2p.Peer_id.t * P2p.RPC.Peer_id.info) list tzresult Lwt.t
+
   val points:
-    Client_commands.context -> (P2p.Point.t * P2p.RPC.Point.info) list Lwt.t
+    config -> (P2p.Point.t * P2p.RPC.Point.info) list tzresult Lwt.t
+
 end
 
 val complete:
-  Client_commands.context ->
-  ?block:Blocks.block -> string -> string list Lwt.t
+  config ->
+  ?block:Blocks.block -> string -> string list tzresult Lwt.t
 
 val describe:
-  Client_commands.context ->
-  ?recurse:bool -> string list -> RPC.Description.directory_descr Lwt.t
-
-(** Low-level *)
-
-val get_json:
-  Client_commands.context ->
-  RPC.meth -> string list -> Data_encoding.json -> Data_encoding.json Lwt.t
-
-val call_service0:
-  Client_commands.context ->
-  (unit, unit, 'i, 'o) RPC.service -> 'i -> 'o Lwt.t
-val call_service1:
-  Client_commands.context ->
-  (unit, unit * 'a, 'i, 'o) RPC.service -> 'a -> 'i -> 'o Lwt.t
-val call_service2:
-  Client_commands.context ->
-  (unit, (unit * 'a) * 'b, 'i, 'o) RPC.service -> 'a -> 'b -> 'i -> 'o Lwt.t
+  config ->
+  ?recurse:bool -> string list ->
+  RPC.Description.directory_descr tzresult Lwt.t

@@ -12,29 +12,25 @@ type ('a, 'b) lwt_format =
 
 type cfg = {
 
-  (* network options. *)
-  node_addr : string ;
-  node_port : int ;
-  tls : bool ;
-
   (* webclient options *)
   web_port : int ;
 
   (* misc options *)
   base_dir : string ;
-  print_timings : bool ;
   force : bool ;
   block : Node_rpc_services.Blocks.block ;
 
 }
 
-type context =
-  { config : cfg ;
-    error : 'a 'b. ('a, 'b) lwt_format -> 'a ;
-    warning : 'a. ('a, unit) lwt_format -> 'a ;
-    message : 'a. ('a, unit) lwt_format -> 'a ;
-    answer : 'a. ('a, unit) lwt_format -> 'a ;
-    log : 'a. string -> ('a, unit) lwt_format -> 'a }
+type context = {
+  rpc_config : Client_rpcs.config ;
+  config : cfg ;
+  error : 'a 'b. ('a, 'b) lwt_format -> 'a ;
+  warning : 'a. ('a, unit) lwt_format -> 'a ;
+  message : 'a. ('a, unit) lwt_format -> 'a ;
+  answer : 'a. ('a, unit) lwt_format -> 'a ;
+  log : 'a. string -> ('a, unit) lwt_format -> 'a ;
+}
 (** This [context] allows the client {!command} handlers to work in
      various modes (command line, batch mode, web client, etc.) by
      abstracting some basic operations such as logging and reading
@@ -48,6 +44,7 @@ val default_cfg : cfg
 
 val make_context :
   ?config:cfg ->
+  ?rpc_config:Client_rpcs.config ->
   (string -> string -> unit Lwt.t) -> context
 (** [make_context ?config log_fun] builds a context whose logging
     callbacks call [log_fun section msg], and whose [error] function
@@ -58,7 +55,7 @@ val ignore_context : context
 (** [ignore_context] is a context whose logging callbacks do nothing,
     and whose [error] function calls [Lwt.fail_with]. *)
 
-type command = (context, unit) Cli_entries.command
+type command = (context, unit tzresult) Cli_entries.command
 
 exception Version_not_found
 

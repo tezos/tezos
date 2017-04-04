@@ -9,7 +9,7 @@
 
 (* Tezos Command line interface - Local Storage for Configuration *)
 
-open Lwt
+open Lwt.Infix
 open Cli_entries
 
 module type Entity = sig
@@ -97,7 +97,7 @@ module Alias = functor (Entity : Entity) -> struct
 
   let load cctxt =
     let filename = filename cctxt in
-    if not (Sys.file_exists filename) then return [] else
+    if not (Sys.file_exists filename) then Lwt.return [] else
       Data_encoding_ezjsonm.read_file filename >>= function
       | Error _ ->
           cctxt.Client_commands.error
@@ -108,43 +108,43 @@ module Alias = functor (Entity : Entity) -> struct
               cctxt.Client_commands.error
                 "didn't understand the %s alias file" Entity.name
           | list ->
-              return list
+              Lwt.return list
 
   let find_opt cctxt name =
     load cctxt >>= fun list ->
-    try return (Some (List.assoc name list))
-    with Not_found -> return None
+    try Lwt.return (Some (List.assoc name list))
+    with Not_found -> Lwt.return_none
 
   let find cctxt name =
     load cctxt >>= fun list ->
-    try return (List.assoc name list)
+    try Lwt.return (List.assoc name list)
     with Not_found ->
       cctxt.Client_commands.error "no %s alias named %s" Entity.name name
 
   let rev_find cctxt v =
     load cctxt >>= fun list ->
-    try return (Some (List.find (fun (_, v') -> v = v') list |> fst))
-    with Not_found -> return None
+    try Lwt.return (Some (List.find (fun (_, v') -> v = v') list |> fst))
+    with Not_found -> Lwt.return_none
 
   let mem cctxt name =
     load cctxt >>= fun list ->
     try
       ignore (List.assoc name list) ;
-      Lwt.return true
+      Lwt.return_true
     with
-    | Not_found -> Lwt.return false
+    | Not_found -> Lwt.return_false
 
   let save cctxt list =
-    catch
+    Lwt.catch
       (fun () ->
          let dirname = dirname cctxt in
          (if not (Sys.file_exists dirname) then Lwt_utils.create_dir dirname
-          else return ()) >>= fun () ->
+          else Lwt.return ()) >>= fun () ->
          let filename = filename cctxt in
          let json = Data_encoding.Json.construct encoding list in
          Data_encoding_ezjsonm.write_file filename json >>= function
-         | Error _ -> fail (Failure "Json.write_file")
-         | Ok () -> return ())
+         | Error _ -> Lwt.fail (Failure "Json.write_file")
+         | Ok () -> Lwt.return ())
       (fun exn ->
          cctxt.Client_commands.error
            "could not write the %s alias file: %s."
@@ -157,20 +157,20 @@ module Alias = functor (Entity : Entity) -> struct
        Lwt_list.iter_s (fun (n, v) ->
            if n = name && v = value then
              (keep := true ;
-              cctxt.Client_commands.message
+              cctxt.message
                 "The %s alias %s already exists with the same value." Entity.name n)
            else if n = name && v <> value then
-             cctxt.Client_commands.error
+             cctxt.error
                "another %s is already aliased as %s, use -force true to update" Entity.name n
            else if n <> name && v = value then
-             cctxt.Client_commands.error
+             cctxt.error
                "this %s is already aliased as %s, use -force true to insert duplicate" Entity.name n
-           else return ())
-         list else return ()) >>= fun () ->
+           else Lwt.return ())
+         list else Lwt.return ()) >>= fun () ->
     let list = List.filter (fun (n, _) -> n <> name) list in
     let list = (name, value) :: list in
     if !keep then
-      return ()
+      Lwt.return ()
     else
       save cctxt list >>= fun () ->
       cctxt.Client_commands.message
@@ -198,7 +198,7 @@ module Alias = functor (Entity : Entity) -> struct
 
   let alias_param ?(name = "name") ?(desc = "existing " ^ Entity.name ^ " alias") next =
     param ~name ~desc
-      (fun cctxt s -> find cctxt s >>= fun v -> return (s, v))
+      (fun cctxt s -> find cctxt s >>= fun v -> Lwt.return (s, v))
       next
 
   let fresh_alias_param ?(name = "new") ?(desc = "new " ^ Entity.name ^ " alias") next =
@@ -210,10 +210,10 @@ module Alias = functor (Entity : Entity) -> struct
                if n = s then
                  cctxt.Client_commands.error
                    "the %s alias %s already exists, use -force true to update" Entity.name n
-               else return ())
+               else Lwt.return ())
              list >>= fun () ->
-           return s
-         else return s)
+           Lwt.return s
+         else Lwt.return s)
       next
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
@@ -224,7 +224,7 @@ module Alias = functor (Entity : Entity) -> struct
     param ~name ~desc
       (fun cctxt s ->
          let read path =
-           catch
+           Lwt.catch
              (fun () -> Lwt_io.(with_file ~mode:Input path read))
              (fun exn -> Lwt.fail_with @@ Format.asprintf "cannot read file (%s)" (Printexc.to_string exn))
            >>= of_source cctxt in
@@ -236,10 +236,10 @@ module Alias = functor (Entity : Entity) -> struct
          | [ "file" ; path ] ->
              read path
          | _ ->
-             catch
+             Lwt.catch
                (fun () -> find cctxt s)
                (fun _ ->
-                  catch
+                  Lwt.catch
                     (fun () -> read s)
                     (fun _ -> of_source cctxt s)))
       next
