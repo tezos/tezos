@@ -358,7 +358,13 @@ type error += Exn of exn
 let error s = Error [ s ]
 let error_exn s = Error [ Exn s ]
 let trace_exn exn f = trace (Exn exn) f
+let generic_trace fmt =
+  Format.kasprintf (fun str -> trace_exn (Failure str)) fmt
 let record_trace_exn exn f = record_trace (Exn exn) f
+
+let failure fmt =
+  Format.kasprintf (fun str -> Exn (Failure str)) fmt
+
 
 let protect ?on_error t =
   Lwt.catch t (fun exn -> fail (Exn exn)) >>= function

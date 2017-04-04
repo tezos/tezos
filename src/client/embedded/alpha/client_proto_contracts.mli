@@ -13,7 +13,7 @@ module RawContractAlias :
 module ContractAlias : sig
   val get_contract:
     Client_commands.context ->
-    string -> (string * Contract.t) Lwt.t
+    string -> (string * Contract.t) tzresult Lwt.t
   val alias_param:
     ?name:string ->
     ?desc:string ->
@@ -26,15 +26,15 @@ module ContractAlias : sig
     (Lwt_io.file_name * Contract.t -> 'a, Client_commands.context, 'ret) Cli_entries.params
   val rev_find:
     Client_commands.context ->
-    Contract.t -> string option Lwt.t
+    Contract.t -> string option tzresult Lwt.t
   val name:
     Client_commands.context ->
-    Contract.t -> string Lwt.t
+    Contract.t -> string tzresult Lwt.t
 end
 
 val list_contracts:
   Client_commands.context ->
-  (string * string * Contract.t) list Lwt.t
+  (string * string * Contract.t) list tzresult Lwt.t
 
 val get_manager:
   Client_rpcs.config ->

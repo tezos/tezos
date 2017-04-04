@@ -17,10 +17,10 @@ module type Entity = sig
   val encoding : t Data_encoding.t
   val of_source :
     Client_commands.context ->
-    string -> t Lwt.t
+    string -> t tzresult Lwt.t
   val to_source :
     Client_commands.context ->
-    t -> string Lwt.t
+    t -> string tzresult Lwt.t
   val name : string
 end
 
@@ -28,40 +28,40 @@ module type Alias = sig
   type t
   val load :
     Client_commands.context ->
-    (string * t) list Lwt.t
+    (string * t) list tzresult Lwt.t
   val find :
     Client_commands.context ->
-    string -> t Lwt.t
+    string -> t tzresult Lwt.t
   val find_opt :
     Client_commands.context ->
-    string -> t option Lwt.t
+    string -> t option tzresult Lwt.t
   val rev_find :
     Client_commands.context ->
-    t -> string option Lwt.t
+    t -> string option tzresult Lwt.t
   val name :
     Client_commands.context ->
-    t -> string Lwt.t
+    t -> string tzresult Lwt.t
   val mem :
     Client_commands.context ->
-    string -> bool Lwt.t
+    string -> bool tzresult Lwt.t
   val add :
     Client_commands.context ->
-    string -> t -> unit Lwt.t
+    string -> t -> unit tzresult Lwt.t
   val del :
     Client_commands.context ->
-    string -> unit Lwt.t
+    string -> unit tzresult Lwt.t
   val update :
     Client_commands.context ->
-    string -> t -> unit Lwt.t
+    string -> t -> unit tzresult Lwt.t
   val save :
     Client_commands.context ->
-    (string * t) list -> unit Lwt.t
+    (string * t) list -> unit tzresult Lwt.t
   val of_source :
     Client_commands.context ->
-    string -> t Lwt.t
+    string -> t tzresult Lwt.t
   val to_source :
     Client_commands.context ->
-    t -> string Lwt.t
+    t -> string tzresult Lwt.t
   val alias_param :
     ?name:string ->
     ?desc:string ->
@@ -97,92 +97,99 @@ module Alias = functor (Entity : Entity) -> struct
 
   let load cctxt =
     let filename = filename cctxt in
-    if not (Sys.file_exists filename) then Lwt.return [] else
-      Data_encoding_ezjsonm.read_file filename >>= function
-      | Error _ ->
-          cctxt.Client_commands.error
-            "couldn't to read the %s alias file" Entity.name
-      | Ok json ->
-          match Data_encoding.Json.destruct encoding json with
-          | exception _ -> (* TODO print_error *)
-              cctxt.Client_commands.error
-                "didn't understand the %s alias file" Entity.name
-          | list ->
-              Lwt.return list
+    if not (Sys.file_exists filename) then
+      return []
+    else
+      Data_encoding_ezjsonm.read_file filename
+      |> generic_trace
+        "couldn't to read the %s alias file" Entity.name >>=? fun json ->
+      match Data_encoding.Json.destruct encoding json with
+      | exception _ -> (* TODO print_error *)
+          failwith "didn't understand the %s alias file" Entity.name
+      | list ->
+          return list
 
   let find_opt cctxt name =
-    load cctxt >>= fun list ->
-    try Lwt.return (Some (List.assoc name list))
-    with Not_found -> Lwt.return_none
+    load cctxt >>=? fun list ->
+    try return (Some (List.assoc name list))
+    with Not_found -> return None
 
   let find cctxt name =
-    load cctxt >>= fun list ->
-    try Lwt.return (List.assoc name list)
+    load cctxt >>=? fun list ->
+    try return (List.assoc name list)
     with Not_found ->
-      cctxt.Client_commands.error "no %s alias named %s" Entity.name name
+      failwith "no %s alias named %s" Entity.name name
 
   let rev_find cctxt v =
-    load cctxt >>= fun list ->
-    try Lwt.return (Some (List.find (fun (_, v') -> v = v') list |> fst))
-    with Not_found -> Lwt.return_none
+    load cctxt >>=? fun list ->
+    try return (Some (List.find (fun (_, v') -> v = v') list |> fst))
+    with Not_found -> return None
 
   let mem cctxt name =
-    load cctxt >>= fun list ->
+    load cctxt >>=? fun list ->
     try
       ignore (List.assoc name list) ;
-      Lwt.return_true
+      return true
     with
-    | Not_found -> Lwt.return_false
+    | Not_found -> return false
 
   let save cctxt list =
     Lwt.catch
       (fun () ->
          let dirname = dirname cctxt in
-         (if not (Sys.file_exists dirname) then Lwt_utils.create_dir dirname
-          else Lwt.return ()) >>= fun () ->
+         Lwt_utils.create_dir dirname >>= fun () ->
          let filename = filename cctxt in
          let json = Data_encoding.Json.construct encoding list in
-         Data_encoding_ezjsonm.write_file filename json >>= function
-         | Error _ -> Lwt.fail (Failure "Json.write_file")
-         | Ok () -> Lwt.return ())
-      (fun exn ->
-         cctxt.Client_commands.error
-           "could not write the %s alias file: %s."
-           Entity.name (Printexc.to_string exn))
+         Data_encoding_ezjsonm.write_file filename json)
+      (fun exn -> Lwt.return (error_exn exn))
+    |> generic_trace "could not write the %s alias file." Entity.name
 
   let add cctxt name value =
     let keep = ref false in
-    load cctxt >>= fun list ->
-    (if not cctxt.config.force then
-       Lwt_list.iter_s (fun (n, v) ->
-           if n = name && v = value then
-             (keep := true ;
+    load cctxt >>=? fun list ->
+    begin
+      if cctxt.config.force then
+        return ()
+      else
+        iter_s (fun (n, v) ->
+            if n = name && v = value then begin
+              keep := true ;
               cctxt.message
-                "The %s alias %s already exists with the same value." Entity.name n)
-           else if n = name && v <> value then
-             cctxt.error
-               "another %s is already aliased as %s, use -force true to update" Entity.name n
-           else if n <> name && v = value then
-             cctxt.error
-               "this %s is already aliased as %s, use -force true to insert duplicate" Entity.name n
-           else Lwt.return ())
-         list else Lwt.return ()) >>= fun () ->
+                "The %s alias %s already exists with the same value."
+                Entity.name n >>= fun () ->
+              return ()
+            end else if n = name && v <> value then begin
+              failwith
+                "another %s is already aliased as %s, \
+                 use -force true to update"
+                Entity.name n
+            end else if n <> name && v = value then begin
+              failwith
+                "this %s is already aliased as %s, \
+                 use -force true to insert duplicate"
+                Entity.name n
+            end else begin
+              return ()
+            end)
+          list
+    end >>=? fun () ->
     let list = List.filter (fun (n, _) -> n <> name) list in
     let list = (name, value) :: list in
     if !keep then
-      Lwt.return ()
+      return ()
     else
-      save cctxt list >>= fun () ->
+      save cctxt list >>=? fun () ->
       cctxt.Client_commands.message
-        "New %s alias '%s' saved." Entity.name name
+        "New %s alias '%s' saved." Entity.name name >>= fun () ->
+      return ()
 
   let del cctxt name =
-    load cctxt >>= fun list ->
+    load cctxt >>=? fun list ->
     let list = List.filter (fun (n, _) -> n <> name) list in
     save cctxt list
 
   let update cctxt name value =
-    load cctxt >>= fun list ->
+    load cctxt >>=? fun list ->
     let list =
       List.map
         (fun (n, v) -> (n, if n = name then value else v))
@@ -190,30 +197,45 @@ module Alias = functor (Entity : Entity) -> struct
     save cctxt list
 
   let save cctxt list =
-    save cctxt  list >>= fun () ->
+    save cctxt list >>=? fun () ->
     cctxt.Client_commands.message
-      "Successful update of the %s alias file." Entity.name
+      "Successful update of the %s alias file." Entity.name >>= fun () ->
+    return ()
 
   include Entity
 
-  let alias_param ?(name = "name") ?(desc = "existing " ^ Entity.name ^ " alias") next =
-    param ~name ~desc
-      (fun cctxt s -> find cctxt s >>= fun v -> Lwt.return (s, v))
-      next
-
-  let fresh_alias_param ?(name = "new") ?(desc = "new " ^ Entity.name ^ " alias") next =
+  let alias_param
+      ?(name = "name") ?(desc = "existing " ^ Entity.name ^ " alias") next =
     param ~name ~desc
       (fun cctxt s ->
-         load cctxt >>= fun list ->
-         if not cctxt.config.force then
-           Lwt_list.iter_s (fun (n, _v) ->
-               if n = s then
-                 cctxt.Client_commands.error
-                   "the %s alias %s already exists, use -force true to update" Entity.name n
-               else Lwt.return ())
-             list >>= fun () ->
-           Lwt.return s
-         else Lwt.return s)
+         find cctxt s >>= function
+         | Ok v -> Lwt.return (s, v)
+         | Error err -> cctxt.error "%a" pp_print_error err)
+      next
+
+  let fresh_alias_param
+      ?(name = "new") ?(desc = "new " ^ Entity.name ^ " alias") next =
+    param ~name ~desc
+      (fun cctxt s ->
+         begin
+           load cctxt >>=? fun list ->
+           begin
+             if cctxt.config.force then
+               return ()
+             else
+               iter_s
+                 (fun (n, _v) ->
+                    if n = s then
+                      failwith
+                        "the %s alias %s already exists, use -force true to update"
+                        Entity.name n
+                    else
+                      return ())
+                 list
+           end
+         end >>= function
+         | Ok () -> Lwt.return s
+         | Error err -> cctxt.error "%a" pp_print_error err)
       next
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
@@ -225,28 +247,37 @@ module Alias = functor (Entity : Entity) -> struct
       (fun cctxt s ->
          let read path =
            Lwt.catch
-             (fun () -> Lwt_io.(with_file ~mode:Input path read))
-             (fun exn -> Lwt.fail_with @@ Format.asprintf "cannot read file (%s)" (Printexc.to_string exn))
-           >>= of_source cctxt in
-         match Utils.split ~limit:1 ':' s with
-         | [ "alias" ; alias ]->
-             find cctxt alias
-         | [ "text" ; text ] ->
-             of_source cctxt text
-         | [ "file" ; path ] ->
-             read path
-         | _ ->
-             Lwt.catch
-               (fun () -> find cctxt s)
-               (fun _ ->
-                  Lwt.catch
-                    (fun () -> read s)
-                    (fun _ -> of_source cctxt s)))
+             (fun () ->
+                Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
+                return content)
+             (fun exn ->
+                failwith
+                  "cannot read file (%s)" (Printexc.to_string exn))
+           >>=? fun content ->
+           of_source cctxt content in
+         begin
+           match Utils.split ~limit:1 ':' s with
+           | [ "alias" ; alias ]->
+               find cctxt alias
+           | [ "text" ; text ] ->
+               of_source cctxt text
+           | [ "file" ; path ] ->
+               read path
+           | _ ->
+               find cctxt s >>= function
+               | Ok v -> return v
+               | Error _ ->
+                   read s >>= function
+                   | Ok v -> return v
+                   | Error _ -> of_source cctxt s
+         end >>= function
+         | Ok s -> Lwt.return s
+         | Error err -> cctxt.error "%a" pp_print_error err)
       next
 
    let name cctxt d =
-     rev_find cctxt d >>= function
+     rev_find cctxt d >>=? function
      | None -> Entity.to_source cctxt d
-     | Some name -> Lwt.return name
+     | Some name -> return name
 
 end

@@ -9,39 +9,43 @@
 
 module Ed25519 = Environment.Ed25519
 
-module RawContractAlias = Client_aliases.Alias (struct
-    type t = Contract.t
-    let encoding = Contract.encoding
-    let of_source _ s =
-      match Contract.of_b58check s with
-      | Error _ -> Lwt.fail (Failure "bad contract notation")
-      | Ok s -> Lwt.return s
-    let to_source _ s =
-      Lwt.return (Contract.to_b58check s)
-    let name = "contract"
-  end)
+module ContractEntity = struct
+  type t = Contract.t
+  let encoding = Contract.encoding
+  let of_source _ s =
+    match Contract.of_b58check s with
+    | Error _ as err ->
+        Lwt.return (wrap_error err)
+        |> trace (failure "bad contract notation")
+    | Ok s -> return s
+  let to_source _ s = return (Contract.to_b58check s)
+  let name = "contract"
+end
+
+module RawContractAlias = Client_aliases.Alias (ContractEntity)
 
 module ContractAlias = struct
+
   let find cctxt s =
-    RawContractAlias.find_opt cctxt s >>= function
-    | Some v -> Lwt.return (s, v)
+    RawContractAlias.find_opt cctxt s >>=? function
+    | Some v -> return (s, v)
     | None ->
-        Client_keys.Public_key_hash.find_opt cctxt s >>= function
+        Client_keys.Public_key_hash.find_opt cctxt s >>=? function
         | Some v ->
-            Lwt.return (s, Contract.default_contract v)
+            return (s, Contract.default_contract v)
         | None ->
-            cctxt.error
-              "no contract alias nor key alias names %s" s
+            failwith "no contract alias nor key alias names %s" s
+
   let find_key cctxt name =
-    Client_keys.Public_key_hash.find cctxt name >>= fun v ->
-    Lwt.return (name, Contract.default_contract v)
+    Client_keys.Public_key_hash.find cctxt name >>=? fun v ->
+    return (name, Contract.default_contract v)
 
   let rev_find cctxt c =
     match Contract.is_default c with
     | Some hash -> begin
-        Client_keys.Public_key_hash.rev_find cctxt hash >>= function
-        | Some name -> Lwt.return (Some ("key:" ^ name))
-        | None -> Lwt.return_none
+        Client_keys.Public_key_hash.rev_find cctxt hash >>=? function
+        | Some name -> return (Some ("key:" ^ name))
+        | None -> return None
       end
     | None -> RawContractAlias.rev_find cctxt c
 
@@ -56,7 +60,12 @@ module ContractAlias = struct
       desc ^ "\n"
       ^ "can be an contract alias or a key alias (autodetected in this order)\n\
          use 'key:name' to force the later" in
-    Cli_entries.param ~name ~desc get_contract next
+    Cli_entries.param ~name ~desc
+      (fun cctxt p ->
+         get_contract cctxt p >>= function
+         | Ok v -> Lwt.return v
+         | Error err -> cctxt.error "%a" pp_print_error err)
+      next
 
   let destination_param ?(name = "dst") ?(desc = "destination contract") next =
     let desc =
@@ -65,25 +74,28 @@ module ContractAlias = struct
          use 'text:literal', 'alias:name', 'key:name' to force" in
     Cli_entries.param ~name ~desc
       (fun cctxt s ->
-         match Utils.split ~limit:1 ':' s with
-         | [ "alias" ; alias ]->
-             find cctxt alias
-         | [ "key" ; text ] ->
-             Client_keys.Public_key_hash.find cctxt text >>= fun v ->
-             Lwt.return (s, Contract.default_contract v)
-         | _ ->
-             Lwt.catch
-               (fun () -> find cctxt s)
-               (fun _ ->
-                  match Contract.of_b58check s with
-                  | Error _ -> Lwt.fail (Failure "bad contract notation")
-                  | Ok v -> Lwt.return (s, v)))
+         begin
+           match Utils.split ~limit:1 ':' s with
+           | [ "alias" ; alias ]->
+               find cctxt alias
+           | [ "key" ; text ] ->
+               Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
+               return (s, Contract.default_contract v)
+           | _ ->
+               find  cctxt s >>= function
+               | Ok v -> return v
+               | Error _ ->
+                   ContractEntity.of_source cctxt s >>=? fun v ->
+                   return (s, v)
+         end >>= function
+         | Ok v -> Lwt.return v
+         | Error err -> cctxt.error "%a" pp_print_error err)
       next
 
    let name cctxt contract =
-     rev_find cctxt contract >|= function
-     | None -> Contract.to_b58check contract
-     | Some name -> name
+     rev_find cctxt contract >>=? function
+     | None -> return (Contract.to_b58check contract)
+     | Some name -> return name
 
 end
 
@@ -93,19 +105,19 @@ module Contract_tags = Client_tags.Tags (struct
 
 let list_contracts cctxt =
   (* List contracts *)
-  RawContractAlias.load cctxt >>= fun raw_contracts ->
-  Lwt_list.map_s (fun (n, v) ->
-      Lwt.return ("", n, v))
+  RawContractAlias.load cctxt >>=? fun raw_contracts ->
+  Lwt_list.map_s
+    (fun (n, v) -> Lwt.return ("", n, v))
     raw_contracts >>= fun contracts ->
-  Client_keys.Public_key_hash.load cctxt >>= fun keys ->
+  Client_keys.Public_key_hash.load cctxt >>=? fun keys ->
   (* List accounts (default contracts of identities) *)
-  Lwt_list.map_s (fun (n, v) ->
-      RawContractAlias.mem cctxt n >>= fun mem ->
+  map_s (fun (n, v) ->
+      RawContractAlias.mem cctxt n >>=? fun mem ->
       let p = if mem then "key:" else "" in
       let v' = Contract.default_contract v in
-      Lwt.return (p, n, v'))
-    keys >>= fun accounts ->
-  Lwt.return (contracts @ accounts)
+      return (p, n, v'))
+    keys >>=? fun accounts ->
+  return (contracts @ accounts)
 
 let get_manager cctxt block source =
   match Contract.is_default source with
@@ -117,19 +129,22 @@ let get_delegate cctxt block source =
   match Contract.is_default source with
   | Some hash -> return hash
   | None ->
-      Client_proto_rpcs.Context.Contract.delegate cctxt block source >>=? function
-      | Some delegate -> return delegate
-      | None -> Client_proto_rpcs.Context.Contract.manager cctxt block source
+      Client_proto_rpcs.Context.Contract.delegate cctxt
+        block source >>=? function
+      | Some delegate ->
+          return delegate
+      | None ->
+          Client_proto_rpcs.Context.Contract.manager cctxt block source
 
 let may_check_key sourcePubKey sourcePubKeyHash =
   match sourcePubKey with
   | Some sourcePubKey ->
-      if not (Ed25519.Public_key_hash.equal (Ed25519.Public_key.hash sourcePubKey) sourcePubKeyHash)
-      then
-        failwith "Invalid public key in `client_proto_endorsement`"
-      else
-        return ()
-  | None -> return ()
+      fail_unless
+        (Ed25519.Public_key_hash.equal
+           (Ed25519.Public_key.hash sourcePubKey) sourcePubKeyHash)
+        (failure "Invalid public key in `client_proto_endorsement`")
+  | None ->
+      return ()
 
 let check_public_key cctxt block ?src_pk src_pk_hash =
   Client_proto_rpcs.Context.Key.get cctxt block src_pk_hash >>= function
@@ -153,40 +168,40 @@ let commands  () =
   let open Cli_entries in
   let open Client_commands in
   [
+
     command ~group ~desc: "add a contract to the wallet"
       (prefixes [ "remember" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
        @@ RawContractAlias.source_param
        @@ stop)
       (fun name hash cctxt ->
-         RawContractAlias.add cctxt name hash >>= fun () ->
-         return ()) ;
+         RawContractAlias.add cctxt name hash) ;
+
     command ~group ~desc: "remove a contract from the wallet"
       (prefixes [ "forget" ; "contract" ]
        @@ RawContractAlias.alias_param
        @@ stop)
-      (fun (name, _) cctxt ->
-         RawContractAlias.del cctxt name >>= fun () ->
-         return ()) ;
+      (fun (name, _) cctxt -> RawContractAlias.del cctxt name) ;
+
     command ~group ~desc: "lists all known contracts"
       (fixed [ "list" ; "known" ; "contracts" ])
       (fun cctxt ->
-         list_contracts cctxt >>= fun contracts ->
-         Lwt_list.iter_s (fun (prefix, alias, contract) ->
-             cctxt.message "%s%s: %s" prefix alias
-               (Contract.to_b58check contract))
-           contracts >>= fun () ->
-         return ()) ;
+         list_contracts cctxt >>=? fun contracts ->
+         iter_s
+           (fun (prefix, alias, contract) ->
+              cctxt.message "%s%s: %s" prefix alias
+                (Contract.to_b58check contract) >>= fun () ->
+              return ())
+           contracts) ;
+
     command ~group ~desc: "forget all known contracts"
       (fixed [ "forget" ; "all" ; "contracts" ])
       (fun cctxt ->
-           if not cctxt.config.force then
-             cctxt.Client_commands.error "this can only used with option -force true" >>= fun () ->
-             return ()
-           else
-             RawContractAlias.save cctxt [] >>= fun () ->
-             return ()
-      ) ;
+         fail_unless
+           cctxt.config.force
+           (failure "this can only used with option -force true") >>=? fun () ->
+         RawContractAlias.save cctxt []) ;
+
     command ~group ~desc: "display a contract from the wallet"
       (prefixes [ "show" ; "known" ; "contract" ]
        @@ RawContractAlias.alias_param
@@ -194,6 +209,7 @@ let commands  () =
       (fun (_, contract) cctxt ->
          cctxt.message "%a\n%!" Contract.pp contract >>= fun () ->
          return ()) ;
+
     command ~group ~desc: "tag a contract in the wallet"
       (prefixes [ "tag" ; "contract" ]
        @@ RawContractAlias.alias_param
@@ -201,12 +217,13 @@ let commands  () =
        @@ Contract_tags.tag_param
        @@ stop)
       (fun (alias, _contract) new_tags cctxt ->
-         Contract_tags.find_opt cctxt alias >>= fun tags ->
-         let new_tags = match tags with
+         Contract_tags.find_opt cctxt alias >>=? fun tags ->
+         let new_tags =
+           match tags with
            | None -> new_tags
            | Some tags -> Utils.merge_list2 tags new_tags in
-         Contract_tags.update cctxt alias new_tags >>= fun () ->
-         return ()) ;
+         Contract_tags.update cctxt alias new_tags) ;
+
     command ~group ~desc: "remove tag(s) from a contract in the wallet"
       (prefixes [ "untag" ; "contract" ]
        @@ RawContractAlias.alias_param
@@ -214,8 +231,9 @@ let commands  () =
        @@ Contract_tags.tag_param
        @@ stop)
       (fun (alias, _contract) new_tags cctxt ->
-         Contract_tags.find_opt cctxt alias >>= fun tags ->
-         let new_tags = match tags with
+         Contract_tags.find_opt cctxt alias >>=? fun tags ->
+         let new_tags =
+           match tags with
            | None -> []
            | Some tags ->
                Utils.merge_filter_list2
@@ -224,6 +242,6 @@ let commands  () =
                      | None, Some _ -> None
                      | Some t1, Some t2 when t1 = t2 -> None
                      | Some t1, _ -> Some t1) tags new_tags in
-         Contract_tags.update cctxt alias new_tags >>= fun () ->
-         return ()) ;
+         Contract_tags.update cctxt alias new_tags) ;
+
   ]
