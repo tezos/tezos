@@ -19,29 +19,22 @@ type operation = {
 }
 
 let monitor cctxt ?contents ?check () =
-  Client_node_rpcs.Operations.monitor cctxt ?contents () >>= fun ops_stream ->
+  Client_node_rpcs.Operations.monitor cctxt ?contents () >>=? fun ops_stream ->
   let convert ops =
-    Lwt_list.filter_map_p
+    Lwt.return ops >>=? fun ops ->
+    map_s
       (fun (hash, op) ->
          match op with
-         | None -> Lwt.return (Some { hash; content = None })
-         | Some op ->
+         | None -> return { hash; content = None }
+         | Some (op : Updater.raw_operation) ->
              Client_proto_rpcs.Helpers.Parse.operations cctxt
-               `Prevalidation ?check [op] >>= function
-             | Ok [proto] ->
-                 Lwt.return (Some { hash ; content = Some (op.shell, proto) })
-             | Ok _ ->
-                 lwt_log_error
-                   "@[<v 2>Error while parsing operations@[" >>= fun () ->
-                 Lwt.return None
-             | Error err ->
-                 lwt_log_error
-                   "@[<v 2>Error while parsing operations@,%a@["
-                   pp_print_error err >>= fun () ->
-                 Lwt.return None)
-     (List.concat ops)
+               `Prevalidation ?check [op] >>=? function
+             | [proto] ->
+                 return { hash ; content = Some (op.shell, proto) }
+             | _ -> failwith "Error while parsing the operation")
+     (List.concat  ops)
   in
-  Lwt.return (Lwt_stream.map_s convert ops_stream)
+  return (Lwt_stream.map_s convert ops_stream)
 
 
 type valid_endorsement = {
@@ -97,17 +90,25 @@ let filter_valid_endorsement cctxt { hash; content } =
           with Not_found -> Lwt.return_none
 
 let monitor_endorsement cctxt =
-  monitor cctxt ~contents:true ~check:true () >>= fun ops_stream ->
+  monitor cctxt ~contents:true ~check:true () >>=? fun ops_stream ->
   let endorsement_stream, push = Lwt_stream.create () in
   Lwt.async begin fun () ->
     Lwt_stream.closed ops_stream >|= fun () -> push None
   end ;
   Lwt.async begin fun () ->
     Lwt_stream.iter_p
-      (Lwt_list.iter_p (fun e ->
-           filter_valid_endorsement cctxt e >>= function
-           | None -> Lwt.return_unit
-           | Some e -> push (Some e) ; Lwt.return_unit))
+      (fun ops ->
+         match ops with
+         | Error _ as err ->
+             push (Some err) ;
+             Lwt.return_unit
+         | Ok ops ->
+             Lwt_list.iter_p
+               (fun e ->
+                  filter_valid_endorsement cctxt e >>= function
+                  | None -> Lwt.return_unit
+                  | Some e -> push (Some (Ok e)) ; Lwt.return_unit)
+               ops)
       ops_stream
   end ;
-  Lwt.return endorsement_stream
+  return endorsement_stream

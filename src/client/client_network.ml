@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Client_commands
+
 let group =
   { Cli_entries.name = "network" ;
     title = "Commands for monitoring and controlling network state" }
@@ -15,10 +17,10 @@ let commands () = [
   let open Cli_entries in
   command ~group ~desc: "show global network status"
     (prefixes ["network" ; "stat"] stop) begin fun cctxt ->
-    Client_node_rpcs.Network.stat cctxt >>= fun stat ->
-    Client_node_rpcs.Network.connections cctxt >>= fun conns ->
-    Client_node_rpcs.Network.peers cctxt >>= fun peers ->
-    Client_node_rpcs.Network.points cctxt >>= fun points ->
+    Client_node_rpcs.Network.stat cctxt.rpc_config >>=? fun stat ->
+    Client_node_rpcs.Network.connections cctxt.rpc_config >>=? fun conns ->
+    Client_node_rpcs.Network.peers cctxt.rpc_config >>=? fun peers ->
+    Client_node_rpcs.Network.points cctxt.rpc_config >>=? fun points ->
     cctxt.message "GLOBAL STATS" >>= fun () ->
     cctxt.message "  %a" P2p_types.Stat.pp stat >>= fun () ->
     cctxt.message "CONNECTIONS" >>= fun () ->
@@ -64,6 +66,6 @@ let commands () = [
                 Point.pp p
                 (if pi.trusted then "★" else " ")
     end points >>= fun () ->
-    Lwt.return_unit
+    return ()
   end
 ]

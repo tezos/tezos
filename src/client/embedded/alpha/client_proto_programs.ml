@@ -538,27 +538,31 @@ let commands () =
     command ~group ~desc: "lists all known programs"
       (fixed [ "list" ; "known" ; "programs" ])
       (fun cctxt -> Program.load cctxt >>= fun list ->
-        Lwt_list.iter_s (fun (n, _) -> cctxt.message "%s" n) list) ;
+        Lwt_list.iter_s (fun (n, _) -> cctxt.message "%s" n) list >>= fun () ->
+        return ()) ;
     command ~group ~desc: "remember a program under some name"
       (prefixes [ "remember" ; "program" ]
        @@ Program.fresh_alias_param
        @@ Program.source_param
        @@ stop)
       (fun name hash cctxt ->
-         Program.add cctxt name hash) ;
+         Program.add cctxt name hash >>= fun () ->
+        return ()) ;
     command ~group ~desc: "forget a remembered program"
       (prefixes [ "forget" ; "program" ]
        @@ Program.alias_param
        @@ stop)
       (fun (name, _) cctxt ->
-         Program.del cctxt name) ;
+         Program.del cctxt name >>= fun () ->
+        return ()) ;
     command ~group ~desc: "display a program"
       (prefixes [ "show" ; "known" ; "program" ]
        @@ Program.alias_param
        @@ stop)
       (fun (_, program) cctxt ->
          Program.to_source cctxt program >>= fun source ->
-         cctxt.message "%s\n" source) ;
+         cctxt.message "%s\n" source >>= fun () ->
+         return ()) ;
     command ~group ~desc: "ask the node to run a program"
       ~args: [ trace_stack_arg ]
       (prefixes [ "run" ; "program" ]
@@ -571,7 +575,7 @@ let commands () =
       (fun program storage input cctxt ->
          let open Data_encoding in
          if !trace_stack then
-           Client_proto_rpcs.Helpers.trace_code cctxt
+           Client_proto_rpcs.Helpers.trace_code cctxt.rpc_config
              cctxt.config.block program (storage, input) >>= function
            | Ok (storage, output, trace) ->
                cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
@@ -584,20 +588,24 @@ let commands () =
                          loc gas
                          (Format.pp_print_list (print_expr no_locations))
                          stack))
-                 trace
+                 trace >>= fun () ->
+               return ()
            | Error errs ->
                cctxt.warning "%a" pp_print_error errs >>= fun () ->
-               cctxt.error "error running program"
+               cctxt.error "error running program" >>= fun () ->
+               return ()
          else
-           Client_proto_rpcs.Helpers.run_code cctxt
+           Client_proto_rpcs.Helpers.run_code cctxt.rpc_config
              cctxt.config.block program (storage, input) >>= function
            | Ok (storage, output) ->
                cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
                  (print_expr no_locations) storage
-                 (print_expr no_locations) output
+                 (print_expr no_locations) output >>= fun () ->
+               return ()
            | Error errs ->
                cctxt.warning "%a" pp_print_error errs >>= fun () ->
-               cctxt.error "error running program") ;
+               cctxt.error "error running program" >>= fun () ->
+               return ()) ;
     command ~group ~desc: "ask the node to typecheck a program"
       ~args: [ show_types_arg ]
       (prefixes [ "typecheck" ; "program" ]
@@ -605,13 +613,14 @@ let commands () =
        @@ stop)
       (fun program cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.typecheck_code cctxt cctxt.config.block program >>= function
+         Client_proto_rpcs.Helpers.typecheck_code cctxt.rpc_config cctxt.config.block program >>= function
          | Ok type_map ->
              let type_map, program = unexpand_macros type_map program in
              cctxt.message "Well typed" >>= fun () ->
              if !show_types then
-               cctxt.message "%a" (print_program no_locations) (program, type_map)
-             else Lwt.return ()
+               cctxt.message "%a" (print_program no_locations) (program, type_map) >>= fun () ->
+               return ()
+             else return ()
          | Error errs ->
              report_typechecking_errors cctxt errs >>= fun () ->
              cctxt.error "ill-typed program") ;
@@ -623,13 +632,15 @@ let commands () =
        @@ stop)
       (fun data exp_ty cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.typecheck_data cctxt
+         Client_proto_rpcs.Helpers.typecheck_data cctxt.rpc_config
            cctxt.config.block (data, exp_ty) >>= function
          | Ok () ->
-             cctxt.message "Well typed"
+             cctxt.message "Well typed" >>= fun () ->
+             return ()
          | Error errs ->
              report_typechecking_errors cctxt errs >>= fun () ->
-             cctxt.error "ill-typed data") ;
+             cctxt.error "ill-typed data" >>= fun () ->
+             return ()) ;
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
               using the same algorithm as script instruction H"
@@ -638,13 +649,15 @@ let commands () =
        @@ stop)
       (fun data cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.hash_data cctxt
+         Client_proto_rpcs.Helpers.hash_data cctxt.rpc_config
            cctxt.config.block data >>= function
          | Ok hash ->
-             cctxt.message "%S" hash
+             cctxt.message "%S" hash >>= fun () ->
+             return ()
          | Error errs ->
              cctxt.warning "%a" pp_print_error errs  >>= fun () ->
-             cctxt.error "ill-formed data") ;
+             cctxt.error "ill-formed data" >>= fun () ->
+             return ()) ;
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
               using the same algorithm as script instruction H, sign it using \
@@ -657,7 +670,7 @@ let commands () =
        @@ stop)
       (fun data (_, key) cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.hash_data cctxt
+         Client_proto_rpcs.Helpers.hash_data cctxt.rpc_config
            cctxt.config.block data >>= function
          | Ok hash ->
              let signature = Ed25519.sign key (MBytes.of_string hash) in
@@ -665,8 +678,10 @@ let commands () =
                hash
                (signature |>
                 Data_encoding.Binary.to_bytes Ed25519.Signature.encoding |>
-                Hex_encode.hex_of_bytes)
+                Hex_encode.hex_of_bytes) >>= fun () ->
+             return ()
          | Error errs ->
              cctxt.warning "%a" pp_print_error errs >>= fun () ->
-             cctxt.error "ill-formed data") ;
+             cctxt.error "ill-formed data" >>= fun () ->
+             return ()) ;
   ]

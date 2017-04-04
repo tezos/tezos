@@ -38,7 +38,7 @@ type 'msg t
 
 val equal: 'mst t -> 'msg t -> bool
 
-val pp : Format.formatter -> 'msg t -> unit
+val pp: Format.formatter -> 'msg t -> unit
 val info: 'msg t -> Connection_info.t
 
 (** {1 Low-level functions (do not use directly)} *)

@@ -13,9 +13,9 @@ type operation = {
 }
 
 val monitor:
-  Client_commands.context ->
+  Client_rpcs.config ->
   ?contents:bool -> ?check:bool -> unit ->
-  operation list Lwt_stream.t Lwt.t
+  operation list tzresult Lwt_stream.t tzresult Lwt.t
 
 type valid_endorsement = {
   hash: Operation_hash.t ;
@@ -25,9 +25,9 @@ type valid_endorsement = {
 }
 
 val filter_valid_endorsement:
-  Client_commands.context ->
+  Client_rpcs.config ->
   operation -> valid_endorsement option Lwt.t
 
 val monitor_endorsement:
-  Client_commands.context ->
-  valid_endorsement Lwt_stream.t Lwt.t
+  Client_rpcs.config ->
+  valid_endorsement tzresult Lwt_stream.t tzresult Lwt.t

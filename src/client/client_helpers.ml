@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Client_commands
 open Client_config
 
 let unique = ref false
@@ -28,25 +29,31 @@ let commands () = Cli_entries.[
          ~desc: "the prefix of the Base58Check-encoded hash to be completed" @@
        stop)
       (fun prefix cctxt ->
-         Client_node_rpcs.complete cctxt ~block:cctxt.config.block prefix >>= fun completions ->
+         Client_node_rpcs.complete
+           cctxt.rpc_config ~block:cctxt.config.block prefix >>=? fun completions ->
          match completions with
          | [] -> Pervasives.exit 3
          | _ :: _ :: _ when !unique -> Pervasives.exit 3
          | completions ->
              List.iter print_endline completions ;
-             Lwt.return_unit) ;
+             return ()) ;
     command
       ~desc: "Wait for the node to be bootstrapped."
       ~args: []
       (prefixes [ "bootstrapped" ] @@
        stop)
       (fun cctxt ->
-         Client_node_rpcs.bootstrapped cctxt >>= fun stream ->
-         Lwt_stream.iter_s (fun (hash, time) ->
-             cctxt.message "Current head: %a (%a)"
-               Block_hash.pp_short hash
-               Time.pp_hum time
+         Client_node_rpcs.bootstrapped cctxt.rpc_config >>=? fun stream ->
+         Lwt_stream.iter_s (function
+             | Ok (hash, time) ->
+                 cctxt.message "Current head: %a (%a)"
+                   Block_hash.pp_short hash
+                   Time.pp_hum time
+             | Error err ->
+                 cctxt.error "Error: %a"
+                   pp_print_error err
            ) stream >>= fun () ->
-         cctxt.answer "Bootstrapped."
+         cctxt.answer "Bootstrapped." >>= fun () ->
+         return ()
 )
   ]

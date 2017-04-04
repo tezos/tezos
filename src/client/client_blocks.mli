@@ -10,11 +10,11 @@
 val genesis: Block_hash.t
 
 val get_block_hash:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_node_rpcs.Blocks.block ->
-  Block_hash.Table.key Lwt.t
+  Block_hash.Table.key tzresult Lwt.t
 
 val get_block_info:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_node_rpcs.Blocks.block ->
-  Client_node_rpcs.Blocks.block_info Lwt.t
+  Client_node_rpcs.Blocks.block_info tzresult Lwt.t

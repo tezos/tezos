@@ -17,13 +17,13 @@ module ContractAlias : sig
   val alias_param:
     ?name:string ->
     ?desc:string ->
-    ('a, Client_commands.context, unit) Cli_entries.params ->
-    (Lwt_io.file_name * Contract.t -> 'a, Client_commands.context, unit) Cli_entries.params
+    ('a, Client_commands.context, 'ret) Cli_entries.params ->
+    (Lwt_io.file_name * Contract.t -> 'a, Client_commands.context, 'ret) Cli_entries.params
   val destination_param:
     ?name:string ->
     ?desc:string ->
-    ('a, Client_commands.context, unit) Cli_entries.params ->
-    (Lwt_io.file_name * Contract.t -> 'a, Client_commands.context, unit) Cli_entries.params
+    ('a, Client_commands.context, 'ret) Cli_entries.params ->
+    (Lwt_io.file_name * Contract.t -> 'a, Client_commands.context, 'ret) Cli_entries.params
   val rev_find:
     Client_commands.context ->
     Contract.t -> string option Lwt.t
@@ -37,19 +37,19 @@ val list_contracts:
   (string * string * Contract.t) list Lwt.t
 
 val get_manager:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   Contract.t ->
   public_key_hash tzresult Lwt.t
 
 val get_delegate:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   Contract.t ->
   public_key_hash tzresult Lwt.t
 
 val check_public_key :
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?src_pk:public_key ->
   public_key_hash ->

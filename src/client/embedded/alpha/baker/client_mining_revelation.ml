@@ -16,7 +16,7 @@ let inject_seed_nonce_revelation cctxt block ?force ?async nonces =
     List.map
       (fun (level, nonce) ->
          Seed_nonce_revelation { level ; nonce }) nonces in
-  Client_node_rpcs.Blocks.net cctxt block >>= fun net ->
+  Client_node_rpcs.Blocks.net cctxt block >>=? fun net ->
   Client_proto_rpcs.Helpers.Forge.Anonymous.operations cctxt
     block ~net operations >>=? fun bytes ->
   Client_node_rpcs.inject_operation cctxt ?force ?async bytes >>=? fun oph ->
@@ -27,14 +27,14 @@ type Error_monad.error += Bad_revelation
 let forge_seed_nonce_revelation
     (cctxt: Client_commands.context)
     block ?(force = false) nonces =
-  Client_node_rpcs.Blocks.hash cctxt block >>= fun hash ->
+  Client_node_rpcs.Blocks.hash cctxt.rpc_config block >>=? fun hash ->
   match nonces with
   | [] ->
       cctxt.message "No nonce to reveal for block %a"
         Block_hash.pp_short hash >>= fun () ->
       return ()
   | _ ->
-      inject_seed_nonce_revelation cctxt block ~force nonces >>=? fun oph ->
+      inject_seed_nonce_revelation cctxt.rpc_config block ~force nonces >>=? fun oph ->
       cctxt.answer
         "Operation successfully injected %d revelation(s) for %a."
         (List.length nonces)

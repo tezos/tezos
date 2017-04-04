@@ -14,7 +14,7 @@ val generate_seed_nonce: unit -> Nonce.t
     reveal the aforementionned nonce during the next cycle. *)
 
 val inject_block:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   priority:int ->
@@ -31,7 +31,7 @@ val inject_block:
     precomputed). [src_sk] is used to sign the block header. *)
 
 val forge_block:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   ?operations:Operation_hash.t list ->
@@ -74,9 +74,9 @@ val create:
   Client_commands.context ->
   ?max_priority: int ->
   public_key_hash list ->
-  Client_mining_blocks.block_info list Lwt_stream.t ->
-  Client_mining_operations.valid_endorsement Lwt_stream.t ->
-  unit Lwt.t
+  Client_mining_blocks.block_info list tzresult Lwt_stream.t ->
+  Client_mining_operations.valid_endorsement tzresult Lwt_stream.t ->
+  unit tzresult Lwt.t
 
 val get_unrevealed_nonces:
   Client_commands.context ->

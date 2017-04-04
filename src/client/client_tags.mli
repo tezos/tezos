@@ -28,8 +28,8 @@ module Tags (Entity : Entity) : sig
   val tag_param:
     ?name:string ->
     ?desc:string ->
-    ('a, Client_commands.context, unit) Cli_entries.params ->
-    (Tag.t -> 'a, Client_commands.context, unit) Cli_entries.params
+    ('a, Client_commands.context, 'ret) Cli_entries.params ->
+    (Tag.t -> 'a, Client_commands.context, 'ret) Cli_entries.params
 
   val rev_find_by_tag:
     Client_commands.context ->
