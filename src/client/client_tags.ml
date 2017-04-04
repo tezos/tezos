@@ -49,12 +49,12 @@ module Tags (Entity : Entity) = struct
           aux (tag :: tags) tail
         with
         | Not_found ->
-          String.(trim s) :: tags
+            String.(trim s) :: tags
       in
-      Lwt.return (aux [] tags_str)
+      return (aux [] tags_str)
 
     let to_source _ tags =
-      Lwt.return (String.concat ", " tags)
+      return (String.concat ", " tags)
 
     let name = Entity.name ^ " tag"
 
@@ -64,15 +64,19 @@ module Tags (Entity : Entity) = struct
     let desc =
       desc ^ "\n"
       ^ "can be one or multiple tags separated by commas" in
-    Cli_entries.param ~name ~desc of_source next
+    Cli_entries.param ~name ~desc
+      (fun cctxt s -> of_source cctxt s >>= function
+         | Ok r -> Lwt.return r
+         | Error err -> cctxt.error "%a" pp_print_error err)
+      next
 
   let rev_find_by_tag cctxt tag =
-    load cctxt >>= fun tags ->
+    load cctxt >>=? fun tags ->
     try return (Some (List.find (fun (_, v) -> List.mem tag v) tags |> fst))
     with Not_found -> return None
 
   let filter cctxt pred =
-    load cctxt >>= fun tags ->
+    load cctxt >>=? fun tags ->
     return (List.filter pred tags)
 
   let filter_by_tag cctxt tag =

@@ -15,20 +15,17 @@ open Client_commands
 module Ed25519 = Environment.Ed25519
 
 let check_contract cctxt neu =
-  RawContractAlias.mem cctxt neu >>= function
+  RawContractAlias.mem cctxt neu >>=? function
   | true ->
-      cctxt.error "contract '%s' already exists" neu
+      failwith "contract '%s' already exists" neu
   | false ->
-      Lwt.return ()
+      return ()
 
 let get_delegate_pkh cctxt = function
-  | None -> Lwt.return None
+  | None ->
+      return None
   | Some delegate ->
-      Lwt.catch
-        (fun () ->
-           Public_key_hash.find cctxt delegate >>= fun r ->
-           Lwt.return (Some r))
-        (fun _ -> Lwt.return None)
+      Public_key_hash.find_opt cctxt delegate
 
 let get_timestamp cctxt block =
   Client_node_rpcs.Blocks.timestamp cctxt.rpc_config block >>=? fun v ->
@@ -40,37 +37,38 @@ let list_contracts cctxt block =
   map_s (fun h ->
       begin match Contract.is_default h with
         | Some m -> begin
-            Public_key_hash.rev_find cctxt m >|= function
-            | None -> ""
-            | Some nm -> nm
+            Public_key_hash.rev_find cctxt m >>=? function
+            | None -> return ""
+            | Some nm -> return nm
           end
         | None -> begin
-            RawContractAlias.rev_find cctxt h >|= function
-            | None -> ""
-            | Some nm -> nm
+            RawContractAlias.rev_find cctxt h >>=? function
+            | None -> return ""
+            | Some nm -> return nm
           end
-      end >>= fun alias ->
+      end >>=? fun alias ->
       return (alias, h, Contract.is_default h))
     contracts
 
 let list_contract_labels cctxt block =
-  Client_proto_rpcs.Context.Contract.list cctxt.rpc_config block >>=? fun contracts ->
+  Client_proto_rpcs.Context.Contract.list
+    cctxt.rpc_config block >>=? fun contracts ->
   map_s (fun h ->
       begin match Contract.is_default h with
         | Some m -> begin
-            Public_key_hash.rev_find cctxt m >>= function
-            | None -> Lwt.return ""
+            Public_key_hash.rev_find cctxt m >>=? function
+            | None -> return ""
             | Some nm ->
-                RawContractAlias.find_opt cctxt nm >|= function
-                | None -> " (known as " ^ nm ^ ")"
-                | Some _ -> " (known as key:" ^ nm ^ ")"
+                RawContractAlias.find_opt cctxt nm >>=? function
+                | None -> return (" (known as " ^ nm ^ ")")
+                | Some _ -> return (" (known as key:" ^ nm ^ ")")
           end
         | None -> begin
-            RawContractAlias.rev_find cctxt h >|= function
-            | None -> ""
-            | Some nm ->  " (known as " ^ nm ^ ")"
+            RawContractAlias.rev_find cctxt h >>=? function
+            | None -> return ""
+            | Some nm ->  return (" (known as " ^ nm ^ ")")
           end
-      end >>= fun nm ->
+      end >>=? fun nm ->
       let kind = match Contract.is_default h with
         | Some _ -> " (default)"
         | None -> "" in
@@ -220,17 +218,21 @@ let group =
 let commands () =
   let open Cli_entries in
   let open Client_commands in
-  [ command ~group ~desc: "access the timestamp of the block"
+  [
+
+    command ~group ~desc: "access the timestamp of the block"
       (fixed [ "get" ; "timestamp" ])
       (fun cctxt -> get_timestamp cctxt cctxt.config.block) ;
+
     command ~group ~desc: "lists all non empty contracts of the block"
       (fixed [ "list" ; "contracts" ])
       (fun cctxt ->
          list_contract_labels cctxt cctxt.config.block >>=? fun contracts ->
-         Lwt_list.iter_s (fun (alias, hash, kind) ->
-             cctxt.message "%s%s%s" hash kind alias)
+         Lwt_list.iter_s
+           (fun (alias, hash, kind) -> cctxt.message "%s%s%s" hash kind alias)
            contracts >>= fun () ->
          return ()) ;
+
     command ~group ~desc: "get the balance of a contract"
       (prefixes [ "get" ; "balance" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
@@ -239,17 +241,19 @@ let commands () =
          get_balance cctxt.rpc_config cctxt.config.block contract >>=? fun amount ->
          cctxt.answer "%a %s" Tez.pp amount tez_sym >>= fun () ->
          return ()) ;
+
     command ~group ~desc: "get the manager of a block"
       (prefixes [ "get" ; "manager" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
       (fun (_, contract) cctxt ->
          Client_proto_rpcs.Context.Contract.manager cctxt.rpc_config cctxt.config.block contract >>=? fun manager ->
-         Public_key_hash.rev_find cctxt manager >>= fun mn ->
-         Public_key_hash.to_source cctxt manager >>= fun m ->
+         Public_key_hash.rev_find cctxt manager >>=? fun mn ->
+         Public_key_hash.to_source cctxt manager >>=? fun m ->
          cctxt.message "%s (%s)" m
            (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
          return ());
+
     command ~group ~desc: "open a new account"
       ~args: ([ fee_arg ; delegate_arg ; force_arg ]
               @ delegatable_args @ spendable_args)
@@ -267,8 +271,8 @@ let commands () =
          ~name:"src" ~desc: "name of the source contract"
        @@ stop)
       (fun neu (_, manager) balance (_, source) cctxt ->
-         check_contract cctxt neu >>= fun () ->
-         get_delegate_pkh cctxt !delegate >>= fun delegate ->
+         check_contract cctxt neu >>=? fun () ->
+         get_delegate_pkh cctxt !delegate >>=? fun delegate ->
          (Client_proto_contracts.get_manager cctxt.rpc_config cctxt.config.block source >>=? fun src_pkh ->
           Client_keys.get_key cctxt src_pkh
           >>=? fun (src_name, src_pk, src_sk) ->
@@ -277,8 +281,8 @@ let commands () =
             ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
             ~delegatable:!delegatable ~spendable:!spendable ?delegate:delegate
             ()) >>=? fun contract ->
-         RawContractAlias.add cctxt neu contract >>= fun () ->
-         return ()) ;
+         RawContractAlias.add cctxt neu contract) ;
+
     command ~group ~desc: "open a new scripted account"
       ~args: ([ fee_arg ; delegate_arg ; force_arg ] @
               delegatable_args @ spendable_args @ [ init_arg ])
@@ -300,8 +304,8 @@ let commands () =
                              combine with -init if the storage type is not unit"
        @@ stop)
       (fun neu (_, manager) balance (_, source) code cctxt ->
-         check_contract cctxt neu >>= fun () ->
-         get_delegate_pkh cctxt !delegate >>= fun delegate ->
+         check_contract cctxt neu >>=? fun () ->
+         get_delegate_pkh cctxt !delegate >>=? fun delegate ->
          (Client_proto_contracts.get_manager cctxt.rpc_config cctxt.config.block source >>=? fun src_pkh ->
           Client_keys.get_key cctxt src_pkh
           >>=? fun (src_name, src_pk, src_sk) ->
@@ -310,8 +314,8 @@ let commands () =
             ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
             ~delegatable:!delegatable ?delegatePubKey:delegate ~code ~init:!init
             ()) >>=? fun contract ->
-         RawContractAlias.add cctxt neu contract >>= fun () ->
-         return ()) ;
+         RawContractAlias.add cctxt neu contract) ;
+
     command ~group ~desc: "open a new (free) account"
       ~args: ([ fee_arg ; delegate_arg ; force_arg ]
               @ delegatable_args @ spendable_args)
@@ -323,10 +327,10 @@ let commands () =
          ~name: "mgr" ~desc: "manager of the new contract"
        @@ stop)
       (fun neu (_, manager) cctxt ->
-         check_contract cctxt neu >>= fun () ->
+         check_contract cctxt neu >>=? fun () ->
          faucet cctxt cctxt.config.block ~force:!force ~manager_pkh:manager () >>=? fun contract ->
-         RawContractAlias.add cctxt neu contract >>= fun () ->
-         return ()) ;
+         RawContractAlias.add cctxt neu contract) ;
+
     command ~group ~desc: "transfer tokens"
       ~args: [ fee_arg ; arg_arg ; force_arg ]
       (prefixes [ "transfer" ]
@@ -351,6 +355,7 @@ let commands () =
                 Contract.pp c)
             contracts >>= fun () ->
           return ())) ;
+
     command ~desc: "Activate a protocol" begin
       prefixes [ "activate" ; "protocol" ] @@
       param ~name:"version" ~desc:"Protocol version (b58check)"
@@ -363,6 +368,7 @@ let commands () =
     end
       (fun hash seckey cctxt ->
          dictate cctxt cctxt.config.block (Activate hash) seckey) ;
+
     command ~desc: "Fork a test protocol" begin
       prefixes [ "fork" ; "test" ; "protocol" ] @@
       param ~name:"version" ~desc:"Protocol version (b58check)"

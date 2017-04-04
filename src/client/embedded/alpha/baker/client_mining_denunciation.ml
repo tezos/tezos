@@ -29,12 +29,17 @@ let create cctxt endorsement_stream =
     | `Endorsement (Some (Ok e)) ->
         last_get_endorsement := None ;
         Client_keys.Public_key_hash.name cctxt
-          e.Client_mining_operations.source >>= fun source ->
-        lwt_debug
-          "Discovered endorsement for block %a by %s (slot @[<h>%a@])"
-          Block_hash.pp_short e.block
-          source
-          Format.(pp_print_list pp_print_int) e.slots >>= fun () ->
-        worker_loop () in
+          e.Client_mining_operations.source >>= function
+        | Ok source ->
+            lwt_debug
+              "Discovered endorsement for block %a by %s (slot @[<h>%a@])"
+              Block_hash.pp_short e.block
+              source
+              Format.(pp_print_list pp_print_int) e.slots >>= fun () ->
+            worker_loop ()
+        | Error _ ->
+            (* TODO log *)
+            worker_loop ()
+  in
   lwt_log_info "Starting denunciation daemon" >>= fun () ->
   worker_loop ()
