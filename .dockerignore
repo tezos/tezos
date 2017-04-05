@@ -52,6 +52,7 @@ test/shell/test-store
 test/shell/test-state
 test/shell/test-context
 test/proto_alpha/test-transaction
+test/proto_alpha/test-origination
 
 **/*~
 **/\#*\#

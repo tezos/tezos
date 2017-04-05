@@ -114,6 +114,15 @@ test:proto_alpha:transactions:
   dependencies:
     - build
 
+test:proto_alpha:origination:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test/proto_alpha run-test-origination
+  dependencies:
+    - build
+
 test:basic.sh:
   stage: test
   tags:
