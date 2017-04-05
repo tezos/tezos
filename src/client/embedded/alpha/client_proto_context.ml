@@ -359,11 +359,11 @@ let commands () =
     command ~desc: "Activate a protocol" begin
       prefixes [ "activate" ; "protocol" ] @@
       param ~name:"version" ~desc:"Protocol version (b58check)"
-        (fun _ p -> Lwt.return @@ Protocol_hash.of_b58check p) @@
+        (fun _ p -> Lwt.return @@ Protocol_hash.of_b58check_exn p) @@
       prefixes [ "with" ; "key" ] @@
       param ~name:"password" ~desc:"Dictator's key"
         (fun _ key ->
-           Lwt.return (Environment.Ed25519.Secret_key.of_b58check key))
+           Lwt.return (Environment.Ed25519.Secret_key.of_b58check_exn key))
         stop
     end
       (fun hash seckey cctxt ->
@@ -372,11 +372,11 @@ let commands () =
     command ~desc: "Fork a test protocol" begin
       prefixes [ "fork" ; "test" ; "protocol" ] @@
       param ~name:"version" ~desc:"Protocol version (b58check)"
-        (fun _ p -> Lwt.return (Protocol_hash.of_b58check p)) @@
+        (fun _ p -> Lwt.return (Protocol_hash.of_b58check_exn p)) @@
       prefixes [ "with" ; "key" ] @@
       param ~name:"password" ~desc:"Dictator's key"
         (fun _ key ->
-           Lwt.return (Environment.Ed25519.Secret_key.of_b58check key))
+           Lwt.return (Environment.Ed25519.Secret_key.of_b58check_exn key))
         stop
     end
       (fun hash seckey cctxt ->

@@ -45,10 +45,15 @@ module Ed25519 = struct
             with _ -> None)
         ~wrap:(fun x -> Public_key x)
 
-    let of_b58check s =
+    let of_b58check_opt s = Base58.simple_decode b58check_encoding s
+    let of_b58check_exn s =
       match Base58.simple_decode b58check_encoding s with
       | Some x -> x
       | None -> Pervasives.failwith "Unexpected hash (ed25519 public key)"
+    let of_b58check s =
+      match Base58.simple_decode b58check_encoding s with
+      | Some x -> Ok x
+      | None -> generic_error "Unexpected hash (ed25519 public key)"
     let to_b58check s = Base58.simple_encode b58check_encoding s
 
     let of_bytes s = Sodium.Sign.Bytes.to_public_key s
@@ -99,10 +104,15 @@ module Ed25519 = struct
             with _ -> None)
         ~wrap:(fun x -> Secret_key x)
 
-    let of_b58check s =
+    let of_b58check_opt s = Base58.simple_decode b58check_encoding s
+    let of_b58check_exn s =
       match Base58.simple_decode b58check_encoding s with
       | Some x -> x
       | None -> Pervasives.failwith "Unexpected hash (ed25519 secret key)"
+    let of_b58check s =
+      match Base58.simple_decode b58check_encoding s with
+      | Some x -> Ok x
+      | None -> generic_error "Unexpected hash (ed25519 public key)"
     let to_b58check s = Base58.simple_encode b58check_encoding s
 
     let of_bytes s = Sodium.Sign.Bytes.to_secret_key s
@@ -150,10 +160,15 @@ module Ed25519 = struct
         ~of_raw:(fun s -> Some (MBytes.of_string s))
         ~wrap:(fun x -> Signature x)
 
-    let of_b58check s =
+    let of_b58check_opt s = Base58.simple_decode b58check_encoding s
+    let of_b58check_exn s =
       match Base58.simple_decode b58check_encoding s with
       | Some x -> x
       | None -> Pervasives.failwith "Unexpected hash (ed25519 signature)"
+    let of_b58check s =
+      match Base58.simple_decode b58check_encoding s with
+      | Some x -> Ok x
+      | None -> generic_error "Unexpected hash (ed25519 public key)"
     let to_b58check s = Base58.simple_encode b58check_encoding s
 
     let of_bytes s = MBytes.of_string (Bytes.to_string s)

@@ -12,9 +12,7 @@ module Ed25519 = Environment.Ed25519
 module Public_key_hash = Client_aliases.Alias (struct
     type t = Ed25519.Public_key_hash.t
     let encoding = Ed25519.Public_key_hash.encoding
-    let of_source _ s =
-      try return (Ed25519.Public_key_hash.of_b58check s)
-      with exn -> Lwt.return (Error_monad.error_exn exn)
+    let of_source _ s = Lwt.return (Ed25519.Public_key_hash.of_b58check s)
     let to_source _ p = return (Ed25519.Public_key_hash.to_b58check p)
     let name = "public key hash"
   end)
@@ -22,9 +20,7 @@ module Public_key_hash = Client_aliases.Alias (struct
 module Public_key = Client_aliases.Alias (struct
     type t = Ed25519.Public_key.t
     let encoding = Ed25519.Public_key.encoding
-    let of_source _ s =
-      try return (Ed25519.Public_key.of_b58check s)
-      with exn -> Lwt.return (Error_monad.error_exn exn)
+    let of_source _ s = Lwt.return (Ed25519.Public_key.of_b58check s)
     let to_source _ p = return (Ed25519.Public_key.to_b58check p)
     let name = "public key"
   end)
@@ -32,9 +28,7 @@ module Public_key = Client_aliases.Alias (struct
 module Secret_key = Client_aliases.Alias (struct
     type t = Ed25519.Secret_key.t
     let encoding = Ed25519.Secret_key.encoding
-    let of_source _ s =
-      try return (Ed25519.Secret_key.of_b58check s)
-      with exn -> Lwt.return (Error_monad.error_exn exn)
+    let of_source _ s = Lwt.return (Ed25519.Secret_key.of_b58check s)
     let to_source _ p = return (Ed25519.Secret_key.to_b58check p)
     let name = "secret key"
   end)

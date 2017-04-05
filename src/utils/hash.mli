@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
+
 (** Tezos - Manipulation and creation of hashes *)
 
 
@@ -64,7 +66,8 @@ module type HASH = sig
 
   include MINIMAL_HASH
 
-  val of_b58check: string -> t
+  val of_b58check_exn: string -> t
+  val of_b58check_opt: string -> t option
   val to_b58check: t -> string
   val to_short_b58check: t -> string
   val encoding: t Data_encoding.t
@@ -87,6 +90,7 @@ end
 
 module type INTERNAL_HASH = sig
   include HASH
+  val of_b58check: string -> t tzresult
   module Table : Hashtbl.S with type key = t
 end
 

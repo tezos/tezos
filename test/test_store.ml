@@ -18,11 +18,11 @@ let (//) = Filename.concat
 (** Basic blocks *)
 
 let genesis_block =
-  Block_hash.of_b58check
+  Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 
 let genesis_protocol =
-  Protocol_hash.of_b58check
+  Protocol_hash.of_b58check_exn
     "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
 let genesis_time =

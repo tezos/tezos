@@ -671,7 +671,7 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ String_kind ; Int_kind ], kind expr)))
     (* IDs *)
     | Key_t, String (_, s) -> begin try
-          return (Ed25519.Public_key_hash.of_b58check s)
+          return (Ed25519.Public_key_hash.of_b58check_exn s)
         with _ -> fail (error ())
       end
     | Key_t, expr ->

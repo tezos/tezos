@@ -13,10 +13,10 @@ let genesis : State.Net.genesis = {
   time =
     Time.of_notation_exn "2016-11-01T00:00:00Z" ;
   block =
-    Block_hash.of_b58check
+    Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z" ;
   protocol =
-    Protocol_hash.of_b58check
+    Protocol_hash.of_b58check_exn
       "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
 }
 

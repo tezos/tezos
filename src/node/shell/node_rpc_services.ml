@@ -108,7 +108,7 @@ module Blocks = struct
       | ["test_prevalidation"] -> Ok `Test_prevalidation
       | ["head"; n] -> Ok (`Head (int_of_string n))
       | ["test_head"; n] -> Ok (`Test_head (int_of_string n))
-      | [h] -> Ok (`Hash (Block_hash.of_b58check h))
+      | [h] -> Ok (`Hash (Block_hash.of_b58check_exn h))
       | _ -> raise Exit
     with _ -> Error "Cannot parse block identifier."
 
@@ -412,7 +412,7 @@ module Operations = struct
       String.concat "," (List.map Operation_hash.to_b58check ops) in
     let destruct h =
       let ops = split ',' h in
-      try Ok (List.map Operation_hash.of_b58check ops)
+      try Ok (List.map Operation_hash.of_b58check_exn ops)
       with _ -> Error "Can't parse hash" in
     RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
@@ -462,7 +462,7 @@ module Protocols = struct
       "A protocol identifier in hexadecimal." in
     let construct = Protocol_hash.to_b58check in
     let destruct h =
-      try Ok (Protocol_hash.of_b58check h)
+      try Ok (Protocol_hash.of_b58check_exn h)
       with _ -> Error "Can't parse hash" in
     RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
@@ -513,7 +513,7 @@ module Network = struct
       ~name:"peer_id"
       ~descr:"A network global identifier, also known as an identity."
       ~destruct:(fun s -> try
-                    Ok (Crypto_box.Public_key_hash.of_b58check s)
+                    Ok (Crypto_box.Public_key_hash.of_b58check_exn s)
                   with Failure msg -> Error msg)
       ~construct:Crypto_box.Public_key_hash.to_b58check
       ()
