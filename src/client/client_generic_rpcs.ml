@@ -343,6 +343,7 @@ let group =
     title = "Commands for the low level RPC layer" }
 
 let commands = [
+
   command ~desc: "list all understood protocol versions"
     (fixed [ "list" ; "versions" ])
     (fun cctxt ->
@@ -350,20 +351,26 @@ let commands = [
          (fun (ver, _) -> cctxt.Client_commands.message "%a" Protocol_hash.pp_short ver)
          (Client_commands.get_versions ()) >>= fun () ->
        return ()) ;
+
   command ~group ~desc: "list available RPCs (low level command for advanced users)"
     (prefixes [ "rpc" ; "list" ] @@ stop)
     (list "/");
+
   command ~group ~desc: "list available RPCs (low level command for advanced users)"
     (prefixes [ "rpc" ; "list" ] @@ string ~name:"url" ~desc: "the RPC's prefix to be described" @@ stop)
     list ;
+
   command ~group ~desc: "get the schemas of an RPC"
     (prefixes [ "rpc" ; "schema" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
     schema ;
+
   command ~group ~desc: "call an RPC (low level command for advanced users)"
     (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
     call ;
+
   command ~group ~desc: "call an RPC (low level command for advanced users)"
     (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL"
      @@ prefix "with" @@ string ~name:"" ~desc:"" @@ stop)
     call_with_json
+
 ]

@@ -85,8 +85,8 @@ let tez_param ~name ~desc next =
     (desc ^ " in \xEA\x9C\xA9\n\
              text format: D,DDD,DDD.DD (centiles and comas are optional)")
     (fun _ s ->
-       try Lwt.return (tez_of_string s)
-       with _ -> Lwt.fail_with "invalid \xEA\x9C\xA9 notation")
+       try return (tez_of_string s)
+       with _ -> failwith "invalid \xEA\x9C\xA9 notation")
     next
 
 let max_priority = ref None

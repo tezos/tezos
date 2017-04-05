@@ -86,10 +86,10 @@ let transfer cctxt
   Client_node_rpcs.Blocks.net cctxt.rpc_config block >>=? fun net ->
   begin match arg with
     | Some arg ->
-        Client_proto_programs.parse_data cctxt arg >>= fun arg ->
-        Lwt.return (Some arg)
-    | None -> Lwt.return None
-  end >>= fun parameters ->
+        Client_proto_programs.parse_data arg >>=? fun arg ->
+        return (Some arg)
+    | None -> return None
+  end >>=? fun parameters ->
   Client_proto_rpcs.Context.Contract.counter cctxt.rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   cctxt.message "Acquired the source's sequence counter (%ld -> %ld)."
@@ -148,7 +148,7 @@ let originate_contract cctxt
     block ?force
     ~source ~src_pk ~src_sk ~manager_pkh ~balance ?delegatable ?delegatePubKey
     ~(code:Script.code) ~init ~fee () =
-  Client_proto_programs.parse_data cctxt init >>= fun storage ->
+  Client_proto_programs.parse_data init >>=? fun storage ->
   let storage = Script.{ storage ; storage_type = code.storage_type } in
   Client_proto_rpcs.Context.Contract.counter cctxt.rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
@@ -358,12 +358,10 @@ let commands () =
 
     command ~desc: "Activate a protocol" begin
       prefixes [ "activate" ; "protocol" ] @@
-      param ~name:"version" ~desc:"Protocol version (b58check)"
-        (fun _ p -> Lwt.return @@ Protocol_hash.of_b58check_exn p) @@
+      Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)" @@
       prefixes [ "with" ; "key" ] @@
-      param ~name:"password" ~desc:"Dictator's key"
-        (fun _ key ->
-           Lwt.return (Environment.Ed25519.Secret_key.of_b58check_exn key))
+      Environment.Ed25519.Secret_key.param
+        ~name:"password" ~desc:"Dictator's key" @@
         stop
     end
       (fun hash seckey cctxt ->
@@ -371,14 +369,13 @@ let commands () =
 
     command ~desc: "Fork a test protocol" begin
       prefixes [ "fork" ; "test" ; "protocol" ] @@
-      param ~name:"version" ~desc:"Protocol version (b58check)"
-        (fun _ p -> Lwt.return (Protocol_hash.of_b58check_exn p)) @@
+      Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)" @@
       prefixes [ "with" ; "key" ] @@
-      param ~name:"password" ~desc:"Dictator's key"
-        (fun _ key ->
-           Lwt.return (Environment.Ed25519.Secret_key.of_b58check_exn key))
-        stop
+      Environment.Ed25519.Secret_key.param
+        ~name:"password" ~desc:"Dictator's key" @@
+      stop
     end
       (fun hash seckey cctxt ->
          dictate cctxt cctxt.config.block (Activate_testnet hash) seckey) ;
+
   ]

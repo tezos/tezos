@@ -85,6 +85,15 @@ let main () =
     command (cctxt config rpc_config) >>= function
     | Ok () ->
         Lwt.return 0
+    | Error [Cli_entries.Command_not_found] ->
+        Format.eprintf "Unknown command, try `-help`.@." ;
+        Lwt.return 1
+    | Error [Cli_entries.Bad_argument (idx, _n, v)] ->
+        Format.eprintf "There's a problem with argument %d, %s.@." idx v ;
+        Lwt.return 1
+    | Error [Cli_entries.Command_failed message] ->
+        Format.eprintf "Command failed, %s.@." message ;
+        Lwt.return 1
     | Error err ->
         Format.eprintf "Error: %a@." pp_print_error err ;
         Lwt.return 1
@@ -95,17 +104,8 @@ let main () =
     | Arg.Bad help ->
         Format.eprintf "%s%!" help ;
         Lwt.return 1
-    | Cli_entries.Command_not_found ->
-        Format.eprintf "Unknown command, try `-help`.@." ;
-        Lwt.return 1
-    | Client_commands.Version_not_found ->
+    |  Client_commands.Version_not_found ->
         Format.eprintf "Unknown protocol version, try `list versions`.@." ;
-        Lwt.return 1
-    | Cli_entries.Bad_argument (idx, _n, v) ->
-        Format.eprintf "There's a problem with argument %d, %s.@." idx v ;
-        Lwt.return 1
-    | Cli_entries.Command_failed message ->
-        Format.eprintf "Command failed, %s.@." message ;
         Lwt.return 1
     | Failure message ->
         Format.eprintf "Fatal error: %s@." message ;

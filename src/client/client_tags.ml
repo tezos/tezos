@@ -65,9 +65,7 @@ module Tags (Entity : Entity) = struct
       desc ^ "\n"
       ^ "can be one or multiple tags separated by commas" in
     Cli_entries.param ~name ~desc
-      (fun cctxt s -> of_source cctxt s >>= function
-         | Ok r -> Lwt.return r
-         | Error err -> cctxt.error "%a" pp_print_error err)
+      (fun cctxt s -> of_source cctxt s)
       next
 
   let rev_find_by_tag cctxt tag =

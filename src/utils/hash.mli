@@ -91,6 +91,11 @@ end
 module type INTERNAL_HASH = sig
   include HASH
   val of_b58check: string -> t tzresult
+  val param:
+    ?name:string ->
+    ?desc:string ->
+    ('a, 'arg, 'ret) Cli_entries.params ->
+    (t -> 'a, 'arg, 'ret) Cli_entries.params
   module Table : Hashtbl.S with type key = t
 end
 
@@ -156,14 +161,7 @@ module Make_Blake2B
 (** {2 Predefined Hashes } ****************************************************)
 
 (** Blocks hashes / IDs. *)
-module Block_hash : sig
-  include INTERNAL_HASH
-  val param :
-    ?name:string ->
-    ?desc:string ->
-    ('a, 'arg, 'ret) Cli_entries.params ->
-    (t -> 'a, 'arg, 'ret) Cli_entries.params
-end
+module Block_hash : INTERNAL_HASH
 
 (** Operations hashes / IDs. *)
 module Operation_hash : INTERNAL_HASH
