@@ -51,6 +51,7 @@ test/p2p/test-p2p-connection-pool
 test/shell/test-store
 test/shell/test-state
 test/shell/test-context
+test/proto_alpha/test-transaction
 
 **/*~
 **/\#*\#

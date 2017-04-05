@@ -39,6 +39,7 @@
 /test/utils/.depend
 /test/p2p/.depend
 /test/shell/.depend
+/test/proto_alpha/.depend
 /test/reports
 
 /test/utils/test-data-encoding
@@ -50,6 +51,7 @@
 /test/shell/test-store
 /test/shell/test-state
 /test/shell/test-context
+/test/proto_alpha/test-transaction
 
 *~
 \#*\#

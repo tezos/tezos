@@ -2,7 +2,8 @@
 DIR := \
   utils \
   shell \
-  p2p
+  p2p \
+  proto_alpha
 
 all: build run
 
