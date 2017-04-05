@@ -7,12 +7,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
+
 (* Tezos: a small Command Line Parsing library *)
 (* Only used in the client. *)
 
-exception Command_not_found
-exception Bad_argument of int * string * string
-exception Command_failed of string
+type error += Command_not_found
+type error += Bad_argument of int * string * string
+type error += Command_failed of string
 
 type ('a, 'arg, 'ret) params
 type ('arg, 'ret) command
@@ -20,7 +22,7 @@ type ('arg, 'ret) command
 val param:
   name: string ->
   desc: string ->
-  ('arg -> string -> 'a Lwt.t) ->
+  ('arg -> string -> 'a tzresult Lwt.t) ->
   ('b, 'arg, 'ret) params ->
   ('a -> 'b, 'arg, 'ret) params
 val prefix:
@@ -33,14 +35,14 @@ val prefixes:
   ('a, 'arg, 'ret) params
 val fixed:
   string list ->
-  ('arg -> 'ret Lwt.t, 'arg, 'ret) params
+  ('arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params
 val stop:
-  ('arg -> 'ret Lwt.t, 'arg, 'ret) params
+  ('arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params
 val seq:
   name: string ->
   desc: string ->
-  ('arg -> string -> 'p Lwt.t) ->
-  ('p list -> 'arg -> 'ret Lwt.t, 'arg, 'ret) params
+  ('arg -> string -> 'p tzresult Lwt.t) ->
+  ('p list -> 'arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params
 
 val string:
   name: string ->
@@ -49,9 +51,9 @@ val string:
   (string -> 'a, 'arg, 'ret) params
 
 val seq_of_param:
-  (('arg -> 'ret Lwt.t, 'arg, 'ret) params ->
-   ('a -> 'arg -> 'ret Lwt.t, 'arg, 'ret) params) ->
-  ('a list -> 'arg -> 'ret Lwt.t, 'arg, 'ret) params
+  (('arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params ->
+   ('a -> 'arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params) ->
+  ('a list -> 'arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params
 
 type group =
   { name : string ;
@@ -71,9 +73,9 @@ val inline_dispatch:
   ('arg, 'ret) command list -> unit ->
   [ `Arg of string | `End ] ->
   [ `Args of (Arg.key * Arg.spec * Arg.doc) list
-  | `Fail of exn
+  | `Fail of error list
   | `Nop
-  | `Res of 'arg -> 'ret Lwt.t ]
+  | `Res of 'arg -> 'ret tzresult Lwt.t ]
 
 val dispatch:
-  ('arg, 'ret) command list -> 'arg -> string list -> 'ret Lwt.t
+  ('arg, 'ret) command list -> 'arg -> string list -> 'ret tzresult Lwt.t

@@ -9,12 +9,14 @@
 
 (* Tezos Command line interface - Command Line Parsing *)
 
+open Error_monad
 open Lwt.Infix
 
 (* User catchable exceptions *)
-exception Command_not_found
-exception Bad_argument of int * string * string
-exception Command_failed of string
+type error += Command_not_found
+type error += Bad_argument of int * string * string
+type error += Command_failed of string
+
 
 (* A simple structure for command interpreters.
    This is more generic than the exported one, see end of file. *)
@@ -22,16 +24,16 @@ type ('a, 'arg, 'ret) params =
   | Prefix : string * ('a, 'arg, 'ret) params ->
     ('a, 'arg, 'ret) params
   | Param : string * string *
-            ('arg -> string -> 'p Lwt.t) *
+            ('arg -> string -> 'p tzresult Lwt.t) *
             ('a, 'arg, 'ret) params ->
     ('p -> 'a, 'arg, 'ret) params
   | Stop :
-      ('arg -> 'ret Lwt.t, 'arg, 'ret) params
+      ('arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params
   | More :
-      (string list -> 'arg -> 'ret Lwt.t, 'arg, 'ret) params
+      (string list -> 'arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params
   | Seq : string * string *
-          ('arg -> string -> 'p Lwt.t) ->
-    ('p list -> 'arg -> 'ret Lwt.t, 'arg, 'ret) params
+          ('arg -> string -> 'p tzresult Lwt.t) ->
+    ('p list -> 'arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params
 
 (* A command group *)
 type group =
@@ -70,29 +72,29 @@ let command ?group ?(args = []) ~desc params handler =
 
 (* Param combinators *)
 let string ~name ~desc next =
-  param name desc (fun _ s -> Lwt.return s) next
+  param name desc (fun _ s -> return s) next
 
 (* Command execution *)
 let exec
     (type arg) (type ret)
     (Command { params ; handler }) (last : arg) args =
   let rec exec
-    : type a. int -> (a, arg, ret) params -> a -> string list -> ret Lwt.t
+    : type a. int -> (a, arg, ret) params -> a -> string list -> ret tzresult Lwt.t
     = fun i params cb args ->
     match params, args with
     | Stop, [] -> cb last
-    | Stop, _ -> Lwt.fail Command_not_found
+    | Stop, _ -> fail Command_not_found
     | Seq (_, _, f), seq ->
         let rec do_seq i acc = function
-          | [] -> Lwt.return (List.rev acc)
+          | [] -> return (List.rev acc)
           | p :: rest ->
               Lwt.catch
                 (fun () -> f last p)
                 (function
-                  | Failure msg -> Lwt.fail (Bad_argument (i, p, msg))
-                  | exn -> Lwt.fail exn) >>= fun v ->
+                  | Failure msg -> fail (Bad_argument (i, p, msg))
+                  | exn -> fail (Exn exn)) >>=? fun v ->
               do_seq (succ i) (v :: acc) rest in
-        do_seq i [] seq >>= fun parsed ->
+        do_seq i [] seq >>=? fun parsed ->
         cb parsed last
     | More, rest -> cb rest last
     | Prefix (n, next), p :: rest when n = p ->
@@ -101,10 +103,10 @@ let exec
         Lwt.catch
           (fun () -> f last p)
           (function
-            | Failure msg -> Lwt.fail (Bad_argument (i, p, msg))
-            | exn -> Lwt.fail exn) >>= fun v ->
+            | Failure msg -> fail (Bad_argument (i, p, msg))
+            | exn -> fail (Exn exn)) >>=? fun v ->
         exec (succ i) next (cb v) rest
-    | _ -> Lwt.fail Command_not_found
+    | _ -> fail Command_not_found
   in exec 1 params handler args
 
 (* Command dispatch tree *)
@@ -168,10 +170,10 @@ let tree_dispatch tree last args =
         begin try
             let t = List.assoc n prefix in
             loop (t, rest)
-          with Not_found -> Lwt.fail Command_not_found end
+          with Not_found -> fail Command_not_found end
     | TParam { tree }, _ :: rest ->
         loop (tree, rest)
-    | _, _ -> Lwt.fail Command_not_found
+    | _, _ -> fail Command_not_found
   in
   loop (tree, args)
 
@@ -196,14 +198,14 @@ let inline_tree_dispatch tree () =
               | TStop (Command { args })
               | TMore (Command { args }) -> `Args args
               | _ -> `Nop end
-          with Not_found -> `Fail Command_not_found end
+          with Not_found -> `Fail [Command_not_found] end
     | (TParam { tree }, acc), `Arg n ->
         state := (tree, n :: acc) ;
         begin match tree with
           | TStop (Command { args })
           | TMore (Command { args }) -> `Args args
           | _ -> `Nop end
-    | _, _ -> `Fail Command_not_found
+    | _, _ -> `Fail [Command_not_found]
 
 (* Try a list of commands on a list of arguments *)
 let dispatch commands =

@@ -56,12 +56,13 @@ let commands () =
 
     command ~args ~desc: "Activate a protocol" begin
       prefixes [ "activate" ; "protocol" ] @@
-      param ~name:"version" ~desc:"Protocol version (b58check)"
-        (fun _ p -> Lwt.return @@ Protocol_hash.of_b58check_exn p) @@
+      Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)" @@
       prefixes [ "with" ; "fitness" ] @@
       param ~name:"fitness"
         ~desc:"Hardcoded fitness of the first block (integer)"
-        (fun _ p -> Lwt.return (Int64.of_string p)) @@
+        (fun _ p ->
+           try return (Int64.of_string p)
+           with _ -> failwith "Cannot read int64") @@
       prefixes [ "and" ; "key" ] @@
       Client_keys.Secret_key.source_param
         ~name:"password" ~desc:"Dictator's key" @@
@@ -76,16 +77,16 @@ let commands () =
 
     command ~args ~desc: "Fork a test protocol" begin
       prefixes [ "fork" ; "test" ; "protocol" ] @@
-      param ~name:"version" ~desc:"Protocol version (b58check)"
-        (fun _ p -> Lwt.return (Protocol_hash.of_b58check_exn p)) @@
+      Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)" @@
       prefixes [ "with" ; "fitness" ] @@
       param ~name:"fitness"
         ~desc:"Hardcoded fitness of the first block (integer)"
-        (fun _ p -> Lwt.return (Int64.of_string p)) @@
+        (fun _ p ->
+           try return (Int64.of_string p)
+           with _ -> failwith "Cannot read int64") @@
       prefixes [ "and" ; "key" ] @@
-      param ~name:"password" ~desc:"Dictator's key"
-        (fun _ key ->
-           Lwt.return (Environment.Ed25519.Secret_key.of_b58check_exn key)) @@
+      Environment.Ed25519.Secret_key.param
+        ~name:"password" ~desc:"Dictator's key" @@
       stop
     end begin fun hash fitness seckey cctxt ->
       let timestamp = !timestamp in

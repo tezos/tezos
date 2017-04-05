@@ -225,9 +225,9 @@ UTILS_LIB_INTFS := \
 
 UTILS_LIB_IMPLS := \
   utils/base58.ml \
-  utils/cli_entries.ml \
   utils/error_monad_sig.ml \
   utils/error_monad.ml \
+  utils/cli_entries.ml \
   utils/data_encoding_ezjsonm.ml \
   utils/time.ml \
   utils/hash.ml \

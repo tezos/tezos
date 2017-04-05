@@ -215,14 +215,16 @@ let parse_args usage dispatcher argv =
     let anon dispatch n = match dispatch (`Arg n) with
       | `Nop -> ()
       | `Args nargs -> args := nargs @ !args
-      | `Fail exn -> raise exn
+      | `Fail err ->
+          Format.kasprintf (fun s -> raise (Arg.Help s)) "%a" pp_print_error err
       | `Res _ -> assert false in
     let dispatch = dispatcher () in
     Arg.parse_argv_dynamic
       ~current:(ref 0) argv args (anon dispatch) "\000" ;
     match dispatch `End with
     | `Res res -> (res, !parsed_args)
-    | `Fail exn -> raise exn
+    | `Fail err ->
+        Format.kasprintf (fun s -> raise (Arg.Help s)) "%a" pp_print_error err
     | `Nop | `Args _ -> assert false
   with
   | Arg.Bad msg ->

@@ -61,10 +61,7 @@ module ContractAlias = struct
       ^ "can be an contract alias or a key alias (autodetected in this order)\n\
          use 'key:name' to force the later" in
     Cli_entries.param ~name ~desc
-      (fun cctxt p ->
-         get_contract cctxt p >>= function
-         | Ok v -> Lwt.return v
-         | Error err -> cctxt.error "%a" pp_print_error err)
+      (fun cctxt p -> get_contract cctxt p)
       next
 
   let destination_param ?(name = "dst") ?(desc = "destination contract") next =
@@ -87,9 +84,7 @@ module ContractAlias = struct
                | Error _ ->
                    ContractEntity.of_source cctxt s >>=? fun v ->
                    return (s, v)
-         end >>= function
-         | Ok v -> Lwt.return v
-         | Error err -> cctxt.error "%a" pp_print_error err)
+         end)
       next
 
    let name cctxt contract =
