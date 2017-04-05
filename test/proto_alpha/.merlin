@@ -1,0 +1,30 @@
+REC
+S .
+B .
+S ../../src/minutils
+B ../../src/minutils
+S ../../src/utils
+B ../../src/utils
+S ../../src/node/net
+B ../../src/node/net
+S ../../src/node/db
+B ../../src/node/db
+S ../../src/node/updater
+B ../../src/node/updater
+S ../../src/node/shell
+B ../../src/node/shell
+S ../../src/proto
+B ../../src/proto
+S ../../src/client
+B ../../src/client
+S ../../src/client/embedded/alpha
+S ../../src/client/embedded/alpha/baker
+B ../../src/client/embedded
+S ../lib
+B ../lib
+FLG -open Error_monad -open Hash -open Utils -open Environment
+FLG -w -40
+PKG lwt
+PKG sodium
+PKG kaputt
+PKG ipaddr
