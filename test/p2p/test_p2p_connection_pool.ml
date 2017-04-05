@@ -190,7 +190,7 @@ let spec = Arg.[
 let main () =
   let open Utils in
   Logging.init Stderr >>= fun () ->
-  let anon_fun num_peers = raise (Arg.Bad "No anonymous argument.") in
+  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
   let ports = !port -- (!port + !clients - 1) in

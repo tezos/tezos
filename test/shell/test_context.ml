@@ -178,18 +178,18 @@ let test_list idx =
       set ctxt ["f";] (MBytes.of_string "Avril") >>= fun ctxt ->
       set ctxt ["g"; "h"] (MBytes.of_string "Avril") >>= fun ctxt ->
       list ctxt [[]] >>= fun l ->
-      Assert.equal_persist_list ~msg:__LOC__ [["a"];["f"];["g"]] l ;
+      Assert.equal_string_list_list ~msg:__LOC__ [["a"];["f"];["g"]] l ;
       list ctxt [["a"]] >>= fun l ->
-      Assert.equal_persist_list
+      Assert.equal_string_list_list
         ~msg:__LOC__ [["a";"b"]; ["a";"c"]; ["a";"d"]] l ;
       list ctxt [["f"]] >>= fun l ->
-      Assert.equal_persist_list ~msg:__LOC__ [] l ;
+      Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       list ctxt [["g"]] >>= fun l ->
-      Assert.equal_persist_list ~msg:__LOC__ [["g";"h"]] l ;
+      Assert.equal_string_list_list ~msg:__LOC__ [["g";"h"]] l ;
       list ctxt [["i"]] >>= fun l ->
-      Assert.equal_persist_list ~msg:__LOC__ [] l ;
+      Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       list ctxt [["a"];["g"]] >>= fun l ->
-      Assert.equal_persist_list ~msg:__LOC__
+      Assert.equal_string_list_list ~msg:__LOC__
         [["a"; "b"]; ["a"; "c"]; ["a"; "d"]; ["g"; "h"]] l ;
       Lwt.return ()
 

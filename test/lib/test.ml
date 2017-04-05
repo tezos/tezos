@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Kaputt.Abbreviations
+module Test = Kaputt.Abbreviations.Test
 
 let keep_dir = try ignore (Sys.getenv "KEEPDIR") ; true with _ -> false
 

@@ -27,44 +27,81 @@ build:
   script:
     - echo "PRODUCTION=yes" > src/Makefile.local
     - make -C src -j4
-    - make -C test -j4 build-test
+    - make -C test build
   artifacts:
     expire_in: 1 week
     untracked: true
 
-test:store:
+
+test:utils:data-encoding:
   stage: test
   tags:
     - tezos_builder
   script:
-    - make -C test run-test-store
+    - make -C test/utils run-test-data-encoding
   dependencies:
     - build
 
-test:context:
+test:utils:merkle:
   stage: test
   tags:
     - tezos_builder
   script:
-    - make -C test run-test-context
+    - make -C test/utils run-test-merkle
   dependencies:
     - build
 
-test:state:
+test:shell:store:
   stage: test
   tags:
     - tezos_builder
   script:
-    - make -C test run-test-state
+    - make -C test/shell run-test-store
   dependencies:
     - build
 
-test:basic:
+test:shell:context:
   stage: test
   tags:
     - tezos_builder
   script:
-    - make -C test run-test-basic
+    - make -C test/shell run-test-context
+  dependencies:
+    - build
+
+test:shell:state:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test/shell run-test-state
+  dependencies:
+    - build
+
+test:p2p:io-scheduler:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test/p2p run-test-p2p-io-scheduler
+  dependencies:
+    - build
+
+test:p2p:connection:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test/p2p run-test-p2p-connection
+  dependencies:
+    - build
+
+test:p2p:connection-pool:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test/p2p run-test-p2p-connection-pool
   dependencies:
     - build
 
@@ -73,52 +110,7 @@ test:basic.sh:
   tags:
     - tezos_builder
   script:
-    - make -C test run-test-basic.sh
-  dependencies:
-    - build
-
-test:data-encoding:
-  stage: test
-  tags:
-    - tezos_builder
-  script:
-    - make -C test run-test-data-encoding
-  dependencies:
-    - build
-
-test:merkle:
-  stage: test
-  tags:
-    - tezos_builder
-  script:
-    - make -C test run-test-merkle
-  dependencies:
-    - build
-
-test:p2p-io-scheduler:
-  stage: test
-  tags:
-    - tezos_builder
-  script:
-    - make -C test run-test-p2p-io-scheduler
-  dependencies:
-    - build
-
-test:p2p-connection:
-  stage: test
-  tags:
-    - tezos_builder
-  script:
-    - make -C test run-test-p2p-connection
-  dependencies:
-    - build
-
-test:p2p-connection-pool:
-  stage: test
-  tags:
-    - tezos_builder
-  script:
-    - make -C test run-test-p2p-connection-pool
+    - make -C test run-basic.sh
   dependencies:
     - build
 
