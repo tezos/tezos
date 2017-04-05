@@ -18,7 +18,8 @@ module Public_key : sig
   type Base58.data +=
     | Public_key of t
 
-  val of_b58check: string -> t
+  val of_b58check_exn: string -> t
+  val of_b58check_opt: string -> t option
   val to_b58check: t -> string
 
   val of_bytes: Bytes.t -> t
@@ -33,7 +34,8 @@ module Secret_key : sig
   type Base58.data +=
     | Secret_key of t
 
-  val of_b58check: string -> t
+  val of_b58check_exn: string -> t
+  val of_b58check_opt: string -> t option
   val to_b58check: t -> string
 
   val of_bytes: Bytes.t -> t
@@ -48,7 +50,8 @@ module Signature : sig
   type Base58.data +=
     | Signature of t
 
-  val of_b58check: string -> t
+  val of_b58check_exn: string -> t
+  val of_b58check_opt: string -> t option
   val to_b58check: t -> string
 
   val of_bytes: Bytes.t -> t

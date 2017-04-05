@@ -192,7 +192,7 @@ module RPC = struct
         Lwt.fail Not_found
 
   let prevalidation_hash =
-    Block_hash.of_b58check
+    Block_hash.of_b58check_exn
       "BLockPrevaLidationPrevaLidationPrevaLidationPrZ4mr6"
 
   let get_net node = function

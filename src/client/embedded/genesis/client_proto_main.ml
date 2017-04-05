@@ -10,7 +10,7 @@
 open Client_commands
 
 let protocol =
-  Protocol_hash.of_b58check
+  Protocol_hash.of_b58check_exn
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
 let call_service1 cctxt s block a1 =
@@ -57,7 +57,7 @@ let commands () =
     command ~args ~desc: "Activate a protocol" begin
       prefixes [ "activate" ; "protocol" ] @@
       param ~name:"version" ~desc:"Protocol version (b58check)"
-        (fun _ p -> Lwt.return @@ Protocol_hash.of_b58check p) @@
+        (fun _ p -> Lwt.return @@ Protocol_hash.of_b58check_exn p) @@
       prefixes [ "with" ; "fitness" ] @@
       param ~name:"fitness"
         ~desc:"Hardcoded fitness of the first block (integer)"
@@ -77,7 +77,7 @@ let commands () =
     command ~args ~desc: "Fork a test protocol" begin
       prefixes [ "fork" ; "test" ; "protocol" ] @@
       param ~name:"version" ~desc:"Protocol version (b58check)"
-        (fun _ p -> Lwt.return (Protocol_hash.of_b58check p)) @@
+        (fun _ p -> Lwt.return (Protocol_hash.of_b58check_exn p)) @@
       prefixes [ "with" ; "fitness" ] @@
       param ~name:"fitness"
         ~desc:"Hardcoded fitness of the first block (integer)"
@@ -85,7 +85,7 @@ let commands () =
       prefixes [ "and" ; "key" ] @@
       param ~name:"password" ~desc:"Dictator's key"
         (fun _ key ->
-           Lwt.return (Environment.Ed25519.Secret_key.of_b58check key)) @@
+           Lwt.return (Environment.Ed25519.Secret_key.of_b58check_exn key)) @@
       stop
     end begin fun hash fitness seckey cctxt ->
       let timestamp = !timestamp in

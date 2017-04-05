@@ -271,7 +271,7 @@ let create_register_file client file hash packname modules =
   create_file file
     (Printf.sprintf
        "module Packed_protocol = struct\n\
-       \  let hash = (%s.Protocol_hash.of_b58check %S)\n\
+       \  let hash = (%s.Protocol_hash.of_b58check_exn %S)\n\
        \  type error = %s.error = ..\n\
        \  type 'a tzresult = 'a %s.tzresult\n\
        \  include %s.%s\n\

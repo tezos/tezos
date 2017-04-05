@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 let protocol =
-  Protocol_hash.of_b58check
+  Protocol_hash.of_b58check_exn
     "ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9"
 
 let demo cctxt =

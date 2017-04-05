@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 let genesis =
-  Block_hash.of_b58check
+  Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 
 let get_block_hash config = function
