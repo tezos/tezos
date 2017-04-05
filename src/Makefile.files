@@ -1,0 +1,398 @@
+
+SRCDIR ?= .
+
+PROTOCOL_ENV_INTFS := \
+$(addprefix proto/environment/, \
+  pervasives.mli \
+  compare.mli \
+  \
+  array.mli list.mli bytes.mli string.mli \
+  set.mli map.mli \
+  int32.mli int64.mli \
+  buffer.mli \
+  format.mli \
+  \
+  lwt_sequence.mli lwt.mli lwt_list.mli \
+  \
+  mBytes.mli \
+  hex_encode.mli \
+  \
+  uri.mli \
+  data_encoding.mli \
+  error_monad.mli \
+  logging.mli \
+  time.mli \
+  base58.mli \
+  hash.mli \
+  ed25519.mli \
+  persist.mli \
+  fitness.mli \
+  context.mli \
+  RPC.mli \
+  \
+  updater.mli \
+)
+
+############################################################################
+## Minimal utils library compatible with js_of_ocaml
+############################################################################
+
+MINUTILS_SOURCE_DIRECTORIES := \
+  ${SRCDIR}/minutils
+
+MINUTILS_OPENED_MODULES :=
+
+MINUTILS_LIB_INTFS := \
+  minutils/mBytes.mli \
+  minutils/hex_encode.mli \
+  minutils/utils.mli \
+  minutils/compare.mli \
+  minutils/data_encoding.mli \
+  minutils/RPC.mli \
+
+MINUTILS_LIB_IMPLS := \
+  minutils/mBytes.ml \
+  minutils/hex_encode.ml \
+  minutils/utils.ml \
+  minutils/compare.ml \
+  minutils/data_encoding.ml \
+  minutils/RPC.ml \
+
+MINUTILS_PACKAGES := \
+  cstruct \
+  lwt  \
+  ocplib-json-typed.bson \
+  ocplib-resto.directory \
+  $(COVERAGEPKG) \
+
+############################################################################
+## Utils library
+############################################################################
+
+UTILS_SOURCE_DIRECTORIES := \
+  ${MINUTILS_SOURCE_DIRECTORIES} \
+  ${SRCDIR}/utils
+
+UTILS_OPENED_MODULES :=
+
+UTILS_LIB_INTFS := \
+  utils/base58.mli \
+  utils/cli_entries.mli \
+  utils/data_encoding_ezjsonm.mli \
+  utils/crypto_box.mli \
+  utils/time.mli \
+  utils/hash.mli \
+  utils/error_monad.mli \
+  utils/lwt_exit.mli \
+  utils/logging.mli \
+  utils/lwt_utils.mli \
+  utils/lwt_pipe.mli \
+  utils/IO.mli \
+  utils/moving_average.mli \
+  utils/ring.mli \
+  utils/watcher.mli \
+
+UTILS_LIB_IMPLS := \
+  utils/base58.ml \
+  utils/error_monad_sig.ml \
+  utils/error_monad.ml \
+  utils/cli_entries.ml \
+  utils/data_encoding_ezjsonm.ml \
+  utils/time.ml \
+  utils/hash.ml \
+  utils/crypto_box.ml \
+  utils/lwt_exit.ml \
+  utils/logging.ml \
+  utils/lwt_utils.ml \
+  utils/lwt_pipe.ml \
+  utils/IO.ml \
+  utils/moving_average.ml \
+  utils/ring.ml \
+  utils/watcher.ml \
+
+UTILS_PACKAGES := \
+  ${MINUTILS_PACKAGES} \
+  base64 \
+  calendar \
+  ezjsonm \
+  ipaddr.unix \
+  lwt.unix \
+  mtime.os \
+  nocrypto \
+  sodium \
+  zarith \
+  $(COVERAGEPKG) \
+
+############################################################################
+## Node protocol compiler (also embedded in the main program)
+############################################################################
+
+COMPILER_SOURCE_DIRECTORIES := \
+  ${UTILS_SOURCE_DIRECTORIES} \
+  ${SRCDIR}/compiler
+
+COMPILER_OPENED_MODULES := Error_monad Hash Utils
+
+COMPILER_EMBEDDED_CMIS := \
+  compiler/sigs/camlinternalFormatBasics.cmi \
+  compiler/sigs/proto_environment.cmi \
+  compiler/sigs/register.cmi
+
+COMPILER_PRECOMPILED_INTFS := \
+  compiler/sigs/tezos_compiler.mli \
+  compiler/sigs/fitness.mli \
+  compiler/sigs/persist.mli \
+  compiler/sigs/store_sigs.mli \
+  compiler/sigs/store.mli \
+  compiler/sigs/context.mli \
+  compiler/sigs/protocol.mli \
+  compiler/sigs/proto_environment.mli \
+  compiler/sigs/register.mli
+
+COMPILER_PRECOMPILED_PACKAGES := \
+  ${MINUTILS_PACKAGES} ${UTILS_PACKAGES}
+
+COMPILER_PRECOMPILED_SOURCE_DIRECTORIES := \
+  ${UTILS_SOURCE_DIRECTORIES} compiler/sigs/
+
+COMPILER_PRECOMPILED_OPENED_MODULES := Error_monad Hash Utils
+
+COMPILER_LIB_INTFS := \
+  compiler/tezos_compiler.mli \
+  compiler/embedded_cmis.mli \
+
+COMPILER_LIB_IMPLS := \
+  compiler/embedded_cmis.ml \
+  compiler/tezos_compiler.ml \
+
+COMPILER_IMPLS := \
+  compiler_main.ml \
+
+COMPILER_PACKAGES := \
+  ${UTILS_PACKAGES} \
+  compiler-libs.optcomp \
+  lwt.unix \
+  ocplib-endian \
+  ocplib-ocamlres \
+  unix \
+
+
+############################################################################
+## Node program
+############################################################################
+
+NODE_LIB_SOURCE_DIRECTORIES := \
+  ${COMPILER_SOURCE_DIRECTORIES} \
+  ${SRCDIR}/node/db ${SRCDIR}/node/net \
+  ${SRCDIR}/node/updater ${SRCDIR}/node/shell \
+
+NODE_SOURCE_DIRECTORIES := \
+  ${NODE_LIB_SOURCE_DIRECTORIES} \
+  ${SRCDIR}/node/main
+
+NODE_OPENED_MODULES := Error_monad Hash Utils
+
+NODE_LIB_INTFS := \
+  \
+  node/net/p2p_types.mli \
+  node/net/p2p_io_scheduler.mli \
+  node/net/p2p_connection.mli \
+  node/net/p2p_connection_pool_types.mli \
+  node/net/p2p_connection_pool.mli \
+  node/net/p2p_welcome.mli \
+  node/net/p2p_discovery.mli \
+  node/net/p2p_maintenance.mli \
+  node/net/p2p.mli \
+  node/net/RPC_server.mli \
+  \
+  node/updater/fitness.mli \
+  \
+  node/db/store_sigs.mli \
+  node/db/raw_store.mli \
+  node/db/store_sigs.mli \
+  node/db/store_helpers.mli \
+  node/db/store.mli \
+  \
+  node/db/ir_funview.mli \
+  node/db/persist.mli \
+  node/db/context.mli \
+  \
+  node/updater/protocol.mli \
+  node/updater/updater.mli \
+  node/updater/proto_environment.mli \
+  node/updater/register.mli \
+  \
+  node/shell/state.mli \
+  node/shell/distributed_db_functors.mli \
+  node/shell/distributed_db_message.mli \
+  node/shell/distributed_db_metadata.mli \
+  node/shell/distributed_db.mli \
+  node/shell/prevalidator.mli \
+  node/shell/validator.mli \
+  \
+  node/shell/node_rpc_services.mli \
+  node/shell/node.mli \
+  node/shell/node_rpc.mli \
+
+# this includes single .mli for `node.top`
+FULL_NODE_LIB_IMPLS := \
+  \
+  compiler/node_compiler_main.ml \
+  \
+  node/net/p2p_types.ml \
+  node/net/p2p_io_scheduler.ml \
+  node/net/p2p_connection.ml \
+  node/net/p2p_connection_pool_types.ml \
+  node/net/p2p_connection_pool.ml \
+  node/net/p2p_welcome.ml \
+  node/net/p2p_discovery.ml \
+  node/net/p2p_maintenance.ml \
+  node/net/p2p.ml \
+  \
+  node/net/RPC_server.ml \
+  \
+  node/updater/fitness.ml \
+  \
+  node/db/raw_store.ml \
+  node/db/store_sigs.mli \
+  node/db/store_helpers.ml \
+  node/db/store.ml \
+  \
+  node/db/ir_funview.ml \
+  node/db/persist.ml \
+  node/db/context.ml \
+  \
+  node/updater/protocol.mli \
+  node/updater/updater.ml \
+  node/updater/environment.ml \
+  node/updater/proto_environment.ml \
+  node/updater/register.ml \
+  \
+  node/shell/state.ml \
+  node/shell/distributed_db_functors.ml \
+  node/shell/distributed_db_message.ml \
+  node/shell/distributed_db_metadata.ml \
+  node/shell/distributed_db.ml \
+  node/shell/prevalidator.ml \
+  node/shell/validator.ml \
+  \
+  node/shell/node_rpc_services.ml \
+  node/shell/node.ml \
+  node/shell/node_rpc.ml \
+
+# this only includes .ml
+NODE_LIB_IMPLS := $(filter-out ${NODE_LIB_INTFS}, ${FULL_NODE_LIB_IMPLS})
+
+NODE_INTFS := \
+  node/main/node_identity_file.mli \
+  node/main/node_config_file.mli \
+  node/main/node_shared_arg.mli \
+  node/main/node_run_command.mli \
+  node/main/node_config_command.mli \
+  node/main/node_identity_command.mli \
+
+NODE_IMPLS := \
+  node/main/node_identity_file.ml \
+  node/main/node_config_file.ml \
+  node/main/node_shared_arg.ml \
+  node/main/node_run_command.ml \
+  node/main/node_config_command.ml \
+  node/main/node_identity_command.ml \
+  node_main.ml \
+
+NODE_PACKAGES := \
+  $(COMPILER_PACKAGES) \
+  calendar \
+  cmdliner \
+  cohttp.lwt \
+  dynlink \
+  git \
+  ipv6-multicast \
+  irmin.unix \
+  ocplib-resto.directory \
+
+EMBEDDED_NODE_PROTOCOLS := \
+  $(patsubst ${SRCDIR}/proto/%/,${SRCDIR}/proto/embedded_proto_%.cmxa, \
+  $(filter-out ${SRCDIR}/proto/environment/, \
+	$(subst TEZOS_PROTOCOL,,$(shell ls ${SRCDIR}/proto/*/TEZOS_PROTOCOL))))
+
+############################################################################
+## Client program
+############################################################################
+
+# we do not include 'node/main'
+CLIENT_SOURCE_DIRECTORIES := \
+  ${NODE_LIB_SOURCE_DIRECTORIES} \
+  ${SRCDIR}/client ${SRCDIR}/client/embedded
+
+CLIENT_OPENED_MODULES := Error_monad Hash Utils
+
+CLIENT_LIB_INTFS := \
+  client/client_rpcs.mli \
+  client/client_node_rpcs.mli \
+  client/client_commands.mli \
+  client/client_generic_rpcs.mli \
+  client/client_helpers.mli \
+  client/client_aliases.mli \
+  client/client_tags.mli \
+  client/client_keys.mli \
+  client/client_protocols.mli \
+  client/client_blocks.mli \
+  client/client_network.mli \
+
+CLIENT_LIB_IMPLS := \
+  client/client_rpcs.ml \
+  client/client_node_rpcs.ml \
+  client/client_commands.ml \
+  client/client_config.ml \
+  client/client_generic_rpcs.ml \
+  client/client_helpers.ml \
+  client/client_aliases.ml \
+  client/client_tags.ml \
+  client/client_keys.ml \
+  client/client_protocols.ml \
+  client/client_blocks.ml \
+  client/client_network.ml \
+
+CLIENT_IMPLS := \
+  client_main.ml
+
+CLIENT_PACKAGES := \
+  ${NODE_PACKAGES} \
+  magic-mime \
+
+EMBEDDED_CLIENT_PROTOCOLS := \
+  $(patsubst ${SRCDIR}/client/embedded/%/, \
+	     ${SRCDIR}/proto/client_embedded_proto_%.cmxa, \
+             $(shell ls -d ${SRCDIR}/client/embedded/*/))
+
+EMBEDDED_CLIENT_VERSIONS := \
+	$(patsubst ${SRCDIR}/client/embedded/%/, \
+	     ${SRCDIR}/client/embedded/client_%.cmx, \
+             $(shell ls -d ${SRCDIR}/client/embedded/*/))
+
+############################################################################
+## Web-Client program
+############################################################################
+
+# we do not include 'node/main'
+WEBCLIENT_SOURCE_DIRECTORIES := \
+  ${NODE_LIB_SOURCE_DIRECTORIES} \
+  ${SRCDIR}/client ${SRCDIR}/client/embedded
+
+WEBCLIENT_OPENED_MODULES := Error_monad Hash Utils
+
+WEBCLIENT_LIB_INTFS := \
+
+WEBCLIENT_LIB_IMPLS := \
+  client/webclient_version.ml \
+
+WEBCLIENT_IMPLS := \
+  webclient_static.ml \
+  webclient_main.ml
+
+EMBEDDED_WEBCLIENT_VERSIONS := \
+	$(patsubst ${SRCDIR}/client/embedded/%/, \
+	     ${SRCDIR}/client/embedded/webclient_%.cmx, \
+             $(shell ls -d ${SRCDIR}/client/embedded/*/))
+

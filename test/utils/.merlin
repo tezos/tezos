@@ -1,0 +1,13 @@
+REC
+S .
+B .
+S ../../src/minutils
+B ../../src/minutils
+S ../../src/utils
+B ../../src/utils
+S ../lib
+B ../lib
+FLG -open Error_monad -open Hash -open Utils
+FLG -w -40
+PKG lwt
+PKG kaputt

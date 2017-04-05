@@ -34,7 +34,7 @@ let rec listen ?port addr =
   end
 
 let accept main_socket =
-  Lwt_unix.accept main_socket >>= fun (fd, sockaddr) ->
+  Lwt_unix.accept main_socket >>= fun (fd, _sockaddr) ->
   return fd
 
 let rec accept_n main_socket n =
@@ -121,7 +121,7 @@ let rec send conn nb_simple_msgs =
   P2p_io_scheduler.write conn msg >>=? fun () ->
   send conn nb_simple_msgs
 
-let client ?max_upload_speed ?write_queue_size addr port time n =
+let client ?max_upload_speed ?write_queue_size addr port time _n =
   let sched =
     P2p_io_scheduler.create
       ?max_upload_speed ?write_queue_size ~read_buffer_size:(1 lsl 12) () in
@@ -215,7 +215,7 @@ let spec =
   ]
 
 let () =
-  let anon_fun num_peers = raise (Arg.Bad "No anonymous argument.") in
+  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg
 
