@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
+
 let (//) = Filename.concat
 let (>>=) = Lwt.bind
 let (>|=) = Lwt.(>|=)
@@ -72,7 +74,8 @@ module type HASH = sig
 
   include MINIMAL_HASH
 
-  val of_b58check: string -> t
+  val of_b58check_exn: string -> t
+  val of_b58check_opt: string -> t option
   val to_b58check: t -> string
   val to_short_b58check: t -> string
   val encoding: t Data_encoding.t
@@ -95,6 +98,7 @@ end
 
 module type INTERNAL_HASH = sig
   include HASH
+  val of_b58check: string -> t tzresult
   module Table : Hashtbl.S with type key = t
 end
 
@@ -278,10 +282,16 @@ module Make_Blake2B (R : sig
       ~wrap: (fun s -> Hash s)
       ~of_raw:(fun h -> of_string h) ~to_raw:to_string
 
-  let of_b58check s =
+  let of_b58check_opt s =
+    Base58.simple_decode b58check_encoding s
+  let of_b58check_exn s =
     match Base58.simple_decode b58check_encoding s with
     | Some x -> x
-    | None -> Format.kasprintf failwith "Unexpected hash (%s)" K.name
+    | None -> Format.kasprintf Pervasives.failwith "Unexpected hash (%s)" K.name
+  let of_b58check s =
+    match Base58.simple_decode b58check_encoding s with
+    | Some x -> Ok x
+    | None -> generic_error "Unexpected hash (%s)" K.name
   let to_b58check s = Base58.simple_encode b58check_encoding s
 
   let to_short_b58check s =
@@ -294,10 +304,10 @@ module Make_Blake2B (R : sig
         (conv to_bytes of_bytes_exn (Fixed.bytes size))
       ~json:
         (describe ~title: (K.title ^ " (Base58Check-encoded Sha256)") @@
-         conv to_b58check (Data_encoding.Json.wrap_error of_b58check) string)
+         conv to_b58check (Data_encoding.Json.wrap_error of_b58check_exn) string)
 
   let param ?(name=K.name) ?(desc=K.title) t =
-    Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check str)) t
+    Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check_exn str)) t
 
   let pp ppf t =
     Format.pp_print_string ppf (to_b58check t)
@@ -579,10 +589,16 @@ module Net_id = struct
       ~wrap: (fun s -> Hash s)
       ~of_raw:of_string ~to_raw: (fun h -> h)
 
-  let of_b58check s =
+  let of_b58check_opt s =
+    Base58.simple_decode b58check_encoding s
+  let of_b58check_exn s =
     match Base58.simple_decode b58check_encoding s with
     | Some x -> x
-    | None -> Format.kasprintf failwith "Unexpected hash (%s)" name
+    | None -> Format.kasprintf Pervasives.failwith "Unexpected hash (%s)" name
+  let of_b58check s =
+    match Base58.simple_decode b58check_encoding s with
+    | Some x -> Ok x
+    | None -> generic_error "Unexpected hash (%s)" name
   let to_b58check s = Base58.simple_encode b58check_encoding s
   let to_short_b58check = to_b58check
 
@@ -592,7 +608,7 @@ module Net_id = struct
       ~binary: (Fixed.string size)
       ~json:
         (describe ~title: (title ^ " (Base58Check-encoded Sha256)") @@
-         conv to_b58check (Data_encoding.Json.wrap_error of_b58check) string)
+         conv to_b58check (Data_encoding.Json.wrap_error of_b58check_exn) string)
 
   let param ?(name=name) ?(desc=title) t =
     Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check str)) t

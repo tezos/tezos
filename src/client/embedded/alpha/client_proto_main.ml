@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 let protocol =
-  Protocol_hash.of_b58check
+  Protocol_hash.of_b58check_exn
     "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 
 let () =

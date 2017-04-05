@@ -78,38 +78,38 @@ type account = {
 }
 
 let genesis_sk =
-  Environment.Ed25519.Secret_key.of_b58check
+  Environment.Ed25519.Secret_key.of_b58check_exn
     "edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z"
 
 let bootstrap1_pk =
-  Environment.Ed25519.Public_key.of_b58check
+  Environment.Ed25519.Public_key.of_b58check_exn
     "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
 let bootstrap2_pk =
-  Environment.Ed25519.Public_key.of_b58check
+  Environment.Ed25519.Public_key.of_b58check_exn
     "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9"
 let bootstrap3_pk =
-  Environment.Ed25519.Public_key.of_b58check
+  Environment.Ed25519.Public_key.of_b58check_exn
     "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV"
 let bootstrap4_pk =
-  Environment.Ed25519.Public_key.of_b58check
+  Environment.Ed25519.Public_key.of_b58check_exn
     "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU"
 let bootstrap5_pk =
-  Environment.Ed25519.Public_key.of_b58check
+  Environment.Ed25519.Public_key.of_b58check_exn
     "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
 let bootstrap1_sk =
-  Environment.Ed25519.Secret_key.of_b58check
+  Environment.Ed25519.Secret_key.of_b58check_exn
     "edskRuR1azSfboG86YPTyxrQgosh5zChf5bVDmptqLTb5EuXAm9rsnDYfTKhq7rDQujdn5WWzwUMeV3agaZ6J2vPQT58jJAJPi"
 let bootstrap2_sk =
-  Environment.Ed25519.Secret_key.of_b58check
+  Environment.Ed25519.Secret_key.of_b58check_exn
     "edskRkJz4Rw2rM5NtabEWMbbg2bF4b1nfFajaqEuEk4SgU7eeDbym9gVQtBTbYo32WUg2zb5sNBkD1whRN7zX43V9bftBbtaKc"
 let bootstrap3_sk =
-  Environment.Ed25519.Secret_key.of_b58check
+  Environment.Ed25519.Secret_key.of_b58check_exn
     "edskS3qsqsNgdjUqeMsVcEwBn8dkZ5iDRz6aF21KhcCtRiAkWBypUSbicccR4Vgqm9UdW2Vabuos6seezqgbXTrmcbLUG4rdAC"
 let bootstrap4_sk =
-  Environment.Ed25519.Secret_key.of_b58check
+  Environment.Ed25519.Secret_key.of_b58check_exn
     "edskRg9qcPqaVQa6jXWNMU5p71tseSuR7NzozgqZ9URsVDi81wTyPJdFSBdeakobyHUi4Xgu61jgKRQvkhXrPmEdEUfiqfiJFL"
 let bootstrap5_sk =
-  Environment.Ed25519.Secret_key.of_b58check
+  Environment.Ed25519.Secret_key.of_b58check_exn
     "edskS7rLN2Df3nbS1EYvwJbWo4umD7yPM1SUeX7gp1WhCVpMFXjcCyM58xs6xsnTsVqHQmJQ2RxoAjJGedWfvFmjQy6etA3dgZ"
 
 let switch_protocol () =
@@ -165,7 +165,7 @@ let transfer ?(block = `Prevalidation) ?(fee = 5L) ~src ~target amount =
     ~amount ~fee ()
 
 let check_balance ?(block = `Prevalidation) account expected =
-  Client_proto_rpcs.Context.Contract.balance cctxt
+  Client_proto_rpcs.Context.Contract.balance cctxt.rpc_config
     block account.contract >>=? fun balance ->
   let balance = Tez.to_cents balance in
   Assert.equal_int64 ~msg:__LOC__ expected balance ;
@@ -173,9 +173,9 @@ let check_balance ?(block = `Prevalidation) account expected =
 
 let mine contract =
   let block = `Head 0 in
-  Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
+  Client_proto_rpcs.Context.level cctxt.rpc_config block >>=? fun level ->
   let seed_nonce = Client_mining_forge.generate_seed_nonce () in
-  Client_mining_forge.forge_block cctxt
+  Client_mining_forge.forge_block cctxt.rpc_config
     ~timestamp:(Time.now ()) ~seed_nonce ~src_sk:contract.secret_key
     block ~priority:(`Auto (contract.public_key_hash, None)) () >>=? fun block_hash ->
   return ()

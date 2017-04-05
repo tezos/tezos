@@ -172,9 +172,9 @@ module Context = struct
     let public_key_hash_arg =
       let construct = Ed25519.Public_key_hash.to_b58check in
       let destruct hash =
-        match Ed25519.Public_key_hash.of_b58check hash with
-        | exception _ -> Error "Cannot parse public key hash"
-        | public_key_hash -> Ok public_key_hash in
+        match Ed25519.Public_key_hash.of_b58check_opt hash with
+        | None -> Error "Cannot parse public key hash"
+        | Some public_key_hash -> Ok public_key_hash in
       RPC.Arg.make
         ~descr:"A public key hash"
         ~name: "public_key_hash"
