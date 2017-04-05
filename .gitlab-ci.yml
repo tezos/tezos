@@ -123,6 +123,15 @@ test:proto_alpha:origination:
   dependencies:
     - build
 
+test:proto_alpha:endorsement:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test/proto_alpha run-test-endorsement
+  dependencies:
+    - build
+
 test:basic.sh:
   stage: test
   tags:
