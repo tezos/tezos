@@ -208,9 +208,8 @@ module Alias = functor (Entity : Entity) -> struct
       ?(name = "name") ?(desc = "existing " ^ Entity.name ^ " alias") next =
     param ~name ~desc
       (fun cctxt s ->
-         find cctxt s >>= function
-         | Ok v -> Lwt.return (s, v)
-         | Error err -> cctxt.error "%a" pp_print_error err)
+         find cctxt s >>=? fun v ->
+         return (s, v))
       next
 
   let fresh_alias_param
@@ -233,9 +232,8 @@ module Alias = functor (Entity : Entity) -> struct
                       return ())
                  list
            end
-         end >>= function
-         | Ok () -> Lwt.return s
-         | Error err -> cctxt.error "%a" pp_print_error err)
+         end >>=? fun () ->
+         return s)
       next
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
@@ -270,9 +268,7 @@ module Alias = functor (Entity : Entity) -> struct
                    read s >>= function
                    | Ok v -> return v
                    | Error _ -> of_source cctxt s
-         end >>= function
-         | Ok s -> Lwt.return s
-         | Error err -> cctxt.error "%a" pp_print_error err)
+         end)
       next
 
    let name cctxt d =

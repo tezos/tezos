@@ -10,7 +10,7 @@
 module Ed25519 = Environment.Ed25519
 open Client_proto_args
 
-let report_parse_error cctxt _prefix exn _lexbuf =
+let report_parse_error _prefix exn _lexbuf =
   let open Lexing in
   let open Script_located_ir in
   let print_loc ppf ((sl, sc), (el, ec)) =
@@ -29,15 +29,15 @@ let report_parse_error cctxt _prefix exn _lexbuf =
         sl sc el ec in
   match exn with
   | Missing_program_field n ->
-      cctxt.Client_commands.error "missing script %s" n
+      failwith "missing script %s" n
   | Illegal_character (loc, c) ->
-      cctxt.Client_commands.error "%a, illegal character %C" print_loc loc c
+      failwith "%a, illegal character %C" print_loc loc c
   | Illegal_escape (loc, c) ->
-      cctxt.Client_commands.error "%a, illegal escape sequence %S" print_loc loc c
+      failwith "%a, illegal escape sequence %S" print_loc loc c
   | Failure s ->
-      cctxt.Client_commands.error "%s" s
+      failwith "%s" s
   | exn ->
-      cctxt.Client_commands.error "%s" @@ Printexc.to_string exn
+      failwith "%s" @@ Printexc.to_string exn
 
 let print_location_mark ppf = function
   | None -> ()
@@ -435,10 +435,10 @@ let report_typechecking_errors cctxt errs =
       | err -> cctxt.warning "%a" pp_print_error [ err ])
     errs
 
-let parse_program cctxt s =
+let parse_program s =
   let lexbuf = Lexing.from_string s in
   try
-    Lwt.return
+    return
       (Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf |>
        List.map Script_located_ir.strip_locations |> fun fields ->
        let rec get_field n = function
@@ -451,25 +451,25 @@ let parse_program cctxt s =
                 storage_type = get_field "storage" fields }
       )
   with
-  | exn -> report_parse_error cctxt "program: " exn lexbuf
+  | exn -> report_parse_error "program: " exn lexbuf
 
-let parse_data cctxt s =
+let parse_data s =
   let lexbuf = Lexing.from_string s in
   try
     match Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf with
-    | [node] -> Lwt.return (Script_located_ir.strip_locations node)
-    | _ -> cctxt.Client_commands.error "single data expression expected"
+    | [node] -> return (Script_located_ir.strip_locations node)
+    | _ -> failwith "single data expression expected"
   with
-  | exn -> report_parse_error cctxt "data: " exn lexbuf
+  | exn -> report_parse_error "data: " exn lexbuf
 
-let parse_data_type cctxt s =
+let parse_data_type s =
   let lexbuf = Lexing.from_string s in
   try
     match Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf with
-    | [node] -> Lwt.return (Script_located_ir.strip_locations node)
-    | _ -> cctxt.Client_commands.error "single type expression expected"
+    | [node] -> return (Script_located_ir.strip_locations node)
+    | _ -> failwith "single type expression expected"
   with
-  | exn -> report_parse_error cctxt "data_type: " exn lexbuf
+  | exn -> report_parse_error "data_type: " exn lexbuf
 
 let unexpand_macros type_map (program : Script.code) =
   let open Script in
@@ -513,9 +513,7 @@ let unexpand_macros type_map (program : Script.code) =
 module Program = Client_aliases.Alias (struct
     type t = Script.code
     let encoding = Script.code_encoding
-    let of_source cctxt s =
-      parse_program cctxt s >>= fun code ->
-      return code
+    let of_source _cctxt s = parse_program s
     let to_source _ p =
       return (Format.asprintf "%a" (print_program no_locations) (p, []))
     let name = "program"
@@ -573,9 +571,11 @@ let commands () =
       (prefixes [ "run" ; "program" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
-       @@ Cli_entries.param ~name:"storage" ~desc:"the storage data" parse_data
+       @@ Cli_entries.param ~name:"storage" ~desc:"the storage data"
+         (fun _cctxt data -> parse_data data)
        @@ prefixes [ "and" ; "input" ]
-       @@ Cli_entries.param ~name:"storage" ~desc:"the input data" parse_data
+       @@ Cli_entries.param ~name:"storage" ~desc:"the input data"
+         (fun _cctxt data -> parse_data data)
        @@ stop)
       (fun program storage input cctxt ->
          let open Data_encoding in
@@ -632,43 +632,44 @@ let commands () =
              else return ()
          | Error errs ->
              report_typechecking_errors cctxt errs >>= fun () ->
-             cctxt.error "ill-typed program") ;
+             failwith "ill-typed program") ;
 
     command ~group ~desc: "ask the node to typecheck a data expression"
       (prefixes [ "typecheck" ; "data" ]
-       @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck" parse_data
+       @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck"
+         (fun _cctxt data -> parse_data data)
        @@ prefixes [ "against" ; "type" ]
-       @@ Cli_entries.param ~name:"type" ~desc:"the expected type" parse_data
+       @@ Cli_entries.param ~name:"type" ~desc:"the expected type"
+         (fun _cctxt data -> parse_data data)
        @@ stop)
       (fun data exp_ty cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.typecheck_data cctxt.rpc_config
+         Client_proto_rpcs.Helpers.typecheck_data cctxt.Client_commands.rpc_config
            cctxt.config.block (data, exp_ty) >>= function
          | Ok () ->
              cctxt.message "Well typed" >>= fun () ->
              return ()
          | Error errs ->
              report_typechecking_errors cctxt errs >>= fun () ->
-             cctxt.error "ill-typed data" >>= fun () ->
-             return ()) ;
+             failwith "ill-typed data") ;
 
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
               using the same algorithm as script instruction H"
       (prefixes [ "hash" ; "data" ]
-       @@ Cli_entries.param ~name:"data" ~desc:"the data to hash" parse_data
+       @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
+         (fun _cctxt data -> parse_data data)
        @@ stop)
       (fun data cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.hash_data cctxt.rpc_config
+         Client_proto_rpcs.Helpers.hash_data cctxt.Client_commands.rpc_config
            cctxt.config.block data >>= function
          | Ok hash ->
              cctxt.message "%S" hash >>= fun () ->
              return ()
          | Error errs ->
              cctxt.warning "%a" pp_print_error errs  >>= fun () ->
-             cctxt.error "ill-formed data" >>= fun () ->
-             return ()) ;
+             failwith "ill-formed data") ;
 
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
@@ -676,7 +677,8 @@ let commands () =
               a given secret key, and display it using the format expected by \
               script instruction CHECK_SIGNATURE"
       (prefixes [ "hash" ; "and" ; "sign" ; "data" ]
-       @@ Cli_entries.param ~name:"data" ~desc:"the data to hash" parse_data
+       @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
+         (fun _cctxt data -> parse_data data)
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.alias_param
        @@ stop)
@@ -694,7 +696,6 @@ let commands () =
              return ()
          | Error errs ->
              cctxt.warning "%a" pp_print_error errs >>= fun () ->
-             cctxt.error "ill-formed data" >>= fun () ->
-             return ()) ;
+             failwith "ill-formed data") ;
 
   ]

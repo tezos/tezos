@@ -32,7 +32,7 @@ type context = {
   log : 'a. string -> ('a, unit) lwt_format -> 'a ;
 }
 
-type command = (context, unit tzresult) Cli_entries.command
+type command = (context, unit) Cli_entries.command
 
 (* Default config *)
 

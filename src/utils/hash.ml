@@ -13,6 +13,7 @@ let (//) = Filename.concat
 let (>>=) = Lwt.bind
 let (>|=) = Lwt.(>|=)
 
+open Error_monad
 open Utils
 
 let () =
@@ -99,6 +100,11 @@ end
 module type INTERNAL_HASH = sig
   include HASH
   val of_b58check: string -> t tzresult
+  val param:
+    ?name:string ->
+    ?desc:string ->
+    ('a, 'arg, 'ret) Cli_entries.params ->
+    (t -> 'a, 'arg, 'ret) Cli_entries.params
   module Table : Hashtbl.S with type key = t
 end
 
@@ -307,7 +313,7 @@ module Make_Blake2B (R : sig
          conv to_b58check (Data_encoding.Json.wrap_error of_b58check_exn) string)
 
   let param ?(name=K.name) ?(desc=K.title) t =
-    Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check_exn str)) t
+    Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check str)) t
 
   let pp ppf t =
     Format.pp_print_string ppf (to_b58check t)

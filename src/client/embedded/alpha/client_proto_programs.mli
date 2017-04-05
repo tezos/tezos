@@ -7,15 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val parse_program:
-  Client_commands.context ->
-  string -> Script.code Lwt.t
-val parse_data:
-  Client_commands.context ->
-  string -> Script.expr Lwt.t
-val parse_data_type:
-  Client_commands.context ->
-  string -> Script.expr Lwt.t
+val parse_program: string -> Script.code tzresult Lwt.t
+val parse_data: string -> Script.expr tzresult Lwt.t
+val parse_data_type: string -> Script.expr tzresult Lwt.t
 
 module Program : Client_aliases.Alias with type t = Script.code
 

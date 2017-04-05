@@ -55,7 +55,7 @@ val ignore_context : context
 (** [ignore_context] is a context whose logging callbacks do nothing,
     and whose [error] function calls [Lwt.fail_with]. *)
 
-type command = (context, unit tzresult) Cli_entries.command
+type command = (context, unit) Cli_entries.command
 
 exception Version_not_found
 
