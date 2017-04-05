@@ -48,3 +48,23 @@ test-transaction: ${LIB} ${TEST_CONNECTION_IMPLS:.ml=.cmx}
 clean::
 	rm -f test-transaction
 
+############################################################################
+## Origination
+
+.PHONY:run-test-origination
+run-test-origination:
+	@echo
+	./test-origination
+
+TEST_CONNECTION_IMPLS := \
+  proto_alpha_helpers.mli \
+  proto_alpha_helpers.ml \
+  test_origination.ml
+
+test-origination: ${LIB} ${TEST_CONNECTION_IMPLS:.ml=.cmx}
+	@echo COMPILE $(notdir $@)
+	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	rm -f test-origination
+
