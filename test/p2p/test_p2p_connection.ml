@@ -99,7 +99,7 @@ let bytes_encoding = Data_encoding.Variable.bytes
 let server main_socket =
   let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
   (* Low-level test. *)
-  raw_accept sched main_socket >>= fun (fd, point) ->
+  raw_accept sched main_socket >>= fun (fd, _point) ->
   lwt_log_notice "Low_level" >>= fun () ->
   P2p_io_scheduler.write fd simple_msg >>=? fun () ->
   P2p_io_scheduler.close fd >>=? fun _ ->
@@ -112,26 +112,26 @@ let server main_socket =
   P2p_connection.kick auth_fd >>= fun () ->
   lwt_log_notice "Kick OK" >>= fun () ->
   (* Let's be rejected. *)
-  accept sched main_socket >>=? fun (info, auth_fd) ->
+  accept sched main_socket >>=? fun (_info, auth_fd) ->
   P2p_connection.accept auth_fd bytes_encoding >>= fun conn ->
   assert (is_rejected conn) ;
   lwt_log_notice "Kicked OK" >>= fun () ->
   (* Accept and send a single message. *)
-  accept sched main_socket >>=? fun (info, auth_fd) ->
+  accept sched main_socket >>=? fun (_info, auth_fd) ->
   lwt_log_notice "Single" >>= fun () ->
   P2p_connection.accept auth_fd bytes_encoding >>=? fun conn ->
   P2p_connection.write_sync conn simple_msg >>=? fun () ->
   P2p_connection.close conn >>= fun _stat ->
   lwt_log_notice "Single OK" >>= fun () ->
   (* Accept and send a single message, while the client expected 2. *)
-  accept sched main_socket >>=? fun (info, auth_fd) ->
+  accept sched main_socket >>=? fun (_info, auth_fd) ->
   lwt_log_notice "Early close (read)" >>= fun () ->
   P2p_connection.accept auth_fd bytes_encoding >>=? fun conn ->
   P2p_connection.write_sync conn simple_msg >>=? fun () ->
   P2p_connection.close conn >>= fun _stat ->
   lwt_log_notice "Early close (read) OK" >>= fun () ->
   (* Accept and wait for the client to close the connection. *)
-  accept sched main_socket >>=? fun (info, auth_fd) ->
+  accept sched main_socket >>=? fun (_info, auth_fd) ->
   lwt_log_notice "Early close (write)" >>= fun () ->
   P2p_connection.accept auth_fd bytes_encoding >>=? fun conn ->
   P2p_connection.close conn >>= fun _stat ->
@@ -161,14 +161,14 @@ let client addr port =
   (* let's exchange a simple message. *)
   connect sched addr port id2 >>=? fun auth_fd ->
   P2p_connection.accept auth_fd bytes_encoding >>=? fun conn ->
-  P2p_connection.read conn >>=? fun (msg_size, msg) ->
+  P2p_connection.read conn >>=? fun (_msg_size, msg) ->
   assert (MBytes.compare simple_msg msg = 0) ;
   P2p_connection.close conn >>= fun _stat ->
   lwt_log_notice "Simple OK" >>= fun () ->
   (* let's detect a closed connection on `read`. *)
   connect sched addr port id2 >>=? fun auth_fd ->
   P2p_connection.accept auth_fd bytes_encoding >>=? fun conn ->
-  P2p_connection.read conn >>=? fun (msg_size, msg) ->
+  P2p_connection.read conn >>=? fun (_msg_size, msg) ->
   assert (MBytes.compare simple_msg msg = 0) ;
   P2p_connection.read conn >>= fun msg ->
   assert (is_connection_closed msg) ;

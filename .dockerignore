@@ -36,17 +36,21 @@ src/client/embedded/alpha/webclient/static/main.js
 src/client/embedded/alpha/webclient/webclient_proto_static.ml
 
 test/.depend
+test/lib/.depend
+test/utils/.depend
+test/p2p/.depend
+test/shell/.depend
 test/reports
 
-test/test-store
-test/test-state
-test/test-context
-test/test-basic
-test/test-data-encoding
-test/test-p2p-io-scheduler
-test/test-p2p-connection
-test/test-p2p-connection-pool
-test/LOG
+test/utils/test-data-encoding
+test/utils/test-merkle
+test/utils/test-lwt-pipe
+test/p2p/test-p2p-io-scheduler
+test/p2p/test-p2p-connection
+test/p2p/test-p2p-connection-pool
+test/shell/test-store
+test/shell/test-state
+test/shell/test-context
 
 **/*~
 **/\#*\#

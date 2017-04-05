@@ -1,5 +1,4 @@
 open Data_encoding
-open Context
 open Hash
 open Error_monad
 

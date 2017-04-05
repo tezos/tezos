@@ -7,24 +7,31 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
 open Hash
-open Kaputt.Abbreviations
 
 include Kaputt.Assertion
 
+module Assert = Kaputt.Abbreviations.Assert
+
 let format_msg = function None -> None | Some msg -> Some (msg ^ "\n")
 
-let is_error ?(msg="") x =
-  match x with
+let is_error ?(msg="") = function
   | Error _ -> ()
   | Ok _ -> fail "Error _" "Ok _" msg
 
-let is_ok ?(msg="") x =
-  match x with
+let contain_error ?(msg="") ~f = function
+  | Ok _ -> fail "Error _" "Ok _" msg
+  | Error error when not (List.exists f error) ->
+      let error_str = Format.asprintf "%a" pp_print_error error in
+      fail "" error_str msg
+  | _ -> ()
+
+let is_ok ?(msg="") = function
   | Ok _ -> ()
   | Error _ -> fail "Ok _" "Error _" msg
 
-let equal_persist_list ?msg l1 l2 =
+let equal_string_list_list ?msg l1 l2 =
   let msg = format_msg msg in
   let pr_persist l =
     let res =
@@ -71,38 +78,12 @@ let equal_block_map ?msg ~eq map1 map2 =
     (fun (h1, _) -> Block_hash.to_string h1)
     b1 b2
 
-let equal_operation ?msg op1 op2 =
-  let msg = format_msg msg in
-  let eq op1 op2 =
-    match op1, op2 with
-    | None, None -> true
-    | Some op1, Some op2 ->
-        Store.Operation.equal op1 op2
-    | _ -> false in
-  let prn = function
-    | None -> "none"
-    | Some op -> Hash.Operation_hash.to_hex (Store.Operation.hash op) in
-  Assert.equal ?msg ~prn ~eq op1 op2
-
-let equal_block ?msg st1 st2 =
-  let msg = format_msg msg in
-  let eq st1 st2 =
-    match st1, st2 with
-    | None, None -> true
-    | Some st1, Some st2 -> Store.Block_header.equal st1 st2
-    | _ -> false in
-  let prn = function
-    | None -> "none"
-    | Some st ->
-        Hash.Block_hash.to_hex (Store.Block_header.hash st) in
-  Assert.equal ?msg ~prn ~eq st1 st2
-
 let equal_result ?msg r1 r2 ~equal_ok ~equal_err =
   let msg = format_msg msg in
   match r1, r2 with
   | Ok r1, Ok r2 -> equal_ok ?msg r1 r2
   | Error e1, Error e2 -> equal_err ?msg e1 e2
-  | Ok r, Error e | Error e, Ok r ->
+  | Ok _, Error _ | Error _, Ok _ ->
       Assert.fail_msg "Results are not the same"
 
 let equal_exn ?msg exn1 exn2 =

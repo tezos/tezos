@@ -116,7 +116,7 @@ let bh3' =
 let check_block s h b =
   Block_header.Contents.read_opt (s, h) >>= function
   | Some b' when Store.Block_header.equal b b' -> Lwt.return_unit
-  | Some b' ->
+  | Some _ ->
       Printf.eprintf "Error while reading block %s\n%!" (Block_hash.to_hex h);
       exit 1
   | None ->
@@ -192,19 +192,19 @@ let test_generic_list (type t)
   Store.store s ["f";] (MBytes.of_string "Avril") >>= fun () ->
   Store.store s ["g"; "h"] (MBytes.of_string "Avril") >>= fun () ->
   list (module Store) s [] >>= fun l ->
-  Assert.equal_persist_list ~msg:__LOC__
+  Assert.equal_string_list_list ~msg:__LOC__
     [["a";"b"];["a";"c"];["a";"d";"e"];["f"];["g";"h"]]
     (List.sort compare l) ;
   list (module Store) s ["a"] >>= fun l ->
-  Assert.equal_persist_list
+  Assert.equal_string_list_list
     ~msg:__LOC__ [["a";"b"]; ["a";"c"]; ["a";"d";"e"]]
     (List.sort compare l) ;
   list (module Store) s ["f"] >>= fun l ->
-  Assert.equal_persist_list ~msg:__LOC__ [] l ;
+  Assert.equal_string_list_list ~msg:__LOC__ [] l ;
   list (module Store) s ["g"] >>= fun l ->
-  Assert.equal_persist_list ~msg:__LOC__ [["g";"h"]] (List.sort compare l) ;
+  Assert.equal_string_list_list ~msg:__LOC__ [["g";"h"]] (List.sort compare l) ;
   list (module Store) s ["i"] >>= fun l ->
-  Assert.equal_persist_list ~msg:__LOC__ [] l ;
+  Assert.equal_string_list_list ~msg:__LOC__ [] l ;
   Lwt.return_unit
 
 (** HashSet *)
@@ -291,7 +291,7 @@ let test_single (type t)
   Assert.is_true ~msg:__LOC__ known ;
   Single.read_opt s >>= fun v' ->
   Assert.equal ~msg:__LOC__ (Some v) v' ;
-  Single.remove s >>= fun v' ->
+  Single.remove s >>= fun () ->
   Single.known s >>= fun known ->
   Assert.is_false ~msg:__LOC__ known ;
   Single.read_opt s >>= fun v' ->
@@ -355,8 +355,9 @@ let test_subblock s =
   and v2 = (12, "Beurk.") in
   SubBlocksMap.store s bh1 v1 >>= fun () ->
   SubBlocksMap.store s bh2 v2 >>= fun () ->
-  SubBlocksMap.read_opt s bh1 >>= fun v1' ->
   SubBlocksMap.known s bh1 >>= fun known ->
+  SubBlocksMap.read_opt s bh1 >>= fun v1' ->
+  Assert.equal ~msg:__LOC__ (Some v1) v1' ;
   Assert.is_true ~msg:__LOC__ known ;
   let map =
     Block_hash.Map.empty
