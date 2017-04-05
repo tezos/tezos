@@ -8,11 +8,11 @@
 (**************************************************************************)
 
 val mine:
-  Client_commands.context ->
+  Client_rpcs.config ->
   ?timestamp: Time.t ->
   Client_node_rpcs.Blocks.block ->
   Data.Command.t ->
   Fitness.fitness ->
   Environment.Ed25519.Secret_key.t ->
-  unit tzresult Lwt.t
+  Block_hash.t tzresult Lwt.t
 

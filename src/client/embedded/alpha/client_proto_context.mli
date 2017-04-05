@@ -7,11 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val list_contracts:
-  Client_commands.context ->
-  Client_proto_rpcs.block ->
-  (string * Contract.t * Environment.Ed25519.Public_key_hash.t option)
-    list tzresult Lwt.t
+open Environment
 
 val get_balance:
   Client_rpcs.config ->
@@ -20,7 +16,7 @@ val get_balance:
   Tez.t tzresult Lwt.t
 
 val transfer:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   source:Contract.t ->
@@ -30,10 +26,10 @@ val transfer:
   ?arg:string ->
   amount:Tez.t ->
   fee:Tez.t ->
-  unit -> Contract.t list tzresult Lwt.t
+  unit -> (Operation_hash.t * Contract.t list) tzresult Lwt.t
 
 val originate_account:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   source:Contract.t ->
@@ -45,10 +41,10 @@ val originate_account:
   ?delegate:public_key_hash ->
   balance:Tez.t ->
   fee:Tez.t ->
-  unit -> Contract.t tzresult Lwt.t
+  unit -> (Operation_hash.t * Contract.t) tzresult Lwt.t
 
 val originate_contract:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   source:Contract.t ->
@@ -61,10 +57,10 @@ val originate_contract:
   code:Script.code ->
   init:string ->
   fee:Tez.t ->
-  unit -> Contract.t tzresult Lwt.t
+  unit -> (Operation_hash.t * Contract.t) tzresult Lwt.t
 
 val delegate_contract:
-  Client_commands.context ->
+  Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   source:Contract.t ->
@@ -72,6 +68,6 @@ val delegate_contract:
   manager_sk:secret_key ->
   fee:Tez.t ->
   public_key_hash option ->
-  unit tzresult Lwt.t
+  Operation_hash.t tzresult Lwt.t
 
 val commands: unit -> Client_commands.command list

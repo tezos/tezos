@@ -13,37 +13,28 @@ let protocol =
   Protocol_hash.of_b58check_exn
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
-let call_service1 cctxt s block a1 =
-  Client_rpcs.call_service1 cctxt
+let call_service1 rpc_config s block a1 =
+  Client_rpcs.call_service1 rpc_config
     (s Node_rpc_services.Blocks.proto_path) block a1
 
-let call_error_service1 cctxt s block a1 =
-  call_service1 cctxt s block a1 >>= function
+let call_error_service1 rpc_config s block a1 =
+  call_service1 rpc_config s block a1 >>= function
   | Ok (Error _ as err) -> Lwt.return (wrap_error err)
   | Ok (Ok v) -> return v
   | Error _ as err -> Lwt.return err
 
 let forge_block
-    cctxt block net_id ?(timestamp = Time.now ()) command fitness =
-  Client_blocks.get_block_hash cctxt block >>=? fun pred ->
-  call_service1 cctxt
+    rpc_config block net_id ?(timestamp = Time.now ()) command fitness =
+  Client_blocks.get_block_hash rpc_config block >>=? fun pred ->
+  call_service1 rpc_config
     Services.Forge.block block
     ((net_id, pred, timestamp, fitness), command)
 
-let mine cctxt ?timestamp block command fitness seckey =
-  Client_blocks.get_block_info cctxt.rpc_config block >>=? fun bi ->
-  forge_block cctxt.rpc_config ?timestamp block bi.net command fitness >>=? fun blk ->
+let mine rpc_config ?timestamp block command fitness seckey =
+  Client_blocks.get_block_info rpc_config block >>=? fun bi ->
+  forge_block rpc_config ?timestamp block bi.net command fitness >>=? fun blk ->
   let signed_blk = Environment.Ed25519.Signature.append seckey blk in
-  Client_node_rpcs.inject_block cctxt.rpc_config signed_blk [[]] >>=? fun hash ->
-  cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
-  return ()
-
-let handle_error cctxt = function
-  | Ok res ->
-      Lwt.return res
-  | Error exns ->
-      pp_print_error Format.err_formatter exns ;
-      cctxt.Client_commands.error "%s" "cannot continue"
+  Client_node_rpcs.inject_block rpc_config signed_blk [[]]
 
 let commands () =
   let timestamp = ref None in
@@ -71,8 +62,10 @@ let commands () =
          let timestamp = !timestamp in
          let fitness =
            Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
-         mine cctxt ?timestamp cctxt.config.block
-           (Activate hash) fitness seckey
+         mine cctxt.rpc_config ?timestamp cctxt.config.block
+           (Activate hash) fitness seckey >>=? fun hash ->
+         cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+         return ()
     end ;
 
     command ~args ~desc: "Fork a test protocol" begin
@@ -92,8 +85,10 @@ let commands () =
       let timestamp = !timestamp in
       let fitness =
         Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
-      mine cctxt ?timestamp cctxt.config.block
-        (Activate_testnet hash) fitness seckey
+      mine cctxt.rpc_config ?timestamp cctxt.config.block
+        (Activate_testnet hash) fitness seckey >>=? fun hash ->
+      cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+      return ()
     end ;
 
   ]
