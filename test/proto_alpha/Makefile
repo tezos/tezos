@@ -68,3 +68,23 @@ test-origination: ${LIB} ${TEST_CONNECTION_IMPLS:.ml=.cmx}
 clean::
 	rm -f test-origination
 
+############################################################################
+## Endorsement
+
+.PHONY:run-test-endorsement
+run-test-endorsement:
+	@echo
+	./test-endorsement
+
+TEST_CONNECTION_IMPLS := \
+  proto_alpha_helpers.mli \
+  proto_alpha_helpers.ml \
+  test_endorsement.ml
+
+test-endorsement: ${LIB} ${TEST_CONNECTION_IMPLS:.ml=.cmx}
+	@echo COMPILE $(notdir $@)
+	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	rm -f test-endorsement
+
