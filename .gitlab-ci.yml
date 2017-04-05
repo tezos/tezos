@@ -105,6 +105,15 @@ test:p2p:connection-pool:
   dependencies:
     - build
 
+test:proto_alpha:transactions:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test/proto_alpha run-test-transaction
+  dependencies:
+    - build
+
 test:basic.sh:
   stage: test
   tags:
