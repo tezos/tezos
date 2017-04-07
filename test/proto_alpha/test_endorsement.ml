@@ -174,10 +174,8 @@ let test_endorsement_rights contract block =
   Helpers.Endorse.endorsement_rights contract block >>|? fun possibilities ->
   possibilities <> []
 
-let run _blkid (({ b1 ; b2 ; b3 ; b4 ; b5 } : Helpers.Account.bootstrap_accounts) as baccounts) =
+let run head (({ b1 ; b2 ; b3 ; b4 ; b5 } : Helpers.Account.bootstrap_accounts) as baccounts) =
 
-  (* Helpers.Mining.mine b1 blkid >>=? fun n -> *)
-  let head = `Head 0 in
   let default_account = Helpers.Account.create "default_account" in
 
   test_endorsement_rights default_account head >>=? fun has_right_to_endorse ->
