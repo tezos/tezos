@@ -288,9 +288,27 @@ let schema url cctxt =
   let open RPC.Description in
   Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
   | Static { service = Some { input ; output } } ->
-      cctxt.message "Input schema:\n%s\nOutput schema:\n%s\n%!"
-        (Data_encoding_ezjsonm.to_string (Json_schema.to_json input))
-        (Data_encoding_ezjsonm.to_string (Json_schema.to_json output)) >>= fun () ->
+      let json = `O [ "input", Json_schema.to_json input ;
+                      "output", Json_schema.to_json output ] in
+      cctxt.message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
+      return ()
+  | _ ->
+      cctxt.message
+        "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
+      return ()
+
+let format url cctxt =
+  let args = Utils.split '/' url in
+  let open RPC.Description in
+  Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
+  | Static { service = Some { input ; output } } ->
+      cctxt.message
+        "@[<v 0>\
+         @[<v 2>Input format:@,%a@]@,\
+         @[<v 2>Output format:@,%a@]@,\
+         @]"
+        Json_schema.pp input
+        Json_schema.pp output >>= fun () ->
       return ()
   | _ ->
       cctxt.message
@@ -315,8 +333,8 @@ let call url cctxt =
           return ()
       | Ok json ->
           Client_rpcs.get_json cctxt.rpc_config `POST args json >>=? fun json ->
-          cctxt.message
-            "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json) >>= fun () ->
+          cctxt.message "%a"
+            Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
           return ()
     end
   | _ ->
@@ -334,8 +352,8 @@ let call_with_json url json (cctxt: Client_commands.context) =
   | Ok json ->
       let open RPC.Description in
       Client_rpcs.get_json cctxt.rpc_config `POST args json >>=? fun json ->
-      cctxt.message
-        "Output:\n%s\n%!" (Data_encoding_ezjsonm.to_string json) >>= fun () ->
+      cctxt.message "%a"
+        Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
       return ()
 
 let group =
@@ -360,9 +378,13 @@ let commands = [
     (prefixes [ "rpc" ; "list" ] @@ string ~name:"url" ~desc: "the RPC's prefix to be described" @@ stop)
     list ;
 
-  command ~group ~desc: "get the schemas of an RPC"
+  command ~group ~desc: "get the input and output JSON schemas of an RPC"
     (prefixes [ "rpc" ; "schema" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
     schema ;
+
+  command ~group ~desc: "get the humanoid readable input and output formats of an RPC"
+    (prefixes [ "rpc" ; "format" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
+    format ;
 
   command ~group ~desc: "call an RPC (low level command for advanced users)"
     (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
@@ -370,7 +392,7 @@ let commands = [
 
   command ~group ~desc: "call an RPC (low level command for advanced users)"
     (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL"
-     @@ prefix "with" @@ string ~name:"" ~desc:"" @@ stop)
+     @@ prefix "with" @@ string ~name:"input" ~desc:"the JSON input to the RPC" @@ stop)
     call_with_json
 
 ]

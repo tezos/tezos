@@ -264,10 +264,16 @@ module Alias = functor (Entity : Entity) -> struct
            | _ ->
                find cctxt s >>= function
                | Ok v -> return v
-               | Error _ ->
+               | Error a_errs ->
                    read s >>= function
                    | Ok v -> return v
-                   | Error _ -> of_source cctxt s
+                   | Error r_errs ->
+                       of_source cctxt s >>= function
+                       | Ok v -> return v
+                       | Error s_errs ->
+                           let all_errs =
+                             List.flatten [ a_errs ; r_errs ; s_errs ] in
+                           Lwt.return (Error all_errs)
          end)
       next
 
