@@ -14,9 +14,31 @@ open Lwt.Infix
 
 (* User catchable exceptions *)
 type error += Command_not_found
-type error += Bad_argument of int * string * string
-type error += Command_failed of string
+type error += Bad_argument of int * string
 
+let () =
+  register_error_kind
+    `Branch
+    ~id: "cli.command_not_found"
+    ~title: "Command not found"
+    ~description: "No command found to interpret the given command line"
+    ~pp:
+      (fun ppf () ->
+         Format.fprintf ppf "Command not found")
+    Data_encoding.empty
+    (function Command_not_found -> Some () | _ -> None)
+    (fun () -> Command_not_found) ;
+  register_error_kind
+    `Branch
+    ~id: "cli.bad_argument"
+    ~title: "Bad argument"
+    ~description: "Error in a command line argument"
+    ~pp:
+      (fun ppf (i, v) ->
+         Format.fprintf ppf "Error in command line argument %d (%s)" i v)
+    Data_encoding.(obj2 (req "index" uint8) (req "value" string))
+    (function Bad_argument (i, v) -> Some (i, v) | _ -> None)
+    (fun (i, v) -> Bad_argument (i, v))
 
 (* A simple structure for command interpreters.
    This is more generic than the exported one, see end of file. *)
@@ -91,8 +113,9 @@ let exec
               Lwt.catch
                 (fun () -> f last p)
                 (function
-                  | Failure msg -> fail (Bad_argument (i, p, msg))
-                  | exn -> fail (Exn exn)) >>=? fun v ->
+                  | Failure msg -> Error_monad.failwith "%s" msg
+                  | exn -> fail (Exn exn))
+              |> trace (Bad_argument (i, p)) >>=? fun v ->
               do_seq (succ i) (v :: acc) rest in
         do_seq i [] seq >>=? fun parsed ->
         cb parsed last
@@ -103,8 +126,9 @@ let exec
         Lwt.catch
           (fun () -> f last p)
           (function
-            | Failure msg -> fail (Bad_argument (i, p, msg))
-            | exn -> fail (Exn exn)) >>=? fun v ->
+            | Failure msg -> Error_monad.failwith "%s" msg
+            | exn -> fail (Exn exn))
+              |> trace (Bad_argument (i, p)) >>=? fun v ->
         exec (succ i) next (cb v) rest
     | _ -> fail Command_not_found
   in exec 1 params handler args

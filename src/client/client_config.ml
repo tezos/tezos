@@ -173,6 +173,8 @@ let default_cli_args = {
   force = false ;
 }
 
+exception Bad of Error_monad.error list
+
 let parse_args usage dispatcher argv =
   (* Init config reference which will be updated as args are parsed *)
   let parsed_args = ref default_cli_args in
@@ -215,24 +217,22 @@ let parse_args usage dispatcher argv =
     let anon dispatch n = match dispatch (`Arg n) with
       | `Nop -> ()
       | `Args nargs -> args := nargs @ !args
-      | `Fail err ->
-          Format.kasprintf (fun s -> raise (Arg.Help s)) "%a" pp_print_error err
+      | `Fail err -> raise (Bad err)
       | `Res _ -> assert false in
     let dispatch = dispatcher () in
     Arg.parse_argv_dynamic
       ~current:(ref 0) argv args (anon dispatch) "\000" ;
     match dispatch `End with
-    | `Res res -> (res, !parsed_args)
-    | `Fail err ->
-        Format.kasprintf (fun s -> raise (Arg.Help s)) "%a" pp_print_error err
+    | `Res res -> return (res, !parsed_args)
+    | `Fail err -> Lwt.return (Error err)
     | `Nop | `Args _ -> assert false
   with
+  | Bad err -> Lwt.return (Error err)
   | Arg.Bad msg ->
       (* FIXME: this is an ugly hack to circumvent [Arg]
          spuriously printing options at the end of the error
          message. *)
-      let msg = List.hd (Utils.split '\000' msg) in
-      raise (Arg.Help (msg ^ usage all_args ^ "\n"))
+      let msg = String.trim (List.hd (Utils.split '\000' msg)) in
+      Error_monad.failwith "%s" msg
   | Arg.Help _ ->
       raise (Arg.Help (usage all_args ^ "\n"))
-
