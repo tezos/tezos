@@ -32,6 +32,16 @@ let null_logger =
     log_error = (fun _ _ _ -> Lwt.return_unit) ;
   }
 
+let config_encoding =
+  let open Data_encoding in
+  conv
+    (fun { host ; port ; tls } -> (host, port, tls))
+    (fun (host, port, tls) -> { host ; port ; tls ; logger = null_logger})
+    (obj3
+       (req "host" string)
+       (req "port" uint16)
+       (req "tls" bool))
+
 let timings_logger ppf =
   Logger {
     log_request = begin fun url _body ->
@@ -73,7 +83,7 @@ let full_logger ppf =
       Format.fprintf ppf "<<<<%d: %s\n%s@." id code body ;
       Lwt.return_unit
     end ;
-}
+  }
 
 let default_config = {
   host = "localhost" ;
@@ -90,6 +100,88 @@ type rpc_error =
 
 type error += RPC_error of config * rpc_error
 
+let rpc_error_encoding =
+  let open Data_encoding in
+  union
+    [ case ~tag: 1
+        (obj2
+           (req "rpc_error_kind" (constant "cannot_connect"))
+           (req "message" string))
+        (function Cannot_connect_to_RPC_server msg -> Some ((), msg) | _ -> None)
+        (function (), msg -> Cannot_connect_to_RPC_server msg) ;
+    case ~tag: 2
+        (obj3
+           (req "rpc_error_kind" (constant "request_failed"))
+           (req "path" (list string))
+           (req "http_code" (conv Cohttp.Code.code_of_status Cohttp.Code.status_of_code uint16)))
+        (function Request_failed (path, code) -> Some ((), path, code) | _ -> None)
+        (function (), path, code -> Request_failed (path, code)) ;
+    case ~tag: 3
+        (obj4
+           (req "rpc_error_kind" (constant "malformed_json"))
+           (req "path" (list string))
+           (req "message" string)
+           (req "text" string))
+        (function Malformed_json (path, json, msg) -> Some ((), path, msg, json) | _ -> None)
+        (function (), path, msg, json -> Malformed_json (path, json, msg)) ;
+    case ~tag: 4
+        (obj4
+           (req "rpc_error_kind" (constant "unexpected_json"))
+           (req "path" (list string))
+           (req "message" string)
+           (req "json" json))
+        (function Unexpected_json (path, json, msg) -> Some ((), path, msg, json) | _ -> None)
+        (function (), path, msg, json -> Unexpected_json (path, json, msg)) ]
+
+let pp_error ppf (config, err) =
+  let pp_path ppf path =
+    Format.fprintf ppf "%s://%s:%d/%s"
+      (if config.tls then "https" else "http")
+      config.host config.port
+      (String.concat "/" path) in
+  match err with
+  | Cannot_connect_to_RPC_server msg ->
+      Format.fprintf ppf "Cannot contact RPC server: %s" msg
+  | Request_failed (path, code) ->
+      let code = Cohttp.Code.code_of_status code in
+      Format.fprintf ppf "@[<v 2>RPC Request failed:@,\
+                          Path: %a@,\
+                          HTTP status: %d (%s)@]"
+        pp_path path
+        code (Cohttp.Code.reason_phrase_of_code code)
+  | Malformed_json (path, json, msg) ->
+      Format.fprintf ppf "@[<v 2>RPC request returned malformed JSON:@,\
+                          Path: %a@,\
+                          Error: %s@,\
+                          @[<v 2>JSON data:@,%a@]@]"
+        pp_path path
+        msg
+        (Format.pp_print_list
+           (fun ppf s -> Format.fprintf ppf "> %s" s))
+        (Utils.split '\n' json)
+  | Unexpected_json (path, json, msg) ->
+      Format.fprintf ppf "@[<v 2>RPC request returned unexpected JSON:@,\
+                          Path: %a@,\
+                          @[<v 2>Error:@,%a@]@,\
+                          @[<v 2>JSON data:@,%a@]@]"
+        pp_path path
+        (Format.pp_print_list (fun ppf s -> Format.fprintf ppf "%s" s))
+        (Utils.split '\n' msg)
+        Json_repr.(pp (module Ezjsonm)) json
+
+let () =
+  register_error_kind
+    `Branch
+    ~id: "client_rpc"
+    ~title: "Client side RPC error"
+    ~description: "An RPC call failed"
+    ~pp: pp_error
+    Data_encoding.(obj2
+                     (req "config" config_encoding)
+                     (req "error" rpc_error_encoding))
+    (function RPC_error (config, err) -> Some (config, err) | _ -> None)
+    (fun (config, err) -> RPC_error (config, err))
+
 let fail config err = fail (RPC_error (config, err))
 
 let make_request config log_request meth service json =
@@ -103,8 +195,8 @@ let make_request config log_request meth service json =
     Cohttp_lwt_unix.Client.call meth ~body uri >>= fun (code, ansbody) ->
     log_request uri json >>= fun reqid ->
     return (reqid, code.Cohttp.Response.status, ansbody)
-  end begin fun e ->
-    let msg = match e with
+  end begin fun exn ->
+    let msg = match exn with
       | Unix.Unix_error (e, _, _) -> Unix.error_message e
       | e -> Printexc.to_string e in
     fail config (Cannot_connect_to_RPC_server msg)
@@ -166,7 +258,7 @@ let get_json config meth service json =
 
 let parse_answer config service path json =
   match RPC.read_answer service json with
-  | Error msg -> (* TODO print_error *)
+  | Error msg ->
       fail config (Unexpected_json (path, json, msg))
   | Ok v -> return v
 
@@ -196,7 +288,7 @@ let call_streamed_service0 cctxt service arg =
         | Ok v -> push (Some (Ok v)) ; loop ()
         | Error _ as err ->
             push (Some err) ; push None ; Lwt.return_unit
-        end
+      end
     | Some (Error _) as v ->
         push v ; push None ; Lwt.return_unit
     | None -> push None ; Lwt.return_unit

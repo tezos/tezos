@@ -51,10 +51,10 @@ let main () =
       Client_node_rpcs.Blocks.protocol rpc_config block >>= function
       | Ok version ->
           Lwt.return (Some version, Client_commands.commands_for_version version)
-      | Error err ->
+      | Error errs ->
           Format.eprintf
-            "Failed to acquire the protocol version from the node: %a.@."
-            pp_print_error err ;
+            "@[<v 2>Ignored error:@,Failed to acquire the protocol version from the node@,%a@."
+            (Format.pp_print_list pp) errs ;
           Lwt.return (None, [])
     end >>= fun (_version, commands_for_version)  ->
     let commands =
@@ -64,51 +64,42 @@ let main () =
       Client_protocols.commands () @
       Client_helpers.commands () @
       commands_for_version in
-    let (command, parsed_args) =
-      Client_config.parse_args
-        (Cli_entries.usage ~commands)
-        (Cli_entries.inline_dispatch commands)
-        Sys.argv in
-    let config : Client_commands.cfg = {
-      base_dir = parsed_config_file.base_dir ;
-      force = parsed_args.force ;
-      block ;
-      web_port = Client_commands.default_cfg.web_port ;
-    } in
-    let rpc_config =
-      if parsed_args.print_timings then
-        { rpc_config with
-          logger = Client_rpcs.timings_logger Format.err_formatter }
-      else
-        rpc_config
-    in
-    command (cctxt config rpc_config) >>= function
+    (Client_config.parse_args
+       (Cli_entries.usage ~commands)
+       (Cli_entries.inline_dispatch commands)
+       Sys.argv >>=? fun (command, parsed_args) ->
+     let config : Client_commands.cfg = {
+       base_dir = parsed_config_file.base_dir ;
+       force = parsed_args.force ;
+       block ;
+       web_port = Client_commands.default_cfg.web_port ;
+     } in
+     let rpc_config =
+       if parsed_args.print_timings then
+         { rpc_config with
+           logger = Client_rpcs.timings_logger Format.err_formatter }
+       else
+         rpc_config
+     in
+     command (cctxt config rpc_config)) >>= function
     | Ok () ->
         Lwt.return 0
-    | Error [Cli_entries.Command_not_found] ->
-        Format.eprintf "Unknown command, try `-help`.@." ;
-        Lwt.return 1
-    | Error [Cli_entries.Bad_argument (idx, _n, v)] ->
-        Format.eprintf "There's a problem with argument %d, %s.@." idx v ;
-        Lwt.return 1
-    | Error [Cli_entries.Command_failed message] ->
-        Format.eprintf "Command failed, %s.@." message ;
-        Lwt.return 1
-    | Error err ->
-        Format.eprintf "Error: %a@." pp_print_error err ;
+    | Error errs ->
+        Format.eprintf "@[<v 2>Fatal error:@,%a@.\
+                        Try `-help` for a list of options and commands.@."
+          (Format.pp_print_list Error_monad.pp) errs ;
         Lwt.return 1
   end begin function
     | Arg.Help help ->
         Format.printf "%s%!" help ;
         Lwt.return 0
-    | Arg.Bad help ->
-        Format.eprintf "%s%!" help ;
-        Lwt.return 1
     |  Client_commands.Version_not_found ->
         Format.eprintf "Unknown protocol version, try `list versions`.@." ;
         Lwt.return 1
     | Failure message ->
-        Format.eprintf "Fatal error: %s@." message ;
+        Format.eprintf
+          "Fatal error: %s@.\
+           Try `-help` for a list of options and commands.@." message ;
         Lwt.return 1
     | exn ->
         Format.printf "Fatal internal error: %s@."

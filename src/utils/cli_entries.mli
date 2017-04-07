@@ -13,8 +13,7 @@ open Error_monad
 (* Only used in the client. *)
 
 type error += Command_not_found
-type error += Bad_argument of int * string * string
-type error += Command_failed of string
+type error += Bad_argument of int * string
 
 type ('a, 'arg, 'ret) params
 type ('arg, 'ret) command

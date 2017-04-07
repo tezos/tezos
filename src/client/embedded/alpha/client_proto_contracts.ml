@@ -34,7 +34,7 @@ module ContractAlias = struct
         | Some v ->
             return (s, Contract.default_contract v)
         | None ->
-            failwith "no contract alias nor key alias names %s" s
+            failwith "no contract or key named %s" s
 
   let find_key cctxt name =
     Client_keys.Public_key_hash.find cctxt name >>=? fun v ->
@@ -79,11 +79,12 @@ module ContractAlias = struct
                Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
                return (s, Contract.default_contract v)
            | _ ->
-               find  cctxt s >>= function
+               find cctxt s >>= function
                | Ok v -> return v
-               | Error _ ->
-                   ContractEntity.of_source cctxt s >>=? fun v ->
-                   return (s, v)
+               | Error k_errs ->
+                   ContractEntity.of_source cctxt s >>= function
+                   | Ok v -> return (s, v)
+                   | Error c_errs -> Lwt.return (Error (k_errs @ c_errs))
          end)
       next
 
