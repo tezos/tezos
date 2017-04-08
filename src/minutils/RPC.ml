@@ -108,11 +108,11 @@ module Answer = struct
 end
 
 
-type step =
+type step = RestoDirectory.step =
   | Static of string
   | Dynamic of Arg.descr
 
-type conflict =
+type conflict = RestoDirectory.conflict =
   | CService
   | CDir
   | CBuilder
@@ -120,8 +120,8 @@ type conflict =
   | CTypes of Arg.descr * Arg.descr
   | CType of Arg.descr * string list
 
-exception Conflict of step list * conflict
-exception Cannot_parse of Arg.descr * string * string list
+exception Conflict = RestoDirectory.Conflict
+exception Cannot_parse = RestoDirectory.Cannot_parse
 
 (* Dispatch *)
 
