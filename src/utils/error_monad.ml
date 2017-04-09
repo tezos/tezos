@@ -286,6 +286,16 @@ module Make() = struct
         fold_right_s f t init >>=? fun acc ->
         f h acc
 
+  let rec join = function
+    | [] -> return ()
+    | t :: ts ->
+        t >>= function
+        | Error _ as err ->
+            join ts >>=? fun () ->
+            Lwt.return err
+        | Ok () ->
+            join ts
+
   let record_trace err result =
     match result with
     | Ok _ as res -> res

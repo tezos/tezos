@@ -144,4 +144,7 @@ module type S = sig
   val fold_right_s :
     ('a -> 'b -> 'b tzresult Lwt.t) -> 'a list -> 'b -> 'b tzresult Lwt.t
 
+  (** A {!Lwt.join} in the monad *)
+  val join : unit tzresult Lwt.t list -> unit tzresult Lwt.t
+
 end
