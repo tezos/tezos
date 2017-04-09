@@ -11,9 +11,6 @@ module Test = Kaputt.Abbreviations.Test
 
 let keep_dir = try ignore (Sys.getenv "KEEPDIR") ; true with _ -> false
 
-let make_test ~title test =
-  Test.add_simple_test ~title (fun () -> Lwt_main.run (test ()))
-
 let rec remove_dir dir =
   if Sys.file_exists dir then begin
     Array.iter (fun file ->
