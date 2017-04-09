@@ -206,6 +206,35 @@ module Random_connections = struct
 
 end
 
+module Garbled = struct
+
+  let is_connection_closed = function
+    | Error ((Write | Read) :: P2p_io_scheduler.Connection_closed :: _) -> true
+    | Ok _ -> false
+    | Error err ->
+        log_info "Unexpected error: %a" pp_print_error err ;
+        false
+
+  let write_bad_all conns =
+    let bad_msg = MBytes.of_string (String.make 16 '\000') in
+    iter_p
+      (fun conn ->
+         trace Write @@ P2p_connection_pool.raw_write_sync conn bad_msg)
+      conns
+
+  let node ch pool points =
+    Simple.connect_all ~timeout:2. pool points >>=? fun conns ->
+    sync ch >>=? fun () ->
+    begin
+      write_bad_all conns >>=? fun () ->
+      Simple.read_all conns
+    end >>= fun err ->
+    _assert (is_connection_closed err) __LOC__ ""
+
+  let run points = detach_nodes node points
+
+end
+
 let addr = ref Ipaddr.V6.localhost
 let port = ref (1024 + Random.int 8192)
 let clients = ref 10
@@ -246,6 +275,7 @@ let main () =
   Test.run "p2p-connection-pool." [
     "simple", (fun _ -> Simple.run points) ;
     "random", (fun _ -> Random_connections.run points !repeat_connections) ;
+    "garbled", (fun _ -> Garbled.run points) ;
   ]
 
 let () =

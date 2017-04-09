@@ -285,6 +285,33 @@ module Close_on_write = struct
 
 end
 
+module Garbled_data = struct
+
+  let encoding = Data_encoding.bytes
+
+  let garbled_msg = MBytes.create (1 lsl 4)
+
+  let server ch sched socket =
+    accept sched socket >>=? fun (info, auth_fd) ->
+    P2p_connection.accept auth_fd encoding >>=? fun conn ->
+    P2p_connection.raw_write_sync conn garbled_msg >>=? fun () ->
+    P2p_connection.read conn >>= fun err ->
+    _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
+    P2p_connection.close conn >>= fun _stat ->
+    return ()
+
+  let client ch sched addr port =
+    connect sched addr port id2 >>=? fun auth_fd ->
+    P2p_connection.accept auth_fd encoding >>=? fun conn ->
+    P2p_connection.read conn >>= fun err ->
+    _assert (is_decoding_error err) __LOC__ "" >>=? fun () ->
+    P2p_connection.close conn >>= fun _stat ->
+    return ()
+
+  let run _dir = run_nodes client server
+
+end
+
 let spec = Arg.[
 
     "-v", Unit (fun () ->
@@ -311,6 +338,7 @@ let main () =
     "simple-message", Simple_message.run ;
     "close-on-read", Close_on_read.run ;
     "close-on-write", Close_on_write.run ;
+    "garbled-data", Garbled_data.run ;
   ]
 
 let () =
