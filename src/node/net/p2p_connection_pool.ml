@@ -117,7 +117,11 @@ module Answerer = struct
     | Ok (size, Message msg) ->
         st.callback.message size msg >>= fun () ->
         worker_loop st
-    | Ok (_, Disconnect) | Error [P2p_io_scheduler.Connection_closed] ->
+    | Ok (_, Disconnect)| Error [P2p_io_scheduler.Connection_closed] ->
+        Canceler.cancel st.canceler >>= fun () ->
+        Lwt.return_unit
+    | Error [P2p_connection.Decoding_error] ->
+        (* TODO: Penalize peer... *)
         Canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
     | Error [Lwt_utils.Canceled] ->
@@ -916,6 +920,7 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
       Lwt_condition.broadcast pool.events.too_many_connections () ;
       log pool Too_many_connections ;
     end ;
+    Lwt_pipe.close messages ;
     P2p_connection.close ~wait:conn.wait_close conn.conn
   end ;
   List.iter (fun f -> f peer_id conn) pool.new_connection_hook ;
