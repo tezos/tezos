@@ -248,6 +248,7 @@ module Reader = struct
     | Ok true ->
         worker_loop st
     | Ok false ->
+        Canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
     | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
       lwt_debug "connection closed to %a"
