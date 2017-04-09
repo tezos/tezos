@@ -299,8 +299,14 @@ module Make() = struct
   let fail_unless cond exn =
     if cond then return () else fail exn
 
+  let fail_when cond exn =
+    if cond then fail exn else return ()
+
   let unless cond f =
     if cond then return () else f ()
+
+  let _when cond f =
+    if cond then f () else return ()
 
   let pp_print_error ppf errors =
     match errors with
@@ -338,6 +344,42 @@ let () =
   let pp = Format.pp_print_string in
   error_kinds :=
     Error_kind { id; from_error ; category; encoding_case ; pp } :: !error_kinds
+
+type error += Assert_error of string * string
+
+let () =
+  let id = "" in
+  let category = `Permanent in
+  let to_error (loc, msg) = Assert_error (loc, msg) in
+  let from_error = function
+    | Assert_error (loc, msg) -> Some (loc, msg)
+    | _ -> None in
+  let title = "Assertion error" in
+  let description =  "An fatal assertion" in
+  let encoding_case =
+    let open Data_encoding in
+    case
+      (describe ~title ~description @@
+       conv (fun (x, y) -> ((), x, y)) (fun ((), x, y) -> (x, y)) @@
+       (obj3
+          (req "kind" (constant "assertion"))
+          (req "location" string)
+          (req "error" string)))
+      from_error to_error in
+  let pp ppf (loc, msg) =
+    Format.fprintf ppf
+      "Assert failure (%s)%s"
+      loc
+      (if msg = "" then "." else ": " ^ msg) in
+  error_kinds :=
+    Error_kind { id; from_error ; category; encoding_case ; pp } :: !error_kinds
+
+let _assert b loc fmt =
+  if b then
+    Format.ikfprintf (fun _ -> return ()) Format.str_formatter fmt
+  else
+    Format.kasprintf (fun msg -> fail (Assert_error (loc, msg))) fmt
+
 
 let protect ~on_error t =
   t  >>= function

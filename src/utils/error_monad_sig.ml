@@ -99,8 +99,15 @@ module type S = sig
 
   (** Erroneous return on failed assertion *)
   val fail_unless : bool -> error -> unit tzresult Lwt.t
+  val fail_when : bool -> error -> unit tzresult Lwt.t
 
   val unless : bool -> (unit -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+  val _when : bool -> (unit -> unit tzresult Lwt.t) -> unit tzresult Lwt.t
+
+  (* Usage: [_assert cond __LOC__ "<fmt>" ...] *)
+  val _assert :
+    bool -> string ->
+    ('a, Format.formatter, unit, unit tzresult Lwt.t) format4 -> 'a
 
   val protect :
     on_error: (error list -> 'a tzresult Lwt.t) ->
