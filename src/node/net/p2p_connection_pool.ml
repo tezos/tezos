@@ -509,6 +509,9 @@ let write { conn } msg =
 let write_sync { conn } msg =
   P2p_connection.write_sync conn (Message msg)
 
+let raw_write_sync { conn } buf =
+  P2p_connection.raw_write_sync conn buf
+
 let write_now { conn } msg =
   P2p_connection.write_now conn (Message msg)
 

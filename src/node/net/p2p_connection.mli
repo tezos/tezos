@@ -112,3 +112,8 @@ val stat: 'msg t -> Stat.t
     [conn]. *)
 
 val close: ?wait:bool -> 'msg t -> unit Lwt.t
+
+(**/**)
+
+(** for testing only *)
+val raw_write_sync: 'msg t -> MBytes.t -> unit tzresult Lwt.t

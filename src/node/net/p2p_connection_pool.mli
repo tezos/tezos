@@ -253,6 +253,10 @@ val write_sync:  ('msg, 'meta) connection -> 'msg -> unit tzresult Lwt.t
 (** [write_sync conn msg] is [P2p_connection.write_sync conn' msg]
     where [conn'] is the internal [P2p_connection.t] inside [conn]. *)
 
+(**/**)
+val raw_write_sync:  ('msg, 'meta) connection -> MBytes.t -> unit tzresult Lwt.t
+(**/**)
+
 val write_now:  ('msg, 'meta) connection -> 'msg -> bool tzresult
 (** [write_now conn msg] is [P2p_connection.write_now conn' msg] where
     [conn'] is the internal [P2p_connection.t] inside [conn]. *)
