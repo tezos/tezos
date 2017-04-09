@@ -117,7 +117,7 @@ module Answerer = struct
     | Ok (size, Message msg) ->
         st.callback.message size msg >>= fun () ->
         worker_loop st
-    | Ok (_, Disconnect)| Error [P2p_io_scheduler.Connection_closed] ->
+    | Ok (_, Disconnect) | Error [P2p_io_scheduler.Connection_closed] ->
         Canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
     | Error [P2p_connection.Decoding_error] ->
