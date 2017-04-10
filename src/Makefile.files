@@ -227,6 +227,7 @@ NODE_LIB_INTFS := \
   node/shell/distributed_db_message.mli \
   node/shell/distributed_db_metadata.mli \
   node/shell/distributed_db.mli \
+  node/shell/prevalidation.mli \
   node/shell/prevalidator.mli \
   node/shell/validator.mli \
   \
@@ -273,6 +274,7 @@ FULL_NODE_LIB_IMPLS := \
   node/shell/distributed_db_message.ml \
   node/shell/distributed_db_metadata.ml \
   node/shell/distributed_db.ml \
+  node/shell/prevalidation.ml \
   node/shell/prevalidator.ml \
   node/shell/validator.ml \
   \

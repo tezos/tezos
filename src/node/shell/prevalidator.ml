@@ -7,40 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
- open Logging.Node.Prevalidator
-
-let preapply
-    net_db ctxt (module Proto : Updater.REGISTRED_PROTOCOL)
-    block timestamp sort ops =
-  lwt_debug "-> prevalidate (%d)" (List.length ops) >>= fun () ->
-  (* The operations list length is bounded by the size of the mempool,
-     where eventually an operation should not stay more than one hours. *)
-  Lwt_list.map_p
-    (fun h ->
-       Distributed_db.Operation.read net_db h >>= function
-       | None -> Lwt.return_none
-       | Some op ->
-           match Proto.parse_operation h op with
-           | Error _ ->
-               (* the operation will never be validated in the
-                  current context, it is silently ignored. It may be
-                  reintroduced in the loop by the next `flush`. *)
-               Lwt.return_none
-           | Ok p -> Lwt.return (Some p))
-    ops >>= fun ops ->
-  Context.set_timestamp ctxt timestamp >>= fun ctxt ->
-  Proto.preapply ctxt block sort (Utils.unopt_list ops) >>= function
-  | Ok (ctxt, r)  ->
-      lwt_debug "<- prevalidate (%d/%d/%d/%d)"
-        (List.length r.Updater.applied)
-        (Operation_hash.Map.cardinal r.Updater.refused)
-        (Operation_hash.Map.cardinal r.Updater.branch_refused)
-        (Operation_hash.Map.cardinal r.Updater.branch_delayed) >>= fun () ->
-      Lwt.return (Ok (ctxt, r))
-  | Error errors ->
-      (* FIXME report internal error *)
-      lwt_debug "<- prevalidate (internal error)" >>= fun () ->
-      Lwt.return (Error errors)
+open Logging.Node.Prevalidator
 
 let list_pendings net_db ~from_block ~to_block old_mempool =
   let rec pop_blocks ancestor hash mempool =
@@ -75,21 +42,21 @@ let list_pendings net_db ~from_block ~to_block old_mempool =
 
 exception Invalid_operation of Operation_hash.t
 
+open Prevalidation
+
 type t = {
   net_db: Distributed_db.net ;
   flush: State.Valid_block.t -> unit;
   notify_operations: P2p.Peer_id.t -> Operation_hash.t list -> unit ;
   prevalidate_operations:
     bool -> Store.Operation.t list ->
-    (Operation_hash.t list * error Updater.preapply_result) tzresult Lwt.t ;
-  operations: unit -> error Updater.preapply_result * Operation_hash.Set.t ;
+    (Operation_hash.t list * error preapply_result) tzresult Lwt.t ;
+  operations: unit -> error preapply_result * Operation_hash.Set.t ;
   pending: ?block:State.Valid_block.t -> unit -> Operation_hash.Set.t Lwt.t ;
   timestamp: unit -> Time.t ;
-  context: unit -> Context.t ;
-  protocol: unit -> (module Updater.REGISTRED_PROTOCOL) ;
+  context: unit -> Context.t tzresult Lwt.t ;
   shutdown: unit -> unit Lwt.t ;
 }
-
 
 let merge _key a b =
   match a, b with
@@ -105,27 +72,23 @@ let create net_db =
   let push_to_worker, worker_waiter = Lwt_utils.queue () in
 
   State.Valid_block.Current.head net_state >>= fun head ->
-  State.Valid_block.Current.protocol net_state >>= fun protocol ->
   State.Operation.list_pending net_state >>= fun initial_mempool ->
   let timestamp = ref (Time.now ()) in
-  begin
-    let (module Proto) = protocol in
-    Context.set_timestamp head.context !timestamp >>= fun ctxt ->
-    Proto.preapply ctxt head.hash false [] >|= function
-    | Error _ -> ref head.context
-    | Ok (ctxt, _) -> ref ctxt
-  end >>= fun context ->
-
+  (start_prevalidation head !timestamp >|= ref) >>= fun validation_state ->
   let pending = Operation_hash.Table.create 53 in
-  let protocol = ref protocol in
   let head = ref head in
-  let operations = ref Updater.empty_result in
+  let operations = ref empty_result in
   let running_validation = ref Lwt.return_unit in
   let unprocessed = ref initial_mempool in
   let broadcast_unprocessed = ref false in
 
-  let set_context ctxt =
-    context := ctxt;
+  let set_validation_state state =
+    validation_state := state;
+    Lwt.return_unit in
+
+  let reset_validation_state head timestamp =
+    start_prevalidation head timestamp >>= fun state ->
+    validation_state := state;
     Lwt.return_unit in
 
   let broadcast_operation ops =
@@ -143,23 +106,29 @@ let create net_db =
       broadcast_unprocessed := false ;
       running_validation := begin
         begin
-          preapply
-            net_db !context !protocol !head.hash !timestamp true
-            (Operation_hash.Set.elements ops) >>= function
-          | Ok (ctxt, r) -> Lwt.return (ctxt, r)
+          Lwt_list.map_p
+            (fun h ->
+               Distributed_db.Operation.read net_db h >>= function
+               | None -> Lwt.return_none
+               | Some po -> Lwt.return_some (h, po))
+            (Operation_hash.Set.elements ops) >>= fun rops ->
+          let rops = Utils.unopt_list rops in
+          (Lwt.return !validation_state >>=? fun validation_state ->
+           prevalidate validation_state ~sort:true rops) >>= function
+          | Ok (state, r) -> Lwt.return (Ok state, r)
           | Error err ->
               let r =
-                { Updater.empty_result with
+                { empty_result with
                   branch_delayed =
                     Operation_hash.Set.fold
                       (fun op m -> Operation_hash.Map.add op err m)
                       ops Operation_hash.Map.empty ; } in
-              Lwt.return (!context, r)
-        end >>= fun (ctxt, r) ->
+              Lwt.return (!validation_state, r)
+        end >>= fun (state, r) ->
         let filter_out s m =
           List.fold_right Operation_hash.Map.remove s m in
         operations := {
-          Updater.applied = List.rev_append r.applied !operations.applied ;
+          applied = List.rev_append r.applied !operations.applied ;
              refused = Operation_hash.Map.empty ;
              branch_refused =
                Operation_hash.Map.merge merge
@@ -171,13 +140,13 @@ let create net_db =
                  (filter_out r.applied !operations.branch_delayed)
                  r.branch_delayed ;
         } ;
-        if broadcast then broadcast_operation r.Updater.applied ;
+        if broadcast then broadcast_operation r.applied ;
         Lwt_list.iter_s
           (fun (_op, _exns) ->
              (* FIXME *)
              (* Distributed_db.Operation.mark_invalid net_db op exns >>= fun _ -> *)
              Lwt.return_unit)
-          (Operation_hash.Map.bindings r.Updater.refused) >>= fun () ->
+          (Operation_hash.Map.bindings r.refused) >>= fun () ->
         (* TODO. Keep a bounded set of 'refused' operations. *)
         (* TODO. Log the error in some statistics associated to
                  the peers that informed us of the operations. And
@@ -185,7 +154,7 @@ let create net_db =
         (* TODO. Keep a bounded set of 'branch_refused' operations
                  into the 'state'. It should be associated to the
                  current block, and updated on 'set_current_head'. *)
-        set_context ctxt
+        set_validation_state state
       end;
       Lwt.catch
         (fun () -> !running_validation)
@@ -209,22 +178,10 @@ let create net_db =
           Lwt_list.iter_s
             (function
               | `Prevalidate (ops, w, force) -> begin
-                  let (module Proto) = !protocol in
                   let result =
-                    map_s (fun (h, b) ->
-                        Distributed_db.Operation.known net_db h >>= function
-                        | true ->
-                            failwith
-                              "Previously injected operation %a"
-                              Operation_hash.pp_short h
-                        | false ->
-                            Lwt.return
-                              (Proto.parse_operation h b
-                               |> record_trace_exn (Invalid_operation h)))
-                      (Operation_hash.Map.bindings ops) >>=? fun parsed_ops ->
-                    Context.set_timestamp !context (Time.now ()) >>= fun ctxt ->
-                    Proto.preapply
-                      ctxt !head.hash true parsed_ops >>=? fun (ctxt, res) ->
+                    let rops = Operation_hash.Map.bindings ops in
+                    Lwt.return !validation_state >>=? fun validation_state ->
+                    prevalidate validation_state ~sort:true rops >>=? fun (state, res) ->
                     let register h =
                       let op = Operation_hash.Map.find h ops in
                       Distributed_db.Operation.inject
@@ -237,18 +194,18 @@ let create net_db =
                            { !operations with
                              applied = h :: !operations.applied };
                          Lwt.return_unit )
-                      res.Updater.applied >>= fun () ->
-                    broadcast_operation res.Updater.applied ;
+                      res.applied >>= fun () ->
+                    broadcast_operation res.applied ;
                     begin
                       if force then
                         Lwt_list.iter_p
                           (fun (h, _exns) -> register h)
                           (Operation_hash.Map.bindings
-                             res.Updater.branch_delayed) >>= fun () ->
+                             res.branch_delayed) >>= fun () ->
                         Lwt_list.iter_p
                           (fun (h, _exns) -> register h)
                           (Operation_hash.Map.bindings
-                             res.Updater.branch_refused) >>= fun () ->
+                             res.branch_refused) >>= fun () ->
                         operations :=
                           { !operations with
                             branch_delayed =
@@ -262,7 +219,7 @@ let create net_db =
                       else
                         Lwt.return_unit
                     end >>= fun () ->
-                    set_context ctxt >>= fun () ->
+                    set_validation_state (Ok state) >>= fun () ->
                     return res
                   in
                   result >>= fun result ->
@@ -299,32 +256,20 @@ let create net_db =
                   lwt_debug "register %a" Operation_hash.pp_short op >>= fun () ->
                   Lwt.return_unit
               | `Flush (new_head : State.Valid_block.t) ->
-                  let new_protocol =
-                    match new_head.protocol with
-                    | None ->
-                        assert false (* FIXME, this should not happen! *)
-                    | Some protocol -> protocol in
                   list_pendings
                     net_db ~from_block:!head ~to_block:new_head
-                    (Updater.operations !operations) >>= fun new_mempool ->
+                    (preapply_result_operations !operations) >>= fun new_mempool ->
                   lwt_debug "flush %a (mempool: %d)"
                     Block_hash.pp_short new_head.hash
                     (Operation_hash.Set.cardinal new_mempool) >>= fun () ->
                   (* Reset the pre-validation context *)
                   head := new_head ;
-                  protocol := new_protocol ;
-                  operations := Updater.empty_result ;
+                  operations := empty_result ;
                   broadcast_unprocessed := false ;
                   unprocessed := new_mempool ;
                   timestamp := Time.now () ;
-                  (* Tag the context as a prevalidation context. *)
-                  let (module Proto) = new_protocol in
-                  Context.set_timestamp
-                    new_head.context !timestamp >>= fun ctxt ->
-                  Proto.preapply
-                    ctxt new_head.hash false [] >>= function
-                  | Error _ -> set_context new_head.context
-                  | Ok (ctxt, _) -> set_context ctxt)
+                  (* Reset the prevalidation context. *)
+                  reset_validation_state new_head !timestamp)
             q >>= fun () ->
           worker_loop ()
     in
@@ -357,14 +302,15 @@ let create net_db =
       Lwt.cancel !running_validation;
     cancel () >>= fun () ->
     prevalidation_worker in
-
   let pending ?block () =
-    let ops = Updater.operations !operations in
+    let ops = preapply_result_operations !operations in
     match block with
     | None -> Lwt.return ops
     | Some to_block ->
-        list_pendings net_db ~from_block:!head ~to_block ops
-  in
+        list_pendings net_db ~from_block:!head ~to_block ops in
+  let context () =
+    Lwt.return !validation_state >>=? fun prevalidation_state ->
+    Prevalidation.end_prevalidation prevalidation_state in
   Lwt.return {
     net_db ;
     flush ;
@@ -376,8 +322,7 @@ let create net_db =
          !unprocessed) ;
     pending ;
     timestamp = (fun () -> !timestamp) ;
-    context = (fun () -> !context) ;
-    protocol = (fun () -> !protocol) ;
+    context ;
     shutdown ;
   }
 
@@ -388,7 +333,6 @@ let operations pv = pv.operations ()
 let pending ?block pv = pv.pending ?block ()
 let timestamp pv = pv.timestamp ()
 let context pv = pv.context ()
-let protocol pv = pv.protocol ()
 let shutdown pv = pv.shutdown ()
 
 let inject_operation pv ?(force = false) (op: Store.Operation.t) =
@@ -404,15 +348,15 @@ let inject_operation pv ?(force = false) (op: Store.Operation.t) =
     (Unclassified
        "Prevalidator.inject_operation: invalid network") >>=? fun () ->
   pv.prevalidate_operations force [op] >>=? function
-  | ([h], { Updater.applied = [h'] }) when Operation_hash.equal h h' ->
+  | ([h], { applied = [h'] }) when Operation_hash.equal h h' ->
       return ()
-  | ([h], { Updater.refused })
+  | ([h], { refused })
     when Operation_hash.Map.cardinal refused = 1 ->
       wrap_error h refused
-  | ([h], { Updater.branch_refused })
+  | ([h], { branch_refused })
     when Operation_hash.Map.cardinal branch_refused = 1 && not force  ->
       wrap_error h branch_refused
-  | ([h], { Updater.branch_delayed })
+  | ([h], { branch_delayed })
     when Operation_hash.Map.cardinal branch_delayed = 1 && not force  ->
       wrap_error h branch_delayed
   | _ ->
