@@ -9,7 +9,7 @@
 
 type worker
 
-val create_worker: State.t -> Distributed_db.t -> worker
+val create_worker: ?max_ttl:int -> State.t -> Distributed_db.t -> worker
 val shutdown: worker -> unit Lwt.t
 
 val notify_block: worker -> Block_hash.t -> State.Block_header.t -> unit Lwt.t

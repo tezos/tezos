@@ -583,5 +583,4 @@ val configure_sandbox:
   Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 
 val activate: context -> Protocol_hash.t -> context Lwt.t
-val set_test_protocol: context -> Protocol_hash.t -> context Lwt.t
-val fork_test_network: context -> context Lwt.t
+val fork_test_network: context -> Protocol_hash.t -> Time.t -> context Lwt.t

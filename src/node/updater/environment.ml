@@ -82,7 +82,7 @@ module Ed25519 = struct
           (conv
              Sodium.Sign.Bigbytes.of_public_key
              Sodium.Sign.Bigbytes.to_public_key
-             bytes)
+             (Fixed.bytes Sodium.Sign.public_key_size))
 
     let hash v =
       Public_key_hash.hash_bytes
@@ -144,7 +144,7 @@ module Ed25519 = struct
           (conv
              Sodium.Sign.Bigbytes.of_secret_key
              Sodium.Sign.Bigbytes.to_secret_key
-             bytes)
+             (Fixed.bytes Sodium.Sign.secret_key_size))
 
   end
 
@@ -199,7 +199,7 @@ module Ed25519 = struct
                 | None -> Data_encoding.Json.cannot_destruct
                             "Ed25519 signature: unexpected prefix.")
              string)
-        ~binary: (Fixed.bytes 64)
+        ~binary: (Fixed.bytes Sodium.Sign.signature_size)
 
     let check public_key signature msg =
       try

@@ -547,11 +547,9 @@ end
 
 let activate ({ context = c } as s) h =
   Updater.activate c h >>= fun c -> Lwt.return { s with context = c }
-let fork_test_network ({ context = c } as s) =
-  Updater.fork_test_network c >>= fun c -> Lwt.return { s with context = c }
-let set_test_protocol ({ context = c } as s) h =
-  Updater.set_test_protocol c h >>= fun c -> Lwt.return { s with context = c }
-
+let fork_test_network ({ context = c } as s) protocol expiration =
+  Updater.fork_test_network c ~protocol ~expiration >>= fun c ->
+  Lwt.return { s with context = c }
 
 (** Resolver *)
 

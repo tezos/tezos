@@ -119,4 +119,3 @@ let configure_sandbox = Init_storage.configure_sandbox
 
 let activate = Storage.activate
 let fork_test_network = Storage.fork_test_network
-let set_test_protocol = Storage.set_test_protocol

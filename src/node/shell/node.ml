@@ -87,29 +87,28 @@ type config = {
   genesis: State.Net.genesis ;
   store_root: string ;
   context_root: string ;
-  test_protocol: Protocol_hash.t option ;
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
+  test_network_max_tll: int option ;
 }
 
-let may_create_net state ?test_protocol genesis =
+let may_create_net state genesis =
   State.Net.get state (Net_id.of_block_hash genesis.State.Net.block) >>= function
   | Ok net -> Lwt.return net
   | Error _ ->
-      State.Net.create state
-        ?test_protocol
-        ~forked_network_ttl:(48 * 3600) (* 2 days *)
-        genesis
+      State.Net.create state genesis
 
 
 let create { genesis ; store_root ; context_root ;
-             test_protocol ; patch_context ; p2p = net_params } =
+             patch_context ; p2p = net_params ;
+             test_network_max_tll = max_ttl } =
   init_p2p net_params >>= fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context () >>=? fun state ->
   let distributed_db = Distributed_db.create state p2p in
-  let validator = Validator.create_worker state distributed_db in
-  may_create_net state ?test_protocol genesis >>= fun mainnet_net ->
+  let validator =
+    Validator.create_worker ?max_ttl state distributed_db in
+  may_create_net state genesis >>= fun mainnet_net ->
   Validator.activate validator mainnet_net >>= fun mainnet_validator ->
   let mainnet_db = Validator.net_db mainnet_validator in
   let shutdown () =
@@ -147,8 +146,7 @@ module RPC = struct
     data: MBytes.t ;
     operations: Operation_hash.t list list option ;
     protocol: Protocol_hash.t ;
-    test_protocol: Protocol_hash.t ;
-    test_network: (Net_id.t * Time.t) option ;
+    test_network: Context.test_network;
  }
 
   let convert (block: State.Valid_block.t) = {
@@ -162,7 +160,6 @@ module RPC = struct
     data = block.proto_header ;
     operations = Some block.operations ;
     protocol = block.protocol_hash ;
-    test_protocol = block.test_protocol_hash ;
     test_network = block.test_network ;
   }
 
@@ -268,13 +265,7 @@ module RPC = struct
         | Error _ -> Lwt.fail Not_found
         | Ok { context ; fitness } ->
             Context.get_protocol context >>= fun protocol ->
-            Context.get_test_protocol context >>= fun test_protocol ->
             Context.get_test_network context >>= fun test_network ->
-            Context.get_test_network_expiration context >>= fun test_network_expiration ->
-            let test_network =
-              match test_network, test_network_expiration with
-              | Some n, Some t -> Some (n, t)
-              | _, None | None, _ -> None in
             let operations =
               let pv_result, _ = Prevalidator.operations pv in
               [ pv_result.applied ] in
@@ -291,7 +282,6 @@ module RPC = struct
                 operations = Some operations ;
                 data = MBytes.of_string "" ;
                 net_id = head.net_id ;
-                test_protocol ;
                 test_network ;
               }
 

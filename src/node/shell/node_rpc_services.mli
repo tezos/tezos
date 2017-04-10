@@ -37,8 +37,7 @@ module Blocks : sig
     data: MBytes.t ;
     operations: Operation_hash.t list list option ;
     protocol: Protocol_hash.t ;
-    test_protocol: Protocol_hash.t ;
-    test_network: (Net_id.t * Time.t) option ;
+    test_network: Context.test_network;
   }
 
   val info:
@@ -61,10 +60,8 @@ module Blocks : sig
     (unit, unit * block, unit, Operation_hash.t list list) RPC.service
   val protocol:
     (unit, unit * block, unit, Protocol_hash.t) RPC.service
-  val test_protocol:
-    (unit, unit * block, unit, Protocol_hash.t) RPC.service
   val test_network:
-    (unit, unit * block, unit, (Net_id.t * Time.t) option) RPC.service
+    (unit, unit * block, unit, Context.test_network) RPC.service
   val pending_operations:
     (unit, unit * block, unit,
      error Prevalidation.preapply_result * Hash.Operation_hash.Set.t) RPC.service

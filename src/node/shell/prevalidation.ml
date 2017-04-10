@@ -143,6 +143,9 @@ let start_prevalidation
     match protocol with
     | None -> assert false (* FIXME, this should not happen! *)
     | Some protocol -> protocol in
+  Context.reset_test_network
+    predecessor_context predecessor
+    timestamp >>= fun predecessor_context ->
   Proto.begin_construction
     ~predecessor_context
     ~predecessor_timestamp
