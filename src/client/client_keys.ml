@@ -83,16 +83,17 @@ let get_key cctxt pkh =
 
 let get_keys cctxt =
   Secret_key.load cctxt >>=? fun sks ->
-  map_filter_s
+  Lwt_list.filter_map_s
     (fun (name, sk) ->
-       Lwt.catch begin fun () ->
+       begin
          Public_key.find cctxt name >>=? fun pk ->
          Public_key_hash.find cctxt name >>=? fun pkh ->
-         return (Some (name, pkh, pk, sk))
-       end begin fun _ ->
-         return None
-       end)
-    sks
+         return (name, pkh, pk, sk)
+       end >>= function
+       | Ok r -> Lwt.return (Some r)
+       | Error _ -> Lwt.return_none)
+    sks >>= fun keys ->
+  return keys
 
 let list_keys cctxt =
   Public_key_hash.load cctxt >>=? fun l ->

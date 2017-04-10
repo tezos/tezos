@@ -66,7 +66,7 @@ module RPC : sig
     t -> (Operation_hash.t * Store.Operation.t) Lwt_stream.t * Watcher.stopper
 
   val pending_operations:
-    t -> block -> (error Updater.preapply_result * Operation_hash.Set.t) Lwt.t
+    t -> block -> (error Prevalidation.preapply_result * Operation_hash.Set.t) Lwt.t
 
   val protocols:
     t -> Protocol_hash.t list Lwt.t
@@ -82,7 +82,7 @@ module RPC : sig
     t -> block ->
     timestamp:Time.t -> sort:bool ->
     Operation_hash.t list ->
-    (Protocol.fitness * error Updater.preapply_result) tzresult Lwt.t
+    (Protocol.fitness * error Prevalidation.preapply_result) tzresult Lwt.t
 
   val validate: t -> Net_id.t -> Block_hash.t -> unit tzresult Lwt.t
 
