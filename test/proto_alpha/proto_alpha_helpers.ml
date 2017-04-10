@@ -399,7 +399,7 @@ module Mining = struct
     let shell =
       { Store.Block_header.net_id = bi.net ; predecessor = bi.hash ;
         timestamp ; fitness ; operations } in
-    let slot = { Block.level = level.level ; priority = Int32.of_int priority } in
+    let slot = { Block.level = level.level ; priority } in
     mine_stamp
       block src_sk shell slot seed_nonce_hash >>=? fun proof_of_work_nonce ->
     Client_proto_rpcs.Helpers.Forge.block rpc_config
@@ -410,7 +410,7 @@ module Mining = struct
       ~fitness
       ~operations
       ~level:level.level
-      ~priority:priority
+      ~priority
       ~seed_nonce_hash
       ~proof_of_work_nonce
       () >>=? fun unsigned_header ->
@@ -453,7 +453,7 @@ module Mining = struct
   let endorsement_reward contract block =
     Client_mining_blocks.info rpc_config block >>=? fun bi ->
     get_first_priority bi.level.level contract block >>=? fun prio ->
-    Mining.endorsement_reward ~block_priority:(Int32.of_int prio) >|=
+    Mining.endorsement_reward ~block_priority:prio >|=
     Register_client_embedded_proto_alpha.wrap_error >>|?
     Tez.to_cents
 

@@ -73,7 +73,7 @@ module Random = struct
     let cycle = level.Level_repr.cycle in
     Seed_storage.for_cycle c cycle >>=? fun random_seed ->
     let rd = level_random random_seed kind level in
-    let sequence = Seed_repr.sequence rd offset in
+    let sequence = Seed_repr.sequence rd (Int32.of_int offset) in
     Storage.Roll.Last_for_cycle.get c cycle >>=? fun bound ->
     let roll, _ = Roll_repr.random sequence bound in
     Storage.Roll.Owner_for_cycle.get c (cycle, roll)
@@ -84,7 +84,7 @@ let mining_rights_owner c level ~priority =
   Random.owner c "mining" level priority
 
 let endorsement_rights_owner c level ~slot =
-  Random.owner c "endorsement" level (Int32.of_int slot)
+  Random.owner c "endorsement" level slot
 
 module Contract = struct
 

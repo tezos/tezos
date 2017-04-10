@@ -35,7 +35,7 @@ module Constants : sig
     block -> (Period.t list) tzresult Lwt.t
   val first_free_mining_slot:
     Client_rpcs.config ->
-    block -> int32 tzresult Lwt.t
+    block -> int tzresult Lwt.t
   val max_signing_slot:
     Client_rpcs.config ->
     block -> int tzresult Lwt.t

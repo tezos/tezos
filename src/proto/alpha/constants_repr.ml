@@ -38,7 +38,7 @@ type constants = {
   voting_period_length: int32 ;
   time_before_reward: Period_repr.t ;
   slot_durations: Period_repr.t list ;
-  first_free_mining_slot: int32 ;
+  first_free_mining_slot: int ;
   max_signing_slot: int ;
   instructions_per_transaction: int ;
   proof_of_work_threshold: int64 ;
@@ -58,7 +58,7 @@ let default = {
     Int64.(mul 365L (mul 24L 3600L)) ;
   slot_durations =
     List.map Period_repr.of_seconds_exn [ 60L ] ;
-  first_free_mining_slot = 16l ;
+  first_free_mining_slot = 16 ;
   max_signing_slot = 15 ;
   instructions_per_transaction = 16 * 1024 ;
   proof_of_work_threshold =
@@ -103,7 +103,7 @@ let constants_encoding =
          opt Compare_slot_durations.(=)
            default.slot_durations c.slot_durations
        and first_free_mining_slot =
-         opt Compare.Int32.(=)
+         opt Compare.Int.(=)
            default.first_free_mining_slot c.first_free_mining_slot
        and max_signing_slot =
          opt Compare.Int.(=)
@@ -171,8 +171,8 @@ let constants_encoding =
             (opt "voting_period_length" int32)
             (opt "time_before_reward" int64)
             (opt "slot_durations" (list Period_repr.encoding))
-            (opt "first_free_mining_slot" int32)
-            (opt "max_signing_slot" int31)
+            (opt "first_free_mining_slot" uint16)
+            (opt "max_signing_slot" uint16)
             (opt "instructions_per_transaction" int31)
             (opt "proof_of_work_threshold" int64)
             (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))

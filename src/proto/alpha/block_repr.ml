@@ -26,7 +26,7 @@ and proto_header = {
 
 and mining_slot = {
   level: Raw_level_repr.t ;
-  priority: Int32.t ;
+  priority: int ;
 }
 
 let mining_slot_encoding =
@@ -36,7 +36,7 @@ let mining_slot_encoding =
     (fun (level, priority) -> { level ; priority })
     (obj2
        (req "level" Raw_level_repr.encoding)
-       (req "proprity" int32))
+       (req "priority" uint16))
 
 let proto_header_encoding =
   let open Data_encoding in
