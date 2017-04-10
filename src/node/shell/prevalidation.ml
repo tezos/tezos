@@ -136,7 +136,8 @@ let start_prevalidation
       hash = predecessor ;
       context = predecessor_context ;
       timestamp = predecessor_timestamp ;
-      fitness = predecessor_fitness }
+      fitness = predecessor_fitness ;
+      level = predecessor_level }
     ~timestamp =
   let (module Proto) =
     match protocol with
@@ -146,6 +147,7 @@ let start_prevalidation
     ~predecessor_context
     ~predecessor_timestamp
     ~predecessor_fitness
+    ~predecessor_level
     ~predecessor
     ~timestamp
   >>=? fun state ->

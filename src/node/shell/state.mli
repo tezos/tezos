@@ -144,6 +144,7 @@ module Block_header : sig
 
   type shell_header = Store.Block_header.shell_header = {
     net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations: Operation_list_list_hash.t ;
@@ -245,6 +246,8 @@ module Valid_block : sig
     (** The genesis of the chain this block belongs to. *)
     hash: Block_hash.t ;
     (** The block hash. *)
+    level: Int32.t ;
+    (** The number of preceding block in the chain. *)
     predecessor: Block_hash.t ;
     (** The preceding block in the chain. *)
     timestamp: Time.t ;

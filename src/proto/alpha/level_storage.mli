@@ -7,11 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val init: Storage.t -> Storage.t tzresult Lwt.t
+val current: Storage.t -> Level_repr.t
+val previous: Storage.t -> Level_repr.t
 
-val increment_current: Storage.t -> Storage.t tzresult Lwt.t
-val current: Storage.t -> Level_repr.t tzresult Lwt.t
-val previous: Storage.t -> Level_repr.t tzresult Lwt.t
+val root: Storage.t -> Level_repr.t
 
 val from_raw: Storage.t -> ?offset:int32 -> Raw_level_repr.t -> Level_repr.t
 val pred: Storage.t -> Level_repr.t -> Level_repr.t option

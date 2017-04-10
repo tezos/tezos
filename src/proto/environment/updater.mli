@@ -19,6 +19,8 @@ val raw_operation_encoding: raw_operation Data_encoding.t
 type shell_block = {
   net_id: Net_id.t ;
   (** The genesis of the chain this block belongs to. *)
+  level: Int32.t ;
+  (** The number of predecessing block in the chain. *)
   predecessor: Block_hash.t ;
   (** The preceding block in the chain. *)
   timestamp: Time.t ;
@@ -46,6 +48,7 @@ type validation_result = {
 
 type rpc_context = {
   context: Context.t ;
+  level: Int32.t ;
   timestamp: Time.t ;
   fitness: Fitness.fitness ;
 }
@@ -124,6 +127,7 @@ module type PROTOCOL = sig
   val begin_construction :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
+    predecessor_level: Int32.t ->
     predecessor_fitness: Fitness.fitness ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->

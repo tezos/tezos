@@ -19,37 +19,23 @@ type header = {
 }
 
 and proto_header = {
-  mining_slot: mining_slot ;
+  priority: int ;
   seed_nonce_hash: Nonce_hash.t ;
   proof_of_work_nonce: MBytes.t ;
 }
 
-and mining_slot = {
-  level: Raw_level_repr.t ;
-  priority: int ;
-}
-
-let mining_slot_encoding =
-  let open Data_encoding in
-  conv
-    (fun { level ; priority } -> level, priority)
-    (fun (level, priority) -> { level ; priority })
-    (obj2
-       (req "level" Raw_level_repr.encoding)
-       (req "priority" uint16))
-
 let proto_header_encoding =
   let open Data_encoding in
   conv
-    (fun { mining_slot ; seed_nonce_hash ; proof_of_work_nonce } ->
-       (mining_slot, (seed_nonce_hash, proof_of_work_nonce)))
-    (fun (mining_slot, (seed_nonce_hash, proof_of_work_nonce)) ->
-       { mining_slot ; seed_nonce_hash ; proof_of_work_nonce })
-    (merge_objs
-       mining_slot_encoding
-       (obj2
-          (req "seed_nonce_hash" Nonce_hash.encoding)
-          (req "proof_of_work_nonce" (Fixed.bytes Constants_repr.proof_of_work_nonce_size))))
+    (fun { priority ; seed_nonce_hash ; proof_of_work_nonce } ->
+       (priority, seed_nonce_hash, proof_of_work_nonce))
+    (fun (priority, seed_nonce_hash, proof_of_work_nonce) ->
+       { priority ; seed_nonce_hash ; proof_of_work_nonce })
+    (obj3
+      (req "priority" uint16)
+      (req "seed_nonce_hash" Nonce_hash.encoding)
+      (req "proof_of_work_nonce"
+         (Fixed.bytes Constants_repr.proof_of_work_nonce_size)))
 
 let signed_proto_header_encoding =
   let open Data_encoding in
@@ -76,13 +62,15 @@ type error +=
   | Cant_parse_proto_header
 
 let parse_header
-    ({ shell = { net_id ; predecessor ; timestamp ; fitness ; operations } ;
+    ({ shell = { net_id ; level ; predecessor ;
+                 timestamp ; fitness ; operations } ;
        proto } : Updater.raw_block) : header tzresult =
   match Data_encoding.Binary.of_bytes signed_proto_header_encoding proto with
   | None -> Error [Cant_parse_proto_header]
   | Some (proto, signature) ->
       let shell =
-        { Updater.net_id ; predecessor ; timestamp ; fitness ; operations } in
+        { Updater.net_id ; level ; predecessor ;
+          timestamp ; fitness ; operations } in
       Ok { shell ; proto ; signature }
 
 let forge_header shell proto =

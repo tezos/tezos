@@ -10,16 +10,54 @@
 open Tezos_hash
 open Storage_functors
 
+(* This key should always be populated for every version of the
+   protocol.  It's absence meaning that the context is empty. *)
+let version_key = ["version"]
+let version_value = "alpha"
+
+type error += Incompatiple_protocol_version
+
+let is_first_block ctxt =
+  Context.get ctxt version_key >>= function
+  | None ->
+      return true
+  | Some bytes ->
+      let s = MBytes.to_string bytes in
+      if Compare.String.(s = version_value) then
+        return false
+      else if Compare.String.(s = "genesis") then
+        return true
+      else
+        fail Incompatiple_protocol_version
+
 let version = "v1"
+let first_level_key = [ version ; "first_level" ]
 let sandboxed_key = [ version ; "sandboxed" ]
 
 type t = Storage_functors.context
 
 type error += Invalid_sandbox_parameter
 
+let current_level { level } = level
 let current_timestamp { timestamp } = timestamp
 let current_fitness { fitness } = fitness
 let set_current_fitness c fitness = { c with fitness }
+
+let get_first_level ctxt =
+  Context.get ctxt first_level_key >>= function
+  | None -> failwith "Invalid context"
+  | Some bytes ->
+      match
+        Data_encoding.Binary.of_bytes Raw_level_repr.encoding bytes
+      with
+      | None -> failwith "Invalid context"
+      | Some level -> return level
+
+let set_first_level ctxt level =
+  let bytes =
+    Data_encoding.Binary.to_bytes Raw_level_repr.encoding level in
+  Context.set ctxt first_level_key bytes >>= fun ctxt ->
+  return ctxt
 
 let get_sandboxed c =
   Context.get c sandboxed_key >>= function
@@ -33,20 +71,40 @@ let set_sandboxed c json =
   Context.set c sandboxed_key
     (Data_encoding.Binary.to_bytes Data_encoding.json json)
 
-let prepare ~timestamp ~fitness (c : Context.t) : t tzresult Lwt.t =
+let may_tag_first_block ctxt level =
+  is_first_block ctxt >>=? function
+  | false ->
+      get_first_level ctxt >>=? fun level ->
+      return (ctxt, false, level)
+  | true ->
+      Context.set ctxt version_key
+        (MBytes.of_string version_value) >>= fun ctxt ->
+      set_first_level ctxt level >>=? fun ctxt ->
+      return (ctxt, true, level)
+
+let prepare ~level ~timestamp ~fitness ctxt =
+  Lwt.return (Raw_level_repr.of_int32 level ) >>=? fun level ->
   Lwt.return (Fitness_repr.to_int64 fitness) >>=? fun fitness ->
-  get_sandboxed c >>=? fun sandbox ->
+  may_tag_first_block ctxt level >>=? fun (ctxt, first_block, first_level) ->
+  get_sandboxed ctxt >>=? fun sandbox ->
   Constants_repr.read sandbox >>=? function constants ->
-  return { context = c ; constants ; timestamp ; fitness }
+  let level =
+    Level_repr.from_raw
+      ~first_level
+      ~cycle_length:constants.Constants_repr.cycle_length
+      ~voting_period_length:constants.Constants_repr.voting_period_length
+    level in
+  return ({ context = ctxt ; constants ; level ;
+            timestamp ; fitness ; first_level},
+          first_block)
 let recover { context } : Context.t = context
 
+let first_level { first_level } = first_level
 let constants { constants } = constants
 
 module Key = struct
 
   let store_root tail = version :: "store" :: tail
-
-  let current_level = store_root ["level"]
 
   let global_counter = store_root ["global_counter"]
 
@@ -118,16 +176,6 @@ module Key = struct
   end
 
 end
-
-(** Global *)
-
-module Current_level =
-  Make_single_data_storage(struct
-    type value = Raw_level_repr.t
-    let name = "level"
-    let key = Key.current_level
-    let encoding = Raw_level_repr.encoding
-  end)
 
 (** Rolls *)
 
