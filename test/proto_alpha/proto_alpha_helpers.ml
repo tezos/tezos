@@ -422,6 +422,7 @@ module Mining = struct
   let mine
       ?(force = false)
       ?(operations = [])
+      ~fitness_gap
       contract
       block =
   Client_mining_blocks.info rpc_config block >>=? fun bi ->
@@ -438,8 +439,7 @@ module Mining = struct
    Register_client_embedded_proto_alpha.wrap_error) >>=? fun fitness ->
   let fitness =
     Fitness_repr.from_int64 @@
-    Int64.add fitness (Int64.of_int @@ List.length operations + 1) in
-  Level.pp_full Format.str_formatter bi.level ;
+    Int64.add fitness (Int64.of_int fitness_gap) in
   inject_block
     ~force
     ~priority

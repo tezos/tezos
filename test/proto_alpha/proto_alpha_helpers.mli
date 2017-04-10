@@ -122,6 +122,7 @@ module Mining : sig
   val mine :
     ?force:bool ->
     ?operations:Operation_hash.t list ->
+    fitness_gap:int ->
     Account.t ->
     Client_node_rpcs.Blocks.block ->
     Block_hash.t tzresult Lwt.t
