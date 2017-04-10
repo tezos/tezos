@@ -284,7 +284,8 @@ module Valid_block : sig
   val read_opt: Net.t -> Block_hash.t -> valid_block option Lwt.t
   val read_exn: Net.t -> Block_hash.t -> valid_block Lwt.t
   val store:
-    Net.t -> Block_hash.t -> Context.t -> valid_block option tzresult Lwt.t
+    Net.t -> Block_hash.t -> Updater.validation_result ->
+    valid_block option tzresult Lwt.t
 
   val watcher: Net.t -> valid_block Lwt_stream.t * Watcher.stopper
 

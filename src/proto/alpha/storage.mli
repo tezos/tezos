@@ -25,7 +25,10 @@
 type t
 
 (** Rerieves the state of the database and gives its abstract view *)
-val prepare : Context.t -> t tzresult Lwt.t
+val prepare :
+  timestamp: Time.t ->
+  fitness: Fitness.fitness ->
+  Context.t -> t tzresult Lwt.t
 
 (** Returns the state of the database resulting of operations on its
     abstract view *)
@@ -34,15 +37,10 @@ val recover : t -> Context.t
 val get_sandboxed : Context.t -> Data_encoding.json option tzresult Lwt.t
 val set_sandboxed : Context.t -> Data_encoding.json -> Context.t Lwt.t
 
-val get_fitness : t -> Fitness.fitness Lwt.t
-val set_fitness : t -> Fitness.fitness -> t Lwt.t
+val current_timestamp : t -> Time.t
 
-val get_timestamp: t -> Time.t Lwt.t
-
-val set_commit_message: t -> string -> t Lwt.t
-
-val get_prevalidation : t -> bool Lwt.t
-val set_prevalidation : t -> t Lwt.t
+val current_fitness : t -> Int64.t
+val set_current_fitness : t -> Int64.t -> t
 
 val constants : t -> Constants_repr.constants
 

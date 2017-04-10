@@ -14,15 +14,9 @@ let version_key = ["version"]
 let version_value = "alpha"
 
 (* This is the genesis protocol: initialise the state *)
-let initialize ~from_genesis (ctxt:Context.t) =
+let initialize ~timestamp ~fitness (ctxt: Context.t) =
   Context.set ctxt version_key (MBytes.of_string version_value) >>= fun ctxt ->
-  Storage.prepare ctxt >>=? fun store ->
-  begin
-    if from_genesis then
-      Lwt.return store
-    else
-      Fitness_storage.init store
-  end >>= fun store ->
+  Storage.prepare ~timestamp ~fitness ctxt >>=? fun store ->
   Level_storage.init store >>=? fun store ->
   Roll_storage.init store >>=? fun store ->
   Nonce_storage.init store >>=? fun store ->
@@ -41,19 +35,20 @@ type error +=
   | Incompatiple_protocol_version
   | Unimplemented_sandbox_migration
 
-let may_initialize ctxt =
+let may_initialize ctxt ~timestamp ~fitness =
   Context.get ctxt version_key >>= function
   | None ->
       (* This is the genesis protocol: The only acceptable preceding
          version is an empty context *)
-      initialize ~from_genesis:false ctxt
+      initialize ~timestamp ~fitness ctxt
   | Some bytes ->
       let s = MBytes.to_string bytes in
-      if Compare.String.(s = version_value)
-      then Storage.prepare ctxt
+      if Compare.String.(s = version_value) then
+        Storage.prepare ~timestamp ~fitness ctxt
       else if Compare.String.(s = "genesis") then
-        initialize ~from_genesis:true ctxt
-      else fail Incompatiple_protocol_version
+        initialize ~timestamp ~fitness ctxt
+      else
+        fail Incompatiple_protocol_version
 
 let configure_sandbox ctxt json =
   let json =
@@ -63,8 +58,7 @@ let configure_sandbox ctxt json =
   Context.get ctxt version_key >>= function
   | None ->
       Storage.set_sandboxed ctxt json >>= fun ctxt ->
-      initialize ~from_genesis:false ctxt >>=? fun ctxt ->
-      return (Storage.recover ctxt)
+      return ctxt
   | Some _ ->
       Storage.get_sandboxed ctxt >>=? function
       | None ->

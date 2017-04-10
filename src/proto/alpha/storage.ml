@@ -12,19 +12,14 @@ open Storage_functors
 
 let version = "v1"
 let sandboxed_key = [ version ; "sandboxed" ]
-let prevalidation_key = [ version ; "prevalidation" ]
 
 type t = Storage_functors.context
 
 type error += Invalid_sandbox_parameter
 
-let get_fitness (c, _) = Context.get_fitness c
-let set_fitness (c, csts) v =
-  Context.set_fitness c v >>= fun c -> Lwt.return (c, csts)
-
-let get_timestamp (c, _) = Context.get_timestamp c
-let set_commit_message (c, csts) msg =
-  Context.set_commit_message c msg >>= fun c -> Lwt.return (c, csts)
+let current_timestamp { timestamp } = timestamp
+let current_fitness { fitness } = fitness
+let set_current_fitness c fitness = { c with fitness }
 
 let get_sandboxed c =
   Context.get c sandboxed_key >>= function
@@ -38,22 +33,14 @@ let set_sandboxed c json =
   Context.set c sandboxed_key
     (Data_encoding.Binary.to_bytes Data_encoding.json json)
 
-let prepare (c : Context.t) : t tzresult Lwt.t =
+let prepare ~timestamp ~fitness (c : Context.t) : t tzresult Lwt.t =
+  Lwt.return (Fitness_repr.to_int64 fitness) >>=? fun fitness ->
   get_sandboxed c >>=? fun sandbox ->
   Constants_repr.read sandbox >>=? function constants ->
-  return (c, constants)
-let recover (c, _ : t) : Context.t = c
+  return { context = c ; constants ; timestamp ; fitness }
+let recover { context } : Context.t = context
 
-let get_prevalidation (c, _ : t) =
-  Context.get c prevalidation_key >>= function
-  | None -> Lwt.return false
-  | Some _ -> Lwt.return true
-let set_prevalidation (c, constants : t) =
-  Context.set c prevalidation_key (MBytes.of_string "prevalidation") >>= fun c ->
-  Lwt.return (c, constants)
-
-
-let constants : t -> _ = snd
+let constants { constants } = constants
 
 module Key = struct
 
@@ -510,12 +497,12 @@ module Rewards = struct
 
 end
 
-let activate (c, constants) h =
-  Updater.activate c h >>= fun c -> Lwt.return (c, constants)
-let fork_test_network (c, constants) =
-  Updater.fork_test_network c >>= fun c -> Lwt.return (c, constants)
-let set_test_protocol (c, constants) h =
-  Updater.set_test_protocol c h >>= fun c -> Lwt.return (c, constants)
+let activate ({ context = c } as s) h =
+  Updater.activate c h >>= fun c -> Lwt.return { s with context = c }
+let fork_test_network ({ context = c } as s) =
+  Updater.fork_test_network c >>= fun c -> Lwt.return { s with context = c }
+let set_test_protocol ({ context = c } as s) h =
+  Updater.set_test_protocol c h >>= fun c -> Lwt.return { s with context = c }
 
 
 (** Resolver *)

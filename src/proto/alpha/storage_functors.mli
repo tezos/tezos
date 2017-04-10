@@ -14,7 +14,12 @@
     indexed data and homgeneous data set). *)
 
 
-type context = Context.t * Constants_repr.constants
+type context = {
+  context: Context.t ;
+  constants: Constants_repr.constants ;
+  timestamp: Time.t ;
+  fitness: Int64.t ;
+}
 
 open Storage_sigs
 

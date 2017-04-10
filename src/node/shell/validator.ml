@@ -181,10 +181,8 @@ let apply_block net db
   begin
     match pred.protocol with
     | None -> fail (State.Unknown_protocol pred.protocol_hash)
-    | Some p ->
-       Context.set_timestamp pred.context block.shell.timestamp >>= fun c ->
-       return (p, c)
-  end >>=? fun ((module Proto), patched_context) ->
+    | Some p -> return p
+  end >>=? fun (module Proto) ->
   lwt_debug "validation of %a: Proto %a"
     Block_hash.pp_short hash
     Protocol_hash.pp_short Proto.hash >>= fun () ->
@@ -201,8 +199,9 @@ let apply_block net db
   lwt_debug "validation of %a: applying block..."
     Block_hash.pp_short hash >>= fun () ->
   Proto.begin_application
-    ~predecessor_context:patched_context
+    ~predecessor_context:pred.context
     ~predecessor_timestamp:pred.timestamp
+    ~predecessor_fitness:pred.fitness
     block >>=? fun state ->
   fold_left_s (fun state op ->
       Proto.apply_operation state op >>=? fun state ->

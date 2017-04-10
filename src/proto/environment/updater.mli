@@ -2,6 +2,7 @@
 
 open Hash
 
+(** The version agnostic toplevel structure of operations. *)
 type shell_operation = {
   net_id: Net_id.t ;
 }
@@ -36,6 +37,18 @@ type raw_block = {
   proto: MBytes.t ;
 }
 val raw_block_encoding: raw_block Data_encoding.t
+
+type validation_result = {
+  context: Context.t ;
+  fitness: Fitness.fitness ;
+  message: string option ;
+}
+
+type rpc_context = {
+  context: Context.t ;
+  timestamp: Time.t ;
+  fitness: Fitness.fitness ;
+}
 
 (** This is the signature of a Tezos protocol implementation. It has
     access to the standard library and the Environment module. *)
@@ -99,6 +112,7 @@ module type PROTOCOL = sig
   val begin_application :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
+    predecessor_fitness: Fitness.fitness ->
     raw_block ->
     validation_state tzresult Lwt.t
 
@@ -110,6 +124,7 @@ module type PROTOCOL = sig
   val begin_construction :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
+    predecessor_fitness: Fitness.fitness ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
     validation_state tzresult Lwt.t
@@ -123,10 +138,10 @@ module type PROTOCOL = sig
       context that will be used as input for the validation of its
       successor block candidates. *)
   val finalize_block :
-    validation_state -> Context.t tzresult Lwt.t
+    validation_state -> validation_result tzresult Lwt.t
 
   (** The list of remote procedures exported by this implementation *)
-  val rpc_services : Context.t RPC.directory
+  val rpc_services : rpc_context RPC.directory
 
   val configure_sandbox :
     Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t

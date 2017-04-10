@@ -9,24 +9,27 @@
 
 open Tezos_context
 
-let rpc_services = ref (RPC.empty : Context.t RPC.directory)
+let rpc_init { Updater.context ; timestamp ; fitness } =
+  Tezos_context.init ~timestamp ~fitness context
+
+let rpc_services = ref (RPC.empty : Updater.rpc_context RPC.directory)
 let register0 s f =
   rpc_services :=
     RPC.register !rpc_services (s RPC.Path.root)
       (fun ctxt () ->
-         ( Tezos_context.init ctxt >>=? fun ctxt ->
+         ( rpc_init ctxt >>=? fun ctxt ->
            f ctxt ) >>= RPC.Answer.return)
 let register1 s f =
   rpc_services :=
     RPC.register !rpc_services (s RPC.Path.root)
       (fun ctxt arg ->
-         ( Tezos_context.init ctxt >>=? fun ctxt ->
+         ( rpc_init ctxt >>=? fun ctxt ->
            f ctxt arg ) >>= RPC.Answer.return)
 let register2 s f =
   rpc_services :=
     RPC.register !rpc_services (s RPC.Path.root)
       (fun (ctxt, arg1) arg2 ->
-         ( Tezos_context.init ctxt >>=? fun ctxt ->
+         ( rpc_init ctxt >>=? fun ctxt ->
            f ctxt arg1 arg2 ) >>= RPC.Answer.return)
 let register1_noctxt s f =
   rpc_services :=
@@ -143,7 +146,7 @@ let () =
     rpc_services :=
       RPC.register !rpc_services (s RPC.Path.root)
         (fun (ctxt, contract) arg ->
-           ( Tezos_context.init ctxt >>=? fun ctxt ->
+           ( rpc_init ctxt >>=? fun ctxt ->
              Contract.exists ctxt contract >>=? function
              | true -> f ctxt contract arg
              | false -> raise Not_found ) >>= RPC.Answer.return) in
@@ -177,7 +180,7 @@ let minimal_timestamp ctxt prio =
 let () = register1
            Services.Helpers.minimal_timestamp
            (fun ctxt slot ->
-             Tezos_context.Timestamp.get_current ctxt >>= fun timestamp ->
+              let timestamp = Tezos_context.Timestamp.current ctxt in
              minimal_timestamp ctxt slot timestamp)
 
 let () =
@@ -305,7 +308,7 @@ let () =
          Lwt_list.filter_map_p (fun x -> x) @@
          List.mapi
            (fun prio c ->
-             Tezos_context.Timestamp.get_current ctxt >>= fun timestamp ->
+             let timestamp = Timestamp.current ctxt in
               Mining.minimal_time
                 ctxt (Int32.of_int prio) timestamp >>= function
               | Error _ -> Lwt.return None
@@ -343,7 +346,7 @@ let mining_rights_for_delegate
       let raw_level = level.level in
       Error_monad.map_s
         (fun priority ->
-          Tezos_context.Timestamp.get_current ctxt >>= fun timestamp ->
+           let timestamp = Timestamp.current ctxt in
            Mining.minimal_time ctxt priority timestamp >>=? fun time ->
            return (raw_level, Int32.to_int priority, time))
         priorities >>=? fun priorities ->
