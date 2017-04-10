@@ -245,7 +245,7 @@ module Valid_block : sig
     (** The genesis of the chain this block belongs to. *)
     hash: Block_hash.t ;
     (** The block hash. *)
-    pred: Block_hash.t ;
+    predecessor: Block_hash.t ;
     (** The preceding block in the chain. *)
     timestamp: Time.t ;
     (** The date at which this block has been forged. *)

@@ -152,7 +152,7 @@ module RPC = struct
 
   let convert (block: State.Valid_block.t)  = {
     hash = block.hash ;
-    predecessor = block.pred ;
+    predecessor = block.predecessor ;
     fitness = block.fitness ;
     timestamp = block.timestamp ;
     protocol = Some block.protocol_hash ;
