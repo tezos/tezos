@@ -142,6 +142,22 @@ type error +=
    | Invalid_operation of Operation_hash.t
    | Non_increasing_timestamp
    | Non_increasing_fitness
+   | Wrong_level of Int32.t * Int32.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"validator.wrong_level"
+    ~title:"Wrong level"
+    ~description:"The block level is not the expected one"
+    ~pp:(fun ppf (e, g) ->
+        Format.fprintf ppf
+          "The declared level %ld is not %ld" g e)
+    Data_encoding.(obj2
+                     (req "expected" int32)
+                     (req "provided" int32))
+    (function Wrong_level (e, g)   -> Some (e, g) | _ -> None)
+    (fun (e, g) -> Wrong_level (e, g))
 
 let apply_block net db
     (pred: State.Valid_block.t) hash (block: State.Block_header.t) =
@@ -151,6 +167,9 @@ let apply_block net db
     Block_hash.pp_short block.shell.predecessor
     Net_id.pp id
   >>= fun () ->
+  fail_unless
+    (Int32.succ pred.level = block.shell.level)
+    (Wrong_level (Int32.succ pred.level, block.shell.level)) >>=? fun () ->
   lwt_log_info "validation of %a: looking for dependencies..."
     Block_hash.pp_short hash >>= fun () ->
   Distributed_db.Operation_list.fetch

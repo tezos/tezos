@@ -14,6 +14,8 @@ open Misc
 type context = {
   context: Context.t ;
   constants: Constants_repr.constants ;
+  first_level: Raw_level_repr.t ;
+  level: Level_repr.t ;
   timestamp: Time.t ;
   fitness: Int64.t ;
 }

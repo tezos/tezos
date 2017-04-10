@@ -57,6 +57,7 @@ module Blocks = struct
 
   type block_info = {
     hash: Block_hash.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     fitness: MBytes.t list ;
     timestamp: Time.t ;
@@ -71,21 +72,22 @@ module Blocks = struct
 
   let block_info_encoding =
     conv
-      (fun { hash ; predecessor ; fitness ; timestamp ; protocol ;
+      (fun { hash ; level ; predecessor ; fitness ; timestamp ; protocol ;
              operations_hash ; operations ; data ; net ;
              test_protocol ; test_network } ->
-        ((hash, predecessor, fitness, timestamp, protocol),
+        ((hash, level, predecessor, fitness, timestamp, protocol),
          (operations_hash, operations, data,
           net, test_protocol, test_network)))
-      (fun ((hash, predecessor, fitness, timestamp, protocol),
+      (fun ((hash, level, predecessor, fitness, timestamp, protocol),
             (operations_hash, operations, data,
              net, test_protocol, test_network)) ->
-        { hash ; predecessor ; fitness ; timestamp ; protocol ;
+        { hash ; level ; predecessor ; fitness ; timestamp ; protocol ;
           operations_hash ; operations ; data ; net ;
           test_protocol ; test_network })
       (merge_objs
-        (obj5
+        (obj6
            (req "hash" Block_hash.encoding)
+           (req "level" int32)
            (req "predecessor" Block_hash.encoding)
            (req "fitness" Fitness.encoding)
            (req "timestamp" Time.encoding)
@@ -192,6 +194,13 @@ module Blocks = struct
       ~input: empty
       ~output: (obj1 (req "net" Net_id.encoding))
       RPC.Path.(block_path / "net")
+
+  let level =
+    RPC.service
+      ~description:"Returns the block's level."
+      ~input: empty
+      ~output: (obj1 (req "level" int32))
+      RPC.Path.(block_path / "level")
 
   let predecessor =
     RPC.service
@@ -642,8 +651,9 @@ let forge_block =
   RPC.service
     ~description: "Forge a block header"
     ~input:
-      (obj6
+      (obj7
          (opt "net_id" Net_id.encoding)
+         (opt "level" int32)
          (opt "predecessor" Block_hash.encoding)
          (opt "timestamp" Time.encoding)
          (req "fitness" Fitness.encoding)

@@ -64,11 +64,7 @@ end
 module Context = struct
 
   let level cctxt block =
-    match block with
-    | `Genesis -> return Level.root
-    | `Hash h when Block_hash.equal Client_blocks.genesis h ->
-        return Level.root
-    | _ -> call_error_service1 cctxt Services.Context.level block ()
+    call_error_service1 cctxt Services.Context.level block ()
 
   let next_level cctxt block =
     call_error_service1 cctxt Services.Context.next_level block ()

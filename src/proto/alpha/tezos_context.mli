@@ -219,6 +219,7 @@ module Level : sig
 
   type t = private {
     level: Raw_level.t ;
+    level_position: int32 ;
     cycle: Cycle.t ;
     cycle_position: int32 ;
     voting_period: Voting_period.t ;
@@ -228,7 +229,7 @@ module Level : sig
   val pp_full: Format.formatter -> t -> unit
   type level = t
 
-  val root: level
+  val root: context -> level
 
   val succ: context -> level -> level
   val pred: context -> level -> level option
@@ -237,8 +238,7 @@ module Level : sig
 
   val diff: level -> level -> int32
 
-  val current: context -> level tzresult Lwt.t
-  val increment_current: context -> context tzresult Lwt.t
+  val current: context -> level
 
   val last_level_in_cycle: context -> Cycle.t -> level
   val levels_in_cycle: context -> Cycle.t -> level list
@@ -523,17 +523,10 @@ module Block : sig
   }
 
   and proto_header = {
-    mining_slot: mining_slot ;
+    priority: int ;
     seed_nonce_hash: Nonce_hash.t ;
     proof_of_work_nonce: MBytes.t ;
   }
-
-  and mining_slot = {
-    level: Raw_level.t ;
-    priority: int ;
-  }
-
-  val mining_slot_encoding: mining_slot Data_encoding.encoding
 
   val max_header_length: int
 
@@ -580,6 +573,7 @@ end
 
 val init:
   Context.t ->
+  level:Int32.t ->
   timestamp:Time.t ->
   fitness:Fitness.t ->
   context tzresult Lwt.t

@@ -15,6 +15,7 @@ val errors:
 val forge_block:
   config ->
   ?net:Net_id.t ->
+  ?level:Int32.t ->
   ?predecessor:Block_hash.t ->
   ?timestamp:Time.t ->
   Fitness.fitness ->
@@ -67,6 +68,9 @@ module Blocks : sig
   val net:
     config ->
     block -> Net_id.t tzresult Lwt.t
+  val level:
+    config ->
+    block -> Int32.t tzresult Lwt.t
   val predecessor:
     config ->
     block -> Block_hash.t tzresult Lwt.t
@@ -102,6 +106,7 @@ module Blocks : sig
 
   type block_info = {
     hash: Block_hash.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     fitness: MBytes.t list ;
     timestamp: Time.t ;

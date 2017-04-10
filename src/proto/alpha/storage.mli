@@ -24,11 +24,17 @@
 (** Abstract view of the database *)
 type t
 
-(** Rerieves the state of the database and gives its abstract view *)
+(** Is first block validated with this version of the protocol ? *)
+val is_first_block: Context.t -> bool tzresult Lwt.t
+
+(** Retrieves the state of the database and gives its abstract view.
+    It also returns wether this is the first block validated
+    with this version of the protocol. *)
 val prepare :
+  level: Int32.t ->
   timestamp: Time.t ->
   fitness: Fitness.fitness ->
-  Context.t -> t tzresult Lwt.t
+  Context.t -> (t * bool) tzresult Lwt.t
 
 (** Returns the state of the database resulting of operations on its
     abstract view *)
@@ -37,21 +43,18 @@ val recover : t -> Context.t
 val get_sandboxed : Context.t -> Data_encoding.json option tzresult Lwt.t
 val set_sandboxed : Context.t -> Data_encoding.json -> Context.t Lwt.t
 
+val current_level : t -> Level_repr.t
 val current_timestamp : t -> Time.t
 
 val current_fitness : t -> Int64.t
 val set_current_fitness : t -> Int64.t -> t
 
 val constants : t -> Constants_repr.constants
+val first_level : t -> Raw_level_repr.t
 
 (** {1 Entity Accessors} *****************************************************)
 
 open Storage_sigs
-
-(** The level of the current block *)
-module Current_level : Single_data_storage
-  with type value = Raw_level_repr.t
-   and type context := t
 
 module Roll : sig
 

@@ -258,6 +258,7 @@ module Block_header = struct
 
   type shell_header = {
     net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations: Operation_list_list_hash.t ;
@@ -267,12 +268,15 @@ module Block_header = struct
   let shell_header_encoding =
     let open Data_encoding in
     conv
-      (fun { net_id ; predecessor ; timestamp ; operations ; fitness } ->
-         (net_id, predecessor, timestamp, operations, fitness))
-      (fun (net_id, predecessor, timestamp, operations, fitness) ->
-         { net_id ; predecessor ; timestamp ; operations ; fitness })
-      (obj5
+      (fun { net_id ; level ; predecessor ;
+             timestamp ; operations ; fitness } ->
+         (net_id, level, predecessor, timestamp, operations, fitness))
+      (fun (net_id, level, predecessor, timestamp, operations, fitness) ->
+         { net_id ; level ; predecessor ;
+           timestamp ; operations ; fitness })
+      (obj6
          (req "net_id" Net_id.encoding)
+         (req "level" int32)
          (req "predecessor" Block_hash.encoding)
          (req "timestamp" Time.encoding)
          (req "operations" Operation_list_list_hash.encoding)

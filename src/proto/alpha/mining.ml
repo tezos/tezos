@@ -14,7 +14,6 @@ open Misc
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
-type error += Wrong_level of Raw_level.t * Raw_level.t (* `Permanent *)
 type error += Wrong_delegate of public_key_hash * public_key_hash (* `Permanent *)
 type error += Cannot_pay_mining_bond (* `Permanent *)
 type error += Cannot_pay_endorsement_bond (* `Permanent *)
@@ -60,20 +59,6 @@ let () =
                      (req "provided" int16))
     (function Invalid_endorsement_slot (m, g)   -> Some (m, g) | _ -> None)
     (fun (m, g) -> Invalid_endorsement_slot (m, g)) ;
-  register_error_kind
-    `Permanent
-    ~id:"mining.wrong_level"
-    ~title:"Wrong level"
-    ~description:"The block level is not the expected one"
-    ~pp:(fun ppf (e, g) ->
-        Format.fprintf ppf
-          "The declared level %a is not %a"
-          Raw_level.pp g Raw_level.pp e)
-    Data_encoding.(obj2
-                     (req "expected" Raw_level.encoding)
-                     (req "provided" Raw_level.encoding))
-    (function Wrong_level (e, g)   -> Some (e, g) | _ -> None)
-    (fun (e, g) -> Wrong_level (e, g)) ;
   register_error_kind
     `Permanent
     ~id:"mining.wrong_delegate"
@@ -133,21 +118,14 @@ let check_timestamp c priority pred_timestamp =
   fail_unless Timestamp.(minimal_time <= timestamp)
     (Timestamp_too_early (minimal_time, timestamp))
 
-let check_mining_rights c
-    { Block.proto = { mining_slot = { level = raw_level ; priority } } }
+let check_mining_rights c { Block.proto = { priority } }
     pred_timestamp =
-  Level.current c >>=? fun current_level ->
-  fail_unless
-    Raw_level.(raw_level = current_level.level)
-    (Wrong_level (current_level.Level.level, raw_level)) >>=? fun () ->
-  let level = Level.from_raw c raw_level in
+  let level = Level.current c in
   Roll.mining_rights_owner c level ~priority >>=? fun delegate ->
   check_timestamp c priority pred_timestamp >>=? fun () ->
   return delegate
 
-let pay_mining_bond c
-    { Block.proto = { mining_slot = { priority} } }
-    id =
+let pay_mining_bond c { Block.proto = { priority } } id =
   if Compare.Int.(priority >= Constants.first_free_mining_slot c)
   then return c
   else
@@ -163,7 +141,7 @@ let pay_endorsement_bond c id =
 let check_signing_rights c slot delegate =
   fail_unless Compare.Int.(0 <= slot && slot <= Constants.max_signing_slot c)
     (Invalid_endorsement_slot (Constants.max_signing_slot c, slot)) >>=? fun () ->
-  Level.current c >>=? fun level ->
+  let level = Level.current c in
   Roll.endorsement_rights_owner c level ~slot >>=? fun owning_delegate ->
   fail_unless (Ed25519.Public_key_hash.equal owning_delegate delegate)
     (Wrong_delegate (owning_delegate, delegate))
@@ -281,12 +259,13 @@ let check_fitness_gap ctxt (block : Block.header) =
   else
     return ()
 
-let first_of_a_cycle l =
-  Compare.Int32.(l.Level.cycle_position = 0l)
+let last_of_a_cycle ctxt l =
+  Compare.Int32.(Int32.succ l.Level.cycle_position =
+                 Constants.cycle_length ctxt)
 
 let dawn_of_a_new_cycle ctxt =
-  Level.current ctxt >>=? fun level ->
-  if first_of_a_cycle level then
+  let level = Level.current ctxt in
+  if last_of_a_cycle ctxt level then
     return (Some level.cycle)
   else
     return None

@@ -54,16 +54,16 @@ let apply_delegate_operation_content
       let ctxt = Fitness.increase ctxt in
       Mining.pay_endorsement_bond ctxt delegate >>=? fun (ctxt, bond) ->
       Mining.endorsement_reward ~block_priority >>=? fun reward ->
-      Level.current ctxt >>=? fun { cycle = current_cycle } ->
+      let { cycle = current_cycle } : Level.t = Level.current ctxt in
       Lwt.return Tez.(reward +? bond) >>=? fun full_reward ->
       Reward.record ctxt delegate current_cycle full_reward
   | Proposals { period ; proposals } ->
-      Level.current ctxt >>=? fun level ->
+      let level = Level.current ctxt in
       fail_unless Voting_period.(level.voting_period = period)
         (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
       Amendment.record_proposals ctxt delegate proposals
   | Ballot { period ; proposal ; ballot } ->
-      Level.current ctxt >>=? fun level ->
+      let level = Level.current ctxt in
       fail_unless Voting_period.(level.voting_period = period)
         (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
       Amendment.record_ballot ctxt delegate proposal ballot
@@ -228,11 +228,8 @@ let apply_operation
 let may_start_new_cycle ctxt =
   Mining.dawn_of_a_new_cycle ctxt >>=? function
   | None -> return ctxt
-  | Some new_cycle ->
-      let last_cycle =
-        match Cycle.pred new_cycle with
-        | None -> assert false
-        | Some last_cycle -> last_cycle in
+  | Some last_cycle ->
+      let new_cycle = Cycle.succ last_cycle in
       Bootstrap.refill ctxt >>=? fun ctxt ->
       Seed.clear_cycle ctxt last_cycle >>=? fun ctxt ->
       Seed.compute_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
@@ -259,12 +256,11 @@ let begin_application ctxt block pred_timestamp =
 
 let finalize_application ctxt block miner =
   (* end of level (from this point nothing should fail) *)
-  let priority = block.Block.proto.mining_slot.priority in
+  let priority = block.Block.proto.priority in
   let reward = Mining.base_mining_reward ctxt ~priority in
   Nonce.record_hash ctxt
     miner reward block.proto.seed_nonce_hash >>=? fun ctxt ->
   Reward.pay_due_rewards ctxt >>=? fun ctxt ->
-  Level.increment_current ctxt >>=? fun ctxt ->
   (* end of cycle *)
   may_start_new_cycle ctxt >>=? fun ctxt ->
   Amendment.may_start_new_voting_cycle ctxt >>=? fun ctxt ->

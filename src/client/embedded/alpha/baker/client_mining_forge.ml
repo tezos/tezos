@@ -22,14 +22,14 @@ let generate_seed_nonce () =
   | Ok nonce -> nonce
 
 let rec compute_stamp
-    cctxt block delegate_sk shell mining_slot seed_nonce_hash =
+    cctxt block delegate_sk shell priority seed_nonce_hash =
   Client_proto_rpcs.Constants.stamp_threshold
     cctxt block >>=? fun stamp_threshold ->
   let rec loop () =
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
     let unsigned_header =
       Tezos_context.Block.forge_header
-        shell { mining_slot ; seed_nonce_hash ; proof_of_work_nonce } in
+        shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
     let signed_header =
       Ed25519.Signature.append delegate_sk unsigned_header in
     let block_hash = Block_hash.hash_bytes [signed_header] in
@@ -51,11 +51,10 @@ let inject_block cctxt block
     Operation_list_list_hash.compute
       (List.map Operation_list_hash.compute operation_list) in
   let shell =
-    { Store.Block_header.net_id = bi.net ; predecessor = bi.hash ;
-      timestamp ; fitness ; operations } in
-  let slot = { Block.level = level.level ; priority } in
+    { Store.Block_header.net_id = bi.net ; level = bi.level ;
+      predecessor = bi.hash ; timestamp ; fitness ; operations } in
   compute_stamp cctxt block
-    src_sk shell slot seed_nonce_hash >>=? fun proof_of_work_nonce ->
+    src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
   Client_proto_rpcs.Helpers.Forge.block cctxt
     block
     ~net:bi.net

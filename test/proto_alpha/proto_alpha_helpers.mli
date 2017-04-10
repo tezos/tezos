@@ -105,7 +105,7 @@ module Mining : sig
     Client_proto_rpcs.block ->
     secret_key ->
     Updater.shell_block ->
-    Block.mining_slot ->
+    int ->
     Nonce_hash.t ->
     MBytes.t tzresult Lwt.t
 
@@ -192,3 +192,7 @@ module Assert : sig
   val invalid_endorsement_slot : msg:string -> 'a tzresult -> unit
 
 end
+
+val rpc_config: Client_rpcs.config
+
+val display_level: Client_proto_rpcs.block -> unit tzresult Lwt.t
