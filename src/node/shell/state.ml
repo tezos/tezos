@@ -996,14 +996,13 @@ module Valid_block = struct
         block_header_store
         (net_state: net_state)
         valid_block_watcher
-        hash context ttl =
+        hash { Updater.context ; fitness ; message } ttl =
       (* Read the block header. *)
       Raw_block_header.Locked.read
         block_header_store hash >>=? fun block ->
       Raw_block_header.Locked.read_discovery_time
         block_header_store hash >>=? fun discovery_time ->
       (* Check fitness coherency. *)
-      Context.get_fitness context >>= fun fitness ->
       fail_unless
         (Fitness.equal fitness block.Store.Block_header.shell.fitness)
         (Invalid_fitness
@@ -1041,7 +1040,15 @@ module Valid_block = struct
       Operation_list.Locked.read_all
         block_header_store hash >>=? fun operations ->
       (* Let's commit the context. *)
-      Context.commit hash context >>= fun () ->
+      let message =
+        match message with
+        | Some message -> message
+        | None ->
+            Format.asprintf "%a: %a"
+              Block_hash.pp_short hash
+              Fitness.pp fitness in
+      Context.commit
+        hash ~time:block.shell.timestamp ~message context >>= fun () ->
       (* Update the chain state. *)
       let store = net_state.chain_store in
       let predecessor = block.shell.predecessor in

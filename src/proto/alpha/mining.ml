@@ -128,7 +128,7 @@ let minimal_time c priority pred_timestamp =
 
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp >>=? fun minimal_time ->
-  Tezos_context.Timestamp.get_current c >>= fun timestamp ->
+  let timestamp = Tezos_context.Timestamp.current c in
   fail_unless Timestamp.(minimal_time <= timestamp)
     (Timestamp_too_early (minimal_time, timestamp))
 
@@ -273,8 +273,8 @@ let max_fitness_gap ctxt =
   Int64.add slots 1L
 
 let check_fitness_gap ctxt (block : Block.header) =
-  Fitness.get ctxt >>=? fun current_fitness ->
-  Fitness.to_int64 block.shell.fitness >>=? fun announced_fitness ->
+  let current_fitness = Fitness.current ctxt in
+  Lwt.return (Fitness.to_int64 block.shell.fitness) >>=? fun announced_fitness ->
   let gap = Int64.sub announced_fitness current_fitness in
   if Compare.Int64.(gap <= 0L || max_fitness_gap ctxt < gap) then
     fail (Invalid_fitness_gap (max_fitness_gap ctxt, gap))

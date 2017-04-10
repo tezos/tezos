@@ -37,6 +37,8 @@ let net_id = Net_id.of_block_hash genesis_block
 
 (** Context creation *)
 
+let commit = commit ~time:Time.epoch ~message:""
+
 let block2 =
   Block_hash.of_hex_exn
     "2222222222222222222222222222222222222222222222222222222222222222"

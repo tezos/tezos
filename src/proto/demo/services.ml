@@ -45,7 +45,7 @@ let failing_service custom_root =
     ~output: (wrap_tzerror Data_encoding.empty)
     RPC.Path.(custom_root / "failing")
 
-let rpc_services : Context.t RPC.directory =
+let rpc_services : Updater.rpc_context RPC.directory =
   let dir = RPC.empty in
   let dir =
     RPC.register

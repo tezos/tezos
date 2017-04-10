@@ -22,7 +22,7 @@ module Period = Period_repr
 
 module Timestamp = struct
   include Time_repr
-  let get_current = Storage.get_timestamp
+  let current = Storage.current_timestamp
 end
 
 include Operation_repr
@@ -110,17 +110,12 @@ end
 
 let init = Init_storage.may_initialize
 
-let finalize ?commit_message c =
-  match commit_message with
-  | None ->
-     return (Storage.recover c)
-  | Some msg ->
-     Storage.set_commit_message c msg >>= fun c ->
-     return (Storage.recover c)
+let finalize ?commit_message:message c =
+  let fitness = Fitness.from_int64 (Fitness.current c) in
+  let context = Storage.recover c in
+  { Updater.context ; fitness ; message }
 
 let configure_sandbox = Init_storage.configure_sandbox
-let get_prevalidation = Storage.get_prevalidation
-let set_prevalidation = Storage.set_prevalidation
 
 let activate = Storage.activate
 let fork_test_network = Storage.fork_test_network

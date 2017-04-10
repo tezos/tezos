@@ -18,20 +18,12 @@ type raw_operation = Store.Operation.t = {
 }
 val raw_operation_encoding: raw_operation Data_encoding.t
 
-(** The version agnostic toplevel structure of blocks. *)
 type shell_block = Store.Block_header.shell_header = {
   net_id: Net_id.t ;
-  (** The genesis of the chain this block belongs to. *)
   predecessor: Block_hash.t ;
-  (** The preceding block in the chain. *)
   timestamp: Time.t ;
-  (** The date at which this block has been forged. *)
   operations: Operation_list_list_hash.t ;
-  (** The sequence of operations. *)
   fitness: MBytes.t list ;
-  (** The announced score of the block. As a sequence of sequences
-      of unsigned bytes. Ordered by length and then by contents
-      lexicographically. *)
 }
 val shell_block_encoding: shell_block Data_encoding.t
 
@@ -40,6 +32,18 @@ type raw_block = Store.Block_header.t = {
   proto: MBytes.t ;
 }
 val raw_block_encoding: raw_block Data_encoding.t
+
+type validation_result = Protocol.validation_result = {
+  context: Context.t ;
+  fitness: Fitness.fitness ;
+  message: string option ;
+}
+
+type rpc_context = Protocol.rpc_context = {
+  context: Context.t ;
+  timestamp: Time.t ;
+  fitness: Fitness.fitness ;
+}
 
 module type PROTOCOL = Protocol.PROTOCOL
 module type REGISTRED_PROTOCOL = sig

@@ -278,9 +278,8 @@ module RPC = struct
         State.Valid_block.Current.head net_state >>= fun head ->
         Prevalidator.context pv >>= function
         | Error _ -> Lwt.fail Not_found
-        | Ok ctxt ->
-            Context.get_fitness ctxt >>= fun fitness ->
-            Context.get_protocol ctxt >>= fun protocol ->
+        | Ok { context ; fitness } ->
+            Context.get_protocol context >>= fun protocol ->
             let operations =
               let pv_result, _ = Prevalidator.operations pv in
               Some [ pv_result.applied ] in
@@ -291,29 +290,36 @@ module RPC = struct
                 protocol = Some protocol ;
                 fitness ; operations ; timestamp }
 
-  let get_context node block =
+  let rpc_context block : Updater.rpc_context =
+    { context = block.State.Valid_block.context ;
+      fitness = block.fitness ;
+      timestamp = block. timestamp }
+
+  let get_rpc_context node block =
     match block with
     | `Genesis ->
         State.Valid_block.Current.genesis node.mainnet_net >>= fun block ->
-        Lwt.return (Some block.context)
+        Lwt.return (Some (rpc_context block))
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
         let net_state = Validator.net_state validator in
         let net_db = Validator.net_db validator in
         State.Valid_block.Current.head net_state >>= fun head ->
-        get_pred net_db n head >>= fun { context } ->
-        Lwt.return (Some context)
+        get_pred net_db n head >>= fun block ->
+        Lwt.return (Some (rpc_context block))
     | `Hash hash-> begin
         read_valid_block node hash >|= function
         | None -> None
-        | Some { context } -> Some context
+        | Some block -> Some (rpc_context block)
       end
     | ( `Prevalidation | `Test_prevalidation ) as block ->
         let validator, _net = get_net node block in
         let pv = Validator.prevalidator validator in
         Prevalidator.context pv >>= function
         | Error _ -> Lwt.fail Not_found
-        | Ok ctxt -> Lwt.return (Some ctxt)
+        | Ok { context ; fitness } ->
+            let timestamp = Prevalidator.timestamp pv in
+            Lwt.return (Some { Updater.context ; fitness ; timestamp })
 
   let operations node block =
     match block with
@@ -417,8 +423,7 @@ module RPC = struct
       ~predecessor ~timestamp >>=? fun validation_state ->
     Prevalidation.prevalidate
       validation_state ~sort rops >>=? fun (validation_state, r) ->
-    Prevalidation.end_prevalidation validation_state >>=? fun ctxt ->
-    Context.get_fitness ctxt >>= fun fitness ->
+    Prevalidation.end_prevalidation validation_state >>=? fun { fitness } ->
     return (fitness, { r with applied = List.rev r.applied })
 
   let complete node ?block str =
@@ -426,9 +431,9 @@ module RPC = struct
     | None ->
         Base58.complete str
     | Some block ->
-        get_context node block >>= function
+        get_rpc_context node block >>= function
         | None -> Lwt.fail Not_found
-        | Some ctxt ->
+        | Some { context = ctxt } ->
             Context.get_protocol ctxt >>= fun protocol_hash ->
             let (module Proto) = Updater.get_exn protocol_hash in
             Base58.complete str >>= fun l1 ->
@@ -436,12 +441,12 @@ module RPC = struct
             Lwt.return (l1 @ l2)
 
   let context_dir node block =
-    get_context node block >>= function
+    get_rpc_context node block >>= function
     | None -> Lwt.return None
-    | Some ctxt ->
-        Context.get_protocol ctxt >>= fun protocol_hash ->
+    | Some rpc_context ->
+        Context.get_protocol rpc_context.context >>= fun protocol_hash ->
         let (module Proto) = Updater.get_exn protocol_hash in
-        let dir =  RPC.map (fun () -> ctxt) Proto.rpc_services in
+        let dir = RPC.map (fun () -> rpc_context) Proto.rpc_services in
         Lwt.return (Some (RPC.map (fun _ -> ()) dir))
 
   let heads node =

@@ -39,4 +39,4 @@ val prevalidate :
   (prevalidation_state * error preapply_result) tzresult Lwt.t
 
 val end_prevalidation :
-  prevalidation_state -> Context.t tzresult Lwt.t
+  prevalidation_state -> Updater.validation_result tzresult Lwt.t

@@ -44,6 +44,6 @@ val inject_operation:
 val flush: t -> State.Valid_block.t -> unit
 val timestamp: t -> Time.t
 val operations: t -> error Prevalidation.preapply_result * Operation_hash.Set.t
-val context: t -> Context.t tzresult Lwt.t
+val context: t -> Updater.validation_result tzresult Lwt.t
 
 val pending: ?block:State.Valid_block.t -> t -> Operation_hash.Set.t Lwt.t
