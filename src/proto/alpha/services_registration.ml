@@ -174,7 +174,7 @@ let () =
 (*-- Helpers -----------------------------------------------------------------*)
 
 let minimal_timestamp ctxt prio =
-  let prio = match prio with None -> 0l | Some p -> Int32.of_int p in
+  let prio = match prio with None -> 0 | Some p -> p in
   Mining.minimal_time ctxt prio
 
 let () = register1
@@ -196,7 +196,7 @@ let () =
            Tezos_context.Level.current ctxt >>=? fun level ->
            Mining.mining_priorities ctxt level >>=? fun (Misc.LCons (miner_pkh, _)) ->
            let miner_contract = Contract.default_contract miner_pkh in
-           let block_prio = 0l in
+           let block_prio = 0 in
            Apply.apply_operation
              ctxt (Some miner_contract) pred_block block_prio operation
            >>=? function
@@ -281,11 +281,11 @@ let () = register2 Services.Helpers.levels levels
 let default_max_mining_priority ctxt arg =
   let default = Constants.first_free_mining_slot ctxt in
   match arg with
-  | None -> Int32.mul 2l default
-  | Some m -> Int32.of_int m
+  | None -> 2 * default
+  | Some m -> m
 
 let mining_rights ctxt level max =
-  let max = Int32.to_int (default_max_mining_priority ctxt max) in
+  let max = default_max_mining_priority ctxt max in
   Mining.mining_priorities ctxt level >>=? fun contract_list ->
   let rec loop l n =
     match n with
@@ -309,8 +309,7 @@ let () =
          List.mapi
            (fun prio c ->
              let timestamp = Timestamp.current ctxt in
-              Mining.minimal_time
-                ctxt (Int32.of_int prio) timestamp >>= function
+              Mining.minimal_time ctxt prio timestamp >>= function
               | Error _ -> Lwt.return None
               | Ok minimal_timestamp -> Lwt.return (Some (c, minimal_timestamp)))
            slots
@@ -348,7 +347,7 @@ let mining_rights_for_delegate
         (fun priority ->
            let timestamp = Timestamp.current ctxt in
            Mining.minimal_time ctxt priority timestamp >>=? fun time ->
-           return (raw_level, Int32.to_int priority, time))
+           return (raw_level, priority, time))
         priorities >>=? fun priorities ->
       return (priorities @ t)
   in
@@ -391,10 +390,8 @@ let () =
 
 let endorsement_rights_for_delegate
     ctxt contract (max_priority, min_level, max_level) =
-  let max_priority =
-    Int32.of_int @@
-    default_max_endorsement_priority ctxt max_priority in
   Level.current ctxt >>=? fun current_level ->
+  let max_priority = default_max_endorsement_priority ctxt max_priority in
   let max_level =
     match max_level with
     | None ->
@@ -412,10 +409,7 @@ let endorsement_rights_for_delegate
       Mining.first_endorsement_slots
         ctxt ~max_priority contract level >>=? fun slots ->
       let raw_level = level.level in
-      let slots =
-        List.rev_map
-          (fun slot -> (raw_level, Int32.to_int slot))
-          slots in
+      let slots = List.rev_map (fun slot -> (raw_level, slot)) slots in
       return (List.rev_append slots t)
   in
   loop min_level
@@ -442,7 +436,6 @@ let () = register1 Services.Helpers.Forge.operations forge_operations
 let forge_block _ctxt
     (net_id, predecessor, timestamp, fitness, operations,
      raw_level, priority, seed_nonce_hash, proof_of_work_nonce) : MBytes.t tzresult Lwt.t =
-  let priority = Int32.of_int priority in
   let mining_slot = { Block.level = raw_level ; priority } in
   return (Block.forge_header
             { net_id ; predecessor ; timestamp ; fitness ; operations }

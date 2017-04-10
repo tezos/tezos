@@ -110,6 +110,7 @@ let () =
     (fun () -> Cannot_pay_endorsement_bond)
 
 let minimal_time c priority pred_timestamp =
+  let priority = Int32.of_int priority in
   let rec cumsum_slot_durations acc durations p =
     if Compare.Int32.(<=) p 0l then
       ok acc
@@ -147,7 +148,7 @@ let check_mining_rights c
 let pay_mining_bond c
     { Block.proto = { mining_slot = { priority} } }
     id =
-  if Compare.Int32.(priority >= Constants.first_free_mining_slot c)
+  if Compare.Int.(priority >= Constants.first_free_mining_slot c)
   then return c
   else
     Contract.spend c (Contract.default_contract id) Constants.mining_bond_cost
@@ -168,7 +169,7 @@ let check_signing_rights c slot delegate =
     (Wrong_delegate (owning_delegate, delegate))
 
 let paying_priorities c =
-  0l ---> Constants.first_free_mining_slot c
+  0 --> Constants.first_free_mining_slot c
 
 let bond_and_reward =
   match Tez.(Constants.mining_bond_cost +? Constants.mining_reward) with
@@ -176,25 +177,25 @@ let bond_and_reward =
   | Error _ -> assert false
 
 let base_mining_reward c ~priority =
-  if Compare.Int32.(priority < Constants.first_free_mining_slot c)
+  if Compare.Int.(priority < Constants.first_free_mining_slot c)
   then bond_and_reward
   else Constants.mining_reward
 
 type error += Incorect_priority
 
 let endorsement_reward ~block_priority:prio =
-  if Compare.Int32.(prio >= 0l)
+  if Compare.Int.(prio >= 0)
   then
     Lwt.return
-      Tez.(Constants.endorsement_reward /? (Int64.(succ (of_int32 prio))))
+      Tez.(Constants.endorsement_reward /? (Int64.(succ (of_int prio))))
   else fail Incorect_priority
 
 let mining_priorities c level =
   let rec f priority =
     Roll.mining_rights_owner c level ~priority >>=? fun delegate ->
-    return (LCons (delegate, (fun () -> f (Int32.succ priority))))
+    return (LCons (delegate, (fun () -> f (succ priority))))
   in
-  f 0l
+  f 0
 
 let endorsement_priorities c level =
   let rec f slot =
@@ -205,7 +206,7 @@ let endorsement_priorities c level =
 
 let select_delegate delegate delegate_list max_priority =
   let rec loop acc l n =
-    if Compare.Int32.(n >= max_priority)
+    if Compare.Int.(n >= max_priority)
     then return (List.rev acc)
     else
       let LCons (pkh, t) = l in
@@ -214,9 +215,9 @@ let select_delegate delegate delegate_list max_priority =
         then n :: acc
         else acc in
       t () >>=? fun t ->
-      loop acc t (Int32.succ n)
+      loop acc t (succ n)
   in
-  loop [] delegate_list 0l
+  loop [] delegate_list 0
 
 let first_mining_priorities
     ctxt
@@ -227,8 +228,7 @@ let first_mining_priorities
 
 let first_endorsement_slots
     ctxt
-    ?(max_priority =
-      Int32.of_int (Constants.max_signing_slot ctxt))
+    ?(max_priority = Constants.max_signing_slot ctxt)
     delegate level =
   endorsement_priorities ctxt level >>=? fun delegate_list ->
   select_delegate delegate delegate_list max_priority

@@ -53,8 +53,7 @@ let inject_block cctxt block
   let shell =
     { Store.Block_header.net_id = bi.net ; predecessor = bi.hash ;
       timestamp ; fitness ; operations } in
-  let slot =
-    { Block.level = level.level ; priority = Int32.of_int priority } in
+  let slot = { Block.level = level.level ; priority } in
   compute_stamp cctxt block
     src_sk shell slot seed_nonce_hash >>=? fun proof_of_work_nonce ->
   Client_proto_rpcs.Helpers.Forge.block cctxt
