@@ -10,6 +10,20 @@
 open Error_monad
 exception Exited of int
 
-val detach: ?prefix:string -> (unit -> unit Lwt.t) -> unit Lwt.t
-val handle_error: (unit -> (unit, error list) result Lwt.t) -> unit Lwt.t
-val wait: unit Lwt.t list -> unit Lwt.t
+module Channel : sig
+  type ('a, 'b) t
+  val push: ('a, 'b) t -> 'a -> unit tzresult Lwt.t
+  val pop: ('a, 'b) t -> 'b tzresult Lwt.t
+end
+
+type ('a, 'b) t = {
+  termination: unit tzresult Lwt.t ;
+  channel: ('b, 'a) Channel.t ;
+}
+
+val detach:
+  ?prefix:string ->
+  (('a, 'b) Channel.t -> unit tzresult Lwt.t) ->
+  ('a, 'b) t Lwt.t
+
+val wait_all: ('a, 'b) t list -> unit tzresult Lwt.t

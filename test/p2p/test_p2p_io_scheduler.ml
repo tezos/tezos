@@ -142,24 +142,20 @@ let run
     addr port time n =
   Logging.init Stderr >>= fun () ->
   listen ?port addr >>= fun (main_socket, port) ->
-  let server =
-    Process.detach ~prefix:"server " begin fun () ->
-      Process.handle_error begin fun () ->
-        server
-          ?display_client_stat ?max_download_speed
-          ~read_buffer_size ?read_queue_size
-          main_socket n
-      end
-    end in
+  Process.detach ~prefix:"server: " begin fun _ ->
+    server
+      ?display_client_stat ?max_download_speed
+      ~read_buffer_size ?read_queue_size
+      main_socket n
+  end >>= fun server_node ->
   let client n =
-    let prefix = Printf.sprintf "client(%d) " n in
-    Process.detach ~prefix begin fun () ->
+    let prefix = Printf.sprintf "client(%d): " n in
+    Process.detach ~prefix begin fun _ ->
       Lwt_utils.safe_close main_socket >>= fun () ->
-      Process.handle_error begin fun () ->
-        client ?max_upload_speed ?write_queue_size addr port time n
-      end
+      client ?max_upload_speed ?write_queue_size addr port time n
     end in
-  Process.wait (server :: List.map client Utils.(1 -- n))
+  Lwt_list.map_p client Utils.(1 -- n) >>= fun client_nodes ->
+  Process.wait_all (server_node :: client_nodes)
 
 let () = Random.self_init ()
 
@@ -221,12 +217,14 @@ let () =
 
 let () =
   Sys.catch_break true ;
-  Lwt_main.run
-    (run
-       ?display_client_stat:!display_client_stat
-       ?max_download_speed:!max_download_speed
-       ?max_upload_speed:!max_upload_speed
-       ~read_buffer_size:!read_buffer_size
-       ?read_queue_size:!read_queue_size
-       ?write_queue_size:!write_queue_size
-       !addr !port !delay !clients)
+  Test.run "p2p.io-scheduler." [
+    "trivial-quota", (fun _dir ->
+        run
+          ?display_client_stat:!display_client_stat
+          ?max_download_speed:!max_download_speed
+          ?max_upload_speed:!max_upload_speed
+          ~read_buffer_size:!read_buffer_size
+          ?read_queue_size:!read_queue_size
+          ?write_queue_size:!write_queue_size
+          !addr !port !delay !clients)
+  ]
