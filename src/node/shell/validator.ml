@@ -129,7 +129,7 @@ let rec may_set_head v (block: State.Valid_block.t) =
           Fitness.pp block.fitness
           Time.pp_hum block.timestamp
           (fun ppf ->
-             if Block_hash.equal head.hash block.pred then
+             if Block_hash.equal head.hash block.predecessor then
                Format.fprintf ppf "same branch"
              else
                Format.fprintf ppf "changing branch") >>= fun () ->

@@ -110,7 +110,7 @@ and net_state = {
 and valid_block = {
   net_id: Net_id.t ;
   hash: Block_hash.t ;
-  pred: Block_hash.t ;
+  predecessor: Block_hash.t ;
   timestamp: Time.t ;
   fitness: Protocol.fitness ;
   operations_hash: Operation_list_list_hash.t ;
@@ -144,7 +144,7 @@ let build_valid_block
   let valid_block = {
     net_id = header.Store.Block_header.shell.net_id ;
     hash ;
-    pred = header.shell.predecessor ;
+    predecessor = header.shell.predecessor ;
     timestamp = header.shell.timestamp ;
     discovery_time ;
     operations_hash = header.shell.operations ;
@@ -932,7 +932,7 @@ module Valid_block = struct
   type t = valid_block = {
     net_id: Net_id.t ;
     hash: Block_hash.t ;
-    pred: Block_hash.t ;
+    predecessor: Block_hash.t ;
     timestamp: Time.t ;
     fitness: Fitness.fitness ;
     operations_hash: Operation_list_list_hash.t ;
@@ -1166,10 +1166,10 @@ module Valid_block = struct
           end
         | res -> res in
       let predecessor state b =
-        if Block_hash.equal b.hash b.pred then
+        if Block_hash.equal b.hash b.predecessor then
           Lwt.return None
         else
-          read_opt state b.pred in
+          read_opt state b.predecessor in
       Raw_helpers.iter_predecessors compare predecessor
         (fun b -> b.timestamp) (fun b -> b.fitness)
 
