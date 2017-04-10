@@ -275,5 +275,4 @@ module Rewards : sig
 end
 
 val activate: t -> Protocol_hash.t -> t Lwt.t
-val set_test_protocol: t -> Protocol_hash.t -> t Lwt.t
-val fork_test_network: t -> t Lwt.t
+val fork_test_network: t -> Protocol_hash.t -> Time.t -> t Lwt.t

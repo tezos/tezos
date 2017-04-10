@@ -88,7 +88,8 @@ let commands () =
       let fitness =
         Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
       mine cctxt.rpc_config ?timestamp cctxt.config.block
-        (Activate_testnet hash) fitness seckey >>=? fun hash ->
+        (Activate_testnet (hash, Int64.mul 24L 3600L))
+        fitness seckey >>=? fun hash ->
       cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
       return ()
     end ;

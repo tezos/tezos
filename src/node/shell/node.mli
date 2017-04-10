@@ -13,9 +13,9 @@ type config = {
   genesis: State.Net.genesis ;
   store_root: string ;
   context_root: string ;
-  test_protocol: Protocol_hash.t option ;
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
+  test_network_max_tll: int option ;
 }
 
 val create: config -> t tzresult Lwt.t

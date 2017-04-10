@@ -45,9 +45,15 @@ type block = {
 }
 
 let max_block_length =
-  match Data_encoding.Binary.fixed_length Data.Command.signed_encoding with
-  | None -> assert false
-  | Some len -> len
+  Data_encoding.Binary.length
+    Data.Command.encoding
+    (Activate_testnet (Protocol_hash.hash_bytes [], 0L))
+  +
+  begin
+    match Data_encoding.Binary.fixed_length Ed25519.Signature.encoding with
+    | None -> assert false
+    | Some len -> len
+  end
 
 let parse_block { Updater.shell ; proto } : block tzresult =
   match Data_encoding.Binary.of_bytes Data.Command.signed_encoding proto with
@@ -88,11 +94,11 @@ let begin_application
         Some (Format.asprintf "activate %a" Protocol_hash.pp_short hash) in
       Updater.activate ctxt hash >>= fun ctxt ->
       return { Updater.message ; context = ctxt ; fitness }
-  | Activate_testnet hash ->
+  | Activate_testnet (hash, delay) ->
       let message =
         Some (Format.asprintf "activate testnet %a" Protocol_hash.pp_short hash) in
-      Updater.set_test_protocol ctxt hash >>= fun ctxt ->
-      Updater.fork_test_network ctxt >>= fun ctxt ->
+      let expiration = Time.add raw_block.shell.timestamp delay in
+      Updater.fork_test_network ctxt hash expiration >>= fun ctxt ->
       return { Updater.message ; context = ctxt ; fitness }
 
 let begin_construction

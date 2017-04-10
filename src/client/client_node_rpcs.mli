@@ -92,12 +92,9 @@ module Blocks : sig
   val protocol:
     config ->
     block -> Protocol_hash.t tzresult Lwt.t
-  val test_protocol:
-    config ->
-    block -> Protocol_hash.t tzresult Lwt.t
   val test_network:
     config ->
-    block -> (Net_id.t * Time.t) option tzresult Lwt.t
+    block -> Context.test_network tzresult Lwt.t
 
   val pending_operations:
     config ->
@@ -115,8 +112,7 @@ module Blocks : sig
     data: MBytes.t ;
     operations: Operation_hash.t list list option ;
     protocol: Protocol_hash.t ;
-    test_protocol: Protocol_hash.t ;
-    test_network: (Net_id.t * Time.t) option ;
+    test_network: Context.test_network;
   }
 
   val info:

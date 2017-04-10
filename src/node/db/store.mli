@@ -46,9 +46,9 @@ module Net : sig
     with type t := store
      and type value := Time.t
 
-  module Forked_network_ttl : SINGLE_STORE
-    with type t := store
-     and type value := Int64.t
+  module Allow_forked_network : SET_STORE
+    with type t := t
+     and type elt := Net_id.t
 
 end
 

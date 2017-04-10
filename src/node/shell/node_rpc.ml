@@ -76,12 +76,6 @@ let register_bi_dir node dir =
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.test_protocol in
-    RPC.register1 dir
-      Services.Blocks.test_protocol implementation in
-  let dir =
-    let implementation b () =
-      Node.RPC.block_info node b >>= fun bi ->
       RPC.Answer.return bi.test_network in
     RPC.register1 dir
       Services.Blocks.test_network implementation in

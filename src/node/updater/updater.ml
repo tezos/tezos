@@ -71,7 +71,6 @@ let register hash proto =
 
 let activate = Context.set_protocol
 let fork_test_network = Context.fork_test_network
-let set_test_protocol = Context.set_test_protocol
 
 let get_exn hash = VersionTable.find versions hash
 let get hash =
