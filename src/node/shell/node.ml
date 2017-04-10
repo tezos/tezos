@@ -138,31 +138,31 @@ module RPC = struct
   type block = Node_rpc_services.Blocks.block
   type block_info = Node_rpc_services.Blocks.block_info = {
     hash: Block_hash.t ;
+    net_id: Net_id.t ;
     level: Int32.t ;
     predecessor: Block_hash.t ;
-    fitness: MBytes.t list ;
     timestamp: Time.t ;
-    protocol: Protocol_hash.t option ;
     operations_hash: Operation_list_list_hash.t ;
+    fitness: MBytes.t list ;
+    data: MBytes.t ;
     operations: Operation_hash.t list list option ;
-    data: MBytes.t option ;
-    net: Net_id.t ;
-    test_protocol: Protocol_hash.t option ;
+    protocol: Protocol_hash.t ;
+    test_protocol: Protocol_hash.t ;
     test_network: (Net_id.t * Time.t) option ;
  }
 
-  let convert (block: State.Valid_block.t)  = {
+  let convert (block: State.Valid_block.t) = {
     hash = block.hash ;
+    net_id = block.net_id ;
     level = block.level ;
     predecessor = block.predecessor ;
-    fitness = block.fitness ;
     timestamp = block.timestamp ;
-    protocol = Some block.protocol_hash ;
     operations_hash = block.operations_hash ;
+    fitness = block.fitness ;
+    data = block.proto_header ;
     operations = Some block.operations ;
-    data = Some block.proto_header ;
-    net = block.net_id ;
-    test_protocol = Some block.test_protocol_hash ;
+    protocol = block.protocol_hash ;
+    test_protocol = block.test_protocol_hash ;
     test_network = block.test_network ;
   }
 
@@ -268,6 +268,13 @@ module RPC = struct
         | Error _ -> Lwt.fail Not_found
         | Ok { context ; fitness } ->
             Context.get_protocol context >>= fun protocol ->
+            Context.get_test_protocol context >>= fun test_protocol ->
+            Context.get_test_network context >>= fun test_network ->
+            Context.get_test_network_expiration context >>= fun test_network_expiration ->
+            let test_network =
+              match test_network, test_network_expiration with
+              | Some n, Some t -> Some (n, t)
+              | _, None | None, _ -> None in
             let operations =
               let pv_result, _ = Prevalidator.operations pv in
               [ pv_result.applied ] in
@@ -277,15 +284,15 @@ module RPC = struct
                 predecessor = head.hash ;
                 fitness ;
                 timestamp = Prevalidator.timestamp pv ;
-                protocol = Some protocol ;
+                protocol ;
                 operations_hash =
                   Operation_list_list_hash.compute
                     (List.map Operation_list_hash.compute operations) ;
                 operations = Some operations ;
-                data = None ;
-                net = head.net_id ;
-                test_protocol = None ;
-                test_network = None ;
+                data = MBytes.of_string "" ;
+                net_id = head.net_id ;
+                test_protocol ;
+                test_network ;
               }
 
   let rpc_context block : Updater.rpc_context =

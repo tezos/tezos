@@ -434,12 +434,12 @@ let forge_operations _ctxt (shell, proto) =
 let () = register1 Services.Helpers.Forge.operations forge_operations
 
 let forge_block _ctxt
-    (net_id, predecessor, timestamp, fitness, operations,
+    (net_id, predecessor, timestamp, fitness, operations_hash,
      level, priority, seed_nonce_hash, proof_of_work_nonce) : MBytes.t tzresult Lwt.t =
   let level = Raw_level.to_int32 level in
   return (Block.forge_header
             { net_id ; level ; predecessor ;
-              timestamp ; fitness ; operations }
+              timestamp ; fitness ; operations_hash }
             { priority ; seed_nonce_hash ; proof_of_work_nonce })
 
 let () = register1 Services.Helpers.Forge.block forge_block

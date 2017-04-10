@@ -63,14 +63,14 @@ type error +=
 
 let parse_header
     ({ shell = { net_id ; level ; predecessor ;
-                 timestamp ; fitness ; operations } ;
+                 timestamp ; fitness ; operations_hash } ;
        proto } : Updater.raw_block) : header tzresult =
   match Data_encoding.Binary.of_bytes signed_proto_header_encoding proto with
   | None -> Error [Cant_parse_proto_header]
   | Some (proto, signature) ->
       let shell =
         { Updater.net_id ; level ; predecessor ;
-          timestamp ; fitness ; operations } in
+          timestamp ; fitness ; operations_hash } in
       Ok { shell ; proto ; signature }
 
 let forge_header shell proto =

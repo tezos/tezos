@@ -173,7 +173,7 @@ let apply_block net db
   lwt_log_info "validation of %a: looking for dependencies..."
     Block_hash.pp_short hash >>= fun () ->
   Distributed_db.Operation_list.fetch
-    db (hash, 0) block.shell.operations >>= fun operation_hashes ->
+    db (hash, 0) block.shell.operations_hash >>= fun operation_hashes ->
   Lwt_list.map_p
     (fun op -> Distributed_db.Operation.fetch db op)
     operation_hashes >>= fun operations ->

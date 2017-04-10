@@ -393,21 +393,22 @@ module Mining = struct
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
     let seed_nonce_hash = Nonce.hash seed_nonce in
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun level ->
-    let operations =
+    let operations_hash =
       Operation_list_list_hash.compute
         [Operation_list_hash.compute operation_list] in
     let shell =
-      { Store.Block_header.net_id = bi.net ; predecessor = bi.hash ;
-        timestamp ; fitness ; operations ; level = Raw_level.to_int32 level.level } in
+      { Store.Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
+        timestamp ; fitness ; operations_hash ;
+        level = Raw_level.to_int32 level.level } in
     mine_stamp
       block src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
     Client_proto_rpcs.Helpers.Forge.block rpc_config
       block
-      ~net:bi.net
+      ~net:bi.net_id
       ~predecessor:bi.hash
       ~timestamp
       ~fitness
-      ~operations
+      ~operations_hash
       ~level:level.level
       ~priority
       ~seed_nonce_hash

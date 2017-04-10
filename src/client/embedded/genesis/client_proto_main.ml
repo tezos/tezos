@@ -33,7 +33,8 @@ let forge_block
 
 let mine rpc_config ?timestamp block command fitness seckey =
   Client_blocks.get_block_info rpc_config block >>=? fun bi ->
-  forge_block rpc_config ?timestamp block bi.net command fitness >>=? fun blk ->
+  forge_block
+    rpc_config ?timestamp block bi.net_id command fitness >>=? fun blk ->
   let signed_blk = Environment.Ed25519.Signature.append seckey blk in
   Client_node_rpcs.inject_block rpc_config signed_blk [[]]
 
