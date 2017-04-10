@@ -44,7 +44,7 @@ module RPC : sig
   val raw_block_info:
     t -> Block_hash.t -> block_info Lwt.t
   val block_watcher:
-    t -> block_info Lwt_stream.t * Watcher.stopper
+    t -> (Block_hash.t * Store.Block_header.t) Lwt_stream.t * Watcher.stopper
   val valid_block_watcher:
     t -> (block_info Lwt_stream.t * Watcher.stopper)
   val heads: t -> block_info Block_hash.Map.t Lwt.t

@@ -166,21 +166,6 @@ module RPC = struct
     test_network = block.test_network ;
   }
 
-  let convert_block hash ({ shell ; proto }: State.Block_header.t)  = {
-    net = shell.net_id ;
-    hash = hash ;
-    level = shell.level ;
-    predecessor = shell.predecessor ;
-    fitness = shell.fitness ;
-    timestamp = shell.timestamp ;
-    protocol = None ;
-    operations_hash = shell.operations ;
-    operations = None ;
-    data = Some proto ;
-    test_protocol = None ;
-    test_network = None ;
-  }
-
   let inject_block node = node.inject_block
   let inject_operation node = node.inject_operation
   let inject_protocol node = node.inject_protocol
@@ -534,12 +519,7 @@ module RPC = struct
       heads >>= fun (_, blocks) ->
     Lwt.return (List.rev blocks)
 
-  let block_watcher node =
-    let stream, shutdown = Distributed_db.watch_block node.distributed_db in
-    Lwt_stream.map
-      (fun (hash, block) -> convert_block hash block)
-      stream,
-    shutdown
+  let block_watcher node = Distributed_db.watch_block node.distributed_db
 
   let valid_block_watcher node =
     let stream, shutdown = Validator.global_watcher node.validator in
