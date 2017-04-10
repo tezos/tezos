@@ -14,7 +14,7 @@ val errors:
 
 val forge_block:
   config ->
-  ?net:Net_id.t ->
+  ?net_id:Net_id.t ->
   ?level:Int32.t ->
   ?predecessor:Block_hash.t ->
   ?timestamp:Time.t ->
@@ -94,7 +94,7 @@ module Blocks : sig
     block -> Protocol_hash.t tzresult Lwt.t
   val test_protocol:
     config ->
-    block -> Protocol_hash.t option tzresult Lwt.t
+    block -> Protocol_hash.t tzresult Lwt.t
   val test_network:
     config ->
     block -> (Net_id.t * Time.t) option tzresult Lwt.t
@@ -106,32 +106,32 @@ module Blocks : sig
 
   type block_info = {
     hash: Block_hash.t ;
+    net_id: Net_id.t ;
     level: Int32.t ;
     predecessor: Block_hash.t ;
-    fitness: MBytes.t list ;
     timestamp: Time.t ;
-    protocol: Protocol_hash.t option ;
     operations_hash: Operation_list_list_hash.t ;
+    fitness: MBytes.t list ;
+    data: MBytes.t ;
     operations: Operation_hash.t list list option ;
-    data: MBytes.t option ;
-    net: Net_id.t ;
-    test_protocol: Protocol_hash.t option ;
+    protocol: Protocol_hash.t ;
+    test_protocol: Protocol_hash.t ;
     test_network: (Net_id.t * Time.t) option ;
   }
 
   val info:
     config ->
-    ?operations:bool -> ?data:bool -> block -> block_info tzresult Lwt.t
+    ?include_ops:bool -> block -> block_info tzresult Lwt.t
 
   val list:
     config ->
-    ?operations:bool -> ?data:bool -> ?length:int -> ?heads:Block_hash.t list ->
+    ?include_ops:bool -> ?length:int -> ?heads:Block_hash.t list ->
     ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
     unit -> block_info list list tzresult Lwt.t
 
   val monitor:
     config ->
-    ?operations:bool -> ?data:bool -> ?length:int -> ?heads:Block_hash.t list ->
+    ?include_ops:bool -> ?length:int -> ?heads:Block_hash.t list ->
     ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
     unit -> block_info list list tzresult Lwt_stream.t tzresult Lwt.t
 

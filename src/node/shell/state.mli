@@ -147,7 +147,7 @@ module Block_header : sig
     level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
-    operations: Operation_list_list_hash.t ;
+    operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
   }
 

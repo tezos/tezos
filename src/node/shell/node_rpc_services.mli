@@ -28,21 +28,21 @@ module Blocks : sig
 
   type block_info = {
     hash: Block_hash.t ;
+    net_id: Net_id.t ;
     level: Int32.t ;
     predecessor: Block_hash.t ;
-    fitness: MBytes.t list ;
     timestamp: Time.t ;
-    protocol: Protocol_hash.t option ;
     operations_hash: Operation_list_list_hash.t ;
+    fitness: MBytes.t list ;
+    data: MBytes.t ;
     operations: Operation_hash.t list list option ;
-    data: MBytes.t option ;
-    net: Net_id.t ;
-    test_protocol: Protocol_hash.t option ;
+    protocol: Protocol_hash.t ;
+    test_protocol: Protocol_hash.t ;
     test_network: (Net_id.t * Time.t) option ;
   }
 
   val info:
-    (unit, unit * block, bool * bool, block_info) RPC.service
+    (unit, unit * block, bool, block_info) RPC.service
   val net:
     (unit, unit * block, unit, Net_id.t) RPC.service
   val level:
@@ -62,7 +62,7 @@ module Blocks : sig
   val protocol:
     (unit, unit * block, unit, Protocol_hash.t) RPC.service
   val test_protocol:
-    (unit, unit * block, unit, Protocol_hash.t option) RPC.service
+    (unit, unit * block, unit, Protocol_hash.t) RPC.service
   val test_network:
     (unit, unit * block, unit, (Net_id.t * Time.t) option) RPC.service
   val pending_operations:
@@ -70,8 +70,7 @@ module Blocks : sig
      error Prevalidation.preapply_result * Hash.Operation_hash.Set.t) RPC.service
 
   type list_param = {
-    operations: bool ;
-    data: bool ;
+    include_ops: bool ;
     length: int option ;
     heads: Block_hash.t list option ;
     monitor: bool option ;

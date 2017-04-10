@@ -149,7 +149,7 @@ let build_valid_block
     predecessor = header.shell.predecessor ;
     timestamp = header.shell.timestamp ;
     discovery_time ;
-    operations_hash = header.shell.operations ;
+    operations_hash = header.shell.operations_hash ;
     operations ;
     fitness = header.shell.fitness ;
     protocol_hash ;
@@ -546,7 +546,7 @@ module Raw_block_header = struct
       predecessor = genesis.block ;
       timestamp = genesis.time ;
       fitness = [] ;
-      operations = Operation_list_list_hash.empty ;
+      operations_hash = Operation_list_list_hash.empty ;
     } in
     let header =
       { Store.Block_header.shell ; proto = MBytes.create 0 } in
@@ -700,7 +700,7 @@ module Block_header = struct
     level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
-    operations: Operation_list_list_hash.t ;
+    operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
   }
 
