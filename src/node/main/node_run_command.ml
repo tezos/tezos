@@ -27,8 +27,6 @@ let context_dir data_dir = data_dir // "context"
 let protocol_dir data_dir = data_dir // "protocol"
 let lock_file data_dir = data_dir // "lock"
 
-let test_protocol = None
-
 let init_logger ?verbosity (log_config : Node_config_file.log) =
   let open Logging in
   begin
@@ -116,11 +114,11 @@ let init_node ?sandbox (config : Node_config_file.t) =
   end >>=? fun p2p_config ->
   let node_config : Node.config = {
     genesis ;
-    test_protocol ;
     patch_context ;
     store_root = store_dir config.data_dir ;
     context_root = context_dir config.data_dir ;
     p2p = p2p_config ;
+    test_network_max_tll = Some (48 * 3600) ; (* 2 days *)
   } in
   Node.create node_config
 

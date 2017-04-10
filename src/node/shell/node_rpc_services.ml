@@ -66,37 +66,36 @@ module Blocks = struct
     data: MBytes.t ;
     operations: Operation_hash.t list list option ;
     protocol: Protocol_hash.t ;
-    test_protocol: Protocol_hash.t ;
-    test_network: (Net_id.t * Time.t) option ;
+    test_network: Context.test_network;
   }
 
   let block_info_encoding =
     conv
       (fun { hash ; net_id ; level ; predecessor ;
              fitness ; timestamp ; protocol ; operations_hash ; data ;
-             operations ; test_protocol ; test_network } ->
+             operations ; test_network } ->
         ({ Store.Block_header.shell =
              { net_id ; level ; predecessor ;
                timestamp ; operations_hash ; fitness } ;
            proto = data },
-         (hash, operations, protocol, test_protocol, test_network)))
+         (hash, operations, protocol, test_network)))
       (fun ({ Store.Block_header.shell =
                 { net_id ; level ; predecessor ;
                   timestamp ; operations_hash ; fitness } ;
               proto = data },
-            (hash, operations, protocol, test_protocol, test_network)) ->
+            (hash, operations, protocol, test_network)) ->
         { hash ; net_id ; level ; predecessor ;
           fitness ; timestamp ; protocol ; operations_hash ; data ;
-          operations ; test_protocol ; test_network })
+          operations ; test_network })
       (dynamic_size
          (merge_objs
             Store.Block_header.encoding
-            (obj5
+            (obj4
                (req "hash" Block_hash.encoding)
                (opt "operations" (list (list Operation_hash.encoding)))
                (req "protocol" Protocol_hash.encoding)
-               (req "test_protocol" Protocol_hash.encoding)
-               (opt "test_network" (tup2 Net_id.encoding Time.encoding)))))
+               (dft "test_network"
+                  Context.test_network_encoding Context.Not_running))))
 
   let parse_block s =
     try
@@ -248,18 +247,11 @@ module Blocks = struct
       ~output: (obj1 (req "protocol" Protocol_hash.encoding))
       RPC.Path.(block_path / "protocol")
 
-  let test_protocol =
-    RPC.service
-      ~description:"List the block test protocol."
-      ~input: empty
-      ~output: (obj1 (req "protocol" Protocol_hash.encoding))
-      RPC.Path.(block_path / "test_protocol")
-
   let test_network =
     RPC.service
-      ~description:"Returns the associated test network."
+      ~description:"Returns the status of the associated test network."
       ~input: empty
-      ~output: (obj1 (opt "net" (tup2 Net_id.encoding Time.encoding)))
+      ~output: Context.test_network_encoding
       RPC.Path.(block_path / "test_network")
 
   let pending_operations =

@@ -33,7 +33,11 @@ and t = {
   net_db: Distributed_db.net ;
   notify_block: Block_hash.t -> Store.Block_header.t -> unit Lwt.t ;
   fetch_block: Block_hash.t -> State.Valid_block.t tzresult Lwt.t ;
-  create_child: State.Valid_block.t -> unit tzresult Lwt.t ;
+  create_child:
+    State.Valid_block.t -> Protocol_hash.t -> Time.t -> unit tzresult Lwt.t ;
+  check_child:
+    Block_hash.t -> Protocol_hash.t -> Time.t -> Time.t -> unit tzresult Lwt.t ;
+  deactivate_child: unit -> unit Lwt.t ;
   test_validator: unit -> (t * Distributed_db.net) option ;
   shutdown: unit -> unit Lwt.t ;
   valid_block_input: State.Valid_block.t Watcher.input ;
@@ -59,29 +63,10 @@ let bootstrapped v = v.bootstrapped
 
 (** Current block computation *)
 
-let may_change_test_network v (block: State.Valid_block.t) =
-  let change =
-    match block.test_network, v.child with
-    | None, None -> false
-    | Some _, None
-    | None, Some _ -> true
-    | Some (net_id, _), Some { net } ->
-        let net_id' = State.Net.id net in
-        not (Net_id.equal net_id net_id') in
-  if change then begin
-    v.create_child block >>= function
-    | Ok () -> Lwt.return_unit
-    | Error err ->
-        lwt_log_error "@[<v 2>Error while switch test network:@ %a@]"
-          Error_monad.pp_print_error err
-  end else
-    Lwt.return_unit
-
 let fetch_protocol v hash =
   lwt_log_notice "Fetching protocol %a"
     Protocol_hash.pp_short hash >>= fun () ->
-  Distributed_db.Protocol.fetch
-    v.worker.db hash >>= fun protocol ->
+  Distributed_db.Protocol.fetch v.worker.db hash >>= fun protocol ->
   Updater.compile hash protocol >>= fun valid ->
   if valid then begin
     lwt_log_notice "Successfully compiled protocol %a"
@@ -101,12 +86,16 @@ let fetch_protocols v (block: State.Valid_block.t) =
     | Some _ -> return false
     | None -> fetch_protocol v block.protocol_hash
   and test_proto_updated =
-    match block.test_protocol with
-    | Some _ -> return false
-    | None -> fetch_protocol v block.test_protocol_hash in
+    match block.test_network with
+    | Not_running -> return false
+    | Forking { protocol }
+    | Running { protocol } ->
+        Distributed_db.Protocol.known v.worker.db protocol >>= fun known ->
+        if known then return false
+        else fetch_protocol v protocol in
   proto_updated >>=? fun proto_updated ->
-  test_proto_updated >>=? fun test_proto_updated ->
-  if test_proto_updated || proto_updated then
+  test_proto_updated >>=? fun _test_proto_updated ->
+  if proto_updated then
     State.Valid_block.read_exn v.net block.hash >>= return
   else
     return block
@@ -122,7 +111,20 @@ let rec may_set_head v (block: State.Valid_block.t) =
     | true ->
         Distributed_db.broadcast_head v.net_db block.hash [] ;
         Prevalidator.flush v.prevalidator block ;
-        may_change_test_network v block >>= fun () ->
+        begin
+          begin
+            match block.test_network with
+            | Not_running -> v.deactivate_child () >>= return
+            | Running { genesis ; protocol ; expiration } ->
+                v.check_child genesis protocol expiration block.timestamp
+            | Forking { protocol ; expiration } ->
+                v.create_child block protocol expiration
+          end >>= function
+          | Ok () -> Lwt.return_unit
+          | Error err ->
+              lwt_log_error "@[<v 2>Error while switch test network:@ %a@]"
+                Error_monad.pp_print_error err
+        end >>= fun () ->
         Watcher.notify v.new_head_input block ;
         lwt_log_notice "update current head %a %a %a(%t)"
           Block_hash.pp_short block.hash
@@ -217,8 +219,10 @@ let apply_block net db
     operations >>=? fun parsed_operations ->
   lwt_debug "validation of %a: applying block..."
     Block_hash.pp_short hash >>= fun () ->
+  Context.reset_test_network
+    pred.context pred.hash block.shell.timestamp >>= fun context ->
   Proto.begin_application
-    ~predecessor_context:pred.context
+    ~predecessor_context:context
     ~predecessor_timestamp:pred.timestamp
     ~predecessor_fitness:pred.fitness
     block >>=? fun state ->
@@ -484,7 +488,7 @@ module Context_db = struct
 end
 
 
-let rec create_validator ?parent worker state db net =
+let rec create_validator ?max_ttl ?parent worker state db net =
 
   let queue = Lwt_pipe.create () in
   let current_ops = ref (fun () -> []) in
@@ -568,6 +572,8 @@ let rec create_validator ?parent worker state db net =
     notify_block ;
     fetch_block ;
     create_child ;
+    check_child ;
+    deactivate_child ;
     test_validator ;
     bootstrapped ;
     new_head_input ;
@@ -585,36 +591,62 @@ let rec create_validator ?parent worker state db net =
   and fetch_block hash =
     Context_db.fetch session v hash
 
-  and create_child block =
-    begin
+  and create_child block protocol expiration =
+    if State.Net.allow_forked_network net then begin
+      deactivate_child () >>= fun () ->
+      begin
+        State.Net.get state net_id >>= function
+        | Ok net_store -> return net_store
+        | Error _ ->
+            State.Valid_block.fork_testnet
+              state net block protocol expiration >>=? fun net_store ->
+            State.Valid_block.Current.head net_store >>= fun block ->
+            Watcher.notify v.worker.valid_block_input block ;
+            return net_store
+      end >>=? fun net_store ->
+      worker.activate ~parent:v net_store >>= fun child ->
+      v.child <- Some child ;
+      return ()
+    end else begin
+      (* Ignoring request... *)
+      return ()
+    end
+
+  and deactivate_child () =
+    match v.child with
+    | None -> Lwt.return_unit
+    | Some child ->
+        v.child <- None ;
+        deactivate child
+
+  and check_child genesis protocol expiration current_time =
+    let activated =
       match v.child with
-      | None -> Lwt.return_unit
+      | None -> false
       | Some child ->
-          v.child <- None ;
-          deactivate child
-    end >>= fun () ->
-    match block.test_network with
-    | None -> return ()
-    | Some (net_id, expiration) ->
-        begin
-          State.Net.get state net_id >>= function
-          | Ok net_store -> return net_store
-          | Error _ ->
-              State.Valid_block.fork_testnet
-                state net block expiration >>=? fun net_store ->
-              State.Valid_block.Current.head net_store >>= fun block ->
-              Watcher.notify v.worker.valid_block_input block ;
-              return net_store
-        end >>=? fun net_store ->
-        worker.activate ~parent:v net_store >>= fun child ->
-        v.child <- Some child ;
-        return ()
+          Block_hash.equal (State.Net.genesis child.net).block genesis in
+    begin
+      match max_ttl with
+      | None -> Lwt.return expiration
+      | Some ttl ->
+          Distributed_db.Block_header.fetch net_db genesis >>= fun genesis ->
+          Lwt.return
+            (Time.min expiration
+               (Time.add genesis.shell.timestamp (Int64.of_int ttl)))
+    end >>= fun local_expiration ->
+    let expired = Time.(local_expiration <= current_time) in
+    if expired && activated then
+      deactivate_child () >>= return
+    else if not activated && not expired then
+      fetch_block genesis >>=? fun genesis ->
+      create_child genesis protocol expiration
+    else
+      return ()
 
   and test_validator () =
     match v.child with
     | None -> None
     | Some child -> Some (child, child.net_db)
-
   in
 
   new_blocks := begin
@@ -637,7 +669,7 @@ let rec create_validator ?parent worker state db net =
 
 type error += Unknown_network of Net_id.t
 
-let create_worker state db =
+let create_worker ?max_ttl state db =
 
   let validators : t Lwt.t Net_id.Table.t =
     Net_id.Table.create 7 in
@@ -770,7 +802,7 @@ let create_worker state db =
       Net_id.pp net_id >>= fun () ->
     get net_id >>= function
     | Error _ ->
-        let v = create_validator ?parent worker state db net in
+        let v = create_validator ?max_ttl ?parent worker state db net in
         Net_id.Table.add validators net_id v ;
         v
     | Ok v -> Lwt.return v

@@ -62,8 +62,7 @@ module Blocks = struct
     data: MBytes.t ;
     operations: Operation_hash.t list list option ;
     protocol: Protocol_hash.t ;
-    test_protocol: Protocol_hash.t ;
-    test_network: (Net_id.t * Time.t) option ;
+    test_network: Context.test_network;
   }
   type preapply_param = Services.Blocks.preapply_param = {
     operations: Operation_hash.t list ;
@@ -93,8 +92,6 @@ module Blocks = struct
     call_service1 cctxt Services.Blocks.operations h ()
   let protocol cctxt h =
     call_service1 cctxt Services.Blocks.protocol h ()
-  let test_protocol cctxt h =
-    call_service1 cctxt Services.Blocks.test_protocol h ()
   let test_network cctxt h =
     call_service1 cctxt Services.Blocks.test_network h ()
 

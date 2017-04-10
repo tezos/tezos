@@ -174,5 +174,10 @@ val compile : Protocol_hash.t -> component list -> bool Lwt.t
     been previously compiled successfully. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 
-val set_test_protocol: Context.t -> Protocol_hash.t -> Context.t Lwt.t
-val fork_test_network: Context.t -> Context.t Lwt.t
+(** Fork a test network. The forkerd network will use the current block
+    as genesis, and [protocol] as economic protocol. The network will
+    be destroyed when a (successor) block will have a timestamp greater
+    than [expiration]. The protocol must have been previously compiled
+    successfully. *)
+val fork_test_network:
+  Context.t -> protocol:Protocol_hash.t -> expiration:Time.t -> Context.t Lwt.t

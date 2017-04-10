@@ -66,8 +66,8 @@ val extract: Lwt_io.file_name -> Protocol_hash.t -> component list -> unit Lwt.t
 val compile: Protocol_hash.t -> component list -> bool Lwt.t
 
 val activate: Context.t -> Protocol_hash.t -> Context.t Lwt.t
-val set_test_protocol: Context.t -> Protocol_hash.t -> Context.t Lwt.t
-val fork_test_network: Context.t -> Context.t Lwt.t
+val fork_test_network:
+  Context.t -> protocol:Protocol_hash.t -> expiration:Time.t -> Context.t Lwt.t
 
 val register: Protocol_hash.t -> (module REGISTRED_PROTOCOL) -> unit
 

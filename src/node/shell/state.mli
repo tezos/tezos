@@ -62,12 +62,12 @@ module Net : sig
   }
   val genesis_encoding: genesis Data_encoding.t
 
-  (** Initialize a network for a given [genesis]. By default the network
-      never expirate and the test_protocol is the genesis protocol. *)
+  (** Initialize a network for a given [genesis]. By default,
+      the network does accept forking test network. When
+      [~allow_forked_network:true] is provided, test network are allowed. *)
   val create:
     global_state ->
-    ?test_protocol: Protocol_hash.t ->
-    ?forked_network_ttl: int ->
+    ?allow_forked_network:bool ->
     genesis -> net Lwt.t
 
   (** Look up for a network by the hash of its genesis block. *)
@@ -88,7 +88,7 @@ module Net : sig
   val id: net -> Net_id.t
   val genesis: net -> genesis
   val expiration: net -> Time.t option
-  val forked_network_ttl: net -> Int64.t option
+  val allow_forked_network: net -> bool
 
 end
 
@@ -264,14 +264,8 @@ module Valid_block : sig
     protocol: (module Updater.REGISTRED_PROTOCOL) option ;
     (** The actual implementation of the protocol to be used for
         validating the following blocks. *)
-    test_protocol_hash: Protocol_hash.t ;
-    (** The protocol to be used for the next test network. *)
-    test_protocol: (module Updater.REGISTRED_PROTOCOL) option ;
-    (** The actual implementatino of the protocol to be used for the
-        next test network. *)
-    test_network: (Net_id.t * Time.t) option ;
-    (** The current test network associated to the block, and the date
-        of its expiration date. *)
+    test_network: Context.test_network ;
+    (** The current test network associated to the block. *)
     context: Context.t ;
     (** The validation context that was produced by the block validation. *)
     successors: Block_hash.Set.t ;
@@ -296,7 +290,10 @@ module Valid_block : sig
   val known_heads: Net.t -> valid_block list Lwt.t
 
   val fork_testnet:
-    global_state -> Net.t -> valid_block -> Time.t -> Net.t tzresult Lwt.t
+    global_state ->
+    Net.t -> valid_block ->
+    Protocol_hash.t -> Time.t ->
+    Net.t tzresult Lwt.t
 
   module Current : sig
 

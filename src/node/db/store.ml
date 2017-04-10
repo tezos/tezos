@@ -61,14 +61,8 @@ module Net = struct
       (struct let name = ["expiration"] end)
       (Store_helpers.Make_value(Time))
 
-  module Forked_network_ttl =
-    Store_helpers.Make_single_store
-      (Indexed_store.Store)
-      (struct let name = ["forked_network_ttl"] end)
-      (Store_helpers.Make_value(struct
-         type t = Int64.t
-         let encoding = Data_encoding.int64
-       end))
+  module Allow_forked_network =
+    Indexed_store.Make_set (struct let name = ["allow_forked_network"] end)
 
 end
 
