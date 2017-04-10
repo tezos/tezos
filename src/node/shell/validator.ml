@@ -749,7 +749,6 @@ let create_worker state db =
     let net_id = State.Net.id net in
     lwt_log_notice "activate network %a"
       Net_id.pp net_id >>= fun () ->
-    State.Valid_block.Current.genesis net >>= fun genesis ->
     get net_id >>= function
     | Error _ ->
         let v = create_validator ?parent worker state db net in
