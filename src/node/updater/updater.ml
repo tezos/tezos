@@ -48,7 +48,7 @@ type shell_block = Store.Block_header.shell_header = {
   level: Int32.t ;
   predecessor: Block_hash.t ;
   timestamp: Time.t ;
-  operations: Operation_list_list_hash.t ;
+  operations_hash: Operation_list_list_hash.t ;
   fitness: MBytes.t list ;
 }
 let shell_block_encoding = Store.Block_header.shell_header_encoding

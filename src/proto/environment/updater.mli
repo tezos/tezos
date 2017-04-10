@@ -25,8 +25,8 @@ type shell_block = {
   (** The preceding block in the chain. *)
   timestamp: Time.t ;
   (** The date at which this block has been forged. *)
-  operations: Operation_list_list_hash.t ;
-  (** The sequence of operations. *)
+  operations_hash: Operation_list_list_hash.t ;
+  (** The hash lf the merkle tree of operations. *)
   fitness: MBytes.t list ;
   (** The announced score of the block. As a sequence of sequences
       of unsigned bytes. Ordered by length and then by contents

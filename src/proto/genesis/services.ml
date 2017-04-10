@@ -54,7 +54,7 @@ let int64_to_bytes i =
   MBytes.set_int64 b 0 i;
   b
 
-let operations =
+let operations_hash =
   Operation_list_list_hash.compute [Operation_list_hash.empty]
 
 let rpc_services : Updater.rpc_context RPC.directory =
@@ -65,7 +65,7 @@ let rpc_services : Updater.rpc_context RPC.directory =
       (Forge.block RPC.Path.root)
       (fun _ctxt ((net_id, level, predecessor, timestamp, fitness), command) ->
          let shell = { Updater.net_id ; level ; predecessor ;
-                       timestamp ; fitness ; operations } in
+                       timestamp ; fitness ; operations_hash } in
          let bytes = Data.Command.forge shell command in
          RPC.Answer.return bytes) in
   dir

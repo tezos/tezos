@@ -245,10 +245,10 @@ module Helpers = struct
         operations cctxt block ~net [Faucet { id ; nonce }]
     end
     let block cctxt
-        block ~net ~predecessor ~timestamp ~fitness ~operations
+        block ~net ~predecessor ~timestamp ~fitness ~operations_hash
         ~level ~priority ~seed_nonce_hash ~proof_of_work_nonce () =
       call_error_service1 cctxt Services.Helpers.Forge.block block
-        (net, predecessor, timestamp, fitness, operations,
+        (net, predecessor, timestamp, fitness, operations_hash,
          level, priority, seed_nonce_hash, proof_of_work_nonce)
   end
 

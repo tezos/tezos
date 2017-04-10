@@ -12,7 +12,7 @@ type block_info = {
   predecessor: Block_hash.t ;
   fitness: MBytes.t list ;
   timestamp: Time.t ;
-  protocol: Protocol_hash.t option ;
+  protocol: Protocol_hash.t ;
   level: Level.t ;
 }
 
@@ -21,7 +21,8 @@ let convert_block_info cctxt
       : Client_node_rpcs.Blocks.block_info ) =
   Client_proto_rpcs.Context.level cctxt (`Hash hash) >>= function
   | Ok level ->
-      Lwt.return (Some { hash ; predecessor ; fitness ; timestamp ; protocol ; level })
+      Lwt.return
+        (Some { hash ; predecessor ; fitness ; timestamp ; protocol ; level })
   | Error _ ->
       (* TODO log error *)
       Lwt.return_none
@@ -32,8 +33,8 @@ let convert_block_info_err cctxt
   Client_proto_rpcs.Context.level cctxt (`Hash hash) >>=? fun level ->
   return { hash ; predecessor ; fitness ; timestamp ; protocol ; level }
 
-let info cctxt ?operations block =
-  Client_node_rpcs.Blocks.info cctxt ?operations block >>=? fun block ->
+let info cctxt ?include_ops block =
+  Client_node_rpcs.Blocks.info cctxt ?include_ops block >>=? fun block ->
   convert_block_info_err cctxt block
 
 let compare (bi1 : block_info) (bi2 : block_info) =
@@ -54,10 +55,10 @@ let sort_blocks cctxt ?(compare = compare) blocks =
   List.sort compare blocks
 
 let monitor cctxt
-    ?operations ?length ?heads ?delay
+    ?include_ops ?length ?heads ?delay
     ?min_date ?min_heads ?compare () =
   Client_node_rpcs.Blocks.monitor cctxt
-    ?operations ?length ?heads ?delay ?min_date ?min_heads
+    ?include_ops ?length ?heads ?delay ?min_date ?min_heads
     () >>=? fun block_stream ->
   let convert blocks =
     Lwt.return blocks >>=? fun blocks ->

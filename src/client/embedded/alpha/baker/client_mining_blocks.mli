@@ -12,20 +12,20 @@ type block_info = {
   predecessor: Block_hash.t ;
   fitness: MBytes.t list ;
   timestamp: Time.t ;
-  protocol: Protocol_hash.t option ;
+  protocol: Protocol_hash.t ;
   level: Level.t ;
 }
 
 val info:
   Client_rpcs.config ->
-  ?operations:bool -> Client_node_rpcs.Blocks.block -> block_info tzresult Lwt.t
+  ?include_ops:bool -> Client_node_rpcs.Blocks.block -> block_info tzresult Lwt.t
 
 val compare:
   block_info -> block_info -> int
 
 val monitor:
   Client_rpcs.config ->
-  ?operations:bool -> ?length:int -> ?heads:Block_hash.t list ->
+  ?include_ops:bool -> ?length:int -> ?heads:Block_hash.t list ->
   ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
   ?compare:(block_info -> block_info -> int) ->
   unit -> block_info list tzresult Lwt_stream.t tzresult Lwt.t

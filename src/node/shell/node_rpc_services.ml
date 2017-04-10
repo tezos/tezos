@@ -57,48 +57,46 @@ module Blocks = struct
 
   type block_info = {
     hash: Block_hash.t ;
+    net_id: Net_id.t ;
     level: Int32.t ;
     predecessor: Block_hash.t ;
-    fitness: MBytes.t list ;
     timestamp: Time.t ;
-    protocol: Protocol_hash.t option ;
     operations_hash: Operation_list_list_hash.t ;
+    fitness: MBytes.t list ;
+    data: MBytes.t ;
     operations: Operation_hash.t list list option ;
-    data: MBytes.t option ;
-    net: Net_id.t ;
-    test_protocol: Protocol_hash.t option ;
+    protocol: Protocol_hash.t ;
+    test_protocol: Protocol_hash.t ;
     test_network: (Net_id.t * Time.t) option ;
   }
 
   let block_info_encoding =
     conv
-      (fun { hash ; level ; predecessor ; fitness ; timestamp ; protocol ;
-             operations_hash ; operations ; data ; net ;
-             test_protocol ; test_network } ->
-        ((hash, level, predecessor, fitness, timestamp, protocol),
-         (operations_hash, operations, data,
-          net, test_protocol, test_network)))
-      (fun ((hash, level, predecessor, fitness, timestamp, protocol),
-            (operations_hash, operations, data,
-             net, test_protocol, test_network)) ->
-        { hash ; level ; predecessor ; fitness ; timestamp ; protocol ;
-          operations_hash ; operations ; data ; net ;
-          test_protocol ; test_network })
-      (merge_objs
-        (obj6
-           (req "hash" Block_hash.encoding)
-           (req "level" int32)
-           (req "predecessor" Block_hash.encoding)
-           (req "fitness" Fitness.encoding)
-           (req "timestamp" Time.encoding)
-           (opt "protocol" Protocol_hash.encoding))
-        (obj6
-           (req "operations_hash" Operation_list_list_hash.encoding)
-           (opt "operations" (list (list Operation_hash.encoding)))
-           (opt "data" bytes)
-           (req "net" Net_id.encoding)
-           (opt "test_protocol" Protocol_hash.encoding)
-           (opt "test_network" (tup2 Net_id.encoding Time.encoding))))
+      (fun { hash ; net_id ; level ; predecessor ;
+             fitness ; timestamp ; protocol ; operations_hash ; data ;
+             operations ; test_protocol ; test_network } ->
+        ({ Store.Block_header.shell =
+             { net_id ; level ; predecessor ;
+               timestamp ; operations_hash ; fitness } ;
+           proto = data },
+         (hash, operations, protocol, test_protocol, test_network)))
+      (fun ({ Store.Block_header.shell =
+                { net_id ; level ; predecessor ;
+                  timestamp ; operations_hash ; fitness } ;
+              proto = data },
+            (hash, operations, protocol, test_protocol, test_network)) ->
+        { hash ; net_id ; level ; predecessor ;
+          fitness ; timestamp ; protocol ; operations_hash ; data ;
+          operations ; test_protocol ; test_network })
+      (dynamic_size
+         (merge_objs
+            Store.Block_header.encoding
+            (obj5
+               (req "hash" Block_hash.encoding)
+               (opt "operations" (list (list Operation_hash.encoding)))
+               (req "protocol" Protocol_hash.encoding)
+               (req "test_protocol" Protocol_hash.encoding)
+               (opt "test_network" (tup2 Net_id.encoding Time.encoding)))))
 
   let parse_block s =
     try
@@ -181,10 +179,7 @@ module Blocks = struct
   let info =
     RPC.service
       ~description:"All the information about a block."
-      ~input:
-        (obj2
-           (dft "operations" bool true)
-           (dft "data" bool true))
+      ~input: (obj1 (dft "operations" bool true))
       ~output: block_info_encoding
       block_path
 
@@ -257,7 +252,7 @@ module Blocks = struct
     RPC.service
       ~description:"List the block test protocol."
       ~input: empty
-      ~output: (obj1 (opt "protocol" Protocol_hash.encoding))
+      ~output: (obj1 (req "protocol" Protocol_hash.encoding))
       RPC.Path.(block_path / "test_protocol")
 
   let test_network =
@@ -329,8 +324,7 @@ module Blocks = struct
       RPC.Path.(block_path / "complete" /: prefix_arg )
 
   type list_param = {
-    operations: bool ;
-    data: bool ;
+    include_ops: bool ;
     length: int option ;
     heads: Block_hash.t list option ;
     monitor: bool option ;
@@ -340,24 +334,19 @@ module Blocks = struct
   }
   let list_param_encoding =
     conv
-      (fun { operations ; data ; length ; heads ; monitor ;
+      (fun { include_ops ; length ; heads ; monitor ;
              delay ; min_date ; min_heads } ->
-        (operations, data, length, heads, monitor, delay, min_date, min_heads))
-      (fun (operations, data, length, heads, monitor, delay, min_date, min_heads) ->
-         { operations ; data ; length ; heads ; monitor ;
+        (include_ops, length, heads, monitor, delay, min_date, min_heads))
+      (fun (include_ops, length, heads, monitor,
+            delay, min_date, min_heads) ->
+         { include_ops ; length ; heads ; monitor ;
            delay ; min_date ; min_heads })
-      (obj8
-         (dft "operations"
+      (obj7
+         (dft "include_ops"
             (Data_encoding.describe
                ~description:
                  "Whether the resulting block informations should include the \
                   list of operations' hashes. Default false."
-               bool) false)
-         (dft "data"
-            (Data_encoding.describe
-               ~description:
-                 "Whether the resulting block informations should include the \
-                  raw protocol dependent data. Default false."
                bool) false)
          (opt "length"
             (Data_encoding.describe

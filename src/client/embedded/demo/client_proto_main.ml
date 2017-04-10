@@ -51,7 +51,7 @@ let mine cctxt =
           (cctxt.message "Cannot parse fitness: %a" Fitness.pp bi.fitness);
         exit 2 in
   Client_node_rpcs.forge_block cctxt.rpc_config
-    ~net:bi.net ~predecessor:bi.hash
+    ~net_id:bi.net_id ~predecessor:bi.hash
     fitness Operation_list_list_hash.empty (MBytes.create 0) >>=? fun bytes ->
   Client_node_rpcs.inject_block cctxt.rpc_config bytes [] >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->

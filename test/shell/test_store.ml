@@ -89,14 +89,14 @@ let test_operation s =
 (** Block store *)
 
 let lolblock ?(operations = []) header =
-  let operations =
+  let operations_hash =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
   { Store.Block_header.shell =
       { timestamp = Time.of_seconds (Random.int64 1500L) ;
         level = 0l ; (* dummy *)
         net_id ;
-        predecessor = genesis_block ; operations ;
+        predecessor = genesis_block ; operations_hash ;
         fitness = [MBytes.of_string @@ string_of_int @@ String.length header;
                    MBytes.of_string @@ string_of_int @@ 12] } ;
     proto = MBytes.of_string header ;

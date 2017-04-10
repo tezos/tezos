@@ -62,7 +62,7 @@ let operation op =
   Data_encoding.Binary.to_bytes Store.Operation.encoding op
 
 let block _state ?(operations = []) pred_hash pred name : Store.Block_header.t =
-  let operations =
+  let operations_hash =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
   let fitness = incr_fitness pred.Store.Block_header.shell.fitness in
@@ -71,7 +71,7 @@ let block _state ?(operations = []) pred_hash pred name : Store.Block_header.t =
         net_id = pred.shell.net_id ;
         level = Int32.succ pred.shell.level ;
         predecessor = pred_hash ;
-        timestamp ; operations; fitness } ;
+        timestamp ; operations_hash ; fitness } ;
     proto = MBytes.of_string name ;
   }
 
@@ -134,7 +134,7 @@ let build_chain state tbl otbl pred names =
 
 let block _state ?(operations = []) (pred: State.Valid_block.t) name
   : State.Block_header.t =
-  let operations =
+  let operations_hash =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
   let fitness = incr_fitness pred.fitness in
@@ -142,7 +142,7 @@ let block _state ?(operations = []) (pred: State.Valid_block.t) name
   { shell = { net_id = pred.net_id ;
               level = Int32.succ pred.level ;
               predecessor = pred.hash ;
-              timestamp ; operations; fitness } ;
+              timestamp ; operations_hash ; fitness } ;
     proto = MBytes.of_string name ;
   }
 

@@ -15,9 +15,9 @@ module Services = Node_rpc_services
 let errors cctxt =
   call_service0 cctxt Services.Error.service ()
 
-let forge_block cctxt ?net ?level ?predecessor ?timestamp fitness ops header =
+let forge_block cctxt ?net_id ?level ?predecessor ?timestamp fitness ops header =
   call_service0 cctxt Services.forge_block
-    (net, level, predecessor, timestamp, fitness, ops, header)
+    (net_id, level, predecessor, timestamp, fitness, ops, header)
 
 let validate_block cctxt net block =
   call_err_service0 cctxt Services.validate_block (net, block)
@@ -53,16 +53,16 @@ module Blocks = struct
 
   type block_info = Services.Blocks.block_info = {
     hash: Block_hash.t ;
+    net_id: Net_id.t ;
     level: Int32.t ;
     predecessor: Block_hash.t ;
-    fitness: MBytes.t list ;
     timestamp: Time.t ;
-    protocol: Protocol_hash.t option ;
     operations_hash: Operation_list_list_hash.t ;
+    fitness: MBytes.t list ;
+    data: MBytes.t ;
     operations: Operation_hash.t list list option ;
-    data: MBytes.t option ;
-    net: Net_id.t ;
-    test_protocol: Protocol_hash.t option ;
+    protocol: Protocol_hash.t ;
+    test_protocol: Protocol_hash.t ;
     test_network: (Net_id.t * Time.t) option ;
   }
   type preapply_param = Services.Blocks.preapply_param = {
@@ -104,19 +104,19 @@ module Blocks = struct
       { operations ; sort ; timestamp }
   let pending_operations cctxt block =
     call_service1 cctxt Services.Blocks.pending_operations block ()
-  let info cctxt ?(operations = true) ?(data = true) h =
-    call_service1 cctxt Services.Blocks.info h (operations, data)
+  let info cctxt ?(include_ops = true) h =
+    call_service1 cctxt Services.Blocks.info h include_ops
   let complete cctxt block prefix =
     call_service2 cctxt Services.Blocks.complete block prefix ()
-  let list cctxt ?(operations = false) ?(data = false)
+  let list cctxt ?(include_ops = false)
       ?length ?heads ?delay ?min_date ?min_heads () =
     call_service0 cctxt Services.Blocks.list
-      { operations ; data ; length ; heads ; monitor = Some false ; delay ;
+      { include_ops ; length ; heads ; monitor = Some false ; delay ;
         min_date ; min_heads }
-  let monitor cctxt ?(operations = false) ?(data = false)
+  let monitor cctxt ?(include_ops = false)
       ?length ?heads ?delay ?min_date ?min_heads () =
     call_streamed_service0 cctxt Services.Blocks.list
-      { operations ; data ; length ; heads ; monitor = Some true ; delay ;
+      { include_ops ; length ; heads ; monitor = Some true ; delay ;
         min_date ; min_heads }
 
 end
