@@ -71,6 +71,7 @@ let begin_application
 let begin_construction
     ~predecessor_context:context
     ~predecessor_timestamp:_
+    ~predecessor_level:_
     ~predecessor_fitness:pred_fitness
     ~predecessor:_
     ~timestamp:_ =

@@ -133,12 +133,13 @@ let record_ballot ctxt delegate proposal ballot =
   | Testing | Proposal ->
       fail Unexpected_ballot
 
-let first_of_a_voting_period l =
-  Compare.Int32.(l.Level.voting_period_position = 0l)
+let last_of_a_voting_period ctxt l =
+  Compare.Int32.(Int32.succ l.Level.voting_period_position =
+                 Constants.voting_period_length ctxt )
 
 let may_start_new_voting_cycle ctxt =
-  Level.current ctxt >>=? fun level ->
-  if first_of_a_voting_period level then
+  let level = Level.current ctxt in
+  if last_of_a_voting_period ctxt level then
     start_new_voting_cycle ctxt
   else
     return ctxt

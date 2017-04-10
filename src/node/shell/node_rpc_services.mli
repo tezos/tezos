@@ -28,6 +28,7 @@ module Blocks : sig
 
   type block_info = {
     hash: Block_hash.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     fitness: MBytes.t list ;
     timestamp: Time.t ;
@@ -44,6 +45,8 @@ module Blocks : sig
     (unit, unit * block, bool * bool, block_info) RPC.service
   val net:
     (unit, unit * block, unit, Net_id.t) RPC.service
+  val level:
+    (unit, unit * block, unit, Int32.t) RPC.service
   val predecessor:
     (unit, unit * block, unit, Block_hash.t) RPC.service
   val predecessors:
@@ -179,7 +182,7 @@ end
 
 val forge_block:
   (unit, unit,
-   Net_id.t option * Block_hash.t option * Time.t option *
+   Net_id.t option * Int32.t option * Block_hash.t option * Time.t option *
    Fitness.fitness * Operation_list_list_hash.t * MBytes.t,
    MBytes.t) RPC.service
 

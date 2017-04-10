@@ -171,6 +171,7 @@ module Block_header : sig
 
   type shell_header = {
     net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations: Operation_list_list_hash.t ;

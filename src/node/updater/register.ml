@@ -49,11 +49,11 @@ let register (module Proto : Protocol.PACKED_PROTOCOL) =
         raw_block >|= wrap_error
     let begin_construction
         ~predecessor_context ~predecessor_timestamp
-        ~predecessor_fitness
+        ~predecessor_level ~predecessor_fitness
         ~predecessor ~timestamp =
       begin_construction
         ~predecessor_context ~predecessor_timestamp
-        ~predecessor_fitness
+        ~predecessor_level ~predecessor_fitness
         ~predecessor ~timestamp >|= wrap_error
     let current_context c =
       current_context c >|= wrap_error

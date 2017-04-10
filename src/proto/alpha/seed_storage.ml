@@ -45,7 +45,7 @@ let compute_for_cycle c cycle =
   | c -> Lwt.return c
 
 let for_cycle c cycle =
-  Level_storage.current c >>=? fun current_level ->
+  let current_level = Level_storage.current c in
   let current_cycle = current_level.cycle in
   let next_cycle = (Level_storage.succ c current_level).cycle in
   fail_unless

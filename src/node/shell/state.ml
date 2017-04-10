@@ -110,6 +110,7 @@ and net_state = {
 and valid_block = {
   net_id: Net_id.t ;
   hash: Block_hash.t ;
+  level: Int32.t ;
   predecessor: Block_hash.t ;
   timestamp: Time.t ;
   fitness: Protocol.fitness ;
@@ -144,6 +145,7 @@ let build_valid_block
   let valid_block = {
     net_id = header.Store.Block_header.shell.net_id ;
     hash ;
+    level = header.shell.level ;
     predecessor = header.shell.predecessor ;
     timestamp = header.shell.timestamp ;
     discovery_time ;
@@ -540,6 +542,7 @@ module Raw_block_header = struct
   let store_genesis store genesis =
     let shell : Store.Block_header.shell_header = {
       net_id = Net_id.of_block_hash genesis.block;
+      level = 0l ;
       predecessor = genesis.block ;
       timestamp = genesis.time ;
       fitness = [] ;
@@ -553,22 +556,23 @@ module Raw_block_header = struct
     Raw_operation_list.Locked.store_all store genesis.block [] [] >>= fun () ->
     Lwt.return header
 
-  let store_testnet_genesis store genesis =
-    let shell : Store.Block_header.shell_header = {
-      net_id = Net_id.of_block_hash genesis.block;
-      predecessor = genesis.block ;
-      timestamp = genesis.time ;
-      fitness = [] ;
-      operations = Operation_list_list_hash.empty ;
-    } in
-    let bytes =
-      Data_encoding.Binary.to_bytes Store.Block_header.encoding {
-        shell ;
-        proto = MBytes.create 0 ;
-      } in
-    Locked.store_raw store genesis.block bytes >>= fun _created ->
-    Raw_operation_list.Locked.store_all store genesis.block [] [] >>= fun () ->
-    Lwt.return shell
+  (* let store_testnet_genesis store genesis = *)
+    (* let shell : Store.Block_header.shell_header = { *)
+      (* net_id = Net_id.of_block_hash genesis.block; *)
+      (* level = 0l ; *)
+      (* predecessor = genesis.block ; *)
+      (* timestamp = genesis.time ; *)
+      (* fitness = [] ; *)
+      (* operations = Operation_list_list_hash.empty ; *)
+    (* } in *)
+    (* let bytes = *)
+      (* Data_encoding.Binary.to_bytes Store.Block_header.encoding { *)
+        (* shell ; *)
+        (* proto = MBytes.create 0 ; *)
+      (* } in *)
+    (* Locked.store_raw store genesis.block bytes >>= fun _created -> *)
+    (* Raw_operation_list.Locked.store_all store genesis.block [] [] >>= fun () -> *)
+    (* Lwt.return shell *)
 
 end
 
@@ -693,6 +697,7 @@ module Block_header = struct
 
   type shell_header = Store.Block_header.shell_header = {
     net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations: Operation_list_list_hash.t ;
@@ -932,6 +937,7 @@ module Valid_block = struct
   type t = valid_block = {
     net_id: Net_id.t ;
     hash: Block_hash.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     fitness: Fitness.fitness ;
@@ -996,7 +1002,7 @@ module Valid_block = struct
         block_header_store
         (net_state: net_state)
         valid_block_watcher
-        hash { Updater.context ; fitness ; message } ttl =
+        hash { Updater.context ; message ; fitness } ttl =
       (* Read the block header. *)
       Raw_block_header.Locked.read
         block_header_store hash >>=? fun block ->
@@ -1044,11 +1050,11 @@ module Valid_block = struct
         match message with
         | Some message -> message
         | None ->
-            Format.asprintf "%a: %a"
+            Format.asprintf "%a(%ld): %a"
               Block_hash.pp_short hash
+              block.shell.level
               Fitness.pp fitness in
-      Context.commit
-        hash ~time:block.shell.timestamp ~message context >>= fun () ->
+      Context.commit hash block.shell.timestamp message context >>= fun () ->
       (* Update the chain state. *)
       let store = net_state.chain_store in
       let predecessor = block.shell.predecessor in
@@ -1083,7 +1089,7 @@ module Valid_block = struct
     | Error _ -> Lwt.fail Not_found
     | Ok b -> Lwt.return b
 
-  let store net hash context =
+  let store net hash vcontext =
     Shared.use net.state begin fun net_state ->
       Shared.use net.block_header_store begin fun block_header_store ->
         Context.exists net_state.context_index hash >>= function
@@ -1095,7 +1101,8 @@ module Valid_block = struct
             | None ->
                 Locked.store
                   block_header_store net_state net.valid_block_watcher
-                  hash context net.forked_network_ttl >>=? fun valid_block ->
+                  hash vcontext
+                  net.forked_network_ttl >>=? fun valid_block ->
                 return (Some valid_block)
       end
     end

@@ -40,6 +40,12 @@ let register_bi_dir node dir =
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
+      RPC.Answer.return bi.level in
+    RPC.register1 dir
+      Services.Blocks.level implementation in
+  let dir =
+    let implementation b () =
+      Node.RPC.block_info node b >>= fun bi ->
       RPC.Answer.return bi.predecessor in
     RPC.register1 dir
       Services.Blocks.predecessor implementation in
@@ -404,14 +410,16 @@ let build_rpc_directory node =
   let dir =
     RPC.register1 dir Services.Protocols.contents (get_protocols node) in
   let dir =
-    let implementation (net_id, pred, time, fitness, operations, header) =
+    let implementation (net_id, level, pred, time, fitness, operations, header) =
       Node.RPC.block_info node (`Head 0) >>= fun bi ->
       let timestamp = Utils.unopt ~default:(Time.now ()) time in
       let net_id = Utils.unopt ~default:bi.net net_id in
       let predecessor = Utils.unopt ~default:bi.hash pred in
+      let level = Utils.unopt ~default:(Int32.succ bi.level) level in
       let res =
         Data_encoding.Binary.to_bytes Store.Block_header.encoding {
-          shell = { net_id ; predecessor ; timestamp ; fitness ; operations } ;
+          shell = { net_id ; predecessor ; level ;
+                    timestamp ; fitness ; operations } ;
           proto = header ;
         } in
       RPC.Answer.return res in

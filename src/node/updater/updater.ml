@@ -19,6 +19,7 @@ type validation_result = Protocol.validation_result = {
 
 type rpc_context = Protocol.rpc_context = {
   context: Context.t ;
+  level: Int32.t ;
   timestamp: Time.t ;
   fitness: Fitness.fitness ;
 }
@@ -44,6 +45,7 @@ let raw_operation_encoding = Store.Operation.encoding
 
 type shell_block = Store.Block_header.shell_header = {
   net_id: Net_id.t ;
+  level: Int32.t ;
   predecessor: Block_hash.t ;
   timestamp: Time.t ;
   operations: Operation_list_list_hash.t ;

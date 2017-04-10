@@ -9,8 +9,8 @@
 
 open Tezos_context
 
-let rpc_init { Updater.context ; timestamp ; fitness } =
-  Tezos_context.init ~timestamp ~fitness context
+let rpc_init { Updater.context ; level ; timestamp ; fitness } =
+  Tezos_context.init ~level ~timestamp ~fitness context
 
 let rpc_services = ref (RPC.empty : Updater.rpc_context RPC.directory)
 let register0 s f =
@@ -95,7 +95,7 @@ let () =
 type error += Unexpected_level_in_context
 
 let level ctxt =
-  Level.current ctxt >>=? fun level ->
+  let level = Level.current ctxt in
   match Level.pred ctxt level with
   | None -> fail Unexpected_level_in_context
   | Some level -> return level
@@ -103,7 +103,7 @@ let level ctxt =
 let () = register0 Services.Context.level level
 
 let next_level ctxt =
-  Level.current ctxt
+  return (Level.current ctxt)
 
 let () = register0 Services.Context.next_level next_level
 
@@ -193,7 +193,7 @@ let () =
        | None -> Error_monad.fail Operation.Cannot_parse_operation
        | Some (shell, contents) ->
            let operation = { hash ; shell ; contents ; signature } in
-           Tezos_context.Level.current ctxt >>=? fun level ->
+           let level = Tezos_context.Level.current ctxt in
            Mining.mining_priorities ctxt level >>=? fun (Misc.LCons (miner_pkh, _)) ->
            let miner_contract = Contract.default_contract miner_pkh in
            let block_prio = 0 in
@@ -302,7 +302,7 @@ let mining_rights ctxt level max =
 let () =
   register1 Services.Helpers.Rights.mining_rights
     (fun ctxt max ->
-       Level.current ctxt >>=? fun level ->
+       let level = Level.current ctxt in
        mining_rights ctxt level max >>=? fun (raw_level, slots) ->
        begin
          Lwt_list.filter_map_p (fun x -> x) @@
@@ -325,7 +325,7 @@ let () =
 let mining_rights_for_delegate
     ctxt contract (max_priority, min_level, max_level) =
   let max_priority = default_max_mining_priority ctxt max_priority in
-  Level.current ctxt >>=? fun current_level ->
+  let current_level = Level.current ctxt in
   let max_level =
     match max_level with
     | None ->
@@ -381,7 +381,7 @@ let endorsement_rights ctxt level max =
 let () =
   register1 Services.Helpers.Rights.endorsement_rights
     (fun ctxt max ->
-       Level.current ctxt >>=? fun level ->
+       let level = Level.current ctxt in
        endorsement_rights ctxt (Level.succ ctxt level) max) ;
   register2 Services.Helpers.Rights.endorsement_rights_for_level
     (fun ctxt raw_level max ->
@@ -390,7 +390,7 @@ let () =
 
 let endorsement_rights_for_delegate
     ctxt contract (max_priority, min_level, max_level) =
-  Level.current ctxt >>=? fun current_level ->
+  let current_level = Level.current ctxt in
   let max_priority = default_max_endorsement_priority ctxt max_priority in
   let max_level =
     match max_level with
@@ -435,11 +435,12 @@ let () = register1 Services.Helpers.Forge.operations forge_operations
 
 let forge_block _ctxt
     (net_id, predecessor, timestamp, fitness, operations,
-     raw_level, priority, seed_nonce_hash, proof_of_work_nonce) : MBytes.t tzresult Lwt.t =
-  let mining_slot = { Block.level = raw_level ; priority } in
+     level, priority, seed_nonce_hash, proof_of_work_nonce) : MBytes.t tzresult Lwt.t =
+  let level = Raw_level.to_int32 level in
   return (Block.forge_header
-            { net_id ; predecessor ; timestamp ; fitness ; operations }
-            { mining_slot ; seed_nonce_hash ; proof_of_work_nonce })
+            { net_id ; level ; predecessor ;
+              timestamp ; fitness ; operations }
+            { priority ; seed_nonce_hash ; proof_of_work_nonce })
 
 let () = register1 Services.Helpers.Forge.block forge_block
 

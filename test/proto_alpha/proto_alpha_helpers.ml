@@ -361,7 +361,7 @@ module Mining = struct
       block
       delegate_sk
       shell
-      mining_slot
+      priority
       seed_nonce_hash =
     Client_proto_rpcs.Constants.stamp_threshold
       rpc_config block >>=? fun stamp_threshold ->
@@ -370,7 +370,7 @@ module Mining = struct
         Sodium.Random.Bigbytes.generate Constants.proof_of_work_nonce_size in
       let unsigned_header =
         Block.forge_header
-          shell { mining_slot ; seed_nonce_hash ; proof_of_work_nonce } in
+          shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
       let signed_header =
         Environment.Ed25519.Signature.append delegate_sk unsigned_header in
       let block_hash = Block_hash.hash_bytes [signed_header] in
@@ -398,10 +398,9 @@ module Mining = struct
         [Operation_list_hash.compute operation_list] in
     let shell =
       { Store.Block_header.net_id = bi.net ; predecessor = bi.hash ;
-        timestamp ; fitness ; operations } in
-    let slot = { Block.level = level.level ; priority } in
+        timestamp ; fitness ; operations ; level = Raw_level.to_int32 level.level } in
     mine_stamp
-      block src_sk shell slot seed_nonce_hash >>=? fun proof_of_work_nonce ->
+      block src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
     Client_proto_rpcs.Helpers.Forge.block rpc_config
       block
       ~net:bi.net
@@ -553,3 +552,8 @@ module Endorse = struct
       block delegate ()
 
 end
+
+let display_level block =
+  Client_proto_rpcs.Context.level rpc_config block >>=? fun lvl ->
+  Format.eprintf "Level: %a@." Level.pp_full lvl ;
+  return ()

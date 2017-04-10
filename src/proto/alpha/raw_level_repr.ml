@@ -39,3 +39,9 @@ let of_int32_exn l =
   if Compare.Int32.(l >= 0l)
   then l
   else invalid_arg "Level_repr.of_int32"
+
+type error += Unexpected_level of Int32.t
+
+let of_int32 l =
+  try Ok (of_int32_exn l)
+  with _ -> Error [Unexpected_level l]

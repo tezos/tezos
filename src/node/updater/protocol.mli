@@ -24,6 +24,7 @@ type raw_operation = Store.Operation.t = {
 
 type shell_block = Store.Block_header.shell_header =
   { net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations: Operation_list_list_hash.t ;
@@ -43,6 +44,7 @@ type validation_result = {
 
 type rpc_context = {
   context: Context.t ;
+  level: Int32.t ;
   timestamp: Time.t ;
   fitness: Fitness.fitness ;
 }
@@ -78,6 +80,7 @@ module type PROTOCOL = sig
   val begin_construction :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
+    predecessor_level: Int32.t ->
     predecessor_fitness: Fitness.fitness ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
