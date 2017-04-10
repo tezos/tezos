@@ -24,7 +24,7 @@ OPENED_MODULES := ${NODE_OPENED_MODULES}
 .PHONY:run-test-p2p-connection
 run-test-p2p-connection:
 	@echo
-	./test-p2p-connection
+	./test-p2p-connection -v
 
 TEST_CONNECTION_IMPLS := \
   test_p2p_connection.ml
@@ -42,7 +42,7 @@ clean::
 .PHONY:run-test-p2p-connection-pool
 run-test-p2p-connection-pool:
 	@echo
-	./test-p2p-connection-pool --clients 10 --repeat 5
+	./test-p2p-connection-pool --clients 10 --repeat 5 -v
 
 TEST_CONNECTION_POOL_IMPLS := \
   test_p2p_connection_pool.ml
