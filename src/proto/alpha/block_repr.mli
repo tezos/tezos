@@ -24,7 +24,7 @@ and proto_header = {
 
 and mining_slot = {
   level: Raw_level_repr.t ;
-  priority: Int32.t ;
+  priority: int ;
 }
 
 val mining_slot_encoding: mining_slot Data_encoding.encoding

@@ -71,7 +71,7 @@ let apply_operation ({ mode ; ctxt ; op_count } as data) operation =
   let pred_block, block_prio, miner_contract =
     match mode with
     | Construction { pred_block } ->
-        pred_block, 0l, None
+        pred_block, 0, None
     | Application (block, delegate) ->
         block.shell.predecessor,
         block.proto.mining_slot.priority,
@@ -94,7 +94,7 @@ let finalize_block { mode ; ctxt ; op_count } = match mode with
       let fitness = Tezos_context.Fitness.current ctxt in
       let commit_message =
         Format.asprintf
-          "lvl %ld, fit %Ld, prio %ld, %d ops"
+          "lvl %ld, fit %Ld, prio %d, %d ops"
           level fitness priority op_count in
       let ctxt = Tezos_context.finalize ~commit_message ctxt in
       return ctxt

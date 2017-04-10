@@ -172,7 +172,7 @@ module Constants : sig
   val voting_period_length: context -> int32
   val time_before_reward: context -> Period.t
   val slot_durations: context -> Period.t list
-  val first_free_mining_slot: context -> int32
+  val first_free_mining_slot: context -> int
   val max_signing_slot: context -> int
   val instructions_per_transaction: context -> int
   val proof_of_work_threshold: context -> int64
@@ -530,7 +530,7 @@ module Block : sig
 
   and mining_slot = {
     level: Raw_level.t ;
-    priority: Int32.t ;
+    priority: int ;
   }
 
   val mining_slot_encoding: mining_slot Data_encoding.encoding
@@ -556,7 +556,7 @@ module Roll : sig
   val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t
 
   val mining_rights_owner:
-    context -> Level.t -> priority:int32 -> public_key_hash tzresult Lwt.t
+    context -> Level.t -> priority:int -> public_key_hash tzresult Lwt.t
 
   val endorsement_rights_owner:
     context -> Level.t -> slot:int -> public_key_hash tzresult Lwt.t

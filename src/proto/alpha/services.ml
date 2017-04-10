@@ -73,7 +73,7 @@ module Constants = struct
       ~description: "First free mining slot"
       ~input: empty
       ~output: (wrap_tzerror @@
-                describe ~title: "first free mining slot" int32)
+                describe ~title: "first free mining slot" uint16)
       RPC.Path.(custom_root / "constants" / "first_free_mining_slot")
 
   let max_signing_slot custom_root =
@@ -81,7 +81,7 @@ module Constants = struct
       ~description: "Max signing slot"
       ~input: empty
       ~output: (wrap_tzerror @@
-                describe ~title: "max signing slot" int31)
+                describe ~title: "max signing slot" uint16)
       RPC.Path.(custom_root / "constants" / "max_signing_slot")
 
   let instructions_per_transaction custom_root =
@@ -563,7 +563,7 @@ module Helpers = struct
              (req "fitness" Fitness.encoding)
              (req "operations" Operation_list_list_hash.encoding)
              (req "level" Raw_level.encoding)
-             (req "priority" int31)
+             (req "priority" uint16)
              (req "nonce_hash" Nonce_hash.encoding)
              (req "proof_of_work_nonce"
                 (Fixed.bytes Tezos_context.Constants.proof_of_work_nonce_size)))
