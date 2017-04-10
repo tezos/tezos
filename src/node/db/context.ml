@@ -84,14 +84,10 @@ type t = context
 (*-- Version Access and Update -----------------------------------------------*)
 
 let current_protocol_key = ["protocol"]
-let current_fitness_key = ["fitness"]
-let current_timestamp_key = ["timestamp"]
 let current_test_protocol_key = ["test_protocol"]
 let current_test_network_key = ["test_network"]
 let current_test_network_expiration_key = ["test_network_expiration"]
 let current_fork_test_network_key = ["fork_test_network"]
-
-let transient_commit_message_key = ["message"]
 
 let exists { repo } key =
   GitStore.of_branch_id
@@ -134,59 +130,17 @@ let exists index key =
     Block_hash.pp_short key exists >>= fun () ->
   Lwt.return exists
 
-let get_and_erase_commit_message ctxt =
-  GitStore.FunView.get ctxt.view transient_commit_message_key >>= function
-  | None -> Lwt.return (None, ctxt)
-  | Some bytes ->
-     GitStore.FunView.del ctxt.view transient_commit_message_key >>= fun view ->
-     Lwt.return (Some (MBytes.to_string bytes), { ctxt with view })
-let set_commit_message ctxt msg =
-  GitStore.FunView.set ctxt.view
-    transient_commit_message_key
-    (MBytes.of_string msg) >>= fun view ->
-  Lwt.return { ctxt with view }
-
-let get_fitness { view } =
-  GitStore.FunView.get view current_fitness_key >>= function
-  | None -> assert false
-  | Some data ->
-      match Data_encoding.Binary.of_bytes Fitness.encoding data with
-      | None -> assert false
-      | Some data -> Lwt.return data
-let set_fitness ctxt data =
-  GitStore.FunView.set ctxt.view current_fitness_key
-    (Data_encoding.Binary.to_bytes Fitness.encoding data) >>= fun view ->
-  Lwt.return { ctxt with view }
-
-let get_timestamp { view } =
-  GitStore.FunView.get view current_timestamp_key >>= function
-  | None -> assert false
-  | Some time ->
-     Lwt.return (Time.of_notation_exn (MBytes.to_string time))
-let set_timestamp ctxt time =
-  GitStore.FunView.set ctxt.view current_timestamp_key
-    (MBytes.of_string (Time.to_notation time)) >>= fun view ->
-  Lwt.return { ctxt with view }
-
 exception Preexistent_context of Block_hash.t
 exception Empty_head of Block_hash.t
 
-let commit key context =
-  get_timestamp context >>= fun timestamp ->
-  get_fitness context >>= fun fitness ->
-  let task =
-    Irmin.Task.create ~date:(Time.to_seconds timestamp) ~owner:"Tezos" in
+let commit key ~time ~message context =
+  let task = Irmin.Task.create ~date:(Time.to_seconds time) ~owner:"Tezos" in
   GitStore.clone task context.store (Block_hash.to_b58check key) >>= function
   | `Empty_head -> Lwt.fail (Empty_head key)
   | `Duplicated_branch -> Lwt.fail (Preexistent_context key)
   | `Ok store ->
-     get_and_erase_commit_message context >>= fun (msg, context) ->
-     let msg = match msg with
-       | None ->
-          Format.asprintf "%a %a"
-            Fitness.pp fitness Block_hash.pp_short key
-       | Some msg -> msg in
-     GitStore.FunView.update_path (store msg) [] context.view >>= fun () ->
+      GitStore.FunView.update_path
+        (store message) [] context.view >>= fun () ->
      context.index.commits <- context.index.commits + 1 ;
      if context.index.commits mod 200 = 0 then
        Lwt_utils.Idle_waiter.force_idle
@@ -267,18 +221,15 @@ let init ?patch_context ~root =
   }
 
 let commit_genesis index ~id:block ~time ~protocol ~test_protocol =
+  let task = Irmin.Task.create ~date:(Time.to_seconds time) ~owner:"Tezos" in
   GitStore.of_branch_id
-    Irmin.Task.none (Block_hash.to_b58check block)
+    task (Block_hash.to_b58check block)
     index.repo >>= fun t ->
-  let store = t () in
+  let store = t "Genesis" in
   GitStore.FunView.of_path store [] >>= fun view ->
   let view = (view, index.repack_scheduler) in
-  GitStore.FunView.set view current_timestamp_key
-    (MBytes.of_string (Time.to_notation time)) >>= fun view ->
   GitStore.FunView.set view current_protocol_key
     (Protocol_hash.to_bytes protocol) >>= fun view ->
-  GitStore.FunView.set view current_fitness_key
-    (Data_encoding.Binary.to_bytes Fitness.encoding []) >>= fun view ->
   GitStore.FunView.set view current_test_protocol_key
     (Protocol_hash.to_bytes test_protocol) >>= fun view ->
   let ctxt = { index ; store ; view } in
@@ -334,7 +285,6 @@ let init_test_network v ~time ~genesis =
   get_test_protocol v >>= fun test_protocol ->
   del_test_network_expiration v >>= fun v ->
   set_protocol v test_protocol >>= fun v ->
-  set_timestamp v time >>= fun v ->
   let task =
     Irmin.Task.create
       ~date:(Time.to_seconds time)

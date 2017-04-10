@@ -75,10 +75,7 @@ module Timestamp : sig
   val of_seconds: string -> time option
   val to_seconds: time -> string
 
-  val get_current: context -> Time.t Lwt.t
-  (** [get_current ctxt] returns the current timestamp of [ctxt]. When
-      [ctxt] is the context of a block, the block timestamp is used,
-      otherwise a timestamp is inferred otherwise. *)
+  val current: context -> Time.t
 
 end
 
@@ -253,10 +250,11 @@ module Fitness : sig
   include (module type of Fitness)
   type t = fitness
 
-  val increase: context -> context tzresult Lwt.t
+  val increase: context -> context
 
-  val get: context -> int64 tzresult Lwt.t
-  val to_int64: fitness -> int64 tzresult Lwt.t
+  val current: context -> int64
+
+  val to_int64: fitness -> int64 tzresult
 
 end
 
@@ -580,14 +578,15 @@ module Reward : sig
 
 end
 
-val init: Context.t -> context tzresult Lwt.t
-val finalize: ?commit_message:string -> context -> Context.t tzresult Lwt.t
+val init:
+  Context.t ->
+  timestamp:Time.t ->
+  fitness:Fitness.t ->
+  context tzresult Lwt.t
+val finalize: ?commit_message:string -> context -> Updater.validation_result
 
 val configure_sandbox:
   Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
-
-val get_prevalidation: context -> bool Lwt.t
-val set_prevalidation: context -> context Lwt.t
 
 val activate: context -> Protocol_hash.t -> context Lwt.t
 val set_test_protocol: context -> Protocol_hash.t -> context Lwt.t

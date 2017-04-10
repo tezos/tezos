@@ -11,7 +11,12 @@
 
 open Misc
 
-type context = Context.t * Constants_repr.constants
+type context = {
+  context: Context.t ;
+  constants: Constants_repr.constants ;
+  timestamp: Time.t ;
+  fitness: Int64.t ;
+}
 
 (*-- Errors ------------------------------------------------------------------*)
 
@@ -52,7 +57,7 @@ module Make_raw_data_storage (P : Raw_data_description) = struct
 
   let key_to_string l = String.concat "/" (key l)
 
-  let get (c, _) k =
+  let get { context = c } k =
     Context.get c (key k) >>= function
     | None ->
         let msg =
@@ -61,16 +66,16 @@ module Make_raw_data_storage (P : Raw_data_description) = struct
     | Some bytes ->
         Lwt.return (P.of_bytes bytes)
 
-  let mem (c, _) k = Context.mem c (key k)
+  let mem { context = c } k = Context.mem c (key k)
 
-  let get_option (c, _) k =
+  let get_option { context = c } k =
     Context.get c (key k) >>= function
     | None -> return None
     | Some bytes ->
         Lwt.return (P.of_bytes bytes >|? fun v -> Some v)
 
   (* Verify that the key is present before modifying *)
-  let set (c, x) k v =
+  let set ({ context = c } as s) k v =
     let key = key k in
     Context.get c key >>= function
     | None ->
@@ -80,13 +85,13 @@ module Make_raw_data_storage (P : Raw_data_description) = struct
     | Some old ->
         let bytes = P.to_bytes v in
         if MBytes.(old = bytes) then
-          return (c, x)
+          return { s with context = c }
         else
           Context.set c key (P.to_bytes v) >>= fun c ->
-          return (c, x)
+          return { s with context = c }
 
   (* Verify that the key is not present before inserting *)
-  let init (c, x) k v =
+  let init ({ context = c } as s) k v =
     let key = key k in
     Context.get c key >>=
       function
@@ -96,27 +101,29 @@ module Make_raw_data_storage (P : Raw_data_description) = struct
           fail (Storage_error msg)
       | None ->
           Context.set c key (P.to_bytes v) >>= fun c ->
-          return (c, x)
+          return { s with context = c }
 
   (* Does not verify that the key is present or not *)
-  let init_set (c, x) k v =
-    Context.set c (key k) (P.to_bytes v) >>= fun c -> return (c, x)
+  let init_set ({ context = c } as s) k v =
+    Context.set c (key k) (P.to_bytes v) >>= fun c ->
+    return { s with context = c }
 
   (* Verify that the key is present before deleting *)
-  let delete (c, x) k =
+  let delete ({ context = c } as s) k =
     let key = key k in
     Context.get c key >>= function
     | Some _ ->
         Context.del c key >>= fun c ->
-        return (c, x)
+        return { s with context = c }
     | None ->
         let msg =
           "cannot delete undefined " ^ P.name ^ " key " ^ key_to_string k in
         fail (Storage_error msg)
 
   (* Do not verify before deleting *)
-  let remove (c, x) k =
-    Context.del c (key k) >>= fun c -> Lwt.return (c, x)
+  let remove ({ context = c } as s) k =
+    Context.del c (key k) >>= fun c ->
+    Lwt.return { s with context = c }
 
 end
 
@@ -229,28 +236,34 @@ module Make_data_set_storage (P : Single_data_description) = struct
         error (Storage_error msg)
     | Some v -> Ok v
 
-  let add (c, x) v =
+  let add ({ context = c } as s) v =
     let hash, data = serial v in
     HashTbl.mem c hash >>= function
-    | true -> return (c, x)
-    | false -> HashTbl.set c hash data >>= fun c -> return (c, x)
+    | true ->
+        return { s with context = c }
+    | false ->
+        HashTbl.set c hash data >>= fun c ->
+        return { s with context = c }
 
-  let del (c, x) v =
+  let del ({ context = c } as s) v =
     let hash, _ = serial v in
     HashTbl.mem c hash >>= function
-    | false -> return (c, x)
-    | true -> HashTbl.del c hash >>= fun c -> return (c, x)
+    | false ->
+        return { s with context = c }
+    | true ->
+        HashTbl.del c hash >>= fun c ->
+        return { s with context = c }
 
-  let mem (c, _) v =
+  let mem { context = c } v =
     let hash, _ = serial v in
     HashTbl.mem c hash >>= fun v ->
     return v
 
-  let elements (c, _) =
+  let elements { context = c } =
     HashTbl.bindings c >>= fun elts ->
     map_s (fun (_, data) -> Lwt.return (unserial data)) elts
 
-  let fold (c, _) init ~f =
+  let fold { context = c } init ~f =
     HashTbl.fold c (ok init)
       ~f:(fun _ data acc ->
           match acc with
@@ -262,9 +275,9 @@ module Make_data_set_storage (P : Single_data_description) = struct
                   f data acc >>= fun acc ->
                   return acc)
 
-  let clear (c, x) =
+  let clear ({ context = c } as s) =
     HashTbl.fold c c ~f:(fun hash _ c -> HashTbl.del c hash) >>= fun c ->
-    return (c, x)
+    return { s with context = c }
 
 end
 
@@ -284,7 +297,7 @@ module Raw_make_iterable_data_storage
 
   let key_to_string k = String.concat "/" (K.to_path k)
 
-  let get (c, _) k =
+  let get { context = c } k =
     HashTbl.get c k >>= function
     | None ->
         let msg =
@@ -293,15 +306,15 @@ module Raw_make_iterable_data_storage
     | Some v ->
         return v
 
-  let mem (c, _) k = HashTbl.mem c k
+  let mem { context = c } k = HashTbl.mem c k
 
-  let get_option (c, _) k =
+  let get_option { context = c } k =
     HashTbl.get c k >>= function
     | None -> return None
     | Some v -> return (Some v)
 
   (* Verify that the key is present before modifying *)
-  let set (c, x) k v =
+  let set ({ context = c } as s) k v =
     HashTbl.get c k >>= function
     | None ->
         let msg =
@@ -309,10 +322,10 @@ module Raw_make_iterable_data_storage
         fail (Storage_error msg)
     | Some _ ->
         HashTbl.set c k v >>= fun c ->
-        return (c, x)
+        return { s with context = c }
 
   (* Verify that the key is not present before inserting *)
-  let init (c, x) k v =
+  let init ({ context = c } as s) k v =
     HashTbl.get c k >>=
       function
       | Some _ ->
@@ -321,29 +334,35 @@ module Raw_make_iterable_data_storage
           fail (Storage_error msg)
       | None ->
           HashTbl.set c k v >>= fun c ->
-          return (c, x)
+          return { s with context = c }
 
   (* Does not verify that the key is present or not *)
-  let init_set (c, x) k v = HashTbl.set c k v >>= fun c -> return (c, x)
+  let init_set ({ context = c } as s) k v =
+    HashTbl.set c k v >>= fun c ->
+    return { s with context = c }
 
   (* Verify that the key is present before deleting *)
-  let delete (c, x) k =
+  let delete ({ context = c } as s) k =
     HashTbl.get c k >>= function
     | Some _ ->
         HashTbl.del c k >>= fun c ->
-        return (c, x)
+        return { s with context = c }
     | None ->
         let msg =
           "cannot delete undefined " ^ P.name ^ " key " ^ key_to_string k in
         fail (Storage_error msg)
 
   (* Do not verify before deleting *)
-  let remove (c, x) k =
-    HashTbl.del c k >>= fun c -> Lwt.return (c, x)
+  let remove ({ context = c } as s) k =
+    HashTbl.del c k >>= fun c ->
+    Lwt.return { s with context = c }
 
-  let clear (c, x) = HashTbl.clear c >>= fun c -> Lwt.return (c, x)
-  let fold (c, _) x ~f = HashTbl.fold c x ~f:(fun k v acc -> f k v acc)
-  let iter (c, _) ~f = HashTbl.fold c () ~f:(fun k v () -> f k v)
+  let clear ({ context = c } as s) =
+    HashTbl.clear c >>= fun c ->
+    Lwt.return { s with context = c }
+
+  let fold { context = c } x ~f = HashTbl.fold c x ~f:(fun k v acc -> f k v acc)
+  let iter { context = c } ~f = HashTbl.fold c () ~f:(fun k v () -> f k v)
 
 end
 

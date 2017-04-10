@@ -51,7 +51,7 @@ let apply_delegate_operation_content
         (Block_hash.equal block pred_block)
         (Wrong_endorsement_predecessor (pred_block, block)) >>=? fun () ->
       Mining.check_signing_rights ctxt slot delegate >>=? fun () ->
-      Fitness.increase ctxt >>=? fun ctxt ->
+      let ctxt = Fitness.increase ctxt in
       Mining.pay_endorsement_bond ctxt delegate >>=? fun (ctxt, bond) ->
       Mining.endorsement_reward ~block_priority >>=? fun reward ->
       Level.current ctxt >>=? fun { cycle = current_cycle } ->
@@ -238,7 +238,7 @@ let may_start_new_cycle ctxt =
       Seed.compute_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
       Roll.clear_cycle ctxt last_cycle >>=? fun ctxt ->
       Roll.freeze_rolls_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
-      Timestamp.get_current ctxt >>= fun timestamp ->
+      let timestamp = Timestamp.current ctxt in
       Lwt.return (Timestamp.(timestamp +? (Constants.time_before_reward ctxt)))
       >>=? fun reward_date ->
       Reward.set_reward_time_for_cycle
@@ -254,10 +254,10 @@ let begin_application ctxt block pred_timestamp =
   Mining.check_mining_rights ctxt block pred_timestamp >>=? fun miner ->
   Mining.check_signature ctxt block miner >>=? fun () ->
   Mining.pay_mining_bond ctxt block miner >>=? fun ctxt ->
-  Fitness.increase ctxt >>=? fun ctxt ->
+  let ctxt = Fitness.increase ctxt in
   return (ctxt, miner)
 
-let finalize_application ctxt block miner op_count =
+let finalize_application ctxt block miner =
   (* end of level (from this point nothing should fail) *)
   let priority = block.Block.proto.mining_slot.priority in
   let reward = Mining.base_mining_reward ctxt ~priority in
@@ -268,14 +268,7 @@ let finalize_application ctxt block miner op_count =
   (* end of cycle *)
   may_start_new_cycle ctxt >>=? fun ctxt ->
   Amendment.may_start_new_voting_cycle ctxt >>=? fun ctxt ->
-  Level.current ctxt >>=? fun { level } ->
-  let level = Raw_level.to_int32 level in
-  Fitness.get ctxt >>=? fun fitness ->
-  let commit_message =
-    Format.asprintf
-      "lvl %ld, fit %Ld, prio %ld, %d ops"
-      level fitness priority op_count in
-  return (commit_message, ctxt)
+  return ctxt
 
 let compare_operations op1 op2 =
   match op1.contents, op2.contents with

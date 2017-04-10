@@ -56,7 +56,7 @@ let int64_to_bytes i =
 let operations =
   Operation_list_list_hash.compute [Operation_list_hash.empty]
 
-let rpc_services : Context.t RPC.directory =
+let rpc_services : Updater.rpc_context RPC.directory =
   let dir = RPC.empty in
   let dir =
     RPC.register

@@ -34,7 +34,7 @@ type validation_state =
     op_count : int }
 
 let current_context { ctxt } =
-  Tezos_context.finalize ctxt
+  return (Tezos_context.finalize ctxt).context
 
 let precheck_block
     ~ancestor_context:_
@@ -47,9 +47,11 @@ let precheck_block
 let begin_application
     ~predecessor_context:ctxt
     ~predecessor_timestamp:pred_timestamp
+    ~predecessor_fitness:pred_fitness
     raw_block =
   Lwt.return (Tezos_context.Block.parse_header raw_block) >>=? fun header ->
-  Tezos_context.init ctxt >>=? fun ctxt ->
+  let timestamp = header.shell.timestamp in
+  Tezos_context.init ~timestamp ~fitness:pred_fitness ctxt >>=? fun ctxt ->
   Apply.begin_application ctxt header pred_timestamp >>=? fun (ctxt, miner) ->
   let mode = Application (header, miner) in
   return { mode ; ctxt ; op_count = 0 }
@@ -57,11 +59,12 @@ let begin_application
 let begin_construction
     ~predecessor_context:ctxt
     ~predecessor_timestamp:_
+    ~predecessor_fitness:pred_fitness
     ~predecessor:pred_block
     ~timestamp =
   let mode = Construction { pred_block ; timestamp } in
-  Tezos_context.init ctxt >>=? fun ctxt ->
-  Apply.begin_construction ctxt >>=? fun ctxt ->
+  Tezos_context.init ~timestamp ~fitness:pred_fitness ctxt >>=? fun ctxt ->
+  let ctxt = Apply.begin_construction ctxt in
   return { mode ; ctxt ; op_count = 0 }
 
 let apply_operation ({ mode ; ctxt ; op_count } as data) operation =
@@ -81,12 +84,19 @@ let apply_operation ({ mode ; ctxt ; op_count } as data) operation =
 
 let finalize_block { mode ; ctxt ; op_count } = match mode with
   | Construction _ ->
-      Tezos_context.finalize ctxt >>=? fun ctxt ->
+      let ctxt = Tezos_context.finalize ctxt in
       return ctxt
   | Application (block, miner) ->
-      Apply.finalize_application
-        ctxt block miner op_count >>=? fun (commit_message, ctxt) ->
-      Tezos_context.finalize ~commit_message ctxt >>=? fun ctxt ->
+      Apply.finalize_application ctxt block miner >>=? fun ctxt ->
+      Tezos_context.Level.current ctxt >>=? fun { level } ->
+      let priority = block.proto.mining_slot.priority in
+      let level = Tezos_context.Raw_level.to_int32 level in
+      let fitness = Tezos_context.Fitness.current ctxt in
+      let commit_message =
+        Format.asprintf
+          "lvl %ld, fit %Ld, prio %ld, %d ops"
+          level fitness priority op_count in
+      let ctxt = Tezos_context.finalize ~commit_message ctxt in
       return ctxt
 
 let compare_operations op1 op2 =

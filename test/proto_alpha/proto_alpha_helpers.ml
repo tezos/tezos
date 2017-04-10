@@ -434,7 +434,7 @@ module Mining = struct
   Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
   let level = Raw_level.succ level.level in
   get_first_priority level contract block >>=? fun priority ->
-  (Fitness_repr.to_int64 bi.fitness >|=
+  (Lwt.return (Fitness_repr.to_int64 bi.fitness) >|=
    Register_client_embedded_proto_alpha.wrap_error) >>=? fun fitness ->
   let fitness =
     Fitness_repr.from_int64 @@

@@ -135,7 +135,8 @@ let start_prevalidation
     { State.Valid_block.protocol ;
       hash = predecessor ;
       context = predecessor_context ;
-      timestamp = predecessor_timestamp }
+      timestamp = predecessor_timestamp ;
+      fitness = predecessor_fitness }
     ~timestamp =
   let (module Proto) =
     match protocol with
@@ -144,8 +145,10 @@ let start_prevalidation
   Proto.begin_construction
     ~predecessor_context
     ~predecessor_timestamp
+    ~predecessor_fitness
     ~predecessor
-    ~timestamp >>=? fun state ->
+    ~timestamp
+  >>=? fun state ->
   return (State { proto = (module Proto) ; state })
 
 let prevalidate
