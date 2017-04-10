@@ -41,23 +41,6 @@ type raw_block = Store.Block_header.t = {
 }
 val raw_block_encoding: raw_block Data_encoding.t
 
-type 'error preapply_result = 'error Protocol.preapply_result = {
-  applied: Operation_hash.t list;
-  refused: 'error list Operation_hash.Map.t; (* e.g. invalid signature. *)
-  branch_refused: 'error list Operation_hash.Map.t; (* e.g. past account counter;
-                                                     insufficent balance *)
-  branch_delayed: 'error list Operation_hash.Map.t; (* e.g. futur account counter. *)
-}
-
-val empty_result: 'error preapply_result
-val map_result: ('a list -> 'b list) -> 'a preapply_result -> 'b preapply_result
-
-val operations: 'error preapply_result -> Operation_hash.Set.t
-
-val preapply_result_encoding :
-  'error list Data_encoding.t ->
-  'error preapply_result Data_encoding.t
-
 module type PROTOCOL = Protocol.PROTOCOL
 module type REGISTRED_PROTOCOL = sig
   val hash: Protocol_hash.t

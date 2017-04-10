@@ -68,15 +68,11 @@ let apply_delegate_operation_content
         (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
       Amendment.record_ballot ctxt delegate proposal ballot
 
-let rec is_reject = function
-  | [] -> false
-  | Script_interpreter.Reject _ :: _ -> true
-  | _ :: err -> is_reject err
-
 type error += Non_scripted_contract_with_parameter
 type error += Scripted_contract_without_paramater
 
-let apply_manager_operation_content ctxt origination_nonce accept_failing_script source = function
+let apply_manager_operation_content
+    ctxt origination_nonce source = function
   | Transaction { amount ; parameters ; destination } -> begin
       Contract.spend ctxt source amount >>=? fun ctxt ->
       Contract.credit ctxt destination amount >>=? fun ctxt ->
@@ -84,7 +80,7 @@ let apply_manager_operation_content ctxt origination_nonce accept_failing_script
       | None -> begin
           match parameters with
           | None | Some (Prim (_, "Unit", [])) ->
-              return (ctxt, origination_nonce)
+              return (ctxt, origination_nonce, None)
           | Some _ -> fail Non_scripted_contract_with_parameter
         end
       | Some { code ; storage } ->
@@ -102,12 +98,9 @@ let apply_manager_operation_content ctxt origination_nonce accept_failing_script
                   Contract.update_script_storage_and_fees
                     ctxt destination
                     Script_interpreter.dummy_storage_fee storage_res >>=? fun ctxt ->
-                  return (ctxt, origination_nonce)
+                  return (ctxt, origination_nonce, None)
               | Error err ->
-                  if accept_failing_script && is_reject err then
-                    return (ctxt, origination_nonce)
-                  else
-                    Lwt.return (Error err)
+                  return (ctxt, origination_nonce, Some err)
     end
   | Origination { manager ; delegate ; script ;
                   spendable ; delegatable ; credit } ->
@@ -122,10 +115,10 @@ let apply_manager_operation_content ctxt origination_nonce accept_failing_script
         ~manager ~delegate ~balance:credit
         ?script
         ~spendable ~delegatable >>=? fun (ctxt, _, origination_nonce) ->
-      return (ctxt, origination_nonce)
+      return (ctxt, origination_nonce, None)
   | Delegation delegate ->
       Contract.set_delegate ctxt source delegate >>=? fun ctxt ->
-      return (ctxt, origination_nonce)
+      return (ctxt, origination_nonce, None)
 
 let check_signature_and_update_public_key ctxt id public_key op =
   begin
@@ -138,9 +131,8 @@ let check_signature_and_update_public_key ctxt id public_key op =
   Operation.check_signature public_key op >>=? fun () ->
   return ctxt
 
-(* TODO document parameters *)
 let apply_sourced_operation
-    ctxt accept_failing_script miner_contract pred_block block_prio
+    ctxt miner_contract pred_block block_prio
     operation origination_nonce ops =
   match ops with
   | Manager_operations { source ; public_key ; fee ; counter ; operations = contents } ->
@@ -156,11 +148,14 @@ let apply_sourced_operation
        | None -> return ctxt
        | Some contract ->
            Contract.credit ctxt contract fee) >>=? fun ctxt ->
-      fold_left_s (fun (ctxt, origination_nonce) content ->
-          Contract.must_exist ctxt source >>=? fun () ->
-          apply_manager_operation_content ctxt origination_nonce
-            accept_failing_script source content)
-        (ctxt, origination_nonce) contents
+      fold_left_s (fun (ctxt, origination_nonce, err) content ->
+          match err with
+          | Some _ -> return (ctxt, origination_nonce, err)
+          | None ->
+              Contract.must_exist ctxt source >>=? fun () ->
+              apply_manager_operation_content
+                ctxt origination_nonce source content)
+        (ctxt, origination_nonce, None) contents
   | Delegate_operations { source ; operations = contents } ->
       let delegate = Ed25519.Public_key.hash source in
       check_signature_and_update_public_key
@@ -171,25 +166,25 @@ let apply_sourced_operation
           apply_delegate_operation_content
             ctxt delegate pred_block block_prio content)
         ctxt contents >>=? fun ctxt ->
-      return (ctxt, origination_nonce)
+      return (ctxt, origination_nonce, None)
   | Dictator_operation (Activate hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       activate ctxt hash >>= fun ctxt ->
-      return (ctxt, origination_nonce)
+      return (ctxt, origination_nonce, None)
   | Dictator_operation (Activate_testnet hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       set_test_protocol ctxt hash >>= fun ctxt ->
       fork_test_network ctxt >>= fun ctxt ->
-      return (ctxt, origination_nonce)
+      return (ctxt, origination_nonce, None)
 
 let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
   match kind with
   | Seed_nonce_revelation { level ; nonce } ->
       let level = Level.from_raw ctxt level in
-      Nonce.reveal ctxt level nonce >>=? fun (ctxt, delegate_to_reward,
-                                              reward_amount) ->
+      Nonce.reveal ctxt level nonce
+      >>=? fun (ctxt, delegate_to_reward, reward_amount) ->
       Reward.record ctxt
         delegate_to_reward level.cycle reward_amount >>=? fun ctxt ->
       begin
@@ -214,7 +209,7 @@ let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
       return (ctxt, origination_nonce)
 
 let apply_operation
-    ctxt accept_failing_script miner_contract pred_block block_prio operation =
+    ctxt miner_contract pred_block block_prio operation =
   match operation.contents with
   | Anonymous_operations ops ->
       let origination_nonce = Contract.initial_origination_nonce operation.hash in
@@ -222,13 +217,13 @@ let apply_operation
         (fun (ctxt, origination_nonce) ->
            apply_anonymous_operation ctxt miner_contract origination_nonce)
         (ctxt, origination_nonce) ops >>=? fun (ctxt, origination_nonce) ->
-      return (ctxt, Contract.originated_contracts origination_nonce)
+      return (ctxt, Contract.originated_contracts origination_nonce, None)
   | Sourced_operations op ->
       let origination_nonce = Contract.initial_origination_nonce operation.hash in
       apply_sourced_operation
-        ctxt accept_failing_script miner_contract pred_block block_prio
-        operation origination_nonce op >>=? fun (ctxt, origination_nonce) ->
-      return (ctxt, Contract.originated_contracts origination_nonce)
+        ctxt miner_contract pred_block block_prio
+        operation origination_nonce op >>=? fun (ctxt, origination_nonce, err) ->
+      return (ctxt, Contract.originated_contracts origination_nonce, err)
 
 let may_start_new_cycle ctxt =
   Mining.dawn_of_a_new_cycle ctxt >>=? function
@@ -250,58 +245,37 @@ let may_start_new_cycle ctxt =
         ctxt last_cycle reward_date >>=? fun ctxt ->
       return ctxt
 
-let apply_main ctxt accept_failing_script block pred_timestamp operations =
-  (* read only checks *)
+let begin_construction ctxt =
+  Fitness.increase ctxt
+
+let begin_application ctxt block pred_timestamp =
   Mining.check_proof_of_work_stamp ctxt block >>=? fun () ->
   Mining.check_fitness_gap ctxt block >>=? fun () ->
-  Mining.check_mining_rights ctxt block pred_timestamp >>=? fun delegate_pkh ->
-  Mining.check_signature ctxt block delegate_pkh >>=? fun () ->
-  (* automatic bonds payment *)
-  Mining.pay_mining_bond ctxt block delegate_pkh >>=? fun ctxt ->
-  (* do effectful stuff *)
+  Mining.check_mining_rights ctxt block pred_timestamp >>=? fun miner ->
+  Mining.check_signature ctxt block miner >>=? fun () ->
+  Mining.pay_mining_bond ctxt block miner >>=? fun ctxt ->
   Fitness.increase ctxt >>=? fun ctxt ->
-  let priority = block.proto.mining_slot.priority in
-  fold_left_s (fun ctxt operation ->
-      apply_operation
-        ctxt accept_failing_script
-        (Some (Contract.default_contract delegate_pkh))
-        block.shell.predecessor priority operation
-      >>=? fun (ctxt, _contracts) -> return ctxt)
-    ctxt operations >>=? fun ctxt ->
+  return (ctxt, miner)
+
+let finalize_application ctxt block miner op_count =
   (* end of level (from this point nothing should fail) *)
+  let priority = block.Block.proto.mining_slot.priority in
   let reward = Mining.base_mining_reward ctxt ~priority in
   Nonce.record_hash ctxt
-    delegate_pkh reward block.proto.seed_nonce_hash >>=? fun ctxt ->
+    miner reward block.proto.seed_nonce_hash >>=? fun ctxt ->
   Reward.pay_due_rewards ctxt >>=? fun ctxt ->
   Level.increment_current ctxt >>=? fun ctxt ->
   (* end of cycle *)
   may_start_new_cycle ctxt >>=? fun ctxt ->
   Amendment.may_start_new_voting_cycle ctxt >>=? fun ctxt ->
-  return ctxt
-
-type error += Internal_error of string
-
-let apply ctxt accept_failing_script block pred_timestamp operations =
-  (init ctxt >>=? fun ctxt ->
-   get_prevalidation ctxt >>= function
-   | true ->
-       fail (Internal_error "we should not call `apply` after `preapply`!")
-   | false ->
-      apply_main ctxt accept_failing_script block pred_timestamp operations >>=? fun ctxt ->
-      Level.current ctxt >>=? fun { level } ->
-      let level = Raw_level.diff level Raw_level.root in
-      Fitness.get ctxt >>=? fun fitness ->
-      let commit_message =
-        (* TODO: add more info ? *)
-        Format.asprintf "lvl %ld, fit %Ld" level fitness in
-      finalize ~commit_message ctxt)
-
-let empty_result =
-  { Updater.applied = [];
-    refused = Operation_hash.Map.empty;
-    branch_refused = Operation_hash.Map.empty;
-    branch_delayed = Operation_hash.Map.empty;
-  }
+  Level.current ctxt >>=? fun { level } ->
+  let level = Raw_level.to_int32 level in
+  Fitness.get ctxt >>=? fun fitness ->
+  let commit_message =
+    Format.asprintf
+      "lvl %ld, fit %Ld, prio %ld, %d ops"
+      level fitness priority op_count in
+  return (commit_message, ctxt)
 
 let compare_operations op1 op2 =
   match op1.contents, op2.contents with
@@ -320,75 +294,3 @@ let compare_operations op1 op2 =
           (* Manager operations with smaller counter are pre-validated first. *)
           Int32.compare op1.counter op2.counter
         end
-
-let merge_result r r' =
-  let open Updater in
-  let merge _key a b =
-    match a, b with
-    | None, None -> None
-    | Some x, None -> Some x
-    | _, Some y -> Some y in
-  { applied = r'.applied @ r.applied ;
-    refused = Operation_hash.Map.merge merge r.refused r'.refused ;
-    branch_refused =
-      Operation_hash.Map.merge merge r.branch_refused r'.branch_refused ;
-    branch_delayed = r'.branch_delayed ;
-  }
-
-let prevalidate ctxt pred_block sort operations =
-  let operations =
-    if sort then List.sort compare_operations operations else operations in
-  let rec loop ctxt operations =
-    (Lwt_list.fold_left_s
-       (fun (ctxt, r) op ->
-          apply_operation ctxt false None pred_block 0l op >>= function
-          | Ok (ctxt, _contracts) ->
-              let applied = op.hash :: r.Updater.applied in
-              Lwt.return (ctxt, { r with Updater.applied} )
-          | Error errors ->
-              match classify_errors errors with
-              | `Branch ->
-                  let branch_refused =
-                    Operation_hash.Map.add op.hash errors r.Updater.branch_refused in
-                  Lwt.return (ctxt, { r with Updater.branch_refused })
-              | `Permanent ->
-                  let refused =
-                    Operation_hash.Map.add op.hash errors r.Updater.refused in
-                  Lwt.return (ctxt, { r with Updater.refused })
-              | `Temporary ->
-                  let branch_delayed =
-                    Operation_hash.Map.add op.hash errors r.Updater.branch_delayed in
-                  Lwt.return (ctxt, { r with Updater.branch_delayed }))
-       (ctxt, empty_result)
-       operations >>= fun (ctxt, r) ->
-     match r.Updater.applied with
-     | _ :: _ when sort ->
-         let rechecked_operations =
-           List.filter
-             (fun op -> Operation_hash.Map.mem op.hash r.Updater.branch_delayed)
-             operations in
-         loop ctxt rechecked_operations >>=? fun (ctxt, r') ->
-         return (ctxt, merge_result r r')
-     | _ ->
-         return (ctxt, r)) in
-  loop ctxt operations
-
-let preapply ctxt pred_block sort operations =
-  let result =
-    init ctxt >>=? fun ctxt ->
-    begin
-      get_prevalidation ctxt >>= function
-      | true -> return ctxt
-      | false ->
-          set_prevalidation ctxt >>= fun ctxt ->
-          Fitness.increase ctxt >>=? fun ctxt ->
-          return ctxt
-    end >>=? fun ctxt ->
-    prevalidate ctxt pred_block sort operations >>=? fun (ctxt, r) ->
-    (* TODO should accept failing script in the last round ?
-            or: what should we export to let the miner decide *)
-    finalize ctxt >>=? fun ctxt ->
-    return (ctxt, r) in
-  (* "Reify" errors into options. *)
-  result >>|? function  (ctxt, r) ->
-    (ctxt, { r with Updater.applied = List.rev r.Updater.applied })
