@@ -64,7 +64,7 @@ let sync_nodes nodes =
   sync_nodes nodes >>= function
   | Ok () | Error (Exn End_of_file :: _) ->
       return ()
-  | Error e as err ->
+  | Error _ as err ->
       Lwt.return err
 
 let run_nodes client server =
@@ -147,7 +147,7 @@ module Low_level = struct
     return ()
 
   let server _ch sched socket =
-    raw_accept sched socket >>= fun (fd, point) ->
+    raw_accept sched socket >>= fun (fd, _point) ->
     P2p_io_scheduler.write fd simple_msg >>=? fun () ->
     P2p_io_scheduler.close fd >>=? fun _ ->
     return ()
@@ -190,7 +190,7 @@ module Kicked = struct
   let encoding = Data_encoding.bytes
 
   let server _ch sched socket =
-    accept sched socket >>=? fun (info, auth_fd) ->
+    accept sched socket >>=? fun (_info, auth_fd) ->
     P2p_connection.accept auth_fd encoding >>= fun conn ->
     _assert (Kick.is_rejected conn) __LOC__ "" >>=? fun () ->
     return ()
@@ -212,7 +212,7 @@ module Simple_message = struct
   let simple_msg2 = MBytes.create (1 lsl 4)
 
   let server ch sched socket =
-    accept sched socket >>=? fun (info, auth_fd) ->
+    accept sched socket >>=? fun (_info, auth_fd) ->
     P2p_connection.accept auth_fd encoding >>=? fun conn ->
     P2p_connection.write_sync conn simple_msg >>=? fun () ->
     P2p_connection.read conn >>=? fun (_msg_size, msg) ->
@@ -242,7 +242,7 @@ module Close_on_read = struct
   let simple_msg = MBytes.create (1 lsl 4)
 
   let server _ch sched socket =
-    accept sched socket >>=? fun (info, auth_fd) ->
+    accept sched socket >>=? fun (_info, auth_fd) ->
     P2p_connection.accept auth_fd encoding >>=? fun conn ->
     P2p_connection.close conn >>= fun _stat ->
     return ()
@@ -266,7 +266,7 @@ module Close_on_write = struct
   let simple_msg = MBytes.create (1 lsl 4)
 
   let server ch sched socket =
-    accept sched socket >>=? fun (info, auth_fd) ->
+    accept sched socket >>=? fun (_info, auth_fd) ->
     P2p_connection.accept auth_fd encoding >>=? fun conn ->
     P2p_connection.close conn >>= fun _stat ->
     sync ch >>=? fun ()->
@@ -291,8 +291,8 @@ module Garbled_data = struct
 
   let garbled_msg = MBytes.create (1 lsl 4)
 
-  let server ch sched socket =
-    accept sched socket >>=? fun (info, auth_fd) ->
+  let server _ch sched socket =
+    accept sched socket >>=? fun (_info, auth_fd) ->
     P2p_connection.accept auth_fd encoding >>=? fun conn ->
     P2p_connection.raw_write_sync conn garbled_msg >>=? fun () ->
     P2p_connection.read conn >>= fun err ->
@@ -300,7 +300,7 @@ module Garbled_data = struct
     P2p_connection.close conn >>= fun _stat ->
     return ()
 
-  let client ch sched addr port =
+  let client _ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
     P2p_connection.accept auth_fd encoding >>=? fun conn ->
     P2p_connection.read conn >>= fun err ->
@@ -328,7 +328,7 @@ let spec = Arg.[
 
 let main () =
   let open Utils in
-  let anon_fun num_peers = raise (Arg.Bad "No anonymous argument.") in
+  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
   Test.run "p2p-connection." [

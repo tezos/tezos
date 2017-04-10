@@ -54,7 +54,7 @@ let sync_nodes nodes =
   sync_nodes nodes >>= function
   | Ok () | Error (Exn End_of_file :: _) ->
       return ()
-  | Error e as err ->
+  | Error _ as err ->
       Lwt.return err
 
 let detach_node f points n =
@@ -100,7 +100,7 @@ let detach_node f points n =
       return ()
     end
 
-let detach_nodes ?(sync = 0) run_node points =
+let detach_nodes run_node points =
   let open Utils in
   let clients = List.length points in
   Lwt_list.map_p
@@ -196,7 +196,7 @@ module Random_connections = struct
     let rem = ref (n * total) in
     iter_p (fun point -> connect_random pool total rem point n) points
 
-  let node repeat channel pool points =
+  let node repeat _channel pool points =
     lwt_log_info "Begin random connections." >>= fun () ->
     connect_random_all pool points repeat >>=? fun () ->
     lwt_log_info "Random connections OK." >>= fun () ->
@@ -267,7 +267,7 @@ let spec = Arg.[
 
 let main () =
   let open Utils in
-  let anon_fun num_peers = raise (Arg.Bad "No anonymous argument.") in
+  let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
   let ports = !port -- (!port + !clients - 1) in
