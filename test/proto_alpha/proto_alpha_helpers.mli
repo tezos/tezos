@@ -11,10 +11,12 @@ open Client_embedded_proto_alpha
 open Tezos_context
 open Client_alpha
 
-val init : unit -> (int * Block_hash.t) tzresult Lwt.t
+val init : ?sandbox:string -> unit -> (int * Block_hash.t) tzresult Lwt.t
 (** [init ()] sets up the test environment, and return the PID of
     forked Tezos node and the block info of the block from where the
     tests will begin. *)
+
+val level : Client_proto_rpcs.block -> Tezos_context.Level.t tzresult Lwt.t
 
 module Account : sig
 
@@ -112,6 +114,7 @@ module Mining : sig
   val inject_block :
     Client_node_rpcs.Blocks.block ->
     ?force:bool ->
+    ?proto_level:int ->
     priority:int ->
     timestamp:Time.t ->
     fitness:Fitness.t ->
@@ -122,7 +125,8 @@ module Mining : sig
   val mine :
     ?force:bool ->
     ?operations:Operation_hash.t list ->
-    fitness_gap:int ->
+    ?fitness_gap:int ->
+    ?proto_level:int ->
     Account.t ->
     Client_node_rpcs.Blocks.block ->
     Block_hash.t tzresult Lwt.t
@@ -152,6 +156,27 @@ module Endorse : sig
     Account.t ->
     Client_proto_rpcs.block ->
     Client_proto_rpcs.Helpers.Rights.endorsement_slot list tzresult Lwt.t
+
+end
+
+module Protocol : sig
+
+  val inject_proposals :
+    ?async:bool ->
+    ?force:bool ->
+    ?block:Client_node_rpcs.Blocks.block ->
+    src:Account.t ->
+    Hash.Protocol_hash.t list ->
+    Hash.Operation_list_hash.elt tzresult Lwt.t
+
+  val inject_ballot :
+    ?async:bool ->
+    ?force:bool ->
+    ?block:Client_node_rpcs.Blocks.block ->
+    src:Account.t ->
+    proposal:Hash.Protocol_hash.t ->
+    Vote.ballot ->
+    Hash.Operation_list_hash.elt tzresult Lwt.t
 
 end
 
@@ -190,6 +215,10 @@ module Assert : sig
   val wrong_delegate : msg:string -> 'a tzresult -> unit
 
   val invalid_endorsement_slot : msg:string -> 'a tzresult -> unit
+
+  val check_protocol :
+    ?msg:string -> block:Client_node_rpcs.Blocks.block ->
+    Hash.Protocol_hash.t -> unit tzresult Lwt.t
 
 end
 

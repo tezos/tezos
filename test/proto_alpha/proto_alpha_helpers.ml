@@ -32,16 +32,19 @@ let activate_alpha () =
     (Activate Client_proto_main.protocol)
     fitness dictator_sk
 
-let init () =
+let init ?(sandbox = "sandbox.json") () =
   Random.self_init () ;
   Unix.chdir (Filename.dirname (Filename.dirname Sys.executable_name)) ;
   let pid =
     Node_helpers.fork_node
       ~port:rpc_config.port
-      ~sandbox:(Filename.dirname Sys.executable_name // "sandbox.json")
+      ~sandbox:(Filename.dirname Sys.executable_name // sandbox)
       () in
   activate_alpha () >>=? fun hash ->
   return (pid, hash)
+
+let level block =
+  Client_alpha.Client_proto_rpcs.Context.level rpc_config block
 
 module Account = struct
 
@@ -237,6 +240,41 @@ module Account = struct
 
 end
 
+module Protocol = struct
+
+  open Account
+
+  let inject_proposals ?async ?force ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) proposals =
+    Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
+    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
+    Client_proto_rpcs.Helpers.Forge.Delegate.proposals rpc_config block
+      ~net:block_info.net_id
+      ~source:pk
+      ~period:next_level.voting_period
+      ~proposals
+      () >>=? fun bytes ->
+    let signed_bytes = Environment.Ed25519.Signature.append sk bytes in
+    Client_node_rpcs.inject_operation
+      rpc_config ?async ?force signed_bytes >>=? fun oph ->
+    return oph
+
+  let inject_ballot ?async ?force ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
+    Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
+    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
+    Client_proto_rpcs.Helpers.Forge.Delegate.ballot rpc_config block
+      ~net:block_info.net_id
+      ~source:pk
+      ~period:next_level.voting_period
+      ~proposal
+      ~ballot
+      () >>=? fun bytes ->
+    let signed_bytes = Environment.Ed25519.Signature.append sk bytes in
+    Client_node_rpcs.inject_operation
+      rpc_config ?async ?force signed_bytes >>=? fun oph ->
+    return oph
+
+end
+
 module Assert = struct
 
   include Assert
@@ -335,6 +373,14 @@ module Assert = struct
         | _ -> false)
     end
 
+  let check_protocol ?msg ~block h =
+    Client_node_rpcs.Blocks.protocol rpc_config block >>=? fun block_proto ->
+    return @@ Assert.equal
+      ?msg:(Assert.format_msg msg)
+      ~prn:Protocol_hash.to_b58check
+      ~eq:Protocol_hash.equal
+      block_proto h
+
 end
 
 module Mining = struct
@@ -383,6 +429,7 @@ module Mining = struct
   let inject_block
       block
       ?force
+      ?proto_level
       ~priority
       ~timestamp
       ~fitness
@@ -391,6 +438,7 @@ module Mining = struct
       operation_list =
     let block = match block with `Prevalidation -> `Head 0 | block -> block in
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
+    let proto_level = Utils.unopt ~default:bi.proto_level proto_level in
     let seed_nonce_hash = Nonce.hash seed_nonce in
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun level ->
     let operations_hash =
@@ -400,7 +448,7 @@ module Mining = struct
       { Store.Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
         timestamp ; fitness ; operations_hash ;
         level = Raw_level.to_int32 level.level ;
-        proto_level = 1 } in
+        proto_level } in
     mine_stamp
       block src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
     Client_proto_rpcs.Helpers.Forge.block rpc_config
@@ -411,7 +459,7 @@ module Mining = struct
       ~fitness
       ~operations_hash
       ~level:level.level
-      ~proto_level:1
+      ~proto_level
       ~priority
       ~seed_nonce_hash
       ~proof_of_work_nonce
@@ -424,7 +472,8 @@ module Mining = struct
   let mine
       ?(force = false)
       ?(operations = [])
-      ~fitness_gap
+      ?(fitness_gap = 1)
+      ?proto_level
       contract
       block =
   Client_mining_blocks.info rpc_config block >>=? fun bi ->
@@ -444,6 +493,7 @@ module Mining = struct
     Int64.add fitness (Int64.of_int fitness_gap) in
   inject_block
     ~force
+    ?proto_level
     ~priority
     ~timestamp
     ~fitness
