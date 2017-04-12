@@ -15,9 +15,9 @@ module Services = Node_rpc_services
 let errors cctxt =
   call_service0 cctxt Services.Error.service ()
 
-let forge_block cctxt ?net_id ?level ?predecessor ?timestamp fitness ops header =
+let forge_block cctxt ?net_id ?level ?proto_level ?predecessor ?timestamp fitness ops header =
   call_service0 cctxt Services.forge_block
-    (net_id, level, predecessor, timestamp, fitness, ops, header)
+    (net_id, level, proto_level, predecessor, timestamp, fitness, ops, header)
 
 let validate_block cctxt net block =
   call_err_service0 cctxt Services.validate_block (net, block)
@@ -55,6 +55,7 @@ module Blocks = struct
     hash: Block_hash.t ;
     net_id: Net_id.t ;
     level: Int32.t ;
+    proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations_hash: Operation_list_list_hash.t ;

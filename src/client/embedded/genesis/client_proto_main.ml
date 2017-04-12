@@ -29,7 +29,7 @@ let forge_block
   Client_node_rpcs.Blocks.level rpc_config block >>=? fun level ->
   call_service1 rpc_config
     Services.Forge.block block
-    ((net_id, Int32.succ level, pred, timestamp, fitness), command)
+    ((net_id, Int32.succ level, 1, pred, timestamp, fitness), command)
 
 let mine rpc_config ?timestamp block command fitness seckey =
   Client_blocks.get_block_info rpc_config block >>=? fun bi ->

@@ -25,6 +25,7 @@ type raw_operation = Store.Operation.t = {
 type shell_block = Store.Block_header.shell_header =
   { net_id: Net_id.t ;
     level: Int32.t ;
+    proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations_hash: Operation_list_list_hash.t ;

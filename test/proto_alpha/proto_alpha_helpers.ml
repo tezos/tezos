@@ -399,7 +399,8 @@ module Mining = struct
     let shell =
       { Store.Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
         timestamp ; fitness ; operations_hash ;
-        level = Raw_level.to_int32 level.level } in
+        level = Raw_level.to_int32 level.level ;
+        proto_level = 1 } in
     mine_stamp
       block src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
     Client_proto_rpcs.Helpers.Forge.block rpc_config
@@ -410,6 +411,7 @@ module Mining = struct
       ~fitness
       ~operations_hash
       ~level:level.level
+      ~proto_level:1
       ~priority
       ~seed_nonce_hash
       ~proof_of_work_nonce

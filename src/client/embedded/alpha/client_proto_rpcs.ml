@@ -246,10 +246,10 @@ module Helpers = struct
     end
     let block cctxt
         block ~net ~predecessor ~timestamp ~fitness ~operations_hash
-        ~level ~priority ~seed_nonce_hash ~proof_of_work_nonce () =
+        ~level ~priority ~proto_level ~seed_nonce_hash ~proof_of_work_nonce () =
       call_error_service1 cctxt Services.Helpers.Forge.block block
-        (net, predecessor, timestamp, fitness, operations_hash,
-         level, priority, seed_nonce_hash, proof_of_work_nonce)
+        ((net, predecessor, timestamp, fitness, operations_hash),
+         (level, priority, proto_level, seed_nonce_hash, proof_of_work_nonce))
   end
 
   module Parse = struct
