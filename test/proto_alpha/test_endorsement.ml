@@ -9,6 +9,7 @@
 
 open Client_embedded_proto_alpha
 open Tezos_context
+open Client_alpha
 
 module Helpers = Proto_alpha_helpers
 module Assert = Helpers.Assert
@@ -16,25 +17,25 @@ module Assert = Helpers.Assert
 let test_double_endorsement contract block =
 
   (* Double endorsement for the same level *)
-  Helpers.Mining.mine contract block >>=? fun b1 ->
+  Helpers.Mining.mine ~fitness_gap:1 contract block >>=? fun b1 ->
 
   (* branch root *)
-  Helpers.Mining.mine contract (`Hash b1) >>=? fun b2 ->
+  Helpers.Mining.mine ~fitness_gap:1 contract (`Hash b1) >>=? fun b2 ->
   (* changing branch *)
-  Helpers.Mining.mine contract (`Hash b1) >>=? fun b2' ->
+  Helpers.Mining.mine ~fitness_gap:1 contract (`Hash b1) >>=? fun b2' ->
 
   (* branch root *)
   Helpers.Endorse.endorse ~force:true contract (`Hash b2) >>=? fun ops ->
-  Helpers.Mining.mine ~operations:[ ops ] contract (`Hash b2) >>=? fun _b3 ->
+  Helpers.Mining.mine ~fitness_gap:2 ~operations:[ ops ] contract (`Hash b2) >>=? fun _b3 ->
 
   Helpers.Endorse.endorse ~force:true contract (`Hash b2') >>=? fun ops ->
-  Helpers.Mining.mine ~operations:[ ops ] contract (`Hash b2') >>=? fun b3' ->
+  Helpers.Mining.mine ~fitness_gap:2 ~operations:[ ops ] contract (`Hash b2') >>=? fun b3' ->
 
   Helpers.Endorse.endorse ~force:true contract (`Hash b3') >>=? fun ops ->
-  Helpers.Mining.mine ~operations:[ ops ] contract (`Hash b3') >>=? fun b4' ->
+  Helpers.Mining.mine ~fitness_gap:2 ~operations:[ ops ] contract (`Hash b3') >>=? fun b4' ->
 
   (* TODO: Inject double endorsement op ! *)
-  Helpers.Mining.mine contract (`Hash b4')
+  Helpers.Mining.mine ~fitness_gap:1 contract (`Hash b4')
 
 (* FIXME: Mining.Invalid_signature is unclassified *)
 let test_invalid_signature block =
@@ -47,7 +48,7 @@ let test_invalid_signature block =
        DYfTKhq7rDQujdn5WWzwUMeV3agaZ6J2vPQT58jJAJPi" in
   let account =
     Helpers.Account.create ~keys:(secret_key, public_key) "WRONG SIGNATURE" in
-  Helpers.Mining.mine account block >>= fun res ->
+  Helpers.Mining.mine ~fitness_gap:1 account block >>= fun res ->
   Assert.generic_economic_error ~msg:__LOC__ res ;
   return ()
 
@@ -77,7 +78,7 @@ let test_invalid_endorsement_slot contract block =
   return ()
 
 let test_endorsement_rewards
-    block ({ Helpers.Account.b1 ; _ } as baccounts) =
+    block ({ Helpers.Account.b5 = b1 ; _ } as baccounts) =
   let get_endorser_except_b1 accounts =
     let account, cpt = ref accounts.(0), ref 0 in
     while !account = b1 do
@@ -94,9 +95,11 @@ let test_endorsement_rewards
   get_endorser_except_b1 accounts >>=? fun (account0, slot0) ->
   Helpers.Account.balance account0 >>=? fun balance0 ->
   Helpers.Endorse.endorse ~slot:slot0 ~force:true account0 block >>=? fun ops ->
-  Helpers.Mining.mine ~operations:[ ops ] b1 block >>=? fun head0 ->
+  Helpers.Mining.mine ~fitness_gap:2 ~operations:[ ops ] b1 block >>=? fun head0 ->
+  Helpers.display_level (`Hash head0) >>=? fun () ->
   Assert.balance_equal ~msg:__LOC__ account0
     (Int64.sub (Tez.to_cents balance0) bond) >>=? fun () ->
+
 
   (* #2 endorse & inject in a block  *)
   let block0 = `Hash head0 in
@@ -104,9 +107,11 @@ let test_endorsement_rewards
   get_endorser_except_b1 accounts >>=? fun (account1, slot1) ->
   Helpers.Account.balance account1 >>=? fun balance1 ->
   Helpers.Endorse.endorse ~slot:slot1 ~force:true account1 block0 >>=? fun ops ->
-  Helpers.Mining.mine ~operations:[ ops ] b1 block0 >>=? fun head1 ->
+  Helpers.Mining.mine ~fitness_gap:2 ~operations:[ ops ] b1 block0 >>=? fun head1 ->
+  Helpers.display_level (`Hash head1) >>=? fun () ->
   Assert.balance_equal ~msg:__LOC__ account1
     (Int64.sub (Tez.to_cents balance1) bond) >>=? fun () ->
+
 
   (* #3 endorse but the operation is not included in a block, so no reward  *)
   let block1 = `Hash head1 in
@@ -117,8 +122,12 @@ let test_endorsement_rewards
   Assert.balance_equal ~msg:__LOC__ account2
     (Int64.sub (Tez.to_cents balance2) bond) >>=? fun () ->
 
-  Helpers.Mining.mine b1 (`Hash head1) >>=? fun head2 ->
-  Helpers.Mining.mine b1 (`Hash head2) >>=? fun head3 ->
+  Helpers.Mining.mine ~fitness_gap:1 b1 (`Hash head1) >>=? fun head2 ->
+  Helpers.display_level (`Hash head2) >>=? fun () ->
+  Helpers.Mining.mine ~fitness_gap:1 b1 (`Hash head2) >>=? fun head3 ->
+  Helpers.display_level (`Hash head3) >>=? fun () ->
+  Helpers.Mining.mine ~fitness_gap:1 b1 (`Hash head3) >>=? fun head4 ->
+  Helpers.display_level (`Hash head4) >>=? fun () ->
 
   (* Check rewards after one cycle for account0 *)
   Helpers.Mining.endorsement_reward b1 block0 >>=? fun rw0 ->
@@ -135,8 +144,10 @@ let test_endorsement_rewards
     ~msg:__LOC__ account2 (Tez.to_cents balance2) >>=? fun () ->
 
   (* #2 endorse and check reward only on the good chain  *)
-  Helpers.Mining.mine b1 (`Hash head3) >>=? fun head ->
-  Helpers.Mining.mine b1 (`Hash head3) >>=? fun fork ->
+  Helpers.Mining.mine ~fitness_gap:1 b1 (`Hash head4) >>=? fun head ->
+  Helpers.display_level (`Hash head) >>=? fun () ->
+  Helpers.Mining.mine ~fitness_gap:1 b1 (`Hash head4) >>=? fun fork ->
+  Helpers.display_level (`Hash fork) >>=? fun () ->
 
   (* working on head *)
   Helpers.Endorse.endorsers_list (`Hash head) baccounts >>=? fun accounts ->
@@ -144,18 +155,22 @@ let test_endorsement_rewards
   Helpers.Account.balance account3 >>=? fun balance3 ->
   Helpers.Endorse.endorse
     ~slot:slot3 ~force:true account3 (`Hash head) >>=? fun ops ->
-  Helpers.Mining.mine ~operations:[ ops ] b1 (`Hash head) >>=? fun new_head ->
+  Helpers.Mining.mine ~fitness_gap:2 ~operations:[ ops ] b1 (`Hash head) >>=? fun new_head ->
+  Helpers.display_level (`Hash new_head) >>=? fun () ->
 
   (* working on fork *)
   Helpers.Endorse.endorsers_list (`Hash fork) baccounts >>=? fun accounts ->
   get_endorser_except_b1 accounts >>=? fun (account4, slot4) ->
   Helpers.Account.balance account4 >>=? fun _balance4 ->
   Helpers.Endorse.endorse ~slot:slot4 ~force:true account4 (`Hash fork) >>=? fun ops ->
-  Helpers.Mining.mine ~operations:[ ops ] b1 (`Hash fork) >>=? fun _new_fork ->
+  Helpers.Mining.mine ~fitness_gap:2 ~operations:[ ops ] b1 (`Hash fork) >>=? fun _new_fork ->
+  Helpers.display_level (`Hash _new_fork) >>=? fun () ->
   Helpers.Account.balance account4 >>=? fun balance4 ->
 
-  Helpers.Mining.mine b1 (`Hash new_head) >>=? fun head ->
-  Helpers.Mining.mine b1 (`Hash head) >>=? fun head ->
+  Helpers.Mining.mine ~fitness_gap:1 b1 (`Hash new_head) >>=? fun head ->
+  Helpers.display_level (`Hash head) >>=? fun () ->
+  Helpers.Mining.mine ~fitness_gap:1 b1 (`Hash head) >>=? fun head ->
+  Helpers.display_level (`Hash head) >>=? fun () ->
 
   (* Check rewards after one cycle *)
   Helpers.Mining.endorsement_reward b1 (`Hash new_head) >>=? fun reward ->
@@ -209,7 +224,7 @@ let run head (({ b1 ; b2 ; b3 ; b4 ; b5 } : Helpers.Account.bootstrap_accounts) 
   (* FIXME: cannot inject double endorsement operation yet, but the
      code is still here
      Double endorsement *)
-  test_double_endorsement b5 (`Hash head) >>=? fun new_head ->
+  test_double_endorsement b4 (`Hash head) >>=? fun new_head ->
 
   return new_head
 

@@ -37,6 +37,8 @@ let net_id = Net_id.of_block_hash genesis_block
 
 (** Context creation *)
 
+let commit = commit ~time:Time.epoch ~message:""
+
 let block2 =
   Block_hash.of_hex_exn
     "2222222222222222222222222222222222222222222222222222222222222222"
@@ -87,8 +89,7 @@ let wrap_context_init f base_dir =
   Context.commit_genesis idx
     ~id:genesis.block
     ~time:genesis.time
-    ~protocol:genesis.protocol
-    ~test_protocol:genesis.protocol >>= fun _ ->
+    ~protocol:genesis.protocol >>= fun _ ->
   create_block2 idx >>= fun () ->
   create_block3a idx >>= fun () ->
   create_block3b idx >>= fun () ->

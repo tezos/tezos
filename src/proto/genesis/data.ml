@@ -14,7 +14,7 @@ module Command = struct
     | Activate of Protocol_hash.t
 
     (* Activate a protocol as a testnet *)
-    | Activate_testnet of Protocol_hash.t
+    | Activate_testnet of Protocol_hash.t * Int64.t
 
   let mk_case name args =
     let open Data_encoding in
@@ -22,7 +22,7 @@ module Command = struct
       (fun o -> ((), o))
       (fun ((), o) -> o)
       (merge_objs
-         (obj1 (req "network" (constant name)))
+         (obj1 (req "command" (constant name)))
          args)
 
   let encoding =
@@ -30,14 +30,18 @@ module Command = struct
     union ~tag_size:`Uint8 [
       case ~tag:0
         (mk_case "activate"
-           (obj1 (req "hash" Protocol_hash.encoding)))
+           (obj1
+              (req "hash" Protocol_hash.encoding)))
         (function (Activate hash) -> Some hash | _ -> None)
         (fun hash -> Activate hash) ;
       case ~tag:1
         (mk_case "activate_testnet"
-           (obj1 (req "hash" Protocol_hash.encoding)))
-        (function (Activate_testnet hash) -> Some hash | _ -> None)
-        (fun hash -> Activate_testnet hash) ;
+           (obj2
+              (req "hash" Protocol_hash.encoding)
+              (req "validity_time" int64)))
+        (function (Activate_testnet (hash, delay)) -> Some (hash, delay)
+                | _ -> None)
+        (fun (hash, delay) -> Activate_testnet (hash, delay)) ;
     ]
 
   let signed_encoding =

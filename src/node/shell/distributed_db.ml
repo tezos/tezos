@@ -348,7 +348,7 @@ module P2p_reader = struct
           | None -> Lwt.return_unit
           | Some bh ->
               if Operation_list_list_hash.compare
-                   found_hash bh.shell.operations <> 0 then
+                   found_hash bh.shell.operations_hash <> 0 then
                 Lwt.return_unit
               else
                 Raw_operation_list.Table.notify
@@ -624,7 +624,7 @@ let inject_block t bytes operations =
                   (List.map Operation_list_hash.compute operations) in
               fail_unless
                 (Operation_list_list_hash.compare
-                   computed_hash block.shell.operations = 0)
+                   computed_hash block.shell.operations_hash = 0)
                 (Exn (Failure "Incoherent operation list")) >>=? fun () ->
               Raw_block_header.Table.inject
                 net_db.block_header_db.table hash block >>= function

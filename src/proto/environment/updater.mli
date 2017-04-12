@@ -2,6 +2,7 @@
 
 open Hash
 
+(** The version agnostic toplevel structure of operations. *)
 type shell_operation = {
   net_id: Net_id.t ;
 }
@@ -18,12 +19,14 @@ val raw_operation_encoding: raw_operation Data_encoding.t
 type shell_block = {
   net_id: Net_id.t ;
   (** The genesis of the chain this block belongs to. *)
+  level: Int32.t ;
+  (** The number of predecessing block in the chain. *)
   predecessor: Block_hash.t ;
   (** The preceding block in the chain. *)
   timestamp: Time.t ;
   (** The date at which this block has been forged. *)
-  operations: Operation_list_list_hash.t ;
-  (** The sequence of operations. *)
+  operations_hash: Operation_list_list_hash.t ;
+  (** The hash lf the merkle tree of operations. *)
   fitness: MBytes.t list ;
   (** The announced score of the block. As a sequence of sequences
       of unsigned bytes. Ordered by length and then by contents
@@ -36,6 +39,19 @@ type raw_block = {
   proto: MBytes.t ;
 }
 val raw_block_encoding: raw_block Data_encoding.t
+
+type validation_result = {
+  context: Context.t ;
+  fitness: Fitness.fitness ;
+  message: string option ;
+}
+
+type rpc_context = {
+  context: Context.t ;
+  level: Int32.t ;
+  timestamp: Time.t ;
+  fitness: Fitness.fitness ;
+}
 
 (** This is the signature of a Tezos protocol implementation. It has
     access to the standard library and the Environment module. *)
@@ -99,6 +115,7 @@ module type PROTOCOL = sig
   val begin_application :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
+    predecessor_fitness: Fitness.fitness ->
     raw_block ->
     validation_state tzresult Lwt.t
 
@@ -110,6 +127,8 @@ module type PROTOCOL = sig
   val begin_construction :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
+    predecessor_level: Int32.t ->
+    predecessor_fitness: Fitness.fitness ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
     validation_state tzresult Lwt.t
@@ -123,10 +142,10 @@ module type PROTOCOL = sig
       context that will be used as input for the validation of its
       successor block candidates. *)
   val finalize_block :
-    validation_state -> Context.t tzresult Lwt.t
+    validation_state -> validation_result tzresult Lwt.t
 
   (** The list of remote procedures exported by this implementation *)
-  val rpc_services : Context.t RPC.directory
+  val rpc_services : rpc_context RPC.directory
 
   val configure_sandbox :
     Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
@@ -155,5 +174,10 @@ val compile : Protocol_hash.t -> component list -> bool Lwt.t
     been previously compiled successfully. *)
 val activate : Context.t -> Protocol_hash.t -> Context.t Lwt.t
 
-val set_test_protocol: Context.t -> Protocol_hash.t -> Context.t Lwt.t
-val fork_test_network: Context.t -> Context.t Lwt.t
+(** Fork a test network. The forkerd network will use the current block
+    as genesis, and [protocol] as economic protocol. The network will
+    be destroyed when a (successor) block will have a timestamp greater
+    than [expiration]. The protocol must have been previously compiled
+    successfully. *)
+val fork_test_network:
+  Context.t -> protocol:Protocol_hash.t -> expiration:Time.t -> Context.t Lwt.t

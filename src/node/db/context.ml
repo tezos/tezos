@@ -84,14 +84,7 @@ type t = context
 (*-- Version Access and Update -----------------------------------------------*)
 
 let current_protocol_key = ["protocol"]
-let current_fitness_key = ["fitness"]
-let current_timestamp_key = ["timestamp"]
-let current_test_protocol_key = ["test_protocol"]
 let current_test_network_key = ["test_network"]
-let current_test_network_expiration_key = ["test_network_expiration"]
-let current_fork_test_network_key = ["fork_test_network"]
-
-let transient_commit_message_key = ["message"]
 
 let exists { repo } key =
   GitStore.of_branch_id
@@ -134,59 +127,17 @@ let exists index key =
     Block_hash.pp_short key exists >>= fun () ->
   Lwt.return exists
 
-let get_and_erase_commit_message ctxt =
-  GitStore.FunView.get ctxt.view transient_commit_message_key >>= function
-  | None -> Lwt.return (None, ctxt)
-  | Some bytes ->
-     GitStore.FunView.del ctxt.view transient_commit_message_key >>= fun view ->
-     Lwt.return (Some (MBytes.to_string bytes), { ctxt with view })
-let set_commit_message ctxt msg =
-  GitStore.FunView.set ctxt.view
-    transient_commit_message_key
-    (MBytes.of_string msg) >>= fun view ->
-  Lwt.return { ctxt with view }
-
-let get_fitness { view } =
-  GitStore.FunView.get view current_fitness_key >>= function
-  | None -> assert false
-  | Some data ->
-      match Data_encoding.Binary.of_bytes Fitness.encoding data with
-      | None -> assert false
-      | Some data -> Lwt.return data
-let set_fitness ctxt data =
-  GitStore.FunView.set ctxt.view current_fitness_key
-    (Data_encoding.Binary.to_bytes Fitness.encoding data) >>= fun view ->
-  Lwt.return { ctxt with view }
-
-let get_timestamp { view } =
-  GitStore.FunView.get view current_timestamp_key >>= function
-  | None -> assert false
-  | Some time ->
-     Lwt.return (Time.of_notation_exn (MBytes.to_string time))
-let set_timestamp ctxt time =
-  GitStore.FunView.set ctxt.view current_timestamp_key
-    (MBytes.of_string (Time.to_notation time)) >>= fun view ->
-  Lwt.return { ctxt with view }
-
 exception Preexistent_context of Block_hash.t
 exception Empty_head of Block_hash.t
 
-let commit key context =
-  get_timestamp context >>= fun timestamp ->
-  get_fitness context >>= fun fitness ->
-  let task =
-    Irmin.Task.create ~date:(Time.to_seconds timestamp) ~owner:"Tezos" in
+let commit key ~time ~message context =
+  let task = Irmin.Task.create ~date:(Time.to_seconds time) ~owner:"Tezos" in
   GitStore.clone task context.store (Block_hash.to_b58check key) >>= function
   | `Empty_head -> Lwt.fail (Empty_head key)
   | `Duplicated_branch -> Lwt.fail (Preexistent_context key)
   | `Ok store ->
-     get_and_erase_commit_message context >>= fun (msg, context) ->
-     let msg = match msg with
-       | None ->
-          Format.asprintf "%a %a"
-            Fitness.pp fitness Block_hash.pp_short key
-       | Some msg -> msg in
-     GitStore.FunView.update_path (store msg) [] context.view >>= fun () ->
+      GitStore.FunView.update_path
+        (store message) [] context.view >>= fun () ->
      context.index.commits <- context.index.commits + 1 ;
      if context.index.commits mod 200 = 0 then
        Lwt_utils.Idle_waiter.force_idle
@@ -250,6 +201,77 @@ let remove_rec ctxt key =
   GitStore.FunView.remove_rec ctxt.view (data_key key) >>= fun view ->
   Lwt.return { ctxt with view }
 
+(*-- Predefined Fields -------------------------------------------------------*)
+
+let get_protocol v =
+  raw_get v current_protocol_key >>= function
+  | None -> assert false
+  | Some data -> Lwt.return (Protocol_hash.of_bytes_exn data)
+let set_protocol v key =
+  raw_set v current_protocol_key (Protocol_hash.to_bytes key)
+
+type test_network =
+  | Not_running
+  | Forking of {
+      protocol: Protocol_hash.t ;
+      expiration: Time.t ;
+    }
+  | Running of {
+      net_id: Net_id.t ;
+      genesis: Block_hash.t ;
+      protocol: Protocol_hash.t ;
+      expiration: Time.t ;
+    }
+
+let test_network_encoding =
+  let open Data_encoding in
+  union [
+    case ~tag:0
+      (obj1 (req "status" (constant "not_running")))
+      (function Not_running -> Some () | _ -> None)
+      (fun () -> Not_running) ;
+    case ~tag:1
+      (obj3
+         (req "status" (constant "forking"))
+         (req "protocol" Protocol_hash.encoding)
+         (req "expiration" Time.encoding))
+      (function
+        | Forking { protocol ; expiration } ->
+            Some ((), protocol, expiration)
+        | _ -> None)
+      (fun ((), protocol, expiration) ->
+         Forking { protocol ; expiration }) ;
+    case ~tag:2
+      (obj5
+         (req "status" (constant "running"))
+         (req "net_id" Net_id.encoding)
+         (req "genesis" Block_hash.encoding)
+         (req "protocol" Protocol_hash.encoding)
+         (req "expiration" Time.encoding))
+      (function
+        | Running { net_id ; genesis ; protocol ; expiration } ->
+            Some ((), net_id, genesis, protocol, expiration)
+        | _ -> None)
+      (fun ((), net_id, genesis, protocol, expiration) ->
+         Running { net_id ; genesis ;protocol ; expiration }) ;
+  ]
+
+let get_test_network v =
+  raw_get v current_test_network_key >>= function
+  | None -> Lwt.fail (Failure "Unexpected error (Context.get_test_network)")
+  | Some data ->
+      match Data_encoding.Binary.of_bytes test_network_encoding data with
+      | None -> Lwt.fail (Failure "Unexpected error (Context.get_test_network)")
+      | Some r -> Lwt.return r
+
+let set_test_network v id =
+  raw_set v current_test_network_key
+    (Data_encoding.Binary.to_bytes test_network_encoding id)
+let del_test_network v  = raw_del v current_test_network_key
+
+let fork_test_network v ~protocol ~expiration =
+  set_test_network v (Forking { protocol ; expiration })
+
 (*-- Initialisation ----------------------------------------------------------*)
 
 let init ?patch_context ~root =
@@ -266,86 +288,48 @@ let init ?patch_context ~root =
       | Some patch_context -> patch_context
   }
 
-let commit_genesis index ~id:block ~time ~protocol ~test_protocol =
+let commit_genesis index ~id:block ~time ~protocol =
+  let task = Irmin.Task.create ~date:(Time.to_seconds time) ~owner:"Tezos" in
   GitStore.of_branch_id
-    Irmin.Task.none (Block_hash.to_b58check block)
+    task (Block_hash.to_b58check block)
     index.repo >>= fun t ->
-  let store = t () in
+  let store = t "Genesis" in
   GitStore.FunView.of_path store [] >>= fun view ->
   let view = (view, index.repack_scheduler) in
-  GitStore.FunView.set view current_timestamp_key
-    (MBytes.of_string (Time.to_notation time)) >>= fun view ->
-  GitStore.FunView.set view current_protocol_key
-    (Protocol_hash.to_bytes protocol) >>= fun view ->
-  GitStore.FunView.set view current_fitness_key
-    (Data_encoding.Binary.to_bytes Fitness.encoding []) >>= fun view ->
-  GitStore.FunView.set view current_test_protocol_key
-    (Protocol_hash.to_bytes test_protocol) >>= fun view ->
   let ctxt = { index ; store ; view } in
+  set_protocol ctxt protocol >>= fun ctxt ->
+  set_test_network ctxt Not_running >>= fun ctxt ->
   index.patch_context ctxt >>= fun ctxt ->
   GitStore.FunView.update_path ctxt.store [] ctxt.view >>= fun () ->
   Lwt.return ctxt
 
-(*-- Predefined Fields -------------------------------------------------------*)
+let compute_testnet_genesis forked_block =
+  let genesis = Block_hash.hash_bytes [Block_hash.to_bytes forked_block] in
+  let net_id = Net_id.of_block_hash genesis in
+  net_id, genesis
 
-let get_protocol v =
-  raw_get v current_protocol_key >>= function
-  | None -> assert false
-  | Some data -> Lwt.return (Protocol_hash.of_bytes_exn data)
-let set_protocol v key =
-  raw_set v current_protocol_key (Protocol_hash.to_bytes key)
-
-let get_test_protocol v =
-  raw_get v current_test_protocol_key >>= function
-  | None -> assert false
-  | Some data -> Lwt.return (Protocol_hash.of_bytes_exn data)
-let set_test_protocol v data =
-  raw_set v current_test_protocol_key (Protocol_hash.to_bytes data)
-
-let get_test_network v =
-  raw_get v current_test_network_key >>= function
-  | None -> Lwt.return_none
-  | Some data -> Lwt.return (Some (Net_id.of_bytes_exn data))
-let set_test_network v id =
-  raw_set v current_test_network_key (Net_id.to_bytes id)
-let del_test_network v  = raw_del v current_test_network_key
-
-let get_test_network_expiration v =
-  raw_get v current_test_network_expiration_key >>= function
-  | None -> Lwt.return_none
-  | Some data -> Lwt.return (Time.of_notation @@ MBytes.to_string data)
-let set_test_network_expiration v data =
-  raw_set v current_test_network_expiration_key
-    (MBytes.of_string @@ Time.to_notation data)
-let del_test_network_expiration v  =
-  raw_del v current_test_network_expiration_key
-
-let read_and_reset_fork_test_network v =
-  raw_get v current_fork_test_network_key >>= function
-  | None -> Lwt.return (false, v)
-  | Some _ ->
-      raw_del v current_fork_test_network_key >>= fun v ->
-      Lwt.return (true, v)
-
-let fork_test_network v =
-  raw_set v current_fork_test_network_key (MBytes.of_string "fork")
-
-let init_test_network v ~time ~genesis =
-  get_test_protocol v >>= fun test_protocol ->
-  del_test_network_expiration v >>= fun v ->
-  set_protocol v test_protocol >>= fun v ->
-  set_timestamp v time >>= fun v ->
-  let task =
-    Irmin.Task.create
-      ~date:(Time.to_seconds time)
-      ~owner:"tezos" in
-  GitStore.clone task v.store (Block_hash.to_b58check genesis) >>= function
-  | `Empty_head -> Lwt.return (Error [Exn (Empty_head genesis)])
-  | `Duplicated_branch -> Lwt.return (Error [Exn (Preexistent_context genesis)])
+let commit_test_network_genesis forked_block time ctxt =
+  let net_id, genesis = compute_testnet_genesis forked_block in
+  let task = Irmin.Task.create ~date:(Time.to_seconds time) ~owner:"Tezos" in
+  GitStore.clone task ctxt.store (Block_hash.to_b58check genesis) >>= function
+  | `Empty_head -> fail (Exn (Empty_head genesis))
+  | `Duplicated_branch -> fail (Exn (Preexistent_context genesis))
   | `Ok store ->
       let msg =
-        Format.asprintf "Fake block. Forking testnet: %a."
-          Block_hash.pp_short genesis in
-      GitStore.FunView.update_path (store msg) [] v.view >>= fun () ->
-      return v
+        Format.asprintf "Forking testnet: %a." Net_id.pp_short net_id in
+      GitStore.FunView.update_path (store msg) [] ctxt.view >>= fun () ->
+      return (net_id, genesis)
 
+let reset_test_network ctxt forked_block timestamp =
+  get_test_network ctxt >>= function
+  | Not_running -> Lwt.return ctxt
+  | Running { expiration } ->
+      if Time.(expiration <= timestamp) then
+        set_test_network ctxt Not_running
+      else
+        Lwt.return ctxt
+  | Forking { protocol ; expiration } ->
+      let net_id, genesis = compute_testnet_genesis forked_block in
+      set_test_network ctxt
+        (Running { net_id ; genesis ;
+                   protocol ; expiration })

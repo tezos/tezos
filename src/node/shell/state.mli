@@ -62,12 +62,12 @@ module Net : sig
   }
   val genesis_encoding: genesis Data_encoding.t
 
-  (** Initialize a network for a given [genesis]. By default the network
-      never expirate and the test_protocol is the genesis protocol. *)
+  (** Initialize a network for a given [genesis]. By default,
+      the network does accept forking test network. When
+      [~allow_forked_network:true] is provided, test network are allowed. *)
   val create:
     global_state ->
-    ?test_protocol: Protocol_hash.t ->
-    ?forked_network_ttl: int ->
+    ?allow_forked_network:bool ->
     genesis -> net Lwt.t
 
   (** Look up for a network by the hash of its genesis block. *)
@@ -88,7 +88,7 @@ module Net : sig
   val id: net -> Net_id.t
   val genesis: net -> genesis
   val expiration: net -> Time.t option
-  val forked_network_ttl: net -> Int64.t option
+  val allow_forked_network: net -> bool
 
 end
 
@@ -144,9 +144,10 @@ module Block_header : sig
 
   type shell_header = Store.Block_header.shell_header = {
     net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
-    operations: Operation_list_list_hash.t ;
+    operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
   }
 
@@ -245,7 +246,9 @@ module Valid_block : sig
     (** The genesis of the chain this block belongs to. *)
     hash: Block_hash.t ;
     (** The block hash. *)
-    pred: Block_hash.t ;
+    level: Int32.t ;
+    (** The number of preceding block in the chain. *)
+    predecessor: Block_hash.t ;
     (** The preceding block in the chain. *)
     timestamp: Time.t ;
     (** The date at which this block has been forged. *)
@@ -261,14 +264,8 @@ module Valid_block : sig
     protocol: (module Updater.REGISTRED_PROTOCOL) option ;
     (** The actual implementation of the protocol to be used for
         validating the following blocks. *)
-    test_protocol_hash: Protocol_hash.t ;
-    (** The protocol to be used for the next test network. *)
-    test_protocol: (module Updater.REGISTRED_PROTOCOL) option ;
-    (** The actual implementatino of the protocol to be used for the
-        next test network. *)
-    test_network: (Net_id.t * Time.t) option ;
-    (** The current test network associated to the block, and the date
-        of its expiration date. *)
+    test_network: Context.test_network ;
+    (** The current test network associated to the block. *)
     context: Context.t ;
     (** The validation context that was produced by the block validation. *)
     successors: Block_hash.Set.t ;
@@ -284,7 +281,8 @@ module Valid_block : sig
   val read_opt: Net.t -> Block_hash.t -> valid_block option Lwt.t
   val read_exn: Net.t -> Block_hash.t -> valid_block Lwt.t
   val store:
-    Net.t -> Block_hash.t -> Context.t -> valid_block option tzresult Lwt.t
+    Net.t -> Block_hash.t -> Updater.validation_result ->
+    valid_block option tzresult Lwt.t
 
   val watcher: Net.t -> valid_block Lwt_stream.t * Watcher.stopper
 
@@ -292,7 +290,10 @@ module Valid_block : sig
   val known_heads: Net.t -> valid_block list Lwt.t
 
   val fork_testnet:
-    global_state -> Net.t -> valid_block -> Time.t -> Net.t tzresult Lwt.t
+    global_state ->
+    Net.t -> valid_block ->
+    Protocol_hash.t -> Time.t ->
+    Net.t tzresult Lwt.t
 
   module Current : sig
 

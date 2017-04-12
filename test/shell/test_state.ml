@@ -38,7 +38,7 @@ let net_id = Net_id.of_block_hash genesis_block
 let incr_fitness fitness =
   let new_fitness =
     match fitness with
-    | [ _ ; fitness ] ->
+    | [ fitness ] ->
         Pervasives.(
           Data_encoding.Binary.of_bytes Data_encoding.int64 fitness
           |> Utils.unopt ~default:0L
@@ -47,7 +47,7 @@ let incr_fitness fitness =
         )
     | _ -> Data_encoding.Binary.to_bytes Data_encoding.int64 1L
   in
-  [ MBytes.of_string "\000" ; new_fitness ]
+  [ new_fitness ]
 
 let incr_timestamp timestamp =
   Time.add timestamp (Int64.add 1L (Random.int64 10L))
@@ -62,15 +62,16 @@ let operation op =
   Data_encoding.Binary.to_bytes Store.Operation.encoding op
 
 let block _state ?(operations = []) pred_hash pred name : Store.Block_header.t =
-  let operations =
+  let operations_hash =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
   let fitness = incr_fitness pred.Store.Block_header.shell.fitness in
   let timestamp = incr_timestamp pred.shell.timestamp in
   { shell = {
         net_id = pred.shell.net_id ;
+        level = Int32.succ pred.shell.level ;
         predecessor = pred_hash ;
-        timestamp ; operations; fitness } ;
+        timestamp ; operations_hash ; fitness } ;
     proto = MBytes.of_string name ;
   }
 
@@ -133,14 +134,15 @@ let build_chain state tbl otbl pred names =
 
 let block _state ?(operations = []) (pred: State.Valid_block.t) name
   : State.Block_header.t =
-  let operations =
+  let operations_hash =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
   let fitness = incr_fitness pred.fitness in
   let timestamp = incr_timestamp pred.timestamp in
   { shell = { net_id = pred.net_id ;
+              level = Int32.succ pred.level ;
               predecessor = pred.hash ;
-              timestamp ; operations; fitness } ;
+              timestamp ; operations_hash ; fitness } ;
     proto = MBytes.of_string name ;
   }
 
@@ -166,6 +168,7 @@ let build_valid_chain state tbl vtbl otbl pred names =
            Proto.begin_application
              ~predecessor_context: pred.context
              ~predecessor_timestamp: pred.timestamp
+             ~predecessor_fitness: pred.fitness
              block >>=? fun vstate ->
            (* no operations *)
            Proto.finalize_block vstate

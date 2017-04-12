@@ -16,9 +16,9 @@ let int64_to_bytes i =
 
 let int64_of_bytes b =
   if Compare.Int.(MBytes.length b <> 8) then
-    fail Invalid_fitness
+    error Invalid_fitness
   else
-    return (MBytes.get_int64 b 0)
+    ok (MBytes.get_int64 b 0)
 
 let from_int64 fitness =
   [ MBytes.of_string Constants_repr.version_number ;
@@ -30,5 +30,5 @@ let to_int64 = function
     when Compare.String.
            (MBytes.to_string version = Constants_repr.version_number) ->
       int64_of_bytes fitness
-  | [] -> return 0L
-  | _ -> fail Invalid_fitness
+  | [] -> ok 0L
+  | _ -> error Invalid_fitness

@@ -7,25 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let version_key = ["version"]
-
-(* This key should always be populated for every version of the
-   protocol.  It's absence meaning that the context is empty. *)
-let version_value = "alpha"
-
 (* This is the genesis protocol: initialise the state *)
-let initialize ~from_genesis (ctxt:Context.t) =
-  Context.set ctxt version_key (MBytes.of_string version_value) >>= fun ctxt ->
-  Storage.prepare ctxt >>=? fun store ->
-  begin
-    if from_genesis then
-      Lwt.return store
-    else
-      Fitness_storage.init store
-  end >>= fun store ->
-  Level_storage.init store >>=? fun store ->
+let initialize store =
   Roll_storage.init store >>=? fun store ->
-  Nonce_storage.init store >>=? fun store ->
   Seed_storage.init store >>=? fun store ->
   Contract_storage.init store >>=? fun store ->
   Reward_storage.init store >>=? fun store ->
@@ -38,34 +22,25 @@ let initialize ~from_genesis (ctxt:Context.t) =
   return store
 
 type error +=
-  | Incompatiple_protocol_version
   | Unimplemented_sandbox_migration
 
-let may_initialize ctxt =
-  Context.get ctxt version_key >>= function
-  | None ->
-      (* This is the genesis protocol: The only acceptable preceding
-         version is an empty context *)
-      initialize ~from_genesis:false ctxt
-  | Some bytes ->
-      let s = MBytes.to_string bytes in
-      if Compare.String.(s = version_value)
-      then Storage.prepare ctxt
-      else if Compare.String.(s = "genesis") then
-        initialize ~from_genesis:true ctxt
-      else fail Incompatiple_protocol_version
+let may_initialize ctxt ~level ~timestamp ~fitness =
+  Storage.prepare ~level ~timestamp ~fitness ctxt >>=? fun (ctxt, first_block) ->
+  if first_block then
+    initialize ctxt
+  else
+    return ctxt
 
 let configure_sandbox ctxt json =
   let json =
     match json with
     | None -> `O []
     | Some json -> json in
-  Context.get ctxt version_key >>= function
-  | None ->
+  Storage.is_first_block ctxt >>=? function
+  | true ->
       Storage.set_sandboxed ctxt json >>= fun ctxt ->
-      initialize ~from_genesis:false ctxt >>=? fun ctxt ->
-      return (Storage.recover ctxt)
-  | Some _ ->
+      return ctxt
+  | false ->
       Storage.get_sandboxed ctxt >>=? function
       | None ->
           fail Unimplemented_sandbox_migration
