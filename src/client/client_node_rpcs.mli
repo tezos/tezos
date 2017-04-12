@@ -16,6 +16,7 @@ val forge_block:
   config ->
   ?net_id:Net_id.t ->
   ?level:Int32.t ->
+  ?proto_level:int ->
   ?predecessor:Block_hash.t ->
   ?timestamp:Time.t ->
   Fitness.fitness ->
@@ -105,6 +106,7 @@ module Blocks : sig
     hash: Block_hash.t ;
     net_id: Net_id.t ;
     level: Int32.t ;
+    proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations_hash: Operation_list_list_hash.t ;

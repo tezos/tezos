@@ -401,15 +401,17 @@ let build_rpc_directory node =
     RPC.register1 dir Services.Protocols.contents (get_protocols node) in
   let dir =
     let implementation
-        (net_id, level, pred, time, fitness, operations_hash, header) =
+        (net_id, level, proto_level, pred, time,
+         fitness, operations_hash, header) =
       Node.RPC.block_info node (`Head 0) >>= fun bi ->
       let timestamp = Utils.unopt ~default:(Time.now ()) time in
       let net_id = Utils.unopt ~default:bi.net_id net_id in
       let predecessor = Utils.unopt ~default:bi.hash pred in
       let level = Utils.unopt ~default:(Int32.succ bi.level) level in
+      let proto_level = Utils.unopt ~default:bi.proto_level proto_level in
       let res =
         Data_encoding.Binary.to_bytes Store.Block_header.encoding {
-          shell = { net_id ; predecessor ; level ;
+          shell = { net_id ; predecessor ; level ; proto_level ;
                     timestamp ; fitness ; operations_hash } ;
           proto = header ;
         } in

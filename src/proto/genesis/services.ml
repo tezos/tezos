@@ -38,9 +38,10 @@ module Forge = struct
       ~description: "Forge a block"
       ~input:
         (merge_objs
-           (obj5
+           (obj6
               (req "net_id" Net_id.encoding)
               (req "level" int32)
+              (req "proto_level" uint8)
               (req "predecessor" Block_hash.encoding)
               (req "timestamp" Time.encoding)
               (req "fitness" Fitness.encoding))
@@ -63,8 +64,9 @@ let rpc_services : Updater.rpc_context RPC.directory =
     RPC.register
       dir
       (Forge.block RPC.Path.root)
-      (fun _ctxt ((net_id, level, predecessor, timestamp, fitness), command) ->
-         let shell = { Updater.net_id ; level ; predecessor ;
+      (fun _ctxt ((net_id, level, proto_level, predecessor,
+                   timestamp, fitness), command) ->
+         let shell = { Updater.net_id ; level ; proto_level ; predecessor ;
                        timestamp ; fitness ; operations_hash } in
          let bytes = Data.Command.forge shell command in
          RPC.Answer.return bytes) in

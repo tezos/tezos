@@ -52,6 +52,7 @@ let inject_block cctxt block
       (List.map Operation_list_hash.compute operations) in
   let shell =
     { Store.Block_header.net_id = bi.net_id ; level = bi.level ;
+      proto_level = bi.proto_level ;
       predecessor = bi.hash ; timestamp ; fitness ; operations_hash } in
   compute_stamp cctxt block
     src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
@@ -63,6 +64,7 @@ let inject_block cctxt block
     ~fitness
     ~operations_hash
     ~level:level.level
+    ~proto_level:bi.proto_level
     ~priority:priority
     ~seed_nonce_hash
     ~proof_of_work_nonce

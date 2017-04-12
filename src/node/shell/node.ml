@@ -139,6 +139,7 @@ module RPC = struct
     hash: Block_hash.t ;
     net_id: Net_id.t ;
     level: Int32.t ;
+    proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations_hash: Operation_list_list_hash.t ;
@@ -153,6 +154,7 @@ module RPC = struct
     hash = block.hash ;
     net_id = block.net_id ;
     level = block.level ;
+    proto_level = block.proto_level ;
     predecessor = block.predecessor ;
     timestamp = block.timestamp ;
     operations_hash = block.operations_hash ;
@@ -266,12 +268,18 @@ module RPC = struct
         | Ok { context ; fitness } ->
             Context.get_protocol context >>= fun protocol ->
             Context.get_test_network context >>= fun test_network ->
+            let proto_level =
+              if Protocol_hash.equal protocol head.protocol_hash then
+                head.proto_level
+              else
+                ((head.proto_level + 1) mod 256) in
             let operations =
               let pv_result, _ = Prevalidator.operations pv in
               [ pv_result.applied ] in
             Lwt.return
               { hash = prevalidation_hash ;
                 level = Int32.succ head.level ;
+                proto_level ;
                 predecessor = head.hash ;
                 fitness ;
                 timestamp = Prevalidator.timestamp pv ;

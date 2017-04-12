@@ -145,6 +145,7 @@ module Block_header : sig
   type shell_header = Store.Block_header.shell_header = {
     net_id: Net_id.t ;
     level: Int32.t ;
+    proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations_hash: Operation_list_list_hash.t ;
@@ -248,6 +249,8 @@ module Valid_block : sig
     (** The block hash. *)
     level: Int32.t ;
     (** The number of preceding block in the chain. *)
+    proto_level: int ;
+    (** The number of protocol amendment block in the chain (modulo 256) *)
     predecessor: Block_hash.t ;
     (** The preceding block in the chain. *)
     timestamp: Time.t ;

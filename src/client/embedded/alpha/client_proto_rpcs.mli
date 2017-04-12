@@ -301,6 +301,7 @@ module Helpers : sig
       operations_hash:Operation_list_list_hash.t ->
       level:Raw_level.t ->
       priority:int ->
+      proto_level:int ->
       seed_nonce_hash:Nonce_hash.t ->
       proof_of_work_nonce:MBytes.t ->
       unit -> MBytes.t tzresult Lwt.t

@@ -70,6 +70,7 @@ let block _state ?(operations = []) pred_hash pred name : Store.Block_header.t =
   { shell = {
         net_id = pred.shell.net_id ;
         level = Int32.succ pred.shell.level ;
+        proto_level = pred.shell.proto_level ;
         predecessor = pred_hash ;
         timestamp ; operations_hash ; fitness } ;
     proto = MBytes.of_string name ;
@@ -141,6 +142,7 @@ let block _state ?(operations = []) (pred: State.Valid_block.t) name
   let timestamp = incr_timestamp pred.timestamp in
   { shell = { net_id = pred.net_id ;
               level = Int32.succ pred.level ;
+              proto_level = pred.proto_level ;
               predecessor = pred.hash ;
               timestamp ; operations_hash ; fitness } ;
     proto = MBytes.of_string name ;
