@@ -28,22 +28,24 @@ module Blocks : sig
 
   type block_info = {
     hash: Block_hash.t ;
+    net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
-    fitness: MBytes.t list ;
     timestamp: Time.t ;
-    protocol: Protocol_hash.t option ;
     operations_hash: Operation_list_list_hash.t ;
+    fitness: MBytes.t list ;
+    data: MBytes.t ;
     operations: Operation_hash.t list list option ;
-    data: MBytes.t option ;
-    net: Net_id.t ;
-    test_protocol: Protocol_hash.t option ;
-    test_network: (Net_id.t * Time.t) option ;
+    protocol: Protocol_hash.t ;
+    test_network: Context.test_network;
   }
 
   val info:
-    (unit, unit * block, bool * bool, block_info) RPC.service
+    (unit, unit * block, bool, block_info) RPC.service
   val net:
     (unit, unit * block, unit, Net_id.t) RPC.service
+  val level:
+    (unit, unit * block, unit, Int32.t) RPC.service
   val predecessor:
     (unit, unit * block, unit, Block_hash.t) RPC.service
   val predecessors:
@@ -58,17 +60,14 @@ module Blocks : sig
     (unit, unit * block, unit, Operation_hash.t list list) RPC.service
   val protocol:
     (unit, unit * block, unit, Protocol_hash.t) RPC.service
-  val test_protocol:
-    (unit, unit * block, unit, Protocol_hash.t option) RPC.service
   val test_network:
-    (unit, unit * block, unit, (Net_id.t * Time.t) option) RPC.service
+    (unit, unit * block, unit, Context.test_network) RPC.service
   val pending_operations:
     (unit, unit * block, unit,
      error Prevalidation.preapply_result * Hash.Operation_hash.Set.t) RPC.service
 
   type list_param = {
-    operations: bool ;
-    data: bool ;
+    include_ops: bool ;
     length: int option ;
     heads: Block_hash.t list option ;
     monitor: bool option ;
@@ -179,7 +178,7 @@ end
 
 val forge_block:
   (unit, unit,
-   Net_id.t option * Block_hash.t option * Time.t option *
+   Net_id.t option * Int32.t option * Block_hash.t option * Time.t option *
    Fitness.fitness * Operation_list_list_hash.t * MBytes.t,
    MBytes.t) RPC.service
 

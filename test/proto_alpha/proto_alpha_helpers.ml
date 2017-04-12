@@ -361,7 +361,7 @@ module Mining = struct
       block
       delegate_sk
       shell
-      mining_slot
+      priority
       seed_nonce_hash =
     Client_proto_rpcs.Constants.stamp_threshold
       rpc_config block >>=? fun stamp_threshold ->
@@ -370,7 +370,7 @@ module Mining = struct
         Sodium.Random.Bigbytes.generate Constants.proof_of_work_nonce_size in
       let unsigned_header =
         Block.forge_header
-          shell { mining_slot ; seed_nonce_hash ; proof_of_work_nonce } in
+          shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
       let signed_header =
         Environment.Ed25519.Signature.append delegate_sk unsigned_header in
       let block_hash = Block_hash.hash_bytes [signed_header] in
@@ -393,24 +393,24 @@ module Mining = struct
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
     let seed_nonce_hash = Nonce.hash seed_nonce in
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun level ->
-    let operations =
+    let operations_hash =
       Operation_list_list_hash.compute
         [Operation_list_hash.compute operation_list] in
     let shell =
-      { Store.Block_header.net_id = bi.net ; predecessor = bi.hash ;
-        timestamp ; fitness ; operations } in
-    let slot = { Block.level = level.level ; priority = Int32.of_int priority } in
+      { Store.Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
+        timestamp ; fitness ; operations_hash ;
+        level = Raw_level.to_int32 level.level } in
     mine_stamp
-      block src_sk shell slot seed_nonce_hash >>=? fun proof_of_work_nonce ->
+      block src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
     Client_proto_rpcs.Helpers.Forge.block rpc_config
       block
-      ~net:bi.net
+      ~net:bi.net_id
       ~predecessor:bi.hash
       ~timestamp
       ~fitness
-      ~operations
+      ~operations_hash
       ~level:level.level
-      ~priority:priority
+      ~priority
       ~seed_nonce_hash
       ~proof_of_work_nonce
       () >>=? fun unsigned_header ->
@@ -422,6 +422,7 @@ module Mining = struct
   let mine
       ?(force = false)
       ?(operations = [])
+      ~fitness_gap
       contract
       block =
   Client_mining_blocks.info rpc_config block >>=? fun bi ->
@@ -434,12 +435,11 @@ module Mining = struct
   Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
   let level = Raw_level.succ level.level in
   get_first_priority level contract block >>=? fun priority ->
-  (Fitness_repr.to_int64 bi.fitness >|=
+  (Lwt.return (Fitness_repr.to_int64 bi.fitness) >|=
    Register_client_embedded_proto_alpha.wrap_error) >>=? fun fitness ->
   let fitness =
     Fitness_repr.from_int64 @@
-    Int64.add fitness (Int64.of_int @@ List.length operations + 1) in
-  Level.pp_full Format.str_formatter bi.level ;
+    Int64.add fitness (Int64.of_int fitness_gap) in
   inject_block
     ~force
     ~priority
@@ -453,7 +453,7 @@ module Mining = struct
   let endorsement_reward contract block =
     Client_mining_blocks.info rpc_config block >>=? fun bi ->
     get_first_priority bi.level.level contract block >>=? fun prio ->
-    Mining.endorsement_reward ~block_priority:(Int32.of_int prio) >|=
+    Mining.endorsement_reward ~block_priority:prio >|=
     Register_client_embedded_proto_alpha.wrap_error >>|?
     Tez.to_cents
 
@@ -553,3 +553,8 @@ module Endorse = struct
       block delegate ()
 
 end
+
+let display_level block =
+  Client_proto_rpcs.Context.level rpc_config block >>=? fun lvl ->
+  Format.eprintf "Level: %a@." Level.pp_full lvl ;
+  return ()

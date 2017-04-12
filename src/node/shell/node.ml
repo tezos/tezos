@@ -87,29 +87,28 @@ type config = {
   genesis: State.Net.genesis ;
   store_root: string ;
   context_root: string ;
-  test_protocol: Protocol_hash.t option ;
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
+  test_network_max_tll: int option ;
 }
 
-let may_create_net state ?test_protocol genesis =
+let may_create_net state genesis =
   State.Net.get state (Net_id.of_block_hash genesis.State.Net.block) >>= function
   | Ok net -> Lwt.return net
   | Error _ ->
-      State.Net.create state
-        ?test_protocol
-        ~forked_network_ttl:(48 * 3600) (* 2 days *)
-        genesis
+      State.Net.create state genesis
 
 
 let create { genesis ; store_root ; context_root ;
-             test_protocol ; patch_context ; p2p = net_params } =
+             patch_context ; p2p = net_params ;
+             test_network_max_tll = max_ttl } =
   init_p2p net_params >>= fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context () >>=? fun state ->
   let distributed_db = Distributed_db.create state p2p in
-  let validator = Validator.create_worker state distributed_db in
-  may_create_net state ?test_protocol genesis >>= fun mainnet_net ->
+  let validator =
+    Validator.create_worker ?max_ttl state distributed_db in
+  may_create_net state genesis >>= fun mainnet_net ->
   Validator.activate validator mainnet_net >>= fun mainnet_validator ->
   let mainnet_db = Validator.net_db mainnet_validator in
   let shutdown () =
@@ -138,44 +137,30 @@ module RPC = struct
   type block = Node_rpc_services.Blocks.block
   type block_info = Node_rpc_services.Blocks.block_info = {
     hash: Block_hash.t ;
+    net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
-    fitness: MBytes.t list ;
     timestamp: Time.t ;
-    protocol: Protocol_hash.t option ;
     operations_hash: Operation_list_list_hash.t ;
+    fitness: MBytes.t list ;
+    data: MBytes.t ;
     operations: Operation_hash.t list list option ;
-    data: MBytes.t option ;
-    net: Net_id.t ;
-    test_protocol: Protocol_hash.t option ;
-    test_network: (Net_id.t * Time.t) option ;
+    protocol: Protocol_hash.t ;
+    test_network: Context.test_network;
  }
 
-  let convert (block: State.Valid_block.t)  = {
+  let convert (block: State.Valid_block.t) = {
     hash = block.hash ;
-    predecessor = block.pred ;
-    fitness = block.fitness ;
+    net_id = block.net_id ;
+    level = block.level ;
+    predecessor = block.predecessor ;
     timestamp = block.timestamp ;
-    protocol = Some block.protocol_hash ;
     operations_hash = block.operations_hash ;
+    fitness = block.fitness ;
+    data = block.proto_header ;
     operations = Some block.operations ;
-    data = Some block.proto_header ;
-    net = block.net_id ;
-    test_protocol = Some block.test_protocol_hash ;
+    protocol = block.protocol_hash ;
     test_network = block.test_network ;
-  }
-
-  let convert_block hash ({ shell ; proto }: State.Block_header.t)  = {
-    net = shell.net_id ;
-    hash = hash ;
-    predecessor = shell.predecessor ;
-    fitness = shell.fitness ;
-    timestamp = shell.timestamp ;
-    protocol = None ;
-    operations_hash = shell.operations ;
-    operations = None ;
-    data = Some proto ;
-    test_protocol = None ;
-    test_network = None ;
   }
 
   let inject_block node = node.inject_block
@@ -278,42 +263,62 @@ module RPC = struct
         State.Valid_block.Current.head net_state >>= fun head ->
         Prevalidator.context pv >>= function
         | Error _ -> Lwt.fail Not_found
-        | Ok ctxt ->
-            Context.get_fitness ctxt >>= fun fitness ->
-            Context.get_protocol ctxt >>= fun protocol ->
+        | Ok { context ; fitness } ->
+            Context.get_protocol context >>= fun protocol ->
+            Context.get_test_network context >>= fun test_network ->
             let operations =
               let pv_result, _ = Prevalidator.operations pv in
-              Some [ pv_result.applied ] in
-            let timestamp = Prevalidator.timestamp pv in
+              [ pv_result.applied ] in
             Lwt.return
-              { (convert head) with
-                hash = prevalidation_hash ;
-                protocol = Some protocol ;
-                fitness ; operations ; timestamp }
+              { hash = prevalidation_hash ;
+                level = Int32.succ head.level ;
+                predecessor = head.hash ;
+                fitness ;
+                timestamp = Prevalidator.timestamp pv ;
+                protocol ;
+                operations_hash =
+                  Operation_list_list_hash.compute
+                    (List.map Operation_list_hash.compute operations) ;
+                operations = Some operations ;
+                data = MBytes.of_string "" ;
+                net_id = head.net_id ;
+                test_network ;
+              }
 
-  let get_context node block =
+  let rpc_context block : Updater.rpc_context =
+    { context = block.State.Valid_block.context ;
+      level = Int32.succ  block.level ;
+      fitness = block.fitness ;
+      timestamp = block. timestamp }
+
+  let get_rpc_context node block =
     match block with
     | `Genesis ->
         State.Valid_block.Current.genesis node.mainnet_net >>= fun block ->
-        Lwt.return (Some block.context)
+        Lwt.return (Some (rpc_context block))
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
         let net_state = Validator.net_state validator in
         let net_db = Validator.net_db validator in
         State.Valid_block.Current.head net_state >>= fun head ->
-        get_pred net_db n head >>= fun { context } ->
-        Lwt.return (Some context)
+        get_pred net_db n head >>= fun block ->
+        Lwt.return (Some (rpc_context block))
     | `Hash hash-> begin
         read_valid_block node hash >|= function
         | None -> None
-        | Some { context } -> Some context
+        | Some block -> Some (rpc_context block)
       end
     | ( `Prevalidation | `Test_prevalidation ) as block ->
-        let validator, _net = get_net node block in
+        let validator, net = get_net node block in
         let pv = Validator.prevalidator validator in
         Prevalidator.context pv >>= function
         | Error _ -> Lwt.fail Not_found
-        | Ok ctxt -> Lwt.return (Some ctxt)
+        | Ok { context ; fitness } ->
+            let timestamp = Prevalidator.timestamp pv in
+            State.Valid_block.Current.head
+              (Distributed_db.state net) >>= fun { level } ->
+            let level = Int32.succ level in
+            Lwt.return (Some { Updater.context ; fitness ; timestamp ; level })
 
   let operations node block =
     match block with
@@ -417,8 +422,7 @@ module RPC = struct
       ~predecessor ~timestamp >>=? fun validation_state ->
     Prevalidation.prevalidate
       validation_state ~sort rops >>=? fun (validation_state, r) ->
-    Prevalidation.end_prevalidation validation_state >>=? fun ctxt ->
-    Context.get_fitness ctxt >>= fun fitness ->
+    Prevalidation.end_prevalidation validation_state >>=? fun { fitness } ->
     return (fitness, { r with applied = List.rev r.applied })
 
   let complete node ?block str =
@@ -426,9 +430,9 @@ module RPC = struct
     | None ->
         Base58.complete str
     | Some block ->
-        get_context node block >>= function
+        get_rpc_context node block >>= function
         | None -> Lwt.fail Not_found
-        | Some ctxt ->
+        | Some { context = ctxt } ->
             Context.get_protocol ctxt >>= fun protocol_hash ->
             let (module Proto) = Updater.get_exn protocol_hash in
             Base58.complete str >>= fun l1 ->
@@ -436,12 +440,12 @@ module RPC = struct
             Lwt.return (l1 @ l2)
 
   let context_dir node block =
-    get_context node block >>= function
+    get_rpc_context node block >>= function
     | None -> Lwt.return None
-    | Some ctxt ->
-        Context.get_protocol ctxt >>= fun protocol_hash ->
+    | Some rpc_context ->
+        Context.get_protocol rpc_context.context >>= fun protocol_hash ->
         let (module Proto) = Updater.get_exn protocol_hash in
-        let dir =  RPC.map (fun () -> ctxt) Proto.rpc_services in
+        let dir = RPC.map (fun () -> rpc_context) Proto.rpc_services in
         Lwt.return (Some (RPC.map (fun _ -> ()) dir))
 
   let heads node =
@@ -512,12 +516,7 @@ module RPC = struct
       heads >>= fun (_, blocks) ->
     Lwt.return (List.rev blocks)
 
-  let block_watcher node =
-    let stream, shutdown = Distributed_db.watch_block node.distributed_db in
-    Lwt_stream.map
-      (fun (hash, block) -> convert_block hash block)
-      stream,
-    shutdown
+  let block_watcher node = Distributed_db.watch_block node.distributed_db
 
   let valid_block_watcher node =
     let stream, shutdown = Validator.global_watcher node.validator in

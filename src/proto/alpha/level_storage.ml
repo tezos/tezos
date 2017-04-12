@@ -15,10 +15,15 @@ let from_raw c ?offset l =
     | None -> l
     | Some o -> Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o)) in
   let constants = Storage.constants c in
+  let first_level = Storage.first_level c in
   Level_repr.from_raw
+    ~first_level
     ~cycle_length:constants.Constants_repr.cycle_length
     ~voting_period_length:constants.Constants_repr.voting_period_length
     l
+
+let root c =
+  Level_repr.root (Storage.first_level c)
 
 let succ c l = from_raw c (Raw_level_repr.succ l.level)
 let pred c l =
@@ -26,20 +31,13 @@ let pred c l =
   | None -> None
   | Some l -> Some (from_raw c l)
 
-let current ctxt =
-  Storage.Current_level.get ctxt >>=? fun l ->
-  return (from_raw ctxt l)
+let current ctxt = Storage.current_level ctxt
 
 let previous ctxt =
-  current ctxt >>=? fun l ->
+  let l = current ctxt in
   match pred ctxt l with
-  | None -> assert false (* Context inited with level = 1. *)
-  | Some p -> return p
-
-let increment_current ctxt =
-  Storage.Current_level.get ctxt >>=? fun l ->
-  Storage.Current_level.set ctxt (Raw_level_repr.succ l)
-
+  | None -> assert false (* We never validate the Genesis... *)
+  | Some p -> p
 
 let first_level_in_cycle ctxt c =
   let constants = Storage.constants ctxt in
@@ -60,8 +58,3 @@ let levels_in_cycle ctxt c =
     else acc
   in
   loop first []
-
-let init ctxt =
-  Storage.Current_level.init ctxt Raw_level_repr.(succ root)
-
-

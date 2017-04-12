@@ -247,7 +247,7 @@ ${TZCLIENT}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa \
              ${EMBEDDED_CLIENT_VERSIONS} \
              ${CLIENT_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
-	@${OCAMLOPT} -linkpkg ${OCAMLFLAGS} -o $@ $^
+	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
 clean::
 	-rm -f ${TZCLIENT}
@@ -413,7 +413,6 @@ client/embedded/client_%.cmx: \
   $(patsubst %.ml, %.cmx, $(NODE_LIB_IMPLS) $(CLIENT_LIB_IMPLS)) \
   proto/client_embedded_proto_%.cmxa \
   $$(shell find client/embedded/% \( -name webclient -or -name _tzbuild \) -prune -or \( -name \*.ml -print -or -name \*.mli -print \))
-	@echo $^
 	@$(MAKE) -C client/embedded/$* ../client_$*.cmx
 
 client/embedded/webclient_%.cmx: \

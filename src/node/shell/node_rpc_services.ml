@@ -57,46 +57,45 @@ module Blocks = struct
 
   type block_info = {
     hash: Block_hash.t ;
+    net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
-    fitness: MBytes.t list ;
     timestamp: Time.t ;
-    protocol: Protocol_hash.t option ;
     operations_hash: Operation_list_list_hash.t ;
+    fitness: MBytes.t list ;
+    data: MBytes.t ;
     operations: Operation_hash.t list list option ;
-    data: MBytes.t option ;
-    net: Net_id.t ;
-    test_protocol: Protocol_hash.t option ;
-    test_network: (Net_id.t * Time.t) option ;
+    protocol: Protocol_hash.t ;
+    test_network: Context.test_network;
   }
 
   let block_info_encoding =
     conv
-      (fun { hash ; predecessor ; fitness ; timestamp ; protocol ;
-             operations_hash ; operations ; data ; net ;
-             test_protocol ; test_network } ->
-        ((hash, predecessor, fitness, timestamp, protocol),
-         (operations_hash, operations, data,
-          net, test_protocol, test_network)))
-      (fun ((hash, predecessor, fitness, timestamp, protocol),
-            (operations_hash, operations, data,
-             net, test_protocol, test_network)) ->
-        { hash ; predecessor ; fitness ; timestamp ; protocol ;
-          operations_hash ; operations ; data ; net ;
-          test_protocol ; test_network })
-      (merge_objs
-        (obj5
-           (req "hash" Block_hash.encoding)
-           (req "predecessor" Block_hash.encoding)
-           (req "fitness" Fitness.encoding)
-           (req "timestamp" Time.encoding)
-           (opt "protocol" Protocol_hash.encoding))
-        (obj6
-           (req "operations_hash" Operation_list_list_hash.encoding)
-           (opt "operations" (list (list Operation_hash.encoding)))
-           (opt "data" bytes)
-           (req "net" Net_id.encoding)
-           (opt "test_protocol" Protocol_hash.encoding)
-           (opt "test_network" (tup2 Net_id.encoding Time.encoding))))
+      (fun { hash ; net_id ; level ; predecessor ;
+             fitness ; timestamp ; protocol ; operations_hash ; data ;
+             operations ; test_network } ->
+        ({ Store.Block_header.shell =
+             { net_id ; level ; predecessor ;
+               timestamp ; operations_hash ; fitness } ;
+           proto = data },
+         (hash, operations, protocol, test_network)))
+      (fun ({ Store.Block_header.shell =
+                { net_id ; level ; predecessor ;
+                  timestamp ; operations_hash ; fitness } ;
+              proto = data },
+            (hash, operations, protocol, test_network)) ->
+        { hash ; net_id ; level ; predecessor ;
+          fitness ; timestamp ; protocol ; operations_hash ; data ;
+          operations ; test_network })
+      (dynamic_size
+         (merge_objs
+            Store.Block_header.encoding
+            (obj4
+               (req "hash" Block_hash.encoding)
+               (opt "operations" (list (list Operation_hash.encoding)))
+               (req "protocol" Protocol_hash.encoding)
+               (dft "test_network"
+                  Context.test_network_encoding Context.Not_running))))
 
   let parse_block s =
     try
@@ -179,10 +178,7 @@ module Blocks = struct
   let info =
     RPC.service
       ~description:"All the information about a block."
-      ~input:
-        (obj2
-           (dft "operations" bool true)
-           (dft "data" bool true))
+      ~input: (obj1 (dft "operations" bool true))
       ~output: block_info_encoding
       block_path
 
@@ -192,6 +188,13 @@ module Blocks = struct
       ~input: empty
       ~output: (obj1 (req "net" Net_id.encoding))
       RPC.Path.(block_path / "net")
+
+  let level =
+    RPC.service
+      ~description:"Returns the block's level."
+      ~input: empty
+      ~output: (obj1 (req "level" int32))
+      RPC.Path.(block_path / "level")
 
   let predecessor =
     RPC.service
@@ -244,18 +247,11 @@ module Blocks = struct
       ~output: (obj1 (req "protocol" Protocol_hash.encoding))
       RPC.Path.(block_path / "protocol")
 
-  let test_protocol =
-    RPC.service
-      ~description:"List the block test protocol."
-      ~input: empty
-      ~output: (obj1 (opt "protocol" Protocol_hash.encoding))
-      RPC.Path.(block_path / "test_protocol")
-
   let test_network =
     RPC.service
-      ~description:"Returns the associated test network."
+      ~description:"Returns the status of the associated test network."
       ~input: empty
-      ~output: (obj1 (opt "net" (tup2 Net_id.encoding Time.encoding)))
+      ~output: Context.test_network_encoding
       RPC.Path.(block_path / "test_network")
 
   let pending_operations =
@@ -320,8 +316,7 @@ module Blocks = struct
       RPC.Path.(block_path / "complete" /: prefix_arg )
 
   type list_param = {
-    operations: bool ;
-    data: bool ;
+    include_ops: bool ;
     length: int option ;
     heads: Block_hash.t list option ;
     monitor: bool option ;
@@ -331,24 +326,19 @@ module Blocks = struct
   }
   let list_param_encoding =
     conv
-      (fun { operations ; data ; length ; heads ; monitor ;
+      (fun { include_ops ; length ; heads ; monitor ;
              delay ; min_date ; min_heads } ->
-        (operations, data, length, heads, monitor, delay, min_date, min_heads))
-      (fun (operations, data, length, heads, monitor, delay, min_date, min_heads) ->
-         { operations ; data ; length ; heads ; monitor ;
+        (include_ops, length, heads, monitor, delay, min_date, min_heads))
+      (fun (include_ops, length, heads, monitor,
+            delay, min_date, min_heads) ->
+         { include_ops ; length ; heads ; monitor ;
            delay ; min_date ; min_heads })
-      (obj8
-         (dft "operations"
+      (obj7
+         (dft "include_ops"
             (Data_encoding.describe
                ~description:
                  "Whether the resulting block informations should include the \
                   list of operations' hashes. Default false."
-               bool) false)
-         (dft "data"
-            (Data_encoding.describe
-               ~description:
-                 "Whether the resulting block informations should include the \
-                  raw protocol dependent data. Default false."
                bool) false)
          (opt "length"
             (Data_encoding.describe
@@ -642,8 +632,9 @@ let forge_block =
   RPC.service
     ~description: "Forge a block header"
     ~input:
-      (obj6
+      (obj7
          (opt "net_id" Net_id.encoding)
+         (opt "level" int32)
          (opt "predecessor" Block_hash.encoding)
          (opt "timestamp" Time.encoding)
          (req "fitness" Fitness.encoding)

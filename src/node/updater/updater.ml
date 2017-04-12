@@ -11,6 +11,19 @@ open Logging.Updater
 
 let (//) = Filename.concat
 
+type validation_result = Protocol.validation_result = {
+  context: Context.t ;
+  fitness: Fitness.fitness ;
+  message: string option ;
+}
+
+type rpc_context = Protocol.rpc_context = {
+  context: Context.t ;
+  level: Int32.t ;
+  timestamp: Time.t ;
+  fitness: Fitness.fitness ;
+}
+
 module type PROTOCOL = Protocol.PROTOCOL
 module type REGISTRED_PROTOCOL = sig
   val hash: Protocol_hash.t
@@ -30,20 +43,13 @@ type raw_operation = Store.Operation.t = {
 }
 let raw_operation_encoding = Store.Operation.encoding
 
-(** The version agnostic toplevel structure of blocks. *)
 type shell_block = Store.Block_header.shell_header = {
   net_id: Net_id.t ;
-  (** The genesis of the chain this block belongs to. *)
+  level: Int32.t ;
   predecessor: Block_hash.t ;
-  (** The preceding block in the chain. *)
   timestamp: Time.t ;
-  (** The date at which this block has been forged. *)
-  operations: Operation_list_list_hash.t ;
-  (** The sequence of operations. *)
+  operations_hash: Operation_list_list_hash.t ;
   fitness: MBytes.t list ;
-  (** The announced score of the block. As a sequence of sequences
-      of unsigned bytes. Ordered by length and then by contents
-      lexicographically. *)
 }
 let shell_block_encoding = Store.Block_header.shell_header_encoding
 
@@ -65,7 +71,6 @@ let register hash proto =
 
 let activate = Context.set_protocol
 let fork_test_network = Context.fork_test_network
-let set_test_protocol = Context.set_test_protocol
 
 let get_exn hash = VersionTable.find versions hash
 let get hash =

@@ -61,14 +61,8 @@ module Net = struct
       (struct let name = ["expiration"] end)
       (Store_helpers.Make_value(Time))
 
-  module Forked_network_ttl =
-    Store_helpers.Make_single_store
-      (Indexed_store.Store)
-      (struct let name = ["forked_network_ttl"] end)
-      (Store_helpers.Make_value(struct
-         type t = Int64.t
-         let encoding = Data_encoding.int64
-       end))
+  module Allow_forked_network =
+    Indexed_store.Make_set (struct let name = ["allow_forked_network"] end)
 
 end
 
@@ -258,24 +252,30 @@ module Block_header = struct
 
   type shell_header = {
     net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
-    operations: Operation_list_list_hash.t ;
+    operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
   }
 
   let shell_header_encoding =
     let open Data_encoding in
     conv
-      (fun { net_id ; predecessor ; timestamp ; operations ; fitness } ->
-         (net_id, predecessor, timestamp, operations, fitness))
-      (fun (net_id, predecessor, timestamp, operations, fitness) ->
-         { net_id ; predecessor ; timestamp ; operations ; fitness })
-      (obj5
+      (fun { net_id ; level ; predecessor ;
+             timestamp ; operations_hash ; fitness } ->
+        (net_id, level, predecessor,
+         timestamp, operations_hash, fitness))
+      (fun (net_id, level, predecessor,
+            timestamp, operations_hash, fitness) ->
+         { net_id ; level ; predecessor ;
+           timestamp ; operations_hash ; fitness })
+      (obj6
          (req "net_id" Net_id.encoding)
+         (req "level" int32)
          (req "predecessor" Block_hash.encoding)
          (req "timestamp" Time.encoding)
-         (req "operations" Operation_list_list_hash.encoding)
+         (req "operations_hash" Operation_list_list_hash.encoding)
          (req "fitness" Fitness.encoding))
 
   module Encoding = struct
@@ -307,7 +307,7 @@ module Block_header = struct
     Block_hash.compare b1.shell.predecessor b2.shell.predecessor >> fun () ->
     compare b1.proto b2.proto >> fun () ->
     Operation_list_list_hash.compare
-      b1.shell.operations b2.shell.operations >> fun () ->
+      b1.shell.operations_hash b2.shell.operations_hash >> fun () ->
     Time.compare b1.shell.timestamp b2.shell.timestamp >> fun () ->
     list compare b1.shell.fitness b2.shell.fitness
 

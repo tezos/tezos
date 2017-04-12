@@ -26,13 +26,15 @@ let call_error_service1 rpc_config s block a1 =
 let forge_block
     rpc_config block net_id ?(timestamp = Time.now ()) command fitness =
   Client_blocks.get_block_hash rpc_config block >>=? fun pred ->
+  Client_node_rpcs.Blocks.level rpc_config block >>=? fun level ->
   call_service1 rpc_config
     Services.Forge.block block
-    ((net_id, pred, timestamp, fitness), command)
+    ((net_id, Int32.succ level, pred, timestamp, fitness), command)
 
 let mine rpc_config ?timestamp block command fitness seckey =
   Client_blocks.get_block_info rpc_config block >>=? fun bi ->
-  forge_block rpc_config ?timestamp block bi.net command fitness >>=? fun blk ->
+  forge_block
+    rpc_config ?timestamp block bi.net_id command fitness >>=? fun blk ->
   let signed_blk = Environment.Ed25519.Signature.append seckey blk in
   Client_node_rpcs.inject_block rpc_config signed_blk [[]]
 
@@ -86,7 +88,8 @@ let commands () =
       let fitness =
         Client_embedded_proto_alpha.Fitness_repr.from_int64 fitness in
       mine cctxt.rpc_config ?timestamp cctxt.config.block
-        (Activate_testnet hash) fitness seckey >>=? fun hash ->
+        (Activate_testnet (hash, Int64.mul 24L 3600L))
+        fitness seckey >>=? fun hash ->
       cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
       return ()
     end ;

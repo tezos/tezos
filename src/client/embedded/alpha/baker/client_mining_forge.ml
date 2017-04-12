@@ -22,14 +22,14 @@ let generate_seed_nonce () =
   | Ok nonce -> nonce
 
 let rec compute_stamp
-    cctxt block delegate_sk shell mining_slot seed_nonce_hash =
+    cctxt block delegate_sk shell priority seed_nonce_hash =
   Client_proto_rpcs.Constants.stamp_threshold
     cctxt block >>=? fun stamp_threshold ->
   let rec loop () =
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
     let unsigned_header =
       Tezos_context.Block.forge_header
-        shell { mining_slot ; seed_nonce_hash ; proof_of_work_nonce } in
+        shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
     let signed_header =
       Ed25519.Signature.append delegate_sk unsigned_header in
     let block_hash = Block_hash.hash_bytes [signed_header] in
@@ -42,28 +42,26 @@ let rec compute_stamp
 let inject_block cctxt block
     ?force
     ~priority ~timestamp ~fitness ~seed_nonce
-    ~src_sk operation_list =
+    ~src_sk operations =
   let block = match block with `Prevalidation -> `Head 0 | block -> block in
   Client_node_rpcs.Blocks.info cctxt block >>=? fun bi ->
   let seed_nonce_hash = Nonce.hash seed_nonce in
   Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
-  let operations =
+  let operations_hash =
     Operation_list_list_hash.compute
-      (List.map Operation_list_hash.compute operation_list) in
+      (List.map Operation_list_hash.compute operations) in
   let shell =
-    { Store.Block_header.net_id = bi.net ; predecessor = bi.hash ;
-      timestamp ; fitness ; operations } in
-  let slot =
-    { Block.level = level.level ; priority = Int32.of_int priority } in
+    { Store.Block_header.net_id = bi.net_id ; level = bi.level ;
+      predecessor = bi.hash ; timestamp ; fitness ; operations_hash } in
   compute_stamp cctxt block
-    src_sk shell slot seed_nonce_hash >>=? fun proof_of_work_nonce ->
+    src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
   Client_proto_rpcs.Helpers.Forge.block cctxt
     block
-    ~net:bi.net
+    ~net:bi.net_id
     ~predecessor:bi.hash
     ~timestamp
     ~fitness
-    ~operations
+    ~operations_hash
     ~level:level.level
     ~priority:priority
     ~seed_nonce_hash
@@ -71,7 +69,7 @@ let inject_block cctxt block
     () >>=? fun unsigned_header ->
   let signed_header = Ed25519.Signature.append src_sk unsigned_header in
   Client_node_rpcs.inject_block cctxt
-    ?force signed_header operation_list >>=? fun block_hash ->
+    ?force signed_header operations >>=? fun block_hash ->
   return block_hash
 
 let forge_block cctxt block

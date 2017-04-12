@@ -45,9 +45,15 @@ type block = {
 }
 
 let max_block_length =
-  match Data_encoding.Binary.fixed_length Data.Command.signed_encoding with
-  | None -> assert false
-  | Some len -> len
+  Data_encoding.Binary.length
+    Data.Command.encoding
+    (Activate_testnet (Protocol_hash.hash_bytes [], 0L))
+  +
+  begin
+    match Data_encoding.Binary.fixed_length Ed25519.Signature.encoding with
+    | None -> assert false
+    | Some len -> len
+  end
 
 let parse_block { Updater.shell ; proto } : block tzresult =
   match Data_encoding.Binary.of_bytes Data.Command.signed_encoding proto with
@@ -61,10 +67,10 @@ let check_signature ctxt { shell ; command ; signature } =
     (Ed25519.Signature.check public_key signature bytes)
     Invalid_signature
 
-type validation_state = block * Context.t
+type validation_state = Updater.validation_result
 
-let current_context (_, ctxt) =
-  return ctxt
+let current_context ({ context } : validation_state) =
+  return context
 
 let precheck_block
     ~ancestor_context:_
@@ -76,38 +82,39 @@ let precheck_block
 let begin_application
     ~predecessor_context:ctxt
     ~predecessor_timestamp:_
+    ~predecessor_fitness:_
     raw_block =
+  Data.Init.may_initialize ctxt >>=? fun ctxt ->
   Lwt.return (parse_block raw_block) >>=? fun block ->
-  return (block, ctxt)
+  check_signature ctxt block >>=? fun () ->
+  let fitness = raw_block.shell.fitness in
+  match block.command with
+  | Data.Command.Activate hash ->
+      let message =
+        Some (Format.asprintf "activate %a" Protocol_hash.pp_short hash) in
+      Updater.activate ctxt hash >>= fun ctxt ->
+      return { Updater.message ; context = ctxt ; fitness }
+  | Activate_testnet (hash, delay) ->
+      let message =
+        Some (Format.asprintf "activate testnet %a" Protocol_hash.pp_short hash) in
+      let expiration = Time.add raw_block.shell.timestamp delay in
+      Updater.fork_test_network ctxt hash expiration >>= fun ctxt ->
+      return { Updater.message ; context = ctxt ; fitness }
 
 let begin_construction
-    ~predecessor_context:_
+    ~predecessor_context:context
     ~predecessor_timestamp:_
+    ~predecessor_level:_
+    ~predecessor_fitness:fitness
     ~predecessor:_
     ~timestamp:_ =
-  Lwt.return (Error []) (* absurd *)
+  (* Dummy result. *)
+  return { Updater.message = None ; context ; fitness }
 
 let apply_operation _vctxt _ =
   Lwt.return (Error []) (* absurd *)
 
-let finalize_block (header, ctxt) =
-  check_signature ctxt header >>=? fun () ->
-  Data.Init.may_initialize ctxt >>=? fun ctxt ->
-  Context.set_fitness ctxt header.shell.fitness >>= fun ctxt ->
-  match header.command with
-  | Activate hash ->
-      let commit_message =
-        Format.asprintf "activate %a" Protocol_hash.pp_short hash in
-      Context.set_commit_message ctxt commit_message >>= fun ctxt ->
-      Updater.activate ctxt hash >>= fun ctxt ->
-      return ctxt
-  | Activate_testnet hash ->
-      let commit_message =
-        Format.asprintf "activate testnet %a" Protocol_hash.pp_short hash in
-      Context.set_commit_message ctxt commit_message >>= fun ctxt ->
-      Updater.set_test_protocol ctxt hash >>= fun ctxt ->
-      Updater.fork_test_network ctxt >>= fun ctxt ->
-      return ctxt
+let finalize_block state = return state
 
 let rpc_services = Services.rpc_services
 

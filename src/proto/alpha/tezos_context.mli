@@ -75,10 +75,7 @@ module Timestamp : sig
   val of_seconds: string -> time option
   val to_seconds: time -> string
 
-  val get_current: context -> Time.t Lwt.t
-  (** [get_current ctxt] returns the current timestamp of [ctxt]. When
-      [ctxt] is the context of a block, the block timestamp is used,
-      otherwise a timestamp is inferred otherwise. *)
+  val current: context -> Time.t
 
 end
 
@@ -175,7 +172,7 @@ module Constants : sig
   val voting_period_length: context -> int32
   val time_before_reward: context -> Period.t
   val slot_durations: context -> Period.t list
-  val first_free_mining_slot: context -> int32
+  val first_free_mining_slot: context -> int
   val max_signing_slot: context -> int
   val instructions_per_transaction: context -> int
   val proof_of_work_threshold: context -> int64
@@ -222,6 +219,7 @@ module Level : sig
 
   type t = private {
     level: Raw_level.t ;
+    level_position: int32 ;
     cycle: Cycle.t ;
     cycle_position: int32 ;
     voting_period: Voting_period.t ;
@@ -231,7 +229,7 @@ module Level : sig
   val pp_full: Format.formatter -> t -> unit
   type level = t
 
-  val root: level
+  val root: context -> level
 
   val succ: context -> level -> level
   val pred: context -> level -> level option
@@ -240,8 +238,7 @@ module Level : sig
 
   val diff: level -> level -> int32
 
-  val current: context -> level tzresult Lwt.t
-  val increment_current: context -> context tzresult Lwt.t
+  val current: context -> level
 
   val last_level_in_cycle: context -> Cycle.t -> level
   val levels_in_cycle: context -> Cycle.t -> level list
@@ -253,10 +250,11 @@ module Fitness : sig
   include (module type of Fitness)
   type t = fitness
 
-  val increase: context -> context tzresult Lwt.t
+  val increase: context -> context
 
-  val get: context -> int64 tzresult Lwt.t
-  val to_int64: fitness -> int64 tzresult Lwt.t
+  val current: context -> int64
+
+  val to_int64: fitness -> int64 tzresult
 
 end
 
@@ -525,17 +523,10 @@ module Block : sig
   }
 
   and proto_header = {
-    mining_slot: mining_slot ;
+    priority: int ;
     seed_nonce_hash: Nonce_hash.t ;
     proof_of_work_nonce: MBytes.t ;
   }
-
-  and mining_slot = {
-    level: Raw_level.t ;
-    priority: Int32.t ;
-  }
-
-  val mining_slot_encoding: mining_slot Data_encoding.encoding
 
   val max_header_length: int
 
@@ -558,7 +549,7 @@ module Roll : sig
   val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t
 
   val mining_rights_owner:
-    context -> Level.t -> priority:int32 -> public_key_hash tzresult Lwt.t
+    context -> Level.t -> priority:int -> public_key_hash tzresult Lwt.t
 
   val endorsement_rights_owner:
     context -> Level.t -> slot:int -> public_key_hash tzresult Lwt.t
@@ -580,15 +571,16 @@ module Reward : sig
 
 end
 
-val init: Context.t -> context tzresult Lwt.t
-val finalize: ?commit_message:string -> context -> Context.t tzresult Lwt.t
+val init:
+  Context.t ->
+  level:Int32.t ->
+  timestamp:Time.t ->
+  fitness:Fitness.t ->
+  context tzresult Lwt.t
+val finalize: ?commit_message:string -> context -> Updater.validation_result
 
 val configure_sandbox:
   Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 
-val get_prevalidation: context -> bool Lwt.t
-val set_prevalidation: context -> context Lwt.t
-
 val activate: context -> Protocol_hash.t -> context Lwt.t
-val set_test_protocol: context -> Protocol_hash.t -> context Lwt.t
-val fork_test_network: context -> context Lwt.t
+val fork_test_network: context -> Protocol_hash.t -> Time.t -> context Lwt.t

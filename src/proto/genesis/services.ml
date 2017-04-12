@@ -38,8 +38,9 @@ module Forge = struct
       ~description: "Forge a block"
       ~input:
         (merge_objs
-           (obj4
+           (obj5
               (req "net_id" Net_id.encoding)
+              (req "level" int32)
               (req "predecessor" Block_hash.encoding)
               (req "timestamp" Time.encoding)
               (req "fitness" Fitness.encoding))
@@ -53,18 +54,18 @@ let int64_to_bytes i =
   MBytes.set_int64 b 0 i;
   b
 
-let operations =
+let operations_hash =
   Operation_list_list_hash.compute [Operation_list_hash.empty]
 
-let rpc_services : Context.t RPC.directory =
+let rpc_services : Updater.rpc_context RPC.directory =
   let dir = RPC.empty in
   let dir =
     RPC.register
       dir
       (Forge.block RPC.Path.root)
-      (fun _ctxt ((net_id, predecessor, timestamp, fitness), command) ->
-         let shell = { Updater.net_id ; predecessor ; timestamp ; fitness ;
-                       operations } in
+      (fun _ctxt ((net_id, level, predecessor, timestamp, fitness), command) ->
+         let shell = { Updater.net_id ; level ; predecessor ;
+                       timestamp ; fitness ; operations_hash } in
          let bytes = Data.Command.forge shell command in
          RPC.Answer.return bytes) in
   dir

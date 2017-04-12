@@ -18,7 +18,7 @@ type error +=
   | Unexpected_nonce
 
 let get_unrevealed c level =
-  Level_storage.current c >>=? fun cur_level ->
+  let cur_level = Level_storage.current c in
   let min_cycle =
     match Cycle_repr.pred cur_level.cycle with
     | None -> Cycle_repr.root
@@ -40,7 +40,7 @@ let get_unrevealed c level =
   (* return nonce_hash *)
 
 let record_hash c delegate_to_reward reward_amount nonce_hash =
-  Level_storage.current c >>=? fun level ->
+  let level = Level_storage.current c in
   Storage.Seed.Nonce.init c level
     (Unrevealed { nonce_hash; delegate_to_reward ; reward_amount })
 
@@ -65,6 +65,3 @@ let get c level = Storage.Seed.Nonce.get c level
 let of_bytes = Seed_repr.make_nonce
 let hash = Seed_repr.hash
 let check_hash = Seed_repr.check_hash
-
-let init c =
-  Storage.Seed.Nonce.init c Level_repr.root (Revealed Seed_repr.initial_nonce_0)
