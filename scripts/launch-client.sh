@@ -2,7 +2,7 @@
 
 set -e
 
-script_dir="$(dirname "$(readlink -f "$0")")"
+script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
 cd "$src_dir"
 

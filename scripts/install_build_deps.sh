@@ -1,6 +1,6 @@
 #! /bin/sh
 
-script_dir="$(dirname "$(readlink -f "$0")")"
+script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
 
 . "$script_dir/version.sh"
@@ -54,7 +54,7 @@ if "$pin"; then
     opam pin add typerex-build --dev --no-action
     ## Force opam to take account of the new `tezos-deps.opam`
     opam pin --yes remove tezos-deps
-    opam pin --yes add --no-action tezos-deps src
+    opam pin --yes add --no-action tezos-deps $src_dir/src
 fi
 
 if "$depext"; then
