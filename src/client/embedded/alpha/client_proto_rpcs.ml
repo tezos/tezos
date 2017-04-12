@@ -218,6 +218,14 @@ module Helpers = struct
           b ~net ~source ~block ~slot () =
         operations cctxt b ~net ~source
           Tezos_context.[Endorsement { block ; slot }]
+      let proposals cctxt
+          b ~net ~source ~period ~proposals () =
+        operations cctxt b ~net ~source
+          Tezos_context.[Proposals { period ; proposals }]
+      let ballot cctxt
+          b ~net ~source ~period ~proposal ~ballot () =
+        operations cctxt b ~net ~source
+          Tezos_context.[Ballot { period ; proposal ; ballot }]
     end
     module Dictator = struct
       let operation cctxt

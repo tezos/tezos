@@ -5,6 +5,7 @@ TESTS := \
   transaction \
   origination \
   endorsement \
+  vote \
 
 include ../Makefile.shared
 
@@ -84,4 +85,23 @@ test-endorsement: ${LIB} ${TEST_CONNECTION_IMPLS:.ml=.cmx}
 
 clean::
 	rm -f test-endorsement
+
+############################################################################
+## Vote
+
+.PHONY:run-test-vote
+run-test-vote:
+	@echo
+	./test-vote
+
+TEST_CONNECTION_IMPLS := \
+  proto_alpha_helpers.ml \
+  test_vote.ml
+
+test-vote: ${LIB} ${TEST_CONNECTION_IMPLS:.ml=.cmx}
+	@echo COMPILE $(notdir $@)
+	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	rm -f test-vote
 

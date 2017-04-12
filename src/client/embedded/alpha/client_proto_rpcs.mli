@@ -269,6 +269,23 @@ module Helpers : sig
         block:Block_hash.t ->
         slot:int ->
         unit -> MBytes.t tzresult Lwt.t
+      val proposals:
+        Client_rpcs.config ->
+        block ->
+        net:Net_id.t ->
+        source:public_key ->
+        period:Voting_period.t ->
+        proposals:Hash.Protocol_hash.t list ->
+        unit -> MBytes.t tzresult Lwt.t
+      val ballot:
+        Client_rpcs.config ->
+        block ->
+        net:Net_id.t ->
+        source:public_key ->
+        period:Voting_period.t ->
+        proposal:Hash.Protocol_hash.t ->
+        ballot:Vote.ballot ->
+        unit -> MBytes.t tzresult Lwt.t
     end
     module Anonymous : sig
       val operations:

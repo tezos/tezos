@@ -132,6 +132,15 @@ test:proto_alpha:endorsement:
   dependencies:
     - build
 
+test:proto_alpha:vote:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test/proto_alpha run-test-vote
+  dependencies:
+    - build
+
 test:basic.sh:
   stage: test
   tags:
