@@ -46,9 +46,9 @@ module Net : sig
     with type t := store
      and type value := Time.t
 
-  module Forked_network_ttl : SINGLE_STORE
-    with type t := store
-     and type value := Int64.t
+  module Allow_forked_network : SET_STORE
+    with type t := t
+     and type elt := Net_id.t
 
 end
 
@@ -171,9 +171,10 @@ module Block_header : sig
 
   type shell_header = {
     net_id: Net_id.t ;
+    level: Int32.t ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
-    operations: Operation_list_list_hash.t ;
+    operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
   }
   val shell_header_encoding: shell_header Data_encoding.t

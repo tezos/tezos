@@ -51,19 +51,19 @@ let apply_delegate_operation_content
         (Block_hash.equal block pred_block)
         (Wrong_endorsement_predecessor (pred_block, block)) >>=? fun () ->
       Mining.check_signing_rights ctxt slot delegate >>=? fun () ->
-      Fitness.increase ctxt >>=? fun ctxt ->
+      let ctxt = Fitness.increase ctxt in
       Mining.pay_endorsement_bond ctxt delegate >>=? fun (ctxt, bond) ->
       Mining.endorsement_reward ~block_priority >>=? fun reward ->
-      Level.current ctxt >>=? fun { cycle = current_cycle } ->
+      let { cycle = current_cycle } : Level.t = Level.current ctxt in
       Lwt.return Tez.(reward +? bond) >>=? fun full_reward ->
       Reward.record ctxt delegate current_cycle full_reward
   | Proposals { period ; proposals } ->
-      Level.current ctxt >>=? fun level ->
+      let level = Level.current ctxt in
       fail_unless Voting_period.(level.voting_period = period)
         (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
       Amendment.record_proposals ctxt delegate proposals
   | Ballot { period ; proposal ; ballot } ->
-      Level.current ctxt >>=? fun level ->
+      let level = Level.current ctxt in
       fail_unless Voting_period.(level.voting_period = period)
         (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
       Amendment.record_ballot ctxt delegate proposal ballot
@@ -175,8 +175,9 @@ let apply_sourced_operation
   | Dictator_operation (Activate_testnet hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
-      set_test_protocol ctxt hash >>= fun ctxt ->
-      fork_test_network ctxt >>= fun ctxt ->
+      let expiration = (* in two days maximum... *)
+        Time.add (Timestamp.current ctxt) (Int64.mul 48L 3600L) in
+      fork_test_network ctxt hash expiration >>= fun ctxt ->
       return (ctxt, origination_nonce, None)
 
 let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
@@ -228,17 +229,14 @@ let apply_operation
 let may_start_new_cycle ctxt =
   Mining.dawn_of_a_new_cycle ctxt >>=? function
   | None -> return ctxt
-  | Some new_cycle ->
-      let last_cycle =
-        match Cycle.pred new_cycle with
-        | None -> assert false
-        | Some last_cycle -> last_cycle in
+  | Some last_cycle ->
+      let new_cycle = Cycle.succ last_cycle in
       Bootstrap.refill ctxt >>=? fun ctxt ->
       Seed.clear_cycle ctxt last_cycle >>=? fun ctxt ->
       Seed.compute_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
       Roll.clear_cycle ctxt last_cycle >>=? fun ctxt ->
       Roll.freeze_rolls_for_cycle ctxt (Cycle.succ new_cycle) >>=? fun ctxt ->
-      Timestamp.get_current ctxt >>= fun timestamp ->
+      let timestamp = Timestamp.current ctxt in
       Lwt.return (Timestamp.(timestamp +? (Constants.time_before_reward ctxt)))
       >>=? fun reward_date ->
       Reward.set_reward_time_for_cycle
@@ -254,28 +252,20 @@ let begin_application ctxt block pred_timestamp =
   Mining.check_mining_rights ctxt block pred_timestamp >>=? fun miner ->
   Mining.check_signature ctxt block miner >>=? fun () ->
   Mining.pay_mining_bond ctxt block miner >>=? fun ctxt ->
-  Fitness.increase ctxt >>=? fun ctxt ->
+  let ctxt = Fitness.increase ctxt in
   return (ctxt, miner)
 
-let finalize_application ctxt block miner op_count =
+let finalize_application ctxt block miner =
   (* end of level (from this point nothing should fail) *)
-  let priority = block.Block.proto.mining_slot.priority in
+  let priority = block.Block.proto.priority in
   let reward = Mining.base_mining_reward ctxt ~priority in
   Nonce.record_hash ctxt
     miner reward block.proto.seed_nonce_hash >>=? fun ctxt ->
   Reward.pay_due_rewards ctxt >>=? fun ctxt ->
-  Level.increment_current ctxt >>=? fun ctxt ->
   (* end of cycle *)
   may_start_new_cycle ctxt >>=? fun ctxt ->
   Amendment.may_start_new_voting_cycle ctxt >>=? fun ctxt ->
-  Level.current ctxt >>=? fun { level } ->
-  let level = Raw_level.to_int32 level in
-  Fitness.get ctxt >>=? fun fitness ->
-  let commit_message =
-    Format.asprintf
-      "lvl %ld, fit %Ld, prio %ld, %d ops"
-      level fitness priority op_count in
-  return (commit_message, ctxt)
+  return ctxt
 
 let compare_operations op1 op2 =
   match op1.contents, op2.contents with

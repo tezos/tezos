@@ -28,7 +28,9 @@ val empty : unit encoding
 val unit : unit encoding
 val constant : string -> unit encoding
 val int8 : int encoding
+val uint8 : int encoding
 val int16 : int encoding
+val uint16 : int encoding
 val int31 : int encoding
 val int32 : int32 encoding
 val int64 : int64 encoding

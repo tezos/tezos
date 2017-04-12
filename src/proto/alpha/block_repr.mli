@@ -17,17 +17,10 @@ type header = {
 }
 
 and proto_header = {
-  mining_slot: mining_slot ;
+  priority: int ;
   seed_nonce_hash: Nonce_hash.t ;
   proof_of_work_nonce: MBytes.t ;
 }
-
-and mining_slot = {
-  level: Raw_level_repr.t ;
-  priority: Int32.t ;
-}
-
-val mining_slot_encoding: mining_slot Data_encoding.encoding
 
 (** The maximum size of block headers in bytes *)
 val max_header_length: int

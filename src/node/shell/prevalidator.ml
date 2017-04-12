@@ -54,7 +54,7 @@ type t = {
   operations: unit -> error preapply_result * Operation_hash.Set.t ;
   pending: ?block:State.Valid_block.t -> unit -> Operation_hash.Set.t Lwt.t ;
   timestamp: unit -> Time.t ;
-  context: unit -> Context.t tzresult Lwt.t ;
+  context: unit -> Updater.validation_result tzresult Lwt.t ;
   shutdown: unit -> unit Lwt.t ;
 }
 

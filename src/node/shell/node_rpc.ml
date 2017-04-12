@@ -12,9 +12,8 @@ open Logging.RPC
 
 module Services = Node_rpc_services
 
-let filter_bi (operations, data) (bi: Services.Blocks.block_info)  =
+let filter_bi operations (bi: Services.Blocks.block_info)  =
   let bi = if operations then bi else { bi with operations = None } in
-  let bi = if data then bi else { bi with data = None } in
   bi
 
 let register_bi_dir node dir =
@@ -34,9 +33,15 @@ let register_bi_dir node dir =
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.net in
+      RPC.Answer.return bi.net_id in
     RPC.register1 dir
       Services.Blocks.net implementation in
+  let dir =
+    let implementation b () =
+      Node.RPC.block_info node b >>= fun bi ->
+      RPC.Answer.return bi.level in
+    RPC.register1 dir
+      Services.Blocks.level implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
@@ -65,17 +70,9 @@ let register_bi_dir node dir =
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      match bi.protocol with
-      | None -> raise Not_found
-      | Some p -> RPC.Answer.return p in
+      RPC.Answer.return bi.protocol in
     RPC.register1 dir
       Services.Blocks.protocol implementation in
-  let dir =
-    let implementation b () =
-      Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.test_protocol in
-    RPC.register1 dir
-      Services.Blocks.test_protocol implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
@@ -214,11 +211,10 @@ let create_delayed_stream
 
 let list_blocks
     node
-    { Services.Blocks.operations ; data ; length ; heads ; monitor ; delay ;
+    { Services.Blocks.include_ops ; length ; heads ; monitor ; delay ;
       min_date; min_heads} =
   let len = match length with None -> 1 | Some x -> x in
   let monitor = match monitor with None -> false | Some x -> x in
-  let include_ops = (operations, data) in
   let time =
     match delay with
     | None -> None
@@ -404,14 +400,17 @@ let build_rpc_directory node =
   let dir =
     RPC.register1 dir Services.Protocols.contents (get_protocols node) in
   let dir =
-    let implementation (net_id, pred, time, fitness, operations, header) =
+    let implementation
+        (net_id, level, pred, time, fitness, operations_hash, header) =
       Node.RPC.block_info node (`Head 0) >>= fun bi ->
       let timestamp = Utils.unopt ~default:(Time.now ()) time in
-      let net_id = Utils.unopt ~default:bi.net net_id in
+      let net_id = Utils.unopt ~default:bi.net_id net_id in
       let predecessor = Utils.unopt ~default:bi.hash pred in
+      let level = Utils.unopt ~default:(Int32.succ bi.level) level in
       let res =
         Data_encoding.Binary.to_bytes Store.Block_header.encoding {
-          shell = { net_id ; predecessor ; timestamp ; fitness ; operations } ;
+          shell = { net_id ; predecessor ; level ;
+                    timestamp ; fitness ; operations_hash } ;
           proto = header ;
         } in
       RPC.Answer.return res in
