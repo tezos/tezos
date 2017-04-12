@@ -5,8 +5,8 @@ set -e
 DIR=$(dirname "$0")
 cd "${DIR}"
 
-DATA_DIR="$(mktemp -td tezos_node.XXXXXXXXXX)"
-CLIENT_DIR="$(mktemp -td tezos_client.XXXXXXXXXX)"
+DATA_DIR="$(mktemp -d -t tezos_node.XXXXXXXXXX)"
+CLIENT_DIR="$(mktemp -d -t tezos_client.XXXXXXXXXX)"
 
 cleanup() {
     [ -z "${NODE_PID}" ] || kill -9 ${NODE_PID} || true

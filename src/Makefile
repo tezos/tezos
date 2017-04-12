@@ -314,7 +314,7 @@ partial-clean::
 .PHONY: clean partial-clean
 clean:: partial-clean
 partial-clean::
-	-find \( -name \*.cm\* -or -name \*.cmp -or -name \*.out -or -name \*~ -or -name \*.o -or -name \*.a \) -delete
+	-find . \( -name \*.cm\* -or -name \*.cmp -or -name \*.out -or -name \*~ -or -name \*.o -or -name \*.a \) -delete
 
 ## Dependencies
 
@@ -366,8 +366,8 @@ compiler/tezos_compiler.cmo compiler/tezos_compiler.cmx: \
 
 partial-clean::
 	-rm -f .depend
-	-find \( -name \*.mli.deps -or -name \*.ml.deps \) -delete
-	-find \( -name \*.mli.deps.byte -or -name \*.ml.deps.byte \) -delete
+	-find . \( -name \*.mli.deps -or -name \*.ml.deps \) -delete
+	-find . \( -name \*.mli.deps.byte -or -name \*.ml.deps.byte \) -delete
 
 
 ## Embedded protocol modules
