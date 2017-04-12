@@ -21,6 +21,8 @@ type shell_block = {
   (** The genesis of the chain this block belongs to. *)
   level: Int32.t ;
   (** The number of predecessing block in the chain. *)
+  proto_level: int ;
+  (** The number of protocol amendment block in the chain (modulo 256) *)
   predecessor: Block_hash.t ;
   (** The preceding block in the chain. *)
   timestamp: Time.t ;

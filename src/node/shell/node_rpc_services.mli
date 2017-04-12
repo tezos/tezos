@@ -30,6 +30,7 @@ module Blocks : sig
     hash: Block_hash.t ;
     net_id: Net_id.t ;
     level: Int32.t ;
+    proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations_hash: Operation_list_list_hash.t ;
@@ -178,8 +179,8 @@ end
 
 val forge_block:
   (unit, unit,
-   Net_id.t option * Int32.t option * Block_hash.t option * Time.t option *
-   Fitness.fitness * Operation_list_list_hash.t * MBytes.t,
+   Net_id.t option * Int32.t option * int option * Block_hash.t option *
+   Time.t option * Fitness.fitness * Operation_list_list_hash.t * MBytes.t,
    MBytes.t) RPC.service
 
 val validate_block:

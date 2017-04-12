@@ -145,6 +145,7 @@ type error +=
    | Non_increasing_timestamp
    | Non_increasing_fitness
    | Wrong_level of Int32.t * Int32.t
+   | Wrong_proto_level of int * int
 
 let () =
   register_error_kind
@@ -159,7 +160,20 @@ let () =
                      (req "expected" int32)
                      (req "provided" int32))
     (function Wrong_level (e, g)   -> Some (e, g) | _ -> None)
-    (fun (e, g) -> Wrong_level (e, g))
+    (fun (e, g) -> Wrong_level (e, g)) ;
+  register_error_kind
+    `Permanent
+    ~id:"validator.wrong_proto_level"
+    ~title:"Wrong protocol level"
+    ~description:"The protocol level is not the expected one"
+    ~pp:(fun ppf (e, g) ->
+        Format.fprintf ppf
+          "The declared protocol level %d is not %d" g e)
+    Data_encoding.(obj2
+                     (req "expected" uint8)
+                     (req "provided" uint8))
+    (function Wrong_proto_level (e, g)   -> Some (e, g) | _ -> None)
+    (fun (e, g) -> Wrong_proto_level (e, g))
 
 let apply_block net db
     (pred: State.Valid_block.t) hash (block: State.Block_header.t) =
@@ -231,6 +245,15 @@ let apply_block net db
       return state)
     state parsed_operations >>=? fun state ->
   Proto.finalize_block state >>=? fun new_context ->
+  Context.get_protocol new_context.context >>= fun new_protocol ->
+  let expected_proto_level =
+    if Protocol_hash.equal new_protocol pred.protocol_hash then
+      pred.proto_level
+    else
+      (pred.proto_level + 1) mod 256 in
+  fail_when (block.shell.proto_level <> expected_proto_level)
+    (Wrong_proto_level (block.shell.proto_level, expected_proto_level))
+  >>=? fun () ->
   lwt_log_info "validation of %a: success"
     Block_hash.pp_short hash >>= fun () ->
   return new_context

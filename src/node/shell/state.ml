@@ -111,6 +111,7 @@ and valid_block = {
   net_id: Net_id.t ;
   hash: Block_hash.t ;
   level: Int32.t ;
+    proto_level: int ;
   predecessor: Block_hash.t ;
   timestamp: Time.t ;
   fitness: Protocol.fitness ;
@@ -136,6 +137,7 @@ let build_valid_block
     net_id = header.Store.Block_header.shell.net_id ;
     hash ;
     level = header.shell.level ;
+    proto_level = header.shell.proto_level ;
     predecessor = header.shell.predecessor ;
     timestamp = header.shell.timestamp ;
     discovery_time ;
@@ -531,6 +533,7 @@ module Raw_block_header = struct
     let shell : Store.Block_header.shell_header = {
       net_id = Net_id.of_block_hash genesis.block;
       level = 0l ;
+      proto_level = 0 ;
       predecessor = genesis.block ;
       timestamp = genesis.time ;
       fitness = [] ;
@@ -686,6 +689,7 @@ module Block_header = struct
   type shell_header = Store.Block_header.shell_header = {
     net_id: Net_id.t ;
     level: Int32.t ;
+    proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations_hash: Operation_list_list_hash.t ;
@@ -927,6 +931,7 @@ module Valid_block = struct
     net_id: Net_id.t ;
     hash: Block_hash.t ;
     level: Int32.t ;
+    proto_level: int ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     fitness: Fitness.fitness ;

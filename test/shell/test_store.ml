@@ -95,6 +95,7 @@ let lolblock ?(operations = []) header =
   { Store.Block_header.shell =
       { timestamp = Time.of_seconds (Random.int64 1500L) ;
         level = 0l ; (* dummy *)
+        proto_level = 0 ; (* dummy *)
         net_id ;
         predecessor = genesis_block ; operations_hash ;
         fitness = [MBytes.of_string @@ string_of_int @@ String.length header;

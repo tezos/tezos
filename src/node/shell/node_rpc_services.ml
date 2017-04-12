@@ -59,6 +59,7 @@ module Blocks = struct
     hash: Block_hash.t ;
     net_id: Net_id.t ;
     level: Int32.t ;
+    proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
     operations_hash: Operation_list_list_hash.t ;
@@ -71,20 +72,20 @@ module Blocks = struct
 
   let block_info_encoding =
     conv
-      (fun { hash ; net_id ; level ; predecessor ;
+      (fun { hash ; net_id ; level ; proto_level ; predecessor ;
              fitness ; timestamp ; protocol ; operations_hash ; data ;
              operations ; test_network } ->
         ({ Store.Block_header.shell =
-             { net_id ; level ; predecessor ;
+             { net_id ; level ; proto_level ; predecessor ;
                timestamp ; operations_hash ; fitness } ;
            proto = data },
          (hash, operations, protocol, test_network)))
       (fun ({ Store.Block_header.shell =
-                { net_id ; level ; predecessor ;
+                { net_id ; level ; proto_level ; predecessor ;
                   timestamp ; operations_hash ; fitness } ;
               proto = data },
             (hash, operations, protocol, test_network)) ->
-        { hash ; net_id ; level ; predecessor ;
+        { hash ; net_id ; level ; proto_level ; predecessor ;
           fitness ; timestamp ; protocol ; operations_hash ; data ;
           operations ; test_network })
       (dynamic_size
@@ -632,9 +633,10 @@ let forge_block =
   RPC.service
     ~description: "Forge a block header"
     ~input:
-      (obj7
+      (obj8
          (opt "net_id" Net_id.encoding)
          (opt "level" int32)
+         (opt "proto_level" uint8)
          (opt "predecessor" Block_hash.encoding)
          (opt "timestamp" Time.encoding)
          (req "fitness" Fitness.encoding)
