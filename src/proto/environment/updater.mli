@@ -16,7 +16,7 @@ val raw_operation_encoding: raw_operation Data_encoding.t
 
 
 (** The version agnostic toplevel structure of blocks. *)
-type shell_block = {
+type shell_block_header = {
   net_id: Net_id.t ;
   (** The genesis of the chain this block belongs to. *)
   level: Int32.t ;
@@ -34,13 +34,13 @@ type shell_block = {
       of unsigned bytes. Ordered by length and then by contents
       lexicographically. *)
 }
-val shell_block_encoding: shell_block Data_encoding.t
+val shell_block_header_encoding: shell_block_header Data_encoding.t
 
-type raw_block = {
-  shell: shell_block ;
+type raw_block_header = {
+  shell: shell_block_header ;
   proto: MBytes.t ;
 }
-val raw_block_encoding: raw_block Data_encoding.t
+val raw_block_header_encoding: raw_block_header Data_encoding.t
 
 type validation_result = {
   context: Context.t ;
@@ -49,10 +49,11 @@ type validation_result = {
 }
 
 type rpc_context = {
+  block_hash: Block_hash.t ;
+  block_header: raw_block_header ;
+  operations_list: unit -> Operation_hash.t list list ;
+  operations: unit -> MBytes.t list list ;
   context: Context.t ;
-  level: Int32.t ;
-  timestamp: Time.t ;
-  fitness: Fitness.fitness ;
 }
 
 (** This is the signature of a Tezos protocol implementation. It has
@@ -104,12 +105,12 @@ module type PROTOCOL = sig
   val precheck_block :
     ancestor_context: Context.t ->
     ancestor_timestamp: Time.t ->
-    raw_block ->
+    raw_block_header ->
     unit tzresult Lwt.t
 
   (** The first step in a block validation sequence. Initializes a
       validation context for validating a block. Takes as argument the
-      {!raw_block} to initialize the context for this block, patching
+      {!raw_block_header} to initialize the context for this block, patching
       the context resulting of the application of the predecessor
       block passed as parameter. The function {!precheck_block} may
       not have been called before [begin_application], so all the
@@ -118,12 +119,12 @@ module type PROTOCOL = sig
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_fitness: Fitness.fitness ->
-    raw_block ->
+    raw_block_header ->
     validation_state tzresult Lwt.t
 
   (** Initializes a validation context for constructing a new block
       (as opposed to validating an existing block). Since there is no
-      {!raw_block} header available, the parts that it provides are
+      {!raw_block_header} header available, the parts that it provides are
       passed as arguments (predecessor block hash, context resulting
       of the application of the predecessor block, and timestamp). *)
   val begin_construction :

@@ -267,7 +267,7 @@ module Helpers = struct
     let block cctxt block shell proto =
       call_error_service1 cctxt
         Services.Helpers.Parse.block block
-        ({ shell ; proto } : Updater.raw_block)
+        ({ shell ; proto } : Updater.raw_block_header)
   end
 
 end

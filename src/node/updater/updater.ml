@@ -43,7 +43,7 @@ type raw_operation = Store.Operation.t = {
 }
 let raw_operation_encoding = Store.Operation.encoding
 
-type shell_block = Store.Block_header.shell_header = {
+type shell_block_header = Store.Block_header.shell_header = {
   net_id: Net_id.t ;
   level: Int32.t ;
   proto_level: int ; (* uint8 *)
@@ -52,13 +52,13 @@ type shell_block = Store.Block_header.shell_header = {
   operations_hash: Operation_list_list_hash.t ;
   fitness: MBytes.t list ;
 }
-let shell_block_encoding = Store.Block_header.shell_header_encoding
+let shell_block_header_encoding = Store.Block_header.shell_header_encoding
 
-type raw_block = Store.Block_header.t = {
-  shell: shell_block ;
+type raw_block_header = Store.Block_header.t = {
+  shell: shell_block_header ;
   proto: MBytes.t ;
 }
-let raw_block_encoding = Store.Block_header.encoding
+let raw_block_header_encoding = Store.Block_header.encoding
 
 (** Version table *)
 
