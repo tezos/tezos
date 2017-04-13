@@ -9,35 +9,65 @@
 
 open Tezos_context
 
-let rpc_init rpc_context =
-  let level = Int32.succ rpc_context.Updater.block_header.shell.level in
-  let timestamp = rpc_context.block_header.shell.timestamp in
-  let fitness = rpc_context.block_header.shell.fitness in
-  Tezos_context.init ~level ~timestamp ~fitness rpc_context.context
+type rpc_context = {
+  block_hash: Block_hash.t ;
+  block_header: Updater.raw_block_header ;
+  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
+  operations: unit -> Updater.raw_operation list list Lwt.t ;
+  context: Tezos_context.t ;
+}
+
+let rpc_init
+    ({ block_hash ; block_header ;
+       operation_hashes ; operations ; context } : Updater.rpc_context) =
+  let level = Int32.succ block_header.shell.level in
+  let timestamp = block_header.shell.timestamp in
+  let fitness = block_header.shell.fitness in
+  Tezos_context.init ~level ~timestamp ~fitness context >>=? fun context ->
+  return { block_hash ; block_header ; operation_hashes ; operations ; context }
 
 let rpc_services = ref (RPC.empty : Updater.rpc_context RPC.directory)
-let register0 s f =
+
+let register0_fullctxt s f =
   rpc_services :=
     RPC.register !rpc_services (s RPC.Path.root)
       (fun ctxt () ->
          ( rpc_init ctxt >>=? fun ctxt ->
            f ctxt ) >>= RPC.Answer.return)
-let register1 s f =
+let register0 s f = register0_fullctxt s (fun { context } -> f context)
+
+let register1_fullctxt s f =
   rpc_services :=
     RPC.register !rpc_services (s RPC.Path.root)
       (fun ctxt arg ->
          ( rpc_init ctxt >>=? fun ctxt ->
            f ctxt arg ) >>= RPC.Answer.return)
-let register2 s f =
+let register1 s f = register1_fullctxt s (fun { context } x -> f context x)
+let register1_noctxt s f =
+  rpc_services :=
+    RPC.register !rpc_services (s RPC.Path.root)
+      (fun _ arg -> f arg >>= RPC.Answer.return)
+
+let register2_fullctxt s f =
   rpc_services :=
     RPC.register !rpc_services (s RPC.Path.root)
       (fun (ctxt, arg1) arg2 ->
          ( rpc_init ctxt >>=? fun ctxt ->
            f ctxt arg1 arg2 ) >>= RPC.Answer.return)
-let register1_noctxt s f =
-  rpc_services :=
-    RPC.register !rpc_services (s RPC.Path.root)
-      (fun _ arg -> f arg >>= RPC.Answer.return)
+let register2 s f = register2_fullctxt s (fun { context } x y -> f context x y)
+
+
+(*-- Operations --------------------------------------------------------------*)
+
+let () =
+  register0_fullctxt
+    Services.operations
+    (fun { operation_hashes ; operations } ->
+       operation_hashes () >>= fun operation_hashes ->
+       operations () >>= fun operations ->
+       map2_s
+         (map2_s (fun x y -> Lwt.return (Operation.parse x y)))
+         operation_hashes operations)
 
 (*-- Constants ---------------------------------------------------------------*)
 
@@ -149,7 +179,7 @@ let () =
     rpc_services :=
       RPC.register !rpc_services (s RPC.Path.root)
         (fun (ctxt, contract) arg ->
-           ( rpc_init ctxt >>=? fun ctxt ->
+           ( rpc_init ctxt >>=? fun { context = ctxt } ->
              Contract.exists ctxt contract >>=? function
              | true -> f ctxt contract arg
              | false -> raise Not_found ) >>= RPC.Answer.return) in

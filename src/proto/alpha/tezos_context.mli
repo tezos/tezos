@@ -491,6 +491,8 @@ and counter = Int32.t
 
 module Operation : sig
 
+  val encoding: operation Data_encoding.t
+
   type error += Cannot_parse_operation (* `Branch *)
   val parse:
     Operation_hash.t -> Updater.raw_operation -> operation tzresult
