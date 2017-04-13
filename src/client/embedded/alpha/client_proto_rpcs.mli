@@ -342,7 +342,7 @@ module Helpers : sig
       proto_operation list tzresult Lwt.t
     val block:
       Client_rpcs.config ->
-      block -> Updater.shell_block -> MBytes.t ->
+      block -> Updater.shell_block_header -> MBytes.t ->
       Block.proto_header tzresult Lwt.t
   end
 
