@@ -51,8 +51,8 @@ type validation_result = {
 type rpc_context = {
   block_hash: Block_hash.t ;
   block_header: raw_block_header ;
-  operations_list: unit -> Operation_hash.t list list ;
-  operations: unit -> MBytes.t list list ;
+  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
+  operations: unit -> raw_operation list list Lwt.t ;
   context: Context.t ;
 }
 

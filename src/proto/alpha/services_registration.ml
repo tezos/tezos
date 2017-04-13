@@ -9,8 +9,11 @@
 
 open Tezos_context
 
-let rpc_init { Updater.context ; level ; timestamp ; fitness } =
-  Tezos_context.init ~level ~timestamp ~fitness context
+let rpc_init rpc_context =
+  let level = Int32.succ rpc_context.Updater.block_header.shell.level in
+  let timestamp = rpc_context.block_header.shell.timestamp in
+  let fitness = rpc_context.block_header.shell.fitness in
+  Tezos_context.init ~level ~timestamp ~fitness rpc_context.context
 
 let rpc_services = ref (RPC.empty : Updater.rpc_context RPC.directory)
 let register0 s f =

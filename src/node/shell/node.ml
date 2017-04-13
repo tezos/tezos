@@ -295,11 +295,24 @@ module RPC = struct
                 test_network ;
               }
 
-  let rpc_context block : Updater.rpc_context =
-    { context = block.State.Valid_block.context ;
-      level = Int32.succ  block.level ;
-      fitness = block.fitness ;
-      timestamp = block. timestamp }
+  let rpc_context (block : State.Valid_block.t) : Updater.rpc_context =
+    { block_hash = block.hash ;
+      block_header = {
+        shell = {
+          net_id = block.net_id ;
+          level = block.level ;
+          proto_level = block.proto_level ;
+          predecessor = block.predecessor ;
+          timestamp = block.timestamp ;
+          operations_hash = block.operations_hash ;
+          fitness = block.fitness ;
+        } ;
+        proto = block.proto_header ;
+      } ;
+      operation_hashes = (fun () -> Lazy.force block.operation_hashes) ;
+      operations = (fun () -> Lazy.force block.operations) ;
+      context = block.context ;
+    }
 
   let get_rpc_context node block =
     match block with
@@ -319,16 +332,48 @@ module RPC = struct
         | Some block -> Some (rpc_context block)
       end
     | ( `Prevalidation | `Test_prevalidation ) as block ->
-        let validator, net = get_net node block in
+        let validator, net_db = get_net node block in
         let pv = Validator.prevalidator validator in
+        let net_state = Validator.net_state validator in
+        State.Valid_block.Current.head net_state >>= fun head ->
         Prevalidator.context pv >>= function
         | Error _ -> Lwt.fail Not_found
         | Ok { context ; fitness } ->
-            let timestamp = Prevalidator.timestamp pv in
-            State.Valid_block.Current.head
-              (Distributed_db.state net) >>= fun { level } ->
-            let level = Int32.succ level in
-            Lwt.return (Some { Updater.context ; fitness ; timestamp ; level })
+            Context.get_protocol context >>= fun protocol ->
+            let proto_level =
+              if Protocol_hash.equal protocol head.protocol_hash then
+                head.proto_level
+              else
+                ((head.proto_level + 1) mod 256) in
+            let operation_hashes =
+              let pv_result, _ = Prevalidator.operations pv in
+              [ pv_result.applied ] in
+            let operations_hash =
+              Operation_list_list_hash.compute
+                (List.map Operation_list_hash.compute operation_hashes) in
+            Lwt.return (Some {
+                Updater.block_hash = prevalidation_hash ;
+                block_header = {
+                  shell = {
+                    net_id = head.net_id ;
+                    level = Int32.succ head.level ;
+                    proto_level ;
+                    predecessor = head.hash ;
+                    timestamp = Prevalidator.timestamp pv ;
+                    operations_hash ;
+                    fitness ;
+                  } ;
+                  proto = MBytes.create 0 ;
+                } ;
+                operation_hashes = (fun () -> Lwt.return operation_hashes) ;
+                operations = begin fun () ->
+                  Lwt_list.map_p
+                    (Lwt_list.map_p
+                         (Distributed_db.Operation.read_exn net_db))
+                    operation_hashes
+                end ;
+                context ;
+              })
 
   let operations node block =
     match block with
