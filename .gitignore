@@ -43,6 +43,7 @@
 /test/reports
 
 /test/utils/test-data-encoding
+/test/utils/test-stream-data-encoding
 /test/utils/test-merkle
 /test/utils/test-lwt-pipe
 /test/p2p/test-p2p-io-scheduler
