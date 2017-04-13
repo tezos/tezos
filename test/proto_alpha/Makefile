@@ -37,7 +37,6 @@ run-test-transaction:
 	./test-transaction
 
 TEST_CONNECTION_IMPLS := \
-  proto_alpha_helpers.mli \
   proto_alpha_helpers.ml \
   test_transaction.ml
 
@@ -57,7 +56,6 @@ run-test-origination:
 	./test-origination
 
 TEST_CONNECTION_IMPLS := \
-  proto_alpha_helpers.mli \
   proto_alpha_helpers.ml \
   test_origination.ml
 
@@ -77,7 +75,6 @@ run-test-endorsement:
 	./test-endorsement
 
 TEST_CONNECTION_IMPLS := \
-  proto_alpha_helpers.mli \
   proto_alpha_helpers.ml \
   test_endorsement.ml
 
