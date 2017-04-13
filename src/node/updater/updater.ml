@@ -11,19 +11,6 @@ open Logging.Updater
 
 let (//) = Filename.concat
 
-type validation_result = Protocol.validation_result = {
-  context: Context.t ;
-  fitness: Fitness.fitness ;
-  message: string option ;
-}
-
-type rpc_context = Protocol.rpc_context = {
-  context: Context.t ;
-  level: Int32.t ;
-  timestamp: Time.t ;
-  fitness: Fitness.fitness ;
-}
-
 module type PROTOCOL = Protocol.PROTOCOL
 module type REGISTRED_PROTOCOL = sig
   val hash: Protocol_hash.t
@@ -59,6 +46,20 @@ type raw_block_header = Store.Block_header.t = {
   proto: MBytes.t ;
 }
 let raw_block_header_encoding = Store.Block_header.encoding
+
+type validation_result = Protocol.validation_result = {
+  context: Context.t ;
+  fitness: Fitness.fitness ;
+  message: string option ;
+}
+
+type rpc_context = Protocol.rpc_context = {
+  block_hash: Block_hash.t ;
+  block_header: Protocol.raw_block_header ;
+  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
+  operations: unit -> raw_operation list list Lwt.t ;
+  context: Context.t ;
+}
 
 (** Version table *)
 
