@@ -44,10 +44,11 @@ type validation_result = {
 }
 
 type rpc_context = {
+  block_hash: Block_hash.t ;
+  block_header: raw_block_header ;
+  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
+  operations: unit -> raw_operation list list Lwt.t ;
   context: Context.t ;
-  level: Int32.t ;
-  timestamp: Time.t ;
-  fitness: Fitness.fitness ;
 }
 
 module type PROTOCOL = sig
