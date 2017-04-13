@@ -116,7 +116,8 @@ and valid_block = {
   timestamp: Time.t ;
   fitness: Protocol.fitness ;
   operations_hash: Operation_list_list_hash.t ;
-  operations: Operation_hash.t list list ;
+  operation_hashes: Operation_hash.t list list Lwt.t Lazy.t ;
+  operations: Store.Operation.t list list Lwt.t Lazy.t ;
   discovery_time: Time.t ;
   protocol_hash: Protocol_hash.t ;
   protocol: (module Updater.REGISTRED_PROTOCOL) option ;
@@ -128,7 +129,7 @@ and valid_block = {
 }
 
 let build_valid_block
-    hash header operations
+    hash header operation_hashes operations
     context discovery_time successors invalid_successors =
   Context.get_protocol context >>= fun protocol_hash ->
   Context.get_test_network context >>= fun test_network ->
@@ -142,6 +143,7 @@ let build_valid_block
     timestamp = header.shell.timestamp ;
     discovery_time ;
     operations_hash = header.shell.operations_hash ;
+    operation_hashes ;
     operations ;
     fitness = header.shell.fitness ;
     protocol_hash ;
@@ -724,6 +726,9 @@ module Block_header = struct
   let read_operations s k =
     Raw_operation_list.read_all s.block_header_store k
 
+  let read_operations_exn s k =
+    Raw_operation_list.read_all_exn s.block_header_store k
+
   let mark_invalid net hash errors =
     mark_invalid net hash errors >>= fun marked ->
     if not marked then
@@ -909,7 +914,8 @@ module Raw_net = struct
           Lwt.return context
     end >>= fun context ->
     build_valid_block
-      genesis.block header [] context genesis.time
+      genesis.block header (lazy Lwt.return_nil) (lazy Lwt.return_nil)
+      context genesis.time
       Block_hash.Set.empty Block_hash.Set.empty >>= fun genesis_block ->
     Lwt.return @@
     build
@@ -936,7 +942,8 @@ module Valid_block = struct
     timestamp: Time.t ;
     fitness: Fitness.fitness ;
     operations_hash: Operation_list_list_hash.t ;
-    operations: Operation_hash.t list list ;
+    operation_hashes: Operation_hash.t list list Lwt.t Lazy.t ;
+    operations: Store.Operation.t list list Lwt.t Lazy.t ;
     discovery_time: Time.t ;
     protocol_hash: Protocol_hash.t ;
     protocol: (module Updater.REGISTRED_PROTOCOL) option ;
@@ -953,7 +960,9 @@ module Valid_block = struct
     let known { context_index } hash =
       Context.exists context_index hash
 
-    let raw_read block operations time chain_store context_index hash =
+    let raw_read
+        block operations operation_hashes
+        time chain_store context_index hash =
       Context.checkout context_index hash >>= function
       | None ->
           fail (Unknown_context hash)
@@ -962,12 +971,15 @@ module Valid_block = struct
           >>= fun successors ->
           Store.Chain.Invalid_successors.read_all (chain_store, hash)
           >>= fun invalid_successors ->
-          build_valid_block hash block operations
+          build_valid_block hash block operation_hashes operations
             context time successors invalid_successors >>= fun block ->
           return block
 
-    let raw_read_exn block operations time chain_store context_index hash =
-      raw_read block operations time chain_store context_index hash >>= function
+    let raw_read_exn
+        block operations operation_hashes
+        time chain_store context_index hash =
+      raw_read block operations operation_hashes
+        time chain_store context_index hash >>= function
       | Error _ -> Lwt.fail Not_found
       | Ok data -> Lwt.return data
 
@@ -976,8 +988,17 @@ module Valid_block = struct
       | None | Some { Time.data = Error _ } ->
           fail (Unknown_block hash)
       | Some { Time.data = Ok block ; time } ->
-          Block_header.read_operations net hash >>=? fun operations ->
-          raw_read block operations
+          let operation_hashes =
+            lazy (Block_header.read_operations_exn net hash) in
+          let operations =
+            lazy (
+              Lazy.force operation_hashes >>= fun operations ->
+              Lwt_list.map_p
+                (Lwt_list.map_p
+                   (Raw_operation.read_exn net.operation_store ))
+                operations)
+          in
+          raw_read block operations operation_hashes
             time net_state.chain_store net_state.context_index hash
 
     let read_opt net net_state hash =
@@ -991,6 +1012,7 @@ module Valid_block = struct
       | Ok data -> Lwt.return data
 
     let store
+        operation_store
         block_header_store
         (net_state: net_state)
         valid_block_watcher
@@ -1011,8 +1033,6 @@ module Valid_block = struct
       Raw_block_header.Locked.mark_valid
         block_header_store hash >>= fun _marked ->
       (* TODO fail if the block was previsouly stored ... ??? *)
-      Operation_list.Locked.read_all
-        block_header_store hash >>=? fun operations ->
       (* Let's commit the context. *)
       let message =
         match message with
@@ -1031,8 +1051,17 @@ module Valid_block = struct
       Store.Chain.Valid_successors.store
         (store, predecessor) hash >>= fun () ->
       (* Build the `valid_block` value. *)
+      let operation_hashes =
+        lazy (Operation_list.Locked.read_all_exn block_header_store hash) in
+      let operations =
+        lazy (
+          Lazy.force operation_hashes >>= fun operations ->
+          Lwt_list.map_p
+            (Lwt_list.map_p
+               (Raw_operation.read_exn operation_store ))
+            operations) in
       raw_read_exn
-        block operations discovery_time
+        block operations operation_hashes discovery_time
         net_state.chain_store net_state.context_index hash >>= fun valid_block ->
       Watcher.notify valid_block_watcher valid_block ;
       Lwt.return (Ok valid_block)
@@ -1067,7 +1096,7 @@ module Valid_block = struct
               block_header_store hash >>= function
             | Some _ -> return None (* Previously invalidated block. *)
             | None ->
-                Locked.store
+                Locked.store net.operation_store
                   block_header_store net_state net.valid_block_watcher
                   hash vcontext >>=? fun valid_block ->
                 return (Some valid_block)
@@ -1328,7 +1357,8 @@ module Net = struct
     Block_header.Locked.read_discovery_time block_header_store
       genesis_hash >>=? fun genesis_discovery_time ->
     Valid_block.Locked.raw_read
-      genesis_shell_header [] genesis_discovery_time
+      genesis_shell_header (lazy Lwt.return_nil) (lazy Lwt.return_nil)
+      genesis_discovery_time
       chain_store context_index genesis_hash >>=? fun genesis_block ->
     return @@
     Raw_net.build
