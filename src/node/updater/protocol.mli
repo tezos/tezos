@@ -22,7 +22,7 @@ type raw_operation = Store.Operation.t = {
   proto: MBytes.t ;
 }
 
-type shell_block = Store.Block_header.shell_header =
+type shell_block_header = Store.Block_header.shell_header =
   { net_id: Net_id.t ;
     level: Int32.t ;
     proto_level: int ; (* uint8 *)
@@ -32,8 +32,8 @@ type shell_block = Store.Block_header.shell_header =
     fitness: MBytes.t list ;
   }
 
-type raw_block = Store.Block_header.t = {
-  shell: shell_block ;
+type raw_block_header = Store.Block_header.t = {
+  shell: shell_block_header ;
   proto: MBytes.t ;
 }
 
@@ -70,13 +70,13 @@ module type PROTOCOL = sig
   val precheck_block :
     ancestor_context: Context.t ->
     ancestor_timestamp: Time.t ->
-    raw_block ->
+    raw_block_header ->
     unit tzresult Lwt.t
   val begin_application :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_fitness: Fitness.fitness ->
-    raw_block ->
+    raw_block_header ->
     validation_state tzresult Lwt.t
   val begin_construction :
     predecessor_context: Context.t ->
