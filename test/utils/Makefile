@@ -4,6 +4,7 @@ SRCDIR=../../src
 TESTS := \
   merkle \
   data-encoding \
+  stream-data-encoding \
   # lwt-pipe
 
 include ../Makefile.shared
@@ -71,3 +72,21 @@ test-data-encoding: ${LIB} ${TEST_DATA_ENCODING_IMPLS:.ml=.cmx}
 
 clean::
 	rm -f test-data-encoding
+
+############################################################################
+## Streamed data_encoding
+
+.PHONY:run-test-stream-data-encoding
+run-test-stream-data-encoding:
+	@echo
+	./test-stream-data-encoding
+
+TEST_DATA_ENCODING_IMPLS := \
+  test_data_encoding.ml
+
+test-stream-data-encoding: ${LIB} ${TEST_DATA_ENCODING_IMPLS:.ml=.cmx}
+	@echo LINK $(notdir $@)
+	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	rm -f test-stream-data-encoding
