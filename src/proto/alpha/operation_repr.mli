@@ -83,6 +83,8 @@ and counter = Int32.t
 
 type error += Cannot_parse_operation (* `Branch *)
 
+val encoding: operation Data_encoding.t
+
 val parse:
   Operation_hash.t -> Updater.raw_operation -> operation tzresult
 
