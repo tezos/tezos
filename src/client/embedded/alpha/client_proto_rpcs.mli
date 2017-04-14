@@ -64,6 +64,12 @@ module Context : sig
     Client_rpcs.config ->
     block -> int32 tzresult Lwt.t
 
+  val voting_period_kind:
+    Client_rpcs.config ->
+    block -> Voting_period.kind tzresult Lwt.t
+  (** [voting_period_kind cctxt blk] returns the voting period kind
+      of [blk]. *)
+
   module Nonce : sig
     val hash:
     Client_rpcs.config ->
