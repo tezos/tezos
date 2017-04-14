@@ -14,7 +14,7 @@ let is_invalid_arg = function
 
 let is_await = function Binary.Await _ -> true | _ -> false
 let is_success = function Binary.Success _ -> true | _ -> false
-let is_error = function Binary.Error _ -> true | _ -> false
+let is_error = function Binary.Error -> true | _ -> false
 
 
 let rec fold_left_pending f accu l =
@@ -51,7 +51,7 @@ let test_read_simple_bin_ko_invalid_data
                in
                match status with
                | Binary.Await _ -> ()
-               | Binary.Error _ -> ()
+               | Binary.Error -> ()
                | Binary.Success {res; remaining} ->
                    (* should not have "Success" *)
                    Assert.equal ~msg:__LOC__ remaining [];
@@ -94,7 +94,7 @@ let test_read_simple_bin_ko_await ?msg encoding value =
                    in
                    match status with
                    | Binary.Await _ -> ()
-                   | Binary.Error _ ->
+                   | Binary.Error ->
                        if not (classify encoding == `Variable) then
                          Assert.fail_msg "%s" (unexpected __LOC__)
                    | Binary.Success result ->
@@ -130,7 +130,7 @@ let test_read_simple_bin_ok ?msg ?(equal=Assert.equal) encoding value =
                  Assert.equal ~msg:__LOC__ remaining [];
                  equal ?msg value res
              | Binary.Await _ -> Assert.fail_msg "%s" (unexpected __LOC__)
-             | Binary.Error _ ->
+             | Binary.Error ->
                  if not (classify encoding == `Variable) then
                    Assert.fail_msg "%s" (unexpected __LOC__)
            end;
@@ -168,7 +168,7 @@ let test_check_simple_bin_ko_invalid_data
                in
                match status with
                | Binary.Await _ -> ()
-               | Binary.Error _ -> ()
+               | Binary.Error -> ()
                | Binary.Success {res; remaining} ->
                    Assert.equal ~msg:__LOC__ remaining [];
                    (* res is unit for check *)
@@ -207,7 +207,7 @@ let test_check_simple_bin_ko_await ?msg encoding value =
                    in
                    match status with
                    | Binary.Await _ -> ()
-                   | Binary.Error _ ->
+                   | Binary.Error ->
                        if not (classify encoding == `Variable) then
                          Assert.fail_msg "%s" (unexpected __LOC__)
                    | Binary.Success result ->
@@ -243,7 +243,7 @@ let test_check_simple_bin_ok ?msg ?(equal=Assert.equal) encoding value =
                  Assert.equal ~msg:__LOC__ remaining [];
                  (* res is unit for check *)
              | Binary.Await _ -> Assert.fail_msg "%s" (unexpected __LOC__)
-             | Binary.Error _ ->
+             | Binary.Error ->
                  if not (classify encoding == `Variable) then
                    Assert.fail_msg "%s" (unexpected __LOC__)
            end;
@@ -375,7 +375,7 @@ let test_union _ =
         )status bin_l
     in
     match status with
-    | Binary.Error _ -> Assert.fail_msg "%s" msg
+    | Binary.Error -> Assert.fail_msg "%s" msg
     | Binary.Await _ -> Assert.fail_msg "%s" msg
     | Binary.Success {res} -> res
   in
@@ -422,7 +422,7 @@ let test_splitted _ =
         )status bin_l
     in
     match status with
-    | Binary.Error _ -> Assert.fail_msg "%s" msg
+    | Binary.Error -> Assert.fail_msg "%s" msg
     | Binary.Await _ -> Assert.fail_msg "%s" msg
     | Binary.Success {res} -> res
   in
