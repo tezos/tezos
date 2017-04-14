@@ -142,6 +142,10 @@ let () = register0 Services.Context.next_level next_level
 
 let () = register0 Services.Context.faucet_counter Contract.get_faucet_counter
 
+let () =
+  register0 Services.Context.voting_period_kind Vote.get_current_period_kind
+
+
 (*-- Context.Nonce -----------------------------------------------------------*)
 
 let nonce ctxt raw_level () =

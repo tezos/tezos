@@ -72,6 +72,9 @@ module Context = struct
   let faucet_counter cctxt block =
     call_error_service1 cctxt Services.Context.faucet_counter block ()
 
+  let voting_period_kind cctxt block =
+    call_error_service1 cctxt Services.Context.voting_period_kind block ()
+
   module Nonce = struct
 
     type nonce_info = Services.Context.Nonce.nonce_info =
