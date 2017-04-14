@@ -410,7 +410,7 @@ module Vote : sig
 
   val get_current_proposal:
     context -> proposal tzresult Lwt.t
-  val set_current_proposal:
+  val init_current_proposal:
     context -> proposal -> context tzresult Lwt.t
   val clear_current_proposal:
     context -> context tzresult Lwt.t

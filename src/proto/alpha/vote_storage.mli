@@ -45,7 +45,7 @@ val set_current_period_kind:
 
 val get_current_proposal:
   Storage.t -> Protocol_hash.t tzresult Lwt.t
-val set_current_proposal:
+val init_current_proposal:
   Storage.t -> Protocol_hash.t -> Storage.t tzresult Lwt.t
 val clear_current_proposal: Storage.t -> Storage.t tzresult Lwt.t
 
