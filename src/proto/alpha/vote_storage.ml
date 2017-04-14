@@ -77,7 +77,7 @@ let get_current_quorum = Storage.Vote.Current_quorum.get
 let set_current_quorum = Storage.Vote.Current_quorum.set
 
 let get_current_proposal = Storage.Vote.Current_proposal.get
-let set_current_proposal = Storage.Vote.Current_proposal.set
+let init_current_proposal = Storage.Vote.Current_proposal.init
 let clear_current_proposal = Storage.Vote.Current_proposal.delete
 
 let init ctxt =

@@ -57,7 +57,7 @@ let start_new_voting_cycle ctxt =
           Vote.freeze_listings ctxt >>=? fun ctxt ->
           return ctxt
       | Some proposal ->
-          Vote.set_current_proposal ctxt proposal >>=? fun ctxt ->
+          Vote.init_current_proposal ctxt proposal >>=? fun ctxt ->
           Vote.freeze_listings ctxt >>=? fun ctxt ->
           Vote.set_current_period_kind ctxt Testing_vote >>=? fun ctxt ->
           return ctxt
