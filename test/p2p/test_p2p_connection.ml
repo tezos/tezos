@@ -287,9 +287,19 @@ end
 
 module Garbled_data = struct
 
-  let encoding = Data_encoding.bytes
+  let encoding =
+    let open Data_encoding in
+    dynamic_size @@ option @@ string
 
-  let garbled_msg = MBytes.create (1 lsl 4)
+  (* generate a fixed garbled_msg to avoid 'Data_encoding.Binary.Await
+     _', which blocks 'make test' *)
+  let garbled_msg =
+    let buf = MBytes.create (1 lsl 4) in
+    MBytes.set_int32 buf 0 (Int32.of_int 4);
+    MBytes.set_int32 buf 4 (Int32.of_int (-1));
+    MBytes.set_int32 buf 8 (Int32.of_int (-1));
+    MBytes.set_int32 buf 12 (Int32.of_int (-1));
+    buf
 
   let server _ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
