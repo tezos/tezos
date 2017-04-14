@@ -143,6 +143,17 @@ module Context = struct
       ~output: (wrap_tzerror int32)
       RPC.Path.(custom_root / "context" / "faucet_counter")
 
+  let voting_period_kind custom_root =
+    RPC.service
+      ~description: "Voting period kind for the current block"
+      ~input: empty
+      ~output:
+        (wrap_tzerror @@
+          (obj1
+            (req "voting_period_kind" Voting_period.kind_encoding)))
+      RPC.Path.(custom_root / "context" / "voting_period_kind")
+
+
   module Nonce = struct
 
     type nonce_info =
