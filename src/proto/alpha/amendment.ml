@@ -121,11 +121,11 @@ let record_proposals ctxt delegate proposals =
       fail Unexpected_proposal
 
 let record_ballot ctxt delegate proposal ballot =
-  Vote.get_current_proposal ctxt >>=? fun current_proposal ->
-  fail_unless (Protocol_hash.equal proposal current_proposal)
-    Invalid_proposal >>=? fun () ->
   Vote.get_current_period_kind ctxt >>=? function
   | Testing_vote | Promotion_vote ->
+      Vote.get_current_proposal ctxt >>=? fun current_proposal ->
+      fail_unless (Protocol_hash.equal proposal current_proposal)
+        Invalid_proposal >>=? fun () ->
       Vote.in_listings ctxt delegate >>= fun in_listings ->
       if in_listings then
         Vote.record_ballot ctxt delegate ballot
