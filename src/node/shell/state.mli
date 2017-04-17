@@ -274,9 +274,6 @@ module Valid_block : sig
     (** The current test network associated to the block. *)
     context: Context.t ;
     (** The validation context that was produced by the block validation. *)
-    successors: Block_hash.Set.t ;
-    invalid_successors: Block_hash.Set.t ;
-    (** The set of valid successors (including forked networks). *)
     proto_header: MBytes.t;
     (** The uninterpreted protocol dependent part of the header. *)
   }

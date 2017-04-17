@@ -396,22 +396,6 @@ module Chain = struct
       (struct let name = ["current_head"] end)
       (Store_helpers.Make_value(Block_hash))
 
-  module Valid_successors =
-    Store_helpers.Make_buffered_set
-      (Store_helpers.Make_substore
-         (Block_header.Indexed_store.Store)
-         (struct let name = ["known_successors" ; "valid" ] end))
-      (Block_hash)
-      (Block_hash.Set)
-
-  module Invalid_successors =
-    Store_helpers.Make_buffered_set
-      (Store_helpers.Make_substore
-         (Block_header.Indexed_store.Store)
-         (struct let name = ["known_successors" ; "invalid"] end))
-      (Block_hash)
-      (Block_hash.Set)
-
   module Successor_in_chain =
     Store_helpers.Make_single_store
       (Block_header.Indexed_store.Store)
