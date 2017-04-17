@@ -18,7 +18,7 @@ type raw_operation = Store.Operation.t = {
 }
 val raw_operation_encoding: raw_operation Data_encoding.t
 
-type shell_block = Store.Block_header.shell_header = {
+type shell_block_header = Store.Block_header.shell_header = {
   net_id: Net_id.t ;
   level: Int32.t ;
   proto_level: int ; (* uint8 *)
@@ -27,13 +27,13 @@ type shell_block = Store.Block_header.shell_header = {
   operations_hash: Operation_list_list_hash.t ;
   fitness: MBytes.t list ;
 }
-val shell_block_encoding: shell_block Data_encoding.t
+val shell_block_header_encoding: shell_block_header Data_encoding.t
 
-type raw_block = Store.Block_header.t = {
-  shell: shell_block ;
+type raw_block_header = Store.Block_header.t = {
+  shell: shell_block_header ;
   proto: MBytes.t ;
 }
-val raw_block_encoding: raw_block Data_encoding.t
+val raw_block_header_encoding: raw_block_header Data_encoding.t
 
 type validation_result = Protocol.validation_result = {
   context: Context.t ;
@@ -42,10 +42,11 @@ type validation_result = Protocol.validation_result = {
 }
 
 type rpc_context = Protocol.rpc_context = {
+  block_hash: Block_hash.t ;
+  block_header: raw_block_header ;
+  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
+  operations: unit -> raw_operation list list Lwt.t ;
   context: Context.t ;
-  level: Int32.t ;
-  timestamp: Time.t ;
-  fitness: Fitness.fitness ;
 }
 
 module type PROTOCOL = Protocol.PROTOCOL

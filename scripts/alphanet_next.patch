@@ -1,15 +1,3 @@
-diff --git a/src/node/shell/distributed_db_message.ml b/src/node/shell/distributed_db_message.ml
---- a/src/node/shell/distributed_db_message.ml
-+++ b/src/node/shell/distributed_db_message.ml
-@@ -144,7 +144,7 @@ let encoding =
- 
- let versions =
-   let open P2p.Version in
--  [ { name = "TEZOS_ALPHANET" ;
-+  [ { name = "TEZOS_ALPHANET_NEXT" ;
-       major = 0 ;
-       minor = 5 ;
-     }
 diff --git a/scripts/alphanet.sh b/scripts/alphanet.sh
 --- a/scripts/alphanet.sh
 +++ b/scripts/alphanet.sh

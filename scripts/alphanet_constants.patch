@@ -22,15 +22,3 @@ diff --git a/src/proto/alpha/constants_repr.ml b/src/proto/alpha/constants_repr.
    max_signing_slot = 15 ;
    instructions_per_transaction = 16 * 1024 ;
    proof_of_work_threshold =
-diff --git a/src/node/shell/distributed_db_message.ml b/src/node/shell/distributed_db_message.ml
---- a/src/node/shell/distributed_db_message.ml
-+++ b/src/node/shell/distributed_db_message.ml
-@@ -144,7 +144,7 @@ let encoding =
- 
- let versions =
-   let open P2p.Version in
--  [ { name = "TEZOS" ;
-+  [ { name = "TEZOS_ALPHANET" ;
-       major = 0 ;
-       minor = 5 ;
-     }

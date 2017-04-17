@@ -350,16 +350,18 @@ module Context_db = struct
               State.Valid_block.store net_state hash data >>=? function
               | None ->
                   State.Valid_block.read net_state hash >>=? fun block ->
+                  Lazy.force block.operation_hashes >>= fun ophs ->
                   Lwt_list.iter_p
                     (Lwt_list.iter_p (fun hash ->
                          Distributed_db.Operation.commit net_db hash))
-                    block.operations >>= fun () ->
+                    ophs >>= fun () ->
                   return (Ok block, false)
               | Some block ->
+                  Lazy.force block.operation_hashes >>= fun ophs ->
                   Lwt_list.iter_p
                     (Lwt_list.iter_p (fun hash ->
                          Distributed_db.Operation.commit net_db hash))
-                    block.operations >>= fun () ->
+                    ophs >>= fun () ->
                   return (Ok block, true)
             end
         | Error err ->

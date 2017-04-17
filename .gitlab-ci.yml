@@ -173,6 +173,7 @@ build:docker:alphanet:
   only:
     - alphanet@tezos/tezos
   script:
+    - sed -i s/TEZOS/TEZOS_ALPHANET/ src/node/shell/distributed_db_message.ml
     - patch -p1 < scripts/alphanet_constants.patch
     - ./scripts/create_docker_image.sh
         "${CI_REGISTRY_IMAGE}" "${CI_BUILD_REF}.patched" .
@@ -185,6 +186,7 @@ build:docker:alphanet_next:
   only:
     - master@tezos/tezos
   script:
+    - sed -i s/TEZOS/TEZOS_ALPHANET_NEXT/ src/node/shell/distributed_db_message.ml
     - patch -p1 < scripts/alphanet_constants.patch
     - patch -p1 < scripts/alphanet_next.patch
     - ./scripts/create_docker_image.sh
@@ -296,9 +298,7 @@ deploy:alphanet_next:
     - echo "${CI_KH}" > ~/.ssh/known_hosts
     - echo "${CI_PK_ALPHANET_NEXT}" > ~/.ssh/id_ed25519
     - chmod 400 ~/.ssh/id_ed25519
-    - ssh greg@zo.gbzm.fr
-    - ssh tezos@35.167.138.212
-    - ssh tezos@35.165.227.4
+    - echo | ssh -v greg@zo.gbzm.fr
   allow_failure: true
 
 cleanup:
