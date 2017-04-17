@@ -128,7 +128,7 @@ check_volume() {
 
 clear_volume() {
     if check_volume ; then
-        docker volume rm "$docker_volume"
+        docker volume rm "$docker_volume" > /dev/null
         echo "\033[32mThe blockchain data has been removed from the disk.\033[0m"
     else
         echo "\033[32mNo remaining data to be removed from the disk.\033[0m"
@@ -170,11 +170,13 @@ start_container() {
         fi
         docker rm "$docker_container" || true > /dev/null 2>&1
         echo "Launching the docker container..."
-        docker run -dit -p "$port:$port" \
+        docker run --rm -dit -p "$port:$port" -p "8732:80" \
                -v $docker_volume:/var/run/tezos \
                --entrypoint /bin/sh \
                --name "$docker_container" \
                "$docker_image" > /dev/null
+        docker exec --user root --detach "$docker_container" \
+               nginx -c /etc/nginx/nginx.conf
         may_restore_identity
         may_restore_accounts
     fi
@@ -188,7 +190,7 @@ stop_container() {
     save_identity ## Saving again, just in case...
     save_accounts
     printf "Stopping the container... "
-    docker stop "$docker_container"
+    docker stop "$docker_container" >/dev/null
     echo " done"
 }
 
@@ -400,10 +402,16 @@ assert_uptodate() {
 
 update_script() {
     pull_image
-    tmp="$(docker run -dit --entrypoint /bin/true "$docker_image")"
-    docker cp "$tmp:home/tezos/scripts/alphanet.sh" "$0"
-    docker stop "$tmp"
-    echo "\033[32mThe script has been updated.\033[0m"
+    tmp="$(docker run --rm -dit --entrypoint /bin/true "$docker_image")"
+    docker cp "$tmp:home/tezos/scripts/alphanet.sh" ".alphanet.sh.new"
+    docker stop "$tmp" > /dev/null
+    if ! diff .alphanet.sh.new  "$0" >/dev/null 2>&1 ; then
+        mv .alphanet.sh.new "$0"
+        echo "\033[32mThe script has been updated.\033[0m"
+    else
+        rm .alphanet.sh.new
+        echo "\033[32mThe script is up to date.\033[0m"
+    fi
 }
 
 usage() {
@@ -470,6 +478,10 @@ case "$command" in
         exec "$0" start "$@"
         ;;
     clear)
+        if check_container; then
+            echo "\033[31mCannot clear data while the container is running.\033[0m"
+            exit 1
+        fi
         clear_volume
         ;;
     status)
