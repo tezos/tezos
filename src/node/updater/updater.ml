@@ -11,19 +11,6 @@ open Logging.Updater
 
 let (//) = Filename.concat
 
-type validation_result = Protocol.validation_result = {
-  context: Context.t ;
-  fitness: Fitness.fitness ;
-  message: string option ;
-}
-
-type rpc_context = Protocol.rpc_context = {
-  context: Context.t ;
-  level: Int32.t ;
-  timestamp: Time.t ;
-  fitness: Fitness.fitness ;
-}
-
 module type PROTOCOL = Protocol.PROTOCOL
 module type REGISTRED_PROTOCOL = sig
   val hash: Protocol_hash.t
@@ -43,7 +30,7 @@ type raw_operation = Store.Operation.t = {
 }
 let raw_operation_encoding = Store.Operation.encoding
 
-type shell_block = Store.Block_header.shell_header = {
+type shell_block_header = Store.Block_header.shell_header = {
   net_id: Net_id.t ;
   level: Int32.t ;
   proto_level: int ; (* uint8 *)
@@ -52,13 +39,27 @@ type shell_block = Store.Block_header.shell_header = {
   operations_hash: Operation_list_list_hash.t ;
   fitness: MBytes.t list ;
 }
-let shell_block_encoding = Store.Block_header.shell_header_encoding
+let shell_block_header_encoding = Store.Block_header.shell_header_encoding
 
-type raw_block = Store.Block_header.t = {
-  shell: shell_block ;
+type raw_block_header = Store.Block_header.t = {
+  shell: shell_block_header ;
   proto: MBytes.t ;
 }
-let raw_block_encoding = Store.Block_header.encoding
+let raw_block_header_encoding = Store.Block_header.encoding
+
+type validation_result = Protocol.validation_result = {
+  context: Context.t ;
+  fitness: Fitness.fitness ;
+  message: string option ;
+}
+
+type rpc_context = Protocol.rpc_context = {
+  block_hash: Block_hash.t ;
+  block_header: Protocol.raw_block_header ;
+  operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
+  operations: unit -> raw_operation list list Lwt.t ;
+  context: Context.t ;
+}
 
 (** Version table *)
 

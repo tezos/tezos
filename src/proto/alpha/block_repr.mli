@@ -11,7 +11,7 @@ open Tezos_hash
 
 (** Exported type *)
 type header = {
-  shell: Updater.shell_block ;
+  shell: Updater.shell_block_header ;
   proto: proto_header ;
   signature: Ed25519.Signature.t ;
 }
@@ -26,16 +26,16 @@ and proto_header = {
 val max_header_length: int
 
 (** Parse the protocol-specific part of a block header. *)
-val parse_header: Updater.raw_block -> header tzresult
+val parse_header: Updater.raw_block_header -> header tzresult
 
 val proto_header_encoding:
   proto_header Data_encoding.encoding
 
 val unsigned_header_encoding:
-  (Updater.shell_block * proto_header) Data_encoding.encoding
+  (Updater.shell_block_header * proto_header) Data_encoding.encoding
 
 val forge_header:
-  Updater.shell_block -> proto_header -> MBytes.t
+  Updater.shell_block_header -> proto_header -> MBytes.t
 (** [forge_header shell_hdr proto_hdr] is the binary serialization
     (using [unsigned_header_encoding]) of a block header,
     comprising both the shell and the protocol part of the header,

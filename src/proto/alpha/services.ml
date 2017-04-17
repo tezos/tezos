@@ -34,6 +34,15 @@ let wrap_tzerror encoding =
       (fun x -> Error x) ;
   ]
 
+
+let operations custom_root =
+  RPC.service
+    ~description: "All the operations of the block (parsed)."
+    ~input: empty
+    ~output: (wrap_tzerror @@
+              (list (list (dynamic_size Operation.encoding))))
+    RPC.Path.(custom_root / "operations")
+
 module Constants = struct
 
   let cycle_length custom_root =
@@ -592,7 +601,7 @@ module Helpers = struct
     let block custom_root =
       RPC.service
         ~description:"Parse a block"
-        ~input: Updater.raw_block_encoding
+        ~input: Updater.raw_block_header_encoding
         ~output: (wrap_tzerror Block.proto_header_encoding)
         RPC.Path.(custom_root / "helpers" / "parse" / "block" )
 

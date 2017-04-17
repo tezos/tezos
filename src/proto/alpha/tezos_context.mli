@@ -491,6 +491,8 @@ and counter = Int32.t
 
 module Operation : sig
 
+  val encoding: operation Data_encoding.t
+
   type error += Cannot_parse_operation (* `Branch *)
   val parse:
     Operation_hash.t -> Updater.raw_operation -> operation tzresult
@@ -517,7 +519,7 @@ end
 module Block : sig
 
   type header = {
-    shell: Updater.shell_block ;
+    shell: Updater.shell_block_header ;
     proto: proto_header ;
     signature: Ed25519.Signature.t ;
   }
@@ -530,16 +532,16 @@ module Block : sig
 
   val max_header_length: int
 
-  val parse_header: Updater.raw_block -> header tzresult
+  val parse_header: Updater.raw_block_header -> header tzresult
 
   val proto_header_encoding:
     proto_header Data_encoding.encoding
 
   val unsigned_header_encoding:
-    (Updater.shell_block * proto_header) Data_encoding.encoding
+    (Updater.shell_block_header * proto_header) Data_encoding.encoding
 
   val forge_header:
-    Updater.shell_block -> proto_header -> MBytes.t
+    Updater.shell_block_header -> proto_header -> MBytes.t
 
 end
 

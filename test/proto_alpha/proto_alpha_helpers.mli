@@ -106,7 +106,7 @@ module Mining : sig
   val mine_stamp :
     Client_proto_rpcs.block ->
     secret_key ->
-    Updater.shell_block ->
+    Updater.shell_block_header ->
     int ->
     Nonce_hash.t ->
     MBytes.t tzresult Lwt.t
