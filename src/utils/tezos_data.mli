@@ -50,6 +50,7 @@ module Operation : sig
 
   include HASHABLE_DATA with type t := t
                          and type hash := Operation_hash.t
+  val of_bytes_exn: MBytes.t -> t
 
 end
 
@@ -74,6 +75,7 @@ module Block_header : sig
 
   include HASHABLE_DATA with type t := t
                          and type hash := Block_hash.t
+  val of_bytes_exn: MBytes.t -> t
 
 end
 
@@ -91,5 +93,6 @@ module Protocol : sig
 
   include HASHABLE_DATA with type t := t
                          and type hash := Protocol_hash.t
+  val of_bytes_exn: MBytes.t -> t
 
 end
