@@ -2,11 +2,11 @@ FROM alpine:$alpine_version
 
 LABEL distro_style="apk" distro="alpine" distro_long="alpine-$alpine_version" arch="x86_64" operatingsystem="linux"
 
-RUN apk update && \
+RUN adduser -S tezos && \
+    apk update && \
     apk upgrade && \
-    apk add sudo bash libssl1.0 libsodium libev gmp git && \
+    apk add sudo bash libssl1.0 libsodium libev gmp git nginx && \
     rm -f /var/cache/apk/* && \
-    adduser -S tezos && \
     echo 'tezos ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/tezos && \
     chmod 440 /etc/sudoers.d/tezos && \
     chown root:root /etc/sudoers.d/tezos && \
@@ -29,6 +29,9 @@ RUN sudo cp scripts/docker_entrypoint.sh /usr/local/bin/tezos && \
 
 RUN sudo mkdir -p /var/run/tezos && \
     sudo chown tezos /var/run/tezos
+
+RUN sudo mkdir -p /run/nginx && \
+    sudo cp scripts/nginx.conf /etc/nginx
 
 ENV EDITOR=vi
 
