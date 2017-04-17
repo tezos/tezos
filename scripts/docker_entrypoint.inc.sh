@@ -6,23 +6,30 @@ client_dir="${client_dir:=/var/run/tezos/client}"
 node="${node:=tezos-node}"
 client="${client:=tezos-client -base-dir \"$client_dir\"}"
 
+save() {
+    [ ! -f "$1" ] || mv "$1" "$data_dir/bak"
+}
+
+restore() {
+    [ ! -f "$data_dir/bak/$(basename "$1")" ] || mv "$data_dir/bak/$(basename "$1")" "$1"
+}
+
 init() {
     if [ ! -f "$data_dir/alphanet_version" ] || \
        [ "$(cat "$data_dir/alphanet_version")"  \
          != "$(cat ~/scripts/alphanet_version)" ]; then
         echo -e "\033[33mThe alphanet chain has been reset\033[0m"
         mkdir -p "$data_dir/bak"
-        mv "$node_dir/identity.json" \
-           "$client_dir/public key hashs" \
-           "$client_dir/public keys" \
-           "$client_dir/secret keys" \
-           "$data_dir/bak"
+        save "$node_dir/identity.json"
+        save "$client_dir/public key hashs"
+        save "$client_dir/public keys"
+        save "$client_dir/secret keys"
         rm -rf "$node_dir" "$client_dir"
         mkdir -p "$node_dir" "$client_dir"
-        mv "$data_dir/bak/identity.json" "$node_dir/"
-        mv "$data_dir/bak/public key hashs" "$client_dir/"
-        mv "$data_dir/bak/public keys" "$client_dir/"
-        mv "$data_dir/bak/secret keys" "$client_dir/"
+        restore "$node_dir/identity.json"
+        restore "$client_dir/public key hashs"
+        restore "$client_dir/public keys"
+        restore "$client_dir/secret keys"
         rmdir "$data_dir/bak"
         cp ~/scripts/alphanet_version "$data_dir/alphanet_version"
     fi
