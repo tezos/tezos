@@ -70,16 +70,6 @@ module Chain : sig
      and type elt := Block_hash.t
      and module Set := Block_hash.Set
 
-  module Valid_successors : BUFFERED_SET_STORE
-    with type t = store * Block_hash.t
-     and type elt := Block_hash.t
-     and module Set := Block_hash.Set
-
-  module Invalid_successors : BUFFERED_SET_STORE
-    with type t = store * Block_hash.t
-     and type elt := Block_hash.t
-     and module Set := Block_hash.Set
-
   module Successor_in_chain : SINGLE_STORE
     with type t = store * Block_hash.t
      and type value := Block_hash.t

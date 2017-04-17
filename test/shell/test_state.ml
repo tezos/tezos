@@ -331,43 +331,6 @@ let test_read_block (s: state) =
 
 (****************************************************************************)
 
-(** State.successors *)
-
-let compare s kind name succs l =
-  if Block_hash.Set.cardinal succs <> List.length l then
-    Assert.fail_msg
-      "unexpected %ssuccessors size (%s: %d %d)"
-      kind name (Block_hash.Set.cardinal succs) (List.length l) ;
-  List.iter
-    (fun bname ->
-       let bh = fst @@ block s bname in
-       if not (Block_hash.Set.mem bh succs) then
-         Assert.fail_msg
-           "missing block in %ssuccessors (%s: %s)" kind name bname)
-    l
-
-let test_successors s =
-  let test s name expected invalid_expected =
-    let b = vblock s name in
-    State.Valid_block.read s.net b.hash >>= function
-    | Error _ ->
-        Assert.fail_msg "Failed while reading block %s" name
-    | Ok { successors ; invalid_successors } ->
-        compare s "" name successors expected ;
-        compare s "invalid " name invalid_successors invalid_expected ;
-        Lwt.return_unit
-
-  in
-  test s "A1" ["A2"] [] >>= fun () ->
-  test s "A3" ["A4";"B1"] [] >>= fun () ->
-  test s "A8" [] [] >>= fun () ->
-  test s "B1" ["B2"] [] >>= fun () ->
-  test s "B7" ["B8"] ["C1"] >>= fun () ->
-  return ()
-
-
-(****************************************************************************)
-
 (** State.path *)
 
 let rec compare_path p1 p2 = match p1, p2 with
@@ -697,7 +660,6 @@ let tests : (string * (state -> unit tzresult Lwt.t)) list = [
   "init", test_init ;
   "read_operation", test_read_operation;
   "read_block", test_read_block ;
-  "successors", test_successors ;
   "path", test_path ;
   "valid_path", test_valid_path ;
   "ancestor", test_ancestor ;
