@@ -321,6 +321,19 @@ end
 
 type error += Cannot_parse_operation
 
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun { hash ; shell ; contents ; signature } ->
+       (hash, (shell, (contents, signature))))
+    (fun (hash, (shell, (contents, signature))) ->
+       { hash ; shell ; contents ; signature })
+    (merge_objs
+       (obj1 (req "hash" Operation_hash.encoding))
+       (merge_objs
+         Updater.shell_operation_encoding
+         Encoding.signed_proto_operation_encoding))
+
 let () =
   register_error_kind
     `Branch

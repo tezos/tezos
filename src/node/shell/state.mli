@@ -258,8 +258,9 @@ module Valid_block : sig
     fitness: Protocol.fitness ;
     (** The (validated) score of the block. *)
     operations_hash: Operation_list_list_hash.t ;
-    operations: Operation_hash.t list list ;
-    (** The sequence of operations ans its (Merkle-)hash. *)
+    operation_hashes: Operation_hash.t list list Lwt.t Lazy.t ;
+    operations: Store.Operation.t list list Lwt.t Lazy.t ;
+    (** The sequence of operations and its (Merkle-)hash. *)
     discovery_time: Time.t ;
     (** The data at which the block was discorevered on the P2P network. *)
     protocol_hash: Protocol_hash.t ;

@@ -88,6 +88,16 @@ val iter_s : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
 
 (** A {!List.map} in the monad *)
 val map_s : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+val map_p : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+
+(** A {!List.map2} in the monad *)
+val map2 :
+  ('a -> 'b -> 'c tzresult) -> 'a list -> 'b list -> 'c list tzresult
+
+(** A {!List.map2} in the monad *)
+val map2_s :
+  ('a -> 'b -> 'c tzresult Lwt.t) -> 'a list -> 'b list ->
+  'c list tzresult Lwt.t
 
 (** A {!List.map_filter} in the monad *)
 val map_filter_s : ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t

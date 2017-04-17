@@ -39,7 +39,7 @@ let compare_operations _ _ = 0
 let max_number_of_operations = 0
 
 type block = {
-  shell: Updater.shell_block ;
+  shell: Updater.shell_block_header ;
   command: Data.Command.t ;
   signature: Ed25519.Signature.t ;
 }
