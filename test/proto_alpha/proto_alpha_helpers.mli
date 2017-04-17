@@ -120,11 +120,11 @@ module Mining : sig
     fitness:Fitness.t ->
     seed_nonce:Nonce.nonce ->
     src_sk:secret_key ->
-    Operation_hash.t list -> Block_hash.t tzresult Lwt.t
+    Operation.raw list -> Block_hash.t tzresult Lwt.t
 
   val mine :
     ?force:bool ->
-    ?operations:Operation_hash.t list ->
+    ?operations:Operation.raw list ->
     ?fitness_gap:int ->
     ?proto_level:int ->
     Account.t ->
@@ -140,11 +140,10 @@ end
 module Endorse : sig
 
   val endorse :
-    ?force:bool ->
     ?slot:int ->
     Account.t ->
     Client_alpha.Client_proto_rpcs.block ->
-    Operation_hash.t tzresult Lwt.t
+    Operation.raw tzresult Lwt.t
 
   val endorsers_list :
     Client_alpha.Client_proto_rpcs.block ->
@@ -161,22 +160,18 @@ end
 
 module Protocol : sig
 
-  val inject_proposals :
-    ?async:bool ->
-    ?force:bool ->
+  val proposals :
     ?block:Client_node_rpcs.Blocks.block ->
     src:Account.t ->
-    Hash.Protocol_hash.t list ->
-    Hash.Operation_list_hash.elt tzresult Lwt.t
+    Protocol_hash.t list ->
+    Operation.raw tzresult Lwt.t
 
-  val inject_ballot :
-    ?async:bool ->
-    ?force:bool ->
+  val ballot :
     ?block:Client_node_rpcs.Blocks.block ->
     src:Account.t ->
-    proposal:Hash.Protocol_hash.t ->
+    proposal:Protocol_hash.t ->
     Vote.ballot ->
-    Hash.Operation_list_hash.elt tzresult Lwt.t
+    Operation.raw tzresult Lwt.t
 
 end
 
@@ -185,13 +180,15 @@ module Assert : sig
   include module type of Assert
 
   val balance_equal:
+    ?block:Client_node_rpcs.Blocks.block ->
     msg:string -> Account.t -> int64 -> unit tzresult Lwt.t
   val delegate_equal:
+    ?block:Client_node_rpcs.Blocks.block ->
     msg:string -> Contract.t -> public_key_hash option -> unit tzresult Lwt.t
 
   val ecoproto_error:
     (Register_client_embedded_proto_alpha.Packed_protocol.error -> bool) ->
-    Error_monad.error -> bool
+    error -> bool
 
   val generic_economic_error : msg:string -> 'a tzresult -> unit
 
@@ -218,7 +215,7 @@ module Assert : sig
 
   val check_protocol :
     ?msg:string -> block:Client_node_rpcs.Blocks.block ->
-    Hash.Protocol_hash.t -> unit tzresult Lwt.t
+    Protocol_hash.t -> unit tzresult Lwt.t
 
   val check_voting_period_kind :
     ?msg:string -> block:Client_node_rpcs.Blocks.block ->

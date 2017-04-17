@@ -247,7 +247,7 @@ module Protocol = struct
   let voting_period_kind ?(block = `Prevalidation) () =
     Client_proto_rpcs.Context.voting_period_kind rpc_config block
 
-  let inject_proposals ?async ?force ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) proposals =
+  let proposals ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) proposals =
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.proposals rpc_config block
@@ -257,11 +257,9 @@ module Protocol = struct
       ~proposals
       () >>=? fun bytes ->
     let signed_bytes = Environment.Ed25519.Signature.append sk bytes in
-    Client_node_rpcs.inject_operation
-      rpc_config ?async ?force signed_bytes >>=? fun oph ->
-    return oph
+    return (Tezos_data.Operation.of_bytes_exn signed_bytes)
 
-  let inject_ballot ?async ?force ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
+  let ballot ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.ballot rpc_config block
@@ -272,9 +270,7 @@ module Protocol = struct
       ~ballot
       () >>=? fun bytes ->
     let signed_bytes = Environment.Ed25519.Signature.append sk bytes in
-    Client_node_rpcs.inject_operation
-      rpc_config ?async ?force signed_bytes >>=? fun oph ->
-    return oph
+    return (Tezos_data.Operation.of_bytes_exn signed_bytes)
 
 end
 
@@ -301,16 +297,16 @@ module Assert = struct
     let prn = Tez.to_string in
     Assert.equal ?msg ~prn ~eq tz1 tz2
 
-  let balance_equal ~msg account expected_balance =
-    Account.balance account >>=? fun actual_balance ->
+  let balance_equal ?block ~msg account expected_balance =
+    Account.balance ?block account >>=? fun actual_balance ->
     match Tez.of_cents expected_balance with
     | None ->
         failwith "invalid tez constant"
     | Some expected_balance ->
         return (equal_tez ~msg actual_balance expected_balance)
 
-  let delegate_equal ~msg contract expected_delegate =
-    Account.delegate contract >>|? fun actual_delegate ->
+  let delegate_equal ?block ~msg contract expected_delegate =
+    Account.delegate ?block contract >>|? fun actual_delegate ->
     equal_pkh ~msg actual_delegate expected_delegate
 
   let ecoproto_error f = function
@@ -445,15 +441,16 @@ module Mining = struct
       ~fitness
       ~seed_nonce
       ~src_sk
-      operation_list =
+      operations =
     let block = match block with `Prevalidation -> `Head 0 | block -> block in
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
     let proto_level = Utils.unopt ~default:bi.proto_level proto_level in
     let seed_nonce_hash = Nonce.hash seed_nonce in
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun level ->
+    let operation_hashes = List.map Tezos_data.Operation.hash operations in
     let operations_hash =
       Operation_list_list_hash.compute
-        [Operation_list_hash.compute operation_list] in
+        [Operation_list_hash.compute operation_hashes] in
     let shell =
       { Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
         timestamp ; fitness ; operations_hash ;
@@ -476,11 +473,12 @@ module Mining = struct
       () >>=? fun unsigned_header ->
     let signed_header = Environment.Ed25519.Signature.append src_sk unsigned_header in
     Client_node_rpcs.inject_block rpc_config
-      ?force signed_header [List.map (fun h -> Client_node_rpcs.Hash h) operation_list] >>=? fun block_hash ->
+      ?force signed_header
+      [List.map (fun h -> Client_node_rpcs.Blob h) operations] >>=? fun block_hash ->
     return block_hash
 
   let mine
-      ?(force = false)
+      ?(force = true)
       ?(operations = [])
       ?(fitness_gap = 1)
       ?proto_level
@@ -523,27 +521,21 @@ end
 
 module Endorse = struct
 
-  let inject_endorsement
+  let forge_endorsement
       block
-      _level
-      ?async
-      ?force
       src_sk
       source
       slot =
-    Client_blocks.get_block_hash rpc_config block >>=? fun block_hash ->
-    Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+    Client_blocks.get_block_info rpc_config block >>=? fun { hash ; net_id } ->
     Client_proto_rpcs.Helpers.Forge.Delegate.endorsement rpc_config
       block
-      ~net
+      ~net:net_id
       ~source
-      ~block:block_hash
+      ~block:hash
       ~slot:slot
       () >>=? fun bytes ->
     let signed_bytes = Environment.Ed25519.Signature.append src_sk bytes in
-    Client_node_rpcs.inject_operation
-      rpc_config ?force ?async signed_bytes >>=? fun oph ->
-    return oph
+    return (Tezos_data.Operation.of_bytes_exn signed_bytes)
 
   let signing_slots
       ?(max_priority = 1024)
@@ -559,12 +551,10 @@ module Endorse = struct
     return slots
 
   let endorse
-      ?(force = false)
       ?slot
       (contract : Account.t)
       block =
-    Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
-    let level = Raw_level.succ @@ level.level in
+    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun { level } ->
     begin
       match slot with
       | Some slot -> return slot
@@ -577,9 +567,7 @@ module Endorse = struct
               failwith "No slot found at level %a" Raw_level.pp level
         end
     end >>=? fun slot ->
-    inject_endorsement
-      block level contract.sk contract.pk slot ~force >>=? fun oph ->
-    return oph
+    forge_endorsement block contract.sk contract.pk slot
 
   (* FIXME @vb: I don't understand this function, copied from @cago. *)
   let endorsers_list block { Account.b1 ; b2 ; b3 ; b4 ; b5 } =

@@ -28,14 +28,13 @@ let run_change_to_demo_proto block ({ b1 ; b2 ; b3 ; b4 ; b5 } : Account.bootstr
   Mining.mine b2 (`Hash head) >>=? fun head ->
 
   (* 1. Propose the 'demo' protocol as b1 (during the Proposal period) *)
-  Protocol.inject_proposals
-    ~force:true
+  Protocol.proposals
     ~block:(`Hash head)
     ~src:b1
-    [demo_protocol] >>=? fun oph ->
+    [demo_protocol] >>=? fun op ->
 
   (* Mine blocks to switch to next vote period (Testing_vote) *)
-  Mining.mine ~operations:[oph] b3 (`Hash head) >>=? fun head ->
+  Mining.mine ~operations:[op] b3 (`Hash head) >>=? fun head ->
   Format.eprintf "Entering `Testing_vote` voting period@.";
   Mining.mine b4 (`Hash head) >>=? fun head ->
   Assert.check_voting_period_kind ~msg:__LOC__ ~block:(`Hash head)
@@ -44,8 +43,7 @@ let run_change_to_demo_proto block ({ b1 ; b2 ; b3 ; b4 ; b5 } : Account.bootstr
   (* 2. Vote unanimously for a proposal *)
 
   let vote_for_demo ~src ~block ballot =
-    Protocol.inject_ballot
-      ~force:true
+    Protocol.ballot
       ~block
       ~src
       ~proposal:demo_protocol
