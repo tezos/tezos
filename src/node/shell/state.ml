@@ -123,14 +123,12 @@ and valid_block = {
   protocol: (module Updater.REGISTRED_PROTOCOL) option ;
   test_network: Context.test_network ;
   context: Context.t ;
-  successors: Block_hash.Set.t ;
-  invalid_successors: Block_hash.Set.t ;
   proto_header: MBytes.t ;
 }
 
 let build_valid_block
     hash header operation_hashes operations
-    context discovery_time successors invalid_successors =
+    context discovery_time =
   Context.get_protocol context >>= fun protocol_hash ->
   Context.get_test_network context >>= fun test_network ->
   let protocol = Updater.get protocol_hash in
@@ -150,8 +148,6 @@ let build_valid_block
     protocol ;
     test_network ;
     context ;
-    successors ;
-    invalid_successors ;
     proto_header = header.Store.Block_header.proto ;
   } in
   Lwt.return valid_block
@@ -729,24 +725,6 @@ module Block_header = struct
   let read_operations_exn s k =
     Raw_operation_list.read_all_exn s.block_header_store k
 
-  let mark_invalid net hash errors =
-    mark_invalid net hash errors >>= fun marked ->
-    if not marked then
-      Lwt.return_false
-    else begin
-      Raw_block_header.read_opt net.block_header_store hash >>= function
-      | Some { shell = { predecessor } } ->
-          Shared.use net.state begin fun state ->
-            Store.Chain.Valid_successors.remove
-              (state.chain_store, predecessor) hash >>= fun () ->
-            Store.Chain.Invalid_successors.store
-              (state.chain_store, predecessor) hash
-          end >>= fun () ->
-          Lwt.return_true
-      | None ->
-          Lwt.return_true
-    end
-
   module Helpers = struct
 
     let check_block state h =
@@ -915,8 +893,7 @@ module Raw_net = struct
     end >>= fun context ->
     build_valid_block
       genesis.block header (lazy Lwt.return_nil) (lazy Lwt.return_nil)
-      context genesis.time
-      Block_hash.Set.empty Block_hash.Set.empty >>= fun genesis_block ->
+      context genesis.time >>= fun genesis_block ->
     Lwt.return @@
     build
       ~genesis
@@ -949,8 +926,6 @@ module Valid_block = struct
     protocol: (module Updater.REGISTRED_PROTOCOL) option ;
     test_network: Context.test_network ;
     context: Context.t ;
-    successors: Block_hash.Set.t ;
-    invalid_successors: Block_hash.Set.t ;
     proto_header: MBytes.t ;
   }
   type valid_block = t
@@ -962,24 +937,21 @@ module Valid_block = struct
 
     let raw_read
         block operations operation_hashes
-        time chain_store context_index hash =
+        time context_index hash =
       Context.checkout context_index hash >>= function
       | None ->
           fail (Unknown_context hash)
       | Some context ->
-          Store.Chain.Valid_successors.read_all (chain_store, hash)
-          >>= fun successors ->
-          Store.Chain.Invalid_successors.read_all (chain_store, hash)
-          >>= fun invalid_successors ->
-          build_valid_block hash block operation_hashes operations
-            context time successors invalid_successors >>= fun block ->
+          build_valid_block
+            hash block operation_hashes operations
+            context time >>= fun block ->
           return block
 
     let raw_read_exn
         block operations operation_hashes
-        time chain_store context_index hash =
+        time context_index hash =
       raw_read block operations operation_hashes
-        time chain_store context_index hash >>= function
+        time context_index hash >>= function
       | Error _ -> Lwt.fail Not_found
       | Ok data -> Lwt.return data
 
@@ -999,7 +971,7 @@ module Valid_block = struct
                 operations)
           in
           raw_read block operations operation_hashes
-            time net_state.chain_store net_state.context_index hash
+            time net_state.context_index hash
 
     let read_opt net net_state hash =
       read net net_state hash >>= function
@@ -1048,8 +1020,6 @@ module Valid_block = struct
       let predecessor = block.shell.predecessor in
       Store.Chain.Known_heads.remove store predecessor >>= fun () ->
       Store.Chain.Known_heads.store store hash >>= fun () ->
-      Store.Chain.Valid_successors.store
-        (store, predecessor) hash >>= fun () ->
       (* Build the `valid_block` value. *)
       let operation_hashes =
         lazy (Operation_list.Locked.read_all_exn block_header_store hash) in
@@ -1062,7 +1032,7 @@ module Valid_block = struct
             operations) in
       raw_read_exn
         block operations operation_hashes discovery_time
-        net_state.chain_store net_state.context_index hash >>= fun valid_block ->
+        net_state.context_index hash >>= fun valid_block ->
       Watcher.notify valid_block_watcher valid_block ;
       Lwt.return (Ok valid_block)
 
@@ -1359,7 +1329,7 @@ module Net = struct
     Valid_block.Locked.raw_read
       genesis_shell_header (lazy Lwt.return_nil) (lazy Lwt.return_nil)
       genesis_discovery_time
-      chain_store context_index genesis_hash >>=? fun genesis_block ->
+      context_index genesis_hash >>=? fun genesis_block ->
     return @@
     Raw_net.build
       ~genesis
