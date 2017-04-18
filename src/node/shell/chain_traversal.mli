@@ -46,3 +46,11 @@ val new_blocks:
     (excluded) to [to_block] (included).  The function raises an
     exception when the two provided blocks do not belong the the same
     [net].  *)
+
+val live_blocks:
+  Block.t -> int -> (Block_hash.Set.t * Operation_hash.Set.t) Lwt.t
+(** [live_blocks b n] return a pair [(blocks,operations)] where
+    [blocks] is the set of arity [n], that contains [b] and its [n-1]
+    predecessors. And where [operations] is the set of operations
+    included in those blocks.
+ *)
