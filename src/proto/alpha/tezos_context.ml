@@ -116,7 +116,7 @@ let init = Init_storage.may_initialize
 let finalize ?commit_message:message c =
   let fitness = Fitness.from_int64 (Fitness.current c) in
   let context = Storage.recover c in
-  { Updater.context ; fitness ; message }
+  { Updater.context ; fitness ; message ; max_operations_ttl = 60 }
 
 let configure_sandbox = Init_storage.configure_sandbox
 
