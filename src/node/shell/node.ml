@@ -73,15 +73,15 @@ let init_p2p net_params =
   match net_params with
   | None ->
       lwt_log_notice "P2P layer is disabled" >>= fun () ->
-      Lwt.return (P2p.faked_network Distributed_db_metadata.cfg)
+      Error_monad.return (P2p.faked_network Distributed_db_metadata.cfg)
   | Some (config, limits) ->
       lwt_log_notice "bootstraping network..." >>= fun () ->
       P2p.create
         ~config ~limits
         Distributed_db_metadata.cfg
-        Distributed_db_message.cfg >>= fun p2p ->
+        Distributed_db_message.cfg >>=? fun p2p ->
       Lwt.async (fun () -> P2p.maintain p2p) ;
-      Lwt.return p2p
+      Error_monad.return p2p
 
 type config = {
   genesis: State.Net.genesis ;
@@ -102,7 +102,7 @@ let may_create_net state genesis =
 let create { genesis ; store_root ; context_root ;
              patch_context ; p2p = net_params ;
              test_network_max_tll = max_ttl } =
-  init_p2p net_params >>= fun p2p ->
+  init_p2p net_params >>=? fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context () >>=? fun state ->
   let distributed_db = Distributed_db.create state p2p in
