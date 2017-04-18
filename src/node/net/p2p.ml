@@ -168,7 +168,7 @@ module Real = struct
     let discoverer = may_create_discovery_worker config pool in
     let maintenance = create_maintenance_worker limits pool discoverer in
     may_create_welcome_worker config limits pool >>= fun welcome ->
-    Lwt.return {
+    return {
       config ;
       limits ;
       io_sched ;
@@ -335,9 +335,42 @@ type ('msg, 'meta) t = {
 }
 type ('msg, 'meta) net = ('msg, 'meta) t
 
+let check_limits =
+  let fail_1 v orig =
+    if not (v <= 0.) then return ()
+    else
+      Error_monad.failwith "value of option %S cannot be negative or null@."
+        orig
+  in
+  let fail_2 v orig =
+    if not (v < 0) then return ()
+    else
+      Error_monad.failwith "value of option %S cannot be negative@." orig
+  in
+  fun c ->
+    fail_1 c.authentification_timeout
+      "authentification-timeout" >>=? fun () ->
+    fail_2 c.min_connections
+      "min-connections" >>=? fun () ->
+    fail_2 c.expected_connections
+      "expected-connections" >>=? fun () ->
+    fail_2 c.max_connections
+      "max-connections" >>=? fun () ->
+    fail_2 c.max_incoming_connections
+      "max-incoming-connections" >>=? fun () ->
+    fail_2 c.read_buffer_size
+      "read-buffer-size" >>=? fun () ->
+    fail_2 c.known_peer_ids_history_size
+      "known-peer-ids-history-size" >>=? fun () ->
+    fail_2 c.known_points_history_size
+      "known-points-history-size" >>=? fun () ->
+    fail_1 c.swap_linger
+      "swap-linger"
+
 let create ~config ~limits meta_cfg msg_cfg =
-  Real.create ~config ~limits meta_cfg msg_cfg  >>= fun net ->
-  Lwt.return {
+  check_limits limits >>=? fun () ->
+  Real.create ~config ~limits meta_cfg msg_cfg  >>=? fun net ->
+  return {
     peer_id = Real.peer_id net ;
     maintain = Real.maintain net ;
     roll = Real.roll net  ;
