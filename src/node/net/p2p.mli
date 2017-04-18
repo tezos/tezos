@@ -139,7 +139,7 @@ val faked_network : 'meta meta_config -> ('msg, 'meta) net
 (** Main network initialisation function *)
 val create :
   config:config -> limits:limits ->
-  'meta meta_config -> 'msg message_config ->  ('msg, 'meta) net Lwt.t
+  'meta meta_config -> 'msg message_config ->  ('msg, 'meta) net tzresult Lwt.t
 
 (** Return one's peer_id *)
 val peer_id : ('msg, 'meta) net -> Peer_id.t
