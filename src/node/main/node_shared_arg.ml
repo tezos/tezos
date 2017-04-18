@@ -20,6 +20,7 @@ type t = {
   max_connections: int option ;
   max_download_speed: int option ;
   max_upload_speed: int option ;
+  binary_chunks_size: int option ;
   peer_table_size: int option ;
   expected_pow: float option ;
   peers: string list ;
@@ -35,7 +36,7 @@ type t = {
 
 let wrap
     data_dir config_file
-    connections max_download_speed max_upload_speed
+    connections max_download_speed max_upload_speed binary_chunks_size
     peer_table_size
     listen_addr peers no_bootstrap_peers closed expected_pow
     rpc_listen_addr rpc_tls
@@ -66,6 +67,7 @@ let wrap
     max_connections ;
     max_download_speed ;
     max_upload_speed ;
+    binary_chunks_size ;
     expected_pow ;
     peers ;
     no_bootstrap_peers ;
@@ -150,6 +152,14 @@ module Term = struct
     Arg.(value & opt (some int) None &
          info ~docs ~doc ~docv:"NUM" ["max-upload-speed"])
 
+  let binary_chunks_size =
+    let doc =
+      Format.sprintf
+      "Size limit (in kB) of binary blocks that are sent to other peers."
+    in
+    Arg.(value & opt (some int) None &
+         info ~docs ~doc ~docv:"NUM" ["binary-chunks-size"])
+
   let peer_table_size =
     let doc = "Maximum size of internal peer tables, \
                used to store metadata/logs about a peer or about a \
@@ -223,7 +233,7 @@ module Term = struct
     let open Term in
     const wrap $ data_dir $ config_file
     $ connections
-    $ max_download_speed $ max_upload_speed
+    $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size
     $ listen_addr $ peers $ no_bootstrap_peers $ closed $ expected_pow
     $ rpc_listen_addr $ rpc_tls
@@ -241,7 +251,7 @@ let read_and_patch_config_file args =
   end >>=? fun cfg ->
   let { data_dir ;
         min_connections ; expected_connections ; max_connections ;
-        max_download_speed ; max_upload_speed ;
+        max_download_speed ; max_upload_speed ; binary_chunks_size ;
         peer_table_size ;
         expected_pow ;
         peers ; no_bootstrap_peers ;
@@ -257,6 +267,7 @@ let read_and_patch_config_file args =
   return @@
   Node_config_file.update
     ?data_dir ?min_connections ?expected_connections ?max_connections
-    ?max_download_speed ?max_upload_speed ?peer_table_size ?expected_pow
+    ?max_download_speed ?max_upload_speed ?binary_chunks_size
+    ?peer_table_size ?expected_pow
     ~bootstrap_peers ?listen_addr ?rpc_listen_addr
     ~closed ~cors_origins ~cors_headers ?rpc_tls ?log_output cfg

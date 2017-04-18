@@ -235,6 +235,39 @@ module Simple_message = struct
 
 end
 
+module Chunked_message = struct
+
+  let encoding = Data_encoding.bytes
+
+  let simple_msg = MBytes.create (1 lsl 8)
+  let simple_msg2 = MBytes.create (1 lsl 8)
+
+  let server ch sched socket =
+    accept sched socket >>=? fun (_info, auth_fd) ->
+    P2p_connection.accept
+      ~binary_chunks_size:21 auth_fd encoding >>=? fun conn ->
+    P2p_connection.write_sync conn simple_msg >>=? fun () ->
+    P2p_connection.read conn >>=? fun (_msg_size, msg) ->
+    _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
+    sync ch >>=? fun () ->
+    P2p_connection.close conn >>= fun _stat ->
+    return ()
+
+  let client ch sched addr port =
+    connect sched addr port id2 >>=? fun auth_fd ->
+    P2p_connection.accept
+      ~binary_chunks_size:21 auth_fd encoding >>=? fun conn ->
+    P2p_connection.write_sync conn simple_msg2 >>=? fun () ->
+    P2p_connection.read conn >>=? fun (_msg_size, msg) ->
+    _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
+    sync ch >>=? fun () ->
+    P2p_connection.close conn >>= fun _stat ->
+    return ()
+
+  let run _dir = run_nodes client server
+
+end
+
 module Close_on_read = struct
 
   let encoding = Data_encoding.bytes
@@ -346,6 +379,7 @@ let main () =
     "kick", Kick.run ;
     "kicked", Kicked.run ;
     "simple-message", Simple_message.run ;
+    "chunked-message", Chunked_message.run ;
     "close-on-read", Close_on_read.run ;
     "close-on-write", Close_on_write.run ;
     "garbled-data", Garbled_data.run ;

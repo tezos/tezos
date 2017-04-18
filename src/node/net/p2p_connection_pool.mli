@@ -113,6 +113,9 @@ type config = {
   (** Peer swapping does not occur more than once during a timespan of
       [spap_linger] seconds. *)
 
+  binary_chunks_size : int option ;
+  (** Size (in bytes) of binary blocks that are sent to other
+      peers. Default value is 64 kB. *)
 }
 
 type 'meta meta_config = {
@@ -254,7 +257,8 @@ val write_sync:  ('msg, 'meta) connection -> 'msg -> unit tzresult Lwt.t
     where [conn'] is the internal [P2p_connection.t] inside [conn]. *)
 
 (**/**)
-val raw_write_sync:  ('msg, 'meta) connection -> MBytes.t -> unit tzresult Lwt.t
+val raw_write_sync:
+  ('msg, 'meta) connection -> MBytes.t -> unit tzresult Lwt.t
 (**/**)
 
 val write_now:  ('msg, 'meta) connection -> 'msg -> bool tzresult

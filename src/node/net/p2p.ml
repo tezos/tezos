@@ -69,6 +69,7 @@ type limits = {
 
   swap_linger : float ;
 
+  binary_chunks_size : int option ;
 }
 
 let create_scheduler limits =
@@ -104,6 +105,7 @@ let create_connection_pool config limits meta_cfg msg_cfg io_sched =
     max_known_points = limits.max_known_points ;
     max_known_peer_ids = limits.max_known_peer_ids ;
     swap_linger = limits.swap_linger ;
+    binary_chunks_size = limits.binary_chunks_size ;
   }
   in
   let pool =
@@ -365,7 +367,13 @@ let check_limits =
     fail_2 c.known_points_history_size
       "known-points-history-size" >>=? fun () ->
     fail_1 c.swap_linger
-      "swap-linger"
+      "swap-linger" >>=? fun () ->
+    begin
+      match c.binary_chunks_size with
+      | None -> return ()
+      | Some size -> P2p_connection.check_binary_chunks_size size
+    end >>=? fun () ->
+    return ()
 
 let create ~config ~limits meta_cfg msg_cfg =
   check_limits limits >>=? fun () ->

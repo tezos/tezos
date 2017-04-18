@@ -31,13 +31,14 @@ type error += Decoding_error
 type error += Myself of Id_point.t
 type error += Not_enough_proof_of_work of Peer_id.t
 type error += Invalid_auth
+type error += Invalid_chunks_size of { value: int ; min: int ; max: int }
 
 module Crypto = struct
 
   let header_length = 2
   let crypto_overhead = 18 (* FIXME import from Sodium.Box. *)
   let max_content_length =
-    1 lsl (header_length * 8) - crypto_overhead
+    1 lsl (header_length * 8) - crypto_overhead - header_length
 
   type data = {
     channel_key : Crypto_box.channel_key ;
@@ -77,6 +78,17 @@ module Crypto = struct
         return buf
 
 end
+
+let check_binary_chunks_size  size =
+  let value = size - Crypto.crypto_overhead - Crypto.header_length in
+  fail_unless
+    (value > 0 &&
+     value <= Crypto.max_content_length)
+    (Invalid_chunks_size
+       { value = size ;
+         min = Crypto.(header_length + crypto_overhead + 1) ;
+         max = Crypto.(max_content_length + crypto_overhead + header_length)
+       })
 
 module Connection_message = struct
 
@@ -226,33 +238,48 @@ module Reader = struct
     mutable worker: unit Lwt.t ;
   }
 
-  let rec read_message st buf =
-    return (Data_encoding.Binary.of_bytes st.encoding buf)
+  let rec read_message st init_mbytes =
+    let rec loop status =
+      Lwt_unix.yield () >>= fun () ->
+      let open Data_encoding.Binary in
+      match status with
+      | Success { res ; res_len ; remaining } ->
+          return (Some (res, res_len, remaining))
+      | Error ->
+          lwt_debug "[read_message] incremental decoding error" >>= fun () ->
+          return None
+      | Await decode_next_buf ->
+          Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+            Crypto.read_chunk st.conn.fd st.conn.cryptobox_data
+          end >>=? fun buf ->
+          lwt_debug
+            "reading %d bytes from %a"
+            (MBytes.length buf) Connection_info.pp st.conn.info >>= fun () ->
+          loop (decode_next_buf buf) in
+    loop
+      (Data_encoding.Binary.read_stream_of_bytes ~init:init_mbytes st.encoding)
 
-  let rec worker_loop st =
+
+  let rec worker_loop st init_mbytes =
     Lwt_unix.yield () >>= fun () ->
-    Lwt_utils.protect ~canceler:st.canceler begin fun () ->
-      Crypto.read_chunk st.conn.fd st.conn.cryptobox_data >>=? fun buf ->
-      let size = 6 * (Sys.word_size / 8) + MBytes.length buf in
-      lwt_debug "reading %d bytes from %a"
-        size Connection_info.pp st.conn.info >>= fun () ->
-      read_message st buf >>=? fun msg ->
+    begin
+      read_message st init_mbytes >>=? fun msg ->
       match msg with
       | None ->
           Lwt_pipe.push st.messages (Error [Decoding_error]) >>= fun () ->
-          return false
-      | Some msg ->
+          return None
+      | Some (msg, size, rem_mbytes) ->
           Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
-          return true
+          return (Some rem_mbytes)
     end >>= function
-    | Ok true ->
-        worker_loop st
-    | Ok false ->
+    | Ok Some rem_mbytes ->
+        worker_loop st rem_mbytes
+    | Ok None ->
         Canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
     | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
-      lwt_debug "connection closed to %a"
-        Connection_info.pp st.conn.info >>= fun () ->
+        lwt_debug "connection closed to %a"
+          Connection_info.pp st.conn.info >>= fun () ->
         Lwt.return_unit
     | Error _ as err ->
         Lwt_pipe.safe_push_now st.messages err ;
@@ -276,7 +303,7 @@ module Reader = struct
     end ;
     st.worker <-
       Lwt_utils.worker "reader"
-        (fun () -> worker_loop st)
+        (fun () -> worker_loop st [])
         (fun () -> Canceler.cancel st.canceler) ;
     st
 
@@ -292,12 +319,25 @@ module Writer = struct
     canceler: Canceler.t ;
     conn: connection ;
     encoding: 'msg Data_encoding.t ;
-    messages: (MBytes.t * unit tzresult Lwt.u option) Lwt_pipe.t ;
+    messages: (MBytes.t list * unit tzresult Lwt.u option) Lwt_pipe.t ;
     mutable worker: unit Lwt.t ;
+    binary_chunks_size: int ; (* in bytes *)
   }
 
+  let rec send_message st buf =
+    let rec loop = function
+      | [] -> return ()
+      | buf :: l ->
+          Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+            Crypto.write_chunk st.conn.fd st.conn.cryptobox_data buf
+          end >>=? fun () ->
+          lwt_debug "writing %d bytes to %a"
+            (MBytes.length buf) Connection_info.pp st.conn.info >>= fun () ->
+          loop l in
+    loop buf
+
   let encode_message st msg =
-    try ok (Data_encoding.Binary.to_bytes st.encoding msg)
+    try ok (Data_encoding.Binary.to_bytes_list st.binary_chunks_size st.encoding msg)
     with _ -> error Encoding_error
 
   let rec worker_loop st =
@@ -316,11 +356,7 @@ module Writer = struct
         Canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
     | Ok (buf, wakener) ->
-        lwt_debug "writing %d bytes to %a"
-          (MBytes.length buf) Connection_info.pp st.conn.info >>= fun () ->
-        Lwt_utils.protect ~canceler:st.canceler begin fun () ->
-          Crypto.write_chunk st.conn.fd st.conn.cryptobox_data buf
-        end >>= fun res ->
+        send_message st buf >>= fun res ->
         match res with
         | Ok () ->
             iter_option wakener ~f:(fun u -> Lwt.wakeup_later u res) ;
@@ -348,16 +384,34 @@ module Writer = struct
                 Canceler.cancel st.canceler >>= fun () ->
                 Lwt.return_unit
 
-  let run ?size conn encoding canceler =
-    let compute_size = function
-      | buf, None -> Sys.word_size + MBytes.length buf
-      | buf, Some _ -> 2 * Sys.word_size + MBytes.length buf
+  let run
+      ?size ?binary_chunks_size
+      conn encoding canceler =
+    let binary_chunks_size =
+      match binary_chunks_size with
+      | None -> Crypto.max_content_length
+      | Some size ->
+          let size = size - Crypto.crypto_overhead - Crypto.header_length in
+          assert (size > 0) ;
+          assert (size <= Crypto.max_content_length) ;
+          size
+    in
+    let compute_size =
+      let buf_list_size =
+        List.fold_left
+          (fun sz buf ->
+             sz + MBytes.length buf + 2 * Sys.word_size) 0
+      in
+      function
+      | buf_l, None -> Sys.word_size + buf_list_size buf_l
+      | buf_l, Some _ -> 2 * Sys.word_size + buf_list_size buf_l
     in
     let size = map_option size ~f:(fun max -> max, compute_size) in
     let st =
       { canceler ; conn ; encoding ;
         messages = Lwt_pipe.create ?size () ;
         worker = Lwt.return_unit ;
+        binary_chunks_size = binary_chunks_size ;
       } in
     Canceler.on_cancel st.canceler begin fun () ->
       Lwt_pipe.close st.messages ;
@@ -388,13 +442,12 @@ type 'msg t = {
 
 let equal { conn = { id = id1 } } { conn = { id = id2 } } = id1 = id2
 
-
 let pp ppf { conn } = Connection_info.pp ppf conn.info
 let info { conn } = conn.info
 
 let accept
     ?incoming_message_queue_size ?outgoing_message_queue_size
-    (fd, info, cryptobox_data) encoding =
+    ?binary_chunks_size (fd, info, cryptobox_data) encoding =
   Lwt_utils.protect begin fun () ->
     Ack.write fd cryptobox_data Ack >>=? fun () ->
     Ack.read fd cryptobox_data
@@ -407,11 +460,14 @@ let accept
   end >>=? fun accepted ->
   fail_unless accepted Rejected >>=? fun () ->
   let canceler = Canceler.create () in
-  let conn = { id = next_conn_id (); fd ; info ; cryptobox_data } in
+  let conn = { id = next_conn_id () ; fd ; info ; cryptobox_data } in
   let reader =
     Reader.run ?size:incoming_message_queue_size conn encoding canceler
   and writer =
-    Writer.run ?size:outgoing_message_queue_size conn encoding canceler in
+    Writer.run
+      ?size:outgoing_message_queue_size ?binary_chunks_size
+      conn encoding canceler
+  in
   let conn = { conn ; reader ; writer } in
   Canceler.on_cancel canceler begin fun () ->
     P2p_io_scheduler.close fd >>= fun _ ->
@@ -445,7 +501,15 @@ let write_now { writer } msg =
   try Ok (Lwt_pipe.push_now writer.messages (buf, None))
   with Lwt_pipe.Closed -> Error [P2p_io_scheduler.Connection_closed]
 
+let rec split_bytes size bytes =
+  if MBytes.length bytes <= size then
+    [bytes]
+  else
+    MBytes.sub bytes 0 size ::
+    split_bytes size (MBytes.sub bytes size (MBytes.length bytes - size))
+
 let raw_write_sync { writer } bytes =
+  let bytes = split_bytes writer.binary_chunks_size bytes in
   catch_closed_pipe begin fun () ->
     let waiter, wakener = Lwt.wait () in
     Lwt_pipe.push writer.messages (bytes, Some wakener) >>= fun () ->

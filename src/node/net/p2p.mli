@@ -127,6 +127,10 @@ type limits = {
   (** Peer swapping does not occur more than once during a timespan of
       [swap_linger] seconds. *)
 
+  binary_chunks_size : int option ;
+  (** Size (in bytes) of binary blocks that are sent to other
+      peers. Default value is 64 kB. Max value is 64kB. *)
+
 }
 
 type ('msg, 'meta) t

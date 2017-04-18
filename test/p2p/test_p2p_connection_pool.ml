@@ -81,6 +81,7 @@ let detach_node f points n =
     max_known_points = None ;
     max_known_peer_ids = None ;
     swap_linger = 0. ;
+    binary_chunks_size = None
     } in
   Process.detach
     ~prefix:(Format.asprintf "%a: " Peer_id.pp_short identity.peer_id)
