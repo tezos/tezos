@@ -40,6 +40,7 @@ module Message = struct
 
   let encoding msg_encoding =
     let open Data_encoding in
+    dynamic_size @@
     union ~tag_size:`Uint16
       ([ case ~tag:0x01 null
            (function Disconnect -> Some () | _ -> None)
@@ -329,6 +330,8 @@ type config = {
   max_known_peer_ids : (int * int) option ; (* max, gc target *)
 
   swap_linger : float ;
+
+  binary_chunks_size : int option ;
 }
 
 type 'meta meta_config = {
@@ -835,6 +838,7 @@ and authenticate pool ?point_info canceler fd point =
         P2p_connection.accept
           ?incoming_message_queue_size:pool.config.incoming_message_queue_size
           ?outgoing_message_queue_size:pool.config.outgoing_message_queue_size
+          ?binary_chunks_size:pool.config.binary_chunks_size
           auth_fd pool.encoding >>= fun conn ->
         lwt_debug "authenticate: %a -> Connected %a"
           Point.pp point

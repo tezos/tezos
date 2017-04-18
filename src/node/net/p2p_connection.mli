@@ -27,6 +27,7 @@ type error += Rejected
 type error += Myself of Id_point.t
 type error += Not_enough_proof_of_work of Peer_id.t
 type error += Invalid_auth
+type error += Invalid_chunks_size of { value: int ; min: int ; max: int }
 
 type authenticated_fd
 (** Type of a connection that successfully passed the authentication
@@ -64,10 +65,14 @@ val kick: authenticated_fd -> unit Lwt.t
 val accept:
   ?incoming_message_queue_size:int ->
   ?outgoing_message_queue_size:int ->
+  ?binary_chunks_size: int ->
   authenticated_fd -> 'msg Data_encoding.t -> 'msg t tzresult Lwt.t
 (** (Low-level) (Cancelable) Accepts a remote peer given an
     authenticated_fd. Used in [P2p_connection_pool], to promote an
     [authenticated_fd] to the status of an active peer. *)
+
+val check_binary_chunks_size:  int -> unit tzresult Lwt.t
+(** Precheck for the [?binary_chunks_size] parameter of [accept]. *)
 
 (** {1 IO functions on connections} *)
 

@@ -56,6 +56,7 @@ val update:
   ?max_connections:int ->
   ?max_download_speed:int ->
   ?max_upload_speed:int ->
+  ?binary_chunks_size:int->
   ?peer_table_size:int ->
   ?expected_pow:float ->
   ?bootstrap_peers:string list ->

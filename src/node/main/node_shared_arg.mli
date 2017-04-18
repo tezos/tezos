@@ -17,6 +17,7 @@ type t = {
   max_connections: int option ;
   max_download_speed: int option ;
   max_upload_speed: int option ;
+  binary_chunks_size: int option ;
   peer_table_size: int option ;
   expected_pow: float option ;
   peers: string list ;
