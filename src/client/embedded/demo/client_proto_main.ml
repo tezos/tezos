@@ -16,7 +16,7 @@ let demo cctxt =
   cctxt.Client_commands.message "Calling the 'echo' RPC." >>= fun () ->
   let msg = "test" in
   Client_proto_rpcs.echo cctxt.rpc_config block msg >>=? fun reply ->
-  fail_unless (reply = msg) (Unclassified "...") >>=? fun () ->
+  fail_unless (reply = msg) (failure "...") >>=? fun () ->
   begin
     cctxt.message "Calling the 'failing' RPC." >>= fun () ->
     Client_proto_rpcs.failing cctxt.rpc_config block 3 >>= function

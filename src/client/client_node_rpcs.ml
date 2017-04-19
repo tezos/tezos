@@ -22,6 +22,12 @@ let forge_block cctxt ?net_id ?level ?proto_level ?predecessor ?timestamp fitnes
 let validate_block cctxt net block =
   call_err_service0 cctxt Services.validate_block (net, block)
 
+type operation = Node_rpc_services.operation =
+  | Blob of Operation.t
+  | Hash of Operation_hash.t
+
+let operation_encoding = Node_rpc_services.operation_encoding
+
 let inject_block cctxt ?(async = false) ?(force = false) raw operations =
   call_err_service0 cctxt Services.inject_block
     { raw ; blocking = not async ; force ; operations }
@@ -66,7 +72,7 @@ module Blocks = struct
     test_network: Context.test_network;
   }
   type preapply_param = Services.Blocks.preapply_param = {
-    operations: Operation_hash.t list ;
+    operations: operation list ;
     sort: bool ;
     timestamp: Time.t option ;
   }
@@ -89,8 +95,9 @@ module Blocks = struct
     call_service1 cctxt Services.Blocks.timestamp h ()
   let fitness cctxt h =
     call_service1 cctxt Services.Blocks.fitness h ()
-  let operations cctxt h =
-    call_service1 cctxt Services.Blocks.operations h ()
+  let operations cctxt ?(contents = false) h =
+    call_service1 cctxt Services.Blocks.operations h
+      { contents ; monitor = false }
   let protocol cctxt h =
     call_service1 cctxt Services.Blocks.protocol h ()
   let test_network cctxt h =
@@ -121,12 +128,10 @@ end
 
 module Operations = struct
 
-  let contents cctxt hashes =
-    call_service1 cctxt Services.Operations.contents hashes ()
-
-  let monitor cctxt ?contents () =
-    call_streamed_service0 cctxt Services.Operations.list
-      { monitor = Some true ; contents }
+  let monitor cctxt ?(contents = false) () =
+    call_streamed_service1 cctxt Services.Blocks.operations
+      `Prevalidation
+      { contents ; monitor = true }
 
 end
 

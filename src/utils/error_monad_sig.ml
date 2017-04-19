@@ -122,6 +122,8 @@ module type S = sig
   (** A {!List.map} in the monad *)
   val map_s : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
   val map_p : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+  val mapi_s : (int -> 'a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+  val mapi_p : (int -> 'a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
   (** A {!List.map2} in the monad *)
   val map2 :

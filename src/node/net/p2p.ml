@@ -463,7 +463,7 @@ module RPC = struct
 
   let connect net point timeout =
     match net.pool with
-    | None -> fail (Unclassified "fake net")
+    | None -> failwith "fake net"
     | Some pool ->
         P2p_connection_pool.connect ~timeout pool point >>|? ignore
 

@@ -210,6 +210,17 @@ module Make() = struct
         map_s f t >>=? fun rt ->
         return (rh :: rt)
 
+  let mapi_s f l =
+    let rec mapi_s f i l =
+      match l with
+      | [] -> return []
+      | h :: t ->
+          f i h >>=? fun rh ->
+          mapi_s f (i+1) t >>=? fun rt ->
+          return (rh :: rt)
+    in
+    mapi_s f 0 l
+
   let rec map_p f l =
     match l with
     | [] ->
@@ -223,6 +234,22 @@ module Make() = struct
         | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
         | Ok _, Error exn
         | Error exn, Ok _ -> Lwt.return (Error exn)
+
+  let mapi_p f l =
+    let rec mapi_p f i l =
+      match l with
+      | [] ->
+          return []
+      | x :: l ->
+          let tx = f i x and tl = mapi_p f (i+1) l in
+          tx >>= fun x ->
+          tl >>= fun l ->
+          match x, l with
+          | Ok x, Ok l -> Lwt.return (Ok (x :: l))
+          | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+          | Ok _, Error exn
+          | Error exn, Ok _ -> Lwt.return (Error exn) in
+    mapi_p f 0 l
 
   let rec map2_s f l1 l2 =
     match l1, l2 with

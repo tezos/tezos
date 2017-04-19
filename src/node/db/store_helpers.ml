@@ -23,6 +23,12 @@ module Make_value (V : ENCODED_VALUE) = struct
       MBytes.create 0
 end
 
+module Raw_value = struct
+  type t = MBytes.t
+  let of_bytes b = ok b
+  let to_bytes b = b
+end
+
 module Make_single_store (S : STORE) (N : NAME) (V : VALUE) = struct
   type t = S.t
   type value = V.t
