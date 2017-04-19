@@ -53,19 +53,19 @@ let incr_timestamp timestamp =
   Time.add timestamp (Int64.add 1L (Random.int64 10L))
 
 let operation op =
-  let op : Store.Operation.t = {
+  let op : Operation.t = {
     shell = { net_id } ;
     proto = MBytes.of_string op ;
   } in
-  Store.Operation.hash op,
+  Operation.hash op,
   op,
-  Data_encoding.Binary.to_bytes Store.Operation.encoding op
+  Data_encoding.Binary.to_bytes Operation.encoding op
 
-let block _state ?(operations = []) pred_hash pred name : Store.Block_header.t =
+let block _state ?(operations = []) pred_hash pred name : Block_header.t =
   let operations_hash =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
-  let fitness = incr_fitness pred.Store.Block_header.shell.fitness in
+  let fitness = incr_fitness pred.Block_header.shell.fitness in
   let timestamp = incr_timestamp pred.shell.timestamp in
   { shell = {
         net_id = pred.shell.net_id ;
@@ -82,11 +82,11 @@ let equal_operation ?msg op1 op2 =
     match op1, op2 with
     | None, None -> true
     | Some op1, Some op2 ->
-        Store.Operation.equal op1 op2
+        Operation.equal op1 op2
     | _ -> false in
   let prn = function
     | None -> "none"
-    | Some op -> Hash.Operation_hash.to_hex (Store.Operation.hash op) in
+    | Some op -> Hash.Operation_hash.to_hex (Operation.hash op) in
   Assert.equal ?msg ~prn ~eq op1 op2
 
 let equal_block ?msg st1 st2 =
@@ -94,12 +94,12 @@ let equal_block ?msg st1 st2 =
   let eq st1 st2 =
     match st1, st2 with
     | None, None -> true
-    | Some st1, Some st2 -> Store.Block_header.equal st1 st2
+    | Some st1, Some st2 -> Block_header.equal st1 st2
     | _ -> false in
   let prn = function
     | None -> "none"
     | Some st ->
-        Hash.Block_hash.to_hex (Store.Block_header.hash st) in
+        Hash.Block_hash.to_hex (Block_header.hash st) in
   Assert.equal ?msg ~prn ~eq st1 st2
 
 let build_chain state tbl otbl pred names =
@@ -115,7 +115,7 @@ let build_chain state tbl otbl pred names =
          Assert.is_true ~msg:__LOC__ store_invalid ;
          Hashtbl.add otbl name (oph, Error []) ;
          let block = block ~operations:[oph] state pred_hash pred name in
-         let hash = Store.Block_header.hash block in
+         let hash = Block_header.hash block in
          State.Block_header.store state hash block >>= fun created ->
          Assert.is_true ~msg:__LOC__ created ;
          State.Block_header.read_opt state hash >>= fun block' ->
@@ -134,7 +134,7 @@ let build_chain state tbl otbl pred names =
   Lwt.return ()
 
 let block _state ?(operations = []) (pred: State.Valid_block.t) name
-  : State.Block_header.t =
+  : Block_header.t =
   let operations_hash =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
@@ -159,7 +159,7 @@ let build_valid_chain state tbl vtbl otbl pred names =
          equal_operation ~msg:__LOC__ (Some op) op' ;
          Hashtbl.add otbl name (oph, Ok op) ;
          let block = block state ~operations:[oph] pred name in
-         let hash = Store.Block_header.hash block in
+         let hash = Tezos_data.Block_header.hash block in
          State.Block_header.store state hash block >>= fun created ->
          Assert.is_true ~msg:__LOC__ created ;
          State.Operation_list.store_all state hash [[oph]] >>= fun () ->
@@ -213,8 +213,8 @@ let build_example_tree net =
   Lwt.return (tbl, vtbl, otbl)
 
 type state = {
-  block: (string, Block_hash.t * Store.Block_header.t) Hashtbl.t ;
-  operation: (string, Operation_hash.t * Store.Operation.t tzresult) Hashtbl.t ;
+  block: (string, Block_hash.t * Block_header.t) Hashtbl.t ;
+  operation: (string, Operation_hash.t * Operation.t tzresult) Hashtbl.t ;
   vblock: (string, State.Valid_block.t) Hashtbl.t ;
   state: State.t ;
   net: State.Net.t ;
@@ -286,9 +286,9 @@ let test_read_operation (s: state) =
                 | Error _ ->
                     Assert.fail_msg "Incorrect valid operation read %s" name
                 | Ok op ->
-                    if op.Store.Operation.proto <> data.proto then
+                    if op.Operation.proto <> data.proto then
                       Assert.fail_msg "Incorrect operation read %s %s" name
-                        (MBytes.to_string data.Store.Operation.proto) ;
+                        (MBytes.to_string data.Operation.proto) ;
                     Lwt.return_unit
               end)
     (operations s) >>= fun () ->
@@ -307,7 +307,7 @@ let test_read_block (s: state) =
         | None ->
             Assert.fail_msg "Cannot read block %s" name
         | Some block' ->
-            if not (Store.Block_header.equal block block') then
+            if not (Block_header.equal block block') then
               Assert.fail_msg "Error while reading block %s" name ;
             Lwt.return_unit
       end >>= fun () ->

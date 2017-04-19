@@ -9,9 +9,16 @@
 
 (* Tezos Protocol Implementation - Low level Repr. of Operations *)
 
+type raw = Operation.t = {
+  shell: Operation.shell_header ;
+  proto: MBytes.t ;
+}
+
+let raw_encoding = Operation.encoding
+
 type operation = {
   hash: Operation_hash.t ;
-  shell: Updater.shell_operation ;
+  shell: Operation.shell_header ;
   contents: proto_operation ;
   signature: Ed25519.Signature.t option ;
 }
@@ -311,7 +318,7 @@ module Encoding = struct
 
   let unsigned_operation_encoding =
     merge_objs
-      Updater.shell_operation_encoding
+      Operation.shell_header_encoding
       proto_operation_encoding
 
   let signed_proto_operation_encoding =
@@ -333,7 +340,7 @@ let encoding =
     (merge_objs
        (obj1 (req "hash" Operation_hash.encoding))
        (merge_objs
-         Updater.shell_operation_encoding
+         Operation.shell_header_encoding
          Encoding.signed_proto_operation_encoding))
 
 let () =
@@ -349,7 +356,7 @@ let () =
     (function Cannot_parse_operation -> Some () | _ -> None)
     (fun () -> Cannot_parse_operation)
 
-let parse hash (op: Updater.raw_operation) =
+let parse hash (op: Operation.t) =
   if not (Compare.Int.(MBytes.length op.proto <= Constants_repr.max_operation_data_length)) then
     error Cannot_parse_operation
   else
@@ -357,7 +364,7 @@ let parse hash (op: Updater.raw_operation) =
             Encoding.signed_proto_operation_encoding
             op.proto with
     | Some (contents, signature) ->
-        let shell = { Updater.net_id = op.shell.net_id } in
+        let shell = { Operation.net_id = op.shell.net_id } in
         ok { hash ; shell ; contents ; signature }
     | None -> error Cannot_parse_operation
 

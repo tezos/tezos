@@ -9,45 +9,21 @@
 
 (** Tezos Protocol Environment - Protocol Implementation Signature *)
 
+open Tezos_data
+
 (* See `src/proto/updater.mli` for documentation. *)
-
-type fitness = Fitness.fitness
-
-type shell_operation = Store.Operation.shell_header = {
-  net_id: Net_id.t ;
-}
-
-type raw_operation = Store.Operation.t = {
-  shell: shell_operation ;
-  proto: MBytes.t ;
-}
-
-type shell_block_header = Store.Block_header.shell_header =
-  { net_id: Net_id.t ;
-    level: Int32.t ;
-    proto_level: int ; (* uint8 *)
-    predecessor: Block_hash.t ;
-    timestamp: Time.t ;
-    operations_hash: Operation_list_list_hash.t ;
-    fitness: MBytes.t list ;
-  }
-
-type raw_block_header = Store.Block_header.t = {
-  shell: shell_block_header ;
-  proto: MBytes.t ;
-}
 
 type validation_result = {
   context: Context.t ;
-  fitness: Fitness.fitness ;
+  fitness: Fitness.t ;
   message: string option ;
 }
 
 type rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: raw_block_header ;
+  block_header: Block_header.t ;
   operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-  operations: unit -> raw_operation list list Lwt.t ;
+  operations: unit -> Operation.t list list Lwt.t ;
   context: Context.t ;
 }
 
@@ -63,7 +39,7 @@ module type PROTOCOL = sig
   type operation
 
   val parse_operation :
-    Operation_hash.t -> raw_operation -> operation tzresult
+    Operation_hash.t -> Operation.t -> operation tzresult
   val compare_operations : operation -> operation -> int
 
   type validation_state
@@ -71,19 +47,19 @@ module type PROTOCOL = sig
   val precheck_block :
     ancestor_context: Context.t ->
     ancestor_timestamp: Time.t ->
-    raw_block_header ->
+    Block_header.t ->
     unit tzresult Lwt.t
   val begin_application :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
-    predecessor_fitness: Fitness.fitness ->
-    raw_block_header ->
+    predecessor_fitness: Fitness.t ->
+    Block_header.t ->
     validation_state tzresult Lwt.t
   val begin_construction :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_level: Int32.t ->
-    predecessor_fitness: Fitness.fitness ->
+    predecessor_fitness: Fitness.t ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
     validation_state tzresult Lwt.t

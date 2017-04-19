@@ -75,12 +75,12 @@ module Blocks = struct
       (fun { hash ; net_id ; level ; proto_level ; predecessor ;
              fitness ; timestamp ; protocol ; operations_hash ; data ;
              operations ; test_network } ->
-        ({ Store.Block_header.shell =
+        ({ Block_header.shell =
              { net_id ; level ; proto_level ; predecessor ;
                timestamp ; operations_hash ; fitness } ;
            proto = data },
          (hash, operations, protocol, test_network)))
-      (fun ({ Store.Block_header.shell =
+      (fun ({ Block_header.shell =
                 { net_id ; level ; proto_level ; predecessor ;
                   timestamp ; operations_hash ; fitness } ;
               proto = data },
@@ -90,7 +90,7 @@ module Blocks = struct
           operations ; test_network })
       (dynamic_size
          (merge_objs
-            Store.Block_header.encoding
+            Block_header.encoding
             (obj4
                (req "hash" Block_hash.encoding)
                (opt "operations" (list (list Operation_hash.encoding)))
@@ -410,7 +410,7 @@ module Operations = struct
   let contents =
     RPC.service
       ~input: empty
-      ~output: (list (dynamic_size Updater.raw_operation_encoding))
+      ~output: (list (dynamic_size Operation.encoding))
       RPC.Path.(root / "operations" /: operations_arg)
 
   type list_param = {
@@ -439,7 +439,7 @@ module Operations = struct
                     (obj2
                        (req "hash" Operation_hash.encoding)
                        (opt "contents"
-                          (dynamic_size Updater.raw_operation_encoding)))
+                          (dynamic_size Operation.encoding)))
               ))))
       RPC.Path.(root / "operations")
 
@@ -463,7 +463,7 @@ module Protocols = struct
       ~output:
         (obj1 (req "data"
                  (describe ~title: "Tezos protocol"
-                    (Store.Protocol.encoding))))
+                    (Protocol.encoding))))
       RPC.Path.(root / "protocols" /: protocols_arg)
 
   type list_param = {
@@ -489,7 +489,7 @@ module Protocols = struct
                  (obj2
                     (req "hash" Protocol_hash.encoding)
                     (opt "contents"
-                       (dynamic_size Store.Protocol.encoding)))
+                       (dynamic_size Protocol.encoding)))
               )))
       RPC.Path.(root / "protocols")
 
@@ -744,10 +744,10 @@ let inject_operation =
 let inject_protocol =
   let proto_of_rpc =
     List.map (fun (name, interface, implementation) ->
-        { Tezos_compiler.Protocol.name; interface; implementation })
+        { Protocol.name; interface; implementation })
   in
   let rpc_of_proto =
-    List.map (fun { Tezos_compiler.Protocol.name; interface; implementation } ->
+    List.map (fun { Protocol.name; interface; implementation } ->
                 (name, interface, implementation))
   in
   let proto =

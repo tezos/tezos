@@ -11,55 +11,28 @@ open Logging.Updater
 
 let (//) = Filename.concat
 
-module type PROTOCOL = Protocol.PROTOCOL
-module type REGISTRED_PROTOCOL = sig
-  val hash: Protocol_hash.t
-  include Protocol.PROTOCOL with type error := error
-                             and type 'a tzresult := 'a tzresult
-  val complete_b58prefix : Context.t -> string -> string list Lwt.t
-end
-
-type shell_operation = Store.Operation.shell_header = {
-  net_id: Net_id.t ;
-}
-let shell_operation_encoding = Store.Operation.shell_header_encoding
-
-type raw_operation = Store.Operation.t = {
-  shell: shell_operation ;
-  proto: MBytes.t ;
-}
-let raw_operation_encoding = Store.Operation.encoding
-
-type shell_block_header = Store.Block_header.shell_header = {
-  net_id: Net_id.t ;
-  level: Int32.t ;
-  proto_level: int ; (* uint8 *)
-  predecessor: Block_hash.t ;
-  timestamp: Time.t ;
-  operations_hash: Operation_list_list_hash.t ;
-  fitness: MBytes.t list ;
-}
-let shell_block_header_encoding = Store.Block_header.shell_header_encoding
-
-type raw_block_header = Store.Block_header.t = {
-  shell: shell_block_header ;
-  proto: MBytes.t ;
-}
-let raw_block_header_encoding = Store.Block_header.encoding
-
-type validation_result = Protocol.validation_result = {
+type validation_result = Protocol_sigs.validation_result = {
   context: Context.t ;
-  fitness: Fitness.fitness ;
+  fitness: Fitness.t ;
   message: string option ;
 }
 
-type rpc_context = Protocol.rpc_context = {
+type rpc_context = Protocol_sigs.rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: Protocol.raw_block_header ;
+  block_header: Block_header.t ;
   operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-  operations: unit -> raw_operation list list Lwt.t ;
+  operations: unit -> Operation.t list list Lwt.t ;
   context: Context.t ;
 }
+
+module type PROTOCOL = Protocol_sigs.PROTOCOL
+module type PACKED_PROTOCOL = Protocol_sigs.PACKED_PROTOCOL
+module type REGISTRED_PROTOCOL = sig
+  val hash: Protocol_hash.t
+  include PROTOCOL with type error := error
+                             and type 'a tzresult := 'a tzresult
+  val complete_b58prefix : Context.t -> string -> string list Lwt.t
+end
 
 (** Version table *)
 
@@ -90,17 +63,11 @@ let get_datadir () =
 let init dir =
   datadir := Some dir
 
-type component = Tezos_compiler.Protocol.component = {
-  name : string ;
-  interface : string option ;
-  implementation : string ;
-}
-
 let create_files dir units =
   Lwt_utils.remove_dir dir >>= fun () ->
   Lwt_utils.create_dir dir >>= fun () ->
   Lwt_list.map_s
-    (fun { name; interface; implementation } ->
+    (fun { Protocol.name; interface; implementation } ->
        let name = String.lowercase_ascii name in
        let ml = dir // (name ^ ".ml") in
        let mli = dir // (name ^ ".mli") in
@@ -118,7 +85,7 @@ let extract dirname hash units =
   let source_dir = dirname // Protocol_hash.to_short_b58check hash // "src" in
   create_files source_dir units >|= fun _files ->
   Tezos_compiler.Meta.to_file source_dir ~hash
-    (List.map (fun {name} -> String.capitalize_ascii name) units)
+    (List.map (fun {Protocol.name} -> String.capitalize_ascii name) units)
 
 let do_compile hash units =
   let datadir = get_datadir () in
@@ -129,7 +96,7 @@ let do_compile hash units =
   in
   create_files source_dir units >>= fun _files ->
   Tezos_compiler.Meta.to_file source_dir ~hash
-    (List.map (fun {name} -> String.capitalize_ascii name) units);
+    (List.map (fun {Protocol.name} -> String.capitalize_ascii name) units);
   let compiler_command =
     (Sys.executable_name,
      Array.of_list [Node_compiler_main.compiler_name; plugin_file; source_dir]) in

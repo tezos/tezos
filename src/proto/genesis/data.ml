@@ -52,7 +52,7 @@ module Command = struct
 
   let forge shell command =
     Data_encoding.Binary.to_bytes
-      (Data_encoding.tup2 Updater.shell_block_header_encoding encoding)
+      (Data_encoding.tup2 Block_header.shell_header_encoding encoding)
       (shell, command)
 
 end

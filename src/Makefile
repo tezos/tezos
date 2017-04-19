@@ -33,7 +33,7 @@ node/updater/proto_environment.mli: \
 compiler/sigs/proto_environment.mli: node/updater/proto_environment.mli
 
 compiler/sigs/proto_environment.cmi: \
-  compiler/sigs/proto_environment.mli compiler/sigs/protocol.cmi \
+  compiler/sigs/proto_environment.mli compiler/sigs/protocol_sigs.cmi \
   compiler/sigs/camlinternalFormatBasics.cmi
 	@echo OCAMLOPT ${TARGET} $@
 	@$(OCAMLOPT) -nopervasives -nostdlib -opaque -I tmp -I compiler/sigs -c $<
@@ -71,24 +71,15 @@ compiler/embedded_cmis.ml: ${COMPILER_EMBEDDED_CMIS}
 partial-clean::
 	rm -f compiler/embedded_cmis.ml
 
-compiler/tezos_compiler.cmi: compiler/sigs/tezos_compiler.cmi
-	@cp -a compiler/sigs/tezos_compiler.cmi compiler
-
 NO_DEPS += \
-  node/updater/fitness.mli \
-  node/updater/protocol.mli \
+  node/updater/protocol_sigs.mli \
   node/updater/proto_environment.mli \
   node/updater/register.mli \
   node/db/persist.mli \
-  node/db/store_sigs.mli \
-  node/db/store_sigs.mli \
-  node/db/store.mli \
   node/db/context.mli
 
-node/updater/fitness.cmi: compiler/sigs/fitness.cmi
-	@cp -a compiler/sigs/fitness.cmi node/updater
-node/updater/protocol.cmi: compiler/sigs/protocol.cmi
-	@cp -a compiler/sigs/protocol.cmi node/updater
+node/updater/protocol_sigs.cmi: compiler/sigs/protocol_sigs.cmi
+	@cp -a compiler/sigs/protocol_sigs.cmi node/updater
 node/updater/proto_environment.cmi: compiler/sigs/proto_environment.cmi
 	@cp -a compiler/sigs/proto_environment.cmi node/updater
 node/updater/register.cmi: compiler/sigs/register.cmi
@@ -96,10 +87,6 @@ node/updater/register.cmi: compiler/sigs/register.cmi
 
 node/db/persist.cmi: compiler/sigs/persist.cmi
 	@cp -a compiler/sigs/persist.cmi node/db
-node/db/store_sigs.cmi: compiler/sigs/store_sigs.cmi
-	@cp -a compiler/sigs/store_sigs.cmi node/db
-node/db/store.cmi: compiler/sigs/store.cmi
-	@cp -a compiler/sigs/store.cmi node/db
 node/db/context.cmi: compiler/sigs/context.cmi
 	@cp -a compiler/sigs/context.cmi node/db
 
@@ -383,7 +370,7 @@ proto/embedded_proto_%.cmxa: \
 	    $@ proto/$*/
 
 CLIENT_PROTO_INCLUDES := \
-  minutils utils node/updater node/db node/net node/shell client \
+  minutils utils compiler node/updater node/db node/net node/shell client \
   $(shell ocamlfind query lwt ocplib-json-typed sodium)
 
 proto/client_embedded_proto_%.cmxa: \

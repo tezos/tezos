@@ -26,6 +26,7 @@ OPENED_MODULES := \
   Register_client_embedded_proto_${PROTO_VERSION} \
   Error_monad \
   Hash \
+  Tezos_data \
   ${OPENED_MODULES}
 
 OBJS := \

@@ -19,7 +19,7 @@ val forge_block:
   ?proto_level:int ->
   ?predecessor:Block_hash.t ->
   ?timestamp:Time.t ->
-  Fitness.fitness ->
+  Fitness.t ->
   Operation_list_list_hash.t ->
   MBytes.t ->
   MBytes.t tzresult Lwt.t
@@ -54,7 +54,7 @@ val inject_operation:
 val inject_protocol:
   config ->
   ?async:bool -> ?force:bool ->
-  Tezos_compiler.Protocol.t ->
+  Protocol.t ->
   Protocol_hash.t tzresult Lwt.t
 
 module Blocks : sig
@@ -152,12 +152,12 @@ module Operations : sig
 
   val contents:
     config ->
-    Operation_hash.t list -> Store.Operation.t list tzresult Lwt.t
+    Operation_hash.t list -> Operation.t list tzresult Lwt.t
 
   val monitor:
     config ->
     ?contents:bool -> unit ->
-    (Operation_hash.t * Store.Operation.t option) list list tzresult
+    (Operation_hash.t * Operation.t option) list list tzresult
       Lwt_stream.t tzresult Lwt.t
 
 end
@@ -166,12 +166,12 @@ module Protocols : sig
 
   val contents:
     config ->
-    Protocol_hash.t -> Store.Protocol.t tzresult Lwt.t
+    Protocol_hash.t -> Protocol.t tzresult Lwt.t
 
   val list:
     config ->
     ?contents:bool -> unit ->
-    (Protocol_hash.t * Store.Protocol.t option) list tzresult Lwt.t
+    (Protocol_hash.t * Protocol.t option) list tzresult Lwt.t
 
 end
 

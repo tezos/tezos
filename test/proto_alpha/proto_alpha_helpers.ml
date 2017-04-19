@@ -455,7 +455,7 @@ module Mining = struct
       Operation_list_list_hash.compute
         [Operation_list_hash.compute operation_list] in
     let shell =
-      { Store.Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
+      { Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
         timestamp ; fitness ; operations_hash ;
         level = Raw_level.to_int32 level.level ;
         proto_level } in

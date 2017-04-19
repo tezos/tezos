@@ -1215,11 +1215,15 @@ let rec length : type x. x t -> x -> int = fun e ->
     try Some (read_rec t buf ofs len)
     with _ -> None
   let write = write
-  let of_bytes ty buf =
+  let of_bytes_exn ty buf =
     let len = MBytes.length buf in
-    match read ty buf 0 len with
-    | None -> None
-    | Some (read_len, r) -> if read_len <> len then None else Some r
+    let read_len, r = read_rec ty buf 0 len in
+    if read_len <> len then
+      failwith "Data_encoding.Binary.of_bytes_exn: remainig data" ;
+    r
+  let of_bytes ty buf =
+    try Some (of_bytes_exn ty buf)
+    with _ -> None
   let to_bytes = to_bytes
 
   let length = length
