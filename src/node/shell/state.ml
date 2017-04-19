@@ -11,8 +11,8 @@ open Logging.Node.State
 
 type error +=
   | Invalid_fitness of { block: Block_hash.t ;
-                         expected: Fitness.fitness ;
-                         found: Fitness.fitness }
+                         expected: Fitness.t ;
+                         found: Fitness.t }
   | Invalid_operations of { block: Block_hash.t ;
                             expected: Operation_list_list_hash.t ;
                             found: Operation_hash.t list list }
@@ -114,10 +114,10 @@ and valid_block = {
     proto_level: int ;
   predecessor: Block_hash.t ;
   timestamp: Time.t ;
-  fitness: Protocol.fitness ;
+  fitness: Fitness.t ;
   operations_hash: Operation_list_list_hash.t ;
   operation_hashes: Operation_hash.t list list Lwt.t Lazy.t ;
-  operations: Store.Operation.t list list Lwt.t Lazy.t ;
+  operations: Operation.t list list Lwt.t Lazy.t ;
   discovery_time: Time.t ;
   protocol_hash: Protocol_hash.t ;
   protocol: (module Updater.REGISTRED_PROTOCOL) option ;
@@ -133,7 +133,7 @@ let build_valid_block
   Context.get_test_network context >>= fun test_network ->
   let protocol = Updater.get protocol_hash in
   let valid_block = {
-    net_id = header.Store.Block_header.shell.net_id ;
+    net_id = header.Block_header.shell.net_id ;
     hash ;
     level = header.shell.level ;
     proto_level = header.shell.proto_level ;
@@ -148,7 +148,7 @@ let build_valid_block
     protocol ;
     test_network ;
     context ;
-    proto_header = header.Store.Block_header.proto ;
+    proto_header = header.Block_header.proto ;
   } in
   Lwt.return valid_block
 
@@ -211,7 +211,10 @@ let wrap_not_found f s k =
   | Some v -> Lwt.return v
 
 module Make_data_store
-    (S : Store.DATA_STORE)
+    (S : sig
+       include Store.DATA_STORE
+       val encoding: value Data_encoding.t
+     end)
     (U : sig
        type store
        val use: store -> (S.store -> 'a Lwt.t) -> 'a Lwt.t
@@ -221,7 +224,7 @@ module Make_data_store
   include INTERNAL_DATA_STORE with type store = U.store
                                and type key = S.key
                                and type key_set := Set.t
-                               and type value = S.value
+                               and type value := S.value
   module Locked : INTERNAL_DATA_STORE with type store = S.store
                                        and type key = S.key
                                        and type key_set := Set.t
@@ -382,7 +385,10 @@ end
 
 module Raw_operation =
   Make_data_store
-    (Store.Operation)
+    (struct
+      include Operation
+      include Store.Operation
+    end)
     (struct
       type store = Store.Operation.store Shared.t
       let use s = Shared.use s
@@ -509,7 +515,10 @@ module Raw_block_header = struct
 
   include
     Make_data_store
-      (Store.Block_header)
+      (struct
+        include Block_header
+        include Store.Block_header
+      end)
       (struct
         type store = Store.Block_header.store Shared.t
         let use s = Shared.use s
@@ -528,7 +537,7 @@ module Raw_block_header = struct
   let read_pred_exn = wrap_not_found read_pred
 
   let store_genesis store genesis =
-    let shell : Store.Block_header.shell_header = {
+    let shell : Block_header.shell_header = {
       net_id = Net_id.of_block_hash genesis.block;
       level = 0l ;
       proto_level = 0 ;
@@ -538,9 +547,9 @@ module Raw_block_header = struct
       operations_hash = Operation_list_list_hash.empty ;
     } in
     let header =
-      { Store.Block_header.shell ; proto = MBytes.create 0 } in
+      { Block_header.shell ; proto = MBytes.create 0 } in
     let bytes =
-      Data_encoding.Binary.to_bytes Store.Block_header.encoding header in
+      Data_encoding.Binary.to_bytes Block_header.encoding header in
     Locked.store_raw store genesis.block bytes >>= fun _created ->
     Raw_operation_list.Locked.store_all store genesis.block [] [] >>= fun () ->
     Lwt.return header
@@ -584,8 +593,8 @@ module Raw_helpers = struct
       Lwt.return (Some (hash1, header1))
     else if
       Time.compare
-        header1.Store.Block_header.timestamp
-        header2.Store.Block_header.timestamp <= 0
+        header1.Block_header.timestamp
+        header2.Block_header.timestamp <= 0
     then begin
       if Block_hash.equal header2.predecessor hash2 then
         Lwt.return_none
@@ -626,7 +635,7 @@ module Raw_helpers = struct
       (compare: t -> t -> int)
       (predecessor: state -> t -> t option Lwt.t)
       (date: t -> Time.t)
-      (fitness: t -> Fitness.fitness)
+      (fitness: t -> Fitness.t)
       state ?max ?min_fitness ?min_date heads ~f =
     let module Local = struct exception Exit end in
     let pop, push =
@@ -684,7 +693,7 @@ end
 
 module Block_header = struct
 
-  type shell_header = Store.Block_header.shell_header = {
+  type shell_header = Block_header.shell_header = {
     net_id: Net_id.t ;
     level: Int32.t ;
     proto_level: int ; (* uint8 *)
@@ -694,7 +703,7 @@ module Block_header = struct
     fitness: MBytes.t list ;
   }
 
-  type t = Store.Block_header.t = {
+  type t = Block_header.t = {
     shell: shell_header ;
     proto: MBytes.t ;
   }
@@ -703,7 +712,10 @@ module Block_header = struct
 
   include
     Make_data_store
-      (Store.Block_header)
+      (struct
+        include Block_header
+        include Store.Block_header
+      end)
       (struct
         type store = net
         let use s = Shared.use s.block_header_store
@@ -770,7 +782,7 @@ module Block_header = struct
             match Time.compare b1.shell.timestamp b2.shell.timestamp with
             | 0 ->
                 Block_hash.compare
-                  (Store.Block_header.hash b1) (Store.Block_header.hash b2)
+                  (Block_header.hash b1) (Block_header.hash b2)
             | res -> res
           end
         | res -> res in
@@ -917,10 +929,10 @@ module Valid_block = struct
     proto_level: int ;
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
-    fitness: Fitness.fitness ;
+    fitness: Fitness.t ;
     operations_hash: Operation_list_list_hash.t ;
     operation_hashes: Operation_hash.t list list Lwt.t Lazy.t ;
-    operations: Store.Operation.t list list Lwt.t Lazy.t ;
+    operations: Operation.t list list Lwt.t Lazy.t ;
     discovery_time: Time.t ;
     protocol_hash: Protocol_hash.t ;
     protocol: (module Updater.REGISTRED_PROTOCOL) option ;
@@ -996,10 +1008,10 @@ module Valid_block = struct
         block_header_store hash >>=? fun discovery_time ->
       (* Check fitness coherency. *)
       fail_unless
-        (Fitness.equal fitness block.Store.Block_header.shell.fitness)
+        (Fitness.equal fitness block.Block_header.shell.fitness)
         (Invalid_fitness
            { block = hash ;
-             expected = block.Store.Block_header.shell.fitness ;
+             expected = block.Block_header.shell.fitness ;
              found = fitness ;
            }) >>=? fun () ->
       Raw_block_header.Locked.mark_valid
@@ -1232,7 +1244,7 @@ module Valid_block = struct
           (state.chain_store, hash) time >>= fun () ->
         Store.Chain.Successor_in_chain.store
           (state.chain_store,
-           shell.Store.Block_header.predecessor) hash >>= fun () ->
+           shell.Block_header.predecessor) hash >>= fun () ->
           Raw_operation_list.read_all_exn
             block_header_store hash >>= fun operations ->
         let operations = List.concat operations in
@@ -1417,17 +1429,20 @@ let () =
 
 module Operation = struct
 
-  type shell_header = Store.Operation.shell_header = {
+  type shell_header = Operation.shell_header = {
     net_id: Net_id.t ;
   }
 
-  type t = Store.Operation.t = {
+  type t = Operation.t = {
     shell: shell_header ;
     proto: MBytes.t ;
   }
 
   include Make_data_store
-      (Store.Operation)
+      (struct
+        include Operation
+        include Store.Operation
+      end)
       (struct
         type store = net
         let use s = Shared.use s.operation_store
@@ -1441,10 +1456,13 @@ end
 
 module Protocol = struct
 
-  type t = Store.Protocol.t
+  type t = Protocol.t
 
   include Make_data_store
-      (Store.Protocol)
+      (struct
+        include Protocol
+        include Store.Protocol
+      end)
       (struct
         type store = global_state
         let use s = Shared.use s.protocol_store

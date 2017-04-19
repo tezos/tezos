@@ -66,7 +66,7 @@ let rpc_services : Updater.rpc_context RPC.directory =
       (Forge.block RPC.Path.root)
       (fun _ctxt ((net_id, level, proto_level, predecessor,
                    timestamp, fitness), command) ->
-         let shell = { Updater.net_id ; level ; proto_level ; predecessor ;
+         let shell = { Block_header.net_id ; level ; proto_level ; predecessor ;
                        timestamp ; fitness ; operations_hash } in
          let bytes = Data.Command.forge shell command in
          RPC.Answer.return bytes) in

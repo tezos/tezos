@@ -79,14 +79,6 @@ module type DATA_STORE = sig
   type key_set
   type value
 
-  val encoding: value Data_encoding.t
-
-  val compare: value -> value -> int
-  val equal: value -> value -> bool
-
-  val hash: value -> key
-  val hash_raw: MBytes.t -> key
-
   module Discovery_time : MAP_STORE
     with type t := store
      and type key := key
@@ -183,37 +175,11 @@ end
 
 module Operation = struct
 
-  type shell_header = {
-    net_id: Net_id.t ;
-  }
-
-  let shell_header_encoding =
-    let open Data_encoding in
-    conv
-      (fun { net_id } -> net_id)
-      (fun net_id -> { net_id })
-      (obj1 (req "net_id" Net_id.encoding))
-
-  module Encoding = struct
-    type t = {
-      shell: shell_header ;
-      proto: MBytes.t ;
-    }
-    let encoding =
-      let open Data_encoding in
-      conv
-        (fun { shell ; proto } -> (shell, proto))
-        (fun (shell, proto) -> { shell ; proto })
-        (merge_objs
-           shell_header_encoding
-           (obj1 (req "data" Variable.bytes)))
-  end
-  module Value = Store_helpers.Make_value(Encoding)
-  include Encoding
+  module Value = Store_helpers.Make_value(Operation)
 
   let compare o1 o2 =
     let (>>) x y = if x = 0 then y () else x in
-    Net_id.compare o1.shell.net_id o1.shell.net_id >> fun () ->
+    Net_id.compare o1.Operation.shell.net_id o2.Operation.shell.net_id >> fun () ->
     MBytes.compare o1.proto o2.proto
   let equal b1 b2 = compare b1 b2 = 0
   let hash op = Operation_hash.hash_bytes [Value.to_bytes op]
@@ -250,52 +216,7 @@ end
 
 module Block_header = struct
 
-  type shell_header = {
-    net_id: Net_id.t ;
-    level: Int32.t ;
-    proto_level: int ; (* uint8 *)
-    predecessor: Block_hash.t ;
-    timestamp: Time.t ;
-    operations_hash: Operation_list_list_hash.t ;
-    fitness: MBytes.t list ;
-  }
-
-  let shell_header_encoding =
-    let open Data_encoding in
-    conv
-      (fun { net_id ; level ; proto_level ; predecessor ;
-             timestamp ; operations_hash ; fitness } ->
-        (net_id, level, proto_level, predecessor,
-         timestamp, operations_hash, fitness))
-      (fun (net_id, level, proto_level, predecessor,
-            timestamp, operations_hash, fitness) ->
-         { net_id ; level ; proto_level ; predecessor ;
-           timestamp ; operations_hash ; fitness })
-      (obj7
-         (req "net_id" Net_id.encoding)
-         (req "level" int32)
-         (req "proto" uint8)
-         (req "predecessor" Block_hash.encoding)
-         (req "timestamp" Time.encoding)
-         (req "operations_hash" Operation_list_list_hash.encoding)
-         (req "fitness" Fitness.encoding))
-
-  module Encoding = struct
-    type t = {
-      shell: shell_header ;
-      proto: MBytes.t ;
-    }
-    let encoding =
-      let open Data_encoding in
-      conv
-        (fun { shell ; proto } -> (shell, proto))
-        (fun (shell, proto) -> { shell ; proto })
-        (merge_objs
-           shell_header_encoding
-           (obj1 (req "data" Variable.bytes)))
-  end
-  module Value = Store_helpers.Make_value(Encoding)
-  include Encoding
+  module Value = Store_helpers.Make_value(Block_header)
 
   let compare b1 b2 =
     let (>>) x y = if x = 0 then y () else x in
@@ -306,7 +227,7 @@ module Block_header = struct
       | [], _ :: _ -> 1
       | x :: xs, y :: ys ->
           compare x y >> fun () -> list compare xs ys in
-    Block_hash.compare b1.shell.predecessor b2.shell.predecessor >> fun () ->
+    Block_hash.compare b1.Block_header.shell.predecessor b2.Block_header.shell.predecessor >> fun () ->
     compare b1.proto b2.proto >> fun () ->
     Operation_list_list_hash.compare
       b1.shell.operations_hash b2.shell.operations_hash >> fun () ->
@@ -417,7 +338,7 @@ end
 
 module Protocol = struct
 
-  include Tezos_compiler.Protocol
+  include Protocol
   let hash_raw bytes = Protocol_hash.hash_bytes [bytes]
 
   type store = global_store
@@ -428,7 +349,7 @@ module Protocol = struct
          (Raw_store)
          (struct let name = ["protocols"] end))
       (Protocol_hash)
-      (Store_helpers.Make_value(Tezos_compiler.Protocol))
+      (Store_helpers.Make_value(Protocol))
       (Protocol_hash.Set)
 
   let register s =

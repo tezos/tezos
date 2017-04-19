@@ -12,7 +12,7 @@ open Logging.Node.Worker
 
 let inject_operation validator ?force bytes =
   let t =
-    match Data_encoding.Binary.of_bytes Store.Operation.encoding bytes with
+    match Data_encoding.Binary.of_bytes Operation.encoding bytes with
     | None -> failwith "Can't parse the operation"
     | Some operation ->
         Validator.get
@@ -24,7 +24,7 @@ let inject_operation validator ?force bytes =
 
 let inject_protocol state ?force:_ proto =
   let proto_bytes =
-    Data_encoding.Binary.to_bytes Store.Protocol.encoding proto in
+    Data_encoding.Binary.to_bytes Protocol.encoding proto in
   let hash = Protocol_hash.hash_bytes [proto_bytes] in
   let validation =
     Updater.compile hash proto >>= function
@@ -63,7 +63,7 @@ type t = {
     ?force:bool -> MBytes.t ->
     (Operation_hash.t * unit tzresult Lwt.t) Lwt.t ;
   inject_protocol:
-    ?force:bool -> Store.Protocol.t ->
+    ?force:bool -> Protocol.t ->
     (Protocol_hash.t * unit tzresult Lwt.t) Lwt.t ;
   p2p: Distributed_db.p2p ; (* For P2P RPCs *)
   shutdown: unit -> unit Lwt.t ;
@@ -521,7 +521,7 @@ module RPC = struct
       Block_hash.Map.empty (test_heads @ heads)
 
   let predecessors node len head =
-    let rec loop net_db acc len hash (block: State.Block_header.t) =
+    let rec loop net_db acc len hash (block: Block_header.t) =
       if Block_hash.equal block.shell.predecessor hash then
         Lwt.return (List.rev acc)
       else begin

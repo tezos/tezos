@@ -15,7 +15,7 @@ open Operation
 
 type operation = {
   hash: Operation_hash.t ;
-  content: (Updater.shell_operation * proto_operation) option
+  content: Tezos_context.Operation.t option
 }
 
 let monitor cctxt ?contents ?check () =
@@ -26,11 +26,11 @@ let monitor cctxt ?contents ?check () =
       (fun (hash, op) ->
          match op with
          | None -> return { hash; content = None }
-         | Some (op : Updater.raw_operation) ->
+         | Some (op : Operation.raw) ->
              Client_proto_rpcs.Helpers.Parse.operations cctxt
                `Prevalidation ?check [op] >>=? function
              | [proto] ->
-                 return { hash ; content = Some (op.shell, proto) }
+                 return { hash ; content = Some proto }
              | _ -> failwith "Error while parsing the operation")
      (List.concat  ops)
   in
@@ -44,15 +44,17 @@ type valid_endorsement = {
   slots: int list ;
 }
 
-let filter_valid_endorsement cctxt { hash; content } =
+let filter_valid_endorsement cctxt ({ hash ; content } : operation) =
   let open Tezos_context in
   match content with
   | None
-  | Some (_, Anonymous_operations _)
-  | Some (_, Sourced_operations (Dictator_operation _ ))
-  | Some (_, Sourced_operations (Manager_operations _ )) ->
+  | Some { contents = Anonymous_operations _ }
+  | Some { contents = Sourced_operations (Dictator_operation _ ) }
+  | Some { contents = Sourced_operations (Manager_operations _ ) } ->
       Lwt.return_none
-  | Some ({net_id}, Sourced_operations (Delegate_operations { source ; operations })) ->
+  | Some { shell = {net_id} ;
+           contents =
+             Sourced_operations (Delegate_operations { source ; operations }) } ->
       let source = Ed25519.Public_key.hash source in
       let endorsements =
         Utils.unopt_list @@ List.map

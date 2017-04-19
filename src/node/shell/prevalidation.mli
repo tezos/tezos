@@ -35,7 +35,7 @@ val start_prevalidation :
 
 val prevalidate :
   prevalidation_state -> sort:bool ->
-  (Operation_hash.t * Store.Operation.t) list ->
+  (Operation_hash.t * Operation.t) list ->
   (prevalidation_state * error preapply_result) tzresult Lwt.t
 
 val end_prevalidation :

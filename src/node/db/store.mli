@@ -92,14 +92,6 @@ module type DATA_STORE = sig
   type key_set
   type value
 
-  val encoding: value Data_encoding.t
-
-  val compare: value -> value -> int
-  val equal: value -> value -> bool
-
-  val hash: value -> key
-  val hash_raw: MBytes.t -> key
-
   module Discovery_time : MAP_STORE
     with type t := store
      and type key := key
@@ -134,23 +126,13 @@ end
 
 module Operation : sig
 
-  type shell_header = {
-    net_id: Net_id.t ;
-  }
-  val shell_header_encoding: shell_header Data_encoding.t
-
-  type t = {
-    shell: shell_header ;
-    proto: MBytes.t ;
-  }
-
   type store
   val get: Net.store -> store
 
   include DATA_STORE
     with type store := store
      and type key = Operation_hash.t
-     and type value = t
+     and type value = Operation.t
      and type key_set = Operation_hash.Set.t
 
 end
@@ -160,29 +142,13 @@ end
 
 module Block_header : sig
 
-  type shell_header = {
-    net_id: Net_id.t ;
-    level: Int32.t ;
-    proto_level: int ; (* uint8 *)
-    predecessor: Block_hash.t ;
-    timestamp: Time.t ;
-    operations_hash: Operation_list_list_hash.t ;
-    fitness: MBytes.t list ;
-  }
-  val shell_header_encoding: shell_header Data_encoding.t
-
-  type t = {
-    shell: shell_header ;
-    proto: MBytes.t ;
-  }
-
   type store
   val get: Net.store -> store
 
   include DATA_STORE
     with type store := store
      and type key = Block_hash.t
-     and type value = t
+     and type value = Block_header.t
      and type key_set = Block_hash.Set.t
 
   module Operation_list_count : SINGLE_STORE
@@ -206,15 +172,13 @@ end
 
 module Protocol : sig
 
-  type t = Tezos_compiler.Protocol.t
-
   type store
   val get: global_store -> store
 
   include DATA_STORE
     with type store := store
      and type key = Protocol_hash.t
-     and type value = t
+     and type value = Protocol.t
      and type key_set = Protocol_hash.Set.t
 
 end

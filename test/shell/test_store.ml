@@ -62,17 +62,17 @@ let net_id = Net_id.of_block_hash genesis_block
 
 (** Operation store *)
 
-let make proto : Store.Operation.t =
+let make proto : Tezos_data.Operation.t =
   { shell = { net_id } ; proto }
 
 let op1 = make (MBytes.of_string "Capadoce")
-let oph1 = Operation.hash op1
+let oph1 = Tezos_data.Operation.hash op1
 let op2 = make (MBytes.of_string "Kivu")
-let oph2 = Operation.hash op2
+let oph2 = Tezos_data.Operation.hash op2
 
 let check_operation s h b =
   Operation.Contents.read (s, h) >>= function
-  | Ok b' when Operation.equal b b' -> Lwt.return_unit
+  | Ok b' when Tezos_data.Operation.equal b b' -> Lwt.return_unit
   | _ ->
       Printf.eprintf "Error while reading operation %s\n%!"
         (Operation_hash.to_hex h);
@@ -92,7 +92,7 @@ let lolblock ?(operations = []) header =
   let operations_hash =
     Operation_list_list_hash.compute
       [Operation_list_hash.compute operations] in
-  { Store.Block_header.shell =
+  { Tezos_data.Block_header.shell =
       { timestamp = Time.of_seconds (Random.int64 1500L) ;
         level = 0l ; (* dummy *)
         proto_level = 0 ; (* dummy *)
@@ -104,11 +104,11 @@ let lolblock ?(operations = []) header =
   }
 
 let b1 = lolblock "Blop !"
-let bh1 = Store.Block_header.hash b1
+let bh1 = Tezos_data.Block_header.hash b1
 let b2 = lolblock "Tacatlopo"
-let bh2 = Store.Block_header.hash b2
+let bh2 = Tezos_data.Block_header.hash b2
 let b3 = lolblock ~operations:[oph1;oph2] "Persil"
-let bh3 = Store.Block_header.hash b3
+let bh3 = Tezos_data.Block_header.hash b3
 let bh3' =
   let raw = Bytes.of_string @@ Block_hash.to_string bh3 in
   Bytes.set raw 31 '\000' ;
@@ -117,7 +117,7 @@ let bh3' =
 
 let check_block s h b =
   Block_header.Contents.read_opt (s, h) >>= function
-  | Some b' when Store.Block_header.equal b b' -> Lwt.return_unit
+  | Some b' when Tezos_data.Block_header.equal b b' -> Lwt.return_unit
   | Some _ ->
       Printf.eprintf "Error while reading block %s\n%!" (Block_hash.to_hex h);
       exit 1

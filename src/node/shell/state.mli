@@ -37,8 +37,8 @@ val close:
 
 type error +=
   | Invalid_fitness of { block: Block_hash.t ;
-                         expected: Fitness.fitness ;
-                         found: Fitness.fitness }
+                         expected: Fitness.t ;
+                         found: Fitness.t }
   | Invalid_operations of { block: Block_hash.t ;
                             expected: Operation_list_list_hash.t ;
                             found: Operation_hash.t list list }
@@ -144,25 +144,9 @@ end
 
 module Block_header : sig
 
-  type shell_header = Store.Block_header.shell_header = {
-    net_id: Net_id.t ;
-    level: Int32.t ;
-    proto_level: int ; (* uint8 *)
-    predecessor: Block_hash.t ;
-    timestamp: Time.t ;
-    operations_hash: Operation_list_list_hash.t ;
-    fitness: MBytes.t list ;
-  }
-
-  type t = Store.Block_header.t = {
-    shell: shell_header ;
-    proto: MBytes.t ;
-  }
-  type block_header = t
-
   include DATA_STORE with type store = Net.t
                       and type key = Block_hash.t
-                      and type value = block_header
+                      and type value := Block_header.t
 
   val mark_invalid: Net.t -> Block_hash.t -> error list -> bool Lwt.t
 
@@ -179,13 +163,13 @@ module Block_header : sig
         [h1] (excluded) to [h2] (included). *)
     val path:
       Net.t -> Block_hash.t -> Block_hash.t ->
-      (Block_hash.t * shell_header) list tzresult Lwt.t
+      (Block_hash.t * Block_header.shell_header) list tzresult Lwt.t
 
     (** [common_ancestor state h1 h2] returns the first common ancestors
         in the history of blocks [h1] and [h2]. *)
     val common_ancestor:
       Net.t -> Block_hash.t -> Block_hash.t ->
-      (Block_hash.t * shell_header) tzresult Lwt.t
+      (Block_hash.t * Block_header.shell_header) tzresult Lwt.t
 
     (** [block_locator state max_length h] compute the sparse block locator
         (/à la/ Bitcoin) for the block [h]. *)
@@ -202,10 +186,10 @@ module Block_header : sig
     val iter_predecessors:
       Net.t ->
       ?max:int ->
-      ?min_fitness:Fitness.fitness ->
+      ?min_fitness:Fitness.t ->
       ?min_date:Time.t ->
-      block_header list ->
-      f:(block_header -> unit Lwt.t) ->
+      Block_header.t list ->
+      f:(Block_header.t -> unit Lwt.t) ->
       unit tzresult Lwt.t
 
   end
@@ -257,11 +241,11 @@ module Valid_block : sig
     (** The preceding block in the chain. *)
     timestamp: Time.t ;
     (** The date at which this block has been forged. *)
-    fitness: Protocol.fitness ;
+    fitness: Fitness.t ;
     (** The (validated) score of the block. *)
     operations_hash: Operation_list_list_hash.t ;
     operation_hashes: Operation_hash.t list list Lwt.t Lazy.t ;
-    operations: Store.Operation.t list list Lwt.t Lazy.t ;
+    operations: Operation.t list list Lwt.t Lazy.t ;
     (** The sequence of operations and its (Merkle-)hash. *)
     discovery_time: Time.t ;
     (** The data at which the block was discorevered on the P2P network. *)
@@ -329,7 +313,7 @@ module Valid_block : sig
 
     val new_blocks:
       Net.t -> from_block:valid_block -> to_block:valid_block ->
-      (Block_hash.t * (Block_hash.t * Block_header.shell_header) list) Lwt.t
+      (Block_hash.t * (Block_hash.t * Tezos_data.Block_header.shell_header) list) Lwt.t
 
   end
 
@@ -360,7 +344,7 @@ module Valid_block : sig
     val iter_predecessors:
       Net.t ->
       ?max:int ->
-      ?min_fitness:Fitness.fitness ->
+      ?min_fitness:Fitness.t ->
       ?min_date:Time.t ->
       valid_block list ->
       f:(valid_block -> unit Lwt.t) ->
@@ -375,18 +359,9 @@ end
 
 module Operation : sig
 
-  type shell_header = Store.Operation.shell_header = {
-    net_id: Net_id.t ;
-  }
-
-  type t = Store.Operation.t = {
-    shell: shell_header ;
-    proto: MBytes.t ;
-  }
-
   include DATA_STORE with type store = Net.t
                       and type key = Operation_hash.t
-                      and type value = t
+                      and type value := Operation.t
 
   val mark_invalid: Net.t -> Operation_hash.t -> error list -> bool Lwt.t
 
@@ -406,7 +381,7 @@ end
 module Protocol : sig
   include DATA_STORE with type store = global_state
                       and type key = Protocol_hash.t
-                      and type value = Tezos_compiler.Protocol.t
+                      and type value := Protocol.t
 
   val list: global_state -> Protocol_hash.Set.t Lwt.t
 

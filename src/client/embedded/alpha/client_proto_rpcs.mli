@@ -348,11 +348,11 @@ module Helpers : sig
   module Parse : sig
     val operations:
       Client_rpcs.config ->
-      block -> ?check:bool -> Updater.raw_operation list ->
-      proto_operation list tzresult Lwt.t
+      block -> ?check:bool -> Operation.raw list ->
+      Operation.t list tzresult Lwt.t
     val block:
       Client_rpcs.config ->
-      block -> Updater.shell_block_header -> MBytes.t ->
+      block -> Block_header.shell_header -> MBytes.t ->
       Block.proto_header tzresult Lwt.t
   end
 

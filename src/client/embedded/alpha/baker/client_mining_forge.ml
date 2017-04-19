@@ -51,7 +51,7 @@ let inject_block cctxt block
     Operation_list_list_hash.compute
       (List.map Operation_list_hash.compute operations) in
   let shell =
-    { Store.Block_header.net_id = bi.net_id ; level = bi.level ;
+    { Block_header.net_id = bi.net_id ; level = bi.level ;
       proto_level = bi.proto_level ;
       predecessor = bi.hash ; timestamp ; fitness ; operations_hash } in
   compute_stamp cctxt block

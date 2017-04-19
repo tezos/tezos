@@ -74,7 +74,10 @@ end
 module Raw_operation =
   Make_raw
     (Operation_hash)
-    (State.Operation)
+    (struct
+      type value = Operation.t
+      include State.Operation
+    end)
     (Operation_hash.Table)
     (struct
       type param = Net_id.t
@@ -85,7 +88,10 @@ module Raw_operation =
 module Raw_block_header =
   Make_raw
     (Block_hash)
-    (State.Block_header)
+    (struct
+      type value = Block_header.t
+      include State.Block_header
+    end)
     (Block_hash.Table)
     (struct
       type param = Net_id.t
@@ -124,7 +130,10 @@ module Raw_operation_list =
 module Raw_protocol =
   Make_raw
     (Protocol_hash)
-    (State.Protocol)
+    (struct
+      type value = Protocol.t
+      include State.Protocol
+    end)
     (Protocol_hash.Table)
     (struct
       type param = unit
@@ -146,8 +155,8 @@ type db = {
   disk: State.t ;
   active_nets: net Net_id.Table.t ;
   protocol_db: Raw_protocol.t ;
-  block_input: (Block_hash.t * Store.Block_header.t) Watcher.input ;
-  operation_input: (Operation_hash.t * Store.Operation.t) Watcher.input ;
+  block_input: (Block_hash.t * Block_header.t) Watcher.input ;
+  operation_input: (Operation_hash.t * Operation.t) Watcher.input ;
 }
 
 and net = {
@@ -278,7 +287,7 @@ module P2p_reader = struct
 
     | Block_header block ->
         may_handle state block.shell.net_id @@ fun net_db ->
-        let hash = Store.Block_header.hash block in
+        let hash = Block_header.hash block in
         Raw_block_header.Table.notify
           net_db.block_header_db.table state.gid hash block >>= fun () ->
         Lwt.return_unit
@@ -297,7 +306,7 @@ module P2p_reader = struct
 
     | Operation operation ->
         may_handle state operation.shell.net_id @@ fun net_db ->
-        let hash = Store.Operation.hash operation in
+        let hash = Operation.hash operation in
         Raw_operation.Table.notify
           net_db.operation_db.table state.gid hash operation >>= fun () ->
         Lwt.return_unit
@@ -314,7 +323,7 @@ module P2p_reader = struct
           hashes
 
     | Protocol protocol ->
-        let hash = Store.Protocol.hash protocol in
+        let hash = Protocol.hash protocol in
         Raw_protocol.Table.notify
           global_db.protocol_db.table state.gid hash protocol >>= fun () ->
         Lwt.return_unit
@@ -606,7 +615,7 @@ end
 let inject_block t bytes operations =
   let hash = Block_hash.hash_bytes [bytes] in
   match
-    Data_encoding.Binary.of_bytes Store.Block_header.encoding bytes
+    Data_encoding.Binary.of_bytes Tezos_data.Block_header.encoding bytes
   with
   | None ->
       failwith "Cannot parse block header."
@@ -638,7 +647,7 @@ let inject_block t bytes operations =
 (*
 let inject_operation t bytes =
   let hash = Operation_hash.hash_bytes [bytes] in
-  match Data_encoding.Binary.of_bytes Store.Operation.encoding bytes with
+  match Data_encoding.Binary.of_bytes Operation.encoding bytes with
   | None ->
       failwith "Cannot parse operations."
   | Some op ->

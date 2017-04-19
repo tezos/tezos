@@ -17,13 +17,13 @@ type t =
   | Current_head of Net_id.t * Block_hash.t * Operation_hash.t list
 
   | Get_block_headers of Net_id.t * Block_hash.t list
-  | Block_header of Store.Block_header.t
+  | Block_header of Block_header.t
 
   | Get_operations of Net_id.t * Operation_hash.t list
-  | Operation of Store.Operation.t
+  | Operation of Operation.t
 
   | Get_protocols of Protocol_hash.t list
-  | Protocol of Tezos_compiler.Protocol.t
+  | Protocol of Protocol.t
 
   | Get_operation_list of Net_id.t * (Block_hash.t * int) list
   | Operation_list of Net_id.t * Block_hash.t * int *
@@ -87,7 +87,7 @@ let encoding =
       (fun (net_id, bhs) -> Get_block_headers (net_id, bhs)) ;
 
     case ~tag:0x21
-      (obj1 (req "block_header" Store.Block_header.encoding))
+      (obj1 (req "block_header" Block_header.encoding))
       (function
         | Block_header bh -> Some bh
         | _ -> None)
@@ -103,7 +103,7 @@ let encoding =
       (fun (net_id, bhs) -> Get_operations (net_id, bhs)) ;
 
     case ~tag:0x31
-      (obj1 (req "operation" Store.Operation.encoding))
+      (obj1 (req "operation" Operation.encoding))
       (function Operation o -> Some o | _ -> None)
       (fun o -> Operation o);
 
@@ -116,7 +116,7 @@ let encoding =
       (fun protos -> Get_protocols protos);
 
     case ~tag:0x41
-      (obj1 (req "protocol" Store.Protocol.encoding))
+      (obj1 (req "protocol" Protocol.encoding))
       (function Protocol proto -> Some proto  | _ -> None)
       (fun proto -> Protocol proto);
 
