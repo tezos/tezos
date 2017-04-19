@@ -15,7 +15,7 @@ open Operation
 
 type operation = {
   hash: Operation_hash.t ;
-  content: Tezos_context.Operation.t option
+  content: Operation.t option
 }
 
 let monitor cctxt ?contents ?check () =
@@ -81,7 +81,8 @@ let filter_valid_endorsement cctxt ({ hash ; content } : operation) =
                   pp_print_error error >>= fun () ->
                 Lwt.return_none
             | Ok () ->
-                Client_node_rpcs.Blocks.preapply cctxt (`Hash block) [hash] >>= function
+                Client_node_rpcs.Blocks.preapply
+                  cctxt (`Hash block) [Client_node_rpcs.Hash hash] >>= function
                 | Ok _ ->
                     Lwt.return (Some { hash ; source ; block ; slots })
                 | Error error ->

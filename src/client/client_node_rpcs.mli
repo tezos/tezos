@@ -34,10 +34,16 @@ val validate_block:
   Net_id.t -> Block_hash.t ->
   unit tzresult Lwt.t
 
+type operation =
+  | Blob of Operation.t
+  | Hash of Operation_hash.t
+
+val operation_encoding: operation Data_encoding.t
+
 val inject_block:
   config ->
   ?async:bool -> ?force:bool ->
-  MBytes.t -> Operation_hash.t list list ->
+  MBytes.t -> operation list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt ?async ?force raw_block] tries to inject
     [raw_block] inside the node. If [?async] is [true], [raw_block]
@@ -89,7 +95,8 @@ module Blocks : sig
     block -> MBytes.t list tzresult Lwt.t
   val operations:
     config ->
-    block -> Operation_hash.t list list tzresult Lwt.t
+    ?contents:bool ->
+    block -> (Operation_hash.t * Operation.t option) list list tzresult Lwt.t
   val protocol:
     config ->
     block -> Protocol_hash.t tzresult Lwt.t
@@ -144,21 +151,17 @@ module Blocks : sig
     block ->
     ?timestamp:Time.t ->
     ?sort:bool ->
-    Hash.Operation_hash.t list -> preapply_result tzresult Lwt.t
+    operation list -> preapply_result tzresult Lwt.t
 
 end
 
 module Operations : sig
 
-  val contents:
-    config ->
-    Operation_hash.t list -> Operation.t list tzresult Lwt.t
-
   val monitor:
     config ->
-    ?contents:bool -> unit ->
-    (Operation_hash.t * Operation.t option) list list tzresult
-      Lwt_stream.t tzresult Lwt.t
+    ?contents:bool ->
+    unit ->
+    (Operation_hash.t * Operation.t option) list list tzresult Lwt_stream.t tzresult Lwt.t
 
 end
 

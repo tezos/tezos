@@ -11,6 +11,8 @@ open Store_sigs
 
 module Make_value (V : ENCODED_VALUE) : VALUE with type t = V.t
 
+module Raw_value : VALUE with type t = MBytes.t
+
 module Make_single_store (S : STORE) (N : NAME) (V : VALUE)
   : SINGLE_STORE with type t = S.t
                   and type value = V.t

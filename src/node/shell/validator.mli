@@ -26,21 +26,21 @@ val get_exn: worker -> Net_id.t -> t Lwt.t
 val deactivate: t -> unit Lwt.t
 
 val net_state: t -> State.Net.t
-val net_db: t -> Distributed_db.net
+val net_db: t -> Distributed_db.net_db
 
 val fetch_block:
-  t -> Block_hash.t -> State.Valid_block.t tzresult Lwt.t
+  t -> Block_hash.t -> State.Block.t tzresult Lwt.t
 
 val inject_block:
   worker -> ?force:bool ->
-  MBytes.t -> Operation_hash.t list list ->
-  (Block_hash.t * State.Valid_block.t tzresult Lwt.t) tzresult Lwt.t
+  MBytes.t -> Distributed_db.operation list list ->
+  (Block_hash.t * State.Block.t tzresult Lwt.t) tzresult Lwt.t
 
 val prevalidator: t -> Prevalidator.t
-val test_validator: t -> (t * Distributed_db.net) option
+val test_validator: t -> (t * Distributed_db.net_db) option
 
-val watcher: t -> State.Valid_block.t Lwt_stream.t * Watcher.stopper
-val new_head_watcher: t -> State.Valid_block.t Lwt_stream.t * Watcher.stopper
-val global_watcher: worker -> State.Valid_block.t Lwt_stream.t * Watcher.stopper
+val watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
+val new_head_watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
+val global_watcher: worker -> State.Block.t Lwt_stream.t * Watcher.stopper
 
 val bootstrapped: t -> unit Lwt.t

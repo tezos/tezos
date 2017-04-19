@@ -53,6 +53,11 @@ val call_streamed_service0:
   (unit, unit, 'a, 'b) RPC.service ->
   'a -> ('b, error list) result Lwt_stream.t tzresult Lwt.t
 
+val call_streamed_service1:
+  config ->
+  (unit, unit * 'a, 'b, 'c) RPC.service ->
+  'a -> 'b -> ('c, error list) result Lwt_stream.t tzresult Lwt.t
+
 val call_err_service0:
   config ->
   (unit, unit, 'i, 'o tzresult) RPC.service ->

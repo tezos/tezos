@@ -78,8 +78,15 @@ module Kind = struct
     | `Fixed n1, `Fixed n2 -> `Fixed (n1 + n2)
     | `Dynamic, `Dynamic | `Fixed _, `Dynamic
     | `Dynamic, `Fixed _ -> `Dynamic
-    | `Variable, (`Dynamic | `Fixed _)
+    | `Variable, `Fixed _
     | (`Dynamic | `Fixed _), `Variable -> `Variable
+    | `Variable, `Dynamic ->
+        Printf.ksprintf invalid_arg
+          "Cannot merge two %s when the left element is of variable length \
+           and the right one of dynamic length. \
+           You should use the reverse order, or wrap the second one \
+           with Data_encoding.dynamic_size."
+          name
     | `Variable, `Variable ->
         Printf.ksprintf invalid_arg
           "Cannot merge two %s with variable length. \

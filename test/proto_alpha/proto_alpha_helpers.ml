@@ -15,7 +15,7 @@ let (//) = Filename.concat
 
 let rpc_config : Client_rpcs.config = {
   host = "localhost" ;
-  port = 18732 ;
+  port = 8192 + Random.int 8192 ;
   tls = false ;
   logger = Client_rpcs.null_logger ;
 }
@@ -476,7 +476,7 @@ module Mining = struct
       () >>=? fun unsigned_header ->
     let signed_header = Environment.Ed25519.Signature.append src_sk unsigned_header in
     Client_node_rpcs.inject_block rpc_config
-      ?force signed_header [operation_list] >>=? fun block_hash ->
+      ?force signed_header [List.map (fun h -> Client_node_rpcs.Hash h) operation_list] >>=? fun block_hash ->
     return block_hash
 
   let mine

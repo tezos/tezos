@@ -49,7 +49,7 @@ let inject_block cctxt block
   Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
   let operations_hash =
     Operation_list_list_hash.compute
-      (List.map Operation_list_hash.compute operations) in
+      (List.map Operation_list_hash.compute (List.map (List.map (function Client_node_rpcs.Blob op -> Tezos_data.Operation.hash op | Hash oph -> oph)) operations)) in
   let shell =
     { Block_header.net_id = bi.net_id ; level = bi.level ;
       proto_level = bi.proto_level ;
@@ -92,10 +92,12 @@ let forge_block cctxt block
     | None ->
         Client_node_rpcs.Blocks.pending_operations
           cctxt block >>=? fun (ops, pendings) ->
-        return (Operation_hash.Set.elements @@
-                Operation_hash.Set.union
-                  (Prevalidation.preapply_result_operations ops)
-                  pendings)
+        let ops =
+          Operation_hash.Set.elements @@
+          Operation_hash.Set.union
+            (Prevalidation.preapply_result_operations ops)
+            pendings in
+        return (List.map (fun x -> Client_node_rpcs.Hash x) ops)
     | Some operations -> return operations
   end >>=? fun operations ->
   begin
@@ -153,7 +155,7 @@ let forge_block cctxt block
           && Operation_hash.Map.is_empty operations.branch_delayed ) then
     inject_block cctxt ?force ~src_sk
       ~priority ~timestamp ~fitness ~seed_nonce block
-      [operations.applied]
+      [List.map (fun h -> Client_node_rpcs.Hash h) operations.applied]
   else
     failwith "Cannot (fully) validate the given operations."
 
@@ -425,6 +427,7 @@ let mine cctxt state =
          block >>=? fun (res, ops) ->
        let operations =
          let open Operation_hash.Set in
+         List.map (fun x -> Client_node_rpcs.Hash x) @@
          elements (union ops (Prevalidation.preapply_result_operations res)) in
        let request = List.length operations in
        Client_node_rpcs.Blocks.preapply cctxt.rpc_config block
@@ -460,7 +463,7 @@ let mine cctxt state =
       Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
       inject_block cctxt.rpc_config
         ~force:true ~src_sk ~priority ~timestamp ~fitness ~seed_nonce
-        (`Hash bi.hash) [operations.applied]
+        (`Hash bi.hash) [List.map (fun h -> Client_node_rpcs.Hash h) operations.applied]
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
       State.record_block cctxt level block_hash seed_nonce
       |> trace_exn (Failure "Error while recording block") >>=? fun () ->

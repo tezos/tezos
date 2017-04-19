@@ -29,6 +29,15 @@ OPENED_MODULES := \
   ${CLIENT_OPENED_MODULES} \
   Environment Client_embedded_proto_alpha Tezos_context
 
+${SRCDIR}/client/embedded/alpha/_tzbuild/%.cmi: ${SRCDIR}/proto/alpha/%.mli
+	${MAKE} -C ${SRCDIR} proto/client_embedded_proto_alpha.cmxa
+${SRCDIR}/client/embedded/alpha/_tzbuild/%.cmx: ${SRCDIR}/proto/alpha/%.ml
+	${MAKE} -C ${SRCDIR} proto/client_embedded_proto_alpha.cmxa
+${SRCDIR}/client/embedded/alpha/%.cmi: ${SRCDIR}/client/embedded/alpha/%.mli
+	${MAKE} -C ${SRCDIR} client/embedded/client_alpha.cmx
+${SRCDIR}/client/embedded/alpha/%.cmx: ${SRCDIR}/client/embedded/alpha/%.ml
+	${MAKE} -C ${SRCDIR} client/embedded/client_alpha.cmx
+
 ############################################################################
 ## Transactions
 
@@ -37,11 +46,11 @@ run-test-transaction:
 	@echo
 	./test-transaction
 
-TEST_CONNECTION_IMPLS := \
+TEST_TRANSACTION_IMPLS := \
   proto_alpha_helpers.ml \
   test_transaction.ml
 
-test-transaction: ${LIB} ${TEST_CONNECTION_IMPLS:.ml=.cmx}
+test-transaction: ${LIB} ${TEST_TRANSACTION_IMPLS:.ml=.cmx}
 	@echo COMPILE $(notdir $@)
 	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
@@ -56,11 +65,11 @@ run-test-origination:
 	@echo
 	./test-origination
 
-TEST_CONNECTION_IMPLS := \
+TEST_ORIGINATION_IMPLS := \
   proto_alpha_helpers.ml \
   test_origination.ml
 
-test-origination: ${LIB} ${TEST_CONNECTION_IMPLS:.ml=.cmx}
+test-origination: ${LIB} ${TEST_ORIGINATION_IMPLS:.ml=.cmx}
 	@echo COMPILE $(notdir $@)
 	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
@@ -75,11 +84,11 @@ run-test-endorsement:
 	@echo
 	./test-endorsement
 
-TEST_CONNECTION_IMPLS := \
+TEST_ENDORSEMENT_IMPLS := \
   proto_alpha_helpers.ml \
   test_endorsement.ml
 
-test-endorsement: ${LIB} ${TEST_CONNECTION_IMPLS:.ml=.cmx}
+test-endorsement: ${LIB} ${TEST_ENDORSEMENT_IMPLS:.ml=.cmx}
 	@echo COMPILE $(notdir $@)
 	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
@@ -94,11 +103,11 @@ run-test-vote:
 	@echo
 	./test-vote
 
-TEST_CONNECTION_IMPLS := \
+TEST_VOTE_IMPLS := \
   proto_alpha_helpers.ml \
   test_vote.ml
 
-test-vote: ${LIB} ${TEST_CONNECTION_IMPLS:.ml=.cmx}
+test-vote: ${LIB} ${TEST_VOTE_IMPLS:.ml=.cmx}
 	@echo COMPILE $(notdir $@)
 	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 

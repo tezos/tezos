@@ -131,16 +131,18 @@ and 'a proto =
     with type validation_state = 'a)
 
 let start_prevalidation
-    ~predecessor:
-    { State.Valid_block.protocol ;
-      hash = predecessor ;
-      context = predecessor_context ;
-      timestamp = predecessor_timestamp ;
-      fitness = predecessor_fitness ;
-      level = predecessor_level }
+    ~predecessor
     ~timestamp =
+  let { Block_header.shell =
+          { fitness = predecessor_fitness ;
+            timestamp = predecessor_timestamp ;
+            level = predecessor_level } } =
+    State.Block.header predecessor in
+  State.Block.context predecessor >>= fun predecessor_context ->
+  Context.get_protocol predecessor_context >>= fun protocol ->
+  let predecessor = State.Block.hash predecessor in
   let (module Proto) =
-    match protocol with
+    match Updater.get protocol with
     | None -> assert false (* FIXME, this should not happen! *)
     | Some protocol -> protocol in
   Context.reset_test_network
