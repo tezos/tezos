@@ -50,17 +50,17 @@ end
 module Operation :
   DISTRIBUTED_DB with type t = net
                   and type key := Operation_hash.t
-                  and type value := Store.Operation.t
+                  and type value := Operation.t
 
 module Block_header :
   DISTRIBUTED_DB with type t = net
                   and type key := Block_hash.t
-                  and type value := Store.Block_header.t
+                  and type value := Block_header.t
 
 module Protocol :
   DISTRIBUTED_DB with type t = db
                   and type key := Protocol_hash.t
-                  and type value := Tezos_compiler.Protocol.t
+                  and type value := Protocol.t
 
 module Operation_list : sig
 
@@ -92,28 +92,28 @@ val broadcast_head:
 
 val inject_block:
   t -> MBytes.t -> Operation_hash.t list list ->
-  (Block_hash.t * Store.Block_header.t) tzresult Lwt.t
+  (Block_hash.t * Tezos_data.Block_header.t) tzresult Lwt.t
 
 (* val inject_operation: *)
   (* t -> MBytes.t -> *)
-  (* (Block_hash.t * Store.Operation.t) tzresult Lwt.t *)
+  (* (Block_hash.t * Operation.t) tzresult Lwt.t *)
 
 val read_block:
-  t -> Block_hash.t -> (net * Store.Block_header.t) option Lwt.t
+  t -> Block_hash.t -> (net * Tezos_data.Block_header.t) option Lwt.t
 val read_block_exn:
-  t -> Block_hash.t -> (net * Store.Block_header.t) Lwt.t
+  t -> Block_hash.t -> (net * Tezos_data.Block_header.t) Lwt.t
 
 val read_operation:
-  t -> Operation_hash.t -> (net * Store.Operation.t) option Lwt.t
+  t -> Operation_hash.t -> (net * Tezos_data.Operation.t) option Lwt.t
 val read_operation_exn:
-  t -> Operation_hash.t -> (net * Store.Operation.t) Lwt.t
+  t -> Operation_hash.t -> (net * Tezos_data.Operation.t) Lwt.t
 
 val watch_block:
-  t -> (Block_hash.t * Store.Block_header.t) Lwt_stream.t * Watcher.stopper
+  t -> (Block_hash.t * Tezos_data.Block_header.t) Lwt_stream.t * Watcher.stopper
 val watch_operation:
-  t -> (Operation_hash.t * Store.Operation.t) Lwt_stream.t * Watcher.stopper
+  t -> (Operation_hash.t * Tezos_data.Operation.t) Lwt_stream.t * Watcher.stopper
 val watch_protocol:
-  t -> (Protocol_hash.t * Store.Protocol.t) Lwt_stream.t * Watcher.stopper
+  t -> (Protocol_hash.t * Tezos_data.Protocol.t) Lwt_stream.t * Watcher.stopper
 
 module Raw : sig
   val encoding: Message.t P2p.Raw.t Data_encoding.t

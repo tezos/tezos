@@ -33,7 +33,7 @@ val is_first_block: Context.t -> bool tzresult Lwt.t
 val prepare :
   level: Int32.t ->
   timestamp: Time.t ->
-  fitness: Fitness.fitness ->
+  fitness: Fitness.t ->
   Context.t -> (t * bool) tzresult Lwt.t
 
 (** Returns the state of the database resulting of operations on its

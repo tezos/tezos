@@ -6,4 +6,5 @@ FLG -open Environment
 FLG -open Hash
 FLG -open Error_monad
 FLG -open Logging
+FLG -open Tezos_data
 FLG -w -40

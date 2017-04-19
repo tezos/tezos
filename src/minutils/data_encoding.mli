@@ -238,6 +238,7 @@ module Binary : sig
   val write : 'a encoding -> 'a -> MBytes.t -> int -> int option
   val to_bytes : 'a encoding -> 'a -> MBytes.t
   val of_bytes : 'a encoding -> MBytes.t -> 'a option
+  val of_bytes_exn : 'a encoding -> MBytes.t -> 'a
 
   (** [to_bytes_list ?copy_blocks blocks_size encod data] encode the
       given data as a list of successive blocks of length

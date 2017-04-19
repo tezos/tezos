@@ -1,4 +1,4 @@
 REC
-FLG -open Error_monad -open Hash -open Utils
+FLG -open Error_monad -open Hash -open Utils -open Tezos_data
 S embedded
 B embedded

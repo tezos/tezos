@@ -25,8 +25,8 @@ $(addprefix proto/environment/, \
   base58.mli \
   hash.mli \
   ed25519.mli \
+  tezos_data.mli \
   persist.mli \
-  fitness.mli \
   context.mli \
   RPC.mli \
   \
@@ -91,6 +91,7 @@ UTILS_LIB_INTFS := \
   utils/moving_average.mli \
   utils/ring.mli \
   utils/watcher.mli \
+  utils/tezos_data.mli \
 
 UTILS_LIB_IMPLS := \
   utils/base58.ml \
@@ -109,6 +110,7 @@ UTILS_LIB_IMPLS := \
   utils/moving_average.ml \
   utils/ring.ml \
   utils/watcher.ml \
+  utils/tezos_data.ml \
 
 UTILS_PACKAGES := \
   ${MINUTILS_PACKAGES} \
@@ -139,13 +141,10 @@ COMPILER_EMBEDDED_CMIS := \
   compiler/sigs/register.cmi
 
 COMPILER_PRECOMPILED_INTFS := \
-  compiler/sigs/tezos_compiler.mli \
-  compiler/sigs/fitness.mli \
+  compiler/sigs/tezos_data.mli \
   compiler/sigs/persist.mli \
-  compiler/sigs/store_sigs.mli \
-  compiler/sigs/store.mli \
   compiler/sigs/context.mli \
-  compiler/sigs/protocol.mli \
+  compiler/sigs/protocol_sigs.mli \
   compiler/sigs/proto_environment.mli \
   compiler/sigs/register.mli
 
@@ -190,7 +189,7 @@ NODE_SOURCE_DIRECTORIES := \
   ${NODE_LIB_SOURCE_DIRECTORIES} \
   ${SRCDIR}/node/main
 
-NODE_OPENED_MODULES := Error_monad Hash Utils
+NODE_OPENED_MODULES := Error_monad Hash Utils Tezos_data
 
 NODE_LIB_INTFS := \
   \
@@ -205,8 +204,6 @@ NODE_LIB_INTFS := \
   node/net/p2p.mli \
   node/net/RPC_server.mli \
   \
-  node/updater/fitness.mli \
-  \
   node/db/store_sigs.mli \
   node/db/raw_store.mli \
   node/db/store_sigs.mli \
@@ -217,7 +214,7 @@ NODE_LIB_INTFS := \
   node/db/persist.mli \
   node/db/context.mli \
   \
-  node/updater/protocol.mli \
+  node/updater/protocol_sigs.mli \
   node/updater/updater.mli \
   node/updater/proto_environment.mli \
   node/updater/register.mli \
@@ -252,8 +249,6 @@ FULL_NODE_LIB_IMPLS := \
   \
   node/net/RPC_server.ml \
   \
-  node/updater/fitness.ml \
-  \
   node/db/raw_store.ml \
   node/db/store_sigs.mli \
   node/db/store_helpers.ml \
@@ -263,7 +258,7 @@ FULL_NODE_LIB_IMPLS := \
   node/db/persist.ml \
   node/db/context.ml \
   \
-  node/updater/protocol.mli \
+  node/updater/protocol_sigs.mli \
   node/updater/updater.ml \
   node/updater/environment.ml \
   node/updater/proto_environment.ml \
@@ -316,10 +311,12 @@ NODE_PACKAGES := \
   threads.posix \
   leveldb \
 
+EMBEDDED_PROTOCOLS := \
+  $(patsubst ${SRCDIR}/proto/%/TEZOS_PROTOCOL,%, \
+	     $(shell ls ${SRCDIR}/proto/*/TEZOS_PROTOCOL))
+
 EMBEDDED_NODE_PROTOCOLS := \
-  $(patsubst ${SRCDIR}/proto/%/,${SRCDIR}/proto/embedded_proto_%.cmxa, \
-  $(filter-out ${SRCDIR}/proto/environment/, \
-	$(subst TEZOS_PROTOCOL,,$(shell ls ${SRCDIR}/proto/*/TEZOS_PROTOCOL))))
+  $(patsubst %,${SRCDIR}/proto/embedded_proto_%.cmxa, ${EMBEDDED_PROTOCOLS})
 
 ############################################################################
 ## Client program
@@ -330,7 +327,7 @@ CLIENT_SOURCE_DIRECTORIES := \
   ${NODE_LIB_SOURCE_DIRECTORIES} \
   ${SRCDIR}/client ${SRCDIR}/client/embedded
 
-CLIENT_OPENED_MODULES := Error_monad Hash Utils
+CLIENT_OPENED_MODULES := Error_monad Hash Utils Tezos_data
 
 CLIENT_LIB_INTFS := \
   client/client_rpcs.mli \
@@ -367,14 +364,16 @@ CLIENT_PACKAGES := \
   magic-mime \
 
 EMBEDDED_CLIENT_PROTOCOLS := \
-  $(patsubst ${SRCDIR}/client/embedded/%/, \
-	     ${SRCDIR}/proto/client_embedded_proto_%.cmxa, \
+  $(patsubst %,${SRCDIR}/proto/client_embedded_proto_%.cmxa, \
+	     ${EMBEDDED_PROTOCOLS})
+
+CLIENT_VERSIONS := \
+  $(patsubst ${SRCDIR}/client/embedded/%/,%, \
              $(shell ls -d ${SRCDIR}/client/embedded/*/))
 
 EMBEDDED_CLIENT_VERSIONS := \
-	$(patsubst ${SRCDIR}/client/embedded/%/, \
-	     ${SRCDIR}/client/embedded/client_%.cmx, \
-             $(shell ls -d ${SRCDIR}/client/embedded/*/))
+  $(patsubst %,${SRCDIR}/client/embedded/client_%.cmx, \
+	     ${CLIENT_VERSIONS})
 
 ############################################################################
 ## Web-Client program
@@ -385,7 +384,7 @@ WEBCLIENT_SOURCE_DIRECTORIES := \
   ${NODE_LIB_SOURCE_DIRECTORIES} \
   ${SRCDIR}/client ${SRCDIR}/client/embedded
 
-WEBCLIENT_OPENED_MODULES := Error_monad Hash Utils
+WEBCLIENT_OPENED_MODULES := Error_monad Hash Utils Tezos_data
 
 WEBCLIENT_LIB_INTFS := \
 

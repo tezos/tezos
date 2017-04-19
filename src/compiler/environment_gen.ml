@@ -57,7 +57,7 @@ module type PACKED_PROTOCOL = sig
   val pp : Format.formatter -> error -> unit
   val complete_b58prefix : Context.t -> string -> string list Lwt.t
 end
-val __cast: (module PACKED_PROTOCOL) -> (module Protocol.PACKED_PROTOCOL)
+val __cast: (module PACKED_PROTOCOL) -> (module Protocol_sigs.PACKED_PROTOCOL)
 |}
 
 let () =

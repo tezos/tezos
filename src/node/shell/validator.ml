@@ -18,7 +18,7 @@ type worker = {
     ?force:bool ->
     MBytes.t -> Operation_hash.t list list ->
     (Block_hash.t * State.Valid_block.t tzresult Lwt.t) tzresult Lwt.t ;
-  notify_block: Block_hash.t -> Store.Block_header.t -> unit Lwt.t ;
+  notify_block: Block_hash.t -> Block_header.t -> unit Lwt.t ;
   shutdown: unit -> unit Lwt.t ;
   valid_block_input: State.Valid_block.t Watcher.input ;
   db: Distributed_db.t ;
@@ -31,7 +31,7 @@ and t = {
   mutable child: t option ;
   prevalidator: Prevalidator.t ;
   net_db: Distributed_db.net ;
-  notify_block: Block_hash.t -> Store.Block_header.t -> unit Lwt.t ;
+  notify_block: Block_hash.t -> Block_header.t -> unit Lwt.t ;
   fetch_block: Block_hash.t -> State.Valid_block.t tzresult Lwt.t ;
   create_child:
     State.Valid_block.t -> Protocol_hash.t -> Time.t -> unit tzresult Lwt.t ;
@@ -176,7 +176,7 @@ let () =
     (fun (e, g) -> Wrong_proto_level (e, g))
 
 let apply_block net db
-    (pred: State.Valid_block.t) hash (block: State.Block_header.t) =
+    (pred: State.Valid_block.t) hash (block: Block_header.t) =
   let id = State.Net.id net in
   lwt_log_notice "validate block %a (after %a), net %a"
     Block_hash.pp_short hash
@@ -267,8 +267,8 @@ module Context_db = struct
 
     type data =
       { validator: t ;
-        state: [ `Inited of Store.Block_header.t tzresult
-               | `Initing of Store.Block_header.t tzresult Lwt.t
+        state: [ `Inited of Block_header.t tzresult
+               | `Initing of Block_header.t tzresult Lwt.t
                | `Running of State.Valid_block.t tzresult Lwt.t ] ;
         wakener: State.Valid_block.t tzresult Lwt.u }
 
@@ -382,7 +382,7 @@ module Context_db = struct
 
   let process (v:t) ~get_context ~set_context hash block =
     let state = Distributed_db.state v.net_db in
-    get_context v block.State.Block_header.shell.predecessor >>= function
+    get_context v block.Block_header.shell.predecessor >>= function
     | Error _ as error ->
         set_context v hash (Error [(* TODO *)]) >>= fun () ->
         Lwt.return error
@@ -437,8 +437,8 @@ module Context_db = struct
         match pb with
         | None -> Some b
         | Some pb
-          when b.Store.Block_header.shell.timestamp
-               < pb.Store.Block_header.shell.timestamp ->
+          when b.Block_header.shell.timestamp
+               < pb.Block_header.shell.timestamp ->
             Some b
         | Some _ as pb -> pb in
       let next =
@@ -448,7 +448,7 @@ module Context_db = struct
              | Error _ ->
                  acc
              | Ok block ->
-                 if Time.(block.Store.Block_header.shell.timestamp > time) then
+                 if Time.(block.Block_header.shell.timestamp > time) then
                    min_block block acc
                  else begin
                    Block_hash.Table.replace session.tbl hash { data with state = `Running begin
@@ -463,7 +463,7 @@ module Context_db = struct
           pendings in
       match next with
       | None -> 0.
-      | Some b -> Int64.to_float (Time.diff b.Store.Block_header.shell.timestamp time)
+      | Some b -> Int64.to_float (Time.diff b.Block_header.shell.timestamp time)
 
   let create net_db =
     let net_state = Distributed_db.state net_db in
@@ -717,7 +717,7 @@ let create_worker ?max_ttl state db =
         v.shutdown ()
   in
 
-  let notify_block hash (block : Store.Block_header.t) =
+  let notify_block hash (block : Block_header.t) =
     match get_exn block.shell.net_id with
     | exception Not_found -> Lwt.return_unit
     | net ->

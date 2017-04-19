@@ -37,7 +37,7 @@ let commands () =
       (fun dirname cctxt ->
          Lwt.catch
            (fun () ->
-              let proto = Tezos_compiler.Protocol.of_dir dirname in
+              let proto = Tezos_compiler.read_dir dirname in
               Client_node_rpcs.inject_protocol cctxt.rpc_config proto >>= function
               | Ok hash ->
                   cctxt.message "Injected protocol %a successfully" Protocol_hash.pp_short hash >>= fun () ->

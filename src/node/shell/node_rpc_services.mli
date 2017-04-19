@@ -102,7 +102,7 @@ module Operations : sig
 
   val contents:
     (unit, unit * Operation_hash.t list,
-     unit, State.Operation.t list) RPC.service
+     unit, Operation.t list) RPC.service
 
 
   type list_param = {
@@ -113,14 +113,14 @@ module Operations : sig
   val list:
     (unit, unit,
      list_param,
-     (Operation_hash.t * Store.Operation.t option) list list) RPC.service
+     (Operation_hash.t * Operation.t option) list list) RPC.service
 
 end
 
 module Protocols : sig
 
   val contents:
-    (unit, unit * Protocol_hash.t, unit, Tezos_compiler.Protocol.t) RPC.service
+    (unit, unit * Protocol_hash.t, unit, Protocol.t) RPC.service
 
   type list_param = {
     contents: bool option ;
@@ -130,7 +130,7 @@ module Protocols : sig
   val list:
     (unit, unit,
      list_param,
-     (Protocol_hash.t * Tezos_compiler.Protocol.t option) list) RPC.service
+     (Protocol_hash.t * Protocol.t option) list) RPC.service
 
 end
 
@@ -180,7 +180,7 @@ end
 val forge_block:
   (unit, unit,
    Net_id.t option * Int32.t option * int option * Block_hash.t option *
-   Time.t option * Fitness.fitness * Operation_list_list_hash.t * MBytes.t,
+   Time.t option * Fitness.t * Operation_list_list_hash.t * MBytes.t,
    MBytes.t) RPC.service
 
 val validate_block:
@@ -202,7 +202,7 @@ val inject_operation:
 
 val inject_protocol:
   (unit, unit,
-   (Tezos_compiler.Protocol.t * bool * bool option),
+   (Protocol.t * bool * bool option),
    Protocol_hash.t tzresult) RPC.service
 
 val bootstrapped: (unit, unit, unit, Block_hash.t * Time.t) RPC.service

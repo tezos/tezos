@@ -49,7 +49,7 @@ type t = {
   flush: State.Valid_block.t -> unit;
   notify_operations: P2p.Peer_id.t -> Operation_hash.t list -> unit ;
   prevalidate_operations:
-    bool -> Store.Operation.t list ->
+    bool -> Operation.t list ->
     (Operation_hash.t list * error preapply_result) tzresult Lwt.t ;
   operations: unit -> error preapply_result * Operation_hash.Set.t ;
   pending: ?block:State.Valid_block.t -> unit -> Operation_hash.Set.t Lwt.t ;
@@ -286,11 +286,11 @@ let create net_db =
       Lwt.return_unit
     end in
   let prevalidate_operations force raw_ops =
-    let ops = List.map Store.Operation.hash raw_ops in
+    let ops = List.map Operation.hash raw_ops in
     let ops_map =
       List.fold_left
         (fun map op ->
-           Operation_hash.Map.add (Store.Operation.hash op) op map)
+           Operation_hash.Map.add (Operation.hash op) op map)
         Operation_hash.Map.empty raw_ops in
     let wait, waker = Lwt.wait () in
     push_to_worker (`Prevalidate (ops_map, waker, force));
@@ -335,7 +335,7 @@ let timestamp pv = pv.timestamp ()
 let context pv = pv.context ()
 let shutdown pv = pv.shutdown ()
 
-let inject_operation pv ?(force = false) (op: Store.Operation.t) =
+let inject_operation pv ?(force = false) (op: Operation.t) =
   let net_id = State.Net.id (Distributed_db.state pv.net_db) in
   let wrap_error h map =
     begin

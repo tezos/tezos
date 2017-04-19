@@ -252,6 +252,7 @@ module Make(Param : sig val name: string end)() = struct
   module Time = Time
   module Ed25519 = Ed25519
   module Hash = Hash
+  module Tezos_data = Tezos_data
   module Persist = Persist
   module RPC = RPC
   module Fitness = Fitness

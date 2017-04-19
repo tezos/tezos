@@ -410,7 +410,7 @@ let build_rpc_directory node =
       let level = Utils.unopt ~default:(Int32.succ bi.level) level in
       let proto_level = Utils.unopt ~default:bi.proto_level proto_level in
       let res =
-        Data_encoding.Binary.to_bytes Store.Block_header.encoding {
+        Data_encoding.Binary.to_bytes Block_header.encoding {
           shell = { net_id ; predecessor ; level ; proto_level ;
                     timestamp ; fitness ; operations_hash } ;
           proto = header ;

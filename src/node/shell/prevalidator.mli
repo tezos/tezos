@@ -39,7 +39,7 @@ val notify_operations: t -> P2p.Peer_id.t -> Operation_hash.t list -> unit
     entry-point used by the P2P layer. The operation content has been
     previously stored on disk. *)
 val inject_operation:
-  t -> ?force:bool -> State.Operation.t -> unit tzresult Lwt.t
+  t -> ?force:bool -> Operation.t -> unit tzresult Lwt.t
 
 val flush: t -> State.Valid_block.t -> unit
 val timestamp: t -> Time.t

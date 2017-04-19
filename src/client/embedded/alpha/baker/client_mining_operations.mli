@@ -9,7 +9,7 @@
 
 type operation = {
   hash: Operation_hash.t ;
-  content: (Updater.shell_operation * proto_operation) option
+  content: Operation.t option ;
 }
 
 val monitor:

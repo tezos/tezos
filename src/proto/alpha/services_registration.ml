@@ -11,9 +11,9 @@ open Tezos_context
 
 type rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: Updater.raw_block_header ;
+  block_header: Block_header.t ;
   operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-  operations: unit -> Updater.raw_operation list list Lwt.t ;
+  operations: unit -> Operation.raw list list Lwt.t ;
   context: Tezos_context.t ;
 }
 
@@ -507,13 +507,14 @@ let check_signature ctxt signature shell contents =
        { signature ; shell ; contents ; hash = dummy_hash }
 
 let parse_operations ctxt (operations, check) =
-  map_s begin fun ({ shell ; proto } : Updater.raw_operation) ->
+  map_s begin fun raw ->
     begin
-      Operation.parse_proto proto >>=? fun (proto, signature) ->
+      Lwt.return
+        (Operation.parse (Tezos_data.Operation.hash raw) raw) >>=? fun op ->
       begin match check with
-      | Some true -> check_signature ctxt signature shell proto
-      | Some false | None -> return ()
-      end >>|? fun () -> proto
+        | Some true -> check_signature ctxt op.signature op.shell op.contents
+        | Some false | None -> return ()
+      end >>|? fun () -> op
     end
   end operations
 

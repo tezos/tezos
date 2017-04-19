@@ -22,7 +22,7 @@ S ../../src/client/embedded/alpha/baker
 B ../../src/client/embedded
 S ../lib
 B ../lib
-FLG -open Error_monad -open Hash -open Utils -open Environment
+FLG -open Error_monad -open Hash -open Utils -open Environment -open Tezos_data
 FLG -w -40
 PKG lwt
 PKG sodium

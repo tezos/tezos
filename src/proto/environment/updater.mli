@@ -1,58 +1,19 @@
 (** Tezos Protocol Environment - Protocol Implementation Updater *)
 
 open Hash
-
-(** The version agnostic toplevel structure of operations. *)
-type shell_operation = {
-  net_id: Net_id.t ;
-}
-val shell_operation_encoding: shell_operation Data_encoding.t
-
-type raw_operation = {
-  shell: shell_operation ;
-  proto: MBytes.t ;
-}
-val raw_operation_encoding: raw_operation Data_encoding.t
-
-
-(** The version agnostic toplevel structure of blocks. *)
-type shell_block_header = {
-  net_id: Net_id.t ;
-  (** The genesis of the chain this block belongs to. *)
-  level: Int32.t ;
-  (** The number of predecessing block in the chain. *)
-  proto_level: int ;
-  (** The number of protocol amendment block in the chain (modulo 256) *)
-  predecessor: Block_hash.t ;
-  (** The preceding block in the chain. *)
-  timestamp: Time.t ;
-  (** The date at which this block has been forged. *)
-  operations_hash: Operation_list_list_hash.t ;
-  (** The hash lf the merkle tree of operations. *)
-  fitness: MBytes.t list ;
-  (** The announced score of the block. As a sequence of sequences
-      of unsigned bytes. Ordered by length and then by contents
-      lexicographically. *)
-}
-val shell_block_header_encoding: shell_block_header Data_encoding.t
-
-type raw_block_header = {
-  shell: shell_block_header ;
-  proto: MBytes.t ;
-}
-val raw_block_header_encoding: raw_block_header Data_encoding.t
+open Tezos_data
 
 type validation_result = {
   context: Context.t ;
-  fitness: Fitness.fitness ;
+  fitness: Fitness.t ;
   message: string option ;
 }
 
 type rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: raw_block_header ;
+  block_header: Block_header.t ;
   operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-  operations: unit -> raw_operation list list Lwt.t ;
+  operations: unit -> Operation.t list list Lwt.t ;
   context: Context.t ;
 }
 
@@ -78,7 +39,7 @@ module type PROTOCOL = sig
   (** The parsing / preliminary validation function for
       operations. Similar to {!parse_block}. *)
   val parse_operation :
-    Operation_hash.t -> raw_operation -> operation tzresult
+    Operation_hash.t -> Operation.t -> operation tzresult
 
   (** Basic ordering of operations. [compare_operations op1 op2] means
       that [op1] should appear before [op2] in a block. *)
@@ -105,12 +66,12 @@ module type PROTOCOL = sig
   val precheck_block :
     ancestor_context: Context.t ->
     ancestor_timestamp: Time.t ->
-    raw_block_header ->
+    Block_header.t ->
     unit tzresult Lwt.t
 
   (** The first step in a block validation sequence. Initializes a
       validation context for validating a block. Takes as argument the
-      {!raw_block_header} to initialize the context for this block, patching
+      {!Block_header.t} to initialize the context for this block, patching
       the context resulting of the application of the predecessor
       block passed as parameter. The function {!precheck_block} may
       not have been called before [begin_application], so all the
@@ -118,20 +79,20 @@ module type PROTOCOL = sig
   val begin_application :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
-    predecessor_fitness: Fitness.fitness ->
-    raw_block_header ->
+    predecessor_fitness: Fitness.t ->
+    Block_header.t ->
     validation_state tzresult Lwt.t
 
   (** Initializes a validation context for constructing a new block
       (as opposed to validating an existing block). Since there is no
-      {!raw_block_header} header available, the parts that it provides are
+      {!Block_header.t} header available, the parts that it provides are
       passed as arguments (predecessor block hash, context resulting
       of the application of the predecessor block, and timestamp). *)
   val begin_construction :
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
     predecessor_level: Int32.t ->
-    predecessor_fitness: Fitness.fitness ->
+    predecessor_fitness: Fitness.t ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
     validation_state tzresult Lwt.t
@@ -155,21 +116,11 @@ module type PROTOCOL = sig
 
 end
 
-(** An OCaml source component of a protocol implementation. *)
-type component = {
-  (** The OCaml module name. *)
-  name : string ;
-  (** The OCaml interface source code *)
-  interface : string option ;
-  (** The OCaml source code *)
-  implementation : string ;
-}
-
 (** Takes a version hash, a list of OCaml components in compilation
     order. The last element must be named [protocol] and respect the
     [protocol.ml] interface. Tries to compile it and returns true
     if the operation was successful. *)
-val compile : Protocol_hash.t -> component list -> bool Lwt.t
+val compile : Protocol_hash.t -> Protocol.t -> bool Lwt.t
 
 (** Activates a given protocol version from a given context. This
     means that the context used for the next block will use this
