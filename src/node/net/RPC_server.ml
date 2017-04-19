@@ -17,7 +17,7 @@ type server = (* hidden *)
 
 module ConnectionMap = Map.Make(Cohttp.Connection)
 
-exception Invalid_method
+exception Invalid_method of { allowed : RPC.meth list }
 exception Cannot_parse_body of string
 
 let check_origin_matches origin allowed_origin =
@@ -110,6 +110,17 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
     let path = Utils.split_path (Uri.path (Cohttp.Request.uri req)) in
     let req_headers = Cohttp.Request.headers req in
     let origin_header = Cohttp.Header.get req_headers "origin" in
+    let answer_with_cors_headers ?headers ?body status =
+      let headers = match headers with
+        | None -> Cohttp.Header.init ()
+        | Some headers -> headers in
+      let body = match body with
+        | None -> Cohttp_lwt_body.empty
+        | Some body -> body in
+      let headers =
+        make_cors_headers ~headers
+          cors_allowed_headers cors_allowed_origins origin_header in
+      Lwt.return (Response.make ~flush:true ~status ~headers (), body) in
     lwt_log_info "(%s) receive request to %s"
       (Cohttp.Connection.to_string con) (Uri.path (Cohttp.Request.uri req)) >>= fun () ->
     Lwt.catch
@@ -118,11 +129,25 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
          | Some res ->
              Lwt.return res
          | None ->
+             let existing_methods () =
+               let supported_meths =
+                 [ `OPTIONS ; `POST ; `PUT ; `PATCH ; `DELETE ; `GET ; `HEAD ] in
+               Lwt_list.filter_map_p
+                 (fun meth ->
+                    Lwt.catch
+                      (fun () ->
+                         lookup root ~meth () path >>= fun _handler ->
+                         Lwt.return_some meth)
+                      (function Not_found | Cannot_parse _ -> Lwt.return_none
+                              | exn -> Lwt.fail exn))
+                 supported_meths >>= function
+               | [] -> Lwt.fail Not_found (* No handler at all -> 404 *)
+               | meths -> Lwt.return meths in
              Lwt.catch
                (fun () ->
                   lookup root ~meth:req.meth () path >>= fun handler ->
                   Lwt.return_some handler)
-               (function Not_found -> Lwt.return_none
+               (function Not_found | Cannot_parse _ -> Lwt.return_none
                        | exn -> Lwt.fail exn) >>= function
              | None ->
                  begin
@@ -135,35 +160,19 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
                          lookup root ~meth () path >>= fun _handler ->
                          (* unless [lookup] failed with [Not_found] -> 404 *)
                          Lwt.return [ meth ]
-                     | None ->
-                         let supported_meths =
-                           [ `POST ; `PUT ; `PATCH ; `DELETE ; `GET ; `HEAD ] in
-                         Lwt_list.filter_map_p
-                           (fun meth ->
-                              Lwt.catch
-                                (fun () ->
-                                   lookup root ~meth () path >>= fun _handler ->
-                                   Lwt.return_some meth)
-                                (function Not_found -> Lwt.return_none
-                                        | exn -> Lwt.fail exn))
-                           supported_meths >>= function
-                         | [] -> Lwt.fail Not_found (* No handler -> 404 *)
-                         | meths -> Lwt.return meths
-                   else Lwt.fail Not_found
+                     | None -> existing_methods ()
+                   else
+                     existing_methods () >>= fun allowed ->
+                     Lwt.fail (Invalid_method { allowed })
                  end >>= fun cors_allowed_meths ->
                  lwt_log_info "(%s) RPC preflight"
                    (Cohttp.Connection.to_string con) >>= fun () ->
                  let headers =
-                   Cohttp.Header.add
+                   Cohttp.Header.add_multi
                      (Cohttp.Header.init ())
                      "Access-Control-Allow-Methods"
-                     (String.concat ", "
-                        (List.map Cohttp.Code.string_of_method cors_allowed_meths)) in
-                 let headers =
-                   make_cors_headers ~headers
-                     cors_allowed_headers cors_allowed_origins origin_header in
-                 Lwt.return (Response.make ~flush:true ~status:(`Code 200) ~headers (),
-                             Cohttp_lwt_body.empty)
+                     (List.map Cohttp.Code.string_of_method cors_allowed_meths) in
+                 answer_with_cors_headers ~headers `OK
              | Some handler ->
                  begin match req.meth with
                    | `POST
@@ -178,7 +187,9 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
                    | `GET
                    | `HEAD
                    | `OPTIONS -> Lwt.return None
-                   | _ -> Lwt.fail Invalid_method
+                   | _ ->
+                       existing_methods () >>= fun allowed ->
+                       Lwt.fail (Invalid_method { allowed })
                  end >>= fun body ->
                  handler body >>= fun { Answer.code ; body } ->
                  let body = match body with
@@ -197,37 +208,27 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
                     else "success") >>= fun () ->
                  let headers =
                    Cohttp.Header.init_with "Content-Type" "application/json" in
-                 let headers =
-                   make_cors_headers ~headers
-                     cors_allowed_headers cors_allowed_origins origin_header
-                 in
-                 Lwt.return (Response.make
-                               ~flush:true ~status:(`Code code) ~headers (), body))
+                 answer_with_cors_headers ~headers ~body (`Code code))
       (function
         | Not_found | Cannot_parse _ ->
             lwt_log_info "(%s) not found"
               (Cohttp.Connection.to_string con) >>= fun () ->
             (call_hook (io, con) req ~answer_404: true post_hook >>= function
               | Some res -> Lwt.return res
-              | None ->
-                  Lwt.return (Response.make ~flush:true ~status:`Not_found (),
-                              Cohttp_lwt_body.empty))
-        | Invalid_method ->
+              | None -> answer_with_cors_headers `Not_found)
+        | Invalid_method { allowed } ->
             lwt_log_info "(%s) bad method"
               (Cohttp.Connection.to_string con) >>= fun () ->
             let headers =
               Cohttp.Header.add_multi (Cohttp.Header.init ())
-                "Allow" ["POST"] in
-            let headers = make_cors_headers ~headers cors_allowed_headers cors_allowed_origins origin_header in
-            Lwt.return (Response.make
-                          ~flush:true ~status:`Method_not_allowed
-                          ~headers (),
-                        Cohttp_lwt_body.empty)
+                "Allow"
+                (List.map Cohttp.Code.string_of_method allowed) in
+            answer_with_cors_headers ~headers `Method_not_allowed
         | Cannot_parse_body msg ->
             lwt_log_info "(%s) can't parse RPC body"
               (Cohttp.Connection.to_string con) >>= fun () ->
-            Lwt.return (Response.make ~flush:true ~status:`Bad_request (),
-                        Cohttp_lwt_body.of_string msg)
+            let body = Cohttp_lwt_body.of_string msg in
+            answer_with_cors_headers ~body `Bad_request
         | e -> Lwt.fail e)
   and conn_closed (_, con) =
     log_info "connection closed %s" (Cohttp.Connection.to_string con) ;
