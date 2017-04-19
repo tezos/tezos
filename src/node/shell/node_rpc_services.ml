@@ -46,6 +46,21 @@ module Error = struct
 
 end
 
+type operation = Distributed_db.operation =
+  | Blob of Operation.t
+  | Hash of Operation_hash.t
+
+let operation_encoding =
+  let open Data_encoding in
+  union [
+    case Operation.encoding
+      (function Blob op -> Some op | Hash _ -> None)
+      (fun op -> Blob op) ;
+    case Operation_hash.encoding
+      (function Hash oph -> Some oph | Blob _ -> None)
+      (fun oph -> Hash oph) ;
+  ]
+
 module Blocks = struct
 
   type block = [
@@ -75,28 +90,28 @@ module Blocks = struct
       (fun { hash ; net_id ; level ; proto_level ; predecessor ;
              fitness ; timestamp ; protocol ; operations_hash ; data ;
              operations ; test_network } ->
-        ({ Block_header.shell =
+        ((hash, operations, protocol, test_network),
+         { Block_header.shell =
              { net_id ; level ; proto_level ; predecessor ;
                timestamp ; operations_hash ; fitness } ;
-           proto = data },
-         (hash, operations, protocol, test_network)))
-      (fun ({ Block_header.shell =
+           proto = data }))
+      (fun ((hash, operations, protocol, test_network),
+            { Block_header.shell =
                 { net_id ; level ; proto_level ; predecessor ;
                   timestamp ; operations_hash ; fitness } ;
-              proto = data },
-            (hash, operations, protocol, test_network)) ->
+              proto = data }) ->
         { hash ; net_id ; level ; proto_level ; predecessor ;
           fitness ; timestamp ; protocol ; operations_hash ; data ;
           operations ; test_network })
       (dynamic_size
          (merge_objs
-            Block_header.encoding
             (obj4
                (req "hash" Block_hash.encoding)
                (opt "operations" (list (list Operation_hash.encoding)))
                (req "protocol" Protocol_hash.encoding)
                (dft "test_network"
-                  Context.test_network_encoding Context.Not_running))))
+                  Context.test_network_encoding Context.Not_running))
+            Block_header.encoding))
 
   let parse_block s =
     try
@@ -136,7 +151,7 @@ module Blocks = struct
     RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
   type preapply_param = {
-    operations: Operation_hash.t list ;
+    operations: operation list ;
     sort: bool ;
     timestamp: Time.t option ;
   }
@@ -152,7 +167,7 @@ module Blocks = struct
             | Some x -> x in
           { operations ; sort ; timestamp })
        (obj3
-          (req "operations" (list Operation_hash.encoding))
+          (req "operations" (list (dynamic_size operation_encoding)))
           (opt "sort" bool)
           (opt "timestamp" Time.encoding)))
 
@@ -234,11 +249,31 @@ module Blocks = struct
       ~output: (obj1 (req "timestamp" Time.encoding))
       RPC.Path.(block_path / "timestamp")
 
+  type operations_param = {
+    contents: bool ;
+    monitor: bool ;
+  }
+
+  let operations_param_encoding =
+    let open Data_encoding in
+    conv
+      (fun { contents ; monitor } -> (contents, monitor))
+      (fun (contents, monitor) -> { contents ; monitor })
+      (obj2
+         (dft "contents" bool false)
+         (dft "monitor" bool false))
+
   let operations =
     RPC.service
       ~description:"List the block operations."
-      ~input: empty
-      ~output: (obj1 (req "operations" (list (list Operation_hash.encoding))))
+      ~input: operations_param_encoding
+      ~output: (obj1
+                  (req "operations"
+                     (list (list
+                              (obj2
+                                 (req "hash" Operation_hash.encoding)
+                                 (opt "contents"
+                                    (dynamic_size Operation.encoding)))))))
       RPC.Path.(block_path / "operations")
 
   let protocol =
@@ -390,58 +425,6 @@ module Blocks = struct
       ~input: list_param_encoding
       ~output: (obj1 (req "blocks" (list (list block_info_encoding))))
       RPC.Path.(root / "blocks")
-
-end
-
-module Operations = struct
-
-  let operations_arg =
-    let name = "operation_id" in
-    let descr =
-      "A operation identifier in hexadecimal." in
-    let construct ops =
-      String.concat "," (List.map Operation_hash.to_b58check ops) in
-    let destruct h =
-      let ops = split ',' h in
-      try Ok (List.map Operation_hash.of_b58check_exn ops)
-      with _ -> Error "Can't parse hash" in
-    RPC.Arg.make ~name ~descr ~construct ~destruct ()
-
-  let contents =
-    RPC.service
-      ~input: empty
-      ~output: (list (dynamic_size Operation.encoding))
-      RPC.Path.(root / "operations" /: operations_arg)
-
-  type list_param = {
-    contents: bool option ;
-    monitor: bool option ;
-  }
-
-  let list_param_encoding =
-    conv
-      (fun {contents; monitor} -> (contents, monitor))
-      (fun (contents, monitor) -> {contents; monitor})
-      (obj2
-         (opt "contents" bool)
-         (opt "monitor" bool))
-
-  let list =
-    RPC.service
-      ~description:
-        "List operations in the mempool."
-      ~input: list_param_encoding
-      ~output:
-        (obj1
-           (req "operations"
-              (list
-                 (list
-                    (obj2
-                       (req "hash" Operation_hash.encoding)
-                       (opt "contents"
-                          (dynamic_size Operation.encoding)))
-              ))))
-      RPC.Path.(root / "operations")
 
 end
 
@@ -661,7 +644,7 @@ type inject_block_param = {
   raw: MBytes.t ;
   blocking: bool ;
   force: bool ;
-  operations: Operation_hash.t list list ;
+  operations: operation list list ;
 }
 
 let inject_block_param =
@@ -689,7 +672,7 @@ let inject_block_param =
        (req "operations"
           (describe
              ~description:"..."
-             (list (list Operation_hash.encoding)))))
+             (list (list (dynamic_size operation_encoding))))))
 
 let inject_block =
   RPC.service

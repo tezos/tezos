@@ -29,7 +29,7 @@ val preapply_result_encoding :
 type prevalidation_state
 
 val start_prevalidation :
-  predecessor: State.Valid_block.t ->
+  predecessor: State.Block.t ->
   timestamp: Time.t ->
   prevalidation_state tzresult Lwt.t
 

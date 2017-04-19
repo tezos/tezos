@@ -25,9 +25,15 @@ type t =
   | Get_protocols of Protocol_hash.t list
   | Protocol of Protocol.t
 
-  | Get_operation_list of Net_id.t * (Block_hash.t * int) list
-  | Operation_list of Net_id.t * Block_hash.t * int *
-                      Operation_hash.t list * Operation_list_list_hash.path
+  | Get_operation_hashes_for_blocks of Net_id.t * (Block_hash.t * int) list
+  | Operation_hashes_for_block of
+      Net_id.t * Block_hash.t * int *
+      Operation_hash.t list * Operation_list_list_hash.path
+
+  | Get_operations_for_blocks of Net_id.t * (Block_hash.t * int) list
+  | Operations_for_block of
+      Net_id.t * Block_hash.t * int *
+      Operation.t list * Operation_list_list_hash.path
 
 val cfg : t P2p.message_config
 

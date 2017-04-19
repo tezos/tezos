@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module type PARAMETRIZED_RO_DISTRIBUTED_DB = sig
+module type DISTRIBUTED_DB = sig
 
   type t
   type key
@@ -15,36 +15,22 @@ module type PARAMETRIZED_RO_DISTRIBUTED_DB = sig
   type param
 
   val known: t -> key -> bool Lwt.t
-  val read: t -> key -> value option Lwt.t
+
+  type error += Missing_data of key
+  val read: t -> key -> value tzresult Lwt.t
+  val read_opt: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
 
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
   val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
 
-end
-
-module type PARAMETRIZED_DISTRIBUTED_DB = sig
-
-  include PARAMETRIZED_RO_DISTRIBUTED_DB
-
-  val commit: t -> key -> unit Lwt.t
-  (* val commit_invalid: t -> key -> unit Lwt.t *) (* TODO *)
+  val remove: t -> key -> unit Lwt.t
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
 
 end
 
-module type DISTRIBUTED_DB = sig
-
-  include PARAMETRIZED_DISTRIBUTED_DB with type param := unit
-
-  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> unit
-  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> value Lwt.t
-
-end
-
 module type DISK_TABLE = sig
-  (* A subtype of State.DATA_STORE *)
   type store
   type key
   type value
@@ -52,8 +38,6 @@ module type DISK_TABLE = sig
   val read: store -> key -> value tzresult Lwt.t
   val read_opt: store -> key -> value option Lwt.t
   val read_exn: store -> key -> value Lwt.t
-  val store: store -> key -> value -> bool Lwt.t
-  val remove: store -> key -> bool Lwt.t
 end
 
 module type MEMORY_TABLE = sig
@@ -81,8 +65,9 @@ end
 module type PRECHECK = sig
   type key
   type param
+  type notified_value
   type value
-  val precheck: key -> param -> value -> bool
+  val precheck: key -> param -> notified_value -> value option
 end
 
 module Make_table
@@ -93,13 +78,13 @@ module Make_table
     (Precheck : PRECHECK with type key := Hash.t
                           and type value := Disk_table.value) : sig
 
-  include PARAMETRIZED_DISTRIBUTED_DB with type key = Hash.t
-                                       and type value = Disk_table.value
-                                       and type param := Precheck.param
+  include DISTRIBUTED_DB with type key = Hash.t
+                          and type value = Disk_table.value
+                          and type param = Precheck.param
   val create:
     ?global_input:(key * value) Watcher.input ->
     Scheduler.t -> Disk_table.store -> t
-  val notify: t -> P2p.Peer_id.t -> key -> value -> unit Lwt.t
+  val notify: t -> P2p.Peer_id.t -> key -> Precheck.notified_value -> unit Lwt.t
 
 end
 

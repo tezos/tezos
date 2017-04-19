@@ -13,6 +13,12 @@ module Error : sig
   val wrap: 'a Data_encoding.t -> 'a tzresult Data_encoding.encoding
 end
 
+type operation = Distributed_db.operation =
+  | Blob of Operation.t
+  | Hash of Operation_hash.t
+
+val operation_encoding: operation Data_encoding.t
+
 module Blocks : sig
 
   type block = [
@@ -57,8 +63,15 @@ module Blocks : sig
     (unit, unit * block, unit, Time.t) RPC.service
   val fitness:
     (unit, unit * block, unit, MBytes.t list) RPC.service
+
+  type operations_param = {
+    contents: bool ;
+    monitor: bool ;
+  }
   val operations:
-    (unit, unit * block, unit, Operation_hash.t list list) RPC.service
+    (unit, unit * block, operations_param,
+     (Operation_hash.t * Operation.t option) list list) RPC.service
+
   val protocol:
     (unit, unit * block, unit, Protocol_hash.t) RPC.service
   val test_network:
@@ -80,7 +93,7 @@ module Blocks : sig
     (unit, unit, list_param, block_info list list) RPC.service
 
   type preapply_param = {
-    operations: Operation_hash.t list ;
+    operations: operation list ;
     sort: bool ;
     timestamp: Time.t option ;
   }
@@ -95,25 +108,6 @@ module Blocks : sig
   val complete: (unit, (unit * block) * string, unit, string list) RPC.service
 
   val proto_path: (unit, unit * block) RPC.Path.path
-
-end
-
-module Operations : sig
-
-  val contents:
-    (unit, unit * Operation_hash.t list,
-     unit, Operation.t list) RPC.service
-
-
-  type list_param = {
-    contents: bool option ;
-    monitor: bool option ;
-  }
-
-  val list:
-    (unit, unit,
-     list_param,
-     (Operation_hash.t * Operation.t option) list list) RPC.service
 
 end
 
@@ -135,6 +129,7 @@ module Protocols : sig
 end
 
 module Network : sig
+
   val stat :
     (unit, unit, unit, P2p.Stat.t) RPC.service
 
@@ -175,6 +170,7 @@ module Network : sig
     val events :
       (unit, unit * P2p.Peer_id.t, bool, P2p.RPC.Peer_id.Event.t list) RPC.service
   end
+
 end
 
 val forge_block:
@@ -190,7 +186,7 @@ type inject_block_param = {
   raw: MBytes.t ;
   blocking: bool ;
   force: bool ;
-  operations: Operation_hash.t list list ;
+  operations: operation list list ;
 }
 
 val inject_block:

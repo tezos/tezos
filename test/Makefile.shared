@@ -52,11 +52,38 @@ CLIENTLIB := ${SRCDIR}/client.cmxa \
 ${MINUTILSLIB} ${UTILSLIB} ${COMPILERLIB} ${NODELIB} ${CLIENTLIB}:
 	${MAKE} -C ${SRCDIR} $@
 
-${SRCDIR}/minutils/%: ${MINUTILSLIB}
-${SRCDIR}/utils/%: ${UTILSLIB}
-${SRCDIR}/compiler/%: ${COMPILERLIB}
-${SRCDIR}/node/%: ${NODELIB}
-${SRCDIR}/client/%: ${CLIENTLIB}
+${SRCDIR}/minutils/%.cmi: ${SRCDIR}/minutils/%.mli
+	${MAKE} -C ${SRCDIR} minutils.cmxa
+${SRCDIR}/minutils/%.cmx : ${SRCDIR}/minutils/%.ml
+	${MAKE} -C ${SRCDIR} minutils.cmxa
+${SRCDIR}/utils/%.cmi: ${SRCDIR}/utils/%.mli
+	${MAKE} -C ${SRCDIR} utils.cmxa
+${SRCDIR}/utils/%.cmx : ${SRCDIR}/utils/%.ml
+	${MAKE} -C ${SRCDIR} utils.cmxa
+${SRCDIR}/compiler/%.cmi: ${SRCDIR}/compiler/%.mli
+	${MAKE} -C ${SRCDIR} compiler.cmxa
+${SRCDIR}/compiler/%.cmx : ${SRCDIR}/compiler/%.ml
+	${MAKE} -C ${SRCDIR} compiler.cmxa
+${SRCDIR}/node/db/%.cmi: ${SRCDIR}/node/db/%.mli
+	${MAKE} -C ${SRCDIR} node.cmxa
+${SRCDIR}/node/db/%.cmx : ${SRCDIR}/node/db/%.ml
+	${MAKE} -C ${SRCDIR} node.cmxa
+${SRCDIR}/node/net/%.cmi: ${SRCDIR}/node/net/%.mli
+	${MAKE} -C ${SRCDIR} node.cmxa
+${SRCDIR}/node/net/%.cmx : ${SRCDIR}/node/net/%.ml
+	${MAKE} -C ${SRCDIR} node.cmxa
+${SRCDIR}/node/shell/%.cmi: ${SRCDIR}/node/shell/%.mli
+	${MAKE} -C ${SRCDIR} node.cmxa
+${SRCDIR}/node/shell/%.cmx : ${SRCDIR}/node/shell/%.ml
+	${MAKE} -C ${SRCDIR} node.cmxa
+${SRCDIR}/node/updater/%.cmi: ${SRCDIR}/node/updater/%.mli
+	${MAKE} -C ${SRCDIR} node.cmxa
+${SRCDIR}/node/updater/%.cmx : ${SRCDIR}/node/updater/%.ml
+	${MAKE} -C ${SRCDIR} node.cmxa
+${SRCDIR}/client/%.cmi: ${SRCDIR}/client/%.mli
+	${MAKE} -C ${SRCDIR} client.cmxa
+${SRCDIR}/client/%.cmx : ${SRCDIR}/client/%.ml
+	${MAKE} -C ${SRCDIR} client.cmxa
 
 ############################################################################
 ## Generic rules
@@ -82,7 +109,7 @@ partial-clean::
 	-find . \( -name \*.cm\* -or -name \*.cmp -or -name \*.out -or -name \*~ -or -name \*.o -or -name \*.a \) -delete
 
 -include .depend
-.depend: $(shell find . -name \*.ml -or -name \*.ml)
+.depend: $(shell find . -name \*.mli -or -name \*.ml)
 	@echo OCAMLDEP "(test/$(notdir $(shell echo $$PWD)))"
 	@$(OCAMLDEP) -native $(INCLUDES) $^ > .depend
 
