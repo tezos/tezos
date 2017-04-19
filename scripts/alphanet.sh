@@ -162,6 +162,9 @@ assert_container() {
 }
 
 start_container() {
+    if [ "$#" -ge 2 ] && [ "$1" = "--rpc-port" ] ; then
+        docker_export_rpc="-p $2:8732"
+    fi
     if check_container; then
         assert_container_uptodate
     else
@@ -170,13 +173,11 @@ start_container() {
         fi
         docker rm "$docker_container" || true > /dev/null 2>&1
         echo "Launching the docker container..."
-        docker run --rm -dit -p "$port:$port" -p "8732:80" \
-               -v $docker_volume:/var/run/tezos \
+        docker run --rm -dit -p "$port:$port" $docker_export_rpc \
+               -v "$docker_volume:/var/run/tezos" \
                --entrypoint /bin/sh \
                --name "$docker_container" \
                "$docker_image" > /dev/null
-        docker exec --user root --detach "$docker_container" \
-               nginx -c /etc/nginx/nginx.conf
         may_restore_identity
         may_restore_accounts
     fi
@@ -198,7 +199,8 @@ stop_container() {
 ## Node ####################################################################
 
 init_node() {
-    docker exec "$docker_container" tezos init "$@"
+    docker exec "$docker_container" tezos init \
+           "$@" --net-addr "[::]:$port"
     save_identity
 }
 
@@ -332,7 +334,11 @@ run_client() {
 }
 
 run_shell() {
-    docker exec -it "$docker_container" bash
+    if [ $# -eq 0 ]; then
+        docker exec -it "$docker_container" bash
+    else
+        docker exec -it "$docker_container" bash -c "$@"
+    fi
     save_accounts
 }
 
@@ -347,8 +353,8 @@ display_head() {
 
 start() {
     pull_image
-    start_container
-    init_node --net-addr "[::]:$port" "$@"
+    start_container "$@"
+    init_node "$@"
     start_node
     start_baker
     start_endorser
@@ -417,11 +423,18 @@ update_script() {
 usage() {
     echo "Usage: $0 [GLOBAL_OPTIONS] <command> [OPTIONS]"
     echo "  Main commands:"
-    echo "    $0 start [OPTIONS] (passed to tezos-node config init)"
+    echo "    $0 start [--rpc-port <int>] [OPTIONS]"
     echo "       Launch a full Tezos alphanet node in a docker container"
     echo "       automatically generating a new network identity."
-    echo "       An account my_account for a manager my_identity is also"
+    echo "       An account 'my_account' for a manager 'my_identity' is also"
     echo "       created to be used via the client."
+    echo "       OPTIONS (others than --rpc-port) are directly passed to the"
+    echo "       Tezos node, see '$0 shell tezos-node config --help'"
+    echo "       for more details."
+    echo "       By default, the RPC port is not exported outside the docker"
+    echo "       container. WARNING: when exported some RPCs could be harmful"
+    echo "       (e.g. 'inject_block', 'force_validation', ...), it is"
+    echo "       advised not to export them publicly."
     echo "    $0 <stop|kill>"
     echo "       Friendly or brutally stop the node."
     echo "    $0 restart"
@@ -447,7 +460,9 @@ usage() {
     echo "    $0 endorser <start|stop|status|log>"
     echo "    $0 shell"
     echo "Node configuration backup directory: $data_dir"
-    echo "Global options are currently restricted to: '--port <int>'"
+    echo "Global options are currently limited to:"
+    echo "  --port <int>"
+    echo "      change public the port Tezos node"
 }
 
 ## Dispatch ################################################################
@@ -503,7 +518,7 @@ case "$command" in
         if [ "$#" -eq 0 ] ; then usage ; exit 1 ; else shift ; fi
         case "$subcommand" in
             start)
-                start_container
+                start_container "$@"
                 warn_script_uptodate
                 ;;
             status)
@@ -617,7 +632,7 @@ case "$command" in
         ;;
     shell)
         assert_uptodate
-        run_shell
+        run_shell "$@"
         ;;
     client)
         assert_uptodate
