@@ -12,7 +12,7 @@ open Tezos_hash
 (** Block header *)
 
 (** Exported type *)
-type header = {
+type t = {
   shell: Block_header.shell_header ;
   proto: proto_header ;
   signature: Ed25519.Signature.t ;
@@ -23,6 +23,14 @@ and proto_header = {
   seed_nonce_hash: Nonce_hash.t ;
   proof_of_work_nonce: MBytes.t ;
 }
+
+type block_header = t
+
+type raw = Tezos_data.Block_header.t
+type shell_header = Tezos_data.Block_header.shell_header
+
+let raw_encoding = Tezos_data.Block_header.encoding
+let shell_header_encoding = Tezos_data.Block_header.shell_header_encoding
 
 let proto_header_encoding =
   let open Data_encoding in
@@ -49,6 +57,17 @@ let unsigned_header_encoding =
     Block_header.shell_header_encoding
     proto_header_encoding
 
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun { shell ; proto ; signature } ->
+       (shell, (proto, signature)))
+    (fun (shell, (proto, signature)) ->
+       { shell ; proto ; signature })
+    (merge_objs
+       Block_header.shell_header_encoding
+       signed_proto_header_encoding)
+
 (** Constants *)
 
 let max_header_length =
@@ -61,10 +80,10 @@ let max_header_length =
 type error +=
   | Cant_parse_proto_header
 
-let parse_header
+let parse
     ({ shell = { net_id ; level ; proto_level ; predecessor ;
                  timestamp ; fitness ; operations_hash } ;
-       proto } : Block_header.t) : header tzresult =
+       proto } : Block_header.t) : block_header tzresult =
   match Data_encoding.Binary.of_bytes signed_proto_header_encoding proto with
   | None -> Error [Cant_parse_proto_header]
   | Some (proto, signature) ->
@@ -73,5 +92,14 @@ let parse_header
           timestamp ; fitness ; operations_hash } in
       Ok { shell ; proto ; signature }
 
-let forge_header shell proto =
+let forge_unsigned shell proto =
   Data_encoding.Binary.to_bytes unsigned_header_encoding (shell, proto)
+
+let hash_raw = Block_header.hash
+let hash { shell ; proto ; signature } =
+  Block_header.hash
+    { shell ;
+      proto =
+        Data_encoding.Binary.to_bytes
+          signed_proto_header_encoding
+          (proto, signature ) }

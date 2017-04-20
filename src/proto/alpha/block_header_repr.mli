@@ -10,7 +10,7 @@
 open Tezos_hash
 
 (** Exported type *)
-type header = {
+type t = {
   shell: Block_header.shell_header ;
   proto: proto_header ;
   signature: Ed25519.Signature.t ;
@@ -22,21 +22,28 @@ and proto_header = {
   proof_of_work_nonce: MBytes.t ;
 }
 
-(** The maximum size of block headers in bytes *)
+type block_header = t
+
+type raw = Tezos_data.Block_header.t
+type shell_header = Tezos_data.Block_header.shell_header
+
+val encoding: block_header Data_encoding.encoding
+val raw_encoding: raw Data_encoding.t
+val proto_header_encoding: proto_header Data_encoding.encoding
+val shell_header_encoding: shell_header Data_encoding.encoding
+
 val max_header_length: int
+(** The maximum size of block headers in bytes *)
 
+val parse: Block_header.t -> block_header tzresult
 (** Parse the protocol-specific part of a block header. *)
-val parse_header: Block_header.t -> header tzresult
 
-val proto_header_encoding:
-  proto_header Data_encoding.encoding
-
-val unsigned_header_encoding:
-  (Block_header.shell_header * proto_header) Data_encoding.encoding
-
-val forge_header:
+val forge_unsigned:
   Block_header.shell_header -> proto_header -> MBytes.t
 (** [forge_header shell_hdr proto_hdr] is the binary serialization
     (using [unsigned_header_encoding]) of a block header,
     comprising both the shell and the protocol part of the header,
     without the signature. *)
+
+val hash: block_header -> Block_hash.t
+val hash_raw: raw -> Block_hash.t
