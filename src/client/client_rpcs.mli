@@ -77,3 +77,13 @@ val call_describe0:
   config ->
   (unit, unit, 'a, 'b) RPC.service ->
   string list -> 'a -> 'b tzresult Lwt.t
+
+type block = Node_rpc_services.Blocks.block
+
+val last_mined_block:
+  block -> [>
+    | `Genesis
+    | `Head of int
+    | `Test_head of int
+    | `Hash of Block_hash.t
+  ]

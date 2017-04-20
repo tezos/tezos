@@ -197,7 +197,7 @@ module Helpers : sig
       val operations:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -207,7 +207,7 @@ module Helpers : sig
       val transaction:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -219,7 +219,7 @@ module Helpers : sig
       val origination:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -235,7 +235,7 @@ module Helpers : sig
       val delegation:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -247,19 +247,19 @@ module Helpers : sig
       val operation:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         dictator_operation ->
         MBytes.t tzresult Lwt.t
       val activate:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         Protocol_hash.t ->
         MBytes.t tzresult Lwt.t
       val activate_testnet:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         Protocol_hash.t ->
         MBytes.t tzresult Lwt.t
     end
@@ -267,14 +267,14 @@ module Helpers : sig
       val operations:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         source:public_key ->
         delegate_operation list ->
         MBytes.t tzresult Lwt.t
       val endorsement:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         source:public_key ->
         block:Block_hash.t ->
         slot:int ->
@@ -282,7 +282,7 @@ module Helpers : sig
       val proposals:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         source:public_key ->
         period:Voting_period.t ->
         proposals:Hash.Protocol_hash.t list ->
@@ -290,7 +290,7 @@ module Helpers : sig
       val ballot:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         source:public_key ->
         period:Voting_period.t ->
         proposal:Hash.Protocol_hash.t ->
@@ -301,27 +301,27 @@ module Helpers : sig
       val operations:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         anonymous_operation list ->
         MBytes.t tzresult Lwt.t
       val seed_nonce_revelation:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         level:Raw_level.t ->
         nonce:Nonce.t ->
         unit -> MBytes.t tzresult Lwt.t
       val faucet:
         Client_rpcs.config ->
         block ->
-        net:Net_id.t ->
+        net_id:Net_id.t ->
         id:public_key_hash ->
         int32 -> MBytes.t tzresult Lwt.t
     end
     val block:
       Client_rpcs.config ->
       block ->
-      net:Net_id.t ->
+      net_id:Net_id.t ->
       predecessor:Block_hash.t ->
       timestamp:Time.t ->
       fitness:Fitness.t ->

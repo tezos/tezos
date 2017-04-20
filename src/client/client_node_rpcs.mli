@@ -72,7 +72,7 @@ module Blocks : sig
     | `Hash of Block_hash.t
     ]
 
-  val net:
+  val net_id:
     config ->
     block -> Net_id.t tzresult Lwt.t
   val level:

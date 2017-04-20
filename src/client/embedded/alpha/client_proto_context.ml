@@ -21,7 +21,7 @@ let transfer rpc_config
     block ?force
     ~source ~src_pk ~src_sk ~destination ?arg ~amount ~fee () =
   let open Cli_entries in
-  Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+  Client_node_rpcs.Blocks.net_id rpc_config block >>=? fun net_id ->
   begin match arg with
     | Some arg ->
         Client_proto_programs.parse_data arg >>=? fun arg ->
@@ -33,7 +33,7 @@ let transfer rpc_config
   let counter = Int32.succ pcounter in
   Client_proto_rpcs.Helpers.Forge.Manager.transaction
     rpc_config block
-    ~net ~source ~sourcePubKey:src_pk ~counter ~amount
+    ~net_id ~source ~sourcePubKey:src_pk ~counter ~amount
     ~destination ?parameters ~fee () >>=? fun bytes ->
   Client_node_rpcs.Blocks.predecessor rpc_config block >>=? fun predecessor ->
   let signature = Ed25519.sign src_sk bytes in
@@ -69,12 +69,12 @@ let originate_account rpc_config
     block ?force
     ~source ~src_pk ~src_sk ~manager_pkh
     ?delegatable ?spendable ?delegate ~balance ~fee () =
-  Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+  Client_node_rpcs.Blocks.net_id rpc_config block >>=? fun net_id ->
   Client_proto_rpcs.Context.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   Client_proto_rpcs.Helpers.Forge.Manager.origination rpc_config block
-    ~net ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
+    ~net_id ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ?spendable
     ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
   let signature = Ed25519.sign src_sk bytes in
@@ -89,9 +89,9 @@ let originate_contract rpc_config
   Client_proto_rpcs.Context.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
-  Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+  Client_node_rpcs.Blocks.net_id rpc_config block >>=? fun net_id ->
   Client_proto_rpcs.Helpers.Forge.Manager.origination rpc_config block
-    ~net ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
+    ~net_id ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ~spendable:!spendable
     ?delegatable ?delegatePubKey
     ~script:{ code ; storage } ~fee () >>=? fun bytes ->
@@ -99,23 +99,23 @@ let originate_contract rpc_config
   originate rpc_config ?force ~block ~signature bytes
 
 let faucet rpc_config block ?force ~manager_pkh () =
-  Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+  Client_node_rpcs.Blocks.net_id rpc_config block >>=? fun net_id ->
   Client_proto_rpcs.Context.faucet_counter rpc_config block >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   Client_proto_rpcs.Helpers.Forge.Anonymous.faucet
-    rpc_config block ~net ~id:manager_pkh counter >>=? fun bytes ->
+    rpc_config block ~net_id ~id:manager_pkh counter >>=? fun bytes ->
   originate rpc_config ?force ~block bytes
 
 let delegate_contract rpc_config
     block ?force
     ~source ?src_pk ~manager_sk
     ~fee delegate_opt =
-  Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+  Client_node_rpcs.Blocks.net_id rpc_config block >>=? fun net_id ->
   Client_proto_rpcs.Context.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   Client_proto_rpcs.Helpers.Forge.Manager.delegation rpc_config block
-    ~net ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
+    ~net_id ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
   >>=? fun bytes ->
   let signature = Environment.Ed25519.sign manager_sk bytes in
   let signed_bytes = MBytes.concat bytes signature in
@@ -126,9 +126,9 @@ let delegate_contract rpc_config
   return oph
 
 let dictate rpc_config block command seckey =
-  Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+  Client_node_rpcs.Blocks.net_id rpc_config block >>=? fun net_id ->
   Client_proto_rpcs.Helpers.Forge.Dictator.operation
-    rpc_config block ~net command >>=? fun bytes ->
+    rpc_config block ~net_id command >>=? fun bytes ->
   let signature = Ed25519.sign seckey bytes in
   let signed_bytes = MBytes.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
@@ -207,9 +207,9 @@ let group =
     title = "Block contextual commands (see option -block)" }
 
 let dictate rpc_config block command seckey =
-  Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+  Client_node_rpcs.Blocks.net_id rpc_config block >>=? fun net_id ->
   Client_proto_rpcs.Helpers.Forge.Dictator.operation
-    rpc_config block ~net command >>=? fun bytes ->
+    rpc_config block ~net_id command >>=? fun bytes ->
   let signature = Ed25519.sign seckey bytes in
   let signed_bytes = MBytes.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in

@@ -58,7 +58,7 @@ let register_bi_dir node dir =
       Node.RPC.block_info node b >>= fun bi ->
       RPC.Answer.return bi.net_id in
     RPC.register1 dir
-      Services.Blocks.net implementation in
+      Services.Blocks.net_id implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->

@@ -49,7 +49,7 @@ module Blocks : sig
 
   val info:
     (unit, unit * block, bool, block_info) RPC.service
-  val net:
+  val net_id:
     (unit, unit * block, unit, Net_id.t) RPC.service
   val level:
     (unit, unit * block, unit, Int32.t) RPC.service

@@ -81,8 +81,8 @@ module Blocks = struct
     fitness: MBytes.t list ;
     timestamp: Time.t ;
   }
-  let net cctxt h =
-    call_service1 cctxt Services.Blocks.net h ()
+  let net_id cctxt h =
+    call_service1 cctxt Services.Blocks.net_id h ()
   let level cctxt h =
     call_service1 cctxt Services.Blocks.level h ()
   let predecessor cctxt h =
