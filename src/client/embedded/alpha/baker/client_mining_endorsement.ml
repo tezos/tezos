@@ -119,19 +119,19 @@ let get_signing_slots cctxt ?max_priority block delegate level =
 let inject_endorsement cctxt
     block level ?async ?force
     src_sk source slot =
-  Client_blocks.get_block_hash cctxt.rpc_config block >>=? fun block_hash ->
-  Client_node_rpcs.Blocks.net cctxt.rpc_config block >>=? fun net ->
+  let block = Client_rpcs.last_mined_block block in
+  Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
   Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt.rpc_config
     block
-    ~net
+    ~net_id:bi.net_id
     ~source
-    ~block:block_hash
+    ~block:bi.hash
     ~slot:slot
     () >>=? fun bytes ->
   let signed_bytes = Ed25519.Signature.append src_sk bytes in
   Client_node_rpcs.inject_operation
     cctxt.rpc_config ?force ?async signed_bytes >>=? fun oph ->
-  State.record_endorsement cctxt level block_hash slot oph >>=? fun () ->
+  State.record_endorsement cctxt level bi.hash slot oph >>=? fun () ->
   return oph
 
 
@@ -152,14 +152,9 @@ let check_endorsement cctxt level slot =
 let forge_endorsement cctxt
     block ?(force = false)
     ~src_sk ?slot ?max_priority src_pk =
-  let block =
-    match block with
-    | `Prevalidation -> `Head 0
-    | `Test_prevalidation -> `Test_head 0
-    | _ -> block in
+  let block = Client_rpcs.last_mined_block block in
   let src_pkh = Ed25519.Public_key.hash src_pk in
-  Client_proto_rpcs.Context.level cctxt.rpc_config block >>=? fun level ->
-  let level = Raw_level.succ level.level in
+  Client_proto_rpcs.Context.next_level cctxt.rpc_config block >>=? fun { level } ->
   begin
     match slot with
     | Some slot -> return slot

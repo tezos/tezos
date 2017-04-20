@@ -326,3 +326,10 @@ let call_describe0 cctxt service path arg =
   let meth, prefix, arg = RPC.forge_request service () arg in
   get_json cctxt meth (prefix @ path) arg >>=? fun json ->
   parse_answer cctxt service prefix json
+
+type block = Node_rpc_services.Blocks.block
+
+let last_mined_block = function
+  | `Prevalidation -> `Head 0
+  | `Test_prevalidation -> `Test_head 0
+  | `Genesis | `Head _ | `Test_head _ | `Hash _ as block -> block

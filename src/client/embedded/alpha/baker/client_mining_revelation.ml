@@ -16,9 +16,9 @@ let inject_seed_nonce_revelation cctxt block ?force ?async nonces =
     List.map
       (fun (level, nonce) ->
          Seed_nonce_revelation { level ; nonce }) nonces in
-  Client_node_rpcs.Blocks.net cctxt block >>=? fun net ->
+  Client_node_rpcs.Blocks.net_id cctxt block >>=? fun net_id ->
   Client_proto_rpcs.Helpers.Forge.Anonymous.operations cctxt
-    block ~net operations >>=? fun bytes ->
+    block ~net_id operations >>=? fun bytes ->
   Client_node_rpcs.inject_operation cctxt ?force ?async bytes >>=? fun oph ->
   return oph
 

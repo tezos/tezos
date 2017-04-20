@@ -251,7 +251,7 @@ module Protocol = struct
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.proposals rpc_config block
-      ~net:block_info.net_id
+      ~net_id:block_info.net_id
       ~source:pk
       ~period:next_level.voting_period
       ~proposals
@@ -263,7 +263,7 @@ module Protocol = struct
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.ballot rpc_config block
-      ~net:block_info.net_id
+      ~net_id:block_info.net_id
       ~source:pk
       ~period:next_level.voting_period
       ~proposal
@@ -460,7 +460,7 @@ module Mining = struct
       block src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
     Client_proto_rpcs.Helpers.Forge.block rpc_config
       block
-      ~net:bi.net_id
+      ~net_id:bi.net_id
       ~predecessor:bi.hash
       ~timestamp
       ~fitness
@@ -526,10 +526,11 @@ module Endorse = struct
       src_sk
       source
       slot =
-    Client_blocks.get_block_info rpc_config block >>=? fun { hash ; net_id } ->
+    let block = Client_rpcs.last_mined_block block in
+    Client_node_rpcs.Blocks.info rpc_config block >>=? fun { hash ; net_id } ->
     Client_proto_rpcs.Helpers.Forge.Delegate.endorsement rpc_config
       block
-      ~net:net_id
+      ~net_id:net_id
       ~source
       ~block:hash
       ~slot:slot
