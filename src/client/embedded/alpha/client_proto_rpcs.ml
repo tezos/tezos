@@ -16,13 +16,9 @@ let handle_error cctxt = function
       pp_print_error Format.err_formatter exns ;
       cctxt.Client_commands.error "%s" "cannot continue"
 
-type block = [
-  | `Genesis
-  | `Head of int | `Prevalidation
-  | `Test_head of int | `Test_prevalidation
-  | `Hash of Block_hash.t
-]
-
+let call_service0 cctxt s block =
+  Client_rpcs.call_service0 cctxt
+    (s Node_rpc_services.Blocks.proto_path) block
 let call_service1 cctxt s block a1 =
   Client_rpcs.call_service1 cctxt
     (s Node_rpc_services.Blocks.proto_path) block a1
@@ -39,6 +35,18 @@ let call_error_service2 cctxt s block a1 a2 =
   | Ok (Error _ as err) -> Lwt.return (wrap_error err)
   | Ok (Ok v) -> return v
   | Error _ as err -> Lwt.return err
+
+type block = Node_rpc_services.Blocks.block
+
+let header cctxt block =
+  call_error_service1 cctxt Services.header block ()
+
+module Header = struct
+  let priority cctxt block =
+    call_error_service1 cctxt Services.Header.priority block ()
+  let seed_nonce_hash cctxt block =
+    call_error_service1 cctxt Services.Header.seed_nonce_hash block ()
+end
 
 module Constants = struct
   let errors cctxt block =

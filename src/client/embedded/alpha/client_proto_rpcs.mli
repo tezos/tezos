@@ -17,6 +17,16 @@ type block = [
   | `Hash of Block_hash.t
 ]
 
+val header:
+  Client_rpcs.config -> block -> Block_header.t tzresult Lwt.t
+
+module Header : sig
+  val priority:
+    Client_rpcs.config -> block -> int tzresult Lwt.t
+  val seed_nonce_hash:
+    Client_rpcs.config -> block -> Nonce_hash.t tzresult Lwt.t
+end
+
 module Constants : sig
   val errors:
     Client_rpcs.config ->
