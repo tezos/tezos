@@ -619,8 +619,8 @@ module Helpers = struct
     let block custom_root =
       RPC.service
         ~description:"Parse a block"
-        ~input: Block_header.encoding
-        ~output: (wrap_tzerror Block.proto_header_encoding)
+        ~input: Block_header.raw_encoding
+        ~output: (wrap_tzerror Block_header.proto_header_encoding)
         RPC.Path.(custom_root / "helpers" / "parse" / "block" )
 
   end

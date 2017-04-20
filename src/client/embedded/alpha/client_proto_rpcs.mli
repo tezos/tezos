@@ -353,7 +353,7 @@ module Helpers : sig
     val block:
       Client_rpcs.config ->
       block -> Block_header.shell_header -> MBytes.t ->
-      Block.proto_header tzresult Lwt.t
+      Block_header.proto_header tzresult Lwt.t
   end
 
 end

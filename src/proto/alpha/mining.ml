@@ -118,14 +118,14 @@ let check_timestamp c priority pred_timestamp =
   fail_unless Timestamp.(minimal_time <= timestamp)
     (Timestamp_too_early (minimal_time, timestamp))
 
-let check_mining_rights c { Block.proto = { priority } }
+let check_mining_rights c { Block_header.proto = { priority } }
     pred_timestamp =
   let level = Level.current c in
   Roll.mining_rights_owner c level ~priority >>=? fun delegate ->
   check_timestamp c priority pred_timestamp >>=? fun () ->
   return delegate
 
-let pay_mining_bond c { Block.proto = { priority } } id =
+let pay_mining_bond c { Block_header.proto = { priority } } id =
   if Compare.Int.(priority >= Constants.first_free_mining_slot c)
   then return c
   else
@@ -216,13 +216,8 @@ let check_hash hash stamp_threshold =
   let word = String.get_int64 bytes 0 in
   Compare.Uint64.(word < stamp_threshold)
 
-let check_header_hash {Block.shell;proto;signature} stamp_threshold =
-  let hash =
-    Block_hash.hash_bytes [
-      Data_encoding.Binary.to_bytes
-        (Data_encoding.tup2
-           Block.unsigned_header_encoding Ed25519.Signature.encoding)
-        ((shell, proto), signature)] in
+let check_header_hash header stamp_threshold =
+  let hash = Block_header.hash header in
   check_hash hash stamp_threshold
 
 type error +=
@@ -238,8 +233,8 @@ let check_proof_of_work_stamp ctxt block =
 
 let check_signature ctxt block id =
   Public_key.get ctxt id >>=? fun key ->
-  let check_signature key { Block.proto ; shell ; signature } =
-    let unsigned_header = Block.forge_header shell proto in
+  let check_signature key { Block_header.proto ; shell ; signature } =
+    let unsigned_header = Block_header.forge_unsigned shell proto in
     Ed25519.Signature.check key signature unsigned_header in
   if check_signature key block then
     return ()
@@ -250,7 +245,7 @@ let max_fitness_gap ctxt =
   let slots = Int64.of_int (Constants.max_signing_slot ctxt + 1) in
   Int64.add slots 1L
 
-let check_fitness_gap ctxt (block : Block.header) =
+let check_fitness_gap ctxt (block : Block_header.t) =
   let current_fitness = Fitness.current ctxt in
   Lwt.return (Fitness.to_int64 block.shell.fitness) >>=? fun announced_fitness ->
   let gap = Int64.sub announced_fitness current_fitness in

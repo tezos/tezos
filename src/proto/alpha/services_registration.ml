@@ -11,7 +11,7 @@ open Tezos_context
 
 type rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: Block_header.t ;
+  block_header: Block_header.raw ;
   operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
   operations: unit -> Operation.raw list list Lwt.t ;
   context: Tezos_context.t ;
@@ -474,7 +474,7 @@ let forge_block _ctxt
     ((net_id, predecessor, timestamp, fitness, operations_hash),
      (level, priority, proto_level, seed_nonce_hash, proof_of_work_nonce)) : MBytes.t tzresult Lwt.t =
   let level = Raw_level.to_int32 level in
-  return (Block.forge_header
+  return (Block_header.forge_unsigned
             { net_id ; level ; proto_level ; predecessor ;
               timestamp ; fitness ; operations_hash }
             { priority ; seed_nonce_hash ; proof_of_work_nonce })
@@ -521,7 +521,7 @@ let parse_operations ctxt (operations, check) =
 let () = register1 Services.Helpers.Parse.operations parse_operations
 
 let parse_block _ctxt raw_block =
-  Lwt.return (Block.parse_header raw_block) >>=? fun { proto } ->
+  Lwt.return (Block_header.parse raw_block) >>=? fun { proto } ->
   return proto
 
 let () = register1 Services.Helpers.Parse.block parse_block

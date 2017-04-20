@@ -30,7 +30,7 @@ module Operation = struct
   type t = operation
   include Operation_repr
 end
-module Block = Block_repr
+module Block_header = Block_header_repr
 module Vote = struct
   include Vote_repr
   include Vote_storage
