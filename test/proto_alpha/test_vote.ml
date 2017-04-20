@@ -23,6 +23,8 @@ let print_level head =
 let run_change_to_demo_proto block ({ b1 ; b2 ; b3 ; b4 ; b5 } : Account.bootstrap_accounts) =
   Mining.mine b1 block >>=? fun head ->
   Format.eprintf "Entering `Proposal` voting period@.";
+  Assert.check_voting_period_kind ~msg:__LOC__ ~block:(`Hash head)
+    Voting_period.Proposal >>=? fun () ->
   Mining.mine b2 (`Hash head) >>=? fun head ->
 
   (* 1. Propose the 'demo' protocol as b1 (during the Proposal period) *)
@@ -36,6 +38,8 @@ let run_change_to_demo_proto block ({ b1 ; b2 ; b3 ; b4 ; b5 } : Account.bootstr
   Mining.mine ~operations:[oph] b3 (`Hash head) >>=? fun head ->
   Format.eprintf "Entering `Testing_vote` voting period@.";
   Mining.mine b4 (`Hash head) >>=? fun head ->
+  Assert.check_voting_period_kind ~msg:__LOC__ ~block:(`Hash head)
+    Voting_period.Testing_vote >>=? fun () ->
 
   (* 2. Vote unanimously for a proposal *)
 
@@ -56,13 +60,17 @@ let run_change_to_demo_proto block ({ b1 ; b2 ; b3 ; b4 ; b5 } : Account.bootstr
   Mining.mine ~operations b5 (`Hash head) >>=? fun head ->
   Format.eprintf "Entering `Testing` voting period@.";
   Mining.mine b1 (`Hash head) >>=? fun head ->
+  Assert.check_voting_period_kind ~msg:__LOC__ ~block:(`Hash head)
+    Voting_period.Testing >>=? fun () ->
 
   (* 3. Test the proposed protocol *)
 
-  (* Mine blocks to switch to next vote period (Promote_vote) *)
+  (* Mine blocks to switch to next vote period (Promotion_vote) *)
   Mining.mine b2 (`Hash head) >>=? fun head ->
-  Format.eprintf "Entering `Promote_vote` voting period@.";
+  Format.eprintf "Entering `Promotion_vote` voting period@.";
   Mining.mine b3 (`Hash head) >>=? fun head ->
+  Assert.check_voting_period_kind ~msg:__LOC__ ~block:(`Hash head)
+    Voting_period.Promotion_vote >>=? fun () ->
 
   (* 4. Vote unanimously for promoting the protocol *)
   map_s (fun src -> vote_for_demo ~src ~block:(`Hash head) Vote.Yay)
