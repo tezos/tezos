@@ -155,6 +155,8 @@ type error +=
    | Non_increasing_fitness
    | Wrong_level of Int32.t * Int32.t
    | Wrong_proto_level of int * int
+   | Replayed_operation of Operation_hash.t
+   | Outdated_operation of Operation_hash.t * Block_hash.t
 
 let () =
   Error_monad.register_error_kind
@@ -204,7 +206,35 @@ let () =
                      (req "expected" uint8)
                      (req "provided" uint8))
     (function Wrong_proto_level (e, g)   -> Some (e, g) | _ -> None)
-    (fun (e, g) -> Wrong_proto_level (e, g))
+    (fun (e, g) -> Wrong_proto_level (e, g)) ;
+  register_error_kind
+    `Permanent
+    ~id:"validator.replayed_operation"
+    ~title:"Replayed operation"
+    ~description:"The block contains an operation that was previously \
+                  included in the chain"
+    ~pp:(fun ppf oph ->
+        Format.fprintf ppf
+          "The operation %a was previously included in the chain."
+          Operation_hash.pp oph)
+    Data_encoding.(obj1 (req "hash" Operation_hash.encoding))
+    (function Replayed_operation oph -> Some oph | _ -> None)
+    (function oph -> Replayed_operation oph) ;
+  register_error_kind
+    `Permanent
+    ~id:"validator.outdated_operations"
+    ~title:"Outdated operation"
+    ~description:"The block contains an operation which is outdated."
+    ~pp:(fun ppf (oph, bh)->
+        Format.fprintf ppf
+          "The operation %a is outdated (%a)"
+          Operation_hash.pp oph
+          Block_hash.pp bh)
+    Data_encoding.(obj2
+                     (req "operation" Operation_hash.encoding)
+                     (req "block" Block_hash.encoding))
+    (function Outdated_operation (oph, bh) -> Some (oph, bh) | _ -> None)
+    (function (oph, bh) -> Outdated_operation (oph, bh))
 
 let apply_block net_state db
     (pred: State.Block.t) hash (block: Block_header.t) =
@@ -215,8 +245,7 @@ let apply_block net_state db
   lwt_log_notice "validate block %a (after %a), net %a"
     Block_hash.pp_short hash
     Block_hash.pp_short block.shell.predecessor
-    Net_id.pp id
-  >>= fun () ->
+    Net_id.pp id >>= fun () ->
   fail_unless
     (Int32.succ pred_header.shell.level = block.shell.level)
     (Wrong_level (Int32.succ pred_header.shell.level,
@@ -245,6 +274,29 @@ let apply_block net_state db
       fail Non_increasing_fitness
     else
       return ()
+  end >>=? fun () ->
+  begin
+    Chain_traversal.live_blocks
+      pred (State.Block.max_operations_ttl pred) >>= fun (live_blocks,
+                                                          live_operations) ->
+    let rec assert_no_duplicates live_operations = function
+      | [] -> return ()
+      | oph :: ophs ->
+          if Operation_hash.Set.mem oph live_operations then
+            fail (Replayed_operation oph)
+          else
+            assert_no_duplicates
+              (Operation_hash.Set.add oph live_operations) ophs in
+    let assert_live operations =
+      List.fold_left
+        (fun acc op ->
+           acc >>=? fun () ->
+           fail_unless
+             (Block_hash.Set.mem op.Operation.shell.branch live_blocks)
+             (Outdated_operation (Operation.hash op, op.shell.branch)))
+        (return ()) operations in
+    assert_no_duplicates live_operations operation_hashes >>=? fun () ->
+    assert_live operations
   end >>=? fun () ->
   Context.get_protocol pred_context >>= fun pred_protocol_hash ->
   begin
@@ -295,6 +347,13 @@ let apply_block net_state db
          expected = block.shell.fitness ;
          found = new_context.fitness ;
        }) >>=? fun () ->
+  let max_operations_ttl =
+    max 0
+      (min
+         ((State.Block.max_operations_ttl pred)+1)
+         new_context.max_operations_ttl) in
+  let new_context =
+    { new_context with max_operations_ttl } in
   lwt_log_info "validation of %a: success"
     Block_hash.pp_short hash >>= fun () ->
   return new_context

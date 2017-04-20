@@ -120,6 +120,7 @@ module Block : sig
   val net_id: t -> Net_id.t
   val level: t -> Int32.t
   val message: t -> string
+  val max_operations_ttl: t -> int
 
   val predecessor: t -> block option Lwt.t
 
