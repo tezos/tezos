@@ -198,12 +198,12 @@ module Blocks = struct
       ~output: block_info_encoding
       block_path
 
-  let net =
+  let net_id =
     RPC.service
       ~description:"Returns the net of the chain in which the block belongs."
       ~input: empty
-      ~output: (obj1 (req "net" Net_id.encoding))
-      RPC.Path.(block_path / "net")
+      ~output: (obj1 (req "net_id" Net_id.encoding))
+      RPC.Path.(block_path / "net_id")
 
   let level =
     RPC.service

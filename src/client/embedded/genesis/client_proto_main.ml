@@ -25,23 +25,20 @@ let call_error_service1 rpc_config s block a1 =
 
 let forge_block
     rpc_config block net_id ?(timestamp = Time.now ()) command fitness =
-  let block =
-    match block with
-    | `Prevalidation -> `Head 0
-    | block -> block in
-  Client_blocks.get_block_hash rpc_config block >>=? fun pred ->
-  Client_node_rpcs.Blocks.level rpc_config block >>=? fun level ->
+  let block = Client_rpcs.last_mined_block block in
+  Client_node_rpcs.Blocks.info rpc_config block >>=? fun pred ->
   let proto_level =
     match command with
     | Data.Command.Activate _ -> 1
     | Data.Command.Activate_testnet (_,_) -> 0 in
   call_service1 rpc_config
     Services.Forge.block block
-    ((net_id, Int32.succ  level, proto_level,
-      pred, timestamp, fitness), command)
+    ((net_id, Int32.succ pred.level, proto_level,
+      pred.hash, timestamp, fitness), command)
 
 let mine rpc_config ?timestamp block command fitness seckey =
-  Client_blocks.get_block_info rpc_config block >>=? fun bi ->
+  let block = Client_rpcs.last_mined_block block in
+  Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
   forge_block
     rpc_config ?timestamp block bi.net_id command fitness >>=? fun blk ->
   let signed_blk = Environment.Ed25519.Signature.append seckey blk in

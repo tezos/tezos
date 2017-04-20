@@ -43,7 +43,7 @@ let inject_block cctxt block
     ?force
     ~priority ~timestamp ~fitness ~seed_nonce
     ~src_sk operations =
-  let block = match block with `Prevalidation -> `Head 0 | block -> block in
+  let block = Client_rpcs.last_mined_block block in
   Client_node_rpcs.Blocks.info cctxt block >>=? fun bi ->
   let seed_nonce_hash = Nonce.hash seed_nonce in
   Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
@@ -58,7 +58,7 @@ let inject_block cctxt block
     src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
   Client_proto_rpcs.Helpers.Forge.block cctxt
     block
-    ~net:bi.net_id
+    ~net_id:bi.net_id
     ~predecessor:bi.hash
     ~timestamp
     ~fitness
@@ -80,13 +80,8 @@ let forge_block cctxt block
     ?timestamp
     ~priority
     ~seed_nonce ~src_sk () =
-  let block =
-    match block with
-    | `Prevalidation -> `Head 0
-    | `Test_prevalidation -> `Test_head 0
-    | block -> block in
-  Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
-  let level = Raw_level.succ level.level in
+  let block = Client_rpcs.last_mined_block block in
+  Client_proto_rpcs.Context.next_level cctxt block >>=? fun { level } ->
   begin
     match operations with
     | None ->

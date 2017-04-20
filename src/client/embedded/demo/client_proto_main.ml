@@ -34,11 +34,7 @@ let demo cctxt =
   return ()
 
 let mine cctxt =
-  let block =
-    match Client_commands.(cctxt.config.block) with
-    | `Prevalidation -> `Head 0
-    | `Test_prevalidation -> `Test_head 0
-    | b -> b in
+  let block = Client_rpcs.last_mined_block cctxt.Client_commands.config.block in
   Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
   let fitness =
     match bi.fitness with
