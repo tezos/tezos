@@ -220,6 +220,10 @@ module Assert : sig
     ?msg:string -> block:Client_node_rpcs.Blocks.block ->
     Hash.Protocol_hash.t -> unit tzresult Lwt.t
 
+  val check_voting_period_kind :
+    ?msg:string -> block:Client_node_rpcs.Blocks.block ->
+    Voting_period.kind -> unit tzresult Lwt.t
+
 end
 
 val rpc_config: Client_rpcs.config

@@ -244,6 +244,9 @@ module Protocol = struct
 
   open Account
 
+  let voting_period_kind ?(block = `Prevalidation) () =
+    Client_proto_rpcs.Context.voting_period_kind rpc_config block
+
   let inject_proposals ?async ?force ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) proposals =
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
@@ -380,6 +383,13 @@ module Assert = struct
       ~prn:Protocol_hash.to_b58check
       ~eq:Protocol_hash.equal
       block_proto h
+
+  let check_voting_period_kind ?msg ~block kind =
+    Client_proto_rpcs.Context.voting_period_kind rpc_config block
+    >>=? fun current_kind ->
+    return @@ Assert.equal
+      ?msg:(Assert.format_msg msg)
+      current_kind kind
 
 end
 
