@@ -11,15 +11,16 @@ open Cli_entries
 open Tezos_context
 open Logging.Client.Revelation
 
-let inject_seed_nonce_revelation cctxt block ?force ?async nonces =
+let inject_seed_nonce_revelation rpc_config block ?force ?async nonces =
   let operations =
     List.map
       (fun (level, nonce) ->
          Seed_nonce_revelation { level ; nonce }) nonces in
-  Client_node_rpcs.Blocks.net_id cctxt block >>=? fun net_id ->
-  Client_proto_rpcs.Helpers.Forge.Anonymous.operations cctxt
-    block ~net_id operations >>=? fun bytes ->
-  Client_node_rpcs.inject_operation cctxt ?force ?async bytes >>=? fun oph ->
+  let block = Client_rpcs.last_mined_block block in
+  Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
+  Client_proto_rpcs.Helpers.Forge.Anonymous.operations rpc_config
+    block ~net_id:bi.net_id ~branch:bi.hash operations >>=? fun bytes ->
+  Client_node_rpcs.inject_operation rpc_config ?force ?async bytes >>=? fun oph ->
   return oph
 
 type Error_monad.error += Bad_revelation
