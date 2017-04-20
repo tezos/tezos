@@ -28,7 +28,7 @@ let rec compute_stamp
   let rec loop () =
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
     let unsigned_header =
-      Tezos_context.Block.forge_header
+      Tezos_context.Block_header.forge_unsigned
         shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
     let signed_header =
       Ed25519.Signature.append delegate_sk unsigned_header in
@@ -51,7 +51,7 @@ let inject_block cctxt block
     Operation_list_list_hash.compute
       (List.map Operation_list_hash.compute (List.map (List.map (function Client_node_rpcs.Blob op -> Tezos_data.Operation.hash op | Hash oph -> oph)) operations)) in
   let shell =
-    { Block_header.net_id = bi.net_id ; level = bi.level ;
+    { Tezos_data.Block_header.net_id = bi.net_id ; level = bi.level ;
       proto_level = bi.proto_level ;
       predecessor = bi.hash ; timestamp ; fitness ; operations_hash } in
   compute_stamp cctxt block

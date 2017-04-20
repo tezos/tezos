@@ -261,7 +261,7 @@ let begin_application ctxt block pred_timestamp =
 
 let finalize_application ctxt block miner =
   (* end of level (from this point nothing should fail) *)
-  let priority = block.Block.proto.priority in
+  let priority = block.Block_header.proto.priority in
   let reward = Mining.base_mining_reward ctxt ~priority in
   Nonce.record_hash ctxt
     miner reward block.proto.seed_nonce_hash >>=? fun ctxt ->

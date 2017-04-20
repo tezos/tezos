@@ -21,7 +21,7 @@ let rpc_config : Client_rpcs.config = {
 }
 
 let dictator_sk =
-  Environment.Ed25519.Secret_key.of_b58check_exn
+  Ed25519.Secret_key.of_b58check_exn
     "edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7\
      pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z"
 
@@ -57,7 +57,6 @@ module Account = struct
   }
 
   let encoding =
-    let open Environment.Ed25519 in
     let open Data_encoding in
     conv
       (fun { alias ; sk ; pk ; pkh ; contract } ->
@@ -67,9 +66,9 @@ module Account = struct
          { alias ; sk ; pk ; pkh ; contract })
       (obj5
          (req "alias" string)
-         (req "sk" Secret_key.encoding)
-         (req "pk" Public_key.encoding)
-         (req "pkh" Public_key_hash.encoding)
+         (req "sk" Ed25519.Secret_key.encoding)
+         (req "pk" Ed25519.Public_key.encoding)
+         (req "pkh" Ed25519.Public_key_hash.encoding)
          (req "contract" Contract.encoding))
 
   let pp_account ppf account =
@@ -80,7 +79,7 @@ module Account = struct
     let sk, pk = match keys with
       | Some keys -> keys
       | None -> Sodium.Sign.random_keypair () in
-    let pkh = Environment.Ed25519.Public_key.hash pk in
+    let pkh = Ed25519.Public_key.hash pk in
     let contract = Contract.default_contract pkh in
     { alias ; contract ; pkh ; pk ; sk }
 
@@ -92,7 +91,6 @@ module Account = struct
   }
 
   let destination_encoding =
-    let open Environment.Ed25519 in
     let open Data_encoding in
     conv
       (fun { alias ; pk ; pkh ; contract } ->
@@ -101,8 +99,8 @@ module Account = struct
          { alias ; pk ; pkh ; contract })
       (obj4
          (req "alias" string)
-         (req "pk" Public_key.encoding)
-         (req "pkh" Public_key_hash.encoding)
+         (req "pk" Ed25519.Public_key.encoding)
+         (req "pkh" Ed25519.Public_key_hash.encoding)
          (req "contract" Contract.encoding))
 
   let pp_destination ppf destination =
@@ -110,53 +108,52 @@ module Account = struct
     Format.fprintf ppf "%s" (Data_encoding_ezjsonm.to_string json)
 
   let create_destination ~alias ~contract ~pk =
-    let pkh = Environment.Ed25519.Public_key.hash pk in
+    let pkh = Ed25519.Public_key.hash pk in
     { alias ; contract ; pk ; pkh }
 
   type bootstrap_accounts = { b1 : t ; b2 : t ; b3 : t ; b4 : t ;  b5 : t  ; }
 
   let bootstrap_accounts =
-    let open Environment.Ed25519 in
     let bootstrap1_pk =
-      Public_key.of_b58check_exn
+      Ed25519.Public_key.of_b58check_exn
         "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" in
     let bootstrap2_pk =
-      Public_key.of_b58check_exn
+      Ed25519.Public_key.of_b58check_exn
         "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9" in
     let bootstrap3_pk =
-      Public_key.of_b58check_exn
+      Ed25519.Public_key.of_b58check_exn
         "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV" in
     let bootstrap4_pk =
-      Public_key.of_b58check_exn
+      Ed25519.Public_key.of_b58check_exn
         "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU" in
     let bootstrap5_pk =
-      Public_key.of_b58check_exn
+      Ed25519.Public_key.of_b58check_exn
         "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" in
     let bootstrap1_sk =
-      Secret_key.of_b58check_exn
+      Ed25519.Secret_key.of_b58check_exn
         "edskRuR1azSfboG86YPTyxrQgosh5zChf5bVDmptqLTb5EuXAm9\
          rsnDYfTKhq7rDQujdn5WWzwUMeV3agaZ6J2vPQT58jJAJPi" in
     let bootstrap2_sk =
-      Secret_key.of_b58check_exn
+      Ed25519.Secret_key.of_b58check_exn
         "edskRkJz4Rw2rM5NtabEWMbbg2bF4b1nfFajaqEuEk4SgU7eeDby\
          m9gVQtBTbYo32WUg2zb5sNBkD1whRN7zX43V9bftBbtaKc" in
     let bootstrap3_sk =
-      Secret_key.of_b58check_exn
+      Ed25519.Secret_key.of_b58check_exn
         "edskS3qsqsNgdjUqeMsVcEwBn8dkZ5iDRz6aF21KhcCtRiAkWByp\
          USbicccR4Vgqm9UdW2Vabuos6seezqgbXTrmcbLUG4rdAC" in
     let bootstrap4_sk =
-      Secret_key.of_b58check_exn
+      Ed25519.Secret_key.of_b58check_exn
         "edskRg9qcPqaVQa6jXWNMU5p71tseSuR7NzozgqZ9URsVDi81wTyP\
          JdFSBdeakobyHUi4Xgu61jgKRQvkhXrPmEdEUfiqfiJFL" in
     let bootstrap5_sk =
-      Secret_key.of_b58check_exn
+      Ed25519.Secret_key.of_b58check_exn
         "edskS7rLN2Df3nbS1EYvwJbWo4umD7yPM1SUeX7gp1WhCVpMFXjcC\
          yM58xs6xsnTsVqHQmJQ2RxoAjJGedWfvFmjQy6etA3dgZ" in
     let cpt = ref 0 in
     match List.map begin fun (pk, sk) ->
         incr cpt ;
         let alias = Printf.sprintf "bootstrap%d" !cpt in
-        let pkh = Environment.Ed25519.Public_key.hash pk in
+        let pkh = Ed25519.Public_key.hash pk in
         { alias ; contract = Contract.default_contract pkh; pkh ; pk ; sk }
       end [
         bootstrap1_pk, bootstrap1_sk;
@@ -256,7 +253,7 @@ module Protocol = struct
       ~period:next_level.voting_period
       ~proposals
       () >>=? fun bytes ->
-    let signed_bytes = Environment.Ed25519.Signature.append sk bytes in
+    let signed_bytes = Ed25519.Signature.append sk bytes in
     return (Tezos_data.Operation.of_bytes_exn signed_bytes)
 
   let ballot ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
@@ -269,7 +266,7 @@ module Protocol = struct
       ~proposal
       ~ballot
       () >>=? fun bytes ->
-    let signed_bytes = Environment.Ed25519.Signature.append sk bytes in
+    let signed_bytes = Ed25519.Signature.append sk bytes in
     return (Tezos_data.Operation.of_bytes_exn signed_bytes)
 
 end
@@ -284,11 +281,11 @@ module Assert = struct
       match pkh1, pkh2 with
       | None, None -> true
       | Some pkh1, Some pkh2 ->
-          Environment.Ed25519.Public_key_hash.equal pkh1 pkh2
+          Ed25519.Public_key_hash.equal pkh1 pkh2
       | _ -> false in
     let prn = function
       | None -> "none"
-      | Some pkh -> Environment.Ed25519.Public_key_hash.to_hex pkh in
+      | Some pkh -> Ed25519.Public_key_hash.to_hex pkh in
     Assert.equal ?msg ~prn ~eq pkh1 pkh2
 
   let equal_tez ?msg tz1 tz2 =
@@ -421,10 +418,10 @@ module Mining = struct
       let proof_of_work_nonce =
         Sodium.Random.Bigbytes.generate Constants.proof_of_work_nonce_size in
       let unsigned_header =
-        Block.forge_header
+        Block_header.forge_unsigned
           shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
       let signed_header =
-        Environment.Ed25519.Signature.append delegate_sk unsigned_header in
+        Ed25519.Signature.append delegate_sk unsigned_header in
       let block_hash = Block_hash.hash_bytes [signed_header] in
       if Mining.check_hash block_hash stamp_threshold then
         proof_of_work_nonce
@@ -452,7 +449,7 @@ module Mining = struct
       Operation_list_list_hash.compute
         [Operation_list_hash.compute operation_hashes] in
     let shell =
-      { Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
+      { Tezos_data.Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
         timestamp ; fitness ; operations_hash ;
         level = Raw_level.to_int32 level.level ;
         proto_level } in
@@ -471,7 +468,7 @@ module Mining = struct
       ~seed_nonce_hash
       ~proof_of_work_nonce
       () >>=? fun unsigned_header ->
-    let signed_header = Environment.Ed25519.Signature.append src_sk unsigned_header in
+    let signed_header = Ed25519.Signature.append src_sk unsigned_header in
     Client_node_rpcs.inject_block rpc_config
       ?force signed_header
       [List.map (fun h -> Client_node_rpcs.Blob h) operations] >>=? fun block_hash ->
@@ -535,7 +532,7 @@ module Endorse = struct
       ~block:hash
       ~slot:slot
       () >>=? fun bytes ->
-    let signed_bytes = Environment.Ed25519.Signature.append src_sk bytes in
+    let signed_bytes = Ed25519.Signature.append src_sk bytes in
     return (Tezos_data.Operation.of_bytes_exn signed_bytes)
 
   let signing_slots

@@ -20,12 +20,12 @@ let max_number_of_operations =
   Tezos_context.Constants.max_number_of_operations
 
 let max_block_length =
-  Tezos_context.Block.max_header_length
+  Tezos_context.Block_header.max_header_length
 
 let rpc_services = Services_registration.rpc_services
 
 type validation_mode =
-  | Application of Tezos_context.Block.header * Tezos_context.public_key_hash
+  | Application of Tezos_context.Block_header.t * Tezos_context.public_key_hash
   | Construction of { pred_block : Block_hash.t ; timestamp : Time.t }
 
 type validation_state =
@@ -40,7 +40,7 @@ let precheck_block
     ~ancestor_context:_
     ~ancestor_timestamp:_
     raw_block =
-  Lwt.return (Tezos_context.Block.parse_header raw_block) >>=? fun _ ->
+  Lwt.return (Tezos_context.Block_header.parse raw_block) >>=? fun _ ->
   (* TODO: decide what other properties should be checked *)
   return ()
 
@@ -49,7 +49,7 @@ let begin_application
     ~predecessor_timestamp:pred_timestamp
     ~predecessor_fitness:pred_fitness
     raw_block =
-  Lwt.return (Tezos_context.Block.parse_header raw_block) >>=? fun header ->
+  Lwt.return (Tezos_context.Block_header.parse raw_block) >>=? fun header ->
   let level = header.shell.level in
   let fitness = pred_fitness in
   let timestamp = header.shell.timestamp in
