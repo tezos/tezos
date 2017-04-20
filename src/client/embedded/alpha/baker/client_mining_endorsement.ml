@@ -124,6 +124,7 @@ let inject_endorsement cctxt
   Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt.rpc_config
     block
     ~net_id:bi.net_id
+    ~branch:bi.hash
     ~source
     ~block:bi.hash
     ~slot:slot

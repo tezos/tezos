@@ -77,6 +77,12 @@ let create net_db =
   let pending = Operation_hash.Table.create 53 in
   let head = ref head in
   let operations = ref empty_result in
+  Chain_traversal.live_blocks
+    !head
+    (State.Block.max_operations_ttl !head)
+    >>= fun (live_blocks, live_operations) ->
+  let live_blocks = ref live_blocks in
+  let live_operations = ref live_operations in
   let running_validation = ref Lwt.return_unit in
   let unprocessed = ref Operation_hash.Set.empty in
   let broadcast_unprocessed = ref false in
@@ -98,22 +104,24 @@ let create net_db =
     if Operation_hash.Set.is_empty !unprocessed then
       Lwt.return ()
     else
-      (* We assume that `!unprocessed` does not contain any operations
-         from `!operations`. *)
       let ops = !unprocessed in
       let broadcast = !broadcast_unprocessed in
       unprocessed := Operation_hash.Set.empty ;
       broadcast_unprocessed := false ;
+      let ops = Operation_hash.Set.diff ops !live_operations in
+      live_operations := Operation_hash.Set.(fold add) !live_operations ops ;
       running_validation := begin
         begin
-          Lwt_list.map_p
+          Lwt_list.filter_map_p
             (fun h ->
                Distributed_db.Operation.read_opt net_db h >>= function
-               | Some po ->
+               | Some po when Block_hash.Set.mem po.shell.branch !live_blocks ->
+                   (* FIXME add the operation on a bounded set of
+                            to-be-ignored operations.*)
+                   Distributed_db.Operation.clear net_db h ;
                    Lwt.return_some (h, po)
-               | None -> Lwt.return_none)
+               | Some _ | None -> Lwt.return_none)
             (Operation_hash.Set.elements ops) >>= fun rops ->
-          let rops = Utils.unopt_list rops in
           (Lwt.return !validation_state >>=? fun validation_state ->
            (prevalidate validation_state ~sort:true rops >>= return)) >>= function
           | Ok (state, r) -> Lwt.return (Ok state, r)
@@ -165,9 +173,6 @@ let create net_db =
   let prevalidation_worker =
 
     let rec worker_loop () =
-      (* TODO cleanup the mempool from outdated operation (1h like
-              Bitcoin ?). And log the removal in some statistic associated
-              to then peers that informed us of the operation. *)
       (* TODO lookup in `!pending` for 'outdated' ops and re-add them
               in `unprocessed` (e.g. if the previous tentative was
               more 5 seconds ago) *)
@@ -229,13 +234,12 @@ let create net_db =
                   Lwt.return_unit
                 end
               | `Register (gid, ops) ->
-                  Lwt_list.filter_p
-                    (fun op ->
-                       Distributed_db.Operation.known net_db op >|= not)
-                  ops >>= fun new_ops ->
                   let known_ops, unknown_ops =
                     List.partition
-                      (fun op -> Operation_hash.Table.mem pending op) new_ops in
+                      (fun op ->
+                         Operation_hash.Table.mem pending op
+                         || Operation_hash.Set.mem op !live_operations)
+                      ops in
                   let fetch op =
                     Distributed_db.Operation.fetch
                       net_db ~peer:gid op () >>= fun _op ->
@@ -260,6 +264,10 @@ let create net_db =
               | `Flush (new_head : State.Block.t) ->
                   list_pendings ~from_block:!head ~to_block:new_head
                     (preapply_result_operations !operations) >>= fun new_mempool ->
+                  Chain_traversal.live_blocks
+                    new_head
+                    (State.Block.max_operations_ttl new_head)
+                  >>= fun (new_live_blocks, new_live_operations) ->
                   lwt_debug "flush %a (mempool: %d)"
                     Block_hash.pp_short (State.Block.hash new_head)
                     (Operation_hash.Set.cardinal new_mempool) >>= fun () ->
@@ -269,6 +277,8 @@ let create net_db =
                   broadcast_unprocessed := false ;
                   unprocessed := new_mempool ;
                   timestamp := Time.now () ;
+                  live_blocks := new_live_blocks ;
+                  live_operations := new_live_operations ;
                   (* Reset the prevalidation context. *)
                   reset_validation_state new_head !timestamp)
             q >>= fun () ->

@@ -19,6 +19,7 @@ val transfer:
   Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
+  ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
   src_sk:secret_key ->
@@ -32,6 +33,7 @@ val originate_account:
   Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
+  ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
   src_sk:secret_key ->
@@ -47,6 +49,7 @@ val originate_contract:
   Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
+  ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
   src_sk:secret_key ->
@@ -63,6 +66,7 @@ val delegate_contract:
   Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
+  ?branch:int ->
   source:Contract.t ->
   ?src_pk:public_key ->
   manager_sk:secret_key ->

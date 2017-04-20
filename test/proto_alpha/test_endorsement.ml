@@ -14,6 +14,12 @@ open Client_alpha
 module Helpers = Proto_alpha_helpers
 module Assert = Helpers.Assert
 
+let { Helpers.Account.b1 ; b2 ; b3 ; b4 ; b5 } =
+  Helpers.Account.bootstrap_accounts
+
+let default_account =
+  Helpers.Account.create "default_account"
+
 let test_double_endorsement contract block =
 
   (* Double endorsement for the same level *)
@@ -59,8 +65,7 @@ let contain_tzerror ?(msg="") ~f t =
       failwith "@[<v 2>Unexpected error@ %a@]" pp_print_error error
   | _ -> return ()
 
-let test_wrong_delegate ~miner contract head =
-  let block = `Hash head in
+let test_wrong_delegate ~miner contract block =
   begin
     Helpers.Endorse.endorse ~slot:1 contract block >>=? fun op ->
     Helpers.Mining.mine block miner [ op ] >>=? fun _ ->
@@ -95,8 +100,8 @@ let test_invalid_endorsement_slot contract block =
   end res ;
   return ()
 
-let test_endorsement_rewards
-    block ({ Helpers.Account.b5 = b1 ; _ } as baccounts) =
+let test_endorsement_rewards block0 =
+
   let get_endorser_except bs accounts =
     let account, cpt = ref accounts.(0), ref 0 in
     while List.mem !account bs do
@@ -109,75 +114,74 @@ let test_endorsement_rewards
 
   (* Endorsement Rights *)
   (* #1 endorse & inject in a block *)
-  Helpers.Endorse.endorsers_list block baccounts >>=? fun accounts ->
+  Helpers.Endorse.endorsers_list block0 >>=? fun accounts ->
   get_endorser_except [ b1 ] accounts >>=? fun (account0, slot0) ->
-  Helpers.Account.balance ~block account0 >>=? fun balance0 ->
-  Helpers.Endorse.endorse ~slot:slot0 account0 block >>=? fun ops ->
-  Helpers.Mining.mine block b1 [ ops ] >>=? fun head0 ->
-  Helpers.display_level (`Hash head0) >>=? fun () ->
-  Assert.balance_equal ~block:(`Hash head0) ~msg:__LOC__ account0
+  Helpers.Account.balance ~block:block0 account0 >>=? fun balance0 ->
+  Helpers.Endorse.endorse ~slot:slot0 account0 block0 >>=? fun op ->
+  Helpers.Mining.mine block0 b1 [ op ] >>=? fun hash1 ->
+  Helpers.display_level (`Hash hash1) >>=? fun () ->
+  Assert.balance_equal ~block:(`Hash hash1) ~msg:__LOC__ account0
     (Int64.sub (Tez.to_cents balance0) bond) >>=? fun () ->
 
-
   (* #2 endorse & inject in a block  *)
-  let block0 = `Hash head0 in
-  Helpers.Endorse.endorsers_list block0 baccounts >>=? fun accounts ->
+  let block1 = `Hash hash1 in
+  Helpers.Endorse.endorsers_list block1 >>=? fun accounts ->
   get_endorser_except [ b1 ; account0 ] accounts >>=? fun (account1, slot1) ->
-  Helpers.Account.balance ~block:block0  account1 >>=? fun balance1 ->
-  Helpers.Endorse.endorse ~slot:slot1 account1 block0 >>=? fun ops ->
-  Helpers.Mining.mine block0 b1 [ ops ] >>=? fun head1 ->
-  Helpers.display_level (`Hash head1) >>=? fun () ->
-  Assert.balance_equal ~block:(`Hash head1) ~msg:__LOC__ account1
+  Helpers.Account.balance ~block:block1 account1 >>=? fun balance1 ->
+  Helpers.Endorse.endorse ~slot:slot1 account1 block1 >>=? fun op ->
+  Helpers.Mining.mine block1 b1 [ op ] >>=? fun hash2 ->
+  Helpers.display_level (`Hash hash2) >>=? fun () ->
+  Assert.balance_equal ~block:(`Hash hash2) ~msg:__LOC__ account1
     (Int64.sub (Tez.to_cents balance1) bond) >>=? fun () ->
 
   (* Check rewards after one cycle for account0 *)
-  Helpers.Mining.mine (`Hash head1) b1 [] >>=? fun head2 ->
-  Helpers.display_level (`Hash head2) >>=? fun () ->
-  Helpers.Mining.mine (`Hash head2) b1 [] >>=? fun head3 ->
-  Helpers.display_level (`Hash head3) >>=? fun () ->
-  Helpers.Mining.mine (`Hash head3) b1 [] >>=? fun head4 ->
-  Helpers.display_level (`Hash head4) >>=? fun () ->
-  Helpers.Mining.endorsement_reward block0 >>=? fun rw0 ->
-  Assert.balance_equal ~block:(`Hash head4) ~msg:__LOC__ account0
+  Helpers.Mining.mine (`Hash hash2) b1 [] >>=? fun hash3 ->
+  Helpers.display_level (`Hash hash3) >>=? fun () ->
+  Helpers.Mining.mine (`Hash hash3) b1 [] >>=? fun hash4 ->
+  Helpers.display_level (`Hash hash4) >>=? fun () ->
+  Helpers.Mining.mine (`Hash hash4) b1 [] >>=? fun hash5 ->
+  Helpers.display_level (`Hash hash5) >>=? fun () ->
+  Helpers.Mining.endorsement_reward block1 >>=? fun rw0 ->
+  Assert.balance_equal ~block:(`Hash hash5) ~msg:__LOC__ account0
     (Int64.add (Tez.to_cents balance0) rw0) >>=? fun () ->
 
   (* Check rewards after one cycle for account1 *)
-  Helpers.Mining.endorsement_reward (`Hash head1) >>=? fun rw1 ->
-  Assert.balance_equal ~block:(`Hash head4) ~msg:__LOC__ account1
+  Helpers.Mining.endorsement_reward (`Hash hash2) >>=? fun rw1 ->
+  Assert.balance_equal ~block:(`Hash hash5) ~msg:__LOC__ account1
     (Int64.add (Tez.to_cents balance1) rw1) >>=? fun () ->
 
   (* #2 endorse and check reward only on the good chain  *)
-  Helpers.Mining.mine (`Hash head4) b1 []>>=? fun head ->
-  Helpers.display_level (`Hash head) >>=? fun () ->
-  Helpers.Mining.mine (`Hash head4) b1 [] >>=? fun fork ->
-  Helpers.display_level (`Hash fork) >>=? fun () ->
+  Helpers.Mining.mine (`Hash hash5) b1 []>>=? fun hash6a ->
+  Helpers.display_level (`Hash hash6a) >>=? fun () ->
+  Helpers.Mining.mine (`Hash hash5) b1 [] >>=? fun hash6b ->
+  Helpers.display_level (`Hash hash6b) >>=? fun () ->
 
   (* working on head *)
-  Helpers.Endorse.endorsers_list (`Hash head) baccounts >>=? fun accounts ->
+  Helpers.Endorse.endorsers_list (`Hash hash6a) >>=? fun accounts ->
   get_endorser_except [ b1 ] accounts >>=? fun (account3, slot3) ->
-  Helpers.Account.balance ~block:(`Hash head) account3 >>=? fun balance3 ->
+  Helpers.Account.balance ~block:(`Hash hash6a) account3 >>=? fun balance3 ->
   Helpers.Endorse.endorse
-    ~slot:slot3 account3 (`Hash head) >>=? fun ops ->
-  Helpers.Mining.mine (`Hash head) b1 [ ops ] >>=? fun new_head ->
-  Helpers.display_level (`Hash new_head) >>=? fun () ->
+    ~slot:slot3 account3 (`Hash hash6a) >>=? fun ops ->
+  Helpers.Mining.mine (`Hash hash6a) b1 [ ops ] >>=? fun hash7a ->
+  Helpers.display_level (`Hash hash7a) >>=? fun () ->
 
   (* working on fork *)
-  Helpers.Endorse.endorsers_list (`Hash fork) baccounts >>=? fun accounts ->
+  Helpers.Endorse.endorsers_list (`Hash hash6b) >>=? fun accounts ->
   get_endorser_except [ b1 ] accounts >>=? fun (account4, slot4) ->
-  Helpers.Account.balance ~block:(`Hash new_head) account4 >>=? fun _balance4 ->
-  Helpers.Endorse.endorse ~slot:slot4 account4 (`Hash fork) >>=? fun ops ->
-  Helpers.Mining.mine (`Hash fork) b1 [ ops ] >>=? fun _new_fork ->
+  Helpers.Account.balance ~block:(`Hash hash7a) account4 >>=? fun _balance4 ->
+  Helpers.Endorse.endorse ~slot:slot4 account4 (`Hash hash6b) >>=? fun ops ->
+  Helpers.Mining.mine (`Hash hash6b) b1 [ ops ] >>=? fun _new_fork ->
   Helpers.display_level (`Hash _new_fork) >>=? fun () ->
-  Helpers.Account.balance ~block:(`Hash new_head) account4 >>=? fun balance4 ->
+  Helpers.Account.balance ~block:(`Hash hash7a) account4 >>=? fun balance4 ->
 
-  Helpers.Mining.mine (`Hash new_head) b1 [] >>=? fun head ->
-  Helpers.display_level (`Hash head) >>=? fun () ->
-  Helpers.Mining.mine (`Hash head) b1 [] >>=? fun head ->
-  Helpers.display_level (`Hash head) >>=? fun () ->
+  Helpers.Mining.mine (`Hash hash7a) b1 [] >>=? fun hash8a ->
+  Helpers.display_level (`Hash hash8a) >>=? fun () ->
+  Helpers.Mining.mine (`Hash hash8a) b1 [] >>=? fun hash9a ->
+  Helpers.display_level (`Hash hash9a) >>=? fun () ->
 
   (* Check rewards after one cycle *)
-  Helpers.Mining.endorsement_reward (`Hash new_head) >>=? fun reward ->
-  Assert.balance_equal ~block:(`Hash head) ~msg:__LOC__ account3
+  Helpers.Mining.endorsement_reward (`Hash hash7a) >>=? fun reward ->
+  Assert.balance_equal ~block:(`Hash hash9a) ~msg:__LOC__ account3
     (Int64.add (Tez.to_cents balance3) reward) >>=? fun () ->
 
   (* Check no reward for the fork *)
@@ -185,57 +189,60 @@ let test_endorsement_rewards
     if account3 = account4 then return ()
     (* if account4 is different from account3, we need to check that there
        is no reward for him since the endorsement was in the fork branch *)
-    else Assert.balance_equal ~block:(`Hash head) ~msg:__LOC__ account4 (Tez.to_cents balance4)
+    else Assert.balance_equal ~block:(`Hash hash9a) ~msg:__LOC__ account4 (Tez.to_cents balance4)
   end >>=? fun () ->
-  return head
+  return ()
 
 let test_endorsement_rights contract block =
   Helpers.Endorse.endorsement_rights contract block >>|? fun possibilities ->
   possibilities <> []
 
-let run head (({ b1 ; b2 ; b3 ; b4 ; b5 } : Helpers.Account.bootstrap_accounts) as baccounts) =
+let run genesis =
 
-  let default_account = Helpers.Account.create "default_account" in
-
-  test_endorsement_rights default_account head >>=? fun has_right_to_endorse ->
+  test_endorsement_rights
+    default_account genesis >>=? fun has_right_to_endorse ->
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse false ;
-  test_endorsement_rights b1 head >>=? fun has_right_to_endorse ->
+  test_endorsement_rights b1 genesis >>=? fun has_right_to_endorse ->
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse true ;
-  test_endorsement_rights b1 head >>=? fun has_right_to_endorse ->
+  test_endorsement_rights b1 genesis >>=? fun has_right_to_endorse ->
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse true ;
 
-  Assert.balance_equal ~block:head ~msg:__LOC__ b1 4_000_000_00L >>=? fun () ->
-  Assert.balance_equal ~block:head ~msg:__LOC__ b2 4_000_000_00L >>=? fun () ->
-  Assert.balance_equal ~block:head ~msg:__LOC__ b3 4_000_000_00L >>=? fun () ->
-  Assert.balance_equal ~block:head ~msg:__LOC__ b4 4_000_000_00L >>=? fun () ->
-  Assert.balance_equal ~block:head ~msg:__LOC__ b5 4_000_000_00L >>=? fun () ->
+  Assert.balance_equal
+    ~block:genesis ~msg:__LOC__ b1 4_000_000_00L >>=? fun () ->
+  Assert.balance_equal
+    ~block:genesis ~msg:__LOC__ b2 4_000_000_00L >>=? fun () ->
+  Assert.balance_equal
+    ~block:genesis ~msg:__LOC__ b3 4_000_000_00L >>=? fun () ->
+  Assert.balance_equal
+    ~block:genesis ~msg:__LOC__ b4 4_000_000_00L >>=? fun () ->
+  Assert.balance_equal
+    ~block:genesis ~msg:__LOC__ b5 4_000_000_00L >>=? fun () ->
 
   (* Check Rewards *)
-  test_endorsement_rewards head baccounts >>=? fun head ->
+  test_endorsement_rewards genesis >>=? fun () ->
 
   (* Endorse with a contract with wrong delegate:
       - contract with no endorsement rights
       - contract which signs at every available slots *)
-  test_wrong_delegate ~miner:b1 default_account head >>= fun () ->
-  test_wrong_delegate ~miner:b1 b5 head >>= fun () ->
+  test_wrong_delegate ~miner:b1 default_account genesis >>= fun () ->
+  test_wrong_delegate ~miner:b1 b5 genesis >>= fun () ->
 
   (* Endorse with a wrong slot : -1 and max (16) *)
-  test_invalid_endorsement_slot b3 (`Hash head) >>=? fun () ->
+  test_invalid_endorsement_slot b3 genesis >>=? fun () ->
 
   (* FIXME: Mining.Invalid_signature is still unclassified *)
-  test_invalid_signature (`Hash head) >>=? fun _ ->
+  test_invalid_signature genesis >>=? fun _ ->
 
   (* FIXME: cannot inject double endorsement operation yet, but the
      code is still here
      Double endorsement *)
-  test_double_endorsement b4 (`Hash head) >>=? fun new_head ->
+  test_double_endorsement b4 genesis >>=? fun _ ->
 
-  return new_head
+  return ()
 
 let main () =
-  Helpers.init () >>=? fun (_node_pid, hash) ->
-  run (`Hash hash) Helpers.Account.bootstrap_accounts >>=? fun _blkh ->
-  return ()
+  Helpers.init () >>=? fun (_node_pid, genesis) ->
+  run (`Hash genesis)
 
 
 let tests = [

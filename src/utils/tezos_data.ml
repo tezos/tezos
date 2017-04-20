@@ -93,14 +93,17 @@ module Operation = struct
 
   type shell_header = {
     net_id: Net_id.t ;
+    branch: Block_hash.t ;
   }
 
   let shell_header_encoding =
     let open Data_encoding in
     conv
-      (fun { net_id } -> net_id)
-      (fun net_id -> { net_id })
-      (obj1 (req "net_id" Net_id.encoding))
+      (fun { net_id ; branch } -> net_id, branch)
+      (fun (net_id, branch) -> { net_id ; branch })
+      (obj2
+         (req "net_id" Net_id.encoding)
+         (req "branch" Block_hash.encoding))
 
   type t = {
     shell: shell_header ;

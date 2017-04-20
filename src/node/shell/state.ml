@@ -296,6 +296,8 @@ module Block = struct
   let message { contents = { message } } = message
   let operation_list_count { contents = { operation_list_count } } =
     operation_list_count
+  let max_operations_ttl { contents = { max_operations_ttl } } =
+    max_operations_ttl
 
   let known_valid net_state hash =
     Shared.use net_state.block_store begin fun store ->

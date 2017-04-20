@@ -114,7 +114,6 @@ module Endorse : sig
 
   val endorsers_list :
     Client_alpha.Client_proto_rpcs.block ->
-    Account.bootstrap_accounts ->
     Account.t array tzresult Lwt.t
 
   val endorsement_rights :

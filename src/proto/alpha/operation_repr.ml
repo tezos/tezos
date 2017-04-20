@@ -364,8 +364,7 @@ let parse hash (op: Operation.t) =
             Encoding.signed_proto_operation_encoding
             op.proto with
     | Some (contents, signature) ->
-        let shell = { Operation.net_id = op.shell.net_id } in
-        ok { hash ; shell ; contents ; signature }
+        ok { hash ; shell = op.shell ; contents ; signature }
     | None -> error Cannot_parse_operation
 
 type error += Invalid_signature (* `Permanent *)
