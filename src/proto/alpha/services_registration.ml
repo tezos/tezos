@@ -69,6 +69,24 @@ let () =
          (map2_s (fun x y -> Lwt.return (Operation.parse x y)))
          operation_hashes operations)
 
+let () =
+  register0_fullctxt
+    Services.header
+    (fun { block_header } ->
+       Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
+       return block_header) ;
+  register0_fullctxt
+    Services.Header.priority
+    (fun { block_header } ->
+       Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
+       return block_header.proto.priority) ;
+  register0_fullctxt
+    Services.Header.seed_nonce_hash
+    (fun { block_header } ->
+       Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
+       return block_header.proto.seed_nonce_hash)
+
+
 (*-- Constants ---------------------------------------------------------------*)
 
 let cycle_length ctxt =

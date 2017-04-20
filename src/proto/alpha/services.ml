@@ -37,11 +37,36 @@ let wrap_tzerror encoding =
 
 let operations custom_root =
   RPC.service
-    ~description: "All the operations of the block (parsed)."
+    ~description: "All the operations of the block (fully decoded)."
     ~input: empty
     ~output: (wrap_tzerror @@
               (list (list (dynamic_size Operation.encoding))))
     RPC.Path.(custom_root / "operations")
+
+let header custom_root =
+  RPC.service
+    ~description: "The header of the block (fully decoded)."
+    ~input: empty
+    ~output: (wrap_tzerror Block_header.encoding)
+    RPC.Path.(custom_root / "header")
+
+module Header = struct
+
+  let priority custom_root =
+    RPC.service
+      ~description: "Mining priority of the block."
+      ~input: empty
+      ~output: (wrap_tzerror uint16)
+      RPC.Path.(custom_root / "header" / "priority")
+
+  let seed_nonce_hash custom_root =
+    RPC.service
+      ~description: "Hash of the seed nonce of the block."
+      ~input: empty
+      ~output: (wrap_tzerror Nonce_hash.encoding)
+      RPC.Path.(custom_root / "header" / "seed_nonce_hash")
+
+end
 
 module Constants = struct
 
