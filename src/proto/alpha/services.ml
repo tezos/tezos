@@ -622,28 +622,6 @@ module Helpers = struct
         ~output: (wrap_tzerror bytes)
         RPC.Path.(custom_root / "helpers" / "forge" / "block_proto_header")
 
-    let block custom_root =
-      RPC.service
-        ~description: "Forge a block header"
-        ~input:
-        (merge_objs
-           (obj5
-              (req "net_id" Net_id.encoding)
-              (req "predecessor" Block_hash.encoding)
-              (req "timestamp" Timestamp.encoding)
-              (req "fitness" Fitness.encoding)
-              (req "operations" Operation_list_list_hash.encoding))
-           (obj5
-              (req "level" Raw_level.encoding)
-              (req "priority" uint16)
-              (req "proto_level" uint8)
-              (req "nonce_hash" Nonce_hash.encoding)
-              (req "proof_of_work_nonce"
-                 (Fixed.bytes
-                    Tezos_context.Constants.proof_of_work_nonce_size))))
-        ~output: (wrap_tzerror bytes)
-        RPC.Path.(custom_root / "helpers" / "forge" / "block")
-
   end
 
   module Parse = struct

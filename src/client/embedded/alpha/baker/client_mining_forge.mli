@@ -15,12 +15,10 @@ val generate_seed_nonce: unit -> Nonce.t
 
 val inject_block:
   Client_rpcs.config ->
-  Client_proto_rpcs.block ->
   ?force:bool ->
+  shell_header:Block_header.shell_header ->
   priority:int ->
-  timestamp:Time.t ->
-  fitness:Fitness.t ->
-  seed_nonce:Nonce.t ->
+  seed_nonce_hash:Nonce_hash.t ->
   src_sk:secret_key ->
   Client_node_rpcs.operation list list ->
   Block_hash.t tzresult Lwt.t
@@ -29,6 +27,9 @@ val inject_block:
     [?force] is set, the fitness check will be bypassed. [priority]
     will be used to compute the mining slot (level is
     precomputed). [src_sk] is used to sign the block header. *)
+
+type error +=
+  | Failed_to_preapply of Client_node_rpcs.operation * error list
 
 val forge_block:
   Client_rpcs.config ->
@@ -39,7 +40,7 @@ val forge_block:
   ?sort:bool ->
   ?timestamp:Time.t ->
   priority:[`Set of int | `Auto of (public_key_hash * int option * bool)] ->
-  seed_nonce:Nonce.t ->
+  seed_nonce_hash:Nonce_hash.t ->
   src_sk:secret_key ->
   unit ->
   Block_hash.t tzresult Lwt.t

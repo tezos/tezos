@@ -44,6 +44,7 @@ type valid_endorsement = {
   slots: int list ;
 }
 
+(*
 let filter_valid_endorsement cctxt ({ hash ; content } : operation) =
   let open Tezos_context in
   match content with
@@ -115,3 +116,11 @@ let monitor_endorsement cctxt =
       ops_stream
   end ;
   return endorsement_stream
+*)
+
+(* Temporary desactivate the monitoring of endorsement:
+   too slow for now. *)
+let monitor_endorsement _ =
+  let stream, _push = Lwt_stream.create () in
+  return stream
+

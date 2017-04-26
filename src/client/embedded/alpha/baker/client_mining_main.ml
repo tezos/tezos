@@ -23,10 +23,11 @@ let mine_block cctxt block
   Client_proto_rpcs.Context.level cctxt.rpc_config block >>=? fun level ->
   let level = Raw_level.succ level.level in
   let seed_nonce = Client_mining_forge.generate_seed_nonce () in
+  let seed_nonce_hash = Nonce.hash seed_nonce in
   Client_mining_forge.forge_block cctxt.rpc_config
     ~timestamp:(Time.now ())
     ?force
-    ~seed_nonce ~src_sk block
+    ~seed_nonce_hash ~src_sk block
     ~priority:(`Auto (delegate, max_priority, free_mining)) () >>=? fun block_hash ->
   Client_mining_forge.State.record_block cctxt level block_hash seed_nonce
   |> trace_exn (Failure "Error while recording block") >>=? fun () ->

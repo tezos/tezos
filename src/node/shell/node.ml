@@ -451,7 +451,9 @@ module RPC = struct
   let protocol_content node hash =
     State.Protocol.read node.state hash
 
-  let preapply node block ~timestamp ~sort ops =
+  let preapply
+      node block
+      ~timestamp ~proto_header ~sort_operations:sort ops =
     begin
       match block with
       | `Genesis ->
@@ -477,11 +479,32 @@ module RPC = struct
     let net_db = Validator.net_db node.mainnet_validator in
     map_p (Distributed_db.resolve_operation net_db) ops >>=? fun rops ->
     Prevalidation.start_prevalidation
-      ~predecessor ~timestamp >>=? fun validation_state ->
+      ~proto_header ~predecessor ~timestamp () >>=? fun validation_state ->
     Prevalidation.prevalidate
-      validation_state ~sort rops >>=? fun (validation_state, r) ->
-    Prevalidation.end_prevalidation validation_state >>=? fun { fitness } ->
-    return (fitness, { r with applied = List.rev r.applied })
+      validation_state ~sort rops >>= fun (validation_state, r) ->
+    let operations_hash =
+      Operation_list_list_hash.compute
+        [Operation_list_hash.compute r.applied] in
+    Prevalidation.end_prevalidation
+      validation_state >>=? fun { fitness ; context } ->
+    let pred_shell_header = State.Block.shell_header predecessor in
+    State.Block.protocol_hash predecessor >>= fun pred_protocol ->
+    Context.get_protocol context >>= fun protocol ->
+    let proto_level =
+      if Protocol_hash.equal protocol pred_protocol then
+        pred_shell_header.proto_level
+      else
+        ((pred_shell_header.proto_level + 1) mod 256) in
+    let shell_header : Block_header.shell_header = {
+      net_id = pred_shell_header.net_id ;
+      level = Int32.succ pred_shell_header.level ;
+      proto_level ;
+      predecessor = State.Block.hash predecessor ;
+      timestamp ;
+      operations_hash ;
+      fitness ;
+    } in
+    return (shell_header, r)
 
   let complete node ?block str =
     match block with

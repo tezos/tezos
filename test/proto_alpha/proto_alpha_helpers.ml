@@ -13,6 +13,8 @@ open Client_alpha
 
 let (//) = Filename.concat
 
+let () = Random.self_init ()
+
 let rpc_config : Client_rpcs.config = {
   host = "localhost" ;
   port = 8192 + Random.int 8192 ;
@@ -33,7 +35,6 @@ let activate_alpha () =
     fitness dictator_sk
 
 let init ?(sandbox = "sandbox.json") () =
-  Random.self_init () ;
   Unix.chdir (Filename.dirname (Filename.dirname Sys.executable_name)) ;
   let pid =
     Node_helpers.fork_node
@@ -311,6 +312,23 @@ module Assert = struct
         List.exists f errors
     | _ -> false
 
+  let hash = function
+    | Client_node_rpcs.Hash h -> h
+    | Blob op -> Tezos_data.Operation.hash op
+
+  let failed_to_preapply ~msg ?op f =
+    Assert.contain_error ~msg ~f:begin function
+      | Client_mining_forge.Failed_to_preapply (op', err) ->
+        begin
+          match op with
+          | None -> true
+          | Some op ->
+              let h = hash op and h' = hash op' in
+              Operation_hash.equal h h'
+        end && List.exists (ecoproto_error f) err
+      | _ -> false
+    end
+
   let generic_economic_error ~msg =
     Assert.contain_error ~msg ~f:(ecoproto_error (fun _ -> true))
 
@@ -363,12 +381,6 @@ module Assert = struct
         | _ -> false)
     end
 
-  let invalid_endorsement_slot ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
-        | Mining.Invalid_endorsement_slot _ -> true
-        | _ -> false)
-    end
-
   let check_protocol ?msg ~block h =
     Client_node_rpcs.Blocks.protocol rpc_config block >>=? fun block_proto ->
     return @@ Assert.equal
@@ -388,128 +400,28 @@ end
 
 module Mining = struct
 
-  let get_first_priority
-      ?(max_priority=1024)
-      level
-      (contract : Account.t)
-      block =
-    Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate
-      rpc_config
-      ~max_priority
-      ~first_level:level
-      ~last_level:level
-      block contract.Account.pkh () >>=? fun possibilities ->
-    try
-      let _, prio, _ =
-        List.find (fun (l,_,_) -> l = level) possibilities in
-      return prio
-    with Not_found ->
-      failwith "No slot found at level %a" Raw_level.pp level
-
-  let rec mine_stamp
-      block
-      delegate_sk
-      shell
-      priority
-      seed_nonce_hash =
-    Client_proto_rpcs.Constants.stamp_threshold
-      rpc_config block >>=? fun stamp_threshold ->
-    let rec loop () =
-      let proof_of_work_nonce =
-        Sodium.Random.Bigbytes.generate Constants.proof_of_work_nonce_size in
-      let unsigned_header =
-        Block_header.forge_unsigned
-          shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
-      let signed_header =
-        Ed25519.Signature.append delegate_sk unsigned_header in
-      let block_hash = Block_hash.hash_bytes [signed_header] in
-      if Mining.check_hash block_hash stamp_threshold then
-        proof_of_work_nonce
-      else
-        loop () in
-    return (loop ())
-
-  let inject_block
-      block
-      ?force
-      ?proto_level
-      ~priority
-      ~timestamp
-      ~fitness
-      ~seed_nonce
-      ~src_sk
-      operations =
-    let block = match block with `Prevalidation -> `Head 0 | block -> block in
-    Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
-    let proto_level = Utils.unopt ~default:bi.proto_level proto_level in
+  let mine block (contract: Account.t) operations =
+    let operations = List.map (fun op -> Client_node_rpcs.Blob op) operations in
+    let seed_nonce =
+      match Nonce.of_bytes @@
+        Sodium.Random.Bigbytes.generate Constants.nonce_length with
+      | Error _ -> assert false
+      | Ok nonce -> nonce in
     let seed_nonce_hash = Nonce.hash seed_nonce in
-    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun level ->
-    let operation_hashes = List.map Tezos_data.Operation.hash operations in
-    let operations_hash =
-      Operation_list_list_hash.compute
-        [Operation_list_hash.compute operation_hashes] in
-    let shell =
-      { Tezos_data.Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
-        timestamp ; fitness ; operations_hash ;
-        level = Raw_level.to_int32 level.level ;
-        proto_level } in
-    mine_stamp
-      block src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
-    Client_proto_rpcs.Helpers.Forge.block rpc_config
+    Client_mining_forge.forge_block
+      rpc_config
       block
-      ~net_id:bi.net_id
-      ~predecessor:bi.hash
-      ~timestamp
-      ~fitness
-      ~operations_hash
-      ~level:level.level
-      ~proto_level
-      ~priority
+      ~operations
+      ~force:true
+      ~best_effort:false
+      ~sort:false
+      ~priority:(`Auto (contract.pkh, Some 1024, false))
       ~seed_nonce_hash
-      ~proof_of_work_nonce
-      () >>=? fun unsigned_header ->
-    let signed_header = Ed25519.Signature.append src_sk unsigned_header in
-    Client_node_rpcs.inject_block rpc_config
-      ?force signed_header
-      [List.map (fun h -> Client_node_rpcs.Blob h) operations] >>=? fun block_hash ->
-    return block_hash
+      ~src_sk:contract.sk
+      ()
 
-  let mine
-      ?(force = true)
-      ?(operations = [])
-      ?(fitness_gap = 1)
-      ?proto_level
-      contract
-      block =
-  Client_mining_blocks.info rpc_config block >>=? fun bi ->
-  let seed_nonce =
-    match Nonce.of_bytes @@
-      Sodium.Random.Bigbytes.generate Constants.nonce_length with
-    | Error _ -> assert false
-    | Ok nonce -> nonce in
-  let timestamp = Time.add (Time.now ()) 1L in
-  Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
-  let level = Raw_level.succ level.level in
-  get_first_priority level contract block >>=? fun priority ->
-  (Lwt.return (Fitness_repr.to_int64 bi.fitness) >|=
-   Register_client_embedded_proto_alpha.wrap_error) >>=? fun fitness ->
-  let fitness =
-    Fitness_repr.from_int64 @@
-    Int64.add fitness (Int64.of_int fitness_gap) in
-  inject_block
-    ~force
-    ?proto_level
-    ~priority
-    ~timestamp
-    ~fitness
-    ~seed_nonce
-    ~src_sk:contract.sk
-    block
-    operations
-
-  let endorsement_reward contract block =
-    Client_mining_blocks.info rpc_config block >>=? fun bi ->
-    get_first_priority bi.level.level contract block >>=? fun prio ->
+  let endorsement_reward block =
+    Client_proto_rpcs.Header.priority rpc_config block >>=? fun prio ->
     Mining.endorsement_reward ~block_priority:prio >|=
     Register_client_embedded_proto_alpha.wrap_error >>|?
     Tez.to_cents

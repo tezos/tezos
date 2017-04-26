@@ -279,6 +279,18 @@ module Make() = struct
             map_filter_s f t >>=? fun rt ->
             return (rh :: rt)
 
+  let rec map_filter_p f l =
+    match l with
+    | [] -> return []
+    | h :: t ->
+        let th = f h
+        and tt = map_filter_s f t in
+        th >>=? function
+        | None -> tt
+        | Some rh ->
+            tt >>=? fun rt ->
+            return (rh :: rt)
+
   let rec iter_s f l =
     match l with
     | [] -> return ()

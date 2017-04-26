@@ -80,9 +80,9 @@ module RPC : sig
 
   val preapply:
     t -> block ->
-    timestamp:Time.t -> sort:bool ->
-    Distributed_db.operation list ->
-    (Fitness.t * error Prevalidation.preapply_result) tzresult Lwt.t
+    timestamp:Time.t -> proto_header:MBytes.t ->
+    sort_operations:bool -> Distributed_db.operation list ->
+    (Block_header.shell_header * error Prevalidation.preapply_result) tzresult Lwt.t
 
   val validate: t -> Net_id.t -> Block_hash.t -> unit tzresult Lwt.t
 

@@ -328,19 +328,12 @@ module Helpers : sig
         id:public_key_hash ->
         int32 -> MBytes.t tzresult Lwt.t
     end
-    val block:
+    val block_proto_header:
       Client_rpcs.config ->
       block ->
-      net_id:Net_id.t ->
-      predecessor:Block_hash.t ->
-      timestamp:Time.t ->
-      fitness:Fitness.t ->
-      operations_hash:Operation_list_list_hash.t ->
-      level:Raw_level.t ->
-      priority:int ->
-      proto_level:int ->
-      seed_nonce_hash:Nonce_hash.t ->
-      proof_of_work_nonce:MBytes.t ->
+      priority: int ->
+      seed_nonce_hash: Nonce_hash.t ->
+      ?proof_of_work_nonce: MBytes.t ->
       unit -> MBytes.t tzresult Lwt.t
       (** [block cctxt root ~net ~predecessor ~timestamp ~fitness
           ~operations ~level ~priority ~seed_nonce_hash

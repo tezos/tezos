@@ -93,14 +93,15 @@ module Blocks : sig
     (unit, unit, list_param, block_info list list) RPC.service
 
   type preapply_param = {
-    operations: operation list ;
-    sort: bool ;
-    timestamp: Time.t option ;
-  }
-  type preapply_result = {
-    operations: error Prevalidation.preapply_result ;
-    fitness: MBytes.t list ;
     timestamp: Time.t ;
+    proto_header: MBytes.t ;
+    operations: operation list ;
+    sort_operations: bool ;
+  }
+
+  type preapply_result = {
+    shell_header: Block_header.shell_header ;
+    operations: error Prevalidation.preapply_result ;
   }
   val preapply:
     (unit, unit * block, preapply_param, preapply_result tzresult) RPC.service
@@ -108,6 +109,7 @@ module Blocks : sig
   val complete: (unit, (unit * block) * string, unit, string list) RPC.service
 
   val proto_path: (unit, unit * block) RPC.Path.path
+
 
 end
 
@@ -173,11 +175,8 @@ module Network : sig
 
 end
 
-val forge_block:
-  (unit, unit,
-   Net_id.t option * Int32.t option * int option * Block_hash.t option *
-   Time.t option * Fitness.t * Operation_list_list_hash.t * MBytes.t,
-   MBytes.t) RPC.service
+val forge_block_header:
+  (unit, unit, Block_header.t, MBytes.t) RPC.service
 
 val validate_block:
   (unit, unit, Net_id.t * Block_hash.t, unit tzresult) RPC.service
