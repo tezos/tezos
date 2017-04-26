@@ -34,11 +34,8 @@ let run cctxt ?max_priority ~delay ?min_date delegates =
     if Client_proto_args.Daemon.(!all || !mining) then begin
       Client_mining_blocks.monitor
         cctxt.rpc_config ?min_date ~min_heads:1 () >>=? fun block_stream ->
-      (* Temporary desactivate the monitoring of endorsement:
-         too slow for now. *)
-      (* Client_mining_operations.monitor_endorsement *)
-      (* cctxt >>= fun endorsement_stream -> *)
-      let endorsement_stream, _push = Lwt_stream.create () in
+      Client_mining_operations.monitor_endorsement
+        cctxt.rpc_config >>=? fun endorsement_stream ->
       Client_mining_forge.create cctxt
         ?max_priority delegates block_stream endorsement_stream >>=? fun () ->
       return ()

@@ -12,22 +12,10 @@ open Client_rpcs
 val errors:
   config -> Json_schema.schema tzresult Lwt.t
 
-val forge_block:
+val forge_block_header:
   config ->
-  ?net_id:Net_id.t ->
-  ?level:Int32.t ->
-  ?proto_level:int ->
-  ?predecessor:Block_hash.t ->
-  ?timestamp:Time.t ->
-  Fitness.t ->
-  Operation_list_list_hash.t ->
-  MBytes.t ->
+  Block_header.t ->
   MBytes.t tzresult Lwt.t
-(** [forge_block cctxt ?net ?predecessor ?timestamp fitness ops
-    proto_hdr] returns the serialization of a block header with
-    [proto_hdr] as protocol-specific part. The arguments [?net] and
-    [?predecessor] are infered from the current head of main network,
-    and [?timestamp] defaults to [Time.now ()]. *)
 
 val validate_block:
   config ->
@@ -141,9 +129,8 @@ module Blocks : sig
     unit -> block_info list list tzresult Lwt_stream.t tzresult Lwt.t
 
   type preapply_result = {
+    shell_header: Block_header.shell_header ;
     operations: error Prevalidation.preapply_result ;
-    fitness: MBytes.t list ;
-    timestamp: Time.t ;
   }
 
   val preapply:
@@ -151,6 +138,7 @@ module Blocks : sig
     block ->
     ?timestamp:Time.t ->
     ?sort:bool ->
+    proto_header:MBytes.t ->
     operation list -> preapply_result tzresult Lwt.t
 
 end

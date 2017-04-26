@@ -10,7 +10,6 @@
 
 open Client_commands
 open Logging.Client.Mining
-module Ed25519 = Environment.Ed25519
 
 let generate_proof_of_work_nonce () =
   Sodium.Random.Bigbytes.generate Constants.proof_of_work_nonce_size
@@ -21,7 +20,7 @@ let generate_seed_nonce () =
   | Error _ -> assert false
   | Ok nonce -> nonce
 
-let rec compute_stamp
+let rec forge_block_header
     cctxt block delegate_sk shell priority seed_nonce_hash =
   Client_proto_rpcs.Constants.stamp_threshold
     cctxt block >>=? fun stamp_threshold ->
@@ -34,54 +33,79 @@ let rec compute_stamp
       Ed25519.Signature.append delegate_sk unsigned_header in
     let block_hash = Block_hash.hash_bytes [signed_header] in
     if Mining.check_hash block_hash stamp_threshold then
-      proof_of_work_nonce
+      signed_header
     else
       loop () in
   return (loop ())
 
-let inject_block cctxt block
-    ?force
-    ~priority ~timestamp ~fitness ~seed_nonce
-    ~src_sk operations =
-  let block = Client_rpcs.last_mined_block block in
-  Client_node_rpcs.Blocks.info cctxt block >>=? fun bi ->
-  let seed_nonce_hash = Nonce.hash seed_nonce in
-  Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
+let empty_proof_of_work_nonce =
+  MBytes.of_string
+    (String.make Constants_repr.proof_of_work_nonce_size  '\000')
+
+let forge_faked_proto_header ~priority ~seed_nonce_hash =
+  Tezos_context.Block_header.forge_unsigned_proto_header
+    { priority ; seed_nonce_hash ;
+      proof_of_work_nonce = empty_proof_of_work_nonce }
+
+let assert_valid_operations_hash shell_header operations =
   let operations_hash =
     Operation_list_list_hash.compute
-      (List.map Operation_list_hash.compute (List.map (List.map (function Client_node_rpcs.Blob op -> Tezos_data.Operation.hash op | Hash oph -> oph)) operations)) in
-  let shell =
-    { Tezos_data.Block_header.net_id = bi.net_id ; level = bi.level ;
-      proto_level = bi.proto_level ;
-      predecessor = bi.hash ; timestamp ; fitness ; operations_hash } in
-  compute_stamp cctxt block
-    src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
-  Client_proto_rpcs.Helpers.Forge.block cctxt
-    block
-    ~net_id:bi.net_id
-    ~predecessor:bi.hash
-    ~timestamp
-    ~fitness
-    ~operations_hash
-    ~level:level.level
-    ~proto_level:bi.proto_level
-    ~priority:priority
-    ~seed_nonce_hash
-    ~proof_of_work_nonce
-    () >>=? fun unsigned_header ->
-  let signed_header = Ed25519.Signature.append src_sk unsigned_header in
+      (List.map Operation_list_hash.compute
+         (List.map
+            (List.map
+               (function
+                 | Client_node_rpcs.Blob op -> Tezos_data.Operation.hash op
+                 | Hash oph -> oph)) operations)) in
+  fail_unless
+    (Operation_list_list_hash.equal
+       operations_hash shell_header.Tezos_data.Block_header.operations_hash)
+    (failure
+       "Client_mining_forge.inject_block: \
+        inconsistent header.")
+
+let inject_block cctxt
+    ?force ~shell_header ~priority ~seed_nonce_hash ~src_sk operations =
+  assert_valid_operations_hash shell_header operations >>=? fun () ->
+  let block = `Hash shell_header.Tezos_data.Block_header.predecessor in
+  forge_block_header cctxt block
+    src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
   Client_node_rpcs.inject_block cctxt
     ?force signed_header operations >>=? fun block_hash ->
   return block_hash
+
+type error +=
+  | Failed_to_preapply of Client_node_rpcs.operation * error list
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"Client_mining_forge.failed_to_preapply"
+    ~title: "Fail to preapply an operation"
+    ~description: ""
+    ~pp:(fun ppf (op, err) ->
+        let h =
+          match op with
+          | Client_node_rpcs.Hash h -> h
+          | Blob op -> Tezos_data.Operation.hash op in
+        Format.fprintf ppf "@[Failed to preapply %a:@ %a@]"
+          Operation_hash.pp_short h
+          pp_print_error err)
+    Data_encoding.
+      (obj2
+        (req "operation" (dynamic_size Client_node_rpcs.operation_encoding))
+        (req "error" Node_rpc_services.Error.encoding))
+    (function
+      | Failed_to_preapply (hash, err) -> Some (hash, err)
+      | _ -> None)
+    (fun (hash, err) -> Failed_to_preapply (hash, err))
 
 let forge_block cctxt block
     ?force
     ?operations ?(best_effort = operations = None) ?(sort = best_effort)
     ?timestamp
     ~priority
-    ~seed_nonce ~src_sk () =
+    ~seed_nonce_hash ~src_sk () =
   let block = Client_rpcs.last_mined_block block in
-  Client_proto_rpcs.Context.next_level cctxt block >>=? fun { level } ->
   begin
     match operations with
     | None ->
@@ -103,6 +127,7 @@ let forge_block cctxt block
         return (prio, time)
       end
     | `Auto (src_pkh, max_priority, free_mining) ->
+        Client_proto_rpcs.Context.next_level cctxt block >>=? fun { level } ->
         Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate cctxt
           ?max_priority
           ~first_level:level
@@ -119,16 +144,16 @@ let forge_block cctxt block
             List.find (fun (l,p,_) -> l = level && p >= min_prio) possibilities in
           return (prio, time)
         with Not_found ->
-          Error_monad.failwith "No slot found at level %a" Raw_level.pp level
+          failwith "No slot found at level %a" Raw_level.pp level
   end >>=? fun (priority, minimal_timestamp) ->
-  lwt_log_info "Mining block at level %a prio %d"
-    Raw_level.pp level priority >>= fun () ->
+  (* lwt_log_info "Mining block at level %a prio %d" *)
+    (* Raw_level.pp level priority >>= fun () -> *)
   begin
     match timestamp, minimal_timestamp with
     | None, timestamp -> return timestamp
     | Some timestamp, minimal_timestamp ->
         if timestamp < minimal_timestamp then
-          Error_monad.failwith
+          failwith
             "Proposed timestamp %a is earlier than minimal timestamp %a"
             Time.pp_hum timestamp
             Time.pp_hum minimal_timestamp
@@ -136,23 +161,57 @@ let forge_block cctxt block
           return timestamp
   end >>=? fun timestamp ->
   let request = List.length operations in
+  let proto_header = forge_faked_proto_header ~priority ~seed_nonce_hash in
   Client_node_rpcs.Blocks.preapply
-    cctxt block ~timestamp ~sort operations >>=?
-  fun { operations ; fitness ; timestamp } ->
-  let valid = List.length operations.applied in
+    cctxt block ~timestamp ~sort ~proto_header operations >>=?
+  fun { operations = result ; shell_header } ->
+  let valid = List.length result.applied in
   lwt_log_info "Found %d valid operations (%d refused) for timestamp %a"
     valid (request - valid)
     Time.pp_hum timestamp >>= fun () ->
-  lwt_log_info "Computed fitness %a" Fitness.pp fitness >>= fun () ->
+  lwt_log_info "Computed fitness %a"
+    Fitness.pp shell_header.fitness >>= fun () ->
   if best_effort
-     || ( Operation_hash.Map.is_empty operations.refused
-          && Operation_hash.Map.is_empty operations.branch_refused
-          && Operation_hash.Map.is_empty operations.branch_delayed ) then
-    inject_block cctxt ?force ~src_sk
-      ~priority ~timestamp ~fitness ~seed_nonce block
-      [List.map (fun h -> Client_node_rpcs.Hash h) operations.applied]
+     || ( Operation_hash.Map.is_empty result.refused
+          && Operation_hash.Map.is_empty result.branch_refused
+          && Operation_hash.Map.is_empty result.branch_delayed ) then
+    let operations =
+      if not best_effort then operations
+      else
+        let map =
+          List.fold_left
+            (fun map op ->
+               match op with
+               | Client_node_rpcs.Hash _ ->  map
+               | Blob op ->
+                   Operation_hash.Map.add (Tezos_data.Operation.hash op) op map)
+            Operation_hash.Map.empty operations in
+        List.map
+          (fun h ->
+             try Client_node_rpcs.Blob (Operation_hash.Map.find h map)
+             with _ -> Client_node_rpcs.Hash h)
+          result.applied in
+    inject_block cctxt
+      ?force ~shell_header ~priority ~seed_nonce_hash ~src_sk
+      [operations]
   else
-    failwith "Cannot (fully) validate the given operations."
+    Lwt.return_error @@
+    Utils.filter_map
+      (fun op ->
+         let h =
+           match op with
+           | Client_node_rpcs.Hash h -> h
+           | Blob op -> Tezos_data.Operation.hash op in
+         try Some (Failed_to_preapply
+                     (op, Operation_hash.Map.find h result.refused))
+         with Not_found ->
+         try Some (Failed_to_preapply
+                       (op, Operation_hash.Map.find h result.branch_refused))
+           with Not_found ->
+             try Some (Failed_to_preapply
+                         (op, Operation_hash.Map.find h result.branch_delayed))
+             with Not_found -> None)
+      operations
 
 
 (** Worker *)
@@ -350,7 +409,6 @@ let safe_get_unrevealed_nonces cctxt block =
       lwt_warn "Cannot read nonces: %a@." pp_print_error err >>= fun () ->
       Lwt.return []
 
-
 let get_delegates cctxt state =
   match state.delegates with
   | [] ->
@@ -406,8 +464,10 @@ let insert_blocks cctxt ?max_priority state bis =
 
 let mine cctxt state =
   let slots = pop_mining_slots state in
-  map_p
-    (fun (timestamp, (bi, prio, delegate)) ->
+  let seed_nonce = generate_seed_nonce () in
+  let seed_nonce_hash = Nonce.hash seed_nonce in
+  Error_monad.map_filter_s
+    (fun (timestamp, (bi, priority, delegate)) ->
        let block = `Hash bi.Client_mining_blocks.hash in
        let timestamp =
          if Block_hash.equal bi.Client_mining_blocks.hash state.genesis then
@@ -417,7 +477,7 @@ let mine cctxt state =
        Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
        lwt_debug "Try mining after %a (slot %d) for %s (%a)"
          Block_hash.pp_short bi.hash
-         prio name Time.pp_hum timestamp >>= fun () ->
+         priority name Time.pp_hum timestamp >>= fun () ->
        Client_node_rpcs.Blocks.pending_operations cctxt.rpc_config
          block >>=? fun (res, ops) ->
        let operations =
@@ -425,40 +485,49 @@ let mine cctxt state =
          List.map (fun x -> Client_node_rpcs.Hash x) @@
          elements (union ops (Prevalidation.preapply_result_operations res)) in
        let request = List.length operations in
+       let proto_header =
+         forge_faked_proto_header ~priority ~seed_nonce_hash in
        Client_node_rpcs.Blocks.preapply cctxt.rpc_config block
-         ~timestamp ~sort:true operations >>= function
+         ~timestamp ~sort:true ~proto_header operations >>= function
        | Error errs ->
            lwt_log_error "Error while prevalidating operations:\n%a"
              pp_print_error
              errs >>= fun () ->
            return None
-       | Ok { operations ; fitness ; timestamp } ->
+       | Ok { operations ; shell_header } ->
            lwt_debug
              "Computed condidate block after %a (slot %d): %d/%d fitness: %a"
-             Block_hash.pp_short bi.hash prio
+             Block_hash.pp_short bi.hash priority
              (List.length operations.applied) request
-             Fitness.pp fitness
+             Fitness.pp shell_header.fitness
            >>= fun () ->
            return
-             (Some (bi, prio, fitness, timestamp, operations, delegate)))
+             (Some (bi, priority, shell_header, operations, delegate)))
     slots >>=? fun candidates ->
   let candidates =
     List.sort
-      (fun (_,_,f1,_,_,_) (_,_,f2,_,_,_) -> ~- (Fitness.compare f1 f2))
-      (Utils.unopt_list candidates) in
+      (fun (_,_,h1,_,_) (_,_,h2,_,_) ->
+         match
+           Fitness.compare h1.Tezos_data.Block_header.fitness h2.fitness
+         with
+         | 0 ->
+             Time.compare h1.timestamp h2.timestamp
+         | cmp -> ~- cmp)
+      candidates in
   match candidates with
-  | (bi, priority, fitness, timestamp, operations, delegate) :: _
-    when Fitness.compare state.best.fitness fitness < 0 -> begin
+  | (bi, priority, shell_header, operations, delegate) :: _
+    when Fitness.compare state.best.fitness shell_header.fitness < 0 ||
+         (Fitness.compare state.best.fitness shell_header.fitness = 0 &&
+          Time.compare shell_header.timestamp state.best.timestamp < 0) -> begin
       let level = Raw_level.succ bi.level.level in
       cctxt.message
         "Select candidate block after %a (slot %d) fitness: %a"
         Block_hash.pp_short bi.hash priority
-        Fitness.pp fitness >>= fun () ->
-      let seed_nonce = generate_seed_nonce () in
+        Fitness.pp shell_header.fitness >>= fun () ->
       Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
       inject_block cctxt.rpc_config
-        ~force:true ~src_sk ~priority ~timestamp ~fitness ~seed_nonce
-        (`Hash bi.hash) [List.map (fun h -> Client_node_rpcs.Hash h) operations.applied]
+        ~force:true ~shell_header ~priority ~seed_nonce_hash ~src_sk
+        [List.map (fun h -> Client_node_rpcs.Hash h) operations.applied]
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
       State.record_block cctxt level block_hash seed_nonce
       |> trace_exn (Failure "Error while recording block") >>=? fun () ->
@@ -470,7 +539,7 @@ let mine cctxt state =
         name
         Block_hash.pp_short bi.hash
         Raw_level.pp level priority
-        Fitness.pp fitness
+        Fitness.pp shell_header.fitness
         (List.length operations.applied) >>= fun () ->
       return ()
     end

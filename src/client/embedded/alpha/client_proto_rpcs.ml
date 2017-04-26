@@ -266,12 +266,15 @@ module Helpers = struct
         let nonce = Sodium.Random.Bigbytes.generate 16 in
         operations cctxt block ~net_id [Faucet { id ; counter ; nonce }]
     end
-    let block cctxt
-        block ~net_id ~predecessor ~timestamp ~fitness ~operations_hash
-        ~level ~priority ~proto_level ~seed_nonce_hash ~proof_of_work_nonce () =
-      call_error_service1 cctxt Services.Helpers.Forge.block block
-        ((net_id, predecessor, timestamp, fitness, operations_hash),
-         (level, priority, proto_level, seed_nonce_hash, proof_of_work_nonce))
+    let empty_proof_of_work_nonce =
+      MBytes.of_string
+        (String.make Constants_repr.proof_of_work_nonce_size  '\000')
+    let block_proto_header cctxt
+        block
+        ~priority ~seed_nonce_hash
+        ?(proof_of_work_nonce = empty_proof_of_work_nonce) () =
+      call_error_service1 cctxt Services.Helpers.Forge.block_proto_header
+        block (priority, seed_nonce_hash, proof_of_work_nonce)
   end
 
   module Parse = struct

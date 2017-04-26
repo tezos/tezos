@@ -73,7 +73,7 @@ let create net_db =
 
   Chain.head net_state >>= fun head ->
   let timestamp = ref (Time.now ()) in
-  (start_prevalidation head !timestamp >|= ref) >>= fun validation_state ->
+  (start_prevalidation head !timestamp () >|= ref) >>= fun validation_state ->
   let pending = Operation_hash.Table.create 53 in
   let head = ref head in
   let operations = ref empty_result in
@@ -86,7 +86,7 @@ let create net_db =
     Lwt.return_unit in
 
   let reset_validation_state head timestamp =
-    start_prevalidation head timestamp >>= fun state ->
+    start_prevalidation head timestamp () >>= fun state ->
     validation_state := state;
     Lwt.return_unit in
 
@@ -109,12 +109,13 @@ let create net_db =
           Lwt_list.map_p
             (fun h ->
                Distributed_db.Operation.read_opt net_db h >>= function
-               | None -> Lwt.return_none
-               | Some po -> Lwt.return_some (h, po))
+               | Some po ->
+                   Lwt.return_some (h, po)
+               | None -> Lwt.return_none)
             (Operation_hash.Set.elements ops) >>= fun rops ->
           let rops = Utils.unopt_list rops in
           (Lwt.return !validation_state >>=? fun validation_state ->
-           prevalidate validation_state ~sort:true rops) >>= function
+           (prevalidate validation_state ~sort:true rops >>= return)) >>= function
           | Ok (state, r) -> Lwt.return (Ok state, r)
           | Error err ->
               let r =
@@ -129,16 +130,16 @@ let create net_db =
           List.fold_right Operation_hash.Map.remove s m in
         operations := {
           applied = List.rev_append r.applied !operations.applied ;
-             refused = Operation_hash.Map.empty ;
-             branch_refused =
-               Operation_hash.Map.merge merge
-                 (* filter_out should not be required here, TODO warn ? *)
-                 (filter_out r.applied !operations.branch_refused)
-                 r.branch_refused ;
-             branch_delayed =
-               Operation_hash.Map.merge merge
-                 (filter_out r.applied !operations.branch_delayed)
-                 r.branch_delayed ;
+          refused = Operation_hash.Map.empty ;
+          branch_refused =
+            Operation_hash.Map.merge merge
+              (* filter_out should not be required here, TODO warn ? *)
+              (filter_out r.applied !operations.branch_refused)
+              r.branch_refused ;
+          branch_delayed =
+            Operation_hash.Map.merge merge
+              (filter_out r.applied !operations.branch_delayed)
+              r.branch_delayed ;
         } ;
         if broadcast then broadcast_operation r.applied ;
         Lwt_list.iter_s
@@ -181,7 +182,8 @@ let create net_db =
                   let result =
                     let rops = Operation_hash.Map.bindings ops in
                     Lwt.return !validation_state >>=? fun validation_state ->
-                    prevalidate validation_state ~sort:true rops >>=? fun (state, res) ->
+                    prevalidate validation_state
+                      ~sort:true rops >>= fun (state, res) ->
                     let register h =
                       let op = Operation_hash.Map.find h ops in
                       Distributed_db.inject_operation

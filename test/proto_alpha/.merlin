@@ -18,8 +18,9 @@ B ../../src/proto
 S ../../src/client
 B ../../src/client
 S ../../src/client/embedded/alpha
+B ../../src/client/embedded/alpha
 S ../../src/client/embedded/alpha/baker
-B ../../src/client/embedded
+B ../../src/client/embedded/alpha/baker
 S ../lib
 B ../lib
 FLG -open Error_monad -open Hash -open Utils -open Environment -open Tezos_data
