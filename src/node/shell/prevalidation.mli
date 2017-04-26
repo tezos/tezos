@@ -29,14 +29,15 @@ val preapply_result_encoding :
 type prevalidation_state
 
 val start_prevalidation :
+  ?proto_header: MBytes.t ->
   predecessor: State.Block.t ->
   timestamp: Time.t ->
-  prevalidation_state tzresult Lwt.t
+  unit -> prevalidation_state tzresult Lwt.t
 
 val prevalidate :
   prevalidation_state -> sort:bool ->
   (Operation_hash.t * Operation.t) list ->
-  (prevalidation_state * error preapply_result) tzresult Lwt.t
+  (prevalidation_state * error preapply_result) Lwt.t
 
 val end_prevalidation :
   prevalidation_state -> Updater.validation_result tzresult Lwt.t

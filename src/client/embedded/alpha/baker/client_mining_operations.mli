@@ -24,10 +24,13 @@ type valid_endorsement = {
   slots: int list ;
 }
 
+(*
 val filter_valid_endorsement:
   Client_rpcs.config ->
   operation -> valid_endorsement option Lwt.t
+*)
 
 val monitor_endorsement:
   Client_rpcs.config ->
   valid_endorsement tzresult Lwt_stream.t tzresult Lwt.t
+

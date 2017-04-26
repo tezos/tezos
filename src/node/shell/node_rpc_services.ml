@@ -150,44 +150,6 @@ module Blocks = struct
     let destruct = parse_block in
     RPC.Arg.make ~name ~descr ~construct ~destruct ()
 
-  type preapply_param = {
-    operations: operation list ;
-    sort: bool ;
-    timestamp: Time.t option ;
-  }
-
-  let preapply_param_encoding =
-    (conv
-       (fun { operations ; sort ; timestamp } ->
-          (operations, Some sort, timestamp))
-       (fun (operations, sort, timestamp) ->
-          let sort =
-            match sort with
-            | None -> true
-            | Some x -> x in
-          { operations ; sort ; timestamp })
-       (obj3
-          (req "operations" (list (dynamic_size operation_encoding)))
-          (opt "sort" bool)
-          (opt "timestamp" Time.encoding)))
-
-  type preapply_result = {
-    operations: error Prevalidation.preapply_result ;
-    fitness: MBytes.t list ;
-    timestamp: Time.t ;
-  }
-
-  let preapply_result_encoding =
-    (conv
-       (fun { operations ; timestamp ; fitness } ->
-          (timestamp, fitness, operations))
-       (fun (timestamp, fitness, operations) ->
-          { operations ; timestamp ; fitness })
-       (obj3
-          (req "timestamp" Time.encoding)
-          (req "fitness" Fitness.encoding)
-          (req "operations" (Prevalidation.preapply_result_encoding Error.encoding))))
-
   let block_path : (unit, unit * block) RPC.Path.path =
     RPC.Path.(root / "blocks" /: blocks_arg )
 
@@ -328,6 +290,41 @@ module Blocks = struct
 
   let proto_path =
     RPC.Path.(block_path / "proto")
+
+  type preapply_param = {
+    timestamp: Time.t ;
+    proto_header: MBytes.t ;
+    operations: operation list ;
+    sort_operations: bool ;
+  }
+
+  let preapply_param_encoding =
+    (conv
+       (fun { timestamp ; proto_header ; operations ; sort_operations } ->
+          (timestamp, proto_header, operations, sort_operations))
+       (fun (timestamp, proto_header, operations, sort_operations) ->
+          { timestamp ; proto_header ; operations ; sort_operations })
+       (obj4
+          (req "timestamp" Time.encoding)
+          (req "proto_header" bytes)
+          (req "operations" (list (dynamic_size operation_encoding)))
+          (dft "sort_operations" bool false)))
+
+  type preapply_result = {
+    shell_header: Block_header.shell_header ;
+    operations: error Prevalidation.preapply_result ;
+  }
+
+  let preapply_result_encoding =
+    (conv
+       (fun { shell_header ; operations } ->
+          (shell_header, operations))
+       (fun (shell_header, operations) ->
+          { shell_header ; operations })
+       (obj2
+          (req "shell_header" Block_header.shell_header_encoding)
+          (req "operations"
+             (Prevalidation.preapply_result_encoding Error.encoding))))
 
   let preapply =
     RPC.service
@@ -612,21 +609,12 @@ module Network = struct
 
 end
 
-let forge_block =
+let forge_block_header =
   RPC.service
     ~description: "Forge a block header"
-    ~input:
-      (obj8
-         (opt "net_id" Net_id.encoding)
-         (opt "level" int32)
-         (opt "proto_level" uint8)
-         (opt "predecessor" Block_hash.encoding)
-         (opt "timestamp" Time.encoding)
-         (req "fitness" Fitness.encoding)
-         (req "operations" Operation_list_list_hash.encoding)
-         (req "header" bytes))
+    ~input: Block_header.encoding
     ~output: (obj1 (req "block" bytes))
-    RPC.Path.(root / "forge_block")
+    RPC.Path.(root / "forge_block_header")
 
 let validate_block =
   RPC.service

@@ -15,9 +15,8 @@ module Services = Node_rpc_services
 let errors cctxt =
   call_service0 cctxt Services.Error.service ()
 
-let forge_block cctxt ?net_id ?level ?proto_level ?predecessor ?timestamp fitness ops header =
-  call_service0 cctxt Services.forge_block
-    (net_id, level, proto_level, predecessor, timestamp, fitness, ops, header)
+let forge_block_header cctxt header =
+  call_service0 cctxt Services.forge_block_header header
 
 let validate_block cctxt net block =
   call_err_service0 cctxt Services.validate_block (net, block)
@@ -72,14 +71,14 @@ module Blocks = struct
     test_network: Context.test_network;
   }
   type preapply_param = Services.Blocks.preapply_param = {
+    timestamp: Time.t ;
+    proto_header: MBytes.t ;
     operations: operation list ;
-    sort: bool ;
-    timestamp: Time.t option ;
+    sort_operations: bool ;
   }
   type preapply_result = Services.Blocks.preapply_result = {
+    shell_header: Block_header.shell_header ;
     operations: error Prevalidation.preapply_result ;
-    fitness: MBytes.t list ;
-    timestamp: Time.t ;
   }
   let net_id cctxt h =
     call_service1 cctxt Services.Blocks.net_id h ()
@@ -103,10 +102,11 @@ module Blocks = struct
   let test_network cctxt h =
     call_service1 cctxt Services.Blocks.test_network h ()
 
-  let preapply cctxt h ?timestamp ?(sort = false) operations =
+  let preapply cctxt h
+      ?(timestamp = Time.now ()) ?(sort = false) ~proto_header operations =
     call_err_service1
       cctxt Services.Blocks.preapply h
-      { operations ; sort ; timestamp }
+      { timestamp ; proto_header ; sort_operations = sort ; operations }
   let pending_operations cctxt block =
     call_service1 cctxt Services.Blocks.pending_operations block ()
   let info cctxt ?(include_ops = true) h =

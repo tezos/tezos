@@ -496,17 +496,6 @@ let forge_block_proto_header _ctxt
 let () =
   register1 Services.Helpers.Forge.block_proto_header forge_block_proto_header
 
-let forge_block _ctxt
-    ((net_id, predecessor, timestamp, fitness, operations_hash),
-     (level, priority, proto_level, seed_nonce_hash, proof_of_work_nonce)) : MBytes.t tzresult Lwt.t =
-  let level = Raw_level.to_int32 level in
-  return (Block_header.forge_unsigned
-            { net_id ; level ; proto_level ; predecessor ;
-              timestamp ; fitness ; operations_hash }
-            { priority ; seed_nonce_hash ; proof_of_work_nonce })
-
-let () = register1 Services.Helpers.Forge.block forge_block
-
 (*-- Helpers.Parse -----------------------------------------------------------*)
 
 let dummy_hash = Operation_hash.hash_bytes []

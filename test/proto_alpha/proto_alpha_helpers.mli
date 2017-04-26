@@ -93,48 +93,15 @@ end
 
 module Mining : sig
 
-  val get_first_priority :
-    ?max_priority:int ->
-    Raw_level.t ->
-    Account.t ->
-    Client_proto_rpcs.block ->
-    int tzresult Lwt.t
-    (** [get_first_priority ?max_prio level account block] is the
-        best (first) mining priority on [block] for [account] at
-        [level]. *)
-
-  val mine_stamp :
-    Client_proto_rpcs.block ->
-    secret_key ->
-    Block_header.shell_header ->
-    int ->
-    Nonce_hash.t ->
-    MBytes.t tzresult Lwt.t
-
-  val inject_block :
+  val mine:
     Client_node_rpcs.Blocks.block ->
-    ?force:bool ->
-    ?proto_level:int ->
-    priority:int ->
-    timestamp:Time.t ->
-    fitness:Fitness.t ->
-    seed_nonce:Nonce.nonce ->
-    src_sk:secret_key ->
-    Operation.raw list -> Block_hash.t tzresult Lwt.t
-
-  val mine :
-    ?force:bool ->
-    ?operations:Operation.raw list ->
-    ?fitness_gap:int ->
-    ?proto_level:int ->
     Account.t ->
-    Client_node_rpcs.Blocks.block ->
+    Operation.raw list ->
     Block_hash.t tzresult Lwt.t
 
-  val endorsement_reward :
-    Account.t ->
-    Client_node_rpcs.Blocks.block ->
-    int64 tzresult Lwt.t
+  val endorsement_reward:
+    Client_node_rpcs.Blocks.block -> int64 tzresult Lwt.t
+
 end
 
 module Endorse : sig
@@ -186,6 +153,13 @@ module Assert : sig
     ?block:Client_node_rpcs.Blocks.block ->
     msg:string -> Contract.t -> public_key_hash option -> unit tzresult Lwt.t
 
+  val failed_to_preapply:
+    msg:string ->
+    ?op:Client_node_rpcs.operation ->
+    (Register_client_embedded_proto_alpha.Packed_protocol.error ->
+     bool) ->
+    'a tzresult -> unit
+
   val ecoproto_error:
     (Register_client_embedded_proto_alpha.Packed_protocol.error -> bool) ->
     error -> bool
@@ -210,8 +184,6 @@ module Assert : sig
   (** Endorsement / mining assertions *)
 
   val wrong_delegate : msg:string -> 'a tzresult -> unit
-
-  val invalid_endorsement_slot : msg:string -> 'a tzresult -> unit
 
   val check_protocol :
     ?msg:string -> block:Client_node_rpcs.Blocks.block ->

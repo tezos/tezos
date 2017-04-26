@@ -15,7 +15,7 @@ module Assert = Helpers.Assert
 
 let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
 
-  Helpers.Mining.mine ~fitness_gap:1 b1 blkid >>=? fun blkh ->
+  Helpers.Mining.mine blkid b1 [] >>=? fun blkh ->
   let foo = Helpers.Account.create "foo" in
   let bar = Helpers.Account.create "bar" in
 

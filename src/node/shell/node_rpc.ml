@@ -128,16 +128,13 @@ let register_bi_dir node dir =
       implementation in
   let dir =
     let implementation
-        b { Services.Blocks.operations ; sort ; timestamp } =
-      let timestamp =
-        match timestamp with
-        | None -> Time.now ()
-        | Some x -> x in
-      Node.RPC.preapply ~timestamp ~sort
-        node b operations >>= function
-      | Ok (fitness, operations) ->
+        b { Services.Blocks.operations ; sort_operations ;
+            timestamp ; proto_header} =
+      Node.RPC.preapply node b
+        ~timestamp ~proto_header ~sort_operations operations >>= function
+      | Ok (shell_header, operations) ->
           RPC.Answer.return
-            (Ok { Services.Blocks.fitness ; operations ; timestamp })
+            (Ok { Services.Blocks.shell_header ; operations })
       | Error _ as err -> RPC.Answer.return err in
     RPC.register1 dir
       Services.Blocks.preapply implementation in
@@ -389,23 +386,11 @@ let build_rpc_directory node =
   let dir =
     RPC.register1 dir Services.Protocols.contents (get_protocols node) in
   let dir =
-    let implementation
-        (net_id, level, proto_level, pred, time,
-         fitness, operations_hash, header) =
-      Node.RPC.block_info node (`Head 0) >>= fun bi ->
-      let timestamp = Utils.unopt ~default:(Time.now ()) time in
-      let net_id = Utils.unopt ~default:bi.net_id net_id in
-      let predecessor = Utils.unopt ~default:bi.hash pred in
-      let level = Utils.unopt ~default:(Int32.succ bi.level) level in
-      let proto_level = Utils.unopt ~default:bi.proto_level proto_level in
+    let implementation header =
       let res =
-        Data_encoding.Binary.to_bytes Block_header.encoding {
-          shell = { net_id ; predecessor ; level ; proto_level ;
-                    timestamp ; fitness ; operations_hash } ;
-          proto = header ;
-        } in
+        Data_encoding.Binary.to_bytes Block_header.encoding header in
       RPC.Answer.return res in
-    RPC.register0 dir Services.forge_block implementation in
+    RPC.register0 dir Services.forge_block_header implementation in
   let dir =
     let implementation (net_id, block_hash) =
       Node.RPC.validate node net_id block_hash >>= fun res ->

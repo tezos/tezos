@@ -46,9 +46,15 @@ let mine cctxt =
         Lwt.ignore_result
           (cctxt.message "Cannot parse fitness: %a" Fitness.pp bi.fitness);
         exit 2 in
-  Client_node_rpcs.forge_block cctxt.rpc_config
-    ~net_id:bi.net_id ~predecessor:bi.hash
-    fitness Operation_list_list_hash.empty (MBytes.create 0) >>=? fun bytes ->
+  Client_node_rpcs.forge_block_header cctxt.rpc_config
+    { shell = { net_id = bi.net_id ;
+                predecessor = bi.hash ;
+                proto_level = bi.proto_level ;
+                level = Int32.succ bi.level ;
+                timestamp = Time.now () ;
+                fitness ;
+                operations_hash = Operation_list_list_hash.empty } ;
+      proto = MBytes.create 0 } >>=? fun bytes ->
   Client_node_rpcs.inject_block cctxt.rpc_config bytes [] >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()
