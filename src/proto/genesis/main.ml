@@ -107,7 +107,9 @@ let begin_construction
     ~predecessor_level:_
     ~predecessor_fitness:fitness
     ~predecessor:_
-    ~timestamp:_ =
+    ~timestamp:_
+    ?proto_header:_
+    () =
   (* Dummy result. *)
   return { Updater.message = None ; context ; fitness }
 
