@@ -74,7 +74,8 @@ let begin_construction
     ~predecessor_level:_
     ~predecessor_fitness:pred_fitness
     ~predecessor:_
-    ~timestamp:_ =
+    ~timestamp:_
+    ?proto_header:_ () =
   Fitness.to_int64 pred_fitness >>=? function pred_fitness ->
   let fitness = Int64.succ pred_fitness in
   return { context ; fitness }

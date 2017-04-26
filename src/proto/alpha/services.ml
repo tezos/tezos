@@ -604,6 +604,24 @@ module Helpers = struct
                describe ~title: "hex encoded operation" bytes)))
         RPC.Path.(custom_root / "helpers" / "forge" / "operations" )
 
+    let empty_proof_of_work_nonce =
+      MBytes.of_string
+        (String.make Constants_repr.proof_of_work_nonce_size  '\000')
+
+    let block_proto_header custom_root =
+      RPC.service
+        ~description: "Forge the protocol-specific part of a block header"
+        ~input:
+          (obj3
+             (req "priority" uint16)
+             (req "nonce_hash" Nonce_hash.encoding)
+             (dft "proof_of_work_nonce"
+                (Fixed.bytes
+                   Tezos_context.Constants.proof_of_work_nonce_size)
+                empty_proof_of_work_nonce))
+        ~output: (wrap_tzerror bytes)
+        RPC.Path.(custom_root / "helpers" / "forge" / "block_proto_header")
+
     let block custom_root =
       RPC.service
         ~description: "Forge a block header"

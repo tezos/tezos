@@ -118,14 +118,14 @@ let check_timestamp c priority pred_timestamp =
   fail_unless Timestamp.(minimal_time <= timestamp)
     (Timestamp_too_early (minimal_time, timestamp))
 
-let check_mining_rights c { Block_header.proto = { priority } }
+let check_mining_rights c { Block_header.priority }
     pred_timestamp =
   let level = Level.current c in
   Roll.mining_rights_owner c level ~priority >>=? fun delegate ->
   check_timestamp c priority pred_timestamp >>=? fun () ->
   return delegate
 
-let pay_mining_bond c { Block_header.proto = { priority } } id =
+let pay_mining_bond c { Block_header.priority } id =
   if Compare.Int.(priority >= Constants.first_free_mining_slot c)
   then return c
   else
