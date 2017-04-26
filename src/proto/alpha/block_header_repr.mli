@@ -36,7 +36,15 @@ val max_header_length: int
 (** The maximum size of block headers in bytes *)
 
 val parse: Block_header.t -> block_header tzresult
-(** Parse the protocol-specific part of a block header. *)
+(** Parse the (signed) protocol-specific part of a block header. *)
+
+val parse_unsigned_proto_header: MBytes.t -> proto_header tzresult
+(** Parse the (unsigned) protocol-specific part of a block header. *)
+
+val forge_unsigned_proto_header: proto_header -> MBytes.t
+(** [forge_header proto_hdr] is the binary serialization
+    (using [proto_header_encoding]) of the protocol-specific part
+    of a block header, without the signature. *)
 
 val forge_unsigned:
   Block_header.shell_header -> proto_header -> MBytes.t

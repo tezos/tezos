@@ -92,8 +92,16 @@ let parse
           timestamp ; fitness ; operations_hash } in
       Ok { shell ; proto ; signature }
 
+let parse_unsigned_proto_header bytes =
+  match Data_encoding.Binary.of_bytes proto_header_encoding bytes with
+  | None -> Error [Cant_parse_proto_header]
+  | Some proto -> Ok proto
+
 let forge_unsigned shell proto =
   Data_encoding.Binary.to_bytes unsigned_header_encoding (shell, proto)
+
+let forge_unsigned_proto_header proto =
+  Data_encoding.Binary.to_bytes proto_header_encoding proto
 
 let hash_raw = Block_header.hash
 let hash { shell ; proto ; signature } =

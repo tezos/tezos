@@ -50,11 +50,11 @@ let register (module Proto : Protocol_sigs.PACKED_PROTOCOL) =
     let begin_construction
         ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness
-        ~predecessor ~timestamp =
+        ~predecessor ~timestamp ?proto_header () =
       begin_construction
         ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness
-        ~predecessor ~timestamp >|= wrap_error
+        ~predecessor ~timestamp ?proto_header () >|= wrap_error
     let current_context c =
       current_context c >|= wrap_error
     let apply_operation c o =

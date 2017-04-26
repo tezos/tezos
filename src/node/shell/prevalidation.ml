@@ -155,6 +155,7 @@ let start_prevalidation
     ~predecessor_level
     ~predecessor
     ~timestamp
+    ()
   >>=? fun state ->
   return (State { proto = (module Proto) ; state })
 

@@ -62,7 +62,8 @@ module type PROTOCOL = sig
     predecessor_fitness: Fitness.t ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
-    validation_state tzresult Lwt.t
+    ?proto_header: MBytes.t ->
+    unit -> validation_state tzresult Lwt.t
   val apply_operation :
     validation_state -> operation -> validation_state tzresult Lwt.t
   val finalize_block :

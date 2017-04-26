@@ -488,6 +488,14 @@ let forge_operations _ctxt (shell, proto) =
 
 let () = register1 Services.Helpers.Forge.operations forge_operations
 
+let forge_block_proto_header _ctxt
+    (priority, seed_nonce_hash, proof_of_work_nonce) : MBytes.t tzresult Lwt.t =
+  return (Block_header.forge_unsigned_proto_header
+            { priority ; seed_nonce_hash ; proof_of_work_nonce })
+
+let () =
+  register1 Services.Helpers.Forge.block_proto_header forge_block_proto_header
+
 let forge_block _ctxt
     ((net_id, predecessor, timestamp, fitness, operations_hash),
      (level, priority, proto_level, seed_nonce_hash, proof_of_work_nonce)) : MBytes.t tzresult Lwt.t =
