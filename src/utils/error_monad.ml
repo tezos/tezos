@@ -269,22 +269,22 @@ module Make() = struct
         map2 f t1 t2 >>? fun rt ->
         Ok (rh :: rt)
 
-  let rec map_filter_s f l =
+  let rec filter_map_s f l =
     match l with
     | [] -> return []
     | h :: t ->
         f h >>=? function
-        | None -> map_filter_s f t
+        | None -> filter_map_s f t
         | Some rh ->
-            map_filter_s f t >>=? fun rt ->
+            filter_map_s f t >>=? fun rt ->
             return (rh :: rt)
 
-  let rec map_filter_p f l =
+  let rec filter_map_p f l =
     match l with
     | [] -> return []
     | h :: t ->
         let th = f h
-        and tt = map_filter_s f t in
+        and tt = filter_map_s f t in
         th >>=? function
         | None -> tt
         | Some rh ->
