@@ -99,8 +99,8 @@ val map2_s :
   ('a -> 'b -> 'c tzresult Lwt.t) -> 'a list -> 'b list ->
   'c list tzresult Lwt.t
 
-(** A {!List.map_filter} in the monad *)
-val map_filter_s : ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
+(** A {!List.filter_map} in the monad *)
+val filter_map_s : ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
 (** A {!List.fold_left} in the monad *)
 val fold_left_s : ('a -> 'b -> 'a tzresult Lwt.t) -> 'a -> 'b list -> 'a tzresult Lwt.t
