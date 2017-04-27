@@ -271,7 +271,7 @@ end = struct
          | Error _ -> failwith "Json.write_file"
          | Ok () -> return ())
       (fun exn ->
-         Error_monad.failwith
+         failwith
            "could not write the block file: %s."
            (Printexc.to_string exn))
 
@@ -377,7 +377,7 @@ let get_unrevealed_nonces cctxt ?(force = false) block =
   | Some cycle ->
       Client_mining_blocks.blocks_from_cycle
         cctxt.rpc_config block cycle >>=? fun blocks ->
-      map_filter_s (fun hash ->
+      filter_map_s (fun hash ->
           Client_proto_nonces.find cctxt hash >>= function
           | None -> return None
           | Some nonce ->
@@ -466,7 +466,7 @@ let mine cctxt state =
   let slots = pop_mining_slots state in
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
-  Error_monad.map_filter_s
+  filter_map_s
     (fun (timestamp, (bi, priority, delegate)) ->
        let block = `Hash bi.Client_mining_blocks.hash in
        let timestamp =

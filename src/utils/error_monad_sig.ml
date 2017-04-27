@@ -134,10 +134,10 @@ module type S = sig
     ('a -> 'b -> 'c tzresult Lwt.t) -> 'a list -> 'b list ->
     'c list tzresult Lwt.t
 
-  (** A {!List.map_filter} in the monad *)
-  val map_filter_s :
+  (** A {!List.filter_map} in the monad *)
+  val filter_map_s :
     ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
-  val map_filter_p :
+  val filter_map_p :
     ('a -> 'b option tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t
 
   (** A {!List.fold_left} in the monad *)

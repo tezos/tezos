@@ -75,7 +75,7 @@ let reveal_block_nonces cctxt ?force block_hashes =
               Block_hash.pp_short hash >>= fun () ->
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
-  map_filter_s (fun (bi : Client_mining_blocks.block_info) ->
+  filter_map_s (fun (bi : Client_mining_blocks.block_info) ->
       Client_proto_nonces.find cctxt bi.hash >>= function
       | None ->
           cctxt.warning "Cannot find nonces for block %a (ignoring)@."
