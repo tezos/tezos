@@ -84,12 +84,12 @@ ${CLIENT} mine for bootstrap1
 ${CLIENT} remember program noop file:scripts/noop.tez
 ${CLIENT} typecheck program noop
 ${CLIENT} originate contract noop \
-          for ${KEY1} transfering 1000 from bootstrap1 \
+          for ${KEY1} transferring 1000 from bootstrap1 \
           running noop
 ${CLIENT} transfer 10 from bootstrap1 to noop -arg "Unit"
 
 ${CLIENT} originate contract hardlimit \
-          for ${KEY1} transfering 1000 from bootstrap1 \
+          for ${KEY1} transferring 1000 from bootstrap1 \
           running file:scripts/hardlimit.tez -init "3"
 ${CLIENT} transfer 10 from bootstrap1 to hardlimit -arg "Unit"
 ${CLIENT} transfer 10 from bootstrap1 to hardlimit -arg "Unit"

@@ -269,7 +269,7 @@ let commands () =
       @@ prefix "for"
       @@ Public_key_hash.alias_param
         ~name: "mgr" ~desc: "manager of the new contract"
-      @@ prefix "transfering"
+      @@ prefix "transferring"
       @@ tez_param
         ~name: "qty" ~desc: "amount taken from source"
       @@ prefix "from"
@@ -300,7 +300,7 @@ let commands () =
       @@ prefix "for"
       @@ Public_key_hash.alias_param
         ~name: "mgr" ~desc: "manager of the new contract"
-      @@ prefix "transfering"
+      @@ prefix "transferring"
       @@ tez_param
         ~name: "qty" ~desc: "amount taken from source"
       @@ prefix "from"
