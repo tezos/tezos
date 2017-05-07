@@ -24,7 +24,7 @@ depends: [
   "ipv6-multicast"
   "irmin-watcher" (* for `irmin.unix` *)
   "irmin" {>= "0.12" & < "1.0" }
-  "lwt" {>= "2.7.0" }
+  "lwt" {>= "3.0.0" }
   "lwt_ssl"
   "menhir"
   "mtime"

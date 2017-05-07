@@ -312,6 +312,7 @@ NODE_PACKAGES := \
   ipv6-multicast \
   irmin.unix \
   ocplib-resto.directory \
+  ssl \
 
 EMBEDDED_NODE_PROTOCOLS := \
   $(patsubst ${SRCDIR}/proto/%/,${SRCDIR}/proto/embedded_proto_%.cmxa, \
