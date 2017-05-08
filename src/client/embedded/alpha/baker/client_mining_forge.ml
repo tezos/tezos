@@ -105,15 +105,21 @@ let forge_block cctxt block
           cctxt block ~prio () >>=? fun time ->
         return (prio, time)
       end
-    | `Auto (src_pkh, max_priority) ->
+    | `Auto (src_pkh, max_priority, free_mining) ->
         Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate cctxt
           ?max_priority
           ~first_level:level
           ~last_level:level
           block src_pkh () >>=? fun possibilities ->
         try
+          begin
+            if free_mining then
+              Client_proto_rpcs.Constants.first_free_mining_slot cctxt block
+            else
+              return 0
+          end >>=? fun min_prio ->
           let _, prio, time =
-            List.find (fun (l,_,_) -> l = level) possibilities in
+            List.find (fun (l,p,_) -> l = level && p >= min_prio) possibilities in
           return (prio, time)
         with Not_found ->
           Error_monad.failwith "No slot found at level %a" Raw_level.pp level

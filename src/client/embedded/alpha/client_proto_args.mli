@@ -17,6 +17,7 @@ val delegate_arg: string * Arg.spec * string
 val delegatable_args: (string * Arg.spec * string) list
 val spendable_args: (string * Arg.spec * string) list
 val max_priority_arg: string * Arg.spec * string
+val free_mining_arg: string * Arg.spec * string
 val force_arg: string * Arg.spec * string
 val endorsement_delay_arg: string * Arg.spec * string
 
@@ -35,6 +36,7 @@ val fee: Tez.t ref
 val init: string ref
 val arg: string option ref
 val max_priority: int option ref
+val free_mining: bool ref
 val endorsement_delay: int ref
 
 module Daemon : sig

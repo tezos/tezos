@@ -11,7 +11,8 @@ open Cli_entries
 open Client_commands
 open Client_proto_contracts
 
-let mine_block cctxt block ?force ?max_priority ?src_sk delegate =
+let mine_block cctxt block
+    ?force ?max_priority ?(free_mining=false) ?src_sk delegate =
   begin
     match src_sk with
     | None ->
@@ -26,7 +27,7 @@ let mine_block cctxt block ?force ?max_priority ?src_sk delegate =
     ~timestamp:(Time.now ())
     ?force
     ~seed_nonce ~src_sk block
-    ~priority:(`Auto (delegate, max_priority)) () >>=? fun block_hash ->
+    ~priority:(`Auto (delegate, max_priority, free_mining)) () >>=? fun block_hash ->
   Client_mining_forge.State.record_block cctxt level block_hash seed_nonce
   |> trace_exn (Failure "Error while recording block") >>=? fun () ->
   cctxt.message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
@@ -122,14 +123,14 @@ let commands () =
          endorse_block cctxt
            ~force:!force ?max_priority:!max_priority delegate) ;
     command ~group ~desc: "Forge and inject block using the delegate rights"
-      ~args: [ max_priority_arg ; force_arg ]
+      ~args: [ max_priority_arg ; force_arg ; free_mining_arg ]
       (prefixes [ "mine"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
          ~name:"miner" ~desc: "name of the delegate owning the mining right"
        @@ stop)
       (fun (_, delegate) cctxt ->
          mine_block cctxt cctxt.config.block
-           ~force:!force ?max_priority:!max_priority delegate) ;
+           ~force:!force ?max_priority:!max_priority ~free_mining:!free_mining delegate) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation"
       ~args: [ force_arg ]
       (prefixes [ "reveal"; "nonce"; "for" ]
