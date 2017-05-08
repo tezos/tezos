@@ -97,6 +97,10 @@ let max_priority_arg =
       with _ -> raise (Arg.Bad "invalid priority in -max-priority")),
   "Set the max_priority used when looking for mining slot."
 
+let free_mining = ref false
+let free_mining_arg =
+    "-free-mining", Arg.Set free_mining, "Only consider free mining slots."
+
 let endorsement_delay = ref 15
 let endorsement_delay_arg =
   "-endorsement-delay",

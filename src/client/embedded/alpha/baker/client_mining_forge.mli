@@ -38,7 +38,7 @@ val forge_block:
   ?best_effort:bool ->
   ?sort:bool ->
   ?timestamp:Time.t ->
-  priority:[`Set of int | `Auto of (public_key_hash * int option)] ->
+  priority:[`Set of int | `Auto of (public_key_hash * int option * bool)] ->
   seed_nonce:Nonce.t ->
   src_sk:secret_key ->
   unit ->
@@ -54,7 +54,7 @@ val forge_block:
 
     * Mining priority: If [`Auto] is used, it will be computed from
       the public key hash of the specified contract, optionally capped
-      to a maximum value.
+      to a maximum value, and optionnaly restricting for free mining slot.
 
     * Timestamp: If [?timestamp] is set, and is compatible with the
       computed mining priority, it will be used. Otherwise, it will be
