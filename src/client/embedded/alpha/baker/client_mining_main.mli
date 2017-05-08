@@ -12,6 +12,7 @@ val mine_block:
   Client_proto_rpcs.block ->
   ?force:bool ->
   ?max_priority: int ->
+  ?free_mining: bool ->
   ?src_sk:secret_key ->
   public_key_hash ->
   unit tzresult Lwt.t
