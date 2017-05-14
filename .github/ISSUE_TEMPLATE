@@ -1,0 +1,36 @@
+<!-- Fill out this template so we can get a good understanding of your intended message. -->
+
+#### Summary
+<!-- Provide a brief, one or two sentence summary of your issue here. -->
+
+<!--
+** Read the next two lines before continuing. **
+IF REPORTING A BUG, delete everything past the Feature Request heading before continuing.
+IF REQUESTING A FEATURE, delete the Bug Report section.
+-->
+
+
+<!-- Bug Report -->
+
+#### System information
+
+Geth version: `geth version`
+OS & Version: Windows/Linux/OSX
+Commit hash : (if `develop`)
+
+#### Expected behaviour
+<!-- What were you expecting/what's supposed to happen? -->
+
+
+#### Actual behaviour
+<!-- Tell us what actually happened. -->
+
+
+#### Steps to reproduce behaviour
+<!-- Tell us how exactly we can reproduce this bug. -->
+
+
+
+<!-- Feature Request -->
+#### About the Feature
+<!-- What specifically do you want to see?  Give us as many details as possible. -->
