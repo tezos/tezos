@@ -81,7 +81,11 @@ Running the node
 ----------------
 
 So far there is no official Tezos network being run, but you might run a local
-test network. Use the following command to run a node that will accept incoming
+test network (the development team is running its own testnet, if you're interested
+in joining this network, please make a request on our slack channel. We have
+limited support abilities at the moment but we'll try to help you best we can).
+
+Use the following command to run a node that will accept incoming
 connections:
 
 ```
