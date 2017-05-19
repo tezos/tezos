@@ -68,13 +68,13 @@ assert() {
     fi
 }
 
-${CLIENT} get balance ${KEY1} | assert "1,000.00 ꜩ"
-${CLIENT} get balance ${KEY2} | assert "2,000.00 ꜩ"
+${CLIENT} get balance for ${KEY1} | assert "1,000.00 ꜩ"
+${CLIENT} get balance for ${KEY2} | assert "2,000.00 ꜩ"
 
 ${CLIENT} transfer 1000 from ${KEY2} to ${KEY1}
 
-${CLIENT} get balance ${KEY1} | assert "2,000.00 ꜩ"
-${CLIENT} get balance ${KEY2} | assert "999.95 ꜩ"
+${CLIENT} get balance for ${KEY1} | assert "2,000.00 ꜩ"
+${CLIENT} get balance for ${KEY2} | assert "999.95 ꜩ"
 
 # Should fail
 # ${CLIENT} transfer 999.95 from ${KEY2} to ${KEY1}
@@ -94,6 +94,11 @@ ${CLIENT} originate contract hardlimit \
 ${CLIENT} transfer 10 from bootstrap1 to hardlimit -arg "Unit"
 ${CLIENT} transfer 10 from bootstrap1 to hardlimit -arg "Unit"
 # ${CLIENT} transfer 10 from bootstrap1 to hardlimit -arg "unit" # should fail
+
+${CLIENT} originate free account free_account for ${KEY1}
+${CLIENT} get delegate for free_account
+${CLIENT} set delegate for free_account to ${KEY2}
+${CLIENT} get delegate for free_account
 
 echo
 echo End of test

@@ -361,15 +361,15 @@ let mining_rights_for_delegate
     ctxt contract (max_priority, min_level, max_level) =
   let max_priority = default_max_mining_priority ctxt max_priority in
   let current_level = Level.current ctxt in
-  let max_level =
-    match max_level with
-    | None ->
-        Level.last_level_in_cycle ctxt @@
-        Cycle.succ current_level.cycle
-    | Some l -> Level.from_raw ctxt l in
   let min_level = match min_level with
     | None -> current_level
     | Some l -> Level.from_raw ctxt l in
+  let max_level =
+    match max_level with
+    | Some max_level -> Level.from_raw ctxt max_level
+    | None ->
+        Level.last_level_in_cycle ctxt @@
+        current_level.cycle in
   let rec loop level =
     if Level.(>) level max_level
     then return []
@@ -427,14 +427,12 @@ let endorsement_rights_for_delegate
     ctxt contract (max_priority, min_level, max_level) =
   let current_level = Level.current ctxt in
   let max_priority = default_max_endorsement_priority ctxt max_priority in
-  let max_level =
-    match max_level with
-    | None ->
-        Level.last_level_in_cycle ctxt @@
-        Cycle.succ (Cycle.succ current_level.cycle)
-    | Some l -> Level.from_raw ctxt l in
   let min_level = match min_level with
     | None -> Level.succ ctxt current_level
+    | Some l -> Level.from_raw ctxt l in
+  let max_level =
+    match max_level with
+    | None -> min_level
     | Some l -> Level.from_raw ctxt l in
   let rec loop level =
     if Level.(>) level max_level
