@@ -117,21 +117,13 @@ let delegate_contract rpc_config
   Client_proto_rpcs.Helpers.Forge.Manager.delegation rpc_config block
     ~net ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
   >>=? fun bytes ->
-  Client_node_rpcs.Blocks.predecessor rpc_config block >>=? fun predecessor ->
   let signature = Environment.Ed25519.sign manager_sk bytes in
   let signed_bytes = MBytes.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Client_proto_rpcs.Helpers.apply_operation rpc_config block
-    predecessor oph bytes (Some signature) >>=? function
-  | [] ->
-      Client_node_rpcs.inject_operation
-        rpc_config ?force signed_bytes >>=? fun injected_oph ->
-      assert (Operation_hash.equal oph injected_oph) ;
-      return oph
-  | contracts ->
-      failwith
-        "The origination introduced %d contracts instead of one."
-        (List.length contracts)
+  Client_node_rpcs.inject_operation
+    rpc_config ?force signed_bytes >>=? fun injected_oph ->
+  assert (Operation_hash.equal oph injected_oph) ;
+  return oph
 
 let dictate rpc_config block command seckey =
   Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
@@ -214,6 +206,18 @@ let group =
   { Cli_entries.name = "context" ;
     title = "Block contextual commands (see option -block)" }
 
+let dictate rpc_config block command seckey =
+  Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+  Client_proto_rpcs.Helpers.Forge.Dictator.operation
+    rpc_config block ~net command >>=? fun bytes ->
+  let signature = Ed25519.sign seckey bytes in
+  let signed_bytes = MBytes.concat bytes signature in
+  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
+  Client_node_rpcs.inject_operation
+    rpc_config signed_bytes >>=? fun injected_oph ->
+  assert (Operation_hash.equal oph injected_oph) ;
+  return oph
+
 let commands () =
   let open Cli_entries in
   let open Client_commands in
@@ -239,7 +243,7 @@ let commands () =
     end ;
 
     command ~group ~desc: "get the balance of a contract" begin
-      prefixes [ "get" ; "balance" ]
+      prefixes [ "get" ; "balance" ; "for" ]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop
     end begin fun (_, contract) cctxt ->
@@ -248,17 +252,49 @@ let commands () =
       return ()
     end ;
 
-    command ~group ~desc: "get the manager of a block" begin
-      prefixes [ "get" ; "manager" ]
+    command ~group ~desc: "get the manager of a contract" begin
+      prefixes [ "get" ; "manager" ; "for" ]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop
     end begin fun (_, contract) cctxt ->
-      Client_proto_rpcs.Context.Contract.manager
+      Client_proto_contracts.get_manager
         cctxt.rpc_config cctxt.config.block contract >>=? fun manager ->
       Public_key_hash.rev_find cctxt manager >>=? fun mn ->
       Public_key_hash.to_source cctxt manager >>=? fun m ->
       cctxt.message "%s (%s)" m
         (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
+      return ()
+    end ;
+
+    command ~group ~desc: "get the delegate of a contract" begin
+      prefixes [ "get" ; "delegate" ; "for" ]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop
+    end begin fun (_, contract) cctxt ->
+      Client_proto_contracts.get_delegate
+        cctxt.rpc_config cctxt.config.block contract >>=? fun delegate ->
+      Public_key_hash.rev_find cctxt delegate >>=? fun mn ->
+      Public_key_hash.to_source cctxt delegate >>=? fun m ->
+      cctxt.message "%s (%s)" m
+        (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
+      return ()
+    end ;
+
+    command ~group ~desc: "set the delegate of a contract"
+      ~args: ([ fee_arg ; force_arg ]) begin
+      prefixes [ "set" ; "delegate" ; "for" ]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ prefix "to"
+      @@ Public_key_hash.alias_param
+        ~name: "mgr" ~desc: "new delegate of the contract"
+      @@ stop
+    end begin fun (_, contract) (_, delegate) cctxt ->
+      get_manager cctxt contract >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
+      delegate_contract
+        cctxt.rpc_config cctxt.config.block ~source:contract
+        ~src_pk ~manager_sk:src_sk ~fee:!fee (Some delegate)
+      >>=? fun oph ->
+      message_injection cctxt ~force:!force oph >>= fun () ->
       return ()
     end ;
 

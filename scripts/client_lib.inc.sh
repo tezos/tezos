@@ -26,11 +26,11 @@ wait_for_the_node_to_be_bootstraped() {
 ## Account #################################################################
 
 may_create_identity() {
-    if ! $client get balance "my_identity" >/dev/null 2>&1 ; then
+    if ! $client get balance for "my_identity" >/dev/null 2>&1 ; then
         echo "Generating new manager key (known as 'my_identity')..."
         $client gen keys "my_identity"
     fi
-    if ! $client get balance "my_account" >/dev/null 2>&1 ; then
+    if ! $client get balance for "my_account" >/dev/null 2>&1 ; then
         echo "Creating new account for 'my_identity' (known as 'my_account')..."
         $client forget contract "my_account" >/dev/null 2>&1 || true
         $client originate free account "my_account" for "my_identity"
