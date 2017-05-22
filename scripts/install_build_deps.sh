@@ -50,7 +50,6 @@ if "$pin"; then
     opam pin --yes add --no-action --dev-repo ocp-ocamlres
     opam pin --yes add --no-action --dev-repo ocplib-json-typed
     opam pin --yes add --no-action --dev-repo ocplib-resto
-    opam pin --yes add --no-action --dev-repo cohttp
     opam pin --yes add --no-action ocp-build 1.99.18-beta ## TMP fix
     opam pin add typerex-build --dev --no-action
     ## Force opam to take account of the new `tezos-deps.opam`
