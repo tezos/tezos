@@ -7,78 +7,113 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* sign *)
-type signed = Signed
-type unsigned = Unsigned
+(** The types for arbitraty precision integers in Michelson.
+    The type variable ['t] is always [n] or [z],
+    [n num] and [z num] are incompatible.
 
-(* length *)
-type eight = Eight
-type sixteen = Sixteen
-type thirtytwo = Thirtytwo
-type sixtyfour = Sixtyfour
+    This is internally a [Z.t].
+    This module mostly adds signedness preservation guarantees. *)
+type 't num
 
-(* int values *)
-type ('s, 'l) int_val = Int of repr and repr
+(** Flag for natural numbers. *)
+and n = Natural_tag
 
-(* int types *)
-type ('s, 'l) int_kind =
-  | Int8 : (signed, eight) int_kind
-  | Uint8 : (unsigned, eight) int_kind
-  | Int16 : (signed, sixteen) int_kind
-  | Uint16 : (unsigned, sixteen) int_kind
-  | Int32 : (signed, thirtytwo) int_kind
-  | Uint32 : (unsigned, thirtytwo) int_kind
-  | Int64 : (signed, sixtyfour) int_kind
-  | Uint64 : (unsigned, sixtyfour) int_kind
+(** Flag for relative numbers. *)
+and z = Integer_tag
 
-(* homogeneous operator types *)
-type ('s, 'l) binop =
-  ('s, 'l) int_kind -> ('s, 'l) int_val -> ('s, 'l) int_val -> ('s, 'l) int_val
-type ('s, 'l) unop =
-  ('s, 'l) int_kind -> ('s, 'l) int_val -> ('s, 'l) int_val
-type ('s, 'l) checked_binop =
-  ('s, 'l) int_kind -> ('s, 'l) int_val -> ('s, 'l) int_val -> ('s, 'l) int_val option
-type ('s, 'l) checked_unop =
-  ('s, 'l) int_kind -> ('s, 'l) int_val -> ('s, 'l) int_val option
-type ('s, 'l) shift =
-  ('s, 'l) int_kind -> ('s, 'l) int_val -> ('s, eight) int_val -> ('s, 'l) int_val
+(** Natural zero. *)
+val zero_n : n num
 
-(* cast operators *)
-val cast : ('tos, 'tol) int_kind -> ('s, 'l) int_val -> ('tos, 'tol) int_val
-val checked_cast : ('tos, 'tol) int_kind -> ('s, 'l) int_val -> ('tos, 'tol) int_val option
+(** Relative zero. *)
+val zero : z num
 
-(* to native int64s *)
-val to_int64 : ('s, 'l) int_kind -> ('s, 'l) int_val -> int64
-val of_int64 : ('s, 'l) int_kind -> int64 -> ('s, 'l) int_val
-val checked_of_int64 : ('s, 'l) int_kind -> int64 -> ('s, 'l) int_val option
+(** Compare two numbers as if they were *)
+val compare : 'a num -> 'a num -> int
 
-(* arithmetics *)
-val abs : (signed, 'l) unop
-val neg : (signed, 'l) unop
-val add : ('s, 'l) binop
-val sub : ('s, 'l) binop
-val mul : ('s, 'l) binop
-val div : ('s, 'l) binop
-val rem : ('s, 'l) binop
-val checked_abs : (signed, 'l) checked_unop
-val checked_neg : (signed, 'l) checked_unop
-val checked_add : ('s, 'l) checked_binop
-val checked_sub : ('s, 'l) checked_binop
-val checked_mul : ('s, 'l) checked_binop
+(** Conversion to an OCaml [string] in decimal notation. *)
+val to_string : _ num -> string
 
-(* bitwise logic *)
-val logand : (unsigned, 'l) binop
-val logor : (unsigned, 'l) binop
-val logxor : (unsigned, 'l) binop
-val lognot : (unsigned, 'l) unop
-val logsl : (unsigned, 'l) shift
-val logsr : (unsigned, 'l) shift
+(** Conversion from an OCaml [string].
+    Returns [None] in case of an invalid notation.
+    Supports [+] and [-] sign modifiers, and [0x], [0o] and [0b] base modifiers. *)
+val of_string : string -> z num option
 
-(* sign aware comparison *)
-val compare : ('s, 'l) int_kind ->
-  ('s, 'l) int_val -> ('s, 'l) int_val -> (signed, sixtyfour) int_val
-val equal : ('s, 'l) int_kind ->
-  ('s, 'l) int_val -> ('s, 'l) int_val -> bool
+(** Conversion to an OCaml [int64], returns [None] on overflow. *)
+val to_int64 : _ num -> int64 option
 
-(* utilities *)
-val string_of_int_kind : ('s, 'l) int_kind -> string
+(** Conversion from an OCaml [int]. *)
+val of_int64 : int64 -> z num
+
+(** Conversion to an OCaml [int], returns [None] on overflow. *)
+val to_int : _ num -> int option
+
+(** Conversion from an OCaml [int64]. *)
+val of_int : int -> z num
+
+(** Addition between naturals. *)
+val add_n : n num -> n num -> n num
+
+(** Multiplication between naturals. *)
+val mul_n : n num -> n num -> n num
+
+(** Euclidean division between naturals.
+    [ediv_n n d] returns [None] if divisor is zero,
+    or [Some (q, r)] where [n = d * q + r] and [[0 <= r < d]] otherwise. *)
+val ediv_n:  n num -> n num -> (n num * n num) option
+
+(** Sign agnostic addition.
+    Use {!add_n} when working with naturals to preserve the sign. *)
+val add : _ num -> _ num -> z num
+
+(** Sign agnostic subtraction.
+    Use {!sub_n} when working with naturals to preserve the sign. *)
+val sub : _ num -> _ num -> z num
+
+(** Sign agnostic multiplication.
+    Use {!mul_n} when working with naturals to preserve the sign. *)
+val mul : _ num -> _ num -> z num
+
+(** Sign agnostic euclidean division.
+    [ediv n d] returns [None] if divisor is zero,
+    or [Some (q, r)] where [n = d * q + r] and [[0 <= r < |d|]] otherwise.
+    Use {!ediv_n} when working with naturals to preserve the sign. *)
+val ediv:  _ num -> _ num -> (z num * n num) option
+
+(** Compute the absolute value of a relative, turning it into a natural. *)
+val abs : z num -> n num
+
+(** Negates a number. *)
+val neg : _ num -> z num
+
+(** Turns a natural into a relative, not changing its value. *)
+val int : n num -> z num
+
+(** Reverses each bit in the representation of the number.
+    Also applies to the sign. *)
+val lognot : _ num -> z num
+
+
+(** Shifts the natural to the left of a number of bits between 0 and 256.
+    Returns [None] if the amount is too high. *)
+val shift_left_n : n num -> n num -> n num option
+
+(** Shifts the natural to the right of a number of bits between 0 and 256.
+    Returns [None] if the amount is too high. *)
+val shift_right_n : n num -> n num -> n num option
+
+(** Shifts the number to the left of a number of bits between 0 and 256.
+    Returns [None] if the amount is too high. *)
+val shift_left : 'a num -> n num -> 'a num option
+
+(** Shifts the number to the right of a number of bits between 0 and 256.
+    Returns [None] if the amount is too high. *)
+val shift_right : 'a num -> n num -> 'a num option
+
+(** Applies a boolean or operation to each bit. *)
+val logor : n num -> n num -> n num
+
+(** Applies a boolean and operation to each bit. *)
+val logand : n num -> n num -> n num
+
+(** Applies a boolean xor operation to each bit. *)
+val logxor : n num -> n num -> n num
