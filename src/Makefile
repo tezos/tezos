@@ -371,7 +371,7 @@ proto/embedded_proto_%.cmxa: \
 
 CLIENT_PROTO_INCLUDES := \
   minutils utils compiler node/updater node/db node/net node/shell client \
-  $(shell ocamlfind query lwt ocplib-json-typed sodium)
+  $(shell ocamlfind query lwt ocplib-json-typed sodium zarith)
 
 proto/client_embedded_proto_%.cmxa: \
   ${TZCOMPILER} \

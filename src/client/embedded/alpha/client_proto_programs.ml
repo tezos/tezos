@@ -197,7 +197,6 @@ let collect_error_locations errs =
       | Invalid_case (loc, _)
       | Invalid_kind (loc, _, _)
       | Fail_not_in_tail_position loc
-      | Undefined_cast (loc, _, _)
       | Undefined_binop (loc, _, _, _)
       | Undefined_unop (loc, _, _)
       | Bad_return (loc, _, _)
@@ -208,8 +207,7 @@ let collect_error_locations errs =
       | Invalid_contract (loc, _)
       | Comparable_type_expected (loc, _)
       | Overflow loc
-      | Reject loc
-      | Division_by_zero loc) :: rest ->
+      | Reject loc) :: rest ->
         collect (loc :: acc) rest
     | _ :: rest -> collect acc rest in
   collect [] errs
@@ -336,13 +334,6 @@ let report_errors cctxt errs =
         cctxt.warning
           "%aThe FAIL instruction must appear in a tail position."
           print_loc loc
-    | Undefined_cast (loc, tya, tyb) ->
-        cctxt.warning
-          "@[<hov 0>@[<hov 2>%atype cast is undefined from@ %a@]@ \
-           @[<hov 2>to@ %a.@]@]"
-          print_loc loc
-          print_ty tya
-          print_ty tyb
     | Undefined_binop (loc, name, tya, tyb) ->
         cctxt.warning
           "@[<hov 0>@[<hov 2>%aoperator %s is undefined between@ %a@]@ \
@@ -404,24 +395,6 @@ let report_errors cctxt errs =
           print_loc loc >>= fun () ->
         cctxt.warning "@[<hov 0>@[<hov 2>Type@ %a@]@ is not comparable.@]"
           print_ty ty
-    | Bad_sign ty ->
-        begin match ty with
-          | Int_t kind ->
-              let signed = match kind with
-                | Script_int.Int8 -> true
-                | Script_int.Int16 -> true
-                | Script_int.Int32 -> true
-                | Script_int.Int64 -> true
-                | Script_int.Uint8 -> false
-                | Script_int.Uint16 -> false
-                | Script_int.Uint32 -> false
-                | Script_int.Uint64 -> false in
-              if signed then
-                cctxt.warning "Unsigned integer type expected."
-              else
-                cctxt.warning "Signed integer type expected."
-          | _ -> assert false
-        end
     | Inconsistent_types (tya, tyb) ->
         cctxt.warning
           "@[<hov 0>@[<hov 2>Type@ %a@]@ \
@@ -429,7 +402,6 @@ let report_errors cctxt errs =
           print_ty tya print_ty tyb
     | Reject _ -> cctxt.warning "Script reached FAIL instruction"
     | Overflow _ -> cctxt.warning "Unexpected arithmetic overflow"
-    | Division_by_zero _ -> cctxt.warning "Division by zero"
     | err ->
         cctxt.warning "%a"
           Local_environment.Environment.Error_monad.pp_print_error [ err ] in
