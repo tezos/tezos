@@ -7,6 +7,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* A smart contract is some code and some storage. The storage has a
+  type and an initial value. The code is the code itself, the types of
+  its arguments, the type of its result, and the type of the storage
+  it is using.
+
+  All of them are expressed in a simple [expr] type, combining
+  [Int] (integer constant), [String] (string constant), [Prim]
+  (a generic primitive for most operations) and [Seq] a sequence
+  of operations.
+ *)
+
 type location =
   int
 
