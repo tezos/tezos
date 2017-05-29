@@ -640,7 +640,7 @@ of bits for a given integer type (e.g. `bits (int8) = 8`).
 
         > MUL ; C / t (x) : t (y) : S   =>   C / t (x * y) : S
 
-     Unckeched for overflows.
+     Unchecked for overflows.
 
    * `DIV`
 
