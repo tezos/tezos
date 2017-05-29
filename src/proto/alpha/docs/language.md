@@ -657,7 +657,7 @@ of bits for a given integer type (e.g. `bits (int8) = 8`).
         > MOD ; C / t (x) : t (y) : S   =>   C / t (x % y) : S
 
    * `CAST t_to` where `t_to in u?int{8|16|32|64}`
-
+     Typecast.
         :: t_from : 'S   ->   t_to : 'S   for   t_from in u?int{8|16|32|64}
 
         > CAST t_to ; C / t_from (x) : S   =>   C / t_to (x) : S
@@ -700,7 +700,8 @@ Alternative operators are defined that check for overflows.
         > CHECKED_MUL ; C / t (x) : t (y) : S   =>   C / t (x * y) : S
 
    * `CHECKED_CAST t_to` where `t_to in u?int{8|16|32|64}`
-
+     Typecast. Fails unless the item can be round-trip converted between
+     types t_from and t_to without changing the value.
         :: t_from : 'S   ->   t_to : 'S   for   t_from in u?int{8|16|32|64}
 
         > CHECKED_CAST t_to ; C / t_from (x) : S   =>   C / t_to (x) : S
