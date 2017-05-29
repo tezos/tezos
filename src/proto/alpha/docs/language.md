@@ -477,9 +477,14 @@ Comparison only works on a class of types that we call comparable.
 A `COMPARE` operation is defined in an ad hoc way for each comparable
 type, but the result of compare is always an `int64`, which can in
 turn be checked in a generic manner using the following
-combinators. The result of `COMPARE` is `0` if the compared values are
-equal, negative if the first is less than the second, and positive
-otherwise.
+combinators. 
+
+   * `COMPARE`:
+     Compares two elements of the same type and returns an `int64`. The
+     result of `COMPARE` is `0` if the compared values are equal,
+     negative if the first is less than the second, and positive
+     otherwise.
+        :: 'comparable : 'comparable : 'S   ->   int64 : 'S
 
    * `EQ`:
      Checks that the top of the stack EQuals zero.
