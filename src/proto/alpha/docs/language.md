@@ -829,7 +829,7 @@ constants as is, concatenate them and use them as keys.
      Apply a function on a set passing the result of each
      application to the next one and return the last.
 
-        :: lambda (pair 'elt * 'b) 'b : set 'elt : 'b : 'S   ->   'b : 'S
+        :: lambda (pair 'elt 'b) 'b : set 'elt : 'b : 'S   ->   'b : 'S
 
 ### Operations on maps
 
