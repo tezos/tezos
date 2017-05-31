@@ -20,7 +20,6 @@ S client
 B client
 S attacker
 B attacker
-FLG -open Result
 FLG -w -30
 FLG -w -40
 PKG base64
@@ -48,3 +47,4 @@ PKG sodium
 PKG ssl
 PKG unix
 PKG zarith
+PKG leveldb

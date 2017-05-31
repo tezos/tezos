@@ -463,3 +463,4 @@ let init dir =
   Protocol.register s ;
   return s
 
+let close = Raw_store.close
