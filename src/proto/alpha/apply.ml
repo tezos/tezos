@@ -196,7 +196,9 @@ let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
               ctxt contract Constants.seed_nonce_revelation_tip >>=? fun ctxt ->
             return (ctxt, origination_nonce)
       end
-  | Faucet { id = manager } ->
+  | Faucet { id = manager ; counter } ->
+      Contract.check_faucet_counter_increment ctxt counter >>=? fun () ->
+      Contract.increment_faucet_counter ctxt >>=? fun ctxt ->
       (* Free tez for all! *)
       begin
         match miner_contract with

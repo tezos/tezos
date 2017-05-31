@@ -27,6 +27,7 @@ and anonymous_operation =
     }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
+      counter: counter ;
       nonce: MBytes.t ;
     }
 
@@ -276,18 +277,19 @@ module Encoding = struct
       (fun ((), level, nonce) -> Seed_nonce_revelation { level ; nonce })
 
   let faucet_encoding =
-    (obj3
+    (obj4
        (req "kind" (constant "faucet"))
        (req "id" Ed25519.Public_key_hash.encoding)
+       (req "counter" int32)
        (req "nonce" (Fixed.bytes 16)))
 
   let faucet_case tag =
     case ~tag faucet_encoding
       (function
-        | Faucet { id ; nonce } -> Some ((), id, nonce)
+        | Faucet { id ; counter ; nonce } -> Some ((), id, counter, nonce)
         | _ -> None
       )
-      (fun ((), id, nonce) -> Faucet { id ; nonce })
+      (fun ((), id, counter, nonce) -> Faucet { id ; counter ; nonce })
 
   let unsigned_operation_case tag =
     case ~tag
