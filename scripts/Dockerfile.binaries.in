@@ -5,7 +5,10 @@ LABEL distro_style="apk" distro="alpine" distro_long="alpine-$alpine_version" ar
 RUN adduser -S tezos && \
     apk update && \
     apk upgrade && \
-    apk add sudo bash libssl1.0 libsodium libev gmp git && \
+    apk add sudo bash libssl1.0 libsodium libev gmp git snappy && \
+    apk add leveldb \
+      --update-cache \
+      --repository http://nl.alpinelinux.org/alpine/edge/testing && \
     rm -f /var/cache/apk/* && \
     echo 'tezos ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/tezos && \
     chmod 440 /etc/sudoers.d/tezos && \

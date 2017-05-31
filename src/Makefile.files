@@ -313,6 +313,8 @@ NODE_PACKAGES := \
   irmin.unix \
   ocplib-resto.directory \
   ssl \
+  threads.posix \
+  leveldb \
 
 EMBEDDED_NODE_PROTOCOLS := \
   $(patsubst ${SRCDIR}/proto/%/,${SRCDIR}/proto/embedded_proto_%.cmxa, \
