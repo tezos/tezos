@@ -79,9 +79,9 @@ let test_invalid_endorsement_slot contract block =
 
 let test_endorsement_rewards
     block ({ Helpers.Account.b5 = b1 ; _ } as baccounts) =
-  let get_endorser_except_b1 accounts =
+  let get_endorser_except bs accounts =
     let account, cpt = ref accounts.(0), ref 0 in
-    while !account = b1 do
+    while List.mem !account bs do
       incr cpt ;
       account := accounts.(!cpt)
     done ;
@@ -92,7 +92,7 @@ let test_endorsement_rewards
   (* Endorsement Rights *)
   (* #1 endorse & inject in a block *)
   Helpers.Endorse.endorsers_list block baccounts >>=? fun accounts ->
-  get_endorser_except_b1 accounts >>=? fun (account0, slot0) ->
+  get_endorser_except [ b1 ] accounts >>=? fun (account0, slot0) ->
   Helpers.Account.balance account0 >>=? fun balance0 ->
   Helpers.Endorse.endorse ~slot:slot0 ~force:true account0 block >>=? fun ops ->
   Helpers.Mining.mine ~fitness_gap:2 ~operations:[ ops ] b1 block >>=? fun head0 ->
@@ -104,7 +104,7 @@ let test_endorsement_rewards
   (* #2 endorse & inject in a block  *)
   let block0 = `Hash head0 in
   Helpers.Endorse.endorsers_list block0 baccounts >>=? fun accounts ->
-  get_endorser_except_b1 accounts >>=? fun (account1, slot1) ->
+  get_endorser_except [ b1 ; account0 ] accounts >>=? fun (account1, slot1) ->
   Helpers.Account.balance account1 >>=? fun balance1 ->
   Helpers.Endorse.endorse ~slot:slot1 ~force:true account1 block0 >>=? fun ops ->
   Helpers.Mining.mine ~fitness_gap:2 ~operations:[ ops ] b1 block0 >>=? fun head1 ->
@@ -116,7 +116,7 @@ let test_endorsement_rewards
   (* #3 endorse but the operation is not included in a block, so no reward  *)
   let block1 = `Hash head1 in
   Helpers.Endorse.endorsers_list block1 baccounts >>=? fun accounts ->
-  get_endorser_except_b1 accounts >>=? fun (account2, slot2) ->
+  get_endorser_except [ b1 ; account0 ; account1 ] accounts >>=? fun (account2, slot2) ->
   Helpers.Account.balance account2 >>=? fun balance2 ->
   Helpers.Endorse.endorse ~slot:slot2 ~force:true account2 block1 >>=? fun _ops ->
   Assert.balance_equal ~msg:__LOC__ account2
@@ -151,7 +151,7 @@ let test_endorsement_rewards
 
   (* working on head *)
   Helpers.Endorse.endorsers_list (`Hash head) baccounts >>=? fun accounts ->
-  get_endorser_except_b1 accounts >>=? fun (account3, slot3) ->
+  get_endorser_except [ b1 ] accounts >>=? fun (account3, slot3) ->
   Helpers.Account.balance account3 >>=? fun balance3 ->
   Helpers.Endorse.endorse
     ~slot:slot3 ~force:true account3 (`Hash head) >>=? fun ops ->
@@ -160,7 +160,7 @@ let test_endorsement_rewards
 
   (* working on fork *)
   Helpers.Endorse.endorsers_list (`Hash fork) baccounts >>=? fun accounts ->
-  get_endorser_except_b1 accounts >>=? fun (account4, slot4) ->
+  get_endorser_except [ b1 ] accounts >>=? fun (account4, slot4) ->
   Helpers.Account.balance account4 >>=? fun _balance4 ->
   Helpers.Endorse.endorse ~slot:slot4 ~force:true account4 (`Hash fork) >>=? fun ops ->
   Helpers.Mining.mine ~fitness_gap:2 ~operations:[ ops ] b1 (`Hash fork) >>=? fun _new_fork ->
@@ -200,11 +200,11 @@ let run head (({ b1 ; b2 ; b3 ; b4 ; b5 } : Helpers.Account.bootstrap_accounts) 
   test_endorsement_rights b1 head >>=? fun has_right_to_endorse ->
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse true ;
 
-  Assert.balance_equal ~msg:__LOC__ b1 2_000_000_00L >>=? fun () ->
-  Assert.balance_equal ~msg:__LOC__ b2 2_000_000_00L >>=? fun () ->
-  Assert.balance_equal ~msg:__LOC__ b3 2_000_000_00L >>=? fun () ->
-  Assert.balance_equal ~msg:__LOC__ b4 2_000_000_00L >>=? fun () ->
-  Assert.balance_equal ~msg:__LOC__ b5 2_000_000_00L >>=? fun () ->
+  Assert.balance_equal ~msg:__LOC__ b1 4_000_000_00L >>=? fun () ->
+  Assert.balance_equal ~msg:__LOC__ b2 4_000_000_00L >>=? fun () ->
+  Assert.balance_equal ~msg:__LOC__ b3 4_000_000_00L >>=? fun () ->
+  Assert.balance_equal ~msg:__LOC__ b4 4_000_000_00L >>=? fun () ->
+  Assert.balance_equal ~msg:__LOC__ b5 4_000_000_00L >>=? fun () ->
 
   (* Check Rewards *)
   test_endorsement_rewards head baccounts >>=? fun head ->
