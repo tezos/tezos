@@ -66,10 +66,10 @@ let default = {
   bootstrap_keys =
     List.map read_public_key [
       "dd5d3536916765fd00a8cd402bddd34e87b49ae5159c43b8feecfd9f06b267d2" ;
-      "ce09f1c6b91d48cdd9f2aa98daf780f07353c759866c7dfbe50eb023bde51629" ;
+      "2dc874e66659ef2df0b7c6f29af7c913d32a01acecb36c4ad1a4ed74af7de33a" ;
       "9c328bddf6249bbe550121076194d99bbe60e5b1e144da4f426561b5d3bbc6ab" ;
       "a3db517734e07ace089ad0a2388e7276fb9b114bd79259dd5c93b0c33d57d6a2" ;
-      "6d2d52e62f1d48f3cf9badbc90cfe5f3aa600194bf21eda44b8e64698a82d341" ;
+      "30cdca1f0713916c9f1f2d3efc9fb688deb3e2f87b19ccd77f4c06676dc9baa9" ;
     ] ;
   dictator_pubkey =
     read_public_key
