@@ -2,7 +2,10 @@ FROM ocaml/opam:alpine-$alpine_version_ocaml-$ocaml_version
 
 COPY scripts/install_build_deps.sh scripts/version.sh scripts/
 COPY src/tezos-deps.opam src/
-RUN sudo apk add libsodium-dev && \
+RUN sudo apk add libsodium-dev snappy-dev && \
+    sudo apk add leveldb-dev \
+      --update-cache \
+      --repository http://nl.alpinelinux.org/alpine/edge/testing && \
     opam switch $ocaml_version && \
     opam config exec -- ./scripts/install_build_deps.sh all \
     rm -fr ~/.opam/log/ \

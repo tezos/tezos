@@ -112,6 +112,7 @@ let create { genesis ; store_root ; context_root ;
   Validator.activate validator mainnet_net >>= fun mainnet_validator ->
   let mainnet_db = Validator.net_db mainnet_validator in
   let shutdown () =
+    State.close state >>= fun () ->
     P2p.shutdown p2p >>= fun () ->
     Validator.shutdown validator >>= fun () ->
     Lwt.return_unit

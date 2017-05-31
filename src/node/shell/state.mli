@@ -30,6 +30,8 @@ val read:
   unit ->
   global_state tzresult Lwt.t
 
+val close:
+  global_state -> unit Lwt.t
 
 (** {2 Errors} **************************************************************)
 

@@ -14,6 +14,7 @@ type global_store = t
 
 (** Open or initialize a store at a given path. *)
 val init: string -> t tzresult Lwt.t
+val close : t -> unit
 
 
 (** {2 Net store} ************************************************************)

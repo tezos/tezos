@@ -38,6 +38,7 @@ depends: [
   "js_of_ocaml"
   "sodium" {>= "0.3.0" }
   "magic-mime"
+  "leveldb" {>= "1.1.2" }
   "kaputt" # { test }
   "bisect_ppx" # { test }
 ]

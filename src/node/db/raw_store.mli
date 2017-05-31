@@ -12,4 +12,5 @@ open Store_sigs
 include STORE
 
 val init: string -> t tzresult Lwt.t
+val close : t -> unit
 
