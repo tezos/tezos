@@ -140,6 +140,8 @@ let next_level ctxt =
 
 let () = register0 Services.Context.next_level next_level
 
+let () = register0 Services.Context.faucet_counter Contract.get_faucet_counter
+
 (*-- Context.Nonce -----------------------------------------------------------*)
 
 let nonce ctxt raw_level () =
