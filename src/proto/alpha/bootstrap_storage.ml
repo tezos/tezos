@@ -14,7 +14,7 @@ type account = {
 
 (* FIXME: when incresing wealth *10, the node is very slow to initialize...
    this should be investigated... *)
-let wealth = Tez_repr.of_cents_exn 2_000_000_00L
+let wealth = Tez_repr.of_cents_exn 4_000_000_00L
 
 let init_account ctxt account =
   Storage.Public_key.init ctxt account.public_key_hash account.public_key >>=? fun ctxt ->
@@ -55,7 +55,7 @@ let refill ctxt =
        Contract_storage.get_balance ctxt contract >>=? fun balance ->
        total >>=? fun total -> Lwt.return Tez_repr.(total +? balance))
     (return Tez_repr.zero) contracts >>=? fun total ->
-  (* The 5 bootstrap accounts should have at least 1/2 of the total amount
+  (* The bootstrap accounts should have at least 1/2 of the total amount
      of tokens. *)
   let accounts = accounts ctxt in
   let min_balance =
