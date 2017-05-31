@@ -559,7 +559,7 @@ module Operation_list = struct
 
   let rec do_read net block acc i =
     if i <= 0 then
-      Lwt.return []
+      Lwt.return acc
     else
       read_exn net (block, i-1) >>= fun ops ->
       do_read net block (ops :: acc) (i-1)
