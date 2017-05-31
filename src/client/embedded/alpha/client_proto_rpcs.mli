@@ -60,6 +60,10 @@ module Context : sig
   (** [next_level cctxt blk] returns the (protocol view of the) level
       of the successor of [blk]. *)
 
+  val faucet_counter:
+    Client_rpcs.config ->
+    block -> int32 tzresult Lwt.t
+
   module Nonce : sig
     val hash:
     Client_rpcs.config ->
@@ -306,7 +310,7 @@ module Helpers : sig
         block ->
         net:Net_id.t ->
         id:public_key_hash ->
-        unit -> MBytes.t tzresult Lwt.t
+        int32 -> MBytes.t tzresult Lwt.t
     end
     val block:
       Client_rpcs.config ->

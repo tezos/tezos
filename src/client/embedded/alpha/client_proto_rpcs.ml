@@ -69,6 +69,9 @@ module Context = struct
   let next_level cctxt block =
     call_error_service1 cctxt Services.Context.next_level block ()
 
+  let faucet_counter cctxt block =
+    call_error_service1 cctxt Services.Context.faucet_counter block ()
+
   module Nonce = struct
 
     type nonce_info = Services.Context.Nonce.nonce_info =
@@ -248,9 +251,9 @@ module Helpers = struct
           block ~net ~level ~nonce () =
         operations cctxt block ~net [Seed_nonce_revelation { level ; nonce }]
       let faucet cctxt
-          block ~net ~id () =
+          block ~net ~id counter =
         let nonce = Sodium.Random.Bigbytes.generate 16 in
-        operations cctxt block ~net [Faucet { id ; nonce }]
+        operations cctxt block ~net [Faucet { id ; counter ; nonce }]
     end
     let block cctxt
         block ~net ~predecessor ~timestamp ~fitness ~operations_hash

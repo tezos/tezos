@@ -27,6 +27,7 @@ and anonymous_operation =
     }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
+      counter: counter ;
       nonce: MBytes.t ;
     }
 
