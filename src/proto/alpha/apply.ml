@@ -104,10 +104,12 @@ let apply_manager_operation_content
     end
   | Origination { manager ; delegate ; script ;
                   spendable ; delegatable ; credit } ->
-      let script = match script with
-        | None -> None
-        | Some script ->
-            Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)) in
+      begin match script with
+        | None -> return None
+        | Some ({ Script.storage ; code } as script) ->
+            Script_ir_translator.parse_script ctxt storage code >>=? fun _ ->
+            return (Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)))
+      end >>=? fun script ->
       Contract.spend ctxt source Constants.origination_burn >>=? fun ctxt ->
       Contract.spend ctxt source credit >>=? fun ctxt ->
       Contract.originate ctxt
