@@ -1409,12 +1409,16 @@ type ex_script = Ex_script : ('a, 'b, 'c) script -> ex_script
 
 let parse_script
   : context -> Script.storage -> Script.code -> ex_script tzresult Lwt.t
-  = fun ctxt { storage; storage_type } { code; arg_type; ret_type } ->
+  = fun ctxt
+    { storage; storage_type = init_storage_type }
+    { code; arg_type; ret_type; storage_type } ->
     (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
     (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
+    (Lwt.return (parse_ty init_storage_type)) >>=? fun (Ex_ty init_storage_type) ->
     (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
     let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
     let ret_type_full = Pair_t (ret_type, storage_type) in
+    Lwt.return (ty_eq init_storage_type storage_type) >>=? fun (Eq _) ->
     parse_data ctxt storage_type storage >>=? fun storage ->
     parse_lambda ctxt ~storage_type arg_type_full ret_type_full code >>=? fun code ->
     return (Ex_script { code; arg_type; ret_type; storage; storage_type })
