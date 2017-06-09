@@ -24,7 +24,7 @@ module type DISTRIBUTED_DB = sig
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
   val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
 
-  val remove: t -> key -> unit Lwt.t
+  val clear: t -> key -> unit
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
 
@@ -190,13 +190,11 @@ end = struct
     | Found _ ->
         Lwt.return_false
 
-  let remove s k =
+  let clear s k =
     match Memory_table.find s.memory k with
-    | exception Not_found -> Lwt.return_unit
+    | exception Not_found -> ()
     | Pending _ -> assert false
-    | Found _ ->
-        Memory_table.remove s.memory k ;
-        Lwt.return_unit
+    | Found _ -> Memory_table.remove s.memory k
 
   let watch s = Watcher.create_stream s.input
 
