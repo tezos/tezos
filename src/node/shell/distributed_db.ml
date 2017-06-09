@@ -188,8 +188,8 @@ module Raw_operation_hashes = struct
   let read_all table hash n =
     map_p (fun i -> Table.read table (hash, i)) (0 -- (n-1))
 
-  let remove_all table hash n =
-    Lwt_list.iter_p (fun i -> Table.remove table (hash, i)) (0 -- (n-1))
+  let clear_all table hash n =
+    List.iter (fun i -> Table.clear table (hash, i)) (0 -- (n-1))
 
 end
 
@@ -250,8 +250,8 @@ module Raw_operations = struct
   let read_all table hash n =
     map_p (fun i -> Table.read table (hash, i)) (0 -- (n-1))
 
-  let remove_all table hash n =
-    Lwt_list.iter_p (fun i -> Table.remove table (hash, i)) (0 -- (n-1))
+  let clear_all table hash n =
+    List.iter (fun i -> Table.clear table (hash, i)) (0 -- (n-1))
 
 end
 
@@ -713,31 +713,27 @@ let commit_block net_db hash n validation_result =
   read_all_operations net_db hash n >>=? fun operations ->
   State.Block.store
     net_db.net_state header operations validation_result >>=? fun res ->
-  Raw_block_header.Table.remove
-    net_db.block_header_db.table hash >>= fun () ->
-  Raw_operation_hashes.remove_all
-    net_db.operation_hashes_db.table hash n >>= fun () ->
-  Raw_operations.remove_all
-    net_db.operations_db.table hash n >>= fun () ->
+  Raw_block_header.Table.clear net_db.block_header_db.table hash ;
+  Raw_operation_hashes.clear_all
+    net_db.operation_hashes_db.table hash n ;
+  Raw_operations.clear_all
+    net_db.operations_db.table hash n ;
   (* TODO: proper handling of the operations table by the prevalidator. *)
-  Lwt_list.iter_p
-    (Lwt_list.iter_p
-       (fun op -> Raw_operation.Table.remove
+  List.iter
+    (List.iter
+       (fun op -> Raw_operation.Table.clear
            net_db.operation_db.table
            (Operation.hash op)))
-    operations >>= fun () ->
+    operations ;
   return res
 
 let commit_invalid_block net_db hash n =
   Raw_block_header.Table.read
     net_db.block_header_db.table hash >>=? fun header ->
   State.Block.store_invalid net_db.net_state header >>=? fun res ->
-  Raw_block_header.Table.remove
-    net_db.block_header_db.table hash >>= fun () ->
-  Raw_operation_hashes.remove_all
-    net_db.operation_hashes_db.table hash n >>= fun () ->
-  Raw_operations.remove_all
-    net_db.operations_db.table hash n >>= fun () ->
+  Raw_block_header.Table.clear net_db.block_header_db.table hash ;
+  Raw_operation_hashes.clear_all net_db.operation_hashes_db.table hash n ;
+  Raw_operations.clear_all net_db.operations_db.table hash n ;
   return res
 
 let inject_operation net_db h op =
@@ -753,7 +749,7 @@ let inject_protocol db h p =
 let commit_protocol db h =
   Raw_protocol.Table.read db.protocol_db.table h >>=? fun p ->
   State.Protocol.store db.disk p >>= fun res ->
-  Raw_protocol.Table.remove db.protocol_db.table h >>= fun () ->
+  Raw_protocol.Table.clear db.protocol_db.table h ;
   return (res <> None)
 
 type operation =
@@ -803,12 +799,10 @@ let inject_block db bytes operations =
                 net_db.operations_db.table hash operations >>= fun _ ->
               return (hash, block)
 
-let remove_block net_db hash n =
-  Raw_operations.remove_all
-    net_db.operations_db.table hash n >>= fun () ->
-  Raw_operation_hashes.remove_all
-    net_db.operation_hashes_db.table hash n >>= fun () ->
-  Raw_block_header.Table.remove net_db.block_header_db.table hash
+let clear_block net_db hash n =
+  Raw_operations.clear_all net_db.operations_db.table hash n ;
+  Raw_operation_hashes.clear_all net_db.operation_hashes_db.table hash n ;
+  Raw_block_header.Table.clear net_db.block_header_db.table hash
 
 let broadcast_head net_db head mempool =
   let msg : Message.t =
@@ -848,6 +842,7 @@ module type DISTRIBUTED_DB = sig
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
   val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
+  val clear: t -> key -> unit
 end
 
 module Make
@@ -867,9 +862,10 @@ module Make
   let read_exn t k = Table.read_exn (Kind.proj t) k
   let prefetch t ?peer k p = Table.prefetch (Kind.proj t) ?peer k p
   let fetch t ?peer k p = Table.fetch (Kind.proj t) ?peer k p
-  let remove t k = Table.remove (Kind.proj t) k
+  let clear t k = Table.clear (Kind.proj t) k
   let inject t k v = Table.inject (Kind.proj t) k v
   let watch t = Table.watch (Kind.proj t)
+  let clear t k = Table.clear (Kind.proj t) k
 end
 
 module Block_header =

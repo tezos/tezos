@@ -52,7 +52,7 @@ val commit_invalid_block:
 val inject_block:
   t -> MBytes.t -> operation list list ->
   (Block_hash.t * Block_header.t) tzresult Lwt.t
-val remove_block: net_db -> Block_hash.t -> int -> unit Lwt.t
+val clear_block: net_db -> Block_hash.t -> int -> unit
 
 val inject_operation:
   net_db -> Operation_hash.t -> Operation.t -> bool tzresult Lwt.t
@@ -83,6 +83,7 @@ module type DISTRIBUTED_DB = sig
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
   val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
+  val clear: t -> key -> unit
 end
 
 module Block_header :
