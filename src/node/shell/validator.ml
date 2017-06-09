@@ -832,8 +832,8 @@ let create_worker ?max_ttl state db =
     let validation =
       protect
         ~on_error: begin fun err ->
-          Distributed_db.remove_block
-            net.net_db hash (List.length operations) >>= fun () ->
+          Distributed_db.clear_block
+            net.net_db hash (List.length operations) ;
           Lwt.return (Error err)
         end
         begin fun () ->
