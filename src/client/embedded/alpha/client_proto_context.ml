@@ -120,10 +120,8 @@ let originate_contract rpc_config
 
 let faucet rpc_config block ?force ?branch ~manager_pkh () =
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
-  Client_proto_rpcs.Context.faucet_counter rpc_config block >>=? fun pcounter ->
-  let counter = Int32.succ pcounter in
   Client_proto_rpcs.Helpers.Forge.Anonymous.faucet
-    rpc_config block ~net_id ~branch ~id:manager_pkh counter >>=? fun bytes ->
+    rpc_config block ~net_id ~branch ~id:manager_pkh () >>=? fun bytes ->
   originate rpc_config ?force ~block bytes
 
 let delegate_contract rpc_config

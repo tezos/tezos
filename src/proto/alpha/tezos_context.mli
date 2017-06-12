@@ -369,12 +369,6 @@ module Contract : sig
   val check_counter_increment:
     context -> contract -> int32 -> unit tzresult Lwt.t
 
-  val get_faucet_counter: context -> int32 tzresult Lwt.t
-
-  val check_faucet_counter_increment: context -> int32 -> unit tzresult Lwt.t
-
-  val increment_faucet_counter: context -> context tzresult Lwt.t
-
 end
 
 module Vote : sig
@@ -441,7 +435,6 @@ and anonymous_operation =
     }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
-      counter: counter ;
       nonce: MBytes.t ;
     }
 
