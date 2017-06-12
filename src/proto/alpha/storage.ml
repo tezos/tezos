@@ -108,8 +108,6 @@ module Key = struct
 
   let global_counter = store_root ["global_counter"]
 
-  let faucet_counter = store_root ["faucet_counter"]
-
   let next_cycle_to_be_rewarded = store_root ["next_cycle_to_be_rewarded"]
   let rewards = store_root ["rewards"]
 
@@ -264,14 +262,6 @@ module Contract = struct
       type value = int32
       let name = "global counter"
       let key = Key.global_counter
-      let encoding = Data_encoding.int32
-    end)
-
-  module Faucet_counter =
-    Make_single_data_storage(struct
-      type value = int32
-      let name = "faucet counter"
-      let key = Key.faucet_counter
       let encoding = Data_encoding.int32
     end)
 

@@ -161,13 +161,6 @@ module Context = struct
                 describe ~title: "detailled level info" Level.encoding)
       RPC.Path.(custom_root / "context" / "next_level")
 
-  let faucet_counter custom_root =
-    RPC.service
-      ~description: "Access the global faucet counter."
-      ~input: empty
-      ~output: (wrap_tzerror int32)
-      RPC.Path.(custom_root / "context" / "faucet_counter")
-
   let voting_period_kind custom_root =
     RPC.service
       ~description: "Voting period kind for the current block"

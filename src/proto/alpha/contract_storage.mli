@@ -28,10 +28,6 @@ val list: Storage.t -> Contract_repr.t list tzresult Lwt.t
 val check_counter_increment: Storage.t -> Contract_repr.t -> int32 -> unit tzresult Lwt.t
 val increment_counter: Storage.t -> Contract_repr.t -> Storage.t tzresult Lwt.t
 
-val get_faucet_counter: Storage.t -> int32 tzresult Lwt.t
-val check_faucet_counter_increment: Storage.t -> int32 -> unit tzresult Lwt.t
-val increment_faucet_counter: Storage.t -> Storage.t tzresult Lwt.t
-
 val is_delegatable : Storage.t -> Contract_repr.t -> bool tzresult Lwt.t
 val is_spendable : Storage.t -> Contract_repr.t -> bool tzresult Lwt.t
 
