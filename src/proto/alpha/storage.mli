@@ -122,12 +122,6 @@ module Contract : sig
     val init : t -> int32 -> t tzresult Lwt.t
   end
 
-  module Faucet_counter : sig
-    val get : t -> int32 tzresult Lwt.t
-    val set : t -> int32 -> t tzresult Lwt.t
-    val init : t -> int32 -> t tzresult Lwt.t
-  end
-
   (** The domain of alive contracts *)
   module Set : Data_set_storage
     with type value = Contract_repr.t

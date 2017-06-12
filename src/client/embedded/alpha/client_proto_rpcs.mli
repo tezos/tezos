@@ -65,10 +65,6 @@ module Context : sig
   (** [next_level cctxt blk] returns the (protocol view of the) level
       of the successor of [blk]. *)
 
-  val faucet_counter:
-    Client_rpcs.config ->
-    block -> int32 tzresult Lwt.t
-
   val voting_period_kind:
     Client_rpcs.config ->
     block -> Voting_period.kind tzresult Lwt.t
@@ -335,7 +331,7 @@ module Helpers : sig
         net_id:Net_id.t ->
         branch:Block_hash.t ->
         id:public_key_hash ->
-        int32 -> MBytes.t tzresult Lwt.t
+        unit -> MBytes.t tzresult Lwt.t
     end
     val block_proto_header:
       Client_rpcs.config ->
