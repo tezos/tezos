@@ -10,30 +10,75 @@
 module Ed25519 = Environment.Ed25519
 open Client_proto_args
 
-let report_parse_error _prefix exn _lexbuf =
+let report_parse_error prefix exn =
   let open Lexing in
   let open Script_located_ir in
-  let print_loc ppf (s, e) =
-    if s.line = e.line then
-      if s.column = e.column then
-        Format.fprintf ppf
-          "at line %d character %d"
-          s.line s.column
+  let print_point ppf { line ; column } =
+    Format.fprintf ppf
+      "at line %d character %d"
+      line column in
+  let print_token ppf = function
+    | Michelson_parser.Open_paren
+    | Michelson_parser.Close_paren ->
+        Format.fprintf ppf "parenthesis"
+    | Michelson_parser.Open_brace
+    | Michelson_parser.Close_brace ->
+        Format.fprintf ppf "curly brace"
+    | Michelson_parser.String _ ->
+        Format.fprintf ppf "string constant"
+    | Michelson_parser.Int _ ->
+        Format.fprintf ppf "integer constant"
+    | Michelson_parser.Ident _ ->
+        Format.fprintf ppf "identifier"
+    | Michelson_parser.Annot _ ->
+        Format.fprintf ppf "annotation"
+    | Michelson_parser.Comment _
+    | Michelson_parser.Eol_comment _ ->
+        Format.fprintf ppf "comment"
+    | Michelson_parser.Semi ->
+        Format.fprintf ppf "semi colon" in
+  let print_loc ppf loc =
+    Format.fprintf ppf "in %s, " prefix ;
+    if loc.start.line = loc.stop.line then
+      if loc.start.column = loc.stop.column then
+      Format.fprintf ppf
+        "at line %d character %d"
+        loc.start.line loc.start.column
       else
-        Format.fprintf ppf
-          "at line %d characters %d to %d"
-          s.line s.column e.column
+      Format.fprintf ppf
+        "at line %d characters %d to %d"
+        loc.start.line loc.start.column loc.stop.column
     else
       Format.fprintf ppf
         "from line %d character %d to line %d character %d"
-        s.line s.column e.line e.column in
+        loc.start.line loc.start.column loc.stop.line loc.stop.column in
   match exn with
-  | Missing_program_field n ->
+  | Script_located_ir.Missing_program_field n ->
       failwith "missing script %s" n
-  | Illegal_character (loc, c) ->
-      failwith "%a, illegal character %C" print_loc loc c
-  | Illegal_escape (loc, c) ->
-      failwith "%a, illegal escape sequence %S" print_loc loc c
+  | Michelson_parser.Invalid_utf8_sequence (point, str) ->
+      failwith "%a, invalid UTF-8 sequence %S" print_point point str
+  | Michelson_parser.Unexpected_character (point, str) ->
+      failwith "%a, unexpected character %s" print_point point str
+  | Michelson_parser.Undefined_escape_character (point, str) ->
+      failwith "%a, undefined escape character \"%s\"" print_point point str
+  | Michelson_parser.Missing_break_after_number point ->
+      failwith "%a, missing break" print_point point
+  | Michelson_parser.Unterminated_string loc ->
+      failwith "%a, unterminated string" print_loc loc
+  | Michelson_parser.Unterminated_integer loc ->
+      failwith "%a, unterminated integer" print_loc loc
+  | Michelson_parser.Unterminated_comment loc ->
+      failwith "%a, unterminated comment" print_loc loc
+  | Michelson_parser.Unclosed { loc ; token } ->
+      failwith "%a, unclosed %a" print_loc loc print_token token
+  | Michelson_parser.Unexpected { loc ; token } ->
+      failwith "%a, unexpected %a" print_loc loc print_token token
+  | Michelson_parser.Extra { loc ; token } ->
+      failwith "%a, extra %a" print_loc loc print_token token
+  | Michelson_parser.Misaligned node ->
+      failwith "%a, misaligned expression" print_loc (node_location node)
+  | Michelson_parser.Empty ->
+      failwith "empty expression"
   | Failure s ->
       failwith "%s" s
   | exn ->
@@ -45,41 +90,54 @@ let print_location_mark ppf = function
 
 let no_locations _ = None
 
+let print_annotation ppf = function
+  | None -> ()
+  | Some a -> Format.fprintf ppf " %s@," a
+
 let rec print_expr_unwrapped_help emacs locations ppf = function
-  | Script.Prim (loc, name, []) ->
+  | Script.Prim (loc, name, [], None) ->
       begin match locations loc with
         | None -> Format.fprintf ppf "%s" name
-        | Some _ as l -> Format.fprintf ppf "(%s%a)" name print_location_mark l
+        | Some _ as l -> Format.fprintf ppf "%s%a" name print_location_mark l
       end
-  | Script.Prim (loc, name, args) ->
-      Format.fprintf ppf (if emacs then "%s%a %a" else "@[<hov 2>%s%a@ %a@]")
-        name print_location_mark (locations loc)
+  | Script.Prim (loc, name, args, (Some _ as annot)) ->
+      Format.fprintf ppf (if emacs then "%s%a %a" else "@[<hov 2>%s%a@ %a]")
+        name print_location_mark (locations loc) print_annotation annot
+  | Script.Prim (loc, name, args, annot) ->
+      Format.fprintf ppf "@[<hv 2>%s%a%a@ %a@]"
+        name
+        print_location_mark (locations loc)
+        print_annotation annot
         (Format.pp_print_list
            ~pp_sep: Format.pp_print_space
            (print_expr_help emacs locations))
         args
-  | Script.Seq (loc, []) ->
+  | Script.Seq (loc, [], None) ->
       begin match locations loc with
         | None -> Format.fprintf ppf "{}"
         | Some _ as l -> Format.fprintf ppf "{%a }" print_location_mark l
       end
-  | Script.Seq (loc, exprs) ->
+  | Script.Seq (loc, exprs, annot) ->
       begin match locations loc with
         | None -> Format.fprintf ppf "@[<hv 2>{ "
         | Some _ as l -> Format.fprintf ppf "@[<hv 2>{%a@ " print_location_mark l
       end ;
-      Format.fprintf ppf "%a@] }"
+      Format.fprintf ppf "%a%a@] }"
         (Format.pp_print_list
            ~pp_sep: (fun ppf () -> Format.fprintf ppf " ;@ ")
            (print_expr_unwrapped_help emacs locations))
         exprs
+        print_annotation annot
   | Script.Int (loc, n) ->
       Format.fprintf ppf "%s%a" n print_location_mark (locations loc)
   | Script.String (loc, s) ->
       Format.fprintf ppf "%S%a" s print_location_mark (locations loc)
 
 and print_expr_help emacs locations ppf = function
-  | Script.Prim (_, _, _ :: _) as expr ->
+  | Script.Prim (_, _, _ :: _, _)
+  | Script.Prim (_, _, [], Some _) as expr ->
+      Format.fprintf ppf "(%a)" (print_expr_unwrapped_help emacs locations) expr
+  | Script.Prim (loc, _, [], None) as expr when locations loc <> None ->
       Format.fprintf ppf "(%a)" (print_expr_unwrapped_help emacs locations) expr
   | expr -> print_expr_unwrapped_help emacs locations ppf expr
 
@@ -103,19 +161,33 @@ let print_stack = print_stack_help false
 let print_emacs_stack = print_stack_help true
 
 let print_typed_code locations ppf (expr, type_map) =
+  let print_stack ppf = function
+    | [] -> Format.fprintf ppf "[]"
+    | more ->
+        Format.fprintf ppf "@[<hov 2>[ %a ]@]"
+          (Format.pp_print_list
+             ~pp_sep: (fun ppf () -> Format.fprintf ppf " :@ ")
+             (print_expr_unwrapped no_locations))
+          more in
+  let print_annot ppf = function
+    | None -> ()
+    | Some annot -> Format.fprintf ppf " %s@," annot in
   let rec print_typed_code_unwrapped ppf expr =
     match expr with
-    | Script.Prim (loc, name, []) ->
+    | Script.Prim (loc, name, [], None) ->
         Format.fprintf ppf "%s%a"
           name print_location_mark (locations loc)
-    | Script.Prim (loc, name, args) ->
-        Format.fprintf ppf "@[<hov 2>%s%a@ %a@]"
-          name print_location_mark (locations loc)
+    | Script.Prim (loc, name, [], Some annot) ->
+        Format.fprintf ppf "(%s %s%a)"
+          name annot print_location_mark (locations loc)
+    | Script.Prim (loc, name, args, annot) ->
+        Format.fprintf ppf "@[<v 2>%s%a%a@ %a@]"
+          name print_annot annot print_location_mark (locations loc)
           (Format.pp_print_list
              ~pp_sep: Format.pp_print_space
              print_typed_code)
           args
-    | Script.Seq (loc, []) ->
+    | Script.Seq (loc, [], None) ->
         begin match List.assoc loc type_map with
           | exception Not_found -> Format.fprintf ppf "{}"
           | (first, _) ->
@@ -127,17 +199,33 @@ let print_typed_code locations ppf (expr, type_map) =
                   Format.fprintf ppf "{%a %a }"
                     print_location_mark l print_stack first
         end
-    | Script.Seq (loc, exprs) ->
-        begin match locations loc with
-          | None ->
+    | Script.Seq (loc, [], Some annot) ->
+        begin match List.assoc loc type_map with
+          | exception Not_found -> Format.fprintf ppf "{ %@%s }" annot
+          | (first, _) ->
+              match locations loc with
+              | None ->
+                  Format.fprintf ppf "{ %@%s } /* %a */"
+                    annot
+                    print_stack first
+              | Some _ as l ->
+                  Format.fprintf ppf "{ %@%s%a %a }"
+                    annot print_location_mark l print_stack first
+        end
+    | Script.Seq (loc, exprs, annot) ->
+        begin match locations loc, annot with
+          | None, None ->
               Format.fprintf ppf "@[<v 2>{ "
-          | Some _ as l ->
-              Format.fprintf ppf "@[<v 2>{%a@,"
+          | None, Some annot ->
+              Format.fprintf ppf "@[<v 2>{ %@%s@," annot
+          | Some _ as l, _ ->
+              Format.fprintf ppf "@[<v 2>{%a%a@,"
+                print_annot annot
                 print_location_mark l
         end ;
         let rec loop = function
           | [] -> assert false
-          | [ Script.Int (loc, _) | String (loc, _) | Prim (loc, _, _) as expr ] ->
+          | [ Script.Int (loc, _) | String (loc, _) | Prim (loc, _, _, _) as expr ] ->
               begin match List.assoc loc type_map with
                 | exception Not_found ->
                     Format.fprintf ppf "%a }@]"
@@ -148,7 +236,7 @@ let print_typed_code locations ppf (expr, type_map) =
                       print_typed_code_unwrapped expr
                       print_stack after
               end ;
-          | Script.Int (loc, _) | String (loc, _) | Prim (loc, _, _) as expr :: rest ->
+          | Script.Int (loc, _) | String (loc, _) | Prim (loc, _, _, _) as expr :: rest ->
               begin match List.assoc loc type_map with
                 | exception Not_found ->
                     Format.fprintf ppf "%a ;@,"
@@ -160,10 +248,10 @@ let print_typed_code locations ppf (expr, type_map) =
                       print_typed_code_unwrapped expr ;
                     loop rest
               end ;
-          | [ Seq (_, _) as expr ] ->
+          | [ Seq (_, _, _) as expr ] ->
               Format.fprintf ppf "%a }@]"
                 print_typed_code_unwrapped expr
-          | Seq (_, _) as expr :: rest ->
+          | Seq (_, _, _) as expr :: rest ->
               Format.fprintf ppf "%a@,"
                 print_typed_code_unwrapped expr ;
               loop rest in
@@ -173,20 +261,18 @@ let print_typed_code locations ppf (expr, type_map) =
     | Script.String (loc, s) ->
         Format.fprintf ppf "%S%a" s print_location_mark (locations loc)
   and print_typed_code ppf = function
-    | Script.Prim (_, _, _ :: _) as expr ->
+    | Script.Prim (_, _, _ :: _, _) as expr ->
         Format.fprintf ppf "(%a)" print_typed_code_unwrapped expr
     | expr -> print_typed_code_unwrapped ppf expr in
   print_typed_code_unwrapped ppf expr
 
 let print_program locations ppf ((c : Script.code), type_map) =
   Format.fprintf ppf
-    "@[<v 0>@[<hov 2>storage@ %a ;@]@,\
-     @[<hov 2>parameter@ %a ;@]@,\
-     @[<hov 2>return@ %a ;@]@,\
+    "@[<v 0>%a ;@,%a ;@,%a ;@,\
      @[<hov 2>code@ %a@]@]"
-    (print_expr no_locations) c.storage_type
-    (print_expr no_locations) c.arg_type
-    (print_expr no_locations) c.ret_type
+    (print_expr_unwrapped no_locations) (Script.Prim (-1, "storage", [ c.storage_type ], None))
+    (print_expr_unwrapped no_locations) (Script.Prim (-1, "parameter", [ c.arg_type ], None))
+    (print_expr_unwrapped no_locations) (Script.Prim (-1, "return", [ c.ret_type ], None))
     (print_typed_code locations) (c.code, type_map)
 
 let collect_error_locations errs =
@@ -489,91 +575,101 @@ type 'a parsed =
     loc_table : (string * (int * Script_located_ir.location) list) list }
 
 let parse_program source =
-  let lexbuf = Lexing.from_string source in
   try
-    return
-      (Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf |> fun fields ->
-       let rec get_field n = function
-         | Script_located_ir.Prim (_, pn, [ ctns ]) :: _ when n = pn -> ctns
-         | _ :: rest -> get_field n rest
-         | [] -> raise (Script_located_ir.Missing_program_field n) in
-       let code, code_loc_table =
-         Script_located_ir.strip_locations (get_field "code" fields) in
-       let arg_type, parameter_loc_table =
-         Script_located_ir.strip_locations (get_field "parameter" fields) in
-       let ret_type, return_loc_table =
-         Script_located_ir.strip_locations (get_field "return" fields) in
-       let storage_type, storage_loc_table =
-         Script_located_ir.strip_locations (get_field "storage" fields) in
-       let ast = Script.{ code ; arg_type ; ret_type ; storage_type } in
-       let loc_table =
-         [ "code", code_loc_table ;
-           "parameter", parameter_loc_table ;
-           "return", return_loc_table ;
-           "storage", storage_loc_table ] in
-       { ast ; source ; loc_table })
+    let fields = Michelson_parser.parse_toplevel (Michelson_parser.tokenize source) in
+    let fields = List.map Script_located_ir.strip_locations fields in
+    let rec get_field n = function
+      | (Script.Prim (_, pn, [ ctns ], _), locs) :: _ when n = pn -> ctns, locs
+      | _ :: rest -> get_field n rest
+      | [] -> raise (Script_located_ir.Missing_program_field n) in
+    let code, code_loc_table = get_field "code" fields in
+    let arg_type, parameter_loc_table = get_field "parameter" fields in
+    let ret_type, return_loc_table = get_field "return" fields in
+    let storage_type, storage_loc_table = get_field "storage" fields in
+    let ast = Script.{ code ; arg_type ; ret_type ; storage_type } in
+    let loc_table =
+      [ "code", code_loc_table ;
+        "parameter", parameter_loc_table ;
+        "return", return_loc_table ;
+        "storage", storage_loc_table ] in
+    return { ast ; source ; loc_table }
   with
-  | exn -> report_parse_error "program: " exn lexbuf
+  | exn -> report_parse_error "program" exn
 
 let parse_data source =
-  let lexbuf = Lexing.from_string source in
   try
-    match Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf with
-    | [node] ->
-        let ast, loc_table = Script_located_ir.strip_locations node in
-        let loc_table = [ "data", loc_table ] in
-        return { ast ; source ; loc_table }
-    | _ -> failwith "single data expression expected"
+    let node = Michelson_parser.parse_expression (Michelson_parser.tokenize source) in
+    let ast, loc_table = Script_located_ir.strip_locations node in
+    let loc_table = [ "data", loc_table ] in
+    return { ast ; source ; loc_table }
   with
-  | exn -> report_parse_error "data: " exn lexbuf
+  | exn -> report_parse_error "data" exn
 
 let parse_data_type source =
-  let lexbuf = Lexing.from_string source in
   try
-    match Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf with
-    | [node] ->
-        let ast, loc_table = Script_located_ir.strip_locations node in
-        let loc_table = [ "data", loc_table ] in
-        return { ast ; source ; loc_table }
-    | _ -> failwith "single type expression expected"
+    let node = Michelson_parser.parse_expression (Michelson_parser.tokenize source) in
+    let ast, loc_table = Script_located_ir.strip_locations node in
+    let loc_table = [ "data", loc_table ] in
+    return { ast ; source ; loc_table }
   with
-  | exn -> report_parse_error "data_type: " exn lexbuf
+  | exn -> report_parse_error "type" exn
 
 let unexpand_macros type_map (program : Script.code) =
   let open Script in
-  let rec caddr type_map acc = function
-    | [] -> Some (List.rev acc)
-    | Prim (loc, "CAR" , []) :: rest when List.mem_assoc loc type_map ->
-        caddr type_map ((loc, "A") :: acc) rest
-    | Prim (loc, "CDR" , []) :: rest when List.mem_assoc loc type_map ->
-        caddr type_map ((loc, "D") :: acc) rest
-    | _ -> None in
-  let rec unexpand type_map node =
-    match node with
-    | Seq (loc, l) ->
-        begin match caddr type_map [] l with
-          | None | Some [] ->
-              let type_map, l =
-                List.fold_left
-                  (fun (type_map, acc) e ->
-                     let type_map, e = unexpand type_map e in
-                     type_map, e :: acc)
-                  (type_map, [])
-                  l in
-              type_map, Seq (loc, List.rev l)
-          | Some l ->
-              let locs, steps = List.split l in
-              let name = "C" ^ String.concat "" steps ^ "R" in
-              let first, last = List.hd locs, List.hd (List.rev locs) in
-              let (before, _) = List.assoc first type_map in
-              let (_, after) = List.assoc last type_map in
-              let type_map =
-                List.filter
-                  (fun (loc, _) -> not (List.mem loc locs))
-                  type_map in
-              let type_map = (loc, (before, after)) :: type_map in
-              type_map, Prim (loc, name, [])
-        end
+  let rec first_prim_in_sequence = function
+    | Int _ | String _ -> None
+    | Prim (loc, _, _, _) -> Some loc
+    | Seq (_, children, _) ->
+        let rec loop = function
+          | [] -> None
+          | child :: children ->
+              match first_prim_in_sequence child with
+              | None -> loop children
+              | Some loc -> Some loc in
+        loop children in
+  let rec last_prim_in_sequence = function
+    | Int _ | String _ -> None
+    | Prim (loc, _, _, _) -> Some loc
+    | Seq (_, children, _) ->
+        let rec reversed = function
+          | [] -> None
+          | child :: children ->
+              match last_prim_in_sequence child with
+              | None -> reversed children
+              | Some loc -> Some loc in
+        reversed (List.rev children) in
+  let rec unexpand type_map original =
+    match Michelson_macros.unexpand original with
+    | Seq (loc, children, annot) ->
+        let type_map, children =
+          List.fold_left
+            (fun (type_map, acc) node ->
+               let type_map, node = unexpand type_map node in
+               type_map, node :: acc)
+            (type_map, []) children in
+        type_map, Seq (loc, List.rev children, annot)
+    | Prim (loc, name, children, annot) ->
+        let type_map =
+          match original with
+          | Seq _ ->
+              if List.mem_assoc loc type_map then
+                type_map
+              else
+                begin match first_prim_in_sequence original, last_prim_in_sequence original with
+                  | None, _ | _, None -> type_map
+                  | Some floc, Some lloc ->
+                      let fty, _ = List.assoc floc type_map in
+                      let _, lty = List.assoc lloc type_map in
+                      (loc, (fty, lty)) :: type_map
+                end
+          | _ -> type_map in
+        let type_map, children =
+          List.fold_left
+            (fun (type_map, acc) node ->
+               let type_map, node = unexpand type_map node in
+               type_map, node :: acc)
+            (type_map, []) children in
+        type_map, Prim (loc, name, List.rev children, annot)
     | oth -> type_map, oth in
   let type_map, code = unexpand type_map program.code in
   type_map, { program with code }
@@ -745,15 +841,13 @@ let commands () =
            cctxt.message
              "((types . (%a)) (errors . (%a)))"
              (Format.pp_print_list
-                (fun ppf (({ Script_located_ir.point = s },
-                           { Script_located_ir.point = e }),
+                (fun ppf ({ Script_located_ir.start = { point = s } ; stop = { point = e } },
                           bef, aft) ->
                   Format.fprintf ppf "(%d %d %a %a)" (s + 1) (e + 1)
                     print_emacs_stack bef print_emacs_stack aft))
              types
              (Format.pp_print_list
-                (fun ppf (({ Script_located_ir.point = s },
-                           { Script_located_ir.point = e }),
+                (fun ppf ({ Script_located_ir.start = { point = s } ; stop = { point = e } },
                           err) ->
                   Format.fprintf ppf "(%d %d %S)" (s + 1) (e + 1) err))
              errors >>= fun () ->

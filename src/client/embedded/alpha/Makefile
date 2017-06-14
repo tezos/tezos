@@ -2,7 +2,8 @@
 PROTO_VERSION := alpha
 
 CLIENT_INTFS := \
-  concrete_parser.mli \
+  michelson_macros.mli \
+  michelson_parser.mli \
   client_proto_rpcs.mli \
   client_proto_args.mli \
   client_proto_contracts.mli \
@@ -13,7 +14,8 @@ CLIENT_INTFS := \
 
 CLIENT_IMPLS := \
   script_located_ir.ml \
-  concrete_parser.ml concrete_lexer.ml \
+  michelson_macros.ml \
+  michelson_parser.ml \
   client_proto_rpcs.ml \
   client_proto_args.ml \
   client_proto_contracts.ml \
@@ -28,10 +30,7 @@ include ../Makefile.shared
 
 ${OBJS}: OPENED_MODULES += Environment Tezos_context
 
-predepend: concrete_parser.ml concrete_lexer.ml
-
 .PHONY: clean
 clean::
 	-rm -f baker/*.cm* baker/*~ baker/*.o baker/*.a
 	-rm -f baker/*.deps baker/*.deps.byte
-	-rm -f concrete_lexer.ml concrete_parser.ml concrete_parser.mli

@@ -54,10 +54,10 @@ type error += Duplicate_set_values of Script.location * Script.expr
 (* ---- Error helpers -------------------------------------------------------*)
 
 let location = function
-  | Prim (loc, _, _)
+  | Prim (loc, _, _, _)
   | Int (loc, _)
   | String (loc, _)
-  | Seq (loc, _) -> loc
+  | Seq (loc, _, _) -> loc
 
 let kind = function
   | Int _ -> Int_kind
@@ -90,8 +90,8 @@ let unexpected expr exp_kinds exp_ns exp_prims =
   match expr with
   | Int (loc, _) -> Invalid_kind (loc, Prim_kind :: exp_kinds, Int_kind)
   | String (loc, _ ) -> Invalid_kind (loc, Prim_kind :: exp_kinds, String_kind)
-  | Seq (loc, _ ) -> Invalid_kind (loc, Prim_kind :: exp_kinds, Seq_kind)
-  | Prim (loc, name, _) ->
+  | Seq (loc, _, _) -> Invalid_kind (loc, Prim_kind :: exp_kinds, Seq_kind)
+  | Prim (loc, name, _, _) ->
       match namespace name, exp_ns with
       | None, _ ->
           Invalid_case (loc, name)
@@ -241,60 +241,60 @@ let ty_of_comparable_ty
 
 let unparse_comparable_ty
   : type a. a comparable_ty -> Script.expr = function
-  | Nat_key -> Prim (-1, "nat", [])
-  | Int_key -> Prim (-1, "int", [])
-  | String_key -> Prim (-1, "string", [])
-  | Tez_key -> Prim (-1, "tez", [])
-  | Bool_key -> Prim (-1, "bool", [])
-  | Key_key -> Prim (-1, "key", [])
-  | Timestamp_key -> Prim (-1, "timestamp", [])
+  | Int_key -> Prim (-1, "int", [], None)
+  | Nat_key -> Prim (-1, "nat", [], None)
+  | String_key -> Prim (-1, "string", [], None)
+  | Tez_key -> Prim (-1, "tez", [], None)
+  | Bool_key -> Prim (-1, "bool", [], None)
+  | Key_key -> Prim (-1, "key", [], None)
+  | Timestamp_key -> Prim (-1, "timestamp", [], None)
 
 let rec unparse_ty
   : type a. a ty -> Script.expr = function
-  | Unit_t -> Prim (-1, "unit", [])
-  | Nat_t -> Prim (-1, "nat", [])
-  | Int_t -> Prim (-1, "int", [])
-  | String_t -> Prim (-1, "string", [])
-  | Tez_t -> Prim (-1, "tez", [])
-  | Bool_t -> Prim (-1, "bool", [])
-  | Key_t -> Prim (-1, "key", [])
-  | Timestamp_t -> Prim (-1, "timestamp", [])
-  | Signature_t -> Prim (-1, "signature", [])
+  | Unit_t -> Prim (-1, "unit", [], None)
+  | Int_t -> Prim (-1, "int", [], None)
+  | Nat_t -> Prim (-1, "nat", [], None)
+  | String_t -> Prim (-1, "string", [], None)
+  | Tez_t -> Prim (-1, "tez", [], None)
+  | Bool_t -> Prim (-1, "bool", [], None)
+  | Key_t -> Prim (-1, "key", [], None)
+  | Timestamp_t -> Prim (-1, "timestamp", [], None)
+  | Signature_t -> Prim (-1, "signature", [], None)
   | Contract_t (utl, utr) ->
       let tl = unparse_ty utl in
       let tr = unparse_ty utr in
-      Prim (-1, "contract", [ tl; tr ])
+      Prim (-1, "contract", [ tl; tr ], None)
   | Pair_t (utl, utr) ->
       let tl = unparse_ty utl in
       let tr = unparse_ty utr in
-      Prim (-1, "pair", [ tl; tr ])
+      Prim (-1, "pair", [ tl; tr ], None)
   | Union_t (utl, utr) ->
       let tl = unparse_ty utl in
       let tr = unparse_ty utr in
-      Prim (-1, "or", [ tl; tr ])
+      Prim (-1, "or", [ tl; tr ], None)
   | Lambda_t (uta, utr) ->
       let ta = unparse_ty uta in
       let tr = unparse_ty utr in
-      Prim (-1, "lambda", [ ta; tr ])
+      Prim (-1, "lambda", [ ta; tr ], None)
   | Option_t ut ->
       let t = unparse_ty ut in
-      Prim (-1, "option", [ t ])
+      Prim (-1, "option", [ t ], None)
   | List_t ut ->
       let t = unparse_ty ut in
-      Prim (-1, "list", [ t ])
+      Prim (-1, "list", [ t ], None)
   | Set_t ut ->
       let t = unparse_comparable_ty ut in
-      Prim (-1, "set", [ t ])
+      Prim (-1, "set", [ t ], None)
   | Map_t (uta, utr) ->
       let ta = unparse_comparable_ty uta in
       let tr = unparse_ty utr in
-      Prim (-1, "map", [ ta; tr ])
+      Prim (-1, "map", [ ta; tr ], None)
 
 let rec unparse_data
   : type a. a ty -> a -> Script.expr
   = fun ty a -> match ty, a with
     | Unit_t, () ->
-        Prim (-1, "Unit", [])
+        Prim (-1, "Unit", [], None)
     | Int_t, v ->
         Int (-1, Script_int.to_string v)
     | Nat_t, v ->
@@ -302,9 +302,9 @@ let rec unparse_data
     | String_t, s ->
         String (-1, s)
     | Bool_t, true ->
-        Prim (-1, "True", [])
+        Prim (-1, "True", [], None)
     | Bool_t, false ->
-        Prim (-1, "False", [])
+        Prim (-1, "False", [], None)
     | Timestamp_t, t ->
         String (-1, Timestamp.to_notation t)
     | Contract_t _, (_, _, c)  ->
@@ -321,21 +321,21 @@ let rec unparse_data
     | Pair_t (tl, tr), (l, r) ->
         let l = unparse_data tl l in
         let r = unparse_data tr r in
-        Prim (-1, "Pair", [ l; r ])
+        Prim (-1, "Pair", [ l; r ], None)
     | Union_t (tl, _), L l ->
         let l = unparse_data tl l in
-        Prim (-1, "Left", [ l ])
+        Prim (-1, "Left", [ l ], None)
     | Union_t (_, tr), R r ->
         let r = unparse_data tr r in
-        Prim (-1, "Right", [ r ])
+        Prim (-1, "Right", [ r ], None)
     | Option_t t, Some v ->
         let v = unparse_data t v in
-        Prim (-1, "Some", [ v ])
+        Prim (-1, "Some", [ v ], None)
     | Option_t _, None ->
-        Prim (-1, "None", [])
+        Prim (-1, "None", [], None)
     | List_t t, items ->
         let items = List.map (unparse_data t) items in
-        Prim (-1, "List", items)
+        Prim (-1, "List", items, None)
     | Set_t t, set ->
         let t = ty_of_comparable_ty t in
         let items =
@@ -343,17 +343,18 @@ let rec unparse_data
             (fun item acc ->
                unparse_data t item :: acc )
             set [] in
-        Prim (-1, "Set", List.rev items)
+        Prim (-1, "Set", List.rev items, None)
     | Map_t (kt, vt), map ->
         let kt = ty_of_comparable_ty kt in
         let items =
           map_fold (fun k v acc ->
               Prim (-1, "Item",
                     [ unparse_data kt k;
-                      unparse_data vt v ])
+                      unparse_data vt v ],
+                   None)
               :: acc)
             map [] in
-        Prim (-1, "Map", List.rev items)
+        Prim (-1, "Map", List.rev items, None)
     | Lambda_t _, Lam (_, original_code) ->
         original_code
 
@@ -480,20 +481,20 @@ type ex_ty = Ex_ty : 'a ty -> ex_ty
 type ex_stack_ty = Ex_stack_ty : 'a stack_ty -> ex_stack_ty
 
 let rec parse_comparable_ty : Script.expr -> ex_comparable_ty tzresult = function
-  | Prim (_, "int", []) -> ok (Ex_comparable_ty Int_key)
-  | Prim (_, "nat", []) -> ok (Ex_comparable_ty Nat_key)
-  | Prim (_, "string", []) -> ok (Ex_comparable_ty String_key)
-  | Prim (_, "tez", []) -> ok (Ex_comparable_ty Tez_key)
-  | Prim (_, "bool", []) -> ok (Ex_comparable_ty Bool_key)
-  | Prim (_, "key", []) -> ok (Ex_comparable_ty Key_key)
-  | Prim (_, "timestamp", []) -> ok (Ex_comparable_ty Timestamp_key)
+  | Prim (_, "int", [], _) -> ok (Ex_comparable_ty Int_key)
+  | Prim (_, "nat", [], _) -> ok (Ex_comparable_ty Nat_key)
+  | Prim (_, "string", [], _) -> ok (Ex_comparable_ty String_key)
+  | Prim (_, "tez", [], _) -> ok (Ex_comparable_ty Tez_key)
+  | Prim (_, "bool", [], _) -> ok (Ex_comparable_ty Bool_key)
+  | Prim (_, "key", [], _) -> ok (Ex_comparable_ty Key_key)
+  | Prim (_, "timestamp", [], _) -> ok (Ex_comparable_ty Timestamp_key)
   | Prim (loc, ("int" | "nat"
                | "string" | "tez" | "bool"
-               | "key" | "timestamp" as prim), l) ->
+               | "key" | "timestamp" as prim), l, _) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
   | Prim (loc, ("pair" | "or" | "set" | "map"
                | "list" | "option"  | "lambda"
-               | "unit" | "signature"  | "contract"), _) as expr ->
+               | "unit" | "signature"  | "contract"), _, _) as expr ->
       parse_ty expr >>? fun (Ex_ty ty) ->
       error (Comparable_type_expected (loc, ty))
   | expr ->
@@ -503,41 +504,41 @@ let rec parse_comparable_ty : Script.expr -> ex_comparable_ty tzresult = functio
           "key" ; "timestamp" ]
 
 and parse_ty : Script.expr -> ex_ty tzresult = function
-  | Prim (_, "unit", []) -> ok (Ex_ty Unit_t)
-  | Prim (_, "int", []) -> ok (Ex_ty Int_t)
-  | Prim (_, "nat", []) -> ok (Ex_ty Nat_t)
-  | Prim (_, "string", []) -> ok (Ex_ty String_t)
-  | Prim (_, "tez", []) -> ok (Ex_ty Tez_t)
-  | Prim (_, "bool", []) -> ok (Ex_ty Bool_t)
-  | Prim (_, "key", []) -> ok (Ex_ty Key_t)
-  | Prim (_, "timestamp", []) -> ok (Ex_ty Timestamp_t)
-  | Prim (_, "signature", []) -> ok (Ex_ty Signature_t)
-  | Prim (_, "contract", [ utl; utr ]) ->
+  | Prim (_, "unit", [], _) -> ok (Ex_ty Unit_t)
+  | Prim (_, "int", [], _) -> ok (Ex_ty (Int_t))
+  | Prim (_, "nat", [], _) -> ok (Ex_ty (Nat_t))
+  | Prim (_, "string", [], _) -> ok (Ex_ty String_t)
+  | Prim (_, "tez", [], _) -> ok (Ex_ty Tez_t)
+  | Prim (_, "bool", [], _) -> ok (Ex_ty Bool_t)
+  | Prim (_, "key", [], _) -> ok (Ex_ty Key_t)
+  | Prim (_, "timestamp", [], _) -> ok (Ex_ty Timestamp_t)
+  | Prim (_, "signature", [], _) -> ok (Ex_ty Signature_t)
+  | Prim (_, "contract", [ utl; utr ], _) ->
       parse_ty utl >>? fun (Ex_ty tl) ->
       parse_ty utr >>? fun (Ex_ty tr) ->
       ok (Ex_ty (Contract_t (tl, tr)))
-  | Prim (_, "pair", [ utl; utr ]) ->
+  | Prim (_, "pair", [ utl; utr ], _) ->
       parse_ty utl >>? fun (Ex_ty tl) ->
       parse_ty utr >>? fun (Ex_ty tr) ->
       ok (Ex_ty (Pair_t (tl, tr)))
-  | Prim (_, "or", [ utl; utr ]) ->
+  | Prim (_, "or", [ utl; utr ], _) ->
       parse_ty utl >>? fun (Ex_ty tl) ->
       parse_ty utr >>? fun (Ex_ty tr) ->
       ok (Ex_ty (Union_t (tl, tr)))
-  | Prim (_, "lambda", [ uta; utr ]) ->
+  | Prim (_, "lambda", [ uta; utr ], _) ->
       parse_ty uta >>? fun (Ex_ty ta) ->
       parse_ty utr >>? fun (Ex_ty tr) ->
       ok (Ex_ty (Lambda_t (ta, tr)))
-  | Prim (_, "option", [ ut ]) ->
+  | Prim (_, "option", [ ut ], _) ->
       parse_ty ut >>? fun (Ex_ty t) ->
       ok (Ex_ty (Option_t t))
-  | Prim (_, "list", [ ut ]) ->
+  | Prim (_, "list", [ ut ], _) ->
       parse_ty ut >>? fun (Ex_ty t) ->
       ok (Ex_ty (List_t t))
-  | Prim (_, "set", [ ut ]) ->
+  | Prim (_, "set", [ ut ], _) ->
       parse_comparable_ty ut >>? fun (Ex_comparable_ty t) ->
       ok (Ex_ty (Set_t t))
-  | Prim (_, "map", [ uta; utr ]) ->
+  | Prim (_, "map", [ uta; utr ], _) ->
       parse_comparable_ty uta >>? fun (Ex_comparable_ty ta) ->
       parse_ty utr >>? fun (Ex_ty tr) ->
       ok (Ex_ty (Map_t (ta, tr)))
@@ -546,7 +547,7 @@ and parse_ty : Script.expr -> ex_ty tzresult = function
                | "unit" | "signature"  | "contract"
                | "int" | "nat"
                | "string" | "tez" | "bool"
-               | "key" | "timestamp" as prim), l) ->
+               | "key" | "timestamp" as prim), l, _) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
   | expr ->
       error @@ unexpected expr [] Type_namespace
@@ -586,15 +587,15 @@ let rec parse_data
       trace (error ()) body in
     match ty, script_data with
     (* Unit *)
-    | Unit_t, Prim (_, "Unit", []) -> return ()
-    | Unit_t, Prim (loc, "Unit", l) ->
+    | Unit_t, Prim (_, "Unit", [], _) -> return ()
+    | Unit_t, Prim (loc, "Unit", l, _) ->
         traced (fail (Invalid_arity (loc, "Unit", 0, List.length l)))
     | Unit_t, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "Unit" ]))
     (* Booleans *)
-    | Bool_t, Prim (_, "True", []) -> return true
-    | Bool_t, Prim (_, "False", []) -> return false
-    | Bool_t, Prim (loc, ("True" | "False" as c), l) ->
+    | Bool_t, Prim (_, "True", [], _) -> return true
+    | Bool_t, Prim (_, "False", [], _) -> return false
+    | Bool_t, Prim (loc, ("True" | "False" as c), l, _) ->
         traced (fail (Invalid_arity (loc, c, 0, List.length l)))
     | Bool_t, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "True" ; "False" ]))
@@ -672,27 +673,27 @@ let rec parse_data
     | Contract_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Pairs *)
-    | Pair_t (ta, tb), Prim (_, "Pair", [ va; vb ]) ->
+    | Pair_t (ta, tb), Prim (_, "Pair", [ va; vb ], _) ->
         traced @@
         parse_data ?type_logger ctxt ta va >>=? fun va ->
         parse_data ?type_logger ctxt tb vb >>=? fun vb ->
         return (va, vb)
-    | Pair_t _, Prim (loc, "Pair", l) ->
+    | Pair_t _, Prim (loc, "Pair", l, _) ->
         fail @@ Invalid_arity (loc, "Pair", 2, List.length l)
     | Pair_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "Pair" ]))
     (* Unions *)
-    | Union_t (tl, _), Prim (_, "Left", [ v ]) ->
+    | Union_t (tl, _), Prim (_, "Left", [ v ], _) ->
         traced @@
         parse_data ?type_logger ctxt tl v >>=? fun v ->
         return (L v)
-    | Union_t _, Prim (loc, "Left", l) ->
+    | Union_t _, Prim (loc, "Left", l, _) ->
         fail @@ Invalid_arity (loc, "Left", 1, List.length l)
-    | Union_t (_, tr), Prim (_, "Right", [ v ]) ->
+    | Union_t (_, tr), Prim (_, "Right", [ v ], _) ->
         traced @@
         parse_data ?type_logger ctxt tr v >>=? fun v ->
         return (R v)
-    | Union_t _, Prim (loc, "Right", l) ->
+    | Union_t _, Prim (loc, "Right", l, _) ->
         fail @@ Invalid_arity (loc, "Right", 1, List.length l)
     | Union_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "Left" ; "Right" ]))
@@ -703,20 +704,20 @@ let rec parse_data
     | Lambda_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Options *)
-    | Option_t t, Prim (_, "Some", [ v ]) ->
+    | Option_t t, Prim (_, "Some", [ v ], _) ->
         traced @@
         parse_data ?type_logger ctxt t v >>=? fun v ->
         return (Some v)
-    | Option_t _, Prim (loc, "Some", l) ->
+    | Option_t _, Prim (loc, "Some", l, _) ->
         fail @@ Invalid_arity (loc, "Some", 1, List.length l)
-    | Option_t _, Prim (_, "None", []) ->
+    | Option_t _, Prim (_, "None", [], _) ->
         return None
-    | Option_t _, Prim (loc, "None", l) ->
+    | Option_t _, Prim (loc, "None", l, _) ->
         fail @@ Invalid_arity (loc, "None", 0, List.length l)
     | Option_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "Some" ; "None" ]))
     (* Lists *)
-    | List_t t, Prim (_, "List", vs) ->
+    | List_t t, Prim (_, "List", vs, _) ->
         traced @@
         fold_right_s
           (fun v rest ->
@@ -726,7 +727,7 @@ let rec parse_data
     | List_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "List" ]))
     (* Sets *)
-    | Set_t t, (Prim (loc, "Set", vs) as expr) ->
+    | Set_t t, (Prim (loc, "Set", vs, _) as expr) ->
         fold_left_s
           (fun (last_value, set) v ->
              parse_comparable_data ?type_logger ctxt t v >>=? fun v ->
@@ -745,10 +746,10 @@ let rec parse_data
     | Set_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "Set" ]))
     (* Maps *)
-    | Map_t (tk, tv), (Prim (loc, "Map", vs) as expr) ->
+    | Map_t (tk, tv), (Prim (loc, "Map", vs, _) as expr) ->
         (fold_left_s
           (fun (last_value, map) -> function
-             | Prim (_, "Item", [ k; v ]) ->
+             | Prim (_, "Item", [ k; v ], _) ->
                  parse_comparable_data ?type_logger ctxt tk k >>=? fun k ->
                  parse_data ?type_logger ctxt tv v >>=? fun v ->
                  begin match last_value with
@@ -762,9 +763,9 @@ let rec parse_data
                   | None -> return ()
                  end >>=? fun () ->
                  return (Some k, map_update k (Some v) map)
-             | Prim (loc, "Item", l) ->
+             | Prim (loc, "Item", l, _) ->
                  fail @@ Invalid_arity (loc, "Item", 2, List.length l)
-             | Prim (loc, name, _) ->
+             | Prim (loc, name, _, _) ->
                  fail @@ Invalid_primitive (loc, [ "Item" ], name)
              | Int _ | String _ | Seq _ ->
                  fail (error ()))
@@ -809,150 +810,150 @@ and parse_instr
       Lwt.return check in
     let check_item_ty exp got loc n =
       check_item (ty_eq exp got) loc n in
-    let typed loc (instr, aft) =
+    let typed loc annot (instr, aft) =
       begin match type_logger with
         | Some log -> log (loc, (unparse_stack stack_ty, unparse_stack aft))
         | None -> ()
       end ;
-      Typed { loc ; instr ; bef = stack_ty ; aft } in
+      Typed { loc ; instr ; bef = stack_ty ; aft ; annot } in
     match script_instr, stack_ty with
     (* stack ops *)
-    | Prim (loc, "DROP", []),
+    | Prim (loc, "DROP", [], annot),
       Item_t (_, rest) ->
-        return (typed loc (Drop, rest))
-    | Prim (loc, "DUP", []),
+        return (typed loc annot (Drop, rest))
+    | Prim (loc, "DUP", [], annot),
       Item_t (v, rest) ->
-        return (typed loc (Dup, Item_t (v, Item_t (v, rest))))
-    | Prim (loc, "SWAP", []),
+        return (typed loc annot (Dup, Item_t (v, Item_t (v, rest))))
+    | Prim (loc, "SWAP", [], annot),
       Item_t (v,  Item_t (w, rest)) ->
-        return (typed loc (Swap, Item_t (w, Item_t (v, rest))))
-    | Prim (loc, "PUSH", [ t ; d ]),
+        return (typed loc annot (Swap, Item_t (w, Item_t (v, rest))))
+    | Prim (loc, "PUSH", [ t ; d ], annot),
       stack ->
         (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t) ->
         parse_data ?type_logger ctxt t d >>=? fun v ->
-        return (typed loc (Const v, Item_t (t, stack)))
-    | Prim (loc, "UNIT", []),
+        return (typed loc annot (Const v, Item_t (t, stack)))
+    | Prim (loc, "UNIT", [], annot),
       stack ->
-        return (typed loc (Const (), Item_t (Unit_t, stack)))
+        return (typed loc annot (Const (), Item_t (Unit_t, stack)))
     (* options *)
-    | Prim (loc, "SOME", []),
+    | Prim (loc, "SOME", [], annot),
       Item_t (t, rest) ->
-        return (typed loc (Cons_some, Item_t (Option_t t, rest)))
-    | Prim (loc, "NONE", [ t ]),
+        return (typed loc annot (Cons_some, Item_t (Option_t t, rest)))
+    | Prim (loc, "NONE", [ t ], annot),
       stack ->
         (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t) ->
-        return (typed loc (Cons_none t, Item_t (Option_t t, stack)))
-    | Prim (loc, "IF_NONE", [ bt ; bf ]),
+        return (typed loc annot (Cons_none t, Item_t (Option_t t, stack)))
+    | Prim (loc, "IF_NONE", [ bt ; bf ], annot),
       (Item_t (Option_t t, rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
         parse_instr ?storage_type ?type_logger ctxt bt rest >>=? fun btr ->
         parse_instr ?storage_type ?type_logger ctxt bf (Item_t (t, rest)) >>=? fun bfr ->
         let branch ibt ibf =
-          { loc ; instr = If_none (ibt, ibf) ; bef ; aft = ibt.aft } in
+          { loc ; instr = If_none (ibt, ibf) ; bef ; aft = ibt.aft ; annot } in
         merge_branches loc btr bfr { branch }
     (* pairs *)
-    | Prim (loc, "PAIR", []),
+    | Prim (loc, "PAIR", [], annot),
       Item_t (a, Item_t (b, rest)) ->
-        return (typed loc (Cons_pair, Item_t (Pair_t(a, b), rest)))
-    | Prim (loc, "CAR", []),
+        return (typed loc annot (Cons_pair, Item_t (Pair_t(a, b), rest)))
+    | Prim (loc, "CAR", [], annot),
       Item_t (Pair_t (a, _), rest) ->
-        return (typed loc (Car, Item_t (a, rest)))
-    | Prim (loc, "CDR", []),
+        return (typed loc annot (Car, Item_t (a, rest)))
+    | Prim (loc, "CDR", [], annot),
       Item_t (Pair_t (_, b), rest) ->
-        return (typed loc (Cdr, Item_t (b, rest)))
+        return (typed loc annot (Cdr, Item_t (b, rest)))
     (* unions *)
-    | Prim (loc, "LEFT", [ tr ]),
+    | Prim (loc, "LEFT", [ tr ], annot),
       Item_t (tl, rest) ->
         (Lwt.return (parse_ty tr)) >>=? fun (Ex_ty tr) ->
-        return (typed loc (Left, Item_t (Union_t (tl, tr), rest)))
-    | Prim (loc, "RIGHT", [ tl ]),
+        return (typed loc annot (Left, Item_t (Union_t (tl, tr), rest)))
+    | Prim (loc, "RIGHT", [ tl ], annot),
       Item_t (tr, rest) ->
         (Lwt.return (parse_ty tl)) >>=? fun (Ex_ty tl) ->
-        return (typed loc (Right, Item_t (Union_t (tl, tr), rest)))
-    | Prim (loc, "IF_LEFT", [ bt ; bf ]),
+        return (typed loc annot (Right, Item_t (Union_t (tl, tr), rest)))
+    | Prim (loc, "IF_LEFT", [ bt ; bf ], annot),
       (Item_t (Union_t (tl, tr), rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
         parse_instr ?storage_type ?type_logger ctxt bt (Item_t (tl, rest)) >>=? fun btr ->
         parse_instr ?storage_type ?type_logger ctxt bf (Item_t (tr, rest)) >>=? fun bfr ->
         let branch ibt ibf =
-          { loc ; instr = If_left (ibt, ibf) ; bef ; aft = ibt.aft } in
+          { loc ; instr = If_left (ibt, ibf) ; bef ; aft = ibt.aft ; annot } in
         merge_branches loc btr bfr { branch }
     (* lists *)
-    | Prim (loc, "NIL", [ t ]),
+    | Prim (loc, "NIL", [ t ], annot),
       stack ->
         (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t) ->
-        return (typed loc (Nil, Item_t (List_t t, stack)))
-    | Prim (loc, "CONS", []),
+        return (typed loc annot (Nil, Item_t (List_t t, stack)))
+    | Prim (loc, "CONS", [], annot),
       Item_t (tv, Item_t (List_t t, rest)) ->
         check_item_ty tv t loc "CONS" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Cons_list, Item_t (List_t t, rest)))
-    | Prim (loc, "IF_CONS", [ bt ; bf ]),
+        return (typed loc annot (Cons_list, Item_t (List_t t, rest)))
+    | Prim (loc, "IF_CONS", [ bt ; bf ], annot),
       (Item_t (List_t t, rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
         parse_instr ?storage_type ?type_logger ctxt bt (Item_t (t, Item_t (List_t t, rest))) >>=? fun btr ->
         parse_instr ?storage_type ?type_logger ctxt bf rest >>=? fun bfr ->
         let branch ibt ibf =
-          { loc ; instr = If_cons (ibt, ibf) ; bef ; aft = ibt.aft } in
+          { loc ; instr = If_cons (ibt, ibf) ; bef ; aft = ibt.aft ; annot } in
         merge_branches loc btr bfr { branch }
-    | Prim (loc, "MAP", []),
+    | Prim (loc, "MAP", [], annot),
       Item_t (Lambda_t (param, ret), Item_t (List_t elt, rest)) ->
         check_item_ty elt param loc "MAP" 2 2 >>=? fun (Eq _) ->
-        return (typed loc (List_map, Item_t (List_t ret, rest)))
-    | Prim (loc, "REDUCE", []),
+        return (typed loc annot (List_map, Item_t (List_t ret, rest)))
+    | Prim (loc, "REDUCE", [], annot),
       Item_t (Lambda_t (Pair_t (pelt, pr), r),
               Item_t (List_t elt, Item_t (init, rest))) ->
         check_item_ty r pr loc "REDUCE" 1 3 >>=? fun (Eq _) ->
         check_item_ty elt pelt loc "REDUCE" 2 3 >>=? fun (Eq _) ->
         check_item_ty init r loc "REDUCE" 3 3 >>=? fun (Eq _) ->
-        return (typed loc (List_reduce, Item_t (r, rest)))
+        return (typed loc annot (List_reduce, Item_t (r, rest)))
     (* sets *)
-    | Prim (loc, "EMPTY_SET", [ t ]),
+    | Prim (loc, "EMPTY_SET", [ t ], annot),
       rest ->
         (Lwt.return (parse_comparable_ty t)) >>=? fun (Ex_comparable_ty t) ->
-        return (typed loc (Empty_set t, Item_t (Set_t t, rest)))
-    | Prim (loc, "MAP", []),
+        return (typed loc annot (Empty_set t, Item_t (Set_t t, rest)))
+    | Prim (loc, "MAP", [], annot),
       Item_t (Lambda_t (param, ret), Item_t (Set_t elt, rest)) ->
         let elt = ty_of_comparable_ty elt in
         (Lwt.return (comparable_ty_of_ty loc ret)) >>=? fun ret ->
         check_item_ty elt param loc "MAP" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Set_map ret, Item_t (Set_t ret, rest)))
-    | Prim (loc, "REDUCE", []),
+        return (typed loc annot (Set_map ret, Item_t (Set_t ret, rest)))
+    | Prim (loc, "REDUCE", [], annot),
       Item_t (Lambda_t (Pair_t (pelt, pr), r),
               Item_t (Set_t elt, Item_t (init, rest))) ->
         let elt = ty_of_comparable_ty elt in
         check_item_ty r pr loc "REDUCE" 1 3 >>=? fun (Eq _) ->
         check_item_ty elt pelt loc "REDUCE" 2 3 >>=? fun (Eq _) ->
         check_item_ty init r loc "REDUCE" 3 3 >>=? fun (Eq _) ->
-        return (typed loc (Set_reduce, Item_t (r, rest)))
-    | Prim (loc, "MEM", []),
+        return (typed loc annot (Set_reduce, Item_t (r, rest)))
+    | Prim (loc, "MEM", [], annot),
       Item_t (v, Item_t (Set_t elt, rest)) ->
         let elt = ty_of_comparable_ty elt in
         check_item_ty elt v loc "MEM" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Set_mem, Item_t (Bool_t, rest)))
-    | Prim (loc, "UPDATE", []),
+        return (typed loc annot (Set_mem, Item_t (Bool_t, rest)))
+    | Prim (loc, "UPDATE", [], annot),
       Item_t (v, Item_t (Bool_t, Item_t (Set_t elt, rest))) ->
         let ty = ty_of_comparable_ty elt in
         check_item_ty ty v loc "UPDATE" 1 3 >>=? fun (Eq _) ->
-        return (typed loc (Set_update, Item_t (Set_t elt, rest)))
-    | Prim (loc, "SIZE", []),
+        return (typed loc annot (Set_update, Item_t (Set_t elt, rest)))
+    | Prim (loc, "SIZE", [], annot),
       Item_t (Set_t _, rest) ->
-        return (typed loc (Set_size, Item_t (Nat_t, rest)))
+        return (typed loc annot (Set_size, Item_t (Nat_t, rest)))
     (* maps *)
-    | Prim (loc, "EMPTY_MAP", [ tk ; tv ]),
+    | Prim (loc, "EMPTY_MAP", [ tk ; tv ], annot),
       stack ->
         (Lwt.return (parse_comparable_ty tk)) >>=? fun (Ex_comparable_ty tk) ->
         (Lwt.return (parse_ty tv)) >>=? fun (Ex_ty tv) ->
-        return (typed loc (Empty_map (tk, tv), Item_t (Map_t (tk, tv), stack)))
-    | Prim (loc, "MAP", []),
+        return (typed loc annot (Empty_map (tk, tv), Item_t (Map_t (tk, tv), stack)))
+    | Prim (loc, "MAP", [], annot),
       Item_t (Lambda_t (Pair_t (pk, pv), ret), Item_t (Map_t (ck, v), rest)) ->
         let k = ty_of_comparable_ty ck in
         check_item_ty pk k loc "MAP" 1 2 >>=? fun (Eq _) ->
         check_item_ty pv v loc "MAP" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Map_map, Item_t (Map_t (ck, ret), rest)))
-    | Prim (loc, "REDUCE", []),
+        return (typed loc annot (Map_map, Item_t (Map_t (ck, ret), rest)))
+    | Prim (loc, "REDUCE", [], annot),
       Item_t (Lambda_t (Pair_t (Pair_t (pk, pv), pr), r),
               Item_t (Map_t (ck, v), Item_t (init, rest))) ->
         let k = ty_of_comparable_ty ck in
@@ -960,58 +961,71 @@ and parse_instr
         check_item_ty pv v loc "REDUCE" 2 3 >>=? fun (Eq _) ->
         check_item_ty r pr loc "REDUCE" 1 3 >>=? fun (Eq _) ->
         check_item_ty init r loc "REDUCE" 3 3 >>=? fun (Eq _) ->
-        return (typed loc (Map_reduce, Item_t (r, rest)))
-    | Prim (loc, "MEM", []),
+        return (typed loc annot (Map_reduce, Item_t (r, rest)))
+    | Prim (loc, "MEM", [], annot),
       Item_t (vk, Item_t (Map_t (ck, _), rest)) ->
         let k = ty_of_comparable_ty ck in
         check_item_ty vk k loc "MEM" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Map_mem, Item_t (Bool_t, rest)))
-    | Prim (loc, "GET", []),
+        return (typed loc annot (Map_mem, Item_t (Bool_t, rest)))
+    | Prim (loc, "GET", [], annot),
       Item_t (vk, Item_t (Map_t (ck, elt), rest)) ->
         let k = ty_of_comparable_ty ck in
         check_item_ty vk k loc "GET" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Map_get, Item_t (Option_t elt, rest)))
-    | Prim (loc, "UPDATE", []),
+        return (typed loc annot (Map_get, Item_t (Option_t elt, rest)))
+    | Prim (loc, "UPDATE", [], annot),
       Item_t (vk, Item_t (Option_t vv, Item_t (Map_t (ck, v), rest))) ->
         let k = ty_of_comparable_ty ck in
         check_item_ty vk k loc "UPDATE" 1 3 >>=? fun (Eq _) ->
         check_item_ty vv v loc "UPDATE" 2 3 >>=? fun (Eq _) ->
-        return (typed loc (Map_update, Item_t (Map_t (ck, v), rest)))
-    | Prim (loc, "SIZE", []),
+        return (typed loc annot (Map_update, Item_t (Map_t (ck, v), rest)))
+    | Prim (loc, "SIZE", [], annot),
       Item_t (Map_t (_, _), rest) ->
-        return (typed loc (Map_size, Item_t (Nat_t, rest)))
+        return (typed loc annot (Map_size, Item_t (Nat_t, rest)))
     (* control *)
-    | Seq (loc, []),
+    | Seq (loc, [], annot),
       stack ->
-        return (typed loc (Nop, stack))
-    | Seq (_, [ single ]),
+        return (typed loc annot (Nop, stack))
+    | Seq (_, [ single ], None),
       stack ->
         parse_instr ?storage_type ?type_logger ctxt single stack
-    | Seq (loc, hd :: tl),
+    | Seq (loc, [ single ], (Some _ as annot)),
+      stack ->
+        parse_instr ?storage_type ?type_logger ctxt single stack >>=? begin function
+          | Typed ({ aft } as instr) ->
+              let nop = { bef = aft ; loc = loc ; aft ; annot = None ; instr = Nop } in
+              return (typed loc annot (Seq (instr, nop), aft))
+          | Failed { descr } ->
+              let descr aft =
+                let nop = { bef = aft ; loc = loc ; aft ; annot = None ; instr = Nop } in
+                let descr = descr aft in
+                { descr with instr = Seq (descr, nop) ; annot } in
+              return (Failed { descr })
+        end
+    | Seq (loc, hd :: tl, annot),
       stack ->
         parse_instr ?storage_type ?type_logger ctxt hd stack >>=? begin function
           | Failed _ ->
               fail (Fail_not_in_tail_position loc)
           | Typed ({ aft = middle } as ihd) ->
-              parse_instr ?storage_type ?type_logger ctxt (Seq (loc, tl)) middle >>=? function
+              parse_instr ?storage_type ?type_logger ctxt (Seq (loc, tl, annot)) middle >>=? function
               | Failed { descr } ->
                   let descr ret =
                     { loc ; instr = Seq (ihd, descr ret) ;
-                      bef = stack ; aft = ret } in
+                      bef = stack ; aft = ret ; annot = None } in
                   return (Failed { descr })
               | Typed itl ->
-                  return (typed loc (Seq (ihd, itl), itl.aft))
+                  return (typed loc annot (Seq (ihd, itl), itl.aft))
         end
-    | Prim (loc, "IF", [ bt ; bf ]),
+    | Prim (loc, "IF", [ bt ; bf ], annot),
       (Item_t (Bool_t, rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
         parse_instr ?storage_type ?type_logger ctxt bt rest >>=? fun btr ->
         parse_instr ?storage_type ?type_logger ctxt bf rest >>=? fun bfr ->
         let branch ibt ibf =
-          { loc ; instr = If (ibt, ibf) ; bef ; aft = ibt.aft } in
+          { loc ; instr = If (ibt, ibf) ; bef ; aft = ibt.aft ; annot } in
         merge_branches loc btr bfr { branch }
-    | Prim (loc, "LOOP", [ body ]),
+    | Prim (loc, "LOOP", [ body ], annot),
       (Item_t (Bool_t, rest) as stack) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
         parse_instr ?storage_type ?type_logger ctxt body rest >>=? begin function
@@ -1019,212 +1033,212 @@ and parse_instr
               trace
                 (Unmatched_branches (loc, ibody.aft, stack))
                 (Lwt.return (stack_ty_eq 1 ibody.aft stack)) >>=? fun (Eq _) ->
-              return (typed loc (Loop ibody, rest))
+              return (typed loc annot (Loop ibody, rest))
           | Failed { descr } ->
               let ibody = descr (Item_t (Bool_t, rest)) in
-              return (typed loc (Loop ibody, rest))
+              return (typed loc annot (Loop ibody, rest))
         end
-    | Prim (loc, "LAMBDA", [ arg ; ret ; code ]),
+    | Prim (loc, "LAMBDA", [ arg ; ret ; code ], annot),
       stack ->
         (Lwt.return (parse_ty arg)) >>=? fun (Ex_ty arg) ->
         (Lwt.return (parse_ty ret)) >>=? fun (Ex_ty ret) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
         parse_lambda ?type_logger ctxt arg ret code >>=? fun lambda ->
-        return (typed loc (Lambda lambda, Item_t (Lambda_t (arg, ret), stack)))
-    | Prim (loc, "EXEC", []),
+        return (typed loc annot (Lambda lambda, Item_t (Lambda_t (arg, ret), stack)))
+    | Prim (loc, "EXEC", [], annot),
       Item_t (arg, Item_t (Lambda_t (param, ret), rest)) ->
         check_item_ty arg param loc "EXEC" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Exec, Item_t (ret, rest)))
-    | Prim (loc, "DIP", [ code ]),
+        return (typed loc annot (Exec, Item_t (ret, rest)))
+    | Prim (loc, "DIP", [ code ], annot),
       Item_t (v, rest) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
         parse_instr ?type_logger ctxt code rest >>=? begin function
           | Typed descr ->
-              return (typed loc (Dip descr, Item_t (v, descr.aft)))
+              return (typed loc annot (Dip descr, Item_t (v, descr.aft)))
           | Failed _ ->
               fail (Fail_not_in_tail_position loc)
         end
-    | Prim (loc, "FAIL", []),
+    | Prim (loc, "FAIL", [], annot),
       bef ->
-        let descr aft = { loc ; instr = Fail ; bef ; aft } in
+        let descr aft = { loc ; instr = Fail ; bef ; aft ; annot } in
         return (Failed { descr })
     (* timestamp operations *)
-    | Prim (loc, "ADD", []),
+    | Prim (loc, "ADD", [], annot),
       Item_t (Timestamp_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Add_timestamp_to_seconds, Item_t (Timestamp_t, rest)))
-    | Prim (loc, "ADD", []),
+        return (typed loc annot (Add_timestamp_to_seconds, Item_t (Timestamp_t, rest)))
+    | Prim (loc, "ADD", [], annot),
       Item_t (Nat_t, Item_t (Timestamp_t, rest)) ->
-        return (typed loc (Add_seconds_to_timestamp, Item_t (Timestamp_t, rest)))
+        return (typed loc annot (Add_seconds_to_timestamp, Item_t (Timestamp_t, rest)))
     (* string operations *)
-    | Prim (loc, "CONCAT", []),
+    | Prim (loc, "CONCAT", [], annot),
       Item_t (String_t, Item_t (String_t, rest)) ->
-        return (typed loc (Concat, Item_t (String_t, rest)))
+        return (typed loc annot (Concat, Item_t (String_t, rest)))
     (* currency operations *)
-    | Prim (loc, "ADD", []),
+    | Prim (loc, "ADD", [], annot),
       Item_t (Tez_t, Item_t (Tez_t, rest)) ->
-        return (typed loc (Add_tez, Item_t (Tez_t, rest)))
-    | Prim (loc, "SUB", []),
+        return (typed loc annot (Add_tez, Item_t (Tez_t, rest)))
+    | Prim (loc, "SUB", [], annot),
       Item_t (Tez_t, Item_t (Tez_t, rest)) ->
-        return (typed loc (Sub_tez, Item_t (Tez_t, rest)))
-    | Prim (loc, "MUL", []),
+        return (typed loc annot (Sub_tez, Item_t (Tez_t, rest)))
+    | Prim (loc, "MUL", [], annot),
       Item_t (Tez_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Mul_teznat, Item_t (Tez_t, rest)))
-    | Prim (loc, "MUL", []),
+        return (typed loc annot (Mul_teznat, Item_t (Tez_t, rest)))
+    | Prim (loc, "MUL", [], annot),
       Item_t (Nat_t, Item_t (Tez_t, rest)) ->
-        return (typed loc (Mul_nattez, Item_t (Tez_t, rest)))
+        return (typed loc annot (Mul_nattez, Item_t (Tez_t, rest)))
     (* boolean operations *)
-    | Prim (loc, "OR", []),
+    | Prim (loc, "OR", [], annot),
       Item_t (Bool_t, Item_t (Bool_t, rest)) ->
-        return (typed loc (Or, Item_t (Bool_t, rest)))
-    | Prim (loc, "AND", []),
+        return (typed loc annot (Or, Item_t (Bool_t, rest)))
+    | Prim (loc, "AND", [], annot),
       Item_t (Bool_t, Item_t (Bool_t, rest)) ->
-        return (typed loc (And, Item_t (Bool_t, rest)))
-    | Prim (loc, "XOR", []),
+        return (typed loc annot (And, Item_t (Bool_t, rest)))
+    | Prim (loc, "XOR", [], annot),
       Item_t (Bool_t, Item_t (Bool_t, rest)) ->
-        return (typed loc (Xor, Item_t (Bool_t, rest)))
-    | Prim (loc, "NOT", []),
+        return (typed loc annot (Xor, Item_t (Bool_t, rest)))
+    | Prim (loc, "NOT", [], annot),
       Item_t (Bool_t, rest) ->
-        return (typed loc (Not, Item_t (Bool_t, rest)))
+        return (typed loc annot (Not, Item_t (Bool_t, rest)))
     (* integer operations *)
-    | Prim (loc, "ABS", []),
+    | Prim (loc, "ABS", [], annot),
       Item_t (Int_t, rest) ->
-        return (typed loc (Abs_int, Item_t (Nat_t, rest)))
-    | Prim (loc, "INT", []),
+        return (typed loc annot (Abs_int, Item_t (Nat_t, rest)))
+    | Prim (loc, "INT", [], annot),
       Item_t (Nat_t, rest) ->
-        return (typed loc (Int_nat, Item_t (Int_t, rest)))
-    | Prim (loc, "NEG", []),
+        return (typed loc annot (Int_nat, Item_t (Int_t, rest)))
+    | Prim (loc, "NEG", [], annot),
       Item_t (Int_t, rest) ->
-        return (typed loc (Neg_int, Item_t (Int_t, rest)))
-    | Prim (loc, "NEG", []),
+        return (typed loc annot (Neg_int, Item_t (Int_t, rest)))
+    | Prim (loc, "NEG", [], annot),
       Item_t (Nat_t, rest) ->
-        return (typed loc (Neg_nat, Item_t (Int_t, rest)))
-    | Prim (loc, "ADD", []),
+        return (typed loc annot (Neg_nat, Item_t (Int_t, rest)))
+    | Prim (loc, "ADD", [], annot),
       Item_t (Int_t, Item_t (Int_t, rest)) ->
-        return (typed loc (Add_intint, Item_t (Int_t, rest)))
-    | Prim (loc, "ADD", []),
+        return (typed loc annot (Add_intint, Item_t (Int_t, rest)))
+    | Prim (loc, "ADD", [], annot),
       Item_t (Int_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Add_intnat, Item_t (Int_t, rest)))
-    | Prim (loc, "ADD", []),
+        return (typed loc annot (Add_intnat, Item_t (Int_t, rest)))
+    | Prim (loc, "ADD", [], annot),
       Item_t (Nat_t, Item_t (Int_t, rest)) ->
-        return (typed loc (Add_natint, Item_t (Int_t, rest)))
-    | Prim (loc, "ADD", []),
+        return (typed loc annot (Add_natint, Item_t (Int_t, rest)))
+    | Prim (loc, "ADD", [], annot),
       Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Add_natnat, Item_t (Nat_t, rest)))
-    | Prim (loc, "SUB", []),
+        return (typed loc annot (Add_natnat, Item_t (Nat_t, rest)))
+    | Prim (loc, "SUB", [], annot),
       Item_t (Int_t, Item_t (Int_t, rest)) ->
-        return (typed loc (Sub_int, Item_t (Int_t, rest)))
-    | Prim (loc, "SUB", []),
+        return (typed loc annot (Sub_int, Item_t (Int_t, rest)))
+    | Prim (loc, "SUB", [], annot),
       Item_t (Int_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Sub_int, Item_t (Int_t, rest)))
-    | Prim (loc, "SUB", []),
+        return (typed loc annot (Sub_int, Item_t (Int_t, rest)))
+    | Prim (loc, "SUB", [], annot),
       Item_t (Nat_t, Item_t (Int_t, rest)) ->
-        return (typed loc (Sub_int, Item_t (Int_t, rest)))
-    | Prim (loc, "SUB", []),
+        return (typed loc annot (Sub_int, Item_t (Int_t, rest)))
+    | Prim (loc, "SUB", [], annot),
       Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Sub_int, Item_t (Int_t, rest)))
-    | Prim (loc, "MUL", []),
+        return (typed loc annot (Sub_int, Item_t (Int_t, rest)))
+    | Prim (loc, "MUL", [], annot),
       Item_t (Int_t, Item_t (Int_t, rest)) ->
-        return (typed loc (Mul_intint, Item_t (Int_t, rest)))
-    | Prim (loc, "MUL", []),
+        return (typed loc annot (Mul_intint, Item_t (Int_t, rest)))
+    | Prim (loc, "MUL", [], annot),
       Item_t (Int_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Mul_intnat, Item_t (Int_t, rest)))
-    | Prim (loc, "MUL", []),
+        return (typed loc annot (Mul_intnat, Item_t (Int_t, rest)))
+    | Prim (loc, "MUL", [], annot),
       Item_t (Nat_t, Item_t (Int_t, rest)) ->
-        return (typed loc (Mul_natint, Item_t (Int_t, rest)))
-    | Prim (loc, "MUL", []),
+        return (typed loc annot (Mul_natint, Item_t (Int_t, rest)))
+    | Prim (loc, "MUL", [], annot),
       Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Mul_natnat, Item_t (Nat_t, rest)))
-    | Prim (loc, "EDIV", []),
+        return (typed loc annot (Mul_natnat, Item_t (Nat_t, rest)))
+    | Prim (loc, "EDIV", [], annot),
       Item_t (Tez_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Ediv_teznat,
+        return (typed loc annot (Ediv_teznat,
                Item_t (Option_t (Pair_t (Tez_t,Tez_t)), rest)))
-    | Prim (loc, "EDIV", []),
+    | Prim (loc, "EDIV", [], annot),
       Item_t (Tez_t, Item_t (Tez_t, rest)) ->
-        return (typed loc (Ediv_tez,
+        return (typed loc annot (Ediv_tez,
                Item_t (Option_t (Pair_t (Nat_t,Tez_t)), rest)))
-    | Prim (loc, "EDIV", []),
+    | Prim (loc, "EDIV", [], annot),
       Item_t (Int_t, Item_t (Int_t, rest)) ->
-        return (typed loc (Ediv_intint,
+        return (typed loc annot (Ediv_intint,
                Item_t (Option_t (Pair_t (Int_t,Nat_t)), rest)))
-    | Prim (loc, "EDIV", []),
+    | Prim (loc, "EDIV", [], annot),
       Item_t (Int_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Ediv_intnat,
+        return (typed loc annot (Ediv_intnat,
                Item_t (Option_t (Pair_t (Int_t,Nat_t)), rest)))
-    | Prim (loc, "EDIV", []),
+    | Prim (loc, "EDIV", [], annot),
       Item_t (Nat_t, Item_t (Int_t, rest)) ->
-        return (typed loc (Ediv_natint,
+        return (typed loc annot (Ediv_natint,
                Item_t (Option_t (Pair_t (Int_t,Nat_t)), rest)))
-    | Prim (loc, "EDIV", []),
+    | Prim (loc, "EDIV", [], annot),
       Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Ediv_natnat,
+        return (typed loc annot (Ediv_natnat,
                Item_t (Option_t (Pair_t (Nat_t,Nat_t)), rest)))
-    | Prim (loc, "LSL", []),
+    | Prim (loc, "LSL", [], annot),
       Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Lsl_nat, Item_t (Nat_t, rest)))
-    | Prim (loc, "LSR", []),
+        return (typed loc annot (Lsl_nat, Item_t (Nat_t, rest)))
+    | Prim (loc, "LSR", [], annot),
       Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Lsr_nat, Item_t (Nat_t, rest)))
-    | Prim (loc, "OR", []),
+        return (typed loc annot (Lsr_nat, Item_t (Nat_t, rest)))
+    | Prim (loc, "OR", [], annot),
       Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Or_nat, Item_t (Nat_t, rest)))
-    | Prim (loc, "AND", []),
+        return (typed loc annot (Or_nat, Item_t (Nat_t, rest)))
+    | Prim (loc, "AND", [], annot),
       Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (And_nat, Item_t (Nat_t, rest)))
-    | Prim (loc, "XOR", []),
+        return (typed loc annot (And_nat, Item_t (Nat_t, rest)))
+    | Prim (loc, "XOR", [], annot),
       Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Xor_nat, Item_t (Nat_t, rest)))
-    | Prim (loc, "NOT", []),
+        return (typed loc annot (Xor_nat, Item_t (Nat_t, rest)))
+    | Prim (loc, "NOT", [], annot),
       Item_t (Int_t, rest) ->
-        return (typed loc (Not_int, Item_t (Int_t, rest)))
-    | Prim (loc, "NOT", []),
+        return (typed loc annot (Not_int, Item_t (Int_t, rest)))
+    | Prim (loc, "NOT", [], annot),
       Item_t (Nat_t, rest) ->
-        return (typed loc (Not_nat, Item_t (Int_t, rest)))
+        return (typed loc annot (Not_nat, Item_t (Int_t, rest)))
     (* comparison *)
-    | Prim (loc, "COMPARE", []),
+    | Prim (loc, "COMPARE", [], annot),
       Item_t (Int_t, Item_t (Int_t, rest)) ->
-        return (typed loc (Compare Int_key, Item_t (Int_t, rest)))
-    | Prim (loc, "COMPARE", []),
+        return (typed loc annot (Compare Int_key, Item_t (Int_t, rest)))
+    | Prim (loc, "COMPARE", [], annot),
       Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc (Compare Nat_key, Item_t (Int_t, rest)))
-    | Prim (loc, "COMPARE", []),
+        return (typed loc annot (Compare Nat_key, Item_t (Int_t, rest)))
+    | Prim (loc, "COMPARE", [], annot),
       Item_t (Bool_t, Item_t (Bool_t, rest)) ->
-        return (typed loc (Compare Bool_key, Item_t (Int_t, rest)))
-    | Prim (loc, "COMPARE", []),
+        return (typed loc annot (Compare Bool_key, Item_t (Int_t, rest)))
+    | Prim (loc, "COMPARE", [], annot),
       Item_t (String_t, Item_t (String_t, rest)) ->
-        return (typed loc (Compare String_key, Item_t (Int_t, rest)))
-    | Prim (loc, "COMPARE", []),
+        return (typed loc annot (Compare String_key, Item_t (Int_t, rest)))
+    | Prim (loc, "COMPARE", [], annot),
       Item_t (Tez_t, Item_t (Tez_t, rest)) ->
-        return (typed loc (Compare Tez_key, Item_t (Int_t, rest)))
-    | Prim (loc, "COMPARE", []),
+        return (typed loc annot (Compare Tez_key, Item_t (Int_t, rest)))
+    | Prim (loc, "COMPARE", [], annot),
       Item_t (Key_t, Item_t (Key_t, rest)) ->
-        return (typed loc (Compare Key_key, Item_t (Int_t, rest)))
-    | Prim (loc, "COMPARE", []),
+        return (typed loc annot (Compare Key_key, Item_t (Int_t, rest)))
+    | Prim (loc, "COMPARE", [], annot),
       Item_t (Timestamp_t, Item_t (Timestamp_t, rest)) ->
-        return (typed loc (Compare Timestamp_key, Item_t (Int_t, rest)))
+        return (typed loc annot (Compare Timestamp_key, Item_t (Int_t, rest)))
     (* comparators *)
-    | Prim (loc, "EQ", []),
+    | Prim (loc, "EQ", [], annot),
       Item_t (Int_t, rest) ->
-        return (typed loc (Eq, Item_t (Bool_t, rest)))
-    | Prim (loc, "NEQ", []),
+        return (typed loc annot (Eq, Item_t (Bool_t, rest)))
+    | Prim (loc, "NEQ", [], annot),
       Item_t (Int_t, rest) ->
-        return (typed loc (Neq, Item_t (Bool_t, rest)))
-    | Prim (loc, "LT", []),
+        return (typed loc annot (Neq, Item_t (Bool_t, rest)))
+    | Prim (loc, "LT", [], annot),
       Item_t (Int_t, rest) ->
-        return (typed loc (Lt, Item_t (Bool_t, rest)))
-    | Prim (loc, "GT", []),
+        return (typed loc annot (Lt, Item_t (Bool_t, rest)))
+    | Prim (loc, "GT", [], annot),
       Item_t (Int_t, rest) ->
-        return (typed loc (Gt, Item_t (Bool_t, rest)))
-    | Prim (loc, "LE", []),
+        return (typed loc annot (Gt, Item_t (Bool_t, rest)))
+    | Prim (loc, "LE", [], annot),
       Item_t (Int_t, rest) ->
-        return (typed loc (Le, Item_t (Bool_t, rest)))
-    | Prim (loc, "GE", []),
+        return (typed loc annot (Le, Item_t (Bool_t, rest)))
+    | Prim (loc, "GE", [], annot),
       Item_t (Int_t, rest) ->
-        return (typed loc (Ge, Item_t (Bool_t, rest)))
+        return (typed loc annot (Ge, Item_t (Bool_t, rest)))
     (* protocol *)
-    | Prim (loc, "MANAGER", []),
+    | Prim (loc, "MANAGER", [], annot),
       Item_t (Contract_t _, rest) ->
-        return (typed loc (Manager, Item_t (Key_t, rest)))
-    | Prim (loc, "TRANSFER_TOKENS", []),
+        return (typed loc annot (Manager, Item_t (Key_t, rest)))
+    | Prim (loc, "TRANSFER_TOKENS", [], annot),
       Item_t (p, Item_t
                 (Tez_t, Item_t
                    (Contract_t (cp, cr), Item_t
@@ -1233,24 +1247,24 @@ and parse_instr
         begin match storage_type with
           | Some storage_type ->
               check_item_ty storage storage_type loc "TRANSFER_TOKENS" 3 4 >>=? fun (Eq _) ->
-              return (typed loc (Transfer_tokens storage,
+              return (typed loc annot (Transfer_tokens storage,
                                  Item_t (cr, Item_t (storage, Empty_t))))
           | None ->
               fail (Transfer_in_lambda loc)
         end
-    | Prim (loc, "CREATE_ACCOUNT", []),
+    | Prim (loc, "CREATE_ACCOUNT", [], annot),
       Item_t
         (Key_t, Item_t
            (Option_t Key_t, Item_t
               (Bool_t, Item_t
                  (Tez_t, rest)))) ->
-        return (typed loc (Create_account,
+        return (typed loc annot (Create_account,
                            Item_t (Contract_t (Unit_t, Unit_t), rest)))
-    | Prim (loc, "DEFAULT_ACCOUNT", []),
+    | Prim (loc, "DEFAULT_ACCOUNT", [], annot),
       Item_t (Key_t, rest) ->
         return
-          (typed loc (Default_account, Item_t (Contract_t (Unit_t, Unit_t), rest)))
-    | Prim (loc, "CREATE_CONTRACT", []),
+          (typed loc annot (Default_account, Item_t (Contract_t (Unit_t, Unit_t), rest)))
+    | Prim (loc, "CREATE_CONTRACT", [], annot),
       Item_t
         (Key_t, Item_t
            (Option_t Key_t, Item_t
@@ -1262,31 +1276,31 @@ and parse_instr
                           (ginit, rest))))))) ->
         check_item_ty gp gr loc "CREATE_CONTRACT" 5 7 >>=? fun (Eq _) ->
         check_item_ty ginit gp loc "CREATE_CONTRACT" 6 7 >>=? fun (Eq _) ->
-        return (typed loc (Create_contract (gp, p, r),
+        return (typed loc annot (Create_contract (gp, p, r),
                            Item_t (Contract_t (p, r), rest)))
-    | Prim (loc, "NOW", []),
+    | Prim (loc, "NOW", [], annot),
       stack ->
-        return (typed loc (Now, Item_t (Timestamp_t, stack)))
-    | Prim (loc, "AMOUNT", []),
+        return (typed loc annot (Now, Item_t (Timestamp_t, stack)))
+    | Prim (loc, "AMOUNT", [], annot),
       stack ->
-        return (typed loc (Amount, Item_t (Tez_t, stack)))
-    | Prim (loc, "BALANCE", []),
+        return (typed loc annot (Amount, Item_t (Tez_t, stack)))
+    | Prim (loc, "BALANCE", [], annot),
       stack ->
-        return (typed loc (Balance, Item_t (Tez_t, stack)))
-    | Prim (loc, "CHECK_SIGNATURE", []),
+        return (typed loc annot (Balance, Item_t (Tez_t, stack)))
+    | Prim (loc, "CHECK_SIGNATURE", [], annot),
       Item_t (Key_t, Item_t (Pair_t (Signature_t, String_t), rest)) ->
-        return (typed loc (Check_signature, Item_t (Bool_t, rest)))
-    | Prim (loc, "H", []),
+        return (typed loc annot (Check_signature, Item_t (Bool_t, rest)))
+    | Prim (loc, "H", [], annot),
       Item_t (t, rest) ->
-        return (typed loc (H t, Item_t (String_t, rest)))
-    | Prim (loc, "STEPS_TO_QUOTA", []),
+        return (typed loc annot (H t, Item_t (String_t, rest)))
+    | Prim (loc, "STEPS_TO_QUOTA", [], annot),
       stack ->
-        return (typed loc (Steps_to_quota, Item_t (Nat_t, stack)))
-    | Prim (loc, "SOURCE", [ ta; tb ]),
+        return (typed loc annot (Steps_to_quota, Item_t (Nat_t, stack)))
+    | Prim (loc, "SOURCE", [ ta; tb ], annot),
       stack ->
         (Lwt.return (parse_ty ta)) >>=? fun (Ex_ty ta) ->
         (Lwt.return (parse_ty tb)) >>=? fun (Ex_ty tb) ->
-        return (typed loc (Source (ta, tb), Item_t (Contract_t (ta, tb), stack)))
+        return (typed loc annot (Source (ta, tb), Item_t (Contract_t (ta, tb), stack)))
     (* Primitive parsing errors *)
     | Prim (loc, ("DROP" | "DUP" | "SWAP" | "SOME" | "UNIT"
                  | "PAIR" | "CAR" | "CDR" | "CONS"
@@ -1302,55 +1316,56 @@ and parse_instr
                  | "CREATE_CONTRACT" | "NOW"
                  | "DEFAULT_ACCOUNT" | "AMOUNT" | "BALANCE"
                  | "CHECK_SIGNATURE" | "H" | "STEPS_TO_QUOTA"
-                 as name), (_ :: _ as l)), _ ->
+                 as name), (_ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
     | Prim (loc, ("NONE" | "LEFT" | "RIGHT" | "NIL"
                  | "EMPTY_SET" | "DIP" | "LOOP"
                  as name), ([]
-                           | _ :: _ :: _ as l)), _ ->
+                           | _ :: _ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 1, List.length l))
     | Prim (loc, ("PUSH" | "IF_NONE" | "IF_LEFT" | "IF_CONS"
                  | "EMPTY_MAP" | "IF" | "SOURCE"
                  as name), ([] | [ _ ]
-                           | _ :: _ :: _ :: _ as l)), _ ->
+                           | _ :: _ :: _ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 2, List.length l))
     | Prim (loc, "LAMBDA", ([] | [ _ ] | [ _ ; _ ]
-                           | _ :: _ :: _ :: _ :: _ as l)), _ ->
+                           | _ :: _ :: _ :: _ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, "LAMBDA", 3, List.length l))
     (* Stack errors *)
     | Prim (loc, ("ADD" | "SUB" | "MUL" | "EDIV"
                  | "AND" | "OR" | "XOR" | "LSL" | "LSR"
-                 | "CONCAT" | "COMPARE" as name), []),
+                 | "CONCAT" | "COMPARE" as name), [], _),
       Item_t (ta, Item_t (tb, _)) ->
         fail (Undefined_binop (loc, name, ta, tb))
     | Prim (loc, ("NEG" | "ABS" | "NOT"
-                 | "EQ" | "NEQ" | "LT" | "GT" | "LE" | "GE" as name), []),
+                 | "EQ" | "NEQ" | "LT" | "GT" | "LE" | "GE" as name),
+            [], _),
       Item_t (t, _) ->
         fail (Undefined_unop (loc, name, t))
-    | Prim (loc, ("REDUCE" | "UPDATE" as name), []),
+    | Prim (loc, ("REDUCE" | "UPDATE" as name), [], _),
       stack ->
         fail (Bad_stack (loc, name, 3, stack))
-    | Prim (loc, "CREATE_CONTRACT", []),
+    | Prim (loc, "CREATE_CONTRACT", [], _),
       stack ->
         fail (Bad_stack (loc, "CREATE_CONTRACT", 7, stack))
-    | Prim (loc, "CREATE_ACCOUNT", []),
+    | Prim (loc, "CREATE_ACCOUNT", [], _),
       stack ->
         fail (Bad_stack (loc, "CREATE_ACCOUNT", 4, stack))
-    | Prim (loc, "TRANSFER_TOKENS", []),
+    | Prim (loc, "TRANSFER_TOKENS", [], _),
       stack ->
         fail (Bad_stack (loc, "TRANSFER_TOKENS", 3, stack))
     | Prim (loc, ("DROP" | "DUP" | "CAR" | "CDR" | "SOME" | "H" | "DIP"
                  | "IF_NONE" | "LEFT" | "RIGHT" | "IF_LEFT" | "IF"
                  | "LOOP" | "IF_CONS" | "MANAGER" | "DEFAULT_ACCOUNT"
                  | "NEG" | "ABS" | "INT" | "NOT"
-                 | "EQ" | "NEQ" | "LT" | "GT" | "LE" | "GE" as name), _),
+                 | "EQ" | "NEQ" | "LT" | "GT" | "LE" | "GE" as name), _, _),
       stack ->
         fail (Bad_stack (loc, name, 1, stack))
     | Prim (loc, ("SWAP" | "PAIR" | "CONS"
                  | "MAP" | "GET" | "MEM" | "EXEC"
                  | "CHECK_SIGNATURE" | "ADD" | "SUB" | "MUL"
                  | "EDIV" | "AND" | "OR" | "XOR"
-                 | "LSL" | "LSR" | "CONCAT" as name), _),
+                 | "LSL" | "LSR" | "CONCAT" as name), _, _),
       stack ->
         fail (Bad_stack (loc, name, 2, stack))
     (* Generic parsing errors *)

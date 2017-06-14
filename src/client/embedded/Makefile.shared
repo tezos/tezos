@@ -37,7 +37,7 @@ ${OBJS} ${OBJS_DEPS}: TARGET="(client_$(PROTO_VERSION).cmx)"
 ${OBJS}: EXTRA_OCAMLFLAGS = -for-pack Client_$(PROTO_VERSION)
 ../client_$(PROTO_VERSION).cmx: EXTRA_OCAMLFLAGS =
 ${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
-  PACKAGES=lwt ocplib-json-typed sodium ocplib-ocamlres
+  PACKAGES=lwt ocplib-json-typed sodium ocplib-ocamlres uutf
 ${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
   ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
 
@@ -57,14 +57,6 @@ ${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
 %.cmi: %.mli
 	@echo OCAMLOPT ${TARGET} $(notdir $@)
 	@$(OCAMLOPT) ${OCAMLFLAGS} -c $<
-
-%.ml: %.mll
-	@echo OCAMLLEX ${TARGET} $(notdir $@)
-	@$(OCAMLLEX) $<
-
-%.ml %.mli: %.mly
-	@echo MENHIR ${TARGET} $(notdir $@)
-	@$(MENHIR) --explain $<
 
 .PHONY: clean
 clean::
