@@ -60,8 +60,8 @@ start_sandboxed_node() {
 
     data_dir="$(mktemp -d -t tezos_node.XXXXXXXXXX)"
     register_dir "$data_dir"
-    ${TZNODE} identity generate 0 --data-dir "${data_dir}" |& sed 's/^/## /' 1>&2
-    ${TZNODE} config init --data-dir="${data_dir}" --connections=2 --expected-pow=0.0 |& sed 's/^/## /' 1>&2
+    ${TZNODE} identity generate 0 --data-dir "${data_dir}" 2>&1|  sed 's/^/## /' 1>&2
+    ${TZNODE} config init --data-dir="${data_dir}" --connections=2 --expected-pow=0.0 2>&1| sed 's/^/## /' 1>&2
     ${TZNODE} run --data-dir "${data_dir}" ${CUSTOM_PARAM} "$@" $default_args > "$data_dir"/LOG 2>&1 &
     node_pid="$!"
     CLEANUP_PROCESSES+=($node_pid)

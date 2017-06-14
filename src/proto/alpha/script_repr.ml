@@ -30,8 +30,8 @@ let location_encoding =
 type expr = (* TODO: turn the location into an alpha ? *)
   | Int of location * string
   | String of location * string
-  | Prim of location * string * expr list
-  | Seq of location * expr list
+  | Prim of location * string * expr list * string option
+  | Seq of location * expr list * string option
 
 let expr_encoding =
   let open Data_encoding in
@@ -43,15 +43,15 @@ let expr_encoding =
     let json =
       union
         [ case string
-            (function (v, []) -> Some v |  _ -> None)
-            (fun v -> (v, [])) ;
-          case (assoc (list expr_encoding))
-            (fun (v, args) -> Some [ (v, args) ])
+            (function (v, [], None) -> Some v |  _ -> None)
+            (fun v -> (v, [], None)) ;
+          case (assoc (tup2 (list expr_encoding) (option string)))
+            (fun (v, args, annot) -> Some [ (v, (args, annot)) ])
             (function
-              | [ (v, args) ] -> (v, args)
+              | [ (v, (args, annot)) ] -> (v, args, annot)
               | _ -> Json.cannot_destruct "invalid script expression") ] in
     let binary =
-      obj2 (req "prim" string) (req "args" (list expr_encoding)) in
+      obj3 (req "prim" string) (req "args" (list expr_encoding)) (opt "annot" string) in
     splitted ~json ~binary in
   let seq_encoding expr_encoding =
     list expr_encoding in
@@ -67,31 +67,31 @@ let expr_encoding =
             (fun v -> String (-1, v)) ;
           case ~tag:2 (prim_encoding expr_encoding)
             (function
-              | Prim (_, v, args) -> Some (v, args)
+              | Prim (_, v, args, annot) -> Some (v, args, annot)
               | _ -> None)
-            (function (prim, args) -> Prim (-1, prim, args)) ;
+            (function (prim, args, annot) -> Prim (-1, prim, args, annot)) ;
           case ~tag:3 (seq_encoding expr_encoding)
-            (function Seq (_, v) -> Some v | _ -> None)
-            (fun args -> Seq (-1, args)) ])
+            (function Seq (_, v, _annot) -> Some v | _ -> None)
+            (fun args -> Seq (-1, args, None)) ])
 
 let update_locations ir =
   let rec update_locations i = function
     | Int (_, v) -> (Int (i, v), succ i)
     | String (_, v) -> (String (i, v), succ i)
-    | Prim (_, name, args) ->
+    | Prim (_, name, args, annot) ->
         let (nargs, ni) =
           List.fold_left (fun (nargs, ni) arg ->
               let narg, ni = update_locations ni arg in
               (narg :: nargs, ni))
             ([], succ i) args in
-        (Prim (i, name, List.rev nargs), ni)
-    | Seq (_, args) ->
+        (Prim (i, name, List.rev nargs, annot), ni)
+    | Seq (_, args, annot) ->
         let (nargs, ni) =
           List.fold_left (fun (nargs, ni) arg ->
               let narg, ni = update_locations ni arg in
               (narg :: nargs, ni))
             ([], succ i) args in
-        (Seq (i, List.rev nargs), ni) in
+        (Seq (i, List.rev nargs, annot), ni) in
   fst (update_locations 1 ir)
 
 let expr_encoding =

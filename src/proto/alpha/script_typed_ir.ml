@@ -312,4 +312,5 @@ and ('bef, 'aft) descr =
   { loc : Script.location ;
     bef : 'bef stack_ty ;
     aft : 'aft stack_ty ;
-    instr : ('bef, 'aft)  instr }
+    instr : ('bef, 'aft)  instr ;
+    annot : string option }
