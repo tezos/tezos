@@ -16,7 +16,7 @@ module type S = sig
 
   type error +=
     | Addition_overflow of qty * qty (* `Temporary *)
-    | Substraction_underflow of qty * qty (* `Temporary *)
+    | Subtraction_underflow of qty * qty (* `Temporary *)
     | Multiplication_overflow of qty * int64 (* `Temporary *)
     | Negative_multiplicator of qty * int64 (* `Temporary *)
     | Invalid_divisor of qty * int64 (* `Temporary *)
@@ -63,7 +63,7 @@ module Make (T: QTY) : S = struct
 
   type error +=
     | Addition_overflow of qty * qty (* `Temporary *)
-    | Substraction_underflow of qty * qty (* `Temporary *)
+    | Subtraction_underflow of qty * qty (* `Temporary *)
     | Multiplication_overflow of qty * int64 (* `Temporary *)
     | Negative_multiplicator of qty * int64 (* `Temporary *)
     | Invalid_divisor of qty * int64 (* `Temporary *)
@@ -138,7 +138,7 @@ module Make (T: QTY) : S = struct
 
   let (-?) t1 t2 =
     match t1 - t2 with
-    | None -> error (Substraction_underflow (t1, t2))
+    | None -> error (Subtraction_underflow (t1, t2))
     | Some v -> ok v
 
   let (+?) t1 t2 =
@@ -212,16 +212,16 @@ module Make (T: QTY) : S = struct
       (fun (a, b) -> Addition_overflow (a, b)) ;
     register_error_kind
       `Temporary
-      ~id:(T.id ^ ".substraction_underflow")
-      ~title:("Underflowing " ^ T.id ^ " substraction")
+      ~id:(T.id ^ ".subtraction_underflow")
+      ~title:("Underflowing " ^ T.id ^ " subtraction")
       ~pp: (fun ppf (opa, opb) ->
-          Format.fprintf ppf "Underflowing substraction of %a %s and %a %s"
+          Format.fprintf ppf "Underflowing subtraction of %a %s and %a %s"
             pp opa T.id pp opb T.id)
       ~description:
-        ("An substraction of two " ^ T.id ^ " amounts underflowed")
+        ("An subtraction of two " ^ T.id ^ " amounts underflowed")
       (obj1 (req "amounts" (tup2 encoding encoding)))
-      (function Substraction_underflow (a, b) -> Some (a, b) | _ -> None)
-      (fun (a, b) -> Substraction_underflow (a, b)) ;
+      (function Subtraction_underflow (a, b) -> Some (a, b) | _ -> None)
+      (fun (a, b) -> Subtraction_underflow (a, b)) ;
     register_error_kind
       `Temporary
       ~id:(T.id ^ ".multiplication_overflow")
