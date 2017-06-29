@@ -188,17 +188,15 @@ module Contract = struct
     Storage.Roll.Contract_change.get c contract >>=? fun change ->
     loop c change >>=? fun (c, change) ->
     Lwt.return Tez_repr.(change -? amount) >>=? fun change ->
-    if Tez_repr.(change = zero) then
+    Storage.Roll.Contract_roll_list.mem c contract >>= fun rolls ->
+    if Tez_repr.(change = zero) && not rolls then
       Storage.Roll.Contract_change.delete c contract
     else
       Storage.Roll.Contract_change.set c contract change
 
   let assert_empty c contract =
     Storage.Roll.Contract_change.mem c contract >>= fun change ->
-    Storage.Roll.Contract_roll_list.get c contract >>=? fun roll_list ->
-    fail_unless (not change &&
-                 match roll_list with None -> true | Some _ -> false)
-      Deleted_contract_owning_rolls
+    fail_unless (not change) Deleted_contract_owning_rolls
 
 end
 
