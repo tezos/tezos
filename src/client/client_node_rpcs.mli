@@ -12,32 +12,26 @@ open Client_rpcs
 val errors:
   config -> Json_schema.schema tzresult Lwt.t
 
-val forge_block:
+val forge_block_header:
   config ->
-  ?net_id:Net_id.t ->
-  ?level:Int32.t ->
-  ?proto_level:int ->
-  ?predecessor:Block_hash.t ->
-  ?timestamp:Time.t ->
-  Fitness.fitness ->
-  Operation_list_list_hash.t ->
-  MBytes.t ->
+  Block_header.t ->
   MBytes.t tzresult Lwt.t
-(** [forge_block cctxt ?net ?predecessor ?timestamp fitness ops
-    proto_hdr] returns the serialization of a block header with
-    [proto_hdr] as protocol-specific part. The arguments [?net] and
-    [?predecessor] are infered from the current head of main network,
-    and [?timestamp] defaults to [Time.now ()]. *)
 
 val validate_block:
   config ->
   Net_id.t -> Block_hash.t ->
   unit tzresult Lwt.t
 
+type operation =
+  | Blob of Operation.t
+  | Hash of Operation_hash.t
+
+val operation_encoding: operation Data_encoding.t
+
 val inject_block:
   config ->
   ?async:bool -> ?force:bool ->
-  MBytes.t -> Operation_hash.t list list ->
+  MBytes.t -> operation list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt ?async ?force raw_block] tries to inject
     [raw_block] inside the node. If [?async] is [true], [raw_block]
@@ -54,7 +48,7 @@ val inject_operation:
 val inject_protocol:
   config ->
   ?async:bool -> ?force:bool ->
-  Tezos_compiler.Protocol.t ->
+  Protocol.t ->
   Protocol_hash.t tzresult Lwt.t
 
 module Blocks : sig
@@ -66,7 +60,7 @@ module Blocks : sig
     | `Hash of Block_hash.t
     ]
 
-  val net:
+  val net_id:
     config ->
     block -> Net_id.t tzresult Lwt.t
   val level:
@@ -89,7 +83,8 @@ module Blocks : sig
     block -> MBytes.t list tzresult Lwt.t
   val operations:
     config ->
-    block -> Operation_hash.t list list tzresult Lwt.t
+    ?contents:bool ->
+    block -> (Operation_hash.t * Operation.t option) list list tzresult Lwt.t
   val protocol:
     config ->
     block -> Protocol_hash.t tzresult Lwt.t
@@ -134,9 +129,8 @@ module Blocks : sig
     unit -> block_info list list tzresult Lwt_stream.t tzresult Lwt.t
 
   type preapply_result = {
+    shell_header: Block_header.shell_header ;
     operations: error Prevalidation.preapply_result ;
-    fitness: MBytes.t list ;
-    timestamp: Time.t ;
   }
 
   val preapply:
@@ -144,21 +138,18 @@ module Blocks : sig
     block ->
     ?timestamp:Time.t ->
     ?sort:bool ->
-    Hash.Operation_hash.t list -> preapply_result tzresult Lwt.t
+    proto_header:MBytes.t ->
+    operation list -> preapply_result tzresult Lwt.t
 
 end
 
 module Operations : sig
 
-  val contents:
-    config ->
-    Operation_hash.t list -> Store.Operation.t list tzresult Lwt.t
-
   val monitor:
     config ->
-    ?contents:bool -> unit ->
-    (Operation_hash.t * Store.Operation.t option) list list tzresult
-      Lwt_stream.t tzresult Lwt.t
+    ?contents:bool ->
+    unit ->
+    (Operation_hash.t * Operation.t option) list list tzresult Lwt_stream.t tzresult Lwt.t
 
 end
 
@@ -166,12 +157,12 @@ module Protocols : sig
 
   val contents:
     config ->
-    Protocol_hash.t -> Store.Protocol.t tzresult Lwt.t
+    Protocol_hash.t -> Protocol.t tzresult Lwt.t
 
   val list:
     config ->
     ?contents:bool -> unit ->
-    (Protocol_hash.t * Store.Protocol.t option) list tzresult Lwt.t
+    (Protocol_hash.t * Protocol.t option) list tzresult Lwt.t
 
 end
 

@@ -277,8 +277,7 @@ let call_service2 cctxt service a1 a2 arg =
   get_json cctxt meth path arg >>=? fun json ->
   parse_answer cctxt service path json
 
-let call_streamed_service0 cctxt service arg =
-  let meth, path, arg = RPC.forge_request service () arg in
+let call_streamed cctxt service (meth, path, arg) =
   get_streamed_json cctxt meth path arg >>=? fun json_st ->
   let parsed_st, push = Lwt_stream.create () in
   let rec loop () =
@@ -295,6 +294,12 @@ let call_streamed_service0 cctxt service arg =
   in
   Lwt.async loop ;
   return parsed_st
+
+let call_streamed_service0 cctxt service arg =
+  call_streamed cctxt service (RPC.forge_request service () arg)
+
+let call_streamed_service1 cctxt service arg1 arg2 =
+  call_streamed cctxt service (RPC.forge_request service ((), arg1) arg2)
 
 let parse_err_answer config service path json =
   match RPC.read_answer service json with
@@ -321,3 +326,10 @@ let call_describe0 cctxt service path arg =
   let meth, prefix, arg = RPC.forge_request service () arg in
   get_json cctxt meth (prefix @ path) arg >>=? fun json ->
   parse_answer cctxt service prefix json
+
+type block = Node_rpc_services.Blocks.block
+
+let last_mined_block = function
+  | `Prevalidation -> `Head 0
+  | `Test_prevalidation -> `Test_head 0
+  | `Genesis | `Head _ | `Test_head _ | `Hash _ as block -> block

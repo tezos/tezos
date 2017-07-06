@@ -93,58 +93,24 @@ end
 
 module Mining : sig
 
-  val get_first_priority :
-    ?max_priority:int ->
-    Raw_level.t ->
-    Account.t ->
-    Client_proto_rpcs.block ->
-    int tzresult Lwt.t
-    (** [get_first_priority ?max_prio level account block] is the
-        best (first) mining priority on [block] for [account] at
-        [level]. *)
-
-  val mine_stamp :
-    Client_proto_rpcs.block ->
-    secret_key ->
-    Updater.shell_block_header ->
-    int ->
-    Nonce_hash.t ->
-    MBytes.t tzresult Lwt.t
-
-  val inject_block :
+  val mine:
     Client_node_rpcs.Blocks.block ->
-    ?force:bool ->
-    ?proto_level:int ->
-    priority:int ->
-    timestamp:Time.t ->
-    fitness:Fitness.t ->
-    seed_nonce:Nonce.nonce ->
-    src_sk:secret_key ->
-    Operation_hash.t list -> Block_hash.t tzresult Lwt.t
-
-  val mine :
-    ?force:bool ->
-    ?operations:Operation_hash.t list ->
-    ?fitness_gap:int ->
-    ?proto_level:int ->
     Account.t ->
-    Client_node_rpcs.Blocks.block ->
+    Operation.raw list ->
     Block_hash.t tzresult Lwt.t
 
-  val endorsement_reward :
-    Account.t ->
-    Client_node_rpcs.Blocks.block ->
-    int64 tzresult Lwt.t
+  val endorsement_reward:
+    Client_node_rpcs.Blocks.block -> int64 tzresult Lwt.t
+
 end
 
 module Endorse : sig
 
   val endorse :
-    ?force:bool ->
     ?slot:int ->
     Account.t ->
     Client_alpha.Client_proto_rpcs.block ->
-    Operation_hash.t tzresult Lwt.t
+    Operation.raw tzresult Lwt.t
 
   val endorsers_list :
     Client_alpha.Client_proto_rpcs.block ->
@@ -161,22 +127,18 @@ end
 
 module Protocol : sig
 
-  val inject_proposals :
-    ?async:bool ->
-    ?force:bool ->
+  val proposals :
     ?block:Client_node_rpcs.Blocks.block ->
     src:Account.t ->
-    Hash.Protocol_hash.t list ->
-    Hash.Operation_list_hash.elt tzresult Lwt.t
+    Protocol_hash.t list ->
+    Operation.raw tzresult Lwt.t
 
-  val inject_ballot :
-    ?async:bool ->
-    ?force:bool ->
+  val ballot :
     ?block:Client_node_rpcs.Blocks.block ->
     src:Account.t ->
-    proposal:Hash.Protocol_hash.t ->
+    proposal:Protocol_hash.t ->
     Vote.ballot ->
-    Hash.Operation_list_hash.elt tzresult Lwt.t
+    Operation.raw tzresult Lwt.t
 
 end
 
@@ -185,13 +147,22 @@ module Assert : sig
   include module type of Assert
 
   val balance_equal:
+    ?block:Client_node_rpcs.Blocks.block ->
     msg:string -> Account.t -> int64 -> unit tzresult Lwt.t
   val delegate_equal:
+    ?block:Client_node_rpcs.Blocks.block ->
     msg:string -> Contract.t -> public_key_hash option -> unit tzresult Lwt.t
+
+  val failed_to_preapply:
+    msg:string ->
+    ?op:Client_node_rpcs.operation ->
+    (Register_client_embedded_proto_alpha.Packed_protocol.error ->
+     bool) ->
+    'a tzresult -> unit
 
   val ecoproto_error:
     (Register_client_embedded_proto_alpha.Packed_protocol.error -> bool) ->
-    Error_monad.error -> bool
+    error -> bool
 
   val generic_economic_error : msg:string -> 'a tzresult -> unit
 
@@ -214,11 +185,9 @@ module Assert : sig
 
   val wrong_delegate : msg:string -> 'a tzresult -> unit
 
-  val invalid_endorsement_slot : msg:string -> 'a tzresult -> unit
-
   val check_protocol :
     ?msg:string -> block:Client_node_rpcs.Blocks.block ->
-    Hash.Protocol_hash.t -> unit tzresult Lwt.t
+    Protocol_hash.t -> unit tzresult Lwt.t
 
   val check_voting_period_kind :
     ?msg:string -> block:Client_node_rpcs.Blocks.block ->

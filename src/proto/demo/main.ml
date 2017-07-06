@@ -57,7 +57,7 @@ let precheck_block
     ~ancestor_context:_
     ~ancestor_timestamp:_
     raw_block =
-  Fitness.to_int64 raw_block.Updater.shell.fitness >>=? fun _ ->
+  Fitness.to_int64 raw_block.Block_header.shell.fitness >>=? fun _ ->
   return ()
 
 let begin_application
@@ -65,7 +65,7 @@ let begin_application
     ~predecessor_timestamp:_
     ~predecessor_fitness:_
     raw_block =
-  Fitness.to_int64 raw_block.Updater.shell.fitness >>=? fun fitness ->
+  Fitness.to_int64 raw_block.Block_header.shell.fitness >>=? fun fitness ->
   return { context ; fitness }
 
 let begin_construction
@@ -74,7 +74,8 @@ let begin_construction
     ~predecessor_level:_
     ~predecessor_fitness:pred_fitness
     ~predecessor:_
-    ~timestamp:_ =
+    ~timestamp:_
+    ?proto_header:_ () =
   Fitness.to_int64 pred_fitness >>=? function pred_fitness ->
   let fitness = Int64.succ pred_fitness in
   return { context ; fitness }

@@ -16,7 +16,7 @@ let demo cctxt =
   cctxt.Client_commands.message "Calling the 'echo' RPC." >>= fun () ->
   let msg = "test" in
   Client_proto_rpcs.echo cctxt.rpc_config block msg >>=? fun reply ->
-  fail_unless (reply = msg) (Unclassified "...") >>=? fun () ->
+  fail_unless (reply = msg) (failure "...") >>=? fun () ->
   begin
     cctxt.message "Calling the 'failing' RPC." >>= fun () ->
     Client_proto_rpcs.failing cctxt.rpc_config block 3 >>= function
@@ -34,11 +34,7 @@ let demo cctxt =
   return ()
 
 let mine cctxt =
-  let block =
-    match Client_commands.(cctxt.config.block) with
-    | `Prevalidation -> `Head 0
-    | `Test_prevalidation -> `Test_head 0
-    | b -> b in
+  let block = Client_rpcs.last_mined_block cctxt.Client_commands.config.block in
   Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
   let fitness =
     match bi.fitness with
@@ -50,9 +46,15 @@ let mine cctxt =
         Lwt.ignore_result
           (cctxt.message "Cannot parse fitness: %a" Fitness.pp bi.fitness);
         exit 2 in
-  Client_node_rpcs.forge_block cctxt.rpc_config
-    ~net_id:bi.net_id ~predecessor:bi.hash
-    fitness Operation_list_list_hash.empty (MBytes.create 0) >>=? fun bytes ->
+  Client_node_rpcs.forge_block_header cctxt.rpc_config
+    { shell = { net_id = bi.net_id ;
+                predecessor = bi.hash ;
+                proto_level = bi.proto_level ;
+                level = Int32.succ bi.level ;
+                timestamp = Time.now () ;
+                fitness ;
+                operations_hash = Operation_list_list_hash.empty } ;
+      proto = MBytes.create 0 } >>=? fun bytes ->
   Client_node_rpcs.inject_block cctxt.rpc_config bytes [] >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()

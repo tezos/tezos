@@ -210,6 +210,17 @@ module Make() = struct
         map_s f t >>=? fun rt ->
         return (rh :: rt)
 
+  let mapi_s f l =
+    let rec mapi_s f i l =
+      match l with
+      | [] -> return []
+      | h :: t ->
+          f i h >>=? fun rh ->
+          mapi_s f (i+1) t >>=? fun rt ->
+          return (rh :: rt)
+    in
+    mapi_s f 0 l
+
   let rec map_p f l =
     match l with
     | [] ->
@@ -223,6 +234,22 @@ module Make() = struct
         | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
         | Ok _, Error exn
         | Error exn, Ok _ -> Lwt.return (Error exn)
+
+  let mapi_p f l =
+    let rec mapi_p f i l =
+      match l with
+      | [] ->
+          return []
+      | x :: l ->
+          let tx = f i x and tl = mapi_p f (i+1) l in
+          tx >>= fun x ->
+          tl >>= fun l ->
+          match x, l with
+          | Ok x, Ok l -> Lwt.return (Ok (x :: l))
+          | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+          | Ok _, Error exn
+          | Error exn, Ok _ -> Lwt.return (Error exn) in
+    mapi_p f 0 l
 
   let rec map2_s f l1 l2 =
     match l1, l2 with
@@ -242,14 +269,26 @@ module Make() = struct
         map2 f t1 t2 >>? fun rt ->
         Ok (rh :: rt)
 
-  let rec map_filter_s f l =
+  let rec filter_map_s f l =
     match l with
     | [] -> return []
     | h :: t ->
         f h >>=? function
-        | None -> map_filter_s f t
+        | None -> filter_map_s f t
         | Some rh ->
-            map_filter_s f t >>=? fun rt ->
+            filter_map_s f t >>=? fun rt ->
+            return (rh :: rt)
+
+  let rec filter_map_p f l =
+    match l with
+    | [] -> return []
+    | h :: t ->
+        let th = f h
+        and tt = filter_map_s f t in
+        th >>=? function
+        | None -> tt
+        | Some rh ->
+            tt >>=? fun rt ->
             return (rh :: rt)
 
   let rec iter_s f l =

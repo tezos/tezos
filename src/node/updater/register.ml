@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Make(Proto : Protocol.PACKED_PROTOCOL) = struct
+module Make(Proto : Protocol_sigs.PACKED_PROTOCOL) = struct
   type proto_error = Proto.error
   type Error_monad.error += Ecoproto_error of Proto.error list
   let wrap_error = function
@@ -29,7 +29,7 @@ module Make(Proto : Protocol.PACKED_PROTOCOL) = struct
       (function ecoerrors -> Ecoproto_error ecoerrors)
 end
 
-let register (module Proto : Protocol.PACKED_PROTOCOL) =
+let register (module Proto : Protocol_sigs.PACKED_PROTOCOL) =
   let module V = struct
     include Proto
     include Make(Proto)
@@ -50,11 +50,11 @@ let register (module Proto : Protocol.PACKED_PROTOCOL) =
     let begin_construction
         ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness
-        ~predecessor ~timestamp =
+        ~predecessor ~timestamp ?proto_header () =
       begin_construction
         ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness
-        ~predecessor ~timestamp >|= wrap_error
+        ~predecessor ~timestamp ?proto_header () >|= wrap_error
     let current_context c =
       current_context c >|= wrap_error
     let apply_operation c o =

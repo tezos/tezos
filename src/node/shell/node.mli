@@ -27,7 +27,7 @@ module RPC : sig
 
   val inject_block:
     t -> ?force:bool ->
-    MBytes.t -> Operation_hash.t list list ->
+    MBytes.t -> Distributed_db.operation list list ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
   (** [inject_block node ?force bytes] tries to insert [bytes]
       (supposedly the serialization of a block header) inside
@@ -38,14 +38,14 @@ module RPC : sig
     t -> ?force:bool -> MBytes.t ->
     (Operation_hash.t * unit tzresult Lwt.t) Lwt.t
   val inject_protocol:
-    t -> ?force:bool -> Tezos_compiler.Protocol.t ->
+    t -> ?force:bool -> Protocol.t ->
     (Protocol_hash.t * unit tzresult Lwt.t) Lwt.t
 
   val raw_block_info:
     t -> Block_hash.t -> block_info Lwt.t
+  val block_header_watcher:
+    t -> (Block_hash.t * Block_header.t) Lwt_stream.t * Watcher.stopper
   val block_watcher:
-    t -> (Block_hash.t * Store.Block_header.t) Lwt_stream.t * Watcher.stopper
-  val valid_block_watcher:
     t -> (block_info Lwt_stream.t * Watcher.stopper)
   val heads: t -> block_info Block_hash.Map.t Lwt.t
 
@@ -58,12 +58,12 @@ module RPC : sig
   val block_info:
     t -> block -> block_info Lwt.t
 
-  val operations:
+  val operation_hashes:
     t -> block -> Operation_hash.t list list Lwt.t
-  val operation_content:
-    t -> Operation_hash.t -> Store.Operation.t option Lwt.t
+  val operations:
+    t -> block -> Operation.t list list Lwt.t
   val operation_watcher:
-    t -> (Operation_hash.t * Store.Operation.t) Lwt_stream.t * Watcher.stopper
+    t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Watcher.stopper
 
   val pending_operations:
     t -> block -> (error Prevalidation.preapply_result * Operation_hash.Set.t) Lwt.t
@@ -71,18 +71,18 @@ module RPC : sig
   val protocols:
     t -> Protocol_hash.t list Lwt.t
   val protocol_content:
-    t -> Protocol_hash.t -> Tezos_compiler.Protocol.t tzresult Lwt.t
+    t -> Protocol_hash.t -> Protocol.t tzresult Lwt.t
   val protocol_watcher:
-    t -> (Protocol_hash.t * Tezos_compiler.Protocol.t) Lwt_stream.t * Watcher.stopper
+    t -> (Protocol_hash.t * Protocol.t) Lwt_stream.t * Watcher.stopper
 
   val context_dir:
     t -> block -> 'a RPC.directory option Lwt.t
 
   val preapply:
     t -> block ->
-    timestamp:Time.t -> sort:bool ->
-    Operation_hash.t list ->
-    (Protocol.fitness * error Prevalidation.preapply_result) tzresult Lwt.t
+    timestamp:Time.t -> proto_header:MBytes.t ->
+    sort_operations:bool -> Distributed_db.operation list ->
+    (Block_header.shell_header * error Prevalidation.preapply_result) tzresult Lwt.t
 
   val validate: t -> Net_id.t -> Block_hash.t -> unit tzresult Lwt.t
 

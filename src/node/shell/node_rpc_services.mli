@@ -13,6 +13,12 @@ module Error : sig
   val wrap: 'a Data_encoding.t -> 'a tzresult Data_encoding.encoding
 end
 
+type operation = Distributed_db.operation =
+  | Blob of Operation.t
+  | Hash of Operation_hash.t
+
+val operation_encoding: operation Data_encoding.t
+
 module Blocks : sig
 
   type block = [
@@ -43,7 +49,7 @@ module Blocks : sig
 
   val info:
     (unit, unit * block, bool, block_info) RPC.service
-  val net:
+  val net_id:
     (unit, unit * block, unit, Net_id.t) RPC.service
   val level:
     (unit, unit * block, unit, Int32.t) RPC.service
@@ -57,8 +63,15 @@ module Blocks : sig
     (unit, unit * block, unit, Time.t) RPC.service
   val fitness:
     (unit, unit * block, unit, MBytes.t list) RPC.service
+
+  type operations_param = {
+    contents: bool ;
+    monitor: bool ;
+  }
   val operations:
-    (unit, unit * block, unit, Operation_hash.t list list) RPC.service
+    (unit, unit * block, operations_param,
+     (Operation_hash.t * Operation.t option) list list) RPC.service
+
   val protocol:
     (unit, unit * block, unit, Protocol_hash.t) RPC.service
   val test_network:
@@ -80,14 +93,15 @@ module Blocks : sig
     (unit, unit, list_param, block_info list list) RPC.service
 
   type preapply_param = {
-    operations: Operation_hash.t list ;
-    sort: bool ;
-    timestamp: Time.t option ;
-  }
-  type preapply_result = {
-    operations: error Prevalidation.preapply_result ;
-    fitness: MBytes.t list ;
     timestamp: Time.t ;
+    proto_header: MBytes.t ;
+    operations: operation list ;
+    sort_operations: bool ;
+  }
+
+  type preapply_result = {
+    shell_header: Block_header.shell_header ;
+    operations: error Prevalidation.preapply_result ;
   }
   val preapply:
     (unit, unit * block, preapply_param, preapply_result tzresult) RPC.service
@@ -96,31 +110,13 @@ module Blocks : sig
 
   val proto_path: (unit, unit * block) RPC.Path.path
 
-end
-
-module Operations : sig
-
-  val contents:
-    (unit, unit * Operation_hash.t list,
-     unit, State.Operation.t list) RPC.service
-
-
-  type list_param = {
-    contents: bool option ;
-    monitor: bool option ;
-  }
-
-  val list:
-    (unit, unit,
-     list_param,
-     (Operation_hash.t * Store.Operation.t option) list list) RPC.service
 
 end
 
 module Protocols : sig
 
   val contents:
-    (unit, unit * Protocol_hash.t, unit, Tezos_compiler.Protocol.t) RPC.service
+    (unit, unit * Protocol_hash.t, unit, Protocol.t) RPC.service
 
   type list_param = {
     contents: bool option ;
@@ -130,11 +126,12 @@ module Protocols : sig
   val list:
     (unit, unit,
      list_param,
-     (Protocol_hash.t * Tezos_compiler.Protocol.t option) list) RPC.service
+     (Protocol_hash.t * Protocol.t option) list) RPC.service
 
 end
 
 module Network : sig
+
   val stat :
     (unit, unit, unit, P2p.Stat.t) RPC.service
 
@@ -175,13 +172,11 @@ module Network : sig
     val events :
       (unit, unit * P2p.Peer_id.t, bool, P2p.RPC.Peer_id.Event.t list) RPC.service
   end
+
 end
 
-val forge_block:
-  (unit, unit,
-   Net_id.t option * Int32.t option * int option * Block_hash.t option *
-   Time.t option * Fitness.fitness * Operation_list_list_hash.t * MBytes.t,
-   MBytes.t) RPC.service
+val forge_block_header:
+  (unit, unit, Block_header.t, MBytes.t) RPC.service
 
 val validate_block:
   (unit, unit, Net_id.t * Block_hash.t, unit tzresult) RPC.service
@@ -190,7 +185,7 @@ type inject_block_param = {
   raw: MBytes.t ;
   blocking: bool ;
   force: bool ;
-  operations: Operation_hash.t list list ;
+  operations: operation list list ;
 }
 
 val inject_block:
@@ -202,7 +197,7 @@ val inject_operation:
 
 val inject_protocol:
   (unit, unit,
-   (Tezos_compiler.Protocol.t * bool * bool option),
+   (Protocol.t * bool * bool option),
    Protocol_hash.t tzresult) RPC.service
 
 val bootstrapped: (unit, unit, unit, Block_hash.t * Time.t) RPC.service

@@ -39,7 +39,7 @@ let compare_operations _ _ = 0
 let max_number_of_operations = 0
 
 type block = {
-  shell: Updater.shell_block_header ;
+  shell: Block_header.shell_header ;
   command: Data.Command.t ;
   signature: Ed25519.Signature.t ;
 }
@@ -55,7 +55,7 @@ let max_block_length =
     | Some len -> len
   end
 
-let parse_block { Updater.shell ; proto } : block tzresult =
+let parse_block { Block_header.shell ; proto } : block tzresult =
   match Data_encoding.Binary.of_bytes Data.Command.signed_encoding proto with
   | None -> Error [Parsing_error]
   | Some (command, signature) -> Ok { shell ; command ; signature }
@@ -107,7 +107,9 @@ let begin_construction
     ~predecessor_level:_
     ~predecessor_fitness:fitness
     ~predecessor:_
-    ~timestamp:_ =
+    ~timestamp:_
+    ?proto_header:_
+    () =
   (* Dummy result. *)
   return { Updater.message = None ; context ; fitness }
 

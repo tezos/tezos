@@ -17,17 +17,23 @@ type t =
   | Current_head of Net_id.t * Block_hash.t * Operation_hash.t list
 
   | Get_block_headers of Net_id.t * Block_hash.t list
-  | Block_header of Store.Block_header.t
+  | Block_header of Block_header.t
 
   | Get_operations of Net_id.t * Operation_hash.t list
-  | Operation of Store.Operation.t
+  | Operation of Operation.t
 
   | Get_protocols of Protocol_hash.t list
-  | Protocol of Tezos_compiler.Protocol.t
+  | Protocol of Protocol.t
 
-  | Get_operation_list of Net_id.t * (Block_hash.t * int) list
-  | Operation_list of Net_id.t * Block_hash.t * int *
-                      Operation_hash.t list * Operation_list_list_hash.path
+  | Get_operation_hashes_for_blocks of Net_id.t * (Block_hash.t * int) list
+  | Operation_hashes_for_block of
+      Net_id.t * Block_hash.t * int *
+      Operation_hash.t list * Operation_list_list_hash.path
+
+  | Get_operations_for_blocks of Net_id.t * (Block_hash.t * int) list
+  | Operations_for_block of
+      Net_id.t * Block_hash.t * int *
+      Operation.t list * Operation_list_list_hash.path
 
 let encoding =
   let open Data_encoding in
@@ -87,7 +93,7 @@ let encoding =
       (fun (net_id, bhs) -> Get_block_headers (net_id, bhs)) ;
 
     case ~tag:0x21
-      (obj1 (req "block_header" Store.Block_header.encoding))
+      (obj1 (req "block_header" Block_header.encoding))
       (function
         | Block_header bh -> Some bh
         | _ -> None)
@@ -103,7 +109,7 @@ let encoding =
       (fun (net_id, bhs) -> Get_operations (net_id, bhs)) ;
 
     case ~tag:0x31
-      (obj1 (req "operation" Store.Operation.encoding))
+      (obj1 (req "operation" Operation.encoding))
       (function Operation o -> Some o | _ -> None)
       (fun o -> Operation o);
 
@@ -116,29 +122,51 @@ let encoding =
       (fun protos -> Get_protocols protos);
 
     case ~tag:0x41
-      (obj1 (req "protocol" Store.Protocol.encoding))
+      (obj1 (req "protocol" Protocol.encoding))
       (function Protocol proto -> Some proto  | _ -> None)
       (fun proto -> Protocol proto);
 
     case ~tag:0x50
       (obj2
          (req "net_id" Net_id.encoding)
-         (req "get_operation_list" (list (tup2 Block_hash.encoding int8))))
+         (req "get_operation_hashes_for_blocks"
+            (list (tup2 Block_hash.encoding int8))))
       (function
-        | Get_operation_list (net_id, keys) -> Some (net_id, keys)
+        | Get_operation_hashes_for_blocks (net_id, keys) -> Some (net_id, keys)
         | _ -> None)
-      (fun (net_id, keys) -> Get_operation_list (net_id, keys));
+      (fun (net_id, keys) -> Get_operation_hashes_for_blocks (net_id, keys));
 
     case ~tag:0x51
       (obj4
          (req "net_id" Net_id.encoding)
-         (req "operation_list" (tup2 Block_hash.encoding int8))
-         (req "operations" (list Operation_hash.encoding))
-         (req "operation_list_path" Operation_list_list_hash.path_encoding))
-      (function Operation_list (net_id, block, ofs, ops, path) ->
+         (req "operation_hashes_for_block" (tup2 Block_hash.encoding int8))
+         (req "operation_hashes" (list Operation_hash.encoding))
+         (req "operation_hashes_path" Operation_list_list_hash.path_encoding))
+      (function Operation_hashes_for_block (net_id, block, ofs, ops, path) ->
          Some (net_id, (block, ofs), ops, path) | _ -> None)
       (fun (net_id, (block, ofs), ops, path) ->
-         Operation_list (net_id, block, ofs, ops, path)) ;
+         Operation_hashes_for_block (net_id, block, ofs, ops, path)) ;
+
+    case ~tag:0x60
+      (obj2
+         (req "net_id" Net_id.encoding)
+         (req "get_operations_for_blocks"
+            (list (tup2 Block_hash.encoding int8))))
+      (function
+        | Get_operations_for_blocks (net_id, keys) -> Some (net_id, keys)
+        | _ -> None)
+      (fun (net_id, keys) -> Get_operations_for_blocks (net_id, keys));
+
+    case ~tag:0x61
+      (obj4
+         (req "net_id" Net_id.encoding)
+         (req "operations_for_block" (tup2 Block_hash.encoding int8))
+         (req "operations" (list (dynamic_size Operation.encoding)))
+         (req "operations_path" Operation_list_list_hash.path_encoding))
+      (function Operations_for_block (net_id, block, ofs, ops, path) ->
+         Some (net_id, (block, ofs), ops, path) | _ -> None)
+      (fun (net_id, (block, ofs), ops, path) ->
+         Operations_for_block (net_id, block, ofs, ops, path)) ;
 
   ]
 
@@ -146,7 +174,7 @@ let versions =
   let open P2p.Version in
   [ { name = "TEZOS" ;
       major = 0 ;
-      minor = 5 ;
+      minor = 6 ;
     }
   ]
 

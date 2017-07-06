@@ -78,8 +78,15 @@ module Kind = struct
     | `Fixed n1, `Fixed n2 -> `Fixed (n1 + n2)
     | `Dynamic, `Dynamic | `Fixed _, `Dynamic
     | `Dynamic, `Fixed _ -> `Dynamic
-    | `Variable, (`Dynamic | `Fixed _)
+    | `Variable, `Fixed _
     | (`Dynamic | `Fixed _), `Variable -> `Variable
+    | `Variable, `Dynamic ->
+        Printf.ksprintf invalid_arg
+          "Cannot merge two %s when the left element is of variable length \
+           and the right one of dynamic length. \
+           You should use the reverse order, or wrap the second one \
+           with Data_encoding.dynamic_size."
+          name
     | `Variable, `Variable ->
         Printf.ksprintf invalid_arg
           "Cannot merge two %s with variable length. \
@@ -1215,11 +1222,15 @@ let rec length : type x. x t -> x -> int = fun e ->
     try Some (read_rec t buf ofs len)
     with _ -> None
   let write = write
-  let of_bytes ty buf =
+  let of_bytes_exn ty buf =
     let len = MBytes.length buf in
-    match read ty buf 0 len with
-    | None -> None
-    | Some (read_len, r) -> if read_len <> len then None else Some r
+    let read_len, r = read_rec ty buf 0 len in
+    if read_len <> len then
+      failwith "Data_encoding.Binary.of_bytes_exn: remainig data" ;
+    r
+  let of_bytes ty buf =
+    try Some (of_bytes_exn ty buf)
+    with _ -> None
   let to_bytes = to_bytes
 
   let length = length

@@ -23,10 +23,11 @@ let mine_block cctxt block
   Client_proto_rpcs.Context.level cctxt.rpc_config block >>=? fun level ->
   let level = Raw_level.succ level.level in
   let seed_nonce = Client_mining_forge.generate_seed_nonce () in
+  let seed_nonce_hash = Nonce.hash seed_nonce in
   Client_mining_forge.forge_block cctxt.rpc_config
     ~timestamp:(Time.now ())
     ?force
-    ~seed_nonce ~src_sk block
+    ~seed_nonce_hash ~src_sk block
     ~priority:(`Auto (delegate, max_priority, free_mining)) () >>=? fun block_hash ->
   Client_mining_forge.State.record_block cctxt level block_hash seed_nonce
   |> trace_exn (Failure "Error while recording block") >>=? fun () ->
@@ -74,7 +75,7 @@ let reveal_block_nonces cctxt ?force block_hashes =
               Block_hash.pp_short hash >>= fun () ->
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
-  map_filter_s (fun (bi : Client_mining_blocks.block_info) ->
+  filter_map_s (fun (bi : Client_mining_blocks.block_info) ->
       Client_proto_nonces.find cctxt bi.hash >>= function
       | None ->
           cctxt.warning "Cannot find nonces for block %a (ignoring)@."

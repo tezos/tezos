@@ -12,7 +12,7 @@ val mine:
   ?timestamp: Time.t ->
   Client_node_rpcs.Blocks.block ->
   Data.Command.t ->
-  Fitness.fitness ->
+  Fitness.t ->
   Environment.Ed25519.Secret_key.t ->
   Block_hash.t tzresult Lwt.t
 

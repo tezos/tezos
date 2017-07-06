@@ -12,6 +12,6 @@ module Make(Param : sig val name: string end)() = struct
   include Environment.Make(Param)()
 
   let __cast (type error) (module X : PACKED_PROTOCOL) =
-    (module X : Protocol.PACKED_PROTOCOL)
+    (module X : Protocol_sigs.PACKED_PROTOCOL)
 
 end

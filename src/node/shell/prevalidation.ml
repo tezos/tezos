@@ -73,21 +73,7 @@ let empty_result =
     branch_refused = Operation_hash.Map.empty ;
     branch_delayed = Operation_hash.Map.empty }
 
-let merge_result r r' =
-  let open Updater in
-  let merge _key a b =
-    match a, b with
-    | None, None -> None
-    | Some x, None -> Some x
-    | _, Some y -> Some y in
-  let merge_map =
-    Operation_hash.Map.merge merge in
-  { applied = r'.applied @ r.applied ;
-    refused = merge_map r.refused r'.refused ;
-    branch_refused = merge_map r.branch_refused r'.branch_refused ;
-    branch_delayed = r'.branch_delayed }
-
-let rec apply_operations apply_operation state ~sort ops =
+let rec apply_operations apply_operation state r ~sort ops =
   Lwt_list.fold_left_s
     (fun (state, r) (hash, op) ->
        apply_operation state op >>= function
@@ -108,7 +94,7 @@ let rec apply_operations apply_operation state ~sort ops =
                let branch_delayed =
                  Operation_hash.Map.add hash errors r.branch_delayed in
                Lwt.return (state, { r with branch_delayed }))
-    (state, empty_result)
+    (state, r)
     ops >>= fun (state, r) ->
   match r.applied with
   | _ :: _ when sort ->
@@ -116,11 +102,13 @@ let rec apply_operations apply_operation state ~sort ops =
         List.filter
           (fun (hash, _) -> Operation_hash.Map.mem hash r.branch_delayed)
           ops in
-      apply_operations apply_operation
-        state ~sort rechecked_operations >>=? fun (state, r') ->
-      return (state, merge_result r r')
+      let remaining = List.length rechecked_operations in
+      if remaining = 0 || remaining = List.length ops then
+        Lwt.return (state, r)
+      else
+        apply_operations apply_operation state r ~sort rechecked_operations
   | _ ->
-      return (state, r)
+      Lwt.return (state, r)
 
 type prevalidation_state =
     State : { proto : 'a proto ; state : 'a }
@@ -130,17 +118,17 @@ and 'a proto =
   (module Updater.REGISTRED_PROTOCOL
     with type validation_state = 'a)
 
-let start_prevalidation
-    ~predecessor:
-    { State.Valid_block.protocol ;
-      hash = predecessor ;
-      context = predecessor_context ;
-      timestamp = predecessor_timestamp ;
-      fitness = predecessor_fitness ;
-      level = predecessor_level }
-    ~timestamp =
+let start_prevalidation ?proto_header ~predecessor ~timestamp () =
+  let { Block_header.shell =
+          { fitness = predecessor_fitness ;
+            timestamp = predecessor_timestamp ;
+            level = predecessor_level } } =
+    State.Block.header predecessor in
+  State.Block.context predecessor >>= fun predecessor_context ->
+  Context.get_protocol predecessor_context >>= fun protocol ->
+  let predecessor = State.Block.hash predecessor in
   let (module Proto) =
-    match protocol with
+    match Updater.get protocol with
     | None -> assert false (* FIXME, this should not happen! *)
     | Some protocol -> protocol in
   Context.reset_test_network
@@ -153,32 +141,47 @@ let start_prevalidation
     ~predecessor_level
     ~predecessor
     ~timestamp
+    ?proto_header
+    ()
   >>=? fun state ->
   return (State { proto = (module Proto) ; state })
+
+type error += Parse_error
 
 let prevalidate
     (State { proto = (module Proto) ; state })
     ~sort ops =
-  (* The operations list length is bounded by the size of the mempool,
-     where eventually an operation should not stay more than one hours. *)
-  Lwt_list.map_p
-    (fun (h, op) ->
-       match Proto.parse_operation h op with
-       | Error _ ->
-           (* the operation will never be validated in the
-              current context, it is silently ignored. It may be
-              reintroduced in the loop by the next `flush`. *)
-           Lwt.return_none
-       | Ok p -> Lwt.return (Some (h, p)))
-    ops >>= fun ops ->
-  let ops = Utils.unopt_list ops in
   let ops =
+    List.map
+      (fun (h, op) ->
+         (h, Proto.parse_operation h op |> record_trace Parse_error))
+      ops in
+  let invalid_ops =
+    Utils.filter_map
+      (fun (h, op) -> match op with
+         | Ok _ -> None
+         | Error err -> Some (h, err)) ops
+  and parsed_ops =
+    Utils.filter_map
+      (fun (h, op) -> match op with
+         | Ok op -> Some (h, op)
+         | Error _ -> None) ops in
+  let sorted_ops =
     if sort then
       let compare (_, op1) (_, op2) = Proto.compare_operations op1 op2 in
-      List.sort compare ops
-    else ops in
-  apply_operations Proto.apply_operation state ~sort ops >>=? fun (state, r) ->
-  return (State { proto = (module Proto) ; state }, r)
+      List.sort compare parsed_ops
+    else parsed_ops in
+  apply_operations
+    Proto.apply_operation
+    state empty_result ~sort sorted_ops >>= fun (state, r) ->
+  let r =
+    { r with
+      applied = List.rev r.applied ;
+      branch_refused =
+        List.fold_left
+          (fun map (h, err) -> Operation_hash.Map.add h err map)
+          r.branch_refused invalid_ops } in
+  Lwt.return (State { proto = (module Proto) ; state }, r)
 
 let end_prevalidation (State { proto = (module Proto) ; state }) =
   Proto.finalize_block state

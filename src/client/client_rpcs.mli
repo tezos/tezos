@@ -53,6 +53,11 @@ val call_streamed_service0:
   (unit, unit, 'a, 'b) RPC.service ->
   'a -> ('b, error list) result Lwt_stream.t tzresult Lwt.t
 
+val call_streamed_service1:
+  config ->
+  (unit, unit * 'a, 'b, 'c) RPC.service ->
+  'a -> 'b -> ('c, error list) result Lwt_stream.t tzresult Lwt.t
+
 val call_err_service0:
   config ->
   (unit, unit, 'i, 'o tzresult) RPC.service ->
@@ -72,3 +77,13 @@ val call_describe0:
   config ->
   (unit, unit, 'a, 'b) RPC.service ->
   string list -> 'a -> 'b tzresult Lwt.t
+
+type block = Node_rpc_services.Blocks.block
+
+val last_mined_block:
+  block -> [>
+    | `Genesis
+    | `Head of int
+    | `Test_head of int
+    | `Hash of Block_hash.t
+  ]

@@ -11,9 +11,9 @@ open Tezos_context
 
 type rpc_context = {
   block_hash: Block_hash.t ;
-  block_header: Updater.raw_block_header ;
+  block_header: Block_header.raw ;
   operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
-  operations: unit -> Updater.raw_operation list list Lwt.t ;
+  operations: unit -> Operation.raw list list Lwt.t ;
   context: Tezos_context.t ;
 }
 
@@ -68,6 +68,24 @@ let () =
        map2_s
          (map2_s (fun x y -> Lwt.return (Operation.parse x y)))
          operation_hashes operations)
+
+let () =
+  register0_fullctxt
+    Services.header
+    (fun { block_header } ->
+       Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
+       return block_header) ;
+  register0_fullctxt
+    Services.Header.priority
+    (fun { block_header } ->
+       Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
+       return block_header.proto.priority) ;
+  register0_fullctxt
+    Services.Header.seed_nonce_hash
+    (fun { block_header } ->
+       Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
+       return block_header.proto.seed_nonce_hash)
+
 
 (*-- Constants ---------------------------------------------------------------*)
 
@@ -470,16 +488,13 @@ let forge_operations _ctxt (shell, proto) =
 
 let () = register1 Services.Helpers.Forge.operations forge_operations
 
-let forge_block _ctxt
-    ((net_id, predecessor, timestamp, fitness, operations_hash),
-     (level, priority, proto_level, seed_nonce_hash, proof_of_work_nonce)) : MBytes.t tzresult Lwt.t =
-  let level = Raw_level.to_int32 level in
-  return (Block.forge_header
-            { net_id ; level ; proto_level ; predecessor ;
-              timestamp ; fitness ; operations_hash }
+let forge_block_proto_header _ctxt
+    (priority, seed_nonce_hash, proof_of_work_nonce) : MBytes.t tzresult Lwt.t =
+  return (Block_header.forge_unsigned_proto_header
             { priority ; seed_nonce_hash ; proof_of_work_nonce })
 
-let () = register1 Services.Helpers.Forge.block forge_block
+let () =
+  register1 Services.Helpers.Forge.block_proto_header forge_block_proto_header
 
 (*-- Helpers.Parse -----------------------------------------------------------*)
 
@@ -507,20 +522,21 @@ let check_signature ctxt signature shell contents =
        { signature ; shell ; contents ; hash = dummy_hash }
 
 let parse_operations ctxt (operations, check) =
-  map_s begin fun ({ shell ; proto } : Updater.raw_operation) ->
+  map_s begin fun raw ->
     begin
-      Operation.parse_proto proto >>=? fun (proto, signature) ->
+      Lwt.return
+        (Operation.parse (Tezos_data.Operation.hash raw) raw) >>=? fun op ->
       begin match check with
-      | Some true -> check_signature ctxt signature shell proto
-      | Some false | None -> return ()
-      end >>|? fun () -> proto
+        | Some true -> check_signature ctxt op.signature op.shell op.contents
+        | Some false | None -> return ()
+      end >>|? fun () -> op
     end
   end operations
 
 let () = register1 Services.Helpers.Parse.operations parse_operations
 
 let parse_block _ctxt raw_block =
-  Lwt.return (Block.parse_header raw_block) >>=? fun { proto } ->
+  Lwt.return (Block_header.parse raw_block) >>=? fun { proto } ->
   return proto
 
 let () = register1 Services.Helpers.Parse.block parse_block

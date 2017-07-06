@@ -9,4 +9,5 @@ S ../../../proto/alpha
 B _tzbuild
 FLG -open Client_embedded_proto_alpha
 FLG -open Register_client_embedded_proto_alpha
+FLG -open Environment
 FLG -open Tezos_context

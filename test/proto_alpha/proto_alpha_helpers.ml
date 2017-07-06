@@ -13,15 +13,17 @@ open Client_alpha
 
 let (//) = Filename.concat
 
+let () = Random.self_init ()
+
 let rpc_config : Client_rpcs.config = {
   host = "localhost" ;
-  port = 18732 ;
+  port = 8192 + Random.int 8192 ;
   tls = false ;
   logger = Client_rpcs.null_logger ;
 }
 
 let dictator_sk =
-  Environment.Ed25519.Secret_key.of_b58check_exn
+  Ed25519.Secret_key.of_b58check_exn
     "edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7\
      pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z"
 
@@ -33,7 +35,6 @@ let activate_alpha () =
     fitness dictator_sk
 
 let init ?(sandbox = "sandbox.json") () =
-  Random.self_init () ;
   Unix.chdir (Filename.dirname (Filename.dirname Sys.executable_name)) ;
   let pid =
     Node_helpers.fork_node
@@ -57,7 +58,6 @@ module Account = struct
   }
 
   let encoding =
-    let open Environment.Ed25519 in
     let open Data_encoding in
     conv
       (fun { alias ; sk ; pk ; pkh ; contract } ->
@@ -67,9 +67,9 @@ module Account = struct
          { alias ; sk ; pk ; pkh ; contract })
       (obj5
          (req "alias" string)
-         (req "sk" Secret_key.encoding)
-         (req "pk" Public_key.encoding)
-         (req "pkh" Public_key_hash.encoding)
+         (req "sk" Ed25519.Secret_key.encoding)
+         (req "pk" Ed25519.Public_key.encoding)
+         (req "pkh" Ed25519.Public_key_hash.encoding)
          (req "contract" Contract.encoding))
 
   let pp_account ppf account =
@@ -80,7 +80,7 @@ module Account = struct
     let sk, pk = match keys with
       | Some keys -> keys
       | None -> Sodium.Sign.random_keypair () in
-    let pkh = Environment.Ed25519.Public_key.hash pk in
+    let pkh = Ed25519.Public_key.hash pk in
     let contract = Contract.default_contract pkh in
     { alias ; contract ; pkh ; pk ; sk }
 
@@ -92,7 +92,6 @@ module Account = struct
   }
 
   let destination_encoding =
-    let open Environment.Ed25519 in
     let open Data_encoding in
     conv
       (fun { alias ; pk ; pkh ; contract } ->
@@ -101,8 +100,8 @@ module Account = struct
          { alias ; pk ; pkh ; contract })
       (obj4
          (req "alias" string)
-         (req "pk" Public_key.encoding)
-         (req "pkh" Public_key_hash.encoding)
+         (req "pk" Ed25519.Public_key.encoding)
+         (req "pkh" Ed25519.Public_key_hash.encoding)
          (req "contract" Contract.encoding))
 
   let pp_destination ppf destination =
@@ -110,53 +109,52 @@ module Account = struct
     Format.fprintf ppf "%s" (Data_encoding_ezjsonm.to_string json)
 
   let create_destination ~alias ~contract ~pk =
-    let pkh = Environment.Ed25519.Public_key.hash pk in
+    let pkh = Ed25519.Public_key.hash pk in
     { alias ; contract ; pk ; pkh }
 
   type bootstrap_accounts = { b1 : t ; b2 : t ; b3 : t ; b4 : t ;  b5 : t  ; }
 
   let bootstrap_accounts =
-    let open Environment.Ed25519 in
     let bootstrap1_pk =
-      Public_key.of_b58check_exn
+      Ed25519.Public_key.of_b58check_exn
         "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" in
     let bootstrap2_pk =
-      Public_key.of_b58check_exn
+      Ed25519.Public_key.of_b58check_exn
         "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9" in
     let bootstrap3_pk =
-      Public_key.of_b58check_exn
+      Ed25519.Public_key.of_b58check_exn
         "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV" in
     let bootstrap4_pk =
-      Public_key.of_b58check_exn
+      Ed25519.Public_key.of_b58check_exn
         "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU" in
     let bootstrap5_pk =
-      Public_key.of_b58check_exn
+      Ed25519.Public_key.of_b58check_exn
         "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" in
     let bootstrap1_sk =
-      Secret_key.of_b58check_exn
+      Ed25519.Secret_key.of_b58check_exn
         "edskRuR1azSfboG86YPTyxrQgosh5zChf5bVDmptqLTb5EuXAm9\
          rsnDYfTKhq7rDQujdn5WWzwUMeV3agaZ6J2vPQT58jJAJPi" in
     let bootstrap2_sk =
-      Secret_key.of_b58check_exn
+      Ed25519.Secret_key.of_b58check_exn
         "edskRkJz4Rw2rM5NtabEWMbbg2bF4b1nfFajaqEuEk4SgU7eeDby\
          m9gVQtBTbYo32WUg2zb5sNBkD1whRN7zX43V9bftBbtaKc" in
     let bootstrap3_sk =
-      Secret_key.of_b58check_exn
+      Ed25519.Secret_key.of_b58check_exn
         "edskS3qsqsNgdjUqeMsVcEwBn8dkZ5iDRz6aF21KhcCtRiAkWByp\
          USbicccR4Vgqm9UdW2Vabuos6seezqgbXTrmcbLUG4rdAC" in
     let bootstrap4_sk =
-      Secret_key.of_b58check_exn
+      Ed25519.Secret_key.of_b58check_exn
         "edskRg9qcPqaVQa6jXWNMU5p71tseSuR7NzozgqZ9URsVDi81wTyP\
          JdFSBdeakobyHUi4Xgu61jgKRQvkhXrPmEdEUfiqfiJFL" in
     let bootstrap5_sk =
-      Secret_key.of_b58check_exn
+      Ed25519.Secret_key.of_b58check_exn
         "edskS7rLN2Df3nbS1EYvwJbWo4umD7yPM1SUeX7gp1WhCVpMFXjcC\
          yM58xs6xsnTsVqHQmJQ2RxoAjJGedWfvFmjQy6etA3dgZ" in
     let cpt = ref 0 in
     match List.map begin fun (pk, sk) ->
         incr cpt ;
         let alias = Printf.sprintf "bootstrap%d" !cpt in
-        let pkh = Environment.Ed25519.Public_key.hash pk in
+        let pkh = Ed25519.Public_key.hash pk in
         { alias ; contract = Contract.default_contract pkh; pkh ; pk ; sk }
       end [
         bootstrap1_pk, bootstrap1_sk;
@@ -247,34 +245,30 @@ module Protocol = struct
   let voting_period_kind ?(block = `Prevalidation) () =
     Client_proto_rpcs.Context.voting_period_kind rpc_config block
 
-  let inject_proposals ?async ?force ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) proposals =
+  let proposals ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) proposals =
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.proposals rpc_config block
-      ~net:block_info.net_id
+      ~net_id:block_info.net_id
       ~source:pk
       ~period:next_level.voting_period
       ~proposals
       () >>=? fun bytes ->
-    let signed_bytes = Environment.Ed25519.Signature.append sk bytes in
-    Client_node_rpcs.inject_operation
-      rpc_config ?async ?force signed_bytes >>=? fun oph ->
-    return oph
+    let signed_bytes = Ed25519.Signature.append sk bytes in
+    return (Tezos_data.Operation.of_bytes_exn signed_bytes)
 
-  let inject_ballot ?async ?force ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
+  let ballot ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
     Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.ballot rpc_config block
-      ~net:block_info.net_id
+      ~net_id:block_info.net_id
       ~source:pk
       ~period:next_level.voting_period
       ~proposal
       ~ballot
       () >>=? fun bytes ->
-    let signed_bytes = Environment.Ed25519.Signature.append sk bytes in
-    Client_node_rpcs.inject_operation
-      rpc_config ?async ?force signed_bytes >>=? fun oph ->
-    return oph
+    let signed_bytes = Ed25519.Signature.append sk bytes in
+    return (Tezos_data.Operation.of_bytes_exn signed_bytes)
 
 end
 
@@ -288,11 +282,11 @@ module Assert = struct
       match pkh1, pkh2 with
       | None, None -> true
       | Some pkh1, Some pkh2 ->
-          Environment.Ed25519.Public_key_hash.equal pkh1 pkh2
+          Ed25519.Public_key_hash.equal pkh1 pkh2
       | _ -> false in
     let prn = function
       | None -> "none"
-      | Some pkh -> Environment.Ed25519.Public_key_hash.to_hex pkh in
+      | Some pkh -> Ed25519.Public_key_hash.to_hex pkh in
     Assert.equal ?msg ~prn ~eq pkh1 pkh2
 
   let equal_tez ?msg tz1 tz2 =
@@ -301,22 +295,39 @@ module Assert = struct
     let prn = Tez.to_string in
     Assert.equal ?msg ~prn ~eq tz1 tz2
 
-  let balance_equal ~msg account expected_balance =
-    Account.balance account >>=? fun actual_balance ->
+  let balance_equal ?block ~msg account expected_balance =
+    Account.balance ?block account >>=? fun actual_balance ->
     match Tez.of_cents expected_balance with
     | None ->
         failwith "invalid tez constant"
     | Some expected_balance ->
         return (equal_tez ~msg actual_balance expected_balance)
 
-  let delegate_equal ~msg contract expected_delegate =
-    Account.delegate contract >>|? fun actual_delegate ->
+  let delegate_equal ?block ~msg contract expected_delegate =
+    Account.delegate ?block contract >>|? fun actual_delegate ->
     equal_pkh ~msg actual_delegate expected_delegate
 
   let ecoproto_error f = function
     | Register_client_embedded_proto_alpha.Ecoproto_error errors ->
         List.exists f errors
     | _ -> false
+
+  let hash = function
+    | Client_node_rpcs.Hash h -> h
+    | Blob op -> Tezos_data.Operation.hash op
+
+  let failed_to_preapply ~msg ?op f =
+    Assert.contain_error ~msg ~f:begin function
+      | Client_mining_forge.Failed_to_preapply (op', err) ->
+        begin
+          match op with
+          | None -> true
+          | Some op ->
+              let h = hash op and h' = hash op' in
+              Operation_hash.equal h h'
+        end && List.exists (ecoproto_error f) err
+      | _ -> false
+    end
 
   let generic_economic_error ~msg =
     Assert.contain_error ~msg ~f:(ecoproto_error (fun _ -> true))
@@ -370,12 +381,6 @@ module Assert = struct
         | _ -> false)
     end
 
-  let invalid_endorsement_slot ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
-        | Mining.Invalid_endorsement_slot _ -> true
-        | _ -> false)
-    end
-
   let check_protocol ?msg ~block h =
     Client_node_rpcs.Blocks.protocol rpc_config block >>=? fun block_proto ->
     return @@ Assert.equal
@@ -395,126 +400,28 @@ end
 
 module Mining = struct
 
-  let get_first_priority
-      ?(max_priority=1024)
-      level
-      (contract : Account.t)
-      block =
-    Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate
-      rpc_config
-      ~max_priority
-      ~first_level:level
-      ~last_level:level
-      block contract.Account.pkh () >>=? fun possibilities ->
-    try
-      let _, prio, _ =
-        List.find (fun (l,_,_) -> l = level) possibilities in
-      return prio
-    with Not_found ->
-      failwith "No slot found at level %a" Raw_level.pp level
-
-  let rec mine_stamp
-      block
-      delegate_sk
-      shell
-      priority
-      seed_nonce_hash =
-    Client_proto_rpcs.Constants.stamp_threshold
-      rpc_config block >>=? fun stamp_threshold ->
-    let rec loop () =
-      let proof_of_work_nonce =
-        Sodium.Random.Bigbytes.generate Constants.proof_of_work_nonce_size in
-      let unsigned_header =
-        Block.forge_header
-          shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
-      let signed_header =
-        Environment.Ed25519.Signature.append delegate_sk unsigned_header in
-      let block_hash = Block_hash.hash_bytes [signed_header] in
-      if Mining.check_hash block_hash stamp_threshold then
-        proof_of_work_nonce
-      else
-        loop () in
-    return (loop ())
-
-  let inject_block
-      block
-      ?force
-      ?proto_level
-      ~priority
-      ~timestamp
-      ~fitness
-      ~seed_nonce
-      ~src_sk
-      operation_list =
-    let block = match block with `Prevalidation -> `Head 0 | block -> block in
-    Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
-    let proto_level = Utils.unopt ~default:bi.proto_level proto_level in
+  let mine block (contract: Account.t) operations =
+    let operations = List.map (fun op -> Client_node_rpcs.Blob op) operations in
+    let seed_nonce =
+      match Nonce.of_bytes @@
+        Sodium.Random.Bigbytes.generate Constants.nonce_length with
+      | Error _ -> assert false
+      | Ok nonce -> nonce in
     let seed_nonce_hash = Nonce.hash seed_nonce in
-    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun level ->
-    let operations_hash =
-      Operation_list_list_hash.compute
-        [Operation_list_hash.compute operation_list] in
-    let shell =
-      { Store.Block_header.net_id = bi.net_id ; predecessor = bi.hash ;
-        timestamp ; fitness ; operations_hash ;
-        level = Raw_level.to_int32 level.level ;
-        proto_level } in
-    mine_stamp
-      block src_sk shell priority seed_nonce_hash >>=? fun proof_of_work_nonce ->
-    Client_proto_rpcs.Helpers.Forge.block rpc_config
+    Client_mining_forge.forge_block
+      rpc_config
       block
-      ~net:bi.net_id
-      ~predecessor:bi.hash
-      ~timestamp
-      ~fitness
-      ~operations_hash
-      ~level:level.level
-      ~proto_level
-      ~priority
+      ~operations
+      ~force:true
+      ~best_effort:false
+      ~sort:false
+      ~priority:(`Auto (contract.pkh, Some 1024, false))
       ~seed_nonce_hash
-      ~proof_of_work_nonce
-      () >>=? fun unsigned_header ->
-    let signed_header = Environment.Ed25519.Signature.append src_sk unsigned_header in
-    Client_node_rpcs.inject_block rpc_config
-      ?force signed_header [operation_list] >>=? fun block_hash ->
-    return block_hash
+      ~src_sk:contract.sk
+      ()
 
-  let mine
-      ?(force = false)
-      ?(operations = [])
-      ?(fitness_gap = 1)
-      ?proto_level
-      contract
-      block =
-  Client_mining_blocks.info rpc_config block >>=? fun bi ->
-  let seed_nonce =
-    match Nonce.of_bytes @@
-      Sodium.Random.Bigbytes.generate Constants.nonce_length with
-    | Error _ -> assert false
-    | Ok nonce -> nonce in
-  let timestamp = Time.add (Time.now ()) 1L in
-  Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
-  let level = Raw_level.succ level.level in
-  get_first_priority level contract block >>=? fun priority ->
-  (Lwt.return (Fitness_repr.to_int64 bi.fitness) >|=
-   Register_client_embedded_proto_alpha.wrap_error) >>=? fun fitness ->
-  let fitness =
-    Fitness_repr.from_int64 @@
-    Int64.add fitness (Int64.of_int fitness_gap) in
-  inject_block
-    ~force
-    ?proto_level
-    ~priority
-    ~timestamp
-    ~fitness
-    ~seed_nonce
-    ~src_sk:contract.sk
-    block
-    operations
-
-  let endorsement_reward contract block =
-    Client_mining_blocks.info rpc_config block >>=? fun bi ->
-    get_first_priority bi.level.level contract block >>=? fun prio ->
+  let endorsement_reward block =
+    Client_proto_rpcs.Header.priority rpc_config block >>=? fun prio ->
     Mining.endorsement_reward ~block_priority:prio >|=
     Register_client_embedded_proto_alpha.wrap_error >>|?
     Tez.to_cents
@@ -523,27 +430,22 @@ end
 
 module Endorse = struct
 
-  let inject_endorsement
+  let forge_endorsement
       block
-      _level
-      ?async
-      ?force
       src_sk
       source
       slot =
-    Client_blocks.get_block_hash rpc_config block >>=? fun block_hash ->
-    Client_node_rpcs.Blocks.net rpc_config block >>=? fun net ->
+    let block = Client_rpcs.last_mined_block block in
+    Client_node_rpcs.Blocks.info rpc_config block >>=? fun { hash ; net_id } ->
     Client_proto_rpcs.Helpers.Forge.Delegate.endorsement rpc_config
       block
-      ~net
+      ~net_id:net_id
       ~source
-      ~block:block_hash
+      ~block:hash
       ~slot:slot
       () >>=? fun bytes ->
-    let signed_bytes = Environment.Ed25519.Signature.append src_sk bytes in
-    Client_node_rpcs.inject_operation
-      rpc_config ?force ?async signed_bytes >>=? fun oph ->
-    return oph
+    let signed_bytes = Ed25519.Signature.append src_sk bytes in
+    return (Tezos_data.Operation.of_bytes_exn signed_bytes)
 
   let signing_slots
       ?(max_priority = 1024)
@@ -559,12 +461,10 @@ module Endorse = struct
     return slots
 
   let endorse
-      ?(force = false)
       ?slot
       (contract : Account.t)
       block =
-    Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
-    let level = Raw_level.succ @@ level.level in
+    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun { level } ->
     begin
       match slot with
       | Some slot -> return slot
@@ -577,9 +477,7 @@ module Endorse = struct
               failwith "No slot found at level %a" Raw_level.pp level
         end
     end >>=? fun slot ->
-    inject_endorsement
-      block level contract.sk contract.pk slot ~force >>=? fun oph ->
-    return oph
+    forge_endorsement block contract.sk contract.pk slot
 
   (* FIXME @vb: I don't understand this function, copied from @cago. *)
   let endorsers_list block { Account.b1 ; b2 ; b3 ; b4 ; b5 } =

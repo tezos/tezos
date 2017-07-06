@@ -9,9 +9,16 @@
 
 (* Tezos Protocol Implementation - Low level Repr. of Operations *)
 
+type raw = Operation.t = {
+  shell: Operation.shell_header ;
+  proto: MBytes.t ;
+}
+
+val raw_encoding: raw Data_encoding.t
+
 type operation = {
   hash: Operation_hash.t ;
-  shell: Updater.shell_operation ;
+  shell: Operation.shell_header ;
   contents: proto_operation ;
   signature: Ed25519.Signature.t option ;
 }
@@ -87,7 +94,7 @@ type error += Cannot_parse_operation (* `Branch *)
 val encoding: operation Data_encoding.t
 
 val parse:
-  Operation_hash.t -> Updater.raw_operation -> operation tzresult
+  Operation_hash.t -> Operation.t -> operation tzresult
 
 val parse_proto:
   MBytes.t ->
@@ -99,12 +106,12 @@ type error += Invalid_signature (* `Permanent *)
 val check_signature:
   Ed25519.Public_key.t -> operation -> unit tzresult Lwt.t
 
-val forge: Updater.shell_operation -> proto_operation -> MBytes.t
+val forge: Operation.shell_header -> proto_operation -> MBytes.t
 
 val proto_operation_encoding:
   proto_operation Data_encoding.t
 
 val unsigned_operation_encoding:
-  (Updater.shell_operation * proto_operation) Data_encoding.t
+  (Operation.shell_header * proto_operation) Data_encoding.t
 
 val max_operation_data_length: int

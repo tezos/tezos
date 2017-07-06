@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 open Store_sigs
+open Tezos_data
 
 type t
 type global_store = t
@@ -70,144 +71,54 @@ module Chain : sig
      and type elt := Block_hash.t
      and module Set := Block_hash.Set
 
-  module Valid_successors : BUFFERED_SET_STORE
+  module In_chain : SINGLE_STORE
     with type t = store * Block_hash.t
-     and type elt := Block_hash.t
-     and module Set := Block_hash.Set
-
-  module Invalid_successors : BUFFERED_SET_STORE
-    with type t = store * Block_hash.t
-     and type elt := Block_hash.t
-     and module Set := Block_hash.Set
-
-  module Successor_in_chain : SINGLE_STORE
-    with type t = store * Block_hash.t
-     and type value := Block_hash.t
-
-  module In_chain_insertion_time : SINGLE_STORE
-    with type t = store * Block_hash.t
-     and type value := Time.t
-
-end
-
-
-(** {2 Generic signature} *****************************************************)
-
-(** Generic signature for Operations, Block_header, and Protocol "tracked"
-    contents (i.e. with 'discovery_time', 'validtity', ...) *)
-module type DATA_STORE = sig
-
-  type store
-  type key
-  type key_set
-  type value
-
-  val encoding: value Data_encoding.t
-
-  val compare: value -> value -> int
-  val equal: value -> value -> bool
-
-  val hash: value -> key
-  val hash_raw: MBytes.t -> key
-
-  module Discovery_time : MAP_STORE
-    with type t := store
-     and type key := key
-     and type value := Time.t
-
-  module Contents : SINGLE_STORE
-    with type t = store * key
-     and type value := value
-
-  module RawContents : SINGLE_STORE
-    with type t = store * key
-     and type value := MBytes.t
-
-  module Validation_time : SINGLE_STORE
-    with type t = store * key
-     and type value := Time.t
-
-  module Errors : MAP_STORE
-    with type t := store
-     and type key := key
-     and type value = error list
-
-  module Pending : BUFFERED_SET_STORE
-    with type t = store
-     and type elt := key
-     and type Set.t = key_set
-
-end
-
-
-(** {2 Operation store} *****************************************************)
-
-module Operation : sig
-
-  type shell_header = {
-    net_id: Net_id.t ;
-  }
-  val shell_header_encoding: shell_header Data_encoding.t
-
-  type t = {
-    shell: shell_header ;
-    proto: MBytes.t ;
-  }
-
-  type store
-  val get: Net.store -> store
-
-  include DATA_STORE
-    with type store := store
-     and type key = Operation_hash.t
-     and type value = t
-     and type key_set = Operation_hash.Set.t
+     and type value := Block_hash.t (* successor *)
 
 end
 
 
 (** {2 Block header store} **************************************************)
 
-module Block_header : sig
-
-  type shell_header = {
-    net_id: Net_id.t ;
-    level: Int32.t ;
-    proto_level: int ; (* uint8 *)
-    predecessor: Block_hash.t ;
-    timestamp: Time.t ;
-    operations_hash: Operation_list_list_hash.t ;
-    fitness: MBytes.t list ;
-  }
-  val shell_header_encoding: shell_header Data_encoding.t
-
-  type t = {
-    shell: shell_header ;
-    proto: MBytes.t ;
-  }
+module Block : sig
 
   type store
   val get: Net.store -> store
 
-  include DATA_STORE
-    with type store := store
-     and type key = Block_hash.t
-     and type value = t
-     and type key_set = Block_hash.Set.t
+  type contents = {
+    header: Block_header.t ;
+    message: string ;
+    operation_list_count: int ;
+  }
 
-  module Operation_list_count : SINGLE_STORE
+  module Contents : SINGLE_STORE
     with type t = store * Block_hash.t
-     and type value = int
+     and type value := contents
 
-  module Operation_list : MAP_STORE
+  module Operation_hashes : MAP_STORE
     with type t = store * Block_hash.t
      and type key = int
      and type value = Operation_hash.t list
 
-  module Operation_list_path : MAP_STORE
+  module Operation_path : MAP_STORE
     with type t = store * Block_hash.t
      and type key = int
      and type value = Operation_list_list_hash.path
+
+  module Operations : MAP_STORE
+    with type t = store * Block_hash.t
+     and type key = int
+     and type value = Operation.t list
+
+  type invalid_block = {
+    level: int32 ;
+    (* errors: Error_monad.error list ; *)
+  }
+
+  module Invalid_block : MAP_STORE
+    with type t = store
+     and type key = Block_hash.t
+     and type value = invalid_block
 
 end
 
@@ -216,15 +127,16 @@ end
 
 module Protocol : sig
 
-  type t = Tezos_compiler.Protocol.t
-
   type store
   val get: global_store -> store
 
-  include DATA_STORE
-    with type store := store
-     and type key = Protocol_hash.t
-     and type value = t
-     and type key_set = Protocol_hash.Set.t
+  module Contents : MAP_STORE
+    with type t := store
+     and type key := Protocol_hash.t
+     and type value := Protocol.t
+
+  module RawContents : SINGLE_STORE
+    with type t = store * Protocol_hash.t
+     and type value := MBytes.t
 
 end

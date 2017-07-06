@@ -15,7 +15,7 @@ open Operation
 
 type operation = {
   hash: Operation_hash.t ;
-  content: (Updater.shell_operation * proto_operation) option
+  content: Operation.t option
 }
 
 let monitor cctxt ?contents ?check () =
@@ -26,11 +26,11 @@ let monitor cctxt ?contents ?check () =
       (fun (hash, op) ->
          match op with
          | None -> return { hash; content = None }
-         | Some (op : Updater.raw_operation) ->
+         | Some (op : Operation.raw) ->
              Client_proto_rpcs.Helpers.Parse.operations cctxt
                `Prevalidation ?check [op] >>=? function
              | [proto] ->
-                 return { hash ; content = Some (op.shell, proto) }
+                 return { hash ; content = Some proto }
              | _ -> failwith "Error while parsing the operation")
      (List.concat  ops)
   in
@@ -44,15 +44,18 @@ type valid_endorsement = {
   slots: int list ;
 }
 
-let filter_valid_endorsement cctxt { hash; content } =
+(*
+let filter_valid_endorsement cctxt ({ hash ; content } : operation) =
   let open Tezos_context in
   match content with
   | None
-  | Some (_, Anonymous_operations _)
-  | Some (_, Sourced_operations (Dictator_operation _ ))
-  | Some (_, Sourced_operations (Manager_operations _ )) ->
+  | Some { contents = Anonymous_operations _ }
+  | Some { contents = Sourced_operations (Dictator_operation _ ) }
+  | Some { contents = Sourced_operations (Manager_operations _ ) } ->
       Lwt.return_none
-  | Some ({net_id}, Sourced_operations (Delegate_operations { source ; operations })) ->
+  | Some { shell = {net_id} ;
+           contents =
+             Sourced_operations (Delegate_operations { source ; operations }) } ->
       let source = Ed25519.Public_key.hash source in
       let endorsements =
         Utils.unopt_list @@ List.map
@@ -79,7 +82,8 @@ let filter_valid_endorsement cctxt { hash; content } =
                   pp_print_error error >>= fun () ->
                 Lwt.return_none
             | Ok () ->
-                Client_node_rpcs.Blocks.preapply cctxt (`Hash block) [hash] >>= function
+                Client_node_rpcs.Blocks.preapply
+                  cctxt (`Hash block) [Client_node_rpcs.Hash hash] >>= function
                 | Ok _ ->
                     Lwt.return (Some { hash ; source ; block ; slots })
                 | Error error ->
@@ -112,3 +116,11 @@ let monitor_endorsement cctxt =
       ops_stream
   end ;
   return endorsement_stream
+*)
+
+(* Temporary desactivate the monitoring of endorsement:
+   too slow for now. *)
+let monitor_endorsement _ =
+  let stream, _push = Lwt_stream.create () in
+  return stream
+

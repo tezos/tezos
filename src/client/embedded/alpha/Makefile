@@ -51,8 +51,8 @@ NODEPENDS := webclient/webclient_proto_static.ml.deps
 
 include ../Makefile.shared
 
-${WEBOBJS}: OPENED_MODULES += Tezos_context
-${OBJS}: OPENED_MODULES += Tezos_context
+${WEBOBJS}: OPENED_MODULES += Environment Tezos_context
+${OBJS}: OPENED_MODULES += Environment Tezos_context
 
 predepend: concrete_parser.ml concrete_lexer.ml
 

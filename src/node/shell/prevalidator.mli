@@ -29,7 +29,7 @@
 type t
 
 (** Creation and destruction of a "prevalidation" worker. *)
-val create: Distributed_db.net -> t Lwt.t
+val create: Distributed_db.net_db -> t Lwt.t
 val shutdown: t -> unit Lwt.t
 
 val notify_operations: t -> P2p.Peer_id.t -> Operation_hash.t list -> unit
@@ -38,12 +38,11 @@ val notify_operations: t -> P2p.Peer_id.t -> Operation_hash.t list -> unit
     be ignored when it is (strongly) refused This is the
     entry-point used by the P2P layer. The operation content has been
     previously stored on disk. *)
-val inject_operation:
-  t -> ?force:bool -> State.Operation.t -> unit tzresult Lwt.t
+val inject_operation: t -> ?force:bool -> Operation.t -> unit tzresult Lwt.t
 
-val flush: t -> State.Valid_block.t -> unit
+val flush: t -> State.Block.t -> unit
 val timestamp: t -> Time.t
 val operations: t -> error Prevalidation.preapply_result * Operation_hash.Set.t
 val context: t -> Updater.validation_result tzresult Lwt.t
 
-val pending: ?block:State.Valid_block.t -> t -> Operation_hash.Set.t Lwt.t
+val pending: ?block:State.Block.t -> t -> Operation_hash.Set.t Lwt.t

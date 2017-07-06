@@ -247,24 +247,36 @@ let may_start_new_cycle ctxt =
         ctxt last_cycle reward_date >>=? fun ctxt ->
       return ctxt
 
-let begin_construction ctxt =
-  Fitness.increase ctxt
+let begin_full_construction ctxt pred_timestamp proto_header =
+  Lwt.return
+    (Block_header.parse_unsigned_proto_header
+       proto_header) >>=? fun proto_header ->
+  Mining.check_mining_rights
+    ctxt proto_header pred_timestamp >>=? fun miner ->
+  Mining.pay_mining_bond ctxt proto_header miner >>=? fun ctxt ->
+  let ctxt = Fitness.increase ctxt in
+  return (ctxt, proto_header, miner)
 
-let begin_application ctxt block pred_timestamp =
-  Mining.check_proof_of_work_stamp ctxt block >>=? fun () ->
-  Mining.check_fitness_gap ctxt block >>=? fun () ->
-  Mining.check_mining_rights ctxt block pred_timestamp >>=? fun miner ->
-  Mining.check_signature ctxt block miner >>=? fun () ->
-  Mining.pay_mining_bond ctxt block miner >>=? fun ctxt ->
+let begin_partial_construction ctxt =
+  let ctxt = Fitness.increase ctxt in
+  return ctxt
+
+let begin_application ctxt block_header pred_timestamp =
+  Mining.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
+  Mining.check_fitness_gap ctxt block_header >>=? fun () ->
+  Mining.check_mining_rights
+    ctxt block_header.proto pred_timestamp >>=? fun miner ->
+  Mining.check_signature ctxt block_header miner >>=? fun () ->
+  Mining.pay_mining_bond ctxt block_header.proto miner >>=? fun ctxt ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, miner)
 
-let finalize_application ctxt block miner =
+let finalize_application ctxt block_proto_header miner =
   (* end of level (from this point nothing should fail) *)
-  let priority = block.Block.proto.priority in
+  let priority = block_proto_header.Block_header.priority in
   let reward = Mining.base_mining_reward ctxt ~priority in
   Nonce.record_hash ctxt
-    miner reward block.proto.seed_nonce_hash >>=? fun ctxt ->
+    miner reward block_proto_header.seed_nonce_hash >>=? fun ctxt ->
   Reward.pay_due_rewards ctxt >>=? fun ctxt ->
   (* end of cycle *)
   may_start_new_cycle ctxt >>=? fun ctxt ->

@@ -29,7 +29,7 @@ val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
 
 val pay_mining_bond:
   context ->
-  Block.header ->
+  Block_header.proto_header ->
   public_key_hash ->
   context tzresult Lwt.t
 
@@ -42,7 +42,8 @@ val pay_endorsement_bond:
     * the bond have been payed if the slot is below [Constants.first_free_mining_slot].
 *)
 val check_mining_rights:
-  context -> Block.header -> Time.t -> public_key_hash tzresult Lwt.t
+  context -> Block_header.proto_header -> Time.t ->
+  public_key_hash tzresult Lwt.t
 
 (** [check_signing_rights c slot contract] verifies that:
     * the slot is valid;
@@ -85,13 +86,13 @@ val first_endorsement_slots:
   Level.t -> int list tzresult Lwt.t
 
 val check_signature:
-  context -> Block.header -> public_key_hash -> unit tzresult Lwt.t
+  context -> Block_header.t -> public_key_hash -> unit tzresult Lwt.t
 
 val check_hash: Block_hash.t -> int64 -> bool
 val check_proof_of_work_stamp:
-  context -> Block.header -> unit tzresult Lwt.t
+  context -> Block_header.t -> unit tzresult Lwt.t
 
 val check_fitness_gap:
-  context -> Block.header -> unit tzresult Lwt.t
+  context -> Block_header.t -> unit tzresult Lwt.t
 
 val dawn_of_a_new_cycle: context -> Cycle.t option tzresult Lwt.t

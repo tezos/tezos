@@ -248,7 +248,7 @@ end
 module Fitness : sig
 
   include (module type of Fitness)
-  type t = fitness
+  type fitness = t
 
   val increase: context -> context
 
@@ -425,7 +425,7 @@ end
 
 type operation = {
   hash: Operation_hash.t ;
-  shell: Updater.shell_operation ;
+  shell: Operation.shell_header ;
   contents: proto_operation ;
   signature: signature option ;
 }
@@ -498,11 +498,17 @@ and counter = Int32.t
 
 module Operation : sig
 
+  type raw = Operation.t = {
+    shell: Operation.shell_header ;
+    proto: MBytes.t ;
+  }
+  val raw_encoding: raw Data_encoding.t
+
+  type t = operation
   val encoding: operation Data_encoding.t
 
   type error += Cannot_parse_operation (* `Branch *)
-  val parse:
-    Operation_hash.t -> Updater.raw_operation -> operation tzresult
+  val parse: Operation_hash.t -> Operation.t -> operation tzresult
 
   val parse_proto:
     MBytes.t -> (proto_operation * signature option) tzresult Lwt.t
@@ -512,21 +518,21 @@ module Operation : sig
 
   val check_signature: public_key -> operation -> unit tzresult Lwt.t
 
-  val forge: Updater.shell_operation -> proto_operation -> MBytes.t
+  val forge: Operation.shell_header -> proto_operation -> MBytes.t
 
   val proto_operation_encoding: proto_operation Data_encoding.t
 
   val unsigned_operation_encoding:
-    (Updater.shell_operation * proto_operation) Data_encoding.t
+    (Operation.shell_header * proto_operation) Data_encoding.t
 
   val max_operation_data_length: int
 
 end
 
-module Block : sig
+module Block_header : sig
 
-  type header = {
-    shell: Updater.shell_block_header ;
+  type t = {
+    shell: Block_header.shell_header ;
     proto: proto_header ;
     signature: Ed25519.Signature.t ;
   }
@@ -537,18 +543,39 @@ module Block : sig
     proof_of_work_nonce: MBytes.t ;
   }
 
+  type block_header = t
+
+  type raw = Tezos_data.Block_header.t
+  type shell_header = Tezos_data.Block_header.shell_header
+
+  val hash: block_header -> Block_hash.t
+  val hash_raw: raw -> Block_hash.t
+
+  val encoding: block_header Data_encoding.encoding
+  val raw_encoding: raw Data_encoding.t
+  val proto_header_encoding: proto_header Data_encoding.encoding
+  val shell_header_encoding: shell_header Data_encoding.encoding
+
   val max_header_length: int
+  (** The maximum size of block headers in bytes *)
 
-  val parse_header: Updater.raw_block_header -> header tzresult
+  val parse: Block_header.t -> block_header tzresult
+  (** Parse the protocol-specific part of a block header. *)
 
-  val proto_header_encoding:
-    proto_header Data_encoding.encoding
+  val parse_unsigned_proto_header: MBytes.t -> proto_header tzresult
+  (** Parse the (unsigned) protocol-specific part of a block header. *)
 
-  val unsigned_header_encoding:
-    (Updater.shell_block_header * proto_header) Data_encoding.encoding
+  val forge_unsigned_proto_header: proto_header -> MBytes.t
+  (** [forge_header proto_hdr] is the binary serialization
+      (using [proto_header_encoding]) of the protocol-specific part
+      of a block header, without the signature. *)
 
-  val forge_header:
-    Updater.shell_block_header -> proto_header -> MBytes.t
+  val forge_unsigned:
+    Block_header.shell_header -> proto_header -> MBytes.t
+  (** [forge_header shell_hdr proto_hdr] is the binary serialization
+      (using [unsigned_header_encoding]) of a block header,
+      comprising both the shell and the protocol part of the header,
+      without the signature. *)
 
 end
 

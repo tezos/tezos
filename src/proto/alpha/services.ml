@@ -37,11 +37,36 @@ let wrap_tzerror encoding =
 
 let operations custom_root =
   RPC.service
-    ~description: "All the operations of the block (parsed)."
+    ~description: "All the operations of the block (fully decoded)."
     ~input: empty
     ~output: (wrap_tzerror @@
               (list (list (dynamic_size Operation.encoding))))
     RPC.Path.(custom_root / "operations")
+
+let header custom_root =
+  RPC.service
+    ~description: "The header of the block (fully decoded)."
+    ~input: empty
+    ~output: (wrap_tzerror Block_header.encoding)
+    RPC.Path.(custom_root / "header")
+
+module Header = struct
+
+  let priority custom_root =
+    RPC.service
+      ~description: "Mining priority of the block."
+      ~input: empty
+      ~output: (wrap_tzerror uint16)
+      RPC.Path.(custom_root / "header" / "priority")
+
+  let seed_nonce_hash custom_root =
+    RPC.service
+      ~description: "Hash of the seed nonce of the block."
+      ~input: empty
+      ~output: (wrap_tzerror Nonce_hash.encoding)
+      RPC.Path.(custom_root / "header" / "seed_nonce_hash")
+
+end
 
 module Constants = struct
 
@@ -579,27 +604,23 @@ module Helpers = struct
                describe ~title: "hex encoded operation" bytes)))
         RPC.Path.(custom_root / "helpers" / "forge" / "operations" )
 
-    let block custom_root =
+    let empty_proof_of_work_nonce =
+      MBytes.of_string
+        (String.make Constants_repr.proof_of_work_nonce_size  '\000')
+
+    let block_proto_header custom_root =
       RPC.service
-        ~description: "Forge a block header"
+        ~description: "Forge the protocol-specific part of a block header"
         ~input:
-        (merge_objs
-           (obj5
-              (req "net_id" Net_id.encoding)
-              (req "predecessor" Block_hash.encoding)
-              (req "timestamp" Timestamp.encoding)
-              (req "fitness" Fitness.encoding)
-              (req "operations" Operation_list_list_hash.encoding))
-           (obj5
-              (req "level" Raw_level.encoding)
-              (req "priority" uint16)
-              (req "proto_level" uint8)
-              (req "nonce_hash" Nonce_hash.encoding)
-              (req "proof_of_work_nonce"
-                 (Fixed.bytes
-                    Tezos_context.Constants.proof_of_work_nonce_size))))
+          (obj3
+             (req "priority" uint16)
+             (req "nonce_hash" Nonce_hash.encoding)
+             (dft "proof_of_work_nonce"
+                (Fixed.bytes
+                   Tezos_context.Constants.proof_of_work_nonce_size)
+                empty_proof_of_work_nonce))
         ~output: (wrap_tzerror bytes)
-        RPC.Path.(custom_root / "helpers" / "forge" / "block")
+        RPC.Path.(custom_root / "helpers" / "forge" / "block_proto_header")
 
   end
 
@@ -610,17 +631,17 @@ module Helpers = struct
         ~description:"Parse operations"
         ~input:
           (obj2
-             (req "operations" (list (dynamic_size Updater.raw_operation_encoding)))
+             (req "operations" (list (dynamic_size Operation.raw_encoding)))
              (opt "check_signature" bool))
         ~output:
-          (wrap_tzerror (list Operation.proto_operation_encoding))
+          (wrap_tzerror (list (dynamic_size Operation.encoding)))
         RPC.Path.(custom_root / "helpers" / "parse" / "operations" )
 
     let block custom_root =
       RPC.service
         ~description:"Parse a block"
-        ~input: Updater.raw_block_header_encoding
-        ~output: (wrap_tzerror Block.proto_header_encoding)
+        ~input: Block_header.raw_encoding
+        ~output: (wrap_tzerror Block_header.proto_header_encoding)
         RPC.Path.(custom_root / "helpers" / "parse" / "block" )
 
   end

@@ -26,8 +26,11 @@ module Timestamp = struct
 end
 
 include Operation_repr
-module Operation = Operation_repr
-module Block = Block_repr
+module Operation = struct
+  type t = operation
+  include Operation_repr
+end
+module Block_header = Block_header_repr
 module Vote = struct
   include Vote_repr
   include Vote_storage
@@ -103,7 +106,7 @@ module Fitness = struct
 
   include Fitness_repr
   include Fitness
-  type t = fitness
+  type fitness = t
   include Fitness_storage
 
 end

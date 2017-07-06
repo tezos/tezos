@@ -15,7 +15,7 @@ S ../../src/node/shell
 B ../../src/node/shell
 S ../lib
 B ../lib
-FLG -open Error_monad -open Hash -open Utils
+FLG -open Error_monad -open Hash -open Utils -open Tezos_data
 FLG -w -40
 PKG lwt
 PKG sodium

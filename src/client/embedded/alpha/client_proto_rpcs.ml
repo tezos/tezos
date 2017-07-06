@@ -16,13 +16,9 @@ let handle_error cctxt = function
       pp_print_error Format.err_formatter exns ;
       cctxt.Client_commands.error "%s" "cannot continue"
 
-type block = [
-  | `Genesis
-  | `Head of int | `Prevalidation
-  | `Test_head of int | `Test_prevalidation
-  | `Hash of Block_hash.t
-]
-
+let call_service0 cctxt s block =
+  Client_rpcs.call_service0 cctxt
+    (s Node_rpc_services.Blocks.proto_path) block
 let call_service1 cctxt s block a1 =
   Client_rpcs.call_service1 cctxt
     (s Node_rpc_services.Blocks.proto_path) block a1
@@ -39,6 +35,18 @@ let call_error_service2 cctxt s block a1 a2 =
   | Ok (Error _ as err) -> Lwt.return (wrap_error err)
   | Ok (Ok v) -> return v
   | Error _ as err -> Lwt.return err
+
+type block = Node_rpc_services.Blocks.block
+
+let header cctxt block =
+  call_error_service1 cctxt Services.header block ()
+
+module Header = struct
+  let priority cctxt block =
+    call_error_service1 cctxt Services.Header.priority block ()
+  let seed_nonce_hash cctxt block =
+    call_error_service1 cctxt Services.Header.seed_nonce_hash block ()
+end
 
 module Constants = struct
   let errors cctxt block =
@@ -182,25 +190,25 @@ module Helpers = struct
 
     module Manager = struct
       let operations cctxt
-          block ~net ~source ?sourcePubKey ~counter ~fee operations =
+          block ~net_id ~source ?sourcePubKey ~counter ~fee operations =
         let ops =
           Manager_operations { source ; public_key = sourcePubKey ;
                                counter ; operations ; fee } in
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
-           ({net_id=net}, Sourced_operations ops))
+           ({net_id}, Sourced_operations ops))
       let transaction cctxt
-          block ~net ~source ?sourcePubKey ~counter
+          block ~net_id ~source ?sourcePubKey ~counter
           ~amount ~destination ?parameters ~fee ()=
-        operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
+        operations cctxt block ~net_id ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[Transaction { amount ; parameters ; destination }]
       let origination cctxt
-          block ~net
+          block ~net_id
           ~source ?sourcePubKey ~counter
           ~managerPubKey ~balance
           ?(spendable = true)
           ?(delegatable = true)
           ?delegatePubKey ?script ~fee () =
-        operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
+        operations cctxt block ~net_id ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[
             Origination { manager = managerPubKey ;
                           delegate = delegatePubKey ;
@@ -210,60 +218,63 @@ module Helpers = struct
                           credit = balance }
           ]
       let delegation cctxt
-          block ~net ~source ?sourcePubKey ~counter ~fee delegate =
-        operations cctxt block ~net ~source ?sourcePubKey ~counter ~fee
+          block ~net_id ~source ?sourcePubKey ~counter ~fee delegate =
+        operations cctxt block ~net_id ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[Delegation delegate]
     end
     module Delegate = struct
       let operations cctxt
-          block ~net ~source operations =
+          block ~net_id ~source operations =
         let ops = Delegate_operations { source ; operations } in
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
-           ({net_id=net}, Sourced_operations ops))
+           ({net_id}, Sourced_operations ops))
       let endorsement cctxt
-          b ~net ~source ~block ~slot () =
-        operations cctxt b ~net ~source
+          b ~net_id ~source ~block ~slot () =
+        operations cctxt b ~net_id ~source
           Tezos_context.[Endorsement { block ; slot }]
       let proposals cctxt
-          b ~net ~source ~period ~proposals () =
-        operations cctxt b ~net ~source
+          b ~net_id ~source ~period ~proposals () =
+        operations cctxt b ~net_id ~source
           Tezos_context.[Proposals { period ; proposals }]
       let ballot cctxt
-          b ~net ~source ~period ~proposal ~ballot () =
-        operations cctxt b ~net ~source
+          b ~net_id ~source ~period ~proposal ~ballot () =
+        operations cctxt b ~net_id ~source
           Tezos_context.[Ballot { period ; proposal ; ballot }]
     end
     module Dictator = struct
       let operation cctxt
-          block ~net operation =
+          block ~net_id operation =
         let op = Dictator_operation operation in
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
-           ({net_id=net}, Sourced_operations op))
+           ({net_id}, Sourced_operations op))
       let activate cctxt
-          b ~net hash =
-          operation cctxt b ~net (Activate hash)
+          b ~net_id hash =
+          operation cctxt b ~net_id (Activate hash)
       let activate_testnet cctxt
-          b ~net hash =
-          operation cctxt b ~net (Activate_testnet hash)
+          b ~net_id hash =
+          operation cctxt b ~net_id (Activate_testnet hash)
     end
     module Anonymous = struct
-      let operations cctxt block ~net operations =
+      let operations cctxt block ~net_id operations =
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
-           ({net_id=net}, Anonymous_operations operations))
+           ({net_id}, Anonymous_operations operations))
       let seed_nonce_revelation cctxt
-          block ~net ~level ~nonce () =
-        operations cctxt block ~net [Seed_nonce_revelation { level ; nonce }]
+          block ~net_id ~level ~nonce () =
+        operations cctxt block ~net_id [Seed_nonce_revelation { level ; nonce }]
       let faucet cctxt
-          block ~net ~id counter =
+          block ~net_id ~id counter =
         let nonce = Sodium.Random.Bigbytes.generate 16 in
-        operations cctxt block ~net [Faucet { id ; counter ; nonce }]
+        operations cctxt block ~net_id [Faucet { id ; counter ; nonce }]
     end
-    let block cctxt
-        block ~net ~predecessor ~timestamp ~fitness ~operations_hash
-        ~level ~priority ~proto_level ~seed_nonce_hash ~proof_of_work_nonce () =
-      call_error_service1 cctxt Services.Helpers.Forge.block block
-        ((net, predecessor, timestamp, fitness, operations_hash),
-         (level, priority, proto_level, seed_nonce_hash, proof_of_work_nonce))
+    let empty_proof_of_work_nonce =
+      MBytes.of_string
+        (String.make Constants_repr.proof_of_work_nonce_size  '\000')
+    let block_proto_header cctxt
+        block
+        ~priority ~seed_nonce_hash
+        ?(proof_of_work_nonce = empty_proof_of_work_nonce) () =
+      call_error_service1 cctxt Services.Helpers.Forge.block_proto_header
+        block (priority, seed_nonce_hash, proof_of_work_nonce)
   end
 
   module Parse = struct
@@ -273,7 +284,7 @@ module Helpers = struct
     let block cctxt block shell proto =
       call_error_service1 cctxt
         Services.Helpers.Parse.block block
-        ({ shell ; proto } : Updater.raw_block_header)
+        ({ shell ; proto } : Block_header.raw)
   end
 
 end

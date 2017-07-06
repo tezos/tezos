@@ -16,6 +16,29 @@ let filter_bi operations (bi: Services.Blocks.block_info)  =
   let bi = if operations then bi else { bi with operations = None } in
   bi
 
+let monitor_operations node contents =
+  let stream, stopper = Node.RPC.operation_watcher node in
+  let shutdown () = Watcher.shutdown stopper in
+  let first_request = ref true in
+  let next () =
+    if not !first_request then
+      Lwt_stream.get stream >>= function
+      | None -> Lwt.return_none
+      | Some (h, op) when contents -> Lwt.return (Some [[h, Some op]])
+      | Some (h, _) -> Lwt.return (Some [[h, None]])
+      else begin
+        first_request := false ;
+        Node.RPC.operation_hashes node `Prevalidation >>= fun hashes ->
+        if contents then
+          Node.RPC.operations node `Prevalidation >>= fun ops ->
+          Lwt.return_some @@
+          List.map2 (List.map2 (fun h op -> h, Some op)) hashes ops
+        else
+          Lwt.return_some @@
+          List.map (List.map (fun h -> h, None)) hashes
+      end in
+  RPC.Answer.return_stream { next ; shutdown }
+
 let register_bi_dir node dir =
   let dir =
     let implementation b include_ops =
@@ -35,7 +58,7 @@ let register_bi_dir node dir =
       Node.RPC.block_info node b >>= fun bi ->
       RPC.Answer.return bi.net_id in
     RPC.register1 dir
-      Services.Blocks.net implementation in
+      Services.Blocks.net_id implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
@@ -80,9 +103,20 @@ let register_bi_dir node dir =
     RPC.register1 dir
       Services.Blocks.test_network implementation in
   let dir =
-    let implementation b () =
-      Node.RPC.operations node b >>=
-      RPC.Answer.return in
+    let implementation b { Node_rpc_services.Blocks.contents ; monitor } =
+      match b with
+      | `Prevalidation when monitor ->
+          monitor_operations node contents
+      | _ ->
+          Node.RPC.operation_hashes node b >>= fun hashes ->
+          if contents then
+            Node.RPC.operations node b >>= fun ops ->
+            RPC.Answer.return @@
+            List.map2 (List.map2 (fun h op -> h, Some op)) hashes ops
+          else
+            RPC.Answer.return @@
+            List.map (List.map (fun h -> h, None)) hashes
+    in
     RPC.register1 dir
       Services.Blocks.operations implementation in
   let dir =
@@ -94,16 +128,13 @@ let register_bi_dir node dir =
       implementation in
   let dir =
     let implementation
-        b { Services.Blocks.operations ; sort ; timestamp } =
-      let timestamp =
-        match timestamp with
-        | None -> Time.now ()
-        | Some x -> x in
-      Node.RPC.preapply ~timestamp ~sort
-        node b operations >>= function
-      | Ok (fitness, operations) ->
+        b { Services.Blocks.operations ; sort_operations ;
+            timestamp ; proto_header} =
+      Node.RPC.preapply node b
+        ~timestamp ~proto_header ~sort_operations operations >>= function
+      | Ok (shell_header, operations) ->
           RPC.Answer.return
-            (Ok { Services.Blocks.fitness ; operations ; timestamp })
+            (Ok { Services.Blocks.shell_header ; operations })
       | Error _ as err -> RPC.Answer.return err in
     RPC.register1 dir
       Services.Blocks.preapply implementation in
@@ -275,7 +306,7 @@ let list_blocks
         requested_blocks in
     RPC.Answer.return infos
   else begin
-    let (bi_stream, stopper) = Node.RPC.valid_block_watcher node in
+    let (bi_stream, stopper) = Node.RPC.block_watcher node in
     let stream =
       match delay with
       | None ->
@@ -297,47 +328,6 @@ let list_blocks
       end in
     RPC.Answer.return_stream { next ; shutdown }
   end
-
-let list_operations node {Services.Operations.monitor; contents} =
-  let monitor = match monitor with None -> false | Some x -> x in
-  let include_ops = match contents with None -> false | Some x -> x in
-  Node.RPC.operations node `Prevalidation >>= fun operationss ->
-  let fetch_operations_content operations =
-    if include_ops then
-      Lwt_list.map_s
-        (fun h ->
-           Node.RPC.operation_content node h >>= fun content ->
-           Lwt.return (h, content))
-        operations
-    else
-      Lwt.return @@ ListLabels.map operations ~f:(fun h -> h, None) in
-  Lwt_list.map_p fetch_operations_content operationss >>= fun operations ->
-  if not monitor then
-    RPC.Answer.return operations
-  else
-    let stream, stopper = Node.RPC.operation_watcher node in
-    let shutdown () = Watcher.shutdown stopper in
-    let first_request = ref true in
-    let next () =
-      if not !first_request then
-        Lwt_stream.get stream >>= function
-        | None -> Lwt.return_none
-        | Some (h, op) when include_ops -> Lwt.return (Some [[h, Some op]])
-        | Some (h, _) -> Lwt.return (Some [[h, None]])
-      else begin
-        first_request := false ;
-        Lwt.return (Some operations)
-      end in
-    RPC.Answer.return_stream { next ; shutdown }
-
-let get_operations node hashes () =
-  Lwt_list.map_p
-    (fun h ->
-       Node.RPC.operation_content node h >>= function
-       | None -> Lwt.fail Not_found
-       | Some h -> Lwt.return h)
-    hashes >>= fun ops ->
-  RPC.Answer.return ops
 
 let list_protocols node {Services.Protocols.monitor; contents} =
   let monitor = match monitor with None -> false | Some x -> x in
@@ -392,31 +382,15 @@ let build_rpc_directory node =
         "All the RPCs which are specific to the protocol version."
       dir Services.Blocks.proto_path implementation in
   let dir =
-    RPC.register0 dir Services.Operations.list (list_operations node) in
-  let dir =
-    RPC.register1 dir Services.Operations.contents (get_operations node) in
-  let dir =
     RPC.register0 dir Services.Protocols.list (list_protocols node) in
   let dir =
     RPC.register1 dir Services.Protocols.contents (get_protocols node) in
   let dir =
-    let implementation
-        (net_id, level, proto_level, pred, time,
-         fitness, operations_hash, header) =
-      Node.RPC.block_info node (`Head 0) >>= fun bi ->
-      let timestamp = Utils.unopt ~default:(Time.now ()) time in
-      let net_id = Utils.unopt ~default:bi.net_id net_id in
-      let predecessor = Utils.unopt ~default:bi.hash pred in
-      let level = Utils.unopt ~default:(Int32.succ bi.level) level in
-      let proto_level = Utils.unopt ~default:bi.proto_level proto_level in
+    let implementation header =
       let res =
-        Data_encoding.Binary.to_bytes Store.Block_header.encoding {
-          shell = { net_id ; predecessor ; level ; proto_level ;
-                    timestamp ; fitness ; operations_hash } ;
-          proto = header ;
-        } in
+        Data_encoding.Binary.to_bytes Block_header.encoding header in
       RPC.Answer.return res in
-    RPC.register0 dir Services.forge_block implementation in
+    RPC.register0 dir Services.forge_block_header implementation in
   let dir =
     let implementation (net_id, block_hash) =
       Node.RPC.validate node net_id block_hash >>= fun res ->
