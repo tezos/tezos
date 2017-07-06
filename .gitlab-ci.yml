@@ -280,11 +280,10 @@ deploy:alphanet:
     - alphanet@tezos/tezos
   script:
     - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - echo "${CI_PK_ALPHANET}" > ~/.ssh/id_ed25519
-    - chmod 400 ~/.ssh/id_ed25519
-    - ssh greg@zo.gbzm.fr
-    - ssh tezos@35.167.138.212
-    - ssh tezos@35.165.227.4
+    - echo "${CI_PK_ALPHANET}" | tr -d "\r" > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - ssh -t tezos@35.167.138.212
+    - ssh -t tezos@35.165.227.4
   allow_failure: true
 
 deploy:alphanet_next:
@@ -296,9 +295,10 @@ deploy:alphanet_next:
     - master@tezos/tezos
   script:
     - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - echo "${CI_PK_ALPHANET_NEXT}" > ~/.ssh/id_ed25519
-    - chmod 400 ~/.ssh/id_ed25519
-    - echo | ssh -v greg@zo.gbzm.fr
+    - echo "${CI_PK_ALPHANET_NEXT}" | tr -d "\r" > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - ssh -t tezos@35.167.138.212
+    - ssh -t tezos@35.165.227.4
   allow_failure: true
 
 cleanup:
