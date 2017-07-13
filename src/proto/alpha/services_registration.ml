@@ -213,6 +213,7 @@ let () =
   register2' Services.Context.Contract.spendable Contract.is_spendable ;
   register2' Services.Context.Contract.delegatable Contract.is_delegatable ;
   register2' Services.Context.Contract.script Contract.get_script ;
+  register2' Services.Context.Contract.storage Contract.get_storage ;
   register2' Services.Context.Contract.get (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Contract.get_manager ctxt contract >>=? fun manager ->
