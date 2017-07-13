@@ -398,7 +398,6 @@ let rec interp
           | Transfer_tokens storage_type,
             Item (p, Item (amount, Item ((tp, Unit_t, destination), Item (sto, Empty)))) -> begin
               Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
-              Lwt.return Tez.(amount -? Constants.origination_burn) >>=? fun amount ->
               Contract.credit ctxt destination amount >>=? fun ctxt ->
               Contract.get_script ctxt destination >>=? fun destination_script ->
               let sto = unparse_data storage_type sto in
