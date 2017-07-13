@@ -1273,12 +1273,13 @@ and parse_instr
         (Key_t, Item_t
            (Option_t Key_t, Item_t
               (Bool_t, Item_t
-                 (Tez_t, Item_t
-                    (Lambda_t (Pair_t (Pair_t (Tez_t, p), gp),
-                               Pair_t (r, gr)), Item_t
-                       (ginit, rest)))))) ->
-        check_item_ty gp gr loc "CREATE_CONTRACT" 5 6 >>=? fun (Eq _) ->
-        check_item_ty ginit gp loc "CREATE_CONTRACT" 6 6 >>=? fun (Eq _) ->
+                 (Bool_t, Item_t
+                    (Tez_t, Item_t
+                       (Lambda_t (Pair_t (Pair_t (Tez_t, p), gp),
+                                  Pair_t (r, gr)), Item_t
+                          (ginit, rest))))))) ->
+        check_item_ty gp gr loc "CREATE_CONTRACT" 5 7 >>=? fun (Eq _) ->
+        check_item_ty ginit gp loc "CREATE_CONTRACT" 6 7 >>=? fun (Eq _) ->
         return (typed loc (Create_contract (gp, p, r),
                            Item_t (Contract_t (p, r), rest)))
     | Prim (loc, "NOW", []),
@@ -1352,7 +1353,7 @@ and parse_instr
         fail (Bad_stack (loc, name, 3, stack))
     | Prim (loc, "CREATE_CONTRACT", []),
       stack ->
-        fail (Bad_stack (loc, "CREATE_CONTRACT", 6, stack))
+        fail (Bad_stack (loc, "CREATE_CONTRACT", 7, stack))
     | Prim (loc, "CREATE_ACCOUNT", []),
       stack ->
         fail (Bad_stack (loc, "CREATE_ACCOUNT", 4, stack))
