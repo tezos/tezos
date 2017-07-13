@@ -236,6 +236,8 @@ let get_script c contract =
   | Some code, Some storage -> return (Some { Script_repr.code ; storage })
   | None, Some _ | Some _, None -> failwith "get_script"
 
+let get_storage = Storage.Contract.Storage.get_option
+
 let get_counter c contract =
   Storage.Contract.Counter.get_option c contract >>=? function
   | None -> begin

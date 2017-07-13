@@ -330,6 +330,8 @@ module Contract : sig
     context -> contract -> bool tzresult Lwt.t
   val get_script:
     context -> contract -> (Script.t option) tzresult Lwt.t
+  val get_storage:
+    context -> contract -> (Script.storage option) tzresult Lwt.t
 
   val get_counter: context -> contract -> int32 tzresult Lwt.t
   val get_balance:
