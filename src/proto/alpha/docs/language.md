@@ -1795,6 +1795,7 @@ X - Full grammar
       | PUSH <type> <data>
       | SOME
       | NONE <type>
+      | UNIT
       | IF_NONE { <instruction> ... } { <instruction> ... }
       | PAIR
       | CAR
@@ -1853,6 +1854,7 @@ X - Full grammar
       | ISNAN
       | NANAN
       | MANAGER
+      | SELF
       | TRANSFER_TOKENS
       | CREATE_ACCOUNT
       | CREATE_CONTRACT
