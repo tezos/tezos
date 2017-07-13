@@ -37,6 +37,7 @@ val get_balance: Storage.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 val get_counter: Storage.t -> Contract_repr.t -> int32 tzresult Lwt.t
 
 val get_script: Storage.t -> Contract_repr.t -> Script_repr.t option tzresult Lwt.t
+val get_storage: Storage.t -> Contract_repr.t -> Script_repr.storage option tzresult Lwt.t
 
 val update_script_storage_and_fees: Storage.t -> Contract_repr.t -> Tez_repr.t -> Script_repr.expr -> Storage.t tzresult Lwt.t
 

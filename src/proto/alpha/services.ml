@@ -301,6 +301,13 @@ module Context = struct
         ~output: (wrap_tzerror (option Script.encoding))
         RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "script")
 
+    let storage custom_root =
+      RPC.service
+        ~description: "Access the data of the contract."
+        ~input: empty
+        ~output: (wrap_tzerror (option Script.storage_encoding))
+        RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "storage")
+
     type info = {
       manager: public_key_hash ;
       balance: Tez.t ;
