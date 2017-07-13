@@ -459,8 +459,8 @@ let rec interp
               let contract = Contract.default_contract key in
               logged_return (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
           | Create_contract (g, p, r),
-            Item (manager, Item (delegate, Item (delegatable, Item (credit,
-                                                                    Item (Lam (_, code), Item (init, rest)))))) ->
+            Item (manager, Item (delegate, Item (spendable, Item (delegatable, Item (credit,
+                                                                    Item (Lam (_, code), Item (init, rest))))))) ->
               let code, storage =
                 { code; arg_type = unparse_ty p; ret_type = unparse_ty r; storage_type =  unparse_ty g },
                 { storage = unparse_data g init; storage_type =  unparse_ty g } in
@@ -470,7 +470,7 @@ let rec interp
                 origination
                 ~manager ~delegate ~balance
                 ~script:({ code ; storage }, (dummy_code_fee, dummy_storage_fee))
-                ~spendable:true ~delegatable
+                ~spendable ~delegatable
               >>=? fun (ctxt, contract, origination) ->
               logged_return ~origination (Item ((p, r, contract), rest), qta - 1, ctxt)
           | Balance, rest ->

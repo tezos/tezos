@@ -269,8 +269,8 @@ and ('bef, 'aft) instr =
        (unit, unit) typed_contract * 'rest) instr
   | Default_account : (public_key_hash * 'rest, (unit, unit) typed_contract * 'rest) instr
   | Create_contract : 'g ty * 'p ty * 'r ty ->
-    (public_key_hash * (public_key_hash option * (bool * (Tez.t *
-                                                          (((Tez.t * 'p) * 'g, 'r * 'g) lambda * ('g * 'rest))))),
+    (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t *
+                                                                 (((Tez.t * 'p) * 'g, 'r * 'g) lambda * ('g * 'rest)))))),
      ('p, 'r) typed_contract * 'rest) instr
   | Now :
       ('rest, Timestamp.t * 'rest) instr
