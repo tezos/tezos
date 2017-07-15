@@ -23,7 +23,7 @@ module Cfg_file = struct
 
   let default = {
     base_dir = Client_commands.default_base_dir ;
-    node_addr = "127.0.0.1" ;
+    node_addr = "localhost" ;
     node_port = 8732 ;
     tls = false ;
     web_port = 8080 ;
