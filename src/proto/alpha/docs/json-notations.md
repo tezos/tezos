@@ -71,10 +71,10 @@ with the following JSON script description.
 
     { "code":
       { "code": [ "CDR",
-                  { "PUSH": [ "uint8", { "int": "3" } ] }
+                  { "PUSH": [ "nat", { "int": "3" } ] }
                   "PAIR" ],
         "argType": "unit",
-        "retType": "uint8",
+        "retType": "nat",
         "storageType": "unit" },
       "storage":
       { "storage": "Unit",
@@ -179,15 +179,9 @@ with the following JSON script description.
       | "H"
       | "STEPS_TO_QUOTA"
       | { "SOURCE": [ /* type */, /* type */ ] }
-    /* type */ ::=
-      | "int8"
-      | "int16"
-      | "int32"
-      | "int64"
-      | "uint8"
-      | "uint16"
-      | "uint32"
-      | "uint64"
+    /* type _/ ::=
+      | "int"
+      | "nat"
       | "unit"
       | "string"
       | "float"
@@ -205,14 +199,8 @@ with the following JSON script description.
       | { "lambda": [ /* type */, /* type */ ] }
       | { "map": [ /* comparable type */, /* type */ ] }
     /* comparable type */ ::=
-      | "int8"
-      | "int16"
-      | "int32"
-      | "int64"
-      | "uint8"
-      | "uint16"
-      | "uint32"
-      | "uint64"
+      | "int"
+      | "nat"
       | "string"
       | "float"
       | "tez"
