@@ -272,11 +272,11 @@ module Identity = struct
     Format.fprintf ppf "%s%!" init ;
     let count = ref 10000 in
     let rec loop n =
-      let start = Mtime.counter () in
+      let start = Mtime_clock.counter () in
       Format.fprintf ppf "%s%!" animation.(n mod animation_size);
       try generate ~max:!count target
       with Not_found ->
-        let time = Mtime.to_ms (Mtime.count start) in
+        let time = Mtime.Span.to_ms (Mtime_clock.count start) in
         count :=
           if time <= 0. then
             !count * 10

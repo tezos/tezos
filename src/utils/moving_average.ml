@@ -31,12 +31,12 @@ let update_hook = ref []
 let on_update f = update_hook := f :: !update_hook
 
 let worker_loop () =
-  let prev = ref @@ Mtime.elapsed () in
+  let prev = ref @@ Mtime_clock.elapsed () in
   let rec inner sleep =
     sleep >>= fun () ->
     let sleep = Lwt_unix.sleep 1. in
-    let now = Mtime.elapsed () in
-    let elapsed = int_of_float (Mtime.(to_ms now -. to_ms !prev)) in
+    let now = Mtime_clock.elapsed () in
+    let elapsed = int_of_float (Mtime.Span.(to_ms now -. to_ms !prev)) in
     prev := now;
     Inttbl.iter
       (fun _ c ->
