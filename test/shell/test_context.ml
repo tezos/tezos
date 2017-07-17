@@ -43,28 +43,28 @@ let block2 =
   Block_hash.of_hex_exn
     "2222222222222222222222222222222222222222222222222222222222222222"
 
-let create_block2 idx =
-  checkout idx genesis_block >>= function
+let create_block2 idx genesis_commit =
+  checkout idx genesis_commit >>= function
   | None ->
       Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
       set ctxt ["a"; "b"] (MBytes.of_string "Novembre") >>= fun ctxt ->
       set ctxt ["a"; "c"] (MBytes.of_string "Juin") >>= fun ctxt ->
       set ctxt ["version";] (MBytes.of_string "0.0") >>= fun ctxt ->
-      commit block2 ctxt
+      commit ctxt
 
 let block3a =
   Block_hash.of_hex_exn
     "3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a"
 
-let create_block3a idx =
-  checkout idx block2 >>= function
+let create_block3a idx block2_commit =
+  checkout idx block2_commit >>= function
   | None  ->
       Assert.fail_msg "checkout block2"
   | Some ctxt ->
       del ctxt ["a"; "b"] >>= fun ctxt ->
       set ctxt ["a"; "d"] (MBytes.of_string "Mars") >>= fun ctxt ->
-      commit block3a ctxt
+      commit ctxt
 
 let block3b =
   Block_hash.of_hex_exn
@@ -74,26 +74,34 @@ let block3c =
   Block_hash.of_hex_exn
     "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c"
 
-let create_block3b idx =
-  checkout idx block2 >>= function
+let create_block3b idx block2_commit =
+  checkout idx block2_commit >>= function
   | None ->
       Assert.fail_msg "checkout block3b"
   | Some ctxt ->
       del ctxt ["a"; "c"] >>= fun ctxt ->
       set ctxt ["a"; "d"] (MBytes.of_string "Février") >>= fun ctxt ->
-      commit block3b ctxt
+      commit ctxt
+
+type t = {
+  idx: Context.index ;
+  genesis: Context.commit ;
+  block2: Context.commit ;
+  block3a: Context.commit ;
+  block3b: Context.commit ;
+}
 
 let wrap_context_init f base_dir =
   let root = base_dir // "context" in
   Context.init root >>= fun idx ->
   Context.commit_genesis idx
-    ~id:genesis.block
+    ~net_id
     ~time:genesis.time
-    ~protocol:genesis.protocol >>= fun _ ->
-  create_block2 idx >>= fun () ->
-  create_block3a idx >>= fun () ->
-  create_block3b idx >>= fun () ->
-  f idx >>= fun result ->
+    ~protocol:genesis.protocol >>= fun genesis ->
+  create_block2 idx genesis >>= fun block2 ->
+  create_block3a idx block2 >>= fun block3a ->
+  create_block3b idx block2  >>= fun block3b ->
+  f { idx; genesis; block2 ; block3a; block3b } >>= fun result ->
   Error_monad.return result
 
 (** Simple test *)
@@ -102,7 +110,7 @@ let c = function
   | None -> None
   | Some s -> Some (MBytes.to_string s)
 
-let test_simple idx =
+let test_simple { idx ; block2 } =
   checkout idx block2 >>= function
   | None ->
       Assert.fail_msg "checkout block2"
@@ -115,7 +123,7 @@ let test_simple idx =
       Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
       Lwt.return ()
 
-let test_continuation idx =
+let test_continuation { idx ; block3a } =
   checkout idx block3a >>= function
   | None  ->
       Assert.fail_msg "checkout block3a"
@@ -130,7 +138,7 @@ let test_continuation idx =
       Assert.equal_string_option ~msg:__LOC__  (Some "Mars") (c mars) ;
       Lwt.return ()
 
-let test_fork idx =
+let test_fork { idx ; block3b } =
   checkout idx block3b >>= function
   | None  ->
       Assert.fail_msg "checkout block3b"
@@ -145,8 +153,8 @@ let test_fork idx =
       Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
       Lwt.return ()
 
-let test_replay idx =
-  checkout idx genesis_block >>= function
+let test_replay { idx ; genesis }  =
+  checkout idx genesis >>= function
   | None  ->
       Assert.fail_msg "checkout genesis_block"
   | Some ctxt0 ->
@@ -168,8 +176,8 @@ let test_replay idx =
       Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
       Lwt.return ()
 
-let test_list idx =
-  checkout idx genesis_block >>= function
+let test_list { idx ; genesis } =
+  checkout idx genesis >>= function
   | None ->
       Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
@@ -197,7 +205,7 @@ let test_list idx =
 
 (******************************************************************************)
 
-let tests : (string * (index -> unit Lwt.t)) list = [
+let tests : (string * (t -> unit Lwt.t)) list = [
   "simple", test_simple ;
   "continuation", test_continuation ;
   "fork", test_fork ;

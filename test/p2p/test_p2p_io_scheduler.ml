@@ -22,7 +22,7 @@ let rec listen ?port addr =
   let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
   Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
   Lwt.catch begin fun () ->
-    Lwt_unix.Versioned.bind_2 main_socket
+    Lwt_unix.bind main_socket
       (ADDR_INET (uaddr, tentative_port)) >>= fun () ->
     Lwt_unix.listen main_socket 50 ;
     Lwt.return (main_socket, tentative_port)

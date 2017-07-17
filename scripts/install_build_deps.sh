@@ -45,13 +45,10 @@ set -e
 set -x
 
 if "$pin"; then
-    opam pin --yes remove --no-action --dev-repo ocplib-resto || true
     opam pin --yes add --no-action --dev-repo sodium
     opam pin --yes add --no-action --dev-repo ocp-ocamlres
     opam pin --yes add --no-action --dev-repo ocplib-json-typed
     opam pin --yes add --no-action --dev-repo ocplib-resto
-    opam pin --yes add --no-action ocp-build 1.99.18-beta ## TMP fix
-    opam pin add typerex-build --dev --no-action
     ## Force opam to take account of the new `tezos-deps.opam`
     opam pin --yes remove tezos-deps
     opam pin --yes add --no-action tezos-deps $src_dir/src
@@ -63,9 +60,5 @@ if "$depext"; then
 fi
 
 if "$install"; then
-    if opam list --installed tezos-deps ; then
-	opam upgrade $(opam list -s --required-by tezos-deps | grep -ve '^ocaml *$')
-    else
-	opam install tezos-deps
-    fi
+    opam install tezos-deps
 fi

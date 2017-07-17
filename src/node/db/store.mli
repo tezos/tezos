@@ -90,6 +90,7 @@ module Block : sig
     message: string ;
     operation_list_count: int ;
     max_operations_ttl: int ;
+    context: Context.commit ;
   }
 
   module Contents : SINGLE_STORE
