@@ -118,7 +118,7 @@ Code patterns are of one of the following syntactical forms.
     (e.g. `DROP`);
   * `INSTR (arg) ...` is a compound instruction,
     whose arguments can be code, data or type patterns
-    (e.g. `PUSH uint8 3`) ;
+    (e.g. `PUSH nat 3`) ;
   * `{ (instr) ; ... }` is a possibly empty sequence of instructions,
     (e.g. `IF { SWAP ; DROP } { DROP }`),
     nested sequences can drop the braces ;
@@ -140,7 +140,7 @@ Stack patterns are of one of the following syntactical forms.
 
 Data patterns are of one of the following syntactical forms.
 
-  * integer literals,
+  * integer/natural number literals,
     (e.g. `3`) ;
   * string literals,
     (e.g. `"contents"`) ;
@@ -201,8 +201,8 @@ block, and do not go wrong.
 ### Type notations
 
 The specification introduces notations for the types of values, terms
-and stacks. Appart from a subset of value types that appear in the
-form of type annotations in some places througout the language, it is
+and stacks. Apart from a subset of value types that appear in the
+form of type annotations in some places throughout the language, it is
 important to understand that this type language only exists in the
 specification.
 
@@ -222,11 +222,11 @@ The types of values in the stack are written:
   * `identifier` for a primitive data-type
     (e.g. `bool`),
   * `identifier (arg)` for a parametric data-type with one parameter type `(arg)`
-    (e.g. `list uint8`),
+    (e.g. `list nat`),
   * `identifier (arg) ...` for a parametric data-type with several parameters
-    (e.g. `map string uint8`),
+    (e.g. `map string int`),
   * `[ (type of stack before) -> (type of stack after) ]` for a code quotation,
-    (e.g. `[ uint8 : uint8 : [] -> uint8 : [] ]`),
+    (e.g. `[ int : int : [] -> int : [] ]`),
   * `lambda (arg) (ret)` is a shortcut for `[ (arg) : [] -> (ret) : [] ]`.
 
 ### Meta type variables
@@ -256,44 +256,44 @@ Typing rules are of the form:
 
     (syntax pattern)
     :: (type of stack before) -> (type of stack after) [rule-name]
-       iff (premisses)
+       iff (premises)
 
-Where premisses are typing requirements over subprograms or values in
+Where premises are typing requirements over subprograms or values in
 the stack, both of the form `(x) :: (type)`, meaning that value `(x)`
 must have type `(type)`.
 
 A program is shown well-typed if one can find an instance of a rule
 that applies to the toplevel program expression, with all meta type
 variables replaced by non variable type expressions, and of which all
-type requirements in the premisses can be proven well-typed in the
+type requirements in the premises can be proven well-typed in the
 same manner. For the reader unfamiliar with formal type systems, this
 is called building a typing derivation.
 
 Here is an example typing derivation on a small program that computes
-`x+5/10` for a given input `x`, obtained by instanciating the typing
+`(x+5)*10` for a given input `x`, obtained by instantiating the typing
 rules for instructions `PUSH`, `ADD` and for the sequence, as found in
-the next sections. When instanciating, we replace the `iff` with `by`.
+the next sections. When instantiating, we replace the `iff` with `by`.
 
-    { PUSH uint8 5 ; ADD ; PUSH uint8 10 ; SWAP ; DIV }
-    :: [ uint8 : [] -> uint8 : [] ]
-       by { PUSH uint8 5 ; ADD }
-          :: [ uint8 : [] -> uint8 : [] ]
-             by PUSH uint8 5
-                :: [ uint8 : [] -> uint8 : uint8 : [] ]
-                   by 5 :: uint8
+    { PUSH nat 5 ; ADD ; PUSH nat 10 ; SWAP ; MUL }
+    :: [ nat : [] -> nat : [] ]
+       by { PUSH nat 5 ; ADD }
+          :: [ nat : [] -> nat : [] ]
+             by PUSH nat 5
+                :: [ nat : [] -> nat : nat : [] ]
+                   by 5 :: nat
             and ADD
-                :: [ uint8 : uint8 : [] -> uint8 : [] ]
-      and { PUSH uint8 10 ; SWAP ; DIV }
-          :: [ uint8 : [] -> uint8 : [] ]
-             by PUSH uint8 10
-                :: [ uint8 : [] -> uint8 : uint8 : [] ]
-                   by 10 :: uint8
-            and { SWAP ; DIV }
-                :: [ uint8 : uint8 : [] -> uint8 : [] ]
+                :: [ nat : nat : [] -> nat : [] ]
+      and { PUSH nat 10 ; SWAP ; MUL }
+          :: [ nat : [] -> nat : [] ]
+             by PUSH nat 10
+                :: [ nat : [] -> nat : nat : [] ]
+                   by 10 :: nat
+            and { SWAP ; MUL }
+                :: [ nat : nat : [] -> nat : [] ]
                    by SWAP
-                      :: [ uint8 : uint8 : [] -> uint8 : uint8 : [] ]
-                  and DIV
-                      :: [ uint8 : uint8 : [] -> uint8 : [] ]
+                      :: [ nat : nat : [] -> nat : nat : [] ]
+                  and MUL
+                      :: [ nat : nat : [] -> nat : [] ]
 
 Producing such a typing derivation can be done in a number of manners,
 such as unification or abstract interpretation. In the implementation
@@ -318,7 +318,7 @@ does not handle any form of polymorphism.
 III - Core data types and notations
 -----------------------------------
 
-   * `string`, `u?int{8|16|32|64}`:
+   * `string`, `nat`, `int`:
      The core primitive constant types.
 
    * `bool`:
@@ -475,60 +475,60 @@ IV - Core instructions
 
 Comparison only works on a class of types that we call comparable.
 A `COMPARE` operation is defined in an ad hoc way for each comparable
-type, but the result of compare is always an `int64`, which can in
+type, but the result of compare is always an `int`, which can in
 turn be checked in a generic manner using the following
-combinators. The result of `COMPARE` is `0` if the compared values are
-equal, negative if the first is less than the second, and positive
-otherwise.
+combinators. The result of `COMPARE` is `0` if the top two elements
+of the stack are equal, negative if the first element in the stack
+is less than the second, and positive otherwise.
 
    * `EQ`:
      Checks that the top of the stack EQuals zero.
 
-        :: int64 : 'S   ->   bool : 'S
+        :: int : 'S   ->   bool : 'S
 
-        > EQ ; C / Int64 (0) : S   =>   C / True : S
-        > EQ ; C / _ : S           =>   C / False : S
+        > EQ ; C / 0 : S     =>   C / True : S
+        > EQ ; C / _ : S     =>   C / False : S
 
 
    * `NEQ`:
      Checks that the top of the stack does Not EQual zero.
 
-        :: int64 : 'S   ->   bool : 'S
+        :: int : 'S   ->   bool : 'S
 
-        > NEQ ; C / Int64 (0) : S   =>   C / False : S
-        > NEQ ; C / _ : S           =>   C / True : S
+        > NEQ ; C / 0 : S     =>   C / False : S
+        > NEQ ; C / _ : S     =>   C / True : S
 
    * `LT`:
      Checks that the top of the stack is Less Than zero.
 
-        :: int64 : 'S   ->   bool : 'S
+        :: int : 'S   ->   bool : 'S
 
-        > LT ; C / Int64 (v) : S   =>   C / True : S   iff  v < 0
-        > LT ; C / _ : S           =>   C / False : S
+        > LT ; C / v : S     =>   C / True : S   iff  v < 0
+        > LT ; C / _ : S     =>   C / False : S
 
    * `GT`:
      Checks that the top of the stack is Greater Than zero.
 
-        :: int64 : 'S   ->   bool : 'S
+        :: int : 'S   ->   bool : 'S
 
-        > GT ; C / Int64 (v) : S   =>   C / True : S   iff  v > 0
-        > GT ; C / _ : S           =>   C / False : S
+        > GT ; C / v : S     =>   C / True : S   iff  v > 0
+        > GT ; C / _ : S     =>   C / False : S
 
    * `LE`:
      Checks that the top of the stack is Less Than of Equal to zero.
 
-        :: int64 : 'S   ->   bool : 'S
+        :: int : 'S   ->   bool : 'S
 
-        > LE ; C / Int64 (v) : S   =>   C / True : S   iff  v <= 0
-        > LE ; C / _ : S           =>   C / False : S
+        > LE ; C / v : S     =>   C / True : S   iff  v <= 0
+        > LE ; C / _ : S     =>   C / False : S
 
    * `GE`:
      Checks that the top of the stack is Greater Than of Equal to zero.
 
-        :: int64 : 'S   ->   bool : 'S
+        :: int : 'S   ->   bool : 'S
 
-        > GE ; C / Int64 (v) : S   =>   C / True : S   iff  v >= 0
-        > GE ; C / _ : S           =>   C / False : S
+        > GE ; C / v : S     =>   C / True : S   iff  v >= 0
+        > GE ; C / _ : S     =>   C / False : S
 
 Syntactic sugar exists for merging `COMPARE` and comparison
 combinators, and also for branching.
@@ -575,184 +575,116 @@ V - Operations
 
         > NOT ; C / x : S   =>   C / ~x : S
 
-### Operations on integers
+### Operations on integers and natural numbers
 
-Integers can be of size 1, 2, 4 or 8 bytes, signed or unsigned.
-Integer Operations are homogeneous, so that performing computations
-between values of different int types must be done via explicit casts.
-
-For specifying arithmetics, we consider that integers are all stored
-on 64 bits (the largest integer size) so that we can express the
-operations, in particular casts, using usual bitwise masks. In this
-context, the type indicator functions are defined as follows (which
-can be read both as a constraint on the bitpatttern and as a
-conversion operation).
-
-     Uint64 (x) = Int64 (x) = x
-     Uint32 (x) = x & 0x00000000FFFFFFFF
-     Int32 (x) = x & 0x00000000FFFFFFFF
-               | (x & 0x80000000 ? 0xFFFFFFFF00000000 : 0)
-     Uint16 (x) = x & 0x000000000000FFFF
-     Int16 (x) = x & 0x000000000000FFFF
-               | (x & 0x8000 ? 0xFFFFFFFFFFFF0000 : 0)
-     Uint8 (x) = x & 0x00000000000000FF
-     Int8 (x) = x & 0x00000000000000FF
-              | (x & 0x80 ? 0xFFFFFFFFFFFFFF00 : 0)
-
-We also use the function `bits (t)` that retrieve the meaningful number
-of bits for a given integer type (e.g. `bits (int8) = 8`).
+Integers and naturals are arbitrary-precision,
+meaning the only size limit is fuel.
 
    * `NEG`
 
-        :: t : 'S   ->   t : 'S   for   t in int{8|16|32|64}
+        :: int : 'S   ->   int : 'S
+        :: nat : 'S   ->   int : 'S
 
-        > NEG ; C / t (x) : S   =>   C / t (-x) : S
-
-     With cycling semantics for overflows (min (t) = -min (t)).
+        > NEG ; C / x : S   =>   C / -x : S
 
    * `ABS`
 
-        :: t : 'S   ->   t : 'S   for   t in int{8|16|32|64}
+        :: int : 'S   ->   nat : 'S
 
-        > ABS ; C / t (x) : S   =>   C / t (abs (x)) : S
-
-     With cycling semantics for overflows (abs (min (t)) = min (t)).
+        > ABS ; C / x : S   =>   C / abs (x) : S
 
    * `ADD`
 
-        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
+        :: int : int : 'S   ->   int : 'S
+        :: int : nat : 'S   ->   int : 'S
+        :: nat : int : 'S   ->   int : 'S
+        :: nat : nat : 'S   ->   nat : 'S
 
-        > ADD ; C / t (x) : t (y) : S   =>   C / t (x + y) : S
-
-     With cycling semantics for overflows.
+        > ADD ; C / x : y : S   =>   C / (x + y) : S
 
    * `SUB`
 
-        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
+        :: int : int : 'S   ->   int : 'S
+        :: int : nat : 'S   ->   int : 'S
+        :: nat : int : 'S   ->   int : 'S
+        :: nat : nat : 'S   ->   int : 'S
 
-        > SUB ; C / t (x) : t (y) : S   =>   C / t (x - y) : S
-
-     With cycling semantics for overflows.
+        > SUB ; C / x : y : S   =>   C / (x - y) : S
 
    * `MUL`
 
-        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
+        :: int : int : 'S   ->   int : 'S
+        :: int : nat : 'S   ->   int : 'S
+        :: nat : int : 'S   ->   int : 'S
+        :: nat : nat : 'S   ->   nat : 'S
 
-        > MUL ; C / t (x) : t (y) : S   =>   C / t (x * y) : S
+        > MUL ; C / x : y : S   =>   C / (x * y) : S
 
-     Unckeched for overflows.
+   * `EDIV`
+     Perform Euclidian division
 
-   * `DIV`
+        :: int : int : 'S   ->   option (pair int nat) : 'S
+        :: int : nat : 'S   ->   option (pair int nat) : 'S
+        :: nat : int : 'S   ->   option (pair int nat) : 'S
+        :: nat : nat : 'S   ->   option (pair nat nat) : 'S
 
-        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
-
-        > DIV ; C / t (x) : t (0) : S   =>   C / [FAIL]
-        > DIV ; C / t (x) : t (y) : S   =>   C / t (x / y) : S
-
-   * `MOD`
-
-        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
-
-        > MOD ; C / t (x) : t (0) : S   =>   C / [FAIL]
-        > MOD ; C / t (x) : t (y) : S   =>   C / t (x % y) : S
-
-   * `CAST t_to` where `t_to in u?int{8|16|32|64}`
-
-        :: t_from : 'S   ->   t_to : 'S   for   t_from in u?int{8|16|32|64}
-
-        > CAST t_to ; C / t_from (x) : S   =>   C / t_to (x) : S
-
-Alternative operators are defined that check for overflows.
-
-   * `CHECKED_NEG`
-
-        :: t : 'S   ->   t : 'S   for   t in int{8|16|32|64}
-
-        > CHECKED_NEG ; C / t (x) : S   =>   [FAIL] on overflow
-        > CHECKED_NEG ; C / t (x) : S   =>   C / t (-x) : S
-
-   * `CHECKED_ABS`
-
-        :: t : 'S   ->   t : 'S   for   t in int{8|16|32|64}
-
-        > CHECKED_ABS ; C / t (x) : S   =>   [FAIL] on overflow
-        > CHECKED_ABS ; C / t (x) : S   =>   C / t (abs (x)) : S
-
-   * `CHECKED_ADD`
-
-        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
-
-        > CHECKED_ADD ; C / t (x) : t (y) : S   =>   [FAIL] on overflow
-        > CHECKED_ADD ; C / t (x) : t (y) : S   =>   C / t (x + y) : S
-
-   * `CHECKED_SUB`
-
-        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
-
-        > CHECKED_SUB ; C / t (x) : t (y) : S   =>   [FAIL] on overflow
-        > CHECKED_SUB ; C / t (x) : t (y) : S   =>   C / t (x - y) : S
-
-   * `CHECKED_MUL`
-
-        :: t : t : 'S   ->   t : 'S   for   t in u?int{8|16|32|64}
-
-        > CHECKED_MUL ; C / t (x) : t (y) : S   =>   [FAIL] on overflow
-        > CHECKED_MUL ; C / t (x) : t (y) : S   =>   C / t (x * y) : S
-
-   * `CHECKED_CAST t_to` where `t_to in u?int{8|16|32|64}`
-
-        :: t_from : 'S   ->   t_to : 'S   for   t_from in u?int{8|16|32|64}
-
-        > CHECKED_CAST t_to ; C / t_from (x) : S   =>   C / t_to (x) : S
-          iff   t_from (x) = t_to (x)
-        > CHECKED_CAST t_to ; C / t_from (x) : S   =>   [FAIL]
+        > EDIV ; C / x : 0 : S   =>   C / None
+        > EDIV ; C / x : y : S   =>   C / Some (Pair (x / y) (x % y)) : S
 
 Bitwise logical operators are also available on unsigned integers.
 
    * `OR`
 
-        :: t : t : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
+        :: nat : nat : 'S   ->   nat : 'S
 
-        > OR ; C / t (x) : t (y) : S   =>   C / t (x | y) : S
+        > OR ; C / x : y : S   =>   C / (x | y) : S
 
    * `AND`
 
-        :: t : t : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
+        :: nat : nat : 'S   ->   nat : 'S
 
-        > AND ; C / t (x) : t (y) : S   =>   C / t (x & y) : S
+        > AND ; C / x : y : S   =>   C / (x & y) : S
 
    * `XOR`
 
-        :: t : t : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
+        :: nat : nat : 'S   ->   nat : 'S
 
-        > XOR ; C / t (x) : t (y) : S   =>   C / t (x ^ y) : S
+        > XOR ; C / x : y : S   =>   C / (x ^ y) : S
 
    * `NOT`
+     The return type of `NOT` is an `int` and not a `nat`.
+     This is because the sign is also negated.
+     The resulting integer is computed using two's complement.
+     For instance, the boolean negation of `0` is `-1`.
 
-        :: t : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
+        :: nat : 'S   ->   int : 'S
+        :: int : 'S   ->   int : 'S
 
-        > NOT ; C / t (x) : S   =>   C / t (~x) : S
+        > NOT ; C / x : S   =>   C / ~x : S
 
    * `LSL`
 
-        :: t : uint8 (s) : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
+        :: nat : nat : 'S   ->   nat : 'S
 
-        > LSL ; C / t (x) : uint8 (s) : S   =>   C / t (x << s) : S
-          iff   s <= bits (t)
-        > LSL ; C / t (x) : uint8 (s) : S   =>   [FAIL]
+        > LSL ; C / x : s : S   =>   C / (x << s) : S
+          iff   s <= 256
+        > LSL ; C / x : s : S   =>   [FAIL]
 
    * `LSR`
 
-        :: t : uint8 (s) : 'S   ->   t : 'S   for   t in uint{8|16|32|64}
+        :: nat : nat : 'S   ->   nat : 'S
 
-        > LSR ; C / t (x) : uint8 (s) : S   =>   C / t (x >>> s) : S
-          iff   s <= bits (t)
-        > LSR ; C / t (x) : uint8 (s) : S   =>   [FAIL]
+        > LSR ; C / x : s : S   =>   C / (x >>> s) : S
 
    * `COMPARE`:
-     Integer comparison (signed or unsigned according to the type).
+     Integer/natural comparison
 
-        :: t : t : 'S   ->   int64 : 'S   for   t in uint{8|16|32|64}
+        :: int : int : 'S   ->   int : 'S
+        :: nat : nat : 'S   ->   int : 'S
+
+        > COMPARE ; C / x : y : S   =>   C / -1 : S  iff x < y
+        > COMPARE ; C / x : y : S   =>   C / 0 : S   iff x = y
+        > COMPARE ; C / x : y : S   =>   C / 1 : S   iff x > y
 
 ### Operations on strings
 
@@ -768,7 +700,7 @@ constants as is, concatenate them and use them as keys.
    * `COMPARE`:
      Lexicographic comparison.
 
-        :: string : string : 'S   ->   int64 : 'S
+        :: string : string : 'S   ->   int : 'S
 
 ### Operations on pairs
 
@@ -1000,19 +932,22 @@ are the addition of a (positive) number of seconds and the comparison.
    * `ADD`
      Increment / decrement a timestamp of the given number of seconds.
 
-        :: timestamp : uint{8|16|32|64} : 'S -> timestamp : 'S
+        :: timestamp : nat : 'S -> timestamp : 'S
+        :: nat : timestamp : 'S -> timestamp : 'S
 
-        > ADD ; C / t : seconds : S   =>   [FAIL]   on overflow
-        > ADD ; C / t : seconds : S   =>   C / (t + seconds) : S
+        > ADD ; C / seconds : nat (t) : S   =>   C / (seconds + t) : S
+        > ADD ; C / nat (t) : seconds : S   =>   C / (t + seconds) : S
 
    * `COMPARE`:
      Timestamp comparison.
 
-        :: timestamp : timestamp : 'S   ->   int64 : 'S
+        :: timestamp : timestamp : 'S   ->   int : 'S
 
 ### Operations on Tez
 
-Operations on tez are limited to prevent overflow and mixing them with
+Tez are internally represented by a 64 bit signed integer.
+There are restrictions to prevent creating a negative amount of tez.
+Operations are limited to prevent overflow and mixing them with
 other numerical types by mistake. They are also mandatorily checked
 for under/overflows.
 
@@ -1032,14 +967,23 @@ for under/overflows.
 
    * `MUL`
 
-        :: tez : u?int{8|16|32|64} : 'S   ->   tez : 'S
+        :: tez : nat : 'S   ->   tez : 'S
+        :: nat : tez : 'S   ->   tez : 'S
 
         > MUL ; C / x : y : S   =>   [FAIL]   on overflow
         > MUL ; C / x : y : S   =>   C / (x * y) : S
 
+   * `EDIV`
+
+        :: tez : nat : 'S   ->   option (pair tez tez) : 'S
+        :: tez : tez : 'S   ->   option (pair nat tez) : 'S
+
+        > EDIV ; C / x : 0 : S   =>   C / None
+        > EDIV ; C / x : y : S   =>   C / Some (Pair (x / y) (x % y)) : S
+
    * `COMPARE`:
 
-        :: tez : tez : 'S   ->   int64 : 'S
+        :: tez : tez : 'S   ->   int : 'S
 
 ### Operations on contracts
 
@@ -1056,13 +1000,13 @@ for under/overflows.
            -> contract 'p 'r : 'S
 
      As with non code-emitted originations the
-     contract code takes as argument the transfered amount plus an
+     contract code takes as argument the transferred amount plus an
      ad-hoc argument and returns an ad-hoc value. The code also takes
      the global data and returns it to be stored and retrieved on the
      next transaction. These data are initialized by another
      parameter. The calling convention for the code is as follows:
      `(Pair arg globals)) -> (Pair ret globals)`, as
-     extrapolable from the instruction type. The first parameters are
+     extrapolatable from the instruction type. The first parameters are
      the manager, optional delegate, then spendable and delegatable
      flags and finally the initial amount taken from the currently
      executed contract. The contract is returned as a first class
@@ -1133,7 +1077,7 @@ for under/overflows.
    * `STEPS_TO_QUOTA`:
      Push the remaining steps before the contract execution must terminate.
 
-        :: 'S   ->   uint32 :: 'S
+        :: 'S   ->   nat :: 'S
 
    * `NOW`:
      Push the timestamp of the block whose validation triggered this
@@ -1156,7 +1100,7 @@ for under/overflows.
 
    * `COMPARE`:
 
-        :: key : key : 'S   ->   int64 : 'S
+        :: key : key : 'S   ->   int : 'S
 
 
 VIII - Concrete syntax
@@ -1174,8 +1118,8 @@ language can only be one of the three following constructs.
 
 There are two kinds of constants:
 
-  1. Integers in decimal (no prefix), hexadecimal (0x prefix), octal
-     (0o prefix) or binary (0b prefix).
+  1. Integers or naturals in decimal (no prefix),
+     hexadecimal (0x prefix), octal (0o prefix) or binary (0b prefix).
   2. Strings with usual escapes `\n`, `\t`, `\b`, `\r`, `\\`, `\"`.
      Strings are encoding agnostic sequences of bytes. Non printable
      characters can be escaped by 3 digits decimal codes `\ddd` or
@@ -1247,7 +1191,7 @@ Both equivalent to:
       arg3
       arg4
 
-Trayling semicolons are ignored:
+Trailing semicolons are ignored:
 
     PRIM
       arg1;
@@ -1286,7 +1230,7 @@ Blocks can be passed as argument to a primitive.
 The concrete syntax follows the same lexical conventions as the
 specification: instructions are represented by uppercase identifiers,
 type constructors by lowercase identifiers, and constant constructors
-are Capitalised.
+are Capitalized.
 
 Lists can be written in a single shot instead of a succession of `Cons`
 
@@ -1337,8 +1281,8 @@ A hash sign (`#`) anywhere outside of a string literal will make the
 rest of the line (and itself) completely ignored, as in the following
 example.
 
-    PUSH int8 1 # pushes 1
-    PUSH int8 2 # pushes 2
+    PUSH nat 1 # pushes 1
+    PUSH nat 2 # pushes 2
     ADD         # computes 2 + 1
 
 IX - Examples
@@ -1357,12 +1301,12 @@ returns a value, hence the complete calling convention above.
 ### Empty contract
 
 Any contract with the same `parameter` and `return` types
-may be written with an empty sequence in its `code` section. 
-The simplest contracts is the contract for which the 
-`parameter`, `storage`, and `return` are all of type `unit`. 
+may be written with an empty sequence in its `code` section.
+The simplest contract is the contract for which the
+`parameter`, `storage`, and `return` are all of type `unit`.
 This contract is as follows:
 
-    code { };
+    code {};
     storage unit;
     parameter unit;
     return unit;
@@ -1392,7 +1336,7 @@ Following the contract calling convention, the code is a lambda of type
       pair unit 'g
       pair unit 'g
 
-writen as
+written as
 
     lambda
       pair unit
@@ -1436,7 +1380,7 @@ The complete source `reservoir.tz` is:
 
 We basically want the same contract as the previous one, but instead
 of destroying it, we want to keep it alive, storing a flag `S` so that
-we can tell afterwards if the tokens have been transfered to `A` or `B`.
+we can tell afterwards if the tokens have been transferred to `A` or `B`.
 We also want a broker `X` to get some fee `P` in any case.
 
 We thus add variables `P` and `S` and `X` to the global data of the
@@ -1456,7 +1400,7 @@ At the beginning of the transaction:
 
 For the contract to stay alive, we test that all least `(Tez "1.00")` is
 still available after each transaction. This value is given as an
-example and must be updated according to the actual Tezos minmal
+example and must be updated according to the actual Tezos minimal
 value for contract balance.
 
 The complete source `scrutable_reservoir.tz` is:
@@ -1541,7 +1485,7 @@ These parameters as grouped in the global storage as follows:
 of type
 
     pair
-      pair uint32 (pair timestamp timestamp)
+      pair nat (pair timestamp timestamp)
       pair
         pair tez tez
         pair (pair account account) account
@@ -1550,7 +1494,7 @@ of type
 The 24 hours after timestamp `Z` are for the buyer and seller to store
 their collateral `(Q * C)`. For this, the contract takes a string as
 parameter, matching `"buyer"` or `"seller"` indicating the party for which
-the tokens are transfered. At the end of this day, each of them can
+the tokens are transferred. At the end of this day, each of them can
 send a transaction to send its tokens back. For this, we need to store
 who already paid and how much, as a `(pair tez tez)` where the left
 component is the buyer and the right one the seller.
@@ -1565,9 +1509,9 @@ will send all the tokens to the seller.
 
 Otherwise, the  seller must deliver at  least `Q` tons of  dried peas to
 the warehouse, in  the next 24 hours.  When the amount is  equal to or
-exceeds `Q`, all the tokens are transfered to the seller and the contract
+exceeds `Q`, all the tokens are transferred to the seller and the contract
 is destroyed. For  storing the quantity of peas  already delivered, we
-add a counter  of type `uint32` in the global  storage. For knowing this
+add a counter  of type `nat` in the global  storage. For knowing this
 quantity, we accept messages from W with a partial amount of delivered
 peas as argument.
 
@@ -1588,16 +1532,16 @@ and the constant parameters on the right, initially as follows.
 of type
 
     pair
-      pair unit32 (pair tez tez)
+      pair nat (pair tez tez)
       pair
-        pair uint32 (pair timestamp timestamp)
+        pair nat (pair timestamp timestamp)
         pair
           pair tez tez
           pair (pair account account) account
 
 The parameter of the transaction will be either a transfer from the
 buyer or the seller or a delivery notification from the warehouse of
-type `(or string uint32)`.
+type `(or string nat)`.
 
 At the beginning of the transaction:
 
@@ -1618,13 +1562,13 @@ with the minimum amount, set to `(Tez "1.00")`.
 
 The complete source `forward.tz` is:
 
-    parameter (or string uint32) ;
+    parameter (or string nat) ;
     return unit ;
     storage
       pair
-        pair uint32 (pair tez tez) # counter from_buyer from_seller
+        pair nat (pair tez tez) # counter from_buyer from_seller
         pair
-          pair uint32 (pair timestamp timestamp) # Q T Z
+          pair nat (pair timestamp timestamp) # Q T Z
           pair
             pair tez tez # K C
             pair
@@ -1632,7 +1576,7 @@ The complete source `forward.tz` is:
               (contract unit unit); # W
     code
       { DUP ; CDDADDR ; # Z
-        PUSH uint64 86400 ; SWAP ; ADD ; # one day in second
+        PUSH nat 86400 ; SWAP ; ADD ; # one day in second
         NOW ; COMPARE ; LT ;
         IF { # Before Z + 24
              DUP ; CAR ; # we must receive (Left "buyer") or (Left "seller")
@@ -1643,7 +1587,7 @@ The complete source `forward.tz` is:
                       DIP { AMOUNT } ; ADD ; # transaction
                       #  then we rebuild the globals
                       DIP { DUP ; CDADDR } ; PAIR ; # seller amount
-                      PUSH uint32 0 ; PAIR ; # delivery counter at 0
+                      PUSH nat 0 ; PAIR ; # delivery counter at 0
                       DIP { CDDR } ; PAIR ; # parameters
                       # and return Unit
                       UNIT ; PAIR }
@@ -1652,7 +1596,7 @@ The complete source `forward.tz` is:
                            DIP { AMOUNT } ; ADD ; # transaction
                            #  then we rebuild the globals
                            DIP { DUP ; CDADAR } ; SWAP ; PAIR ; # buyer amount
-                           PUSH uint32 0 ; PAIR ; # delivery counter at 0
+                           PUSH nat 0 ; PAIR ; # delivery counter at 0
                            DIP { CDDR } ; PAIR ; # parameters
                            # and return Unit
                            UNIT ; PAIR }
@@ -1662,7 +1606,7 @@ The complete source `forward.tz` is:
              # test if the required amount is reached
              DUP ; CDDAAR ; # Q
              DIP { DUP ; CDDDADR } ; MUL ; # C
-             PUSH uint8 2 ; MUL ;
+             PUSH nat 2 ; MUL ;
              PUSH tez "1.00" ; ADD ;
              BALANCE ; COMPARE ; LT ; # balance < 2 * (Q * C) + 1
              IF { # refund the parties
@@ -1684,7 +1628,7 @@ The complete source `forward.tz` is:
                   IF { FAIL } # Between Z + 24 and T
                      { # after T
                        DUP ; CDDADAR # T
-                       PUSH uint64 86400 ; ADD # one day in second
+                       PUSH nat 86400 ; ADD # one day in second
                        NOW ; COMPARE ; LT
                        IF { # Between T and T + 24
                             # we only accept transactions from the buyer
@@ -1701,7 +1645,7 @@ The complete source `forward.tz` is:
                                            IF { FAIL } { } } ; # abort or continue
                                      #  then we rebuild the globals
                                      DIP { DUP ; CDADDR } ; PAIR ; # seller amount
-                                     PUSH uint32 0 ; PAIR ; # delivery counter at 0
+                                     PUSH nat 0 ; PAIR ; # delivery counter at 0
                                      DIP { CDDR } ; PAIR ; # parameters
                                      # and return Unit
                                      UNIT ; PAIR }
@@ -1722,8 +1666,8 @@ The complete source `forward.tz` is:
                                  UNIT ; PAIR }
                                { # otherwise continue
                                  DUP ; CDDADAR # T
-                                 PUSH uint64 86400 ; ADD ;
-                                 PUSH uint64 86400 ; ADD ; # two days in second
+                                 PUSH nat 86400 ; ADD ;
+                                 PUSH nat 86400 ; ADD ; # two days in second
                                  NOW ; COMPARE ; LT
                                  IF { # Between T + 24 and T + 48
                                       # We accept only delivery notifications, from W
@@ -1758,12 +1702,13 @@ The complete source `forward.tz` is:
                                       UNIT ; TRANSFER_TOKENS ; DROP ;
                                       # and return unit
                                       UNIT ; PAIR } } } } } } }
-    
+
 X - Full grammar
 ----------------
 
     <data> ::=
       | <int constant>
+      | <natural number constant>
       | <string constant>
       | <timestamp string constant>
       | <signature string constant>
@@ -1861,14 +1806,8 @@ X - Full grammar
       | STEPS_TO_QUOTA
       | SOURCE <type> <type>
     <type> ::=
-      | int8
-      | int16
-      | int32
-      | int64
-      | uint8
-      | uint16
-      | uint32
-      | uint64
+      | int
+      | nat
       | unit
       | string
       | tez
@@ -1885,14 +1824,8 @@ X - Full grammar
       | lambda <type> <type>
       | map <comparable type> <type>
     <comparable type> ::=
-      | int8
-      | int16
-      | int32
-      | int64
-      | uint8
-      | uint16
-      | uint32
-      | uint64
+      | int
+      | nat
       | string
       | tez
       | bool
