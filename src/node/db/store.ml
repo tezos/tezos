@@ -87,6 +87,7 @@ module Block = struct
     message: string ;
     operation_list_count: int ;
     max_operations_ttl: int ;
+    context: Context.commit ;
   }
 
   module Contents =
@@ -99,15 +100,18 @@ module Block = struct
            let open Data_encoding in
            conv
              (fun { header ; message ; operation_list_count ;
-                    max_operations_ttl } ->
-               (message, operation_list_count, max_operations_ttl, header))
+                    max_operations_ttl ; context } ->
+               (message, operation_list_count, max_operations_ttl,
+                context, header))
              (fun (message, operation_list_count,
-                   max_operations_ttl, header) ->
-                { header ; message ; max_operations_ttl ; operation_list_count })
-             (obj4
+                   max_operations_ttl, context, header) ->
+               { header ; message ; max_operations_ttl ;
+                 operation_list_count ; context })
+             (obj5
                 (req "message" string)
                 (req "operation_list_count" uint8)
                 (req "max_operations_ttl" uint16)
+                (req "context" Context.commit_encoding)
                 (req "header" Block_header.encoding))
        end))
 

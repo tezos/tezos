@@ -9,159 +9,105 @@
 
 (** Tezos - Versioned (key x value) store (over Irmin) *)
 
+open Hash
 open Logging.Db
 
 module IrminPath = Irmin.Path.String_list
 
 module MBytesContent = struct
-  module Tc_S0 =
-    (val Tc.biject Tc.cstruct Cstruct.to_bigarray Cstruct.of_bigarray)
-  include Tc_S0
-  module Path = Irmin.Path.String_list
-  let merge =
-    let fn = Irmin.Merge.(option (module Tc_S0) (default (module Tc_S0))) in
-    fun _path -> fn
+  type t = MBytes.t
+  let t =
+    Irmin.Type.(like cstruct)
+      (fun x -> Cstruct.to_bigarray x)
+      (fun x -> Cstruct.of_bigarray x)
+  let merge = Irmin.Merge.default Irmin.Type.(option t)
+  let pp ppf b = Format.pp_print_string ppf (MBytes.to_string b)
+  let of_string s = Ok (MBytes.of_string s)
 end
 
-module GitStore = struct
-
-  module Store =
-    Irmin_unix.Irmin_git.FS
-      (MBytesContent) (Irmin.Ref.String) (Irmin.Hash.SHA1)
-
-  include Store
-
-  module View = Irmin.View (Store)
-
-  module FunView = struct
-    include Ir_funview.Make (Store)
-    type v = t * Lwt_utils.Idle_waiter.t
-    let get (t, w) k =
-      Lwt_utils.Idle_waiter.task w @@ fun () ->
-      read t k
-    let mem (t, w) k =
-      Lwt_utils.Idle_waiter.task w @@ fun () ->
-      mem t k
-    let dir_mem (t, w) k =
-      Lwt_utils.Idle_waiter.task w @@ fun () ->
-      dir_mem t k
-    let del (t, w) k =
-      Lwt_utils.Idle_waiter.task w @@ fun () ->
-      remove t k >>= fun t ->
-      Lwt.return (t, w)
-    let remove_rec (t, w) k =
-      Lwt_utils.Idle_waiter.task w @@ fun () ->
-      remove_rec t k >>= fun t ->
-      Lwt.return (t, w)
-    let set (t, w) k v =
-      Lwt_utils.Idle_waiter.task w @@ fun () ->
-      update t k v >>= fun t ->
-      Lwt.return (t, w)
-    let update_path db k (t, w) =
-      Lwt_utils.Idle_waiter.task w @@ fun () ->
-      update_path db k t
-    let list (t, w) k =
-      Lwt_utils.Idle_waiter.task w @@ fun () ->
-      Lwt_list.map_p (list t) k >|= List.flatten
-  end
-
-end
+module GitStore =
+  Irmin_unix.Git.FS.Make
+    (MBytesContent) (Irmin.Path.String_list) (Irmin.Branch.String)
 
 type index = {
   path: string ;
   repo: GitStore.Repo.t ;
   patch_context: context -> context Lwt.t ;
   mutable commits: int ;
-  repack_scheduler : Lwt_utils.Idle_waiter.t ;
+  repack_scheduler: Lwt_utils.Idle_waiter.t ;
 }
+
 and context = {
   index: index ;
-  store: GitStore.t ;
-  view: GitStore.FunView.v ;
+  parents: GitStore.Commit.t list ;
+  tree: GitStore.tree ;
 }
 type t = context
+
+type commit = GitStore.Commit.Hash.t
+
+let dummy_commit =
+  match
+    GitStore.Commit.Hash.of_string "0000000000000000000000000000000000000000"
+  with
+  | Ok c -> c
+  | Error _ -> assert false
+
+let commit_encoding : commit Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun c -> Cstruct.to_bigarray (Irmin.Type.encode_cstruct GitStore.Commit.Hash.t c))
+    (fun c ->
+       match
+         Irmin.Type.decode_cstruct
+           GitStore.Commit.Hash.t
+           (Cstruct.of_bigarray c)
+       with
+       | Ok x -> x
+       | _ -> assert false
+    )
+    bytes
 
 (*-- Version Access and Update -----------------------------------------------*)
 
 let current_protocol_key = ["protocol"]
 let current_test_network_key = ["test_network"]
 
-let exists { repo } key =
-  GitStore.of_branch_id
-    Irmin.Task.none (Block_hash.to_b58check key) repo >>= fun t ->
-  let store = t () in
-  GitStore.read store current_protocol_key >>= function
-  | Some _ ->
-      Lwt.return true
-  | None ->
-      Lwt.return false
+let exists index key =
+  Lwt_utils.Idle_waiter.task index.repack_scheduler @@ fun () ->
+  GitStore.Commit.of_hash index.repo key >>= function
+  | None -> Lwt.return_false
+  | Some _ -> Lwt.return_true
 
 let checkout index key =
-  lwt_debug "-> Context.checkout %a"
-    Block_hash.pp_short key >>= fun () ->
-  exists index key >>= fun exists ->
-  if not exists then
-    Lwt.return None
-  else
-    GitStore.of_branch_id
-      Irmin.Task.none (Block_hash.to_b58check key) index.repo >>= fun t ->
-    let store = t () in
-    GitStore.FunView.of_path store [] >>= fun view ->
-    let view = (view, index.repack_scheduler) in
-    let ctxt = { index ; store ; view } in
-    index.patch_context ctxt >>= fun ctxt ->
-    lwt_debug "<- Context.checkout %a OK"
-      Block_hash.pp_short key >>= fun () ->
-    Lwt.return (Some ctxt)
+  Lwt_utils.Idle_waiter.task index.repack_scheduler @@ fun () ->
+  GitStore.Commit.of_hash index.repo key >>= function
+  | None -> Lwt.return_none
+  | Some commit ->
+      GitStore.Commit.tree commit >>= fun tree ->
+      let ctxt = { index ; tree ; parents = [commit] } in
+      index.patch_context ctxt >>= fun ctxt ->
+      Lwt.return (Some ctxt)
 
 let checkout_exn index key =
   checkout index key >>= function
   | None -> Lwt.fail Not_found
   | Some p -> Lwt.return p
 
-let exists index key =
-  lwt_debug "-> Context.exists %a"
-    Block_hash.pp_short key >>= fun () ->
-  exists index key >>= fun exists ->
-  lwt_debug "<- Context.exists %a %B"
-    Block_hash.pp_short key exists >>= fun () ->
-  Lwt.return exists
 
 exception Preexistent_context of Block_hash.t
 exception Empty_head of Block_hash.t
 
-let commit key ~time ~message context =
-  let task = Irmin.Task.create ~date:(Time.to_seconds time) ~owner:"Tezos" in
-  GitStore.clone task context.store (Block_hash.to_b58check key) >>= function
-  | `Empty_head -> Lwt.fail (Empty_head key)
-  | `Duplicated_branch -> Lwt.fail (Preexistent_context key)
-  | `Ok store ->
-      GitStore.FunView.update_path
-        (store message) [] context.view >>= fun () ->
-     context.index.commits <- context.index.commits + 1 ;
-     if context.index.commits mod 200 = 0 then
-       Lwt_utils.Idle_waiter.force_idle
-         context.index.repack_scheduler
-         (fun () ->
-            lwt_debug "begin git repack" >>= fun () ->
-            let command =
-              "git",
-              [| "git" ; "-C" ; context.index.path ;
-                 "repack" ; "-a" ; "-d" |] in
-            let t0 = Unix.gettimeofday () in
-            Lwt_process.exec
-              ~stdout: `Dev_null ~stderr: `Dev_null
-              command >>= fun res ->
-            let dt = Unix.gettimeofday () -. t0 in
-            match res with
-            | WEXITED 0 ->
-                lwt_log_notice "git repack complete in %0.2f sec" dt
-            | WEXITED code | WSTOPPED code | WSIGNALED code ->
-                lwt_log_error "git repack failed with code %d after  %0.2f sec"
-                  code dt) >>= fun () ->
-       Lwt.return ()
-     else
-       Lwt.return ()
+let raw_commit ~time ~message context =
+  let info =
+    Irmin.Info.v ~date:(Time.to_seconds time) ~author:"Tezos" message in
+  GitStore.Commit.v
+    context.index.repo ~info ~parents:context.parents context.tree
+
+let commit ~time ~message context =
+  Lwt_utils.Idle_waiter.task context.index.repack_scheduler @@ fun () ->
+  raw_commit ~time ~message context >>= fun commit ->
+  Lwt.return (GitStore.Commit.hash commit)
 
 (*-- Generic Store Primitives ------------------------------------------------*)
 
@@ -173,33 +119,44 @@ let undata_key = function
   | _ -> assert false
 
 let mem ctxt key =
-  GitStore.FunView.mem ctxt.view (data_key key) >>= fun v ->
+  Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
+  GitStore.Tree.mem ctxt.tree (data_key key) >>= fun v ->
   Lwt.return v
 
 let dir_mem ctxt key =
-  GitStore.FunView.dir_mem ctxt.view (data_key key) >>= fun v ->
+  Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
+  GitStore.Tree.mem_tree ctxt.tree (data_key key) >>= fun v ->
   Lwt.return v
 
-let raw_get ctxt key = GitStore.FunView.get ctxt.view key
+let raw_get ctxt key =
+  Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
+  GitStore.Tree.find ctxt.tree key
 let get t key = raw_get t (data_key key)
 
 let raw_set ctxt key data =
-  GitStore.FunView.set ctxt.view key data >>= fun view ->
-  Lwt.return { ctxt with view }
+  Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
+  GitStore.Tree.add ctxt.tree key data >>= fun tree ->
+  Lwt.return { ctxt with tree }
 let set t key data = raw_set t (data_key key) data
 
 let raw_del ctxt key =
-  GitStore.FunView.del ctxt.view key >>= fun view ->
-  Lwt.return { ctxt with view }
+  Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
+  GitStore.Tree.remove ctxt.tree key >>= fun tree ->
+  Lwt.return { ctxt with tree }
 let del t key = raw_del t (data_key key)
 
+let list_one ctxt key =
+  Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
+  GitStore.Tree.list ctxt.tree (data_key key) >>= fun keys ->
+  Lwt.return (List.map (fun (k,_) -> key @ [k]) keys)
+
 let list ctxt keys =
-  GitStore.FunView.list ctxt.view (List.map data_key keys) >>= fun keys ->
-  Lwt.return (List.map undata_key keys)
+  Lwt_list.map_p (list_one ctxt) keys >|= List.flatten
 
 let remove_rec ctxt key =
-  GitStore.FunView.remove_rec ctxt.view (data_key key) >>= fun view ->
-  Lwt.return { ctxt with view }
+  Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
+  GitStore.Tree.remove ctxt.tree (data_key key) >>= fun tree ->
+  Lwt.return { ctxt with tree }
 
 (*-- Predefined Fields -------------------------------------------------------*)
 
@@ -275,50 +232,46 @@ let fork_test_network v ~protocol ~expiration =
 (*-- Initialisation ----------------------------------------------------------*)
 
 let init ?patch_context ~root =
-  GitStore.Repo.create
-    (Irmin_unix.Irmin_git.config ~root ~bare:true ()) >>= fun repo ->
+  GitStore.Repo.v
+    (Irmin_git.config ~bare:true root) >>= fun repo ->
   Lwt.return {
     commits = 0 ;
-    repack_scheduler = Lwt_utils.Idle_waiter.create () ;
     path = root ;
     repo ;
+    repack_scheduler = Lwt_utils.Idle_waiter.create () ;
     patch_context =
       match patch_context with
       | None -> (fun ctxt -> Lwt.return ctxt)
       | Some patch_context -> patch_context
   }
 
-let commit_genesis index ~id:block ~time ~protocol =
-  let task = Irmin.Task.create ~date:(Time.to_seconds time) ~owner:"Tezos" in
-  GitStore.of_branch_id
-    task (Block_hash.to_b58check block)
-    index.repo >>= fun t ->
-  let store = t "Genesis" in
-  GitStore.FunView.of_path store [] >>= fun view ->
-  let view = (view, index.repack_scheduler) in
-  let ctxt = { index ; store ; view } in
+let get_branch net_id = Format.asprintf "%a" Net_id.pp net_id
+
+
+let commit_genesis index ~net_id ~time ~protocol =
+  Lwt_utils.Idle_waiter.task index.repack_scheduler @@ fun () ->
+  let tree = GitStore.Tree.empty in
+  let ctxt = { index ; tree ; parents = [] } in
+  index.patch_context ctxt >>= fun ctxt ->
   set_protocol ctxt protocol >>= fun ctxt ->
   set_test_network ctxt Not_running >>= fun ctxt ->
-  index.patch_context ctxt >>= fun ctxt ->
-  GitStore.FunView.update_path ctxt.store [] ctxt.view >>= fun () ->
-  Lwt.return ctxt
+  raw_commit ~time ~message:"Genesis" ctxt >>= fun commit ->
+  GitStore.Branch.set index.repo (get_branch net_id) commit >>= fun () ->
+  Lwt.return (GitStore.Commit.hash commit)
 
 let compute_testnet_genesis forked_block =
   let genesis = Block_hash.hash_bytes [Block_hash.to_bytes forked_block] in
   let net_id = Net_id.of_block_hash genesis in
   net_id, genesis
 
-let commit_test_network_genesis forked_block time ctxt =
+let commit_test_network_genesis index forked_block time ctxt =
+  Lwt_utils.Idle_waiter.task index.repack_scheduler @@ fun () ->
   let net_id, genesis = compute_testnet_genesis forked_block in
-  let task = Irmin.Task.create ~date:(Time.to_seconds time) ~owner:"Tezos" in
-  GitStore.clone task ctxt.store (Block_hash.to_b58check genesis) >>= function
-  | `Empty_head -> fail (Exn (Empty_head genesis))
-  | `Duplicated_branch -> fail (Exn (Preexistent_context genesis))
-  | `Ok store ->
-      let msg =
-        Format.asprintf "Forking testnet: %a." Net_id.pp_short net_id in
-      GitStore.FunView.update_path (store msg) [] ctxt.view >>= fun () ->
-      return (net_id, genesis)
+  let branch = get_branch net_id in
+  let message = Format.asprintf "Forking testnet: %s." branch in
+  raw_commit ~time ~message ctxt >>= fun commit ->
+  GitStore.Branch.set index.repo branch commit >>= fun () ->
+  return (net_id, genesis, GitStore.Commit.hash commit)
 
 let reset_test_network ctxt forked_block timestamp =
   get_test_network ctxt >>= function
@@ -333,3 +286,24 @@ let reset_test_network ctxt forked_block timestamp =
       set_test_network ctxt
         (Running { net_id ; genesis ;
                    protocol ; expiration })
+
+let clear_test_network index net_id =
+  (* TODO remove commits... ??? *)
+  Lwt_utils.Idle_waiter.task index.repack_scheduler @@ fun () ->
+  let branch = get_branch net_id in
+  GitStore.Branch.remove index.repo branch
+
+let set_head index net_id commit =
+  Lwt_utils.Idle_waiter.task index.repack_scheduler @@ fun () ->
+  let branch = get_branch net_id in
+  GitStore.Commit.of_hash index.repo commit >>= function
+  | None -> assert false
+  | Some commit ->
+      GitStore.Branch.set index.repo branch commit
+
+let set_master index commit =
+  Lwt_utils.Idle_waiter.task index.repack_scheduler @@ fun () ->
+  GitStore.Commit.of_hash index.repo commit >>= function
+  | None -> assert false
+  | Some commit ->
+      GitStore.Branch.set index.repo GitStore.Branch.master commit

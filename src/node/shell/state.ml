@@ -95,9 +95,10 @@ type t = global_state
 
 module Locked_block = struct
 
-  let store_genesis context_index store genesis =
+  let store_genesis store genesis commit =
+    let net_id = Net_id.of_block_hash genesis.block in
     let shell : Block_header.shell_header = {
-      net_id = Net_id.of_block_hash genesis.block;
+      net_id ;
       level = 0l ;
       proto_level = 0 ;
       predecessor = genesis.block ;
@@ -108,12 +109,8 @@ module Locked_block = struct
     let header : Block_header.t = { shell ; proto = MBytes.create 0 } in
     Store.Block.Contents.store (store, genesis.block)
       { Store.Block.header ; message = "Genesis" ;
-        operation_list_count = 0 ; max_operations_ttl = 0 } >>= fun () ->
-    Context.commit_genesis
-      context_index
-      ~id:genesis.block
-      ~time:genesis.time
-      ~protocol:genesis.protocol >>= fun _context ->
+        operation_list_count = 0 ; max_operations_ttl = 0 ;
+        context = commit } >>= fun () ->
     Lwt.return header
 
 end
@@ -168,7 +165,7 @@ module Net = struct
 
   let locked_create
       data ?expiration ?(allow_forked_network = false)
-      net_id genesis =
+      net_id genesis commit =
     let net_store = Store.Net.get data.global_store net_id in
     let block_store = Store.Block.get net_store
     and chain_store = Store.Chain.get net_store in
@@ -189,7 +186,7 @@ module Net = struct
         Lwt.return_unit
     end >>= fun () ->
     Locked_block.store_genesis
-      data.context_index block_store genesis >>= fun _genesis_header ->
+      block_store genesis commit >>= fun _genesis_header ->
     allocate
       ~genesis
       ~current_head:genesis.block
@@ -205,8 +202,13 @@ module Net = struct
       if Net_id.Table.mem data.nets net_id then
         Pervasives.failwith "State.Net.create"
       else
+        Context.commit_genesis
+          data.context_index
+          ~net_id
+          ~time:genesis.time
+          ~protocol:genesis.protocol >>= fun commit ->
         locked_create
-          data ?allow_forked_network net_id genesis >>= fun net ->
+          data ?allow_forked_network net_id genesis commit >>= fun net ->
         Net_id.Table.add data.nets net_id net ;
         Lwt.return net
     end
@@ -356,19 +358,22 @@ module Block = struct
             Block_hash.pp_short hash
             block_header.shell.level
             Fitness.pp fitness in
-    let contents = {
-      Store.Block.header = block_header ;
-      message ;
-      operation_list_count = List.length operations ;
-      max_operations_ttl ;
-    } in
     Shared.use net_state.block_store begin fun store ->
       Store.Block.Invalid_block.known store hash >>= fun known_invalid ->
       fail_when known_invalid (failure "Known invalid") >>=? fun () ->
       Store.Block.Contents.known (store, hash) >>= fun known ->
       if known then
-        return false
+        return None
       else begin
+        Context.commit
+          ~time:block_header.shell.timestamp ~message context >>= fun commit ->
+        let contents = {
+          Store.Block.header = block_header ;
+          message ;
+          operation_list_count = List.length operations ;
+          max_operations_ttl ;
+          context = commit ;
+        } in
         Store.Block.Contents.store (store, hash) contents >>= fun () ->
         let hashes = List.map (List.map Operation.hash) operations in
         let list_hashes = List.map Operation_list_hash.compute hashes in
@@ -382,24 +387,18 @@ module Block = struct
         Lwt_list.iteri_p
           (fun i ops -> Store.Block.Operations.store (store, hash) i ops)
           operations >>= fun () ->
-        Context.commit
-          hash block_header.shell.timestamp message context >>= fun () ->
-        return true
+        (* Update the chain state. *)
+        Shared.use net_state.chain_state begin fun chain_state ->
+          let store = chain_state.chain_store in
+          let predecessor = block_header.shell.predecessor in
+          Store.Chain.Known_heads.remove store predecessor >>= fun () ->
+          Store.Chain.Known_heads.store store hash
+        end >>= fun () ->
+        let block = { net_state ; hash ; contents } in
+        Watcher.notify net_state.block_watcher block ;
+        return (Some block)
       end
-    end >>=? fun commited ->
-    if not commited then
-      return None
-    else
-      (* Update the chain state. *)
-      Shared.use net_state.chain_state begin fun chain_state ->
-        let store = chain_state.chain_store in
-        let predecessor = block_header.shell.predecessor in
-        Store.Chain.Known_heads.remove store predecessor >>= fun () ->
-        Store.Chain.Known_heads.store store hash
-      end >>= fun () ->
-      let block = { net_state ; hash ; contents } in
-      Watcher.notify net_state.block_watcher block ;
-      return (Some block)
+    end
 
   let store_invalid net_state block_header =
     let bytes = Block_header.to_bytes block_header in
@@ -452,21 +451,20 @@ module Block = struct
     end
 
   let context { net_state ; hash } =
+    Shared.use net_state.block_store begin fun block_store ->
+      Store.Block.Contents.read_exn (block_store, hash)
+    end  >>= fun { context = commit } ->
     Shared.use net_state.context_index begin fun context_index ->
-      Context.checkout_exn context_index hash
+      Context.checkout_exn context_index commit
     end
 
-  let protocol_hash { net_state ; hash } =
-    Shared.use net_state.context_index begin fun context_index ->
-      Context.checkout_exn context_index hash >>= fun context ->
-      Context.get_protocol context
-    end
+  let protocol_hash block =
+    context block >>= fun context ->
+    Context.get_protocol context
 
-  let test_network { net_state ; hash } =
-    Shared.use net_state.context_index begin fun context_index ->
-      Context.checkout_exn context_index hash >>= fun context ->
-      Context.get_test_network context
-    end
+  let test_network block =
+    context block >>= fun context ->
+    Context.get_test_network context
 
 end
 
@@ -495,15 +493,15 @@ let fork_testnet state block protocol expiration =
     Context.set_test_network context Not_running >>= fun context ->
     Context.set_protocol context protocol >>= fun context ->
     Context.commit_test_network_genesis
-      block.hash block.contents.header.shell.timestamp
-      context >>=? fun (net_id, genesis) ->
+      data.context_index block.hash block.contents.header.shell.timestamp
+      context >>=? fun (net_id, genesis, commit) ->
     let genesis = {
       block = genesis ;
       time = Time.add block.contents.header.shell.timestamp 1L ;
       protocol ;
     } in
     Net.locked_create data
-      net_id ~expiration genesis >>= fun net ->
+      net_id ~expiration genesis commit >>= fun net ->
     return net
   end
 

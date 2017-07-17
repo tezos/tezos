@@ -207,15 +207,14 @@ NODE_LIB_INTFS := \
   node/net/p2p.mli \
   node/net/RPC_server.mli \
   \
+  node/db/persist.mli \
+  node/db/context.mli \
+  \
   node/db/store_sigs.mli \
   node/db/raw_store.mli \
   node/db/store_sigs.mli \
   node/db/store_helpers.mli \
   node/db/store.mli \
-  \
-  node/db/ir_funview.mli \
-  node/db/persist.mli \
-  node/db/context.mli \
   \
   node/updater/protocol_sigs.mli \
   node/updater/updater.mli \
@@ -254,14 +253,13 @@ FULL_NODE_LIB_IMPLS := \
   \
   node/net/RPC_server.ml \
   \
+  node/db/persist.ml \
+  node/db/context.ml \
+  \
   node/db/raw_store.ml \
   node/db/store_sigs.mli \
   node/db/store_helpers.ml \
   node/db/store.ml \
-  \
-  node/db/ir_funview.ml \
-  node/db/persist.ml \
-  node/db/context.ml \
   \
   node/updater/protocol_sigs.mli \
   node/updater/updater.ml \
@@ -312,7 +310,7 @@ NODE_PACKAGES := \
   dynlink \
   git \
   ipv6-multicast \
-  irmin.unix \
+  irmin-unix \
   ocplib-resto.directory \
   ssl \
   threads.posix \

@@ -16,6 +16,11 @@ type index
 type t
 type context = t
 
+type commit
+
+val dummy_commit: commit
+val commit_encoding: commit Data_encoding.t
+
 (** Open or initialize a versioned store at a given path. *)
 val init:
   ?patch_context:(context -> context Lwt.t) ->
@@ -24,14 +29,14 @@ val init:
 
 val commit_genesis:
   index ->
-  id:Block_hash.t ->
+  net_id:Net_id.t ->
   time:Time.t ->
   protocol:Protocol_hash.t ->
-  context Lwt.t
+  commit Lwt.t
 
 val commit_test_network_genesis:
-  Block_hash.t -> Time.t -> context ->
-  (Net_id.t * Block_hash.t) tzresult Lwt.t
+  index -> Block_hash.t -> Time.t -> context ->
+  (Net_id.t * Block_hash.t * commit) tzresult Lwt.t
 
 (** {2 Generic interface} ****************************************************)
 
@@ -39,15 +44,16 @@ include Persist.STORE with type t := context
 
 (** {2 Accessing and Updating Versions} **************************************)
 
-exception Preexistent_context of Block_hash.t
-val exists: index -> Block_hash.t -> bool Lwt.t
-val checkout: index -> Block_hash.t -> context option Lwt.t
-val checkout_exn: index -> Block_hash.t -> context Lwt.t
+val exists: index -> commit -> bool Lwt.t
+val checkout: index -> commit -> context option Lwt.t
+val checkout_exn: index -> commit -> context Lwt.t
 val commit:
-  Block_hash.t ->
   time:Time.t ->
   message:string ->
-  context -> unit Lwt.t
+  context ->
+  commit Lwt.t
+val set_head: index -> Net_id.t -> commit -> unit Lwt.t
+val set_master: index -> commit -> unit Lwt.t
 
 (** {2 Predefined Fields} ****************************************************)
 
@@ -77,3 +83,4 @@ val reset_test_network: context -> Block_hash.t -> Time.t -> context Lwt.t
 
 val fork_test_network:
   context -> protocol:Protocol_hash.t -> expiration:Time.t -> context Lwt.t
+val clear_test_network: index -> Net_id.t -> unit Lwt.t
