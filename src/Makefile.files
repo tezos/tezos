@@ -121,7 +121,7 @@ UTILS_PACKAGES := \
   ezjsonm \
   ipaddr.unix \
   lwt.unix \
-  mtime.os \
+  mtime.clock.os \
   nocrypto \
   sodium \
   zarith \
