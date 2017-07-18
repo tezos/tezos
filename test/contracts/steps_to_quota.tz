@@ -1,4 +1,4 @@
 parameter unit;
-return uint32;
+return nat;
 storage unit;
 code {DROP; UNIT; STEPS_TO_QUOTA; PAIR};

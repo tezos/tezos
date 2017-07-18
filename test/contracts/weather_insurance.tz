@@ -1,7 +1,7 @@
 # (pair signed_weather_data actual_level)
-parameter (pair signature uint16);
+parameter (pair signature nat);
 # (pair (under_key over_key) (pair weather_service_key (pair rain_level days_in_future)))
-storage (pair (pair (contract unit unit) (contract unit unit)) (pair uint16 key));
+storage (pair (pair (contract unit unit) (contract unit unit)) (pair nat key));
 return unit;
 code {DUP; DUP;
       CAR; DUP; DIP{CDR; H}; CAR; PAIR;
