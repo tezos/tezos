@@ -169,6 +169,7 @@ with the following JSON script description.
       | "NANAN"
       | "MANAGER"
       | "TRANSFER_FUNDS"
+      | "DEFAULT_ACCOUNT"
       | "CREATE_ACCOUNT"
       | "CREATE_CONTRACT"
       | "NOW"

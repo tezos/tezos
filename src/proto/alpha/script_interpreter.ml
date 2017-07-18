@@ -456,6 +456,9 @@ let rec interp
                 ~manager ~delegate ~balance
                 ?script:None ~spendable:true ~delegatable >>=? fun (ctxt, contract, origination) ->
               logged_return ~origination (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
+          | Default_account, Item (key, rest) ->
+              let contract = Contract.default_contract key in
+              logged_return (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
           | Create_contract (g, p, r),
             Item (manager, Item (delegate, Item (delegatable, Item (credit,
                                                                     Item (Lam (_, code), Item (init, rest)))))) ->

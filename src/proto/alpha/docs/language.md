@@ -1120,6 +1120,14 @@ for under/overflows.
 
         :: 'S   ->   tez :: 'S
 
+   * `DEFAULT_ACCOUNT`:
+     Return a default contract with the given public/private key pair.
+     Any funds deposited in this contract can immediately be spent by the
+     holder of the private key. This contract cannot execute Michelson code
+     and will always exist on the blockchain.
+
+        :: key : 'S   ->   contract unit unit :: 'S
+
 ### Special operations
 
    * `STEPS_TO_QUOTA`:

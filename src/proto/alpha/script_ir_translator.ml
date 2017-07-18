@@ -1247,6 +1247,10 @@ and parse_instr
                  (Tez_t, rest)))) ->
         return (typed loc (Create_account,
                            Item_t (Contract_t (Unit_t, Unit_t), rest)))
+    | Prim (loc, "DEFAULT_ACCOUNT", []),
+      Item_t (Key_t, rest) ->
+        return
+          (typed loc (Default_account, Item_t (Contract_t (Unit_t, Unit_t), rest)))
     | Prim (loc, "CREATE_CONTRACT", []),
       Item_t
         (Key_t, Item_t
@@ -1296,7 +1300,8 @@ and parse_instr
                  | "COMPARE" | "EQ" | "NEQ"
                  | "LT" | "GT" | "LE" | "GE"
                  | "MANAGER" | "TRANSFER_TOKENS" | "CREATE_ACCOUNT"
-                 | "CREATE_CONTRACT" | "NOW" | "AMOUNT" | "BALANCE"
+                 | "CREATE_CONTRACT" | "NOW"
+                 | "DEFAULT_ACCOUNT" | "AMOUNT" | "BALANCE"
                  | "CHECK_SIGNATURE" | "H" | "STEPS_TO_QUOTA"
                  as name), (_ :: _ as l)), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
@@ -1339,7 +1344,7 @@ and parse_instr
         fail (Bad_stack (loc, "TRANSFER_TOKENS", 3, stack))
     | Prim (loc, ("DROP" | "DUP" | "CAR" | "CDR" | "SOME" | "H" | "DIP"
                  | "IF_NONE" | "LEFT" | "RIGHT" | "IF_LEFT" | "IF"
-                 | "LOOP" | "IF_CONS" | "MANAGER"
+                 | "LOOP" | "IF_CONS" | "MANAGER" | "DEFAULT_ACCOUNT"
                  | "NEG" | "ABS" | "NOT"
                  | "EQ" | "NEQ" | "LT" | "GT" | "LE" | "GE" as name), _),
       stack ->
@@ -1369,7 +1374,7 @@ and parse_instr
             "LT" ; "GT" ; "LE" ; "GE" ;
             "MANAGER" ; "TRANSFER_TOKENS" ; "CREATE_ACCOUNT" ;
             "CREATE_CONTRACT" ; "NOW" ; "AMOUNT" ; "BALANCE" ;
-            "CHECK_SIGNATURE" ; "H" ; "STEPS_TO_QUOTA" ;
+            "DEFAULT_ACCOUNT" ; "CHECK_SIGNATURE" ; "H" ; "STEPS_TO_QUOTA" ;
             "PUSH" ; "NONE" ; "LEFT" ; "RIGHT" ; "NIL" ;
             "EMPTY_SET" ; "DIP" ; "CHECKED_CAST" ; "CAST" ; "LOOP" ;
             "IF_NONE" ; "IF_LEFT" ; "IF_CONS" ;
