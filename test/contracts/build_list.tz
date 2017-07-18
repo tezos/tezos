@@ -1,7 +1,7 @@
-parameter uint64;
-return (list uint64);
+parameter nat;
+return (list nat);
 storage unit;
-code {CAR; NIL uint64; SWAP; DUP; PUSH uint64 0; CMPNEQ;
-      LOOP {DUP; DIP {SWAP}; CONS; SWAP; PUSH uint64 1; SWAP; SUB;
-            DUP; PUSH uint64 0; CMPNEQ};
+code {CAR; NIL nat; SWAP; DUP; PUSH nat 0; CMPNEQ;
+      LOOP {DUP; DIP {SWAP}; CONS; SWAP; PUSH nat 1; SWAP; SUB;
+            DUP; DIP{ABS} ; PUSH int 0; CMPNEQ};
       CONS; UNIT; SWAP; PAIR};
