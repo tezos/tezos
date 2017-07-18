@@ -43,6 +43,7 @@ assert_output () {
 	local input=$2;
 	local storage=$3;
 	local expected=$4;
+  echo "Testing [$contract]"
 	local output=$(run_contract_file "$contract" "$input" "$storage" | sed '1,/output/d' |
 				       sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' ||
 				       { printf '\nTest failed with error at line %s\n' "$(caller)" > /dev/stderr;
@@ -82,6 +83,7 @@ init_with_transfer () {
     local INITIAL_STORAGE="$3"
     local TRANSFER_AMT="$4"
     local TRANSFER_SRC=${5-bootstrap1}
+    echo "Originating [$NAME]"
     ${TZCLIENT} originate contract ${NAME} \
                 for ${KEY} transferring "${TRANSFER_AMT}" \
                 from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}"
