@@ -267,6 +267,7 @@ and ('bef, 'aft) instr =
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
        (unit, unit) typed_contract * 'rest) instr
+  | Default_account : (public_key_hash * 'rest, (unit, unit) typed_contract * 'rest) instr
   | Create_contract : 'g ty * 'p ty * 'r ty ->
     (public_key_hash * (public_key_hash option * (bool * (Tez.t *
                                                           (((Tez.t * 'p) * 'g, 'r * 'g) lambda * ('g * 'rest))))),
