@@ -148,13 +148,13 @@ module Helpers = struct
     call_error_service1 cctxt Services.Helpers.apply_operation
       block (pred_block, hash, forged_operation, signature)
 
-  let run_code cctxt block code (storage, input) =
+  let run_code cctxt block code (storage, input, amount) =
     call_error_service1 cctxt Services.Helpers.run_code
-      block (code, storage, input, None, None, None)
+      block (code, storage, input, amount, None, None)
 
-  let trace_code cctxt block code (storage, input) =
+  let trace_code cctxt block code (storage, input, amount) =
     call_error_service1 cctxt Services.Helpers.trace_code
-      block (code, storage, input, None, None, None)
+      block (code, storage, input, amount, None, None)
 
   let typecheck_data cctxt =
     call_error_service1 cctxt Services.Helpers.typecheck_data

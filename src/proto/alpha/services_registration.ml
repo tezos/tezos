@@ -258,13 +258,6 @@ let () =
            | (_ctxt, _, Some script_err) -> Lwt.return (Error script_err)
            | (_ctxt, contracts, None) -> Lwt.return (Ok contracts)) ;
   let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =
-    let amount =
-      match amount with
-      | Some amount -> amount
-      | None ->
-          match Tez.of_cents 100_00L with
-          | Some tez -> tez
-          | None -> Tez.zero in
     let contract =
       match contract with
       | Some contract -> contract

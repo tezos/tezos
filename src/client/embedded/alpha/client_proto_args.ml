@@ -15,16 +15,6 @@ let tez_of_string s =
   | None -> invalid_arg "tez_of_string"
   | Some t -> t
 
-let fee = ref (tez_of_string "0.05")
-let fee_arg =
-  "-fee",
-  Arg.String (fun s ->
-      try fee := tez_of_string s
-      with _ -> raise (Arg.Bad "invalid \xEA\x9C\xA9 notation in parameter -fee")),
-  "The fee in \xEA\x9C\xA9 to pay to the miner.\n\
-   default: \'0.05\"\n\
-   text format: D,DDD,DDD.DD (centiles are optional, comas are optional)"
-
 let init = ref "Unit"
 let init_arg =
   "-init",
@@ -79,15 +69,36 @@ let delegatable_args =
     Arg.Clear delegatable,
     "Set the created contract to be non delegatable (default)" ]
 
+let tez_format = "text format: D,DDD,DDD.DD (centiles are optional, commas are optional)"
+
+let tez_arg ~name ~desc ~default =
+  let ref_cell = ref (tez_of_string default) in
+  (ref_cell,
+   (name,
+    Arg.String (fun s ->
+        try ref_cell := tez_of_string s
+        with _ -> raise (Arg.Bad
+                           ("invalid \xEA\x9C\xA9 notation in parameter " ^ name))),
+    (Printf.sprintf
+       "%s\ndefault: \"%s\"\n%s"
+       desc
+       default
+       tez_format)))
+
 let tez_param ~name ~desc next =
   Cli_entries.param
     name
-    (desc ^ " in \xEA\x9C\xA9\n\
-             text format: D,DDD,DDD.DD (centiles and comas are optional)")
+    (desc ^ " in \xEA\x9C\xA9\n" ^ tez_format)
     (fun _ s ->
        try return (tez_of_string s)
        with _ -> failwith "invalid \xEA\x9C\xA9 notation")
     next
+
+let fee, fee_arg =
+  tez_arg
+    ~name:"-fee"
+    ~desc:"The fee in \xEA\x9C\xA9 to pay to the miner."
+    ~default:"0.05"
 
 let max_priority = ref None
 let max_priority_arg =
