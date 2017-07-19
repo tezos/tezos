@@ -16,7 +16,8 @@ open Script_typed_ir
 
 (* Auxiliary types for error documentation *)
 type namespace = Type_namespace | Constant_namespace | Instr_namespace
-type kind =  Int_kind | String_kind | Prim_kind | Seq_kind
+type kind = Int_kind | String_kind | Prim_kind | Seq_kind
+type type_map = (int * (Script.expr list * Script.expr list)) list
 
 (* Structure errors *)
 type error += Invalid_arity of Script.location * string * int * int
@@ -47,7 +48,7 @@ type error += Bad_sign : _ ty -> error
 (* Toplevel errors *)
 type error += Ill_typed_data : string option * Script.expr * _ ty -> error
 type error += Ill_formed_type of string option * Script.expr
-type error += Ill_typed_contract : Script.expr * _ ty * _ ty * _ ty -> error
+type error += Ill_typed_contract : Script.expr * _ ty * _ ty * _ ty * type_map -> error
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -611,9 +612,17 @@ let comparable_ty_of_ty
     | Timestamp_t -> ok Timestamp_key
     | ty -> error (Comparable_type_expected (loc, ty))
 
+let rec unparse_stack
+  : type a. a stack_ty -> Script.expr list
+  = function
+    | Empty_t -> []
+    | Item_t (ty, rest) -> unparse_ty ty :: unparse_stack rest
+
 let rec parse_data
-  : type a. context -> a ty -> Script.expr -> a tzresult Lwt.t
-  = fun ctxt ty script_data ->
+  : type a.
+    ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
+    context -> a ty -> Script.expr -> a tzresult Lwt.t
+  = fun ?type_logger ctxt ty script_data ->
     let error () =
       Invalid_constant (location script_data, script_data, ty) in
     let traced body =
@@ -699,8 +708,8 @@ let rec parse_data
     (* Pairs *)
     | Pair_t (ta, tb), Prim (_, "Pair", [ va; vb ]) ->
         traced @@
-        parse_data ctxt ta va >>=? fun va ->
-        parse_data ctxt tb vb >>=? fun vb ->
+        parse_data ?type_logger ctxt ta va >>=? fun va ->
+        parse_data ?type_logger ctxt tb vb >>=? fun vb ->
         return (va, vb)
     | Pair_t _, Prim (loc, "Pair", l) ->
         fail @@ Invalid_arity (loc, "Pair", 2, List.length l)
@@ -709,13 +718,13 @@ let rec parse_data
     (* Unions *)
     | Union_t (tl, _), Prim (_, "Left", [ v ]) ->
         traced @@
-        parse_data ctxt tl v >>=? fun v ->
+        parse_data ?type_logger ctxt tl v >>=? fun v ->
         return (L v)
     | Union_t _, Prim (loc, "Left", l) ->
         fail @@ Invalid_arity (loc, "Left", 1, List.length l)
     | Union_t (_, tr), Prim (_, "Right", [ v ]) ->
         traced @@
-        parse_data ctxt tr v >>=? fun v ->
+        parse_data ?type_logger ctxt tr v >>=? fun v ->
         return (R v)
     | Union_t _, Prim (loc, "Right", l) ->
         fail @@ Invalid_arity (loc, "Right", 1, List.length l)
@@ -724,13 +733,13 @@ let rec parse_data
     (* Lambdas *)
     | Lambda_t (ta, tr), (Seq _ as script_instr) ->
         traced @@
-        parse_lambda ctxt ta tr script_instr
+        parse_lambda ?type_logger ctxt ta tr script_instr
     | Lambda_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Options *)
     | Option_t t, Prim (_, "Some", [ v ]) ->
         traced @@
-        parse_data ctxt t v >>=? fun v ->
+        parse_data ?type_logger ctxt t v >>=? fun v ->
         return (Some v)
     | Option_t _, Prim (loc, "Some", l) ->
         fail @@ Invalid_arity (loc, "Some", 1, List.length l)
@@ -745,7 +754,7 @@ let rec parse_data
         traced @@
         fold_left_s
           (fun rest v ->
-             parse_data ctxt t v >>=? fun v ->
+             parse_data ?type_logger ctxt t v >>=? fun v ->
              return (v :: rest))
           [] vs
     | List_t _, expr ->
@@ -755,7 +764,7 @@ let rec parse_data
         traced @@
         fold_left_s
           (fun acc v ->
-             parse_comparable_data ctxt t v >>=? fun v ->
+             parse_comparable_data ?type_logger ctxt t v >>=? fun v ->
              return (set_update v true acc))
           (empty_set t) vs
     | Set_t _, expr ->
@@ -766,8 +775,8 @@ let rec parse_data
         fold_left_s
           (fun acc -> function
              | Prim (_, "Item", [ k; v ]) ->
-                 parse_comparable_data ctxt tk k >>=? fun k ->
-                 parse_data ctxt tv v >>=? fun v ->
+                 parse_comparable_data ?type_logger ctxt tk k >>=? fun k ->
+                 parse_data ?type_logger ctxt tv v >>=? fun v ->
                  return (map_update k (Some v) acc)
              | Prim (loc, "Item", l) ->
                  fail @@ Invalid_arity (loc, "Item", 2, List.length l)
@@ -780,16 +789,19 @@ let rec parse_data
         traced (fail (unexpected expr [] Constant_namespace [ "Map" ]))
 
 and parse_comparable_data
-  : type a. context -> a comparable_ty -> Script.expr -> a tzresult Lwt.t
-  = fun ctxt ty script_data ->
-    parse_data ctxt (ty_of_comparable_ty ty) script_data
+  : type a. ?type_logger:(int * (Script.expr list * Script.expr list) -> unit) ->
+    context -> a comparable_ty -> Script.expr -> a tzresult Lwt.t
+  = fun ?type_logger ctxt ty script_data ->
+    parse_data ?type_logger ctxt (ty_of_comparable_ty ty) script_data
 
 and parse_lambda
   : type arg ret storage. context ->
     ?storage_type: storage ty ->
+    ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
     arg ty -> ret ty -> Script.expr -> (arg, ret) lambda tzresult Lwt.t =
-  fun ctxt ?storage_type arg ret script_instr ->
-    parse_instr ctxt ?storage_type script_instr (Item_t (arg, Empty_t)) >>=? function
+  fun ctxt ?storage_type ?type_logger arg ret script_instr ->
+    parse_instr ctxt ?storage_type ?type_logger
+      script_instr (Item_t (arg, Empty_t)) >>=? function
     | Typed ({ loc ; aft = (Item_t (ty, Empty_t) as stack_ty) } as descr) ->
         trace
           (Bad_return (loc, stack_ty, ret))
@@ -803,8 +815,9 @@ and parse_lambda
 and parse_instr
   : type bef storage. context ->
     ?storage_type: storage ty ->
+    ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
     Script.expr -> bef stack_ty -> bef judgement tzresult Lwt.t =
-  fun ctxt ?storage_type script_instr stack_ty ->
+  fun ctxt ?storage_type ?type_logger script_instr stack_ty ->
     let return : bef judgement -> bef judgement tzresult Lwt.t = return in
     let check_item check loc name n m =
       trace (Bad_stack (loc, name, m, stack_ty)) @@
@@ -813,6 +826,10 @@ and parse_instr
     let check_item_ty exp got loc n =
       check_item (ty_eq exp got) loc n in
     let typed loc (instr, aft) =
+      begin match type_logger with
+        | Some log -> log (loc, (unparse_stack stack_ty, unparse_stack aft))
+        | None -> ()
+      end ;
       Typed { loc ; instr ; bef = stack_ty ; aft } in
     match script_instr, stack_ty with
     (* stack ops *)
@@ -828,7 +845,7 @@ and parse_instr
     | Prim (loc, "PUSH", [ t ; d ]),
       stack ->
         (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t) ->
-        parse_data ctxt t d >>=? fun v ->
+        parse_data ?type_logger ctxt t d >>=? fun v ->
         return (typed loc (Const v, Item_t (t, stack)))
     | Prim (loc, "UNIT", []),
       stack ->
@@ -845,8 +862,8 @@ and parse_instr
       (Item_t (Option_t t, rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt rest >>=? fun btr ->
-        parse_instr ?storage_type ctxt bf (Item_t (t, rest)) >>=? fun bfr ->
+        parse_instr ?storage_type ?type_logger ctxt bt rest >>=? fun btr ->
+        parse_instr ?storage_type ?type_logger ctxt bf (Item_t (t, rest)) >>=? fun bfr ->
         let branch ibt ibf =
           { loc ; instr = If_none (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
@@ -873,8 +890,8 @@ and parse_instr
       (Item_t (Union_t (tl, tr), rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt (Item_t (tl, rest)) >>=? fun btr ->
-        parse_instr ?storage_type ctxt bf (Item_t (tr, rest)) >>=? fun bfr ->
+        parse_instr ?storage_type ?type_logger ctxt bt (Item_t (tl, rest)) >>=? fun btr ->
+        parse_instr ?storage_type ?type_logger ctxt bf (Item_t (tr, rest)) >>=? fun bfr ->
         let branch ibt ibf =
           { loc ; instr = If_left (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
@@ -891,8 +908,8 @@ and parse_instr
       (Item_t (List_t t, rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt (Item_t (t, Item_t (List_t t, rest))) >>=? fun btr ->
-        parse_instr ?storage_type ctxt bf rest >>=? fun bfr ->
+        parse_instr ?storage_type ?type_logger ctxt bt (Item_t (t, Item_t (List_t t, rest))) >>=? fun btr ->
+        parse_instr ?storage_type ?type_logger ctxt bf rest >>=? fun bfr ->
         let branch ibt ibf =
           { loc ; instr = If_cons (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
@@ -979,14 +996,14 @@ and parse_instr
         return (typed loc (Nop, stack))
     | Seq (_, [ single ]),
       stack ->
-        parse_instr ?storage_type ctxt single stack
+        parse_instr ?storage_type ?type_logger ctxt single stack
     | Seq (loc, hd :: tl),
       stack ->
-        parse_instr ?storage_type ctxt hd stack >>=? begin function
+        parse_instr ?storage_type ?type_logger ctxt hd stack >>=? begin function
           | Failed _ ->
               fail (Fail_not_in_tail_position loc)
           | Typed ({ aft = middle } as ihd) ->
-              parse_instr ?storage_type ctxt (Seq (loc, tl)) middle >>=? function
+              parse_instr ?storage_type ?type_logger ctxt (Seq (loc, tl)) middle >>=? function
               | Failed { descr } ->
                   let descr ret =
                     { loc ; instr = Seq (ihd, descr ret) ;
@@ -999,15 +1016,15 @@ and parse_instr
       (Item_t (Bool_t, rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt rest >>=? fun btr ->
-        parse_instr ?storage_type ctxt bf rest >>=? fun bfr ->
+        parse_instr ?storage_type ?type_logger ctxt bt rest >>=? fun btr ->
+        parse_instr ?storage_type ?type_logger ctxt bf rest >>=? fun bfr ->
         let branch ibt ibf =
           { loc ; instr = If (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
     | Prim (loc, "LOOP", [ body ]),
       (Item_t (Bool_t, rest) as stack) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_instr ?storage_type ctxt body rest >>=? begin function
+        parse_instr ?storage_type ?type_logger ctxt body rest >>=? begin function
           | Typed ibody ->
               trace
                 (Unmatched_branches (loc, ibody.aft, stack))
@@ -1022,7 +1039,7 @@ and parse_instr
         (Lwt.return (parse_ty arg)) >>=? fun (Ex_ty arg) ->
         (Lwt.return (parse_ty ret)) >>=? fun (Ex_ty ret) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
-        parse_lambda ctxt arg ret code >>=? fun lambda ->
+        parse_lambda ?type_logger ctxt arg ret code >>=? fun lambda ->
         return (typed loc (Lambda lambda, Item_t (Lambda_t (arg, ret), stack)))
     | Prim (loc, "EXEC", []),
       Item_t (arg, Item_t (Lambda_t (param, ret), rest)) ->
@@ -1031,7 +1048,7 @@ and parse_instr
     | Prim (loc, "DIP", [ code ]),
       Item_t (v, rest) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
-        parse_instr ctxt code rest >>=? begin function
+        parse_instr ?type_logger ctxt code rest >>=? begin function
           | Typed descr ->
               return (typed loc (Dip descr, Item_t (v, descr.aft)))
           | Failed _ ->
@@ -1410,8 +1427,9 @@ and parse_contract
 type ex_script = Ex_script : ('a, 'b, 'c) script -> ex_script
 
 let parse_script
-  : context -> Script.storage -> Script.code -> ex_script tzresult Lwt.t
-  = fun ctxt
+  : ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
+  context -> Script.storage -> Script.code -> ex_script tzresult Lwt.t
+  = fun ?type_logger ctxt
     { storage; storage_type = init_storage_type }
     { code; arg_type; ret_type; storage_type } ->
     (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
@@ -1421,12 +1439,11 @@ let parse_script
     let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
     let ret_type_full = Pair_t (ret_type, storage_type) in
     Lwt.return (ty_eq init_storage_type storage_type) >>=? fun (Eq _) ->
-    parse_data ctxt storage_type storage >>=? fun storage ->
-    parse_lambda ctxt ~storage_type arg_type_full ret_type_full code >>=? fun code ->
+    parse_data ?type_logger ctxt storage_type storage >>=? fun storage ->
+    trace
+      (Ill_typed_contract (code, arg_type, ret_type, storage_type, []))
+      (parse_lambda ctxt ~storage_type ?type_logger arg_type_full ret_type_full code) >>=? fun code ->
     return (Ex_script { code; arg_type; ret_type; storage; storage_type })
-
-type type_map =
-  (int * (Script.expr list * Script.expr list)) list
 
 let type_map_enc =
   let open Data_encoding in
@@ -1438,11 +1455,6 @@ let type_map_enc =
           (list Script.expr_encoding)))
 
 let type_map descr =
-  let rec unparse_stack
-    : type a. a stack_ty -> Script.expr list
-    = function
-      | Empty_t -> []
-      | Item_t (ty, rest) -> unparse_ty ty :: unparse_stack rest in
   let rec type_map
     : type bef aft. type_map -> (bef, aft) descr -> type_map
     = fun acc { loc ; instr ; bef ; aft } ->
@@ -1482,6 +1494,7 @@ let type_map descr =
 let typecheck_code
   : context -> Script.code -> type_map tzresult Lwt.t
   = fun ctxt { code; arg_type; ret_type; storage_type } ->
+    let failure_type_map = ref [] in
     trace
       (Ill_formed_type (Some "parameter", arg_type))
       (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
@@ -1494,21 +1507,24 @@ let typecheck_code
     let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
     let ret_type_full = Pair_t (ret_type, storage_type) in
     trace
-      (Ill_typed_contract (code, arg_type, ret_type, storage_type))
+      (Ill_typed_contract (code, arg_type, ret_type, storage_type, !failure_type_map))
       (parse_lambda ctxt
-         ~storage_type arg_type_full ret_type_full
+         ~storage_type
+         ~type_logger:(fun x -> failure_type_map := x :: !failure_type_map)
+         arg_type_full ret_type_full
          code) >>=? fun (Lam (descr,_)) ->
     return (type_map descr)
 
 let typecheck_data
-  : context -> Script.expr * Script.expr -> unit tzresult Lwt.t
-  = fun ctxt (data, exp_ty) ->
+  : ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
+  context -> Script.expr * Script.expr -> unit tzresult Lwt.t
+  = fun ?type_logger ctxt (data, exp_ty) ->
     trace
       (Ill_formed_type (None, exp_ty))
       (Lwt.return (parse_ty exp_ty)) >>=? fun (Ex_ty exp_ty) ->
     trace
       (Ill_typed_data (None, data, exp_ty))
-      (parse_data ctxt exp_ty data) >>=? fun _ ->
+      (parse_data ?type_logger ctxt exp_ty data) >>=? fun _ ->
     return ()
 
 (* ---- Error registration --------------------------------------------------*)
@@ -1898,14 +1914,15 @@ let () =
       "The toplevel error thrown when trying to typecheck \
        a contract code against given input, output and storage types \
        (always followed by more precise errors)."
-    (obj4
+    (obj5
        (req "expectedParameterType" ex_ty_enc)
        (req "expectedReturnType" ex_ty_enc)
        (req "expectedStorageType" ex_ty_enc)
-       (req "illTypedExpression" Script.expr_encoding))
+       (req "illTypedExpression" Script.expr_encoding)
+       (req "typeMap" type_map_enc))
     (function
-      | Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty) ->
-          Some (Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty, expr)
+      | Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty, type_map) ->
+          Some (Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty, expr, type_map)
       | _ -> None)
-    (fun (Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty, expr) ->
-       Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty))
+    (fun (Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty, expr, type_map) ->
+       Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty, type_map))

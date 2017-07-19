@@ -178,7 +178,7 @@ let print_program locations ppf ((c : Script.code), type_map) =
     (print_expr no_locations) c.ret_type
     (print_typed_code locations) (c.code, type_map)
 
-let report_typechecking_errors cctxt errs =
+let report_typechecking_errors ?show_types cctxt errs =
   let open Client_commands in
   let open Script_typed_ir in
   let open Script_ir_translator in
@@ -217,7 +217,7 @@ let report_typechecking_errors cctxt errs =
   let rec collect_locations acc = function
     | (Ill_typed_data (_, _, _)
       | Ill_formed_type (_, _)
-      | Ill_typed_contract (_, _, _, _)) :: _
+      | Ill_typed_contract (_, _, _, _, _)) :: _
     | [] ->
         let assoc, _ =
           List.fold_left
@@ -272,7 +272,10 @@ let report_typechecking_errors cctxt errs =
              | Some s -> Format.fprintf ppf "%s " s)
           name
           (print_expr locations) expr
-    | Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty) ->
+    | Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty, type_map) ->
+        (match show_types with
+         | Some prog -> cctxt.message "%a\n" (print_program no_locations) (prog, type_map)
+         | None -> Lwt.return ()) >>= fun () ->
         cctxt.warning
           "@[<v 2>Ill typed contract:@ %a@]"
           (print_program locations)
@@ -420,7 +423,7 @@ let report_typechecking_errors cctxt errs =
     let locations = match errs with
       | (Ill_typed_data (_, _, _)
         | Ill_formed_type (_, _)
-        | Ill_typed_contract (_, _, _, _)) :: rest ->
+        | Ill_typed_contract (_, _, _, _, _)) :: rest ->
           collect_locations [] rest
       | _ -> locations in
     match errs with
@@ -636,7 +639,8 @@ let commands () =
                return ()
              else return ()
          | Error errs ->
-             report_typechecking_errors cctxt errs >>= fun () ->
+             report_typechecking_errors
+               ?show_types:(if !show_types then Some program else None) cctxt errs >>= fun () ->
              failwith "ill-typed program") ;
 
     command ~group ~desc: "ask the node to typecheck a data expression"
