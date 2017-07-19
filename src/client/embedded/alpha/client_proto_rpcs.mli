@@ -153,12 +153,12 @@ module Helpers : sig
   val run_code:
     Client_rpcs.config ->
     block -> Script.code ->
-    (Script.expr * Script.expr) ->
+    (Script.expr * Script.expr * Tez.t) ->
     (Script.expr * Script.expr) tzresult Lwt.t
   val trace_code:
     Client_rpcs.config ->
     block -> Script.code ->
-    (Script.expr * Script.expr) ->
+    (Script.expr * Script.expr * Tez.t) ->
     (Script.expr * Script.expr *
      (Script.location * int * Script.expr list) list) tzresult Lwt.t
   val typecheck_code:

@@ -535,6 +535,11 @@ let commands () =
     "-trace-stack",
     Arg.Set trace_stack,
     "Show the stack after each step" in
+  let amount, amount_arg =
+    Client_proto_args.tez_arg
+      ~name:"-amount"
+      ~desc:"The amount of the transfer in \xEA\x9C\xA9."
+      ~default: "0.00" in
   [
 
     command ~group ~desc: "lists all known programs"
@@ -567,7 +572,7 @@ let commands () =
          return ()) ;
 
     command ~group ~desc: "ask the node to run a program"
-      ~args: [ trace_stack_arg ]
+      ~args: [ trace_stack_arg ; amount_arg ]
       (prefixes [ "run" ; "program" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
@@ -581,7 +586,7 @@ let commands () =
          let open Data_encoding in
          if !trace_stack then
            Client_proto_rpcs.Helpers.trace_code cctxt.rpc_config
-             cctxt.config.block program (storage, input) >>= function
+             cctxt.config.block program (storage, input, !amount) >>= function
            | Ok (storage, output, trace) ->
                cctxt.message
                  "@[<v 0>@[<v 2>storage@,%a@]@,\
@@ -604,7 +609,7 @@ let commands () =
                return ()
          else
            Client_proto_rpcs.Helpers.run_code cctxt.rpc_config
-             cctxt.config.block program (storage, input) >>= function
+             cctxt.config.block program (storage, input, !amount) >>= function
            | Ok (storage, output) ->
                cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
                  (print_expr no_locations) storage

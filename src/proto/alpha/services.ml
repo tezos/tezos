@@ -361,7 +361,7 @@ module Helpers = struct
        (req "script" Script.code_encoding)
        (req "storage" Script.expr_encoding)
        (req "input" Script.expr_encoding)
-       (opt "amount" Tez.encoding)
+       (req "amount" Tez.encoding)
        (opt "contract" Contract.encoding)
        (opt "origination_nonce" Contract.origination_nonce_encoding))
 
