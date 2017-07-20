@@ -1810,7 +1810,6 @@ X - Full grammar
       | EXEC
       | DIP { <instruction> ... }
       | FAIL
-      | NOP
       | CONCAT
       | ADD
       | SUB
