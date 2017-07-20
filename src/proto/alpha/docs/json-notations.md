@@ -133,7 +133,6 @@ with the following JSON script description.
       | "EXEC"
       | { "DIP": [ [ /* instruction */ ... ] ] }
       | "FAIL"
-      | "NOP"
       | "CONCAT"
       | "ADD"
       | "SUB"

@@ -333,7 +333,7 @@ let rec interp
           | Fail, _ ->
               fail (Reject loc)
           | Nop, stack ->
-              logged_return (stack, qta - 1, ctxt)
+              logged_return (stack, qta, ctxt)
           (* comparison *)
           | Compare Bool_key, Item (a, Item (b, rest)) ->
               let cmpres = Compare.Bool.compare a b in

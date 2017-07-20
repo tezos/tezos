@@ -1041,9 +1041,6 @@ and parse_instr
       bef ->
         let descr aft = { loc ; instr = Fail ; bef ; aft } in
         return (Failed { descr })
-    | Prim (loc, "NOP", []),
-      stack ->
-        return (typed loc (Nop, stack))
     (* timestamp operations *)
     | Prim (loc, "ADD", []),
       Item_t (Timestamp_t, Item_t (Int_t kind, rest)) ->
@@ -1290,7 +1287,7 @@ and parse_instr
     | Prim (loc, ("DROP" | "DUP" | "SWAP" | "SOME" | "UNIT"
                  | "PAIR" | "CAR" | "CDR" | "CONS"
                  | "MEM" | "UPDATE" | "MAP" | "REDUCE"
-                 | "GET" | "EXEC" | "FAIL" | "NOP"
+                 | "GET" | "EXEC" | "FAIL"
                  | "CONCAT" | "ADD" | "SUB"
                  | "MUL" | "DIV" | "MOD" | "OR" | "AND" | "XOR"
                  | "NOT" | "CHECKED_ABS" | "CHECKED_NEG"
@@ -1362,7 +1359,7 @@ and parse_instr
           [ "DROP" ; "DUP" ; "SWAP" ; "SOME" ; "UNIT" ;
             "PAIR" ; "CAR" ; "CDR" ; "CONS" ;
             "MEM" ; "UPDATE" ; "MAP" ; "REDUCE" ;
-            "GET" ; "EXEC" ; "FAIL" ; "NOP" ;
+            "GET" ; "EXEC" ; "FAIL" ;
             "CONCAT" ; "ADD" ; "SUB" ;
             "MUL" ; "DIV" ; "MOD" ; "OR" ; "AND" ; "XOR" ;
             "NOT" ; "CHECKED_ABS" ; "CHECKED_NEG" ;
