@@ -607,7 +607,7 @@ let commands () =
                  trace >>= fun () ->
                return ()
            | Error errs ->
-               cctxt.warning "%a" pp_print_error errs >>= fun () ->
+               report_typechecking_errors cctxt errs >>= fun () ->
                cctxt.error "error running program" >>= fun () ->
                return ()
          else
@@ -619,7 +619,7 @@ let commands () =
                  (print_expr no_locations) output >>= fun () ->
                return ()
            | Error errs ->
-               cctxt.warning "%a" pp_print_error errs >>= fun () ->
+               report_typechecking_errors cctxt errs >>= fun () ->
                cctxt.error "error running program" >>= fun () ->
                return ()) ;
 

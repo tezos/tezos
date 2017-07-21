@@ -515,7 +515,9 @@ and execute ?log origination orig source ctxt storage script amount arg qta =
   (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
   let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
   let ret_type_full = Pair_t (ret_type, storage_type) in
-  parse_lambda ~storage_type ctxt arg_type_full ret_type_full code >>=? fun lambda ->
+  trace
+    (Ill_typed_contract (code, arg_type, ret_type, storage_type, []))
+    (parse_lambda ~storage_type ctxt arg_type_full ret_type_full code) >>=? fun lambda ->
   parse_data ctxt arg_type arg >>=? fun arg ->
   parse_data ctxt storage_type storage >>=? fun storage ->
   interp ?log origination qta orig source amount ctxt lambda ((amount, arg), storage)
