@@ -97,7 +97,7 @@ module Term = struct
     let doc =
       "Expected amount of proof-of-work for the node identity. \
        The optional parameter should be a float between 0 and 256, where
-       0 disable the proof-of-work mechanism. Default: 24" in
+       0 disables the proof-of-work mechanism." in
     Arg.(value & pos 1 (some float) None & info [] ~docv:"DIFFICULTY" ~doc)
 
   let term =
@@ -128,7 +128,7 @@ module Manpage = struct
         This is the default operation." ;
     `P "$(b,generate [difficulty]) generates an identity whose \
         proof of work stamp difficulty is at least equal to $(i,difficulty). \
-        The value provided must be a floating point number between 0 and 128. \
+        The value provided must be a floating point number between 0 and 256. \
         It roughly reflects the numbers of expected leading zeroes in the hash \
         of the identity data-structure. \
         Therefore, a value of 0 means no proof-of-work, and the difficulty \
