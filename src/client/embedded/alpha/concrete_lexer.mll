@@ -38,7 +38,9 @@ let curr_location lexbuf =
   lexbuf.Lexing.lex_start_p, lexbuf.Lexing.lex_curr_p
 
 let pos pos =
-  Lexing.(pos.pos_lnum, pos.pos_cnum - pos.pos_bol)
+  { line = pos.Lexing.pos_lnum ;
+    column = pos.Lexing.pos_cnum - pos.Lexing.pos_bol ;
+    point = pos.Lexing.pos_cnum }
 
 let pos2 (start, stop) =
   pos start, pos stop
