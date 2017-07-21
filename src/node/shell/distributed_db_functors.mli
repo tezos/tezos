@@ -71,7 +71,12 @@ module type PRECHECK = sig
 end
 
 module Make_table
-    (Hash : sig type t end)
+    (Hash : sig
+       type t
+       val name : string
+       val encoding : t Data_encoding.t
+       val pp : Format.formatter -> t -> unit
+     end)
     (Disk_table : DISK_TABLE with type key := Hash.t)
     (Memory_table : MEMORY_TABLE with type key := Hash.t)
     (Scheduler : SCHEDULER_EVENTS with type key := Hash.t)
