@@ -70,7 +70,12 @@ module type PRECHECK = sig
 end
 
 module Make_table
-    (Hash : sig type t end)
+    (Hash : sig
+       type t
+       val name : string
+       val encoding : t Data_encoding.t
+       val pp : Format.formatter -> t -> unit
+     end)
     (Disk_table : DISK_TABLE with type key := Hash.t)
     (Memory_table : MEMORY_TABLE with type key := Hash.t)
     (Scheduler : SCHEDULER_EVENTS with type key := Hash.t)
@@ -122,6 +127,17 @@ end = struct
     | Pending _ -> Lwt.fail Not_found
 
   type error += Missing_data of key
+
+  let () =
+    Error_monad.register_error_kind `Permanent
+      ~id: ("distributed_db." ^ Hash.name ^ ".missing")
+      ~title: ("Missing " ^ Hash.name)
+      ~description: ("Some " ^ Hash.name ^ " is missing from the distributed db")
+      ~pp: (fun ppf key ->
+          Format.fprintf ppf "Missing %s %a" Hash.name Hash.pp key)
+      (Data_encoding.obj1 (Data_encoding.req "key" Hash.encoding))
+      (function Missing_data key -> Some key | _ -> None)
+      (fun key -> Missing_data key)
 
   let read s k =
     match Memory_table.find s.memory k with
