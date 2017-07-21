@@ -45,7 +45,7 @@ let transfer rpc_config
   begin match arg with
     | Some arg ->
         Client_proto_programs.parse_data arg >>=? fun arg ->
-        return (Some arg)
+        return (Some arg.ast)
     | None -> return None
   end >>=? fun parameters ->
   Client_proto_rpcs.Context.Contract.counter
@@ -105,7 +105,7 @@ let originate_contract rpc_config
     ~source ~src_pk ~src_sk ~manager_pkh ~balance ?delegatable ?delegatePubKey
     ~(code:Script.code) ~init ~fee () =
   Client_proto_programs.parse_data init >>=? fun storage ->
-  let storage = Script.{ storage ; storage_type = code.storage_type } in
+  let storage = Script.{ storage=storage.ast ; storage_type = code.storage_type } in
   Client_proto_rpcs.Context.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
@@ -357,7 +357,7 @@ let commands () =
         ~name:"prg" ~desc: "script of the account\n\
                             combine with -init if the storage type is not unit"
       @@ stop
-    end begin fun neu (_, manager) balance (_, source) code cctxt ->
+    end begin fun neu (_, manager) balance (_, source) { ast = code } cctxt ->
       check_contract cctxt neu >>=? fun () ->
       get_delegate_pkh cctxt !delegate >>=? fun delegate ->
       get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->

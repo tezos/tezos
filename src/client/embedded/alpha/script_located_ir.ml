@@ -8,10 +8,26 @@
 (**************************************************************************)
 
 type point =
-  int * int
+  { line : int ;
+    column : int ;
+    point : int }
 
 type location =
   point * point
+
+let location_encoding =
+  let open Data_encoding in
+  let point_encoding =
+    conv
+      (fun { line ; column ; point } -> (line, column, point))
+      (fun (line, column, point) -> { line ; column ; point })
+      (obj3
+         (req "line" uint16)
+         (req "column" uint16)
+         (req "point" uint16)) in
+  obj2
+    (req "start" point_encoding)
+    (req "stop" point_encoding)
 
 type node =
   | Int of location * string
@@ -50,15 +66,21 @@ exception Missing_program_field of string
 
 let strip_locations root =
   let id = let id = ref (-1) in fun () -> incr id ; !id in
+  let loc_table = ref [] in
   let rec strip_locations l =
     let id = id () in
     match l with
-    | Int (_, v) ->
+    | Int (loc, v) ->
+        loc_table := (id, loc) :: !loc_table ;
         Script.Int (id, v)
-    | String (_, v) ->
+    | String (loc, v) ->
+        loc_table := (id, loc) :: !loc_table ;
         Script.String (id, v)
-    | Seq (_, seq) ->
+    | Seq (loc, seq) ->
+        loc_table := (id, loc) :: !loc_table ;
         Script.Seq (id, List.map strip_locations seq)
-    | Prim (_, name, seq) ->
+    | Prim (loc, name, seq) ->
+        loc_table := (id, loc) :: !loc_table ;
         Script.Prim (id, name, List.map strip_locations seq) in
-  strip_locations root
+  let stripped = strip_locations root in
+  stripped, List.rev !loc_table
