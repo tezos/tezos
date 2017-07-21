@@ -97,7 +97,7 @@ module Term = struct
     let doc =
       "Expected amount of proof-of-work for the node identity. \
        The optional parameter should be a float between 0 and 256, where
-       0 disable the proof-of-work mechanism." in
+       0 disable the proof-of-work mechanism. Default: 24" in
     Arg.(value & pos 1 (some float) None & info [] ~docv:"DIFFICULTY" ~doc)
 
   let term =
