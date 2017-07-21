@@ -13,20 +13,20 @@ open Client_proto_args
 let report_parse_error _prefix exn _lexbuf =
   let open Lexing in
   let open Script_located_ir in
-  let print_loc ppf ((sl, sc), (el, ec)) =
-    if sl = el then
-      if sc = ec then
-      Format.fprintf ppf
-        "at line %d character %d"
-        sl sc
+  let print_loc ppf (s, e) =
+    if s.line = e.line then
+      if s.column = e.column then
+        Format.fprintf ppf
+          "at line %d character %d"
+          s.line s.column
       else
-      Format.fprintf ppf
-        "at line %d characters %d to %d"
-        sl sc ec
+        Format.fprintf ppf
+          "at line %d characters %d to %d"
+          s.line s.column e.column
     else
       Format.fprintf ppf
         "from line %d character %d to line %d character %d"
-        sl sc el ec in
+        s.line s.column e.line e.column in
   match exn with
   | Missing_program_field n ->
       failwith "missing script %s" n
@@ -83,15 +83,16 @@ and print_expr locations ppf = function
       Format.fprintf ppf "(%a)" (print_expr_unwrapped locations) expr
   | expr -> print_expr_unwrapped locations ppf expr
 
+let print_stack ppf = function
+  | [] -> Format.fprintf ppf "[]"
+  | more ->
+      Format.fprintf ppf "@[<hov 2>[ %a ]@]"
+        (Format.pp_print_list
+           ~pp_sep: (fun ppf () -> Format.fprintf ppf " :@ ")
+           (print_expr_unwrapped no_locations))
+        more
+
 let print_typed_code locations ppf (expr, type_map) =
-  let print_stack ppf = function
-    | [] -> Format.fprintf ppf "[]"
-    | more ->
-        Format.fprintf ppf "@[<hov 2>[ %a ]@]"
-          (Format.pp_print_list
-             ~pp_sep: (fun ppf () -> Format.fprintf ppf " :@ ")
-             (print_expr_unwrapped no_locations))
-          more in
   let rec print_typed_code_unwrapped ppf expr =
     match expr with
     | Script.Prim (loc, name, []) ->
@@ -178,6 +179,34 @@ let print_program locations ppf ((c : Script.code), type_map) =
     (print_expr no_locations) c.ret_type
     (print_typed_code locations) (c.code, type_map)
 
+let collect_error_locations errs =
+  let open Script_typed_ir in
+  let open Script_ir_translator in
+  let rec collect acc = function
+    | (Ill_typed_data (_, _, _)
+      | Ill_formed_type (_, _)
+      | Ill_typed_contract (_, _, _, _, _)) :: _
+    | [] -> acc
+    | (Invalid_arity (loc, _, _, _)
+      | Invalid_namespace (loc, _, _, _)
+      | Invalid_primitive (loc, _, _)
+      | Invalid_case (loc, _)
+      | Invalid_kind (loc, _, _)
+      | Fail_not_in_tail_position loc
+      | Undefined_cast (loc, _, _)
+      | Undefined_binop (loc, _, _, _)
+      | Undefined_unop (loc, _, _)
+      | Bad_return (loc, _, _)
+      | Bad_stack (loc, _, _, _)
+      | Unmatched_branches (loc, _, _)
+      | Transfer_in_lambda loc
+      | Invalid_constant (loc, _, _)
+      | Invalid_contract (loc, _)
+      | Comparable_type_expected (loc, _)) :: rest ->
+        collect (loc :: acc) rest
+    | _ :: rest -> collect acc rest in
+  collect [] errs
+
 let report_typechecking_errors ?show_types cctxt errs =
   let open Client_commands in
   let open Script_typed_ir in
@@ -214,38 +243,6 @@ let report_typechecking_errors ?show_types cctxt errs =
         Format.fprintf ppf "%a,@ %a"
           Format.pp_print_text first print_enumeration rest
     | [] -> assert false in
-  let rec collect_locations acc = function
-    | (Ill_typed_data (_, _, _)
-      | Ill_formed_type (_, _)
-      | Ill_typed_contract (_, _, _, _, _)) :: _
-    | [] ->
-        let assoc, _ =
-          List.fold_left
-            (fun (acc, i) l ->
-               if List.mem_assoc l acc then
-                 (acc, i)
-               else
-                 ((l, i) :: acc, i + 1))
-            ([], 1) acc in
-        (fun l -> try Some (List.assoc l assoc) with Not_found -> None)
-    | (Invalid_arity (loc, _, _, _)
-      | Invalid_namespace (loc, _, _, _)
-      | Invalid_primitive (loc, _, _)
-      | Invalid_case (loc, _)
-      | Invalid_kind (loc, _, _)
-      | Fail_not_in_tail_position loc
-      | Undefined_cast (loc, _, _)
-      | Undefined_binop (loc, _, _, _)
-      | Undefined_unop (loc, _, _)
-      | Bad_return (loc, _, _)
-      | Bad_stack (loc, _, _, _)
-      | Unmatched_branches (loc, _, _)
-      | Transfer_in_lambda loc
-      | Invalid_constant (loc, _, _)
-      | Invalid_contract (loc, _)
-      | Comparable_type_expected (loc, _)) :: rest ->
-        collect_locations (loc :: acc) rest
-    | _ :: rest -> collect_locations acc rest in
   let print_typechecking_error locations err =
     let print_loc ppf loc =
       match locations loc with
@@ -424,7 +421,17 @@ let report_typechecking_errors ?show_types cctxt errs =
       | (Ill_typed_data (_, _, _)
         | Ill_formed_type (_, _)
         | Ill_typed_contract (_, _, _, _, _)) :: rest ->
-          collect_locations [] rest
+          let collected =
+            collect_error_locations rest in
+          let assoc, _ =
+            List.fold_left
+              (fun (acc, i) l ->
+                 if List.mem_assoc l acc then
+                   (acc, i)
+                 else
+                   ((l, i) :: acc, i + 1))
+              ([], 1) collected in
+          (fun l -> try Some (List.assoc l assoc) with Not_found -> None)
       | _ -> locations in
     match errs with
     | [] -> Lwt.return ()
@@ -438,38 +445,58 @@ let report_typechecking_errors ?show_types cctxt errs =
       | err -> cctxt.warning "%a" pp_print_error [ err ])
     errs
 
-let parse_program s =
-  let lexbuf = Lexing.from_string s in
+type 'a parsed =
+  { ast : 'a ;
+    source : string ;
+    loc_table : (string * (int * Script_located_ir.location) list) list }
+
+let parse_program source =
+  let lexbuf = Lexing.from_string source in
   try
     return
-      (Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf |>
-       List.map Script_located_ir.strip_locations |> fun fields ->
+      (Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf |> fun fields ->
        let rec get_field n = function
-         | Script.Prim (_, pn, [ ctns ]) :: _ when n = pn -> ctns
+         | Script_located_ir.Prim (_, pn, [ ctns ]) :: _ when n = pn -> ctns
          | _ :: rest -> get_field n rest
          | [] -> raise (Script_located_ir.Missing_program_field n) in
-       Script.{ code = get_field "code" fields ;
-                arg_type = get_field "parameter" fields ;
-                ret_type = get_field "return" fields ;
-                storage_type = get_field "storage" fields }
-      )
+       let code, code_loc_table =
+         Script_located_ir.strip_locations (get_field "code" fields) in
+       let arg_type, parameter_loc_table =
+         Script_located_ir.strip_locations (get_field "parameter" fields) in
+       let ret_type, return_loc_table =
+         Script_located_ir.strip_locations (get_field "return" fields) in
+       let storage_type, storage_loc_table =
+         Script_located_ir.strip_locations (get_field "storage" fields) in
+       let ast = Script.{ code ; arg_type ; ret_type ; storage_type } in
+       let loc_table =
+         [ "code", code_loc_table ;
+           "parameter", parameter_loc_table ;
+           "return", return_loc_table ;
+           "storage", storage_loc_table ] in
+       { ast ; source ; loc_table })
   with
   | exn -> report_parse_error "program: " exn lexbuf
 
-let parse_data s =
-  let lexbuf = Lexing.from_string s in
+let parse_data source =
+  let lexbuf = Lexing.from_string source in
   try
     match Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf with
-    | [node] -> return (Script_located_ir.strip_locations node)
+    | [node] ->
+        let ast, loc_table = Script_located_ir.strip_locations node in
+        let loc_table = [ "data", loc_table ] in
+        return { ast ; source ; loc_table }
     | _ -> failwith "single data expression expected"
   with
   | exn -> report_parse_error "data: " exn lexbuf
 
-let parse_data_type s =
-  let lexbuf = Lexing.from_string s in
+let parse_data_type source =
+  let lexbuf = Lexing.from_string source in
   try
     match Concrete_parser.tree Concrete_lexer.(token (init_state ())) lexbuf with
-    | [node] -> return (Script_located_ir.strip_locations node)
+    | [node] ->
+        let ast, loc_table = Script_located_ir.strip_locations node in
+        let loc_table = [ "data", loc_table ] in
+        return { ast ; source ; loc_table }
     | _ -> failwith "single type expression expected"
   with
   | exn -> report_parse_error "data_type: " exn lexbuf
@@ -514,11 +541,20 @@ let unexpand_macros type_map (program : Script.code) =
   type_map, { program with code }
 
 module Program = Client_aliases.Alias (struct
-    type t = Script.code
-    let encoding = Script.code_encoding
+    type t = Script.code parsed
+    let encoding =
+      let open Data_encoding in
+      let loc_table_encoding =
+        assoc (list (tup2 uint16 Script_located_ir.location_encoding)) in
+      conv
+        (fun { ast ; source ; loc_table } -> (ast, source, loc_table))
+        (fun (ast, source, loc_table) -> { ast ; source ; loc_table })
+        (obj3
+           (req "ast" Script.code_encoding)
+           (req "source" string)
+           (req "loc_table" loc_table_encoding))
     let of_source _cctxt s = parse_program s
-    let to_source _ p =
-      return (Format.asprintf "%a" (print_program no_locations) (p, []))
+    let to_source _ { source } = return source
     let name = "program"
   end)
 
@@ -533,6 +569,11 @@ let commands () =
     "-details",
     Arg.Set show_types,
     "Show the types of each instruction" in
+  let emacs_mode = ref false in
+  let emacs_mode_arg =
+    "-emacs",
+    Arg.Set emacs_mode,
+    "Output in michelson-mode.el compatible format" in
   let trace_stack = ref false in
   let trace_stack_arg =
     "-trace-stack",
@@ -589,7 +630,7 @@ let commands () =
          let open Data_encoding in
          if !trace_stack then
            Client_proto_rpcs.Helpers.trace_code cctxt.rpc_config
-             cctxt.config.block program (storage, input, !amount) >>= function
+             cctxt.config.block program.ast (storage.ast, input.ast, !amount) >>= function
            | Ok (storage, output, trace) ->
                cctxt.message
                  "@[<v 0>@[<v 2>storage@,%a@]@,\
@@ -600,7 +641,7 @@ let commands () =
                     (fun ppf (loc, gas, stack) ->
                        Format.fprintf ppf
                          "- @[<v 0>location: %d (remaining gas: %d)@,\
-                            [ @[<v 0>%a ]@]@]"
+                          [ @[<v 0>%a ]@]@]"
                          loc gas
                          (Format.pp_print_list (print_expr no_locations))
                          stack))
@@ -612,7 +653,7 @@ let commands () =
                return ()
          else
            Client_proto_rpcs.Helpers.run_code cctxt.rpc_config
-             cctxt.config.block program (storage, input, !amount) >>= function
+             cctxt.config.block program.ast (storage.ast, input.ast, !amount) >>= function
            | Ok (storage, output) ->
                cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
                  (print_expr no_locations) storage
@@ -624,24 +665,77 @@ let commands () =
                return ()) ;
 
     command ~group ~desc: "ask the node to typecheck a program"
-      ~args: [ show_types_arg ]
+      ~args: [ show_types_arg ; emacs_mode_arg ]
       (prefixes [ "typecheck" ; "program" ]
        @@ Program.source_param
        @@ stop)
       (fun program cctxt ->
          let open Data_encoding in
-         Client_proto_rpcs.Helpers.typecheck_code cctxt.rpc_config cctxt.config.block program >>= function
-         | Ok type_map ->
-             let type_map, program = unexpand_macros type_map program in
-             cctxt.message "Well typed" >>= fun () ->
-             if !show_types then
-               cctxt.message "%a" (print_program no_locations) (program, type_map) >>= fun () ->
-               return ()
-             else return ()
-         | Error errs ->
-             report_typechecking_errors
-               ?show_types:(if !show_types then Some program else None) cctxt errs >>= fun () ->
-             failwith "ill-typed program") ;
+         Client_proto_rpcs.Helpers.typecheck_code
+           cctxt.rpc_config cctxt.config.block program.ast >>= fun res ->
+         if !emacs_mode then
+           let emacs_type_map type_map =
+             (Utils.filter_map
+                (fun (n, loc) ->
+                   try
+                     let bef, aft = List.assoc (n + 1) type_map in
+                     Some (loc, bef, aft)
+                   with
+                     Not_found -> None)
+                (List.assoc "code" program.loc_table),
+              []) in
+           begin match res with
+             | Ok type_map ->
+                 Lwt.return (emacs_type_map type_map)
+             | Error errs ->
+                 let msg = Buffer.create 5000 in
+                 let cctxt = Client_commands.make_context
+                     (fun _ t -> Buffer.add_string msg t ; Buffer.add_char msg '\n' ; Lwt.return ()) in
+                 match errs with
+                 | Ecoproto_error (Script_ir_translator.Ill_formed_type
+                                     (Some ("return" | "parameter" | "storage" as field), _) :: errs) :: _ ->
+                     report_typechecking_errors cctxt [ Ecoproto_error errs ] >>= fun () ->
+                     Lwt.return ([], [ List.assoc 0 (List.assoc field program.loc_table), Buffer.contents msg ])
+                 | Ecoproto_error (Script_ir_translator.Ill_typed_contract (_, _, _, _, type_map) :: errs) :: _ ->
+                     (report_typechecking_errors cctxt [ Ecoproto_error errs ]  >>= fun () ->
+                      let (types, _) = emacs_type_map type_map in
+                      let loc = match collect_error_locations errs with
+                        | hd :: _ -> hd - 1
+                        | [] -> 0 in
+                      Lwt.return (types, [ List.assoc loc (List.assoc "code" program.loc_table), Buffer.contents msg ]))
+                 | _ -> Lwt.return ([], [])
+           end >>= fun (types, errors) ->
+           cctxt.message
+             "(@[<v 0>(types . (@[<v 0>%a@]))@,\
+              (errors . (@[<v 0>%a@])))@]"
+             (Format.pp_print_list
+                (fun ppf (({ Script_located_ir.point = s },
+                           { Script_located_ir.point = e }),
+                          bef, aft) ->
+                  Format.fprintf ppf "(%d %d \"%s\")" (s + 1) (e + 1)
+                    (Format.asprintf "@[<v 0>%a@, \\u2B87@,%a@]"
+                       print_stack bef print_stack aft)))
+             types
+             (Format.pp_print_list
+                (fun ppf (({ Script_located_ir.point = s },
+                           { Script_located_ir.point = e }),
+                          err) ->
+                  Format.fprintf ppf "(%d %d %S)" (s + 1) (e + 1) err))
+             errors >>= fun () ->
+           return ()
+         else
+           match res with
+           | Ok type_map ->
+               let type_map, program = unexpand_macros type_map program.ast in
+               cctxt.message "Well typed" >>= fun () ->
+               if !show_types then
+                 cctxt.message "%a" (print_program no_locations) (program, type_map) >>= fun () ->
+                 return ()
+               else return ()
+           | Error errs ->
+               report_typechecking_errors
+                 ?show_types:(if !show_types then Some program.ast else None) cctxt errs >>= fun () ->
+               failwith "ill-typed program") ;
 
     command ~group ~desc: "ask the node to typecheck a data expression"
       (prefixes [ "typecheck" ; "data" ]
@@ -654,7 +748,7 @@ let commands () =
       (fun data exp_ty cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_data cctxt.Client_commands.rpc_config
-           cctxt.config.block (data, exp_ty) >>= function
+           cctxt.config.block (data.ast, exp_ty.ast) >>= function
          | Ok () ->
              cctxt.message "Well typed" >>= fun () ->
              return ()
@@ -672,7 +766,7 @@ let commands () =
       (fun data cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.hash_data cctxt.Client_commands.rpc_config
-           cctxt.config.block data >>= function
+           cctxt.config.block (data.ast) >>= function
          | Ok hash ->
              cctxt.message "%S" hash >>= fun () ->
              return ()
@@ -694,7 +788,7 @@ let commands () =
       (fun data (_, key) cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.hash_data cctxt.rpc_config
-           cctxt.config.block data >>= function
+           cctxt.config.block (data.ast) >>= function
          | Ok hash ->
              let signature = Ed25519.sign key (MBytes.of_string hash) in
              cctxt.message "Hash: %S@.Signature: %S"

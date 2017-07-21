@@ -7,10 +7,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val parse_program: string -> Script.code tzresult Lwt.t
-val parse_data: string -> Script.expr tzresult Lwt.t
-val parse_data_type: string -> Script.expr tzresult Lwt.t
+type 'a parsed =
+  { ast : 'a ;
+    source : string ;
+    loc_table : (string * (int * Script_located_ir.location) list) list }
 
-module Program : Client_aliases.Alias with type t = Script.code
+val parse_program: string -> Script.code parsed tzresult Lwt.t
+val parse_data: string -> Script.expr parsed tzresult Lwt.t
+val parse_data_type: string -> Script.expr parsed tzresult Lwt.t
+
+module Program : Client_aliases.Alias with type t = Script.code parsed
 
 val commands: unit -> Client_commands.command list
