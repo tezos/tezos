@@ -533,7 +533,7 @@ let unexpand_macros type_map (program : Script.code) =
                 List.filter
                   (fun (loc, _) -> not (List.mem loc locs))
                   type_map in
-              let type_map = (loc, (before, after)):: type_map in
+              let type_map = (loc, (before, after)) :: type_map in
               type_map, Prim (loc, name, [])
         end
     | oth -> type_map, oth in
@@ -678,7 +678,7 @@ let commands () =
              (Utils.filter_map
                 (fun (n, loc) ->
                    try
-                     let bef, aft = List.assoc (n + 1) type_map in
+                     let bef, aft = List.assoc n type_map in
                      Some (loc, bef, aft)
                    with
                      Not_found -> None)
@@ -700,7 +700,7 @@ let commands () =
                      (report_typechecking_errors cctxt [ Ecoproto_error errs ]  >>= fun () ->
                       let (types, _) = emacs_type_map type_map in
                       let loc = match collect_error_locations errs with
-                        | hd :: _ -> hd - 1
+                        | hd :: _ -> hd
                         | [] -> 0 in
                       Lwt.return (types, [ List.assoc loc (List.assoc "code" program.loc_table), Buffer.contents msg ]))
                  | _ -> Lwt.return ([], [])
@@ -713,8 +713,10 @@ let commands () =
                            { Script_located_ir.point = e }),
                           bef, aft) ->
                   Format.fprintf ppf "(%d %d \"%s\")" (s + 1) (e + 1)
-                    (Format.asprintf "@[<v 0>%a@, \\u2B87@,%a@]"
-                       print_stack bef print_stack aft)))
+                    (String.concat "\\n"
+                       (String.split_on_char '\n'
+                          (Format.asprintf "@[<v 0>%a@, \\u2B87@,%a@]"
+                             print_stack bef print_stack aft)))))
              types
              (Format.pp_print_list
                 (fun ppf (({ Script_located_ir.point = s },

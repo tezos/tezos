@@ -1455,41 +1455,82 @@ let type_map_enc =
           (list Script.expr_encoding)))
 
 let type_map descr =
-  let rec type_map
+  let rec instr_type_map
     : type bef aft. type_map -> (bef, aft) descr -> type_map
     = fun acc { loc ; instr ; bef ; aft } ->
       let self acc =
         (loc, (unparse_stack bef, unparse_stack aft)) :: acc in
-      match instr with
-      | If_none (dbt, dbf) ->
-          let acc = type_map acc dbt in
-          let acc = type_map acc dbf in
+      match instr, aft with
+      | If_none (dbt, dbf), _ ->
+          let acc = instr_type_map acc dbt in
+          let acc = instr_type_map acc dbf in
           self acc
-      | If_left (dbt, dbf) ->
-          let acc = type_map acc dbt in
-          let acc = type_map acc dbf in
+      | If_left (dbt, dbf), _ ->
+          let acc = instr_type_map acc dbt in
+          let acc = instr_type_map acc dbf in
           self acc
-      | If_cons (dbt, dbf) ->
-          let acc = type_map acc dbt in
-          let acc = type_map acc dbf in
+      | If_cons (dbt, dbf), _ ->
+          let acc = instr_type_map acc dbt in
+          let acc = instr_type_map acc dbf in
           self acc
-      | Seq (dl, dr) ->
-          let acc = type_map acc dl in
-          let acc = type_map acc dr in
+      | Seq (dl, dr), _ ->
+          let acc = instr_type_map acc dl in
+          let acc = instr_type_map acc dr in
           acc
-      | If (dbt, dbf) ->
-          let acc = type_map acc dbt in
-          let acc = type_map acc dbf in
+      | If (dbt, dbf), _ ->
+          let acc = instr_type_map acc dbt in
+          let acc = instr_type_map acc dbf in
           self acc
-      | Loop body ->
-          let acc = type_map acc body in
+      | Loop body, _ ->
+          let acc = instr_type_map acc body in
           self acc
-      | Dip body ->
-          let acc = type_map acc body in
+      | Dip body, _ ->
+          let acc = instr_type_map acc body in
           self acc
-      | _ ->
-          self acc in
-  type_map [] descr
+      | Lambda (Lam (body, _)), _ ->
+          let acc = instr_type_map acc body in
+          self acc
+      | Const v, Item_t (ty, _) ->
+          let acc = data_type_map acc ty v in
+          self acc
+      | _, _ ->
+          self acc
+  and data_type_map
+    : type a. type_map -> a ty -> a -> type_map
+    = fun acc ty v ->
+      match ty, v with
+      | Unit_t, _ -> acc
+      | Int_t _, _ -> acc
+      | Signature_t, _ -> acc
+      | String_t, _ -> acc
+      | Tez_t, _ -> acc
+      | Key_t, _ -> acc
+      | Timestamp_t, _ -> acc
+      | Bool_t, _ -> acc
+      | Contract_t _,_ -> acc
+      | Set_t _, _ -> acc
+      | Pair_t (lty, rty), (l, r) ->
+          let acc = data_type_map acc lty l in
+          let acc = data_type_map acc rty r in
+          acc
+      | Union_t (lty, _), L l ->
+          data_type_map acc lty l
+      | Union_t (_, rty), R r ->
+          data_type_map acc rty r
+      | Lambda_t _, Lam (body, _) ->
+          instr_type_map acc body
+      | Option_t _, None -> acc
+      | Option_t ty, Some v ->
+          data_type_map acc ty v
+      | List_t ty, l ->
+          List.fold_left
+            (fun acc v -> data_type_map acc ty v)
+            acc l
+      | Map_t (_, ty), m ->
+          map_fold
+            (fun _ v acc -> data_type_map acc ty v)
+            m acc in
+  instr_type_map [] descr
 
 let typecheck_code
   : context -> Script.code -> type_map tzresult Lwt.t
@@ -1506,13 +1547,15 @@ let typecheck_code
       (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
     let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
     let ret_type_full = Pair_t (ret_type, storage_type) in
+    let result =
+      parse_lambda ctxt
+        ~storage_type
+        ~type_logger:(fun x -> failure_type_map := x :: !failure_type_map)
+        arg_type_full ret_type_full
+        code in
     trace
       (Ill_typed_contract (code, arg_type, ret_type, storage_type, !failure_type_map))
-      (parse_lambda ctxt
-         ~storage_type
-         ~type_logger:(fun x -> failure_type_map := x :: !failure_type_map)
-         arg_type_full ret_type_full
-         code) >>=? fun (Lam (descr,_)) ->
+      result >>=? fun (Lam (descr,_)) ->
     return (type_map descr)
 
 let typecheck_data
