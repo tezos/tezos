@@ -65,7 +65,7 @@ exception Missing_program_field of string
 (*-- Converters between IR and Located IR -----------------------------------*)
 
 let strip_locations root =
-  let id = let id = ref (-1) in fun () -> incr id ; !id in
+  let id = let id = ref 0 in fun () -> incr id ; !id in
   let loc_table = ref [] in
   let rec strip_locations l =
     let id = id () in
