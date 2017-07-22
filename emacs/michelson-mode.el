@@ -326,7 +326,27 @@
                   nil
                 (setq message (concat message "\n")))
               (setq message (concat message (cadr (cdr elt)))))))
-      (display-message-or-buffer message "*Michelson*"))))
+      (if (string= message "")
+          (setq message "\n  No instruction at point."))
+      (let
+          ((message-window
+            (display-buffer-below-selected
+             (get-buffer-create "*Michelson*") nil))
+           (lines 0))
+        (save-excursion
+          (set-buffer "*Michelson*")
+          (toggle-read-only nil)
+          (erase-buffer)
+          (insert message)
+          (toggle-read-only t)
+          (beginning-of-buffer)
+          (while (not (eobp))
+            (vertical-motion 1)
+            (setq lines (+ 1 lines)))
+          (window-resize
+           message-window
+           (+ (- (max 4 lines)
+                 (window-size message-window)) 1)))))))
 
 (defun michelson-update-minibuffer-info ()
   (when (nth 2 michelson-state) (cancel-timer (nth 2 michelson-state)))
