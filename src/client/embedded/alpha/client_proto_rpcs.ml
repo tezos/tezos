@@ -132,6 +132,8 @@ module Context = struct
       call_error_service2 cctxt Services.Context.Contract.delegatable b c ()
     let script cctxt b c =
       call_error_service2 cctxt Services.Context.Contract.script b c ()
+    let storage cctxt b c =
+      call_error_service2 cctxt Services.Context.Contract.storage b c ()
   end
 
 end
