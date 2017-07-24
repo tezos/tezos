@@ -1,7 +1,11 @@
 parameter key;
 storage string;
 return unit;
-code {CADR; DIP{UNIT; LAMBDA (pair (pair tez string) unit) (pair string unit) {CADR; UNIT; SWAP; PAIR};
-                PUSH tez "100.00"; PUSH bool False; PUSH bool False; NONE key};
-      CREATE_CONTRACT; DIP{PUSH string ""}; PUSH tez "0.00"; PUSH string "abcdefg"; TRANSFER_TOKENS;
+code {CAR; DIP{UNIT; LAMBDA (pair string unit)
+                            (pair string unit)
+                            {CAR; UNIT; SWAP; PAIR};
+               PUSH tez "100.00"; PUSH bool False;
+               PUSH bool False; NONE key};
+      CREATE_CONTRACT; DIP{PUSH string ""}; PUSH tez "0.00";
+      PUSH string "abcdefg"; TRANSFER_TOKENS;
       DIP{DROP}; UNIT; PAIR};

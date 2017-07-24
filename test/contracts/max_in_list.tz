@@ -1,10 +1,10 @@
 parameter (list int32);
 storage unit;
 return (option int32);
-code {CADR; DIP{NONE int32};
+code {CAR; DIP{NONE int32};
       LAMBDA
         (pair int32 (option int32))
         (option int32)
-        {DUP; DUP; CAR; SWAP; CDR; 
+        {DUP; DUP; CAR; SWAP; CDR;
          IF_NONE {DIP{DROP}; SOME} {CMPGT; IF {CDR} {CAR; SOME}}};
       REDUCE; UNIT; SWAP; PAIR};

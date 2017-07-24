@@ -1,4 +1,5 @@
 parameter key
 return unit
 storage unit
-code {DIP{UNIT}; CADR; DEFAULT_ACCOUNT; PUSH tez "100"; UNIT; TRANSFER_TOKENS; PAIR}
+code {DIP{UNIT}; CAR; DEFAULT_ACCOUNT;
+      PUSH tez "100"; UNIT; TRANSFER_TOKENS; PAIR}
