@@ -1,0 +1,4 @@
+parameter (contract unit unit);
+return unit;
+storage unit;
+code {CADR; DIP{UNIT}; PUSH tez "100.00"; UNIT; TRANSFER_TOKENS; PAIR};

@@ -14,6 +14,7 @@ build:
 run:
 	${MAKE} ${addprefix run-,${DIR}}
 	${MAKE} run-basic.sh
+	${MAKE} run-contracts.sh
 clean:
 	${MAKE} -C lib clean
 	${MAKE} ${addprefix clean-,${DIR}}
@@ -27,3 +28,6 @@ ${addprefix clean-,${DIR}}: clean-%:
 
 run-basic.sh:
 	./test-basic.sh
+
+run-contracts.sh:
+	./test-contracts.sh
