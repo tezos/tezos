@@ -27,7 +27,7 @@ let () =
     ~pp:(fun ppf (c, r, p) ->
         Format.fprintf ppf "Initial amount of contract %a too low (required %a but provided %a)"
           Contract_repr.pp c
-          Tez_repr.pp r Tez_repr.pp p)
+          Tez_repr.pp p Tez_repr.pp r)
     Data_encoding.(obj3
                      (req "contract" Contract_repr.encoding)
                      (req "required" Tez_repr.encoding)
