@@ -1,0 +1,4 @@
+parameter bool;
+storage unit;
+return bool;
+code {CADR; IF {PUSH bool True} {PUSH bool False}; UNIT; SWAP; PAIR};

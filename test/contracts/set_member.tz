@@ -1,0 +1,4 @@
+parameter string;
+storage (set string);
+return bool;
+code {DUP; CADR; DIP{CDR}; MEM; DIP{EMPTY_SET string}; PAIR};
