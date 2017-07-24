@@ -1,4 +1,4 @@
 parameter unit;
-code {CADR; PUSH uint32 300; PAIR};
+code {CAR; PUSH uint32 300; PAIR};
 return uint32;
 storage unit;

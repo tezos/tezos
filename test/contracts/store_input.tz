@@ -1,4 +1,4 @@
 parameter string;
 return unit;
 storage string;
-code {CADR; UNIT; PAIR};
+code {CAR; UNIT; PAIR};

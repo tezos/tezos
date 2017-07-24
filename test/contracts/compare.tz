@@ -1,7 +1,7 @@
 parameter (pair tez tez);
 return (list bool);
 storage unit;
-code {CADR; DUP; DUP; DUP; DUP; DIIIIIP {NIL bool};
+code {CAR; DUP; DUP; DUP; DUP; DIIIIIP {NIL bool};
       DIIIIP {DUP; CAR; DIP {CDR}; COMPARE; LE; CONS};
       DIIIP {DUP; CAR; DIP {CDR}; COMPARE; GE; CONS};
       DIIP{DUP; CAR; DIP {CDR}; COMPARE; LT; CONS};

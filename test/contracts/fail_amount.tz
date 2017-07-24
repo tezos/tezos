@@ -2,4 +2,4 @@
 parameter unit;
 storage unit;
 return unit;
-code {CAAR; PUSH tez "10"; CMPGT; IF {FAIL} {UNIT; UNIT; PAIR}}
+code {AMOUNT; PUSH tez "10"; CMPGT; IF {FAIL} {}}

@@ -1,4 +1,6 @@
 parameter string;
 return string;
 storage unit;
-code {CADR; LAMBDA string string {PUSH string "_abc"; SWAP; CONCAT}; SWAP; EXEC; UNIT; SWAP; PAIR};
+code {CAR;
+      LAMBDA string string {PUSH string "_abc"; SWAP; CONCAT};
+      SWAP; EXEC; UNIT; SWAP; PAIR};
