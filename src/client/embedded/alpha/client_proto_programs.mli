@@ -16,6 +16,8 @@ val parse_program: string -> Script.code parsed tzresult Lwt.t
 val parse_data: string -> Script.expr parsed tzresult Lwt.t
 val parse_data_type: string -> Script.expr parsed tzresult Lwt.t
 
+val print_storage: Format.formatter -> Script.storage -> unit
+
 module Program : Client_aliases.Alias with type t = Script.code parsed
 
 val commands: unit -> Client_commands.command list

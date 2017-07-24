@@ -83,6 +83,9 @@ and print_expr locations ppf = function
       Format.fprintf ppf "(%a)" (print_expr_unwrapped locations) expr
   | expr -> print_expr_unwrapped locations ppf expr
 
+let print_storage ppf ({ storage } : Script.storage) =
+  print_expr no_locations ppf storage
+
 let print_stack ppf = function
   | [] -> Format.fprintf ppf "[]"
   | more ->

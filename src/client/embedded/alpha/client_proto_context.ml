@@ -17,6 +17,9 @@ module Ed25519 = Environment.Ed25519
 let get_balance cctxt block contract =
   Client_proto_rpcs.Context.Contract.balance cctxt block contract
 
+let get_storage cctxt block contract =
+  Client_proto_rpcs.Context.Contract.storage cctxt block contract
+
 let rec find_predecessor rpc_config h n =
   if n <= 0 then
     return (`Hash h)
@@ -258,6 +261,19 @@ let commands () =
       get_balance cctxt.rpc_config cctxt.config.block contract >>=? fun amount ->
       cctxt.answer "%a %s" Tez.pp amount tez_sym >>= fun () ->
       return ()
+    end ;
+
+    command ~group ~desc: "get the storage of a contract" begin
+      prefixes [ "get" ; "storage" ; "for" ]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop
+    end begin fun (_, contract) cctxt ->
+      get_storage cctxt.rpc_config cctxt.config.block contract >>=? function
+      | None ->
+          cctxt.error "This is not a smart contract."
+      | Some storage ->
+          cctxt.answer "%a" Client_proto_programs.print_storage storage >>= fun () ->
+          return ()
     end ;
 
     command ~group ~desc: "get the manager of a contract" begin

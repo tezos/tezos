@@ -135,6 +135,9 @@ module Context : sig
     val script:
       Client_rpcs.config ->
       block -> Contract.t -> Script.t option tzresult Lwt.t
+    val storage:
+      Client_rpcs.config ->
+      block -> Contract.t -> Script.storage option tzresult Lwt.t
   end
 end
 
