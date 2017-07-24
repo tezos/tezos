@@ -1,0 +1,10 @@
+parameter (pair tez tez);
+return (list bool);
+storage unit;
+code {CADR; DUP; DUP; DUP; DUP; DIIIIIP {NIL bool};
+      DIIIIP {DUP; CAR; DIP {CDR}; COMPARE; LE; CONS};
+      DIIIP {DUP; CAR; DIP {CDR}; COMPARE; GE; CONS};
+      DIIP{DUP; CAR; DIP {CDR}; COMPARE; LT; CONS};
+      DIP {DUP; CAR; DIP {CDR}; COMPARE; GT; CONS}
+      DUP; CAR; DIP {CDR}; COMPARE; EQ; CONS;
+      UNIT; SWAP; PAIR};

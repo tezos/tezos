@@ -1,0 +1,4 @@
+storage unit;
+return (map string string);
+parameter unit;
+code {DROP; EMPTY_MAP string string; PUSH string "world"; SOME; PUSH string "hello"; UPDATE; UNIT; SWAP; PAIR};

@@ -1,0 +1,4 @@
+parameter bool;
+return bool;
+storage unit;
+code {CADR; NOT; UNIT; SWAP; PAIR};

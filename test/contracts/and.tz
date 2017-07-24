@@ -1,0 +1,5 @@
+parameter (pair bool bool);
+return bool;
+storage unit;
+code {DUP; CADR; CAR; SWAP; CADR; CDR; AND;
+      UNIT; SWAP; PAIR};
