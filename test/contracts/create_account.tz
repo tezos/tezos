@@ -1,5 +1,5 @@
 parameter key;
 return unit;
 storage (contract unit unit);
-code {CADR; DIP{PUSH tez "100.00"; PUSH bool False; NONE key}; CREATE_ACCOUNT;
-      UNIT; PAIR};
+code {CAR; DIP{PUSH tez "100.00"; PUSH bool False; NONE key};
+      CREATE_ACCOUNT; UNIT; PAIR};

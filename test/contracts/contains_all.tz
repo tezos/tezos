@@ -1,8 +1,10 @@
 parameter (pair (list string) (list string));
 storage unit;
 return bool;
-code {CADR; DUP; CAR; DIP{CDR}; EMPTY_SET string; SWAP;
+code {CAR; DUP; CAR; DIP{CDR}; EMPTY_SET string; SWAP;
       LAMBDA (pair string (set string)) (set string) {DUP; CAR; DIP{CDR}; PUSH bool True; SWAP; UPDATE};
       REDUCE; PUSH bool True; SWAP; PAIR; SWAP;
-      LAMBDA (pair string (pair (set string) bool)) (pair (set string) bool) {DUP; DUP; CAR; DIP{CDAR; DIP{CDDR}; DUP}; MEM; DIP{SWAP}; AND; SWAP; PAIR};
+      LAMBDA (pair string (pair (set string) bool))
+             (pair (set string) bool)
+             {DUP; DUP; CAR; DIP{CDAR; DIP{CDDR}; DUP}; MEM; DIP{SWAP}; AND; SWAP; PAIR};
       REDUCE; CDR; UNIT; SWAP; PAIR};

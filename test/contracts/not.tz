@@ -1,4 +1,4 @@
 parameter bool;
 return bool;
 storage unit;
-code {CADR; NOT; UNIT; SWAP; PAIR};
+code {CAR; NOT; UNIT; SWAP; PAIR};

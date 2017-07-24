@@ -40,7 +40,7 @@ end
 type ('key, 'value) map = (module Boxed_map with type key = 'key and type value = 'value)
 
 type ('arg, 'ret, 'storage) script =
-  { code : (((Tez.t, 'arg) pair, 'storage) pair, ('ret, 'storage) pair) lambda ;
+  { code : (('arg, 'storage) pair, ('ret, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
     ret_type : 'ret ty ;
     storage : 'storage ;
@@ -270,7 +270,7 @@ and ('bef, 'aft) instr =
   | Default_account : (public_key_hash * 'rest, (unit, unit) typed_contract * 'rest) instr
   | Create_contract : 'g ty * 'p ty * 'r ty ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t *
-                                                                 (((Tez.t * 'p) * 'g, 'r * 'g) lambda * ('g * 'rest)))))),
+                                                                 (('p * 'g, 'r * 'g) lambda * ('g * 'rest)))))),
      ('p, 'r) typed_contract * 'rest) instr
   | Now :
       ('rest, Timestamp.t * 'rest) instr

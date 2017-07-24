@@ -1,7 +1,4 @@
-parameter unit
-code
-  { # This is a noop contract
-    CDR ; UNIT ; PAIR
-  }
-return unit
-storage unit
+parameter unit;
+code {};
+return unit;
+storage unit;

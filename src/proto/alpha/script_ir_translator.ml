@@ -1275,7 +1275,7 @@ and parse_instr
               (Bool_t, Item_t
                  (Bool_t, Item_t
                     (Tez_t, Item_t
-                       (Lambda_t (Pair_t (Pair_t (Tez_t, p), gp),
+                       (Lambda_t (Pair_t (p, gp),
                                   Pair_t (r, gr)), Item_t
                           (ginit, rest))))))) ->
         check_item_ty gp gr loc "CREATE_CONTRACT" 5 7 >>=? fun (Eq _) ->
@@ -1437,7 +1437,7 @@ let parse_script
     (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
     (Lwt.return (parse_ty init_storage_type)) >>=? fun (Ex_ty init_storage_type) ->
     (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
-    let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
+    let arg_type_full = Pair_t (arg_type, storage_type) in
     let ret_type_full = Pair_t (ret_type, storage_type) in
     Lwt.return (ty_eq init_storage_type storage_type) >>=? fun (Eq _) ->
     parse_data ?type_logger ctxt storage_type storage >>=? fun storage ->
@@ -1546,7 +1546,7 @@ let typecheck_code
     trace
       (Ill_formed_type (Some "storage", storage_type))
       (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
-    let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
+    let arg_type_full = Pair_t (arg_type, storage_type) in
     let ret_type_full = Pair_t (ret_type, storage_type) in
     let result =
       parse_lambda ctxt

@@ -1,4 +1,4 @@
 parameter (or bool string);
 return (or string bool);
 storage unit;
-code {CADR; IF_LEFT {RIGHT string} {LEFT bool}; UNIT; SWAP; PAIR};
+code {CAR; IF_LEFT {RIGHT string} {LEFT bool}; UNIT; SWAP; PAIR};

@@ -1,7 +1,7 @@
 parameter uint64;
 return (list uint64);
 storage unit;
-code {CADR; NIL uint64; SWAP; DUP; PUSH uint64 0; CMPNEQ;
+code {CAR; NIL uint64; SWAP; DUP; PUSH uint64 0; CMPNEQ;
       LOOP {DUP; DIP {SWAP}; CONS; SWAP; PUSH uint64 1; SWAP; SUB;
             DUP; PUSH uint64 0; CMPNEQ};
       CONS; UNIT; SWAP; PAIR};

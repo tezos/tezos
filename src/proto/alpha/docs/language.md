@@ -1052,7 +1052,7 @@ for under/overflows.
      Forge a new contract.
 
 
-        :: key : key? : bool : bool : tez : lambda (pair (pair tez 'p) 'g) (pair 'r 'g) : 'g : 'S
+        :: key : key? : bool : bool : tez : lambda (pair 'p 'g) (pair 'r 'g) : 'g : 'S
            -> contract 'p 'r : 'S
 
      As with non code-emitted originations the
@@ -1061,7 +1061,7 @@ for under/overflows.
      the global data and returns it to be stored and retrieved on the
      next transaction. These data are initialized by another
      parameter. The calling convention for the code is as follows:
-     `(Pair (Pair amount arg) globals)) -> (Pair ret globals)`, as
+     `(Pair arg globals)) -> (Pair ret globals)`, as
      extrapolable from the instruction type. The first parameters are
      the manager, optional delegate, then spendable and delegatable
      flags and finally the initial amount taken from the currently
@@ -1149,12 +1149,12 @@ for under/overflows.
 
         :: 'a : 'S   ->   string : 'S
 
-   * `CHECK_SIGNATURE`
+   * `CHECK_SIGNATURE`:
      Check that a sequence of bytes has been signed with a given key.
 
         :: key : pair signature string : 'S   ->   bool : 'S
 
-   * `COMPARE`
+   * `COMPARE`:
 
         :: key : key : 'S   ->   int64 : 'S
 
@@ -1349,27 +1349,23 @@ data storage. The type of the global data of the storage is fixed for
 each contract at origination time. This is ensured statically by
 checking on origination that the code preserves the type of the global
 data. For this, the code of the contract is checked to be of the
-following type lambda (pair (pair tez 'arg) 'global) -> (pair 'ret
+following type lambda (pair 'arg 'global) -> (pair 'ret
 'global) where 'global is the type of the original global store given
-on origination. The contract also takes a parameter and an amount, and
+on origination. The contract also takes a parameter and
 returns a value, hence the complete calling convention above.
 
 ### Empty contract
 
-Because of the calling convention, the empty sequence is not a valid
-contract of type `(contract unit unit)`. The code for building a
-contract of such a type must take a `unit` argument, an amount in `tez`,
-and transform a unit global storage, and must thus be of type `(lambda
-(pair (pair tez unit) unit) (pair unit unit))`.
+Any contract with the same `parameter` and `return` types
+may be written with an empty sequence in its `code` section. 
+The simplest contracts is the contract for which the 
+`parameter`, `storage`, and `return` are all of type `unit`. 
+This contract is as follows:
 
-Such a minimal contract code is thus `{ CDR ; UNIT ; PAIR }`.
-
-A valid contract source file would be as follows.
-
-    code { CDR ; UNIT ; PAIR }
-    storage unit
-    parameter unit
-    return unit
+    code { };
+    storage unit;
+    parameter unit;
+    return unit;
 
 ### Reservoir contract
 
@@ -1393,13 +1389,13 @@ Hence, the global data of the contract has the following type
 Following the contract calling convention, the code is a lambda of type
 
     lambda
-      pair (pair tez unit) 'g
+      pair unit 'g
       pair unit 'g
 
 writen as
 
     lambda
-      pair (pair tez unit)
+      pair unit
         pair
           pair timestamp tez
           pair (contract unit unit) (contract unit unit)
@@ -1614,9 +1610,8 @@ At the beginning of the transaction:
     S               via a CDDDDADR
     W               via a CDDDDDR
     the delivery counter via a CDAAR
-    the amount versed by the buyer via a CDADAR
     the amount versed by the seller via a CDADDR
-    the argument via a CADR
+    the argument via a CAR
 
 The contract returns a unit value, and we assume that it is created
 with the minimum amount, set to `(Tez "1.00")`.
@@ -1640,12 +1635,12 @@ The complete source `forward.tz` is:
         PUSH uint64 86400 ; SWAP ; ADD ; # one day in second
         NOW ; COMPARE ; LT ;
         IF { # Before Z + 24
-             DUP ; CADR ; # we must receive (Left "buyer") or (Left "seller")
+             DUP ; CAR ; # we must receive (Left "buyer") or (Left "seller")
              IF_LEFT
                { DUP ; PUSH string "buyer" ; COMPARE ; EQ ;
                  IF { DROP ;
                       DUP ; CDADAR ; # amount already versed by the buyer
-                      DIP { DUP ; CAAR } ; ADD ; # transaction
+                      DIP { AMOUNT } ; ADD ; # transaction
                       #  then we rebuild the globals
                       DIP { DUP ; CDADDR } ; PAIR ; # seller amount
                       PUSH uint32 0 ; PAIR ; # delivery counter at 0
@@ -1654,7 +1649,7 @@ The complete source `forward.tz` is:
                       UNIT ; PAIR }
                     { PUSH string "seller" ; COMPARE ; EQ ;
                       IF { DUP ; CDADDR ; # amount already versed by the seller
-                           DIP { DUP ; CAAR } ; ADD ; # transaction
+                           DIP { AMOUNT } ; ADD ; # transaction
                            #  then we rebuild the globals
                            DIP { DUP ; CDADAR } ; SWAP ; PAIR ; # buyer amount
                            PUSH uint32 0 ; PAIR ; # delivery counter at 0
@@ -1693,11 +1688,11 @@ The complete source `forward.tz` is:
                        NOW ; COMPARE ; LT
                        IF { # Between T and T + 24
                             # we only accept transactions from the buyer
-                            DUP ; CADR ; # we must receive (Left "buyer")
+                            DUP ; CAR ; # we must receive (Left "buyer")
                             IF_LEFT
                               { PUSH string "buyer" ; COMPARE ; EQ ;
                                 IF { DUP ; CDADAR ; # amount already versed by the buyer
-                                     DIP { DUP ; CAAR } ; ADD ; # transaction
+                                     DIP { AMOUNT } ; ADD ; # transaction
                                      # The amount must not exceed Q * K
                                      DUP ;
                                      DIIP { DUP ; CDDAAR ; # Q
@@ -1736,7 +1731,7 @@ The complete source `forward.tz` is:
                                       SOURCE unit unit ; MANAGER ;
                                       COMPARE ; NEQ ;
                                       IF { FAIL } {} # fail if not the warehouse
-                                      DUP ; CADR ; # we must receive (Right amount)
+                                      DUP ; CAR ; # we must receive (Right amount)
                                       IF_LEFT
                                         { FAIL } # (Left _)
                                         { # We increment the counter
@@ -1763,7 +1758,7 @@ The complete source `forward.tz` is:
                                       UNIT ; TRANSFER_TOKENS ; DROP ;
                                       # and return unit
                                       UNIT ; PAIR } } } } } } }
-
+    
 X - Full grammar
 ----------------
 

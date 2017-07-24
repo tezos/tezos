@@ -517,7 +517,7 @@ let unexpand_macros type_map (program : Script.code) =
     match node with
     | Seq (loc, l) ->
         begin match caddr type_map [] l with
-          | None ->
+          | None | Some [] ->
               let type_map, l =
                 List.fold_left
                   (fun (type_map, acc) e ->

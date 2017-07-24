@@ -4,12 +4,12 @@ parameter (pair signature uint16);
 storage (pair (pair (contract unit unit) (contract unit unit)) (pair uint16 key));
 return unit;
 code {DUP; DUP;
-      CADR; DUP; DIP{CDR; H}; CAR; PAIR;
+      CAR; DUP; DIP{CDR; H}; CAR; PAIR;
       SWAP; CDDDR; CHECK_SIGNATURE; # Check if the data has been correctly signed
-      IF {NOP} {FAIL} # If signature is not correct, end the execution
+      IF {} {FAIL} # If signature is not correct, end the execution
       DUP; DUP; DUP; DIIIP{CDR}; # Place storage type on bottom of stack
       DIIP{CDAR};                # Place contracts below numbers
-      DIP{CADDR};                # Get actual rain
+      DIP{CADR};                # Get actual rain
       CDDAR;                     # Get rain threshold
       CMPLT; IF {CAR} {CDR};     # Select contract to receive tokens
       BALANCE; UNIT; TRANSFER_TOKENS; # Setup and execute transfer
