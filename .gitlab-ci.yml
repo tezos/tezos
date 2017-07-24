@@ -151,6 +151,15 @@ test:basic.sh:
   dependencies:
     - build
 
+test:contracts.sh:
+  stage: test
+  tags:
+    - tezos_builder
+  script:
+    - make -C test run-contracts.sh
+  dependencies:
+    - build
+
 build:docker:
   stage: build_docker
   image: docker:latest
