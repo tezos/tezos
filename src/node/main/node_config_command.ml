@@ -113,11 +113,11 @@ module Manpage = struct
         factory default one. \
         If additional command-line arguments are provided, \
         they will amend the generated file. \
-        It assumes that a configuration file already exists, \
+        It assumes that a configuration file already exists \
         and will abort otherwise." ;
     `P "$(b,init) is like reset but assumes that \
-        no configuration file is present, \
-        and will abort other otherwise." ;
+        no configuration file is present \
+        and will abort otherwise." ;
     `P "$(b,update) is the main option to edit the configuration file of Tezos. \
         It will parse command line arguments and add or replace corresponding \
         entries in the Tezos configuration file."

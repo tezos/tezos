@@ -189,7 +189,7 @@ let net =
       { expected_pow ; bootstrap_peers ;
         listen_addr ; closed ; limits })
     (obj5
-       (dft "expected-proof-or-work" float default_net.expected_pow)
+       (dft "expected-proof-of-work" float default_net.expected_pow)
        (dft "bootstrap-peers"
           (list string) default_net.bootstrap_peers)
        (opt "listen-addr" string)
