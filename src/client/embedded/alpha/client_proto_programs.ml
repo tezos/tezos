@@ -185,6 +185,7 @@ let print_program locations ppf ((c : Script.code), type_map) =
 let collect_error_locations errs =
   let open Script_typed_ir in
   let open Script_ir_translator in
+  let open Script_interpreter in
   let rec collect acc = function
     | (Ill_typed_data (_, _, _)
       | Ill_formed_type (_, _)
@@ -205,15 +206,19 @@ let collect_error_locations errs =
       | Transfer_in_lambda loc
       | Invalid_constant (loc, _, _)
       | Invalid_contract (loc, _)
-      | Comparable_type_expected (loc, _)) :: rest ->
+      | Comparable_type_expected (loc, _)
+      | Overflow loc
+      | Reject loc
+      | Division_by_zero loc) :: rest ->
         collect (loc :: acc) rest
     | _ :: rest -> collect acc rest in
   collect [] errs
 
-let report_typechecking_errors ?show_types cctxt errs =
+let report_errors cctxt errs =
   let open Client_commands in
   let open Script_typed_ir in
   let open Script_ir_translator in
+  let open Script_interpreter in
   let rec print_ty (type t) ppf (ty : t ty) =
     let expr = unparse_ty ty in
     print_expr no_locations ppf expr in
@@ -246,7 +251,7 @@ let report_typechecking_errors ?show_types cctxt errs =
         Format.fprintf ppf "%a,@ %a"
           Format.pp_print_text first print_enumeration rest
     | [] -> assert false in
-  let print_typechecking_error locations err =
+  let print_error locations err =
     let print_loc ppf loc =
       match locations loc with
       | None ->
@@ -273,11 +278,17 @@ let report_typechecking_errors ?show_types cctxt errs =
           name
           (print_expr locations) expr
     | Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty, type_map) ->
-        (match show_types with
-         | Some prog -> cctxt.message "%a\n" (print_program no_locations) (prog, type_map)
-         | None -> Lwt.return ()) >>= fun () ->
         cctxt.warning
           "@[<v 2>Ill typed contract:@ %a@]"
+          (print_program locations)
+          ({ Script.storage_type = unparse_ty storage_ty ;
+             arg_type = unparse_ty arg_ty ;
+             ret_type = unparse_ty ret_ty ;
+             code = expr }, type_map)
+    | Runtime_contract_error (contract, expr, arg_ty, ret_ty, storage_ty) ->
+        cctxt.warning
+          "@[<v 2>Runtime error in contract %a:@ %a@]"
+          Contract.pp contract
           (print_program locations)
           ({ Script.storage_type = unparse_ty storage_ty ;
              arg_type = unparse_ty arg_ty ;
@@ -416,14 +427,18 @@ let report_typechecking_errors ?show_types cctxt errs =
           "@[<hov 0>@[<hov 2>Type@ %a@]@ \
            @[<hov 2>is not compatible with type@ %a.@]@]"
           print_ty tya print_ty tyb
+    | Reject _ -> cctxt.warning "Script reached FAIL instruction"
+    | Overflow _ -> cctxt.warning "Unexpected arithmetic overflow"
+    | Division_by_zero _ -> cctxt.warning "Division by zero"
     | err ->
         cctxt.warning "%a"
           Local_environment.Environment.Error_monad.pp_print_error [ err ] in
-  let rec print_typechecking_error_trace locations errs =
+  let rec print_error_trace locations errs =
     let locations = match errs with
       | (Ill_typed_data (_, _, _)
         | Ill_formed_type (_, _)
-        | Ill_typed_contract (_, _, _, _, _)) :: rest ->
+        | Ill_typed_contract (_, _, _, _, _)
+        | Runtime_contract_error (_, _, _, _, _)) :: rest ->
           let collected =
             collect_error_locations rest in
           let assoc, _ =
@@ -439,12 +454,12 @@ let report_typechecking_errors ?show_types cctxt errs =
     match errs with
     | [] -> Lwt.return ()
     | err :: errs ->
-        print_typechecking_error locations err >>= fun () ->
-        print_typechecking_error_trace locations errs in
+        print_error locations err >>= fun () ->
+        print_error_trace locations errs in
   Lwt_list.iter_s
     (function
       | Ecoproto_error errs ->
-          print_typechecking_error_trace no_locations errs
+          print_error_trace no_locations errs
       | err -> cctxt.warning "%a" pp_print_error [ err ])
     errs
 
@@ -631,6 +646,10 @@ let commands () =
        @@ stop)
       (fun program storage input cctxt ->
          let open Data_encoding in
+         let print_errors errs =
+           report_errors cctxt errs >>= fun () ->
+           cctxt.error "error running program" >>= fun () ->
+           return () in
          if !trace_stack then
            Client_proto_rpcs.Helpers.trace_code cctxt.rpc_config
              cctxt.config.block program.ast (storage.ast, input.ast, !amount) >>= function
@@ -650,10 +669,7 @@ let commands () =
                          stack))
                  trace >>= fun () ->
                return ()
-           | Error errs ->
-               report_typechecking_errors cctxt errs >>= fun () ->
-               cctxt.error "error running program" >>= fun () ->
-               return ()
+           | Error errs -> print_errors errs
          else
            Client_proto_rpcs.Helpers.run_code cctxt.rpc_config
              cctxt.config.block program.ast (storage.ast, input.ast, !amount) >>= function
@@ -663,9 +679,7 @@ let commands () =
                  (print_expr no_locations) output >>= fun () ->
                return ()
            | Error errs ->
-               report_typechecking_errors cctxt errs >>= fun () ->
-               cctxt.error "error running program" >>= fun () ->
-               return ()) ;
+               print_errors errs);
 
     command ~group ~desc: "ask the node to typecheck a program"
       ~args: [ show_types_arg ; emacs_mode_arg ]
@@ -697,10 +711,10 @@ let commands () =
                  match errs with
                  | Ecoproto_error (Script_ir_translator.Ill_formed_type
                                      (Some ("return" | "parameter" | "storage" as field), _) :: errs) :: _ ->
-                     report_typechecking_errors cctxt [ Ecoproto_error errs ] >>= fun () ->
+                     report_errors cctxt [ Ecoproto_error errs ] >>= fun () ->
                      Lwt.return ([], [ List.assoc 0 (List.assoc field program.loc_table), Buffer.contents msg ])
                  | Ecoproto_error (Script_ir_translator.Ill_typed_contract (_, _, _, _, type_map) :: errs) :: _ ->
-                     (report_typechecking_errors cctxt [ Ecoproto_error errs ]  >>= fun () ->
+                     (report_errors cctxt [ Ecoproto_error errs ]  >>= fun () ->
                       let (types, _) = emacs_type_map type_map in
                       let loc = match collect_error_locations errs with
                         | hd :: _ -> hd
@@ -738,9 +752,8 @@ let commands () =
                  return ()
                else return ()
            | Error errs ->
-               report_typechecking_errors
-                 ?show_types:(if !show_types then Some program.ast else None) cctxt errs >>= fun () ->
-               failwith "ill-typed program") ;
+               report_errors cctxt errs >>= fun () ->
+               cctxt.error "ill-typed program") ;
 
     command ~group ~desc: "ask the node to typecheck a data expression"
       (prefixes [ "typecheck" ; "data" ]
@@ -758,8 +771,8 @@ let commands () =
              cctxt.message "Well typed" >>= fun () ->
              return ()
          | Error errs ->
-             report_typechecking_errors cctxt errs >>= fun () ->
-             failwith "ill-typed data") ;
+             report_errors cctxt errs >>= fun () ->
+             cctxt.error "ill-typed data") ;
 
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
@@ -777,7 +790,7 @@ let commands () =
              return ()
          | Error errs ->
              cctxt.warning "%a" pp_print_error errs  >>= fun () ->
-             failwith "ill-formed data") ;
+             cctxt.error "ill-formed data") ;
 
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
@@ -804,6 +817,6 @@ let commands () =
              return ()
          | Error errs ->
              cctxt.warning "%a" pp_print_error errs >>= fun () ->
-             failwith "ill-formed data") ;
+             cctxt.error "ill-formed data") ;
 
   ]

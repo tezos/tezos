@@ -22,6 +22,7 @@ type error += Quota_exceeded
 type error += Overflow of Script.location
 type error += Reject of Script.location
 type error += Division_by_zero of Script.location
+type error += Runtime_contract_error : Contract.t * Script.expr * _ ty * _ ty * _ ty -> error
 
 let () =
   let open Data_encoding in
@@ -56,11 +57,28 @@ let () =
   register_error_kind
     `Temporary
     ~id:"scriptRejectedRuntimeError"
-    ~title: "Script rejected (runtime script error)"
-    ~description: ""
+    ~title: "Script failed (runtime script error)"
+    ~description: "A FAIL instruction was reached"
     (obj1 (req "location" Script.location_encoding))
     (function Reject loc -> Some loc | _ -> None)
-    (fun loc -> Reject loc)
+    (fun loc -> Reject loc);
+  register_error_kind
+    `Temporary
+    ~id:"scriptRuntimeError"
+    ~title: "Script runtime error"
+    ~description: "Toplevel error for all runtime script errors"
+    (obj5
+       (req "contractHandle" Contract.encoding)
+       (req "contractCode" Script.expr_encoding)
+       (req "contractParameterType" ex_ty_enc)
+       (req "contractReturnType" ex_ty_enc)
+       (req "contractStorageType" ex_ty_enc))
+    (function
+      | Runtime_contract_error (contract, expr, arg_ty, ret_ty, storage_ty) ->
+          Some (contract, expr, Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty)
+      | _ -> None)
+    (fun (contract, expr, Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty) ->
+       Runtime_contract_error (contract, expr, arg_ty, ret_ty, storage_ty));
 
 (* ---- interpreter ---------------------------------------------------------*)
 
@@ -519,7 +537,9 @@ and execute ?log origination orig source ctxt storage script amount arg qta =
     (parse_lambda ~storage_type ctxt arg_type_full ret_type_full code) >>=? fun lambda ->
   parse_data ctxt arg_type arg >>=? fun arg ->
   parse_data ctxt storage_type storage >>=? fun storage ->
-  interp ?log origination qta orig source amount ctxt lambda (arg, storage)
+  trace
+    (Runtime_contract_error (source, code, arg_type, ret_type_full, storage_type))
+    (interp ?log origination qta orig source amount ctxt lambda (arg, storage))
   >>=? fun (ret, qta, ctxt, origination) ->
   let ret, storage = ret in
   return (unparse_data storage_type storage,

@@ -1433,14 +1433,24 @@ let parse_script
   = fun ?type_logger ctxt
     { storage; storage_type = init_storage_type }
     { code; arg_type; ret_type; storage_type } ->
-    (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
-    (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
-    (Lwt.return (parse_ty init_storage_type)) >>=? fun (Ex_ty init_storage_type) ->
-    (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
+    trace
+      (Ill_formed_type (Some "parameter", arg_type))
+      (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
+    trace
+      (Ill_formed_type (Some "return", ret_type))
+      (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
+    trace
+      (Ill_formed_type (Some "initial storage", init_storage_type))
+      (Lwt.return (parse_ty init_storage_type)) >>=? fun (Ex_ty init_storage_type) ->
+    trace
+      (Ill_formed_type (Some "storage", storage_type))
+      (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
     let arg_type_full = Pair_t (arg_type, storage_type) in
     let ret_type_full = Pair_t (ret_type, storage_type) in
     Lwt.return (ty_eq init_storage_type storage_type) >>=? fun (Eq _) ->
-    parse_data ?type_logger ctxt storage_type storage >>=? fun storage ->
+    trace
+      (Ill_typed_data (None, storage, storage_type))
+      (parse_data ?type_logger ctxt storage_type storage) >>=? fun storage ->
     trace
       (Ill_typed_contract (code, arg_type, ret_type, storage_type, []))
       (parse_lambda ctxt ~storage_type ?type_logger arg_type_full ret_type_full code) >>=? fun code ->
@@ -1573,6 +1583,15 @@ let typecheck_data
 
 (* ---- Error registration --------------------------------------------------*)
 
+let ex_ty_enc =
+    Data_encoding.conv
+      (fun (Ex_ty ty) -> unparse_ty ty)
+      (fun expr ->
+         match parse_ty expr with
+         | Ok (Ex_ty ty) -> Ex_ty ty
+         | _ -> Ex_ty Unit_t (* FIXME: ? *))
+      Script.expr_encoding
+
 let () =
   let open Data_encoding in
   let located enc =
@@ -1602,14 +1621,6 @@ let () =
                   "string", String_kind ;
                   "primitiveApplication", Prim_kind ;
                   "sequence", Seq_kind ] in
-  let ex_ty_enc =
-    conv
-      (fun (Ex_ty ty) -> unparse_ty ty)
-      (fun expr ->
-         match parse_ty expr with
-         | Ok (Ex_ty ty) -> Ex_ty ty
-         | _ -> Ex_ty Unit_t (* FIXME: ? *))
-      Script.expr_encoding in
   let ex_stack_ty_enc =
     let rec unfold = function
       | Ex_stack_ty (Item_t (ty, rest)) ->
@@ -1671,7 +1682,7 @@ let () =
     ~id:"invalidExpressionKindTypeError"
     ~title: "Invalid expression kind (typechecking error)"
     ~description:
-      "In a ascript or data expression, an expression was of the wrong kind \
+      "In a script or data expression, an expression was of the wrong kind \
        (for instance a string where only a primitive applications can appear)."
     (located (obj2
                 (req "expectedKinds" (list kind_enc))
@@ -1686,7 +1697,7 @@ let () =
     ~id:"invalidPrimitiveNamespaceTypeError"
     ~title: "Invalid primitive namespace (typechecking error)"
     ~description:
-      "In a ascript or data expression, a primitive was of the wrong namespace."
+      "In a script or data expression, a primitive was of the wrong namespace."
     (located (obj3
                 (req "primitiveName" string)
                 (req "expectedNamespace" namespace_enc)
