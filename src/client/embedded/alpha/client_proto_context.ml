@@ -380,12 +380,16 @@ let commands () =
       originate_contract cctxt.rpc_config cctxt.config.block ~force:!force
         ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
         ~delegatable:!delegatable ?delegatePubKey:delegate ~code ~init:!init
-        () >>=? fun (oph, contract) ->
-      message_injection cctxt
-        ~force:!force ~contracts:[contract] oph >>= fun () ->
-      RawContractAlias.add cctxt neu contract >>=? fun () ->
-      message_added_contract cctxt neu >>= fun () ->
-      return ()
+        () >>=function
+      | Error errs ->
+          Client_proto_programs.report_errors cctxt errs >>= fun () ->
+          cctxt.error "origination simulation failed"
+      | Ok (oph, contract) ->
+          message_injection cctxt
+            ~force:!force ~contracts:[contract] oph >>= fun () ->
+          RawContractAlias.add cctxt neu contract >>=? fun () ->
+          message_added_contract cctxt neu >>= fun () ->
+          return ()
     end ;
 
     command ~group ~desc: "open a new (free) account"
@@ -425,9 +429,13 @@ let commands () =
       get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
       transfer cctxt.rpc_config cctxt.config.block ~force:!force
         ~source ~src_pk ~src_sk ~destination
-        ?arg:!arg ~amount ~fee:!fee () >>=? fun (oph, contracts) ->
-      message_injection cctxt ~force:!force ~contracts oph >>= fun () ->
-      return ()
+        ?arg:!arg ~amount ~fee:!fee () >>= function
+      | Error errs ->
+          Client_proto_programs.report_errors cctxt errs >>= fun () ->
+          cctxt.error "transfer simulation failed"
+      | Ok (oph, contracts) ->
+          message_injection cctxt ~force:!force ~contracts oph >>= fun () ->
+          return ()
     end;
 
     command ~desc: "Activate a protocol" begin

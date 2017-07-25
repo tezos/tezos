@@ -8,11 +8,13 @@
 (**************************************************************************)
 
 open Tezos_context
+open Script_typed_ir
 
 type error += Quota_exceeded
 type error += Overflow of Script.location
 type error += Reject of Script.location
 type error += Division_by_zero of Script.location
+type error += Runtime_contract_error : Contract.t * Script.expr * _ ty * _ ty * _ ty -> error
 
 val dummy_code_fee : Tez.t
 val dummy_storage_fee : Tez.t
