@@ -576,7 +576,7 @@ and execute ?log origination orig source ctxt storage script amount arg qta =
   parse_data ctxt arg_type arg >>=? fun arg ->
   parse_data ctxt storage_type storage >>=? fun storage ->
   trace
-    (Runtime_contract_error (source, code, arg_type, ret_type_full, storage_type))
+    (Runtime_contract_error (source, code, arg_type, ret_type, storage_type))
     (interp ?log origination qta orig source amount ctxt lambda (arg, storage))
   >>=? fun (ret, qta, ctxt, origination) ->
   let ret, storage = ret in
