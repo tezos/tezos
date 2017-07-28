@@ -17,6 +17,8 @@ S ../../src/proto
 B ../../src/proto
 S ../../src/client
 B ../../src/client
+S ../../src/client/embedded
+B ../../src/client/embedded
 S ../../src/client/embedded/alpha
 B ../../src/client/embedded/alpha
 S ../../src/client/embedded/alpha/baker

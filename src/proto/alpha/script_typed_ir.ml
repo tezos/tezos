@@ -14,7 +14,8 @@ open Script_int
 (* ---- Auxiliary types -----------------------------------------------------*)
 
 type 'ty comparable_ty =
-  | Int_key : ('s, 'l) int_kind -> ('s, 'l) int_val comparable_ty
+  | Int_key : (z num) comparable_ty
+  | Nat_key : (n num) comparable_ty
   | String_key : string comparable_ty
   | Tez_key : Tez.t comparable_ty
   | Bool_key : bool comparable_ty
@@ -40,7 +41,7 @@ end
 type ('key, 'value) map = (module Boxed_map with type key = 'key and type value = 'value)
 
 type ('arg, 'ret, 'storage) script =
-  { code : (((Tez.t, 'arg) pair, 'storage) pair, ('ret, 'storage) pair) lambda ;
+  { code : (('arg, 'storage) pair, ('ret, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
     ret_type : 'ret ty ;
     storage : 'storage ;
@@ -60,7 +61,8 @@ and ('arg, 'ret) typed_contract =
 
 and 'ty ty =
   | Unit_t : unit ty
-  | Int_t : ('s, 'l) int_kind -> ('s, 'l) int_val ty
+  | Int_t : z num ty
+  | Nat_t : n num ty
   | Signature_t : signature ty
   | String_t : string ty
   | Tez_t : Tez.t ty
@@ -162,19 +164,27 @@ and ('bef, 'aft) instr =
   | Concat :
       (string * (string * 'rest), string * 'rest) instr
   (* timestamp operations *)
-  | Add_seconds_to_timestamp : (unsigned, 'l) int_kind ->
-    ((unsigned, 'l) int_val * (Timestamp.t * 'rest), Timestamp.t * 'rest) instr
-  | Add_timestamp_to_seconds : (unsigned, 'l) int_kind ->
-    (Timestamp.t * ((unsigned, 'l) int_val * 'rest), Timestamp.t * 'rest) instr
+  (* TODO: check if we need int instead of nat *)
+  | Add_seconds_to_timestamp :
+    (n num * (Timestamp.t * 'rest), Timestamp.t * 'rest) instr
+  | Add_timestamp_to_seconds :
+    (Timestamp.t * (n num * 'rest), Timestamp.t * 'rest) instr
   (* currency operations *)
+  (* TODO: we can either just have conversions to/from integers and
+     do all operations on integers, or we need more operations on
+     Tez. Also Sub_tez should return Tez.t option (if negative) and *)
   | Add_tez :
       (Tez.t * (Tez.t * 'rest), Tez.t * 'rest) instr
   | Sub_tez :
       (Tez.t * (Tez.t * 'rest), Tez.t * 'rest) instr
-  | Mul_tez : (unsigned, 'l) int_kind ->
-    (Tez.t * ((unsigned, 'l) int_val * 'rest), Tez.t * 'rest) instr
-  | Mul_tez' : (unsigned, 'l) int_kind ->
-    ((unsigned, 'l) int_val * (Tez.t * 'rest), Tez.t * 'rest) instr
+  | Mul_teznat :
+      (Tez.t * (n num * 'rest), Tez.t * 'rest) instr
+  | Mul_nattez :
+      (n num * (Tez.t * 'rest), Tez.t * 'rest) instr
+  | Ediv_teznat :
+      (Tez.t * (n num * 'rest), ((Tez.t, Tez.t) pair) option * 'rest) instr
+  | Ediv_tez :
+      (Tez.t * (Tez.t * 'rest), ((n num, Tez.t) pair) option * 'rest) instr
   (* boolean operations *)
   | Or :
       (bool * (bool * 'rest), bool * 'rest) instr
@@ -185,42 +195,54 @@ and ('bef, 'aft) instr =
   | Not :
       (bool * 'rest, bool * 'rest) instr
   (* integer operations *)
-  | Checked_neg_int : (signed, 'l) int_kind ->
-    ((signed, 'l) int_val * 'rest, (signed, 'l) int_val * 'rest) instr
-  | Checked_abs_int : (signed, 'l) int_kind ->
-    ((signed, 'l) int_val * 'rest, (signed, 'l) int_val * 'rest) instr
-  | Checked_add_int : ('s, 'l) int_kind ->
-    (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Checked_sub_int : ('s, 'l) int_kind ->
-    (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Checked_mul_int : ('s, 'l) int_kind ->
-    (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Neg_int : (signed, 'l) int_kind ->
-    ((signed, 'l) int_val * 'rest, (signed, 'l) int_val * 'rest) instr
-  | Abs_int : (signed, 'l) int_kind ->
-    ((signed, 'l) int_val * 'rest, (signed, 'l) int_val * 'rest) instr
-  | Add_int : ('s, 'l) int_kind ->
-    (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Sub_int : ('s, 'l) int_kind ->
-    (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Mul_int : ('s, 'l) int_kind ->
-    (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Div_int : ('s, 'l) int_kind ->
-    (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Mod_int : ('s, 'l) int_kind ->
-    (('s, 'l) int_val * (('s, 'l) int_val * 'rest), ('s, 'l) int_val * 'rest) instr
-  | Lsl_int : (unsigned, 'l) int_kind ->
-    ((unsigned, 'l) int_val * ((unsigned, eight) int_val * 'rest), (unsigned, 'l) int_val * 'rest) instr
-  | Lsr_int : (unsigned, 'l) int_kind ->
-    ((unsigned, 'l) int_val * ((unsigned, eight) int_val * 'rest), (unsigned, 'l) int_val * 'rest) instr
-  | Or_int : (unsigned, 'l) int_kind ->
-    ((unsigned, 'l) int_val * ((unsigned, 'l) int_val * 'rest), (unsigned, 'l) int_val * 'rest) instr
-  | And_int : (unsigned, 'l) int_kind ->
-    ((unsigned, 'l) int_val * ((unsigned, 'l) int_val * 'rest), (unsigned, 'l) int_val * 'rest) instr
-  | Xor_int : (unsigned, 'l) int_kind ->
-    ((unsigned, 'l) int_val * ((unsigned, 'l) int_val * 'rest), (unsigned, 'l) int_val * 'rest) instr
-  | Not_int : (unsigned, 'l) int_kind ->
-    ((unsigned, 'l) int_val * 'rest, (unsigned, 'l) int_val * 'rest) instr
+  | Neg_nat :
+      (n num * 'rest, z num * 'rest) instr
+  | Neg_int :
+      (z num * 'rest, z num * 'rest) instr
+  | Abs_int :
+      (z num * 'rest, n num * 'rest) instr
+  | Int_nat :
+      (n num * 'rest, z num * 'rest) instr
+  | Add_intint :
+      (z num * (z num * 'rest), z num * 'rest) instr
+  | Add_intnat :
+      (z num * (n num * 'rest), z num * 'rest) instr
+  | Add_natint :
+      (n num * (z num * 'rest), z num * 'rest) instr
+  | Add_natnat :
+      (n num * (n num * 'rest), n num * 'rest) instr
+  | Sub_int :
+      ('s num * ('t num * 'rest), z num * 'rest) instr
+  | Mul_intint :
+      (z num * (z num * 'rest), z num * 'rest) instr
+  | Mul_intnat :
+      (z num * (n num * 'rest), z num * 'rest) instr
+  | Mul_natint :
+      (n num * (z num * 'rest), z num * 'rest) instr
+  | Mul_natnat :
+      (n num * (n num * 'rest), n num * 'rest) instr
+  | Ediv_intint :
+      (z num * (z num * 'rest), ((z num, n num) pair) option * 'rest) instr
+  | Ediv_intnat :
+      (z num * (n num * 'rest), ((z num, n num) pair) option * 'rest) instr
+  | Ediv_natint :
+      (n num * (z num * 'rest), ((z num, n num) pair) option * 'rest) instr
+  | Ediv_natnat :
+      (n num * (n num * 'rest), ((n num, n num) pair) option * 'rest) instr
+  | Lsl_nat :
+      (n num * (n num * 'rest), n num * 'rest) instr
+  | Lsr_nat :
+      (n num * (n num * 'rest), n num * 'rest) instr
+  | Or_nat :
+      (n num * (n num * 'rest), n num * 'rest) instr
+  | And_nat :
+      (n num * (n num * 'rest), n num * 'rest) instr
+  | Xor_nat :
+      (n num * (n num * 'rest), n num * 'rest) instr
+  | Not_nat :
+      (n num * 'rest, z num * 'rest) instr
+  | Not_int :
+      (z num * 'rest, z num * 'rest) instr
   (* control *)
   | Seq : ('bef, 'trans) descr * ('trans, 'aft) descr ->
     ('bef, 'aft) instr
@@ -235,31 +257,27 @@ and ('bef, 'aft) instr =
   | Lambda : ('arg, 'ret) lambda ->
     ('rest, ('arg, 'ret) lambda * 'rest) instr
   | Fail :
-    ('bef, 'aft) instr
+      ('bef, 'aft) instr
   | Nop :
       ('rest, 'rest) instr
   (* comparison *)
   | Compare : 'a comparable_ty ->
-    ('a * ('a * 'rest), (signed, sixtyfour) int_val * 'rest) instr
+    ('a * ('a * 'rest), z num * 'rest) instr
   (* comparators *)
   | Eq :
-      ((signed, sixtyfour) int_val * 'rest, bool * 'rest) instr
+      (z num * 'rest, bool * 'rest) instr
   | Neq :
-      ((signed, sixtyfour) int_val * 'rest, bool * 'rest) instr
+      (z num * 'rest, bool * 'rest) instr
   | Lt :
-      ((signed, sixtyfour) int_val * 'rest, bool * 'rest) instr
+      (z num * 'rest, bool * 'rest) instr
   | Gt :
-      ((signed, sixtyfour) int_val * 'rest, bool * 'rest) instr
+      (z num * 'rest, bool * 'rest) instr
   | Le :
-      ((signed, sixtyfour) int_val * 'rest, bool * 'rest) instr
+      (z num * 'rest, bool * 'rest) instr
   | Ge :
-      ((signed, sixtyfour) int_val * 'rest, bool * 'rest) instr
-  (* casts *)
-  | Int_of_int : ('sf, 'lf) int_kind * ('st, 'lt) int_kind ->
-    (('sf, 'lf) int_val * 'rest, ('st, 'lt) int_val * 'rest) instr
-  | Checked_int_of_int : ('sf, 'lf) int_kind * ('st, 'lt) int_kind ->
-    (('sf, 'lf) int_val * 'rest, ('st, 'lt) int_val * 'rest) instr
-  (* protocol *)
+      (z num * 'rest, bool * 'rest) instr
+
+   (* protocol *)
   | Manager :
       (('arg, 'ret) typed_contract * 'rest, public_key_hash * 'rest) instr
   | Transfer_tokens : 'sto ty ->
@@ -267,9 +285,11 @@ and ('bef, 'aft) instr =
   | Create_account :
       (public_key_hash * (public_key_hash option * (bool * (Tez.t * 'rest))),
        (unit, unit) typed_contract * 'rest) instr
+  | Default_account :
+      (public_key_hash * 'rest, (unit, unit) typed_contract * 'rest) instr
   | Create_contract : 'g ty * 'p ty * 'r ty ->
-    (public_key_hash * (public_key_hash option * (bool * (Tez.t *
-                                                          (((Tez.t * 'p) * 'g, 'r * 'g) lambda * ('g * 'rest))))),
+    (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t *
+       (('p * 'g, 'r * 'g) lambda * ('g * 'rest)))))),
      ('p, 'r) typed_contract * 'rest) instr
   | Now :
       ('rest, Timestamp.t * 'rest) instr
@@ -279,8 +299,8 @@ and ('bef, 'aft) instr =
       (public_key_hash * ((signature * string) * 'rest), bool * 'rest) instr
   | H : 'a ty ->
     ('a * 'rest, string * 'rest) instr
-  | Steps_to_quota :
-      ('rest, (unsigned, thirtytwo) int_val * 'rest) instr
+  | Steps_to_quota : (* TODO: check that it always returns a nat *)
+      ('rest, n num * 'rest) instr
   | Source : 'p ty * 'r ty ->
     ('rest, ('p, 'r) typed_contract * 'rest) instr
   | Amount :

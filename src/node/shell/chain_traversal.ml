@@ -132,3 +132,19 @@ let new_blocks ~from_block ~to_block =
   path ancestor to_block >>= function
   | None -> assert false
   | Some path -> Lwt.return (ancestor, path)
+
+let live_blocks block n =
+  let rec loop bacc oacc block n =
+    Block.all_operation_hashes block >>= fun hashes ->
+    let oacc =
+      List.fold_left
+        (List.fold_left
+           (fun oacc op -> Operation_hash.Set.add op oacc))
+        oacc hashes  in
+    let bacc = Block_hash.Set.add (Block.hash block) bacc in
+    if n = 0 then Lwt.return (bacc, oacc)
+    else
+      Block.predecessor block >>= function
+      | None -> Lwt.return (bacc, oacc)
+      | Some predecessor -> loop bacc oacc predecessor (pred n) in
+  loop Block_hash.Set.empty Operation_hash.Set.empty block n

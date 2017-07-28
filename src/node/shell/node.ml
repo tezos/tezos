@@ -230,7 +230,7 @@ module RPC = struct
       Lwt.return v
     else
       State.Block.predecessor v >>= function
-      | None -> Lwt.fail Not_found
+      | None -> Lwt.return v
       | Some v -> predecessor net_db (n-1) v
 
   let block_info node (block: block) =

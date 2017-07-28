@@ -19,11 +19,11 @@ depends: [
   "calendar"
   "cohttp" {>= "0.21" }
   "conduit"
+  "ezjsonm" {= "0.4.3" }
   "git"
   "git-unix"
   "ipv6-multicast"
   "irmin-watcher" (* for `irmin.unix` *)
-  "ezjsonm" {= "0.4.3" }
   "irmin" {>= "0.12" & < "1.0" }
   "lwt" {>= "3.0.0" }
   "lwt_ssl"

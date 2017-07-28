@@ -225,9 +225,13 @@ let expand original =
       expand_duuuuup ;
       expand_compare ]
 
+let loc = function
+  | Prim (loc, _, _) | Int (loc, _) | String (loc, _) | Seq (loc, _) -> loc
+
 let apply node arg =
   match node with
-  | Prim (loc, n, args) -> Prim (loc, n, args @ [arg])
+  | Prim ((sloc, _), n, args) ->
+     Prim ((sloc, snd (loc arg)), n, args @ [arg])
   | Int _ | String _ | Seq _ as _node ->
       raise (Invalid_application (node_location arg))
 
@@ -236,8 +240,12 @@ let rec apply_seq node = function
   | n1 :: n2 -> apply_seq (apply node n1) n2
 
 let pos p1 p2 =
-  Lexing.((p1.pos_lnum, p1.pos_cnum - p1.pos_bol),
-          (p2.pos_lnum, p2.pos_cnum - p2.pos_bol))
+  ({ line = p1.Lexing.pos_lnum ;
+    column = p1.Lexing.pos_cnum - p1.Lexing.pos_bol ;
+    point = p1.Lexing.pos_cnum },
+   { line = p2.Lexing.pos_lnum ;
+     column = p2.Lexing.pos_cnum - p2.Lexing.pos_bol ;
+     point = p2.Lexing.pos_cnum })
 
 %}
 

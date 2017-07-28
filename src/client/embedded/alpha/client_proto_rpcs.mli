@@ -10,12 +10,7 @@
 val string_of_errors: error list -> string
 val handle_error: Client_commands.context -> 'a tzresult -> 'a Lwt.t
 
-type block = [
-  | `Genesis
-  | `Head of int | `Prevalidation
-  | `Test_head of int | `Test_prevalidation
-  | `Hash of Block_hash.t
-]
+type block = Node_rpc_services.Blocks.block
 
 val header:
   Client_rpcs.config -> block -> Block_header.t tzresult Lwt.t
@@ -69,10 +64,6 @@ module Context : sig
     block -> Level.t tzresult Lwt.t
   (** [next_level cctxt blk] returns the (protocol view of the) level
       of the successor of [blk]. *)
-
-  val faucet_counter:
-    Client_rpcs.config ->
-    block -> int32 tzresult Lwt.t
 
   val voting_period_kind:
     Client_rpcs.config ->
@@ -144,6 +135,9 @@ module Context : sig
     val script:
       Client_rpcs.config ->
       block -> Contract.t -> Script.t option tzresult Lwt.t
+    val storage:
+      Client_rpcs.config ->
+      block -> Contract.t -> Script.storage option tzresult Lwt.t
   end
 end
 
@@ -162,12 +156,12 @@ module Helpers : sig
   val run_code:
     Client_rpcs.config ->
     block -> Script.code ->
-    (Script.expr * Script.expr) ->
+    (Script.expr * Script.expr * Tez.t) ->
     (Script.expr * Script.expr) tzresult Lwt.t
   val trace_code:
     Client_rpcs.config ->
     block -> Script.code ->
-    (Script.expr * Script.expr) ->
+    (Script.expr * Script.expr * Tez.t) ->
     (Script.expr * Script.expr *
      (Script.location * int * Script.expr list) list) tzresult Lwt.t
   val typecheck_code:
@@ -208,6 +202,7 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -218,6 +213,7 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -230,6 +226,7 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -246,6 +243,7 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         source:Contract.t ->
         ?sourcePubKey:public_key ->
         counter:int32 ->
@@ -258,18 +256,21 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         dictator_operation ->
         MBytes.t tzresult Lwt.t
       val activate:
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         Protocol_hash.t ->
         MBytes.t tzresult Lwt.t
       val activate_testnet:
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         Protocol_hash.t ->
         MBytes.t tzresult Lwt.t
     end
@@ -278,6 +279,7 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         source:public_key ->
         delegate_operation list ->
         MBytes.t tzresult Lwt.t
@@ -285,6 +287,7 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         source:public_key ->
         block:Block_hash.t ->
         slot:int ->
@@ -293,6 +296,7 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         source:public_key ->
         period:Voting_period.t ->
         proposals:Hash.Protocol_hash.t list ->
@@ -301,6 +305,7 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         source:public_key ->
         period:Voting_period.t ->
         proposal:Hash.Protocol_hash.t ->
@@ -312,12 +317,14 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         anonymous_operation list ->
         MBytes.t tzresult Lwt.t
       val seed_nonce_revelation:
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         level:Raw_level.t ->
         nonce:Nonce.t ->
         unit -> MBytes.t tzresult Lwt.t
@@ -325,8 +332,9 @@ module Helpers : sig
         Client_rpcs.config ->
         block ->
         net_id:Net_id.t ->
+        branch:Block_hash.t ->
         id:public_key_hash ->
-        int32 -> MBytes.t tzresult Lwt.t
+        unit -> MBytes.t tzresult Lwt.t
     end
     val block_proto_header:
       Client_rpcs.config ->
@@ -335,17 +343,6 @@ module Helpers : sig
       seed_nonce_hash: Nonce_hash.t ->
       ?proof_of_work_nonce: MBytes.t ->
       unit -> MBytes.t tzresult Lwt.t
-      (** [block cctxt root ~net ~predecessor ~timestamp ~fitness
-          ~operations ~level ~priority ~seed_nonce_hash
-          ~proof_of_work_nonce ()] returns the binary serialization of
-          a block header (comprising the shell and protocol-specific
-          part), rooted at [root], belonging to [net], with
-          predecessor [predecessor], [timestamp], [fitness],
-          associated operations [operations], level [level] (the
-          protocol cannot deduce it from [predecessor] on its own),
-          priority [priority] (the priority of this miner in the
-          mining queue associated to [level]), [seed_nonce_hash] (the
-          chosen seed that we will reveal in the next cycle). *)
   end
 
   module Parse : sig

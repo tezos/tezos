@@ -21,6 +21,11 @@ val free_mining_arg: string * Arg.spec * string
 val force_arg: string * Arg.spec * string
 val endorsement_delay_arg: string * Arg.spec * string
 
+val tez_arg :
+  name:string ->
+  desc:string ->
+  default:string ->
+  Tez.tez ref * (string * Arg.spec * string)
 val tez_param :
   name:string ->
   desc:string ->

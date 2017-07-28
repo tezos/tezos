@@ -378,7 +378,7 @@ let () =
     | Unclassified msg -> Some msg
     | error ->
         let msg = Obj.(extension_name @@ extension_constructor error) in
-        Some ("Unclassified error: " ^ msg ^ ".") in
+        Some ("Unclassified error: " ^ msg ^ ". Was the error registered?") in
   let title = "Generic error" in
   let description =  "An unclassified error" in
   let encoding_case =

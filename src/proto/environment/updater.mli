@@ -7,6 +7,7 @@ type validation_result = {
   context: Context.t ;
   fitness: Fitness.t ;
   message: string option ;
+  max_operations_ttl: int ;
 }
 
 type rpc_context = {

@@ -89,6 +89,7 @@ module Block : sig
     header: Block_header.t ;
     message: string ;
     operation_list_count: int ;
+    max_operations_ttl: int ;
   }
 
   module Contents : SINGLE_STORE

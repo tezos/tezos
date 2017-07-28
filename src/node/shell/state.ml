@@ -108,7 +108,7 @@ module Locked_block = struct
     let header : Block_header.t = { shell ; proto = MBytes.create 0 } in
     Store.Block.Contents.store (store, genesis.block)
       { Store.Block.header ; message = "Genesis" ;
-        operation_list_count = 0 } >>= fun () ->
+        operation_list_count = 0 ; max_operations_ttl = 0 } >>= fun () ->
     Context.commit_genesis
       context_index
       ~id:genesis.block
@@ -296,6 +296,8 @@ module Block = struct
   let message { contents = { message } } = message
   let operation_list_count { contents = { operation_list_count } } =
     operation_list_count
+  let max_operations_ttl { contents = { max_operations_ttl } } =
+    max_operations_ttl
 
   let known_valid net_state hash =
     Shared.use net_state.block_store begin fun store ->
@@ -342,7 +344,7 @@ module Block = struct
 
   let store
       net_state block_header operations
-      { Updater.context ; fitness ; message } =
+      { Updater.context ; fitness ; message ; max_operations_ttl } =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     (* let's the validator check the consistency... of fitness, level, ... *)
@@ -358,6 +360,7 @@ module Block = struct
       Store.Block.header = block_header ;
       message ;
       operation_list_count = List.length operations ;
+      max_operations_ttl ;
     } in
     Shared.use net_state.block_store begin fun store ->
       Store.Block.Invalid_block.known store hash >>= fun known_invalid ->

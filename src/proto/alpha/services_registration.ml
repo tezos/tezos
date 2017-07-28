@@ -158,8 +158,6 @@ let next_level ctxt =
 
 let () = register0 Services.Context.next_level next_level
 
-let () = register0 Services.Context.faucet_counter Contract.get_faucet_counter
-
 let () =
   register0 Services.Context.voting_period_kind Vote.get_current_period_kind
 
@@ -215,6 +213,7 @@ let () =
   register2' Services.Context.Contract.spendable Contract.is_spendable ;
   register2' Services.Context.Contract.delegatable Contract.is_delegatable ;
   register2' Services.Context.Contract.script Contract.get_script ;
+  register2' Services.Context.Contract.storage Contract.get_storage ;
   register2' Services.Context.Contract.get (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Contract.get_manager ctxt contract >>=? fun manager ->
@@ -260,13 +259,6 @@ let () =
            | (_ctxt, _, Some script_err) -> Lwt.return (Error script_err)
            | (_ctxt, contracts, None) -> Lwt.return (Ok contracts)) ;
   let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =
-    let amount =
-      match amount with
-      | Some amount -> amount
-      | None ->
-          match Tez.of_cents 100_00L with
-          | Some tez -> tez
-          | None -> Tez.zero in
     let contract =
       match contract with
       | Some contract -> contract

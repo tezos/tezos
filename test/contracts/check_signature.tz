@@ -1,0 +1,5 @@
+parameter key;
+storage (pair signature string);
+return bool;
+code {DUP; DUP; DIP{CDR; DUP; CAR; DIP{CDR; H}; PAIR};
+      CAR; CHECK_SIGNATURE; DIP{CDR}; PAIR};

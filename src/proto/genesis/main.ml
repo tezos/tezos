@@ -93,13 +93,15 @@ let begin_application
       let message =
         Some (Format.asprintf "activate %a" Protocol_hash.pp_short hash) in
       Updater.activate ctxt hash >>= fun ctxt ->
-      return { Updater.message ; context = ctxt ; fitness }
+      return { Updater.message ; context = ctxt ;
+               fitness ; max_operations_ttl = 0 }
   | Activate_testnet (hash, delay) ->
       let message =
         Some (Format.asprintf "activate testnet %a" Protocol_hash.pp_short hash) in
       let expiration = Time.add raw_block.shell.timestamp delay in
       Updater.fork_test_network ctxt hash expiration >>= fun ctxt ->
-      return { Updater.message ; context = ctxt ; fitness }
+      return { Updater.message ; context = ctxt ; fitness ;
+               max_operations_ttl = 0 }
 
 let begin_construction
     ~predecessor_context:context
@@ -111,7 +113,8 @@ let begin_construction
     ?proto_header:_
     () =
   (* Dummy result. *)
-  return { Updater.message = None ; context ; fitness }
+  return { Updater.message = None ; context ;
+           fitness ; max_operations_ttl = 0 }
 
 let apply_operation _vctxt _ =
   Lwt.return (Error []) (* absurd *)

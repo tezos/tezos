@@ -63,7 +63,7 @@ let net_id = Net_id.of_block_hash genesis_block
 (** Operation store *)
 
 let make proto : Tezos_data.Operation.t =
-  { shell = { net_id } ; proto }
+  { shell = { net_id ; branch = genesis_block } ; proto }
 
 let op1 = make (MBytes.of_string "Capadoce")
 let oph1 = Tezos_data.Operation.hash op1
@@ -89,7 +89,8 @@ let lolblock ?(operations = []) header =
         proto = MBytes.of_string header ;
       } ;
     operation_list_count = Random.int 32 ;
-    message = ""
+    max_operations_ttl = 0 ;
+    message = "" ;
   }
 
 let b1 = lolblock "Blop !"

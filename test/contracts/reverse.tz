@@ -1,0 +1,7 @@
+parameter (list string);
+storage unit;
+return (list string);
+code {CAR; DIP {NIL string}; SWAP; PUSH bool True;
+      # INV: BOOL : ORIG_LIST : REV_LIST : []
+      LOOP {IF_CONS {DIP {SWAP}; CONS; SWAP; PUSH bool True} {NIL string; PUSH bool False}};
+      DROP; UNIT; SWAP; PAIR};

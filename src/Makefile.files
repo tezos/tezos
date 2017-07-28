@@ -12,6 +12,7 @@ $(addprefix proto/environment/, \
   buffer.mli \
   format.mli \
   \
+  z.mli \
   lwt_sequence.mli lwt.mli lwt_list.mli \
   \
   mBytes.mli \
@@ -114,6 +115,7 @@ UTILS_LIB_IMPLS := \
 
 UTILS_PACKAGES := \
   ${MINUTILS_PACKAGES} \
+  zarith \
   base64 \
   calendar \
   ezjsonm \

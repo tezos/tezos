@@ -250,6 +250,7 @@ module Protocol = struct
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.proposals rpc_config block
       ~net_id:block_info.net_id
+      ~branch:block_info.hash
       ~source:pk
       ~period:next_level.voting_period
       ~proposals
@@ -262,6 +263,7 @@ module Protocol = struct
     Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.ballot rpc_config block
       ~net_id:block_info.net_id
+      ~branch:block_info.hash
       ~source:pk
       ~period:next_level.voting_period
       ~proposal
@@ -440,6 +442,7 @@ module Endorse = struct
     Client_proto_rpcs.Helpers.Forge.Delegate.endorsement rpc_config
       block
       ~net_id:net_id
+      ~branch:hash
       ~source
       ~block:hash
       ~slot:slot
@@ -480,7 +483,7 @@ module Endorse = struct
     forge_endorsement block contract.sk contract.pk slot
 
   (* FIXME @vb: I don't understand this function, copied from @cago. *)
-  let endorsers_list block { Account.b1 ; b2 ; b3 ; b4 ; b5 } =
+  let endorsers_list block =
     let get_endorser_list result (account : Account.t) level block =
       Client_proto_rpcs.Helpers.Rights.endorsement_rights_for_delegate
         rpc_config block account.pkh
@@ -489,6 +492,7 @@ module Endorse = struct
         ~last_level:level () >>|? fun slots ->
       List.iter (fun (_,slot) -> result.(slot) <- account) slots
     in
+    let { Account.b1 ; b2 ; b3 ; b4 ; b5 } = Account.bootstrap_accounts in
     let result = Array.make 16 b1 in
     Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
     let level = Raw_level.succ @@ level.level in

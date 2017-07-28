@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 open Tezos_context
-open Script_int
 open Script
 open Script_typed_ir
 
@@ -16,7 +15,8 @@ open Script_typed_ir
 
 (* Auxiliary types for error documentation *)
 type namespace = Type_namespace | Constant_namespace | Instr_namespace
-type kind =  Int_kind | String_kind | Prim_kind | Seq_kind
+type kind = Int_kind | String_kind | Prim_kind | Seq_kind
+type type_map = (int * (Script.expr list * Script.expr list)) list
 
 (* Structure errors *)
 type error += Invalid_arity of Script.location * string * int * int
@@ -27,7 +27,6 @@ type error += Invalid_kind of Script.location * kind list * kind
 
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
-type error += Undefined_cast : Script.location * _ ty * _ ty -> error
 type error += Undefined_binop : Script.location * string * _ ty * _ ty -> error
 type error += Undefined_unop : Script.location * string * _ ty -> error
 type error += Bad_return : Script.location * _ stack_ty * _ ty -> error
@@ -42,12 +41,11 @@ type error += Invalid_constant : Script.location * Script.expr * _ ty -> error
 type error += Invalid_contract of Script.location * Contract.t
 type error += Comparable_type_expected : Script.location * _ ty -> error
 type error += Inconsistent_types : _ ty * _ ty -> error
-type error += Bad_sign : _ ty -> error
 
 (* Toplevel errors *)
 type error += Ill_typed_data : string option * Script.expr * _ ty -> error
 type error += Ill_formed_type of string option * Script.expr
-type error += Ill_typed_contract : Script.expr * _ ty * _ ty * _ ty -> error
+type error += Ill_typed_contract : Script.expr * _ ty * _ ty * _ ty * type_map -> error
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -117,13 +115,18 @@ let compare_comparable
     | Bool_key -> Compare.Bool.compare x y
     | Tez_key -> Tez.compare x y
     | Key_key -> Ed25519.Public_key_hash.compare x y
-    | Int_key kind ->
-        let res =
-          Script_int.to_int64 Script_int.Int64
-            (Script_int.compare kind x y) in
-        if Compare.Int64.(res = 0L) then 0
-        else if Compare.Int64.(res > 0L) then 1
+    | Int_key ->
+               let res = (Script_int.compare x y) in
+        if Compare.Int.(res = 0) then 0
+        else if Compare.Int.(res > 0) then 1
         else -1
+
+    | Nat_key ->
+               let res = (Script_int.compare x y) in
+        if Compare.Int.(res = 0) then 0
+        else if Compare.Int.(res > 0) then 1
+        else -1
+
     | Timestamp_key -> Timestamp.compare x y
 
 let empty_set
@@ -214,7 +217,8 @@ let map_fold
 
 let ty_of_comparable_ty
   : type a. a comparable_ty -> a ty = function
-  | Int_key k -> Int_t k
+  | Int_key -> Int_t
+  | Nat_key -> Nat_t
   | String_key -> String_t
   | Tez_key -> Tez_t
   | Bool_key -> Bool_t
@@ -223,14 +227,8 @@ let ty_of_comparable_ty
 
 let unparse_comparable_ty
   : type a. a comparable_ty -> Script.expr = function
-  | Int_key Int8 -> Prim (-1, "int8", [])
-  | Int_key Int16 -> Prim (-1, "int16", [])
-  | Int_key Int32 -> Prim (-1, "int32", [])
-  | Int_key Int64 -> Prim (-1, "int64", [])
-  | Int_key Uint8 -> Prim (-1, "uint8", [])
-  | Int_key Uint16 -> Prim (-1, "uint16", [])
-  | Int_key Uint32 -> Prim (-1, "uint32", [])
-  | Int_key Uint64 -> Prim (-1, "uint64", [])
+  | Nat_key -> Prim (-1, "nat", [])
+  | Int_key -> Prim (-1, "int", [])
   | String_key -> Prim (-1, "string", [])
   | Tez_key -> Prim (-1, "tez", [])
   | Bool_key -> Prim (-1, "bool", [])
@@ -240,14 +238,8 @@ let unparse_comparable_ty
 let rec unparse_ty
   : type a. a ty -> Script.expr = function
   | Unit_t -> Prim (-1, "unit", [])
-  | Int_t Int8 -> Prim (-1, "int8", [])
-  | Int_t Int16 -> Prim (-1, "int16", [])
-  | Int_t Int32 -> Prim (-1, "int32", [])
-  | Int_t Int64 -> Prim (-1, "int64", [])
-  | Int_t Uint8 -> Prim (-1, "uint8", [])
-  | Int_t Uint16 -> Prim (-1, "uint16", [])
-  | Int_t Uint32 -> Prim (-1, "uint32", [])
-  | Int_t Uint64 -> Prim (-1, "uint64", [])
+  | Nat_t -> Prim (-1, "nat", [])
+  | Int_t -> Prim (-1, "int", [])
   | String_t -> Prim (-1, "string", [])
   | Tez_t -> Prim (-1, "tez", [])
   | Bool_t -> Prim (-1, "bool", [])
@@ -289,8 +281,10 @@ let rec unparse_data
   = fun ty a -> match ty, a with
     | Unit_t, () ->
         Prim (-1, "Unit", [])
-    | Int_t k, v ->
-        Int (-1, Int64.to_string (to_int64 k v))
+    | Int_t, v ->
+        Int (-1, Script_int.to_string v)
+    | Nat_t, v ->
+        Int (-1, Script_int.to_string v)
     | String_t, s ->
         String (-1, s)
     | Bool_t, true ->
@@ -351,53 +345,20 @@ let rec unparse_data
 
 (* ---- Equality witnesses --------------------------------------------------*)
 
-type ('ta, 'tb) eq =
-  | Eq : 'same * 'same -> ('same, 'same) eq
+type ('ta, 'tb) eq = Eq : 'same * 'same -> ('same, 'same) eq
 
 let eq
   : type t. t -> t -> (t, t) eq tzresult
   = fun ta tb -> Ok (Eq (ta, tb))
 
-let int_kind_eq
-  : type sa la sb lb. (sa, la) int_kind -> (sb, lb) int_kind ->
-    ((sa, la) int_kind, (sb, lb) int_kind) eq tzresult
-  = fun ka kb -> match ka, kb with
-    | Int8, Int8 -> eq ka kb
-    | Uint8, Uint8 -> eq ka kb
-    | Int16, Int16 -> eq ka kb
-    | Uint16, Uint16 -> eq ka kb
-    | Int32, Int32 -> eq ka kb
-    | Uint32, Uint32 -> eq ka kb
-    | Int64, Int64 -> eq ka kb
-    | Uint64, Uint64 -> eq ka kb
-    | _ -> error @@ Inconsistent_types (Int_t ka, Int_t kb)
-
-let unsigned_int_kind
-  : type sa la. (sa, la) int_kind -> (sa, unsigned) eq tzresult
-  = fun kind -> match kind with
-    | Uint8 -> eq Unsigned Unsigned
-    | Uint16 -> eq Unsigned Unsigned
-    | Uint32 -> eq Unsigned Unsigned
-    | Uint64 -> eq Unsigned Unsigned
-    | _ -> error @@ Bad_sign (Int_t kind)
-
-let signed_int_kind
-  : type sa la. (sa, la) int_kind -> (sa, signed) eq tzresult
-  = fun kind -> match kind with
-    | Int8 -> eq Signed Signed
-    | Int16 -> eq Signed Signed
-    | Int32 -> eq Signed Signed
-    | Int64 -> eq Signed Signed
-    | _ -> error @@ Bad_sign (Int_t kind)
-
+(* TODO: shall we allow operations to compare nats and ints ? *)
 let comparable_ty_eq
   : type ta tb.
     ta comparable_ty -> tb comparable_ty ->
     (ta comparable_ty, tb comparable_ty) eq tzresult
   = fun ta tb -> match ta, tb with
-    | Int_key ka, Int_key kb ->
-        int_kind_eq ka kb >>? fun (Eq _) ->
-        (eq ta tb : (ta comparable_ty, tb comparable_ty) eq tzresult)
+    | Int_key, Int_key -> eq ta tb
+    | Nat_key, Nat_key -> eq ta tb
     | String_key, String_key -> eq ta tb
     | Tez_key, Tez_key -> eq ta tb
     | Bool_key, Bool_key -> eq ta tb
@@ -410,9 +371,8 @@ let rec ty_eq
   = fun ta tb ->
     match ta, tb with
     | Unit_t, Unit_t -> eq ta tb
-    | Int_t ka, Int_t kb ->
-        int_kind_eq ka kb >>? fun (Eq _) ->
-        (eq ta tb : (ta ty, tb ty) eq tzresult)
+    | Int_t, Int_t -> eq ta tb
+    | Nat_t, Nat_t -> eq ta tb
     | Key_t, Key_t -> eq ta tb
     | String_t, String_t -> eq ta tb
     | Signature_t, Signature_t -> eq ta tb
@@ -504,24 +464,16 @@ let merge_branches
 type ex_comparable_ty = Ex_comparable_ty : 'a comparable_ty -> ex_comparable_ty
 type ex_ty = Ex_ty : 'a ty -> ex_ty
 type ex_stack_ty = Ex_stack_ty : 'a stack_ty -> ex_stack_ty
-type ex_int_kind = Ex_int_kind : ('s, 'l) int_kind -> ex_int_kind
 
 let rec parse_comparable_ty : Script.expr -> ex_comparable_ty tzresult = function
-  | Prim (_, "int8", []) -> ok (Ex_comparable_ty (Int_key Int8))
-  | Prim (_, "int16", []) -> ok (Ex_comparable_ty (Int_key Int16))
-  | Prim (_, "int32", []) -> ok (Ex_comparable_ty (Int_key Int32))
-  | Prim (_, "int64", []) -> ok (Ex_comparable_ty (Int_key Int64))
-  | Prim (_, "uint8", []) -> ok (Ex_comparable_ty (Int_key Uint8))
-  | Prim (_, "uint16", []) -> ok (Ex_comparable_ty (Int_key Uint16))
-  | Prim (_, "uint32", []) -> ok (Ex_comparable_ty (Int_key Uint32))
-  | Prim (_, "uint64", []) -> ok (Ex_comparable_ty (Int_key Uint64))
+  | Prim (_, "int", []) -> ok (Ex_comparable_ty Int_key)
+  | Prim (_, "nat", []) -> ok (Ex_comparable_ty Nat_key)
   | Prim (_, "string", []) -> ok (Ex_comparable_ty String_key)
   | Prim (_, "tez", []) -> ok (Ex_comparable_ty Tez_key)
   | Prim (_, "bool", []) -> ok (Ex_comparable_ty Bool_key)
   | Prim (_, "key", []) -> ok (Ex_comparable_ty Key_key)
   | Prim (_, "timestamp", []) -> ok (Ex_comparable_ty Timestamp_key)
-  | Prim (loc, ("int8" | "int16" | "int32" | "int64"
-               | "uint8" | "uint16" | "uint32" | "uint64"
+  | Prim (loc, ("int" | "nat"
                | "string" | "tez" | "bool"
                | "key" | "timestamp" as prim), l) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -532,21 +484,14 @@ let rec parse_comparable_ty : Script.expr -> ex_comparable_ty tzresult = functio
       error (Comparable_type_expected (loc, ty))
   | expr ->
       error @@ unexpected expr [] Type_namespace
-        [ "int8" ; "int16" ; "int32" ; "int64" ;
-          "uint8" ; "uint16" ; "uint32" ; "uint64" ;
+        [ "int" ; "nat" ;
           "string" ; "tez" ; "bool" ;
           "key" ; "timestamp" ]
 
 and parse_ty : Script.expr -> ex_ty tzresult = function
   | Prim (_, "unit", []) -> ok (Ex_ty Unit_t)
-  | Prim (_, "int8", []) -> ok (Ex_ty (Int_t Int8))
-  | Prim (_, "int16", []) -> ok (Ex_ty (Int_t Int16))
-  | Prim (_, "int32", []) -> ok (Ex_ty (Int_t Int32))
-  | Prim (_, "int64", []) -> ok (Ex_ty (Int_t Int64))
-  | Prim (_, "uint8", []) -> ok (Ex_ty (Int_t Uint8))
-  | Prim (_, "uint16", []) -> ok (Ex_ty (Int_t Uint16))
-  | Prim (_, "uint32", []) -> ok (Ex_ty (Int_t Uint32))
-  | Prim (_, "uint64", []) -> ok (Ex_ty (Int_t Uint64))
+  | Prim (_, "int", []) -> ok (Ex_ty Int_t)
+  | Prim (_, "nat", []) -> ok (Ex_ty Nat_t)
   | Prim (_, "string", []) -> ok (Ex_ty String_t)
   | Prim (_, "tez", []) -> ok (Ex_ty Tez_t)
   | Prim (_, "bool", []) -> ok (Ex_ty Bool_t)
@@ -585,8 +530,7 @@ and parse_ty : Script.expr -> ex_ty tzresult = function
   | Prim (loc, ("pair" | "or" | "set" | "map"
                | "list" | "option"  | "lambda"
                | "unit" | "signature"  | "contract"
-               | "int8" | "int16" | "int32" | "int64"
-               | "uint8" | "uint16" | "uint32" | "uint64"
+               | "int" | "nat"
                | "string" | "tez" | "bool"
                | "key" | "timestamp" as prim), l) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
@@ -595,15 +539,15 @@ and parse_ty : Script.expr -> ex_ty tzresult = function
         [ "pair" ; "or" ; "set" ; "map" ;
           "list" ; "option"  ; "lambda" ;
           "unit" ; "signature"  ; "contract" ;
-          "int8" ; "int16" ; "int32" ; "int64" ;
-          "uint8" ; "uint16" ; "uint32" ; "uint64" ;
-         "string" ; "tez" ; "bool" ;
+          "int" ; "nat" ;
+          "string" ; "tez" ; "bool" ;
           "key" ; "timestamp" ]
 
 let comparable_ty_of_ty
   : type a. int -> a ty -> a comparable_ty tzresult
   = fun loc ty -> match ty with
-    | Int_t k -> ok (Int_key k)
+    | Int_t -> ok Int_key
+    | Nat_t -> ok Nat_key
     | String_t -> ok String_key
     | Tez_t -> ok Tez_key
     | Bool_t -> ok Bool_key
@@ -611,9 +555,17 @@ let comparable_ty_of_ty
     | Timestamp_t -> ok Timestamp_key
     | ty -> error (Comparable_type_expected (loc, ty))
 
+let rec unparse_stack
+  : type a. a stack_ty -> Script.expr list
+  = function
+    | Empty_t -> []
+    | Item_t (ty, rest) -> unparse_ty ty :: unparse_stack rest
+
 let rec parse_data
-  : type a. context -> a ty -> Script.expr -> a tzresult Lwt.t
-  = fun ctxt ty script_data ->
+  : type a.
+    ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
+    context -> a ty -> Script.expr -> a tzresult Lwt.t
+  = fun ?type_logger ctxt ty script_data ->
     let error () =
       Invalid_constant (location script_data, script_data, ty) in
     let traced body =
@@ -637,13 +589,22 @@ let rec parse_data
     | String_t, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Integers *)
-    | Int_t k, Int (_, v) -> begin try
-          match checked_of_int64 k (Int64.of_string v) with
-          | None -> raise Exit
-          | Some i -> return i
-        with _ -> fail (error ())
-      end
-    | Int_t _, expr ->
+    | Int_t, Int (_, v) ->
+        begin match Script_int.of_string v with
+          | None -> fail (error ())
+          | Some v -> return v
+        end
+    | Nat_t, Int (_, v) ->
+        begin match Script_int.of_string v with
+          | None -> fail (error ())
+          | Some v ->
+              if Compare.Int.(Script_int.compare v Script_int.zero >= 0) then
+                return (Script_int.abs v)
+              else fail (error ())
+        end
+    | Int_t, expr ->
+        traced (fail (Invalid_kind (location expr, [ Int_kind ], kind expr)))
+    | Nat_t, expr ->
         traced (fail (Invalid_kind (location expr, [ Int_kind ], kind expr)))
     (* Tez amounts *)
     | Tez_t, String (_, v) -> begin try
@@ -699,8 +660,8 @@ let rec parse_data
     (* Pairs *)
     | Pair_t (ta, tb), Prim (_, "Pair", [ va; vb ]) ->
         traced @@
-        parse_data ctxt ta va >>=? fun va ->
-        parse_data ctxt tb vb >>=? fun vb ->
+        parse_data ?type_logger ctxt ta va >>=? fun va ->
+        parse_data ?type_logger ctxt tb vb >>=? fun vb ->
         return (va, vb)
     | Pair_t _, Prim (loc, "Pair", l) ->
         fail @@ Invalid_arity (loc, "Pair", 2, List.length l)
@@ -709,13 +670,13 @@ let rec parse_data
     (* Unions *)
     | Union_t (tl, _), Prim (_, "Left", [ v ]) ->
         traced @@
-        parse_data ctxt tl v >>=? fun v ->
+        parse_data ?type_logger ctxt tl v >>=? fun v ->
         return (L v)
     | Union_t _, Prim (loc, "Left", l) ->
         fail @@ Invalid_arity (loc, "Left", 1, List.length l)
     | Union_t (_, tr), Prim (_, "Right", [ v ]) ->
         traced @@
-        parse_data ctxt tr v >>=? fun v ->
+        parse_data ?type_logger ctxt tr v >>=? fun v ->
         return (R v)
     | Union_t _, Prim (loc, "Right", l) ->
         fail @@ Invalid_arity (loc, "Right", 1, List.length l)
@@ -724,13 +685,13 @@ let rec parse_data
     (* Lambdas *)
     | Lambda_t (ta, tr), (Seq _ as script_instr) ->
         traced @@
-        parse_lambda ctxt ta tr script_instr
+        parse_lambda ?type_logger ctxt ta tr script_instr
     | Lambda_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Options *)
     | Option_t t, Prim (_, "Some", [ v ]) ->
         traced @@
-        parse_data ctxt t v >>=? fun v ->
+        parse_data ?type_logger ctxt t v >>=? fun v ->
         return (Some v)
     | Option_t _, Prim (loc, "Some", l) ->
         fail @@ Invalid_arity (loc, "Some", 1, List.length l)
@@ -745,7 +706,7 @@ let rec parse_data
         traced @@
         fold_left_s
           (fun rest v ->
-             parse_data ctxt t v >>=? fun v ->
+             parse_data ?type_logger ctxt t v >>=? fun v ->
              return (v :: rest))
           [] vs
     | List_t _, expr ->
@@ -755,7 +716,7 @@ let rec parse_data
         traced @@
         fold_left_s
           (fun acc v ->
-             parse_comparable_data ctxt t v >>=? fun v ->
+             parse_comparable_data ?type_logger ctxt t v >>=? fun v ->
              return (set_update v true acc))
           (empty_set t) vs
     | Set_t _, expr ->
@@ -766,8 +727,8 @@ let rec parse_data
         fold_left_s
           (fun acc -> function
              | Prim (_, "Item", [ k; v ]) ->
-                 parse_comparable_data ctxt tk k >>=? fun k ->
-                 parse_data ctxt tv v >>=? fun v ->
+                 parse_comparable_data ?type_logger ctxt tk k >>=? fun k ->
+                 parse_data ?type_logger ctxt tv v >>=? fun v ->
                  return (map_update k (Some v) acc)
              | Prim (loc, "Item", l) ->
                  fail @@ Invalid_arity (loc, "Item", 2, List.length l)
@@ -780,16 +741,19 @@ let rec parse_data
         traced (fail (unexpected expr [] Constant_namespace [ "Map" ]))
 
 and parse_comparable_data
-  : type a. context -> a comparable_ty -> Script.expr -> a tzresult Lwt.t
-  = fun ctxt ty script_data ->
-    parse_data ctxt (ty_of_comparable_ty ty) script_data
+  : type a. ?type_logger:(int * (Script.expr list * Script.expr list) -> unit) ->
+    context -> a comparable_ty -> Script.expr -> a tzresult Lwt.t
+  = fun ?type_logger ctxt ty script_data ->
+    parse_data ?type_logger ctxt (ty_of_comparable_ty ty) script_data
 
 and parse_lambda
   : type arg ret storage. context ->
     ?storage_type: storage ty ->
+    ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
     arg ty -> ret ty -> Script.expr -> (arg, ret) lambda tzresult Lwt.t =
-  fun ctxt ?storage_type arg ret script_instr ->
-    parse_instr ctxt ?storage_type script_instr (Item_t (arg, Empty_t)) >>=? function
+  fun ctxt ?storage_type ?type_logger arg ret script_instr ->
+    parse_instr ctxt ?storage_type ?type_logger
+      script_instr (Item_t (arg, Empty_t)) >>=? function
     | Typed ({ loc ; aft = (Item_t (ty, Empty_t) as stack_ty) } as descr) ->
         trace
           (Bad_return (loc, stack_ty, ret))
@@ -803,8 +767,9 @@ and parse_lambda
 and parse_instr
   : type bef storage. context ->
     ?storage_type: storage ty ->
+    ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
     Script.expr -> bef stack_ty -> bef judgement tzresult Lwt.t =
-  fun ctxt ?storage_type script_instr stack_ty ->
+  fun ctxt ?storage_type ?type_logger script_instr stack_ty ->
     let return : bef judgement -> bef judgement tzresult Lwt.t = return in
     let check_item check loc name n m =
       trace (Bad_stack (loc, name, m, stack_ty)) @@
@@ -813,6 +778,10 @@ and parse_instr
     let check_item_ty exp got loc n =
       check_item (ty_eq exp got) loc n in
     let typed loc (instr, aft) =
+      begin match type_logger with
+        | Some log -> log (loc, (unparse_stack stack_ty, unparse_stack aft))
+        | None -> ()
+      end ;
       Typed { loc ; instr ; bef = stack_ty ; aft } in
     match script_instr, stack_ty with
     (* stack ops *)
@@ -828,7 +797,7 @@ and parse_instr
     | Prim (loc, "PUSH", [ t ; d ]),
       stack ->
         (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t) ->
-        parse_data ctxt t d >>=? fun v ->
+        parse_data ?type_logger ctxt t d >>=? fun v ->
         return (typed loc (Const v, Item_t (t, stack)))
     | Prim (loc, "UNIT", []),
       stack ->
@@ -845,8 +814,8 @@ and parse_instr
       (Item_t (Option_t t, rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt rest >>=? fun btr ->
-        parse_instr ?storage_type ctxt bf (Item_t (t, rest)) >>=? fun bfr ->
+        parse_instr ?storage_type ?type_logger ctxt bt rest >>=? fun btr ->
+        parse_instr ?storage_type ?type_logger ctxt bf (Item_t (t, rest)) >>=? fun bfr ->
         let branch ibt ibf =
           { loc ; instr = If_none (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
@@ -873,8 +842,8 @@ and parse_instr
       (Item_t (Union_t (tl, tr), rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt (Item_t (tl, rest)) >>=? fun btr ->
-        parse_instr ?storage_type ctxt bf (Item_t (tr, rest)) >>=? fun bfr ->
+        parse_instr ?storage_type ?type_logger ctxt bt (Item_t (tl, rest)) >>=? fun btr ->
+        parse_instr ?storage_type ?type_logger ctxt bf (Item_t (tr, rest)) >>=? fun bfr ->
         let branch ibt ibf =
           { loc ; instr = If_left (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
@@ -891,8 +860,8 @@ and parse_instr
       (Item_t (List_t t, rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt (Item_t (t, Item_t (List_t t, rest))) >>=? fun btr ->
-        parse_instr ?storage_type ctxt bf rest >>=? fun bfr ->
+        parse_instr ?storage_type ?type_logger ctxt bt (Item_t (t, Item_t (List_t t, rest))) >>=? fun btr ->
+        parse_instr ?storage_type ?type_logger ctxt bf rest >>=? fun bfr ->
         let branch ibt ibf =
           { loc ; instr = If_cons (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
@@ -979,14 +948,14 @@ and parse_instr
         return (typed loc (Nop, stack))
     | Seq (_, [ single ]),
       stack ->
-        parse_instr ?storage_type ctxt single stack
+        parse_instr ?storage_type ?type_logger ctxt single stack
     | Seq (loc, hd :: tl),
       stack ->
-        parse_instr ?storage_type ctxt hd stack >>=? begin function
+        parse_instr ?storage_type ?type_logger ctxt hd stack >>=? begin function
           | Failed _ ->
               fail (Fail_not_in_tail_position loc)
           | Typed ({ aft = middle } as ihd) ->
-              parse_instr ?storage_type ctxt (Seq (loc, tl)) middle >>=? function
+              parse_instr ?storage_type ?type_logger ctxt (Seq (loc, tl)) middle >>=? function
               | Failed { descr } ->
                   let descr ret =
                     { loc ; instr = Seq (ihd, descr ret) ;
@@ -999,15 +968,15 @@ and parse_instr
       (Item_t (Bool_t, rest) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_instr ?storage_type ctxt bt rest >>=? fun btr ->
-        parse_instr ?storage_type ctxt bf rest >>=? fun bfr ->
+        parse_instr ?storage_type ?type_logger ctxt bt rest >>=? fun btr ->
+        parse_instr ?storage_type ?type_logger ctxt bf rest >>=? fun bfr ->
         let branch ibt ibf =
           { loc ; instr = If (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
     | Prim (loc, "LOOP", [ body ]),
       (Item_t (Bool_t, rest) as stack) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
-        parse_instr ?storage_type ctxt body rest >>=? begin function
+        parse_instr ?storage_type ?type_logger ctxt body rest >>=? begin function
           | Typed ibody ->
               trace
                 (Unmatched_branches (loc, ibody.aft, stack))
@@ -1022,7 +991,7 @@ and parse_instr
         (Lwt.return (parse_ty arg)) >>=? fun (Ex_ty arg) ->
         (Lwt.return (parse_ty ret)) >>=? fun (Ex_ty ret) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
-        parse_lambda ctxt arg ret code >>=? fun lambda ->
+        parse_lambda ?type_logger ctxt arg ret code >>=? fun lambda ->
         return (typed loc (Lambda lambda, Item_t (Lambda_t (arg, ret), stack)))
     | Prim (loc, "EXEC", []),
       Item_t (arg, Item_t (Lambda_t (param, ret), rest)) ->
@@ -1031,7 +1000,7 @@ and parse_instr
     | Prim (loc, "DIP", [ code ]),
       Item_t (v, rest) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
-        parse_instr ctxt code rest >>=? begin function
+        parse_instr ?type_logger ctxt code rest >>=? begin function
           | Typed descr ->
               return (typed loc (Dip descr, Item_t (v, descr.aft)))
           | Failed _ ->
@@ -1041,18 +1010,13 @@ and parse_instr
       bef ->
         let descr aft = { loc ; instr = Fail ; bef ; aft } in
         return (Failed { descr })
-    | Prim (loc, "NOP", []),
-      stack ->
-        return (typed loc (Nop, stack))
     (* timestamp operations *)
     | Prim (loc, "ADD", []),
-      Item_t (Timestamp_t, Item_t (Int_t kind, rest)) ->
-        check_item (unsigned_int_kind kind) loc "ADD" 2 2 >>=? fun (Eq _) ->
-        return (typed loc (Add_timestamp_to_seconds kind, Item_t (Timestamp_t, rest)))
+      Item_t (Timestamp_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Add_timestamp_to_seconds, Item_t (Timestamp_t, rest)))
     | Prim (loc, "ADD", []),
-      Item_t (Int_t kind, Item_t (Timestamp_t, rest)) ->
-        check_item (unsigned_int_kind kind) loc "ADD" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Add_seconds_to_timestamp kind, Item_t (Timestamp_t, rest)))
+      Item_t (Nat_t, Item_t (Timestamp_t, rest)) ->
+        return (typed loc (Add_seconds_to_timestamp, Item_t (Timestamp_t, rest)))
     (* string operations *)
     | Prim (loc, "CONCAT", []),
       Item_t (String_t, Item_t (String_t, rest)) ->
@@ -1065,13 +1029,11 @@ and parse_instr
       Item_t (Tez_t, Item_t (Tez_t, rest)) ->
         return (typed loc (Sub_tez, Item_t (Tez_t, rest)))
     | Prim (loc, "MUL", []),
-      Item_t (Tez_t, Item_t (Int_t kind, rest)) ->
-        check_item (unsigned_int_kind kind) loc "MUL" 2 2 >>=? fun (Eq _) ->
-        return (typed loc (Mul_tez kind, Item_t (Tez_t, rest)))
+      Item_t (Tez_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Mul_teznat, Item_t (Tez_t, rest)))
     | Prim (loc, "MUL", []),
-      Item_t (Int_t kind, Item_t (Tez_t, rest)) ->
-        check_item (unsigned_int_kind kind) loc "MUL" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Mul_tez' kind, Item_t (Tez_t, rest)))
+      Item_t (Nat_t, Item_t (Tez_t, rest)) ->
+        return (typed loc (Mul_nattez, Item_t (Tez_t, rest)))
     (* boolean operations *)
     | Prim (loc, "OR", []),
       Item_t (Bool_t, Item_t (Bool_t, rest)) ->
@@ -1086,144 +1048,140 @@ and parse_instr
       Item_t (Bool_t, rest) ->
         return (typed loc (Not, Item_t (Bool_t, rest)))
     (* integer operations *)
-    | Prim (loc, "CHECKED_ABS", []),
-      Item_t (Int_t k, rest) ->
-        check_item (signed_int_kind k) loc "CHECKED_ABS" 1 1 >>=? fun (Eq _) ->
-        return (typed loc (Checked_abs_int k, Item_t (Int_t k, rest)))
-    | Prim (loc, "CHECKED_NEG", []),
-      Item_t (Int_t k, rest) ->
-        check_item (signed_int_kind k) loc "CHECKED_NEG" 1 1 >>=? fun (Eq _) ->
-        return (typed loc (Checked_neg_int k, Item_t (Int_t k, rest)))
-    | Prim (loc, "CHECKED_ADD", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (int_kind_eq kl kr) loc "CHECKED_ADD" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Checked_add_int kl, Item_t (Int_t kl, rest)))
-    | Prim (loc, "CHECKED_SUB", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (int_kind_eq kl kr) loc "CHECKED_SUB" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Checked_sub_int kl, Item_t (Int_t kl, rest)))
-    | Prim (loc, "CHECKED_MUL", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (int_kind_eq kl kr) loc "CHECKED_MUL" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Checked_mul_int kl, Item_t (Int_t kl, rest)))
     | Prim (loc, "ABS", []),
-      Item_t (Int_t k, rest) ->
-        check_item (signed_int_kind k) loc "ABS" 1 1 >>=? fun (Eq _) ->
-        return (typed loc (Abs_int k, Item_t (Int_t k, rest)))
+      Item_t (Int_t, rest) ->
+        return (typed loc (Abs_int, Item_t (Nat_t, rest)))
+    | Prim (loc, "INT", []),
+      Item_t (Nat_t, rest) ->
+        return (typed loc (Int_nat, Item_t (Int_t, rest)))
     | Prim (loc, "NEG", []),
-      Item_t (Int_t k, rest) ->
-        check_item (signed_int_kind k) loc "NEG" 1 1 >>=? fun (Eq _) ->
-        return (typed loc (Neg_int k, Item_t (Int_t k, rest)))
+      Item_t (Int_t, rest) ->
+        return (typed loc (Neg_int, Item_t (Int_t, rest)))
+    | Prim (loc, "NEG", []),
+      Item_t (Nat_t, rest) ->
+        return (typed loc (Neg_nat, Item_t (Int_t, rest)))
     | Prim (loc, "ADD", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (int_kind_eq kl kr) loc "ADD" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Add_int kl, Item_t (Int_t kl, rest)))
+      Item_t (Int_t, Item_t (Int_t, rest)) ->
+        return (typed loc (Add_intint, Item_t (Int_t, rest)))
+    | Prim (loc, "ADD", []),
+      Item_t (Int_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Add_intnat, Item_t (Int_t, rest)))
+    | Prim (loc, "ADD", []),
+      Item_t (Nat_t, Item_t (Int_t, rest)) ->
+        return (typed loc (Add_natint, Item_t (Int_t, rest)))
+    | Prim (loc, "ADD", []),
+      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Add_natnat, Item_t (Nat_t, rest)))
     | Prim (loc, "SUB", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (int_kind_eq kl kr) loc "SUB" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Sub_int kl, Item_t (Int_t kl, rest)))
+      Item_t (Int_t, Item_t (Int_t, rest)) ->
+        return (typed loc (Sub_int, Item_t (Int_t, rest)))
+    | Prim (loc, "SUB", []),
+      Item_t (Int_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Sub_int, Item_t (Int_t, rest)))
+    | Prim (loc, "SUB", []),
+      Item_t (Nat_t, Item_t (Int_t, rest)) ->
+        return (typed loc (Sub_int, Item_t (Int_t, rest)))
+    | Prim (loc, "SUB", []),
+      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Sub_int, Item_t (Int_t, rest)))
     | Prim (loc, "MUL", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (int_kind_eq kl kr) loc "MUL" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Mul_int kl, Item_t (Int_t kl, rest)))
-    | Prim (loc, "DIV", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (int_kind_eq kl kr) loc "DIV" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Div_int kl, Item_t (Int_t kl, rest)))
-    | Prim (loc, "MOD", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (int_kind_eq kl kr) loc "MOD" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Mod_int kl, Item_t (Int_t kl, rest)))
+      Item_t (Int_t, Item_t (Int_t, rest)) ->
+        return (typed loc (Mul_intint, Item_t (Int_t, rest)))
+    | Prim (loc, "MUL", []),
+      Item_t (Int_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Mul_intnat, Item_t (Int_t, rest)))
+    | Prim (loc, "MUL", []),
+      Item_t (Nat_t, Item_t (Int_t, rest)) ->
+        return (typed loc (Mul_natint, Item_t (Int_t, rest)))
+    | Prim (loc, "MUL", []),
+      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Mul_natnat, Item_t (Nat_t, rest)))
+    | Prim (loc, "EDIV", []),
+      Item_t (Tez_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Ediv_teznat,
+               Item_t (Option_t (Pair_t (Tez_t,Tez_t)), rest)))
+    | Prim (loc, "EDIV", []),
+      Item_t (Tez_t, Item_t (Tez_t, rest)) ->
+        return (typed loc (Ediv_tez,
+               Item_t (Option_t (Pair_t (Nat_t,Tez_t)), rest)))
+    | Prim (loc, "EDIV", []),
+      Item_t (Int_t, Item_t (Int_t, rest)) ->
+        return (typed loc (Ediv_intint,
+               Item_t (Option_t (Pair_t (Int_t,Nat_t)), rest)))
+    | Prim (loc, "EDIV", []),
+      Item_t (Int_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Ediv_intnat,
+               Item_t (Option_t (Pair_t (Int_t,Nat_t)), rest)))
+    | Prim (loc, "EDIV", []),
+      Item_t (Nat_t, Item_t (Int_t, rest)) ->
+        return (typed loc (Ediv_natint,
+               Item_t (Option_t (Pair_t (Int_t,Nat_t)), rest)))
+    | Prim (loc, "EDIV", []),
+      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Ediv_natnat,
+               Item_t (Option_t (Pair_t (Nat_t,Nat_t)), rest)))
     | Prim (loc, "LSL", []),
-      Item_t (Int_t k, Item_t (Int_t Uint8, rest)) ->
-        check_item (unsigned_int_kind k) loc "LSL" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Lsl_int k, Item_t (Int_t k, rest)))
+      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Lsl_nat, Item_t (Nat_t, rest)))
     | Prim (loc, "LSR", []),
-      Item_t (Int_t k, Item_t (Int_t Uint8, rest)) ->
-        check_item (unsigned_int_kind k) loc "LSR" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Lsr_int k, Item_t (Int_t k, rest)))
+      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Lsr_nat, Item_t (Nat_t, rest)))
     | Prim (loc, "OR", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (unsigned_int_kind kl) loc "OR" 1 2 >>=? fun (Eq _) ->
-        check_item (int_kind_eq kl kr) loc "OR" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Or_int kl, Item_t (Int_t kl, rest)))
+      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Or_nat, Item_t (Nat_t, rest)))
     | Prim (loc, "AND", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (unsigned_int_kind kl) loc "AND" 1 2 >>=? fun (Eq _) ->
-        check_item (int_kind_eq kl kr) loc "AND" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (And_int kl, Item_t (Int_t kl, rest)))
+      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (And_nat, Item_t (Nat_t, rest)))
     | Prim (loc, "XOR", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (unsigned_int_kind kl) loc "XOR" 1 2 >>=? fun (Eq _) ->
-        check_item (int_kind_eq kl kr) loc "XOR" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Xor_int kl, Item_t (Int_t kl, rest)))
+      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Xor_nat, Item_t (Nat_t, rest)))
     | Prim (loc, "NOT", []),
-      Item_t (Int_t k, rest) ->
-        check_item (unsigned_int_kind k) loc "NOT" 1 1 >>=? fun (Eq _) ->
-        return (typed loc (Not_int k, Item_t (Int_t k, rest)))
+      Item_t (Int_t, rest) ->
+        return (typed loc (Not_int, Item_t (Int_t, rest)))
+    | Prim (loc, "NOT", []),
+      Item_t (Nat_t, rest) ->
+        return (typed loc (Not_nat, Item_t (Int_t, rest)))
     (* comparison *)
     | Prim (loc, "COMPARE", []),
-      Item_t (Int_t kl, Item_t (Int_t kr, rest)) ->
-        check_item (int_kind_eq kl kr) loc "COMPARE" 1 2 >>=? fun (Eq _) ->
-        return (typed loc (Compare (Int_key kl), Item_t (Int_t Int64, rest)))
+      Item_t (Int_t, Item_t (Int_t, rest)) ->
+        return (typed loc (Compare Int_key, Item_t (Int_t, rest)))
+    | Prim (loc, "COMPARE", []),
+      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
+        return (typed loc (Compare Nat_key, Item_t (Int_t, rest)))
     | Prim (loc, "COMPARE", []),
       Item_t (Bool_t, Item_t (Bool_t, rest)) ->
-        return (typed loc (Compare Bool_key, Item_t (Int_t Int64, rest)))
+        return (typed loc (Compare Bool_key, Item_t (Int_t, rest)))
     | Prim (loc, "COMPARE", []),
       Item_t (String_t, Item_t (String_t, rest)) ->
-        return (typed loc (Compare String_key, Item_t (Int_t Int64, rest)))
+        return (typed loc (Compare String_key, Item_t (Int_t, rest)))
     | Prim (loc, "COMPARE", []),
       Item_t (Tez_t, Item_t (Tez_t, rest)) ->
-        return (typed loc (Compare Tez_key, Item_t (Int_t Int64, rest)))
+        return (typed loc (Compare Tez_key, Item_t (Int_t, rest)))
     | Prim (loc, "COMPARE", []),
       Item_t (Key_t, Item_t (Key_t, rest)) ->
-        return (typed loc (Compare Key_key, Item_t (Int_t Int64, rest)))
+        return (typed loc (Compare Key_key, Item_t (Int_t, rest)))
     | Prim (loc, "COMPARE", []),
       Item_t (Timestamp_t, Item_t (Timestamp_t, rest)) ->
-        return (typed loc (Compare Timestamp_key, Item_t (Int_t Int64, rest)))
+        return (typed loc (Compare Timestamp_key, Item_t (Int_t, rest)))
     (* comparators *)
     | Prim (loc, "EQ", []),
-      Item_t (Int_t Int64, rest) ->
+      Item_t (Int_t, rest) ->
         return (typed loc (Eq, Item_t (Bool_t, rest)))
     | Prim (loc, "NEQ", []),
-      Item_t (Int_t Int64, rest) ->
+      Item_t (Int_t, rest) ->
         return (typed loc (Neq, Item_t (Bool_t, rest)))
     | Prim (loc, "LT", []),
-      Item_t (Int_t Int64, rest) ->
+      Item_t (Int_t, rest) ->
         return (typed loc (Lt, Item_t (Bool_t, rest)))
     | Prim (loc, "GT", []),
-      Item_t (Int_t Int64, rest) ->
+      Item_t (Int_t, rest) ->
         return (typed loc (Gt, Item_t (Bool_t, rest)))
     | Prim (loc, "LE", []),
-      Item_t (Int_t Int64, rest) ->
+      Item_t (Int_t, rest) ->
         return (typed loc (Le, Item_t (Bool_t, rest)))
     | Prim (loc, "GE", []),
-      Item_t (Int_t Int64, rest) ->
+      Item_t (Int_t, rest) ->
         return (typed loc (Ge, Item_t (Bool_t, rest)))
-    (* casts *)
-    | Prim (loc, "CHECKED_CAST", [ t ]),
-      stack ->
-        (Lwt.return (parse_ty t)) >>=? fun (Ex_ty ty) -> begin match ty, stack with
-          | Int_t kt,
-            Item_t (Int_t kf, rest) ->
-              return (typed loc (Checked_int_of_int (kf, kt),
-                                 Item_t (Int_t kt, rest)))
-          | ty, Item_t (ty', _) ->
-              fail (Undefined_cast (loc, ty', ty))
-          | _, Empty_t ->
-              fail (Bad_stack (loc, "CHECKED_CAST", 1, stack))
-        end
-    | Prim (loc, "CAST", [ t ]),
-      stack ->
-        (Lwt.return (parse_ty t)) >>=? fun (Ex_ty ty) -> begin match ty, stack with
-          | Int_t kt, Item_t (Int_t kf, rest)  ->
-              return (typed loc (Int_of_int (kf, kt),
-                                 Item_t (Int_t kt, rest)))
-          | ty, Item_t (ty', _) ->
-              fail (Undefined_cast (loc, ty', ty))
-          | _, Empty_t ->
-              fail (Bad_stack (loc, "CAST", 1, stack))
-        end
     (* protocol *)
     | Prim (loc, "MANAGER", []),
       Item_t (Contract_t _, rest) ->
@@ -1250,17 +1208,22 @@ and parse_instr
                  (Tez_t, rest)))) ->
         return (typed loc (Create_account,
                            Item_t (Contract_t (Unit_t, Unit_t), rest)))
+    | Prim (loc, "DEFAULT_ACCOUNT", []),
+      Item_t (Key_t, rest) ->
+        return
+          (typed loc (Default_account, Item_t (Contract_t (Unit_t, Unit_t), rest)))
     | Prim (loc, "CREATE_CONTRACT", []),
       Item_t
         (Key_t, Item_t
            (Option_t Key_t, Item_t
               (Bool_t, Item_t
-                 (Tez_t, Item_t
-                    (Lambda_t (Pair_t (Pair_t (Tez_t, p), gp),
-                               Pair_t (r, gr)), Item_t
-                       (ginit, rest)))))) ->
-        check_item_ty gp gr loc "CREATE_CONTRACT" 5 6 >>=? fun (Eq _) ->
-        check_item_ty ginit gp loc "CREATE_CONTRACT" 6 6 >>=? fun (Eq _) ->
+                 (Bool_t, Item_t
+                    (Tez_t, Item_t
+                       (Lambda_t (Pair_t (p, gp),
+                                  Pair_t (r, gr)), Item_t
+                          (ginit, rest))))))) ->
+        check_item_ty gp gr loc "CREATE_CONTRACT" 5 7 >>=? fun (Eq _) ->
+        check_item_ty ginit gp loc "CREATE_CONTRACT" 6 7 >>=? fun (Eq _) ->
         return (typed loc (Create_contract (gp, p, r),
                            Item_t (Contract_t (p, r), rest)))
     | Prim (loc, "NOW", []),
@@ -1280,7 +1243,7 @@ and parse_instr
         return (typed loc (H t, Item_t (String_t, rest)))
     | Prim (loc, "STEPS_TO_QUOTA", []),
       stack ->
-        return (typed loc (Steps_to_quota, Item_t (Int_t Uint32, stack)))
+        return (typed loc (Steps_to_quota, Item_t (Nat_t, stack)))
     | Prim (loc, "SOURCE", [ ta; tb ]),
       stack ->
         (Lwt.return (parse_ty ta)) >>=? fun (Ex_ty ta) ->
@@ -1290,21 +1253,21 @@ and parse_instr
     | Prim (loc, ("DROP" | "DUP" | "SWAP" | "SOME" | "UNIT"
                  | "PAIR" | "CAR" | "CDR" | "CONS"
                  | "MEM" | "UPDATE" | "MAP" | "REDUCE"
-                 | "GET" | "EXEC" | "FAIL" | "NOP"
+                 | "GET" | "EXEC" | "FAIL"
                  | "CONCAT" | "ADD" | "SUB"
-                 | "MUL" | "DIV" | "MOD" | "OR" | "AND" | "XOR"
-                 | "NOT" | "CHECKED_ABS" | "CHECKED_NEG"
-                 | "CHECKED_ADD" | "CHECKED_SUB" | "CHECKED_MUL"
+                 | "MUL" | "EDIV" | "OR" | "AND" | "XOR"
+                 | "NOT"
                  | "ABS" | "NEG" | "LSL" | "LSR"
                  | "COMPARE" | "EQ" | "NEQ"
                  | "LT" | "GT" | "LE" | "GE"
                  | "MANAGER" | "TRANSFER_TOKENS" | "CREATE_ACCOUNT"
-                 | "CREATE_CONTRACT" | "NOW" | "AMOUNT" | "BALANCE"
+                 | "CREATE_CONTRACT" | "NOW"
+                 | "DEFAULT_ACCOUNT" | "AMOUNT" | "BALANCE"
                  | "CHECK_SIGNATURE" | "H" | "STEPS_TO_QUOTA"
                  as name), (_ :: _ as l)), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
     | Prim (loc, ("NONE" | "LEFT" | "RIGHT" | "NIL"
-                 | "EMPTY_SET" | "DIP" | "CHECKED_CAST" | "CAST" | "LOOP"
+                 | "EMPTY_SET" | "DIP" | "LOOP"
                  as name), ([]
                            | _ :: _ :: _ as l)), _ ->
         fail (Invalid_arity (loc, name, 1, List.length l))
@@ -1317,11 +1280,9 @@ and parse_instr
                            | _ :: _ :: _ :: _ :: _ as l)), _ ->
         fail (Invalid_arity (loc, "LAMBDA", 3, List.length l))
     (* Stack errors *)
-    | Prim (loc, ("ADD" | "SUB" | "MUL" | "DIV" | "MOD"
+    | Prim (loc, ("ADD" | "SUB" | "MUL" | "EDIV"
                  | "AND" | "OR" | "XOR" | "LSL" | "LSR"
-                 | "CONCAT" | "COMPARE"
-                 | "CHECKED_ABS" | "CHECKED_NEG"
-                 | "CHECKED_ADD" | "CHECKED_SUB" | "CHECKED_MUL" as name), []),
+                 | "CONCAT" | "COMPARE" as name), []),
       Item_t (ta, Item_t (tb, _)) ->
         fail (Undefined_binop (loc, name, ta, tb))
     | Prim (loc, ("NEG" | "ABS" | "NOT"
@@ -1333,7 +1294,7 @@ and parse_instr
         fail (Bad_stack (loc, name, 3, stack))
     | Prim (loc, "CREATE_CONTRACT", []),
       stack ->
-        fail (Bad_stack (loc, "CREATE_CONTRACT", 6, stack))
+        fail (Bad_stack (loc, "CREATE_CONTRACT", 7, stack))
     | Prim (loc, "CREATE_ACCOUNT", []),
       stack ->
         fail (Bad_stack (loc, "CREATE_ACCOUNT", 4, stack))
@@ -1342,18 +1303,16 @@ and parse_instr
         fail (Bad_stack (loc, "TRANSFER_TOKENS", 3, stack))
     | Prim (loc, ("DROP" | "DUP" | "CAR" | "CDR" | "SOME" | "H" | "DIP"
                  | "IF_NONE" | "LEFT" | "RIGHT" | "IF_LEFT" | "IF"
-                 | "LOOP" | "IF_CONS" | "MANAGER"
-                 | "NEG" | "ABS" | "NOT"
+                 | "LOOP" | "IF_CONS" | "MANAGER" | "DEFAULT_ACCOUNT"
+                 | "NEG" | "ABS" | "INT" | "NOT"
                  | "EQ" | "NEQ" | "LT" | "GT" | "LE" | "GE" as name), _),
       stack ->
         fail (Bad_stack (loc, name, 1, stack))
     | Prim (loc, ("SWAP" | "PAIR" | "CONS"
                  | "MAP" | "GET" | "MEM" | "EXEC"
                  | "CHECK_SIGNATURE" | "ADD" | "SUB" | "MUL"
-                 | "DIV" | "MOD" | "AND" | "OR" | "XOR"
-                 | "LSL" | "LSR" | "CONCAT"
-                 | "CHECKED_ABS" | "CHECKED_NEG" | "CHECKED_ADD"
-                 | "CHECKED_SUB" | "CHECKED_MUL" | "COMPARE" as name), _),
+                 | "EDIV" | "AND" | "OR" | "XOR"
+                 | "LSL" | "LSR" | "CONCAT" as name), _),
       stack ->
         fail (Bad_stack (loc, name, 2, stack))
     (* Generic parsing errors *)
@@ -1362,19 +1321,18 @@ and parse_instr
           [ "DROP" ; "DUP" ; "SWAP" ; "SOME" ; "UNIT" ;
             "PAIR" ; "CAR" ; "CDR" ; "CONS" ;
             "MEM" ; "UPDATE" ; "MAP" ; "REDUCE" ;
-            "GET" ; "EXEC" ; "FAIL" ; "NOP" ;
+            "GET" ; "EXEC" ; "FAIL" ;
             "CONCAT" ; "ADD" ; "SUB" ;
-            "MUL" ; "DIV" ; "MOD" ; "OR" ; "AND" ; "XOR" ;
-            "NOT" ; "CHECKED_ABS" ; "CHECKED_NEG" ;
-            "CHECKED_ADD" ; "CHECKED_SUB" ; "CHECKED_MUL" ;
-            "ABS" ; "NEG" ; "LSL" ; "LSR" ;
+            "MUL" ; "EDIV" ; "OR" ; "AND" ; "XOR" ;
+            "NOT" ;
+            "ABS" ; "INT"; "NEG" ; "LSL" ; "LSR" ;
             "COMPARE" ; "EQ" ; "NEQ" ;
             "LT" ; "GT" ; "LE" ; "GE" ;
             "MANAGER" ; "TRANSFER_TOKENS" ; "CREATE_ACCOUNT" ;
             "CREATE_CONTRACT" ; "NOW" ; "AMOUNT" ; "BALANCE" ;
-            "CHECK_SIGNATURE" ; "H" ; "STEPS_TO_QUOTA" ;
+            "DEFAULT_ACCOUNT" ; "CHECK_SIGNATURE" ; "H" ; "STEPS_TO_QUOTA" ;
             "PUSH" ; "NONE" ; "LEFT" ; "RIGHT" ; "NIL" ;
-            "EMPTY_SET" ; "DIP" ; "CHECKED_CAST" ; "CAST" ; "LOOP" ;
+            "EMPTY_SET" ; "DIP" ; "LOOP" ;
             "IF_NONE" ; "IF_LEFT" ; "IF_CONS" ;
             "EMPTY_MAP" ; "IF" ; "SOURCE" ; "LAMBDA" ]
 
@@ -1408,23 +1366,33 @@ and parse_contract
 type ex_script = Ex_script : ('a, 'b, 'c) script -> ex_script
 
 let parse_script
-  : context -> Script.storage -> Script.code -> ex_script tzresult Lwt.t
-  = fun ctxt
+  : ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
+  context -> Script.storage -> Script.code -> ex_script tzresult Lwt.t
+  = fun ?type_logger ctxt
     { storage; storage_type = init_storage_type }
     { code; arg_type; ret_type; storage_type } ->
-    (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
-    (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
-    (Lwt.return (parse_ty init_storage_type)) >>=? fun (Ex_ty init_storage_type) ->
-    (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
-    let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
+    trace
+      (Ill_formed_type (Some "parameter", arg_type))
+      (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
+    trace
+      (Ill_formed_type (Some "return", ret_type))
+      (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
+    trace
+      (Ill_formed_type (Some "initial storage", init_storage_type))
+      (Lwt.return (parse_ty init_storage_type)) >>=? fun (Ex_ty init_storage_type) ->
+    trace
+      (Ill_formed_type (Some "storage", storage_type))
+      (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
+    let arg_type_full = Pair_t (arg_type, storage_type) in
     let ret_type_full = Pair_t (ret_type, storage_type) in
     Lwt.return (ty_eq init_storage_type storage_type) >>=? fun (Eq _) ->
-    parse_data ctxt storage_type storage >>=? fun storage ->
-    parse_lambda ctxt ~storage_type arg_type_full ret_type_full code >>=? fun code ->
+    trace
+      (Ill_typed_data (None, storage, storage_type))
+      (parse_data ?type_logger ctxt storage_type storage) >>=? fun storage ->
+    trace
+      (Ill_typed_contract (code, arg_type, ret_type, storage_type, []))
+      (parse_lambda ctxt ~storage_type ?type_logger arg_type_full ret_type_full code) >>=? fun code ->
     return (Ex_script { code; arg_type; ret_type; storage; storage_type })
-
-type type_map =
-  (int * (Script.expr list * Script.expr list)) list
 
 let type_map_enc =
   let open Data_encoding in
@@ -1436,50 +1404,88 @@ let type_map_enc =
           (list Script.expr_encoding)))
 
 let type_map descr =
-  let rec unparse_stack
-    : type a. a stack_ty -> Script.expr list
-    = function
-      | Empty_t -> []
-      | Item_t (ty, rest) -> unparse_ty ty :: unparse_stack rest in
-  let rec type_map
+  let rec instr_type_map
     : type bef aft. type_map -> (bef, aft) descr -> type_map
     = fun acc { loc ; instr ; bef ; aft } ->
       let self acc =
         (loc, (unparse_stack bef, unparse_stack aft)) :: acc in
-      match instr with
-      | If_none (dbt, dbf) ->
-          let acc = type_map acc dbt in
-          let acc = type_map acc dbf in
+      match instr, aft with
+      | If_none (dbt, dbf), _ ->
+          let acc = instr_type_map acc dbt in
+          let acc = instr_type_map acc dbf in
           self acc
-      | If_left (dbt, dbf) ->
-          let acc = type_map acc dbt in
-          let acc = type_map acc dbf in
+      | If_left (dbt, dbf), _ ->
+          let acc = instr_type_map acc dbt in
+          let acc = instr_type_map acc dbf in
           self acc
-      | If_cons (dbt, dbf) ->
-          let acc = type_map acc dbt in
-          let acc = type_map acc dbf in
+      | If_cons (dbt, dbf), _ ->
+          let acc = instr_type_map acc dbt in
+          let acc = instr_type_map acc dbf in
           self acc
-      | Seq (dl, dr) ->
-          let acc = type_map acc dl in
-          let acc = type_map acc dr in
+      | Seq (dl, dr), _ ->
+          let acc = instr_type_map acc dl in
+          let acc = instr_type_map acc dr in
           acc
-      | If (dbt, dbf) ->
-          let acc = type_map acc dbt in
-          let acc = type_map acc dbf in
+      | If (dbt, dbf), _ ->
+          let acc = instr_type_map acc dbt in
+          let acc = instr_type_map acc dbf in
           self acc
-      | Loop body ->
-          let acc = type_map acc body in
+      | Loop body, _ ->
+          let acc = instr_type_map acc body in
           self acc
-      | Dip body ->
-          let acc = type_map acc body in
+      | Dip body, _ ->
+          let acc = instr_type_map acc body in
           self acc
-      | _ ->
-          self acc in
-  type_map [] descr
+      | Lambda (Lam (body, _)), _ ->
+          let acc = instr_type_map acc body in
+          self acc
+      | Const v, Item_t (ty, _) ->
+          let acc = data_type_map acc ty v in
+          self acc
+      | _, _ ->
+          self acc
+  and data_type_map
+    : type a. type_map -> a ty -> a -> type_map
+    = fun acc ty v ->
+      match ty, v with
+      | Unit_t, _ -> acc
+      | Int_t, _ -> acc
+      | Nat_t, _ -> acc
+      | Signature_t, _ -> acc
+      | String_t, _ -> acc
+      | Tez_t, _ -> acc
+      | Key_t, _ -> acc
+      | Timestamp_t, _ -> acc
+      | Bool_t, _ -> acc
+      | Contract_t _,_ -> acc
+      | Set_t _, _ -> acc
+      | Pair_t (lty, rty), (l, r) ->
+          let acc = data_type_map acc lty l in
+          let acc = data_type_map acc rty r in
+          acc
+      | Union_t (lty, _), L l ->
+          data_type_map acc lty l
+      | Union_t (_, rty), R r ->
+          data_type_map acc rty r
+      | Lambda_t _, Lam (body, _) ->
+          instr_type_map acc body
+      | Option_t _, None -> acc
+      | Option_t ty, Some v ->
+          data_type_map acc ty v
+      | List_t ty, l ->
+          List.fold_left
+            (fun acc v -> data_type_map acc ty v)
+            acc l
+      | Map_t (_, ty), m ->
+          map_fold
+            (fun _ v acc -> data_type_map acc ty v)
+            m acc in
+  instr_type_map [] descr
 
 let typecheck_code
   : context -> Script.code -> type_map tzresult Lwt.t
   = fun ctxt { code; arg_type; ret_type; storage_type } ->
+    let failure_type_map = ref [] in
     trace
       (Ill_formed_type (Some "parameter", arg_type))
       (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
@@ -1489,27 +1495,41 @@ let typecheck_code
     trace
       (Ill_formed_type (Some "storage", storage_type))
       (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
-    let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
+    let arg_type_full = Pair_t (arg_type, storage_type) in
     let ret_type_full = Pair_t (ret_type, storage_type) in
+    let result =
+      parse_lambda ctxt
+        ~storage_type
+        ~type_logger:(fun x -> failure_type_map := x :: !failure_type_map)
+        arg_type_full ret_type_full
+        code in
     trace
-      (Ill_typed_contract (code, arg_type, ret_type, storage_type))
-      (parse_lambda ctxt
-         ~storage_type arg_type_full ret_type_full
-         code) >>=? fun (Lam (descr,_)) ->
+      (Ill_typed_contract (code, arg_type, ret_type, storage_type, !failure_type_map))
+      result >>=? fun (Lam (descr,_)) ->
     return (type_map descr)
 
 let typecheck_data
-  : context -> Script.expr * Script.expr -> unit tzresult Lwt.t
-  = fun ctxt (data, exp_ty) ->
+  : ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
+  context -> Script.expr * Script.expr -> unit tzresult Lwt.t
+  = fun ?type_logger ctxt (data, exp_ty) ->
     trace
       (Ill_formed_type (None, exp_ty))
       (Lwt.return (parse_ty exp_ty)) >>=? fun (Ex_ty exp_ty) ->
     trace
       (Ill_typed_data (None, data, exp_ty))
-      (parse_data ctxt exp_ty data) >>=? fun _ ->
+      (parse_data ?type_logger ctxt exp_ty data) >>=? fun _ ->
     return ()
 
 (* ---- Error registration --------------------------------------------------*)
+
+let ex_ty_enc =
+    Data_encoding.conv
+      (fun (Ex_ty ty) -> unparse_ty ty)
+      (fun expr ->
+         match parse_ty expr with
+         | Ok (Ex_ty ty) -> Ex_ty ty
+         | _ -> Ex_ty Unit_t (* FIXME: ? *))
+      Script.expr_encoding
 
 let () =
   let open Data_encoding in
@@ -1540,14 +1560,6 @@ let () =
                   "string", String_kind ;
                   "primitiveApplication", Prim_kind ;
                   "sequence", Seq_kind ] in
-  let ex_ty_enc =
-    conv
-      (fun (Ex_ty ty) -> unparse_ty ty)
-      (fun expr ->
-         match parse_ty expr with
-         | Ok (Ex_ty ty) -> Ex_ty ty
-         | _ -> Ex_ty Unit_t (* FIXME: ? *))
-      Script.expr_encoding in
   let ex_stack_ty_enc =
     let rec unfold = function
       | Ex_stack_ty (Item_t (ty, rest)) ->
@@ -1609,7 +1621,7 @@ let () =
     ~id:"invalidExpressionKindTypeError"
     ~title: "Invalid expression kind (typechecking error)"
     ~description:
-      "In a ascript or data expression, an expression was of the wrong kind \
+      "In a script or data expression, an expression was of the wrong kind \
        (for instance a string where only a primitive applications can appear)."
     (located (obj2
                 (req "expectedKinds" (list kind_enc))
@@ -1624,7 +1636,7 @@ let () =
     ~id:"invalidPrimitiveNamespaceTypeError"
     ~title: "Invalid primitive namespace (typechecking error)"
     ~description:
-      "In a ascript or data expression, a primitive was of the wrong namespace."
+      "In a script or data expression, a primitive was of the wrong namespace."
     (located (obj3
                 (req "primitiveName" string)
                 (req "expectedNamespace" namespace_enc)
@@ -1647,21 +1659,6 @@ let () =
       | _ -> None)
     (fun (loc, ()) ->
        Fail_not_in_tail_position loc) ;
-  register_error_kind
-    `Permanent
-    ~id:"undefinedCastTypeError"
-    ~title: "Undefined cast (typechecking error)"
-    ~description:
-      "A CAST operation is performed to or from an unsupported type."
-    (located (obj2
-                (req "wrongInputType" ex_ty_enc)
-                (req "wrongOutputType" ex_ty_enc)))
-    (function
-      | Undefined_cast (loc, tyl, tyr) ->
-          Some (loc, (Ex_ty tyl, Ex_ty tyr))
-      | _ -> None)
-    (fun (loc, (Ex_ty tyl, Ex_ty tyr)) ->
-       Undefined_cast (loc, tyl, tyr)) ;
   register_error_kind
     `Permanent
     ~id:"undefinedBinopTypeError"
@@ -1839,21 +1836,7 @@ let () =
       | _ -> None)
     (fun (Ex_ty tya, Ex_ty tyb) ->
        Inconsistent_types (tya, tyb)) ;
-  register_error_kind
-    `Permanent
-    ~id:"badSignTypeError"
-    ~title: "Bad sign (typechecking error)"
-    ~description:
-      "A signed (resp. unsigned) integer kind was used in a place \
-       where only unsigned (resp. signed) integers can be used, \
-       this error is always accompanied \
-       with another error that provides more context."
-    (obj1 (req "wrongIntegerType" ex_ty_enc))
-    (function
-      | Bad_sign ty -> Some (Ex_ty ty)
-      | _ -> None)
-    (fun (Ex_ty ty) ->
-       Bad_sign ty) ;
+
   (* Toplevel errors *)
   register_error_kind
     `Permanent
@@ -1896,14 +1879,15 @@ let () =
       "The toplevel error thrown when trying to typecheck \
        a contract code against given input, output and storage types \
        (always followed by more precise errors)."
-    (obj4
+    (obj5
        (req "expectedParameterType" ex_ty_enc)
        (req "expectedReturnType" ex_ty_enc)
        (req "expectedStorageType" ex_ty_enc)
-       (req "illTypedExpression" Script.expr_encoding))
+       (req "illTypedExpression" Script.expr_encoding)
+       (req "typeMap" type_map_enc))
     (function
-      | Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty) ->
-          Some (Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty, expr)
+      | Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty, type_map) ->
+          Some (Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty, expr, type_map)
       | _ -> None)
-    (fun (Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty, expr) ->
-       Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty))
+    (fun (Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty, expr, type_map) ->
+       Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty, type_map))

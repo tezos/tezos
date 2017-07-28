@@ -1,0 +1,7 @@
+parameter nat;
+return (list nat);
+storage unit;
+code {CAR; NIL nat; SWAP; DUP; PUSH nat 0; CMPNEQ;
+      LOOP {DUP; DIP {SWAP}; CONS; SWAP; PUSH nat 1; SWAP; SUB;
+            DUP; DIP{ABS} ; PUSH int 0; CMPNEQ};
+      CONS; UNIT; SWAP; PAIR};

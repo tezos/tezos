@@ -1,17 +1,17 @@
 storage unit ;
-parameter uint16 ;
+parameter nat ;
 return (list (contract unit unit)) ;
 code
-  { CADR ; DUP ; PUSH uint16 0 ; CMPNEQ ;
+  { CAR ; DUP ; PUSH nat 0 ; CMPNEQ ;
     DIIP { NIL (contract unit unit) } ;
     LOOP
       { PUSH tez "5.00" ;
         PUSH bool True ; # delegatable
         NONE key ; # delegate
-        PUSH key "Nf4DPTCksayh83VhjDVE8M8et7KmXAppD3s7" ; # manager
+        PUSH key "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" ; # manager
         CREATE_ACCOUNT ;
         SWAP ; DIP { CONS } ;
-        PUSH uint16 1 ; SWAP ; SUB ;
-        DUP ; PUSH uint16 0 ; CMPNEQ } ;
+        PUSH nat 1 ; SWAP ; SUB ;
+        DUP ; PUSH nat 0 ; CMPNEQ } ;
     DROP ;
     UNIT ; SWAP ; PAIR }

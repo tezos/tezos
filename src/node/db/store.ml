@@ -86,6 +86,7 @@ module Block = struct
     header: Block_header.t ;
     message: string ;
     operation_list_count: int ;
+    max_operations_ttl: int ;
   }
 
   module Contents =
@@ -97,13 +98,16 @@ module Block = struct
          let encoding =
            let open Data_encoding in
            conv
-             (fun { header ; message ; operation_list_count } ->
-               (message, operation_list_count, header))
-             (fun (message, operation_list_count, header) ->
-                { header ; message ; operation_list_count })
-             (obj3
+             (fun { header ; message ; operation_list_count ;
+                    max_operations_ttl } ->
+               (message, operation_list_count, max_operations_ttl, header))
+             (fun (message, operation_list_count,
+                   max_operations_ttl, header) ->
+                { header ; message ; max_operations_ttl ; operation_list_count })
+             (obj4
                 (req "message" string)
                 (req "operation_list_count" uint8)
+                (req "max_operations_ttl" uint16)
                 (req "header" Block_header.encoding))
        end))
 

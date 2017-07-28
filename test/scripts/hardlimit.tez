@@ -1,8 +1,0 @@
-parameter unit
-code
-  { # This contract stop to accept transactions after N incoming transactions
-    CDR ; PUSH uint32 1 ; SWAP ; SUB ;
-    DUP ; PUSH uint32 0 ; COMPARE ; EQ ; IF { FAIL } {} ;
-    UNIT ; PAIR }
-return unit
-storage uint32

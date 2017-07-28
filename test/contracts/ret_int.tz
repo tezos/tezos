@@ -1,0 +1,4 @@
+parameter unit;
+code {CAR; PUSH nat 300; PAIR};
+return nat;
+storage unit;

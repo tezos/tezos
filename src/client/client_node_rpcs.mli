@@ -53,12 +53,7 @@ val inject_protocol:
 
 module Blocks : sig
 
-  type block = [
-    | `Genesis
-    | `Head of int | `Prevalidation
-    | `Test_head of int | `Test_prevalidation
-    | `Hash of Block_hash.t
-    ]
+  type block = Node_rpc_services.Blocks.block
 
   val net_id:
     config ->

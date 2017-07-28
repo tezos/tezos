@@ -34,7 +34,6 @@ and anonymous_operation =
     }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
-      counter: counter ;
       nonce: MBytes.t ;
     }
 
@@ -284,19 +283,18 @@ module Encoding = struct
       (fun ((), level, nonce) -> Seed_nonce_revelation { level ; nonce })
 
   let faucet_encoding =
-    (obj4
+    (obj3
        (req "kind" (constant "faucet"))
        (req "id" Ed25519.Public_key_hash.encoding)
-       (req "counter" int32)
        (req "nonce" (Fixed.bytes 16)))
 
   let faucet_case tag =
     case ~tag faucet_encoding
       (function
-        | Faucet { id ; counter ; nonce } -> Some ((), id, counter, nonce)
+        | Faucet { id ; nonce } -> Some ((), id, nonce)
         | _ -> None
       )
-      (fun ((), id, counter, nonce) -> Faucet { id ; counter ; nonce })
+      (fun ((), id, nonce) -> Faucet { id ; nonce })
 
   let unsigned_operation_case tag =
     case ~tag
@@ -364,8 +362,7 @@ let parse hash (op: Operation.t) =
             Encoding.signed_proto_operation_encoding
             op.proto with
     | Some (contents, signature) ->
-        let shell = { Operation.net_id = op.shell.net_id } in
-        ok { hash ; shell ; contents ; signature }
+        ok { hash ; shell = op.shell ; contents ; signature }
     | None -> error Cannot_parse_operation
 
 type error += Invalid_signature (* `Permanent *)

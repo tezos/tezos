@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 open Tezos_context
-open Script_int
 open Script
 open Script_typed_ir
 open Script_ir_translator
@@ -21,7 +20,7 @@ let dummy_storage_fee = Tez.fifty_cents
 type error += Quota_exceeded
 type error += Overflow of Script.location
 type error += Reject of Script.location
-type error += Division_by_zero of Script.location
+type error += Runtime_contract_error : Contract.t * Script.expr * _ ty * _ ty * _ ty -> error
 
 let () =
   let open Data_encoding in
@@ -46,21 +45,30 @@ let () =
     (function Overflow loc -> Some loc | _ -> None)
     (fun loc -> Overflow loc) ;
   register_error_kind
-    `Permanent
-    ~id:"divisionByZeroRuntimeError"
-    ~title: "Division by zero (runtime script error)"
-    ~description: ""
-    (obj1 (req "location" Script.location_encoding))
-    (function Division_by_zero loc -> Some loc | _ -> None)
-    (fun loc -> Division_by_zero loc) ;
-  register_error_kind
     `Temporary
     ~id:"scriptRejectedRuntimeError"
-    ~title: "Script rejected (runtime script error)"
-    ~description: ""
+    ~title: "Script failed (runtime script error)"
+    ~description: "A FAIL instruction was reached"
     (obj1 (req "location" Script.location_encoding))
     (function Reject loc -> Some loc | _ -> None)
-    (fun loc -> Reject loc)
+    (fun loc -> Reject loc);
+  register_error_kind
+    `Temporary
+    ~id:"scriptRuntimeError"
+    ~title: "Script runtime error"
+    ~description: "Toplevel error for all runtime script errors"
+    (obj5
+       (req "contractHandle" Contract.encoding)
+       (req "contractCode" Script.expr_encoding)
+       (req "contractParameterType" ex_ty_enc)
+       (req "contractReturnType" ex_ty_enc)
+       (req "contractStorageType" ex_ty_enc))
+    (function
+      | Runtime_contract_error (contract, expr, arg_ty, ret_ty, storage_ty) ->
+          Some (contract, expr, Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty)
+      | _ -> None)
+    (fun (contract, expr, Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty) ->
+       Runtime_contract_error (contract, expr, arg_ty, ret_ty, storage_ty));
 
 (* ---- interpreter ---------------------------------------------------------*)
 
@@ -212,20 +220,26 @@ let rec interp
           | Map_update, Item (k, Item (v, Item (map, rest))) ->
               logged_return (Item (map_update k v map, rest), qta - 1, ctxt)
           (* timestamp operations *)
-          | Add_seconds_to_timestamp kind, Item (n, Item (t, rest)) ->
-              let n = Script_int.to_int64 kind n in
-              Lwt.return
-                (Period.of_seconds n >>? fun p ->
-                 Timestamp.(t +? p) >>? fun res ->
-                 Ok (Item (res, rest), qta - 1, ctxt)) >>=? fun res ->
-              logged_return res
-          | Add_timestamp_to_seconds kind, Item (t, Item (n, rest)) ->
-              let n = Script_int.to_int64 kind n in
-              Lwt.return
-                (Period.of_seconds n >>? fun p ->
-                 Timestamp.(t +? p) >>? fun res ->
-                 Ok (Item (res, rest), qta - 1, ctxt)) >>=? fun res ->
-              logged_return res
+          | Add_seconds_to_timestamp, Item (n, Item (t, rest)) ->
+              begin match Script_int.to_int64 n with
+                | None -> fail (Overflow loc)
+                | Some n ->
+                    Lwt.return
+                      (Period.of_seconds n >>? fun p ->
+                       Timestamp.(t +? p) >>? fun res ->
+                       Ok (Item (res, rest), qta - 1, ctxt)) >>=? fun res ->
+                    logged_return res
+              end
+          | Add_timestamp_to_seconds, Item (t, Item (n, rest)) ->
+              begin match Script_int.to_int64 n with
+                | None -> fail (Overflow loc)
+                | Some n ->
+                    Lwt.return
+                      (Period.of_seconds n >>? fun p ->
+                       Timestamp.(t +? p) >>? fun res ->
+                       Ok (Item (res, rest), qta - 1, ctxt)) >>=? fun res ->
+                    logged_return res
+              end
           (* string operations *)
           | Concat, Item (x, Item (y, rest)) ->
               logged_return (Item (x ^ y, rest), qta - 1, ctxt)
@@ -236,12 +250,22 @@ let rec interp
           | Sub_tez, Item (x, Item (y, rest)) ->
               Lwt.return Tez.(x -? y) >>=? fun res ->
               logged_return (Item (res, rest), qta - 1, ctxt)
-          | Mul_tez kind, Item (x, Item (y, rest)) ->
-              Lwt.return Tez.(x *? Script_int.to_int64 kind y) >>=? fun res ->
-              logged_return (Item (res, rest), qta - 1, ctxt)
-          | Mul_tez' kind, Item (y, Item (x, rest)) ->
-              Lwt.return Tez.(x *? Script_int.to_int64 kind y) >>=? fun res ->
-              logged_return (Item (res, rest), qta - 1, ctxt)
+          | Mul_teznat, Item (x, Item (y, rest)) ->
+             begin
+               match Script_int.to_int64 y with
+               | None -> fail (Overflow loc)
+               | Some y ->
+                  Lwt.return Tez.(x *? y) >>=? fun res ->
+                  logged_return (Item (res, rest), qta - 1, ctxt)
+             end
+          | Mul_nattez, Item (y, Item (x, rest)) ->
+             begin
+               match Script_int.to_int64 y with
+               | None -> fail (Overflow loc)
+               | Some y ->
+                  Lwt.return Tez.(x *? y) >>=? fun res ->
+                  logged_return (Item (res, rest), qta - 1, ctxt)
+             end
           (* boolean operations *)
           | Or, Item (x, Item (y, rest)) ->
               logged_return (Item (x || y, rest), qta - 1, ctxt)
@@ -252,63 +276,98 @@ let rec interp
           | Not, Item (x, rest) ->
               logged_return (Item (not x, rest), qta - 1, ctxt)
           (* integer operations *)
-          | Checked_abs_int kind, Item (x, rest) ->
-              begin match Script_int.checked_abs kind x with
+          | Abs_int, Item (x, rest) ->
+              logged_return (Item (Script_int.abs x, rest), qta - 1, ctxt)
+          | Int_nat, Item (x, rest) ->
+              logged_return (Item (Script_int.int x, rest), qta - 1, ctxt)
+          | Neg_int, Item (x, rest) ->
+              logged_return (Item (Script_int.neg x, rest), qta - 1, ctxt)
+          | Neg_nat, Item (x, rest) ->
+              logged_return (Item (Script_int.neg x, rest), qta - 1, ctxt)
+          | Add_intint, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.add x y, rest), qta - 1, ctxt)
+          | Add_intnat, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.add x y, rest), qta - 1, ctxt)
+          | Add_natint, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.add x y, rest), qta - 1, ctxt)
+          | Add_natnat, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.add_n x y, rest), qta - 1, ctxt)
+          | Sub_int, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.sub x y, rest), qta - 1, ctxt)
+          | Mul_intint, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.mul x y, rest), qta - 1, ctxt)
+          | Mul_intnat, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.mul x y, rest), qta - 1, ctxt)
+          | Mul_natint, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.mul x y, rest), qta - 1, ctxt)
+          | Mul_natnat, Item (x, Item (y, rest)) ->
+             logged_return (Item (Script_int.mul_n x y, rest), qta - 1, ctxt)
+
+          | Ediv_teznat, Item (x, Item (y, rest)) ->
+             let x = Script_int.of_int64 (Tez.to_cents x) in
+             let result =
+               match Script_int.ediv x y with
+               | None -> None
+               | Some (q, r) ->
+                  match Script_int.to_int64 q,
+                        Script_int.to_int64 r with
+                  | Some q, Some r ->
+                     begin
+                       match Tez.of_cents q, Tez.of_cents r with
+                       | Some q, Some r -> Some (q,r)
+                       (* Cannot overflow *)
+                       | _ -> assert false
+                     end
+                  (* Cannot overflow *)
+                  | _ -> assert false
+              in
+              logged_return (Item (result, rest), qta -1, ctxt)
+
+          | Ediv_tez, Item (x, Item (y, rest)) ->
+             let x = Script_int.abs (Script_int.of_int64 (Tez.to_cents x)) in
+             let y = Script_int.abs (Script_int.of_int64 (Tez.to_cents y)) in
+             begin match Script_int.ediv_n x y with
+               | None ->
+                   logged_return (Item (None, rest), qta -1, ctxt)
+               | Some (q, r) ->
+                   let r =
+                     match Script_int.to_int64 r with
+                     | None -> assert false (* Cannot overflow *)
+                     | Some r ->
+                         match Tez.of_cents r with
+                         | None -> assert false (* Cannot overflow *)
+                         | Some r -> r in
+                   logged_return (Item (Some (q, r), rest), qta -1, ctxt)
+             end
+
+          | Ediv_intint, Item (x, Item (y, rest)) ->
+               logged_return (Item (Script_int.ediv x y, rest), qta -1, ctxt)
+          | Ediv_intnat, Item (x, Item (y, rest)) ->
+               logged_return (Item (Script_int.ediv x y, rest), qta -1, ctxt)
+          | Ediv_natint, Item (x, Item (y, rest)) ->
+               logged_return (Item (Script_int.ediv x y, rest), qta -1, ctxt)
+          | Ediv_natnat, Item (x, Item (y, rest)) ->
+               logged_return (Item (Script_int.ediv_n x y, rest), qta -1, ctxt)
+          | Lsl_nat, Item (x, Item (y, rest)) ->
+              begin match Script_int.shift_left_n x y with
                 | None -> fail (Overflow loc)
-                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
+                | Some r -> logged_return (Item (r, rest), qta - 1, ctxt)
               end
-          | Checked_neg_int kind, Item (x, rest) ->
-              begin match Script_int.checked_neg kind x with
+          | Lsr_nat, Item (x, Item (y, rest)) ->
+              begin match Script_int.shift_right_n x y with
                 | None -> fail (Overflow loc)
-                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
+                | Some r -> logged_return (Item (r, rest), qta - 1, ctxt)
               end
-          | Checked_add_int kind, Item (x, Item (y, rest)) ->
-              begin match Script_int.checked_add kind x y with
-                | None -> fail (Overflow loc)
-                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
-              end
-          | Checked_sub_int kind, Item (x, Item (y, rest)) ->
-              begin match Script_int.checked_sub kind x y with
-                | None -> fail (Overflow loc)
-                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
-              end
-          | Checked_mul_int kind, Item (x, Item (y, rest)) ->
-              begin match Script_int.checked_mul kind x y with
-                | None -> fail (Overflow loc)
-                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
-              end
-          | Abs_int kind, Item (x, rest) ->
-              logged_return (Item (Script_int.abs kind x, rest), qta - 1, ctxt)
-          | Neg_int kind, Item (x, rest) ->
-              logged_return (Item (Script_int.neg kind x, rest), qta - 1, ctxt)
-          | Add_int kind, Item (x, Item (y, rest)) ->
-              logged_return (Item (Script_int.add kind x y, rest), qta - 1, ctxt)
-          | Sub_int kind, Item (x, Item (y, rest)) ->
-              logged_return (Item (Script_int.sub kind x y, rest), qta - 1, ctxt)
-          | Mul_int kind, Item (x, Item (y, rest)) ->
-              logged_return (Item (Script_int.mul kind x y, rest), qta - 1, ctxt)
-          | Div_int kind, Item (x, Item (y, rest)) ->
-              if Compare.Int64.(Script_int.to_int64 kind y = 0L) then
-                fail (Division_by_zero loc)
-              else
-                logged_return (Item (Script_int.div kind x y, rest), qta - 1, ctxt)
-          | Mod_int kind, Item (x, Item (y, rest)) ->
-              if Compare.Int64.(Script_int.to_int64 kind y = 0L) then
-                fail (Division_by_zero loc)
-              else
-                logged_return (Item (Script_int.rem kind x y, rest), qta - 1, ctxt)
-          | Lsl_int kind, Item (x, Item (y, rest)) ->
-              logged_return (Item (Script_int.logsl kind x y, rest), qta - 1, ctxt)
-          | Lsr_int kind, Item (x, Item (y, rest)) ->
-              logged_return (Item (Script_int.logsr kind x y, rest), qta - 1, ctxt)
-          | Or_int kind, Item (x, Item (y, rest)) ->
-              logged_return (Item (Script_int.logor kind x y, rest), qta - 1, ctxt)
-          | And_int kind, Item (x, Item (y, rest)) ->
-              logged_return (Item (Script_int.logand kind x y, rest), qta - 1, ctxt)
-          | Xor_int kind, Item (x, Item (y, rest)) ->
-              logged_return (Item (Script_int.logxor kind x y, rest), qta - 1, ctxt)
-          | Not_int kind, Item (x, rest) ->
-              logged_return (Item (Script_int.lognot kind x, rest), qta - 1, ctxt)
+          | Or_nat, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.logor x y, rest), qta - 1, ctxt)
+          | And_nat, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.logand x y, rest), qta - 1, ctxt)
+          | Xor_nat, Item (x, Item (y, rest)) ->
+              logged_return (Item (Script_int.logxor x y, rest), qta - 1, ctxt)
+          | Not_int, Item (x, rest) ->
+              logged_return (Item (Script_int.lognot x, rest), qta - 1, ctxt)
+          | Not_nat, Item (x, rest) ->
+              logged_return (Item (Script_int.lognot x, rest), qta - 1, ctxt)
           (* control *)
           | Seq (hd, tl), stack ->
               step origination qta ctxt hd stack >>=? fun (trans, qta, ctxt, origination) ->
@@ -333,64 +392,61 @@ let rec interp
           | Fail, _ ->
               fail (Reject loc)
           | Nop, stack ->
-              logged_return (stack, qta - 1, ctxt)
+              logged_return (stack, qta, ctxt)
           (* comparison *)
           | Compare Bool_key, Item (a, Item (b, rest)) ->
               let cmpres = Compare.Bool.compare a b in
-              let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
+              let cmpres = Script_int.of_int cmpres in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare String_key, Item (a, Item (b, rest)) ->
               let cmpres = Compare.String.compare a b in
-              let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
+              let cmpres = Script_int.of_int cmpres in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare Tez_key, Item (a, Item (b, rest)) ->
               let cmpres = Tez.compare a b in
-              let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
+              let cmpres = Script_int.of_int cmpres in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
-          | Compare (Int_key kind), Item (a, Item (b, rest)) ->
-              let cmpres = Script_int.compare kind a b in
+          | Compare Int_key, Item (a, Item (b, rest)) ->
+              let cmpres = Script_int.compare a b in
+              let cmpres = Script_int.of_int cmpres in
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
+          | Compare Nat_key, Item (a, Item (b, rest)) ->
+              let cmpres = Script_int.compare a b in
+              let cmpres = Script_int.of_int cmpres in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare Key_key, Item (a, Item (b, rest)) ->
               let cmpres = Ed25519.Public_key_hash.compare a b in
-              let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
+              let cmpres = Script_int.of_int cmpres in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare Timestamp_key, Item (a, Item (b, rest)) ->
               let cmpres = Timestamp.compare a b in
-              let cmpres = Script_int.of_int64 Int64 (Int64.of_int cmpres) in
+              let cmpres = Script_int.of_int cmpres in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           (* comparators *)
           | Eq, Item (cmpres, rest) ->
-              let cmpres = Script_int.to_int64 Int64 cmpres in
-              let cmpres = Compare.Int64.(cmpres = 0L) in
+              let cmpres = Script_int.compare cmpres Script_int.zero in
+              let cmpres = Compare.Int.(cmpres = 0) in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Neq, Item (cmpres, rest) ->
-              let cmpres = Script_int.to_int64 Int64 cmpres in
-              let cmpres = Compare.Int64.(cmpres <> 0L) in
+              let cmpres = Script_int.compare cmpres Script_int.zero in
+              let cmpres = Compare.Int.(cmpres <> 0) in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Lt, Item (cmpres, rest) ->
-              let cmpres = Script_int.to_int64 Int64 cmpres in
-              let cmpres = Compare.Int64.(cmpres < 0L) in
-              logged_return (Item (cmpres, rest), qta - 1, ctxt)
-          | Gt, Item (cmpres, rest) ->
-              let cmpres = Script_int.to_int64 Int64 cmpres in
-              let cmpres = Compare.Int64.(cmpres > 0L) in
+              let cmpres = Script_int.compare cmpres Script_int.zero in
+              let cmpres = Compare.Int.(cmpres < 0) in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Le, Item (cmpres, rest) ->
-              let cmpres = Script_int.to_int64 Int64 cmpres in
-              let cmpres = Compare.Int64.(cmpres <= 0L) in
+              let cmpres = Script_int.compare cmpres Script_int.zero in
+              let cmpres = Compare.Int.(cmpres <= 0) in
+              logged_return (Item (cmpres, rest), qta - 1, ctxt)
+          | Gt, Item (cmpres, rest) ->
+              let cmpres = Script_int.compare cmpres Script_int.zero in
+              let cmpres = Compare.Int.(cmpres > 0) in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Ge, Item (cmpres, rest) ->
-              let cmpres = Script_int.to_int64 Int64 cmpres in
-              let cmpres = Compare.Int64.(cmpres >= 0L) in
+              let cmpres = Script_int.compare cmpres Script_int.zero in
+              let cmpres = Compare.Int.(cmpres >= 0) in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
-          (* casts *)
-          | Checked_int_of_int (_, kt), Item (v, rest) ->
-              begin match Script_int.checked_cast kt v with
-                | None -> fail (Overflow loc)
-                | Some res -> logged_return (Item (res, rest), qta - 1, ctxt)
-              end
-          | Int_of_int (_, kt), Item (v, rest) ->
-              logged_return (Item (Script_int.cast kt v, rest), qta - 1, ctxt)
           (* protocol *)
           | Manager, Item ((_, _, contract), rest) ->
               Contract.get_manager ctxt contract >>=? fun manager ->
@@ -398,7 +454,6 @@ let rec interp
           | Transfer_tokens storage_type,
             Item (p, Item (amount, Item ((tp, Unit_t, destination), Item (sto, Empty)))) -> begin
               Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
-              Lwt.return Tez.(amount -? Constants.origination_burn) >>=? fun amount ->
               Contract.credit ctxt destination amount >>=? fun ctxt ->
               Contract.get_script ctxt destination >>=? fun destination_script ->
               let sto = unparse_data storage_type sto in
@@ -456,9 +511,12 @@ let rec interp
                 ~manager ~delegate ~balance
                 ?script:None ~spendable:true ~delegatable >>=? fun (ctxt, contract, origination) ->
               logged_return ~origination (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
+          | Default_account, Item (key, rest) ->
+              let contract = Contract.default_contract key in
+              logged_return (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
           | Create_contract (g, p, r),
-            Item (manager, Item (delegate, Item (delegatable, Item (credit,
-                                                                    Item (Lam (_, code), Item (init, rest)))))) ->
+            Item (manager, Item (delegate, Item (spendable, Item (delegatable, Item (credit,
+                                                                    Item (Lam (_, code), Item (init, rest))))))) ->
               let code, storage =
                 { code; arg_type = unparse_ty p; ret_type = unparse_ty r; storage_type =  unparse_ty g },
                 { storage = unparse_data g init; storage_type =  unparse_ty g } in
@@ -468,7 +526,7 @@ let rec interp
                 origination
                 ~manager ~delegate ~balance
                 ~script:({ code ; storage }, (dummy_code_fee, dummy_storage_fee))
-                ~spendable:true ~delegatable
+                ~spendable ~delegatable
               >>=? fun (ctxt, contract, origination) ->
               logged_return ~origination (Item ((p, r, contract), rest), qta - 1, ctxt)
           | Balance, rest ->
@@ -486,7 +544,7 @@ let rec interp
               let hash = Script.hash_expr (unparse_data ty v) in
               logged_return (Item (hash, rest), qta - 1, ctxt)
           | Steps_to_quota, rest ->
-              let steps = Script_int.of_int64 Uint32 (Int64.of_int qta) in
+              let steps = Script_int.abs (Script_int.of_int qta) in
               logged_return (Item (steps, rest), qta - 1, ctxt)
           | Source (ta, tb), rest ->
               logged_return (Item ((ta, tb, orig), rest), qta - 1, ctxt)
@@ -510,12 +568,16 @@ and execute ?log origination orig source ctxt storage script amount arg qta =
   (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
   (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
   (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
-  let arg_type_full = Pair_t (Pair_t (Tez_t, arg_type), storage_type) in
+  let arg_type_full = Pair_t (arg_type, storage_type) in
   let ret_type_full = Pair_t (ret_type, storage_type) in
-  parse_lambda ~storage_type ctxt arg_type_full ret_type_full code >>=? fun lambda ->
+  trace
+    (Ill_typed_contract (code, arg_type, ret_type, storage_type, []))
+    (parse_lambda ~storage_type ctxt arg_type_full ret_type_full code) >>=? fun lambda ->
   parse_data ctxt arg_type arg >>=? fun arg ->
   parse_data ctxt storage_type storage >>=? fun storage ->
-  interp ?log origination qta orig source amount ctxt lambda ((amount, arg), storage)
+  trace
+    (Runtime_contract_error (source, code, arg_type, ret_type_full, storage_type))
+    (interp ?log origination qta orig source amount ctxt lambda (arg, storage))
   >>=? fun (ret, qta, ctxt, origination) ->
   let ret, storage = ret in
   return (unparse_data storage_type storage,

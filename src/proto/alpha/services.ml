@@ -161,13 +161,6 @@ module Context = struct
                 describe ~title: "detailled level info" Level.encoding)
       RPC.Path.(custom_root / "context" / "next_level")
 
-  let faucet_counter custom_root =
-    RPC.service
-      ~description: "Access the global faucet counter."
-      ~input: empty
-      ~output: (wrap_tzerror int32)
-      RPC.Path.(custom_root / "context" / "faucet_counter")
-
   let voting_period_kind custom_root =
     RPC.service
       ~description: "Voting period kind for the current block"
@@ -308,6 +301,13 @@ module Context = struct
         ~output: (wrap_tzerror (option Script.encoding))
         RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "script")
 
+    let storage custom_root =
+      RPC.service
+        ~description: "Access the data of the contract."
+        ~input: empty
+        ~output: (wrap_tzerror (option Script.storage_encoding))
+        RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "storage")
+
     type info = {
       manager: public_key_hash ;
       balance: Tez.t ;
@@ -368,7 +368,7 @@ module Helpers = struct
        (req "script" Script.code_encoding)
        (req "storage" Script.expr_encoding)
        (req "input" Script.expr_encoding)
-       (opt "amount" Tez.encoding)
+       (req "amount" Tez.encoding)
        (opt "contract" Contract.encoding)
        (opt "origination_nonce" Contract.origination_nonce_encoding))
 

@@ -13,8 +13,6 @@ type error +=
   | Cannot_pay_storage_fee of Contract_repr.contract * Tez_repr.t * Tez_repr.t (* `Temporary *)
   | Counter_in_the_past of Contract_repr.contract * int32 * int32 (* `Branch *)
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
-  | Faucet_counter_in_the_past of int32 * int32 (* `Branch *)
-  | Faucet_counter_in_the_future of int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
   | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
@@ -29,7 +27,7 @@ let () =
     ~pp:(fun ppf (c, r, p) ->
         Format.fprintf ppf "Initial amount of contract %a too low (required %a but provided %a)"
           Contract_repr.pp c
-          Tez_repr.pp r Tez_repr.pp p)
+          Tez_repr.pp p Tez_repr.pp r)
     Data_encoding.(obj3
                      (req "contract" Contract_repr.encoding)
                      (req "required" Tez_repr.encoding)
@@ -107,36 +105,6 @@ let () =
          (req "found" int32))
     (function Counter_in_the_past (c, x, y) -> Some (c, x, y) | _ -> None)
     (fun (c, x, y) -> Counter_in_the_past (c, x, y)) ;
-  register_error_kind
-    `Temporary
-    ~id:"contract.faucet_counter_in_the_future"
-    ~title:"Invalid faucet counter (not yet reached) in a manager operation"
-    ~description:"An operation assumed a faucet counter in the future"
-    ~pp:(fun ppf (exp, found) ->
-        Format.fprintf ppf
-          "Faucet counter %ld not yet reached (expected %ld)"
-          found exp)
-    Data_encoding.
-      (obj2
-         (req "expected" int32)
-         (req "found" int32))
-    (function Faucet_counter_in_the_future (x, y) -> Some (x, y) | _ -> None)
-    (fun (x, y) -> Faucet_counter_in_the_future (x, y)) ;
-  register_error_kind
-    `Branch
-    ~id:"contract.faucet_counter_in_the_past"
-    ~title:"Invalid faucet counter (already used) in a manager operation"
-    ~description:"An operation assumed a faucet counter in the past"
-    ~pp:(fun ppf (exp, found) ->
-        Format.fprintf ppf
-          "Faucet counter %ld already used (expected %ld)"
-          found exp)
-    Data_encoding.
-      (obj2
-         (req "expected" int32)
-         (req "found" int32))
-    (function Faucet_counter_in_the_past (x, y) -> Some (x, y) | _ -> None)
-    (fun (x, y) -> Faucet_counter_in_the_past (x, y)) ;
   register_error_kind
     `Temporary
     ~id:"contract.non_existing_contract"
@@ -260,23 +228,6 @@ let increment_counter c contract =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
   Storage.Contract.Counter.set c contract (Int32.succ contract_counter)
 
-let get_faucet_counter c =
-  Storage.Contract.Faucet_counter.get c
-
-let check_faucet_counter_increment c counter =
-  Storage.Contract.Faucet_counter.get c >>=? fun faucet_counter ->
-  let expected = Int32.succ faucet_counter in
-  if Compare.Int32.(expected = counter)
-  then return ()
-  else if Compare.Int32.(expected > counter) then
-    fail (Faucet_counter_in_the_past (expected, counter))
-  else
-    fail (Faucet_counter_in_the_future (expected, counter))
-
-let increment_faucet_counter c =
-  Storage.Contract.Faucet_counter.get c >>=? fun faucet_counter ->
-  Storage.Contract.Faucet_counter.set c (Int32.succ faucet_counter)
-
 let get_script c contract =
   Storage.Contract.Code.get_option c contract >>=? fun code ->
   Storage.Contract.Storage.get_option c contract >>=? fun storage ->
@@ -284,6 +235,8 @@ let get_script c contract =
   | None, None -> return None
   | Some code, Some storage -> return (Some { Script_repr.code ; storage })
   | None, Some _ | Some _, None -> failwith "get_script"
+
+let get_storage = Storage.Contract.Storage.get_option
 
 let get_counter c contract =
   Storage.Contract.Counter.get_option c contract >>=? function
@@ -416,5 +369,4 @@ let originate c nonce ~balance ~manager ?script ~delegate ~spendable ~delegatabl
   return (c, contract, nonce)
 
 let init c =
-  Storage.Contract.Faucet_counter.init c 0l >>=? fun c ->
   Storage.Contract.Global_counter.init c 0l

@@ -20,7 +20,12 @@ type 'a request_param = {
 }
 
 module Make_raw
-    (Hash : sig type t end)
+    (Hash : sig
+       type t
+       val name : string
+       val encoding : t Data_encoding.t
+       val pp : Format.formatter -> t -> unit
+      end)
     (Disk_table :
        Distributed_db_functors.DISK_TABLE with type key := Hash.t)
     (Memory_table :
@@ -155,7 +160,14 @@ module Raw_operation_hashes = struct
 
   include
     Make_raw
-      (struct type t = Block_hash.t * int end)
+      (struct
+        type t = Block_hash.t * int
+        let name = "raw_operation_hash"
+        let pp ppf (h, n) = Format.fprintf ppf "%a:%d" Block_hash.pp h n
+        let encoding =
+          let open Data_encoding in
+          obj2 (req "block" Block_hash.encoding) (req "index" uint16)
+      end)
       (Operation_hashes_storage)
       (Operations_table)
       (struct
@@ -217,7 +229,14 @@ end
 module Raw_operations = struct
   include
     Make_raw
-      (struct type t = Block_hash.t * int end)
+      (struct
+        type t = Block_hash.t * int
+        let name = "raw_operation"
+        let pp ppf (h, n) = Format.fprintf ppf "%a:%d" Block_hash.pp h n
+        let encoding =
+          let open Data_encoding in
+          obj2 (req "block" Block_hash.encoding) (req "index" uint16)
+      end)
       (Operations_storage)
       (Operations_table)
       (struct

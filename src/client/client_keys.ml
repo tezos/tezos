@@ -127,9 +127,11 @@ let commands () =
       (fun name sk cctxt ->
          Public_key.find_opt cctxt name >>=? function
          | None ->
-             failwith
-               "no public key named '%s', add it before adding the secret key"
-               name
+             let pk = Sodium.Sign.secret_key_to_public_key sk in
+             Public_key_hash.add cctxt
+               name (Ed25519.Public_key.hash pk) >>=? fun () ->
+             Public_key.add cctxt name pk >>=? fun () ->
+             Secret_key.add cctxt name sk
          | Some pk ->
              fail_unless
                (check_keys_consistency pk sk || cctxt.config.force)
