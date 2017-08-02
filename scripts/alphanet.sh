@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/bash
 
 set -e
 
@@ -30,6 +30,12 @@ suffix=
 
 data_dir="$HOME/.tezos-alphanet$suffix"
 docker_container="tezos-alphanet$suffix"
+
+if [ $ALPHANET_EMACS ]; then
+    interactive_flags="-t"
+else
+    interactive_flags="-it"
+fi
 
 
 ## Saving state ############################################################
@@ -108,7 +114,7 @@ may_restore_accounts() {
 ## Container ###############################################################
 
 pull_image() {
-    if [ "$TEZOS_ALPHANET_DO_NOT_PULL" = "yes" ] ; then
+    if [ "$TEZOS_ALPHANET_DO_NOT_PULL" = "yes" ] ||  [ "$ALPHANET_EMACS" ] ; then
         return ;
     fi
     docker pull "$docker_image"
@@ -205,7 +211,7 @@ init_node() {
 }
 
 check_node() {
-    check_container && docker exec -it "$docker_container" tezos check_node
+    check_container && docker exec "$interactive_flags" "$docker_container" tezos check_node
 }
 
 assert_node() {
@@ -239,7 +245,7 @@ start_node() {
 }
 
 log_node() {
-    docker exec -it "$docker_container" tezos log_node
+    docker exec "$interactive_flags" "$docker_container" tezos log_node
 }
 
 stop_node() {
@@ -250,7 +256,7 @@ stop_node() {
 ## Baker ###################################################################
 
 check_baker() {
-    check_node && docker exec -it "$docker_container" tezos check_baker
+    check_node && docker exec "$interactive_flags" "$docker_container" tezos check_baker
 }
 
 assert_baker() {
@@ -279,7 +285,7 @@ start_baker() {
 }
 
 log_baker() {
-    docker exec -it "$docker_container" tezos log_baker
+    docker exec "$interactive_flags" "$docker_container" tezos log_baker
 }
 
 stop_baker() {
@@ -289,7 +295,7 @@ stop_baker() {
 ## Baker ###################################################################
 
 check_endorser() {
-    check_node && docker exec -it "$docker_container" tezos check_endorser
+    check_node && docker exec "$interactive_flags" "$docker_container" tezos check_endorser
 }
 
 assert_endorser() {
@@ -318,7 +324,7 @@ start_endorser() {
 }
 
 log_endorser() {
-    docker exec -it "$docker_container" tezos log_endorser
+    docker exec "$interactive_flags" "$docker_container" tezos log_endorser
 }
 
 stop_endorser() {
@@ -329,7 +335,22 @@ stop_endorser() {
 
 
 run_client() {
-    docker exec -it "$docker_container" tezos client "$@"
+    declare -a container_args=();
+    for arg in "$@"; do
+        if [[ "$arg" == 'container:'* ]]; then
+            local_path=${arg#container:}
+            docker exec "$docker_container" mkdir -p -m 777 /tmp/copied/
+            file_name=$(basename "${local_path}")
+            docker_path="/tmp/copied/$file_name"
+            docker cp "${local_path}" "$docker_container:${docker_path}"
+            docker exec "$docker_container" sudo chmod 644 "${docker_path}"
+            container_args+=($docker_path);
+        else
+            container_args+=(${arg});
+        fi
+    done
+    docker exec "$interactive_flags" "$docker_container" tezos client "${container_args[@]}"
+    docker exec "$docker_container" rm -rf /tmp/copied # Remove copied files
     save_accounts
 }
 
@@ -343,9 +364,9 @@ run_shell() {
 }
 
 display_head() {
-    docker exec -it "$docker_container" tezos \
+    docker exec "$interactive_flags" "$docker_container" tezos \
            client rpc call /blocks/head with '{}'
-    docker exec -it "$docker_container" tezos \
+    docker exec "$interactive_flags" "$docker_container" tezos \
            client rpc call /blocks/head/proto/context/level with '{}'
 }
 
@@ -363,7 +384,7 @@ start() {
 }
 
 go_alpha_go() {
-    docker exec -it "$docker_container" tezos client \
+    docker exec "$interactive_flags" "$docker_container" tezos client \
            activate \
            protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
            with fitness 1 \
@@ -389,6 +410,9 @@ status() {
 }
 
 warn_script_uptodate() {
+    if [[ $ALPHANET_EMACS ]]; then
+       return
+    fi
     docker cp "$docker_container:home/tezos/scripts/alphanet.sh" \
               ".alphanet.sh.new"
     if ! diff .alphanet.sh.new  "$0" >/dev/null 2>&1 ; then
@@ -463,6 +487,11 @@ usage() {
     echo "Global options are currently limited to:"
     echo "  --port <int>"
     echo "      change public the port Tezos node"
+    echo "Container prefix:"
+    echo "    container:<FILE>"
+    echo "      can be used anywhere 'file:<FILE>' is permitted in client commands."
+    echo "      It will cause the referenced file to be copied into the docker conainer."
+    echo "      Files will be renamed, which may make errors difficult to read"
 }
 
 ## Dispatch ################################################################
