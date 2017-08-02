@@ -13,6 +13,7 @@ open Tezos_context
 
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
+type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.expr option (* `Permanent *)
 
 let () =
   register_error_kind
@@ -42,7 +43,21 @@ let () =
                      (req "current" Voting_period.encoding)
                      (req "provided" Voting_period.encoding))
     (function Wrong_voting_period (e, p) -> Some (e, p) | _ -> None)
-    (fun (e, p) -> Wrong_voting_period (e, p))
+    (fun (e, p) -> Wrong_voting_period (e, p));
+  register_error_kind
+    `Permanent
+    ~id:"badContractParameter"
+    ~title:"Contract supplied an invalid parameter"
+    ~description:"Either no parameter was supplied to a contract, \
+                  a parameter was passed to an account, \
+                  or a parameter was supplied of the wrong type"
+    Data_encoding.(obj3
+                     (req "contract" Contract.encoding)
+                     (opt "expectedType" Script.expr_encoding)
+                     (opt "providedArgument" Script.expr_encoding))
+    (function Bad_contract_parameter (c, expected, supplied) ->
+       Some (c, expected, supplied) | _ -> None)
+    (fun (c, expected, supplied) -> Bad_contract_parameter (c, expected, supplied))
 
 let apply_delegate_operation_content
     ctxt delegate pred_block block_priority = function
@@ -68,9 +83,6 @@ let apply_delegate_operation_content
         (Wrong_voting_period (level.voting_period, period)) >>=? fun () ->
       Amendment.record_ballot ctxt delegate proposal ballot
 
-type error += Non_scripted_contract_with_parameter
-type error += Scripted_contract_without_paramater
-
 let apply_manager_operation_content
     ctxt origination_nonce source = function
   | Transaction { amount ; parameters ; destination } -> begin
@@ -81,26 +93,34 @@ let apply_manager_operation_content
           match parameters with
           | None | Some (Prim (_, "Unit", [])) ->
               return (ctxt, origination_nonce, None)
-          | Some _ -> fail Non_scripted_contract_with_parameter
+          | Some _ -> fail (Bad_contract_parameter (destination, None, parameters))
         end
       | Some { code ; storage } ->
-          match parameters with
-          | None -> fail Scripted_contract_without_paramater
-          | Some parameters ->
-              Script_interpreter.execute
-                origination_nonce
-                source destination ctxt storage code amount parameters
-                (Constants.instructions_per_transaction ctxt)
-              >>= function
-              | Ok (storage_res, _res, _steps, ctxt, origination_nonce) ->
-                  (* TODO: pay for the steps and the storage diff:
-                     update_script_storage checks the storage cost *)
-                  Contract.update_script_storage_and_fees
-                    ctxt destination
-                    Script_interpreter.dummy_storage_fee storage_res >>=? fun ctxt ->
-                  return (ctxt, origination_nonce, None)
-              | Error err ->
-                  return (ctxt, origination_nonce, Some err)
+          let call_contract argument =
+            Script_interpreter.execute
+              origination_nonce
+              source destination ctxt storage code amount argument
+              (Constants.instructions_per_transaction ctxt)
+            >>= function
+            | Ok (storage_res, _res, _steps, ctxt, origination_nonce) ->
+                (* TODO: pay for the steps and the storage diff:
+                   update_script_storage checks the storage cost *)
+                Contract.update_script_storage_and_fees
+                  ctxt destination
+                  Script_interpreter.dummy_storage_fee storage_res >>=? fun ctxt ->
+                return (ctxt, origination_nonce, None)
+            | Error err ->
+                return (ctxt, origination_nonce, Some err) in
+          match parameters, code.arg_type with
+          | None, Prim (_, "unit", _) -> call_contract (Prim (0, "Unit", []))
+          | Some parameters, arg_type -> begin
+              Script_ir_translator.typecheck_data ctxt (parameters, arg_type) >>= function
+              | Ok () -> call_contract parameters
+              | Error errs ->
+                  let err = Bad_contract_parameter (destination, Some arg_type, Some parameters) in
+                  return (ctxt, origination_nonce, Some ((err :: errs)))
+            end
+          | None, arg_type -> fail (Bad_contract_parameter (destination, Some arg_type, None))
     end
   | Origination { manager ; delegate ; script ;
                   spendable ; delegatable ; credit } ->

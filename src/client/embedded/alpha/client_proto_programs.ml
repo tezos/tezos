@@ -275,6 +275,23 @@ let report_errors cctxt errs =
              | Some s -> Format.fprintf ppf "%s " s)
           name
           (print_expr locations) expr
+    | Apply.Bad_contract_parameter (c, None, _) ->
+        cctxt.warning
+          "@[<v 0>Account %a is not a smart contract, it does not take arguments.@,\
+           The `-arg' flag cannot be used when transferring to an account.@]"
+          Contract.pp c
+    | Apply.Bad_contract_parameter (c, Some expected, None) ->
+        cctxt.warning
+          "@[<v 0>Contract %a expected an argument of type@,  %a@,but no argument was provided.@,\
+           The `-arg' flag can be used when transferring to a smart contract.@]"
+          Contract.pp c
+          (print_expr_unwrapped no_locations) expected
+    | Apply.Bad_contract_parameter (c, Some expected, Some argument) ->
+        cctxt.warning
+          "@[<v 0>Contract %a expected an argument of type@,  %a@but received@,  %a@]"
+          Contract.pp c
+          (print_expr_unwrapped no_locations) expected
+          (print_expr_unwrapped no_locations) argument
     | Ill_typed_contract (expr, arg_ty, ret_ty, storage_ty, type_map) ->
         cctxt.warning
           "@[<v 2>Ill typed contract:@ %a@]"
