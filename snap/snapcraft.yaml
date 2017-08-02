@@ -45,7 +45,9 @@ parts:
       mkdir .opam
       opam init --root .opam --auto-setup --switch 4.04.0
       eval `opam config env --root=.opam`
-      opam install --yes depext
+      opam install --yes depext ocplib-json-typed
+      opam pin add --yes mtime 0.8.4
+      opam pin add --yes irmin 0.12.0
       DEPEXTOPT="--noninteractive" make build-deps
       make
     after: [ocaml, opam, libsodium, camlp4]

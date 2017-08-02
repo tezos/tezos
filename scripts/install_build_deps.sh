@@ -64,8 +64,8 @@ fi
 
 if "$install"; then
     if opam list --installed tezos-deps ; then
-	opam upgrade $(opam list -s --required-by tezos-deps | grep -ve '^ocaml *$')
+	opam upgrade --yes $(opam list -s --required-by tezos-deps | grep -ve '^ocaml *$')
     else
-	opam install tezos-deps
+	opam install --yes tezos-deps
     fi
 fi
