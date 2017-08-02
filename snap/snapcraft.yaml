@@ -1,0 +1,86 @@
+name: tezos
+version: git
+summary: A self-amending cryptographic ledger
+description: |
+  Tezos is a distributed consensus platform with meta-consensus capability.
+  Tezos not only comes to consensus about state, like BTC or ETH. It also
+  comes to consensus about how the protocol and the nodes should adapt and
+  upgrade.
+
+grade: devel # must be 'stable' to release into candidate/stable channels
+confinement: strict
+
+apps:
+  node:
+    command: tezos-node
+    plugs: [network, network-bind]
+    aliases: [tezos-node]
+  client:
+    command: tezos-client
+    plugs: [network]
+    aliases: [tezos-client]
+  protocol-compiler:
+    command: tezos-protocol-compiler
+    plugs: [network]
+    aliases: [tezos-protocol-compiler]
+
+parts:
+  tezos:
+    source: .
+    plugin: nil
+    build-packages:
+      - g++
+      - make
+      - libev-dev
+      - libleveldb-dev
+      - libsnappy-dev
+      - unzip
+      - pkg-config
+      - libgmp-dev
+      - zlib1g-dev
+      - libssl-dev
+    build: |
+      export LIBRARY_PATH=$LD_LIBRARY_PATH
+      export C_INCLUDE_PATH=$SNAPCRAFT_STAGE/include/:$C_INCLUDE_PATH
+      mkdir .opam
+      opam init --root .opam --auto-setup --switch 4.04.0
+      eval `opam config env --root=.opam`
+      opam install --yes depext
+      DEPEXTOPT="--noninteractive" make build-deps
+      make
+    after: [ocaml, opam, libsodium, camlp4]
+  ocaml:
+    source: http://caml.inria.fr/pub/distrib/ocaml-4.04/ocaml-4.04.0.tar.gz
+    plugin: nil
+    build-packages: [make]
+    build: |
+      ./configure -prefix $SNAPCRAFT_STAGE/usr
+      make world.opt
+    install: make install
+  opam:
+    source: https://github.com/ocaml/opam.git
+    plugin: nil
+    build-packages:
+      - make
+    build: |
+      ./configure --prefix $SNAPCRAFT_STAGE/usr
+      make lib-ext
+      make
+    install: make install
+    after: [ocaml]
+  libsodium:
+    source: https://download.libsodium.org/libsodium/releases/libsodium-1.0.13.tar.gz
+    plugin: autotools
+  camlp4:
+    source: https://github.com/ocaml/camlp4/archive/4.04+1.tar.gz
+    plugin: nil
+    prepare: sed -i 's/OB_FLAGS=""/OB_FLAGS="-no-hygiene"/g' configure
+    build: |
+      mkdir .opam
+      opam init --root .opam --auto-setup --switch 4.04.0
+      eval `opam config env --root=.opam`
+      opam install --yes ocamlbuild
+      ./configure
+      make all
+    install: DESTDIR=$SNAPCRAFT_STAGE/usr make install
+    after: [ocaml, opam]
