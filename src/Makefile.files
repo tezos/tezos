@@ -171,6 +171,7 @@ COMPILER_IMPLS := \
 
 COMPILER_PACKAGES := \
   ${UTILS_PACKAGES} \
+  compiler-libs \
   compiler-libs.optcomp \
   lwt.unix \
   ocplib-endian \
