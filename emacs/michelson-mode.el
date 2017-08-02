@@ -17,6 +17,11 @@
   :type 'string
   :group 'michelson-options)
 
+(defcustom michelson-alphanet nil
+  "Is the client command currently using the alphanet.sh script?"
+  :type 'boolean
+  :group 'michelson-options)
+
 (defgroup michelson-faces nil
   "Font lock faces for Michelson mode."
   :prefix "michelson-"
@@ -294,15 +299,18 @@
 (defun michelson-type-at-point ()
   "Display the type of the expression under the cursor."
   (interactive)
-  (let ((tmp-file (concat buffer-file-name ".emacs")))
+  (let ((tmp-file (make-temp-file (buffer-name))))
     (write-region (point-min) (point-max) tmp-file nil 'no-message)
-    (let* ((stdout
-            (shell-command-to-string
-             (concat
-              michelson-mode-client-command
-              " typecheck program "
-              tmp-file
-              " -details -emacs")))
+    (let* ((command (concat
+                     (if michelson-alphanet "ALPHANET_EMACS=true " "")
+                     michelson-mode-client-command
+                     " typecheck program "
+                     (if michelson-alphanet
+                         (concat "container:" buffer-file-name)
+                       buffer-file-name)
+                     " -details -emacs"))
+           (stdout
+            (shell-command-to-string command))
            (record
             (car (read-from-string stdout)))
            (errors
