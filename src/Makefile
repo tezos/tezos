@@ -138,7 +138,7 @@ utils.top: DEVFLAGS=
 utils.top:
 	( $(patsubst %, echo "#require \"%\";;" ; ,${UTILS_PACKAGES}) ) > .ocamlinit.utils
 	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS}) ) >> .ocamlinit.utils
-	utop -init .ocamlinit.utils ${OCAMLFLAGS}
+	utop -init .ocamlinit.utils ${UTOPFLAGS}
 
 ############################################################################
 ## Node protocol compiler (also embedded in the main program)
@@ -200,7 +200,7 @@ node.top: ${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS} ${COMPILER_LIB_IMPLS} ${FULL_
 	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS}) ) >> .ocamlinit.node
 	( $(patsubst %, echo "open %;;" ; ,Error_monad Hash Utils) ) >> .ocamlinit.node
 	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${COMPILER_LIB_IMPLS} ${FULL_NODE_LIB_IMPLS}) ) >> .ocamlinit.node
-	utop -init .ocamlinit.node ${OCAMLFLAGS}
+	utop -init .ocamlinit.node ${UTOPFLAGS}
 
 clean::
 	rm -f ${TZNODE}
