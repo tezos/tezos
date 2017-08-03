@@ -64,6 +64,7 @@ val set_fold :
   'elt Script_typed_ir.set -> 'acc -> 'acc
 val set_update : 'a -> bool -> 'a Script_typed_ir.set -> 'a Script_typed_ir.set
 val set_mem : 'elt -> 'elt Script_typed_ir.set -> bool
+val set_size : 'elt Script_typed_ir.set -> Script_int.n Script_int.num
 
 val empty_map : 'a Script_typed_ir.comparable_ty -> ('a, 'b) Script_typed_ir.map
 val map_fold :
@@ -74,6 +75,7 @@ val map_update :
 val map_mem : 'key -> ('key, 'value) Script_typed_ir.map -> bool
 val map_get : 'key -> ('key, 'value) Script_typed_ir.map -> 'value option
 val map_key_ty : ('a, 'b) Script_typed_ir.map -> 'a Script_typed_ir.comparable_ty
+val map_size : ('a, 'b) Script_typed_ir.map -> Script_int.n Script_int.num
 
 val ty_eq :
   'ta Script_typed_ir.ty -> 'tb Script_typed_ir.ty ->

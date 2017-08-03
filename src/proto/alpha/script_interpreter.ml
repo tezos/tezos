@@ -190,6 +190,8 @@ let rec interp
               logged_return (Item (set_mem v set, rest), qta - 1, ctxt)
           | Set_update, Item (v, Item (presence, Item (set, rest))) ->
               logged_return (Item (set_update v presence set, rest), qta - 1, ctxt)
+          | Set_size, Item (set, rest) ->
+              logged_return (Item (set_size set, rest), qta - 1, ctxt)
           (* maps *)
           | Empty_map (t, _), rest ->
               logged_return (Item (empty_map t, rest), qta - 1, ctxt)
@@ -219,6 +221,8 @@ let rec interp
               logged_return (Item (map_get v map, rest), qta - 1, ctxt)
           | Map_update, Item (k, Item (v, Item (map, rest))) ->
               logged_return (Item (map_update k v map, rest), qta - 1, ctxt)
+          | Map_size, Item (map, rest) ->
+              logged_return (Item (map_size map, rest), qta - 1, ctxt)
           (* timestamp operations *)
           | Add_seconds_to_timestamp, Item (n, Item (t, rest)) ->
               begin match Script_int.to_int64 n with
