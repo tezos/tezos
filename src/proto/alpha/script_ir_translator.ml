@@ -169,6 +169,11 @@ let set_fold
   = fun f (module Box) ->
     Box.OPS.fold f Box.boxed
 
+let set_size
+  : type elt. elt set -> Script_int.n Script_int.num =
+  fun (module Box) ->
+    Script_int.(abs (of_int (Box.OPS.cardinal Box.boxed)))
+
 let map_key_ty
   : type a b. (a, b) map -> a comparable_ty
   = fun (module Box) -> Box.key_ty
@@ -216,6 +221,11 @@ let map_fold
   : type key value acc. (key -> value -> acc -> acc) -> (key, value) map -> acc -> acc
   = fun f (module Box) ->
     Box.OPS.fold f Box.boxed
+
+let map_size
+  : type key value. (key, value) map -> Script_int.n Script_int.num =
+  fun (module Box) ->
+    Script_int.(abs (of_int (Box.OPS.cardinal Box.boxed)))
 
 (* ---- Unparsing (Typed IR -> Untyped epressions) --------------------------*)
 
@@ -927,6 +937,9 @@ and parse_instr
         let ty = ty_of_comparable_ty elt in
         check_item_ty ty v loc "UPDATE" 1 3 >>=? fun (Eq _) ->
         return (typed loc (Set_update, Item_t (Set_t elt, rest)))
+    | Prim (loc, "SIZE", []),
+      Item_t (Set_t _, rest) ->
+        return (typed loc (Set_size, Item_t (Nat_t, rest)))
     (* maps *)
     | Prim (loc, "EMPTY_MAP", [ tk ; tv ]),
       stack ->
@@ -964,6 +977,9 @@ and parse_instr
         check_item_ty vk k loc "UPDATE" 1 3 >>=? fun (Eq _) ->
         check_item_ty vv v loc "UPDATE" 2 3 >>=? fun (Eq _) ->
         return (typed loc (Map_update, Item_t (Map_t (ck, v), rest)))
+    | Prim (loc, "SIZE", []),
+      Item_t (Map_t (_, _), rest) ->
+        return (typed loc (Map_size, Item_t (Nat_t, rest)))
     (* control *)
     | Seq (loc, []),
       stack ->
@@ -1275,7 +1291,7 @@ and parse_instr
     | Prim (loc, ("DROP" | "DUP" | "SWAP" | "SOME" | "UNIT"
                  | "PAIR" | "CAR" | "CDR" | "CONS"
                  | "MEM" | "UPDATE" | "MAP" | "REDUCE"
-                 | "GET" | "EXEC" | "FAIL"
+                 | "GET" | "EXEC" | "FAIL" | "SIZE"
                  | "CONCAT" | "ADD" | "SUB"
                  | "MUL" | "EDIV" | "OR" | "AND" | "XOR"
                  | "NOT"
@@ -1343,7 +1359,7 @@ and parse_instr
           [ "DROP" ; "DUP" ; "SWAP" ; "SOME" ; "UNIT" ;
             "PAIR" ; "CAR" ; "CDR" ; "CONS" ;
             "MEM" ; "UPDATE" ; "MAP" ; "REDUCE" ;
-            "GET" ; "EXEC" ; "FAIL" ;
+            "GET" ; "EXEC" ; "FAIL" ; "SIZE" ;
             "CONCAT" ; "ADD" ; "SUB" ;
             "MUL" ; "EDIV" ; "OR" ; "AND" ; "XOR" ;
             "NOT" ;

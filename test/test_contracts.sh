@@ -102,6 +102,20 @@ assert_output $CONTRACT_PATH/set_member.tz '(Set)' '"Hi"' 'False'
 assert_output $CONTRACT_PATH/set_member.tz '(Set "Hi")' '"Hi"' 'True'
 assert_output $CONTRACT_PATH/set_member.tz '(Set "Hello" "World")' '""' 'False'
 
+# Set size
+assert_output $CONTRACT_PATH/set_size.tz Unit '(Set)' 0
+assert_output $CONTRACT_PATH/set_size.tz Unit '(Set 1)' 1
+assert_output $CONTRACT_PATH/set_size.tz Unit '(Set 1 2 3)' 3
+assert_output $CONTRACT_PATH/set_size.tz Unit '(Set 1 2 3 4 5 6)' 6
+
+# Map size
+assert_output $CONTRACT_PATH/map_size.tz Unit '(Map)' 0
+assert_output $CONTRACT_PATH/map_size.tz Unit '(Map (Item "a" 1))' 1
+assert_output $CONTRACT_PATH/map_size.tz Unit \
+              '(Map (Item "a" 1) (Item "b" 2) (Item "c" 3))' 3
+assert_output $CONTRACT_PATH/map_size.tz Unit \
+              '(Map (Item "a" 1) (Item "b" 2) (Item "c" 3) (Item "d" 4) (Item "e" 5) (Item "f" 6))' 6
+
 # Contains all elements -- does the second list contain all of the same elements
 # as the first one? I'm ignoring element multiplicity
 assert_output $CONTRACT_PATH/contains_all.tz \

@@ -146,6 +146,7 @@ and ('bef, 'aft) instr =
       ('elt * ('elt set * 'rest), bool * 'rest) instr
   | Set_update :
       ('elt * (bool * ('elt set * 'rest)), 'elt set * 'rest) instr
+  | Set_size : ('a set * 'rest, n num * 'rest) instr
   (* maps *)
   | Empty_map : 'a comparable_ty * 'v ty ->
     ('rest, ('a, 'v) map * 'rest) instr
@@ -160,6 +161,7 @@ and ('bef, 'aft) instr =
       ('a * (('a, 'v) map * 'rest), 'v option * 'rest) instr
   | Map_update :
       ('a * ('v option * (('a, 'v) map * 'rest)), ('a, 'v) map * 'rest) instr
+  | Map_size : (('a, 'b) map * 'rest, n num * 'rest) instr
   (* string operations *)
   | Concat :
       (string * (string * 'rest), string * 'rest) instr

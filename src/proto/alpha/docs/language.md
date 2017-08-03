@@ -768,6 +768,11 @@ constants as is, concatenate them and use them as keys.
 
         :: lambda (pair 'elt * 'b) 'b : set 'elt : 'b : 'S   ->   'b : 'S
 
+   * `SIZE`:
+     Get the cardinality of the set.
+
+        :: set 'elt : 'S -> nat : 'S
+
 ### Operations on maps
 
    * `EMPTY_MAP 'key 'val`:
@@ -806,6 +811,11 @@ constants as is, concatenate them and use them as keys.
 
         :: lambda (pair (pair 'key 'val) 'b) 'b : map 'key 'val : 'b : 'S   ->   'b : 'S
 
+   * `SIZE`:
+     Get the cardinality of the map.
+
+        :: map 'key 'val : 'S -> nat : 'S
+
 ### Operations on optional values
 
    * `SOME`:
@@ -831,6 +841,7 @@ constants as is, concatenate them and use them as keys.
 
         > IF_NONE ; C / (None) : S   =>    bt ; C / S
         > IF_NONE ; C / (Some a) : S    =>    bf ; C / a : S
+
 
 ### Operations on unions
 
