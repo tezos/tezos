@@ -11,14 +11,14 @@ diff --git a/scripts/alphanet.sh b/scripts/alphanet.sh
  
 -docker_image=docker.io/tezos/tezos:alphanet
 -docker_volume=tezos-alphanet-data$suffix
-+docker_image=docker.io/tezos/tezos:alphanet_next
-+docker_volume=tezos-alphanet-next-data$suffix
++docker_image=docker.io/tezos/tezos:zeronet
++docker_volume=tezos-zeronet-data$suffix
  suffix=
  
 -data_dir="$HOME/.tezos-alphanet$suffix"
 -docker_container="tezos-alphanet$suffix"
-+data_dir="$HOME/.tezos-alphanet-next$suffix"
-+docker_container="tezos-alphanet-next$suffix"
++data_dir="$HOME/.tezos-zeronet$suffix"
++docker_container="tezos-zeronet$suffix"
  
  
  ## Saving state ############################################################
