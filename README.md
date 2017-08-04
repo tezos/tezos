@@ -23,7 +23,7 @@ configuration related to your project. This is necessary so that the project
 doesn't conflict with other OCaml projects or other versions of Tezos.
 
 ```
-opam switch tezos --alias-of 4.04.0
+opam switch tezos --alias-of 4.04.2
 ```
 
 Activate the new switch:
