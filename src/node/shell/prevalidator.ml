@@ -116,9 +116,6 @@ let create net_db =
             (fun h ->
                Distributed_db.Operation.read_opt net_db h >>= function
                | Some po when Block_hash.Set.mem po.shell.branch !live_blocks ->
-                   (* FIXME add the operation on a bounded set of
-                            to-be-ignored operations.*)
-                   Distributed_db.Operation.clear net_db h ;
                    Lwt.return_some (h, po)
                | Some _ | None -> Lwt.return_none)
             (Operation_hash.Set.elements ops) >>= fun rops ->
@@ -191,6 +188,7 @@ let create net_db =
                       ~sort:true rops >>= fun (state, res) ->
                     let register h =
                       let op = Operation_hash.Map.find h ops in
+                      live_operations := Operation_hash.Set.add h !live_operations ;
                       Distributed_db.inject_operation
                         net_db h op >>=? fun (_ : bool) ->
                       return () in
