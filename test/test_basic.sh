@@ -2,7 +2,7 @@
 
 set -e
 
-source test-utils.sh
+source test_utils.sh
 
 ${TZCLIENT} list known identities
 
