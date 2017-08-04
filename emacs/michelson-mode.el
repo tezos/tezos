@@ -1,5 +1,7 @@
 ;; Major mode for editing Michelson smart contracts.
 
+(require 'cl)
+
 (defvar michelson-mode-hook nil)
 
 (defgroup michelson nil
@@ -12,7 +14,7 @@
   :prefix "michelson-"
   :group 'michelson)
 
-(defcustom michelson-mode-client-command "tezos-client"
+(defcustom michelson-client-command "tezos-client"
   "Path to the `tezos-client' binary."
   :type 'string
   :group 'michelson-options)
@@ -27,6 +29,21 @@
   :prefix "michelson-"
   :group 'michelson
   :group 'faces)
+
+(defcustom michelson-live-editing t
+  "Toggles live types and error printing.
+Overrides `michelson-print-errors' and `michelson-highlight-errors'"
+  :group 'michelson-options)
+
+(defcustom michelson-print-errors t
+  "Print the errors in the output buffer."
+  :type 'boolean
+  :group 'michelson-options)
+
+(defcustom michelson-highlight-errors t
+  "Highlight errors in the source buffer."
+  :type 'boolean
+  :group 'michelson-options)
 
 (defvar michelson-face-instruction
   'michelson-face-instruction
@@ -47,6 +64,7 @@
 (defvar michelson-face-constant
   'michelson-face-constant
   "Face name for Michelson constants.")
+
 (defface michelson-face-constant
    '((t (:inherit 'font-lock-constant-face)))
    "Face for Michelson constants."
@@ -68,9 +86,19 @@
    "Face for Michelson comments."
    :group 'michelson-faces)
 
+(defvar michelson-face-declaration
+  'michelson-face-declaration
+  "Face name for Michelson declarations.")
+
+(defface michelson-face-declaration
+   '((t (:inherit 'font-lock-keyword-face)))
+   "Face for Michelson constants."
+   :group 'michelson-faces)
+
 (defvar michelson-face-error
   'michelson-face-error
   "Face name for Michelson comments.")
+
 (defface michelson-face-error
   '(( ((class color) (background light)) (:background "MistyRose") )
     ( ((class color) (background dark)) (:background "DarkRed") ))
@@ -86,6 +114,14 @@
   "Open the face customization group for Michelson mode."
   (interactive)
   (customize-group-other-window `michelson-faces))
+
+(defun michelson-toggle-print-errors ()
+  (interactive)
+  (setq michelson-print-errors (not michelson-print-errors)))
+
+(defun michelson-highlight-errors ()
+  (interactive)
+  (setq michelson-highlight-errors (not michelson-highlight-errors)))
 
 (defconst michelson-mode-map
   (let ((michelson-mode-map (make-sparse-keymap)))
@@ -125,6 +161,8 @@
     '("\\<[A-Z][a-z_0-9]+\\>" . michelson-face-constant)
     '("\\<[A-Z][A-Z_0-9]*\\>" . michelson-face-instruction)
     '("\\<\$[A-Za-z-_0-9]*\\>" . michelson-face-annotation)
+    ;; This will have problems if users have whitespace in front of the declarations
+    '("^parameter\\|^return\\|^storage\\|^code" . michelson-face-declaration)
     '("\\<[a-z][a-z_0-9]*\\>" . michelson-face-type))
    nil nil nil nil
    '(font-lock-syntactic-face-function . michelson-font-lock-syntactic-face-function)))
@@ -296,68 +334,157 @@
                 (michelson-goto-previous-token)))))
     (display-message-or-buffer message "*Michelson*")))
 
-(defun michelson-type-at-point ()
-  "Display the type of the expression under the cursor."
-  (interactive)
-  (let ((tmp-file (make-temp-file (buffer-name))))
+(cl-defstruct cache
+  "Cache for types. Invalid entries are removed"
+  types
+  errors)
+
+(defvar michelson-cached-buffer-info (make-cache :types '() :errors '()))
+
+(defvar michelson-process-output-buffer "*Michelson-process*")
+
+(defun michelson-erase-process-buffer ()
+  "Remove all text from process buffer."
+  (get-buffer-create michelson-process-output-buffer)
+  (with-current-buffer michelson-process-output-buffer
+    (erase-buffer)))
+
+(defun michelson-async-command-to-string (command callback)
+  "Asynchronously execute `COMMAND' and call the `CALLBACK' on the resulting string."
+  (lexical-let ((callback-fun callback))
+    (michelson-erase-process-buffer)
+    (set-process-sentinel
+     (start-process-shell-command
+      "michelson-shell-process"
+      michelson-process-output-buffer
+      command)
+     (lambda (process signal)
+       (let ((output
+              (with-current-buffer michelson-process-output-buffer
+                (buffer-string))))
+         (funcall callback-fun output))))))
+
+(defun michelson-clean-cache ()
+  "Clean the buffer's program info cache."
+  (let ((types (cache-types michelson-cached-buffer-info))
+        (errors (cache-errors michelson-cached-buffer-info))
+        (clean-cache-entry
+         (lambda (alist)
+           (remove-if (lambda (entry)
+                        (let ((tok-end (cadr entry)))
+                          (> tok-end (point))))
+                      alist))))
+    (setq michelson-cached-buffer-info
+          (make-cache :types (funcall clean-cache-entry types)
+                      :errors (funcall clean-cache-entry errors)))))
+
+(defun michelson-get-info (buffer-name)
+  "Refresh the info about the program in `BUFFER-NAME' from the command."
+  (lexical-let ((tmp-file (make-temp-file buffer-name)))
     (write-region (point-min) (point-max) tmp-file nil 'no-message)
-    (let* ((command (concat
-                     (if michelson-alphanet "ALPHANET_EMACS=true " "")
-                     michelson-mode-client-command
-                     " typecheck program "
-                     (if michelson-alphanet
-                         (concat "container:" buffer-file-name)
-                       buffer-file-name)
-                     " -details -emacs"))
-           (stdout
-            (shell-command-to-string command))
-           (record
-            (car (read-from-string stdout)))
-           (errors
-            (cdr (assoc 'errors record)))
-           (types
-            (cdr (assoc 'types record)))
-           (message ""))
-      (delete-file tmp-file)
-      (remove-overlays)
-      (setq message "")
-      (dolist (elt types)
-        (if (and (<= (car elt) (point)) (<= (point) (cadr elt))
-                 (equal (get-text-property (point) 'face)
-                        'michelson-face-instruction))
-            (setq message (cadr (cdr elt)))))
+    (let ((command (concat
+                    "ALPHANET_EMACS=true "
+                    "TEZOS_ALPHANET_DO_NOT_PULL=yes "
+                    michelson-client-command
+                    " typecheck program "
+                    (let ((file-name
+                           (make-temp-file (buffer-name))))
+                      (write-region (point-min) (point-max) file-name nil 'no-message)
+                      (if michelson-alphanet
+                          (concat "container:" file-name)
+                        file-name))
+                    " -details -emacs")))
+      (michelson-async-command-to-string
+       command
+       (lambda (output)
+         (condition-case err
+             (let*
+                 ((record (car (read-from-string output)))
+                  (errors (cdr (assoc 'errors record)))
+                  (types  (cdr (assoc 'types record))))
+               (setq michelson-cached-buffer-info (make-cache :types types :errors errors)))
+           ((error err)
+            (let ((inhibit-message t))
+              (message output)))))))))
+
+(defvar michelson-output-buffer-name
+  "*Michelson*")
+
+(defun michelson-write-output-buffer (data)
+  "Write the given `DATA' to the output buffer."
+  (lexical-let*
+      ((buffer (get-buffer-create michelson-output-buffer-name))
+       (message-window
+        (if (get-buffer-window buffer)
+            (get-buffer-window buffer)
+          (display-buffer-below-selected buffer nil)))
+       (lines 0))
+    (when (get-buffer-window buffer)
+      (set-window-dedicated-p (get-buffer-window buffer) t))
+    (save-excursion
+      (set-buffer michelson-output-buffer-name)
+      (read-only-mode -1)
+      (erase-buffer)
+      (insert data)
+      (read-only-mode 1)
+      (goto-char (point-min))
+      (while (not (eobp))
+        (vertical-motion 1)
+        (setq lines (+ 1 lines)))
+      (window-resize
+       message-window
+       (min (- (window-total-height) 5)
+            (+ (- (max 4 lines)
+                  (window-size message-window))
+               2))))))
+
+(defun michelson-show-program-info (types errors)
+  "Show the program's `TYPES' and `ERRORS'."
+  (interactive)
+  (remove-overlays)
+  (lexical-let ((types-info nil)
+                (errors-info nil))
+    (dolist (elt types)
+      (if (and (<= (car elt) (point)) (<= (point) (cadr elt))
+               (equal (get-text-property (point) 'face)
+                      'michelson-face-instruction))
+          (setq types-info (cadr (cdr elt)))))
+    (when michelson-highlight-errors
       (dolist (elt errors)
         (overlay-put (make-overlay (car elt) (cadr elt)) 'face 'michelson-face-error)
         (if (and (<= (car elt) (point)) (<= (point) (cadr elt)))
             (progn
-              (if (string= "" message)
-                  nil
-                (setq message (concat message "\n")))
-              (setq message (concat message (cadr (cdr elt)))))))
-      (if (string= message "")
-          (setq message "\n  No instruction at point."))
-      (let
-          ((message-window
-            (display-buffer-below-selected
-             (get-buffer-create "*Michelson*") nil))
-           (lines 0))
-        (save-excursion
-          (set-buffer "*Michelson*")
-          (toggle-read-only nil)
-          (erase-buffer)
-          (insert message)
-          (toggle-read-only t)
-          (beginning-of-buffer)
-          (while (not (eobp))
-            (vertical-motion 1)
-            (setq lines (+ 1 lines)))
-          (window-resize
-           message-window
-           (+ (- (max 4 lines)
-                 (window-size message-window)) 1)))))))
+              (when michelson-print-errors
+                (unless errors-info
+                  (setq errors-info (concat errors-info "\n")))
+                (setq errors-info (concat errors-info (cadr (cdr elt)))))))))
+    (michelson-write-output-buffer
+     (cond ((not (or types-info types-info)) "\n  No instruction at point.\n")
+           ((and errors-info (not types-info)) errors-info)
+           (t (concat types-info "\n\n" errors-info))))))
+
+(defun michelson-type-at-point ()
+  "Display the type of the expression under the cursor."
+  (interactive)
+  (michelson-get-info (buffer-name))
+  (let ((types (cache-types michelson-cached-buffer-info))
+        (errors (cache-errors michelson-cached-buffer-info)))
+    (michelson-show-program-info types errors)))
+
+(defun michelson-toggle-live-editing ()
+  "Toggle `michelson-live-editing'.
+Enables or disables stack and error display."
+  (interactive)
+  (when (and michelson-live-editing
+             (get-buffer michelson-output-buffer-name))
+    (save-excursion
+      (set-buffer michelson-output-buffer-name)
+      (kill-buffer-and-window)))
+  (setq michelson-live-editing (not michelson-live-editing)))
 
 (defun michelson-update-minibuffer-info ()
-  (when (nth 2 michelson-state) (cancel-timer (nth 2 michelson-state)))
+  (when (nth 2 michelson-state)
+    (cancel-timer (nth 2 michelson-state)))
   (setf
    (nth 2 michelson-state)
    (run-at-time
@@ -365,7 +492,8 @@
     (lambda (buffer)
       (with-current-buffer buffer
         (setf (nth 2 michelson-state) nil)
-        (when (not (= (nth 0 michelson-state) (point)))
+        (when (and (not (= (nth 0 michelson-state) (point)))
+                   michelson-live-editing)
           (setf (nth 0 michelson-state) (point))
           (michelson-type-at-point))))
     (current-buffer))))
@@ -388,12 +516,16 @@
   (set
    (make-local-variable 'michelson-state)
    (list 0 0 nil))
+  (set (make-local-variable 'michelson-cached-buffer-info)
+       (make-cache :types nil
+                   :errors nil))
   (add-to-list
    (make-local-variable 'pre-command-hook)
    'michelson-update-minibuffer-info)
   (add-to-list
    (make-local-variable 'focus-in-hook)
    'michelson-update-minibuffer-info)
+  (add-hook 'post-self-insert-hook 'michelson-clean-cache)
   (setq major-mode 'michelson-mode)
   (setq mode-name "Michelson")
   (setq indent-tabs-mode nil)
