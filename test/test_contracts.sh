@@ -2,7 +2,7 @@
 
 set -e
 
-source test-utils.sh
+source test_utils.sh
 
 CONTRACT_PATH=contracts
 

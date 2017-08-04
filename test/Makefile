@@ -27,7 +27,7 @@ ${addprefix clean-,${DIR}}: clean-%:
 	${MAKE} -C $* clean
 
 run-basic.sh:
-	./test-basic.sh
+	./test_basic.sh
 
 run-contracts.sh:
-	./test-contracts.sh
+	./test_contracts.sh
