@@ -22,25 +22,25 @@ configuration, including the OCaml compiler, all packages, and package manager
 configuration related to your project. This is necessary so that the project
 doesn't conflict with other OCaml projects or other versions of Tezos.
 
-```
+```shell
 opam switch tezos --alias-of 4.04.2
 ```
 
 Activate the new switch:
 
-```
+```shell
 eval `opam config env`
 ```
 
 Install Tezos dependencies:
 
-```
+```shell
 make build-deps
 ```
 
 Compile the project:
 
-```
+```shell
 make
 ```
 
@@ -68,7 +68,7 @@ Running the node in a sandbox
 
 To run a single instance of a Tezos node in sandbox mode:
 
-```
+```shell
 ./tezos-node run --sandbox --rpc-addr localhost:8732
 ```
 
@@ -88,7 +88,7 @@ limited support abilities at the moment but we'll try to help you best we can).
 Use the following command to run a node that will accept incoming
 connections:
 
-```
+```shell
 ./tezos-node identity generate 24.
 ```
 
@@ -108,7 +108,7 @@ command line. For instance, if `$dir/config.json` does not exist, the following
 command will generate it and replace the default values with the values from
 the command line:
 
-```
+```shell
 ./tezos-node run --data-dir "$dir" --net-addr localhost:9733
 ```
 
@@ -119,7 +119,7 @@ If this mechanism is not sufficient, one can provide Tezos with a list of
 initial peers, either by editing the option `net.bootstrap-peers` in the
 `config.json` file, or by specifying a command line parameter:
 
-```
+```shell
 ./tezos-node run \
              --data-dir "$dir" --net-addr localhost:2023 \
              --peer localhost:2021 --peer localhost:2022
@@ -131,7 +131,7 @@ existing `"$dir"/config.json` file. But, you may explicit ask the node
 to reset or to update the file according to the command line parameters
 with the following commands line:
 
-```
+```shell
 ./tezos-node config reset --data-dir "$dir" --net-addr localhost:9733
 ./tezos-node config update --data-dir "$dir" --net-addr localhost:9734
 ```
@@ -147,12 +147,12 @@ configuration file would not parse. They are just provided here to
 help writing your own configuration file if needed.
 
 
-```
+```javascript
 {
 
   /* Location of the data dir on disk. */
 
-  "data-dir": "/home/tezos/my_data_dir"
+  "data-dir": "/home/tezos/my_data_dir",
 
   /* Configuration of net parameters */
 
@@ -290,7 +290,7 @@ default and it must be explicitely activated with the `--rpc-addr` option.
 Typically, if you are not trying to run a local network and just want to
 explore the RPC, you would run:
 
-```
+```shell
 ./tezos-node run --sandbox --rpc-addr localhost
 ```
 
@@ -298,28 +298,28 @@ The RPC interface is self-documented and the `tezos-client` executable is able
 to pretty-print the RPC API. For instance, to see the API provided by the Tezos
 Shell:
 
-```
+```shell
 ./tezos-client rpc list
 ```
 
 To get API attached to the "genesis" block, including the remote procedures
 provided by the associated economic protocol version:
 
-```
+```shell
 ./tezos-client rpc list /blocks/genesis/
 ```
 
 You might also want the JSON schema describing the expected input and output of
 a RPC. For instance:
 
-```
+```shell
 ./tezos-client rpc schema /blocks/genesis/hash
 ```
 
 Note: you can get the same information, but as a raw JSON object, with a simple
 HTTP request:
 
-```
+```shell
 wget --post-data '{ "recursive": true }' -O - http://localhost:8732/describe
 wget --post-data '{ "recursive": true }' -O - http://localhost:8732/describe/blocks/genesis
 wget -O - http://localhost:8732/describe/blocks/genesis/hash
