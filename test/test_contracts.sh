@@ -192,3 +192,12 @@ init_with_transfer $CONTRACT_PATH/create_contract.tz ${KEY2} \
                    "\"$(get_contract_addr test_transfer_account1)\"" 1000 bootstrap1
 ${TZCLIENT} transfer 0.00 from bootstrap1 to create_contract -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
 assert_storage_contains create_contract '"abcdefg"'
+
+# Test DEFAULT_ACCOUNT
+init_with_transfer $CONTRACT_PATH/default_account.tz ${KEY1} \
+				   Unit 1000 bootstrap1
+${TZCLIENT} transfer 0.00 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\""
+assert_balance $BOOTSTRAP4_IDENTITY "4,000,100.00 ꜩ"
+account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
+${TZCLIENT} transfer 0.00 from bootstrap1 to default_account  -arg "\"$account\""
+assert_balance $account "100.00 ꜩ"

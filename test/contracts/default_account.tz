@@ -1,5 +1,5 @@
-parameter key
-return unit
-storage unit
+parameter key;
+return unit;
+storage unit;
 code {DIP{UNIT}; CAR; DEFAULT_ACCOUNT;
-      PUSH tez "100"; UNIT; TRANSFER_TOKENS; PAIR}
+      PUSH tez "100.00"; UNIT; TRANSFER_TOKENS; PAIR}
