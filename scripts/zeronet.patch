@@ -20,8 +20,8 @@ diff --git a/scripts/alphanet.sh b/scripts/alphanet.sh
 +data_dir="$HOME/.tezos-zeronet$suffix"
 +docker_container="tezos-zeronet$suffix"
  
- 
- ## Saving state ############################################################
+ if [ $ALPHANET_EMACS ]; then
+     interactive_flags="-t"
 diff --git a/src/node/main/node_config_file.ml b/src/node/main/node_config_file.ml
 --- a/src/node/main/node_config_file.ml
 +++ b/src/node/main/node_config_file.ml

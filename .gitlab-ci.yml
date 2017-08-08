@@ -31,15 +31,7 @@ build:
     ## Building dependencies...
     - ./scripts/create_docker_image.build_deps.sh
         "build_deps" "${CI_BUILD_REF}"
-        "${CI_REGISTRY_IMAGE}/build_deps:${CI_BUILD_REF_NAME}"
-        "${CI_REGISTRY_IMAGE}/build_deps:master"
-    ## Saving the docker image...
-    - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] &&
-         [ "${CI_BUILD_REF_NAME}" = "master" ] ; then
-        docker tag "build_deps:${CI_BUILD_REF}"
-                   "${CI_REGISTRY_IMAGE}/build_deps:master" ;
-        docker push "${CI_REGISTRY_IMAGE}/build_deps:master" ;
-      fi
+        "${CI_REGISTRY_IMAGE}/build_deps"
     ## Preparing sources for the alphanet or the zeronet...
     - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
         ./scripts/apply_patch.sh "${CI_BUILD_REF_NAME}" ;
@@ -142,6 +134,9 @@ publish:docker:minimal:
     - zeronet@tezos/tezos
   script:
     - docker pull "${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}"
+    - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
+        ./scripts/apply_patch.sh "${CI_BUILD_REF_NAME}" ;
+      fi
     - ./scripts/create_docker_image.minimal.sh
         "${public_docker_image}" "${CI_BUILD_REF_NAME}"
         "${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}"
@@ -185,41 +180,57 @@ publish:github:
          HEAD
     - git push git@github.com:tezos/tezos.git -f HEAD:${CI_BUILD_REF_NAME}
 
-deploy:alphanet:
+
+## Relaunching the bootstrap servers of the alphanet.zeronet
+
+.bootstrap_template: &bootstrap_definition
   image: ocaml/opam
   stage: deploy
   only:
     - alphanet@tezos/tezos
-  script:
+    - zeronet@tezos/tezos
+  before_script:
     - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - echo "${CI_PK_ALPHANET}" | tr -d "\r" > ~/.ssh/id_ed25519
-    - echo "${CI_SSH_CONFIG}" | tr -d "\r" > ~/.ssh/ssh_config
+    - if [ "${CI_BUILD_REF_NAME}" = "alphanet" ]; then
+        echo "${CI_PK_ALPHANET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
+      else
+        echo "${CI_PK_ZERONET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
+      fi
+    - echo "${CI_SSH_CONFIG}" | tr -d "\r" > ~/.ssh/config
     - chmod 600 ~/.ssh/id_ed25519
-    - ssh -t bootstrap1
-    - ssh -t bootstrap2
-    - ssh -t bootstrap3
-    - ssh -t bootstrap4
-    - ssh -t bootstrap5
-    - ssh -t bootstrap6
   allow_failure: true
 
-deploy:zeronet:
-  image: ocaml/opam
-  stage: deploy
-  only:
-    - zeronet@tezos/tezos
+deploy:bootstrap1:
+  <<: *bootstrap_definition
   script:
-    - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - echo "${CI_PK_ZERONET}" | tr -d "\r" > ~/.ssh/id_ed25519
-    - echo "${CI_SSH_CONFIG}" | tr -d "\r" > ~/.ssh/ssh_config
-    - chmod 600 ~/.ssh/id_ed25519
-    - ssh -t bootstrap1
-    - ssh -t bootstrap2
-    - ssh -t bootstrap3
-    - ssh -t bootstrap4
-    - ssh -t bootstrap5
-    - ssh -t bootstrap6
-  allow_failure: true
+    - ssh bootstrap1
+
+deploy:bootstrap2:
+  <<: *bootstrap_definition
+  script:
+    - ssh bootstrap2
+
+deploy:bootstrap3:
+  <<: *bootstrap_definition
+  script:
+    - ssh bootstrap3
+
+deploy:bootstrap4:
+  <<: *bootstrap_definition
+  script:
+    - ssh bootstrap4
+
+deploy:bootstrap5:
+  <<: *bootstrap_definition
+  script:
+    - ssh bootstrap5
+
+deploy:bootstrap6:
+  <<: *bootstrap_definition
+  script:
+    - ssh bootstrap6
+
+## Cleanup...
 
 cleanup:
   <<: *dind_definition
