@@ -432,7 +432,7 @@ assert_uptodate() {
 
 update_script() {
     pull_image
-    tmp="$(docker run --rm -dit --entrypoint /bin/true "$docker_image")"
+    tmp="$(docker run --rm -dit --entrypoint /bin/sleep "$docker_image" 20)"
     docker cp "$tmp:home/tezos/scripts/alphanet.sh" ".alphanet.sh.new"
     docker stop "$tmp" > /dev/null
     if ! diff .alphanet.sh.new  "$0" >/dev/null 2>&1 ; then

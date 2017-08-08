@@ -26,19 +26,21 @@ sed scripts/Dockerfile.build_deps.in \
     -e 's|$ocaml_version|'"$ocaml_version"'|g' > Dockerfile
 
 ## Lookup for for prebuilt dependencies...
-base_layers=$(docker inspect --format="{{ .RootFS.Layers }}" --type=image $base_image | tr -d '[]')
-same() {
-    docker run --rm "$1" cat /home/opam/$2 | diff -wq $2 -
-}
+dependencies="scripts/install_build_deps.sh src/tezos-deps.opam Dockerfile"
+dependencies_sha1=$(docker inspect --format="{{ .RootFS.Layers }}" --type=image $base_image | sha1sum - $dependencies | sha1sum | tr -d ' -')
 for cached_image in "$@"; do
-    if ! docker pull $cached_image; then continue; fi
-    cached_base_layers=$(docker inspect --format="{{ .RootFS.Layers }}" --type=image $cached_image | tr -d '[]')
-    if [ "${cached_base_layers##$base_layers}" = "$cached_base_layers" ]; then continue; fi
-    if ! same "$cached_image" scripts/install_build_deps.sh ; then continue ; fi
-    if ! same "$cached_image" src/tezos-deps.opam ; then continue ; fi
-    if ! same "$cached_image" Dockerfile ; then continue ; fi
-    docker tag "$cached_image" "$image_name:$image_version"
-    exit 0
+    echo
+    echo "### Looking for prebuilt dependencies ($cached_image)..."
+    if docker pull "$cached_image:$dependencies_sha1"; then
+        echo
+        echo "### Found $cached_image:$dependencies_sha1"
+        echo
+        docker tag "$cached_image:$dependencies_sha1" \
+                   "$image_name:$image_version"
+        exit 0
+    fi
+    echo "### Missing..."
+    echo
 done
 
 echo
@@ -52,3 +54,12 @@ rm Dockerfile
 echo
 echo "### Succesfully build docker image: $image_name:$image_version"
 echo
+
+for cached_image in "$@"; do
+    echo
+    echo "### Saving socker image ($cached_image)..."
+    echo
+    docker tag "$image_name:$image_version" \
+               "$cached_image:$dependencies_sha1"
+    docker push "$cached_image:$dependencies_sha1"
+done
