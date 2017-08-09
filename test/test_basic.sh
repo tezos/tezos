@@ -4,6 +4,12 @@ set -e
 
 source test_utils.sh
 
+start_sandboxed_node
+sleep 3
+activate_alpha
+
+add_bootstrap_identities
+
 ${TZCLIENT} list known identities
 
 ${TZCLIENT} transfer 1000 from bootstrap1 to ${KEY1}

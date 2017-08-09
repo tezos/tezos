@@ -123,6 +123,11 @@ test:contracts.sh:
   script:
     - make -C test run-contracts.sh
 
+test:multinode.sh:
+  <<: *test_definition
+  script:
+    - make -C test run-multinode.sh
+
 ## Publishing (small) docker images with tezos binaries
 
 publish:docker:minimal:
