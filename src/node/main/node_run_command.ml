@@ -20,6 +20,8 @@ let genesis : State.Net.genesis = {
       "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
 }
 
+type error += Nonlocalhost_sandbox of P2p_types.addr
+
 let (//) = Filename.concat
 
 let store_dir data_dir = data_dir // "store"
@@ -74,43 +76,48 @@ let init_node ?sandbox (config : Node_config_file.t) =
             | Ok json ->
                 Lwt.return (Some (patch_context (Some json)))
   end >>= fun patch_context ->
+  (* TODO "WARN" when pow is below our expectation. *)
   begin
-    match sandbox with
-    | Some _ -> return None
+    match config.net.listen_addr with
     | None ->
-        Node_identity_file.read
-          (config.data_dir //
-           Node_identity_file.default_name) >>=? fun identity ->
-        lwt_log_notice
-          "Peer's global id: %a"
-          P2p.Peer_id.pp identity.peer_id >>= fun () ->
-        (* TODO "WARN" when pow is below our expectation. *)
-        begin
-          match config.net.listen_addr with
-          | None ->
-              lwt_log_notice "Not listening to RPC calls." >>= fun () ->
-              return (None, None)
-          | Some addr ->
-              Node_config_file.resolve_listening_addrs addr >>= function
-              | [] ->
-                  failwith "Cannot resolve RPC listening address: %S" addr
-              | (addr, port) :: _ -> return (Some addr, Some port)
-        end >>=? fun (listening_addr, listening_port) ->
-        Node_config_file.resolve_bootstrap_addrs
-          config.net.bootstrap_peers >>= fun trusted_points ->
-        let p2p_config : P2p.config =
-          { listening_addr ;
-            listening_port ;
-            trusted_points ;
-            peers_file =
-              (config.data_dir // "peers.json") ;
-            closed_network = config.net.closed ;
-            identity ;
-            proof_of_work_target =
-              Crypto_box.make_target config.net.expected_pow ;
-          }
-        in
-        return (Some (p2p_config, config.net.limits))
+        lwt_log_notice "Not listening to P2P calls." >>= fun () ->
+        return (None, None)
+    | Some addr ->
+        Node_config_file.resolve_listening_addrs addr >>= function
+        | [] ->
+            failwith "Cannot resolve P2P listening address: %S" addr
+        | (addr, port) :: _ -> return (Some addr, Some port)
+  end >>=? fun (listening_addr, listening_port) ->
+  begin
+    match listening_addr, sandbox with
+    | Some addr, Some _
+      when Ipaddr.V6.(compare addr unspecified) = 0 ->
+        return None
+    | Some addr, Some _ when Ipaddr.V6.(compare addr localhost) != 0 ->
+        fail (Nonlocalhost_sandbox addr)
+    | None, Some _ -> return None
+    | _ ->
+        (Node_config_file.resolve_bootstrap_addrs
+           config.net.bootstrap_peers) >>= fun trusted_points ->
+          Node_identity_file.read
+            (config.data_dir //
+             Node_identity_file.default_name) >>=? fun identity ->
+          lwt_log_notice
+            "Peer's global id: %a"
+            P2p.Peer_id.pp identity.peer_id >>= fun () ->
+          let p2p_config : P2p.config =
+            { listening_addr ;
+              listening_port ;
+              trusted_points ;
+              peers_file =
+                (config.data_dir // "peers.json") ;
+              closed_network = config.net.closed ;
+              identity ;
+              proof_of_work_target =
+                Crypto_box.make_target config.net.expected_pow ;
+            }
+          in
+          return (Some (p2p_config, config.net.limits))
   end >>=? fun p2p_config ->
   let node_config : Node.config = {
     genesis ;
@@ -186,7 +193,18 @@ let process sandbox verbosity args =
     | [_] -> Some Logging.Info
     | _ -> Some Logging.Debug in
   let run =
-    Node_shared_arg.read_and_patch_config_file args >>=? fun config ->
+    Node_shared_arg.read_and_patch_config_file
+      ~ignore_bootstrap_peers:(match sandbox with
+          | Some _ -> true
+          | None -> false)
+      args >>=? fun config ->
+    begin match sandbox with
+      | Some _ ->
+          if config.data_dir = Node_config_file.default_data_dir
+          then failwith "Cannot use default data directory while in sandbox mode"
+          else return ()
+      | None -> return ()
+    end >>=? fun () ->
     Lwt_utils.Lock_file.is_locked
       (lock_file config.data_dir) >>=? function
     | false ->
@@ -210,7 +228,8 @@ module Term = struct
   let sandbox =
     let open Cmdliner in
     let doc =
-      "Run the daemon in sandbox mode. P2P is disabled, and constants of \
+      "Run the daemon in sandbox mode. \
+       P2P to non-localhost addressses are disabled, and constants of \
        the economic protocol can be altered with an optional JSON file. \
        $(b,IMPORTANT): Using sandbox mode affects the node state and \
        subsequent runs of Tezos node must also use sandbox mode. \

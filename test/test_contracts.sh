@@ -4,6 +4,15 @@ set -e
 
 source test_utils.sh
 
+start_sandboxed_node
+sleep 3
+
+activate_alpha
+
+add_bootstrap_identities
+
+printf "\n\n"
+
 CONTRACT_PATH=contracts
 
 # FORMAT: assert_output contract_file storage input expected_result
@@ -201,3 +210,5 @@ assert_balance $BOOTSTRAP4_IDENTITY "4,000,100.00 ꜩ"
 account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
 ${TZCLIENT} transfer 0.00 from bootstrap1 to default_account  -arg "\"$account\""
 assert_balance $account "100.00 ꜩ"
+
+printf "\nEnd of test\n"

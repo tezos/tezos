@@ -31,3 +31,6 @@ run-basic.sh:
 
 run-contracts.sh:
 	./test_contracts.sh
+
+run-multinode.sh:
+	./test_multinode.sh
