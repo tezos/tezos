@@ -750,7 +750,7 @@ constants as is, concatenate them and use them as keys.
    * `MEM`:
      Check for the presence of an element in a set.
 
-        :: 'key : set 'elt : 'S   ->  bool : 'S
+        :: 'elt : set 'elt : 'S   ->  bool : 'S
 
    * `UPDATE`:
      Inserts or removes an element in a set, replacing a previous value.
