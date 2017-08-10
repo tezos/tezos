@@ -1,12 +1,9 @@
 FROM $base_image
 
 COPY src /home/opam/tezos/src
+COPY test /home/opam/tezos/test
 
 RUN sudo chown -R opam /home/opam/tezos && \
     echo "PRODUCTION=yes" > /home/opam/tezos/src/Makefile.local && \
-    opam config exec -- make -C tezos/src -j4
-
-COPY test /home/opam/tezos/test
-
-RUN sudo chown -R opam /home/opam/tezos/test && \
+    opam config exec -- make -C tezos/src -j4 && \
     opam config exec -- make -C tezos/test -j4 build

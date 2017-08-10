@@ -9,10 +9,12 @@ cd "$src_dir"
 . scripts/version.sh
 image_name="${1:-tezos_build_deps}"
 image_version="${2:-latest}"
-shift 2
+cached_image="${3:-}"
 
-base_image="ocaml/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
-docker pull "$base_image"
+base_image="tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
+if ! docker pull "$base_image" ; then
+    ./create_docker_image.alpine.sh
+fi
 
 cleanup () {
     set +e
@@ -28,7 +30,7 @@ sed scripts/Dockerfile.build_deps.in \
 ## Lookup for for prebuilt dependencies...
 dependencies="scripts/install_build_deps.sh src/tezos-deps.opam Dockerfile"
 dependencies_sha1=$(docker inspect --format="{{ .RootFS.Layers }}" --type=image $base_image | sha1sum - $dependencies | sha1sum | tr -d ' -')
-for cached_image in "$@"; do
+if [ ! -z "$cached_image" ]; then
     echo
     echo "### Looking for prebuilt dependencies ($cached_image)..."
     if docker pull "$cached_image:$dependencies_sha1"; then
@@ -41,7 +43,7 @@ for cached_image in "$@"; do
     fi
     echo "### Missing..."
     echo
-done
+fi
 
 echo
 echo "### Building tezos dependencies..."
@@ -55,11 +57,11 @@ echo
 echo "### Succesfully build docker image: $image_name:$image_version"
 echo
 
-for cached_image in "$@"; do
+if [ ! -z "$cached_image" ]; then
     echo
     echo "### Saving socker image ($cached_image)..."
     echo
     docker tag "$image_name:$image_version" \
                "$cached_image:$dependencies_sha1"
     docker push "$cached_image:$dependencies_sha1"
-done
+fi

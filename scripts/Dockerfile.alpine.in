@@ -1,0 +1,34 @@
+## Based on https://github.com/ocaml/opam-dockerfiles
+
+FROM alpine:$alpine_version
+
+RUN apk update && apk upgrade && \
+    apk add alpine-sdk openssh bash nano ncurses-dev rsync xz m4 \
+            opam aspcud \
+            gmp-dev libev-dev libressl-dev linux-headers pcre-dev perl zlib-dev \
+            libsodium-dev snappy-dev && \
+    apk add leveldb-dev \
+      --update-cache \
+      --repository http://nl.alpinelinux.org/alpine/edge/testing && \
+    rm -f /var/cache/apk/* && \
+    adduser -S opam && \
+    echo 'opam ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/opam && \
+    chmod 440 /etc/sudoers.d/opam && \
+    chown root:root /etc/sudoers.d/opam && \
+    sed -i.bak 's/^Defaults.*requiretty//g' /etc/sudoers
+
+USER opam
+
+WORKDIR /home/opam
+
+RUN mkdir .ssh && \
+    chmod 700 .ssh && \
+    git config --global user.email "docker@example.com" && \
+    git config --global user.name "Docker CI" && \
+    sudo -u opam sh -c "git clone -b master git://github.com/ocaml/opam-repository" && \
+    sudo -u opam sh -c "opam init -a -y --comp $ocaml_version /home/opam/opam-repository" && \
+    sudo -u opam sh -c "opam install -y depext travis-opam"
+
+ENTRYPOINT [ "opam", "config", "exec", "--" ]
+
+CMD [ "sh" ]

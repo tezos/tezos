@@ -2,6 +2,7 @@ variables:
   public_docker_image: docker.io/tezos/tezos
 
 stages:
+  - prepare
   - build
   - test
   - publish
@@ -21,6 +22,24 @@ stages:
     - docker login -u gitlab-ci-token -p "$CI_BUILD_TOKEN" "${CI_REGISTRY}"
   tags:
     - docker
+
+## Prepare docker image with precompiled OCaml/opam
+
+prepare:
+  <<: *dind_definition
+  stage: prepare
+  only:
+    - schedules
+  before_script:
+    - . ./scripts/version.sh
+  script:
+    - ./scripts/create_docker_image.alpine.sh
+    - mkdir ~/.docker
+    - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
+    - docker push "tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
+    - docker tag "tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
+                 "tezos/opam:latest"
+    - docker push "tezos/opam:latest"
 
 ## Tezos
 
@@ -145,13 +164,14 @@ publish:docker:minimal:
     - ./scripts/create_docker_image.minimal.sh
         "${public_docker_image}" "${CI_BUILD_REF_NAME}"
         "${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}"
+    - mkdir ~/.docker
     - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
     - docker push "${public_docker_image}:${CI_BUILD_REF_NAME}"
 
 ## Publish to github...
 
 publish:github:
-  image: ocaml/opam
+  image: tezos/opam
   stage: publish
   only:
     - master@tezos/tezos
@@ -179,7 +199,7 @@ publish:github:
 ## Relaunching the bootstrap servers of the alphanet.zeronet
 
 .bootstrap_template: &bootstrap_definition
-  image: ocaml/opam
+  image: tezos/opam
   stage: deploy
   only:
     - alphanet@tezos/tezos

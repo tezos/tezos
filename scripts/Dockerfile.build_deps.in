@@ -2,12 +2,8 @@ FROM $base_image
 
 COPY scripts/install_build_deps.sh scripts/version.sh scripts/
 COPY src/tezos-deps.opam src/
-COPY Dockerfile Dockerfile
-RUN sudo apk add libsodium-dev snappy-dev && \
-    sudo apk add leveldb-dev \
-      --update-cache \
-      --repository http://nl.alpinelinux.org/alpine/edge/testing && \
-    opam switch $ocaml_version && \
-    opam config exec -- ./scripts/install_build_deps.sh all \
-    rm -fr ~/.opam/log/ \
-           "$(opam config exec -- ocamlfind query compiler-libs)"/../topdirs.cmi
+RUN sudo apk update && \
+    opam config exec -- ./scripts/install_build_deps.sh all && \
+    sudo rm -f /var/cache/apk/* && \
+    rm -fr ~/.opam/log/ && \
+    rm -fr "$(opam config exec -- ocamlfind query stdlib)"/topdirs.cmi
