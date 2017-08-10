@@ -159,17 +159,7 @@ publish:github:
     - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
         ./scripts/apply_patch.sh "${CI_BUILD_REF_NAME}" ;
       fi
-    - git filter-branch --prune-empty --index-filter
-         'git rm -r --cached --ignore-unmatch
-            .gitlab-ci.yml
-            "docs/proof of stake.md"
-            src/client/embedded/bootstrap/mining/
-            scripts/alphanet.sh
-            scripts/alphanet_constants.patch
-            scripts/alphanet_next.patch
-            scripts/zeronet.patch
-            scripts/delete_ci_image.sh'
-          --env-filter
+    - git filter-branch --prune-empty --env-filter
             'if [ $GIT_COMMIT != "f42e9d12ac75d2876a4cf600d44976b7090d4533" ] ; then
                export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" ;
                export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL" ;

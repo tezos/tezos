@@ -21,12 +21,16 @@ case "$branch" in
         sed -i s/TEZOS/TEZOS_ZERONET/ src/node/shell/distributed_db_message.ml
         patch -p1 < scripts/alphanet_constants.patch
         patch -p1 < scripts/zeronet.patch
+        cp README.md docs/README.master
+        cp docs/README.zeronet README.md
         if has_git; then git commit -a -m "Zeronet: DO NOT MERGE" --author "Tezos CI <null@tezos.com>"; fi
         echo "Done"
         ;;
     alphanet)
         sed -i s/TEZOS/TEZOS_ALPHANET/ src/node/shell/distributed_db_message.ml
         patch -p1 < scripts/alphanet_constants.patch
+        cp README.md docs/README.master
+        cp docs/README.alphanet README.md
         if has_git; then git commit -a -m "Alphanet: DO NOT MERGE" --author "Tezos CI <null@tezos.com>"; fi
         echo "Done"
         ;;
