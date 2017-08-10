@@ -1,0 +1,70 @@
+Reset 2017-08-10
+================
+
+This update includes changes in the on-disk state of the node and in
+the format of blocks and operations. It thus requires a chain reset.
+
+Main changes includes:
+
+[Doc]
+
+- The documentation previously available on the Slack channel is now
+  available at:
+
+    https://raw.githubusercontent.com/tezos/tezos/alphanet/README.md
+
+- The `alphanet` branch of the github repository is now automaticaly
+  synchronized with `alphanet` docker image. And the latest version of
+  the `alphanet.sh` is available at:
+
+    https://raw.githubusercontent.com/tezos/tezos/alphanet/scripts/alphanet.sh
+
+  No need to update manually though, the script auto-update itself
+  when running:
+
+    ./alphanet.sh restart
+
+  Or:
+
+    ./alphanet.sh update_script
+
+
+[Michelson]
+
+- minor language enhencements, mostly resulting from the feedback of
+  Milo's daily challenge:
+
+    http://www.michelson-lang.com/
+
+- the alphanet scripts now understands a container: prefix wherever a
+  file: prefix is accepted, temporarily copying the file into the
+  container, and the emacs-mode is aware of that
+
+[Node]
+
+- Operations now include a block hash in their header. Such an
+  operation could only be included in a successor of this block.
+
+- The economics protocol now refuses blocks that includes an operation
+  forged more 64 blocks in the past. As any constants set by the
+  economic protocol, it is amendable by a vote.
+
+- Header of blocks now includes a hash of the "context" that result
+  from its validation. This is currently the SHA1 of the git commit,
+  but this will be changed in a near future for a safer cryptographic
+  hash.
+
+- The node does not need anymore to maintain a full index of the
+  operation to operate. This greatly reduce the memory and disk usage.
+
+- The node now builds against `irmin.1.3` where some of our code and
+  optimizations were upstreamed. We were previously stuck to
+  irmin.0.12.
+
+
+[CI]
+
+- This is not directly visible in the alphanet, but our CI
+  infrastrucre is now ready for open development.
+  More about that soon (or later).
+
