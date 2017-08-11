@@ -262,11 +262,11 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         log_output } = args in
   let bootstrap_peers =
     if no_bootstrap_peers || ignore_bootstrap_peers
-    then peers
-    else begin
-      log_info "Ignoring bootstrap peers";
-      cfg.net.bootstrap_peers @ peers
-    end in
+    then begin
+      log_info "Ignoring bootstrap peers" ;
+      peers
+    end else
+      cfg.net.bootstrap_peers @ peers in
   return @@
   Node_config_file.update
     ?data_dir ?min_connections ?expected_connections ?max_connections
