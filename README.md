@@ -1,335 +1,321 @@
-TEZOS
-=====
+Tezos (alphanet)
+================
 
-Tezos is a distributed consensus platform with meta-consensus capability. Tezos
-not only comes to consensus about state, like BTC or ETH. It also comes to
-consensus about how the protocol and the nodes should adapt and upgrade.
+Welcome to the Tezos alphanet, which is a pre-release network for the
+Tezos blockchain. Currently, the chain is reset every few weeks.
 
-See https://www.tezos.com/ for more information about the project.
+For news and support about the alphanet, please join IRC (`#tezos` on
+freenode). Please, report bugs related to the alphanet on the IRC
+channel before filling Github issues.
+
+For more information about the project in general, see:
+
+  https://www.tezos.com/
 
 
-Build instructions
-------------------
+How to join the alphanet ?
+==========================
 
-To compile Tezos, you need an OCaml compiler (version 4.04.0) and all the
-libraries listed in `src/tezos-deps.opam`.
+We provide two ways of joining the alphanet :
 
-The best way to install all dependencies is by first installing
-[OPAM](https://opam.ocaml.org/), the OCaml package manager.
+- use `docker` and prebuilt binaries
+  (recommended way, tested on windows/mac/linux)
+- manual compilation and installation
+  (linux and mac only)
 
-Create a new switch alias for Tezos. A switch is your own version of the OPAM
-configuration, including the OCaml compiler, all packages, and package manager
-configuration related to your project. This is necessary so that the project
-doesn't conflict with other OCaml projects or other versions of Tezos.
+The `alphanet.sh` script
+------------------------
 
-```
-opam switch tezos --alias-of 4.04.2
-```
+The recommended way for running an up-to-date Tezos node connected to
+the alphanet is to use `scripts/alphanet.sh`. Its only requirement is a
+working installation of Docker:
 
-Activate the new switch:
+  https://www.docker.com/community-edition
 
-```
-eval `opam config env`
-```
-
-Install Tezos dependencies:
-
-```
-make build-deps
-```
-
-Compile the project:
+First, you need to download the script:
 
 ```
-make
+wget https://raw.githubusercontent.com/tezos/tezos/alphanet/scripts/alphanet.sh
+chmod +x alphanet.sh
 ```
 
-This should produce three binaries:
-
-* `tezos-node`: the tezos daemon itself;
-* `tezos-client`: a minimal command-line client;
-* `tezos-protocol-compiler`: a protocol compiler used for developing new version of the economic protocol.
-
-Currently Tezos is being developed for Linux only. It should work on mac OS,
-but it has not been tested recently. A Windows port is in progress.
-
-
-Note that, when executing `make build-deps`, OPAM will detect if
-required system dependencies are installed. However, it is not able to
-detect which versions you actually have. Typically, `make` will
-probably fail if you have an libsodium < 1.0.11. In this case, make
-sure you have a recent version of libsodium and libsodium-dev, or
-download and install them from, eg,
-https://pkgs.org/download/libsodium18 and
-https://pkgs.org/download/libsodium-dev
-
-Running the node in a sandbox
------------------------------
-
-To run a single instance of a Tezos node in sandbox mode:
+You are now one step away from a working node:
 
 ```
-./tezos-node run --sandbox --rpc-addr localhost:8732
+./alphanet.sh start
 ```
 
-This "sandboxed" node will not participate in the P2P network, but will accept
-RPC from localhost on port 8732. See below from more details on the RPC
-interface.
+This will launch a docker container running the various daemons that
+form a working tezos node. The first launch might take a few minutes
+to synchronize the chain.
+
+On first launch the script will also create a cryptographic identity
+(nicknamed `my_identity`) and provide you with free tezzies on a fresh
+account (nicknamed `my_account`). You might check your balance with:
+
+```
+./alphanet.sh client get balance for my_account
+```
+
+On some circumstances the account creation might fail. If so, see
+section "Known issues" below on how to force the account creation.
+
+See `./alphanet.sh --help` for more informations about the script.
+In particular see `./alphanet.sh client --help` and
+`scripts/README.master` for more information about the client.
+
+Every call to `alphanet.sh` will check for updates of the node and
+will fail if your node is not up-to-date. For updating the node,
+simply run:
+
+```
+./alphanet.sh restart
+```
+
+If you prefer to temporarily disable automatic updates, you just
+have to set an environment variable:
+
+```
+export TEZOS_ALPHANET_DO_NOT_PULL=yes
+```
 
 
-Running the node
-----------------
+Compilation from sources
+------------------------
 
-So far there is no official Tezos network being run, but you might run a local
-test network (the development team is running its own testnet, if you're interested
-in joining this network, please make a request on our slack channel. We have
-limited support abilities at the moment but we'll try to help you best we can).
+The `alphanet` branch in the tezos git repository will always contain
+the up-to-date sources of the tezos-node required for running the
+alphanet. See `docs/README.master` on how to compile it.
 
-Use the following command to run a node that will accept incoming
-connections:
+Once built, you might launch the a node by running:
 
 ```
 ./tezos-node identity generate 24.
+./tezos-node run --rpc-addr localhost
 ```
 
-This will first generate a new node identity and compute the
-associated stamp of proof-of-work. Then, the node will listen to
-connections coming in on `[::]:9732`. All used data is stored at
-`$HOME/.tezos-node/`. For example, the default configuration file is
-at `$HOME/.tezos-node/config.json`.
+By default this instance will store its data in `$HOME/.tezos-node`
+and will listen to incoming peers on port 9732. It will also listen
+to RPC requests on port 8732 (only from `localhost`). You might find
+more options by running `./tezos-node config --help`.
 
-To run multiple nodes on the same machine, you can duplicate and edit
-`$HOME/.tezos-node/config.json` while making sure they don't share paths to the
-database or any other data file (cf. options `db.store` ; `db.context` ;
-`db.protocol`, `net.peers-metadata` and `net.identity`).
-
-You could also let Tezos generate a config file by specifying options on the
-command line. For instance, if `$dir/config.json` does not exist, the following
-command will generate it and replace the default values with the values from
-the command line:
+If you want to stake (see below for more details), you will also have
+to run:
 
 ```
-./tezos-node run --data-dir "$dir" --net-addr localhost:9733
+./tezos-client launch daemon
 ```
 
-The Tezos server has a built-in mechanism to discover peers on the local
-network (using UDP packets broadcasted on port 7732).
+That's all. For the rest of the document, to execute the example
+commands, you will have to replace `./alphanet.sh client` by
+`./tezos-client`.
 
-If this mechanism is not sufficient, one can provide Tezos with a list of
-initial peers, either by editing the option `net.bootstrap-peers` in the
-`config.json` file, or by specifying a command line parameter:
 
-```
-./tezos-node run \
-             --data-dir "$dir" --net-addr localhost:2023 \
-             --peer localhost:2021 --peer localhost:2022
-```
+How to observe the network ?
+============================
 
-If `"$dir"/config.json` exists, the command line options override those
-read in the config file. By default, Tezos won't modify the content of an
-existing `"$dir"/config.json` file. But, you may explicit ask the node
-to reset or to update the file according to the command line parameters
-with the following commands line:
+The alphanet script provides a basic command `./alhpanet.sh head` that
+allows you to see if your own node is synchronized. 
 
-```
-./tezos-node config reset --data-dir "$dir" --net-addr localhost:9733
-./tezos-node config update --data-dir "$dir" --net-addr localhost:9734
-```
+The Tezos client also offers a lot of commands to introspect the state of
+the node, and also to list and call the RPCs of the nodes.
 
-Configuration options
----------------------
+Enthusiastic Tezos adopter fredcy has also developed a nice block explorer
+for the alphanet. See [https://github.com/fredcy/tezos-client].
 
-Here is an example configuration file with all parameters
-specified. Most of the time it uses default values, except for cases
-where the default is not explanatory enough (i.e. "bootstrap-peers" is
-an empty list by default). Comments are not allowed in JSON, so this
-configuration file would not parse. They are just provided here to
-help writing your own configuration file if needed.
+In an upcoming version, we will also provide an opt-in tool for node runners
+that will allow us to provide a global monitoring panel of the alphanet.
 
+
+How to obtain free Tez from the faucet contract ?
+=================================================
+
+The alphanet contains an ad-hoc faucet contract, that will generate
+new tezzies for you to test. Obviously, this contract will not be
+available outside of the test network.
+
+First, if you don't have any cryptographic identity yet, you need to
+generate one (replace `my_identity` with any name that suits you
+best):
 
 ```
-{
-
-  /* Location of the data dir on disk. */
-
-  "data-dir": "/home/tezos/my_data_dir"
-
-  /* Configuration of net parameters */
-
-  "net": {
-
-    /* Floating point number between 0 and 256 that represents a
-    difficulty, 24 signifies for example that at least 24 leading
-    zeroes are expected in the hash. */
-
-    "expected-proof-of-work": 24.5,
-
-    /* List of hosts. Tezos can connect to both IPv6 and IPv4
-    hosts. If the port is not specified, default port 9732 will be
-    assumed. */
-
-    "bootstrap-peers": ["::1:10732", "::ffff:192.168.1.3:9733", "mynode.tezos.com"],
-
-    /* Specify if the network is closed or not. A closed network
-    allows only peers listed in "bootstrap-peers". */
-
-    "closed": false,
-
-    /* Network limits */
-
-    "limits": {
-
-      /* Delay granted to a peer to perform authentication, in
-      seconds. */
-
-      "authentication-timeout": 5,
-
-      /* Strict minimum number of connections (triggers an urgent
-      maintenance). */
-
-      "min-connections": 50,
-
-      /* Targeted number of connections to reach when bootstraping /
-      maintaining. */
-
-      "expected-connections": 100,
-
-      /* Maximum number of connections (exceeding peers are
-      disconnected). */
-
-      "max-connections": 200,
-
-      /* Number above which pending incoming connections are
-      immediately rejected. */
-
-      "backlog": 20,
-
-      /* Maximum allowed number of incoming connections that are
-      pending authentication. */
-
-      "max-incoming-connections": 20,
-
-      /* Max download and upload speeds in KiB/s. */
-
-      "max-download-speed": 1024,
-      "max-upload-speed": 1024,
-
-      /* Size of the buffer passed to read(2). */
-
-      "read-buffer-size": 16384,
-    }
-  },
-
-  /* Configuration of rpc parameters */
-
-  "rpc": {
-
-    /* Host to listen to. If the port is not specified, the default
-    port 8732 will be assumed. */
-
-    "listen-addr": "localhost:8733",
-
-    /* Cross Origin Resource Sharing parameters, see
-    https://en.wikipedia.org/wiki/Cross-origin_resource_sharing. */
-
-    "cors-origin": [],
-    "cors-headers": [],
-
-    /* Certificate and key files (necessary when TLS is used). */
-
-    "crt": "tezos-node.crt",
-    "key": "tezos-node.key"
-  },
-
-  /* Configuration of log parameters */
-
-  "log": {
-
-    /* Output for the logging function. Either "stdout", "stderr" or
-    the name of a log file . */
-
-    "output": "tezos-node.log",
-
-    /* Verbosity level: one of 'fatal', 'error', 'warn', 'notice',
-    'info', 'debug'. */
-
-    "level": "info",
-
-    /* Fine-grained logging instructions. Same format as described in
-    `tezos-node run --help`, DEBUG section. In the example below,
-    sections "net" and all sections starting by "client" will have
-    their messages logged up to the debug level, whereas the rest of
-    log sections will be logged up to the notice level. */
-
-    "rules": "client* -> debug, net -> debug, * -> notice",
-
-    /* Format for the log file, see
-    http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates. */
-
-    "template": "$(date) - $(section): $(message)"
-  }
-}
+./alphanet.sh client gen keys "my_identity"
 ```
 
-Debugging
----------
-
-It is possible to set independant log levels for different logging
-sections in Tezos, as well as specifying an output file for
-logging. See the description of log parameters above as well as
-documentation under the DEBUG section diplayed by `tezos-node run
---help'.
-
-
-JSON/RPC interface
-------------------
-
-The Tezos node provides a JSON/RPC interface. Note that it is an RPC, and it is
-JSON based, but it does not follow the "JSON-RPC" protocol. It is not active by
-default and it must be explicitely activated with the `--rpc-addr` option.
-Typically, if you are not trying to run a local network and just want to
-explore the RPC, you would run:
+Then, you have to generate a new "free" account (replace `my_account`
+with any name that suits you best and `my_identity` by the name used
+in the previous command):
 
 ```
-./tezos-node run --sandbox --rpc-addr localhost
+./alphanet.sh client originate free account "my_account" for "my_identity"
 ```
 
-The RPC interface is self-documented and the `tezos-client` executable is able
-to pretty-print the RPC API. For instance, to see the API provided by the Tezos
-Shell:
+That's all. You might check your balance:
 
 ```
-./tezos-client rpc list
+./alphanet.sh client get balance for "my_account"
 ```
 
-To get API attached to the "genesis" block, including the remote procedures
-provided by the associated economic protocol version:
+If you want MORE tezzies, you need to generate as many free accounts as
+you need (you should receive ꜩ100.000 per account) and then transfer
+the tezzies into a single account. For instance:
 
 ```
-./tezos-client rpc list /blocks/genesis/
+./alphanet.sh client originate free account "my_alt_account" for "my_identity"
+./alphanet.sh client transfer 100,000.00 from "my_alt_account" to "my_account" -fee 0.00
+./alphanet.sh client forget contract "my_alt_account"
 ```
 
-You might also want the JSON schema describing the expected input and output of
-a RPC. For instance:
+Note that the test network is kind enough to accept transactions
+without fees...
+
+
+
+How to play with smart-contracts ?
+==================================
+
+An advanced documentation of the smart contract language is in
+
+  `/src/proto/alpha/docs/language.md`
+  
+Some test contracts are in
+
+   `/tests/contracts/`
+
+For details and examples, see:
+
+  http://www.michelson-lang.com/
+
+
+
+How to stake on the alphanet ?
+==============================
+
+By default, the faucet of the alphanet (the one behind `./alphanet.sh
+originate free account "my_account" for "my_identity"`) creates
+contracts which are managed by `my_identity` but whose staking rights
+are delegated to the baker of the block including the
+origination. That way we are sure that staking rights are attributed
+to an active baker.
+
+But, nonetheless, you might claim your staking rights!
+
+The following command returns the current delegate of a contract:
 
 ```
-./tezos-client rpc schema /blocks/genesis/hash
+./alphanet.sh client get delegate for "my_account"
 ```
 
-Note: you can get the same information, but as a raw JSON object, with a simple
-HTTP request:
+If it is one the following, it is indeed one of our "bootstrap"
+contracts!
+
+- `tz1YLtLqD1fWHthSVHPD116oYvsd4PTAHUoc`
+- `tz1irovm9SKduvL3npv8kDM54PSWY5VJXoyz`
+- `tz1UsgSSdRwwhYrqq7iVp2jMbYvNsGbWTozp`
+- `tz1TwYbKYYJxw7AyubY4A9BUm2BMCPq7moaC`
+- `tz1QWft73Zhj5VSA1sCuEi9HhDDJqywE6BtC`
+
+You might change the delegate of a contract with a single command:
 
 ```
-wget --post-data '{ "recursive": true }' -O - http://localhost:8732/describe
-wget --post-data '{ "recursive": true }' -O - http://localhost:8732/describe/blocks/genesis
-wget -O - http://localhost:8732/describe/blocks/genesis/hash
+./alphanet.sh client set delegate for "my_account" to "my_identity"
+
+```
+
+You now have staking rights!
+
+Well, almost.
+
+You should wait.
+
+A little bit.
+
+At most two cycles. Which, on the alphanet is 128 blocks (something
+around 2 hours). On the mainnet, this will be between 2 weeks and a
+month.
+
+
+But, to enforce your right a last step is required. When baking or
+endorsing a block, a bond is taken out of the default account
+associated to the public key of the delegate. Hence, in order to
+stake, you must be provisioning for bond deposit.
+
+```
+./alphanet.sh client transfer 50,000.00 from "my_account" to "my_identity"
+```
+
+On the alphanet, a bond is ꜩ1000. Hence, with the previous command you
+provisioned 50 bonds. If you want more, see section "How to obtain
+free Tez from the faucet contract ?".
+
+Now, you are settled. The `alphanet` docker image runs a baker daemon
+and a endorser daemon, by default for all your keys.
+
+To know if you staked, just run:
+
+```
+./alphanet.sh baker log
+./alphanet.sh endorser log
+```
+
+You should see lines such as:
+
+```
+Injected block BLxzbB7PBW1axq for bootstrap5 after BLSrg4dXzL2aqq  (level 1381, slot 0, fitness 00::0000000000005441, operations 21)
+```
+
+Or:
+
+```
+Injected endorsement for block 'BLSrg4dXzL2aqq'  (level 1381, slot 3, contract bootstrap5) 'oo524wKiEWBoPD'
+```
+
+On the alphanet, rewards for staking are credited after 24 hours. The
+reward for baking or endorsing a block is ꜩ150. The safety bond is
+returned together with the reward.
+
+To know when you will be allowed to stake in the current cycle, you
+might try the following RPCs, where you replaced `tz1iFY8ads...` by
+the appropriate value:
+
+```
+$ ./alphanet.sh client list known identities
+my_identity: tz1iFY8aDskx9QGbgBy68SNAGgkc7AE2iG9H (public key known) (secret key known)
+$ ./alphanet.sh client rpc call /blocks/head/proto/helpers/rights/mining/delegate/tz1iFY8aDskx9QGbgBy68SNAGgkc7AE2iG9H with '{}'
+{ "ok":
+    [ { "level": 1400.000000, "priority": 2.000000,
+        "timestamp": "2017-05-19T03:21:52Z" },
+      ...  ] }
 ```
 
 
+Known issues
+============
 
-The minimal CLI client
-----------------------
+Missing account `my_account`
+----------------------------
 
-Work in progress.
+The chain synchronization has not been optimized yet and the
+`alphanet.sh` script might misdetect the end of the synchronization
+step. If so, it will try to create your free account in an outdated
+context and your new account will never be included in the chain.
 
-See `./tezos-client -help` for available commands.
+To fix this, just wait for your node to be synchronized: for that run
+the following command, in the middle of a (raw) json object, it should
+display the date of the last block (which should not be too far in the
+past):
+
+```
+./alphanet.sh head
+```
+
+Please note that the printed date is GMT, don't forget the time shift.
+
+Then, you need to remove from the client state the non-existant
+contract and regenerate a new one:
+
+```
+./alphanet.sh client forget contract "my_account"
+./alphanet.sh client originate free account "my_account" for "my_identity"
+```
+
