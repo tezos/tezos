@@ -45,18 +45,18 @@ let print_location_mark ppf = function
 
 let no_locations _ = None
 
-let rec print_expr_unwrapped locations ppf = function
+let rec print_expr_unwrapped_help emacs locations ppf = function
   | Script.Prim (loc, name, []) ->
       begin match locations loc with
         | None -> Format.fprintf ppf "%s" name
         | Some _ as l -> Format.fprintf ppf "(%s%a)" name print_location_mark l
       end
   | Script.Prim (loc, name, args) ->
-      Format.fprintf ppf "@[<hov 2>%s%a@ %a@]"
+      Format.fprintf ppf (if emacs then "%s%a %a" else "@[<hov 2>%s%a@ %a@]")
         name print_location_mark (locations loc)
         (Format.pp_print_list
            ~pp_sep: Format.pp_print_space
-           (print_expr locations))
+           (print_expr_help emacs locations))
         args
   | Script.Seq (loc, []) ->
       begin match locations loc with
@@ -71,29 +71,36 @@ let rec print_expr_unwrapped locations ppf = function
       Format.fprintf ppf "%a@] }"
         (Format.pp_print_list
            ~pp_sep: (fun ppf () -> Format.fprintf ppf " ;@ ")
-           (print_expr_unwrapped locations))
+           (print_expr_unwrapped_help emacs locations))
         exprs
   | Script.Int (loc, n) ->
       Format.fprintf ppf "%s%a" n print_location_mark (locations loc)
   | Script.String (loc, s) ->
       Format.fprintf ppf "%S%a" s print_location_mark (locations loc)
 
-and print_expr locations ppf = function
+and print_expr_help emacs locations ppf = function
   | Script.Prim (_, _, _ :: _) as expr ->
-      Format.fprintf ppf "(%a)" (print_expr_unwrapped locations) expr
-  | expr -> print_expr_unwrapped locations ppf expr
+      Format.fprintf ppf "(%a)" (print_expr_unwrapped_help emacs locations) expr
+  | expr -> print_expr_unwrapped_help emacs locations ppf expr
+
+let print_expr_unwrapped = print_expr_unwrapped_help false
+let print_expr = print_expr_help false
 
 let print_storage ppf ({ storage } : Script.storage) =
   print_expr no_locations ppf storage
 
-let print_stack ppf = function
-  | [] -> Format.fprintf ppf "[]"
+let print_stack_help emacs ppf = function
+  | [] -> Format.fprintf ppf (if emacs then "()" else "[]")
   | more ->
-      Format.fprintf ppf "@[<hov 2>[ %a ]@]"
+      Format.fprintf ppf (if emacs then "(%a)" else "@[<hov 2>[ %a ]@]")
         (Format.pp_print_list
-           ~pp_sep: (fun ppf () -> Format.fprintf ppf " :@ ")
-           (print_expr_unwrapped no_locations))
+           ~pp_sep: (fun ppf () -> Format.fprintf ppf (if emacs then "@ " else " :@ "))
+           ((if emacs then print_expr else print_expr_unwrapped) no_locations))
         more
+
+let print_stack = print_stack_help false
+
+let print_emacs_stack = print_stack_help true
 
 let print_typed_code locations ppf (expr, type_map) =
   let rec print_typed_code_unwrapped ppf expr =
@@ -712,17 +719,13 @@ let commands () =
                  | _ -> Lwt.return ([], [])
            end >>= fun (types, errors) ->
            cctxt.message
-             "(@[<v 0>(types . (@[<v 0>%a@]))@,\
-              (errors . (@[<v 0>%a@])))@]"
+             "((types . (%a)) (errors . (%a)))"
              (Format.pp_print_list
                 (fun ppf (({ Script_located_ir.point = s },
                            { Script_located_ir.point = e }),
                           bef, aft) ->
-                  Format.fprintf ppf "(%d %d \"%s\")" (s + 1) (e + 1)
-                    (String.concat "\\n"
-                       (String.split_on_char '\n'
-                          (Format.asprintf "@[<v 0>%a@, \\u2B87@,%a@]"
-                             print_stack bef print_stack aft)))))
+                  Format.fprintf ppf "(%d %d %a %a)" (s + 1) (e + 1)
+                    print_emacs_stack bef print_emacs_stack aft))
              types
              (Format.pp_print_list
                 (fun ppf (({ Script_located_ir.point = s },
