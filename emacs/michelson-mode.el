@@ -1,6 +1,7 @@
 ;; Major mode for editing Michelson smart contracts.
 
-(require 'cl)
+(require 'cl-lib)
+(require 'deferred)
 
 (defvar michelson-mode-hook nil)
 
@@ -104,6 +105,12 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
     ( ((class color) (background dark)) (:background "DarkRed") ))
    "Face for Michelson annotations."
    :group 'michelson-faces)
+
+(defface michelson-stack-highlight-face
+  '(( ((class color) (background light)) (:background "gray86") )
+    ( ((class color) (background dark)) (:background "grey21") ))
+  "Face for alternating lines of the stack."
+  :group 'michelson-faces)
 
 (defun michelson-customize-options ()
   "Open the general customization group for Michelson mode."
@@ -351,18 +358,14 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
 
 (defun michelson-async-command-to-string (command callback)
   "Asynchronously execute `COMMAND' and call the `CALLBACK' on the resulting string."
-  (lexical-let ((callback-fun callback))
-    (michelson-erase-process-buffer)
-    (set-process-sentinel
-     (start-process-shell-command
-      "michelson-shell-process"
-      michelson-process-output-buffer
-      command)
-     (lambda (process signal)
-       (let ((output
-              (with-current-buffer michelson-process-output-buffer
-                (buffer-string))))
-         (funcall callback-fun output))))))
+  (lexical-let ((command command)
+                (callback-fun callback))
+    (deferred:$
+      (deferred:$
+          (apply 'deferred:process command)
+          (deferred:nextc it callback-fun))
+      ;; TODO: make this show only the client error
+      (deferred:error it (lambda (err) (michelson-write-output-buffer (cadr err)))))))
 
 (defun michelson-clean-cache ()
   "Clean the buffer's program info cache."
@@ -382,36 +385,51 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   "Refresh the info about the program in `BUFFER-NAME' from the command."
   (lexical-let ((tmp-file (make-temp-file buffer-name)))
     (write-region (point-min) (point-max) tmp-file nil 'no-message)
-    (let ((command (concat
-                    "ALPHANET_EMACS=true "
-                    "TEZOS_ALPHANET_DO_NOT_PULL=yes "
-                    michelson-client-command
-                    " typecheck program "
+    (let ((command
+           (append (split-string (expand-file-name michelson-client-command) " ")
+                   (list 
+                    "typecheck"
+                    "program"
                     (let ((file-name
                            (make-temp-file (buffer-name))))
                       (write-region (point-min) (point-max) file-name nil 'no-message)
                       (if michelson-alphanet
                           (concat "container:" file-name)
                         file-name))
-                    " -details -emacs")))
-      (michelson-async-command-to-string
-       command
-       (lambda (output)
-         (condition-case err
-             (let*
-                 ((record (car (read-from-string output)))
-                  (errors (cdr (assoc 'errors record)))
-                  (types  (cdr (assoc 'types record))))
-               (setq michelson-cached-buffer-info (make-cache :types types :errors errors)))
-           ((error err)
-            (let ((inhibit-message t))
-              (message output)))))))))
+                    "-details"
+                    "-emacs"))))
+          (michelson-async-command-to-string
+           command
+           (lambda (output)
+             (condition-case err
+                 (let*
+                     ((record (car (read-from-string output)))
+                      (errors (cdr (assoc 'errors record)))
+                      (types  (cdr (assoc 'types record))))
+                   (setq michelson-cached-buffer-info (make-cache :types types :errors errors)))
+               ((error err)
+                (let ((inhibit-message t))
+                  (message output)))))))))
 
 (defvar michelson-output-buffer-name
   "*Michelson*")
 
-(defun michelson-write-output-buffer (data)
-  "Write the given `DATA' to the output buffer."
+(defun michelson-output-width ()
+  (lexical-let* ((buffer (get-buffer-create michelson-output-buffer-name))
+                 (message-window
+                  (if (get-buffer-window buffer)
+                      (get-buffer-window buffer)
+                    (display-buffer-below-selected buffer nil))))
+    (window-body-width message-window)))
+  
+
+(defun michelson-write-output-buffer (data &optional do-not-overwrite)
+  "Write the given `DATA' to the output buffer.
+If `DATA' is a string, it is written directly,
+overwriting the data in the buffer.
+If `DATA' is a list of strings, the strings are written into the buffer,
+with alternating lines highlighted.
+If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are maintained."
   (lexical-let*
       ((buffer (get-buffer-create michelson-output-buffer-name))
        (message-window
@@ -424,8 +442,20 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
     (save-excursion
       (set-buffer michelson-output-buffer-name)
       (read-only-mode -1)
-      (erase-buffer)
-      (insert data)
+      (unless do-not-overwrite
+        (erase-buffer))
+      (goto-char (point-min))
+      (remove-overlays)
+      (if (listp data)
+          (lexical-let ((michelson-highlighting t))
+            (dolist (ele (reverse data))
+              (lexical-let ((prev-point (point)))
+                (insert ele)
+                (when michelson-highlighting
+                  (overlay-put (make-overlay prev-point (point))
+                               'face 'michelson-stack-highlight-face))
+                (setq michelson-highlighting (not michelson-highlighting)))))
+        (insert data))
       (read-only-mode 1)
       (goto-char (point-min))
       (while (not (eobp))
@@ -438,38 +468,333 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
                   (window-size message-window))
                2))))))
 
-(defun michelson-show-program-info (types errors)
+(defun michelson-format-stack-top (bef-ele aft-ele width)
+  (lexical-let*
+      ((pp-no-trailing-newline (lambda (sexp)
+                                 (let* ((str (pp-to-string sexp))
+                                        (len (length str)))
+                                   (if (equal "\n" (substring str (- len 1) len))
+                                       (substring str 0 (- len 1))
+                                     str))))
+       (bef-strs (if bef-ele (split-string (funcall pp-no-trailing-newline bef-ele) "\n") '("")))
+       (aft-strs (if aft-ele (split-string (funcall pp-no-trailing-newline aft-ele) "\n") '("")))
+       (width width))
+    (letrec ((format-strings
+              (lambda (befs afts)
+                (if (or befs afts)
+                    (concat (format (format "%%-%ds|     %%s\n" (/ width 2))
+                                    (if befs (car befs) "")
+                                    (if afts (car afts) ""))
+                            (funcall format-strings (cdr befs) (cdr afts)))
+                  ""))))
+      (funcall format-strings bef-strs aft-strs))))
+    
+
+(defun michelson-format-stacks (bef-stack aft-stack)
+  (letrec ((michelson-format-stacks-help
+            (lambda (bef aft)
+              (if (or bef aft)
+                  (cons (michelson-format-stack-top (car bef) (car aft) (michelson-output-width))
+                        (funcall michelson-format-stacks-help (cdr bef) (cdr aft)))
+                '()))))
+    (funcall michelson-format-stacks-help (reverse bef-stack) (reverse aft-stack))))
+
+(cl-defstruct michelson-stacks
+  "A pair of stacks, from `BEF' (before) and `AFT' (after) the instruction"
+  bef
+  aft)
+
+(defun michelson-get-previous-stack ()
+  (save-excursion
+    (michelson-goto-previous-token)
+    (lexical-let ((stacks nil)
+                  (brace-count 0)
+                  (break nil))
+      (while (and (not break)
+                  (not stacks)
+                  (> (point) 0)
+                  (>= brace-count 0))
+        (backward-char)
+        (cond ((and (equal (get-text-property (point) 'face)
+                           'michelson-face-instruction)
+                    (= brace-count 0))
+               (setq break t)
+               (setq stacks (michelson-stacks-at-loc (point))))
+              ((equal (string (char-after (point))) "{")
+               (setq brace-count (- brace-count 1)))
+              ((equal (string (char-after (point))) "}")
+               (setq brace-count (+ brace-count 1)))
+              (t nil)))
+      stacks)))
+
+
+(defun michelson-completion-at-point ()
+  (let ((prev-stack (michelson-get-previous-stack)))
+    (if prev-stack
+        (let* ((bds (bounds-of-thing-at-point 'word))
+               (start (car bds))
+               (end (cdr bds))
+               (completion-stack (michelson-stacks-aft prev-stack))
+               (instrs (michelson-get-suggestion-list completion-stack)))
+          (list start end instrs . nil))
+      nil)))
+
+(defun michelson-stacks-at-loc (loc)
+  (let ((types-info nil))
+    (dolist (elt (cache-types michelson-cached-buffer-info))
+      (when (and (<= (car elt) loc) (<= loc (cadr elt))
+                 (equal (get-text-property loc 'face)
+                        'michelson-face-instruction))
+          (setq types-info (make-michelson-stacks :bef (caddr elt)
+                                                  :aft (cadddr elt)))))
+    types-info))
+
+(defun michelson-show-program-info ()
   "Show the program's `TYPES' and `ERRORS'."
   (interactive)
   (remove-overlays)
-  (lexical-let ((types-info nil)
-                (errors-info nil))
-    (dolist (elt types)
-      (if (and (<= (car elt) (point)) (<= (point) (cadr elt))
-               (equal (get-text-property (point) 'face)
-                      'michelson-face-instruction))
-          (setq types-info (cadr (cdr elt)))))
+  (lexical-let* ((stacks (michelson-stacks-at-loc (point)))
+                 (types-info (and stacks (michelson-format-stacks (michelson-stacks-bef stacks)
+                                                                  (michelson-stacks-aft stacks))))
+                 (errors-info nil))
     (when michelson-highlight-errors
-      (dolist (elt errors)
+      (dolist (elt (cache-errors michelson-cached-buffer-info))
         (overlay-put (make-overlay (car elt) (cadr elt)) 'face 'michelson-face-error)
-        (if (and (<= (car elt) (point)) (<= (point) (cadr elt)))
-            (progn
-              (when michelson-print-errors
-                (unless errors-info
-                  (setq errors-info (concat errors-info "\n")))
-                (setq errors-info (concat errors-info (cadr (cdr elt)))))))))
-    (michelson-write-output-buffer
-     (cond ((not (or types-info types-info)) "\n  No instruction at point.\n")
-           ((and errors-info (not types-info)) errors-info)
-           (t (concat types-info "\n\n" errors-info))))))
+        (when (and (<= (car elt) (point)) (<= (point) (cadr elt)))
+          (progn
+            (when michelson-print-errors
+              (unless errors-info
+                (setq errors-info (concat errors-info "\n")))
+              (setq errors-info (concat errors-info (cadr (cdr elt)))))))))
+    (cond ((and types-info errors-info)
+           (michelson-write-output-buffer errors-info nil)
+           (michelson-write-output-buffer types-info t))
+          (types-info
+           (michelson-write-output-buffer types-info nil))
+          (errors-info
+           (michelson-write-output-buffer errors-info nil))
+          (t (michelson-write-output-buffer "\nNo information available at point")))))
 
 (defun michelson-type-at-point ()
   "Display the type of the expression under the cursor."
   (interactive)
   (michelson-get-info (buffer-name))
-  (let ((types (cache-types michelson-cached-buffer-info))
-        (errors (cache-errors michelson-cached-buffer-info)))
-    (michelson-show-program-info types errors)))
+  (michelson-show-program-info))
+
+(defun michelson-make-suggest (instr pred)
+  "Suggest `INSTR' if `PRED' is not nil."
+  (lexical-let ((instr instr)
+                (pred pred))
+    (lambda (stack)
+      (if (funcall pred stack)
+          (if (listp instr)
+              instr
+            `(,instr))
+        nil))))
+
+
+(defun michelson-constrained-p (var hash)
+  (not (equal var (gethash var hash var))))
+
+(defun michelson-polymorphic-match (tbl match-types stack)
+  (cond ((not match-types) t)
+        ((not stack) nil)
+        ((and (consp match-types) (consp stack))
+         (and (michelson-polymorphic-match tbl (car match-types) (car stack))
+              (michelson-polymorphic-match tbl (cdr match-types) (cdr stack))))
+        ((and (symbolp match-types) (symbolp stack))
+         (if (and (michelson-constrained-p match-types tbl)
+                  (gethash match-types tbl))
+             (equal (gethash match-types tbl nil) stack)
+           (progn
+             (puthash match-types stack tbl)
+             t)))
+        (t nil)))
+
+(defmacro forall (vars matching-stack)
+  (unless (listp ',vars)
+    (error "forall must take a list of vars"))
+  `(lambda (stack)
+     (let ((tbl (make-hash-table :test 'equal)))
+       ,@(mapcar (lambda (var) `(puthash ',var ',var tbl)) vars)
+       (michelson-polymorphic-match tbl ',matching-stack stack))))
+
+(defun michelson-literals-match-p (types)
+  "Generate a predicate that matches `TYPES' against the top of the stack."
+  (lexical-let ((types types))
+    (lambda (stack)
+      (michelson-polymorphic-match
+       (make-hash-table :test 'equal)
+       types
+       stack))))
+
+(defun michelson-suggest-literals (instr &rest types)
+  "Suggest `INSTR' when `TYPES' are on the top of the stack."
+  (michelson-make-suggest
+   instr
+   (michelson-literals-match-p types)))
+                            
+
+(defun michelson-suggest-or (instr pred1 pred2)
+  (lexical-let ((pred1 pred1)
+                (pred2 pred2))
+    (michelson-make-suggest
+     instr
+     (lambda (stack) (or (funcall pred1 stack) (funcall pred2 stack))))))
+
+(defun michelson-suggest-reorderable (instr type1 type2)
+  (michelson-suggest-or instr
+                        (michelson-literals-match-p `(,type1 ,type2))
+                        (michelson-literals-match-p `(,type2 ,type1))))
+
+(defvar michelson-suggest-always-available
+  '("FAIL" "PUSH" "UNIT" "LAMBDA" "NONE"
+    "EMPTY_SET" "EMPTY_MAP" "NIL" "BALANCE"
+    "AMOUNT" "STEPS_TO_QUOTA" "NOW"))
+
+(defun michelson-comparable-p (type)
+  "Is the `TYPE' comparable?"
+  (memq type '(int nat string tez bool key timestamp)))
+
+
+(defun michelson-suggest-pairs-help (pair-type accessor-prefix)
+  "Suggest all possible pair accessors on the given `PAIR-TYPE' and `ACCESSOR-PREFIX'."
+  (cons (concat accessor-prefix "R")
+        (if (and (consp pair-type) (equal (car pair-type) 'pair))
+            (let ((car-ele (cadr pair-type))
+                  (cdr-ele (caddr pair-type)))
+              (append
+               (michelson-suggest-pairs-help car-ele
+                                             (concat accessor-prefix "A"))
+               (michelson-suggest-pairs-help car-ele
+                                             (concat accessor-prefix "D"))
+               '())))))
+
+(defun michelson-suggest-pairs (stack)
+  "Suggest all possible pair accessors on the given `STACK'."
+  (if (and (consp (car stack)) (equal (caar stack) 'pair))
+      (append (michelson-suggest-pairs-help (cadar stack) "CA")
+              (michelson-suggest-pairs-help (caddar stack) "CD")
+      nil)))
+
+(defconst michelson-comparison-operations
+  '("EQ" "NEQ" "LT" "LE" "GT" "GE"))
+
+(defun michelson-suggest-comparable (stack)
+  (let ((first (car stack))
+        (second (cadr stack)))
+    (if (and first
+             second
+             (michelson-comparable-p first)
+             (equal first second))
+        (cons
+         "COMPARE"
+         (append
+          (mapcar (lambda (x) (concat "CMP" x))
+                  michelson-comparison-operations)
+          (mapcar (lambda (x) (concat "IFCMP" x))
+                  michelson-comparison-operations)))
+      '())))
+
+(defun michelson-suggest-depth (instrs depth)
+  "Suggest `INSTRS' if the stack depth is greater than or equal to `DEPTH'."
+  (michelson-make-suggest
+   instrs
+   (lexical-let ((depth depth))
+     (lambda (stack) (>= (length stack) depth)))))
+
+(defun michelson-suggest-prefix-depth (prefix additional suffix)
+  (lexical-let ((prefix prefix)
+                (additional additional)
+                (suffix suffix))
+    (lambda (stack)
+      (reverse (car (reduce
+                     (lambda (acc ele)
+                       (lexical-let ((existing (car acc))
+                                     (prefix (concat (cdr acc) additional)))
+                         (cons (cons (concat prefix suffix) existing)
+                               prefix)))
+                     stack
+                     :initial-value (cons nil "D")))))))
+
+(defvar michelson-type-completion-list
+  (list
+   (michelson-make-suggest "EXEC" (forall (arg ret) (arg (lambda arg ret))))
+   (michelson-make-suggest "MEM" (forall (val-type) (val-type (set val-type))))
+   (michelson-make-suggest "MEM" (forall (key-type val-type) (key-type (map key-type val-type))))
+   (michelson-make-suggest "UPDATE" (forall (val-type) (val-type bool (set val-type))))
+   (michelson-make-suggest "UPDATE" (forall (key-type val-type)
+                                            (key-type (option val-type) (map key-type val-type))))
+   (michelson-make-suggest "MAP" (forall (lt rt) ((lambda lt rt) (list lt))))
+   (michelson-make-suggest "MAP" (forall (k v b) ((lambda (pair k v) b) (map k v))))
+   (michelson-suggest-literals "IF" 'bool)
+   (michelson-suggest-literals "LOOP" 'bool)
+   (michelson-suggest-literals michelson-comparison-operations 'int)
+   'michelson-suggest-comparable
+   'michelson-suggest-pairs
+   (michelson-suggest-prefix-depth "D" "I" "P")
+   (michelson-suggest-prefix-depth "D" "U" "P")
+   (lambda (stack) (and (cdr stack)
+                        (funcall (michelson-suggest-prefix-depth "PA" "A" "IP") (cdr stack))))
+   (michelson-suggest-literals "NOT" 'bool)
+   (michelson-suggest-literals '("OR" "AND" "XOR") 'bool 'bool)
+   (michelson-suggest-literals "ABS" 'int)
+   (michelson-make-suggest
+    '("ADD" "SUB" "MUL" "EDIV")
+    (lambda (stack)
+      (let ((first (car stack))
+            (second (cadr stack))
+            (intnat '(int nat)))
+        (and first
+             second
+             (memq first intnat)
+             (memq second intnat)))))
+   (michelson-suggest-reorderable "ADD" 'nat 'timestamp)
+   (michelson-suggest-literals "NOT" 'int)
+   (michelson-suggest-literals '("OR" "AND" "XOR" "LSL" "LSR") 'nat 'nat)
+   (michelson-suggest-literals '("CONCAT") 'string 'string)
+   (michelson-suggest-depth '("SOME" "LEFT" "RIGHT") 1)
+   (michelson-suggest-literals '("ADD" "SUB") 'tez 'tez)
+   (michelson-suggest-reorderable '("ADD" "SUB" "MUL") 'tez 'nat)
+   (michelson-suggest-literals "EDIV" 'tez 'nat)
+   (michelson-suggest-literals "EDIV" 'tez 'tez)
+   (michelson-suggest-literals "DEFAULT_ACCOUNT" 'key)
+   (michelson-suggest-depth "SWAP" 2)
+   (michelson-suggest-depth '("DROP" "H") 1)
+   (michelson-suggest-literals "CHECK_SIGNATURE" 'key '(pair signature string))
+   (michelson-suggest-literals "CREATE_ACCOUNT" 'key '(option key) 'bool 'tez)
+   (michelson-make-suggest "IF_NONE" (forall (x) (option x)))
+   (michelson-make-suggest "IF_LEFT" (forall (x y) (or x y)))
+   ;; This is not exactly the type of TRANSFER_TOKENS.
+   ;; It will be changed once the concurrency model is worked out
+   (michelson-make-suggest "TRANSFER_TOKENS" (forall (p r g) (p tez (contract p r) g)))
+   (michelson-make-suggest
+    "CREATE_CONTRACT"
+    (forall (p r g) (key (option key) bool bool tez (lambda (pair p g) (pair r g)) g)))
+   (michelson-make-suggest "MANAGER" (forall (p r) ((contract p r))))
+   (michelson-make-suggest "CONS" (forall (a) (a (list a))))
+   (michelson-make-suggest "IF_CONS" (forall (a) (list a)))
+   (michelson-make-suggest "GET" (forall (k v) (k (map k v))))
+   (michelson-make-suggest "UPDATE" (forall (v) (v bool (set v))))
+   (michelson-make-suggest "UPDATE" (forall (k v) (k (option v) (map k v))))
+   (michelson-make-suggest "REDUCE" (forall (elt b) ((lambda (pair elt b) b) (set elt) b)))
+   (michelson-make-suggest "REDUCE" (forall (key val b) ((lambda (pair (pair key val) b) b) (map key val) b)))
+   (michelson-make-suggest "REDUCE" (forall (a b) ((lambda (pair a b) b) (list a) b)))
+   
+   
+))
+
+;; Special handling
+;; PA+IR
+
+
+(defun michelson-get-suggestion-list (stack)
+  (lexical-let ((stack stack))
+    (reduce (lambda (func acc) (append (funcall func stack) acc))
+            michelson-type-completion-list
+            :from-end t
+            :initial-value michelson-suggest-always-available)))
+
 
 (defun michelson-toggle-live-editing ()
   "Toggle `michelson-live-editing'.
@@ -481,6 +806,7 @@ Enables or disables stack and error display."
       (set-buffer michelson-output-buffer-name)
       (kill-buffer-and-window)))
   (setq michelson-live-editing (not michelson-live-editing)))
+
 
 (defun michelson-update-minibuffer-info ()
   (when (nth 2 michelson-state)
@@ -531,8 +857,12 @@ Enables or disables stack and error display."
   (setq indent-tabs-mode nil)
   (setq show-trailing-whitespace t)
   (setq buffer-file-coding-system 'utf-8-unix)
+  (add-hook 'completion-at-point-functions 'michelson-completion-at-point nil 'local)
+  (setq-local company-backends '(company-capf))
+  (setq-local process-environment (cons "ALPHANET_EMACS=true"
+                                        (cons "TEZOS_ALPHANET_DO_NOT_PULL=yes"
+                                              process-environment)))
   (run-hooks 'michelson-mode-hook))
-
 (add-to-list 'auto-mode-alist '("\\.tz\\'" . michelson-mode))
 (add-to-list 'auto-mode-alist '("\\.tez\\'" . michelson-mode))
 
