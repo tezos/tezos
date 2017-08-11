@@ -3,6 +3,15 @@ This mode is a work in progress.
 Please contact us with bugs and feature requests.
 All of the options mentioned below are also accessible via the customize menu.
 
+## Dependencies:
+To operate the mode, please install the following dependencies.
+All are available from either melpa, elpa, or marmalade
+and are available under a free software license.
+
+| Package  | Package Repository | Sources |
+| -------- | ------------------ | --------------- |
+| deferred | Melpa  | https://github.com/kiwanami/emacs-deferred |
+
 ## Required Configuration
 To use the mode, you must load the `michelson-mode.el` file into Emacs.
 Add the following to your `.emacs` file.
