@@ -7,8 +7,8 @@ if [ -z "$TZPATH" ]; then
 fi
 
 # Global arrays for cleanup
-if [ -z "${CLEANUP_DIS}" ]; then
-    export CLEANUP_DIS=()
+if [ -z "${CLEANUP_DIRS}" ]; then
+    export CLEANUP_DIRS=()
 fi
 
 if [ -z "${CLEANUP_PROCESSES}" ]; then
@@ -19,33 +19,35 @@ cleanup() {
     for ps in "${CLEANUP_PROCESSES[@]}"; do
         kill -9 $ps
     done
-    CLEANUP_PROCESSES=()
+    CLEANUP_PROCESSES=();
     sleep 2
 
-    for node_dir in "${CLEANUP_DIS[@]}"; do
-        printf "\nNode's log:\n" > /dev/stderr
-        cat $node_dir/LOG > /dev/stderr
+    for node_dir in "${CLEANUP_DIRS[@]}"; do
+        printf "\nNode's log:\n" 1>&2
+        [ ! -f $node_dir/LOG ] || cat $node_dir/LOG 1>&2
         rm -rf $node_dir
     done
-    CLEANUP_DIS=()
+    CLEANUP_DIRS=()
 
     for client_dir in ${CLIENT_DIRS[@]}; do
-        rm -rf $client_dir
+        rm -rf $client_dir;
     done
-    CLIENT_DIRS=()
+    CLIENT_DIRS=();
 }
 trap cleanup EXIT
 
 register_dir() {
-    CLEANUP_DIS+=("$1")
+    CLEANUP_DIRS+=("$1")
 }
 
 make_client () {
     client_dir="$(mktemp -d -t tezos_client.XXXXXXXXXX)"
     echo "${TZPATH}/tezos-client -base-dir ${client_dir}"
 }
-TZCLIENT=$(make_client)
-TZNODE="${TZPATH}/tezos-node"
+TZCLIENT_DIR="$(mktemp -d -t tezos_client.XXXXXXXXXX)"
+register_dir "${TZCLIENT_DIR}"
+export TZCLIENT="${TZPATH}/tezos-client -base-dir ${TZCLIENT_DIR}"
+export TZNODE="${TZPATH}/tezos-node"
 
 CUSTOM_PARAM="--sandbox=${TZPATH}/test/sandbox.json"
 
@@ -58,12 +60,15 @@ start_sandboxed_node() {
 
     data_dir="$(mktemp -d -t tezos_node.XXXXXXXXXX)"
     register_dir "$data_dir"
-    ${TZNODE} identity generate 0 --data-dir "${data_dir}"
-    ${TZNODE} config init --data-dir=${data_dir} --connections=2 --expected-pow=0.0
+    ${TZNODE} identity generate 0 --data-dir "${data_dir}" |& sed 's/^/## /' 1>&2
+    ${TZNODE} config init --data-dir="${data_dir}" --connections=2 --expected-pow=0.0 |& sed 's/^/## /' 1>&2
     ${TZNODE} run --data-dir "${data_dir}" ${CUSTOM_PARAM} "$@" $default_args > "$data_dir"/LOG 2>&1 &
     node_pid="$!"
     CLEANUP_PROCESSES+=($node_pid)
-    echo "Created node, pid: ${node_pid}, log: $data_dir/LOG" > /dev/stderr
+    export CLEANUP_PROCESSES
+    echo alias tezos-client=\"${TZCLIENT} \"\;
+    echo alias "tezos-sandbox-stop=\"kill -9 ${node_pid}; sleep 1; rm -rf ${data_dir} ${TZCLIENT_DIR};\""
+    echo "## Created node, pid: ${node_pid}, log: $data_dir/LOG" 1>&2
 }
 
 
@@ -75,7 +80,8 @@ activate_alpha() {
                 activate \
                 protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
                 with fitness 1 \
-                and key edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z
+                and key edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z \
+                > /dev/stderr
 }
 
 
@@ -239,3 +245,13 @@ add_bootstrap_identities() {
 extract_operation_hash() {
     grep "Operation hash is" | grep -o "'.*'" | tr -d "'"
 }
+
+display_aliases() {
+    echo <<EOF
+
+alias tezos-client="${TZCLIENT} "\;
+alias tezos-sandbox-stop="kill -9 ${node_pid}; sleep 1; rm -rf ${CLEANUP_DIRS[@]}; unalias tezos-client tezos-sandbox-stop"
+
+EOF
+}
+
