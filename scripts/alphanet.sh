@@ -88,7 +88,7 @@ save_accounts() {
     if [ ! -f "$data_dir/secret keys" ]; then
         echo "Saving the secrets into '$data_dir/secret keys'..."
         echo
-        echo "\033[33mWARNING: THE SECRET KEYS FILE IS UNENCRYPTED!!!\033[0m"
+        echo -e "\033[33mWARNING: THE SECRET KEYS FILE IS UNENCRYPTED!!!\033[0m"
         echo
         mkdir -p "$data_dir/"
     fi
@@ -135,9 +135,9 @@ check_volume() {
 clear_volume() {
     if check_volume ; then
         docker volume rm "$docker_volume" > /dev/null
-        echo "\033[32mThe blockchain data has been removed from the disk.\033[0m"
+        echo -e "\033[32mThe blockchain data has been removed from the disk.\033[0m"
     else
-        echo "\033[32mNo remaining data to be removed from the disk.\033[0m"
+        echo -e "\033[32mNo remaining data to be removed from the disk.\033[0m"
     fi
 }
 
@@ -162,7 +162,7 @@ assert_container_uptodate() {
 
 assert_container() {
     if ! check_container; then
-        echo "\033[31mNo container currently running!\033[0m"
+        echo -e "\033[31mNo container currently running!\033[0m"
         exit 1
     fi
 }
@@ -191,7 +191,7 @@ start_container() {
 
 stop_container() {
     if ! check_container; then
-        echo "\033[31mNo container to kill!\033[0m"
+        echo -e "\033[31mNo container to kill!\033[0m"
         exit 1
     fi
     save_identity ## Saving again, just in case...
@@ -216,22 +216,22 @@ check_node() {
 
 assert_node() {
     if ! check_node; then
-        echo "\033[31mNode is not running!\033[0m"
+        echo -e "\033[31mNode is not running!\033[0m"
         exit 0
     fi
 }
 
 status_node() {
     if check_node; then
-        echo "\033[32mNode is running\033[0m"
+        echo -e "\033[32mNode is running\033[0m"
     else
-        echo "\033[33mNode is not running\033[0m"
+        echo -e "\033[33mNode is not running\033[0m"
     fi
 }
 
 start_node() {
     if check_node; then
-        echo "\033[31mCannot run two nodes in the same container!\033[0m"
+        echo -e "\033[31mCannot run two nodes in the same container!\033[0m"
         exit 1
     fi
     if $docker_1_13; then
@@ -241,7 +241,7 @@ start_node() {
            "$docker_container" tezos run_node
     sleep 1
     docker exec "$docker_container" tezos wait_node
-    echo "\033[32mThe node is now running.\033[0m"
+    echo -e "\033[32mThe node is now running.\033[0m"
 }
 
 log_node() {
@@ -261,27 +261,27 @@ check_baker() {
 
 assert_baker() {
     if ! check_baker; then
-        echo "\033[31mBaker is not running!\033[0m"
+        echo -e "\033[31mBaker is not running!\033[0m"
         exit 0
     fi
 }
 
 status_baker() {
     if check_baker; then
-        echo "\033[32mBaker is running\033[0m"
+        echo -e "\033[32mBaker is running\033[0m"
     else
-        echo "\033[33mBaker is not running\033[0m"
+        echo -e "\033[33mBaker is not running\033[0m"
     fi
 }
 
 start_baker() {
     if check_baker; then
-        echo "\033[31mCannot run two bakers in the same container!\033[0m"
+        echo -e "\033[31mCannot run two bakers in the same container!\033[0m"
         exit 1
     fi
     TEZOS_LOG="${TEZOS_LOG:=* -> info}"
     docker exec -d "$docker_container" tezos run_baker
-    echo "\033[32mThe baker is now running.\033[0m"
+    echo -e "\033[32mThe baker is now running.\033[0m"
 }
 
 log_baker() {
@@ -300,27 +300,27 @@ check_endorser() {
 
 assert_endorser() {
     if ! check_baker; then
-        echo "\033[31mEndorser is not running!\033[0m"
+        echo -e "\033[31mEndorser is not running!\033[0m"
         exit 0
     fi
 }
 
 status_endorser() {
     if check_endorser; then
-        echo "\033[32mEndorser is running\033[0m"
+        echo -e "\033[32mEndorser is running\033[0m"
     else
-        echo "\033[33mEndorser is not running\033[0m"
+        echo -e "\033[33mEndorser is not running\033[0m"
     fi
 }
 
 start_endorser() {
     if check_endorser; then
-        echo "\033[31mCannot run two endorsers in the same container!\033[0m"
+        echo -e "\033[31mCannot run two endorsers in the same container!\033[0m"
         exit 1
     fi
     TEZOS_LOG="${TEZOS_LOG:=* -> info}"
     docker exec -d "$docker_container" tezos run_endorser
-    echo "\033[32mThe endorser is now running.\033[0m"
+    echo -e "\033[32mThe endorser is now running.\033[0m"
 }
 
 log_endorser() {
@@ -399,10 +399,10 @@ stop() {
 status() {
     pull_image
     if ! uptodate_container; then
-        echo "\033[31mThe container is running but not the latest available.\033[0m"
+        echo -e "\033[31mThe container is running but not the latest available.\033[0m"
         exit 1
     fi
-    echo "\033[32mThe container is running and up to date.\033[0m"
+    echo -e "\033[32mThe container is running and up to date.\033[0m"
     warn_script_uptodate verbose
     status_node
     status_baker
@@ -416,10 +416,10 @@ warn_script_uptodate() {
     docker cp "$docker_container:home/tezos/scripts/alphanet.sh" \
               ".alphanet.sh.new"
     if ! diff .alphanet.sh.new  "$0" >/dev/null 2>&1 ; then
-        echo "\033[33mWarning: the container contains a new version of 'alphanet.sh'.\033[0m"
-        echo "\033[33mYou might run '$0 update_script' to synchronize.\033[0m"
+        echo -e "\033[33mWarning: the container contains a new version of 'alphanet.sh'.\033[0m"
+        echo -e "\033[33mYou might run '$0 update_script' to synchronize.\033[0m"
     elif [ "$1" = "verbose" ] ; then
-        echo "\033[32mThe script is up to date.\033[0m"
+        echo -e "\033[32mThe script is up to date.\033[0m"
     fi
     rm .alphanet.sh.new
 }
@@ -437,10 +437,10 @@ update_script() {
     docker stop "$tmp" > /dev/null
     if ! diff .alphanet.sh.new  "$0" >/dev/null 2>&1 ; then
         mv .alphanet.sh.new "$0"
-        echo "\033[32mThe script has been updated.\033[0m"
+        echo -e "\033[32mThe script has been updated.\033[0m"
     else
         rm .alphanet.sh.new
-        echo "\033[32mThe script is up to date.\033[0m"
+        echo -e "\033[32mThe script is up to date.\033[0m"
     fi
 }
 
@@ -523,7 +523,7 @@ case "$command" in
         ;;
     clear)
         if check_container; then
-            echo "\033[31mCannot clear data while the container is running.\033[0m"
+            echo -e "\033[31mCannot clear data while the container is running.\033[0m"
             exit 1
         fi
         clear_volume
@@ -552,9 +552,9 @@ case "$command" in
                 ;;
             status)
                 if check_container; then
-                    echo "\033[32mContainer is running\033[0m"
+                    echo -e "\033[32mContainer is running\033[0m"
                 else
-                    echo "\033[33mContainer is not running\033[0m"
+                    echo -e "\033[33mContainer is not running\033[0m"
                 fi
                 ;;
             stop)
