@@ -1,0 +1,4 @@
+parameter (list nat);
+return nat;
+storage unit;
+code{CAR; IF_CONS {DIP{DROP}} {FAIL}; UNIT; SWAP; PAIR};

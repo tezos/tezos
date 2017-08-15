@@ -2,6 +2,8 @@
 
 set -e
 
+set -o pipefail
+
 source test_utils.sh
 
 start_sandboxed_node
@@ -67,6 +69,16 @@ assert_output $CONTRACT_PATH/max_in_list.tz Unit \
 assert_output $CONTRACT_PATH/max_in_list.tz Unit \
 			  '(List -10 -1 -20 -100)' '(Some -1)'
 
+# Identity on lists
+assert_output $CONTRACT_PATH/list_id.tz Unit '(List "1" "2" "3")' '(List "1" "2" "3")'
+assert_output $CONTRACT_PATH/list_id.tz Unit '(List)' 'List'
+assert_output $CONTRACT_PATH/list_id.tz Unit '(List "a" "b" "c")' '(List "a" "b" "c")'
+
+assert_output $CONTRACT_PATH/map_id.tz Unit '(List "1" "2" "3")' '(List "1" "2" "3")'
+assert_output $CONTRACT_PATH/map_id.tz Unit '(List)' 'List'
+assert_output $CONTRACT_PATH/map_id.tz Unit '(List "a" "b" "c")' '(List "a" "b" "c")'
+
+
 # Set member -- set is in storage
 assert_output $CONTRACT_PATH/set_member.tz '(Set)' '"Hi"' 'False'
 assert_output $CONTRACT_PATH/set_member.tz '(Set "Hi")' '"Hi"' 'True'
@@ -119,6 +131,8 @@ assert_output $CONTRACT_PATH/swap_left_right.tz Unit '(Right "a")' '(Left "a")'
 # Reverse a list
 assert_output $CONTRACT_PATH/reverse.tz Unit '(List )' 'List'
 assert_output $CONTRACT_PATH/reverse.tz Unit '(List "c" "b" "a")' '(List "a" "b" "c")'
+assert_output $CONTRACT_PATH/reverse_loop.tz Unit '(List )' 'List'
+assert_output $CONTRACT_PATH/reverse_loop.tz Unit '(List "c" "b" "a")' '(List "a" "b" "c")'
 
 # Exec concat contract
 assert_output $CONTRACT_PATH/exec_concat.tz Unit '""' '"_abc"'
@@ -138,6 +152,10 @@ assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "2.37" "2.37")' '(List True 
 # Test addition and subtraction on tez
 assert_output $CONTRACT_PATH/tez_add_sub.tz Unit '(Pair "2.00" "1.00")' '(Pair "3.00" "1.00")'
 assert_output $CONTRACT_PATH/tez_add_sub.tz Unit '(Pair "2.31" "1.01")' '(Pair "3.32" "1.30")'
+
+# Test get first element of list
+assert_output $CONTRACT_PATH/first.tz Unit '(List 1 2 3 4)' '1'
+assert_output $CONTRACT_PATH/first.tz Unit '(List 4)' '4'
 
 # Hash input string
 # Test assumed to be correct -- hash is based on encoding of AST
