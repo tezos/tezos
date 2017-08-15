@@ -149,11 +149,11 @@ let rec interp
           | If_cons (bt, _), Item (hd :: tl, rest) ->
               step origination qta ctxt bt (Item (hd, Item (tl, rest)))
           | List_map, Item (lam, Item (l, rest)) ->
-              fold_left_s (fun (tail, qta, ctxt, origination) arg ->
+              fold_right_s (fun arg (tail, qta, ctxt, origination) ->
                   interp ?log origination qta orig source amount ctxt lam arg
                   >>=? fun (ret, qta, ctxt, origination) ->
                   return (ret :: tail, qta, ctxt, origination))
-                ([], qta, ctxt, origination) l >>=? fun (res, qta, ctxt, origination) ->
+                l ([], qta, ctxt, origination) >>=? fun (res, qta, ctxt, origination) ->
               logged_return ~origination (Item (res, rest), qta, ctxt)
           | List_reduce, Item (lam, Item (l, Item (init, rest))) ->
               fold_left_s

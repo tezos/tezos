@@ -704,11 +704,11 @@ let rec parse_data
     (* Lists *)
     | List_t t, Prim (_, "List", vs) ->
         traced @@
-        fold_left_s
-          (fun rest v ->
+        fold_right_s
+          (fun v rest ->
              parse_data ?type_logger ctxt t v >>=? fun v ->
              return (v :: rest))
-          [] vs
+          vs []
     | List_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "List" ]))
     (* Sets *)

@@ -199,23 +199,23 @@ KEY2=bar
 
 add_bootstrap_identities() {
     client=${1:-${TZCLIENT}}
-    ${client} add identity bootstrap1 ${BOOTSTRAP1_IDENTITY}
+    # ${client} add identity bootstrap1 ${BOOTSTRAP1_IDENTITY}
     ${client} add public key bootstrap1 ${BOOTSTRAP1_PUBLIC}
     ${client} add secret key bootstrap1 ${BOOTSTRAP1_SECRET}
 
-    ${client} add identity bootstrap2 ${BOOTSTRAP2_IDENTITY}
+    # ${client} add identity bootstrap2 ${BOOTSTRAP2_IDENTITY}
     ${client} add public key bootstrap2 ${BOOTSTRAP2_PUBLIC}
     ${client} add secret key bootstrap2 ${BOOTSTRAP2_SECRET}
 
-    ${client} add identity bootstrap3 ${BOOTSTRAP3_IDENTITY}
+    # ${client} add identity bootstrap3 ${BOOTSTRAP3_IDENTITY}
     ${client} add public key bootstrap3 ${BOOTSTRAP3_PUBLIC}
     ${client} add secret key bootstrap3 ${BOOTSTRAP3_SECRET}
 
-    ${client} add identity bootstrap4 ${BOOTSTRAP4_IDENTITY}
+    # ${client} add identity bootstrap4 ${BOOTSTRAP4_IDENTITY}
     ${client} add public key bootstrap4 ${BOOTSTRAP4_PUBLIC}
     ${client} add secret key bootstrap4 ${BOOTSTRAP4_SECRET}
 
-    ${client} add identity bootstrap5 ${BOOTSTRAP5_IDENTITY}
+    # ${client} add identity bootstrap5 ${BOOTSTRAP5_IDENTITY}
     ${client} add public key bootstrap5 ${BOOTSTRAP5_PUBLIC}
     ${client} add secret key bootstrap5 ${BOOTSTRAP5_SECRET}
 

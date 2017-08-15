@@ -1,0 +1,6 @@
+parameter (list string);
+return (list string);
+storage unit;
+code { CAR; NIL string; SWAP; PUSH bool True;
+       LOOP { IF_CONS {SWAP; DIP{CONS}; PUSH bool True} {NIL string; PUSH bool False}};
+       DROP; UNIT; SWAP; PAIR}
