@@ -347,6 +347,30 @@ let report_errors cctxt errs =
           (snd (human_kind got))
           print_enumeration
           (List.map (fun k -> let (a, n) = human_kind k in a ^ " " ^ n) exp)
+    | Duplicate_map_keys (_, expr) ->
+        cctxt.warning
+          "@[<v 2>Map literals cannot contain duplicate keys, \
+           however a duplicate key was found:@ \
+           @[%a@]"
+          (print_expr no_locations) expr
+    | Unordered_map_keys (_, expr) ->
+        cctxt.warning
+          "@[<v 2>Keys in a map literal must be in strictly ascending order, \
+           but they were unordered in literal:@ \
+           @[%a@]"
+          (print_expr no_locations) expr
+    | Duplicate_set_values (_, expr) ->
+        cctxt.warning
+          "@[<v 2>Set literals cannot contain duplicate values, \
+           however a duplicate value was found:@ \
+           @[%a@]"
+          (print_expr no_locations) expr
+    | Unordered_set_values (_, expr) ->
+        cctxt.warning
+          "@[<v 2>Values in a set literal must be in strictly ascending order, \
+           but they were unordered in literal:@ \
+           @[%a@]"
+          (print_expr no_locations) expr
     | Fail_not_in_tail_position loc ->
         cctxt.warning
           "%aThe FAIL instruction must appear in a tail position."

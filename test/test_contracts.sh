@@ -20,8 +20,16 @@ CONTRACT_PATH=contracts
 # FORMAT: assert_output contract_file storage input expected_result
 
 assert_output $CONTRACT_PATH/ret_int.tz Unit Unit 300
+
+# Identity on strings
 assert_output $CONTRACT_PATH/str_id.tz Unit '"Hello"' '"Hello"'
 assert_output $CONTRACT_PATH/str_id.tz Unit '"abcd"' '"abcd"'
+
+# Identity on pairs
+assert_output $CONTRACT_PATH/pair_id.tz Unit '(Pair True False)' '(Pair True False)'
+assert_output $CONTRACT_PATH/pair_id.tz Unit '(Pair False True)' '(Pair False True)'
+assert_output $CONTRACT_PATH/pair_id.tz Unit '(Pair True True)' '(Pair True True)'
+assert_output $CONTRACT_PATH/pair_id.tz Unit '(Pair False False)' '(Pair False False)'
 
 # Logical not
 assert_output $CONTRACT_PATH/not.tz Unit True False
@@ -58,7 +66,7 @@ assert_output $CONTRACT_PATH/concat_list.tz Unit '(List )' '""'
 assert_output $CONTRACT_PATH/concat_list.tz \
 			  Unit '(List "Hello" " " "World" "!")' '"Hello World!"'
 
-# Find maximum int32 in list -- returns None if not found
+# Find maximum int in list -- returns None if not found
 assert_output $CONTRACT_PATH/max_in_list.tz Unit '(List)' 'None'
 assert_output $CONTRACT_PATH/max_in_list.tz Unit '(List 1)' '(Some 1)'
 assert_output $CONTRACT_PATH/max_in_list.tz Unit '(List -1)' '(Some -1)'
@@ -74,10 +82,20 @@ assert_output $CONTRACT_PATH/list_id.tz Unit '(List "1" "2" "3")' '(List "1" "2"
 assert_output $CONTRACT_PATH/list_id.tz Unit '(List)' 'List'
 assert_output $CONTRACT_PATH/list_id.tz Unit '(List "a" "b" "c")' '(List "a" "b" "c")'
 
-assert_output $CONTRACT_PATH/map_id.tz Unit '(List "1" "2" "3")' '(List "1" "2" "3")'
-assert_output $CONTRACT_PATH/map_id.tz Unit '(List)' 'List'
-assert_output $CONTRACT_PATH/map_id.tz Unit '(List "a" "b" "c")' '(List "a" "b" "c")'
+assert_output $CONTRACT_PATH/list_id_map.tz Unit '(List "1" "2" "3")' '(List "1" "2" "3")'
+assert_output $CONTRACT_PATH/list_id_map.tz Unit '(List)' 'List'
+assert_output $CONTRACT_PATH/list_id_map.tz Unit '(List "a" "b" "c")' '(List "a" "b" "c")'
 
+
+# Identity on maps
+assert_output $CONTRACT_PATH/map_id.tz Unit '(Map (Item 0 1))' '(Map (Item 0 1))'
+assert_output $CONTRACT_PATH/map_id.tz Unit '(Map (Item 0 0))' '(Map (Item 0 0))'
+assert_output $CONTRACT_PATH/map_id.tz Unit '(Map (Item 0 0) (Item 3 4))' '(Map (Item 0 0) (Item 3 4))'
+
+# Identity on sets
+assert_output $CONTRACT_PATH/set_id.tz Unit '(Set "a" "b" "c")' '(Set "a" "b" "c")'
+assert_output $CONTRACT_PATH/set_id.tz Unit '(Set)' 'Set'
+assert_output $CONTRACT_PATH/set_id.tz Unit '(Set "asdf" "bcde")' '(Set "asdf" "bcde")'
 
 # Set member -- set is in storage
 assert_output $CONTRACT_PATH/set_member.tz '(Set)' '"Hi"' 'False'
@@ -228,5 +246,10 @@ assert_balance $BOOTSTRAP4_IDENTITY "4,000,100.00 ꜩ"
 account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
 ${TZCLIENT} transfer 0.00 from bootstrap1 to default_account  -arg "\"$account\""
 assert_balance $account "100.00 ꜩ"
+
+assert_fails ${TZCLIENT} typecheck data '(Map (Item 0 1) (Item 0 1))' against type '(map nat nat)'
+assert_fails ${TZCLIENT} typecheck data '(Map (Item 0 1) (Item 10 1) (Item 5 1))' against type '(map nat nat)'
+assert_fails ${TZCLIENT} typecheck data '(Set "A" "C" "B")' against type '(set string)'
+assert_fails ${TZCLIENT} typecheck data '(Set "A" "B" "B")' against type '(set string)'
 
 printf "\nEnd of test\n"

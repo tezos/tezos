@@ -1,4 +1,4 @@
-parameter (list string);
-return (list string);
+parameter (map nat nat);
+return (map nat nat);
 storage unit;
-code {CAR; LAMBDA string string {}; MAP; UNIT; SWAP; PAIR}
+code {}
