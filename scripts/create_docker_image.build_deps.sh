@@ -13,7 +13,7 @@ cached_image="${3:-}"
 
 base_image="tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
 if ! docker pull "$base_image" ; then
-    ./create_docker_image.alpine.sh
+    ./scripts/create_docker_image.alpine.sh
 fi
 
 cleanup () {
@@ -59,7 +59,7 @@ echo
 
 if [ ! -z "$cached_image" ]; then
     echo
-    echo "### Saving socker image ($cached_image)..."
+    echo "### Saving docker image ($cached_image)..."
     echo
     docker tag "$image_name:$image_version" \
                "$cached_image:$dependencies_sha1"
