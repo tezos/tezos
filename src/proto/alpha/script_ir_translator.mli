@@ -46,6 +46,10 @@ type error += Invalid_constant : Script.location * Script.expr * _ Script_typed_
 type error += Invalid_contract of Script.location * Contract.t
 type error += Comparable_type_expected : Script.location * _ Script_typed_ir.ty -> error
 type error += Inconsistent_types : _ Script_typed_ir.ty * _ Script_typed_ir.ty -> error
+type error += Unordered_map_keys of Script.location * Script.expr
+type error += Unordered_set_values of Script.location * Script.expr
+type error += Duplicate_map_keys of Script.location * Script.expr
+type error += Duplicate_set_values of Script.location * Script.expr
 
 (* Toplevel errors *)
 type error += Ill_typed_data : string option * Script.expr * _ Script_typed_ir.ty -> error

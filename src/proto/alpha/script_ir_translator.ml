@@ -46,6 +46,10 @@ type error += Inconsistent_types : _ ty * _ ty -> error
 type error += Ill_typed_data : string option * Script.expr * _ ty -> error
 type error += Ill_formed_type of string option * Script.expr
 type error += Ill_typed_contract : Script.expr * _ ty * _ ty * _ ty * type_map -> error
+type error += Unordered_map_keys of Script.location * Script.expr
+type error += Unordered_set_values of Script.location * Script.expr
+type error += Duplicate_map_keys of Script.location * Script.expr
+type error += Duplicate_set_values of Script.location * Script.expr
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -329,7 +333,7 @@ let rec unparse_data
             (fun item acc ->
                unparse_data t item :: acc )
             set [] in
-        Prim (-1, "Set", items)
+        Prim (-1, "Set", List.rev items)
     | Map_t (kt, vt), map ->
         let kt = ty_of_comparable_ty kt in
         let items =
@@ -339,7 +343,7 @@ let rec unparse_data
                       unparse_data vt v ])
               :: acc)
             map [] in
-        Prim (-1, "Map", items)
+        Prim (-1, "Map", List.rev items)
     | Lambda_t _, Lam (_, original_code) ->
         original_code
 
@@ -712,31 +716,49 @@ let rec parse_data
     | List_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "List" ]))
     (* Sets *)
-    | Set_t t, Prim (_, "Set", vs) ->
-        traced @@
+    | Set_t t, (Prim (loc, "Set", vs) as expr) ->
         fold_left_s
-          (fun acc v ->
+          (fun (last_value, set) v ->
              parse_comparable_data ?type_logger ctxt t v >>=? fun v ->
-             return (set_update v true acc))
-          (empty_set t) vs
+             begin match last_value with
+              | Some value ->
+                  if Compare.Int.(0 <= (compare_comparable t value v))
+                  then
+                    if Compare.Int.(0 = (compare_comparable t value v))
+                    then fail (Duplicate_set_values (loc, expr))
+                    else fail (Unordered_set_values (loc, expr))
+                  else return ()
+              | None -> return ()
+             end >>=? fun () -> 
+             return (Some v, set_update v true set))
+          (None, empty_set t) vs >>|? snd |> traced
     | Set_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "Set" ]))
     (* Maps *)
-    | Map_t (tk, tv), Prim (_, "Map", vs) ->
-        traced @@
-        fold_left_s
-          (fun acc -> function
+    | Map_t (tk, tv), (Prim (loc, "Map", vs) as expr) ->
+        (fold_left_s
+          (fun (last_value, map) -> function
              | Prim (_, "Item", [ k; v ]) ->
                  parse_comparable_data ?type_logger ctxt tk k >>=? fun k ->
                  parse_data ?type_logger ctxt tv v >>=? fun v ->
-                 return (map_update k (Some v) acc)
+                 begin match last_value with
+                  | Some value ->
+                      if Compare.Int.(0 <= (compare_comparable tk value k))
+                      then
+                        if Compare.Int.(0 = (compare_comparable tk value k))
+                        then fail (Duplicate_map_keys (loc, expr))
+                        else fail (Unordered_map_keys (loc, expr))
+                      else return ()
+                  | None -> return ()
+                 end >>=? fun () ->
+                 return (Some k, map_update k (Some v) map)
              | Prim (loc, "Item", l) ->
                  fail @@ Invalid_arity (loc, "Item", 2, List.length l)
              | Prim (loc, name, _) ->
                  fail @@ Invalid_primitive (loc, [ "Item" ], name)
              | Int _ | String _ | Seq _ ->
                  fail (error ()))
-          (empty_map tk) vs
+          (None, empty_map tk) vs) >>|? snd |> traced
     | Map_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ "Map" ]))
 
@@ -749,8 +771,8 @@ and parse_comparable_data
 and parse_lambda
   : type arg ret storage. context ->
     ?storage_type: storage ty ->
-    ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
-    arg ty -> ret ty -> Script.expr -> (arg, ret) lambda tzresult Lwt.t =
+    ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) -> 
+   arg ty -> ret ty -> Script.expr -> (arg, ret) lambda tzresult Lwt.t =
   fun ctxt ?storage_type ?type_logger arg ret script_instr ->
     parse_instr ctxt ?storage_type ?type_logger
       script_instr (Item_t (arg, Empty_t)) >>=? function
@@ -1646,6 +1668,55 @@ let () =
       | _ -> None)
     (fun (loc, (name, exp, got)) ->
        Invalid_namespace (loc, name, exp, got)) ;
+  register_error_kind
+    `Permanent
+    ~id:"unorderedMapLiteral"
+    ~title:"Invalid map key order"
+    ~description:"Map keys must be in strictly increasing order"
+    (obj2
+       (req "location" Script.location_encoding)
+       (req "item" Script.expr_encoding))
+    (function
+      | Unordered_map_keys (loc, expr) -> Some (loc, expr)
+      | _ -> None)
+    (fun (loc, expr) -> Unordered_map_keys (loc, expr));
+  register_error_kind
+    `Permanent
+    ~id:"duplicateMapKeys"
+    ~title:"Duplicate map keys"
+    ~description:"Map literals cannot contain duplicated keys"
+    (obj2
+       (req "location" Script.location_encoding)
+       (req "item" Script.expr_encoding))
+    (function
+      | Duplicate_map_keys (loc, expr) -> Some (loc, expr)
+      | _ -> None)
+    (fun (loc, expr) -> Duplicate_map_keys (loc, expr));
+  register_error_kind
+    `Permanent
+    ~id:"unorderedSetLiteral"
+    ~title:"Invalid set value order"
+    ~description:"Set values must be in strictly increasing order"
+    (obj2
+       (req "location" Script.location_encoding)
+       (req "value" Script.expr_encoding))
+    (function
+      | Unordered_set_values (loc, expr) -> Some (loc, expr)
+      | _ -> None)
+    (fun (loc, expr) -> Unordered_set_values (loc, expr));
+  register_error_kind
+    `Permanent
+    ~id:"duplicateSetValuesInLiteral"
+    ~title:"Sets literals cannot contain duplicate elements"
+    ~description:"Set literals cannot contain duplicate elements, \
+                  but a duplicae was found while parsing."
+    (obj2
+       (req "location" Script.location_encoding)
+       (req "value" Script.expr_encoding))
+    (function
+      | Duplicate_set_values (loc, expr) -> Some (loc, expr)
+      | _ -> None)
+    (fun (loc, expr) -> Duplicate_set_values (loc, expr));
   (* -- Instruction typing errors ------------- *)
   register_error_kind
     `Permanent

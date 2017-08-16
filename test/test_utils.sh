@@ -98,7 +98,7 @@ assert_output () {
                        { printf '\nTest failed with error at line %s\n' "$(caller)" > /dev/stderr;
                          exit 1; });
     if [ "$expected" != "$output" ]; then
-        echo "Test at" `caller` failed > /dev/stderr;
+        echo "Test at " `caller` failed > /dev/stderr;
         printf "Expected %s but got %s" "$expected" "$output" > /dev/stderr;
         exit 1;
     fi
@@ -175,6 +175,17 @@ assert() {
         echo "Unexpected result: \"${result}\""
         echo "Expected: \"${expected}\""
         exit 2
+    fi
+}
+
+assert_fails() {
+    printf "[Asserting failure]\n"
+    if "$@" 2> /dev/null; then
+        printf "Expected command line to fail, but succeeded:\n"
+        echo "$@"
+        exit 1
+    else
+        return 0
     fi
 }
 
