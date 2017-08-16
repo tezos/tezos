@@ -22,11 +22,12 @@ getTagDigest() {
     local token=$1
     local reponame=$2
     local tag=$3
-    local id=$(curl -s -H "Authorization: Bearer ${token}" \
-                    -D - -o /dev/null \
+    local digest="$(curl -s -H "Authorization: Bearer ${token}" \
+                            -H "Accept: application/vnd.docker.distribution.manifest.v2+json" \
+                    --head  \
                     "${registry_uri}/${reponame}/manifests/${tag}" | \
-                   grep Docker-Content-Digest | tr -d '\r')
-    echo -n "${id##Docker-Content-Digest: }"
+                   grep Docker-Content-Digest | tr -d '\r')"
+    echo -n "${digest##Docker-Content-Digest: }"
 }
 
 deleteDigest() {

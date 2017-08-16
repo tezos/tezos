@@ -247,13 +247,11 @@ deploy:bootstrap6:
 
 ## Cleanup...
 
-cleanup:
-  <<: *dind_definition
-  stage: cleanup
-  script:
-    - ./scripts/delete_ci_image.sh gitlab-ci-token "${CI_BUILD_TOKEN}"
-         "${CI_PROJECT_PATH_SLUG}/build"
-         "${CI_BUILD_REF}"
-  ## Temporary allowed failure until image deletion is allowed on gitlab
-  ## https://gitlab.com/gitlab-org/gitlab-ce/merge_requests/13248
-  allow_failure: true
+# cleanup:
+  # <<: *dind_definition
+  # stage: cleanup
+  # script:
+    # - apk add -U curl jq
+    # - ./scripts/delete_ci_image.sh gitlab-ci-token "${CI_BUILD_TOKEN}"
+         # "${CI_PROJECT_PATH}/build"
+         # "${CI_BUILD_REF}"
