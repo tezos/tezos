@@ -34,7 +34,7 @@ prepare:
     - . ./scripts/version.sh
   script:
     - ./scripts/create_docker_image.alpine.sh
-    - mkdir ~/.docker
+    - mkdir ~/.docker || true
     - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
     - docker push "tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
     - docker tag "tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
@@ -164,7 +164,7 @@ publish:docker:minimal:
     - ./scripts/create_docker_image.minimal.sh
         "${public_docker_image}" "${CI_BUILD_REF_NAME}"
         "${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}"
-    - mkdir ~/.docker
+    - mkdir ~/.docker || true
     - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
     - docker push "${public_docker_image}:${CI_BUILD_REF_NAME}"
 
