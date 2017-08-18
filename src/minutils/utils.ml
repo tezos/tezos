@@ -10,6 +10,8 @@
 module StringMap = Map.Make (String)
 
 let split delim ?(dup = true) ?(limit = max_int) path =
+  (* Return a list of the substrings in path delimited by the character delim.
+     For ~dup:false, include "" in the return list when delim follows delim. *)
   let l = String.length path in
   let rec do_slashes acc limit i =
     if i >= l then
