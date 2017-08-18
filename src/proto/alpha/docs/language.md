@@ -471,6 +471,11 @@ IV - Core instructions
 
         > UNIT / S   =>   Unit : S
 
+   * `LAMBDA 'a 'b code`:
+     Push a lambda with given parameter and return types onto the stack.
+
+        :: 'A ->  (lambda 'a 'b) : 'A
+
 ### Generic comparison
 
 Comparison only works on a class of types that we call comparable.
