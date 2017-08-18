@@ -9,40 +9,25 @@
 
 module StringMap = Map.Make (String)
 
-let split delim ?(dup = true) ?(limit = max_int) path =
-  let l = String.length path in
-  let rec do_slashes acc limit i =
-    if i >= l then
-      List.rev acc
-    else if String.get path i = delim then
-      if dup then
-        do_slashes acc limit (i + 1)
-      else
-        do_split acc limit (i + 1)
-    else
-      do_split acc limit i
-  and do_split acc limit i =
-    if limit <= 0 then
-      if i = l then
-        List.rev acc
-      else
-        List.rev (String.sub path i (l - i) :: acc)
-    else
-      do_component acc (pred limit) i i
-  and do_component acc limit i j =
-    if j >= l then
-      if i = j then
-        List.rev acc
-      else
-        List.rev (String.sub path i (j - i) :: acc)
-    else if String.get path j = delim then
-      do_slashes (String.sub path i (j - i) :: acc) limit j
-    else
-      do_component acc limit i (j + 1) in
-  if limit > 0 then
-    do_slashes [] limit 0
+let split delim ?(dup = true) ?(limit = max_int) s : string list =
+  if limit <= 0 then [s]
   else
-    [ path ]
+    (* Skip first character if it matches delimiter. *)
+    let len = String.length s in
+    let pos = ref @@ if (len > 0) && (s.[0] = delim) then 1 else 0 in
+    let retval, last = ref [], ref !pos in
+    while (List.length !retval < limit) && (!pos < len) do
+      if s.[!pos] = delim then (
+        (* Skip this match if last char also matched, or dup'ing *)
+        if (not dup) || (!last != !pos) then
+          retval := String.sub s !last (!pos - !last) :: !retval;
+        last := !pos + 1);
+      pos := !pos + 1;
+    done;
+    List.rev @@
+      if !last < len then (* Only if last char not delim *)
+        String.sub s !last (len - !last) :: !retval
+      else !retval;;
 
 let split_path path = split '/' path
 
