@@ -11,34 +11,47 @@ See https://www.tezos.com/ for more information about the project.
 Build instructions
 ------------------
 
-To compile Tezos, you need an OCaml compiler (version 4.04.0) and all the
+To compile Tezos, you need an OCaml compiler (version 4.04.2) and all the
 libraries listed in `src/tezos-deps.opam`.
 
 The best way to install all dependencies is by first installing
 [OPAM](https://opam.ocaml.org/), the OCaml package manager.
 
-Create a new switch alias for Tezos. A switch is your own version of the OPAM
-configuration, including the OCaml compiler, all packages, and package manager
-configuration related to your project. This is necessary so that the project
-doesn't conflict with other OCaml projects or other versions of Tezos.
+Then, you need to create a new switch alias for Tezos. A switch is
+your own version of the OPAM configuration, including the OCaml
+compiler, all packages, and package manager configuration related to
+your project. This is necessary so that the project doesn't conflict
+with other OCaml projects or other versions of Tezos.
 
 ```
-opam switch tezos --alias-of 4.04.2
+opam update
+opam switch "tezos" --alias-of 4.04.2
 ```
 
-Activate the new switch:
+Note that if you previously created a switch named `tezos` but with an
+older OCaml version you need to remove the switch with `opam switch
+remove "tezos"`.
+
+When the switch is ready, you need to activate it:
 
 ```
 eval `opam config env`
 ```
 
-Install Tezos dependencies:
+Install the libraries which Tezos depends on:
 
 ```
 make build-deps
 ```
 
-Compile the project:
+While building the dependencies, `opam` is able to handle correctly
+the OCaml libraries but it is not always able to handle all external C
+libraries we depend on. On most system, it is able to suggest a call
+to the system package manager but it currently does not handle version
+check. In particular, the `libsodium-dev` packages on Ubuntu is too
+old for building Tezos, we rely on version `1.0.11` at least.
+
+At last, compile the project:
 
 ```
 make
@@ -69,7 +82,7 @@ Running the node in a sandbox
 To run a single instance of a Tezos node in sandbox mode:
 
 ```
-./tezos-node run --sandbox --rpc-addr localhost:8732
+./tezos-node run --sandbox --rpc-addr localhost:8732 --data-dir /tmp/tezos-sandbox
 ```
 
 This "sandboxed" node will not participate in the P2P network, but will accept
@@ -291,7 +304,7 @@ Typically, if you are not trying to run a local network and just want to
 explore the RPC, you would run:
 
 ```
-./tezos-node run --sandbox --rpc-addr localhost
+./tezos-node run --rpc-addr localhost
 ```
 
 The RPC interface is self-documented and the `tezos-client` executable is able
