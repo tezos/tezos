@@ -188,7 +188,7 @@ let write_file ?(bin=false) fn contents =
     )
     (fun () -> close_out oc)
 
-let (<<) g f = fun a -> g (f a)
+
 
 let rec (--) i j =
   let rec loop acc j =
@@ -303,3 +303,5 @@ let parse_addr_port s =
             | _pos ->
                 invalid_arg "split_url_port: IPv6 addresses must be bracketed"
   end
+
+let (<<) g f = fun a -> g (f a)

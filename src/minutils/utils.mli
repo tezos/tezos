@@ -70,8 +70,6 @@ val finalize: (unit -> 'a) -> (unit -> unit) -> 'a
 val read_file: ?bin:bool -> string -> string
 val write_file: ?bin:bool -> string -> string -> unit
 
-(** Compose functions from right to left. *)
-val (<<) : ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
 
 (** Sequence: [i--j] is the sequence [i;i+1;...;j-1;j] *)
 val (--) : int -> int -> int list
@@ -95,3 +93,6 @@ val select: int -> 'a list -> 'a * 'a list
 (** [split_url_port uri] is (node, service) where [node] is the DNS or
     IP and service is the optional port number or service name. *)
 val parse_addr_port: string -> string * string
+
+(** Compose functions from right to left. *)
+val (<<) : ('b -> 'c) -> ('a -> 'b) -> 'a -> 'c
