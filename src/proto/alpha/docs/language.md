@@ -929,14 +929,6 @@ are the addition of a (positive) number of seconds and the comparison.
    * `ADD`
      Increment / decrement a timestamp of the given number of seconds.
 
-        :: timestamp : float : 'S -> timestamp : 'S
-
-        > ADD ; C / t : period : S   =>   [FAIL]   iff   period < 0
-        > ADD ; C / t : period : S   =>   C / (t + period seconds) : S
-
-   * `ADD`
-     Increment / decrement a timestamp of the given number of seconds.
-
         :: timestamp : nat : 'S -> timestamp : 'S
         :: nat : timestamp : 'S -> timestamp : 'S
 
