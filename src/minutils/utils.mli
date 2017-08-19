@@ -13,9 +13,13 @@ module StringMap : Map.S with type key = string
     ignoring slashes at the beginning and end of string. *)
 val split_path: string -> string list
 
-(** Splits a string on a delimier character, grouping multiple
-    delimiters, and ignoring delimiters at the beginning and end of
-    string, if [limit] is passed, stops after [limit] split(s). *)
+(** Substrings in string s delimited by char delim.
+
+    Given ~dup:false, include "" in the return list when delim follows delim.
+    Given ~limit:n, return first n substrings, followed by remainder of s.
+
+    Attempts to match boundary conditions of predecessor in commit d95e7be00b.
+    See test/utils/test_utils.ml for examples. **)
 val split: char -> ?dup:bool -> ?limit: int -> string -> string list
 
 val map_option: f:('a -> 'b) -> 'a option -> 'b option
