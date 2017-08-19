@@ -80,9 +80,15 @@ let filter_map f l =
   List.rev @@ List.fold_left (fun acc x -> may_cons acc (f x)) [] l
 
 let list_rev_sub l n =
-  ListLabels.fold_left l ~init:(n, []) ~f:begin fun (n, l) elt ->
-    if n <= 0 then (n, l) else (n - 1, elt :: l)
-  end |> snd
+  if n < 0 then
+    invalid_arg "Utils.list_rev_sub: `n` must be non-negative.";
+  let rec append_rev_sub acc l = function
+    | 0 -> acc
+    | n ->
+        match l with
+        | [] -> acc
+        | hd :: tl -> append_rev_sub (hd :: acc) tl (n - 1) in
+  append_rev_sub [] l n
 
 let list_sub l n = list_rev_sub l n |> List.rev
 
