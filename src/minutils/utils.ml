@@ -301,5 +301,5 @@ let parse_addr_port s =
                 check_port port ;
                 addr, port
             | _pos ->
-                invalid_arg "split_url_port: IPv6 addresses must be bracketed"
+                invalid_arg "Utils.parse_addr_port: IPv6 addresses must be bracketed"
   end
