@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Comparators for primitive types, and for lists and options of those types *)
+
 module type S = sig
   type t
   val (=) : t -> t -> bool
