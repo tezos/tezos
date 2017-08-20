@@ -9,7 +9,8 @@
 
 (* Tezos Utility library - Hexadecimal encoding *)
 
-(* From OCaml's stdlib. See [Digest.to_hex] *)
+(* From OCaml's stdlib. See [Digest.to_hex], and [hex_of_bytes], [hex_encode]
+   below for examples. *)
 let gen_encode length get s =
   let n = length s in
   let result = Bytes.create (n*2) in
@@ -21,7 +22,8 @@ let gen_encode length get s =
 let hex_of_bytes = gen_encode MBytes.length MBytes.get_uint8
 let hex_encode = gen_encode String.length (fun s i -> int_of_char s.[i])
 
-(* From OCaml's stdlib. See [Digest.from_hex]. *)
+(* From OCaml's stdlib. See [Digest.from_hex], and [hex_decode], [bytes_of_hex]
+   below for examples. *)
 let gen_decode create set h =
   let n = String.length h in
   if n mod 2 <> 0 then invalid_arg ("hex_decode: " ^ h);
@@ -45,41 +47,3 @@ let hex_decode s =
 
 let bytes_of_hex s =
   gen_decode MBytes.create MBytes.set_int8 s
-
-(*
-let hex_bytes =
-  let open Data_encoding in
-  let schema =
-     let open Json_schema in
-     create
-       { title = None ;
-         description = None ;
-         default = None;
-         enum = None;
-         kind = String {
-             pattern = Some "^[a-zA-Z0-9]+$";
-             min_length = 0;
-             max_length = None;
-           };
-         format = None ;
-         id = None } in
-  conv ~schema hex_of_bytes (Json.wrap_error bytes_of_hex) string
-
-let sha256 =
-  let open Data_encoding in
-  let schema =
-    let open Json_schema in
-    create
-      { title = None ;
-        description = None ;
-        default = None;
-        enum = None;
-        kind = String {
-            pattern = Some "^[a-zA-Z0-9]+$";
-            min_length = 64;
-            max_length = Some 64;
-          };
-        format = Some "sha256" ;
-        id = None } in
-  conv ~schema hex_of_bytes (Json.wrap_error bytes_of_hex) string
-*)
