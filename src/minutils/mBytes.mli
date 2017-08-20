@@ -7,11 +7,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Low-level byte array querying and manipulation.
+
+    Default layout for numeric operations is big-endian.
+    Little-endian operations in the LE submodule. **)
+
 open Bigarray
 
+(* Arrays are of characters, represented as uint8's, in row-major layout. *)
 type t = (char, int8_unsigned_elt, c_layout) Array1.t
 
 val create: int -> t
+(** [create n] allocates and returns an array of size [n] **)
 
 val length: t -> int
 
@@ -143,3 +150,4 @@ val (>) : t -> t -> bool
 val compare : t -> t -> int
 
 val concat: t -> t -> t
+(** Returns a new array with adjacent copies of the two input arrays **)
