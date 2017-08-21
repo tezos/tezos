@@ -822,15 +822,15 @@ constants as is, concatenate them and use them as keys.
 
         > NONE ; C / v :: S   =>   C / None :: S
 
-   * `IF_SOME bt bf`:
+   * `IF_NONE bf bt`:
      Inspect an optional value.
 
         :: 'a? : 'S   ->   'b : 'S
            iff   bt :: [ 'a : 'S -> 'b : 'S]
                  bf :: [ 'S -> 'b : 'S]
 
-        > IF_SOME ; C / (Some a) : S    =>    bt ; C / a : S
-        > IF_SOME ; C / (None) : S   =>    bf ; C / S
+        > IF_NONE ; C / (Some a) : S    =>    bt ; C / a : S
+        > IF_NONE ; C / (None) : S   =>    bf ; C / S
 
 ### Operations on unions
 
