@@ -18,7 +18,8 @@ else
     docker_1_13=false
 fi
 
-src_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+current_dir="$(pwd -P)"
+src_dir="$(cd "$(dirname "$0")" && echo "$current_dir/")"
 cd "$src_dir"
 
 default_port=9732
@@ -31,7 +32,7 @@ suffix=
 data_dir="$HOME/.tezos-alphanet$suffix"
 docker_container="tezos-alphanet$suffix"
 
-if [ $ALPHANET_EMACS ]; then
+if [ ! -z "$ALPHANET_EMACS" ]; then
     interactive_flags="-t"
 else
     interactive_flags="-it"
@@ -175,7 +176,7 @@ start_container() {
         assert_container_uptodate
     else
         if ! check_volume; then
-            docker volume create $docker_volume
+            docker volume create "$docker_volume"
         fi
         docker rm "$docker_container" || true > /dev/null 2>&1
         echo "Launching the docker container..."
@@ -338,13 +339,16 @@ run_client() {
     declare -a container_args=();
     for arg in "$@"; do
         if [[ "$arg" == 'container:'* ]]; then
-            local_path=${arg#container:}
+            local_path="${arg#container:}"
+            if [[ "$local_path" != '/'* ]]; then
+                local_path="$current_dir/$local_path"
+            fi
             docker exec "$docker_container" mkdir -p -m 777 /tmp/copied/
             file_name=$(basename "${local_path}")
             docker_path="/tmp/copied/$file_name"
             docker cp "${local_path}" "$docker_container:${docker_path}"
             docker exec "$docker_container" sudo chmod 644 "${docker_path}"
-            container_args+=($docker_path);
+            container_args+=("file:$docker_path");
         else
             container_args+=(${arg});
         fi
