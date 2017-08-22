@@ -2,6 +2,7 @@
 SRCDIR=../../src
 
 TESTS := \
+  utils \
   merkle \
   data-encoding \
   stream-data-encoding \
@@ -55,8 +56,27 @@ test-merkle: ${LIB} ${TEST_MERKLE_IMPLS:.ml=.cmx}
 clean::
 	rm -f test-merkle
 
+
 ############################################################################
-## Data_encoding
+## Utils
+
+.PHONY:run-test-utils
+run-test-utils:
+	@echo
+	./test-utils
+
+TEST_UTILS_IMPLS := \
+  test_utils.ml
+
+test-utils: ${LIB} ${TEST_UTILS_IMPLS:.ml=.cmx}
+	@echo LINK $(notdir $@)
+	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	rm -f test-utils
+
+############################################################################
+## Utils
 
 .PHONY:run-test-data-encoding
 run-test-data-encoding:
