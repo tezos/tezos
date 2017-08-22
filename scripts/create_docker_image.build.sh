@@ -18,8 +18,8 @@ cleanup () {
 }
 trap cleanup EXIT INT
 
-sed scripts/Dockerfile.build.in \
-    -e 's|$base_image|'"$build_deps_image_name"'|g' > Dockerfile
+sed -e 's|$base_image|'"$build_deps_image_name"'|g' \
+    scripts/Dockerfile.build.in > Dockerfile
 
 echo
 echo "### Building tezos..."

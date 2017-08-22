@@ -30,8 +30,8 @@ echo
 echo "### Building minimal docker image..."
 echo
 
-sed scripts/Dockerfile.minimal.in \
-    -e 's|$alpine_version|'"$alpine_version"'|g' > Dockerfile
+sed -e 's|$alpine_version|'"$alpine_version"'|g' \
+    scripts/Dockerfile.minimal.in > Dockerfile
 docker build -t "$image_name:$image_version" .
 
 echo
