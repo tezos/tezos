@@ -23,9 +23,9 @@ cleanup () {
 }
 trap cleanup EXIT INT
 
-sed scripts/Dockerfile.build_deps.in \
-    -e 's|$base_image|'"$base_image"'|g' \
-    -e 's|$ocaml_version|'"$ocaml_version"'|g' > Dockerfile
+sed -e 's|$base_image|'"$base_image"'|g' \
+    -e 's|$ocaml_version|'"$ocaml_version"'|g' \
+    scripts/Dockerfile.build_deps.in > Dockerfile
 
 ## Lookup for for prebuilt dependencies...
 dependencies="scripts/install_build_deps.sh src/tezos-deps.opam Dockerfile"
