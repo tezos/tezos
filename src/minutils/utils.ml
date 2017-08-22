@@ -210,35 +210,40 @@ let take_n_unsorted n l =
     | x :: xs -> loop (x :: acc) (pred n) xs in
   loop [] n l
 
-module Bounded(E: Set.OrderedType) = struct
+module Bounded(E: Set.OrderedType) : sig
 
-  (* TODO one day replace list by an heap array *)
+  type t
+  val create: int -> t
+  val insert: E.t -> t -> unit
+  val get: t -> E.t list
+
+end = struct
+
+  (* TODO one day replace the list by an heap array *)
 
   type t = {
     bound : int ;
     mutable size : int ;
     mutable data : E.t list ;
   }
-  let create bound = { bound ; size = 0 ; data = [] }
+
+  let create bound =
+    if bound <= 0 then invalid_arg "Utils.Bounded(_).create" ;
+    { bound ; size = 0 ; data = [] }
 
   let rec push x = function
     | [] -> [x]
     | (y :: xs) as ys ->
-        let c = compare x y in
-        if c < 0 then x :: ys else if c = 0 then ys else y :: push x xs
-
-  let replace x xs =
-    match xs with
-    | y :: xs when compare x y > 0 ->
-        push x xs
-    | xs -> xs
+        if E.compare x y <= 0
+        then x :: ys
+        else y :: push x xs
 
   let insert x t =
     if t.size < t.bound then begin
       t.size <- t.size + 1 ;
       t.data <- push x t.data
     end else if E.compare (List.hd t.data) x < 0 then
-      t.data <- replace x t.data
+      t.data <- push x (List.tl t.data)
 
   let get { data } = data
 
