@@ -33,7 +33,6 @@ PKG dynlink
 PKG ezjsonm
 PKG git
 PKG git-unix
-PKG ipv6-multicast
 PKG irmin-unix
 PKG irmin-git
 PKG irmin
