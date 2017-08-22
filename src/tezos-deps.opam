@@ -22,7 +22,6 @@ depends: [
   "ezjsonm" {= "0.4.3" }
   "git"
   "git-unix"
-  "ipv6-multicast"
   "irmin-watcher" (* for `irmin.unix` *)
   "irmin" {>= "0.12" & < "1.0" }
   "lwt" {>= "3.0.0" }

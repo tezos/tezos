@@ -32,7 +32,6 @@ PKG cstruct
 PKG dynlink
 PKG ezjsonm
 PKG git
-PKG ipv6-multicast
 PKG irmin
 PKG lwt
 PKG magic-mime

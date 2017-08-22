@@ -310,7 +310,6 @@ NODE_PACKAGES := \
   cohttp.lwt \
   dynlink \
   git \
-  ipv6-multicast \
   irmin.unix \
   ocplib-resto.directory \
   ssl \
