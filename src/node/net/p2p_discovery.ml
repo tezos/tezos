@@ -17,6 +17,7 @@ let shutdown () = Lwt.return_unit
 
 let inet_addr = Unix.inet_addr_of_string "ff0e::54:455a:3053"
 
+(*
 module Message = struct
 
   let encoding =
@@ -61,7 +62,6 @@ let create_socket (iface, disco_addr, disco_port) =
   Ipv6_multicast.Unix.membership ?iface usock disco_addr `Join ;
   iface, sock, saddr
 
-(*
 module Answerer = struct
 
   (* Launch an answer machine for the discovery mechanism, takes a
