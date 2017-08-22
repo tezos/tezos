@@ -20,8 +20,8 @@ module type S = sig
   val min : t -> t -> t
 end
 
-module Char = struct
-  type t = char
+module MakeBasic(T : sig type t end) : (S with type t = T.t) = struct
+  type t = T.t
   let (=) = ((=) : t -> t -> bool)
   let (<>) = ((<>) : t -> t -> bool)
   let (<) = ((<) : t -> t -> bool)
@@ -33,57 +33,13 @@ module Char = struct
   let min x y = if x <= y then x else y
 end
 
-module Bool = struct
-  type t = bool
-  let (=) = ((=) : t -> t -> bool)
-  let (<>) = ((<>) : t -> t -> bool)
-  let (<) = ((<) : t -> t -> bool)
-  let (<=) = ((<=) : t -> t -> bool)
-  let (>=) = ((>=) : t -> t -> bool)
-  let (>) = ((>) : t -> t -> bool)
-  let compare = compare
-  let max x y = if x >= y then x else y
-  let min x y = if x <= y then x else y
-end
-
-module Int = struct
-  type t = int
-  let (=) = ((=) : t -> t -> bool)
-  let (<>) = ((<>) : t -> t -> bool)
-  let (<) = ((<) : t -> t -> bool)
-  let (<=) = ((<=) : t -> t -> bool)
-  let (>=) = ((>=) : t -> t -> bool)
-  let (>) = ((>) : t -> t -> bool)
-  let compare = compare
-  let max x y = if x >= y then x else y
-  let min x y = if x <= y then x else y
-end
-
-module Int32 = struct
-  type t = int32
-  let (=) = ((=) : t -> t -> bool)
-  let (<>) = ((<>) : t -> t -> bool)
-  let (<) = ((<) : t -> t -> bool)
-  let (<=) = ((<=) : t -> t -> bool)
-  let (>=) = ((>=) : t -> t -> bool)
-  let (>) = ((>) : t -> t -> bool)
-  let compare = compare
-  let max x y = if x >= y then x else y
-  let min x y = if x <= y then x else y
-end
-
-module Int64 = struct
-  type t = int64
-  let (=) = ((=) : t -> t -> bool)
-  let (<>) = ((<>) : t -> t -> bool)
-  let (<) = ((<) : t -> t -> bool)
-  let (<=) = ((<=) : t -> t -> bool)
-  let (>=) = ((>=) : t -> t -> bool)
-  let (>) = ((>) : t -> t -> bool)
-  let compare = compare
-  let max x y = if x >= y then x else y
-  let min x y = if x <= y then x else y
-end
+module Char = MakeBasic(struct type t = char end)
+module String = MakeBasic(struct type t = string end)
+module Bool = MakeBasic(struct type t = bool end)
+module Float = MakeBasic(struct type t = float end)
+module Int = MakeBasic(struct type t = int end)
+module Int32 = MakeBasic(struct type t = int32 end)
+module Int64 = MakeBasic(struct type t = int64 end)
 
 module MakeUnsigned(Int : S)(Z : sig val zero : Int.t end) = struct
   type t = Int.t
@@ -110,32 +66,6 @@ end
 
 module Uint32 = MakeUnsigned(Int32)(struct let zero = 0l end)
 module Uint64 = MakeUnsigned(Int64)(struct let zero = 0L end)
-
-module Float = struct
-  type t = float
-  let (=) = ((=) : t -> t -> bool)
-  let (<>) = ((<>) : t -> t -> bool)
-  let (<) = ((<) : t -> t -> bool)
-  let (<=) = ((<=) : t -> t -> bool)
-  let (>=) = ((>=) : t -> t -> bool)
-  let (>) = ((>) : t -> t -> bool)
-  let compare = compare
-  let max x y = if x >= y then x else y
-  let min x y = if x <= y then x else y
-end
-
-module String = struct
-  type t = string
-  let (=) = ((=) : t -> t -> bool)
-  let (<>) = ((<>) : t -> t -> bool)
-  let (<) = ((<) : t -> t -> bool)
-  let (<=) = ((<=) : t -> t -> bool)
-  let (>=) = ((>=) : t -> t -> bool)
-  let (>) = ((>) : t -> t -> bool)
-  let compare = compare
-  let max x y = if x >= y then x else y
-  let min x y = if x <= y then x else y
-end
 
 module List(P : S) = struct
   type t = P.t list
