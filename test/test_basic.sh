@@ -47,6 +47,11 @@ ${TZCLIENT} get delegate for free_account
 ${TZCLIENT} set delegate for free_account to ${KEY2}
 ${TZCLIENT} get delegate for free_account
 
+${TZCLIENT} get balance for bootstrap5 | assert "4,000,000.00 ꜩ"
+${TZCLIENT} transfer 4000000.00 from bootstrap5 to bootstrap1 -fee 0
+${TZCLIENT} transfer 4000000.00 from bootstrap1 to bootstrap5 -fee 0
+${TZCLIENT} get balance for bootstrap5 | assert "4,000,000.00 ꜩ"
+
 echo
 echo End of test
 echo
