@@ -842,6 +842,16 @@ constants as is, concatenate them and use them as keys.
         > IF_NONE ; C / (None) : S   =>    bt ; C / S
         > IF_NONE ; C / (Some a) : S    =>    bf ; C / a : S
 
+   * `IF_SOME bt bf`:
+     Inspect an optional value.
+
+        :: 'a? : 'S   ->   'b : 'S
+           iff   bt :: [ 'a : 'S -> 'b : 'S]
+                 bf :: [ 'S -> 'b : 'S]
+
+        > IF_SOME ; C / (Some a) : S    =>    bt ; C / a : S
+        > IF_SOME ; C / (None) : S   =>    bf ; C / S
+
 
 ### Operations on unions
 
@@ -868,6 +878,17 @@ constants as is, concatenate them and use them as keys.
 
         > IF_LEFT ; C / (Left a) : S    =>    bt ; C / a : S
         > IF_LEFT ; C / (Right b) : S   =>    bf ; C / b : S
+
+   * `IF_RIGHT bt bf`:
+     Inspect an optional value.
+
+        :: or 'a 'b : 'S   ->   'c : 'S
+           iff   bt :: [ 'b : 'S -> 'c : 'S]
+                 bf :: [ 'a : 'S -> 'c : 'S]
+
+        > IF_LEFT ; C / (Right b) : S   =>    bt ; C / b : S
+        > IF_RIGHT ; C / (Left a) : S    =>    bf ; C / a : S
+
 
 ### Operations on lists
 
@@ -1110,6 +1131,41 @@ for under/overflows.
 
         :: key : key : 'S   ->   int : 'S
 
+### Assertion operations
+
+All assertion operations are syntactic sugar for conditionals
+with a `FAIL` instruction in the appropriate branch.
+When possible, use them to increase clarity about illegal states.
+
+   * `ASSERT`:
+
+        > IF {} {FAIL}
+
+   * `ASSERT_{EQ|NEQ|LT|LE|GT|GE}`:
+
+        > ASSERT_(\op) => IF(\op) {} {FAIL}
+
+   * `ASSERT_CMP{EQ|NEQ|LT|LE|GT|GE}`:
+
+        > ASSERT_CMP(\op) => IFCMP(\op) {} {FAIL}
+
+   * `ASSERT_NONE`:
+     Equivalent to ``.
+
+        > ASSERT_NONE => IF_NONE {} {FAIL}
+
+   * `ASSERT_SOME`:
+     Equivalent to `IF_NONE {FAIL} {}`.
+
+        > ASSERT_NONE => IF_NONE {FAIL} {}
+
+   * `ASSERT_LEFT`:
+
+        > ASSERT_LEFT => IF_LEFT {} {FAIL}
+
+   * `ASSERT_RIGHT`:
+
+        > ASSERT_RIGHT => IF_LEFT {FAIL} {}
 
 VIII - Concrete syntax
 ----------------------
