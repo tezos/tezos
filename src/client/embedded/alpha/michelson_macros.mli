@@ -18,7 +18,10 @@ val expand_dxiiivp : node -> node option
 val expand_paaiair : node -> node option
 val expand_duuuuup : node -> node option
 val expand_compare : node -> node option
+val expand_asserts : node -> node option
 val expand_unpaaiair : node -> node option
+val expand_if_some : node -> node option
+val expand_if_right : node -> node option
 
 open Script
 
@@ -31,4 +34,7 @@ val unexpand_dxiiivp : expr -> expr option
 val unexpand_paaiair : expr -> expr option
 val unexpand_duuuuup : expr -> expr option
 val unexpand_compare : expr -> expr option
+val unexpand_asserts : expr -> expr option
 val unexpand_unpaaiair : expr -> expr option
+val unexpand_if_some : expr -> expr option
+val unexpand_if_right : expr -> expr option

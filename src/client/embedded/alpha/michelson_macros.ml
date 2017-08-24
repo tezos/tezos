@@ -353,6 +353,54 @@ let expand_compare original =
   | Prim (loc, "IFGE", args, None) ->
       Some (Seq (loc, [ Prim (loc, "GE", [], None) ;
                         Prim (loc, "IF", args, None) ], None))
+  | _ -> None;;
+
+
+let expand_asserts original =
+  let fail_false loc =
+    [ Seq(loc, [], None) ; Seq(loc, [ Prim (loc, "FAIL", [], None) ], None) ] in
+  let fail_true loc =
+    [ Seq(loc, [ Prim (loc, "FAIL", [], None) ], None) ; Seq(loc, [], None) ] in
+  match original with
+  | Prim (loc, "ASSERT", [], None) ->
+      Some (Seq (loc, [ Prim (loc, "IF", fail_false loc, None) ], None))
+  | Prim (loc, "ASSERT_NONE", [], None) ->
+      Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_false loc, None) ], None))
+  | Prim (loc, "ASSERT_SOME", [], None) ->
+      Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_true loc, None) ], None))
+  | Prim (loc, "ASSERT_LEFT", [], None) ->
+      Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_false loc, None) ], None))
+  | Prim (loc, "ASSERT_RIGHT", [], None) ->
+      Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_true loc, None) ], None))
+  | Prim (loc, s, [], None)
+    when String.(length s >  7 && equal (sub s 0 7) "ASSERT_") ->
+      begin
+        let remaining = String.(sub s 7 ((length s) - 7)) in
+        let remaining_prim = Prim(loc, remaining, [], None) in
+        match remaining with
+        | "EQ" | "NEQ" | "LT" | "LE" | "GE" | "GT" ->
+            Some (Seq (loc, [ remaining_prim ;
+                              Prim (loc, "IF", fail_false loc, None) ], None))
+        | _ ->
+            begin
+              match expand_compare remaining_prim with
+            | None -> None
+            | Some seq ->
+                Some (Seq (loc, [ seq ;
+                                  Prim (loc, "IF", fail_false loc, None) ], None))
+          end
+      end
+  | _ -> None
+
+
+let expand_if_some = function
+  | Prim (loc, "IF_SOME", [ right ; left ], None) ->
+      Some (Seq (loc, [ Prim (loc, "IF_NONE", [ left ; right ], None) ], None))
+  | _ -> None
+
+let expand_if_right = function
+  | Prim (loc, "IF_RIGHT", [ right ; left ], None) ->
+      Some (Seq (loc, [ Prim (loc, "IF_LEFT", [ left ; right ], None) ], None))
   | _ -> None
 
 let expand original =
@@ -374,7 +422,10 @@ let expand original =
       expand_paaiair ;
       expand_unpaaiair ;
       expand_duuuuup ;
-      expand_compare ]
+      expand_compare ;
+      expand_asserts ;
+      expand_if_some ;
+      expand_if_right ]
 
 open Script
 
@@ -521,27 +572,23 @@ let unexpand_dxiiivp expanded =
   | _ -> None
 
 let unexpand_duuuuup expanded =
-  let is_duuuuup_prim_name str =
-    let len = String.length str in
-    len >= 3
-    && String.get str 0 = 'D'
-    && String.get str (len - 1) = 'P'
-    && begin
-      let all_u = ref true in
-      for i = 1 to len - 2 do
-        all_u := !all_u && String.get str i = 'U'
-      done ;
-      !all_u
-    end in
-  match expanded with
-  | Seq (loc,
-         [ Prim (_, "DIP",
-                 [ Prim (_, sub, [], None) ], None) ;
-           Prim (_, "SWAP", [], None) ], None)
-    when is_duuuuup_prim_name sub ->
-      let name = "DU" ^ String.sub sub 1 (String.length sub - 1) in
-      Some (Prim (loc, name, [], None))
-  | _ -> None
+  let rec help expanded =
+    match expanded with
+    | Seq (loc, [ Prim (_, "DUP", [], None) ], None) -> Some (loc, 1)
+    | Seq (_, [ Prim (_, "DIP", [expanded'], None);
+                Prim (_, "SWAP", [], None) ], None) ->
+        begin
+          match help expanded' with
+          | None -> None
+          | Some (loc, n) -> Some (loc, n + 1)
+        end
+    | _ -> None
+  in let rec dupn = function
+      | 0 -> "P"
+      | n -> "U" ^ (dupn (n - 1)) in
+  match help expanded with
+  | None -> None
+  | Some (loc, n) -> Some (Prim (loc, "D" ^ (dupn n), [], None))
 
 let unexpand_paaiair expanded =
   match expanded with
@@ -650,6 +697,51 @@ let unexpand_compare expanded =
       Some (Prim (loc, "IFGE", args, None))
   | _ -> None
 
+let unexpand_asserts expanded =
+  match expanded with
+  | Seq (loc, [ Prim (_, "IF", [ Seq (_, [ ], None) ;
+                                 Seq (_, [ Prim(_, "FAIL", [], None) ], None) ],
+                      None) ], None) ->
+      Some (Prim (loc, "ASSERT", [], None))
+  | Seq (loc, [ Seq (_, [ Prim(_, "COMPARE", [], None) ; Prim(_, comparison, [], None) ], None) ;
+                Prim (_, "IF", [ Seq (_, [ ], None) ;
+                                 Seq (_, [ Prim(_, "FAIL", [], None) ], None) ],
+                      None) ], None) ->
+      Some (Prim (loc, "ASSERT_CMP" ^ comparison, [], None))
+  | Seq (loc, [ Prim (_, comparison, [], None) ;
+                Prim (_, "IF", [ Seq (_, [ ], None) ;
+                                 Seq (_, [ Prim(_, "FAIL", [], None) ], None) ],
+                      None) ], None) ->
+      Some (Prim (loc, "ASSERT_" ^ comparison, [], None))
+  | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, [ ], None) ;
+                                      Seq (_, [ Prim(_, "FAIL", [], None) ], None) ],
+                      None) ], None) ->
+      Some (Prim (loc, "ASSERT_NONE", [], None))
+  | Seq (loc, [ Prim (_, "IF_NONE", [ Seq (_, [ Prim(_, "FAIL", [], None) ], None) ;
+                                      Seq (_, [ ], None)],
+                      None) ], None) ->
+      Some (Prim (loc, "ASSERT_SOME", [], None))
+  | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, [ ], None) ;
+                                      Seq (_, [ Prim(_, "FAIL", [], None) ], None) ],
+                      None) ], None) ->
+      Some (Prim (loc, "ASSERT_LEFT", [], None))
+  | Seq (loc, [ Prim (_, "IF_LEFT", [ Seq (_, [ Prim(_, "FAIL", [], None) ], None) ;
+                                      Seq (_, [ ], None) ],
+                      None) ], None) ->
+      Some (Prim (loc, "ASSERT_RIGHT", [], None))
+  | _ -> None
+
+
+let unexpand_if_some = function
+  | Seq (loc, [ Prim (_, "IF_NONE", [ left ; right ], None) ], None) ->
+      Some (Prim (loc, "IF_SOME", [ right ; left ], None))
+  | _ -> None
+
+let unexpand_if_right = function
+  | Seq (loc, [ Prim (_, "IF_LEFT", [ left ; right ], None) ], None) ->
+      Some (Prim (loc, "IF_RIGHT", [ right ; left ], None))
+  | _ -> None
+
 let unexpand original =
   let try_expansions unexpanders =
     match
@@ -662,11 +754,14 @@ let unexpand original =
     | None -> original
     | Some rewritten -> rewritten in
   try_expansions
-    [ unexpand_caddadr ;
+    [ unexpand_asserts ;
+      unexpand_caddadr ;
       unexpand_set_caddadr ;
       unexpand_map_caddadr ;
       unexpand_dxiiivp ;
       unexpand_paaiair ;
       unexpand_unpaaiair ;
       unexpand_duuuuup ;
-      unexpand_compare ]
+      unexpand_compare ;
+      unexpand_if_some ;
+      unexpand_if_right ]
