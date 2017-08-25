@@ -372,8 +372,8 @@ IV - Core instructions
      main result (second rule below). Its type is thus completely
      generic.
 
-        > FAIL / _   =>  [FAIL]
-        > _ / [FAIL]    =>   [FAIL]
+        > FAIL / _   =>  [FAIL]  
+        >_ / [FAIL]    =>   [FAIL]
 
    * `{ I ; C }`:
      Sequence.
@@ -393,7 +393,7 @@ IV - Core instructions
            iff   bt :: [ 'A -> 'B ]
                  bf :: [ 'A -> 'B ]
 
-        > IF bt bf / True : S    =>    bt / S
+        > IF bt bf / True : S    =>    bt / S  
         > IF bt bf / False : S   =>    bf / S
 
    * `LOOP body`:
@@ -402,7 +402,7 @@ IV - Core instructions
         :: bool : 'A   ->   'A
            iff   body :: [ 'A -> bool : 'A ]
 
-        > LOOP body / True : S    =>    body ; LOOP body / S
+        > LOOP body / True : S    =>    body ; LOOP body / S  
         > LOOP body / False : S   =>    S
 
    * `DIP code`:
@@ -411,8 +411,8 @@ IV - Core instructions
         :: 'b : 'A   ->   'b : 'C
            iff   code :: [ 'A -> 'C ]
 
-        > DIP code / x : S   =>   x : S'
-          where    code / S   =>   S'
+        > DIP code / x : S   =>   x : S'  
+        > where    code / S   =>   S'
 
    * `DII+P code`:
      A syntactic sugar for working deeper in the stack.
@@ -424,8 +424,8 @@ IV - Core instructions
 
         :: 'a : lambda 'a 'b : 'C   ->   'b : 'C
 
-        > EXEC / a : f : S   =>   r : S
-          where f / a : []   =>   r : []
+        > EXEC / a : f : S   =>   r : S  
+        > where f / a : []   =>   r : []
 
 ### Stack operations
 
@@ -491,7 +491,7 @@ is less than the second, and positive otherwise.
 
         :: int : 'S   ->   bool : 'S
 
-        > EQ ; C / 0 : S     =>   C / True : S
+        > EQ ; C / 0 : S     =>   C / True : S  
         > EQ ; C / _ : S     =>   C / False : S
 
 
@@ -500,7 +500,7 @@ is less than the second, and positive otherwise.
 
         :: int : 'S   ->   bool : 'S
 
-        > NEQ ; C / 0 : S     =>   C / False : S
+        > NEQ ; C / 0 : S     =>   C / False : S  
         > NEQ ; C / _ : S     =>   C / True : S
 
    * `LT`:
@@ -508,7 +508,7 @@ is less than the second, and positive otherwise.
 
         :: int : 'S   ->   bool : 'S
 
-        > LT ; C / v : S     =>   C / True : S   iff  v < 0
+        > LT ; C / v : S     =>   C / True : S   iff  v < 0  
         > LT ; C / _ : S     =>   C / False : S
 
    * `GT`:
@@ -516,7 +516,7 @@ is less than the second, and positive otherwise.
 
         :: int : 'S   ->   bool : 'S
 
-        > GT ; C / v : S     =>   C / True : S   iff  v > 0
+        > GT ; C / v : S     =>   C / True : S   iff  v > 0  
         > GT ; C / _ : S     =>   C / False : S
 
    * `LE`:
@@ -524,7 +524,7 @@ is less than the second, and positive otherwise.
 
         :: int : 'S   ->   bool : 'S
 
-        > LE ; C / v : S     =>   C / True : S   iff  v <= 0
+        > LE ; C / v : S     =>   C / True : S   iff  v <= 0  
         > LE ; C / _ : S     =>   C / False : S
 
    * `GE`:
@@ -532,7 +532,7 @@ is less than the second, and positive otherwise.
 
         :: int : 'S   ->   bool : 'S
 
-        > GE ; C / v : S     =>   C / True : S   iff  v >= 0
+        > GE ; C / v : S     =>   C / True : S   iff  v >= 0  
         > GE ; C / _ : S     =>   C / False : S
 
 Syntactic sugar exists for merging `COMPARE` and comparison
@@ -587,7 +587,7 @@ meaning the only size limit is fuel.
 
    * `NEG`
 
-        :: int : 'S   ->   int : 'S
+        :: int : 'S   ->   int : 'S  
         :: nat : 'S   ->   int : 'S
 
         > NEG ; C / x : S   =>   C / -x : S
@@ -600,27 +600,27 @@ meaning the only size limit is fuel.
 
    * `ADD`
 
-        :: int : int : 'S   ->   int : 'S
-        :: int : nat : 'S   ->   int : 'S
-        :: nat : int : 'S   ->   int : 'S
+        :: int : int : 'S   ->   int : 'S  
+        :: int : nat : 'S   ->   int : 'S  
+        :: nat : int : 'S   ->   int : 'S  
         :: nat : nat : 'S   ->   nat : 'S
 
         > ADD ; C / x : y : S   =>   C / (x + y) : S
 
    * `SUB`
 
-        :: int : int : 'S   ->   int : 'S
-        :: int : nat : 'S   ->   int : 'S
-        :: nat : int : 'S   ->   int : 'S
+        :: int : int : 'S   ->   int : 'S  
+        :: int : nat : 'S   ->   int : 'S  
+        :: nat : int : 'S   ->   int : 'S  
         :: nat : nat : 'S   ->   int : 'S
 
         > SUB ; C / x : y : S   =>   C / (x - y) : S
 
    * `MUL`
 
-        :: int : int : 'S   ->   int : 'S
-        :: int : nat : 'S   ->   int : 'S
-        :: nat : int : 'S   ->   int : 'S
+        :: int : int : 'S   ->   int : 'S  
+        :: int : nat : 'S   ->   int : 'S  
+        :: nat : int : 'S   ->   int : 'S  
         :: nat : nat : 'S   ->   nat : 'S
 
         > MUL ; C / x : y : S   =>   C / (x * y) : S
@@ -628,12 +628,12 @@ meaning the only size limit is fuel.
    * `EDIV`
      Perform Euclidian division
 
-        :: int : int : 'S   ->   option (pair int nat) : 'S
-        :: int : nat : 'S   ->   option (pair int nat) : 'S
-        :: nat : int : 'S   ->   option (pair int nat) : 'S
+        :: int : int : 'S   ->   option (pair int nat) : 'S  
+        :: int : nat : 'S   ->   option (pair int nat) : 'S  
+        :: nat : int : 'S   ->   option (pair int nat) : 'S  
         :: nat : nat : 'S   ->   option (pair nat nat) : 'S
 
-        > EDIV ; C / x : 0 : S   =>   C / None
+        > EDIV ; C / x : 0 : S   =>   C / None  
         > EDIV ; C / x : y : S   =>   C / Some (Pair (x / y) (x % y)) : S
 
 Bitwise logical operators are also available on unsigned integers.
@@ -662,7 +662,7 @@ Bitwise logical operators are also available on unsigned integers.
      The resulting integer is computed using two's complement.
      For instance, the boolean negation of `0` is `-1`.
 
-        :: nat : 'S   ->   int : 'S
+        :: nat : 'S   ->   int : 'S  
         :: int : 'S   ->   int : 'S
 
         > NOT ; C / x : S   =>   C / ~x : S
@@ -671,8 +671,8 @@ Bitwise logical operators are also available on unsigned integers.
 
         :: nat : nat : 'S   ->   nat : 'S
 
-        > LSL ; C / x : s : S   =>   C / (x << s) : S
-          iff   s <= 256
+        > LSL ; C / x : s : S   =>   C / (x << s) : S  
+        >  iff   s <= 256  
         > LSL ; C / x : s : S   =>   [FAIL]
 
    * `LSR`
@@ -684,11 +684,11 @@ Bitwise logical operators are also available on unsigned integers.
    * `COMPARE`:
      Integer/natural comparison
 
-        :: int : int : 'S   ->   int : 'S
+        :: int : int : 'S   ->   int : 'S  
         :: nat : nat : 'S   ->   int : 'S
 
-        > COMPARE ; C / x : y : S   =>   C / -1 : S  iff x < y
-        > COMPARE ; C / x : y : S   =>   C / 0 : S   iff x = y
+        > COMPARE ; C / x : y : S   =>   C / -1 : S  iff x < y  
+        > COMPARE ; C / x : y : S   =>   C / 0 : S   iff x = y  
         > COMPARE ; C / x : y : S   =>   C / 1 : S   iff x > y
 
 ### Operations on strings
@@ -719,7 +719,7 @@ constants as is, concatenate them and use them as keys.
    * `P(A*AI)+R`:
      A syntactic sugar for building nested pairs in bulk.
 
-        > P(\fst=A*)AI(\rest=(A*AI)+)R ; C / S  =>  P(\fst)AIR ; P(\rest)R ; C / S
+        > P(\fst=A*)AI(\rest=(A*AI)+)R ; C / S  =>  P(\fst)AIR ; P(\rest)R ; C / S  
         > PA(\rest=A*)AIR ; C / S  =>   DIP (P(\rest)AIR) ; C / S
 
    * `CAR`:
@@ -739,7 +739,7 @@ constants as is, concatenate them and use them as keys.
    * `C[AD]+R`:
      A syntactic sugar for accessing fields in nested pairs.
 
-        > CA(\rest=[AD]+)R ; C / S   =>   CAR ; C(\rest)R ; C / S
+        > CA(\rest=[AD]+)R ; C / S   =>   CAR ; C(\rest)R ; C / S  
         > CD(\rest=[AD]+)R ; C / S   =>   CDR ; C(\rest)R ; C / S
 
 ### Operations on sets
@@ -839,7 +839,7 @@ constants as is, concatenate them and use them as keys.
            iff   bt :: [ 'S -> 'b : 'S]
                  bf :: [ 'a : 'S -> 'b : 'S]
 
-        > IF_NONE ; C / (None) : S   =>    bt ; C / S
+        > IF_NONE ; C / (None) : S   =>    bt ; C / S  
         > IF_NONE ; C / (Some a) : S    =>    bf ; C / a : S
 
 
@@ -866,7 +866,7 @@ constants as is, concatenate them and use them as keys.
            iff   bt :: [ 'a : 'S -> 'c : 'S]
                  bf :: [ 'b : 'S -> 'c : 'S]
 
-        > IF_LEFT ; C / (Left a) : S    =>    bt ; C / a : S
+        > IF_LEFT ; C / (Left a) : S    =>    bt ; C / a : S  
         > IF_LEFT ; C / (Right b) : S   =>    bf ; C / b : S
 
 ### Operations on lists
@@ -892,7 +892,7 @@ constants as is, concatenate them and use them as keys.
            iff   bt :: [ 'a : list 'a : 'S -> 'b : 'S]
                  bf :: [ 'S -> 'b : 'S]
 
-        > IF_CONS ; C / (Cons a rest) : S   =>    bt ; C / a : rest : S
+        > IF_CONS ; C / (Cons a rest) : S   =>    bt ; C / a : rest : S  
         > IF_CONS ; C / Nil : S   =>    bf ; C / S
 
    * `MAP`:
@@ -940,10 +940,10 @@ are the addition of a (positive) number of seconds and the comparison.
    * `ADD`
      Increment / decrement a timestamp of the given number of seconds.
 
-        :: timestamp : nat : 'S -> timestamp : 'S
+        :: timestamp : nat : 'S -> timestamp : 'S  
         :: nat : timestamp : 'S -> timestamp : 'S
 
-        > ADD ; C / seconds : nat (t) : S   =>   C / (seconds + t) : S
+        > ADD ; C / seconds : nat (t) : S   =>   C / (seconds + t) : S  
         > ADD ; C / nat (t) : seconds : S   =>   C / (t + seconds) : S
 
    * `COMPARE`:
@@ -963,30 +963,30 @@ for under/overflows.
 
         :: tez : tez : 'S   ->   tez : 'S
 
-        > ADD ; C / x : y : S   =>   [FAIL]   on overflow
+        > ADD ; C / x : y : S   =>   [FAIL]   on overflow  
         > ADD ; C / x : y : S   =>   C / (x + y) : S
 
    * `SUB`:
 
         :: tez : tez : 'S   ->   tez : 'S
 
-        > SUB ; C / x : y : S   =>   [FAIL]   iff   x < y
+        > SUB ; C / x : y : S   =>   [FAIL]   iff   x < y  
         > SUB ; C / x : y : S   =>   C / (x - y) : S
 
    * `MUL`
 
-        :: tez : nat : 'S   ->   tez : 'S
+        :: tez : nat : 'S   ->   tez : 'S  
         :: nat : tez : 'S   ->   tez : 'S
 
-        > MUL ; C / x : y : S   =>   [FAIL]   on overflow
+        > MUL ; C / x : y : S   =>   [FAIL]   on overflow  
         > MUL ; C / x : y : S   =>   C / (x * y) : S
 
    * `EDIV`
 
-        :: tez : nat : 'S   ->   option (pair tez tez) : 'S
+        :: tez : nat : 'S   ->   option (pair tez tez) : 'S  
         :: tez : tez : 'S   ->   option (pair nat tez) : 'S
 
-        > EDIV ; C / x : 0 : S   =>   C / None
+        > EDIV ; C / x : 0 : S   =>   C / None  
         > EDIV ; C / x : y : S   =>   C / Some (Pair (x / y) (x % y)) : S
 
    * `COMPARE`:
