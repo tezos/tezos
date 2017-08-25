@@ -211,41 +211,47 @@ let take_n_unsorted n l =
   loop [] n l
 
 module Bounded(E: Set.OrderedType) : sig
-
   type t
   val create: int -> t
   val insert: E.t -> t -> unit
   val get: t -> E.t list
-
 end = struct
 
-  (* TODO one day replace the list by an heap array *)
+  module SE = Map.Make(E)
 
-  type t = {
-    bound : int ;
-    mutable size : int ;
-    mutable data : E.t list ;
-  }
+  type t = { bound : int ; (* Number of biggest elements to keep track of *)
+             mutable data : int SE.t; (* Biggest elements seen so far *)
+             mutable minelt : E.t option; (* Smallest of biggest elements *)
+             mutable numbig : int; (* Size of biggest observed *) }
 
   let create bound =
     if bound <= 0 then invalid_arg "Utils.Bounded(_).create" ;
-    { bound ; size = 0 ; data = [] }
-
-  let rec push x = function
-    | [] -> [x]
-    | (y :: xs) as ys ->
-        if E.compare x y <= 0
-        then x :: ys
-        else y :: push x xs
+    { bound ; data = SE.empty ; numbig = 0 ; minelt = None }
 
   let insert x t =
-    if t.size < t.bound then begin
-      t.size <- t.size + 1 ;
-      t.data <- push x t.data
-    end else if E.compare (List.hd t.data) x < 0 then
-      t.data <- push x (List.tl t.data)
+    let update data minelt numbig = (* Update [t] with given values. *)
+      t.data <- data;
+      t.minelt <- Some minelt;
+      t.numbig <- numbig in
+    match t.minelt with
+    | None -> update (SE.add x 1 SE.empty) x 1; (* First element *)
+    | Some minelt ->
+        let nminelt = if (E.compare x minelt = 1) then minelt else x in
+        let numx = if SE.mem x t.data then SE.find x t.data else 0 in
+        let plusx = SE.add x (numx + 1) t.data in
+        if t.numbig < t.bound then update plusx nminelt @@ t.numbig + 1
+        else if x != nminelt then (* =>[x>minelt]. No change if [x=minelt] *)
+          let mincount = SE.find minelt t.data in
+          if mincount = 1 then
+            let newdata = SE.remove minelt plusx in
+            update newdata (newdata |> SE.min_binding |> fst) t.numbig
+          else update (SE.add minelt (mincount - 1) plusx) minelt t.numbig;;
 
-  let get { data } = data
+  let get { data } =
+    let rec repeat acc (x, c) = match c with
+      | 0 -> acc
+      | n -> repeat (x :: acc) (x, n - 1) in
+    SE.bindings data |> List.rev |> List.fold_left repeat []
 
 end
 
