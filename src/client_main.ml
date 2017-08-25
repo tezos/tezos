@@ -78,8 +78,9 @@ let main () =
        if parsed_args.print_timings then
          { rpc_config with
            logger = Client_rpcs.timings_logger Format.err_formatter }
-       else
-         rpc_config
+       else if parsed_args.log_requests
+       then {rpc_config with logger = Client_rpcs.full_logger Format.err_formatter }
+       else rpc_config
      in
      command (cctxt config rpc_config)) >>= function
     | Ok () ->

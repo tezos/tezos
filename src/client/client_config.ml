@@ -164,12 +164,14 @@ let preparse_args argv =
 type cli_args = {
   block: Node_rpc_services.Blocks.block ;
   print_timings: bool ;
+  log_requests: bool ;
   force: bool ;
 }
 
 let default_cli_args = {
   block = Client_commands.default_cfg.block ;
   print_timings = false ;
+  log_requests = false ;
   force = false ;
 }
 
@@ -197,6 +199,9 @@ let parse_args usage dispatcher argv =
     "-block", Arg.String (fun _ -> ( (* preparsed *) )),
       "The block on which to apply contextual commands.\n\
        default: " ^ Node_rpc_services.Blocks.to_string default_cli_args.block ;
+    "-log-requests",
+    Arg.Unit (fun () -> parsed_args := { !parsed_args with log_requests = true }),
+    "If set, this flag causes all requests and responses to the node to be logged."
   ] in
   (* Command-line args which can be set in config file as well *)
   let file_args = [
