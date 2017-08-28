@@ -76,20 +76,6 @@ download and install them from, eg,
 https://pkgs.org/download/libsodium18 and
 https://pkgs.org/download/libsodium-dev
 
-Running the node in a sandbox
------------------------------
-
-To run a single instance of a Tezos node in sandbox mode:
-
-```
-./tezos-node run --sandbox --rpc-addr localhost:8732 --data-dir /tmp/tezos-sandbox
-```
-
-This "sandboxed" node will not participate in the P2P network, but will accept
-RPC from localhost on port 8732. See below from more details on the RPC
-interface.
-
-
 Running the node
 ----------------
 
@@ -147,6 +133,74 @@ with the following commands line:
 ```
 ./tezos-node config reset --data-dir "$dir" --net-addr localhost:9733
 ./tezos-node config update --data-dir "$dir" --net-addr localhost:9734
+```
+
+Running the node in a sandbox
+-----------------------------
+
+To run a 'localhost-only' instance of a Tezos network, we provide two
+helper scripts:
+
+- `./scripts/launch-sandboxed-node.sh`
+- `./scripts/init-sandboxed-client.sh`
+
+For instance, if you want to run local network with two nodes, in a
+first terminal, the following command will initialize a node listening
+for peers on port `19731` and listening for RPC on port `18731`.
+
+```
+./scripts/launch-sandboxed-node.sh 1
+```
+
+This node will store its data in a temporary directory which will be
+removed when the node is killed.
+
+To launch the second node, just run the following command, it will
+listen on port `19739` and `18739`:
+
+```
+./scripts/launch-sandboxed-node.sh 9
+```
+
+You might replace `1` or `9` by any number in between if you want to
+run more than two nodes. But, if you intend to run a single node
+network, you might remove the spurious "Too few connections" warnings
+by lowering the number of expected connection, by running the
+following command instead:
+
+```
+./scripts/launch-sandboxed-node.sh 1 --connections 0
+```
+
+Once your node(s) is/are running, open a new terminal and initialize
+the "sandboxed" client data:
+
+```
+eval `./scripts/init-sandboxed-client.sh 1`
+```
+
+It will initialize the client data in a temporary directory. It will
+also defines in the current shell session an alias `tezos-client`
+preconfigured for communicating the same-numbered node. For instance:
+
+```
+$ tezos-client rpc call blocks/head/hash
+{ "hash": "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z" }
+```
+
+When you bootstrap a new network, the network is initialized with a
+dummy economic protocol, called "genesis". If you want to run the same
+protocol than the alphanet, `init-sandboxed-client` also defines an
+alias `tezos-activate-alpha`, that you need to execute once for
+activating the whole network. For instance:
+
+```
+$ tezos-client rpc call blocks/head/protocol
+{ "protocol": "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" }
+$ tezos-activate-alpha
+Injected BMBcK869jaHQDc
+$ tezos-client rpc call blocks/head/protocol
+{ "protocol": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" }
 ```
 
 Configuration options

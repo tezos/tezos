@@ -1,25 +1,42 @@
-#!/usr/bin/env bash
+#! /bin/sh
 
+set -e
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
-export TZPATH="$(dirname $script_dir)"
+src_dir="$(dirname "$script_dir")"
+cd "$src_dir"
 
-. $TZPATH/test/test_utils.sh
+if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
+    echo "Small script to launch local and closed test network with a maximum of 9 nodes."
+    echo
+    echo "Usage: $0 <id>"
+    echo "  where <id> should be an integer between 1 and 9."
+    exit 1
+fi
 
-start_sandboxed_node
-sleep 3
+id="$1"
+shift 1
 
-activate_alpha |& sed 's/^/## /' > /dev/stderr
+port=$((19730 + id))
+rpc=$((18730 + id))
+expected_pow="${expected_pow:-0.0}"
+node_dir="$(mktemp -td tezos-node-XXXXX)"
+peers="--no-bootstrap-peers $(seq -f '--peer localhost:1973%.f' 1 9) --closed"
+node="$src_dir/tezos-node"
+sandbox_param="--sandbox=$script_dir/sandbox.json"
 
-trap - EXIT
+cleanup () {
+    set +e
+    echo Cleaning up...
+    rm -rf "$node_dir"
+}
+trap cleanup EXIT INT
 
-display_aliases
-
-echo | sed 's/^/## /' 1>&2 <<EOF
-
-  Successfully launched a sandboxed node.
-
-  Run 'tezos-client' to communicate with the sandboxed node.
-  Run 'tezos-sandbox-stop' to stop the node and remove the sandbox data.
-
-EOF
+$node config init \
+      --data-dir "$node_dir" \
+      --net-addr ":$port" \
+      --rpc-addr "[::]:$rpc" \
+      --expected-pow "$expected_pow" \
+      --connections 2 $peers
+$node identity generate "$expected_pow" --data-dir "$node_dir"
+$node run --data-dir "$node_dir" "$sandbox_param" "$@"
