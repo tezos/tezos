@@ -108,6 +108,23 @@ module Peer_id = Crypto_box.Public_key_hash
 
 (* public types *)
 type addr = Ipaddr.V6.t
+
+let addr_encoding =
+  let open Data_encoding in
+  splitted
+    ~json:begin
+      conv
+        Ipaddr.V6.to_string
+        Ipaddr.V6.of_string_exn
+        string
+    end
+    ~binary:begin
+      conv
+        Ipaddr.V6.to_bytes
+        Ipaddr.V6.of_bytes_exn
+        string
+    end
+
 type port = int
 
 module Point = struct
@@ -202,12 +219,9 @@ module Id_point = struct
 
     let encoding =
       let open Data_encoding in
-      conv
-        (fun (addr, port) -> Ipaddr.V6.to_string addr, port)
-        (fun (addr, port) -> Ipaddr.V6.of_string_exn addr, port)
-        (obj2
-           (req "addr" string)
-           (opt "port" uint16))
+      (obj2
+         (req "addr" addr_encoding)
+         (opt "port" uint16))
 
   end
 

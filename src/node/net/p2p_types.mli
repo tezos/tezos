@@ -45,6 +45,7 @@ end
 type addr = Ipaddr.V6.t
 type port = int
 
+val addr_encoding : addr Data_encoding.t
 
 (** Point, i.e. socket address *)
 
