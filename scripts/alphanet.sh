@@ -350,7 +350,7 @@ run_client() {
             docker exec "$docker_container" sudo chmod 644 "${docker_path}"
             container_args+=("file:$docker_path");
         else
-            container_args+=(${arg});
+            container_args+=("${arg}");
         fi
     done
     docker exec "$interactive_flags" "$docker_container" tezos client "${container_args[@]}"
