@@ -320,14 +320,13 @@ module Peer_info = struct
       let open Data_encoding in
       conv
         (fun { kind ; timestamp ; point = (addr, port) } ->
-           (kind, timestamp, Ipaddr.V6.to_string addr, port))
+           (kind, timestamp, addr, port))
         (fun (kind, timestamp, addr, port) ->
-           let addr = Ipaddr.V6.of_string_exn addr in
            { kind ; timestamp ; point = (addr, port) })
         (obj4
            (req "kind" kind_encoding)
            (req "timestamp" Time.encoding)
-           (req "addr" string)
+           (req "addr" P2p_types.addr_encoding)
            (opt "port" int16))
 
   end

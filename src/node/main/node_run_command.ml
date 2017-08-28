@@ -20,7 +20,24 @@ let genesis : State.Net.genesis = {
       "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
 }
 
-type error += Nonlocalhost_sandbox of P2p_types.addr
+type error += Non_private_sandbox of P2p_types.addr
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"main.run.non_private_sandbox"
+    ~title:"Fordidden public sandbox"
+    ~description:"A sandboxed node should not listen on public address."
+    ~pp:begin fun ppf addr ->
+      Format.fprintf ppf
+        "The node is configured to listen a public addres (%a), \
+         while only 'private' network are authorised with `--sandbox`.
+           See `%s run --help` on how to change the listening address."
+        Ipaddr.V6.pp_hum addr Sys.argv.(0)
+    end
+    Data_encoding.(obj1 (req "addr" P2p_types.addr_encoding))
+    (function Non_private_sandbox addr -> Some addr | _ -> None)
+    (fun addr -> Non_private_sandbox addr)
 
 let (//) = Filename.concat
 
@@ -93,8 +110,8 @@ let init_node ?sandbox (config : Node_config_file.t) =
     | Some addr, Some _
       when Ipaddr.V6.(compare addr unspecified) = 0 ->
         return None
-    | Some addr, Some _ when Ipaddr.V6.(compare addr localhost) != 0 ->
-        fail (Nonlocalhost_sandbox addr)
+    | Some addr, Some _ when not (Ipaddr.V6.is_private addr) ->
+        fail (Non_private_sandbox addr)
     | None, Some _ -> return None
     | _ ->
         (Node_config_file.resolve_bootstrap_addrs
