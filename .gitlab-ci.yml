@@ -116,36 +116,43 @@ test:proto_alpha:transactions:
   <<: *test_definition
   script:
     - make -C test/proto_alpha run-test-transaction
+  retry: 1
 
 test:proto_alpha:origination:
   <<: *test_definition
   script:
     - make -C test/proto_alpha run-test-origination
+  retry: 1
 
 test:proto_alpha:endorsement:
   <<: *test_definition
   script:
     - make -C test/proto_alpha run-test-endorsement
+  retry: 1
 
 test:proto_alpha:vote:
   <<: *test_definition
   script:
     - make -C test/proto_alpha run-test-vote
+  retry: 1
 
 test:basic.sh:
   <<: *test_definition
   script:
     - make -C test run-basic.sh
+  retry: 1
 
 test:contracts.sh:
   <<: *test_definition
   script:
     - make -C test run-contracts.sh
+  retry: 1
 
 test:multinode.sh:
   <<: *test_definition
   script:
     - make -C test run-multinode.sh
+  retry: 1
 
 ## Publishing (small) docker images with tezos binaries
 
