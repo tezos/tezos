@@ -1,10 +1,12 @@
-#! /bin/sh
+#! /usr/bin/env bash
 
 set -e
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 src_dir="$(dirname "$script_dir")"
 cd "$src_dir"
+
+source $script_dir/node_lib.inc.sh
 
 if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
     echo "Small script to launch local and closed test network with a maximum of 9 nodes."
@@ -14,29 +16,12 @@ if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
     exit 1
 fi
 
-id="$1"
-shift 1
-
-port=$((19730 + id))
-rpc=$((18730 + id))
-expected_pow="${expected_pow:-0.0}"
-node_dir="$(mktemp -td tezos-node-XXXXX)"
-peers="--no-bootstrap-peers $(seq -f '--peer localhost:1973%.f' 1 9) --closed"
-node="$src_dir/tezos-node"
-sandbox_param="--sandbox=$script_dir/sandbox.json"
-
 cleanup () {
     set +e
     echo Cleaning up...
-    rm -rf "$node_dir"
+    cleanup_nodes
 }
 trap cleanup EXIT INT
 
-$node config init \
-      --data-dir "$node_dir" \
-      --net-addr ":$port" \
-      --rpc-addr "[::]:$rpc" \
-      --expected-pow "$expected_pow" \
-      --connections 2 $peers
-$node identity generate "$expected_pow" --data-dir "$node_dir"
-$node run --data-dir "$node_dir" "$sandbox_param" "$@"
+start_sandboxed_node "$@"
+wait $node_pids

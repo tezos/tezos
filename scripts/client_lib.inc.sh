@@ -1,7 +1,26 @@
-#! /bin/sh
+#! /usr/bin/env bash
 
 client_dir="${client_dir:=$HOME/.tezos-client}"
 client="${client:=tezos-client -base-dir $client_dir}"
+
+client_dirs=()
+
+init_sandboxed_client() {
+
+    id="$1"
+    shift 1
+
+    rpc=$((18730 + id))
+    client_dir="$(mktemp -d -t tezos-client.XXXXXXXX)"
+    client_dirs+=("$client_dir")
+    client="$src_dir/tezos-client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+
+}
+
+cleanup_clients() {
+    rm -rf "${client_dirs[@]}"
+}
+
 
 ## Waiter ##################################################################
 
@@ -138,18 +157,23 @@ log_endorser() {
 
 # key pairs from $src_dir/test/sandbox.json
 
+BOOTSTRAP1_IDENTITY="tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
 BOOTSTRAP1_PUBLIC="edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
 BOOTSTRAP1_SECRET="edskRuR1azSfboG86YPTyxrQgosh5zChf5bVDmptqLTb5EuXAm9rsnDYfTKhq7rDQujdn5WWzwUMeV3agaZ6J2vPQT58jJAJPi"
 
+BOOTSTRAP2_IDENTITY="tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN"
 BOOTSTRAP2_PUBLIC="edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9"
 BOOTSTRAP2_SECRET="edskRkJz4Rw2rM5NtabEWMbbg2bF4b1nfFajaqEuEk4SgU7eeDbym9gVQtBTbYo32WUg2zb5sNBkD1whRN7zX43V9bftBbtaKc"
 
+BOOTSTRAP3_IDENTITY="tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
 BOOTSTRAP3_PUBLIC="edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV"
 BOOTSTRAP3_SECRET="edskS3qsqsNgdjUqeMsVcEwBn8dkZ5iDRz6aF21KhcCtRiAkWBypUSbicccR4Vgqm9UdW2Vabuos6seezqgbXTrmcbLUG4rdAC"
 
+BOOTSTRAP4_IDENTITY="tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
 BOOTSTRAP4_PUBLIC="edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU"
 BOOTSTRAP4_SECRET="edskRg9qcPqaVQa6jXWNMU5p71tseSuR7NzozgqZ9URsVDi81wTyPJdFSBdeakobyHUi4Xgu61jgKRQvkhXrPmEdEUfiqfiJFL"
 
+BOOTSTRAP5_IDENTITY="tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv"
 BOOTSTRAP5_PUBLIC="edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
 BOOTSTRAP5_SECRET="edskS7rLN2Df3nbS1EYvwJbWo4umD7yPM1SUeX7gp1WhCVpMFXjcCyM58xs6xsnTsVqHQmJQ2RxoAjJGedWfvFmjQy6etA3dgZ"
 
@@ -173,5 +197,15 @@ add_sandboxed_bootstrap_identities() {
     ${client} add secret key bootstrap5 ${BOOTSTRAP5_SECRET}
 
     ${client} add secret key dictator ${DICTATOR_SECRET}
+
+}
+
+activate_alpha() {
+
+    ${client} \
+        -block genesis \
+        activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
+        with fitness 1 \
+        and key dictator
 
 }

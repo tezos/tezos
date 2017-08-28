@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /usr/bin/env bash
 
 set -e
 
@@ -18,14 +18,9 @@ if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
     exit 1
 fi
 
-id="$1"
-shift 1
-
-rpc=$((18730 + id))
-client_dir="$(mktemp -td tezos-client-XXXXX)"
-client="./tezos-client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
-
 . "$script_dir/client_lib.inc.sh"
+
+init_sandboxed_client "$1"
 
 add_sandboxed_bootstrap_identities | sed -e 's/^/## /' 1>&2
 
