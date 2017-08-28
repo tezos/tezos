@@ -1,17 +1,19 @@
 #!/bin/bash
 
 set -e
-
 set -o pipefail
 
-source test_utils.sh
+test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
+source $test_dir/lib/test_lib.inc.sh
 
-start_sandboxed_node
-sleep 3
-
+start_node 1
 activate_alpha
 
-add_bootstrap_identities
+key1=foo
+key2=bar
+
+$client gen keys $key1
+$client gen keys $key2
 
 printf "\n\n"
 
@@ -203,67 +205,68 @@ assert_output $CONTRACT_PATH/check_signature.tz \
 '(Pair "26981d372a7b3866621bf79713d249197fe6d518ef702fa65738e1715bde9da54df04fefbcc84287ecaa9f74ad9296462731aa24bbcece63c6bf73a8f5752309" "abcd")' \
 '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' False
 
+$client transfer 1000 from bootstrap1 to $key1
+$client transfer 2000 from bootstrap1 to $key2
 
-${TZCLIENT} transfer 1000 from bootstrap1 to ${KEY1}
-${TZCLIENT} transfer 2000 from bootstrap1 to ${KEY2}
-
-assert_balance ${KEY1} "1,000.00 ꜩ"
-assert_balance ${KEY2} "2,000.00 ꜩ"
+assert_balance $key1 "1,000.00 ꜩ"
+assert_balance $key2 "2,000.00 ꜩ"
 
 # Create a contract and transfer 100 ꜩ to it
-init_with_transfer $CONTRACT_PATH/store_input.tz ${KEY1} '""' 100 bootstrap1
-${TZCLIENT} transfer 100 from bootstrap1 to store_input -arg '"abcdefg"'
+init_with_transfer $CONTRACT_PATH/store_input.tz $key1 '""' 100 bootstrap1
+$client transfer 100 from bootstrap1 to store_input -arg '"abcdefg"'
 assert_balance store_input "200.00 ꜩ"
 assert_storage_contains store_input '"abcdefg"'
-${TZCLIENT} transfer 100 from bootstrap1 to store_input -arg '"xyz"'
+$client transfer 100 from bootstrap1 to store_input -arg '"xyz"'
 assert_storage_contains store_input '"xyz"'
 
-init_with_transfer $CONTRACT_PATH/transfer_amount.tz ${KEY1} '"0"' "100" bootstrap1
-${TZCLIENT} transfer 500 from bootstrap1 to transfer_amount -arg Unit
+init_with_transfer $CONTRACT_PATH/transfer_amount.tz $key1 '"0"' "100" bootstrap1
+$client transfer 500 from bootstrap1 to transfer_amount -arg Unit
 assert_storage_contains transfer_amount 500
 
 # This tests the `NOW` instruction.
 # This test may fail if timings are marginal, though I have not yet seen this happen
-init_with_transfer $CONTRACT_PATH/store_now.tz ${KEY1} '"2017-07-13T09:19:01Z"' "100" bootstrap1
-${TZCLIENT} transfer 500 from bootstrap1 to store_now -arg Unit
-assert_storage_contains store_now "$(${TZCLIENT} get timestamp)"
+init_with_transfer $CONTRACT_PATH/store_now.tz $key1 '"2017-07-13T09:19:01Z"' "100" bootstrap1
+$client transfer 500 from bootstrap1 to store_now -arg Unit
+assert_storage_contains store_now "$($client get timestamp)"
 
 # Tests TRANSFER_TO
-${TZCLIENT} originate account "test_transfer_account1" for ${KEY1} transferring 100 from bootstrap1
-${TZCLIENT} originate account "test_transfer_account2" for ${KEY1} transferring 20 from bootstrap1
-init_with_transfer $CONTRACT_PATH/transfer_to.tz ${KEY2} Unit 1000 bootstrap1
+$client originate account "test_transfer_account1" for $key1 transferring 100 from bootstrap1
+$client originate account "test_transfer_account2" for $key1 transferring 20 from bootstrap1
+init_with_transfer $CONTRACT_PATH/transfer_to.tz $key2 Unit 1000 bootstrap1
 assert_balance test_transfer_account1 "100.00 ꜩ"
-${TZCLIENT} transfer 100 from bootstrap1 to transfer_to \
+$client transfer 100 from bootstrap1 to transfer_to \
             -arg "\"$(get_contract_addr test_transfer_account1)\""
 assert_balance test_transfer_account1 "200.00 ꜩ" # Why isn't this 200 ꜩ? Mining fee?
-${TZCLIENT} transfer 100 from bootstrap1 to transfer_to \
+$client transfer 100 from bootstrap1 to transfer_to \
             -arg "\"$(get_contract_addr test_transfer_account2)\""
 assert_balance test_transfer_account2 "120.00 ꜩ" # Why isn't this 120 ꜩ? Mining fee?
 
 # Tests create_account
-init_with_transfer $CONTRACT_PATH/create_account.tz ${KEY2} \
+init_with_transfer $CONTRACT_PATH/create_account.tz $key2 \
                    "\"$(get_contract_addr test_transfer_account1)\"" 1000 bootstrap1
-${TZCLIENT} transfer 100 from bootstrap1 to create_account \
+$client transfer 100 from bootstrap1 to create_account \
             -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' | assert_in_output "New contract"
 
 # Creates a contract, transfers data to it and stores the data
-init_with_transfer $CONTRACT_PATH/create_contract.tz ${KEY2} \
+init_with_transfer $CONTRACT_PATH/create_contract.tz $key2 \
                    "\"$(get_contract_addr test_transfer_account1)\"" 1000 bootstrap1
-${TZCLIENT} transfer 0.00 from bootstrap1 to create_contract -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
+$client transfer 0.00 from bootstrap1 to create_contract -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
 assert_storage_contains create_contract '"abcdefg"'
 
 # Test DEFAULT_ACCOUNT
-init_with_transfer $CONTRACT_PATH/default_account.tz ${KEY1} \
+init_with_transfer $CONTRACT_PATH/default_account.tz $key1 \
 				   Unit 1000 bootstrap1
-${TZCLIENT} transfer 0.00 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\""
+$client transfer 0.00 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\""
 assert_balance $BOOTSTRAP4_IDENTITY "4,000,100.00 ꜩ"
 account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
-${TZCLIENT} transfer 0.00 from bootstrap1 to default_account  -arg "\"$account\""
+$client transfer 0.00 from bootstrap1 to default_account  -arg "\"$account\""
 assert_balance $account "100.00 ꜩ"
 
-assert_fails ${TZCLIENT} typecheck data '(Map (Item 0 1) (Item 0 1))' against type '(map nat nat)'
-assert_fails ${TZCLIENT} typecheck data '(Map (Item 0 1) (Item 10 1) (Item 5 1))' against type '(map nat nat)'
-assert_fails ${TZCLIENT} typecheck data '(Set "A" "C" "B")' against type '(set string)'
-assert_fails ${TZCLIENT} typecheck data '(Set "A" "B" "B")' against type '(set string)'
+assert_fails $client typecheck data '(Map (Item 0 1) (Item 0 1))' against type '(map nat nat)'
+assert_fails $client typecheck data '(Map (Item 0 1) (Item 10 1) (Item 5 1))' against type '(map nat nat)'
+assert_fails $client typecheck data '(Set "A" "C" "B")' against type '(set string)'
+assert_fails $client typecheck data '(Set "A" "B" "B")' against type '(set string)'
 
 printf "\nEnd of test\n"
+
+show_logs="no"

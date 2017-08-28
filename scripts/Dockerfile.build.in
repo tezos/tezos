@@ -2,6 +2,7 @@ FROM $base_image
 
 COPY src /home/opam/tezos/src
 COPY test /home/opam/tezos/test
+COPY scripts /home/opam/tezos/scripts
 
 RUN sudo chown -R opam /home/opam/tezos && \
     echo "PRODUCTION=yes" > /home/opam/tezos/src/Makefile.local && \
