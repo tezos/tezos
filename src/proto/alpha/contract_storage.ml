@@ -364,7 +364,7 @@ let originate c nonce ~balance ~manager ?script ~delegate ~spendable ~delegatabl
   create c nonce ~balance ~manager ~delegate ?script ~spendable ~delegatable >>=? fun (c, contract, nonce) ->
   (* check contract fee *)
   contract_fee c contract >>=? fun fee ->
-  fail_unless Tez_repr.(balance > fee)
+  fail_unless Tez_repr.(balance >= fee)
     (Initial_amount_too_low (contract, balance, fee)) >>=? fun () ->
   return (c, contract, nonce)
 

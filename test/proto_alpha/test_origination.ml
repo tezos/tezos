@@ -39,7 +39,7 @@ let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
     ~src:b1
     ~manager_pkh:foo.pkh
     ~spendable:true
-    ~balance:100L () >>= fun result ->
+    ~balance:99L () >>= fun result ->
   Assert.initial_amount_too_low ~msg:__LOC__ result ;
 
   (* Origination with amount > 1 tez *)
@@ -47,7 +47,7 @@ let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
     ~src:b1
     ~manager_pkh:foo.pkh
     ~spendable:true
-    ~balance:101L () >>= fun _result ->
+    ~balance:100L () >>= fun _result ->
   (* TODO: test if new contract exists *)
 
   (* Non-delegatable contract *)
