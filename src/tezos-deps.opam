@@ -35,7 +35,7 @@ depends: [
   "reactiveData"
   "tyxml"
   "js_of_ocaml"
-  "js_of_ocaml-ppx"
+  "js_of_ocaml-tyxml"
   "sodium" {>= "0.3.0" }
   "magic-mime"
   "leveldb" {>= "1.1.2" }
