@@ -25,6 +25,7 @@ src/client/embedded/alpha/concrete_parser.mli
 
 test/reports
 test/**/test-*
+test/LOG.*
 
 **/*~
 **/\#*\#
