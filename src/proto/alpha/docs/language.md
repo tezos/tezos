@@ -414,11 +414,6 @@ IV - Core instructions
         > DIP code / x : S   =>   x : S'
           where    code / S   =>   S'
 
-   * `DII+P code`:
-     A syntactic sugar for working deeper in the stack.
-
-        > DII(\rest=I*)P code / S   =>   DIP (DI(\rest)P code) / S
-
    * `EXEC`:
      Execute a function from the stack.
 
@@ -442,11 +437,6 @@ IV - Core instructions
         :: 'a : 'A   ->   'a : 'a : 'A
 
         > DUP / x : S   =>   x : x : S
-
-   * `DUU+P`:
-     A syntactic sugar for duplicating the `n`th element of the stack.
-
-        > DUU(\rest=U*)P / S   =>   DIP (DU(\rest)P) ; SWAP / S
 
    * `SWAP`:
      Exchange the top two elements of the stack.
@@ -534,22 +524,6 @@ is less than the second, and positive otherwise.
 
         > GE ; C / v : S     =>   C / True : S   iff  v >= 0
         > GE ; C / _ : S     =>   C / False : S
-
-Syntactic sugar exists for merging `COMPARE` and comparison
-combinators, and also for branching.
-
-   * `CMP{EQ|NEQ|LT|GT|LE|GE}`
-
-        > CMP(\op) ; C / S   =>   COMPARE ; (\op) ; C / S
-
-   * `IF{EQ|NEQ|LT|GT|LE|GE} bt bf`
-
-        > IF(\op) ; C / S   =>   (\op) ; IF bt bf ; C / S
-
-   * `IFCMP{EQ|NEQ|LT|GT|LE|GE} bt bf`
-
-        > IFCMP(\op) ; C / S   =>   COMPARE ; (\op) ; IF bt bf ; C / S
-
 
 V - Operations
 --------------
@@ -716,12 +690,6 @@ constants as is, concatenate them and use them as keys.
 
         > PAIR ; C / a : b : S   =>   C / (Pair a b) : S
 
-   * `P(A*AI)+R`:
-     A syntactic sugar for building nested pairs in bulk.
-
-        > P(\fst=A*)AI(\rest=(A*AI)+)R ; C / S  =>  P(\fst)AIR ; P(\rest)R ; C / S
-        > PA(\rest=A*)AIR ; C / S  =>   DIP (P(\rest)AIR) ; C / S
-
    * `CAR`:
      Access the left part of a pair.
 
@@ -735,12 +703,6 @@ constants as is, concatenate them and use them as keys.
         :: pair _ 'b : 'S   ->   'b : 'S
 
         > Car ; C / (Pair _ b) : S   =>   C / b : S
-
-   * `C[AD]+R`:
-     A syntactic sugar for accessing fields in nested pairs.
-
-        > CA(\rest=[AD]+)R ; C / S   =>   CAR ; C(\rest)R ; C / S
-        > CD(\rest=[AD]+)R ; C / S   =>   CDR ; C(\rest)R ; C / S
 
 ### Operations on sets
 
@@ -842,17 +804,6 @@ constants as is, concatenate them and use them as keys.
         > IF_NONE ; C / (None) : S   =>    bt ; C / S
         > IF_NONE ; C / (Some a) : S    =>    bf ; C / a : S
 
-   * `IF_SOME bt bf`:
-     Inspect an optional value.
-
-        :: 'a? : 'S   ->   'b : 'S
-           iff   bt :: [ 'a : 'S -> 'b : 'S]
-                 bf :: [ 'S -> 'b : 'S]
-
-        > IF_SOME ; C / (Some a) : S    =>    bt ; C / a : S
-        > IF_SOME ; C / (None) : S   =>    bf ; C / S
-
-
 ### Operations on unions
 
    * `LEFT 'b`:
@@ -870,7 +821,7 @@ constants as is, concatenate them and use them as keys.
         > RIGHT ; C / v :: S   =>   C / (Right v) :: S
 
    * `IF_LEFT bt bf`:
-     Inspect an optional value.
+     Inspect a value of a variant type.
 
         :: or 'a 'b : 'S   ->   'c : 'S
            iff   bt :: [ 'a : 'S -> 'c : 'S]
@@ -880,7 +831,7 @@ constants as is, concatenate them and use them as keys.
         > IF_LEFT ; C / (Right b) : S   =>    bf ; C / b : S
 
    * `IF_RIGHT bt bf`:
-     Inspect an optional value.
+     Inspect a value of a variant type.
 
         :: or 'a 'b : 'S   ->   'c : 'S
            iff   bt :: [ 'b : 'S -> 'c : 'S]
@@ -1131,8 +1082,35 @@ for under/overflows.
 
         :: key : key : 'S   ->   int : 'S
 
-### Assertion operations
+VIII - Macros
+-------------
+In addition to the operations above,
+several extensions have been added to the language's concreate syntax.
+If you are interacting with the node via RPC, bypassing the client,
+which expands away these macros, you will need to desurgar them yourself.
 
+These macros are designed to be unambiguous and reversable,
+meaning that errors are reported in terms of resugared syntax.
+Below you'll see these macros defined in terms of other syntactic forms.
+That is how these macros are seen by the node.
+
+### Compare
+Syntactic sugar exists for merging `COMPARE` and comparison
+combinators, and also for branching.
+
+   * `CMP{EQ|NEQ|LT|GT|LE|GE}`
+
+        > CMP(\op) ; C / S   =>   COMPARE ; (\op) ; C / S
+
+   * `IF{EQ|NEQ|LT|GT|LE|GE} bt bf`
+
+        > IF(\op) ; C / S   =>   (\op) ; IF bt bf ; C / S
+
+   * `IFCMP{EQ|NEQ|LT|GT|LE|GE} bt bf`
+
+        > IFCMP(\op) ; C / S   =>   COMPARE ; (\op) ; IF bt bf ; C / S
+
+### Assertion Macros
 All assertion operations are syntactic sugar for conditionals
 with a `FAIL` instruction in the appropriate branch.
 When possible, use them to increase clarity about illegal states.
@@ -1167,7 +1145,57 @@ When possible, use them to increase clarity about illegal states.
 
         > ASSERT_RIGHT => IF_LEFT {FAIL} {}
 
-VIII - Concrete syntax
+
+### Syntactic Conveniences
+These are macros are simply more convenient syntax for various common operations.
+
+
+   * `DII+P code`:
+     A syntactic sugar for working deeper in the stack.
+
+        > DII(\rest=I*)P code / S   =>   DIP (DI(\rest)P code) / S
+
+
+   * `DUU+P`:
+     A syntactic sugar for duplicating the `n`th element of the stack.
+
+        > DUU(\rest=U*)P / S   =>   DIP (DU(\rest)P) ; SWAP / S
+
+   * `P(A*AI)+R`:
+     A syntactic sugar for building nested pairs in bulk.
+
+        > P(\fst=A*)AI(\rest=(A*AI)+)R ; C / S  =>  P(\fst)AIR ; P(\rest)R ; C / S
+        > PA(\rest=A*)AIR ; C / S  =>   DIP (P(\rest)AIR) ; C / S
+
+   * `C[AD]+R`:
+     A syntactic sugar for accessing fields in nested pairs.
+
+        > CA(\rest=[AD]+)R ; C / S   =>   CAR ; C(\rest)R ; C / S
+        > CD(\rest=[AD]+)R ; C / S   =>   CDR ; C(\rest)R ; C / S
+
+
+   * `IF_SOME bt bf`:
+     Inspect an optional value.
+
+        :: 'a? : 'S   ->   'b : 'S
+           iff   bt :: [ 'a : 'S -> 'b : 'S]
+                 bf :: [ 'S -> 'b : 'S]
+
+        > IF_SOME ; C / (Some a) : S    =>    bt ; C / a : S
+        > IF_SOME ; C / (None) : S   =>    bf ; C / S
+
+   * `SET_CAR`:
+     Set the first value of a pair.
+
+        > SET_CAR => CDR; SWAP; PAIR
+
+   * `SET_CDR`:
+     Set the first value of a pair.
+
+        > SET_CDR => CAR; PAIR
+
+
+IX - Concrete syntax
 ----------------------
 
 The concrete language is very close to the formal notation of the
@@ -1349,7 +1377,7 @@ example.
     PUSH nat 2 # pushes 2
     ADD         # computes 2 + 1
 
-IX - Examples
+X - Examples
 -------------
 
 Contracts in the system are stored as a piece of code and a global
@@ -1896,7 +1924,7 @@ X - Full grammar
       | key
       | timestamp
 
-XI - Reference implementation
+XII - Reference implementation
 -----------------------------
 
 The language is implemented in OCaml as follows:
