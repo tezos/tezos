@@ -399,6 +399,22 @@ let call_with_json raw_url json (cctxt: Client_commands.full_context) =
       cctxt#generic_json_call `POST ~body uri >>=?
       display_answer cctxt
 
+let call_with_file_or_json url maybe_file (cctxt: Client_commands.full_context) =
+  begin
+    match TzString.split ':' ~limit:1 maybe_file with
+    | [ "file" ; filename] ->
+        (* Mostly copied from src/client/client_aliases.ml *)
+        Lwt.catch
+          (fun () ->
+             Lwt_io.(with_file ~mode:Input filename read) >>= fun content ->
+             return content)
+          (fun exn ->
+             failwith
+               "cannot read file (%s)" (Printexc.to_string exn))
+    | _ -> return maybe_file
+  end >>=? fun json ->
+  call_with_json url json cctxt
+
 let group =
   { Cli_entries.name = "rpc" ;
     title = "Commands for the low level RPC layer" }
@@ -442,7 +458,10 @@ let commands = [
   command ~group ~desc: "call an RPC (low level command for advanced users)"
     no_options
     (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL"
-     @@ prefix "with" @@ string ~name:"input" ~desc:"the JSON input to the RPC" @@ stop)
-    (fun () -> call_with_json)
+     @@ prefix "with"
+     @@ string ~name:"input"
+       ~desc:"the JSON input to the RPC or `file:FILENAME`, which is the path to a file containing the JSON"
+     @@ stop)
+    (fun () -> call_with_file_or_json)
 
 ]
