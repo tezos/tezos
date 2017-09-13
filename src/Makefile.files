@@ -376,29 +376,3 @@ CLIENT_VERSIONS := \
 EMBEDDED_CLIENT_VERSIONS := \
   $(patsubst %,${SRCDIR}/client/embedded/client_%.cmx, \
 	     ${CLIENT_VERSIONS})
-
-############################################################################
-## Web-Client program
-############################################################################
-
-# we do not include 'node/main'
-WEBCLIENT_SOURCE_DIRECTORIES := \
-  ${NODE_LIB_SOURCE_DIRECTORIES} \
-  ${SRCDIR}/client ${SRCDIR}/client/embedded
-
-WEBCLIENT_OPENED_MODULES := Error_monad Hash Utils Tezos_data
-
-WEBCLIENT_LIB_INTFS := \
-
-WEBCLIENT_LIB_IMPLS := \
-  client/webclient_version.ml \
-
-WEBCLIENT_IMPLS := \
-  webclient_static.ml \
-  webclient_main.ml
-
-EMBEDDED_WEBCLIENT_VERSIONS := \
-	$(patsubst ${SRCDIR}/client/embedded/%/, \
-	     ${SRCDIR}/client/embedded/webclient_%.cmx, \
-             $(shell ls -d ${SRCDIR}/client/embedded/*/))
-

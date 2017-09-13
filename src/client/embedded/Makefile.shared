@@ -1,7 +1,6 @@
 
 all: \
-  ../client_$(PROTO_VERSION).cmx \
-  ../webclient_$(PROTO_VERSION).cmx
+  ../client_$(PROTO_VERSION).cmx
 
 -include ../../../Makefile.local
 include ../../../Makefile.config
@@ -42,32 +41,10 @@ ${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
 ${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
   ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
 
-WEBOBJS := \
-  ${WEBCLIENT_IMPLS:.ml=.cmx} ${WEBCLIENT_INTFS:.mli=.cmi}
-WEBOBJS_DEPENDS := \
-  ${WEBCLIENT_IMPLS:.ml=.ml.deps} ${WEBCLIENT_INTFS:.mli=.mli.deps}
-
-${WEBOBJS} ${WEBOBJS_DEPS}: TARGET="(webclient_$(PROTO_VERSION).cmx)"
-${WEBOBJS} ${WEBOBJS_DEPS}: SOURCE_DIRECTORIES += ..
-${WEBOBJS} ${WEBOBJS_DEPS}: OPENED_MODULES += Client_${PROTO_VERSION}
-${WEBOBJS}: EXTRA_OCAMLFLAGS = -for-pack Webclient_$(PROTO_VERSION)
-../client_$(PROTO_VERSION).cmx: EXTRA_OCAMLFLAGS =
-${WEBOBJS} ${WEBOBJS_DEPS} ../webclient_$(PROTO_VERSION).cmx: \
-  PACKAGES=lwt ocplib-json-typed sodium ocplib-ocamlres
-${WEBOBJS} ${WEBOBJS_DEPS} ../webclient_$(PROTO_VERSION).cmx: \
-  ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
-${WEBOBJS} ../webclient_$(PROTO_VERSION).cmx: \
-  ../client_${PROTO_VERSION}.cmx
-
 ../client_$(PROTO_VERSION).cmx: $(patsubst %.ml, %.cmx, ${CLIENT_IMPLS})
 	@echo LINK $(notdir $@)
 	@$(OCAMLOPT) -linkall ${OCAMLFLAGS} -pack -o $@ \
 	   $(patsubst %.ml, %.cmx, ${CLIENT_IMPLS})
-
-../webclient_$(PROTO_VERSION).cmx: $(patsubst %.ml, %.cmx, ${WEBCLIENT_IMPLS})
-	@echo LINK $(notdir $@)
-	@$(OCAMLOPT) -linkall ${OCAMLFLAGS} -pack -o $@ \
-	   $(patsubst %.ml, %.cmx, ${WEBCLIENT_IMPLS})
 
 %.cmx: %.ml
 	@echo OCAMLOPT ${TARGET} $(notdir $@)
@@ -92,7 +69,6 @@ ${WEBOBJS} ../webclient_$(PROTO_VERSION).cmx: \
 .PHONY: clean
 clean::
 	-rm -f ../client_$(PROTO_VERSION).cm* ../client_$(PROTO_VERSION).o
-	-rm -f ../webclient_$(PROTO_VERSION).cm* ../webclient_$(PROTO_VERSION).o
 	-rm -f *.cm* *~ *.o *.a *.deps *.deps.byte
 	-rm -rf _tzbuild
 	-rm -f .depend
@@ -104,8 +80,7 @@ endif
 predepend:
 
 DEPENDS += \
-  $(patsubst %,%.deps,${CLIENT_INTFS} ${CLIENT_IMPLS}) \
-  $(patsubst %,%.deps,${WEBCLIENT_INTFS} ${WEBCLIENT_IMPLS})
+  $(patsubst %,%.deps,${CLIENT_INTFS} ${CLIENT_IMPLS})
 DEPENDS := $(filter-out ${NODEPENDS}, ${DEPENDS})
 
 .SECONDARY: ${DEPENDS}

@@ -6,10 +6,9 @@ include Makefile.files
 TZCOMPILER=../tezos-protocol-compiler
 TZNODE=../tezos-node
 TZCLIENT=../tezos-client
-TZWEBCLIENT=../tezos-webclient
 TZATTACKER=../tezos-attacker
 
-all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT} # ${TZWEBCLIENT} ${TZATTACKER}
+all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT} # ${TZATTACKER}
 
 NODEPS :=
 
@@ -242,47 +241,6 @@ clean::
 	-rm -f ${TZCLIENT}
 
 ############################################################################
-## Webclient program
-############################################################################
-
-WEBCLIENT_OBJS := \
-  ${WEBCLIENT_IMPLS:.ml=.cmx} ${WEBCLIENT_IMPLS:.ml=.ml.deps} \
-  ${WEBCLIENT_LIB_IMPLS:.ml=.cmx} ${WEBCLIENT_LIB_IMPLS:.ml=.ml.deps} \
-  ${WEBCLIENT_LIB_INTFS:.mli=.cmi} ${WEBCLIENT_LIB_INTFS:.mli=.mli.deps} \
-  ${TZWEBCLIENT}
-${WEBCLIENT_OBJS}: PACKAGES=${WEBCLIENT_PACKAGES}
-${WEBCLIENT_OBJS}: SOURCE_DIRECTORIES=${WEBCLIENT_SOURCE_DIRECTORIES}
-${WEBCLIENT_OBJS}: OPENED_MODULES=${WEBCLIENT_OPENED_MODULES}
-
-${WEBCLIENT_LIB_IMPLS:.ml=.cmx} ${WEBCLIENT_LIB_IMPLS:.ml=.ml.deps}: TARGET="(webclient.cmxa)"
-${WEBCLIENT_LIB_INTFS:.mli=.cmi} ${WEBCLIENT_LIB_INTFS:.mli=.mli.deps}: TARGET="(webclient.cmxa)"
-
-${EMBEDDED_WEBCLIENT_VERSIONS}: webclient.cmxa
-${WEBCLIENT_IMPLS:.ml=.cmx}: ${EMBEDDED_CLIENT_VERSIONS} ${EMBEDDED_WEBCLIENT_VERSIONS}
-
-webclient.cmxa: ${WEBCLIENT_LIB_IMPLS:.ml=.cmx} client.cmxa
-	@echo LINK $(notdir $@)
-	${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ ${WEBCLIENT_LIB_IMPLS:.ml=.cmx}
-
-${TZWEBCLIENT}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa \
-             client.cmxa webclient.cmxa \
-             ${EMBEDDED_CLIENT_PROTOCOLS} \
-             ${EMBEDDED_CLIENT_VERSIONS} \
-             ${EMBEDDED_WEBCLIENT_VERSIONS} \
-             ${WEBCLIENT_IMPLS:.ml=.cmx}
-	@echo LINK $(notdir $@)
-	@${OCAMLOPT} -linkpkg ${OCAMLFLAGS} -o $@ $^
-
-clean::
-	-rm -f ${TZCLIENT}
-
-webclient_static.ml: $(shell find  webclient_static/)
-	ocp-ocamlres webclient_static -o $@
-
-partial-clean::
-	-rm -f webclient_static.ml
-
-############################################################################
 ## Generic rules
 ############################################################################
 
@@ -325,9 +283,7 @@ DEPENDS := $(filter-out $(NO_DEPS), \
   $(NODE_INTFS) $(NODE_IMPLS) \
   $(CLIENT_LIB_INTFS) $(CLIENT_LIB_IMPLS) \
   $(CLIENT_INTFS) $(CLIENT_IMPLS) \
-  $(WEBCLIENT_LIB_INTFS) $(WEBCLIENT_LIB_IMPLS) \
   $(ATTACKER_LIB_INTFS) $(ATTACKER_LIB_IMPLS) \
-  $(WEBCLIENT_INTFS) $(WEBCLIENT_IMPLS) \
   $(ATTACKER_INTFS) $(ATTACKER_IMPLS) \
 )
 DEPENDS_BYTECODE := \
@@ -401,15 +357,8 @@ partial-clean::
 client/embedded/client_%.cmx: \
   $(patsubst %.ml, %.cmx, $(NODE_LIB_IMPLS) $(CLIENT_LIB_IMPLS)) \
   proto/client_embedded_proto_%.cmxa \
-  $$(shell find client/embedded/% \( -name webclient -or -name _tzbuild \) -prune -or \( -name \*.ml -print -or -name \*.mli -print \))
+  $$(shell find client/embedded/% \( -name _tzbuild \) -prune -or \( -name \*.ml -print -or -name \*.mli -print \))
 	@$(MAKE) -C client/embedded/$* ../client_$*.cmx
-
-client/embedded/webclient_%.cmx: \
-  client/embedded/client_%.cmx \
-	minutils.cma \
-  $$(shell find client/embedded/%/webclient -name \*.ml -or -name \*.mli 2>/dev/null) \
-  $$(shell find client/embedded/%/webclient/static/ 2>/dev/null)
-	@$(MAKE) -C client/embedded/$* ../webclient_$*.cmx
 
 partial-clean::
 	-for d in $$(ls -d client/embedded/*/) ; do make clean -C $$d ; done

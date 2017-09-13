@@ -33,8 +33,6 @@ depends: [
   "ocplib-json-typed"
   "ocplib-resto" {>= "dev" }
   "reactiveData"
-  "tyxml"
-  "js_of_ocaml"
   "sodium" {>= "0.3.0" }
   "magic-mime"
   "leveldb" {>= "1.1.2" }

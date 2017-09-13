@@ -89,7 +89,6 @@ module Client = struct
   module Revelation = Make(struct let name = "client.revealation" end)
   module Denunciation = Make(struct let name = "client.denunciation" end)
 end
-module Webclient = Make(struct let name = "webclient" end)
 
 type template = Lwt_log.template
 let default_template = "$(date) - $(section): $(message)"
