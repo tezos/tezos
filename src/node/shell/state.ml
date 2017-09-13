@@ -12,6 +12,8 @@ open Logging.Node.State
 type error +=
   | Unknown_network of Net_id.t
 
+type error += Bad_data_dir
+
 let () =
   Error_monad.register_error_kind
     `Temporary
@@ -23,6 +25,18 @@ let () =
     Data_encoding.(obj1 (req "net" Net_id.encoding))
     (function Unknown_network x -> Some x | _ -> None)
     (fun x -> Unknown_network x) ;
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"badDataDir"
+    ~title:"Bad data directory"
+    ~description:"The data directory could not be read. \
+                  This could be because it was generated with an \
+                  old version of the tezos-node program. \
+                  Deleting and regenerating this directory \
+                  may fix the problem."
+    Data_encoding.empty
+    (function Bad_data_dir -> Some () | _ -> None)
+    (fun () -> Bad_data_dir) ;
 
 (** *)
 
@@ -238,15 +252,18 @@ module Net = struct
       data.global_store id >>= fun allow_forked_network ->
     let genesis = { time ; protocol ; block = genesis_hash } in
     Store.Chain.Current_head.read chain_store >>=? fun current_head ->
-    allocate
-      ~genesis
-      ~current_head
-      ~expiration
-      ~allow_forked_network
-      global_state
-      data.context_index
-      chain_store
-      block_store >>= return
+    try
+      allocate
+        ~genesis
+        ~current_head
+        ~expiration
+        ~allow_forked_network
+        global_state
+        data.context_index
+        chain_store
+        block_store >>= return
+    with Not_found ->
+      fail Bad_data_dir
 
   let locked_read_all global_state data =
     Store.Net.list data.global_store >>= fun ids ->
