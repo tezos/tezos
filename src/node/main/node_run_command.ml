@@ -14,7 +14,7 @@ let genesis : State.Net.genesis = {
     Time.of_notation_exn "2016-11-01T00:00:00Z" ;
   block =
     Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z" ;
+      "BLockGenesisGenesisGenesisGenesisGenesisAAAAAdKYvcG" ;
   protocol =
     Protocol_hash.of_b58check_exn
       "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
