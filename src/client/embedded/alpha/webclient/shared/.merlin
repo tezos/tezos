@@ -1,5 +1,0 @@
-B ../../../../../minutils
-S ../../../../../minutils
-PKG lwt
-PKG ocplib-json-typed.bson
-PKG ocplib-resto.directory
