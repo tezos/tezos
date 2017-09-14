@@ -67,7 +67,7 @@ module Term = struct
             Node_config_file.read config_file >>=? fun cfg ->
             return { cfg with data_dir }
       end >>=? fun cfg ->
-      let cfg = Node_config_file.update ?expected_pow cfg in
+      Node_config_file.update ?expected_pow cfg >>=? fun cfg ->
       match subcommand with
       | Show -> show cfg
       | Generate -> generate cfg

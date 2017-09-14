@@ -267,7 +267,6 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
       peers
     end else
       cfg.net.bootstrap_peers @ peers in
-  return @@
   Node_config_file.update
     ?data_dir ?min_connections ?expected_connections ?max_connections
     ?max_download_speed ?max_upload_speed ?binary_chunks_size
