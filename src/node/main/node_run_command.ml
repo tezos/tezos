@@ -185,7 +185,7 @@ let init_signal () =
   ignore (Lwt_unix.on_signal Sys.sigterm handler : Lwt_unix.signal_handler_id)
 
 let run ?verbosity ?sandbox (config : Node_config_file.t) =
-  Lwt_utils.create_dir config.data_dir >>= fun () ->
+  Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   Lwt_utils.Lock_file.create
     ~unlink_on_exit:true (lock_file config.data_dir) >>=? fun () ->
   init_signal () ;

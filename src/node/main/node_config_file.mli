@@ -67,7 +67,7 @@ val update:
   ?cors_headers:string list ->
   ?rpc_tls:tls ->
   ?log_output:Logging.Output.t ->
-  t -> t
+  t -> t tzresult Lwt.t
 
 val to_string: t -> string
 val read: string -> t tzresult Lwt.t

@@ -257,7 +257,7 @@ let read fp =
     return default_config
 
 let write fp cfg =
-  Lwt_utils.create_dir ~perm:0o700 (Filename.dirname fp) >>= fun () ->
+  Node_data_version.ensure_data_dir (Filename.dirname fp) >>=? fun () ->
   Data_encoding_ezjsonm.write_file fp
     (Data_encoding.Json.construct encoding cfg)
 
@@ -284,6 +284,8 @@ let update
     ?rpc_tls
     ?log_output
     cfg =
+  let data_dir = Utils.unopt ~default:cfg.data_dir data_dir in
+  Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size =
     map_option peer_table_size ~f:(fun i -> i, i / 4 * 3) in
   let unopt_list ~default = function
@@ -343,8 +345,7 @@ let update
     output = Utils.unopt ~default:cfg.log.output log_output ;
   }
   in
-  { data_dir = Utils.unopt ~default:cfg.data_dir data_dir ;
-    net ; rpc ; log }
+  return { data_dir ; net ; rpc ; log }
 
 let resolve_addr ?default_port ?(passive = false) peer =
   let addr, port = Utils.parse_addr_port peer in

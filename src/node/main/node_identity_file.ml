@@ -81,6 +81,6 @@ let write file identity =
   if Sys.file_exists file then
     fail (Existent_identity_file file)
   else
-    Lwt_utils.create_dir ~perm:0o700 (Filename.dirname file) >>= fun () ->
+    Node_data_version.ensure_data_dir (Filename.dirname file) >>=? fun () ->
     Data_encoding_ezjsonm.write_file file
       (Data_encoding.Json.construct P2p.Identity.encoding identity)
