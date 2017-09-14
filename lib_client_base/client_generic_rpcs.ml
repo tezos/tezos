@@ -28,7 +28,7 @@ type input = {
 
 (* generic JSON generation from a schema with callback for random or
    interactive filling *)
-let fill_in input schema =
+let fill_in ?(show_optionals=true) input schema =
   let rec element path { title ; kind }=
     match kind with
     | Integer { minimum ; maximum } ->
@@ -73,6 +73,10 @@ let fill_in input schema =
         fill_loop [] 0 elts >>= fun acc ->
         Lwt.return (`A (List.rev acc))
     | Object { properties } ->
+        let properties =
+          if show_optionals
+          then properties
+          else (List.filter (fun (_, _, b, _) -> b) properties) in
         let rec fill_loop acc ls =
           match ls with
           | [] -> Lwt.return acc
@@ -101,7 +105,7 @@ let fill_in input schema =
   in
   element [] (Json_schema.root schema)
 
-let random_fill_in schema =
+let random_fill_in ?(show_optionals=true) schema =
   let display _ = Lwt.return () in
   let int min max _ _ =
     let max = Int64.of_int max
@@ -115,7 +119,7 @@ let random_fill_in schema =
   let continue _ _ = Lwt.return (Random.int 4 = 0) in
   Lwt.catch
     (fun () ->
-       fill_in
+       fill_in ~show_optionals
          { int ; float ; string ; bool ; display ; continue }
          schema >>= fun json ->
        Lwt.return (Ok json))
@@ -123,11 +127,11 @@ let random_fill_in schema =
        let msg = Printf.sprintf "Fill-in failed %s\n%!" (Printexc.to_string e) in
        Lwt.return (Error msg))
 
-let editor_fill_in schema =
+let editor_fill_in ?(show_optionals=true) schema =
   let tmp = Filename.temp_file "tezos_rpc_call_" ".json" in
   let rec init () =
     (* write a temp file with instructions *)
-    random_fill_in schema >>= function
+    random_fill_in ~show_optionals schema >>= function
     | Error msg -> Lwt.return (Error msg)
     | Ok json ->
         Lwt_io.(with_file ~mode:Output tmp (fun fp ->
@@ -343,12 +347,12 @@ let format url (cctxt : #Client_commands.logging_rpcs) =
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
       return ()
 
-let fill_in schema =
+let fill_in ?(show_optionals=true) schema =
   let open Json_schema in
   match (root schema).kind with
   | Null -> Lwt.return (Ok `Null)
   | Any | Object { properties = [] } -> Lwt.return (Ok (`O []))
-  | _ -> editor_fill_in schema
+  | _ -> editor_fill_in ~show_optionals schema
 
 let display_answer (cctxt : #Client_commands.full_context) = function
   | `Ok json ->
@@ -376,7 +380,7 @@ let call raw_url (cctxt : #Client_commands.full_context) =
           cctxt#generic_json_call `POST uri >>=?
           display_answer cctxt
       | { input = Some input } ->
-          fill_in input >>= function
+          fill_in ~show_optionals:false input >>= function
           | Error msg ->
               cctxt#error "%s" msg >>= fun () ->
               return ()
