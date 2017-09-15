@@ -724,6 +724,15 @@ constants as is, concatenate them and use them as keys.
 
         :: 'elt : bool : set 'elt : 'S   ->   set 'elt : 'S
 
+   * `MAP`:
+     Apply a function on a map and return the map of results under
+     the same bindings.
+
+     The `'b` type must be comparable (the `COMPARE` primitive must be
+     defined over it).
+
+        :: lambda 'elt 'b : set 'elt : 'S   ->   set 'b : 'S
+
    * `REDUCE`:
      Apply a function on a set passing the result of each
      application to the next one and return the last.
@@ -896,6 +905,9 @@ VI - Domain specific data types
    * `key`:
      A public cryptography key.
 
+   * `key_hash`:
+     The hash of a public cryptography key.
+
    * `signature`:
      A cryptographic signature.
 
@@ -970,13 +982,13 @@ for under/overflows.
    * `MANAGER`:
      Access the manager of a contract.
 
-        :: contract 'p 'r : 'S   ->   key : 'S
+        :: contract 'p 'r : 'S   ->   key_hash : 'S
 
    * `CREATE_CONTRACT`:
      Forge a new contract.
 
 
-        :: key : key? : bool : bool : tez : lambda (pair 'p 'g) (pair 'r 'g) : 'g : 'S
+        :: key_hash : key_hash? : bool : bool : tez : lambda (pair 'p 'g) (pair 'r 'g) : 'g : 'S
            -> contract 'p 'r : 'S
 
      As with non code-emitted originations the
@@ -995,7 +1007,7 @@ for under/overflows.
    * `CREATE_ACCOUNT`:
      Forge an account (a contract without code).
 
-        :: key : key? : bool : tez : 'S   ->   contract unit unit : 'S
+        :: key_hash : key_hash? : bool : tez : 'S   ->   contract unit unit : 'S
 
      Take as argument the manager, optional delegate, the delegatable
      flag and finally the initial amount taken from the currently
@@ -1050,7 +1062,7 @@ for under/overflows.
      holder of the private key. This contract cannot execute Michelson code
      and will always exist on the blockchain.
 
-        :: key : 'S   ->   contract unit unit :: 'S
+        :: key_hash : 'S   ->   contract unit unit :: 'S
 
 ### Special operations
 
@@ -1067,6 +1079,11 @@ for under/overflows.
 
 ### Cryptographic primitives
 
+   * `HASH_KEY`:
+     Compute the b58check of a public key.
+
+        :: key : 'S   ->   key_hash : 'S
+
    * `H`:
      Compute a cryptographic hash of the value contents using the
      Sha256 cryptographic algorithm.
@@ -1080,7 +1097,7 @@ for under/overflows.
 
    * `COMPARE`:
 
-        :: key : key : 'S   ->   int : 'S
+        :: key_hash : key_hash : 'S   ->   int : 'S
 
 VIII - Macros
 -------------
@@ -1777,6 +1794,7 @@ X - Full grammar
       | <timestamp string constant>
       | <signature string constant>
       | <key string constant>
+      | <key_hash string constant>
       | <tez string constant>
       | <contract string constant>
       | Unit
@@ -1844,29 +1862,19 @@ X - Full grammar
       | GT
       | LE
       | GE
-      | CAST
-      | CHECKED_ABS
-      | CHECKED_NEG
-      | CHECKED_ADD
-      | CHECKED_SUB
-      | CHECKED_MUL
-      | CHECKED_CAST
-      | FLOOR
-      | CEIL
-      | INF
-      | NAN
-      | ISNAN
-      | NANAN
+      | INT
       | MANAGER
       | SELF
       | TRANSFER_TOKENS
       | CREATE_ACCOUNT
       | CREATE_CONTRACT
+      | DEFAULT_ACCOUNT
       | NOW
       | AMOUNT
       | BALANCE
       | CHECK_SIGNATURE
       | H
+      | HASH_KEY
       | STEPS_TO_QUOTA
       | SOURCE <type> <type>
     <type> ::=
@@ -1877,6 +1885,7 @@ X - Full grammar
       | tez
       | bool
       | key
+      | key_hash
       | timestamp
       | signature
       | option <type>
@@ -1893,7 +1902,7 @@ X - Full grammar
       | string
       | tez
       | bool
-      | key
+      | key_hash
       | timestamp
 
 XII - Reference implementation

@@ -1,5 +1,5 @@
-parameter key;
+parameter key_hash;
 return unit;
 storage (contract unit unit);
-code {CAR; DIP{PUSH tez "100.00"; PUSH bool False; NONE key};
+code {CAR; DIP{PUSH tez "100.00"; PUSH bool False; NONE key_hash};
       CREATE_ACCOUNT; UNIT; PAIR};
