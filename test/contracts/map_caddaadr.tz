@@ -1,6 +1,4 @@
 parameter unit;
 storage (pair (pair nat (pair nat (pair (pair (pair nat tez) nat) nat))) nat);
-return (pair (pair nat (pair nat (pair (pair (pair nat tez) nat) nat))) nat);
-code { CDR ;
-       MAP_CADDAADR { PUSH tez "1.00" ; ADD } ;
-       DUP ; PAIR };
+return unit;
+code { MAP_CDADDAADR { PUSH tez "1.00" ; ADD } };

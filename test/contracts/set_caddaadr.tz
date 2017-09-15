@@ -1,7 +1,6 @@
-parameter unit;
+parameter tez;
 storage (pair (pair nat (pair nat (pair (pair (pair nat tez) nat) nat))) nat);
-return (pair (pair nat (pair nat (pair (pair (pair nat tez) nat) nat))) nat);
-code { CDR ; DUP ;
-       DIP { CADDAADR ; PUSH tez "1.00" ; ADD } ;
+return unit;
+code { DUP ; CAR ; SWAP ; CDR ;
        SET_CADDAADR ;
-       DUP ; PAIR };
+       UNIT ; PAIR };

@@ -265,12 +265,12 @@ assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 0)' '1' '(Pair "hello" 1
 assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 500)' '3' '(Pair "hello" 3)'
 assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 7)' '100' '(Pair "hello" 100)'
 
-assert_output  $CONTRACT_PATH/set_caddaadr.tz \
+assert_storage  $CONTRACT_PATH/set_caddaadr.tz \
 '(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0.00") 4) 5))) 6)' \
-'Unit' \
-'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "1.00") 4) 5))) 6)'
+'"3.00"' \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "3.00") 4) 5))) 6)'
 
-assert_output  $CONTRACT_PATH/map_caddaadr.tz \
+assert_storage  $CONTRACT_PATH/map_caddaadr.tz \
 '(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0.00") 4) 5))) 6)' \
 'Unit' \
 '(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "1.00") 4) 5))) 6)'
