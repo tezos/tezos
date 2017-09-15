@@ -19,7 +19,7 @@ type 'ty comparable_ty =
   | String_key : string comparable_ty
   | Tez_key : Tez.t comparable_ty
   | Bool_key : bool comparable_ty
-  | Key_key : public_key_hash comparable_ty
+  | Key_hash_key : public_key_hash comparable_ty
   | Timestamp_key : Timestamp.t comparable_ty
 
 module type Boxed_set = sig
@@ -66,7 +66,8 @@ and 'ty ty =
   | Signature_t : signature ty
   | String_t : string ty
   | Tez_t : Tez.t ty
-  | Key_t : public_key_hash ty
+  | Key_hash_t : public_key_hash ty
+  | Key_t : public_key ty
   | Timestamp_t : Timestamp.t ty
   | Bool_t : bool ty
   | Pair_t : 'a ty * 'b ty -> ('a, 'b) pair ty
@@ -298,7 +299,9 @@ and ('bef, 'aft) instr =
   | Balance :
       ('rest, Tez.t * 'rest) instr
   | Check_signature :
-      (public_key_hash * ((signature * string) * 'rest), bool * 'rest) instr
+      (public_key * ((signature * string) * 'rest), bool * 'rest) instr
+  | Hash_key :
+      (public_key * 'rest, public_key_hash * 'rest) instr
   | H : 'a ty ->
     ('a * 'rest, string * 'rest) instr
   | Steps_to_quota : (* TODO: check that it always returns a nat *)

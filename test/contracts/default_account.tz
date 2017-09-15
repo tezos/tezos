@@ -1,4 +1,4 @@
-parameter key;
+parameter key_hash;
 return unit;
 storage unit;
 code {DIP{UNIT}; CAR; DEFAULT_ACCOUNT;
