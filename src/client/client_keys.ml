@@ -104,6 +104,19 @@ let list_keys cctxt =
        return (name, pkh, pkm, pks))
     l
 
+let alias_keys cctxt name =
+  Public_key_hash.load cctxt >>=? fun l ->
+  let rec find_key = function
+    | [] -> return None
+    | (key_name, pkh) :: tl ->
+        if String.(key_name = name)
+        then
+          Public_key.find_opt cctxt name >>=? fun pkm ->
+          Secret_key.find_opt cctxt name >>=? fun pks ->
+          return (Some (pkh, pkm, pks))
+        else find_key tl
+  in find_key l
+
 let group =
   { Cli_entries.name = "keys" ;
     title = "Commands for managing cryptographic keys" }
@@ -111,6 +124,11 @@ let group =
 let commands () =
   let open Cli_entries in
   let open Client_commands in
+  let show_private = ref false in
+  let show_private_arg =
+    "-show-secret",
+    Arg.Set show_private,
+    "Show the private key" in
   [
 
     command ~group ~desc: "generate a pair of keys"
@@ -169,6 +187,32 @@ let commands () =
                 (if pks then " (secret key known)" else "") >>= fun () ->
               return ())
            l) ;
+
+    command ~group ~desc: "show the keys associated with an identity"
+      ~args: [ show_private_arg ]
+      (prefixes [ "show" ; "identity"]
+       @@ Public_key_hash.alias_param
+       @@ stop)
+      (fun (name, _) cctxt ->
+         let ok_lwt x = x >>= (fun x -> return x) in
+         alias_keys cctxt name >>=? fun key_info ->
+         match key_info with
+         | None -> ok_lwt @@ cctxt.message "No keys found for identity"
+         | Some (hash, pub, priv) ->
+             Public_key_hash.to_source cctxt hash >>=? fun hash ->
+             ok_lwt @@ cctxt.message "Hash: %s" hash >>=? fun () ->
+             match pub with
+             | None -> return ()
+             | Some pub ->
+                 Public_key.to_source cctxt pub >>=? fun pub ->
+                 ok_lwt @@ cctxt.message "Public Key: %s" pub >>=? fun () ->
+                 if !show_private then
+                   match priv with
+                   | None -> return ()
+                   | Some priv ->
+                       Secret_key.to_source cctxt priv >>=? fun priv ->
+                       ok_lwt @@ cctxt.message "Secret Key: %s" priv
+                 else return ()) ;
 
     command ~group ~desc: "forget all keys"
       (fixed [ "forget" ; "all" ; "keys" ])
