@@ -114,7 +114,7 @@ commands, you will have to replace `./alphanet.sh client` by
 How to observe the network ?
 ============================
 
-The alphanet script provides a basic command `./alhpanet.sh head` that
+The alphanet script provides a basic command `./alphanet.sh head` that
 allows you to see if your own node is synchronized. 
 
 The Tezos client also offers a lot of commands to introspect the state of
