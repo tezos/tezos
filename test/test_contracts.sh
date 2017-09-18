@@ -265,6 +265,16 @@ assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 0)' '1' '(Pair "hello" 1
 assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 500)' '3' '(Pair "hello" 3)'
 assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 7)' '100' '(Pair "hello" 100)'
 
+assert_output  $CONTRACT_PATH/set_caddaadr.tz \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0.00") 4) 5))) 6)' \
+'Unit' \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "1.00") 4) 5))) 6)'
+
+assert_output  $CONTRACT_PATH/map_caddaadr.tz \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0.00") 4) 5))) 6)' \
+'Unit' \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "1.00") 4) 5))) 6)'
+
 # Did the given key sign the string? (key is bootstrap1)
 assert_output $CONTRACT_PATH/check_signature.tz \
 '(Pair "26981d372a7b3866621bf79713d249197fe6d518ef702fa65738e1715bde9da54df04fefbcc84287ecaa9f74ad9296462731aa24bbcece63c6bf73a8f5752309" "hello")' \

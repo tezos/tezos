@@ -1187,12 +1187,12 @@ These are macros are simply more convenient syntax for various common operations
    * `SET_CAR`:
      Set the first value of a pair.
 
-        > SET_CAR => CDR; SWAP; PAIR
+        > SET_CAR => CDR ; SWAP ; PAIR
 
    * `SET_CDR`:
      Set the first value of a pair.
 
-        > SET_CDR => CAR; PAIR
+        > SET_CDR => CAR ; PAIR
 
    * `SET_C[AD]+R`:
      A syntactic sugar for setting fields in nested pairs.
@@ -1201,6 +1201,24 @@ These are macros are simply more convenient syntax for various common operations
             { DUP ; DIP { CAR ; SET_C(\rest)R } ; CDR ; SWAP ; PAIR } ; C / S
         > SET_CD(\rest=[AD]+)R ; C / S   =>
             { DUP ; DIP { CDR ; SET_C(\rest)R } ; CAR ; PAIR } ; C / S
+
+   * `MAP_CAR` code:
+     Transform the first value of a pair.
+
+        > SET_CAR => DUP ; CDR ; SWAP ; code ; CAR ; PAIR
+
+   * `MAP_CDR` code:
+     Transform the first value of a pair.
+
+        > SET_CDR => DUP ; CDR ; code ; SWAP ; CAR ; PAIR
+
+   * `MAP_C[AD]+R` code:
+     A syntactic sugar for transforming fields in nested pairs.
+
+        > MAP_CA(\rest=[AD]+)R ; C / S   =>
+            { DUP ; DIP { CAR ; MAP_C(\rest)R code } ; CDR ; SWAP ; PAIR } ; C / S
+        > MAP_CD(\rest=[AD]+)R ; C / S   =>
+            { DUP ; DIP { CDR ; MAP_C(\rest)R code } ; CAR ; PAIR } ; C / S
 
 IX - Concrete syntax
 ----------------------
