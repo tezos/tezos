@@ -100,7 +100,7 @@ let rec print_expr_unwrapped_help emacs locations ppf = function
         | None -> Format.fprintf ppf "%s" name
         | Some _ as l -> Format.fprintf ppf "%s%a" name print_location_mark l
       end
-  | Script.Prim (loc, name, args, (Some _ as annot)) ->
+  | Script.Prim (loc, name, _, (Some _ as annot)) ->
       Format.fprintf ppf (if emacs then "%s%a %a" else "@[<hov 2>%s%a@ %a]")
         name print_location_mark (locations loc) print_annotation annot
   | Script.Prim (loc, name, args, annot) ->
@@ -698,59 +698,60 @@ let group =
 
 let commands () =
   let open Cli_entries in
-  let show_types = ref false in
-  let show_types_arg =
-    "-details",
-    Arg.Set show_types,
-    "Show the types of each instruction" in
-  let emacs_mode = ref false in
-  let emacs_mode_arg =
-    "-emacs",
-    Arg.Set emacs_mode,
-    "Output in michelson-mode.el compatible format" in
-  let trace_stack = ref false in
-  let trace_stack_arg =
-    "-trace-stack",
-    Arg.Set trace_stack,
-    "Show the stack after each step" in
-  let amount, amount_arg =
+  let show_types_switch =
+    switch
+      ~parameter:"-details"
+      ~doc:"Show the types of each instruction" in
+  let emacs_mode_switch =
+    switch
+      ~parameter:"-emacs"
+      ~doc:"Output in michelson-mode.el compatible format" in
+  let trace_stack_switch =
+    switch
+      ~parameter:"-trace-stack"
+      ~doc:"Show the stack after each step" in
+  let amount_arg =
     Client_proto_args.tez_arg
-      ~name:"-amount"
-      ~desc:"The amount of the transfer in \xEA\x9C\xA9."
-      ~default: "0.00" in
+      ~parameter:"-amount"
+      ~doc:"The amount of the transfer in \xEA\x9C\xA9."
+      ~default:"0.05" in
   [
 
     command ~group ~desc: "lists all known programs"
+      no_options
       (fixed [ "list" ; "known" ; "programs" ])
-      (fun cctxt ->
+      (fun () cctxt ->
          Program.load cctxt >>=? fun list ->
          Lwt_list.iter_s (fun (n, _) -> cctxt.message "%s" n) list >>= fun () ->
          return ()) ;
 
     command ~group ~desc: "remember a program under some name"
+      no_options
       (prefixes [ "remember" ; "program" ]
        @@ Program.fresh_alias_param
        @@ Program.source_param
        @@ stop)
-      (fun name hash cctxt -> Program.add cctxt name hash) ;
+      (fun () name hash cctxt -> Program.add cctxt name hash) ;
 
     command ~group ~desc: "forget a remembered program"
+      no_options
       (prefixes [ "forget" ; "program" ]
        @@ Program.alias_param
        @@ stop)
-      (fun (name, _) cctxt -> Program.del cctxt name) ;
+      (fun () (name, _) cctxt -> Program.del cctxt name) ;
 
     command ~group ~desc: "display a program"
+      no_options
       (prefixes [ "show" ; "known" ; "program" ]
        @@ Program.alias_param
        @@ stop)
-      (fun (_, program) cctxt ->
+      (fun () (_, program) cctxt ->
          Program.to_source cctxt program >>=? fun source ->
          cctxt.message "%s\n" source >>= fun () ->
          return ()) ;
 
     command ~group ~desc: "ask the node to run a program"
-      ~args: [ trace_stack_arg ; amount_arg ]
+      (args2 trace_stack_switch amount_arg)
       (prefixes [ "run" ; "program" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
@@ -760,15 +761,15 @@ let commands () =
        @@ Cli_entries.param ~name:"storage" ~desc:"the input data"
          (fun _cctxt data -> parse_data data)
        @@ stop)
-      (fun program storage input cctxt ->
+      (fun (trace_stack, amount) program storage input cctxt ->
          let open Data_encoding in
          let print_errors errs =
            report_errors cctxt errs >>= fun () ->
            cctxt.error "error running program" >>= fun () ->
            return () in
-         if !trace_stack then
+         if trace_stack then
            Client_proto_rpcs.Helpers.trace_code cctxt.rpc_config
-             cctxt.config.block program.ast (storage.ast, input.ast, !amount) >>= function
+             cctxt.config.block program.ast (storage.ast, input.ast, amount) >>= function
            | Ok (storage, output, trace) ->
                cctxt.message
                  "@[<v 0>@[<v 2>storage@,%a@]@,\
@@ -788,7 +789,7 @@ let commands () =
            | Error errs -> print_errors errs
          else
            Client_proto_rpcs.Helpers.run_code cctxt.rpc_config
-             cctxt.config.block program.ast (storage.ast, input.ast, !amount) >>= function
+             cctxt.config.block program.ast (storage.ast, input.ast, amount) >>= function
            | Ok (storage, output) ->
                cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
                  (print_expr no_locations) storage
@@ -798,15 +799,15 @@ let commands () =
                print_errors errs);
 
     command ~group ~desc: "ask the node to typecheck a program"
-      ~args: [ show_types_arg ; emacs_mode_arg ]
+      (args2 show_types_switch emacs_mode_switch)
       (prefixes [ "typecheck" ; "program" ]
        @@ Program.source_param
        @@ stop)
-      (fun program cctxt ->
+      (fun (show_types, emacs_mode) program cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_code
            cctxt.rpc_config cctxt.config.block program.ast >>= fun res ->
-         if !emacs_mode then
+         if emacs_mode then
            let emacs_type_map type_map =
              (Utils.filter_map
                 (fun (n, loc) ->
@@ -857,7 +858,7 @@ let commands () =
            | Ok type_map ->
                let type_map, program = unexpand_macros type_map program.ast in
                cctxt.message "Well typed" >>= fun () ->
-               if !show_types then
+               if show_types then
                  cctxt.message "%a" (print_program no_locations) (program, type_map) >>= fun () ->
                  return ()
                else return ()
@@ -866,6 +867,7 @@ let commands () =
                cctxt.error "ill-typed program") ;
 
     command ~group ~desc: "ask the node to typecheck a data expression"
+      no_options
       (prefixes [ "typecheck" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck"
          (fun _cctxt data -> parse_data data)
@@ -873,7 +875,7 @@ let commands () =
        @@ Cli_entries.param ~name:"type" ~desc:"the expected type"
          (fun _cctxt data -> parse_data data)
        @@ stop)
-      (fun data exp_ty cctxt ->
+      (fun () data exp_ty cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_data cctxt.Client_commands.rpc_config
            cctxt.config.block (data.ast, exp_ty.ast) >>= function
@@ -887,11 +889,12 @@ let commands () =
     command ~group
       ~desc: "ask the node to compute the hash of a data expression \
               using the same algorithm as script instruction H"
+      no_options
       (prefixes [ "hash" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
          (fun _cctxt data -> parse_data data)
        @@ stop)
-      (fun data cctxt ->
+      (fun () data cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.hash_data cctxt.Client_commands.rpc_config
            cctxt.config.block (data.ast) >>= function
@@ -907,13 +910,14 @@ let commands () =
               using the same algorithm as script instruction H, sign it using \
               a given secret key, and display it using the format expected by \
               script instruction CHECK_SIGNATURE"
+      no_options
       (prefixes [ "hash" ; "and" ; "sign" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
          (fun _cctxt data -> parse_data data)
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.alias_param
        @@ stop)
-      (fun data (_, key) cctxt ->
+      (fun () data (_, key) cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.hash_data cctxt.rpc_config
            cctxt.config.block (data.ast) >>= function

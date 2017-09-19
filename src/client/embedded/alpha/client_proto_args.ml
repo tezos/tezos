@@ -7,129 +7,156 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Cli_entries
+
+type error += Bad_tez_arg of string * string (* Arg_name * value *)
+type error += Bad_max_priority of string
+type error += Bad_endorsement_delay of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"badTezArg"
+    ~title:"Bad Tez Arg"
+    ~description:("Invalid \xEA\x9C\xA9 notation in parameter.")
+    ~pp:(fun ppf (arg_name, literal) ->
+        Format.fprintf ppf
+          "Invalid \xEA\x9C\xA9 notation in parameter %s: '%s'"
+          arg_name literal)
+    Data_encoding.(obj2
+                     (req "parameter" string)
+                     (req "literal" string))
+    (function Bad_tez_arg (parameter, literal) -> Some (parameter, literal) | _ -> None)
+    (fun (parameter, literal) -> Bad_tez_arg (parameter, literal)) ;
+  register_error_kind
+    `Permanent
+    ~id:"badMaxPriorityArg"
+    ~title:"Bad -max-priority arg"
+    ~description:("invalid priority in -max-priority")
+    ~pp:(fun ppf literal ->
+        Format.fprintf ppf "invalid priority '%s'in -max-priority" literal)
+    Data_encoding.(obj1 (req "parameter" string))
+    (function Bad_max_priority parameter -> Some parameter | _ -> None)
+    (fun parameter -> Bad_max_priority parameter) ;
+  register_error_kind
+    `Permanent
+    ~id:"badEndorsementDelayArg"
+    ~title:"Bad -endorsement-delay arg"
+    ~description:("invalid priority in -endorsement-delay")
+    ~pp:(fun ppf literal ->
+        Format.fprintf ppf "Bad argument value for -endorsement-delay. Expected an integer, but given '%s'" literal)
+    Data_encoding.(obj1 (req "parameter" string))
+    (function Bad_endorsement_delay parameter -> Some parameter | _ -> None)
+    (fun parameter -> Bad_endorsement_delay parameter)
+  
+
 let tez_sym =
   "\xEA\x9C\xA9"
 
-let tez_of_string s =
-  match Tez.of_string s with
-  | None -> invalid_arg "tez_of_string"
-  | Some t -> t
-
-let init = ref "Unit"
 let init_arg =
-  "-init",
-  Arg.Set_string init,
-  "The initial value of the contract's storage.\n\
-   default: unit"
+  default_arg
+    ~parameter:"-init"
+    ~doc:"The initial value of the contract's storage."
+    ~default:"Unit"
+    (fun _ s -> return s)
 
-let arg = ref None
 let arg_arg =
-  "-arg",
-  Arg.String (fun a -> arg := Some a),
-  "The argument passed to the contract's script, if needed.\n\
-   default: no argument"
-
-let delegate = ref None
+  default_arg
+    ~parameter:"-arg"
+    ~doc:"The argument passed to the contract's script, if needed."
+    ~default:"Unit"
+    (fun _ a -> return a)
+  
 let delegate_arg =
-  "-delegate",
-  Arg.String (fun s -> delegate := Some s),
-  "Set the delegate of the contract.\n\
-   Must be a known identity."
+  arg
+    ~parameter:"-delegate"
+    ~doc:"Set the delegate of the contract.\
+          Must be a known identity."
+    (fun _ s -> return s)
+  
 
-let source = ref None
 let source_arg =
-  "-source",
-  Arg.String (fun s -> source := Some s),
-  "Set the source of the bonds to be paid.\n\
-   Must be a known identity."
+  arg
+    ~parameter:"-source"
+    ~doc:"Set the source of the bonds to be paid.\
+          Must be a known identity."
+    (fun _ s -> return s)
 
-let spendable = ref true
-let spendable_args =
-  [ "-spendable",
-    Arg.Set spendable,
-    "Set the created contract to be spendable (default)" ;
-    "-non-spendable",
-    Arg.Clear spendable,
-    "Set the created contract to be non spendable" ]
+let non_spendable_switch =
+  switch
+    ~parameter:"-non-spendable"
+    ~doc:"Set the created contract to be non spendable"
 
-let force = ref false
-let force_arg =
-  "-force",
-  Arg.Set force,
-  "Force the injection of branch-invalid operation or force \
-  \ the injection of bleck without a fitness greater than the \
-  \ current head."
+let force_switch =
+  switch
+    ~parameter:"-force"
+    ~doc:"Force the injection of branch-invalid operation or force \
+         \ the injection of block without a fitness greater than the \
+         \ current head."
 
-let delegatable = ref false
-let delegatable_args =
-  [ "-delegatable",
-    Arg.Set delegatable,
-    "Set the created contract to be delegatable" ;
-    "-non-delegatable",
-    Arg.Clear delegatable,
-    "Set the created contract to be non delegatable (default)" ]
+let delegatable_switch =
+  switch
+    ~parameter:"-delegatable"
+    ~doc:"Set the created contract to be delegatable"
 
 let tez_format = "text format: D,DDD,DDD.DD (centiles are optional, commas are optional)"
 
-let tez_arg ~name ~desc ~default =
-  let ref_cell = ref (tez_of_string default) in
-  (ref_cell,
-   (name,
-    Arg.String (fun s ->
-        try ref_cell := tez_of_string s
-        with _ -> raise (Arg.Bad
-                           ("invalid \xEA\x9C\xA9 notation in parameter " ^ name))),
-    (Printf.sprintf
-       "%s\ndefault: \"%s\"\n%s"
-       desc
-       default
-       tez_format)))
+let tez_arg ~default ~parameter ~doc =
+  default_arg ~parameter ~doc ~default
+    (fun _ s ->
+       match Tez.of_string s with
+       | Some tez -> return tez
+       | None -> fail (Bad_tez_arg (parameter, s)))
 
 let tez_param ~name ~desc next =
   Cli_entries.param
     name
     (desc ^ " in \xEA\x9C\xA9\n" ^ tez_format)
     (fun _ s ->
-       try return (tez_of_string s)
-       with _ -> failwith "invalid \xEA\x9C\xA9 notation")
+       match Tez.of_string s with
+       | None -> fail (Bad_tez_arg (name, s))
+       | Some tez -> return tez)
     next
 
-let fee, fee_arg =
+let fee_arg =
   tez_arg
-    ~name:"-fee"
-    ~desc:"The fee in \xEA\x9C\xA9 to pay to the miner."
     ~default:"0.05"
+    ~parameter:"-fee"
+    ~doc:"The fee in \xEA\x9C\xA9 to pay to the miner."
 
-let max_priority = ref None
 let max_priority_arg =
-  "-max-priority",
-  Arg.String (fun s ->
-      try max_priority := Some (int_of_string s)
-      with _ -> raise (Arg.Bad "invalid priority in -max-priority")),
-  "Set the max_priority used when looking for mining slot."
+  arg
+    ~parameter:"-max-priority"
+    ~doc:"Set the max_priority used when looking for mining slot."
+    (fun _ s ->
+       try return (int_of_string s)
+       with _ -> fail (Bad_max_priority s))
 
-let free_mining = ref false
-let free_mining_arg =
-    "-free-mining", Arg.Set free_mining, "Only consider free mining slots."
+let free_mining_switch =
+  switch
+    ~parameter:"-free-mining"
+    ~doc:"Only consider free mining slots."
 
-let endorsement_delay = ref 15
 let endorsement_delay_arg =
-  "-endorsement-delay",
-  Arg.String (fun s ->
-      try endorsement_delay := int_of_string s
-      with _ -> raise (Arg.Bad "invalid priority in -endorsement-delay")),
-  "Set the delay used before to endorse the current block."
+  default_arg
+    ~parameter:"-endorsement-delay"
+    ~doc:"Set the delay used before to endorse the current block."
+    ~default:"15"
+    (fun _ s ->
+       try return (int_of_string s)
+       with _ -> fail (Bad_endorsement_delay s))
 
 module Daemon = struct
-  let all = ref true
-  let arg r = Arg.Unit (fun () -> all := false; r := true)
-  let mining = ref false
-  let mining_arg =
-    "-mining", arg mining, "Run the mining daemon"
-  let endorsement = ref false
-  let endorsement_arg =
-    "-endorsement", arg endorsement, "Run the endorsement daemon"
-  let denunciation = ref false
-  let denunciation_arg =
-    "-denunciation", arg denunciation, "Run the denunciation daemon"
+  let mining_switch =
+    switch
+      ~parameter:"-mining"
+      ~doc:"Run the mining daemon"
+  let endorsement_switch =
+    switch
+      ~parameter:"-endorsement"
+      ~doc:"Run the endorsement daemon"
+  let denunciation_switch =
+    switch
+      ~parameter:"-denunciation"
+      ~doc:"Run the denunciation daemon"
 end

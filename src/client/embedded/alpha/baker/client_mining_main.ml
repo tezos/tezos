@@ -94,11 +94,12 @@ let reveal_nonces cctxt ?force () =
 
 open Client_proto_args
 
-let run_daemon cctxt delegates =
+let run_daemon cctxt max_priority endorsement_delay delegates ~endorsement ~mining ~denunciation =
   Client_mining_daemon.run cctxt
-    ?max_priority:!max_priority
-    ~delay:!endorsement_delay
+    ?max_priority
+    ~delay:endorsement_delay
     ~min_date:((Time.add (Time.now ()) (Int64.neg 1800L)))
+    ~endorsement ~mining ~denunciation
     (List.map snd delegates)
 
 let group =
@@ -109,43 +110,47 @@ let commands () =
   let open Cli_entries in
   [
     command ~group ~desc: "Launch a daemon that handles delegate operations."
-      ~args: [endorsement_delay_arg; max_priority_arg;
-              Daemon.mining_arg ; Daemon.endorsement_arg ; Daemon.denunciation_arg]
+      (args5 max_priority_arg endorsement_delay_arg
+                  Daemon.mining_switch Daemon.endorsement_switch Daemon.denunciation_switch)
       (prefixes [ "launch" ; "daemon" ]
-       @@ seq_of_param Client_keys.Public_key_hash.alias_param )
-      (fun delegates cctxt ->
-         run_daemon cctxt delegates) ;
+       @@ seq_of_param Client_keys.Public_key_hash.alias_param)
+      (fun (max_priority, endorsement_delay, mining, endorsement, denunciation) delegates cctxt ->
+         let (endorsement, mining, denunciation) =
+           if (not endorsement) && (not mining) && (not denunciation)
+           then (true, true, true)
+           else (endorsement, mining, denunciation) in
+         run_daemon cctxt max_priority endorsement_delay ~endorsement ~mining ~denunciation delegates) ;
     command ~group ~desc: "Forge and inject an endorsement operation"
-      ~args: [ force_arg ]
+      (args2 force_switch max_priority_arg)
       (prefixes [ "endorse"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
          ~name:"miner" ~desc: "name of the delegate owning the endorsement right"
        @@ stop)
-      (fun (_, delegate) cctxt ->
+      (fun (force, max_priority) (_, delegate) cctxt ->
          endorse_block cctxt
-           ~force:!force ?max_priority:!max_priority delegate) ;
+           ~force ?max_priority delegate) ;
     command ~group ~desc: "Forge and inject block using the delegate rights"
-      ~args: [ max_priority_arg ; force_arg ; free_mining_arg ]
+      (args3 max_priority_arg force_switch free_mining_switch)
       (prefixes [ "mine"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
          ~name:"miner" ~desc: "name of the delegate owning the mining right"
        @@ stop)
-      (fun (_, delegate) cctxt ->
+      (fun (max_priority, force, free_mining) (_, delegate) cctxt ->
          mine_block cctxt cctxt.config.block
-           ~force:!force ?max_priority:!max_priority ~free_mining:!free_mining delegate) ;
+           ~force ?max_priority ~free_mining delegate) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation"
-      ~args: [ force_arg ]
+      (args1 force_switch)
       (prefixes [ "reveal"; "nonce"; "for" ]
-       @@ Cli_entries.seq_of_param Block_hash.param)
-      (fun block_hashes cctxt ->
+       @@ seq_of_param Block_hash.param)
+      (fun force block_hashes cctxt ->
          reveal_block_nonces cctxt
-           ~force:!force block_hashes) ;
+           ~force block_hashes) ;
     command ~group ~desc: "Forge and inject redemption operations"
-      ~args: [ force_arg ]
+      (args1 force_switch)
       (prefixes [ "reveal"; "nonces" ]
        @@ stop)
-      (fun cctxt ->
-         reveal_nonces cctxt ~force:!force ()) ;
+      (fun force cctxt ->
+         reveal_nonces cctxt ~force ()) ;
   ]
 
 let () =

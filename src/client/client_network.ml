@@ -16,7 +16,8 @@ let group =
 let commands () = [
   let open Cli_entries in
   command ~group ~desc: "show global network status"
-    (prefixes ["network" ; "stat"] stop) begin fun cctxt ->
+    no_options
+    (prefixes ["network" ; "stat"] stop) begin fun () cctxt ->
     Client_node_rpcs.Network.stat cctxt.rpc_config >>=? fun stat ->
     Client_node_rpcs.Network.connections cctxt.rpc_config >>=? fun conns ->
     Client_node_rpcs.Network.peers cctxt.rpc_config >>=? fun peers ->

@@ -60,6 +60,7 @@ val originate_contract:
   code:Script.code ->
   init:string ->
   fee:Tez.t ->
+  spendable:bool ->
   unit -> (Operation_hash.t * Contract.t) tzresult Lwt.t
 
 val delegate_contract:
