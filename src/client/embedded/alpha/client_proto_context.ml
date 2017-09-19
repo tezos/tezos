@@ -43,7 +43,6 @@ let get_branch rpc_config block branch =
 let transfer rpc_config
     block ?force ?branch
     ~source ~src_pk ~src_sk ~destination ?arg ~amount ~fee () =
-  let open Cli_entries in
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
   begin match arg with
     | Some arg ->
@@ -106,7 +105,7 @@ let originate_account rpc_config
 let originate_contract rpc_config
     block ?force ?branch
     ~source ~src_pk ~src_sk ~manager_pkh ~balance ?delegatable ?delegatePubKey
-    ~(code:Script.code) ~init ~fee () =
+    ~(code:Script.code) ~init ~fee ~spendable () =
   Client_proto_programs.parse_data init >>=? fun storage ->
   let storage = Script.{ storage=storage.ast ; storage_type = code.storage_type } in
   Client_proto_rpcs.Context.Contract.counter
@@ -115,7 +114,7 @@ let originate_contract rpc_config
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
   Client_proto_rpcs.Helpers.Forge.Manager.origination rpc_config block
     ~net_id ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
-    ~counter ~balance ~spendable:!spendable
+    ~counter ~balance ~spendable:spendable
     ?delegatable ?delegatePubKey
     ~script:{ code ; storage } ~fee () >>=? fun bytes ->
   let signature = Ed25519.sign src_sk bytes in
@@ -229,241 +228,259 @@ let dictate rpc_config block command seckey =
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
 
+let default_fee =
+  match Tez.of_cents 5L with
+  | None -> raise (Failure "internal error: Could not parse default_fee literal")
+  | Some fee -> fee
+
 let commands () =
   let open Cli_entries in
   let open Client_commands in
   [
+    command ~group ~desc: "access the timestamp of the block"
+      no_options
+      (fixed [ "get" ; "timestamp" ])
+      begin fun () cctxt ->
+        Client_node_rpcs.Blocks.timestamp
+          cctxt.rpc_config cctxt.config.block >>=? fun v ->
+        cctxt.message "%s" (Time.to_notation v) >>= fun () ->
+        return ()
+      end ;
 
-    command ~group ~desc: "access the timestamp of the block" begin
-      fixed [ "get" ; "timestamp" ]
-    end begin fun cctxt ->
-      Client_node_rpcs.Blocks.timestamp
-        cctxt.rpc_config cctxt.config.block >>=? fun v ->
-      cctxt.message "%s" (Time.to_notation v) >>= fun () ->
-      return ()
-    end ;
+    command ~group ~desc: "lists all non empty contracts of the block"
+      no_options
+      (fixed [ "list" ; "contracts" ])
+      begin fun () cctxt ->
+        list_contract_labels cctxt cctxt.config.block >>=? fun contracts ->
+        Lwt_list.iter_s
+          (fun (alias, hash, kind) -> cctxt.message "%s%s%s" hash kind alias)
+          contracts >>= fun () ->
+        return ()
+      end ;
 
-    command ~group ~desc: "lists all non empty contracts of the block" begin
-      fixed [ "list" ; "contracts" ]
-    end begin fun cctxt ->
-      list_contract_labels cctxt cctxt.config.block >>=? fun contracts ->
-      Lwt_list.iter_s
-        (fun (alias, hash, kind) -> cctxt.message "%s%s%s" hash kind alias)
-        contracts >>= fun () ->
-      return ()
-    end ;
+    command ~group ~desc: "get the balance of a contract"
+      no_options
+      (prefixes [ "get" ; "balance" ; "for" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun () (_, contract) cctxt ->
+        get_balance cctxt.rpc_config cctxt.config.block contract >>=? fun amount ->
+        cctxt.answer "%a %s" Tez.pp amount tez_sym >>= fun () ->
+        return ()
+      end ;
 
-    command ~group ~desc: "get the balance of a contract" begin
-      prefixes [ "get" ; "balance" ; "for" ]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop
-    end begin fun (_, contract) cctxt ->
-      get_balance cctxt.rpc_config cctxt.config.block contract >>=? fun amount ->
-      cctxt.answer "%a %s" Tez.pp amount tez_sym >>= fun () ->
-      return ()
-    end ;
+    command ~group ~desc: "get the storage of a contract"
+      no_options
+      (prefixes [ "get" ; "storage" ; "for" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun () (_, contract) cctxt ->
+        get_storage cctxt.rpc_config cctxt.config.block contract >>=? function
+        | None ->
+            cctxt.error "This is not a smart contract."
+        | Some storage ->
+            cctxt.answer "%a" Client_proto_programs.print_storage storage >>= fun () ->
+            return ()
+      end ;
 
-    command ~group ~desc: "get the storage of a contract" begin
-      prefixes [ "get" ; "storage" ; "for" ]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop
-    end begin fun (_, contract) cctxt ->
-      get_storage cctxt.rpc_config cctxt.config.block contract >>=? function
-      | None ->
-          cctxt.error "This is not a smart contract."
-      | Some storage ->
-          cctxt.answer "%a" Client_proto_programs.print_storage storage >>= fun () ->
-          return ()
-    end ;
+    command ~group ~desc: "get the manager of a contract"
+      no_options
+      (prefixes [ "get" ; "manager" ; "for" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun () (_, contract) cctxt ->
+        Client_proto_contracts.get_manager
+          cctxt.rpc_config cctxt.config.block contract >>=? fun manager ->
+        Public_key_hash.rev_find cctxt manager >>=? fun mn ->
+        Public_key_hash.to_source cctxt manager >>=? fun m ->
+        cctxt.message "%s (%s)" m
+          (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
+        return ()
+      end ;
 
-    command ~group ~desc: "get the manager of a contract" begin
-      prefixes [ "get" ; "manager" ; "for" ]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop
-    end begin fun (_, contract) cctxt ->
-      Client_proto_contracts.get_manager
-        cctxt.rpc_config cctxt.config.block contract >>=? fun manager ->
-      Public_key_hash.rev_find cctxt manager >>=? fun mn ->
-      Public_key_hash.to_source cctxt manager >>=? fun m ->
-      cctxt.message "%s (%s)" m
-        (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
-      return ()
-    end ;
-
-    command ~group ~desc: "get the delegate of a contract" begin
-      prefixes [ "get" ; "delegate" ; "for" ]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ stop
-    end begin fun (_, contract) cctxt ->
-      Client_proto_contracts.get_delegate
-        cctxt.rpc_config cctxt.config.block contract >>=? fun delegate ->
-      Public_key_hash.rev_find cctxt delegate >>=? fun mn ->
-      Public_key_hash.to_source cctxt delegate >>=? fun m ->
-      cctxt.message "%s (%s)" m
-        (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
-      return ()
-    end ;
+    command ~group ~desc: "get the delegate of a contract"
+      no_options
+      (prefixes [ "get" ; "delegate" ; "for" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ stop)
+      begin fun () (_, contract) cctxt ->
+        Client_proto_contracts.get_delegate
+          cctxt.rpc_config cctxt.config.block contract >>=? fun delegate ->
+        Public_key_hash.rev_find cctxt delegate >>=? fun mn ->
+        Public_key_hash.to_source cctxt delegate >>=? fun m ->
+        cctxt.message "%s (%s)" m
+          (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
+        return ()
+      end ;
 
     command ~group ~desc: "set the delegate of a contract"
-      ~args: ([ fee_arg ; force_arg ]) begin
-      prefixes [ "set" ; "delegate" ; "for" ]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
-      @@ prefix "to"
-      @@ Public_key_hash.alias_param
-        ~name: "mgr" ~desc: "new delegate of the contract"
-      @@ stop
-    end begin fun (_, contract) (_, delegate) cctxt ->
-      get_manager cctxt contract >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
-      delegate_contract
-        cctxt.rpc_config cctxt.config.block ~source:contract
-        ~src_pk ~manager_sk:src_sk ~fee:!fee (Some delegate)
-      >>=? fun oph ->
-      message_injection cctxt ~force:!force oph >>= fun () ->
-      return ()
-    end ;
+      (args2 fee_arg force_switch)
+      (prefixes [ "set" ; "delegate" ; "for" ]
+       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+       @@ prefix "to"
+       @@ Public_key_hash.alias_param
+         ~name: "mgr" ~desc: "new delegate of the contract"
+       @@ stop)
+      begin fun (fee, force) (_, contract) (_, delegate) cctxt ->
+        get_manager cctxt contract >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
+        delegate_contract
+          cctxt.rpc_config cctxt.config.block ~source:contract
+          ~src_pk ~manager_sk:src_sk ~fee (Some delegate)
+        >>=? fun oph ->
+        message_injection cctxt ~force:force oph >>= fun () ->
+        return ()
+      end ;
 
     command ~group ~desc: "open a new account"
-      ~args: ([ fee_arg ; delegate_arg ; force_arg ]
-              @ delegatable_args @ spendable_args) begin
-      prefixes [ "originate" ; "account" ]
-      @@ RawContractAlias.fresh_alias_param
-        ~name: "new" ~desc: "name of the new contract"
-      @@ prefix "for"
-      @@ Public_key_hash.alias_param
-        ~name: "mgr" ~desc: "manager of the new contract"
-      @@ prefix "transferring"
-      @@ tez_param
-        ~name: "qty" ~desc: "amount taken from source"
-      @@ prefix "from"
-      @@ ContractAlias.alias_param
-        ~name:"src" ~desc: "name of the source contract"
-      @@ stop
-    end begin fun neu (_, manager) balance (_, source) cctxt ->
-      check_contract cctxt neu >>=? fun () ->
-      get_delegate_pkh cctxt !delegate >>=? fun delegate ->
-      get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
-      originate_account cctxt.rpc_config cctxt.config.block ~force:!force
-        ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
-        ~delegatable:!delegatable ~spendable:!spendable ?delegate:delegate
-        () >>=? fun (oph, contract) ->
-      message_injection cctxt
-        ~force:!force ~contracts:[contract] oph >>= fun () ->
-      RawContractAlias.add cctxt neu contract >>=? fun () ->
-      message_added_contract cctxt neu >>= fun () ->
-      return ()
-    end ;
+      (args5 fee_arg delegate_arg delegatable_switch
+                  force_switch non_spendable_switch)
+      (prefixes [ "originate" ; "account" ]
+       @@ RawContractAlias.fresh_alias_param
+         ~name: "new" ~desc: "name of the new contract"
+       @@ prefix "for"
+       @@ Public_key_hash.alias_param
+         ~name: "mgr" ~desc: "manager of the new contract"
+       @@ prefix "transferring"
+       @@ tez_param
+         ~name: "qty" ~desc: "amount taken from source"
+       @@ prefix "from"
+       @@ ContractAlias.alias_param
+         ~name:"src" ~desc: "name of the source contract"
+       @@ stop)
+      begin fun (fee, delegate, delegatable, force, non_spendable)
+        neu (_, manager) balance (_, source) cctxt ->
+        check_contract cctxt neu >>=? fun () ->
+        get_delegate_pkh cctxt delegate >>=? fun delegate ->
+        get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
+        originate_account cctxt.rpc_config cctxt.config.block ~force:force
+          ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee
+          ~delegatable:delegatable ~spendable:(not non_spendable) ?delegate:delegate
+          () >>=? fun (oph, contract) ->
+        message_injection cctxt
+          ~force:force ~contracts:[contract] oph >>= fun () ->
+        RawContractAlias.add cctxt neu contract >>=? fun () ->
+        message_added_contract cctxt neu >>= fun () ->
+        return ()
+      end ;
 
     command ~group ~desc: "open a new scripted account"
-      ~args: ([ fee_arg ; delegate_arg ; force_arg ] @
-              delegatable_args @ spendable_args @ [ init_arg ]) begin
-      prefixes [ "originate" ; "contract" ]
-      @@ RawContractAlias.fresh_alias_param
-        ~name: "new" ~desc: "name of the new contract"
-      @@ prefix "for"
-      @@ Public_key_hash.alias_param
-        ~name: "mgr" ~desc: "manager of the new contract"
-      @@ prefix "transferring"
-      @@ tez_param
-        ~name: "qty" ~desc: "amount taken from source"
-      @@ prefix "from"
-      @@ ContractAlias.alias_param
-        ~name:"src" ~desc: "name of the source contract"
-      @@ prefix "running"
-      @@ Program.source_param
-        ~name:"prg" ~desc: "script of the account\n\
-                            combine with -init if the storage type is not unit"
-      @@ stop
-    end begin fun neu (_, manager) balance (_, source) { ast = code } cctxt ->
-      check_contract cctxt neu >>=? fun () ->
-      get_delegate_pkh cctxt !delegate >>=? fun delegate ->
-      get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
-      originate_contract cctxt.rpc_config cctxt.config.block ~force:!force
-        ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee:!fee
-        ~delegatable:!delegatable ?delegatePubKey:delegate ~code ~init:!init
-        () >>=function
-      | Error errs ->
-          Client_proto_programs.report_errors cctxt errs >>= fun () ->
-          cctxt.error "origination simulation failed"
-      | Ok (oph, contract) ->
-          message_injection cctxt
-            ~force:!force ~contracts:[contract] oph >>= fun () ->
-          RawContractAlias.add cctxt neu contract >>=? fun () ->
-          message_added_contract cctxt neu >>= fun () ->
-          return ()
-    end ;
+      (args6
+                  fee_arg delegate_arg force_switch
+                  delegatable_switch non_spendable_switch init_arg)
+      (prefixes [ "originate" ; "contract" ]
+       @@ RawContractAlias.fresh_alias_param
+         ~name: "new" ~desc: "name of the new contract"
+       @@ prefix "for"
+       @@ Public_key_hash.alias_param
+         ~name: "mgr" ~desc: "manager of the new contract"
+       @@ prefix "transferring"
+       @@ tez_param
+         ~name: "qty" ~desc: "amount taken from source"
+       @@ prefix "from"
+       @@ ContractAlias.alias_param
+         ~name:"src" ~desc: "name of the source contract"
+       @@ prefix "running"
+       @@ Program.source_param
+         ~name:"prg" ~desc: "script of the account\n\
+                             combine with -init if the storage type is not unit"
+       @@ stop)
+      begin fun (fee, delegate, force, delegatable, non_spendable, init)
+        neu (_, manager) balance (_, source) { ast = code } cctxt ->
+        check_contract cctxt neu >>=? fun () ->
+        get_delegate_pkh cctxt delegate >>=? fun delegate ->
+        get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
+        originate_contract cctxt.rpc_config cctxt.config.block ~force:force
+          ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee
+          ~delegatable:delegatable ?delegatePubKey:delegate ~code
+          ~init
+          ~spendable:(not non_spendable)
+          () >>=function
+        | Error errs ->
+            Client_proto_programs.report_errors cctxt errs >>= fun () ->
+            cctxt.error "origination simulation failed"
+        | Ok (oph, contract) ->
+            message_injection cctxt
+              ~force:force ~contracts:[contract] oph >>= fun () ->
+            RawContractAlias.add cctxt neu contract >>=? fun () ->
+            message_added_contract cctxt neu >>= fun () ->
+            return ()
+      end ;
 
     command ~group ~desc: "open a new (free) account"
-      ~args: ([ fee_arg ; delegate_arg ; force_arg ]
-              @ delegatable_args @ spendable_args) begin
-      prefixes [ "originate" ; "free" ; "account" ]
-      @@ RawContractAlias.fresh_alias_param
-        ~name: "new" ~desc: "name of the new contract"
-      @@ prefix "for"
-      @@ Public_key_hash.alias_param
-        ~name: "mgr" ~desc: "manager of the new contract"
-      @@ stop end
-      begin fun neu (_, manager) cctxt ->
+      (args1 force_switch)
+      (prefixes [ "originate" ; "free" ; "account" ]
+       @@ RawContractAlias.fresh_alias_param
+         ~name: "new" ~desc: "name of the new contract"
+       @@ prefix "for"
+       @@ Public_key_hash.alias_param
+         ~name: "mgr" ~desc: "manager of the new contract"
+       @@ stop)
+      begin fun force neu (_, manager) cctxt ->
         check_contract cctxt neu >>=? fun () ->
         faucet cctxt.rpc_config cctxt.config.block
-          ~force:!force ~manager_pkh:manager () >>=? fun (oph, contract) ->
+          ~force:force ~manager_pkh:manager () >>=? fun (oph, contract) ->
         message_injection cctxt
-          ~force:!force ~contracts:[contract] oph >>= fun () ->
+          ~force:force ~contracts:[contract] oph >>= fun () ->
         RawContractAlias.add cctxt neu contract >>=? fun () ->
         message_added_contract cctxt neu >>= fun () ->
         return ()
       end;
 
     command ~group ~desc: "transfer tokens"
-      ~args: [ fee_arg ; arg_arg ; force_arg ] begin
-      prefixes [ "transfer" ]
-      @@ tez_param
-        ~name: "qty" ~desc: "amount taken from source"
-      @@ prefix "from"
-      @@ ContractAlias.alias_param
-        ~name: "src" ~desc: "name of the source contract"
-      @@ prefix "to"
-      @@ ContractAlias.destination_param
-        ~name: "dst" ~desc: "name/literal of the destination contract"
-      @@ stop
-    end begin fun amount (_, source) (_, destination) cctxt ->
-      get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
-      transfer cctxt.rpc_config cctxt.config.block ~force:!force
-        ~source ~src_pk ~src_sk ~destination
-        ?arg:!arg ~amount ~fee:!fee () >>= function
-      | Error errs ->
-          Client_proto_programs.report_errors cctxt errs >>= fun () ->
-          cctxt.error "transfer simulation failed"
-      | Ok (oph, contracts) ->
-          message_injection cctxt ~force:!force ~contracts oph >>= fun () ->
-          return ()
-    end;
+      (args3 fee_arg arg_arg force_switch)
+      (prefixes [ "transfer" ]
+       @@ tez_param
+         ~name: "qty" ~desc: "amount taken from source"
+       @@ prefix "from"
+       @@ ContractAlias.alias_param
+         ~name: "src" ~desc: "name of the source contract"
+       @@ prefix "to"
+       @@ ContractAlias.destination_param
+         ~name: "dst" ~desc: "name/literal of the destination contract"
+       @@ stop)
+      begin fun (fee, arg, force) amount (_, source) (_, destination) cctxt ->
+        get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
+        transfer cctxt.rpc_config cctxt.config.block ~force:force
+          ~source ~src_pk ~src_sk ~destination
+          ~arg ~amount ~fee () >>= function
+        | Error errs ->
+            Client_proto_programs.report_errors cctxt errs >>= fun () ->
+            cctxt.error "transfer simulation failed"
+        | Ok (oph, contracts) ->
+            message_injection cctxt ~force:force ~contracts oph >>= fun () ->
+            return ()
+      end;
 
-    command ~desc: "Activate a protocol" begin
-      prefixes [ "activate" ; "protocol" ] @@
-      Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)" @@
-      prefixes [ "with" ; "key" ] @@
-      Environment.Ed25519.Secret_key.param
-        ~name:"password" ~desc:"Dictator's key" @@
-        stop
-    end begin fun hash seckey cctxt ->
-      dictate cctxt.rpc_config cctxt.config.block
-        (Activate hash) seckey >>=? fun oph ->
-      message_injection cctxt ~force:!force oph >>= fun () ->
-      return ()
-    end ;
+    command ~desc: "Activate a protocol"
+      (args1 force_switch)
+      (prefixes [ "activate" ; "protocol" ]
+       @@ Protocol_hash.param ~name:"version"
+         ~desc:"Protocol version (b58check)"
+       @@ prefixes [ "with" ; "key" ]
+       @@ Environment.Ed25519.Secret_key.param
+         ~name:"password" ~desc:"Dictator's key"
+       @@ stop)
+      begin fun force hash seckey cctxt ->
+        dictate cctxt.rpc_config cctxt.config.block
+          (Activate hash) seckey >>=? fun oph ->
+        message_injection cctxt ~force:force oph >>= fun () ->
+        return ()
+      end ;
 
-    command ~desc: "Fork a test protocol" begin
-      prefixes [ "fork" ; "test" ; "protocol" ] @@
-      Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)" @@
-      prefixes [ "with" ; "key" ] @@
-      Environment.Ed25519.Secret_key.param
-        ~name:"password" ~desc:"Dictator's key" @@
-      stop
-    end begin fun hash seckey cctxt ->
-      dictate cctxt.rpc_config cctxt.config.block
-        (Activate_testnet hash) seckey >>=? fun oph ->
-      message_injection cctxt ~force:!force oph >>= fun () ->
-      return ()
-    end ;
+    command ~desc: "Fork a test protocol"
+      (args1 force_switch)
+      (prefixes [ "fork" ; "test" ; "protocol" ]
+       @@ Protocol_hash.param ~name:"version"
+         ~desc:"Protocol version (b58check)"
+       @@ prefixes [ "with" ; "key" ]
+       @@ Environment.Ed25519.Secret_key.param
+         ~name:"password" ~desc:"Dictator's key"
+       @@ stop)
+      begin fun force hash seckey cctxt ->
+        dictate cctxt.rpc_config cctxt.config.block
+          (Activate_testnet hash) seckey >>=? fun oph ->
+        message_injection cctxt ~force:force oph >>= fun () ->
+        return ()
+      end ;
 
   ]

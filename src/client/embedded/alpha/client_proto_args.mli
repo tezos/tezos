@@ -9,47 +9,33 @@
 
 val tez_sym: string
 
-val init_arg: string * Arg.spec * string
-val fee_arg: string * Arg.spec * string
-val arg_arg: string * Arg.spec * string
-val source_arg: string * Arg.spec * string
-val delegate_arg: string * Arg.spec * string
-val delegatable_args: (string * Arg.spec * string) list
-val spendable_args: (string * Arg.spec * string) list
-val max_priority_arg: string * Arg.spec * string
-val free_mining_arg: string * Arg.spec * string
-val force_arg: string * Arg.spec * string
-val endorsement_delay_arg: string * Arg.spec * string
+open Cli_entries
+val init_arg: (string, Client_commands.context) arg
+val fee_arg: (Tez.t, Client_commands.context) arg
+val arg_arg: (string, Client_commands.context) arg
+val source_arg: (string option, Client_commands.context) arg
+
+val delegate_arg: (string option, Client_commands.context) arg
+val delegatable_switch: (bool, Client_commands.context) arg
+val non_spendable_switch: (bool, Client_commands.context) arg
+val max_priority_arg: (int option, Client_commands.context) arg
+val free_mining_switch: (bool, Client_commands.context) arg
+val force_switch: (bool, Client_commands.context) arg
+val endorsement_delay_arg: (int, Client_commands.context) arg
 
 val tez_arg :
-  name:string ->
-  desc:string ->
   default:string ->
-  Tez.tez ref * (string * Arg.spec * string)
+  parameter:string ->
+  doc:string ->
+  (Tez.t, Client_commands.context) arg
 val tez_param :
   name:string ->
   desc:string ->
   ('a, Client_commands.context, 'ret) Cli_entries.params ->
   (Tez.t -> 'a, Client_commands.context, 'ret) Cli_entries.params
 
-val delegate: string option ref
-val source: string option ref
-val delegatable: bool ref
-val spendable: bool ref
-val force: bool ref
-val fee: Tez.t ref
-val init: string ref
-val arg: string option ref
-val max_priority: int option ref
-val free_mining: bool ref
-val endorsement_delay: int ref
-
 module Daemon : sig
-  val mining_arg: string * Arg.spec * string
-  val endorsement_arg: string * Arg.spec * string
-  val denunciation_arg: string * Arg.spec * string
-  val all: bool ref
-  val mining: bool ref
-  val endorsement: bool ref
-  val denunciation: bool ref
+  val mining_switch: (bool, Client_commands.context) arg
+  val endorsement_switch: (bool, Client_commands.context) arg
+  val denunciation_switch: (bool, Client_commands.context) arg
 end

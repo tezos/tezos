@@ -71,16 +71,19 @@ let commands () =
   let group = {name = "demo" ; title = "Some demo command" } in
   [
     command ~group ~desc: "A demo command"
+      no_options
       (fixed [ "demo" ])
-      (fun cctxt -> demo cctxt) ;
+      (fun () cctxt -> demo cctxt) ;
     command ~group ~desc: "A failing command"
+      no_options
       (fixed [ "fail" ])
-      (fun _cctxt ->
+      (fun () _cctxt ->
          Error.demo_error 101010
          >|= wrap_error) ;
     command ~group ~desc: "Mine an empty block"
+      no_options
       (fixed [ "mine" ])
-      (fun cctxt -> mine cctxt) ;
+      (fun () cctxt -> mine cctxt) ;
   ]
 
 let () =

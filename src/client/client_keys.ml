@@ -124,25 +124,26 @@ let group =
 let commands () =
   let open Cli_entries in
   let open Client_commands in
-  let show_private = ref false in
-  let show_private_arg =
-    "-show-secret",
-    Arg.Set show_private,
-    "Show the private key" in
+  let show_private_switch =
+    switch
+      ~parameter:"-show-secret"
+      ~doc:"Show the private key" in
   [
 
     command ~group ~desc: "generate a pair of keys"
+      no_options
       (prefixes [ "gen" ; "keys" ]
        @@ Secret_key.fresh_alias_param
        @@ stop)
-      (fun name cctxt -> gen_keys cctxt name) ;
+      (fun () name cctxt -> gen_keys cctxt name) ;
 
     command ~group ~desc: "add a secret key to the wallet"
+      no_options
       (prefixes [ "add" ; "secret" ; "key" ]
        @@ Secret_key.fresh_alias_param
        @@ Secret_key.source_param
        @@ stop)
-      (fun name sk cctxt ->
+      (fun () name sk cctxt ->
          Public_key.find_opt cctxt name >>=? function
          | None ->
              let pk = Sodium.Sign.secret_key_to_public_key sk in
@@ -159,25 +160,28 @@ let commands () =
              Secret_key.add cctxt name sk) ;
 
     command ~group ~desc: "add a public key to the wallet"
+      no_options
       (prefixes [ "add" ; "public" ; "key" ]
        @@ Public_key.fresh_alias_param
        @@ Public_key.source_param
        @@ stop)
-      (fun name key cctxt ->
+      (fun () name key cctxt ->
          Public_key_hash.add cctxt
            name (Ed25519.Public_key.hash key) >>=? fun () ->
          Public_key.add cctxt name key) ;
 
     command ~group ~desc: "add an ID a public key hash to the wallet"
+      no_options
       (prefixes [ "add" ; "identity" ]
        @@ Public_key_hash.fresh_alias_param
        @@ Public_key_hash.source_param
        @@ stop)
-      (fun name hash cctxt -> Public_key_hash.add cctxt name hash) ;
+      (fun () name hash cctxt -> Public_key_hash.add cctxt name hash) ;
 
     command ~group ~desc: "list all public key hashes and associated keys"
+      no_options
       (fixed [ "list" ; "known" ; "identities" ])
-      (fun cctxt ->
+      (fun () cctxt ->
          list_keys cctxt >>=? fun l ->
          iter_s
            (fun (name, pkh, pkm, pks) ->
@@ -189,11 +193,11 @@ let commands () =
            l) ;
 
     command ~group ~desc: "show the keys associated with an identity"
-      ~args: [ show_private_arg ]
+      (args1 show_private_switch)
       (prefixes [ "show" ; "identity"]
        @@ Public_key_hash.alias_param
        @@ stop)
-      (fun (name, _) cctxt ->
+      (fun show_private (name, _) cctxt ->
          let ok_lwt x = x >>= (fun x -> return x) in
          alias_keys cctxt name >>=? fun key_info ->
          match key_info with
@@ -206,7 +210,7 @@ let commands () =
              | Some pub ->
                  Public_key.to_source cctxt pub >>=? fun pub ->
                  ok_lwt @@ cctxt.message "Public Key: %s" pub >>=? fun () ->
-                 if !show_private then
+                 if show_private then
                    match priv with
                    | None -> return ()
                    | Some priv ->
@@ -215,8 +219,9 @@ let commands () =
                  else return ()) ;
 
     command ~group ~desc: "forget all keys"
+      no_options
       (fixed [ "forget" ; "all" ; "keys" ])
-      (fun cctxt ->
+      (fun () cctxt ->
          fail_unless cctxt.config.force
            (failure "this can only used with option -force true") >>=? fun () ->
          Public_key.save cctxt [] >>=? fun () ->

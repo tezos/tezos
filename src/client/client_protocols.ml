@@ -23,18 +23,20 @@ let commands () =
   [
 
     command ~group ~desc: "list known protocols"
+      no_options
       (prefixes [ "list" ; "protocols" ] stop)
-      (fun cctxt ->
+      (fun () cctxt ->
          Client_node_rpcs.Protocols.list cctxt.rpc_config ~contents:false () >>=? fun protos ->
          Lwt_list.iter_s (fun (ph, _p) -> cctxt.message "%a" Protocol_hash.pp ph) protos >>= fun () ->
          return ()
       );
 
     command ~group ~desc: "inject a new protocol to the shell database"
+      no_options
       (prefixes [ "inject" ; "protocol" ]
        @@ param ~name:"dir" ~desc:"directory containing a protocol" check_dir
        @@ stop)
-      (fun dirname cctxt ->
+      (fun () dirname cctxt ->
          Lwt.catch
            (fun () ->
               let proto = Tezos_compiler.read_dir dirname in
@@ -54,10 +56,11 @@ let commands () =
       );
 
     command ~group ~desc: "dump a protocol from the shell database"
+      no_options
       (prefixes [ "dump" ; "protocol" ]
        @@ Protocol_hash.param ~name:"protocol hash" ~desc:""
        @@ stop)
-      (fun ph cctxt ->
+      (fun () ph cctxt ->
          Client_node_rpcs.Protocols.contents cctxt.rpc_config ph >>=? fun proto ->
          Updater.extract "" ph proto >>= fun () ->
          cctxt.message "Extracted protocol %a" Protocol_hash.pp_short ph >>= fun () ->

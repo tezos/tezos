@@ -9,6 +9,33 @@
 
 (* Tezos Command line interface - Configuration and Arguments Parsing *)
 
+type error += Invalid_block_argument of string
+type error += Invalid_port_arg of string
+let () =
+  register_error_kind
+    `Branch
+    ~id: "badBlocksArgument"
+    ~title: "Bad Blocks Argument"
+    ~description: "Blocks argument could not be parsed"
+    ~pp:
+      (fun ppf s ->
+         Format.fprintf ppf "Value provided for -block flag (%s) could not be parsed" s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_block_argument s -> Some s | _ -> None)
+    (fun s -> Invalid_block_argument s) ;
+  register_error_kind
+    `Branch
+    ~id: "invalidPortArgument"
+    ~title: "Bad Port Argument"
+    ~description: "Port argument could not be parsed"
+    ~pp:
+      (fun ppf s ->
+         Format.fprintf ppf "Value provided for -port flag (%s) could not be parsed" s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_port_arg s -> Some s | _ -> None)
+    (fun s -> Invalid_port_arg s)
+
+
 let (//) = Filename.concat
 
 module Cfg_file = struct
@@ -37,18 +64,18 @@ module Cfg_file = struct
          (base_dir, Some node_addr, Some node_port,
           Some tls, Some web_port))
       (fun (base_dir, node_addr, node_port, tls, web_port) ->
-        let open Utils in
-        let node_addr = unopt ~default:default.node_addr node_addr in
-        let node_port = unopt ~default:default.node_port node_port in
-        let tls = unopt ~default:default.tls tls in
-        let web_port = unopt ~default:default.web_port web_port in
-        { base_dir ; node_addr ; node_port ; tls ; web_port })
+         let open Utils in
+         let node_addr = unopt ~default:default.node_addr node_addr in
+         let node_port = unopt ~default:default.node_port node_port in
+         let tls = unopt ~default:default.tls tls in
+         let web_port = unopt ~default:default.web_port web_port in
+         { base_dir ; node_addr ; node_port ; tls ; web_port })
       (obj5
-        (req "base_dir" string)
-        (opt "node_addr" string)
-        (opt "node_port" int16)
-        (opt "tls" bool)
-        (opt "web_port" int16))
+         (req "base_dir" string)
+         (opt "node_addr" string)
+         (opt "node_port" int16)
+         (opt "tls" bool)
+         (opt "web_port" int16))
 
   let from_json json =
     Data_encoding.Json.destruct encoding json
@@ -64,31 +91,104 @@ module Cfg_file = struct
 
 end
 
-exception Found of string
+type cli_args = {
+  block: Node_rpc_services.Blocks.block ;
+  print_timings: bool ;
+  log_requests: bool ;
+  force: bool ;
+}
 
-let preparse name argv =
-  try
-    for i = 0 to Array.length argv - 2 do
-      if argv.(i) = name then raise (Found argv.(i+1))
-    done ;
-    None
-  with Found s -> Some s
+let default_cli_args = {
+  block = Client_commands.default_cfg.block ;
+  print_timings = false ;
+  log_requests = false ;
+  force = false ;
+}
 
-let preparse_bool name argv =
-  try
-    for i = 0 to Array.length argv - 1 do
-      if argv.(i) = name then raise (Found "")
-    done ;
-    false
-  with Found _ -> true
+open Cli_entries
 
-let preparse_args argv =
-  let base_dir =
-    match preparse "-base-dir" argv with
-    | None -> Client_commands.default_base_dir
-    | Some base_dir -> base_dir in
+(* Command-line only args (not in config file) *)
+let base_dir_arg =
+  default_arg
+    ~parameter:"-base-dir"
+    ~doc:"The directory where the Tezos client will store all its data."
+    ~default:Client_commands.default_base_dir
+    (fun _ x -> return x)
+let config_file_arg =
+  arg
+    ~parameter:"-config-file"
+    ~doc:"The main configuration file."
+    (fun _ x -> return x)
+let timings_switch =
+  switch
+    ~parameter:"-timings"
+    ~doc:"Show RPC request times if present."
+let force_switch =
+  switch
+    ~parameter:"-force"
+    ~doc:"Show less courtesy than the average user."
+let block_arg =
+  default_arg
+    ~parameter:"-block"
+    ~doc:"The block on which to apply contextual commands."
+    ~default:(Node_rpc_services.Blocks.to_string default_cli_args.block)
+    (fun _ block -> match Node_rpc_services.Blocks.parse_block block with
+       | Error _ ->
+           fail (Invalid_block_argument block)
+       | Ok block -> return block)
+let log_requests_switch =
+  switch
+    ~parameter:"-log-requests"
+    ~doc:"Causes all requests and responses to the node to be logged."
+
+(* Command-line args which can be set in config file as well *)
+let addr_arg =
+  default_arg
+    ~parameter:"-addr"
+    ~doc:"The IP address of the node."
+    ~default:Cfg_file.default.node_addr
+    (fun _ x -> return x)
+let port_arg =
+  default_arg
+    ~parameter:"-port"
+    ~doc:"The RPC port of the node."
+    ~default:(string_of_int Cfg_file.default.node_port)
+    (fun _ x -> try
+        return (int_of_string x)
+      with Failure _ ->
+        fail (Invalid_port_arg x))
+let tls_switch =
+  switch
+    ~parameter:"-tls"
+    ~doc:"Use TLS to connect to node."
+
+let global_options =
+  args9 base_dir_arg
+    config_file_arg
+    force_switch
+    timings_switch
+    block_arg
+    log_requests_switch
+    addr_arg
+    port_arg
+    tls_switch
+
+let parse_config_args (ctx : Client_commands.cfg) argv =
+  parse_initial_options
+    global_options
+    ctx
+    argv >>|?
+  fun ((base_dir,
+        config_file,
+        force,
+        timings,
+        block,
+        log_requests,
+        node_addr,
+        node_port,
+        tls), remaining) ->
   let config_file =
-    match preparse "-config-file" argv with
+    match config_file with
     | None -> base_dir // "config"
     | Some config_file -> config_file in
   let config_dir = Filename.dirname config_file in
@@ -120,31 +220,7 @@ let preparse_args argv =
               "Error: can't parse the configuration file: %s\n%a@."
               config_file (fun ppf exn -> Json_encoding.print_error ppf exn) exn ;
             exit 1 in
-  let tls = cfg.tls || preparse_bool "-tls" argv in
-  let node_addr =
-    match preparse "-addr" argv with
-    | None -> cfg.node_addr
-    | Some node_addr -> node_addr in
-  let node_port =
-    match preparse "-port" argv with
-    | None -> cfg.node_port
-    | Some port ->
-        try int_of_string port
-        with _ ->
-          Format.eprintf
-            "Error: can't parse the -port option: %S.@." port ;
-          exit 1 in
-  let block =
-    match preparse "-block" Sys.argv with
-    | None -> Client_commands.default_cfg.block
-    | Some block ->
-        match Node_rpc_services.Blocks.parse_block block with
-        | Error _ ->
-            Format.eprintf
-              "Error: can't parse the -block option: %S.@."
-              block ;
-            exit 1
-        | Ok block -> block in
+  let tls = cfg.tls || tls in
   let cfg = { cfg with tls ; node_port ; node_addr } in
   if Sys.file_exists base_dir && not (Sys.is_directory base_dir) then begin
     Format.eprintf "Error: %s is not a directory.@." base_dir ;
@@ -157,87 +233,4 @@ let preparse_args argv =
   end ;
   IO.mkdir config_dir ;
   if not (Sys.file_exists config_file) then Cfg_file.write config_file cfg ;
-  (cfg, block)
-
-(* Entry point *)
-
-type cli_args = {
-  block: Node_rpc_services.Blocks.block ;
-  print_timings: bool ;
-  log_requests: bool ;
-  force: bool ;
-}
-
-let default_cli_args = {
-  block = Client_commands.default_cfg.block ;
-  print_timings = false ;
-  log_requests = false ;
-  force = false ;
-}
-
-exception Bad of Error_monad.error list
-
-let parse_args usage dispatcher argv =
-  (* Init config reference which will be updated as args are parsed *)
-  let parsed_args = ref default_cli_args in
-  (* Command-line only args (not in config file) *)
-  let cli_args = [
-    "-base-dir", Arg.String (fun _ -> ( (* preparsed *) )),
-      "The directory where the Tezos client will store all its data.\n\
-       default: " ^ Client_commands.default_base_dir ;
-    "-config-file", Arg.String (fun _ -> ( (* preparsed *) )),
-      "The main configuration file.\n\
-       default: " ^ Client_commands.default_base_dir // "config" ;
-    "-timings",
-      Arg.Bool (fun x -> parsed_args := { !parsed_args with print_timings = x }),
-      "Show RPC request times.\n\
-       default: " ^ string_of_bool default_cli_args.print_timings ;
-    "-force",
-      Arg.Bool (fun x -> parsed_args := { !parsed_args with force = x }),
-      "Show less courtesy than the average user.\n\
-       default: " ^ string_of_bool default_cli_args.force ;
-    "-block", Arg.String (fun _ -> ( (* preparsed *) )),
-      "The block on which to apply contextual commands.\n\
-       default: " ^ Node_rpc_services.Blocks.to_string default_cli_args.block ;
-    "-log-requests",
-    Arg.Unit (fun () -> parsed_args := { !parsed_args with log_requests = true }),
-    "If set, this flag causes all requests and responses to the node to be logged."
-  ] in
-  (* Command-line args which can be set in config file as well *)
-  let file_args = [
-    (* Network options *)
-    "-addr", Arg.String (fun _ -> ( (* preparsed *) )),
-      "The IP address at which the node's RPC server can be reached.\n\
-       default: " ^ Cfg_file.default.node_addr ;
-    "-port", Arg.Int (fun _ -> ( (* preparsed *) )),
-      "The TCP port at which the node's RPC server can be reached.\n\
-       default: " ^ string_of_int Cfg_file.default.node_port ;
-    "-tls", Arg.Bool (fun _ -> ( (* preparsed *) )),
-      "Use TLS to connect to node.\n\
-       default: " ^ string_of_bool Cfg_file.default.tls ;
-  ] in
-  let all_args = cli_args @ file_args in
-  try
-    let args = ref all_args in
-    let anon dispatch n = match dispatch (`Arg n) with
-      | `Nop -> ()
-      | `Args nargs -> args := nargs @ !args
-      | `Fail err -> raise (Bad err)
-      | `Res _ -> assert false in
-    let dispatch = dispatcher () in
-    Arg.parse_argv_dynamic
-      ~current:(ref 0) argv args (anon dispatch) "\000" ;
-    match dispatch `End with
-    | `Res res -> return (res, !parsed_args)
-    | `Fail err -> Lwt.return (Error err)
-    | `Nop | `Args _ -> assert false
-  with
-  | Bad err -> Lwt.return (Error err)
-  | Arg.Bad msg ->
-      (* FIXME: this is an ugly hack to circumvent [Arg]
-         spuriously printing options at the end of the error
-         message. *)
-      let msg = String.trim (List.hd (Utils.split '\000' msg)) in
-      Error_monad.failwith "%s" msg
-  | Arg.Help _ ->
-      raise (Arg.Help (usage all_args ^ "\n"))
+  (cfg, { block ; print_timings = timings ; log_requests ; force }, remaining)

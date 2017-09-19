@@ -363,36 +363,43 @@ let group =
 let commands = [
 
   command ~desc: "list all understood protocol versions"
+    no_options
     (fixed [ "list" ; "versions" ])
-    (fun cctxt ->
+    (fun () cctxt ->
        Lwt_list.iter_s
          (fun (ver, _) -> cctxt.Client_commands.message "%a" Protocol_hash.pp_short ver)
          (Client_commands.get_versions ()) >>= fun () ->
        return ()) ;
 
   command ~group ~desc: "list available RPCs (low level command for advanced users)"
+    no_options
     (prefixes [ "rpc" ; "list" ] @@ stop)
-    (list "/");
+    (fun () -> (list "/"));
 
   command ~group ~desc: "list available RPCs (low level command for advanced users)"
+    no_options
     (prefixes [ "rpc" ; "list" ] @@ string ~name:"url" ~desc: "the RPC's prefix to be described" @@ stop)
-    list ;
+    (fun () -> list) ;
 
   command ~group ~desc: "get the input and output JSON schemas of an RPC"
+    no_options
     (prefixes [ "rpc" ; "schema" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
-    schema ;
+    (fun () -> schema) ;
 
   command ~group ~desc: "get the humanoid readable input and output formats of an RPC"
+    no_options
     (prefixes [ "rpc" ; "format" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
-    format ;
+    (fun () -> format) ;
 
   command ~group ~desc: "call an RPC (low level command for advanced users)"
+    no_options
     (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
-    call ;
+    (fun () -> call) ;
 
   command ~group ~desc: "call an RPC (low level command for advanced users)"
+    no_options
     (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL"
      @@ prefix "with" @@ string ~name:"input" ~desc:"the JSON input to the RPC" @@ stop)
-    call_with_json
+    (fun () -> call_with_json)
 
 ]
