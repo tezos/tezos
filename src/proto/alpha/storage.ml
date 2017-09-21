@@ -113,12 +113,20 @@ module Key = struct
 
   let public_keys = ["public_keys" ; "ed25519"]
 
+  let nbyte_of_int32 i n =
+    Int32.to_string @@
+    Int32.logand (Int32.shift_left i (8 * n)) (Int32.of_int 0xff)
+
+  let roll_path roll l =
+    let i = Roll_repr.to_int32 roll in
+    nbyte_of_int32 i 0 :: nbyte_of_int32 i 1 :: Int32.to_string i :: l
+
   module Roll = struct
     let store_root l = store_root ("rolls" :: l)
     let next = store_root [ "next" ]
     let limbo = store_root [ "limbo" ]
     let roll_store roll l =
-      store_root @@ Int32.to_string (Roll_repr.to_int32 roll) :: l
+      store_root @@ roll_path roll @@ l
     let successor r = roll_store r ["successor"]
     let owner r = roll_store r ["owner"]
   end
@@ -131,7 +139,7 @@ module Key = struct
     let random_seed c = cycle_store c [ "random_seed" ]
     let reward_date c = cycle_store c [ "reward_date" ]
     let roll_owner (c, r) =
-      cycle_store c [ "roll_owners" ; Int32.to_string (Roll_repr.to_int32 r)]
+      cycle_store c @@ "roll_owners" :: roll_path r []
     let unrevealed_nonce_hash l =
       let c = l.Level_repr.cycle in
       cycle_store c [ "unrevealed_nonce_hash" ;
