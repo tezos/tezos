@@ -543,11 +543,13 @@ module Net_id = struct
 
   let size = 4
 
-  let of_block_hash bh =
+  let extract bh =
     MBytes.substring (Block_hash.to_bytes bh) 0 4
 
-  let hash_bytes l = of_block_hash (Block_hash.hash_bytes l)
-  let hash_string l = of_block_hash (Block_hash.hash_string l)
+  let hash_bytes l = extract (Block_hash.hash_bytes l)
+  let hash_string l = extract (Block_hash.hash_string l)
+
+  let of_block_hash bh = hash_bytes [Block_hash.to_bytes bh]
 
   type Base58.data += Hash of t
 
