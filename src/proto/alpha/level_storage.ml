@@ -41,9 +41,14 @@ let previous ctxt =
 
 let first_level_in_cycle ctxt c =
   let constants = Storage.constants ctxt in
+  let first_level = Storage.first_level ctxt in
   from_raw ctxt
     (Raw_level_repr.of_int32_exn
-       (Int32.mul constants.Constants_repr.cycle_length (Cycle_repr.to_int32 c)))
+       (Int32.add
+          (Raw_level_repr.to_int32 first_level)
+          (Int32.mul
+             constants.Constants_repr.cycle_length
+             (Cycle_repr.to_int32 c))))
 
 let last_level_in_cycle ctxt c =
   match pred ctxt (first_level_in_cycle ctxt (Cycle_repr.succ c)) with
