@@ -84,10 +84,18 @@ let read_chain_store { chain_state } f =
     f state.chain_store state.data
   end
 
-let update_chain_store { chain_state } f =
+let update_chain_store { net_id ; context_index ; chain_state } f =
   Shared.use chain_state begin fun state ->
     f state.chain_store state.data >>= fun (data, res) ->
-    Utils.iter_option data ~f:(fun data -> state.data <- data) ;
+    Lwt_utils.may data
+      ~f:begin fun data ->
+        state.data <- data ;
+        Shared.use context_index begin fun context_index ->
+          Context.set_head context_index net_id
+            data.current_head.contents.context
+        end >>= fun () ->
+        Lwt.return_unit
+      end >>= fun () ->
     Lwt.return res
   end
 
