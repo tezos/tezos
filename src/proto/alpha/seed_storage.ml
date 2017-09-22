@@ -31,8 +31,10 @@ let compute_for_cycle c cycle =
       let combine (c, random_seed) level =
         Storage.Seed.Nonce.get c level >>=? function
         | Revealed nonce ->
+            Storage.Seed.Nonce.delete c level >>=? fun c ->
             return (c, Seed_repr.nonce random_seed nonce)
         | Unrevealed _ ->
+            Storage.Seed.Nonce.delete c level >>=? fun c ->
             return (c, random_seed)
       in
       Storage.Seed.For_cycle.get c previous_cycle >>=? fun seed ->
