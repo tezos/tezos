@@ -47,3 +47,5 @@ test/LOG.*
 
 **/*.rej
 **/*.orig
+
+_opam
