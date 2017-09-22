@@ -87,8 +87,9 @@ let reveal_block_nonces cctxt ?force block_hashes =
   do_reveal cctxt ?force cctxt.config.block blocks
 
 let reveal_nonces cctxt ?force () =
+  let block = Client_rpcs.last_mined_block cctxt.config.block in
   Client_mining_forge.get_unrevealed_nonces
-    cctxt ?force cctxt.config.block >>=? fun nonces ->
+    cctxt ?force block >>=? fun nonces ->
   do_reveal cctxt ?force cctxt.config.block nonces
 
 open Client_proto_args
