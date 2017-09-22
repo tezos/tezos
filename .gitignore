@@ -46,3 +46,5 @@ bisect*.out
 
 *.rej
 *.orig
+
+/_opam
