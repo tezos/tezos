@@ -34,7 +34,7 @@ let check_approval_and_update_quorum ctxt =
   let actual_vote = Int32.add casted_vote ballots.pass in
   let actual_quorum =
     Int32.div (Int32.mul actual_vote 100_00l) maximum_vote in
-  let supermajority = Int32.div (Int32.mul 8l casted_vote) 10l in
+  let supermajority = Int32.div (Int32.mul 2l casted_vote) 3l in
   let updated_quorum =
     Int32.div
       (Int32.add (Int32.mul 8l expected_quorum)
