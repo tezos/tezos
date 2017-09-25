@@ -196,14 +196,97 @@ assert_output $CONTRACT_PATH/first.tz Unit '(List 4)' '4'
 assert_output $CONTRACT_PATH/hash_string.tz Unit '"abcdefg"' '"exprv3MnhXvjthGzZ7jDtXRRFremZyey9rsGtL7JRkeaQX1fThN7WF"'
 assert_output $CONTRACT_PATH/hash_string.tz Unit '"12345"' '"expru81QVHsW2qaWLNHnMHSxDNhqtat17ajadri6mKUvXyc2EWHZC3"'
 
-# Did the given key sign the string?
+# Test ASSERT
+assert_output $CONTRACT_PATH/assert.tz Unit True Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert.tz on storage Unit and input False
+
+# COMPARE; ASSERT_
+assert_output $CONTRACT_PATH/assert_eq.tz Unit '(Pair -1 -1)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_eq.tz on storage Unit and input '(Pair 0 -1)'
+
+assert_output $CONTRACT_PATH/assert_eq.tz Unit '(Pair -1 -1)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_eq.tz on storage Unit and input '(Pair 0 -1)'
+
+assert_output $CONTRACT_PATH/assert_neq.tz Unit '(Pair 0 -1)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_neq.tz on storage Unit and input '(Pair -1 -1)'
+
+assert_output $CONTRACT_PATH/assert_lt.tz Unit '(Pair -1 0)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_lt.tz on storage Unit and input '(Pair 0 -1)'
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_lt.tz on storage Unit and input '(Pair 0 0)'
+
+assert_output $CONTRACT_PATH/assert_le.tz Unit '(Pair 0 0)' Unit
+assert_output $CONTRACT_PATH/assert_le.tz Unit '(Pair -1 0)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_le.tz on storage Unit and input '(Pair 0 -1)'
+
+assert_output $CONTRACT_PATH/assert_gt.tz Unit '(Pair 0 -1)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_gt.tz on storage Unit and input '(Pair -1 0)'
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_gt.tz on storage Unit and input '(Pair 0 0)'
+
+assert_output $CONTRACT_PATH/assert_ge.tz Unit '(Pair 0 0)' Unit
+assert_output $CONTRACT_PATH/assert_ge.tz Unit '(Pair 0 -1)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_ge.tz on storage Unit and input '(Pair -1 0)'
+
+# ASSERT_CMP
+assert_output $CONTRACT_PATH/assert_cmpeq.tz Unit '(Pair -1 -1)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_cmpeq.tz on storage Unit and input '(Pair 0 -1)'
+
+assert_output $CONTRACT_PATH/assert_cmpeq.tz Unit '(Pair -1 -1)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_cmpeq.tz on storage Unit and input '(Pair 0 -1)'
+
+assert_output $CONTRACT_PATH/assert_cmpneq.tz Unit '(Pair 0 -1)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_cmpneq.tz on storage Unit and input '(Pair -1 -1)'
+
+assert_output $CONTRACT_PATH/assert_cmplt.tz Unit '(Pair -1 0)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_cmplt.tz on storage Unit and input '(Pair 0 -1)'
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_cmplt.tz on storage Unit and input '(Pair 0 0)'
+
+assert_output $CONTRACT_PATH/assert_cmple.tz Unit '(Pair 0 0)' Unit
+assert_output $CONTRACT_PATH/assert_cmple.tz Unit '(Pair -1 0)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_cmple.tz on storage Unit and input '(Pair 0 -1)'
+
+assert_output $CONTRACT_PATH/assert_cmpgt.tz Unit '(Pair 0 -1)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_cmpgt.tz on storage Unit and input '(Pair -1 0)'
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_cmpgt.tz on storage Unit and input '(Pair 0 0)'
+
+assert_output $CONTRACT_PATH/assert_cmpge.tz Unit '(Pair 0 0)' Unit
+assert_output $CONTRACT_PATH/assert_cmpge.tz Unit '(Pair 0 -1)' Unit
+assert_fails ${TZCLIENT} run program $CONTRACT_PATH/assert_cmpge.tz on storage Unit and input '(Pair -1 0)'
+
+# IF_SOME
+assert_output $CONTRACT_PATH/if_some.tz Unit '(Some "hello")' '"hello"'
+assert_output $CONTRACT_PATH/if_some.tz Unit 'None' '""'
+
+# Tests the SET_CAR and SET_CDR instructions
+assert_output  $CONTRACT_PATH/set_car.tz '(Pair "hello" 0)' '"world"' '(Pair "world" 0)'
+assert_output  $CONTRACT_PATH/set_car.tz '(Pair "hello" 0)' '"abc"' '(Pair "abc" 0)'
+assert_output  $CONTRACT_PATH/set_car.tz '(Pair "hello" 0)' '""' '(Pair "" 0)'
+
+assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 0)' '1' '(Pair "hello" 1)'
+assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 500)' '3' '(Pair "hello" 3)'
+assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 7)' '100' '(Pair "hello" 100)'
+
+assert_storage  $CONTRACT_PATH/set_caddaadr.tz \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0.00") 4) 5))) 6)' \
+'"3.00"' \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "3.00") 4) 5))) 6)'
+
+assert_storage  $CONTRACT_PATH/map_caddaadr.tz \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0.00") 4) 5))) 6)' \
+'Unit' \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "1.00") 4) 5))) 6)'
+
+# Did the given key sign the string? (key is bootstrap1)
 assert_output $CONTRACT_PATH/check_signature.tz \
 '(Pair "26981d372a7b3866621bf79713d249197fe6d518ef702fa65738e1715bde9da54df04fefbcc84287ecaa9f74ad9296462731aa24bbcece63c6bf73a8f5752309" "hello")' \
-'"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' True
+'"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"' True
 
 assert_output $CONTRACT_PATH/check_signature.tz \
 '(Pair "26981d372a7b3866621bf79713d249197fe6d518ef702fa65738e1715bde9da54df04fefbcc84287ecaa9f74ad9296462731aa24bbcece63c6bf73a8f5752309" "abcd")' \
-'"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' False
+'"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"' False
+
+# Convert a public key to a public key hash
+assert_output $CONTRACT_PATH/hash_key.tz Unit '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"' '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
+assert_output $CONTRACT_PATH/hash_key.tz Unit '"edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES"' '"tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k"'
 
 $client transfer 1000 from bootstrap1 to $key1
 $client transfer 2000 from bootstrap1 to $key2

@@ -418,7 +418,7 @@ let rec interp
               let cmpres = Script_int.compare a b in
               let cmpres = Script_int.of_int cmpres in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
-          | Compare Key_key, Item (a, Item (b, rest)) ->
+          | Compare Key_hash_key, Item (a, Item (b, rest)) ->
               let cmpres = Ed25519.Public_key_hash.compare a b in
               let cmpres = Script_int.of_int cmpres in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
@@ -540,10 +540,11 @@ let rec interp
               let now = Timestamp.current ctxt in
               logged_return (Item (now, rest), qta - 1, ctxt)
           | Check_signature, Item (key, Item ((signature, message), rest)) ->
-              Public_key.get ctxt key >>=? fun key ->
               let message = MBytes.of_string message in
               let res = Ed25519.Signature.check key signature message in
               logged_return (Item (res, rest), qta - 1, ctxt)
+          | Hash_key, Item (key, rest) ->
+              logged_return (Item (Ed25519.Public_key.hash key, rest), qta -1, ctxt)
           | H ty, Item (v, rest) ->
               let hash = Script.hash_expr (unparse_data ty v) in
               logged_return (Item (hash, rest), qta - 1, ctxt)

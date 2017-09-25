@@ -23,7 +23,7 @@ case "$branch" in
         patch -p1 < scripts/zeronet.patch
         cp README.md docs/README.master
         cp docs/README.zeronet README.md
-        if has_git; then git commit -a -m "Zeronet: DO NOT MERGE" --author "Tezos CI <null@tezos.com>"; fi
+        if has_git; then git add docs/README.master; git commit -a -m "Zeronet: DO NOT MERGE" --author "Tezos CI <null@tezos.com>"; fi
         echo "Done"
         ;;
     alphanet)
@@ -31,7 +31,7 @@ case "$branch" in
         patch -p1 < scripts/alphanet_constants.patch
         cp README.md docs/README.master
         cp docs/README.alphanet README.md
-        if has_git; then git commit -a -m "Alphanet: DO NOT MERGE" --author "Tezos CI <null@tezos.com>"; fi
+        if has_git; then git add docs/README.master; git commit -a -m "Alphanet: DO NOT MERGE" --author "Tezos CI <null@tezos.com>"; fi
         echo "Done"
         ;;
     *)

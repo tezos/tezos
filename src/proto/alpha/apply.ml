@@ -91,7 +91,7 @@ let apply_manager_operation_content
       Contract.get_script ctxt destination >>=? function
       | None -> begin
           match parameters with
-          | None | Some (Prim (_, "Unit", [])) ->
+          | None | Some (Prim (_, "Unit", [], _)) ->
               return (ctxt, origination_nonce, None)
           | Some _ -> fail (Bad_contract_parameter (destination, None, parameters))
         end
@@ -112,7 +112,7 @@ let apply_manager_operation_content
             | Error err ->
                 return (ctxt, origination_nonce, Some err) in
           match parameters, code.arg_type with
-          | None, Prim (_, "unit", _) -> call_contract (Prim (0, "Unit", []))
+          | None, Prim (_, "unit", _, _) -> call_contract (Prim (0, "Unit", [], None))
           | Some parameters, arg_type -> begin
               Script_ir_translator.typecheck_data ctxt (parameters, arg_type) >>= function
               | Ok () -> call_contract parameters

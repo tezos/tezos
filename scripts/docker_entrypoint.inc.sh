@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /usr/bin/env bash
 
 data_dir="/var/run/tezos"
 node_dir="${node_dir:=/var/run/tezos/node}"

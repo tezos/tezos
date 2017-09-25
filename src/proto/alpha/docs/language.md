@@ -414,11 +414,6 @@ IV - Core instructions
         > DIP code / x : S   =>   x : S'
           where    code / S   =>   S'
 
-   * `DII+P code`:
-     A syntactic sugar for working deeper in the stack.
-
-        > DII(\rest=I*)P code / S   =>   DIP (DI(\rest)P code) / S
-
    * `EXEC`:
      Execute a function from the stack.
 
@@ -442,11 +437,6 @@ IV - Core instructions
         :: 'a : 'A   ->   'a : 'a : 'A
 
         > DUP / x : S   =>   x : x : S
-
-   * `DUU+P`:
-     A syntactic sugar for duplicating the `n`th element of the stack.
-
-        > DUU(\rest=U*)P / S   =>   DIP (DU(\rest)P) ; SWAP / S
 
    * `SWAP`:
      Exchange the top two elements of the stack.
@@ -534,22 +524,6 @@ is less than the second, and positive otherwise.
 
         > GE ; C / v : S     =>   C / True : S   iff  v >= 0
         > GE ; C / _ : S     =>   C / False : S
-
-Syntactic sugar exists for merging `COMPARE` and comparison
-combinators, and also for branching.
-
-   * `CMP{EQ|NEQ|LT|GT|LE|GE}`
-
-        > CMP(\op) ; C / S   =>   COMPARE ; (\op) ; C / S
-
-   * `IF{EQ|NEQ|LT|GT|LE|GE} bt bf`
-
-        > IF(\op) ; C / S   =>   (\op) ; IF bt bf ; C / S
-
-   * `IFCMP{EQ|NEQ|LT|GT|LE|GE} bt bf`
-
-        > IFCMP(\op) ; C / S   =>   COMPARE ; (\op) ; IF bt bf ; C / S
-
 
 V - Operations
 --------------
@@ -716,12 +690,6 @@ constants as is, concatenate them and use them as keys.
 
         > PAIR ; C / a : b : S   =>   C / (Pair a b) : S
 
-   * `P(A*AI)+R`:
-     A syntactic sugar for building nested pairs in bulk.
-
-        > P(\fst=A*)AI(\rest=(A*AI)+)R ; C / S  =>  P(\fst)AIR ; P(\rest)R ; C / S
-        > PA(\rest=A*)AIR ; C / S  =>   DIP (P(\rest)AIR) ; C / S
-
    * `CAR`:
      Access the left part of a pair.
 
@@ -735,12 +703,6 @@ constants as is, concatenate them and use them as keys.
         :: pair _ 'b : 'S   ->   'b : 'S
 
         > Car ; C / (Pair _ b) : S   =>   C / b : S
-
-   * `C[AD]+R`:
-     A syntactic sugar for accessing fields in nested pairs.
-
-        > CA(\rest=[AD]+)R ; C / S   =>   CAR ; C(\rest)R ; C / S
-        > CD(\rest=[AD]+)R ; C / S   =>   CDR ; C(\rest)R ; C / S
 
 ### Operations on sets
 
@@ -761,6 +723,15 @@ constants as is, concatenate them and use them as keys.
      Inserts or removes an element in a set, replacing a previous value.
 
         :: 'elt : bool : set 'elt : 'S   ->   set 'elt : 'S
+
+   * `MAP`:
+     Apply a function on a map and return the map of results under
+     the same bindings.
+
+     The `'b` type must be comparable (the `COMPARE` primitive must be
+     defined over it).
+
+        :: lambda 'elt 'b : set 'elt : 'S   ->   set 'b : 'S
 
    * `REDUCE`:
      Apply a function on a set passing the result of each
@@ -842,7 +813,6 @@ constants as is, concatenate them and use them as keys.
         > IF_NONE ; C / (None) : S   =>    bt ; C / S
         > IF_NONE ; C / (Some a) : S    =>    bf ; C / a : S
 
-
 ### Operations on unions
 
    * `LEFT 'b`:
@@ -860,7 +830,7 @@ constants as is, concatenate them and use them as keys.
         > RIGHT ; C / v :: S   =>   C / (Right v) :: S
 
    * `IF_LEFT bt bf`:
-     Inspect an optional value.
+     Inspect a value of a variant type.
 
         :: or 'a 'b : 'S   ->   'c : 'S
            iff   bt :: [ 'a : 'S -> 'c : 'S]
@@ -868,6 +838,17 @@ constants as is, concatenate them and use them as keys.
 
         > IF_LEFT ; C / (Left a) : S    =>    bt ; C / a : S
         > IF_LEFT ; C / (Right b) : S   =>    bf ; C / b : S
+
+   * `IF_RIGHT bt bf`:
+     Inspect a value of a variant type.
+
+        :: or 'a 'b : 'S   ->   'c : 'S
+           iff   bt :: [ 'b : 'S -> 'c : 'S]
+                 bf :: [ 'a : 'S -> 'c : 'S]
+
+        > IF_LEFT ; C / (Right b) : S   =>    bt ; C / b : S
+        > IF_RIGHT ; C / (Left a) : S    =>    bf ; C / a : S
+
 
 ### Operations on lists
 
@@ -923,6 +904,9 @@ VI - Domain specific data types
 
    * `key`:
      A public cryptography key.
+
+   * `key_hash`:
+     The hash of a public cryptography key.
 
    * `signature`:
      A cryptographic signature.
@@ -998,13 +982,13 @@ for under/overflows.
    * `MANAGER`:
      Access the manager of a contract.
 
-        :: contract 'p 'r : 'S   ->   key : 'S
+        :: contract 'p 'r : 'S   ->   key_hash : 'S
 
    * `CREATE_CONTRACT`:
      Forge a new contract.
 
 
-        :: key : key? : bool : bool : tez : lambda (pair 'p 'g) (pair 'r 'g) : 'g : 'S
+        :: key_hash : key_hash? : bool : bool : tez : lambda (pair 'p 'g) (pair 'r 'g) : 'g : 'S
            -> contract 'p 'r : 'S
 
      As with non code-emitted originations the
@@ -1023,7 +1007,7 @@ for under/overflows.
    * `CREATE_ACCOUNT`:
      Forge an account (a contract without code).
 
-        :: key : key? : bool : tez : 'S   ->   contract unit unit : 'S
+        :: key_hash : key_hash? : bool : tez : 'S   ->   contract unit unit : 'S
 
      Take as argument the manager, optional delegate, the delegatable
      flag and finally the initial amount taken from the currently
@@ -1078,7 +1062,7 @@ for under/overflows.
      holder of the private key. This contract cannot execute Michelson code
      and will always exist on the blockchain.
 
-        :: key : 'S   ->   contract unit unit :: 'S
+        :: key_hash : 'S   ->   contract unit unit :: 'S
 
 ### Special operations
 
@@ -1095,6 +1079,11 @@ for under/overflows.
 
 ### Cryptographic primitives
 
+   * `HASH_KEY`:
+     Compute the b58check of a public key.
+
+        :: key : 'S   ->   key_hash : 'S
+
    * `H`:
      Compute a cryptographic hash of the value contents using the
      Sha256 cryptographic algorithm.
@@ -1108,17 +1097,155 @@ for under/overflows.
 
    * `COMPARE`:
 
-        :: key : key : 'S   ->   int : 'S
+        :: key_hash : key_hash : 'S   ->   int : 'S
+
+VIII - Macros
+-------------
+In addition to the operations above,
+several extensions have been added to the language's concreate syntax.
+If you are interacting with the node via RPC, bypassing the client,
+which expands away these macros, you will need to desurgar them yourself.
+
+These macros are designed to be unambiguous and reversable,
+meaning that errors are reported in terms of resugared syntax.
+Below you'll see these macros defined in terms of other syntactic forms.
+That is how these macros are seen by the node.
+
+### Compare
+Syntactic sugar exists for merging `COMPARE` and comparison
+combinators, and also for branching.
+
+   * `CMP{EQ|NEQ|LT|GT|LE|GE}`
+
+        > CMP(\op) ; C / S   =>   COMPARE ; (\op) ; C / S
+
+   * `IF{EQ|NEQ|LT|GT|LE|GE} bt bf`
+
+        > IF(\op) ; C / S   =>   (\op) ; IF bt bf ; C / S
+
+   * `IFCMP{EQ|NEQ|LT|GT|LE|GE} bt bf`
+
+        > IFCMP(\op) ; C / S   =>   COMPARE ; (\op) ; IF bt bf ; C / S
+
+### Assertion Macros
+All assertion operations are syntactic sugar for conditionals
+with a `FAIL` instruction in the appropriate branch.
+When possible, use them to increase clarity about illegal states.
+
+   * `ASSERT`:
+
+        > IF {} {FAIL}
+
+   * `ASSERT_{EQ|NEQ|LT|LE|GT|GE}`:
+
+        > ASSERT_(\op) => IF(\op) {} {FAIL}
+
+   * `ASSERT_CMP{EQ|NEQ|LT|LE|GT|GE}`:
+
+        > ASSERT_CMP(\op) => IFCMP(\op) {} {FAIL}
+
+   * `ASSERT_NONE`:
+     Equivalent to ``.
+
+        > ASSERT_NONE => IF_NONE {} {FAIL}
+
+   * `ASSERT_SOME`:
+     Equivalent to `IF_NONE {FAIL} {}`.
+
+        > ASSERT_NONE => IF_NONE {FAIL} {}
+
+   * `ASSERT_LEFT`:
+
+        > ASSERT_LEFT => IF_LEFT {} {FAIL}
+
+   * `ASSERT_RIGHT`:
+
+        > ASSERT_RIGHT => IF_LEFT {FAIL} {}
 
 
-VIII - Concrete syntax
+### Syntactic Conveniences
+These are macros are simply more convenient syntax for various common operations.
+
+
+   * `DII+P code`:
+     A syntactic sugar for working deeper in the stack.
+
+        > DII(\rest=I*)P code / S   =>   DIP (DI(\rest)P code) / S
+
+
+   * `DUU+P`:
+     A syntactic sugar for duplicating the `n`th element of the stack.
+
+        > DUU(\rest=U*)P / S   =>   DIP (DU(\rest)P) ; SWAP / S
+
+   * `P(A*AI)+R`:
+     A syntactic sugar for building nested pairs in bulk.
+
+        > P(\fst=A*)AI(\rest=(A*AI)+)R ; C / S  =>  P(\fst)AIR ; P(\rest)R ; C / S
+        > PA(\rest=A*)AIR ; C / S  =>   DIP (P(\rest)AIR) ; C / S
+
+   * `C[AD]+R`:
+     A syntactic sugar for accessing fields in nested pairs.
+
+        > CA(\rest=[AD]+)R ; C / S   =>   CAR ; C(\rest)R ; C / S
+        > CD(\rest=[AD]+)R ; C / S   =>   CDR ; C(\rest)R ; C / S
+
+
+   * `IF_SOME bt bf`:
+     Inspect an optional value.
+
+        :: 'a? : 'S   ->   'b : 'S
+           iff   bt :: [ 'a : 'S -> 'b : 'S]
+                 bf :: [ 'S -> 'b : 'S]
+
+        > IF_SOME ; C / (Some a) : S    =>    bt ; C / a : S
+        > IF_SOME ; C / (None) : S   =>    bf ; C / S
+
+   * `SET_CAR`:
+     Set the first value of a pair.
+
+        > SET_CAR => CDR ; SWAP ; PAIR
+
+   * `SET_CDR`:
+     Set the first value of a pair.
+
+        > SET_CDR => CAR ; PAIR
+
+   * `SET_C[AD]+R`:
+     A syntactic sugar for setting fields in nested pairs.
+
+        > SET_CA(\rest=[AD]+)R ; C / S   =>
+            { DUP ; DIP { CAR ; SET_C(\rest)R } ; CDR ; SWAP ; PAIR } ; C / S
+        > SET_CD(\rest=[AD]+)R ; C / S   =>
+            { DUP ; DIP { CDR ; SET_C(\rest)R } ; CAR ; PAIR } ; C / S
+
+   * `MAP_CAR` code:
+     Transform the first value of a pair.
+
+        > SET_CAR => DUP ; CDR ; SWAP ; code ; CAR ; PAIR
+
+   * `MAP_CDR` code:
+     Transform the first value of a pair.
+
+        > SET_CDR => DUP ; CDR ; code ; SWAP ; CAR ; PAIR
+
+   * `MAP_C[AD]+R` code:
+     A syntactic sugar for transforming fields in nested pairs.
+
+        > MAP_CA(\rest=[AD]+)R ; C / S   =>
+            { DUP ; DIP { CAR ; MAP_C(\rest)R code } ; CDR ; SWAP ; PAIR } ; C / S
+        > MAP_CD(\rest=[AD]+)R ; C / S   =>
+            { DUP ; DIP { CDR ; MAP_C(\rest)R code } ; CAR ; PAIR } ; C / S
+
+IX - Concrete syntax
 ----------------------
 
 The concrete language is very close to the formal notation of the
 specification. Its structure is extremely simple: an expression in the
-language can only be one of the three following constructs.
+language can only be one of the four following constructs.
 
-  1. A constant (integer or string).
+  1. An integer.
+  1. A character string.
   2. The application of a primitive to a sequence of expressions.
   3. A sequence of expressions.
 
@@ -1129,109 +1256,54 @@ There are two kinds of constants:
   1. Integers or naturals in decimal (no prefix),
      hexadecimal (0x prefix), octal (0o prefix) or binary (0b prefix).
   2. Strings with usual escapes `\n`, `\t`, `\b`, `\r`, `\\`, `\"`.
-     Strings are encoding agnostic sequences of bytes. Non printable
-     characters can be escaped by 3 digits decimal codes `\ddd` or
-     2 digit hexadecimal codes `\xHH`.
+     The encoding of a Michelson source file must be UTF-8,
+     and non-ASCII characters can only appear in strings and comments.
+     No line break can appear in a string.
 
 ### Primitive applications
 
-In the specification, primitive applications always luckily fit on a
-single line. In this case, the concrete syntax is exactly the formal
-notation. However, it is sometimes necessary to break lines in a real
-program, which can be done as follows.
+A primitive application is a name followed by arguments
 
-As in Python or Haskell, the concrete syntax of the language is
-indentation sensitive. The elements of a syntactical block, such as
-all the elements of a sequence, or all the parameters of a primitive,
-must be written with the exact same left margin in the program source
-code. This is unlike in C-like languages, where blocks are delimited
-with braces and the margin is ignored by the compiled.
+    prim arg1 arg2
 
-The simplest form requires to break the line after the primitive name
-and after every argument. Argument must be indented by at least one
-more space than the primitive, and all arguments must sit on the exact
-same column.
+When a primitive application is the argument to another primitive
+application, it must be wrapped with parentheses.
 
-    PRIM
-      arg1
-      arg2
-      ...
-
-If an argument of a primitive application is a primitive application
-itself, its arguments must be pushed even further on the right, to
-lift any ambiguity, as in the following example.
-
-    PRIM1
-      PRIM2
-        arg1_prim2
-        arg2_prim2
-      arg2_prim1
-
-It is possible to put successive arguments on a single line using
-a semicolon as a separator:
-
-    PRIM
-      arg1; arg2
-      arg3; arg4
-
-It is also possible to add arguments on the same line as the primitive
-as a lighter way to write simple expressions. An other representation
-of the first example is:
-
-    PRIM arg1 arg2 ...
-
-It is possible to mix both notations as in:
-
-    PRIM arg1 arg2
-      arg3
-      arg4
-
-Or even:
-
-    PRIM arg1 arg2
-      arg3; arg4
-
-Both equivalent to:
-
-    PRIM
-      arg1
-      arg2
-      arg3
-      arg4
-
-Trailing semicolons are ignored:
-
-    PRIM
-      arg1;
-      arg2
-
-Calling a primitive with a compound argument on a single line is
-allowed by wrapping with parentheses. Another notation for the second
-example is:
-
-    PRIM1 (PRIM2 arg1_prim2 arg2_prim2) arg2_prim1
+    prim (prim1 arg11 arg12) (prim2 arg21 arg22)
 
 ### Sequences
 
 Successive expression can be grouped as a single sequence expression
-using braces delimiters and semicolon separators.
+using curly braces as delimiters and semicolon as separators.
 
     { expr1 ; expr2 ; expr3 ; expr4 }
 
-A sequence block can be split on several lines. In this situation, the
-whole block, including the closing brace, must be indented with
-respect to the first instruction.
+A sequence can be passed as argument to a primitive.
 
-    { expr1 ; expr2
-      expr3 ; expr4 }
+    prim arg1 arg2 { arg3_expr1 ; arg3_expr2 }
 
-Blocks can be passed as argument to a primitive.
+Primitive applications right inside a sequence cannot be wrapped.
 
+    { (prim arg1 arg2) } # is not ok
 
-    PRIM arg1 arg2
-      { arg3_expr1 ; arg3_expr2
-        arg3_expr3 ; arg3_expr4 }
+### Indentation
 
+To remove ambiguities for human readers, the parser enforces some
+indentation rules.
+
+  - For sequences:
+    - All expressions in a sequence must be aligned on the same column.
+    - An exception is made when consecutive expressions fit on the same
+      line, as long as the first of them is correctly aligned.
+    - All expressions in a sequence must be indented to the right of the
+      opening curly brace by at least one column.
+    - The closing curly brace cannot be on the left of the opening one.
+  - For primitive applications:
+    - All arguments in an application must be aligned on the same column.
+    - An exception is made when consecutive arguments fit on the same
+      line, as long as the first of them is correctly aligned.
+    - All arguments in a sequence must be indented to the right of the
+      primitive name by at least one column.
 
 ### Conventions
 
@@ -1269,11 +1341,8 @@ All domain specific constants are strings with specific formats:
 To prevent errors, control flow primitives that take instructions as
 parameters require sequences in the concrete syntax.
 
-    IF { instr1_true ; instr2_true ; ... } { instr1_false ; instr2_false ; ... }
-
-    IF
-      { instr1_true ; instr2_true ; ... }
-      { instr1_false ; instr2_false ; ... }
+    IF { instr1_true ; instr2_true ; ... }
+       { instr1_false ; instr2_false ; ... }
 
 ### Main program structure
 
@@ -1289,11 +1358,14 @@ A hash sign (`#`) anywhere outside of a string literal will make the
 rest of the line (and itself) completely ignored, as in the following
 example.
 
-    PUSH nat 1 # pushes 1
-    PUSH nat 2 # pushes 2
-    ADD         # computes 2 + 1
+    { PUSH nat 1 ; # pushes 1
+      PUSH nat 2 ; # pushes 2
+      ADD }        # computes 2 + 1
 
-IX - Examples
+Comments that span on multiple lines or that stop before the end of
+the line can also be written, using C-like delimiters (`/* ... */`).
+
+X - Examples
 -------------
 
 Contracts in the system are stored as a piece of code and a global
@@ -1335,34 +1407,36 @@ Hence, the global data of the contract has the following type
 
     'g =
       pair
-        pair timestamp tez
-        pair (contract unit unit) (contract unit unit)
+        (pair timestamp tez)
+        (pair (contract unit unit) (contract unit unit))
 
 Following the contract calling convention, the code is a lambda of type
 
     lambda
-      pair unit 'g
-      pair unit 'g
+      (pair unit 'g)
+      (pair unit 'g)
 
 written as
 
     lambda
-      pair unit
-        pair
-          pair timestamp tez
-          pair (contract unit unit) (contract unit unit)
-      pair unit
-        pair
-          pair timestamp tez
-          pair (contract unit unit) (contract unit unit)
+      (pair
+         unit
+         (pair
+           (pair timestamp tez)
+           (pair (contract unit unit) (contract unit unit))))
+      (pair
+         unit
+         (pair
+            (pair timestamp tez)
+            (pair (contract unit unit) (contract unit unit))))
 
 The complete source `reservoir.tz` is:
 
     parameter timestamp ;
     storage
-      pair
-        (pair timestamp tez) # T N
-        (pair (contract unit unit) (contract unit unit)) ; # A B
+      (pair
+         (pair timestamp tez) # T N
+         (pair (contract unit unit) (contract unit unit))) ; # A B
     return unit ;
     code
       { DUP ; CDAAR ; # T
@@ -1415,15 +1489,15 @@ The complete source `scrutable_reservoir.tz` is:
 
     parameter timestamp ;
     storage
-      pair
-        string # S
-        pair
-          timestamp # T
-          pair
-            (pair tez tez) ; # P N
-            pair
-              (contract unit unit) # X
-              pair (contract unit unit) (contract unit unit) ; # A B
+      (pair
+         string # S
+         (pair
+            timestamp # T
+            (pair
+               (pair tez tez) ; # P N
+               (pair
+                  (contract unit unit) # X
+                  (pair (contract unit unit) (contract unit unit)))))) ; # A B
     return unit ;
     code
       { DUP ; CDAR # S
@@ -1485,19 +1559,18 @@ peas, and the accounts of the buyer `B`, the seller `S` and the warehouse `W`.
 These parameters as grouped in the global storage as follows:
 
     Pair
-      Pair (Pair Q (Pair T Z))
-      Pair
-        (Pair K C)
-        (Pair (Pair B S) W)
+      (Pair (Pair Q (Pair T Z)))
+      (Pair
+         (Pair K C)
+         (Pair (Pair B S) W))
 
 of type
 
     pair
-      pair nat (pair timestamp timestamp)
-      pair
-        pair tez tez
-        pair (pair account account) account
-
+      (pair nat (pair timestamp timestamp))
+      (pair
+         (pair tez tez)
+         (pair (pair account account) account))
 
 The 24 hours after timestamp `Z` are for the buyer and seller to store
 their collateral `(Q * C)`. For this, the contract takes a string as
@@ -1530,22 +1603,22 @@ Hence, the global storage is a pair, with the counters on the left,
 and the constant parameters on the right, initially as follows.
 
     Pair
-      Pair 0 (Pair 0_00 0_00)
-      Pair
-        Pair (Pair Q (Pair T Z))
-        Pair
-          (Pair K C)
-          (Pair (Pair B S) W)
+      (Pair 0 (Pair 0_00 0_00))
+      (Pair
+         (Pair (Pair Q (Pair T Z)))
+         (Pair
+            (Pair K C)
+            (Pair (Pair B S) W)))
 
 of type
 
     pair
-      pair nat (pair tez tez)
-      pair
-        pair nat (pair timestamp timestamp)
-        pair
-          pair tez tez
-          pair (pair account account) account
+      (pair nat (pair tez tez))
+      (pair
+         (pair nat (pair timestamp timestamp))
+         (pair
+            (pair tez tez)
+            (pair (pair account account) account)))
 
 The parameter of the transaction will be either a transfer from the
 buyer or the seller or a delivery notification from the warehouse of
@@ -1573,15 +1646,15 @@ The complete source `forward.tz` is:
     parameter (or string nat) ;
     return unit ;
     storage
-      pair
-        pair nat (pair tez tez) # counter from_buyer from_seller
-        pair
-          pair nat (pair timestamp timestamp) # Q T Z
-          pair
-            pair tez tez # K C
-            pair
-              pair (contract unit unit) (contract unit unit) # B S
-              (contract unit unit); # W
+      (pair
+         (pair nat (pair tez tez)) # counter from_buyer from_seller
+         (pair
+            (pair nat (pair timestamp timestamp)) # Q T Z
+            (pair
+               (pair tez tez) # K C
+               (pair
+                  (pair (contract unit unit) (contract unit unit)) # B S
+                  (contract unit unit))))) ; # W
     code
       { DUP ; CDDADDR ; # Z
         PUSH nat 86400 ; SWAP ; ADD ; # one day in second
@@ -1721,6 +1794,7 @@ X - Full grammar
       | <timestamp string constant>
       | <signature string constant>
       | <key string constant>
+      | <key_hash string constant>
       | <tez string constant>
       | <contract string constant>
       | Unit
@@ -1788,29 +1862,19 @@ X - Full grammar
       | GT
       | LE
       | GE
-      | CAST
-      | CHECKED_ABS
-      | CHECKED_NEG
-      | CHECKED_ADD
-      | CHECKED_SUB
-      | CHECKED_MUL
-      | CHECKED_CAST
-      | FLOOR
-      | CEIL
-      | INF
-      | NAN
-      | ISNAN
-      | NANAN
+      | INT
       | MANAGER
       | SELF
       | TRANSFER_TOKENS
       | CREATE_ACCOUNT
       | CREATE_CONTRACT
+      | DEFAULT_ACCOUNT
       | NOW
       | AMOUNT
       | BALANCE
       | CHECK_SIGNATURE
       | H
+      | HASH_KEY
       | STEPS_TO_QUOTA
       | SOURCE <type> <type>
     <type> ::=
@@ -1821,6 +1885,7 @@ X - Full grammar
       | tez
       | bool
       | key
+      | key_hash
       | timestamp
       | signature
       | option <type>
@@ -1837,10 +1902,10 @@ X - Full grammar
       | string
       | tez
       | bool
-      | key
+      | key_hash
       | timestamp
 
-XI - Reference implementation
+XII - Reference implementation
 -----------------------------
 
 The language is implemented in OCaml as follows:

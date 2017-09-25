@@ -1,3 +1,21 @@
+Reset 2017-09-21
+================
+
+[Node]
+
+- fix a performance issue in roll storage
+
+[Doc]
+
+- improve scripts and documentations on how to run sandboxed node
+  or a local private network
+
+[Client]
+
+- add an option `-log-requests`. All RPC requests and responses to the
+  node are logged on `stderr`.
+
+
 Reset 2017-08-10
 ================
 

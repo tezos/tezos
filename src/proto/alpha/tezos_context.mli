@@ -116,8 +116,8 @@ module Script : sig
   type expr =
     | Int of location * string
     | String of location * string
-    | Prim of location * string * expr list
-    | Seq of location * expr list
+    | Prim of location * string * expr list * string option
+    | Seq of location * expr list * string option
 
   type code = {
     code: expr ;

@@ -114,3 +114,21 @@ test-vote: ${LIB} ${TEST_VOTE_IMPLS:.ml=.cmx}
 clean::
 	rm -f test-vote
 
+############################################################################
+## Michelson Parser
+
+.PHONY: run-test-michelson-parser
+run-test-michelson-parser:
+	@echo
+	./test-michelson-parser
+
+TEST_MICHELSON_PARSER_IMPLS := \
+  proto_alpha_helpers.ml \
+  test_michelson_parser.ml
+
+test-michelson-parser: ${LIB} ${TEST_MICHELSON_PARSER_IMPLS:.ml=.cmx}
+	@echo COMPILE $(notdir $@)
+	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
+
+clean::
+	rm -f test-michelson-parser

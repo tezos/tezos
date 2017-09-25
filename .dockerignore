@@ -7,12 +7,9 @@
 tezos-node
 tezos-protocol-compiler
 tezos-client
-tezos-webclient
 tezos-attacker
 
 src/Makefile.local
-
-src/webclient_static.ml
 
 src/node/updater/environment_gen
 src/node/updater/proto_environment.mli
@@ -25,15 +22,10 @@ src/client/embedded/**/_tzbuild
 src/client/embedded/alpha/concrete_lexer.ml
 src/client/embedded/alpha/concrete_parser.ml
 src/client/embedded/alpha/concrete_parser.mli
-src/client/embedded/alpha/webclient_proto_static.ml
-src/client/embedded/alpha/main.byte
-src/client/embedded/alpha/webclient_static/main.js
-src/client/embedded/alpha/webclient/browser/main.byte
-src/client/embedded/alpha/webclient/static/main.js
-src/client/embedded/alpha/webclient/webclient_proto_static.ml
 
 test/reports
 test/**/test-*
+test/LOG.*
 
 **/*~
 **/\#*\#
@@ -55,3 +47,5 @@ test/**/test-*
 
 **/*.rej
 **/*.orig
+
+_opam

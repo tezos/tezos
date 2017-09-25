@@ -64,10 +64,14 @@ trap cleanup EXIT INT
 ### Various helpers
 
 run_contract_file () {
-    local contract=$1
-    local storage=$2
-    local input=$3
-    $client run program "$contract" on storage "$storage" and input "$input"
+    local contract="$1"
+    local storage="$2"
+    local input="$3"
+    local amount_flag=""
+    if [ ! -z "$4" ]; then
+        amount_flag="-amount $4"
+    fi
+    $client run program "$contract" on storage "$storage" and input "$input" $amount_flag
 }
 
 assert_output () {
@@ -75,14 +79,33 @@ assert_output () {
     local input=$2;
     local storage=$3;
     local expected=$4;
+    local amount=$5;
     echo "Testing [$contract]"
-    local output=$(run_contract_file "$contract" "$input" "$storage" | sed '1,/output/d' |
+    local output=$(run_contract_file "$contract" "$input" "$storage" "$amount" | sed '1,/output/d' |
                        sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' ||
                        { printf '\nTest failed with error at line %s\n' "$(caller)" 1>&2;
                          exit 1; });
     if [ "$expected" != "$output" ]; then
         echo "Test at " `caller` failed 1>&2 ;
         printf "Expected %s but got %s" "$expected" "$output" 1>&2 ;
+        exit 1;
+    fi
+}
+
+assert_storage () {
+    local contract=$1;
+    local input=$2;
+    local storage=$3;
+    local expected=$4;
+    local amount=$5;
+    echo "Testing [$contract]"
+    local storage=$(run_contract_file "$contract" "$input" "$storage" "$amount"  | awk '/storage/{getline; print}' |
+                        sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' ||
+                        { printf '\nTest failed with error at line %s\n' "$(caller)" 1>&2;
+                          exit 1; });
+    if [ "$expected" != "$storage" ]; then
+        echo "Test at " `caller` failed 1>&2 ;
+        printf "Expected %s but got %s" "$expected" "$storage" 1>&2 ;
         exit 1;
     fi
 }
@@ -169,6 +192,18 @@ assert_fails() {
         exit 1
     else
         return 0
+    fi
+}
+
+assert_contract_fails() {
+    local contract=$1;
+    local input=$2;
+    local storage=$3;
+    local amount=$4;
+    printf "Testing failure for [$contract]\n"
+    if run_contract_file "$contract" "$input" "$storage" "$amount" 2> /dev/null ; then
+        printf "Expected contract execution to fail, but succeeded:\n"
+        exit 1
     fi
 }
 
