@@ -2,6 +2,7 @@
 
 (require 'cl-lib)
 (require 'deferred)
+(require 'font-lock)
 
 (defvar michelson-mode-hook nil)
 
@@ -50,7 +51,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   'michelson-face-instruction
   "Face name for Michelson instructions.")
 (defface michelson-face-instruction
-  '((t (:inherit 'font-lock-keyword-face)))
+  '((t (:inherit font-lock-keyword-face)))
   "Face for Michelson instructions."
   :group 'michelson-faces)
 
@@ -58,7 +59,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   'michelson-face-type
   "Face name for Michelson types.")
 (defface michelson-face-type
-   '((t (:inherit 'font-lock-type-face)))
+   '((t (:inherit font-lock-type-face)))
    "Face for Michelson types."
    :group 'michelson-faces)
 
@@ -67,7 +68,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   "Face name for Michelson constants.")
 
 (defface michelson-face-constant
-   '((t (:inherit 'font-lock-constant-face)))
+   '((t (:inherit font-lock-constant-face)))
    "Face for Michelson constants."
    :group 'michelson-faces)
 
@@ -75,7 +76,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   'michelson-face-instruction
   "Face name for Michelson instructions.")
 (defface michelson-face-annotation
-   '((t (:inherit 'font-lock-string-face)))
+   '((t (:inherit font-lock-string-face)))
    "Face for Michelson annotations."
    :group 'michelson-faces)
 
@@ -83,7 +84,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   'michelson-face-comment
   "Face name for Michelson comments.")
 (defface michelson-face-comment
-   '((t (:inherit 'font-lock-comment-face)))
+   '((t (:inherit font-lock-comment-face)))
    "Face for Michelson comments."
    :group 'michelson-faces)
 
@@ -92,7 +93,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   "Face name for Michelson declarations.")
 
 (defface michelson-face-declaration
-   '((t (:inherit 'font-lock-keyword-face)))
+   '((t (:inherit font-lock-keyword-face)))
    "Face for Michelson constants."
    :group 'michelson-faces)
 
