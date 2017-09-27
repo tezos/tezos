@@ -12,6 +12,12 @@ open Error_monad
 (* Tezos: a small Command Line Parsing library *)
 (* Only used in the client. *)
 
+(** The type for positional parameters and flags *)
+type ('p, 'ctx) parameter
+val parameter : ?autocomplete:('ctx -> string list tzresult Lwt.t) ->
+  ('ctx -> string -> 'p tzresult Lwt.t) ->
+  ('p, 'ctx) parameter
+
 (** {2 Flags and Options } *)
 
 (** {3 Options and Switches } *)
@@ -22,13 +28,14 @@ type ('a, 'ctx) arg
     The [~parameter] argument should begin with a [-].
     If the argument is not provided, [None] is returned *)
 val arg : doc:string -> parameter:string ->
-  ('ctx -> string -> 'p tzresult Lwt.t) ->
+  ('p, 'ctx) parameter ->
   ('p option, 'ctx) arg
+
 (** Create an argument that will contain the [~default] value if it is not provided.
     @see arg *)
 val default_arg : doc:string -> parameter:string ->
   default:string ->
-  ('ctx -> string -> 'p tzresult Lwt.t) ->
+  ('p, 'ctx) parameter ->
   ('p, 'ctx) arg
 (** Create a boolean switch.
     The value will be set to [true] if the switch is provided and [false] if it is not. *)
@@ -46,21 +53,25 @@ type ('a, 'ctx) options
 
 (** Include no optional parameters *)
 val no_options : (unit, 'ctx) options
+
 (** Include 1 optional parameter *)
 val args1 :
   ('a, 'ctx) arg ->
   ('a, 'ctx) options
+
 (** Include 2 optional parameters *)
 val args2 :
   ('a, 'ctx) arg ->
   ('b, 'ctx) arg ->
   ('a * 'b, 'ctx) options
+
 (** Include 3 optional parameters *)
 val args3 :
   ('a, 'ctx) arg ->
   ('b, 'ctx) arg ->
   ('c, 'ctx) arg ->
   ('a * 'b * 'c, 'ctx) options
+
 (** Include 4 optional parameters *)
 val args4 :
   ('a, 'ctx) arg ->
@@ -68,6 +79,7 @@ val args4 :
   ('c, 'ctx) arg ->
   ('d, 'ctx) arg ->
   ('a * 'b * 'c * 'd, 'ctx) options
+
 (** Include 5 optional parameters *)
 val args5 :
   ('a, 'ctx) arg ->
@@ -76,6 +88,7 @@ val args5 :
   ('d, 'ctx) arg ->
   ('e, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e, 'ctx) options
+
 (** Include 6 optional parameters *)
 val args6 :
   ('a, 'ctx) arg ->
@@ -85,6 +98,7 @@ val args6 :
   ('e, 'ctx) arg ->
   ('f, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f, 'ctx) options
+
 (** Include 7 optional parameters *)
 val args7 :
   ('a, 'ctx) arg ->
@@ -93,15 +107,18 @@ val args7 :
   ('d, 'ctx) arg ->
   ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g, 'ctx) options
+
 (** Include 8 optional parameters *)
 val args8 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
   ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h, 'ctx) options
+
 (** Include 9 optional parameters *)
 val args9 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
   ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
   ('i, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i, 'ctx) options
+
 (** Include 10 optional parameters *)
 val args10 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) arg ->
   ('e, 'ctx) arg -> ('f, 'ctx) arg -> ('g, 'ctx) arg -> ('h, 'ctx) arg ->
@@ -117,7 +134,7 @@ type ('a, 'ctx, 'ret) params
 val param:
   name: string ->
   desc: string ->
-  ('ctx -> string -> 'a tzresult Lwt.t) ->
+  ('a, 'ctx) parameter ->
   ('b, 'ctx, 'ret) params ->
   ('a -> 'b, 'ctx, 'ret) params
 
@@ -189,7 +206,11 @@ val handle_cli_errors:
 (** Find and call the applicable command on the series of arguments.
     @raises [Failure] if the command list would be ambiguous. *)
 val dispatch:
-  ('ctx, 'ret) command list -> 'ctx -> string list -> 'ret tzresult Lwt.t
+  ?global_options:('a, 'ctx) options ->
+  ('ctx, 'ret) command list ->
+  'ctx ->
+  string list ->
+  'ret tzresult Lwt.t
 
 (** Parse the sequence of optional arguments that proceed a command *)
 val parse_initial_options :

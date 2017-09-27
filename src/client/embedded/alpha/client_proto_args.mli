@@ -39,3 +39,5 @@ module Daemon : sig
   val endorsement_switch: (bool, Client_commands.context) arg
   val denunciation_switch: (bool, Client_commands.context) arg
 end
+
+val string_parameter : (string, Client_commands.context) Cli_entries.parameter

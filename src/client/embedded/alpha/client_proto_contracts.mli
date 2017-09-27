@@ -30,6 +30,7 @@ module ContractAlias : sig
   val name:
     Client_commands.context ->
     Contract.t -> string tzresult Lwt.t
+  val autocomplete: Client_commands.context -> string list tzresult Lwt.t
 end
 
 val list_contracts:

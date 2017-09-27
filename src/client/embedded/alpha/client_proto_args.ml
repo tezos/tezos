@@ -53,26 +53,29 @@ let () =
 let tez_sym =
   "\xEA\x9C\xA9"
 
+let string_parameter =
+  parameter (fun _ x -> return x)
+
 let init_arg =
   default_arg
     ~parameter:"-init"
     ~doc:"The initial value of the contract's storage."
     ~default:"Unit"
-    (fun _ s -> return s)
+    string_parameter
 
 let arg_arg =
   default_arg
     ~parameter:"-arg"
     ~doc:"The argument passed to the contract's script, if needed."
     ~default:"Unit"
-    (fun _ a -> return a)
+    string_parameter
   
 let delegate_arg =
   arg
     ~parameter:"-delegate"
     ~doc:"Set the delegate of the contract.\
           Must be a known identity."
-    (fun _ s -> return s)
+    string_parameter
   
 
 let source_arg =
@@ -80,7 +83,7 @@ let source_arg =
     ~parameter:"-source"
     ~doc:"Set the source of the bonds to be paid.\
           Must be a known identity."
-    (fun _ s -> return s)
+    string_parameter
 
 let non_spendable_switch =
   switch
@@ -101,21 +104,21 @@ let delegatable_switch =
 
 let tez_format = "text format: D,DDD,DDD.DD (centiles are optional, commas are optional)"
 
-let tez_arg ~default ~parameter ~doc =
-  default_arg ~parameter ~doc ~default
+let tez_parameter param =
+  parameter
     (fun _ s ->
        match Tez.of_string s with
        | Some tez -> return tez
-       | None -> fail (Bad_tez_arg (parameter, s)))
+       | None -> fail (Bad_tez_arg (param, s)))
+
+let tez_arg ~default ~parameter ~doc =
+  default_arg ~parameter ~doc ~default (tez_parameter parameter)
 
 let tez_param ~name ~desc next =
   Cli_entries.param
     name
     (desc ^ " in \xEA\x9C\xA9\n" ^ tez_format)
-    (fun _ s ->
-       match Tez.of_string s with
-       | None -> fail (Bad_tez_arg (name, s))
-       | Some tez -> return tez)
+    (tez_parameter name)
     next
 
 let fee_arg =
@@ -128,9 +131,9 @@ let max_priority_arg =
   arg
     ~parameter:"-max-priority"
     ~doc:"Set the max_priority used when looking for baking slot."
-    (fun _ s ->
-       try return (int_of_string s)
-       with _ -> fail (Bad_max_priority s))
+    (parameter (fun _ s ->
+         try return (int_of_string s)
+         with _ -> fail (Bad_max_priority s)))
 
 let free_baking_switch =
   switch
@@ -142,9 +145,9 @@ let endorsement_delay_arg =
     ~parameter:"-endorsement-delay"
     ~doc:"Set the delay used before to endorse the current block."
     ~default:"15"
-    (fun _ s ->
-       try return (int_of_string s)
-       with _ -> fail (Bad_endorsement_delay s))
+    (parameter (fun _ s ->
+         try return (int_of_string s)
+         with _ -> fail (Bad_endorsement_delay s)))
 
 module Daemon = struct
   let baking_switch =

@@ -45,6 +45,11 @@ let mine rpc_config ?timestamp block command fitness seckey =
   let signed_blk = Environment.Ed25519.Signature.append seckey blk in
   Client_node_rpcs.inject_block rpc_config signed_blk [[]]
 
+let int64_parameter =
+  (Cli_entries.parameter (fun _ p ->
+       try return (Int64.of_string p)
+       with _ -> failwith "Cannot read int64"))
+
 let commands () =
   let open Cli_entries in
   let args =
@@ -52,10 +57,10 @@ let commands () =
       (arg
          ~parameter:"-timestamp"
          ~doc:"Set the timestamp of the block (and initial time of the chain)"
-         (fun _ t ->
-            match (Time.of_notation t) with
-            | None -> Error_monad.failwith "Could not parse value provided to -timestamp option"
-            | Some t -> return t)) in
+         (parameter (fun _ t ->
+              match (Time.of_notation t) with
+              | None -> Error_monad.failwith "Could not parse value provided to -timestamp option"
+              | Some t -> return t))) in
   [
 
     command ~desc: "Activate a protocol"
@@ -65,9 +70,7 @@ let commands () =
        @@ prefixes [ "with" ; "fitness" ]
        @@ param ~name:"fitness"
          ~desc:"Hardcoded fitness of the first block (integer)"
-         (fun _ p ->
-            try return (Int64.of_string p)
-            with _ -> failwith "Cannot read int64")
+         int64_parameter
        @@ prefixes [ "and" ; "key" ]
        @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"Dictator's key"
@@ -88,9 +91,7 @@ let commands () =
        @@ prefixes [ "with" ; "fitness" ]
        @@ param ~name:"fitness"
          ~desc:"Hardcoded fitness of the first block (integer)"
-         (fun _ p ->
-            try return (Int64.of_string p)
-            with _ -> failwith "Cannot read int64")
+         int64_parameter
        @@ prefixes [ "and" ; "key" ]
        @@ Environment.Ed25519.Secret_key.param
          ~name:"password" ~desc:"Dictator's key"
