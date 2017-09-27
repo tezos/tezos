@@ -19,18 +19,25 @@ type error += Option_expected_argument of string
 type error += Unknown_option of string
 type error += Invalid_options_combination of string
 
-type ('a, 'arg) arg =
+type ('p, 'ctx) parameter =
+  { converter: ('ctx -> string -> 'p tzresult Lwt.t) ;
+    autocomplete: ('ctx -> string list tzresult Lwt.t) option }
+
+let parameter ?autocomplete converter =
+  { converter ; autocomplete }
+
+type ('a, 'ctx) arg =
   | Arg : { doc : string ;
             parameter : string ;
-            kind : 'arg -> string -> 'p tzresult Lwt.t } ->
-    ('p option, 'arg) arg
+            kind : ('p, 'ctx) parameter } ->
+    ('p option, 'ctx) arg
   | DefArg : { doc : string ;
                parameter : string ;
-               kind : 'arg -> string -> 'p tzresult Lwt.t ;
-               default : string } -> ('p, 'arg) arg
+               kind : ('p, 'ctx) parameter ;
+               default : string } -> ('p, 'ctx) arg
   | Switch : { doc : string ;
                parameter : string } ->
-    (bool, 'arg) arg
+    (bool, 'ctx) arg
 
 let arg ~doc ~parameter kind =
   Arg { doc ;
@@ -44,7 +51,7 @@ let default_arg ~doc ~parameter ~default kind =
            default }
 
 let switch ~doc ~parameter =
-  Switch {doc ; parameter}
+  Switch { doc ; parameter }
 
 type ('a, 'arg) args =
   | NoArgs : (unit, 'args) args
@@ -55,21 +62,21 @@ let parse_arg :
   type a ctx. (a, ctx) arg -> string option StringMap.t -> ctx -> a tzresult Lwt.t =
   fun spec args_dict ctx ->
     match spec with
-    | Arg { parameter ; kind } ->
+    | Arg { parameter ; kind={ converter } } ->
         begin
           try
             begin
               match StringMap.find parameter args_dict with
               | None -> return None
               | Some s ->
-                  (kind ctx s) >>|? fun x ->
+                  (converter ctx s) >>|? fun x ->
                   Some x
             end
           with Not_found ->
             return None
         end
-    | DefArg { parameter ; kind ; default } ->
-        kind ctx default >>= fun default ->
+    | DefArg { parameter ; kind={ converter } ; default } ->
+        converter ctx default >>= fun default ->
         begin match default with
           | Ok x -> return x
           | Error _ ->
@@ -80,7 +87,7 @@ let parse_arg :
         begin try
             match StringMap.find parameter args_dict with
             | None -> return default
-            | Some s -> kind ctx s
+            | Some s -> converter ctx s
           with Not_found -> return default
         end
     | Switch { parameter } ->
@@ -113,30 +120,37 @@ let rec make_arities_dict :
           | Switch { parameter } -> recur parameter 0
         end
 
-
 let check_help_flag error = function
   | ("-help" | "--help") :: _ -> fail error
   | _ -> return ()
 
-let make_args_dict_consume help_flag spec args =
-  let rec make_args_dict arities acc args =
+(* ignore_autocomplete is a hack to have the initial arguments get parsed
+   even if autocomplete command is running *)
+let make_args_dict_consume help_flag ignore_autocomplete spec args =
+  let rec make_args_dict completing arities acc args =
     check_help_flag help_flag args >>=? fun () ->
     match args with
     | [] -> return (acc, [])
+    | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: remaining_args
+      when ignore_autocomplete ->
+        make_args_dict true arities acc remaining_args >>=? fun (dict, _) ->
+        return (dict, "bash_autocomplete" :: prev_arg :: cur_arg :: script :: remaining_args)
     | arg :: tl ->
         if StringMap.mem arg arities
         then let arity = StringMap.find arg arities in
           check_help_flag help_flag tl >>=? fun () ->
           match arity, tl with
-          | 0, tl' -> make_args_dict arities (StringMap.add arg None acc) tl'
+          | 0, tl' -> make_args_dict completing arities (StringMap.add arg None acc) tl'
           | 1, value :: tl' ->
-              make_args_dict arities (StringMap.add arg (Some value) acc) tl'
+              make_args_dict completing arities (StringMap.add arg (Some value) acc) tl'
+          | 1, [] when completing ->
+              return (acc, [])
           | 1, [] ->
               fail (Option_expected_argument arg)
           | _, _ ->
               raise (Failure "cli_entries: Arguments with arity not equal to 1 or 0 not supported")
         else return (acc, args)
-  in make_args_dict (make_arities_dict StringMap.empty spec) StringMap.empty args
+  in make_args_dict false (make_arities_dict StringMap.empty spec) StringMap.empty args
 
 let make_args_dict_filter help_flag spec args =
   let rec make_args_dict arities (dict, other_args) args =
@@ -161,7 +175,7 @@ let make_args_dict_filter help_flag spec args =
   (dict, List.rev remaining)
 
 let make_args_dict help_handler spec args =
-  make_args_dict_consume help_handler spec args >>=? fun (args, remaining) ->
+  make_args_dict_consume help_handler false spec args >>=? fun (args, remaining) ->
   match remaining with
   | [] -> return args
   | hd :: _ -> fail (Unknown_option hd)
@@ -210,18 +224,18 @@ let args10 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 =
 
 (* A simple structure for command interpreters.
    This is more generic than the exported one, see end of file. *)
-type ('a, 'arg, 'ret) params =
-  | Prefix : string * ('a, 'arg, 'ret) params ->
-    ('a, 'arg, 'ret) params
+type ('a, 'ctx, 'ret) params =
+  | Prefix : string * ('a, 'ctx, 'ret) params ->
+    ('a, 'ctx, 'ret) params
   | Param : string * string *
-            ('arg -> string -> 'p tzresult Lwt.t) *
-            ('a, 'arg, 'ret) params ->
-    ('p -> 'a, 'arg, 'ret) params
+            ('p, 'ctx) parameter *
+            ('a, 'ctx, 'ret) params ->
+    ('p -> 'a, 'ctx, 'ret) params
   | Stop :
-      ('arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params
+      ('ctx -> 'ret tzresult Lwt.t, 'ctx, 'ret) params
   | Seq : string * string *
-          ('arg -> string -> 'p tzresult Lwt.t) ->
-    ('p list -> 'arg -> 'ret tzresult Lwt.t, 'arg, 'ret) params
+          ('p, 'ctx) parameter ->
+    ('p list -> 'ctx -> 'ret tzresult Lwt.t, 'ctx, 'ret) params
 
 (* A command group *)
 type group =
@@ -244,11 +258,12 @@ type error += Command_not_found : string list * ('a, 'b) command list -> error
 type error += Help_flag : ('a, 'b) command list -> error (* when -help appears in input *)
 type error += Help_cmd : string list * ('a, 'b) command list * bool * bool -> error    (* ./tezos-client help *)
 type error += Bare_help : error   (* ./tezos-client or ./tezos-client -help *)
+type error += Autocomplete_command : string list -> error
 
 let parse_initial_options :
   type a ctx. (a, ctx) options -> ctx -> string list -> (a * string list) tzresult Lwt.t =
   fun (Argument { spec ; converter }) ctx args ->
-    make_args_dict_consume Bare_help spec args >>=? fun (dict, remaining) ->
+    make_args_dict_consume Bare_help true spec args >>=? fun (dict, remaining) ->
     parse_args spec dict ctx >>|? fun nested ->
     (converter nested, remaining)
 
@@ -257,7 +272,7 @@ let param ~name ~desc kind next = Param (name, desc, kind, next)
 let seq ~name ~desc kind = Seq (name, desc, kind)
 let seq_of_param param =
   match param Stop with
-  | Param (n, desc, f, Stop) -> Seq (n, desc, f)
+  | Param (n, desc, parameter, Stop) -> Seq (n, desc, parameter)
   | _ -> invalid_arg "Cli_entries.seq_of_param"
 
 let prefix keyword next = Prefix (keyword, next)
@@ -272,7 +287,7 @@ let command ?group ~desc options params handler =
 
 (* Param combinators *)
 let string ~name ~desc next =
-  param name desc (fun _ s -> return s) next
+  param name desc { converter=(fun _ s -> return s) ; autocomplete=None } next
 
 (* Help commands *)
 let help_group =
@@ -330,22 +345,22 @@ let rec help_commands commands =
 
 (* Command execution *)
 let exec
-    (type arg) (type ret)
+    (type ctx) (type ret)
     (Command { options=(Argument { converter ; spec=options_spec }) ;
                params=spec ;
                handler })
-    (ctx : arg) params args_dict =
+    (ctx : ctx) params args_dict =
   let rec exec
-    : type a. int -> (a, arg, ret) params -> a -> string list -> ret tzresult Lwt.t
+    : type a. int -> (a, ctx, ret) params -> a -> string list -> ret tzresult Lwt.t
     = fun i spec cb params ->
       match spec, params with
       | Stop, _ -> cb ctx
-      | Seq (_, _, f), seq ->
+      | Seq (_, _, { converter }), seq ->
           let rec do_seq i acc = function
             | [] -> return (List.rev acc)
             | p :: rest ->
                 Lwt.catch
-                  (fun () -> f ctx p)
+                  (fun () -> converter ctx p)
                   (function
                     | Failure msg -> Error_monad.failwith "%s" msg
                     | exn -> fail (Exn exn))
@@ -355,9 +370,9 @@ let exec
           cb parsed ctx
       | Prefix (n, next), p :: rest when n = p ->
           exec (succ i) next cb rest
-      | Param (_, _, f, next), p :: rest ->
+      | Param (_, _, { converter }, next), p :: rest ->
           Lwt.catch
-            (fun () -> f ctx p)
+            (fun () -> converter ctx p)
             (function
               | Failure msg -> Error_monad.failwith "%s" msg
               | exn -> fail (Exn exn))
@@ -374,13 +389,14 @@ type ('arg, 'ret) level =
     prefix : (string * ('arg, 'ret) tree) list }
 and ('arg, 'ret) param_level =
   { stop : ('arg, 'ret) command option ;
+    autocomplete : ('arg -> string list tzresult Lwt.t) option ;
     tree : ('arg, 'ret) tree }
-and ('arg, 'ret) tree =
-  | TPrefix : ('arg, 'ret) level -> ('arg, 'ret) tree
-  | TParam : ('arg, 'ret) param_level -> ('arg, 'ret) tree
-  | TStop : ('arg, 'ret) command -> ('arg, 'ret) tree
-  | TSeq : ('arg, 'ret) command -> ('arg, 'ret) tree
-  | TEmpty : ('arg, 'ret) tree
+and ('ctx, 'ret) tree =
+  | TPrefix : ('ctx, 'ret) level -> ('ctx, 'ret) tree
+  | TParam : ('ctx, 'ret) param_level -> ('ctx, 'ret) tree
+  | TStop : ('ctx, 'ret) command -> ('ctx, 'ret) tree
+  | TSeq : ('ctx, 'ret) command * ('ctx -> string list tzresult Lwt.t) option -> ('ctx, 'ret) tree
+  | TEmpty : ('ctx, 'ret) tree
 
 let has_options : type ret ctx. (ctx, ret) command -> bool =
   fun (Command { options=Argument { spec } }) ->
@@ -390,20 +406,25 @@ let has_options : type ret ctx. (ctx, ret) command -> bool =
     in args_help spec
 
 let insert_in_dispatch_tree
-    (type arg) (type ret)
+    (type ctx) (type ret)
     root (Command { params } as command) =
+  let access_autocomplete :
+    type p. (p, ctx) parameter -> (ctx -> string list tzresult Lwt.t) option =
+    fun { autocomplete } -> autocomplete in
   let rec insert_tree
-    : type a. (arg, ret) tree -> (a, arg, ret) params -> (_, _) tree
+    : type a. (ctx, ret) tree -> (a, ctx, ret) params -> (ctx, ret) tree
     = fun t c -> match t, c with
       | TEmpty, Stop -> TStop command
-      | TEmpty, Seq (_, _, _) -> TSeq command
-      | TEmpty, Param (_, _, _, next) ->
-          TParam { tree = insert_tree TEmpty next ; stop = None }
+      | TEmpty, Seq (_, _, { autocomplete }) -> TSeq (command, autocomplete)
+      | TEmpty, Param (_, _, param, next) ->
+          TParam { tree = insert_tree TEmpty next ; stop = None ; autocomplete=access_autocomplete param}
       | TEmpty, Prefix (n, next) ->
           TPrefix { stop = None ; prefix = [ (n, insert_tree TEmpty next) ] }
-      | TStop cmd, Param (_, _, _, next) ->
+      | TStop cmd, Param (_, _, param, next) ->
           if not (has_options cmd)
-          then TParam { tree = insert_tree TEmpty next ; stop = Some cmd }
+          then TParam { tree = insert_tree TEmpty next ;
+                        stop = Some cmd ;
+                        autocomplete=access_autocomplete param }
           else raise (Failure "Command cannot have both prefix and options")
       | TStop cmd, Prefix (n, next) ->
           TPrefix { stop = Some cmd ;
@@ -431,7 +452,7 @@ let make_dispatch_tree commands =
 let rec gather_commands ?(acc=[]) tree =
   match tree with
   | TEmpty -> acc
-  | TSeq c
+  | TSeq (c, _)
   | TStop c -> c :: acc
   | TPrefix { stop ; prefix } ->
       gather_assoc ~acc:(match stop with
@@ -459,7 +480,7 @@ let find_command tree initial_arguments =
         then fail (Extra_arguments (List.rev acc, c))
         else make_args_dict (Help_flag [c]) spec args >>=? fun args_dict ->
           return (c, args_dict, initial_arguments)
-    | TSeq (Command { options=Argument { spec }} as c), remaining ->
+    | TSeq (Command { options=Argument { spec }} as c, _), remaining ->
         if List.exists (function "-help" | "--help" -> true | _ -> false) remaining then
           fail (Help_flag ( gather_commands tree))
         else
@@ -553,7 +574,7 @@ let print_highlight highlight_strings formatter str =
                       Format.fprintf formatter "\x1b[103m%s\x1b[0m" delimiter)
                 list
         end
-  in print_string (List.map Str.regexp highlight_strings)
+  in print_string (List.map Str.regexp_string highlight_strings)
 
 let print_commandline ppf (highlights, options, args) =
   let rec print
@@ -716,6 +737,168 @@ let command_usage
     commands
     exe
 
+let get_arg : type a ctx. (a, ctx) arg -> string = function
+  | Arg { parameter } -> parameter
+  | DefArg { parameter } -> parameter
+  | Switch { parameter } -> parameter
+
+let rec list_args : type arg ctx. (arg, ctx) args -> string list = function
+  | NoArgs -> []
+  | AddArg (arg, args) -> (get_arg arg) :: (list_args args)
+
+let complete_func autocomplete cctxt =
+  match autocomplete with
+  | None -> return []
+  | Some autocomplete -> autocomplete cctxt
+
+let list_command_args (Command { options=Argument { spec } }) =
+  list_args spec
+
+module StringSet = Set.Make(String)
+
+let get_arg_parameter (type a) (arg : (a, _) arg) =
+  match arg with
+  | Arg { parameter } -> parameter
+  | DefArg { parameter } -> parameter
+  | Switch { parameter } -> parameter
+
+let complete_arg : type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t =
+  fun ctx -> function
+    | Arg { kind={ autocomplete } } -> complete_func autocomplete ctx
+    | DefArg { kind={ autocomplete } } -> complete_func autocomplete ctx
+    | Switch _ -> return []
+
+let rec remaining_spec :
+  type a ctx. StringSet.t -> (a, ctx) args -> string list =
+  fun seen -> function
+    | NoArgs -> []
+    | AddArg (arg, rest) ->
+        let parameter = get_arg_parameter arg in
+        if StringSet.mem parameter seen
+        then (remaining_spec seen rest)
+        else parameter :: (remaining_spec seen rest)
+
+let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
+  let arities = make_arities_dict StringMap.empty args_spec in
+  let rec complete_spec : type a. string -> (a, ctx) args -> string list tzresult Lwt.t =
+    fun name -> function
+      | NoArgs -> return []
+      | AddArg (arg, rest) ->
+          if (get_arg_parameter arg) = name
+          then complete_arg ctx arg
+          else complete_spec name rest in
+  let rec help args ind seen =
+    match args with
+    | _ when ind = 0 ->
+        continuation args 0 >>|? fun cont_args ->
+        cont_args @ remaining_spec seen args_spec
+    | [] ->
+        Pervasives.failwith
+          "cli_entries internal autocomplete error"
+    | arg :: tl ->
+        if StringMap.mem arg arities
+        then
+          let seen = StringSet.add arg seen in
+          begin
+            match StringMap.find arg arities, tl with
+            | 0, args when ind = 0 ->
+                continuation args 0 >>|? fun cont_args ->
+                remaining_spec seen args_spec @ cont_args
+            | 0, args -> help args (ind - 1) seen
+            | 1, _ when ind = 1 -> complete_spec arg args_spec
+            | 1, _ :: tl -> help tl (ind - 2) seen
+            | _ -> Pervasives.failwith "cli_entries internal error, invalid arity"
+          end
+        else continuation args ind
+  in help args ind StringSet.empty
+
+let complete_next_tree cctxt = function
+  | TPrefix { stop; prefix } ->
+      return
+        ((match stop with
+            | None -> []
+            | Some command -> list_command_args command)
+         @ (List.map fst prefix))
+  | TSeq (command, autocomplete) ->
+      complete_func autocomplete cctxt >>|? fun completions ->
+      completions @ (list_command_args command)
+  | TParam { autocomplete } ->
+      complete_func autocomplete cctxt
+  | TStop command -> return (list_command_args command)
+  | TEmpty -> return []
+
+let complete_tree cctxt tree index args =
+  let rec help tree args ind =
+    if ind = 0
+    then complete_next_tree cctxt tree
+    else
+      match tree, args with
+      | TSeq _, _ -> complete_next_tree cctxt tree
+      | TPrefix { prefix }, hd :: tl ->
+          begin
+            try help (List.assoc hd prefix) tl (ind - 1)
+            with Not_found -> return []
+          end
+      | TParam { tree }, _ :: tl ->
+          help tree tl (ind - 1)
+      | TStop Command { options=Argument { spec } }, args ->
+          complete_options (fun _ _ -> return []) args spec ind cctxt
+      | (TParam _ | TPrefix _), []
+      | TEmpty, _ -> return []
+  in help tree args index
+
+
+let autocomplete ~script ~cur_arg ~prev_arg ~args ~tree ~global_options cctxt =
+  (* Interp: (ind 0) is the index of the cursor *)
+  let rec ind n = function
+    | [] -> None
+    | hd :: tl ->
+        if hd = prev_arg
+        then Some (Utils.unopt ~default:(n + 1) (ind (n + 1) tl))
+        else (ind (n + 1) tl) in
+  begin
+    if prev_arg = script
+    then complete_next_tree cctxt tree >>|? fun command_completions ->
+      begin
+        match global_options with
+        | None -> command_completions
+        | Some (Argument { spec }) ->
+            remaining_spec StringSet.empty spec
+            @ command_completions
+      end
+    else
+      match ind 0 args with
+      | None -> return []
+      | Some index ->
+          begin
+            match global_options with
+            | None -> complete_tree cctxt tree index args
+            | Some (Argument { spec }) ->
+                complete_options (fun args ind -> complete_tree cctxt tree ind args)
+                  args spec index cctxt
+          end
+  end >>|? fun completions ->
+  List.filter
+    (fun completion -> Str.string_match (Str.regexp_string cur_arg) completion 0)
+    completions
+
+(* Try a list of commands on a list of arguments *)
+let dispatch ?global_options commands ctx args =
+  let commands = help_commands commands @ commands in
+  let tree = make_dispatch_tree commands in
+  match args with
+  | [] | [ "-help" | "--help" ] -> fail Bare_help
+  | "bash_autocomplete" :: prev_arg :: cur_arg :: script :: remaining_args ->
+      autocomplete ~script ~cur_arg ~prev_arg ~args:remaining_args ~global_options ~tree ctx
+      >>= fun completions ->
+      fail (Autocomplete_command
+              (match completions with
+               | Ok completions -> completions
+               | Error _ -> []))
+  | _ ->
+      find_command tree args >>=? fun (command, args_dict, filtered_args) ->
+      exec command ctx filtered_args args_dict
+
 let handle_cli_errors ~stdout ~stderr ~global_options = function
   | Ok _ ->
       return 0
@@ -789,25 +972,19 @@ let handle_cli_errors ~stdout ~stderr ~global_options = function
             Format.fprintf stdout "%a@."
               (usage ~global_options ~details:true ?highlights:None) [] ;
             return 0
+        | Autocomplete_command (completions) ->
+            Format.pp_print_list
+              ~pp_sep:Format.pp_print_newline
+              Format.pp_print_string
+              Format.std_formatter
+              completions;
+            return 0
         | Help_flag commands ->
             Format.fprintf stdout "%a@." command_usage commands ;
             return 0
         | e -> fail e
       end
   | (Error _) as errors -> Lwt.return errors
-
-(* Try a list of commands on a list of arguments *)
-let dispatch commands ctx args =
-  let commands = help_commands commands @ commands in
-  match args with
-  | [] | [ "-help" | "--help" ] -> fail Bare_help
-  | _ ->
-      let tree = make_dispatch_tree commands in
-      find_command tree args >>=? fun (command, args_dict, filtered_args) ->
-      exec command ctx filtered_args args_dict
-
-let usage ppf ?global_options commands =
-  usage ppf ?highlights:None ~details:true ?global_options commands
 
 let () =
   register_error_kind

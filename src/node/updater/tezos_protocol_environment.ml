@@ -59,7 +59,7 @@ module Ed25519 = struct
     let of_bytes s = Sodium.Sign.Bytes.to_public_key s
 
     let param ?(name="ed25519-public") ?(desc="Ed25519 public key (b58check-encoded)") t =
-      Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check str)) t
+      Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
 
     let () =
       Base58.check_encoded_prefix b58check_encoding "edpk" 54
@@ -121,7 +121,7 @@ module Ed25519 = struct
     let of_bytes s = Sodium.Sign.Bytes.to_secret_key s
 
     let param ?(name="ed25519-secret") ?(desc="Ed25519 secret key (b58check-encoded)") t =
-      Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check str)) t
+      Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
 
     let () =
       Base58.check_encoded_prefix b58check_encoding "edsk" 98
@@ -180,7 +180,7 @@ module Ed25519 = struct
     let of_bytes s = MBytes.of_string (Bytes.to_string s)
 
     let param ?(name="signature") ?(desc="Signature (b58check-encoded)") t =
-      Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check str)) t
+      Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
 
     let () =
       Base58.check_encoded_prefix b58check_encoding "edsig" 99

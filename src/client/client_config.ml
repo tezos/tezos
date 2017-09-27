@@ -107,18 +107,28 @@ let default_cli_args = {
 
 open Cli_entries
 
+let string_parameter : (string, Client_commands.context) parameter =
+  parameter (fun _ x -> return x)
+
+let block_parameter =
+  parameter
+    (fun _ block -> match Node_rpc_services.Blocks.parse_block block with
+       | Error _ ->
+           fail (Invalid_block_argument block)
+       | Ok block -> return block)
+
 (* Command-line only args (not in config file) *)
 let base_dir_arg =
   default_arg
     ~parameter:"-base-dir"
     ~doc:"The directory where the Tezos client will store all its data."
     ~default:Client_commands.default_base_dir
-    (fun _ x -> return x)
+    string_parameter
 let config_file_arg =
   arg
     ~parameter:"-config-file"
     ~doc:"The main configuration file."
-    (fun _ x -> return x)
+    string_parameter
 let timings_switch =
   switch
     ~parameter:"-timings"
@@ -132,10 +142,7 @@ let block_arg =
     ~parameter:"-block"
     ~doc:"The block on which to apply contextual commands."
     ~default:(Node_rpc_services.Blocks.to_string default_cli_args.block)
-    (fun _ block -> match Node_rpc_services.Blocks.parse_block block with
-       | Error _ ->
-           fail (Invalid_block_argument block)
-       | Ok block -> return block)
+    block_parameter
 let log_requests_switch =
   switch
     ~parameter:"-log-requests"
@@ -147,16 +154,17 @@ let addr_arg =
     ~parameter:"-addr"
     ~doc:"The IP address of the node."
     ~default:Cfg_file.default.node_addr
-    (fun _ x -> return x)
+    string_parameter
 let port_arg =
   default_arg
     ~parameter:"-port"
     ~doc:"The RPC port of the node."
     ~default:(string_of_int Cfg_file.default.node_port)
-    (fun _ x -> try
+    (parameter
+       (fun _ x -> try
         return (int_of_string x)
       with Failure _ ->
-        fail (Invalid_port_arg x))
+        fail (Invalid_port_arg x)))
 let tls_switch =
   switch
     ~parameter:"-tls"
@@ -173,7 +181,7 @@ let global_options =
     port_arg
     tls_switch
 
-let parse_config_args (ctx : Client_commands.cfg) argv =
+let parse_config_args (ctx : Client_commands.context) argv =
   parse_initial_options
     global_options
     ctx

@@ -701,6 +701,9 @@ let group =
   { Cli_entries.name = "programs" ;
     title = "Commands for managing the record of known programs" }
 
+let data_parameter =
+  Cli_entries.parameter (fun _ -> parse_data)
+
 let commands () =
   let open Cli_entries in
   let show_types_switch =
@@ -761,10 +764,10 @@ let commands () =
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
        @@ Cli_entries.param ~name:"storage" ~desc:"the storage data"
-         (fun _cctxt data -> parse_data data)
+         data_parameter
        @@ prefixes [ "and" ; "input" ]
        @@ Cli_entries.param ~name:"storage" ~desc:"the input data"
-         (fun _cctxt data -> parse_data data)
+         data_parameter
        @@ stop)
       (fun (trace_stack, amount) program storage input cctxt ->
          let open Data_encoding in
@@ -875,10 +878,10 @@ let commands () =
       no_options
       (prefixes [ "typecheck" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck"
-         (fun _cctxt data -> parse_data data)
+         data_parameter
        @@ prefixes [ "against" ; "type" ]
        @@ Cli_entries.param ~name:"type" ~desc:"the expected type"
-         (fun _cctxt data -> parse_data data)
+         data_parameter
        @@ stop)
       (fun () data exp_ty cctxt ->
          let open Data_encoding in
@@ -897,7 +900,7 @@ let commands () =
       no_options
       (prefixes [ "hash" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
-         (fun _cctxt data -> parse_data data)
+         data_parameter
        @@ stop)
       (fun () data cctxt ->
          let open Data_encoding in
@@ -918,7 +921,7 @@ let commands () =
       no_options
       (prefixes [ "hash" ; "and" ; "sign" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
-         (fun _cctxt data -> parse_data data)
+         data_parameter
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.alias_param
        @@ stop)

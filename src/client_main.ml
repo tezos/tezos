@@ -40,8 +40,11 @@ let main () =
   Random.self_init () ;
   Sodium.Random.stir () ;
   Lwt.catch begin fun () ->
+    let original_args = List.tl (Array.to_list Sys.argv) in
     begin
-      Client_config.parse_config_args Client_commands.default_cfg (List.tl (Array.to_list Sys.argv))
+      Client_config.parse_config_args
+        (cctxt Client_commands.default_cfg Client_rpcs.default_config)
+        original_args
       >>=? fun (parsed_config_file, parsed_args, remaining) ->
       let rpc_config : Client_rpcs.config = {
         Client_rpcs.default_config with
@@ -82,6 +85,7 @@ let main () =
       in
       let client_config = (cctxt config rpc_config) in
       (Cli_entries.dispatch
+         ~global_options:Client_config.global_options
          commands
          client_config
          remaining) end >>=

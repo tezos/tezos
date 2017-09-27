@@ -20,6 +20,7 @@ let commands () =
       return dn
     else
       failwith "%s is not a directory" dn in
+  let check_dir_parameter = parameter check_dir in
   [
 
     command ~group ~desc: "list known protocols"
@@ -34,7 +35,7 @@ let commands () =
     command ~group ~desc: "inject a new protocol to the shell database"
       no_options
       (prefixes [ "inject" ; "protocol" ]
-       @@ param ~name:"dir" ~desc:"directory containing a protocol" check_dir
+       @@ param ~name:"dir" ~desc:"directory containing a protocol" check_dir_parameter
        @@ stop)
       (fun () dirname cctxt ->
          Lwt.catch

@@ -73,5 +73,7 @@ module type Alias = sig
     ?desc:string ->
     ('a, Client_commands.context, 'ret) Cli_entries.params ->
     (t -> 'a, Client_commands.context, 'ret) Cli_entries.params
+  val autocomplete:
+    Client_commands.context -> string list tzresult Lwt.t
 end
 module Alias (Entity : Entity) : Alias with type t = Entity.t

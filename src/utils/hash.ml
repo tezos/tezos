@@ -313,7 +313,9 @@ module Make_Blake2B (R : sig
          conv to_b58check (Data_encoding.Json.wrap_error of_b58check_exn) string)
 
   let param ?(name=K.name) ?(desc=K.title) t =
-    Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check str)) t
+    Cli_entries.param
+      ~name
+      ~desc (Cli_entries.parameter (fun _ str -> Lwt.return (of_b58check str))) t
 
   let pp ppf t =
     Format.pp_print_string ppf (to_b58check t)
@@ -619,7 +621,7 @@ module Net_id = struct
          conv to_b58check (Data_encoding.Json.wrap_error of_b58check_exn) string)
 
   let param ?(name=name) ?(desc=title) t =
-    Cli_entries.param ~name ~desc (fun _ str -> Lwt.return (of_b58check str)) t
+    Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
 
   let pp ppf t =
     Format.pp_print_string ppf (to_b58check t)

@@ -77,6 +77,8 @@ module type Alias = sig
     ?desc:string ->
     ('a, Client_commands.context, 'ret) Cli_entries.params ->
     (t -> 'a, Client_commands.context, 'ret) Cli_entries.params
+  val autocomplete:
+    Client_commands.context -> string list tzresult Lwt.t
 end
 
 module Alias = functor (Entity : Entity) -> struct
@@ -108,6 +110,11 @@ module Alias = functor (Entity : Entity) -> struct
           failwith "didn't understand the %s alias file" Entity.name
       | list ->
           return list
+
+  let autocomplete cctxt =
+    load cctxt >>= function
+    | Error _ -> return []
+    | Ok list -> return (List.map fst list)
 
   let find_opt cctxt name =
     load cctxt >>=? fun list ->
@@ -207,24 +214,24 @@ module Alias = functor (Entity : Entity) -> struct
   let alias_param
       ?(name = "name") ?(desc = "existing " ^ Entity.name ^ " alias") next =
     param ~name ~desc
-      (fun cctxt s ->
-         find cctxt s >>=? fun v ->
-         return (s, v))
+      (parameter (fun cctxt s ->
+           find cctxt s >>=? fun v ->
+           return (s, v)))
       next
 
   let fresh_alias_param
       ?(name = "new") ?(desc = "new " ^ Entity.name ^ " alias") next =
     param ~name ~desc
-      (fun cctxt s ->
-         begin
-           load cctxt >>=? fun list ->
+      (parameter (fun cctxt s ->
            begin
-             if cctxt.config.force then
-               return ()
-             else
-               iter_s
-                 (fun (n, _v) ->
-                    if n = s then
+             load cctxt >>=? fun list ->
+             begin
+               if cctxt.config.force then
+                 return ()
+               else
+                 iter_s
+                   (fun (n, _v) ->
+                      if n = s then
                       Entity.to_source cctxt _v >>=? fun value ->
                       failwith
                         "@[<v 2>The %s alias %s already exists.@,\
@@ -232,12 +239,12 @@ module Alias = functor (Entity : Entity) -> struct
                          Use -force true to update@]"
                         Entity.name n
                         value
-                    else
-                      return ())
-                 list
-           end
-         end >>=? fun () ->
-         return s)
+                      else
+                        return ())
+                   list
+             end
+           end >>=? fun () ->
+           return s))
       next
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
@@ -246,39 +253,39 @@ module Alias = functor (Entity : Entity) -> struct
       ^ "can be an alias, file or literal (autodetected in this order)\n\
          use 'file:path', 'text:literal' or 'alias:name' to force" in
     param ~name ~desc
-      (fun cctxt s ->
-         let read path =
-           Lwt.catch
-             (fun () ->
-                Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
-                return content)
-             (fun exn ->
-                failwith
-                  "cannot read file (%s)" (Printexc.to_string exn))
-           >>=? fun content ->
-           of_source cctxt content in
-         begin
-           match Utils.split ~limit:1 ':' s with
-           | [ "alias" ; alias ]->
-               find cctxt alias
-           | [ "text" ; text ] ->
-               of_source cctxt text
-           | [ "file" ; path ] ->
-               read path
-           | _ ->
-               find cctxt s >>= function
-               | Ok v -> return v
-               | Error a_errs ->
-                   read s >>= function
-                   | Ok v -> return v
-                   | Error r_errs ->
-                       of_source cctxt s >>= function
-                       | Ok v -> return v
-                       | Error s_errs ->
-                           let all_errs =
-                             List.flatten [ a_errs ; r_errs ; s_errs ] in
-                           Lwt.return (Error all_errs)
-         end)
+      (parameter (fun cctxt s ->
+           let read path =
+             Lwt.catch
+               (fun () ->
+                  Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
+                  return content)
+               (fun exn ->
+                  failwith
+                    "cannot read file (%s)" (Printexc.to_string exn))
+             >>=? fun content ->
+             of_source cctxt content in
+           begin
+             match Utils.split ~limit:1 ':' s with
+             | [ "alias" ; alias ]->
+                 find cctxt alias
+             | [ "text" ; text ] ->
+                 of_source cctxt text
+             | [ "file" ; path ] ->
+                 read path
+             | _ ->
+                 find cctxt s >>= function
+                 | Ok v -> return v
+                 | Error a_errs ->
+                     read s >>= function
+                     | Ok v -> return v
+                     | Error r_errs ->
+                         of_source cctxt s >>= function
+                         | Ok v -> return v
+                         | Error s_errs ->
+                             let all_errs =
+                               List.flatten [ a_errs ; r_errs ; s_errs ] in
+                             Lwt.return (Error all_errs)
+           end))
       next
 
    let name cctxt d =

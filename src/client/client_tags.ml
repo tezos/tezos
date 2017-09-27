@@ -64,9 +64,10 @@ module Tags (Entity : Entity) = struct
     let desc =
       desc ^ "\n"
       ^ "can be one or multiple tags separated by commas" in
-    Cli_entries.param ~name ~desc
-      (fun cctxt s -> of_source cctxt s)
-      next
+    Cli_entries.(
+      param ~name ~desc
+        (parameter (fun cctxt s -> of_source cctxt s))
+        next)
 
   let rev_find_by_tag cctxt tag =
     load cctxt >>=? fun tags ->
