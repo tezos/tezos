@@ -390,12 +390,9 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
                    (list 
                     "typecheck"
                     "program"
-                    (let ((file-name
-                           (make-temp-file (buffer-name))))
-                      (write-region (point-min) (point-max) file-name nil 'no-message)
-                      (if michelson-alphanet
-                          (concat "container:" file-name)
-                        file-name))
+                    (if michelson-alphanet
+                        (concat "container:" tmp-file)
+                      tmp-file)
                     "-details"
                     "-emacs"))))
           (michelson-async-command-to-string
@@ -406,7 +403,8 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
                      ((record (car (read-from-string output)))
                       (errors (cdr (assoc 'errors record)))
                       (types  (cdr (assoc 'types record))))
-                   (setq michelson-cached-buffer-info (make-cache :types types :errors errors)))
+                   (setq michelson-cached-buffer-info (make-cache :types types :errors errors))
+                   (delete-file tmp-file))
                ((error err)
                 (let ((inhibit-message t))
                   (message output)))))))))
