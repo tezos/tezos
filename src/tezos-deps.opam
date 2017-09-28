@@ -23,7 +23,7 @@ depends: [
   "git"
   "git-unix"
   "irmin" {>= "1.3" }
-  "irmin-unix"
+  "irmin-unix" {>= "1.3" }
   "lwt" {>= "3.0.0" }
   "lwt_ssl"
   "menhir"
