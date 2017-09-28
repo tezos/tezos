@@ -40,5 +40,6 @@ start_sandboxed_node() {
 
 cleanup_nodes() {
     [ -z "${node_pids[0]}" ] || kill "${node_pids[@]}"
+    for pid in "${node_pids[@]}" ; do wait "$pid" ; done
     rm -rf "${node_dirs[@]}"
 }
