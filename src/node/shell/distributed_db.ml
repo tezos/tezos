@@ -301,9 +301,7 @@ module Raw_protocol =
 
 type callback = {
   notify_branch: P2p.Peer_id.t -> Block_hash.t list -> unit ;
-  current_branch: int -> Block_hash.t list Lwt.t ;
   notify_head: P2p.Peer_id.t -> Block_hash.t -> Operation_hash.t list -> unit ;
-  current_head: int -> (Block_hash.t * Operation_hash.t list) Lwt.t ;
   disconnection: P2p.Peer_id.t -> unit ;
 }
 
@@ -324,7 +322,7 @@ and net_db = {
   block_header_db: Raw_block_header.t ;
   operation_hashes_db: Raw_operation_hashes.t ;
   operations_db: Raw_operations.t ;
-  callback: callback ;
+  mutable callback: callback ;
   active_peers: P2p.Peer_id.Set.t ref ;
   active_connections: p2p_reader P2p.Peer_id.Table.t ;
 }
@@ -336,6 +334,12 @@ and p2p_reader = {
   canceler: Lwt_utils.Canceler.t ;
   mutable worker: unit Lwt.t ;
 }
+
+let noop_callback = {
+    notify_branch = begin fun _gid _locator -> () end ;
+    notify_head =  begin fun _gid _block _ops -> () end ;
+    disconnection = begin fun _gid -> () end ;
+  }
 
 type t = db
 
@@ -399,7 +403,8 @@ module P2p_reader = struct
           ignore
           @@ P2p.try_send global_db.p2p state.conn
           @@ Get_current_branch net_id ;
-        net_db.callback.current_branch 200 >>= fun locator ->
+        Chain.head net_db.net_state >>= fun head ->
+        Chain_traversal.block_locator head 200 >>= fun locator ->
         ignore
         @@ P2p.try_send global_db.p2p state.conn
         @@ Current_branch (net_id, locator) ;
@@ -423,10 +428,12 @@ module P2p_reader = struct
 
     | Get_current_head net_id ->
         may_handle state net_id @@ fun net_db ->
-        net_db.callback.current_head 200 >>= fun (head, mempool) ->
+        Chain.head net_db.net_state >>= fun head ->
+        Chain.mempool net_db.net_state >>= fun mempool ->
         ignore
         @@ P2p.try_send global_db.p2p state.conn
-        @@ Current_head (net_id, head, mempool) ;
+        @@ Current_head (net_id, State.Block.hash head,
+                         Utils.list_sub mempool 200) ;
         Lwt.return_unit
 
     | Current_head (net_id, head, mempool) ->
@@ -640,7 +647,7 @@ let create disk p2p =
   P2p.iter_connections p2p (P2p_reader.run db) ;
   db
 
-let activate ~callback ({ p2p ; active_nets } as global_db) net_state =
+let activate ({ p2p ; active_nets } as global_db) net_state =
   let net_id = State.Net.id net_state in
   match Net_id.Table.find active_nets net_id with
   | exception Not_found ->
@@ -663,7 +670,7 @@ let activate ~callback ({ p2p ; active_nets } as global_db) net_state =
       let net = {
         global_db ; operation_db ; block_header_db ;
         operation_hashes_db ; operations_db ;
-        net_state ; callback ; active_peers ;
+        net_state ; callback = noop_callback ; active_peers ;
         active_connections = P2p.Peer_id.Table.create 53 ;
       } in
       P2p.iter_connections p2p (fun _peer_id conn ->
@@ -674,6 +681,9 @@ let activate ~callback ({ p2p ; active_nets } as global_db) net_state =
       net
   | net ->
       net
+
+let set_callback net_db callback =
+  net_db.callback <- callback
 
 let deactivate net_db =
   let { active_nets ; p2p } = net_db.global_db in

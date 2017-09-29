@@ -71,6 +71,7 @@ and chain_state = {
 
 and chain_data = {
   current_head: block ;
+  current_reversed_mempool: Operation_hash.t list ;
 }
 
 and block = {
@@ -155,7 +156,8 @@ module Net = struct
           net_state ;
           hash = current_head ;
           contents = current_block ;
-        }
+        } ;
+        current_reversed_mempool = [] ;
       } ;
       chain_store ;
     }

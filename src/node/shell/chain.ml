@@ -82,7 +82,9 @@ let locked_set_head chain_store data block =
 let set_head net_state block =
   update_chain_store net_state begin fun chain_store data ->
     locked_set_head chain_store data block >>= fun () ->
-    Lwt.return (Some { current_head = block }, ())
+    Lwt.return (Some { current_head = block  ;
+                       current_reversed_mempool = [] },
+                ())
   end
 
 let test_and_set_head net_state ~old block =
@@ -91,5 +93,18 @@ let test_and_set_head net_state ~old block =
       Lwt.return (None, false)
     else
       locked_set_head chain_store data block >>= fun () ->
-      Lwt.return (Some { current_head = block }, true)
+      Lwt.return (Some { current_head = block ;
+                         current_reversed_mempool = [] },
+                  true)
+  end
+
+let set_reversed_mempool net_state current_reversed_mempool =
+  update_chain_store net_state begin fun _chain_store data ->
+    Lwt.return (Some { data with current_reversed_mempool },
+                ())
+  end
+
+let mempool net_state =
+  read_chain_store net_state begin fun _chain_store data ->
+    Lwt.return (List.rev data.current_reversed_mempool)
   end
