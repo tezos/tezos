@@ -24,13 +24,12 @@ val state: net_db -> State.Net.t
 
 type callback = {
   notify_branch: P2p.Peer_id.t -> Block_hash.t list -> unit ;
-  current_branch: int -> Block_hash.t list Lwt.t ;
   notify_head: P2p.Peer_id.t -> Block_hash.t -> Operation_hash.t list -> unit ;
-  current_head: int -> (Block_hash.t * Operation_hash.t list) Lwt.t ;
   disconnection: P2p.Peer_id.t -> unit ;
 }
 
-val activate: callback:callback -> t -> State.Net.t -> net_db
+val activate: t -> State.Net.t -> net_db
+val set_callback: net_db -> callback -> unit
 val deactivate: net_db -> unit Lwt.t
 
 val broadcast_head:

@@ -607,37 +607,23 @@ end
 
 let rec create_validator ?parent worker ?max_child_ttl state db net =
 
-  let queue = Lwt_pipe.create () in
-  let current_ops = ref (fun () -> []) in
+  let net_id = State.Net.id net in
+  let net_db = Distributed_db.activate db net in
+  let session = Context_db.create net_db in
 
-  let callback : Distributed_db.callback = {
+  let queue = Lwt_pipe.create () in
+  Prevalidator.create net_db >>= fun prevalidator ->
+  let new_blocks = ref Lwt.return_unit in
+
+  Distributed_db.set_callback net_db {
     notify_branch = begin fun gid locator ->
       Lwt.async (fun () -> Lwt_pipe.push queue (`Branch (gid, locator)))
-    end ;
-    current_branch = begin fun size ->
-      Chain.head net >>= fun head ->
-      Chain_traversal.block_locator head size
     end ;
     notify_head =  begin fun gid block ops ->
       Lwt.async (fun () -> Lwt_pipe.push queue (`Head (gid, block, ops))) ;
     end ;
-    current_head = begin fun size ->
-      Chain.head net >>= fun head ->
-      Lwt.return (State.Block.hash head, Utils.list_sub (!current_ops ()) size)
-    end ;
     disconnection = (fun _gid -> ()) ;
-  } in
-
-  let net_id = State.Net.id net in
-  let net_db = Distributed_db.activate ~callback db net in
-  let session = Context_db.create net_db in
-
-  Prevalidator.create net_db >>= fun prevalidator ->
-  current_ops :=
-    (fun () ->
-       let res, _ = Prevalidator.operations prevalidator in
-       res.applied);
-  let new_blocks = ref Lwt.return_unit in
+  } ;
 
   let shutdown () =
     lwt_log_notice "shutdown %a" Net_id.pp net_id >>= fun () ->

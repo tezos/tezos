@@ -153,6 +153,7 @@ val fork_testnet:
 
 type chain_data = {
   current_head: Block.t ;
+  current_reversed_mempool: Operation_hash.t list ;
 }
 
 val read_chain_store:

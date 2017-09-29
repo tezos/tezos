@@ -146,6 +146,7 @@ let create net_db =
               (filter_out r.applied !operations.branch_delayed)
               r.branch_delayed ;
         } ;
+        Chain.set_reversed_mempool net_state !operations.applied >>= fun () ->
         if broadcast then broadcast_operation r.applied ;
         Lwt_list.iter_s
           (fun (_op, _exns) ->
@@ -200,6 +201,8 @@ let create net_db =
                              applied = h :: !operations.applied };
                          return () )
                       res.applied >>=? fun () ->
+                    Chain.set_reversed_mempool
+                      net_state !operations.applied >>= fun () ->
                     broadcast_operation res.applied ;
                     begin
                       if force then

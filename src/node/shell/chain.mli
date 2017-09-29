@@ -19,10 +19,16 @@ val head: Net.t -> Block.t Lwt.t
 
 val known_heads: Net.t -> Block.t list Lwt.t
 
+val mem: Net.t -> Block_hash.t -> bool Lwt.t
+(** Test whether a block belongs to the current mainnet. *)
+
 val set_head: Net.t -> Block.t -> unit Lwt.t
 (** Record a block as the current head of the network's blockchain. *)
 
-val mem: Net.t -> Block_hash.t -> bool Lwt.t
+val set_reversed_mempool: Net.t -> Operation_hash.t list -> unit Lwt.t
+(** Record a list as the current list of pending operations. *)
+
+val mempool: Net.t -> Operation_hash.t list Lwt.t
 
 val test_and_set_head:
   Net.t -> old:Block.t -> Block.t -> bool Lwt.t
