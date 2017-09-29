@@ -16,6 +16,20 @@ type value = MBytes.t
 
 type error += Unknown of string list
 
+let () =
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"raw_store.unknown"
+    ~title:"Missing key in store"
+    ~description:"Missing key in store"
+    ~pp:(fun ppf keys ->
+        Format.fprintf ppf
+          "Missing key in store: %s"
+          (String.concat "/" keys))
+    Data_encoding.(obj1 (req "key" (list string)))
+    (function Unknown keys -> Some keys | _ -> None)
+    (fun keys -> Unknown keys)
+
 let concat = String.concat "/"
 let split = String.split_on_char '/'
 
