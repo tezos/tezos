@@ -151,14 +151,23 @@ end = struct
     match Memory_table.find s.memory k with
     | exception Not_found -> begin
         Disk_table.read_opt s.disk k >>= function
-        | None ->
-          let waiter, wakener = Lwt.wait () in
-          Memory_table.add s.memory k (Pending (wakener, param)) ;
-          Scheduler.request s.scheduler peer k ;
-          waiter
         | Some v -> Lwt.return v
+        | None ->
+            match Memory_table.find s.memory k with
+            | exception Not_found -> begin
+                let waiter, wakener = Lwt.wait () in
+                Memory_table.add s.memory k (Pending (wakener, param)) ;
+                Scheduler.request s.scheduler peer k ;
+                waiter
+              end
+            | Pending (w, _) ->
+                Scheduler.request s.scheduler peer k ;
+                Lwt.waiter_of_wakener w
+            | Found v -> Lwt.return v
       end
-    | Pending (w, _) -> Lwt.waiter_of_wakener w
+    | Pending (w, _) ->
+        Scheduler.request s.scheduler peer k ;
+        Lwt.waiter_of_wakener w
     | Found v -> Lwt.return v
 
   let prefetch s ?peer k param = Lwt.ignore_result (fetch s ?peer k param)
