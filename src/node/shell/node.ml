@@ -101,15 +101,15 @@ let may_create_net state genesis =
 
 let create { genesis ; store_root ; context_root ;
              patch_context ; p2p = net_params ;
-             test_network_max_tll = max_ttl } =
+             test_network_max_tll = max_child_ttl } =
   init_p2p net_params >>=? fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context () >>=? fun state ->
   let distributed_db = Distributed_db.create state p2p in
-  let validator =
-    Validator.create ?max_ttl state distributed_db in
+  let validator = Validator.create state distributed_db in
   may_create_net state genesis >>= fun mainnet_net ->
-  Validator.activate validator mainnet_net >>= fun mainnet_validator ->
+  Validator.activate validator
+    ?max_child_ttl mainnet_net >>= fun mainnet_validator ->
   let mainnet_db = Validator.net_db mainnet_validator in
   let shutdown () =
     State.close state >>= fun () ->
