@@ -79,6 +79,7 @@ module Net : sig
       - its optional expiration time
       - the associated global state. *)
 
+  val global_state: net_state -> global_state
 
 end
 
@@ -119,6 +120,7 @@ module Block : sig
   val fitness: t -> Fitness.t
   val operation_list_count: t -> int
   val net_id: t -> Net_id.t
+  val net_state: t -> Net.t
   val level: t -> Int32.t
   val message: t -> string
   val max_operations_ttl: t -> int
@@ -149,8 +151,7 @@ val read_block_exn:
   global_state -> Block_hash.t -> Block.t Lwt.t
 
 val fork_testnet:
-  global_state -> Block.t -> Protocol_hash.t -> Time.t ->
-  Net.t tzresult Lwt.t
+  Block.t -> Protocol_hash.t -> Time.t -> Net.t tzresult Lwt.t
 
 type chain_data = {
   current_head: Block.t ;

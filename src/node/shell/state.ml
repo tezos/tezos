@@ -48,6 +48,7 @@ and global_data = {
 }
 
 and net_state = {
+  global_state: global_state ;
   net_id: Net_id.t ;
   genesis: genesis ;
   expiration: Time.t option ;
@@ -147,7 +148,7 @@ module Net = struct
   let allocate
       ~genesis ~expiration ~allow_forked_network
       ~current_head
-      context_index chain_store block_store =
+      global_state context_index chain_store block_store =
     Store.Block.Contents.read_exn
       (block_store, current_head) >>= fun current_block ->
     let rec chain_state = {
@@ -162,6 +163,7 @@ module Net = struct
       chain_store ;
     }
     and net_state = {
+      global_state ;
       net_id = Net_id.of_block_hash genesis.block ;
       chain_state = { Shared.data = chain_state ; lock = Lwt_mutex.create () } ;
       genesis ;
@@ -174,7 +176,7 @@ module Net = struct
     Lwt.return net_state
 
   let locked_create
-      data ?expiration ?(allow_forked_network = false)
+      global_state data ?expiration ?(allow_forked_network = false)
       net_id genesis commit =
     let net_store = Store.Net.get data.global_store net_id in
     let block_store = Store.Block.get net_store
@@ -202,6 +204,7 @@ module Net = struct
       ~current_head:genesis.block
       ~expiration
       ~allow_forked_network
+      global_state
       data.context_index
       chain_store
       block_store
@@ -218,12 +221,12 @@ module Net = struct
           ~time:genesis.time
           ~protocol:genesis.protocol >>= fun commit ->
         locked_create
-          data ?allow_forked_network net_id genesis commit >>= fun net ->
+          state data ?allow_forked_network net_id genesis commit >>= fun net ->
         Net_id.Table.add data.nets net_id net ;
         Lwt.return net
     end
 
-  let locked_read data id =
+  let locked_read global_state data id =
     let net_store = Store.Net.get data.global_store id in
     let block_store = Store.Block.get net_store
     and chain_store = Store.Chain.get net_store in
@@ -240,22 +243,23 @@ module Net = struct
       ~current_head
       ~expiration
       ~allow_forked_network
+      global_state
       data.context_index
       chain_store
       block_store >>= return
 
-  let locked_read_all data =
+  let locked_read_all global_state data =
     Store.Net.list data.global_store >>= fun ids ->
     iter_p
       (fun id ->
-         locked_read data id >>=? fun net ->
+         locked_read global_state data id >>=? fun net ->
          Net_id.Table.add data.nets id net ;
          return ())
       ids
 
   let read_all state =
     Shared.use state.global_data begin fun data ->
-      locked_read_all data
+      locked_read_all state data
     end
 
   let get state id =
@@ -274,6 +278,7 @@ module Net = struct
   let genesis { genesis } = genesis
   let expiration { expiration } = expiration
   let allow_forked_network { allow_forked_network } = allow_forked_network
+  let global_state { global_state } = global_state
 
   let destroy state net =
     lwt_debug "destroy %a" Net_id.pp (id net) >>= fun () ->
@@ -299,6 +304,7 @@ module Block = struct
 
   let hash { hash } = hash
   let header { contents = { header } } = header
+  let net_state { net_state } = net_state
   let shell_header { contents = { header = { shell } } } = shell
   let net_id b = (shell_header b).net_id
   let timestamp b = (shell_header b).timestamp
@@ -506,8 +512,8 @@ let read_block_exn t hash =
   | None -> Lwt.fail Not_found
   | Some b -> Lwt.return b
 
-let fork_testnet state block protocol expiration =
-  Shared.use state.global_data begin fun data ->
+let fork_testnet block protocol expiration =
+  Shared.use block.net_state.global_state.global_data begin fun data ->
     Block.context block >>= fun context ->
     Context.set_test_network context Not_running >>= fun context ->
     Context.set_protocol context protocol >>= fun context ->
@@ -519,7 +525,7 @@ let fork_testnet state block protocol expiration =
       time = Time.add block.contents.header.shell.timestamp 1L ;
       protocol ;
     } in
-    Net.locked_create data
+    Net.locked_create block.net_state.global_state data
       net_id ~expiration genesis commit >>= fun net ->
     return net
   end

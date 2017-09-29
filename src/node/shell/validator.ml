@@ -702,8 +702,7 @@ let rec create_validator ?parent worker ?max_child_ttl state db net =
         State.Net.get state net_id >>= function
         | Ok net_store -> return net_store
         | Error _ ->
-            State.fork_testnet
-              state block protocol expiration >>=? fun net_store ->
+            State.fork_testnet block protocol expiration >>=? fun net_store ->
             Chain.head net_store >>= fun block ->
             Watcher.notify v.worker.valid_block_input block ;
             return net_store
