@@ -51,10 +51,10 @@ let inject_block validator ?force bytes operations =
 type t = {
   state: State.t ;
   distributed_db: Distributed_db.t ;
-  validator: Validator.worker ;
+  validator: Validator.t ;
   mainnet_db: Distributed_db.net_db ;
   mainnet_net: State.Net.t ;
-  mainnet_validator: Validator.t ;
+  mainnet_validator: Validator.net_validator ;
   inject_block:
     ?force:bool ->
     MBytes.t -> Distributed_db.operation list list ->
@@ -107,7 +107,7 @@ let create { genesis ; store_root ; context_root ;
     ~store_root ~context_root ?patch_context () >>=? fun state ->
   let distributed_db = Distributed_db.create state p2p in
   let validator =
-    Validator.create_worker ?max_ttl state distributed_db in
+    Validator.create ?max_ttl state distributed_db in
   may_create_net state genesis >>= fun mainnet_net ->
   Validator.activate validator mainnet_net >>= fun mainnet_validator ->
   let mainnet_db = Validator.net_db mainnet_validator in
