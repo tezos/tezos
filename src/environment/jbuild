@@ -30,6 +30,7 @@
     v1/compare.mli
     v1/data_encoding.mli
     v1/error_monad.mli
+    v1/micheline.mli
     v1/logging.mli
     v1/time.mli
     v1/base58.mli
