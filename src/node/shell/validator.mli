@@ -7,40 +7,40 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type worker
-
-val create_worker: ?max_ttl:int -> State.t -> Distributed_db.t -> worker
-val shutdown: worker -> unit Lwt.t
-
-val notify_block: worker -> Block_hash.t -> Block_header.t -> unit Lwt.t
-
 type t
+
+val create: ?max_ttl:int -> State.t -> Distributed_db.t -> t
+val shutdown: t -> unit Lwt.t
+
+val notify_block: t -> Block_hash.t -> Block_header.t -> unit Lwt.t
+
+type net_validator
 
 type error +=
    | Non_increasing_timestamp
    | Non_increasing_fitness
 
-val activate: worker -> State.Net.t -> t Lwt.t
-val get: worker -> Net_id.t -> t tzresult Lwt.t
-val get_exn: worker -> Net_id.t -> t Lwt.t
-val deactivate: t -> unit Lwt.t
+val activate: t -> State.Net.t -> net_validator Lwt.t
+val get: t -> Net_id.t -> net_validator tzresult Lwt.t
+val get_exn: t -> Net_id.t -> net_validator Lwt.t
+val deactivate: net_validator -> unit Lwt.t
 
-val net_state: t -> State.Net.t
-val net_db: t -> Distributed_db.net_db
+val net_state: net_validator -> State.Net.t
+val net_db: net_validator -> Distributed_db.net_db
 
 val fetch_block:
-  t -> Block_hash.t -> State.Block.t tzresult Lwt.t
+  net_validator -> Block_hash.t -> State.Block.t tzresult Lwt.t
 
 val inject_block:
-  worker -> ?force:bool ->
+  t -> ?force:bool ->
   MBytes.t -> Distributed_db.operation list list ->
   (Block_hash.t * State.Block.t tzresult Lwt.t) tzresult Lwt.t
 
-val prevalidator: t -> Prevalidator.t
-val test_validator: t -> (t * Distributed_db.net_db) option
+val prevalidator: net_validator -> Prevalidator.t
+val test_validator: net_validator -> (net_validator * Distributed_db.net_db) option
 
-val watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
-val new_head_watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
-val global_watcher: worker -> State.Block.t Lwt_stream.t * Watcher.stopper
+val watcher: net_validator -> State.Block.t Lwt_stream.t * Watcher.stopper
+val new_head_watcher: net_validator -> State.Block.t Lwt_stream.t * Watcher.stopper
+val global_watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
 
-val bootstrapped: t -> unit Lwt.t
+val bootstrapped: net_validator -> unit Lwt.t

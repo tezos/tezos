@@ -9,11 +9,11 @@
 
 open Logging.Node.Validator
 
-type worker = {
-  activate: ?parent:t -> State.Net.t -> t Lwt.t ;
-  get: Net_id.t -> t tzresult Lwt.t ;
-  get_exn: Net_id.t -> t Lwt.t ;
-  deactivate: t -> unit Lwt.t ;
+type t = {
+  activate: ?parent:net_validator -> State.Net.t -> net_validator Lwt.t ;
+  get: Net_id.t -> net_validator tzresult Lwt.t ;
+  get_exn: Net_id.t -> net_validator Lwt.t ;
+  deactivate: net_validator -> unit Lwt.t ;
   inject_block:
     ?force:bool ->
     MBytes.t -> Distributed_db.operation list list ->
@@ -24,11 +24,11 @@ type worker = {
   db: Distributed_db.t ;
 }
 
-and t = {
+and net_validator = {
   net: State.Net.t ;
-  worker: worker ;
-  parent: t option ;
-  mutable child: t option ;
+  worker: t ;
+  parent: net_validator option ;
+  mutable child: net_validator option ;
   prevalidator: Prevalidator.t ;
   net_db: Distributed_db.net_db ;
   notify_block: Block_hash.t -> Block_header.t -> unit Lwt.t ;
@@ -38,7 +38,7 @@ and t = {
   check_child:
     Block_hash.t -> Protocol_hash.t -> Time.t -> Time.t -> unit tzresult Lwt.t ;
   deactivate_child: unit -> unit Lwt.t ;
-  test_validator: unit -> (t * Distributed_db.net_db) option ;
+  test_validator: unit -> (net_validator * Distributed_db.net_db) option ;
   shutdown: unit -> unit Lwt.t ;
   valid_block_input_for_net: State.Block.t Watcher.input ;
   new_head_input: State.Block.t Watcher.input ;
@@ -49,7 +49,7 @@ let net_state { net } = net
 let net_db { net_db } = net_db
 
 let activate w net = w.activate net
-let deactivate t = t.worker.deactivate t
+let deactivate net_validator = net_validator.worker.deactivate net_validator
 let get w = w.get
 let get_exn w = w.get_exn
 let notify_block w = w.notify_block
@@ -366,7 +366,7 @@ module Context_db = struct
     type value = State.Block.t
 
     type data =
-      { validator: t ;
+      { validator: net_validator ;
         state: [ `Inited of Block_header.t tzresult
                | `Initing of Block_header.t tzresult Lwt.t
                | `Running of State.Block.t tzresult Lwt.t ] ;
@@ -470,7 +470,7 @@ module Context_db = struct
           Lwt.wakeup wakener err ;
           Lwt.return_unit
 
-  let process (v:t) ~get_context ~set_context hash block =
+  let process (v: net_validator) ~get_context ~set_context hash block =
     let net_state = Distributed_db.state v.net_db in
     get_context v block.Block_header.shell.predecessor >>= function
     | Error _ as error ->
@@ -671,11 +671,11 @@ let rec create_validator ?max_ttl ?parent worker state db net =
             wait ()
           else
             Lwt.return_unit in
-    let t =
+    let net_validator =
       wait () >>= fun () ->
       Watcher.shutdown stopper ;
       Lwt.return_unit in
-    Lwt.no_cancel t
+    Lwt.no_cancel net_validator
   in
 
   let rec v = {
@@ -787,9 +787,9 @@ let rec create_validator ?max_ttl ?parent worker state db net =
 
 type error += Unknown_network of Net_id.t
 
-let create_worker ?max_ttl state db =
+let create ?max_ttl state db =
 
-  let validators : t Lwt.t Net_id.Table.t =
+  let validators : net_validator Lwt.t Net_id.Table.t =
     Net_id.Table.create 7 in
 
   let valid_block_input = Watcher.create_input () in
@@ -882,7 +882,7 @@ let create_worker ?max_ttl state db =
     cancel () >>= fun () ->
     let validators =
       Net_id.Table.fold
-        (fun _ (v: t Lwt.t) acc -> (v >>= fun v -> v.shutdown ()) :: acc)
+        (fun _ (v: net_validator Lwt.t) acc -> (v >>= fun v -> v.shutdown ()) :: acc)
         validators [] in
     Lwt.join (maintenance_worker :: validators) in
 
@@ -939,5 +939,5 @@ let new_head_watcher { new_head_input } =
 let watcher { valid_block_input_for_net } =
   Watcher.create_stream valid_block_input_for_net
 
-let global_watcher ({ valid_block_input } : worker) =
+let global_watcher ({ valid_block_input } : t) =
   Watcher.create_stream valid_block_input
