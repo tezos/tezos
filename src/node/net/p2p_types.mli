@@ -27,20 +27,8 @@ end
 
 (** Peer_id, i.e. persistent peer identifier *)
 
-module Peer_id : sig
-  type t = Crypto_box.Public_key_hash.t
-  (** Type of a peer_id, a public key hash. *)
-
-  val compare : t -> t -> int
-  val equal : t -> t -> bool
-  val pp : Format.formatter -> t -> unit
-  val pp_short : Format.formatter -> t -> unit
-  val encoding : t Data_encoding.t
-  val of_string_exn : string -> t
-  module Map : Map.S with type key = t
-  module Set : Set.S with type elt = t
-  module Table : Hashtbl.S with type key = t
-end
+module Peer_id : Hash.INTERNAL_HASH
+  with type t = Crypto_box.Public_key_hash.t
 
 type addr = Ipaddr.V6.t
 type port = int
