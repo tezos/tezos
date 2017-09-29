@@ -10,7 +10,7 @@
 type t =
 
   | Get_current_branch of Net_id.t
-  | Current_branch of Net_id.t * Block_hash.t list (* Block locator *)
+  | Current_branch of Net_id.t * Block_locator.t
   | Deactivate of Net_id.t
 
   | Get_current_head of Net_id.t
@@ -51,7 +51,7 @@ let encoding =
     case ~tag:0x11
       (obj2
          (req "net_id" Net_id.encoding)
-         (req "current_branch" (list Block_hash.encoding)))
+         (req "current_branch" Block_locator.encoding))
       (function
         | Current_branch (net_id, bhs) -> Some (net_id, bhs)
         | _ -> None)

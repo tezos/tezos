@@ -320,6 +320,15 @@ module Block = struct
       Store.Block.Invalid_block.known store hash
     end
 
+  let known net_state hash =
+    Shared.use net_state.block_store begin fun store ->
+      Store.Block.Contents.known (store, hash) >>= fun known ->
+      if known then
+        Lwt.return_true
+      else
+        Store.Block.Invalid_block.known store hash
+    end
+
   let read net_state hash =
     Shared.use net_state.block_store begin fun store ->
       Store.Block.Contents.read (store, hash) >>=? fun contents ->

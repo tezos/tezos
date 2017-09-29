@@ -37,25 +37,6 @@ let common_ancestor (b1: Block.t) (b2: Block.t) =
       | Some b1 -> loop b1 b2 in
   loop b1 b2
 
-let block_locator (b: Block.t) sz =
-  let rec loop acc sz step cpt b =
-    if sz = 0 then
-      Lwt.return (List.rev acc)
-    else
-      Block.predecessor b >>= function
-      | None ->
-          Lwt.return (List.rev (Block.hash b :: acc))
-      | Some predecessor ->
-          if cpt = 0 then
-            loop (Block.hash b :: acc) (sz - 1)
-                 (step * 2) (step * 20 - 1) predecessor
-          else if cpt mod step = 0 then
-            loop (Block.hash b :: acc) (sz - 1)
-                 step (cpt - 1) predecessor
-          else
-            loop acc sz step (cpt - 1) predecessor in
-  loop [] sz 1 9 b
-
 let iter_predecessors ?max ?min_fitness ?min_date heads ~f =
   let module Local = struct exception Exit end in
   let compare b1 b2 =

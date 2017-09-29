@@ -34,25 +34,6 @@ let mem net_state hash =
       Store.Chain.In_chain.known (chain_store, hash)
   end
 
-let find_new net_state hist sz =
-  let rec common_ancestor hist =
-    match hist with
-    | [] -> Lwt.return (Net.genesis net_state).block
-    | h :: hist ->
-        mem net_state h >>= function
-        | false -> common_ancestor hist
-        | true -> Lwt.return h in
-  let rec path sz acc h =
-    if sz <= 0 then Lwt.return (List.rev acc)
-    else
-      read_chain_store net_state begin fun chain_store _data ->
-        Store.Chain.In_chain.read_opt (chain_store, h)
-      end >>= function
-      | None -> Lwt.return (List.rev acc)
-      | Some s -> path (sz-1) (s :: acc) s in
-  common_ancestor hist >>= fun ancestor ->
-  path sz [] ancestor
-
 let locked_set_head chain_store data block =
   let rec pop_blocks ancestor block =
     let hash = Block.hash block in

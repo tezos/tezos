@@ -300,7 +300,7 @@ module Raw_protocol =
     end)
 
 type callback = {
-  notify_branch: P2p.Peer_id.t -> Block_hash.t list -> unit ;
+  notify_branch: P2p.Peer_id.t -> Block_locator.t -> unit ;
   notify_head: P2p.Peer_id.t -> Block_hash.t -> Operation_hash.t list -> unit ;
   disconnection: P2p.Peer_id.t -> unit ;
 }
@@ -404,7 +404,7 @@ module P2p_reader = struct
           @@ P2p.try_send global_db.p2p state.conn
           @@ Get_current_branch net_id ;
         Chain.head net_db.net_state >>= fun head ->
-        Chain_traversal.block_locator head 200 >>= fun locator ->
+        Block_locator.compute head 200 >>= fun locator ->
         ignore
         @@ P2p.try_send global_db.p2p state.conn
         @@ Current_branch (net_id, locator) ;
@@ -414,7 +414,7 @@ module P2p_reader = struct
         may_activate global_db state net_id @@ fun net_db ->
         Lwt_list.exists_p
           (State.Block.known_invalid net_db.net_state)
-          locator >>= fun known_invalid ->
+          (locator :> Block_hash.t list) >>= fun known_invalid ->
         if not known_invalid then
           net_db.callback.notify_branch state.gid locator ;
         (* TODO Kickban *)
