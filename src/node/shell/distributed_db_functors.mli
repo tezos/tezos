@@ -101,7 +101,12 @@ module type REQUEST = sig
 end
 
 module Make_request_scheduler
-    (Hash : sig type t end)
+    (Hash : sig
+       type t
+       val name : string
+       val encoding : t Data_encoding.t
+       val pp : Format.formatter -> t -> unit
+     end)
     (Table : MEMORY_TABLE with type key := Hash.t)
     (Request : REQUEST with type key := Hash.t) : sig
 

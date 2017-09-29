@@ -162,7 +162,7 @@ module Raw_operation_hashes = struct
     Make_raw
       (struct
         type t = Block_hash.t * int
-        let name = "raw_operation_hash"
+        let name = "operation_hashes"
         let pp ppf (h, n) = Format.fprintf ppf "%a:%d" Block_hash.pp h n
         let encoding =
           let open Data_encoding in
@@ -231,7 +231,7 @@ module Raw_operations = struct
     Make_raw
       (struct
         type t = Block_hash.t * int
-        let name = "raw_operation"
+        let name = "operations"
         let pp ppf (h, n) = Format.fprintf ppf "%a:%d" Block_hash.pp h n
         let encoding =
           let open Data_encoding in
@@ -390,7 +390,9 @@ module P2p_reader = struct
   let handle_msg global_db state msg =
 
     let open Message in
-    let open Logging.Node.Worker in
+    let module Logging =
+      Logging.Make(struct let name = "node.distributed_db.p2p_reader" end) in
+    let open Logging in
 
     lwt_debug "Read message from %a: %a"
       P2p.Peer_id.pp_short state.gid Message.pp_json msg >>= fun () ->
@@ -575,7 +577,7 @@ module P2p_reader = struct
                 Raw_operations.Table.notify
                   net_db.operations_db.table state.gid
                   (block, ofs) (ops, path) >>= fun () ->
-        Lwt.return_unit
+                Lwt.return_unit
 
   let rec worker_loop global_db state =
     Lwt_utils.protect ~canceler:state.canceler begin fun () ->
