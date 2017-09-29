@@ -299,7 +299,10 @@ end = struct
     let delay = next -. now in
     if delay <= 0. then Lwt.return_unit else Lwt_unix.sleep delay
 
-  let process_event state = function
+  (* TODO should depend on the ressource kind... *)
+  let initial_delay = 0.1
+
+  let process_event state now = function
     | Request (peer, key) -> begin
         try
           let data = Table.find state.pending key in
@@ -307,7 +310,11 @@ end = struct
             match peer with
             | None -> data.peers
             | Some peer -> P2p.Peer_id.Set.add peer data.peers in
-          Table.replace state.pending key { data with peers } ;
+          Table.replace state.pending key {
+            delay = initial_delay ;
+            next_request = min data.next_request (now +. initial_delay) ;
+            peers ;
+          } ;
           Lwt.return_unit
         with Not_found ->
           let peers =
@@ -316,8 +323,8 @@ end = struct
             | Some peer -> P2p.Peer_id.Set.singleton peer in
           Table.add state.pending key {
             peers ;
-            next_request = Unix.gettimeofday () ;
-            delay = 1.0 ;
+            next_request = now ;
+            delay = initial_delay ;
           } ;
           Lwt.return_unit
       end
@@ -337,9 +344,10 @@ end = struct
     if Lwt.state shutdown <> Lwt.Sleep then
       Lwt.return_unit
     else if Lwt.state state.events <> Lwt.Sleep then
+      let now = Unix.gettimeofday () in
       state.events >>= fun events ->
       state.events <- state.wait_events () ;
-      Lwt_list.iter_s (process_event state) events >>= fun () ->
+      Lwt_list.iter_s (process_event state now) events >>= fun () ->
       worker_loop state
     else
       let now = Unix.gettimeofday () in
