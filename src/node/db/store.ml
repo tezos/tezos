@@ -85,7 +85,6 @@ module Block = struct
   type contents = {
     header: Block_header.t ;
     message: string ;
-    operation_list_count: int ;
     max_operations_ttl: int ;
     context: Context.commit ;
   }
@@ -99,17 +98,12 @@ module Block = struct
          let encoding =
            let open Data_encoding in
            conv
-             (fun { header ; message ; operation_list_count ;
-                    max_operations_ttl ; context } ->
-               (message, operation_list_count, max_operations_ttl,
-                context, header))
-             (fun (message, operation_list_count,
-                   max_operations_ttl, context, header) ->
-               { header ; message ; max_operations_ttl ;
-                 operation_list_count ; context })
-             (obj5
+             (fun { header ; message ; max_operations_ttl ; context } ->
+               (message, max_operations_ttl, context, header))
+             (fun (message, max_operations_ttl, context, header) ->
+               { header ; message ; max_operations_ttl ; context })
+             (obj4
                 (req "message" string)
-                (req "operation_list_count" uint8)
                 (req "max_operations_ttl" uint16)
                 (req "context" Context.commit_encoding)
                 (req "header" Block_header.encoding))

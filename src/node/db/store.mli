@@ -88,7 +88,6 @@ module Block : sig
   type contents = {
     header: Block_header.t ;
     message: string ;
-    operation_list_count: int ;
     max_operations_ttl: int ;
     context: Context.commit ;
   }

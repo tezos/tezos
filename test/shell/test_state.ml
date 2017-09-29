@@ -72,6 +72,7 @@ let block _state ?(operations = []) pred_hash pred name : Block_header.t =
         level = Int32.succ pred.shell.level ;
         proto_level = pred.shell.proto_level ;
         predecessor = pred_hash ;
+        validation_passes = 1 ;
         timestamp ; operations_hash ; fitness } ;
     proto = MBytes.of_string name ;
   }
@@ -114,6 +115,7 @@ let block _state ?(operations = []) (pred: State.Block.t) name
               level = Int32.succ pred_header.level ;
               proto_level = pred_header.proto_level ;
               predecessor = State.Block.hash pred ;
+              validation_passes = 1 ;
               timestamp ; operations_hash ; fitness } ;
     proto = MBytes.of_string name ;
   }

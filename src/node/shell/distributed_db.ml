@@ -736,17 +736,18 @@ let read_all_operations net_db hash n =
            map_p (Raw_operation.Table.read net_db.operation_db.table) hashes)
     operations
 
-let commit_block net_db hash n validation_result =
+let commit_block net_db hash validation_result =
   Raw_block_header.Table.read
     net_db.block_header_db.table hash >>=? fun header ->
-  read_all_operations net_db hash n >>=? fun operations ->
+  read_all_operations net_db
+    hash header.shell.validation_passes >>=? fun operations ->
   State.Block.store
     net_db.net_state header operations validation_result >>=? fun res ->
   Raw_block_header.Table.clear net_db.block_header_db.table hash ;
   Raw_operation_hashes.clear_all
-    net_db.operation_hashes_db.table hash n ;
+    net_db.operation_hashes_db.table hash header.shell.validation_passes ;
   Raw_operations.clear_all
-    net_db.operations_db.table hash n ;
+    net_db.operations_db.table hash header.shell.validation_passes ;
   (* TODO: proper handling of the operations table by the prevalidator. *)
   List.iter
     (List.iter
@@ -756,13 +757,15 @@ let commit_block net_db hash n validation_result =
     operations ;
   return res
 
-let commit_invalid_block net_db hash n =
+let commit_invalid_block net_db hash =
   Raw_block_header.Table.read
     net_db.block_header_db.table hash >>=? fun header ->
   State.Block.store_invalid net_db.net_state header >>=? fun res ->
   Raw_block_header.Table.clear net_db.block_header_db.table hash ;
-  Raw_operation_hashes.clear_all net_db.operation_hashes_db.table hash n ;
-  Raw_operations.clear_all net_db.operations_db.table hash n ;
+  Raw_operation_hashes.clear_all
+    net_db.operation_hashes_db.table hash header.shell.validation_passes ;
+  Raw_operations.clear_all
+    net_db.operations_db.table hash header.shell.validation_passes ;
   return res
 
 let inject_operation net_db h op =

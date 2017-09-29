@@ -43,10 +43,10 @@ val resolve_operation:
   net_db -> operation -> (Operation_hash.t * Operation.t) tzresult Lwt.t
 
 val commit_block:
-  net_db -> Block_hash.t -> int -> Updater.validation_result ->
+  net_db -> Block_hash.t -> Updater.validation_result ->
   State.Block.t option tzresult Lwt.t
 val commit_invalid_block:
-  net_db -> Block_hash.t -> int ->
+  net_db -> Block_hash.t ->
   bool tzresult Lwt.t
 val inject_block:
   t -> MBytes.t -> operation list list ->

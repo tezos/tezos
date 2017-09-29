@@ -118,7 +118,7 @@ module Block : sig
   val shell_header: t -> Block_header.shell_header
   val timestamp: t -> Time.t
   val fitness: t -> Fitness.t
-  val operation_list_count: t -> int
+  val validation_passes: t -> int
   val net_id: t -> Net_id.t
   val net_state: t -> Net.t
   val level: t -> Int32.t

@@ -143,6 +143,7 @@ module RPC = struct
     proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
+    validation_passes: int ; (* uint8 *)
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
     data: MBytes.t ;
@@ -165,6 +166,7 @@ module RPC = struct
       proto_level = header.shell.proto_level ;
       predecessor = header.shell.predecessor ;
       timestamp = header.shell.timestamp ;
+      validation_passes = header.shell.validation_passes ;
       operations_hash = header.shell.operations_hash ;
       fitness = header.shell.fitness ;
       data = header.proto ;
@@ -275,6 +277,7 @@ module RPC = struct
                 fitness ;
                 timestamp = Prevalidator.timestamp pv ;
                 protocol ;
+                validation_passes = List.length operations ;
                 operations_hash =
                   Operation_list_list_hash.compute
                     (List.map Operation_list_hash.compute operations) ;
@@ -350,6 +353,7 @@ module RPC = struct
                     proto_level ;
                     predecessor = head_hash ;
                     timestamp = Prevalidator.timestamp pv ;
+                    validation_passes = List.length operation_hashes ;
                     operations_hash ;
                     fitness ;
                   } ;
@@ -501,6 +505,7 @@ module RPC = struct
       proto_level ;
       predecessor = State.Block.hash predecessor ;
       timestamp ;
+      validation_passes = 1 ;
       operations_hash ;
       fitness ;
     } in

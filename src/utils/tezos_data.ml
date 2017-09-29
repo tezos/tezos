@@ -172,6 +172,7 @@ module Block_header = struct
     proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
+    validation_passes: int ; (* uint8 *)
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
   }
@@ -180,19 +181,20 @@ module Block_header = struct
     let open Data_encoding in
     conv
       (fun { net_id ; level ; proto_level ; predecessor ;
-             timestamp ; operations_hash ; fitness } ->
+             timestamp ; validation_passes ; operations_hash ; fitness } ->
         (net_id, level, proto_level, predecessor,
-         timestamp, operations_hash, fitness))
+         timestamp, validation_passes, operations_hash, fitness))
       (fun (net_id, level, proto_level, predecessor,
-            timestamp, operations_hash, fitness) ->
+            timestamp, validation_passes, operations_hash, fitness) ->
         { net_id ; level ; proto_level ; predecessor ;
-          timestamp ; operations_hash ; fitness })
-      (obj7
+          timestamp ; validation_passes ; operations_hash ; fitness })
+      (obj8
          (req "net_id" Net_id.encoding)
          (req "level" int32)
          (req "proto" uint8)
          (req "predecessor" Block_hash.encoding)
          (req "timestamp" Time.encoding)
+         (req "validation_pass" uint8)
          (req "operations_hash" Operation_list_list_hash.encoding)
          (req "fitness" Fitness.encoding))
 

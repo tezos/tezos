@@ -82,14 +82,14 @@ type error +=
 
 let parse
     ({ shell = { net_id ; level ; proto_level ; predecessor ;
-                 timestamp ; fitness ; operations_hash } ;
+                 timestamp ; fitness ; validation_passes ; operations_hash } ;
        proto } : Block_header.t) : block_header tzresult =
   match Data_encoding.Binary.of_bytes signed_proto_header_encoding proto with
   | None -> Error [Cant_parse_proto_header]
   | Some (proto, signature) ->
       let shell =
         { Block_header.net_id ; level ; proto_level ; predecessor ;
-          timestamp ; fitness ; operations_hash } in
+          timestamp ; fitness ; validation_passes ; operations_hash } in
       Ok { shell ; proto ; signature }
 
 let parse_unsigned_proto_header bytes =

@@ -77,6 +77,7 @@ module Blocks = struct
     proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
+    validation_passes: int ; (* uint8 *)
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
     data: MBytes.t ;
@@ -88,20 +89,22 @@ module Blocks = struct
   let block_info_encoding =
     conv
       (fun { hash ; net_id ; level ; proto_level ; predecessor ;
-             fitness ; timestamp ; protocol ; operations_hash ; data ;
+             fitness ; timestamp ; protocol ;
+             validation_passes ; operations_hash ; data ;
              operations ; test_network } ->
         ((hash, operations, protocol, test_network),
          { Block_header.shell =
              { net_id ; level ; proto_level ; predecessor ;
-               timestamp ; operations_hash ; fitness } ;
+               timestamp ; validation_passes ; operations_hash ; fitness } ;
            proto = data }))
       (fun ((hash, operations, protocol, test_network),
             { Block_header.shell =
                 { net_id ; level ; proto_level ; predecessor ;
-                  timestamp ; operations_hash ; fitness } ;
+                  timestamp ; validation_passes ; operations_hash ; fitness } ;
               proto = data }) ->
         { hash ; net_id ; level ; proto_level ; predecessor ;
-          fitness ; timestamp ; protocol ; operations_hash ; data ;
+          fitness ; timestamp ; protocol ;
+          validation_passes ; operations_hash ; data ;
           operations ; test_network })
       (dynamic_size
          (merge_objs
