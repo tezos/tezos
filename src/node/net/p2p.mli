@@ -171,6 +171,11 @@ val connection_info :
   ('msg, 'meta) net -> ('msg, 'meta) connection -> Connection_info.t
 val connection_stat :
   ('msg, 'meta) net -> ('msg, 'meta) connection -> Stat.t
+
+(** Cleanly closes a connection. *)
+val disconnect :
+  ('msg, 'meta) net -> ?wait:bool -> ('msg, 'meta) connection -> unit Lwt.t
+
 val global_stat : ('msg, 'meta) net -> Stat.t
 
 (** Accessors for meta information about a global identifier *)

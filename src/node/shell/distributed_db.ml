@@ -707,6 +707,11 @@ let get_net { active_nets } net_id =
   try Some (Net_id.Table.find active_nets net_id)
   with Not_found -> None
 
+let disconnect { global_db = { p2p } } peer_id =
+  match P2p.find_connection p2p peer_id with
+  | None -> Lwt.return_unit
+  | Some conn -> P2p.disconnect p2p conn
+
 let shutdown { p2p ; p2p_readers ; active_nets } =
   P2p.Peer_id.Table.fold
     (fun _peer_id reader acc ->
