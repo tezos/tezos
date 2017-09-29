@@ -14,6 +14,15 @@ module type DATA = sig
   val compare: t -> t -> int
   val equal: t -> t -> bool
 
+  val (=): t -> t -> bool
+  val (<>): t -> t -> bool
+  val (<): t -> t -> bool
+  val (<=): t -> t -> bool
+  val (>=): t -> t -> bool
+  val (>): t -> t -> bool
+  val min: t -> t -> t
+  val max: t -> t -> t
+
   val pp: Format.formatter -> t -> unit
 
   val encoding: t Data_encoding.t
