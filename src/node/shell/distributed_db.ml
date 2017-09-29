@@ -885,7 +885,7 @@ module Make
   type value = Table.value
   type param = Table.param
   let known t k = Table.known (Kind.proj t) k
-  type error += Missing_data of key
+  type error += Missing_data = Table.Missing_data
   let read t k = Table.read (Kind.proj t) k
   let read_opt t k = Table.read_opt (Kind.proj t) k
   let read_exn t k = Table.read_exn (Kind.proj t) k
