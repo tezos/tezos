@@ -1,0 +1,16 @@
+(jbuild_version 1)
+
+(library
+ ((name micheline)
+  (libraries
+   (
+    ;; External
+    uutf
+    ;; Internal
+    minutils
+    utils
+    ))
+  (flags (:standard -w +27-30-40@8))
+  (wrapped false)))
+
+

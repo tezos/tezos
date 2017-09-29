@@ -256,6 +256,7 @@ module Make(Param : sig val name: string end)() = struct
   module Tezos_data = Tezos_data
   module Persist = Persist
   module RPC = RPC
+  module Micheline = Micheline
   module Fitness = Fitness
   module Error_monad = struct
     type error_category = [ `Branch | `Temporary | `Permanent ]
