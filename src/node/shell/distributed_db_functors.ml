@@ -364,23 +364,19 @@ end = struct
                   not (P2p.Peer_id.Set.is_empty peers) then
                  ( Table.remove state.pending key ; acc )
                else
-                 let requested_peers =
-                   if P2p.Peer_id.Set.is_empty remaining_peers
-                   then active_peers
-                   else remaining_peers
-                 in
+                 let requested_peer =
+                   P2p.Peer_id.random_set_elt
+                     (if P2p.Peer_id.Set.is_empty remaining_peers
+                      then active_peers
+                      else remaining_peers) in
                  let next = { peers = remaining_peers ;
                               next_request = now +. delay ;
                               delay = delay *. 1.2 } in
                  Table.replace state.pending key next ;
-                 P2p.Peer_id.Set.fold
-                   (fun gid acc ->
-                      let requests =
-                        try key :: P2p_types.Peer_id.Map.find gid acc
-                        with Not_found -> [key] in
-                      P2p_types.Peer_id.Map.add gid requests acc)
-                   requested_peers
-                   acc)
+                 let requests =
+                   try key :: P2p_types.Peer_id.Map.find requested_peer acc
+                   with Not_found -> [key] in
+                 P2p_types.Peer_id.Map.add requested_peer requests acc)
           state.pending P2p_types.Peer_id.Map.empty in
       P2p_types.Peer_id.Map.iter (Request.send state.param) requests ;
       worker_loop state

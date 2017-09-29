@@ -105,6 +105,7 @@ module type INTERNAL_HASH = sig
     ?desc:string ->
     ('a, 'arg, 'ret) Cli_entries.params ->
     (t -> 'a, 'arg, 'ret) Cli_entries.params
+  val random_set_elt: Set.t -> t
   module Table : Hashtbl.S with type key = t
 end
 
@@ -325,12 +326,22 @@ module Make_Blake2B (R : sig
 
   module Set = struct
     include Set.Make(struct type nonrec t = t let compare = compare end)
+    exception Found of elt
+    let random_elt s =
+      let n = Random.int (cardinal s) in
+      try
+        ignore
+          (fold (fun x i -> if i = n then raise (Found x) ; i+1) s 0 : int) ;
+        assert false
+      with Found x -> x
     let encoding =
       Data_encoding.conv
         elements
         (fun l -> List.fold_left (fun m x -> add x m) empty l)
         Data_encoding.(list encoding)
   end
+
+  let random_set_elt = Set.random_elt
 
   module Map = struct
     include Map.Make(struct type nonrec t = t let compare = compare end)
@@ -631,12 +642,21 @@ module Net_id = struct
 
   module Set = struct
     include Set.Make(struct type nonrec t = t let compare = compare end)
+    exception Found of elt
+    let random_elt s =
+      let n = Random.int (cardinal s) in
+      try
+        ignore
+          (fold (fun x i -> if i = n then raise (Found x) ; i+1) s 0 : int) ;
+        assert false
+      with Found x -> x
     let encoding =
       Data_encoding.conv
         elements
         (fun l -> List.fold_left (fun m x -> add x m) empty l)
         Data_encoding.(list encoding)
   end
+  let random_set_elt = Set.random_elt
 
   module Map = struct
     include Map.Make(struct type nonrec t = t let compare = compare end)
