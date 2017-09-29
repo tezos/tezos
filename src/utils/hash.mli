@@ -96,6 +96,7 @@ module type INTERNAL_HASH = sig
     ?desc:string ->
     ('a, 'arg, 'ret) Cli_entries.params ->
     (t -> 'a, 'arg, 'ret) Cli_entries.params
+  val random_set_elt: Set.t -> t
   module Table : Hashtbl.S with type key = t
 end
 
