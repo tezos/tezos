@@ -18,10 +18,6 @@ val common_ancestor: Block.t -> Block.t -> Block.t Lwt.t
 (** [common_ancestor state h1 h2] returns the first common ancestors
     in the history of blocks [h1] and [h2]. *)
 
-val block_locator: Block.t -> int -> Block_hash.t list Lwt.t
-(** [block_locator state max_length h] compute the sparse block locator
-    (/à la/ Bitcoin) for the block [h]. *)
-
 val iter_predecessors:
   ?max:int ->
   ?min_fitness:Fitness.t ->

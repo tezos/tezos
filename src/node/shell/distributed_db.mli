@@ -23,7 +23,7 @@ type net_db
 val state: net_db -> State.Net.t
 
 type callback = {
-  notify_branch: P2p.Peer_id.t -> Block_hash.t list -> unit ;
+  notify_branch: P2p.Peer_id.t -> Block_locator.t -> unit ;
   notify_head: P2p.Peer_id.t -> Block_hash.t -> Operation_hash.t list -> unit ;
   disconnection: P2p.Peer_id.t -> unit ;
 }

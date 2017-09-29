@@ -35,9 +35,3 @@ val test_and_set_head:
 (** Atomically change the current head of the network's blockchain.
     This returns [true] whenever the change succeeded, or [false]
     when the current head os not equal to the [old] argument. *)
-
-val find_new:
-  Net.t -> Block_hash.t list -> int -> Block_hash.t list Lwt.t
-  (** [find_new net locator max_length], where [locator] is a sparse block
-      locator (/à la/ Bitcoin), returns the missing block when compared
-      with the current branch of [net]. *)

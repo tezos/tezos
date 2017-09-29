@@ -757,7 +757,9 @@ let rec create_validator ?parent worker ?max_child_ttl state db net =
     let rec loop () =
       Lwt_pipe.pop queue >>= function
       | `Branch (_gid, locator) ->
-          List.iter (Context_db.prefetch v session) locator ;
+          List.iter
+            (Context_db.prefetch v session)
+            (locator :> Block_hash.t list) ;
           loop ()
       | `Head (gid, head, ops) ->
           Context_db.prefetch v session head ;

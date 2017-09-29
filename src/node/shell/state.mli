@@ -89,6 +89,7 @@ module Block : sig
   type t
   type block = t
 
+  val known: Net.t -> Block_hash.t -> bool Lwt.t
   val known_valid: Net.t -> Block_hash.t -> bool Lwt.t
   val known_invalid: Net.t -> Block_hash.t -> bool Lwt.t
 

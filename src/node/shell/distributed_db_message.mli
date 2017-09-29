@@ -10,7 +10,7 @@
 type t =
 
   | Get_current_branch of Net_id.t
-  | Current_branch of Net_id.t * Block_hash.t list (* Block locator *)
+  | Current_branch of Net_id.t * Block_locator.t
   | Deactivate of Net_id.t
 
   | Get_current_head of Net_id.t

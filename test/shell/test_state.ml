@@ -275,8 +275,9 @@ let test_ancestor s =
 
 let test_locator s =
   let check_locator h1 expected =
-    Chain_traversal.block_locator
+    Block_locator.compute
       (vblock s h1) (List.length expected) >>= fun l ->
+    let l = (l :> Block_hash.t list) in
     if List.length l <> List.length expected then
       Assert.fail_msg
         "Invalid locator length %s (found: %d, expected: %d)"
@@ -414,12 +415,12 @@ let test_new_blocks s =
 
 (****************************************************************************)
 
-(** Chain.find_new *)
+(** Block_locator.find_new *)
 
 let test_find_new s =
   let test s h expected =
-    Chain_traversal.block_locator (vblock s h) 50 >>= fun loc ->
-    Chain.find_new s.net loc (List.length expected) >>= fun blocks ->
+    Block_locator.compute (vblock s h) 50 >>= fun loc ->
+    Block_locator.find_new s.net loc (List.length expected) >>= fun blocks ->
     if List.length blocks <> List.length expected then
       Assert.fail_msg
         "Invalid locator length %s (found: %d, expected: %d)"
