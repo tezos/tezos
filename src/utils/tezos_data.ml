@@ -16,6 +16,15 @@ module type DATA = sig
   val compare: t -> t -> int
   val equal: t -> t -> bool
 
+  val (=): t -> t -> bool
+  val (<>): t -> t -> bool
+  val (<): t -> t -> bool
+  val (<=): t -> t -> bool
+  val (>=): t -> t -> bool
+  val (>): t -> t -> bool
+  val min: t -> t -> t
+  val max: t -> t -> t
+
   val pp: Format.formatter -> t -> unit
 
   val encoding: t Data_encoding.t
@@ -70,6 +79,15 @@ module Fitness = struct
     if len = 0 then compare_rec f1 f2 else len
 
   let equal f1 f2 = compare f1 f2 = 0
+
+  let (=) = equal
+  let (<>) x y = compare x y <> 0
+  let (<) x y = compare x y < 0
+  let (<=) x y = compare x y <= 0
+  let (>=) x y = compare x y >= 0
+  let (>) x y = compare x y > 0
+  let min x y = if x <= y then x else y
+  let max x y = if x <= y then y else x
 
   let rec pp fmt = function
     | [] -> ()
@@ -127,6 +145,15 @@ module Operation = struct
     Net_id.compare o1.shell.net_id o1.shell.net_id >> fun () ->
     MBytes.compare o1.proto o2.proto
   let equal b1 b2 = compare b1 b2 = 0
+
+  let (=) = equal
+  let (<>) x y = compare x y <> 0
+  let (<) x y = compare x y < 0
+  let (<=) x y = compare x y <= 0
+  let (>=) x y = compare x y >= 0
+  let (>) x y = compare x y > 0
+  let min x y = if x <= y then x else y
+  let max x y = if x <= y then y else x
 
   let to_bytes v = Data_encoding.Binary.to_bytes encoding v
   let of_bytes b = Data_encoding.Binary.of_bytes encoding b
@@ -214,6 +241,15 @@ module Block_header = struct
 
   let equal b1 b2 = compare b1 b2 = 0
 
+  let (=) = equal
+  let (<>) x y = compare x y <> 0
+  let (<) x y = compare x y < 0
+  let (<=) x y = compare x y <= 0
+  let (>=) x y = compare x y >= 0
+  let (>) x y = compare x y > 0
+  let min x y = if x <= y then x else y
+  let max x y = if x <= y then y else x
+
   let to_bytes v = Data_encoding.Binary.to_bytes encoding v
   let of_bytes b = Data_encoding.Binary.of_bytes encoding b
   let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
@@ -272,6 +308,15 @@ module Protocol = struct
 
   let compare = Pervasives.compare
   let equal = (=)
+
+  let (=) = equal
+  let (<>) x y = compare x y <> 0
+  let (<) x y = compare x y < 0
+  let (<=) x y = compare x y <= 0
+  let (>=) x y = compare x y >= 0
+  let (>) x y = compare x y > 0
+  let min x y = if x <= y then x else y
+  let max x y = if x <= y then y else x
 
   let to_bytes v = Data_encoding.Binary.to_bytes encoding v
   let of_bytes b = Data_encoding.Binary.of_bytes encoding b
