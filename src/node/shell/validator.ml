@@ -10,7 +10,7 @@
 open Logging.Node.Validator
 
 type t = {
-  activate: ?parent:net_validator -> State.Net.t -> net_validator Lwt.t ;
+  activate: ?parent:net_validator -> ?max_child_ttl:int -> State.Net.t -> net_validator Lwt.t ;
   get: Net_id.t -> net_validator tzresult Lwt.t ;
   get_exn: Net_id.t -> net_validator Lwt.t ;
   deactivate: net_validator -> unit Lwt.t ;
@@ -48,7 +48,7 @@ and net_validator = {
 let net_state { net } = net
 let net_db { net_db } = net_db
 
-let activate w net = w.activate net
+let activate w ?max_child_ttl net = w.activate ?max_child_ttl net
 let deactivate net_validator = net_validator.worker.deactivate net_validator
 let get w = w.get
 let get_exn w = w.get_exn
@@ -605,7 +605,7 @@ module Context_db = struct
 end
 
 
-let rec create_validator ?max_ttl ?parent worker state db net =
+let rec create_validator ?parent worker ?max_child_ttl state db net =
 
   let queue = Lwt_pipe.create () in
   let current_ops = ref (fun () -> []) in
@@ -744,7 +744,7 @@ let rec create_validator ?max_ttl ?parent worker state db net =
       | Some child ->
           Block_hash.equal (State.Net.genesis child.net).block genesis in
     begin
-      match max_ttl with
+      match max_child_ttl with
       | None -> Lwt.return expiration
       | Some ttl ->
           Distributed_db.Block_header.fetch net_db genesis () >>= fun genesis ->
@@ -787,7 +787,7 @@ let rec create_validator ?max_ttl ?parent worker state db net =
 
 type error += Unknown_network of Net_id.t
 
-let create ?max_ttl state db =
+let create state db =
 
   let validators : net_validator Lwt.t Net_id.Table.t =
     Net_id.Table.create 7 in
@@ -908,13 +908,13 @@ let create ?max_ttl state db =
       end in
     return (hash, validation) in
 
-  let rec activate ?parent net =
+  let rec activate ?parent ?max_child_ttl net =
     let net_id = State.Net.id net in
     lwt_log_notice "activate network %a"
       Net_id.pp net_id >>= fun () ->
     get net_id >>= function
     | Error _ ->
-        let v = create_validator ?max_ttl ?parent worker state db net in
+        let v = create_validator ?max_child_ttl ?parent worker state db net in
         Net_id.Table.add validators net_id v ;
         v
     | Ok v -> Lwt.return v

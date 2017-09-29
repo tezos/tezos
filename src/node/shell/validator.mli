@@ -9,7 +9,7 @@
 
 type t
 
-val create: ?max_ttl:int -> State.t -> Distributed_db.t -> t
+val create: State.t -> Distributed_db.t -> t
 val shutdown: t -> unit Lwt.t
 
 val notify_block: t -> Block_hash.t -> Block_header.t -> unit Lwt.t
@@ -20,7 +20,7 @@ type error +=
    | Non_increasing_timestamp
    | Non_increasing_fitness
 
-val activate: t -> State.Net.t -> net_validator Lwt.t
+val activate: t -> ?max_child_ttl:int -> State.Net.t -> net_validator Lwt.t
 val get: t -> Net_id.t -> net_validator tzresult Lwt.t
 val get_exn: t -> Net_id.t -> net_validator Lwt.t
 val deactivate: net_validator -> unit Lwt.t
