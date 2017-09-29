@@ -32,6 +32,8 @@ val activate: t -> State.Net.t -> net_db
 val set_callback: net_db -> callback -> unit
 val deactivate: net_db -> unit Lwt.t
 
+val disconnect: net_db -> P2p.Peer_id.t -> unit Lwt.t
+
 val broadcast_head:
   net_db -> Block_hash.t -> Operation_hash.t list -> unit
 

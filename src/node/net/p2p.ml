@@ -201,6 +201,8 @@ module Real = struct
       ~init:[] ~f:(fun _peer_id c acc -> c :: acc)
   let find_connection { pool } peer_id =
     P2p_connection_pool.Connection.find_by_peer_id pool peer_id
+  let disconnect ?wait conn =
+    P2p_connection_pool.disconnect ?wait conn
   let connection_info _net conn =
     P2p_connection_pool.Connection.info conn
   let connection_stat _net conn =
@@ -319,6 +321,7 @@ type ('msg, 'meta) t = {
   shutdown : unit -> unit Lwt.t ;
   connections : unit -> ('msg, 'meta) connection list ;
   find_connection : Peer_id.t -> ('msg, 'meta) connection option ;
+  disconnect : ?wait:bool -> ('msg, 'meta) connection -> unit Lwt.t ;
   connection_info : ('msg, 'meta) connection -> Connection_info.t ;
   connection_stat : ('msg, 'meta) connection -> Stat.t ;
   global_stat : unit -> Stat.t ;
@@ -385,6 +388,7 @@ let create ~config ~limits meta_cfg msg_cfg =
     shutdown = Real.shutdown net  ;
     connections = Real.connections net  ;
     find_connection = Real.find_connection net ;
+    disconnect = Real.disconnect ;
     connection_info = Real.connection_info net  ;
     connection_stat = Real.connection_stat net ;
     global_stat = Real.global_stat net ;
@@ -408,6 +412,7 @@ let faked_network meta_config = {
   shutdown = Lwt.return ;
   connections = (fun () -> []) ;
   find_connection = (fun _ -> None) ;
+  disconnect = (fun ?wait:_ _ -> Lwt.return_unit) ;
   connection_info = (fun _ -> Fake.connection_info) ;
   connection_stat = (fun _ -> Fake.empty_stat) ;
   global_stat = (fun () -> Fake.empty_stat) ;
@@ -429,6 +434,7 @@ let maintain net = net.maintain ()
 let roll net = net.roll ()
 let shutdown net = net.shutdown ()
 let connections net = net.connections ()
+let disconnect net = net.disconnect
 let find_connection net = net.find_connection
 let connection_info net = net.connection_info
 let connection_stat net = net.connection_stat
