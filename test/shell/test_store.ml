@@ -83,12 +83,12 @@ let lolblock ?(operations = []) header =
             level = 0l ; (* dummy *)
             proto_level = 0 ; (* dummy *)
             net_id ;
+            validation_passes = Random.int 32 ;
             predecessor = genesis_block ; operations_hash ;
             fitness = [MBytes.of_string @@ string_of_int @@ String.length header;
                        MBytes.of_string @@ string_of_int @@ 12] } ;
         proto = MBytes.of_string header ;
       } ;
-    operation_list_count = Random.int 32 ;
     max_operations_ttl = 0 ;
     message = "" ;
     context = Context.dummy_commit ;
@@ -108,8 +108,7 @@ let bh3' =
 
 let equal (b1: Store.Block.contents) (b2: Store.Block.contents) =
   Block_header.equal b1.header b2.header &&
-  b1.message = b2.message &&
-  b1.operation_list_count = b2.operation_list_count
+  b1.message = b2.message
 
 let check_block s h b =
   Store.Block.Contents.read (s, h) >>= function

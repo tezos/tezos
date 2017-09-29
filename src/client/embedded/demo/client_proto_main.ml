@@ -53,6 +53,7 @@ let mine cctxt =
                 level = Int32.succ bi.level ;
                 timestamp = Time.now () ;
                 fitness ;
+                validation_passes = 0 ;
                 operations_hash = Operation_list_list_hash.empty } ;
       proto = MBytes.create 0 } >>=? fun bytes ->
   Client_node_rpcs.inject_block cctxt.rpc_config bytes [] >>=? fun hash ->

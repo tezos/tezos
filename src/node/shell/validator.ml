@@ -254,6 +254,9 @@ let apply_block net_state db
     Block_hash.pp_short hash >>= fun () ->
   Distributed_db.Operations.fetch
     db (hash, 0) block.shell.operations_hash >>= fun operations ->
+  fail_unless (block.shell.validation_passes <= 1)
+    (* TODO constant to be exported from the protocol... *)
+    (failure "unexpected error (TO BE REMOVED)") >>=? fun () ->
   let operation_hashes = List.map Operation.hash operations in
   lwt_debug "validation of %a: found operations"
     Block_hash.pp_short hash >>= fun () ->
@@ -447,7 +450,7 @@ module Context_db = struct
       begin
         match data with
         | Ok data -> begin
-            Distributed_db.commit_block net_db hash 1 data >>=? function
+            Distributed_db.commit_block net_db hash data >>=? function
             | None ->
                 (* Should not happen if the block is not validated twice *)
                 assert false
@@ -455,7 +458,7 @@ module Context_db = struct
                 return (Ok block)
             end
         | Error err ->
-            Distributed_db.commit_invalid_block net_db hash 1 >>=? fun changed ->
+            Distributed_db.commit_invalid_block net_db hash >>=? fun changed ->
             assert changed ;
             return (Error err)
       end >>= function

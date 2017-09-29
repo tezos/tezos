@@ -114,13 +114,13 @@ module Locked_block = struct
       predecessor = genesis.block ;
       timestamp = genesis.time ;
       fitness = [] ;
+      validation_passes = 0 ;
       operations_hash = Operation_list_list_hash.empty ;
     } in
     let header : Block_header.t = { shell ; proto = MBytes.create 0 } in
     Store.Block.Contents.store (store, genesis.block)
       { Store.Block.header ; message = "Genesis" ;
-        operation_list_count = 0 ; max_operations_ttl = 0 ;
-        context = commit } >>= fun () ->
+        max_operations_ttl = 0 ; context = commit } >>= fun () ->
     Lwt.return header
 
 end
@@ -311,9 +311,8 @@ module Block = struct
   let fitness b = (shell_header b).fitness
   let level b = (shell_header b).level
   let proto_level b = (shell_header b).proto_level
+  let validation_passes b = (shell_header b).validation_passes
   let message { contents = { message } } = message
-  let operation_list_count { contents = { operation_list_count } } =
-    operation_list_count
   let max_operations_ttl { contents = { max_operations_ttl } } =
     max_operations_ttl
 
@@ -395,7 +394,6 @@ module Block = struct
         let contents = {
           Store.Block.header = block_header ;
           message ;
-          operation_list_count = List.length operations ;
           max_operations_ttl ;
           context = commit ;
         } in
@@ -444,7 +442,7 @@ module Block = struct
     Watcher.create_stream net_state.block_watcher
 
   let operation_hashes { net_state ; hash ; contents } i =
-    if i < 0 || contents.operation_list_count <= i then
+    if i < 0 || contents.header.shell.validation_passes <= i then
       invalid_arg "State.Block.operations" ;
     Shared.use net_state.block_store begin fun store ->
       Store.Block.Operation_hashes.read_exn (store, hash) i >>= fun hashes ->
@@ -456,11 +454,11 @@ module Block = struct
     Shared.use net_state.block_store begin fun store ->
       Lwt_list.map_p
         (Store.Block.Operation_hashes.read_exn (store, hash))
-        (0 -- (contents.operation_list_count - 1))
+        (0 -- (contents.header.shell.validation_passes - 1))
     end
 
   let operations { net_state ; hash ; contents } i =
-    if i < 0 || contents.operation_list_count <= i then
+    if i < 0 || contents.header.shell.validation_passes <= i then
       invalid_arg "State.Block.operations" ;
     Shared.use net_state.block_store begin fun store ->
       Store.Block.Operation_path.read_exn (store, hash) i >>= fun path ->
@@ -472,7 +470,7 @@ module Block = struct
     Shared.use net_state.block_store begin fun store ->
       Lwt_list.map_p
         (fun i -> Store.Block.Operations.read_exn (store, hash) i)
-        (0 -- (contents.operation_list_count - 1))
+        (0 -- (contents.header.shell.validation_passes - 1))
     end
 
   let context { net_state ; hash } =
