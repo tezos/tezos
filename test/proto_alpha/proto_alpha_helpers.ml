@@ -35,11 +35,17 @@ let activate_alpha () =
     fitness dictator_sk
 
 let init ?(sandbox = "sandbox.json") () =
-  Unix.chdir (Filename.dirname (Filename.dirname Sys.executable_name)) ;
+  (* Handles relative path on OSX *)
+  let executable_path =
+    if Filename.is_relative Sys.argv.(0)
+    then Filename.concat (Sys.getcwd ()) Sys.argv.(0)
+    else Sys.argv.(0) in
+  Unix.chdir (Filename.dirname executable_path) ;
+  Unix.chdir ".." ;
   let pid =
     Node_helpers.fork_node
       ~port:rpc_config.port
-      ~sandbox:(Filename.dirname Sys.executable_name // sandbox)
+      ~sandbox:(Filename.dirname executable_path // sandbox)
       () in
   activate_alpha () >>=? fun hash ->
   return (pid, hash)
