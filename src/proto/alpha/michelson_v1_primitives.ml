@@ -94,6 +94,8 @@ type prim =
   | I_UNIT
   | I_UPDATE
   | I_XOR
+  | I_ITER
+  | I_LOOP_LEFT
   | T_bool
   | T_contract
   | T_int
@@ -214,6 +216,8 @@ let string_of_prim = function
   | I_UNIT -> "UNIT"
   | I_UPDATE -> "UPDATE"
   | I_XOR -> "XOR"
+  | I_ITER -> "ITER"
+  | I_LOOP_LEFT -> "LOOP_LEFT"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -315,6 +319,8 @@ let prim_of_string = function
   | "UNIT" -> ok I_UNIT
   | "UPDATE" -> ok I_UPDATE
   | "XOR" -> ok I_XOR
+  | "ITER" -> ok I_ITER
+  | "LOOP_LEFT" -> ok I_LOOP_LEFT
   | "bool" -> ok T_bool
   | "contract" -> ok T_contract
   | "int" -> ok T_int
@@ -457,24 +463,26 @@ let prim_encoding =
     | I_UNIT -> 78
     | I_UPDATE -> 79
     | I_XOR -> 80
-    | T_bool -> 81
-    | T_contract -> 82
-    | T_int -> 83
-    | T_key -> 84
-    | T_key_hash -> 85
-    | T_lambda -> 86
-    | T_list -> 87
-    | T_map -> 88
-    | T_nat -> 89
-    | T_option -> 90
-    | T_or -> 91
-    | T_pair -> 92
-    | T_set -> 93
-    | T_signature -> 94
-    | T_string -> 95
-    | T_tez -> 96
-    | T_timestamp -> 97
-    | T_unit -> 99 in
+    | I_ITER -> 81
+    | I_LOOP_LEFT -> 82
+    | T_bool -> 83
+    | T_contract -> 84
+    | T_int -> 85
+    | T_key -> 86
+    | T_key_hash -> 87
+    | T_lambda -> 88
+    | T_list -> 89
+    | T_map -> 90
+    | T_nat -> 91
+    | T_option -> 92
+    | T_or -> 93
+    | T_pair -> 94
+    | T_set -> 95
+    | T_signature -> 96
+    | T_string -> 97
+    | T_tez -> 98
+    | T_timestamp -> 99
+    | T_unit -> 100 in
   let of_int_map = [|
     K_parameter ;
     K_return ;
@@ -557,6 +565,8 @@ let prim_encoding =
     I_UNIT ;
     I_UPDATE ;
     I_XOR ;
+    I_ITER ;
+    I_LOOP_LEFT ;
     T_bool ;
     T_contract ;
     T_int ;
@@ -576,7 +586,7 @@ let prim_encoding =
     T_timestamp ;
     T_unit |] in
   let of_int i =
-    if Compare.Int.(i >= 0 || i <= 99) then
+    if Compare.Int.(i >= 0 || i <= 100) then
       of_int_map.(i)
     else
       raise Data_encoding.No_case_matched in

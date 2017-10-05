@@ -207,6 +207,8 @@ module Script : sig
     | I_UNIT
     | I_UPDATE
     | I_XOR
+    | I_ITER
+    | I_LOOP_LEFT
     | T_bool
     | T_contract
     | T_int

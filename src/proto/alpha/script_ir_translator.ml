@@ -41,6 +41,9 @@ type error += Bad_stack_item of int
 type error += Inconsistent_annotations of string * string
 type error += Inconsistent_type_annotations : Script.location * _ ty * _ ty -> error
 type error += Unexpected_annotation of Script.location
+type error += Invalid_map_body : Script.location * _ stack_ty -> error
+type error += Invalid_map_block_fail of Script.location
+type error += Invalid_iter_body : Script.location * _ stack_ty * _ stack_ty -> error
 
 (* Value typing errors *)
 type error += Invalid_constant : Script.location * Script.expr * _ ty -> error
@@ -173,7 +176,9 @@ let namespace = function
   | I_TRANSFER_TOKENS
   | I_UNIT
   | I_UPDATE
-  | I_XOR -> Instr_namespace
+  | I_XOR
+  | I_ITER
+  | I_LOOP_LEFT -> Instr_namespace
   | T_bool
   | T_contract
   | T_int
@@ -1134,10 +1139,25 @@ and parse_instr
         let branch ibt ibf =
           { loc ; instr = If_cons (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
+    | Prim (loc, I_SIZE, [], instr_annot),
+      Item_t (List_t _, rest, _) ->
+        return (typed loc (List_size, Item_t (Nat_t, rest, instr_annot)))
     | Prim (loc, I_MAP, [], instr_annot),
       Item_t (Lambda_t (param, ret), Item_t (List_t elt, rest, _), _) ->
         check_item_ty elt param loc I_MAP 2 2 >>=? fun (Eq _) ->
         return (typed loc (List_map, Item_t (List_t ret, rest, instr_annot)))
+    | Prim (loc, I_MAP, [ body ], instr_annot),
+      (Item_t (List_t elt, starting_rest, _)) ->
+        check_kind [ Seq_kind ] body >>=? fun () ->
+        parse_instr ?type_logger tc_context ctxt body (Item_t (elt, starting_rest, None)) >>=? begin function
+          | Typed ({ aft = Item_t (ret, rest, _) } as ibody) ->
+              trace
+                (Invalid_map_body (loc, ibody.aft))
+                (Lwt.return (stack_ty_eq 1 rest starting_rest)) >>=? fun (Eq _) ->
+              return (typed loc (List_map_body ibody, Item_t (List_t ret, rest, instr_annot)))
+          | Typed { aft } -> fail (Invalid_map_body (loc, aft))
+          | Failed _ -> fail (Invalid_map_block_fail loc)
+        end
     | Prim (loc, I_REDUCE, [], instr_annot),
       Item_t (Lambda_t (Pair_t ((pelt, _), (pr, _)), r),
               Item_t (List_t elt, Item_t (init, rest, _), _), _) ->
@@ -1148,6 +1168,20 @@ and parse_instr
     | Prim (loc, I_SIZE, [], instr_annot),
       Item_t (List_t _, rest, _) ->
         return (typed loc (List_size, Item_t (Nat_t, rest, instr_annot)))
+    | Prim (loc, I_ITER, [ body ], instr_annot),
+      Item_t (List_t elt, rest, _) ->
+        check_kind [ Seq_kind ] body >>=? fun () ->
+        fail_unexpected_annot loc instr_annot >>=? fun () ->
+        parse_instr ?type_logger tc_context ctxt body (Item_t (elt, rest, None)) >>=? begin function
+          | Typed ({ aft } as ibody) ->
+              trace
+                (Invalid_iter_body (loc, rest, ibody.aft))
+                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun (Eq _) ->
+              return (typed loc (List_iter ibody, rest))
+          | Failed { descr } ->
+              let ibody = descr rest in
+              return (typed loc (List_iter ibody, rest))
+        end
     (* sets *)
     | Prim (loc, I_EMPTY_SET, [ t ], instr_annot),
       rest ->
@@ -1167,6 +1201,21 @@ and parse_instr
         check_item_ty elt pelt loc I_REDUCE 2 3 >>=? fun (Eq _) ->
         check_item_ty init r loc I_REDUCE 3 3 >>=? fun (Eq _) ->
         return (typed loc (Set_reduce, Item_t (r, rest, instr_annot)))
+    | Prim (loc, I_ITER, [ body ], annot),
+      Item_t (Set_t comp_elt, rest, _) ->
+        check_kind [ Seq_kind ] body >>=? fun () ->
+        fail_unexpected_annot loc annot >>=? fun () ->
+        let elt = ty_of_comparable_ty comp_elt in
+        parse_instr ?type_logger tc_context ctxt body (Item_t (elt, rest, None)) >>=? begin function
+          | Typed ({ aft } as ibody) ->
+              trace
+                (Invalid_iter_body (loc, rest, ibody.aft))
+                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun (Eq _) ->
+              return (typed loc (Set_iter ibody, rest))
+          | Failed { descr } ->
+              let ibody = descr rest in
+              return (typed loc (Set_iter ibody, rest))
+        end
     | Prim (loc, I_MEM, [], instr_annot),
       Item_t (v, Item_t (Set_t elt, rest, _), _) ->
         let elt = ty_of_comparable_ty elt in
@@ -1203,6 +1252,23 @@ and parse_instr
         check_item_ty r pr loc I_REDUCE 1 3 >>=? fun (Eq _) ->
         check_item_ty init r loc I_REDUCE 3 3 >>=? fun (Eq _) ->
         return (typed loc (Map_reduce, Item_t (r, rest, instr_annot)))
+    | Prim (loc, I_ITER, [ body ], instr_annot),
+      Item_t (Map_t (comp_elt, element_ty), rest, _) ->
+        check_kind [ Seq_kind ] body >>=? fun () ->
+        fail_unexpected_annot loc instr_annot >>=? fun () ->
+        let key = ty_of_comparable_ty comp_elt in
+        parse_instr ?type_logger tc_context ctxt body
+          (Item_t (Pair_t ((key, None), (element_ty, None)), rest, None))
+        >>=? begin function
+          | Typed ({ aft } as ibody) ->
+              trace
+                (Invalid_iter_body (loc, rest, ibody.aft))
+                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun (Eq _) ->
+              return (typed loc (Map_iter ibody, rest))
+          | Failed { descr } ->
+              let ibody = descr rest in
+              return (typed loc (Map_iter ibody, rest))
+        end
     | Prim (loc, I_MEM, [], instr_annot),
       Item_t (vk, Item_t (Map_t (ck, _), rest, _), _) ->
         let k = ty_of_comparable_ty ck in
@@ -1278,6 +1344,20 @@ and parse_instr
           | Failed { descr } ->
               let ibody = descr (Item_t (Bool_t, rest, stack_annot)) in
               return (typed loc (Loop ibody, rest))
+        end
+    | Prim (loc, I_LOOP_LEFT, [ body ], instr_annot),
+      (Item_t (Union_t ((tl, tl_annot), (tr, tr_annot)), rest, _) as stack) ->
+        check_kind [ Seq_kind ] body >>=? fun () ->
+        fail_unexpected_annot loc instr_annot >>=? fun () ->
+        parse_instr ?type_logger tc_context ctxt body (Item_t (tl, rest, tl_annot)) >>=? begin function
+          | Typed ibody ->
+              trace
+                (Unmatched_branches (loc, ibody.aft, stack))
+                (Lwt.return (stack_ty_eq 1 ibody.aft stack)) >>=? fun (Eq _) ->
+              return (typed loc (Loop_left ibody, (Item_t (tr, rest, tr_annot))))
+          | Failed { descr } ->
+              let ibody = descr (Item_t (Union_t ((tl, tl_annot), (tr, tr_annot)), rest, None)) in
+              return (typed loc (Loop_left ibody, Item_t (tr, rest, tr_annot)))
         end
     | Prim (loc, I_LAMBDA, [ arg ; ret ; code ], instr_annot),
       stack ->
@@ -1584,8 +1664,8 @@ and parse_instr
                  | I_H | I_STEPS_TO_QUOTA
                  as name), (_ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 0, List.length l))
-    | Prim (loc, (I_NONE | I_LEFT | I_RIGHT | I_NIL
-                 | I_EMPTY_SET | I_DIP | I_LOOP
+    | Prim (loc, (I_NONE | I_LEFT | I_RIGHT | I_NIL | I_MAP | I_ITER
+                 | I_EMPTY_SET | I_DIP | I_LOOP | I_LOOP_LEFT
                  as name), ([]
                            | _ :: _ :: _ as l), _), _ ->
         fail (Invalid_arity (loc, name, 1, List.length l))
@@ -1628,7 +1708,7 @@ and parse_instr
       stack ->
         fail (Bad_stack (loc, name, 1, stack))
     | Prim (loc, (I_SWAP | I_PAIR | I_CONS
-                 | I_MAP | I_GET | I_MEM | I_EXEC
+                 | I_GET | I_MEM | I_EXEC
                  | I_CHECK_SIGNATURE | I_ADD | I_SUB | I_MUL
                  | I_EDIV | I_AND | I_OR | I_XOR
                  | I_LSL | I_LSR | I_CONCAT as name), _, _),
@@ -1639,7 +1719,7 @@ and parse_instr
         fail @@ unexpected expr [ Seq_kind ] Instr_namespace
           [ I_DROP ; I_DUP ; I_SWAP ; I_SOME ; I_UNIT ;
             I_PAIR ; I_CAR ; I_CDR ; I_CONS ;
-            I_MEM ; I_UPDATE ; I_MAP ; I_REDUCE ;
+            I_MEM ; I_UPDATE ; I_MAP ; I_REDUCE ; I_ITER ;
             I_GET ; I_EXEC ; I_FAIL ; I_SIZE ;
             I_CONCAT ; I_ADD ; I_SUB ;
             I_MUL ; I_EDIV ; I_OR ; I_AND ; I_XOR ;
@@ -2203,7 +2283,47 @@ let () =
       | _ -> None)
     (fun (Ex_ty tya, Ex_ty tyb) ->
        Inconsistent_types (tya, tyb)) ;
-
+  register_error_kind
+    `Permanent
+    ~id:"invalidMapBody"
+    ~title: "Invalid map body"
+    ~description:
+      "The body of a map block did not match the expected type"
+    (obj2
+      (req "loc" Script.location_encoding)
+      (req "bodyType" ex_stack_ty_enc))
+    (function
+      | Invalid_map_body (loc, stack) ->
+          Some (loc, Ex_stack_ty stack)
+      | _ -> None)
+    (fun (loc, Ex_stack_ty stack) ->
+       Invalid_map_body (loc, stack)) ;
+  register_error_kind
+    `Permanent
+    ~id:"invalidMapBlockFail"
+    ~title:"FAIL instruction occurred as body of map block"
+    ~description:"FAIL cannot be the only instruction in the body.\
+                  The propper type of the return list cannot be inferred."
+    (obj1 (req "loc" Script.location_encoding))
+    (function
+      | Invalid_map_block_fail loc -> Some loc
+      | _ -> None)
+    (fun loc -> Invalid_map_block_fail loc) ;
+  register_error_kind
+    `Permanent
+    ~id:"invalidIterBody"
+    ~title:"ITER body returned wrong stack type"
+    ~description:"The body of an ITER instruction\
+                  must result in the same stack type as before\
+                  the ITER."
+    (obj3
+       (req "loc" Script.location_encoding)
+       (req "befStack" ex_stack_ty_enc)
+       (req "aftStack" ex_stack_ty_enc))
+    (function
+      | Invalid_iter_body (loc, bef, aft) -> Some (loc, Ex_stack_ty bef, Ex_stack_ty aft)
+      | _ -> None)
+    (fun (loc, Ex_stack_ty bef, Ex_stack_ty aft) -> Invalid_iter_body (loc, bef, aft)) ;
   (* Toplevel errors *)
   register_error_kind
     `Permanent
