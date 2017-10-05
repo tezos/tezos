@@ -13,6 +13,6 @@ code { DUP; DUP;
        DIIP{CDAR};                # Place contracts below numbers
        DIP{CADR};                # Get actual rain
        CDDAR;                     # Get rain threshold
-       CMPLT; IF {CAR @lt; ANNOT @winner} {CDR @geq; ANNOT @winner};     # Select contract to receive tokens
+       CMPLT; IF {CAR @winner} {CDR @winner};     # Select contract to receive tokens
        BALANCE; UNIT; TRANSFER_TOKENS; # Setup and execute transfer
        PAIR };                          # Save storage

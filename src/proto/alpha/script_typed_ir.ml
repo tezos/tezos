@@ -134,10 +134,15 @@ and ('bef, 'aft) instr =
     ('a list * 'bef, 'aft) instr
   | List_map :
       (('param, 'ret) lambda * ('param list * 'rest), 'ret list * 'rest) instr
+  | List_map_body : ('a * 'rest, 'b * 'rest) descr ->
+    ('a list * 'rest, 'b list * 'rest) instr
   | List_reduce :
       (('param * 'res, 'res) lambda *
        ('param list * ('res * 'rest)), 'res * 'rest) instr
   | List_size : ('a list * 'rest, n num * 'rest) instr
+  | List_iter :
+      ('a * 'rest, 'rest) descr ->
+    ('a list * 'rest, 'rest) instr
   (* sets *)
   | Empty_set : 'a comparable_ty ->
     ('rest, 'a set * 'rest) instr
@@ -146,6 +151,9 @@ and ('bef, 'aft) instr =
   | Set_reduce :
       (('param * 'res, 'res) lambda *
        ('param set * ('res * 'rest)), 'res * 'rest) instr
+  | Set_iter :
+      ('a * 'rest, 'rest) descr ->
+    ('a set * 'rest, 'rest) instr
   | Set_mem :
       ('elt * ('elt set * 'rest), bool * 'rest) instr
   | Set_update :
@@ -159,6 +167,9 @@ and ('bef, 'aft) instr =
   | Map_reduce :
       ((('a * 'v) * 'res, 'res) lambda *
        (('a, 'v) map * ('res * 'rest)), 'res * 'rest) instr
+  | Map_iter :
+      (('a * 'v) * 'rest, 'rest) descr ->
+    (('a, 'v) map * 'rest, 'rest) instr
   | Map_mem :
       ('a * (('a, 'v) map * 'rest), bool * 'rest) instr
   | Map_get :
@@ -263,6 +274,8 @@ and ('bef, 'aft) instr =
     (bool * 'bef, 'aft) instr
   | Loop : ('rest, bool * 'rest) descr ->
     (bool * 'rest, 'rest) instr
+  | Loop_left : ('a * 'rest, ('a, 'b) union * 'rest) descr ->
+    (('a, 'b) union * 'rest, 'b * 'rest) instr
   | Dip : ('bef, 'aft) descr ->
     ('top * 'bef, 'top * 'aft) instr
   | Exec :

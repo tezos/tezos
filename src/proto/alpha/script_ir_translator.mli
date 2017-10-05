@@ -47,6 +47,9 @@ type error += Transfer_in_lambda of Script.location
 type error += Transfer_in_dip of Script.location
 type error += Bad_stack_length
 type error += Bad_stack_item of int
+type error += Invalid_map_body : Script.location * _ Script_typed_ir.stack_ty -> error
+type error += Invalid_map_block_fail of Script.location
+type error += Invalid_iter_body : Script.location * _ Script_typed_ir.stack_ty * _ Script_typed_ir.stack_ty -> error
 
 (* Value typing errors *)
 type error += Invalid_constant : Script.location * Script.expr * _ Script_typed_ir.ty -> error

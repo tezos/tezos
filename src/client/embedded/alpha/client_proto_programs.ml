@@ -9,6 +9,7 @@
 
 module Ed25519 = Environment.Ed25519
 open Client_proto_args
+
 open Michelson_v1_printer
 
 module Program = Client_aliases.Alias (struct

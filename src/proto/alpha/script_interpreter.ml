@@ -142,6 +142,17 @@ let rec interp
                   return (ret :: tail, qta, ctxt, origination))
                 l ([], qta, ctxt, origination) >>=? fun (res, qta, ctxt, origination) ->
               logged_return ~origination (Item (res, rest), qta, ctxt)
+          | List_map_body body, Item (l, rest) ->
+              let rec help rest qta = function
+                | [] -> logged_return ~origination (Item ([], rest), qta, ctxt)
+                | hd :: tl ->
+                    step origination qta ctxt body (Item (hd, rest))
+                    >>=? fun (Item (hd, rest), qta, _, _) ->
+                    help rest qta tl
+                    >>=? fun (Item (tl, rest), qta, ctxt, origination) ->
+                    logged_return ~origination (Item (hd :: tl, rest), qta, ctxt)
+              in help rest qta l >>=? fun (res, qta, ctxt, origination) ->
+              logged_return ~origination (res, qta - 1, ctxt)
           | List_reduce, Item (lam, Item (l, Item (init, rest))) ->
               fold_left_s
                 (fun (partial, qta, ctxt, origination) arg ->
@@ -154,6 +165,14 @@ let rec interp
              let len = List.length list in
              let len = Script_int.(abs (of_int len)) in
               logged_return (Item (len, rest), qta - 1, ctxt)
+          | List_iter body, Item (l, init_stack) ->
+              fold_left_s
+                (fun (stack, qta, ctxt, origination) arg ->
+                   step origination qta ctxt body (Item (arg, stack))
+                   >>=? fun (stack, qta, ctxt, origination) ->
+                   return (stack, qta, ctxt, origination))
+                (init_stack, qta, ctxt, origination) l >>=? fun (stack, qta, ctxt, origination) ->
+              logged_return ~origination (stack, qta, ctxt)
           (* sets *)
           | Empty_set t, rest ->
               logged_return (Item (empty_set t, rest), qta - 1, ctxt)
@@ -177,6 +196,15 @@ let rec interp
                    return (partial, qta, ctxt, origination))
                 (init, qta, ctxt, origination) items >>=? fun (res, qta, ctxt, origination) ->
               logged_return ~origination (Item (res, rest), qta, ctxt)
+          | Set_iter body, Item (set, init_stack) ->
+              fold_left_s
+                (fun (stack, qta, ctxt, origination) arg ->
+                   step origination qta ctxt body (Item (arg, stack))
+                   >>=? fun (stack, qta, ctxt, origination) ->
+                   return (stack, qta, ctxt, origination))
+                (init_stack, qta, ctxt, origination)
+                (set_fold (fun e acc -> e :: acc) set []) >>=? fun (stack, qta, ctxt, origination) ->
+              logged_return ~origination (stack, qta, ctxt)
           | Set_mem, Item (v, Item (set, rest)) ->
               logged_return (Item (set_mem v set, rest), qta - 1, ctxt)
           | Set_update, Item (v, Item (presence, Item (set, rest))) ->
@@ -206,6 +234,16 @@ let rec interp
                    return (partial, qta, ctxt, origination))
                 (init, qta, ctxt, origination) items >>=? fun (res, qta, ctxt, origination) ->
               logged_return ~origination (Item (res, rest), qta, ctxt)
+          | Map_iter body, Item (map, init_stack) ->
+              let items =
+                List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
+              fold_left_s
+                (fun (stack, qta, ctxt, origination) arg ->
+                   step origination qta ctxt body (Item (arg, stack))
+                   >>=? fun (stack, qta, ctxt, origination) ->
+                   return (stack, qta, ctxt, origination))
+                (init_stack, qta, ctxt, origination) items >>=? fun (stack, qta, ctxt, origination) ->
+              logged_return ~origination (stack, qta, ctxt)
           | Map_mem, Item (v, Item (map, rest)) ->
               logged_return (Item (map_mem v map, rest), qta - 1, ctxt)
           | Map_get, Item (v, Item (map, rest)) ->
@@ -364,6 +402,11 @@ let rec interp
               step origination (qta - 1) ctxt descr trans
           | Loop _, Item (false, rest) ->
               logged_return (rest, qta, ctxt)
+          | Loop_left body, Item (L v, rest) ->
+              step origination qta ctxt body (Item (v, rest)) >>=? fun (trans, qta, ctxt, origination) ->
+              step origination (qta - 1) ctxt descr trans
+          | Loop_left _, Item (R v, rest) ->
+              logged_return (Item (v, rest), qta, ctxt)
           | Dip b, Item (ign, rest) ->
               step origination qta ctxt b rest >>=? fun (res, qta, ctxt, origination) ->
               logged_return ~origination (Item (ign, res), qta, ctxt)

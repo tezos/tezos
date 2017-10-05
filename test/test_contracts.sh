@@ -15,9 +15,16 @@ key2=bar
 $client gen keys $key1
 $client gen keys $key2
 
+CONTRACT_PATH=contracts
+
 printf "\n\n"
 
-CONTRACT_PATH=contracts
+# Assert well typed
+echo "Typechecking contracts in '${CONTRACT_PATH}'"
+ls $CONTRACT_PATH \
+    | xargs -I{} $client typecheck program $CONTRACT_PATH/{} > /dev/null
+
+printf "All contracts are well typed\n\n"
 
 # FORMAT: assert_output contract_file storage input expected_result
 
@@ -94,6 +101,19 @@ assert_output $CONTRACT_PATH/map_id.tz Unit '(Map (Item 0 1))' '(Map (Item 0 1))
 assert_output $CONTRACT_PATH/map_id.tz Unit '(Map (Item 0 0))' '(Map (Item 0 0))'
 assert_output $CONTRACT_PATH/map_id.tz Unit '(Map (Item 0 0) (Item 3 4))' '(Map (Item 0 0) (Item 3 4))'
 
+# Map block on lists
+assert_output $CONTRACT_PATH/list_map_block.tz Unit '(List)' 'List'
+assert_output $CONTRACT_PATH/list_map_block.tz Unit '(List 1 1 1 1)' '(List 1 2 3 4)'
+assert_output $CONTRACT_PATH/list_map_block.tz Unit '(List 1 2 3 0)' '(List 1 3 5 3)'
+
+# List iter
+assert_output $CONTRACT_PATH/list_iter.tz Unit '(List 10 2 1)' 20
+assert_output $CONTRACT_PATH/list_iter.tz Unit '(List 3 6 9)' 162
+
+assert_output $CONTRACT_PATH/list_iter2.tz Unit '(List "a" "b" "c")' '"cba"'
+assert_output $CONTRACT_PATH/list_iter2.tz Unit '(List)' '""'
+
+
 # Identity on sets
 assert_output $CONTRACT_PATH/set_id.tz Unit '(Set "a" "b" "c")' '(Set "a" "b" "c")'
 assert_output $CONTRACT_PATH/set_id.tz Unit '(Set)' 'Set'
@@ -109,6 +129,11 @@ assert_output $CONTRACT_PATH/set_size.tz Unit '(Set)' 0
 assert_output $CONTRACT_PATH/set_size.tz Unit '(Set 1)' 1
 assert_output $CONTRACT_PATH/set_size.tz Unit '(Set 1 2 3)' 3
 assert_output $CONTRACT_PATH/set_size.tz Unit '(Set 1 2 3 4 5 6)' 6
+
+# Set iter
+assert_output $CONTRACT_PATH/set_iter.tz Unit '(Set)' 0
+assert_output $CONTRACT_PATH/set_iter.tz Unit '(Set 1)' 1
+assert_output $CONTRACT_PATH/set_iter.tz Unit '(Set -100 1 2 3)' '-94'
 
 # Map size
 assert_output $CONTRACT_PATH/map_size.tz Unit '(Map)' 0
@@ -154,6 +179,10 @@ assert_output $CONTRACT_PATH/get_map_value.tz \
 			  '(Map (Item "1" "one") (Item "2" "two"))' \
 			  '"1"' '(Some "one")'
 
+# Map iter
+assert_output $CONTRACT_PATH/map_iter.tz Unit '(Map (Item 0 100) (Item 2 100))' '(Pair 2 200)'
+assert_output $CONTRACT_PATH/map_iter.tz Unit '(Map (Item 1 1) (Item 2 100))' '(Pair 3 101)'
+
 # Return True if True branch of if was taken and False otherwise
 assert_output $CONTRACT_PATH/if.tz Unit True True
 assert_output $CONTRACT_PATH/if.tz Unit False False
@@ -167,6 +196,10 @@ assert_output $CONTRACT_PATH/reverse.tz Unit '(List )' 'List'
 assert_output $CONTRACT_PATH/reverse.tz Unit '(List "c" "b" "a")' '(List "a" "b" "c")'
 assert_output $CONTRACT_PATH/reverse_loop.tz Unit '(List )' 'List'
 assert_output $CONTRACT_PATH/reverse_loop.tz Unit '(List "c" "b" "a")' '(List "a" "b" "c")'
+
+# Reverse using LOOP_LEFT
+assert_output $CONTRACT_PATH/loop_left.tz Unit '(List )' 'List'
+assert_output $CONTRACT_PATH/loop_left.tz Unit '(List "c" "b" "a")' '(List "a" "b" "c")'
 
 # Exec concat contract
 assert_output $CONTRACT_PATH/exec_concat.tz Unit '""' '"_abc"'
