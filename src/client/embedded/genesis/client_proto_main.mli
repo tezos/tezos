@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Client_proto_genesis
+
 val mine:
   Client_rpcs.config ->
   ?timestamp: Time.t ->

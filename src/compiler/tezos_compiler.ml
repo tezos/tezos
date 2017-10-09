@@ -16,9 +16,7 @@
 
 *)
 
-open Tezos_data
-
-(* GRGR TODO: fail in the presence of "external" *)
+(* TODO: fail in the presence of "external" *)
 
 module Backend = struct
   (* See backend_intf.mli. *)
@@ -36,6 +34,7 @@ module Backend = struct
     (* The "-1" is to allow for a potential closure environment parameter. *)
     Proc.max_arguments_for_tailcalls - 1
 end
+
 let backend = (module Backend : Backend_intf.S)
 
 let warnings = "+a-4-6-7-9-29-40..42-44-45-48"
@@ -44,6 +43,53 @@ let warn_error = "-a+8"
 let () =
   Clflags.unsafe_string := false ;
   Clflags.native_code := true
+
+(** Override the default 'Env.Persistent_signature.load'
+    with a lookup in locally defined hashtable.
+*)
+
+let preloaded_cmis : (string, Env.Persistent_signature.t) Hashtbl.t =
+  Hashtbl.create ~random:true 42
+
+(* Set hook *)
+let () =
+  let open Env.Persistent_signature in
+  Env.Persistent_signature.load :=
+    (fun ~unit_name ->
+       try Some (Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name))
+       with Not_found -> None)
+
+let load_cmi_from_file file =
+  Hashtbl.add preloaded_cmis
+    (String.capitalize_ascii Filename.(basename (chop_extension file)))
+    { filename = file ;
+      cmi = Cmi_format.read_cmi file ;
+    }
+
+let load_embeded_cmi (unit_name, content) =
+  let content = Bytes.of_string content in
+  (* Read cmi magic *)
+  let magic_len = String.length Config.cmi_magic_number in
+  let magic = Bytes.sub content 0 magic_len in
+  assert (magic = Bytes.of_string Config.cmi_magic_number) ;
+  (* Read cmi_name and cmi_sign *)
+  let pos = magic_len in
+  let (cmi_name, cmi_sign) = Marshal.from_bytes content pos in
+  let pos = pos + Marshal.total_size content pos in
+  (* Read cmi_crcs *)
+  let cmi_crcs = Marshal.from_bytes content pos in
+  let pos = pos + Marshal.total_size content pos  in
+  (* Read cmi_flags *)
+  let cmi_flags = Marshal.from_bytes content pos in
+  (* TODO check crcrs... *)
+  Hashtbl.add
+    preloaded_cmis
+    (String.capitalize_ascii unit_name)
+    { filename  =  unit_name ^ ".cmi" ;
+      cmi = { cmi_name; cmi_sign; cmi_crcs; cmi_flags } ;
+    }
+
+let load_embeded_cmis cmis = List.iter load_embeded_cmi cmis
 
 (** Compilation environment.
 
@@ -58,13 +104,20 @@ let () =
 
  *)
 
+
 let tezos_protocol_env =
-  [ "camlinternalFormatBasics", Embedded_cmis.camlinternalFormatBasics_cmi ;
-    "proto_environment", Embedded_cmis.proto_environment_cmi ;
+  let open Tezos_compiler_embedded_cmis in
+  [
+    "CamlinternalFormatBasics", camlinternalFormatBasics_cmi ;
+    "Tezos_protocol_environment_sigs_v1", tezos_protocol_environment_sigs_v1_cmi ;
   ]
 
 let register_env =
-  [ "register", Embedded_cmis.register_cmi ]
+  let open Tezos_compiler_embedded_cmis in
+  [
+    "Tezos_protocol_registerer", tezos_protocol_registerer_cmi ;
+  ]
+
 
 (** Helpers *)
 
@@ -75,21 +128,6 @@ let create_file ?(perm = 0o644) name content =
   let fd = openfile name [O_TRUNC; O_CREAT; O_WRONLY] perm in
   ignore(write_substring fd content 0 (String.length content));
   close fd
-
-let read_md5 file =
-  let ic = open_in file in
-  let md5 = input_line ic in
-  close_in ic ;
-  md5
-
-let rec create_dir ?(perm = 0o755) dir =
-  if not (Sys.file_exists dir) then begin
-    create_dir (Filename.dirname dir);
-    Unix.mkdir dir perm
-  end
-
-let dump_cmi dir (file, content) =
-  create_file (dir // file ^ ".cmi") content
 
 let safe_unlink file =
   try Unix.unlink file
@@ -103,20 +141,74 @@ let unlink_object obj =
   safe_unlink (Filename.chop_suffix obj ".cmx" ^ ".cmi");
   safe_unlink (Filename.chop_suffix obj ".cmx" ^ ".o")
 
+let debug_flag = ref false
 
-(** TEZOS_PROTOCOL files *)
+let debug fmt =
+  if !debug_flag then Format.eprintf fmt
+  else Format.ifprintf Format.err_formatter fmt
+
+let hash_file file =
+  let open Sodium.Generichash in
+  let buflen = 8092 in
+  let buf = BytesLabels.create buflen in
+  let fd = Unix.openfile file [Unix.O_RDONLY] 0o600 in
+  let state = init ~size:32 () in
+  let rec loop () =
+    match Unix.read fd buf 0 buflen with
+    | 0 -> ()
+    | nb_read ->
+        Bytes.update state @@
+        if nb_read = buflen then buf else BytesLabels.sub buf 0 nb_read
+  in
+  loop () ;
+  Unix.close fd ;
+  BytesLabels.unsafe_to_string (Bytes.of_hash (final state))
+
+(** Semi-generic compilation functions *)
+
+let pack_objects output objects =
+  let output = output ^ ".cmx" in
+  Compmisc.init_path true;
+  Asmpackager.package_files
+    ~backend Format.err_formatter Env.initial_safe_string objects output ;
+  Warnings.check_fatal () ;
+  output
+
+let link_shared output objects =
+  Compenv.(readenv Format.err_formatter Before_link) ;
+  Compmisc.init_path true;
+  Asmlink.link_shared Format.err_formatter objects output ;
+  Warnings.check_fatal ()
+
+let compile_ml ?for_pack ml =
+  let target = Filename.chop_extension ml in
+  Clflags.for_package := for_pack ;
+  Compenv.(readenv Format.err_formatter (Before_compile ml));
+  Optcompile.implementation ~backend Format.err_formatter ml target ;
+  Clflags.for_package := None ;
+  target ^ ".cmx"
 
 module Meta = struct
+
   let name = "TEZOS_PROTOCOL"
+
   let config_file_encoding =
     let open Data_encoding in
-    obj2
-      (opt "hash" ~description:"Used to force the hash of the protocol" Protocol_hash.encoding)
-      (req "modules" ~description:"Modules comprising the protocol" (list string))
+    obj3
+      (opt "hash"
+         ~description:"Used to force the hash of the protocol"
+         Protocol_hash.encoding)
+      (opt "expected_env_version"
+         Protocol.env_version_encoding)
+      (req "modules"
+         ~description:"Modules comprising the protocol"
+         (list string))
 
-  let to_file dirname ?hash modules =
+  let to_file dirname ?hash ?env_version modules =
     let config_file =
-      Data_encoding.Json.construct config_file_encoding (hash, modules) in
+      Data_encoding.Json.construct
+        config_file_encoding
+        (hash, env_version, modules) in
     Utils.write_file ~bin:false (dirname // name) @@
     Data_encoding_ezjsonm.to_string config_file
 
@@ -125,8 +217,8 @@ module Meta = struct
     Data_encoding_ezjsonm.from_string |> function
     | Error err -> Pervasives.failwith err
     | Ok json -> Data_encoding.Json.destruct config_file_encoding json
-end
 
+end
 
 let find_component dirname module_name =
   let open Protocol in
@@ -144,293 +236,99 @@ let find_component dirname module_name =
       { name = module_name; interface = Some interface; implementation }
 
 let read_dir dirname =
-    let _hash, modules = Meta.of_file dirname in
-    List.map (find_component dirname) modules
+  let hash, expected_env, modules = Meta.of_file dirname in
+  let components = List.map (find_component dirname) modules in
+  let expected_env = match expected_env with None -> Protocol.V1 | Some v -> v in
+  let protocol = Protocol.{ expected_env ; components } in
+  let hash =
+    match hash with
+    | None -> Protocol.hash protocol
+    | Some hash -> hash in
+  hash, protocol
 
-(** Semi-generic compilation functions *)
-
-let compile_mli ?(ctxt = "") ?(keep_object = false) target mli =
-  Printf.printf "OCAMLOPT%s %s\n%!" ctxt (Filename.basename target ^ ".cmi");
-  Compenv.(readenv Format.err_formatter (Before_compile mli)) ;
-  Optcompile.interface Format.err_formatter mli target ;
-  if not keep_object then
-    at_exit (fun () -> safe_unlink (target ^ ".cmi"))
-
-
-let compile_ml ?(ctxt = "") ?(keep_object = false) ?for_pack target ml =
-  Printf.printf "OCAMLOPT%s %s\n%!" ctxt (Filename.basename target ^ ".cmx") ;
-  Compenv.(readenv Format.err_formatter (Before_compile ml));
-  Clflags.for_package := for_pack;
-  Optcompile.implementation
-    ~backend Format.err_formatter ml target;
-  Clflags.for_package := None;
-  if not keep_object then
-    at_exit (fun () -> unlink_object (target ^ ".cmx")) ;
-  target ^ ".cmx"
-
-let modification_date file = Unix.((stat file).st_mtime)
-
-let compile_units
-    ?ctxt
-    ?(update_needed = true)
-    ?keep_object ?for_pack ~source_dir ~build_dir units =
-  let compile_unit update_needed unit =
-    let basename = String.uncapitalize_ascii unit in
-    let mli = source_dir // basename ^ ".mli" in
-    let cmi = build_dir // basename ^ ".cmi" in
-    let ml  = source_dir // basename ^ ".ml"  in
-    let cmx = build_dir // basename ^ ".cmx"  in
-    let target = build_dir  // basename in
-    let update_needed =
-      update_needed
-      || not (Sys.file_exists cmi)
-      || ( Sys.file_exists mli
-           && modification_date cmi < modification_date mli )
-      || not (Sys.file_exists cmx)
-      || modification_date cmx < modification_date ml in
-    if update_needed then begin
-      unlink_object cmx ;
-      if Sys.file_exists mli then compile_mli ?ctxt ?keep_object target mli ;
-      ignore (compile_ml ?ctxt ?keep_object ?for_pack target ml)
-    end ;
-    update_needed, cmx in
-  List.fold_left
-    (fun (update_needed, acc) unit->
-       let update_needed, output = compile_unit update_needed unit in
-       update_needed, output :: acc)
-    (update_needed, []) units
-  |> snd |> List.rev
-
-let pack_objects ?(ctxt = "") ?(keep_object = false) output objects =
-  Printf.printf "PACK%s %s\n%!" ctxt (Filename.basename output);
-  Compmisc.init_path true;
-  Asmpackager.package_files
-    ~backend Format.err_formatter Env.initial_safe_string objects output;
-  if not keep_object then at_exit (fun () -> unlink_object output) ;
-  Warnings.check_fatal ()
-
-let link_shared ?(static=false) output objects =
-  Printf.printf "LINK %s\n%!" (Filename.basename output);
-  Compenv.(readenv Format.err_formatter Before_link);
-  Compmisc.init_path true;
-  if static then
-    Asmlibrarian.create_archive objects output
-  else
-    Asmlink.link_shared Format.err_formatter objects output;
-  Warnings.check_fatal ()
-
-(** Main for the 'forked' compiler.
-
-    It expect the following arguments:
-
-      output.cmxs source_dir
-
-    where, [source_dir] should contains a TEZOS_PROTOCOL file such as:
-
-      hash = "69872d2940b7d11c9eabbc685115bd7867a94424"
-      modules = [Data; Main]
-
-    The [source_dir] should also contains the corresponding source
-    file. For instance: [data.ml], [main.ml] and optionnaly [data.mli]
-    and [main.mli].
-
- *)
-
-let create_register_file client file hash packname modules =
-  let unit = List.hd (List.rev modules) in
-  let environment_module = packname ^ ".Local_environment.Environment" in
-  let error_monad_module = environment_module ^ ".Error_monad" in
-  let context_module = environment_module ^ ".Context" in
-  let hash_module = environment_module ^ ".Hash" in
-  create_file file
-    (Printf.sprintf
-       "module Packed_protocol = struct\n\
-       \  let hash = (%s.Protocol_hash.of_b58check_exn %S)\n\
-       \  type error = %s.error = ..\n\
-       \  type 'a tzresult = 'a %s.tzresult\n\
-       \  include %s.%s\n\
-       \  let error_encoding  = %s.error_encoding  ()\n\
-       \  let classify_errors = %s.classify_errors\n\
-       \  let pp = %s.pp\n\
-       \  let complete_b58prefix = %s.complete
-       \ end\n\
-       \ %s\n\
-       "
-       hash_module
-       (Protocol_hash.to_b58check hash)
-       error_monad_module
-       error_monad_module
-       packname (String.capitalize_ascii unit)
-       error_monad_module
-       error_monad_module
-       error_monad_module
-       context_module
-       (if client then
-          "include Register.Make(Packed_protocol)"
-        else
-          Printf.sprintf
-            "let () = Register.register (%s.__cast (module Packed_protocol : %s.PACKED_PROTOCOL))" environment_module environment_module))
+(** Main *)
 
 let mktemp_dir () =
   Filename.get_temp_dir_name () //
   Printf.sprintf "tezos-protocol-build-%06X" (Random.int 0xFFFFFF)
 
 let main () =
-
   Random.self_init () ;
-  Sodium.Random.stir () ;
-
   let anonymous = ref []
-  and client = ref false
-  and build_dir = ref None
-  and include_dirs = ref [] in
-  let static = ref false in
+  and static = ref false
+  and build_dir = ref None in
   let args_spec = [
-    "-static", Arg.Set static, " Build a library (.cmxa)";
-    "-client", Arg.Set client, " Preserve type equality with concrete node environment (used to embed protocol into the client)" ;
-    "-I", Arg.String (fun s -> include_dirs := s :: !include_dirs), "path Path for concrete node signatures (used to embed protocol into the client)" ;
+    "-static", Arg.Set static, " Only build the static library (no .cmxs)";
     "-bin-annot", Arg.Set Clflags.binary_annotations, " (see ocamlopt)" ;
     "-g", Arg.Set Clflags.debug, " (see ocamlopt)" ;
-    "-build-dir", Arg.String (fun s -> build_dir := Some s), "path Reuse build dir (incremental compilation)"] in
-  let usage_msg = Printf.sprintf "Usage: %s <out> <src>\nOptions are:" Sys.argv.(0) in
+    "-build-dir", Arg.String (fun s -> build_dir := Some s),
+    "use custom build directory and preserve build artifacts"
+  ] in
+  let usage_msg =
+    Printf.sprintf
+      "Usage: %s [options] <out> <srcdir>\nOptions are:"
+      Sys.argv.(0) in
   Arg.parse args_spec (fun s -> anonymous := s :: !anonymous) usage_msg ;
-
-  let client = !client and include_dirs = !include_dirs in
-  let output, source_dir =
+  let (output, source_dir) =
     match List.rev !anonymous with
-    | [ output ; source_dir ] -> output, source_dir
+    | [ output ; protocol_dir ] -> output, protocol_dir
     | _ -> Arg.usage args_spec usage_msg ; Pervasives.exit 1 in
-  if include_dirs <> [] && not client then begin
-    Arg.usage args_spec usage_msg ; Pervasives.exit 1
-  end ;
-
-  let keep_object, build_dir, sigs_dir =
+  let build_dir =
     match !build_dir with
     | None ->
-        let build_dir = mktemp_dir () in
-        false, build_dir, build_dir // "sigs"
-    | Some build_dir ->
-        true, build_dir, mktemp_dir () in
-  create_dir build_dir ;
-  create_dir sigs_dir ;
-  at_exit (fun () ->
-      Unix.rmdir sigs_dir ;
-      if not keep_object then Unix.rmdir build_dir ) ;
-
-  let hash, units = Meta.of_file source_dir in
-  let hash = match hash with
-    | Some hash -> hash
-    | None -> Protocol.hash @@ List.map (find_component source_dir) units
-  in
-  let packname =
-    if keep_object then
-      String.capitalize_ascii (Filename.(basename @@ chop_extension output))
-    else
-      Format.asprintf "Protocol_%a" Protocol_hash.pp hash in
-  let packed_objects =
-    if keep_object then
-      Filename.dirname output // String.uncapitalize_ascii packname ^ ".cmx"
-    else
-      build_dir // packname ^ ".cmx" in
-  let ctxt = Printf.sprintf " (%s)" (Filename.basename output) in
-  let logname =
-    if keep_object then
-      try
-        Scanf.sscanf
-          Filename.(basename @@ chop_extension output)
-          "embedded_proto_%s"
-          (fun s -> "proto." ^ s)
-      with _ ->
-        Filename.(basename @@ chop_extension output)
-    else
-      Format.asprintf "proto.%a" Protocol_hash.pp hash in
-
-  (* TODO proper error *)
-  assert (List.length units >= 1);
-
+        let dir = mktemp_dir () in
+        at_exit (fun () -> Lwt_main.run (Lwt_utils.remove_dir dir)) ;
+        dir
+    | Some dir -> dir in
+  Lwt_main.run (Lwt_utils.create_dir ~perm:0o755 build_dir) ;
+  Lwt_main.run (Lwt_utils.create_dir ~perm:0o755 (Filename.dirname output)) ;
+  let hash, protocol = read_dir source_dir in
+  (* Generate the 'functor' *)
+  let functor_file = build_dir // "functor.ml" in
+  let oc = open_out functor_file in
+  Tezos_protocol_packer.dump oc
+    (Array.map
+       begin fun { Protocol.name }  ->
+         let name_lowercase = String.uncapitalize_ascii name in
+         source_dir // name_lowercase ^ ".ml"
+       end
+       (Array.of_list protocol.components)) ;
+  close_out oc ;
+  (* Compile the protocol *)
+  let proto_cmi = Filename.chop_extension functor_file ^ ".cmi" in
+  let functor_unit =
+    String.capitalize_ascii
+      Filename.(basename (chop_extension functor_file)) in
+  let for_pack = String.capitalize_ascii (Filename.basename output) in
   (* Initialize the compilers *)
   Compenv.(readenv Format.err_formatter Before_args);
-  if not client then Clflags.no_std_include := true;
-  Clflags.include_dirs := build_dir :: sigs_dir :: include_dirs;
   Clflags.nopervasives := true;
-  Warnings.parse_options false warnings;
-  Warnings.parse_options true warn_error;
+  Clflags.no_std_include := true ;
+  Clflags.include_dirs := [Filename.dirname functor_file] ;
+  Warnings.parse_options false warnings ;
+  Warnings.parse_options true warn_error ;
 
-  let md5 =
-    if not client then
-      Digest.(to_hex (file Sys.executable_name))
-    else
-      try
-        let environment_cmi =
-          Misc.find_in_path_uncap !Clflags.include_dirs "environment.cmi" in
-        let environment_cmx =
-          Misc.find_in_path_uncap !Clflags.include_dirs "environment.cmx" in
-        Digest.(to_hex (file Sys.executable_name) ^
-                (to_hex (file environment_cmi)) ^
-                (to_hex (file environment_cmx)))
-      with Not_found ->
-        Printf.eprintf "%s: Cannot find 'environment.cmi'.\n%!" Sys.argv.(0);
-        Pervasives.exit 1
-  in
-  let update_needed =
-    not (Sys.file_exists (build_dir // ".tezos_compiler"))
-    || read_md5 (build_dir // ".tezos_compiler") <> md5 in
+  load_embeded_cmis tezos_protocol_env ;
+  let packed_protocol_object = compile_ml ~for_pack functor_file in
 
-  if keep_object then
-    create_file (build_dir // ".tezos_compiler") (md5 ^ "\n");
-
-  (* Compile the /ad-hoc/ Error_monad. *)
-  List.iter (dump_cmi sigs_dir) tezos_protocol_env ;
-  at_exit (fun () -> List.iter (unlink_cmi sigs_dir) tezos_protocol_env ) ;
-  let local_environment_unit = "local_environment" in
-  let local_environment_ml = build_dir // local_environment_unit ^ ".ml" in
-  create_file local_environment_ml @@ Printf.sprintf {|
-      module Environment = %s.Make(struct let name = %S end)()
-    |}
-    (if client then "Environment" else "Proto_environment")
-    logname ;
-  if not keep_object then
-    at_exit (fun () ->
-        safe_unlink local_environment_ml) ;
-  let local_environment_object =
-    compile_units
-      ~ctxt
-      ~for_pack:packname
-      ~keep_object
-      ~build_dir ~source_dir:build_dir [local_environment_unit]
-  in
-
-  Compenv.implicit_modules :=
-    [ "Local_environment"; "Environment" ;
-      "Error_monad" ; "Hash" ; "Logging" ; "Tezos_data" ];
-
-  (* Compile the protocol *)
-  let objects =
-    compile_units
-      ~ctxt
-      ~update_needed
-      ~keep_object ~for_pack:packname ~build_dir ~source_dir units in
-  pack_objects ~ctxt ~keep_object
-    packed_objects (local_environment_object @ objects) ;
+  load_embeded_cmis register_env ;
+  load_cmi_from_file proto_cmi ;
 
   (* Compiler the 'registering module' *)
-  List.iter (dump_cmi sigs_dir) register_env;
-  at_exit (fun () -> List.iter (unlink_cmi sigs_dir) register_env ) ;
-  let register_unit =
-    if client then
-      Filename.dirname output //
-      "register_" ^
-      Filename.(basename @@ chop_extension output)
-    else
-      build_dir // Format.asprintf "register_%s" packname in
-  let register_file = register_unit ^ ".ml" in
-  create_register_file client register_file hash packname units ;
-  if not keep_object then at_exit (fun () -> safe_unlink register_file) ;
-  if keep_object then
-    Clflags.include_dirs := !Clflags.include_dirs @ [Filename.dirname output] ;
-  let register_object =
-    compile_ml ~keep_object:client (register_unit) register_file in
+  let register_file = Filename.dirname functor_file // "register.ml" in
+  create_file register_file
+    (Printf.sprintf
+       "module Name = struct let name = %S end\n\
+       \ let () = Tezos_protocol_registerer.register Name.name (module %s.Make)"
+       (Protocol_hash.to_b58check hash)
+       functor_unit) ;
+  let register_object = compile_ml ~for_pack register_file in
+
+  let resulting_object =
+    pack_objects output [ packed_protocol_object ; register_object ] in
 
   (* Create the final [cmxs] *)
-  Clflags.link_everything := true ;
-  link_shared ~static:!static output [packed_objects; register_object]
+  if not !static then begin
+    Clflags.link_everything := true ;
+    link_shared (output ^ ".cmxs") [resulting_object] ;
+  end

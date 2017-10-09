@@ -30,7 +30,7 @@ let rec forge_block_header
       Tezos_context.Block_header.forge_unsigned
         shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
     let signed_header =
-      Ed25519.Signature.append delegate_sk unsigned_header in
+      Environment.Ed25519.Signature.append delegate_sk unsigned_header in
     let block_hash = Block_hash.hash_bytes [signed_header] in
     if Mining.check_hash block_hash stamp_threshold then
       signed_header

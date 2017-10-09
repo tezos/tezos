@@ -1,5 +1,3 @@
-open MBytes
-
 (** In memory JSON data *)
 type json =
   [ `O of (string * json) list

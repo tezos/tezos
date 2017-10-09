@@ -1,13 +1,8 @@
 REC
-S ../environment
-B ../environment
-S ../packer
-B ../packer
 B ../minutils
 S ../minutils
-B ../utils
-S ../utils
-FLG -open Tezos_data -open Hash
+B .
+S .
 # minutils
 PKG cstruct
 PKG lwt
@@ -24,7 +19,3 @@ PKG mtime.clock.os
 PKG nocrypto
 PKG sodium
 PKG zarith
-# compiler
-PKG compiler-libs
-PKG compiler-libs.optcomp
-PKG sodium

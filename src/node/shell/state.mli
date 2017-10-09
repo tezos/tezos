@@ -190,3 +190,19 @@ module Protocol : sig
   val list: global_state -> Protocol_hash.Set.t Lwt.t
 
 end
+
+module Registred_protocol : sig
+
+  module type T = sig
+    val hash: Protocol_hash.t
+    include Updater.RAW_PROTOCOL with type error := error
+                                  and type 'a tzresult := 'a tzresult
+    val complete_b58prefix : Context.t -> string -> string list Lwt.t
+  end
+
+  val mem: Protocol_hash.t -> bool
+
+  val get: Protocol_hash.t -> (module T) option
+  val get_exn: Protocol_hash.t -> (module T)
+
+end

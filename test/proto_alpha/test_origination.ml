@@ -7,9 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_embedded_proto_alpha
-open Tezos_context
-
 module Helpers = Proto_alpha_helpers
 module Assert = Helpers.Assert
 

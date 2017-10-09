@@ -7,9 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_embedded_proto_alpha
-open Tezos_context
-open Client_alpha
+module Ed25519 = Environment.Ed25519
 
 let (//) = Filename.concat
 
@@ -316,7 +314,7 @@ module Assert = struct
     equal_pkh ~msg actual_delegate expected_delegate
 
   let ecoproto_error f = function
-    | Register_client_embedded_proto_alpha.Ecoproto_error errors ->
+    | Ecoproto_error errors ->
         List.exists f errors
     | _ -> false
 
@@ -341,7 +339,7 @@ module Assert = struct
     Assert.contain_error ~msg ~f:(ecoproto_error (fun _ -> true))
 
   let unknown_contract ~msg =
-    let open Client_embedded_proto_alpha.Storage_functors in
+    let open Storage_functors in
     Assert.contain_error ~msg ~f:begin ecoproto_error (function
         | Storage_error _ -> true
         | _ -> false)
@@ -431,7 +429,7 @@ module Mining = struct
   let endorsement_reward block =
     Client_proto_rpcs.Header.priority rpc_config block >>=? fun prio ->
     Mining.endorsement_reward ~block_priority:prio >|=
-    Register_client_embedded_proto_alpha.wrap_error >>|?
+    wrap_error >>|?
     Tez.to_cents
 
 end

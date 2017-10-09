@@ -36,15 +36,13 @@ ${TESTLIB}: $(shell find ${SRCDIR}/../test/lib -name \*.ml -or -name \*.mli)
 ## External packages
 ############################################################################
 
+PACKERLIB := ${SRCDIR}/packer.cmxa
 MINUTILSLIB := ${SRCDIR}/minutils.cmxa
 UTILSLIB := ${SRCDIR}/utils.cmxa
 COMPILERLIB := ${SRCDIR}/compiler.cmxa
 NODELIB := ${SRCDIR}/node.cmxa
 
 CLIENTLIB := ${SRCDIR}/client.cmxa \
-  $(patsubst ${SRCDIR}/client/embedded/%/, \
-	     ${SRCDIR}/proto/client_embedded_proto_%.cmxa, \
-             $(shell ls -d ${SRCDIR}/client/embedded/*/)) \
   $(patsubst ${SRCDIR}/client/embedded/%/, \
              ${SRCDIR}/client/embedded/client_%.cmx, \
 	     $(shell ls -d ${SRCDIR}/client/embedded/*/))

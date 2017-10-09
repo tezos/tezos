@@ -9,5 +9,4 @@
 
 (** Tezos Protocol Implementation - Protocol Signature Instance *)
 
-include Updater.PROTOCOL with type error := error
-                          and type 'a tzresult := 'a tzresult
+include Updater.PROTOCOL

@@ -7,9 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Make(Param : sig val name: string end)() = struct
+(* module Make(Param : sig val name: string end)() = struct *)
 
-  include Environment.Make(Param)()
+module V1 = struct
+  include Environment.Make(struct let name = "proto.alpha" end)()
 
   let __cast (type error) (module X : PACKED_PROTOCOL) =
     (module X : Protocol_sigs.PACKED_PROTOCOL)

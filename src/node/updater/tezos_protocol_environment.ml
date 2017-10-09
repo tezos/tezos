@@ -257,10 +257,15 @@ module Make(Param : sig val name: string end)() = struct
   module Persist = Persist
   module RPC = RPC
   module Fitness = Fitness
-  module Updater = Updater
   module Error_monad = struct
     type error_category = [ `Branch | `Temporary | `Permanent ]
     include Error_monad.Make()
+  end
+  module Updater = struct
+    include Updater
+    module type PROTOCOL =
+      RAW_PROTOCOL with type error := Error_monad.error
+                    and type 'a tzresult := 'a Error_monad.tzresult
   end
   module Logging = Logging.Make(Param)
   module Base58 = struct
@@ -275,14 +280,4 @@ module Make(Param : sig val name: string end)() = struct
     let register_resolver = Base58.register_resolver
     let complete ctxt s = Base58.complete ctxt s
   end
-
-  module type PACKED_PROTOCOL = sig
-    val hash : Protocol_hash.t
-    include Updater.PROTOCOL
-    val error_encoding : error Data_encoding.t
-    val classify_errors : error list -> [ `Branch | `Temporary | `Permanent ]
-    val pp : Format.formatter -> error -> unit
-    val complete_b58prefix : Context.t -> string -> string list Lwt.t
-  end
-
 end

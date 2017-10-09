@@ -577,6 +577,50 @@ module Protocol = struct
 
 end
 
+module Registred_protocol = struct
+
+  module type T = sig
+    val hash: Protocol_hash.t
+    include Updater.RAW_PROTOCOL with type error := error
+                                  and type 'a tzresult := 'a tzresult
+    val complete_b58prefix : Context.t -> string -> string list Lwt.t
+  end
+
+  let build_v1 hash =
+    let (module F) = Tezos_protocol_registerer.get_exn hash in
+    let module Name = struct
+      let name = Protocol_hash.to_b58check hash
+    end in
+    let module Env = Tezos_protocol_environment.Make(Name)() in
+    (module struct
+      let hash = hash
+      module P = F(Env)
+      include P
+      include Updater.WrapProtocol(Name)(Env)(P)
+      let complete_b58prefix = Env.Context.complete
+    end : T)
+
+  module VersionTable = Protocol_hash.Table
+
+  let versions : (module T) VersionTable.t =
+    VersionTable.create 20
+
+  let mem hash =
+    VersionTable.mem versions hash || Tezos_protocol_registerer.mem hash
+
+  let get_exn hash =
+    try VersionTable.find versions hash
+    with Not_found ->
+      let proto = build_v1 hash in
+      VersionTable.add versions hash proto ;
+      proto
+
+  let get hash =
+    try Some (get_exn hash)
+    with Not_found -> None
+
+end
+
 let read
   ?patch_context
   ~store_root

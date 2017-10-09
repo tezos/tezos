@@ -225,13 +225,18 @@ end
 
 module Protocol = struct
 
-  type t = component list
+  type t = {
+    expected_env: env_version ;
+    components: component list ;
+  }
 
   and component = {
     name: string ;
     interface: string option ;
     implementation: string ;
   }
+
+  and env_version = V1
 
   let component_encoding =
     let open Data_encoding in
@@ -245,7 +250,21 @@ module Protocol = struct
          (opt "interface" string)
          (req "implementation" string))
 
-  let encoding = Data_encoding.list component_encoding
+  let env_version_encoding =
+    let open Data_encoding in
+    conv
+      (function V1 -> 0)
+      (function 0 -> V1 | _ -> failwith "unexpected environment version")
+      int16
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun { expected_env ; components } -> (expected_env, components))
+      (fun (expected_env, components) -> { expected_env ; components })
+      (obj2
+         (req "expected_env_version" env_version_encoding)
+         (req "components" (list component_encoding)))
 
   let pp fmt op =
     Format.pp_print_string fmt @@

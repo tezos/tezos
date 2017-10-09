@@ -713,40 +713,13 @@ let inject_operation =
     RPC.Path.(root / "inject_operation")
 
 let inject_protocol =
-  let proto_of_rpc =
-    List.map (fun (name, interface, implementation) ->
-        { Protocol.name; interface; implementation })
-  in
-  let rpc_of_proto =
-    List.map (fun { Protocol.name; interface; implementation } ->
-                (name, interface, implementation))
-  in
-  let proto =
-    conv
-      rpc_of_proto
-      proto_of_rpc
-      (list
-         (obj3
-            (req "name"
-               (describe ~title:"OCaml module name"
-                  string))
-            (opt "interface"
-               (describe
-                  ~description:"Content of the .mli file"
-                  string))
-            (req "implementation"
-               (describe
-                  ~description:"Content of the .ml file"
-                  string))))
-  in
   RPC.service
     ~description:
       "Inject a protocol in node. Returns the ID of the protocol."
     ~input:
       (obj3
          (req "protocol"
-            (describe ~title: "Tezos protocol"
-               proto))
+            (describe ~title: "Tezos protocol" Protocol.encoding))
          (dft "blocking"
             (describe
                ~description:

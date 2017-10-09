@@ -18,8 +18,8 @@ SOURCE_DIRECTORIES := \
   ../lib
 
 LIB := \
-  ${MINUTILSLIB} ${UTILSLIB} ${COMPILERLIB} \
-  ${NODELIB} ${CLIENTLIB} ${EMBEDDED_CLIENT_PROTOCOLS} ${TESTLIB}
+  ${PACKERLIB} ${MINUTILSLIB} ${UTILSLIB} ${COMPILERLIB} \
+  ${NODELIB} ${EMBEDDED_CLIENT_PROTOCOLS} ${CLIENTLIB} ${TESTLIB}
 
 PACKAGES := \
   ${CLIENT_PACKAGES} \
@@ -27,12 +27,8 @@ PACKAGES := \
 
 OPENED_MODULES := \
   ${CLIENT_OPENED_MODULES} \
-  Environment Client_embedded_proto_alpha Tezos_context
+  Client_alpha Client_proto_alpha Tezos_context
 
-${SRCDIR}/client/embedded/alpha/_tzbuild/%.cmi: ${SRCDIR}/proto/alpha/%.mli
-	${MAKE} -C ${SRCDIR} proto/client_embedded_proto_alpha.cmxa
-${SRCDIR}/client/embedded/alpha/_tzbuild/%.cmx: ${SRCDIR}/proto/alpha/%.ml
-	${MAKE} -C ${SRCDIR} proto/client_embedded_proto_alpha.cmxa
 ${SRCDIR}/client/embedded/alpha/%.cmi: ${SRCDIR}/client/embedded/alpha/%.mli
 	${MAKE} -C ${SRCDIR} client/embedded/client_alpha.cmx
 ${SRCDIR}/client/embedded/alpha/%.cmx: ${SRCDIR}/client/embedded/alpha/%.ml

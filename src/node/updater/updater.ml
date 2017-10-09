@@ -11,14 +11,14 @@ open Logging.Updater
 
 let (//) = Filename.concat
 
-type validation_result = Protocol_sigs.validation_result = {
+type validation_result = {
   context: Context.t ;
   fitness: Fitness.t ;
   message: string option ;
   max_operations_ttl: int ;
 }
 
-type rpc_context = Protocol_sigs.rpc_context = {
+type rpc_context = {
   block_hash: Block_hash.t ;
   block_header: Block_header.t ;
   operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
@@ -26,32 +26,49 @@ type rpc_context = Protocol_sigs.rpc_context = {
   context: Context.t ;
 }
 
-module type PROTOCOL = Protocol_sigs.PROTOCOL
-module type PACKED_PROTOCOL = Protocol_sigs.PACKED_PROTOCOL
-module type REGISTRED_PROTOCOL = sig
-  val hash: Protocol_hash.t
-  include PROTOCOL with type error := error
-                             and type 'a tzresult := 'a tzresult
-  val complete_b58prefix : Context.t -> string -> string list Lwt.t
+module type RAW_PROTOCOL = sig
+  type error = ..
+  type 'a tzresult
+  type operation
+  val max_operation_data_length: int
+  val max_block_length: int
+  val max_number_of_operations: int
+  val parse_operation:
+    Operation_hash.t -> Operation.t -> operation tzresult
+  val compare_operations: operation -> operation -> int
+  type validation_state
+  val current_context: validation_state -> Context.t tzresult Lwt.t
+  val precheck_block:
+    ancestor_context: Context.t ->
+    ancestor_timestamp: Time.t ->
+    Block_header.t ->
+    unit tzresult Lwt.t
+  val begin_application:
+    predecessor_context: Context.t ->
+    predecessor_timestamp: Time.t ->
+    predecessor_fitness: Fitness.t ->
+    Block_header.t ->
+    validation_state tzresult Lwt.t
+  val begin_construction:
+    predecessor_context: Context.t ->
+    predecessor_timestamp: Time.t ->
+    predecessor_level: Int32.t ->
+    predecessor_fitness: Fitness.t ->
+    predecessor: Block_hash.t ->
+    timestamp: Time.t ->
+    ?proto_header: MBytes.t ->
+    unit -> validation_state tzresult Lwt.t
+  val apply_operation:
+    validation_state -> operation -> validation_state tzresult Lwt.t
+  val finalize_block:
+    validation_state -> validation_result tzresult Lwt.t
+  val rpc_services: rpc_context RPC.directory
+  val configure_sandbox:
+    Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 end
-
-(** Version table *)
-
-module VersionTable = Protocol_hash.Table
-
-let versions : ((module REGISTRED_PROTOCOL)) VersionTable.t =
-  VersionTable.create 20
-
-let register hash proto =
-  VersionTable.add versions hash proto
 
 let activate = Context.set_protocol
 let fork_test_network = Context.fork_test_network
-
-let get_exn hash = VersionTable.find versions hash
-let get hash =
-  try Some (get_exn hash)
-  with Not_found -> None
 
 (** Compiler *)
 
@@ -82,13 +99,17 @@ let create_files dir units =
   let files = List.concat files in
   Lwt.return files
 
-let extract dirname hash units =
-  let source_dir = dirname // Protocol_hash.to_short_b58check hash // "src" in
-  create_files source_dir units >|= fun _files ->
-  Tezos_compiler.Meta.to_file source_dir ~hash
-    (List.map (fun {Protocol.name} -> String.capitalize_ascii name) units)
+let extract dir ?hash (p: Protocol.t) =
+  create_files dir p.components >>= fun _files ->
+  Tezos_compiler.Meta.to_file dir
+    ?hash
+    ~env_version:p.expected_env
+    (List.map (fun {Protocol.name} -> String.capitalize_ascii name) p.components) ;
+  Lwt.return_unit
 
-let do_compile hash units =
+let do_compile hash p =
+  assert (p.Protocol.expected_env = V1) ;
+  let units = p.components in
   let datadir = get_datadir () in
   let source_dir = datadir // Protocol_hash.to_short_b58check hash // "src" in
   let log_file = datadir // Protocol_hash.to_short_b58check hash // "LOG" in
@@ -120,13 +141,81 @@ let do_compile hash units =
           (Dynlink.error_message err) plugin_file;
         Lwt.return false
 
-let compile hash units =
-  if VersionTable.mem versions hash then
+let compile hash p =
+  if Tezos_protocol_registerer.mem hash then
     Lwt.return true
   else begin
-    do_compile hash units >>= fun success ->
-    let loaded = VersionTable.mem versions hash in
+    do_compile hash p >>= fun success ->
+    let loaded = Tezos_protocol_registerer.mem hash in
     if success && not loaded then
       log_error "Internal error while compiling %a" Protocol_hash.pp hash;
     Lwt.return loaded
   end
+
+module type REGISTRED_PROTOCOL = sig
+  val hash: Protocol_hash.t
+  include RAW_PROTOCOL with type error := error
+                                and type 'a tzresult := 'a tzresult
+  val complete_b58prefix : Context.t -> string -> string list Lwt.t
+end
+
+module WrapProtocol
+    (Name : sig val name: string end)
+    (Env : Tezos_protocol_environment_sigs_v1.T
+     with type Format.formatter = Format.formatter
+      and type 'a Data_encoding.t = 'a Data_encoding.t
+      and type 'a Lwt.t = 'a Lwt.t
+      and type ('a, 'b) Pervasives.result = ('a, 'b) Pervasives.result)
+    (P : Env.Updater.PROTOCOL) = struct
+  type proto_error = Env.Error_monad.error
+  type error += Ecoproto_error of proto_error list
+  let wrap_error = function
+    | Ok _ as ok -> ok
+    | Error errors -> Error [Ecoproto_error errors]
+  let () =
+    let id = Format.asprintf "Ecoproto.%s" Name.name in
+    Error_monad.register_wrapped_error_kind
+      (fun ecoerrors -> Env.Error_monad.classify_errors ecoerrors)
+      ~id ~title:"Error returned by the protocol"
+      ~description:"Wrapped error for the economic protocol."
+      ~pp:(fun ppf ->
+          Format.fprintf ppf
+            "@[<v 2>Economic error:@ %a@]"
+            (Format.pp_print_list Env.Error_monad.pp))
+      Data_encoding.(obj1 (req "ecoproto"
+                             (list (Env.Error_monad.error_encoding ()))))
+      (function Ecoproto_error ecoerrors -> Some ecoerrors
+              | _ -> None )
+      (function ecoerrors -> Ecoproto_error ecoerrors)
+  include P
+  let precheck_block
+      ~ancestor_context ~ancestor_timestamp
+      raw_block =
+    precheck_block
+      ~ancestor_context ~ancestor_timestamp
+      raw_block >|= wrap_error
+  let begin_application
+      ~predecessor_context ~predecessor_timestamp
+      ~predecessor_fitness
+      raw_block =
+    begin_application
+      ~predecessor_context ~predecessor_timestamp
+      ~predecessor_fitness
+      raw_block >|= wrap_error
+  let begin_construction
+      ~predecessor_context ~predecessor_timestamp
+      ~predecessor_level ~predecessor_fitness
+      ~predecessor ~timestamp ?proto_header () =
+    begin_construction
+      ~predecessor_context ~predecessor_timestamp
+      ~predecessor_level ~predecessor_fitness
+      ~predecessor ~timestamp ?proto_header () >|= wrap_error
+  let current_context c =
+    current_context c >|= wrap_error
+  let apply_operation c o =
+    apply_operation c o >|= wrap_error
+  let finalize_block c = finalize_block c >|= wrap_error
+  let parse_operation h b = parse_operation h b |> wrap_error
+  let configure_sandbox c j =
+    configure_sandbox c j >|= wrap_error
+end

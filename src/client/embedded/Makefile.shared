@@ -7,6 +7,7 @@ include ../../../Makefile.config
 
 NODE_DIRECTORIES = \
   $(addprefix ../../../, \
+    environment \
     minutils \
     utils \
     node/updater \
@@ -21,12 +22,9 @@ SOURCE_DIRECTORIES += \
   ../../../proto
 
 OPENED_MODULES := \
-  Client_embedded_proto_${PROTO_VERSION} \
-  Register_client_embedded_proto_${PROTO_VERSION} \
   Error_monad \
   Hash \
-  Tezos_data \
-  ${OPENED_MODULES}
+  Tezos_data
 
 OBJS := \
   ${CLIENT_IMPLS:.ml=.cmx} ${CLIENT_INTFS:.mli=.cmi}
@@ -37,9 +35,9 @@ ${OBJS} ${OBJS_DEPS}: TARGET="(client_$(PROTO_VERSION).cmx)"
 ${OBJS}: EXTRA_OCAMLFLAGS = -for-pack Client_$(PROTO_VERSION)
 ../client_$(PROTO_VERSION).cmx: EXTRA_OCAMLFLAGS =
 ${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
-  PACKAGES=lwt ocplib-json-typed sodium ocplib-ocamlres uutf
+  PACKAGES=lwt ocplib-json-typed sodium ocplib-ocamlres uutf ocplib-endian zarith
 ${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
-  ../../../proto/client_embedded_proto_${PROTO_VERSION}.cmxa
+  ../../../proto/tezos_embedded_protocol_${PROTO_VERSION}.cmx
 
 ../client_$(PROTO_VERSION).cmx: $(patsubst %.ml, %.cmx, ${CLIENT_IMPLS})
 	@echo LINK $(notdir $@)

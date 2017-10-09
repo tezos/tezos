@@ -7,3 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
+val camlinternalFormatBasics_cmi: string
+val tezos_protocol_environment_sigs_v1_cmi: string
+val tezos_protocol_registerer_cmi: string

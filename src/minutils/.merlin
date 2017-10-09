@@ -1,0 +1,7 @@
+REC
+B .
+S .
+PKG cstruct
+PKG lwt
+PKG ocplib-json-typed.bson
+PKG ocplib-resto.directory

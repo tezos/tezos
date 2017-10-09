@@ -1,5 +1,6 @@
 
 /tezos-node
+/tezos-protocol-packer
 /tezos-protocol-compiler
 /tezos-client
 /tezos-attacker
@@ -8,9 +9,9 @@
 /src/.ocamlinit.node
 /src/Makefile.local
 
-/src/compiler/environment_gen
-/src/node/updater/proto_environment.mli
-/src/compiler/embedded_cmis.ml
+/src/environment/tezos_protocol_environment_sigs_v1.ml
+
+/src/compiler/tezos_compiler_embedded_cmis.ml
 
 /src/proto/**/_tzbuild
 /src/proto/register_client_*.ml

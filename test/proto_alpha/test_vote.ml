@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_embedded_proto_alpha
-open Tezos_context
 open Proto_alpha_helpers
 
 let demo_protocol =
