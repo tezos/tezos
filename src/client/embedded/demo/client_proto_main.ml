@@ -44,7 +44,7 @@ let mine cctxt =
         [ v ; b ]
     | _ ->
         Lwt.ignore_result
-          (cctxt.message "Cannot parse fitness: %a" Fitness.pp bi.fitness);
+          (cctxt.message "Cannot parse fitness: %a" Environment.Fitness.pp bi.fitness);
         exit 2 in
   Client_node_rpcs.forge_block_header cctxt.rpc_config
     { shell = { net_id = bi.net_id ;

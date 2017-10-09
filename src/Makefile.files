@@ -1,8 +1,14 @@
 
 SRCDIR ?= .
 
+SIGS_PACKER:=environment/tezos_protocol_environment_sigs_packer
+PACKED_SIGS_V1:=environment/tezos_protocol_environment_sigs_v1
+
+ENVIRONMENT_SOURCE_DIRECTORIES := \
+  ${SRCDIR}/environment
+
 PROTOCOL_ENV_INTFS := \
-$(addprefix proto/environment/, \
+$(addprefix environment/v1/, \
   pervasives.mli \
   compare.mli \
   \
@@ -33,6 +39,18 @@ $(addprefix proto/environment/, \
   \
   updater.mli \
 )
+
+PACKER_DIRECTORIES := \
+  ${SRCDIR}/packer
+
+PACKER_LIB_INTFS := \
+  packer/tezos_protocol_packer.mli
+
+PACKER_LIB_IMPLS := \
+  packer/tezos_protocol_packer.ml
+
+PACKER_IMPLS := \
+  packer_main.ml
 
 ############################################################################
 ## Minimal utils library compatible with js_of_ocaml
@@ -127,43 +145,39 @@ UTILS_PACKAGES := \
   zarith \
   $(COVERAGEPKG) \
 
+
 ############################################################################
 ## Node protocol compiler (also embedded in the main program)
 ############################################################################
 
 COMPILER_SOURCE_DIRECTORIES := \
+  ${ENVIRONMENT_SOURCE_DIRECTORIES} \
+  ${PACKER_DIRECTORIES} \
   ${UTILS_SOURCE_DIRECTORIES} \
   ${SRCDIR}/compiler
 
-COMPILER_OPENED_MODULES := Error_monad Hash Utils
+COMPILER_OPENED_MODULES := Tezos_data Hash
+
+$(shell ocamlfind query stdlib)/camlinternalFormatBasics.cmi: \
+  $(shell ocamlfind query stdlib)/camlinternalFormatBasics.mli
+	@echo -n # do nothing...
 
 COMPILER_EMBEDDED_CMIS := \
-  compiler/sigs/camlinternalFormatBasics.cmi \
-  compiler/sigs/proto_environment.cmi \
-  compiler/sigs/register.cmi
+  $(shell ocamlfind query stdlib)/camlinternalFormatBasics.cmi \
+  ${PACKED_SIGS_V1}.cmi \
+  compiler/tezos_protocol_registerer.cmi
 
-COMPILER_PRECOMPILED_INTFS := \
-  compiler/sigs/tezos_data.mli \
-  compiler/sigs/persist.mli \
-  compiler/sigs/context.mli \
-  compiler/sigs/protocol_sigs.mli \
-  compiler/sigs/proto_environment.mli \
-  compiler/sigs/register.mli
-
-COMPILER_PRECOMPILED_PACKAGES := \
-  ${MINUTILS_PACKAGES} ${UTILS_PACKAGES}
-
-COMPILER_PRECOMPILED_SOURCE_DIRECTORIES := \
-  ${UTILS_SOURCE_DIRECTORIES} compiler/sigs/
-
-COMPILER_PRECOMPILED_OPENED_MODULES := Error_monad Hash Utils
+COMPILER_IMPLS := \
+  compiler_main.ml \
 
 COMPILER_LIB_INTFS := \
+  compiler/tezos_compiler_embedded_cmis.mli \
+  compiler/tezos_protocol_registerer.mli \
   compiler/tezos_compiler.mli \
-  compiler/embedded_cmis.mli \
 
 COMPILER_LIB_IMPLS := \
-  compiler/embedded_cmis.ml \
+  compiler/tezos_compiler_embedded_cmis.ml \
+  compiler/tezos_protocol_registerer.ml \
   compiler/tezos_compiler.ml \
 
 COMPILER_IMPLS := \
@@ -173,11 +187,6 @@ COMPILER_PACKAGES := \
   ${UTILS_PACKAGES} \
   compiler-libs \
   compiler-libs.optcomp \
-  lwt.unix \
-  ocplib-endian \
-  ocplib-ocamlres \
-  unix \
-
 
 ############################################################################
 ## Node program
@@ -216,9 +225,7 @@ NODE_LIB_INTFS := \
   node/db/store_helpers.mli \
   node/db/store.mli \
   \
-  node/updater/protocol_sigs.mli \
   node/updater/updater.mli \
-  node/updater/proto_environment.mli \
   node/updater/register.mli \
   \
   node/shell/state.mli \
@@ -261,10 +268,8 @@ FULL_NODE_LIB_IMPLS := \
   node/db/store_helpers.ml \
   node/db/store.ml \
   \
-  node/updater/protocol_sigs.mli \
   node/updater/updater.ml \
-  node/updater/environment.ml \
-  node/updater/proto_environment.ml \
+  node/updater/tezos_protocol_environment.ml \
   node/updater/register.ml \
   \
   node/shell/state.ml \
@@ -310,6 +315,7 @@ NODE_PACKAGES := \
   dynlink \
   git \
   irmin-unix \
+  mtime \
   ocplib-resto.directory \
   ssl \
   threads.posix \
@@ -320,7 +326,7 @@ EMBEDDED_PROTOCOLS := \
 	     $(shell ls ${SRCDIR}/proto/*/TEZOS_PROTOCOL))
 
 EMBEDDED_NODE_PROTOCOLS := \
-  $(patsubst %,${SRCDIR}/proto/embedded_proto_%.cmxa, ${EMBEDDED_PROTOCOLS})
+  $(patsubst %,${SRCDIR}/proto/tezos_embedded_protocol_%.cmx, ${EMBEDDED_PROTOCOLS})
 
 ############################################################################
 ## Client program
@@ -365,9 +371,7 @@ CLIENT_PACKAGES := \
   ${NODE_PACKAGES} \
   magic-mime \
 
-EMBEDDED_CLIENT_PROTOCOLS := \
-  $(patsubst %,${SRCDIR}/proto/client_embedded_proto_%.cmxa, \
-	     ${EMBEDDED_PROTOCOLS})
+EMBEDDED_CLIENT_PROTOCOLS := ${EMBEDDED_NODE_PROTOCOLS}
 
 CLIENT_VERSIONS := \
   $(patsubst ${SRCDIR}/client/embedded/%/,%, \
@@ -376,3 +380,58 @@ CLIENT_VERSIONS := \
 EMBEDDED_CLIENT_VERSIONS := \
   $(patsubst %,${SRCDIR}/client/embedded/client_%.cmx, \
 	     ${CLIENT_VERSIONS})
+
+
+ALPHA_MODULES := $(addprefix ${SRCDIR}/proto/alpha/, \
+  misc.ml \
+  tezos_hash.ml \
+  \
+  qty_repr.ml \
+  tez_repr.ml \
+  period_repr.ml \
+  time_repr.ml \
+  constants_repr.ml \
+  fitness_repr.ml \
+  raw_level_repr.ml \
+  voting_period_repr.ml \
+  cycle_repr.ml \
+  level_repr.ml \
+  seed_repr.ml \
+  script_int_repr.ml \
+  script_repr.ml \
+  contract_repr.ml \
+  roll_repr.ml \
+  vote_repr.ml \
+  operation_repr.ml \
+  block_header_repr.ml \
+  \
+  storage_sigs.ml \
+  storage_functors.ml \
+  storage.ml \
+  \
+  level_storage.ml \
+  nonce_storage.ml \
+  seed_storage.ml \
+  roll_storage.ml \
+  contract_storage.ml \
+  reward_storage.ml \
+  bootstrap_storage.ml \
+  fitness_storage.ml \
+  vote_storage.ml \
+  init_storage.ml \
+  public_key_storage.ml \
+  \
+  tezos_context.ml \
+  \
+  script_typed_ir.ml \
+  script_ir_translator.ml \
+  script_interpreter.ml \
+  \
+  mining.ml \
+  amendment.ml \
+  apply.ml \
+  \
+  services.ml \
+  services_registration.ml \
+  main.ml \
+)

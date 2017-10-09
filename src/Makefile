@@ -1,14 +1,14 @@
 
+TZPROTOCOLPACKER:=../tezos-protocol-packer
+TZCOMPILER:=../tezos-protocol-compiler
+TZNODE:=../tezos-node
+TZCLIENT:=../tezos-client
+
+all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT}
+
 -include Makefile.local
 include Makefile.config
 include Makefile.files
-
-TZCOMPILER=../tezos-protocol-compiler
-TZNODE=../tezos-node
-TZCLIENT=../tezos-client
-TZATTACKER=../tezos-attacker
-
-all: ${TZCOMPILER} ${TZNODE} ${TZCLIENT} # ${TZATTACKER}
 
 NODEPS :=
 
@@ -16,78 +16,93 @@ NODEPS :=
 ## Protocol environment
 ############################################################################
 
-.INTERMEDIATE: compiler/environment_gen
-.SECONDARY: node/updater/proto_environment.mli
+.INTERMEDIATE: ${SIGS_PACKER}
+.SECONDARY: ${PACKED_SIGS_V1}.ml
 
-compiler/environment_gen: compiler/environment_gen.ml
+ENVIRONMENT_OBJS := ${PACKED_SIGS_V1}.cmi ${PACKED_SIGS_V1}.cmx
+
+${ENVIRONMENT_OBJS}: PACKAGES=
+${ENVIRONMENT_OBJS}: SOURCE_DIRECTORIES=${ENVIRONMENT_DIRECTORIES}
+${ENVIRONMENT_OBJS}: TARGET="(tezos_protocol_environment_sigs_v1.cmx)"
+${ENVIRONMENT_OBJS}: OPENED_MODULES=
+
+${SIGS_PACKER}: ${SIGS_PACKER}.ml
 	@echo LINK $(notdir $@)
 	@$(OCAMLOPT) -o $@ $^
 
-node/updater/proto_environment.mli: \
-	compiler/environment_gen $(PROTOCOL_ENV_INTFS)
+${PACKED_SIGS_V1}.ml: \
+  ${SIGS_PACKER} $(PROTOCOL_ENV_INTFS)
 	@echo GENERATING $(notdir $@)
-	@compiler/environment_gen node/updater/proto_environment.mli \
-	  $(PROTOCOL_ENV_INTFS)
+	@${SIGS_PACKER} $(PROTOCOL_ENV_INTFS) > $@
 
-compiler/sigs/proto_environment.mli: node/updater/proto_environment.mli
-
-compiler/sigs/proto_environment.cmi: \
-  compiler/sigs/proto_environment.mli compiler/sigs/protocol_sigs.cmi \
-  compiler/sigs/camlinternalFormatBasics.cmi
-	@echo OCAMLOPT ${TARGET} $@
-	@$(OCAMLOPT) -nopervasives -nostdlib -opaque -I tmp -I compiler/sigs -c $<
+${PACKED_SIGS_V1}.cmi: ${PACKED_SIGS_V1}.cmx
+${PACKED_SIGS_V1}.cmx: EXTRA_OCAMLFLAGS = -nopervasives
 
 partial-clean::
-	rm -f node/updater/proto_environment.mli
-	rm -f compiler/environment_gen
+	rm -f ${SIGS_PACKER}
+	rm -f ${PACKED_SIGS_V1}.ml
 
 ############################################################################
-## Protocol environment
+## Protocol packer
 ############################################################################
 
+PACKER_OBJS := \
+   ${PACKER_LIB_IMPLS:.ml=.cmx} ${PACKER_LIB_IMPLS:.ml=.ml.deps} \
+   ${PACKER_LIB_INTFS:.mli=.cmi} ${PACKER_LIB_INTFS:.mli=.mli.deps} \
+   ${PACKER_IMPLS:.ml=.cmx} ${PACKER_IMPLS:.ml=.ml.deps} \
 
-compiler/sigs/register.cmi: EXTRA_OCAMLFLAGS = -opaque
+${PACKER_OBJS}: PACKAGES=
+${PACKER_OBJS}: SOURCE_DIRECTORIES=${PACKER_DIRECTORIES}
+${PACKER_OBJS}: TARGET="(packer.cmxa)"
+${PACKER_OBJS}: OPENED_MODULES=
 
-COMPILER_PRECOMPILED_OBJS := \
-  ${COMPILER_PRECOMPILED_INTFS:.mli=.cmi} \
-  ${COMPILER_PRECOMPILED_INTFS:.mli=.mli.deps}
+packer.cmxa: ${PACKER_LIB_IMPLS:.ml=.cmx}
+	@echo LINK $(notdir $@)
+	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
 
-${COMPILER_PRECOMPILED_OBJS}: PACKAGES=${COMPILER_PRECOMPILED_PACKAGES}
-${COMPILER_PRECOMPILED_OBJS}: SOURCE_DIRECTORIES=${COMPILER_PRECOMPILED_SOURCE_DIRECTORIES}
-${COMPILER_PRECOMPILED_OBJS}: TARGET="(embedded_cmis.cmx)"
-${COMPILER_PRECOMPILED_OBJS}: OPENED_MODULES=${COMPILER_PRECOMPILED_OPENED_MODULES}
+${TZPROTOCOLPACKER}: packer.cmxa ${PACKER_IMPLS:.ml=.cmx}
+	@echo LINK $(notdir $@)
+	@$(OCAMLOPT) -o $@ $^
 
-compiler/sigs/camlinternalFormatBasics.cmi:
-	ln -sf $(shell ocamlc -where)/camlinternalFormatBasics.cmi $@
+clean::
+	rm -rf ${TZPROTOCOLPACKER}
 
-.INTERMEDIATE: compiler/embedded_cmis.ml
-compiler/embedded_cmis.cmx: compiler/embedded_cmis.cmi
+############################################################################
+## Protocol compiler (also embedded in the node)
+############################################################################
 
-compiler/embedded_cmis.ml: ${COMPILER_EMBEDDED_CMIS}
+COMPILER_OBJS := \
+   ${COMPILER_IMPLS:.ml=.cmx} ${COMPILER_IMPLS:.ml=.ml.deps} \
+   ${COMPILER_LIB_IMPLS:.ml=.cmx} ${COMPILER_LIB_IMPLS:.ml=.ml.deps} \
+   ${COMPILER_LIB_INTFS:.mli=.cmi} ${COMPILER_LIB_INTFS:.mli=.mli.deps} \
+   ${TZCOMPILER}
+${COMPILER_OBJS}: PACKAGES=${COMPILER_PACKAGES}
+${COMPILER_OBJS}: SOURCE_DIRECTORIES=${COMPILER_SOURCE_DIRECTORIES}
+${COMPILER_OBJS}: TARGET="(compiler.cmxa)"
+${COMPILER_OBJS}: OPENED_MODULES=${COMPILER_OPENED_MODULES}
+
+compiler/tezos_protocol_registerer.cmi: EXTRA_OCAMLFLAGS = -opaque
+
+.INTERMEDIATE: compiler/tezos_compiler_embedded_cmis.ml
+compiler/tezos_compiler_embedded_cmis.cmx: compiler/tezos_compiler_embedded_cmis.cmi
+
+compiler/tezos_compiler_embedded_cmis.ml: ${COMPILER_EMBEDDED_CMIS}
 	@echo OCAMLRES ${TARGET} $(notdir $@)
 	@$(OCAMLRES) -format ocaml -o $@ $^
 
+compiler.cmxa: ${COMPILER_LIB_IMPLS:.ml=.cmx}
+	@echo LINK $(notdir $@)
+	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
+
+${TZCOMPILER}: packer.cmxa minutils.cmxa utils.cmxa compiler.cmxa ${COMPILER_IMPLS:.ml=.cmx}
+	@echo LINK $(notdir $@)
+	@$(OCAMLOPT) -linkpkg $(patsubst %, -package %, $(COMPILER_PACKAGES)) -o $@ $^
+
 partial-clean::
-	rm -f compiler/embedded_cmis.ml
+	rm -f compiler/tezos_compiler_embedded_cmis.ml
 
-NO_DEPS += \
-  node/updater/protocol_sigs.mli \
-  node/updater/proto_environment.mli \
-  node/updater/register.mli \
-  node/db/persist.mli \
-  node/db/context.mli
-
-node/updater/protocol_sigs.cmi: compiler/sigs/protocol_sigs.cmi
-	@cp -a compiler/sigs/protocol_sigs.cmi node/updater
-node/updater/proto_environment.cmi: compiler/sigs/proto_environment.cmi
-	@cp -a compiler/sigs/proto_environment.cmi node/updater
-node/updater/register.cmi: compiler/sigs/register.cmi
-	@cp -a compiler/sigs/register.cmi node/updater
-
-node/db/persist.cmi: compiler/sigs/persist.cmi
-	@cp -a compiler/sigs/persist.cmi node/db
-node/db/context.cmi: compiler/sigs/context.cmi
-	@cp -a compiler/sigs/context.cmi node/db
+clean::
+	rm -f ${TZCOMPILER}
 
 
 ############################################################################
@@ -139,30 +154,8 @@ utils.top:
 	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS}) ) >> .ocamlinit.utils
 	utop -init .ocamlinit.utils ${UTOPFLAGS}
 
-############################################################################
-## Node protocol compiler (also embedded in the main program)
-############################################################################
-
-COMPILER_OBJS := \
-  ${COMPILER_IMPLS:.ml=.cmx} ${COMPILER_IMPLS:.ml=.ml.deps} \
-  ${COMPILER_LIB_IMPLS:.ml=.cmx} ${COMPILER_LIB_IMPLS:.ml=.ml.deps} \
-  ${COMPILER_LIB_INTFS:.mli=.cmi} ${COMPILER_LIB_INTFS:.mli=.mli.deps} \
-  ${TZCOMPILER}
-${COMPILER_OBJS}: PACKAGES=${COMPILER_PACKAGES}
-${COMPILER_OBJS}: SOURCE_DIRECTORIES=${COMPILER_SOURCE_DIRECTORIES}
-${COMPILER_OBJS}: TARGET="(compiler.cmxa)"
-${COMPILER_OBJS}: OPENED_MODULES=${COMPILER_OPENED_MODULES}
-
-compiler.cmxa: ${COMPILER_LIB_IMPLS:.ml=.cmx}
-	@echo LINK $(notdir $@)
-	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
-
-${TZCOMPILER}: minutils.cmxa utils.cmxa compiler.cmxa ${COMPILER_IMPLS:.ml=.cmx}
-	@echo LINK $(notdir $@)
-	@$(OCAMLOPT) -linkpkg $(patsubst %, -package %, $(COMPILER_PACKAGES)) -o $@ $^
-
-clean::
-	rm -f ${TZCOMPILER}
+partial-clean::
+	-rm -f .ocamlinit.utils
 
 ############################################################################
 ## Node program
@@ -179,6 +172,9 @@ ${NODE_OBJS}: SOURCE_DIRECTORIES=${NODE_SOURCE_DIRECTORIES}
 ${NODE_OBJS}: TARGET="(node.cmxa)"
 ${NODE_OBJS}: OPENED_MODULES=${NODE_OPENED_MODULES}
 
+${NODE_IMPLS:.ml=.cmx} ${NODE_IMPLS:.ml=.ml.deps} \
+${NODE_INTFS:.mli=.cmi} ${NODE_INTFS:.mli=.mli.deps}: TARGET="(tezos-node)"
+
 node/updater/environment.cmi: node/updater/environment.cmx
 
 node.cmxa: ${NODE_LIB_IMPLS:.ml=.cmx}
@@ -186,7 +182,7 @@ node.cmxa: ${NODE_LIB_IMPLS:.ml=.cmx}
 	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
 
  ${NODE_IMPLS:.ml=.cmx}: ${EMBEDDED_NODE_PROTOCOLS}
-${TZNODE}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa ${EMBEDDED_NODE_PROTOCOLS} ${NODE_IMPLS:.ml=.cmx}
+${TZNODE}: packer.cmxa minutils.cmxa utils.cmxa compiler.cmxa node.cmxa ${EMBEDDED_NODE_PROTOCOLS} ${NODE_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
 	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
@@ -205,6 +201,11 @@ node.top: ${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS} ${COMPILER_LIB_IMPLS} ${FULL_
 
 clean::
 	rm -f ${TZNODE}
+
+
+partial-clean::
+	-rm -f .ocamlinit.node
+
 
 ############################################################################
 ## Client program
@@ -229,7 +230,7 @@ client.cmxa: ${CLIENT_LIB_IMPLS:.ml=.cmx}
 ${EMBEDDED_CLIENT_VERSIONS}: client.cmxa ${EMBEDDED_CLIENT_PROTOCOLS}
 ${CLIENT_IMPLS:.ml=.cmx}: ${EMBEDDED_CLIENT_VERSIONS}
 
-${TZCLIENT}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa \
+${TZCLIENT}: packer.cmxa minutils.cmxa utils.cmxa compiler.cmxa node.cmxa \
              client.cmxa \
              ${EMBEDDED_CLIENT_PROTOCOLS} \
              ${EMBEDDED_CLIENT_VERSIONS} \
@@ -266,14 +267,15 @@ partial-clean::
 ## Dependencies
 
 NO_DEPS += \
-   compiler/embedded_cmis.ml \
-   compiler/embedded_cmis.mli
-compiler/embedded_cmis.cmx compiler/embedded_cmis.cmi: OPENED_MODULES=
+   compiler/tezos_compiler_embedded_cmis.ml \
+   compiler/tezos_compiler_embedded_cmis.mli
+compiler/tezos_compiler_embedded_cmis.cmx compiler/tezos_compiler_embedded_cmis.cmi: OPENED_MODULES=
 
 ifneq ($(MAKECMDGOALS),clean)
 include .depend
 endif
 DEPENDS := $(filter-out $(NO_DEPS), \
+  $(PACKER_LIB_INTFS) $(PACKER_LIB_IMPLS) $(PACKER_IMPLS) \
   $(MINUTILS_LIB_INTFS) $(MINUTILS_LIB_IMPLS) \
   $(UTILS_LIB_INTFS) $(UTILS_LIB_IMPLS) \
   ${COMPILER_PRECOMPILED_INTFS} \
@@ -289,9 +291,9 @@ DEPENDS := $(filter-out $(NO_DEPS), \
 DEPENDS_BYTECODE := \
   $(filter-out $(NO_DEPS), $(MINUTILS_LIB_INTFS) $(MINUTILS_LIB_IMPLS))
 
-predepend: node/updater/proto_environment.mli
+predepend: ${PACKED_SIGS_V1}.ml
 compiler/tezos_compiler.cmo compiler/tezos_compiler.cmx: \
-	compiler/embedded_cmis.cmi compiler/embedded_cmis.cmx
+	compiler/tezos_compiler_embedded_cmis.cmi compiler/tezos_compiler_embedded_cmis.cmx
 
 .SECONDARY: $(patsubst %,%.deps,${DEPENDS}) $(patsubst %,%.deps.byte,${DEPENDS_BYTECODE})
 .depend: $(patsubst %,%.deps,${DEPENDS}) $(patsubst %,%.deps.byte,${DEPENDS_BYTECODE})
@@ -318,47 +320,28 @@ partial-clean::
 ## Embedded protocol modules
 
 .SECONDEXPANSION:
-proto/embedded_proto_%.cmxa: \
+proto/tezos_embedded_protocol_%.cmx: \
   ${TZCOMPILER} \
   proto/%/TEZOS_PROTOCOL \
   $$(wildcard proto/%/*.ml) \
   $$(wildcard proto/%/*.mli)
+	@echo "TZCOMPILER (tezos_protocol_$*.cmx)"
 	@${TZCOMPILER} -static ${DEVFLAGS} \
-	    -build-dir proto/$*/_tzbuild \
-	    $@ proto/$*/
-
-CLIENT_PROTO_INCLUDES := \
-  minutils utils compiler node/updater node/db node/net node/shell client \
-  $(shell ocamlfind query lwt ocplib-json-typed sodium zarith)
-
-proto/client_embedded_proto_%.cmxa: \
-  ${TZCOMPILER} \
-  node/updater/environment.cmi \
-  node/updater/environment.cmx \
-  node/updater/proto_environment.cmi \
-  node/updater/proto_environment.cmx \
-  proto/%/TEZOS_PROTOCOL \
-  $$(wildcard proto/%/*.ml) \
-  $$(wildcard proto/%/*.mli)
-	@./${TZCOMPILER} -static -client ${DEVFLAGS} \
-	   -build-dir client/embedded/$*/_tzbuild \
-	   $(addprefix -I , ${CLIENT_PROTO_INCLUDES}) \
-	   $@ proto/$*
+	    proto/tezos_embedded_protocol_$* proto/$*
 
 partial-clean::
-	-rm -rf $(patsubst proto/embedded_proto_%.cmxa,proto/%/_tzbuild, \
-		   ${EMBEDDED_NODE_PROTOCOLS})
-	-rm -f $(patsubst proto/client_embedded_proto_%.cmxa, \
-	                proto/register_client_embedded_proto_%.ml, \
-			${EMBEDDED_CLIENT_PROTOCOLS})
+	-rm -rf ${EMBEDDED_NODE_PROTOCOLS}
 
 ## Embedded client protocol modules
 
 client/embedded/client_%.cmx: \
   $(patsubst %.ml, %.cmx, $(NODE_LIB_IMPLS) $(CLIENT_LIB_IMPLS)) \
-  proto/client_embedded_proto_%.cmxa \
+  proto/tezos_embedded_protocol_%.cmx \
   $$(shell find client/embedded/% \( -name _tzbuild \) -prune -or \( -name \*.ml -print -or -name \*.mli -print \))
 	@$(MAKE) -C client/embedded/$* ../client_$*.cmx
+
+client/embedded/client_genesis.cmx: \
+  client/embedded/client_alpha.cmx
 
 partial-clean::
 	-for d in $$(ls -d client/embedded/*/) ; do make clean -C $$d ; done

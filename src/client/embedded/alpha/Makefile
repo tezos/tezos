@@ -13,6 +13,7 @@ CLIENT_INTFS := \
   client_proto_main.mli
 
 CLIENT_IMPLS := \
+  client_proto_alpha.ml \
   script_located_ir.ml \
   michelson_macros.ml \
   michelson_parser.ml \
@@ -28,7 +29,8 @@ CLIENT_IMPLS := \
 
 include ../Makefile.shared
 
-${OBJS}: OPENED_MODULES += Environment Tezos_context
+${OBJS_DEPS} ${OBJS}: OPENED_MODULES += Client_proto_alpha Tezos_context
+client_proto_alpha.ml.deps client_proto_alpha.cmx: OPENED_MODULES :=
 
 .PHONY: clean
 clean::

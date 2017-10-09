@@ -83,7 +83,7 @@ let fetch_protocols v (block: State.Block.t) =
   State.Block.context block >>= fun context ->
   let proto_updated =
     Context.get_protocol context >>= fun protocol_hash ->
-    match Updater.get protocol_hash with
+    match State.Registred_protocol.get protocol_hash with
     | Some _ -> return false
     | None -> fetch_protocol v protocol_hash
   and test_proto_updated =
@@ -91,7 +91,7 @@ let fetch_protocols v (block: State.Block.t) =
     | Not_running -> return false
     | Forking { protocol }
     | Running { protocol } ->
-        match Updater.get protocol with
+        match State.Registred_protocol.get protocol with
         | Some _ -> return false
         | None -> fetch_protocol v protocol in
   proto_updated >>=? fun proto_updated ->
@@ -300,7 +300,7 @@ let apply_block net_state db
   end >>=? fun () ->
   Context.get_protocol pred_context >>= fun pred_protocol_hash ->
   begin
-    match Updater.get pred_protocol_hash with
+    match State.Registred_protocol.get pred_protocol_hash with
     | None -> fail Unknown_protocol
     | Some p -> return p
   end >>=? fun (module Proto) ->

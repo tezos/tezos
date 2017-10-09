@@ -7,3 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
+val dump: out_channel -> string array -> unit
+
+val main: unit -> unit

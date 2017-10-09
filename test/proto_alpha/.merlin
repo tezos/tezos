@@ -1,6 +1,8 @@
 REC
 S .
 B .
+S ../../src/packer
+B ../../src/packer
 S ../../src/minutils
 B ../../src/minutils
 S ../../src/utils

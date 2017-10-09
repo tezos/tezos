@@ -82,7 +82,10 @@ end
 
 module Protocol : sig
 
-  type t = component list
+  type t = {
+    expected_env: env_version ;
+    components: component list ;
+  }
 
   and component = {
     name: string ;
@@ -90,7 +93,10 @@ module Protocol : sig
     implementation: string ;
   }
 
+  and env_version = V1
+
   val component_encoding: component Data_encoding.t
+  val env_version_encoding: env_version Data_encoding.t
 
   include HASHABLE_DATA with type t := t
                          and type hash := Protocol_hash.t

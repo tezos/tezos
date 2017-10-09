@@ -538,7 +538,7 @@ let report_errors cctxt errs =
     | Overflow _ -> cctxt.warning "Unexpected arithmetic overflow"
     | err ->
         cctxt.warning "%a"
-          Local_environment.Environment.Error_monad.pp_print_error [ err ] in
+          Environment.Error_monad.pp_print_error [ err ] in
   let rec print_error_trace locations errs =
     let locations = match errs with
       | (Ill_typed_data (_, _, _)

@@ -7,9 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_embedded_proto_alpha
-open Tezos_context
-open Client_alpha
+module Ed25519 = Environment.Ed25519
 
 val init : ?sandbox:string -> unit -> (int * Block_hash.t) tzresult Lwt.t
 (** [init ()] sets up the test environment, and return the PID of
@@ -155,12 +153,12 @@ module Assert : sig
   val failed_to_preapply:
     msg:string ->
     ?op:Client_node_rpcs.operation ->
-    (Register_client_embedded_proto_alpha.Packed_protocol.error ->
+    (Environment.Error_monad.error ->
      bool) ->
     'a tzresult -> unit
 
   val ecoproto_error:
-    (Register_client_embedded_proto_alpha.Packed_protocol.error -> bool) ->
+    (Environment.Error_monad.error -> bool) ->
     error -> bool
 
   val generic_economic_error : msg:string -> 'a tzresult -> unit

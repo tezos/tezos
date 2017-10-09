@@ -115,8 +115,7 @@ type prevalidation_state =
     -> prevalidation_state
 
 and 'a proto =
-  (module Updater.REGISTRED_PROTOCOL
-    with type validation_state = 'a)
+  (module State.Registred_protocol.T with type validation_state = 'a)
 
 let start_prevalidation ?proto_header ~predecessor ~timestamp () =
   let { Block_header.shell =
@@ -128,7 +127,7 @@ let start_prevalidation ?proto_header ~predecessor ~timestamp () =
   Context.get_protocol predecessor_context >>= fun protocol ->
   let predecessor = State.Block.hash predecessor in
   let (module Proto) =
-    match Updater.get protocol with
+    match State.Registred_protocol.get protocol with
     | None -> assert false (* FIXME, this should not happen! *)
     | Some protocol -> protocol in
   Context.reset_test_network

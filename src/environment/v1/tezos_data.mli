@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Hash
-
 module type DATA = sig
 
   type t
@@ -80,8 +78,13 @@ end
 
 module Protocol : sig
 
+  type t = {
+    expected_env: env_version ;
+    components: component list ;
+  }
+
   (** An OCaml source component of a protocol implementation. *)
-  type component = {
+  and component = {
     (** The OCaml module name. *)
     name : string ;
     (** The OCaml interface source code *)
@@ -90,10 +93,10 @@ module Protocol : sig
     implementation : string ;
   }
 
-  type t = component list
-
+  and env_version = V1
 
   val component_encoding: component Data_encoding.t
+  val env_version_encoding: env_version Data_encoding.t
 
   include HASHABLE_DATA with type t := t
                          and type hash := Protocol_hash.t

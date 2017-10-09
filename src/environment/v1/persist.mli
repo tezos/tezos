@@ -1,8 +1,5 @@
 (**  Tezos - Persistent structures on top of {!Store} or {!Context} *)
 
-open Lwt
-
-
 (** Keys in (kex x value) database implementations *)
 type key = string list
 

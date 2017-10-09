@@ -1,1 +1,0 @@
-../../node/updater/proto_environment.mli

@@ -39,7 +39,7 @@ let commands () =
       (fun () dirname cctxt ->
          Lwt.catch
            (fun () ->
-              let proto = Tezos_compiler.read_dir dirname in
+              let _hash, proto = Tezos_compiler.read_dir dirname in
               Client_node_rpcs.inject_protocol cctxt.rpc_config proto >>= function
               | Ok hash ->
                   cctxt.message "Injected protocol %a successfully" Protocol_hash.pp_short hash >>= fun () ->
@@ -62,7 +62,7 @@ let commands () =
        @@ stop)
       (fun () ph cctxt ->
          Client_node_rpcs.Protocols.contents cctxt.rpc_config ph >>=? fun proto ->
-         Updater.extract "" ph proto >>= fun () ->
+         Updater.extract (Protocol_hash.to_short_b58check ph) ~hash:ph proto >>= fun () ->
          cctxt.message "Extracted protocol %a" Protocol_hash.pp_short ph >>= fun () ->
          return ()
     ) ;

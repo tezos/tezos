@@ -2,6 +2,7 @@
 PROTO_VERSION = genesis
 
 CLIENT_IMPLS = \
+  client_proto_genesis.ml \
   client_proto_main.ml
 
 CLIENT_INTFS = \
@@ -9,4 +10,10 @@ CLIENT_INTFS = \
 
 include ../Makefile.shared
 
-${OBJS}: ../../../proto/client_embedded_proto_alpha.cmxa
+SOURCE_DIRECTORIES += ..
+
+${OBJS_DEPS} ${OBJS}: ../client_alpha.cmx
+${OBJS_DEPS} ${OBJS}: OPENED_MODULES += Client_proto_genesis
+client_proto_genesis.ml.deps client_proto_genesis.cmx: OPENED_MODULES :=
+
+../client_alpha.cmx:
