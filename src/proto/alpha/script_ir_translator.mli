@@ -38,6 +38,7 @@ type error += Bad_return : Script.location * _ Script_typed_ir.stack_ty * _ Scri
 type error += Bad_stack : Script.location * string * int * _ Script_typed_ir.stack_ty -> error
 type error += Unmatched_branches : Script.location * _ Script_typed_ir.stack_ty * _ Script_typed_ir.stack_ty -> error
 type error += Transfer_in_lambda of Script.location
+type error += Transfer_in_dip of Script.location
 type error += Bad_stack_length
 type error += Bad_stack_item of int
 
@@ -91,13 +92,6 @@ val parse_ty :
   Script.expr -> ex_ty tzresult
 val unparse_ty :
   'a Script_typed_ir.ty -> Script.expr
-
-val parse_lambda :
-  context ->
-  ?storage_type:'storage Script_typed_ir.ty ->
-  ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
-  'arg Script_typed_ir.ty -> 'ret Script_typed_ir.ty -> Script.expr ->
-  ('arg, 'ret) Script_typed_ir.lambda tzresult Lwt.t
 
 val type_map_enc : type_map Data_encoding.encoding
 val ex_ty_enc : ex_ty Data_encoding.encoding
