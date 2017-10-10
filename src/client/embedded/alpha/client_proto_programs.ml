@@ -296,6 +296,7 @@ let collect_error_locations errs =
       | Bad_stack (loc, _, _, _)
       | Unmatched_branches (loc, _, _)
       | Transfer_in_lambda loc
+      | Transfer_in_dip loc
       | Invalid_constant (loc, _, _)
       | Invalid_contract (loc, _)
       | Comparable_type_expected (loc, _)
@@ -505,6 +506,10 @@ let report_errors cctxt errs =
     | Transfer_in_lambda loc ->
         cctxt.warning
           "%aThe TRANSFER_TOKENS instruction cannot appear in a lambda."
+          print_loc loc
+    | Transfer_in_dip loc ->
+        cctxt.warning
+          "%aThe TRANSFER_TOKENS instruction cannot appear within a DIP."
           print_loc loc
     | Bad_stack_length ->
         cctxt.warning
