@@ -20,7 +20,7 @@ type 'ty comparable_ty =
   | Tez_key : Tez.t comparable_ty
   | Bool_key : bool comparable_ty
   | Key_hash_key : public_key_hash comparable_ty
-  | Timestamp_key : Timestamp.t comparable_ty
+  | Timestamp_key : Script_timestamp.t comparable_ty
 
 module type Boxed_set = sig
   type elt
@@ -68,7 +68,7 @@ and 'ty ty =
   | Tez_t : Tez.t ty
   | Key_hash_t : public_key_hash ty
   | Key_t : public_key ty
-  | Timestamp_t : Timestamp.t ty
+  | Timestamp_t : Script_timestamp.t ty
   | Bool_t : bool ty
   | Pair_t : 'a ty * 'b ty -> ('a, 'b) pair ty
   | Union_t : 'a ty * 'b ty -> ('a, 'b) union ty
@@ -168,11 +168,18 @@ and ('bef, 'aft) instr =
   | Concat :
       (string * (string * 'rest), string * 'rest) instr
   (* timestamp operations *)
-  (* TODO: check if we need int instead of nat *)
   | Add_seconds_to_timestamp :
-    (n num * (Timestamp.t * 'rest), Timestamp.t * 'rest) instr
+      (z num * (Script_timestamp.t * 'rest),
+       Script_timestamp.t * 'rest) instr
   | Add_timestamp_to_seconds :
-    (Timestamp.t * (n num * 'rest), Timestamp.t * 'rest) instr
+      (Script_timestamp.t * (z num * 'rest),
+       Script_timestamp.t * 'rest) instr
+  | Sub_timestamp_seconds :
+      (Script_timestamp.t * (z num * 'rest),
+       Script_timestamp.t * 'rest) instr
+  | Diff_timestamps :
+      (Script_timestamp.t * (Script_timestamp.t * 'rest),
+       z num * 'rest) instr
   (* currency operations *)
   (* TODO: we can either just have conversions to/from integers and
      do all operations on integers, or we need more operations on
@@ -296,7 +303,7 @@ and ('bef, 'aft) instr =
        (('p * 'g, 'r * 'g) lambda * ('g * 'rest)))))),
      ('p, 'r) typed_contract * 'rest) instr
   | Now :
-      ('rest, Timestamp.t * 'rest) instr
+      ('rest, Script_timestamp.t * 'rest) instr
   | Balance :
       ('rest, Tez.t * 'rest) instr
   | Check_signature :

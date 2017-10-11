@@ -18,8 +18,8 @@ let dummy_storage_fee = Tez.fifty_cents
 (* ---- Run-time errors -----------------------------------------------------*)
 
 type error += Quota_exceeded
-type error += Overflow of Script.location
 type error += Reject of Script.location
+type error += Overflow of Script.location
 type error += Runtime_contract_error : Contract.t * Script.expr * _ ty * _ ty * _ ty -> error
 
 let () =
@@ -34,16 +34,6 @@ let () =
     empty
     (function Quota_exceeded -> Some () | _ -> None)
     (fun () -> Quota_exceeded) ;
-  register_error_kind
-    `Permanent
-    ~id:"overflowRuntimeError"
-    ~title: "Value overflow (runtime script error)"
-    ~description:
-      "An integer or currency overflow happened \
-       during the execution of a script"
-    (obj1 (req "location" Script.location_encoding))
-    (function Overflow loc -> Some loc | _ -> None)
-    (fun loc -> Overflow loc) ;
   register_error_kind
     `Temporary
     ~id:"scriptRejectedRuntimeError"
@@ -229,25 +219,13 @@ let rec interp
               logged_return (Item (map_size map, rest), qta - 1, ctxt)
           (* timestamp operations *)
           | Add_seconds_to_timestamp, Item (n, Item (t, rest)) ->
-              begin match Script_int.to_int64 n with
-                | None -> fail (Overflow loc)
-                | Some n ->
-                    Lwt.return
-                      (Period.of_seconds n >>? fun p ->
-                       Timestamp.(t +? p) >>? fun res ->
-                       Ok (Item (res, rest), qta - 1, ctxt)) >>=? fun res ->
-                    logged_return res
-              end
+              logged_return (Item (Script_timestamp.add_delta t n, rest), qta - 1, ctxt)
           | Add_timestamp_to_seconds, Item (t, Item (n, rest)) ->
-              begin match Script_int.to_int64 n with
-                | None -> fail (Overflow loc)
-                | Some n ->
-                    Lwt.return
-                      (Period.of_seconds n >>? fun p ->
-                       Timestamp.(t +? p) >>? fun res ->
-                       Ok (Item (res, rest), qta - 1, ctxt)) >>=? fun res ->
-                    logged_return res
-              end
+              logged_return (Item (Script_timestamp.add_delta t n, rest), qta - 1, ctxt)
+          | Sub_timestamp_seconds, Item (t, Item (s, rest)) ->
+              logged_return (Item (Script_timestamp.sub_delta t s, rest), qta - 1, ctxt)
+          | Diff_timestamps, Item (t1, Item (t2, rest)) ->
+              logged_return (Item (Script_timestamp.diff t1 t2, rest), qta - 1, ctxt)
           (* string operations *)
           | Concat, Item (x, Item (y, rest)) ->
               logged_return (Item (x ^ y, rest), qta - 1, ctxt)
@@ -427,7 +405,7 @@ let rec interp
               let cmpres = Script_int.of_int cmpres in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           | Compare Timestamp_key, Item (a, Item (b, rest)) ->
-              let cmpres = Timestamp.compare a b in
+              let cmpres = Script_timestamp.compare a b in
               let cmpres = Script_int.of_int cmpres in
               logged_return (Item (cmpres, rest), qta - 1, ctxt)
           (* comparators *)
@@ -541,7 +519,7 @@ let rec interp
               Contract.get_balance ctxt source >>=? fun balance ->
               logged_return (Item (balance, rest), qta - 1, ctxt)
           | Now, rest ->
-              let now = Timestamp.current ctxt in
+              let now = Script_timestamp.now ctxt in
               logged_return (Item (now, rest), qta - 1, ctxt)
           | Check_signature, Item (key, Item ((signature, message), rest)) ->
               let message = MBytes.of_string message in

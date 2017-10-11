@@ -312,6 +312,24 @@ init_with_transfer $CONTRACT_PATH/store_now.tz $key1 '"2017-07-13T09:19:01Z"' "1
 $client transfer 500 from bootstrap1 to store_now -arg Unit
 assert_storage_contains store_now "$($client get timestamp)"
 
+# Test timestamp operations
+assert_output $CONTRACT_PATH/add_timestamp_delta.tz Unit '(Pair 100 100)' '"1970-01-01T00:03:20Z"'
+assert_output $CONTRACT_PATH/add_timestamp_delta.tz Unit '(Pair 100 -100)' '"1970-01-01T00:00:00Z"'
+assert_output $CONTRACT_PATH/add_timestamp_delta.tz Unit '(Pair "1970-01-01T00:00:00Z" 0)' '"1970-01-01T00:00:00Z"'
+
+assert_output $CONTRACT_PATH/add_delta_timestamp.tz Unit '(Pair 100 100)' '"1970-01-01T00:03:20Z"'
+assert_output $CONTRACT_PATH/add_delta_timestamp.tz Unit '(Pair -100 100)' '"1970-01-01T00:00:00Z"'
+assert_output $CONTRACT_PATH/add_delta_timestamp.tz Unit '(Pair 0 "1970-01-01T00:00:00Z")' '"1970-01-01T00:00:00Z"'
+
+assert_output $CONTRACT_PATH/sub_timestamp_delta.tz Unit '(Pair 100 100)' '"1970-01-01T00:00:00Z"'
+assert_output $CONTRACT_PATH/sub_timestamp_delta.tz Unit '(Pair 100 -100)' '"1970-01-01T00:03:20Z"'
+assert_output $CONTRACT_PATH/sub_timestamp_delta.tz Unit '(Pair 100 2000000000000000000)' -1999999999999999900
+
+assert_output $CONTRACT_PATH/diff_timestamps.tz Unit '(Pair 0 0)' 0
+assert_output $CONTRACT_PATH/diff_timestamps.tz Unit '(Pair 0 1)' -1
+assert_output $CONTRACT_PATH/diff_timestamps.tz Unit '(Pair 1 0)' 1
+assert_output $CONTRACT_PATH/diff_timestamps.tz Unit '(Pair "1970-01-01T00:03:20Z" "1970-01-01T00:00:00Z")' 200
+
 # Tests TRANSFER_TO
 $client originate account "test_transfer_account1" for $key1 transferring 100 from bootstrap1
 $client originate account "test_transfer_account2" for $key1 transferring 20 from bootstrap1

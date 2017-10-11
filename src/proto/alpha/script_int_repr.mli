@@ -50,6 +50,12 @@ val to_int : _ num -> int option
 (** Conversion from an OCaml [int64]. *)
 val of_int : int -> z num
 
+(** Conversion from a Zarith integer ([Z.t]). *)
+val of_zint : Z.t -> z num
+
+(** Conversion to a Zarith integer ([Z.t]). *)
+val to_zint : 'a num -> Z.t
+
 (** Addition between naturals. *)
 val add_n : n num -> n num -> n num
 

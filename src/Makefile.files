@@ -398,6 +398,7 @@ ALPHA_MODULES := $(addprefix ${SRCDIR}/proto/alpha/, \
   level_repr.ml \
   seed_repr.ml \
   script_int_repr.ml \
+  script_timestamp_repr.ml \
   script_repr.ml \
   contract_repr.ml \
   roll_repr.ml \
