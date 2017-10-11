@@ -16,6 +16,7 @@
         "Level_repr",
         "Seed_repr",
         "Script_int_repr",
+        "Script_timestamp_repr",
         "Script_repr",
         "Contract_repr",
         "Roll_repr",

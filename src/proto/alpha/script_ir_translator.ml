@@ -144,8 +144,7 @@ let compare_comparable
         if Compare.Int.(res = 0) then 0
         else if Compare.Int.(res > 0) then 1
         else -1
-
-    | Timestamp_key -> Timestamp.compare x y
+    | Timestamp_key -> Script_timestamp.compare x y
 
 let empty_set
   : type a. a comparable_ty -> a set
@@ -321,7 +320,11 @@ let rec unparse_data
     | Bool_t, false ->
         Prim (-1, "False", [], None)
     | Timestamp_t, t ->
-        String (-1, Timestamp.to_notation t)
+        begin
+          match Script_timestamp.to_notation t with
+          | None -> Int (-1, Script_timestamp.to_num_str t)
+          | Some s -> String (-1, s)
+        end
     | Contract_t _, (_, _, c)  ->
         String (-1, Contract.to_b58check c)
     | Signature_t, s ->
@@ -368,7 +371,7 @@ let rec unparse_data
               Prim (-1, "Item",
                     [ unparse_data kt k;
                       unparse_data vt v ],
-                   None)
+                    None)
               :: acc)
             map [] in
         Prim (-1, "Map", List.rev items, None)
@@ -647,12 +650,12 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Timestamps *)
     | Timestamp_t, (Int (_, v)) -> begin
-        match (Timestamp.of_seconds v) with
+        match Script_timestamp.of_string v with
         | Some v -> return v
         | None -> fail (error ())
       end
     | Timestamp_t, String (_, s) -> begin try
-          match Timestamp.of_notation s with
+          match Script_timestamp.of_string s with
           | Some v -> return v
           | None -> fail (error ())
         with _ -> fail (error ())
@@ -1090,11 +1093,17 @@ and parse_instr
         return (Failed { descr })
     (* timestamp operations *)
     | Prim (loc, "ADD", [], annot),
-      Item_t (Timestamp_t, Item_t (Nat_t, rest)) ->
+      Item_t (Timestamp_t, Item_t (Int_t, rest)) ->
         return (typed loc annot (Add_timestamp_to_seconds, Item_t (Timestamp_t, rest)))
     | Prim (loc, "ADD", [], annot),
-      Item_t (Nat_t, Item_t (Timestamp_t, rest)) ->
+      Item_t (Int_t, Item_t (Timestamp_t, rest)) ->
         return (typed loc annot (Add_seconds_to_timestamp, Item_t (Timestamp_t, rest)))
+    | Prim (loc, "SUB", [], annot),
+      Item_t (Timestamp_t, Item_t (Int_t, rest)) ->
+        return (typed loc annot (Sub_timestamp_seconds, Item_t (Timestamp_t, rest)))
+    | Prim (loc, "SUB", [], annot),
+      Item_t (Timestamp_t, Item_t (Timestamp_t, rest)) ->
+        return (typed loc annot (Diff_timestamps, Item_t (Int_t, rest)))
     (* string operations *)
     | Prim (loc, "CONCAT", [], annot),
       Item_t (String_t, Item_t (String_t, rest)) ->

@@ -73,9 +73,9 @@ module Timestamp : sig
   val to_notation: time -> string
 
   val of_seconds: string -> time option
-  val to_seconds: time -> string
+  val to_seconds_string: time -> string
 
-  val current: context -> Time.t
+  val current : context -> time
 
 end
 
@@ -108,6 +108,20 @@ module Cycle : sig
 end
 
 module Script_int : module type of Script_int_repr
+
+module Script_timestamp : sig
+  open Script_int
+  type t
+  val compare : t -> t -> int
+  val to_string : t -> string
+  val to_notation : t -> string option
+  val to_num_str : t -> string
+  val of_string : string -> t option
+  val diff : t -> t -> z num
+  val add_delta : t -> z num -> t
+  val sub_delta : t -> z num -> t
+  val now : context -> t
+end
 
 module Script : sig
 

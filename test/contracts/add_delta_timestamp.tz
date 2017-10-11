@@ -1,0 +1,4 @@
+parameter (pair int timestamp);
+storage unit;
+return timestamp;
+code { CAR; DUP; CAR; DIP{CDR}; ADD; UNIT; SWAP; PAIR}

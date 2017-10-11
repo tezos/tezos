@@ -25,6 +25,9 @@ let of_int64 n = Z.of_int64 n
 let to_int x = try Some (Z.to_int x) with _ -> None
 let of_int n = Z.of_int n
 
+let of_zint x = x
+let to_zint x = x
+
 let add x y = Z.add x y
 let sub x y = Z.sub x y
 let mul x y = Z.mul x y

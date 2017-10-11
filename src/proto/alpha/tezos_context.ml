@@ -38,6 +38,13 @@ end
 module Raw_level = Raw_level_repr
 module Cycle = Cycle_repr
 module Script_int = Script_int_repr
+module Script_timestamp = struct
+  include Script_timestamp_repr
+  let now ctxt =
+    Storage.current_timestamp ctxt
+    |> Timestamp.to_seconds
+    |> of_int64
+end
 module Script = Script_repr
 
 type public_key = Ed25519.Public_key.t

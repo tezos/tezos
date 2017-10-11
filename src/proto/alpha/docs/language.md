@@ -923,17 +923,30 @@ VII - Domain specific operations
 ### Operations on timestamps
 
 Timestamp immediates can be obtained by the `NOW` operation, or
-retrieved from script parameters or globals. The only valid operations
-are the addition of a (positive) number of seconds and the comparison.
+retrieved from script parameters or globals.
 
    * `ADD`
      Increment / decrement a timestamp of the given number of seconds.
 
-        :: timestamp : nat : 'S -> timestamp : 'S
-        :: nat : timestamp : 'S -> timestamp : 'S
+        :: timestamp : int : 'S -> timestamp : 'S
+        :: int : timestamp : 'S -> timestamp : 'S
 
         > ADD ; C / seconds : nat (t) : S   =>   C / (seconds + t) : S
         > ADD ; C / nat (t) : seconds : S   =>   C / (t + seconds) : S
+
+   * `SUB`
+     Subtract a number of seconds from a timestamp.
+
+        :: timestamp : int : 'S -> timestamp : 'S
+
+        > SUB ; C / seconds : nat (t) : S   =>   C / (seconds - t) : S
+
+   * `SUB`
+     Subtract two timestamps.
+
+        :: timestamp : timestamp : 'S -> int : 'S
+
+        > SUB ; C / seconds(t1) : seconds(t2) : S   =>   C / (t1 - t2) : S
 
    * `COMPARE`:
      Timestamp comparison.
