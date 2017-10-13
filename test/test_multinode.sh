@@ -66,22 +66,22 @@ retry() {
     done
 }
 
-$client1 mine for bootstrap1
+$client1 mine for bootstrap1 -max-priority 512
 retry 2 15 assert_propagation_level 2
 
-$client2 mine for bootstrap2
+$client2 mine for bootstrap2 -max-priority 512
 retry 2 15 assert_propagation_level 3
 
-$client3 mine for bootstrap3
+$client3 mine for bootstrap3 -max-priority 512
 retry 2 15 assert_propagation_level 4
 
-$client4 mine for bootstrap4
+$client4 mine for bootstrap4 -max-priority 512
 retry 2 15 assert_propagation_level 5
 
 endorse_hash=$($client3 endorse for bootstrap3 | extract_operation_hash)
 transfer_hash=$($client4 transfer 500 from bootstrap1 to bootstrap3 | extract_operation_hash)
 
-retry 2 15 $client4 mine for bootstrap4
+retry 2 15 $client4 mine for bootstrap4 -max-priority 512
 
 assert_contains_operation() {
     hash="$1"

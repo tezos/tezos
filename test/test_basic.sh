@@ -33,7 +33,7 @@ $client get balance for $key2 | assert "999.95 ꜩ"
 # wait for the delay between two block
 sleep 1
 
-$client mine for bootstrap1
+$client mine for bootstrap1 -max-priority 512
 
 $client remember program noop file:contracts/noop.tz
 $client typecheck program noop
