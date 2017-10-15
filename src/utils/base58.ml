@@ -44,6 +44,17 @@ module Alphabet = struct
 
   let default = bitcoin
 
+  let all_in_alphabet alphabet string =
+    let ok = Array.make 256 false in
+    String.iter (fun x -> ok.(Char.code x) <- true) alphabet.encode ;
+    let res = ref true in
+    for i = 0 to (String.length string) - 1 do
+      res := !res && ok.(Char.code string.[i])
+    done;
+    !res
+
+  let pp ppf { encode } = Format.fprintf ppf "%s" encode
+
 end
 
 let count_trailing_char s c =

@@ -68,6 +68,59 @@ let gen_keys ?seed cctxt name =
     "I generated a brand new pair of keys under the name '%s'." name >>= fun () ->
   return ()
 
+let gen_keys_containing ?(prefix=false) ~containing ~name (cctxt : Client_commands.context) =
+  let unrepresentable =
+    List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
+  match unrepresentable with
+  | _ :: _ ->
+      cctxt.warning
+        "The following can't be written in the key alphabet (%a): %a"
+        Base58.Alphabet.pp Base58.Alphabet.bitcoin
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+           (fun ppf s -> Format.fprintf ppf "'%s'" s))
+        unrepresentable >>= return
+  | [] ->
+      Public_key_hash.mem cctxt name >>=? fun name_exists ->
+      if name_exists && not cctxt.config.force
+      then
+        cctxt.warning
+          "Key for name '%s' already exists. Use -force to update." name >>= return
+      else
+        begin
+          cctxt.message "This process uses a brute force search and \
+                         may take a long time to find a key." >>= fun () ->
+          let matches =
+            if prefix then
+              let containing_tz1 = List.map ((^) "tz1") containing in
+              (fun key -> List.exists
+                  (fun containing ->
+                     String.sub key 0 (String.length containing) = containing)
+                  containing_tz1)
+            else
+              let re = Str.regexp (String.concat "\\|" containing) in
+              (fun key -> try ignore (Str.search_forward re key 0); true
+                with Not_found -> false) in
+          let rec loop attempts =
+            let seed = Seed.generate () in
+            let secret_key, public_key = Sodium.Sign.seed_keypair seed in
+            let hash = Ed25519.Public_key_hash.to_b58check @@ Ed25519.Public_key.hash public_key in
+            if matches hash
+            then
+              Secret_key.add cctxt name secret_key >>=? fun () ->
+              Public_key.add cctxt name public_key >>=? fun () ->
+              Public_key_hash.add cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
+              return hash
+            else begin if attempts mod 25_000 = 0
+              then cctxt.message "Tried %d keys without finding a match" attempts
+              else Lwt.return () end >>= fun () ->
+              loop (attempts + 1) in
+          loop 1 >>=? fun key_hash ->
+          cctxt.message
+            "Generated '%s' under the name '%s'." key_hash name >>= fun () ->
+          return ()
+        end
+
 let check_keys_consistency pk sk =
   let message = MBytes.of_string "Voulez-vous coucher avec moi, ce soir ?" in
   let signature = Ed25519.sign sk message in
@@ -137,6 +190,15 @@ let commands () =
        @@ stop)
       (fun () name cctxt -> gen_keys cctxt name) ;
 
+    command ~group ~desc: "Generate keys including the given string"
+      (args1 (switch ~doc:"The key must begin with tz1[containing]" ~parameter:"-prefix"))
+      (prefixes [ "gen" ; "vanity" ; "keys" ]
+       @@ Public_key_hash.fresh_alias_param
+       @@ prefix "matching"
+       @@ (seq_of_param @@ string ~name:"strs" ~desc:"String key must contain"))
+      (fun prefix name containing cctxt ->
+         gen_keys_containing ~prefix ~containing ~name cctxt) ;
+
     command ~group ~desc: "add a secret key to the wallet"
       no_options
       (prefixes [ "add" ; "secret" ; "key" ]
@@ -156,7 +218,7 @@ let commands () =
                (check_keys_consistency pk sk || cctxt.config.force)
                (failure
                   "public and secret keys '%s' don't correspond, \
-                   please don't use -force true" name) >>=? fun () ->
+                   please don't use -force" name) >>=? fun () ->
              Secret_key.add cctxt name sk) ;
 
     command ~group ~desc: "add a public key to the wallet"
@@ -223,7 +285,7 @@ let commands () =
       (fixed [ "forget" ; "all" ; "keys" ])
       (fun () cctxt ->
          fail_unless cctxt.config.force
-           (failure "this can only used with option -force true") >>=? fun () ->
+           (failure "this can only used with option -force") >>=? fun () ->
          Public_key.save cctxt [] >>=? fun () ->
          Secret_key.save cctxt [] >>=? fun () ->
          Public_key_hash.save cctxt []) ;
