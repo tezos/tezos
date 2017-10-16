@@ -345,7 +345,7 @@ It is possible to set independant log levels for different logging
 sections in Tezos, as well as specifying an output file for
 logging. See the description of log parameters above as well as
 documentation under the DEBUG section diplayed by `tezos-node run
---help'.
+--help`.
 
 
 JSON/RPC interface
