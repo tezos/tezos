@@ -3,21 +3,34 @@ FROM alpine:$alpine_version
 LABEL distro_style="apk" distro="alpine" distro_long="alpine-$alpine_version" arch="x86_64" operatingsystem="linux"
 
 RUN adduser -S tezos && \
+    adduser tezos abuild && \
     apk update && \
     apk upgrade && \
     apk add sudo bash libssl1.0 libsodium libev gmp git snappy && \
-    apk add leveldb \
-      --update-cache \
-      --repository http://nl.alpinelinux.org/alpine/edge/testing && \
     rm -f /var/cache/apk/* && \
     echo 'tezos ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/tezos && \
     chmod 440 /etc/sudoers.d/tezos && \
     chown root:root /etc/sudoers.d/tezos && \
     sed -i 's/^Defaults.*requiretty//g' /etc/sudoers
+
 USER tezos
 
 COPY . /home/tezos
+
 WORKDIR /home/tezos
+
+RUN sudo apk update && \
+    sudo apk add abuild build-base snappy-dev && \
+    abuild-keygen -ai && \
+    mkdir leveldb-1.18 && \
+    cp scripts/leveldb-1.18.APKBUILD leveldb-1.18/APKBUILD && \
+    cd leveldb-1.18 && \
+    abuild checksum && abuild -r && \
+    cd .. && \
+    sudo apk del build-base snappy-dev abuild && \
+    sudo apk add packages/tezos/x86_64/leveldb-1.18-r0.apk && \
+    rm -rf leveldb-1.18 packages && \
+    sudo rm -f /var/cache/apk/*
 
 RUN sudo chown root:root bin/* && \
     sudo chmod a+rx bin/* && \

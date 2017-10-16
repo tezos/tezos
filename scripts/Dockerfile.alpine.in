@@ -3,15 +3,14 @@
 FROM alpine:$alpine_version
 
 RUN apk update && apk upgrade && \
-    apk add alpine-sdk openssh bash nano ncurses-dev rsync xz m4 \
+    apk add build-base snappy-dev abuild \
+            alpine-sdk openssh bash nano ncurses-dev rsync xz m4 \
             opam aspcud \
             gmp-dev libev-dev libressl-dev linux-headers pcre-dev perl zlib-dev \
             libsodium-dev snappy-dev && \
-    apk add leveldb-dev \
-      --update-cache \
-      --repository http://nl.alpinelinux.org/alpine/edge/testing && \
     rm -f /var/cache/apk/* && \
     adduser -S opam && \
+    adduser opam abuild && \
     echo 'opam ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/opam && \
     chmod 440 /etc/sudoers.d/opam && \
     chown root:root /etc/sudoers.d/opam && \
@@ -20,6 +19,13 @@ RUN apk update && apk upgrade && \
 USER opam
 
 WORKDIR /home/opam
+
+COPY scripts/leveldb-1.18.APKBUILD /home/opam/leveldb-1.18/APKBUILD
+RUN sudo chown -R opam leveldb-1.18
+
+RUN abuild-keygen -a && \
+    cd leveldb-1.18 && \
+    abuild checksum && abuild -r
 
 RUN mkdir .ssh && \
     chmod 700 .ssh && \
