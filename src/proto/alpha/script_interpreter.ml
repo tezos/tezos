@@ -67,7 +67,7 @@ let rec unparse_stack
   : type a. a stack * a stack_ty -> Script.expr list
   = function
     | Empty, Empty_t -> []
-    | Item (v, rest), Item_t (ty, rest_ty) ->
+    | Item (v, rest), Item_t (ty, rest_ty, _) ->
         Micheline.strip_locations (unparse_data ty v) :: unparse_stack (rest, rest_ty)
 
 let rec interp
@@ -507,9 +507,9 @@ let rec interp
                                    (init, rest))))))) ->
               let code =
                 Micheline.strip_locations
-                  (Seq (0, [ Prim (0, K_parameter, [ unparse_ty p ], None) ;
-                             Prim (0, K_return, [ unparse_ty r ], None) ;
-                             Prim (0, K_storage, [ unparse_ty g ], None) ;
+                  (Seq (0, [ Prim (0, K_parameter, [ unparse_ty None p ], None) ;
+                             Prim (0, K_return, [ unparse_ty None r ], None) ;
+                             Prim (0, K_storage, [ unparse_ty None g ], None) ;
                              Prim (0, K_code, [ Micheline.root code ], None) ], None)) in
               let storage = Micheline.strip_locations (unparse_data g init) in
               Contract.spend_from_script ctxt source credit >>=? fun ctxt ->

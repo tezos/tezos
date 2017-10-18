@@ -303,6 +303,21 @@ type provided by the programmer, and checking that the resulting
 symbolic stack is consistent with the expected result, also provided
 by the programmer.
 
+### Annotations
+All instructions in the language can optionally take an annotation.
+Annotations allow you to specify additional information about data
+or pair and union types.
+
+At join points in the program
+(`IF`, `IF_LEFT`, `IF_CONS`, `IF_NONE`, `LOOP`), annotations must be compatible.
+Annotations are compatible if both elements are annotated with the same annotation
+or if at least one of the values/types is unannotated.
+
+An instruction that carries an annotation places an annotation on the top item in the stack.
+Stack visualization tools like the Michelson's Emacs mode print annotations
+as associated with each type.
+This is useful as a debugging aid.
+
 ### Side note
 
 As with most type systems, it is incomplete. There are programs that

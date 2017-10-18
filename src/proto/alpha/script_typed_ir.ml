@@ -59,6 +59,8 @@ and ('arg, 'ret) lambda =
 and ('arg, 'ret) typed_contract =
   'arg ty * 'ret ty * Contract.t
 
+and annot = string option
+
 and 'ty ty =
   | Unit_t : unit ty
   | Int_t : z num ty
@@ -70,8 +72,8 @@ and 'ty ty =
   | Key_t : public_key ty
   | Timestamp_t : Script_timestamp.t ty
   | Bool_t : bool ty
-  | Pair_t : 'a ty * 'b ty -> ('a, 'b) pair ty
-  | Union_t : 'a ty * 'b ty -> ('a, 'b) union ty
+  | Pair_t : ('a ty * annot) * ('b ty * annot) -> ('a, 'b) pair ty
+  | Union_t : ('a ty * annot) * ('b ty * annot) -> ('a, 'b) union ty
   | Lambda_t : 'arg ty * 'ret ty -> ('arg, 'ret) lambda ty
   | Option_t : 'v ty -> 'v option ty
   | List_t : 'v ty -> 'v list ty
@@ -80,7 +82,7 @@ and 'ty ty =
   | Contract_t : 'arg ty * 'ret ty -> ('arg, 'ret) typed_contract ty
 
 and 'ty stack_ty =
-  | Item_t : 'ty ty * 'rest stack_ty -> ('ty * 'rest) stack_ty
+  | Item_t : 'ty ty * 'rest stack_ty * annot -> ('ty * 'rest) stack_ty
   | Empty_t : end_of_stack stack_ty
 
 (* ---- Instructions --------------------------------------------------------*)
@@ -323,5 +325,4 @@ and ('bef, 'aft) descr =
   { loc : Script.location ;
     bef : 'bef stack_ty ;
     aft : 'aft stack_ty ;
-    instr : ('bef, 'aft)  instr ;
-    annot : string option }
+    instr : ('bef, 'aft)  instr }

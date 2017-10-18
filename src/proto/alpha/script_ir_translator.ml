@@ -38,6 +38,9 @@ type error += Transfer_in_lambda of Script.location
 type error += Transfer_in_dip of Script.location
 type error += Bad_stack_length
 type error += Bad_stack_item of int
+type error += Inconsistent_annotations of string * string
+type error += Inconsistent_type_annotations : Script.location * _ ty * _ ty -> error
+type error += Unexpected_annotation of Script.location
 
 (* Value typing errors *)
 type error += Invalid_constant : Script.location * Script.expr * _ ty -> error
@@ -63,9 +66,17 @@ type tc_context =
   | Dip : 'a stack_ty -> tc_context
   | Toplevel : { storage_type : 'a ty } -> tc_context
 
-let add_dip ty = function
-  | Lambda | Toplevel _ -> Dip (Item_t (ty, Empty_t))
-  | Dip stack -> Dip (Item_t (ty, stack))
+let add_dip ty annot = function
+  | Lambda | Toplevel _ -> Dip (Item_t (ty, Empty_t, annot))
+  | Dip stack -> Dip (Item_t (ty, stack, annot))
+
+let default_param_annot = Some "@parameter"
+let default_storage_annot = Some "@storage"
+let default_arg_annot = Some "@arg"
+
+let default_annot ~default = function
+  | None -> default
+  | annot -> annot
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -344,45 +355,46 @@ let unparse_comparable_ty
   | Timestamp_key -> Prim (-1, T_timestamp, [], None)
 
 let rec unparse_ty
-  : type a. a ty -> Script.node = function
-  | Unit_t -> Prim (-1, T_unit, [], None)
-  | Int_t -> Prim (-1, T_int, [], None)
-  | Nat_t -> Prim (-1, T_nat, [], None)
-  | String_t -> Prim (-1, T_string, [], None)
-  | Tez_t -> Prim (-1, T_tez, [], None)
-  | Bool_t -> Prim (-1, T_bool, [], None)
-  | Key_hash_t -> Prim (-1, T_key_hash, [], None)
-  | Key_t -> Prim (-1, T_key, [], None)
-  | Timestamp_t -> Prim (-1, T_timestamp, [], None)
-  | Signature_t -> Prim (-1, T_signature, [], None)
+  : type a. annot -> a ty -> Script.node = fun annot ->
+  function
+  | Unit_t -> Prim (-1, T_unit, [], annot)
+  | Int_t -> Prim (-1, T_int, [], annot)
+  | Nat_t -> Prim (-1, T_nat, [], annot)
+  | String_t -> Prim (-1, T_string, [], annot)
+  | Tez_t -> Prim (-1, T_tez, [], annot)
+  | Bool_t -> Prim (-1, T_bool, [], annot)
+  | Key_hash_t -> Prim (-1, T_key_hash, [], annot)
+  | Key_t -> Prim (-1, T_key, [], annot)
+  | Timestamp_t -> Prim (-1, T_timestamp, [], annot)
+  | Signature_t -> Prim (-1, T_signature, [], annot)
   | Contract_t (utl, utr) ->
-      let tl = unparse_ty utl in
-      let tr = unparse_ty utr in
-      Prim (-1, T_contract, [ tl; tr ], None)
-  | Pair_t (utl, utr) ->
-      let tl = unparse_ty utl in
-      let tr = unparse_ty utr in
-      Prim (-1, T_pair, [ tl; tr ], None)
-  | Union_t (utl, utr) ->
-      let tl = unparse_ty utl in
-      let tr = unparse_ty utr in
-      Prim (-1, T_or, [ tl; tr ], None)
+      let tl = unparse_ty None utl in
+      let tr = unparse_ty None utr in
+      Prim (-1, T_contract, [ tl; tr ], annot)
+  | Pair_t ((utl, left_annot), (utr, right_annot)) ->
+      let tl = unparse_ty left_annot utl in
+      let tr = unparse_ty right_annot utr in
+      Prim (-1, T_pair, [ tl; tr ], annot)
+  | Union_t ((utl, left_annot), (utr, right_annot)) ->
+      let tl = unparse_ty left_annot utl in
+      let tr = unparse_ty right_annot utr in
+      Prim (-1, T_or, [ tl; tr ], annot)
   | Lambda_t (uta, utr) ->
-      let ta = unparse_ty uta in
-      let tr = unparse_ty utr in
-      Prim (-1, T_lambda, [ ta; tr ], None)
+      let ta = unparse_ty None uta in
+      let tr = unparse_ty None utr in
+      Prim (-1, T_lambda, [ ta; tr ], annot)
   | Option_t ut ->
-      let t = unparse_ty ut in
-      Prim (-1, T_option, [ t ], None)
+      let t = unparse_ty None ut in
+      Prim (-1, T_option, [ t ], annot)
   | List_t ut ->
-      let t = unparse_ty ut in
-      Prim (-1, T_list, [ t ], None)
+      let t = unparse_ty None ut in
+      Prim (-1, T_list, [ t ], annot)
   | Set_t ut ->
       let t = unparse_comparable_ty ut in
       Prim (-1, T_set, [ t ], None)
   | Map_t (uta, utr) ->
       let ta = unparse_comparable_ty uta in
-      let tr = unparse_ty utr in
+      let tr = unparse_ty None utr in
       Prim (-1, T_map, [ ta; tr ], None)
 
 let rec unparse_data
@@ -419,14 +431,14 @@ let rec unparse_data
         String (-1, Ed25519.Public_key.to_b58check k)
     | Key_hash_t, k ->
         String (-1, Ed25519.Public_key_hash.to_b58check k)
-    | Pair_t (tl, tr), (l, r) ->
+    | Pair_t ((tl, _), (tr, _)), (l, r) ->
         let l = unparse_data tl l in
         let r = unparse_data tr r in
         Prim (-1, D_Pair, [ l; r ], None)
-    | Union_t (tl, _), L l ->
+    | Union_t ((tl, _), _), L l ->
         let l = unparse_data tl l in
         Prim (-1, D_Left, [ l ], None)
-    | Union_t (_, tr), R r ->
+    | Union_t (_, (tr, _)), R r ->
         let r = unparse_data tr r in
         Prim (-1, D_Right, [ r ], None)
     | Option_t t, Some v ->
@@ -504,12 +516,13 @@ let rec ty_eq
         (comparable_ty_eq ea eb >>? fun (Eq _) ->
          (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (ta, tb))
-    | Pair_t (tal, tar), Pair_t (tbl, tbr) ->
+    | Pair_t ((tal, _), (tar, _)),
+      Pair_t ((tbl, _), (tbr, _)) ->
         (ty_eq tal tbl >>? fun (Eq _) ->
          ty_eq tar tbr >>? fun (Eq _) ->
          (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (ta, tb))
-    | Union_t (tal, tar), Union_t (tbl, tbr) ->
+    | Union_t ((tal, _), (tar, _)), Union_t ((tbl, _), (tbr, _)) ->
         (ty_eq tal tbl >>? fun (Eq _) ->
          ty_eq tar tbr >>? fun (Eq _) ->
          (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
@@ -538,13 +551,115 @@ let rec stack_ty_eq
   : type ta tb. int -> ta stack_ty -> tb stack_ty ->
     (ta stack_ty, tb stack_ty) eq tzresult = fun lvl ta tb ->
   match ta, tb with
-  | Item_t (tva, ra), Item_t (tvb, rb) ->
+  | Item_t (tva, ra, _), Item_t (tvb, rb, _) ->
       ty_eq tva tvb |>
       record_trace (Bad_stack_item lvl) >>? fun  (Eq _) ->
       stack_ty_eq (lvl + 1) ra rb >>? fun (Eq _) ->
       (eq ta tb : (ta stack_ty, tb stack_ty) eq tzresult)
   | Empty_t, Empty_t -> eq ta tb
   | _, _ -> error Bad_stack_length
+
+let merge_annot annot1 annot2 =
+  match annot1, annot2 with
+  | None, None
+  | Some _, None
+  | None, Some _ -> ok None
+  | Some annot1, Some annot2 ->
+      if String.equal annot1 annot2
+      then ok (Some annot1)
+      else error (Inconsistent_annotations (annot1, annot2))
+
+let merge_comparable_types
+  : type ta.
+    ta comparable_ty -> ta comparable_ty ->
+    ta comparable_ty
+  = fun ta tb -> match ta, tb with
+    | Int_key, Int_key -> ta
+    | Nat_key, Nat_key -> ta
+    | String_key, String_key -> ta
+    | Tez_key, Tez_key -> ta
+    | Bool_key, Bool_key -> ta
+    | Key_hash_key, Key_hash_key -> ta
+    | Timestamp_key, Timestamp_key -> ta
+    | _, _ -> assert false
+
+let error_unexpected_annot loc annot =
+  match annot with
+  | None -> ok ()
+  | Some _ -> error (Unexpected_annotation loc)
+
+let fail_unexpected_annot loc annot =
+  Lwt.return (error_unexpected_annot loc annot)
+
+let merge_types :
+  type b.Script.location -> b ty -> b ty -> b ty tzresult =
+  let rec help : type a.a ty -> a ty -> a ty tzresult
+    = fun ty1 ty2 ->
+      match ty1, ty2 with
+      | Unit_t, Unit_t -> ok Unit_t
+      | Int_t, Int_t -> ok Int_t
+      | Nat_t, Nat_t -> ok Nat_t
+      | Key_t, Key_t -> ok Key_t
+      | Key_hash_t, Key_hash_t -> ok Key_hash_t
+      | String_t, String_t -> ok String_t
+      | Signature_t, Signature_t -> ok Signature_t
+      | Tez_t, Tez_t -> ok Tez_t
+      | Timestamp_t, Timestamp_t -> ok Timestamp_t
+      | Bool_t, Bool_t -> ok Bool_t
+      | Map_t (tal, tar), Map_t (tbl, tbr) ->
+          help tar tbr >>? fun value ->
+          ty_eq tar value >>? fun (Eq _) ->
+          ok (Map_t (merge_comparable_types tal tbl, value))
+      | Set_t ea, Set_t eb ->
+          ok (Set_t (merge_comparable_types ea eb))
+      | Pair_t ((tal, left_annot1), (tar, right_annot1)),
+        Pair_t ((tbl, left_annot2), (tbr, right_annot2)) ->
+          merge_annot left_annot1 left_annot2 >>? fun left_annot ->
+          merge_annot right_annot1 right_annot2 >>? fun right_annot ->
+          help tal tbl >>? fun left_ty ->
+          help tar tbr >|? fun right_ty ->
+          Pair_t ((left_ty, left_annot), (right_ty, right_annot))
+      | Union_t ((tal, tal_annot), (tar, tar_annot)),
+        Union_t ((tbl, tbl_annot), (tbr, tbr_annot)) ->
+          merge_annot tal_annot tbl_annot >>? fun left_annot ->
+          merge_annot tar_annot tbr_annot >>? fun right_annot ->
+          help tal tbl >>? fun left_ty ->
+          help tar tbr >|? fun right_ty ->
+          Union_t ((left_ty, left_annot), (right_ty, right_annot))
+      | Lambda_t (tal, tar), Lambda_t (tbl, tbr) ->
+          help tal tbl >>? fun left_ty ->
+          help tar tbr >|? fun right_ty ->
+          Lambda_t (left_ty, right_ty)
+      | Contract_t (tal, tar), Contract_t (tbl, tbr) ->
+          help tal tbl >>? fun left_ty ->
+          help tar tbr >|? fun right_ty ->
+          Contract_t (left_ty, right_ty)
+      | Option_t tva, Option_t tvb ->
+          help tva tvb >|? fun ty ->
+          Option_t ty
+      | List_t tva, List_t tvb ->
+          help tva tvb >|? fun ty ->
+          List_t ty
+      | _, _ -> assert false
+  in (fun loc ty1 ty2 ->
+      record_trace
+        (Inconsistent_type_annotations (loc, ty1, ty2))
+        (help ty1 ty2))
+
+let merge_stacks
+  : type ta. Script.location -> ta stack_ty -> ta stack_ty -> ta stack_ty tzresult
+  = fun loc ->
+    let rec help : type a. a stack_ty -> a stack_ty -> a stack_ty tzresult
+      = fun stack1 stack2 ->
+        match stack1, stack2 with
+        | Empty_t, Empty_t -> ok Empty_t
+        | Item_t (ty1, rest1, annot1),
+          Item_t (ty2, rest2, annot2) ->
+            merge_annot annot1 annot2 >>? fun annot ->
+            merge_types loc ty1 ty2 >>? fun ty ->
+            help rest1 rest2 >|? fun rest ->
+            Item_t (ty, rest, annot)
+    in help
 
 (* ---- Type checker resuls -------------------------------------------------*)
 
@@ -557,6 +672,7 @@ type 'bef judgement =
 type ('t, 'f, 'b) branch =
   { branch : 'r. ('t, 'r) descr -> ('f, 'r) descr -> ('b, 'r) descr } [@@unboxed]
 
+
 let merge_branches
   : type bef a b. int -> a judgement -> b judgement ->
     (a, b, bef) branch ->
@@ -564,10 +680,12 @@ let merge_branches
   = fun loc btr bfr { branch } ->
     match btr, bfr with
     | Typed ({ aft = aftbt } as dbt), Typed ({ aft = aftbf } as dbf) ->
+        let unmatched_branches = (Unmatched_branches (loc, aftbt, aftbf)) in
         trace
-          (Unmatched_branches (loc, aftbt, aftbf))
-          (Lwt.return (stack_ty_eq 1 aftbt aftbf)) >>=? fun (Eq _) ->
-        return (Typed (branch dbt dbf))
+          unmatched_branches
+          (Lwt.return (stack_ty_eq 1 aftbt aftbf) >>=? fun (Eq _) ->
+           Lwt.return (merge_stacks loc aftbt aftbf) >>=? fun merged_stack ->
+           return (Typed (branch {dbt with aft=merged_stack} {dbf with aft=merged_stack})))
     | Failed { descr = descrt }, Failed { descr = descrf } ->
         let descr ret =
           branch (descrt ret) (descrf ret) in
@@ -592,7 +710,7 @@ let rec parse_comparable_ty : Script.node -> ex_comparable_ty tzresult = functio
   | Prim (loc, (T_pair | T_or | T_set | T_map
                | T_list | T_option  | T_lambda
                | T_unit | T_signature  | T_contract), _, _) as expr ->
-      parse_ty expr >>? fun (Ex_ty ty) ->
+      parse_ty expr >>? fun (Ex_ty ty, _) ->
       error (Comparable_type_expected (loc, ty))
   | expr ->
       error @@ unexpected expr [] Type_namespace
@@ -600,55 +718,59 @@ let rec parse_comparable_ty : Script.node -> ex_comparable_ty tzresult = functio
           T_string ; T_tez ; T_bool ;
           T_key ; T_key_hash ; T_timestamp ]
 
-and parse_ty : Script.node -> ex_ty tzresult = function
-  | Prim (_, T_unit, [], _) -> ok (Ex_ty Unit_t)
-  | Prim (_, T_int, [], _) -> ok (Ex_ty (Int_t))
-  | Prim (_, T_nat, [], _) -> ok (Ex_ty (Nat_t))
-  | Prim (_, T_string, [], _) -> ok (Ex_ty String_t)
-  | Prim (_, T_tez, [], _) -> ok (Ex_ty Tez_t)
-  | Prim (_, T_bool, [], _) -> ok (Ex_ty Bool_t)
-  | Prim (_, T_key, [], _) -> ok (Ex_ty Key_t)
-  | Prim (_, T_key_hash, [], _) -> ok (Ex_ty Key_hash_t)
-  | Prim (_, T_timestamp, [], _) -> ok (Ex_ty Timestamp_t)
-  | Prim (_, T_signature, [], _) -> ok (Ex_ty Signature_t)
-  | Prim (_, T_contract, [ utl; utr ], _) ->
-      parse_ty utl >>? fun (Ex_ty tl) ->
-      parse_ty utr >>? fun (Ex_ty tr) ->
-      ok (Ex_ty (Contract_t (tl, tr)))
-  | Prim (_, T_pair, [ utl; utr ], _) ->
-      parse_ty utl >>? fun (Ex_ty tl) ->
-      parse_ty utr >>? fun (Ex_ty tr) ->
-      ok (Ex_ty (Pair_t (tl, tr)))
-  | Prim (_, T_or, [ utl; utr ], _) ->
-      parse_ty utl >>? fun (Ex_ty tl) ->
-      parse_ty utr >>? fun (Ex_ty tr) ->
-      ok (Ex_ty (Union_t (tl, tr)))
-  | Prim (_, T_lambda, [ uta; utr ], _) ->
-      parse_ty uta >>? fun (Ex_ty ta) ->
-      parse_ty utr >>? fun (Ex_ty tr) ->
-      ok (Ex_ty (Lambda_t (ta, tr)))
-  | Prim (_, T_option, [ ut ], _) ->
-      parse_ty ut >>? fun (Ex_ty t) ->
-      ok (Ex_ty (Option_t t))
-  | Prim (_, T_list, [ ut ], _) ->
-      parse_ty ut >>? fun (Ex_ty t) ->
-      ok (Ex_ty (List_t t))
-  | Prim (_, T_set, [ ut ], _) ->
+and parse_ty : Script.node -> (ex_ty * annot) tzresult = function
+  | Prim (_, T_unit, [], annot) -> ok (Ex_ty Unit_t, annot)
+  | Prim (_, T_int, [], annot) -> ok (Ex_ty (Int_t), annot)
+  | Prim (_, T_nat, [], annot) -> ok (Ex_ty (Nat_t), annot)
+  | Prim (_, T_string, [], annot) -> ok (Ex_ty String_t, annot)
+  | Prim (_, T_tez, [], annot) -> ok (Ex_ty Tez_t, annot)
+  | Prim (_, T_bool, [], annot) -> ok (Ex_ty Bool_t, annot)
+  | Prim (_, T_key, [], annot) -> ok (Ex_ty Key_t, annot)
+  | Prim (_, T_key_hash, [], annot) -> ok (Ex_ty Key_hash_t, annot)
+  | Prim (_, T_timestamp, [], annot) -> ok (Ex_ty Timestamp_t, annot)
+  | Prim (_, T_signature, [], annot) -> ok (Ex_ty Signature_t, annot)
+  | Prim (loc, T_contract, [ utl; utr ], annot) ->
+      parse_ty utl >>? fun (Ex_ty tl, left_annot) ->
+      parse_ty utr >>? fun (Ex_ty tr, right_annot) ->
+      error_unexpected_annot loc left_annot >>? fun () ->
+      error_unexpected_annot loc right_annot >|? fun () ->
+      (Ex_ty (Contract_t (tl, tr)), annot)
+  | Prim (_, T_pair, [ utl; utr ], annot) ->
+      parse_ty utl >>? fun (Ex_ty tl, left_annot) ->
+      parse_ty utr >>? fun (Ex_ty tr, right_annot) ->
+      ok (Ex_ty (Pair_t ((tl, left_annot), (tr, right_annot))), annot)
+  | Prim (_, T_or, [ utl; utr ], annot) ->
+      parse_ty utl >>? fun (Ex_ty tl, left_annot) ->
+      parse_ty utr >|? fun (Ex_ty tr, right_annot) ->
+      (Ex_ty (Union_t ((tl, left_annot), (tr, right_annot))), annot)
+  | Prim (_, T_lambda, [ uta; utr ], annot) ->
+      parse_ty uta >>? fun (Ex_ty ta, _) ->
+      parse_ty utr >>? fun (Ex_ty tr, _) ->
+      ok (Ex_ty (Lambda_t (ta, tr)), annot)
+  | Prim (loc, T_option, [ ut ], annot) ->
+      parse_ty ut >>? fun (Ex_ty t, opt_annot) ->
+      error_unexpected_annot loc annot >|? fun () ->
+      (Ex_ty (Option_t t), opt_annot)
+  | Prim (loc, T_list, [ ut ], annot) ->
+      parse_ty ut >>? fun (Ex_ty t, list_annot) ->
+      error_unexpected_annot loc list_annot >>? fun () ->
+      (ok (Ex_ty (List_t t), annot))
+  | Prim (_, T_set, [ ut ], annot) ->
       parse_comparable_ty ut >>? fun (Ex_comparable_ty t) ->
-      ok (Ex_ty (Set_t t))
-  | Prim (_, T_map, [ uta; utr ], _) ->
+      ok (Ex_ty (Set_t t), annot)
+  | Prim (_, T_map, [ uta; utr ], annot) ->
       parse_comparable_ty uta >>? fun (Ex_comparable_ty ta) ->
-      parse_ty utr >>? fun (Ex_ty tr) ->
-      ok (Ex_ty (Map_t (ta, tr)))
-  | Prim (loc, (T_pair | T_or | T_map as prim), l, _) ->
-      error (Invalid_arity (loc, prim, 2, List.length l))
-  | Prim (loc, (T_set | T_list | T_option as prim), l, _) ->
-      error (Invalid_arity (loc, prim, 1, List.length l))
-  | Prim (loc, ( T_unit | T_signature  | T_contract
+      parse_ty utr >>? fun (Ex_ty tr, _) ->
+      ok (Ex_ty (Map_t (ta, tr)), annot)
+  | Prim (loc, (T_unit | T_signature
                | T_int | T_nat
                | T_string | T_tez | T_bool
                | T_key | T_key_hash | T_timestamp as prim), l, _) ->
       error (Invalid_arity (loc, prim, 0, List.length l))
+  | Prim (loc, (T_set | T_list | T_option as prim), l, _) ->
+      error (Invalid_arity (loc, prim, 1, List.length l))
+  | Prim (loc, (T_pair | T_or | T_map | T_lambda | T_contract as prim), l, _) ->
+      error (Invalid_arity (loc, prim, 2, List.length l))
   | expr ->
       error @@ unexpected expr [] Type_namespace
         [ T_pair ; T_or ; T_set ; T_map ;
@@ -674,7 +796,7 @@ let rec unparse_stack
   : type a. a stack_ty -> Script.expr list
   = function
     | Empty_t -> []
-    | Item_t (ty, rest) -> strip_locations (unparse_ty ty) :: unparse_stack rest
+    | Item_t (ty, rest, annot) -> strip_locations (unparse_ty annot ty) :: unparse_stack rest
 
 let rec parse_data
   : type a.
@@ -782,7 +904,7 @@ let rec parse_data
     | Contract_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Pairs *)
-    | Pair_t (ta, tb), Prim (_, D_Pair, [ va; vb ], _) ->
+    | Pair_t ((ta, _), (tb, _)), Prim (_, D_Pair, [ va; vb ], _) ->
         traced @@
         parse_data ?type_logger ctxt ta va >>=? fun va ->
         parse_data ?type_logger ctxt tb vb >>=? fun vb ->
@@ -792,13 +914,13 @@ let rec parse_data
     | Pair_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ D_Pair ]))
     (* Unions *)
-    | Union_t (tl, _), Prim (_, D_Left, [ v ], _) ->
+    | Union_t ((tl, _), _), Prim (_, D_Left, [ v ], _) ->
         traced @@
         parse_data ?type_logger ctxt tl v >>=? fun v ->
         return (L v)
     | Union_t _, Prim (loc, D_Left, l, _) ->
         fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
-    | Union_t (_, tr), Prim (_, D_Right, [ v ], _) ->
+    | Union_t (_, (tr, _)), Prim (_, D_Right, [ v ], _) ->
         traced @@
         parse_data ?type_logger ctxt tr v >>=? fun v ->
         return (R v)
@@ -809,7 +931,7 @@ let rec parse_data
     (* Lambdas *)
     | Lambda_t (ta, tr), (Seq _ as script_instr) ->
         traced @@
-        parse_returning Lambda ?type_logger ctxt ta tr script_instr
+        parse_returning Lambda ?type_logger ctxt (ta, Some "@arg") tr script_instr
     | Lambda_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Options *)
@@ -891,11 +1013,11 @@ and parse_comparable_data
 and parse_returning
   : type arg ret. tc_context -> context ->
     ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
-    arg ty -> ret ty -> Script.node -> (arg, ret) lambda tzresult Lwt.t =
-  fun tc_context ctxt ?type_logger arg ret script_instr ->
+    arg ty * annot -> ret ty -> Script.node -> (arg, ret) lambda tzresult Lwt.t =
+  fun tc_context ctxt ?type_logger (arg, arg_annot) ret script_instr ->
     parse_instr tc_context ctxt ?type_logger
-      script_instr (Item_t (arg, Empty_t)) >>=? function
-    | Typed ({ loc ; aft = (Item_t (ty, Empty_t) as stack_ty) } as descr) ->
+      script_instr (Item_t (arg, Empty_t, arg_annot)) >>=? function
+    | Typed ({ loc ; aft = (Item_t (ty, Empty_t, _) as stack_ty) } as descr) ->
         trace
           (Bad_return (loc, stack_ty, ret))
           (Lwt.return (ty_eq ty ret)) >>=? fun (Eq _) ->
@@ -903,7 +1025,8 @@ and parse_returning
     | Typed { loc ; aft = stack_ty } ->
         fail (Bad_return (loc, stack_ty, ret))
     | Failed { descr } ->
-        return (Lam (descr (Item_t (ret, Empty_t)), strip_locations script_instr) : (arg, ret) lambda)
+        return (Lam (descr (Item_t (ret, Empty_t, None)), strip_locations script_instr)
+                : (arg, ret) lambda)
 
 and parse_instr
   : type bef.
@@ -919,508 +1042,530 @@ and parse_instr
       Lwt.return check in
     let check_item_ty exp got loc n =
       check_item (ty_eq exp got) loc n in
-    let typed loc annot (instr, aft) =
+    let typed loc (instr, aft) =
       begin match type_logger, script_instr with
         | None, _
         | Some _, (Seq (-1, _, _) | Int _ | String _) -> ()
         | Some log, (Prim _ | Seq _) ->
             log loc (unparse_stack stack_ty) (unparse_stack aft)
       end ;
-      Typed { loc ; instr ; bef = stack_ty ; aft ; annot } in
+      Typed { loc ; instr ; bef = stack_ty ; aft } in
     match script_instr, stack_ty with
     (* stack ops *)
-    | Prim (loc, I_DROP, [], annot),
-      Item_t (_, rest) ->
-        return (typed loc annot (Drop, rest))
-    | Prim (loc, I_DUP, [], annot),
-      Item_t (v, rest) ->
-        return (typed loc annot (Dup, Item_t (v, Item_t (v, rest))))
-    | Prim (loc, I_SWAP, [], annot),
-      Item_t (v,  Item_t (w, rest)) ->
-        return (typed loc annot (Swap, Item_t (w, Item_t (v, rest))))
-    | Prim (loc, I_PUSH, [ t ; d ], annot),
+    | Prim (loc, I_DROP, [], _),
+      Item_t (_, rest, _) ->
+        return (typed loc (Drop, rest))
+    | Prim (loc, I_DUP, [], instr_annot),
+      Item_t (v, rest, stack_annot) ->
+        return (typed loc (Dup, Item_t (v, Item_t (v, rest, stack_annot), instr_annot)))
+    | Prim (loc, I_SWAP, [], instr_annot),
+      Item_t (v,  Item_t (w, rest, _), cur_top_annot) ->
+        return (typed loc (Swap, Item_t (w, Item_t (v, rest, cur_top_annot), instr_annot)))
+    | Prim (loc, I_PUSH, [ t ; d ], instr_annot),
       stack ->
-        (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t) ->
+        (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t, _) ->
         parse_data ?type_logger ctxt t d >>=? fun v ->
-        return (typed loc annot (Const v, Item_t (t, stack)))
-    | Prim (loc, I_UNIT, [], annot),
+        return (typed loc (Const v, Item_t (t, stack, instr_annot)))
+    | Prim (loc, I_UNIT, [], instr_annot),
       stack ->
-        return (typed loc annot (Const (), Item_t (Unit_t, stack)))
+        return (typed loc (Const (), Item_t (Unit_t, stack, instr_annot)))
     (* options *)
-    | Prim (loc, I_SOME, [], annot),
-      Item_t (t, rest) ->
-        return (typed loc annot (Cons_some, Item_t (Option_t t, rest)))
-    | Prim (loc, I_NONE, [ t ], annot),
+    | Prim (loc, I_SOME, [], instr_annot),
+      Item_t (t, rest, _) ->
+        return (typed loc (Cons_some, Item_t (Option_t t, rest, instr_annot)))
+    | Prim (loc, I_NONE, [ t ], instr_annot),
       stack ->
-        (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t) ->
-        return (typed loc annot (Cons_none t, Item_t (Option_t t, stack)))
-    | Prim (loc, I_IF_NONE, [ bt ; bf ], annot),
-      (Item_t (Option_t t, rest) as bef) ->
+        (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t, _) ->
+        return (typed loc (Cons_none t, Item_t (Option_t t, stack, instr_annot)))
+    | Prim (loc, I_IF_NONE, [ bt ; bf ], instr_annot),
+      (Item_t (Option_t t, rest, _) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
         parse_instr ?type_logger tc_context ctxt bt rest >>=? fun btr ->
-        parse_instr ?type_logger tc_context ctxt bf (Item_t (t, rest)) >>=? fun bfr ->
+        parse_instr ?type_logger tc_context ctxt bf (Item_t (t, rest, instr_annot)) >>=? fun bfr ->
         let branch ibt ibf =
-          { loc ; instr = If_none (ibt, ibf) ; bef ; aft = ibt.aft ; annot } in
+          { loc ; instr = If_none (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
     (* pairs *)
-    | Prim (loc, I_PAIR, [], annot),
-      Item_t (a, Item_t (b, rest)) ->
-        return (typed loc annot (Cons_pair, Item_t (Pair_t(a, b), rest)))
-    | Prim (loc, I_CAR, [], annot),
-      Item_t (Pair_t (a, _), rest) ->
-        return (typed loc annot (Car, Item_t (a, rest)))
-    | Prim (loc, I_CDR, [], annot),
-      Item_t (Pair_t (_, b), rest) ->
-        return (typed loc annot (Cdr, Item_t (b, rest)))
+    | Prim (loc, I_PAIR, [], instr_annot),
+      Item_t (a, Item_t (b, rest, snd_annot), fst_annot) ->
+        return (typed loc (Cons_pair, Item_t (Pair_t((a, fst_annot), (b, snd_annot)), rest, instr_annot)))
+    | Prim (loc, I_CAR, [], instr_annot),
+      Item_t (Pair_t ((a, _), _), rest, _) ->
+        return (typed loc (Car, Item_t (a, rest, instr_annot)))
+    | Prim (loc, I_CDR, [], instr_annot),
+      Item_t (Pair_t (_, (b, _)), rest, _) ->
+        return (typed loc (Cdr, Item_t (b, rest, instr_annot)))
     (* unions *)
-    | Prim (loc, I_LEFT, [ tr ], annot),
-      Item_t (tl, rest) ->
-        (Lwt.return (parse_ty tr)) >>=? fun (Ex_ty tr) ->
-        return (typed loc annot (Left, Item_t (Union_t (tl, tr), rest)))
-    | Prim (loc, I_RIGHT, [ tl ], annot),
-      Item_t (tr, rest) ->
-        (Lwt.return (parse_ty tl)) >>=? fun (Ex_ty tl) ->
-        return (typed loc annot (Right, Item_t (Union_t (tl, tr), rest)))
-    | Prim (loc, I_IF_LEFT, [ bt ; bf ], annot),
-      (Item_t (Union_t (tl, tr), rest) as bef) ->
+    | Prim (loc, I_LEFT, [ tr ], instr_annot),
+      Item_t (tl, rest, stack_annot) ->
+        (Lwt.return (parse_ty tr)) >>=? fun (Ex_ty tr, _) ->
+        return (typed loc (Left, Item_t (Union_t ((tl, stack_annot), (tr, None)), rest, instr_annot)))
+    | Prim (loc, I_RIGHT, [ tl ], instr_annot),
+      Item_t (tr, rest, stack_annot) ->
+        (Lwt.return (parse_ty tl)) >>=? fun (Ex_ty tl, _) ->
+        return (typed loc (Right, Item_t (Union_t ((tl, None), (tr, stack_annot)), rest, instr_annot)))
+    | Prim (loc, I_IF_LEFT, [ bt ; bf ], instr_annot),
+      (Item_t (Union_t ((tl, left_annot), (tr, right_annot)), rest, _) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_instr ?type_logger tc_context ctxt bt (Item_t (tl, rest)) >>=? fun btr ->
-        parse_instr ?type_logger tc_context ctxt bf (Item_t (tr, rest)) >>=? fun bfr ->
+        fail_unexpected_annot loc instr_annot >>=? fun () ->
+        parse_instr ?type_logger tc_context ctxt bt (Item_t (tl, rest, left_annot)) >>=? fun btr ->
+        parse_instr ?type_logger tc_context ctxt bf (Item_t (tr, rest, right_annot)) >>=? fun bfr ->
         let branch ibt ibf =
-          { loc ; instr = If_left (ibt, ibf) ; bef ; aft = ibt.aft ; annot } in
+          { loc ; instr = If_left (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
     (* lists *)
-    | Prim (loc, I_NIL, [ t ], annot),
+    | Prim (loc, I_NIL, [ t ], instr_annot),
       stack ->
-        (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t) ->
-        return (typed loc annot (Nil, Item_t (List_t t, stack)))
-    | Prim (loc, I_CONS, [], annot),
-      Item_t (tv, Item_t (List_t t, rest)) ->
+        (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t, _) ->
+        return (typed loc (Nil, Item_t (List_t t, stack, instr_annot)))
+    | Prim (loc, I_CONS, [], instr_annot),
+      Item_t (tv, Item_t (List_t t, rest, _), _) ->
         check_item_ty tv t loc I_CONS 1 2 >>=? fun (Eq _) ->
-        return (typed loc annot (Cons_list, Item_t (List_t t, rest)))
-    | Prim (loc, I_IF_CONS, [ bt ; bf ], annot),
-      (Item_t (List_t t, rest) as bef) ->
+        return (typed loc (Cons_list, Item_t (List_t t, rest, instr_annot)))
+    | Prim (loc, I_IF_CONS, [ bt ; bf ], instr_annot),
+      (Item_t (List_t t, rest, stack_annot) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
-        parse_instr ?type_logger tc_context ctxt bt (Item_t (t, Item_t (List_t t, rest))) >>=? fun btr ->
+        parse_instr ?type_logger tc_context ctxt bt
+          (Item_t (t, Item_t (List_t t, rest, stack_annot), instr_annot)) >>=? fun btr ->
         parse_instr ?type_logger tc_context ctxt bf rest >>=? fun bfr ->
         let branch ibt ibf =
-          { loc ; instr = If_cons (ibt, ibf) ; bef ; aft = ibt.aft ; annot } in
+          { loc ; instr = If_cons (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
-    | Prim (loc, I_MAP, [], annot),
-      Item_t (Lambda_t (param, ret), Item_t (List_t elt, rest)) ->
+    | Prim (loc, I_MAP, [], instr_annot),
+      Item_t (Lambda_t (param, ret), Item_t (List_t elt, rest, _), _) ->
         check_item_ty elt param loc I_MAP 2 2 >>=? fun (Eq _) ->
-        return (typed loc annot (List_map, Item_t (List_t ret, rest)))
-    | Prim (loc, I_REDUCE, [], annot),
-      Item_t (Lambda_t (Pair_t (pelt, pr), r),
-              Item_t (List_t elt, Item_t (init, rest))) ->
+        return (typed loc (List_map, Item_t (List_t ret, rest, instr_annot)))
+    | Prim (loc, I_REDUCE, [], instr_annot),
+      Item_t (Lambda_t (Pair_t ((pelt, _), (pr, _)), r),
+              Item_t (List_t elt, Item_t (init, rest, _), _), _) ->
         check_item_ty r pr loc I_REDUCE 1 3 >>=? fun (Eq _) ->
         check_item_ty elt pelt loc I_REDUCE 2 3 >>=? fun (Eq _) ->
         check_item_ty init r loc I_REDUCE 3 3 >>=? fun (Eq _) ->
-        return (typed loc annot (List_reduce, Item_t (r, rest)))
-    | Prim (loc, I_SIZE, [], annot),
-      Item_t (List_t _, rest) ->
-        return (typed loc annot (List_size, Item_t (Nat_t, rest)))
+        return (typed loc (List_reduce, Item_t (r, rest, instr_annot)))
+    | Prim (loc, I_SIZE, [], instr_annot),
+      Item_t (List_t _, rest, _) ->
+        return (typed loc (List_size, Item_t (Nat_t, rest, instr_annot)))
     (* sets *)
-    | Prim (loc, I_EMPTY_SET, [ t ], annot),
+    | Prim (loc, I_EMPTY_SET, [ t ], instr_annot),
       rest ->
         (Lwt.return (parse_comparable_ty t)) >>=? fun (Ex_comparable_ty t) ->
-        return (typed loc annot (Empty_set t, Item_t (Set_t t, rest)))
-    | Prim (loc, I_MAP, [], annot),
-      Item_t (Lambda_t (param, ret), Item_t (Set_t elt, rest)) ->
+        return (typed loc (Empty_set t, Item_t (Set_t t, rest, instr_annot)))
+    | Prim (loc, I_MAP, [], instr_annot),
+      Item_t (Lambda_t (param, ret), Item_t (Set_t elt, rest, _), _) ->
         let elt = ty_of_comparable_ty elt in
         (Lwt.return (comparable_ty_of_ty loc ret)) >>=? fun ret ->
         check_item_ty elt param loc I_MAP 1 2 >>=? fun (Eq _) ->
-        return (typed loc annot (Set_map ret, Item_t (Set_t ret, rest)))
-    | Prim (loc, I_REDUCE, [], annot),
-      Item_t (Lambda_t (Pair_t (pelt, pr), r),
-              Item_t (Set_t elt, Item_t (init, rest))) ->
+        return (typed loc (Set_map ret, Item_t (Set_t ret, rest, instr_annot)))
+    | Prim (loc, I_REDUCE, [], instr_annot),
+      Item_t (Lambda_t (Pair_t ((pelt, _), (pr, _)), r),
+              Item_t (Set_t elt, Item_t (init, rest, _), _), _) ->
         let elt = ty_of_comparable_ty elt in
         check_item_ty r pr loc I_REDUCE 1 3 >>=? fun (Eq _) ->
         check_item_ty elt pelt loc I_REDUCE 2 3 >>=? fun (Eq _) ->
         check_item_ty init r loc I_REDUCE 3 3 >>=? fun (Eq _) ->
-        return (typed loc annot (Set_reduce, Item_t (r, rest)))
-    | Prim (loc, I_MEM, [], annot),
-      Item_t (v, Item_t (Set_t elt, rest)) ->
+        return (typed loc (Set_reduce, Item_t (r, rest, instr_annot)))
+    | Prim (loc, I_MEM, [], instr_annot),
+      Item_t (v, Item_t (Set_t elt, rest, _), _) ->
         let elt = ty_of_comparable_ty elt in
         check_item_ty elt v loc I_MEM 1 2 >>=? fun (Eq _) ->
-        return (typed loc annot (Set_mem, Item_t (Bool_t, rest)))
-    | Prim (loc, I_UPDATE, [], annot),
-      Item_t (v, Item_t (Bool_t, Item_t (Set_t elt, rest))) ->
+        return (typed loc (Set_mem, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_UPDATE, [], instr_annot),
+      Item_t (v, Item_t (Bool_t, Item_t (Set_t elt, rest, _), _), _) ->
         let ty = ty_of_comparable_ty elt in
         check_item_ty ty v loc I_UPDATE 1 3 >>=? fun (Eq _) ->
-        return (typed loc annot (Set_update, Item_t (Set_t elt, rest)))
-    | Prim (loc, I_SIZE, [], annot),
-      Item_t (Set_t _, rest) ->
-        return (typed loc annot (Set_size, Item_t (Nat_t, rest)))
+        return (typed loc (Set_update, Item_t (Set_t elt, rest, instr_annot)))
+    | Prim (loc, I_SIZE, [], instr_annot),
+      Item_t (Set_t _, rest, _) ->
+        return (typed loc (Set_size, Item_t (Nat_t, rest, instr_annot)))
     (* maps *)
-    | Prim (loc, I_EMPTY_MAP, [ tk ; tv ], annot),
+    | Prim (loc, I_EMPTY_MAP, [ tk ; tv ], instr_annot),
       stack ->
         (Lwt.return (parse_comparable_ty tk)) >>=? fun (Ex_comparable_ty tk) ->
-        (Lwt.return (parse_ty tv)) >>=? fun (Ex_ty tv) ->
-        return (typed loc annot (Empty_map (tk, tv), Item_t (Map_t (tk, tv), stack)))
-    | Prim (loc, I_MAP, [], annot),
-      Item_t (Lambda_t (Pair_t (pk, pv), ret), Item_t (Map_t (ck, v), rest)) ->
+        (Lwt.return (parse_ty tv)) >>=? fun (Ex_ty tv, _) ->
+        return (typed loc (Empty_map (tk, tv), Item_t (Map_t (tk, tv), stack, instr_annot)))
+    | Prim (loc, I_MAP, [], instr_annot),
+      Item_t (Lambda_t (Pair_t ((pk, _), (pv, _)), ret),
+              Item_t (Map_t (ck, v), rest, _), _) ->
         let k = ty_of_comparable_ty ck in
         check_item_ty pk k loc I_MAP 1 2 >>=? fun (Eq _) ->
         check_item_ty pv v loc I_MAP 1 2 >>=? fun (Eq _) ->
-        return (typed loc annot (Map_map, Item_t (Map_t (ck, ret), rest)))
-    | Prim (loc, I_REDUCE, [], annot),
-      Item_t (Lambda_t (Pair_t (Pair_t (pk, pv), pr), r),
-              Item_t (Map_t (ck, v), Item_t (init, rest))) ->
+        return (typed loc (Map_map, Item_t (Map_t (ck, ret), rest, instr_annot)))
+    | Prim (loc, I_REDUCE, [], instr_annot),
+      Item_t (Lambda_t (Pair_t ((Pair_t ((pk, _), (pv, _)), _), (pr, _)), r),
+              Item_t (Map_t (ck, v),
+                      Item_t (init, rest, _), _), _) ->
         let k = ty_of_comparable_ty ck in
         check_item_ty pk k loc I_REDUCE 2 3 >>=? fun (Eq _) ->
         check_item_ty pv v loc I_REDUCE 2 3 >>=? fun (Eq _) ->
         check_item_ty r pr loc I_REDUCE 1 3 >>=? fun (Eq _) ->
         check_item_ty init r loc I_REDUCE 3 3 >>=? fun (Eq _) ->
-        return (typed loc annot (Map_reduce, Item_t (r, rest)))
-    | Prim (loc, I_MEM, [], annot),
-      Item_t (vk, Item_t (Map_t (ck, _), rest)) ->
+        return (typed loc (Map_reduce, Item_t (r, rest, instr_annot)))
+    | Prim (loc, I_MEM, [], instr_annot),
+      Item_t (vk, Item_t (Map_t (ck, _), rest, _), _) ->
         let k = ty_of_comparable_ty ck in
         check_item_ty vk k loc I_MEM 1 2 >>=? fun (Eq _) ->
-        return (typed loc annot (Map_mem, Item_t (Bool_t, rest)))
-    | Prim (loc, I_GET, [], annot),
-      Item_t (vk, Item_t (Map_t (ck, elt), rest)) ->
+        return (typed loc (Map_mem, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_GET, [], instr_annot),
+      Item_t (vk, Item_t (Map_t (ck, elt), rest, _), _) ->
         let k = ty_of_comparable_ty ck in
         check_item_ty vk k loc I_GET 1 2 >>=? fun (Eq _) ->
-        return (typed loc annot (Map_get, Item_t (Option_t elt, rest)))
-    | Prim (loc, I_UPDATE, [], annot),
-      Item_t (vk, Item_t (Option_t vv, Item_t (Map_t (ck, v), rest))) ->
+        return (typed loc (Map_get, Item_t (Option_t elt, rest, instr_annot)))
+    | Prim (loc, I_UPDATE, [], instr_annot),
+      Item_t (vk, Item_t (Option_t vv, Item_t (Map_t (ck, v), rest, _), _), _) ->
         let k = ty_of_comparable_ty ck in
         check_item_ty vk k loc I_UPDATE 1 3 >>=? fun (Eq _) ->
         check_item_ty vv v loc I_UPDATE 2 3 >>=? fun (Eq _) ->
-        return (typed loc annot (Map_update, Item_t (Map_t (ck, v), rest)))
-    | Prim (loc, I_SIZE, [], annot),
-      Item_t (Map_t (_, _), rest) ->
-        return (typed loc annot (Map_size, Item_t (Nat_t, rest)))
+        return (typed loc (Map_update, Item_t (Map_t (ck, v), rest, instr_annot)))
+    | Prim (loc, I_SIZE, [], instr_annot),
+      Item_t (Map_t (_, _), rest, _) ->
+        return (typed loc (Map_size, Item_t (Nat_t, rest, instr_annot)))
     (* control *)
     | Seq (loc, [], annot),
       stack ->
-        return (typed loc annot (Nop, stack))
-    | Seq (loc, [ single ], (Some _ as annot)),
+        fail_unexpected_annot loc annot >>=? fun () ->
+        return (typed loc (Nop, stack))
+    | Seq (loc, [ single ], annot),
       stack ->
+        fail_unexpected_annot loc annot >>=? fun () ->
         parse_instr ?type_logger tc_context ctxt single stack >>=? begin function
           | Typed ({ aft } as instr) ->
-              let nop = { bef = aft ; loc = loc ; aft ; annot = None ; instr = Nop } in
-              return (typed loc annot (Seq (instr, nop), aft))
+              let nop = { bef = aft ; loc = loc ; aft ; instr = Nop } in
+              return (typed loc (Seq (instr, nop), aft))
           | Failed { descr } ->
               let descr aft =
-                let nop = { bef = aft ; loc = loc ; aft ; annot = None ; instr = Nop } in
+                let nop = { bef = aft ; loc = loc ; aft ; instr = Nop } in
                 let descr = descr aft in
-                { descr with instr = Seq (descr, nop) ; annot } in
+                { descr with instr = Seq (descr, nop) } in
               return (Failed { descr })
         end
     | Seq (loc, hd :: tl, annot),
       stack ->
+        fail_unexpected_annot loc annot >>=? fun () ->
         parse_instr ?type_logger tc_context ctxt hd stack >>=? begin function
           | Failed _ ->
               fail (Fail_not_in_tail_position (Micheline.location hd))
           | Typed ({ aft = middle } as ihd) ->
-              parse_instr ?type_logger tc_context ctxt (Seq (-1, tl, annot)) middle >>=? function
+              parse_instr ?type_logger tc_context ctxt (Seq (-1, tl, None)) middle >>=? function
               | Failed { descr } ->
                   let descr ret =
                     { loc ; instr = Seq (ihd, descr ret) ;
-                      bef = stack ; aft = ret ; annot = None } in
+                      bef = stack ; aft = ret } in
                   return (Failed { descr })
               | Typed itl ->
-                  return (typed loc annot (Seq (ihd, itl), itl.aft))
+                  return (typed loc (Seq (ihd, itl), itl.aft))
         end
-    | Prim (loc, I_IF, [ bt ; bf ], annot),
-      (Item_t (Bool_t, rest) as bef) ->
+    | Prim (loc, I_IF, [ bt ; bf ], _),
+      (Item_t (Bool_t, rest, _) as bef) ->
         check_kind [ Seq_kind ] bt >>=? fun () ->
         check_kind [ Seq_kind ] bf >>=? fun () ->
         parse_instr ?type_logger tc_context ctxt bt rest >>=? fun btr ->
         parse_instr ?type_logger tc_context ctxt bf rest >>=? fun bfr ->
         let branch ibt ibf =
-          { loc ; instr = If (ibt, ibf) ; bef ; aft = ibt.aft ; annot } in
+          { loc ; instr = If (ibt, ibf) ; bef ; aft = ibt.aft } in
         merge_branches loc btr bfr { branch }
-    | Prim (loc, I_LOOP, [ body ], annot),
-      (Item_t (Bool_t, rest) as stack) ->
+    | Prim (loc, I_LOOP, [ body ], _),
+      (Item_t (Bool_t, rest, stack_annot) as stack) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
         parse_instr ?type_logger tc_context ctxt body rest >>=? begin function
           | Typed ibody ->
               trace
                 (Unmatched_branches (loc, ibody.aft, stack))
                 (Lwt.return (stack_ty_eq 1 ibody.aft stack)) >>=? fun (Eq _) ->
-              return (typed loc annot (Loop ibody, rest))
+              return (typed loc (Loop ibody, rest))
           | Failed { descr } ->
-              let ibody = descr (Item_t (Bool_t, rest)) in
-              return (typed loc annot (Loop ibody, rest))
+              let ibody = descr (Item_t (Bool_t, rest, stack_annot)) in
+              return (typed loc (Loop ibody, rest))
         end
-    | Prim (loc, I_LAMBDA, [ arg ; ret ; code ], annot),
+    | Prim (loc, I_LAMBDA, [ arg ; ret ; code ], instr_annot),
       stack ->
-        (Lwt.return (parse_ty arg)) >>=? fun (Ex_ty arg) ->
-        (Lwt.return (parse_ty ret)) >>=? fun (Ex_ty ret) ->
+        (Lwt.return (parse_ty arg)) >>=? fun (Ex_ty arg, arg_annot) ->
+        (Lwt.return (parse_ty ret)) >>=? fun (Ex_ty ret, _) ->
         check_kind [ Seq_kind ] code >>=? fun () ->
-        parse_returning Lambda ?type_logger ctxt arg ret code >>=? fun lambda ->
-        return (typed loc annot (Lambda lambda, Item_t (Lambda_t (arg, ret), stack)))
-    | Prim (loc, I_EXEC, [], annot),
-      Item_t (arg, Item_t (Lambda_t (param, ret), rest)) ->
+        parse_returning Lambda ?type_logger ctxt
+          (arg, default_annot ~default:default_arg_annot arg_annot)
+          ret code >>=? fun lambda ->
+        return (typed loc (Lambda lambda, Item_t (Lambda_t (arg, ret), stack, instr_annot)))
+    | Prim (loc, I_EXEC, [], instr_annot),
+      Item_t (arg, Item_t (Lambda_t (param, ret), rest, _), _) ->
         check_item_ty arg param loc I_EXEC 1 2 >>=? fun (Eq _) ->
-        return (typed loc annot (Exec, Item_t (ret, rest)))
-    | Prim (loc, I_DIP, [ code ], annot),
-      Item_t (v, rest) ->
+        return (typed loc (Exec, Item_t (ret, rest, instr_annot)))
+    | Prim (loc, I_DIP, [ code ], instr_annot),
+      Item_t (v, rest, stack_annot) ->
+        fail_unexpected_annot loc instr_annot >>=? fun () ->
         check_kind [ Seq_kind ] code >>=? fun () ->
-        parse_instr ?type_logger (add_dip v tc_context) ctxt code rest >>=? begin function
+        parse_instr ?type_logger (add_dip v stack_annot tc_context) ctxt code rest >>=? begin function
           | Typed descr ->
-              return (typed loc annot (Dip descr, Item_t (v, descr.aft)))
+              return (typed loc (Dip descr, Item_t (v, descr.aft, stack_annot)))
           | Failed _ ->
               fail (Fail_not_in_tail_position loc)
         end
     | Prim (loc, I_FAIL, [], annot),
       bef ->
-        let descr aft = { loc ; instr = Fail ; bef ; aft ; annot } in
+        fail_unexpected_annot loc annot >>=? fun () ->
+        let descr aft = { loc ; instr = Fail ; bef ; aft } in
         return (Failed { descr })
     (* timestamp operations *)
-    | Prim (loc, I_ADD, [], annot),
-      Item_t (Timestamp_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Add_timestamp_to_seconds, Item_t (Timestamp_t, rest)))
-    | Prim (loc, I_ADD, [], annot),
-      Item_t (Int_t, Item_t (Timestamp_t, rest)) ->
-        return (typed loc annot (Add_seconds_to_timestamp, Item_t (Timestamp_t, rest)))
-    | Prim (loc, I_SUB, [], annot),
-      Item_t (Timestamp_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Sub_timestamp_seconds, Item_t (Timestamp_t, rest)))
-    | Prim (loc, I_SUB, [], annot),
-      Item_t (Timestamp_t, Item_t (Timestamp_t, rest)) ->
-        return (typed loc annot (Diff_timestamps, Item_t (Int_t, rest)))
+    | Prim (loc, I_ADD, [], instr_annot),
+      Item_t (Timestamp_t, Item_t (Int_t, rest, _), _) ->
+        return (typed loc (Add_timestamp_to_seconds, Item_t (Timestamp_t, rest, instr_annot)))
+    | Prim (loc, I_ADD, [], instr_annot),
+      Item_t (Int_t, Item_t (Timestamp_t, rest, _), _) ->
+        return (typed loc (Add_seconds_to_timestamp, Item_t (Timestamp_t, rest, instr_annot)))
+    | Prim (loc, I_SUB, [], instr_annot),
+      Item_t (Timestamp_t, Item_t (Int_t, rest, _), _) ->
+        return (typed loc (Sub_timestamp_seconds, Item_t (Timestamp_t, rest, instr_annot)))
+    | Prim (loc, I_SUB, [], instr_annot),
+      Item_t (Timestamp_t, Item_t (Timestamp_t, rest, _), _) ->
+        return (typed loc (Diff_timestamps, Item_t (Int_t, rest, instr_annot)))
     (* string operations *)
-    | Prim (loc, I_CONCAT, [], annot),
-      Item_t (String_t, Item_t (String_t, rest)) ->
-        return (typed loc annot (Concat, Item_t (String_t, rest)))
+    | Prim (loc, I_CONCAT, [], instr_annot),
+      Item_t (String_t, Item_t (String_t, rest, _), _) ->
+        return (typed loc (Concat, Item_t (String_t, rest, instr_annot)))
     (* currency operations *)
-    | Prim (loc, I_ADD, [], annot),
-      Item_t (Tez_t, Item_t (Tez_t, rest)) ->
-        return (typed loc annot (Add_tez, Item_t (Tez_t, rest)))
-    | Prim (loc, I_SUB, [], annot),
-      Item_t (Tez_t, Item_t (Tez_t, rest)) ->
-        return (typed loc annot (Sub_tez, Item_t (Tez_t, rest)))
-    | Prim (loc, I_MUL, [], annot),
-      Item_t (Tez_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Mul_teznat, Item_t (Tez_t, rest)))
-    | Prim (loc, I_MUL, [], annot),
-      Item_t (Nat_t, Item_t (Tez_t, rest)) ->
-        return (typed loc annot (Mul_nattez, Item_t (Tez_t, rest)))
+    | Prim (loc, I_ADD, [], instr_annot),
+      Item_t (Tez_t, Item_t (Tez_t, rest, _), _) ->
+        return (typed loc (Add_tez, Item_t (Tez_t, rest, instr_annot)))
+    | Prim (loc, I_SUB, [], instr_annot),
+      Item_t (Tez_t, Item_t (Tez_t, rest, _), _) ->
+        return (typed loc (Sub_tez, Item_t (Tez_t, rest, instr_annot)))
+    | Prim (loc, I_MUL, [], instr_annot),
+      Item_t (Tez_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Mul_teznat, Item_t (Tez_t, rest, instr_annot)))
+    | Prim (loc, I_MUL, [], instr_annot),
+      Item_t (Nat_t, Item_t (Tez_t, rest, _), _) ->
+        return (typed loc (Mul_nattez, Item_t (Tez_t, rest, instr_annot)))
     (* boolean operations *)
-    | Prim (loc, I_OR, [], annot),
-      Item_t (Bool_t, Item_t (Bool_t, rest)) ->
-        return (typed loc annot (Or, Item_t (Bool_t, rest)))
-    | Prim (loc, I_AND, [], annot),
-      Item_t (Bool_t, Item_t (Bool_t, rest)) ->
-        return (typed loc annot (And, Item_t (Bool_t, rest)))
-    | Prim (loc, I_XOR, [], annot),
-      Item_t (Bool_t, Item_t (Bool_t, rest)) ->
-        return (typed loc annot (Xor, Item_t (Bool_t, rest)))
-    | Prim (loc, I_NOT, [], annot),
-      Item_t (Bool_t, rest) ->
-        return (typed loc annot (Not, Item_t (Bool_t, rest)))
+    | Prim (loc, I_OR, [], instr_annot),
+      Item_t (Bool_t, Item_t (Bool_t, rest, _), _) ->
+        return (typed loc (Or, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_AND, [], instr_annot),
+      Item_t (Bool_t, Item_t (Bool_t, rest, _), _) ->
+        return (typed loc (And, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_XOR, [], instr_annot),
+      Item_t (Bool_t, Item_t (Bool_t, rest, _), _) ->
+        return (typed loc (Xor, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_NOT, [], instr_annot),
+      Item_t (Bool_t, rest, _) ->
+        return (typed loc (Not, Item_t (Bool_t, rest, instr_annot)))
     (* integer operations *)
-    | Prim (loc, I_ABS, [], annot),
-      Item_t (Int_t, rest) ->
-        return (typed loc annot (Abs_int, Item_t (Nat_t, rest)))
-    | Prim (loc, I_INT, [], annot),
-      Item_t (Nat_t, rest) ->
-        return (typed loc annot (Int_nat, Item_t (Int_t, rest)))
-    | Prim (loc, I_NEG, [], annot),
-      Item_t (Int_t, rest) ->
-        return (typed loc annot (Neg_int, Item_t (Int_t, rest)))
-    | Prim (loc, I_NEG, [], annot),
-      Item_t (Nat_t, rest) ->
-        return (typed loc annot (Neg_nat, Item_t (Int_t, rest)))
-    | Prim (loc, I_ADD, [], annot),
-      Item_t (Int_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Add_intint, Item_t (Int_t, rest)))
-    | Prim (loc, I_ADD, [], annot),
-      Item_t (Int_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Add_intnat, Item_t (Int_t, rest)))
-    | Prim (loc, I_ADD, [], annot),
-      Item_t (Nat_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Add_natint, Item_t (Int_t, rest)))
-    | Prim (loc, I_ADD, [], annot),
-      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Add_natnat, Item_t (Nat_t, rest)))
-    | Prim (loc, I_SUB, [], annot),
-      Item_t (Int_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Sub_int, Item_t (Int_t, rest)))
-    | Prim (loc, I_SUB, [], annot),
-      Item_t (Int_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Sub_int, Item_t (Int_t, rest)))
-    | Prim (loc, I_SUB, [], annot),
-      Item_t (Nat_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Sub_int, Item_t (Int_t, rest)))
-    | Prim (loc, I_SUB, [], annot),
-      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Sub_int, Item_t (Int_t, rest)))
-    | Prim (loc, I_MUL, [], annot),
-      Item_t (Int_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Mul_intint, Item_t (Int_t, rest)))
-    | Prim (loc, I_MUL, [], annot),
-      Item_t (Int_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Mul_intnat, Item_t (Int_t, rest)))
-    | Prim (loc, I_MUL, [], annot),
-      Item_t (Nat_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Mul_natint, Item_t (Int_t, rest)))
-    | Prim (loc, I_MUL, [], annot),
-      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Mul_natnat, Item_t (Nat_t, rest)))
-    | Prim (loc, I_EDIV, [], annot),
-      Item_t (Tez_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Ediv_teznat,
-               Item_t (Option_t (Pair_t (Tez_t,Tez_t)), rest)))
-    | Prim (loc, I_EDIV, [], annot),
-      Item_t (Tez_t, Item_t (Tez_t, rest)) ->
-        return (typed loc annot (Ediv_tez,
-               Item_t (Option_t (Pair_t (Nat_t,Tez_t)), rest)))
-    | Prim (loc, I_EDIV, [], annot),
-      Item_t (Int_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Ediv_intint,
-               Item_t (Option_t (Pair_t (Int_t,Nat_t)), rest)))
-    | Prim (loc, I_EDIV, [], annot),
-      Item_t (Int_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Ediv_intnat,
-               Item_t (Option_t (Pair_t (Int_t,Nat_t)), rest)))
-    | Prim (loc, I_EDIV, [], annot),
-      Item_t (Nat_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Ediv_natint,
-               Item_t (Option_t (Pair_t (Int_t,Nat_t)), rest)))
-    | Prim (loc, I_EDIV, [], annot),
-      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Ediv_natnat,
-               Item_t (Option_t (Pair_t (Nat_t,Nat_t)), rest)))
-    | Prim (loc, I_LSL, [], annot),
-      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Lsl_nat, Item_t (Nat_t, rest)))
-    | Prim (loc, I_LSR, [], annot),
-      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Lsr_nat, Item_t (Nat_t, rest)))
-    | Prim (loc, I_OR, [], annot),
-      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Or_nat, Item_t (Nat_t, rest)))
-    | Prim (loc, I_AND, [], annot),
-      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (And_nat, Item_t (Nat_t, rest)))
-    | Prim (loc, I_XOR, [], annot),
-      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Xor_nat, Item_t (Nat_t, rest)))
-    | Prim (loc, I_NOT, [], annot),
-      Item_t (Int_t, rest) ->
-        return (typed loc annot (Not_int, Item_t (Int_t, rest)))
-    | Prim (loc, I_NOT, [], annot),
-      Item_t (Nat_t, rest) ->
-        return (typed loc annot (Not_nat, Item_t (Int_t, rest)))
+    | Prim (loc, I_ABS, [], instr_annot),
+      Item_t (Int_t, rest, _) ->
+        return (typed loc (Abs_int, Item_t (Nat_t, rest, instr_annot)))
+    | Prim (loc, I_INT, [], instr_annot),
+      Item_t (Nat_t, rest, _) ->
+        return (typed loc (Int_nat, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_NEG, [], instr_annot),
+      Item_t (Int_t, rest, _) ->
+        return (typed loc (Neg_int, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_NEG, [], instr_annot),
+      Item_t (Nat_t, rest, _) ->
+        return (typed loc (Neg_nat, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_ADD, [], instr_annot),
+      Item_t (Int_t, Item_t (Int_t, rest, _), _) ->
+        return (typed loc (Add_intint, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_ADD, [], instr_annot),
+      Item_t (Int_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Add_intnat, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_ADD, [], instr_annot),
+      Item_t (Nat_t, Item_t (Int_t, rest, _), _) ->
+        return (typed loc (Add_natint, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_ADD, [], instr_annot),
+      Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Add_natnat, Item_t (Nat_t, rest, instr_annot)))
+    | Prim (loc, I_SUB, [], instr_annot),
+      Item_t (Int_t, Item_t (Int_t, rest, _), _) ->
+        return (typed loc (Sub_int, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_SUB, [], instr_annot),
+      Item_t (Int_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Sub_int, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_SUB, [], instr_annot),
+      Item_t (Nat_t, Item_t (Int_t, rest, _), _) ->
+        return (typed loc (Sub_int, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_SUB, [], instr_annot),
+      Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Sub_int, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_MUL, [], instr_annot),
+      Item_t (Int_t, Item_t (Int_t, rest, _), _) ->
+        return (typed loc (Mul_intint, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_MUL, [], instr_annot),
+      Item_t (Int_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Mul_intnat, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_MUL, [], instr_annot),
+      Item_t (Nat_t, Item_t (Int_t, rest, _), _) ->
+        return (typed loc (Mul_natint, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_MUL, [], instr_annot),
+      Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Mul_natnat, Item_t (Nat_t, rest, instr_annot)))
+    | Prim (loc, I_EDIV, [], instr_annot),
+      Item_t (Tez_t, Item_t (Nat_t, rest, _), _) ->
+        return
+          (typed loc
+             (Ediv_teznat,
+              Item_t (Option_t (Pair_t ((Tez_t, None), (Tez_t, None))), rest, instr_annot)))
+    | Prim (loc, I_EDIV, [], instr_annot),
+      Item_t (Tez_t, Item_t (Tez_t, rest, _), _) ->
+        return (typed loc (Ediv_tez,
+               Item_t (Option_t (Pair_t ((Nat_t, None), (Tez_t, None))), rest, instr_annot)))
+    | Prim (loc, I_EDIV, [], instr_annot),
+      Item_t (Int_t, Item_t (Int_t, rest, _), _) ->
+        return
+          (typed loc
+             (Ediv_intint,
+              Item_t (Option_t (Pair_t ((Int_t, None), (Nat_t, None))), rest, instr_annot)))
+    | Prim (loc, I_EDIV, [], instr_annot),
+      Item_t (Int_t, Item_t (Nat_t, rest, _), _) ->
+        return
+          (typed loc
+             (Ediv_intnat,
+              Item_t (Option_t (Pair_t ((Int_t, None), (Nat_t, None))), rest, instr_annot)))
+    | Prim (loc, I_EDIV, [], instr_annot),
+      Item_t (Nat_t, Item_t (Int_t, rest, _), _) ->
+        return
+          (typed loc
+             (Ediv_natint,
+              Item_t (Option_t (Pair_t ((Int_t, None), (Nat_t, None))), rest, instr_annot)))
+    | Prim (loc, I_EDIV, [], instr_annot),
+      Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
+        return
+          (typed loc
+             (Ediv_natnat,
+              Item_t (Option_t (Pair_t ((Nat_t, None), (Nat_t, None))), rest, instr_annot)))
+    | Prim (loc, I_LSL, [], instr_annot),
+      Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Lsl_nat, Item_t (Nat_t, rest, instr_annot)))
+    | Prim (loc, I_LSR, [], instr_annot),
+      Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Lsr_nat, Item_t (Nat_t, rest, instr_annot)))
+    | Prim (loc, I_OR, [], instr_annot),
+      Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Or_nat, Item_t (Nat_t, rest, instr_annot)))
+    | Prim (loc, I_AND, [], instr_annot),
+      Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (And_nat, Item_t (Nat_t, rest, instr_annot)))
+    | Prim (loc, I_XOR, [], instr_annot),
+      Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Xor_nat, Item_t (Nat_t, rest, instr_annot)))
+    | Prim (loc, I_NOT, [], instr_annot),
+      Item_t (Int_t, rest, _) ->
+        return (typed loc (Not_int, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_NOT, [], instr_annot),
+      Item_t (Nat_t, rest, _) ->
+        return (typed loc (Not_nat, Item_t (Int_t, rest, instr_annot)))
     (* comparison *)
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Int_t, Item_t (Int_t, rest)) ->
-        return (typed loc annot (Compare Int_key, Item_t (Int_t, rest)))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Nat_t, Item_t (Nat_t, rest)) ->
-        return (typed loc annot (Compare Nat_key, Item_t (Int_t, rest)))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Bool_t, Item_t (Bool_t, rest)) ->
-        return (typed loc annot (Compare Bool_key, Item_t (Int_t, rest)))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (String_t, Item_t (String_t, rest)) ->
-        return (typed loc annot (Compare String_key, Item_t (Int_t, rest)))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Tez_t, Item_t (Tez_t, rest)) ->
-        return (typed loc annot (Compare Tez_key, Item_t (Int_t, rest)))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Key_hash_t, Item_t (Key_hash_t, rest)) ->
-        return (typed loc annot (Compare Key_hash_key, Item_t (Int_t, rest)))
-    | Prim (loc, I_COMPARE, [], annot),
-      Item_t (Timestamp_t, Item_t (Timestamp_t, rest)) ->
-        return (typed loc annot (Compare Timestamp_key, Item_t (Int_t, rest)))
+    | Prim (loc, I_COMPARE, [], instr_annot),
+      Item_t (Int_t, Item_t (Int_t, rest, _), _) ->
+        return (typed loc (Compare Int_key, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_COMPARE, [], instr_annot),
+      Item_t (Nat_t, Item_t (Nat_t, rest, _), _) ->
+        return (typed loc (Compare Nat_key, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_COMPARE, [], instr_annot),
+      Item_t (Bool_t, Item_t (Bool_t, rest, _), _) ->
+        return (typed loc (Compare Bool_key, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_COMPARE, [], instr_annot),
+      Item_t (String_t, Item_t (String_t, rest, _), _) ->
+        return (typed loc (Compare String_key, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_COMPARE, [], instr_annot),
+      Item_t (Tez_t, Item_t (Tez_t, rest, _), _) ->
+        return (typed loc (Compare Tez_key, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_COMPARE, [], instr_annot),
+      Item_t (Key_hash_t, Item_t (Key_hash_t, rest, _), _) ->
+        return (typed loc (Compare Key_hash_key, Item_t (Int_t, rest, instr_annot)))
+    | Prim (loc, I_COMPARE, [], instr_annot),
+      Item_t (Timestamp_t, Item_t (Timestamp_t, rest, _), _) ->
+        return (typed loc (Compare Timestamp_key, Item_t (Int_t, rest, instr_annot)))
     (* comparators *)
-    | Prim (loc, I_EQ, [], annot),
-      Item_t (Int_t, rest) ->
-        return (typed loc annot (Eq, Item_t (Bool_t, rest)))
-    | Prim (loc, I_NEQ, [], annot),
-      Item_t (Int_t, rest) ->
-        return (typed loc annot (Neq, Item_t (Bool_t, rest)))
-    | Prim (loc, I_LT, [], annot),
-      Item_t (Int_t, rest) ->
-        return (typed loc annot (Lt, Item_t (Bool_t, rest)))
-    | Prim (loc, I_GT, [], annot),
-      Item_t (Int_t, rest) ->
-        return (typed loc annot (Gt, Item_t (Bool_t, rest)))
-    | Prim (loc, I_LE, [], annot),
-      Item_t (Int_t, rest) ->
-        return (typed loc annot (Le, Item_t (Bool_t, rest)))
-    | Prim (loc, I_GE, [], annot),
-      Item_t (Int_t, rest) ->
-        return (typed loc annot (Ge, Item_t (Bool_t, rest)))
+    | Prim (loc, I_EQ, [], instr_annot),
+      Item_t (Int_t, rest, _) ->
+        return (typed loc (Eq, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_NEQ, [], instr_annot),
+      Item_t (Int_t, rest, _) ->
+        return (typed loc (Neq, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_LT, [], instr_annot),
+      Item_t (Int_t, rest, _) ->
+        return (typed loc (Lt, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_GT, [], instr_annot),
+      Item_t (Int_t, rest, _) ->
+        return (typed loc (Gt, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_LE, [], instr_annot),
+      Item_t (Int_t, rest, _) ->
+        return (typed loc (Le, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_GE, [], instr_annot),
+      Item_t (Int_t, rest, _) ->
+        return (typed loc (Ge, Item_t (Bool_t, rest, instr_annot)))
     (* protocol *)
-    | Prim (loc, I_MANAGER, [], annot),
-      Item_t (Contract_t _, rest) ->
-        return (typed loc annot (Manager, Item_t (Key_hash_t, rest)))
-    | Prim (loc, I_TRANSFER_TOKENS, [], annot),
+    | Prim (loc, I_MANAGER, [], instr_annot),
+      Item_t (Contract_t _, rest, _) ->
+        return (typed loc (Manager, Item_t (Key_hash_t, rest, instr_annot)))
+    | Prim (loc, I_TRANSFER_TOKENS, [], instr_annot),
       Item_t (p, Item_t
                 (Tez_t, Item_t
                    (Contract_t (cp, cr), Item_t
-                      (storage, Empty_t)))) ->
+                      (storage, Empty_t, storage_annot), _), _), _) ->
         check_item_ty p cp loc I_TRANSFER_TOKENS 1 4 >>=? fun (Eq _) ->
         begin match tc_context with
           | Dip _ -> fail (Transfer_in_dip loc)
           | Lambda -> fail (Transfer_in_lambda loc)
           | Toplevel { storage_type } ->
               check_item_ty storage storage_type loc I_TRANSFER_TOKENS 3 4 >>=? fun (Eq _) ->
-              return (typed loc annot (Transfer_tokens storage,
-                                       Item_t (cr, Item_t (storage, Empty_t))))
+              return (typed loc (Transfer_tokens storage,
+                                 Item_t (cr, Item_t (storage, Empty_t, storage_annot),
+                                         instr_annot)))
         end
-    | Prim (loc, I_CREATE_ACCOUNT, [], annot),
+    | Prim (loc, I_CREATE_ACCOUNT, [], instr_annot),
       Item_t
         (Key_hash_t, Item_t
            (Option_t Key_hash_t, Item_t
               (Bool_t, Item_t
-                 (Tez_t, rest)))) ->
-        return (typed loc annot (Create_account,
-                           Item_t (Contract_t (Unit_t, Unit_t), rest)))
-    | Prim (loc, I_DEFAULT_ACCOUNT, [], annot),
-      Item_t (Key_hash_t, rest) ->
+                 (Tez_t, rest, _), _), _), _) ->
+        return (typed loc (Create_account,
+                           Item_t (Contract_t (Unit_t, Unit_t), rest, instr_annot)))
+    | Prim (loc, I_DEFAULT_ACCOUNT, [], instr_annot),
+      Item_t (Key_hash_t, rest, _) ->
         return
-          (typed loc annot (Default_account, Item_t (Contract_t (Unit_t, Unit_t), rest)))
-    | Prim (loc, I_CREATE_CONTRACT, [], annot),
+          (typed loc (Default_account, Item_t (Contract_t (Unit_t, Unit_t), rest, instr_annot)))
+    | Prim (loc, I_CREATE_CONTRACT, [], instr_annot),
       Item_t
         (Key_hash_t, Item_t
            (Option_t Key_hash_t, Item_t
               (Bool_t, Item_t
                  (Bool_t, Item_t
                     (Tez_t, Item_t
-                       (Lambda_t (Pair_t (p, gp),
-                                  Pair_t (r, gr)), Item_t
-                          (ginit, rest))))))) ->
+                       (Lambda_t (Pair_t ((p, _), (gp, _)),
+                                  Pair_t ((r, _), (gr, _))), Item_t
+                          (ginit, rest, _), _), _), _), _), _), _) ->
         check_item_ty gp gr loc I_CREATE_CONTRACT 5 7 >>=? fun (Eq _) ->
         check_item_ty ginit gp loc I_CREATE_CONTRACT 6 7 >>=? fun (Eq _) ->
-        return (typed loc annot (Create_contract (gp, p, r),
-                           Item_t (Contract_t (p, r), rest)))
-    | Prim (loc, I_NOW, [], annot),
+        return (typed loc (Create_contract (gp, p, r),
+                           Item_t (Contract_t (p, r), rest, instr_annot)))
+    | Prim (loc, I_NOW, [], instr_annot),
       stack ->
-        return (typed loc annot (Now, Item_t (Timestamp_t, stack)))
-    | Prim (loc, I_AMOUNT, [], annot),
+        return (typed loc (Now, Item_t (Timestamp_t, stack, instr_annot)))
+    | Prim (loc, I_AMOUNT, [], instr_annot),
       stack ->
-        return (typed loc annot (Amount, Item_t (Tez_t, stack)))
-    | Prim (loc, I_BALANCE, [], annot),
+        return (typed loc (Amount, Item_t (Tez_t, stack, instr_annot)))
+    | Prim (loc, I_BALANCE, [], instr_annot),
       stack ->
-        return (typed loc annot (Balance, Item_t (Tez_t, stack)))
-    | Prim (loc, I_HASH_KEY, [], annot),
-      Item_t (Key_t, rest) ->
-        return (typed loc annot (Hash_key, Item_t (Key_hash_t, rest)))
-    | Prim (loc, I_CHECK_SIGNATURE, [], annot),
-      Item_t (Key_t, Item_t (Pair_t (Signature_t, String_t), rest)) ->
-        return (typed loc annot (Check_signature, Item_t (Bool_t, rest)))
-    | Prim (loc, I_H, [], annot),
-      Item_t (t, rest) ->
-        return (typed loc annot (H t, Item_t (String_t, rest)))
-    | Prim (loc, I_STEPS_TO_QUOTA, [], annot),
+        return (typed loc (Balance, Item_t (Tez_t, stack, instr_annot)))
+    | Prim (loc, I_HASH_KEY, [], instr_annot),
+      Item_t (Key_t, rest, _) ->
+        return (typed loc (Hash_key, Item_t (Key_hash_t, rest, instr_annot)))
+    | Prim (loc, I_CHECK_SIGNATURE, [], instr_annot),
+      Item_t (Key_t, Item_t (Pair_t ((Signature_t, _), (String_t, _)), rest, _), _) ->
+        return (typed loc (Check_signature, Item_t (Bool_t, rest, instr_annot)))
+    | Prim (loc, I_H, [], instr_annot),
+      Item_t (t, rest, _) ->
+        return (typed loc (H t, Item_t (String_t, rest, instr_annot)))
+    | Prim (loc, I_STEPS_TO_QUOTA, [], instr_annot),
       stack ->
-        return (typed loc annot (Steps_to_quota, Item_t (Nat_t, stack)))
-    | Prim (loc, I_SOURCE, [ ta; tb ], annot),
+        return (typed loc (Steps_to_quota, Item_t (Nat_t, stack, instr_annot)))
+    | Prim (loc, I_SOURCE, [ ta; tb ], instr_annot),
       stack ->
-        (Lwt.return (parse_ty ta)) >>=? fun (Ex_ty ta) ->
-        (Lwt.return (parse_ty tb)) >>=? fun (Ex_ty tb) ->
-        return (typed loc annot (Source (ta, tb), Item_t (Contract_t (ta, tb), stack)))
+        (Lwt.return (parse_ty ta)) >>=? fun (Ex_ty ta, _) ->
+        (Lwt.return (parse_ty tb)) >>=? fun (Ex_ty tb, _) ->
+        return (typed loc (Source (ta, tb), Item_t (Contract_t (ta, tb), stack, instr_annot)))
     (* Primitive parsing errors *)
     | Prim (loc, (I_DROP | I_DUP | I_SWAP | I_SOME | I_UNIT
                  | I_PAIR | I_CAR | I_CDR | I_CONS
@@ -1456,12 +1601,12 @@ and parse_instr
     | Prim (loc, (I_ADD | I_SUB | I_MUL | I_EDIV
                  | I_AND | I_OR | I_XOR | I_LSL | I_LSR
                  | I_CONCAT | I_COMPARE as name), [], _),
-      Item_t (ta, Item_t (tb, _)) ->
+      Item_t (ta, Item_t (tb, _, _), _) ->
         fail (Undefined_binop (loc, name, ta, tb))
     | Prim (loc, (I_NEG | I_ABS | I_NOT
                  | I_EQ | I_NEQ | I_LT | I_GT | I_LE | I_GE as name),
             [], _),
-      Item_t (t, _) ->
+      Item_t (t, _, _) ->
         fail (Undefined_unop (loc, name, t))
     | Prim (loc, (I_REDUCE | I_UPDATE as name), [], _),
       stack ->
@@ -1531,8 +1676,8 @@ and parse_contract
         | Some { code } ->
             Lwt.return
               (parse_toplevel code >>? fun (arg_type, ret_type, _, _) ->
-               parse_ty arg_type >>? fun (Ex_ty targ) ->
-               parse_ty ret_type >>? fun (Ex_ty tret) ->
+               parse_ty arg_type >>? fun (Ex_ty targ, _) ->
+               parse_ty ret_type >>? fun (Ex_ty tret, _) ->
                ty_eq targ arg >>? fun (Eq _) ->
                ty_eq tret ret >>? fun (Eq _) ->
                let contract : (arg, ret) typed_contract =
@@ -1594,21 +1739,22 @@ let parse_script
     Lwt.return (parse_toplevel code) >>=? fun (arg_type, ret_type, storage_type, code_field) ->
     trace
       (Ill_formed_type (Some "parameter", code, location arg_type))
-      (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
+      (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type, param_annot) ->
     trace
       (Ill_formed_type (Some "return", code, location ret_type))
-      (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
+      (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type, _) ->
     trace
       (Ill_formed_type (Some "storage", code, location storage_type))
-      (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
-    let arg_type_full = Pair_t (arg_type, storage_type) in
-    let ret_type_full = Pair_t (ret_type, storage_type) in
+      (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type, storage_annot) ->
+    let arg_type_full = Pair_t ((arg_type, default_annot ~default:default_param_annot param_annot),
+                                (storage_type, default_annot ~default:default_storage_annot storage_annot)) in
+    let ret_type_full = Pair_t ((ret_type, None), (storage_type, None)) in
     trace
       (Ill_typed_data (None, storage, storage_type))
       (parse_data ?type_logger ctxt storage_type (root storage)) >>=? fun storage ->
     trace
       (Ill_typed_contract (code, []))
-      (parse_returning (Toplevel { storage_type }) ctxt ?type_logger arg_type_full ret_type_full code_field)
+      (parse_returning (Toplevel { storage_type }) ctxt ?type_logger (arg_type_full, None) ret_type_full code_field)
     >>=? fun code ->
     return (Ex_script { code; arg_type; ret_type; storage; storage_type })
 
@@ -1628,23 +1774,25 @@ let typecheck_code
   = fun ctxt code ->
     Lwt.return (parse_toplevel code) >>=? fun (arg_type, ret_type, storage_type, code_field) ->
     let type_map = ref [] in
+    (* TODO: annotation checking *)
     trace
       (Ill_formed_type (Some "parameter", code, location arg_type))
-      (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type) ->
+      (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type, param_annot) ->
     trace
       (Ill_formed_type (Some "return", code, location ret_type))
-      (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type) ->
+      (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type, _) ->
     trace
       (Ill_formed_type (Some "storage", code, location storage_type))
-      (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type) ->
-    let arg_type_full = Pair_t (arg_type, storage_type) in
-    let ret_type_full = Pair_t (ret_type, storage_type) in
+      (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type, storage_annot) ->
+    let arg_type_full = Pair_t ((arg_type, default_annot ~default:default_param_annot param_annot),
+                                (storage_type, default_annot ~default:default_storage_annot storage_annot)) in
+    let ret_type_full = Pair_t ((ret_type, None), (storage_type, None)) in
     let result =
       parse_returning
         (Toplevel { storage_type })
         ctxt
         ~type_logger: (fun loc bef aft -> type_map := (loc, (bef, aft)) :: !type_map)
-        arg_type_full ret_type_full code_field in
+        (arg_type_full, None) ret_type_full code_field in
     trace
       (Ill_typed_contract (code, !type_map))
       result >>=? fun (Lam _) ->
@@ -1656,7 +1804,7 @@ let typecheck_data
   = fun ?type_logger ctxt (data, exp_ty) ->
     trace
       (Ill_formed_type (None, exp_ty, 0))
-      (Lwt.return (parse_ty (root exp_ty))) >>=? fun (Ex_ty exp_ty) ->
+      (Lwt.return (parse_ty (root exp_ty))) >>=? fun (Ex_ty exp_ty, _) ->
     trace
       (Ill_typed_data (None, data, exp_ty))
       (parse_data ?type_logger ctxt exp_ty (root data)) >>=? fun _ ->
@@ -1666,10 +1814,10 @@ let typecheck_data
 
 let ex_ty_enc =
     Data_encoding.conv
-      (fun (Ex_ty ty) -> strip_locations (unparse_ty ty))
+      (fun (Ex_ty ty) -> strip_locations (unparse_ty None ty))
       (fun expr ->
          match parse_ty (root expr) with
-         | Ok (Ex_ty ty) -> Ex_ty ty
+         | Ok (Ex_ty ty, _) -> Ex_ty ty
          | _ -> Ex_ty Unit_t (* FIXME: ? *))
       Script.expr_encoding
 
@@ -1704,15 +1852,15 @@ let () =
                   "sequence", Seq_kind ] in
   let ex_stack_ty_enc =
     let rec unfold = function
-      | Ex_stack_ty (Item_t (ty, rest)) ->
-          Ex_ty ty :: unfold (Ex_stack_ty rest)
+      | Ex_stack_ty (Item_t (ty, rest, annot)) ->
+          (Ex_ty ty, annot) :: unfold (Ex_stack_ty rest)
       | Ex_stack_ty Empty_t -> [] in
     let rec fold = function
-      | Ex_ty ty :: rest ->
+      | (Ex_ty ty, annot) :: rest ->
           let Ex_stack_ty rest = fold rest in
-          Ex_stack_ty (Item_t (ty, rest))
+          Ex_stack_ty (Item_t (ty, rest, annot))
       | [] -> Ex_stack_ty Empty_t in
-    conv unfold fold (list ex_ty_enc) in
+    conv unfold fold (list (tup2 ex_ty_enc (option string))) in
   (* -- Structure errors ---------------------- *)
   register_error_kind
     `Permanent
@@ -1908,6 +2056,38 @@ let () =
       | _ -> None)
     (fun (loc, (name, s, Ex_stack_ty sty)) ->
        Bad_stack (loc, name, s, sty)) ;
+  register_error_kind
+    `Permanent
+    ~id:"inconsistentAnnotations"
+    ~title:"Annotations inconsistent between branches"
+    ~description:"The annotations on two types could not be merged"
+    (obj2
+       (req "annot1" string)
+       (req "annot2" string))
+    (function Inconsistent_annotations (annot1, annot2) -> Some (annot1, annot2)
+            | _ -> None)
+    (fun (annot1, annot2) -> Inconsistent_annotations (annot1, annot2)) ;
+  register_error_kind
+    `Permanent
+    ~id:"inconsistentTypeAnnotations"
+    ~title:"Types contain inconsistent annotations"
+    ~description:"The two types contain annotations that do not match"
+    (located (obj2
+               (req "type1" ex_ty_enc)
+               (req "type2" ex_ty_enc)))
+    (function
+      | Inconsistent_type_annotations (loc, ty1, ty2) -> Some (loc, (Ex_ty ty1, Ex_ty ty2))
+      | _ -> None)
+    (fun (loc, (Ex_ty ty1, Ex_ty ty2)) -> Inconsistent_type_annotations (loc, ty1, ty2)) ;
+  register_error_kind
+    `Permanent
+    ~id:"unexpectedAnnotation"
+    ~title:"An annotation was encountered where no annotation is expected"
+    ~description:"A node in the syntax tree was impropperly annotated"
+    (located empty)
+    (function Unexpected_annotation loc -> Some (loc, ())
+            | _ -> None)
+    (fun (loc, ()) -> Unexpected_annotation loc);
   register_error_kind
     `Permanent
     ~id:"unmatchedBranchesTypeError"

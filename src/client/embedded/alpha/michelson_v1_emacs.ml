@@ -10,17 +10,24 @@
 open Micheline
 
 let print_expr ppf expr =
+  let print_annot ppf = function
+    | None -> ()
+    | Some annot -> Format.fprintf ppf " %s" annot in
   let rec print_expr ppf = function
     | Int (_, value) -> Format.fprintf ppf "%s" value
     | String (_, value) -> Micheline_printer.print_string ppf value
-    | Seq (_, items, _) ->
-        Format.fprintf ppf "(seq %a)"
+    | Seq (_, items, annot) ->
+        Format.fprintf ppf "(seq%a %a)"
+          print_annot annot
           (Format.pp_print_list ~pp_sep:Format.pp_print_space print_expr)
           items
-    | Prim (_, name, [], _) ->
+    | Prim (_, name, [], None) ->
         Format.fprintf ppf "%s" name
-    | Prim (_, name, items, _) ->
-        Format.fprintf ppf "(%s %a)" name
+    | Prim (_, name, items, annot) ->
+        Format.fprintf ppf "(%s%a%s%a)"
+          name
+          print_annot annot
+          (if items = [] then "" else " ")
           (Format.pp_print_list ~pp_sep:Format.pp_print_space print_expr) items in
   let root = root (Michelson_v1_primitives.strings_of_prims expr) in
   Format.fprintf ppf "@[<h>%a@]" print_expr root
@@ -59,6 +66,8 @@ let print_type_map ppf (parsed, type_map) =
 let first_error_location errs =
   let rec find = function
     | [] -> 0
+    | Inconsistent_type_annotations (loc, _, _) :: _
+    | Unexpected_annotation loc :: _
     | Ill_formed_type (_, _, loc) :: _
     | Invalid_arity (loc, _, _, _) :: _
     | Invalid_namespace (loc, _, _, _) :: _

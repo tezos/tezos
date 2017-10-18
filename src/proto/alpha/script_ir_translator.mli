@@ -19,10 +19,8 @@ type ex_script = Ex_script : ('a, 'b, 'c) Script_typed_ir.script -> ex_script
 (* ---- Error definitions ---------------------------------------------------*)
 
 (* Auxiliary types for error documentation *)
-type namespace =
-    Type_namespace | Constant_namespace | Instr_namespace | Keyword_namespace
-type kind =
-    Int_kind | String_kind | Prim_kind | Seq_kind
+type namespace = Type_namespace | Constant_namespace | Instr_namespace | Keyword_namespace
+type kind = Int_kind | String_kind | Prim_kind | Seq_kind
 type type_map = (int * (Script.expr list * Script.expr list)) list
 
 (* Structure errors *)
@@ -39,6 +37,12 @@ type error += Undefined_unop : Script.location * Script.prim * _ Script_typed_ir
 type error += Bad_return : Script.location * _ Script_typed_ir.stack_ty * _ Script_typed_ir.ty -> error
 type error += Bad_stack : Script.location * Script.prim * int * _ Script_typed_ir.stack_ty -> error
 type error += Unmatched_branches : Script.location * _ Script_typed_ir.stack_ty * _ Script_typed_ir.stack_ty -> error
+
+type error += Inconsistent_annotations of string * string
+type error += Inconsistent_type_annotations :
+                Script.location * _ Script_typed_ir.ty * _ Script_typed_ir.ty -> error
+type error += Unexpected_annotation of Script.location
+
 type error += Transfer_in_lambda of Script.location
 type error += Transfer_in_dip of Script.location
 type error += Bad_stack_length
@@ -91,9 +95,9 @@ val unparse_data :
   'a Script_typed_ir.ty -> 'a -> Script.node
 
 val parse_ty :
-  Script.node -> ex_ty tzresult
+  Script.node -> (ex_ty * Script_typed_ir.annot) tzresult
 val unparse_ty :
-  'a Script_typed_ir.ty -> Script.node
+  string option -> 'a Script_typed_ir.ty -> Script.node
 
 val type_map_enc : type_map Data_encoding.encoding
 val ex_ty_enc : ex_ty Data_encoding.encoding

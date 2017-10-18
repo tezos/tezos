@@ -1,4 +1,4 @@
-parameter (pair bool bool);
+parameter (pair (bool @first) (bool @second));
 return bool;
 storage unit;
-code {CAR; DUP; CAR; DIP{CDR}; AND; UNIT; SWAP; PAIR};
+code { CAR @param; DUP; CAR @first; DIP{CDR @second}; AND; UNIT; SWAP; PAIR };
