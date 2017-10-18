@@ -469,25 +469,29 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
 
 (defun michelson-format-stack-top (bef-ele aft-ele width)
   (lexical-let*
-      ((pp-no-trailing-newline (lambda (sexp)
-                                 (let* ((str (pp-to-string sexp))
-                                        (len (length str)))
-                                   (if (equal "\n" (substring str (- len 1) len))
-                                       (substring str 0 (- len 1))
-                                     str))))
+      ((pp-no-trailing-newline
+        (lambda (sexp)
+          (let* ((str (pp-to-string sexp))
+                 (len (length str)))
+            (if (equal "\n" (substring str (- len 1) len))
+                (substring str 0 (- len 1))
+              str))))
        (bef-strs (if bef-ele (split-string (funcall pp-no-trailing-newline bef-ele) "\n") '("")))
        (aft-strs (if aft-ele (split-string (funcall pp-no-trailing-newline aft-ele) "\n") '("")))
        (width width))
     (letrec ((format-strings
               (lambda (befs afts)
                 (if (or befs afts)
-                    (concat (format (format "%%-%ds|     %%s\n" (/ width 2))
-                                    (if befs (car befs) "")
-                                    (if afts (car afts) ""))
-                            (funcall format-strings (cdr befs) (cdr afts)))
+                    (let ((aft-stack (if afts (car afts) "")))
+                      (concat (format (format "%%-%ds|%s%%s\n"
+                                              (/ width 2)
+                                              (if (equal aft-stack "") "" "     "))
+                                      (if befs (car befs) "")
+                                      aft-stack)
+                              (funcall format-strings (cdr befs) (cdr afts))))
                   ""))))
       (funcall format-strings bef-strs aft-strs))))
-    
+
 
 (defun michelson-format-stacks (bef-stack aft-stack)
   (letrec ((michelson-format-stacks-help
