@@ -135,6 +135,7 @@ and ('bef, 'aft) instr =
   | List_reduce :
       (('param * 'res, 'res) lambda *
        ('param list * ('res * 'rest)), 'res * 'rest) instr
+  | List_size : ('a list * 'rest, n num * 'rest) instr
   (* sets *)
   | Empty_set : 'a comparable_ty ->
     ('rest, 'a set * 'rest) instr
