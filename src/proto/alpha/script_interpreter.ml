@@ -163,6 +163,10 @@ let rec interp
                    return (partial, qta, ctxt, origination))
                 (init, qta, ctxt, origination) l >>=? fun (res, qta, ctxt, origination) ->
               logged_return ~origination (Item (res, rest), qta, ctxt)
+          | List_size, Item (list, rest) ->
+             let len = List.length list in
+             let len = Script_int.(abs (of_int len)) in
+              logged_return (Item (len, rest), qta - 1, ctxt)
           (* sets *)
           | Empty_set t, rest ->
               logged_return (Item (empty_set t, rest), qta - 1, ctxt)

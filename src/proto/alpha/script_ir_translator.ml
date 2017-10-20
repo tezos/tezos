@@ -763,7 +763,7 @@ let rec parse_data
                     else fail (Unordered_set_values (loc, expr))
                   else return ()
               | None -> return ()
-             end >>=? fun () -> 
+             end >>=? fun () ->
              return (Some v, set_update v true set))
           (None, empty_set t) vs >>|? snd |> traced
     | Set_t _, expr ->
@@ -932,6 +932,9 @@ and parse_instr
         check_item_ty elt pelt loc "REDUCE" 2 3 >>=? fun (Eq _) ->
         check_item_ty init r loc "REDUCE" 3 3 >>=? fun (Eq _) ->
         return (typed loc annot (List_reduce, Item_t (r, rest)))
+    | Prim (loc, "SIZE", [], annot),
+      Item_t (List_t _, rest) ->
+        return (typed loc annot (List_size, Item_t (Nat_t, rest)))
     (* sets *)
     | Prim (loc, "EMPTY_SET", [ t ], annot),
       rest ->
