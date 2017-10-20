@@ -889,6 +889,11 @@ constants as is, concatenate them and use them as keys.
 
         :: lambda (pair 'a 'b) 'b : list 'a : 'b : 'S -> 'b : 'S
 
+   * `SIZE`:
+     Get the number of elements in the list.
+
+        :: list 'elt : 'S -> nat : 'S
+
 
 VI - Domain specific data types
 -------------------------------
