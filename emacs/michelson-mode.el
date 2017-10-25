@@ -420,7 +420,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
                       (get-buffer-window buffer)
                     (display-buffer-below-selected buffer nil))))
     (window-body-width message-window)))
-  
+
 
 (defun michelson-write-output-buffer (data &optional do-not-overwrite)
   "Write the given `DATA' to the output buffer.
@@ -827,6 +827,14 @@ Enables or disables stack and error display."
           (michelson-type-at-point))))
     (current-buffer))))
 
+(defun michelson-close-output-buffer ()
+  "Close the interactive editing buffer."
+  (interactive)
+  (let ((buffer (get-buffer michelson-output-buffer-name)))
+    (when buffer
+      (let ((window (get-buffer-window buffer)))
+        (if window (quit-window t window) (kill-buffer buffer))))))
+
 (define-derived-mode michelson-mode prog-mode "Michelson"
   "Major mode for editing Michelson smart contracts."
   (interactive)
@@ -855,6 +863,7 @@ Enables or disables stack and error display."
    (make-local-variable 'focus-in-hook)
    'michelson-update-minibuffer-info)
   (add-hook 'post-self-insert-hook 'michelson-clean-cache)
+  (add-hook 'kill-buffer-hook 'michelson-close-output-buffer t t)
   (setq major-mode 'michelson-mode)
   (setq mode-name "Michelson")
   (setq indent-tabs-mode nil)
