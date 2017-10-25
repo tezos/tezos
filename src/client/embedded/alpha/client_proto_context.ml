@@ -332,8 +332,7 @@ let commands () =
       end ;
 
     command ~group ~desc: "open a new account"
-      (args5 fee_arg delegate_arg delegatable_switch
-                  force_switch non_spendable_switch)
+      (args4 fee_arg delegate_arg delegatable_switch force_switch)
       (prefixes [ "originate" ; "account" ]
        @@ RawContractAlias.fresh_alias_param
          ~name: "new" ~desc: "name of the new contract"
@@ -347,14 +346,14 @@ let commands () =
        @@ ContractAlias.alias_param
          ~name:"src" ~desc: "name of the source contract"
        @@ stop)
-      begin fun (fee, delegate, delegatable, force, non_spendable)
+      begin fun (fee, delegate, delegatable, force)
         neu (_, manager) balance (_, source) cctxt ->
         check_contract cctxt neu >>=? fun () ->
         get_delegate_pkh cctxt delegate >>=? fun delegate ->
         get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
         originate_account cctxt.rpc_config cctxt.config.block ~force:force
           ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee
-          ~delegatable:delegatable ~spendable:(not non_spendable) ?delegate:delegate
+          ~delegatable:delegatable ~spendable:true ?delegate:delegate
           () >>=? fun (oph, contract) ->
         message_injection cctxt
           ~force:force ~contracts:[contract] oph >>= fun () ->
@@ -363,10 +362,10 @@ let commands () =
         return ()
       end ;
 
-    command ~group ~desc: "open a new scripted account"
+    command ~group ~desc: "Launch a smart contract on the blockchain"
       (args6
-                  fee_arg delegate_arg force_switch
-                  delegatable_switch non_spendable_switch init_arg)
+         fee_arg delegate_arg force_switch
+         delegatable_switch spendable_switch init_arg)
       (prefixes [ "originate" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
          ~name: "new" ~desc: "name of the new contract"
@@ -384,7 +383,7 @@ let commands () =
          ~name:"prg" ~desc: "script of the account\n\
                              combine with -init if the storage type is not unit"
        @@ stop)
-      begin fun (fee, delegate, force, delegatable, non_spendable, init)
+      begin fun (fee, delegate, force, delegatable, spendable, init)
         neu (_, manager) balance (_, source) { ast = code } cctxt ->
         check_contract cctxt neu >>=? fun () ->
         get_delegate_pkh cctxt delegate >>=? fun delegate ->
@@ -393,7 +392,7 @@ let commands () =
           ~source ~src_pk ~src_sk ~manager_pkh:manager ~balance ~fee
           ~delegatable:delegatable ?delegatePubKey:delegate ~code
           ~init
-          ~spendable:(not non_spendable)
+          ~spendable:spendable
           () >>=function
         | Error errs ->
             Client_proto_programs.report_errors cctxt errs >>= fun () ->
