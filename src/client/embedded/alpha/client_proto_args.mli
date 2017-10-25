@@ -17,7 +17,7 @@ val source_arg: (string option, Client_commands.context) arg
 
 val delegate_arg: (string option, Client_commands.context) arg
 val delegatable_switch: (bool, Client_commands.context) arg
-val non_spendable_switch: (bool, Client_commands.context) arg
+val spendable_switch: (bool, Client_commands.context) arg
 val max_priority_arg: (int option, Client_commands.context) arg
 val free_baking_switch: (bool, Client_commands.context) arg
 val force_switch: (bool, Client_commands.context) arg

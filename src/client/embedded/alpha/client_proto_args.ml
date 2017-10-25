@@ -85,10 +85,10 @@ let source_arg =
           Must be a known identity."
     string_parameter
 
-let non_spendable_switch =
+let spendable_switch =
   switch
-    ~parameter:"-non-spendable"
-    ~doc:"Set the created contract to be non spendable"
+    ~parameter:"-spendable"
+    ~doc:"Set the created contract to be spendable"
 
 let force_switch =
   switch
