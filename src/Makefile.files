@@ -232,8 +232,6 @@ NODE_LIB_INTFS := \
 
 NODE_LIB_IMPLS := \
   \
-  compiler/node_compiler_main.ml \
-  \
   node/net/p2p_types.ml \
   node/net/p2p_io_scheduler.ml \
   node/net/p2p_connection.ml \
