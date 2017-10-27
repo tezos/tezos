@@ -1,0 +1,55 @@
+(jbuild_version 1)
+
+(rule
+ ((targets (environment.ml))
+  (action
+    (write-file ${@}
+      "include Tezos_protocol_environment.Make(struct let name = \"demo\" end)()"))))
+
+(rule
+ ((targets (registerer.ml))
+  (action
+    (write-file ${@}
+       "module Ignored =
+  State.Register_embedded_protocol
+    (Tezos_protocol_environment_demo.Environment)
+    (Tezos_embedded_raw_protocol_demo.Main)
+    (struct
+       let hash =
+         Some (Hash.Protocol_hash.of_b58check_exn
+                 \"ProtoDemoDemoDemoDemoDemoDemoDemoDemoDemoDemoD3c8k9\")
+       let sources = Tezos_data.Protocol.{
+         expected_env = V1 ;
+         components = [(* FIXME ?? *)] ;
+    } end)"))))
+
+(library
+  ((name tezos_protocol_environment_demo)
+  (libraries (node_updater))
+  (modules (Environment))))
+
+(library
+  ((name tezos_embedded_raw_protocol_demo)
+   (libraries (tezos_protocol_environment_demo))
+   (library_flags (:standard -linkall))
+   (flags (:standard -nopervasives -nostdlib
+                     -w +a-4-6-7-9-29-40..42-44-45-48
+                     -warn-error -a+8
+                     -open Tezos_protocol_environment_demo__Environment
+                     -open Error_monad
+                     -open Hash
+                     -open Tezos_data))
+   (modules (:standard \ Environment Registerer))))
+
+(library
+  ((name tezos_embedded_protocol_demo)
+   (library_flags (:standard -linkall))
+   (libraries (tezos_embedded_raw_protocol_demo node_shell))
+   (modules (Registerer))))
+
+(alias
+ ((name runtest_sandboxing)
+  (deps ((glob_files *.ml)
+         (glob_files *.mli)
+         TEZOS_PROTOCOL))
+  (action (run ${exe:../../compiler_main.exe} dummy_genesis ${path-no-dep:.}))))

@@ -1,0 +1,48 @@
+(jbuild_version 1)
+
+(alias
+ ((name runtest_basic.sh)
+  (deps (../src/node_main.exe
+         ../src/client_main.exe
+         sandbox.json
+         test_basic.sh
+         lib/test_lib.inc.sh
+         ../scripts/node_lib.inc.sh
+         ../scripts/client_lib.inc.sh
+         (glob_files contracts/*)
+         ))
+  (locks  (/tcp-port/18731
+           /tcp-port/19731))
+  (action (run bash ${path:test_basic.sh}))))
+
+(alias
+ ((name runtest_contracts.sh)
+  (deps (../src/node_main.exe
+         ../src/client_main.exe
+         sandbox.json
+         test_contracts.sh
+         lib/test_lib.inc.sh
+         ../scripts/node_lib.inc.sh
+         ../scripts/client_lib.inc.sh
+         (glob_files contracts/*)
+         ))
+  (locks  (/tcp-port/18732
+           /tcp-port/19732))
+  (action (run bash ${path:test_contracts.sh}))))
+
+(alias
+ ((name runtest_multinode.sh)
+  (deps (../src/node_main.exe
+         ../src/client_main.exe
+         sandbox.json
+         test_multinode.sh
+         lib/test_lib.inc.sh
+         ../scripts/node_lib.inc.sh
+         ../scripts/client_lib.inc.sh
+         (glob_files contracts/*)
+         ))
+  (locks  (/tcp-port/18731 /tcp-port/18732 /tcp-port/18733 /tcp-port/18734
+           /tcp-port/18735 /tcp-port/18736 /tcp-port/18737 /tcp-port/18738
+           /tcp-port/19731 /tcp-port/19732 /tcp-port/19733 /tcp-port/19734
+           /tcp-port/19735 /tcp-port/19736 /tcp-port/19737 /tcp-port/19738))
+  (action (run bash ${path:test_multinode.sh}))))

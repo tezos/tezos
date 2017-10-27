@@ -1,0 +1,6 @@
+(jbuild_version 1)
+
+(executable
+  ((name sigs_packer)
+  (public_name tezos-protocol-environment-sigs-packer)))
+

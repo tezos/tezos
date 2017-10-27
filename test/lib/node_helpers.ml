@@ -26,7 +26,6 @@ let handle_error res log_file_name =
       ignore (Sys.command (Printf.sprintf "cat %s" log_file_name) : int) ;
       raise Node_exited_prematurely
 
-
 let fork_node ?(timeout = 4) ?(port = 18732) ?sandbox () =
   let data_dir =
     Printf.sprintf
@@ -37,9 +36,11 @@ let fork_node ?(timeout = 4) ?(port = 18732) ?sandbox () =
     Filename.open_temp_file "tezos_node_" ".log" in
   let log_fd = Unix.descr_of_out_channel log_file in
   let null_fd = Unix.(openfile "/dev/null" [O_RDONLY] 0o644) in
+  let exe =
+    let (//) = Filename.concat in
+    Filename.(Sys.getcwd () // ".." // "src" // "node_main.exe") in
   let pid =
-    Unix.create_process
-      Filename.(concat (dirname (Sys.getcwd ())) "tezos-node")
+    Unix.create_process exe
       [| "tezos-node" ;
          "run" ;
          "--data-dir"; data_dir ;

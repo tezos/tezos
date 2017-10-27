@@ -13,52 +13,19 @@ if [ "$(ocaml -vnum)" != "$ocaml_version" ]; then
   exit 1;
 fi
 
-cmd="$1"
-if [ -z "$cmd" ]; then cmd=all; fi
-
-pin=false
-depext=false
-install=false
-
-case $cmd in
-    pin)
-	pin=true
-	;;
-    depext)
-	depext=true
-	;;
-    install)
-	install=true
-	;;
-    all)
-	pin=true
-	depext=true
-	install=true
-	;;
-    *)
-        echo "Unknown command '$cmd'."
-        echo "Usage: $0 [pin|depext|install|all|]"
-        exit 1
-esac
-
 set -e
 set -x
 
-if "$pin"; then
-    opam pin --yes add --no-action --dev-repo sodium
-    opam pin --yes add --no-action --dev-repo ocp-ocamlres
-    opam pin --yes add --no-action --dev-repo ocplib-json-typed
-    opam pin --yes add --no-action --dev-repo ocplib-resto
-    ## Force opam to take account of the new `tezos-deps.opam`
-    opam pin --yes remove tezos-deps
-    opam pin --yes add --no-action tezos-deps $src_dir/src
-fi
+opam pin --yes add --no-action --dev-repo sodium
+opam pin --yes add --no-action --dev-repo ocp-ocamlres
+opam pin --yes add --no-action --dev-repo ocplib-json-typed
+opam pin --yes add --no-action --dev-repo ocplib-resto
+opam pin --yes add --no-action --dev-repo jbuilder
+## Force opam to take account of the new `tezos-deps.opam`
+opam pin --yes remove tezos
+opam pin --yes add --no-action tezos $src_dir
 
-if "$depext"; then
-    opam list --installed depext || opam install depext
-    opam depext $DEPEXTOPT tezos-deps
-fi
+opam list --installed depext || opam install depext
+opam depext tezos
 
-if "$install"; then
-    opam install tezos-deps
-fi
+opam install tezos --deps-only

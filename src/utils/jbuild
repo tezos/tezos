@@ -1,0 +1,23 @@
+(jbuild_version 1)
+
+(library
+ ((name utils)
+  (libraries
+   (
+    ;; External
+    base64
+    calendar
+    ezjsonm
+    ipaddr.unix
+    lwt.unix
+    mtime.clock.os
+    nocrypto
+    sodium
+    zarith
+    ;; Internal
+    minutils
+    ))
+  (flags (:standard -w +27-30-40@8))
+  (wrapped false)))
+
+

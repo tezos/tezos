@@ -1,0 +1,11 @@
+(jbuild_version 1)
+
+(library
+ ((name node_shell)
+  (libraries (utils minutils node_net node_db node_updater ezjsonm ocplib-json-typed.bson))
+  (flags (:standard -w +27-30-40@8
+                    -open Error_monad
+                    -open Hash
+                    -open Utils
+                    -open Tezos_data))
+  (wrapped false)))

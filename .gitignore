@@ -1,51 +1,18 @@
 
+/_build
+/tezos.install
+
 /tezos-node
-/tezos-protocol-packer
 /tezos-protocol-compiler
 /tezos-client
-/tezos-attacker
 
-/src/.ocamlinit.utils
-/src/.ocamlinit.node
-/src/Makefile.local
-
-/src/environment/tezos_protocol_environment_sigs_v1.ml
-
-/src/compiler/tezos_compiler_embedded_cmis.ml
-
-/src/proto/**/_tzbuild
-/src/proto/register_client_*.ml
-/src/client/embedded/**/_tzbuild
-
-/src/client/embedded/alpha/concrete_lexer.ml
-/src/client/embedded/alpha/concrete_parser.ml
-/src/client/embedded/alpha/concrete_parser.mli
-
-/test/reports
-/test/*/test-*
-/test/LOG.*
-
-.depend
+.merlin
 
 *~
 \#*\#
-
-*.[oa]
-*.so
-*~
-*.cm[iaoxt]
-*.cmti
-*.cmxa
-*.cmxs
-*.cmp
-*.mli.deps
-*.ml.deps
-*.mli.deps.byte
-*.ml.deps.byte
-
-bisect*.out
 
 *.rej
 *.orig
 
 /_opam
+/Dockerfile

@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 open Client_commands
+open Tezos_embedded_raw_protocol_genesis
 
 let protocol =
   Protocol_hash.of_b58check_exn
@@ -73,7 +74,7 @@ let commands () =
        @@ stop)
       begin fun timestamp hash fitness seckey cctxt ->
         let fitness =
-          Client_embedded_alpha.Client_proto_alpha.Fitness_repr.from_int64 fitness in
+          Tezos_embedded_raw_protocol_alpha.Fitness_repr.from_int64 fitness in
         mine cctxt.rpc_config ?timestamp cctxt.config.block
           (Activate hash) fitness seckey >>=? fun hash ->
         cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
@@ -96,7 +97,7 @@ let commands () =
        @@ stop)
       begin fun timestamp hash fitness seckey cctxt ->
         let fitness =
-          Client_embedded_alpha.Client_proto_alpha.Fitness_repr.from_int64 fitness in
+          Tezos_embedded_raw_protocol_alpha.Fitness_repr.from_int64 fitness in
         mine cctxt.rpc_config ?timestamp cctxt.config.block
           (Activate_testnet (hash, Int64.mul 24L 3600L))
           fitness seckey >>=? fun hash ->

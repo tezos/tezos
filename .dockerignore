@@ -1,51 +1,22 @@
-.git
-.gitignore
-.gitlab-ci.yml
 
-**/.depend
+_build
+tezos.install
 
 tezos-node
 tezos-protocol-compiler
 tezos-client
-tezos-attacker
 
-src/Makefile.local
-
-src/node/updater/environment_gen
-src/node/updater/proto_environment.mli
-src/compiler/embedded_cmis.ml
-
-src/proto/**/_tzbuild
-src/proto/register_client_*.ml
-src/client/embedded/**/_tzbuild
-
-src/client/embedded/alpha/concrete_lexer.ml
-src/client/embedded/alpha/concrete_parser.ml
-src/client/embedded/alpha/concrete_parser.mli
-
-test/reports
-test/**/test-*
-test/LOG.*
+**/.merlin
 
 **/*~
 **/\#*\#
-
-**/*.[oa]
-**/*.so
-**/*~
-**/*.cm[iaoxt]
-**/*.cmti
-**/*.cmxa
-**/*.cmxs
-**/*.cmp
-**/*.mli.deps
-**/*.ml.deps
-**/*.mli.deps.byte
-**/*.ml.deps.byte
-
-**/bisect*.out
 
 **/*.rej
 **/*.orig
 
 _opam
+
+.git
+.gitignore
+.gitlab-ci.yml
+

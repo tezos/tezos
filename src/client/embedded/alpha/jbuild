@@ -1,0 +1,16 @@
+(jbuild_version 1)
+
+(library
+ ((name client_embedded_alpha)
+  (libraries (tezos_embedded_protocol_alpha
+              tezos_embedded_raw_protocol_alpha
+              client_lib))
+  (library_flags (:standard -linkall))
+  (flags (:standard -w +27-30-40@8
+                    -open Error_monad
+                    -open Hash
+                    -open Utils
+                    -open Tezos_data
+                    -open Tezos_protocol_environment_alpha
+                    -open Tezos_embedded_raw_protocol_alpha
+                    -open Tezos_context))))

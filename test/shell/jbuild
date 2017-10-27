@@ -1,0 +1,41 @@
+(jbuild_version 1)
+
+(executables
+ ((names (test_context
+          test_state
+          test_store))
+  (libraries (minutils
+              utils
+              test_lib
+              node_shell
+              tezos_embedded_protocol_demo
+              tezos_embedded_protocol_alpha
+              tezos_embedded_protocol_genesis))
+  (flags (:standard -open Error_monad
+                    -open Hash
+                    -open Utils
+                    -open Tezos_data))))
+
+(alias
+ ((name buildtest)
+  (deps (test_context.exe
+         test_state.exe
+         test_store.exe))))
+
+(alias
+ ((name runtest_context)
+  (action (run ${exe:test_context.exe}))))
+
+(alias
+ ((name runtest_state)
+  (action (run ${exe:test_state.exe}))))
+
+(alias
+ ((name runtest_store)
+  (action (run ${exe:test_store.exe}))))
+
+(alias
+ ((name runtest)
+  (deps ((alias runtest_context)
+         (alias runtest_state)
+         (alias runtest_store)))))

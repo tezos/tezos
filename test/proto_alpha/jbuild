@@ -1,0 +1,62 @@
+(jbuild_version 1)
+
+(executables
+ ((names (test_endorsement
+          ;; test_michelson_parser
+          test_origination
+          test_transaction
+          test_vote))
+  (libraries (test_lib
+              client_lib
+              client_embedded_genesis
+              client_embedded_alpha))
+  (flags (:standard -open Error_monad
+                    -open Hash
+                    -open Tezos_data
+                    -open Tezos_protocol_environment_alpha
+                    -open Tezos_embedded_raw_protocol_alpha
+                    -open Tezos_context
+                    -open Client_embedded_alpha))))
+
+(alias
+ ((name buildtest)
+  (deps (test_endorsement.exe
+         ;; test_michelson_parser.exe
+         test_origination.exe
+         test_transaction.exe
+         test_vote.exe))))
+
+(alias
+ ((name runtest_endorsement)
+  (deps (../../src/node_main.exe
+         sandbox.json))
+  (locks  (/tcp-port/18100))
+  (action (run ${exe:test_endorsement.exe}))))
+
+(alias
+ ((name runtest_origination)
+  (deps (../../src/node_main.exe
+         sandbox.json))
+  (locks  (/tcp-port/18200))
+  (action (run ${exe:test_origination.exe}))))
+
+(alias
+ ((name runtest_transaction)
+  (deps (../../src/node_main.exe
+         sandbox.json))
+  (locks  (/tcp-port/18300))
+  (action (run ${exe:test_transaction.exe}))))
+
+(alias
+ ((name runtest_vote)
+  (deps (../../src/node_main.exe
+         sandbox-vote.json))
+  (locks  (/tcp-port/18400))
+  (action (run ${exe:test_vote.exe}))))
+
+(alias
+ ((name runtest)
+  (deps ((alias runtest_endorsement)
+         (alias runtest_origination)
+         (alias runtest_transaction)
+         (alias runtest_vote)))))

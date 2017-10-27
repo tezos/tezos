@@ -1,9 +1,9 @@
 FROM $base_image
 
-COPY scripts/install_build_deps.sh scripts/version.sh scripts/
-COPY src/tezos-deps.opam src/
+COPY scripts/install_build_deps.sh scripts/version.sh tezos/scripts/
+COPY tezos.opam tezos/
 RUN sudo apk update && \
-    opam config exec -- ./scripts/install_build_deps.sh all && \
+    opam config exec -- ./tezos/scripts/install_build_deps.sh && \
     sudo rm -f /var/cache/apk/* && \
     rm -fr ~/.opam/log/ && \
     rm -fr "$(opam config exec -- ocamlfind query stdlib)"/topdirs.cmi

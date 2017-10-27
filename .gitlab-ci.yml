@@ -72,87 +72,77 @@ build:
   dependencies:
     - build
 
-test:utils:data-encoding:
+test:utils:
   <<: *test_definition
   script:
-    - make -C test/utils run-test-data-encoding
+    - jbuilder build @test/utils/runtest
 
-test:utils:merkle:
+test:shell:
   <<: *test_definition
   script:
-    - make -C test/utils run-test-merkle
-
-test:shell:store:
-  <<: *test_definition
-  script:
-    - make -C test/shell run-test-store
-
-test:shell:context:
-  <<: *test_definition
-  script:
-    - make -C test/shell run-test-context
-
-test:shell:state:
-  <<: *test_definition
-  script:
-    - make -C test/shell run-test-state
+    - jbuilder build @test/shell/runtest
 
 test:p2p:io-scheduler:
   <<: *test_definition
   script:
-    - make -C test/p2p run-test-p2p-io-scheduler
+    - jbuilder build @test/p2p/runtest_p2p_io_scheduler
 
 test:p2p:connection:
   <<: *test_definition
   script:
-    - make -C test/p2p run-test-p2p-connection
+    - jbuilder build @test/p2p/runtest_p2p_connection
 
 test:p2p:connection-pool:
   <<: *test_definition
   script:
-    - make -C test/p2p run-test-p2p-connection-pool
+    - jbuilder build @test/p2p/runtest_p2p_connection_pool
 
-test:proto_alpha:transactions:
+test:proto_alpha:transaction:
   <<: *test_definition
   script:
-    - make -C test/proto_alpha run-test-transaction
+    - jbuilder build @test/proto_alpha/runtest_transaction
   retry: 1
 
 test:proto_alpha:origination:
   <<: *test_definition
   script:
-    - make -C test/proto_alpha run-test-origination
+    - jbuilder build @test/proto_alpha/runtest_origination
   retry: 1
 
 test:proto_alpha:endorsement:
   <<: *test_definition
   script:
-    - make -C test/proto_alpha run-test-endorsement
+    - jbuilder build @test/proto_alpha/runtest_endorsement
   retry: 1
 
 test:proto_alpha:vote:
   <<: *test_definition
   script:
-    - make -C test/proto_alpha run-test-vote
+    - jbuilder build @test/proto_alpha/runtest_vote
   retry: 1
 
 test:basic.sh:
   <<: *test_definition
   script:
-    - make -C test run-basic.sh
+    - jbuilder build @test/runtest_basic.sh
   retry: 1
 
 test:contracts.sh:
   <<: *test_definition
   script:
-    - make -C test run-contracts.sh
+    - jbuilder build @test/runtest_contracts.sh
   retry: 1
 
 test:multinode.sh:
   <<: *test_definition
   script:
-    - make -C test run-multinode.sh
+    - jbuilder build @test/runtest_multinode.sh
   retry: 1
+
+test:proto:sandboxing:
+  <<: *test_definition
+  script:
+    - jbuilder build @src/proto/runtest_sandboxing
 
 ## Publishing (small) docker images with tezos binaries
 
