@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_proto_genesis
+open Tezos_embedded_raw_protocol_genesis
 
 val mine:
   Client_rpcs.config ->

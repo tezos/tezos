@@ -1,0 +1,28 @@
+(jbuild_version 1)
+
+(executable
+ ((name compiler_main)
+  (public_name tezos-protocol-compiler)
+  (libraries (tezos_protocol_compiler))
+  (flags (:standard -w +27-30-40@8
+                    -linkall))
+  (modules (Compiler_main))))
+
+(executable
+ ((name node_main)
+  (public_name tezos-node)
+  (libraries (node_db node_main_lib node_net cmdliner
+              tezos_embedded_protocol_genesis
+              tezos_embedded_protocol_demo
+              tezos_embedded_protocol_alpha))
+  (flags (:standard -w +27-30-40@8
+                    -linkall))
+  (modules (Node_main))))
+
+(executable
+ ((name client_main)
+  (public_name tezos-client)
+  (libraries (lwt utils client_lib client_embedded_genesis client_embedded_alpha))
+  (flags (:standard -w +27-30-40@8
+                    -linkall))
+  (modules (Client_main))))

@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+    ((name minutils)
+     (libraries (cstruct
+                 lwt
+                 ocplib-json-typed.bson
+                 ocplib-resto.directory))
+     (flags (:standard -w +27-30-40@8))
+     (wrapped false)))

@@ -1,0 +1,28 @@
+(jbuild_version 1)
+
+(rule
+ ((targets (embedded_cmis.ml))
+  (action
+    (run ${bin:ocp-ocamlres} -format ocaml -o ${@}
+           ${lib:stdlib:camlinternalFormatBasics.cmi}
+           ${path:registerer.cmi}
+           ${path:../environment/tezos_protocol_environment_sigs_v1.cmi}))))
+
+(library
+ ((name tezos_protocol_compiler)
+  (libraries (utils
+              minutils
+              tezos_protocol_environment_sigs
+              compiler-libs
+              compiler-libs.optcomp
+              lwt.unix
+              ocplib-endian
+              ocplib-ocamlres
+              unix))
+  (wrapped false)
+  (flags (:standard -w +27-30-40@8
+                    -opaque
+                    -open Error_monad
+                    -open Hash
+                    -open Utils
+                    -open Tezos_data))))

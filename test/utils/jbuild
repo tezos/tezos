@@ -1,0 +1,49 @@
+(jbuild_version 1)
+
+(executables
+ ((names (test_data_encoding
+          test_lwt_pipe
+          test_merkle
+          test_stream_data_encoding
+          test_utils))
+  (libraries (minutils utils test_lib))
+  (flags (:standard -open Error_monad
+                    -open Hash
+                    -open Utils
+                    -open Tezos_data))))
+
+(alias
+  ((name buildtest)
+   (deps (test_data_encoding.exe
+          test_lwt_pipe.exe
+          test_merkle.exe
+          test_stream_data_encoding.exe
+          test_utils.exe))))
+
+(alias
+ ((name runtest_data_encoding)
+  (action (run ${exe:test_data_encoding.exe}))))
+
+(alias
+ ((name runtest_lwt_pipe)
+  (action (run ${exe:test_lwt_pipe.exe}))))
+
+(alias
+ ((name runtest_merkle)
+  (action (run ${exe:test_merkle.exe}))))
+
+(alias
+ ((name runtest_stream_data_encoding)
+  (action (run ${exe:test_stream_data_encoding.exe}))))
+
+(alias
+ ((name runtest_utils)
+  (action (run ${exe:test_utils.exe}))))
+
+(alias
+ ((name runtest)
+  (deps ((alias runtest_data_encoding)
+         (alias runtest_lwt_pipe)
+         (alias runtest_merkle)
+         (alias runtest_stream_data_encoding)
+         (alias runtest_utils)))))

@@ -1,0 +1,17 @@
+(jbuild_version 1)
+
+(library
+ ((name client_lib)
+  (libraries (minutils
+              utils
+              cohttp
+              node_shell
+              node_db
+              node_updater
+              tezos_protocol_compiler))
+  (flags (:standard -w +27-30-40@8
+                    -open Error_monad
+                    -open Hash
+                    -open Utils
+                    -open Tezos_data))
+  (wrapped false)))
