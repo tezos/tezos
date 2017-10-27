@@ -219,9 +219,7 @@ NODE_LIB_INTFS := \
   node/db/persist.mli \
   node/db/context.mli \
   \
-  node/db/store_sigs.mli \
   node/db/raw_store.mli \
-  node/db/store_sigs.mli \
   node/db/store_helpers.mli \
   node/db/store.mli \
   \
@@ -243,8 +241,7 @@ NODE_LIB_INTFS := \
   node/shell/node.mli \
   node/shell/node_rpc.mli \
 
-# this includes single .mli for `node.top`
-FULL_NODE_LIB_IMPLS := \
+NODE_LIB_IMPLS := \
   \
   compiler/node_compiler_main.ml \
   \
@@ -264,7 +261,7 @@ FULL_NODE_LIB_IMPLS := \
   node/db/context.ml \
   \
   node/db/raw_store.ml \
-  node/db/store_sigs.mli \
+  node/db/store_sigs.ml \
   node/db/store_helpers.ml \
   node/db/store.ml \
   \
@@ -286,9 +283,6 @@ FULL_NODE_LIB_IMPLS := \
   node/shell/node_rpc_services.ml \
   node/shell/node.ml \
   node/shell/node_rpc.ml \
-
-# this only includes .ml
-NODE_LIB_IMPLS := $(filter-out ${NODE_LIB_INTFS}, ${FULL_NODE_LIB_IMPLS})
 
 NODE_INTFS := \
   node/main/node_identity_file.mli \
