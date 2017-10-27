@@ -1,7 +1,7 @@
 
 SRCDIR ?= .
 
-SIGS_PACKER:=environment/tezos_protocol_environment_sigs_packer
+SIGS_PACKER:=environment/sigs_packer/sigs_packer
 PACKED_SIGS_V1:=environment/tezos_protocol_environment_sigs_v1
 
 ENVIRONMENT_SOURCE_DIRECTORIES := \
