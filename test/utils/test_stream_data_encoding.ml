@@ -1,5 +1,4 @@
 open Data_encoding
-open Context
 open Hash
 open Error_monad
 
@@ -436,7 +435,7 @@ let test_splitted _ =
   Assert.equal ~msg:__LOC__ "44" (get_result ~msg:__LOC__ binB);
   Lwt.return_unit
 
-   
+
 let wrap_test f base_dir =
   f base_dir >>= fun result ->
   return result
