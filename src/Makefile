@@ -57,7 +57,7 @@ ${COMPILER_OBJS}: SOURCE_DIRECTORIES=${COMPILER_SOURCE_DIRECTORIES}
 ${COMPILER_OBJS}: TARGET="(compiler.cmxa)"
 ${COMPILER_OBJS}: OPENED_MODULES=${COMPILER_OPENED_MODULES}
 
-compiler/tezos_protocol_registerer.cmi: EXTRA_OCAMLFLAGS = -opaque
+compiler/registerer.cmi: EXTRA_OCAMLFLAGS = -opaque
 
 .INTERMEDIATE: compiler/tezos_compiler_embedded_cmis.ml
 compiler/tezos_compiler_embedded_cmis.cmx: compiler/tezos_compiler_embedded_cmis.cmi
