@@ -1,6 +1,6 @@
 
 all: \
-  ../client_$(PROTO_VERSION).cmx
+  ../client_embedded_$(PROTO_VERSION).cmx
 
 -include ../../../Makefile.local
 include ../../../Makefile.config
@@ -31,15 +31,15 @@ OBJS := \
 OBJS_DEPS := \
    ${CLIENT_IMPLS:.ml=.ml.deps} ${CLIENT_INTFS:.mli=.mli.deps}
 
-${OBJS} ${OBJS_DEPS}: TARGET="(client_$(PROTO_VERSION).cmx)"
-${OBJS}: EXTRA_OCAMLFLAGS = -for-pack Client_$(PROTO_VERSION)
-../client_$(PROTO_VERSION).cmx: EXTRA_OCAMLFLAGS =
-${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
+${OBJS} ${OBJS_DEPS}: TARGET="(client_embedded_$(PROTO_VERSION).cmx)"
+${OBJS}: EXTRA_OCAMLFLAGS = -for-pack Client_embedded_$(PROTO_VERSION)
+../client_embedded_$(PROTO_VERSION).cmx: EXTRA_OCAMLFLAGS =
+${OBJS} ${OBJS_DEPS} ../client_embedded_$(PROTO_VERSION).cmx: \
   PACKAGES=lwt ocplib-json-typed sodium ocplib-ocamlres uutf ocplib-endian zarith
-${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
+${OBJS} ${OBJS_DEPS} ../client_embedded_$(PROTO_VERSION).cmx: \
   ../../../proto/tezos_embedded_protocol_${PROTO_VERSION}.cmx
 
-../client_$(PROTO_VERSION).cmx: $(patsubst %.ml, %.cmx, ${CLIENT_IMPLS})
+../client_embedded_$(PROTO_VERSION).cmx: $(patsubst %.ml, %.cmx, ${CLIENT_IMPLS})
 	@echo LINK $(notdir $@)
 	@$(OCAMLOPT) -linkall ${OCAMLFLAGS} -pack -o $@ \
 	   $(patsubst %.ml, %.cmx, ${CLIENT_IMPLS})
@@ -58,7 +58,7 @@ ${OBJS} ${OBJS_DEPS} ../client_$(PROTO_VERSION).cmx: \
 
 .PHONY: clean
 clean::
-	-rm -f ../client_$(PROTO_VERSION).cm* ../client_$(PROTO_VERSION).o
+	-rm -f ../client_embedded_$(PROTO_VERSION).cm* ../client_embedded_$(PROTO_VERSION).o
 	-rm -f *.cm* *~ *.o *.a *.deps *.deps.byte
 	-rm -rf _tzbuild
 	-rm -f .depend

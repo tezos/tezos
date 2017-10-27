@@ -41,14 +41,7 @@ CLIENT_IMPLS := \
   client_mining_daemon.ml \
   client_mining_main.ml
 
--include baker/Makefile
-
 include ../Makefile.shared
 
 ${OBJS_DEPS} ${OBJS}: OPENED_MODULES += Client_proto_alpha Tezos_context
 client_proto_alpha.ml.deps client_proto_alpha.cmx: OPENED_MODULES :=
-
-.PHONY: clean
-clean::
-	-rm -f baker/*.cm* baker/*~ baker/*.o baker/*.a
-	-rm -f baker/*.deps baker/*.deps.byte

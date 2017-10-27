@@ -26,12 +26,12 @@ PACKAGES := \
 
 OPENED_MODULES := \
   ${CLIENT_OPENED_MODULES} \
-  Client_alpha Client_proto_alpha Tezos_context
+  Client_embedded_alpha Client_proto_alpha Tezos_context
 
 ${SRCDIR}/client/embedded/alpha/%.cmi: ${SRCDIR}/client/embedded/alpha/%.mli
-	${MAKE} -C ${SRCDIR} client/embedded/client_alpha.cmx
+	${MAKE} -C ${SRCDIR} client/embedded/client_embedded_alpha.cmx
 ${SRCDIR}/client/embedded/alpha/%.cmx: ${SRCDIR}/client/embedded/alpha/%.ml
-	${MAKE} -C ${SRCDIR} client/embedded/client_alpha.cmx
+	${MAKE} -C ${SRCDIR} client/embedded/client_embedded_alpha.cmx
 
 ############################################################################
 ## Transactions

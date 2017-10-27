@@ -43,7 +43,7 @@ NODELIB := ${SRCDIR}/node.cmxa
 
 CLIENTLIB := ${SRCDIR}/client.cmxa \
   $(patsubst ${SRCDIR}/client/embedded/%/, \
-             ${SRCDIR}/client/embedded/client_%.cmx, \
+             ${SRCDIR}/client/embedded/client_embedded_%.cmx, \
 	     $(shell ls -d ${SRCDIR}/client/embedded/*/))
 
 ${MINUTILSLIB} ${UTILSLIB} ${COMPILERLIB} ${NODELIB} ${CLIENTLIB}:
