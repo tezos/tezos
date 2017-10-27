@@ -12,8 +12,8 @@ include ../Makefile.shared
 
 SOURCE_DIRECTORIES += ..
 
-${OBJS_DEPS} ${OBJS}: ../client_alpha.cmx
+${OBJS_DEPS} ${OBJS}: ../client_embedded_alpha.cmx
 ${OBJS_DEPS} ${OBJS}: OPENED_MODULES += Client_proto_genesis
 client_proto_genesis.ml.deps client_proto_genesis.cmx: OPENED_MODULES :=
 
-../client_alpha.cmx:
+../client_embedded_alpha.cmx:

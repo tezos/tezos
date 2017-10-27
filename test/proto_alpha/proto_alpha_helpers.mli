@@ -107,11 +107,11 @@ module Endorse : sig
   val endorse :
     ?slot:int ->
     Account.t ->
-    Client_alpha.Client_proto_rpcs.block ->
+    Client_proto_rpcs.block ->
     Operation.raw tzresult Lwt.t
 
   val endorsers_list :
-    Client_alpha.Client_proto_rpcs.block ->
+    Client_proto_rpcs.block ->
     Account.t array tzresult Lwt.t
 
   val endorsement_rights :

@@ -309,14 +309,14 @@ partial-clean::
 
 ## Embedded client protocol modules
 
-client/embedded/client_%.cmx: \
+client/embedded/client_embedded_%.cmx: \
   $(patsubst %.ml, %.cmx, $(NODE_LIB_IMPLS) $(CLIENT_LIB_IMPLS)) \
   proto/tezos_embedded_protocol_%.cmx \
   $$(shell find client/embedded/% \( -name _tzbuild \) -prune -or \( -name \*.ml -print -or -name \*.mli -print \))
-	@$(MAKE) -C client/embedded/$* ../client_$*.cmx
+	@$(MAKE) -C client/embedded/$* ../client_embedded_$*.cmx
 
-client/embedded/client_genesis.cmx: \
-  client/embedded/client_alpha.cmx
+client/embedded/client_embedded_genesis.cmx: \
+  client/embedded/client_embedded_alpha.cmx
 
 partial-clean::
 	-for d in $$(ls -d client/embedded/*/) ; do make clean -C $$d ; done

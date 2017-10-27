@@ -359,7 +359,7 @@ CLIENT_VERSIONS := \
              $(shell ls -d ${SRCDIR}/client/embedded/*/))
 
 EMBEDDED_CLIENT_VERSIONS := \
-  $(patsubst %,${SRCDIR}/client/embedded/client_%.cmx, \
+  $(patsubst %,${SRCDIR}/client/embedded/client_embedded_%.cmx, \
 	     ${CLIENT_VERSIONS})
 
 

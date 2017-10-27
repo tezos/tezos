@@ -27,7 +27,7 @@ let dictator_sk =
 
 let activate_alpha () =
   let fitness = Fitness_repr.from_int64 0L in
-  Client_genesis.Client_proto_main.mine
+  Client_embedded_genesis.Client_proto_main.mine
     rpc_config (`Head 0)
     (Activate Client_proto_main.protocol)
     fitness dictator_sk
@@ -49,7 +49,7 @@ let init ?(sandbox = "sandbox.json") () =
   return (pid, hash)
 
 let level block =
-  Client_alpha.Client_proto_rpcs.Context.level rpc_config block
+  Client_proto_rpcs.Context.level rpc_config block
 
 module Account = struct
 
