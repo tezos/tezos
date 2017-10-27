@@ -64,6 +64,8 @@ end
 
 val dynamic_size : 'a encoding -> 'a encoding
 
+val delayed : (unit -> 'a encoding) -> 'a encoding
+
 val json : json encoding
 val json_schema : json_schema encoding
 

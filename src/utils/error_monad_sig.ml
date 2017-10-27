@@ -22,7 +22,7 @@ module type S = sig
   val pp_print_error: Format.formatter -> error list -> unit
 
   (** An error serializer *)
-  val error_encoding : unit -> error Data_encoding.t
+  val error_encoding : error Data_encoding.t
   val json_of_error : error -> Data_encoding.json
   val error_of_json : Data_encoding.json -> error
 

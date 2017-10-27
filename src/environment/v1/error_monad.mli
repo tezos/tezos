@@ -16,7 +16,7 @@ type error = ..
 val pp : Format.formatter -> error -> unit
 
 (** A JSON error serializer *)
-val error_encoding : unit -> error Data_encoding.t
+val error_encoding : error Data_encoding.t
 val json_of_error : error -> Data_encoding.json
 val error_of_json : Data_encoding.json -> error
 
