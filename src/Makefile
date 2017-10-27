@@ -59,10 +59,10 @@ ${COMPILER_OBJS}: OPENED_MODULES=${COMPILER_OPENED_MODULES}
 
 compiler/registerer.cmi: EXTRA_OCAMLFLAGS = -opaque
 
-.INTERMEDIATE: compiler/tezos_compiler_embedded_cmis.ml
-compiler/tezos_compiler_embedded_cmis.cmx: compiler/tezos_compiler_embedded_cmis.cmi
+.INTERMEDIATE: compiler/embedded_cmis.ml
+compiler/embedded_cmis.cmx: compiler/embedded_cmis.cmi
 
-compiler/tezos_compiler_embedded_cmis.ml: ${COMPILER_EMBEDDED_CMIS}
+compiler/embedded_cmis.ml: ${COMPILER_EMBEDDED_CMIS}
 	@echo OCAMLRES ${TARGET} $(notdir $@)
 	@$(OCAMLRES) -format ocaml -o $@ $^
 
@@ -75,7 +75,7 @@ ${TZCOMPILER}: minutils.cmxa utils.cmxa compiler.cmxa ${COMPILER_IMPLS:.ml=.cmx}
 	@$(OCAMLOPT) -linkpkg $(patsubst %, -package %, $(COMPILER_PACKAGES)) -o $@ $^
 
 partial-clean::
-	rm -f compiler/tezos_compiler_embedded_cmis.ml
+	rm -f compiler/embedded_cmis.ml
 
 clean::
 	rm -f ${TZCOMPILER}
@@ -243,9 +243,9 @@ partial-clean::
 ## Dependencies
 
 NO_DEPS += \
-   compiler/tezos_compiler_embedded_cmis.ml \
-   compiler/tezos_compiler_embedded_cmis.mli
-compiler/tezos_compiler_embedded_cmis.cmx compiler/tezos_compiler_embedded_cmis.cmi: OPENED_MODULES=
+   compiler/embedded_cmis.ml \
+   compiler/embedded_cmis.mli
+compiler/embedded_cmis.cmx compiler/embedded_cmis.cmi: OPENED_MODULES=
 
 ifneq ($(MAKECMDGOALS),clean)
 include .depend
@@ -268,7 +268,7 @@ DEPENDS_BYTECODE := \
 
 predepend: ${PACKED_SIGS_V1}.ml
 compiler/tezos_compiler.cmo compiler/tezos_compiler.cmx: \
-	compiler/tezos_compiler_embedded_cmis.cmi compiler/tezos_compiler_embedded_cmis.cmx
+	compiler/embedded_cmis.cmi compiler/embedded_cmis.cmx
 
 .SECONDARY: $(patsubst %,%.deps,${DEPENDS}) $(patsubst %,%.deps.byte,${DEPENDS_BYTECODE})
 .depend: $(patsubst %,%.deps,${DEPENDS}) $(patsubst %,%.deps.byte,${DEPENDS_BYTECODE})

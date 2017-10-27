@@ -106,14 +106,14 @@ let load_embeded_cmis cmis = List.iter load_embeded_cmi cmis
 
 
 let tezos_protocol_env =
-  let open Tezos_compiler_embedded_cmis in
+  let open Embedded_cmis in
   [
     "CamlinternalFormatBasics", camlinternalFormatBasics_cmi ;
     "Tezos_protocol_environment_sigs_v1", tezos_protocol_environment_sigs_v1_cmi ;
   ]
 
 let register_env =
-  let open Tezos_compiler_embedded_cmis in
+  let open Embedded_cmis in
   [
     "registerer", registerer_cmi ;
   ]

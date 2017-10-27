@@ -158,13 +158,13 @@ COMPILER_IMPLS := \
   compiler_main.ml \
 
 COMPILER_LIB_INTFS := \
-  compiler/tezos_compiler_embedded_cmis.mli \
+  compiler/embedded_cmis.mli \
   compiler/registerer.mli \
   compiler/packer.mli \
   compiler/tezos_compiler.mli \
 
 COMPILER_LIB_IMPLS := \
-  compiler/tezos_compiler_embedded_cmis.ml \
+  compiler/embedded_cmis.ml \
   compiler/registerer.ml \
   compiler/packer.ml \
   compiler/tezos_compiler.ml \
