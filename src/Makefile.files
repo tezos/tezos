@@ -40,18 +40,6 @@ $(addprefix environment/v1/, \
   updater.mli \
 )
 
-PACKER_DIRECTORIES := \
-  ${SRCDIR}/packer
-
-PACKER_LIB_INTFS := \
-  packer/tezos_protocol_packer.mli
-
-PACKER_LIB_IMPLS := \
-  packer/tezos_protocol_packer.ml
-
-PACKER_IMPLS := \
-  packer_main.ml
-
 ############################################################################
 ## Minimal utils library compatible with js_of_ocaml
 ############################################################################
@@ -152,7 +140,6 @@ UTILS_PACKAGES := \
 
 COMPILER_SOURCE_DIRECTORIES := \
   ${ENVIRONMENT_SOURCE_DIRECTORIES} \
-  ${PACKER_DIRECTORIES} \
   ${UTILS_SOURCE_DIRECTORIES} \
   ${SRCDIR}/compiler
 
@@ -173,11 +160,13 @@ COMPILER_IMPLS := \
 COMPILER_LIB_INTFS := \
   compiler/tezos_compiler_embedded_cmis.mli \
   compiler/tezos_protocol_registerer.mli \
+  compiler/packer.mli \
   compiler/tezos_compiler.mli \
 
 COMPILER_LIB_IMPLS := \
   compiler/tezos_compiler_embedded_cmis.ml \
   compiler/tezos_protocol_registerer.ml \
+  compiler/packer.ml \
   compiler/tezos_compiler.ml \
 
 COMPILER_IMPLS := \

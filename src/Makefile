@@ -42,30 +42,6 @@ partial-clean::
 	rm -f ${SIGS_PACKER}
 	rm -f ${PACKED_SIGS_V1}.ml
 
-############################################################################
-## Protocol packer
-############################################################################
-
-PACKER_OBJS := \
-   ${PACKER_LIB_IMPLS:.ml=.cmx} ${PACKER_LIB_IMPLS:.ml=.ml.deps} \
-   ${PACKER_LIB_INTFS:.mli=.cmi} ${PACKER_LIB_INTFS:.mli=.mli.deps} \
-   ${PACKER_IMPLS:.ml=.cmx} ${PACKER_IMPLS:.ml=.ml.deps} \
-
-${PACKER_OBJS}: PACKAGES=
-${PACKER_OBJS}: SOURCE_DIRECTORIES=${PACKER_DIRECTORIES}
-${PACKER_OBJS}: TARGET="(packer.cmxa)"
-${PACKER_OBJS}: OPENED_MODULES=
-
-packer.cmxa: ${PACKER_LIB_IMPLS:.ml=.cmx}
-	@echo LINK $(notdir $@)
-	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
-
-${TZPROTOCOLPACKER}: packer.cmxa ${PACKER_IMPLS:.ml=.cmx}
-	@echo LINK $(notdir $@)
-	@$(OCAMLOPT) -o $@ $^
-
-clean::
-	rm -rf ${TZPROTOCOLPACKER}
 
 ############################################################################
 ## Protocol compiler (also embedded in the node)
@@ -94,7 +70,7 @@ compiler.cmxa: ${COMPILER_LIB_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
 	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
 
-${TZCOMPILER}: packer.cmxa minutils.cmxa utils.cmxa compiler.cmxa ${COMPILER_IMPLS:.ml=.cmx}
+${TZCOMPILER}: minutils.cmxa utils.cmxa compiler.cmxa ${COMPILER_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
 	@$(OCAMLOPT) -linkpkg $(patsubst %, -package %, $(COMPILER_PACKAGES)) -o $@ $^
 
@@ -182,7 +158,7 @@ node.cmxa: ${NODE_LIB_IMPLS:.ml=.cmx}
 	@${OCAMLOPT} ${OCAMLFLAGS} -a -o $@ $^
 
  ${NODE_IMPLS:.ml=.cmx}: ${EMBEDDED_NODE_PROTOCOLS}
-${TZNODE}: packer.cmxa minutils.cmxa utils.cmxa compiler.cmxa node.cmxa ${EMBEDDED_NODE_PROTOCOLS} ${NODE_IMPLS:.ml=.cmx}
+${TZNODE}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa ${EMBEDDED_NODE_PROTOCOLS} ${NODE_IMPLS:.ml=.cmx}
 	@echo LINK $(notdir $@)
 	@${OCAMLOPT} -linkall -linkpkg ${OCAMLFLAGS} -o $@ $^
 
@@ -230,7 +206,7 @@ client.cmxa: ${CLIENT_LIB_IMPLS:.ml=.cmx}
 ${EMBEDDED_CLIENT_VERSIONS}: client.cmxa ${EMBEDDED_CLIENT_PROTOCOLS}
 ${CLIENT_IMPLS:.ml=.cmx}: ${EMBEDDED_CLIENT_VERSIONS}
 
-${TZCLIENT}: packer.cmxa minutils.cmxa utils.cmxa compiler.cmxa node.cmxa \
+${TZCLIENT}: minutils.cmxa utils.cmxa compiler.cmxa node.cmxa \
              client.cmxa \
              ${EMBEDDED_CLIENT_PROTOCOLS} \
              ${EMBEDDED_CLIENT_VERSIONS} \
@@ -275,7 +251,6 @@ ifneq ($(MAKECMDGOALS),clean)
 include .depend
 endif
 DEPENDS := $(filter-out $(NO_DEPS), \
-  $(PACKER_LIB_INTFS) $(PACKER_LIB_IMPLS) $(PACKER_IMPLS) \
   $(MINUTILS_LIB_INTFS) $(MINUTILS_LIB_IMPLS) \
   $(UTILS_LIB_INTFS) $(UTILS_LIB_IMPLS) \
   ${COMPILER_PRECOMPILED_INTFS} \
