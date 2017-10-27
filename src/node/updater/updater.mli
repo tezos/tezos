@@ -77,6 +77,8 @@ end
 
 (* The end of this file is not exported to the protocol... *)
 
+val compiler_name: string
+
 module Node_protocol_environment_sigs : sig
 
   module type V1 = sig

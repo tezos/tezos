@@ -66,6 +66,8 @@ let extract dir ?hash (p: Protocol.t) =
     (List.map (fun {Protocol.name} -> String.capitalize_ascii name) p.components) ;
   Lwt.return_unit
 
+let compiler_name = "tezos-protocol-compiler"
+
 let do_compile hash p =
   assert (p.Protocol.expected_env = V1) ;
   let units = p.components in
@@ -80,7 +82,7 @@ let do_compile hash p =
     (List.map (fun {Protocol.name} -> String.capitalize_ascii name) units);
   let compiler_command =
     (Sys.executable_name,
-     Array.of_list [Node_compiler_main.compiler_name; plugin_file; source_dir]) in
+     Array.of_list [compiler_name; plugin_file; source_dir]) in
   let fd = Unix.(openfile log_file [O_WRONLY; O_CREAT; O_TRUNC] 0o644) in
   let pi =
     Lwt_process.exec
