@@ -101,11 +101,11 @@ let do_compile hash p =
         Lwt.return false
 
 let compile hash p =
-  if Tezos_protocol_registerer.mem hash then
+  if Registerer.mem hash then
     Lwt.return true
   else begin
     do_compile hash p >>= fun success ->
-    let loaded = Tezos_protocol_registerer.mem hash in
+    let loaded = Registerer.mem hash in
     if success && not loaded then
       log_error "Internal error while compiling %a" Protocol_hash.pp hash;
     Lwt.return loaded

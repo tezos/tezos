@@ -586,7 +586,7 @@ module Registred_protocol = struct
   end
 
   let build_v1 hash =
-    let (module F) = Tezos_protocol_registerer.get_exn hash in
+    let (module F) = Registerer.get_exn hash in
     let module Name = struct
       let name = Protocol_hash.to_b58check hash
     end in
@@ -605,7 +605,7 @@ module Registred_protocol = struct
     VersionTable.create 20
 
   let mem hash =
-    VersionTable.mem versions hash || Tezos_protocol_registerer.mem hash
+    VersionTable.mem versions hash || Registerer.mem hash
 
   let get_exn hash =
     try VersionTable.find versions hash

@@ -152,20 +152,20 @@ $(shell ocamlfind query stdlib)/camlinternalFormatBasics.cmi: \
 COMPILER_EMBEDDED_CMIS := \
   $(shell ocamlfind query stdlib)/camlinternalFormatBasics.cmi \
   ${PACKED_SIGS_V1}.cmi \
-  compiler/tezos_protocol_registerer.cmi
+  compiler/registerer.cmi
 
 COMPILER_IMPLS := \
   compiler_main.ml \
 
 COMPILER_LIB_INTFS := \
   compiler/tezos_compiler_embedded_cmis.mli \
-  compiler/tezos_protocol_registerer.mli \
+  compiler/registerer.mli \
   compiler/packer.mli \
   compiler/tezos_compiler.mli \
 
 COMPILER_LIB_IMPLS := \
   compiler/tezos_compiler_embedded_cmis.ml \
-  compiler/tezos_protocol_registerer.ml \
+  compiler/registerer.ml \
   compiler/packer.ml \
   compiler/tezos_compiler.ml \
 
