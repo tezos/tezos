@@ -50,7 +50,7 @@ let opened_modules = [
 
 let dump oc files =
   Printf.fprintf oc
-    "module Make (Tezos_protocol_environment : Tezos_protocol_environment_sigs_v1.T) = struct\n" ;
+    "module Make (Tezos_protocol_environment : Tezos_protocol_environment_sigs__V1.T) = struct\n" ;
   Printf.fprintf oc "[@@@ocaml.warning \"-33\"]\n" ;
   List.iter (Printf.fprintf oc "open %s\n") opened_modules ;
   Printf.fprintf oc "[@@@ocaml.warning \"+33\"]\n" ;

@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 module type PROTOCOL_V1 =
-  functor (Env : Tezos_protocol_environment_sigs_v1.T) -> Env.Updater.PROTOCOL
+  functor (Env : Tezos_protocol_environment_sigs.V1.T) -> Env.Updater.PROTOCOL
 
 module VersionTable = Protocol_hash.Table
 

@@ -1,7 +1,7 @@
 (jbuild_version 1)
 
 (rule
- ((targets (tezos_protocol_environment_sigs_v1.ml))
+ ((targets (v1.ml))
   (deps
    (
     ;; Part of OCaml stdlib
@@ -51,5 +51,4 @@
 (library
  ((name tezos_protocol_environment_sigs)
   (flags (:standard -nopervasives))
-  (wrapped false)
-  (modules ("Tezos_protocol_environment_sigs_v1"))))
+  (modules ("V1"))))

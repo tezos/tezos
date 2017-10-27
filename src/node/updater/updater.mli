@@ -83,7 +83,7 @@ module Node_protocol_environment_sigs : sig
 
   module type V1 = sig
 
-    include Tezos_protocol_environment_sigs_v1.T
+    include Tezos_protocol_environment_sigs.V1.T
       with type Format.formatter = Format.formatter
        and type 'a Data_encoding.t = 'a Data_encoding.t
        and type 'a Lwt.t = 'a Lwt.t
