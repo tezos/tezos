@@ -9,7 +9,7 @@
 
 let () =
   try
-    Tezos_compiler.main ();
+    Native.main ();
     Pervasives.exit 0
   with exn ->
     Format.eprintf "%a\n%!" Opterrors.report_error exn;

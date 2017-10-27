@@ -60,7 +60,7 @@ let create_files dir units =
 
 let extract dir ?hash (p: Protocol.t) =
   create_files dir p.components >>= fun _files ->
-  Tezos_compiler.Meta.to_file dir
+  Native.Meta.to_file dir
     ?hash
     ~env_version:p.expected_env
     (List.map (fun {Protocol.name} -> String.capitalize_ascii name) p.components) ;
@@ -76,7 +76,7 @@ let do_compile hash p =
                     Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp hash
   in
   create_files source_dir units >>= fun _files ->
-  Tezos_compiler.Meta.to_file source_dir ~hash
+  Native.Meta.to_file source_dir ~hash
     (List.map (fun {Protocol.name} -> String.capitalize_ascii name) units);
   let compiler_command =
     (Sys.executable_name,
