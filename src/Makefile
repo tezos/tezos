@@ -190,11 +190,11 @@ partial-clean::
 	-rm -f proto/*.cm* proto/*.a
 
 node.top: DEVFLAGS=
-node.top: ${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS} ${COMPILER_LIB_IMPLS} ${FULL_NODE_LIB_IMPLS}
+node.top: ${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS} ${COMPILER_LIB_IMPLS} ${NODE_LIB_IMPLS}
 	( $(patsubst %, echo "#require \"%\";;" ; ,${NODE_PACKAGES}) ) > .ocamlinit.node
 	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${MINUTILS_LIB_IMPLS} ${UTILS_LIB_IMPLS}) ) >> .ocamlinit.node
 	( $(patsubst %, echo "open %;;" ; ,${NODE_OPENED_MODULES}) ) >> .ocamlinit.node
-	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${COMPILER_LIB_IMPLS} ${FULL_NODE_LIB_IMPLS}) ) >> .ocamlinit.node
+	( $(patsubst %, echo "#mod_use \"%\";;" ; ,${COMPILER_LIB_IMPLS} ${NODE_LIB_IMPLS}) ) >> .ocamlinit.node
 	utop -I +compiler-libs ocamlcommon.cma -init .ocamlinit.node ${UTOPFLAGS}
 ## HACK: the explicit loading of `ocamlcommon.cma` is here to
 ## circumvent a bug in utop. https://github.com/diml/utop/issues/213
