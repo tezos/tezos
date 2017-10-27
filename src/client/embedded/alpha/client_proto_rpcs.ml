@@ -24,7 +24,7 @@ let call_service1 cctxt s block a1 =
     (s Node_rpc_services.Blocks.proto_path) block a1
 let call_error_service1 cctxt s block a1 =
   call_service1 cctxt s block a1 >>= function
-  | Ok (Error _ as err) -> Lwt.return (wrap_error err)
+  | Ok (Error _ as err) -> Lwt.return (Environment.wrap_error err)
   | Ok (Ok v) -> return v
   | Error _ as err -> Lwt.return err
 let call_service2 cctxt s block a1 a2 =
@@ -32,7 +32,7 @@ let call_service2 cctxt s block a1 a2 =
     (s Node_rpc_services.Blocks.proto_path) block a1 a2
 let call_error_service2 cctxt s block a1 a2 =
   call_service2 cctxt s block a1 a2 >>= function
-  | Ok (Error _ as err) -> Lwt.return (wrap_error err)
+  | Ok (Error _ as err) -> Lwt.return (Environment.wrap_error err)
   | Ok (Ok v) -> return v
   | Error _ as err -> Lwt.return err
 

@@ -314,7 +314,7 @@ module Assert = struct
     equal_pkh ~msg actual_delegate expected_delegate
 
   let ecoproto_error f = function
-    | Ecoproto_error errors ->
+    | Environment.Ecoproto_error errors ->
         List.exists f errors
     | _ -> false
 
@@ -429,7 +429,7 @@ module Mining = struct
   let endorsement_reward block =
     Client_proto_rpcs.Header.priority rpc_config block >>=? fun prio ->
     Mining.endorsement_reward ~block_priority:prio >|=
-    wrap_error >>|?
+    Environment.wrap_error >>|?
     Tez.to_cents
 
 end

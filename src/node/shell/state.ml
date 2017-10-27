@@ -581,8 +581,7 @@ module Registred_protocol = struct
 
   module type T = sig
     val hash: Protocol_hash.t
-    include Updater.RAW_PROTOCOL with type error := error
-                                  and type 'a tzresult := 'a tzresult
+    include Updater.NODE_PROTOCOL
     val complete_b58prefix : Context.t -> string -> string list Lwt.t
   end
 
@@ -596,7 +595,7 @@ module Registred_protocol = struct
       let hash = hash
       module P = F(Env)
       include P
-      include Updater.WrapProtocol(Name)(Env)(P)
+      include Updater.LiftProtocol(Name)(Env)(P)
       let complete_b58prefix = Env.Context.complete
     end : T)
 
@@ -618,6 +617,36 @@ module Registred_protocol = struct
   let get hash =
     try Some (get_exn hash)
     with Not_found -> None
+
+end
+
+module Register_embedded_protocol
+    (Env : Updater.Node_protocol_environment_sigs.V1)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : sig
+       val hash: Protocol_hash.t option
+       val sources: Tezos_data.Protocol.t
+     end) = struct
+
+  let () =
+    let hash =
+      match Source.hash with
+      | None -> Tezos_data.Protocol.hash Source.sources
+      | Some hash -> hash in
+    let module Name = struct
+      let name = Protocol_hash.to_b58check hash
+    end in
+    (* TODO add a memory table for "embedded" sources... *)
+    Registred_protocol.VersionTable.add
+      Registred_protocol.versions hash
+      (module struct
+        let hash = hash
+        include Proto
+        include Updater.LiftProtocol(Name)(Env)(Proto)
+        let complete_b58prefix = Env.Context.complete
+      end : Registred_protocol.T)
+
+
 
 end
 

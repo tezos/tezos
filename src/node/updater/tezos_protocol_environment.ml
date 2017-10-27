@@ -280,4 +280,27 @@ module Make(Param : sig val name: string end)() = struct
     let register_resolver = Base58.register_resolver
     let complete ctxt s = Base58.complete ctxt s
   end
+
+  type error += Ecoproto_error of Error_monad.error list
+
+  let () =
+    let id = Format.asprintf "Ecoproto.%s" Param.name in
+    register_wrapped_error_kind
+      (fun ecoerrors -> Error_monad.classify_errors ecoerrors)
+      ~id ~title:"Error returned by the protocol"
+      ~description:"Wrapped error for the economic protocol."
+      ~pp:(fun ppf ->
+          Format.fprintf ppf
+            "@[<v 2>Economic error:@ %a@]"
+            (Format.pp_print_list Error_monad.pp))
+      Data_encoding.(obj1 (req "ecoproto"
+                             (list Error_monad.error_encoding)))
+      (function Ecoproto_error ecoerrors -> Some ecoerrors
+              | _ -> None )
+      (function ecoerrors -> Ecoproto_error ecoerrors)
+
+  let wrap_error = function
+    | Ok _ as ok -> ok
+    | Error errors -> Error [Ecoproto_error errors]
+
 end
