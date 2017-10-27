@@ -183,7 +183,7 @@ module WrapProtocol
             "@[<v 2>Economic error:@ %a@]"
             (Format.pp_print_list Env.Error_monad.pp))
       Data_encoding.(obj1 (req "ecoproto"
-                             (list (Env.Error_monad.error_encoding ()))))
+                             (list Env.Error_monad.error_encoding)))
       (function Ecoproto_error ecoerrors -> Some ecoerrors
               | _ -> None )
       (function ecoerrors -> Ecoproto_error ecoerrors)

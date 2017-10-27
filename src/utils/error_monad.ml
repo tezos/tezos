@@ -117,10 +117,12 @@ module Make() = struct
         encoding
     | Some encoding -> encoding
 
+  let error_encoding = Data_encoding.delayed error_encoding
+
   let json_of_error error =
-    Data_encoding.Json.(construct (error_encoding ())) error
+    Data_encoding.Json.construct error_encoding error
   let error_of_json json =
-    Data_encoding.Json.(destruct (error_encoding ())) json
+    Data_encoding.Json.destruct error_encoding json
 
   let classify_error error =
     let rec find e = function
@@ -166,7 +168,7 @@ module Make() = struct
     let open Data_encoding in
     let errors_encoding =
       describe ~title: "An erroneous result" @@
-      obj1 (req "error" (list (error_encoding ()))) in
+      obj1 (req "error" (list error_encoding)) in
     let t_encoding =
       describe ~title: "A successful result" @@
       obj1 (req "result" t_encoding) in

@@ -139,7 +139,7 @@ let () =
 let () =
   register1_noctxt Services.Constants.errors
     (fun () ->
-       Lwt.return (Data_encoding.Json.(schema (error_encoding ()))))
+       Lwt.return (Data_encoding.Json.(schema error_encoding)))
 
 (*-- Context -----------------------------------------------------------------*)
 

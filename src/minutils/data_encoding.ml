@@ -152,6 +152,7 @@ type 'a desc =
       { encoding : 'a t ;
         json_encoding : 'a Json_encoding.encoding } -> 'a desc
   | Dynamic_size : 'a t -> 'a desc
+  | Delayed : (unit -> 'a t) -> 'a desc
 
 and _ field =
   | Req : string * 'a t -> 'a field
@@ -209,6 +210,7 @@ let rec classify : type a l. a t -> Kind.t = fun e ->
   | Def { encoding } -> classify encoding
   | Splitted { encoding } -> classify encoding
   | Dynamic_size _ -> `Dynamic
+  | Delayed f -> classify (f ())
 
 let make ?json_encoding encoding = { encoding ; json_encoding }
 
@@ -357,6 +359,7 @@ module Json = struct
     | Union (_tag_size, _, cases) -> union (List.map case_json cases)
     | Splitted { json_encoding } -> json_encoding
     | Dynamic_size e -> get_json e
+    | Delayed f -> get_json (f ())
 
   and field_json
     : type a l. a field -> a Json_encoding.field =
@@ -433,6 +436,9 @@ module Encoding = struct
 
   let dynamic_size e =
     make @@ Dynamic_size e
+
+  let delayed f =
+    make @@ Delayed f
 
   let null = make @@ Null
   let empty = make @@ Empty
@@ -838,6 +844,7 @@ let rec length : type x. x t -> x -> int = fun e ->
     | Dynamic_size e ->
         let length = length e in
         fun v -> Size.int32 + length v
+    | Delayed f -> length (f ())
 
   (** Writer *)
 
@@ -1000,6 +1007,7 @@ let rec length : type x. x t -> x -> int = fun e ->
         and write = write_rec e in
         fun v buf ofs ->
           int32 (Int32.of_int @@ length v) buf ofs |> write v buf
+    | Delayed f -> write_rec (f ())
 
   let write t v buf ofs =
     try Some (write_rec t v buf ofs)
@@ -1217,6 +1225,7 @@ let rec length : type x. x t -> x -> int = fun e ->
           let sz = Int32.to_int sz in
           if sz < 0 then raise (Invalid_size sz);
           read buf ofs sz
+    | Delayed f -> read_rec (f ())
 
   let read t buf ofs len =
     try Some (read_rec t buf ofs len)
@@ -1512,6 +1521,8 @@ let rec length : type x. x t -> x -> int = fun e ->
               let sz = Int32.to_int sz in
               if sz < 0 then raise (Invalid_size sz) ;
               data_checker path e buf sz
+
+          | Delayed f -> data_checker path (f ()) buf len
 
         with Need_more_data ->
           P_await { path ; encoding = e ; data_len = len }, buf

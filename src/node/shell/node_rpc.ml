@@ -427,7 +427,7 @@ let build_rpc_directory node =
   let dir =
     let implementation () =
       RPC.Answer.return
-        Data_encoding.Json.(schema (Error_monad.error_encoding ())) in
+        Data_encoding.Json.(schema Error_monad.error_encoding) in
     RPC.register0 dir Services.Error.service implementation in
   let dir =
     RPC.register1 dir Services.complete
