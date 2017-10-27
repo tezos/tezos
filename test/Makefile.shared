@@ -36,7 +36,6 @@ ${TESTLIB}: $(shell find ${SRCDIR}/../test/lib -name \*.ml -or -name \*.mli)
 ## External packages
 ############################################################################
 
-PACKERLIB := ${SRCDIR}/packer.cmxa
 MINUTILSLIB := ${SRCDIR}/minutils.cmxa
 UTILSLIB := ${SRCDIR}/utils.cmxa
 COMPILERLIB := ${SRCDIR}/compiler.cmxa
