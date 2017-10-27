@@ -9,6 +9,14 @@
 
 (* See `src/environment/v1//updater.mli` for documentation. *)
 
+val compile: Protocol_hash.t -> Protocol.t -> bool Lwt.t
+val activate: Context.t -> Protocol_hash.t -> Context.t Lwt.t
+val fork_test_network:
+  Context.t -> protocol:Protocol_hash.t -> expiration:Time.t -> Context.t Lwt.t
+
+val extract: Lwt_io.file_name -> ?hash:Protocol_hash.t -> Protocol.t -> unit Lwt.t
+val init: string -> unit
+
 type validation_result = {
   context: Context.t ;
   fitness: Fitness.t ;
@@ -26,7 +34,7 @@ type rpc_context = {
 
 module type RAW_PROTOCOL = sig
   type error = ..
-  type 'a tzresult
+  type 'a tzresult = ('a, error list) result
   type operation
   val max_operation_data_length: int
   val max_block_length: int
@@ -65,39 +73,47 @@ module type RAW_PROTOCOL = sig
     Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 end
 
-val compile: Protocol_hash.t -> Protocol.t -> bool Lwt.t
-val activate: Context.t -> Protocol_hash.t -> Context.t Lwt.t
-val fork_test_network:
-  Context.t -> protocol:Protocol_hash.t -> expiration:Time.t -> Context.t Lwt.t
+(**/**)
 
-val extract: Lwt_io.file_name -> ?hash:Protocol_hash.t -> Protocol.t -> unit Lwt.t
-val init: string -> unit
+(* The end of this file is not exported to the protocol... *)
 
-module WrapProtocol(Name : sig val name: string end)
-    (Env : Tezos_protocol_environment_sigs_v1.T
-     with type Format.formatter = Format.formatter
-      and type 'a Data_encoding.t = 'a Data_encoding.t
-      and type 'a Lwt.t = 'a Lwt.t
-      and type ('a, 'b) Pervasives.result = ('a, 'b) result
-      and type Hash.Net_id.t = Hash.Net_id.t
-      and type Hash.Block_hash.t = Hash.Block_hash.t
-      and type Hash.Operation_hash.t = Hash.Operation_hash.t
-      and type Hash.Operation_list_list_hash.t = Hash.Operation_list_list_hash.t
-      and type Context.t = Context.t
-      and type Time.t = Time.t
-      and type MBytes.t = MBytes.t
-      and type Tezos_data.Operation.shell_header = Tezos_data.Operation.shell_header
-      and type Tezos_data.Operation.t = Tezos_data.Operation.t
-      and type Tezos_data.Block_header.shell_header = Tezos_data.Block_header.shell_header
-      and type Tezos_data.Block_header.t = Tezos_data.Block_header.t
-      and type 'a RPC.directory = 'a RPC.directory
-      and type Updater.validation_result = validation_result
-      and type Updater.rpc_context = rpc_context)
-    (P : Env.Updater.PROTOCOL) : sig
-  include RAW_PROTOCOL with type error := error
-                        and type 'a tzresult := 'a tzresult
-                        and type operation := P.operation
-                        and type validation_state := P.validation_state
-  type error += Ecoproto_error of Env.Error_monad.error list
-  val wrap_error: 'a Env.Error_monad.tzresult -> 'a tzresult
+module Node_protocol_environment_sigs : sig
+
+  module type V1 = sig
+
+    include Tezos_protocol_environment_sigs_v1.T
+      with type Format.formatter = Format.formatter
+       and type 'a Data_encoding.t = 'a Data_encoding.t
+       and type 'a Lwt.t = 'a Lwt.t
+       and type ('a, 'b) Pervasives.result = ('a, 'b) result
+       and type Hash.Net_id.t = Hash.Net_id.t
+       and type Hash.Block_hash.t = Hash.Block_hash.t
+       and type Hash.Operation_hash.t = Hash.Operation_hash.t
+       and type Hash.Operation_list_list_hash.t = Hash.Operation_list_list_hash.t
+       and type Context.t = Context.t
+       and type Time.t = Time.t
+       and type MBytes.t = MBytes.t
+       and type Tezos_data.Operation.shell_header = Tezos_data.Operation.shell_header
+       and type Tezos_data.Operation.t = Tezos_data.Operation.t
+       and type Tezos_data.Block_header.shell_header = Tezos_data.Block_header.shell_header
+       and type Tezos_data.Block_header.t = Tezos_data.Block_header.t
+       and type 'a RPC.directory = 'a RPC.directory
+       and type Updater.validation_result = validation_result
+       and type Updater.rpc_context = rpc_context
+
+    type error += Ecoproto_error of Error_monad.error list
+    val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
+
+  end
+
 end
+
+module type NODE_PROTOCOL =
+  RAW_PROTOCOL with type error := error
+                and type 'a tzresult := 'a tzresult
+
+module LiftProtocol(Name : sig val name: string end)
+    (Env : Node_protocol_environment_sigs.V1)
+    (P : Env.Updater.PROTOCOL) :
+  NODE_PROTOCOL with type operation := P.operation
+                and type validation_state := P.validation_state

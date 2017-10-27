@@ -13,4 +13,4 @@ module Environment = Tezos_protocol_environment.Make(Raw.Register.Name)()
 module P = Raw.Functor.Make(Environment)
 
 include P
-include Updater.WrapProtocol(Raw.Register.Name)(Environment)(P)
+include Updater.LiftProtocol(Raw.Register.Name)(Environment)(P)

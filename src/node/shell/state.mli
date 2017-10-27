@@ -195,8 +195,7 @@ module Registred_protocol : sig
 
   module type T = sig
     val hash: Protocol_hash.t
-    include Updater.RAW_PROTOCOL with type error := error
-                                  and type 'a tzresult := 'a tzresult
+    include Updater.NODE_PROTOCOL
     val complete_b58prefix : Context.t -> string -> string list Lwt.t
   end
 
@@ -206,3 +205,11 @@ module Registred_protocol : sig
   val get_exn: Protocol_hash.t -> (module T)
 
 end
+
+module Register_embedded_protocol
+    (Env : Updater.Node_protocol_environment_sigs.V1)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : sig
+       val hash: Protocol_hash.t option
+       val sources: Tezos_data.Protocol.t
+     end) : sig end

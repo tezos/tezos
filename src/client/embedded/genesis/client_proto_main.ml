@@ -19,7 +19,7 @@ let call_service1 rpc_config s block a1 =
 
 let call_error_service1 rpc_config s block a1 =
   call_service1 rpc_config s block a1 >>= function
-  | Ok (Error _ as err) -> Lwt.return (wrap_error err)
+  | Ok (Error _ as err) -> Lwt.return (Environment.wrap_error err)
   | Ok (Ok v) -> return v
   | Error _ as err -> Lwt.return err
 

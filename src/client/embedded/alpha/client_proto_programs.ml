@@ -569,7 +569,7 @@ let report_errors cctxt errs =
         print_error_trace locations errs in
   Lwt_list.iter_s
     (function
-      | Ecoproto_error errs ->
+      | Environment.Ecoproto_error errs ->
           print_error_trace no_locations errs
       | err -> cctxt.warning "%a" pp_print_error [ err ])
     errs
@@ -831,12 +831,12 @@ let commands () =
                  let cctxt = Client_commands.make_context
                      (fun _ t -> Buffer.add_string msg t ; Buffer.add_char msg '\n' ; Lwt.return ()) in
                  match errs with
-                 | Ecoproto_error (Script_ir_translator.Ill_formed_type
+                 | Environment.Ecoproto_error (Script_ir_translator.Ill_formed_type
                                      (Some ("return" | "parameter" | "storage" as field), _) :: errs) :: _ ->
-                     report_errors cctxt [ Ecoproto_error errs ] >>= fun () ->
+                     report_errors cctxt [ Environment.Ecoproto_error errs ] >>= fun () ->
                      Lwt.return ([], [ List.assoc 0 (List.assoc field program.loc_table), Buffer.contents msg ])
-                 | Ecoproto_error (Script_ir_translator.Ill_typed_contract (_, _, _, _, type_map) :: errs) :: _ ->
-                     (report_errors cctxt [ Ecoproto_error errs ]  >>= fun () ->
+                 | Environment.Ecoproto_error (Script_ir_translator.Ill_typed_contract (_, _, _, _, type_map) :: errs) :: _ ->
+                     (report_errors cctxt [ Environment.Ecoproto_error errs ]  >>= fun () ->
                       let (types, _) = emacs_type_map type_map in
                       let loc = match collect_error_locations errs with
                         | hd :: _ -> hd
