@@ -9,7 +9,6 @@
 
 open Cli_entries
 open Tezos_context
-open Logging.Client.Revelation
 
 let inject_seed_nonce_revelation rpc_config block ?force ?async nonces =
   let operations =

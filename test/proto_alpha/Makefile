@@ -14,7 +14,6 @@ SOURCE_DIRECTORIES := \
   ${SRCDIR}/proto \
   ${SRCDIR}/client/embedded \
   ${SRCDIR}/client/embedded/alpha \
-  ${SRCDIR}/client/embedded/alpha/baker \
   ../lib
 
 LIB := \
