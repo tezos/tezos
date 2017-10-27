@@ -126,10 +126,16 @@ let start_prevalidation ?proto_header ~predecessor ~timestamp () =
   State.Block.context predecessor >>= fun predecessor_context ->
   Context.get_protocol predecessor_context >>= fun protocol ->
   let predecessor = State.Block.hash predecessor in
-  let (module Proto) =
+  begin
     match State.Registred_protocol.get protocol with
-    | None -> assert false (* FIXME, this should not happen! *)
-    | Some protocol -> protocol in
+    | None ->
+        (* FIXME. *)
+        (* This should not happen: it should be handled in the validator. *)
+        failwith "Prevalidation: missing protocol '%a' for the current block."
+          Protocol_hash.pp_short protocol
+    | Some protocol ->
+        return protocol
+  end >>=? fun (module Proto) ->
   Context.reset_test_network
     predecessor_context predecessor
     timestamp >>= fun predecessor_context ->
