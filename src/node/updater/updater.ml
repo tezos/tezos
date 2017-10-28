@@ -60,7 +60,7 @@ let create_files dir units =
 
 let extract dir ?hash (p: Protocol.t) =
   create_files dir p.components >>= fun _files ->
-  Native.Meta.to_file dir
+  Tezos_protocol_compiler.Native.Meta.to_file dir
     ?hash
     ~env_version:p.expected_env
     (List.map (fun {Protocol.name} -> String.capitalize_ascii name) p.components) ;
@@ -78,7 +78,7 @@ let do_compile hash p =
                     Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp hash
   in
   create_files source_dir units >>= fun _files ->
-  Native.Meta.to_file source_dir ~hash
+  Tezos_protocol_compiler.Native.Meta.to_file source_dir ~hash
     (List.map (fun {Protocol.name} -> String.capitalize_ascii name) units);
   let compiler_command =
     (Sys.executable_name,
@@ -103,11 +103,11 @@ let do_compile hash p =
         Lwt.return false
 
 let compile hash p =
-  if Registerer.mem hash then
+  if Tezos_protocol_compiler.Registerer.mem hash then
     Lwt.return true
   else begin
     do_compile hash p >>= fun success ->
-    let loaded = Registerer.mem hash in
+    let loaded = Tezos_protocol_compiler.Registerer.mem hash in
     if success && not loaded then
       log_error "Internal error while compiling %a" Protocol_hash.pp hash;
     Lwt.return loaded

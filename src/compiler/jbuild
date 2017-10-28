@@ -5,7 +5,7 @@
   (action
     (run ${bin:ocp-ocamlres} -format ocaml -o ${@}
            ${lib:stdlib:camlinternalFormatBasics.cmi}
-           ${path:registerer.cmi}
+           ${path:tezos_protocol_compiler__Registerer.cmi}
            ${path:../environment/tezos_protocol_environment_sigs_v1.cmi}))))
 
 (library
@@ -19,7 +19,6 @@
               ocplib-endian
               ocplib-ocamlres
               unix))
-  (wrapped false)
   (flags (:standard -w +27-30-40@8
                     -opaque
                     -open Error_monad
