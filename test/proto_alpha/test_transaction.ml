@@ -105,7 +105,7 @@ let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
   return blkh
 
 let main () =
-  Helpers.init () >>=? fun (_node_pid, hash) ->
+  Helpers.init ~rpc_port:18300 () >>=? fun (_node_pid, hash) ->
   run (`Hash hash) Helpers.Account.bootstrap_accounts >>=? fun _blkh ->
   return ()
 

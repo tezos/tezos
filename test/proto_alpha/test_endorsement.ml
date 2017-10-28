@@ -237,7 +237,7 @@ let run genesis =
   return ()
 
 let main () =
-  Helpers.init () >>=? fun (_node_pid, genesis) ->
+  Helpers.init ~rpc_port:18100 () >>=? fun (_node_pid, genesis) ->
   run (`Hash genesis)
 
 

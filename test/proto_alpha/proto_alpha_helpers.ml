@@ -13,8 +13,8 @@ let (//) = Filename.concat
 
 let () = Random.self_init ()
 
-let rpc_config : Client_rpcs.config = {
-  host = "localhost" ;
+let rpc_config = ref {
+  Client_rpcs.host = "localhost" ;
   port = 8192 + Random.int 8192 ;
   tls = false ;
   logger = Client_rpcs.null_logger ;
@@ -28,11 +28,16 @@ let dictator_sk =
 let activate_alpha () =
   let fitness = Fitness_repr.from_int64 0L in
   Client_embedded_genesis.Client_proto_main.mine
-    rpc_config (`Head 0)
+    !rpc_config (`Head 0)
     (Activate Client_proto_main.protocol)
     fitness dictator_sk
 
-let init ?(sandbox = "sandbox.json") () =
+let init ?(sandbox = "sandbox.json") ?rpc_port () =
+  begin
+    match rpc_port with
+    | None -> ()
+    | Some port -> rpc_config := { !rpc_config with port }
+  end ;
   (* Handles relative path on OSX *)
   let executable_path =
     if Filename.is_relative Sys.argv.(0)
@@ -42,14 +47,14 @@ let init ?(sandbox = "sandbox.json") () =
   Unix.chdir ".." ;
   let pid =
     Node_helpers.fork_node
-      ~port:rpc_config.port
+      ~port:!rpc_config.port
       ~sandbox:(Filename.dirname executable_path // sandbox)
       () in
   activate_alpha () >>=? fun hash ->
   return (pid, hash)
 
 let level block =
-  Client_proto_rpcs.Context.level rpc_config block
+  Client_proto_rpcs.Context.level !rpc_config block
 
 module Account = struct
 
@@ -178,7 +183,7 @@ module Account = struct
       ~amount () =
     let amount = match Tez.of_cents amount with None -> Tez.zero | Some a -> a in
     let fee = match Tez.of_cents fee with None -> Tez.zero | Some a -> a in
-    Client_proto_context.transfer rpc_config
+    Client_proto_context.transfer !rpc_config
       block
       ~source:account.contract
       ~src_pk:account.pk
@@ -205,7 +210,7 @@ module Account = struct
     let delegatable, delegate = match delegate with
       | None -> false, None
       | Some delegate -> true, Some delegate in
-    Client_proto_context.originate_account rpc_config block
+    Client_proto_context.originate_account !rpc_config block
       ~source:src.contract
       ~src_pk:src.pk
       ~src_sk:src.sk
@@ -225,19 +230,19 @@ module Account = struct
     let fee = match Tez.of_cents fee with
       | None -> Tez.zero
       | Some amount -> amount in
-    Client_proto_context.delegate_contract rpc_config block
+    Client_proto_context.delegate_contract !rpc_config block
       ~source:contract
       ~manager_sk
       ~fee
       delegate_opt
 
   let balance ?(block = `Prevalidation) (account : t) =
-    Client_proto_rpcs.Context.Contract.balance rpc_config
+    Client_proto_rpcs.Context.Contract.balance !rpc_config
       block account.contract
 
   (* TODO: gather contract related functions in a Contract module? *)
   let delegate ?(block = `Prevalidation) (contract : Contract.t) =
-    Client_proto_rpcs.Context.Contract.delegate rpc_config
+    Client_proto_rpcs.Context.Contract.delegate !rpc_config
       block contract
 
 end
@@ -247,12 +252,12 @@ module Protocol = struct
   open Account
 
   let voting_period_kind ?(block = `Prevalidation) () =
-    Client_proto_rpcs.Context.voting_period_kind rpc_config block
+    Client_proto_rpcs.Context.voting_period_kind !rpc_config block
 
   let proposals ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) proposals =
-    Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
-    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
-    Client_proto_rpcs.Helpers.Forge.Delegate.proposals rpc_config block
+    Client_node_rpcs.Blocks.info !rpc_config block >>=? fun block_info ->
+    Client_proto_rpcs.Context.next_level !rpc_config block >>=? fun next_level ->
+    Client_proto_rpcs.Helpers.Forge.Delegate.proposals !rpc_config block
       ~net_id:block_info.net_id
       ~branch:block_info.hash
       ~source:pk
@@ -263,9 +268,9 @@ module Protocol = struct
     return (Tezos_data.Operation.of_bytes_exn signed_bytes)
 
   let ballot ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
-    Client_node_rpcs.Blocks.info rpc_config block >>=? fun block_info ->
-    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun next_level ->
-    Client_proto_rpcs.Helpers.Forge.Delegate.ballot rpc_config block
+    Client_node_rpcs.Blocks.info !rpc_config block >>=? fun block_info ->
+    Client_proto_rpcs.Context.next_level !rpc_config block >>=? fun next_level ->
+    Client_proto_rpcs.Helpers.Forge.Delegate.ballot !rpc_config block
       ~net_id:block_info.net_id
       ~branch:block_info.hash
       ~source:pk
@@ -388,7 +393,7 @@ module Assert = struct
     end
 
   let check_protocol ?msg ~block h =
-    Client_node_rpcs.Blocks.protocol rpc_config block >>=? fun block_proto ->
+    Client_node_rpcs.Blocks.protocol !rpc_config block >>=? fun block_proto ->
     return @@ Assert.equal
       ?msg:(Assert.format_msg msg)
       ~prn:Protocol_hash.to_b58check
@@ -396,7 +401,7 @@ module Assert = struct
       block_proto h
 
   let check_voting_period_kind ?msg ~block kind =
-    Client_proto_rpcs.Context.voting_period_kind rpc_config block
+    Client_proto_rpcs.Context.voting_period_kind !rpc_config block
     >>=? fun current_kind ->
     return @@ Assert.equal
       ?msg:(Assert.format_msg msg)
@@ -415,7 +420,7 @@ module Mining = struct
       | Ok nonce -> nonce in
     let seed_nonce_hash = Nonce.hash seed_nonce in
     Client_mining_forge.forge_block
-      rpc_config
+      !rpc_config
       block
       ~operations
       ~force:true
@@ -427,7 +432,7 @@ module Mining = struct
       ()
 
   let endorsement_reward block =
-    Client_proto_rpcs.Header.priority rpc_config block >>=? fun prio ->
+    Client_proto_rpcs.Header.priority !rpc_config block >>=? fun prio ->
     Mining.endorsement_reward ~block_priority:prio >|=
     Environment.wrap_error >>|?
     Tez.to_cents
@@ -442,8 +447,8 @@ module Endorse = struct
       source
       slot =
     let block = Client_rpcs.last_mined_block block in
-    Client_node_rpcs.Blocks.info rpc_config block >>=? fun { hash ; net_id } ->
-    Client_proto_rpcs.Helpers.Forge.Delegate.endorsement rpc_config
+    Client_node_rpcs.Blocks.info !rpc_config block >>=? fun { hash ; net_id } ->
+    Client_proto_rpcs.Helpers.Forge.Delegate.endorsement !rpc_config
       block
       ~net_id:net_id
       ~branch:hash
@@ -460,7 +465,7 @@ module Endorse = struct
       delegate
       level =
     Client_proto_rpcs.Helpers.Rights.endorsement_rights_for_delegate
-      rpc_config ~max_priority ~first_level:level ~last_level:level
+      !rpc_config ~max_priority ~first_level:level ~last_level:level
       block delegate () >>=? fun possibilities ->
     let slots =
       List.map (fun (_,slot) -> slot)
@@ -471,7 +476,7 @@ module Endorse = struct
       ?slot
       (contract : Account.t)
       block =
-    Client_proto_rpcs.Context.next_level rpc_config block >>=? fun { level } ->
+    Client_proto_rpcs.Context.next_level !rpc_config block >>=? fun { level } ->
     begin
       match slot with
       | Some slot -> return slot
@@ -490,7 +495,7 @@ module Endorse = struct
   let endorsers_list block =
     let get_endorser_list result (account : Account.t) level block =
       Client_proto_rpcs.Helpers.Rights.endorsement_rights_for_delegate
-        rpc_config block account.pkh
+        !rpc_config block account.pkh
         ~max_priority:16
         ~first_level:level
         ~last_level:level () >>|? fun slots ->
@@ -498,7 +503,7 @@ module Endorse = struct
     in
     let { Account.b1 ; b2 ; b3 ; b4 ; b5 } = Account.bootstrap_accounts in
     let result = Array.make 16 b1 in
-    Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
+    Client_proto_rpcs.Context.level !rpc_config block >>=? fun level ->
     let level = Raw_level.succ @@ level.level in
     get_endorser_list result b1 level block >>=? fun () ->
     get_endorser_list result b2 level block >>=? fun () ->
@@ -510,11 +515,11 @@ module Endorse = struct
   let endorsement_rights
     ?(max_priority = 1024)
     (contract : Account.t) block =
-    Client_proto_rpcs.Context.level rpc_config block >>=? fun level ->
+    Client_proto_rpcs.Context.level !rpc_config block >>=? fun level ->
     let delegate = contract.pkh in
     let level = level.level in
     Client_proto_rpcs.Helpers.Rights.endorsement_rights_for_delegate
-      rpc_config
+      !rpc_config
       ~max_priority
       ~first_level:level
       ~last_level:level
@@ -523,6 +528,6 @@ module Endorse = struct
 end
 
 let display_level block =
-  Client_proto_rpcs.Context.level rpc_config block >>=? fun lvl ->
+  Client_proto_rpcs.Context.level !rpc_config block >>=? fun lvl ->
   Format.eprintf "Level: %a@." Level.pp_full lvl ;
   return ()

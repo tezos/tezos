@@ -9,7 +9,10 @@
 
 module Ed25519 = Environment.Ed25519
 
-val init : ?sandbox:string -> unit -> (int * Block_hash.t) tzresult Lwt.t
+val init :
+  ?sandbox:string ->
+  ?rpc_port:int ->
+  unit -> (int * Block_hash.t) tzresult Lwt.t
 (** [init ()] sets up the test environment, and return the PID of
     forked Tezos node and the block info of the block from where the
     tests will begin. *)
@@ -191,7 +194,5 @@ module Assert : sig
     Voting_period.kind -> unit tzresult Lwt.t
 
 end
-
-val rpc_config: Client_rpcs.config
 
 val display_level: Client_proto_rpcs.block -> unit tzresult Lwt.t

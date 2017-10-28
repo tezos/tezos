@@ -84,7 +84,7 @@ let run_change_to_demo_proto block
   return (`Hash head)
 
 let change_to_demo_proto () =
-  init ~sandbox:"sandbox-vote.json" () >>=? fun (_node_pid, hash) ->
+  init ~sandbox:"sandbox-vote.json" ~rpc_port:18400 () >>=? fun (_node_pid, hash) ->
   run_change_to_demo_proto (`Hash hash) Account.bootstrap_accounts >>=? fun _blkh ->
   return ()
 
