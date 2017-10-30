@@ -1,0 +1,26 @@
+parameter (or (pair string (pair tez (contract unit unit))) nat);
+return unit;
+storage (pair (contract nat (pair nat bool)) (pair nat (map nat (pair string (pair tez (contract unit unit))))));
+code { DUP; DIP{CDR}; CAR;      # Get the input while preserving the output
+       IF_LEFT { DIP{ DUP; CAR; SWAP; CDR; DUP; CAR; DIP{CDR}};
+                 SOME; SWAP; DUP; DIP{UPDATE}; # Add the element to the map
+                 PUSH nat 1; ADD; PAIR; SWAP;  # Add 1 to the index
+                 PAIR; UNIT; PAIR}             # Cleanup and finish
+               # Check our other contract to see if the transaction is allowed
+               { DIP{DUP; CAR}; PUSH tez "0.00"; SWAP; TRANSFER_TOKENS;
+                 # Arrange the stack
+                 DUP; CDR;
+                 IF { CAR; DUP; DIIP{DUP; CDDR; DUP};
+                      DIP{ GET; # Get the value of the data
+                           IF_NONE {FAIL} {}; # This should not happen
+                           SWAP;
+                           NONE (pair string (pair tez (contract unit unit)))};
+                      UPDATE; # Delete the element
+                      SWAP;
+                      # More stack arranging
+                      DIP{ SWAP; DUP; CAR; DIP{CDR}};
+                      DIP{DIP{CAR; PAIR}; PAIR};
+                      DUP; CDAR;
+                      DIP{CDDR}; UNIT; TRANSFER_TOKENS; # Make the transfer
+                      PAIR}
+                    { FAIL }}}

@@ -26,6 +26,12 @@ ls $CONTRACT_PATH \
 
 printf "All contracts are well typed\n\n"
 
+# Assert all contracts typecheck
+for contract in `ls $CONTRACT_PATH/*.tz`; do
+    printf "[Typechecking %s]\n" "$contract";
+    ${client} typecheck program "$contract";
+done
+
 # FORMAT: assert_output contract_file storage input expected_result
 
 assert_output $CONTRACT_PATH/ret_int.tz Unit Unit 300

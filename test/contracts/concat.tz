@@ -1,0 +1,11 @@
+
+parameter string;
+storage string;
+return string;
+code {DUP;                      # We're going to need both the storage and parameter
+      CAR;                      # Get the parameter
+      DIP{CDR;                  # Get the storage value
+          DUP};                 # We need to replace it in the storage, so we dup it
+      SWAP;                     # Get the order we want (this is optional)
+      CONCAT;                   # Concatenate the strings
+      PAIR}                     # Pair them up, matching the calling convention

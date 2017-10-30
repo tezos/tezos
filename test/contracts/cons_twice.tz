@@ -1,0 +1,12 @@
+
+parameter nat;
+storage (list nat);
+return unit;
+code { DUP;                     # Duplicate the storage and parameter
+       CAR;                     # Extract the parameter
+       DIP{CDR};                # Extract the storage
+       DUP;                     # Duplicate the parameter
+       DIP{CONS};               # Add the first instance of the parameter to the list
+       CONS;                    # Add the second instance of the parameter to the list
+       PUSH unit Unit;          # Put the value Unit on the stack (calling convention)
+       PAIR}                    # Finish the calling convention
