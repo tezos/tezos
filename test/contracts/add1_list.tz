@@ -1,0 +1,9 @@
+parameter (list int);
+storage unit;
+return (list int);
+code { CAR;                      # Get the parameter
+       LAMBDA int int { PUSH int 1; ADD }; # Create a lambda that adds 1
+       MAP;                              # Map over the list
+       UNIT;                             # Push Unit
+       SWAP;                             # Reorder the stack for the PAIR
+       PAIR }                             # Match the calling convetion

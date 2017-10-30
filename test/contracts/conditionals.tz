@@ -1,0 +1,11 @@
+
+parameter (or string (option int));
+storage unit;
+return string;
+code { CAR;                      # Access the storage
+       IF_LEFT {}                # The string is on top of the stack, nothing to do
+               { IF_NONE { FAIL}  # Fail if None
+                         { PUSH int 0; CMPGT; # Check for negative number
+                           IF {FAIL}          # Fail if negative
+                              {PUSH string ""}}}; # Push the empty string
+       UNIT; SWAP; PAIR}                          # Calling convention

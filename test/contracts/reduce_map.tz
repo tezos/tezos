@@ -1,0 +1,22 @@
+
+parameter (pair (lambda int int) (list int));
+return (list int);
+storage unit;
+code { DIP{NIL int};
+       CAR;
+       DUP;
+       DIP{CAR; PAIR};          # Unpack data and setup accumulator
+       CDR;
+       LAMBDA (pair int (pair (lambda int int) (list int)))
+              (pair (lambda int int) (list int))
+              # Apply the lambda and add the new element to the list
+              { DUP; CDAR;
+                DIP{ DUP; DIP{CDAR}; DUP;
+                     CAR; DIP{CDDR; SWAP}; EXEC; CONS};
+                PAIR};
+       REDUCE; CDR; DIP{NIL int}; # First reduce
+       LAMBDA (pair int (list int))
+              (list int)
+              {DUP; CAR; DIP{CDR}; CONS};
+       REDUCE;                  # Correct list order
+       UNIT; SWAP; PAIR}        # Calling convention

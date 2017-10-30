@@ -1,0 +1,17 @@
+parameter unit;
+storage (option
+           (pair (pair (contract unit unit) (contract unit unit))
+                 (pair (pair timestamp (contract (option (pair signature int)) int))
+                       (pair tez int))));
+return unit;
+code { CDR; IF_NONE {FAIL} {}; # Check if settlement has already ocurred
+       DUP; CDAAR; NOW; CMPLT; IF {FAIL} {}; # Check the timestamp
+       DUP; CDADR; DIP{SOME}; PUSH tez "1.01"; NONE (pair signature int);
+       TRANSFER_TOKENS; DIP{IF_NONE{FAIL} {}};
+       DIP{DUP; CDDR; DUP; CDR}; CMPGT;
+       SWAP;
+       DIP{ IF {CAAR} {CADR};
+            DIP{ NONE (pair (pair (contract unit unit) (contract unit unit))
+                            (pair (pair timestamp (contract (option (pair signature int)) int))
+                                  (pair tez int)))}};
+       CAR; UNIT; TRANSFER_TOKENS; PAIR}
