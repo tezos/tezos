@@ -21,7 +21,7 @@ stages:
     - docker info
     - docker login -u gitlab-ci-token -p "$CI_BUILD_TOKEN" "${CI_REGISTRY}"
   tags:
-    - docker
+    - safe_docker
 
 ## Prepare docker image with precompiled OCaml/opam
 
