@@ -115,7 +115,7 @@ module Block : sig
 
   type invalid_block = {
     level: int32 ;
-    (* errors: Error_monad.error list ; *)
+    errors: Error_monad.error list ;
   }
 
   module Invalid_block : MAP_STORE

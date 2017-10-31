@@ -152,7 +152,7 @@ module Block = struct
 
   type invalid_block = {
     level: int32 ;
-    (* errors: Error_monad.error list ; *)
+    errors: Error_monad.error list ;
   }
 
   module Invalid_block =
@@ -166,9 +166,9 @@ module Block = struct
          let encoding =
            let open Data_encoding in
            conv
-             (fun { level } -> (level))
-             (fun (level) -> { level  })
-             int32
+             (fun { level ; errors } -> (level, errors))
+             (fun (level, errors) -> { level ; errors })
+             (tup2 int32 (list Error_monad.error_encoding))
        end))
 
   let register s =

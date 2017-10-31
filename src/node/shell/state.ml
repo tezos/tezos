@@ -376,6 +376,10 @@ module Block = struct
     Shared.use net_state.block_store begin fun store ->
       Store.Block.Invalid_block.known store hash
     end
+  let read_invalid net_state hash =
+    Shared.use net_state.block_store begin fun store ->
+      Store.Block.Invalid_block.read_opt store hash
+    end
 
   let known net_state hash =
     Shared.use net_state.block_store begin fun store ->
@@ -478,7 +482,7 @@ module Block = struct
       end
     end
 
-  let store_invalid net_state block_header =
+  let store_invalid net_state block_header errors =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     Shared.use net_state.block_store begin fun store ->
@@ -489,7 +493,7 @@ module Block = struct
         return false
       else
         Store.Block.Invalid_block.store store hash
-          { level = block_header.shell.level } >>= fun () ->
+          { level = block_header.shell.level ; errors } >>= fun () ->
         return true
     end
 

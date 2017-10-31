@@ -792,9 +792,9 @@ let commit_block net_db hash header operations result =
   clear_block net_db hash header.shell.validation_passes ;
   return res
 
-let commit_invalid_block net_db hash header _err =
+let commit_invalid_block net_db hash header errors =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
-  State.Block.store_invalid net_db.net_state header >>=? fun res ->
+  State.Block.store_invalid net_db.net_state header errors >>=? fun res ->
   clear_block net_db hash header.shell.validation_passes ;
   return res
 
