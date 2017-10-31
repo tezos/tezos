@@ -474,6 +474,7 @@ module Context_db = struct
     let net_state = Distributed_db.state v.net_db in
     get_context v block.Block_header.shell.predecessor >>= function
     | Error _ as error ->
+        Lwt_unix.yield () >>= fun () ->
         set_context v hash (Error [(* TODO *)]) >>= fun () ->
         Lwt.return error
     | Ok _context ->
