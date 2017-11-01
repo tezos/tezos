@@ -225,9 +225,13 @@ module Alias = functor (Entity : Entity) -> struct
                iter_s
                  (fun (n, _v) ->
                     if n = s then
+                      Entity.to_source cctxt _v >>=? fun value ->
                       failwith
-                        "the %s alias %s already exists, use -force true to update"
+                        "@[<v 2>The %s alias %s already exists.@,\
+                         The current value is %s.@,\
+                         Use -force true to update@]"
                         Entity.name n
+                        value
                     else
                       return ())
                  list
