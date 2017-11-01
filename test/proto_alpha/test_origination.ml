@@ -12,7 +12,7 @@ module Assert = Helpers.Assert
 
 let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
 
-  Helpers.Mining.mine blkid b1 [] >>=? fun blkh ->
+  Helpers.Baking.mine blkid b1 [] >>=? fun blkh ->
   let foo = Helpers.Account.create "foo" in
 
   (* Origination with amount = 0 tez *)

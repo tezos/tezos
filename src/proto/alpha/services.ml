@@ -54,7 +54,7 @@ module Header = struct
 
   let priority custom_root =
     RPC.service
-      ~description: "Mining priority of the block."
+      ~description: "Baking priority of the block."
       ~input: empty
       ~output: (wrap_tzerror uint16)
       RPC.Path.(custom_root / "header" / "priority")

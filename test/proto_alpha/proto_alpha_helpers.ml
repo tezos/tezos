@@ -388,7 +388,7 @@ module Assert = struct
 
   let wrong_delegate ~msg =
     Assert.contain_error ~msg ~f:begin ecoproto_error (function
-        | Mining.Wrong_delegate _ -> true
+        | Baking.Wrong_delegate _ -> true
         | _ -> false)
     end
 
@@ -409,7 +409,7 @@ module Assert = struct
 
 end
 
-module Mining = struct
+module Baking = struct
 
   let mine block (contract: Account.t) operations =
     let operations = List.map (fun op -> Client_node_rpcs.Blob op) operations in
@@ -433,7 +433,7 @@ module Mining = struct
 
   let endorsement_reward block =
     Client_proto_rpcs.Header.priority !rpc_config block >>=? fun prio ->
-    Mining.endorsement_reward ~block_priority:prio >|=
+    Baking.endorsement_reward ~block_priority:prio >|=
     Environment.wrap_error >>|?
     Tez.to_cents
 

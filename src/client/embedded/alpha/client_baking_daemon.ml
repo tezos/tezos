@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Client_commands
-open Logging.Client.Mining
+open Logging.Client.Baking
 
 let run cctxt ?max_priority ~delay ?min_date delegates ~endorsement ~denunciation ~baking =
   (* TODO really detach... *)
