@@ -12,5 +12,5 @@
     "cycle_length" : 4,
     "voting_period_length" : 2,
     "time_before_reward" : 1,
-    "first_free_mining_slot" : 4
+    "first_free_baking_slot" : 4
 }
