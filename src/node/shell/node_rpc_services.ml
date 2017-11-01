@@ -658,7 +658,7 @@ let inject_operation =
        constructed using a contextual RPCs from the latest block \
        and signed by the client. By default, the RPC will wait for \
        the operation to be (pre-)validated before answering. See \
-       RPCs ubder /blocks/prevalidation for more details on the \
+       RPCs under /blocks/prevalidation for more details on the \
        prevalidation context."
     ~input:
       (obj4
