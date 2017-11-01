@@ -337,10 +337,10 @@ init_with_transfer $CONTRACT_PATH/transfer_to.tz $key2 Unit 1000 bootstrap1
 assert_balance test_transfer_account1 "100.00 ꜩ"
 $client transfer 100 from bootstrap1 to transfer_to \
             -arg "\"$(get_contract_addr test_transfer_account1)\""
-assert_balance test_transfer_account1 "200.00 ꜩ" # Why isn't this 200 ꜩ? Mining fee?
+assert_balance test_transfer_account1 "200.00 ꜩ" # Why isn't this 200 ꜩ? Baking fee?
 $client transfer 100 from bootstrap1 to transfer_to \
             -arg "\"$(get_contract_addr test_transfer_account2)\""
-assert_balance test_transfer_account2 "120.00 ꜩ" # Why isn't this 120 ꜩ? Mining fee?
+assert_balance test_transfer_account2 "120.00 ꜩ" # Why isn't this 120 ꜩ? Baking fee?
 
 # Tests create_account
 init_with_transfer $CONTRACT_PATH/create_account.tz $key2 \

@@ -231,7 +231,7 @@ let () =
 
 let minimal_timestamp ctxt prio =
   let prio = match prio with None -> 0 | Some p -> p in
-  Mining.minimal_time ctxt prio
+  Baking.minimal_time ctxt prio
 
 let () = register1
            Services.Helpers.minimal_timestamp
@@ -250,7 +250,7 @@ let () =
        | Some (shell, contents) ->
            let operation = { hash ; shell ; contents ; signature } in
            let level = Tezos_context.Level.current ctxt in
-           Mining.baking_priorities ctxt level >>=? fun (Misc.LCons (miner_pkh, _)) ->
+           Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (miner_pkh, _)) ->
            let miner_contract = Contract.default_contract miner_pkh in
            let block_prio = 0 in
            Apply.apply_operation
@@ -335,7 +335,7 @@ let default_max_baking_priority ctxt arg =
 
 let baking_rights ctxt level max =
   let max = default_max_baking_priority ctxt max in
-  Mining.baking_priorities ctxt level >>=? fun contract_list ->
+  Baking.baking_priorities ctxt level >>=? fun contract_list ->
   let rec loop l n =
     match n with
     | 0 -> return []
@@ -358,7 +358,7 @@ let () =
          List.mapi
            (fun prio c ->
              let timestamp = Timestamp.current ctxt in
-              Mining.minimal_time ctxt prio timestamp >>= function
+              Baking.minimal_time ctxt prio timestamp >>= function
               | Error _ -> Lwt.return None
               | Ok minimal_timestamp -> Lwt.return (Some (c, minimal_timestamp)))
            slots
@@ -389,13 +389,13 @@ let baking_rights_for_delegate
     then return []
     else
       loop (Level.succ ctxt level) >>=? fun t ->
-      Mining.first_baking_priorities
+      Baking.first_baking_priorities
         ctxt ~max_priority contract level >>=? fun priorities ->
       let raw_level = level.level in
       Error_monad.map_s
         (fun priority ->
            let timestamp = Timestamp.current ctxt in
-           Mining.minimal_time ctxt priority timestamp >>=? fun time ->
+           Baking.minimal_time ctxt priority timestamp >>=? fun time ->
            return (raw_level, priority, time))
         priorities >>=? fun priorities ->
       return (priorities @ t)
@@ -414,7 +414,7 @@ let default_max_endorsement_priority ctxt arg =
 
 let endorsement_rights ctxt level max =
   let max = default_max_endorsement_priority ctxt max in
-  Mining.endorsement_priorities ctxt level >>=? fun contract_list ->
+  Baking.endorsement_priorities ctxt level >>=? fun contract_list ->
   let rec loop l n =
     match n with
     | 0 -> return []
@@ -453,7 +453,7 @@ let endorsement_rights_for_delegate
     then return []
     else
       loop (Level.succ ctxt level) >>=? fun t ->
-      Mining.first_endorsement_slots
+      Baking.first_endorsement_slots
         ctxt ~max_priority contract level >>=? fun slots ->
       let raw_level = level.level in
       let slots = List.rev_map (fun slot -> (raw_level, slot)) slots in

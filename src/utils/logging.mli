@@ -39,7 +39,7 @@ module Node : sig
 end
 module Client : sig
   module Blocks : LOG
-  module Mining : LOG
+  module Baking : LOG
   module Endorsement : LOG
   module Revelation : LOG
   module Denunciation : LOG

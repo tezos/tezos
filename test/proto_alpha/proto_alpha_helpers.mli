@@ -92,7 +92,7 @@ module Account : sig
 
 end
 
-module Mining : sig
+module Baking : sig
 
   val mine:
     Client_node_rpcs.Blocks.block ->

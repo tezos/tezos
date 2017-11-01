@@ -53,7 +53,7 @@ val forge_block:
       operations and add them to the block. Otherwise, provided
       operations will be used. In both cases, they will be validated.
 
-    * Mining priority: If [`Auto] is used, it will be computed from
+    * Baking priority: If [`Auto] is used, it will be computed from
       the public key hash of the specified contract, optionally capped
       to a maximum value, and optionnaly restricting for free baking slot.
 

@@ -9,7 +9,7 @@
 
 
 open Client_commands
-open Logging.Client.Mining
+open Logging.Client.Baking
 
 let generate_proof_of_work_nonce () =
   Sodium.Random.Bigbytes.generate Constants.proof_of_work_nonce_size
@@ -32,7 +32,7 @@ let rec forge_block_header
     let signed_header =
       Environment.Ed25519.Signature.append delegate_sk unsigned_header in
     let block_hash = Block_hash.hash_bytes [signed_header] in
-    if Mining.check_hash block_hash stamp_threshold then
+    if Baking.check_hash block_hash stamp_threshold then
       signed_header
     else
       loop () in
@@ -146,7 +146,7 @@ let forge_block cctxt block
         with Not_found ->
           failwith "No slot found at level %a" Raw_level.pp level
   end >>=? fun (priority, minimal_timestamp) ->
-  (* lwt_log_info "Mining block at level %a prio %d" *)
+  (* lwt_log_info "Baking block at level %a prio %d" *)
     (* Raw_level.pp level priority >>= fun () -> *)
   begin
     match timestamp, minimal_timestamp with
