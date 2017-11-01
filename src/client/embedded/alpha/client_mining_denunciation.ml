@@ -29,7 +29,7 @@ let create cctxt endorsement_stream =
     | `Endorsement (Some (Ok e)) ->
         last_get_endorsement := None ;
         Client_keys.Public_key_hash.name cctxt
-          e.Client_mining_operations.source >>= function
+          e.Client_baking_operations.source >>= function
         | Ok source ->
             lwt_debug
               "Discovered endorsement for block %a by %s (slot @[<h>%a@])"

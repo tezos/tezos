@@ -19,7 +19,7 @@ val delegate_arg: (string option, Client_commands.context) arg
 val delegatable_switch: (bool, Client_commands.context) arg
 val non_spendable_switch: (bool, Client_commands.context) arg
 val max_priority_arg: (int option, Client_commands.context) arg
-val free_mining_switch: (bool, Client_commands.context) arg
+val free_baking_switch: (bool, Client_commands.context) arg
 val force_switch: (bool, Client_commands.context) arg
 val endorsement_delay_arg: (int, Client_commands.context) arg
 
@@ -35,7 +35,7 @@ val tez_param :
   (Tez.t -> 'a, Client_commands.context, 'ret) Cli_entries.params
 
 module Daemon : sig
-  val mining_switch: (bool, Client_commands.context) arg
+  val baking_switch: (bool, Client_commands.context) arg
   val endorsement_switch: (bool, Client_commands.context) arg
   val denunciation_switch: (bool, Client_commands.context) arg
 end

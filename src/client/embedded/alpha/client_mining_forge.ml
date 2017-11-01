@@ -60,7 +60,7 @@ let assert_valid_operations_hash shell_header operations =
     (Operation_list_list_hash.equal
        operations_hash shell_header.Tezos_data.Block_header.operations_hash)
     (failure
-       "Client_mining_forge.inject_block: \
+       "Client_baking_forge.inject_block: \
         inconsistent header.")
 
 let inject_block cctxt
@@ -79,7 +79,7 @@ type error +=
 let () =
   register_error_kind
     `Permanent
-    ~id:"Client_mining_forge.failed_to_preapply"
+    ~id:"Client_baking_forge.failed_to_preapply"
     ~title: "Fail to preapply an operation"
     ~description: ""
     ~pp:(fun ppf (op, err) ->
@@ -126,17 +126,17 @@ let forge_block cctxt block
           cctxt block ~prio () >>=? fun time ->
         return (prio, time)
       end
-    | `Auto (src_pkh, max_priority, free_mining) ->
+    | `Auto (src_pkh, max_priority, free_baking) ->
         Client_proto_rpcs.Context.next_level cctxt block >>=? fun { level } ->
-        Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate cctxt
+        Client_proto_rpcs.Helpers.Rights.baking_rights_for_delegate cctxt
           ?max_priority
           ~first_level:level
           ~last_level:level
           block src_pkh () >>=? fun possibilities ->
         try
           begin
-            if free_mining then
-              Client_proto_rpcs.Constants.first_free_mining_slot cctxt block
+            if free_baking then
+              Client_proto_rpcs.Constants.first_free_baking_slot cctxt block
             else
               return 0
           end >>=? fun min_prio ->
@@ -299,19 +299,19 @@ end = struct
 
 end
 
-let get_mining_slot cctxt
-    ?max_priority (bi: Client_mining_blocks.block_info) delegates =
+let get_baking_slot cctxt
+    ?max_priority (bi: Client_baking_blocks.block_info) delegates =
   let block = `Hash bi.hash in
   let level = Raw_level.succ bi.level.level in
   Lwt_list.filter_map_p
     (fun delegate ->
-       Client_proto_rpcs.Helpers.Rights.mining_rights_for_delegate cctxt
+       Client_proto_rpcs.Helpers.Rights.baking_rights_for_delegate cctxt
          ?max_priority
          ~first_level:level
          ~last_level:level
          block delegate () >>= function
        | Error errs ->
-           log_error "Error while fetching mining possibilities:\n%a"
+           log_error "Error while fetching baking possibilities:\n%a"
              pp_print_error errs ;
            Lwt.return_none
        | Ok slots ->
@@ -327,18 +327,18 @@ let get_mining_slot cctxt
   | [] -> Lwt.return None
   | slot :: _ -> Lwt.return (Some slot)
 
-let rec insert_mining_slot slot = function
+let rec insert_baking_slot slot = function
   | [] -> [slot]
   | ((timestamp,_) :: _) as slots when Time.(fst slot < timestamp) ->
       slot :: slots
-  | slot' :: slots -> slot' :: insert_mining_slot slot slots
+  | slot' :: slots -> slot' :: insert_baking_slot slot slots
 
 type state = {
   genesis: Block_hash.t ;
   delegates: public_key_hash list ;
-  mutable best: Client_mining_blocks.block_info ;
+  mutable best: Client_baking_blocks.block_info ;
   mutable future_slots:
-    (Time.t * (Client_mining_blocks.block_info * int * public_key_hash)) list ;
+    (Time.t * (Client_baking_blocks.block_info * int * public_key_hash)) list ;
 }
 
 let create_state genesis delegates best =
@@ -375,7 +375,7 @@ let get_unrevealed_nonces cctxt ?(force = false) block =
   match Cycle.pred cur_cycle with
   | None -> return []
   | Some cycle ->
-      Client_mining_blocks.blocks_from_cycle
+      Client_baking_blocks.blocks_from_cycle
         cctxt.rpc_config block cycle >>=? fun blocks ->
       filter_map_s (fun hash ->
           Client_proto_nonces.find cctxt hash >>= function
@@ -417,10 +417,10 @@ let get_delegates cctxt state =
   | _ :: _ as delegates -> return delegates
 
 let insert_block
-    cctxt ?max_priority state (bi: Client_mining_blocks.block_info) =
+    cctxt ?max_priority state (bi: Client_baking_blocks.block_info) =
   begin
     safe_get_unrevealed_nonces cctxt (`Hash bi.hash) >>= fun nonces ->
-    Client_mining_revelation.forge_seed_nonce_revelation
+    Client_baking_revelation.forge_seed_nonce_revelation
       cctxt ~force:true (`Hash bi.hash) (List.map snd nonces)
   end >>= fun _ignore_error ->
   if Fitness.compare state.best.fitness bi.fitness < 0 then begin
@@ -429,21 +429,21 @@ let insert_block
       ~before:(Time.add state.best.timestamp (-1800L)) state ;
   end ;
   get_delegates cctxt state >>=? fun delegates ->
-  get_mining_slot cctxt.rpc_config ?max_priority bi delegates >>= function
+  get_baking_slot cctxt.rpc_config ?max_priority bi delegates >>= function
   | None ->
       lwt_debug
         "Can't compute slot for %a" Block_hash.pp_short bi.hash >>= fun () ->
       return ()
   | Some ((timestamp, (_,_,delegate)) as slot) ->
       Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-      lwt_log_info "New mining slot at %a for %s after %a"
+      lwt_log_info "New baking slot at %a for %s after %a"
         Time.pp_hum timestamp
         name
         Block_hash.pp_short bi.hash >>= fun () ->
-      state.future_slots <- insert_mining_slot slot state.future_slots ;
+      state.future_slots <- insert_baking_slot slot state.future_slots ;
       return ()
 
-let pop_mining_slots state =
+let pop_baking_slots state =
   let now = Time.now () in
   let rec pop acc = function
     | [] -> List.rev acc, []
@@ -463,19 +463,19 @@ let insert_blocks cctxt ?max_priority state bis =
       Lwt.return_unit
 
 let mine cctxt state =
-  let slots = pop_mining_slots state in
+  let slots = pop_baking_slots state in
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
   filter_map_s
     (fun (timestamp, (bi, priority, delegate)) ->
-       let block = `Hash bi.Client_mining_blocks.hash in
+       let block = `Hash bi.Client_baking_blocks.hash in
        let timestamp =
-         if Block_hash.equal bi.Client_mining_blocks.hash state.genesis then
+         if Block_hash.equal bi.Client_baking_blocks.hash state.genesis then
            Time.now ()
          else
            timestamp in
        Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-       lwt_debug "Try mining after %a (slot %d) for %s (%a)"
+       lwt_debug "Try baking after %a (slot %d) for %s (%a)"
          Block_hash.pp_short bi.hash
          priority name Time.pp_hum timestamp >>= fun () ->
        Client_node_rpcs.Blocks.pending_operations cctxt.rpc_config
@@ -550,9 +550,9 @@ let mine cctxt state =
 let create
     cctxt ?max_priority delegates
     (block_stream:
-       Client_mining_blocks.block_info list tzresult Lwt_stream.t)
+       Client_baking_blocks.block_info list tzresult Lwt_stream.t)
     (endorsement_stream:
-       Client_mining_operations.valid_endorsement tzresult Lwt_stream.t) =
+       Client_baking_operations.valid_endorsement tzresult Lwt_stream.t) =
   Lwt_stream.get block_stream >>= function
   | None | Some (Ok [] | Error _) ->
       cctxt.Client_commands.error "Can't fetch the current block head."
@@ -592,7 +592,7 @@ let create
               "@[<hov 2>Discoverer blocks:@ %a@]"
               (Format.pp_print_list
                  (fun ppf bi ->
-                    Block_hash.pp_short ppf bi.Client_mining_blocks.hash))
+                    Block_hash.pp_short ppf bi.Client_baking_blocks.hash))
               bis
               >>= fun () ->
               insert_blocks cctxt ?max_priority state bis >>= fun () ->
@@ -602,22 +602,22 @@ let create
             Lwt.cancel timeout ;
             last_get_endorsement := None ;
             Client_keys.Public_key_hash.name cctxt
-              e.Client_mining_operations.source >>= fun _source ->
+              e.Client_baking_operations.source >>= fun _source ->
             (* TODO *)
             worker_loop ()
         | `Timeout ->
-            lwt_debug "Waking up for mining..." >>= fun () ->
+            lwt_debug "Waking up for baking..." >>= fun () ->
             begin
               mine cctxt state >>= function
               | Ok () -> Lwt.return_unit
               | Error errs ->
-                  lwt_log_error "Error while mining:\n%a"
+                  lwt_log_error "Error while baking:\n%a"
                     pp_print_error
                     errs >>= fun () ->
                   Lwt.return_unit
             end >>= fun () ->
             worker_loop () in
-  lwt_log_info "Starting mining daemon" >>= fun () ->
+  lwt_log_info "Starting baking daemon" >>= fun () ->
   worker_loop () >>= fun () ->
   return ()
 

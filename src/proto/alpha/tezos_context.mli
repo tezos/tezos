@@ -172,13 +172,13 @@ end
 module Constants : sig
 
   val proof_of_work_nonce_size: int
-  val mining_reward: Tez.t
+  val baking_reward: Tez.t
   val endorsement_reward: Tez.t
   val max_number_of_operations: int
   val nonce_length: int
   val seed_nonce_revelation_tip: Tez.t
   val origination_burn: Tez.t
-  val mining_bond_cost: Tez.t
+  val baking_bond_cost: Tez.t
   val endorsement_bond_cost: Tez.t
   val faucet_credit: Tez.t
 
@@ -186,7 +186,7 @@ module Constants : sig
   val voting_period_length: context -> int32
   val time_before_reward: context -> Period.t
   val slot_durations: context -> Period.t list
-  val first_free_mining_slot: context -> int
+  val first_free_baking_slot: context -> int
   val max_signing_slot: context -> int
   val instructions_per_transaction: context -> int
   val proof_of_work_threshold: context -> int64
@@ -593,7 +593,7 @@ module Roll : sig
   val freeze_rolls_for_cycle: context -> Cycle.t -> context tzresult Lwt.t
   val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t
 
-  val mining_rights_owner:
+  val baking_rights_owner:
     context -> Level.t -> priority:int -> public_key_hash tzresult Lwt.t
 
   val endorsement_rights_owner:

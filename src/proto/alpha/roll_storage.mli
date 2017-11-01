@@ -34,7 +34,7 @@ val freeze_rolls_for_cycle :
 val clear_cycle :
   Storage.t -> Cycle_repr.t -> Storage.t tzresult Lwt.t
 
-val mining_rights_owner :
+val baking_rights_owner :
   Storage.t -> Level_repr.t -> priority:int ->
   Ed25519.Public_key_hash.t tzresult Lwt.t
 

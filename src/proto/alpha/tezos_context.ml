@@ -68,9 +68,9 @@ module Constants = struct
   let slot_durations c =
     let constants = Storage.constants c in
     constants.slot_durations
-  let first_free_mining_slot c =
+  let first_free_baking_slot c =
     let constants = Storage.constants c in
-    constants.first_free_mining_slot
+    constants.first_free_baking_slot
   let max_signing_slot c =
     let constants = Storage.constants c in
     constants.max_signing_slot

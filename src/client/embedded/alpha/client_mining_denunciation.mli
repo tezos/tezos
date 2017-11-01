@@ -9,5 +9,5 @@
 
 val create:
   Client_commands.context ->
-  Client_mining_operations.valid_endorsement tzresult Lwt_stream.t ->
+  Client_baking_operations.valid_endorsement tzresult Lwt_stream.t ->
   unit Lwt.t

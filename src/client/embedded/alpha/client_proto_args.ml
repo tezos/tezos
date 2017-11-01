@@ -127,15 +127,15 @@ let fee_arg =
 let max_priority_arg =
   arg
     ~parameter:"-max-priority"
-    ~doc:"Set the max_priority used when looking for mining slot."
+    ~doc:"Set the max_priority used when looking for baking slot."
     (fun _ s ->
        try return (int_of_string s)
        with _ -> fail (Bad_max_priority s))
 
-let free_mining_switch =
+let free_baking_switch =
   switch
-    ~parameter:"-free-mining"
-    ~doc:"Only consider free mining slots."
+    ~parameter:"-free-baking"
+    ~doc:"Only consider free baking slots."
 
 let endorsement_delay_arg =
   default_arg
@@ -147,10 +147,10 @@ let endorsement_delay_arg =
        with _ -> fail (Bad_endorsement_delay s))
 
 module Daemon = struct
-  let mining_switch =
+  let baking_switch =
     switch
-      ~parameter:"-mining"
-      ~doc:"Run the mining daemon"
+      ~parameter:"-baking"
+      ~doc:"Run the baking daemon"
   let endorsement_switch =
     switch
       ~parameter:"-endorsement"

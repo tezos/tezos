@@ -59,8 +59,8 @@ module Constants = struct
     call_error_service1 cctxt Services.Constants.time_before_reward block ()
   let slot_durations cctxt block =
     call_error_service1 cctxt Services.Constants.slot_durations block ()
-  let first_free_mining_slot cctxt block =
-    call_error_service1 cctxt Services.Constants.first_free_mining_slot block ()
+  let first_free_baking_slot cctxt block =
+    call_error_service1 cctxt Services.Constants.first_free_baking_slot block ()
   let max_signing_slot cctxt block =
     call_error_service1 cctxt Services.Constants.max_signing_slot block ()
   let instructions_per_transaction cctxt block =
@@ -171,11 +171,11 @@ module Helpers = struct
     call_error_service2 cctxt Services.Helpers.levels block cycle ()
 
   module Rights = struct
-    type mining_slot = Raw_level.t * int * Time.t
+    type baking_slot = Raw_level.t * int * Time.t
     type endorsement_slot = Raw_level.t * int
-    let mining_rights_for_delegate cctxt
+    let baking_rights_for_delegate cctxt
         b c ?max_priority ?first_level ?last_level () =
-      call_error_service2 cctxt Services.Helpers.Rights.mining_rights_for_delegate
+      call_error_service2 cctxt Services.Helpers.Rights.baking_rights_for_delegate
       b c (max_priority, first_level, last_level)
     let endorsement_rights_for_delegate cctxt
         b c ?max_priority ?first_level ?last_level () =
@@ -289,9 +289,9 @@ module Helpers = struct
 end
 (* type slot = *)
       (* raw_level * int * timestamp option *)
-    (* let mining_possibilities *)
+    (* let baking_possibilities *)
         (* b c ?max_priority ?first_level ?last_level () = *)
-      (* call_error_service2 Services.Helpers.Context.Contract.mining_possibilities *)
+      (* call_error_service2 Services.Helpers.Context.Contract.baking_possibilities *)
         (* b c (max_priority, first_level, last_level) *)
     (* (\* let endorsement_possibilities b c ?max_priority ?first_level ?last_level () = *\) *)
       (* call_error_service2 Services.Helpers.Context.Contract.endorsement_possibilities *)

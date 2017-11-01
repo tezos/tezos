@@ -84,7 +84,7 @@ module Node = struct
 end
 module Client = struct
   module Blocks = Make(struct let name = "client.blocks" end)
-  module Mining = Make(struct let name = "client.mining" end)
+  module Mining = Make(struct let name = "client.baking" end)
   module Endorsement = Make(struct let name = "client.endorsement" end)
   module Revelation = Make(struct let name = "client.revealation" end)
   module Denunciation = Make(struct let name = "client.denunciation" end)
