@@ -181,7 +181,7 @@ module Assert : sig
   val initial_amount_too_low : msg:string -> 'a tzresult -> unit
   val non_delegatable : msg:string -> 'a tzresult -> unit
 
-  (** Endorsement / mining assertions *)
+  (** Endorsement / baking assertions *)
 
   val wrong_delegate : msg:string -> 'a tzresult -> unit
 

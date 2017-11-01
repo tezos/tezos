@@ -11,5 +11,5 @@
     "slot_durations" : [ 1, 0 ],
     "cycle_length" : 4,
     "time_before_reward" : 1,
-    "first_free_mining_slot" : 4
+    "first_free_baking_slot" : 4
 }

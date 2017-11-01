@@ -68,7 +68,7 @@ may_create_identity() {
 check_baker() {
     pids=$(pgrep -x tezos-client 2>/dev/null)
     for pid in $pids; do
-        if grep -- "-mining" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
+        if grep -- "-baking" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
             return 0
         fi
     done
@@ -81,13 +81,13 @@ run_baker() {
         exit 1
     fi
     echo "Start baker..."
-    exec $client launch daemon -mining -max-priority 64 "$@" > "$client_dir/baker.log"
+    exec $client launch daemon -baking -max-priority 64 "$@" > "$client_dir/baker.log"
 }
 
 stop_baker() {
     pids=$(pgrep -x tezos-client 2>/dev/null)
     for pid in $pids; do
-        if grep -- "-mining" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
+        if grep -- "-baking" "/proc/$pid/cmdline" >/dev/null 2>&1 ; then
             echo "Killing the baker..."
             kill "$pid"
         fi

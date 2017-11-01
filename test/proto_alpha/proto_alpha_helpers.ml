@@ -329,7 +329,7 @@ module Assert = struct
 
   let failed_to_preapply ~msg ?op f =
     Assert.contain_error ~msg ~f:begin function
-      | Client_mining_forge.Failed_to_preapply (op', err) ->
+      | Client_baking_forge.Failed_to_preapply (op', err) ->
         begin
           match op with
           | None -> true
@@ -419,7 +419,7 @@ module Mining = struct
       | Error _ -> assert false
       | Ok nonce -> nonce in
     let seed_nonce_hash = Nonce.hash seed_nonce in
-    Client_mining_forge.forge_block
+    Client_baking_forge.forge_block
       !rpc_config
       block
       ~operations
