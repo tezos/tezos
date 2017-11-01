@@ -15,4 +15,4 @@ val run:
   public_key_hash list ->
   endorsement:bool ->
   denunciation:bool ->
-  mining:bool -> unit tzresult Lwt.t
+  baking:bool -> unit tzresult Lwt.t

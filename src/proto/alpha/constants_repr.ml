@@ -22,11 +22,11 @@ let origination_burn =
   Tez_repr.of_cents_exn 1_00L
 let minimal_contract_balance =
   Tez_repr.of_cents_exn 1_00L
-let mining_bond_cost =
+let baking_bond_cost =
   Tez_repr.of_cents_exn 1000_00L
 let endorsement_bond_cost =
   Tez_repr.of_cents_exn 1000_00L
-let mining_reward =
+let baking_reward =
   Tez_repr.of_cents_exn 150_00L
 let endorsement_reward =
   Tez_repr.of_cents_exn 150_00L
@@ -38,7 +38,7 @@ type constants = {
   voting_period_length: int32 ;
   time_before_reward: Period_repr.t ;
   slot_durations: Period_repr.t list ;
-  first_free_mining_slot: int ;
+  first_free_baking_slot: int ;
   max_signing_slot: int ;
   instructions_per_transaction: int ;
   proof_of_work_threshold: int64 ;
@@ -58,7 +58,7 @@ let default = {
       Int64.(mul 365L (mul 24L 3600L)) ;
   slot_durations =
     List.map Period_repr.of_seconds_exn [ 60L ] ;
-  first_free_mining_slot = 16 ;
+  first_free_baking_slot = 16 ;
   max_signing_slot = 15 ;
   instructions_per_transaction = 16 * 1024 ;
   proof_of_work_threshold =
@@ -102,9 +102,9 @@ let constants_encoding =
        and slot_durations =
          opt Compare_slot_durations.(=)
            default.slot_durations c.slot_durations
-       and first_free_mining_slot =
+       and first_free_baking_slot =
          opt Compare.Int.(=)
-           default.first_free_mining_slot c.first_free_mining_slot
+           default.first_free_baking_slot c.first_free_baking_slot
        and max_signing_slot =
          opt Compare.Int.(=)
            default.max_signing_slot c.max_signing_slot
@@ -125,7 +125,7 @@ let constants_encoding =
           voting_period_length,
           time_before_reward,
           slot_durations,
-          first_free_mining_slot,
+          first_free_baking_slot,
           max_signing_slot,
           instructions_per_transaction,
           proof_of_work_threshold,
@@ -135,7 +135,7 @@ let constants_encoding =
             voting_period_length,
             time_before_reward,
             slot_durations,
-            first_free_mining_slot,
+            first_free_baking_slot,
             max_signing_slot,
             instructions_per_transaction,
             proof_of_work_threshold,
@@ -151,8 +151,8 @@ let constants_encoding =
         slot_durations =
           unopt default.slot_durations @@
           slot_durations ;
-        first_free_mining_slot =
-          unopt default.first_free_mining_slot first_free_mining_slot ;
+        first_free_baking_slot =
+          unopt default.first_free_baking_slot first_free_baking_slot ;
         max_signing_slot =
           unopt default.max_signing_slot max_signing_slot ;
         instructions_per_transaction =
@@ -171,7 +171,7 @@ let constants_encoding =
             (opt "voting_period_length" int32)
             (opt "time_before_reward" int64)
             (opt "slot_durations" (list Period_repr.encoding))
-            (opt "first_free_mining_slot" uint16)
+            (opt "first_free_baking_slot" uint16)
             (opt "max_signing_slot" uint16)
             (opt "instructions_per_transaction" int31)
             (opt "proof_of_work_threshold" int64)

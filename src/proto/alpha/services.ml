@@ -102,13 +102,13 @@ module Constants = struct
                 describe ~title: "time between slots" (list Period.encoding))
       RPC.Path.(custom_root / "constants" / "time_between_slots")
 
-  let first_free_mining_slot custom_root =
+  let first_free_baking_slot custom_root =
     RPC.service
-      ~description: "First free mining slot"
+      ~description: "First free baking slot"
       ~input: empty
       ~output: (wrap_tzerror @@
-                describe ~title: "first free mining slot" uint16)
-      RPC.Path.(custom_root / "constants" / "first_free_mining_slot")
+                describe ~title: "first free baking slot" uint16)
+      RPC.Path.(custom_root / "constants" / "first_free_baking_slot")
 
   let max_signing_slot custom_root =
     RPC.service
@@ -470,13 +470,13 @@ module Helpers = struct
          (req "level" Raw_level.encoding)
          (req "priority" int31))
 
-    let mining_slot_encoding =
+    let baking_slot_encoding =
       (obj3
          (req "level" Raw_level.encoding)
          (req "priority" int31)
          (req "timestamp" Timestamp.encoding))
 
-    let mining_rights custom_root =
+    let baking_rights custom_root =
       RPC.service
         ~description:
           "List gelegates allowed to mine for the next level, \
@@ -485,14 +485,14 @@ module Helpers = struct
         ~output: (wrap_tzerror @@
                   obj2
                     (req "level" Raw_level.encoding)
-                    (req "mining_rights"
+                    (req "baking_rights"
                        (list
                           (obj2
                              (req "delegate" Ed25519.Public_key_hash.encoding)
                              (req "timestamp" Timestamp.encoding)))))
-        RPC.Path.(custom_root / "helpers" / "rights" / "mining")
+        RPC.Path.(custom_root / "helpers" / "rights" / "baking")
 
-    let mining_rights_for_level custom_root =
+    let baking_rights_for_level custom_root =
       RPC.service
         ~description:
           "List delegate allowed to mine for a given level, \
@@ -504,36 +504,36 @@ module Helpers = struct
                     (req "delegates"
                        (list Ed25519.Public_key_hash.encoding)))
         RPC.Path.(custom_root / "helpers" / "rights"
-                  / "mining" / "level" /: Raw_level.arg )
+                  / "baking" / "level" /: Raw_level.arg )
 
-    let mining_levels custom_root =
+    let baking_levels custom_root =
       RPC.service
         ~description:
-          "List level for which we might computed mining rights."
+          "List level for which we might computed baking rights."
         ~input: empty
         ~output: (wrap_tzerror @@
                   obj1 (req "levels" (list Raw_level.encoding)))
         RPC.Path.(custom_root / "helpers" / "rights"
-                  / "mining" / "level"  )
+                  / "baking" / "level"  )
 
-    let mining_rights_for_delegate custom_root =
+    let baking_rights_for_delegate custom_root =
       RPC.service
-        ~description: "Future mining rights for a given delegate."
+        ~description: "Future baking rights for a given delegate."
         ~input: slots_range_encoding
-        ~output: (wrap_tzerror (Data_encoding.list mining_slot_encoding))
+        ~output: (wrap_tzerror (Data_encoding.list baking_slot_encoding))
         RPC.Path.(custom_root / "helpers" / "rights"
-                  / "mining" / "delegate" /: Context.Key.public_key_hash_arg )
+                  / "baking" / "delegate" /: Context.Key.public_key_hash_arg )
 
-    let mining_delegates custom_root =
+    let baking_delegates custom_root =
       RPC.service
         ~description:
-          "List delegates with mining rights."
+          "List delegates with baking rights."
         ~input: empty
         ~output: (wrap_tzerror @@
                   obj1 (req "delegates"
                           (list Ed25519.Public_key_hash.encoding)))
         RPC.Path.(custom_root / "helpers" / "rights"
-                  / "mining" / "delegate"  )
+                  / "baking" / "delegate"  )
 
     let endorsement_rights custom_root =
       RPC.service

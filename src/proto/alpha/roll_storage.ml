@@ -80,8 +80,8 @@ module Random = struct
 
 end
 
-let mining_rights_owner c level ~priority =
-  Random.owner c "mining" level priority
+let baking_rights_owner c level ~priority =
+  Random.owner c "baking" level priority
 
 let endorsement_rights_owner c level ~slot =
   Random.owner c "endorsement" level slot

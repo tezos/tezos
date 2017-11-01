@@ -10,33 +10,33 @@
 open Client_commands
 open Logging.Client.Mining
 
-let run cctxt ?max_priority ~delay ?min_date delegates ~endorsement ~denunciation ~mining =
+let run cctxt ?max_priority ~delay ?min_date delegates ~endorsement ~denunciation ~baking =
   (* TODO really detach... *)
   let endorsement =
     if endorsement then
-      Client_mining_blocks.monitor
+      Client_baking_blocks.monitor
         cctxt.rpc_config ?min_date ~min_heads:1 () >>=? fun block_stream ->
-      Client_mining_endorsement.create cctxt ~delay delegates block_stream >>= fun () ->
+      Client_baking_endorsement.create cctxt ~delay delegates block_stream >>= fun () ->
       return ()
     else
       return ()
   in
   let denunciation =
     if denunciation then
-      Client_mining_operations.monitor_endorsement
+      Client_baking_operations.monitor_endorsement
         cctxt.rpc_config >>=? fun endorsement_stream ->
-      Client_mining_denunciation.create cctxt endorsement_stream >>= fun () ->
+      Client_baking_denunciation.create cctxt endorsement_stream >>= fun () ->
       return ()
     else
       return ()
   in
   let forge =
-    if mining then begin
-      Client_mining_blocks.monitor
+    if baking then begin
+      Client_baking_blocks.monitor
         cctxt.rpc_config ?min_date ~min_heads:1 () >>=? fun block_stream ->
-      Client_mining_operations.monitor_endorsement
+      Client_baking_operations.monitor_endorsement
         cctxt.rpc_config >>=? fun endorsement_stream ->
-      Client_mining_forge.create cctxt
+      Client_baking_forge.create cctxt
         ?max_priority delegates block_stream endorsement_stream >>=? fun () ->
       return ()
     end else

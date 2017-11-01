@@ -112,11 +112,11 @@ let slot_durations ctxt =
 
 let () = register0 Services.Constants.slot_durations slot_durations
 
-let first_free_mining_slot ctxt =
-  return @@ Constants.first_free_mining_slot ctxt
+let first_free_baking_slot ctxt =
+  return @@ Constants.first_free_baking_slot ctxt
 
 let () =
-  register0 Services.Constants.first_free_mining_slot first_free_mining_slot
+  register0 Services.Constants.first_free_baking_slot first_free_baking_slot
 
 let max_signing_slot ctxt =
   return @@ Constants.max_signing_slot ctxt
@@ -250,7 +250,7 @@ let () =
        | Some (shell, contents) ->
            let operation = { hash ; shell ; contents ; signature } in
            let level = Tezos_context.Level.current ctxt in
-           Mining.mining_priorities ctxt level >>=? fun (Misc.LCons (miner_pkh, _)) ->
+           Mining.baking_priorities ctxt level >>=? fun (Misc.LCons (miner_pkh, _)) ->
            let miner_contract = Contract.default_contract miner_pkh in
            let block_prio = 0 in
            Apply.apply_operation
@@ -327,15 +327,15 @@ let () = register2 Services.Helpers.levels levels
 
 (*-- Helpers.Rights ----------------------------------------------------------*)
 
-let default_max_mining_priority ctxt arg =
-  let default = Constants.first_free_mining_slot ctxt in
+let default_max_baking_priority ctxt arg =
+  let default = Constants.first_free_baking_slot ctxt in
   match arg with
   | None -> 2 * default
   | Some m -> m
 
-let mining_rights ctxt level max =
-  let max = default_max_mining_priority ctxt max in
-  Mining.mining_priorities ctxt level >>=? fun contract_list ->
+let baking_rights ctxt level max =
+  let max = default_max_baking_priority ctxt max in
+  Mining.baking_priorities ctxt level >>=? fun contract_list ->
   let rec loop l n =
     match n with
     | 0 -> return []
@@ -349,10 +349,10 @@ let mining_rights ctxt level max =
   return (level.level, prio)
 
 let () =
-  register1 Services.Helpers.Rights.mining_rights
+  register1 Services.Helpers.Rights.baking_rights
     (fun ctxt max ->
        let level = Level.current ctxt in
-       mining_rights ctxt level max >>=? fun (raw_level, slots) ->
+       baking_rights ctxt level max >>=? fun (raw_level, slots) ->
        begin
          Lwt_list.filter_map_p (fun x -> x) @@
          List.mapi
@@ -366,14 +366,14 @@ let () =
        return (raw_level, timed_slots))
 
 let () =
-  register2 Services.Helpers.Rights.mining_rights_for_level
+  register2 Services.Helpers.Rights.baking_rights_for_level
     (fun ctxt raw_level max ->
        let level = Level.from_raw ctxt raw_level in
-       mining_rights ctxt level max)
+       baking_rights ctxt level max)
 
-let mining_rights_for_delegate
+let baking_rights_for_delegate
     ctxt contract (max_priority, min_level, max_level) =
-  let max_priority = default_max_mining_priority ctxt max_priority in
+  let max_priority = default_max_baking_priority ctxt max_priority in
   let current_level = Level.current ctxt in
   let min_level = match min_level with
     | None -> current_level
@@ -389,7 +389,7 @@ let mining_rights_for_delegate
     then return []
     else
       loop (Level.succ ctxt level) >>=? fun t ->
-      Mining.first_mining_priorities
+      Mining.first_baking_priorities
         ctxt ~max_priority contract level >>=? fun priorities ->
       let raw_level = level.level in
       Error_monad.map_s
@@ -403,8 +403,8 @@ let mining_rights_for_delegate
   loop min_level
 
 let () =
-  register2 Services.Helpers.Rights.mining_rights_for_delegate
-    mining_rights_for_delegate
+  register2 Services.Helpers.Rights.baking_rights_for_delegate
+    baking_rights_for_delegate
 
 let default_max_endorsement_priority ctxt arg =
   let default = Constants.max_signing_slot ctxt in

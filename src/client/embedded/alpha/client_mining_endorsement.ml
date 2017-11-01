@@ -178,14 +178,14 @@ let forge_endorsement cctxt
 
 type state = {
   delegates: public_key_hash list ;
-  mutable best: Client_mining_blocks.block_info ;
+  mutable best: Client_baking_blocks.block_info ;
   mutable to_endorse: endorsement list ;
   delay: int64;
 }
 and endorsement = {
   time: Time.t ;
   delegate: public_key_hash ;
-  block: Client_mining_blocks.block_info ;
+  block: Client_baking_blocks.block_info ;
   slot: int;
 }
 
@@ -217,7 +217,7 @@ let drop_old_endorsement ~before state =
       state.to_endorse
 
 let schedule_endorsements cctxt state bis =
-  let may_endorse (block: Client_mining_blocks.block_info) delegate time =
+  let may_endorse (block: Client_baking_blocks.block_info) delegate time =
     Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
     lwt_log_info "May endorse block %a for %s"
       Block_hash.pp_short block.hash name >>= fun () ->

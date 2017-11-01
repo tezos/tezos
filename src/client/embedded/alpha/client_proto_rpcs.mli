@@ -38,7 +38,7 @@ module Constants : sig
   val slot_durations:
     Client_rpcs.config ->
     block -> (Period.t list) tzresult Lwt.t
-  val first_free_mining_slot:
+  val first_free_baking_slot:
     Client_rpcs.config ->
     block -> int tzresult Lwt.t
   val max_signing_slot:
@@ -181,14 +181,14 @@ module Helpers : sig
     block -> Cycle.t -> (Raw_level.t * Raw_level.t) tzresult Lwt.t
 
   module Rights : sig
-    type mining_slot = Raw_level.t * int * Time.t
+    type baking_slot = Raw_level.t * int * Time.t
     type endorsement_slot = Raw_level.t * int
-    val mining_rights_for_delegate:
+    val baking_rights_for_delegate:
       Client_rpcs.config ->
       block -> public_key_hash ->
       ?max_priority:int -> ?first_level:Raw_level.t ->
       ?last_level:Raw_level.t -> unit ->
-      (mining_slot list) tzresult Lwt.t
+      (baking_slot list) tzresult Lwt.t
     val endorsement_rights_for_delegate:
       Client_rpcs.config ->
       block -> public_key_hash ->
