@@ -7,19 +7,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type point =
+type point = Micheline_parser.point =
   { point : int ;
     byte : int ;
     line : int ;
     column : int }
 
-let point_zero =
-  { point = 0 ;
-    byte = 0 ;
-    line = 0 ;
-    column = 0 }
+let point_zero = Micheline_parser.point_zero
 
-type location =
+type location = Micheline_parser.location =
   { start : point ;
     stop : point }
 
@@ -41,11 +37,9 @@ let location_encoding =
        (req "start" point_encoding)
        (req "stop" point_encoding))
 
-type node =
-  | Int of location * string
-  | String of location * string
-  | Prim of location * string * node list * string option
-  | Seq of location * node list * string option
+type node = (location, string) Micheline.node
+
+open Micheline
 
 let node_location = function
   | Int (loc, _)
@@ -61,16 +55,16 @@ let strip_locations root =
     match l with
     | Int (loc, v) ->
         loc_table := (id, loc) :: !loc_table ;
-        Script.Int (id, v)
+        Int (id, v)
     | String (loc, v) ->
         loc_table := (id, loc) :: !loc_table ;
-        Script.String (id, v)
+        String (id, v)
     | Seq (loc, seq, annot) ->
         loc_table := (id, loc) :: !loc_table ;
-        Script.Seq (id, List.map strip_locations seq, annot)
+        Seq (id, List.map strip_locations seq, annot)
     | Prim (loc, name, seq, annot) ->
         loc_table := (id, loc) :: !loc_table ;
-        Script.Prim (id, name, List.map strip_locations seq, annot) in
+        Prim (id, name, List.map strip_locations seq, annot) in
   let stripped = strip_locations root in
   stripped, List.rev !loc_table
 

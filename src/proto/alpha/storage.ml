@@ -340,19 +340,19 @@ module Contract = struct
   module Code =
     Make_indexed_data_storage(struct
       type key = Contract_repr.t
-      type value = Script_repr.code
+      type value = Script_repr.expr
       let name = "contract code"
       let key = Key.Contract.code
-      let encoding = Script_repr.code_encoding
+      let encoding = Script_repr.expr_encoding
     end)
 
   module Storage =
     Make_indexed_data_storage(struct
       type key = Contract_repr.t
-      type value = Script_repr.storage
+      type value = Script_repr.expr
       let name = "contract storage"
       let key = Key.Contract.storage
-      let encoding = Script_repr.storage_encoding
+      let encoding = Script_repr.expr_encoding
     end)
 
   module Code_fees =

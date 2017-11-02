@@ -20,7 +20,7 @@ let dummy_storage_fee = Tez.fifty_cents
 type error += Quota_exceeded
 type error += Reject of Script.location
 type error += Overflow of Script.location
-type error += Runtime_contract_error : Contract.t * Script.expr * _ ty * _ ty * _ ty -> error
+type error += Runtime_contract_error : Contract.t * Script.expr -> error
 
 let () =
   let open Data_encoding in
@@ -47,18 +47,15 @@ let () =
     ~id:"scriptRuntimeError"
     ~title: "Script runtime error"
     ~description: "Toplevel error for all runtime script errors"
-    (obj5
+    (obj2
        (req "contractHandle" Contract.encoding)
-       (req "contractCode" Script.expr_encoding)
-       (req "contractParameterType" ex_ty_enc)
-       (req "contractReturnType" ex_ty_enc)
-       (req "contractStorageType" ex_ty_enc))
+       (req "contractCode" Script.expr_encoding))
     (function
-      | Runtime_contract_error (contract, expr, arg_ty, ret_ty, storage_ty) ->
-          Some (contract, expr, Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty)
+      | Runtime_contract_error (contract, expr) ->
+          Some (contract, expr)
       | _ -> None)
-    (fun (contract, expr, Ex_ty arg_ty, Ex_ty ret_ty, Ex_ty storage_ty) ->
-       Runtime_contract_error (contract, expr, arg_ty, ret_ty, storage_ty));
+    (fun (contract, expr) ->
+       Runtime_contract_error (contract, expr));
 
 (* ---- interpreter ---------------------------------------------------------*)
 
@@ -71,7 +68,7 @@ let rec unparse_stack
   = function
     | Empty, Empty_t -> []
     | Item (v, rest), Item_t (ty, rest_ty) ->
-        unparse_data ty v :: unparse_stack (rest, rest_ty)
+        Micheline.strip_locations (unparse_data ty v) :: unparse_stack (rest, rest_ty)
 
 let rec interp
   : type p r.
@@ -237,21 +234,21 @@ let rec interp
               Lwt.return Tez.(x -? y) >>=? fun res ->
               logged_return (Item (res, rest), qta - 1, ctxt)
           | Mul_teznat, Item (x, Item (y, rest)) ->
-             begin
-               match Script_int.to_int64 y with
-               | None -> fail (Overflow loc)
-               | Some y ->
-                  Lwt.return Tez.(x *? y) >>=? fun res ->
-                  logged_return (Item (res, rest), qta - 1, ctxt)
-             end
+              begin
+                match Script_int.to_int64 y with
+                | None -> fail (Overflow loc)
+                | Some y ->
+                    Lwt.return Tez.(x *? y) >>=? fun res ->
+                    logged_return (Item (res, rest), qta - 1, ctxt)
+              end
           | Mul_nattez, Item (y, Item (x, rest)) ->
-             begin
-               match Script_int.to_int64 y with
-               | None -> fail (Overflow loc)
-               | Some y ->
-                  Lwt.return Tez.(x *? y) >>=? fun res ->
-                  logged_return (Item (res, rest), qta - 1, ctxt)
-             end
+              begin
+                match Script_int.to_int64 y with
+                | None -> fail (Overflow loc)
+                | Some y ->
+                    Lwt.return Tez.(x *? y) >>=? fun res ->
+                    logged_return (Item (res, rest), qta - 1, ctxt)
+              end
           (* boolean operations *)
           | Or, Item (x, Item (y, rest)) ->
               logged_return (Item (x || y, rest), qta - 1, ctxt)
@@ -287,53 +284,53 @@ let rec interp
           | Mul_natint, Item (x, Item (y, rest)) ->
               logged_return (Item (Script_int.mul x y, rest), qta - 1, ctxt)
           | Mul_natnat, Item (x, Item (y, rest)) ->
-             logged_return (Item (Script_int.mul_n x y, rest), qta - 1, ctxt)
+              logged_return (Item (Script_int.mul_n x y, rest), qta - 1, ctxt)
 
           | Ediv_teznat, Item (x, Item (y, rest)) ->
-             let x = Script_int.of_int64 (Tez.to_cents x) in
-             let result =
-               match Script_int.ediv x y with
-               | None -> None
-               | Some (q, r) ->
-                  match Script_int.to_int64 q,
-                        Script_int.to_int64 r with
-                  | Some q, Some r ->
-                     begin
-                       match Tez.of_cents q, Tez.of_cents r with
-                       | Some q, Some r -> Some (q,r)
-                       (* Cannot overflow *)
-                       | _ -> assert false
-                     end
-                  (* Cannot overflow *)
-                  | _ -> assert false
+              let x = Script_int.of_int64 (Tez.to_cents x) in
+              let result =
+                match Script_int.ediv x y with
+                | None -> None
+                | Some (q, r) ->
+                    match Script_int.to_int64 q,
+                          Script_int.to_int64 r with
+                    | Some q, Some r ->
+                        begin
+                          match Tez.of_cents q, Tez.of_cents r with
+                          | Some q, Some r -> Some (q,r)
+                          (* Cannot overflow *)
+                          | _ -> assert false
+                        end
+                    (* Cannot overflow *)
+                    | _ -> assert false
               in
               logged_return (Item (result, rest), qta -1, ctxt)
 
           | Ediv_tez, Item (x, Item (y, rest)) ->
-             let x = Script_int.abs (Script_int.of_int64 (Tez.to_cents x)) in
-             let y = Script_int.abs (Script_int.of_int64 (Tez.to_cents y)) in
-             begin match Script_int.ediv_n x y with
-               | None ->
-                   logged_return (Item (None, rest), qta -1, ctxt)
-               | Some (q, r) ->
-                   let r =
-                     match Script_int.to_int64 r with
-                     | None -> assert false (* Cannot overflow *)
-                     | Some r ->
-                         match Tez.of_cents r with
-                         | None -> assert false (* Cannot overflow *)
-                         | Some r -> r in
-                   logged_return (Item (Some (q, r), rest), qta -1, ctxt)
-             end
+              let x = Script_int.abs (Script_int.of_int64 (Tez.to_cents x)) in
+              let y = Script_int.abs (Script_int.of_int64 (Tez.to_cents y)) in
+              begin match Script_int.ediv_n x y with
+                | None ->
+                    logged_return (Item (None, rest), qta -1, ctxt)
+                | Some (q, r) ->
+                    let r =
+                      match Script_int.to_int64 r with
+                      | None -> assert false (* Cannot overflow *)
+                      | Some r ->
+                          match Tez.of_cents r with
+                          | None -> assert false (* Cannot overflow *)
+                          | Some r -> r in
+                    logged_return (Item (Some (q, r), rest), qta -1, ctxt)
+              end
 
           | Ediv_intint, Item (x, Item (y, rest)) ->
-               logged_return (Item (Script_int.ediv x y, rest), qta -1, ctxt)
+              logged_return (Item (Script_int.ediv x y, rest), qta -1, ctxt)
           | Ediv_intnat, Item (x, Item (y, rest)) ->
-               logged_return (Item (Script_int.ediv x y, rest), qta -1, ctxt)
+              logged_return (Item (Script_int.ediv x y, rest), qta -1, ctxt)
           | Ediv_natint, Item (x, Item (y, rest)) ->
-               logged_return (Item (Script_int.ediv x y, rest), qta -1, ctxt)
+              logged_return (Item (Script_int.ediv x y, rest), qta -1, ctxt)
           | Ediv_natnat, Item (x, Item (y, rest)) ->
-               logged_return (Item (Script_int.ediv_n x y, rest), qta -1, ctxt)
+              logged_return (Item (Script_int.ediv_n x y, rest), qta -1, ctxt)
           | Lsl_nat, Item (x, Item (y, rest)) ->
               begin match Script_int.shift_left_n x y with
                 | None -> fail (Overflow loc)
@@ -442,7 +439,7 @@ let rec interp
               Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
               Contract.credit ctxt destination amount >>=? fun ctxt ->
               Contract.get_script ctxt destination >>=? fun destination_script ->
-              let sto = unparse_data storage_type sto in
+              let sto = Micheline.strip_locations (unparse_data storage_type sto) in
               Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto >>=? fun ctxt ->
               begin match destination_script with
                 | None ->
@@ -450,9 +447,9 @@ let rec interp
                     Lwt.return (ty_eq tp Unit_t |>
                                 record_trace (Invalid_contract (loc, destination))) >>=? fun (Eq _) ->
                     return (ctxt, qta, origination)
-                | Some { code ; storage } ->
+                | Some script ->
                     let p = unparse_data tp p in
-                    execute origination source destination ctxt storage code amount p qta
+                    execute origination source destination ctxt script amount p qta
                     >>=? fun (csto, ret, qta, ctxt, origination) ->
                     Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee csto >>=? fun ctxt ->
                     trace
@@ -462,8 +459,8 @@ let rec interp
               end >>=? fun (ctxt, qta, origination) ->
               Contract.get_script ctxt source >>=? (function
                   | None -> assert false
-                  | Some { storage = { storage } } ->
-                      parse_data ctxt storage_type storage >>=? fun sto ->
+                  | Some { storage } ->
+                      parse_data ctxt storage_type (Micheline.root storage) >>=? fun sto ->
                       logged_return ~origination (Item ((), Item (sto, Empty)), qta - 1, ctxt))
             end
           | Transfer_tokens storage_type,
@@ -472,11 +469,11 @@ let rec interp
               Contract.credit ctxt destination amount >>=? fun ctxt ->
               Contract.get_script ctxt destination >>=? function
               | None -> fail (Invalid_contract (loc, destination))
-              | Some { code ; storage } ->
-                  let sto = unparse_data storage_type sto in
+              | Some script ->
+                  let sto = Micheline.strip_locations (unparse_data storage_type sto) in
                   Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto >>=? fun ctxt ->
                   let p = unparse_data tp p in
-                  execute origination source destination ctxt storage code amount p qta
+                  execute origination source destination ctxt script amount p qta
                   >>=? fun (sto, ret, qta, ctxt, origination) ->
                   Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee sto >>=? fun ctxt ->
                   trace
@@ -484,8 +481,8 @@ let rec interp
                     (parse_data ctxt tr ret) >>=? fun v ->
                   Contract.get_script ctxt source >>=? (function
                       | None -> assert false
-                      | Some { storage = { storage } } ->
-                          parse_data ctxt storage_type storage >>=? fun sto ->
+                      | Some { storage } ->
+                          parse_data ctxt storage_type (Micheline.root storage) >>=? fun sto ->
                           logged_return ~origination (Item (v, Item (sto, Empty)), qta - 1, ctxt))
             end
           | Create_account,
@@ -501,11 +498,20 @@ let rec interp
               let contract = Contract.default_contract key in
               logged_return (Item ((Unit_t, Unit_t, contract), rest), qta - 1, ctxt)
           | Create_contract (g, p, r),
-            Item (manager, Item (delegate, Item (spendable, Item (delegatable, Item (credit,
-                                                                    Item (Lam (_, code), Item (init, rest))))))) ->
-              let code, storage =
-                { code; arg_type = unparse_ty p; ret_type = unparse_ty r; storage_type =  unparse_ty g },
-                { storage = unparse_data g init; storage_type =  unparse_ty g } in
+            Item (manager, Item
+                    (delegate, Item
+                       (spendable, Item
+                          (delegatable, Item
+                             (credit, Item
+                                (Lam (_, code), Item
+                                   (init, rest))))))) ->
+              let code =
+                Micheline.strip_locations
+                  (Seq (0, [ Prim (0, K_parameter, [ unparse_ty p ], None) ;
+                             Prim (0, K_return, [ unparse_ty r ], None) ;
+                             Prim (0, K_storage, [ unparse_ty g ], None) ;
+                             Prim (0, K_code, [ Micheline.root code ], None) ], None)) in
+              let storage = Micheline.strip_locations (unparse_data g init) in
               Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
               Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
               Contract.originate ctxt
@@ -528,7 +534,7 @@ let rec interp
           | Hash_key, Item (key, rest) ->
               logged_return (Item (Ed25519.Public_key.hash key, rest), qta -1, ctxt)
           | H ty, Item (v, rest) ->
-              let hash = Script.hash_expr (unparse_data ty v) in
+              let hash = Script.hash_expr (Micheline.strip_locations (unparse_data ty v)) in
               logged_return (Item (hash, rest), qta - 1, ctxt)
           | Steps_to_quota, rest ->
               let steps = Script_int.abs (Script_int.of_int qta) in
@@ -549,23 +555,25 @@ let rec interp
 
 (* ---- contract handling ---------------------------------------------------*)
 
-and execute ?log origination orig source ctxt storage script amount arg qta =
-  parse_script ctxt storage script
+and execute ?log origination orig source ctxt script amount arg qta =
+  parse_script ctxt script
   >>=? fun (Ex_script { code; arg_type; ret_type; storage; storage_type }) ->
   parse_data ctxt arg_type arg >>=? fun arg ->
   trace
-    (Runtime_contract_error (source, script.code, arg_type, ret_type, storage_type))
+    (Runtime_contract_error (source, script.code))
     (interp ?log origination qta orig source amount ctxt code (arg, storage))
-  >>=? fun (ret, qta, ctxt, origination) ->
-  let ret, storage = ret in
-  return (unparse_data storage_type storage,
+  >>=? fun ((ret, storage), qta, ctxt, origination) ->
+  return (Micheline.strip_locations (unparse_data storage_type storage),
           unparse_data ret_type ret,
           qta, ctxt, origination)
 
-let trace origination orig source ctxt storage script amount arg qta =
+let trace origination orig source ctxt script amount arg qta =
   let log = ref [] in
-  execute ~log origination orig source ctxt storage script amount arg qta >>=? fun res ->
-  return (res, List.rev !log)
+  execute ~log origination orig source ctxt script amount (Micheline.root arg) qta
+  >>=? fun (sto, res, qta, ctxt, origination) ->
+  return ((sto, Micheline.strip_locations res, qta, ctxt, origination), List.rev !log)
 
-let execute orig source ctxt storage script amount arg qta =
-  execute orig source ctxt storage script amount arg qta
+let execute origination orig source ctxt script amount arg qta =
+  execute origination orig source ctxt script amount (Micheline.root arg) qta
+  >>=? fun (sto, res, qta, ctxt, origination) ->
+  return (sto, Micheline.strip_locations res, qta, ctxt, origination)

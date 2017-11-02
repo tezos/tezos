@@ -45,8 +45,10 @@ module Script_timestamp = struct
     |> Timestamp.to_seconds
     |> of_int64
 end
-module Script = Script_repr
-
+module Script = struct
+  include Michelson_v1_primitives
+  include Script_repr
+end
 type public_key = Ed25519.Public_key.t
 type public_key_hash = Ed25519.Public_key_hash.t
 type secret_key = Ed25519.Secret_key.t

@@ -19,23 +19,25 @@ type ex_script = Ex_script : ('a, 'b, 'c) Script_typed_ir.script -> ex_script
 (* ---- Error definitions ---------------------------------------------------*)
 
 (* Auxiliary types for error documentation *)
-type namespace = Type_namespace | Constant_namespace | Instr_namespace
-type kind =  Int_kind | String_kind | Prim_kind | Seq_kind
+type namespace =
+    Type_namespace | Constant_namespace | Instr_namespace | Keyword_namespace
+type kind =
+    Int_kind | String_kind | Prim_kind | Seq_kind
 type type_map = (int * (Script.expr list * Script.expr list)) list
 
 (* Structure errors *)
-type error += Invalid_arity of Script.location * string * int * int
-type error += Invalid_namespace of Script.location * string * namespace * namespace
-type error += Invalid_primitive of Script.location * string list * string
-type error += Invalid_case of Script.location * string
+type error += Invalid_arity of Script.location * Script.prim * int * int
+type error += Invalid_namespace of Script.location * Script.prim * namespace * namespace
+type error += Invalid_primitive of Script.location * Script.prim list * Script.prim
 type error += Invalid_kind of Script.location * kind list * kind
+type error += Missing_field of Script.prim
 
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
-type error += Undefined_binop : Script.location * string * _ Script_typed_ir.ty * _ Script_typed_ir.ty -> error
-type error += Undefined_unop : Script.location * string * _ Script_typed_ir.ty -> error
+type error += Undefined_binop : Script.location * Script.prim * _ Script_typed_ir.ty * _ Script_typed_ir.ty -> error
+type error += Undefined_unop : Script.location * Script.prim * _ Script_typed_ir.ty -> error
 type error += Bad_return : Script.location * _ Script_typed_ir.stack_ty * _ Script_typed_ir.ty -> error
-type error += Bad_stack : Script.location * string * int * _ Script_typed_ir.stack_ty -> error
+type error += Bad_stack : Script.location * Script.prim * int * _ Script_typed_ir.stack_ty -> error
 type error += Unmatched_branches : Script.location * _ Script_typed_ir.stack_ty * _ Script_typed_ir.stack_ty -> error
 type error += Transfer_in_lambda of Script.location
 type error += Transfer_in_dip of Script.location
@@ -54,8 +56,8 @@ type error += Duplicate_set_values of Script.location * Script.expr
 
 (* Toplevel errors *)
 type error += Ill_typed_data : string option * Script.expr * _ Script_typed_ir.ty -> error
-type error += Ill_formed_type of string option * Script.expr
-type error += Ill_typed_contract : Script.expr * _ Script_typed_ir.ty * _ Script_typed_ir.ty * _ Script_typed_ir.ty * type_map -> error
+type error += Ill_formed_type of string option * Script.expr * Script.location
+type error += Ill_typed_contract : Script.expr * type_map -> error
 
 (* ---- Sets and Maps -------------------------------------------------------*)
 
@@ -83,26 +85,29 @@ val ty_eq :
   ('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq tzresult
 
 val parse_data :
-  ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
-  context -> 'a Script_typed_ir.ty -> Script.expr -> 'a tzresult Lwt.t
+  ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
+  context -> 'a Script_typed_ir.ty -> Script.node -> 'a tzresult Lwt.t
 val unparse_data :
-  'a Script_typed_ir.ty -> 'a -> Script.expr
+  'a Script_typed_ir.ty -> 'a -> Script.node
 
 val parse_ty :
-  Script.expr -> ex_ty tzresult
+  Script.node -> ex_ty tzresult
 val unparse_ty :
-  'a Script_typed_ir.ty -> Script.expr
+  'a Script_typed_ir.ty -> Script.node
 
 val type_map_enc : type_map Data_encoding.encoding
 val ex_ty_enc : ex_ty Data_encoding.encoding
 
+val parse_toplevel
+  : Script.expr -> (Script.node * Script.node * Script.node * Script.node) tzresult
+
 val typecheck_code :
-  context -> Script.code -> type_map tzresult Lwt.t
+  context -> Script.expr -> type_map tzresult Lwt.t
 
 val typecheck_data :
-  ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
+  ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
   context -> Script.expr * Script.expr -> unit tzresult Lwt.t
 
 val parse_script :
-  ?type_logger: (int * (Script.expr list * Script.expr list) -> unit) ->
-  context -> Script.storage -> Script.code -> ex_script tzresult Lwt.t
+  ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
+  context -> Script.t -> ex_script tzresult Lwt.t

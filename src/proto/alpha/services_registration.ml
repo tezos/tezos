@@ -265,8 +265,6 @@ let () =
       | None ->
           Contract.default_contract
             (List.hd (Bootstrap.accounts ctxt)).Bootstrap.public_key_hash in
-    let storage : Script.storage =
-      { storage ; storage_type = (script : Script.code).storage_type } in
     let qta =
       Constants.instructions_per_transaction ctxt in
     let origination_nonce =
@@ -278,24 +276,24 @@ let () =
     (script, storage, input, amount, contract, qta, origination_nonce) in
   register1 Services.Helpers.run_code
     (fun ctxt parameters ->
-       let (script, storage, input, amount, contract, qta, origination_nonce) =
+       let (code, storage, input, amount, contract, qta, origination_nonce) =
          run_parameters ctxt parameters in
        Script_interpreter.execute
          origination_nonce
          contract (* transaction initiator *)
          contract (* script owner *)
-         ctxt storage script amount input
+         ctxt { storage ; code } amount input
          qta >>=? fun (sto, ret, _qta, _ctxt, _) ->
        Error_monad.return (sto, ret)) ;
   register1 Services.Helpers.trace_code
     (fun ctxt parameters ->
-       let (script, storage, input, amount, contract, qta, origination_nonce) =
+       let (code, storage, input, amount, contract, qta, origination_nonce) =
          run_parameters ctxt parameters in
        Script_interpreter.trace
          origination_nonce
          contract (* transaction initiator *)
          contract (* script owner *)
-         ctxt storage script amount input
+         ctxt { storage ; code } amount input
          qta >>=? fun ((sto, ret, _qta, _ctxt, _), trace) ->
        Error_monad.return (sto, ret, trace))
 

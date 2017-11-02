@@ -46,8 +46,8 @@ let transfer rpc_config
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
   begin match arg with
     | Some arg ->
-        Client_proto_programs.parse_data arg >>=? fun arg ->
-        return (Some arg.ast)
+        Lwt.return (Michelson_v1_parser.parse_expression arg) >>=? fun { expanded = arg } ->
+        return (Some arg)
     | None -> return None
   end >>=? fun parameters ->
   Client_proto_rpcs.Context.Contract.counter
@@ -105,9 +105,8 @@ let originate_account rpc_config
 let originate_contract rpc_config
     block ?force ?branch
     ~source ~src_pk ~src_sk ~manager_pkh ~balance ?delegatable ?delegatePubKey
-    ~(code:Script.code) ~init ~fee ~spendable () =
-  Client_proto_programs.parse_data init >>=? fun storage ->
-  let storage = Script.{ storage=storage.ast ; storage_type = code.storage_type } in
+    ~code ~init ~fee ~spendable () =
+  Lwt.return (Michelson_v1_parser.parse_expression init) >>=? fun { expanded = storage } ->
   Client_proto_rpcs.Context.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
@@ -279,7 +278,7 @@ let commands () =
         | None ->
             cctxt.error "This is not a smart contract."
         | Some storage ->
-            cctxt.answer "%a" Client_proto_programs.print_storage storage >>= fun () ->
+            cctxt.answer "%a" Michelson_v1_printer.print_expr_unwrapped storage >>= fun () ->
             return ()
       end ;
 
@@ -384,7 +383,7 @@ let commands () =
                              combine with -init if the storage type is not unit"
        @@ stop)
       begin fun (fee, delegate, force, delegatable, spendable, init)
-        neu (_, manager) balance (_, source) { ast = code } cctxt ->
+        neu (_, manager) balance (_, source) { expanded = code } cctxt ->
         check_contract cctxt neu >>=? fun () ->
         get_delegate_pkh cctxt delegate >>=? fun delegate ->
         get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
@@ -395,7 +394,11 @@ let commands () =
           ~spendable:spendable
           () >>=function
         | Error errs ->
-            Client_proto_programs.report_errors cctxt errs >>= fun () ->
+            cctxt.warning "%a"
+              (Michelson_v1_error_reporter.report_errors
+                 ~details: true
+                 ~show_source: true
+                 ?parsed:None) errs >>= fun () ->
             cctxt.error "origination simulation failed"
         | Ok (oph, contract) ->
             message_injection cctxt
@@ -443,7 +446,11 @@ let commands () =
           ~source ~src_pk ~src_sk ~destination
           ~arg ~amount ~fee () >>= function
         | Error errs ->
-            Client_proto_programs.report_errors cctxt errs >>= fun () ->
+            cctxt.warning "%a"
+              (Michelson_v1_error_reporter.report_errors
+                 ~details: false
+                 ~show_source: true
+                 ?parsed:None) errs >>= fun () ->
             cctxt.error "transfer simulation failed"
         | Ok (oph, contracts) ->
             message_injection cctxt ~force:force ~contracts oph >>= fun () ->

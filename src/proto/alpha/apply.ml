@@ -91,15 +91,19 @@ let apply_manager_operation_content
       Contract.get_script ctxt destination >>=? function
       | None -> begin
           match parameters with
-          | None | Some (Prim (_, "Unit", [], _)) ->
+          | None ->
               return (ctxt, origination_nonce, None)
-          | Some _ -> fail (Bad_contract_parameter (destination, None, parameters))
+          | Some arg ->
+              match Micheline.root arg with
+              | Prim (_, D_Unit, [], _) ->
+                  return (ctxt, origination_nonce, None)
+              | _ -> fail (Bad_contract_parameter (destination, None, parameters))
         end
-      | Some { code ; storage } ->
+      | Some script ->
           let call_contract argument =
             Script_interpreter.execute
               origination_nonce
-              source destination ctxt storage code amount argument
+              source destination ctxt script amount argument
               (Constants.instructions_per_transaction ctxt)
             >>= function
             | Ok (storage_res, _res, _steps, ctxt, origination_nonce) ->
@@ -111,23 +115,26 @@ let apply_manager_operation_content
                 return (ctxt, origination_nonce, None)
             | Error err ->
                 return (ctxt, origination_nonce, Some err) in
-          match parameters, code.arg_type with
-          | None, Prim (_, "unit", _, _) -> call_contract (Prim (0, "Unit", [], None))
-          | Some parameters, arg_type -> begin
+          Lwt.return (Script_ir_translator.parse_toplevel script.code) >>=? fun (arg_type, _, _, _) ->
+          let arg_type = Micheline.strip_locations arg_type in
+          match parameters, Micheline.root arg_type with
+          | None, Prim (_, T_unit, _, _) ->
+              call_contract (Micheline.strip_locations (Prim (0, Script.D_Unit, [], None)))
+          | Some parameters, _ -> begin
               Script_ir_translator.typecheck_data ctxt (parameters, arg_type) >>= function
               | Ok () -> call_contract parameters
               | Error errs ->
                   let err = Bad_contract_parameter (destination, Some arg_type, Some parameters) in
                   return (ctxt, origination_nonce, Some ((err :: errs)))
             end
-          | None, arg_type -> fail (Bad_contract_parameter (destination, Some arg_type, None))
+          | None, _ -> fail (Bad_contract_parameter (destination, Some arg_type, None))
     end
   | Origination { manager ; delegate ; script ;
                   spendable ; delegatable ; credit } ->
       begin match script with
         | None -> return None
-        | Some ({ Script.storage ; code } as script) ->
-            Script_ir_translator.parse_script ctxt storage code >>=? fun _ ->
+        | Some script ->
+            Script_ir_translator.parse_script ctxt script >>=? fun _ ->
             return (Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)))
       end >>=? fun script ->
       Contract.spend ctxt source Constants.origination_burn >>=? fun ctxt ->
