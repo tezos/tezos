@@ -57,7 +57,7 @@ val originate_contract:
   balance:Tez.t ->
   ?delegatable:bool ->
   ?delegatePubKey:public_key_hash ->
-  code:Script.code ->
+  code:Script.expr ->
   init:string ->
   fee:Tez.t ->
   spendable:bool ->

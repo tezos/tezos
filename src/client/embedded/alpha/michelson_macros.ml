@@ -7,7 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Script_located_ir
+open Micheline
+
+type 'l node = ('l, string) Micheline.node
 
 let expand_caddadr original =
   match original with
@@ -426,8 +428,6 @@ let expand original =
       expand_asserts ;
       expand_if_some ;
       expand_if_right ]
-
-open Script
 
 let unexpand_caddadr expanded =
   let rec rsteps acc = function

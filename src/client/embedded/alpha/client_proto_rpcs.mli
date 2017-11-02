@@ -137,7 +137,7 @@ module Context : sig
       block -> Contract.t -> Script.t option tzresult Lwt.t
     val storage:
       Client_rpcs.config ->
-      block -> Contract.t -> Script.storage option tzresult Lwt.t
+      block -> Contract.t -> Script.expr option tzresult Lwt.t
   end
 end
 
@@ -155,18 +155,18 @@ module Helpers : sig
     (Contract.t list) tzresult Lwt.t
   val run_code:
     Client_rpcs.config ->
-    block -> Script.code ->
+    block -> Script.expr ->
     (Script.expr * Script.expr * Tez.t) ->
     (Script.expr * Script.expr) tzresult Lwt.t
   val trace_code:
     Client_rpcs.config ->
-    block -> Script.code ->
+    block -> Script.expr ->
     (Script.expr * Script.expr * Tez.t) ->
     (Script.expr * Script.expr *
      (Script.location * int * Script.expr list) list) tzresult Lwt.t
   val typecheck_code:
     Client_rpcs.config ->
-    block -> Script.code -> Script_ir_translator.type_map tzresult Lwt.t
+    block -> Script.expr -> Script_ir_translator.type_map tzresult Lwt.t
   val typecheck_data:
     Client_rpcs.config ->
     block -> Script.expr * Script.expr -> unit tzresult Lwt.t

@@ -17,6 +17,7 @@
         "Seed_repr",
         "Script_int_repr",
         "Script_timestamp_repr",
+        "Michelson_v1_primitives",
         "Script_repr",
         "Contract_repr",
         "Roll_repr",

@@ -309,18 +309,16 @@ let contract_fee c contract =
       Lwt.return Tez_repr.(Constants_repr.minimal_contract_balance +? script_fees)
 
 let update_script_storage_and_fees c contract storage_fees storage =
-  let open Script_repr in
   Storage.Contract.Balance.get_option c contract >>=? function
   | None ->
       (* The contract was destroyed *)
       return c
   | Some balance ->
-      Storage.Contract.Storage.get c contract >>=? fun { storage_type } ->
       Storage.Contract.Storage_fees.set c contract storage_fees >>=? fun c ->
       contract_fee c contract >>=? fun fee ->
       fail_unless Tez_repr.(balance > fee)
         (Cannot_pay_storage_fee (contract, balance, fee)) >>=? fun () ->
-      Storage.Contract.Storage.set c contract { storage; storage_type }
+      Storage.Contract.Storage.set c contract storage
 
 let spend_from_script c contract amount =
   Storage.Contract.Balance.get c contract >>=? fun balance ->

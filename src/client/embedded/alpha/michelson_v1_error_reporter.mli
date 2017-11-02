@@ -7,6 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Program : Client_aliases.Alias with type t = Michelson_v1_parser.parsed
-
-val commands: unit -> Client_commands.command list
+val report_errors :
+  details: bool ->
+  show_source: bool ->
+  ?parsed: Michelson_v1_parser.parsed ->
+  Format.formatter ->
+  Error_monad.error list ->
+  unit

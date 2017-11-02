@@ -305,7 +305,7 @@ module Context = struct
       RPC.service
         ~description: "Access the data of the contract."
         ~input: empty
-        ~output: (wrap_tzerror (option Script.storage_encoding))
+        ~output: (wrap_tzerror (option Script.expr_encoding))
         RPC.Path.(custom_root / "context" / "contracts" /: Contract.arg / "storage")
 
     type info = {
@@ -365,7 +365,7 @@ module Helpers = struct
 
   let run_code_input_encoding =
     (obj6
-       (req "script" Script.code_encoding)
+       (req "script" Script.expr_encoding)
        (req "storage" Script.expr_encoding)
        (req "input" Script.expr_encoding)
        (req "amount" Tez.encoding)
@@ -414,7 +414,7 @@ module Helpers = struct
   let typecheck_code custom_root =
     RPC.service
       ~description: "Typecheck a piece of code in the current context"
-      ~input: Script.code_encoding
+      ~input: Script.expr_encoding
       ~output: (wrap_tzerror Script_ir_translator.type_map_enc)
       RPC.Path.(custom_root / "helpers" / "typecheck_code")
 
