@@ -1041,6 +1041,10 @@ and parse_instr
     Script.node -> bef stack_ty -> bef judgement tzresult Lwt.t =
   fun tc_context ctxt ?type_logger script_instr stack_ty ->
     let return : bef judgement -> bef judgement tzresult Lwt.t = return in
+    let keep_or_rewrite_annot value_annot instr_annot =
+      match value_annot, instr_annot with
+      | annot, None -> annot
+      | _, annot -> annot in
     let check_item check loc name n m =
       trace (Bad_stack (loc, name, m, stack_ty)) @@
       trace (Bad_stack_item n) @@
@@ -1062,10 +1066,12 @@ and parse_instr
         return (typed loc (Drop, rest))
     | Prim (loc, I_DUP, [], instr_annot),
       Item_t (v, rest, stack_annot) ->
-        return (typed loc (Dup, Item_t (v, Item_t (v, rest, stack_annot), instr_annot)))
+        let annot = keep_or_rewrite_annot stack_annot instr_annot in
+        return (typed loc (Dup, Item_t (v, Item_t (v, rest, stack_annot), annot)))
     | Prim (loc, I_SWAP, [], instr_annot),
-      Item_t (v,  Item_t (w, rest, _), cur_top_annot) ->
-        return (typed loc (Swap, Item_t (w, Item_t (v, rest, cur_top_annot), instr_annot)))
+      Item_t (v,  Item_t (w, rest, stack_annot), cur_top_annot) ->
+        let annot = keep_or_rewrite_annot stack_annot instr_annot in
+        return (typed loc (Swap, Item_t (w, Item_t (v, rest, cur_top_annot), annot)))
     | Prim (loc, I_PUSH, [ t ; d ], instr_annot),
       stack ->
         (Lwt.return (parse_ty t)) >>=? fun (Ex_ty t, _) ->
@@ -1096,11 +1102,13 @@ and parse_instr
       Item_t (a, Item_t (b, rest, snd_annot), fst_annot) ->
         return (typed loc (Cons_pair, Item_t (Pair_t((a, fst_annot), (b, snd_annot)), rest, instr_annot)))
     | Prim (loc, I_CAR, [], instr_annot),
-      Item_t (Pair_t ((a, _), _), rest, _) ->
-        return (typed loc (Car, Item_t (a, rest, instr_annot)))
+      Item_t (Pair_t ((a, value_annot), _), rest, _) ->
+        let annot = keep_or_rewrite_annot value_annot instr_annot in
+        return (typed loc (Car, Item_t (a, rest, annot)))
     | Prim (loc, I_CDR, [], instr_annot),
-      Item_t (Pair_t (_, (b, _)), rest, _) ->
-        return (typed loc (Cdr, Item_t (b, rest, instr_annot)))
+      Item_t (Pair_t (_, (b, value_annot)), rest, _) ->
+        let annot = keep_or_rewrite_annot value_annot instr_annot in
+        return (typed loc (Cdr, Item_t (b, rest, annot)))
     (* unions *)
     | Prim (loc, I_LEFT, [ tr ], instr_annot),
       Item_t (tl, rest, stack_annot) ->
@@ -1488,7 +1496,7 @@ and parse_instr
     | Prim (loc, I_EDIV, [], instr_annot),
       Item_t (Tez_t, Item_t (Tez_t, rest, _), _) ->
         return (typed loc (Ediv_tez,
-               Item_t (Option_t (Pair_t ((Nat_t, None), (Tez_t, None))), rest, instr_annot)))
+                           Item_t (Option_t (Pair_t ((Nat_t, None), (Tez_t, None))), rest, instr_annot)))
     | Prim (loc, I_EDIV, [], instr_annot),
       Item_t (Int_t, Item_t (Int_t, rest, _), _) ->
         return
