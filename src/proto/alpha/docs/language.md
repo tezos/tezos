@@ -41,10 +41,12 @@ Table of contents
   * V - Operations
   * VI - Domain specific data types
   * VII - Domain specific operations
-  * VIII - Concrete syntax
-  * IX - Examples
-  * X - Full grammar
-  * XI - Reference implementation
+  * VIII - Macros
+  * IX - Concrete syntax
+  * X - JSON syntax
+  * XI - Examples
+  * XII - Full grammar
+  * XIII - Reference implementation
 
 I - Semantics
 -------------
@@ -157,7 +159,7 @@ constructors is fixed by this specification. Michelson does not let
 the programmer introduce its own types.
 
 Be aware that the syntax used in the specification may differ a bit
-from the concrete syntax, which is presented in Section VIII. In
+from the concrete syntax, which is presented in Section IX. In
 particular, some instructions are annotated with types that are not
 present in the concrete language because they are synthesized by the
 typechecker.
@@ -304,19 +306,28 @@ symbolic stack is consistent with the expected result, also provided
 by the programmer.
 
 ### Annotations
-All instructions in the language can optionally take an annotation.
-Annotations allow you to specify additional information about data
-or pair and union types.
 
-At join points in the program
-(`IF`, `IF_LEFT`, `IF_CONS`, `IF_NONE`, `LOOP`), annotations must be compatible.
-Annotations are compatible if both elements are annotated with the same annotation
-or if at least one of the values/types is unannotated.
+Most Instructions in the language can optionally take an annotation.
+Annotations allow you to better track data, on the stack and within
+pairs and unions.
 
-An instruction that carries an annotation places an annotation on the top item in the stack.
-Stack visualization tools like the Michelson's Emacs mode print annotations
-as associated with each type.
-This is useful as a debugging aid.
+If added on the components of a type, the annotation will be
+propagated by the typechecker througout access instructions.
+
+Annotating an instruction that produces a value on the stack will
+rewrite the annotation an the toplevel of its type.
+
+Trying to annotate an instruction that does not produce a value will
+result in a typechecking error.
+
+At join points in the program (`IF`, `IF_LEFT`, `IF_CONS`, `IF_NONE`,
+`LOOP`), annotations must be compatible.  Annotations are compatible
+if both elements are annotated with the same annotation or if at least
+one of the values/types is unannotated.
+
+Stack visualization tools like the Michelson's Emacs mode print
+annotations associated with each type in the program, as propagated by
+the typechecker. This is useful as a debugging aid.
 
 ### Side note
 
@@ -419,6 +430,15 @@ IV - Core instructions
 
         > LOOP body / True : S    =>    body ; LOOP body / S
         > LOOP body / False : S   =>    S
+
+   * `LOOP_LEFT body`:
+     A loop with an accumulator
+
+        :: (or 'a 'b) : 'A   ->   'A
+           iff   body :: [ 'a : 'A -> (or 'a 'b) : 'A ]
+
+        > LOOP body / (Left a)  : S    =>    body ; LOOP body / (or 'a 'b) : S
+        > LOOP body / (Right b) : S   =>    b : S
 
    * `DIP code`:
      Runs code protecting the top of the stack.
@@ -748,11 +768,25 @@ constants as is, concatenate them and use them as keys.
 
         :: lambda 'elt 'b : set 'elt : 'S   ->   set 'b : 'S
 
+   * `MAP body`:
+     Apply the body expression to each element of the set.
+     The body sequence has access to the stack.
+
+        :: (set 'elt) : 'A   ->  (set 'b) : 'A
+           iff   body :: [ 'elt : 'A -> 'b : 'A ]
+
    * `REDUCE`:
      Apply a function on a set passing the result of each
      application to the next one and return the last.
 
         :: lambda (pair 'elt * 'b) 'b : set 'elt : 'b : 'S   ->   'b : 'S
+
+   * `ITER body`:
+     Apply the body expression to each element of a set.
+     The body sequence has access to the stack.
+
+        :: (set 'elt) : 'A   ->  'A
+           iff   body :: [ 'elt : 'A -> 'A ]
 
    * `SIZE`:
      Get the cardinality of the set.
@@ -791,11 +825,25 @@ constants as is, concatenate them and use them as keys.
 
         :: lambda (pair 'key 'val) 'b : map 'key 'val : 'S   ->   map 'key 'b : 'S
 
+   * `MAP body`:
+     Apply the body expression to each element of a map.
+     The body sequence has access to the stack.
+
+        :: (map 'key 'val) : 'A   ->  (map 'key 'b) : 'A
+           iff   body :: [ (pair 'key 'val) : 'A -> 'b : 'A ]
+
    * `REDUCE`:
      Apply a function on a map passing the result of each
      application to the next one and return the last.
 
         :: lambda (pair (pair 'key 'val) 'b) 'b : map 'key 'val : 'b : 'S   ->   'b : 'S
+
+   * `ITER body`:
+     Apply the body expression to each element of a map.
+     The body sequence has access to the stack.
+
+        :: (map 'elt 'val) : 'A   ->  'A
+           iff   body :: [ (pair 'elt 'val) : 'A -> 'A ]
 
    * `SIZE`:
      Get the cardinality of the map.
@@ -897,6 +945,13 @@ constants as is, concatenate them and use them as keys.
 
         :: lambda 'a 'b : list 'a : 'S -> list 'b : 'S
 
+   * `MAP body`:
+     Apply the body expression to each element of the list.
+     The body sequence has access to the stack.
+
+        :: (list 'elt) : 'A   ->  (list 'b) : 'A
+           iff   body :: [ 'elt : 'A -> 'b : 'A ]
+
    * `REDUCE`:
      Apply a function on a list from left to right
      passing the result of each application to the next one
@@ -909,6 +964,12 @@ constants as is, concatenate them and use them as keys.
 
         :: list 'elt : 'S -> nat : 'S
 
+   * `ITER body`:
+     Apply the body expression to each element of a list.
+     The body sequence has access to the stack.
+
+        :: (list 'elt) : 'A   ->  'A
+           iff   body :: [ 'elt : 'A -> 'A ]
 
 VI - Domain specific data types
 -------------------------------
@@ -1134,6 +1195,7 @@ for under/overflows.
 
 VIII - Macros
 -------------
+
 In addition to the operations above,
 several extensions have been added to the language's concreate syntax.
 If you are interacting with the node via RPC, bypassing the client,
@@ -1282,6 +1344,8 @@ language can only be one of the four following constructs.
   2. The application of a primitive to a sequence of expressions.
   3. A sequence of expressions.
 
+This simple four cases notation is called Micheline.
+
 ### Constants
 
 There are two kinds of constants:
@@ -1290,8 +1354,11 @@ There are two kinds of constants:
      hexadecimal (0x prefix), octal (0o prefix) or binary (0b prefix).
   2. Strings with usual escapes `\n`, `\t`, `\b`, `\r`, `\\`, `\"`.
      The encoding of a Michelson source file must be UTF-8,
-     and non-ASCII characters can only appear in strings and comments.
+     and non-ASCII characters can only appear in comments.
      No line break can appear in a string.
+     Any non-printable characters must be escaped using
+     two hexadecimal characters, as in '\xHH' or the predefine
+     escape sequences above..
 
 ### Primitive applications
 
@@ -1338,7 +1405,22 @@ indentation rules.
     - All arguments in a sequence must be indented to the right of the
       primitive name by at least one column.
 
-### Conventions
+### Annotations
+
+Sequences and primitive applications can receive an annotation.
+
+An annotation is a lowercase identifier that starts with an `@` sign.
+It comes after the opening curly brace for sequence, and after the
+primitive name for primitive applications.
+
+    { @annot
+      expr ;
+      expr ;
+      ... }
+
+    (prim @annot arg arg ...)
+
+### Differences with the formal notation
 
 The concrete syntax follows the same lexical conventions as the
 specification: instructions are represented by uppercase identifiers,
@@ -1349,7 +1431,7 @@ Lists can be written in a single shot instead of a succession of `Cons`
 
     (List 1 2 3) = (Cons 1 (Cons 2 (Cons 3 Nil)))
 
-All domain specific constants are strings with specific formats:
+All domain specific constants are Micheline strings with specific formats:
 
   - `tez` amounts are written using the same notation as JSON schemas
     and the command line client: thousands are optionally separated by
@@ -1398,7 +1480,40 @@ example.
 Comments that span on multiple lines or that stop before the end of
 the line can also be written, using C-like delimiters (`/* ... */`).
 
-X - Examples
+X - JSON syntax
+---------------
+
+Micheline expressions are encoded in JSON like this:
+
+  - An integer `N` is an object with a single field `"int"`
+    whose valus is the decimal representation as a string.
+
+    `{ "int": "N" }`
+
+  - A string `"contents"` is an object with a single field `"string"`
+    whose valus is the decimal representation as a string.
+
+    `{ "string": "contents" }`
+
+  - A sequence is a JSON array.
+
+    `[ expr, ... ]`
+
+  - A primitive application is an object with two fields
+    `"prim"` for the primitive name and `"args"` for the
+    arguments (that must contain an array).
+    A third optionnal field `"annot"` may contains an annotation,
+    including the `@` sign.
+
+    { "prim": "pair",
+      "args": [ { "prim": "nat", args: [] },
+                { "prim": "nat", args: [] } ],
+      "annot": "@numbers" }`
+
+As in the concrete syntax, all domain specific constants are encoded
+as strings.
+
+XI - Examples
 -------------
 
 Contracts in the system are stored as a piece of code and a global
@@ -1817,7 +1932,7 @@ The complete source `forward.tz` is:
                                       # and return unit
                                       UNIT ; PAIR } } } } } } }
 
-X - Full grammar
+XII - Full grammar
 ----------------
 
     <data> ::=
@@ -1864,12 +1979,15 @@ X - Full grammar
       | EMPTY_SET <type>
       | EMPTY_MAP <comparable type> <type>
       | MAP
+      | MAP { <instruction> ... }
       | REDUCE
+      | ITER { <instruction> ... }
       | MEM
       | GET
       | UPDATE
       | IF { <instruction> ... } { <instruction> ... }
       | LOOP { <instruction> ... }
+      | LOOP_LEFT { <instruction> ... }
       | LAMBDA <type> <type> { <instruction> ... }
       | EXEC
       | DIP { <instruction> ... }
@@ -1911,15 +2029,9 @@ X - Full grammar
       | STEPS_TO_QUOTA
       | SOURCE <type> <type>
     <type> ::=
-      | int
-      | nat
-      | unit
-      | string
-      | tez
-      | bool
+      | <comparable type>
       | key
-      | key_hash
-      | timestamp
+      | unit
       | signature
       | option <type>
       | list <type>
@@ -1938,7 +2050,7 @@ X - Full grammar
       | key_hash
       | timestamp
 
-XII - Reference implementation
+XIII - Reference implementation
 -----------------------------
 
 The language is implemented in OCaml as follows:
