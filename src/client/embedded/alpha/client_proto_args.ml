@@ -48,7 +48,7 @@ let () =
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_endorsement_delay parameter -> Some parameter | _ -> None)
     (fun parameter -> Bad_endorsement_delay parameter)
-  
+
 
 let tez_sym =
   "\xEA\x9C\xA9"
@@ -69,14 +69,13 @@ let arg_arg =
     ~doc:"The argument passed to the contract's script, if needed."
     ~default:"Unit"
     string_parameter
-  
+
 let delegate_arg =
   arg
     ~parameter:"-delegate"
     ~doc:"Set the delegate of the contract.\
           Must be a known identity."
     string_parameter
-  
 
 let source_arg =
   arg
@@ -148,6 +147,12 @@ let endorsement_delay_arg =
     (parameter (fun _ s ->
          try return (int_of_string s)
          with _ -> fail (Bad_endorsement_delay s)))
+
+let no_print_source_flag =
+  switch
+    ~parameter:"-no-print-source"
+    ~doc:"Don't print the source code if an error is encountered.\
+          This should be enabled for extremely large programs"
 
 module Daemon = struct
   let baking_switch =

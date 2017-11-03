@@ -1173,9 +1173,6 @@ and parse_instr
         check_item_ty elt pelt loc I_REDUCE 2 3 >>=? fun (Eq _) ->
         check_item_ty init r loc I_REDUCE 3 3 >>=? fun (Eq _) ->
         return (typed loc (List_reduce, Item_t (r, rest, instr_annot)))
-    | Prim (loc, I_SIZE, [], instr_annot),
-      Item_t (List_t _, rest, _) ->
-        return (typed loc (List_size, Item_t (Nat_t, rest, instr_annot)))
     | Prim (loc, I_ITER, [ body ], instr_annot),
       Item_t (List_t elt, rest, _) ->
         check_kind [ Seq_kind ] body >>=? fun () ->
