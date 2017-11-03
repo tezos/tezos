@@ -2,6 +2,7 @@
 
 (library
  ((name node_updater)
+  (public_name tezos.node.updater)
   (libraries (utils minutils micheline tezos_protocol_compiler node_db dynlink))
   (flags (:standard -w +27-30-40@8
                     -open Error_monad

@@ -5,6 +5,9 @@ all:
 	@cp _build/default/src/client_main.exe tezos-client
 	@cp _build/default/src/compiler_main.exe tezos-protocol-compiler
 
+doc-html:
+	@jbuilder build @doc
+
 build-test:
 	@jbuilder build @buildtest
 
