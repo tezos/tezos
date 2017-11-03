@@ -2,6 +2,7 @@
 
 (library
  ((name micheline)
+  (public_name tezos.micheline)
   (libraries
    (
     ;; External

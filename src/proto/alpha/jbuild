@@ -26,12 +26,14 @@ let () =
 
 (library
   ((name tezos_protocol_environment_alpha)
+   (public_name tezos.protocol_environment.alpha)
    (library_flags (:standard -linkall))
    (libraries (node_updater))
    (modules (Environment))))
 
 (library
   ((name tezos_embedded_raw_protocol_alpha)
+   (public_name tezos.embedded_raw_protocol.alpha)
    (libraries (tezos_protocol_environment_alpha))
    (library_flags (:standard -linkall))
    (flags (:standard -nopervasives -nostdlib
@@ -45,6 +47,7 @@ let () =
 
 (library
   ((name tezos_embedded_protocol_alpha)
+   (public_name tezos.embedded_protocol.alpha)
    (library_flags (:standard -linkall))
    (libraries (tezos_embedded_raw_protocol_alpha node_shell))
    (modules (Registerer))))

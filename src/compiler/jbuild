@@ -11,6 +11,7 @@
 
 (library
  ((name tezos_protocol_compiler)
+  (public_name tezos.protocol_compiler)
   (libraries (utils
               minutils
               tezos_protocol_environment_sigs
