@@ -107,7 +107,7 @@ let report_errors ppf (parsed, errs) =
           let message =
             Format.asprintf "%a"
               (Michelson_v1_error_reporter.report_errors
-                 ~details: false ~show_source: false ~parsed)
+                 ~details:false ~show_source:false ~parsed)
               errs in
           let { start = { point = s } ; stop = { point = e } } =
             let oloc = List.assoc loc parsed.unexpansion_table in

@@ -23,6 +23,8 @@ val free_baking_switch: (bool, Client_commands.context) arg
 val force_switch: (bool, Client_commands.context) arg
 val endorsement_delay_arg: (int, Client_commands.context) arg
 
+val no_print_source_flag : (bool, Client_commands.context) arg
+
 val tez_arg :
   default:string ->
   parameter:string ->

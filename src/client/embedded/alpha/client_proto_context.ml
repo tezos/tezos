@@ -362,9 +362,9 @@ let commands () =
       end ;
 
     command ~group ~desc: "Launch a smart contract on the blockchain"
-      (args6
+      (args7
          fee_arg delegate_arg force_switch
-         delegatable_switch spendable_switch init_arg)
+         delegatable_switch spendable_switch init_arg no_print_source_flag)
       (prefixes [ "originate" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
          ~name: "new" ~desc: "name of the new contract"
@@ -382,7 +382,7 @@ let commands () =
          ~name:"prg" ~desc: "script of the account\n\
                              combine with -init if the storage type is not unit"
        @@ stop)
-      begin fun (fee, delegate, force, delegatable, spendable, init)
+      begin fun (fee, delegate, force, delegatable, spendable, init, no_print_source)
         neu (_, manager) balance (_, source) { expanded = code } cctxt ->
         check_contract cctxt neu >>=? fun () ->
         get_delegate_pkh cctxt delegate >>=? fun delegate ->
@@ -396,8 +396,8 @@ let commands () =
         | Error errs ->
             cctxt.warning "%a"
               (Michelson_v1_error_reporter.report_errors
-                 ~details: true
-                 ~show_source: true
+                 ~details:(not no_print_source)
+                 ~show_source: (not no_print_source)
                  ?parsed:None) errs >>= fun () ->
             cctxt.error "origination simulation failed"
         | Ok (oph, contract) ->
@@ -429,7 +429,7 @@ let commands () =
       end;
 
     command ~group ~desc: "transfer tokens"
-      (args3 fee_arg arg_arg force_switch)
+      (args4 fee_arg arg_arg force_switch no_print_source_flag)
       (prefixes [ "transfer" ]
        @@ tez_param
          ~name: "qty" ~desc: "amount taken from source"
@@ -440,7 +440,7 @@ let commands () =
        @@ ContractAlias.destination_param
          ~name: "dst" ~desc: "name/literal of the destination contract"
        @@ stop)
-      begin fun (fee, arg, force) amount (_, source) (_, destination) cctxt ->
+      begin fun (fee, arg, force, no_print_source) amount (_, source) (_, destination) cctxt ->
         get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
         transfer cctxt.rpc_config cctxt.config.block ~force:force
           ~source ~src_pk ~src_sk ~destination
@@ -449,7 +449,7 @@ let commands () =
             cctxt.warning "%a"
               (Michelson_v1_error_reporter.report_errors
                  ~details: false
-                 ~show_source: true
+                 ~show_source:(not no_print_source)
                  ?parsed:None) errs >>= fun () ->
             cctxt.error "transfer simulation failed"
         | Ok (oph, contracts) ->

@@ -90,7 +90,7 @@ let commands () =
          return ()) ;
 
     command ~group ~desc: "ask the node to run a program"
-      (args2 trace_stack_switch amount_arg)
+      (args3 trace_stack_switch amount_arg no_print_source_flag)
       (prefixes [ "run" ; "program" ]
        @@ Program.source_param
        @@ prefixes [ "on" ; "storage" ]
@@ -100,13 +100,13 @@ let commands () =
        @@ Cli_entries.param ~name:"storage" ~desc:"the input data"
          data_parameter
        @@ stop)
-      (fun (trace_stack, amount) program storage input cctxt ->
+      (fun (trace_stack, amount, no_print_source) program storage input cctxt ->
          let open Data_encoding in
          let print_errors errs =
            cctxt.warning "%a"
              (Michelson_v1_error_reporter.report_errors
                 ~details:false
-                ~show_source: true
+                ~show_source: (not no_print_source)
                 ~parsed:program) errs >>= fun () ->
            cctxt.error "error running program" >>= fun () ->
            return () in
@@ -142,11 +142,11 @@ let commands () =
                print_errors errs);
 
     command ~group ~desc: "ask the node to typecheck a program"
-      (args2 show_types_switch emacs_mode_switch)
+      (args3 show_types_switch emacs_mode_switch no_print_source_flag)
       (prefixes [ "typecheck" ; "program" ]
        @@ Program.source_param
        @@ stop)
-      (fun (show_types, emacs_mode) program cctxt ->
+      (fun (show_types, emacs_mode, no_print_source) program cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_code
            cctxt.rpc_config cctxt.config.block program.expanded >>= fun res ->
@@ -177,12 +177,12 @@ let commands () =
                cctxt.warning "%a"
                  (Michelson_v1_error_reporter.report_errors
                     ~details: show_types
-                    ~show_source: true
+                    ~show_source: (not no_print_source)
                     ~parsed:program) errs >>= fun () ->
                cctxt.error "ill-typed program") ;
 
     command ~group ~desc: "ask the node to typecheck a data expression"
-      no_options
+      (args1 no_print_source_flag)
       (prefixes [ "typecheck" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck"
          data_parameter
@@ -190,7 +190,7 @@ let commands () =
        @@ Cli_entries.param ~name:"type" ~desc:"the expected type"
          data_parameter
        @@ stop)
-      (fun () data exp_ty cctxt ->
+      (fun no_print_source data exp_ty cctxt ->
          let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_data cctxt.Client_commands.rpc_config
            cctxt.config.block (data.expanded, exp_ty.expanded) >>= function
@@ -201,7 +201,7 @@ let commands () =
              cctxt.warning "%a"
                (Michelson_v1_error_reporter.report_errors
                   ~details:false
-                  ~show_source: true
+                  ~show_source:(not no_print_source)
                   ?parsed:None) errs >>= fun () ->
              cctxt.error "ill-typed data") ;
 
