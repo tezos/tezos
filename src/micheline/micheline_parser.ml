@@ -10,6 +10,8 @@
 open Error_monad
 open Micheline
 
+type 'a parsing_result = 'a * error list
+
 type point =
   { point : int ;
     byte : int ;
@@ -111,17 +113,20 @@ let tokenize source =
   let tok start stop token =
     { loc = { start ; stop } ; token } in
   let stack = ref [] in
-  let next () =
+  let errors = ref [] in
+  let rec next () =
     match !stack with
     | charloc :: charlocs ->
         stack := charlocs ;
-        ok charloc
+        charloc
     | [] ->
         let loc = here () in
         match Uutf.decode decoder with
         | `Await -> assert false
-        | `Malformed s -> error (Invalid_utf8_sequence (loc, s))
-        | `Uchar _ | `End as other -> ok (other, loc) in
+        | `Malformed s ->
+            errors := Invalid_utf8_sequence (loc, s) :: !errors ;
+            next ()
+        | `Uchar _ | `End as other -> other, loc in
   let back charloc =
     stack := charloc :: !stack in
   let uchar_to_char c =
@@ -130,22 +135,25 @@ let tokenize source =
     else
       None in
   let rec skip acc =
-    next () >>? function
-    | `End, _ -> ok (List.rev acc)
+    match next () with
+    | `End, _ -> List.rev acc
     | `Uchar c, start ->
         begin match uchar_to_char c with
           | Some ('a'..'z' | 'A'..'Z') -> ident acc start (fun s -> Ident s)
           | Some '@' -> ident acc start (fun s -> Annot s)
           | Some '-' ->
-              begin next () >>? function
+              begin match next () with
                 | `End, stop ->
-                    error (Unterminated_integer { start ; stop })
-                | `Uchar c, stop ->
+                    errors := Unterminated_integer { start ; stop } :: !errors ;
+                    List.rev acc
+                | `Uchar c, stop as first ->
                     begin match uchar_to_char c with
                       | Some '0' -> base acc start
                       | Some ('1'..'9') -> integer `dec acc start false
                       | Some _ | None ->
-                          error (Unterminated_integer { start ; stop })
+                          errors := Unterminated_integer { start ; stop } :: !errors ;
+                          back first ;
+                          skip acc
                     end
               end
           | Some '0' -> base acc start
@@ -159,26 +167,31 @@ let tokenize source =
           | Some '"' -> string acc [] start
           | Some '#' -> eol_comment acc start
           | Some '/' ->
-              begin next () >>? function
+              begin match next () with
                 | `Uchar c, _ when Uchar.equal c (Uchar.of_char '*') ->
                     comment acc start 0
-                | (`Uchar _ | `End), _ ->
-                    error (Unexpected_character (start, "/"))
+                | (`Uchar _ | `End), _ as charloc ->
+                    errors := Unexpected_character (start, "/") :: !errors ;
+                    back charloc ;
+                    skip acc
               end
           | Some _ | None ->
               let byte = Uutf.decoder_byte_count decoder in
               let s = String.sub source start.byte (byte - start.byte) in
-              error (Unexpected_character (start, s))
+              errors := Unexpected_character (start, s) :: !errors ;
+              skip acc
         end
   and base acc start =
-    next () >>? function
+    match next () with
     | (`Uchar c, stop) as charloc ->
         begin match uchar_to_char c with
           | Some ('0'.. '9') -> integer `dec acc start false
           | Some 'x' -> integer `hex acc start true
           | Some 'b' -> integer `bin acc start true
           | Some ('a' | 'c'..'w' | 'y' | 'z' | 'A'..'Z') ->
-              error (Missing_break_after_number stop)
+              errors := Missing_break_after_number stop :: !errors ;
+              back charloc ;
+              skip (tok start stop (Int "0") :: acc)
           | Some _ | None ->
               back charloc ;
               skip (tok start stop (Int "0") :: acc)
@@ -191,46 +204,57 @@ let tokenize source =
       let value =
         String.sub source start.byte (stop.byte - start.byte) in
       tok start stop (Int value) in
-    next () >>? function
+    match next () with
     | (`Uchar c, stop) as charloc ->
+        let missing_break () =
+          errors := Missing_break_after_number stop :: !errors ;
+          back charloc ;
+          skip (tok stop :: acc) in
         begin match base, Uchar.to_char c with
           | `dec, ('0'.. '9') ->
               integer `dec acc start false
           | `dec, ('a'..'z' | 'A'..'Z') ->
-              error (Missing_break_after_number stop)
+              missing_break ()
           | `hex, ('0'..'9' | 'a'..'f' | 'A'..'F') ->
               integer `hex acc start false
           | `hex, ('g'..'z' | 'G'..'Z') ->
-              error (Missing_break_after_number stop)
+              missing_break ()
           | `bin, ('0' | '1') ->
               integer `bin acc start false
           | `bin, ('2'..'9' | 'a'..'z' | 'A'..'Z') ->
-              error (Missing_break_after_number stop)
+              missing_break ()
           | (`bin | `hex), _ when first ->
-              error (Unterminated_integer { start ; stop })
+              errors := Unterminated_integer { start ; stop } :: !errors ;
+              back charloc ;
+              skip (tok stop :: acc)
           | _ ->
               back charloc ;
               skip (tok stop :: acc)
         end
     | (`End, stop) as other ->
-        if first && base = `bin || base = `hex then
-          error (Unterminated_integer { start ; stop })
-        else begin
-          back other ;
-          skip (tok stop :: acc)
-        end
+        if first && base = `bin || base = `hex then begin
+          errors := Unterminated_integer { start ; stop } :: !errors
+        end ;
+        back other ;
+        skip (tok stop :: acc)
   and string acc sacc start =
     let tok () =
       tok start (here ()) (String (String.concat "" (List.rev sacc))) in
-    next () >>? function
-    | `End, stop -> error (Unterminated_string { start ; stop })
+    match next () with
+    | `End, stop ->
+        errors := Unterminated_string { start ; stop } :: !errors ;
+        skip (tok () :: acc)
     | `Uchar c, stop ->
         match uchar_to_char c with
         | Some '"' -> skip (tok () :: acc)
-        | Some '\n' -> error (Unterminated_string { start ; stop })
+        | Some '\n' ->
+            errors := Unterminated_string { start ; stop } :: !errors ;
+            skip (tok () :: acc)
         | Some '\\' ->
-            begin next () >>? function
-              | `End, stop -> error (Unterminated_string { start ; stop })
+            begin match next () with
+              | `End, stop ->
+                  errors := Unterminated_string { start ; stop } :: !errors ;
+                  skip (tok () :: acc)
               | `Uchar c, loc ->
                   match uchar_to_char c with
                   | Some '"' -> string acc ("\"" :: sacc) start
@@ -242,7 +266,8 @@ let tokenize source =
                   | Some _ | None ->
                       let byte = Uutf.decoder_byte_count decoder in
                       let s = String.sub source loc.byte (byte - loc.byte) in
-                      error (Undefined_escape_sequence (loc, s))
+                      errors := Undefined_escape_sequence (loc, s) :: !errors ;
+                      string acc sacc start
             end
         | Some _ | None ->
             let byte = Uutf.decoder_byte_count decoder in
@@ -253,7 +278,7 @@ let tokenize source =
       let name =
         String.sub source start.byte (stop.byte - start.byte) in
       tok start stop (ret name) in
-    next () >>? function
+    match next () with
     | (`Uchar c, stop) as charloc ->
         begin match uchar_to_char c with
           | Some ('a'..'z' | 'A'..'Z' | '_' | '0'..'9') ->
@@ -266,12 +291,15 @@ let tokenize source =
         back other ;
         skip (tok stop :: acc)
   and comment acc start lvl =
-    next () >>? function
-    | `End, stop -> error (Unterminated_comment { start ; stop })
+    match next () with
+    | `End, stop ->
+        errors := Unterminated_comment { start ; stop } :: !errors ;
+        let text = String.sub source start.byte (stop.byte - start.byte) in
+        skip (tok start stop (Comment text) :: acc)
     | `Uchar c, _ ->
         begin match uchar_to_char c with
           | Some '*' ->
-              begin next () >>? function
+              begin match next () with
                 | `Uchar c, _ when Uchar.equal c (Uchar.of_char '/') ->
                     if lvl = 0 then
                       let stop = here () in
@@ -285,7 +313,7 @@ let tokenize source =
                     comment acc start lvl
               end
           | Some '/' ->
-              begin next () >>? function
+              begin match next () with
                 | `Uchar c, _ when Uchar.equal c (Uchar.of_char '*') ->
                     comment acc start (lvl + 1)
                 | other ->
@@ -298,7 +326,7 @@ let tokenize source =
     let tok stop =
       let text = String.sub source start.byte (stop.byte - start.byte) in
       tok start stop (Eol_comment text) in
-    next () >>? function
+    match next () with
     | `Uchar c, stop ->
         begin match uchar_to_char c with
           | Some '\n' -> skip (tok stop :: acc)
@@ -307,7 +335,8 @@ let tokenize source =
     | (_, stop) as other ->
         back other ;
         skip (tok stop :: acc) in
-  skip []
+  let tokens = skip [] in
+  tokens, List.rev !errors
 
 type node = (location, string) Micheline.node
 
@@ -379,7 +408,7 @@ type error += Extra of token
 type error += Misaligned of node
 type error += Empty
 
-let rec parse ?(check = true) tokens stack =
+let rec parse ?(check = true) errors tokens stack =
   (* Two steps:
      - 1. parse without checking indentation [parse]
      - 2. check indentation [check] (inlined in 1) *)
@@ -397,60 +426,66 @@ let rec parse ?(check = true) tokens stack =
       assert false
   (* Return *)
   | Expression (Some result) :: _, [] ->
-      ok [ result ]
-  | Expression (Some _) :: _, token :: _ ->
-      error (Unexpected token)
+      [ result ], List.rev errors
+  | Expression (Some _) :: _, token :: rem ->
+      let errors = Unexpected token :: errors in
+      parse ~check errors rem (* skip *) stack
   | Expression None :: _, [] ->
-      error Empty
+      let errors = Empty :: errors in
+      let ghost = { start = point_zero ; stop = point_zero} in
+      [ Seq (ghost, [], None) ], List.rev errors
   | Toplevel [ Seq (_, exprs, _) as expr ] :: [],
     [] ->
-      (if check then do_check ~toplevel: true expr else ok ()) >>? fun () ->
-      ok exprs
+      let errors = if check then do_check ~toplevel: false errors expr else errors in
+      exprs, List.rev errors
   | Toplevel exprs :: [],
     [] ->
       let exprs = List.rev exprs in
       let loc = { start = min_point exprs ; stop = max_point exprs } in
-      let expr = Micheline.Seq (loc, exprs, None) in
-      (if check then do_check ~toplevel: true expr else ok ()) >>? fun () ->
-      ok exprs
+      let expr = Seq (loc, exprs, None) in
+      let errors = if check then do_check ~toplevel: true errors expr else errors in
+      exprs, List.rev errors
   (* Ignore comments *)
   | _,
     { token = Eol_comment _ | Comment _ } :: rest ->
-      parse ~check rest stack
+      parse ~check errors rest stack
   | (Expression None | Sequence _ | Toplevel _) :: _,
     ({ token = Int _ | String _ } as token):: { token = Eol_comment _ | Comment _ } :: rest
   | (Wrapped _ | Unwrapped _) :: _,
     ({ token = Open_paren } as token)
     :: { token = Eol_comment _ | Comment _ } :: rest ->
-      parse ~check (token :: rest) stack
+      parse ~check errors (token :: rest) stack
   (* Erroneous states *)
   | (Wrapped _ | Unwrapped _) :: _ ,
     ({ token = Open_paren } as token)
-    :: { token = Open_paren | Open_brace } :: _
+    :: { token = Open_paren | Open_brace } :: rem
   | Unwrapped _ :: Expression _ :: _ ,
-    ({ token = Semi | Close_brace | Close_paren } as token) :: _
+    ({ token = Semi | Close_brace | Close_paren } as token) :: rem
   | Expression None :: _ ,
-    ({ token = Semi | Close_brace | Close_paren | Open_paren } as token) :: _ ->
-      error (Unexpected token)
+    ({ token = Semi | Close_brace | Close_paren | Open_paren } as token) :: rem ->
+      let errors = Unexpected token :: errors in
+      parse ~check errors rem (* skip *) stack
   | (Sequence _ | Toplevel _) :: _ ,
-    { token = Semi } :: ({ token = Semi } as token) :: _ ->
-      error (Extra token)
+    ({ token = Semi } as valid) :: ({ token = Semi } as token) :: rem ->
+      let errors = Unexpected token :: errors in
+      parse ~check errors (valid (* skip *) :: rem) stack
   | (Wrapped _ | Unwrapped _) :: _ ,
     { token = Open_paren }
-    :: ({ token = Int _ | String _ | Annot _ | Close_paren } as token)  :: _
+    :: ({ token = Int _ | String _ | Annot _ | Close_paren } as token) :: rem
   | (Expression None | Sequence _ | Toplevel _) :: _,
-    { token = Int _ | String _ } :: ({ token = Ident _ | Int _ | String _ | Annot _ | Close_paren | Open_paren | Open_brace } as token) :: _
+    { token = Int _ | String _ } :: ({ token = Ident _ | Int _ | String _ | Annot _ | Close_paren | Open_paren | Open_brace } as token) :: rem
   | Unwrapped (_, _, _, _) :: Toplevel _ :: _,
-    ({ token = Close_brace } as token) :: _
+    ({ token = Close_brace } as token) :: rem
   | Unwrapped (_, _, _, _) :: _,
-    ({ token = Close_paren } as token) :: _
+    ({ token = Close_paren } as token) :: rem
   | Toplevel _ :: [],
-    ({ token = Close_paren } as token) :: _
+    ({ token = Close_paren } as token) :: rem
   | Toplevel _ :: [],
-    ({ token = Close_brace } as token) :: _
+    ({ token = Close_brace } as token) :: rem
   | _,
-    ({ token = Annot _ } as token) :: _ ->
-      error (Unexpected token)
+    ({ token = Annot _ } as token) :: rem ->
+      let errors = Unexpected token :: errors in
+      parse ~check errors rem (* skip *) stack
   | Wrapped (token, _, _, _) :: _,
     ({ token = Close_brace | Semi } :: _ | [])
   | (Sequence _ | Toplevel _) :: _,
@@ -459,39 +494,45 @@ let rec parse ?(check = true) tokens stack =
     ({ token = Open_paren } as token) :: ({ token = Close_brace | Semi } :: _ | [])
   | (Sequence (token, _, _) :: _ | Unwrapped _ :: Sequence (token, _, _) :: _),
     ({ token = Close_paren } :: _ | [])->
-      error (Unclosed token)
+      let errors = Unclosed token :: errors in
+      let fake =
+        { token with token = match token.token with
+              | Open_paren -> Close_paren
+              | Open_brace -> Close_brace
+              | _ -> assert false } in
+      parse ~check errors (fake :: (* insert *) tokens) stack
   (* Valid states *)
   | (Toplevel _ | Sequence (_, _, _)) :: _ ,
     { token = Ident name ; loc } :: { token = Annot annot } :: rest ->
       let mode = Unwrapped (loc, name, [], Some annot) in
-      parse ~check rest (push_mode mode stack)
+      parse ~check errors rest (push_mode mode stack)
   | (Expression None | Toplevel _ | Sequence (_, _, _)) :: _ ,
     { token = Ident name ; loc } :: rest ->
       let mode = Unwrapped (loc, name, [], None) in
-      parse ~check rest (push_mode mode stack)
+      parse ~check errors rest (push_mode mode stack)
   | (Unwrapped _ | Wrapped _) :: _,
     { token = Int value ; loc } :: rest
   | (Expression None | Sequence _ | Toplevel _) :: _,
     { token = Int value ; loc } :: ([] | { token = Semi | Close_brace} :: _ as rest) ->
       let expr : node = Int (loc, value) in
-      (if check then do_check ~toplevel: false expr else ok ()) >>? fun () ->
-      parse ~check rest (fill_mode expr stack)
+      let errors = if check then do_check ~toplevel: false errors expr else errors in
+      parse ~check errors rest (fill_mode expr stack)
   | (Unwrapped _ | Wrapped _) :: _,
     { token = String contents ; loc } :: rest
   | (Expression None | Sequence _ | Toplevel _) :: _,
     { token = String contents ; loc } :: ([] | { token = Semi | Close_brace} :: _ as rest) ->
       let expr : node = String (loc, contents) in
-      (if check then do_check ~toplevel: false expr else ok ()) >>? fun () ->
-      parse ~check rest (fill_mode expr stack)
+      let errors = if check then do_check ~toplevel: false errors expr else errors in
+      parse ~check errors rest (fill_mode expr stack)
   | Sequence ({ loc = { start } }, exprs, annot) :: _ ,
     { token = Close_brace ; loc = { stop } } :: rest ->
       let exprs = List.rev exprs in
       let expr = Micheline.Seq ({ start ; stop }, exprs, annot) in
-      (if check then do_check ~toplevel: false expr else ok ()) >>? fun () ->
-      parse ~check rest (fill_mode expr (pop_mode stack))
+      let errors = if check then do_check ~toplevel: false errors expr else errors in
+      parse ~check errors rest (fill_mode expr (pop_mode stack))
   | (Sequence _ | Toplevel _) :: _ ,
     { token = Semi } :: rest ->
-      parse ~check rest stack
+      parse ~check errors rest stack
   | Unwrapped ({ start ; stop }, name, exprs, annot) :: Expression _ :: _,
     ([] as rest)
   | Unwrapped ({ start ; stop }, name, exprs, annot) :: Toplevel _ :: _,
@@ -503,81 +544,82 @@ let rec parse ?(check = true) tokens stack =
       let exprs = List.rev exprs in
       let stop = if exprs = [] then stop else max_point exprs in
       let expr = Micheline.Prim ({ start ; stop }, name, exprs, annot) in
-      (if check then do_check ~toplevel: false expr else ok ()) >>? fun () ->
-      parse ~check rest (fill_mode expr (pop_mode stack))
+      let errors = if check then do_check ~toplevel: false errors expr else errors in
+      parse ~check errors rest (fill_mode expr (pop_mode stack))
   | (Wrapped _ | Unwrapped _) :: _ ,
     ({ token = Open_paren } as token) :: { token = Ident name } :: { token = Annot annot } :: rest ->
       let mode = Wrapped (token, name, [], Some annot) in
-      parse ~check rest (push_mode mode stack)
+      parse ~check errors rest (push_mode mode stack)
   | (Wrapped _ | Unwrapped _) :: _ ,
     ({ token = Open_paren } as token) :: { token = Ident name } :: rest ->
       let mode = Wrapped (token, name, [], None) in
-      parse ~check rest (push_mode mode stack)
+      parse ~check errors rest (push_mode mode stack)
   | (Wrapped _ | Unwrapped _) :: _ ,
     { token = Ident name ; loc } :: rest ->
       let expr = Micheline.Prim (loc, name, [], None) in
-      (if check then do_check ~toplevel: false expr else ok ()) >>? fun () ->
-      parse ~check rest (fill_mode expr stack)
+      let errors = if check then do_check ~toplevel: false errors expr else errors in
+      parse ~check errors rest (fill_mode expr stack)
   | (Wrapped _ | Unwrapped _ | Toplevel _ | Sequence _ | Expression None) :: _ ,
     ({ token = Open_brace } as token) :: { token = Annot annot } :: rest ->
       let mode = Sequence (token, [], Some annot) in
-      parse ~check rest (push_mode mode stack)
+      parse ~check errors rest (push_mode mode stack)
   | (Wrapped _ | Unwrapped _ | Toplevel _ | Sequence _ | Expression None) :: _ ,
     ({ token = Open_brace } as token) :: rest ->
       let mode = Sequence (token, [], None) in
-      parse ~check rest (push_mode mode stack)
+      parse ~check errors rest (push_mode mode stack)
 (* indentation checker *)
-and do_check ?(toplevel = false) = function
+and do_check ?(toplevel = false) errors = function
   | Seq ({ start ; stop }, [], _) as expr ->
       if start.column >= stop.column then
-        error (Misaligned expr)
-      else ok ()
+        Misaligned expr :: errors
+      else errors
   | Prim ({ start ; stop }, _, first :: rest, _)
   | Seq ({ start ; stop }, first :: rest, _) as expr ->
       let { column = first_column ; line = first_line } =
         min_point [ first ] in
       if start.column >= stop.column then
-        error (Misaligned expr)
+        Misaligned expr :: errors
       else if not toplevel && start.column >= first_column then
-        error (Misaligned expr)
+        Misaligned expr :: errors
       else
         (* In a sequence or in the arguments of a primitive, we
            require all items to be aligned, but we relax the rule to
            allow consecutive items to be writtem on the same line. *)
-        let rec in_line_or_aligned prev_start_line = function
-          | [] -> ok ()
+        let rec in_line_or_aligned prev_start_line errors = function
+          | [] -> errors
           | expr :: rest ->
               let { column ; line = start_line } = min_point [ expr ] in
               let { line = stop_line } = max_point [ expr ] in
-              if stop_line <> prev_start_line
-              && column <> first_column then
-                error (Misaligned expr)
-              else
-                in_line_or_aligned start_line rest in
-        in_line_or_aligned first_line rest
-  | Prim (_, _, [], _) | String _ | Int _ -> ok ()
+              let errors =
+                if stop_line <> prev_start_line
+                && column <> first_column then
+                  Misaligned expr :: errors
+                else
+                  errors in
+              in_line_or_aligned start_line errors rest in
+        in_line_or_aligned first_line errors rest
+  | Prim (_, _, [], _) | String _ | Int _ -> errors
 
 let parse_expression ?check tokens =
   let result = match tokens with
     | ({ token = Open_paren } as token) :: { token = Ident name } :: { token = Annot annot } :: rest ->
         let mode = Wrapped (token, name, [], Some annot) in
-        parse ?check rest [ mode ; Expression None ]
+        parse ?check [] rest [ mode ; Expression None ]
     | ({ token = Open_paren } as token) :: { token = Ident name } :: rest ->
         let mode = Wrapped (token, name, [], None) in
-        parse ?check rest [ mode ; Expression None ]
+        parse ?check [] rest [ mode ; Expression None ]
     | _ ->
-        parse ?check tokens [ Expression None ] in
+        parse ?check [] tokens [ Expression None ] in
   match result with
-  | Ok [ single ] -> Ok single
-  | Ok _ -> assert false
-  | Error errs -> Error errs
+  | [ single ], errors -> single, errors
+  | _ -> assert false
 
 let parse_toplevel ?check tokens =
-  parse ?check tokens [ Toplevel [] ]
+  parse ?check [] tokens [ Toplevel [] ]
 
 let print_point ppf { line ; column } =
   Format.fprintf ppf
-    "at line %d character %d"
+    "At line %d character %d"
     line column
 
 let print_token_kind ppf = function
@@ -594,16 +636,21 @@ let print_location ppf loc =
   if loc.start.line = loc.stop.line then
     if loc.start.column = loc.stop.column then
       Format.fprintf ppf
-        "at line %d character %d"
+        "At line %d character %d"
         loc.start.line loc.start.column
     else
       Format.fprintf ppf
-        "at line %d characters %d to %d"
+        "At line %d characters %d to %d"
         loc.start.line loc.start.column loc.stop.column
   else
     Format.fprintf ppf
-      "from line %d character %d to line %d character %d"
+      "From line %d character %d to line %d character %d"
       loc.start.line loc.start.column loc.stop.line loc.stop.column
+
+let no_parsing_error (ast, errors) =
+  match errors with
+  | [] -> ok ast
+  | errors -> Error errors
 
 let () =
   register_error_kind `Permanent

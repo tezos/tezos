@@ -40,13 +40,18 @@ let get_branch rpc_config block branch =
   Client_node_rpcs.Blocks.info rpc_config block >>=? fun { net_id ; hash } ->
   return (net_id, hash)
 
+let parse_expression arg =
+  Lwt.return
+    (Micheline_parser.no_parsing_error
+       (Michelson_v1_parser.parse_expression arg))
+
 let transfer rpc_config
     block ?force ?branch
     ~source ~src_pk ~src_sk ~destination ?arg ~amount ~fee () =
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
   begin match arg with
     | Some arg ->
-        Lwt.return (Michelson_v1_parser.parse_expression arg) >>=? fun { expanded = arg } ->
+        parse_expression arg >>=? fun { expanded = arg } ->
         return (Some arg)
     | None -> return None
   end >>=? fun parameters ->
@@ -106,7 +111,7 @@ let originate_contract rpc_config
     block ?force ?branch
     ~source ~src_pk ~src_sk ~manager_pkh ~balance ?delegatable ?delegatePubKey
     ~code ~init ~fee ~spendable () =
-  Lwt.return (Michelson_v1_parser.parse_expression init) >>=? fun { expanded = storage } ->
+  parse_expression init >>=? fun { expanded = storage } ->
   Client_proto_rpcs.Context.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
@@ -383,7 +388,8 @@ let commands () =
                              combine with -init if the storage type is not unit"
        @@ stop)
       begin fun (fee, delegate, force, delegatable, spendable, init, no_print_source)
-        neu (_, manager) balance (_, source) { expanded = code } cctxt ->
+        neu (_, manager) balance (_, source) program cctxt ->
+        Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
         check_contract cctxt neu >>=? fun () ->
         get_delegate_pkh cctxt delegate >>=? fun delegate ->
         get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->

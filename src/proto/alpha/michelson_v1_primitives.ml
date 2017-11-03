@@ -9,8 +9,9 @@
 
 open Micheline
 
-type error += Unknown_primitive of string
+type error += Unknown_primitive_name of string
 type error += Invalid_case of string
+type error += Invalid_primitive_name of Micheline.canonical_location
 
 type prim =
   | K_parameter
@@ -341,15 +342,17 @@ let prim_of_string = function
   | "unit" -> ok T_unit
   | n ->
       if valid_case n then
-        error (Unknown_primitive n)
+        error (Unknown_primitive_name n)
       else
         error (Invalid_case n)
 
 let prims_of_strings expr =
   let rec convert = function
     | Int _ | String _ as expr -> ok expr
-    | Prim (_, prim, args, annot) ->
-        prim_of_string prim >>? fun prim ->
+    | Prim (loc, prim, args, annot) ->
+        Error_monad.record_trace
+          (Invalid_primitive_name loc)
+          (prim_of_string prim) >>? fun prim ->
         List.fold_left
           (fun acc arg ->
              acc >>? fun args ->
@@ -609,10 +612,10 @@ let () =
     ~pp:(fun ppf n -> Format.fprintf ppf "Unknown primitive %s." n)
     Data_encoding.(obj1 (req "wrongPrimitiveName" string))
     (function
-      | Unknown_primitive got -> Some got
+      | Unknown_primitive_name got -> Some got
       | _ -> None)
     (fun got ->
-       Unknown_primitive got) ;
+       Unknown_primitive_name got) ;
   register_error_kind
     `Permanent
     ~id:"invalidPrimitiveNameCaseTypeError"
@@ -620,9 +623,24 @@ let () =
     ~description:
       "In a script or data expression, a primitive name is \
        neither uppercase, lowercase or capitalized."
+    ~pp:(fun ppf n -> Format.fprintf ppf "Primitive %s has invalid case." n)
     Data_encoding.(obj1 (req "wrongPrimitiveName" string))
     (function
       | Invalid_case name -> Some name
       | _ -> None)
     (fun name ->
-       Invalid_case name)
+       Invalid_case name) ;
+  register_error_kind
+    `Permanent
+    ~id:"invalidPrimitiveNameTypeErro"
+    ~title: "Invalid primitive name (typechecking error)"
+    ~description:
+      "In a script or data expression, a primitive name is \
+       unknown or has a wrong case."
+    ~pp:(fun ppf _ -> Format.fprintf ppf "Invalid primitive.")
+    Data_encoding.(obj1 (req "location" Micheline.canonical_location_encoding))
+    (function
+      | Invalid_primitive_name loc -> Some loc
+      | _ -> None)
+    (fun loc ->
+       Invalid_primitive_name loc)

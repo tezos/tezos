@@ -9,6 +9,10 @@
 
 open Error_monad
 
+type 'a parsing_result = 'a * error list
+
+val no_parsing_error : 'a parsing_result -> 'a tzresult
+
 type point =
   { point : int ;
     byte : int ;
@@ -42,7 +46,7 @@ type token =
   { token : token_value ;
     loc : location }
 
-val tokenize : string -> token list tzresult
+val tokenize : string -> token list parsing_result
 
 type node = (location, string) Micheline.node
 
@@ -67,9 +71,9 @@ type error += Extra of token
 type error += Misaligned of node
 type error += Empty
 
-val parse_toplevel : ?check:bool -> token list -> node list tzresult
+val parse_toplevel : ?check:bool -> token list -> node list parsing_result
 
-val parse_expression : ?check:bool -> token list -> node tzresult
+val parse_expression : ?check:bool -> token list -> node parsing_result
 
 val print_location : Format.formatter -> location -> unit
 

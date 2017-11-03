@@ -13,18 +13,15 @@ open Client_proto_args
 open Michelson_v1_printer
 
 module Program = Client_aliases.Alias (struct
-    type t = Michelson_v1_parser.parsed
+    type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
     let encoding =
       Data_encoding.conv
-        (fun { Michelson_v1_parser.source } -> source)
-        (fun source ->
-           match Michelson_v1_parser.parse_toplevel source with
-           | Ok parsed -> parsed
-           | Error _ -> Pervasives.failwith "could not decode Michelson program alias")
+        (fun ({ Michelson_v1_parser.source }, _) -> source)
+        (fun source -> Michelson_v1_parser.parse_toplevel source)
         Data_encoding.string
     let of_source _cctxt source =
-      Lwt.return (Michelson_v1_parser.parse_toplevel source)
-    let to_source _ { Michelson_v1_parser.source } = return source
+      return (Michelson_v1_parser.parse_toplevel source)
+    let to_source _ ({ Michelson_v1_parser.source }, _) = return source
     let name = "program"
   end)
 
@@ -33,7 +30,7 @@ let group =
     title = "Commands for managing the record of known programs" }
 
 let data_parameter =
-  Cli_entries.parameter (fun _ data -> Lwt.return (Michelson_v1_parser.parse_expression data))
+  Cli_entries.parameter (fun _ data -> return (Michelson_v1_parser.parse_expression data))
 
 let commands () =
   let open Cli_entries in
@@ -70,7 +67,9 @@ let commands () =
        @@ Program.fresh_alias_param
        @@ Program.source_param
        @@ stop)
-      (fun () name hash cctxt -> Program.add cctxt name hash) ;
+      (fun () name program cctxt ->
+         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun program ->
+         Program.add cctxt name (program, [])) ;
 
     command ~group ~desc: "forget a remembered program"
       no_options
@@ -85,8 +84,8 @@ let commands () =
        @@ Program.alias_param
        @@ stop)
       (fun () (_, program) cctxt ->
-         Program.to_source cctxt program >>=? fun source ->
-         cctxt.message "%s\n" source >>= fun () ->
+         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun program ->
+         cctxt.message "%s\n" program.source >>= fun () ->
          return ()) ;
 
     command ~group ~desc: "ask the node to run a program"
@@ -101,53 +100,62 @@ let commands () =
          data_parameter
        @@ stop)
       (fun (trace_stack, amount, no_print_source) program storage input cctxt ->
+         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun program ->
+         Lwt.return (Micheline_parser.no_parsing_error storage) >>=? fun storage ->
+         Lwt.return (Micheline_parser.no_parsing_error input) >>=? fun input ->
          let print_errors errs =
            cctxt.warning "%a"
              (Michelson_v1_error_reporter.report_errors
                 ~details:false
                 ~show_source: (not no_print_source)
-                ~parsed:program) errs >>= fun () ->
+                ~parsed: program) errs >>= fun () ->
            cctxt.error "error running program" >>= fun () ->
            return () in
-         if trace_stack then
-           Client_proto_rpcs.Helpers.trace_code cctxt.rpc_config
-             cctxt.config.block program.expanded (storage.expanded, input.expanded, amount) >>= function
-           | Ok (storage, output, trace) ->
-               cctxt.message
-                 "@[<v 0>@[<v 2>storage@,%a@]@,\
-                  @[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
-                 print_expr storage
-                 print_expr output
-                 (Format.pp_print_list
-                    (fun ppf (loc, gas, stack) ->
-                       Format.fprintf ppf
-                         "- @[<v 0>location: %d (remaining gas: %d)@,\
-                          [ @[<v 0>%a ]@]@]"
-                         loc gas
-                         (Format.pp_print_list print_expr)
-                         stack))
-                 trace >>= fun () ->
-               return ()
-           | Error errs -> print_errors errs
-         else
-           Client_proto_rpcs.Helpers.run_code cctxt.rpc_config
-             cctxt.config.block program.expanded (storage.expanded, input.expanded, amount) >>= function
-           | Ok (storage, output) ->
-               cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
-                 print_expr storage
-                 print_expr output >>= fun () ->
-               return ()
-           | Error errs ->
-               print_errors errs);
+         begin
+           if trace_stack then
+             Client_proto_rpcs.Helpers.trace_code cctxt.rpc_config
+               cctxt.config.block program.expanded
+               (storage.expanded, input.expanded, amount) >>=? fun (storage, output, trace) ->
+             cctxt.message
+               "@[<v 0>@[<v 2>storage@,%a@]@,\
+                @[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
+               print_expr storage
+               print_expr output
+               (Format.pp_print_list
+                  (fun ppf (loc, gas, stack) ->
+                     Format.fprintf ppf
+                       "- @[<v 0>location: %d (remaining gas: %d)@,\
+                        [ @[<v 0>%a ]@]@]"
+                       loc gas
+                       (Format.pp_print_list print_expr)
+                       stack))
+               trace >>= fun () ->
+             return ()
+           else
+             Client_proto_rpcs.Helpers.run_code cctxt.rpc_config
+               cctxt.config.block program.expanded
+               (storage.expanded, input.expanded, amount) >>=? fun (storage, output) ->
+             cctxt.message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
+               print_expr storage
+               print_expr output >>= fun () ->
+             return ()
+         end >>= function
+         | Ok () -> return ()
+         | Error errs ->
+             print_errors errs);
 
     command ~group ~desc: "ask the node to typecheck a program"
       (args3 show_types_switch emacs_mode_switch no_print_source_flag)
       (prefixes [ "typecheck" ; "program" ]
        @@ Program.source_param
        @@ stop)
-      (fun (show_types, emacs_mode, no_print_source) program cctxt ->
-         Client_proto_rpcs.Helpers.typecheck_code
-           cctxt.rpc_config cctxt.config.block program.expanded >>= fun res ->
+      (fun (show_types, emacs_mode, no_print_source) (program, errors) cctxt ->
+         begin match errors with
+           | [] ->
+               Client_proto_rpcs.Helpers.typecheck_code
+                 cctxt.rpc_config cctxt.config.block program.expanded
+           | errors -> Lwt.return (Error errors)
+         end >>= fun res ->
          if emacs_mode then
            let type_map, errs = match res with
              | Ok type_map -> type_map, []
@@ -189,6 +197,8 @@ let commands () =
          data_parameter
        @@ stop)
       (fun no_print_source data exp_ty cctxt ->
+         Lwt.return (Micheline_parser.no_parsing_error data) >>=? fun data ->
+         Lwt.return (Micheline_parser.no_parsing_error exp_ty) >>=? fun exp_ty ->
          Client_proto_rpcs.Helpers.typecheck_data cctxt.Client_commands.rpc_config
            cctxt.config.block (data.expanded, exp_ty.expanded) >>= function
          | Ok () ->
@@ -211,6 +221,7 @@ let commands () =
          data_parameter
        @@ stop)
       (fun () data cctxt ->
+         Lwt.return (Micheline_parser.no_parsing_error data) >>=? fun data ->
          Client_proto_rpcs.Helpers.hash_data cctxt.Client_commands.rpc_config
            cctxt.config.block (data.expanded) >>= function
          | Ok hash ->
@@ -233,6 +244,7 @@ let commands () =
        @@ Client_keys.Secret_key.alias_param
        @@ stop)
       (fun () data (_, key) cctxt ->
+         Lwt.return (Micheline_parser.no_parsing_error data) >>=? fun data ->
          Client_proto_rpcs.Helpers.hash_data cctxt.rpc_config
            cctxt.config.block (data.expanded) >>= function
          | Ok hash ->

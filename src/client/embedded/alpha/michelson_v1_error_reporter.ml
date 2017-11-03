@@ -72,7 +72,8 @@ let collect_error_locations errs =
       | Invalid_contract (loc, _)
       | Comparable_type_expected (loc, _)
       | Overflow loc
-      | Reject loc) :: rest ->
+      | Reject loc
+      | Michelson_v1_primitives.Invalid_primitive_name loc) :: rest ->
         collect (loc :: acc) rest
     | _ :: rest -> collect acc rest in
   collect [] errs
@@ -341,9 +342,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 print_ty (None, tyb)
           | Reject _ -> Format.fprintf ppf "Script reached FAIL instruction"
           | Overflow _ -> Format.fprintf ppf "Unexpected arithmetic overflow"
-          | err ->
-              Format.fprintf ppf "%a"
-                Environment.Error_monad.pp_print_error [ err ]
+          | err -> Format.fprintf ppf "%a" Environment.Error_monad.pp err
         end ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest in
@@ -351,5 +350,5 @@ let report_errors ~details ~show_source ?parsed ppf errs =
     (Format.pp_print_list
        (fun ppf -> function
           | Environment.Ecoproto_error errs -> print_trace (fun _ -> None) errs
-          | err -> pp_print_error ppf [ err ]))
+          | err -> pp ppf err))
     errs

@@ -25,5 +25,5 @@ type parsed =
         expression. *)
   }
 
-val parse_toplevel : ?check:bool -> string -> parsed tzresult
-val parse_expression : ?check:bool -> string -> parsed tzresult
+val parse_toplevel : ?check:bool -> string -> parsed Micheline_parser.parsing_result
+val parse_expression : ?check:bool -> string -> parsed Micheline_parser.parsing_result

@@ -99,8 +99,8 @@ let unparse ?type_map parse expanded =
         |> Micheline_printer.printable (fun n -> n)
         |> Format.asprintf "%a" Micheline_printer.print_expr in
   match parse source with
-  | Ok res -> res
-  | Error _ -> Pervasives.failwith "Michelson_v1_printer.unexpand"
+  | res, [] -> res
+  | _, _ :: _ -> Pervasives.failwith "Michelson_v1_printer.unexpand"
 
 let unparse_toplevel ?type_map = unparse ?type_map Michelson_v1_parser.parse_toplevel
 let unparse_expression = unparse Michelson_v1_parser.parse_expression

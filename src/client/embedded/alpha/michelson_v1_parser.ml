@@ -17,7 +17,7 @@ type parsed =
     expansion_table : (int * (Micheline_parser.location * int list)) list ;
     unexpansion_table : (int * int) list }
 
-let expand_all source ast =
+let expand_all source ast errors =
   let unexpanded, loc_table =
     extract_locations ast in
   let rec expand expr =
@@ -49,20 +49,28 @@ let expand_all source ast =
          (l, (ploc, elocs)))
       (List.sort compare loc_table)
       (List.sort compare grouped) in
-  Environment.wrap_error (Michelson_v1_primitives.prims_of_strings expanded) >>? fun expanded ->
-  ok { source ; unexpanded ; expanded ; expansion_table ; unexpansion_table }
+  match Environment.wrap_error (Michelson_v1_primitives.prims_of_strings expanded) with
+  | Ok expanded ->
+      { source ; unexpanded ; expanded ;
+        expansion_table ; unexpansion_table },
+      errors
+  | Error errs ->
+      { source ; unexpanded ;
+        expanded = Micheline.strip_locations (Seq ((), [], None)) ;
+        expansion_table ; unexpansion_table },
+      errs @ errors
 
 let parse_toplevel ?check source =
-  Micheline_parser.tokenize source >>? fun tokens ->
-  Micheline_parser.parse_toplevel ?check tokens >>? fun asts ->
+  let tokens, lexing_errors = Micheline_parser.tokenize source in
+  let asts, parsing_errors = Micheline_parser.parse_toplevel ?check tokens in
   let ast = match asts with
     | [ ast ] -> ast
     | asts ->
         let start = min_point asts and stop = max_point asts in
         Seq ({ start ; stop }, asts, None) in
-  expand_all source ast
+  expand_all source ast (lexing_errors @ parsing_errors)
 
 let parse_expression ?check source =
-  Micheline_parser.tokenize source >>? fun tokens ->
-  Micheline_parser.parse_expression ?check tokens >>? fun ast ->
-  expand_all source ast
+  let tokens, lexing_errors = Micheline_parser.tokenize source in
+  let ast, parsing_errors = Micheline_parser.parse_expression ?check tokens in
+  expand_all source ast (lexing_errors @ parsing_errors)

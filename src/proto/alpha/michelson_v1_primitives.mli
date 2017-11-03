@@ -7,8 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type error += Unknown_primitive of string (* `Permanent *)
+type error += Unknown_primitive_name of string (* `Permanent *)
 type error += Invalid_case of string (* `Permanent *)
+type error += Invalid_primitive_name of Micheline.canonical_location (* `Permanent *)
 
 type prim =
   | K_parameter

@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Program : Client_aliases.Alias with type t = Michelson_v1_parser.parsed
+module Program : Client_aliases.Alias
+  with type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 
 val commands: unit -> Client_commands.command list
