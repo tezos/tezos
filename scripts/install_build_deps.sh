@@ -20,7 +20,6 @@ opam pin --yes add --no-action --dev-repo sodium
 opam pin --yes add --no-action --dev-repo ocp-ocamlres
 opam pin --yes add --no-action --dev-repo ocplib-json-typed
 opam pin --yes add --no-action --dev-repo ocplib-resto
-opam pin --yes add --no-action --dev-repo jbuilder
 ## Force opam to take account of the new `tezos-deps.opam`
 opam pin --yes remove tezos
 opam pin --yes add --no-action tezos $src_dir
