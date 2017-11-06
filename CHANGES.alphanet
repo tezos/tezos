@@ -1,3 +1,84 @@
+For the next reset
+==================
+
+[Client]
+
+ - Autocomplete scripts for bash.
+
+- Smart contracts are now non spendable by default.
+
+[Node]
+
+ - Prevent potential stack overflow in validation.
+
+- Fix concurrency issue where operations were cleared from
+   memory before being used.
+
+- Continue background work on the multipass validator:
+   cleanup and document data structures, better logging
+   of resource requests, enhance requests for the same piece
+   of data to multiple peers.
+
+[Build]
+
+- Refactor the economic protocol amendment code. Protocols are
+   now compiled to functors, taking the type signature of their
+   runtime environment as parameter. This simplifies the
+   dependencies, and will allow third party developpers to
+   instanciate economic protocols in other contexts than the node.
+
+- Switch from Makefiles to jbuilder, yay!
+
+- Rename (hopefully) all occurences of "mining" into "baking".
+
+[Michelson]
+
+ - Introduce Micheline, the (now independent) IR of Michelson.
+   The parser and printer should now be used on their own, outside
+   of the client or node.
+
+- Implement a basic semantics of annotations.
+   The typechecker now propagates annotations on types througout the
+   code, and tagging instructions with an annotation allows the
+   programmer to reannotate the element produced by the instruction.
+   The emacs mode displays propagated annotations.
+
+- Add a version of `ITER` that takes a static code block and expects
+   a colletion on the initial stack, and works like a `LOOP`, pushing
+   the element of the collection one at a time on the stack. This is
+   like `REDUCE` but using a static code block instead of a dynamic
+   lambda. In the same vein, `MAP` can take a code block.
+
+- Add `LOOP_LEFT` that uses a different type for the accumulator and
+   the return value. Continues while the top of the stack is `Left 'a`
+   and stops on `Right 'b`.
+
+- Change timestamps to be arbitrary  precision relative integers.
+
+- Add `SIZE` on lists.
+
+Reset 2017-10-13
+================
+
+[Client]
+
+ - Fix missing nonce revelation at end of cycle.
+ - New command line analyzer and better help pages.
+
+[Node]
+
+ - Various small fixes and error message enhancements.
+
+[Alphanet]
+
+ - Use older leveldb-1.18 as upgrade to the newer version made the
+   node crash.
+
+[Michelson]
+
+ - Split the `key` type into `key` and `key_hash` to
+   prevent an error raised when using an unrevealed key.
+
 Reset 2017-09-21
 ================
 
@@ -15,6 +96,10 @@ Reset 2017-09-21
 - add an option `-log-requests`. All RPC requests and responses to the
   node are logged on `stderr`.
 
+[Michelson]
+
+ - Split the `key` type into `key` and `key_hash` to
+   prevent an error raised when using an unrevealed key.
 
 Reset 2017-08-10
 ================
@@ -49,7 +134,7 @@ Main changes includes:
 
 [Michelson]
 
-- minor language enhencements, mostly resulting from the feedback of
+- minor language enhancements, mostly resulting from the feedback of
   Milo's daily challenge:
 
     http://www.michelson-lang.com/
@@ -64,7 +149,7 @@ Main changes includes:
   operation could only be included in a successor of this block.
 
 - The economics protocol now refuses blocks that includes an operation
-  forged more 64 blocks in the past. As any constants set by the
+  forged more than 64 blocks in the past. As any constants set by the
   economic protocol, it is amendable by a vote.
 
 - Header of blocks now includes a hash of the "context" that result
