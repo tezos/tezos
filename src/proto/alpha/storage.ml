@@ -547,7 +547,7 @@ module Rewards = struct
         else cmp1
     end)(struct
       type value = Tez_repr.t
-      let name = "level miner contract"
+      let name = "level baker contract"
       let encoding = Tez_repr.encoding
     end)
 

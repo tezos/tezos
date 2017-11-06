@@ -23,7 +23,7 @@ val paying_priorities: context -> int list
 val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
     time, given the predecessor block timestamp [pred_block_time],
-    after which a miner with priority [priority] is allowed to
+    after which a baker with priority [priority] is allowed to
     mine. Fail with [Invalid_slot_durations_constant] if the minimal
     time cannot be computed. *)
 

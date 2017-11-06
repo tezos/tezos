@@ -161,7 +161,7 @@ let check_signature_and_update_public_key ctxt id public_key op =
   return ctxt
 
 let apply_sourced_operation
-    ctxt miner_contract pred_block block_prio
+    ctxt baker_contract pred_block block_prio
     operation origination_nonce ops =
   match ops with
   | Manager_operations { source ; public_key ; fee ; counter ; operations = contents } ->
@@ -173,7 +173,7 @@ let apply_sourced_operation
         ctxt source counter >>=? fun () ->
       Contract.increment_counter ctxt source >>=? fun ctxt ->
       Contract.spend ctxt source fee >>=? fun ctxt ->
-      (match miner_contract with
+      (match baker_contract with
        | None -> return ctxt
        | Some contract ->
            Contract.credit ctxt contract fee) >>=? fun ctxt ->
@@ -209,7 +209,7 @@ let apply_sourced_operation
       fork_test_network ctxt hash expiration >>= fun ctxt ->
       return (ctxt, origination_nonce, None)
 
-let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
+let apply_anonymous_operation ctxt baker_contract origination_nonce kind =
   match kind with
   | Seed_nonce_revelation { level ; nonce } ->
       let level = Level.from_raw ctxt level in
@@ -218,7 +218,7 @@ let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
       Reward.record ctxt
         delegate_to_reward level.cycle reward_amount >>=? fun ctxt ->
       begin
-        match miner_contract with
+        match baker_contract with
         | None -> return (ctxt, origination_nonce)
         | Some contract ->
             Contract.credit
@@ -228,7 +228,7 @@ let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
   | Faucet { id = manager } ->
       (* Free tez for all! *)
       begin
-        match miner_contract with
+        match baker_contract with
         | None -> return None
         | Some contract -> Contract.get_delegate_opt ctxt contract
       end >>=? fun delegate ->
@@ -239,19 +239,19 @@ let apply_anonymous_operation ctxt miner_contract origination_nonce kind =
       return (ctxt, origination_nonce)
 
 let apply_operation
-    ctxt miner_contract pred_block block_prio operation =
+    ctxt baker_contract pred_block block_prio operation =
   match operation.contents with
   | Anonymous_operations ops ->
       let origination_nonce = Contract.initial_origination_nonce operation.hash in
       fold_left_s
         (fun (ctxt, origination_nonce) ->
-           apply_anonymous_operation ctxt miner_contract origination_nonce)
+           apply_anonymous_operation ctxt baker_contract origination_nonce)
         (ctxt, origination_nonce) ops >>=? fun (ctxt, origination_nonce) ->
       return (ctxt, Contract.originated_contracts origination_nonce, None)
   | Sourced_operations op ->
       let origination_nonce = Contract.initial_origination_nonce operation.hash in
       apply_sourced_operation
-        ctxt miner_contract pred_block block_prio
+        ctxt baker_contract pred_block block_prio
         operation origination_nonce op >>=? fun (ctxt, origination_nonce, err) ->
       return (ctxt, Contract.originated_contracts origination_nonce, err)
 
@@ -277,10 +277,10 @@ let begin_full_construction ctxt pred_timestamp proto_header =
     (Block_header.parse_unsigned_proto_header
        proto_header) >>=? fun proto_header ->
   Baking.check_baking_rights
-    ctxt proto_header pred_timestamp >>=? fun miner ->
-  Baking.pay_baking_bond ctxt proto_header miner >>=? fun ctxt ->
+    ctxt proto_header pred_timestamp >>=? fun baker ->
+  Baking.pay_baking_bond ctxt proto_header baker >>=? fun ctxt ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, proto_header, miner)
+  return (ctxt, proto_header, baker)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
@@ -290,18 +290,18 @@ let begin_application ctxt block_header pred_timestamp =
   Baking.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
   Baking.check_baking_rights
-    ctxt block_header.proto pred_timestamp >>=? fun miner ->
-  Baking.check_signature ctxt block_header miner >>=? fun () ->
-  Baking.pay_baking_bond ctxt block_header.proto miner >>=? fun ctxt ->
+    ctxt block_header.proto pred_timestamp >>=? fun baker ->
+  Baking.check_signature ctxt block_header baker >>=? fun () ->
+  Baking.pay_baking_bond ctxt block_header.proto baker >>=? fun ctxt ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, miner)
+  return (ctxt, baker)
 
-let finalize_application ctxt block_proto_header miner =
+let finalize_application ctxt block_proto_header baker =
   (* end of level (from this point nothing should fail) *)
   let priority = block_proto_header.Block_header.priority in
   let reward = Baking.base_baking_reward ctxt ~priority in
   Nonce.record_hash ctxt
-    miner reward block_proto_header.seed_nonce_hash >>=? fun ctxt ->
+    baker reward block_proto_header.seed_nonce_hash >>=? fun ctxt ->
   Reward.pay_due_rewards ctxt >>=? fun ctxt ->
   (* end of cycle *)
   may_start_new_cycle ctxt >>=? fun ctxt ->

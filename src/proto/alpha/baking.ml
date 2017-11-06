@@ -24,7 +24,7 @@ let () =
     ~id:"baking.timestamp_too_early"
     ~title:"Block forged too early"
     ~description:"The block timestamp is before the first slot \
-                  for this miner at this level"
+                  for this baker at this level"
     ~pp:(fun ppf (r, p) ->
       Format.fprintf ppf "Block forged too early (%a is before %a)"
                      Time.pp_hum p Time.pp_hum r)
@@ -78,7 +78,7 @@ let () =
     ~id:"baking.cannot_pay_baking_bond"
     ~title:"Cannot pay baking bond"
     ~description:
-      "Impossible to take the required tokens on the miner's contract"
+      "Impossible to take the required tokens on the baker's contract"
     ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay the baking bond")
     Data_encoding.unit
     (function Cannot_pay_baking_bond -> Some () | _ -> None)

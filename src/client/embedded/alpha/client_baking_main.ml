@@ -124,7 +124,7 @@ let commands () =
       (args2 force_switch max_priority_arg)
       (prefixes [ "endorse"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
-         ~name:"miner" ~desc: "name of the delegate owning the endorsement right"
+         ~name:"baker" ~desc: "name of the delegate owning the endorsement right"
        @@ stop)
       (fun (force, max_priority) (_, delegate) cctxt ->
          endorse_block cctxt
@@ -133,7 +133,7 @@ let commands () =
       (args3 max_priority_arg force_switch free_baking_switch)
       (prefixes [ "mine"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
-         ~name:"miner" ~desc: "name of the delegate owning the baking right"
+         ~name:"baker" ~desc: "name of the delegate owning the baking right"
        @@ stop)
       (fun (max_priority, force, free_baking) (_, delegate) cctxt ->
          mine_block cctxt cctxt.config.block
