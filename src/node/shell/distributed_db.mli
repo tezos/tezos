@@ -84,7 +84,7 @@ module type DISTRIBUTED_DB = sig
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
   val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
-  val clear: t -> key -> unit
+  val clear_or_cancel: t -> key -> unit
 end
 
 module Block_header :

@@ -24,7 +24,7 @@ module type DISTRIBUTED_DB = sig
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
   val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
 
-  val clear: t -> key -> unit
+  val clear_or_cancel: t -> key -> unit
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
 
@@ -57,6 +57,7 @@ module type SCHEDULER_EVENTS = sig
   type key
   val request: t -> P2p.Peer_id.t option -> key -> unit
   val notify: t -> P2p.Peer_id.t -> key -> unit
+  val notify_cancelation: t -> key -> unit
   val notify_unrequested: t -> P2p.Peer_id.t -> key -> unit
   val notify_duplicate: t -> P2p.Peer_id.t -> key -> unit
   val notify_invalid: t -> P2p.Peer_id.t -> key -> unit

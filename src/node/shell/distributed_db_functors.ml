@@ -24,7 +24,7 @@ module type DISTRIBUTED_DB = sig
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
   val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
 
-  val clear: t -> key -> unit
+  val clear_or_cancel: t -> key -> unit
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
 
@@ -56,6 +56,7 @@ module type SCHEDULER_EVENTS = sig
   type key
   val request: t -> P2p.Peer_id.t option -> key -> unit
   val notify: t -> P2p.Peer_id.t -> key -> unit
+  val notify_cancelation: t -> key -> unit
   val notify_unrequested: t -> P2p.Peer_id.t -> key -> unit
   val notify_duplicate: t -> P2p.Peer_id.t -> key -> unit
   val notify_invalid: t -> P2p.Peer_id.t -> key -> unit
@@ -215,10 +216,13 @@ end = struct
     | Found _ ->
         Lwt.return_false
 
-  let clear s k =
+  let clear_or_cancel s k =
     match Memory_table.find s.memory k with
     | exception Not_found -> ()
-    | Pending _ -> assert false
+    | Pending (w, _) ->
+        Scheduler.notify_cancelation s.scheduler k ;
+        Memory_table.remove s.memory k ;
+        Lwt.wakeup_later_exn w Lwt.Canceled
     | Found _ -> Memory_table.remove s.memory k
 
   let watch s = Watcher.create_stream s.input
@@ -268,6 +272,7 @@ end = struct
   and event =
     | Request of P2p.Peer_id.t option * key
     | Notify of P2p.Peer_id.t * key
+    | Notify_cancelation of key
     | Notify_invalid of P2p.Peer_id.t * key
     | Notify_duplicate of P2p.Peer_id.t * key
     | Notify_unrequested of P2p.Peer_id.t * key
@@ -278,6 +283,10 @@ end = struct
     debug "push received %a from %a"
       Hash.pp k P2p.Peer_id.pp_short p ;
     t.push_to_worker (Notify (p, k))
+  let notify_cancelation t k =
+    debug "push cancelation %a"
+      Hash.pp k ;
+    t.push_to_worker (Notify_cancelation k)
   let notify_invalid t p k =
     debug "push received invalid %a from %a"
       Hash.pp k P2p.Peer_id.pp_short p ;
@@ -360,6 +369,11 @@ end = struct
         Table.remove state.pending key ;
         lwt_debug "received %a from %a"
           Hash.pp key P2p.Peer_id.pp_short peer >>= fun () ->
+        Lwt.return_unit
+    | Notify_cancelation key ->
+        Table.remove state.pending key ;
+        lwt_debug "canceled %a"
+          Hash.pp key >>= fun () ->
         Lwt.return_unit
     | Notify_invalid (peer, key) ->
         lwt_debug "received invalid %a from %a"
