@@ -133,7 +133,7 @@ let apply_manager_operation_content
             Script_interpreter.execute
               origination_nonce
               source destination ctxt script amount argument
-              (Constants.instructions_per_transaction ctxt)
+              (Gas.of_int (Constants.max_gas ctxt))
             >>= function
             | Ok (storage_res, _res, _steps, ctxt, origination_nonce) ->
                 (* TODO: pay for the steps and the storage diff:

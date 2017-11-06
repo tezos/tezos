@@ -76,9 +76,9 @@ module Constants = struct
   let max_signing_slot c =
     let constants = Raw_context.constants c in
     constants.max_signing_slot
-  let instructions_per_transaction c =
+  let max_gas c =
     let constants = Raw_context.constants c in
-    constants.instructions_per_transaction
+    constants.max_gas
   let proof_of_work_threshold c =
     let constants = Raw_context.constants c in
     constants.proof_of_work_threshold

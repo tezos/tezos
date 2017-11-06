@@ -138,7 +138,7 @@ module Constants = struct
       ~error: Data_encoding.empty
       RPC_path.(custom_root / "constants" / "max_signing_slot")
 
-  let instructions_per_transaction custom_root =
+  let max_gas custom_root =
     RPC_service.post_service
       ~description: "Instructions per transaction"
       ~query: RPC_query.empty
@@ -146,7 +146,7 @@ module Constants = struct
       ~output: (wrap_tzerror @@
                 describe ~title: "instructions per transaction" int31)
       ~error: Data_encoding.empty
-      RPC_path.(custom_root / "constants" / "instructions_per_transaction")
+      RPC_path.(custom_root / "constants" / "max_gas")
 
   let proof_of_work_threshold custom_root =
     RPC_service.post_service
@@ -479,7 +479,7 @@ module Helpers = struct
                      (req "trace"
                         (list @@ obj3
                            (req "location" Script.location_encoding)
-                           (req "gas" int31)
+                           (req "gas" Gas.encoding)
                            (req "stack" (list (Script.expr_encoding)))))))
       ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "trace_code")

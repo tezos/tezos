@@ -121,6 +121,7 @@ module Script_timestamp : sig
   val add_delta : t -> z num -> t
   val sub_delta : t -> z num -> t
   val now : context -> t
+  val to_zint : t -> Z.t
 end
 
 module Script : sig
@@ -275,7 +276,7 @@ module Constants : sig
   val slot_durations: context -> Period.t list
   val first_free_baking_slot: context -> int
   val max_signing_slot: context -> int
-  val instructions_per_transaction: context -> int
+  val max_gas: context -> int
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Ed25519.Public_key.t
   val max_number_of_operations: context -> int list

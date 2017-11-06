@@ -78,3 +78,10 @@ external of_int: int -> t = "ml_z_of_int" [@@ noalloc]
 
 external equal: t -> t -> bool = "ml_z_equal" [@@ noalloc]
 external compare: t -> t -> int = "ml_z_compare" [@@ noalloc]
+
+external numbits: t -> int = "ml_z_numbits" [@@ noalloc]
+(** Returns the number of significant bits in the given number.
+    If [x] is zero, [numbits x] returns 0.  Otherwise,
+    [numbits x] returns a positive integer [n] such that
+    [2^{n-1} <= |x| < 2^n].  Note that [numbits] is defined
+    for negative arguments, and that [numbits (-x) = numbits x]. *)

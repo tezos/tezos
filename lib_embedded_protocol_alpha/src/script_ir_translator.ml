@@ -418,6 +418,7 @@ let empty_set
       type elt = a
       module OPS = OPS
       let boxed = OPS.empty
+      let size = 0
     end)
 
 let set_update
@@ -427,10 +428,14 @@ let set_update
       type elt = a
       module OPS = Box.OPS
       let boxed =
-        if b then
-          Box.OPS.add v Box.boxed
-        else
-          Box.OPS.remove v Box.boxed
+        if b
+        then Box.OPS.add v Box.boxed
+        else Box.OPS.remove v Box.boxed
+      let size =
+        let mem = Box.OPS.mem v Box.boxed in
+        if mem
+        then if b then Box.size else Box.size - 1
+        else if b then Box.size + 1 else Box.size
     end)
 
 let set_mem
@@ -446,7 +451,7 @@ let set_fold
 let set_size
   : type elt. elt set -> Script_int.n Script_int.num =
   fun (module Box) ->
-    Script_int.(abs (of_int (Box.OPS.cardinal Box.boxed)))
+    Script_int.(abs (of_int Box.size))
 
 let map_key_ty
   : type a b. (a, b) map -> a comparable_ty
@@ -464,13 +469,13 @@ let empty_map
       type value = b
       let key_ty = ty
       module OPS = OPS
-      let boxed = OPS.empty
+      let boxed = (OPS.empty, 0)
     end)
 
 let map_get
   : type key value. key -> (key, value) map -> value option
   = fun k (module Box) ->
-    try Some (Box.OPS.find k Box.boxed) with Not_found -> None
+    try Some (Box.OPS.find k (fst Box.boxed)) with Not_found -> None
 
 let map_update
   : type a b. a -> b option -> (a, b) map -> (a, b) map
@@ -481,25 +486,27 @@ let map_update
       let key_ty = Box.key_ty
       module OPS = Box.OPS
       let boxed =
+        let (map, size) = Box.boxed in
+        let contains = Box.OPS.mem k map in
         match v with
-        | Some v -> Box.OPS.add k v Box.boxed
-        | None -> Box.OPS.remove k Box.boxed
+        | Some v -> (Box.OPS.add k v map, size + if contains then 0 else 1)
+        | None -> (Box.OPS.remove k map, size - if contains then 1 else 0)
     end)
 
 let map_mem
   : type key value. key -> (key, value) map -> bool
   = fun k (module Box) ->
-    Box.OPS.mem k Box.boxed
+    Box.OPS.mem k (fst Box.boxed)
 
 let map_fold
   : type key value acc. (key -> value -> acc -> acc) -> (key, value) map -> acc -> acc
   = fun f (module Box) ->
-    Box.OPS.fold f Box.boxed
+    Box.OPS.fold f (fst Box.boxed)
 
 let map_size
   : type key value. (key, value) map -> Script_int.n Script_int.num =
   fun (module Box) ->
-    Script_int.(abs (of_int (Box.OPS.cardinal Box.boxed)))
+    Script_int.(abs (of_int (snd Box.boxed)))
 
 (* ---- Unparsing (Typed IR -> Untyped epressions) --------------------------*)
 

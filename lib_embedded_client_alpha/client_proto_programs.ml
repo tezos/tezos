@@ -53,9 +53,9 @@ let print_trace_result (cctxt : #Client_commands.logger) ~show_source ~parsed =
         (Format.pp_print_list
            (fun ppf (loc, gas, stack) ->
               Format.fprintf ppf
-                "- @[<v 0>location: %d (remaining gas: %d)@,\
+                "- @[<v 0>location: %d (remaining gas: %a)@,\
                  [ @[<v 0>%a ]@]@]"
-                loc gas
+                loc Gas.pp gas
                 (Format.pp_print_list print_expr)
                 stack))
         trace >>= fun () ->

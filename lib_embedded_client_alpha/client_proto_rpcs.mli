@@ -163,7 +163,7 @@ module Helpers : sig
     block -> Script.expr ->
     (Script.expr * Script.expr * Tez.t) ->
     (Script.expr * Script.expr *
-     (Script.location * int * Script.expr list) list) tzresult Lwt.t
+     (Script.location * Gas.t * Script.expr list) list) tzresult Lwt.t
   val typecheck_code:
     #Client_rpcs.ctxt ->
     block -> Script.expr -> Script_ir_translator.type_map tzresult Lwt.t

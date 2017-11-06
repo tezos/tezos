@@ -28,3 +28,5 @@ val diff : t -> t -> z num
 val add_delta : t -> z num -> t
 
 val sub_delta : t -> z num -> t
+
+val to_zint : t -> Z.t

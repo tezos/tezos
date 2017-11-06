@@ -123,13 +123,12 @@ let max_signing_slot ctxt () =
 
 let () = register0 Services.Constants.max_signing_slot max_signing_slot
 
-let instructions_per_transaction ctxt () =
-  return @@ Constants.instructions_per_transaction ctxt
+let max_gas ctxt () =
+  return @@ Constants.max_gas ctxt
 
 let () =
   register0
-    Services.Constants.instructions_per_transaction
-    instructions_per_transaction
+    Services.Constants.max_gas max_gas
 
 let proof_of_work_threshold ctxt () =
   return @@ Constants.proof_of_work_threshold ctxt
@@ -280,36 +279,36 @@ let () =
       | None ->
           Contract.default_contract
             (List.hd (Bootstrap.accounts ctxt)).Bootstrap.public_key_hash in
-    let qta =
-      Constants.instructions_per_transaction ctxt in
+    let max_gas =
+      Constants.max_gas ctxt in
     let origination_nonce =
       match origination_nonce with
       | Some origination_nonce -> origination_nonce
       | None ->
           Contract.initial_origination_nonce
             (Operation_hash.hash_string [ "FAKE " ; "FAKE" ; "FAKE" ]) in
-    (script, storage, input, amount, contract, qta, origination_nonce) in
+    (script, storage, input, amount, contract, max_gas, origination_nonce) in
   register1 Services.Helpers.run_code
     (fun ctxt () parameters ->
-       let (code, storage, input, amount, contract, qta, origination_nonce) =
+       let (code, storage, input, amount, contract, gas, origination_nonce) =
          run_parameters ctxt parameters in
        Script_interpreter.execute
          origination_nonce
          contract (* transaction initiator *)
          contract (* script owner *)
          ctxt { storage ; code } amount input
-         qta >>=? fun (sto, ret, _qta, _ctxt, _) ->
+         (Gas.of_int gas) >>=? fun (sto, ret, _gas, _ctxt, _) ->
        Error_monad.return (sto, ret)) ;
   register1 Services.Helpers.trace_code
     (fun ctxt () parameters ->
-       let (code, storage, input, amount, contract, qta, origination_nonce) =
+       let (code, storage, input, amount, contract, gas, origination_nonce) =
          run_parameters ctxt parameters in
        Script_interpreter.trace
          origination_nonce
          contract (* transaction initiator *)
          contract (* script owner *)
          ctxt { storage ; code } amount input
-         qta >>=? fun ((sto, ret, _qta, _ctxt, _), trace) ->
+         (Gas.of_int gas) >>=? fun ((sto, ret, _gas, _ctxt, _), trace) ->
        Error_monad.return (sto, ret, trace))
 
 let () =

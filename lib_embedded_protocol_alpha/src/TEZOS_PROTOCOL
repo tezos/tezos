@@ -46,6 +46,7 @@
         "Tezos_context",
 
         "Script_typed_ir",
+        "Gas",
         "Script_ir_translator",
         "Script_interpreter",
 

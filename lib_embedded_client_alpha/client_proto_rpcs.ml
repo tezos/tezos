@@ -64,7 +64,7 @@ module Constants = struct
   let max_signing_slot cctxt block =
     call_error_service1 cctxt Services.Constants.max_signing_slot block ()
   let instructions_per_transaction cctxt block =
-    call_error_service1 cctxt Services.Constants.instructions_per_transaction block ()
+    call_error_service1 cctxt Services.Constants.max_gas block ()
   let stamp_threshold cctxt block =
     call_error_service1 cctxt Services.Constants.proof_of_work_threshold block ()
 end

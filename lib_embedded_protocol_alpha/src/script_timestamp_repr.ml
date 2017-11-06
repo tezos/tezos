@@ -43,3 +43,5 @@ let sub_delta t delta = Z.sub t (Script_int_repr.to_zint delta)
 
 let add_delta t delta =
   Z.add t (Script_int_repr.to_zint delta)
+
+let to_zint x = x

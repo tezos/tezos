@@ -47,7 +47,7 @@ type constants = {
   slot_durations: Period_repr.t list ;
   first_free_baking_slot: int ;
   max_signing_slot: int ;
-  instructions_per_transaction: int ;
+  max_gas: int ;
   proof_of_work_threshold: int64 ;
   bootstrap_keys: Ed25519.Public_key.t list ;
   dictator_pubkey: Ed25519.Public_key.t ;
@@ -71,7 +71,7 @@ let default = {
     List.map Period_repr.of_seconds_exn [ 60L ] ;
   first_free_baking_slot = 16 ;
   max_signing_slot = 15 ;
-  instructions_per_transaction = 16 * 1024 ;
+  max_gas = 40_000 ;
   proof_of_work_threshold =
     Int64.(lognot (sub (shift_left 1L 56) 1L)) ;
   bootstrap_keys =
@@ -128,9 +128,9 @@ let constants_encoding =
        and max_signing_slot =
          opt Compare.Int.(=)
            default.max_signing_slot c.max_signing_slot
-       and instructions_per_transaction =
+       and max_gas =
          opt Compare.Int.(=)
-           default.instructions_per_transaction c.instructions_per_transaction
+           default.max_gas c.max_gas
        and proof_of_work_threshold =
          opt Compare.Int64.(=)
            default.proof_of_work_threshold c.proof_of_work_threshold
@@ -159,7 +159,7 @@ let constants_encoding =
            slot_durations,
            first_free_baking_slot,
            max_signing_slot,
-           instructions_per_transaction,
+           max_gas,
            proof_of_work_threshold,
            bootstrap_keys,
            dictator_pubkey),
@@ -173,7 +173,7 @@ let constants_encoding =
              slot_durations,
              first_free_baking_slot,
              max_signing_slot,
-             instructions_per_transaction,
+             max_gas,
              proof_of_work_threshold,
              bootstrap_keys,
              dictator_pubkey),
@@ -195,8 +195,8 @@ let constants_encoding =
           unopt default.first_free_baking_slot first_free_baking_slot ;
         max_signing_slot =
           unopt default.max_signing_slot max_signing_slot ;
-        instructions_per_transaction =
-          unopt default.instructions_per_transaction instructions_per_transaction ;
+        max_gas =
+          unopt default.max_gas max_gas ;
         proof_of_work_threshold =
           unopt default.proof_of_work_threshold proof_of_work_threshold ;
         bootstrap_keys =

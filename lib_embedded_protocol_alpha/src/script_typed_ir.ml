@@ -26,6 +26,7 @@ module type Boxed_set = sig
   type elt
   module OPS : Set.S with type elt = elt
   val boxed : OPS.t
+  val size : int
 end
 
 type 'elt set = (module Boxed_set with type elt = 'elt)
@@ -35,7 +36,7 @@ module type Boxed_map = sig
   type value
   val key_ty : key comparable_ty
   module OPS : Map.S with type key = key
-  val boxed : value OPS.t
+  val boxed : value OPS.t * int
 end
 
 type ('key, 'value) map = (module Boxed_map with type key = 'key and type value = 'value)

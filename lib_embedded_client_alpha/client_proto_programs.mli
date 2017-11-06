@@ -28,14 +28,14 @@ val trace :
   input:Michelson_v1_parser.parsed ->
   Client_rpcs.block ->
   #Client_rpcs.ctxt ->
-  (Script.expr * Script.expr * (int * int * Script.expr list) list) tzresult Lwt.t
+  (Script.expr * Script.expr * (int * Gas.t * Script.expr list) list) tzresult Lwt.t
 
 val print_trace_result :
   #Client_commands.logger ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr * Script_repr.expr *
-   (int * int * Script_repr.expr list) list)
+   (int * Gas.t * Script_repr.expr list) list)
     tzresult -> unit tzresult Lwt.t
 
 val print_run_result :
