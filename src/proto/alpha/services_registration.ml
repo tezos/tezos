@@ -240,7 +240,7 @@ let () = register1
              minimal_timestamp ctxt slot timestamp)
 
 let () =
-  (* ctxt accept_failing_script miner_contract pred_block block_prio operation *)
+  (* ctxt accept_failing_script baker_contract pred_block block_prio operation *)
   register1 Services.Helpers.apply_operation
     (fun ctxt (pred_block, hash, forged_operation, signature) ->
        match Data_encoding.Binary.of_bytes
@@ -250,11 +250,11 @@ let () =
        | Some (shell, contents) ->
            let operation = { hash ; shell ; contents ; signature } in
            let level = Tezos_context.Level.current ctxt in
-           Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (miner_pkh, _)) ->
-           let miner_contract = Contract.default_contract miner_pkh in
+           Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (baker_pkh, _)) ->
+           let baker_contract = Contract.default_contract baker_pkh in
            let block_prio = 0 in
            Apply.apply_operation
-             ctxt (Some miner_contract) pred_block block_prio operation
+             ctxt (Some baker_contract) pred_block block_prio operation
            >>=? function
            | (_ctxt, _, Some script_err) -> Lwt.return (Error script_err)
            | (_ctxt, contracts, None) -> Lwt.return (Ok contracts)) ;

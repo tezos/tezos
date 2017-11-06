@@ -124,7 +124,7 @@ let fee_arg =
   tez_arg
     ~default:"0.05"
     ~parameter:"-fee"
-    ~doc:"The fee in \xEA\x9C\xA9 to pay to the miner."
+    ~doc:"The fee in \xEA\x9C\xA9 to pay to the baker."
 
 let max_priority_arg =
   arg

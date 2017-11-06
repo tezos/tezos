@@ -27,7 +27,7 @@ let rpc_services = Services_registration.rpc_services
 type validation_mode =
   | Application of {
       block_header : Tezos_context.Block_header.t ;
-      miner : Tezos_context.public_key_hash ;
+      baker : Tezos_context.public_key_hash ;
     }
   | Partial_construction of {
       predecessor : Block_hash.t ;
@@ -35,7 +35,7 @@ type validation_mode =
   | Full_construction of {
       predecessor : Block_hash.t ;
       block_proto_header : Tezos_context.Block_header.proto_header ;
-      miner : Tezos_context.public_key_hash ;
+      baker : Tezos_context.public_key_hash ;
     }
 
 type validation_state =
@@ -65,8 +65,8 @@ let begin_application
   let timestamp = block_header.shell.timestamp in
   Tezos_context.init ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
-    ctxt block_header pred_timestamp >>=? fun (ctxt, miner) ->
-  let mode = Application { block_header ; miner } in
+    ctxt block_header pred_timestamp >>=? fun (ctxt, baker) ->
+  let mode = Application { block_header ; baker } in
   return { mode ; ctxt ; op_count = 0 }
 
 let begin_construction
@@ -90,27 +90,27 @@ let begin_construction
     | Some proto_header ->
         Apply.begin_full_construction
           ctxt pred_timestamp
-          proto_header >>=? fun (ctxt, block_proto_header, miner) ->
+          proto_header >>=? fun (ctxt, block_proto_header, baker) ->
         let mode =
-          Full_construction { predecessor ; miner ; block_proto_header } in
+          Full_construction { predecessor ; baker ; block_proto_header } in
         return (mode, ctxt)
   end >>=? fun (mode, ctxt) ->
   return { mode ; ctxt ; op_count = 0 }
 
 let apply_operation ({ mode ; ctxt ; op_count } as data) operation =
-  let pred_block, block_prio, miner_contract =
+  let pred_block, block_prio, baker_contract =
     match mode with
     | Partial_construction { predecessor } ->
         predecessor, 0, None
     | Application
-        { miner ;  block_header = { shell = { predecessor } ;
+        { baker ;  block_header = { shell = { predecessor } ;
                                     proto = block_proto_header } }
-    | Full_construction { predecessor ; block_proto_header ; miner } ->
+    | Full_construction { predecessor ; block_proto_header ; baker } ->
         predecessor,
         block_proto_header.priority,
-        Some (Tezos_context.Contract.default_contract miner) in
+        Some (Tezos_context.Contract.default_contract baker) in
   Apply.apply_operation
-    ctxt miner_contract pred_block block_prio operation
+    ctxt baker_contract pred_block block_prio operation
   >>=? fun (ctxt, _contracts, _ignored_script_error) ->
   let op_count = op_count + 1 in
   return { data with ctxt ; op_count }
@@ -120,9 +120,9 @@ let finalize_block { mode ; ctxt ; op_count } = match mode with
       let ctxt = Tezos_context.finalize ctxt in
       return ctxt
   | Application
-      { miner ;  block_header = { proto = block_proto_header } }
-  | Full_construction { block_proto_header ; miner } ->
-      Apply.finalize_application ctxt block_proto_header miner >>=? fun ctxt ->
+      { baker ;  block_header = { proto = block_proto_header } }
+  | Full_construction { block_proto_header ; baker } ->
+      Apply.finalize_application ctxt block_proto_header baker >>=? fun ctxt ->
       let { level } : Tezos_context.Level.t =
         Tezos_context. Level.current ctxt in
       let priority = block_proto_header.priority in
