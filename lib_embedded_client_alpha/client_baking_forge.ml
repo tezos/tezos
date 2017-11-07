@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_commands
 open Logging.Client.Baking
 
 let generate_proof_of_work_nonce () =
@@ -200,11 +199,11 @@ let forge_block cctxt block
 module State : sig
 
   val get_block:
-    Client_commands.context ->
+    #Client_commands.wallet ->
     Raw_level.t -> Block_hash.t list tzresult Lwt.t
 
   val record_block:
-    Client_commands.context ->
+    #Client_commands.wallet ->
     Raw_level.t -> Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
 
 end = struct
@@ -224,41 +223,18 @@ end = struct
                (req "level" Raw_level.encoding)
                (req "blocks" (list Block_hash.encoding))))
 
-  let filename cctxt =
-    Client_commands.(Filename.concat cctxt.config.base_dir "blocks")
+  let name =
+    "blocks"
 
-  let load cctxt =
-    let filename = filename cctxt in
-    if not (Sys.file_exists filename) then return LevelMap.empty else
-      Data_encoding_ezjsonm.read_file filename >>= function
-      | Error _ ->
-          failwith "couldn't to read the block file"
-      | Ok json ->
-          match Data_encoding.Json.destruct encoding json with
-          | exception _ -> (* TODO print_error *)
-              failwith "didn't understand the block file"
-          | map ->
-              return map
+  let load (wallet : #Client_commands.wallet) =
+    wallet#load name ~default:LevelMap.empty encoding
 
-  let save cctxt map =
-    Lwt.catch
-      (fun () ->
-         let dirname = Client_commands.(cctxt.config.base_dir) in
-         (if not (Sys.file_exists dirname) then Lwt_utils.create_dir dirname
-          else Lwt.return ()) >>= fun () ->
-         let filename = filename cctxt in
-         let json = Data_encoding.Json.construct encoding map in
-         Data_encoding_ezjsonm.write_file filename json >>= function
-         | Error _ -> failwith "Json.write_file"
-         | Ok () -> return ())
-      (fun exn ->
-         failwith
-           "could not write the block file: %s."
-           (Printexc.to_string exn))
+  let save (wallet : #Client_commands.wallet) map =
+    wallet#write name map encoding
 
   let lock = Lwt_mutex.create ()
 
-  let get_block cctxt level =
+  let get_block (cctxt : #Client_commands.wallet) level =
     Lwt_mutex.with_lock lock
       (fun () ->
          load cctxt >>=? fun map ->
@@ -350,33 +326,33 @@ let compute_timeout { future_slots } =
       else
         Lwt_unix.sleep (Int64.to_float delay)
 
-let get_unrevealed_nonces cctxt ?(force = false) block =
-  Client_proto_rpcs.Context.next_level cctxt.rpc_config block >>=? fun level ->
+let get_unrevealed_nonces (cctxt : Client_commands.full_context) ?(force = false) block =
+  Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
   let cur_cycle = level.cycle in
   match Cycle.pred cur_cycle with
   | None -> return []
   | Some cycle ->
       Client_baking_blocks.blocks_from_cycle
-        cctxt.rpc_config block cycle >>=? fun blocks ->
+        cctxt block cycle >>=? fun blocks ->
       filter_map_s (fun hash ->
-          Client_proto_nonces.find cctxt hash >>= function
+          Client_proto_nonces.find cctxt hash >>=? function
           | None -> return None
           | Some nonce ->
               Client_proto_rpcs.Context.level
-                cctxt.rpc_config (`Hash hash) >>=? fun level ->
+                cctxt (`Hash hash) >>=? fun level ->
               if force then
                 return (Some (hash, (level.level, nonce)))
               else
                 Client_proto_rpcs.Context.Nonce.get
-                  cctxt.rpc_config block level.level >>=? function
+                  cctxt block level.level >>=? function
                 | Missing nonce_hash
                   when Nonce.check_hash nonce nonce_hash ->
-                    cctxt.warning "Found nonce for %a (level: %a)@."
+                    cctxt#warning "Found nonce for %a (level: %a)@."
                       Block_hash.pp_short hash
                       Level.pp level >>= fun () ->
                     return (Some (hash, (level.level, nonce)))
                 | Missing _nonce_hash ->
-                    cctxt.error "Incoherent nonce for level %a"
+                    cctxt#error "Incoherent nonce for level %a"
                       Raw_level.pp level.level >>= fun () ->
                     return None
                 | Forgotten -> return None
@@ -398,7 +374,7 @@ let get_delegates cctxt state =
   | _ :: _ as delegates -> return delegates
 
 let insert_block
-    cctxt ?max_priority state (bi: Client_baking_blocks.block_info) =
+    (cctxt : Client_commands.full_context) ?max_priority state (bi: Client_baking_blocks.block_info) =
   begin
     safe_get_unrevealed_nonces cctxt (`Hash bi.hash) >>= fun nonces ->
     Client_baking_revelation.forge_seed_nonce_revelation
@@ -410,7 +386,7 @@ let insert_block
       ~before:(Time.add state.best.timestamp (-1800L)) state ;
   end ;
   get_delegates cctxt state >>=? fun delegates ->
-  get_baking_slot cctxt.rpc_config ?max_priority bi delegates >>= function
+  get_baking_slot cctxt ?max_priority bi delegates >>= function
   | None ->
       lwt_debug
         "Can't compute slot for %a" Block_hash.pp_short bi.hash >>= fun () ->
@@ -443,7 +419,7 @@ let insert_blocks cctxt ?max_priority state bis =
       Format.eprintf "Error: %a" pp_print_error err  ;
       Lwt.return_unit
 
-let bake cctxt state =
+let bake (cctxt : Client_commands.full_context) state =
   let slots = pop_baking_slots state in
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
@@ -459,7 +435,7 @@ let bake cctxt state =
        lwt_debug "Try baking after %a (slot %d) for %s (%a)"
          Block_hash.pp_short bi.hash
          priority name Time.pp_hum timestamp >>= fun () ->
-       Client_node_rpcs.Blocks.pending_operations cctxt.rpc_config
+       Client_node_rpcs.Blocks.pending_operations cctxt
          block >>=? fun (res, ops) ->
        let operations =
          List.map snd @@
@@ -469,7 +445,7 @@ let bake cctxt state =
        let request = List.length operations in
        let proto_header =
          forge_faked_proto_header ~priority ~seed_nonce_hash in
-       Client_node_rpcs.Blocks.preapply cctxt.rpc_config block
+       Client_node_rpcs.Blocks.preapply cctxt block
          ~timestamp ~sort:true ~proto_header operations >>= function
        | Error errs ->
            lwt_log_error "Error while prevalidating operations:\n%a"
@@ -502,12 +478,12 @@ let bake cctxt state =
          (Fitness.compare state.best.fitness shell_header.fitness = 0 &&
           Time.compare shell_header.timestamp state.best.timestamp < 0) -> begin
       let level = Raw_level.succ bi.level.level in
-      cctxt.message
+      cctxt#message
         "Select candidate block after %a (slot %d) fitness: %a"
         Block_hash.pp_short bi.hash priority
         Fitness.pp shell_header.fitness >>= fun () ->
       Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
-      inject_block cctxt.rpc_config
+      inject_block cctxt
         ~force:true ~net_id:bi.net_id
         ~shell_header ~priority ~seed_nonce_hash ~src_sk
         [List.map snd operations.applied]
@@ -515,7 +491,7 @@ let bake cctxt state =
       State.record_block cctxt level block_hash seed_nonce
       |> trace_exn (Failure "Error while recording block") >>=? fun () ->
       Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
-      cctxt.message
+      cctxt#message
         "Injected block %a for %s after %a \
         \ (level %a, slot %d, fitness %a, operations %d)"
         Block_hash.pp_short block_hash
@@ -531,16 +507,16 @@ let bake cctxt state =
       return ()
 
 let create
-    cctxt ?max_priority delegates
+    (cctxt : Client_commands.full_context) ?max_priority delegates
     (block_stream:
        Client_baking_blocks.block_info list tzresult Lwt_stream.t)
     (endorsement_stream:
        Client_baking_operations.valid_endorsement tzresult Lwt_stream.t) =
   Lwt_stream.get block_stream >>= function
   | None | Some (Ok [] | Error _) ->
-      cctxt.Client_commands.error "Can't fetch the current block head."
+      cctxt#error "Can't fetch the current block head."
   | Some (Ok (bi :: _ as initial_heads)) ->
-      Client_node_rpcs.Blocks.hash cctxt.rpc_config `Genesis >>=? fun genesis_hash ->
+      Client_node_rpcs.Blocks.hash cctxt `Genesis >>=? fun genesis_hash ->
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with

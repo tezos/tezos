@@ -50,7 +50,7 @@ let pp_block ppf
     operations
     (Hex_encode.hex_of_bytes data)
 
-let stuck_node_report (cctxt : Client_commands.context) file =
+let stuck_node_report cctxt file =
   let ppf = Format.formatter_of_out_channel (open_out file) in
   let skip_line () =
     Format.pp_print_newline ppf ();
@@ -70,7 +70,7 @@ let stuck_node_report (cctxt : Client_commands.context) file =
     (Client_commands.get_versions ()) >>=? fun () ->
   skip_line () >>=? fun () ->
   print_title "Heads:" 2 >>=? fun () ->
-  Client_rpcs.call_service0 cctxt.rpc_config Node_rpc_services.Blocks.list
+  Client_rpcs.call_service0 cctxt Node_rpc_services.Blocks.list
     { include_ops = true ;
       length = Some 1 ;
       heads = None ;
@@ -89,8 +89,7 @@ let stuck_node_report (cctxt : Client_commands.context) file =
     ppf heads >>=? fun () ->
   skip_line () >>=? fun () ->
   print_title "Rejected blocks:" 2 >>=? fun () ->
-  Client_rpcs.call_service0
-    cctxt.rpc_config
+  Client_rpcs.call_service0 cctxt
     Node_rpc_services.Blocks.list_invalid () >>=? fun invalid ->
   return @@
   Format.pp_print_list

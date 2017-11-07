@@ -9,29 +9,8 @@
 
 (* Tezos Command line interface - Main Program *)
 
-open Client_commands
-
-let cctxt config rpc_config =
-  let startup =
-    CalendarLib.Printer.Precise_Calendar.sprint
-      "%Y-%m-%dT%H:%M:%SZ"
-      (CalendarLib.Calendar.Precise.now ()) in
-  let log channel msg = match channel with
-    | "stdout" ->
-        print_endline msg ;
-        Lwt.return ()
-    | "stderr" ->
-        prerr_endline msg ;
-        Lwt.return ()
-    | log ->
-        let (//) = Filename.concat in
-        Lwt_utils.create_dir (config.base_dir // "logs" // log) >>= fun () ->
-        Lwt_io.with_file
-          ~flags: Unix.[ O_APPEND ; O_CREAT ; O_WRONLY ]
-          ~mode: Lwt_io.Output
-          Client_commands.(config.base_dir // "logs" // log // startup)
-          (fun chan -> Lwt_io.write chan msg) in
-  Client_commands.make_context ~config ~rpc_config log
+let cctxt ~base_dir ~block rpc_config =
+  Client_commands.make_context ~base_dir ~block ~rpc_config (Client_commands.default_log ~base_dir)
 
 (* Main (lwt) entry *)
 let main () =
@@ -41,7 +20,9 @@ let main () =
     let original_args = List.tl (Array.to_list Sys.argv) in
     begin
       Client_config.parse_config_args
-        (cctxt Client_commands.default_cfg Client_rpcs.default_config)
+        (cctxt ~base_dir:Client_commands.default_base_dir
+           ~block:Client_commands.default_block
+           Client_rpcs.default_config)
         original_args
       >>=? fun (parsed_config_file, parsed_args, remaining) ->
       let rpc_config : Client_rpcs.config = {
@@ -51,7 +32,7 @@ let main () =
         tls = parsed_config_file.tls ;
       } in
       begin
-        Client_node_rpcs.Blocks.protocol rpc_config parsed_args.block >>= function
+        Client_node_rpcs.Blocks.protocol (new Client_rpcs.rpc rpc_config) parsed_args.block >>= function
         | Ok version -> begin
             match parsed_args.protocol with
             | None ->
@@ -87,27 +68,24 @@ let main () =
         Client_helpers.commands () @
         Client_debug.commands () @
         commands_for_version in
-      let config : Client_commands.cfg = {
-        base_dir = parsed_config_file.base_dir ;
-        block = parsed_args.block ;
-      } in
       let rpc_config =
         if parsed_args.print_timings then
           { rpc_config with
             logger = Client_rpcs.timings_logger Format.err_formatter }
         else if parsed_args.log_requests
-        then {rpc_config with logger = Client_rpcs.full_logger Format.err_formatter }
+        then { rpc_config with logger = Client_rpcs.full_logger Format.err_formatter }
         else rpc_config
       in
-      let client_config = (cctxt config rpc_config) in
+      let client_config =
+        cctxt ~block:parsed_args.block ~base_dir:parsed_config_file.base_dir rpc_config in
       (Cli_entries.dispatch
          ~global_options:Client_config.global_options
          commands
          client_config
          remaining) end >>=
     Cli_entries.handle_cli_errors
-      ~stdout: Format.std_formatter
-      ~stderr: Format.err_formatter
+      ~stdout:Format.std_formatter
+      ~stderr:Format.err_formatter
       ~global_options:Client_config.global_options
     >>= function
     | Ok i ->

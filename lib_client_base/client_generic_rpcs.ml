@@ -10,7 +10,6 @@
 (* Tezos Command line interface - Generic JSON RPC interface *)
 
 open Lwt.Infix
-open Client_commands
 open Cli_entries
 open Json_schema
 
@@ -188,9 +187,9 @@ let rec count =
 
 (*-- Commands ---------------------------------------------------------------*)
 
-let list url cctxt =
+let list url (cctxt : Client_commands.full_context) =
   let args = String.split '/' url in
-  Client_node_rpcs.describe cctxt.rpc_config
+  Client_node_rpcs.describe cctxt
     ~recurse:true args >>=? fun tree ->
   let open RPC.Description in
   let collected_args = ref [] in
@@ -278,52 +277,52 @@ let list url cctxt =
     Format.pp_print_list
       (fun ppf (n,t) -> display ppf ([ n ], tpath @ [ n ], t))
   in
-  cctxt.message "@ @[<v 2>Available services:@ @ %a@]@."
+  cctxt#message "@ @[<v 2>Available services:@ @ %a@]@."
     display (args, args, tree) >>= fun () ->
   if !collected_args <> [] then begin
-    cctxt.message "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
+    cctxt#message "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
       (Format.pp_print_list display_arg) !collected_args >>= fun () ->
     return ()
   end else return ()
 
 
-let schema url cctxt =
+let schema url (cctxt : Client_commands.full_context) =
   let args = String.split '/' url in
   let open RPC.Description in
-  Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
+  Client_node_rpcs.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
       match RPC.MethMap.find `POST services with
       | exception Not_found ->
-          cctxt.message
+          cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
           return ()
       | { input = Some input ; output } ->
           let json = `O [ "input", Json_schema.to_json input ;
                           "output", Json_schema.to_json output ] in
-          cctxt.message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
+          cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
           return ()
       | { input = None ; output } ->
           let json = `O [ "output", Json_schema.to_json output ] in
-          cctxt.message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
+          cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
           return ()
     end
   | _ ->
-      cctxt.message
+      cctxt#message
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
       return ()
 
-let format url cctxt =
+let format url (cctxt : #Client_commands.logging_rpcs) =
   let args = String.split '/' url in
   let open RPC.Description in
-  Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
+  Client_node_rpcs.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
       match RPC.MethMap.find `POST services with
       | exception Not_found ->
-          cctxt.message
+          cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
           return ()
       | { input = Some input ; output } ->
-          cctxt.message
+          cctxt#message
             "@[<v 0>\
              @[<v 2>Input format:@,%a@]@,\
              @[<v 2>Output format:@,%a@]@,\
@@ -332,7 +331,7 @@ let format url cctxt =
             Json_schema.pp output >>= fun () ->
           return ()
       | { input = None ; output } ->
-          cctxt.message
+          cctxt#message
             "@[<v 0>\
              @[<v 2>Output format:@,%a@]@,\
              @]"
@@ -340,7 +339,7 @@ let format url cctxt =
           return ()
     end
   | _ ->
-      cctxt.message
+      cctxt#message
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
       return ()
 
@@ -351,43 +350,43 @@ let fill_in schema =
   | Any | Object { properties = [] } -> Lwt.return (Ok (`O []))
   | _ -> editor_fill_in schema
 
-let call url cctxt =
+let call url (cctxt : Client_commands.full_context) =
   let args = String.split '/' url in
   let open RPC.Description in
-  Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
+  Client_node_rpcs.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
       match RPC.MethMap.find `POST services with
       | exception Not_found ->
-          cctxt.message
+          cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
           return ()
       | { input = None } -> assert false (* TODO *)
       | { input = Some input } ->
           fill_in input >>= function
           | Error msg ->
-              cctxt.error "%s" msg >>= fun () ->
+              cctxt#error "%s" msg >>= fun () ->
               return ()
           | Ok json ->
-              Client_rpcs.get_json cctxt.rpc_config `POST args json >>=? fun json ->
-              cctxt.message "%a"
+              cctxt#get_json `POST args json >>=? fun json ->
+              cctxt#message "%a"
                 Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
               return ()
     end
   | _ ->
-      cctxt.message
+      cctxt#message
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
       return ()
 
-let call_with_json url json (cctxt: Client_commands.context) =
+let call_with_json url json (cctxt: Client_commands.full_context) =
   let args = String.split '/' url in
   match Data_encoding_ezjsonm.from_string json with
   | Error err ->
-      cctxt.error
+      cctxt#error
         "Failed to parse the provided json: %s\n%!"
         err
   | Ok json ->
-      Client_rpcs.get_json cctxt.rpc_config `POST args json >>=? fun json ->
-      cctxt.message "%a"
+      cctxt#get_json `POST args json >>=? fun json ->
+      cctxt#message "%a"
         Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
       return ()
 
@@ -400,9 +399,9 @@ let commands = [
   command ~desc: "list all understood protocol versions"
     no_options
     (fixed [ "list" ; "versions" ])
-    (fun () cctxt ->
+    (fun () (cctxt : Client_commands.full_context) ->
        Lwt_list.iter_s
-         (fun (ver, _) -> cctxt.Client_commands.message "%a" Protocol_hash.pp_short ver)
+         (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
          (Client_commands.get_versions ()) >>= fun () ->
        return ()) ;
 

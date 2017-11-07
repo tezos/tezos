@@ -13,7 +13,7 @@ type operation = {
 }
 
 val monitor:
-  Client_rpcs.config ->
+  #Client_rpcs.rpc_sig ->
   ?contents:bool -> ?check:bool -> unit ->
   operation list tzresult Lwt_stream.t tzresult Lwt.t
 
@@ -24,13 +24,7 @@ type valid_endorsement = {
   slots: int list ;
 }
 
-(*
-val filter_valid_endorsement:
-  Client_rpcs.config ->
-  operation -> valid_endorsement option Lwt.t
-*)
-
 val monitor_endorsement:
-  Client_rpcs.config ->
+  #Client_rpcs.rpc_sig ->
   valid_endorsement tzresult Lwt_stream.t tzresult Lwt.t
 

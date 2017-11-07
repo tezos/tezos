@@ -16,10 +16,10 @@ module type Entity = sig
   type t
   val encoding : t Data_encoding.t
   val of_source :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     string -> t tzresult Lwt.t
   val to_source :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     t -> string tzresult Lwt.t
   val name : string
 end
@@ -28,140 +28,116 @@ module type Alias = sig
   type t
   type fresh_param
   val load :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     (string * t) list tzresult Lwt.t
+  val set :
+    #Client_commands.wallet ->
+    (string * t) list ->
+    unit tzresult Lwt.t
   val find :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     string -> t tzresult Lwt.t
   val find_opt :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     string -> t option tzresult Lwt.t
   val rev_find :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     t -> string option tzresult Lwt.t
   val name :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     t -> string tzresult Lwt.t
   val mem :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     string -> bool tzresult Lwt.t
   val add :
     force:bool ->
-    Client_commands.context ->
+    #Client_commands.wallet ->
     string -> t -> unit tzresult Lwt.t
   val del :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     string -> unit tzresult Lwt.t
   val update :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     string -> t -> unit tzresult Lwt.t
-  val save :
-    Client_commands.context ->
-    (string * t) list -> unit tzresult Lwt.t
   val of_source :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     string -> t tzresult Lwt.t
   val to_source :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     t -> string tzresult Lwt.t
   val alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, Client_commands.context, 'ret) Cli_entries.params ->
-    (string * t -> 'a, Client_commands.context, 'ret) Cli_entries.params
+    ('a, (#Client_commands.wallet as 'b), 'ret) Cli_entries.params ->
+    (string * t -> 'a, 'b, 'ret) Cli_entries.params
   val fresh_alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, Client_commands.context, 'ret) Cli_entries.params ->
-    (fresh_param -> 'a, Client_commands.context, 'ret) Cli_entries.params
+    ('a, (< .. > as 'obj), 'ret) Cli_entries.params ->
+    (fresh_param -> 'a, 'obj, 'ret) Cli_entries.params
   val of_fresh :
-    Client_commands.context ->
+    #Client_commands.wallet ->
     bool ->
     fresh_param ->
     string tzresult Lwt.t
   val source_param :
     ?name:string ->
     ?desc:string ->
-    ('a, Client_commands.context, 'ret) Cli_entries.params ->
-    (t -> 'a, Client_commands.context, 'ret) Cli_entries.params
+    ('a, (#Client_commands.wallet as 'obj), 'ret) Cli_entries.params ->
+    (t -> 'a, 'obj, 'ret) Cli_entries.params
   val autocomplete:
-    Client_commands.context -> string list tzresult Lwt.t
+    #Client_commands.wallet -> string list tzresult Lwt.t
 end
 
 module Alias = functor (Entity : Entity) -> struct
 
   open Client_commands
 
-  let encoding =
+  let wallet_encoding : (string * Entity.t) list Data_encoding.encoding =
     let open Data_encoding in
     list (obj2
             (req "name" string)
             (req "value" Entity.encoding))
 
-  let dirname cctxt =
-    cctxt.config.base_dir
+  let load (wallet : #wallet) =
+    wallet#load Entity.name ~default:[] wallet_encoding
 
-  let filename cctxt =
-    Filename.concat (dirname cctxt) (Entity.name ^ "s")
+  let set (wallet : #wallet) entries =
+    wallet#write Entity.name entries wallet_encoding
 
-  let load cctxt =
-    let filename = filename cctxt in
-    if not (Sys.file_exists filename) ||
-       Unix.(stat filename).st_size = 0 then
-      return []
-    else
-      Data_encoding_ezjsonm.read_file filename
-      |> generic_trace
-        "couldn't to read the %s alias file" Entity.name >>=? fun json ->
-      match Data_encoding.Json.destruct encoding json with
-      | exception _ -> (* TODO print_error *)
-          failwith "didn't understand the %s alias file" Entity.name
-      | list ->
-          return list
 
-  let autocomplete cctxt =
-    load cctxt >>= function
+  let autocomplete wallet =
+    load wallet >>= function
     | Error _ -> return []
     | Ok list -> return (List.map fst list)
 
-  let find_opt cctxt name =
-    load cctxt >>=? fun list ->
+  let find_opt (wallet : #wallet) name =
+    load wallet >>=? fun list ->
     try return (Some (List.assoc name list))
     with Not_found -> return None
 
-  let find cctxt name =
-    load cctxt >>=? fun list ->
+  let find (wallet : #wallet) name =
+    load wallet >>=? fun list ->
     try return (List.assoc name list)
     with Not_found ->
       failwith "no %s alias named %s" Entity.name name
 
-  let rev_find cctxt v =
-    load cctxt >>=? fun list ->
+  let rev_find (wallet : #wallet) v =
+    load wallet >>=? fun list ->
     try return (Some (List.find (fun (_, v') -> v = v') list |> fst))
     with Not_found -> return None
 
-  let mem cctxt name =
-    load cctxt >>=? fun list ->
+  let mem (wallet : #wallet) name =
+    load wallet >>=? fun list ->
     try
       ignore (List.assoc name list) ;
       return true
     with
     | Not_found -> return false
 
-  let save cctxt list =
-    Lwt.catch
-      (fun () ->
-         let dirname = dirname cctxt in
-         Lwt_utils.create_dir dirname >>= fun () ->
-         let filename = filename cctxt in
-         let json = Data_encoding.Json.construct encoding list in
-         Data_encoding_ezjsonm.write_file filename json)
-      (fun exn -> Lwt.return (error_exn exn))
-    |> generic_trace "could not write the %s alias file." Entity.name
-
-  let add ~force cctxt name value =
+  let add ~force (wallet : #wallet) name value =
     let keep = ref false in
-    load cctxt >>=? fun list ->
+    load wallet >>=? fun list ->
     begin
       if force then
         return ()
@@ -169,19 +145,16 @@ module Alias = functor (Entity : Entity) -> struct
         iter_s (fun (n, v) ->
             if n = name && v = value then begin
               keep := true ;
-              cctxt.message
-                "The %s alias %s already exists with the same value."
-                Entity.name n >>= fun () ->
               return ()
             end else if n = name && v <> value then begin
               failwith
                 "another %s is already aliased as %s, \
-                 use -force true to update"
+                 use -force to update"
                 Entity.name n
             end else if n <> name && v = value then begin
               failwith
                 "this %s is already aliased as %s, \
-                 use -force true to insert duplicate"
+                 use -force to insert duplicate"
                 Entity.name n
             end else begin
               return ()
@@ -193,51 +166,45 @@ module Alias = functor (Entity : Entity) -> struct
     if !keep then
       return ()
     else
-      save cctxt list >>=? fun () ->
-      cctxt.Client_commands.message
-        "New %s alias '%s' saved." Entity.name name >>= fun () ->
-      return ()
+      wallet#write Entity.name list wallet_encoding
 
-  let del cctxt name =
-    load cctxt >>=? fun list ->
+  let del (wallet : #wallet) name =
+    load wallet >>=? fun list ->
     let list = List.filter (fun (n, _) -> n <> name) list in
-    save cctxt list
+    wallet#write Entity.name list wallet_encoding
 
-  let update cctxt name value =
-    load cctxt >>=? fun list ->
+  let update (wallet : #wallet) name value =
+    load wallet >>=? fun list ->
     let list =
       List.map
         (fun (n, v) -> (n, if n = name then value else v))
         list in
-    save cctxt list
+    wallet#write Entity.name list wallet_encoding
 
-  let save cctxt list =
-    save cctxt list >>=? fun () ->
-    cctxt.Client_commands.message
-      "Successful update of the %s alias file." Entity.name >>= fun () ->
-    return ()
+  let save wallet list =
+    wallet#write Entity.name wallet_encoding list
 
   include Entity
 
   let alias_param
       ?(name = "name") ?(desc = "existing " ^ Entity.name ^ " alias") next =
     param ~name ~desc
-      (parameter (fun cctxt s ->
+      (parameter (fun (cctxt : #Client_commands.wallet) s ->
            find cctxt s >>=? fun v ->
            return (s, v)))
       next
 
   type fresh_param = Fresh of string
 
-  let of_fresh cctxt force (Fresh s) =
-    load cctxt >>=? fun list ->
+  let of_fresh (wallet : #wallet) force (Fresh s) =
+    load wallet >>=? fun list ->
     begin if force then
         return ()
       else
         iter_s
           (fun (n, _v) ->
              if n = s then
-               Entity.to_source cctxt _v >>=? fun value ->
+               Entity.to_source wallet _v >>=? fun value ->
                failwith
                  "@[<v 2>The %s alias %s already exists.@,\
                   The current value is %s.@,\
@@ -253,7 +220,7 @@ module Alias = functor (Entity : Entity) -> struct
   let fresh_alias_param
       ?(name = "new") ?(desc = "new " ^ Entity.name ^ " alias") next =
     param ~name ~desc
-      (parameter (fun _ s -> return @@ Fresh s))
+      (parameter (fun (_ : < .. >) s -> return @@ Fresh s))
       next
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
@@ -297,9 +264,9 @@ module Alias = functor (Entity : Entity) -> struct
            end))
       next
 
-  let name cctxt d =
-    rev_find cctxt d >>=? function
-    | None -> Entity.to_source cctxt d
+  let name (wallet : #wallet) d =
+    rev_find wallet d >>=? function
+    | None -> Entity.to_source wallet d
     | Some name -> return name
 
 end

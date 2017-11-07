@@ -10,45 +10,66 @@
 type ('a, 'b) lwt_format =
   ('a, Format.formatter, unit, 'b Lwt.t) format4
 
-type cfg = {
-  base_dir : string ;
-  block : Node_rpc_services.Blocks.block ;
-}
+class type logger_sig = object
+  method error : ('a, 'b) lwt_format -> 'a
+  method warning : ('a, unit) lwt_format -> 'a
+  method message : ('a, unit) lwt_format -> 'a
+  method answer :  ('a, unit) lwt_format -> 'a
+  method log : string -> ('a, unit) lwt_format -> 'a
+end
 
-type context = {
-  rpc_config : Client_rpcs.config ;
-  config : cfg ;
-  error : 'a 'b. ('a, 'b) lwt_format -> 'a ;
-  warning : 'a. ('a, unit) lwt_format -> 'a ;
-  message : 'a. ('a, unit) lwt_format -> 'a ;
-  answer : 'a. ('a, unit) lwt_format -> 'a ;
-  log : 'a. string -> ('a, unit) lwt_format -> 'a ;
-}
-(** This [context] allows the client {!command} handlers to work in
+val default_log : base_dir:string -> string -> string -> unit Lwt.t
+
+class logger : (string -> string -> unit Lwt.t) -> logger_sig
+
+class type wallet = object
+  method load : string -> default:'a -> 'a Data_encoding.encoding -> 'a tzresult Lwt.t
+  method write : string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
+end
+
+class type block = object
+  method block : Node_rpc_services.Blocks.block
+end
+
+class type logging_wallet = object
+  inherit logger_sig
+  inherit wallet
+end
+
+class type logging_rpcs = object
+  inherit logger_sig
+  inherit Client_rpcs.rpc_sig
+end
+
+class type full_context = object
+  inherit logger_sig
+  inherit wallet
+  inherit Client_rpcs.rpc_sig
+  inherit block
+end
+(** The [full_context] allows the client {!command} handlers to work in
+>>>>>>> 3ab6ecd4... Client library refactor
      various modes (command line, batch mode, web client, etc.) by
      abstracting some basic operations such as logging and reading
      configuration options. It is passed as parameter to the command
      handler when running a command, and must be transmitted to all
      basic operations, also making client commands reantrant. *)
 
-val default_base_dir : string
-val default_cfg_of_base_dir : string -> cfg
-val default_cfg : cfg
-
 val make_context :
-  ?config:cfg ->
+  ?base_dir:string ->
+  ?block:Node_rpc_services.Blocks.block ->
   ?rpc_config:Client_rpcs.config ->
-  (string -> string -> unit Lwt.t) -> context
+  (string -> string -> unit Lwt.t) -> full_context
 (** [make_context ?config log_fun] builds a context whose logging
     callbacks call [log_fun section msg], and whose [error] function
     fails with [Failure] and the given message. If not passed,
     [config] is {!default_cfg}. *)
 
-val ignore_context : context
+val ignore_context : full_context
 (** [ignore_context] is a context whose logging callbacks do nothing,
     and whose [error] function calls [Lwt.fail_with]. *)
 
-type command = (context, unit) Cli_entries.command
+type command = (full_context, unit) Cli_entries.command
 
 exception Version_not_found
 
@@ -58,4 +79,7 @@ val get_versions: unit -> (Protocol_hash.t * (command list)) list
 
 (** Have a command execute ignoring warnings.
     This switch should be used when data will be overwritten. *)
-val force_switch : (bool, context) Cli_entries.arg
+val force_switch : (bool, full_context) Cli_entries.arg
+
+val default_base_dir : string
+val default_block : Node_rpc_services.Blocks.block

@@ -181,6 +181,142 @@ let () =
 
 let fail config err = fail (RPC_error (config, err))
 
+class type rpc_sig = object
+  method get_json :
+    RPC.meth ->
+    string list -> Data_encoding.json -> Data_encoding.json Error_monad.tzresult Lwt.t
+  method get_streamed_json :
+    RPC.meth ->
+    string list ->
+    Data_encoding.json ->
+    (Data_encoding.json, Error_monad.error list) result Lwt_stream.t
+      Error_monad.tzresult Lwt.t
+  method make_request :
+    (Uri.t -> Data_encoding.json -> 'a Lwt.t) ->
+    RPC.meth ->
+    string list ->
+    Data_encoding.json ->
+    ('a * Cohttp.Code.status_code * Cohttp_lwt_body.t)
+      Error_monad.tzresult Lwt.t
+  method parse_answer :
+    (unit, 'b, 'c, 'd) RPC.service ->
+    string list ->
+    Data_encoding.json -> 'd Error_monad.tzresult Lwt.t
+  method parse_err_answer :
+    (unit, 'e, 'f, 'g Error_monad.tzresult) RPC.service ->
+    string list ->
+    Data_encoding.json -> 'g Error_monad.tzresult Lwt.t
+end
+
+class rpc config = object (self)
+  val config = config
+  method make_request :
+    type a. (Uri.t -> Data_encoding.json -> a Lwt.t) ->
+    RPC.meth ->
+    string list ->
+    Data_encoding.json ->
+    (a * Cohttp.Code.status_code * Cohttp_lwt_body.t)
+      Error_monad.tzresult Lwt.t =
+    fun log_request meth service json ->
+      let scheme = if config.tls then "https" else "http" in
+      let path = String.concat "/" service in
+      let uri =
+        Uri.make ~scheme ~host:config.host ~port:config.port ~path () in
+      let reqbody = Data_encoding_ezjsonm.to_string json in
+      Lwt.catch begin fun () ->
+        let body = Cohttp_lwt_body.of_string reqbody in
+        Cohttp_lwt_unix.Client.call
+          (meth :> Cohttp.Code.meth) ~body uri >>= fun (code, ansbody) ->
+        log_request uri json >>= fun reqid ->
+        return (reqid, code.Cohttp.Response.status, ansbody)
+      end begin fun exn ->
+        let msg = match exn with
+          | Unix.Unix_error (e, _, _) -> Unix.error_message e
+          | e -> Printexc.to_string e in
+        fail config (Cannot_connect_to_RPC_server msg)
+      end
+
+  method get_streamed_json meth service json =
+    let Logger logger = config.logger in
+    self#make_request logger.log_request
+      meth service json >>=? fun (reqid, code, ansbody) ->
+    match code with
+    | #Cohttp.Code.success_status ->
+        let ansbody = Cohttp_lwt_body.to_stream ansbody in
+        let json_st = Data_encoding_ezjsonm.from_stream ansbody in
+        let parsed_st, push = Lwt_stream.create () in
+        let rec loop () =
+          Lwt_stream.get json_st >>= function
+          | Some (Ok json) as v ->
+              push v ;
+              logger.log_success reqid code json >>= fun () ->
+              loop ()
+          | None ->
+              push None ;
+              Lwt.return_unit
+          | Some (Error msg) ->
+              let error =
+                RPC_error (config, Malformed_json (service, "", msg)) in
+              push (Some (Error [error])) ;
+              push None ;
+              Lwt.return_unit
+        in
+        Lwt.async loop ;
+        return parsed_st
+    | err ->
+        Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
+        logger.log_error reqid code ansbody >>= fun () ->
+        fail config (Request_failed (service, err))
+
+  method parse_answer : type b c d. (unit, b, c, d) RPC.service ->
+    string list ->
+    Data_encoding.json -> d Error_monad.tzresult Lwt.t =
+    fun service path json ->
+      match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
+      | exception msg ->
+          let msg =
+            Format.asprintf "%a" (fun x -> Data_encoding.Json.print_error x) msg in
+          fail config (Unexpected_json (path, json, msg))
+      | v -> return v
+
+
+  method get_json : RPC.meth ->
+    string list -> Data_encoding.json -> Data_encoding.json Error_monad.tzresult Lwt.t =
+    fun meth service json ->
+      let Logger logger = config.logger in
+      self#make_request logger.log_request
+        meth service json >>=? fun (reqid, code, ansbody) ->
+      Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
+      match code with
+      | #Cohttp.Code.success_status -> begin
+          if ansbody = "" then
+            return `Null
+          else
+            match Data_encoding_ezjsonm.from_string ansbody with
+            | Error msg ->
+                logger.log_error reqid code ansbody >>= fun () ->
+                fail config (Malformed_json (service, ansbody, msg))
+            | Ok json ->
+                logger.log_success reqid code json >>= fun () ->
+                return json
+        end
+      | err ->
+          logger.log_error reqid code ansbody >>= fun () ->
+          fail config (Request_failed (service, err))
+
+  method parse_err_answer : type e f g.
+    (unit, e, f, g Error_monad.tzresult) RPC.service ->
+    string list ->
+    Data_encoding.json -> g Error_monad.tzresult Lwt.t =
+    fun service path json ->
+      match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
+      | exception msg -> (* TODO print_error *)
+          let msg =
+            Format.asprintf "%a" (fun x -> Data_encoding.Json.print_error x) msg in
+          fail config (Unexpected_json (path, json, msg))
+      | v -> Lwt.return v
+end
+
 let make_request config log_request meth service json =
   let scheme = if config.tls then "https" else "http" in
   let path = String.concat "/" service in
@@ -201,90 +337,28 @@ let make_request config log_request meth service json =
     fail config (Cannot_connect_to_RPC_server msg)
   end
 
-let get_streamed_json config meth service json =
-  let Logger logger = config.logger in
-  make_request config logger.log_request
-    meth service json >>=? fun (reqid, code, ansbody) ->
-  match code with
-  | #Cohttp.Code.success_status ->
-      let ansbody = Cohttp_lwt_body.to_stream ansbody in
-      let json_st = Data_encoding_ezjsonm.from_stream ansbody in
-      let parsed_st, push = Lwt_stream.create () in
-      let rec loop () =
-        Lwt_stream.get json_st >>= function
-        | Some (Ok json) as v ->
-            push v ;
-            logger.log_success reqid code json >>= fun () ->
-            loop ()
-        | None ->
-            push None ;
-            Lwt.return_unit
-        | Some (Error msg) ->
-            let error =
-              RPC_error (config, Malformed_json (service, "", msg)) in
-            push (Some (Error [error])) ;
-            push None ;
-            Lwt.return_unit
-      in
-      Lwt.async loop ;
-      return parsed_st
-  | err ->
-      Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
-      logger.log_error reqid code ansbody >>= fun () ->
-      fail config (Request_failed (service, err))
-
-let get_json config meth service json =
-  let Logger logger = config.logger in
-  make_request config logger.log_request
-    meth service json >>=? fun (reqid, code, ansbody) ->
-  Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
-  match code with
-  | #Cohttp.Code.success_status -> begin
-      if ansbody = "" then
-        return `Null
-      else
-        match Data_encoding_ezjsonm.from_string ansbody with
-        | Error msg ->
-            logger.log_error reqid code ansbody >>= fun () ->
-            fail config (Malformed_json (service, ansbody, msg))
-        | Ok json ->
-            logger.log_success reqid code json >>= fun () ->
-            return json
-    end
-  | err ->
-      logger.log_error reqid code ansbody >>= fun () ->
-      fail config (Request_failed (service, err))
-
-let parse_answer config service path json =
-  match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
-  | exception msg ->
-      let msg =
-        Format.asprintf "%a" (fun x -> Data_encoding.Json.print_error x) msg in
-      fail config (Unexpected_json (path, json, msg))
-  | v -> return v
-
-let call_service0 cctxt service arg =
+let call_service0 (rpc : #rpc_sig) service arg =
   let meth, path, arg = RPC.forge_request service () arg in
-  get_json cctxt meth path arg >>=? fun json ->
-  parse_answer cctxt service path json
+  rpc#get_json meth path arg >>=? fun json ->
+  rpc#parse_answer service path json
 
-let call_service1 cctxt service a1 arg =
+let call_service1 (rpc : #rpc_sig) service a1 arg =
   let meth, path, arg = RPC.forge_request service ((), a1) arg in
-  get_json cctxt meth path arg >>=? fun json ->
-  parse_answer cctxt service path json
+  rpc#get_json meth path arg >>=? fun json ->
+  rpc#parse_answer service path json
 
-let call_service2 cctxt service a1 a2 arg =
+let call_service2 (rpc : #rpc_sig) service a1 a2 arg =
   let meth, path, arg = RPC.forge_request service (((), a1), a2) arg in
-  get_json cctxt meth path arg >>=? fun json ->
-  parse_answer cctxt service path json
+  rpc#get_json meth path arg >>=? fun json ->
+  rpc#parse_answer service path json
 
-let call_streamed cctxt service (meth, path, arg) =
-  get_streamed_json cctxt meth path arg >>=? fun json_st ->
+let call_streamed (rpc : #rpc_sig) service (meth, path, arg) =
+  rpc#get_streamed_json meth path arg >>=? fun json_st ->
   let parsed_st, push = Lwt_stream.create () in
   let rec loop () =
     Lwt_stream.get json_st >>= function
     | Some (Ok json) -> begin
-        parse_answer cctxt service path json >>= function
+        rpc#parse_answer service path json >>= function
         | Ok v -> push (Some (Ok v)) ; loop ()
         | Error _ as err ->
             push (Some err) ; push None ; Lwt.return_unit
@@ -296,34 +370,26 @@ let call_streamed cctxt service (meth, path, arg) =
   Lwt.async loop ;
   return parsed_st
 
-let call_streamed_service0 cctxt service arg =
-  call_streamed cctxt service (RPC.forge_request service () arg)
+let call_streamed_service0 (rpc : #rpc_sig) service arg =
+  call_streamed rpc service (RPC.forge_request service () arg)
 
 let call_streamed_service1 cctxt service arg1 arg2 =
   call_streamed cctxt service (RPC.forge_request service ((), arg1) arg2)
 
-let parse_err_answer config service path json =
-  match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
-  | exception msg -> (* TODO print_error *)
-      let msg =
-        Format.asprintf "%a" (fun x -> Data_encoding.Json.print_error x) msg in
-      fail config (Unexpected_json (path, json, msg))
-  | v -> Lwt.return v
-
-let call_err_service0 cctxt service arg =
+let call_err_service0 (rpc : #rpc_sig) service arg =
   let meth, path, arg = RPC.forge_request service () arg in
-  get_json cctxt meth path arg >>=? fun json ->
-  parse_err_answer cctxt service path json
+  rpc#get_json meth path arg >>=? fun json ->
+  rpc#parse_err_answer service path json
 
-let call_err_service1 cctxt service a1 arg =
+let call_err_service1 (rpc : #rpc_sig) service a1 arg =
   let meth, path, arg = RPC.forge_request service ((), a1) arg in
-  get_json cctxt meth path arg >>=? fun json ->
-  parse_err_answer cctxt service path json
+  rpc#get_json meth path arg >>=? fun json ->
+  rpc#parse_err_answer service path json
 
-let call_err_service2 cctxt service a1 a2 arg =
+let call_err_service2 (rpc : #rpc_sig) service a1 a2 arg =
   let meth, path, arg = RPC.forge_request service (((), a1), a2) arg in
-  get_json cctxt meth path arg >>=? fun json ->
-  parse_err_answer cctxt service path json
+  rpc#get_json meth path arg >>=? fun json ->
+  rpc#parse_err_answer service path json
 
 type block = Node_rpc_services.Blocks.block
 

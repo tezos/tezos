@@ -31,7 +31,7 @@ module Secret_key = Client_aliases.Alias (struct
     let name = "secret key"
   end)
 
-let gen_keys ?(force=false) ?seed cctxt name =
+let gen_keys ?(force=false) ?seed (cctxt : #Client_commands.wallet) name =
   let seed =
     match seed with
     | None -> Ed25519.Seed.generate ()
@@ -41,16 +41,14 @@ let gen_keys ?(force=false) ?seed cctxt name =
   Public_key.add ~force cctxt name public_key >>=? fun () ->
   Public_key_hash.add ~force
     cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
-  cctxt.message
-    "I generated a brand new pair of keys under the name '%s'." name >>= fun () ->
   return ()
 
-let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : Client_commands.context) =
+let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : Client_commands.full_context) =
   let unrepresentable =
     List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
   match unrepresentable with
   | _ :: _ ->
-      cctxt.warning
+      cctxt#warning
         "The following can't be written in the key alphabet (%a): %a"
         Base58.Alphabet.pp Base58.Alphabet.bitcoin
         (Format.pp_print_list
@@ -61,11 +59,11 @@ let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt 
       Public_key_hash.mem cctxt name >>=? fun name_exists ->
       if name_exists && not force
       then
-        cctxt.warning
+        cctxt#warning
           "Key for name '%s' already exists. Use -force to update." name >>= return
       else
         begin
-          cctxt.message "This process uses a brute force search and \
+          cctxt#warning "This process uses a brute force search and \
                          may take a long time to find a key." >>= fun () ->
           let matches =
             if prefix then
@@ -89,11 +87,11 @@ let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt 
               Public_key_hash.add ~force cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
               return hash
             else begin if attempts mod 25_000 = 0
-              then cctxt.message "Tried %d keys without finding a match" attempts
+              then cctxt#message "Tried %d keys without finding a match" attempts
               else Lwt.return () end >>= fun () ->
               loop (attempts + 1) in
           loop 1 >>=? fun key_hash ->
-          cctxt.message
+          cctxt#message
             "Generated '%s' under the name '%s'." key_hash name >>= fun () ->
           return ()
         end
@@ -103,21 +101,21 @@ let check_keys_consistency pk sk =
   let signature = Ed25519.sign sk message in
   Ed25519.Signature.check pk signature message
 
-let get_key cctxt pkh =
+let get_key (cctxt : #Client_commands.wallet) pkh =
   Public_key_hash.rev_find cctxt pkh >>=? function
-  | None -> cctxt.error "no keys for the source contract manager"
+  | None -> failwith "no keys for the source contract manager"
   | Some n ->
       Public_key.find cctxt n >>=? fun pk ->
       Secret_key.find cctxt n >>=? fun sk ->
       return (n, pk, sk)
 
-let get_keys cctxt =
-  Secret_key.load cctxt >>=? fun sks ->
+let get_keys (wallet : #Client_commands.wallet) =
+  Secret_key.load wallet >>=? fun sks ->
   Lwt_list.filter_map_s
     (fun (name, sk) ->
        begin
-         Public_key.find cctxt name >>=? fun pk ->
-         Public_key_hash.find cctxt name >>=? fun pkh ->
+         Public_key.find wallet name >>=? fun pk ->
+         Public_key_hash.find wallet name >>=? fun pkh ->
          return (name, pkh, pk, sk)
        end >>= function
        | Ok r -> Lwt.return (Some r)
@@ -165,7 +163,7 @@ let commands () =
       (prefixes [ "gen" ; "keys" ]
        @@ Secret_key.fresh_alias_param
        @@ stop)
-      (fun force name cctxt ->
+      (fun force name (cctxt : Client_commands.full_context) ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
          gen_keys ~force cctxt name) ;
 
@@ -204,6 +202,18 @@ let commands () =
 
     command ~group ~desc: "add a public key to the wallet"
       (args1 Client_commands.force_switch)
+      (prefixes [ "add" ; "public" ; "key" ]
+       @@ Public_key.fresh_alias_param
+       @@ Public_key.source_param
+       @@ stop)
+      (fun force name key cctxt ->
+         Public_key.of_fresh cctxt force name >>=? fun name ->
+         Public_key_hash.add ~force cctxt
+           name (Ed25519.Public_key.hash key) >>=? fun () ->
+         Public_key.add ~force cctxt name key) ;
+
+    command ~group ~desc: "add a public key to the wallet"
+      (args1 Client_commands.force_switch)
       (prefixes [ "add" ; "identity" ]
        @@ Public_key_hash.fresh_alias_param
        @@ Public_key_hash.source_param
@@ -215,12 +225,12 @@ let commands () =
     command ~group ~desc: "list all public key hashes and associated keys"
       no_options
       (fixed [ "list" ; "known" ; "identities" ])
-      (fun () cctxt ->
+      (fun () (cctxt : Client_commands.full_context) ->
          list_keys cctxt >>=? fun l ->
          iter_s
            (fun (name, pkh, pkm, pks) ->
               Public_key_hash.to_source cctxt pkh >>=? fun v ->
-              cctxt.message "%s: %s%s%s" name v
+              cctxt#message "%s: %s%s%s" name v
                 (if pkm then " (public key known)" else "")
                 (if pks then " (secret key known)" else "") >>= fun () ->
               return ())
@@ -231,25 +241,25 @@ let commands () =
       (prefixes [ "show" ; "identity"]
        @@ Public_key_hash.alias_param
        @@ stop)
-      (fun show_private (name, _) cctxt ->
+      (fun show_private (name, _) (cctxt : Client_commands.full_context) ->
          let ok_lwt x = x >>= (fun x -> return x) in
          alias_keys cctxt name >>=? fun key_info ->
          match key_info with
-         | None -> ok_lwt @@ cctxt.message "No keys found for identity"
+         | None -> ok_lwt @@ cctxt#message "No keys found for identity"
          | Some (hash, pub, priv) ->
              Public_key_hash.to_source cctxt hash >>=? fun hash ->
-             ok_lwt @@ cctxt.message "Hash: %s" hash >>=? fun () ->
+             ok_lwt @@ cctxt#message "Hash: %s" hash >>=? fun () ->
              match pub with
              | None -> return ()
              | Some pub ->
                  Public_key.to_source cctxt pub >>=? fun pub ->
-                 ok_lwt @@ cctxt.message "Public Key: %s" pub >>=? fun () ->
+                 ok_lwt @@ cctxt#message "Public Key: %s" pub >>=? fun () ->
                  if show_private then
                    match priv with
                    | None -> return ()
                    | Some priv ->
                        Secret_key.to_source cctxt priv >>=? fun priv ->
-                       ok_lwt @@ cctxt.message "Secret Key: %s" priv
+                       ok_lwt @@ cctxt#message "Secret Key: %s" priv
                  else return ()) ;
 
     command ~group ~desc: "forget all keys"
@@ -257,9 +267,9 @@ let commands () =
       (fixed [ "forget" ; "all" ; "keys" ])
       (fun force cctxt ->
          fail_unless force
-           (failure "this can only used with option -force true") >>=? fun () ->
-         Public_key.save cctxt [] >>=? fun () ->
-         Secret_key.save cctxt [] >>=? fun () ->
-         Public_key_hash.save cctxt []) ;
+           (failure "this can only used with option -force") >>=? fun () ->
+         Public_key.set cctxt [] >>=? fun () ->
+         Secret_key.set cctxt [] >>=? fun () ->
+         Public_key_hash.set cctxt []) ;
 
   ]

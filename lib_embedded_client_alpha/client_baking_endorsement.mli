@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 val forge_endorsement:
-  Client_commands.context ->
+  Client_commands.full_context ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   src_sk:secret_key ->
@@ -17,9 +17,8 @@ val forge_endorsement:
   public_key ->
   Operation_hash.t tzresult Lwt.t
 
-val create:
-  Client_commands.context ->
-  delay: int ->
+val create :
+  Client_commands.full_context ->
+  delay:int ->
   public_key_hash list ->
-  Client_baking_blocks.block_info list tzresult Lwt_stream.t ->
-  unit Lwt.t
+  Client_baking_blocks.block_info list tzresult Lwt_stream.t -> unit Lwt.t

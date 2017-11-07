@@ -10,11 +10,11 @@
 let string_of_errors exns =
   Format.asprintf "  @[<v>%a@]" pp_print_error exns
 
-let handle_error cctxt = function
+let handle_error (cctxt : #Client_commands.logger) = function
   | Ok res -> Lwt.return res
   | Error exns ->
       pp_print_error Format.err_formatter exns ;
-      cctxt.Client_commands.error "%s" "cannot continue"
+      cctxt#error "%s" "cannot continue"
 
 let call_service0 cctxt s block =
   Client_rpcs.call_service0 cctxt

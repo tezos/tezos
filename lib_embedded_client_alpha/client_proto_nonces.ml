@@ -18,65 +18,35 @@ let encoding : t Data_encoding.t =
        (req "block" Block_hash.encoding)
        (req "nonce" Nonce.encoding))
 
-let filename cctxt =
-  Client_commands.(Filename.concat cctxt.config.base_dir "nonces")
+let name = "nonces"
 
-let load cctxt =
-  let filename = filename cctxt in
-  if not (Sys.file_exists filename) then
-    Lwt.return []
-  else
-    Data_encoding_ezjsonm.read_file filename >>= function
-    | Error _ ->
-        cctxt.Client_commands.error "couldn't to read the nonces file"
-    | Ok json ->
-        match Data_encoding.Json.destruct encoding json with
-        | exception _ -> (* TODO print_error *)
-            cctxt.Client_commands.error "didn't understand the nonces file"
-        | list ->
-            Lwt.return list
+let load (wallet : #Client_commands.wallet) =
+  wallet#load ~default:[] name encoding
 
-let check_dir dirname =
-  if not (Sys.file_exists dirname) then
-    Lwt_utils.create_dir dirname
-  else
-    Lwt.return ()
+let save (wallet : #Client_commands.wallet) list =
+  wallet#write name list encoding
 
-let save cctxt list =
-  Lwt.catch
-    (fun () ->
-       let dirname = Client_commands.(cctxt.config.base_dir) in
-       check_dir dirname >>= fun () ->
-       let filename = filename cctxt in
-       let json = Data_encoding.Json.construct encoding list in
-       Data_encoding_ezjsonm.write_file filename json >>= function
-       | Error _ -> failwith "Json.write_file"
-       | Ok () -> return ())
-    (fun exn ->
-       cctxt.Client_commands.error
-         "could not write the nonces file: %s." (Printexc.to_string exn))
-
-let mem cctxt block_hash =
-  load cctxt >|= fun data ->
+let mem (wallet : #Client_commands.wallet) block_hash =
+  load wallet >>|? fun data ->
   List.mem_assoc block_hash data
 
-let find cctxt block_hash =
-  load cctxt >|= fun data ->
+let find wallet block_hash =
+  load wallet >>|? fun data ->
   try Some (List.assoc block_hash data)
   with Not_found -> None
 
-let add cctxt block_hash nonce =
-  load cctxt >>= fun data ->
-  save cctxt ((block_hash, nonce) ::
-              List.remove_assoc block_hash data)
+let add wallet block_hash nonce =
+  load wallet >>=? fun data ->
+  save wallet ((block_hash, nonce) ::
+               List.remove_assoc block_hash data)
 
-let del cctxt block_hash =
-  load cctxt >>= fun data ->
-  save cctxt (List.remove_assoc block_hash data)
+let del wallet block_hash =
+  load wallet >>=? fun data ->
+  save wallet (List.remove_assoc block_hash data)
 
-let dels cctxt hashes =
-  load cctxt >>= fun data ->
-  save cctxt @@
+let dels wallet hashes =
+  load wallet >>=? fun data ->
+  save wallet @@
   List.fold_left
     (fun data hash -> List.remove_assoc hash data)
     data hashes

@@ -47,6 +47,8 @@ module Tez : sig
   val of_cents: int64 -> tez option
   val to_cents: tez -> int64
 
+  val default_fee : t
+
 end
 
 module Period : sig

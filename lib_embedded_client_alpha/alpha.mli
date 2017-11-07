@@ -7,7 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val create:
-  Client_commands.full_context ->
-  Client_baking_operations.valid_endorsement tzresult Lwt_stream.t ->
-  unit Lwt.t
+module RPCs = Client_rpcs
+
+module Contracts : module type of Client_proto_contracts
+
+module Context : module type of Client_proto_context
+
+module Programs : module type of Client_proto_programs

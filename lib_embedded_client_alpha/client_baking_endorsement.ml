@@ -8,18 +8,17 @@
 (**************************************************************************)
 
 open Logging.Client.Endorsement
-open Client_commands
 
 module State : sig
 
   val get_endorsement:
-    Client_commands.context ->
+    #Client_commands.wallet ->
     Raw_level.t ->
     int ->
     (Block_hash.t * Operation_hash.t) option tzresult Lwt.t
 
   val record_endorsement:
-    Client_commands.context ->
+    #Client_commands.wallet ->
     Raw_level.t ->
     Block_hash.t ->
     int -> Operation_hash.t -> unit tzresult Lwt.t
@@ -45,46 +44,21 @@ end = struct
                            (req "block" Block_hash.encoding)
                            (req "operation" Operation_hash.encoding))))))
 
-  let filename cctxt =
-    Client_commands.(Filename.concat cctxt.config.base_dir "endorsements")
+  let name =
+    "endorsements"
 
-  let load cctxt =
-    let filename = filename cctxt in
-    if not (Sys.file_exists filename) then return LevelMap.empty else
-      Data_encoding_ezjsonm.read_file filename >>= function
-      | Error _ ->
-          cctxt.Client_commands.error
-            "couldn't to read the endorsement file"
-      | Ok json ->
-          match Data_encoding.Json.destruct encoding json with
-          | exception _ -> (* TODO print_error *)
-              cctxt.Client_commands.error
-                "didn't understand the endorsement file"
-          | map ->
-              return map
+  let load (wallet : #Client_commands.wallet) =
+    wallet#load name encoding ~default:LevelMap.empty
 
-  let save cctxt map =
-    Lwt.catch
-      (fun () ->
-         let dirname = Client_commands.(cctxt.config.base_dir) in
-         (if not (Sys.file_exists dirname) then Lwt_utils.create_dir dirname
-          else Lwt.return ()) >>= fun () ->
-         let filename = filename cctxt in
-         let json = Data_encoding.Json.construct encoding map in
-         Data_encoding_ezjsonm.write_file filename json >>= function
-         | Error _ -> failwith "Json.write_file"
-         | Ok () -> return ())
-      (fun exn ->
-         cctxt.Client_commands.error
-           "could not write the endorsement file: %s."
-           (Printexc.to_string exn))
+  let save (wallet : #Client_commands.wallet) map =
+    wallet#write name encoding map
 
   let lock = Lwt_mutex.create ()
 
-  let get_endorsement cctxt level slot =
+  let get_endorsement (wallet : #Client_commands.wallet) level slot =
     Lwt_mutex.with_lock lock
       (fun () ->
-         load cctxt >>=? fun map ->
+         load wallet >>=? fun map ->
          try
            let _, block, op =
              LevelMap.find level map
@@ -92,15 +66,16 @@ end = struct
            return (Some (block, op))
          with Not_found -> return None)
 
-  let record_endorsement cctxt level hash slot oph =
+  let record_endorsement (wallet : #Client_commands.wallet) level hash slot oph =
     Lwt_mutex.with_lock lock
       (fun () ->
-         load cctxt >>=? fun map ->
+         load wallet >>=? fun map ->
          let previous =
            try LevelMap.find level map
            with Not_found -> [] in
-         save cctxt
-           (LevelMap.add level ((slot, hash, oph) :: previous) map))
+         wallet#write name
+           (LevelMap.add level ((slot, hash, oph) :: previous) map)
+           encoding)
 
 end
 
@@ -113,12 +88,12 @@ let get_signing_slots cctxt ?max_priority block delegate level =
     @@ List.filter (fun (l, _) -> l = level) possibilities in
   return slots
 
-let inject_endorsement cctxt
+let inject_endorsement (cctxt : Client_commands.full_context)
     block level ?async ?force
     src_sk source slot =
   let block = Client_rpcs.last_baked_block block in
-  Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
-  Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt.rpc_config
+  Client_node_rpcs.Blocks.info cctxt block >>=? fun bi ->
+  Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt
     block
     ~branch:bi.hash
     ~source
@@ -127,8 +102,7 @@ let inject_endorsement cctxt
     () >>=? fun bytes ->
   let signed_bytes = Ed25519.Signature.append src_sk bytes in
   Client_node_rpcs.inject_operation
-    cctxt.rpc_config ?force ?async ~net_id:bi.net_id
-    signed_bytes >>=? fun oph ->
+    cctxt ?force ?async ~net_id:bi.net_id signed_bytes >>=? fun oph ->
   State.record_endorsement cctxt level bi.hash slot oph >>=? fun () ->
   return oph
 
@@ -147,20 +121,20 @@ let check_endorsement cctxt level slot =
         Block_hash.pp_short block Raw_level.pp level slot
 
 
-let forge_endorsement cctxt
+let forge_endorsement (cctxt : Client_commands.full_context)
     block ?(force = false)
     ~src_sk ?slot ?max_priority src_pk =
   let block = Client_rpcs.last_baked_block block in
   let src_pkh = Ed25519.Public_key.hash src_pk in
-  Client_proto_rpcs.Context.next_level cctxt.rpc_config block >>=? fun { level } ->
+  Client_proto_rpcs.Context.next_level cctxt block >>=? fun { level } ->
   begin
     match slot with
     | Some slot -> return slot
     | None ->
         get_signing_slots
-          cctxt.rpc_config ?max_priority block src_pkh level >>=? function
+          cctxt ?max_priority block src_pkh level >>=? function
         | slot::_ -> return slot
-        | [] -> cctxt.error "No slot found at level %a" Raw_level.pp level
+        | [] -> cctxt#error "No slot found at level %a" Raw_level.pp level
   end >>=? fun slot ->
   begin
     if force then return ()
@@ -213,14 +187,14 @@ let drop_old_endorsement ~before state =
       (fun { block } -> Fitness.compare before block.fitness <= 0)
       state.to_endorse
 
-let schedule_endorsements cctxt state bis =
+let schedule_endorsements (cctxt : Client_commands.full_context) state bis =
   let may_endorse (block: Client_baking_blocks.block_info) delegate time =
     Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
     lwt_log_info "May endorse block %a for %s"
       Block_hash.pp_short block.hash name >>= fun () ->
     let b = `Hash block.hash in
     let level = Raw_level.succ block.level.level in
-    get_signing_slots cctxt.rpc_config b delegate level >>=? fun slots ->
+    get_signing_slots cctxt b delegate level >>=? fun slots ->
     lwt_debug "Found slots for %a/%s (%d)"
       Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->
     iter_p
@@ -283,7 +257,7 @@ let schedule_endorsements cctxt state bis =
          bis)
     delegates
 
-let schedule_endorsements cctxt state bis =
+let schedule_endorsements (cctxt : Client_commands.full_context) state bis =
   schedule_endorsements cctxt state bis >>= function
   | Error exns ->
       lwt_log_error
@@ -318,7 +292,7 @@ let endorse cctxt state =
            inject_endorsement cctxt
              b level ~async:true ~force:true
              sk pk slot >>=? fun oph ->
-           cctxt.message
+           cctxt#message
              "Injected endorsement for block '%a' \
              \ (level %a, slot %d, contract %s) '%a'"
              Block_hash.pp_short hash
@@ -338,11 +312,11 @@ let compute_timeout state =
       else
         Lwt_unix.sleep (Int64.to_float delay)
 
-let create cctxt ~delay contracts block_stream =
+let create (cctxt : Client_commands.full_context) ~delay contracts block_stream =
   lwt_log_info "Starting endorsement daemon" >>= fun () ->
   Lwt_stream.get block_stream >>= function
   | None | Some (Ok []) | Some (Error _) ->
-      cctxt.Client_commands.error "Can't fetch the current block head."
+      cctxt#error "Can't fetch the current block head."
   | Some (Ok (bi :: _ as initial_heads)) ->
       let last_get_block = ref None in
       let get_block () =

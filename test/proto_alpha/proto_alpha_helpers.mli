@@ -71,16 +71,15 @@ module Account : sig
     ?fee:int64 ->
     src:t ->
     manager_pkh:public_key_hash ->
-    spendable:bool ->
     balance:int64 ->
     unit -> (Operation_hash.t * Contract.t) tzresult Lwt.t
 
   val set_delegate :
     ?block:Client_proto_rpcs.block ->
     ?fee:int64 ->
-    ?src_pk:public_key ->
     contract:Contract.t ->
     manager_sk:secret_key ->
+    src_pk:public_key ->
     public_key_hash option ->
     Operation_hash.t tzresult Lwt.t
 

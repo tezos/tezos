@@ -10,7 +10,7 @@
 open Tezos_embedded_raw_protocol_genesis
 
 val bake:
-  Client_rpcs.config ->
+  #Client_rpcs.rpc_sig ->
   ?timestamp: Time.t ->
   Client_node_rpcs.Blocks.block ->
   Data.Command.t ->

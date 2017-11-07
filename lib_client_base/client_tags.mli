@@ -28,21 +28,21 @@ module Tags (Entity : Entity) : sig
   val tag_param:
     ?name:string ->
     ?desc:string ->
-    ('a, Client_commands.context, 'ret) Cli_entries.params ->
-    (Tag.t -> 'a, Client_commands.context, 'ret) Cli_entries.params
+    ('a, Client_commands.full_context, 'ret) Cli_entries.params ->
+    (Tag.t -> 'a, Client_commands.full_context, 'ret) Cli_entries.params
 
   val rev_find_by_tag:
-    Client_commands.context ->
+    Client_commands.full_context ->
     string ->
     string option tzresult Lwt.t
 
   val filter:
-    Client_commands.context ->
+    Client_commands.full_context ->
     (string * t -> bool) ->
     (string * t) list tzresult Lwt.t
 
   val filter_by_tag:
-    Client_commands.context ->
+    Client_commands.full_context ->
     string ->
     (string * t) list tzresult Lwt.t
 

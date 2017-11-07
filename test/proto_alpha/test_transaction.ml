@@ -49,26 +49,10 @@ let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
     ~amount:1000_00L () >>= fun result ->
   Assert.balance_too_low ~msg:__LOC__ result ;
 
-  (* Check non-spendability of a non-spendable contract *)
-  (* TODO: Unspecified economic error: should be more specific. *)
-  Helpers.Account.originate
-    ~src:foo
-    ~manager_pkh:foo.pkh
-    ~spendable:false
-    ~balance:50_00L () >>=? fun (_oph, non_spendable) ->
-  Format.printf "Created non-spendable contract %a@." Contract.pp non_spendable ;
-  let account = { foo with contract = non_spendable } in
-  Helpers.Account.transfer
-    ~account
-    ~destination:bar.contract
-    ~amount:10_00L () >>= fun result ->
-  Assert.non_spendable ~msg:__LOC__ result ;
-
   (* Check spendability of a spendable contract *)
   Helpers.Account.originate
     ~src:foo
     ~manager_pkh:foo.pkh
-    ~spendable:true
     ~balance:50_00L () >>=? fun (_oph, spendable) ->
   Format.printf "Created contract %a@." Contract.pp spendable ;
   let account = { foo with contract = spendable } in

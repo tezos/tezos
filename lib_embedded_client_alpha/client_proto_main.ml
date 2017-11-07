@@ -13,6 +13,7 @@ let protocol =
 
 let () =
   Client_commands.register protocol @@
-  Client_proto_programs.commands () @
-  Client_proto_contracts.commands () @
-  Client_proto_context.commands ()
+  Client_proto_programs_commands.commands () @
+  Client_proto_contracts_commands.commands () @
+  Client_proto_context_commands.commands () @
+  Client_baking_main.commands ()

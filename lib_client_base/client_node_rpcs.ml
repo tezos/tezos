@@ -12,11 +12,11 @@
 open Client_rpcs
 module Services = Node_rpc_services
 
-let errors cctxt =
-  call_service0 cctxt Services.Error.service ()
+let errors (rpc : #rpc_sig) =
+  call_service0 rpc Services.Error.service ()
 
-let forge_block_header cctxt header =
-  call_service0 cctxt Services.forge_block_header header
+let forge_block_header rpc header =
+  call_service0 rpc Services.forge_block_header header
 
 let inject_block cctxt
     ?(async = false) ?(force = false) ?net_id
@@ -46,7 +46,7 @@ let describe config ?(recurse = true) path =
   let { RPC.Service.meth ; path } =
     RPC.Service.forge_request Node_rpc_services.describe
       ((), path) { RPC.Description.recurse } in
-  get_json config meth path (`O []) >>=? fun json ->
+  config#get_json meth path (`O []) >>=? fun json ->
   match Data_encoding.Json.destruct (RPC.Service.output_encoding Node_rpc_services.describe) json with
   | exception msg ->
       let msg =

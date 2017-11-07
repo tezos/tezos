@@ -24,20 +24,20 @@ let inject_seed_nonce_revelation rpc_config block ?force ?async nonces =
   return oph
 
 let forge_seed_nonce_revelation
-    (cctxt: Client_commands.context)
+    (cctxt: Client_commands.full_context)
     block ?(force = false) nonces =
-  Client_node_rpcs.Blocks.hash cctxt.rpc_config block >>=? fun hash ->
+  Client_node_rpcs.Blocks.hash cctxt block >>=? fun hash ->
   match nonces with
   | [] ->
-      cctxt.message "No nonce to reveal for block %a"
+      cctxt#message "No nonce to reveal for block %a"
         Block_hash.pp_short hash >>= fun () ->
       return ()
   | _ ->
-      inject_seed_nonce_revelation cctxt.rpc_config block ~force nonces >>=? fun oph ->
-      cctxt.answer
+      inject_seed_nonce_revelation cctxt block ~force nonces >>=? fun oph ->
+      cctxt#answer
         "Operation successfully injected %d revelation(s) for %a."
         (List.length nonces)
         Block_hash.pp_short hash >>= fun () ->
-      cctxt.answer "Operation hash is '%a'."
+      cctxt#answer "Operation hash is '%a'."
         Operation_hash.pp_short oph >>= fun () ->
       return ()

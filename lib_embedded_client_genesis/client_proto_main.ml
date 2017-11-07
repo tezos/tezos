@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_commands
 open Tezos_embedded_raw_protocol_genesis
 
 let protocol =
@@ -84,13 +83,12 @@ let commands () =
        @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
-      begin fun timestamp hash fitness validation_passes seckey cctxt ->
+      begin fun timestamp hash fitness validation_passes seckey (cctxt : Client_commands.full_context) ->
         let fitness =
           Tezos_embedded_raw_protocol_alpha.Fitness_repr.from_int64 fitness in
-        bake cctxt.rpc_config ?timestamp cctxt.config.block
-          (Activate { protocol = hash ; validation_passes })
-          fitness seckey >>=? fun hash ->
-        cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+        bake cctxt ?timestamp cctxt#block
+          (Activate { protocol = hash ; validation_passes }) fitness seckey >>=? fun hash ->
+        cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return ()
       end ;
 
@@ -113,12 +111,12 @@ let commands () =
       begin fun timestamp hash fitness validation_passes seckey cctxt ->
         let fitness =
           Tezos_embedded_raw_protocol_alpha.Fitness_repr.from_int64 fitness in
-        bake cctxt.rpc_config ?timestamp cctxt.config.block
+        bake cctxt ?timestamp cctxt#block
           (Activate_testnet { protocol = hash ;
                               validation_passes ;
                               delay = Int64.mul 24L 3600L })
           fitness seckey >>=? fun hash ->
-        cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
+        cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return ()
       end ;
 

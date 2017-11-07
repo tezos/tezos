@@ -110,15 +110,16 @@ type cli_args = {
 }
 
 let default_cli_args = {
-  block = Client_commands.default_cfg.block ;
+  block = Client_commands.default_block ;
   protocol = None ;
   print_timings = false ;
   log_requests = false ;
 }
 
+
 open Cli_entries
 
-let string_parameter : (string, Client_commands.context) parameter =
+let string_parameter : (string, Client_commands.full_context) parameter =
   parameter (fun _ x -> return x)
 
 let block_parameter =
@@ -205,7 +206,7 @@ let global_options =
     port_arg
     tls_switch
 
-let parse_config_args (ctx : Client_commands.context) argv =
+let parse_config_args (ctx : Client_commands.full_context) argv =
   parse_initial_options
     global_options
     ctx

@@ -7,14 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_commands
-
-let run cctxt ?max_priority ~delay ?min_date delegates ~endorsement ~denunciation ~baking =
+let run (cctxt : Client_commands.full_context) ?max_priority ~delay ?min_date delegates ~endorsement ~denunciation ~baking =
   (* TODO really detach... *)
   let endorsement =
     if endorsement then
       Client_baking_blocks.monitor
-        cctxt.rpc_config ?min_date ~min_heads:1 () >>=? fun block_stream ->
+        cctxt ?min_date ~min_heads:1 () >>=? fun block_stream ->
       Client_baking_endorsement.create cctxt ~delay delegates block_stream >>= fun () ->
       return ()
     else
@@ -23,7 +21,7 @@ let run cctxt ?max_priority ~delay ?min_date delegates ~endorsement ~denunciatio
   let denunciation =
     if denunciation then
       Client_baking_operations.monitor_endorsement
-        cctxt.rpc_config >>=? fun endorsement_stream ->
+        cctxt >>=? fun endorsement_stream ->
       Client_baking_denunciation.create cctxt endorsement_stream >>= fun () ->
       return ()
     else
@@ -32,9 +30,9 @@ let run cctxt ?max_priority ~delay ?min_date delegates ~endorsement ~denunciatio
   let forge =
     if baking then begin
       Client_baking_blocks.monitor
-        cctxt.rpc_config ?min_date ~min_heads:1 () >>=? fun block_stream ->
+        cctxt ?min_date ~min_heads:1 () >>=? fun block_stream ->
       Client_baking_operations.monitor_endorsement
-        cctxt.rpc_config >>=? fun endorsement_stream ->
+        cctxt >>=? fun endorsement_stream ->
       Client_baking_forge.create cctxt
         ?max_priority delegates block_stream endorsement_stream >>=? fun () ->
       return ()
