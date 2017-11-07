@@ -89,7 +89,6 @@ let main () =
         commands_for_version in
       let config : Client_commands.cfg = {
         base_dir = parsed_config_file.base_dir ;
-        force = parsed_args.force ;
         block = parsed_args.block ;
       } in
       let rpc_config =

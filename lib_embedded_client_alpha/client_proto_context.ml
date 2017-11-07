@@ -194,10 +194,10 @@ let message_injection cctxt ~force ?(contracts = []) oph =
 let message_added_contract cctxt name =
   cctxt.message "Contract memorized as %s." name
 
-let check_contract cctxt neu =
-  RawContractAlias.mem cctxt neu >>=? function
+let check_contract cctxt new_contract =
+  RawContractAlias.mem cctxt new_contract >>=? function
   | true ->
-      failwith "contract '%s' already exists" neu
+      failwith "contract '%s' already exists" new_contract
   | false ->
       return ()
 
@@ -323,7 +323,7 @@ let commands () =
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ prefix "to"
        @@ Public_key_hash.alias_param
-         ~name: "mgr" ~desc: "new delegate of the contract"
+         ~name: "mgr" ~desc: "New delegate of the contract"
        @@ stop)
       begin fun (fee, force) (_, contract) (_, delegate) cctxt ->
         get_manager cctxt contract >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
@@ -351,8 +351,9 @@ let commands () =
          ~name:"src" ~desc: "name of the source contract"
        @@ stop)
       begin fun (fee, delegate, delegatable, force)
-        neu (_, manager) balance (_, source) cctxt ->
-        check_contract cctxt neu >>=? fun () ->
+        new_contract (_, manager) balance (_, source) cctxt ->
+        RawContractAlias.of_fresh cctxt force new_contract >>=? fun new_contract ->
+        check_contract cctxt new_contract >>=? fun () ->
         get_delegate_pkh cctxt delegate >>=? fun delegate ->
         get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
         originate_account cctxt.rpc_config cctxt.config.block ~force:force
@@ -361,8 +362,8 @@ let commands () =
           () >>=? fun (oph, contract) ->
         message_injection cctxt
           ~force:force ~contracts:[contract] oph >>= fun () ->
-        RawContractAlias.add cctxt neu contract >>=? fun () ->
-        message_added_contract cctxt neu >>= fun () ->
+        RawContractAlias.add ~force cctxt new_contract contract >>=? fun () ->
+        message_added_contract cctxt new_contract >>= fun () ->
         return ()
       end ;
 
@@ -388,9 +389,10 @@ let commands () =
                              combine with -init if the storage type is not unit"
        @@ stop)
       begin fun (fee, delegate, force, delegatable, spendable, init, no_print_source)
-        neu (_, manager) balance (_, source) program cctxt ->
+        new_contract (_, manager) balance (_, source) program cctxt ->
+        RawContractAlias.of_fresh cctxt force new_contract >>=? fun new_contract ->
+        check_contract cctxt new_contract >>=? fun () ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
-        check_contract cctxt neu >>=? fun () ->
         get_delegate_pkh cctxt delegate >>=? fun delegate ->
         get_manager cctxt source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
         originate_contract cctxt.rpc_config cctxt.config.block ~force:force
@@ -409,8 +411,8 @@ let commands () =
         | Ok (oph, contract) ->
             message_injection cctxt
               ~force:force ~contracts:[contract] oph >>= fun () ->
-            RawContractAlias.add cctxt neu contract >>=? fun () ->
-            message_added_contract cctxt neu >>= fun () ->
+            RawContractAlias.add ~force cctxt new_contract contract >>=? fun () ->
+            message_added_contract cctxt new_contract >>= fun () ->
             return ()
       end ;
 
@@ -423,14 +425,15 @@ let commands () =
        @@ Public_key_hash.alias_param
          ~name: "mgr" ~desc: "manager of the new contract"
        @@ stop)
-      begin fun force neu (_, manager) cctxt ->
-        check_contract cctxt neu >>=? fun () ->
+      begin fun force new_contract (_, manager) cctxt ->
+        RawContractAlias.of_fresh cctxt force new_contract >>=? fun new_contract ->
+        check_contract cctxt new_contract >>=? fun () ->
         faucet cctxt.rpc_config cctxt.config.block
           ~force:force ~manager_pkh:manager () >>=? fun (oph, contract) ->
         message_injection cctxt
           ~force:force ~contracts:[contract] oph >>= fun () ->
-        RawContractAlias.add cctxt neu contract >>=? fun () ->
-        message_added_contract cctxt neu >>= fun () ->
+        RawContractAlias.add ~force cctxt new_contract contract >>=? fun () ->
+        message_added_contract cctxt new_contract >>= fun () ->
         return ()
       end;
 

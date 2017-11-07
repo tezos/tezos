@@ -26,6 +26,7 @@ val list_keys:
   (string * Public_key_hash.t * bool * bool) list tzresult Lwt.t
 
 val gen_keys:
+  ?force:bool ->
   ?seed: Ed25519.Seed.t ->
   Client_commands.context ->
   string ->

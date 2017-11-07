@@ -12,7 +12,6 @@ type ('a, 'b) lwt_format =
 
 type cfg = {
   base_dir : string ;
-  force : bool ;
   block : Node_rpc_services.Blocks.block ;
 }
 
@@ -34,7 +33,6 @@ let (//) = Filename.concat
 
 let default_cfg_of_base_dir base_dir = {
   base_dir ;
-  force = false ;
   block = `Prevalidation ;
 }
 
@@ -93,3 +91,9 @@ let register name commands =
 let commands_for_version version =
   try Protocol_hash.Table.find versions version
   with Not_found -> raise Version_not_found
+
+let force_switch =
+  Cli_entries.switch
+    ~parameter:"-force"
+    ~doc:"Take an action that will overwrite data.\
+          This silences any warnings and some checks"

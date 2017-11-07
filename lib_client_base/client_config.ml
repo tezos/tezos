@@ -107,7 +107,6 @@ type cli_args = {
   protocol: Protocol_hash.t option ;
   print_timings: bool ;
   log_requests: bool ;
-  force: bool ;
 }
 
 let default_cli_args = {
@@ -115,7 +114,6 @@ let default_cli_args = {
   protocol = None ;
   print_timings = false ;
   log_requests = false ;
-  force = false ;
 }
 
 open Cli_entries
@@ -158,10 +156,6 @@ let timings_switch =
   switch
     ~parameter:"-timings"
     ~doc:"Show RPC request times if present."
-let force_switch =
-  switch
-    ~parameter:"-force"
-    ~doc:"Show less courtesy than the average user."
 let block_arg =
   default_arg
     ~parameter:"-block"
@@ -201,9 +195,8 @@ let tls_switch =
     ~doc:"Use TLS to connect to node."
 
 let global_options =
-  args10 base_dir_arg
+  args9 base_dir_arg
     config_file_arg
-    force_switch
     timings_switch
     block_arg
     protocol_arg
@@ -219,7 +212,6 @@ let parse_config_args (ctx : Client_commands.context) argv =
     argv >>|?
   fun ((base_dir,
         config_file,
-        force,
         timings,
         block,
         protocol,
@@ -278,4 +270,4 @@ let parse_config_args (ctx : Client_commands.context) argv =
   end ;
   Utils.mkdir config_dir ;
   if not (Sys.file_exists config_file) then Cfg_file.write config_file cfg ;
-  (cfg, { block ; print_timings = timings ; log_requests ; force ; protocol }, remaining)
+  (cfg, { block ; print_timings = timings ; log_requests ; protocol }, remaining)

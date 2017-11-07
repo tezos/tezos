@@ -26,6 +26,7 @@ end
 
 module type Alias = sig
   type t
+  type fresh_param
   val load :
     Client_commands.context ->
     (string * t) list tzresult Lwt.t
@@ -45,6 +46,7 @@ module type Alias = sig
     Client_commands.context ->
     string -> bool tzresult Lwt.t
   val add :
+    force:bool ->
     Client_commands.context ->
     string -> t -> unit tzresult Lwt.t
   val del :
@@ -71,7 +73,12 @@ module type Alias = sig
     ?name:string ->
     ?desc:string ->
     ('a, Client_commands.context, 'ret) Cli_entries.params ->
-    (string -> 'a, Client_commands.context, 'ret) Cli_entries.params
+    (fresh_param -> 'a, Client_commands.context, 'ret) Cli_entries.params
+  val of_fresh :
+    Client_commands.context ->
+    bool ->
+    fresh_param ->
+    string tzresult Lwt.t
   val source_param :
     ?name:string ->
     ?desc:string ->
@@ -152,11 +159,11 @@ module Alias = functor (Entity : Entity) -> struct
       (fun exn -> Lwt.return (error_exn exn))
     |> generic_trace "could not write the %s alias file." Entity.name
 
-  let add cctxt name value =
+  let add ~force cctxt name value =
     let keep = ref false in
     load cctxt >>=? fun list ->
     begin
-      if cctxt.config.force then
+      if force then
         return ()
       else
         iter_s (fun (n, v) ->
@@ -220,32 +227,33 @@ module Alias = functor (Entity : Entity) -> struct
            return (s, v)))
       next
 
+  type fresh_param = Fresh of string
+
+  let of_fresh cctxt force (Fresh s) =
+    load cctxt >>=? fun list ->
+    begin if force then
+        return ()
+      else
+        iter_s
+          (fun (n, _v) ->
+             if n = s then
+               Entity.to_source cctxt _v >>=? fun value ->
+               failwith
+                 "@[<v 2>The %s alias %s already exists.@,\
+                  The current value is %s.@,\
+                  Use -force to update@]"
+                 Entity.name n
+                 value
+             else
+               return ())
+          list
+    end >>=? fun () ->
+    return s
+
   let fresh_alias_param
       ?(name = "new") ?(desc = "new " ^ Entity.name ^ " alias") next =
     param ~name ~desc
-      (parameter (fun cctxt s ->
-           begin
-             load cctxt >>=? fun list ->
-             begin
-               if cctxt.config.force then
-                 return ()
-               else
-                 iter_s
-                   (fun (n, _v) ->
-                      if n = s then
-                        Entity.to_source cctxt _v >>=? fun value ->
-                        failwith
-                          "@[<v 2>The %s alias %s already exists.@,\
-                           The current value is %s.@,\
-                           Use -force true to update@]"
-                          Entity.name n
-                          value
-                      else
-                        return ())
-                   list
-             end
-           end >>=? fun () ->
-           return s))
+      (parameter (fun _ s -> return @@ Fresh s))
       next
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =

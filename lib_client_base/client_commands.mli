@@ -12,7 +12,6 @@ type ('a, 'b) lwt_format =
 
 type cfg = {
   base_dir : string ;
-  force : bool ;
   block : Node_rpc_services.Blocks.block ;
 }
 
@@ -56,3 +55,7 @@ exception Version_not_found
 val register: Protocol_hash.t -> command list -> unit
 val commands_for_version: Protocol_hash.t -> command list
 val get_versions: unit -> (Protocol_hash.t * (command list)) list
+
+(** Have a command execute ignoring warnings.
+    This switch should be used when data will be overwritten. *)
+val force_switch : (bool, context) Cli_entries.arg

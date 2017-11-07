@@ -62,14 +62,15 @@ let commands () =
          return ()) ;
 
     command ~group ~desc: "remember a program under some name"
-      no_options
+      (args1 Client_commands.force_switch)
       (prefixes [ "remember" ; "program" ]
        @@ Program.fresh_alias_param
        @@ Program.source_param
        @@ stop)
-      (fun () name program cctxt ->
+      (fun force name program cctxt ->
+         Program.of_fresh cctxt force name >>=? fun name ->
          Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun program ->
-         Program.add cctxt name (program, [])) ;
+         Program.add ~force cctxt name (program, [])) ;
 
     command ~group ~desc: "forget a remembered program"
       no_options

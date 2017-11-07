@@ -31,21 +31,21 @@ module Secret_key = Client_aliases.Alias (struct
     let name = "secret key"
   end)
 
-let gen_keys ?seed cctxt name =
+let gen_keys ?(force=false) ?seed cctxt name =
   let seed =
     match seed with
     | None -> Ed25519.Seed.generate ()
     | Some s -> s in
   let _, public_key, secret_key = Ed25519.generate_seeded_key seed in
-  Secret_key.add cctxt name secret_key >>=? fun () ->
-  Public_key.add cctxt name public_key >>=? fun () ->
-  Public_key_hash.add
+  Secret_key.add ~force cctxt name secret_key >>=? fun () ->
+  Public_key.add ~force cctxt name public_key >>=? fun () ->
+  Public_key_hash.add ~force
     cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
   cctxt.message
     "I generated a brand new pair of keys under the name '%s'." name >>= fun () ->
   return ()
 
-let gen_keys_containing ?(prefix=false) ~containing ~name (cctxt : Client_commands.context) =
+let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : Client_commands.context) =
   let unrepresentable =
     List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
   match unrepresentable with
@@ -59,7 +59,7 @@ let gen_keys_containing ?(prefix=false) ~containing ~name (cctxt : Client_comman
         unrepresentable >>= return
   | [] ->
       Public_key_hash.mem cctxt name >>=? fun name_exists ->
-      if name_exists && not cctxt.config.force
+      if name_exists && not force
       then
         cctxt.warning
           "Key for name '%s' already exists. Use -force to update." name >>= return
@@ -84,9 +84,9 @@ let gen_keys_containing ?(prefix=false) ~containing ~name (cctxt : Client_comman
             let hash = Ed25519.Public_key_hash.to_b58check @@ Ed25519.Public_key.hash public_key in
             if matches hash
             then
-              Secret_key.add cctxt name secret_key >>=? fun () ->
-              Public_key.add cctxt name public_key >>=? fun () ->
-              Public_key_hash.add cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
+              Secret_key.add ~force cctxt name secret_key >>=? fun () ->
+              Public_key.add ~force cctxt name public_key >>=? fun () ->
+              Public_key_hash.add ~force cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
               return hash
             else begin if attempts mod 25_000 = 0
               then cctxt.message "Tried %d keys without finding a match" attempts
@@ -161,61 +161,56 @@ let commands () =
   [
 
     command ~group ~desc: "generate a pair of keys"
-      no_options
+      (args1 Client_commands.force_switch)
       (prefixes [ "gen" ; "keys" ]
        @@ Secret_key.fresh_alias_param
        @@ stop)
-      (fun () name cctxt -> gen_keys cctxt name) ;
+      (fun force name cctxt ->
+         Secret_key.of_fresh cctxt force name >>=? fun name ->
+         gen_keys ~force cctxt name) ;
 
     command ~group ~desc: "Generate keys including the given string"
-      (args1 (switch ~doc:"The key must begin with tz1[containing]" ~parameter:"-prefix"))
+      (args2 (switch ~doc:"The key must begin with tz1[containing]" ~parameter:"-prefix") force_switch)
       (prefixes [ "gen" ; "vanity" ; "keys" ]
        @@ Public_key_hash.fresh_alias_param
        @@ prefix "matching"
        @@ (seq_of_param @@ string ~name:"strs" ~desc:"String key must contain"))
-      (fun prefix name containing cctxt ->
-         gen_keys_containing ~prefix ~containing ~name cctxt) ;
+      (fun (prefix, force) name containing cctxt ->
+         Public_key_hash.of_fresh cctxt force name >>=? fun name ->
+         gen_keys_containing ~force ~prefix ~containing ~name cctxt) ;
 
     command ~group ~desc: "add a secret key to the wallet"
-      no_options
+      (args1 Client_commands.force_switch)
       (prefixes [ "add" ; "secret" ; "key" ]
        @@ Secret_key.fresh_alias_param
        @@ Secret_key.source_param
        @@ stop)
-      (fun () name sk cctxt ->
+      (fun force name sk cctxt ->
+         Secret_key.of_fresh cctxt force name >>=? fun name ->
          Public_key.find_opt cctxt name >>=? function
          | None ->
              let pk = Ed25519.Secret_key.to_public_key sk in
-             Public_key_hash.add cctxt
+             Public_key_hash.add ~force cctxt
                name (Ed25519.Public_key.hash pk) >>=? fun () ->
-             Public_key.add cctxt name pk >>=? fun () ->
-             Secret_key.add cctxt name sk
+             Public_key.add ~force cctxt name pk >>=? fun () ->
+             Secret_key.add ~force cctxt name sk
          | Some pk ->
              fail_unless
-               (check_keys_consistency pk sk || cctxt.config.force)
+               (check_keys_consistency pk sk || force)
                (failure
                   "public and secret keys '%s' don't correspond, \
                    please don't use -force" name) >>=? fun () ->
-             Secret_key.add cctxt name sk) ;
+             Secret_key.add ~force cctxt name sk) ;
 
     command ~group ~desc: "add a public key to the wallet"
-      no_options
-      (prefixes [ "add" ; "public" ; "key" ]
-       @@ Public_key.fresh_alias_param
-       @@ Public_key.source_param
-       @@ stop)
-      (fun () name key cctxt ->
-         Public_key_hash.add cctxt
-           name (Ed25519.Public_key.hash key) >>=? fun () ->
-         Public_key.add cctxt name key) ;
-
-    command ~group ~desc: "add an ID a public key hash to the wallet"
-      no_options
+      (args1 Client_commands.force_switch)
       (prefixes [ "add" ; "identity" ]
        @@ Public_key_hash.fresh_alias_param
        @@ Public_key_hash.source_param
        @@ stop)
-      (fun () name hash cctxt -> Public_key_hash.add cctxt name hash) ;
+      (fun force name hash cctxt ->
+         Public_key_hash.of_fresh cctxt force name >>=? fun name ->
+         Public_key_hash.add ~force cctxt name hash) ;
 
     command ~group ~desc: "list all public key hashes and associated keys"
       no_options
@@ -258,11 +253,11 @@ let commands () =
                  else return ()) ;
 
     command ~group ~desc: "forget all keys"
-      no_options
+      (args1 Client_commands.force_switch)
       (fixed [ "forget" ; "all" ; "keys" ])
-      (fun () cctxt ->
-         fail_unless cctxt.config.force
-           (failure "this can only used with option -force") >>=? fun () ->
+      (fun force cctxt ->
+         fail_unless force
+           (failure "this can only used with option -force true") >>=? fun () ->
          Public_key.save cctxt [] >>=? fun () ->
          Secret_key.save cctxt [] >>=? fun () ->
          Public_key_hash.save cctxt []) ;

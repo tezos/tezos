@@ -177,13 +177,14 @@ let commands  () =
   [
 
     command ~group ~desc: "add a contract to the wallet"
-      no_options
+      (args1 Client_commands.force_switch)
       (prefixes [ "remember" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
        @@ RawContractAlias.source_param
        @@ stop)
-      (fun () name hash cctxt ->
-         RawContractAlias.add cctxt name hash) ;
+      (fun force name hash cctxt ->
+         RawContractAlias.of_fresh cctxt force name >>=? fun name ->
+         RawContractAlias.add ~force cctxt name hash) ;
 
     command ~group ~desc: "remove a contract from the wallet"
       no_options
@@ -205,11 +206,11 @@ let commands  () =
            contracts) ;
 
     command ~group ~desc: "forget all known contracts"
-      no_options
+      (args1 Client_commands.force_switch)
       (fixed [ "forget" ; "all" ; "contracts" ])
-      (fun () cctxt ->
+      (fun force cctxt ->
          fail_unless
-           cctxt.config.force
+           force
            (failure "this can only used with option -force true") >>=? fun () ->
          RawContractAlias.save cctxt []) ;
 

@@ -22,6 +22,7 @@ end
 
 module type Alias = sig
   type t
+  type fresh_param
   val load :
     Client_commands.context ->
     (string * t) list tzresult Lwt.t
@@ -41,6 +42,7 @@ module type Alias = sig
     Client_commands.context ->
     string -> bool tzresult Lwt.t
   val add :
+    force:bool ->
     Client_commands.context ->
     string -> t -> unit tzresult Lwt.t
   val del :
@@ -67,7 +69,12 @@ module type Alias = sig
     ?name:string ->
     ?desc:string ->
     ('a, Client_commands.context, 'ret) Cli_entries.params ->
-    (string -> 'a, Client_commands.context, 'ret) Cli_entries.params
+    (fresh_param -> 'a, Client_commands.context, 'ret) Cli_entries.params
+  val of_fresh :
+    Client_commands.context ->
+    bool ->
+    fresh_param ->
+    string tzresult Lwt.t
   val source_param :
     ?name:string ->
     ?desc:string ->
