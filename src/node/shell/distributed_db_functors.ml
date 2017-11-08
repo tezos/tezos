@@ -19,12 +19,14 @@ module type DISTRIBUTED_DB = sig
   val known: t -> key -> bool Lwt.t
 
   type error += Missing_data of key
+  type error += Canceled of key
   val read: t -> key -> value tzresult Lwt.t
   val read_opt: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
 
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
-  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
+  val fetch:
+    t -> ?peer:P2p.Peer_id.t -> key -> param -> value tzresult Lwt.t
 
   val clear_or_cancel: t -> key -> unit
   val inject: t -> key -> value -> bool Lwt.t
@@ -108,7 +110,7 @@ end = struct
   }
 
   and status =
-    | Pending of { wakener : value Lwt.u ;
+    | Pending of { wakener : value tzresult Lwt.u ;
                    mutable waiters : int ;
                    param : param }
     | Found of value
@@ -132,6 +134,7 @@ end = struct
     | Pending _ -> Lwt.fail Not_found
 
   type error += Missing_data of key
+  type error += Canceled of key
 
   let () =
     Error_monad.register_error_kind `Permanent
@@ -171,7 +174,7 @@ end = struct
     match Memory_table.find s.memory k with
     | exception Not_found -> begin
         Disk_table.read_opt s.disk k >>= function
-        | Some v -> Lwt.return v
+        | Some v -> return v
         | None ->
             match Memory_table.find s.memory k with
             | exception Not_found -> begin
@@ -185,13 +188,13 @@ end = struct
                 Scheduler.request s.scheduler peer k ;
                 data.waiters <- data.waiters + 1 ;
                 wrap s k (Lwt.waiter_of_wakener data.wakener)
-            | Found v -> Lwt.return v
+            | Found v -> return v
       end
     | Pending data ->
         Scheduler.request s.scheduler peer k ;
         data.waiters <- data.waiters + 1 ;
         wrap s k (Lwt.waiter_of_wakener data.wakener)
-    | Found v -> Lwt.return v
+    | Found v -> return v
 
   let prefetch s ?peer k param = Lwt.ignore_result (fetch s ?peer k param)
 
@@ -214,7 +217,7 @@ end = struct
         | Some v ->
             Scheduler.notify s.scheduler p k ;
             Memory_table.replace s.memory k (Found v) ;
-            Lwt.wakeup w v ;
+            Lwt.wakeup_later w (Ok v) ;
             iter_option s.global_input
               ~f:(fun input -> Watcher.notify input (k, v)) ;
             Watcher.notify s.input (k, v) ;
@@ -244,7 +247,7 @@ end = struct
     | Pending { wakener = w ; _ } ->
         Scheduler.notify_cancelation s.scheduler k ;
         Memory_table.remove s.memory k ;
-        Lwt.wakeup_later_exn w Lwt.Canceled
+        Lwt.wakeup_later w (Error [Canceled k])
     | Found _ -> Memory_table.remove s.memory k
 
   let watch s = Watcher.create_stream s.input
