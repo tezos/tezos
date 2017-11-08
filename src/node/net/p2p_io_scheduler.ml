@@ -117,7 +117,8 @@ module Scheduler(IO : IO) = struct
           worker_loop st
       | Error ([Connection_closed |
                 Exn ( Lwt_pipe.Closed |
-                      Unix.Unix_error (EBADF, _, _) )] as err) ->
+                      Unix.Unix_error ((EBADF | ETIMEDOUT), _, _) )]
+               as err) ->
           lwt_debug "Connection closed (pop: %d, %s)"
             conn.id IO.name >>= fun () ->
           cancel conn err >>= fun () ->
