@@ -106,7 +106,8 @@ end = struct
   }
 
   and status =
-    | Pending of value Lwt.u * param
+    | Pending of { wakener : value Lwt.u ;
+                   param : param }
     | Found of value
 
   let known s k =
@@ -157,16 +158,16 @@ end = struct
             match Memory_table.find s.memory k with
             | exception Not_found -> begin
                 let waiter, wakener = Lwt.wait () in
-                Memory_table.add s.memory k (Pending (wakener, param)) ;
+                Memory_table.add s.memory k (Pending  { wakener ; param }) ;
                 Scheduler.request s.scheduler peer k ;
                 waiter
               end
-            | Pending (w, _) ->
+            | Pending { wakener = w ; _ } ->
                 Scheduler.request s.scheduler peer k ;
                 Lwt.waiter_of_wakener w
             | Found v -> Lwt.return v
       end
-    | Pending (w, _) ->
+    | Pending { wakener = w ; _ } ->
         Scheduler.request s.scheduler peer k ;
         Lwt.waiter_of_wakener w
     | Found v -> Lwt.return v
@@ -184,7 +185,7 @@ end = struct
             Scheduler.notify_unrequested s.scheduler p k ;
             Lwt.return_unit
       end
-    | Pending (w, param) -> begin
+    | Pending { wakener = w ; param } -> begin
         match Precheck.precheck k param v with
         | None ->
             Scheduler.notify_invalid s.scheduler p k ;
@@ -219,7 +220,7 @@ end = struct
   let clear_or_cancel s k =
     match Memory_table.find s.memory k with
     | exception Not_found -> ()
-    | Pending (w, _) ->
+    | Pending { wakener = w ; _ } ->
         Scheduler.notify_cancelation s.scheduler k ;
         Memory_table.remove s.memory k ;
         Lwt.wakeup_later_exn w Lwt.Canceled
