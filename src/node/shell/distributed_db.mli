@@ -79,13 +79,17 @@ module type DISTRIBUTED_DB = sig
   val known: t -> key -> bool Lwt.t
   type error += Missing_data of key
   type error += Canceled of key
+  type error += Timeout of key
   val read: t -> key -> value tzresult Lwt.t
   val read_opt: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
   val fetch:
-    t -> ?peer:P2p.Peer_id.t -> key -> param -> value tzresult Lwt.t
+    t ->
+    ?peer:P2p.Peer_id.t ->
+    ?timeout:float ->
+    key -> param -> value tzresult Lwt.t
   val clear_or_cancel: t -> key -> unit
 end
 

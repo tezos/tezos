@@ -876,13 +876,17 @@ module type DISTRIBUTED_DB = sig
   val known: t -> key -> bool Lwt.t
   type error += Missing_data of key
   type error += Canceled of key
+  type error += Timeout of key
   val read: t -> key -> value tzresult Lwt.t
   val read_opt: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
   val fetch:
-    t -> ?peer:P2p.Peer_id.t -> key -> param -> value tzresult Lwt.t
+    t ->
+    ?peer:P2p.Peer_id.t ->
+    ?timeout:float ->
+    key -> param -> value tzresult Lwt.t
   val clear_or_cancel: t -> key -> unit
 end
 
@@ -899,11 +903,13 @@ module Make
   let known t k = Table.known (Kind.proj t) k
   type error += Missing_data = Table.Missing_data
   type error += Canceled = Table.Canceled
+  type error += Timeout = Table.Timeout
   let read t k = Table.read (Kind.proj t) k
   let read_opt t k = Table.read_opt (Kind.proj t) k
   let read_exn t k = Table.read_exn (Kind.proj t) k
   let prefetch t ?peer k p = Table.prefetch (Kind.proj t) ?peer k p
-  let fetch t ?peer k p = Table.fetch (Kind.proj t) ?peer k p
+  let fetch t ?peer ?timeout k p =
+    Table.fetch (Kind.proj t) ?peer ?timeout k p
   let clear_or_cancel t k = Table.clear_or_cancel (Kind.proj t) k
   let inject t k v = Table.inject (Kind.proj t) k v
   let watch t = Table.watch (Kind.proj t)
