@@ -99,7 +99,8 @@ module Alias = functor (Entity : Entity) -> struct
 
   let load cctxt =
     let filename = filename cctxt in
-    if not (Sys.file_exists filename) then
+    if not (Sys.file_exists filename) ||
+       Unix.(stat filename).st_size = 0 then
       return []
     else
       Data_encoding_ezjsonm.read_file filename
