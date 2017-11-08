@@ -243,6 +243,7 @@ let create net_db =
                       ops in
                   let fetch op =
                     Distributed_db.Operation.fetch
+                      ~timeout:10. (* TODO allow to adjust the constant ... *)
                       net_db ~peer:gid op () >>= fun _op ->
                     push_to_worker (`Handle op) ;
                     Lwt.return_unit
@@ -252,7 +253,10 @@ let create net_db =
                     unknown_ops ;
                   List.iter (fun op ->
                       Lwt.ignore_result
-                        (Distributed_db.Operation.fetch net_db ~peer:gid op ()))
+                        (Distributed_db.Operation.fetch
+                           (* TODO allow to adjust the constant ... *)
+                           ~timeout:10.
+                           net_db ~peer:gid op ()))
                     known_ops ;
                   Lwt.return_unit
               | `Handle op ->
