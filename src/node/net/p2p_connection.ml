@@ -261,16 +261,19 @@ module Reader = struct
 
 
   let rec worker_loop st init_mbytes =
-    Lwt_unix.yield () >>= fun () ->
     begin
       read_message st init_mbytes >>=? fun msg ->
       match msg with
       | None ->
-          Lwt_pipe.push st.messages (Error [Decoding_error]) >>= fun () ->
-          return None
+          Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+            Lwt_pipe.push st.messages (Error [Decoding_error]) >>= fun () ->
+            return None
+          end
       | Some (msg, size, rem_mbytes) ->
-          Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
-          return (Some rem_mbytes)
+          Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+            Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
+            return (Some rem_mbytes)
+          end
     end >>= function
     | Ok Some rem_mbytes ->
         worker_loop st rem_mbytes
