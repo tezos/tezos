@@ -27,6 +27,11 @@ val pop : 'a t -> 'a Lwt.t
 (** [pop q] is a thread that blocks while [q] is empty, then
     removes and returns the first element in [q]. *)
 
+val pop_all : 'a t -> 'a list Lwt.t
+(** [pop_all q] is a thread that blocks while [q] is empty, then
+    removes and returns all the element in [q] (in the order they
+    were inserted). *)
+
 val peek : 'a t -> 'a Lwt.t
 (** [peek] is like [pop] except it does not removes the first
     element. *)
