@@ -66,7 +66,7 @@ let bootstrapped v = v.bootstrapped
 let fetch_protocol v hash =
   lwt_log_notice "Fetching protocol %a"
     Protocol_hash.pp_short hash >>= fun () ->
-  Distributed_db.Protocol.fetch v.worker.db hash () >>= fun protocol ->
+  Distributed_db.Protocol.fetch v.worker.db hash () >>=? fun protocol ->
   Updater.compile hash protocol >>= fun valid ->
   if valid then begin
     lwt_log_notice "Successfully compiled protocol %a"
@@ -253,7 +253,7 @@ let apply_block net_state db
   lwt_log_info "validation of %a: looking for dependencies..."
     Block_hash.pp_short hash >>= fun () ->
   Distributed_db.Operations.fetch
-    db (hash, 0) block.shell.operations_hash >>= fun operations ->
+    db (hash, 0) block.shell.operations_hash >>=? fun operations ->
   fail_unless (block.shell.validation_passes <= 1)
     (* TODO constant to be exported from the protocol... *)
     (failure "unexpected error (TO BE REMOVED)") >>=? fun () ->
@@ -399,7 +399,7 @@ module Context_db = struct
       assert (not (Block_hash.Table.mem tbl hash));
       let waiter, wakener = Lwt.wait () in
       let data =
-        Distributed_db.Block_header.fetch net_db hash () >>= return in
+        Distributed_db.Block_header.fetch net_db hash () in
       match Lwt.state data with
       | Lwt.Return data ->
           let state = `Inited data in
@@ -733,13 +733,13 @@ let rec create_validator ?parent worker ?max_child_ttl state db net =
           Block_hash.equal (State.Net.genesis child.net).block genesis in
     begin
       match max_child_ttl with
-      | None -> Lwt.return expiration
+      | None -> return expiration
       | Some ttl ->
-          Distributed_db.Block_header.fetch net_db genesis () >>= fun genesis ->
-          Lwt.return
+          Distributed_db.Block_header.fetch net_db genesis () >>=? fun genesis ->
+          return
             (Time.min expiration
                (Time.add genesis.shell.timestamp (Int64.of_int ttl)))
-    end >>= fun local_expiration ->
+    end >>=? fun local_expiration ->
     let expired = Time.(local_expiration <= current_time) in
     if expired && activated then
       deactivate_child () >>= return

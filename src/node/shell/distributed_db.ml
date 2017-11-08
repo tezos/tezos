@@ -875,12 +875,14 @@ module type DISTRIBUTED_DB = sig
   type param
   val known: t -> key -> bool Lwt.t
   type error += Missing_data of key
+  type error += Canceled of key
   val read: t -> key -> value tzresult Lwt.t
   val read_opt: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
   val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
-  val fetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> value Lwt.t
+  val fetch:
+    t -> ?peer:P2p.Peer_id.t -> key -> param -> value tzresult Lwt.t
   val clear_or_cancel: t -> key -> unit
 end
 
@@ -896,6 +898,7 @@ module Make
   type param = Table.param
   let known t k = Table.known (Kind.proj t) k
   type error += Missing_data = Table.Missing_data
+  type error += Canceled = Table.Canceled
   let read t k = Table.read (Kind.proj t) k
   let read_opt t k = Table.read_opt (Kind.proj t) k
   let read_exn t k = Table.read_exn (Kind.proj t) k
