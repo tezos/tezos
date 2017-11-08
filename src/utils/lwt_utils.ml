@@ -472,6 +472,16 @@ let protect ?on_error ?canceler t =
 
 type error += Timeout
 
+let () =
+  Error_monad.register_error_kind
+    `Temporary
+    ~id:"utils.Timeout"
+    ~title:"Timeout"
+    ~description:"Timeout"
+    Data_encoding.unit
+    (function Timeout -> Some () | _ -> None)
+    (fun () -> Timeout)
+
 let with_timeout ?(canceler = Canceler.create ()) timeout f =
   let t = Lwt_unix.sleep timeout in
   Lwt.choose [

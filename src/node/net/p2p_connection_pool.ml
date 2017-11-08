@@ -1031,8 +1031,13 @@ and swap pool conn current_peer_id new_point =
   | Error err -> begin
       pool.latest_accepted_swap <- pool.latest_succesfull_swap ;
       log pool (Swap_failure { source = source_peer_id }) ;
-      lwt_log_error "Swap to %a failed: %a"
-        Point.pp new_point pp_print_error err
+      match err with
+      | [ Lwt_utils.Timeout ] ->
+          lwt_debug "Swap to %a was interupted: %a"
+            Point.pp new_point pp_print_error err
+      | _ ->
+          lwt_log_error "Swap to %a failed: %a"
+            Point.pp new_point pp_print_error err
     end
 
 let accept pool fd point =
