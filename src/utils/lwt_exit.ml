@@ -17,12 +17,18 @@ let () =
     (function
       | Exit -> ()
       | exn ->
-          Format.eprintf
-            "@[Uncaught (asynchronous) exception (%d):@ %a@]"
-            (Unix.getpid ())
-            Error_monad.pp_exn exn ;
           let backtrace = Printexc.get_backtrace () in
-          if String.length backtrace <> 0 then
-            Format.eprintf "\n%s" backtrace ;
-          Format.eprintf "@." ;
+          Logging.Node.Main.fatal_error "@[<v 2>%a%a@]"
+            (fun ppf exn ->
+               Format.fprintf ppf
+                 "@[Uncaught (asynchronous) exception (%d):@ %a@]"
+                 (Unix.getpid ())
+                 Error_monad.pp_exn exn)
+            exn
+            (fun ppf backtrace ->
+               if String.length backtrace <> 0 then
+                 Format.fprintf ppf
+                   "@,Backtrace:@,  @[<h>%a@]"
+                   Format.pp_print_text backtrace)
+            backtrace ;
           Lwt.wakeup exit_wakener 1)

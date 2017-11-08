@@ -34,7 +34,9 @@ let fork_test_network = Context.fork_test_network
 let datadir = ref None
 let get_datadir () =
   match !datadir with
-  | None -> fatal_error "not initialized"
+  | None ->
+      fatal_error "Node not initialized" ;
+      Lwt_exit.exit 1
   | Some m -> m
 
 let init dir =
