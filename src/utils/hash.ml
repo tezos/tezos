@@ -310,7 +310,7 @@ module Make_Blake2B (R : sig
       ~binary:
         (conv to_bytes of_bytes_exn (Fixed.bytes size))
       ~json:
-        (describe ~title: (K.title ^ " (Base58Check-encoded Sha256)") @@
+        (describe ~title: (K.title ^ " (Base58Check-encoded Blake2B hash)") @@
          conv to_b58check (Data_encoding.Json.wrap_error of_b58check_exn) string)
 
   let param ?(name=K.name) ?(desc=K.title) t =
@@ -628,7 +628,7 @@ module Net_id = struct
     splitted
       ~binary: (Fixed.string size)
       ~json:
-        (describe ~title: (title ^ " (Base58Check-encoded Sha256)") @@
+        (describe ~title: (title ^ " (Base58Check-encoded Blake2B hash)") @@
          conv to_b58check (Data_encoding.Json.wrap_error of_b58check_exn) string)
 
   let param ?(name=name) ?(desc=title) t =

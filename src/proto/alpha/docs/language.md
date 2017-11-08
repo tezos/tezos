@@ -1180,7 +1180,7 @@ for under/overflows.
 
    * `H`:
      Compute a cryptographic hash of the value contents using the
-     Sha256 cryptographic algorithm.
+     Blake2B cryptographic hash function.
 
         :: 'a : 'S   ->   string : 'S
 
@@ -1448,7 +1448,7 @@ All domain specific constants are Micheline strings with specific formats:
   - `contract`s are the raw strings returned by JSON RPCs or the command
     line interface and cannot be forged by hand so their format is of
     no interest here.
-  - `key`s are `Sha256` hashes of `ed25519` public keys encoded in
+  - `key`s are `Blake2B` hashes of `ed25519` public keys encoded in
     `base58` format with the following custom alphabet:
     `"eXMNE9qvHPQDdcFx5J86rT7VRm2atAypGhgLfbS3CKjnksB4"`.
   - `signature`s are `ed25519` signatures as a series of hex-encoded bytes.

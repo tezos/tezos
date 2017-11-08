@@ -145,7 +145,7 @@ module type PrefixedName = sig
   val b58check_prefix : string
 end
 
-(** Builds a new Hash type using Sha256. *)
+(** Builds a new Hash type using Blake2B. *)
 module Make_minimal_Blake2B (Name : Name) : INTERNAL_MINIMAL_HASH
 module Make_Blake2B
     (Register : sig
