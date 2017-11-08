@@ -55,9 +55,9 @@ and log = {
 
 let default_net_limits : P2p.limits = {
   authentification_timeout = 5. ;
-  min_connections = 50 ;
-  expected_connections = 100 ;
-  max_connections = 200 ;
+  min_connections = 10 ;
+  expected_connections = 50 ;
+  max_connections = 100 ;
   backlog = 20 ;
   max_incoming_connections = 20 ;
   max_download_speed = None ;
