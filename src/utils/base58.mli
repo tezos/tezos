@@ -91,7 +91,7 @@ val complete: ?alphabet:Alphabet.t -> string -> string list Lwt.t
 
 (** {1 Low-level: distinct registering function for economic protocol} *)
 
-(** See [src/proto/environment/base48.mli]} for an inlined
+(** See [src/environment/v1/base58.mli]} for an inlined
     documentation. *)
 module Make(C: sig type context end) : sig
 

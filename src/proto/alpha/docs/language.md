@@ -1449,7 +1449,7 @@ All domain specific constants are Micheline strings with specific formats:
     line interface and cannot be forged by hand so their format is of
     no interest here.
   - `key`s are `Sha256` hashes of `ed25519` public keys encoded in
-    `base48` format with the following custom alphabet:
+    `base58` format with the following custom alphabet:
     `"eXMNE9qvHPQDdcFx5J86rT7VRm2atAypGhgLfbS3CKjnksB4"`.
   - `signature`s are `ed25519` signatures as a series of hex-encoded bytes.
 
