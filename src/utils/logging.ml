@@ -16,7 +16,7 @@ module type LOG = sig
   val log_notice: ('a, Format.formatter, unit, unit) format4 -> 'a
   val warn: ('a, Format.formatter, unit, unit) format4 -> 'a
   val log_error: ('a, Format.formatter, unit, unit) format4 -> 'a
-  val fatal_error: ('a, Format.formatter, unit, 'b) format4 -> 'a
+  val fatal_error: ('a, Format.formatter, unit, unit) format4 -> 'a
 
   val lwt_debug: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   val lwt_log_info: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
@@ -56,10 +56,7 @@ module Make(S : sig val name: string end) : LOG = struct
   let log_notice fmt = ign_log_f ~section ~level:Lwt_log.Notice fmt
   let warn fmt = ign_log_f ~section ~level:Lwt_log.Warning fmt
   let log_error fmt = ign_log_f ~section ~level:Lwt_log.Error fmt
-  let fatal_error fmt =
-    Format.kasprintf
-      (fun s -> Lwt_log.ign_fatal ~section s; Lwt_exit.exit 1)
-      fmt
+  let fatal_error fmt = ign_log_f ~section ~level:Lwt_log.Fatal fmt
 
   let lwt_debug fmt = log_f ~section ~level:Lwt_log.Debug fmt
   let lwt_log_info fmt = log_f ~section ~level:Lwt_log.Info fmt
@@ -202,6 +199,9 @@ let init ?(template = default_template) output =
   end >>= fun logger ->
   Lwt_log.default := logger ;
   Lwt.return_unit
+
+let close () =
+  Lwt_log.close !Lwt_log.default
 
 type level = Lwt_log_core.level =
   | Debug
