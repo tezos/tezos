@@ -66,7 +66,7 @@ let merge _key a b =
 
 let create net_db =
 
-  let net_state = Distributed_db.state net_db in
+  let net_state = Distributed_db.net_state net_db in
 
   let cancelation, cancel, _on_cancel = Lwt_utils.canceler () in
   let push_to_worker, worker_waiter = Lwt_utils.queue () in
@@ -351,7 +351,7 @@ let context pv = pv.context ()
 let shutdown pv = pv.shutdown ()
 
 let inject_operation pv ?(force = false) (op: Operation.t) =
-  let net_id = State.Net.id (Distributed_db.state pv.net_db) in
+  let net_id = State.Net.id (Distributed_db.net_state pv.net_db) in
   let wrap_error h map =
     begin
       try return (Operation_hash.Map.find h map)

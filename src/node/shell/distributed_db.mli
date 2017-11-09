@@ -16,11 +16,13 @@ module Metadata = Distributed_db_metadata
 type p2p = (Message.t, Metadata.t) P2p.net
 
 val create: State.t -> p2p -> t
+val state: db -> State.t
 val shutdown: t -> unit Lwt.t
 
 type net_db
 
-val state: net_db -> State.Net.t
+val net_state: net_db -> State.Net.t
+val db: net_db -> db
 
 type callback = {
   notify_branch: P2p.Peer_id.t -> Block_locator.t -> unit ;
