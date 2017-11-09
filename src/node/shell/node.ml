@@ -441,7 +441,7 @@ module RPC = struct
         | None ->
             Lwt.return (Prevalidation.empty_result, Operation_hash.Set.empty)
         | Some (validator, net_db) ->
-            let net_state = Distributed_db.state net_db in
+            let net_state = Distributed_db.net_state net_db in
             let prevalidator = Validator.prevalidator validator in
             State.Block.read_exn net_state h >>= fun block ->
             Prevalidator.pending ~block prevalidator >|= fun ops ->
@@ -540,7 +540,7 @@ module RPC = struct
       match Validator.test_validator node.mainnet_validator with
       | None -> Lwt.return_nil
       | Some (_, net_db) ->
-          Chain.known_heads (Distributed_db.state net_db)
+          Chain.known_heads (Distributed_db.net_state net_db)
     end >>= fun test_heads ->
     Lwt_list.fold_left_s
       (fun map block ->

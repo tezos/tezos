@@ -343,7 +343,9 @@ let noop_callback = {
 
 type t = db
 
-let state { net_state } = net_state
+let state { disk } = disk
+let net_state { net_state } = net_state
+let db { global_db } = global_db
 
 module P2p_reader = struct
 

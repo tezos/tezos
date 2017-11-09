@@ -474,7 +474,7 @@ module Context_db = struct
           Lwt.return_unit
 
   let process (v: net_validator) ~get_context ~set_context hash block =
-    let net_state = Distributed_db.state v.net_db in
+    let net_state = Distributed_db.net_state v.net_db in
     get_context v block.Block_header.shell.predecessor >>= function
     | Error _ as error ->
         Lwt_unix.yield () >>= fun () ->
@@ -561,7 +561,7 @@ module Context_db = struct
       | Some b -> Int64.to_float (Time.diff b.Block_header.shell.timestamp time)
 
   let create net_db =
-    let net_state = Distributed_db.state net_db in
+    let net_state = Distributed_db.net_state net_db in
     let tbl = Block_hash.Table.create 50 in
     let canceler = Lwt_utils.Canceler.create () in
     let worker_trigger, worker_waiter = Lwt_utils.trigger () in
