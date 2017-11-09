@@ -136,7 +136,7 @@ module Contract : sig
   (** The manager of a contract *)
   module Manager : Indexed_data_storage
     with type key = Contract_repr.t
-     and type value = Ed25519.Public_key_hash.t
+     and type value = Manager_repr.t
      and type context := t
 
   (** The delegate of a contract, if any. *)

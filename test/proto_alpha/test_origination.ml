@@ -64,6 +64,7 @@ let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
 
   (* Change delegate of a non-delegatable contract *)
   Helpers.Account.set_delegate
+    ~src_pk:b1.pk
     ~contract:nd_contract
     ~manager_sk:b1.sk
     (Some b2.pkh) >>= fun result ->
@@ -71,6 +72,7 @@ let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
 
   (* Change delegate of a delegatable contract *)
   Helpers.Account.set_delegate
+    ~src_pk:b1.pk
     ~contract:d_contract
     ~manager_sk:b1.sk
     (Some b2.pkh) >>= fun _result ->

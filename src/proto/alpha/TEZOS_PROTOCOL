@@ -23,6 +23,7 @@
         "Roll_repr",
         "Vote_repr",
         "Operation_repr",
+        "Manager_repr",
         "Block_header_repr",
 
         "Storage_sigs",

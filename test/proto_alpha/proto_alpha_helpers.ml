@@ -224,6 +224,7 @@ module Account = struct
   let set_delegate
       ?(block = `Prevalidation)
       ?(fee = 5L)
+      ?src_pk
       ~contract
       ~manager_sk
       delegate_opt =
@@ -234,6 +235,7 @@ module Account = struct
       ~source:contract
       ~manager_sk
       ~fee
+      ?src_pk
       delegate_opt
 
   let balance ?(block = `Prevalidation) (account : t) =
@@ -370,7 +372,19 @@ module Assert = struct
 
   let inconsistent_pkh ~msg =
     Assert.contain_error ~msg ~f:begin ecoproto_error (function
-        | Public_key_storage.Inconsistent_hash _ -> true
+        | Contract_storage.Inconsistent_hash _ -> true
+        | _ -> false)
+    end
+
+  let inconsistent_public_key ~msg =
+    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+        | Contract_storage.Inconsistent_public_key _ -> true
+        | _ -> false)
+    end
+
+  let missing_public_key ~msg =
+    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+        | Contract_storage.Missing_public_key _ -> true
         | _ -> false)
     end
 

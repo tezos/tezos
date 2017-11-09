@@ -295,10 +295,10 @@ module Contract = struct
   module Manager =
     Make_indexed_data_storage(struct
       type key = Contract_repr.t
-      type value = Ed25519.Public_key_hash.t
+      type value = Manager_repr.t
       let name = "contract manager"
       let key = Key.Contract.manager
-      let encoding = Ed25519.Public_key_hash.encoding
+      let encoding = Manager_repr.encoding
     end)
 
   module Spendable =

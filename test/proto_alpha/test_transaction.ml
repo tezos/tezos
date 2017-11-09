@@ -100,7 +100,7 @@ let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
     ~account
     ~destination:b2.contract
     ~amount:10_00L () >>= fun result ->
-  Assert.inconsistent_pkh ~msg:__LOC__ result ;
+  Assert.inconsistent_public_key ~msg:__LOC__ result ;
 
   return blkh
 

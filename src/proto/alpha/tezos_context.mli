@@ -424,6 +424,9 @@ module Contract : sig
 
   val get_manager:
     context -> contract -> public_key_hash tzresult Lwt.t
+  val update_manager_key:
+    context -> contract -> public_key option -> (context * public_key) tzresult Lwt.t
+
   val get_delegate_opt:
     context -> contract -> public_key_hash option tzresult Lwt.t
   val is_delegatable:

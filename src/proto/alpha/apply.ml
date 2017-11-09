@@ -149,28 +149,15 @@ let apply_manager_operation_content
       Contract.set_delegate ctxt source delegate >>=? fun ctxt ->
       return (ctxt, origination_nonce, None)
 
-let check_signature_and_update_public_key ctxt id public_key op =
-  begin
-    match public_key with
-    | None -> return ctxt
-    | Some public_key ->
-        Public_key.reveal ctxt id public_key
-  end >>=? fun ctxt ->
-  Public_key.get ctxt id >>=? fun public_key ->
-  Operation.check_signature public_key op >>=? fun () ->
-  return ctxt
-
 let apply_sourced_operation
     ctxt baker_contract pred_block block_prio
     operation origination_nonce ops =
   match ops with
   | Manager_operations { source ; public_key ; fee ; counter ; operations = contents } ->
       Contract.must_exist ctxt source >>=? fun () ->
-      Contract.get_manager ctxt source >>=? fun manager ->
-      check_signature_and_update_public_key
-        ctxt manager public_key operation >>=? fun ctxt ->
-      Contract.check_counter_increment
-        ctxt source counter >>=? fun () ->
+      Contract.update_manager_key ctxt source public_key >>=? fun (ctxt,public_key) ->
+      Operation.check_signature public_key operation >>=? fun () ->
+      Contract.check_counter_increment ctxt source counter >>=? fun () ->
       Contract.increment_counter ctxt source >>=? fun ctxt ->
       Contract.spend ctxt source fee >>=? fun ctxt ->
       (match baker_contract with
@@ -187,10 +174,10 @@ let apply_sourced_operation
         (ctxt, origination_nonce, None) contents
   | Delegate_operations { source ; operations = contents } ->
       let delegate = Ed25519.Public_key.hash source in
-      check_signature_and_update_public_key
-        ctxt delegate (Some source) operation >>=? fun ctxt ->
+      Public_key.reveal ctxt delegate source >>=? fun ctxt ->
+      Operation.check_signature source operation >>=? fun () ->
       (* TODO, see how to extract the public key hash after this operation to
-         pass it to apply_delegate_operation_content *)
+       pass it to apply_delegate_operation_content *)
       fold_left_s (fun ctxt content ->
           apply_delegate_operation_content
             ctxt delegate pred_block block_prio content)

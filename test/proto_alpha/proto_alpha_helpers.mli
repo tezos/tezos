@@ -78,6 +78,7 @@ module Account : sig
   val set_delegate :
     ?block:Client_proto_rpcs.block ->
     ?fee:int64 ->
+    ?src_pk:public_key ->
     contract:Contract.t ->
     manager_sk:secret_key ->
     public_key_hash option ->
@@ -176,6 +177,8 @@ module Assert : sig
   val balance_too_low : msg:string -> 'a tzresult -> unit
   val non_spendable : msg:string -> 'a tzresult -> unit
   val inconsistent_pkh : msg:string -> 'a tzresult -> unit
+  val inconsistent_public_key : msg:string -> 'a tzresult -> unit
+  val missing_public_key : msg:string -> 'a tzresult -> unit
 
   (** Origination assertions *)
 

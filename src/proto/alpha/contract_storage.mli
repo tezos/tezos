@@ -16,6 +16,9 @@ type error +=
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
   | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
+  | Inconsistent_hash of Ed25519.Public_key.t * Ed25519.Public_key_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
+  | Inconsistent_public_key of Ed25519.Public_key.t * Ed25519.Public_key.t (* `Permanent *)
+  | Missing_public_key of Ed25519.Public_key_hash.t (* `Permanent *)
   | Failure of string (* `Permanent *)
 
 val delete : Storage.t -> Contract_repr.t -> Storage.t tzresult Lwt.t
@@ -32,6 +35,10 @@ val is_delegatable : Storage.t -> Contract_repr.t -> bool tzresult Lwt.t
 val is_spendable : Storage.t -> Contract_repr.t -> bool tzresult Lwt.t
 
 val get_manager: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t tzresult Lwt.t
+val update_manager_key:
+  Storage.t -> Contract_repr.t -> Ed25519.Public_key.t option ->
+    (Storage.t * Ed25519.Public_key.t) tzresult Lwt.t
+
 val get_delegate_opt: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option tzresult Lwt.t
 val get_balance: Storage.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 val get_counter: Storage.t -> Contract_repr.t -> int32 tzresult Lwt.t

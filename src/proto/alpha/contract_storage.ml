@@ -16,6 +16,9 @@ type error +=
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
   | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
+  | Inconsistent_hash of Ed25519.Public_key.t * Ed25519.Public_key_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
+  | Inconsistent_public_key of Ed25519.Public_key.t * Ed25519.Public_key.t (* `Permanent *)
+  | Missing_public_key of Ed25519.Public_key_hash.t (* `Permanent *)
   | Failure of string (* `Permanent *)
 
 let () =
@@ -131,6 +134,47 @@ let () =
     (fun c -> Non_delegatable_contract c) ;
   register_error_kind
     `Permanent
+    ~id:"contract.manager.inconsistent_hash"
+    ~title:"Inconsistent public key hash"
+    ~description:"A revealed manager public key is inconsistent with the announced hash"
+    ~pp:(fun ppf (k, eh, ph) ->
+        Format.fprintf ppf "The hash of the manager public key %s is not %a as announced but %a"
+          (Ed25519.Public_key.to_b58check k)
+          Ed25519.Public_key_hash.pp ph
+          Ed25519.Public_key_hash.pp eh)
+    Data_encoding.(obj3
+                     (req "public_key" Ed25519.Public_key.encoding)
+                     (req "expected_hash" Ed25519.Public_key_hash.encoding)
+                     (req "provided_hash" Ed25519.Public_key_hash.encoding))
+    (function Inconsistent_hash (k, eh, ph) -> Some (k, eh, ph) | _ -> None)
+    (fun (k, eh, ph) -> Inconsistent_hash (k, eh, ph)) ;
+  register_error_kind
+    `Permanent
+    ~id:"contract.manager.inconsistent_public_key"
+    ~title:"Inconsistent public key"
+    ~description:"A provided manager public key is different with the public key stored in the contract"
+    ~pp:(fun ppf (eh, ph) ->
+        Format.fprintf ppf "Expected manager public key %s but %s was provided"
+          (Ed25519.Public_key.to_b58check ph)
+          (Ed25519.Public_key.to_b58check eh))
+    Data_encoding.(obj2
+                     (req "public_key" Ed25519.Public_key.encoding)
+                     (req "expected_public_key" Ed25519.Public_key.encoding))
+    (function Inconsistent_public_key (eh, ph) -> Some (eh, ph) | _ -> None)
+    (fun (eh, ph) -> Inconsistent_public_key (eh, ph)) ;
+  register_error_kind
+    `Permanent
+    ~id:"contract.manager.missing_public_key"
+    ~title:"Missing public key"
+    ~description:"The manager public key must be provided to execute the current operation"
+    ~pp:(fun ppf (k) ->
+        Format.fprintf ppf "The manager public key ( with hash %a ) is missing"
+          Ed25519.Public_key_hash.pp k)
+    Data_encoding.(obj1 (req "hash" Ed25519.Public_key_hash.encoding))
+    (function Missing_public_key (k) -> Some (k) | _ -> None)
+    (fun (k) -> Missing_public_key (k)) ;
+  register_error_kind
+    `Permanent
     ~id:"contract.failure"
     ~title:"Contract storage failure"
     ~description:"Unexpected contract storage error"
@@ -138,7 +182,7 @@ let () =
     Data_encoding.(obj1 (req "message" string))
     (function Failure s -> Some s | _ -> None)
     (fun s -> Failure s)
-
+ 
 let failwith msg = fail (Failure msg)
 
 let create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable =
@@ -146,7 +190,7 @@ let create_base c contract ~balance ~manager ~delegate ?script ~spendable ~deleg
    | None -> return 0l
    | Some _ -> Storage.Contract.Global_counter.get c) >>=? fun counter ->
   Storage.Contract.Balance.init c contract balance >>=? fun c ->
-  Storage.Contract.Manager.init c contract manager >>=? fun c ->
+  Storage.Contract.Manager.init c contract (Manager_repr.hash manager) >>=? fun c ->
   begin
     match delegate with
     | None -> return c
@@ -254,7 +298,28 @@ let get_manager c contract =
       | Some manager -> return manager
       | None -> failwith "get_manager"
     end
-  | Some v -> return v
+  | Some (Manager_repr.Hash v) -> return v
+  | Some (Manager_repr.Public_key v) -> return (Ed25519.Public_key.hash v)
+
+let update_manager_key c contract = function
+  | Some public_key ->
+    begin Storage.Contract.Manager.get c contract >>=? function
+    | (Manager_repr.Public_key v) -> (* key revealed for the second time *)
+        if Ed25519.Public_key.(v = public_key) then return (c,v)
+        else fail (Inconsistent_public_key (v,public_key))
+    | (Manager_repr.Hash v) ->
+        let actual_hash = Ed25519.Public_key.hash public_key in
+        if (Ed25519.Public_key_hash.equal actual_hash v) then
+          let v = (Manager_repr.public_key public_key) in
+          Storage.Contract.Manager.set c contract v >>=? fun c ->
+          return (c,public_key) (* reveal and update key *)
+        else fail (Inconsistent_hash (public_key,v,actual_hash))
+    end
+  | None -> 
+    begin Storage.Contract.Manager.get c contract >>=? function
+    | (Manager_repr.Public_key v) -> return (c,v) (* already revealed *)
+    | (Manager_repr.Hash v) -> fail (Missing_public_key (v))
+    end
 
 let get_delegate_opt = Roll_storage.get_contract_delegate
 
