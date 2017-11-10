@@ -156,7 +156,27 @@ end = struct
           Format.fprintf ppf "Missing %s %a" Hash.name Hash.pp key)
       (Data_encoding.obj1 (Data_encoding.req "key" Hash.encoding))
       (function Missing_data key -> Some key | _ -> None)
-      (fun key -> Missing_data key)
+      (fun key -> Missing_data key) ;
+    register_error_kind
+      `Permanent
+      ~title: ("Canceled fetch of a " ^ Hash.name)
+      ~description: ("The fetch of a " ^ Hash.name ^ " has been canceled")
+      ~id: ("distributed_db." ^ Hash.name ^ ".fetch_canceled")
+      ~pp: (fun ppf key ->
+          Format.fprintf ppf "Fetch of %s %a canceled" Hash.name Hash.pp key)
+      Data_encoding.(obj1 (req "key" Hash.encoding))
+      (function (Canceled key) -> Some key | _ -> None)
+      (fun key -> Canceled key) ;
+    register_error_kind
+      `Permanent
+      ~title: ("Timed out fetch of a " ^ Hash.name)
+      ~description: ("The fetch of a " ^ Hash.name ^ " has timed out")
+      ~id: ("distributed_db." ^ Hash.name ^ ".fetch_timeout")
+      ~pp: (fun ppf key ->
+          Format.fprintf ppf "Fetch of %s %a timed out" Hash.name Hash.pp key)
+      Data_encoding.(obj1 (req "key" Hash.encoding))
+      (function (Timeout key) -> Some key | _ -> None)
+      (fun key -> Timeout key)
 
   let read s k =
     match Memory_table.find s.memory k with
