@@ -26,7 +26,12 @@ module type DISTRIBUTED_DB = sig
   val read_opt: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
 
-  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
+  val prefetch:
+    t ->
+    ?peer:P2p.Peer_id.t ->
+    ?timeout:float ->
+    key -> param -> unit
+
   val fetch:
     t ->
     ?peer:P2p.Peer_id.t ->
@@ -207,7 +212,8 @@ end = struct
         wrap s k ?timeout (Lwt.waiter_of_wakener data.wakener)
     | Found v -> return v
 
-  let prefetch s ?peer k param = Lwt.ignore_result (fetch s ?peer k param)
+  let prefetch s ?peer ?timeout k param =
+    try ignore (fetch s ?peer ?timeout k param) with _ -> ()
 
   let notify s p k v =
     match Memory_table.find s.memory k with
