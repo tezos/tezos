@@ -617,6 +617,8 @@ module Registred_protocol = struct
     val complete_b58prefix : Context.t -> string -> string list Lwt.t
   end
 
+  type t = (module T)
+
   let build_v1 hash =
     let (module F) = Tezos_protocol_compiler.Registerer.get_exn hash in
     let module Name = struct
@@ -637,7 +639,8 @@ module Registred_protocol = struct
     VersionTable.create 20
 
   let mem hash =
-    VersionTable.mem versions hash || Tezos_protocol_compiler.Registerer.mem hash
+    VersionTable.mem versions hash ||
+    Tezos_protocol_compiler.Registerer.mem hash
 
   let get_exn hash =
     try VersionTable.find versions hash
@@ -677,8 +680,6 @@ module Register_embedded_protocol
         include Updater.LiftProtocol(Name)(Env)(Proto)
         let complete_b58prefix = Env.Context.complete
       end : Registred_protocol.T)
-
-
 
 end
 

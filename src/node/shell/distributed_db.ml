@@ -883,7 +883,11 @@ module type DISTRIBUTED_DB = sig
   val read_opt: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
-  val prefetch: t -> ?peer:P2p.Peer_id.t -> key -> param -> unit
+  val prefetch:
+    t ->
+    ?peer:P2p.Peer_id.t ->
+    ?timeout:float ->
+    key -> param -> unit
   val fetch:
     t ->
     ?peer:P2p.Peer_id.t ->
@@ -909,7 +913,8 @@ module Make
   let read t k = Table.read (Kind.proj t) k
   let read_opt t k = Table.read_opt (Kind.proj t) k
   let read_exn t k = Table.read_exn (Kind.proj t) k
-  let prefetch t ?peer k p = Table.prefetch (Kind.proj t) ?peer k p
+  let prefetch t ?peer ?timeout k p =
+    Table.prefetch (Kind.proj t) ?peer ?timeout k p
   let fetch t ?peer ?timeout k p =
     Table.fetch (Kind.proj t) ?peer ?timeout k p
   let clear_or_cancel t k = Table.clear_or_cancel (Kind.proj t) k
