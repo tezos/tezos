@@ -20,12 +20,13 @@ type 'a t =
     empty: unit Lwt_condition.t ;
   }
 
+let push_overhead = 4 * (Sys.word_size / 8)
+
 let create ?size () =
   let max_size, compute_size =
     match size with
     | None -> max_int, (fun _ -> 0)
-    | Some (max_size, compute_size) ->
-        max_size, (fun e -> 4 * (Sys.word_size / 8) + compute_size e) in
+    | Some (max_size, compute_size) -> max_size, compute_size in
   { queue = Queue.create () ;
     current_size = 0 ;
     max_size ;

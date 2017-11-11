@@ -884,7 +884,8 @@ and create_connection pool p2p_conn id_point point_info peer_info _version =
   let canceler = Canceler.create () in
   let size =
     map_option pool.config.incoming_app_message_queue_size
-      ~f:(fun qs -> qs, fun (size, _) -> (Sys.word_size / 8) * 11 + size) in
+      ~f:(fun qs -> qs, fun (size, _) ->
+          (Sys.word_size / 8) * 11 + size + Lwt_pipe.push_overhead) in
   let messages = Lwt_pipe.create ?size () in
   let rec callback =
     { Answerer.message =
