@@ -113,7 +113,7 @@ let rec may_set_head v (block: State.Block.t) =
     Chain.test_and_set_head v.net ~old:head block >>= function
     | false -> may_set_head v block
     | true ->
-        Distributed_db.broadcast_head v.net_db block [] ;
+        Distributed_db.Advertise.current_head v.net_db block ;
         Prevalidator.flush v.prevalidator block ;
         begin
           begin

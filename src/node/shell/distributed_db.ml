@@ -849,15 +849,6 @@ let clear_block net_db hash n =
   Raw_operation_hashes.clear_all net_db.operation_hashes_db.table hash n ;
   Raw_block_header.Table.clear_or_cancel net_db.block_header_db.table hash
 
-let broadcast_head net_db head mempool =
-  let net_id = State.Net.id net_db.net_state in
-  assert (Net_id.equal net_id (State.Block.net_id head)) ;
-  let msg : Message.t =
-    Current_head (net_id, State.Block.header head, mempool) in
-  P2p.Peer_id.Table.iter
-    (fun _peer_id state ->
-       ignore (P2p.try_send net_db.global_db.p2p state.conn msg))
-    net_db.active_connections
 
 let watch_block_header { block_input } =
   Watcher.create_stream block_input
@@ -957,4 +948,51 @@ module Protocol =
     type t = db
     let proj db = db.protocol_db.table
   end)
+
+
+let broadcast net_db msg =
+  P2p.Peer_id.Table.iter
+    (fun _peer_id state ->
+       ignore (P2p.try_send net_db.global_db.p2p state.conn msg))
+    net_db.active_connections
+
+let try_send net_db peer_id msg =
+  try
+    let conn = P2p.Peer_id.Table.find net_db.active_connections peer_id in
+    ignore (P2p.try_send net_db.global_db.p2p conn.conn msg : bool)
+  with Not_found -> ()
+
+let send net_db ?peer msg =
+  match peer with
+  | Some peer -> try_send net_db peer msg
+  | None -> broadcast net_db msg
+
+module Request = struct
+
+  let current_head net_db ?peer () =
+    let net_id = State.Net.id net_db.net_state in
+    send net_db ?peer @@ Get_current_head net_id
+
+  let current_branch net_db ?peer () =
+    let net_id = State.Net.id net_db.net_state in
+    send net_db ?peer @@ Get_current_branch net_id
+
+end
+
+module Advertise = struct
+
+  let current_head net_db ?peer ?(mempool = []) head =
+    let net_id = State.Net.id net_db.net_state in
+    assert (Net_id.equal net_id (State.Block.net_id head)) ;
+    send net_db ?peer @@
+    Current_head (net_id, State.Block.header head, mempool)
+
+  let current_branch net_db ?peer head =
+    let net_id = State.Net.id net_db.net_state in
+    assert (Net_id.equal net_id (State.Block.net_id head)) ;
+    Block_locator.compute head 200 >>= fun locator ->
+    send net_db ?peer @@ Current_branch (net_id, locator) ;
+    Lwt.return_unit
+
+end
 
