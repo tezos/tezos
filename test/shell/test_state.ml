@@ -279,7 +279,7 @@ let test_locator s =
   let check_locator h1 expected =
     Block_locator.compute
       (vblock s h1) (List.length expected) >>= fun l ->
-    let l = (l :> Block_hash.t list) in
+    let _, l = (l : Block_locator.t :> _ * _) in
     if List.length l <> List.length expected then
       Assert.fail_msg
         "Invalid locator length %s (found: %d, expected: %d)"
@@ -287,12 +287,12 @@ let test_locator s =
     List.iter2
       (fun h h2 ->
          if not (Block_hash.equal h (State.Block.hash @@ vblock s h2)) then
-           Assert.fail_msg "Invalid locator %s (expectd: %s)" h1 h2)
+           Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
       l expected ;
     Lwt.return_unit in
-  check_locator "A8" ["A8";"A7";"A6";"A5";"A4";"A3";"A2"] >>= fun () ->
-  check_locator "B8" ["B8";"B7";"B6";"B5";"B4";"B3";"B2";"B1";"A3"] >>= fun () ->
-  check_locator "B8" ["B8";"B7";"B6";"B5";"B4"] >>= fun () ->
+  check_locator "A8" ["A7";"A6";"A5";"A4";"A3";"A2"] >>= fun () ->
+  check_locator "B8" ["B7";"B6";"B5";"B4";"B3";"B2";"B1";"A3"] >>= fun () ->
+  check_locator "B8" ["B7";"B6";"B5";"B4"] >>= fun () ->
   return ()
 
 
@@ -397,7 +397,7 @@ let test_new_blocks s =
     and from_block = vblock s h in
     Chain_traversal.new_blocks ~from_block ~to_block >>= fun (ancestor, blocks) ->
     if not (Block_hash.equal (State.Block.hash ancestor) (State.Block.hash @@ vblock s expected_ancestor)) then
-      Assert.fail_msg "Invalid locator %s (expected: %s)" h expected_ancestor ;
+      Assert.fail_msg "Invalid ancestor %s -> %s (expected: %s)" head h expected_ancestor ;
     if List.length blocks <> List.length expected then
       Assert.fail_msg
         "Invalid locator length %s (found: %d, expected: %d)"
@@ -405,7 +405,7 @@ let test_new_blocks s =
     List.iter2
       (fun h1 h2 ->
          if not (Block_hash.equal (State.Block.hash h1) (State.Block.hash @@ vblock s h2)) then
-           Assert.fail_msg "Invalid locator %s (expected: %s)" h h2)
+           Assert.fail_msg "Invalid new blocks %s -> %s (expected: %s)" head h h2)
       blocks expected ;
     Lwt.return_unit
   in
@@ -425,17 +425,17 @@ let test_find_new s =
     Block_locator.find_new s.net loc (List.length expected) >>= fun blocks ->
     if List.length blocks <> List.length expected then
       Assert.fail_msg
-        "Invalid locator length %s (found: %d, expected: %d)"
+        "Invalid find new length %s (found: %d, expected: %d)"
         h (List.length blocks) (List.length expected) ;
     List.iter2
       (fun h1 h2 ->
          if not (Block_hash.equal h1 (State.Block.hash @@ vblock s h2)) then
-           Assert.fail_msg "Invalid locator %s (expected: %s)" h h2)
+           Assert.fail_msg "Invalid find new %s.%d (expected: %s)" h (List.length expected) h2)
       blocks expected ;
     Lwt.return_unit
   in
-  test s "A6" [] >>= fun () ->
   Chain.set_head s.net (vblock s "A8") >>= fun _ ->
+  test s "A6" [] >>= fun () ->
   test s "A6" ["A7";"A8"] >>= fun () ->
   test s "A6" ["A7"] >>= fun () ->
   test s "B4" ["A4"] >>= fun () ->

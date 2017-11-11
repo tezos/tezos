@@ -25,8 +25,10 @@ val net_state: net_db -> State.Net.t
 val db: net_db -> db
 
 type callback = {
-  notify_branch: P2p.Peer_id.t -> Block_locator.t -> unit ;
-  notify_head: P2p.Peer_id.t -> Block_hash.t -> Operation_hash.t list -> unit ;
+  notify_branch:
+    P2p.Peer_id.t -> Block_locator.t -> unit ;
+  notify_head:
+    P2p.Peer_id.t -> Block_header.t -> Operation_hash.t list -> unit ;
   disconnection: P2p.Peer_id.t -> unit ;
 }
 
@@ -37,7 +39,7 @@ val deactivate: net_db -> unit Lwt.t
 val disconnect: net_db -> P2p.Peer_id.t -> unit Lwt.t
 
 val broadcast_head:
-  net_db -> Block_hash.t -> Operation_hash.t list -> unit
+  net_db -> State.Block.t -> Operation_hash.t list -> unit
 
 type operation =
   | Blob of Operation.t

@@ -72,6 +72,7 @@ module Net : sig
 
   val id: net_state -> Net_id.t
   val genesis: net_state -> genesis
+  val faked_genesis_hash: net_state -> Block_hash.t
   val expiration: net_state -> Time.t option
   val allow_forked_network: net_state -> bool
   (** Accessors. Respectively access to;
