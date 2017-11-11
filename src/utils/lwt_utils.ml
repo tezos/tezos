@@ -483,17 +483,17 @@ let () =
     (fun () -> Timeout)
 
 let with_timeout ?(canceler = Canceler.create ()) timeout f =
-  let t = Lwt_unix.sleep timeout in
-  Lwt.choose [
-    (t >|= fun () -> None) ;
-    (f canceler >|= fun x -> Some x)
-  ] >>= function
-  | Some x when Lwt.state t = Lwt.Sleep ->
-      Lwt.cancel t ;
-      Lwt.return x
-  | _ ->
-      Canceler.cancel canceler >>= fun () ->
-      fail Timeout
+  let timeout = Lwt_unix.sleep timeout in
+  let target = f canceler in
+  Lwt.choose [ timeout ; (target >|= fun _ -> ()) ] >>= fun () ->
+  Lwt_unix.yield () >>= fun () ->
+  if Lwt.state target <> Lwt.Sleep then begin
+    Lwt.cancel timeout ;
+    target
+  end else begin
+    Canceler.cancel canceler >>= fun () ->
+    fail Timeout
+  end
 
 let unless cond f =
   if cond then Lwt.return () else f ()
