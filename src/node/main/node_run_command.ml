@@ -142,6 +142,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
     context_root = context_dir config.data_dir ;
     p2p = p2p_config ;
     test_network_max_tll = Some (48 * 3600) ; (* 2 days *)
+    bootstrap_threshold = 4 ; (* TODO add parameter *)
   } in
   Node.create node_config
 

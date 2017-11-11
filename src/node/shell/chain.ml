@@ -65,7 +65,7 @@ let set_head net_state block =
     locked_set_head chain_store data block >>= fun () ->
     Lwt.return (Some { current_head = block  ;
                        current_reversed_mempool = [] },
-                ())
+                data.current_head)
   end
 
 let test_and_set_head net_state ~old block =

@@ -9,24 +9,17 @@
 
 type t
 
-val create: State.t -> Distributed_db.t -> t
+val peer_id: t -> P2p.Peer_id.t
+val bootstrapped: t -> bool
+val current_head: t -> Block_hash.t
+
+val create:
+  ?notify_new_block: (State.Block.t -> unit) ->
+  ?notify_bootstrapped: (unit -> unit) ->
+  ?notify_termination: (t -> unit) ->
+  Block_validator.t ->
+  Distributed_db.net_db -> P2p.Peer_id.t -> t Lwt.t
 val shutdown: t -> unit Lwt.t
 
-val activate:
-  t ->
-  ?bootstrap_threshold:int ->
-  ?max_child_ttl:int ->
-  State.Net.t -> Net_validator.t Lwt.t
-
-type error +=
-  | Inactive_network of Net_id.t
-val get: t -> Net_id.t -> Net_validator.t tzresult Lwt.t
-val get_exn: t -> Net_id.t -> Net_validator.t Lwt.t
-
-val inject_block:
-  t ->
-  ?force:bool ->
-  MBytes.t -> Distributed_db.operation list list ->
-  (Block_hash.t * State.Block.t tzresult Lwt.t) tzresult Lwt.t
-
-val watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
+val notify_branch: t -> Block_locator.t -> unit
+val notify_head: t -> Block_header.t -> unit

@@ -5,7 +5,7 @@ set -e
 test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
 source $test_dir/lib/test_lib.inc.sh
 
-expected_connections=3
+expected_connections=4
 max_peer_id=8
 for i in $(seq 1 $max_peer_id); do
     echo
@@ -15,18 +15,18 @@ for i in $(seq 1 $max_peer_id); do
     echo
 done
 
-## waiting for the node to establich connections
-sleep 2
+## waiting for the node to establish connections
+
 for client in "${client_instances[@]}"; do
     echo
     echo "### $client network stat"
     echo
+    $client bootstrapped
     $client network stat
     echo
 done
 
 activate_alpha
-sleep 5
 
 assert_propagation_level() {
     level=$1
@@ -38,12 +38,16 @@ assert_propagation_level() {
     done
 }
 
-printf "\n\nAsserting protocol propagation\n"
 
-for client in "${client_instances[@]}"; do
-    $client rpc call /blocks/head/protocol \
-        | assert_in_output "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-done
+assert_protocol() {
+    proto=$1
+    printf "\n\nAsserting protocol propagation\n"
+    for client in "${client_instances[@]}"; do
+        ( $client rpc call /blocks/head/protocol | assert_in_output "$proto" ) \
+              || exit 2
+    done
+}
+
 
 printf "\n\n"
 
@@ -66,6 +70,8 @@ retry() {
     done
 }
 
+retry 2 15 assert_protocol "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+
 $client1 mine for bootstrap1 -max-priority 512
 retry 2 15 assert_propagation_level 2
 
@@ -81,7 +87,8 @@ retry 2 15 assert_propagation_level 5
 endorse_hash=$($client3 endorse for bootstrap3 | extract_operation_hash)
 transfer_hash=$($client4 transfer 500 from bootstrap1 to bootstrap3 | extract_operation_hash)
 
-retry 2 15 $client4 mine for bootstrap4 -max-priority 512
+# wait for the propagation of operations
+sleep 2
 
 assert_contains_operation() {
     hash="$1"
@@ -93,8 +100,9 @@ assert_contains_operation() {
     done
 }
 
+$client4 mine for bootstrap4 -max-priority 512
 retry 2 15 assert_contains_operation $endorse_hash
-assert_contains_operation $transfer_hash
+retry 2 15 assert_contains_operation $transfer_hash
 
 echo
 echo End of test

@@ -9,24 +9,38 @@
 
 type t
 
-val create: State.t -> Distributed_db.t -> t
-val shutdown: t -> unit Lwt.t
-
-val activate:
-  t ->
-  ?bootstrap_threshold:int ->
-  ?max_child_ttl:int ->
-  State.Net.t -> Net_validator.t Lwt.t
+type protocol_error =
+  | Compilation_failed
+  | Dynlinking_failed
 
 type error +=
-  | Inactive_network of Net_id.t
-val get: t -> Net_id.t -> Net_validator.t tzresult Lwt.t
-val get_exn: t -> Net_id.t -> Net_validator.t Lwt.t
+  | Invalid_protocol of
+      { hash: Protocol_hash.t ; error: protocol_error }
 
-val inject_block:
+val create: Distributed_db.t -> t
+
+val validate:
   t ->
-  ?force:bool ->
-  MBytes.t -> Distributed_db.operation list list ->
-  (Block_hash.t * State.Block.t tzresult Lwt.t) tzresult Lwt.t
+  Protocol_hash.t -> Protocol.t ->
+  State.Registred_protocol.t tzresult Lwt.t
 
-val watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
+val shutdown: t -> unit Lwt.t
+
+val fetch_and_compile_protocol:
+  t ->
+  ?peer:P2p.Peer_id.t ->
+  ?timeout:float ->
+  Protocol_hash.t -> State.Registred_protocol.t tzresult Lwt.t
+
+val fetch_and_compile_protocols:
+  t ->
+  ?peer:P2p.Peer_id.t ->
+  ?timeout:float ->
+  State.Block.t -> unit tzresult Lwt.t
+
+val prefetch_and_compile_protocols:
+  t ->
+  ?peer:P2p.Peer_id.t ->
+  ?timeout:float ->
+  State.Block.t -> unit
+

@@ -18,9 +18,6 @@ let errors cctxt =
 let forge_block_header cctxt header =
   call_service0 cctxt Services.forge_block_header header
 
-let validate_block cctxt net block =
-  call_err_service0 cctxt Services.validate_block (net, block)
-
 type operation = Node_rpc_services.operation =
   | Blob of Operation.t
   | Hash of Operation_hash.t

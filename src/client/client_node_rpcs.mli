@@ -17,11 +17,6 @@ val forge_block_header:
   Block_header.t ->
   MBytes.t tzresult Lwt.t
 
-val validate_block:
-  config ->
-  Net_id.t -> Block_hash.t ->
-  unit tzresult Lwt.t
-
 type operation =
   | Blob of Operation.t
   | Hash of Operation_hash.t

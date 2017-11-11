@@ -392,11 +392,6 @@ let build_rpc_directory node =
       RPC.Answer.return res in
     RPC.register0 dir Services.forge_block_header implementation in
   let dir =
-    let implementation (net_id, block_hash) =
-      Node.RPC.validate node net_id block_hash >>= fun res ->
-      RPC.Answer.return res in
-    RPC.register0 dir Services.validate_block implementation in
-  let dir =
     let implementation
         { Node_rpc_services.raw ; blocking ; force ; operations } =
       begin

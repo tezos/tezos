@@ -619,18 +619,6 @@ let forge_block_header =
     ~output: (obj1 (req "block" bytes))
     RPC.Path.(root / "forge_block_header")
 
-let validate_block =
-  RPC.service
-    ~description:
-      "Force the node to fetch and validate the given block hash."
-    ~input:
-      (obj2
-         (req "net" Net_id.encoding)
-         (req "hash" Block_hash.encoding))
-    ~output:
-      (Error.wrap @@ empty)
-    RPC.Path.(root / "validate_block")
-
 type inject_block_param = {
   raw: MBytes.t ;
   blocking: bool ;

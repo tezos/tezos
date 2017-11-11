@@ -179,9 +179,6 @@ end
 val forge_block_header:
   (unit, unit, Block_header.t, MBytes.t) RPC.service
 
-val validate_block:
-  (unit, unit, Net_id.t * Block_hash.t, unit tzresult) RPC.service
-
 type inject_block_param = {
   raw: MBytes.t ;
   blocking: bool ;

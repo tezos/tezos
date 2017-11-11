@@ -516,24 +516,10 @@ module P2p_reader = struct
     | Operation_hashes_for_block (net_id, block, ofs, ops, path) -> begin
         may_handle state net_id @@ fun net_db ->
         (* TODO early detection of non-requested list. *)
-        let found_hash, found_ofs =
-          Operation_list_list_hash.check_path
-            path (Operation_list_hash.compute ops) in
-        if found_ofs <> ofs then
-          Lwt.return_unit
-        else
-          Raw_block_header.Table.read_opt
-            net_db.block_header_db.table block >>= function
-          | None -> Lwt.return_unit
-          | Some bh ->
-              if Operation_list_list_hash.compare
-                  found_hash bh.shell.operations_hash <> 0 then
-                Lwt.return_unit
-              else
-                Raw_operation_hashes.Table.notify
-                  net_db.operation_hashes_db.table state.gid
-                  (block, ofs) (ops, path) >>= fun () ->
-                Lwt.return_unit
+        Raw_operation_hashes.Table.notify
+          net_db.operation_hashes_db.table state.gid
+          (block, ofs) (ops, path) >>= fun () ->
+        Lwt.return_unit
       end
 
     | Get_operations_for_blocks (net_id, blocks) ->
@@ -555,24 +541,10 @@ module P2p_reader = struct
     | Operations_for_block (net_id, block, ofs, ops, path) ->
         may_handle state net_id @@ fun net_db ->
         (* TODO early detection of non-requested operations. *)
-        let found_hash, found_ofs =
-          Operation_list_list_hash.check_path
-            path (Operation_list_hash.compute (List.map Operation.hash ops)) in
-        if found_ofs <> ofs then
-          Lwt.return_unit
-        else
-          Raw_block_header.Table.read_opt
-            net_db.block_header_db.table block >>= function
-          | None -> Lwt.return_unit
-          | Some bh ->
-              if Operation_list_list_hash.compare
-                  found_hash bh.shell.operations_hash <> 0 then
-                Lwt.return_unit
-              else
-                Raw_operations.Table.notify
-                  net_db.operations_db.table state.gid
-                  (block, ofs) (ops, path) >>= fun () ->
-                Lwt.return_unit
+        Raw_operations.Table.notify
+          net_db.operations_db.table state.gid
+          (block, ofs) (ops, path) >>= fun () ->
+        Lwt.return_unit
 
   let rec worker_loop global_db state =
     Lwt_utils.protect ~canceler:state.canceler begin fun () ->
@@ -601,7 +573,9 @@ module P2p_reader = struct
         end)
       db.active_nets ;
     state.worker <-
-      Lwt_utils.worker "db_network_reader"
+      Lwt_utils.worker
+        (Format.asprintf "db_network_reader.%a"
+           P2p.Peer_id.pp_short gid)
         ~run:(fun () -> worker_loop db state)
         ~cancel:(fun () -> Lwt_utils.Canceler.cancel canceler) ;
     P2p.Peer_id.Table.add db.p2p_readers gid state
@@ -738,36 +712,41 @@ let read_all_operations net_db hash n =
            map_p (Raw_operation.Table.read net_db.operation_db.table) hashes)
     operations
 
-let commit_block net_db hash validation_result =
-  Raw_block_header.Table.read
-    net_db.block_header_db.table hash >>=? fun header ->
-  read_all_operations net_db
-    hash header.shell.validation_passes >>=? fun operations ->
-  State.Block.store
-    net_db.net_state header operations validation_result >>=? fun res ->
-  Raw_block_header.Table.clear_or_cancel net_db.block_header_db.table hash ;
-  Raw_operation_hashes.clear_all
-    net_db.operation_hashes_db.table hash header.shell.validation_passes ;
-  Raw_operations.clear_all
-    net_db.operations_db.table hash header.shell.validation_passes ;
-  (* TODO: proper handling of the operations table by the prevalidator. *)
-  List.iter
-    (List.iter
-       (fun op -> Raw_operation.Table.clear_or_cancel
-           net_db.operation_db.table
-           (Operation.hash op)))
-    operations ;
+let clear_block net_db hash n =
+  (* TODO use a reference counter ?? *)
+  Raw_operations.clear_all net_db.operations_db.table hash n ;
+  Raw_operation_hashes.clear_all net_db.operation_hashes_db.table hash n ;
+  Raw_block_header.Table.clear_or_cancel net_db.block_header_db.table hash
+
+let commit_block net_db hash header operations result =
+  assert (Block_hash.equal hash (Block_header.hash header)) ;
+  assert (Net_id.equal (State.Net.id net_db.net_state) header.shell.net_id) ;
+  assert (List.length operations = header.shell.validation_passes) ;
+  State.Block.store net_db.net_state header operations result >>=? fun res ->
+  clear_block net_db hash header.shell.validation_passes ;
   return res
 
-let commit_invalid_block net_db hash =
-  Raw_block_header.Table.read
-    net_db.block_header_db.table hash >>=? fun header ->
+let commit_invalid_block net_db hash header _err =
+  assert (Block_hash.equal hash (Block_header.hash header)) ;
+  assert (Net_id.equal (State.Net.id net_db.net_state) header.shell.net_id) ;
   State.Block.store_invalid net_db.net_state header >>=? fun res ->
-  Raw_block_header.Table.clear_or_cancel net_db.block_header_db.table hash ;
-  Raw_operation_hashes.clear_all
-    net_db.operation_hashes_db.table hash header.shell.validation_passes ;
-  Raw_operations.clear_all
-    net_db.operations_db.table hash header.shell.validation_passes ;
+  clear_block net_db hash header.shell.validation_passes ;
+  return res
+
+let clear_operations net_db operations =
+  List.iter
+    (List.iter
+       (Raw_operation.Table.clear_or_cancel net_db.operation_db.table))
+    operations
+
+let inject_block_header net_db h b =
+  fail_unless
+    (Net_id.equal
+       b.Block_header.shell.net_id
+       (State.Net.id net_db.net_state))
+    (failure "Inconsitent net_id in operation") >>=? fun () ->
+  Raw_block_header.Table.inject
+    net_db.block_header_db.table h b >>= fun res ->
   return res
 
 let inject_operation net_db h op =
@@ -780,8 +759,7 @@ let inject_operation net_db h op =
 let inject_protocol db h p =
   Raw_protocol.Table.inject db.protocol_db.table h p
 
-let commit_protocol db h =
-  Raw_protocol.Table.read db.protocol_db.table h >>=? fun p ->
+let commit_protocol db h p =
   State.Protocol.store db.disk p >>= fun res ->
   Raw_protocol.Table.clear_or_cancel db.protocol_db.table h ;
   return (res <> None)
@@ -795,49 +773,10 @@ let resolve_operation net_db = function
       fail_unless
         (Net_id.equal op.shell.net_id (State.Net.id net_db.net_state))
         (failure "Inconsistent net_id in operation.") >>=? fun () ->
-      return (Operation.hash op, op)
+      return op
   | Hash oph ->
       Raw_operation.Table.read net_db.operation_db.table oph >>=? fun op ->
-      return (oph, op)
-
-let inject_block db bytes operations =
-  let hash = Block_hash.hash_bytes [bytes] in
-  match Block_header.of_bytes bytes with
-  | None ->
-      failwith "Cannot parse block header."
-  | Some block ->
-      match get_net db block.shell.net_id with
-      | None ->
-          failwith "Unknown network."
-      | Some net_db ->
-          map_p
-            (map_p (resolve_operation net_db))
-            operations >>=? fun operations ->
-          let hashes = List.map (List.map fst) operations in
-          let operations = List.map (List.map snd) operations in
-          let computed_hash =
-            Operation_list_list_hash.compute
-              (List.map Operation_list_hash.compute hashes) in
-          fail_when
-            (Operation_list_list_hash.compare
-               computed_hash block.shell.operations_hash <> 0)
-            (Exn (Failure "Incoherent operation list")) >>=? fun () ->
-          Raw_block_header.Table.inject
-            net_db.block_header_db.table hash block >>= function
-          | false ->
-              failwith "Previously injected block."
-          | true ->
-              Raw_operation_hashes.inject_all
-                net_db.operation_hashes_db.table hash hashes >>= fun _ ->
-              Raw_operations.inject_all
-                net_db.operations_db.table hash operations >>= fun _ ->
-              return (hash, block)
-
-let clear_block net_db hash n =
-  Raw_operations.clear_all net_db.operations_db.table hash n ;
-  Raw_operation_hashes.clear_all net_db.operation_hashes_db.table hash n ;
-  Raw_block_header.Table.clear_or_cancel net_db.block_header_db.table hash
-
+      return op
 
 let watch_block_header { block_input } =
   Watcher.create_stream block_input

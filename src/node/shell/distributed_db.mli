@@ -43,24 +43,30 @@ type operation =
   | Hash of Operation_hash.t
 
 val resolve_operation:
-  net_db -> operation -> (Operation_hash.t * Operation.t) tzresult Lwt.t
+  net_db -> operation -> Operation.t tzresult Lwt.t
 
 val commit_block:
-  net_db -> Block_hash.t -> Updater.validation_result ->
+  net_db ->
+  Block_hash.t ->
+  Block_header.t -> Operation.t list list ->
+  Updater.validation_result ->
   State.Block.t option tzresult Lwt.t
+
 val commit_invalid_block:
-  net_db -> Block_hash.t ->
+  net_db ->
+  Block_hash.t -> Block_header.t -> Error_monad.error list ->
   bool tzresult Lwt.t
-val inject_block:
-  t -> MBytes.t -> operation list list ->
-  (Block_hash.t * Block_header.t) tzresult Lwt.t
-val clear_block: net_db -> Block_hash.t -> int -> unit
+
+val clear_operations: net_db -> Operation_hash.t list list -> unit
+
+val inject_block_header:
+  net_db -> Block_hash.t -> Block_header.t -> bool tzresult Lwt.t
 
 val inject_operation:
   net_db -> Operation_hash.t -> Operation.t -> bool tzresult Lwt.t
 
 val commit_protocol:
-  db -> Protocol_hash.t -> bool tzresult Lwt.t
+  db -> Protocol_hash.t -> Protocol.t -> bool tzresult Lwt.t
 val inject_protocol:
   db -> Protocol_hash.t -> Protocol.t -> bool Lwt.t
 
@@ -109,6 +115,10 @@ module Operations :
                   and type key = Block_hash.t * int
                   and type value = Operation.t list
                   and type param := Operation_list_list_hash.t
+
+val read_all_operations:
+  net_db -> Block_hash.t -> int -> Operation.t list list tzresult Lwt.t
+
 
 module Operation_hashes :
   DISTRIBUTED_DB with type t = net_db

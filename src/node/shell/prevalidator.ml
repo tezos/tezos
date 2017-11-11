@@ -9,23 +9,31 @@
 
 open Logging.Node.Prevalidator
 
-let list_pendings ~from_block ~to_block old_mempool =
+let list_pendings ?maintain_net_db  ~from_block ~to_block old_mempool =
   let rec pop_blocks ancestor block mempool =
     let hash = State.Block.hash block in
     if Block_hash.equal hash ancestor then
       Lwt.return mempool
     else
-      State.Block.all_operation_hashes block >>= fun operations ->
-      let mempool =
-        List.fold_left
-          (List.fold_left (fun mempool h -> Operation_hash.Set.add h mempool))
-          mempool operations in
+      State.Block.all_operations block >>= fun operations ->
+      Lwt_list.fold_left_s
+        (Lwt_list.fold_left_s (fun mempool op ->
+             let h = Operation.hash op in
+             Lwt_utils.may maintain_net_db
+               ~f:begin fun net_db ->
+                 Distributed_db.inject_operation net_db h op >>= fun _ ->
+                 Lwt.return_unit
+               end >>= fun () ->
+             Lwt.return (Operation_hash.Set.add h mempool)))
+        mempool operations >>= fun mempool ->
       State.Block.predecessor block >>= function
       | None -> assert false
       | Some predecessor -> pop_blocks ancestor predecessor mempool
   in
   let push_block mempool block =
     State.Block.all_operation_hashes block >|= fun operations ->
+    iter_option maintain_net_db
+      ~f:(fun net_db -> Distributed_db.clear_operations net_db operations) ;
     List.fold_left
       (List.fold_left (fun mempool h -> Operation_hash.Set.remove h mempool))
       mempool operations
@@ -238,21 +246,23 @@ let create net_db =
                          Operation_hash.Table.mem pending op
                          || Operation_hash.Set.mem op !live_operations)
                       ops in
-                  let fetch op =
+                  let fetch h =
                     Distributed_db.Operation.fetch
                       ~timeout:10. (* TODO allow to adjust the constant ... *)
-                      net_db ~peer:gid op () >>= function
+                      net_db ~peer:gid h () >>= function
                     | Ok _op ->
-                        push_to_worker (`Handle op) ;
+                        push_to_worker (`Handle h) ;
                         Lwt.return_unit
                     | Error [ Distributed_db.Operation.Canceled _ ] ->
                         lwt_debug
                           "operation %a included before being prevalidated"
-                          Operation_hash.pp_short op >>= fun () ->
+                          Operation_hash.pp_short h >>= fun () ->
+                        Operation_hash.Table.remove pending h ;
                         Lwt.return_unit
                     | Error _ ->
-                        (* should not happen *)
-                        Lwt.return_unit in
+                        Operation_hash.Table.remove pending h ;
+                        Lwt.return_unit
+                  in
                   List.iter
                     (fun op -> Operation_hash.Table.add pending op (fetch op))
                     unknown_ops ;
@@ -272,7 +282,9 @@ let create net_db =
                   lwt_debug "register %a" Operation_hash.pp_short op >>= fun () ->
                   Lwt.return_unit
               | `Flush (new_head : State.Block.t) ->
-                  list_pendings ~from_block:!head ~to_block:new_head
+                  list_pendings
+                    ~maintain_net_db:net_db
+                    ~from_block:!head ~to_block:new_head
                     (preapply_result_operations !operations) >>= fun new_mempool ->
                   Chain_traversal.live_blocks
                     new_head
@@ -294,7 +306,10 @@ let create net_db =
             q >>= fun () ->
           worker_loop ()
     in
-    Lwt_utils.worker "prevalidator" ~run:worker_loop ~cancel in
+    Lwt_utils.worker
+      (Format.asprintf "prevalidator.%a"
+         Net_id.pp (State.Net.id net_state))
+      ~run:worker_loop ~cancel in
 
   let flush head =
     push_to_worker (`Flush head) ;

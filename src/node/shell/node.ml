@@ -17,7 +17,7 @@ let inject_operation validator ?force bytes =
     | Some operation ->
         Validator.get
           validator operation.shell.net_id >>=? fun net_validator ->
-        let pv = Validator.prevalidator net_validator in
+        let pv = Net_validator.prevalidator net_validator in
         Prevalidator.inject_operation pv ?force operation in
   let hash = Operation_hash.hash_bytes [bytes] in
   Lwt.return (hash, t)
@@ -44,17 +44,14 @@ let inject_protocol state ?force:_ proto =
 
 let inject_block validator ?force bytes operations =
   Validator.inject_block
-    validator ?force
-    bytes operations >>=? fun (hash, block) ->
+    validator ?force bytes operations >>=? fun (hash, block) ->
   return (hash, (block >>=? fun _ -> return ()))
 
 type t = {
   state: State.t ;
   distributed_db: Distributed_db.t ;
   validator: Validator.t ;
-  mainnet_db: Distributed_db.net_db ;
-  mainnet_net: State.Net.t ;
-  mainnet_validator: Validator.net_validator ;
+  mainnet_validator: Net_validator.t ;
   inject_block:
     ?force:bool ->
     MBytes.t -> Distributed_db.operation list list ->
@@ -90,6 +87,7 @@ type config = {
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
   test_network_max_tll: int option ;
+  bootstrap_threshold: int ;
 }
 
 let may_create_net state genesis =
@@ -101,16 +99,17 @@ let may_create_net state genesis =
 
 let create { genesis ; store_root ; context_root ;
              patch_context ; p2p = net_params ;
-             test_network_max_tll = max_child_ttl } =
+             test_network_max_tll = max_child_ttl ;
+             bootstrap_threshold } =
   init_p2p net_params >>=? fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context () >>=? fun state ->
   let distributed_db = Distributed_db.create state p2p in
   let validator = Validator.create state distributed_db in
-  may_create_net state genesis >>= fun mainnet_net ->
+  may_create_net state genesis >>= fun mainnet_state ->
   Validator.activate validator
-    ?max_child_ttl mainnet_net >>= fun mainnet_validator ->
-  let mainnet_db = Validator.net_db mainnet_validator in
+    ~bootstrap_threshold
+    ?max_child_ttl mainnet_state >>= fun mainnet_validator ->
   let shutdown () =
     State.close state >>= fun () ->
     P2p.shutdown p2p >>= fun () ->
@@ -121,8 +120,6 @@ let create { genesis ; store_root ; context_root ;
     state ;
     distributed_db ;
     validator ;
-    mainnet_db ;
-    mainnet_net ;
     mainnet_validator ;
     inject_block = inject_block validator ;
     inject_operation = inject_operation validator ;
@@ -190,35 +187,29 @@ module RPC = struct
     Block_hash.of_b58check_exn
       "BLockPrevaLidationPrevaLidationPrevaLidationPrZ4mr6"
 
-  let get_net node = function
-    | `Genesis | `Head _ | `Prevalidation ->
-        node.mainnet_validator, node.mainnet_db
-    | `Test_head _ | `Test_prevalidation ->
-        match Validator.test_validator node.mainnet_validator with
-        | None -> raise Not_found
-        | Some v -> v
-
   let get_validator node = function
     | `Genesis | `Head _ | `Prevalidation -> node.mainnet_validator
     | `Test_head _ | `Test_prevalidation ->
-        match Validator.test_validator node.mainnet_validator with
+        match Net_validator.child node.mainnet_validator with
         | None -> raise Not_found
-        | Some (v, _) -> v
+        | Some v -> v
 
   let get_validator_per_hash node hash =
     State.read_block_exn node.state hash >>= fun block ->
     let header = State.Block.header block in
     if Net_id.equal
-        (State.Net.id node.mainnet_net)
+        (Net_validator.net_id node.mainnet_validator)
         header.shell.net_id then
-      Lwt.return (Some (node.mainnet_validator, node.mainnet_db))
+      Lwt.return (Some node.mainnet_validator)
     else
-      match Validator.test_validator node.mainnet_validator with
-      | Some (test_validator, net_db)
-        when Net_id.equal
-            (State.Net.id (Validator.net_state test_validator))
-            header.shell.net_id ->
-          Lwt.return (Some (node.mainnet_validator, net_db))
+      match Net_validator.child node.mainnet_validator with
+      | Some test_validator ->
+          if Net_id.equal
+              (Net_validator.net_id test_validator)
+              header.shell.net_id then
+            Lwt.return_some test_validator
+          else
+            Lwt.return_none
       | _ -> Lwt.return_none
 
   let read_valid_block node h =
@@ -238,19 +229,20 @@ module RPC = struct
   let block_info node (block: block) =
     match block with
     | `Genesis ->
-        Chain.genesis node.mainnet_net >>= convert
+        let net_state = Net_validator.net_state node.mainnet_validator in
+        Chain.genesis net_state >>= convert
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
-        let net_db = Validator.net_db validator in
-        let net_state = Validator.net_state validator in
+        let net_db = Net_validator.net_db validator in
+        let net_state = Net_validator.net_state validator in
         Chain.head net_state >>= fun head ->
         predecessor net_db n head >>= convert
     | `Hash h ->
         read_valid_block_exn node h >>= convert
     | ( `Prevalidation | `Test_prevalidation ) as block ->
         let validator = get_validator node block in
-        let pv = Validator.prevalidator validator in
-        let net_state = Validator.net_state validator in
+        let pv = Net_validator.prevalidator validator in
+        let net_state = Net_validator.net_state validator in
         Chain.head net_state >>= fun head ->
         let head_header = State.Block.header head in
         let head_hash = State.Block.hash head in
@@ -301,13 +293,14 @@ module RPC = struct
   let get_rpc_context node block =
     match block with
     | `Genesis ->
-        Chain.genesis node.mainnet_net >>= fun block ->
+        let net_state = Net_validator.net_state node.mainnet_validator in
+        Chain.genesis net_state >>= fun block ->
         rpc_context block >>= fun ctxt ->
         Lwt.return (Some ctxt)
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
-        let net_state = Validator.net_state validator in
-        let net_db = Validator.net_db validator in
+        let net_state = Net_validator.net_state validator in
+        let net_db = Net_validator.net_db validator in
         Chain.head net_state >>= fun head ->
         predecessor net_db n head >>= fun block ->
         rpc_context block >>= fun ctxt ->
@@ -321,9 +314,10 @@ module RPC = struct
             Lwt.return (Some ctxt)
       end
     | ( `Prevalidation | `Test_prevalidation ) as block ->
-        let validator, net_db = get_net node block in
-        let pv = Validator.prevalidator validator in
-        let net_state = Validator.net_state validator in
+        let validator = get_validator node block in
+        let pv = Net_validator.prevalidator validator in
+        let net_db = Net_validator.net_db validator in
+        let net_state = Net_validator.net_state validator in
         Chain.head net_state >>= fun head ->
         let head_header = State.Block.header head in
         let head_hash = State.Block.hash head in
@@ -374,14 +368,14 @@ module RPC = struct
     | `Genesis -> Lwt.return []
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
-        let net_state = Validator.net_state validator in
-        let net_db = Validator.net_db validator in
+        let net_state = Net_validator.net_state validator in
+        let net_db = Net_validator.net_db validator in
         Chain.head net_state >>= fun head ->
         predecessor net_db n head >>= fun block ->
         State.Block.all_operation_hashes block
     | (`Prevalidation | `Test_prevalidation) as block ->
-        let validator, _net = get_net node block in
-        let pv = Validator.prevalidator validator in
+        let validator = get_validator node block in
+        let pv = Net_validator.prevalidator validator in
         let { Prevalidation.applied }, _ = Prevalidator.operations pv in
         Lwt.return [applied]
     | `Hash hash ->
@@ -395,14 +389,15 @@ module RPC = struct
     | `Genesis -> Lwt.return []
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
-        let net_state = Validator.net_state validator in
-        let net_db = Validator.net_db validator in
+        let net_state = Net_validator.net_state validator in
+        let net_db = Net_validator.net_db validator in
         Chain.head net_state >>= fun head ->
         predecessor net_db n head >>= fun block ->
         State.Block.all_operations block
     | (`Prevalidation | `Test_prevalidation) as block ->
-        let validator, net_db = get_net node block in
-        let pv = Validator.prevalidator validator in
+        let validator = get_validator node block in
+        let net_db = Net_validator.net_db validator in
+        let pv = Net_validator.prevalidator validator in
         let { Prevalidation.applied }, _ = Prevalidator.operations pv in
         Lwt_list.map_p
           (Distributed_db.Operation.read_exn net_db) applied >>= fun applied ->
@@ -417,32 +412,32 @@ module RPC = struct
     match block with
     | ( `Head 0 | `Prevalidation
       | `Test_head 0 | `Test_prevalidation ) as block ->
-        let validator, _net = get_net node block in
-        let pv = Validator.prevalidator validator in
+        let validator = get_validator node block in
+        let pv = Net_validator.prevalidator validator in
         Lwt.return (Prevalidator.operations pv)
     | ( `Head n | `Test_head n ) as block ->
         let validator = get_validator node block in
-        let prevalidator = Validator.prevalidator validator in
-        let net_state = Validator.net_state validator in
-        let net_db = Validator.net_db validator in
+        let prevalidator = Net_validator.prevalidator validator in
+        let net_state = Net_validator.net_state validator in
+        let net_db = Net_validator.net_db validator in
         Chain.head net_state >>= fun head ->
         predecessor net_db n head >>= fun b ->
         Prevalidator.pending ~block:b prevalidator >|= fun ops ->
         Prevalidation.empty_result, ops
     | `Genesis ->
-        let net = node.mainnet_net in
-        Chain.genesis net >>= fun b ->
-        let validator = get_validator node `Genesis in
-        let prevalidator = Validator.prevalidator validator in
+        let net_state = Net_validator.net_state node.mainnet_validator in
+        let prevalidator =
+          Net_validator.prevalidator node.mainnet_validator in
+        Chain.genesis net_state >>= fun b ->
         Prevalidator.pending ~block:b prevalidator >|= fun ops ->
         Prevalidation.empty_result, ops
     | `Hash h -> begin
         get_validator_per_hash node h >>= function
         | None ->
             Lwt.return (Prevalidation.empty_result, Operation_hash.Set.empty)
-        | Some (validator, net_db) ->
-            let net_state = Distributed_db.net_state net_db in
-            let prevalidator = Validator.prevalidator validator in
+        | Some validator ->
+            let net_state = Net_validator.net_state validator in
+            let prevalidator = Net_validator.prevalidator validator in
             State.Block.read_exn net_state h >>= fun block ->
             Prevalidator.pending ~block prevalidator >|= fun ops ->
             Prevalidation.empty_result, ops
@@ -461,17 +456,17 @@ module RPC = struct
     begin
       match block with
       | `Genesis ->
-          let net = node.mainnet_net in
-          Chain.genesis net >>= return
+          let net_state = Net_validator.net_state node.mainnet_validator in
+          Chain.genesis net_state >>= return
       | ( `Head 0 | `Prevalidation
         | `Test_head 0 | `Test_prevalidation ) as block ->
           let validator = get_validator node block in
-          let net_state = Validator.net_state validator in
+          let net_state = Net_validator.net_state validator in
           Chain.head net_state >>= return
       | `Head n | `Test_head n as block -> begin
           let validator = get_validator node block in
-          let net_state = Validator.net_state validator in
-          let net_db = Validator.net_db validator in
+          let net_state = Net_validator.net_state validator in
+          let net_db = Net_validator.net_db validator in
           Chain.head net_state >>= fun head ->
           predecessor net_db n head >>= return
         end
@@ -480,10 +475,11 @@ module RPC = struct
           | None -> Lwt.return (error_exn Not_found)
           | Some data -> return data
     end >>=? fun predecessor ->
-    let net_db = Validator.net_db node.mainnet_validator in
+    let net_db = Net_validator.net_db node.mainnet_validator in
     map_p (Distributed_db.resolve_operation net_db) ops >>=? fun rops ->
     Prevalidation.start_prevalidation
       ~proto_header ~predecessor ~timestamp () >>=? fun validation_state ->
+    let rops = List.map (fun x -> Operation.hash x, x) rops in
     Prevalidation.prevalidate
       validation_state ~sort rops >>= fun (validation_state, r) ->
     let operations_hash =
@@ -535,12 +531,14 @@ module RPC = struct
         Lwt.return (Some (RPC.map (fun _ -> ()) dir))
 
   let heads node =
-    Chain.known_heads node.mainnet_net >>= fun heads ->
+    let net_state = Net_validator.net_state node.mainnet_validator in
+    Chain.known_heads net_state >>= fun heads ->
     begin
-      match Validator.test_validator node.mainnet_validator with
+      match Net_validator.child node.mainnet_validator with
       | None -> Lwt.return_nil
-      | Some (_, net_db) ->
-          Chain.known_heads (Distributed_db.net_state net_db)
+      | Some test_validator ->
+          let net_state = Net_validator.net_state test_validator in
+          Chain.known_heads net_state
     end >>= fun test_heads ->
     Lwt_list.fold_left_s
       (fun map block ->
@@ -600,7 +598,7 @@ module RPC = struct
     Distributed_db.watch_block_header node.distributed_db
 
   let block_watcher node =
-    let stream, shutdown = Validator.global_watcher node.validator in
+    let stream, shutdown = Validator.watcher node.validator in
     Lwt_stream.map_s (fun block -> convert block) stream,
     shutdown
 
@@ -610,19 +608,15 @@ module RPC = struct
   let protocol_watcher node =
     Distributed_db.watch_protocol node.distributed_db
 
-  let validate node net_id block =
-    Validator.get node.validator net_id >>=? fun net_v ->
-    Validator.fetch_block net_v block >>=? fun _ ->
-    return ()
-
   let bootstrapped node =
     let block_stream, stopper =
-      Validator.new_head_watcher node.mainnet_validator in
+      Net_validator.new_head_watcher node.mainnet_validator in
     let first_run = ref true in
     let next () =
       if !first_run then begin
         first_run := false ;
-        Chain.head node.mainnet_net >>= fun head ->
+        let net_state = Net_validator.net_state node.mainnet_validator in
+        Chain.head net_state >>= fun head ->
         let head_hash = State.Block.hash head in
         let head_header = State.Block.header head in
         Lwt.return (Some (head_hash, head_header.shell.timestamp))
@@ -631,7 +625,7 @@ module RPC = struct
           ( Lwt_stream.get block_stream >|=
             map_option ~f:(fun b ->
                 (State.Block.hash b, (State.Block.header b).shell.timestamp)) ) ;
-          (Validator.bootstrapped node.mainnet_validator >|= fun () -> None) ;
+          (Net_validator.bootstrapped node.mainnet_validator >|= fun () -> None) ;
         ]
       end in
     let shutdown () = Watcher.shutdown stopper in

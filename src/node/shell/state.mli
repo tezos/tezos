@@ -126,6 +126,7 @@ module Block : sig
   val message: t -> string
   val max_operations_ttl: t -> int
 
+  val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t
 
   val context: t -> Context.t Lwt.t

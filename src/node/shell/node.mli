@@ -16,6 +16,7 @@ type config = {
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
   test_network_max_tll: int option ;
+  bootstrap_threshold: int ;
 }
 
 val create: config -> t tzresult Lwt.t
@@ -83,8 +84,6 @@ module RPC : sig
     timestamp:Time.t -> proto_header:MBytes.t ->
     sort_operations:bool -> Distributed_db.operation list ->
     (Block_header.shell_header * error Prevalidation.preapply_result) tzresult Lwt.t
-
-  val validate: t -> Net_id.t -> Block_hash.t -> unit tzresult Lwt.t
 
   val context_dir:
     t -> block -> 'a RPC.directory option Lwt.t

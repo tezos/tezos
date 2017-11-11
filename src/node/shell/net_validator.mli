@@ -9,24 +9,31 @@
 
 type t
 
-val create: State.t -> Distributed_db.t -> t
-val shutdown: t -> unit Lwt.t
-
-val activate:
-  t ->
-  ?bootstrap_threshold:int ->
+val create:
   ?max_child_ttl:int ->
-  State.Net.t -> Net_validator.t Lwt.t
+  ?bootstrap_threshold:int ->
+  Block_validator.t ->
+  State.Block.t Watcher.input ->
+  Distributed_db.t ->
+  State.Net.t ->
+  t Lwt.t
 
-type error +=
-  | Inactive_network of Net_id.t
-val get: t -> Net_id.t -> Net_validator.t tzresult Lwt.t
-val get_exn: t -> Net_id.t -> Net_validator.t Lwt.t
+val bootstrapped: t -> unit Lwt.t
 
-val inject_block:
+val net_id: t -> Net_id.t
+val net_state: t -> State.Net.t
+val prevalidator: t -> Prevalidator.t
+val net_db: t -> Distributed_db.net_db
+val child: t -> t option
+
+val validate_block:
   t ->
   ?force:bool ->
-  MBytes.t -> Distributed_db.operation list list ->
-  (Block_hash.t * State.Block.t tzresult Lwt.t) tzresult Lwt.t
+  Block_hash.t -> Block_header.t -> Operation.t list list ->
+  State.Block.t tzresult Lwt.t
 
-val watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
+val shutdown: t -> unit Lwt.t
+
+val valid_block_watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
+val new_head_watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
+

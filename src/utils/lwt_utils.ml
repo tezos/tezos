@@ -468,7 +468,8 @@ let protect ?on_error ?canceler t =
       let err = if canceled then [Canceled] else err in
       match on_error with
       | None -> Lwt.return (Error err)
-      | Some on_error -> on_error err
+      | Some on_error ->
+          Lwt.catch (fun () -> on_error err) (fun exn -> fail (Exn exn))
 
 type error += Timeout
 
