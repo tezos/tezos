@@ -17,7 +17,9 @@ type 'a t
 val create : ?size:(int * ('a -> int)) -> unit -> 'a t
 (** [create ~size:(max_size, compute_size)] is an empty queue that can
     hold max [size] bytes of data, using [compute_size] to compute the
-    size of a datum. *)
+    size of a datum. If want to count allocated bytes precisely, you
+    need to add [push_overhead] to the result of[compute_size].
+    When no [size] argument is provided, the queue is unbounded. *)
 
 val push : 'a t -> 'a -> unit Lwt.t
 (** [push q v] is a thread that blocks while [q] contains more
@@ -88,3 +90,6 @@ val close : 'a t -> unit
     Thus, after a pipe has been closed, reads never block.
     Close is idempotent.
 *)
+
+val push_overhead: int
+(** The allocated size in bytes when pushing in the queue. *)

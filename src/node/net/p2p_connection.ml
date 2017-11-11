@@ -291,7 +291,7 @@ module Reader = struct
 
   let run ?size conn encoding canceler =
     let compute_size = function
-      | Ok (size, _) -> (Sys.word_size / 8) * 11 + size
+      | Ok (size, _) -> (Sys.word_size / 8) * 11 + size + Lwt_pipe.push_overhead
       | Error _ -> 0 (* we push Error only when we close the socket,
                         we don't fear memory leaks in that case... *) in
     let size = map_option size ~f:(fun max -> (max, compute_size)) in
@@ -406,8 +406,10 @@ module Writer = struct
              sz + MBytes.length buf + 2 * Sys.word_size) 0
       in
       function
-      | buf_l, None -> Sys.word_size + buf_list_size buf_l
-      | buf_l, Some _ -> 2 * Sys.word_size + buf_list_size buf_l
+      | buf_l, None ->
+          Sys.word_size + buf_list_size buf_l + Lwt_pipe.push_overhead
+      | buf_l, Some _ ->
+          2 * Sys.word_size + buf_list_size buf_l + Lwt_pipe.push_overhead
     in
     let size = map_option size ~f:(fun max -> max, compute_size) in
     let st =

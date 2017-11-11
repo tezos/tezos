@@ -339,11 +339,12 @@ let create
 exception Closed
 
 let read_size = function
-  | Ok buf -> (Sys.word_size / 8) * 8 + MBytes.length buf
+  | Ok buf -> (Sys.word_size / 8) * 8 + MBytes.length buf + Lwt_pipe.push_overhead
   | Error _ -> 0 (* we push Error only when we close the socket,
                     we don't fear memory leaks in that case... *)
 
-let write_size mbytes = (Sys.word_size / 8) * 6 + MBytes.length mbytes
+let write_size mbytes =
+  (Sys.word_size / 8) * 6 + MBytes.length mbytes + Lwt_pipe.push_overhead
 
 let register =
   let cpt = ref 0 in
