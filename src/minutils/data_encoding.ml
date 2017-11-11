@@ -551,6 +551,7 @@ module Encoding = struct
       | Obj _ -> true
       | Objs _ (* by construction *) -> true
       | Conv { encoding = e } -> is_obj e
+      | Dynamic_size e  -> is_obj e
       | Union (_,_,cases) ->
           List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
       | Empty -> true
@@ -591,6 +592,7 @@ module Encoding = struct
       | Tup _ -> true
       | Tups _ (* by construction *) -> true
       | Conv { encoding = e } -> is_tup e
+      | Dynamic_size e  -> is_tup e
       | Union (_,_,cases) ->
           List.for_all (function Case { encoding = e} -> is_tup e) cases
       | _ -> false in
