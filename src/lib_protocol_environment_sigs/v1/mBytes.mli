@@ -25,7 +25,7 @@ val shift: t -> int -> t
 
 val blit: t -> int -> t -> int -> int -> unit
 (** [blit src ofs_src dst ofs_dst len] copy [len] bytes from [src]
-    starting at [ofs_src] into [dst] starting at [ofs_dst].] *)
+    starting at [ofs_src] into [dst] starting at [ofs_dst]. *)
 
 val blit_from_string: string -> int -> t -> int -> int -> unit
 (** See [blit] *)

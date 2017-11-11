@@ -34,7 +34,7 @@ val shift: t -> int -> t
 
 val blit: t -> int -> t -> int -> int -> unit
 (** [blit src ofs_src dst ofs_dst len] copy [len] bytes from [src]
-    starting at [ofs_src] into [dst] starting at [ofs_dst].] *)
+    starting at [ofs_src] into [dst] starting at [ofs_dst]. *)
 
 val blit_from_string: string -> int -> t -> int -> int -> unit
 (** See [blit] *)
@@ -95,7 +95,7 @@ val get_double: t -> int -> float
 
 val set_int16: t -> int -> int -> unit
 (** [set_int16 buff i v] writes the least significant 16 bits of [v]
-      to [buff] at offset [i] *)
+    to [buff] at offset [i] *)
 
 val set_int32: t -> int -> int32 -> unit
 (** [set_int32 buff i v] writes [v] to [buff] at offset [i] *)

@@ -458,3 +458,21 @@ deploy:bootstrap6:
     # - ./scripts/delete_ci_image.sh gitlab-ci-token "${CI_BUILD_TOKEN}"
          # "${CI_PROJECT_PATH}/build"
          # "${CI_BUILD_REF}"
+
+pages:
+  stage: publish
+  image: ${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}
+  only:
+    - master@tezos/tezos
+  artifacts:
+    paths:
+    - public
+  script:
+    - cd /home/opam/tezos
+    - sudo apk update && sudo apk upgrade
+    - sudo apk add py3-sphinx py3-sphinx_rtd_theme
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - opam install odoc
+    - make doc-html && sudo mv docs/_build "${CI_PROJECT_DIR}"/public
+  dependencies:
+    - build

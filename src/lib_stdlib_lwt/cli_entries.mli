@@ -33,7 +33,7 @@ val arg : doc:string -> parameter:string ->
   ('p option, 'ctx) arg
 
 (** Create an argument that will contain the [~default] value if it is not provided.
-    @see arg *)
+    see arg *)
 val default_arg : doc:string -> parameter:string ->
   default:string ->
   ('p, 'ctx) parameter ->

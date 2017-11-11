@@ -1,7 +1,10 @@
 
 .DS_Store
+__pycache__
 
-/_build
+/docs/introduction/readme.rst
+
+_build
 *.install
 
 /tezos-node
