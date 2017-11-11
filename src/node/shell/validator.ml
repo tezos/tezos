@@ -113,7 +113,7 @@ let rec may_set_head v (block: State.Block.t) =
     Chain.test_and_set_head v.net ~old:head block >>= function
     | false -> may_set_head v block
     | true ->
-        Distributed_db.broadcast_head v.net_db block_hash [] ;
+        Distributed_db.broadcast_head v.net_db block [] ;
         Prevalidator.flush v.prevalidator block ;
         begin
           begin
@@ -623,7 +623,7 @@ let rec create_validator ?parent worker ?max_child_ttl state db net =
       Lwt.async (fun () -> Lwt_pipe.push queue (`Branch (gid, locator)))
     end ;
     notify_head =  begin fun gid block ops ->
-      Lwt.async (fun () -> Lwt_pipe.push queue (`Head (gid, block, ops))) ;
+      Lwt.async (fun () -> Lwt_pipe.push queue (`Head (gid, Block_header.hash block, ops))) ;
     end ;
     disconnection = (fun _gid -> ()) ;
   } ;
@@ -759,9 +759,10 @@ let rec create_validator ?parent worker ?max_child_ttl state db net =
     let rec loop () =
       Lwt_pipe.pop queue >>= function
       | `Branch (_gid, locator) ->
+          let head, hist = (locator : Block_locator.t :> _ * _) in
           List.iter
             (Context_db.prefetch v session)
-            (locator :> Block_hash.t list) ;
+            (Block_header.hash head :: hist) ;
           loop ()
       | `Head (gid, head, ops) ->
           Context_db.prefetch v session head ;

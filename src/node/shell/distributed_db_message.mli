@@ -14,7 +14,7 @@ type t =
   | Deactivate of Net_id.t
 
   | Get_current_head of Net_id.t
-  | Current_head of Net_id.t * Block_hash.t * Operation_hash.t list
+  | Current_head of Net_id.t * Block_header.t * Operation_hash.t list
 
   | Get_block_headers of Net_id.t * Block_hash.t list
   | Block_header of Block_header.t

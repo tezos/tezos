@@ -65,6 +65,7 @@ and net_state = {
   global_state: global_state ;
   net_id: Net_id.t ;
   genesis: genesis ;
+  faked_genesis_hash: Block_hash.t ;
   expiration: Time.t option ;
   allow_forked_network: bool ;
   block_store: Store.Block.store Shared.t ;
@@ -160,7 +161,7 @@ module Net = struct
   type net_state = t
 
   let allocate
-      ~genesis ~expiration ~allow_forked_network
+      ~genesis ~faked_genesis_hash ~expiration ~allow_forked_network
       ~current_head
       global_state context_index chain_store block_store =
     Store.Block.Contents.read_exn
@@ -180,7 +181,7 @@ module Net = struct
       global_state ;
       net_id = Net_id.of_block_hash genesis.block ;
       chain_state = { Shared.data = chain_state ; lock = Lwt_mutex.create () } ;
-      genesis ;
+      genesis ; faked_genesis_hash ;
       expiration ;
       allow_forked_network ;
       block_store = Shared.create block_store ;
@@ -212,9 +213,10 @@ module Net = struct
         Lwt.return_unit
     end >>= fun () ->
     Locked_block.store_genesis
-      block_store genesis commit >>= fun _genesis_header ->
+      block_store genesis commit >>= fun genesis_header ->
     allocate
       ~genesis
+      ~faked_genesis_hash:(Block_header.hash genesis_header)
       ~current_head:genesis.block
       ~expiration
       ~allow_forked_network
@@ -250,11 +252,13 @@ module Net = struct
     Store.Net.Expiration.read_opt net_store >>= fun expiration ->
     Store.Net.Allow_forked_network.known
       data.global_store id >>= fun allow_forked_network ->
+    Store.Block.Contents.read (block_store, genesis_hash) >>=? fun genesis_header ->
     let genesis = { time ; protocol ; block = genesis_hash } in
     Store.Chain.Current_head.read chain_store >>=? fun current_head ->
     try
       allocate
         ~genesis
+        ~faked_genesis_hash:(Block_header.hash genesis_header.header)
         ~current_head
         ~expiration
         ~allow_forked_network
@@ -293,6 +297,7 @@ module Net = struct
 
   let id { net_id } = net_id
   let genesis { genesis } = genesis
+  let faked_genesis_hash { faked_genesis_hash } = faked_genesis_hash
   let expiration { expiration } = expiration
   let allow_forked_network { allow_forked_network } = allow_forked_network
   let global_state { global_state } = global_state

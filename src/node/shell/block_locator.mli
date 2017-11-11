@@ -9,7 +9,7 @@
 
 open State
 
-type t = private Block_hash.t list
+type t = private (Block_header.t * Block_hash.t list)
 (** A type for sparse block locator (/à la/ Bitcoin) *)
 
 val encoding: t Data_encoding.t

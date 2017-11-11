@@ -14,7 +14,7 @@ type t =
   | Deactivate of Net_id.t
 
   | Get_current_head of Net_id.t
-  | Current_head of Net_id.t * Block_hash.t * Operation_hash.t list
+  | Current_head of Net_id.t * Block_header.t * Operation_hash.t list
 
   | Get_block_headers of Net_id.t * Block_hash.t list
   | Block_header of Block_header.t
@@ -53,9 +53,9 @@ let encoding =
          (req "net_id" Net_id.encoding)
          (req "current_branch" Block_locator.encoding))
       (function
-        | Current_branch (net_id, bhs) -> Some (net_id, bhs)
+        | Current_branch (net_id, locator) -> Some (net_id, locator)
         | _ -> None)
-      (fun (net_id, bhs) -> Current_branch (net_id, bhs)) ;
+      (fun (net_id, locator) -> Current_branch (net_id, locator)) ;
 
     case ~tag:0x12
       (obj1
@@ -76,7 +76,7 @@ let encoding =
     case ~tag:0x14
       (obj3
          (req "net_id" Net_id.encoding)
-         (req "current_head" Block_hash.encoding)
+         (req "current_block_header" (dynamic_size Block_header.encoding))
          (req "current_mempool" (list Operation_hash.encoding)))
       (function
         | Current_head (net_id, bh, ops) -> Some (net_id, bh, ops)
@@ -184,4 +184,5 @@ let raw_encoding = P2p.Raw.encoding encoding
 
 let pp_json ppf msg =
   Format.pp_print_string ppf
-    (Data_encoding_ezjsonm.to_string (Data_encoding.Json.construct raw_encoding (Message msg)))
+    (Data_encoding_ezjsonm.to_string
+       (Data_encoding.Json.construct raw_encoding (Message msg)))

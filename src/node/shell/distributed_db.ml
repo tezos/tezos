@@ -300,8 +300,10 @@ module Raw_protocol =
     end)
 
 type callback = {
-  notify_branch: P2p.Peer_id.t -> Block_locator.t -> unit ;
-  notify_head: P2p.Peer_id.t -> Block_hash.t -> Operation_hash.t list -> unit ;
+  notify_branch:
+    P2p.Peer_id.t -> Block_locator.t -> unit ;
+  notify_head:
+    P2p.Peer_id.t -> Block_header.t -> Operation_hash.t list -> unit ;
   disconnection: P2p.Peer_id.t -> unit ;
 }
 
@@ -416,9 +418,10 @@ module P2p_reader = struct
 
     | Current_branch (net_id, locator) ->
         may_activate global_db state net_id @@ fun net_db ->
+        let head, hist = (locator :> Block_header.t * Block_hash.t list) in
         Lwt_list.exists_p
           (State.Block.known_invalid net_db.net_state)
-          (locator :> Block_hash.t list) >>= fun known_invalid ->
+          (Block_header.hash head :: hist) >>= fun known_invalid ->
         if not known_invalid then
           net_db.callback.notify_branch state.gid locator ;
         (* TODO Kickban *)
@@ -436,15 +439,16 @@ module P2p_reader = struct
         Chain.mempool net_db.net_state >>= fun mempool ->
         ignore
         @@ P2p.try_send global_db.p2p state.conn
-        @@ Current_head (net_id, State.Block.hash head,
+        @@ Current_head (net_id, State.Block.header head,
                          Utils.list_sub mempool 200) ;
         Lwt.return_unit
 
-    | Current_head (net_id, head, mempool) ->
+    | Current_head (net_id, header, mempool) ->
         may_handle state net_id @@ fun net_db ->
+        let head = Block_header.hash header in
         State.Block.known_invalid net_db.net_state head >>= fun known_invalid ->
         if not known_invalid then
-          net_db.callback.notify_head state.gid head mempool ;
+          net_db.callback.notify_head state.gid header mempool ;
         (* TODO Kickban *)
         Lwt.return_unit
 
@@ -846,8 +850,10 @@ let clear_block net_db hash n =
   Raw_block_header.Table.clear_or_cancel net_db.block_header_db.table hash
 
 let broadcast_head net_db head mempool =
+  let net_id = State.Net.id net_db.net_state in
+  assert (Net_id.equal net_id (State.Block.net_id head)) ;
   let msg : Message.t =
-    Current_head (State.Net.id net_db.net_state, head, mempool) in
+    Current_head (net_id, State.Block.header head, mempool) in
   P2p.Peer_id.Table.iter
     (fun _peer_id state ->
        ignore (P2p.try_send net_db.global_db.p2p state.conn msg))
