@@ -27,6 +27,7 @@ type t = {
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;
   log_output: Logging.Output.t option ;
+  bootstrap_threshold: int option ;
 }
 
 module Term : sig

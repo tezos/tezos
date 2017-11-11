@@ -12,6 +12,7 @@ type t = {
   net : net ;
   rpc : rpc ;
   log : log ;
+  shell : shell ;
 }
 
 and net = {
@@ -41,6 +42,10 @@ and log = {
   template : Logging.template ;
 }
 
+and shell = {
+  bootstrap_threshold : int ;
+}
+
 val default_data_dir: string
 val default_net_port: int
 val default_rpc_port: int
@@ -65,6 +70,7 @@ val update:
   ?cors_headers:string list ->
   ?rpc_tls:tls ->
   ?log_output:Logging.Output.t ->
+  ?bootstrap_threshold:int ->
   t -> t tzresult Lwt.t
 
 val to_string: t -> string

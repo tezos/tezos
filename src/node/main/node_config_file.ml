@@ -22,6 +22,7 @@ type t = {
   net : net ;
   rpc : rpc ;
   log : log ;
+  shell : shell ;
 }
 
 and net = {
@@ -49,6 +50,10 @@ and log = {
   default_level : Logging.level ;
   rules : string option ;
   template : Logging.template ;
+}
+
+and shell = {
+  bootstrap_threshold : int ;
 }
 
 let default_net_limits : P2p.limits = {
@@ -96,11 +101,16 @@ let default_log = {
   template = Logging.default_template ;
 }
 
+let default_shell = {
+  bootstrap_threshold = 4 ;
+}
+
 let default_config = {
   data_dir = default_data_dir ;
   net = default_net ;
   rpc = default_rpc ;
   log = default_log ;
+  shell = default_shell ;
 }
 
 let limit : P2p.limits Data_encoding.t =
@@ -235,16 +245,27 @@ let log =
        (opt "rules" string)
        (dft "template" string default_log.template))
 
+let shell =
+  let open Data_encoding in
+  conv
+    (fun { bootstrap_threshold } -> bootstrap_threshold)
+    (fun bootstrap_threshold -> { bootstrap_threshold })
+    (obj1
+       (dft "bootstrap_threshold" uint8 default_shell.bootstrap_threshold))
+
 let encoding =
   let open Data_encoding in
   conv
-    (fun { data_dir ; rpc ; net ; log } -> (data_dir, rpc, net, log))
-    (fun (data_dir, rpc, net, log) -> { data_dir ; rpc ; net ; log })
-    (obj4
+    (fun { data_dir ; rpc ; net ; log ; shell } ->
+       (data_dir, rpc, net, log, shell))
+    (fun (data_dir, rpc, net, log, shell) ->
+       { data_dir ; rpc ; net ; log ; shell })
+    (obj5
        (dft "data-dir" string default_data_dir)
        (dft "rpc" rpc default_rpc)
        (req "net" net)
-       (dft "log" log default_log))
+       (dft "log" log default_log)
+       (dft "shell" shell default_shell))
 
 let read fp =
   if Sys.file_exists fp then begin
@@ -281,6 +302,7 @@ let update
     ?(cors_headers = [])
     ?rpc_tls
     ?log_output
+    ?bootstrap_threshold
     cfg =
   let data_dir = Utils.unopt ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
@@ -342,8 +364,14 @@ let update
     cfg.log with
     output = Utils.unopt ~default:cfg.log.output log_output ;
   }
+  and shell : shell = {
+    bootstrap_threshold =
+      Utils.unopt
+        ~default:cfg.shell.bootstrap_threshold
+        bootstrap_threshold ;
+  }
   in
-  return { data_dir ; net ; rpc ; log }
+  return { data_dir ; net ; rpc ; log ; shell }
 
 let resolve_addr ?default_port ?(passive = false) peer =
   let addr, port = Utils.parse_addr_port peer in

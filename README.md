@@ -334,6 +334,17 @@ help writing your own configuration file if needed.
     http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates. */
 
     "template": "$(date) - $(section): $(message)"
+  },
+
+  /* Configuration for the validator and mempool parameters */
+
+  "shell": {
+
+     /* The number of peers to synchronize with
+        before declaring the node 'bootstrapped'. */
+
+     "bootstrap_threshold": 4
+
   }
 }
 ```

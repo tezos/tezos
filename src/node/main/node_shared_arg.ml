@@ -32,6 +32,7 @@ type t = {
   cors_headers: string list ;
   rpc_tls: Node_config_file.tls option ;
   log_output: Logging.Output.t option ;
+  bootstrap_threshold: int option ;
 }
 
 let wrap
@@ -55,10 +56,11 @@ let wrap
 
   (* when `--expected-connections` is used,
      override all the bounds defined in the configuration file. *)
-  let min_connections, expected_connections, max_connections =
+  let bootstrap_threshold,
+      min_connections, expected_connections, max_connections =
     match connections with
-    | None -> None, None, None
-    | Some x -> Some (x/2), Some x, Some (3*x/2) in
+    | None -> None, None, None, None
+    | Some x ->  Some (min (x/4) 2), Some (x/2), Some x, Some (3*x/2) in
 
   { data_dir ;
     config_file ;
@@ -79,6 +81,7 @@ let wrap
     rpc_tls ;
     log_output ;
     peer_table_size ;
+    bootstrap_threshold ;
   }
 
 module Manpage = struct
@@ -258,7 +261,9 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
         listen_addr ; closed ;
         rpc_listen_addr ; rpc_tls ;
         cors_origins ; cors_headers ;
-        log_output } = args in
+        log_output ;
+        bootstrap_threshold ;
+      } = args in
   let bootstrap_peers =
     if no_bootstrap_peers || ignore_bootstrap_peers
     then begin
@@ -271,4 +276,5 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
     ?max_download_speed ?max_upload_speed ?binary_chunks_size
     ?peer_table_size ?expected_pow
     ~bootstrap_peers ?listen_addr ?rpc_listen_addr
-    ~closed ~cors_origins ~cors_headers ?rpc_tls ?log_output cfg
+    ~closed ~cors_origins ~cors_headers ?rpc_tls ?log_output
+    ?bootstrap_threshold cfg
