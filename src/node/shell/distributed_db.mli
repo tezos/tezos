@@ -38,9 +38,6 @@ val deactivate: net_db -> unit Lwt.t
 
 val disconnect: net_db -> P2p.Peer_id.t -> unit Lwt.t
 
-val broadcast_head:
-  net_db -> State.Block.t -> Operation_hash.t list -> unit
-
 type operation =
   | Blob of Operation.t
   | Hash of Operation_hash.t
@@ -135,3 +132,18 @@ module Raw : sig
   val encoding: Message.t P2p.Raw.t Data_encoding.t
   val supported_versions: P2p_types.Version.t list
 end
+
+module Request : sig
+  val current_branch: net_db -> ?peer:P2p.Peer_id.t -> unit -> unit
+  val current_head: net_db -> ?peer:P2p.Peer_id.t -> unit -> unit
+end
+
+module Advertise : sig
+  val current_head:
+    net_db -> ?peer:P2p.Peer_id.t ->
+    ?mempool:Operation_hash.t list -> State.Block.t -> unit
+  val current_branch:
+    net_db -> ?peer:P2p.Peer_id.t ->
+    State.Block.t -> unit Lwt.t
+end
+

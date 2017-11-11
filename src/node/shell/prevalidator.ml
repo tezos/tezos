@@ -97,7 +97,7 @@ let create net_db =
     Lwt.return_unit in
 
   let broadcast_operation ops =
-    Distributed_db.broadcast_head net_db !head ops in
+    Distributed_db.Advertise.current_head net_db ~mempool:ops !head in
 
   let handle_unprocessed () =
     if Operation_hash.Set.is_empty !unprocessed then
