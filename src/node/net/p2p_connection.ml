@@ -489,19 +489,32 @@ let catch_closed_pipe f =
     | exn -> fail (Exn exn)
   end
 
-let write { writer } msg =
+let pp_json encoding ppf msg =
+  Format.pp_print_string ppf
+    (Data_encoding_ezjsonm.to_string
+       (Data_encoding.Json.construct encoding msg))
+
+let write { writer ; conn } msg =
   catch_closed_pipe begin fun () ->
+    debug "Sending message to %a: %a"
+      P2p_types.Peer_id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
     Lwt.return (Writer.encode_message writer msg) >>=? fun buf ->
     Lwt_pipe.push writer.messages (buf, None) >>= return
   end
-let write_sync { writer } msg =
+
+let write_sync { writer ; conn } msg =
   catch_closed_pipe begin fun () ->
     let waiter, wakener = Lwt.wait () in
+    debug "Sending message to %a: %a"
+      P2p_types.Peer_id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
     Lwt.return (Writer.encode_message writer msg) >>=? fun buf ->
     Lwt_pipe.push writer.messages (buf, Some wakener) >>= fun () ->
     waiter
   end
-let write_now { writer } msg =
+
+let write_now { writer ; conn } msg =
+  debug "Try sending message to %a: %a"
+    P2p_types.Peer_id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
   Writer.encode_message writer msg >>? fun buf ->
   try Ok (Lwt_pipe.push_now writer.messages (buf, None))
   with Lwt_pipe.Closed -> Error [P2p_io_scheduler.Connection_closed]
