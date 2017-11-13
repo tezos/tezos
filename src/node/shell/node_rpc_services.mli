@@ -13,12 +13,6 @@ module Error : sig
   val wrap: 'a Data_encoding.t -> 'a tzresult Data_encoding.encoding
 end
 
-type operation = Distributed_db.operation =
-  | Blob of Operation.t
-  | Hash of Operation_hash.t
-
-val operation_encoding: operation Data_encoding.t
-
 module Blocks : sig
 
   type block = [
@@ -43,7 +37,7 @@ module Blocks : sig
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
     data: MBytes.t ;
-    operations: Operation_hash.t list list option ;
+    operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
     test_network: Context.test_network;
   }
@@ -79,7 +73,7 @@ module Blocks : sig
     (unit, unit * block, unit, Context.test_network) RPC.service
   val pending_operations:
     (unit, unit * block, unit,
-     error Prevalidation.preapply_result * Hash.Operation_hash.Set.t) RPC.service
+     error Prevalidation.preapply_result * Operation.t Operation_hash.Map.t) RPC.service
 
   type list_param = {
     include_ops: bool ;
@@ -96,7 +90,7 @@ module Blocks : sig
   type preapply_param = {
     timestamp: Time.t ;
     proto_header: MBytes.t ;
-    operations: operation list ;
+    operations: Operation.t list ;
     sort_operations: bool ;
   }
 
@@ -183,7 +177,7 @@ type inject_block_param = {
   raw: MBytes.t ;
   blocking: bool ;
   force: bool ;
-  operations: operation list list ;
+  operations: Operation.t list list ;
 }
 
 val inject_block:

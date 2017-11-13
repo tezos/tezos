@@ -104,6 +104,7 @@ module Make() = struct
             !error_kinds in
         let json_encoding = Data_encoding.union cases in
         let encoding =
+          Data_encoding.dynamic_size @@
           Data_encoding.splitted
             ~json:json_encoding
             ~binary:

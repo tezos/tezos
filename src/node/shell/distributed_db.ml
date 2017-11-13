@@ -764,20 +764,6 @@ let commit_protocol db h p =
   Raw_protocol.Table.clear_or_cancel db.protocol_db.table h ;
   return (res <> None)
 
-type operation =
-  | Blob of Operation.t
-  | Hash of Operation_hash.t
-
-let resolve_operation net_db = function
-  | Blob op ->
-      fail_unless
-        (Net_id.equal op.shell.net_id (State.Net.id net_db.net_state))
-        (failure "Inconsistent net_id in operation.") >>=? fun () ->
-      return op
-  | Hash oph ->
-      Raw_operation.Table.read net_db.operation_db.table oph >>=? fun op ->
-      return op
-
 let watch_block_header { block_input } =
   Watcher.create_stream block_input
 let watch_operation { operation_input } =

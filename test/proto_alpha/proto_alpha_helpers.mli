@@ -156,7 +156,7 @@ module Assert : sig
 
   val failed_to_preapply:
     msg:string ->
-    ?op:Client_node_rpcs.operation ->
+    ?op:Tezos_data.Operation.t ->
     (Environment.Error_monad.error ->
      bool) ->
     'a tzresult -> unit

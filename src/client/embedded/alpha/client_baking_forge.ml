@@ -52,10 +52,7 @@ let assert_valid_operations_hash shell_header operations =
     Operation_list_list_hash.compute
       (List.map Operation_list_hash.compute
          (List.map
-            (List.map
-               (function
-                 | Client_node_rpcs.Blob op -> Tezos_data.Operation.hash op
-                 | Hash oph -> oph)) operations)) in
+            (List.map Tezos_data.Operation.hash) operations)) in
   fail_unless
     (Operation_list_list_hash.equal
        operations_hash shell_header.Tezos_data.Block_header.operations_hash)
@@ -74,7 +71,7 @@ let inject_block cctxt
   return block_hash
 
 type error +=
-  | Failed_to_preapply of Client_node_rpcs.operation * error list
+  | Failed_to_preapply of Tezos_data.Operation.t * error list
 
 let () =
   register_error_kind
@@ -83,16 +80,13 @@ let () =
     ~title: "Fail to preapply an operation"
     ~description: ""
     ~pp:(fun ppf (op, err) ->
-        let h =
-          match op with
-          | Client_node_rpcs.Hash h -> h
-          | Blob op -> Tezos_data.Operation.hash op in
+        let h = Tezos_data.Operation.hash op in
         Format.fprintf ppf "@[Failed to preapply %a:@ %a@]"
           Operation_hash.pp_short h
           pp_print_error err)
     Data_encoding.
       (obj2
-         (req "operation" (dynamic_size Client_node_rpcs.operation_encoding))
+         (req "operation" (dynamic_size Tezos_data.Operation.encoding))
          (req "error" Node_rpc_services.Error.encoding))
     (function
       | Failed_to_preapply (hash, err) -> Some (hash, err)
@@ -112,11 +106,13 @@ let forge_block cctxt block
         Client_node_rpcs.Blocks.pending_operations
           cctxt block >>=? fun (ops, pendings) ->
         let ops =
-          Operation_hash.Set.elements @@
-          Operation_hash.Set.union
+          List.map snd @@
+          Operation_hash.Map.bindings @@
+          Operation_hash.Map.fold
+            Operation_hash.Map.add
             (Prevalidation.preapply_result_operations ops)
             pendings in
-        return (List.map (fun x -> Client_node_rpcs.Hash x) ops)
+        return ops
     | Some operations -> return operations
   end >>=? fun operations ->
   begin
@@ -177,20 +173,7 @@ let forge_block cctxt block
        && Operation_hash.Map.is_empty result.branch_delayed ) then
     let operations =
       if not best_effort then operations
-      else
-        let map =
-          List.fold_left
-            (fun map op ->
-               match op with
-               | Client_node_rpcs.Hash _ ->  map
-               | Blob op ->
-                   Operation_hash.Map.add (Tezos_data.Operation.hash op) op map)
-            Operation_hash.Map.empty operations in
-        List.map
-          (fun h ->
-             try Client_node_rpcs.Blob (Operation_hash.Map.find h map)
-             with _ -> Client_node_rpcs.Hash h)
-          result.applied in
+      else List.map snd result.applied in
     inject_block cctxt
       ?force ~shell_header ~priority ~seed_nonce_hash ~src_sk
       [operations]
@@ -198,18 +181,15 @@ let forge_block cctxt block
     Lwt.return_error @@
     Utils.filter_map
       (fun op ->
-         let h =
-           match op with
-           | Client_node_rpcs.Hash h -> h
-           | Blob op -> Tezos_data.Operation.hash op in
+         let h = Tezos_data.Operation.hash op in
          try Some (Failed_to_preapply
-                     (op, Operation_hash.Map.find h result.refused))
+                     (op, snd @@ Operation_hash.Map.find h result.refused))
          with Not_found ->
          try Some (Failed_to_preapply
-                     (op, Operation_hash.Map.find h result.branch_refused))
+                     (op, snd @@ Operation_hash.Map.find h result.branch_refused))
          with Not_found ->
          try Some (Failed_to_preapply
-                     (op, Operation_hash.Map.find h result.branch_delayed))
+                     (op, snd @@ Operation_hash.Map.find h result.branch_delayed))
          with Not_found -> None)
       operations
 
@@ -481,9 +461,10 @@ let mine cctxt state =
        Client_node_rpcs.Blocks.pending_operations cctxt.rpc_config
          block >>=? fun (res, ops) ->
        let operations =
-         let open Operation_hash.Set in
-         List.map (fun x -> Client_node_rpcs.Hash x) @@
-         elements (union ops (Prevalidation.preapply_result_operations res)) in
+         List.map snd @@
+         Operation_hash.Map.bindings @@
+         Operation_hash.Map.(fold add)
+           ops (Prevalidation.preapply_result_operations res) in
        let request = List.length operations in
        let proto_header =
          forge_faked_proto_header ~priority ~seed_nonce_hash in
@@ -527,7 +508,7 @@ let mine cctxt state =
       Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
       inject_block cctxt.rpc_config
         ~force:true ~shell_header ~priority ~seed_nonce_hash ~src_sk
-        [List.map (fun h -> Client_node_rpcs.Hash h) operations.applied]
+        [List.map snd operations.applied]
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
       State.record_block cctxt level block_hash seed_nonce
       |> trace_exn (Failure "Error while recording block") >>=? fun () ->

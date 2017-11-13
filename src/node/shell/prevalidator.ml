@@ -24,7 +24,7 @@ let list_pendings ?maintain_net_db  ~from_block ~to_block old_mempool =
                  Distributed_db.inject_operation net_db h op >>= fun _ ->
                  Lwt.return_unit
                end >>= fun () ->
-             Lwt.return (Operation_hash.Set.add h mempool)))
+             Lwt.return (Operation_hash.Map.add h op mempool)))
         mempool operations >>= fun mempool ->
       State.Block.predecessor block >>= function
       | None -> assert false
@@ -35,7 +35,7 @@ let list_pendings ?maintain_net_db  ~from_block ~to_block old_mempool =
     iter_option maintain_net_db
       ~f:(fun net_db -> Distributed_db.clear_operations net_db operations) ;
     List.fold_left
-      (List.fold_left (fun mempool h -> Operation_hash.Set.remove h mempool))
+      (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
       mempool operations
   in
   Chain_traversal.new_blocks ~from_block ~to_block >>= fun (ancestor, path) ->
@@ -57,8 +57,8 @@ type t = {
   prevalidate_operations:
     bool -> Operation.t list ->
     (Operation_hash.t list * error preapply_result) tzresult Lwt.t ;
-  operations: unit -> error preapply_result * Operation_hash.Set.t ;
-  pending: ?block:State.Block.t -> unit -> Operation_hash.Set.t Lwt.t ;
+  operations: unit -> error preapply_result * Operation.t Operation_hash.Map.t ;
+  pending: ?block:State.Block.t -> unit -> Operation.t Operation_hash.Map.t Lwt.t ;
   timestamp: unit -> Time.t ;
   context: unit -> Updater.validation_result tzresult Lwt.t ;
   shutdown: unit -> unit Lwt.t ;
@@ -84,6 +84,7 @@ let create
   (start_prevalidation ~predecessor:head ~timestamp:!timestamp () >|= ref) >>= fun validation_state ->
   let pending = Operation_hash.Table.create 53 in
   let head = ref head in
+  let mempool = ref [] in
   let operations = ref empty_result in
   Chain_traversal.live_blocks
     !head
@@ -92,7 +93,7 @@ let create
   let live_blocks = ref live_blocks in
   let live_operations = ref live_operations in
   let running_validation = ref Lwt.return_unit in
-  let unprocessed = ref Operation_hash.Set.empty in
+  let unprocessed = ref Operation_hash.Map.empty in
   let broadcast_unprocessed = ref false in
 
   let set_validation_state state =
@@ -108,24 +109,30 @@ let create
     Distributed_db.Advertise.current_head net_db ~mempool:ops !head in
 
   let handle_unprocessed () =
-    if Operation_hash.Set.is_empty !unprocessed then
+    if Operation_hash.Map.is_empty !unprocessed then
       Lwt.return ()
     else
       let ops = !unprocessed in
       let broadcast = !broadcast_unprocessed in
-      unprocessed := Operation_hash.Set.empty ;
+      unprocessed := Operation_hash.Map.empty ;
       broadcast_unprocessed := false ;
-      let ops = Operation_hash.Set.diff ops !live_operations in
-      live_operations := Operation_hash.Set.(fold add) !live_operations ops ;
+      let ops =
+        Operation_hash.Set.fold
+          (fun k m -> Operation_hash.Map.remove k m)
+          !live_operations ops in
+      live_operations :=
+        Operation_hash.Map.fold
+          (fun k _ m -> Operation_hash.Set.add k m)
+          ops !live_operations ;
       running_validation := begin
         begin
           Lwt_list.filter_map_p
-            (fun h ->
-               Distributed_db.Operation.read_opt net_db h >>= function
-               | Some po when Block_hash.Set.mem po.shell.branch !live_blocks ->
-                   Lwt.return_some (h, po)
-               | Some _ | None -> Lwt.return_none)
-            (Operation_hash.Set.elements ops) >>= fun rops ->
+            (fun (h, op) ->
+               if Block_hash.Set.mem op.Operation.shell.branch !live_blocks then
+                 Lwt.return_some (h, op)
+               else
+                 Lwt.return_none)
+            (Operation_hash.Map.bindings ops) >>= fun rops ->
           (Lwt.return !validation_state >>=? fun validation_state ->
            (prevalidate validation_state ~sort:true rops >>= return)) >>= function
           | Ok (state, r) -> Lwt.return (Ok state, r)
@@ -133,13 +140,15 @@ let create
               let r =
                 { empty_result with
                   branch_delayed =
-                    Operation_hash.Set.fold
-                      (fun op m -> Operation_hash.Map.add op err m)
+                    Operation_hash.Map.fold
+                      (fun h op m -> Operation_hash.Map.add h (op, err) m)
                       ops Operation_hash.Map.empty ; } in
               Lwt.return (!validation_state, r)
         end >>= fun (state, r) ->
         let filter_out s m =
-          List.fold_right Operation_hash.Map.remove s m in
+          List.fold_right (fun (h, _op) -> Operation_hash.Map.remove h) s m in
+        let new_ops = List.map fst r.applied in
+        mempool := List.rev_append new_ops !mempool ;
         operations := {
           applied = List.rev_append r.applied !operations.applied ;
           refused = Operation_hash.Map.empty ;
@@ -153,8 +162,8 @@ let create
               (filter_out r.applied !operations.branch_delayed)
               r.branch_delayed ;
         } ;
-        Chain.set_reversed_mempool net_state !operations.applied >>= fun () ->
-        if broadcast then broadcast_operation r.applied ;
+        Chain.set_reversed_mempool net_state !mempool >>= fun () ->
+        if broadcast then broadcast_operation new_ops ;
         Lwt_list.iter_s
           (fun (_op, _exns) ->
              (* FIXME *)
@@ -194,31 +203,31 @@ let create
                     Lwt.return !validation_state >>=? fun validation_state ->
                     prevalidate validation_state
                       ~sort:true rops >>= fun (state, res) ->
-                    let register h =
-                      let op = Operation_hash.Map.find h ops in
-                      live_operations := Operation_hash.Set.add h !live_operations ;
+                    let register h op =
+                      live_operations :=
+                        Operation_hash.Set.add h !live_operations ;
                       Distributed_db.inject_operation
                         net_db h op >>=? fun (_ : bool) ->
                       return () in
                     iter_s
-                      (fun h ->
-                         register h >>=? fun () ->
+                      (fun (h, op) ->
+                         register h op >>=? fun () ->
+                         mempool := h :: !mempool ;
                          operations :=
                            { !operations with
-                             applied = h :: !operations.applied };
+                             applied = (h, op) :: !operations.applied };
                          return () )
                       res.applied >>=? fun () ->
-                    Chain.set_reversed_mempool
-                      net_state !operations.applied >>= fun () ->
-                    broadcast_operation res.applied ;
+                    Chain.set_reversed_mempool net_state !mempool >>= fun () ->
+                    broadcast_operation (List.map fst res.applied) ;
                     begin
                       if force then
                         iter_p
-                          (fun (h, _exns) -> register h)
+                          (fun (h, (op, _exns)) -> register h op)
                           (Operation_hash.Map.bindings
                              res.branch_delayed) >>=? fun () ->
                         iter_p
-                          (fun (h, _exns) -> register h)
+                          (fun (h, (op, _exns)) -> register h op)
                           (Operation_hash.Map.bindings
                              res.branch_refused) >>=? fun () ->
                         operations :=
@@ -252,8 +261,8 @@ let create
                     Distributed_db.Operation.fetch
                       ~timeout:operation_timeout
                       net_db ~peer:gid h () >>= function
-                    | Ok _op ->
-                        push_to_worker (`Handle h) ;
+                    | Ok op ->
+                        push_to_worker (`Handle (h, op)) ;
                         Lwt.return_unit
                     | Error [ Distributed_db.Operation.Canceled _ ] ->
                         lwt_debug
@@ -276,12 +285,11 @@ let create
                             net_db ~peer:gid op ()))
                     known_ops ;
                   Lwt.return_unit
-              | `Handle op ->
-                  lwt_debug "register %a" Operation_hash.pp_short op >>= fun () ->
-                  Operation_hash.Table.remove pending op ;
+              | `Handle (h, op) ->
+                  Operation_hash.Table.remove pending h ;
                   broadcast_unprocessed := true ;
-                  unprocessed := Operation_hash.Set.singleton op ;
-                  lwt_debug "register %a" Operation_hash.pp_short op >>= fun () ->
+                  unprocessed := Operation_hash.Map.singleton h op ;
+                  lwt_debug "register %a" Operation_hash.pp_short h >>= fun () ->
                   Lwt.return_unit
               | `Flush (new_head : State.Block.t) ->
                   list_pendings
@@ -294,9 +302,10 @@ let create
                   >>= fun (new_live_blocks, new_live_operations) ->
                   lwt_debug "flush %a (mempool: %d)"
                     Block_hash.pp_short (State.Block.hash new_head)
-                    (Operation_hash.Set.cardinal new_mempool) >>= fun () ->
+                    (Operation_hash.Map.cardinal new_mempool) >>= fun () ->
                   (* Reset the pre-validation context *)
                   head := new_head ;
+                  mempool := [] ;
                   operations := empty_result ;
                   broadcast_unprocessed := false ;
                   unprocessed := new_mempool ;
@@ -376,7 +385,7 @@ let inject_operation pv ?(force = false) (op: Operation.t) =
   let net_id = State.Net.id (Distributed_db.net_state pv.net_db) in
   let wrap_error h map =
     begin
-      try return (Operation_hash.Map.find h map)
+      try return (snd (Operation_hash.Map.find h map))
       with Not_found ->
         failwith "unexpected protocol result"
     end >>=? fun errors ->
@@ -385,7 +394,7 @@ let inject_operation pv ?(force = false) (op: Operation.t) =
     (failure
        "Prevalidator.inject_operation: invalid network") >>=? fun () ->
   pv.prevalidate_operations force [op] >>=? function
-  | ([h], { applied = [h'] }) when Operation_hash.equal h h' ->
+  | ([h], { applied = [h', _] }) when Operation_hash.equal h h' ->
       return ()
   | ([h], { refused })
     when Operation_hash.Map.cardinal refused = 1 ->

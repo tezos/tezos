@@ -18,12 +18,6 @@ let errors cctxt =
 let forge_block_header cctxt header =
   call_service0 cctxt Services.forge_block_header header
 
-type operation = Node_rpc_services.operation =
-  | Blob of Operation.t
-  | Hash of Operation_hash.t
-
-let operation_encoding = Node_rpc_services.operation_encoding
-
 let inject_block cctxt ?(async = false) ?(force = false) raw operations =
   call_err_service0 cctxt Services.inject_block
     { raw ; blocking = not async ; force ; operations }
@@ -64,14 +58,14 @@ module Blocks = struct
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
     data: MBytes.t ;
-    operations: Operation_hash.t list list option ;
+    operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
     test_network: Context.test_network;
   }
   type preapply_param = Services.Blocks.preapply_param = {
     timestamp: Time.t ;
     proto_header: MBytes.t ;
-    operations: operation list ;
+    operations: Operation.t list ;
     sort_operations: bool ;
   }
   type preapply_result = Services.Blocks.preapply_result = {

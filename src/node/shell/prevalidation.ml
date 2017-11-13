@@ -9,10 +9,10 @@
 
 
 type 'error preapply_result = {
-  applied: Operation_hash.t list;
-  refused: 'error list Operation_hash.Map.t;
-  branch_refused: 'error list Operation_hash.Map.t;
-  branch_delayed: 'error list Operation_hash.Map.t;
+  applied: (Operation_hash.t * Operation.t) list;
+  refused: (Operation.t * 'error list) Operation_hash.Map.t;
+  branch_refused: (Operation.t * 'error list) Operation_hash.Map.t;
+  branch_delayed: (Operation.t * 'error list) Operation_hash.Map.t;
 }
 
 let empty_result = {
@@ -31,7 +31,16 @@ let map_result f r = {
 
 let preapply_result_encoding error_encoding =
   let open Data_encoding in
-  let refused_encoding = tup2 Operation_hash.encoding error_encoding in
+  let operation_encoding =
+    merge_objs
+      (obj1 (req "hash" Operation_hash.encoding))
+      (dynamic_size Operation.encoding) in
+  let refused_encoding =
+    merge_objs
+      (obj1 (req "hash" Operation_hash.encoding))
+      (merge_objs
+         (dynamic_size Operation.encoding)
+         (obj1 (req "error" error_encoding))) in
   let build_list map = Operation_hash.Map.bindings map in
   let build_map list =
     List.fold_right
@@ -47,7 +56,7 @@ let preapply_result_encoding error_encoding =
        let branch_delayed = build_map branch_delayed in
        { applied ; refused ; branch_refused ; branch_delayed })
     (obj4
-       (req "applied" (list Operation_hash.encoding))
+       (req "applied" (list operation_encoding))
        (req "refused" (list refused_encoding))
        (req "branch_refused" (list refused_encoding))
        (req "branch_delayed" (list refused_encoding)))
@@ -55,15 +64,15 @@ let preapply_result_encoding error_encoding =
 let preapply_result_operations t =
   let ops =
     List.fold_left
-      (fun acc x -> Operation_hash.Set.add x acc)
-      Operation_hash.Set.empty t.applied in
+      (fun acc (h, op) -> Operation_hash.Map.add h op acc)
+      Operation_hash.Map.empty t.applied in
   let ops =
     Operation_hash.Map.fold
-      (fun x _ acc -> Operation_hash.Set.add x acc)
+      (fun h (op, _err) acc -> Operation_hash.Map.add h op acc)
       t.branch_delayed ops in
   let ops =
     Operation_hash.Map.fold
-      (fun x _ acc -> Operation_hash.Set.add x acc)
+      (fun h (op, _err) acc -> Operation_hash.Map.add h op acc)
       t.branch_refused ops in
   ops
 
@@ -75,24 +84,24 @@ let empty_result =
 
 let rec apply_operations apply_operation state r ~sort ops =
   Lwt_list.fold_left_s
-    (fun (state, r) (hash, op) ->
-       apply_operation state op >>= function
+    (fun (state, r) (hash, op, parsed_op) ->
+       apply_operation state parsed_op >>= function
        | Ok state ->
-           let applied = hash :: r.applied in
-           Lwt.return (state, { r with applied} )
+           let applied = (hash, op) :: r.applied in
+           Lwt.return (state, { r with applied } )
        | Error errors ->
            match classify_errors errors with
            | `Branch ->
                let branch_refused =
-                 Operation_hash.Map.add hash errors r.branch_refused in
+                 Operation_hash.Map.add hash (op, errors) r.branch_refused in
                Lwt.return (state, { r with branch_refused })
            | `Permanent ->
                let refused =
-                 Operation_hash.Map.add hash errors r.refused in
+                 Operation_hash.Map.add hash (op, errors) r.refused in
                Lwt.return (state, { r with refused })
            | `Temporary ->
                let branch_delayed =
-                 Operation_hash.Map.add hash errors r.branch_delayed in
+                 Operation_hash.Map.add hash (op, errors) r.branch_delayed in
                Lwt.return (state, { r with branch_delayed }))
     (state, r)
     ops >>= fun (state, r) ->
@@ -100,7 +109,7 @@ let rec apply_operations apply_operation state r ~sort ops =
   | _ :: _ when sort ->
       let rechecked_operations =
         List.filter
-          (fun (hash, _) -> Operation_hash.Map.mem hash r.branch_delayed)
+          (fun (hash, _, _) -> Operation_hash.Map.mem hash r.branch_delayed)
           ops in
       let remaining = List.length rechecked_operations in
       if remaining = 0 || remaining = List.length ops then
@@ -155,25 +164,25 @@ type error += Parse_error
 
 let prevalidate
     (State { proto = (module Proto) ; state })
-    ~sort ops =
+    ~sort (ops : (Operation_hash.t * Operation.t) list)=
   let ops =
     List.map
       (fun (h, op) ->
-         (h, Proto.parse_operation h op |> record_trace Parse_error))
+         (h, op, Proto.parse_operation h op |> record_trace Parse_error))
       ops in
   let invalid_ops =
     Utils.filter_map
-      (fun (h, op) -> match op with
+      (fun (h, op, parsed_op) -> match parsed_op with
          | Ok _ -> None
-         | Error err -> Some (h, err)) ops
+         | Error err -> Some (h, op, err)) ops
   and parsed_ops =
     Utils.filter_map
-      (fun (h, op) -> match op with
-         | Ok op -> Some (h, op)
+      (fun (h, op, parsed_op) -> match parsed_op with
+         | Ok parsed_op -> Some (h, op, parsed_op)
          | Error _ -> None) ops in
   let sorted_ops =
     if sort then
-      let compare (_, op1) (_, op2) = Proto.compare_operations op1 op2 in
+      let compare (_, _, op1) (_, _, op2) = Proto.compare_operations op1 op2 in
       List.sort compare parsed_ops
     else parsed_ops in
   apply_operations
@@ -184,7 +193,7 @@ let prevalidate
       applied = List.rev r.applied ;
       branch_refused =
         List.fold_left
-          (fun map (h, err) -> Operation_hash.Map.add h err map)
+          (fun map (h, op, err) -> Operation_hash.Map.add h (op, err) map)
           r.branch_refused invalid_ops } in
   Lwt.return (State { proto = (module Proto) ; state }, r)
 

@@ -20,7 +20,7 @@ val inject_block:
   priority:int ->
   seed_nonce_hash:Nonce_hash.t ->
   src_sk:secret_key ->
-  Client_node_rpcs.operation list list ->
+  Tezos_data.Operation.t list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
     ~seed_nonce ~src_sk ops] tries to inject a block in the node. If
@@ -29,13 +29,13 @@ val inject_block:
     precomputed). [src_sk] is used to sign the block header. *)
 
 type error +=
-  | Failed_to_preapply of Client_node_rpcs.operation * error list
+  | Failed_to_preapply of Tezos_data.Operation.t * error list
 
 val forge_block:
   Client_rpcs.config ->
   Client_proto_rpcs.block ->
   ?force:bool ->
-  ?operations:Client_node_rpcs.operation list ->
+  ?operations:Tezos_data.Operation.t list ->
   ?best_effort:bool ->
   ?sort:bool ->
   ?timestamp:Time.t ->

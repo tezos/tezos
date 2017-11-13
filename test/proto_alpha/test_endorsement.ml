@@ -84,13 +84,13 @@ let test_wrong_delegate ~miner contract block =
 let test_invalid_endorsement_slot contract block =
   Helpers.Endorse.endorse ~slot:~-1 contract block >>=? fun op ->
   Helpers.Baking.mine block contract [ op ] >>= fun res ->
-  Assert.failed_to_preapply ~msg:__LOC__ ~op:(Blob op) begin function
+  Assert.failed_to_preapply ~msg:__LOC__ ~op begin function
     | Baking.Invalid_endorsement_slot _ -> true
     | _ -> false
   end res ;
   Helpers.Endorse.endorse ~slot:16 contract block >>=? fun op ->
   Helpers.Baking.mine block contract [ op ] >>= fun res ->
-  Assert.failed_to_preapply ~msg:__LOC__ ~op:(Blob op) begin function
+  Assert.failed_to_preapply ~msg:__LOC__ ~op begin function
     | Baking.Invalid_endorsement_slot _ -> true
     | _ -> false
   end res ;

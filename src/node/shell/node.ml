@@ -54,7 +54,7 @@ type t = {
   mainnet_validator: Net_validator.t ;
   inject_block:
     ?force:bool ->
-    MBytes.t -> Distributed_db.operation list list ->
+    MBytes.t -> Operation.t list list ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t ;
   inject_operation:
     ?force:bool -> MBytes.t ->
@@ -151,7 +151,7 @@ module RPC = struct
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
     data: MBytes.t ;
-    operations: Operation_hash.t list list option ;
+    operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
     test_network: Context.test_network;
   }
@@ -159,7 +159,9 @@ module RPC = struct
   let convert (block: State.Block.t) =
     let hash = State.Block.hash block in
     let header = State.Block.header block in
-    State.Block.all_operation_hashes block >>= fun operations ->
+    State.Block.all_operations block >>= fun operations ->
+    let operations =
+      List.map (List.map (fun op -> (Operation.hash op, op))) operations in
     State.Block.context block >>= fun context ->
     Context.get_protocol context >>= fun protocol ->
     Context.get_test_network context >>= fun test_network ->
@@ -279,7 +281,9 @@ module RPC = struct
                 validation_passes = List.length operations ;
                 operations_hash =
                   Operation_list_list_hash.compute
-                    (List.map Operation_list_hash.compute operations) ;
+                    (List.map
+                       (fun ops -> Operation_list_hash.compute (List.map fst ops))
+                       operations) ;
                 operations = Some operations ;
                 data = MBytes.of_string "" ;
                 net_id = head_header.shell.net_id ;
@@ -323,7 +327,6 @@ module RPC = struct
     | ( `Prevalidation | `Test_prevalidation ) as block ->
         let validator = get_validator node block in
         let pv = Net_validator.prevalidator validator in
-        let net_db = Net_validator.net_db validator in
         let net_state = Net_validator.net_state validator in
         Chain.head net_state >>= fun head ->
         let head_header = State.Block.header head in
@@ -339,9 +342,10 @@ module RPC = struct
                 head_header.shell.proto_level
               else
                 ((head_header.shell.proto_level + 1) mod 256) in
-            let operation_hashes =
+            let operation_hashes, operations =
               let pv_result, _ = Prevalidator.operations pv in
-              [ pv_result.applied ] in
+              [ List.map fst pv_result.applied ],
+              [ List.map snd pv_result.applied ] in
             let operations_hash =
               Operation_list_list_hash.compute
                 (List.map Operation_list_hash.compute operation_hashes) in
@@ -361,12 +365,7 @@ module RPC = struct
                   proto = MBytes.create 0 ;
                 } ;
                 operation_hashes = (fun () -> Lwt.return operation_hashes) ;
-                operations = begin fun () ->
-                  Lwt_list.map_p
-                    (Lwt_list.map_p
-                       (Distributed_db.Operation.read_exn net_db))
-                    operation_hashes
-                end ;
+                operations = (fun () -> Lwt.return operations) ;
                 context ;
               })
 
@@ -384,7 +383,7 @@ module RPC = struct
         let validator = get_validator node block in
         let pv = Net_validator.prevalidator validator in
         let { Prevalidation.applied }, _ = Prevalidator.operations pv in
-        Lwt.return [applied]
+        Lwt.return [List.map fst applied]
     | `Hash hash ->
         read_valid_block node hash >>= function
         | None -> Lwt.return_nil
@@ -403,12 +402,9 @@ module RPC = struct
         State.Block.all_operations block
     | (`Prevalidation | `Test_prevalidation) as block ->
         let validator = get_validator node block in
-        let net_db = Net_validator.net_db validator in
         let pv = Net_validator.prevalidator validator in
         let { Prevalidation.applied }, _ = Prevalidator.operations pv in
-        Lwt_list.map_p
-          (Distributed_db.Operation.read_exn net_db) applied >>= fun applied ->
-        Lwt.return [applied]
+        Lwt.return [List.map snd applied]
     | `Hash hash ->
         read_valid_block node hash >>= function
         | None -> Lwt.return_nil
@@ -441,7 +437,7 @@ module RPC = struct
     | `Hash h -> begin
         get_validator_per_hash node h >>= function
         | None ->
-            Lwt.return (Prevalidation.empty_result, Operation_hash.Set.empty)
+            Lwt.return (Prevalidation.empty_result, Operation_hash.Map.empty)
         | Some validator ->
             let net_state = Net_validator.net_state validator in
             let prevalidator = Net_validator.prevalidator validator in
@@ -482,16 +478,14 @@ module RPC = struct
           | None -> Lwt.return (error_exn Not_found)
           | Some data -> return data
     end >>=? fun predecessor ->
-    let net_db = Net_validator.net_db node.mainnet_validator in
-    map_p (Distributed_db.resolve_operation net_db) ops >>=? fun rops ->
     Prevalidation.start_prevalidation
       ~proto_header ~predecessor ~timestamp () >>=? fun validation_state ->
-    let rops = List.map (fun x -> Operation.hash x, x) rops in
+    let ops = List.map (fun x -> Operation.hash x, x) ops in
     Prevalidation.prevalidate
-      validation_state ~sort rops >>= fun (validation_state, r) ->
+      validation_state ~sort ops >>= fun (validation_state, r) ->
     let operations_hash =
       Operation_list_list_hash.compute
-        [Operation_list_hash.compute r.applied] in
+        [Operation_list_hash.compute (List.map fst r.applied)] in
     Prevalidation.end_prevalidation
       validation_state >>=? fun { fitness ; context } ->
     let pred_shell_header = State.Block.shell_header predecessor in

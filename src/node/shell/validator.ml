@@ -62,10 +62,7 @@ let inject_block v ?force bytes operations =
   | None -> failwith "Cannot parse block header."
   | Some block ->
       get v block.shell.net_id >>=? fun nv ->
-      (* TODO... remove `Distributed_db.operation`
-                 and only accept raw operations ??? *)
       let validation =
-        map_p (map_p (Distributed_db.resolve_operation (Net_validator.net_db nv))) operations >>=? fun operations ->
         Net_validator.validate_block nv ?force hash block operations in
       return (hash, validation)
 

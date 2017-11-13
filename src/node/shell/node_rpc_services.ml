@@ -46,21 +46,6 @@ module Error = struct
 
 end
 
-type operation = Distributed_db.operation =
-  | Blob of Operation.t
-  | Hash of Operation_hash.t
-
-let operation_encoding =
-  let open Data_encoding in
-  union [
-    case Operation.encoding
-      (function Blob op -> Some op | Hash _ -> None)
-      (fun op -> Blob op) ;
-    case Operation_hash.encoding
-      (function Hash oph -> Some oph | Blob _ -> None)
-      (fun oph -> Hash oph) ;
-  ]
-
 module Blocks = struct
 
   type block = [
@@ -81,12 +66,16 @@ module Blocks = struct
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
     data: MBytes.t ;
-    operations: Operation_hash.t list list option ;
+    operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
     test_network: Context.test_network;
   }
 
   let block_info_encoding =
+    let operation_encoding =
+      merge_objs
+        (obj1 (req "hash" Operation_hash.encoding))
+        Operation.encoding in
     conv
       (fun { hash ; net_id ; level ; proto_level ; predecessor ;
              fitness ; timestamp ; protocol ;
@@ -110,7 +99,7 @@ module Blocks = struct
          (merge_objs
             (obj4
                (req "hash" Block_hash.encoding)
-               (opt "operations" (list (list Operation_hash.encoding)))
+               (opt "operations" (dynamic_size (list (dynamic_size (list (dynamic_size operation_encoding))))))
                (req "protocol" Protocol_hash.encoding)
                (dft "test_network"
                   Context.test_network_encoding Context.Not_running))
@@ -256,6 +245,10 @@ module Blocks = struct
       RPC.Path.(block_path / "test_network")
 
   let pending_operations =
+    let operation_encoding =
+      merge_objs
+        (obj1 (req "hash" Operation_hash.encoding))
+        Operation.encoding in
     (* TODO: branch_delayed/... *)
     RPC.service
       ~description:
@@ -263,32 +256,18 @@ module Blocks = struct
       ~input: empty
       ~output:
         (conv
-           (fun ({ Prevalidation.applied; branch_delayed ; branch_refused },
-                 unprocessed) ->
-             (applied,
-              Operation_hash.Map.bindings branch_delayed,
-              Operation_hash.Map.bindings branch_refused,
-              Operation_hash.Set.elements unprocessed))
-           (fun (applied, branch_delayed, branch_refused, unprocessed) ->
-              ({ Prevalidation.applied ; refused = Operation_hash.Map.empty ;
-                 branch_refused =
-                   List.fold_right
-                     (fun (k, o) -> Operation_hash.Map.add k o)
-                     branch_refused  Operation_hash.Map.empty ;
-                 branch_delayed =
-                   List.fold_right
-                     (fun (k, o) -> Operation_hash.Map.add k o)
-                     branch_delayed  Operation_hash.Map.empty ;
-               },
-               List.fold_right Operation_hash.Set.add
-                 unprocessed Operation_hash.Set.empty))
-           (obj4
-              (req "applied" (list Operation_hash.encoding))
-              (req "branch_delayed"
-                 (list (tup2 Operation_hash.encoding Error.encoding)))
-              (req "branch_refused"
-                 (list (tup2 Operation_hash.encoding Error.encoding)))
-              (req "unprocessed" (list Operation_hash.encoding))))
+           (fun (preapplied, unprocessed) ->
+              ({ preapplied with Prevalidation.refused = Operation_hash.Map.empty },
+               Operation_hash.Map.bindings unprocessed))
+           (fun (preapplied, unprocessed) ->
+              (preapplied,
+               List.fold_right
+                 (fun (h, op) m -> Operation_hash.Map.add h op m)
+                 unprocessed Operation_hash.Map.empty))
+           (merge_objs
+              (dynamic_size
+                 (Prevalidation.preapply_result_encoding Error.encoding))
+              (obj1 (req "unprocessed" (list (dynamic_size operation_encoding))))))
       RPC.Path.(block_path / "pending_operations")
 
   let proto_path =
@@ -297,7 +276,7 @@ module Blocks = struct
   type preapply_param = {
     timestamp: Time.t ;
     proto_header: MBytes.t ;
-    operations: operation list ;
+    operations: Operation.t list ;
     sort_operations: bool ;
   }
 
@@ -310,7 +289,7 @@ module Blocks = struct
        (obj4
           (req "timestamp" Time.encoding)
           (req "proto_header" bytes)
-          (req "operations" (list (dynamic_size operation_encoding)))
+          (req "operations" (list (dynamic_size Operation.encoding)))
           (dft "sort_operations" bool false)))
 
   type preapply_result = {
@@ -623,7 +602,7 @@ type inject_block_param = {
   raw: MBytes.t ;
   blocking: bool ;
   force: bool ;
-  operations: operation list list ;
+  operations: Operation.t list list ;
 }
 
 let inject_block_param =
@@ -651,7 +630,7 @@ let inject_block_param =
        (req "operations"
           (describe
              ~description:"..."
-             (list (list (dynamic_size operation_encoding))))))
+             (list (list (dynamic_size Operation.encoding))))))
 
 let inject_block =
   RPC.service

@@ -26,7 +26,7 @@ val get_exn: t -> Net_id.t -> Net_validator.t Lwt.t
 val inject_block:
   t ->
   ?force:bool ->
-  MBytes.t -> Distributed_db.operation list list ->
+  MBytes.t -> Operation.t list list ->
   (Block_hash.t * State.Block.t tzresult Lwt.t) tzresult Lwt.t
 
 val watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper

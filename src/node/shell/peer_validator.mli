@@ -11,7 +11,7 @@ type t
 
 val peer_id: t -> P2p.Peer_id.t
 val bootstrapped: t -> bool
-val current_head: t -> Block_hash.t
+val current_head: t -> Block_header.t
 
 val create:
   ?notify_new_block: (State.Block.t -> unit) ->

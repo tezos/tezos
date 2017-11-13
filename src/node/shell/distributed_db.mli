@@ -38,13 +38,6 @@ val deactivate: net_db -> unit Lwt.t
 
 val disconnect: net_db -> P2p.Peer_id.t -> unit Lwt.t
 
-type operation =
-  | Blob of Operation.t
-  | Hash of Operation_hash.t
-
-val resolve_operation:
-  net_db -> operation -> Operation.t tzresult Lwt.t
-
 val commit_block:
   net_db ->
   Block_hash.t ->

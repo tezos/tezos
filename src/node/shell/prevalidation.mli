@@ -8,19 +8,19 @@
 (**************************************************************************)
 
 type 'error preapply_result = {
-  applied: Operation_hash.t list;
-  refused: 'error list Operation_hash.Map.t;
+  applied: (Operation_hash.t * Operation.t) list;
+  refused: (Operation.t * 'error list) Operation_hash.Map.t;
   (* e.g. invalid signature *)
-  branch_refused: 'error list Operation_hash.Map.t;
+  branch_refused: (Operation.t * 'error list) Operation_hash.Map.t;
   (* e.g. insufficent balance *)
-  branch_delayed: 'error list Operation_hash.Map.t;
+  branch_delayed: (Operation.t * 'error list) Operation_hash.Map.t;
   (* e.g. timestamp in the future *)
 }
 
 val empty_result : 'error preapply_result
 
 val preapply_result_operations :
-  'error preapply_result -> Operation_hash.Set.t
+  'error preapply_result -> Operation.t Operation_hash.Map.t
 
 val preapply_result_encoding :
   'error list Data_encoding.t ->

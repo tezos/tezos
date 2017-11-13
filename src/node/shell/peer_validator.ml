@@ -32,8 +32,8 @@ type t = {
   notify_bootstrapped: unit -> unit ;
 
   mutable bootstrapped: bool ;
-  mutable last_validated_head: Block_hash.t ;
-  mutable last_advertised_head: Block_hash.t ;
+  mutable last_validated_head: Block_header.t ;
+  mutable last_advertised_head: Block_header.t ;
 
   mutable worker: unit Lwt.t ;
   dropbox: msg Lwt_dropbox.t ;
@@ -130,7 +130,7 @@ let may_validate_new_head pv hash header =
             Block_hash.pp_short hash
             P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
           set_bootstrapped pv ;
-          pv.last_validated_head <- hash ;
+          pv.last_validated_head <- header ;
           return ()
       | false ->
           lwt_log_info
@@ -246,9 +246,10 @@ let create
   let canceler = Canceler.create () in
   let dropbox = Lwt_dropbox.create () in
   let net_state = Distributed_db.net_state net_db in
-  let genesis = (State.Net.genesis net_state).block in
+  State.Block.read_exn net_state
+    (State.Net.genesis net_state).block >>= fun genesis ->
   let rec notify_new_block block =
-    pv.last_validated_head <- State.Block.hash block ;
+    pv.last_validated_head <- State.Block.header block ;
     external_notify_new_block block
   and pv = {
     block_validator ;
@@ -261,8 +262,8 @@ let create
     net_db ;
     peer_id ;
     bootstrapped = false ;
-    last_validated_head = genesis ;
-    last_advertised_head = genesis ;
+    last_validated_head = State.Block.header genesis ;
+    last_advertised_head = State.Block.header genesis ;
     canceler ;
     dropbox ;
     worker = Lwt.return_unit ;
@@ -282,15 +283,17 @@ let create
   Lwt.return pv
 
 let notify_branch pv locator =
-  let head, _ = (locator : Block_locator.t :> _ * _) in
-  let hash = Block_header.hash head in
-  pv.last_advertised_head <- hash ;
+  let header, _ = (locator : Block_locator.t :> _ * _) in
+  let hash = Block_header.hash header in
+  (* TODO penalize decreasing fitness *)
+  pv.last_advertised_head <- header ;
   try Lwt_dropbox.put pv.dropbox (New_branch (hash, locator))
   with Lwt_dropbox.Closed -> ()
 
 let notify_head pv header =
   let hash = Block_header.hash header in
-  pv.last_advertised_head <- hash ;
+  pv.last_advertised_head <- header ;
+  (* TODO penalize decreasing fitness *)
   match Lwt_dropbox.peek pv.dropbox with
   | Some (New_branch _) -> () (* ignore *)
   | None | Some (New_head _) ->

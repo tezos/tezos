@@ -36,7 +36,7 @@ module RPC : sig
 
   val inject_block:
     t -> ?force:bool ->
-    MBytes.t -> Distributed_db.operation list list ->
+    MBytes.t -> Operation.t list list ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
   (** [inject_block node ?force bytes] tries to insert [bytes]
       (supposedly the serialization of a block header) inside
@@ -75,7 +75,7 @@ module RPC : sig
     t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Watcher.stopper
 
   val pending_operations:
-    t -> block -> (error Prevalidation.preapply_result * Operation_hash.Set.t) Lwt.t
+    t -> block -> (error Prevalidation.preapply_result * Operation.t Operation_hash.Map.t) Lwt.t
 
   val protocols:
     t -> Protocol_hash.t list Lwt.t
@@ -90,7 +90,7 @@ module RPC : sig
   val preapply:
     t -> block ->
     timestamp:Time.t -> proto_header:MBytes.t ->
-    sort_operations:bool -> Distributed_db.operation list ->
+    sort_operations:bool -> Operation.t list ->
     (Block_header.shell_header * error Prevalidation.preapply_result) tzresult Lwt.t
 
   val context_dir:

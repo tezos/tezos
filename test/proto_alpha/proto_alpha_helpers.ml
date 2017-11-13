@@ -325,9 +325,7 @@ module Assert = struct
         List.exists f errors
     | _ -> false
 
-  let hash = function
-    | Client_node_rpcs.Hash h -> h
-    | Blob op -> Tezos_data.Operation.hash op
+  let hash op = Tezos_data.Operation.hash op
 
   let failed_to_preapply ~msg ?op f =
     Assert.contain_error ~msg ~f:begin function
@@ -426,7 +424,6 @@ end
 module Baking = struct
 
   let mine block (contract: Account.t) operations =
-    let operations = List.map (fun op -> Client_node_rpcs.Blob op) operations in
     let seed_nonce =
       match Nonce.of_bytes @@
         Sodium.Random.Bigbytes.generate Constants.nonce_length with

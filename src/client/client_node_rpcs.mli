@@ -17,16 +17,10 @@ val forge_block_header:
   Block_header.t ->
   MBytes.t tzresult Lwt.t
 
-type operation =
-  | Blob of Operation.t
-  | Hash of Operation_hash.t
-
-val operation_encoding: operation Data_encoding.t
-
 val inject_block:
   config ->
   ?async:bool -> ?force:bool ->
-  MBytes.t -> operation list list ->
+  MBytes.t -> Operation.t list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt ?async ?force raw_block] tries to inject
     [raw_block] inside the node. If [?async] is [true], [raw_block]
@@ -85,7 +79,7 @@ module Blocks : sig
   val pending_operations:
     config ->
     block ->
-    (error Prevalidation.preapply_result * Operation_hash.Set.t) tzresult Lwt.t
+    (error Prevalidation.preapply_result * Operation.t Operation_hash.Map.t) tzresult Lwt.t
 
   type block_info = {
     hash: Block_hash.t ;
@@ -98,7 +92,7 @@ module Blocks : sig
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
     data: MBytes.t ;
-    operations: Operation_hash.t list list option ;
+    operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
     test_network: Context.test_network;
   }
@@ -130,7 +124,7 @@ module Blocks : sig
     ?timestamp:Time.t ->
     ?sort:bool ->
     proto_header:MBytes.t ->
-    operation list -> preapply_result tzresult Lwt.t
+    Operation.t list -> preapply_result tzresult Lwt.t
 
 end
 
