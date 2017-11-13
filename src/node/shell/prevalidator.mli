@@ -29,7 +29,9 @@
 type t
 
 (** Creation and destruction of a "prevalidation" worker. *)
-val create: Distributed_db.net_db -> t Lwt.t
+val create:
+  operation_timeout: float ->
+  Distributed_db.net_db -> t Lwt.t
 val shutdown: t -> unit Lwt.t
 
 val notify_operations: t -> P2p.Peer_id.t -> Operation_hash.t list -> unit

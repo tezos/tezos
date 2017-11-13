@@ -11,6 +11,8 @@ type t
 
 val create:
   ?notify_new_block: (State.Block.t -> unit) ->
+  block_header_timeout:float ->
+  block_operations_timeout: float ->
   Block_validator.t ->
   P2p.Peer_id.t -> Distributed_db.net_db ->
   Block_locator.t -> t

@@ -144,7 +144,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
     test_network_max_tll = Some (48 * 3600) ; (* 2 days *)
     bootstrap_threshold = config.shell.bootstrap_threshold ;
   } in
-  Node.create node_config
+  Node.create node_config config.shell.timeout
 
 let () =
   let old_hook = !Lwt.async_exception_hook in

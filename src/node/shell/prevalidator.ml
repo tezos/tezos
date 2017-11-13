@@ -70,7 +70,9 @@ let merge _key a b =
   | Some x, None -> Some x
   | _, Some y -> Some y
 
-let create net_db =
+let create
+    ~operation_timeout
+    net_db =
 
   let net_state = Distributed_db.net_state net_db in
 
@@ -248,7 +250,7 @@ let create net_db =
                       ops in
                   let fetch h =
                     Distributed_db.Operation.fetch
-                      ~timeout:10. (* TODO allow to adjust the constant ... *)
+                      ~timeout:operation_timeout
                       net_db ~peer:gid h () >>= function
                     | Ok _op ->
                         push_to_worker (`Handle h) ;
@@ -266,12 +268,12 @@ let create net_db =
                   List.iter
                     (fun op -> Operation_hash.Table.add pending op (fetch op))
                     unknown_ops ;
-                  List.iter (fun op ->
-                      Lwt.ignore_result
-                        (Distributed_db.Operation.fetch
-                           (* TODO allow to adjust the constant ... *)
-                           ~timeout:10.
-                           net_db ~peer:gid op ()))
+                  List.iter
+                    (fun op ->
+                       Lwt.ignore_result
+                         (Distributed_db.Operation.fetch
+                            ~timeout:operation_timeout
+                            net_db ~peer:gid op ()))
                     known_ops ;
                   Lwt.return_unit
               | `Handle op ->

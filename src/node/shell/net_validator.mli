@@ -9,9 +9,18 @@
 
 type t
 
+type timeout = {
+  operation: float ;
+  block_header: float ;
+  block_operations: float ;
+  protocol: float ;
+  new_head_request: float ;
+}
+
 val create:
   ?max_child_ttl:int ->
   ?bootstrap_threshold:int ->
+  timeout ->
   Block_validator.t ->
   State.Block.t Watcher.input ->
   Distributed_db.t ->

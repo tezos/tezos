@@ -12,6 +12,8 @@ module Canceler = Lwt_utils.Canceler
 
 type t = {
   canceler: Canceler.t ;
+  block_header_timeout: float ;
+  block_operations_timeout: float ;
   mutable headers_fetch_worker: unit Lwt.t ;
   mutable operations_fetch_worker: unit Lwt.t ;
   mutable validation_worker: unit Lwt.t ;
@@ -56,7 +58,7 @@ let fetch_step pipeline (step : Block_locator.step)  =
         P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_utils.protect ~canceler:pipeline.canceler begin fun () ->
         Distributed_db.Block_header.fetch
-          ~timeout:60. (* TODO allow to adjust the constant ... *)
+          ~timeout:pipeline.block_header_timeout
           pipeline.net_db ~peer:pipeline.peer_id
           hash ()
       end >>=? fun header ->
@@ -108,7 +110,7 @@ let rec operations_fetch_worker_loop pipeline =
       (fun i ->
          Lwt_utils.protect ~canceler:pipeline.canceler begin fun () ->
            Distributed_db.Operations.fetch
-             ~timeout:60. (* TODO allow to adjust the constant ... *)
+             ~timeout:pipeline.block_operations_timeout
              pipeline.net_db ~peer:pipeline.peer_id
              (hash, i) header.shell.operations_hash
          end)
@@ -170,6 +172,7 @@ let rec validation_worker_loop pipeline =
 
 let create
     ?(notify_new_block = fun _ -> ())
+    ~block_header_timeout ~block_operations_timeout
     block_validator peer_id net_db locator =
   let canceler = Canceler.create () in
   let fetched_headers =
@@ -178,6 +181,7 @@ let create
     Lwt_pipe.create ~size:(50, fun _ -> 1) () in
   let pipeline = {
     canceler ;
+    block_header_timeout ; block_operations_timeout ;
     headers_fetch_worker = Lwt.return_unit ;
     operations_fetch_worker = Lwt.return_unit ;
     validation_worker = Lwt.return_unit ;

@@ -17,6 +17,7 @@ type t = {
   net_db: Distributed_db.net_db ;
   block_validator: Block_validator.t ;
 
+  timeout: timeout ;
   bootstrap_threshold: int ;
   mutable bootstrapped: bool ;
   bootstrapped_wakener: unit Lwt.u ;
@@ -37,6 +38,15 @@ type t = {
   canceler: Canceler.t ;
 
 }
+
+and timeout = {
+  operation: float ;
+  block_header: float ;
+  block_operations: float ;
+  protocol: float ;
+  new_head_request: float ;
+}
+
 
 let rec shutdown nv =
   Canceler.cancel nv.canceler >>= fun () ->
@@ -73,6 +83,10 @@ let may_activate_peer_validator nv peer_id =
   with Not_found ->
     let pv =
       Peer_validator.create
+        ~new_head_request_timeout:nv.timeout.new_head_request
+        ~block_header_timeout:nv.timeout.block_header
+        ~block_operations_timeout:nv.timeout.block_operations
+        ~protocol_timeout:nv.timeout.protocol
         ~notify_new_block:(notify_new_block nv)
         ~notify_bootstrapped: begin fun () ->
           P2p.Peer_id.Table.add nv.bootstrapped_peers peer_id () ;
@@ -108,10 +122,11 @@ let broadcast_head nv ~previous block =
 let rec create
     ?max_child_ttl ?parent
     ?(bootstrap_threshold = 1)
-    block_validator
+    timeout block_validator
     global_valid_block_input db net_state =
   let net_db = Distributed_db.activate db net_state in
-  Prevalidator.create net_db >>= fun prevalidator ->
+  Prevalidator.create
+    ~operation_timeout:timeout.operation net_db >>= fun prevalidator ->
   let valid_block_input = Watcher.create_input () in
   let new_head_input = Watcher.create_input () in
   let canceler = Canceler.create () in
@@ -119,6 +134,7 @@ let rec create
   let nv = {
     db ; net_state ; net_db ; block_validator ;
     prevalidator ;
+    timeout ;
     valid_block_input ; global_valid_block_input ;
     new_head_input ;
     parent ; max_child_ttl ; child = None ;
@@ -229,7 +245,7 @@ and may_switch_test_network nv block =
             return net_state
       end >>=? fun net_state ->
       create
-        ~parent:nv nv.block_validator
+        ~parent:nv nv.timeout nv.block_validator
         nv.global_valid_block_input
         nv.db net_state >>= fun child ->
       nv.child <- Some child ;
@@ -288,12 +304,13 @@ and may_switch_test_network nv block =
 let create
     ?max_child_ttl
     ?bootstrap_threshold
+    timeout
     block_validator global_valid_block_input global_db state =
   (* hide the optional ?parent *)
   create
     ?max_child_ttl
     ?bootstrap_threshold
-    block_validator global_valid_block_input global_db state
+    timeout block_validator global_valid_block_input global_db state
 
 let net_id { net_state } = State.Net.id net_state
 let net_state { net_state } = net_state

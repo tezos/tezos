@@ -15,16 +15,20 @@ type t = {
   state: State.t ;
   db: Distributed_db.t ;
   block_validator: Block_validator.t ;
+  timeout: Net_validator.timeout ;
 
   valid_block_input: State.Block.t Watcher.input ;
   active_nets: Net_validator.t Lwt.t Net_id.Table.t ;
 
 }
 
-let create state db =
-  let block_validator = Block_validator.create db in
+let create state db timeout =
+  let block_validator =
+    Block_validator.create
+      ~protocol_timeout:timeout.Net_validator.protocol
+      db in
   let valid_block_input = Watcher.create_input () in
-  { state ; db ; block_validator ;
+  { state ; db ; timeout ; block_validator ;
     valid_block_input ;
     active_nets = Net_id.Table.create 7 ;
   }
@@ -38,7 +42,7 @@ let activate v ?bootstrap_threshold ?max_child_ttl net_state =
       Net_validator.create
         ?bootstrap_threshold
         ?max_child_ttl
-        v.block_validator v.valid_block_input v.db net_state in
+        v.timeout v.block_validator v.valid_block_input v.db net_state in
     Net_id.Table.add v.active_nets net_id nv ;
     nv
 

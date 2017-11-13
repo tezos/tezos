@@ -54,6 +54,7 @@ and log = {
 
 and shell = {
   bootstrap_threshold : int ;
+  timeout : Node.timeout ;
 }
 
 let default_net_limits : P2p.limits = {
@@ -103,6 +104,13 @@ let default_log = {
 
 let default_shell = {
   bootstrap_threshold = 4 ;
+  timeout = {
+    operation = 10. ;
+    block_header = 60. ;
+    block_operations = 60. ;
+    protocol = 120. ;
+    new_head_request = 90. ;
+  }
 }
 
 let default_config = {
@@ -245,13 +253,35 @@ let log =
        (opt "rules" string)
        (dft "template" string default_log.template))
 
+let timeout_encoding =
+  let open Data_encoding in
+  let uint8 = conv int_of_float float_of_int uint8 in
+  conv
+    (fun { Node.operation ; block_header ; block_operations ;
+           protocol ; new_head_request } ->
+      (operation, block_header, block_operations,
+       protocol, new_head_request))
+    (fun (operation, block_header, block_operations,
+          protocol, new_head_request) ->
+      { operation ; block_header ; block_operations ;
+        protocol ; new_head_request })
+    (obj5
+       (dft "operation" uint8 default_shell.timeout.operation)
+       (dft "block_header" uint8 default_shell.timeout.block_header)
+       (dft "block_operations" uint8 default_shell.timeout.block_operations)
+       (dft "protocol" uint8 default_shell.timeout.protocol)
+       (dft "new_head_request" uint8 default_shell.timeout.new_head_request)
+    )
+
 let shell =
   let open Data_encoding in
   conv
-    (fun { bootstrap_threshold } -> bootstrap_threshold)
-    (fun bootstrap_threshold -> { bootstrap_threshold })
-    (obj1
-       (dft "bootstrap_threshold" uint8 default_shell.bootstrap_threshold))
+    (fun { bootstrap_threshold ; timeout } -> bootstrap_threshold, timeout)
+    (fun (bootstrap_threshold, timeout) -> { bootstrap_threshold ; timeout })
+    (obj2
+       (dft "bootstrap_threshold" uint8 default_shell.bootstrap_threshold)
+       (dft "timeout" timeout_encoding default_shell.timeout)
+    )
 
 let encoding =
   let open Data_encoding in
@@ -369,6 +399,7 @@ let update
       Utils.unopt
         ~default:cfg.shell.bootstrap_threshold
         bootstrap_threshold ;
+    timeout = cfg.shell.timeout ;
   }
   in
   return { data_dir ; net ; rpc ; log ; shell }

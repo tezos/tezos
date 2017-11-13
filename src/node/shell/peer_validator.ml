@@ -22,6 +22,11 @@ type t = {
   net_db: Distributed_db.net_db ;
   block_validator: Block_validator.t ;
 
+  new_head_request_timeout: float ;
+  block_header_timeout: float ;
+  block_operations_timeout: float ;
+  protocol_timeout: float ;
+
   (* callback to net_validator *)
   notify_new_block: State.Block.t -> unit ;
   notify_bootstrapped: unit -> unit ;
@@ -54,6 +59,8 @@ let bootstrap_new_branch pv _ancestor _head unknown_prefix =
   let pipeline =
     Bootstrap_pipeline.create
       ~notify_new_block:pv.notify_new_block
+      ~block_header_timeout:pv.block_header_timeout
+      ~block_operations_timeout:pv.block_operations_timeout
       pv.block_validator
       pv.peer_id pv.net_db unknown_prefix in
   Lwt_utils.protect ~canceler:pv.canceler
@@ -93,7 +100,7 @@ let validate_new_head pv hash (header : Block_header.t) =
         (fun i ->
            Lwt_utils.protect ~canceler:pv.canceler begin fun () ->
              Distributed_db.Operations.fetch
-               ~timeout:60. (* TODO allow to adjust the constant ... *)
+               ~timeout:pv.block_operations_timeout
                pv.net_db ~peer:pv.peer_id
                (hash, i) header.shell.operations_hash
            end)
@@ -165,9 +172,9 @@ let may_validate_new_branch pv distant_hash locator =
 let rec worker_loop pv =
   begin
     Lwt_utils.protect ~canceler:pv.canceler begin fun () ->
-      (* TODO should the timeout be protocol dependent ?? *)
-      (* TODO or setup by the local admin ?? or a mix ??*)
-      Lwt_dropbox.take_with_timeout 90. pv.dropbox >>= return
+      Lwt_dropbox.take_with_timeout
+        pv.new_head_request_timeout
+        pv.dropbox >>= return
     end >>=? function
     | None ->
         lwt_log_info "no new head from peer %a for 90 seconds."
@@ -199,7 +206,9 @@ let rec worker_loop pv =
   | Error [Block_validator.Unavailable_protocol { protocol } ] -> begin
       Block_validator.fetch_and_compile_protocol
         pv.block_validator
-        ~peer:pv.peer_id ~timeout:60. protocol >>= function
+        ~peer:pv.peer_id
+        ~timeout:pv.protocol_timeout
+        protocol >>= function
       | Ok _ -> worker_loop pv
       | Error _ ->
           (* TODO penality... *)
@@ -227,6 +236,10 @@ let create
     ?notify_new_block:(external_notify_new_block = fun _ -> ())
     ?(notify_bootstrapped = fun () -> ())
     ?(notify_termination = fun _ -> ())
+    ~new_head_request_timeout
+    ~block_header_timeout
+    ~block_operations_timeout
+    ~protocol_timeout
     block_validator net_db peer_id =
   lwt_debug "creating validator for peer %a."
     P2p.Peer_id.pp_short peer_id >>= fun () ->
@@ -241,6 +254,10 @@ let create
     block_validator ;
     notify_new_block ;
     notify_bootstrapped ;
+    new_head_request_timeout ;
+    block_header_timeout ;
+    block_operations_timeout ;
+    protocol_timeout ;
     net_db ;
     peer_id ;
     bootstrapped = false ;

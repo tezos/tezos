@@ -19,7 +19,15 @@ type config = {
   bootstrap_threshold: int ;
 }
 
-val create: config -> t tzresult Lwt.t
+and timeout = {
+  operation: float ;
+  block_header: float ;
+  block_operations: float ;
+  protocol: float ;
+  new_head_request: float ;
+}
+
+val create: config -> timeout -> t tzresult Lwt.t
 
 module RPC : sig
 

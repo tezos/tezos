@@ -9,7 +9,7 @@
 
 type t
 
-val create: State.t -> Distributed_db.t -> t
+val create: State.t -> Distributed_db.t -> Net_validator.timeout -> t
 val shutdown: t -> unit Lwt.t
 
 val activate:

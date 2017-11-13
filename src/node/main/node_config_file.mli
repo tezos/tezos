@@ -44,6 +44,7 @@ and log = {
 
 and shell = {
   bootstrap_threshold : int ;
+  timeout : Node.timeout ;
 }
 
 val default_data_dir: string

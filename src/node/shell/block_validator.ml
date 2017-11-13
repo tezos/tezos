@@ -25,6 +25,7 @@ type message = Message: 'a request * 'a Lwt.u option -> message
 
 type t = {
   protocol_validator: Protocol_validator.t ;
+  protocol_timeout: float ;
   mutable worker: unit Lwt.t ;
   messages: message Lwt_pipe.t ;
   canceler: Canceler.t ;
@@ -421,7 +422,9 @@ let rec worker_loop bv =
             lwt_debug "previously validated block %a (after pipe)"
               Block_hash.pp_short hash >>= fun () ->
             Protocol_validator.prefetch_and_compile_protocols
-              bv.protocol_validator ?peer ~timeout:60. block ;
+              bv.protocol_validator
+              ?peer ~timeout:bv.protocol_timeout
+              block ;
             may_wakeup (Ok block) ;
             return ()
         | None ->
@@ -447,7 +450,9 @@ let rec worker_loop bv =
                     assert false (* should not happen *)
                 | Some block ->
                     Protocol_validator.prefetch_and_compile_protocols
-                      bv.protocol_validator ?peer ~timeout:60. block ;
+                      bv.protocol_validator
+                      ?peer ~timeout:bv.protocol_timeout
+                      block ;
                     may_wakeup (Ok block) ;
                     notify_new_block block ;
                     return ()
@@ -481,12 +486,13 @@ let rec worker_loop bv =
       Canceler.cancel bv.canceler >>= fun () ->
       Lwt.return_unit
 
-let create db =
+let create ~protocol_timeout db =
   let protocol_validator = Protocol_validator.create db in
   let canceler = Canceler.create () in
   let messages = Lwt_pipe.create () in
   let bv = {
     protocol_validator ;
+    protocol_timeout ;
     canceler ; messages ;
     worker = Lwt.return_unit } in
   Canceler.on_cancel bv.canceler begin fun () ->
@@ -503,7 +509,7 @@ let shutdown { canceler ; worker } =
   Canceler.cancel canceler >>= fun () ->
   worker
 
-let validate { messages ; protocol_validator }
+let validate { messages ; protocol_validator ; protocol_timeout }
     ?canceler ?peer ?(notify_new_block = fun _ -> ())
     net_db hash (header : Block_header.t) operations =
   let net_state = Distributed_db.net_state net_db in
@@ -512,7 +518,9 @@ let validate { messages ; protocol_validator }
       lwt_debug "previously validated block %a (before pipe)"
         Block_hash.pp_short hash >>= fun () ->
       Protocol_validator.prefetch_and_compile_protocols
-        protocol_validator ?peer ~timeout:60. block ;
+        protocol_validator
+        ?peer ~timeout:protocol_timeout
+        block ;
       return block
   | None ->
       let res, wakener = Lwt.task () in

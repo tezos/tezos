@@ -39,7 +39,9 @@ type error +=
         expected: Operation_list_list_hash.t ;
         found: Operation_list_list_hash.t }
 
-val create: Distributed_db.t -> t
+val create:
+  protocol_timeout:float ->
+  Distributed_db.t -> t
 
 val validate:
   t ->

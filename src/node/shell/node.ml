@@ -90,22 +90,29 @@ type config = {
   bootstrap_threshold: int ;
 }
 
+and timeout = Net_validator.timeout = {
+  operation: float ;
+  block_header: float ;
+  block_operations: float ;
+  protocol: float ;
+  new_head_request: float ;
+}
+
 let may_create_net state genesis =
   State.Net.get state (Net_id.of_block_hash genesis.State.Net.block) >>= function
   | Ok net -> Lwt.return net
   | Error _ ->
       State.Net.create state genesis
 
-
 let create { genesis ; store_root ; context_root ;
              patch_context ; p2p = net_params ;
              test_network_max_tll = max_child_ttl ;
-             bootstrap_threshold } =
+             bootstrap_threshold } timeout =
   init_p2p net_params >>=? fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context () >>=? fun state ->
   let distributed_db = Distributed_db.create state p2p in
-  let validator = Validator.create state distributed_db in
+  let validator = Validator.create state distributed_db timeout in
   may_create_net state genesis >>= fun mainnet_state ->
   Validator.activate validator
     ~bootstrap_threshold

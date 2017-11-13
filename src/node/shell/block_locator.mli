@@ -21,7 +21,9 @@ val compute: Block.t -> int -> t Lwt.t
     the [block]. The locator contains at most [max_length] elements. *)
 
 val fold:
-  f:('a -> block:Block_hash.t -> pred:Block_hash.t -> step:int -> strict_step:bool -> 'a) ->
+  f:('a ->
+     block:Block_hash.t -> pred:Block_hash.t ->
+     step:int -> strict_step:bool -> 'a) ->
   'a -> t -> 'a
 (** [map f l] applies [f] to each block of the locator, the last one
     excepted. The function also receives the expected predecessor
@@ -36,7 +38,15 @@ type step = {
   step: int ;
   strict_step: bool ;
 }
+(** A 'step' in a locator is a couple of consecutives hashes in the
+    locator, and the expected difference of level the two blocks (or
+    an upper bounds when [strict_step = false]). *)
+
 val to_steps: t -> step list
+(** Build all the 'steps' composing the locator, starting with the
+    oldest one (typically the predecessor of the first step will be
+    `genesis`). All steps contains [strict_step = true], except the
+    first one. *)
 
 val estimated_length: t -> int
 (** [estimated_length locator] estimate the length of the chain

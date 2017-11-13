@@ -17,6 +17,10 @@ val create:
   ?notify_new_block: (State.Block.t -> unit) ->
   ?notify_bootstrapped: (unit -> unit) ->
   ?notify_termination: (t -> unit) ->
+  new_head_request_timeout:float ->
+  block_header_timeout:float ->
+  block_operations_timeout:float ->
+  protocol_timeout:float ->
   Block_validator.t ->
   Distributed_db.net_db -> P2p.Peer_id.t -> t Lwt.t
 val shutdown: t -> unit Lwt.t
