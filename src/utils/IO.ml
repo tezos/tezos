@@ -1,6 +1,6 @@
 (* For this source file only.
  * Copyright (c) 2013-2014 Thomas Gazagnaire <thomas@gazagnaire.org>
- * Copyright (c) 2016 Dynamic Ledger Solutions, Inc. <contact@tezos.com>
+ * Copyright (c) 2016-2017 Dynamic Ledger Solutions, Inc. <contact@tezos.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
