@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Tezos Shell - Network message for the gossip P2P protocol. *)
+
 type t =
 
   | Get_current_branch of Net_id.t

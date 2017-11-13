@@ -43,7 +43,7 @@ let inject_protocol state ?force:_ proto =
   Lwt.return (hash, validation)
 
 let inject_block validator ?force bytes operations =
-  Validator.inject_block
+  Validator.validate_block
     validator ?force bytes operations >>=? fun (hash, block) ->
   return (hash, (block >>=? fun _ -> return ()))
 
@@ -607,7 +607,7 @@ module RPC = struct
     Distributed_db.watch_operation node.distributed_db
 
   let protocol_watcher node =
-    Distributed_db.watch_protocol node.distributed_db
+    Distributed_db.Protocol.watch node.distributed_db
 
   let bootstrapped node =
     let block_stream, stopper =

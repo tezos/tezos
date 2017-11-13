@@ -7,11 +7,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Tezos Shell - Main entry point of the validation scheduler. *)
+
 type t
 
 val create: State.t -> Distributed_db.t -> Net_validator.timeout -> t
 val shutdown: t -> unit Lwt.t
 
+(** Start the validation scheduler of a given network. *)
 val activate:
   t ->
   ?bootstrap_threshold:int ->
@@ -23,10 +26,12 @@ type error +=
 val get: t -> Net_id.t -> Net_validator.t tzresult Lwt.t
 val get_exn: t -> Net_id.t -> Net_validator.t Lwt.t
 
-val inject_block:
+(** Force the validation of a block. *)
+val validate_block:
   t ->
   ?force:bool ->
   MBytes.t -> Operation.t list list ->
   (Block_hash.t * State.Block.t tzresult Lwt.t) tzresult Lwt.t
 
+(** Monitor all the valid block (for all activate networks). *)
 val watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper

@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Tezos Shell - High-level API for the Gossip network and local
+                  storage (helpers). *)
+
 module type DISTRIBUTED_DB = sig
 
   type t

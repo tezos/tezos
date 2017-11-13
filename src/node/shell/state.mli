@@ -7,9 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t
-type global_state = t
-(** An abstraction over all the disk storage used by the node.
+(** Tezos Shell - Abstraction over all the disk storage.
 
     It encapsulates access to:
 
@@ -18,14 +16,17 @@ type global_state = t
       - the blockchain and its alternate heads of a "network";
       - the pool of pending operations of a "network". *)
 
+type t
+type global_state = t
+
+(** Read the internal state of the node and initialize
+    the databases. *)
 val read:
   ?patch_context:(Context.t -> Context.t Lwt.t) ->
   store_root:string ->
   context_root:string ->
   unit ->
   global_state tzresult Lwt.t
-(** Read the internal state of the node and initialize
-    the databases. *)
 
 val close:
   global_state -> unit Lwt.t
@@ -38,12 +39,14 @@ type error +=
 
 (** {2 Network} ************************************************************)
 
-(** Data specific to a given network. *)
+(** Data specific to a given network (e.g the mainnet or the current
+    test network).  *)
 module Net : sig
 
   type t
   type net_state = t
 
+  (** The chain starts from a genesis block associated to a seed protocol *)
   type genesis = {
     time: Time.t ;
     block: Block_hash.t ;
@@ -51,40 +54,40 @@ module Net : sig
   }
   val genesis_encoding: genesis Data_encoding.t
 
+  (** Initialize a network for a given [genesis]. By default,
+      the network does accept forking test network. When
+      [~allow_forked_network:true] is provided, test network are allowed. *)
   val create:
     global_state ->
     ?allow_forked_network:bool ->
     genesis -> net_state Lwt.t
-  (** Initialize a network for a given [genesis]. By default,
-      the network does accept forking test network. When
-      [~allow_forked_network:true] is provided, test network are allowed. *)
 
-  val get: global_state -> Net_id.t -> net_state tzresult Lwt.t
   (** Look up for a network by the hash of its genesis block. *)
+  val get: global_state -> Net_id.t -> net_state tzresult Lwt.t
 
-  val all: global_state -> net_state list Lwt.t
   (** Returns all the known networks. *)
+  val all: global_state -> net_state list Lwt.t
 
-  val destroy: global_state -> net_state -> unit Lwt.t
   (** Destroy a network: this completly removes from the local storage all
       the data associated to the network (this includes blocks and
       operations). *)
+  val destroy: global_state -> net_state -> unit Lwt.t
 
+  (** Various accessors. *)
   val id: net_state -> Net_id.t
   val genesis: net_state -> genesis
+  val global_state: net_state -> global_state
+
+  (** Hash of the faked block header of the genesis block. *)
   val faked_genesis_hash: net_state -> Block_hash.t
+
+  (** Return the expiration timestamp of a test netwowk. *)
   val expiration: net_state -> Time.t option
   val allow_forked_network: net_state -> bool
-  (** Accessors. Respectively access to;
-      - the network id (the hash of its genesis block)
-      - its optional expiration time
-      - the associated global state. *)
-
-  val global_state: net_state -> global_state
 
 end
 
-(** {2 Block database} ********************************************************)
+(** {2 Block database} *****************************************************)
 
 module Block : sig
 

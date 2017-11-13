@@ -93,9 +93,6 @@ let validate_new_head pv hash (header : Block_header.t) =
         "fetching operations for new head %a from peer %a"
         Block_hash.pp_short hash
         P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
-      Distributed_db.inject_block_header pv.net_db hash header >>=? fun _ ->
-      (* TODO look for predownloaded (individual)
-              operations in the prevalidator ?? *)
       map_p
         (fun i ->
            Lwt_utils.protect ~canceler:pv.canceler begin fun () ->

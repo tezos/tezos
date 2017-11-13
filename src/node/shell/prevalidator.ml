@@ -33,7 +33,10 @@ let list_pendings ?maintain_net_db  ~from_block ~to_block old_mempool =
   let push_block mempool block =
     State.Block.all_operation_hashes block >|= fun operations ->
     iter_option maintain_net_db
-      ~f:(fun net_db -> Distributed_db.clear_operations net_db operations) ;
+      ~f:(fun net_db ->
+          List.iter
+            (List.iter (Distributed_db.Operation.clear_or_cancel net_db))
+            operations) ;
     List.fold_left
       (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
       mempool operations

@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Tezos Shell Net - Low level API for the Gossip network *)
+
 (** A peer connection address *)
 type addr = Ipaddr.V6.t
 

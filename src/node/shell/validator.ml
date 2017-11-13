@@ -56,7 +56,7 @@ let get v net_id =
   try get_exn v net_id >>= fun nv -> return nv
   with Not_found -> fail (Inactive_network net_id)
 
-let inject_block v ?force bytes operations =
+let validate_block v ?force bytes operations =
   let hash = Block_hash.hash_bytes [bytes] in
   match Block_header.of_bytes bytes with
   | None -> failwith "Cannot parse block header."

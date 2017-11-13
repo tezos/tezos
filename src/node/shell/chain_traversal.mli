@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Tezos Shell Module - Chain Traversal API *)
+
 open State
 
 val path: Block.t -> Block.t -> Block.t list option Lwt.t

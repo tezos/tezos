@@ -696,23 +696,7 @@ let shutdown { p2p ; p2p_readers ; active_nets } =
   P2p.shutdown p2p >>= fun () ->
   Lwt.return_unit
 
-let read_all_operations net_db hash n =
-  Lwt_list.map_p
-    (fun i ->
-       Raw_operations.Table.read_opt net_db.operations_db.table (hash, i))
-    (0 -- (n-1)) >>= fun operations ->
-  mapi_p
-    (fun i ops ->
-       match ops with
-       | Some ops -> return ops
-       | None ->
-           Raw_operation_hashes.Table.read
-             net_db.operation_hashes_db.table (hash, i) >>=? fun hashes ->
-           map_p (Raw_operation.Table.read net_db.operation_db.table) hashes)
-    operations
-
 let clear_block net_db hash n =
-  (* TODO use a reference counter ?? *)
   Raw_operations.clear_all net_db.operations_db.table hash n ;
   Raw_operation_hashes.clear_all net_db.operation_hashes_db.table hash n ;
   Raw_block_header.Table.clear_or_cancel net_db.block_header_db.table hash
@@ -732,12 +716,6 @@ let commit_invalid_block net_db hash header _err =
   clear_block net_db hash header.shell.validation_passes ;
   return res
 
-let clear_operations net_db operations =
-  List.iter
-    (List.iter
-       (Raw_operation.Table.clear_or_cancel net_db.operation_db.table))
-    operations
-
 let inject_block_header net_db h b =
   fail_unless
     (Net_id.equal
@@ -755,9 +733,6 @@ let inject_operation net_db h op =
   Raw_operation.Table.inject net_db.operation_db.table h op >>= fun res ->
   return res
 
-let inject_protocol db h p =
-  Raw_protocol.Table.inject db.protocol_db.table h p
-
 let commit_protocol db h p =
   State.Protocol.store db.disk p >>= fun res ->
   Raw_protocol.Table.clear_or_cancel db.protocol_db.table h ;
@@ -767,8 +742,6 @@ let watch_block_header { block_input } =
   Watcher.create_stream block_input
 let watch_operation { operation_input } =
   Watcher.create_stream operation_input
-let watch_protocol { protocol_db } =
-  Raw_protocol.Table.watch protocol_db.table
 
 module Raw = struct
   let encoding = P2p.Raw.encoding Message.cfg.encoding
@@ -779,26 +752,26 @@ module type DISTRIBUTED_DB = sig
   type t
   type key
   type value
-  type param
   val known: t -> key -> bool Lwt.t
   type error += Missing_data of key
-  type error += Canceled of key
-  type error += Timeout of key
   val read: t -> key -> value tzresult Lwt.t
   val read_opt: t -> key -> value option Lwt.t
   val read_exn: t -> key -> value Lwt.t
-  val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
-  val prefetch:
-    t ->
-    ?peer:P2p.Peer_id.t ->
-    ?timeout:float ->
-    key -> param -> unit
+  type param
+  type error += Timeout of key
   val fetch:
     t ->
     ?peer:P2p.Peer_id.t ->
     ?timeout:float ->
     key -> param -> value tzresult Lwt.t
+  val prefetch:
+    t ->
+    ?peer:P2p.Peer_id.t ->
+    ?timeout:float ->
+    key -> param -> unit
+  type error += Canceled of key
   val clear_or_cancel: t -> key -> unit
+  val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
 end
 
 module Make
@@ -807,7 +780,6 @@ module Make
        type t
        val proj: t -> Table.t
      end) = struct
-  type t = Kind.t
   type key = Table.key
   type value = Table.value
   let known t k = Table.known (Kind.proj t) k
@@ -826,11 +798,16 @@ module Make
   let watch t = Table.watch (Kind.proj t)
 end
 
-module Block_header =
-  Make (Raw_block_header.Table) (struct
-    type t = net_db
-    let proj net = net.block_header_db.table
-  end)
+module Block_header = struct
+  type t = Block_header.t
+  include (Make (Raw_block_header.Table) (struct
+             type t = net_db
+             let proj net = net.block_header_db.table
+           end) : DISTRIBUTED_DB with type t := net_db
+                                  and type key := Block_hash.t
+                                  and type value := Block_header.t
+                                  and type param := unit)
+end
 
 module Operation_hashes =
   Make (Raw_operation_hashes.Table) (struct
@@ -844,17 +821,27 @@ module Operations =
     let proj net = net.operations_db.table
   end)
 
-module Operation =
-  Make (Raw_operation.Table) (struct
-    type t = net_db
-    let proj net = net.operation_db.table
-  end)
+module Operation = struct
+  type t = Operation.t
+  include (Make (Raw_operation.Table) (struct
+             type t = net_db
+             let proj net = net.operation_db.table
+           end) : DISTRIBUTED_DB with type t := net_db
+                                  and type key := Operation_hash.t
+                                  and type value := Operation.t
+                                  and type param := unit)
+end
 
-module Protocol =
-  Make (Raw_protocol.Table) (struct
-    type t = db
-    let proj db = db.protocol_db.table
-  end)
+module Protocol = struct
+  type t = Protocol.t
+  include (Make (Raw_protocol.Table) (struct
+             type t = db
+             let proj db = db.protocol_db.table
+           end) : DISTRIBUTED_DB with type t := db
+                                  and type key := Protocol_hash.t
+                                  and type value := Protocol.t
+                                  and type param := unit)
+end
 
 
 let broadcast net_db msg =
