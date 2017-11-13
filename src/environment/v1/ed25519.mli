@@ -1,5 +1,13 @@
-(** Tezos - Ed25519 cryptography *)
+(**************************************************************************)
+(*                                                                        *)
+(*    Copyright (c) 2014 - 2016.                                          *)
+(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
+(*                                                                        *)
+(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
+(*                                                                        *)
+(**************************************************************************)
 
+(** Tezos - Ed25519 cryptography *)
 
 (** {2 Hashed public keys for user ID} ***************************************)
 

@@ -22,7 +22,6 @@
     v1/lwt_sequence.mli
     v1/lwt.mli
     v1/lwt_list.mli
-    v1/uri.mli
 
     ;; Tezos extended stdlib
     v1/mBytes.mli
