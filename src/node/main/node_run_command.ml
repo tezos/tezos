@@ -27,11 +27,11 @@ let () =
     `Permanent
     ~id:"main.run.non_private_sandbox"
     ~title:"Fordidden public sandbox"
-    ~description:"A sandboxed node should not listen on public address."
+    ~description:"A sandboxed node should not listen on a public address."
     ~pp:begin fun ppf addr ->
       Format.fprintf ppf
-        "The node is configured to listen a public addres (%a), \
-         while only 'private' network are authorised with `--sandbox`.
+        "The node is configured to listen on a public address (%a), \
+         while only 'private' networks are authorised with `--sandbox`.
            See `%s run --help` on how to change the listening address."
         Ipaddr.V6.pp_hum addr Sys.argv.(0)
     end
@@ -249,7 +249,7 @@ module Term = struct
     let open Cmdliner in
     let doc =
       "Run the daemon in sandbox mode. \
-       P2P to non-localhost addressses are disabled, and constants of \
+       P2P to non-localhost addresses are disabled, and constants of \
        the economic protocol can be altered with an optional JSON file. \
        $(b,IMPORTANT): Using sandbox mode affects the node state and \
        subsequent runs of Tezos node must also use sandbox mode. \
@@ -292,7 +292,7 @@ module Manpage = struct
            A $(b,*) can be used as a wildcard \
            in sections, i.e. $(b, client* -> debug). \
            The rules are matched left to right, \
-           therefore the leftmost rule is the most prioritary one."
+           therefore the leftmost rule is highest priority."
          ) ;
     ]
 
