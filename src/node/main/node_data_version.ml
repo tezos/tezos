@@ -53,13 +53,13 @@ let () =
   register_error_kind
     `Permanent
     ~id: "noDataDirVersionFile"
-    ~title: "Data directory version file did not exist"
-    ~description: "Data directory version file did not exist"
+    ~title: "Data directory version file does not exist"
+    ~description: "Data directory version file does not exist"
     Data_encoding.(obj1 (req "versionPath" string))
     ~pp:(fun ppf path ->
         Format.fprintf ppf
           "Expected to find data directory version file at '%s', \
-          \ but the file did not exist."
+          \ but the file does not exist."
           path)
     (function No_data_dir_version_file path -> Some path | _ -> None)
     (fun path -> No_data_dir_version_file path)
