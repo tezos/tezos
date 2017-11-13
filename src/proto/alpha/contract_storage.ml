@@ -182,7 +182,7 @@ let () =
     Data_encoding.(obj1 (req "message" string))
     (function Failure s -> Some s | _ -> None)
     (fun s -> Failure s)
- 
+
 let failwith msg = fail (Failure msg)
 
 let create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable =
@@ -190,7 +190,7 @@ let create_base c contract ~balance ~manager ~delegate ?script ~spendable ~deleg
    | None -> return 0l
    | Some _ -> Storage.Contract.Global_counter.get c) >>=? fun counter ->
   Storage.Contract.Balance.init c contract balance >>=? fun c ->
-  Storage.Contract.Manager.init c contract (Manager_repr.hash manager) >>=? fun c ->
+  Storage.Contract.Manager.init c contract (Manager_repr.Hash manager) >>=? fun c ->
   begin
     match delegate with
     | None -> return c
@@ -303,23 +303,23 @@ let get_manager c contract =
 
 let update_manager_key c contract = function
   | Some public_key ->
-    begin Storage.Contract.Manager.get c contract >>=? function
-    | (Manager_repr.Public_key v) -> (* key revealed for the second time *)
-        if Ed25519.Public_key.(v = public_key) then return (c,v)
-        else fail (Inconsistent_public_key (v,public_key))
-    | (Manager_repr.Hash v) ->
-        let actual_hash = Ed25519.Public_key.hash public_key in
-        if (Ed25519.Public_key_hash.equal actual_hash v) then
-          let v = (Manager_repr.public_key public_key) in
-          Storage.Contract.Manager.set c contract v >>=? fun c ->
-          return (c,public_key) (* reveal and update key *)
-        else fail (Inconsistent_hash (public_key,v,actual_hash))
-    end
+      begin Storage.Contract.Manager.get c contract >>=? function
+        | (Manager_repr.Public_key v) -> (* key revealed for the second time *)
+            if Ed25519.Public_key.(v = public_key) then return (c,v)
+            else fail (Inconsistent_public_key (v,public_key))
+        | (Manager_repr.Hash v) ->
+            let actual_hash = Ed25519.Public_key.hash public_key in
+            if (Ed25519.Public_key_hash.equal actual_hash v) then
+              let v = (Manager_repr.Public_key public_key) in
+              Storage.Contract.Manager.set c contract v >>=? fun c ->
+              return (c,public_key) (* reveal and update key *)
+            else fail (Inconsistent_hash (public_key,v,actual_hash))
+      end
   | None -> 
-    begin Storage.Contract.Manager.get c contract >>=? function
-    | (Manager_repr.Public_key v) -> return (c,v) (* already revealed *)
-    | (Manager_repr.Hash v) -> fail (Missing_public_key (v))
-    end
+      begin Storage.Contract.Manager.get c contract >>=? function
+        | (Manager_repr.Public_key v) -> return (c,v) (* already revealed *)
+        | (Manager_repr.Hash v) -> fail (Missing_public_key (v))
+      end
 
 let get_delegate_opt = Roll_storage.get_contract_delegate
 

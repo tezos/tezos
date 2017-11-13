@@ -232,7 +232,7 @@ let check_proof_of_work_stamp ctxt block =
     fail Invalid_stamp
 
 let check_signature ctxt block id =
-  Public_key.get ctxt id >>=? fun key ->
+  Delegates_pubkey.get ctxt id >>=? fun key ->
   let check_signature key { Block_header.proto ; shell ; signature } =
     let unsigned_header = Block_header.forge_unsigned shell proto in
     Ed25519.Signature.check key signature unsigned_header in

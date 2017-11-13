@@ -87,7 +87,7 @@ module Constants = struct
     constants.dictator_pubkey
 end
 
-module Public_key = Public_key_storage
+module Delegates_pubkey = Public_key_storage
 
 module Voting_period = Voting_period_repr
 

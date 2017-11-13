@@ -37,7 +37,7 @@ val is_spendable : Storage.t -> Contract_repr.t -> bool tzresult Lwt.t
 val get_manager: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t tzresult Lwt.t
 val update_manager_key:
   Storage.t -> Contract_repr.t -> Ed25519.Public_key.t option ->
-    (Storage.t * Ed25519.Public_key.t) tzresult Lwt.t
+  (Storage.t * Ed25519.Public_key.t) tzresult Lwt.t
 
 val get_delegate_opt: Storage.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option tzresult Lwt.t
 val get_balance: Storage.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t

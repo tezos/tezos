@@ -185,11 +185,11 @@ let () = register0 Services.Context.Nonce.hash nonce_hash
 (*-- Context.Key -------------------------------------------------------------*)
 
 let get_key ctxt hash () =
-  Public_key.get ctxt hash >>=? fun pk ->
+  Delegates_pubkey.get ctxt hash >>=? fun pk ->
   return (hash, pk)
 
 let () = register2 Services.Context.Key.get get_key
-let () = register0 Services.Context.Key.list Public_key.list
+let () = register0 Services.Context.Key.list Delegates_pubkey.list
 
 (*-- Context.Contract --------------------------------------------------------*)
 
@@ -469,7 +469,7 @@ let operation_public_key ctxt = function
   | None -> return None
   | Some public_key ->
       let hash = Ed25519.Public_key.hash public_key in
-      Public_key.get_option ctxt hash >>=? function
+      Delegates_pubkey.get_option ctxt hash >>=? function
       | None -> return (Some public_key)
       | Some _ -> return None
 
@@ -499,7 +499,7 @@ let check_signature ctxt signature shell contents =
         | Some key -> return key
         | None ->
             Contract.get_manager ctxt op.source >>=? fun manager ->
-            Public_key.get ctxt manager
+            Delegates_pubkey.get ctxt manager
       end >>=? fun public_key ->
       Operation.check_signature public_key
         { signature ; shell ; contents ; hash = dummy_hash }

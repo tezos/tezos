@@ -282,7 +282,8 @@ module Constants : sig
 
 end
 
-module Public_key : sig
+(** Global storage for all delegates public keys *)
+module Delegates_pubkey : sig
 
   val get:
     context -> public_key_hash -> public_key tzresult Lwt.t

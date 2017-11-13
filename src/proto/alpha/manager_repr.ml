@@ -15,34 +15,21 @@ type manager_key =
 
 type t = manager_key
 
-let hash hash = Hash hash
-let public_key hash = Public_key hash
-
 open Data_encoding
 
-let hash_encoding =
-  (obj1
-    (req "hash" Ed25519.Public_key_hash.encoding)
-  )
-
-let pubkey_encoding =
-  (obj1
-    (req "public_key" Ed25519.Public_key.encoding)
-  )
-
 let hash_case tag =
-  case ~tag hash_encoding
-  (function
-    | Hash hash -> Some hash
-    | _ -> None)
-  (fun hash -> Hash hash)
+  case ~tag Ed25519.Public_key_hash.encoding
+    (function
+      | Hash hash -> Some hash
+      | _ -> None)
+    (fun hash -> Hash hash)
 
 let pubkey_case tag =
-  case ~tag pubkey_encoding
-  (function
-    | Public_key hash -> Some hash
-    | _ -> None)
-  (fun hash -> Public_key hash)
+  case ~tag Ed25519.Public_key.encoding
+    (function
+      | Public_key hash -> Some hash
+      | _ -> None)
+    (fun hash -> Public_key hash)
 
 
 let encoding =

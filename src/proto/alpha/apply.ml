@@ -174,10 +174,10 @@ let apply_sourced_operation
         (ctxt, origination_nonce, None) contents
   | Delegate_operations { source ; operations = contents } ->
       let delegate = Ed25519.Public_key.hash source in
-      Public_key.reveal ctxt delegate source >>=? fun ctxt ->
+      Delegates_pubkey.reveal ctxt delegate source >>=? fun ctxt ->
       Operation.check_signature source operation >>=? fun () ->
       (* TODO, see how to extract the public key hash after this operation to
-       pass it to apply_delegate_operation_content *)
+         pass it to apply_delegate_operation_content *)
       fold_left_s (fun ctxt content ->
           apply_delegate_operation_content
             ctxt delegate pred_block block_prio content)
