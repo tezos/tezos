@@ -7,9 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
 open Logging.Node.State
 open State
+
+let mempool_encoding = State.mempool_encoding
 
 let genesis net_state =
   let genesis = Net.genesis net_state in
@@ -64,7 +65,7 @@ let set_head net_state block =
   update_chain_store net_state begin fun chain_store data ->
     locked_set_head chain_store data block >>= fun () ->
     Lwt.return (Some { current_head = block  ;
-                       current_reversed_mempool = [] },
+                       current_mempool = State.empty_mempool },
                 data.current_head)
   end
 
@@ -75,17 +76,6 @@ let test_and_set_head net_state ~old block =
     else
       locked_set_head chain_store data block >>= fun () ->
       Lwt.return (Some { current_head = block ;
-                         current_reversed_mempool = [] },
+                         current_mempool = State.empty_mempool },
                   true)
-  end
-
-let set_reversed_mempool net_state current_reversed_mempool =
-  update_chain_store net_state begin fun _chain_store data ->
-    Lwt.return (Some { data with current_reversed_mempool },
-                ())
-  end
-
-let mempool net_state =
-  read_chain_store net_state begin fun _chain_store data ->
-    Lwt.return (List.rev data.current_reversed_mempool)
   end

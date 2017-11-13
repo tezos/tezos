@@ -14,7 +14,7 @@ type t =
   | Deactivate of Net_id.t
 
   | Get_current_head of Net_id.t
-  | Current_head of Net_id.t * Block_header.t * Operation_hash.t list
+  | Current_head of Net_id.t * Block_header.t * Mempool.t
 
   | Get_block_headers of Net_id.t * Block_hash.t list
   | Block_header of Block_header.t
@@ -77,11 +77,11 @@ let encoding =
       (obj3
          (req "net_id" Net_id.encoding)
          (req "current_block_header" (dynamic_size Block_header.encoding))
-         (req "current_mempool" (list Operation_hash.encoding)))
+         (req "current_mempool" Mempool.encoding))
       (function
-        | Current_head (net_id, bh, ops) -> Some (net_id, bh, ops)
+        | Current_head (net_id, bh, mempool) -> Some (net_id, bh, mempool)
         | _ -> None)
-      (fun (net_id, bh, ops) -> Current_head (net_id, bh, ops)) ;
+      (fun (net_id, bh, mempool) -> Current_head (net_id, bh, mempool)) ;
 
     case ~tag:0x20
       (obj2

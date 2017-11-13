@@ -87,13 +87,32 @@ and chain_state = {
 
 and chain_data = {
   current_head: block ;
-  current_reversed_mempool: Operation_hash.t list ;
+  current_mempool: mempool ;
+}
+
+and mempool = {
+  known_valid: Operation_hash.t list ;
+  pending: Operation_hash.Set.t ;
 }
 
 and block = {
   net_state: net_state ;
   hash: Block_hash.t ;
   contents: Store.Block.contents ;
+}
+
+let mempool_encoding =
+  let open Data_encoding in
+  conv
+    (fun { known_valid ; pending } -> (known_valid, pending))
+    (fun (known_valid, pending) -> { known_valid ; pending })
+    (obj2
+       (req "known_valid" (dynamic_size (list Operation_hash.encoding)))
+       (req "pending" (dynamic_size Operation_hash.Set.encoding)))
+
+let empty_mempool = {
+  known_valid = [] ;
+  pending = Operation_hash.Set.empty ;
 }
 
 let read_chain_store { chain_state } f =
@@ -173,7 +192,7 @@ module Net = struct
           hash = current_head ;
           contents = current_block ;
         } ;
-        current_reversed_mempool = [] ;
+        current_mempool = empty_mempool ;
       } ;
       chain_store ;
     }

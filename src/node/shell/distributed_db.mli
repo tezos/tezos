@@ -28,7 +28,7 @@ type callback = {
   notify_branch:
     P2p.Peer_id.t -> Block_locator.t -> unit ;
   notify_head:
-    P2p.Peer_id.t -> Block_header.t -> Operation_hash.t list -> unit ;
+    P2p.Peer_id.t -> Block_header.t -> Mempool.t -> unit ;
   disconnection: P2p.Peer_id.t -> unit ;
 }
 
@@ -144,7 +144,7 @@ end
 module Advertise : sig
   val current_head:
     net_db -> ?peer:P2p.Peer_id.t ->
-    ?mempool:Operation_hash.t list -> State.Block.t -> unit
+    ?mempool:Mempool.t -> State.Block.t -> unit
   val current_branch:
     net_db -> ?peer:P2p.Peer_id.t ->
     State.Block.t -> unit Lwt.t

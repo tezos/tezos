@@ -294,7 +294,7 @@ type callback = {
   notify_branch:
     P2p.Peer_id.t -> Block_locator.t -> unit ;
   notify_head:
-    P2p.Peer_id.t -> Block_header.t -> Operation_hash.t list -> unit ;
+    P2p.Peer_id.t -> Block_header.t -> Mempool.t -> unit ;
   disconnection: P2p.Peer_id.t -> unit ;
 }
 
@@ -424,12 +424,11 @@ module P2p_reader = struct
 
     | Get_current_head net_id ->
         may_handle state net_id @@ fun net_db ->
-        Chain.head net_db.net_state >>= fun head ->
-        Chain.mempool net_db.net_state >>= fun mempool ->
+        Mempool.get net_db.net_state >>= fun (head, mempool) ->
+        (* TODO bound the sent mempool size *)
         ignore
         @@ P2p.try_send global_db.p2p state.conn
-        @@ Current_head (net_id, State.Block.header head,
-                         Utils.list_sub mempool 200) ;
+        @@ Current_head (net_id, head, mempool) ;
         Lwt.return_unit
 
     | Current_head (net_id, header, mempool) ->
@@ -889,7 +888,7 @@ end
 
 module Advertise = struct
 
-  let current_head net_db ?peer ?(mempool = []) head =
+  let current_head net_db ?peer ?(mempool = Mempool.empty) head =
     let net_id = State.Net.id net_db.net_state in
     assert (Net_id.equal net_id (State.Block.net_id head)) ;
     send net_db ?peer @@

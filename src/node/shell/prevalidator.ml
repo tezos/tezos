@@ -53,7 +53,7 @@ open Prevalidation
 type t = {
   net_db: Distributed_db.net_db ;
   flush: State.Block.t -> unit;
-  notify_operations: P2p.Peer_id.t -> Operation_hash.t list -> unit ;
+  notify_operations: P2p.Peer_id.t -> Mempool.t -> unit ;
   prevalidate_operations:
     bool -> Operation.t list ->
     (Operation_hash.t list * error preapply_result) tzresult Lwt.t ;
@@ -84,7 +84,7 @@ let create
   (start_prevalidation ~predecessor:head ~timestamp:!timestamp () >|= ref) >>= fun validation_state ->
   let pending = Operation_hash.Table.create 53 in
   let head = ref head in
-  let mempool = ref [] in
+  let mempool = ref Mempool.empty in
   let operations = ref empty_result in
   Chain_traversal.live_blocks
     !head
@@ -105,8 +105,25 @@ let create
     validation_state := state;
     Lwt.return_unit in
 
-  let broadcast_operation ops =
-    Distributed_db.Advertise.current_head net_db ~mempool:ops !head in
+  let broadcast_new_operations r =
+    Distributed_db.Advertise.current_head
+      net_db
+      ~mempool:{
+        known_valid = [] ;
+        pending =
+          List.fold_right
+            (fun (k, _) s -> Operation_hash.Set.add k s)
+            r.applied @@
+          Operation_hash.Map.fold
+            (fun k _ s -> Operation_hash.Set.add k s)
+            r.branch_delayed @@
+          Operation_hash.Map.fold
+            (fun k _ s -> Operation_hash.Set.add k s)
+            r.branch_refused @@
+          Operation_hash.Set.empty ;
+      }
+      !head
+  in
 
   let handle_unprocessed () =
     if Operation_hash.Map.is_empty !unprocessed then
@@ -146,9 +163,20 @@ let create
               Lwt.return (!validation_state, r)
         end >>= fun (state, r) ->
         let filter_out s m =
+          List.fold_right (fun (h, _op) -> Operation_hash.Set.remove h) s m in
+        mempool := {
+          known_valid = !mempool.known_valid @ List.rev_map fst r.applied ;
+          pending =
+            Operation_hash.Map.fold
+              (fun k _ s -> Operation_hash.Set.add k s)
+              r.branch_delayed @@
+            Operation_hash.Map.fold
+              (fun k _ s -> Operation_hash.Set.add k s)
+              r.branch_refused @@
+            filter_out r.applied !mempool.pending ;
+        } ;
+        let filter_out s m =
           List.fold_right (fun (h, _op) -> Operation_hash.Map.remove h) s m in
-        let new_ops = List.map fst r.applied in
-        mempool := List.rev_append new_ops !mempool ;
         operations := {
           applied = List.rev_append r.applied !operations.applied ;
           refused = Operation_hash.Map.empty ;
@@ -162,8 +190,9 @@ let create
               (filter_out r.applied !operations.branch_delayed)
               r.branch_delayed ;
         } ;
-        Chain.set_reversed_mempool net_state !mempool >>= fun () ->
-        if broadcast then broadcast_operation new_ops ;
+        Mempool.set net_state
+          ~head:(State.Block.hash !head) !mempool >>= fun () ->
+        if broadcast then broadcast_new_operations r ;
         Lwt_list.iter_s
           (fun (_op, _exns) ->
              (* FIXME *)
@@ -212,14 +241,17 @@ let create
                     iter_s
                       (fun (h, op) ->
                          register h op >>=? fun () ->
-                         mempool := h :: !mempool ;
+                         mempool := { !mempool with
+                                      known_valid =
+                                        !mempool.known_valid @ [h] } ;
                          operations :=
                            { !operations with
-                             applied = (h, op) :: !operations.applied };
+                             applied = (h, op) :: !operations.applied } ;
                          return () )
                       res.applied >>=? fun () ->
-                    Chain.set_reversed_mempool net_state !mempool >>= fun () ->
-                    broadcast_operation (List.map fst res.applied) ;
+                    Mempool.set net_state
+                      ~head:(State.Block.hash !head) !mempool >>= fun () ->
+                    broadcast_new_operations res ;
                     begin
                       if force then
                         iter_p
@@ -250,7 +282,10 @@ let create
                   Lwt.wakeup w result ;
                   Lwt.return_unit
                 end
-              | `Register (gid, ops) ->
+              | `Register (gid, mempool) ->
+                  let ops =
+                    Operation_hash.Set.elements mempool.Mempool.pending @
+                    mempool.known_valid in
                   let known_ops, unknown_ops =
                     List.partition
                       (fun op ->
@@ -305,7 +340,7 @@ let create
                     (Operation_hash.Map.cardinal new_mempool) >>= fun () ->
                   (* Reset the pre-validation context *)
                   head := new_head ;
-                  mempool := [] ;
+                  mempool := Mempool.empty ;
                   operations := empty_result ;
                   broadcast_unprocessed := false ;
                   unprocessed := new_mempool ;
@@ -327,9 +362,9 @@ let create
     if not (Lwt.is_sleeping !running_validation) then
       Lwt.cancel !running_validation
   in
-  let notify_operations gid ops =
+  let notify_operations gid mempool =
     Lwt.async begin fun () ->
-      push_to_worker (`Register (gid, ops)) ;
+      push_to_worker (`Register (gid, mempool)) ;
       Lwt.return_unit
     end in
   let prevalidate_operations force raw_ops =

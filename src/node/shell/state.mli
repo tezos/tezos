@@ -155,9 +155,17 @@ val read_block_exn:
 val fork_testnet:
   Block.t -> Protocol_hash.t -> Time.t -> Net.t tzresult Lwt.t
 
+type mempool = {
+  known_valid: Operation_hash.t list ;
+  pending: Operation_hash.Set.t ;
+}
+
+val empty_mempool: mempool
+val mempool_encoding: mempool Data_encoding.t
+
 type chain_data = {
   current_head: Block.t ;
-  current_reversed_mempool: Operation_hash.t list ;
+  current_mempool: mempool ;
 }
 
 val read_chain_store:
