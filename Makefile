@@ -1,18 +1,20 @@
 
+DEV ?= --dev
+
 all:
-	@jbuilder build tezos.install --dev
+	@jbuilder build tezos.install ${DEV}
 	@cp _build/default/src/node_main.exe tezos-node
 	@cp _build/default/src/client_main.exe tezos-client
 	@cp _build/default/src/compiler_main.exe tezos-protocol-compiler
 
 doc-html:
-	@jbuilder build @doc --dev
+	@jbuilder build @doc ${DEV}
 
 build-test:
-	@jbuilder build @buildtest --dev
+	@jbuilder build @buildtest ${DEV}
 
 test:
-	@jbuilder runtest
+	@jbuilder runtest ${DEV}
 
 build-deps:
 	@./scripts/install_build_deps.sh

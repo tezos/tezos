@@ -3,10 +3,7 @@
 (library
  ((name client_lib)
   (public_name tezos.client)
-  (libraries (minutils
-              utils
-              cohttp
-              node_shell
+  (libraries (node_shell
               node_db
               node_updater
               tezos_protocol_compiler))

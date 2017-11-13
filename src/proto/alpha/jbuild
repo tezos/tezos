@@ -25,32 +25,32 @@ let () =
     } end) in ()"))))
 
 (library
-  ((name tezos_protocol_environment_alpha)
-   (public_name tezos.protocol_environment.alpha)
-   (library_flags (:standard -linkall -w -9 -safe-string))
-   (libraries (node_updater))
-   (modules (Environment))))
+ ((name tezos_protocol_environment_alpha)
+  (public_name tezos.protocol_environment.alpha)
+  (library_flags (:standard -linkall -w -9 -safe-string))
+  (libraries (node_updater))
+  (modules (Environment))))
 
 (library
-  ((name tezos_embedded_raw_protocol_alpha)
-   (public_name tezos.embedded_raw_protocol.alpha)
-   (libraries (tezos_protocol_environment_alpha))
-   (library_flags (:standard -linkall))
-   (flags (:standard -nopervasives -nostdlib -safe-string
-                     -w +a-4-6-7-9-29-32-40..42-44-45-48
-                     -warn-error -a+8
-                     -open Tezos_protocol_environment_alpha__Environment
-                     -open Error_monad
-                     -open Hash
-                     -open Tezos_data))
-   (modules (:standard \ Environment Registerer))))
+ ((name tezos_embedded_raw_protocol_alpha)
+  (public_name tezos.embedded_raw_protocol.alpha)
+  (libraries (tezos_protocol_environment_alpha))
+  (library_flags (:standard -linkall))
+  (flags (:standard -nopervasives -nostdlib -safe-string
+                    -w +a-4-6-7-9-29-32-40..42-44-45-48
+                    -warn-error -a+8
+                    -open Tezos_protocol_environment_alpha__Environment
+                    -open Error_monad
+                    -open Hash
+                    -open Tezos_data))
+  (modules (:standard \ Environment Registerer))))
 
 (library
-  ((name tezos_embedded_protocol_alpha)
-   (public_name tezos.embedded_protocol.alpha)
-   (library_flags (:standard -linkall -w -9-32 -safe-string))
-   (libraries (tezos_embedded_raw_protocol_alpha node_shell))
-   (modules (Registerer))))
+ ((name tezos_embedded_protocol_alpha)
+  (public_name tezos.embedded_protocol.alpha)
+  (library_flags (:standard -linkall -w -9-32 -safe-string))
+  (libraries (tezos_embedded_raw_protocol_alpha node_shell))
+  (modules (Registerer))))
 
 (alias
  ((name runtest_sandboxing)

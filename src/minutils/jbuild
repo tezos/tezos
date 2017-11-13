@@ -1,11 +1,11 @@
 (jbuild_version 1)
 
 (library
-    ((name minutils)
-     (public_name tezos.minutils)
-     (libraries (cstruct
-                 lwt
-                 ocplib-json-typed.bson
-                 ocplib-resto.directory))
-     (flags (:standard -w -9+27-30-32-40@8 -safe-string))
-     (wrapped false)))
+ ((name minutils)
+  (public_name tezos.minutils)
+  (libraries (cstruct
+              lwt
+              ocplib-json-typed.bson
+              ocplib-resto.directory))
+  (flags (:standard -w -9+27-30-32-40@8 -safe-string))
+  (wrapped false)))
