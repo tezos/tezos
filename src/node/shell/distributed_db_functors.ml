@@ -259,7 +259,7 @@ end = struct
               ~f:(fun input -> Watcher.notify input (k, v)) ;
             Watcher.notify s.input (k, v) ;
             Lwt.return_unit
-        end
+      end
     | Found _ ->
         Scheduler.notify_duplicate s.scheduler p k ;
         Lwt.return_unit

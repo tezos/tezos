@@ -76,7 +76,7 @@ let begin_construction
     ~predecessor:_
     ~timestamp:_
     ?proto_header:_ () =
-  Fitness.to_int64 pred_fitness >>=? function pred_fitness ->
+  Fitness.to_int64 pred_fitness >>=? fun pred_fitness ->
   let fitness = Int64.succ pred_fitness in
   return { context ; fitness }
 

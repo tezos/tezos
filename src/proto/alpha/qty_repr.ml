@@ -152,13 +152,13 @@ module Make (T: QTY) : S = struct
     let open Int64 in
     let rec step cur pow acc =
       if cur = 0L then
-	      ok acc
+        ok acc
       else
-	      pow +? pow >>? fun npow ->
+        pow +? pow >>? fun npow ->
         if logand cur 1L = 1L then
           acc +? pow >>? fun nacc ->
           step (shift_right_logical cur 1) npow nacc
-	      else
+        else
           step (shift_right_logical cur 1) npow acc in
     if m < 0L then
       error (Negative_multiplicator (t, m))

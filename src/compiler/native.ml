@@ -101,7 +101,7 @@ let load_embeded_cmis cmis = List.iter load_embeded_cmi cmis
     the protocol first-class module into the [Updater.versions]
     hashtable).
 
- *)
+*)
 
 
 let tezos_protocol_env =

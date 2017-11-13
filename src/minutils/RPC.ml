@@ -51,11 +51,11 @@ let string_of_method = function
 
 let service ?(meth = default_meth) ?description ~input ~output path =
   (meth,
-  Resto.service
-    ?description
-    ~input:(Data_encoding.Json.convert input)
-    ~output:(Data_encoding.Json.convert output)
-    path)
+   Resto.service
+     ?description
+     ~input:(Data_encoding.Json.convert input)
+     ~output:(Data_encoding.Json.convert output)
+     path)
 
 (* REST services *)
 

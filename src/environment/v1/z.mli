@@ -30,7 +30,7 @@ val ediv_rem: t -> t -> (t * t)
 (** Euclidean division and remainder.  [ediv_rem a b] returns a pair [(q, r)]
     such that [a = b * q + r] and [0 <= r < |b|].
     Raises [Division_by_zero] if [b = 0].
- *)
+*)
 
 external logand: t -> t -> t = "ml_z_logand" "ml_as_z_logand"
 (** Bitwise logical and. *)
@@ -44,20 +44,20 @@ external logxor: t -> t -> t = "ml_z_logxor" "ml_as_z_logxor"
 external lognot: t -> t = "ml_z_lognot" "ml_as_z_lognot"
 (** Bitwise logical negation.
     The identity [lognot a]=[-a-1] always hold.
- *)
+*)
 
 external shift_left: t -> int -> t = "ml_z_shift_left" "ml_as_z_shift_left"
 (** Shifts to the left.
     Equivalent to a multiplication by a power of 2.
     The second argument must be non-negative.
- *)
+*)
 
 external shift_right: t -> int -> t = "ml_z_shift_right" "ml_as_z_shift_right"
 (** Shifts to the right.
     This is an arithmetic shift,
     equivalent to a division by a power of 2 with rounding towards -oo.
     The second argument must be non-negative.
- *)
+*)
 
 val to_string: t -> string
 val of_string: string -> t

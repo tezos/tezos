@@ -24,32 +24,32 @@
 
 (** Byte sequence operations.
 
-   A byte sequence is a mutable data structure that contains a
-   fixed-length sequence of bytes. Each byte can be indexed in
-   constant time for reading or writing.
+    A byte sequence is a mutable data structure that contains a
+    fixed-length sequence of bytes. Each byte can be indexed in
+    constant time for reading or writing.
 
-   Given a byte sequence [s] of length [l], we can access each of the
-   [l] bytes of [s] via its index in the sequence. Indexes start at
-   [0], and we will call an index valid in [s] if it falls within the
-   range [[0...l-1]] (inclusive). A position is the point between two
-   bytes or at the beginning or end of the sequence.  We call a
-   position valid in [s] if it falls within the range [[0...l]]
-   (inclusive). Note that the byte at index [n] is between positions
-   [n] and [n+1].
+    Given a byte sequence [s] of length [l], we can access each of the
+    [l] bytes of [s] via its index in the sequence. Indexes start at
+    [0], and we will call an index valid in [s] if it falls within the
+    range [[0...l-1]] (inclusive). A position is the point between two
+    bytes or at the beginning or end of the sequence.  We call a
+    position valid in [s] if it falls within the range [[0...l]]
+    (inclusive). Note that the byte at index [n] is between positions
+    [n] and [n+1].
 
-   Two parameters [start] and [len] are said to designate a valid
-   range of [s] if [len >= 0] and [start] and [start+len] are valid
-   positions in [s].
+    Two parameters [start] and [len] are said to designate a valid
+    range of [s] if [len >= 0] and [start] and [start+len] are valid
+    positions in [s].
 
-   Byte sequences can be modified in place, for instance via the [set]
-   and [blit] functions described below.  See also strings (module
-   {!String}), which are almost the same data structure, but cannot be
-   modified in place.
+    Byte sequences can be modified in place, for instance via the [set]
+    and [blit] functions described below.  See also strings (module
+    {!String}), which are almost the same data structure, but cannot be
+    modified in place.
 
-   Bytes are represented by the OCaml type [char].
+    Bytes are represented by the OCaml type [char].
 
-   @since 4.02.0
- *)
+    @since 4.02.0
+*)
 
 external length : bytes -> int = "%bytes_length"
 (** Return the length (number of bytes) of the argument. *)
@@ -243,23 +243,23 @@ val rcontains_from : bytes -> int -> char -> bool
 
 val uppercase_ascii : bytes -> bytes
 (** Return a copy of the argument, with all lowercase letters
-   translated to uppercase, using the US-ASCII character set.
-   @since 4.03.0 *)
+    translated to uppercase, using the US-ASCII character set.
+    @since 4.03.0 *)
 
 val lowercase_ascii : bytes -> bytes
 (** Return a copy of the argument, with all uppercase letters
-   translated to lowercase, using the US-ASCII character set.
-   @since 4.03.0 *)
+    translated to lowercase, using the US-ASCII character set.
+    @since 4.03.0 *)
 
 val capitalize_ascii : bytes -> bytes
 (** Return a copy of the argument, with the first character set to uppercase,
-   using the US-ASCII character set.
-   @since 4.03.0 *)
+    using the US-ASCII character set.
+    @since 4.03.0 *)
 
 val uncapitalize_ascii : bytes -> bytes
 (** Return a copy of the argument, with the first character set to lowercase,
-   using the US-ASCII character set.
-   @since 4.03.0 *)
+    using the US-ASCII character set.
+    @since 4.03.0 *)
 
 type t = bytes
 (** An alias for the type of byte sequences. *)

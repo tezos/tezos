@@ -111,12 +111,12 @@ let merge_filter_list2
     | r1, [] -> finalize acc @ (filter_map (fun x1 -> f (Some x1) None) r1)
     | [], r2 -> finalize acc @ (filter_map (fun x2 -> f None (Some x2)) r2)
     | ((h1 :: t1) as r1), ((h2 :: t2) as r2) ->
-      if compare h1 h2 > 0 then
-        merge_aux (may_cons acc (f None (Some h2))) (r1, t2)
-      else if compare h1 h2 < 0 then
-        merge_aux (may_cons acc (f (Some h1) None)) (t1, r2)
-      else (* m1 = m2 *)
-        merge_aux (may_cons acc (f (Some h1) (Some h2))) (t1, t2)
+        if compare h1 h2 > 0 then
+          merge_aux (may_cons acc (f None (Some h2))) (r1, t2)
+        else if compare h1 h2 < 0 then
+          merge_aux (may_cons acc (f (Some h1) None)) (t1, r2)
+        else (* m1 = m2 *)
+          merge_aux (may_cons acc (f (Some h1) (Some h2))) (t1, t2)
   in
   merge_aux [] (sort l1, sort l2)
 
@@ -149,9 +149,9 @@ let rec remove_elem_from_list nb = function
 
 let split_list_at n l =
   let rec split n acc = function
-  | [] -> List.rev acc, []
-  | l when n <= 0 -> List.rev acc, l
-  | hd :: tl -> split (n - 1) (hd :: acc) tl in
+    | [] -> List.rev acc, []
+    | l when n <= 0 -> List.rev acc, l
+    | hd :: tl -> split (n - 1) (hd :: acc) tl in
   split n [] l
 
 let has_prefix ~prefix s =

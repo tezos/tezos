@@ -26,7 +26,7 @@ module Blocks : sig
     | `Head of int | `Prevalidation
     | `Test_head of int | `Test_prevalidation
     | `Hash of Block_hash.t
-    ]
+  ]
   val blocks_arg : block RPC.Arg.arg
 
   val parse_block: string -> (block, string) result

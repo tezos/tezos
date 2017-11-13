@@ -109,7 +109,7 @@ let commands () =
   [
     command ~group ~desc: "Launch a daemon that handles delegate operations."
       (args5 max_priority_arg endorsement_delay_arg
-                  Daemon.baking_switch Daemon.endorsement_switch Daemon.denunciation_switch)
+         Daemon.baking_switch Daemon.endorsement_switch Daemon.denunciation_switch)
       (prefixes [ "launch" ; "daemon" ]
        @@ seq_of_param Client_keys.Public_key_hash.alias_param)
       (fun (max_priority, endorsement_delay, baking, endorsement, denunciation) delegates cctxt ->

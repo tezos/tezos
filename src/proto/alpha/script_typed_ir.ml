@@ -303,7 +303,7 @@ and ('bef, 'aft) instr =
   | Ge :
       (z num * 'rest, bool * 'rest) instr
 
-   (* protocol *)
+  (* protocol *)
   | Manager :
       (('arg, 'ret) typed_contract * 'rest, public_key_hash * 'rest) instr
   | Transfer_tokens : 'sto ty ->
@@ -315,7 +315,7 @@ and ('bef, 'aft) instr =
       (public_key_hash * 'rest, (unit, unit) typed_contract * 'rest) instr
   | Create_contract : 'g ty * 'p ty * 'r ty ->
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t *
-       (('p * 'g, 'r * 'g) lambda * ('g * 'rest)))))),
+                                                                  (('p * 'g, 'r * 'g) lambda * ('g * 'rest)))))),
      ('p, 'r) typed_contract * 'rest) instr
   | Now :
       ('rest, Script_timestamp.t * 'rest) instr

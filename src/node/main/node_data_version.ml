@@ -30,8 +30,8 @@ let () =
     ~title: "Invalid data directory version"
     ~description: "The data directory version was not the one that was expected"
     Data_encoding.(obj2
-                    (req "expectedVersion" string)
-                    (req "actualVersion" string))
+                     (req "expectedVersion" string)
+                     (req "actualVersion" string))
     (function
       | Invalid_data_dir_version (expected, actual) ->
           Some (expected, actual)
@@ -59,7 +59,7 @@ let () =
     ~pp:(fun ppf path ->
         Format.fprintf ppf
           "Expected to find data directory version file at '%s', \
-           \ but the file did not exist."
+          \ but the file did not exist."
           path)
     (function No_data_dir_version_file path -> Some path | _ -> None)
     (fun path -> No_data_dir_version_file path)

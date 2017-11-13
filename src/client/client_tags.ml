@@ -35,30 +35,30 @@ module Tags (Entity : Entity) = struct
 
   include Client_aliases.Alias (struct
 
-    type t = Tag.t
+      type t = Tag.t
 
-    let encoding = Tag.encoding
+      let encoding = Tag.encoding
 
-    (* Split a string of tags separated by commas, and possibly spaces *)
-    let of_source _ tags_str =
-      let rec aux tags s =
-        try
-          let idx = String.index s ',' in
-          let tag = String.(trim (sub s 0 idx)) in
-          let tail = String.(sub s (idx + 1) (length s - (idx + 1))) in
-          aux (tag :: tags) tail
-        with
-        | Not_found ->
-            String.(trim s) :: tags
-      in
-      return (aux [] tags_str)
+      (* Split a string of tags separated by commas, and possibly spaces *)
+      let of_source _ tags_str =
+        let rec aux tags s =
+          try
+            let idx = String.index s ',' in
+            let tag = String.(trim (sub s 0 idx)) in
+            let tail = String.(sub s (idx + 1) (length s - (idx + 1))) in
+            aux (tag :: tags) tail
+          with
+          | Not_found ->
+              String.(trim s) :: tags
+        in
+        return (aux [] tags_str)
 
-    let to_source _ tags =
-      return (String.concat ", " tags)
+      let to_source _ tags =
+        return (String.concat ", " tags)
 
-    let name = Entity.name ^ " tag"
+      let name = Entity.name ^ " tag"
 
-  end)
+    end)
 
   let tag_param ?(name = "tag") ?(desc = "list of tags") next =
     let desc =

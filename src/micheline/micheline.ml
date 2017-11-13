@@ -31,16 +31,16 @@ let canonical_location_encoding =
   int31
 
 let location = function
-    | Int (loc, _) -> loc
-    | String (loc, _) -> loc
-    | Seq (loc, _, _) -> loc
-    | Prim (loc, _, _, _) -> loc
+  | Int (loc, _) -> loc
+  | String (loc, _) -> loc
+  | Seq (loc, _, _) -> loc
+  | Prim (loc, _, _, _) -> loc
 
 let annotation = function
-    | Int (_, _) -> None
-    | String (_, _) -> None
-    | Seq (_, _, annot) -> annot
-    | Prim (_, _, _, annot) -> annot
+  | Int (_, _) -> None
+  | String (_, _) -> None
+  | Seq (_, _, annot) -> annot
+  | Prim (_, _, _, annot) -> annot
 
 
 let root (Canonical expr) = expr
@@ -100,18 +100,18 @@ let map f (Canonical expr) =
     | Seq (loc, seq, annot) ->
         Seq (loc, List.map (map_node f) seq, annot)
     | Prim (loc, name, seq, annot) ->
-    Prim (loc, f name, List.map (map_node f) seq, annot) in
+        Prim (loc, f name, List.map (map_node f) seq, annot) in
   Canonical (map_node f expr)
 
 let rec map_node fl fp = function
   | Int (loc, v) ->
-    Int (fl loc, v)
+      Int (fl loc, v)
   | String (loc, v) ->
-    String (fl loc, v)
+      String (fl loc, v)
   | Seq (loc, seq, annot) ->
-    Seq (fl loc, List.map (map_node fl fp) seq, annot)
+      Seq (fl loc, List.map (map_node fl fp) seq, annot)
   | Prim (loc, name, seq, annot) ->
-    Prim (fl loc, fp name, List.map (map_node fl fp) seq, annot)
+      Prim (fl loc, fp name, List.map (map_node fl fp) seq, annot)
 
 let canonical_encoding prim_encoding =
   let open Data_encoding in

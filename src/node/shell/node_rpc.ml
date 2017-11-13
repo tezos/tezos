@@ -26,17 +26,17 @@ let monitor_operations node contents =
       | None -> Lwt.return_none
       | Some (h, op) when contents -> Lwt.return (Some [[h, Some op]])
       | Some (h, _) -> Lwt.return (Some [[h, None]])
-      else begin
-        first_request := false ;
-        Node.RPC.operation_hashes node `Prevalidation >>= fun hashes ->
-        if contents then
-          Node.RPC.operations node `Prevalidation >>= fun ops ->
-          Lwt.return_some @@
-          List.map2 (List.map2 (fun h op -> h, Some op)) hashes ops
-        else
-          Lwt.return_some @@
-          List.map (List.map (fun h -> h, None)) hashes
-      end in
+    else begin
+      first_request := false ;
+      Node.RPC.operation_hashes node `Prevalidation >>= fun hashes ->
+      if contents then
+        Node.RPC.operations node `Prevalidation >>= fun ops ->
+        Lwt.return_some @@
+        List.map2 (List.map2 (fun h op -> h, Some op)) hashes ops
+      else
+        Lwt.return_some @@
+        List.map (List.map (fun h -> h, None)) hashes
+    end in
   RPC.Answer.return_stream { next ; shutdown }
 
 let register_bi_dir node dir =
@@ -178,7 +178,7 @@ let create_delayed_stream
           future_blocks := rest ;
           future_blocks_set :=
             Block_hash.Set.remove bi.hash !future_blocks_set ;
-        Some bi
+          Some bi
       | _ -> None in
     next, mem, insert, pop in
   let _block_watcher_worker =
@@ -275,7 +275,7 @@ let list_blocks
           | Some time ->
               let rec current_predecessor (bi: Node.RPC.block_info)  =
                 if Time.compare bi.timestamp time <= 0
-                   || bi.hash = bi.predecessor then
+                || bi.hash = bi.predecessor then
                   Lwt.return bi
                 else
                   Node.RPC.raw_block_info node bi.predecessor >>=
@@ -287,7 +287,7 @@ let list_blocks
             (fun
               (bi1: Services.Blocks.block_info)
               (bi2: Services.Blocks.block_info) ->
-               ~- (Fitness.compare bi1.fitness bi2.fitness))
+              ~- (Fitness.compare bi1.fitness bi2.fitness))
             heads_info in
         List.map
           (fun ({ hash } : Services.Blocks.block_info) -> hash)
@@ -453,7 +453,7 @@ let build_rpc_directory node =
       let stream, stopper = Node.RPC.Network.watch node in
       let shutdown () = Watcher.shutdown stopper in
       let next () = Lwt_stream.get stream in
-        RPC.Answer.return_stream { next ; shutdown } in
+      RPC.Answer.return_stream { next ; shutdown } in
     RPC.register0 dir Services.Network.events implementation in
   let dir =
     let implementation point timeout =
@@ -500,7 +500,7 @@ let build_rpc_directory node =
           end in
         RPC.Answer.return_stream { next ; shutdown }
       else
-      Node.RPC.Network.Peer_id.events node peer_id |> RPC.Answer.return in
+        Node.RPC.Network.Peer_id.events node peer_id |> RPC.Answer.return in
     RPC.register1 dir Services.Network.Peer_id.events implementation in
 
   (* Network : Point *)

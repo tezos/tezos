@@ -17,9 +17,9 @@ let is_invalid_arg = function
   | _ -> false
 
 let test_simple_json ?msg ?(equal=Assert.equal) encoding value =
-    let json = Json.construct encoding value in
-    let result = Json.destruct encoding json in
-    equal ?msg value result
+  let json = Json.construct encoding value in
+  let result = Json.destruct encoding json in
+  equal ?msg value result
 
 let test_simple_bin ?msg ?(equal=Assert.equal) encoding value =
   let bin = Binary.to_bytes encoding value in
@@ -134,29 +134,29 @@ let prn_t = function
   | E -> "E"
 
 let test_tag_errors _ =
-    let duplicate_tag () =
-      union [
-        case ~tag:1
-          int8
-          (fun i -> i)
-          (fun i -> Some i) ;
-        case ~tag:1
-          int8
-          (fun i -> i)
-          (fun i -> Some i)] in
-    Assert.test_fail ~msg:__LOC__ duplicate_tag
-      (function Duplicated_tag _ -> true
-              | _ -> false) ;
-    let invalid_tag () =
-      union [
-        case ~tag:(2 lsl 7)
-          int8
-          (fun i -> i)
-          (fun i -> Some i)] in
-    Assert.test_fail ~msg:__LOC__  invalid_tag
-      (function (Invalid_tag (_, `Uint8)) -> true
-              | _ -> false) ;
-    Lwt.return_unit
+  let duplicate_tag () =
+    union [
+      case ~tag:1
+        int8
+        (fun i -> i)
+        (fun i -> Some i) ;
+      case ~tag:1
+        int8
+        (fun i -> i)
+        (fun i -> Some i)] in
+  Assert.test_fail ~msg:__LOC__ duplicate_tag
+    (function Duplicated_tag _ -> true
+            | _ -> false) ;
+  let invalid_tag () =
+    union [
+      case ~tag:(2 lsl 7)
+        int8
+        (fun i -> i)
+        (fun i -> Some i)] in
+  Assert.test_fail ~msg:__LOC__  invalid_tag
+    (function (Invalid_tag (_, `Uint8)) -> true
+            | _ -> false) ;
+  Lwt.return_unit
 
 let test_union _ =
   let enc =
@@ -233,7 +233,7 @@ let test_splitted _ =
              case ~tag:2
                s_enc
                (fun s -> Some { field = int_of_string s })
-              (fun s -> string_of_int s.field) ;
+               (fun s -> string_of_int s.field) ;
            ])) in
   let get_result ~msg bin =
     match Binary.of_bytes enc bin with

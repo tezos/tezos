@@ -36,8 +36,8 @@ let get_unrevealed c level =
       return (nonce_hash, delegate_to_reward, reward_amount)
 
 (* let get_unrevealed_hash c level = *)
-  (* get_unrevealed c level >>=? fun (nonce_hash, _) -> *)
-  (* return nonce_hash *)
+(* get_unrevealed c level >>=? fun (nonce_hash, _) -> *)
+(* return nonce_hash *)
 
 let record_hash c delegate_to_reward reward_amount nonce_hash =
   let level = Level_storage.current c in

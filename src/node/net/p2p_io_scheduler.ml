@@ -206,7 +206,7 @@ module Scheduler(IO : IO) = struct
         st.readys_low ;
       Queue.clear st.readys_low ;
       Queue.transfer tmp st.readys_low ;
-  end
+    end
 
   let shutdown st =
     lwt_debug "--> scheduler(%s).shutdown" IO.name >>= fun () ->
@@ -349,42 +349,42 @@ let write_size mbytes =
 let register =
   let cpt = ref 0 in
   fun st conn ->
-  if st.closed then begin
-    Lwt.async (fun () -> Lwt_utils.safe_close conn) ;
-    raise Closed
-  end else begin
-    let id = incr cpt; !cpt in
-    let canceler = Canceler.create () in
-    let read_size =
-      map_option st.read_queue_size ~f:(fun v -> v, read_size) in
-    let write_size =
-      map_option st.write_queue_size ~f:(fun v -> v, write_size) in
-    let read_queue = Lwt_pipe.create ?size:read_size () in
-    let write_queue = Lwt_pipe.create ?size:write_size () in
-    let read_conn =
-      ReadScheduler.create_connection
-        st.read_scheduler (conn, st.read_buffer_size) read_queue canceler id
-    and write_conn =
-      WriteScheduler.create_connection
-        st.write_scheduler write_queue conn canceler id in
-    Canceler.on_cancel canceler begin fun () ->
-      Inttbl.remove st.connected id ;
-      Moving_average.destroy read_conn.counter ;
-      Moving_average.destroy write_conn.counter ;
-      Lwt_pipe.close write_queue ;
-      Lwt_pipe.close read_queue ;
-      Lwt_utils.safe_close conn
-    end ;
-    let conn = {
-      sched = st ; id ; conn ; canceler ;
-      read_queue ; read_conn ;
-      write_queue ; write_conn ;
-      partial_read = None ;
-    } in
-    Inttbl.add st.connected id conn ;
-    log_info "--> register (%d)" conn.id ;
-    conn
-  end
+    if st.closed then begin
+      Lwt.async (fun () -> Lwt_utils.safe_close conn) ;
+      raise Closed
+    end else begin
+      let id = incr cpt; !cpt in
+      let canceler = Canceler.create () in
+      let read_size =
+        map_option st.read_queue_size ~f:(fun v -> v, read_size) in
+      let write_size =
+        map_option st.write_queue_size ~f:(fun v -> v, write_size) in
+      let read_queue = Lwt_pipe.create ?size:read_size () in
+      let write_queue = Lwt_pipe.create ?size:write_size () in
+      let read_conn =
+        ReadScheduler.create_connection
+          st.read_scheduler (conn, st.read_buffer_size) read_queue canceler id
+      and write_conn =
+        WriteScheduler.create_connection
+          st.write_scheduler write_queue conn canceler id in
+      Canceler.on_cancel canceler begin fun () ->
+        Inttbl.remove st.connected id ;
+        Moving_average.destroy read_conn.counter ;
+        Moving_average.destroy write_conn.counter ;
+        Lwt_pipe.close write_queue ;
+        Lwt_pipe.close read_queue ;
+        Lwt_utils.safe_close conn
+      end ;
+      let conn = {
+        sched = st ; id ; conn ; canceler ;
+        read_queue ; read_conn ;
+        write_queue ; write_conn ;
+        partial_read = None ;
+      } in
+      Inttbl.add st.connected id conn ;
+      log_info "--> register (%d)" conn.id ;
+      conn
+    end
 
 let write { write_queue } msg =
   Lwt.catch

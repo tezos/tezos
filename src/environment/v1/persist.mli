@@ -152,17 +152,17 @@ module MakePersistentMap (S : STORE) (K : KEY) (C : VALUE)
     OCaml map as an explicitly synchronized in-memory buffer. *)
 module MakeBufferedPersistentMap
     (S : STORE) (K : KEY) (C : VALUE) (Map : Map.S with type key = K.t)
- : BUFFERED_PERSISTENT_MAP
-   with type t := S.t
-    and type key := K.t
-    and type value := C.t
-    and module Map := Map
+  : BUFFERED_PERSISTENT_MAP
+    with type t := S.t
+     and type key := K.t
+     and type value := C.t
+     and module Map := Map
 
 (** {2 Predefined Instances} *************************************************)
 
 module MakePersistentBytesMap (S : STORE) (K : KEY)
   : PERSISTENT_MAP
-  with type t := S.t and type key := K.t and type value := MBytes.t
+    with type t := S.t and type key := K.t and type value := MBytes.t
 
 module MakeBufferedPersistentBytesMap
     (S : STORE) (K : KEY) (Map : Map.S with type key = K.t)

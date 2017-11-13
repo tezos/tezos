@@ -63,25 +63,25 @@ let detach_node f points n =
   let identity = Identity.generate proof_of_work_target in
   let nb_points = List.length points in
   let config = P2p_connection_pool.{
-    identity ;
-    proof_of_work_target ;
-    trusted_points = points ;
-    peers_file = "/dev/null" ;
-    closed_network = true ;
-    listening_port = Some port ;
-    min_connections = nb_points ;
-    max_connections = nb_points ;
-    max_incoming_connections = nb_points ;
-    authentification_timeout = 2. ;
-    incoming_app_message_queue_size = None ;
-    incoming_message_queue_size = None ;
-    outgoing_message_queue_size = None ;
-    known_peer_ids_history_size = 100 ;
-    known_points_history_size = 100 ;
-    max_known_points = None ;
-    max_known_peer_ids = None ;
-    swap_linger = 0. ;
-    binary_chunks_size = None
+      identity ;
+      proof_of_work_target ;
+      trusted_points = points ;
+      peers_file = "/dev/null" ;
+      closed_network = true ;
+      listening_port = Some port ;
+      min_connections = nb_points ;
+      max_connections = nb_points ;
+      max_incoming_connections = nb_points ;
+      authentification_timeout = 2. ;
+      incoming_app_message_queue_size = None ;
+      incoming_message_queue_size = None ;
+      outgoing_message_queue_size = None ;
+      known_peer_ids_history_size = 100 ;
+      known_points_history_size = 100 ;
+      max_known_points = None ;
+      max_known_peer_ids = None ;
+      swap_linger = 0. ;
+      binary_chunks_size = None
     } in
   Process.detach
     ~prefix:(Format.asprintf "%a: " Peer_id.pp_short identity.peer_id)

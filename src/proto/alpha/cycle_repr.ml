@@ -12,17 +12,17 @@ type cycle = t
 
 let encoding = Data_encoding.int32
 let arg =
-    let construct = Int32.to_string in
-    let destruct str =
-      match Int32.of_string str with
-      | exception _ -> Error "Cannot parse cycle"
-      | cycle -> Ok cycle in
-    RPC.Arg.make
-      ~descr:"A cycle integer"
-      ~name: "block_cycle"
-      ~construct
-      ~destruct
-      ()
+  let construct = Int32.to_string in
+  let destruct str =
+    match Int32.of_string str with
+    | exception _ -> Error "Cannot parse cycle"
+    | cycle -> Ok cycle in
+  RPC.Arg.make
+    ~descr:"A cycle integer"
+    ~name: "block_cycle"
+    ~construct
+    ~destruct
+    ()
 
 let pp ppf cycle = Format.fprintf ppf "%ld" cycle
 

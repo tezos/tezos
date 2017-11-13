@@ -101,10 +101,10 @@ module ContractAlias = struct
               end)))
       next
 
-   let name cctxt contract =
-     rev_find cctxt contract >>=? function
-     | None -> return (Contract.to_b58check contract)
-     | Some name -> return name
+  let name cctxt contract =
+    rev_find cctxt contract >>=? function
+    | None -> return (Contract.to_b58check contract)
+    | Some name -> return name
 
 end
 

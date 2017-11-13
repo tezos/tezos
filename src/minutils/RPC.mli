@@ -289,10 +289,10 @@ val register_dynamic_directory3:
 
 (** Registring custom directory lookup. *)
 type custom_lookup = RestoDirectory.custom_lookup
-  (* | CustomService of Description.service_descr * *)
-  (*                    ( Data_encoding.json option -> *)
-  (*                      Data_encoding.json Answer.answer Lwt.t ) *)
-  (* | CustomDirectory of Description.directory_descr *)
+(* | CustomService of Description.service_descr * *)
+(*                    ( Data_encoding.json option -> *)
+(*                      Data_encoding.json Answer.answer Lwt.t ) *)
+(* | CustomDirectory of Description.directory_descr *)
 
 val register_custom_lookup:
   ?meth:meth ->

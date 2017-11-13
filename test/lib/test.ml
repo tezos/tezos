@@ -135,23 +135,23 @@ let run prefix tests =
        let res = Test.exec_test test  in
        begin
          match res with
-        | Passed ->
-            incr passed;
-            incr total
-        | Failed _ ->
-            incr failed;
-            incr total
-        | Uncaught _ ->
-            incr uncaught;
-            incr total
-        | Report (pass, tot, unc, _, _) ->
-            passed := !passed + pass;
-            failed := !failed + (tot - pass -unc);
-            uncaught := !uncaught + unc;
-            total := !total + tot
-        | Exit_code c ->
-            incr (if c = 0 then passed else failed);
-            incr total
+         | Passed ->
+             incr passed;
+             incr total
+         | Failed _ ->
+             incr failed;
+             incr total
+         | Uncaught _ ->
+             incr uncaught;
+             incr total
+         | Report (pass, tot, unc, _, _) ->
+             passed := !passed + pass;
+             failed := !failed + (tot - pass -unc);
+             uncaught := !uncaught + unc;
+             total := !total + tot
+         | Exit_code c ->
+             incr (if c = 0 then passed else failed);
+             incr total
        end ;
        output title res ;
        flush stderr)

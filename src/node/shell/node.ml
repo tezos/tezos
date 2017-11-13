@@ -150,7 +150,7 @@ module RPC = struct
     operations: Operation_hash.t list list option ;
     protocol: Protocol_hash.t ;
     test_network: Context.test_network;
- }
+  }
 
   let convert (block: State.Block.t) =
     let hash = State.Block.hash block in
@@ -363,7 +363,7 @@ module RPC = struct
                 operations = begin fun () ->
                   Lwt_list.map_p
                     (Lwt_list.map_p
-                         (Distributed_db.Operation.read_exn net_db))
+                       (Distributed_db.Operation.read_exn net_db))
                     operation_hashes
                 end ;
                 context ;

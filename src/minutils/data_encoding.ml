@@ -285,34 +285,34 @@ module Json = struct
   and lift_union_in_pair
     : type a b. pair_builder -> Kind.t -> a t -> b t -> (a * b) t
     = fun b p e1 e2 ->
-    match lift_union e1, lift_union e2 with
-    | e1, { encoding = Union (_kind, tag, cases) } ->
-        make @@
-        Union (`Dynamic (* ignored *), tag,
-               List.map
-                 (fun (Case { encoding = e2 ; proj ; inj ; tag }) ->
-                    Case { encoding = lift_union_in_pair b p e1 e2 ;
-                           proj = (fun (x, y) ->
-                               match proj y with
-                               | None -> None
-                               | Some y -> Some (x, y)) ;
-                           inj = (fun (x, y) -> (x, inj y)) ;
-                           tag })
-                 cases)
-    | { encoding = Union (_kind, tag, cases) }, e2 ->
-        make @@
-        Union (`Dynamic (* ignored *), tag,
-               List.map
-                 (fun (Case { encoding = e1 ; proj ; inj ; tag }) ->
-                    Case { encoding = lift_union_in_pair b p e1 e2 ;
-                           proj = (fun (x, y) ->
-                               match proj x with
-                               | None -> None
-                               | Some x -> Some (x, y)) ;
-                           inj = (fun (x, y) -> (inj x, y)) ;
-                           tag })
-                 cases)
-    | e1, e2 -> b.build p e1 e2
+      match lift_union e1, lift_union e2 with
+      | e1, { encoding = Union (_kind, tag, cases) } ->
+          make @@
+          Union (`Dynamic (* ignored *), tag,
+                 List.map
+                   (fun (Case { encoding = e2 ; proj ; inj ; tag }) ->
+                      Case { encoding = lift_union_in_pair b p e1 e2 ;
+                             proj = (fun (x, y) ->
+                                 match proj y with
+                                 | None -> None
+                                 | Some y -> Some (x, y)) ;
+                             inj = (fun (x, y) -> (x, inj y)) ;
+                             tag })
+                   cases)
+      | { encoding = Union (_kind, tag, cases) }, e2 ->
+          make @@
+          Union (`Dynamic (* ignored *), tag,
+                 List.map
+                   (fun (Case { encoding = e1 ; proj ; inj ; tag }) ->
+                      Case { encoding = lift_union_in_pair b p e1 e2 ;
+                             proj = (fun (x, y) ->
+                                 match proj x with
+                                 | None -> None
+                                 | Some x -> Some (x, y)) ;
+                             inj = (fun (x, y) -> (inj x, y)) ;
+                             tag })
+                   cases)
+      | e1, e2 -> b.build p e1 e2
 
   let rec json : type a. a desc -> a Json_encoding.encoding =
     let open Json_encoding in
@@ -384,7 +384,7 @@ module Json = struct
     | `Star
     (** Any / every field or index. *)
     | `Next
-    (** The next element after an array. *) ]
+      (** The next element after an array. *) ]
 
   include Json_encoding
 
@@ -632,7 +632,7 @@ module Encoding = struct
         (((h, g), (f, e)), ((d, c), (b, a))))
       (fun (((h, g), (f, e)), ((d, c), (b, a))) ->
          (h, g, f, e, d, c, b, a))
-          ty
+      ty
   let obj8 f8 f7 f6 f5 f4 f3 f2 f1 = conv8 (obj8 f8 f7 f6 f5 f4 f3 f2 f1)
   let tup8 f8 f7 f6 f5 f4 f3 f2 f1 = conv8 (tup8 f8 f7 f6 f5 f4 f3 f2 f1)
   let conv9 ty =
@@ -735,7 +735,7 @@ module Binary = struct
     read: 'a. 'a t -> MBytes.t -> int -> int -> (int * 'a) ;
   }
 
-let rec length : type x. x t -> x -> int = fun e ->
+  let rec length : type x. x t -> x -> int = fun e ->
     match e.encoding with
     (* Fixed *)
     | Null -> fun _ -> 0
@@ -1265,7 +1265,7 @@ let rec length : type x. x t -> x -> int = fun e ->
       | P_seq : { path : path ; encoding : 'a t ;
                   fun_data_len : int -> int } -> path
       | P_list : { path:path ; encoding:'a t ; data_len : int ;
-                    base_ofs : int ; nb_elts_read : int } -> path
+                   base_ofs : int ; nb_elts_read : int } -> path
 
     (* used to accumulate given mbytes when reading a list of blocks,
        as well as the current offset and the number of unread bytes *)
@@ -1634,18 +1634,18 @@ let rec length : type x. x t -> x -> int = fun e ->
       MBytes.t list -> 'a t ->
       (MBytes.t Queue.t -> int -> 'b option) -> 'b status
       = fun l e success_result ->
-      match classify e with
-      | `Variable -> invalid_arg "streaming data with variable size"
-      | `Fixed _ | `Dynamic ->
-          let mb_buf = {
-            past   = Queue.create() ; past_len = 0 ;
-            future = Queue.create() ; unread = 0; ofs = 0 }
-          in
-          List.iter (insert_mbytes mb_buf) l ;
-          let path =
-            P_await { path = P_top ; encoding = e ; data_len = - 1 } in
-          try bytes_stream_reader_rec (data_checker path mb_buf) success_result
-          with _ -> Error
+        match classify e with
+        | `Variable -> invalid_arg "streaming data with variable size"
+        | `Fixed _ | `Dynamic ->
+            let mb_buf = {
+              past   = Queue.create() ; past_len = 0 ;
+              future = Queue.create() ; unread = 0; ofs = 0 }
+            in
+            List.iter (insert_mbytes mb_buf) l ;
+            let path =
+              P_await { path = P_top ; encoding = e ; data_len = - 1 } in
+            try bytes_stream_reader_rec (data_checker path mb_buf) success_result
+            with _ -> Error
 
   end
 

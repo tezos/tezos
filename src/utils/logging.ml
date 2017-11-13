@@ -205,18 +205,18 @@ let close () =
 
 type level = Lwt_log_core.level =
   | Debug
-      (** Debugging message. They can be automatically removed by the
-          syntax extension. *)
+  (** Debugging message. They can be automatically removed by the
+      syntax extension. *)
   | Info
-      (** Informational message. Suitable to be displayed when the
-          program is in verbose mode. *)
+  (** Informational message. Suitable to be displayed when the
+      program is in verbose mode. *)
   | Notice
-      (** Same as {!Info}, but is displayed by default. *)
+  (** Same as {!Info}, but is displayed by default. *)
   | Warning
-      (** Something strange happend *)
+  (** Something strange happend *)
   | Error
-      (** An error message, which should not means the end of the
-          program. *)
+  (** An error message, which should not means the end of the
+      program. *)
   | Fatal
 
 let level_encoding =

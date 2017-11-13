@@ -78,7 +78,7 @@ let begin_construction
     ~timestamp
     ?proto_header
     () =
- let level = Int32.succ pred_level in
+  let level = Int32.succ pred_level in
   let fitness = pred_fitness in
   Tezos_context.init ~timestamp ~level ~fitness ctxt >>=? fun ctxt ->
   begin

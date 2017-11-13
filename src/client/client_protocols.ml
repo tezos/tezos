@@ -45,7 +45,7 @@ let commands () =
               | Ok hash ->
                   cctxt.message "Injected protocol %a successfully" Protocol_hash.pp_short hash >>= fun () ->
                   return ()
-    
+
               | Error err ->
                   cctxt.error "Error while injecting protocol from %s: %a"
                     dirname Error_monad.pp_print_error err >>= fun () ->
@@ -66,8 +66,8 @@ let commands () =
          Updater.extract (Protocol_hash.to_short_b58check ph) ~hash:ph proto >>= fun () ->
          cctxt.message "Extracted protocol %a" Protocol_hash.pp_short ph >>= fun () ->
          return ()
-    ) ;
-         (* | Error err -> *)
-             (* cctxt.error "Error while dumping protocol %a: %a" *)
-               (* Protocol_hash.pp_short ph Error_monad.pp_print_error err); *)
+      ) ;
+    (* | Error err -> *)
+    (* cctxt.error "Error while dumping protocol %a: %a" *)
+    (* Protocol_hash.pp_short ph Error_monad.pp_print_error err); *)
   ]

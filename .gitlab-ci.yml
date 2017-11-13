@@ -72,6 +72,11 @@ build:
   dependencies:
     - build
 
+test:ocp-indent:
+  <<: *test_definition
+  script:
+    - jbuilder build @runtest_indent
+
 test:utils:
   <<: *test_definition
   script:

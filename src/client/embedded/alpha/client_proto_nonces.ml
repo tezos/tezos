@@ -68,7 +68,7 @@ let find cctxt block_hash =
 let add cctxt block_hash nonce =
   load cctxt >>= fun data ->
   save cctxt ((block_hash, nonce) ::
-        List.remove_assoc block_hash data)
+              List.remove_assoc block_hash data)
 
 let del cctxt block_hash =
   load cctxt >>= fun data ->

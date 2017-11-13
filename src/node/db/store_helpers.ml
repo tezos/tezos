@@ -113,9 +113,9 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
         | Some path -> f path acc
       else
         S.fold t path ~init:acc ~f:begin fun k acc ->
-            match k with
-            | `Dir k -> dig (i-1) k acc
-            | `Key _ -> Lwt.return acc
+          match k with
+          | `Dir k -> dig (i-1) k acc
+          | `Key _ -> Lwt.return acc
         end in
     dig I.path_length [] init
 

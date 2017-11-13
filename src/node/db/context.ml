@@ -131,7 +131,7 @@ let commit ~time ~message context =
               code dt
       end
   end >>= fun () ->
-  Lwt.return commit
+    Lwt.return commit
 
 (*-- Generic Store Primitives ------------------------------------------------*)
 

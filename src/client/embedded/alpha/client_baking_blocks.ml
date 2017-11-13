@@ -45,7 +45,7 @@ let compare (bi1 : block_info) (bi2 : block_info) =
           match Time.compare bi1.timestamp bi2.timestamp with
           | 0 -> Block_hash.compare bi1.predecessor bi2.predecessor
           | x -> - x
-          end
+        end
       | x -> - x
     end
   | x -> x

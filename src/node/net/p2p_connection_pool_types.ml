@@ -367,26 +367,26 @@ module Peer_info = struct
     let open Data_encoding in
     conv
       (fun { peer_id ; trusted ; metadata ; events ; created ;
-           last_failed_connection ; last_rejected_connection ;
-           last_established_connection ; last_disconnection } ->
-         (peer_id, created, trusted, metadata, Ring.elements events,
-          last_failed_connection, last_rejected_connection,
-          last_established_connection, last_disconnection))
+             last_failed_connection ; last_rejected_connection ;
+             last_established_connection ; last_disconnection } ->
+        (peer_id, created, trusted, metadata, Ring.elements events,
+         last_failed_connection, last_rejected_connection,
+         last_established_connection, last_disconnection))
       (fun (peer_id, created, trusted, metadata, event_list,
-          last_failed_connection, last_rejected_connection,
-          last_established_connection, last_disconnection) ->
-         let info = create ~trusted ~metadata peer_id in
-         let events = Ring.create log_size in
-         Ring.add_list info.events event_list ;
-         { state = Disconnected ;
-           trusted ; peer_id ; metadata ; created ;
-           last_failed_connection ;
-           last_rejected_connection ;
-           last_established_connection ;
-           last_disconnection ;
-           events ;
-           watchers = Watcher.create_input () ;
-         })
+            last_failed_connection, last_rejected_connection,
+            last_established_connection, last_disconnection) ->
+        let info = create ~trusted ~metadata peer_id in
+        let events = Ring.create log_size in
+        Ring.add_list info.events event_list ;
+        { state = Disconnected ;
+          trusted ; peer_id ; metadata ; created ;
+          last_failed_connection ;
+          last_rejected_connection ;
+          last_established_connection ;
+          last_disconnection ;
+          events ;
+          watchers = Watcher.create_input () ;
+        })
       (obj9
          (req "peer_id" Peer_id.encoding)
          (req "created" Time.encoding)

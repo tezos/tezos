@@ -233,13 +233,13 @@ module Alias = functor (Entity : Entity) -> struct
                  iter_s
                    (fun (n, _v) ->
                       if n = s then
-                      Entity.to_source cctxt _v >>=? fun value ->
-                      failwith
-                        "@[<v 2>The %s alias %s already exists.@,\
-                         The current value is %s.@,\
-                         Use -force true to update@]"
-                        Entity.name n
-                        value
+                        Entity.to_source cctxt _v >>=? fun value ->
+                        failwith
+                          "@[<v 2>The %s alias %s already exists.@,\
+                           The current value is %s.@,\
+                           Use -force true to update@]"
+                          Entity.name n
+                          value
                       else
                         return ())
                    list
@@ -289,9 +289,9 @@ module Alias = functor (Entity : Entity) -> struct
            end))
       next
 
-   let name cctxt d =
-     rev_find cctxt d >>=? function
-     | None -> Entity.to_source cctxt d
-     | Some name -> return name
+  let name cctxt d =
+    rev_find cctxt d >>=? function
+    | None -> Entity.to_source cctxt d
+    | Some name -> return name
 
 end

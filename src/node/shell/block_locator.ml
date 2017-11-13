@@ -31,10 +31,10 @@ let compute (b: Block.t) sz =
       | Some predecessor ->
           if cpt = 0 then
             loop (Block.hash b :: acc) (sz - 1)
-                 (step * 2) (step * 20 - 1) predecessor
+              (step * 2) (step * 20 - 1) predecessor
           else if cpt mod step = 0 then
             loop (Block.hash b :: acc) (sz - 1)
-                 step (cpt - 1) predecessor
+              step (cpt - 1) predecessor
           else
             loop acc sz step (cpt - 1) predecessor in
   Block.predecessor b >>= function
@@ -78,8 +78,8 @@ type step = {
 let to_steps locator =
   fold
     ~f:begin fun acc ~block ~pred ~step ~strict_step -> {
-          block ; predecessor = pred ; step ; strict_step ;
-        } :: acc
+        block ; predecessor = pred ; step ; strict_step ;
+      } :: acc
     end
     [] locator
 

@@ -88,15 +88,15 @@ let prepare ~level ~timestamp ~fitness ctxt =
   may_tag_first_block ctxt level >>=? fun (ctxt, first_block, first_level) ->
   get_sandboxed ctxt >>=? fun sandbox ->
   Constants_repr.read sandbox >>=? function constants ->
-  let level =
-    Level_repr.from_raw
-      ~first_level
-      ~cycle_length:constants.Constants_repr.cycle_length
-      ~voting_period_length:constants.Constants_repr.voting_period_length
-    level in
-  return ({ context = ctxt ; constants ; level ;
-            timestamp ; fitness ; first_level},
-          first_block)
+    let level =
+      Level_repr.from_raw
+        ~first_level
+        ~cycle_length:constants.Constants_repr.cycle_length
+        ~voting_period_length:constants.Constants_repr.voting_period_length
+        level in
+    return ({ context = ctxt ; constants ; level ;
+              timestamp ; fitness ; first_level},
+            first_block)
 let recover { context } : Context.t = context
 
 let first_level { first_level } = first_level
@@ -241,7 +241,7 @@ module Roll = struct
       let encoding = Ed25519.Public_key_hash.encoding
     end)
 
-   module Contract_roll_list =
+  module Contract_roll_list =
     Make_indexed_optional_data_storage(struct
       type key = Contract_repr.t
       type value = Roll_repr.t
@@ -438,7 +438,7 @@ module Vote = struct
         let key = Key.Vote.ballots
         let name = "ballot"
         let encoding = Vote_repr.ballot_encoding
-  end)
+      end)
 
 end
 

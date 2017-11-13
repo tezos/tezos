@@ -251,14 +251,14 @@ module Make_minimal_Blake2B (K : Name) = struct
 
   module Table = struct
     include Hashtbl.Make(struct
-      type nonrec t = t
-      let hash s =
-        Int64.to_int
-          (EndianString.BigEndian.get_int64
-             (Bytes.unsafe_to_string (Sodium.Generichash.Bytes.of_hash s))
-             0)
-      let equal = equal
-    end)
+        type nonrec t = t
+        let hash s =
+          Int64.to_int
+            (EndianString.BigEndian.get_int64
+               (Bytes.unsafe_to_string (Sodium.Generichash.Bytes.of_hash s))
+               0)
+        let equal = equal
+      end)
   end
 
 end
@@ -691,10 +691,10 @@ module Net_id = struct
 
   module Table = struct
     include Hashtbl.Make(struct
-      type nonrec t = t
-      let hash = Hashtbl.hash
-      let equal = equal
-    end)
+        type nonrec t = t
+        let hash = Hashtbl.hash
+        let equal = equal
+      end)
   end
 
 end

@@ -73,15 +73,15 @@ module Context : sig
 
   module Nonce : sig
     val hash:
-    Client_rpcs.config ->
-    block -> Nonce_hash.t tzresult Lwt.t
+      Client_rpcs.config ->
+      block -> Nonce_hash.t tzresult Lwt.t
     type nonce_info =
       | Revealed of Nonce.t
       | Missing of Nonce_hash.t
       | Forgotten
     val get:
-    Client_rpcs.config ->
-    block -> Raw_level.t -> nonce_info tzresult Lwt.t
+      Client_rpcs.config ->
+      block -> Raw_level.t -> nonce_info tzresult Lwt.t
   end
   module Key : sig
     val get :
@@ -95,8 +95,8 @@ module Context : sig
   end
   module Contract : sig
     val list:
-    Client_rpcs.config ->
-    block -> Contract.t list tzresult Lwt.t
+      Client_rpcs.config ->
+      block -> Contract.t list tzresult Lwt.t
     type info = {
       manager: public_key_hash ;
       balance: Tez.t ;

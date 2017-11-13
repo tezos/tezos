@@ -26,8 +26,8 @@ module Make_set (S : STORE) (I : INDEX)
 module Make_buffered_set
     (S : STORE) (I : INDEX) (Set : Set.S with type elt = I.t)
   : BUFFERED_SET_STORE with type t = S.t
-                      and type elt = I.t
-                      and module Set = Set
+                        and type elt = I.t
+                        and module Set = Set
 
 module Make_map
     (S : STORE) (I : INDEX) (V : VALUE)

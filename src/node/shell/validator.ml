@@ -146,17 +146,17 @@ let rec may_set_head v (block: State.Block.t) =
 (** Block validation *)
 
 type error +=
-   | Invalid_operation of Operation_hash.t
-   | Invalid_fitness of { block: Block_hash.t ;
-                          expected: Fitness.t ;
-                          found: Fitness.t }
-   | Unknown_protocol
-   | Non_increasing_timestamp
-   | Non_increasing_fitness
-   | Wrong_level of Int32.t * Int32.t
-   | Wrong_proto_level of int * int
-   | Replayed_operation of Operation_hash.t
-   | Outdated_operation of Operation_hash.t * Block_hash.t
+  | Invalid_operation of Operation_hash.t
+  | Invalid_fitness of { block: Block_hash.t ;
+                         expected: Fitness.t ;
+                         found: Fitness.t }
+  | Unknown_protocol
+  | Non_increasing_timestamp
+  | Non_increasing_fitness
+  | Wrong_level of Int32.t * Int32.t
+  | Wrong_proto_level of int * int
+  | Replayed_operation of Operation_hash.t
+  | Outdated_operation of Operation_hash.t * Block_hash.t
 
 let () =
   Error_monad.register_error_kind
@@ -168,7 +168,7 @@ let () =
     ~pp:(fun ppf (block, expected, found) ->
         Format.fprintf ppf
           "@[<v 2>Invalid fitness for block %a@ \
-           \ expected %a@ \
+          \ expected %a@ \
           \ found %a"
           Block_hash.pp_short block
           Fitness.pp expected
@@ -365,110 +365,110 @@ let apply_block net_state db
 
 module Context_db = struct
 
-    type data =
-      { validator: net_validator ;
-        state: [ `Inited of Block_header.t tzresult
-               | `Initing of Block_header.t tzresult Lwt.t
-               | `Running of State.Block.t tzresult Lwt.t ] ;
-        wakener: State.Block.t tzresult Lwt.u }
+  type data =
+    { validator: net_validator ;
+      state: [ `Inited of Block_header.t tzresult
+             | `Initing of Block_header.t tzresult Lwt.t
+             | `Running of State.Block.t tzresult Lwt.t ] ;
+      wakener: State.Block.t tzresult Lwt.u }
 
-    type context =
-      { tbl : data Block_hash.Table.t ;
-        canceler : Lwt_utils.Canceler.t ;
-        worker_trigger: unit -> unit;
-        worker_waiter: unit -> unit Lwt.t ;
-        worker: unit Lwt.t ;
-        net_db : Distributed_db.net_db ;
-        net_state : State.Net.t }
+  type context =
+    { tbl : data Block_hash.Table.t ;
+      canceler : Lwt_utils.Canceler.t ;
+      worker_trigger: unit -> unit;
+      worker_waiter: unit -> unit Lwt.t ;
+      worker: unit Lwt.t ;
+      net_db : Distributed_db.net_db ;
+      net_state : State.Net.t }
 
-    let pending_requests { tbl } =
-      Block_hash.Table.fold
-        (fun h data acc ->
-           match data.state with
-           | `Initing _ -> acc
-           | `Running _ -> acc
-           | `Inited d -> (h, d, data) :: acc)
-        tbl []
+  let pending_requests { tbl } =
+    Block_hash.Table.fold
+      (fun h data acc ->
+         match data.state with
+         | `Initing _ -> acc
+         | `Running _ -> acc
+         | `Inited d -> (h, d, data) :: acc)
+      tbl []
 
-    let pending { tbl } hash = Block_hash.Table.mem tbl hash
+  let pending { tbl } hash = Block_hash.Table.mem tbl hash
 
-    let request validator { tbl ; worker_trigger ; net_db } hash =
-      assert (not (Block_hash.Table.mem tbl hash));
-      let waiter, wakener = Lwt.wait () in
-      let data =
-        Distributed_db.Block_header.fetch net_db hash () in
-      match Lwt.state data with
-      | Lwt.Return data ->
-          let state = `Inited data in
-          Block_hash.Table.add tbl hash { validator ; state ; wakener } ;
-          worker_trigger () ;
-          waiter
-      | _ ->
-          let state = `Initing data in
-          Block_hash.Table.add tbl hash { validator ; state ; wakener } ;
-          Lwt.async
-            (fun () ->
-               data >>= fun data ->
-               let state = `Inited data in
-               Block_hash.Table.replace tbl hash { validator ; state ; wakener } ;
-               worker_trigger () ;
-               Lwt.return_unit) ;
-          waiter
+  let request validator { tbl ; worker_trigger ; net_db } hash =
+    assert (not (Block_hash.Table.mem tbl hash));
+    let waiter, wakener = Lwt.wait () in
+    let data =
+      Distributed_db.Block_header.fetch net_db hash () in
+    match Lwt.state data with
+    | Lwt.Return data ->
+        let state = `Inited data in
+        Block_hash.Table.add tbl hash { validator ; state ; wakener } ;
+        worker_trigger () ;
+        waiter
+    | _ ->
+        let state = `Initing data in
+        Block_hash.Table.add tbl hash { validator ; state ; wakener } ;
+        Lwt.async
+          (fun () ->
+             data >>= fun data ->
+             let state = `Inited data in
+             Block_hash.Table.replace tbl hash { validator ; state ; wakener } ;
+             worker_trigger () ;
+             Lwt.return_unit) ;
+        waiter
 
-    let prefetch validator ({ net_state ; tbl } as session) hash =
-      Lwt.ignore_result
-        (State.Block.known_valid net_state hash >>= fun exists ->
-         if not exists && not (Block_hash.Table.mem tbl hash) then
-           request validator session hash >>= fun _ -> Lwt.return_unit
-         else
-           Lwt.return_unit)
+  let prefetch validator ({ net_state ; tbl } as session) hash =
+    Lwt.ignore_result
+      (State.Block.known_valid net_state hash >>= fun exists ->
+       if not exists && not (Block_hash.Table.mem tbl hash) then
+         request validator session hash >>= fun _ -> Lwt.return_unit
+       else
+         Lwt.return_unit)
 
-    let known { net_state } hash =
-      State.Block.known_valid net_state hash
+  let known { net_state } hash =
+    State.Block.known_valid net_state hash
 
-    let read { net_state } hash =
-      State.Block.read net_state hash
+  let read { net_state } hash =
+    State.Block.read net_state hash
 
-    let fetch ({ net_state ; tbl } as session) validator hash =
-      try Lwt.waiter_of_wakener (Block_hash.Table.find tbl hash).wakener
-      with Not_found ->
-        State.Block.known_invalid net_state hash >>= fun known_invalid ->
-        if known_invalid then
-          Lwt.return (Error [failure "Invalid predecessor"])
-        else
-          State.Block.read_opt net_state hash >>= function
-          | Some op ->
-              Lwt.return (Ok op)
+  let fetch ({ net_state ; tbl } as session) validator hash =
+    try Lwt.waiter_of_wakener (Block_hash.Table.find tbl hash).wakener
+    with Not_found ->
+      State.Block.known_invalid net_state hash >>= fun known_invalid ->
+      if known_invalid then
+        Lwt.return (Error [failure "Invalid predecessor"])
+      else
+        State.Block.read_opt net_state hash >>= function
+        | Some op ->
+            Lwt.return (Ok op)
+        | None ->
+            try Lwt.waiter_of_wakener (Block_hash.Table.find tbl hash).wakener
+            with Not_found -> request validator session hash
+
+  let store { net_db ; tbl } hash data =
+    begin
+      match data with
+      | Ok data -> begin
+          Distributed_db.commit_block net_db hash data >>=? function
           | None ->
-              try Lwt.waiter_of_wakener (Block_hash.Table.find tbl hash).wakener
-              with Not_found -> request validator session hash
-
-    let store { net_db ; tbl } hash data =
-      begin
-        match data with
-        | Ok data -> begin
-            Distributed_db.commit_block net_db hash data >>=? function
-            | None ->
-                (* Should not happen if the block is not validated twice *)
-                assert false
-            | Some block ->
-                return (Ok block)
-            end
-        | Error err ->
-            Distributed_db.commit_invalid_block net_db hash >>=? fun changed ->
-            assert changed ;
-            return (Error err)
-      end >>= function
-      | Ok block ->
-          let wakener = (Block_hash.Table.find tbl hash).wakener in
-          Block_hash.Table.remove tbl hash;
-          Lwt.wakeup wakener block ;
-          Lwt.return_unit
-      | Error _ as err ->
-          let wakener = (Block_hash.Table.find tbl hash).wakener in
-          Block_hash.Table.remove tbl hash;
-          Lwt.wakeup wakener err ;
-          Lwt.return_unit
+              (* Should not happen if the block is not validated twice *)
+              assert false
+          | Some block ->
+              return (Ok block)
+        end
+      | Error err ->
+          Distributed_db.commit_invalid_block net_db hash >>=? fun changed ->
+          assert changed ;
+          return (Error err)
+    end >>= function
+    | Ok block ->
+        let wakener = (Block_hash.Table.find tbl hash).wakener in
+        Block_hash.Table.remove tbl hash;
+        Lwt.wakeup wakener block ;
+        Lwt.return_unit
+    | Error _ as err ->
+        let wakener = (Block_hash.Table.find tbl hash).wakener in
+        Block_hash.Table.remove tbl hash;
+        Lwt.wakeup wakener err ;
+        Lwt.return_unit
 
   let process (v: net_validator) ~get_context ~set_context hash block =
     let net_state = Distributed_db.net_state v.net_db in
@@ -482,7 +482,7 @@ module Context_db = struct
         begin
           Chain.genesis net_state >>= fun genesis ->
           if Block_hash.equal (State.Block.hash genesis)
-                              block.shell.predecessor then
+              block.shell.predecessor then
             Lwt.return genesis
           else
             State.Block.read_exn net_state block.shell.predecessor
@@ -524,38 +524,38 @@ module Context_db = struct
                 return block
 
   let request session ~get_context ~set_context pendings =
-      let time = Time.now () in
-      let min_block b pb =
-        match pb with
-        | None -> Some b
-        | Some pb
-          when b.Block_header.shell.timestamp
-               < pb.Block_header.shell.timestamp ->
-            Some b
-        | Some _ as pb -> pb in
-      let next =
-        List.fold_left
-          (fun acc (hash, block, (data : data)) ->
-             match block with
-             | Error _ ->
+    let time = Time.now () in
+    let min_block b pb =
+      match pb with
+      | None -> Some b
+      | Some pb
+        when b.Block_header.shell.timestamp
+             < pb.Block_header.shell.timestamp ->
+          Some b
+      | Some _ as pb -> pb in
+    let next =
+      List.fold_left
+        (fun acc (hash, block, (data : data)) ->
+           match block with
+           | Error _ ->
+               acc
+           | Ok block ->
+               if Time.(block.Block_header.shell.timestamp > time) then
+                 min_block block acc
+               else begin
+                 Block_hash.Table.replace session.tbl hash { data with state = `Running begin
+                     Lwt_main.yield () >>= fun () ->
+                     process data.validator ~get_context ~set_context hash block >>= fun res ->
+                     Block_hash.Table.remove session.tbl hash ;
+                     Lwt.return res
+                   end } ;
                  acc
-             | Ok block ->
-                 if Time.(block.Block_header.shell.timestamp > time) then
-                   min_block block acc
-                 else begin
-                   Block_hash.Table.replace session.tbl hash { data with state = `Running begin
-                       Lwt_main.yield () >>= fun () ->
-                       process data.validator ~get_context ~set_context hash block >>= fun res ->
-                       Block_hash.Table.remove session.tbl hash ;
-                       Lwt.return res
-                     end } ;
-                   acc
-                 end)
-          None
-          pendings in
-      match next with
-      | None -> 0.
-      | Some b -> Int64.to_float (Time.diff b.Block_header.shell.timestamp time)
+               end)
+        None
+        pendings in
+    match next with
+    | None -> 0.
+    | Some b -> Int64.to_float (Time.diff b.Block_header.shell.timestamp time)
 
   let create net_db =
     let net_state = Distributed_db.net_state net_db in
@@ -649,7 +649,7 @@ let create_validator ?parent worker ?max_child_ttl state db net =
                  ( Lwt_unix.sleep 30. >|= fun () -> None) ] >>= function
       | Some block when
           Time.((State.Block.header block).shell.timestamp < add (Time.now ()) (-60L)) ->
-            wait ()
+          wait ()
       | _ ->
           Chain.head net >>= fun head ->
           Chain.genesis net >>= fun genesis ->
@@ -891,7 +891,7 @@ let create state db =
             fetch_block net hash
           else
             failwith "Fitness is below the current one"
-      end in
+        end in
     return (hash, validation) in
 
   let rec activate ?parent ?max_child_ttl net =

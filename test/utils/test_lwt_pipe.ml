@@ -44,7 +44,7 @@ let main () =
   let anon_fun _ = () in
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg;
-    run !qsize !nb_producers
-      !nb_consumers !produced_per_producer !consumed_per_consumer
+  run !qsize !nb_producers
+    !nb_consumers !produced_per_producer !consumed_per_consumer
 
 let () = Lwt_main.run @@ main ()

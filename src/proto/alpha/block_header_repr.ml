@@ -40,10 +40,10 @@ let proto_header_encoding =
     (fun (priority, seed_nonce_hash, proof_of_work_nonce) ->
        { priority ; seed_nonce_hash ; proof_of_work_nonce })
     (obj3
-      (req "priority" uint16)
-      (req "seed_nonce_hash" Nonce_hash.encoding)
-      (req "proof_of_work_nonce"
-         (Fixed.bytes Constants_repr.proof_of_work_nonce_size)))
+       (req "priority" uint16)
+       (req "seed_nonce_hash" Nonce_hash.encoding)
+       (req "proof_of_work_nonce"
+          (Fixed.bytes Constants_repr.proof_of_work_nonce_size)))
 
 let signed_proto_header_encoding =
   let open Data_encoding in

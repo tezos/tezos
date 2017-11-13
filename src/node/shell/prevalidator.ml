@@ -78,7 +78,7 @@ let create net_db =
   Chain_traversal.live_blocks
     !head
     (State.Block.max_operations_ttl !head)
-    >>= fun (live_blocks, live_operations) ->
+  >>= fun (live_blocks, live_operations) ->
   let live_blocks = ref live_blocks in
   let live_operations = ref live_operations in
   let running_validation = ref Lwt.return_unit in

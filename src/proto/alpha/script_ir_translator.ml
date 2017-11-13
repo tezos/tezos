@@ -231,13 +231,13 @@ let compare_comparable
     | Tez_key -> Tez.compare x y
     | Key_hash_key -> Ed25519.Public_key_hash.compare x y
     | Int_key ->
-               let res = (Script_int.compare x y) in
+        let res = (Script_int.compare x y) in
         if Compare.Int.(res = 0) then 0
         else if Compare.Int.(res > 0) then 1
         else -1
 
     | Nat_key ->
-               let res = (Script_int.compare x y) in
+        let res = (Script_int.compare x y) in
         if Compare.Int.(res = 0) then 0
         else if Compare.Int.(res > 0) then 1
         else -1
@@ -968,14 +968,14 @@ let rec parse_data
           (fun (last_value, set) v ->
              parse_comparable_data ?type_logger ctxt t v >>=? fun v ->
              begin match last_value with
-              | Some value ->
-                  if Compare.Int.(0 <= (compare_comparable t value v))
-                  then
-                    if Compare.Int.(0 = (compare_comparable t value v))
-                    then fail (Duplicate_set_values (loc, strip_locations expr))
-                    else fail (Unordered_set_values (loc, strip_locations expr))
-                  else return ()
-              | None -> return ()
+               | Some value ->
+                   if Compare.Int.(0 <= (compare_comparable t value v))
+                   then
+                     if Compare.Int.(0 = (compare_comparable t value v))
+                     then fail (Duplicate_set_values (loc, strip_locations expr))
+                     else fail (Unordered_set_values (loc, strip_locations expr))
+                   else return ()
+               | None -> return ()
              end >>=? fun () ->
              return (Some v, set_update v true set))
           (None, empty_set t) vs >>|? snd |> traced
@@ -984,28 +984,28 @@ let rec parse_data
     (* Maps *)
     | Map_t (tk, tv), (Prim (loc, D_Map, vs, _) as expr) ->
         (fold_left_s
-          (fun (last_value, map) -> function
-             | Prim (_, D_Item, [ k; v ], _) ->
-                 parse_comparable_data ?type_logger ctxt tk k >>=? fun k ->
-                 parse_data ?type_logger ctxt tv v >>=? fun v ->
-                 begin match last_value with
-                  | Some value ->
-                      if Compare.Int.(0 <= (compare_comparable tk value k))
-                      then
-                        if Compare.Int.(0 = (compare_comparable tk value k))
-                        then fail (Duplicate_map_keys (loc, strip_locations expr))
-                        else fail (Unordered_map_keys (loc, strip_locations expr))
-                      else return ()
-                  | None -> return ()
-                 end >>=? fun () ->
-                 return (Some k, map_update k (Some v) map)
-             | Prim (loc, D_Item, l, _) ->
-                 fail @@ Invalid_arity (loc, D_Item, 2, List.length l)
-             | Prim (loc, name, _, _) ->
-                 fail @@ Invalid_primitive (loc, [ D_Item ], name)
-             | Int _ | String _ | Seq _ ->
-                 fail (error ()))
-          (None, empty_map tk) vs) >>|? snd |> traced
+           (fun (last_value, map) -> function
+              | Prim (_, D_Item, [ k; v ], _) ->
+                  parse_comparable_data ?type_logger ctxt tk k >>=? fun k ->
+                  parse_data ?type_logger ctxt tv v >>=? fun v ->
+                  begin match last_value with
+                    | Some value ->
+                        if Compare.Int.(0 <= (compare_comparable tk value k))
+                        then
+                          if Compare.Int.(0 = (compare_comparable tk value k))
+                          then fail (Duplicate_map_keys (loc, strip_locations expr))
+                          else fail (Unordered_map_keys (loc, strip_locations expr))
+                        else return ()
+                    | None -> return ()
+                  end >>=? fun () ->
+                  return (Some k, map_update k (Some v) map)
+              | Prim (loc, D_Item, l, _) ->
+                  fail @@ Invalid_arity (loc, D_Item, 2, List.length l)
+              | Prim (loc, name, _, _) ->
+                  fail @@ Invalid_primitive (loc, [ D_Item ], name)
+              | Int _ | String _ | Seq _ ->
+                  fail (error ()))
+           (None, empty_map tk) vs) >>|? snd |> traced
     | Map_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ D_Map ]))
 
@@ -1819,7 +1819,7 @@ type ex_script = Ex_script : ('a, 'b, 'c) script -> ex_script
 
 let parse_script
   : ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
-  context -> Script.t -> ex_script tzresult Lwt.t
+    context -> Script.t -> ex_script tzresult Lwt.t
   = fun ?type_logger ctxt { code ; storage } ->
     Lwt.return (parse_toplevel code) >>=? fun (arg_type, ret_type, storage_type, code_field) ->
     trace
@@ -1885,7 +1885,7 @@ let typecheck_code
 
 let typecheck_data
   : ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
-  context -> Script.expr * Script.expr -> unit tzresult Lwt.t
+    context -> Script.expr * Script.expr -> unit tzresult Lwt.t
   = fun ?type_logger ctxt (data, exp_ty) ->
     trace
       (Ill_formed_type (None, exp_ty, 0))
@@ -1898,13 +1898,13 @@ let typecheck_data
 (* ---- Error registration --------------------------------------------------*)
 
 let ex_ty_enc =
-    Data_encoding.conv
-      (fun (Ex_ty ty) -> strip_locations (unparse_ty None ty))
-      (fun expr ->
-         match parse_ty (root expr) with
-         | Ok (Ex_ty ty, _) -> Ex_ty ty
-         | _ -> Ex_ty Unit_t (* FIXME: ? *))
-      Script.expr_encoding
+  Data_encoding.conv
+    (fun (Ex_ty ty) -> strip_locations (unparse_ty None ty))
+    (fun expr ->
+       match parse_ty (root expr) with
+       | Ok (Ex_ty ty, _) -> Ex_ty ty
+       | _ -> Ex_ty Unit_t (* FIXME: ? *))
+    Script.expr_encoding
 
 let () =
   let open Data_encoding in
@@ -2158,8 +2158,8 @@ let () =
     ~title:"Types contain inconsistent annotations"
     ~description:"The two types contain annotations that do not match"
     (located (obj2
-               (req "type1" ex_ty_enc)
-               (req "type2" ex_ty_enc)))
+                (req "type1" ex_ty_enc)
+                (req "type2" ex_ty_enc)))
     (function
       | Inconsistent_type_annotations (loc, ty1, ty2) -> Some (loc, (Ex_ty ty1, Ex_ty ty2))
       | _ -> None)
@@ -2295,8 +2295,8 @@ let () =
     ~description:
       "The body of a map block did not match the expected type"
     (obj2
-      (req "loc" Script.location_encoding)
-      (req "bodyType" ex_stack_ty_enc))
+       (req "loc" Script.location_encoding)
+       (req "bodyType" ex_stack_ty_enc))
     (function
       | Invalid_map_body (loc, stack) ->
           Some (loc, Ex_stack_ty stack)

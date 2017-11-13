@@ -97,9 +97,9 @@ module Block = struct
            let open Data_encoding in
            conv
              (fun { header ; message ; max_operations_ttl ; context } ->
-               (message, max_operations_ttl, context, header))
+                (message, max_operations_ttl, context, header))
              (fun (message, max_operations_ttl, context, header) ->
-               { header ; message ; max_operations_ttl ; context })
+                { header ; message ; max_operations_ttl ; context })
              (obj4
                 (req "message" string)
                 (req "max_operations_ttl" uint16)

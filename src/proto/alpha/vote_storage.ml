@@ -33,7 +33,7 @@ let get_ballots ctxt =
   Storage.Vote.Ballots.fold ctxt
     ~f:(fun delegate ballot (ballots: ballots tzresult) ->
         Storage.Vote.Listings.get ctxt delegate >>=? fun weight ->
-          let count = Int32.add weight in
+        let count = Int32.add weight in
         Lwt.return begin
           ballots >>? fun ballots ->
           match ballot with

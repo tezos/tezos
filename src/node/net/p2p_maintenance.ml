@@ -160,7 +160,7 @@ let rec worker_loop st =
     end >>=? fun () ->
     let n_connected = P2p_connection_pool.active_connections pool in
     if n_connected < st.bounds.min_threshold
-       || st.bounds.max_threshold < n_connected then
+    || st.bounds.max_threshold < n_connected then
       maintain st
     else begin
       P2p_connection_pool.send_swap_request pool ;

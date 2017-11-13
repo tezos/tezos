@@ -339,8 +339,8 @@ let encoding =
     (merge_objs
        (obj1 (req "hash" Operation_hash.encoding))
        (merge_objs
-         Operation.shell_header_encoding
-         Encoding.signed_proto_operation_encoding))
+          Operation.shell_header_encoding
+          Encoding.signed_proto_operation_encoding))
 
 let () =
   register_error_kind

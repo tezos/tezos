@@ -36,13 +36,13 @@ let increment_nonce = Sodium.Box.increment_nonce
 let box = Sodium.Box.Bigbytes.box
 let box_open sk pk msg nonce =
   try Some (Sodium.Box.Bigbytes.box_open sk pk msg nonce) with
-    | Sodium.Verification_failure -> None
+  | Sodium.Verification_failure -> None
 
 let precompute = Sodium.Box.precompute
 let fast_box = Sodium.Box.Bigbytes.fast_box
 let fast_box_open ck msg nonce =
   try Some (Sodium.Box.Bigbytes.fast_box_open ck msg nonce) with
-    | Sodium.Verification_failure -> None
+  | Sodium.Verification_failure -> None
 
 let compare_target hash target =
   let hash = Z.of_bits (Hash.Generic_hash.to_string hash) in
@@ -91,21 +91,21 @@ let generate_proof_of_work ?max pk target =
 
 let public_key_encoding =
   let open Data_encoding in
-    conv
-      Sodium.Box.Bigbytes.of_public_key
-      Sodium.Box.Bigbytes.to_public_key
-      (Fixed.bytes Sodium.Box.public_key_size)
+  conv
+    Sodium.Box.Bigbytes.of_public_key
+    Sodium.Box.Bigbytes.to_public_key
+    (Fixed.bytes Sodium.Box.public_key_size)
 
 let secret_key_encoding =
   let open Data_encoding in
-    conv
-      Sodium.Box.Bigbytes.of_secret_key
-      Sodium.Box.Bigbytes.to_secret_key
-      (Fixed.bytes Sodium.Box.secret_key_size)
+  conv
+    Sodium.Box.Bigbytes.of_secret_key
+    Sodium.Box.Bigbytes.to_secret_key
+    (Fixed.bytes Sodium.Box.secret_key_size)
 
 let nonce_encoding =
   let open Data_encoding in
-    conv
-      Sodium.Box.Bigbytes.of_nonce
-      Sodium.Box.Bigbytes.to_nonce
-      (Fixed.bytes Sodium.Box.nonce_size)
+  conv
+    Sodium.Box.Bigbytes.of_nonce
+    Sodium.Box.Bigbytes.to_nonce
+    (Fixed.bytes Sodium.Box.nonce_size)

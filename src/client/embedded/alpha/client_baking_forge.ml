@@ -92,8 +92,8 @@ let () =
           pp_print_error err)
     Data_encoding.
       (obj2
-        (req "operation" (dynamic_size Client_node_rpcs.operation_encoding))
-        (req "error" Node_rpc_services.Error.encoding))
+         (req "operation" (dynamic_size Client_node_rpcs.operation_encoding))
+         (req "error" Node_rpc_services.Error.encoding))
     (function
       | Failed_to_preapply (hash, err) -> Some (hash, err)
       | _ -> None)
@@ -147,7 +147,7 @@ let forge_block cctxt block
           failwith "No slot found at level %a" Raw_level.pp level
   end >>=? fun (priority, minimal_timestamp) ->
   (* lwt_log_info "Baking block at level %a prio %d" *)
-    (* Raw_level.pp level priority >>= fun () -> *)
+  (* Raw_level.pp level priority >>= fun () -> *)
   begin
     match timestamp, minimal_timestamp with
     | None, timestamp -> return timestamp
@@ -172,9 +172,9 @@ let forge_block cctxt block
   lwt_log_info "Computed fitness %a"
     Fitness.pp shell_header.fitness >>= fun () ->
   if best_effort
-     || ( Operation_hash.Map.is_empty result.refused
-          && Operation_hash.Map.is_empty result.branch_refused
-          && Operation_hash.Map.is_empty result.branch_delayed ) then
+  || ( Operation_hash.Map.is_empty result.refused
+       && Operation_hash.Map.is_empty result.branch_refused
+       && Operation_hash.Map.is_empty result.branch_delayed ) then
     let operations =
       if not best_effort then operations
       else
@@ -206,11 +206,11 @@ let forge_block cctxt block
                      (op, Operation_hash.Map.find h result.refused))
          with Not_found ->
          try Some (Failed_to_preapply
-                       (op, Operation_hash.Map.find h result.branch_refused))
-           with Not_found ->
-             try Some (Failed_to_preapply
-                         (op, Operation_hash.Map.find h result.branch_delayed))
-             with Not_found -> None)
+                     (op, Operation_hash.Map.find h result.branch_refused))
+         with Not_found ->
+         try Some (Failed_to_preapply
+                     (op, Operation_hash.Map.find h result.branch_delayed))
+         with Not_found -> None)
       operations
 
 
@@ -594,9 +594,9 @@ let create
                  (fun ppf bi ->
                     Block_hash.pp_short ppf bi.Client_baking_blocks.hash))
               bis
-              >>= fun () ->
-              insert_blocks cctxt ?max_priority state bis >>= fun () ->
-              worker_loop ()
+            >>= fun () ->
+            insert_blocks cctxt ?max_priority state bis >>= fun () ->
+            worker_loop ()
           end
         | `Endorsement (Some (Ok e)) ->
             Lwt.cancel timeout ;
@@ -617,6 +617,6 @@ let create
                   Lwt.return_unit
             end >>= fun () ->
             worker_loop () in
-  lwt_log_info "Starting baking daemon" >>= fun () ->
-  worker_loop () >>= fun () ->
-  return ()
+      lwt_log_info "Starting baking daemon" >>= fun () ->
+      worker_loop () >>= fun () ->
+      return ()

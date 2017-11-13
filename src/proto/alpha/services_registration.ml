@@ -234,10 +234,10 @@ let minimal_timestamp ctxt prio =
   Baking.minimal_time ctxt prio
 
 let () = register1
-           Services.Helpers.minimal_timestamp
-           (fun ctxt slot ->
-              let timestamp = Tezos_context.Timestamp.current ctxt in
-             minimal_timestamp ctxt slot timestamp)
+    Services.Helpers.minimal_timestamp
+    (fun ctxt slot ->
+       let timestamp = Tezos_context.Timestamp.current ctxt in
+       minimal_timestamp ctxt slot timestamp)
 
 let () =
   (* ctxt accept_failing_script baker_contract pred_block block_prio operation *)
@@ -355,7 +355,7 @@ let () =
          Lwt_list.filter_map_p (fun x -> x) @@
          List.mapi
            (fun prio c ->
-             let timestamp = Timestamp.current ctxt in
+              let timestamp = Timestamp.current ctxt in
               Baking.minimal_time ctxt prio timestamp >>= function
               | Error _ -> Lwt.return None
               | Ok minimal_timestamp -> Lwt.return (Some (c, minimal_timestamp)))
@@ -507,9 +507,9 @@ let check_signature ctxt signature shell contents =
       Operation.check_signature source
         { signature ; shell ; contents ; hash = dummy_hash }
   | Sourced_operations (Dictator_operation _) ->
-     let key = Constants.dictator_pubkey ctxt in
-     Operation.check_signature key
-       { signature ; shell ; contents ; hash = dummy_hash }
+      let key = Constants.dictator_pubkey ctxt in
+      Operation.check_signature key
+        { signature ; shell ; contents ; hash = dummy_hash }
 
 let parse_operations ctxt (operations, check) =
   map_s begin fun raw ->

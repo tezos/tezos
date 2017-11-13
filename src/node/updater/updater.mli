@@ -118,4 +118,4 @@ module LiftProtocol(Name : sig val name: string end)
     (Env : Node_protocol_environment_sigs.V1)
     (P : Env.Updater.PROTOCOL) :
   NODE_PROTOCOL with type operation := P.operation
-                and type validation_state := P.validation_state
+                 and type validation_state := P.validation_state

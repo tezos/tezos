@@ -24,40 +24,40 @@
 
 (** String operations.
 
-  A string is an immutable data structure that contains a
-  fixed-length sequence of (single-byte) characters. Each character
-  can be accessed in constant time through its index.
+    A string is an immutable data structure that contains a
+    fixed-length sequence of (single-byte) characters. Each character
+    can be accessed in constant time through its index.
 
-  Given a string [s] of length [l], we can access each of the [l]
-  characters of [s] via its index in the sequence. Indexes start at
-  [0], and we will call an index valid in [s] if it falls within the
-  range [[0...l-1]] (inclusive). A position is the point between two
-  characters or at the beginning or end of the string.  We call a
-  position valid in [s] if it falls within the range [[0...l]]
-  (inclusive). Note that the character at index [n] is between
-  positions [n] and [n+1].
+    Given a string [s] of length [l], we can access each of the [l]
+    characters of [s] via its index in the sequence. Indexes start at
+    [0], and we will call an index valid in [s] if it falls within the
+    range [[0...l-1]] (inclusive). A position is the point between two
+    characters or at the beginning or end of the string.  We call a
+    position valid in [s] if it falls within the range [[0...l]]
+    (inclusive). Note that the character at index [n] is between
+    positions [n] and [n+1].
 
-  Two parameters [start] and [len] are said to designate a valid
-  substring of [s] if [len >= 0] and [start] and [start+len] are
-  valid positions in [s].
+    Two parameters [start] and [len] are said to designate a valid
+    substring of [s] if [len >= 0] and [start] and [start+len] are
+    valid positions in [s].
 
- *)
+*)
 
 external length : string -> int = "%string_length"
 (** Return the length (number of characters) of the given string. *)
 
 external get : string -> int -> char = "%string_safe_get"
 (** [String.get s n] returns the character at index [n] in string [s].
-   You can also write [s.[n]] instead of [String.get s n].
+    You can also write [s.[n]] instead of [String.get s n].
 
-   Raise [Invalid_argument] if [n] not a valid index in [s]. *)
+    Raise [Invalid_argument] if [n] not a valid index in [s]. *)
 
 
 val make : int -> char -> string
 (** [String.make n c] returns a fresh string of length [n],
-   filled with the character [c].
+    filled with the character [c].
 
-   Raise [Invalid_argument] if [n < 0] or [n > ]{!Sys.max_string_length}. *)
+    Raise [Invalid_argument] if [n < 0] or [n > ]{!Sys.max_string_length}. *)
 
 val init : int -> (int -> char) -> string
 (** [String.init n f] returns a string of length [n], with character
@@ -71,11 +71,11 @@ val init : int -> (int -> char) -> string
 
 val sub : string -> int -> int -> string
 (** [String.sub s start len] returns a fresh string of length [len],
-   containing the substring of [s] that starts at position [start] and
-   has length [len].
+    containing the substring of [s] that starts at position [start] and
+    has length [len].
 
-   Raise [Invalid_argument] if [start] and [len] do not
-   designate a valid substring of [s]. *)
+    Raise [Invalid_argument] if [start] and [len] do not
+    designate a valid substring of [s]. *)
 
 val blit : string -> int -> bytes -> int -> int -> unit
 (** Same as {!Bytes.blit_string}. *)
@@ -89,14 +89,14 @@ val concat : string -> string list -> string
 
 val iter : (char -> unit) -> string -> unit
 (** [String.iter f s] applies function [f] in turn to all
-   the characters of [s].  It is equivalent to
-   [f s.[0]; f s.[1]; ...; f s.[String.length s - 1]; ()]. *)
+    the characters of [s].  It is equivalent to
+    [f s.[0]; f s.[1]; ...; f s.[String.length s - 1]; ()]. *)
 
 val iteri : (int -> char -> unit) -> string -> unit
 (** Same as {!String.iter}, but the
-   function is applied to the index of the element as first argument
-   (counting from 0), and the character itself as second argument.
-   @since 4.00.0 *)
+    function is applied to the index of the element as first argument
+    (counting from 0), and the character itself as second argument.
+    @since 4.00.0 *)
 
 val map : (char -> char) -> string -> string
 (** [String.map f s] applies function [f] in turn to all the
@@ -112,11 +112,11 @@ val mapi : (int -> char -> char) -> string -> string
 
 val trim : string -> string
 (** Return a copy of the argument, without leading and trailing
-   whitespace.  The characters regarded as whitespace are: [' '],
-   ['\012'], ['\n'], ['\r'], and ['\t'].  If there is neither leading nor
-   trailing whitespace character in the argument, return the original
-   string itself, not a copy.
-   @since 4.00.0 *)
+    whitespace.  The characters regarded as whitespace are: [' '],
+    ['\012'], ['\n'], ['\r'], and ['\t'].  If there is neither leading nor
+    trailing whitespace character in the argument, return the original
+    string itself, not a copy.
+    @since 4.00.0 *)
 
 val escaped : string -> string
 (** Return a copy of the argument, with special characters
@@ -137,71 +137,71 @@ val escaped : string -> string
 
 val index : string -> char -> int
 (** [String.index s c] returns the index of the first
-   occurrence of character [c] in string [s].
+    occurrence of character [c] in string [s].
 
-   Raise [Not_found] if [c] does not occur in [s]. *)
+    Raise [Not_found] if [c] does not occur in [s]. *)
 
 val rindex : string -> char -> int
 (** [String.rindex s c] returns the index of the last
-   occurrence of character [c] in string [s].
+    occurrence of character [c] in string [s].
 
-   Raise [Not_found] if [c] does not occur in [s]. *)
+    Raise [Not_found] if [c] does not occur in [s]. *)
 
 val index_from : string -> int -> char -> int
 (** [String.index_from s i c] returns the index of the
-   first occurrence of character [c] in string [s] after position [i].
-   [String.index s c] is equivalent to [String.index_from s 0 c].
+    first occurrence of character [c] in string [s] after position [i].
+    [String.index s c] is equivalent to [String.index_from s 0 c].
 
-   Raise [Invalid_argument] if [i] is not a valid position in [s].
-   Raise [Not_found] if [c] does not occur in [s] after position [i]. *)
+    Raise [Invalid_argument] if [i] is not a valid position in [s].
+    Raise [Not_found] if [c] does not occur in [s] after position [i]. *)
 
 val rindex_from : string -> int -> char -> int
 (** [String.rindex_from s i c] returns the index of the
-   last occurrence of character [c] in string [s] before position [i+1].
-   [String.rindex s c] is equivalent to
-   [String.rindex_from s (String.length s - 1) c].
+    last occurrence of character [c] in string [s] before position [i+1].
+    [String.rindex s c] is equivalent to
+    [String.rindex_from s (String.length s - 1) c].
 
-   Raise [Invalid_argument] if [i+1] is not a valid position in [s].
-   Raise [Not_found] if [c] does not occur in [s] before position [i+1]. *)
+    Raise [Invalid_argument] if [i+1] is not a valid position in [s].
+    Raise [Not_found] if [c] does not occur in [s] before position [i+1]. *)
 
 val contains : string -> char -> bool
 (** [String.contains s c] tests if character [c]
-   appears in the string [s]. *)
+    appears in the string [s]. *)
 
 val contains_from : string -> int -> char -> bool
 (** [String.contains_from s start c] tests if character [c]
-   appears in [s] after position [start].
-   [String.contains s c] is equivalent to
-   [String.contains_from s 0 c].
+    appears in [s] after position [start].
+    [String.contains s c] is equivalent to
+    [String.contains_from s 0 c].
 
-   Raise [Invalid_argument] if [start] is not a valid position in [s]. *)
+    Raise [Invalid_argument] if [start] is not a valid position in [s]. *)
 
 val rcontains_from : string -> int -> char -> bool
 (** [String.rcontains_from s stop c] tests if character [c]
-   appears in [s] before position [stop+1].
+    appears in [s] before position [stop+1].
 
-   Raise [Invalid_argument] if [stop < 0] or [stop+1] is not a valid
-   position in [s]. *)
+    Raise [Invalid_argument] if [stop < 0] or [stop+1] is not a valid
+    position in [s]. *)
 
 val uppercase_ascii : string -> string
 (** Return a copy of the argument, with all lowercase letters
-   translated to uppercase, using the US-ASCII character set.
-   @since 4.03.0 *)
+    translated to uppercase, using the US-ASCII character set.
+    @since 4.03.0 *)
 
 val lowercase_ascii : string -> string
 (** Return a copy of the argument, with all uppercase letters
-   translated to lowercase, using the US-ASCII character set.
-   @since 4.03.0 *)
+    translated to lowercase, using the US-ASCII character set.
+    @since 4.03.0 *)
 
 val capitalize_ascii : string -> string
 (** Return a copy of the argument, with the first character set to uppercase,
-   using the US-ASCII character set.
-   @since 4.03.0 *)
+    using the US-ASCII character set.
+    @since 4.03.0 *)
 
 val uncapitalize_ascii : string -> string
 (** Return a copy of the argument, with the first character set to lowercase,
-   using the US-ASCII character set.
-   @since 4.03.0 *)
+    using the US-ASCII character set.
+    @since 4.03.0 *)
 
 type t = string
 (** An alias for the type of strings. *)

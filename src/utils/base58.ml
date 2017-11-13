@@ -30,7 +30,7 @@ module Alphabet = struct
       if Bytes.get str char <> '\255' then
         Format.kasprintf invalid_arg
           "Base58: invalid alphabet (dup '%c' %d %d)"
-        (char_of_int char) (int_of_char @@ Bytes.get str char) i ;
+          (char_of_int char) (int_of_char @@ Bytes.get str char) i ;
       Bytes.set str char (char_of_int i) ;
     done ;
     { encode = alphabet ; decode = Bytes.to_string str }
@@ -91,10 +91,10 @@ let raw_encode ?(alphabet=Alphabet.default) s =
   let s = Z.of_bits s in
   let rec loop s =
     if s = Z.zero then 0 else
-    let s, r = Z.div_rem s zbase in
-    let i = loop s in
-    Bytes.set res i (to_char ~alphabet (Z.to_int r)) ;
-    i + 1 in
+      let s, r = Z.div_rem s zbase in
+      let i = loop s in
+      Bytes.set res i (to_char ~alphabet (Z.to_int r)) ;
+      i + 1 in
   let i = loop s in
   let res = Bytes.sub_string res 0 i in
   String.make zeros zero ^ res
@@ -105,9 +105,9 @@ let raw_decode ?(alphabet=Alphabet.default) s =
   let len = String.length s in
   let rec loop res i =
     if i = len then res else
-    let x = Z.of_int (of_char ~alphabet (String.get s i)) in
-    let res = Z.(add x (mul res zbase)) in
-    loop res (i+1)
+      let x = Z.of_int (of_char ~alphabet (String.get s i)) in
+      let res = Z.(add x (mul res zbase)) in
+      loop res (i+1)
   in
   let res = Z.to_bits @@ loop Z.zero zeros in
   let res_tzeros = count_trailing_char res '\000' in

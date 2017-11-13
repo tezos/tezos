@@ -95,8 +95,8 @@ module Identity : sig
 
   val generate_with_animation :
     Format.formatter -> Crypto_box.target -> t
-  (** [generate_with_animation ppf target] is a freshly minted identity
-      whose proof of work stamp difficulty is at least equal to [target]. *)
+    (** [generate_with_animation ppf target] is a freshly minted identity
+        whose proof of work stamp difficulty is at least equal to [target]. *)
 
 end
 

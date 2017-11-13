@@ -28,7 +28,7 @@ let monitor cctxt ?contents ?check () =
              | [proto] ->
                  return { hash ; content = Some proto }
              | _ -> failwith "Error while parsing the operation")
-     (List.concat  ops)
+      (List.concat  ops)
   in
   return (Lwt_stream.map_s convert ops_stream)
 

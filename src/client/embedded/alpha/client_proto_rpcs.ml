@@ -176,11 +176,11 @@ module Helpers = struct
     let baking_rights_for_delegate cctxt
         b c ?max_priority ?first_level ?last_level () =
       call_error_service2 cctxt Services.Helpers.Rights.baking_rights_for_delegate
-      b c (max_priority, first_level, last_level)
+        b c (max_priority, first_level, last_level)
     let endorsement_rights_for_delegate cctxt
         b c ?max_priority ?first_level ?last_level () =
-    call_error_service2 cctxt Services.Helpers.Rights.endorsement_rights_for_delegate
-      b c (max_priority, first_level, last_level)
+      call_error_service2 cctxt Services.Helpers.Rights.endorsement_rights_for_delegate
+        b c (max_priority, first_level, last_level)
   end
 
   module Forge = struct
@@ -246,10 +246,10 @@ module Helpers = struct
            ({net_id ; branch}, Sourced_operations op))
       let activate cctxt
           b ~net_id ~branch hash =
-          operation cctxt b ~net_id ~branch (Activate hash)
+        operation cctxt b ~net_id ~branch (Activate hash)
       let activate_testnet cctxt
           b ~net_id ~branch hash =
-          operation cctxt b ~net_id ~branch (Activate_testnet hash)
+        operation cctxt b ~net_id ~branch (Activate_testnet hash)
     end
     module Anonymous = struct
       let operations cctxt block ~net_id ~branch operations =
@@ -286,11 +286,11 @@ module Helpers = struct
 
 end
 (* type slot = *)
-      (* raw_level * int * timestamp option *)
-    (* let baking_possibilities *)
-        (* b c ?max_priority ?first_level ?last_level () = *)
-      (* call_error_service2 Services.Helpers.Context.Contract.baking_possibilities *)
-        (* b c (max_priority, first_level, last_level) *)
-    (* (\* let endorsement_possibilities b c ?max_priority ?first_level ?last_level () = *\) *)
-      (* call_error_service2 Services.Helpers.Context.Contract.endorsement_possibilities *)
-        (* b c (max_priority, first_level, last_level) *)
+(* raw_level * int * timestamp option *)
+(* let baking_possibilities *)
+(* b c ?max_priority ?first_level ?last_level () = *)
+(* call_error_service2 Services.Helpers.Context.Contract.baking_possibilities *)
+(* b c (max_priority, first_level, last_level) *)
+(* (\* let endorsement_possibilities b c ?max_priority ?first_level ?last_level () = *\) *)
+(* call_error_service2 Services.Helpers.Context.Contract.endorsement_possibilities *)
+(* b c (max_priority, first_level, last_level) *)

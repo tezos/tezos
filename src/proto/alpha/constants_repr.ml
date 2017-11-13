@@ -164,20 +164,20 @@ let constants_encoding =
         dictator_pubkey =
           unopt default.dictator_pubkey dictator_pubkey ;
       } )
-     Data_encoding.(
-       merge_objs
-         (obj10
-            (opt "cycle_length" int32)
-            (opt "voting_period_length" int32)
-            (opt "time_before_reward" int64)
-            (opt "slot_durations" (list Period_repr.encoding))
-            (opt "first_free_baking_slot" uint16)
-            (opt "max_signing_slot" uint16)
-            (opt "instructions_per_transaction" int31)
-            (opt "proof_of_work_threshold" int64)
-            (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
-            (opt "dictator_pubkey" Ed25519.Public_key.encoding))
-         unit)
+    Data_encoding.(
+      merge_objs
+        (obj10
+           (opt "cycle_length" int32)
+           (opt "voting_period_length" int32)
+           (opt "time_before_reward" int64)
+           (opt "slot_durations" (list Period_repr.encoding))
+           (opt "first_free_baking_slot" uint16)
+           (opt "max_signing_slot" uint16)
+           (opt "instructions_per_transaction" int31)
+           (opt "proof_of_work_threshold" int64)
+           (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
+           (opt "dictator_pubkey" Ed25519.Public_key.encoding))
+        unit)
 
 type error += Constant_read of exn
 

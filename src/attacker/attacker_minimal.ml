@@ -34,10 +34,10 @@ let block_forged ?prev ops =
       Proto.Fitness_repr.int64_to_bytes x ] in
   let pred = match prev with None -> genesis_block_hashed | Some x -> x in
   let block ops = Store.Block_header.{ net_id = network ;
-                      predecessor = pred ;
-                      timestamp = Time.now () ;
-                      fitness = from_int64 1L;
-                      operations = ops } in
+                                       predecessor = pred ;
+                                       timestamp = Time.now () ;
+                                       fitness = from_int64 1L;
+                                       operations = ops } in
   let open Proto in
   let generate_proof_of_work_nonce () =
     Sodium.Random.Bigbytes.generate
@@ -70,12 +70,12 @@ let tx_forged ?dest amount fee =
         parameters = None ;
         destination = default_contract trgt.public_key_hash ; } in
   let op = Sourced_operations
-    ( Manager_operations
-        { source = default_contract src.public_key_hash ;
-          public_key = Some src.public_key ;
-          fee = of_cents_exn fee ;
-          counter = 1l ;
-          operations = [tx] ; }) in
+      ( Manager_operations
+          { source = default_contract src.public_key_hash ;
+            public_key = Some src.public_key ;
+            fee = of_cents_exn fee ;
+            counter = 1l ;
+            operations = [tx] ; }) in
   forge { net_id = network } op
 
 (* forge a list of proposals, california eat your heart out *)
@@ -98,7 +98,7 @@ let ballot_forged period prop vote =
       period = period ;
       proposal = prop ;
       ballot = vote
-      } in
+    } in
   let op = Sourced_operations (Delegate_operations {
       source = src.public_key ;
       operations = [ballot] }) in

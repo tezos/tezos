@@ -162,9 +162,9 @@ let port_arg =
     ~default:(string_of_int Cfg_file.default.node_port)
     (parameter
        (fun _ x -> try
-        return (int_of_string x)
-      with Failure _ ->
-        fail (Invalid_port_arg x)))
+           return (int_of_string x)
+         with Failure _ ->
+           fail (Invalid_port_arg x)))
 let tls_switch =
   switch
     ~parameter:"-tls"

@@ -155,7 +155,7 @@ module Term = struct
   let binary_chunks_size =
     let doc =
       Format.sprintf
-      "Size limit (in kB) of binary blocks that are sent to other peers."
+        "Size limit (in kB) of binary blocks that are sent to other peers."
     in
     Arg.(value & opt (some int) None &
          info ~docs ~doc ~docv:"NUM" ["binary-chunks-size"])

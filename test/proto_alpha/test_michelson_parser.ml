@@ -216,7 +216,7 @@ Assert.equal (get_tokens @@ tokenize @@ "string")
 
 let parse_expr_no_locs str =
   List.map strip_locations
-  Michelson_parser.(parse_toplevel (tokenize str))
+    Michelson_parser.(parse_toplevel (tokenize str))
 
 let assert_parses str parsed =
   Assert.equal (parse_expr_no_locs str) parsed;;
@@ -247,8 +247,8 @@ assert_parses "PUSH (pair bool string) (Pair False \"abc\")"
                               [ Prim ((), "bool", [], None) ;
                                 Prim ((), "string", [], None) ], None) ;
                         Prim ((), "Pair", 
-                                   [ Prim ((), "False", [], None) ;
-                                     String ((), "abc")], None) ], None) ];
+                              [ Prim ((), "False", [], None) ;
+                                String ((), "abc")], None) ], None) ];
 assert_parses "PUSH (list nat) (List 1 2 3)"
   [ Prim ((), "PUSH", [ Prim ((), "list",
                               [ Prim ((), "nat", [], None) ], None) ;
@@ -262,7 +262,7 @@ assert_parses "PUSH (lambda nat nat) {}"
                               [ Prim ((), "nat", [], None);
                                 Prim ((), "nat", [], None)], None) ;
                         Seq((), [], None)],
-                        None) ];
+          None) ];
 assert_parses "PUSH key \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\""
   [ Prim ((), "PUSH", [ Prim ((), "key", [], None) ;
                         String ((),"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") ],
@@ -278,9 +278,9 @@ assert_parses "PUSH (map int bool) (Map (Item 100 False))"
           None) ];
 assert_parses
   "parameter int; \
-return int; \ 
+   return int; \ 
 storage unit; \
-code {}"
+   code {}"
   [ Prim ((), "parameter", [ Prim((), "int", [], None) ], None);
     Prim ((), "return", [ Prim((), "int", [], None) ], None);
     Prim ((), "storage", [ Prim((), "unit", [], None) ], None);

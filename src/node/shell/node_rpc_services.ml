@@ -25,7 +25,7 @@ module Error = struct
         (Printf.sprintf
            "The full list of error is available with \
             the global RPC `%s /%s`"
-            (RPC.string_of_method meth) (String.concat "/" path))
+           (RPC.string_of_method meth) (String.concat "/" path))
       (conv
          ~schema:Json_schema.any
          (fun exn -> `A (List.map json_of_error exn))
@@ -68,7 +68,7 @@ module Blocks = struct
     | `Head of int | `Prevalidation
     | `Test_head of int | `Test_prevalidation
     | `Hash of Block_hash.t
-    ]
+  ]
 
   type block_info = {
     hash: Block_hash.t ;
@@ -367,8 +367,8 @@ module Blocks = struct
         (include_ops, length, heads, monitor, delay, min_date, min_heads))
       (fun (include_ops, length, heads, monitor,
             delay, min_date, min_heads) ->
-         { include_ops ; length ; heads ; monitor ;
-           delay ; min_date ; min_heads })
+        { include_ops ; length ; heads ; monitor ;
+          delay ; min_date ; min_heads })
       (obj7
          (dft "include_ops"
             (Data_encoding.describe

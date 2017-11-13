@@ -125,7 +125,7 @@ module Make() = struct
   let classify_error error =
     let rec find e = function
       | [] -> `Temporary
-          (* assert false (\* See "Generic error" *\) *)
+      (* assert false (\* See "Generic error" *\) *)
       | Error_kind { from_error ; category } :: rest ->
           match from_error e with
           | Some x -> begin
@@ -368,72 +368,72 @@ module Make() = struct
           (Format.pp_print_list pp)
           (List.rev errors)
 
-type error += Unclassified of string
+  type error += Unclassified of string
 
-let () =
-  let id = "" in
-  let category = `Temporary in
-  let to_error msg = Unclassified msg in
-  let from_error = function
-    | Unclassified msg -> Some msg
-    | error ->
-        let msg = Obj.(extension_name @@ extension_constructor error) in
-        Some ("Unclassified error: " ^ msg ^ ". Was the error registered?") in
-  let title = "Generic error" in
-  let description =  "An unclassified error" in
-  let encoding_case =
-    let open Data_encoding in
-    case
-      (describe ~title ~description @@
-       conv (fun x -> ((), x)) (fun ((), x) -> x) @@
-       (obj2
-          (req "kind" (constant "generic"))
-          (req "error" string)))
-      from_error to_error in
-  let pp = Format.pp_print_string in
-  error_kinds :=
-    Error_kind { id; from_error ; category; encoding_case ; pp } :: !error_kinds
+  let () =
+    let id = "" in
+    let category = `Temporary in
+    let to_error msg = Unclassified msg in
+    let from_error = function
+      | Unclassified msg -> Some msg
+      | error ->
+          let msg = Obj.(extension_name @@ extension_constructor error) in
+          Some ("Unclassified error: " ^ msg ^ ". Was the error registered?") in
+    let title = "Generic error" in
+    let description =  "An unclassified error" in
+    let encoding_case =
+      let open Data_encoding in
+      case
+        (describe ~title ~description @@
+         conv (fun x -> ((), x)) (fun ((), x) -> x) @@
+         (obj2
+            (req "kind" (constant "generic"))
+            (req "error" string)))
+        from_error to_error in
+    let pp = Format.pp_print_string in
+    error_kinds :=
+      Error_kind { id; from_error ; category; encoding_case ; pp } :: !error_kinds
 
-type error += Assert_error of string * string
+  type error += Assert_error of string * string
 
-let () =
-  let id = "" in
-  let category = `Permanent in
-  let to_error (loc, msg) = Assert_error (loc, msg) in
-  let from_error = function
-    | Assert_error (loc, msg) -> Some (loc, msg)
-    | _ -> None in
-  let title = "Assertion error" in
-  let description =  "An fatal assertion" in
-  let encoding_case =
-    let open Data_encoding in
-    case
-      (describe ~title ~description @@
-       conv (fun (x, y) -> ((), x, y)) (fun ((), x, y) -> (x, y)) @@
-       (obj3
-          (req "kind" (constant "assertion"))
-          (req "location" string)
-          (req "error" string)))
-      from_error to_error in
-  let pp ppf (loc, msg) =
-    Format.fprintf ppf
-      "Assert failure (%s)%s"
-      loc
-      (if msg = "" then "." else ": " ^ msg) in
-  error_kinds :=
-    Error_kind { id; from_error ; category; encoding_case ; pp } :: !error_kinds
+  let () =
+    let id = "" in
+    let category = `Permanent in
+    let to_error (loc, msg) = Assert_error (loc, msg) in
+    let from_error = function
+      | Assert_error (loc, msg) -> Some (loc, msg)
+      | _ -> None in
+    let title = "Assertion error" in
+    let description =  "An fatal assertion" in
+    let encoding_case =
+      let open Data_encoding in
+      case
+        (describe ~title ~description @@
+         conv (fun (x, y) -> ((), x, y)) (fun ((), x, y) -> (x, y)) @@
+         (obj3
+            (req "kind" (constant "assertion"))
+            (req "location" string)
+            (req "error" string)))
+        from_error to_error in
+    let pp ppf (loc, msg) =
+      Format.fprintf ppf
+        "Assert failure (%s)%s"
+        loc
+        (if msg = "" then "." else ": " ^ msg) in
+    error_kinds :=
+      Error_kind { id; from_error ; category; encoding_case ; pp } :: !error_kinds
 
-let _assert b loc fmt =
-  if b then
-    Format.ikfprintf (fun _ -> return ()) Format.str_formatter fmt
-  else
-    Format.kasprintf (fun msg -> fail (Assert_error (loc, msg))) fmt
+  let _assert b loc fmt =
+    if b then
+      Format.ikfprintf (fun _ -> return ()) Format.str_formatter fmt
+    else
+      Format.kasprintf (fun msg -> fail (Assert_error (loc, msg))) fmt
 
 
-let protect ~on_error t =
-  t  >>= function
-  | Ok res -> return res
-  | Error err -> on_error err
+  let protect ~on_error t =
+    t  >>= function
+    | Ok res -> return res
+    | Error err -> on_error err
 
 end
 

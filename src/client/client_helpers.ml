@@ -53,5 +53,5 @@ let commands () = Cli_entries.[
            ) stream >>= fun () ->
          cctxt.answer "Bootstrapped." >>= fun () ->
          return ()
-)
+      )
   ]

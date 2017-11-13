@@ -6,7 +6,7 @@ set -o pipefail
 test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
 source $test_dir/lib/test_lib.inc.sh
 
-start_node 2
+start_node 1
 activate_alpha
 
 key1=foo

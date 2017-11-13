@@ -669,10 +669,10 @@ module Block_header : sig
 
   val forge_unsigned:
     Block_header.shell_header -> proto_header -> MBytes.t
-  (** [forge_header shell_hdr proto_hdr] is the binary serialization
-      (using [unsigned_header_encoding]) of a block header,
-      comprising both the shell and the protocol part of the header,
-      without the signature. *)
+    (** [forge_header shell_hdr proto_hdr] is the binary serialization
+        (using [unsigned_header_encoding]) of a block header,
+        comprising both the shell and the protocol part of the header,
+        without the signature. *)
 
 end
 

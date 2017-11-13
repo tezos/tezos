@@ -57,7 +57,7 @@ let () =
     (fun (contract, expr) ->
        Runtime_contract_error (contract, expr));
 
-(* ---- interpreter ---------------------------------------------------------*)
+  (* ---- interpreter ---------------------------------------------------------*)
 
 type 'tys stack =
   | Item : 'ty * 'rest stack -> ('ty * 'rest) stack
@@ -162,8 +162,8 @@ let rec interp
                 (init, qta, ctxt, origination) l >>=? fun (res, qta, ctxt, origination) ->
               logged_return ~origination (Item (res, rest), qta, ctxt)
           | List_size, Item (list, rest) ->
-             let len = List.length list in
-             let len = Script_int.(abs (of_int len)) in
+              let len = List.length list in
+              let len = Script_int.(abs (of_int len)) in
               logged_return (Item (len, rest), qta - 1, ctxt)
           | List_iter body, Item (l, init_stack) ->
               fold_left_s

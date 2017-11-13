@@ -460,8 +460,8 @@ module GcPeer_idSet = Utils.Bounded(struct
   end)
 
 let gc_peer_ids ({ meta_config = { score } ;
-              config = { max_known_peer_ids } ;
-              known_peer_ids ; } as pool) =
+                   config = { max_known_peer_ids } ;
+                   known_peer_ids ; } as pool) =
   match max_known_peer_ids with
   | None -> ()
   | Some (_, target) ->
@@ -804,13 +804,13 @@ and authenticate pool ?point_info canceler fd point =
     unopt_map connection_point_info
       ~default:(not pool.config.closed_network)
       ~f:begin fun connection_point_info ->
-      match Point_info.State.get connection_point_info with
-      | Requested _ -> not incoming
-      | Disconnected ->
-          not pool.config.closed_network
-          || Point_info.trusted connection_point_info
-      | Accepted _ | Running _ -> false
-    end
+        match Point_info.State.get connection_point_info with
+        | Requested _ -> not incoming
+        | Disconnected ->
+            not pool.config.closed_network
+            || Point_info.trusted connection_point_info
+        | Accepted _ | Running _ -> false
+      end
   in
   let acceptable_peer_id =
     match Peer_info.State.get peer_info with
@@ -975,7 +975,7 @@ and swap_request pool conn new_point _new_peer_id =
       (Time.max pool.latest_succesfull_swap pool.latest_accepted_swap) in
   let new_point_info = register_point pool source_peer_id new_point in
   if span_since_last_swap < int_of_float pool.config.swap_linger
-     || not (Point_info.State.is_disconnected new_point_info) then begin
+  || not (Point_info.State.is_disconnected new_point_info) then begin
     log pool (Swap_request_ignored { source = source_peer_id }) ;
     lwt_log_info "Ignoring swap request from %a" Peer_id.pp source_peer_id
   end else begin
@@ -1043,7 +1043,7 @@ let accept pool fd point =
   log pool (Incoming_connection point) ;
   if pool.config.max_incoming_connections <= Point.Table.length pool.incoming
   || pool.config.max_connections <= active_connections pool then
- Lwt.async (fun () -> Lwt_utils.safe_close fd)
+    Lwt.async (fun () -> Lwt_utils.safe_close fd)
   else
     let canceler = Canceler.create () in
     Point.Table.add pool.incoming point canceler ;

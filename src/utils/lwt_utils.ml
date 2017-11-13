@@ -313,12 +313,12 @@ let stable_sort cmp l =
           end
       end
     | n, l ->
-       let n1 = n asr 1 in
-       let n2 = n - n1 in
-       let l2 = chop n1 l in
-       rev_sort n1 l >>= fun s1 ->
-       rev_sort n2 l2 >>= fun s2 ->
-       rev_merge_rev s1 s2 []
+        let n1 = n asr 1 in
+        let n2 = n - n1 in
+        let l2 = chop n1 l in
+        rev_sort n1 l >>= fun s1 ->
+        rev_sort n2 l2 >>= fun s2 ->
+        rev_merge_rev s1 s2 []
   and rev_sort n l =
     match n, l with
     | 2, x1 :: x2 :: _ -> begin

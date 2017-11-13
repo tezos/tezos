@@ -76,15 +76,15 @@ module Point_info : sig
 
     type 'conn t =
       | Requested of { cancel: Canceler.t }
-        (** We initiated a connection. *)
+      (** We initiated a connection. *)
       | Accepted of { current_peer_id: Peer_id.t ;
                       cancel: Canceler.t }
-        (** We accepted a incoming connection. *)
+      (** We accepted a incoming connection. *)
       | Running of { data: 'conn ;
                      current_peer_id: Peer_id.t }
-        (** Successfully authentificated connection, normal business. *)
+      (** Successfully authentificated connection, normal business. *)
       | Disconnected
-        (** No connection established currently. *)
+      (** No connection established currently. *)
     type 'conn state = 'conn t
 
     val pp : Format.formatter -> 'conn t -> unit
@@ -113,19 +113,19 @@ module Point_info : sig
 
     type kind =
       | Outgoing_request
-        (** We initiated a connection. *)
+      (** We initiated a connection. *)
       | Accepting_request of Peer_id.t
-        (** We accepted a connection after authentifying the remote peer. *)
+      (** We accepted a connection after authentifying the remote peer. *)
       | Rejecting_request of Peer_id.t
-        (** We rejected a connection after authentifying the remote peer. *)
+      (** We rejected a connection after authentifying the remote peer. *)
       | Request_rejected of Peer_id.t option
-        (** The remote peer rejected our connection. *)
+      (** The remote peer rejected our connection. *)
       | Connection_established of Peer_id.t
-        (** We succesfully established a authentified connection. *)
+      (** We succesfully established a authentified connection. *)
       | Disconnection of Peer_id.t
-        (** We decided to close the connection. *)
+      (** We decided to close the connection. *)
       | External_disconnection of Peer_id.t
-        (** The connection was closed for external reason. *)
+      (** The connection was closed for external reason. *)
 
     type t = {
       kind : kind ;
@@ -207,13 +207,13 @@ module Peer_info : sig
     type 'conn t =
       | Accepted of { current_point: Id_point.t ;
                       cancel: Canceler.t }
-        (** We accepted a incoming connection, we greeted back and
-            we are waiting for an acknowledgement. *)
+      (** We accepted a incoming connection, we greeted back and
+          we are waiting for an acknowledgement. *)
       | Running of { data: 'conn ;
                      current_point: Id_point.t }
-        (** Successfully authentificated connection, normal business. *)
+      (** Successfully authentificated connection, normal business. *)
       | Disconnected
-        (** No connection established currently. *)
+      (** No connection established currently. *)
     type 'conn state = 'conn t
 
     val pp : Format.formatter -> 'conn t -> unit
@@ -241,17 +241,17 @@ module Peer_info : sig
 
     type kind =
       | Accepting_request
-        (** We accepted a connection after authentifying the remote peer. *)
+      (** We accepted a connection after authentifying the remote peer. *)
       | Rejecting_request
-        (** We rejected a connection after authentifying the remote peer. *)
+      (** We rejected a connection after authentifying the remote peer. *)
       | Request_rejected
-        (** The remote peer rejected our connection. *)
+      (** The remote peer rejected our connection. *)
       | Connection_established
-        (** We succesfully established a authentified connection. *)
+      (** We succesfully established a authentified connection. *)
       | Disconnection
-        (** We decided to close the connection. *)
+      (** We decided to close the connection. *)
       | External_disconnection
-        (** The connection was closed for external reason. *)
+      (** The connection was closed for external reason. *)
 
     type t = {
       kind : kind ;

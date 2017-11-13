@@ -20,7 +20,7 @@
  * License along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
  * 02111-1307, USA.
- *)
+*)
 
 (* TEZOS CHANGES
 
@@ -62,63 +62,63 @@
 (** {2 Definitions and basics} *)
 
 type +'a t
-  (** The type of threads returning a result of type ['a]. *)
+(** The type of threads returning a result of type ['a]. *)
 
 val return : 'a -> 'a t
-  (** [return e] is a thread whose return value is the value of the
-      expression [e]. *)
+(** [return e] is a thread whose return value is the value of the
+    expression [e]. *)
 
 (* val fail : exn -> 'a t *)
 (*   (\** [fail e] is a thread that fails with the exception [e]. *\) *)
 
 val bind : 'a t -> ('a -> 'b t) -> 'b t
-  (** [bind t f] is a thread which first waits for the thread [t] to
-      terminate and then, if the thread succeeds, behaves as the
-      application of function [f] to the return value of [t].  If the
-      thread [t] fails, [bind t f] also fails, with the same
-      exception.
+(** [bind t f] is a thread which first waits for the thread [t] to
+    terminate and then, if the thread succeeds, behaves as the
+    application of function [f] to the return value of [t].  If the
+    thread [t] fails, [bind t f] also fails, with the same
+    exception.
 
-      The expression [bind t (fun x -> t')] can intuitively be read as
-      [let x = t in t'], and if you use the {e lwt.syntax} syntax
-      extension, you can write a bind operation like that: [lwt x = t in t'].
+    The expression [bind t (fun x -> t')] can intuitively be read as
+    [let x = t in t'], and if you use the {e lwt.syntax} syntax
+    extension, you can write a bind operation like that: [lwt x = t in t'].
 
-      Note that [bind] is also often used just for synchronization
-      purpose: [t'] will not execute before [t] is terminated.
+    Note that [bind] is also often used just for synchronization
+    purpose: [t'] will not execute before [t] is terminated.
 
-      The result of a thread can be bound several time. *)
+    The result of a thread can be bound several time. *)
 
 val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
-  (** [t >>= f] is an alternative notation for [bind t f]. *)
+(** [t >>= f] is an alternative notation for [bind t f]. *)
 
 val (=<<) : ('a -> 'b t) -> 'a t -> 'b t
-  (** [f =<< t] is [t >>= f] *)
+(** [f =<< t] is [t >>= f] *)
 
 val map : ('a -> 'b) -> 'a t -> 'b t
-  (** [map f m] map the result of a thread. This is the same as [bind
-      m (fun x -> return (f x))] *)
+(** [map f m] map the result of a thread. This is the same as [bind
+    m (fun x -> return (f x))] *)
 
 val (>|=) : 'a t -> ('a -> 'b) -> 'b t
-  (** [m >|= f] is [map f m] *)
+(** [m >|= f] is [map f m] *)
 
 val (=|<) : ('a -> 'b) -> 'a t -> 'b t
-  (** [f =|< m] is [map f m] *)
+(** [f =|< m] is [map f m] *)
 
 (** {3 Pre-allocated threads} *)
 
 val return_unit : unit t
-  (** [return_unit = return ()] *)
+(** [return_unit = return ()] *)
 
 val return_none : 'a option t
-  (** [return_none = return None] *)
+(** [return_none = return None] *)
 
 val return_nil : 'a list t
-  (** [return_nil = return \[\]] *)
+(** [return_nil = return \[\]] *)
 
 val return_true : bool t
-  (** [return_true = return true] *)
+(** [return_true = return true] *)
 
 val return_false : bool t
-  (** [return_false = return false] *)
+(** [return_false = return false] *)
 
 (* (\** {2 Thread storage} *\) *)
 
@@ -223,18 +223,18 @@ val return_false : bool t
 (*       the list of threads that have not yet terminated. *\) *)
 
 val join : unit t list -> unit t
-  (** [join l] waits for all threads in [l] to terminate. If one of
-      the threads fails, then [join l] will fails with the same
-      exception as the first one to terminate.
+(** [join l] waits for all threads in [l] to terminate. If one of
+    the threads fails, then [join l] will fails with the same
+    exception as the first one to terminate.
 
-      Note: {!join} leaves the local values of the current thread
-      unchanged. *)
+    Note: {!join} leaves the local values of the current thread
+    unchanged. *)
 
 (* val ( <?> ) : 'a t -> 'a t -> 'a t *)
 (*   (\** [t <?> t'] is the same as [choose [t; t']] *\) *)
 
 val ( <&> ) : unit t -> unit t -> unit t
-  (** [t <&> t'] is the same as [join [t; t']] *)
+(** [t <&> t'] is the same as [join [t; t']] *)
 
 (* val async : (unit -> 'a t) -> unit *)
 (*   (\** [async f] starts a thread without waiting for the result. If it *)

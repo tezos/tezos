@@ -25,7 +25,7 @@ module Make_raw
        val name : string
        val encoding : t Data_encoding.t
        val pp : Format.formatter -> t -> unit
-      end)
+     end)
     (Disk_table :
        Distributed_db_functors.DISK_TABLE with type key := Hash.t)
     (Memory_table :
@@ -329,10 +329,10 @@ and p2p_reader = {
 }
 
 let noop_callback = {
-    notify_branch = begin fun _gid _locator -> () end ;
-    notify_head =  begin fun _gid _block _ops -> () end ;
-    disconnection = begin fun _gid -> () end ;
-  }
+  notify_branch = begin fun _gid _locator -> () end ;
+  notify_head =  begin fun _gid _block _ops -> () end ;
+  disconnection = begin fun _gid -> () end ;
+}
 
 type t = db
 
@@ -566,7 +566,7 @@ module P2p_reader = struct
           | None -> Lwt.return_unit
           | Some bh ->
               if Operation_list_list_hash.compare
-                   found_hash bh.shell.operations_hash <> 0 then
+                  found_hash bh.shell.operations_hash <> 0 then
                 Lwt.return_unit
               else
                 Raw_operations.Table.notify
@@ -671,9 +671,9 @@ let activate ({ p2p ; active_nets } as global_db) net_state =
         active_connections = P2p.Peer_id.Table.create 53 ;
       } in
       P2p.iter_connections p2p (fun _peer_id conn ->
-        Lwt.async begin fun () ->
-          P2p.send p2p conn (Get_current_branch net_id)
-        end) ;
+          Lwt.async begin fun () ->
+            P2p.send p2p conn (Get_current_branch net_id)
+          end) ;
       Net_id.Table.add active_nets net_id net ;
       net
   | net ->
@@ -695,7 +695,7 @@ let deactivate net_db =
     net_db.active_connections ;
   Raw_operation.shutdown net_db.operation_db >>= fun () ->
   Raw_block_header.shutdown net_db.block_header_db >>= fun () ->
-    Lwt.return_unit >>= fun () ->
+  Lwt.return_unit >>= fun () ->
   Lwt.return_unit
 
 let get_net { active_nets } net_id =
@@ -715,9 +715,9 @@ let shutdown { p2p ; p2p_readers ; active_nets } =
     Lwt.return_unit >>= fun () ->
   Net_id.Table.fold
     (fun _ net_db acc ->
-      Raw_operation.shutdown net_db.operation_db >>= fun () ->
-      Raw_block_header.shutdown net_db.block_header_db >>= fun () ->
-      acc)
+       Raw_operation.shutdown net_db.operation_db >>= fun () ->
+       Raw_block_header.shutdown net_db.block_header_db >>= fun () ->
+       acc)
     active_nets
     Lwt.return_unit >>= fun () ->
   P2p.shutdown p2p >>= fun () ->

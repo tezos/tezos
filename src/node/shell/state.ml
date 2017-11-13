@@ -38,7 +38,7 @@ let () =
     (function Bad_data_dir -> Some () | _ -> None)
     (fun () -> Bad_data_dir) ;
 
-(** *)
+  (** *)
 
 module Shared = struct
   type 'a t = {
@@ -689,10 +689,10 @@ module Register_embedded_protocol
 end
 
 let read
-  ?patch_context
-  ~store_root
-  ~context_root
-  () =
+    ?patch_context
+    ~store_root
+    ~context_root
+    () =
   Store.init store_root >>=? fun global_store ->
   Context.init ?patch_context ~root:context_root >>= fun context_index ->
   let global_data = {

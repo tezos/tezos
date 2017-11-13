@@ -89,19 +89,19 @@ module MakeUnsigned(Int : S)(Z : sig val zero : Int.t end) = struct
   type t = Int.t
   let compare va vb =
     Int.(if va >= Z.zero then if vb >= Z.zero then compare va vb else -1
-           else if vb >= Z.zero then 1 else compare va vb)
+         else if vb >= Z.zero then 1 else compare va vb)
   let (=) = ((=) : t -> t -> bool)
   let (<>) = ((<>) : t -> t -> bool)
   let (<) a b =
     Int.(if Z.zero <= a then
-             (a < b || b < Z.zero)
-           else
-             (b < Z.zero && a < b))
+           (a < b || b < Z.zero)
+         else
+           (b < Z.zero && a < b))
   let (<=) a b =
     Int.(if Z.zero <= a then
-             (a <= b || b < Z.zero)
-           else
-             (b < Z.zero && a <= b))
+           (a <= b || b < Z.zero)
+         else
+           (b < Z.zero && a <= b))
   let (>=) a b = (<=) b a
   let (>) a b = (<) b a
   let max x y = if x >= y then x else y

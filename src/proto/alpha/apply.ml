@@ -189,9 +189,9 @@ let apply_sourced_operation
       let delegate = Ed25519.Public_key.hash source in
       check_signature_and_update_public_key
         ctxt delegate (Some source) operation >>=? fun ctxt ->
-    (* TODO, see how to extract the public key hash after this operation to
-       pass it to apply_delegate_operation_content *)
-    fold_left_s (fun ctxt content ->
+      (* TODO, see how to extract the public key hash after this operation to
+         pass it to apply_delegate_operation_content *)
+      fold_left_s (fun ctxt content ->
           apply_delegate_operation_content
             ctxt delegate pred_block block_prio content)
         ctxt contents >>=? fun ctxt ->

@@ -81,11 +81,11 @@ val unit : unit encoding
 val constant : string -> unit encoding
 
 (** Signed 8 bit integer
-   (data is encoded as a byte in binary and an integer in JSON). *)
+    (data is encoded as a byte in binary and an integer in JSON). *)
 val int8 : int encoding
 
 (** Unsigned 8 bit integer
-   (data is encoded as a byte in binary and an integer in JSON). *)
+    (data is encoded as a byte in binary and an integer in JSON). *)
 val uint8 : int encoding
 
 (** Signed 16 bit integer
@@ -93,7 +93,7 @@ val uint8 : int encoding
 val int16 : int encoding
 
 (** Unsigned 16 bit integer
-   (data is encoded as a short in binary and an integer in JSON). *)
+    (data is encoded as a short in binary and an integer in JSON). *)
 val uint16 : int encoding
 
 (** Signed 31 bit integer, which corresponds to type int on 32-bit OCaml systems
@@ -105,7 +105,7 @@ val int31 : int encoding
 val int32 : int32 encoding
 
 (** Signed 64 bit integer
-   (data is encodedas a 64-bit int in binary and a decimal string in JSON). *)
+    (data is encodedas a 64-bit int in binary and a decimal string in JSON). *)
 val int64 : int64 encoding
 
 (** Encoding of a boolean

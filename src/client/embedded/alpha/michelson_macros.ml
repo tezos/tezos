@@ -386,11 +386,11 @@ let expand_asserts original =
         | _ ->
             begin
               match expand_compare remaining_prim with
-            | None -> None
-            | Some seq ->
-                Some (Seq (loc, [ seq ;
-                                  Prim (loc, "IF", fail_false loc, None) ], None))
-          end
+              | None -> None
+              | Some seq ->
+                  Some (Seq (loc, [ seq ;
+                                    Prim (loc, "IF", fail_false loc, None) ], None))
+            end
       end
   | _ -> None
 
@@ -618,11 +618,11 @@ let unexpand_unpaaiair expanded =
         | Prim (_, "DIP", [ Seq (_, _, _) as sub ], None) :: rest ->
             destruct ("A" :: sacc) acc (sub :: rest)
         | Seq (_, [ Prim (_, "DUP", [], None) ;
-                      Prim (_, "CAR", [], None) ;
-                      Prim (_, "DIP",
-                            [ Seq (_,
-                                   [ Prim (_, "CDR", [], None) ], None) ],
-                            None) ], None) :: rest ->
+                    Prim (_, "CAR", [], None) ;
+                    Prim (_, "DIP",
+                          [ Seq (_,
+                                 [ Prim (_, "CDR", [], None) ], None) ],
+                          None) ], None) :: rest ->
             destruct [] (List.rev ("AI" :: sacc) :: acc) rest
         | _ -> None in
       begin match destruct [] [ [ "R" ] ] nodes with

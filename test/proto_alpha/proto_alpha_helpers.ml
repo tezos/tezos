@@ -14,11 +14,11 @@ let (//) = Filename.concat
 let () = Random.self_init ()
 
 let rpc_config = ref {
-  Client_rpcs.host = "localhost" ;
-  port = 8192 + Random.int 8192 ;
-  tls = false ;
-  logger = Client_rpcs.null_logger ;
-}
+    Client_rpcs.host = "localhost" ;
+    port = 8192 + Random.int 8192 ;
+    tls = false ;
+    logger = Client_rpcs.null_logger ;
+  }
 
 let dictator_sk =
   Ed25519.Secret_key.of_b58check_exn
@@ -200,7 +200,7 @@ module Account = struct
       ~manager_pkh
       ~spendable
       ~balance
-       () =
+      () =
     let fee = match Tez.of_cents fee with
       | None -> Tez.zero
       | Some amount -> amount in
@@ -330,13 +330,13 @@ module Assert = struct
   let failed_to_preapply ~msg ?op f =
     Assert.contain_error ~msg ~f:begin function
       | Client_baking_forge.Failed_to_preapply (op', err) ->
-        begin
-          match op with
-          | None -> true
-          | Some op ->
-              let h = hash op and h' = hash op' in
-              Operation_hash.equal h h'
-        end && List.exists (ecoproto_error f) err
+          begin
+            match op with
+            | None -> true
+            | Some op ->
+                let h = hash op and h' = hash op' in
+                Operation_hash.equal h h'
+          end && List.exists (ecoproto_error f) err
       | _ -> false
     end
 
@@ -513,8 +513,8 @@ module Endorse = struct
     return result
 
   let endorsement_rights
-    ?(max_priority = 1024)
-    (contract : Account.t) block =
+      ?(max_priority = 1024)
+      (contract : Account.t) block =
     Client_proto_rpcs.Context.level !rpc_config block >>=? fun level ->
     let delegate = contract.pkh in
     let level = level.level in

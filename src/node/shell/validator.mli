@@ -17,8 +17,8 @@ val notify_block: t -> Block_hash.t -> Block_header.t -> unit Lwt.t
 type net_validator
 
 type error +=
-   | Non_increasing_timestamp
-   | Non_increasing_fitness
+  | Non_increasing_timestamp
+  | Non_increasing_fitness
 
 val activate: t -> ?max_child_ttl:int -> State.Net.t -> net_validator Lwt.t
 val get: t -> Net_id.t -> net_validator tzresult Lwt.t

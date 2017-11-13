@@ -26,8 +26,8 @@
          ../scripts/client_lib.inc.sh
          (glob_files contracts/*)
          ))
-  (locks  (/tcp-port/18732
-           /tcp-port/19732))
+  (locks  (/tcp-port/18731
+           /tcp-port/19731))
   (action (run bash ${path:test_contracts.sh}))))
 
 (alias
@@ -46,3 +46,9 @@
            /tcp-port/19731 /tcp-port/19732 /tcp-port/19733 /tcp-port/19734
            /tcp-port/19735 /tcp-port/19736 /tcp-port/19737 /tcp-port/19738))
   (action (run bash ${path:test_multinode.sh}))))
+
+(alias
+ ((name runtest)
+  (deps ((alias runtest_basic.sh)
+         (alias runtest_contracts.sh)
+         (alias runtest_multinode.sh)))))

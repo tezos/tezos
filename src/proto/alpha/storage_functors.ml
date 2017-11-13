@@ -96,14 +96,14 @@ module Make_raw_data_storage (P : Raw_data_description) = struct
   let init ({ context = c } as s) k v =
     let key = key k in
     Context.get c key >>=
-      function
-      | Some _ ->
-          let msg
-            = "cannot init existing " ^ P.name ^ " key " ^ key_to_string k in
-          fail (Storage_error msg)
-      | None ->
-          Context.set c key (P.to_bytes v) >>= fun c ->
-          return { s with context = c }
+    function
+    | Some _ ->
+        let msg
+          = "cannot init existing " ^ P.name ^ " key " ^ key_to_string k in
+        fail (Storage_error msg)
+    | None ->
+        Context.set c key (P.to_bytes v) >>= fun c ->
+        return { s with context = c }
 
   (* Does not verify that the key is present or not *)
   let init_set ({ context = c } as s) k v =
@@ -292,10 +292,10 @@ module Raw_make_iterable_data_storage
 
   module HashTbl =
     Persist.MakePersistentMap(Context)(K)(struct
-    type t = P.value
-    let of_bytes b = Data_encoding.Binary.of_bytes P.encoding b
-    let to_bytes v = Data_encoding.Binary.to_bytes P.encoding v
-  end)
+      type t = P.value
+      let of_bytes b = Data_encoding.Binary.of_bytes P.encoding b
+      let to_bytes v = Data_encoding.Binary.to_bytes P.encoding v
+    end)
 
   let key_to_string k = String.concat "/" (K.to_path k)
 
@@ -329,14 +329,14 @@ module Raw_make_iterable_data_storage
   (* Verify that the key is not present before inserting *)
   let init ({ context = c } as s) k v =
     HashTbl.get c k >>=
-      function
-      | Some _ ->
-          let msg
-            = "cannot init existing " ^ P.name ^ " key " ^ key_to_string k in
-          fail (Storage_error msg)
-      | None ->
-          HashTbl.set c k v >>= fun c ->
-          return { s with context = c }
+    function
+    | Some _ ->
+        let msg
+          = "cannot init existing " ^ P.name ^ " key " ^ key_to_string k in
+        fail (Storage_error msg)
+    | None ->
+        HashTbl.set c k v >>= fun c ->
+        return { s with context = c }
 
   (* Does not verify that the key is present or not *)
   let init_set ({ context = c } as s) k v =

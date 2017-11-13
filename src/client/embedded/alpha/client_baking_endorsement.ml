@@ -244,7 +244,7 @@ let schedule_endorsements cctxt state bis =
                then begin
                  lwt_log_info
                    "Schedule endorsement for block %a \
-                 \ (level %a, slot %d, time %a) (replace block %a)"
+                   \ (level %a, slot %d, time %a) (replace block %a)"
                    Block_hash.pp_short block.hash
                    Raw_level.pp level
                    slot

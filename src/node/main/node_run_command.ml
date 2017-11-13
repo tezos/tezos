@@ -115,25 +115,25 @@ let init_node ?sandbox (config : Node_config_file.t) =
     | _ ->
         (Node_config_file.resolve_bootstrap_addrs
            config.net.bootstrap_peers) >>= fun trusted_points ->
-          Node_identity_file.read
-            (config.data_dir //
-             Node_identity_file.default_name) >>=? fun identity ->
-          lwt_log_notice
-            "Peer's global id: %a"
-            P2p.Peer_id.pp identity.peer_id >>= fun () ->
-          let p2p_config : P2p.config =
-            { listening_addr ;
-              listening_port ;
-              trusted_points ;
-              peers_file =
-                (config.data_dir // "peers.json") ;
-              closed_network = config.net.closed ;
-              identity ;
-              proof_of_work_target =
-                Crypto_box.make_target config.net.expected_pow ;
-            }
-          in
-          return (Some (p2p_config, config.net.limits))
+        Node_identity_file.read
+          (config.data_dir //
+           Node_identity_file.default_name) >>=? fun identity ->
+        lwt_log_notice
+          "Peer's global id: %a"
+          P2p.Peer_id.pp identity.peer_id >>= fun () ->
+        let p2p_config : P2p.config =
+          { listening_addr ;
+            listening_port ;
+            trusted_points ;
+            peers_file =
+              (config.data_dir // "peers.json") ;
+            closed_network = config.net.closed ;
+            identity ;
+            proof_of_work_target =
+              Crypto_box.make_target config.net.expected_pow ;
+          }
+        in
+        return (Some (p2p_config, config.net.limits))
   end >>=? fun p2p_config ->
   let node_config : Node.config = {
     genesis ;

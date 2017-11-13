@@ -42,7 +42,7 @@ let encoding =
           voting_period, voting_period_position) ->
       { level ; level_position ;
         cycle ; cycle_position ;
-         voting_period ; voting_period_position })
+        voting_period ; voting_period_position })
     (obj6
        (req "level" Raw_level_repr.encoding)
        (req "level_position" int32)

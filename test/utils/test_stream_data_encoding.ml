@@ -406,7 +406,7 @@ let test_splitted _ =
              case ~tag:2
                s_enc
                (fun s -> Some { field = int_of_string s })
-              (fun s -> string_of_int s.field) ;
+               (fun s -> string_of_int s.field) ;
            ])) in
   let get_result ~msg bin_l =
     let status = Binary.read_stream_of_bytes enc in

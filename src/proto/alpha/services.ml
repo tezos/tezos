@@ -167,7 +167,7 @@ module Context = struct
       ~input: empty
       ~output:
         (wrap_tzerror @@
-          (obj1
+         (obj1
             (req "voting_period_kind" Voting_period.kind_encoding)))
       RPC.Path.(custom_root / "context" / "voting_period_kind")
 
@@ -195,20 +195,20 @@ module Context = struct
           (fun () -> Forgotten) ;
       ]
 
-  let get custom_root =
-    RPC.service
-      ~description: "Info about the nonce of a previous block."
-      ~input: empty
-      ~output: (wrap_tzerror nonce_encoding)
-      RPC.Path.(custom_root / "context" / "nonce" /: Raw_level.arg)
+    let get custom_root =
+      RPC.service
+        ~description: "Info about the nonce of a previous block."
+        ~input: empty
+        ~output: (wrap_tzerror nonce_encoding)
+        RPC.Path.(custom_root / "context" / "nonce" /: Raw_level.arg)
 
-  let hash custom_root =
-    RPC.service
-      ~description: "Hash of the current block's nonce."
-      ~input: empty
-      ~output: (wrap_tzerror @@
-                describe ~title: "nonce hash" Nonce_hash.encoding)
-      RPC.Path.(custom_root / "context" / "nonce")
+    let hash custom_root =
+      RPC.service
+        ~description: "Hash of the current block's nonce."
+        ~input: empty
+        ~output: (wrap_tzerror @@
+                  describe ~title: "nonce hash" Nonce_hash.encoding)
+        RPC.Path.(custom_root / "context" / "nonce")
 
   end
 

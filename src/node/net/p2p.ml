@@ -226,10 +226,10 @@ module Real = struct
       P2p_connection_pool.Connection.fold
         net.pool ~init:[]
         ~f:begin fun _peer_id conn acc ->
-        (P2p_connection_pool.is_readable conn >>= function
-          | Ok () -> Lwt.return (Some conn)
-          | Error _ -> Lwt_utils.never_ending) :: acc
-      end in
+          (P2p_connection_pool.is_readable conn >>= function
+            | Ok () -> Lwt.return (Some conn)
+            | Error _ -> Lwt_utils.never_ending) :: acc
+        end in
     Lwt.pick (
       ( P2p_connection_pool.Pool_event.wait_new_connection net.pool >>= fun () ->
         Lwt.return_none )::

@@ -38,7 +38,7 @@ let check_approval_and_update_quorum ctxt =
   let updated_quorum =
     Int32.div
       (Int32.add (Int32.mul 8l expected_quorum)
-                 (Int32.mul 2l actual_quorum))
+         (Int32.mul 2l actual_quorum))
       10l in
   Vote.set_current_quorum ctxt updated_quorum >>=? fun ctxt ->
   return

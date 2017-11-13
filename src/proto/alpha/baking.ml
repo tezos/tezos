@@ -26,8 +26,8 @@ let () =
     ~description:"The block timestamp is before the first slot \
                   for this baker at this level"
     ~pp:(fun ppf (r, p) ->
-      Format.fprintf ppf "Block forged too early (%a is before %a)"
-                     Time.pp_hum p Time.pp_hum r)
+        Format.fprintf ppf "Block forged too early (%a is before %a)"
+          Time.pp_hum p Time.pp_hum r)
     Data_encoding.(obj2
                      (req "minimum" Time.encoding)
                      (req "provided" Time.encoding))
@@ -102,12 +102,12 @@ let minimal_time c priority pred_timestamp =
     else match durations with
       | [] -> cumsum_slot_durations acc [ Period.one_minute ] p
       | [ last ] ->
-         Period.mult p last >>? fun period ->
-         Timestamp.(acc +? period)
+          Period.mult p last >>? fun period ->
+          Timestamp.(acc +? period)
       | first :: durations ->
-         Timestamp.(acc +? first) >>? fun acc ->
-         let p = Int32.pred p in
-         cumsum_slot_durations acc durations p in
+          Timestamp.(acc +? first) >>? fun acc ->
+          let p = Int32.pred p in
+          cumsum_slot_durations acc durations p in
   Lwt.return
     (cumsum_slot_durations
        pred_timestamp (Constants.slot_durations c) (Int32.succ priority))

@@ -109,14 +109,14 @@ let rpc_error_encoding =
            (req "message" string))
         (function Cannot_connect_to_RPC_server msg -> Some ((), msg) | _ -> None)
         (function (), msg -> Cannot_connect_to_RPC_server msg) ;
-    case ~tag: 2
+      case ~tag: 2
         (obj3
            (req "rpc_error_kind" (constant "request_failed"))
            (req "path" (list string))
            (req "http_code" (conv Cohttp.Code.code_of_status Cohttp.Code.status_of_code uint16)))
         (function Request_failed (path, code) -> Some ((), path, code) | _ -> None)
         (function (), path, code -> Request_failed (path, code)) ;
-    case ~tag: 3
+      case ~tag: 3
         (obj4
            (req "rpc_error_kind" (constant "malformed_json"))
            (req "path" (list string))
@@ -124,7 +124,7 @@ let rpc_error_encoding =
            (req "text" string))
         (function Malformed_json (path, json, msg) -> Some ((), path, msg, json) | _ -> None)
         (function (), path, msg, json -> Malformed_json (path, json, msg)) ;
-    case ~tag: 4
+      case ~tag: 4
         (obj4
            (req "rpc_error_kind" (constant "unexpected_json"))
            (req "path" (list string))
