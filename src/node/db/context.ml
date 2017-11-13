@@ -105,9 +105,36 @@ let raw_commit ~time ~message context =
     context.index.repo ~info ~parents:context.parents context.tree
 
 let commit ~time ~message context =
-  Lwt_utils.Idle_waiter.task context.index.repack_scheduler @@ fun () ->
-  raw_commit ~time ~message context >>= fun commit ->
-  Lwt.return (GitStore.Commit.hash commit)
+  begin
+    Lwt_utils.Idle_waiter.task context.index.repack_scheduler @@ fun () ->
+    raw_commit ~time ~message context >>= fun commit ->
+    Lwt.return (GitStore.Commit.hash commit)
+  end >>= fun commit ->
+  context.index.commits <- context.index.commits + 1 ;
+  if context.index.commits mod 200 <> 0 then Lwt.return commit
+  else begin
+    Lwt_utils.Idle_waiter.force_idle
+      context.index.repack_scheduler
+      begin fun () ->
+         lwt_debug "begin git repack" >>= fun () ->
+         let command =
+           "git",
+           [| "git" ; "-C" ; context.index.path ;
+              "repack" ; "-a" ; "-d" |] in
+            let t0 = Unix.gettimeofday () in
+            Lwt_process.exec
+              ~stdout: `Dev_null ~stderr: `Dev_null
+              command >>= fun res ->
+            let dt = Unix.gettimeofday () -. t0 in
+            match res with
+            | WEXITED 0 ->
+                lwt_log_notice "git repack complete in %0.2f sec" dt
+            | WEXITED code | WSTOPPED code | WSIGNALED code ->
+                lwt_log_error "git repack failed with code %d after %0.2f sec"
+                  code dt
+      end
+  end >>= fun () ->
+  Lwt.return commit
 
 (*-- Generic Store Primitives ------------------------------------------------*)
 
@@ -210,7 +237,7 @@ let test_network_encoding =
             Some ((), net_id, genesis, protocol, expiration)
         | _ -> None)
       (fun ((), net_id, genesis, protocol, expiration) ->
-         Running { net_id ; genesis ;protocol ; expiration }) ;
+         Running { net_id ; genesis ; protocol ; expiration }) ;
   ]
 
 let get_test_network v =
