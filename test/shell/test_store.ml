@@ -217,7 +217,6 @@ let test_hashset (type t)
       (Make_substore(Store)(struct let name = ["test_set"] end))
       (Block_hash)
       (BlockSet) in
-  let open BlockSet in
   let bhset : BlockSet.t = BlockSet.add bh2 (BlockSet.add bh1 BlockSet.empty) in
   StoreSet.store_all s bhset >>= fun () ->
   StoreSet.read_all s >>= fun bhset' ->
@@ -227,8 +226,8 @@ let test_hashset (type t)
   StoreSet.store_all s bhset2 >>= fun () ->
   StoreSet.read_all s >>= fun bhset2' ->
   Assert.equal_block_set ~msg:__LOC__ bhset2 bhset2' ;
-  StoreSet.fold s BlockSet.empty
-    (fun bh acc -> Lwt.return (BlockSet.add bh acc)) >>= fun bhset2'' ->
+  StoreSet.fold s ~init:BlockSet.empty
+    ~f:(fun bh acc -> Lwt.return (BlockSet.add bh acc)) >>= fun bhset2'' ->
   Assert.equal_block_set ~msg:__LOC__ bhset2 bhset2'' ;
   Store.store s ["day";"current"] (MBytes.of_string "Mercredi") >>= fun () ->
   StoreSet.remove_all s >>= fun () ->

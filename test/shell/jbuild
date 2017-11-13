@@ -11,7 +11,9 @@
               tezos_embedded_protocol_demo
               tezos_embedded_protocol_alpha
               tezos_embedded_protocol_genesis))
-  (flags (:standard -open Error_monad
+  (flags (:standard -w -9-32
+                    -safe-string
+                    -open Error_monad
                     -open Hash
                     -open Utils
                     -open Tezos_data))))

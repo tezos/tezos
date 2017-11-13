@@ -358,7 +358,7 @@ let stable_sort cmp l =
 
 let sort = stable_sort
 
-let rec read_bytes ?(pos = 0) ?len fd buf =
+let read_bytes ?(pos = 0) ?len fd buf =
   let len = match len with None -> Bytes.length buf - pos | Some l -> l in
   let rec inner pos len =
     if len = 0 then

@@ -101,7 +101,6 @@ let commands () =
          data_parameter
        @@ stop)
       (fun (trace_stack, amount, no_print_source) program storage input cctxt ->
-         let open Data_encoding in
          let print_errors errs =
            cctxt.warning "%a"
              (Michelson_v1_error_reporter.report_errors
@@ -147,7 +146,6 @@ let commands () =
        @@ Program.source_param
        @@ stop)
       (fun (show_types, emacs_mode, no_print_source) program cctxt ->
-         let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_code
            cctxt.rpc_config cctxt.config.block program.expanded >>= fun res ->
          if emacs_mode then
@@ -191,7 +189,6 @@ let commands () =
          data_parameter
        @@ stop)
       (fun no_print_source data exp_ty cctxt ->
-         let open Data_encoding in
          Client_proto_rpcs.Helpers.typecheck_data cctxt.Client_commands.rpc_config
            cctxt.config.block (data.expanded, exp_ty.expanded) >>= function
          | Ok () ->
@@ -214,7 +211,6 @@ let commands () =
          data_parameter
        @@ stop)
       (fun () data cctxt ->
-         let open Data_encoding in
          Client_proto_rpcs.Helpers.hash_data cctxt.Client_commands.rpc_config
            cctxt.config.block (data.expanded) >>= function
          | Ok hash ->
@@ -237,7 +233,6 @@ let commands () =
        @@ Client_keys.Secret_key.alias_param
        @@ stop)
       (fun () data (_, key) cctxt ->
-         let open Data_encoding in
          Client_proto_rpcs.Helpers.hash_data cctxt.rpc_config
            cctxt.config.block (data.expanded) >>= function
          | Ok hash ->

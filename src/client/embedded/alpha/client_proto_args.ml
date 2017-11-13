@@ -115,8 +115,8 @@ let tez_arg ~default ~parameter ~doc =
 
 let tez_param ~name ~desc next =
   Cli_entries.param
-    name
-    (desc ^ " in \xEA\x9C\xA9\n" ^ tez_format)
+    ~name
+    ~desc:(desc ^ " in \xEA\x9C\xA9\n" ^ tez_format)
     (tez_parameter name)
     next
 

@@ -93,7 +93,7 @@ type t = {
 
 let wrap_context_init f base_dir =
   let root = base_dir // "context" in
-  Context.init root >>= fun idx ->
+  Context.init ~root ?patch_context:None >>= fun idx ->
   Context.commit_genesis idx
     ~net_id
     ~time:genesis.time

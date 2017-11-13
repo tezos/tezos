@@ -131,9 +131,9 @@ let may_create_discovery_worker _config pool =
 let create_maintenance_worker limits pool disco =
   let bounds =
     bounds
-      limits.min_connections
-      limits.expected_connections
-      limits.max_connections
+      ~min:limits.min_connections
+      ~expected:limits.expected_connections
+      ~max:limits.max_connections
   in
   P2p_maintenance.run
     ~connection_timeout:limits.authentification_timeout
@@ -214,7 +214,7 @@ module Real = struct
   let get_metadata { pool } conn =
     P2p_connection_pool.Peer_ids.get_metadata pool conn
 
-  let rec recv _net conn =
+  let recv _net conn =
     P2p_connection_pool.read conn >>=? fun msg ->
     lwt_debug "message read from %a"
       Connection_info.pp
@@ -611,7 +611,6 @@ module RPC = struct
            (opt "last_miss" Time.encoding))
 
     let info_of_point_info i =
-      let open P2p_connection_pool in
       let open P2p_connection_pool_types in
       let state = match Point_info.State.get i with
         | Requested _ -> Requested

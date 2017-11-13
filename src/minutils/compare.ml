@@ -159,7 +159,7 @@ end
 
 module Option(P : S) = struct
   type t = P.t option
-  let rec compare xs ys =
+  let compare xs ys =
     match xs, ys with
     | None, None -> 0
     | None, _ -> -1

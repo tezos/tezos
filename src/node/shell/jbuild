@@ -4,7 +4,8 @@
  ((name node_shell)
   (public_name tezos.node.shell)
   (libraries (utils minutils node_net node_db node_updater ezjsonm ocplib-json-typed.bson))
-  (flags (:standard -w +27-30-40@8
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
                     -open Error_monad
                     -open Hash
                     -open Utils

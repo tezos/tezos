@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
 open CalendarLib
 
 module T = struct

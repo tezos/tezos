@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
 open Micheline
 
 type location = { comment : string option }

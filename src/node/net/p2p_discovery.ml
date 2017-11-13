@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open P2p_types
 include Logging.Make (struct let name = "p2p.discovery" end)
 
 type t = ()

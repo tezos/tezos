@@ -64,11 +64,13 @@ val of_string: string -> t
 
 external to_int64: t -> int64 = "ml_z_to_int64"
 (** Converts to a 64-bit integer. May raise [Overflow]. *)
+
 external of_int64: int64 -> t = "ml_z_of_int64"
 (** Converts from a 64-bit integer. *)
 
 external to_int: t -> int = "ml_z_to_int"
 (** Converts to a base integer. May raise an [Overflow]. *)
+
 external of_int: int -> t = "ml_z_of_int" [@@ noalloc]
 (** Converts from a base integer. *)
 

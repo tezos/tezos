@@ -365,9 +365,6 @@ let apply_block net_state db
 
 module Context_db = struct
 
-    type key = Block_hash.t
-    type value = State.Block.t
-
     type data =
       { validator: net_validator ;
         state: [ `Inited of Block_header.t tzresult
@@ -608,7 +605,7 @@ module Context_db = struct
 end
 
 
-let rec create_validator ?parent worker ?max_child_ttl state db net =
+let create_validator ?parent worker ?max_child_ttl state db net =
 
   let net_id = State.Net.id net in
   let net_db = Distributed_db.activate db net in
@@ -775,8 +772,6 @@ let rec create_validator ?parent worker ?max_child_ttl state db net =
   end ;
 
   Lwt.return v
-
-type error += Unknown_network of Net_id.t
 
 let create state db =
 

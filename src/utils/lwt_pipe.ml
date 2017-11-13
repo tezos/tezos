@@ -91,9 +91,9 @@ let rec push ({ closed ; queue ; current_size ;
     wait_pop q >>= fun () ->
     push q elt
 
-let rec push_now ({ closed ; queue ; compute_size ;
-                    current_size ; max_size
-                  } as q) elt =
+let push_now ({ closed ; queue ; compute_size ;
+                current_size ; max_size
+              } as q) elt =
   if closed then raise Closed ;
   let elt_size = compute_size elt in
   (current_size + elt_size < max_size || Queue.is_empty queue)

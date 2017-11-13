@@ -162,7 +162,7 @@ let alias_keys cctxt name =
   let rec find_key = function
     | [] -> return None
     | (key_name, pkh) :: tl ->
-        if String.(key_name = name)
+        if key_name = name
         then
           Public_key.find_opt cctxt name >>=? fun pkm ->
           Secret_key.find_opt cctxt name >>=? fun pks ->

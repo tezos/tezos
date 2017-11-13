@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 module List = ListLabels
-open Logging.Db
 
 type t = LevelDB.db
 type key = string list

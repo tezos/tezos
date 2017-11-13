@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
 open Micheline
 
 val print_string : Format.formatter -> string -> unit

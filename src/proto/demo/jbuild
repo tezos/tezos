@@ -32,8 +32,8 @@
   ((name tezos_embedded_raw_protocol_demo)
    (libraries (tezos_protocol_environment_demo))
    (library_flags (:standard -linkall))
-   (flags (:standard -nopervasives -nostdlib
-                     -w +a-4-6-7-9-29-40..42-44-45-48
+   (flags (:standard -nopervasives -nostdlib -safe-string
+                     -w +a-4-6-7-9-29-32-40..42-44-45-48
                      -warn-error -a+8
                      -open Tezos_protocol_environment_demo__Environment
                      -open Error_monad
@@ -43,7 +43,7 @@
 
 (library
   ((name tezos_embedded_protocol_demo)
-   (library_flags (:standard -linkall))
+   (library_flags (:standard -linkall -w -9-32 -safe-string))
    (libraries (tezos_embedded_raw_protocol_demo node_shell))
    (modules (Registerer))))
 

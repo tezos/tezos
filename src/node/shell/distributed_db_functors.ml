@@ -323,7 +323,6 @@ end = struct
   include Logging.Make(struct let name = "node.distributed_db.scheduler." ^ Hash.name end)
 
   type key = Hash.t
-  type param = Request.param
 
   type t = {
     param: Request.param ;

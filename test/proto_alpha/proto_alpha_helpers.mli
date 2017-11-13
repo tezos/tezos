@@ -171,6 +171,7 @@ module Assert : sig
   val unknown_contract : msg:string -> 'a tzresult -> unit
   (** [unknown_contract ~msg result] raises if result is not a
       [Storage_error]. *)
+
   val non_existing_contract : msg:string -> 'a tzresult -> unit
   val balance_too_low : msg:string -> 'a tzresult -> unit
   val non_spendable : msg:string -> 'a tzresult -> unit

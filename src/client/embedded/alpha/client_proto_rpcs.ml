@@ -185,8 +185,6 @@ module Helpers = struct
 
   module Forge = struct
 
-    open Operation
-
     module Manager = struct
       let operations cctxt
           block ~net_id ~branch ~source ?sourcePubKey ~counter ~fee operations =

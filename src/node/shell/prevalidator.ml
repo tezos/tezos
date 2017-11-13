@@ -40,8 +40,6 @@ let list_pendings ~from_block ~to_block old_mempool =
 
 (** Worker *)
 
-exception Invalid_operation of Operation_hash.t
-
 open Prevalidation
 
 type t = {
@@ -73,7 +71,7 @@ let create net_db =
 
   Chain.head net_state >>= fun head ->
   let timestamp = ref (Time.now ()) in
-  (start_prevalidation head !timestamp () >|= ref) >>= fun validation_state ->
+  (start_prevalidation ~predecessor:head ~timestamp:!timestamp () >|= ref) >>= fun validation_state ->
   let pending = Operation_hash.Table.create 53 in
   let head = ref head in
   let operations = ref empty_result in
@@ -92,7 +90,7 @@ let create net_db =
     Lwt.return_unit in
 
   let reset_validation_state head timestamp =
-    start_prevalidation head timestamp () >>= fun state ->
+    start_prevalidation ~predecessor:head ~timestamp () >>= fun state ->
     validation_state := state;
     Lwt.return_unit in
 

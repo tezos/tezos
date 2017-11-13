@@ -2,8 +2,10 @@
 
 (library
  ((name node_main_lib)
+  (public_name tezos.node.main)
   (libraries (utils minutils cmdliner node_net node_shell))
-  (flags (:standard -w +27-30-40@8
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
                     -open Error_monad
                     -open Hash
                     -open Utils

@@ -7,7 +7,9 @@
           test_stream_data_encoding
           test_utils))
   (libraries (minutils utils test_lib))
-  (flags (:standard -open Error_monad
+  (flags (:standard -w -9-32
+                    -safe-string
+                    -open Error_monad
                     -open Hash
                     -open Utils
                     -open Tezos_data))))

@@ -14,7 +14,7 @@ let dump_file oc file =
   let rec loop () =
     let len = input ic buf 0 buflen in
     if len <> 0 then begin
-      Printf.fprintf oc "%s" (if len = buflen then buf else Bytes.sub buf 0 len) ;
+      Printf.fprintf oc "%s" (Bytes.to_string (if len = buflen then buf else Bytes.sub buf 0 len)) ;
       loop ()
     end
   in
@@ -32,15 +32,15 @@ let include_mli oc file =
   let unit =
     String.capitalize_ascii
       (Filename.chop_extension (Filename.basename file)) in
-  Printf.fprintf stdout "module %s : sig\n" unit ;
-  Printf.fprintf stdout "# 1 %S\n" file ;
-  dump_file stdout file ;
-  Printf.fprintf stdout "end\n" ;
+  Printf.fprintf oc "module %s : sig\n" unit ;
+  Printf.fprintf oc "# 1 %S\n" file ;
+  dump_file oc file ;
+  Printf.fprintf oc "end\n" ;
   if unit = "Result" then
-    Printf.fprintf stdout
+    Printf.fprintf oc
       "type ('a, 'b) result = ('a, 'b) Result.result = \
       \ Ok of 'a | Error of 'b\n" ;
-  if List.mem unit opened_modules then Printf.fprintf stdout "open %s\n" unit
+  if List.mem unit opened_modules then Printf.fprintf oc "open %s\n" unit
 
 let () =
   Printf.fprintf stdout "module type T = sig\n" ;

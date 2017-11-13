@@ -38,10 +38,6 @@ module Make_raw
      with type key := Hash.t
       and type value := Disk_table.value) = struct
 
-  type key = Hash.t
-  type value = Disk_table.value
-  type param = Disk_table.store
-
   module Request = struct
     type param = Request_message.param request_param
     let active { active } = active ()
@@ -73,7 +69,6 @@ end
 
 module Fake_operation_storage = struct
   type store = State.Net.t
-  type key = Operation_hash.t
   type value = Operation.t
   let known _ _ = Lwt.return_false
   let read _ _ = Lwt.return (Error_monad.error_exn Not_found)
@@ -98,7 +93,6 @@ module Raw_operation =
 
 module Block_header_storage = struct
   type store = State.Net.t
-  type key = Block_hash.t
   type value = Block_header.t
   let known = State.Block.known_valid
   let read net_state h =
@@ -106,7 +100,7 @@ module Block_header_storage = struct
     return (State.Block.header b)
   let read_opt net_state h =
     State.Block.read_opt net_state h >>= fun b ->
-    Lwt.return (Utils.map_option State.Block.header b)
+    Lwt.return (Utils.map_option ~f:State.Block.header b)
   let read_exn net_state h =
     State.Block.read_exn net_state h >>= fun b ->
     Lwt.return (State.Block.header b)
@@ -129,7 +123,6 @@ module Raw_block_header =
 
 module Operation_hashes_storage = struct
   type store = State.Net.t
-  type key = Block_hash.t * int
   type value = Operation_hash.t list
   let known net_state (h, _) = State.Block.known_valid net_state h
   let read net_state (h, i) =
@@ -207,7 +200,6 @@ end
 
 module Operations_storage = struct
   type store = State.Net.t
-  type key = Block_hash.t * int
   type value = Operation.t list
   let known net_state (h, _) = State.Block.known_valid net_state h
   let read net_state (h, i) =
@@ -276,7 +268,6 @@ end
 
 module Protocol_storage = struct
   type store = State.t
-  type key = Protocol_hash.t
   type value = Protocol.t
   let known = State.Protocol.known
   let read = State.Protocol.read
@@ -350,8 +341,6 @@ let net_state { net_state } = net_state
 let db { global_db } = global_db
 
 module P2p_reader = struct
-
-  type t = p2p_reader
 
   let may_activate global_db state net_id f =
     match Net_id.Table.find state.peer_active_nets net_id with
@@ -858,11 +847,6 @@ let watch_protocol { protocol_db } =
   Raw_protocol.Table.watch protocol_db.table
 
 module Raw = struct
-  type 'a t =
-    | Bootstrap
-    | Advertise of P2p_types.Point.t list
-    | Message of 'a
-    | Disconnect
   let encoding = P2p.Raw.encoding Message.cfg.encoding
   let supported_versions = Message.cfg.versions
 end
@@ -902,7 +886,6 @@ module Make
   type t = Kind.t
   type key = Table.key
   type value = Table.value
-  type param = Table.param
   let known t k = Table.known (Kind.proj t) k
   type error += Missing_data = Table.Missing_data
   type error += Canceled = Table.Canceled

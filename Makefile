@@ -1,15 +1,15 @@
 
 all:
-	@jbuilder build tezos.install
+	@jbuilder build tezos.install --dev
 	@cp _build/default/src/node_main.exe tezos-node
 	@cp _build/default/src/client_main.exe tezos-client
 	@cp _build/default/src/compiler_main.exe tezos-protocol-compiler
 
 doc-html:
-	@jbuilder build @doc
+	@jbuilder build @doc --dev
 
 build-test:
-	@jbuilder build @buildtest
+	@jbuilder build @buildtest --dev
 
 test:
 	@jbuilder runtest

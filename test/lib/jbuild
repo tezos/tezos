@@ -3,4 +3,5 @@
 (library
  ((name test_lib)
   (libraries (kaputt utils minutils))
-  (wrapped false)))
+  (wrapped false)
+  (flags (:standard -w -9-32 -safe-string))))

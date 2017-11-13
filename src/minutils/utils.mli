@@ -62,6 +62,7 @@ val filter_map: ('a -> 'b option) -> 'a list -> 'b list
 
 (** [list_rev_sub l n] is [List.rev l] capped to max [n] elements *)
 val list_rev_sub : 'a list -> int -> 'a list
+
 (** [list_sub l n] is [l] capped to max [n] elements *)
 val list_sub: 'a list -> int -> 'a list
 

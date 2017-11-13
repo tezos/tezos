@@ -4,7 +4,8 @@
  ((name compiler_main)
   (public_name tezos-protocol-compiler)
   (libraries (tezos_protocol_compiler))
-  (flags (:standard -w +27-30-40@8
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
                     -linkall))
   (modules (Compiler_main))))
 
@@ -15,7 +16,8 @@
               tezos_embedded_protocol_genesis
               tezos_embedded_protocol_demo
               tezos_embedded_protocol_alpha))
-  (flags (:standard -w +27-30-40@8
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
                     -linkall))
   (modules (Node_main))))
 
@@ -23,6 +25,7 @@
  ((name client_main)
   (public_name tezos-client)
   (libraries (lwt utils client_lib client_embedded_genesis client_embedded_alpha))
-  (flags (:standard -w +27-30-40@8
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
                     -linkall))
   (modules (Client_main))))

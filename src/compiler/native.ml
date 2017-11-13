@@ -53,7 +53,6 @@ let preloaded_cmis : (string, Env.Persistent_signature.t) Hashtbl.t =
 
 (* Set hook *)
 let () =
-  let open Env.Persistent_signature in
   Env.Persistent_signature.load :=
     (fun ~unit_name ->
        try Some (Hashtbl.find preloaded_cmis (String.capitalize_ascii unit_name))
@@ -154,12 +153,12 @@ let hash_file file =
   let buf = BytesLabels.create buflen in
   let fd = Unix.openfile file [Unix.O_RDONLY] 0o600 in
   let state = init ~size:32 () in
-  let rec loop () =
+  let loop () =
     match Unix.read fd buf 0 buflen with
     | 0 -> ()
     | nb_read ->
         Bytes.update state @@
-        if nb_read = buflen then buf else BytesLabels.sub buf 0 nb_read
+        if nb_read = buflen then buf else BytesLabels.sub buf ~pos:0 ~len:nb_read
   in
   loop () ;
   Unix.close fd ;

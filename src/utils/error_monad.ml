@@ -40,8 +40,6 @@ module Make() = struct
           pp: Format.formatter -> 'err -> unit ; } ->
       error_kind
 
-  type registred_errors = error_kind list
-
   let error_kinds
     : error_kind list ref
     = ref []
@@ -281,7 +279,7 @@ module Make() = struct
             filter_map_s f t >>=? fun rt ->
             return (rh :: rt)
 
-  let rec filter_map_p f l =
+  let filter_map_p f l =
     match l with
     | [] -> return []
     | h :: t ->

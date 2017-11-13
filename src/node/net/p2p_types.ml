@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Logging.Net
-
 module Canceler = Lwt_utils.Canceler
 
 module Version = struct

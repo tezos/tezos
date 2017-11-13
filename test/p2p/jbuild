@@ -5,7 +5,9 @@
           test_p2p_connection_pool
           test_p2p_io_scheduler))
   (libraries (minutils utils test_lib node_net))
-  (flags (:standard -linkall
+  (flags (:standard -w -9-32
+                    -linkall
+                    -safe-string
                     -open Error_monad
                     -open Hash
                     -open Utils

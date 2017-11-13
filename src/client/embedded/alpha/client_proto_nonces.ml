@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Cli_entries
-
 (* TODO locking... *)
 
 type t = (Block_hash.t * Nonce.t) list

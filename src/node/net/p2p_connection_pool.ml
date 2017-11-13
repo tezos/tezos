@@ -140,8 +140,8 @@ module Answerer = struct
     } in
     st.worker <-
       Lwt_utils.worker "answerer"
-        (fun () -> worker_loop st)
-        (fun () -> Canceler.cancel canceler) ;
+        ~run:(fun () -> worker_loop st)
+        ~cancel:(fun () -> Canceler.cancel canceler) ;
     st
 
   let shutdown st =
@@ -682,8 +682,6 @@ let pool_stat { io_sched } =
 (***************************************************************************)
 
 type error += Rejected of Peer_id.t
-type error += Unexpected_point_state
-type error += Unexpected_peer_id_state
 type error += Pending_connection
 type error += Connected
 type error += Connection_closed = P2p_io_scheduler.Connection_closed
@@ -781,7 +779,7 @@ and authenticate pool ?point_info canceler fd point =
     if incoming then
       Point.Table.remove pool.incoming point
     else
-      iter_option Point_info.State.set_disconnected point_info ;
+      iter_option ~f:Point_info.State.set_disconnected point_info ;
     Lwt.return (Error err)
   end >>=? fun (info, auth_fd) ->
   (* Authentication correct! *)
@@ -857,7 +855,7 @@ and authenticate pool ?point_info canceler fd point =
         Lwt.return (Error err)
       end >>=? fun conn ->
       let id_point =
-        match info.id_point, map_option Point_info.point point_info with
+        match info.id_point, map_option ~f:Point_info.point point_info with
         | (addr, _), Some (_, port) -> addr, Some port
         | id_point, None ->  id_point in
       return

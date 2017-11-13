@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open P2p_types
-
 type t = {
   data_dir: string option ;
   config_file: string ;

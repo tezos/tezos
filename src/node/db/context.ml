@@ -10,7 +10,6 @@
 (** Tezos - Versioned (key x value) store (over Irmin) *)
 
 open Hash
-open Logging.Db
 
 module IrminPath = Irmin.Path.String_list
 
@@ -95,9 +94,6 @@ let checkout_exn index key =
   | Some p -> Lwt.return p
 
 
-exception Preexistent_context of Block_hash.t
-exception Empty_head of Block_hash.t
-
 let raw_commit ~time ~message context =
   let info =
     Irmin.Info.v ~date:(Time.to_seconds time) ~author:"Tezos" message in
@@ -116,29 +112,28 @@ let commit ~time ~message context =
     Lwt_utils.Idle_waiter.force_idle
       context.index.repack_scheduler
       begin fun () ->
-         lwt_debug "begin git repack" >>= fun () ->
-         let command =
-           "git",
-           [| "git" ; "-C" ; context.index.path ;
-              "repack" ; "-a" ; "-d" |] in
-            let t0 = Unix.gettimeofday () in
-            Lwt_process.exec
-              ~stdout: `Dev_null ~stderr: `Dev_null
-              command >>= fun res ->
-            let dt = Unix.gettimeofday () -. t0 in
-            match res with
-            | WEXITED 0 ->
-                lwt_log_notice "git repack complete in %0.2f sec" dt
-            | WEXITED code | WSTOPPED code | WSIGNALED code ->
-                lwt_log_error "git repack failed with code %d after %0.2f sec"
-                  code dt
+        let open Logging.Db in
+        lwt_debug "begin git repack" >>= fun () ->
+        let command =
+          "git",
+          [| "git" ; "-C" ; context.index.path ;
+             "repack" ; "-a" ; "-d" |] in
+        let t0 = Unix.gettimeofday () in
+        Lwt_process.exec
+          ~stdout: `Dev_null ~stderr: `Dev_null
+          command >>= fun res ->
+        let dt = Unix.gettimeofday () -. t0 in
+        match res with
+        | WEXITED 0 ->
+            lwt_log_notice "git repack complete in %0.2f sec" dt
+        | WEXITED code | WSTOPPED code | WSIGNALED code ->
+            lwt_log_error "git repack failed with code %d after %0.2f sec"
+              code dt
       end
   end >>= fun () ->
   Lwt.return commit
 
 (*-- Generic Store Primitives ------------------------------------------------*)
-
-type key = string list
 
 let data_key key = "data" :: key
 let undata_key = function

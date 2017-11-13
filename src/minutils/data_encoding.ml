@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Utils
-
 type json =
   [ `O of (string * json) list
   | `Bool of bool
@@ -16,10 +14,6 @@ type json =
   | `A of json list
   | `Null
   | `String of string ]
-
-and document =
-  [ `O of (string * json) list
-  | `A of json list ]
 
 type json_schema = Json_schema.schema
 
@@ -172,8 +166,7 @@ and 'a t = {
 
 type 'a encoding = 'a t
 
-let rec classify : type a l. a t -> Kind.t = fun e ->
-  let open Kind in
+let rec classify : type a. a t -> Kind.t = fun e ->
   match e.encoding with
   (* Fixed *)
   | Null -> `Fixed 0
@@ -221,8 +214,6 @@ module Json = struct
   }
 
   exception Parse_error of string
-
-  type nonrec json = json
 
   let wrap_error f =
     fun str ->
@@ -292,7 +283,7 @@ module Json = struct
     | _ -> e
 
   and lift_union_in_pair
-    : type a a_l b b_l. pair_builder -> Kind.t -> a t -> b t -> (a * b) t
+    : type a b. pair_builder -> Kind.t -> a t -> b t -> (a * b) t
     = fun b p e1 e2 ->
     match lift_union e1, lift_union e2 with
     | e1, { encoding = Union (_kind, tag, cases) } ->
@@ -323,7 +314,7 @@ module Json = struct
                  cases)
     | e1, e2 -> b.build p e1 e2
 
-  let rec json : type a l. a desc -> a Json_encoding.encoding =
+  let rec json : type a. a desc -> a Json_encoding.encoding =
     let open Json_encoding in
     function
     | Null -> null
@@ -362,19 +353,19 @@ module Json = struct
     | Delayed f -> get_json (f ())
 
   and field_json
-    : type a l. a field -> a Json_encoding.field =
+    : type a. a field -> a Json_encoding.field =
     let open Json_encoding in
     function
     | Req (name, e) -> req name (get_json e)
     | Opt (_, name, e) -> opt name (get_json e)
     | Dft (name, e, d) -> dft name (get_json e) d
 
-  and case_json : type a l. a case -> a Json_encoding.case =
+  and case_json : type a. a case -> a Json_encoding.case =
     let open Json_encoding in
     function
     | Case { encoding = e ; proj ; inj ; _ } -> case (get_json e) proj inj
 
-  and get_json : type a l. a t -> a Json_encoding.encoding = fun e ->
+  and get_json : type a. a t -> a Json_encoding.encoding = fun e ->
     match e.json_encoding with
     | None ->
         let json_encoding = json (lift_union e).encoding in
@@ -459,7 +450,7 @@ module Encoding = struct
   let array e = dynamic_size (Variable.array e)
   let list e = dynamic_size (Variable.list e)
 
-  let conv (type l) proj inj ?schema encoding =
+  let conv proj inj ?schema encoding =
     make @@ Conv { proj ; inj ; encoding ; schema }
 
   let string_enum l = dynamic_size (Variable.string_enum l)
@@ -546,7 +537,7 @@ module Encoding = struct
     raw_merge_objs (obj2 f10 f9) (obj8 f8 f7 f6 f5 f4 f3 f2 f1)
 
   let merge_objs o1 o2 =
-    let rec is_obj : type a l. a t -> bool = fun e ->
+    let rec is_obj : type a. a t -> bool = fun e ->
       match e.encoding with
       | Obj _ -> true
       | Objs _ (* by construction *) -> true
@@ -587,7 +578,7 @@ module Encoding = struct
     raw_merge_tups (tup2 e10 e9) (tup8 e8 e7 e6 e5 e4 e3 e2 e1)
 
   let merge_tups t1 t2 =
-    let rec is_tup : type a l. a t -> bool = fun e ->
+    let rec is_tup : type a. a t -> bool = fun e ->
       match e.encoding with
       | Tup _ -> true
       | Tups _ (* by construction *) -> true
@@ -745,7 +736,6 @@ module Binary = struct
   }
 
 let rec length : type x. x t -> x -> int = fun e ->
-    let open Kind in
     match e.encoding with
     (* Fixed *)
     | Null -> fun _ -> 0
@@ -780,7 +770,7 @@ let rec length : type x. x t -> x -> int = fun e ->
           | Case { tag = None } -> None
           | Case { encoding = e ; proj ; tag = Some _ } ->
               let length v = tag_size sz + length e v in
-              Some (fun v -> Utils.map_option length (proj v)) in
+              Some (fun v -> Utils.map_option ~f:length (proj v)) in
         apply (Utils.filter_map case_length cases)
     | Mu (`Dynamic, _name, self) ->
         fun v -> length (self e) v
@@ -953,8 +943,7 @@ let rec length : type x. x t -> x -> int = fun e ->
   end
 
   let rec write_rec
-    : type a l. a t -> a -> MBytes.t -> int -> int = fun e ->
-    let open Kind in
+    : type a. a t -> a -> MBytes.t -> int -> int = fun e ->
     let open Writer in
     match e.encoding with
     | Null -> (fun () _buf ofs -> ofs)
@@ -1159,8 +1148,7 @@ let rec length : type x. x t -> x -> int = fun e ->
 
   end
 
-  let rec read_rec : type a l. a t-> MBytes.t -> int -> int -> int * a = fun e ->
-    let open Kind in
+  let rec read_rec : type a. a t-> MBytes.t -> int -> int -> int * a = fun e ->
     let open Reader in
     match e.encoding with
     | Null -> (fun _buf ofs _len -> ofs, ())

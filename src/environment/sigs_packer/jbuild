@@ -2,5 +2,6 @@
 
 (executable
   ((name sigs_packer)
-  (public_name tezos-protocol-environment-sigs-packer)))
+   (public_name tezos-protocol-environment-sigs-packer)
+   (flags (:standard -w -9-32 -safe-string))))
 

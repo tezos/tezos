@@ -16,7 +16,6 @@ open Json_schema
 
 (*-- Assisted, schema directed input fill in --------------------------------*)
 
-exception Erroneous_construct
 exception Unsupported_construct
 
 type input = {
@@ -132,7 +131,7 @@ let editor_fill_in schema =
     random_fill_in schema >>= function
     | Error msg -> Lwt.return (Error msg)
     | Ok json ->
-        Lwt_io.(with_file Output tmp (fun fp ->
+        Lwt_io.(with_file ~mode:Output tmp (fun fp ->
             write_line fp (Data_encoding_ezjsonm.to_string json))) >>= fun () ->
         edit ()
   and edit () =
@@ -160,7 +159,7 @@ let editor_fill_in schema =
         Lwt.return (Error msg)
   and reread () =
     (* finally reread the file *)
-    Lwt_io.(with_file Input tmp (fun fp -> read fp)) >>= fun text ->
+    Lwt_io.(with_file ~mode:Input tmp (fun fp -> read fp)) >>= fun text ->
     match Data_encoding_ezjsonm.from_string text with
     | Ok r -> Lwt.return (Ok r)
     | Error msg -> Lwt.return (Error (Printf.sprintf "bad input: %s" msg))
@@ -350,7 +349,6 @@ let call_with_json url json (cctxt: Client_commands.context) =
         "Failed to parse the provided json: %s\n%!"
         err
   | Ok json ->
-      let open RPC.Description in
       Client_rpcs.get_json cctxt.rpc_config `POST args json >>=? fun json ->
       cctxt.message "%a"
         Json_repr.(pp (module Ezjsonm)) json >>= fun () ->

@@ -287,14 +287,14 @@ let command ?group ~desc options params handler =
 
 (* Param combinators *)
 let string ~name ~desc next =
-  param name desc { converter=(fun _ s -> return s) ; autocomplete=None } next
+  param ~name ~desc { converter=(fun _ s -> return s) ; autocomplete=None } next
 
 (* Help commands *)
 let help_group =
   { name = "man" ;
     title = "Access the documentation" }
 
-let rec string_contains ~needle ~haystack =
+let string_contains ~needle ~haystack =
   try
     Some (Str.search_forward (Str.regexp_string needle) haystack 0)
   with Not_found ->
@@ -539,7 +539,7 @@ let has_args : type a ctx. (a, ctx) args -> bool = function
   | NoArgs -> false
   | AddArg (_,_) -> true
 
-let rec print_options_brief (type ctx) =
+let print_options_brief (type ctx) =
   let help_option :
     type a. Format.formatter -> (a, ctx) arg -> unit =
     fun ppf -> function
@@ -631,7 +631,7 @@ let contains_params_args :
     in help params
 
 let print_command :
-  type a ctx ret. ?prefix: string -> ?highlights:string list -> Format.formatter -> (ctx, ret) command -> unit
+  type ctx ret. ?prefix: string -> ?highlights:string list -> Format.formatter -> (ctx, ret) command -> unit
   = fun ?(prefix = "") ?(highlights=[]) ppf (Command { params ; desc ; options=Argument { spec } }) ->
     if contains_params_args params spec
     then
@@ -686,7 +686,6 @@ let command_args_help ppf command =
     command
 
 let usage
-    (type ctx) (type ret)
     ppf
     ?global_options
     ~details
@@ -727,7 +726,7 @@ let usage
   Format.fprintf ppf "@]"
 
 let command_usage
-    (type ctx) (type ret) ppf commands =
+    ppf commands =
   let exe = Filename.basename Sys.executable_name in
   let prefix = exe ^ " [global options] " in
   Format.fprintf ppf

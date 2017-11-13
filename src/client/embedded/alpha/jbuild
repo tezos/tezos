@@ -2,11 +2,13 @@
 
 (library
  ((name client_embedded_alpha)
+  (public_name tezos.client.embedded.alpha)
   (libraries (tezos_embedded_protocol_alpha
               tezos_embedded_raw_protocol_alpha
               client_lib))
   (library_flags (:standard -linkall))
-  (flags (:standard -w +27-30-40@8
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
                     -open Error_monad
                     -open Hash
                     -open Utils

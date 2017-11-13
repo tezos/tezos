@@ -95,11 +95,11 @@ module Protocol : sig
 
   (** An OCaml source component of a protocol implementation. *)
   and component = {
-    (** The OCaml module name. *)
+    (* The OCaml module name. *)
     name : string ;
-    (** The OCaml interface source code *)
+    (* The OCaml interface source code *)
     interface : string option ;
-    (** The OCaml source code *)
+    (* The OCaml source code *)
     implementation : string ;
   }
 

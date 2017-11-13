@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 open Client_commands
-open Client_config
 
 let unique_switch =
   Cli_entries.switch

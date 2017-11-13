@@ -300,7 +300,6 @@ module Peer_info = struct
       | External_disconnection
 
     let kind_encoding =
-      let open Data_encoding in
       Data_encoding.string_enum [
         "incoming_request", Accepting_request ;
         "rejecting_request", Rejecting_request ;

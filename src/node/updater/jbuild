@@ -4,7 +4,8 @@
  ((name node_updater)
   (public_name tezos.node.updater)
   (libraries (utils minutils micheline tezos_protocol_compiler node_db dynlink))
-  (flags (:standard -w +27-30-40@8
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
                     -open Error_monad
                     -open Hash
                     -open Utils
