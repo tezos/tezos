@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open P2p_types
-
 let (//) = Filename.concat
 
 let home =
@@ -318,7 +316,7 @@ let update
       Utils.first_some
         peer_table_size cfg.net.limits.max_known_peer_ids ;
     binary_chunks_size =
-      Utils.map_option (fun x -> x lsl 10) binary_chunks_size ;
+      Utils.map_option ~f:(fun x -> x lsl 10) binary_chunks_size ;
   } in
   let net : net = {
     expected_pow =

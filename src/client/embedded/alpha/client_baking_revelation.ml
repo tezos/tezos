@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Cli_entries
 open Tezos_context
 
 let inject_seed_nonce_revelation rpc_config block ?force ?async nonces =
@@ -21,8 +20,6 @@ let inject_seed_nonce_revelation rpc_config block ?force ?async nonces =
     block ~net_id:bi.net_id ~branch:bi.hash operations >>=? fun bytes ->
   Client_node_rpcs.inject_operation rpc_config ?force ?async bytes >>=? fun oph ->
   return oph
-
-type Error_monad.error += Bad_revelation
 
 let forge_seed_nonce_revelation
     (cctxt: Client_commands.context)

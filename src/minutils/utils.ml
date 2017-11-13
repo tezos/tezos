@@ -147,7 +147,7 @@ let rec remove_elem_from_list nb = function
   | l when nb <= 0 -> l
   | _ :: tl -> remove_elem_from_list (nb - 1) tl
 
-let rec split_list_at n l =
+let split_list_at n l =
   let rec split n acc = function
   | [] -> List.rev acc, []
   | l when n <= 0 -> List.rev acc, l
@@ -196,7 +196,7 @@ let write_file ?(bin=false) fn contents =
 
 let (<<) g f = fun a -> g (f a)
 
-let rec (--) i j =
+let (--) i j =
   let rec loop acc j =
     if j < i then acc else loop (j :: acc) (pred j) in
   loop [] j

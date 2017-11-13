@@ -54,7 +54,7 @@ let locked_set_head chain_store data block =
     Lwt.return hash
   in
   Chain_traversal.new_blocks
-    data.current_head block >>= fun (ancestor, path) ->
+    ~from_block:data.current_head ~to_block:block >>= fun (ancestor, path) ->
   let ancestor = Block.hash ancestor in
   pop_blocks ancestor data.current_head >>= fun () ->
   Lwt_list.fold_left_s push_block ancestor path >>= fun _ ->

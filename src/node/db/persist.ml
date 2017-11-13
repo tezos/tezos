@@ -121,7 +121,6 @@ module MakeBytesStore
 
   type t = S.t
   type key = K.t
-  type value = MBytes.t
 
   let to_path k =
     let suffix = K.to_path k in
@@ -228,8 +227,8 @@ module MakePersistentSet
     | true -> dig K.length K.prefix x
     | false -> Lwt.return x
 
-  let iter c ~f = fold c () (fun x () -> f x)
-  let elements c = fold c [] (fun p xs -> Lwt.return (p :: xs))
+  let iter c ~f = fold c () ~f:(fun x () -> f x)
+  let elements c = fold c [] ~f:(fun p xs -> Lwt.return (p :: xs))
 
 end
 
@@ -239,7 +238,7 @@ module MakeBufferedPersistentSet
   include MakePersistentSet(S)(K)
 
   let read c =
-    fold c Set.empty (fun p set -> Lwt.return (Set.add p set))
+    fold c Set.empty ~f:(fun p set -> Lwt.return (Set.add p set))
 
   let write c set =
     S.set c inited_key empty >>= fun c ->
@@ -307,8 +306,8 @@ module MakePersistentMap
     | true -> dig K.length K.prefix x
     | false -> Lwt.return x
 
-  let iter c ~f = fold c () (fun k v () -> f k v)
-  let bindings c = fold c [] (fun k v acc -> Lwt.return ((k, v) :: acc))
+  let iter c ~f = fold c () ~f:(fun k v () -> f k v)
+  let bindings c = fold c [] ~f:(fun k v acc -> Lwt.return ((k, v) :: acc))
 
 end
 
@@ -317,7 +316,7 @@ module MakeBufferedPersistentMap
 
   include MakePersistentMap(S)(K)(C)
 
-  let read c = fold c Map.empty (fun k v m -> Lwt.return (Map.add k v m))
+  let read c = fold c Map.empty ~f:(fun k v m -> Lwt.return (Map.add k v m))
 
   let write c m =
     clear c >>= fun c ->
@@ -399,10 +398,7 @@ module MakeImperativeProxy
     { rdata: rdata ;
       state: [ `Inited of Scheduler.data | `Initing of Scheduler.data Lwt.t ] ;
       wakener: Store.value Lwt.u }
-  type store = Store.t
   type state = Scheduler.state
-  type key = Store.key
-  type value = Store.value
 
   type t =
     { tbl : data Table.t ;
@@ -594,7 +590,7 @@ module MakeHashResolver
       | [d] ->
           Store.list t [prefix] >>= fun prefixes ->
           Lwt_list.filter_map_p (fun prefix ->
-              match remove_prefix d (List.hd (List.rev prefix)) with
+              match remove_prefix ~prefix:d (List.hd (List.rev prefix)) with
               | None -> Lwt.return_none
               | Some _ -> Lwt.return (Some (build prefix))
             ) prefixes

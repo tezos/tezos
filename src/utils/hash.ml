@@ -7,14 +7,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
-
 let (//) = Filename.concat
 let (>>=) = Lwt.bind
 let (>|=) = Lwt.(>|=)
 
 open Error_monad
-open Utils
 
 let () =
   let expected_primitive = "blake2b"
@@ -549,7 +546,6 @@ module Generic_hash =
 module Net_id = struct
 
   type t = string
-  type net_id = t
 
   let name = "Net_id"
   let title = "Network identifier"

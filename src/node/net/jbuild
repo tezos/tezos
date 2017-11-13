@@ -4,7 +4,8 @@
  ((name node_net)
   (public_name tezos.node.net)
   (libraries (utils minutils conduit-lwt-unix cohttp cohttp-lwt-unix))
-  (flags (:standard -w +27-30-40@8
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
                     -open Error_monad
                     -open Hash
                     -open Utils

@@ -171,8 +171,8 @@ module Scheduler(IO : IO) = struct
     } in
     st.worker <-
       Lwt_utils.worker IO.name
-        (fun () -> worker_loop st)
-        (fun () -> Canceler.cancel st.canceler) ;
+        ~run:(fun () -> worker_loop st)
+        ~cancel:(fun () -> Canceler.cancel st.canceler) ;
     st
 
   let create_connection st in_param out_param canceler id =
@@ -418,7 +418,7 @@ let read_now conn ?pos ?len buf =
   | None ->
       try
         map_option
-          (read_from conn ?pos ?len buf)
+          ~f:(read_from conn ?pos ?len buf)
           (Lwt_pipe.pop_now conn.read_queue)
       with Lwt_pipe.Closed -> Some (Error [Connection_closed])
 

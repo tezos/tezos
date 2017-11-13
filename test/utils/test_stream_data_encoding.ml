@@ -1,5 +1,4 @@
 open Data_encoding
-open Hash
 open Error_monad
 
 let (>>=) = Lwt.bind
@@ -22,7 +21,7 @@ let rec fold_left_pending f accu l =
   | a::l -> fold_left_pending f (f accu a l) l
 
 let test_read_simple_bin_ko_invalid_data
-    ?msg ?(not_equal=Assert.not_equal) encoding value =
+    ?(not_equal=Assert.not_equal) encoding value =
   let len_data = MBytes.length (Binary.to_bytes encoding value) in
   if classify encoding != `Variable && len_data > 0 then
     for sz = 1 to len_data do
@@ -64,14 +63,14 @@ let test_read_simple_bin_ko_invalid_data
 let unexpected loc =
   loc ^ ": This case should not happen"
 
-let test_read_simple_bin_ko_await ?msg encoding value =
+let test_read_simple_bin_ko_await encoding value =
   let len_data = MBytes.length (Binary.to_bytes encoding value) in
   if classify encoding != `Variable && len_data > 0 then
     for sz = 1 to len_data do
       let l = Binary.to_bytes_list sz encoding value in
       match List.rev l with
       | [] -> Assert.fail_msg "%s" (unexpected __LOC__)
-      | e::r ->
+      | _ :: r ->
           let l = List.rev r in (* last mbyte removed !! *)
           ignore(
             fold_left_pending
@@ -96,7 +95,7 @@ let test_read_simple_bin_ko_await ?msg encoding value =
                    | Binary.Error ->
                        if not (classify encoding == `Variable) then
                          Assert.fail_msg "%s" (unexpected __LOC__)
-                   | Binary.Success result ->
+                   | Binary.Success _ ->
                        Assert.fail_msg "%s" (unexpected __LOC__)
                  end;
                  _done
@@ -139,7 +138,7 @@ let test_read_simple_bin_ok ?msg ?(equal=Assert.equal) encoding value =
   done
 
 let test_check_simple_bin_ko_invalid_data
-    ?msg ?(not_equal=Assert.not_equal) encoding value =
+    encoding value =
   let len_data = MBytes.length (Binary.to_bytes encoding value) in
   if classify encoding != `Variable && len_data > 0 then
     for sz = 1 to len_data do
@@ -168,7 +167,7 @@ let test_check_simple_bin_ko_invalid_data
                match status with
                | Binary.Await _ -> ()
                | Binary.Error -> ()
-               | Binary.Success {res; remaining} ->
+               | Binary.Success { remaining } ->
                    Assert.equal ~msg:__LOC__ remaining [];
                    (* res is unit for check *)
              end;
@@ -177,14 +176,14 @@ let test_check_simple_bin_ko_invalid_data
       )
     done
 
-let test_check_simple_bin_ko_await ?msg encoding value =
+let test_check_simple_bin_ko_await encoding value =
   let len_data = MBytes.length (Binary.to_bytes encoding value) in
   if classify encoding != `Variable && len_data > 0 then
     for sz = 1 to len_data do
       let l = Binary.to_bytes_list sz encoding value in
       match List.rev l with
       | [] -> Assert.fail_msg "%s" (unexpected __LOC__)
-      | e::r ->
+      | _ :: r ->
           let l = List.rev r in (* last mbyte removed !! *)
           ignore(
             fold_left_pending
@@ -209,7 +208,7 @@ let test_check_simple_bin_ko_await ?msg encoding value =
                    | Binary.Error ->
                        if not (classify encoding == `Variable) then
                          Assert.fail_msg "%s" (unexpected __LOC__)
-                   | Binary.Success result ->
+                   | Binary.Success _ ->
                        Assert.fail_msg "%s" (unexpected __LOC__)
                  end;
                  _done
@@ -217,7 +216,7 @@ let test_check_simple_bin_ko_await ?msg encoding value =
           )
     done
 
-let test_check_simple_bin_ok ?msg ?(equal=Assert.equal) encoding value =
+let test_check_simple_bin_ok encoding value =
   let len_data = max 1 (MBytes.length (Binary.to_bytes encoding value)) in
   for sz = 1 to len_data do
     ignore(
@@ -238,7 +237,7 @@ let test_check_simple_bin_ok ?msg ?(equal=Assert.equal) encoding value =
                  )status _todo
              in
              match status with
-             | Binary.Success {res; remaining} ->
+             | Binary.Success { remaining } ->
                  Assert.equal ~msg:__LOC__ remaining [];
                  (* res is unit for check *)
              | Binary.Await _ -> Assert.fail_msg "%s" (unexpected __LOC__)
@@ -254,15 +253,14 @@ let test_check_simple_bin_ok ?msg ?(equal=Assert.equal) encoding value =
 let test_simple
     ~msg ?(equal=Assert.equal) ?(not_equal=Assert.not_equal) enc value
   =
-  test_check_simple_bin_ok ~msg:(msg ^ ": binary-ok") ~equal enc value;
-  test_check_simple_bin_ko_await ~msg:(msg ^ ": binary-ko_await") enc value;
-  test_check_simple_bin_ko_invalid_data
-    ~msg:(msg ^ ": binary-invalid_data") ~not_equal enc value;
+  test_check_simple_bin_ok enc value;
+  test_check_simple_bin_ko_await enc value;
+  test_check_simple_bin_ko_invalid_data enc value;
 
   test_read_simple_bin_ok ~msg:(msg ^ ": binary-ok") ~equal enc value;
-  test_read_simple_bin_ko_await ~msg:(msg ^ ": binary-ko_await") enc value;
+  test_read_simple_bin_ko_await enc value;
   test_read_simple_bin_ko_invalid_data
-    ~msg:(msg ^ ": binary-invalid_data") ~not_equal enc value
+    ~not_equal enc value
 
 
 

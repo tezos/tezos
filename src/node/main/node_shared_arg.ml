@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 open Cmdliner
-open P2p_types
 open Logging.Node.Main
 
 let (//) = Filename.concat
@@ -51,7 +50,7 @@ let wrap
 
   let rpc_tls =
     Utils.map_option
-      (fun (cert, key) -> { Node_config_file.cert ; key })
+      ~f:(fun (cert, key) -> { Node_config_file.cert ; key })
       rpc_tls in
 
   (* when `--expected-connections` is used,

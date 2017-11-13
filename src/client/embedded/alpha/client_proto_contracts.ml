@@ -134,7 +134,6 @@ let get_manager cctxt block source =
   | None -> Client_proto_rpcs.Context.Contract.manager cctxt block source
 
 let get_delegate cctxt block source =
-  let open Client_keys in
   match Contract.is_default source with
   | Some hash -> return hash
   | None ->

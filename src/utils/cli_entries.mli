@@ -21,6 +21,7 @@ val parameter : ?autocomplete:('ctx -> string list tzresult Lwt.t) ->
 (** {2 Flags and Options } *)
 
 (** {3 Options and Switches } *)
+
 (** Type for option or switch *)
 type ('a, 'ctx) arg
 
@@ -37,6 +38,7 @@ val default_arg : doc:string -> parameter:string ->
   default:string ->
   ('p, 'ctx) parameter ->
   ('p, 'ctx) arg
+
 (** Create a boolean switch.
     The value will be set to [true] if the switch is provided and [false] if it is not. *)
 val switch : doc:string -> parameter:string ->
@@ -144,6 +146,7 @@ val prefix:
   string ->
   ('a, 'ctx, 'ret) params ->
   ('a, 'ctx, 'ret) params
+
 (** Multiple words given in sequence for a command line *)
 val prefixes:
   string list ->
@@ -154,6 +157,7 @@ val prefixes:
 val fixed:
   string list ->
   ('ctx -> 'ret tzresult Lwt.t, 'ctx, 'ret) params
+
 (** End the description of the command line *)
 val stop:
   ('ctx -> 'ret tzresult Lwt.t, 'ctx, 'ret) params

@@ -9,7 +9,6 @@
 
 open Logging.Client.Endorsement
 open Client_commands
-open Cli_entries
 
 module Ed25519 = Environment.Ed25519
 

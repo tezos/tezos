@@ -59,7 +59,7 @@ let parse_toplevel ?check source =
     | [ ast ] -> ast
     | asts ->
         let start = min_point asts and stop = max_point asts in
-        Seq (Michelson_macros.{ start ; stop }, asts, None) in
+        Seq ({ start ; stop }, asts, None) in
   expand_all source ast
 
 let parse_expression ?check source =

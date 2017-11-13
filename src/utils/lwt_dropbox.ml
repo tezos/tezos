@@ -30,7 +30,7 @@ let notify_put dropbox =
       dropbox.put_waiter <- None ;
       Lwt.wakeup_later w ()
 
-let rec put dropbox elt =
+let put dropbox elt =
   if dropbox.closed then
     raise Closed
   else begin

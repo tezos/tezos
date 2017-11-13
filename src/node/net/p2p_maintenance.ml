@@ -185,8 +185,8 @@ let run ~connection_timeout bounds pool disco =
   } in
   st.maintain_worker <-
     Lwt_utils.worker "maintenance"
-      (fun () -> worker_loop st)
-      (fun () -> Canceler.cancel canceler) ;
+      ~run:(fun () -> worker_loop st)
+      ~cancel:(fun () -> Canceler.cancel canceler) ;
   st
 
 let maintain { just_maintained ; please_maintain } =

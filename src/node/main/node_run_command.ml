@@ -47,7 +47,6 @@ let protocol_dir data_dir = data_dir // "protocol"
 let lock_file data_dir = data_dir // "lock"
 
 let init_logger ?verbosity (log_config : Node_config_file.log) =
-  let open Logging in
   begin
     match verbosity with
     | Some level ->
@@ -61,7 +60,7 @@ let init_logger ?verbosity (log_config : Node_config_file.log) =
               match Sys.getenv "LWT_LOG" with
               | rules -> Some rules
               | exception Not_found -> log_config.rules in
-        Utils.iter_option Lwt_log_core.load_rules rules
+        Utils.iter_option ~f:Lwt_log_core.load_rules rules
   end ;
   Logging.init ~template:log_config.template log_config.output
 
@@ -202,7 +201,7 @@ let run ?verbosity ?sandbox (config : Node_config_file.t) =
   lwt_log_notice "Shutting down the Tezos node..." >>= fun () ->
   Node.shutdown node >>= fun () ->
   lwt_log_notice "Shutting down the RPC server..." >>= fun () ->
-  Lwt_utils.may RPC_server.shutdown rpc >>= fun () ->
+  Lwt_utils.may ~f:RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
   Logging.close () >>= fun () ->
   return ()

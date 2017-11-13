@@ -17,7 +17,7 @@ let print_ty (type t) ppf (annot, (ty : t ty)) =
   |> Micheline.strip_locations
   |> Michelson_v1_printer.print_expr_unwrapped ppf
 
-let rec print_stack_ty (type t) ?(depth = max_int) ppf (s : t stack_ty) =
+let print_stack_ty (type t) ?(depth = max_int) ppf (s : t stack_ty) =
   let rec loop
     : type t. int -> Format.formatter -> t stack_ty -> unit
     = fun depth ppf -> function

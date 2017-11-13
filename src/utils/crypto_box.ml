@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Utils
-
 (** Tezos - X25519/XSalsa20-Poly1305 cryptography *)
 
 type secret_key = Sodium.Box.secret_key
@@ -16,7 +14,6 @@ type public_key = Sodium.Box.public_key
 type channel_key = Sodium.Box.channel_key
 type nonce = Sodium.Box.nonce
 type target = Z.t
-exception TargetNot256Bit
 
 module Public_key_hash = Hash.Make_Blake2B (Base58) (struct
     let name = "Crypto_box.Public_key_hash"

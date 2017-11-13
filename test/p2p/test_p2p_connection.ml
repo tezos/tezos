@@ -370,7 +370,6 @@ let spec = Arg.[
   ]
 
 let main () =
-  let open Utils in
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;

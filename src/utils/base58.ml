@@ -168,8 +168,8 @@ module MakeEncodings(E: sig
   let check_ambiguous_prefix prefix encodings =
     List.iter
       (fun (Encoding { encoded_prefix = s }) ->
-         if remove_prefix s prefix <> None ||
-            remove_prefix prefix s <> None then
+         if remove_prefix ~prefix:s prefix <> None ||
+            remove_prefix ~prefix s <> None then
            Format.ksprintf invalid_arg
              "Base58.register_encoding: duplicate prefix: %S, %S." s prefix)
       encodings

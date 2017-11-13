@@ -20,7 +20,7 @@ let generate_seed_nonce () =
   | Error _ -> assert false
   | Ok nonce -> nonce
 
-let rec forge_block_header
+let forge_block_header
     cctxt block delegate_sk shell priority seed_nonce_hash =
   Client_proto_rpcs.Constants.stamp_threshold
     cctxt block >>=? fun stamp_threshold ->
@@ -620,6 +620,3 @@ let create
   lwt_log_info "Starting baking daemon" >>= fun () ->
   worker_loop () >>= fun () ->
   return ()
-
-(* FIXME bug in ocamldep ?? *)
-open Level

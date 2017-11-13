@@ -619,7 +619,7 @@ module RPC = struct
     let block_stream, stopper =
       Validator.new_head_watcher node.mainnet_validator in
     let first_run = ref true in
-    let rec next () =
+    let next () =
       if !first_run then begin
         first_run := false ;
         Chain.head node.mainnet_net >>= fun head ->

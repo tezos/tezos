@@ -9,7 +9,6 @@
 
 (* Tezos Command line interface - Main Program *)
 
-open Lwt.Infix
 open Client_commands
 open Error_monad
 

@@ -62,8 +62,8 @@ let run ~backlog pool ?addr port  =
     } in
     st.worker <-
       Lwt_utils.worker "welcome"
-        (fun () -> worker_loop st)
-        (fun () -> Canceler.cancel st.canceler) ;
+        ~run:(fun () -> worker_loop st)
+        ~cancel:(fun () -> Canceler.cancel st.canceler) ;
     Lwt.return st
   end begin fun exn ->
     lwt_log_error

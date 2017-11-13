@@ -7,9 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Cli_entries
 open Client_commands
-open Client_proto_contracts
 
 let mine_block cctxt block
     ?force ?max_priority ?(free_baking=false) ?src_sk delegate =

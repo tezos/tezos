@@ -238,7 +238,7 @@ module Reader = struct
     mutable worker: unit Lwt.t ;
   }
 
-  let rec read_message st init_mbytes =
+  let read_message st init_mbytes =
     let rec loop status =
       Lwt_unix.yield () >>= fun () ->
       let open Data_encoding.Binary in
@@ -306,8 +306,8 @@ module Reader = struct
     end ;
     st.worker <-
       Lwt_utils.worker "reader"
-        (fun () -> worker_loop st [])
-        (fun () -> Canceler.cancel st.canceler) ;
+        ~run:(fun () -> worker_loop st [])
+        ~cancel:(fun () -> Canceler.cancel st.canceler) ;
     st
 
   let shutdown st =
@@ -327,7 +327,7 @@ module Writer = struct
     binary_chunks_size: int ; (* in bytes *)
   }
 
-  let rec send_message st buf =
+  let send_message st buf =
     let rec loop = function
       | [] -> return ()
       | buf :: l ->
@@ -429,8 +429,8 @@ module Writer = struct
     end ;
     st.worker <-
       Lwt_utils.worker "writer"
-        (fun () -> worker_loop st)
-        (fun () -> Canceler.cancel st.canceler) ;
+        ~run:(fun () -> worker_loop st)
+        ~cancel:(fun () -> Canceler.cancel st.canceler) ;
     st
 
   let shutdown st =
@@ -479,9 +479,6 @@ let accept
     Lwt.return_unit
   end ;
   return conn
-
-exception Not_available
-exception Connection_closed
 
 let catch_closed_pipe f =
   Lwt.catch f begin function

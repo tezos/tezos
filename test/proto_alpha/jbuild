@@ -10,7 +10,8 @@
               client_lib
               client_embedded_genesis
               client_embedded_alpha))
-  (flags (:standard -open Error_monad
+  (flags (:standard -w -9-32 -safe-string
+                    -open Error_monad
                     -open Hash
                     -open Tezos_data
                     -open Tezos_protocol_environment_alpha

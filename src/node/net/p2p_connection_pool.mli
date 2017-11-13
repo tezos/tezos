@@ -337,7 +337,7 @@ module Log_event : sig
 
   type t =
 
-    (** Pool-level events *)
+    (* Pool-level events *)
 
     | Too_few_connections
     | Too_many_connections
@@ -347,10 +347,11 @@ module Log_event : sig
 
     | Gc_points
     (** Garbage collection of known point table has been triggered. *)
+
     | Gc_peer_ids
     (** Garbage collection of known peer_ids table has been triggered. *)
 
-    (** Connection-level events *)
+    (* Connection-level events *)
 
     | Incoming_connection of Point.t
     (** We accept(2)-ed an incoming connection *)

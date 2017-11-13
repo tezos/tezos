@@ -9,8 +9,6 @@
 
 module Ed25519 = Environment.Ed25519
 
-open Operation
-
 type operation = {
   hash: Operation_hash.t ;
   content: Operation.t option

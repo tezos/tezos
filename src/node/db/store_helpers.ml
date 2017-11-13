@@ -140,7 +140,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
           list t prefix >>= fun prefixes ->
           Lwt_list.map_p (function
               | `Key prefix | `Dir prefix ->
-                  match Utils.remove_prefix d (List.hd (List.rev prefix)) with
+                  match Utils.remove_prefix ~prefix:d (List.hd (List.rev prefix)) with
                   | None -> Lwt.return_nil
                   | Some _ -> loop (i+1) prefix [])
             prefixes
