@@ -7,6 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Tezos Protocol Environment - Basic data structures *)
+
+(** Generic interface for a datatype with comparison, pretty-printer
+    and serialization functions. *)
 module type DATA = sig
 
   type t
@@ -31,8 +35,8 @@ module type DATA = sig
 
 end
 
-module Fitness : DATA with type t = MBytes.t list
-
+(** Generic interface for a datatype with comparison, pretty-printer,
+    serialization functions and a hashing function. *)
 module type HASHABLE_DATA = sig
 
   include DATA
@@ -43,11 +47,18 @@ module type HASHABLE_DATA = sig
 
 end
 
+(** The fitness of a block is defined as a list of bytes,
+    compared in a lexicographical order (longer list are greater). *)
+module Fitness : DATA with type t = MBytes.t list
+
+(** Tezos operations. *)
 module Operation : sig
 
   type shell_header = {
     net_id: Net_id.t ;
     branch: Block_hash.t ;
+    (** The operation is only valid in a branch containing the
+        block [branch]. *)
   }
   val shell_header_encoding: shell_header Data_encoding.t
 
@@ -66,10 +77,14 @@ module Block_header : sig
   type shell_header = {
     net_id: Net_id.t ;
     level: Int32.t ;
-    proto_level: int ; (* uint8 *)
+    (** The number of preceding block in this chain, i.e. the genesis
+        has level 0. *)
+    proto_level: int ;
+    (** The number of preceding protocol change in the chain (modulo 256), 
+        i.e the genesis has proto_level 0. *)
     predecessor: Block_hash.t ;
     timestamp: Time.t ;
-    validation_passes: int ; (* uint8 *)
+    validation_passes: int ;
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
   }

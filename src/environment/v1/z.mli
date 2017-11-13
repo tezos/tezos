@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(** Tezos Protocol Environment - Arbitrary precision arithmetic. *)
+
 type t
 val zero: t
 val one: t

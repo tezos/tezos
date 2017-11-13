@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Tezos Protocol Environment - Protocol Implementation Updater *)
+(** Tezos Protocol Environment - Protocol updater. *)
 
 type validation_result = {
   context: Context.t ;
@@ -31,13 +31,13 @@ module type PROTOCOL = sig
   (** The version specific type of operations. *)
   type operation
 
-  (** The maximum size of operations in bytes *)
+  (** The maximum size of operations in bytes. *)
   val max_operation_data_length: int
 
-  (** The maximum size of block headers in bytes *)
+  (** The maximum size of block headers in bytes. *)
   val max_block_length: int
 
-  (** The maximum *)
+  (** The maximum number of operations allowed in one block. *)
   val max_number_of_operations: int
 
   (** The parsing / preliminary validation function for
@@ -75,11 +75,10 @@ module type PROTOCOL = sig
 
   (** The first step in a block validation sequence. Initializes a
       validation context for validating a block. Takes as argument the
-      {!Block_header.t} to initialize the context for this block, patching
-      the context resulting of the application of the predecessor
-      block passed as parameter. The function {!precheck_block} may
-      not have been called before [begin_application], so all the
-      check performed by the former must be repeated in the latter. *)
+      {!Block_header.t} to initialize the context for this block. The
+      function {!precheck_block} may not have been called before
+      [begin_application], so all the check performed by the former
+      must be repeated in the latter. *)
   val begin_application:
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
@@ -88,10 +87,13 @@ module type PROTOCOL = sig
     validation_state tzresult Lwt.t
 
   (** Initializes a validation context for constructing a new block
-      (as opposed to validating an existing block). Since there is no
-      {!Block_header.t} header available, the parts that it provides are
-      passed as arguments (predecessor block hash, context resulting
-      of the application of the predecessor block, and timestamp). *)
+      (as opposed to validating an existing block). When the
+      [proto_header] argument is not specified, the function should
+      produce the exact same effect on the context than would produce
+      the validation of a block containing an "equivalent" (but
+      complete) header. For instance, if the block header usually
+      includes a signature, the header provided to
+      {!begin_construction} could includes a faked signature. *)
   val begin_construction:
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
@@ -116,6 +118,9 @@ module type PROTOCOL = sig
   (** The list of remote procedures exported by this implementation *)
   val rpc_services: rpc_context RPC.directory
 
+  (** An ad-hoc context patcher. It used only for debugging protocol
+      while running in the "sandbox" mode. This function is never used
+      in production. *)
   val configure_sandbox:
     Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 
