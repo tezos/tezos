@@ -175,7 +175,7 @@ module Term = struct
 
   let no_bootstrap_peers =
     let doc =
-      "Ignore the peers foud in the config file (or the hardcoded \
+      "Ignore the peers found in the config file (or the hard-coded \
        bootstrap peers in the absence of config file)." in
     Arg.(value & flag &
          info ~docs ~doc ["no-bootstrap-peers"])
