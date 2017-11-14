@@ -16,23 +16,23 @@ type t =
   | Get_current_head of Net_id.t
   | Current_head of Net_id.t * Block_header.t * Mempool.t
 
-  | Get_block_headers of Net_id.t * Block_hash.t list
+  | Get_block_headers of Block_hash.t list
   | Block_header of Block_header.t
 
-  | Get_operations of Net_id.t * Operation_hash.t list
+  | Get_operations of Operation_hash.t list
   | Operation of Operation.t
 
   | Get_protocols of Protocol_hash.t list
   | Protocol of Protocol.t
 
-  | Get_operation_hashes_for_blocks of Net_id.t * (Block_hash.t * int) list
+  | Get_operation_hashes_for_blocks of (Block_hash.t * int) list
   | Operation_hashes_for_block of
-      Net_id.t * Block_hash.t * int *
+      Block_hash.t * int *
       Operation_hash.t list * Operation_list_list_hash.path
 
-  | Get_operations_for_blocks of Net_id.t * (Block_hash.t * int) list
+  | Get_operations_for_blocks of (Block_hash.t * int) list
   | Operations_for_block of
-      Net_id.t * Block_hash.t * int *
+      Block_hash.t * int *
       Operation.t list * Operation_list_list_hash.path
 
 let encoding =
@@ -84,13 +84,11 @@ let encoding =
       (fun (net_id, bh, mempool) -> Current_head (net_id, bh, mempool)) ;
 
     case ~tag:0x20
-      (obj2
-         (req "net_id" Net_id.encoding)
-         (req "get_block_headers" (list Block_hash.encoding)))
+      (obj1 (req "get_block_headers" (list Block_hash.encoding)))
       (function
-        | Get_block_headers (net_id, bhs) -> Some (net_id, bhs)
+        | Get_block_headers bhs -> Some bhs
         | _ -> None)
-      (fun (net_id, bhs) -> Get_block_headers (net_id, bhs)) ;
+      (fun bhs -> Get_block_headers bhs) ;
 
     case ~tag:0x21
       (obj1 (req "block_header" Block_header.encoding))
@@ -100,13 +98,11 @@ let encoding =
       (fun bh -> Block_header bh) ;
 
     case ~tag:0x30
-      (obj2
-         (req "net_id" Net_id.encoding)
-         (req "get_operations" (list Operation_hash.encoding)))
+      (obj1 (req "get_operations" (list Operation_hash.encoding)))
       (function
-        | Get_operations (net_id, bhs) -> Some (net_id, bhs)
+        | Get_operations bhs -> Some bhs
         | _ -> None)
-      (fun (net_id, bhs) -> Get_operations (net_id, bhs)) ;
+      (fun bhs -> Get_operations bhs) ;
 
     case ~tag:0x31
       (obj1 (req "operation" Operation.encoding))
@@ -127,46 +123,48 @@ let encoding =
       (fun proto -> Protocol proto);
 
     case ~tag:0x50
-      (obj2
-         (req "net_id" Net_id.encoding)
-         (req "get_operation_hashes_for_blocks"
-            (list (tup2 Block_hash.encoding int8))))
+      (obj1 (req "get_operation_hashes_for_blocks"
+               (list (tup2 Block_hash.encoding int8))))
       (function
-        | Get_operation_hashes_for_blocks (net_id, keys) -> Some (net_id, keys)
+        | Get_operation_hashes_for_blocks keys -> Some keys
         | _ -> None)
-      (fun (net_id, keys) -> Get_operation_hashes_for_blocks (net_id, keys));
+      (fun keys -> Get_operation_hashes_for_blocks keys);
 
     case ~tag:0x51
-      (obj4
-         (req "net_id" Net_id.encoding)
-         (req "operation_hashes_for_block" (tup2 Block_hash.encoding int8))
+      (obj3
+         (req "operation_hashes_for_block"
+            (obj2
+               (req "hash" Block_hash.encoding)
+               (req "validation_pass" int8)))
          (req "operation_hashes" (list Operation_hash.encoding))
          (req "operation_hashes_path" Operation_list_list_hash.path_encoding))
-      (function Operation_hashes_for_block (net_id, block, ofs, ops, path) ->
-         Some (net_id, (block, ofs), ops, path) | _ -> None)
-      (fun (net_id, (block, ofs), ops, path) ->
-         Operation_hashes_for_block (net_id, block, ofs, ops, path)) ;
+      (function Operation_hashes_for_block (block, ofs, ops, path) ->
+         Some ((block, ofs), ops, path) | _ -> None)
+      (fun ((block, ofs), ops, path) ->
+         Operation_hashes_for_block (block, ofs, ops, path)) ;
 
     case ~tag:0x60
-      (obj2
-         (req "net_id" Net_id.encoding)
-         (req "get_operations_for_blocks"
-            (list (tup2 Block_hash.encoding int8))))
+      (obj1 (req "get_operations_for_blocks"
+               (list (obj2
+                        (req "hash" Block_hash.encoding)
+                        (req "validation_pass" int8)))))
       (function
-        | Get_operations_for_blocks (net_id, keys) -> Some (net_id, keys)
+        | Get_operations_for_blocks keys -> Some keys
         | _ -> None)
-      (fun (net_id, keys) -> Get_operations_for_blocks (net_id, keys));
+      (fun keys -> Get_operations_for_blocks keys);
 
     case ~tag:0x61
-      (obj4
-         (req "net_id" Net_id.encoding)
-         (req "operations_for_block" (tup2 Block_hash.encoding int8))
+      (obj3
+         (req "operations_for_block"
+            (obj2
+               (req "hash" Block_hash.encoding)
+               (req "validation_pass" int8)))
          (req "operations" (list (dynamic_size Operation.encoding)))
          (req "operations_path" Operation_list_list_hash.path_encoding))
-      (function Operations_for_block (net_id, block, ofs, ops, path) ->
-         Some (net_id, (block, ofs), ops, path) | _ -> None)
-      (fun (net_id, (block, ofs), ops, path) ->
-         Operations_for_block (net_id, block, ofs, ops, path)) ;
+      (function Operations_for_block (block, ofs, ops, path) ->
+         Some ((block, ofs), ops, path) | _ -> None)
+      (fun ((block, ofs), ops, path) ->
+         Operations_for_block (block, ofs, ops, path)) ;
 
   ]
 

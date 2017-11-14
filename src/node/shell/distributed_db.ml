@@ -82,8 +82,8 @@ module Raw_operation =
     (Fake_operation_storage)
     (Operation_hash.Table)
     (struct
-      type param = Net_id.t
-      let forge net_id keys = Message.Get_operations (net_id, keys)
+      type param = unit
+      let forge () keys = Message.Get_operations keys
     end)
     (struct
       type param = unit
@@ -112,8 +112,8 @@ module Raw_block_header =
     (Block_header_storage)
     (Block_hash.Table)
     (struct
-      type param = Net_id.t
-      let forge net_id keys = Message.Get_block_headers (net_id, keys)
+      type param = unit
+      let forge () keys = Message.Get_block_headers keys
     end)
     (struct
       type param = unit
@@ -164,9 +164,9 @@ module Raw_operation_hashes = struct
       (Operation_hashes_storage)
       (Operations_table)
       (struct
-        type param = Net_id.t
-        let forge net_id keys =
-          Message.Get_operation_hashes_for_blocks (net_id, keys)
+        type param = unit
+        let forge () keys =
+          Message.Get_operation_hashes_for_blocks keys
       end)
       (struct
         type param = Operation_list_list_hash.t
@@ -232,9 +232,9 @@ module Raw_operations = struct
       (Operations_storage)
       (Operations_table)
       (struct
-        type param = Net_id.t
-        let forge net_id keys =
-          Message.Get_operations_for_blocks (net_id, keys)
+        type param = unit
+        let forge () keys =
+          Message.Get_operations_for_blocks keys
       end)
       (struct
         type param = Operation_list_list_hash.t
@@ -340,7 +340,14 @@ let state { disk } = disk
 let net_state { net_state } = net_state
 let db { global_db } = global_db
 
-let find_pending_block_header active_nets h =
+let read_block_header { disk } h =
+  State.read_block disk h >>= function
+  | Some b ->
+      Lwt.return_some (State.Block.net_id b, State.Block.header b)
+  | None ->
+      Lwt.return_none
+
+let find_pending_block_header { peer_active_nets } h  =
   Net_id.Table.fold
     (fun _net_id net_db acc ->
        match acc with
@@ -349,10 +356,34 @@ let find_pending_block_header active_nets h =
              net_db.block_header_db.table h ->
            Some net_db
        | None -> None)
-    active_nets
+    peer_active_nets
     None
 
-let find_pending_operation active_nets h =
+let find_pending_operations { peer_active_nets } h i =
+  Net_id.Table.fold
+    (fun _net_id net_db acc ->
+       match acc with
+       | Some _ -> acc
+       | None when Raw_operations.Table.pending
+             net_db.operations_db.table (h, i) ->
+           Some net_db
+       | None -> None)
+    peer_active_nets
+    None
+
+let find_pending_operation_hashes { peer_active_nets } h i =
+  Net_id.Table.fold
+    (fun _net_id net_db acc ->
+       match acc with
+       | Some _ -> acc
+       | None when Raw_operation_hashes.Table.pending
+             net_db.operation_hashes_db.table (h, i) ->
+           Some net_db
+       | None -> None)
+    peer_active_nets
+    None
+
+let find_pending_operation { peer_active_nets } h =
   Net_id.Table.fold
     (fun _net_id net_db acc ->
        match acc with
@@ -361,8 +392,21 @@ let find_pending_operation active_nets h =
              net_db.operation_db.table h ->
            Some net_db
        | None -> None)
-    active_nets
+    peer_active_nets
     None
+
+let read_operation { active_nets } h =
+  Net_id.Table.fold
+    (fun net_id net_db acc ->
+       acc >>= function
+       | Some _ -> acc
+       | None ->
+           Raw_operation.Table.read_opt
+             net_db.operation_db.table h >>= function
+           | None -> Lwt.return_none
+           | Some bh -> Lwt.return_some (net_id, bh))
+    active_nets
+    Lwt.return_none
 
 module P2p_reader = struct
 
@@ -464,22 +508,22 @@ module P2p_reader = struct
         (* TODO Kickban *)
         Lwt.return_unit
 
-    | Get_block_headers (net_id, hashes) ->
-        may_handle state net_id @@ fun net_db ->
-        (* TODO: Blame request of unadvertised blocks ? *)
+    | Get_block_headers hashes ->
         Lwt_list.iter_p
           (fun hash ->
-             State.Block.read_opt net_db.net_state hash >|= function
-             | None -> ()
-             | Some b ->
-                 let header = State.Block.header b in
+             read_block_header global_db hash >>= function
+             | None ->
+                 (* TODO: Blame request of unadvertised blocks ? *)
+                 Lwt.return_unit
+             | Some (_net_id, header) ->
                  ignore @@
-                 P2p.try_send global_db.p2p state.conn (Block_header header))
+                 P2p.try_send global_db.p2p state.conn (Block_header header) ;
+                 Lwt.return_unit)
           hashes
 
     | Block_header block -> begin
         let hash = Block_header.hash block in
-        match find_pending_block_header state.peer_active_nets hash with
+        match find_pending_block_header state hash with
         | None ->
             (* TODO some penalty. *)
             Lwt.return_unit
@@ -489,22 +533,22 @@ module P2p_reader = struct
             Lwt.return_unit
       end
 
-    | Get_operations (net_id, hashes) ->
-        may_handle state net_id @@ fun net_db ->
-        (* TODO: only answers for prevalidated operations *)
+    | Get_operations hashes ->
         Lwt_list.iter_p
           (fun hash ->
-             Raw_operation.Table.read_opt
-               net_db.operation_db.table hash >|= function
-             | None -> ()
-             | Some p ->
+             read_operation global_db hash >>= function
+             | None ->
+                 (* TODO: Blame request of unadvertised operations ? *)
+                 Lwt.return_unit
+             | Some (_net_id, op) ->
                  ignore @@
-                 P2p.try_send global_db.p2p state.conn (Operation p))
+                 P2p.try_send global_db.p2p state.conn (Operation op) ;
+                 Lwt.return_unit)
           hashes
 
     | Operation operation -> begin
         let hash = Operation.hash operation in
-        match find_pending_operation state.peer_active_nets hash with
+        match find_pending_operation state hash with
         | None ->
             (* TODO some penalty. *)
             Lwt.return_unit
@@ -517,11 +561,14 @@ module P2p_reader = struct
     | Get_protocols hashes ->
         Lwt_list.iter_p
           (fun hash ->
-             State.Protocol.read_opt global_db.disk hash >|= function
-             | None -> ()
+             State.Protocol.read_opt global_db.disk hash >>= function
+             | None ->
+                 (* TODO: Blame request of unadvertised protocol ? *)
+                 Lwt.return_unit
              | Some p ->
                  ignore @@
-                 P2p.try_send global_db.p2p state.conn (Protocol p))
+                 P2p.try_send global_db.p2p state.conn (Protocol p) ;
+                 Lwt.return_unit)
           hashes
 
     | Protocol protocol ->
@@ -530,54 +577,57 @@ module P2p_reader = struct
           global_db.protocol_db.table state.gid hash protocol >>= fun () ->
         Lwt.return_unit
 
-    | Get_operation_hashes_for_blocks (net_id, blocks) ->
-        may_handle state net_id @@ fun net_db ->
-        (* TODO: Blame request of unadvertised blocks ? *)
+    | Get_operation_hashes_for_blocks blocks ->
         Lwt_list.iter_p
           (fun (hash, ofs) ->
-             State.Block.read_opt net_db.net_state hash >>= function
+             State.read_block global_db.disk hash >>= function
              | None -> Lwt.return_unit
-             | Some b ->
-                 State.Block.operation_hashes b ofs >>= fun (hashes, path) ->
+             | Some block ->
+                 State.Block.operation_hashes
+                   block ofs >>= fun (hashes, path) ->
                  ignore @@
-                 P2p.try_send global_db.p2p state.conn
-                   (Operation_hashes_for_block
-                      (net_id, hash, ofs, hashes, path)) ;
+                 P2p.try_send global_db.p2p state.conn @@
+                 Operation_hashes_for_block (hash, ofs, hashes, path) ;
                  Lwt.return_unit)
           blocks
 
-    | Operation_hashes_for_block (net_id, block, ofs, ops, path) -> begin
-        may_handle state net_id @@ fun net_db ->
-        (* TODO early detection of non-requested list. *)
-        Raw_operation_hashes.Table.notify
-          net_db.operation_hashes_db.table state.gid
-          (block, ofs) (ops, path) >>= fun () ->
-        Lwt.return_unit
+    | Operation_hashes_for_block (block, ofs, ops, path) -> begin
+        match find_pending_operation_hashes state block ofs with
+        | None ->
+            (* TODO some penalty. *)
+            Lwt.return_unit
+        | Some net_db ->
+            Raw_operation_hashes.Table.notify
+              net_db.operation_hashes_db.table state.gid
+              (block, ofs) (ops, path) >>= fun () ->
+            Lwt.return_unit
       end
 
-    | Get_operations_for_blocks (net_id, blocks) ->
-        may_handle state net_id @@ fun net_db ->
-        (* TODO: Blame request of unadvertised blocks ? *)
+    | Get_operations_for_blocks blocks ->
         Lwt_list.iter_p
           (fun (hash, ofs) ->
-             State.Block.read_opt net_db.net_state hash >>= function
+             State.read_block global_db.disk hash >>= function
              | None -> Lwt.return_unit
-             | Some b ->
-                 State.Block.operations b ofs >>= fun (hashes, path) ->
+             | Some block ->
+                 State.Block.operations
+                   block ofs >>= fun (ops, path) ->
                  ignore @@
-                 P2p.try_send global_db.p2p state.conn
-                   (Operations_for_block
-                      (net_id, hash, ofs, hashes, path)) ;
+                 P2p.try_send global_db.p2p state.conn @@
+                 Operations_for_block (hash, ofs, ops, path) ;
                  Lwt.return_unit)
           blocks
 
-    | Operations_for_block (net_id, block, ofs, ops, path) ->
-        may_handle state net_id @@ fun net_db ->
-        (* TODO early detection of non-requested operations. *)
-        Raw_operations.Table.notify
-          net_db.operations_db.table state.gid
-          (block, ofs) (ops, path) >>= fun () ->
-        Lwt.return_unit
+    | Operations_for_block (block, ofs, ops, path) -> begin
+        match find_pending_operations state block ofs with
+        | None ->
+            (* TODO some penalty. *)
+            Lwt.return_unit
+        | Some net_db ->
+            Raw_operations.Table.notify
+              net_db.operations_db.table state.gid
+              (block, ofs) (ops, path) >>= fun () ->
+            Lwt.return_unit
+      end
 
   let rec worker_loop global_db state =
     Lwt_utils.protect ~canceler:state.canceler begin fun () ->
@@ -657,7 +707,7 @@ let activate ({ p2p ; active_nets } as global_db) net_state =
   | exception Not_found ->
       let active_peers = ref P2p.Peer_id.Set.empty in
       let p2p_request =
-        { data = net_id ;
+        { data = () ;
           active = (fun () -> !active_peers) ;
           send = raw_try_send p2p ;
         } in
@@ -828,22 +878,6 @@ module Block_header = struct
                                   and type value := Block_header.t
                                   and type param := unit)
 end
-
-let read_block_header { disk ; active_nets } h =
-  State.read_block disk h >>= function
-  | Some b ->
-      Lwt.return_some (State.Block.net_id b, State.Block.header b)
-  | None ->
-      Net_id.Table.fold
-        (fun net_id net_db acc ->
-           acc >>= function
-           | Some _ -> acc
-           | None ->
-               Block_header.read_opt net_db h >>= function
-               | None -> Lwt.return_none
-               | Some bh -> Lwt.return_some (net_id, bh))
-        active_nets
-        Lwt.return_none
 
 module Operation_hashes =
   Make (Raw_operation_hashes.Table) (struct
