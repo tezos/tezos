@@ -63,7 +63,7 @@ let net_id = Net_id.of_block_hash genesis_block
 (** Operation store *)
 
 let make proto : Tezos_data.Operation.t =
-  { shell = { net_id ; branch = genesis_block } ; proto }
+  { shell = { branch = genesis_block } ; proto }
 
 let op1 = make (MBytes.of_string "Capadoce")
 let oph1 = Tezos_data.Operation.hash op1

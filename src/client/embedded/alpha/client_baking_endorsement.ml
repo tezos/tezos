@@ -122,7 +122,6 @@ let inject_endorsement cctxt
   Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
   Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt.rpc_config
     block
-    ~net_id:bi.net_id
     ~branch:bi.hash
     ~source
     ~block:bi.hash
@@ -130,7 +129,8 @@ let inject_endorsement cctxt
     () >>=? fun bytes ->
   let signed_bytes = Ed25519.Signature.append src_sk bytes in
   Client_node_rpcs.inject_operation
-    cctxt.rpc_config ?force ?async signed_bytes >>=? fun oph ->
+    cctxt.rpc_config ?force ?async ~net_id:bi.net_id
+    signed_bytes >>=? fun oph ->
   State.record_endorsement cctxt level bi.hash slot oph >>=? fun () ->
   return oph
 

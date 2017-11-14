@@ -35,3 +35,9 @@ val validate_block:
 
 (** Monitor all the valid block (for all activate networks). *)
 val watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
+
+val inject_operation:
+  t ->
+  ?force:bool ->
+  ?net_id:Net_id.t ->
+  Operation.t -> unit tzresult Lwt.t

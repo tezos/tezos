@@ -12,8 +12,6 @@ type t
 type block_error =
   | Cannot_parse_operation of Operation_hash.t
   | Invalid_fitness of { expected: Fitness.t ; found: Fitness.t }
-  | Inconsistent_netid of { operation: Operation_hash.t ;
-                            expected: Net_id.t ; found: Net_id.t }
   | Non_increasing_timestamp
   | Non_increasing_fitness
   | Invalid_level of { expected: Int32.t ; found: Int32.t }

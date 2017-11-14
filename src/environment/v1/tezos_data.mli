@@ -55,7 +55,6 @@ module Fitness : DATA with type t = MBytes.t list
 module Operation : sig
 
   type shell_header = {
-    net_id: Net_id.t ;
     branch: Block_hash.t ;
     (** The operation is only valid in a branch containing the
         block [branch]. *)

@@ -43,6 +43,8 @@ module type DISTRIBUTED_DB = sig
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
 
+  val pending: t -> key -> bool
+
 end
 
 module type DISK_TABLE = sig

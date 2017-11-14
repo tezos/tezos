@@ -260,7 +260,6 @@ module Protocol = struct
     Client_node_rpcs.Blocks.info !rpc_config block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level !rpc_config block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.proposals !rpc_config block
-      ~net_id:block_info.net_id
       ~branch:block_info.hash
       ~source:pk
       ~period:next_level.voting_period
@@ -273,7 +272,6 @@ module Protocol = struct
     Client_node_rpcs.Blocks.info !rpc_config block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level !rpc_config block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.ballot !rpc_config block
-      ~net_id:block_info.net_id
       ~branch:block_info.hash
       ~source:pk
       ~period:next_level.voting_period
@@ -458,10 +456,9 @@ module Endorse = struct
       source
       slot =
     let block = Client_rpcs.last_mined_block block in
-    Client_node_rpcs.Blocks.info !rpc_config block >>=? fun { hash ; net_id } ->
+    Client_node_rpcs.Blocks.info !rpc_config block >>=? fun { hash } ->
     Client_proto_rpcs.Helpers.Forge.Delegate.endorsement !rpc_config
       block
-      ~net_id:net_id
       ~branch:hash
       ~source
       ~block:hash

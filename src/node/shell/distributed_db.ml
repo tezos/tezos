@@ -340,6 +340,18 @@ let state { disk } = disk
 let net_state { net_state } = net_state
 let db { global_db } = global_db
 
+let find_pending_operation active_nets h =
+  Net_id.Table.fold
+    (fun _net_id net_db acc ->
+       match acc with
+       | Some _ -> acc
+       | None ->
+           if Raw_operation.Table.pending net_db.operation_db.table h then
+             Some net_db
+           else None)
+    active_nets
+    None
+
 module P2p_reader = struct
 
   let may_activate global_db state net_id f =
@@ -473,12 +485,17 @@ module P2p_reader = struct
                  P2p.try_send global_db.p2p state.conn (Operation p))
           hashes
 
-    | Operation operation ->
-        may_handle state operation.shell.net_id @@ fun net_db ->
+    | Operation operation -> begin
         let hash = Operation.hash operation in
-        Raw_operation.Table.notify
-          net_db.operation_db.table state.gid hash operation >>= fun () ->
-        Lwt.return_unit
+        match find_pending_operation state.peer_active_nets hash with
+        | None ->
+            (* TODO some penalty. *)
+            Lwt.return_unit
+        | Some net_db ->
+            Raw_operation.Table.notify
+              net_db.operation_db.table state.gid hash operation >>= fun () ->
+            Lwt.return_unit
+      end
 
     | Get_protocols hashes ->
         Lwt_list.iter_p
@@ -727,9 +744,7 @@ let inject_block_header net_db h b =
   return res
 
 let inject_operation net_db h op =
-  fail_unless
-    (Net_id.equal op.Operation.shell.net_id (State.Net.id net_db.net_state))
-    (failure "Inconsitent net_id in operation") >>=? fun () ->
+  assert (Operation_hash.equal h (Operation.hash op)) ;
   Raw_operation.Table.inject net_db.operation_db.table h op >>= fun res ->
   return res
 
@@ -809,6 +824,22 @@ module Block_header = struct
                                   and type param := unit)
 end
 
+let read_block_header { disk ; active_nets } h =
+  State.read_block disk h >>= function
+  | Some b ->
+      Lwt.return_some (State.Block.net_id b, State.Block.header b)
+  | None ->
+      Net_id.Table.fold
+        (fun net_id net_db acc ->
+           acc >>= function
+           | Some _ -> acc
+           | None ->
+               Block_header.read_opt net_db h >>= function
+               | None -> Lwt.return_none
+               | Some bh -> Lwt.return_some (net_id, bh))
+        active_nets
+        Lwt.return_none
+
 module Operation_hashes =
   Make (Raw_operation_hashes.Table) (struct
     type t = net_db
@@ -822,7 +853,7 @@ module Operations =
   end)
 
 module Operation = struct
-  type t = Operation.t
+  include Operation
   include (Make (Raw_operation.Table) (struct
              type t = net_db
              let proj net = net.operation_db.table

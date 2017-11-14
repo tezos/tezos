@@ -185,7 +185,8 @@ val inject_block:
 
 val inject_operation:
   (unit, unit,
-   (MBytes.t * bool * bool option), Operation_hash.t tzresult) RPC.service
+   (MBytes.t * bool * Net_id.t option * bool option),
+   Operation_hash.t tzresult) RPC.service
 
 val inject_protocol:
   (unit, unit,

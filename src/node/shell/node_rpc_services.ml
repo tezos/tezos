@@ -658,7 +658,7 @@ let inject_operation =
        RPCs ubder /blocks/prevalidation for more details on the \
        prevalidation context."
     ~input:
-      (obj3
+      (obj4
          (req "signedOperationContents"
             (describe ~title: "Tezos signed operation (hex encoded)"
                bytes))
@@ -669,6 +669,7 @@ let inject_operation =
                   (pre-)validated before answering. (default: true)"
                bool)
             true)
+         (opt "net_id" Net_id.encoding)
          (opt "force"
             (describe
                ~description:

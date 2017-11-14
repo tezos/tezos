@@ -10,15 +10,13 @@
 open Lwt.Infix
 open Logging.Node.Worker
 
-let inject_operation validator ?force bytes =
+let inject_operation validator ?force ?net_id bytes =
   let t =
     match Data_encoding.Binary.of_bytes Operation.encoding bytes with
     | None -> failwith "Can't parse the operation"
-    | Some operation ->
-        Validator.get
-          validator operation.shell.net_id >>=? fun net_validator ->
-        let pv = Net_validator.prevalidator net_validator in
-        Prevalidator.inject_operation pv ?force operation in
+    | Some op ->
+        Validator.inject_operation validator ?force ?net_id op
+  in
   let hash = Operation_hash.hash_bytes [bytes] in
   Lwt.return (hash, t)
 
@@ -57,7 +55,7 @@ type t = {
     MBytes.t -> Operation.t list list ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t ;
   inject_operation:
-    ?force:bool -> MBytes.t ->
+    ?force:bool -> ?net_id:Net_id.t -> MBytes.t ->
     (Operation_hash.t * unit tzresult Lwt.t) Lwt.t ;
   inject_protocol:
     ?force:bool -> Protocol.t ->

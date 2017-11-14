@@ -402,8 +402,9 @@ let build_rpc_directory node =
       end >>= RPC.Answer.return in
     RPC.register0 dir Services.inject_block implementation in
   let dir =
-    let implementation (contents, blocking, force) =
-      Node.RPC.inject_operation node ?force contents >>= fun (hash, wait) ->
+    let implementation (contents, blocking, net_id, force) =
+      Node.RPC.inject_operation
+        node ?force ?net_id contents >>= fun (hash, wait) ->
       begin
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end >>= RPC.Answer.return in

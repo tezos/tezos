@@ -17,8 +17,10 @@ let inject_seed_nonce_revelation rpc_config block ?force ?async nonces =
   let block = Client_rpcs.last_mined_block block in
   Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
   Client_proto_rpcs.Helpers.Forge.Anonymous.operations rpc_config
-    block ~net_id:bi.net_id ~branch:bi.hash operations >>=? fun bytes ->
-  Client_node_rpcs.inject_operation rpc_config ?force ?async bytes >>=? fun oph ->
+    block ~branch:bi.hash operations >>=? fun bytes ->
+  Client_node_rpcs.inject_operation
+    rpc_config ?force ?async ~net_id:bi.net_id
+    bytes >>=? fun oph ->
   return oph
 
 let forge_seed_nonce_revelation

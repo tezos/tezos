@@ -30,7 +30,7 @@ val inject_block:
 
 val inject_operation:
   config ->
-  ?async:bool -> ?force:bool ->
+  ?async:bool -> ?force:bool -> ?net_id:Net_id.t ->
   MBytes.t ->
   Operation_hash.t tzresult Lwt.t
 

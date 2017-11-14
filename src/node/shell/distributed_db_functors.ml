@@ -42,6 +42,8 @@ module type DISTRIBUTED_DB = sig
   val inject: t -> key -> value -> bool Lwt.t
   val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
 
+  val pending: t -> key -> bool
+
 end
 
 module type DISK_TABLE = sig
@@ -293,6 +295,12 @@ end = struct
     let memory = Memory_table.create 17 in
     let input = Watcher.create_input () in
     { scheduler ; disk ; memory ; input ; global_input }
+
+  let pending s k =
+    match Memory_table.find s.memory k with
+    | exception Not_found -> false
+    | Found _ -> false
+    | Pending _ -> true
 
 end
 

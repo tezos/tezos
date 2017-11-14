@@ -54,7 +54,7 @@ let incr_timestamp timestamp =
 
 let operation op =
   let op : Operation.t = {
-    shell = { net_id ; branch = genesis_block } ;
+    shell = { branch = genesis_block } ;
     proto = MBytes.of_string op ;
   } in
   Operation.hash op,

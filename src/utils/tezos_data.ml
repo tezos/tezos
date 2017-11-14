@@ -110,18 +110,15 @@ end
 module Operation = struct
 
   type shell_header = {
-    net_id: Net_id.t ;
     branch: Block_hash.t ;
   }
 
   let shell_header_encoding =
     let open Data_encoding in
     conv
-      (fun { net_id ; branch } -> net_id, branch)
-      (fun (net_id, branch) -> { net_id ; branch })
-      (obj2
-         (req "net_id" Net_id.encoding)
-         (req "branch" Block_hash.encoding))
+      (fun { branch } -> branch)
+      (fun branch -> { branch })
+      (obj1 (req "branch" Block_hash.encoding))
 
   type t = {
     shell: shell_header ;
@@ -142,7 +139,7 @@ module Operation = struct
 
   let compare o1 o2 =
     let (>>) x y = if x = 0 then y () else x in
-    Net_id.compare o1.shell.net_id o1.shell.net_id >> fun () ->
+    Block_hash.compare o1.shell.branch o1.shell.branch >> fun () ->
     MBytes.compare o1.proto o2.proto
   let equal b1 b2 = compare b1 b2 = 0
 

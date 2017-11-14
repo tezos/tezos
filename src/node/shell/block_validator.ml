@@ -36,8 +36,6 @@ type t = {
 type block_error =
   | Cannot_parse_operation of Operation_hash.t
   | Invalid_fitness of { expected: Fitness.t ; found: Fitness.t }
-  | Inconsistent_netid of { operation: Operation_hash.t ;
-                            expected: Net_id.t ; found: Net_id.t }
   | Non_increasing_timestamp
   | Non_increasing_fitness
   | Invalid_level of { expected: Int32.t ; found: Int32.t }
@@ -147,15 +145,6 @@ let pp_block_error ppf = function
         \ found %a@]"
         Fitness.pp expected
         Fitness.pp found
-  | Inconsistent_netid { operation ; expected ; found } ->
-      Format.fprintf ppf
-        "@[<v 2>The network identifier of the operation %a is not \
-        \ constitent with the network identifier of the block: @ \
-        \ expected: %a@ \
-        \ found: %a@]"
-        Operation_hash.pp_short operation
-        Net_id.pp expected
-        Net_id.pp found
   | Non_increasing_timestamp ->
       Format.fprintf ppf "Non increasing timestamp"
   | Non_increasing_fitness ->
@@ -334,16 +323,6 @@ let apply_block
   check_header pred_header hash header >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
   check_liveness net_state pred hash operation_hashes operations >>=? fun () ->
-  iter_p (iter_p (fun op ->
-      let op_hash = Operation.hash op in
-      fail_unless
-        (Net_id.equal op.shell.net_id header.shell.net_id)
-        (invalid_block hash @@ Inconsistent_netid {
-            operation = op_hash ;
-            expected = header.shell.net_id ;
-            found = op.shell.net_id ;
-          })))
-    operations >>=? fun () ->
   map2_s (map2_s begin fun op_hash raw ->
       Lwt.return (Proto.parse_operation op_hash raw)
       |> trace (invalid_block hash (Cannot_parse_operation op_hash))

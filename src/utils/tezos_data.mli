@@ -48,7 +48,6 @@ end
 module Operation : sig
 
   type shell_header = {
-    net_id: Net_id.t ;
     branch: Block_hash.t ;
   }
   val shell_header_encoding: shell_header Data_encoding.t

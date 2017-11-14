@@ -420,7 +420,6 @@ let context pv = pv.context ()
 let shutdown pv = pv.shutdown ()
 
 let inject_operation pv ?(force = false) (op: Operation.t) =
-  let net_id = State.Net.id (Distributed_db.net_state pv.net_db) in
   let wrap_error h map =
     begin
       try return (snd (Operation_hash.Map.find h map))
@@ -428,9 +427,6 @@ let inject_operation pv ?(force = false) (op: Operation.t) =
         failwith "unexpected protocol result"
     end >>=? fun errors ->
     Lwt.return (Error errors) in
-  fail_unless (Net_id.equal net_id op.shell.net_id)
-    (failure
-       "Prevalidator.inject_operation: invalid network") >>=? fun () ->
   pv.prevalidate_operations force [op] >>=? function
   | ([h], { applied = [h', _] }) when Operation_hash.equal h h' ->
       return ()

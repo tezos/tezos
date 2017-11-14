@@ -187,25 +187,25 @@ module Helpers = struct
 
     module Manager = struct
       let operations cctxt
-          block ~net_id ~branch ~source ?sourcePubKey ~counter ~fee operations =
+          block ~branch ~source ?sourcePubKey ~counter ~fee operations =
         let ops =
           Manager_operations { source ; public_key = sourcePubKey ;
                                counter ; operations ; fee } in
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
-           ({net_id ; branch }, Sourced_operations ops))
+           ({ branch }, Sourced_operations ops))
       let transaction cctxt
-          block ~net_id ~branch ~source ?sourcePubKey ~counter
+          block ~branch ~source ?sourcePubKey ~counter
           ~amount ~destination ?parameters ~fee ()=
-        operations cctxt block ~net_id ~branch ~source ?sourcePubKey ~counter ~fee
+        operations cctxt block ~branch ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[Transaction { amount ; parameters ; destination }]
       let origination cctxt
-          block ~net_id ~branch
+          block ~branch
           ~source ?sourcePubKey ~counter
           ~managerPubKey ~balance
           ?(spendable = true)
           ?(delegatable = true)
           ?delegatePubKey ?script ~fee () =
-        operations cctxt block ~net_id ~branch ~source ?sourcePubKey ~counter ~fee
+        operations cctxt block ~branch ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[
             Origination { manager = managerPubKey ;
                           delegate = delegatePubKey ;
@@ -215,53 +215,53 @@ module Helpers = struct
                           credit = balance }
           ]
       let delegation cctxt
-          block ~net_id ~branch ~source ?sourcePubKey ~counter ~fee delegate =
-        operations cctxt block ~net_id ~branch ~source ?sourcePubKey ~counter ~fee
+          block ~branch ~source ?sourcePubKey ~counter ~fee delegate =
+        operations cctxt block ~branch ~source ?sourcePubKey ~counter ~fee
           Tezos_context.[Delegation delegate]
     end
     module Delegate = struct
       let operations cctxt
-          block ~net_id ~branch ~source operations =
+          block ~branch ~source operations =
         let ops = Delegate_operations { source ; operations } in
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
-           ({net_id ; branch}, Sourced_operations ops))
+           ({ branch }, Sourced_operations ops))
       let endorsement cctxt
-          b ~net_id ~branch ~source ~block ~slot () =
-        operations cctxt b ~net_id ~branch ~source
+          b ~branch ~source ~block ~slot () =
+        operations cctxt b ~branch ~source
           Tezos_context.[Endorsement { block ; slot }]
       let proposals cctxt
-          b ~net_id ~branch ~source ~period ~proposals () =
-        operations cctxt b ~net_id ~branch ~source
+          b ~branch ~source ~period ~proposals () =
+        operations cctxt b ~branch ~source
           Tezos_context.[Proposals { period ; proposals }]
       let ballot cctxt
-          b ~net_id ~branch ~source ~period ~proposal ~ballot () =
-        operations cctxt b ~net_id ~branch ~source
+          b ~branch ~source ~period ~proposal ~ballot () =
+        operations cctxt b ~branch ~source
           Tezos_context.[Ballot { period ; proposal ; ballot }]
     end
     module Dictator = struct
       let operation cctxt
-          block ~net_id ~branch operation =
+          block ~branch operation =
         let op = Dictator_operation operation in
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
-           ({net_id ; branch}, Sourced_operations op))
+           ({ branch }, Sourced_operations op))
       let activate cctxt
-          b ~net_id ~branch hash =
-        operation cctxt b ~net_id ~branch (Activate hash)
+          b ~branch hash =
+        operation cctxt b ~branch (Activate hash)
       let activate_testnet cctxt
-          b ~net_id ~branch hash =
-        operation cctxt b ~net_id ~branch (Activate_testnet hash)
+          b ~branch hash =
+        operation cctxt b ~branch (Activate_testnet hash)
     end
     module Anonymous = struct
-      let operations cctxt block ~net_id ~branch operations =
+      let operations cctxt block ~branch operations =
         (call_error_service1 cctxt Services.Helpers.Forge.operations block
-           ({net_id ; branch}, Anonymous_operations operations))
+           ({ branch }, Anonymous_operations operations))
       let seed_nonce_revelation cctxt
-          block ~net_id ~branch ~level ~nonce () =
-        operations cctxt block ~net_id ~branch [Seed_nonce_revelation { level ; nonce }]
+          block ~branch ~level ~nonce () =
+        operations cctxt block ~branch [Seed_nonce_revelation { level ; nonce }]
       let faucet cctxt
-          block ~net_id ~branch ~id () =
+          block ~branch ~id () =
         let nonce = Sodium.Random.Bigbytes.generate 16 in
-        operations cctxt block ~net_id ~branch [Faucet { id ; nonce }]
+        operations cctxt block ~branch [Faucet { id ; nonce }]
     end
     let empty_proof_of_work_nonce =
       MBytes.of_string

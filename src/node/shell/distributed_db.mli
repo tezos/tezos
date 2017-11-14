@@ -32,6 +32,9 @@ type net_db
     for new head or new operations. *)
 val activate: t -> State.Net.t -> net_db
 
+(** Look for the database of an active network. *)
+val get_net: t -> Net_id.t -> net_db option
+
 (** Deactivate a given network. The node will notify its neighbours
     that it does not care anymore about this network. *)
 val deactivate: net_db -> unit Lwt.t
@@ -177,6 +180,10 @@ module Block_header : sig
                           and type value := Block_header.t
                           and type param := unit
 end
+
+(** Lookup for block header in any active networks *)
+val read_block_header:
+  db -> Block_hash.t -> (Net_id.t * Block_header.t) option Lwt.t
 
 (** Index of all the operations of a given block (per validation pass). *)
 module Operations :
