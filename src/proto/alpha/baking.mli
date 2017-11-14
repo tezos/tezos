@@ -20,19 +20,31 @@ type error += Cannot_pay_endorsement_bond (* `Permanent *)
 
 val paying_priorities: context -> int list
 
-val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
     time, given the predecessor block timestamp [pred_block_time],
     after which a baker with priority [priority] is allowed to
     mine. Fail with [Invalid_slot_durations_constant] if the minimal
     time cannot be computed. *)
+val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
 
+(** [pay_baking_bond: cxt baker] Debit the baking bond (See
+    !Constants.baking_bond_cost) from the default account of the
+    [baker]. No bond is debited if the baking priority of this block is
+    greater than the maximum number of paying baking in the network
+    (meaning that n. bakers skipped their turn).
+
+    Raise an error if the baker account does not have enough
+    funds to claim baking rights. *)
 val pay_baking_bond:
   context ->
   Block_header.proto_header ->
   public_key_hash ->
   context tzresult Lwt.t
 
+(** [pay_endorsement_bond: cxt baker] Debit the endorsement bond
+    (See !Constants.endorsement_bond_cost) from the default account
+    of the [baker]. Raise an error if the baker account does not
+    have enough funds to claim endorsement rights *)
 val pay_endorsement_bond:
   context -> public_key_hash -> (context * Tez.t) tzresult Lwt.t
 
@@ -57,27 +69,30 @@ val check_signing_rights:
     reward and the bond, or just the base reward otherwise *)
 val base_baking_reward: context -> priority:int -> Tez.t
 
+(** Returns the endorsement reward calculated w.r.t a given priotiry.  *)
 val endorsement_reward: block_priority:int -> Tez.t tzresult Lwt.t
 
-val baking_priorities:
-  context -> Level.t -> public_key_hash lazy_list
 (** [baking_priorities ctxt level] is the lazy list of contract's
     public key hashes that are allowed to mine for [level]. *)
+val baking_priorities:
+  context -> Level.t -> public_key_hash lazy_list
 
+(** [endorsement_priorities ctxt level] is the lazy list of contract's
+    public key hashes that are allowed to endorse for [level]. *)
 val endorsement_priorities:
   context -> Level.t -> public_key_hash lazy_list
 
+(** [first_baking_priorities ctxt ?max_priority contract_hash level]
+    is a list of priorities of max [?max_priority] elements, where the
+    delegate of [contract_hash] is allowed to mine for [level]. If
+    [?max_priority] is [None], a sensible number of priorities is
+    returned. *)
 val first_baking_priorities:
   context ->
   ?max_priority:int ->
   public_key_hash ->
   Level.t ->
   int list tzresult Lwt.t
-(** [first_baking_priorities ctxt ?max_priority contract_hash level]
-    is a list of priorities of max [?max_priority] elements, where the
-    delegate of [contract_hash] is allowed to mine for [level]. If
-    [?max_priority] is [None], a sensible number of priorities is
-    returned. *)
 
 val first_endorsement_slots:
   context ->
@@ -85,13 +100,19 @@ val first_endorsement_slots:
   public_key_hash ->
   Level.t -> int list tzresult Lwt.t
 
+(** [check_signature ctxt block id] check if the block is signed with
+    the given key *)
 val check_signature:
   context -> Block_header.t -> public_key_hash -> unit tzresult Lwt.t
 
 val check_hash: Block_hash.t -> int64 -> bool
+
+(** verify if the proof of work stamp is valid *)
 val check_proof_of_work_stamp:
   context -> Block_header.t -> unit tzresult Lwt.t
 
+(** check if the gap between the fitness of the current context
+    and the given block is within the protocol parameters *)
 val check_fitness_gap:
   context -> Block_header.t -> unit tzresult Lwt.t
 

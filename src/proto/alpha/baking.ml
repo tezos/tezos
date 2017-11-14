@@ -78,7 +78,7 @@ let () =
     ~id:"baking.cannot_pay_baking_bond"
     ~title:"Cannot pay baking bond"
     ~description:
-      "Impossible to take the required tokens on the baker's contract"
+      "Impossible to debit the required tokens on the baker's contract"
     ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay the baking bond")
     Data_encoding.unit
     (function Cannot_pay_baking_bond -> Some () | _ -> None)
@@ -88,7 +88,7 @@ let () =
     ~id:"baking.cannot_pay_endorsement_bond"
     ~title:"Cannot pay endorsement bond"
     ~description:
-      "Impossible to take the required tokens on the endorser's contract"
+      "Impossible to debit the required tokens on the endorser's contract"
     ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay the endorsement bond")
     Data_encoding.unit
     (function Cannot_pay_endorsement_bond -> Some () | _ -> None)
