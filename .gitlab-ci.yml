@@ -186,15 +186,6 @@ publish:github:
     - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
         ./scripts/apply_patch.sh "${CI_BUILD_REF_NAME}" ;
       fi
-    - git filter-branch --prune-empty --env-filter
-            'if [ $GIT_COMMIT != "f42e9d12ac75d2876a4cf600d44976b7090d4533" ] ; then
-               export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" ;
-               export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL" ;
-               export GIT_COMMITTER_DATE="$GIT_AUTHOR_DATE" ;
-               export GIT_AUTHOR_NAME="Dynamic Ledger Solutions, Inc." ;
-               export GIT_AUTHOR_EMAIL="contact@tezos.com" ;
-             fi'
-         HEAD
     - git push git@github.com:tezos/tezos.git -f HEAD:${CI_BUILD_REF_NAME}
 
 
