@@ -10,7 +10,7 @@ for f in  ` find \( -name _build -or \
                  \( -name \*.ml -or -name \*.mli \) -print`; do
   ff=$(basename $f)
   ocp-indent $f > $tmp_dir/$ff
-  diff -u --color $f $tmp_dir/$ff
+  diff -U 3 $f $tmp_dir/$ff
   if [ $? -ne 0 ]; then
       failed=yes
   fi
