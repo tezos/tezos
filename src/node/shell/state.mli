@@ -169,6 +169,8 @@ val mempool_encoding: mempool Data_encoding.t
 type chain_data = {
   current_head: Block.t ;
   current_mempool: mempool ;
+  live_blocks: Block_hash.Set.t ;
+  live_operations: Operation_hash.Set.t ;
 }
 
 val read_chain_store:

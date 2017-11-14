@@ -88,6 +88,8 @@ and chain_state = {
 and chain_data = {
   current_head: block ;
   current_mempool: mempool ;
+  live_blocks: Block_hash.Set.t ;
+  live_operations: Operation_hash.Set.t ;
 }
 
 and mempool = {
@@ -193,6 +195,8 @@ module Net = struct
           contents = current_block ;
         } ;
         current_mempool = empty_mempool ;
+        live_blocks = Block_hash.Set.singleton genesis.block ;
+        live_operations = Operation_hash.Set.empty ;
       } ;
       chain_store ;
     }

@@ -35,6 +35,18 @@ let mem net_state hash =
       Store.Chain.In_chain.known (chain_store, hash)
   end
 
+type data = State.chain_data = {
+  current_head: Block.t ;
+  current_mempool: mempool ;
+  live_blocks: Block_hash.Set.t ;
+  live_operations: Operation_hash.Set.t ;
+}
+
+let data net_state =
+  read_chain_store net_state begin fun _chain_store data ->
+    Lwt.return data
+  end
+
 let locked_set_head chain_store data block =
   let rec pop_blocks ancestor block =
     let hash = Block.hash block in
@@ -59,13 +71,22 @@ let locked_set_head chain_store data block =
   let ancestor = Block.hash ancestor in
   pop_blocks ancestor data.current_head >>= fun () ->
   Lwt_list.fold_left_s push_block ancestor path >>= fun _ ->
-  Store.Chain.Current_head.store chain_store (Block.hash block)
+  Store.Chain.Current_head.store chain_store (Block.hash block) >>= fun () ->
+  (* TODO more optimized updated of live_{blocks/operations} when the
+     new head is a direct successor of the current head... *)
+  Chain_traversal.live_blocks
+    block (State.Block.max_operations_ttl block) >>= fun (live_blocks,
+                                                          live_operations) ->
+  Lwt.return { current_head = block  ;
+               current_mempool = State.empty_mempool ;
+               live_blocks ;
+               live_operations ;
+             }
 
 let set_head net_state block =
   update_chain_store net_state begin fun chain_store data ->
-    locked_set_head chain_store data block >>= fun () ->
-    Lwt.return (Some { current_head = block  ;
-                       current_mempool = State.empty_mempool },
+    locked_set_head chain_store data block >>= fun new_chain_data ->
+    Lwt.return (Some new_chain_data,
                 data.current_head)
   end
 
@@ -74,8 +95,6 @@ let test_and_set_head net_state ~old block =
     if not (Block.equal data.current_head old) then
       Lwt.return (None, false)
     else
-      locked_set_head chain_store data block >>= fun () ->
-      Lwt.return (Some { current_head = block ;
-                         current_mempool = State.empty_mempool },
-                  true)
+      locked_set_head chain_store data block >>= fun new_chain_data ->
+      Lwt.return (Some new_chain_data, true)
   end

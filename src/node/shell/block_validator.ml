@@ -310,16 +310,22 @@ let assert_operation_liveness block live_blocks operations =
                               originating_block = op.shell.branch })))
     operations
 
-let check_liveness pred hash operations_hashes operations =
-  Chain_traversal.live_blocks
-    pred (State.Block.max_operations_ttl pred) >>= fun (live_blocks,
-                                                        live_operations) ->
+let check_liveness net_state pred hash operations_hashes operations =
+  begin
+    Chain.data net_state >>= fun chain_data ->
+    if State.Block.equal chain_data.current_head pred then
+      Lwt.return (chain_data.live_blocks, chain_data.live_operations)
+    else
+      Chain_traversal.live_blocks
+        pred (State.Block.max_operations_ttl pred)
+  end >>= fun (live_blocks, live_operations) ->
   assert_no_duplicate_operations
     hash live_operations operations_hashes >>=? fun () ->
   assert_operation_liveness hash live_blocks operations >>=? fun () ->
   return ()
 
 let apply_block
+    net_state
     pred (module Proto : State.Registred_protocol.T)
     hash (header: Block_header.t)
     operations =
@@ -327,7 +333,7 @@ let apply_block
   and pred_hash = State.Block.hash pred in
   check_header pred_header hash header >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
-  check_liveness pred hash operation_hashes operations >>=? fun () ->
+  check_liveness net_state pred hash operation_hashes operations >>=? fun () ->
   iter_p (iter_p (fun op ->
       let op_hash = Operation.hash op in
       fail_unless
@@ -436,7 +442,9 @@ let rec worker_loop bv =
               get_proto pred hash >>=? fun proto ->
               (* TODO also protect with [bv.canceler]. *)
               Lwt_utils.protect ?canceler begin fun () ->
-                apply_block pred proto hash header operations
+                apply_block
+                  (Distributed_db.net_state net_db)
+                  pred proto hash header operations
               end
             end >>= function
             | Ok result -> begin
