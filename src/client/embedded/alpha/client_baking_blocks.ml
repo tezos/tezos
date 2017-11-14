@@ -9,6 +9,7 @@
 
 type block_info = {
   hash: Block_hash.t ;
+  net_id: Net_id.t ;
   predecessor: Block_hash.t ;
   fitness: MBytes.t list ;
   timestamp: Time.t ;
@@ -17,21 +18,22 @@ type block_info = {
 }
 
 let convert_block_info cctxt
-    ( { hash ; predecessor ; fitness ; timestamp ; protocol }
+    ( { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol }
       : Client_node_rpcs.Blocks.block_info ) =
   Client_proto_rpcs.Context.level cctxt (`Hash hash) >>= function
   | Ok level ->
       Lwt.return
-        (Some { hash ; predecessor ; fitness ; timestamp ; protocol ; level })
+        (Some { hash ; net_id ; predecessor ;
+                fitness ; timestamp ; protocol ; level })
   | Error _ ->
       (* TODO log error *)
       Lwt.return_none
 
 let convert_block_info_err cctxt
-    ( { hash ; predecessor ; fitness ; timestamp ; protocol }
+    ( { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol }
       : Client_node_rpcs.Blocks.block_info ) =
   Client_proto_rpcs.Context.level cctxt (`Hash hash) >>=? fun level ->
-  return { hash ; predecessor ; fitness ; timestamp ; protocol ; level }
+  return { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol ; level }
 
 let info cctxt ?include_ops block =
   Client_node_rpcs.Blocks.info cctxt ?include_ops block >>=? fun block ->

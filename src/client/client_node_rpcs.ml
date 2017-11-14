@@ -18,9 +18,11 @@ let errors cctxt =
 let forge_block_header cctxt header =
   call_service0 cctxt Services.forge_block_header header
 
-let inject_block cctxt ?(async = false) ?(force = false) raw operations =
+let inject_block cctxt
+    ?(async = false) ?(force = false) ?net_id
+    raw operations =
   call_err_service0 cctxt Services.inject_block
-    { raw ; blocking = not async ; force ; operations }
+    { raw ; blocking = not async ; force ; net_id ; operations }
 
 let inject_operation cctxt ?(async = false) ?force ?net_id operation =
   call_err_service0 cctxt Services.inject_operation

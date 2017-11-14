@@ -81,14 +81,14 @@ module Blocks = struct
              fitness ; timestamp ; protocol ;
              validation_passes ; operations_hash ; data ;
              operations ; test_network } ->
-        ((hash, operations, protocol, test_network),
+        ((hash, net_id, operations, protocol, test_network),
          { Block_header.shell =
-             { net_id ; level ; proto_level ; predecessor ;
+             { level ; proto_level ; predecessor ;
                timestamp ; validation_passes ; operations_hash ; fitness } ;
            proto = data }))
-      (fun ((hash, operations, protocol, test_network),
+      (fun ((hash, net_id, operations, protocol, test_network),
             { Block_header.shell =
-                { net_id ; level ; proto_level ; predecessor ;
+                { level ; proto_level ; predecessor ;
                   timestamp ; validation_passes ; operations_hash ; fitness } ;
               proto = data }) ->
         { hash ; net_id ; level ; proto_level ; predecessor ;
@@ -97,8 +97,9 @@ module Blocks = struct
           operations ; test_network })
       (dynamic_size
          (merge_objs
-            (obj4
+            (obj5
                (req "hash" Block_hash.encoding)
+               (req "net_id" Net_id.encoding)
                (opt "operations" (dynamic_size (list (dynamic_size (list (dynamic_size operation_encoding))))))
                (req "protocol" Protocol_hash.encoding)
                (dft "test_network"
@@ -602,16 +603,17 @@ type inject_block_param = {
   raw: MBytes.t ;
   blocking: bool ;
   force: bool ;
+  net_id: Net_id.t option ;
   operations: Operation.t list list ;
 }
 
 let inject_block_param =
   conv
-    (fun { raw ; blocking ; force ; operations } ->
-       (raw, blocking, force, operations))
-    (fun (raw, blocking, force, operations) ->
-       { raw ; blocking ; force ; operations })
-    (obj4
+    (fun { raw ; blocking ; force ; net_id ; operations } ->
+       (raw, blocking, force, net_id, operations))
+    (fun (raw, blocking, force, net_id, operations) ->
+       { raw ; blocking ; force ; net_id ; operations })
+    (obj5
        (req "data" bytes)
        (dft "blocking"
           (describe
@@ -627,6 +629,7 @@ let inject_block_param =
                 the current head. (default: false)"
              bool)
           false)
+       (opt "net_id" Net_id.encoding)
        (req "operations"
           (describe
              ~description:"..."

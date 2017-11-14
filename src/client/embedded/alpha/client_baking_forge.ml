@@ -61,13 +61,14 @@ let assert_valid_operations_hash shell_header operations =
         inconsistent header.")
 
 let inject_block cctxt
-    ?force ~shell_header ~priority ~seed_nonce_hash ~src_sk operations =
+    ?force ?net_id
+    ~shell_header ~priority ~seed_nonce_hash ~src_sk operations =
   assert_valid_operations_hash shell_header operations >>=? fun () ->
   let block = `Hash shell_header.Tezos_data.Block_header.predecessor in
   forge_block_header cctxt block
     src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
   Client_node_rpcs.inject_block cctxt
-    ?force signed_header operations >>=? fun block_hash ->
+    ?force ?net_id signed_header operations >>=? fun block_hash ->
   return block_hash
 
 type error +=
@@ -174,8 +175,9 @@ let forge_block cctxt block
     let operations =
       if not best_effort then operations
       else List.map snd result.applied in
+    Client_node_rpcs.Blocks.info cctxt block >>=? fun {net_id} ->
     inject_block cctxt
-      ?force ~shell_header ~priority ~seed_nonce_hash ~src_sk
+      ?force ~net_id ~shell_header ~priority ~seed_nonce_hash ~src_sk
       [operations]
   else
     Lwt.return_error @@
@@ -507,7 +509,8 @@ let mine cctxt state =
         Fitness.pp shell_header.fitness >>= fun () ->
       Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
       inject_block cctxt.rpc_config
-        ~force:true ~shell_header ~priority ~seed_nonce_hash ~src_sk
+        ~force:true ~net_id:bi.net_id
+        ~shell_header ~priority ~seed_nonce_hash ~src_sk
         [List.map snd operations.applied]
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
       State.record_block cctxt level block_hash seed_nonce

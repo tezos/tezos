@@ -64,9 +64,9 @@ let rpc_services : Updater.rpc_context RPC.directory =
     RPC.register
       dir
       (Forge.block RPC.Path.root)
-      (fun _ctxt ((net_id, level, proto_level, predecessor,
+      (fun _ctxt ((_net_id, level, proto_level, predecessor,
                    timestamp, fitness), command) ->
-        let shell = { Block_header.net_id ; level ; proto_level ; predecessor ;
+        let shell = { Block_header.level ; proto_level ; predecessor ;
                       timestamp ; fitness ; validation_passes = 1 ; operations_hash } in
         let bytes = Data.Command.forge shell command in
         RPC.Answer.return bytes) in

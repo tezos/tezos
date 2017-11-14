@@ -47,8 +47,7 @@ let mine cctxt =
           (cctxt.message "Cannot parse fitness: %a" Environment.Fitness.pp bi.fitness);
         exit 2 in
   Client_node_rpcs.forge_block_header cctxt.rpc_config
-    { shell = { net_id = bi.net_id ;
-                predecessor = bi.hash ;
+    { shell = { predecessor = bi.hash ;
                 proto_level = bi.proto_level ;
                 level = Int32.succ bi.level ;
                 timestamp = Time.now () ;
@@ -56,7 +55,7 @@ let mine cctxt =
                 validation_passes = 0 ;
                 operations_hash = Operation_list_list_hash.empty } ;
       proto = MBytes.create 0 } >>=? fun bytes ->
-  Client_node_rpcs.inject_block cctxt.rpc_config bytes [] >>=? fun hash ->
+  Client_node_rpcs.inject_block cctxt.rpc_config ~net_id:bi.net_id bytes [] >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()
 

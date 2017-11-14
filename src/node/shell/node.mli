@@ -35,7 +35,7 @@ module RPC : sig
   type block_info = Node_rpc_services.Blocks.block_info
 
   val inject_block:
-    t -> ?force:bool ->
+    t -> ?force:bool -> ?net_id:Net_id.t ->
     MBytes.t -> Operation.t list list ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
   (** [inject_block node ?force bytes] tries to insert [bytes]

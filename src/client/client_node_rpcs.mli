@@ -19,7 +19,7 @@ val forge_block_header:
 
 val inject_block:
   config ->
-  ?async:bool -> ?force:bool ->
+  ?async:bool -> ?force:bool -> ?net_id:Net_id.t ->
   MBytes.t -> Operation.t list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt ?async ?force raw_block] tries to inject

@@ -66,7 +66,6 @@ end
 module Block_header : sig
 
   type shell_header = {
-    net_id: Net_id.t ;
     level: Int32.t ;
     proto_level: int ; (* uint8 *)
     predecessor: Block_hash.t ;

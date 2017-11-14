@@ -142,9 +142,7 @@ type t = global_state
 module Locked_block = struct
 
   let store_genesis store genesis commit =
-    let net_id = Net_id.of_block_hash genesis.block in
     let shell : Block_header.shell_header = {
-      net_id ;
       level = 0l ;
       proto_level = 0 ;
       predecessor = genesis.block ;
@@ -350,8 +348,8 @@ module Block = struct
   let hash { hash } = hash
   let header { contents = { header } } = header
   let net_state { net_state } = net_state
+  let net_id { net_state = { net_id } } = net_id
   let shell_header { contents = { header = { shell } } } = shell
-  let net_id b = (shell_header b).net_id
   let timestamp b = (shell_header b).timestamp
   let fitness b = (shell_header b).fitness
   let level b = (shell_header b).level

@@ -30,6 +30,7 @@ val get_exn: t -> Net_id.t -> Net_validator.t Lwt.t
 val validate_block:
   t ->
   ?force:bool ->
+  ?net_id:Net_id.t ->
   MBytes.t -> Operation.t list list ->
   (Block_hash.t * State.Block.t tzresult Lwt.t) tzresult Lwt.t
 

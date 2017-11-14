@@ -9,6 +9,7 @@
 
 type block_info = {
   hash: Block_hash.t ;
+  net_id: Net_id.t ;
   predecessor: Block_hash.t ;
   fitness: MBytes.t list ;
   timestamp: Time.t ;

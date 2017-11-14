@@ -340,15 +340,27 @@ let state { disk } = disk
 let net_state { net_state } = net_state
 let db { global_db } = global_db
 
+let find_pending_block_header active_nets h =
+  Net_id.Table.fold
+    (fun _net_id net_db acc ->
+       match acc with
+       | Some _ -> acc
+       | None when Raw_block_header.Table.pending
+             net_db.block_header_db.table h ->
+           Some net_db
+       | None -> None)
+    active_nets
+    None
+
 let find_pending_operation active_nets h =
   Net_id.Table.fold
     (fun _net_id net_db acc ->
        match acc with
        | Some _ -> acc
-       | None ->
-           if Raw_operation.Table.pending net_db.operation_db.table h then
-             Some net_db
-           else None)
+       | None when Raw_operation.Table.pending
+             net_db.operation_db.table h ->
+           Some net_db
+       | None -> None)
     active_nets
     None
 
@@ -465,12 +477,17 @@ module P2p_reader = struct
                  P2p.try_send global_db.p2p state.conn (Block_header header))
           hashes
 
-    | Block_header block ->
-        may_handle state block.shell.net_id @@ fun net_db ->
+    | Block_header block -> begin
         let hash = Block_header.hash block in
-        Raw_block_header.Table.notify
-          net_db.block_header_db.table state.gid hash block >>= fun () ->
-        Lwt.return_unit
+        match find_pending_block_header state.peer_active_nets hash with
+        | None ->
+            (* TODO some penalty. *)
+            Lwt.return_unit
+        | Some net_db ->
+            Raw_block_header.Table.notify
+              net_db.block_header_db.table state.gid hash block >>= fun () ->
+            Lwt.return_unit
+      end
 
     | Get_operations (net_id, hashes) ->
         may_handle state net_id @@ fun net_db ->
@@ -720,7 +737,6 @@ let clear_block net_db hash n =
 
 let commit_block net_db hash header operations result =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
-  assert (Net_id.equal (State.Net.id net_db.net_state) header.shell.net_id) ;
   assert (List.length operations = header.shell.validation_passes) ;
   State.Block.store net_db.net_state header operations result >>=? fun res ->
   clear_block net_db hash header.shell.validation_passes ;
@@ -728,19 +744,8 @@ let commit_block net_db hash header operations result =
 
 let commit_invalid_block net_db hash header _err =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
-  assert (Net_id.equal (State.Net.id net_db.net_state) header.shell.net_id) ;
   State.Block.store_invalid net_db.net_state header >>=? fun res ->
   clear_block net_db hash header.shell.validation_passes ;
-  return res
-
-let inject_block_header net_db h b =
-  fail_unless
-    (Net_id.equal
-       b.Block_header.shell.net_id
-       (State.Net.id net_db.net_state))
-    (failure "Inconsitent net_id in operation") >>=? fun () ->
-  Raw_block_header.Table.inject
-    net_db.block_header_db.table h b >>= fun res ->
   return res
 
 let inject_operation net_db h op =

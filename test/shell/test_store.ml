@@ -82,7 +82,6 @@ let lolblock ?(operations = []) header =
           { timestamp = Time.of_seconds (Random.int64 1500L) ;
             level = 0l ; (* dummy *)
             proto_level = 0 ; (* dummy *)
-            net_id ;
             validation_passes = Random.int 32 ;
             predecessor = genesis_block ; operations_hash ;
             fitness = [MBytes.of_string @@ string_of_int @@ String.length header;

@@ -74,7 +74,6 @@ end
 module Block_header : sig
 
   type shell_header = {
-    net_id: Net_id.t ;
     level: Int32.t ;
     (** The number of preceding block in this chain, i.e. the genesis
         has level 0. *)

@@ -56,14 +56,37 @@ let get v net_id =
   try get_exn v net_id >>= fun nv -> return nv
   with Not_found -> fail (Inactive_network net_id)
 
-let validate_block v ?force bytes operations =
+let validate_block v ?(force = false) ?net_id bytes operations =
   let hash = Block_hash.hash_bytes [bytes] in
   match Block_header.of_bytes bytes with
   | None -> failwith "Cannot parse block header."
   | Some block ->
-      get v block.shell.net_id >>=? fun nv ->
+      begin
+        match net_id with
+        | None -> begin
+            Distributed_db.read_block_header
+              v.db block.shell.predecessor >>= function
+            | None ->
+                failwith "Unknown predecessor (%a), cannot inject the block."
+                  Block_hash.pp_short block.shell.predecessor
+            | Some (net_id, _bh) -> get v net_id
+          end
+        | Some net_id ->
+            get v net_id >>=? fun nv ->
+            if force then
+              return nv
+            else
+              Distributed_db.Block_header.known
+                (Net_validator.net_db nv)
+                block.shell.predecessor >>= function
+              | true ->
+                  return nv
+              | false ->
+                  failwith "Unknown predecessor (%a), cannot inject the block."
+                    Block_hash.pp_short block.shell.predecessor
+      end >>=? fun nv ->
       let validation =
-        Net_validator.validate_block nv ?force hash block operations in
+        Net_validator.validate_block nv ~force hash block operations in
       return (hash, validation)
 
 let shutdown { active_nets ; block_validator } =

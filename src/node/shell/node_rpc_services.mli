@@ -177,6 +177,7 @@ type inject_block_param = {
   raw: MBytes.t ;
   blocking: bool ;
   force: bool ;
+  net_id: Net_id.t option ;
   operations: Operation.t list list ;
 }
 

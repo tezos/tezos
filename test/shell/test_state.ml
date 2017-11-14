@@ -68,7 +68,6 @@ let block _state ?(operations = []) pred_hash pred name : Block_header.t =
   let fitness = incr_fitness pred.Block_header.shell.fitness in
   let timestamp = incr_timestamp pred.shell.timestamp in
   { shell = {
-        net_id = pred.shell.net_id ;
         level = Int32.succ pred.shell.level ;
         proto_level = pred.shell.proto_level ;
         predecessor = pred_hash ;
@@ -111,8 +110,7 @@ let block _state ?(operations = []) (pred: State.Block.t) name
   let pred_header = State.Block.shell_header pred in
   let fitness = incr_fitness pred_header.fitness in
   let timestamp = incr_timestamp pred_header.timestamp in
-  { shell = { net_id = pred_header.net_id ;
-              level = Int32.succ pred_header.level ;
+  { shell = { level = Int32.succ pred_header.level ;
               proto_level = pred_header.proto_level ;
               predecessor = State.Block.hash pred ;
               validation_passes = 1 ;

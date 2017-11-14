@@ -24,7 +24,9 @@
 (executable
  ((name client_main)
   (public_name tezos-client)
-  (libraries (lwt utils client_lib client_embedded_genesis client_embedded_alpha))
+  (libraries (lwt utils client_lib
+              client_embedded_genesis
+              client_embedded_alpha))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -linkall))

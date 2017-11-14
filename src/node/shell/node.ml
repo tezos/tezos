@@ -40,9 +40,9 @@ let inject_protocol state ?force:_ proto =
   in
   Lwt.return (hash, validation)
 
-let inject_block validator ?force bytes operations =
+let inject_block validator ?force ?net_id bytes operations =
   Validator.validate_block
-    validator ?force bytes operations >>=? fun (hash, block) ->
+    validator ?force ?net_id bytes operations >>=? fun (hash, block) ->
   return (hash, (block >>=? fun _ -> return ()))
 
 type t = {
@@ -52,6 +52,7 @@ type t = {
   mainnet_validator: Net_validator.t ;
   inject_block:
     ?force:bool ->
+    ?net_id:Net_id.t ->
     MBytes.t -> Operation.t list list ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t ;
   inject_operation:
@@ -165,7 +166,7 @@ module RPC = struct
     Context.get_test_network context >>= fun test_network ->
     Lwt.return {
       hash ;
-      net_id = header.shell.net_id ;
+      net_id = State.Block.net_id block ;
       level = header.shell.level ;
       proto_level = header.shell.proto_level ;
       predecessor = header.shell.predecessor ;
@@ -203,17 +204,13 @@ module RPC = struct
 
   let get_validator_per_hash node hash =
     State.read_block_exn node.state hash >>= fun block ->
-    let header = State.Block.header block in
-    if Net_id.equal
-        (Net_validator.net_id node.mainnet_validator)
-        header.shell.net_id then
+    let net_id = State.Block.net_id block in
+    if Net_id.equal (Net_validator.net_id node.mainnet_validator) net_id then
       Lwt.return (Some node.mainnet_validator)
     else
       match Net_validator.child node.mainnet_validator with
       | Some test_validator ->
-          if Net_id.equal
-              (Net_validator.net_id test_validator)
-              header.shell.net_id then
+          if Net_id.equal (Net_validator.net_id test_validator) net_id then
             Lwt.return_some test_validator
           else
             Lwt.return_none
@@ -253,6 +250,7 @@ module RPC = struct
         Chain.head net_state >>= fun head ->
         let head_header = State.Block.header head in
         let head_hash = State.Block.hash head in
+        let head_net_id = State.Block.net_id head in
         State.Block.context head >>= fun head_context ->
         Context.get_protocol head_context >>= fun head_protocol ->
         Prevalidator.context pv >>= function
@@ -284,7 +282,7 @@ module RPC = struct
                        operations) ;
                 operations = Some operations ;
                 data = MBytes.of_string "" ;
-                net_id = head_header.shell.net_id ;
+                net_id = head_net_id ;
                 test_network ;
               }
 
@@ -351,7 +349,6 @@ module RPC = struct
                 Updater.block_hash = prevalidation_hash ;
                 block_header = {
                   shell = {
-                    net_id = head_header.shell.net_id ;
                     level = Int32.succ head_header.shell.level ;
                     proto_level ;
                     predecessor = head_hash ;
@@ -495,7 +492,6 @@ module RPC = struct
       else
         ((pred_shell_header.proto_level + 1) mod 256) in
     let shell_header : Block_header.shell_header = {
-      net_id = pred_shell_header.net_id ;
       level = Int32.succ pred_shell_header.level ;
       proto_level ;
       predecessor = State.Block.hash predecessor ;
