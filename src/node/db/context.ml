@@ -140,6 +140,9 @@ let undata_key = function
   | "data" :: key -> key
   | _ -> assert false
 
+type key = string list
+type value = MBytes.t
+
 let mem ctxt key =
   Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
   GitStore.Tree.mem ctxt.tree (data_key key) >>= fun v ->

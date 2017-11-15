@@ -40,7 +40,16 @@ val commit_test_network_genesis:
 
 (** {2 Generic interface} ****************************************************)
 
-include Persist.STORE with type t := context
+type key = string list
+type value = MBytes.t
+
+val mem: context -> key -> bool Lwt.t
+val dir_mem: context -> key -> bool Lwt.t
+val get: context -> key -> value option Lwt.t
+val set: context -> key -> value -> t Lwt.t
+val del: context -> key -> t Lwt.t
+val list: context -> key list -> key list Lwt.t
+val remove_rec: context -> key -> t Lwt.t
 
 (** {2 Accessing and Updating Versions} **************************************)
 

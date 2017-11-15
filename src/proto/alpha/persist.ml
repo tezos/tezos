@@ -9,8 +9,6 @@
 
 (*  Tezos - Persistent structures on top of {!Store} or {!Context} *)
 
-open Lwt.Infix
-
 (*-- Signatures --------------------------------------------------------------*)
 
 type key = string list
@@ -108,7 +106,7 @@ let prefix prf key =
 let unprefix prf key =
   let rec eat = function
     | k :: key, p :: prefix ->
-        assert (k = p) ;
+        assert Compare.String.(k = p) ;
         eat (key, prefix)
     | key, [] -> key
     | _ -> assert false in
@@ -165,9 +163,9 @@ module MakeTypedStore
   let set s k v = S.set s k (C.to_bytes v)
   let del = S.del
 
-  let raw_get = S.get
-
 end
+
+module CompareStringList = Compare.List(Compare.String)
 
 module RawKey = struct
   type t = key
@@ -175,7 +173,7 @@ module RawKey = struct
   let length = 0
   let to_path p = p
   let of_path p = p
-  let compare pa pb = Pervasives.compare pa pb
+  let compare = CompareStringList.compare
 end
 module RawValue = struct
   type t = value
@@ -190,7 +188,7 @@ module MakePersistentSet
 
   let to_path k =
     let suffix = K.to_path k in
-    assert (List.length suffix = K.length) ;
+    assert Compare.Int.(List.length suffix = K.length) ;
     prefix K.prefix suffix
 
   let of_path p = K.of_path (unprefix K.prefix p)
@@ -216,9 +214,9 @@ module MakePersistentSet
 
   let fold c x ~f =
     let rec dig i root acc =
-      if root = inited_key then
+      if CompareStringList.(root = inited_key) then
         Lwt.return acc
-      else if i <= 0 then
+      else if Compare.Int.(i <= 0) then
         f (of_path root) acc
       else
         S.list c [root] >>= fun roots ->
@@ -259,7 +257,7 @@ module MakePersistentMap
 
   let to_path k =
     let suffix = K.to_path k in
-    assert (List.length suffix = K.length) ;
+    assert Compare.Int.(List.length suffix = K.length) ;
     prefix K.prefix suffix
 
   let of_path p = K.of_path (unprefix K.prefix p)
@@ -290,9 +288,9 @@ module MakePersistentMap
 
   let fold c x ~f =
     let rec dig i root acc =
-      if root = inited_key then
+      if CompareStringList.(root = inited_key) then
         Lwt.return acc
-      else if i <= 0 then
+      else if Compare.Int.(i <= 0) then
         S.get c root >>= function
         | None -> Lwt.return acc
         | Some b ->
@@ -324,206 +322,6 @@ module MakeBufferedPersistentMap
     Lwt_list.fold_left_s
       (fun c (k, b) -> S.set c (to_path k) (C.to_bytes b))
       c (Map.bindings m)
-
-end
-
-(*-- Imperative overlays ----------------------------------------------------*)
-
-type 'a shared_ref =
-  { mutable contents : 'a ;
-    lock : Lwt_mutex.t }
-let share contents =
-  { contents ;
-    lock = Lwt_mutex.create () }
-let update r f =
-  Lwt_mutex.with_lock r.lock
-    (fun () -> f r.contents >>= function
-       | None -> Lwt.return false
-       | Some new_contents ->
-           r.contents <- new_contents ;
-           Lwt.return true)
-let update_with_res r f =
-  Lwt_mutex.with_lock r.lock
-    (fun () -> f r.contents >>= function
-       | (None, x) -> Lwt.return (false, x)
-       | (Some new_contents, x) ->
-           r.contents <- new_contents ;
-           Lwt.return (true, x))
-let use r f =
-  Lwt_mutex.with_lock r.lock
-    (fun () -> f r.contents)
-
-module type IMPERATIVE_PROXY = sig
-  module Store : TYPED_STORE
-
-  type t
-  type rdata
-  type state
-  val create: state -> Store.t shared_ref -> t
-  val known: t -> Store.key -> bool Lwt.t
-  val read: t -> Store.key -> Store.value option Lwt.t
-  val store: t -> Store.key -> Store.value -> bool Lwt.t
-  val update: t -> Store.key -> Store.value -> bool Lwt.t
-  val remove: t -> Store.key -> bool Lwt.t
-  val prefetch: t -> rdata -> Store.key -> unit
-  val fetch: t -> rdata -> Store.key -> Store.value Lwt.t
-  val pending: t -> Store.key -> bool
-  val shutdown: t -> unit Lwt.t
-end
-
-module type IMPERATIVE_PROXY_SCHEDULER = sig
-  module Store : TYPED_STORE
-  type state
-  type rdata
-  type data
-
-  val name : string
-  val init_request :
-    state -> Store.key -> data Lwt.t
-  val request :
-    state ->
-    get:(rdata -> Store.key -> Store.value Lwt.t) ->
-    set:(Store.key -> Store.value -> unit Lwt.t) ->
-    (Store.key * data * rdata) list -> float
-end
-
-module MakeImperativeProxy
-    (Store : TYPED_STORE)
-    (Table : Hashtbl.S with type key = Store.key)
-    (Scheduler : IMPERATIVE_PROXY_SCHEDULER with module Store := Store)
-  : IMPERATIVE_PROXY with module Store := Store and type state = Scheduler.state and type rdata = Scheduler.rdata = struct
-
-  type rdata = Scheduler.rdata
-  type data =
-    { rdata: rdata ;
-      state: [ `Inited of Scheduler.data | `Initing of Scheduler.data Lwt.t ] ;
-      wakener: Store.value Lwt.u }
-  type state = Scheduler.state
-
-  type t =
-    { tbl : data Table.t ;
-      store : Store.t shared_ref ;
-      cancelation: unit -> unit Lwt.t ;
-      cancel: unit -> unit Lwt.t ;
-      on_cancel: (unit -> unit Lwt.t) -> unit ;
-      worker_trigger: unit -> unit;
-      worker_waiter: unit -> unit Lwt.t ;
-      worker: unit Lwt.t ;
-      gstate : state }
-
-  let pending_requests { tbl } =
-    Table.fold
-      (fun h data acc ->
-         match data.state with
-         | `Initing _ -> acc
-         | `Inited d -> (h, d, data.rdata) :: acc)
-      tbl []
-
-  let pending { tbl } hash = Table.mem tbl hash
-
-  let request { tbl ; worker_trigger ; gstate } rdata hash =
-    assert (not (Table.mem tbl hash));
-    let waiter, wakener = Lwt.wait () in
-    let data = Scheduler.init_request gstate hash in
-    match Lwt.state data with
-    | Lwt.Return data ->
-        let state = `Inited data in
-        Table.add tbl hash { rdata ; state ; wakener } ;
-        worker_trigger () ;
-        waiter
-    | _ ->
-        let state = `Initing data in
-        Table.add tbl hash { rdata ; state ; wakener } ;
-        Lwt.async
-          (fun () ->
-             data >>= fun data ->
-             let state = `Inited data in
-             Table.add tbl hash { rdata ; state ; wakener } ;
-             worker_trigger () ;
-             Lwt.return_unit) ;
-        waiter
-
-  let prefetch ({ store ; tbl } as session) rdata hash =
-    Lwt.ignore_result
-      (use store (fun store -> Store.mem store hash) >>= fun exists ->
-       if not exists && not (Table.mem tbl hash) then
-         request session rdata hash >>= fun _ -> Lwt.return_unit
-       else
-         Lwt.return_unit)
-
-  let known { store } hash =
-    use store (fun store -> Store.mem store hash)
-
-  let read { store } hash =
-    use store (fun store -> Store.get store hash)
-
-  let fetch ({ store ; tbl } as session) rdata hash =
-    try Lwt.waiter_of_wakener (Table.find tbl hash).wakener
-    with Not_found ->
-      use store (fun store -> Store.get store hash) >>= function
-      | Some op -> Lwt.return op
-      | None ->
-          try Lwt.waiter_of_wakener (Table.find tbl hash).wakener
-          with Not_found -> request session rdata hash
-
-  let store { store ; tbl } hash data =
-    update store (fun store ->
-        Store.mem store hash >>= fun exists ->
-        if exists then Lwt.return_none
-        else ( Store.set store hash data >>= fun store ->
-               Lwt.return (Some store) ) ) >>= fun changed ->
-    try
-      let wakener = (Table.find tbl hash).wakener in
-      Table.remove tbl hash;
-      Lwt.wakeup wakener data;
-      Lwt.return changed
-    with Not_found -> Lwt.return changed
-
-  let remove { store ; _ } hash =
-    update store (fun store ->
-        Store.mem store hash >>= fun exists ->
-        if not exists then Lwt.return_none
-        else ( Store.del store hash >>= fun store ->
-               Lwt.return (Some store) ) )
-
-  let update { store ; _ } hash data =
-    update store (fun store ->
-        Store.mem store hash >>= fun exists ->
-        if not exists then Lwt.return_none
-        else ( Store.set store hash data >>= fun store ->
-               Lwt.return (Some store) ) )
-
-  let create gstate st =
-    let tbl = Table.create 50 in
-    let cancelation, cancel, on_cancel = Lwt_utils.canceler () in
-    let worker_trigger, worker_waiter = Lwt_utils.trigger () in
-    let session =
-      { tbl ; gstate ; store = st ; worker = Lwt.return () ;
-        cancelation ; cancel ; on_cancel ;
-        worker_trigger ; worker_waiter } in
-    let worker =
-      let rec worker_loop () =
-        Lwt.pick [(worker_waiter () >|= fun () -> `Process);
-                  (cancelation () >|= fun () -> `Cancel)] >>= function
-        | `Cancel -> Lwt.return_unit
-        | `Process ->
-            begin
-              match pending_requests session with
-              | [] -> ()
-              | requests ->
-                  let get = fetch session
-                  and set k v = store session k v >>= fun _ -> Lwt.return_unit in
-                  let timeout = Scheduler.request gstate ~get ~set requests in
-                  if timeout > 0. then
-                    Lwt.ignore_result (Lwt_unix.sleep timeout >|= worker_trigger);
-            end;
-            worker_loop ()
-      in
-      Lwt_utils.worker Scheduler.name ~run:worker_loop ~cancel in
-    { session with worker }
-
-  let shutdown { cancel ; worker } =
-    cancel () >>= fun () -> worker
 
 end
 
@@ -578,7 +376,7 @@ module MakeHashResolver
   let plen = List.length Store.prefix
   let build path =
     H.of_path_exn @@
-    Utils.remove_elem_from_list plen path
+    Misc.remove_elem_from_list plen path
   let resolve t p =
     let rec loop prefix = function
       | [] ->
@@ -590,7 +388,7 @@ module MakeHashResolver
       | [d] ->
           Store.list t [prefix] >>= fun prefixes ->
           Lwt_list.filter_map_p (fun prefix ->
-              match remove_prefix ~prefix:d (List.hd (List.rev prefix)) with
+              match Misc.remove_prefix ~prefix:d (List.hd (List.rev prefix)) with
               | None -> Lwt.return_none
               | Some _ -> Lwt.return (Some (build prefix))
             ) prefixes

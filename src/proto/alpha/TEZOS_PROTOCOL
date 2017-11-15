@@ -26,6 +26,7 @@
         "Manager_repr",
         "Block_header_repr",
 
+        "Persist",
         "Storage_sigs",
         "Storage_functors",
         "Storage",
