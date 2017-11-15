@@ -52,6 +52,20 @@ let get_exn { active_nets } net_id =
 type error +=
   | Inactive_network of Net_id.t
 
+let () =
+  register_error_kind `Branch
+    ~id: "node.validator.inactive_network"
+    ~title: "Inactive network"
+    ~description: "Attempted validation of a block from an inactive network."
+    ~pp: (fun ppf net ->
+        Format.fprintf ppf
+          "Tried to validate a block from network %a, \
+           that is not currently considered active."
+          Net_id.pp net)
+    Data_encoding.(obj1 (req "inactive_network" Net_id.encoding))
+    (function Inactive_network net -> Some net | _ -> None)
+    (fun net -> Inactive_network net)
+
 let get v net_id =
   try get_exn v net_id >>= fun nv -> return nv
   with Not_found -> fail (Inactive_network net_id)
