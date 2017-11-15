@@ -170,18 +170,34 @@ let raw_del ctxt key =
   Lwt.return { ctxt with tree }
 let del t key = raw_del t (data_key key)
 
-let list_one ctxt key =
-  Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
-  GitStore.Tree.list ctxt.tree (data_key key) >>= fun keys ->
-  Lwt.return (List.map (fun (k,_) -> key @ [k]) keys)
-
-let list ctxt keys =
-  Lwt_list.map_p (list_one ctxt) keys >|= List.flatten
-
 let remove_rec ctxt key =
   Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
   GitStore.Tree.remove ctxt.tree (data_key key) >>= fun tree ->
   Lwt.return { ctxt with tree }
+
+let fold ctxt key ~init ~f =
+  Lwt_utils.Idle_waiter.task ctxt.index.repack_scheduler @@ fun () ->
+  GitStore.Tree.list ctxt.tree (data_key key) >>= fun keys ->
+  Lwt_list.fold_left_s
+    begin fun acc (name, kind) ->
+      let key =
+        match kind with
+        | `Contents -> `Key (key @ [name])
+        | `Node -> `Dir (key @ [name]) in
+      f key acc
+    end
+    init keys
+
+let fold_keys s k ~init ~f =
+  let rec loop k acc =
+    fold s k ~init:acc
+      ~f:(fun file acc ->
+          match file with
+          | `Key k -> f k acc
+          | `Dir k -> loop k acc) in
+  loop k init
+
+let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
 (*-- Predefined Fields -------------------------------------------------------*)
 

@@ -48,8 +48,16 @@ val dir_mem: context -> key -> bool Lwt.t
 val get: context -> key -> value option Lwt.t
 val set: context -> key -> value -> t Lwt.t
 val del: context -> key -> t Lwt.t
-val list: context -> key list -> key list Lwt.t
 val remove_rec: context -> key -> t Lwt.t
+
+val fold:
+  context -> key -> init:'a ->
+  f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
+  'a Lwt.t
+
+val keys: context -> key -> key list Lwt.t
+val fold_keys:
+  context -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
 (** {2 Accessing and Updating Versions} **************************************)
 

@@ -266,7 +266,7 @@ module Make_data_set_storage (P : Single_data_description) = struct
     map_s (fun (_, data) -> Lwt.return (unserial data)) elts
 
   let fold { context = c } init ~f =
-    HashTbl.fold c (ok init)
+    HashTbl.fold c ~init:(ok init)
       ~f:(fun _ data acc ->
           match acc with
           | Error _ -> Lwt.return acc
@@ -278,7 +278,7 @@ module Make_data_set_storage (P : Single_data_description) = struct
                   return acc)
 
   let clear ({ context = c } as s) =
-    HashTbl.fold c c ~f:(fun hash _ c -> HashTbl.del c hash) >>= fun c ->
+    HashTbl.fold c ~init:c ~f:(fun hash _ c -> HashTbl.del c hash) >>= fun c ->
     return { s with context = c }
 
 end
@@ -363,8 +363,8 @@ module Raw_make_iterable_data_storage
     HashTbl.clear c >>= fun c ->
     Lwt.return { s with context = c }
 
-  let fold { context = c } x ~f = HashTbl.fold c x ~f:(fun k v acc -> f k v acc)
-  let iter { context = c } ~f = HashTbl.fold c () ~f:(fun k v () -> f k v)
+  let fold { context = c } x ~f = HashTbl.fold c ~init:x ~f:(fun k v acc -> f k v acc)
+  let iter { context = c } ~f = HashTbl.fold c ~init:() ~f:(fun k v () -> f k v)
 
 end
 

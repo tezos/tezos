@@ -21,8 +21,14 @@ module type STORE = sig
   val get: t -> key -> value option Lwt.t
   val set: t -> key -> value -> t Lwt.t
   val del: t -> key -> t Lwt.t
-  val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
+  val fold:
+    t -> key -> init:'a ->
+    f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
+  val keys: t -> key -> key list Lwt.t
+  val fold_keys:
+    t -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 module type BYTES_STORE = sig
@@ -32,7 +38,6 @@ module type BYTES_STORE = sig
   val get: t -> key -> value option Lwt.t
   val set: t -> key -> value -> t Lwt.t
   val del: t -> key -> t Lwt.t
-  val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
 end
 
@@ -69,7 +74,7 @@ module type PERSISTENT_SET = sig
   val elements : t -> key list Lwt.t
   val clear : t -> t Lwt.t
   val iter : t -> f:(key -> unit Lwt.t) -> unit Lwt.t
-  val fold : t -> 'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val fold : t -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 module type BUFFERED_PERSISTENT_SET = sig
@@ -88,7 +93,7 @@ module type PERSISTENT_MAP = sig
   val bindings : t -> (key * value) list Lwt.t
   val clear : t -> t Lwt.t
   val iter : t -> f:(key -> value -> unit Lwt.t) -> unit Lwt.t
-  val fold : t -> 'a -> f:(key -> value -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val fold : t -> init:'a -> f:(key -> value -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 module type BUFFERED_PERSISTENT_MAP = sig
@@ -123,7 +128,6 @@ module MakeBytesStore
   let to_path k =
     let suffix = K.to_path k in
     prefix K.prefix suffix
-  let of_path k = K.of_path (unprefix K.prefix k)
 
   let mem s k =
     S.mem s (to_path k)
@@ -136,10 +140,6 @@ module MakeBytesStore
 
   let del s k =
     S.del s (to_path k)
-
-  let list s l =
-    S.list s (List.map to_path l) >>= fun res ->
-    Lwt.return (List.map of_path res)
 
   let remove_rec s k =
     S.remove_rec s (to_path k)
@@ -212,21 +212,26 @@ module MakePersistentSet
   let clear c =
     S.remove_rec c K.prefix
 
-  let fold c x ~f =
-    let rec dig i root acc =
-      if CompareStringList.(root = inited_key) then
-        Lwt.return acc
-      else if Compare.Int.(i <= 0) then
-        f (of_path root) acc
+  let fold s ~init ~f =
+    let rec dig i path acc =
+      if Compare.Int.(i <= 1) then
+        S.fold s path ~init:acc ~f:begin fun k acc ->
+          match k with
+          | `Dir _ -> Lwt.return acc
+          | `Key file -> f (of_path file) acc
+        end
       else
-        S.list c [root] >>= fun roots ->
-        Lwt_list.fold_right_s (dig (i - 1)) roots acc in
-    S.mem c inited_key >>= function
-    | true -> dig K.length K.prefix x
-    | false -> Lwt.return x
+        S.fold s path ~init:acc ~f:begin fun k acc ->
+          match k with
+          | `Dir k ->
+              dig (i-1) k acc
+          | `Key _ ->
+              Lwt.return acc
+        end in
+    dig K.length K.prefix init
 
-  let iter c ~f = fold c () ~f:(fun x () -> f x)
-  let elements c = fold c [] ~f:(fun p xs -> Lwt.return (p :: xs))
+  let iter c ~f = fold c ~init:() ~f:(fun x () -> f x)
+  let elements c = fold c ~init:[] ~f:(fun p xs -> Lwt.return (p :: xs))
 
 end
 
@@ -236,7 +241,7 @@ module MakeBufferedPersistentSet
   include MakePersistentSet(S)(K)
 
   let read c =
-    fold c Set.empty ~f:(fun p set -> Lwt.return (Set.add p set))
+    fold c ~init:Set.empty ~f:(fun p set -> Lwt.return (Set.add p set))
 
   let write c set =
     S.set c inited_key empty >>= fun c ->
@@ -286,26 +291,32 @@ module MakePersistentMap
   let clear c =
     S.remove_rec c K.prefix
 
-  let fold c x ~f =
-    let rec dig i root acc =
-      if CompareStringList.(root = inited_key) then
-        Lwt.return acc
-      else if Compare.Int.(i <= 0) then
-        S.get c root >>= function
-        | None -> Lwt.return acc
-        | Some b ->
-            match C.of_bytes b with
-            | None -> Lwt.return acc
-            | Some v -> f (of_path root) v acc
+  let fold s ~init ~f =
+    let rec dig i path acc =
+      if Compare.Int.(i <= 1) then
+        S.fold s path ~init:acc ~f:begin fun k acc ->
+          match k with
+          | `Dir _ -> Lwt.return acc
+          | `Key file ->
+              S.get s file >>= function
+              | None -> Lwt.return acc
+              | Some b ->
+                  match C.of_bytes b with
+                  | None ->
+                      (* Silently ignore unparsable data *)
+                      Lwt.return acc
+                  | Some v -> f (of_path file) v acc
+        end
       else
-        S.list c [root] >>= fun roots ->
-        Lwt_list.fold_right_s (dig (i - 1)) roots acc in
-    S.mem c inited_key >>= function
-    | true -> dig K.length K.prefix x
-    | false -> Lwt.return x
+        S.fold s path ~init:acc ~f:begin fun k acc ->
+          match k with
+          | `Dir k -> dig (i-1) k acc
+          | `Key _ -> Lwt.return acc
+        end in
+    dig K.length K.prefix init
 
-  let iter c ~f = fold c () ~f:(fun k v () -> f k v)
-  let bindings c = fold c [] ~f:(fun k v acc -> Lwt.return ((k, v) :: acc))
+  let iter c ~f = fold c ~init:() ~f:(fun k v () -> f k v)
+  let bindings c = fold c ~init:[] ~f:(fun k v acc -> Lwt.return ((k, v) :: acc))
 
 end
 
@@ -314,7 +325,7 @@ module MakeBufferedPersistentMap
 
   include MakePersistentMap(S)(K)(C)
 
-  let read c = fold c Map.empty ~f:(fun k v m -> Lwt.return (Map.add k v m))
+  let read c = fold c ~init:Map.empty ~f:(fun k v m -> Lwt.return (Map.add k v m))
 
   let write c m =
     clear c >>= fun c ->
@@ -369,7 +380,10 @@ module MakeHashResolver
     (Store : sig
        type t
        val dir_mem: t -> string list -> bool Lwt.t
-       val list: t -> string list list -> string list list Lwt.t
+       val fold:
+         t -> key -> init:'a ->
+         f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
+         'a Lwt.t
        val prefix: string list
      end)
     (H: HASH) = struct
@@ -377,20 +391,28 @@ module MakeHashResolver
   let build path =
     H.of_path_exn @@
     Misc.remove_elem_from_list plen path
+  let list t k =
+    Store.fold t k ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
   let resolve t p =
     let rec loop prefix = function
       | [] ->
-          Lwt.return [build prefix]
+          list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix -> loop prefix []) prefixes
+          >|= List.flatten
       | "" :: ds ->
-          Store.list t [prefix] >>= fun prefixes ->
-          Lwt_list.map_p (fun prefix -> loop prefix ds) prefixes
+          list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix -> loop prefix ds) prefixes
           >|= List.flatten
       | [d] ->
-          Store.list t [prefix] >>= fun prefixes ->
-          Lwt_list.filter_map_p (fun prefix ->
-              match Misc.remove_prefix ~prefix:d (List.hd (List.rev prefix)) with
-              | None -> Lwt.return_none
-              | Some _ -> Lwt.return (Some (build prefix))
+          list t prefix >>= fun prefixes ->
+          Lwt_list.filter_map_p (function
+              | `Dir _ -> Lwt.return_none
+              | `Key prefix ->
+                  match Misc.remove_prefix ~prefix:d (List.hd (List.rev prefix)) with
+                  | None -> Lwt.return_none
+                  | Some _ -> Lwt.return (Some (build prefix))
             ) prefixes
       | d :: ds ->
           Store.dir_mem t (prefix @ [d]) >>= function

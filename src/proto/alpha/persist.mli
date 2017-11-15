@@ -23,8 +23,14 @@ module type STORE = sig
   val get: t -> key -> value option Lwt.t
   val set: t -> key -> value -> t Lwt.t
   val del: t -> key -> t Lwt.t
-  val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
+  val fold:
+    t -> key -> init:'a ->
+    f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
+  val keys: t -> key -> key list Lwt.t
+  val fold_keys:
+    t -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 (** Projection of OCaml keys of some abstract type to concrete storage
@@ -62,7 +68,6 @@ module type BYTES_STORE = sig
   val get: t -> key -> value option Lwt.t
   val set: t -> key -> value -> t Lwt.t
   val del: t -> key -> t Lwt.t
-  val list: t -> key list -> key list Lwt.t
   val remove_rec: t -> key -> t Lwt.t
 end
 
@@ -100,7 +105,7 @@ module type PERSISTENT_SET = sig
   val elements : t -> key list Lwt.t
   val clear : t -> t Lwt.t
   val iter : t -> f:(key -> unit Lwt.t) -> unit Lwt.t
-  val fold : t -> 'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val fold : t -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 (** Signature of a buffered set as returned by {!MakeBufferedPersistentSet} *)
@@ -139,7 +144,7 @@ module type PERSISTENT_MAP = sig
   val bindings : t -> (key * value) list Lwt.t
   val clear : t -> t Lwt.t
   val iter : t -> f:(key -> value -> unit Lwt.t) -> unit Lwt.t
-  val fold : t -> 'a -> f:(key -> value -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val fold : t -> init:'a -> f:(key -> value -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 end
 
 (** Signature of a buffered map as returned by {!MakeBufferedPersistentMap} *)
@@ -202,7 +207,10 @@ module MakeHashResolver
     (Store : sig
        type t
        val dir_mem: t -> key -> bool Lwt.t
-       val list: t -> key list -> key list Lwt.t
+       val fold:
+         t -> key -> init:'a ->
+         f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
+         'a Lwt.t
        val prefix: string list
      end)
     (H: Hash.HASH) : sig

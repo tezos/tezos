@@ -176,7 +176,7 @@ let test_replay { idx ; genesis }  =
       Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
       Lwt.return ()
 
-let test_list { idx ; genesis } =
+let test_keys { idx ; genesis } =
   checkout idx genesis >>= function
   | None ->
       Assert.fail_msg "checkout genesis_block"
@@ -186,20 +186,23 @@ let test_list { idx ; genesis } =
       set ctxt ["a"; "d"; "e"] (MBytes.of_string "Septembre") >>= fun ctxt ->
       set ctxt ["f";] (MBytes.of_string "Avril") >>= fun ctxt ->
       set ctxt ["g"; "h"] (MBytes.of_string "Avril") >>= fun ctxt ->
-      list ctxt [[]] >>= fun l ->
-      Assert.equal_string_list_list ~msg:__LOC__ [["a"];["f"];["g"]] l ;
-      list ctxt [["a"]] >>= fun l ->
-      Assert.equal_string_list_list
-        ~msg:__LOC__ [["a";"b"]; ["a";"c"]; ["a";"d"]] l ;
-      list ctxt [["f"]] >>= fun l ->
-      Assert.equal_string_list_list ~msg:__LOC__ [] l ;
-      list ctxt [["g"]] >>= fun l ->
-      Assert.equal_string_list_list ~msg:__LOC__ [["g";"h"]] l ;
-      list ctxt [["i"]] >>= fun l ->
-      Assert.equal_string_list_list ~msg:__LOC__ [] l ;
-      list ctxt [["a"];["g"]] >>= fun l ->
+      keys ctxt [] >>= fun l ->
       Assert.equal_string_list_list ~msg:__LOC__
-        [["a"; "b"]; ["a"; "c"]; ["a"; "d"]; ["g"; "h"]] l ;
+        [["a";"b"];
+         ["a";"c"];
+         ["a";"d";"e"];
+         ["f"];
+         ["g";"h"]] (List.sort compare l) ;
+      keys ctxt ["a"] >>= fun l ->
+      Assert.equal_string_list_list
+        ~msg:__LOC__ [["a";"b"]; ["a";"c"]; ["a";"d";"e"]]
+        (List.sort compare l) ;
+      keys ctxt ["f"] >>= fun l ->
+      Assert.equal_string_list_list ~msg:__LOC__ [] l ;
+      keys ctxt ["g"] >>= fun l ->
+      Assert.equal_string_list_list ~msg:__LOC__ [["g";"h"]] l ;
+      keys ctxt ["i"] >>= fun l ->
+      Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       Lwt.return ()
 
 
@@ -210,7 +213,7 @@ let tests : (string * (t -> unit Lwt.t)) list = [
   "continuation", test_continuation ;
   "fork", test_fork ;
   "replay", test_replay ;
-  "list", test_list ;
+  "keys", test_keys ;
 ]
 
 let () =

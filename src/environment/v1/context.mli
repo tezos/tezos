@@ -23,8 +23,16 @@ val dir_mem: t -> key -> bool Lwt.t
 val get: t -> key -> value option Lwt.t
 val set: t -> key -> value -> t Lwt.t
 val del: t -> key -> t Lwt.t
-val list: t -> key list -> key list Lwt.t
 val remove_rec: t -> key -> t Lwt.t
+
+val fold:
+  t -> key -> init:'a ->
+  f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
+  'a Lwt.t
+
+val keys: t -> key -> key list Lwt.t
+val fold_keys:
+  t -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
 val register_resolver:
   'a Base58.encoding -> (t -> string -> 'a list Lwt.t) -> unit
