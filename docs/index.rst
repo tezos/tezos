@@ -26,6 +26,7 @@ Welcome to Tezos's documentation!
    :caption: White doc:
 
    whitedoc/the_big_picture
+   whitedoc/validation
    whitedoc/michelson
    whitedoc/proof_of_stake
 

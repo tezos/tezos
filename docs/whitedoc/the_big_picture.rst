@@ -4,6 +4,7 @@ Tezos Software Architecture
 ===========================
 
 The diagram below shows a very coarse grained architecture of Tezos.
+
 |Tezos architecture diagram|
 
 The characteristic that makes Tezos unique is its self-amending
@@ -28,7 +29,7 @@ responsibility of selecting and downloading alternative chains, feed
 them to the protocol, which in turn has the responsibility to check them
 for errors, and give them an absolute score. The shell then simply
 selects the valid head of highest absolute score. This part of the shell
-is called the validator.
+is called :ref:`the validator<validation>`.
 
 The rest of the shell includes the peer-to-peer layer, the disk storage
 of blocks, the operations to allow the node to transmit the chain data
