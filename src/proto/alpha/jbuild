@@ -57,4 +57,5 @@ let () =
   (deps ((glob_files *.ml)
          (glob_files *.mli)
          TEZOS_PROTOCOL))
-  (action (run ${exe:../../compiler_main.exe} dummy_alpha ${path-no-dep:.}))))
+  (action (chdir ${ROOT}
+          (run ${exe:../../compiler_main.exe} dummy_alpha ${path-no-dep:.})))))

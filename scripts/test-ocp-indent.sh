@@ -13,7 +13,7 @@ for f in  ` find \( -name _build -or \
   ocp-indent $f > $tmp_dir/$ff
   diff -U 3 $f $tmp_dir/$ff
   if [ $? -ne 0 ]; then
-    if [ $fix = "fix" ]; then
+    if [ "$fix" = "fix" ]; then
       echo "Fix indentation $f"
       cp $tmp_dir/$ff $f
     else
