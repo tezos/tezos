@@ -14,8 +14,8 @@ let from_raw c ?offset l =
     match offset with
     | None -> l
     | Some o -> Raw_level_repr.(of_int32_exn (Int32.add (to_int32 l) o)) in
-  let constants = Storage.constants c in
-  let first_level = Storage.first_level c in
+  let constants = Raw_context.constants c in
+  let first_level = Raw_context.first_level c in
   Level_repr.from_raw
     ~first_level
     ~cycle_length:constants.Constants_repr.cycle_length
@@ -23,7 +23,7 @@ let from_raw c ?offset l =
     l
 
 let root c =
-  Level_repr.root (Storage.first_level c)
+  Level_repr.root (Raw_context.first_level c)
 
 let succ c l = from_raw c (Raw_level_repr.succ l.level)
 let pred c l =
@@ -31,7 +31,7 @@ let pred c l =
   | None -> None
   | Some l -> Some (from_raw c l)
 
-let current ctxt = Storage.current_level ctxt
+let current ctxt = Raw_context.current_level ctxt
 
 let previous ctxt =
   let l = current ctxt in
@@ -40,8 +40,8 @@ let previous ctxt =
   | Some p -> p
 
 let first_level_in_cycle ctxt c =
-  let constants = Storage.constants ctxt in
-  let first_level = Storage.first_level ctxt in
+  let constants = Raw_context.constants ctxt in
+  let first_level = Raw_context.first_level ctxt in
   from_raw ctxt
     (Raw_level_repr.of_int32_exn
        (Int32.add

@@ -20,13 +20,13 @@ type nonce = t
 val encoding: nonce Data_encoding.t
 
 val record_hash:
-  Storage.t ->
+  Raw_context.t ->
   Ed25519.Public_key_hash.t -> Tez_repr.t ->
-  Nonce_hash.t -> Storage.t tzresult Lwt.t
+  Nonce_hash.t -> Raw_context.t tzresult Lwt.t
 
 val reveal:
-  Storage.t -> Level_repr.t -> nonce ->
-  (Storage.t * Ed25519.Public_key_hash.t * Tez_repr.t) tzresult Lwt.t
+  Raw_context.t -> Level_repr.t -> nonce ->
+  (Raw_context.t * Ed25519.Public_key_hash.t * Tez_repr.t) tzresult Lwt.t
 
 type status =
   | Unrevealed of {
@@ -36,7 +36,7 @@ type status =
     }
   | Revealed of nonce
 
-val get: Storage.t -> Level_repr.t -> status tzresult Lwt.t
+val get: Raw_context.t -> Level_repr.t -> status tzresult Lwt.t
 
 val of_bytes: MBytes.t -> nonce tzresult
 val hash: nonce -> Nonce_hash.t

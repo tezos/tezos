@@ -21,30 +21,10 @@ let initialize store =
   Vote_storage.init store >>=? fun store ->
   return store
 
-type error +=
-  | Unimplemented_sandbox_migration
-
 let may_initialize ctxt ~level ~timestamp ~fitness =
-  Storage.prepare ~level ~timestamp ~fitness ctxt >>=? fun (ctxt, first_block) ->
+  Raw_context.prepare
+    ~level ~timestamp ~fitness ctxt >>=? fun (ctxt, first_block) ->
   if first_block then
     initialize ctxt
   else
     return ctxt
-
-let configure_sandbox ctxt json =
-  let json =
-    match json with
-    | None -> `O []
-    | Some json -> json in
-  Storage.is_first_block ctxt >>=? function
-  | true ->
-      Storage.set_sandboxed ctxt json >>= fun ctxt ->
-      return ctxt
-  | false ->
-      Storage.get_sandboxed ctxt >>=? function
-      | None ->
-          fail Unimplemented_sandbox_migration
-      | Some _ ->
-          (* FIXME GRGR fail if parameter changed! *)
-          (* failwith "Changing sandbox parameter is not yet implemented" *)
-          return ctxt

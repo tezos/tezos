@@ -54,7 +54,7 @@ module type MINIMAL_HASH = sig
   val read: MBytes.t -> int -> t
   val write: MBytes.t -> int -> t -> unit
 
-  val to_path: t -> string list
+  val to_path: t -> string list -> string list
   val of_path: string list -> t option
   val of_path_exn: string list -> t
 
@@ -226,11 +226,11 @@ module Make_minimal_Blake2B (K : Name) = struct
     loop init off
 
   let path_length = 6
-  let to_path key =
+  let to_path key l =
     let key = to_hex key in
-    [ String.sub key 0 2 ; String.sub key 2 2 ;
-      String.sub key 4 2 ; String.sub key 6 2 ;
-      String.sub key 8 2 ; String.sub key 10 (size * 2 - 10) ]
+    String.sub key 0 2 :: String.sub key 2 2 ::
+    String.sub key 4 2 :: String.sub key 6 2 ::
+    String.sub key 8 2 :: String.sub key 10 (size * 2 - 10) :: l
   let of_path path =
     let path = String.concat "" path in
     of_hex path
@@ -677,7 +677,7 @@ module Net_id = struct
     loop init off
 
   let path_length = 1
-  let to_path key = [to_hex key]
+  let to_path key l = to_hex key :: l
   let of_path path =
     let path = String.concat "" path in
     of_hex path

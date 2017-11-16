@@ -148,3 +148,33 @@ let (<=) l1 l2 = Compare.Int.(<=) (compare l1 l2) 0
 let (<) l1 l2 = Compare.Int.(<) (compare l1 l2) 0
 let min l1 l2 = if l1 <= l2 then l1 else l2
 let max l1 l2 = if l1 >= l2 then l1 else l2
+
+module Index = struct
+  type t = contract
+  let path_length =
+    assert Compare.Int.(Ed25519.Public_key_hash.path_length =
+                        Contract_hash.path_length) ;
+    Ed25519.Public_key_hash.path_length + 1
+  let to_path c l =
+    match c with
+    | Default k ->
+        "pubkey" :: Ed25519.Public_key_hash.to_path k l
+    | Originated h ->
+        "originated" :: Contract_hash.to_path h l
+  let of_path = function
+    | "pubkey" :: key -> begin
+        match Ed25519.Public_key_hash.of_path key with
+        | None -> None
+        | Some h -> Some (Default h)
+      end
+    | "originated" :: key -> begin
+        match Contract_hash.of_path key with
+        | None -> None
+        | Some h -> Some (Originated h)
+      end
+    | _ -> None
+  let contract_prefix s =
+    "originated" :: Contract_hash.prefix_path s
+  let pkh_prefix s =
+    "pubkey" :: Ed25519.Public_key_hash.prefix_path s
+end

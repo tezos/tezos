@@ -45,3 +45,15 @@ type error += Unexpected_level of Int32.t
 let of_int32 l =
   try Ok (of_int32_exn l)
   with _ -> Error [Unexpected_level l]
+
+module Index = struct
+  type t = raw_level
+  let path_length = 1
+  let to_path level l = Int32.to_string level :: l
+  let of_path = function
+    | [s] -> begin
+        try Some (Int32.of_string s)
+        with _ -> None
+      end
+    | _ -> None
+end

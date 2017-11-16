@@ -24,7 +24,7 @@ let clear_cycle c cycle =
     if Roll_repr.(roll = last) then
       return c
     else
-      Storage.Roll.Owner_for_cycle.delete c (cycle, roll) >>=? fun c ->
+      Storage.Roll.Owner_for_cycle.delete (c, cycle) roll >>=? fun c ->
       loop c (Roll_repr.succ roll) in
   loop c Roll_repr.first
 
@@ -49,7 +49,7 @@ let freeze_rolls_for_cycle ctxt cycle =
         | None -> return acc
         | Some delegate ->
             Storage.Roll.Owner_for_cycle.init
-              ctxt (cycle, promoted_roll) delegate >>=? fun ctxt ->
+              (ctxt, cycle) promoted_roll delegate >>=? fun ctxt ->
             return (ctxt, Roll_repr.succ promoted_roll))
   >>=? fun (ctxt, last_promoted_roll) ->
   Storage.Roll.Last_for_cycle.init ctxt cycle last_promoted_roll
@@ -75,8 +75,8 @@ module Random = struct
     let rd = level_random random_seed kind level in
     let sequence = Seed_repr.sequence rd (Int32.of_int offset) in
     Storage.Roll.Last_for_cycle.get c cycle >>=? fun bound ->
-    let roll, _ = Roll_repr.random sequence bound in
-    Storage.Roll.Owner_for_cycle.get c (cycle, roll)
+    let roll, _ = Roll_repr.random sequence ~bound in
+    Storage.Roll.Owner_for_cycle.get (c, cycle) roll
 
 end
 
@@ -94,10 +94,10 @@ module Contract = struct
     return (roll, c)
 
   let get_limbo_roll c =
-    Storage.Roll.Limbo.get c >>=? function
+    Storage.Roll.Limbo.get_option c >>=? function
     | None ->
         fresh_roll c >>=? fun (roll, c) ->
-        Storage.Roll.Limbo.set c (Some roll) >>=? fun c ->
+        Storage.Roll.Limbo.init c roll >>=? fun c ->
         return (roll, c)
     | Some roll ->
         return (roll, c)
@@ -119,24 +119,24 @@ module Contract = struct
        contract : roll -> successor_roll -> ...
        limbo : limbo_head -> ...
     *)
-    Storage.Roll.Limbo.get c >>=? fun limbo_head ->
-    Storage.Roll.Contract_roll_list.get c contract >>=? function
+    Storage.Roll.Limbo.get_option c >>=? fun limbo_head ->
+    Storage.Roll.Contract_roll_list.get_option c contract >>=? function
     | None -> fail No_roll_in_contract
     | Some roll ->
         Storage.Roll.Owner.delete c roll >>=? fun c ->
-        Storage.Roll.Successor.get c roll >>=? fun successor_roll ->
-        Storage.Roll.Contract_roll_list.set c contract successor_roll >>=? fun c ->
+        Storage.Roll.Successor.get_option c roll >>=? fun successor_roll ->
+        Storage.Roll.Contract_roll_list.set_option c contract successor_roll >>= fun c ->
         (* contract : successor_roll -> ...
            roll ------^
            limbo : limbo_head -> ... *)
-        Storage.Roll.Successor.set c roll limbo_head >>=? fun c ->
+        Storage.Roll.Successor.set_option c roll limbo_head >>= fun c ->
         (* contract : successor_roll -> ...
            roll ------v
            limbo : limbo_head -> ... *)
-        Storage.Roll.Limbo.set c (Some roll) >>=? fun c ->
+        Storage.Roll.Limbo.init_set c roll >>= fun c ->
         (* contract : successor_roll -> ...
            limbo : roll -> limbo_head -> ... *)
-        Lwt.return (Ok (roll, c))
+        return (roll, c)
 
   let create_roll_in_contract c contract =
     consume_roll_change c contract >>=? fun c ->
@@ -145,21 +145,22 @@ module Contract = struct
        contract : contract_head -> ...
        limbo : roll -> limbo_successor -> ...
     *)
-    Storage.Roll.Contract_roll_list.get c contract >>=? fun contract_head ->
+    Storage.Roll.Contract_roll_list.get_option c contract >>=? fun contract_head ->
     get_limbo_roll c >>=? fun (roll, c) ->
     Storage.Roll.Owner.init c roll contract >>=? fun c ->
-    Storage.Roll.Successor.get c roll >>=? fun limbo_successor ->
-    Storage.Roll.Limbo.set c limbo_successor >>=? fun c ->
+    Storage.Roll.Successor.get_option c roll >>=? fun limbo_successor ->
+    Storage.Roll.Limbo.set_option c limbo_successor >>= fun c ->
     (* contract : contract_head -> ...
        roll ------v
        limbo : limbo_successor -> ... *)
-    Storage.Roll.Successor.set c roll contract_head >>=? fun c ->
+    Storage.Roll.Successor.set_option c roll contract_head >>= fun c ->
     (* contract : contract_head -> ...
        roll ------^
        limbo : limbo_successor -> ... *)
-    Storage.Roll.Contract_roll_list.set c contract (Some roll)
-  (* contract : roll -> contract_head -> ...
-     limbo : limbo_successor -> ... *)
+    Storage.Roll.Contract_roll_list.init_set c contract roll >>= fun c ->
+    (* contract : roll -> contract_head -> ...
+       limbo : limbo_successor -> ... *)
+    return c
 
   let init c contract =
     Storage.Roll.Contract_change.init c contract Tez_repr.zero

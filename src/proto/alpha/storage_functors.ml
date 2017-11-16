@@ -7,399 +7,441 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Tezos Protocol Implementation - Typed storage accessor builders *)
+open Storage_sigs
 
-open Misc
-
-type context = {
-  context: Context.t ;
-  constants: Constants_repr.constants ;
-  first_level: Raw_level_repr.t ;
-  level: Level_repr.t ;
-  timestamp: Time.t ;
-  fitness: Int64.t ;
-}
-
-(*-- Errors ------------------------------------------------------------------*)
-
-type error += Storage_error of string
-
-let () =
-  let open Data_encoding in
-  register_error_kind `Permanent
-    ~id:"storageError"
-    ~title: "Storage error (fatal internal error)"
-    ~description:
-      "An error that should never happen unless something \
-       has been deleted or corrupted in the database"
-    ~pp:(fun ppf msg ->
-        Format.fprintf ppf "@[<v 2>Storage error:@ %a@]"
-          pp_print_paragraph msg)
-    (obj1 (req "msg" string))
-    (function Storage_error msg -> Some msg | _ -> None)
-    (fun msg -> Storage_error msg)
-
-(*-- Generic data accessor ---------------------------------------------------*)
-
-module type Raw_data_description = sig
-  type key
-  type value
-  val name : string
-  val key : key -> string list
-  val of_bytes : MBytes.t -> value tzresult
-  val to_bytes : value -> MBytes.t
+module type ENCODED_VALUE = sig
+  type t
+  val encoding: t Data_encoding.t
 end
 
-module Make_raw_data_storage (P : Raw_data_description) = struct
-
-  type key = P.key
-  type value = P.value
-
-  let key k = P.key k
-
-  let key_to_string l = String.concat "/" (key l)
-
-  let get { context = c } k =
-    Context.get c (key k) >>= function
-    | None ->
-        let msg =
-          "cannot get undefined " ^ P.name ^ " key " ^ key_to_string k in
-        fail (Storage_error msg)
-    | Some bytes ->
-        Lwt.return (P.of_bytes bytes)
-
-  let mem { context = c } k = Context.mem c (key k)
-
-  let get_option { context = c } k =
-    Context.get c (key k) >>= function
-    | None -> return None
-    | Some bytes ->
-        Lwt.return (P.of_bytes bytes >|? fun v -> Some v)
-
-  (* Verify that the key is present before modifying *)
-  let set ({ context = c } as s) k v =
-    let key = key k in
-    Context.get c key >>= function
-    | None ->
-        let msg =
-          "cannot set undefined " ^ P.name ^ " key " ^ key_to_string k in
-        fail (Storage_error msg)
-    | Some old ->
-        let bytes = P.to_bytes v in
-        if MBytes.(old = bytes) then
-          return { s with context = c }
-        else
-          Context.set c key (P.to_bytes v) >>= fun c ->
-          return { s with context = c }
-
-  (* Verify that the key is not present before inserting *)
-  let init ({ context = c } as s) k v =
-    let key = key k in
-    Context.get c key >>=
-    function
-    | Some _ ->
-        let msg
-          = "cannot init existing " ^ P.name ^ " key " ^ key_to_string k in
-        fail (Storage_error msg)
-    | None ->
-        Context.set c key (P.to_bytes v) >>= fun c ->
-        return { s with context = c }
-
-  (* Does not verify that the key is present or not *)
-  let init_set ({ context = c } as s) k v =
-    Context.set c (key k) (P.to_bytes v) >>= fun c ->
-    return { s with context = c }
-
-  (* Verify that the key is present before deleting *)
-  let delete ({ context = c } as s) k =
-    let key = key k in
-    Context.get c key >>= function
-    | Some _ ->
-        Context.del c key >>= fun c ->
-        return { s with context = c }
-    | None ->
-        let msg =
-          "cannot delete undefined " ^ P.name ^ " key " ^ key_to_string k in
-        fail (Storage_error msg)
-
-  (* Do not verify before deleting *)
-  let remove ({ context = c } as s) k =
-    Context.del c (key k) >>= fun c ->
-    Lwt.return { s with context = c }
-
-end
-
-(*-- Indexed data accessor ---------------------------------------------------*)
-
-module type Data_description = sig
-  type value
-  val name : string
-  val encoding : value Data_encoding.t
-end
-
-module type Indexed_data_description = sig
-  type key
-  val key : key -> string list
-  include Data_description
-end
-
-module Make_indexed_data_storage (P : Indexed_data_description) =
-  Make_raw_data_storage(struct
-    include P
-
-    let of_bytes b =
-      match Data_encoding.Binary.of_bytes P.encoding b with
-      | None ->
-          let msg =
-            "cannot deserialize " ^ P.name ^ " value" in
-          error (Storage_error msg)
-      | Some v -> Ok v
-    let to_bytes v = Data_encoding.Binary.to_bytes P.encoding v
-  end)
-
-module Make_indexed_optional_data_storage (P : Indexed_data_description) = struct
-  module Raw = Make_indexed_data_storage(P)
-  type key = P.key
-  type value = P.value
-  let get = Raw.get_option
-  let mem = Raw.mem
-  let set c k r =
-    match r with
-    | None -> Raw.remove c k >>= fun c -> return c
-    | Some r -> Raw.init_set c k r
-end
-
-(*-- Single data accessor ----------------------------------------------------*)
-
-module type Single_data_description = sig
-  val key : string list
-  include Data_description
-end
-
-module Make_single_data_storage (P : Single_data_description) = struct
-  module Single_desc = struct
-    type value = P.value
-    type key = unit
-    let encoding = P.encoding
-    let name = P.name
-    let key () = P.key
-  end
-  include Make_indexed_data_storage(Single_desc)
-  let get c = get c ()
-  let mem c = mem c ()
-  let get_option c = get_option c ()
-  let set c r = set c () r
-  let init c r = init c () r
-  let init_set c r = init_set c () r
-  let remove c = remove c ()
-  let delete c = delete c ()
-end
-
-module Make_single_optional_data_storage (P : Single_data_description) = struct
-  module Raw = Make_single_data_storage (P)
-  type value = P.value
-  let get = Raw.get_option
-  let mem = Raw.mem
-  let set c r =
-    match r with
-    | None -> Raw.remove c >>= fun c -> return c
-    | Some r -> Raw.init_set c r
-end
-
-(*-- Data set (set of homogeneous data under a key prefix) -------------------*)
-
-module Make_data_set_storage (P : Single_data_description) = struct
-
-  module Key = struct
-    include Hash.Make_minimal_Blake2B(struct
-        let name = P.name
-        let title = ("A " ^ P.name ^ "key")
-        let size = None
-      end)
-    let of_path = of_path_exn
-    let prefix = P.key
-    let length = path_length
-  end
-
-  module HashTbl =
-    Persist.MakePersistentMap(Context)(Key)(Persist.RawValue)
-
-  type value = P.value
-
-  let serial v =
-    let data = Data_encoding.Binary.to_bytes P.encoding v in
-    Key.hash_bytes [data], data
-
-  let unserial b =
-    match Data_encoding.Binary.of_bytes P.encoding b with
-    | None ->
-        let msg =
-          "cannot deserialize " ^ P.name ^ " value" in
-        error (Storage_error msg)
+module Make_value (V : ENCODED_VALUE) = struct
+  type t = V.t
+  let of_bytes b =
+    match Data_encoding.Binary.of_bytes V.encoding b with
+    | None -> Error [Raw_context.Storage_error (Corrupted_data [(* FIXME??*)])]
     | Some v -> Ok v
-
-  let add ({ context = c } as s) v =
-    let hash, data = serial v in
-    HashTbl.mem c hash >>= function
-    | true ->
-        return { s with context = c }
-    | false ->
-        HashTbl.set c hash data >>= fun c ->
-        return { s with context = c }
-
-  let del ({ context = c } as s) v =
-    let hash, _ = serial v in
-    HashTbl.mem c hash >>= function
-    | false ->
-        return { s with context = c }
-    | true ->
-        HashTbl.del c hash >>= fun c ->
-        return { s with context = c }
-
-  let mem { context = c } v =
-    let hash, _ = serial v in
-    HashTbl.mem c hash >>= fun v ->
-    return v
-
-  let elements { context = c } =
-    HashTbl.bindings c >>= fun elts ->
-    map_s (fun (_, data) -> Lwt.return (unserial data)) elts
-
-  let fold { context = c } init ~f =
-    HashTbl.fold c ~init:(ok init)
-      ~f:(fun _ data acc ->
-          match acc with
-          | Error _ -> Lwt.return acc
-          | Ok acc ->
-              match unserial data with
-              | Error _ as err -> Lwt.return err
-              | Ok data ->
-                  f data acc >>= fun acc ->
-                  return acc)
-
-  let clear ({ context = c } as s) =
-    HashTbl.fold c ~init:c ~f:(fun hash _ c -> HashTbl.del c hash) >>= fun c ->
-    return { s with context = c }
-
+  let to_bytes v =
+    try Data_encoding.Binary.to_bytes V.encoding v
+    with _ -> MBytes.create 0
 end
 
-module Raw_make_iterable_data_storage
-    (K: Persist.KEY)
-    (P: Data_description) = struct
+module Raw_value = struct
+  type t = MBytes.t
+  let of_bytes b = ok b
+  let to_bytes b = b
+end
 
-  type key = K.t
-  type value = P.value
+let map_key f = function
+  | `Key k -> `Key (f k)
+  | `Dir k -> `Dir (f k)
 
-  module HashTbl =
-    Persist.MakePersistentMap(Context)(K)(struct
-      type t = P.value
-      let of_bytes b = Data_encoding.Binary.of_bytes P.encoding b
-      let to_bytes v = Data_encoding.Binary.to_bytes P.encoding v
-    end)
+let map_option f = function
+  | None -> None
+  | Some x -> Some (f x)
 
-  let key_to_string k = String.concat "/" (K.to_path k)
+module Make_subcontext (C : Raw_context.T) (N : NAME)
+  : Raw_context.T with type t = C.t = struct
+  type t = C.t
+  type context = t
+  let name_length = List.length N.name
+  let to_key k = N.name @ k
+  let of_key k = Misc.remove_elem_from_list name_length k
+  let mem t k = C.mem t (to_key k)
+  let dir_mem t k = C.dir_mem t (to_key k)
+  let get t k = C.get t (to_key k)
+  let get_option t k = C.get_option t (to_key k)
+  let init t k v = C.init t (to_key k) v
+  let set t k v = C.set t (to_key k) v
+  let init_set t k v = C.init_set t (to_key k) v
+  let set_option t k v = C.set_option t (to_key k) v
+  let delete t k = C.delete t (to_key k)
+  let remove t k = C.remove t (to_key k)
+  let remove_rec t k = C.remove_rec t (to_key k)
+  let fold t k ~init ~f =
+    C.fold t (to_key k) ~init
+      ~f:(fun k acc -> f (map_key of_key k) acc)
+  let keys t k = C.keys t (to_key k) >|= fun keys -> List.map of_key keys
+  let fold_keys t k ~init ~f =
+    C.fold_keys t (to_key k) ~init ~f:(fun k acc -> f (of_key k) acc)
+  let project = C.project
+end
 
-  let get { context = c } k =
-    HashTbl.get c k >>= function
-    | None ->
-        let msg =
-          "cannot get undefined " ^ P.name ^ " key " ^ key_to_string k in
-        fail (Storage_error msg)
-    | Some v ->
-        return v
-
-  let mem { context = c } k = HashTbl.mem c k
-
-  let get_option { context = c } k =
-    HashTbl.get c k >>= function
+module Make_single_data_storage (C : Raw_context.T) (N : NAME) (V : VALUE)
+  : Single_data_storage with type t = C.t
+                         and type value = V.t = struct
+  type t = C.t
+  type context = t
+  type value = V.t
+  let mem t =
+    C.mem t N.name
+  let get t =
+    C.get t N.name >>=? fun b ->
+    Lwt.return (V.of_bytes b)
+  let get_option t =
+    C.get_option t N.name >>= function
     | None -> return None
-    | Some v -> return (Some v)
+    | Some b ->
+        match V.of_bytes b with
+        | Ok v -> return (Some v)
+        | Error _ as err -> Lwt.return err
+  let init t v =
+    C.init t N.name (V.to_bytes v) >>=? fun t ->
+    return (C.project t)
+  let set t v =
+    C.set t N.name (V.to_bytes v) >>=? fun t ->
+    return (C.project t)
+  let init_set t v =
+    C.init_set t N.name (V.to_bytes v) >>= fun t ->
+    Lwt.return (C.project t)
+  let set_option t v =
+    C.set_option t N.name (map_option V.to_bytes v) >>= fun t ->
+    Lwt.return (C.project t)
+  let remove t =
+    C.remove t N.name >>= fun t ->
+    Lwt.return (C.project t)
+  let delete t =
+    C.delete t N.name >>=? fun t ->
+    return (C.project t)
+end
 
-  (* Verify that the key is present before modifying *)
-  let set ({ context = c } as s) k v =
-    HashTbl.get c k >>= function
-    | None ->
-        let msg =
-          "cannot set undefined " ^ P.name ^ " key " ^ key_to_string k in
-        fail (Storage_error msg)
-    | Some _ ->
-        HashTbl.set c k v >>= fun c ->
-        return { s with context = c }
+module type INDEX = sig
+  type t
+  val path_length: int
+  val to_path: t -> string list -> string list
+  val of_path: string list -> t option
+end
 
-  (* Verify that the key is not present before inserting *)
-  let init ({ context = c } as s) k v =
-    HashTbl.get c k >>=
-    function
-    | Some _ ->
-        let msg
-          = "cannot init existing " ^ P.name ^ " key " ^ key_to_string k in
-        fail (Storage_error msg)
-    | None ->
-        HashTbl.set c k v >>= fun c ->
-        return { s with context = c }
+module Pair(I1 : INDEX)(I2 : INDEX)
+  : INDEX with type t = I1.t * I2.t = struct
+  type t = I1.t * I2.t
+  let path_length = I1.path_length + I2.path_length
+  let to_path (x, y) l = I1.to_path x (I2.to_path y l)
+  let of_path l =
+    match Misc.take I1.path_length l with
+    | None -> None
+    | Some (l1, l2) ->
+        match I1.of_path l1, I2.of_path l2 with
+        | Some x, Some y -> Some (x, y)
+        | _ -> None
+end
 
-  (* Does not verify that the key is present or not *)
-  let init_set ({ context = c } as s) k v =
-    HashTbl.set c k v >>= fun c ->
-    return { s with context = c }
+module Make_data_set_storage (C : Raw_context.T) (I : INDEX)
+  : Data_set_storage with type t = C.t and type elt = I.t = struct
 
-  (* Verify that the key is present before deleting *)
-  let delete ({ context = c } as s) k =
-    HashTbl.get c k >>= function
-    | Some _ ->
-        HashTbl.del c k >>= fun c ->
-        return { s with context = c }
-    | None ->
-        let msg =
-          "cannot delete undefined " ^ P.name ^ " key " ^ key_to_string k in
-        fail (Storage_error msg)
+  type t = C.t
+  type context = t
+  type elt = I.t
 
-  (* Do not verify before deleting *)
-  let remove ({ context = c } as s) k =
-    HashTbl.del c k >>= fun c ->
-    Lwt.return { s with context = c }
+  let inited = MBytes.of_string "inited"
 
-  let clear ({ context = c } as s) =
-    HashTbl.clear c >>= fun c ->
-    Lwt.return { s with context = c }
+  let mem s i =
+    C.mem s (I.to_path i [])
+  let add s i =
+    C.init_set s (I.to_path i []) inited >>= fun t ->
+    Lwt.return (C.project t)
+  let del s i =
+    C.remove s (I.to_path i []) >>= fun t ->
+    Lwt.return (C.project t)
+  let clear s =
+    C.remove_rec s [] >>= fun t ->
+    Lwt.return (C.project t)
 
-  let fold { context = c } x ~f = HashTbl.fold c ~init:x ~f:(fun k v acc -> f k v acc)
-  let iter { context = c } ~f = HashTbl.fold c ~init:() ~f:(fun k v () -> f k v)
+  let fold s ~init ~f =
+    let rec dig i path acc =
+      if Compare.Int.(i <= 1) then
+        C.fold s path ~init:acc ~f:begin fun k acc ->
+          match k with
+          | `Dir _ -> Lwt.return acc
+          | `Key file ->
+              match I.of_path file with
+              | None -> assert false
+              | Some p -> f p acc
+        end
+      else
+        C.fold s path ~init:acc ~f:begin fun k acc ->
+          match k with
+          | `Dir k ->
+              dig (i-1) k acc
+          | `Key _ ->
+              Lwt.return acc
+        end in
+    dig I.path_length [] init
+
+  let elements s =
+    fold s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 
 end
 
-module Make_iterable_data_storage (H: HASH) (P: Single_data_description) =
-  Raw_make_iterable_data_storage(struct
-    include H
-    let of_path = H.of_path_exn
-    let prefix = P.key
-    let length = path_length
-  end)(P)
+module Make_indexed_data_storage
+    (C : Raw_context.T) (I : INDEX) (V : VALUE)
+  : Indexed_data_storage with type t = C.t
+                          and type key = I.t
+                          and type value = V.t = struct
+  type t = C.t
+  type context = t
+  type key = I.t
+  type value = V.t
+  let mem s i =
+    C.mem s (I.to_path i [])
+  let get s i =
+    C.get s (I.to_path i []) >>=? fun b ->
+    Lwt.return (V.of_bytes b)
+  let get_option s i =
+    C.get_option s (I.to_path i []) >>= function
+    | None -> return None
+    | Some b ->
+        match V.of_bytes b with
+        | Ok v -> return (Some v)
+        | Error _ as err -> Lwt.return err
+  let set s i v =
+    C.set s (I.to_path i []) (V.to_bytes v) >>=? fun t ->
+    return (C.project t)
+  let init s i v =
+    C.init s (I.to_path i []) (V.to_bytes v) >>=? fun t ->
+    return (C.project t)
+  let init_set s i v =
+    C.init_set s (I.to_path i []) (V.to_bytes v) >>= fun t ->
+    Lwt.return (C.project t)
+  let set_option s i v =
+    C.set_option s (I.to_path i []) (map_option V.to_bytes v) >>= fun t ->
+    Lwt.return (C.project t)
+  let remove s i =
+    C.remove s (I.to_path i []) >>= fun t ->
+    Lwt.return (C.project t)
+  let delete s i =
+    C.delete s (I.to_path i []) >>=? fun t ->
+    return (C.project t)
+  let clear s =
+    C.remove_rec s [] >>= fun t ->
+    Lwt.return (C.project t)
+  let fold s ~init ~f =
+    let rec dig i path acc =
+      if Compare.Int.(i <= 1) then
+        C.fold s path ~init:acc ~f:begin fun k acc ->
+          match k with
+          | `Dir _ -> Lwt.return acc
+          | `Key file ->
+              C.get_option s file >>= function
+              | None -> Lwt.return acc
+              | Some b ->
+                  match V.of_bytes b with
+                  | Error _ ->
+                      (* Silently ignore unparsable data *)
+                      Lwt.return acc
+                  | Ok v ->
+                      match I.of_path file with
+                      | None -> assert false
+                      | Some path -> f path v acc
+        end
+      else
+        C.fold s path ~init:acc ~f:begin fun k acc ->
+          match k with
+          | `Dir k -> dig (i-1) k acc
+          | `Key _ -> Lwt.return acc
+        end in
+    dig I.path_length [] init
 
-let register_resolvers (module H : Hash.HASH) prefixes =
+  let bindings s =
+    fold s ~init:[] ~f:(fun p v acc -> Lwt.return ((p,v) :: acc))
+  let fold_keys s ~init ~f =
+    C.fold s [] ~init
+      ~f:(fun p acc ->
+          match p with
+          | `Dir _ -> Lwt.return acc
+          | `Key p ->
+              match I.of_path p with
+              | None -> assert false
+              | Some path -> f path acc)
+  let keys s =
+    fold_keys s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
 
-  let module Set = H.Set in
+end
 
-  let resolvers =
-    List.map
-      (fun prefix ->
-         let module R = Persist.MakeHashResolver(struct
-             include Context
-             let prefix = prefix
-           end)(H) in
-         R.resolve)
-      prefixes in
+module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
+  : Indexed_raw_context with type t = C.t
+                         and type key = I.t = struct
 
-  let resolve c m =
-    match resolvers with
-    | [resolve] -> resolve c m
-    | resolvers ->
-        Lwt_list.map_p (fun resolve -> resolve c m) resolvers >|= fun hs ->
-        List.fold_left
-          (fun acc hs -> List.fold_left (fun acc h -> Set.add h acc) acc hs)
-          Set.empty hs |>
-        Set.elements in
+  type t = C.t
+  type context = t
+  type key = I.t
 
-  Context.register_resolver H.b58check_encoding resolve
+  module Raw_context = struct
+    type t = C.t * I.t
+    type context = t
+    let to_key i k = I.to_path i k
+    let of_key k = Misc.remove_elem_from_list I.path_length k
+    let mem (t, i) k = C.mem t (to_key i k)
+    let dir_mem (t, i) k = C.dir_mem t (to_key i k)
+    let get (t, i) k = C.get t (to_key i k)
+    let get_option (t, i) k = C.get_option t (to_key i k)
+    let init (t, i) k v =
+      C.init t (to_key i k) v >>=? fun t -> return (t, i)
+    let set (t, i) k v =
+      C.set t (to_key i k) v >>=? fun t -> return (t, i)
+    let init_set (t, i) k v =
+      C.init_set t (to_key i k) v >>= fun t -> Lwt.return (t, i)
+    let set_option (t, i) k v =
+      C.set_option t (to_key i k) v >>= fun t -> Lwt.return (t, i)
+    let delete (t, i) k =
+      C.delete t (to_key i k) >>=? fun t -> return (t, i)
+    let remove (t, i) k =
+      C.remove t (to_key i k) >>= fun t -> Lwt.return (t, i)
+    let remove_rec (t, i) k =
+      C.remove_rec t (to_key i k) >>= fun t -> Lwt.return (t, i)
+    let fold (t, i) k ~init ~f =
+      C.fold t (to_key i k) ~init
+        ~f:(fun k acc -> f (map_key of_key k) acc)
+    let keys (t, i) k = C.keys t (to_key i k) >|= fun keys -> List.map of_key keys
+    let fold_keys (t, i) k ~init ~f =
+      C.fold_keys t (to_key i k) ~init ~f:(fun k acc -> f (of_key k) acc)
+    let project (t, _) = C.project t
+  end
 
+  let clear t i =
+    Raw_context.remove_rec (t, i) [] >>= fun (t, _) ->
+    Lwt.return (C.project t)
 
+  let fold_keys t ~init ~f =
+    let rec dig i path acc =
+      if Compare.Int.(i <= 0) then
+        match I.of_path path with
+        | None -> assert false
+        | Some path -> f path acc
+      else
+        C.fold t path ~init:acc ~f:begin fun k acc ->
+          match k with
+          | `Dir k -> dig (i-1) k acc
+          | `Key _ -> Lwt.return acc
+        end in
+    dig I.path_length [] init
+
+  let keys t =
+    fold_keys t ~init:[] ~f:(fun i acc -> Lwt.return (i :: acc))
+
+  let list t k = C.fold t k ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+  let resolve t prefix =
+    let rec loop i prefix = function
+      | [] when Compare.Int.(i = I.path_length) -> begin
+          match I.of_path prefix with
+          | None -> assert false
+          | Some path -> Lwt.return [path]
+        end
+      | [] ->
+          list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix -> loop (i+1) prefix []) prefixes
+          >|= List.flatten
+      | [d] when Compare.Int.(i = I.path_length - 1) ->
+          if Compare.Int.(i >= I.path_length) then invalid_arg "IO.resolve" ;
+          list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix ->
+                  match Misc.remove_prefix ~prefix:d (List.hd (List.rev prefix)) with
+                  | None -> Lwt.return_nil
+                  | Some _ -> loop (i+1) prefix [])
+            prefixes
+          >|= List.flatten
+      | "" :: ds ->
+          list t prefix >>= fun prefixes ->
+          Lwt_list.map_p (function
+              | `Key prefix | `Dir prefix -> loop (i+1) prefix ds) prefixes
+          >|= List.flatten
+      | d :: ds ->
+          if Compare.Int.(i >= I.path_length) then invalid_arg "IO.resolve" ;
+          C.dir_mem t (prefix @ [d]) >>= function
+          | true -> loop (i+1) (prefix @ [d]) ds
+          | false -> Lwt.return_nil in
+    loop 0 [] prefix
+
+  module Make_set (N : NAME) = struct
+    type t = C.t
+    type context = t
+    type elt = I.t
+    let inited = MBytes.of_string "inited"
+    let mem s i = Raw_context.mem (s, i) N.name
+    let add s i =
+      Raw_context.init_set (s, i) N.name inited >>= fun (s, _) ->
+      Lwt.return (C.project s)
+    let del s i =
+      Raw_context.remove (s, i) N.name >>= fun (s, _) ->
+      Lwt.return (C.project s)
+    let clear s =
+      fold_keys s
+        ~init:s
+        ~f:begin fun i s ->
+          Raw_context.remove (s, i) N.name >>= fun (s, _) ->
+          Lwt.return s
+        end >>= fun t ->
+      Lwt.return (C.project t)
+    let fold s ~init ~f =
+      fold_keys s ~init
+        ~f:(fun i acc ->
+            mem s i >>= function
+            | true -> f i acc
+            | false -> Lwt.return acc)
+    let elements s =
+      fold s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+  end
+
+  module Make_map (N : NAME) (V : VALUE) = struct
+    type t = C.t
+    type context = t
+    type key = I.t
+    type value = V.t
+    let mem s i =
+      Raw_context.mem (s,i) N.name
+    let get s i =
+      Raw_context.get (s,i) N.name >>=? fun b ->
+      Lwt.return (V.of_bytes b)
+    let get_option s i =
+      Raw_context.get_option (s,i) N.name >>= function
+      | None -> return None
+      | Some b ->
+          match V.of_bytes b with
+          | Ok v -> return (Some v)
+          | Error _ as err -> Lwt.return err
+    let set s i v =
+      Raw_context.set (s,i) N.name (V.to_bytes v) >>=? fun (s, _) ->
+      return (C.project s)
+    let init s i v =
+      Raw_context.init (s,i) N.name (V.to_bytes v) >>=? fun (s, _) ->
+      return (C.project s)
+    let init_set s i v =
+      Raw_context.init_set (s,i) N.name (V.to_bytes v) >>= fun (s, _) ->
+      Lwt.return (C.project s)
+    let set_option s i v =
+      Raw_context.set_option (s,i)
+        N.name (map_option V.to_bytes v) >>= fun (s, _) ->
+      Lwt.return (C.project s)
+    let remove s i =
+      Raw_context.remove (s,i) N.name >>= fun (s, _) ->
+      Lwt.return (C.project s)
+    let delete s i =
+      Raw_context.delete (s,i) N.name >>=? fun (s, _) ->
+      return (C.project s)
+    let clear s =
+      fold_keys s ~init:s
+        ~f:begin fun i s ->
+          Raw_context.remove (s,i) N.name >>= fun (s, _) ->
+          Lwt.return s
+        end >>= fun t ->
+      Lwt.return (C.project t)
+    let fold s ~init ~f =
+      fold_keys s ~init
+        ~f:(fun i acc ->
+            get s i >>= function
+            | Error _ -> Lwt.return acc
+            | Ok v -> f i v acc)
+    let bindings s =
+      fold s ~init:[] ~f:(fun p v acc -> Lwt.return ((p,v) :: acc))
+    let fold_keys s ~init ~f =
+      fold_keys s ~init
+        ~f:(fun i acc ->
+            mem s i >>= function
+            | false -> Lwt.return acc
+            | true -> f i acc)
+    let keys s =
+      fold_keys s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+  end
+
+end

@@ -7,14 +7,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val current: Storage.t -> Level_repr.t
-val previous: Storage.t -> Level_repr.t
+val current: Raw_context.t -> Level_repr.t
+val previous: Raw_context.t -> Level_repr.t
 
-val root: Storage.t -> Level_repr.t
+val root: Raw_context.t -> Level_repr.t
 
-val from_raw: Storage.t -> ?offset:int32 -> Raw_level_repr.t -> Level_repr.t
-val pred: Storage.t -> Level_repr.t -> Level_repr.t option
-val succ: Storage.t -> Level_repr.t -> Level_repr.t
+val from_raw: Raw_context.t -> ?offset:int32 -> Raw_level_repr.t -> Level_repr.t
+val pred: Raw_context.t -> Level_repr.t -> Level_repr.t option
+val succ: Raw_context.t -> Level_repr.t -> Level_repr.t
 
-val last_level_in_cycle: Storage.t -> Cycle_repr.t -> Level_repr.t
-val levels_in_cycle: Storage.t -> Cycle_repr.t -> Level_repr.t list
+val last_level_in_cycle: Raw_context.t -> Cycle_repr.t -> Level_repr.t
+val levels_in_cycle: Raw_context.t -> Cycle_repr.t -> Level_repr.t list

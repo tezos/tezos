@@ -84,8 +84,8 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     type key = string list
     type value = MBytes.t
     let to_key i k =
-      assert (List.length (I.to_path i) = I.path_length) ;
-      I.to_path i @ k
+      assert (List.length (I.to_path i []) = I.path_length) ;
+      I.to_path i k
     let of_key k = Utils.remove_elem_from_list I.path_length k
     let known (t,i) k = S.known t (to_key i k)
     let known_dir (t,i) k = S.known_dir t (to_key i k)
@@ -250,9 +250,9 @@ module Make_set (S : STORE) (I : INDEX) = struct
   type t = S.t
   type elt = I.t
   let inited = MBytes.of_string "inited"
-  let known s i = S.known s (I.to_path i)
-  let store s i = S.store s (I.to_path i) inited
-  let remove s i = S.remove s (I.to_path i)
+  let known s i = S.known s (I.to_path i [])
+  let store s i = S.store s (I.to_path i []) inited
+  let remove s i = S.remove s (I.to_path i [])
   let remove_all s = S.remove_dir s []
 
   let fold s ~init ~f =
@@ -298,9 +298,9 @@ module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
   type t = S.t
   type key = I.t
   type value = V.t
-  let known s i = S.known s (I.to_path i)
+  let known s i = S.known s (I.to_path i [])
   let read s i =
-    S.read s (I.to_path i) >>=? fun b -> Lwt.return (V.of_bytes b)
+    S.read s (I.to_path i []) >>=? fun b -> Lwt.return (V.of_bytes b)
   let read_opt s i =
     read s i >>= function
     | Error _ -> Lwt.return_none
@@ -309,8 +309,8 @@ module Make_map (S : STORE) (I : INDEX) (V : VALUE) = struct
     read s i >>= function
     | Error _ -> Lwt.fail Not_found
     | Ok v -> Lwt.return v
-  let store s i v = S.store s (I.to_path i) (V.to_bytes v)
-  let remove s i = S.remove s (I.to_path i)
+  let store s i v = S.store s (I.to_path i []) (V.to_bytes v)
+  let remove s i = S.remove s (I.to_path i [])
   let remove_all s = S.remove_dir s []
   let fold s ~init ~f =
     let rec dig i path acc =
@@ -375,7 +375,7 @@ end
 module Integer_index = struct
   type t = int
   let path_length = 1
-  let to_path x = [string_of_int x]
+  let to_path x l = string_of_int x :: l
   let of_path = function
     | [x] -> begin try Some (int_of_string x) with _ -> None end
     | _ -> None

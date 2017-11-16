@@ -29,7 +29,7 @@ let make public_key =
   { public_key ; public_key_hash = Ed25519.Public_key.hash public_key }
 
 let accounts ctxt =
-  let { Constants_repr.bootstrap_keys } = Storage.constants ctxt in
+  let { Constants_repr.bootstrap_keys } = Raw_context.constants ctxt in
   List.map make bootstrap_keys
 
 let init ctxt =
@@ -49,7 +49,7 @@ let account_encoding =
 
 let refill ctxt =
   (* Unefficient HACK for the alphanet only... *)
-  Contract_storage.list ctxt >>=? fun contracts ->
+  Contract_storage.list ctxt >>= fun contracts ->
   List.fold_left
     (fun total contract ->
        Contract_storage.get_balance ctxt contract >>=? fun balance ->

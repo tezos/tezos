@@ -295,7 +295,7 @@ module Delegates_pubkey : sig
     context -> public_key_hash -> context Lwt.t
 
   val list:
-    context -> (public_key_hash * public_key) list tzresult Lwt.t
+    context -> (public_key_hash * public_key) list Lwt.t
 
 end
 
@@ -413,7 +413,7 @@ module Contract : sig
   val exists: context -> contract -> bool tzresult Lwt.t
   val must_exist: context -> contract -> unit tzresult Lwt.t
 
-  val list: context -> contract list tzresult Lwt.t
+  val list: context -> contract list Lwt.t
 
   type origination_nonce
 
@@ -485,10 +485,10 @@ module Vote : sig
 
   val record_proposal:
     context -> Protocol_hash.t -> public_key_hash ->
-    context tzresult Lwt.t
+    context Lwt.t
   val get_proposals:
-    context -> int32 Protocol_hash.Map.t tzresult Lwt.t
-  val clear_proposals: context -> context tzresult Lwt.t
+    context -> int32 Protocol_hash.Map.t Lwt.t
+  val clear_proposals: context -> context Lwt.t
 
   val freeze_listings: context -> context tzresult Lwt.t
   val clear_listings: context -> context tzresult Lwt.t
@@ -504,7 +504,7 @@ module Vote : sig
   }
 
   val record_ballot:
-    context -> public_key_hash -> ballot -> context tzresult Lwt.t
+    context -> public_key_hash -> ballot -> context Lwt.t
   val get_ballots: context -> ballots tzresult Lwt.t
   val clear_ballots: context -> context Lwt.t
 

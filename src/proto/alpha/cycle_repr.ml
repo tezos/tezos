@@ -40,3 +40,16 @@ let of_int32_exn l =
   if Compare.Int32.(l >= 0l)
   then l
   else invalid_arg "Level_repr.Cycle.of_int32"
+
+module Index = struct
+  type t = cycle
+  let path_length = 1
+  let to_path c l =
+    Int32.to_string (to_int32 c) :: l
+  let of_path = function
+    | [s] -> begin
+        try Some (Int32.of_string s)
+        with _ -> None
+      end
+    | _ -> None
+end

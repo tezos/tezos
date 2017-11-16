@@ -49,8 +49,8 @@ let check_approval_and_update_quorum ctxt =
 let start_new_voting_cycle ctxt =
   Vote.get_current_period_kind ctxt >>=? function
   | Proposal -> begin
-      Vote.get_proposals ctxt >>=? fun proposals ->
-      Vote.clear_proposals ctxt >>=? fun ctxt ->
+      Vote.get_proposals ctxt >>= fun proposals ->
+      Vote.clear_proposals ctxt >>= fun ctxt ->
       Vote.clear_listings ctxt >>=? fun ctxt ->
       match select_winning_proposal proposals with
       | None ->
@@ -111,10 +111,10 @@ let record_proposals ctxt delegate proposals =
   | Proposal ->
       Vote.in_listings ctxt delegate >>= fun in_listings ->
       if in_listings then
-        fold_left_s
+        Lwt_list.fold_left_s
           (fun ctxt proposal ->
              Vote.record_proposal ctxt proposal delegate)
-          ctxt proposals
+          ctxt proposals >>= return
       else
         fail Unauthorized_proposal
   | Testing_vote | Testing | Promotion_vote ->
@@ -128,7 +128,7 @@ let record_ballot ctxt delegate proposal ballot =
         Invalid_proposal >>=? fun () ->
       Vote.in_listings ctxt delegate >>= fun in_listings ->
       if in_listings then
-        Vote.record_ballot ctxt delegate ballot
+        Vote.record_ballot ctxt delegate ballot >>= return
       else
         fail Unauthorized_ballot
   | Testing | Proposal ->

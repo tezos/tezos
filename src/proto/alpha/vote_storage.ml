@@ -11,7 +11,8 @@ let record_proposal ctxt delegate proposal =
   Storage.Vote.Proposals.add ctxt (delegate, proposal)
 
 let get_proposals ctxt =
-  Storage.Vote.Proposals.fold ctxt Protocol_hash.Map.empty
+  Storage.Vote.Proposals.fold ctxt
+    ~init:Protocol_hash.Map.empty
     ~f:(fun (proposal, _delegate) acc ->
         let previous =
           try Protocol_hash.Map.find proposal acc
@@ -41,7 +42,7 @@ let get_ballots ctxt =
           | Nay  -> ok { ballots with nay = count ballots.nay }
           | Pass  -> ok { ballots with pass = count ballots.pass }
         end)
-    (ok { yay = 0l ; nay = 0l; pass = 0l })
+    ~init:(ok { yay = 0l ; nay = 0l; pass = 0l })
 
 let clear_ballots = Storage.Vote.Ballots.clear
 
@@ -57,7 +58,7 @@ let freeze_listings ctxt =
               | Some count -> return count
             end >>=? fun count ->
             Storage.Vote.Listings.init_set
-              ctxt delegate (Int32.succ count) >>=? fun ctxt ->
+              ctxt delegate (Int32.succ count) >>= fun ctxt ->
             return (ctxt, Int32.succ total)) >>=? fun (ctxt, total) ->
   Storage.Vote.Listings_size.init ctxt total >>=? fun ctxt ->
   return ctxt

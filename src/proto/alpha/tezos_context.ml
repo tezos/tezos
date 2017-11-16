@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = Storage.t
+type t = Raw_context.t
 type context = t
 
 module type BASIC_DATA = sig
@@ -22,7 +22,7 @@ module Period = Period_repr
 
 module Timestamp = struct
   include Time_repr
-  let current = Storage.current_timestamp
+  let current = Raw_context.current_timestamp
 end
 
 include Operation_repr
@@ -41,7 +41,7 @@ module Script_int = Script_int_repr
 module Script_timestamp = struct
   include Script_timestamp_repr
   let now ctxt =
-    Storage.current_timestamp ctxt
+    Raw_context.current_timestamp ctxt
     |> Timestamp.to_seconds
     |> of_int64
 end
@@ -59,31 +59,31 @@ include Tezos_hash
 module Constants = struct
   include Constants_repr
   let cycle_length c =
-    let constants = Storage.constants c in
+    let constants = Raw_context.constants c in
     constants.cycle_length
   let voting_period_length c =
-    let constants = Storage.constants c in
+    let constants = Raw_context.constants c in
     constants.voting_period_length
   let time_before_reward c =
-    let constants = Storage.constants c in
+    let constants = Raw_context.constants c in
     constants.time_before_reward
   let slot_durations c =
-    let constants = Storage.constants c in
+    let constants = Raw_context.constants c in
     constants.slot_durations
   let first_free_baking_slot c =
-    let constants = Storage.constants c in
+    let constants = Raw_context.constants c in
     constants.first_free_baking_slot
   let max_signing_slot c =
-    let constants = Storage.constants c in
+    let constants = Raw_context.constants c in
     constants.max_signing_slot
   let instructions_per_transaction c =
-    let constants = Storage.constants c in
+    let constants = Raw_context.constants c in
     constants.instructions_per_transaction
   let proof_of_work_threshold c =
-    let constants = Storage.constants c in
+    let constants = Raw_context.constants c in
     constants.proof_of_work_threshold
   let dictator_pubkey c =
-    let constants = Storage.constants c in
+    let constants = Raw_context.constants c in
     constants.dictator_pubkey
 end
 
@@ -124,10 +124,10 @@ let init = Init_storage.may_initialize
 
 let finalize ?commit_message:message c =
   let fitness = Fitness.from_int64 (Fitness.current c) in
-  let context = Storage.recover c in
+  let context = Raw_context.recover c in
   { Updater.context ; fitness ; message ; max_operations_ttl = 60 }
 
-let configure_sandbox = Init_storage.configure_sandbox
+let configure_sandbox = Raw_context.configure_sandbox
 
-let activate = Storage.activate
-let fork_test_network = Storage.fork_test_network
+let activate = Raw_context.activate
+let fork_test_network = Raw_context.fork_test_network

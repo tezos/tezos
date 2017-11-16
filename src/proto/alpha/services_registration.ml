@@ -189,12 +189,15 @@ let get_key ctxt hash () =
   return (hash, pk)
 
 let () = register2 Services.Context.Key.get get_key
-let () = register0 Services.Context.Key.list Delegates_pubkey.list
+let () =
+  register0 Services.Context.Key.list
+    (fun t -> Delegates_pubkey.list t >>= return)
 
 (*-- Context.Contract --------------------------------------------------------*)
 
 let () =
-  register0 Services.Context.Contract.list Contract.list
+  register0 Services.Context.Contract.list
+    (fun ctxt -> Contract.list ctxt >>= return)
 
 let () =
   let register2 s f =

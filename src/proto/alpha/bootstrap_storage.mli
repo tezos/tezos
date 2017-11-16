@@ -14,8 +14,8 @@ type account = {
 
 val account_encoding: account Data_encoding.t
 
-val accounts: Storage.t -> account list
+val accounts: Raw_context.t -> account list
 
-val init: Storage.t -> Storage.t tzresult Lwt.t
+val init: Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-val refill: Storage.t -> Storage.t tzresult Lwt.t
+val refill: Raw_context.t -> Raw_context.t tzresult Lwt.t

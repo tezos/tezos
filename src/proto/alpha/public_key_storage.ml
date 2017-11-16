@@ -36,13 +36,15 @@ let get_option = Storage.Public_key.get_option
 let reveal c hash key =
   let actual_hash = Ed25519.Public_key.hash key in
   if Ed25519.Public_key_hash.equal hash actual_hash then
-    Storage.Public_key.init_set c hash key
+    Storage.Public_key.init_set c hash key >>= return
   else
     fail (Inconsistent_hash (key, actual_hash, hash))
 
 let remove = Storage.Public_key.remove
 
 let list ctxt =
-  Storage.Public_key.fold ctxt [] ~f:(fun pk_h pk acc ->
-      Lwt.return @@ (pk_h, pk) :: acc) >>= fun res ->
-  return res
+  Storage.Public_key.fold ctxt
+    ~init:[]
+    ~f:begin fun pk_h pk acc ->
+      Lwt.return @@ (pk_h, pk) :: acc
+    end

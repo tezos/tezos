@@ -210,8 +210,7 @@ let create_base c contract ~balance ~manager ~delegate ?script ~spendable ~deleg
        return c) >>=? fun c ->
   Roll_storage.Contract.init c contract >>=? fun c ->
   Roll_storage.Contract.add_amount c contract balance >>=? fun c ->
-  Storage.Contract.Set.add c contract >>=? fun c ->
-  Lwt.return (Ok (c, contract))
+  return (c, contract)
 
 let create c nonce ~balance ~manager ~delegate ?script ~spendable ~delegatable =
   let contract = Contract_repr.originated_contract nonce in
@@ -238,7 +237,7 @@ let delete c contract =
   Storage.Contract.Storage.remove c contract >>= fun c ->
   Storage.Contract.Code_fees.remove c contract >>= fun c ->
   Storage.Contract.Storage_fees.remove c contract >>= fun c ->
-  Storage.Contract.Set.del c contract
+  return c
 
 let exists c contract =
   match Contract_repr.is_default contract with
@@ -253,8 +252,7 @@ let must_exist c contract =
   | true -> return ()
   | false -> fail (Non_existing_contract contract)
 
-let list c =
-  Storage.Contract.Set.elements c
+let list c = Storage.Contract.list c
 
 let check_counter_increment c contract counter =
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
@@ -360,7 +358,8 @@ let set_delegate c contract delegate =
           Storage.Contract.Delegate.remove c contract >>= fun c ->
           return c
       | Some delegate ->
-          Storage.Contract.Delegate.init_set c contract delegate
+          Storage.Contract.Delegate.init_set c contract delegate >>= fun c ->
+          return c
 
 let contract_fee c contract =
   Storage.Contract.Code_fees.get_option c contract >>=? fun code_fees ->

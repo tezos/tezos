@@ -67,7 +67,7 @@ val hash : nonce -> Nonce_hash.t
 val check_hash : nonce -> Nonce_hash.t -> bool
 
 (** For using nonce hashes as keys in the hierarchical database *)
-val nonce_hash_key_part : Nonce_hash.t -> string list
+val nonce_hash_key_part : Nonce_hash.t -> string list -> string list
 
 (** {2 Predefined nonce} *****************************************************)
 

@@ -20,8 +20,11 @@ type value = MBytes.t
 
 val mem: t -> key -> bool Lwt.t
 val dir_mem: t -> key -> bool Lwt.t
+
 val get: t -> key -> value option Lwt.t
+
 val set: t -> key -> value -> t Lwt.t
+
 val del: t -> key -> t Lwt.t
 val remove_rec: t -> key -> t Lwt.t
 

@@ -342,9 +342,8 @@ module Assert = struct
     Assert.contain_error ~msg ~f:(ecoproto_error (fun _ -> true))
 
   let unknown_contract ~msg =
-    let open Storage_functors in
     Assert.contain_error ~msg ~f:begin ecoproto_error (function
-        | Storage_error _ -> true
+        | Raw_context.Storage_error _ -> true
         | _ -> false)
     end
 

@@ -20,3 +20,11 @@ val succ: cycle -> cycle
 
 val to_int32: cycle -> int32
 val of_int32_exn: int32 -> cycle
+
+module Index : sig
+  (* Storage_functors.INDEX with type t = cycle *)
+  type t = cycle
+  val path_length: int
+  val to_path: t -> string list -> string list
+  val of_path: string list -> t option
+end

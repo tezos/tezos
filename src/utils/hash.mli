@@ -48,7 +48,7 @@ module type MINIMAL_HASH = sig
   val read: MBytes.t -> int -> t
   val write: MBytes.t -> int -> t -> unit
 
-  val to_path: t -> string list
+  val to_path: t -> string list -> string list
   val of_path: string list -> t option
   val of_path_exn: string list -> t
 

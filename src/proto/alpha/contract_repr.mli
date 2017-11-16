@@ -59,3 +59,12 @@ val encoding : contract Data_encoding.t
 val origination_nonce_encoding : origination_nonce Data_encoding.t
 
 val arg : contract RPC.Arg.arg
+
+module Index : sig
+  type t = contract
+  val path_length: int
+  val to_path: t -> string list -> string list
+  val of_path: string list -> t option
+  val contract_prefix: string -> string list
+  val pkh_prefix: string -> string list
+end

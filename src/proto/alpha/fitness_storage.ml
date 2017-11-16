@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let current = Storage.current_fitness
+let current = Raw_context.current_fitness
 let increase ctxt =
   let fitness = current ctxt in
-  Storage.set_current_fitness ctxt (Int64.succ fitness)
+  Raw_context.set_current_fitness ctxt (Int64.succ fitness)

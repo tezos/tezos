@@ -8,13 +8,13 @@
 (**************************************************************************)
 
 val record_proposal:
-  Storage.t -> Protocol_hash.t -> Ed25519.Public_key_hash.t ->
-  Storage.t tzresult Lwt.t
+  Raw_context.t -> Protocol_hash.t -> Ed25519.Public_key_hash.t ->
+  Raw_context.t Lwt.t
 
 val get_proposals:
-  Storage.t -> int32 Protocol_hash.Map.t tzresult Lwt.t
+  Raw_context.t -> int32 Protocol_hash.Map.t Lwt.t
 
-val clear_proposals: Storage.t -> Storage.t tzresult Lwt.t
+val clear_proposals: Raw_context.t -> Raw_context.t Lwt.t
 
 type ballots = {
   yay: int32 ;
@@ -23,30 +23,30 @@ type ballots = {
 }
 
 val record_ballot:
-  Storage.t -> Ed25519.Public_key_hash.t -> Vote_repr.ballot ->
-  Storage.t tzresult Lwt.t
-val get_ballots: Storage.t -> ballots tzresult Lwt.t
-val clear_ballots: Storage.t -> Storage.t Lwt.t
+  Raw_context.t -> Ed25519.Public_key_hash.t -> Vote_repr.ballot ->
+  Raw_context.t Lwt.t
+val get_ballots: Raw_context.t -> ballots tzresult Lwt.t
+val clear_ballots: Raw_context.t -> Raw_context.t Lwt.t
 
-val freeze_listings: Storage.t -> Storage.t tzresult Lwt.t
-val clear_listings: Storage.t -> Storage.t tzresult Lwt.t
+val freeze_listings: Raw_context.t -> Raw_context.t tzresult Lwt.t
+val clear_listings: Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-val listing_size: Storage.t -> int32 tzresult Lwt.t
+val listing_size: Raw_context.t -> int32 tzresult Lwt.t
 val in_listings:
-  Storage.t -> Ed25519.Public_key_hash.t -> bool Lwt.t
+  Raw_context.t -> Ed25519.Public_key_hash.t -> bool Lwt.t
 
-val get_current_quorum: Storage.t -> int32 tzresult Lwt.t
-val set_current_quorum: Storage.t -> int32 -> Storage.t tzresult Lwt.t
+val get_current_quorum: Raw_context.t -> int32 tzresult Lwt.t
+val set_current_quorum: Raw_context.t -> int32 -> Raw_context.t tzresult Lwt.t
 
 val get_current_period_kind:
-  Storage.t -> Voting_period_repr.kind tzresult Lwt.t
+  Raw_context.t -> Voting_period_repr.kind tzresult Lwt.t
 val set_current_period_kind:
-  Storage.t -> Voting_period_repr.kind -> Storage.t tzresult Lwt.t
+  Raw_context.t -> Voting_period_repr.kind -> Raw_context.t tzresult Lwt.t
 
 val get_current_proposal:
-  Storage.t -> Protocol_hash.t tzresult Lwt.t
+  Raw_context.t -> Protocol_hash.t tzresult Lwt.t
 val init_current_proposal:
-  Storage.t -> Protocol_hash.t -> Storage.t tzresult Lwt.t
-val clear_current_proposal: Storage.t -> Storage.t tzresult Lwt.t
+  Raw_context.t -> Protocol_hash.t -> Raw_context.t tzresult Lwt.t
+val clear_current_proposal: Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-val init: Storage.t -> Storage.t tzresult Lwt.t
+val init: Raw_context.t -> Raw_context.t tzresult Lwt.t
