@@ -124,7 +124,7 @@ module Connection_message = struct
     let encoded_message_len =
       Data_encoding.Binary.length encoding message in
     fail_unless
-      (encoded_message_len < Crypto.max_content_length)
+      (encoded_message_len < 1 lsl (Crypto.header_length * 8))
       Encoding_error >>=? fun () ->
     let len = Crypto.header_length + encoded_message_len in
     let buf = MBytes.create len in

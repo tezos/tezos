@@ -26,6 +26,13 @@ let id0 =
 
 let versions = Version.[{ name = "TEST" ; minor = 0 ; major = 0 }]
 
+let random_bytes len =
+  let msg = MBytes.create len in
+  for i = 0 to len / 8 - 1 do
+    MBytes.set_int64 msg (i*8) (Random.int64 Int64.max_int)
+  done ;
+  msg
+
 let rec listen ?port addr =
   let tentative_port =
     match port with
@@ -136,7 +143,7 @@ let is_decoding_error = function
 
 module Low_level = struct
 
-  let simple_msg = MBytes.create (1 lsl 4)
+  let simple_msg = random_bytes (1 lsl 4)
 
   let client _ch sched addr port =
     let msg = MBytes.create (MBytes.length simple_msg) in
@@ -208,8 +215,8 @@ module Simple_message = struct
 
   let encoding = Data_encoding.bytes
 
-  let simple_msg = MBytes.create (1 lsl 4)
-  let simple_msg2 = MBytes.create (1 lsl 4)
+  let simple_msg = random_bytes (1 lsl 4)
+  let simple_msg2 = random_bytes (1 lsl 4)
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
@@ -239,8 +246,8 @@ module Chunked_message = struct
 
   let encoding = Data_encoding.bytes
 
-  let simple_msg = MBytes.create (1 lsl 8)
-  let simple_msg2 = MBytes.create (1 lsl 8)
+  let simple_msg = random_bytes (1 lsl 8)
+  let simple_msg2 = random_bytes (1 lsl 8)
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
@@ -268,11 +275,42 @@ module Chunked_message = struct
 
 end
 
+module Oversized_message = struct
+
+  let encoding = Data_encoding.bytes
+
+  let simple_msg = random_bytes (1 lsl 17)
+  let simple_msg2 = random_bytes (1 lsl 17)
+
+  let server ch sched socket =
+    accept sched socket >>=? fun (_info, auth_fd) ->
+    P2p_connection.accept auth_fd encoding >>=? fun conn ->
+    P2p_connection.write_sync conn simple_msg >>=? fun () ->
+    P2p_connection.read conn >>=? fun (_msg_size, msg) ->
+    _assert (MBytes.compare simple_msg2 msg = 0) __LOC__ "" >>=? fun () ->
+    sync ch >>=? fun () ->
+    P2p_connection.close conn >>= fun _stat ->
+    return ()
+
+  let client ch sched addr port =
+    connect sched addr port id2 >>=? fun auth_fd ->
+    P2p_connection.accept auth_fd encoding >>=? fun conn ->
+    P2p_connection.write_sync conn simple_msg2 >>=? fun () ->
+    P2p_connection.read conn >>=? fun (_msg_size, msg) ->
+    _assert (MBytes.compare simple_msg msg = 0) __LOC__ "" >>=? fun () ->
+    sync ch >>=? fun () ->
+    P2p_connection.close conn >>= fun _stat ->
+    return ()
+
+  let run _dir = run_nodes client server
+
+end
+
 module Close_on_read = struct
 
   let encoding = Data_encoding.bytes
 
-  let simple_msg = MBytes.create (1 lsl 4)
+  let simple_msg = random_bytes (1 lsl 4)
 
   let server _ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
@@ -296,7 +334,7 @@ module Close_on_write = struct
 
   let encoding = Data_encoding.bytes
 
-  let simple_msg = MBytes.create (1 lsl 4)
+  let simple_msg = random_bytes (1 lsl 4)
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
@@ -379,6 +417,7 @@ let main () =
     "kicked", Kicked.run ;
     "simple-message", Simple_message.run ;
     "chunked-message", Chunked_message.run ;
+    "oversized-message", Oversized_message.run ;
     "close-on-read", Close_on_read.run ;
     "close-on-write", Close_on_write.run ;
     "garbled-data", Garbled_data.run ;
