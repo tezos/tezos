@@ -799,8 +799,7 @@ let commit_invalid_block net_db hash header errors =
 
 let inject_operation net_db h op =
   assert (Operation_hash.equal h (Operation.hash op)) ;
-  Raw_operation.Table.inject net_db.operation_db.table h op >>= fun res ->
-  return res
+  Raw_operation.Table.inject net_db.operation_db.table h op
 
 let commit_protocol db h p =
   State.Protocol.store db.disk p >>= fun res ->

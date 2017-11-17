@@ -43,7 +43,7 @@ val notify_operations: t -> P2p.Peer_id.t -> Mempool.t -> unit
     be ignored when it is (strongly) refused This is the
     entry-point used by the P2P layer. The operation content has been
     previously stored on disk. *)
-val inject_operation: t -> ?force:bool -> Operation.t -> unit tzresult Lwt.t
+val inject_operation: t -> Operation.t -> unit tzresult Lwt.t
 
 val flush: t -> State.Block.t -> unit
 val timestamp: t -> Time.t

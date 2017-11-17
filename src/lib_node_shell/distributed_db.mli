@@ -232,7 +232,7 @@ end
 
 (** Inject a new operation in the local index (memory only). *)
 val inject_operation:
-  net_db -> Operation_hash.t -> Operation.t -> bool tzresult Lwt.t
+  net_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
 
 (** Monitor all the fetched operations (for all activate networks). *)
 val watch_operation:
