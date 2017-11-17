@@ -61,10 +61,8 @@ module type Single_data_storage = sig
 
 end
 
-(** The generic signature of indexed data accessors (a set of values
-    of the same type indexed by keys of the same form in the
-    hierarchical (key x value) database). *)
-module type Indexed_data_storage = sig
+(** Restricted version of {!Indexed_data_storage} w/o iterators. *)
+module type Non_iterable_indexed_data_storage = sig
 
   type t
   type context = t
@@ -115,13 +113,29 @@ module type Indexed_data_storage = sig
       bucket does not exists. *)
   val remove: context -> key -> Raw_context.t Lwt.t
 
+end
+
+(** The generic signature of indexed data accessors (a set of values
+    of the same type indexed by keys of the same form in the
+    hierarchical (key x value) database). *)
+module type Indexed_data_storage = sig
+
+  include Non_iterable_indexed_data_storage
+
+  (** Empties all the keys and associated data. *)
   val clear: context -> Raw_context.t Lwt.t
 
+  (** Lists all the keys. *)
   val keys: context -> key list Lwt.t
+
+  (** Lists all the keys and associated data. *)
   val bindings: context -> (key * value) list Lwt.t
 
+  (** Iterates over all the keys and associated data. *)
   val fold:
     context -> init:'a -> f:(key -> value -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+
+  (** Iterate over all the keys. *)
   val fold_keys:
     context -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
@@ -151,6 +165,7 @@ module type Data_set_storage = sig
       particular order. *)
   val elements: context -> elt list Lwt.t
 
+  (** Iterates over the elements of the set. *)
   val fold: context -> init:'a -> f:(elt -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
   (** Removes all elements in the set *)

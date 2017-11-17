@@ -221,6 +221,24 @@ let register_resolvers enc resolve =
 type error += Unimplemented_sandbox_migration
 
 let configure_sandbox ctxt json =
+  let rec json_equals x y = match x, y with
+    | `Float x, `Float y -> Compare.Float.(x = y)
+    | `Bool x, `Bool y -> Compare.Bool.(x = y)
+    | `String x, `String y -> Compare.String.(x = y)
+    | `Null, `Null -> true
+    | `O x, `O y ->
+        let sort =
+          List.sort (fun (a, _) (b, _) -> Compare.String.compare a b) in
+        Compare.Int.(=) (List.length x) (List.length y) &&
+        List.for_all2
+          (fun (nx, vx) (ny, vy) ->
+             Compare.String.(nx = ny) && json_equals vx vy)
+          (sort x) (sort y)
+    | `A x, `A y ->
+        Compare.Int.(=) (List.length x) (List.length y) &&
+        List.for_all2 json_equals x y
+    | _, _ -> false
+  in
   let json =
     match json with
     | None -> `O []
@@ -233,10 +251,11 @@ let configure_sandbox ctxt json =
       get_sandboxed ctxt >>=? function
       | None ->
           fail Unimplemented_sandbox_migration
-      | Some _ ->
-          (* FIXME GRGR fail if parameter changed! *)
-          (* failwith "Changing sandbox parameter is not yet implemented" *)
-          return ctxt
+      | Some existing ->
+          if json_equals existing json then
+            return ctxt
+          else
+            failwith "Changing sandbox parameter is not yet implemented"
 
 (* Generic context ********************************************************)
 

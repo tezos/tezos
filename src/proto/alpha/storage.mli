@@ -203,7 +203,7 @@ module Seed : sig
       }
     | Revealed of Seed_repr.nonce
 
-  module Nonce : Indexed_data_storage
+  module Nonce : Non_iterable_indexed_data_storage
     with type key := Level_repr.t
      and type value := nonce_status
      and type t := Raw_context.t

@@ -33,11 +33,6 @@ module Contract = struct
       (struct let name = ["global_counter"] end)
       (Make_value(Int32))
 
-  (* module Set = *)
-  (* Make_data_set_storage *)
-  (* (Make_subcontext(Raw_context)(struct let name = ["set"] end)) *)
-  (* (Contract_repr.Index) *)
-
   module Indexed_context =
     Make_indexed_subcontext
       (Make_subcontext(Raw_context)(struct let name = ["index"] end))
@@ -330,13 +325,6 @@ module Seed = struct
     let set_option ctxt l v = Cycle.Nonce.set_option (ctxt, l.cycle) l.level v
     let delete ctxt l = Cycle.Nonce.delete (ctxt, l.cycle) l.level
     let remove ctxt l = Cycle.Nonce.remove (ctxt, l.cycle) l.level
-    (* We don't need the follwing iterators and I am kind of busy
-       defining a signature "Non_iterable_indexed_data_storage" *)
-    let clear _ctxt = assert false
-    let keys _ctxt = assert false
-    let bindings _ctxt = assert false
-    let fold _ctxt = assert false
-    let fold_keys _ctxt = assert false
   end
   module For_cycle = Cycle.Seed
 
