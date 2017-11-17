@@ -38,7 +38,7 @@ module Crypto = struct
   let header_length = 2
   let crypto_overhead = 18 (* FIXME import from Sodium.Box. *)
   let max_content_length =
-    1 lsl (header_length * 8) - crypto_overhead - header_length
+    1 lsl (header_length * 8) - crypto_overhead
 
   type data = {
     channel_key : Crypto_box.channel_key ;
@@ -54,7 +54,7 @@ module Crypto = struct
       Crypto_box.fast_box cryptobox_data.channel_key buf local_nonce in
     let encrypted_len = MBytes.length encrypted_message in
     fail_unless
-      (encrypted_len < max_content_length)
+      (encrypted_len < 1 lsl (header_length * 8))
       Invalid_message_size >>=? fun () ->
     MBytes.set_int16 header_buf 0 encrypted_len ;
     P2p_io_scheduler.write fd header_buf >>=? fun () ->
