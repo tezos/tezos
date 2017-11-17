@@ -84,6 +84,14 @@ Reset 2017-09-21
 
 [Node]
 
+- P2p: fix issue with data greater then 2^16 bytes
+- Irmin: restore usage `git-repack`... (mistakenly removed)
+
+Reset 2017-09-21
+================
+
+[Node]
+
 - fix a performance issue in roll storage
 
 [Doc]
