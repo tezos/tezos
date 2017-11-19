@@ -8,6 +8,9 @@ source $test_dir/lib/test_lib.inc.sh
 start_node 1
 activate_alpha
 
+sleep 2
+$client bake for bootstrap1 -max-priority 512
+
 key1=foo
 key2=bar
 

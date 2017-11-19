@@ -195,44 +195,47 @@ let test_endorsement_rights contract block =
 
 let run genesis =
 
+  Helpers.Baking.bake genesis b1 [] >>=? fun blk ->
+
+  let block = `Hash blk in
   test_endorsement_rights
-    default_account genesis >>=? fun has_right_to_endorse ->
+    default_account block >>=? fun has_right_to_endorse ->
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse false ;
-  test_endorsement_rights b1 genesis >>=? fun has_right_to_endorse ->
+  test_endorsement_rights b1 block >>=? fun has_right_to_endorse ->
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse true ;
-  test_endorsement_rights b1 genesis >>=? fun has_right_to_endorse ->
+  test_endorsement_rights b1 block >>=? fun has_right_to_endorse ->
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse true ;
 
   Assert.balance_equal
-    ~block:genesis ~msg:__LOC__ b1 4_000_000_00L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b1 3_999_000_00L >>=? fun () ->
   Assert.balance_equal
-    ~block:genesis ~msg:__LOC__ b2 4_000_000_00L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b2 4_000_000_00L >>=? fun () ->
   Assert.balance_equal
-    ~block:genesis ~msg:__LOC__ b3 4_000_000_00L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b3 4_000_000_00L >>=? fun () ->
   Assert.balance_equal
-    ~block:genesis ~msg:__LOC__ b4 4_000_000_00L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b4 4_000_000_00L >>=? fun () ->
   Assert.balance_equal
-    ~block:genesis ~msg:__LOC__ b5 4_000_000_00L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b5 4_000_000_00L >>=? fun () ->
 
   (* Check Rewards *)
-  test_endorsement_rewards genesis >>=? fun () ->
+  test_endorsement_rewards block >>=? fun () ->
 
   (* Endorse with a contract with wrong delegate:
       - contract with no endorsement rights
       - contract which signs at every available slots *)
-  test_wrong_delegate ~baker:b1 default_account genesis >>= fun () ->
-  test_wrong_delegate ~baker:b1 b5 genesis >>= fun () ->
+  test_wrong_delegate ~baker:b1 default_account block >>= fun () ->
+  test_wrong_delegate ~baker:b1 b5 block >>= fun () ->
 
   (* Endorse with a wrong slot : -1 and max (16) *)
-  test_invalid_endorsement_slot b3 genesis >>=? fun () ->
+  test_invalid_endorsement_slot b3 block >>=? fun () ->
 
   (* FIXME: Baking.Invalid_signature is still unclassified *)
-  test_invalid_signature genesis >>=? fun _ ->
+  test_invalid_signature block >>=? fun _ ->
 
   (* FIXME: cannot inject double endorsement operation yet, but the
      code is still here
      Double endorsement *)
-  test_double_endorsement b4 genesis >>=? fun _ ->
+  test_double_endorsement b4 block >>=? fun _ ->
 
   return ()
 

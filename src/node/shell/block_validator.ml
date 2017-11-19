@@ -50,6 +50,7 @@ type block_error =
         timestamp: Time.t ;
       }
   | Unexpected_number_of_validation_passes of int (* uint8 *)
+  | Too_many_operations of { pass: int; found: int; max: int }
 
 let block_error_encoding =
   let open Data_encoding in
@@ -131,6 +132,18 @@ let block_error_encoding =
           | Unexpected_number_of_validation_passes n -> Some ((), n)
           | _ -> None)
         (fun ((), n) -> Unexpected_number_of_validation_passes n) ;
+      case
+        (obj4
+           (req "error" (constant "too_many_operations"))
+           (req "validation_pass" uint8)
+           (req "found" uint16)
+           (req "max" uint16))
+        (function
+          | Too_many_operations { pass ; found ; max } ->
+              Some ((), pass, found, max)
+          | _ -> None)
+        (fun ((), pass, found, max) ->
+           Too_many_operations { pass ; found ; max }) ;
     ]
 
 let pp_block_error ppf = function
@@ -183,6 +196,10 @@ let pp_block_error ppf = function
       Format.fprintf ppf
         "Invalid number of validation passes (found: %d)"
         n
+  | Too_many_operations { pass ; found ; max } ->
+      Format.fprintf ppf
+        "Too many operations in validation pass %d (found: %d, max: %d)"
+        pass found max
 
 type error +=
   | Invalid_block of
@@ -263,7 +280,8 @@ let () =
        Inconsistent_operations_hash { block ; expected ; found })
 
 let check_header
-    (pred_header: Block_header.t) hash (header: Block_header.t) =
+    (pred: State.Block.t) hash (header: Block_header.t) =
+  let pred_header = State.Block.header pred in
   fail_unless
     (Int32.succ pred_header.shell.level = header.shell.level)
     (invalid_block hash @@
@@ -276,7 +294,8 @@ let check_header
     Fitness.(pred_header.shell.fitness < header.shell.fitness)
     (invalid_block hash Non_increasing_fitness) >>=? fun () ->
   fail_unless
-    (header.shell.validation_passes <= 1) (* FIXME to be found in Proto *)
+    (header.shell.validation_passes =
+     List.length (State.Block.max_number_of_operations pred))
     (invalid_block hash
        (Unexpected_number_of_validation_passes header.shell.validation_passes)
     ) >>=? fun () ->
@@ -320,7 +339,14 @@ let apply_block
     operations =
   let pred_header = State.Block.header pred
   and pred_hash = State.Block.hash pred in
-  check_header pred_header hash header >>=? fun () ->
+  check_header pred hash header >>=? fun () ->
+  iteri2_p
+    (fun i ops max ->
+       fail_unless
+         (List.length ops <= max)
+         (invalid_block hash @@
+          Too_many_operations { pass = i + 1 ; found = List.length ops ; max }))
+    operations (State.Block.max_number_of_operations pred) >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
   check_liveness net_state pred hash operation_hashes operations >>=? fun () ->
   map2_s (map2_s begin fun op_hash raw ->

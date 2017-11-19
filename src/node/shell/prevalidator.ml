@@ -153,16 +153,17 @@ let create
                else
                  Lwt.return_none)
             (Operation_hash.Map.bindings ops) >>= fun rops ->
-          (Lwt.return !validation_state >>=? fun validation_state ->
-           (prevalidate validation_state ~sort:true rops >>= return)) >>= function
-          | Ok (state, r) -> Lwt.return (Ok state, r)
+          match !validation_state with
+          | Ok validation_state ->
+              prevalidate validation_state ~sort:true rops >>= fun (state, r) ->
+              Lwt.return (Ok state, r)
           | Error err ->
               let r =
                 { empty_result with
                   branch_delayed =
-                    Operation_hash.Map.fold
-                      (fun h op m -> Operation_hash.Map.add h (op, err) m)
-                      ops Operation_hash.Map.empty ; } in
+                    List.fold_left
+                      (fun m (h, op) -> Operation_hash.Map.add h (op, err) m)
+                      Operation_hash.Map.empty rops ; } in
               Lwt.return (!validation_state, r)
         end >>= fun (state, r) ->
         let filter_out s m =

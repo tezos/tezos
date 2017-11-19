@@ -11,10 +11,17 @@ module Command = struct
 
   type t =
     (* Activate a protocol *)
-    | Activate of Protocol_hash.t
+    | Activate of {
+        protocol: Protocol_hash.t ;
+        validation_passes: int ;
+      }
 
     (* Activate a protocol as a testnet *)
-    | Activate_testnet of Protocol_hash.t * Int64.t
+    | Activate_testnet of {
+        protocol: Protocol_hash.t ;
+        validation_passes: int ;
+        delay: Int64.t ;
+      }
 
   let mk_case name args =
     let open Data_encoding in
@@ -30,18 +37,28 @@ module Command = struct
     union ~tag_size:`Uint8 [
       case ~tag:0
         (mk_case "activate"
-           (obj1
-              (req "hash" Protocol_hash.encoding)))
-        (function (Activate hash) -> Some hash | _ -> None)
-        (fun hash -> Activate hash) ;
-      case ~tag:1
-        (mk_case "activate_testnet"
            (obj2
               (req "hash" Protocol_hash.encoding)
+              (req "validation_passes" uint8)
+           ))
+        (function
+          | Activate { protocol ; validation_passes } ->
+              Some (protocol, validation_passes)
+          | _ -> None)
+        (fun (protocol, validation_passes) ->
+           Activate { protocol ; validation_passes }) ;
+      case ~tag:1
+        (mk_case "activate_testnet"
+           (obj3
+              (req "hash" Protocol_hash.encoding)
+              (req "validation_passes" uint8)
               (req "validity_time" int64)))
-        (function (Activate_testnet (hash, delay)) -> Some (hash, delay)
-                | _ -> None)
-        (fun (hash, delay) -> Activate_testnet (hash, delay)) ;
+        (function
+          | Activate_testnet { protocol ; validation_passes ; delay } ->
+              Some (protocol, validation_passes, delay)
+          | _ -> None)
+        (fun (protocol, validation_passes, delay) ->
+           Activate_testnet { protocol ; validation_passes ; delay }) ;
     ]
 
   let signed_encoding =

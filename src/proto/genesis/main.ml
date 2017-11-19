@@ -47,7 +47,9 @@ type block = {
 let max_block_length =
   Data_encoding.Binary.length
     Data.Command.encoding
-    (Activate_testnet (Protocol_hash.hash_bytes [], 0L))
+    (Activate_testnet { protocol = Protocol_hash.hash_bytes [] ;
+                        validation_passes = 0 ;
+                        delay = 0L })
   +
   begin
     match Data_encoding.Binary.fixed_length Ed25519.Signature.encoding with
@@ -89,22 +91,25 @@ let begin_application
   check_signature ctxt block >>=? fun () ->
   let fitness = raw_block.shell.fitness in
   match block.command with
-  | Data.Command.Activate hash ->
+  | Data.Command.Activate { protocol = hash ; validation_passes } ->
       let message =
         Some (Format.asprintf "activate %a" Protocol_hash.pp_short hash) in
       Updater.activate ctxt hash >>= fun ctxt ->
       return { Updater.message ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
-               max_number_of_operations = [] ;
+               max_number_of_operations =
+                 Array.to_list (Array.make validation_passes 0) ;
                max_operation_data_length = 0 }
-  | Activate_testnet (hash, delay) ->
+  | Activate_testnet { protocol = hash ; validation_passes ; delay } ->
       let message =
         Some (Format.asprintf "activate testnet %a" Protocol_hash.pp_short hash) in
       let expiration = Time.add raw_block.shell.timestamp delay in
-      Updater.fork_test_network ctxt hash expiration >>= fun ctxt ->
+      Updater.fork_test_network ctxt ~protocol:hash ~expiration >>= fun ctxt ->
       return { Updater.message ; context = ctxt ; fitness ;
-               max_operations_ttl = 0 ; max_operation_data_length = 0 ;
-               max_number_of_operations = [] }
+               max_operations_ttl = 0 ;
+               max_number_of_operations =
+                 Array.to_list (Array.make validation_passes 0) ;
+               max_operation_data_length = 0 }
 
 let begin_construction
     ~predecessor_context:context

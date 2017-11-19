@@ -29,7 +29,7 @@ let activate_alpha () =
   let fitness = Fitness_repr.from_int64 0L in
   Client_embedded_genesis.Client_proto_main.bake
     !rpc_config (`Head 0)
-    (Activate Client_proto_main.protocol)
+    (Activate { protocol = Client_proto_main.protocol ; validation_passes = 1})
     fitness dictator_sk
 
 let init ?(sandbox = "sandbox.json") ?rpc_port () =

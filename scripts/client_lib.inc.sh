@@ -207,6 +207,7 @@ activate_alpha() {
         -block genesis \
         activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
         with fitness 1 \
+        and passes 1 \
         and key dictator
 
 }
