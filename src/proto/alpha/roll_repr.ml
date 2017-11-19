@@ -25,11 +25,10 @@ let (=) = Compare.Int32.(=)
 module Index = struct
   type t = roll
   let path_length = 3
-  let nbyte_of_int32 i n =
-    Int32.to_string @@
-    Int32.logand (Int32.shift_right i (8 * n)) (Int32.of_int 0xff)
   let to_path roll l =
-    nbyte_of_int32 roll 0 :: nbyte_of_int32 roll 1 :: Int32.to_string roll :: l
+    (Int32.to_string @@ Int32.logand roll (Int32.of_int 0xff)) ::
+    (Int32.to_string @@ Int32.logand (Int32.shift_right_logical roll 8) (Int32.of_int 0xff)) ::
+    Int32.to_string roll :: l
   let of_path = function
     | _ :: _ :: s :: _ -> begin
         try Some (Int32.of_string s)
