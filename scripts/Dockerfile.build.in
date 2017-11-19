@@ -3,6 +3,7 @@ FROM $base_image
 COPY src tezos/src
 COPY test tezos/test
 COPY scripts tezos/scripts
+COPY vendors tezos/vendors
 COPY Makefile jbuild .ocp-indent tezos/
 
 RUN sudo chown -R opam /home/opam/tezos && \

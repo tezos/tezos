@@ -1,0 +1,6 @@
+(jbuild_version 1)
+
+(library
+ ((name        irmin_leveldb)
+  (public_name irmin-leveldb)
+  (libraries   (irmin leveldb git))))
