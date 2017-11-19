@@ -158,6 +158,12 @@ let next_level ctxt =
 
 let () = register0 Services.Context.next_level next_level
 
+let roll_value ctxt =
+  return (Roll.value ctxt)
+let () = register0 Services.Context.roll_value roll_value
+
+let () = register0 Services.Context.next_roll Roll.next
+
 let () =
   register0 Services.Context.voting_period_kind Vote.get_current_period_kind
 

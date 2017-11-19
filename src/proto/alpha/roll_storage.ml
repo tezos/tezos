@@ -97,14 +97,16 @@ module Contract = struct
         return (roll, c)
 
   let consume_roll_change c contract =
+    let roll_value = Raw_context.roll_value c in
     Storage.Roll.Contract_change.get c contract >>=? fun change ->
     trace Consume_roll_change
-      (Lwt.return Tez_repr.(change -? Constants_repr.roll_value)) >>=? fun new_change ->
+      (Lwt.return Tez_repr.(change -? roll_value)) >>=? fun new_change ->
     Storage.Roll.Contract_change.set c contract new_change
 
   let recover_roll_change c contract =
+    let roll_value = Raw_context.roll_value c in
     Storage.Roll.Contract_change.get c contract >>=? fun change ->
-    Lwt.return Tez_repr.(change +? Constants_repr.roll_value) >>=? fun new_change ->
+    Lwt.return Tez_repr.(change +? roll_value) >>=? fun new_change ->
     Storage.Roll.Contract_change.set c contract new_change
 
   let pop_roll_from_contract c contract =
@@ -160,25 +162,27 @@ module Contract = struct
     Storage.Roll.Contract_change.init c contract Tez_repr.zero
 
   let add_amount c contract amount =
+    let roll_value = Raw_context.roll_value c in
     Storage.Roll.Contract_change.get c contract >>=? fun change ->
     Lwt.return Tez_repr.(amount +? change) >>=? fun change ->
     Storage.Roll.Contract_change.set c contract change >>=? fun c ->
     let rec loop c change =
-      if Tez_repr.(change < Constants_repr.roll_value) then
+      if Tez_repr.(change < roll_value) then
         return c
       else
-        Lwt.return Tez_repr.(change -? Constants_repr.roll_value) >>=? fun  change ->
+        Lwt.return Tez_repr.(change -? roll_value) >>=? fun  change ->
         create_roll_in_contract c contract >>=? fun c ->
         loop c change in
     loop c change
 
   let remove_amount c contract amount =
+    let roll_value = Raw_context.roll_value c in
     let rec loop c change =
       if Tez_repr.(amount <= change)
       then return (c, change)
       else
         pop_roll_from_contract c contract >>=? fun (_, c) ->
-        Lwt.return Tez_repr.(change +? Constants_repr.roll_value) >>=? fun change ->
+        Lwt.return Tez_repr.(change +? roll_value) >>=? fun change ->
         loop c change in
     Storage.Roll.Contract_change.get c contract >>=? fun change ->
     loop c change >>=? fun (c, change) ->
@@ -194,6 +198,33 @@ module Contract = struct
     fail_unless (not change) Deleted_contract_owning_rolls
 
 end
+
+let value = Raw_context.roll_value
+
+(* HACK for the alphanet: let's increase the roll value when
+   the total amount of roll is greater than 100,000. *)
+let may_recompute_rolls c =
+  Storage.Roll.Next.get c >>=? fun next ->
+  let double = Roll_repr.too_many_roll next in
+  if Compare.Int.(double <= 0) then
+    return c
+  else
+    Raw_context.double_roll_value c double >>=? fun c ->
+    Storage.Roll.clear c >>= fun c ->
+    Storage.Roll.Limbo.remove c >>= fun c ->
+    Storage.Roll.Next.init_set c Roll_repr.first >>= fun c ->
+    Storage.Contract.fold c ~init:(ok c) ~f:begin fun k c ->
+      Lwt.return c >>=? fun c ->
+      Storage.Roll.Contract_roll_list.remove c k >>= fun c ->
+      Storage.Roll.Contract_change.init_set c k Tez_repr.zero >>= fun c ->
+      Storage.Contract.Balance.get c k >>=? fun balance ->
+      Contract.add_amount c k balance >>=? fun c ->
+      return c
+    end
+
+let next c =
+  Storage.Roll.Next.get c >>=? fun next ->
+  return (Roll_repr.to_int32 next)
 
 let init c =
   Storage.Roll.Next.init c Roll_repr.first

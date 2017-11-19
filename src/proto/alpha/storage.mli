@@ -30,6 +30,8 @@ module Roll : sig
      and type value = Contract_repr.t
      and type t := Raw_context.t
 
+  val clear: Raw_context.t -> Raw_context.t Lwt.t
+
   (** The next roll to be allocated. *)
   module Next : Single_data_storage
     with type value = Roll_repr.t
@@ -87,6 +89,9 @@ module Contract : sig
   end
 
   (** The domain of alive contracts *)
+  val fold :
+    Raw_context.t ->
+    init:'a -> f:(Contract_repr.t -> 'a -> 'a Lwt.t) -> 'a Lwt.t
   val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
   (** All the tez possesed by a contract, including rolls and change *)

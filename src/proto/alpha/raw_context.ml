@@ -14,6 +14,7 @@ type t = {
   level: Level_repr.t ;
   timestamp: Time.t ;
   fitness: Int64.t ;
+  roll_value: Tez_repr.t ;
 }
 type context = t
 type root_context = t
@@ -23,6 +24,7 @@ let current_timestamp ctxt = ctxt.timestamp
 let current_fitness ctxt = ctxt.fitness
 let first_level ctxt = ctxt.first_level
 let constants ctxt = ctxt.constants
+let roll_value ctxt = ctxt.roll_value
 let recover ctxt = ctxt.context
 
 let set_current_fitness ctxt fitness = { ctxt with fitness }
@@ -124,6 +126,7 @@ let is_first_block ctxt =
 
 let version = "v1"
 let first_level_key = [ version ; "first_level" ]
+let roll_value_key = [ version ; "roll_value" ]
 let sandboxed_key = [ version ; "sandboxed" ]
 
 let get_first_level ctxt =
@@ -140,6 +143,22 @@ let set_first_level ctxt level =
   let bytes =
     Data_encoding.Binary.to_bytes Raw_level_repr.encoding level in
   Context.set ctxt first_level_key bytes >>= fun ctxt ->
+  return ctxt
+
+let get_roll_value ctxt =
+  Context.get ctxt roll_value_key >>= function
+  | None -> storage_error (Missing_key (roll_value_key, `Get))
+  | Some bytes ->
+      match
+        Data_encoding.Binary.of_bytes Tez_repr.encoding bytes
+      with
+      | None -> storage_error (Corrupted_data roll_value_key)
+      | Some level -> return level
+
+let set_roll_value ctxt level =
+  let bytes =
+    Data_encoding.Binary.to_bytes Tez_repr.encoding level in
+  Context.set ctxt roll_value_key bytes >>= fun ctxt ->
   return ctxt
 
 type error += Failed_to_parse_sandbox_parameter of MBytes.t
@@ -188,16 +207,34 @@ let prepare ~level ~timestamp ~fitness ctxt =
   Lwt.return (Fitness_repr.to_int64 fitness) >>=? fun fitness ->
   may_tag_first_block ctxt level >>=? fun (ctxt, first_block, first_level) ->
   get_sandboxed ctxt >>=? fun sandbox ->
-  Constants_repr.read sandbox >>=? function constants ->
-    let level =
-      Level_repr.from_raw
-        ~first_level
-        ~cycle_length:constants.Constants_repr.cycle_length
-        ~voting_period_length:constants.Constants_repr.voting_period_length
-        level in
-    return ({ context = ctxt ; constants ; level ;
-              timestamp ; fitness ; first_level},
-            first_block)
+  Constants_repr.read sandbox >>=? fun constants ->
+  begin
+    if first_block then begin
+      set_roll_value ctxt constants.initial_roll_value >>=? fun ctxt ->
+      return (ctxt, constants.initial_roll_value)
+    end else begin
+      get_roll_value ctxt >>=? fun roll_value ->
+      return (ctxt, roll_value)
+    end
+  end >>=? fun (ctxt, roll_value) ->
+  let level =
+    Level_repr.from_raw
+      ~first_level
+      ~cycle_length:constants.Constants_repr.cycle_length
+      ~voting_period_length:constants.Constants_repr.voting_period_length
+      level in
+  return ({ context = ctxt ; constants ; level ;
+            timestamp ; fitness ; first_level ; roll_value ;
+          },
+          first_block)
+
+let rec double_roll_value ctxt i =
+  if Compare.Int.(i <= 0) then
+    return ctxt
+  else
+    Lwt.return Tez_repr.(ctxt.roll_value +? ctxt.roll_value) >>=? fun roll_value ->
+    set_roll_value ctxt.context roll_value >>=? fun context ->
+    double_roll_value { ctxt with context ; roll_value } (i-1)
 
 let activate ({ context = c } as s) h =
   Updater.activate c h >>= fun c -> Lwt.return { s with context = c }
@@ -214,6 +251,7 @@ let register_resolvers enc resolve =
       level =  Level_repr.root Raw_level_repr.root ;
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
+      roll_value = Tez_repr.zero ;
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve

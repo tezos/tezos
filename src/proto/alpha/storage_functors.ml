@@ -265,6 +265,10 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
   type context = t
   type key = I.t
 
+  let clear t =
+    C.remove_rec t [] >>= fun t ->
+    Lwt.return (C.project t)
+
   module Raw_context = struct
     type t = C.t * I.t
     type context = t
@@ -296,10 +300,6 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       C.fold_keys t (to_key i k) ~init ~f:(fun k acc -> f (of_key k) acc)
     let project (t, _) = C.project t
   end
-
-  let clear t i =
-    Raw_context.remove_rec (t, i) [] >>= fun (t, _) ->
-    Lwt.return (C.project t)
 
   let fold_keys t ~init ~f =
     let rec dig i path acc =

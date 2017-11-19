@@ -681,6 +681,9 @@ end
 
 module Roll : sig
 
+  val value: context -> Tez.t
+  val next: context -> Int32.t tzresult Lwt.t
+
   val freeze_rolls_for_cycle: context -> Cycle.t -> context tzresult Lwt.t
   val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t
 

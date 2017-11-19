@@ -58,6 +58,7 @@ val set_current_fitness: context -> Int64.t -> t
 
 val constants: context -> Constants_repr.constants
 val first_level: context -> Raw_level_repr.t
+val roll_value: context -> Tez_repr.t
 
 (** {1 Generic accessors} *************************************************)
 
@@ -132,3 +133,6 @@ module type T = sig
 end
 
 include T with type t := t and type context := context
+
+(** HACK alphanet *)
+val double_roll_value: context -> int -> context tzresult Lwt.t

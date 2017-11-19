@@ -161,6 +161,18 @@ module Context = struct
                 describe ~title: "detailled level info" Level.encoding)
       RPC.Path.(custom_root / "context" / "next_level")
 
+  let roll_value custom_root =
+    RPC.service
+      ~input: empty
+      ~output: (wrap_tzerror Tez.encoding)
+      RPC.Path.(custom_root / "context" / "roll_value")
+
+  let next_roll custom_root =
+    RPC.service
+      ~input: empty
+      ~output: (wrap_tzerror int32)
+      RPC.Path.(custom_root / "context" / "next_roll")
+
   let voting_period_kind custom_root =
     RPC.service
       ~description: "Voting period kind for the current block"

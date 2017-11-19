@@ -28,3 +28,6 @@ module Index : sig
   val to_path: t -> string list -> string list
   val of_path: string list -> t option
 end
+
+(** Hack for the alphanet. *)
+val too_many_roll: t -> int

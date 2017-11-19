@@ -38,6 +38,7 @@ module Contract = struct
       (Make_subcontext(Raw_context)(struct let name = ["index"] end))
       (Contract_repr.Index)
 
+  let fold = Indexed_context.fold_keys
   let list = Indexed_context.keys
 
   module Balance =
@@ -232,6 +233,8 @@ module Roll = struct
 
   module Last_for_cycle = Cycle.Last_roll
   module Owner_for_cycle = Cycle.Roll_owner
+
+  let clear = Indexed_context.clear
 
 end
 

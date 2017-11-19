@@ -12,8 +12,6 @@ let version_number = "\000"
 let proof_of_work_nonce_size = 8
 let nonce_length = 32
 
-let roll_value =
-  Tez_repr.of_cents_exn 10000_00L
 let seed_nonce_revelation_tip =
   Tez_repr.of_cents_exn 10_00L
 let origination_burn =
@@ -44,6 +42,7 @@ type constants = {
   dictator_pubkey: Ed25519.Public_key.t ;
   max_number_of_operations: int list ;
   max_operation_data_length: int ;
+  initial_roll_value: Tez_repr.t ;
 }
 
 let read_public_key s =
@@ -78,6 +77,8 @@ let default = {
     [ 300 ] ;
   max_operation_data_length =
     16 * 1024 ; (* 16kB *)
+  initial_roll_value =
+    Tez_repr.of_cents_exn 10000_00L ;
 }
 
 let opt (=) def v = if def = v then None else Some v
@@ -132,6 +133,9 @@ let constants_encoding =
        and max_operation_data_length =
          opt Compare.Int.(=)
            default.max_operation_data_length c.max_operation_data_length
+       and initial_roll_value =
+         opt Tez_repr.(=)
+           default.initial_roll_value c.initial_roll_value
        in
        ((( cycle_length,
            voting_period_length,
@@ -144,7 +148,8 @@ let constants_encoding =
            bootstrap_keys,
            dictator_pubkey),
          (max_number_of_operations,
-          max_operation_data_length)), ()) )
+          max_operation_data_length,
+          initial_roll_value)), ()) )
     (fun ((( cycle_length,
              voting_period_length,
              time_before_reward,
@@ -156,7 +161,8 @@ let constants_encoding =
              bootstrap_keys,
              dictator_pubkey),
            (max_number_of_operations,
-            max_operation_data_length)), ()) ->
+            max_operation_data_length,
+            initial_roll_value)), ()) ->
       { cycle_length =
           unopt default.cycle_length cycle_length ;
         voting_period_length =
@@ -183,6 +189,8 @@ let constants_encoding =
           unopt default.max_number_of_operations max_number_of_operations ;
         max_operation_data_length =
           unopt default.max_operation_data_length max_operation_data_length ;
+        initial_roll_value =
+          unopt default.initial_roll_value initial_roll_value ;
       } )
     Data_encoding.(
       merge_objs
@@ -198,9 +206,10 @@ let constants_encoding =
               (opt "proof_of_work_threshold" int64)
               (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
               (opt "dictator_pubkey" Ed25519.Public_key.encoding))
-           (obj2
+           (obj3
               (opt "max_number_of_operations" (list uint16))
               (opt "max_number_of_operations" int31)
+              (opt "initial_roll_value" Tez_repr.encoding)
            ))
         unit)
 

@@ -12,8 +12,6 @@ type account = {
   public_key : Ed25519.Public_key.t ;
 }
 
-(* FIXME: when incresing wealth *10, the node is very slow to initialize...
-   this should be investigated... *)
 let wealth = Tez_repr.of_cents_exn 4_000_000_00L
 
 let init_account ctxt account =
@@ -69,4 +67,6 @@ let refill ctxt =
        | Error _ -> return ctxt
        | Ok tez -> Contract_storage.credit ctxt contract tez)
     ctxt
-    accounts
+    accounts >>=? fun c ->
+  Roll_storage.may_recompute_rolls c >>=? fun c ->
+  return c

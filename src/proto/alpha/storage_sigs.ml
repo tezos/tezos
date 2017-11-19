@@ -189,7 +189,7 @@ module type Indexed_raw_context = sig
   type context = t
   type key
 
-  val clear: context -> key -> Raw_context.t Lwt.t
+  val clear: context -> Raw_context.t Lwt.t
 
   val fold_keys:
     context -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
