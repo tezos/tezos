@@ -312,6 +312,37 @@ module Make() = struct
         | Ok (), Error exn
         | Error exn, Ok () -> Lwt.return (Error exn)
 
+  let rec iter2_p f l1 l2 =
+    match l1, l2 with
+    | [], [] -> return ()
+    | [], _ | _, [] -> invalid_arg "Error_monad.iter2_p"
+    | x1 :: l1 , x2 :: l2 ->
+        let tx = f x1 x2 and tl = iter2_p f l1 l2 in
+        tx >>= fun tx_res ->
+        tl >>= fun tl_res ->
+        match tx_res, tl_res with
+        | Ok (), Ok () -> Lwt.return (Ok ())
+        | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+        | Ok (), Error exn
+        | Error exn, Ok () -> Lwt.return (Error exn)
+
+  let iteri2_p f l1 l2 =
+    let rec iteri2_p i f l1 l2 =
+      match l1, l2 with
+      | [], [] -> return ()
+      | [], _ | _, [] -> invalid_arg "Error_monad.iteri2_p"
+      | x1 :: l1 , x2 :: l2 ->
+          let tx = f i x1 x2 and tl = iteri2_p (i+1) f l1 l2 in
+          tx >>= fun tx_res ->
+          tl >>= fun tl_res ->
+          match tx_res, tl_res with
+          | Ok (), Ok () -> Lwt.return (Ok ())
+          | Error exn1, Error exn2 -> Lwt.return (Error (exn1 @ exn2))
+          | Ok (), Error exn
+          | Error exn, Ok () -> Lwt.return (Error exn)
+    in
+    iteri2_p 0 f l1 l2
+
   let rec fold_left_s f init l =
     match l with
     | [] -> return init
