@@ -47,10 +47,11 @@ let pay_rewards_for_cycle c cycle =
         match c with
         | Error _ -> Lwt.return c
         | Ok c ->
-            Storage.Rewards.Amount.remove (c, cycle) delegate >>= fun c ->
             Contract_storage.credit c
               (Contract_repr.default_contract delegate)
-              amount)
+              amount) >>=? fun c ->
+  Storage.Rewards.Amount.clear (c, cycle) >>= fun c ->
+  return c
 
 let pay_due_rewards c =
   let timestamp = Raw_context.current_timestamp c in

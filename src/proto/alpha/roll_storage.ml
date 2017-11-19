@@ -18,15 +18,9 @@ let get_contract_delegate c contract =
   | None -> Storage.Contract.Delegate.get_option c contract
 
 let clear_cycle c cycle =
-  Storage.Roll.Last_for_cycle.get c cycle >>=? fun last ->
   Storage.Roll.Last_for_cycle.delete c cycle >>=? fun c ->
-  let rec loop c roll =
-    if Roll_repr.(roll = last) then
-      return c
-    else
-      Storage.Roll.Owner_for_cycle.delete (c, cycle) roll >>=? fun c ->
-      loop c (Roll_repr.succ roll) in
-  loop c Roll_repr.first
+  Storage.Roll.Owner_for_cycle.clear (c, cycle) >>= fun c ->
+  return c
 
 let fold ctxt ~f init =
   Storage.Roll.Next.get ctxt >>=? fun last ->
