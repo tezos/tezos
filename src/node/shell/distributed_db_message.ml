@@ -172,7 +172,7 @@ let versions =
   let open P2p.Version in
   [ { name = "TEZOS" ;
       major = 0 ;
-      minor = 26 ;
+      minor = 27 ;
     }
   ]
 

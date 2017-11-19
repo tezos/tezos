@@ -1,15 +1,19 @@
 For the next reset
 ==================
 
+[Alphanet]
+
+- Limit the number of faucet operations at 5 per block.
+
 [Client]
 
- - Autocomplete scripts for bash.
+- Autocomplete scripts for bash.
 
 - Smart contracts are now non spendable by default.
 
 [Node]
 
- - Prevent potential stack overflow in validation.
+- Prevent potential stack overflow in validation.
 
 - Fix concurrency issue where operations were cleared from
    memory before being used.
@@ -17,7 +21,12 @@ For the next reset
 - Continue background work on the multipass validator:
    cleanup and document data structures, better logging
    of resource requests, enhance requests for the same piece
-   of data to multiple peers.
+   of data to multiple peers, split the code in smaller
+   simpler components.
+
+- P2p: fix issue with data greater than 2^16 bytes
+
+- Irmin: use an experimental LevelDB backend
 
 [Build]
 
@@ -57,6 +66,14 @@ For the next reset
 
 - Add `SIZE` on lists.
 
+Reset 2017-11-17
+================
+
+[Node]
+
+- P2p: fix issue with data greater then 2^16 bytes
+- Irmin: restore usage `git-repack`... (mistakenly removed)
+
 Reset 2017-10-13
 ================
 
@@ -78,14 +95,6 @@ Reset 2017-10-13
 
  - Split the `key` type into `key` and `key_hash` to
    prevent an error raised when using an unrevealed key.
-
-Reset 2017-09-21
-================
-
-[Node]
-
-- P2p: fix issue with data greater then 2^16 bytes
-- Irmin: restore usage `git-repack`... (mistakenly removed)
 
 Reset 2017-09-21
 ================
