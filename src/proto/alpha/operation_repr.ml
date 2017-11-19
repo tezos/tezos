@@ -327,7 +327,6 @@ module Encoding = struct
 end
 
 type error += Cannot_parse_operation
-type error += Operation_exceeds_max_length of int
 
 let encoding =
   let open Data_encoding in
@@ -353,30 +352,15 @@ let () =
         Format.fprintf ppf "The operation cannot be parsed")
     Data_encoding.unit
     (function Cannot_parse_operation -> Some () | _ -> None)
-    (fun () -> Cannot_parse_operation) ;
-  register_error_kind
-    `Branch
-    ~id:"operationExceedsMaxLength"
-    ~title:"Operation exceeded maximum allowed operation length"
-    ~description:"The operation exceeded the maximum allowed length of an operation."
-    ~pp:(fun ppf len ->
-        Format.fprintf ppf
-          "The operation was %d bytes, but operations must be less than %d bytes."
-          len Constants_repr.max_operation_data_length)
-    Data_encoding.(obj1 (req "length" int31))
-    (function Operation_exceeds_max_length len -> Some len | _ -> None)
-    (fun len -> Operation_exceeds_max_length len)
+    (fun () -> Cannot_parse_operation)
 
 let parse hash (op: Operation.t) =
-  if not (Compare.Int.(MBytes.length op.proto <= Constants_repr.max_operation_data_length)) then
-    error (Operation_exceeds_max_length (MBytes.length op.proto))
-  else
-    match Data_encoding.Binary.of_bytes
-            Encoding.signed_proto_operation_encoding
-            op.proto with
-    | Some (contents, signature) ->
-        ok { hash ; shell = op.shell ; contents ; signature }
-    | None -> error Cannot_parse_operation
+  match Data_encoding.Binary.of_bytes
+          Encoding.signed_proto_operation_encoding
+          op.proto with
+  | Some (contents, signature) ->
+      ok { hash ; shell = op.shell ; contents ; signature }
+  | None -> error Cannot_parse_operation
 
 type error += Invalid_signature (* `Permanent *)
 type error += Missing_signature (* `Permanent *)
@@ -429,5 +413,3 @@ let parse_proto bytes =
   | None -> fail Cannot_parse_operation
 
 include Encoding
-
-let max_operation_data_length = Constants_repr.max_operation_data_length

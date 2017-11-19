@@ -126,6 +126,7 @@ let rec create
     global_valid_block_input db net_state =
   let net_db = Distributed_db.activate db net_state in
   Prevalidator.create
+    ~max_operations:2000 (* FIXME temporary constant *)
     ~operation_timeout:timeout.operation net_db >>= fun prevalidator ->
   let valid_block_input = Watcher.create_input () in
   let new_head_input = Watcher.create_input () in

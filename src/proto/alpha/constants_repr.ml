@@ -9,7 +9,6 @@
 
 let version_number = "\000"
 
-let max_operation_data_length = 16 * 1024
 let proof_of_work_nonce_size = 8
 let nonce_length = 32
 
@@ -44,6 +43,7 @@ type constants = {
   bootstrap_keys: Ed25519.Public_key.t list ;
   dictator_pubkey: Ed25519.Public_key.t ;
   max_number_of_operations: int list ;
+  max_operation_data_length: int ;
 }
 
 let read_public_key s =
@@ -76,6 +76,8 @@ let default = {
       "4d5373455738070434f214826d301a1c206780d7f789fcbf94c2149b2e0718cc" ;
   max_number_of_operations =
     [ 300 ] ;
+  max_operation_data_length =
+    16 * 1024 ; (* 16kB *)
 }
 
 let opt (=) def v = if def = v then None else Some v
@@ -127,6 +129,9 @@ let constants_encoding =
        and max_number_of_operations =
          opt CompareListInt.(=)
            default.max_number_of_operations c.max_number_of_operations
+       and max_operation_data_length =
+         opt Compare.Int.(=)
+           default.max_operation_data_length c.max_operation_data_length
        in
        ((( cycle_length,
            voting_period_length,
@@ -138,7 +143,8 @@ let constants_encoding =
            proof_of_work_threshold,
            bootstrap_keys,
            dictator_pubkey),
-         max_number_of_operations), ()) )
+         (max_number_of_operations,
+          max_operation_data_length)), ()) )
     (fun ((( cycle_length,
              voting_period_length,
              time_before_reward,
@@ -149,7 +155,8 @@ let constants_encoding =
              proof_of_work_threshold,
              bootstrap_keys,
              dictator_pubkey),
-           max_number_of_operations), ()) ->
+           (max_number_of_operations,
+            max_operation_data_length)), ()) ->
       { cycle_length =
           unopt default.cycle_length cycle_length ;
         voting_period_length =
@@ -174,6 +181,8 @@ let constants_encoding =
           unopt default.dictator_pubkey dictator_pubkey ;
         max_number_of_operations =
           unopt default.max_number_of_operations max_number_of_operations ;
+        max_operation_data_length =
+          unopt default.max_operation_data_length max_operation_data_length ;
       } )
     Data_encoding.(
       merge_objs
@@ -189,8 +198,10 @@ let constants_encoding =
               (opt "proof_of_work_threshold" int64)
               (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
               (opt "dictator_pubkey" Ed25519.Public_key.encoding))
-           (obj1
-              (opt "max_number_of_operations" (list uint16))))
+           (obj2
+              (opt "max_number_of_operations" (list uint16))
+              (opt "max_number_of_operations" int31)
+           ))
         unit)
 
 type error += Constant_read of exn

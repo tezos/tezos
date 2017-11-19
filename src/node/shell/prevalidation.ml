@@ -82,29 +82,29 @@ let empty_result =
     branch_refused = Operation_hash.Map.empty ;
     branch_delayed = Operation_hash.Map.empty }
 
-let rec apply_operations apply_operation state r ~sort ops =
+let rec apply_operations apply_operation state r max_ops ~sort ops =
   Lwt_list.fold_left_s
-    (fun (state, r) (hash, op, parsed_op) ->
-       apply_operation state parsed_op >>= function
+    (fun (state, max_ops, r) (hash, op, parsed_op) ->
+       apply_operation state max_ops op parsed_op >>= function
        | Ok state ->
            let applied = (hash, op) :: r.applied in
-           Lwt.return (state, { r with applied } )
+           Lwt.return (state, max_ops - 1, { r with applied })
        | Error errors ->
            match classify_errors errors with
            | `Branch ->
                let branch_refused =
                  Operation_hash.Map.add hash (op, errors) r.branch_refused in
-               Lwt.return (state, { r with branch_refused })
+               Lwt.return (state, max_ops, { r with branch_refused })
            | `Permanent ->
                let refused =
                  Operation_hash.Map.add hash (op, errors) r.refused in
-               Lwt.return (state, { r with refused })
+               Lwt.return (state, max_ops, { r with refused })
            | `Temporary ->
                let branch_delayed =
                  Operation_hash.Map.add hash (op, errors) r.branch_delayed in
-               Lwt.return (state, { r with branch_delayed }))
-    (state, r)
-    ops >>= fun (state, r) ->
+               Lwt.return (state, max_ops, { r with branch_delayed }))
+    (state, max_ops, r)
+    ops >>= fun (state, max_ops, r) ->
   match r.applied with
   | _ :: _ when sort ->
       let rechecked_operations =
@@ -113,25 +113,38 @@ let rec apply_operations apply_operation state r ~sort ops =
           ops in
       let remaining = List.length rechecked_operations in
       if remaining = 0 || remaining = List.length ops then
-        Lwt.return (state, r)
+        Lwt.return (state, max_ops, r)
       else
-        apply_operations apply_operation state r ~sort rechecked_operations
+        apply_operations apply_operation state r max_ops ~sort rechecked_operations
   | _ ->
-      Lwt.return (state, r)
+      Lwt.return (state, max_ops, r)
 
 type prevalidation_state =
-    State : { proto : 'a proto ; state : 'a }
+    State : { proto : 'a proto ; state : 'a ;
+              max_number_of_operations : int ;
+              max_operation_data_length : int }
     -> prevalidation_state
 
 and 'a proto =
   (module State.Registred_protocol.T with type validation_state = 'a)
 
-let start_prevalidation ?proto_header ~predecessor ~timestamp () =
+let start_prevalidation
+    ?proto_header
+    ?max_number_of_operations
+    ~predecessor ~timestamp () =
   let { Block_header.shell =
           { fitness = predecessor_fitness ;
             timestamp = predecessor_timestamp ;
             level = predecessor_level } } =
     State.Block.header predecessor in
+  let max_number_of_operations =
+    match max_number_of_operations with
+    | Some max -> max
+    | None ->
+        try List.hd (State.Block.max_number_of_operations predecessor)
+        with _ -> 0 in
+  let max_operation_data_length =
+    State.Block.max_operation_data_length predecessor in
   State.Block.context predecessor >>= fun predecessor_context ->
   Context.get_protocol predecessor_context >>= fun protocol ->
   let predecessor = State.Block.hash predecessor in
@@ -158,12 +171,39 @@ let start_prevalidation ?proto_header ~predecessor ~timestamp () =
     ?proto_header
     ()
   >>=? fun state ->
-  return (State { proto = (module Proto) ; state })
+  return (State { proto = (module Proto) ; state ;
+                  max_number_of_operations ; max_operation_data_length })
 
 type error += Parse_error
+type error += Too_many_operations
+type error += Oversized_operation of { size: int ; max: int }
+
+let () =
+  register_error_kind `Temporary
+    ~id:"prevalidation.too_many_operations"
+    ~title:"Too many pending operations in prevalidation"
+    ~description:"The prevalidation context is full."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Too many operation in prevalidation context.")
+    Data_encoding.empty
+    (function Too_many_operations -> Some () | _ -> None)
+    (fun () -> Too_many_operations) ;
+  register_error_kind `Permanent
+    ~id:"prevalidation.oversized_operation"
+    ~title:"Oversized operation"
+    ~description:"The operation size is bigger than allowed."
+    ~pp:(fun ppf (size, max) ->
+        Format.fprintf ppf "Oversized operation (size: %d, max: %d)"
+          size max)
+    Data_encoding.(obj2
+                     (req "size" int31)
+                     (req "max_size" int31))
+    (function Oversized_operation { size ; max } -> Some (size, max) | _ -> None)
+    (fun (size, max) -> Oversized_operation { size ; max })
 
 let prevalidate
-    (State { proto = (module Proto) ; state })
+    (State { proto = (module Proto) ; state ;
+             max_number_of_operations ; max_operation_data_length })
     ~sort (ops : (Operation_hash.t * Operation.t) list)=
   let ops =
     List.map
@@ -185,9 +225,18 @@ let prevalidate
       let compare (_, _, op1) (_, _, op2) = Proto.compare_operations op1 op2 in
       List.sort compare parsed_ops
     else parsed_ops in
+  let apply_operation state max_ops op parse_op =
+    let size = Data_encoding.Binary.length Operation.encoding op in
+    if max_ops <= 0 then
+      fail Too_many_operations
+    else if size > max_operation_data_length then
+      fail (Oversized_operation { size ; max = max_operation_data_length })
+    else
+      Proto.apply_operation state parse_op in
   apply_operations
-    Proto.apply_operation
-    state empty_result ~sort sorted_ops >>= fun (state, r) ->
+    apply_operation
+    state empty_result max_number_of_operations
+    ~sort sorted_ops >>= fun (state, max_number_of_operations, r) ->
   let r =
     { r with
       applied = List.rev r.applied ;
@@ -195,7 +244,9 @@ let prevalidate
         List.fold_left
           (fun map (h, op, err) -> Operation_hash.Map.add h (op, err) map)
           r.branch_refused invalid_ops } in
-  Lwt.return (State { proto = (module Proto) ; state }, r)
+  Lwt.return (State { proto = (module Proto) ; state ;
+                      max_number_of_operations ; max_operation_data_length },
+              r)
 
 let end_prevalidation (State { proto = (module Proto) ; state }) =
   Proto.finalize_block state

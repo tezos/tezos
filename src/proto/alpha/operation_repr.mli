@@ -112,5 +112,3 @@ val proto_operation_encoding:
 
 val unsigned_operation_encoding:
   (Operation.shell_header * proto_operation) Data_encoding.t
-
-val max_operation_data_length: int

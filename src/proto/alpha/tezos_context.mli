@@ -279,6 +279,7 @@ module Constants : sig
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Ed25519.Public_key.t
   val max_number_of_operations: context -> int list
+  val max_operation_data_length: context -> int
 
 end
 
@@ -625,8 +626,6 @@ module Operation : sig
 
   val unsigned_operation_encoding:
     (Operation.shell_header * proto_operation) Data_encoding.t
-
-  val max_operation_data_length: int
 
 end
 

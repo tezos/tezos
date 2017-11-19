@@ -32,6 +32,7 @@ type t
 
 (** Creation and destruction of a "prevalidation" worker. *)
 val create:
+  max_operations: int ->
   operation_timeout: float ->
   Distributed_db.net_db -> t Lwt.t
 val shutdown: t -> unit Lwt.t

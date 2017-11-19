@@ -51,6 +51,8 @@ type block_error =
       }
   | Unexpected_number_of_validation_passes of int (* uint8 *)
   | Too_many_operations of { pass: int; found: int; max: int }
+  | Oversized_operation of { operation: Operation_hash.t;
+                             size: int; max: int }
 
 let block_error_encoding =
   let open Data_encoding in
@@ -144,6 +146,18 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), pass, found, max) ->
            Too_many_operations { pass ; found ; max }) ;
+      case
+        (obj4
+           (req "error" (constant "oversized_operation"))
+           (req "operation" Operation_hash.encoding)
+           (req "found" int31)
+           (req "max" int31))
+        (function
+          | Oversized_operation { operation ; size ; max } ->
+              Some ((), operation, size, max)
+          | _ -> None)
+        (fun ((), operation, size, max) ->
+           Oversized_operation { operation ; size ; max }) ;
     ]
 
 let pp_block_error ppf = function
@@ -200,6 +214,10 @@ let pp_block_error ppf = function
       Format.fprintf ppf
         "Too many operations in validation pass %d (found: %d, max: %d)"
         pass found max
+  | Oversized_operation { operation ; size ; max } ->
+      Format.fprintf ppf
+        "Oversized operation %a (size: %d, max: %d)"
+        Operation_hash.pp_short operation size max
 
 type error +=
   | Invalid_block of
@@ -345,7 +363,18 @@ let apply_block
        fail_unless
          (List.length ops <= max)
          (invalid_block hash @@
-          Too_many_operations { pass = i + 1 ; found = List.length ops ; max }))
+          Too_many_operations
+            { pass = i + 1 ; found = List.length ops ; max }) >>=? fun () ->
+       let max_size = State.Block.max_operation_data_length pred in
+       iter_p (fun op ->
+           let size = Data_encoding.Binary.length Operation.encoding op in
+           fail_unless
+             (size <= max_size)
+             (invalid_block hash @@
+              Oversized_operation
+                { operation = Operation.hash op ;
+                  size ; max = max_size })) ops >>=? fun () ->
+       return ())
     operations (State.Block.max_number_of_operations pred) >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
   check_liveness net_state pred hash operation_hashes operations >>=? fun () ->

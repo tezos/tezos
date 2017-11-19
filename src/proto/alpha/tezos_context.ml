@@ -88,6 +88,9 @@ module Constants = struct
   let max_number_of_operations c =
     let constants = Raw_context.constants c in
     constants.max_number_of_operations
+  let max_operation_data_length c =
+    let constants = Raw_context.constants c in
+    constants.max_operation_data_length
 end
 
 module Delegates_pubkey = Public_key_storage
@@ -130,7 +133,7 @@ let finalize ?commit_message:message c =
   let context = Raw_context.recover c in
   let constants = Raw_context.constants c in
   { Updater.context ; fitness ; message ; max_operations_ttl = 60 ;
-    max_operation_data_length = 0 ;
+    max_operation_data_length = constants.max_operation_data_length ;
     max_number_of_operations = constants.max_number_of_operations ;
   }
 

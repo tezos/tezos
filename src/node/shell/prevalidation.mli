@@ -30,6 +30,7 @@ type prevalidation_state
 
 val start_prevalidation :
   ?proto_header: MBytes.t ->
+  ?max_number_of_operations: int ->
   predecessor: State.Block.t ->
   timestamp: Time.t ->
   unit -> prevalidation_state tzresult Lwt.t

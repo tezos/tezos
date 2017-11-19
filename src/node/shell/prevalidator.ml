@@ -74,6 +74,7 @@ let merge _key a b =
   | _, Some y -> Some y
 
 let create
+    ~max_operations
     ~operation_timeout
     net_db =
 
@@ -84,11 +85,18 @@ let create
 
   Chain.head net_state >>= fun head ->
   let timestamp = ref (Time.now ()) in
-  (start_prevalidation ~predecessor:head ~timestamp:!timestamp () >|= ref) >>= fun validation_state ->
+  let max_number_of_operations =
+    try 2 * List.hd (State.Block.max_number_of_operations head)
+    with _ -> 0 in
+  (start_prevalidation
+     ~max_number_of_operations
+     ~predecessor:head
+     ~timestamp:!timestamp () >|= ref) >>= fun validation_state ->
   let pending = Operation_hash.Table.create 53 in
   let head = ref head in
   let mempool = ref Mempool.empty in
   let operations = ref empty_result in
+  let operation_count = ref 0 in (* unprocessed + operations/mempool *)
   Chain_traversal.live_blocks
     !head
     (State.Block.max_operations_ttl !head)
@@ -150,9 +158,13 @@ let create
             (fun (h, op) ->
                if Block_hash.Set.mem op.Operation.shell.branch !live_blocks then
                  Lwt.return_some (h, op)
-               else
-                 Lwt.return_none)
+               else begin
+                 Distributed_db.Operation.clear_or_cancel net_db h ;
+                 Lwt.return_none
+               end)
             (Operation_hash.Map.bindings ops) >>= fun rops ->
+          operation_count :=
+            !operation_count - Operation_hash.Map.cardinal ops + List.length rops ;
           match !validation_state with
           | Ok validation_state ->
               prevalidate validation_state ~sort:true rops >>= fun (state, r) ->
@@ -198,9 +210,8 @@ let create
           ~head:(State.Block.hash !head) !mempool >>= fun () ->
         if broadcast then broadcast_new_operations r ;
         Lwt_list.iter_s
-          (fun (_op, _exns) ->
-             (* FIXME *)
-             (* Distributed_db.Operation.mark_invalid net_db op exns >>= fun _ -> *)
+          (fun (op, _exns) ->
+             Distributed_db.Operation.clear_or_cancel net_db op ;
              Lwt.return_unit)
           (Operation_hash.Map.bindings r.refused) >>= fun () ->
         (* TODO. Keep a bounded set of 'refused' operations. *)
@@ -237,6 +248,7 @@ let create
                     prevalidate validation_state
                       ~sort:true rops >>= fun (state, res) ->
                     let register h op =
+                      incr operation_count ;
                       live_operations :=
                         Operation_hash.Set.add h !live_operations ;
                       Distributed_db.inject_operation
@@ -286,6 +298,8 @@ let create
                   Lwt.wakeup w result ;
                   Lwt.return_unit
                 end
+              | `Register (_gid, _mempool) when !operation_count >= max_operations ->
+                  Lwt.return_unit
               | `Register (gid, mempool) ->
                   let ops =
                     Operation_hash.Set.elements mempool.Mempool.pending @
@@ -326,10 +340,16 @@ let create
                   Lwt.return_unit
               | `Handle (h, op) ->
                   Operation_hash.Table.remove pending h ;
-                  broadcast_unprocessed := true ;
-                  unprocessed := Operation_hash.Map.singleton h op ;
-                  lwt_debug "register %a" Operation_hash.pp_short h >>= fun () ->
-                  Lwt.return_unit
+                  if !operation_count < max_operations then begin
+                    broadcast_unprocessed := true ;
+                    incr operation_count ;
+                    unprocessed := Operation_hash.Map.singleton h op ;
+                    lwt_debug "register %a" Operation_hash.pp_short h >>= fun () ->
+                    Lwt.return_unit
+                  end else begin
+                    Distributed_db.Operation.clear_or_cancel net_db h ;
+                    Lwt.return_unit
+                  end
               | `Flush (new_head : State.Block.t) ->
                   list_pendings
                     ~maintain_net_db:net_db
@@ -348,6 +368,7 @@ let create
                   operations := empty_result ;
                   broadcast_unprocessed := false ;
                   unprocessed := new_mempool ;
+                  operation_count := Operation_hash.Map.cardinal new_mempool ;
                   timestamp := Time.now () ;
                   live_blocks := new_live_blocks ;
                   live_operations := new_live_operations ;
