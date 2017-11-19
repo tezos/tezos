@@ -9,11 +9,33 @@
 
 (** Tezos Protocol Environment - Protocol updater. *)
 
+(** Validation result: the record returned by the protocol
+    on the successfull validation of a block. *)
 type validation_result = {
+
   context: Context.t ;
+  (** The resulting context, it will be used for the next block. *)
+
   fitness: Fitness.t ;
+  (** The effective fitness of the block (to be compared with
+      the 'announced' one in the block header. *)
+
   message: string option ;
+  (** An optional informative message to be used as in the 'git
+      commit' of the block's context. *)
+
+  max_operation_data_length: int ;
+  (** The maximum size of operations in bytes. *)
+
+  max_number_of_operations: int list ;
+  (** The maximum number of operations allowed in one block
+      (per validation pass). *)
+
   max_operations_ttl: int ;
+  (** The "time-to-live" of operation for the next block: any
+      operations whose 'branch' is older than 'ttl' blocks in the
+      past cannot be included in the next block. *)
+
 }
 
 type rpc_context = {
@@ -28,17 +50,11 @@ type rpc_context = {
     access to the standard library and the Environment module. *)
 module type PROTOCOL = sig
 
-  (** The version specific type of operations. *)
-  type operation
-
-  (** The maximum size of operations in bytes. *)
-  val max_operation_data_length: int
-
   (** The maximum size of block headers in bytes. *)
   val max_block_length: int
 
-  (** The maximum number of operations allowed in one block. *)
-  val max_number_of_operations: int
+  (** The version specific type of operations. *)
+  type operation
 
   (** The parsing / preliminary validation function for
       operations. Similar to {!parse_block}. *)

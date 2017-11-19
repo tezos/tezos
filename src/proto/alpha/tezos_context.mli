@@ -262,7 +262,6 @@ module Constants : sig
   val proof_of_work_nonce_size: int
   val baking_reward: Tez.t
   val endorsement_reward: Tez.t
-  val max_number_of_operations: int
   val nonce_length: int
   val seed_nonce_revelation_tip: Tez.t
   val origination_burn: Tez.t
@@ -279,6 +278,7 @@ module Constants : sig
   val instructions_per_transaction: context -> int
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Ed25519.Public_key.t
+  val max_number_of_operations: context -> int list
 
 end
 

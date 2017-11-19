@@ -85,6 +85,9 @@ module Constants = struct
   let dictator_pubkey c =
     let constants = Raw_context.constants c in
     constants.dictator_pubkey
+  let max_number_of_operations c =
+    let constants = Raw_context.constants c in
+    constants.max_number_of_operations
 end
 
 module Delegates_pubkey = Public_key_storage
@@ -125,7 +128,11 @@ let init = Init_storage.may_initialize
 let finalize ?commit_message:message c =
   let fitness = Fitness.from_int64 (Fitness.current c) in
   let context = Raw_context.recover c in
-  { Updater.context ; fitness ; message ; max_operations_ttl = 60 }
+  let constants = Raw_context.constants c in
+  { Updater.context ; fitness ; message ; max_operations_ttl = 60 ;
+    max_operation_data_length = 0 ;
+    max_number_of_operations = constants.max_number_of_operations ;
+  }
 
 let configure_sandbox = Raw_context.configure_sandbox
 

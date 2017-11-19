@@ -128,6 +128,8 @@ module Block : sig
   val level: t -> Int32.t
   val message: t -> string
   val max_operations_ttl: t -> int
+  val max_number_of_operations: t -> int list
+  val max_operation_data_length: t -> int
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t

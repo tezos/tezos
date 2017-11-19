@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* See `src/environment/v1//updater.mli` for documentation. *)
+(* See `src/environment/v1/updater.mli` for documentation. *)
 
 val compile: Protocol_hash.t -> Protocol.t -> bool Lwt.t
 val activate: Context.t -> Protocol_hash.t -> Context.t Lwt.t
@@ -21,6 +21,8 @@ type validation_result = {
   context: Context.t ;
   fitness: Fitness.t ;
   message: string option ;
+  max_operation_data_length: int ;
+  max_number_of_operations: int list ;
   max_operations_ttl: int ;
 }
 
@@ -35,10 +37,8 @@ type rpc_context = {
 module type RAW_PROTOCOL = sig
   type error = ..
   type 'a tzresult = ('a, error list) result
-  type operation
-  val max_operation_data_length: int
   val max_block_length: int
-  val max_number_of_operations: int
+  type operation
   val parse_operation:
     Operation_hash.t -> Operation.t -> operation tzresult
   val compare_operations: operation -> operation -> int

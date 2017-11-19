@@ -89,6 +89,8 @@ module Block : sig
     header: Block_header.t ;
     message: string ;
     max_operations_ttl: int ;
+    max_number_of_operations: int list;
+    max_operation_data_length: int;
     context: Context.commit ;
   }
 

@@ -13,12 +13,6 @@ type operation = Tezos_context.operation
 
 let parse_operation = Tezos_context.Operation.parse
 
-let max_operation_data_length =
-  Tezos_context.Operation.max_operation_data_length
-
-let max_number_of_operations =
-  Tezos_context.Constants.max_number_of_operations
-
 let max_block_length =
   Tezos_context.Block_header.max_header_length
 

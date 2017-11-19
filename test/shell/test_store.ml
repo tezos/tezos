@@ -91,6 +91,8 @@ let lolblock ?(operations = []) header =
     max_operations_ttl = 0 ;
     message = "" ;
     context = Context.dummy_commit ;
+    max_number_of_operations = [] ;
+    max_operation_data_length = 0 ;
   }
 
 let b1 = lolblock "Blop !"

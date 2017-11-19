@@ -10,7 +10,6 @@
 let version_number = "\000"
 
 let max_operation_data_length = 16 * 1024
-let max_number_of_operations = 200
 let proof_of_work_nonce_size = 8
 let nonce_length = 32
 
@@ -44,6 +43,7 @@ type constants = {
   proof_of_work_threshold: int64 ;
   bootstrap_keys: Ed25519.Public_key.t list ;
   dictator_pubkey: Ed25519.Public_key.t ;
+  max_number_of_operations: int list ;
 }
 
 let read_public_key s =
@@ -73,7 +73,9 @@ let default = {
     ] ;
   dictator_pubkey =
     read_public_key
-      "4d5373455738070434f214826d301a1c206780d7f789fcbf94c2149b2e0718cc";
+      "4d5373455738070434f214826d301a1c206780d7f789fcbf94c2149b2e0718cc" ;
+  max_number_of_operations =
+    [ 300 ] ;
 }
 
 let opt (=) def v = if def = v then None else Some v
@@ -82,6 +84,8 @@ let unopt def = function None -> def | Some v -> v
 let map_option f = function
   | None -> None
   | Some x -> Some (f x)
+
+module CompareListInt = Compare.List(Compare.Int)
 
 let constants_encoding =
   (* let open Data_encoding in *)
@@ -120,27 +124,32 @@ let constants_encoding =
        and dictator_pubkey =
          opt Ed25519.Public_key.(=)
            default.dictator_pubkey c.dictator_pubkey
+       and max_number_of_operations =
+         opt CompareListInt.(=)
+           default.max_number_of_operations c.max_number_of_operations
        in
-       (( cycle_length,
-          voting_period_length,
-          time_before_reward,
-          slot_durations,
-          first_free_baking_slot,
-          max_signing_slot,
-          instructions_per_transaction,
-          proof_of_work_threshold,
-          bootstrap_keys,
-          dictator_pubkey), ()) )
-    (fun (( cycle_length,
-            voting_period_length,
-            time_before_reward,
-            slot_durations,
-            first_free_baking_slot,
-            max_signing_slot,
-            instructions_per_transaction,
-            proof_of_work_threshold,
-            bootstrap_keys,
-            dictator_pubkey), ()) ->
+       ((( cycle_length,
+           voting_period_length,
+           time_before_reward,
+           slot_durations,
+           first_free_baking_slot,
+           max_signing_slot,
+           instructions_per_transaction,
+           proof_of_work_threshold,
+           bootstrap_keys,
+           dictator_pubkey),
+         max_number_of_operations), ()) )
+    (fun ((( cycle_length,
+             voting_period_length,
+             time_before_reward,
+             slot_durations,
+             first_free_baking_slot,
+             max_signing_slot,
+             instructions_per_transaction,
+             proof_of_work_threshold,
+             bootstrap_keys,
+             dictator_pubkey),
+           max_number_of_operations), ()) ->
       { cycle_length =
           unopt default.cycle_length cycle_length ;
         voting_period_length =
@@ -163,20 +172,25 @@ let constants_encoding =
           unopt default.bootstrap_keys bootstrap_keys ;
         dictator_pubkey =
           unopt default.dictator_pubkey dictator_pubkey ;
+        max_number_of_operations =
+          unopt default.max_number_of_operations max_number_of_operations ;
       } )
     Data_encoding.(
       merge_objs
-        (obj10
-           (opt "cycle_length" int32)
-           (opt "voting_period_length" int32)
-           (opt "time_before_reward" int64)
-           (opt "slot_durations" (list Period_repr.encoding))
-           (opt "first_free_baking_slot" uint16)
-           (opt "max_signing_slot" uint16)
-           (opt "instructions_per_transaction" int31)
-           (opt "proof_of_work_threshold" int64)
-           (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
-           (opt "dictator_pubkey" Ed25519.Public_key.encoding))
+        (merge_objs
+           (obj10
+              (opt "cycle_length" int32)
+              (opt "voting_period_length" int32)
+              (opt "time_before_reward" int64)
+              (opt "slot_durations" (list Period_repr.encoding))
+              (opt "first_free_baking_slot" uint16)
+              (opt "max_signing_slot" uint16)
+              (opt "instructions_per_transaction" int31)
+              (opt "proof_of_work_threshold" int64)
+              (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
+              (opt "dictator_pubkey" Ed25519.Public_key.encoding))
+           (obj1
+              (opt "max_number_of_operations" (list uint16))))
         unit)
 
 type error += Constant_read of exn
