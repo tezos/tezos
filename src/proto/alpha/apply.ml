@@ -14,6 +14,8 @@ open Tezos_context
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
 type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.expr option (* `Permanent *)
+type error += Too_many_faucet
+
 
 let () =
   register_error_kind
@@ -57,7 +59,19 @@ let () =
                      (opt "providedArgument" Script.expr_encoding))
     (function Bad_contract_parameter (c, expected, supplied) ->
        Some (c, expected, supplied) | _ -> None)
-    (fun (c, expected, supplied) -> Bad_contract_parameter (c, expected, supplied))
+    (fun (c, expected, supplied) -> Bad_contract_parameter (c, expected, supplied)) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.too_many_faucet"
+    ~title:"Too many faucet"
+    ~description:"Trying to include a faucet operation in a block \
+                 \ with more than 5 faucet operations."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Too many faucet operation.")
+    Data_encoding.unit
+    (function Too_many_faucet -> Some () | _ -> None)
+    (fun () -> Too_many_faucet)
+
 
 let apply_delegate_operation_content
     ctxt delegate pred_block block_priority = function
@@ -219,11 +233,15 @@ let apply_anonymous_operation ctxt baker_contract origination_nonce kind =
         | None -> return None
         | Some contract -> Contract.get_delegate_opt ctxt contract
       end >>=? fun delegate ->
-      Contract.originate ctxt
-        origination_nonce
-        ~manager ~delegate ~balance:Constants.faucet_credit ?script:None
-        ~spendable:true ~delegatable:true >>=? fun (ctxt, _, origination_nonce) ->
-      return (ctxt, origination_nonce)
+      if Compare.Int.(faucet_count ctxt < 5) then
+        let ctxt = incr_faucet_count ctxt in
+        Contract.originate ctxt
+          origination_nonce
+          ~manager ~delegate ~balance:Constants.faucet_credit ?script:None
+          ~spendable:true ~delegatable:true >>=? fun (ctxt, _, origination_nonce) ->
+        return (ctxt, origination_nonce)
+      else
+        fail Too_many_faucet
 
 let apply_operation
     ctxt baker_contract pred_block block_prio operation =

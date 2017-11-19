@@ -723,3 +723,9 @@ val configure_sandbox:
 
 val activate: context -> Protocol_hash.t -> context Lwt.t
 val fork_test_network: context -> Protocol_hash.t -> Time.t -> context Lwt.t
+
+(**/**)
+
+(* HACK alphanet *)
+val faucet_count: context -> int
+val incr_faucet_count: context -> context

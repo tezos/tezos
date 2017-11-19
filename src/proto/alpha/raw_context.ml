@@ -15,6 +15,7 @@ type t = {
   timestamp: Time.t ;
   fitness: Int64.t ;
   roll_value: Tez_repr.t ;
+  faucet_count: int;
 }
 type context = t
 type root_context = t
@@ -23,10 +24,12 @@ let current_level ctxt = ctxt.level
 let current_timestamp ctxt = ctxt.timestamp
 let current_fitness ctxt = ctxt.fitness
 let first_level ctxt = ctxt.first_level
+let faucet_count ctxt = ctxt.faucet_count
 let constants ctxt = ctxt.constants
 let roll_value ctxt = ctxt.roll_value
 let recover ctxt = ctxt.context
 
+let incr_faucet_count ctxt = { ctxt with faucet_count = ctxt.faucet_count + 1 }
 let set_current_fitness ctxt fitness = { ctxt with fitness }
 
 type storage_error =
@@ -225,6 +228,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
       level in
   return ({ context = ctxt ; constants ; level ;
             timestamp ; fitness ; first_level ; roll_value ;
+            faucet_count = 0 ;
           },
           first_block)
 
@@ -252,6 +256,7 @@ let register_resolvers enc resolve =
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
       roll_value = Tez_repr.zero ;
+      faucet_count = 0 ;
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve

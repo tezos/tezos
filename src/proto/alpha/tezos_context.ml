@@ -141,3 +141,6 @@ let configure_sandbox = Raw_context.configure_sandbox
 
 let activate = Raw_context.activate
 let fork_test_network = Raw_context.fork_test_network
+
+let faucet_count = Raw_context.faucet_count
+let incr_faucet_count = Raw_context.incr_faucet_count
