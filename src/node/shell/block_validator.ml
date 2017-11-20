@@ -457,7 +457,6 @@ let rec worker_loop bv =
     | Request_validation { net_db ; notify_new_block ; canceler ;
                            peer ; hash ; header ; operations } ->
         let net_state = Distributed_db.net_state net_db in
-        State.Block.known_invalid net_state hash >>= fun invalid ->
         State.Block.read_opt net_state hash >>= function
         | Some block ->
             lwt_debug "previously validated block %a (after pipe)"
@@ -468,54 +467,59 @@ let rec worker_loop bv =
               block ;
             may_wakeup (Ok block) ;
             return ()
-        | None when invalid ->
-            may_wakeup (Error [(* TODO commit error and read back*)]) ;
-            return ()
         | None ->
-            begin
-              lwt_debug "validating block %a"
-                Block_hash.pp_short hash >>= fun () ->
-              State.Block.read
-                net_state header.shell.predecessor >>=? fun pred ->
-              get_proto pred hash >>=? fun proto ->
-              (* TODO also protect with [bv.canceler]. *)
-              Lwt_utils.protect ?canceler begin fun () ->
-                apply_block
-                  (Distributed_db.net_state net_db)
-                  pred proto hash header operations
-              end
-            end >>= function
-            | Ok result -> begin
-                lwt_log_info "validated block %a"
-                  Block_hash.pp_short hash >>= fun () ->
-                Lwt_utils.protect ~canceler:bv.canceler begin fun () ->
-                  Distributed_db.commit_block
-                    net_db hash header operations result
-                end >>=? function
-                | None ->
-                    assert false (* should not happen *)
-                | Some block ->
-                    Protocol_validator.prefetch_and_compile_protocols
-                      bv.protocol_validator
-                      ?peer ~timeout:bv.protocol_timeout
-                      block ;
-                    may_wakeup (Ok block) ;
-                    notify_new_block block ;
+            State.Block.read_invalid net_state hash >>= function
+            | Some { errors } ->
+                may_wakeup (Error errors) ;
+                return ()
+            | None ->
+                begin
+                  lwt_debug "validating block %a"
+                    Block_hash.pp_short hash >>= fun () ->
+                  State.Block.read
+                    net_state header.shell.predecessor >>=? fun pred ->
+                  get_proto pred hash >>=? fun proto ->
+                  (* TODO also protect with [bv.canceler]. *)
+                  Lwt_utils.protect ?canceler begin fun () ->
+                    apply_block
+                      (Distributed_db.net_state net_db)
+                      pred proto hash header operations
+                  end
+                end >>= function
+                | Ok result -> begin
+                    lwt_log_info "validated block %a"
+                      Block_hash.pp_short hash >>= fun () ->
+                    Lwt_utils.protect ~canceler:bv.canceler begin fun () ->
+                      Distributed_db.commit_block
+                        net_db hash header operations result
+                    end >>=? function
+                    | None ->
+                        assert false (* should not happen *)
+                    | Some block ->
+                        Protocol_validator.prefetch_and_compile_protocols
+                          bv.protocol_validator
+                          ?peer ~timeout:bv.protocol_timeout
+                          block ;
+                        may_wakeup (Ok block) ;
+                        notify_new_block block ;
+                        return ()
+                  end
+                (* TODO catch other temporary error (e.g. system errors)
+                   and do not 'commit' them on disk... *)
+                | Error [Lwt_utils.Canceled | Unavailable_protocol _] as err ->
+                    may_wakeup err ;
                     return ()
-              end
-            (* TODO catch other temporary error (e.g. system errors)
-               and do not 'commit' them on disk... *)
-            | Error [Lwt_utils.Canceled | Unavailable_protocol _] as err ->
-                may_wakeup err ;
-                return ()
-            | Error errors as err ->
-                Lwt_utils.protect ~canceler:bv.canceler begin fun () ->
-                  Distributed_db.commit_invalid_block
-                    net_db hash header errors
-                end >>=? fun commited ->
-                assert commited ;
-                may_wakeup err ;
-                return ()
+                | Error errors as err ->
+                    lwt_log_error "@[<v 2>Received invalid block %a:@ %a@]"
+                      Block_hash.pp_short hash
+                      Error_monad.pp_print_error errors >>= fun () ->
+                    Lwt_utils.protect ~canceler:bv.canceler begin fun () ->
+                      Distributed_db.commit_invalid_block
+                        net_db hash header errors
+                    end >>=? fun commited ->
+                    assert commited ;
+                    may_wakeup err ;
+                    return ()
   end >>= function
   | Ok () ->
       worker_loop bv
