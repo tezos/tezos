@@ -95,7 +95,7 @@ end
 
 module Baking : sig
 
-  val mine:
+  val bake:
     Client_node_rpcs.Blocks.block ->
     Account.t ->
     Operation.raw list ->

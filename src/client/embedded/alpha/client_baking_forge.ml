@@ -100,7 +100,7 @@ let forge_block cctxt block
     ?timestamp
     ~priority
     ~seed_nonce_hash ~src_sk () =
-  let block = Client_rpcs.last_mined_block block in
+  let block = Client_rpcs.last_baked_block block in
   begin
     match operations with
     | None ->
@@ -444,7 +444,7 @@ let insert_blocks cctxt ?max_priority state bis =
       Format.eprintf "Error: %a" pp_print_error err  ;
       Lwt.return_unit
 
-let mine cctxt state =
+let bake cctxt state =
   let slots = pop_baking_slots state in
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
@@ -592,7 +592,7 @@ let create
         | `Timeout ->
             lwt_debug "Waking up for baking..." >>= fun () ->
             begin
-              mine cctxt state >>= function
+              bake cctxt state >>= function
               | Ok () -> Lwt.return_unit
               | Error errs ->
                   lwt_log_error "Error while baking:\n%a"

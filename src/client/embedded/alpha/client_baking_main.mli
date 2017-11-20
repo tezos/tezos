@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val mine_block:
+val bake_block:
   Client_commands.context ->
   Client_proto_rpcs.block ->
   ?force:bool ->

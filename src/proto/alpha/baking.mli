@@ -23,7 +23,7 @@ val paying_priorities: context -> int list
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
     time, given the predecessor block timestamp [pred_block_time],
     after which a baker with priority [priority] is allowed to
-    mine. Fail with [Invalid_slot_durations_constant] if the minimal
+    bake. Fail with [Invalid_slot_durations_constant] if the minimal
     time cannot be computed. *)
 val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
 
@@ -73,7 +73,7 @@ val base_baking_reward: context -> priority:int -> Tez.t
 val endorsement_reward: block_priority:int -> Tez.t tzresult Lwt.t
 
 (** [baking_priorities ctxt level] is the lazy list of contract's
-    public key hashes that are allowed to mine for [level]. *)
+    public key hashes that are allowed to bake for [level]. *)
 val baking_priorities:
   context -> Level.t -> public_key_hash lazy_list
 
@@ -84,7 +84,7 @@ val endorsement_priorities:
 
 (** [first_baking_priorities ctxt ?max_priority contract_hash level]
     is a list of priorities of max [?max_priority] elements, where the
-    delegate of [contract_hash] is allowed to mine for [level]. If
+    delegate of [contract_hash] is allowed to bake for [level]. If
     [?max_priority] is [None], a sensible number of priorities is
     returned. *)
 val first_baking_priorities:

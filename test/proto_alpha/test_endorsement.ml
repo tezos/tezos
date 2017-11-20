@@ -19,25 +19,25 @@ let default_account =
 let test_double_endorsement contract block =
 
   (* Double endorsement for the same level *)
-  Helpers.Baking.mine block contract [] >>=? fun b1 ->
+  Helpers.Baking.bake block contract [] >>=? fun b1 ->
 
   (* branch root *)
-  Helpers.Baking.mine (`Hash b1) contract [] >>=? fun b2 ->
+  Helpers.Baking.bake (`Hash b1) contract [] >>=? fun b2 ->
   (* changing branch *)
-  Helpers.Baking.mine (`Hash b1) contract [] >>=? fun b2' ->
+  Helpers.Baking.bake (`Hash b1) contract [] >>=? fun b2' ->
 
   (* branch root *)
   Helpers.Endorse.endorse contract (`Hash b2) >>=? fun op ->
-  Helpers.Baking.mine (`Hash b2) contract [ op ] >>=? fun _b3 ->
+  Helpers.Baking.bake (`Hash b2) contract [ op ] >>=? fun _b3 ->
 
   Helpers.Endorse.endorse contract (`Hash b2') >>=? fun op ->
-  Helpers.Baking.mine (`Hash b2') contract [ op ] >>=? fun b3' ->
+  Helpers.Baking.bake (`Hash b2') contract [ op ] >>=? fun b3' ->
 
   Helpers.Endorse.endorse contract (`Hash b3') >>=? fun op ->
-  Helpers.Baking.mine (`Hash b3') contract [ op ] >>=? fun b4' ->
+  Helpers.Baking.bake (`Hash b3') contract [ op ] >>=? fun b4' ->
 
   (* TODO: Inject double endorsement op ! *)
-  Helpers.Baking.mine (`Hash b4') contract []
+  Helpers.Baking.bake (`Hash b4') contract []
 
 (* FIXME: Baking.Invalid_signature is unclassified *)
 let test_invalid_signature block =
@@ -50,7 +50,7 @@ let test_invalid_signature block =
        DYfTKhq7rDQujdn5WWzwUMeV3agaZ6J2vPQT58jJAJPi" in
   let account =
     Helpers.Account.create ~keys:(secret_key, public_key) "WRONG SIGNATURE" in
-  Helpers.Baking.mine block account [] >>= fun res ->
+  Helpers.Baking.bake block account [] >>= fun res ->
   Assert.generic_economic_error ~msg:__LOC__ res ;
   return ()
 
@@ -61,18 +61,18 @@ let contain_tzerror ?(msg="") ~f t =
       failwith "@[<v 2>Unexpected error@ %a@]" pp_print_error error
   | _ -> return ()
 
-let test_wrong_delegate ~miner contract block =
+let test_wrong_delegate ~baker contract block =
   begin
     Helpers.Endorse.endorse ~slot:1 contract block >>=? fun op ->
-    Helpers.Baking.mine block miner [ op ] >>=? fun _ ->
+    Helpers.Baking.bake block baker [ op ] >>=? fun _ ->
     Helpers.Endorse.endorse ~slot:2 contract block >>=? fun op ->
-    Helpers.Baking.mine block miner [ op ] >>=? fun _ ->
+    Helpers.Baking.bake block baker [ op ] >>=? fun _ ->
     Helpers.Endorse.endorse ~slot:3 contract block >>=? fun op ->
-    Helpers.Baking.mine block miner [ op ] >>=? fun _ ->
+    Helpers.Baking.bake block baker [ op ] >>=? fun _ ->
     Helpers.Endorse.endorse ~slot:4 contract block >>=? fun op ->
-    Helpers.Baking.mine block miner [ op ] >>=? fun _ ->
+    Helpers.Baking.bake block baker [ op ] >>=? fun _ ->
     Helpers.Endorse.endorse ~slot:5 contract block >>=? fun op ->
-    Helpers.Baking.mine block miner [ op ] >>=? fun _ ->
+    Helpers.Baking.bake block baker [ op ] >>=? fun _ ->
     return ()
   end >>= fun res ->
   Assert.failed_to_preapply ~msg:__LOC__ begin function
@@ -83,13 +83,13 @@ let test_wrong_delegate ~miner contract block =
 
 let test_invalid_endorsement_slot contract block =
   Helpers.Endorse.endorse ~slot:~-1 contract block >>=? fun op ->
-  Helpers.Baking.mine block contract [ op ] >>= fun res ->
+  Helpers.Baking.bake block contract [ op ] >>= fun res ->
   Assert.failed_to_preapply ~msg:__LOC__ ~op begin function
     | Baking.Invalid_endorsement_slot _ -> true
     | _ -> false
   end res ;
   Helpers.Endorse.endorse ~slot:16 contract block >>=? fun op ->
-  Helpers.Baking.mine block contract [ op ] >>= fun res ->
+  Helpers.Baking.bake block contract [ op ] >>= fun res ->
   Assert.failed_to_preapply ~msg:__LOC__ ~op begin function
     | Baking.Invalid_endorsement_slot _ -> true
     | _ -> false
@@ -114,7 +114,7 @@ let test_endorsement_rewards block0 =
   get_endorser_except [ b1 ] accounts >>=? fun (account0, slot0) ->
   Helpers.Account.balance ~block:block0 account0 >>=? fun balance0 ->
   Helpers.Endorse.endorse ~slot:slot0 account0 block0 >>=? fun op ->
-  Helpers.Baking.mine block0 b1 [ op ] >>=? fun hash1 ->
+  Helpers.Baking.bake block0 b1 [ op ] >>=? fun hash1 ->
   Helpers.display_level (`Hash hash1) >>=? fun () ->
   Assert.balance_equal ~block:(`Hash hash1) ~msg:__LOC__ account0
     (Int64.sub (Tez.to_cents balance0) bond) >>=? fun () ->
@@ -125,17 +125,17 @@ let test_endorsement_rewards block0 =
   get_endorser_except [ b1 ; account0 ] accounts >>=? fun (account1, slot1) ->
   Helpers.Account.balance ~block:block1 account1 >>=? fun balance1 ->
   Helpers.Endorse.endorse ~slot:slot1 account1 block1 >>=? fun op ->
-  Helpers.Baking.mine block1 b1 [ op ] >>=? fun hash2 ->
+  Helpers.Baking.bake block1 b1 [ op ] >>=? fun hash2 ->
   Helpers.display_level (`Hash hash2) >>=? fun () ->
   Assert.balance_equal ~block:(`Hash hash2) ~msg:__LOC__ account1
     (Int64.sub (Tez.to_cents balance1) bond) >>=? fun () ->
 
   (* Check rewards after one cycle for account0 *)
-  Helpers.Baking.mine (`Hash hash2) b1 [] >>=? fun hash3 ->
+  Helpers.Baking.bake (`Hash hash2) b1 [] >>=? fun hash3 ->
   Helpers.display_level (`Hash hash3) >>=? fun () ->
-  Helpers.Baking.mine (`Hash hash3) b1 [] >>=? fun hash4 ->
+  Helpers.Baking.bake (`Hash hash3) b1 [] >>=? fun hash4 ->
   Helpers.display_level (`Hash hash4) >>=? fun () ->
-  Helpers.Baking.mine (`Hash hash4) b1 [] >>=? fun hash5 ->
+  Helpers.Baking.bake (`Hash hash4) b1 [] >>=? fun hash5 ->
   Helpers.display_level (`Hash hash5) >>=? fun () ->
   Helpers.Baking.endorsement_reward block1 >>=? fun rw0 ->
   Assert.balance_equal ~block:(`Hash hash5) ~msg:__LOC__ account0
@@ -147,9 +147,9 @@ let test_endorsement_rewards block0 =
     (Int64.add (Tez.to_cents balance1) rw1) >>=? fun () ->
 
   (* #2 endorse and check reward only on the good chain  *)
-  Helpers.Baking.mine (`Hash hash5) b1 []>>=? fun hash6a ->
+  Helpers.Baking.bake (`Hash hash5) b1 []>>=? fun hash6a ->
   Helpers.display_level (`Hash hash6a) >>=? fun () ->
-  Helpers.Baking.mine (`Hash hash5) b1 [] >>=? fun hash6b ->
+  Helpers.Baking.bake (`Hash hash5) b1 [] >>=? fun hash6b ->
   Helpers.display_level (`Hash hash6b) >>=? fun () ->
 
   (* working on head *)
@@ -158,7 +158,7 @@ let test_endorsement_rewards block0 =
   Helpers.Account.balance ~block:(`Hash hash6a) account3 >>=? fun balance3 ->
   Helpers.Endorse.endorse
     ~slot:slot3 account3 (`Hash hash6a) >>=? fun ops ->
-  Helpers.Baking.mine (`Hash hash6a) b1 [ ops ] >>=? fun hash7a ->
+  Helpers.Baking.bake (`Hash hash6a) b1 [ ops ] >>=? fun hash7a ->
   Helpers.display_level (`Hash hash7a) >>=? fun () ->
 
   (* working on fork *)
@@ -166,13 +166,13 @@ let test_endorsement_rewards block0 =
   get_endorser_except [ b1 ] accounts >>=? fun (account4, slot4) ->
   Helpers.Account.balance ~block:(`Hash hash7a) account4 >>=? fun _balance4 ->
   Helpers.Endorse.endorse ~slot:slot4 account4 (`Hash hash6b) >>=? fun ops ->
-  Helpers.Baking.mine (`Hash hash6b) b1 [ ops ] >>=? fun _new_fork ->
+  Helpers.Baking.bake (`Hash hash6b) b1 [ ops ] >>=? fun _new_fork ->
   Helpers.display_level (`Hash _new_fork) >>=? fun () ->
   Helpers.Account.balance ~block:(`Hash hash7a) account4 >>=? fun balance4 ->
 
-  Helpers.Baking.mine (`Hash hash7a) b1 [] >>=? fun hash8a ->
+  Helpers.Baking.bake (`Hash hash7a) b1 [] >>=? fun hash8a ->
   Helpers.display_level (`Hash hash8a) >>=? fun () ->
-  Helpers.Baking.mine (`Hash hash8a) b1 [] >>=? fun hash9a ->
+  Helpers.Baking.bake (`Hash hash8a) b1 [] >>=? fun hash9a ->
   Helpers.display_level (`Hash hash9a) >>=? fun () ->
 
   (* Check rewards after one cycle *)
@@ -220,8 +220,8 @@ let run genesis =
   (* Endorse with a contract with wrong delegate:
       - contract with no endorsement rights
       - contract which signs at every available slots *)
-  test_wrong_delegate ~miner:b1 default_account genesis >>= fun () ->
-  test_wrong_delegate ~miner:b1 b5 genesis >>= fun () ->
+  test_wrong_delegate ~baker:b1 default_account genesis >>= fun () ->
+  test_wrong_delegate ~baker:b1 b5 genesis >>= fun () ->
 
   (* Endorse with a wrong slot : -1 and max (16) *)
   test_invalid_endorsement_slot b3 genesis >>=? fun () ->

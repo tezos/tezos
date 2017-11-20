@@ -27,7 +27,7 @@ let dictator_sk =
 
 let activate_alpha () =
   let fitness = Fitness_repr.from_int64 0L in
-  Client_embedded_genesis.Client_proto_main.mine
+  Client_embedded_genesis.Client_proto_main.bake
     !rpc_config (`Head 0)
     (Activate Client_proto_main.protocol)
     fitness dictator_sk
@@ -420,7 +420,7 @@ end
 
 module Baking = struct
 
-  let mine block (contract: Account.t) operations =
+  let bake block (contract: Account.t) operations =
     let seed_nonce =
       match Nonce.of_bytes @@
         Sodium.Random.Bigbytes.generate Constants.nonce_length with
@@ -454,7 +454,7 @@ module Endorse = struct
       src_sk
       source
       slot =
-    let block = Client_rpcs.last_mined_block block in
+    let block = Client_rpcs.last_baked_block block in
     Client_node_rpcs.Blocks.info !rpc_config block >>=? fun { hash } ->
     Client_proto_rpcs.Helpers.Forge.Delegate.endorsement !rpc_config
       block

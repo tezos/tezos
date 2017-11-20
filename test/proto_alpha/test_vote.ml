@@ -20,11 +20,11 @@ let print_level head =
 
 let run_change_to_demo_proto block
     ({ b1 ; b2 ; b3 ; b4 ; b5 } : Account.bootstrap_accounts) =
-  Baking.mine block b1 [] >>=? fun head ->
+  Baking.bake block b1 [] >>=? fun head ->
   Format.eprintf "Entering `Proposal` voting period@.";
   Assert.check_voting_period_kind ~msg:__LOC__ ~block:(`Hash head)
     Voting_period.Proposal >>=? fun () ->
-  Baking.mine (`Hash head) b2 [] >>=? fun head ->
+  Baking.bake (`Hash head) b2 [] >>=? fun head ->
 
   (* 1. Propose the 'demo' protocol as b1 (during the Proposal period) *)
   Protocol.proposals
@@ -33,9 +33,9 @@ let run_change_to_demo_proto block
     [demo_protocol] >>=? fun op ->
 
   (* Mine blocks to switch to next vote period (Testing_vote) *)
-  Baking.mine (`Hash head) b3 [op] >>=? fun head ->
+  Baking.bake (`Hash head) b3 [op] >>=? fun head ->
   Format.eprintf "Entering `Testing_vote` voting period@.";
-  Baking.mine (`Hash head) b4 [] >>=? fun head ->
+  Baking.bake (`Hash head) b4 [] >>=? fun head ->
   Assert.check_voting_period_kind ~msg:__LOC__ ~block:(`Hash head)
     Voting_period.Testing_vote >>=? fun () ->
 
@@ -54,18 +54,18 @@ let run_change_to_demo_proto block
     all_accounts >>=? fun operations ->
 
   (* Mine blocks to switch to next vote period (Testing) *)
-  Baking.mine (`Hash head) b5 operations >>=? fun head ->
+  Baking.bake (`Hash head) b5 operations >>=? fun head ->
   Format.eprintf "Entering `Testing` voting period@.";
-  Baking.mine (`Hash head) b1 [] >>=? fun head ->
+  Baking.bake (`Hash head) b1 [] >>=? fun head ->
   Assert.check_voting_period_kind ~msg:__LOC__ ~block:(`Hash head)
     Voting_period.Testing >>=? fun () ->
 
   (* 3. Test the proposed protocol *)
 
   (* Mine blocks to switch to next vote period (Promote_vote) *)
-  Baking.mine (`Hash head) b2 [] >>=? fun head ->
+  Baking.bake (`Hash head) b2 [] >>=? fun head ->
   Format.eprintf "Entering `Promote_vote` voting period@.";
-  Baking.mine (`Hash head) b3 [] >>=? fun head ->
+  Baking.bake (`Hash head) b3 [] >>=? fun head ->
   Assert.check_voting_period_kind ~msg:__LOC__ ~block:(`Hash head)
     Voting_period.Promotion_vote >>=? fun () ->
 
@@ -75,8 +75,8 @@ let run_change_to_demo_proto block
 
   (* Mine blocks to switch to end the vote cycle (back to Proposal) *)
   Format.eprintf "Switching to `demo` protocol@.";
-  Baking.mine (`Hash head) b4 operations >>=? fun head ->
-  Baking.mine (`Hash head) b5 [] >>=? fun head ->
+  Baking.bake (`Hash head) b4 operations >>=? fun head ->
+  Baking.bake (`Hash head) b5 [] >>=? fun head ->
 
   Assert.check_protocol
     ~msg:__LOC__ ~block:(`Hash head) demo_protocol >>=? fun () ->

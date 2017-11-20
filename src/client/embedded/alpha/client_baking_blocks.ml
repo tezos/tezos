@@ -68,7 +68,7 @@ let monitor cctxt
   return (Lwt_stream.map_s convert block_stream)
 
 let blocks_from_cycle cctxt block cycle =
-  let block = Client_rpcs.last_mined_block block in
+  let block = Client_rpcs.last_baked_block block in
   Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
   Client_proto_rpcs.Helpers.levels cctxt block cycle >>=? fun (first, last) ->
   let length = Int32.to_int (Raw_level.diff level.level first) in

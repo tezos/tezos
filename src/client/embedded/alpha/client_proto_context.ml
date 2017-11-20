@@ -29,7 +29,7 @@ let rec find_predecessor rpc_config h n =
 
 let get_branch rpc_config block branch =
   let branch = Utils.unopt ~default:0 branch in (* TODO export parameter *)
-  let block = Client_rpcs.last_mined_block block in
+  let block = Client_rpcs.last_baked_block block in
   begin
     match block with
     | `Head n -> return (`Head (n+branch))
@@ -219,7 +219,7 @@ let group =
     title = "Block contextual commands (see option -block)" }
 
 let dictate rpc_config ?force block command seckey =
-  let block = Client_rpcs.last_mined_block block in
+  let block = Client_rpcs.last_baked_block block in
   Client_node_rpcs.Blocks.info
     rpc_config block >>=? fun { net_id ; hash = branch } ->
   Client_proto_rpcs.Helpers.Forge.Dictator.operation

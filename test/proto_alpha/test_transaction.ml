@@ -12,7 +12,7 @@ module Assert = Helpers.Assert
 
 let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
 
-  Helpers.Baking.mine blkid b1 [] >>=? fun blkh ->
+  Helpers.Baking.bake blkid b1 [] >>=? fun blkh ->
   let foo = Helpers.Account.create "foo" in
   let bar = Helpers.Account.create "bar" in
 

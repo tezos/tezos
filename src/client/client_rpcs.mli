@@ -80,7 +80,7 @@ val call_describe0:
 
 type block = Node_rpc_services.Blocks.block
 
-val last_mined_block:
+val last_baked_block:
   block -> [>
     | `Genesis
     | `Head of int

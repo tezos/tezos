@@ -33,8 +33,8 @@ let demo cctxt =
   cctxt.answer "All good!" >>= fun () ->
   return ()
 
-let mine cctxt =
-  let block = Client_rpcs.last_mined_block cctxt.Client_commands.config.block in
+let bake cctxt =
+  let block = Client_rpcs.last_baked_block cctxt.Client_commands.config.block in
   Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
   let fitness =
     match bi.fitness with
@@ -80,10 +80,10 @@ let commands () =
       (fun () _cctxt ->
          Error.demo_error 101010
          >|= Environment.wrap_error) ;
-    command ~group ~desc: "Mine an empty block"
+    command ~group ~desc: "Bake an empty block"
       no_options
-      (fixed [ "mine" ])
-      (fun () cctxt -> mine cctxt) ;
+      (fixed [ "bake" ])
+      (fun () cctxt -> bake cctxt) ;
   ]
 
 let () =

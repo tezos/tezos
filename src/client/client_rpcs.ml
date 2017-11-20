@@ -329,7 +329,7 @@ let call_describe0 cctxt service path arg =
 
 type block = Node_rpc_services.Blocks.block
 
-let last_mined_block = function
+let last_baked_block = function
   | `Prevalidation -> `Head 0
   | `Test_prevalidation -> `Test_head 0
   | `Genesis | `Head _ | `Test_head _ | `Hash _ as block -> block

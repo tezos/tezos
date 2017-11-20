@@ -9,7 +9,7 @@
 
 open Tezos_embedded_raw_protocol_genesis
 
-val mine:
+val bake:
   Client_rpcs.config ->
   ?timestamp: Time.t ->
   Client_node_rpcs.Blocks.block ->

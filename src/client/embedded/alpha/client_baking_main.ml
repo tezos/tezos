@@ -9,7 +9,7 @@
 
 open Client_commands
 
-let mine_block cctxt block
+let bake_block cctxt block
     ?force ?max_priority ?(free_baking=false) ?src_sk delegate =
   begin
     match src_sk with
@@ -85,7 +85,7 @@ let reveal_block_nonces cctxt ?force block_hashes =
   do_reveal cctxt ?force cctxt.config.block blocks
 
 let reveal_nonces cctxt ?force () =
-  let block = Client_rpcs.last_mined_block cctxt.config.block in
+  let block = Client_rpcs.last_baked_block cctxt.config.block in
   Client_baking_forge.get_unrevealed_nonces
     cctxt ?force block >>=? fun nonces ->
   do_reveal cctxt ?force cctxt.config.block nonces
@@ -129,12 +129,12 @@ let commands () =
            ~force ?max_priority delegate) ;
     command ~group ~desc: "Forge and inject block using the delegate rights"
       (args3 max_priority_arg force_switch free_baking_switch)
-      (prefixes [ "mine"; "for" ]
+      (prefixes [ "bake"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
          ~name:"baker" ~desc: "name of the delegate owning the baking right"
        @@ stop)
       (fun (max_priority, force, free_baking) (_, delegate) cctxt ->
-         mine_block cctxt cctxt.config.block
+         bake_block cctxt cctxt.config.block
            ~force ?max_priority ~free_baking delegate) ;
     command ~group ~desc: "Forge and inject a seed-nonce revelation operation"
       (args1 force_switch)

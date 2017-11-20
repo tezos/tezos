@@ -26,7 +26,7 @@ let call_error_service1 rpc_config s block a1 =
 
 let forge_block
     rpc_config block net_id ?(timestamp = Time.now ()) command fitness =
-  let block = Client_rpcs.last_mined_block block in
+  let block = Client_rpcs.last_baked_block block in
   Client_node_rpcs.Blocks.info rpc_config block >>=? fun pred ->
   let proto_level =
     match command with
@@ -37,8 +37,8 @@ let forge_block
     ((net_id, Int32.succ pred.level, proto_level,
       pred.hash, timestamp, fitness), command)
 
-let mine rpc_config ?timestamp block command fitness seckey =
-  let block = Client_rpcs.last_mined_block block in
+let bake rpc_config ?timestamp block command fitness seckey =
+  let block = Client_rpcs.last_baked_block block in
   Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
   forge_block
     rpc_config ?timestamp block bi.net_id command fitness >>=? fun blk ->
@@ -78,7 +78,7 @@ let commands () =
       begin fun timestamp hash fitness seckey cctxt ->
         let fitness =
           Tezos_embedded_raw_protocol_alpha.Fitness_repr.from_int64 fitness in
-        mine cctxt.rpc_config ?timestamp cctxt.config.block
+        bake cctxt.rpc_config ?timestamp cctxt.config.block
           (Activate hash) fitness seckey >>=? fun hash ->
         cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return ()
@@ -99,7 +99,7 @@ let commands () =
       begin fun timestamp hash fitness seckey cctxt ->
         let fitness =
           Tezos_embedded_raw_protocol_alpha.Fitness_repr.from_int64 fitness in
-        mine cctxt.rpc_config ?timestamp cctxt.config.block
+        bake cctxt.rpc_config ?timestamp cctxt.config.block
           (Activate_testnet (hash, Int64.mul 24L 3600L))
           fitness seckey >>=? fun hash ->
         cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->

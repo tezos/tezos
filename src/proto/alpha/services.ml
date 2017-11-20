@@ -479,7 +479,7 @@ module Helpers = struct
     let baking_rights custom_root =
       RPC.service
         ~description:
-          "List gelegates allowed to mine for the next level, \
+          "List gelegates allowed to bake for the next level, \
            ordered by priority."
         ~input: (obj1 (opt "max_priority" int31))
         ~output: (wrap_tzerror @@
@@ -495,7 +495,7 @@ module Helpers = struct
     let baking_rights_for_level custom_root =
       RPC.service
         ~description:
-          "List delegate allowed to mine for a given level, \
+          "List delegate allowed to bake for a given level, \
            ordered by priority."
         ~input: (obj1 (opt "max_priority" int31))
         ~output: (wrap_tzerror @@

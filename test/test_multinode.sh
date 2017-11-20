@@ -72,16 +72,16 @@ retry() {
 
 retry 2 15 assert_protocol "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
 
-$client1 mine for bootstrap1 -max-priority 512
+$client1 bake for bootstrap1 -max-priority 512
 retry 2 15 assert_propagation_level 2
 
-$client2 mine for bootstrap2 -max-priority 512
+$client2 bake for bootstrap2 -max-priority 512
 retry 2 15 assert_propagation_level 3
 
-$client3 mine for bootstrap3 -max-priority 512
+$client3 bake for bootstrap3 -max-priority 512
 retry 2 15 assert_propagation_level 4
 
-$client4 mine for bootstrap4 -max-priority 512
+$client4 bake for bootstrap4 -max-priority 512
 retry 2 15 assert_propagation_level 5
 
 endorse_hash=$($client3 endorse for bootstrap3 | extract_operation_hash)
@@ -100,7 +100,7 @@ assert_contains_operation() {
     done
 }
 
-$client4 mine for bootstrap4 -max-priority 512
+$client4 bake for bootstrap4 -max-priority 512
 retry 2 15 assert_contains_operation $endorse_hash
 retry 2 15 assert_contains_operation $transfer_hash
 
