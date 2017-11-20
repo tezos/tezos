@@ -144,11 +144,13 @@ let rec validation_worker_loop pipeline =
     lwt_log_info "requesting validation for block %a from peer %a."
       Block_hash.pp_short hash
       P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
-    Block_validator.validate
-      ~canceler:pipeline.canceler
-      ~notify_new_block:pipeline.notify_new_block
-      pipeline.block_validator
-      pipeline.net_db hash header operations >>=? fun _block ->
+    Lwt_utils.protect ~canceler:pipeline.canceler begin fun () ->
+      Block_validator.validate
+        ~canceler:pipeline.canceler
+        ~notify_new_block:pipeline.notify_new_block
+        pipeline.block_validator
+        pipeline.net_db hash header operations
+    end >>=? fun _block ->
     lwt_log_info "validated block %a from peer %a."
       Block_hash.pp_short hash
       P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
