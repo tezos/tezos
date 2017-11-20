@@ -457,6 +457,7 @@ let rec worker_loop bv =
     | Request_validation { net_db ; notify_new_block ; canceler ;
                            peer ; hash ; header ; operations } ->
         let net_state = Distributed_db.net_state net_db in
+        State.Block.known_invalid net_state hash >>= fun invalid ->
         State.Block.read_opt net_state hash >>= function
         | Some block ->
             lwt_debug "previously validated block %a (after pipe)"
@@ -466,6 +467,9 @@ let rec worker_loop bv =
               ?peer ~timeout:bv.protocol_timeout
               block ;
             may_wakeup (Ok block) ;
+            return ()
+        | None when invalid ->
+            may_wakeup (Error [(* TODO commit error and read back*)]) ;
             return ()
         | None ->
             begin
