@@ -3,11 +3,11 @@
 FROM alpine:$alpine_version
 
 RUN apk update && apk upgrade && \
-    apk add build-base snappy-dev abuild \
-            alpine-sdk openssh bash nano ncurses-dev rsync xz m4 \
+    apk add build-base snappy-dev abuild alpine-sdk \
+            openssh bash nano ncurses-dev rsync xz m4 \
             opam aspcud \
             gmp-dev libev-dev libressl-dev linux-headers pcre-dev perl zlib-dev \
-            libsodium-dev snappy-dev && \
+            libsodium-dev && \
     rm -f /var/cache/apk/* && \
     adduser -S opam && \
     adduser opam abuild && \
@@ -20,13 +20,6 @@ USER opam
 
 WORKDIR /home/opam
 
-COPY scripts/leveldb-1.18.APKBUILD /home/opam/leveldb-1.18/APKBUILD
-RUN sudo chown -R opam leveldb-1.18
-
-RUN abuild-keygen -a && \
-    cd leveldb-1.18 && \
-    abuild checksum && abuild -r
-
 RUN mkdir .ssh && \
     chmod 700 .ssh && \
     git config --global user.email "docker@example.com" && \
@@ -34,6 +27,19 @@ RUN mkdir .ssh && \
     sudo -u opam sh -c "git clone -b master git://github.com/ocaml/opam-repository" && \
     sudo -u opam sh -c "opam init -a -y --comp $ocaml_version /home/opam/opam-repository" && \
     sudo -u opam sh -c "opam install -y depext travis-opam"
+
+COPY scripts/leveldb-1.18.APKBUILD /home/opam/leveldb-1.18/APKBUILD
+RUN sudo chown -R opam leveldb-1.18
+
+RUN sudo apk update && \
+    abuild-keygen -ai && \
+    cd leveldb-1.18 && \
+    abuild checksum && abuild -r && \
+    cd .. && \
+    sudo apk add packages/opam/x86_64/leveldb-1.18-r0.apk && \
+    sudo apk add packages/opam/x86_64/leveldb-dev-1.18-r0.apk && \
+    rm -rf leveldb-1.18 packages && \
+    sudo rm -f /var/cache/apk/*
 
 ENTRYPOINT [ "opam", "config", "exec", "--" ]
 
