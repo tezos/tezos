@@ -6,6 +6,7 @@
   (libraries (cstruct
               lwt
               ocplib-json-typed.bson
-              ocplib-resto.directory))
+              ocplib-resto.directory
+              ocplib-endian.bigstring))
   (flags (:standard -w -9+27-30-32-40@8 -safe-string))
   (wrapped false)))
