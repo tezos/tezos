@@ -34,6 +34,10 @@ val pop_all : 'a t -> 'a list Lwt.t
     removes and returns all the element in [q] (in the order they
     were inserted). *)
 
+val pop_all_now : 'a t -> 'a list
+(** [pop_all_now q] returns all the element in [q] (in the order they
+    were inserted), or [[]] if [q] is empty. *)
+
 val peek : 'a t -> 'a Lwt.t
 (** [peek] is like [pop] except it does not removes the first
     element. *)

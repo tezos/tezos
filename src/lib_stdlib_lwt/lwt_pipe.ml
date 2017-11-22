@@ -162,14 +162,17 @@ let rec values_available q =
   else
     Lwt.return_unit
 
+let rec pop_all_loop q acc =
+  match pop_now_exn q with
+  | exception Empty -> List.rev acc
+  | e -> pop_all_loop q (e :: acc)
+
 let pop_all q =
-  let rec loop acc =
-    match pop_now_exn q with
-    | exception Empty -> List.rev acc
-    | e -> loop (e :: acc)
-  in
   pop q >>= fun e ->
-  Lwt.return (loop [e])
+  Lwt.return (pop_all_loop q [e])
+
+let pop_all_now q =
+  pop_all_loop q []
 
 let close q =
   if not q.closed then begin
