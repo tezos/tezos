@@ -10,19 +10,31 @@
 (* Tezos Command line interface - Configuration and Arguments Parsing *)
 
 type error += Invalid_block_argument of string
+type error += Invalid_protocol_argument of string
 type error += Invalid_port_arg of string
 let () =
   register_error_kind
     `Branch
-    ~id: "badBlocksArgument"
-    ~title: "Bad Blocks Argument"
-    ~description: "Blocks argument could not be parsed"
+    ~id: "badBlockArgument"
+    ~title: "Bad Block Argument"
+    ~description: "Block argument could not be parsed"
     ~pp:
       (fun ppf s ->
          Format.fprintf ppf "Value provided for -block flag (%s) could not be parsed" s)
     Data_encoding.(obj1 (req "value" string))
     (function Invalid_block_argument s -> Some s | _ -> None)
     (fun s -> Invalid_block_argument s) ;
+  register_error_kind
+    `Branch
+    ~id: "badProtocolArgument"
+    ~title: "Bad Protocol Argument"
+    ~description: "Protocol argument could not be parsed"
+    ~pp:
+      (fun ppf s ->
+         Format.fprintf ppf "Value provided for -protocol flag (%s) does not correspond to any known protocol" s)
+    Data_encoding.(obj1 (req "value" string))
+    (function Invalid_protocol_argument s -> Some s | _ -> None)
+    (fun s -> Invalid_protocol_argument s) ;
   register_error_kind
     `Branch
     ~id: "invalidPortArgument"
@@ -93,6 +105,7 @@ end
 
 type cli_args = {
   block: Node_rpc_services.Blocks.block ;
+  protocol: Protocol_hash.t option ;
   print_timings: bool ;
   log_requests: bool ;
   force: bool ;
@@ -100,6 +113,7 @@ type cli_args = {
 
 let default_cli_args = {
   block = Client_commands.default_cfg.block ;
+  protocol = None ;
   print_timings = false ;
   log_requests = false ;
   force = false ;
@@ -113,9 +127,21 @@ let string_parameter : (string, Client_commands.context) parameter =
 let block_parameter =
   parameter
     (fun _ block -> match Node_rpc_services.Blocks.parse_block block with
-       | Error _ ->
-           fail (Invalid_block_argument block)
+       | Error _ -> fail (Invalid_block_argument block)
        | Ok block -> return block)
+
+let protocol_parameter =
+  parameter
+    (fun _ arg ->
+       try
+         let (hash,_commands) =
+           List.find (fun (hash,_commands) ->
+               (Protocol_hash.to_short_b58check hash) = arg
+             ) (Client_commands.get_versions ())
+         in
+         return (Some hash)
+       with Not_found -> fail (Invalid_protocol_argument arg)
+    )
 
 (* Command-line only args (not in config file) *)
 let base_dir_arg =
@@ -143,6 +169,11 @@ let block_arg =
     ~doc:"The block on which to apply contextual commands."
     ~default:(Node_rpc_services.Blocks.to_string default_cli_args.block)
     block_parameter
+let protocol_arg =
+  arg
+    ~parameter:"-protocol"
+    ~doc:"Use contextual commands of a specific protocol."
+    protocol_parameter
 let log_requests_switch =
   switch
     ~parameter:"-log-requests"
@@ -171,11 +202,12 @@ let tls_switch =
     ~doc:"Use TLS to connect to node."
 
 let global_options =
-  args9 base_dir_arg
+  args10 base_dir_arg
     config_file_arg
     force_switch
     timings_switch
     block_arg
+    protocol_arg
     log_requests_switch
     addr_arg
     port_arg
@@ -191,6 +223,7 @@ let parse_config_args (ctx : Client_commands.context) argv =
         force,
         timings,
         block,
+        protocol,
         log_requests,
         node_addr,
         node_port,
@@ -200,6 +233,11 @@ let parse_config_args (ctx : Client_commands.context) argv =
     | None -> base_dir // "config"
     | Some config_file -> config_file in
   let config_dir = Filename.dirname config_file in
+  let protocol =
+    match protocol with
+    | None -> None
+    | Some p -> p
+  in
   let cfg =
     if not (Sys.file_exists config_file) then
       { Cfg_file.default with base_dir = base_dir }
@@ -241,4 +279,4 @@ let parse_config_args (ctx : Client_commands.context) argv =
   end ;
   IO.mkdir config_dir ;
   if not (Sys.file_exists config_file) then Cfg_file.write config_file cfg ;
-  (cfg, { block ; print_timings = timings ; log_requests ; force }, remaining)
+  (cfg, { block ; print_timings = timings ; log_requests ; force ; protocol }, remaining)

@@ -53,13 +53,32 @@ let main () =
       } in
       begin
         Client_node_rpcs.Blocks.protocol rpc_config parsed_args.block >>= function
-        | Ok version ->
-            return (Some version, Client_commands.commands_for_version version)
-        | Error errs ->
-            Format.eprintf
-              "@[<v 2>Ignored error:@,Failed to acquire the protocol version from the node@,%a@."
-              (Format.pp_print_list pp) errs ;
-            return (None, [])
+        | Ok version -> begin
+            match parsed_args.protocol with
+            | None ->
+                return (Some version, Client_commands.commands_for_version version)
+            | Some given_version -> begin
+                if not (Hash.Protocol_hash.equal version given_version) then
+                  Format.eprintf
+                    "@[<v 2>Warning:@,\
+                     The protocol provided via `-protocol` (%a)@,\
+                     is not the one retrieved from the node (%a).@."
+                    Hash.Protocol_hash.pp_short given_version
+                    Hash.Protocol_hash.pp_short version ;
+                return (Some version, Client_commands.commands_for_version given_version)
+              end
+          end
+        | Error errs -> begin
+            match parsed_args.protocol with
+            | None -> begin
+                Format.eprintf
+                  "@[<v 2>Ignored error:@,Failed to acquire the protocol version from the node@,%a@."
+                  (Format.pp_print_list pp) errs ;
+                return (None, [])
+              end
+            | Some version ->
+                return (Some version, Client_commands.commands_for_version version)
+          end
       end >>=? fun (_version, commands_for_version)  ->
       let commands =
         Client_generic_rpcs.commands @
