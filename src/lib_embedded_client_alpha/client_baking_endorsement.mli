@@ -10,7 +10,6 @@
 val forge_endorsement:
   Client_commands.full_context ->
   Client_proto_rpcs.block ->
-  ?force:bool ->
   src_sk:secret_key ->
   ?slot:int ->
   ?max_priority:int ->

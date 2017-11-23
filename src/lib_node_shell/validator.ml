@@ -114,7 +114,7 @@ let shutdown { active_nets ; block_validator } =
 let watcher { valid_block_input } =
   Lwt_watcher.create_stream valid_block_input
 
-let inject_operation v ?(force = false) ?net_id op =
+let inject_operation v ?net_id op =
   begin
     match net_id with
     | None -> begin
@@ -127,17 +127,14 @@ let inject_operation v ?(force = false) ?net_id op =
       end
     | Some net_id ->
         get v net_id >>=? fun nv ->
-        if force then
-          return nv
-        else
-          Distributed_db.Block_header.known
-            (Net_validator.net_db nv)
-            op.shell.branch >>= function
-          | true ->
-              return nv
-          | false ->
-              failwith "Unknown branch (%a), cannot inject the operation."
-                Block_hash.pp_short op.shell.branch
+        Distributed_db.Block_header.known
+          (Net_validator.net_db nv)
+          op.shell.branch >>= function
+        | true ->
+            return nv
+        | false ->
+            failwith "Unknown branch (%a), cannot inject the operation."
+              Block_hash.pp_short op.shell.branch
   end >>=? fun nv ->
   let pv = Net_validator.prevalidator nv in
-  Prevalidator.inject_operation pv ~force op
+  Prevalidator.inject_operation pv op

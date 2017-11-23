@@ -9,7 +9,7 @@
 
 open Tezos_context
 
-let inject_seed_nonce_revelation rpc_config block ?force ?async nonces =
+let inject_seed_nonce_revelation rpc_config block ?async nonces =
   let operations =
     List.map
       (fun (level, nonce) ->
@@ -19,13 +19,13 @@ let inject_seed_nonce_revelation rpc_config block ?force ?async nonces =
   Client_proto_rpcs.Helpers.Forge.Anonymous.operations rpc_config
     block ~branch:bi.hash operations >>=? fun bytes ->
   Client_node_rpcs.inject_operation
-    rpc_config ?force ?async ~net_id:bi.net_id
+    rpc_config ?async ~net_id:bi.net_id
     bytes >>=? fun oph ->
   return oph
 
 let forge_seed_nonce_revelation
     (cctxt: Client_commands.full_context)
-    block ?(force = false) nonces =
+    block nonces =
   Client_node_rpcs.Blocks.hash cctxt block >>=? fun hash ->
   match nonces with
   | [] ->
@@ -33,7 +33,7 @@ let forge_seed_nonce_revelation
         Block_hash.pp_short hash >>= fun () ->
       return ()
   | _ ->
-      inject_seed_nonce_revelation cctxt block ~force nonces >>=? fun oph ->
+      inject_seed_nonce_revelation cctxt block nonces >>=? fun oph ->
       cctxt#answer
         "Operation successfully injected %d revelation(s) for %a."
         (List.length nonces)

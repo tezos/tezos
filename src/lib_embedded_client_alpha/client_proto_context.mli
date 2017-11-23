@@ -44,7 +44,6 @@ val set_delegate :
 
 val operation_submitted_message :
   #Client_commands.logger ->
-  ?force:bool ->
   Operation_hash.t ->
   unit tzresult Lwt.t
 
@@ -55,7 +54,6 @@ val source_to_keys:
   (public_key * secret_key) tzresult Lwt.t
 
 val originate_account :
-  ?force:bool ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
@@ -78,7 +76,6 @@ val save_contract :
 
 val operation_submitted_message :
   #Client_commands.logger ->
-  ?force:bool ->
   ?contracts:Contract.t list ->
   Operation_hash.t ->
   unit tzresult Lwt.t
@@ -86,7 +83,6 @@ val operation_submitted_message :
 val originate_contract:
   fee:Tez.t ->
   delegate:public_key_hash option ->
-  ?force:bool ->
   ?delegatable:bool ->
   ?spendable:bool ->
   initial_storage:string ->
@@ -100,7 +96,6 @@ val originate_contract:
   (Operation_hash.t * Contract.t) tzresult Lwt.t
 
 val faucet :
-  ?force:bool ->
   ?branch:int ->
   manager_pkh:public_key_hash ->
   Client_rpcs.block ->
@@ -110,7 +105,6 @@ val faucet :
 val transfer :
   #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->
-  ?force:bool ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->

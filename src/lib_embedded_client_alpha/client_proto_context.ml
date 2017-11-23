@@ -43,7 +43,7 @@ let parse_expression arg =
        (Michelson_v1_parser.parse_expression arg))
 
 let transfer rpc_config
-    block ?force ?branch
+    block ?branch
     ~source ~src_pk ~src_sk ~destination ?arg ~amount ~fee () =
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
   begin match arg with
@@ -66,11 +66,11 @@ let transfer rpc_config
   Client_proto_rpcs.Helpers.apply_operation rpc_config block
     predecessor oph bytes (Some signature) >>=? fun contracts ->
   Client_node_rpcs.inject_operation
-    rpc_config ?force ~net_id signed_bytes >>=? fun injected_oph ->
+    rpc_config ~net_id signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
   return (oph, contracts)
 
-let originate rpc_config ?force ?net_id ~block ?signature bytes =
+let originate rpc_config ?net_id ~block ?signature bytes =
   let signed_bytes =
     match signature with
     | None -> bytes
@@ -81,7 +81,7 @@ let originate rpc_config ?force ?net_id ~block ?signature bytes =
     predecessor oph bytes signature >>=? function
   | [ contract ] ->
       Client_node_rpcs.inject_operation
-        rpc_config ?force ?net_id signed_bytes >>=? fun injected_oph ->
+        rpc_config ?net_id signed_bytes >>=? fun injected_oph ->
       assert (Operation_hash.equal oph injected_oph) ;
       return (oph, contract)
   | contracts ->
@@ -89,13 +89,8 @@ let originate rpc_config ?force ?net_id ~block ?signature bytes =
         "The origination introduced %d contracts instead of one."
         (List.length contracts)
 
-let operation_submitted_message (cctxt : #Client_commands.logger) ?(force=false) ?(contracts = []) oph =
-  begin
-    if not force then
-      cctxt#message "Operation successfully injected in the node."
-    else
-      Lwt.return_unit
-  end >>= fun () ->
+let operation_submitted_message (cctxt : #Client_commands.logger) ?(contracts = []) oph =
+  cctxt#message "Operation successfully injected in the node." >>= fun () ->
   cctxt#message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   Lwt_list.iter_s
     (fun c ->
@@ -104,7 +99,7 @@ let operation_submitted_message (cctxt : #Client_commands.logger) ?(force=false)
          Contract.pp c)
     contracts >>= return
 
-let originate_account ?(force=false) ?branch
+let originate_account ?branch
     ~source ~src_pk ~src_sk ~manager_pkh
     ?delegatable ?delegate ~balance ~fee block rpc_config () =
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
@@ -116,16 +111,16 @@ let originate_account ?(force=false) ?branch
     ~counter ~balance ~spendable:true
     ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
   let signature = Ed25519.sign src_sk bytes in
-  originate rpc_config ~force ~block ~net_id ~signature bytes
+  originate rpc_config ~block ~net_id ~signature bytes
 
-let faucet ?force ?branch ~manager_pkh block rpc_config () =
+let faucet ?branch ~manager_pkh block rpc_config () =
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
   Client_proto_rpcs.Helpers.Forge.Anonymous.faucet
     rpc_config block ~branch ~id:manager_pkh () >>=? fun bytes ->
-  originate rpc_config ?force ~net_id ~block bytes
+  originate rpc_config ~net_id ~block bytes
 
 let delegate_contract rpc_config
-    block ?force ?branch
+    block ?branch
     ~source ?src_pk ~manager_sk
     ~fee delegate_opt =
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
@@ -139,7 +134,7 @@ let delegate_contract rpc_config
   let signed_bytes = Ed25519.Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_node_rpcs.inject_operation
-    rpc_config ?force ~net_id signed_bytes >>=? fun injected_oph ->
+    rpc_config ~net_id signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
 
@@ -209,7 +204,6 @@ let save_contract ~force cctxt alias_name contract =
 let originate_contract
     ~fee
     ~delegate
-    ?(force=false)
     ?(delegatable=true)
     ?(spendable=false)
     ~initial_storage
@@ -234,4 +228,4 @@ let originate_contract
     ~delegatable ?delegatePubKey:delegate
     ~script:{ code ; storage } ~fee () >>=? fun bytes ->
   let signature = Ed25519.sign src_sk bytes in
-  originate cctxt ~force ~block ~signature bytes
+  originate cctxt ~block ~signature bytes

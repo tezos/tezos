@@ -89,7 +89,7 @@ let get_signing_slots cctxt ?max_priority block delegate level =
   return slots
 
 let inject_endorsement (cctxt : Client_commands.full_context)
-    block level ?async ?force
+    block level ?async
     src_sk source slot =
   let block = Client_rpcs.last_baked_block block in
   Client_node_rpcs.Blocks.info cctxt block >>=? fun bi ->
@@ -102,7 +102,7 @@ let inject_endorsement (cctxt : Client_commands.full_context)
     () >>=? fun bytes ->
   let signed_bytes = Ed25519.Signature.append src_sk bytes in
   Client_node_rpcs.inject_operation
-    cctxt ?force ?async ~net_id:bi.net_id signed_bytes >>=? fun oph ->
+    cctxt ?async ~net_id:bi.net_id signed_bytes >>=? fun oph ->
   State.record_endorsement cctxt level bi.hash slot oph >>=? fun () ->
   return oph
 
@@ -122,7 +122,7 @@ let check_endorsement cctxt level slot =
 
 
 let forge_endorsement (cctxt : Client_commands.full_context)
-    block ?(force = false)
+    block
     ~src_sk ?slot ?max_priority src_pk =
   let block = Client_rpcs.last_baked_block block in
   let src_pkh = Ed25519.Public_key.hash src_pk in
@@ -136,12 +136,9 @@ let forge_endorsement (cctxt : Client_commands.full_context)
         | slot::_ -> return slot
         | [] -> cctxt#error "No slot found at level %a" Raw_level.pp level
   end >>=? fun slot ->
-  begin
-    if force then return ()
-    else check_endorsement cctxt level slot
-  end >>=? fun () ->
+  check_endorsement cctxt level slot >>=? fun () ->
   inject_endorsement cctxt
-    block level ~force
+    block level
     src_sk src_pk slot
 
 
@@ -290,7 +287,7 @@ let endorse cctxt state =
            lwt_debug "Endorsing %a for %s (slot %d)!"
              Block_hash.pp_short hash name slot >>= fun () ->
            inject_endorsement cctxt
-             b level ~async:true ~force:true
+             b level ~async:true
              sk pk slot >>=? fun oph ->
            cctxt#message
              "Injected endorsement for block '%a' \

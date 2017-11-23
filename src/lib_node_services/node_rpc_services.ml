@@ -758,7 +758,7 @@ let inject_operation =
        prevalidation context."
     ~query: RPC_query.empty
     ~input:
-      (obj4
+      (obj3
          (req "signedOperationContents"
             (describe ~title: "Tezos signed operation (hex encoded)"
                bytes))
@@ -769,13 +769,7 @@ let inject_operation =
                   (pre-)validated before answering. (default: true)"
                bool)
             true)
-         (opt "net_id" Net_id.encoding)
-         (opt "force"
-            (describe
-               ~description:
-                 "Should we inject operation that are \"branch_refused\" \
-                  or \"branch_delayed\". (default: false)"
-               bool)))
+         (opt "net_id" Net_id.encoding))
     ~output:
       (Error.wrap @@
        describe

@@ -21,7 +21,6 @@ val bake_block:
 (** Endorse a block *)
 val endorse_block:
   Client_commands.full_context ->
-  ?force:bool ->
   ?max_priority:int ->
   Client_keys.Public_key_hash.t ->
   unit Error_monad.tzresult Lwt.t
@@ -35,14 +34,12 @@ val get_predecessor_cycle:
 (** Reveal the nonces used to bake each block in the given list *)
 val reveal_block_nonces :
   Client_commands.full_context ->
-  ?force:bool ->
   Block_hash.t list ->
   unit Error_monad.tzresult Lwt.t
 
 (** Reveal all unrevealed nonces *)
 val reveal_nonces :
   Client_commands.full_context ->
-  ?force:bool ->
   unit ->
   unit Error_monad.tzresult Lwt.t
 

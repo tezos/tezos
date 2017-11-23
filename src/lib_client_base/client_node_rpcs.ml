@@ -24,9 +24,9 @@ let inject_block cctxt
   call_err_service0 cctxt Services.inject_block
     { raw ; blocking = not async ; force ; net_id ; operations }
 
-let inject_operation cctxt ?(async = false) ?force ?net_id operation =
+let inject_operation cctxt ?(async = false) ?net_id operation =
   call_err_service0 cctxt Services.inject_operation
-    (operation, not async, net_id, force)
+    (operation, not async, net_id)
 
 let inject_protocol cctxt ?(async = false) ?force protocol =
   call_err_service0 cctxt Services.inject_protocol

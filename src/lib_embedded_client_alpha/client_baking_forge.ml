@@ -379,7 +379,7 @@ let insert_block
   begin
     safe_get_unrevealed_nonces cctxt (`Hash bi.hash) >>= fun nonces ->
     Client_baking_revelation.forge_seed_nonce_revelation
-      cctxt ~force:true (`Hash bi.hash) (List.map snd nonces)
+      cctxt (`Hash bi.hash) (List.map snd nonces)
   end >>= fun _ignore_error ->
   if Fitness.compare state.best.fitness bi.fitness < 0 then begin
     state.best <- bi ;

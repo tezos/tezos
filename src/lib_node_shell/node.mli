@@ -44,7 +44,7 @@ module RPC : sig
       non strictly increasing fitness. *)
 
   val inject_operation:
-    t -> ?force:bool -> ?net_id:Net_id.t -> MBytes.t ->
+    t -> ?net_id:Net_id.t -> MBytes.t ->
     (Operation_hash.t * unit tzresult Lwt.t) Lwt.t
   val inject_protocol:
     t -> ?force:bool -> Protocol.t ->

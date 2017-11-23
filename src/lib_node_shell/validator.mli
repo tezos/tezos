@@ -39,6 +39,5 @@ val watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
 val inject_operation:
   t ->
-  ?force:bool ->
   ?net_id:Net_id.t ->
   Operation.t -> unit tzresult Lwt.t

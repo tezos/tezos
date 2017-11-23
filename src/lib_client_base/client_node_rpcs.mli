@@ -28,7 +28,7 @@ val inject_block:
 
 val inject_operation:
   #Client_rpcs.ctxt ->
-  ?async:bool -> ?force:bool -> ?net_id:Net_id.t ->
+  ?async:bool -> ?net_id:Net_id.t ->
   MBytes.t ->
   Operation_hash.t tzresult Lwt.t
 

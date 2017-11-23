@@ -30,10 +30,10 @@ let bake_block (cctxt : Client_commands.full_context) block
   cctxt#message "Injected block %a" Block_hash.pp_short block_hash >>= fun () ->
   return ()
 
-let endorse_block cctxt ?force ?max_priority delegate =
+let endorse_block cctxt ?max_priority delegate =
   Client_keys.get_key cctxt delegate >>=? fun (_src_name, src_pk, src_sk) ->
   Client_baking_endorsement.forge_endorsement cctxt
-    cctxt#block ?force ?max_priority ~src_sk src_pk >>=? fun oph ->
+    cctxt#block ?max_priority ~src_sk src_pk >>=? fun oph ->
   cctxt#answer "Operation successfully injected in the node." >>= fun () ->
   cctxt#answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return ()
@@ -49,14 +49,14 @@ let get_predecessor_cycle (cctxt : #Client_commands.logger) cycle =
           Cycle.pp cycle
   | Some cycle -> Lwt.return cycle
 
-let do_reveal cctxt ?force block blocks =
+let do_reveal cctxt block blocks =
   let nonces = List.map snd blocks in
   Client_baking_revelation.forge_seed_nonce_revelation cctxt
-    block ?force nonces >>=? fun () ->
+    block nonces >>=? fun () ->
   Client_proto_nonces.dels cctxt (List.map fst blocks) >>=? fun () ->
   return ()
 
-let reveal_block_nonces (cctxt : Client_commands.full_context) ?force block_hashes =
+let reveal_block_nonces (cctxt : Client_commands.full_context) block_hashes =
   Lwt_list.filter_map_p
     (fun hash ->
        Lwt.catch
@@ -80,13 +80,13 @@ let reveal_block_nonces (cctxt : Client_commands.full_context) ?force block_hash
       | Some nonce ->
           return (Some (bi.hash, (bi.level.level, nonce))))
     block_infos >>=? fun blocks ->
-  do_reveal cctxt ?force cctxt#block blocks
+  do_reveal cctxt cctxt#block blocks
 
-let reveal_nonces cctxt ?force () =
+let reveal_nonces cctxt () =
   let block = Client_rpcs.last_baked_block cctxt#block in
   Client_baking_forge.get_unrevealed_nonces
-    cctxt ?force block >>=? fun nonces ->
-  do_reveal cctxt ?force cctxt#block nonces
+    cctxt block >>=? fun nonces ->
+  do_reveal cctxt cctxt#block nonces
 
 let run_daemon cctxt ?max_priority ~endorsement_delay delegates ~endorsement ~baking ~denunciation =
   Client_baking_daemon.run cctxt

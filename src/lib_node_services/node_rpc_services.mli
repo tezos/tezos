@@ -267,7 +267,7 @@ val inject_block:
 
 val inject_operation:
   ([ `POST ], unit,
-   unit, unit, (MBytes.t * bool * Net_id.t option * bool option),
+   unit, unit, (MBytes.t * bool * Net_id.t option),
    Operation_hash.t tzresult, unit) RPC_service.t
 
 val inject_protocol:
