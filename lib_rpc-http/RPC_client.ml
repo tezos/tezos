@@ -48,36 +48,36 @@ type rest_error =
 let rest_error_encoding =
   let open Data_encoding in
   union
-    [ case ~tag: 0
+    [ case (Tag  0)
         (obj1
            (req "kind" (constant "empty_answer")))
         (function Empty_answer -> Some () | _ -> None)
         (fun () -> Empty_answer) ;
-      case ~tag: 1
+      case (Tag  1)
         (obj2
            (req "kind" (constant "connection_failed"))
            (req "message" string))
         (function Connection_failed msg -> Some ((), msg) | _ -> None)
         (function (), msg -> Connection_failed msg) ;
-      case ~tag: 2
+      case (Tag  2)
         (obj2
            (req "kind" (constant "bad_request"))
            (req "message" string))
         (function Bad_request msg -> Some ((), msg) | _ -> None)
         (function (), msg -> Bad_request msg) ;
-      case ~tag: 3
+      case (Tag  3)
         (obj2
            (req "kind" (constant "method_not_allowed"))
            (req "allowed" (list RPC_service.meth_encoding)))
         (function Method_not_allowed meths -> Some ((), meths) | _ -> None)
         (function ((), meths) -> Method_not_allowed meths) ;
-      case ~tag: 4
+      case (Tag  4)
         (obj2
            (req "kind" (constant "unsupported_media_type"))
            (opt "content_type" string))
         (function Unsupported_media_type m -> Some ((), m) | _ -> None)
         (function ((), m) -> Unsupported_media_type m) ;
-      case ~tag: 5
+      case (Tag  5)
         (obj3
            (req "kind" (constant "not_acceptable"))
            (req "proposed" string)
@@ -88,7 +88,7 @@ let rest_error_encoding =
           | _ -> None)
         (function ((), proposed, acceptable) ->
            Not_acceptable { proposed ; acceptable }) ;
-      case ~tag: 6
+      case (Tag  6)
         (obj4
            (req "kind" (constant "unexpected_status_code"))
            (req "code" uint16)
@@ -101,7 +101,7 @@ let rest_error_encoding =
         (function ((), code, content, media_type) ->
            let code = Cohttp.Code.status_of_code code in
            Unexpected_status_code { code ; content ; media_type }) ;
-      case ~tag: 7
+      case (Tag  7)
         (obj3
            (req "kind" (constant "unexpected_content_type"))
            (req "received" string)
@@ -112,7 +112,7 @@ let rest_error_encoding =
           | _ -> None)
         (function ((), received, acceptable) ->
            Unexpected_content_type { received ; acceptable }) ;
-      case ~tag: 8
+      case (Tag  8)
         (obj4
            (req "kind" (constant "unexpected_content"))
            (req "content" string)

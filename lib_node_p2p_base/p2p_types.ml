@@ -382,18 +382,18 @@ module Point_state = struct
         (merge_objs
            (obj1 (req "event_kind" (constant name))) obj) in
     union ~tag_size:`Uint8 [
-      case ~tag:0 (branch_encoding "requested" empty)
+      case (Tag 0) (branch_encoding "requested" empty)
         (function Requested -> Some () | _ -> None)
         (fun () -> Requested) ;
-      case ~tag:1 (branch_encoding "accepted"
-                     (obj1 (req "peer_id" Peer_id.encoding)))
+      case (Tag 1) (branch_encoding "accepted"
+                       (obj1 (req "peer_id" Peer_id.encoding)))
         (function Accepted peer_id -> Some peer_id | _ -> None)
         (fun peer_id -> Accepted peer_id) ;
-      case ~tag:2 (branch_encoding "running"
-                     (obj1 (req "peer_id" Peer_id.encoding)))
+      case (Tag 2) (branch_encoding "running"
+                       (obj1 (req "peer_id" Peer_id.encoding)))
         (function Running peer_id -> Some peer_id | _ -> None)
         (fun peer_id -> Running peer_id) ;
-      case ~tag:3 (branch_encoding "disconnected" empty)
+      case (Tag 3) (branch_encoding "disconnected" empty)
         (function Disconnected -> Some () | _ -> None)
         (fun () -> Disconnected) ;
     ]
@@ -600,114 +600,114 @@ module Connection_pool_log_event = struct
         (merge_objs
            (obj1 (req "event" (constant name))) obj) in
     union ~tag_size:`Uint8 [
-      case ~tag:0 (branch_encoding "too_few_connections" empty)
+      case (Tag 0) (branch_encoding "too_few_connections" empty)
         (function Too_few_connections -> Some () | _ -> None)
         (fun () -> Too_few_connections) ;
-      case ~tag:1 (branch_encoding "too_many_connections" empty)
+      case (Tag 1) (branch_encoding "too_many_connections" empty)
         (function Too_many_connections -> Some () | _ -> None)
         (fun () -> Too_many_connections) ;
-      case ~tag:2 (branch_encoding "new_point"
-                     (obj1 (req "point" Point.encoding)))
+      case (Tag 2) (branch_encoding "new_point"
+                       (obj1 (req "point" Point.encoding)))
         (function New_point p -> Some p | _ -> None)
         (fun p -> New_point p) ;
-      case ~tag:3 (branch_encoding "new_peer"
-                     (obj1 (req "peer_id" Peer_id.encoding)))
+      case (Tag 3) (branch_encoding "new_peer"
+                       (obj1 (req "peer_id" Peer_id.encoding)))
         (function New_peer p -> Some p | _ -> None)
         (fun p -> New_peer p) ;
-      case ~tag:4 (branch_encoding "incoming_connection"
-                     (obj1 (req "point" Point.encoding)))
+      case (Tag 4) (branch_encoding "incoming_connection"
+                       (obj1 (req "point" Point.encoding)))
         (function Incoming_connection p -> Some p | _ -> None)
         (fun p -> Incoming_connection p) ;
-      case ~tag:5 (branch_encoding "outgoing_connection"
-                     (obj1 (req "point" Point.encoding)))
+      case (Tag 5) (branch_encoding "outgoing_connection"
+                       (obj1 (req "point" Point.encoding)))
         (function Outgoing_connection p -> Some p | _ -> None)
         (fun p -> Outgoing_connection p) ;
-      case ~tag:6 (branch_encoding "authentication_failed"
-                     (obj1 (req "point" Point.encoding)))
+      case (Tag 6) (branch_encoding "authentication_failed"
+                       (obj1 (req "point" Point.encoding)))
         (function Authentication_failed p -> Some p | _ -> None)
         (fun p -> Authentication_failed p) ;
-      case ~tag:7 (branch_encoding "accepting_request"
-                     (obj3
-                        (req "point" Point.encoding)
-                        (req "id_point" Id_point.encoding)
-                        (req "peer_id" Peer_id.encoding)))
+      case (Tag 7) (branch_encoding "accepting_request"
+                       (obj3
+                          (req "point" Point.encoding)
+                          (req "id_point" Id_point.encoding)
+                          (req "peer_id" Peer_id.encoding)))
         (function Accepting_request (p, id_p, g) ->
            Some (p, id_p, g) | _ -> None)
         (fun (p, id_p, g) -> Accepting_request (p, id_p, g)) ;
-      case ~tag:8 (branch_encoding "rejecting_request"
-                     (obj3
-                        (req "point" Point.encoding)
-                        (req "id_point" Id_point.encoding)
-                        (req "peer_id" Peer_id.encoding)))
+      case (Tag 8) (branch_encoding "rejecting_request"
+                       (obj3
+                          (req "point" Point.encoding)
+                          (req "id_point" Id_point.encoding)
+                          (req "peer_id" Peer_id.encoding)))
         (function Rejecting_request (p, id_p, g) ->
            Some (p, id_p, g) | _ -> None)
         (fun (p, id_p, g) -> Rejecting_request (p, id_p, g)) ;
-      case ~tag:9 (branch_encoding "request_rejected"
-                     (obj2
-                        (req "point" Point.encoding)
-                        (opt "identity"
-                           (tup2 Id_point.encoding Peer_id.encoding))))
+      case (Tag 9) (branch_encoding "request_rejected"
+                       (obj2
+                          (req "point" Point.encoding)
+                          (opt "identity"
+                             (tup2 Id_point.encoding Peer_id.encoding))))
         (function Request_rejected (p, id) -> Some (p, id) | _ -> None)
         (fun (p, id) -> Request_rejected (p, id)) ;
-      case ~tag:10 (branch_encoding "connection_established"
-                      (obj2
-                         (req "id_point" Id_point.encoding)
-                         (req "peer_id" Peer_id.encoding)))
+      case (Tag 10) (branch_encoding "connection_established"
+                        (obj2
+                           (req "id_point" Id_point.encoding)
+                           (req "peer_id" Peer_id.encoding)))
         (function Connection_established (id_p, g) ->
            Some (id_p, g) | _ -> None)
         (fun (id_p, g) -> Connection_established (id_p, g)) ;
-      case ~tag:11 (branch_encoding "disconnection"
-                      (obj1 (req "peer_id" Peer_id.encoding)))
+      case (Tag 11) (branch_encoding "disconnection"
+                        (obj1 (req "peer_id" Peer_id.encoding)))
         (function Disconnection g -> Some g | _ -> None)
         (fun g -> Disconnection g) ;
-      case ~tag:12 (branch_encoding "external_disconnection"
-                      (obj1 (req "peer_id" Peer_id.encoding)))
+      case (Tag 12) (branch_encoding "external_disconnection"
+                        (obj1 (req "peer_id" Peer_id.encoding)))
         (function External_disconnection g -> Some g | _ -> None)
         (fun g -> External_disconnection g) ;
-      case ~tag:13 (branch_encoding "gc_points" empty)
+      case (Tag 13) (branch_encoding "gc_points" empty)
         (function Gc_points -> Some () | _ -> None)
         (fun () -> Gc_points) ;
-      case ~tag:14 (branch_encoding "gc_peer_ids" empty)
+      case (Tag 14) (branch_encoding "gc_peer_ids" empty)
         (function Gc_peer_ids -> Some () | _ -> None)
         (fun () -> Gc_peer_ids) ;
-      case ~tag:15 (branch_encoding "swap_request_received"
-                      (obj1 (req "source" Peer_id.encoding)))
+      case (Tag 15) (branch_encoding "swap_request_received"
+                        (obj1 (req "source" Peer_id.encoding)))
         (function
           | Swap_request_received { source } -> Some source
           | _ -> None)
         (fun source -> Swap_request_received { source }) ;
-      case ~tag:16 (branch_encoding "swap_ack_received"
-                      (obj1 (req "source" Peer_id.encoding)))
+      case (Tag 16) (branch_encoding "swap_ack_received"
+                        (obj1 (req "source" Peer_id.encoding)))
         (function
           | Swap_ack_received { source } -> Some source
           | _ -> None)
         (fun source -> Swap_ack_received { source }) ;
-      case ~tag:17 (branch_encoding "swap_request_sent"
-                      (obj1 (req "source" Peer_id.encoding)))
+      case (Tag 17) (branch_encoding "swap_request_sent"
+                        (obj1 (req "source" Peer_id.encoding)))
         (function
           | Swap_request_sent { source } -> Some source
           | _ -> None)
         (fun source -> Swap_request_sent { source }) ;
-      case ~tag:18 (branch_encoding "swap_ack_sent"
-                      (obj1 (req "source" Peer_id.encoding)))
+      case (Tag 18) (branch_encoding "swap_ack_sent"
+                        (obj1 (req "source" Peer_id.encoding)))
         (function
           | Swap_ack_sent { source } -> Some source
           | _ -> None)
         (fun source -> Swap_ack_sent { source }) ;
-      case ~tag:19 (branch_encoding "swap_request_ignored"
-                      (obj1 (req "source" Peer_id.encoding)))
+      case (Tag 19) (branch_encoding "swap_request_ignored"
+                        (obj1 (req "source" Peer_id.encoding)))
         (function
           | Swap_request_ignored { source } -> Some source
           | _ -> None)
         (fun source -> Swap_request_ignored { source }) ;
-      case ~tag:20 (branch_encoding "swap_success"
-                      (obj1 (req "source" Peer_id.encoding)))
+      case (Tag 20) (branch_encoding "swap_success"
+                        (obj1 (req "source" Peer_id.encoding)))
         (function
           | Swap_success { source } -> Some source
           | _ -> None)
         (fun source -> Swap_success { source }) ;
-      case ~tag:21 (branch_encoding "swap_failure"
-                      (obj1 (req "source" Peer_id.encoding)))
+      case (Tag 21) (branch_encoding "swap_failure"
+                        (obj1 (req "source" Peer_id.encoding)))
         (function
           | Swap_failure { source } -> Some source
           | _ -> None)

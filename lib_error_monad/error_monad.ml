@@ -67,7 +67,7 @@ module Make() = struct
            name) ;
     let encoding_case =
       let open Data_encoding in
-      case
+      case Json_only
         (describe ~title ~description @@
          conv (fun x -> (((), ()), x)) (fun (((),()), x) -> x) @@
          merge_objs
@@ -175,10 +175,10 @@ module Make() = struct
       obj1 (req "result" t_encoding) in
     union
       ~tag_size:`Uint8
-      [ case ~tag:0 t_encoding
+      [ case (Tag 0) t_encoding
           (function Ok x -> Some x | _ -> None)
           (function res -> Ok res) ;
-        case ~tag:1 errors_encoding
+        case (Tag 1) errors_encoding
           (function Error x -> Some x | _ -> None)
           (fun errs -> Error errs) ]
 
@@ -417,7 +417,7 @@ module Make() = struct
     let description =  "An unclassified error" in
     let encoding_case =
       let open Data_encoding in
-      case
+      case Json_only
         (describe ~title ~description @@
          conv (fun x -> ((), x)) (fun ((), x) -> x) @@
          (obj2
@@ -426,7 +426,7 @@ module Make() = struct
         from_error to_error in
     let pp = Format.pp_print_string in
     error_kinds :=
-      Error_kind { id; from_error ; category; encoding_case ; pp } :: !error_kinds
+      Error_kind { id ; from_error ; category ; encoding_case ; pp } :: !error_kinds
 
   type error += Assert_error of string * string
 
@@ -441,7 +441,7 @@ module Make() = struct
     let description =  "An fatal assertion" in
     let encoding_case =
       let open Data_encoding in
-      case
+      case Json_only
         (describe ~title ~description @@
          conv (fun (x, y) -> ((), x, y)) (fun ((), x, y) -> (x, y)) @@
          (obj3

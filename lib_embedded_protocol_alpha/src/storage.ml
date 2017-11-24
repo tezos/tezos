@@ -142,7 +142,7 @@ module Cycle = struct
   let nonce_status_encoding =
     let open Data_encoding in
     union [
-      case ~tag:0
+      case (Tag 0)
         (tup3
            Nonce_hash.encoding
            Ed25519.Public_key_hash.encoding
@@ -153,7 +153,7 @@ module Cycle = struct
           | _ -> None)
         (fun (nonce_hash, delegate_to_reward, reward_amount) ->
            Unrevealed { nonce_hash ; delegate_to_reward ; reward_amount }) ;
-      case ~tag:1
+      case (Tag 1)
         Seed_repr.nonce_encoding
         (function
           | Revealed nonce -> Some nonce

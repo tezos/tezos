@@ -57,14 +57,14 @@ let block_error_encoding =
   let open Data_encoding in
   union
     [
-      case
+      case (Tag 0)
         (obj2
            (req "error" (constant "cannot_parse_operation"))
            (req "operation" Operation_hash.encoding))
         (function Cannot_parse_operation operation -> Some ((), operation)
                 | _ -> None)
         (fun ((), operation) -> Cannot_parse_operation operation) ;
-      case
+      case (Tag 1)
         (obj3
            (req "error" (constant "invalid_fitness"))
            (req "expected" Fitness.encoding)
@@ -74,19 +74,19 @@ let block_error_encoding =
               Some ((), expected, found)
           | _ -> None)
         (fun ((), expected, found) -> Invalid_fitness { expected ; found }) ;
-      case
+      case (Tag 2)
         (obj1
            (req "error" (constant "non_increasing_timestamp")))
         (function Non_increasing_timestamp -> Some ()
                 | _ -> None)
         (fun () -> Non_increasing_timestamp) ;
-      case
+      case (Tag 3)
         (obj1
            (req "error" (constant "non_increasing_fitness")))
         (function Non_increasing_fitness -> Some ()
                 | _ -> None)
         (fun () -> Non_increasing_fitness) ;
-      case
+      case (Tag 4)
         (obj3
            (req "error" (constant "invalid_level"))
            (req "expected" int32)
@@ -96,7 +96,7 @@ let block_error_encoding =
               Some ((), expected, found)
           | _ -> None)
         (fun ((), expected, found) -> Invalid_level { expected ; found }) ;
-      case
+      case (Tag 5)
         (obj3
            (req "error" (constant "invalid_proto_level"))
            (req "expected" uint8)
@@ -107,14 +107,14 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), expected, found) ->
            Invalid_proto_level { expected ; found }) ;
-      case
+      case (Tag 6)
         (obj2
            (req "error" (constant "replayed_operation"))
            (req "operation" Operation_hash.encoding))
         (function Replayed_operation operation -> Some ((), operation)
                 | _ -> None)
         (fun ((), operation) -> Replayed_operation operation) ;
-      case
+      case (Tag 7)
         (obj3
            (req "error" (constant "outdated_operation"))
            (req "operation" Operation_hash.encoding)
@@ -125,7 +125,7 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), operation, originating_block) ->
            Outdated_operation { operation ; originating_block }) ;
-      case
+      case (Tag 8)
         (obj2
            (req "error" (constant "unexpected_number_of_passes"))
            (req "found" uint8))
@@ -133,7 +133,7 @@ let block_error_encoding =
           | Unexpected_number_of_validation_passes n -> Some ((), n)
           | _ -> None)
         (fun ((), n) -> Unexpected_number_of_validation_passes n) ;
-      case
+      case (Tag 9)
         (obj4
            (req "error" (constant "too_many_operations"))
            (req "validation_pass" uint8)
@@ -145,7 +145,7 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), pass, found, max) ->
            Too_many_operations { pass ; found ; max }) ;
-      case
+      case (Tag 10)
         (obj4
            (req "error" (constant "oversized_operation"))
            (req "operation" Operation_hash.encoding)

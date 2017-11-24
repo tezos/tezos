@@ -36,10 +36,10 @@ let meth_encoding =
 let path_item_encoding =
   let open Data_encoding in
   union [
-    case ~tag:0 string
+    case (Tag 0) string
       (function PStatic s -> Some s | _ -> None)
       (fun s -> PStatic s) ;
-    case ~tag:1 arg_encoding
+    case (Tag 1) arg_encoding
       (function PDynamic s -> Some s | _ -> None)
       (fun s -> PDynamic s) ;
   ]
@@ -47,19 +47,19 @@ let path_item_encoding =
 let query_kind_encoding =
   let open Data_encoding in
   union [
-    case ~tag:0
+    case (Tag 0)
       (obj1 (req "single" arg_encoding))
       (function Single s -> Some s | _ -> None)
       (fun s -> Single s) ;
-    case ~tag:1
+    case (Tag 1)
       (obj1 (req "optional" arg_encoding))
       (function Optional s -> Some s | _ -> None)
       (fun s -> Optional s) ;
-    case ~tag:2
+    case (Tag 2)
       (obj1 (req "flag" empty))
       (function Flag -> Some () | _ -> None)
       (fun () -> Flag) ;
-    case ~tag:3
+    case (Tag 3)
       (obj1 (req "multi" arg_encoding))
       (function Multi s -> Some s | _ -> None)
       (fun s -> Multi s) ;
@@ -96,7 +96,7 @@ let directory_descr_encoding =
   mu "service_tree" @@ fun directory_descr_encoding ->
   let static_subdirectories_descr_encoding =
     union [
-      case ~tag:0 (obj1 (req  "suffixes"
+      case (Tag 0) (obj1 (req  "suffixes"
                            (list (obj2 (req "name" string)
                                     (req "tree" directory_descr_encoding)))))
         (function Suffixes map ->
@@ -104,7 +104,7 @@ let directory_descr_encoding =
         (fun m ->
            let add acc (n,t) =  StringMap.add n t acc in
            Suffixes (List.fold_left add StringMap.empty m)) ;
-      case ~tag:1 (obj1 (req "dynamic_dispatch"
+      case (Tag 1) (obj1 (req "dynamic_dispatch"
                            (obj2
                               (req "arg" arg_encoding)
                               (req "tree" directory_descr_encoding))))
@@ -140,10 +140,10 @@ let directory_descr_encoding =
          (opt "patch_service" service_descr_encoding)
          (opt "subdirs" static_subdirectories_descr_encoding)) in
   union [
-    case ~tag:0 (obj1 (req "static" static_directory_descr_encoding))
+    case (Tag 0) (obj1 (req "static" static_directory_descr_encoding))
       (function Static descr -> Some descr | _ -> None)
       (fun descr -> Static descr) ;
-    case ~tag:1 (obj1 (req "dynamic" (option string)))
+    case (Tag 1) (obj1 (req "dynamic" (option string)))
       (function Dynamic descr -> Some descr | _ -> None)
       (fun descr -> Dynamic descr) ;
   ]

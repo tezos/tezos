@@ -160,9 +160,11 @@ val list : 'a encoding -> 'a list encoding
 
 val assoc : 'a encoding -> (string * 'a) list encoding
 
+type case_tag = Tag of int | Json_only
+
 type 't case
 val case :
-  ?tag:int -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
+  case_tag -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 val union :
   ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
 

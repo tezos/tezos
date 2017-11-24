@@ -25,9 +25,9 @@ exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
 exception Unexpected_enum of string * string list
 exception Invalid_size of int
 
-let apply fs v =
+let apply ?(error=No_case_matched) fs v =
   let rec loop = function
-    | [] -> raise No_case_matched
+    | [] -> raise error
     | f :: fs ->
         match f v with
         | Some l -> l
@@ -107,6 +107,8 @@ module Kind = struct
 
 end
 
+type case_tag = Tag of int | Json_only
+
 type 'a desc =
   | Null : unit desc
   | Empty : unit desc
@@ -158,7 +160,7 @@ and 'a case =
   | Case : { encoding : 'a t ;
              proj : ('t -> 'a option) ;
              inj : ('a -> 't) ;
-             tag : int option } -> 't case
+             tag : case_tag } -> 't case
 
 and 'a t = {
   encoding: 'a desc ;
@@ -685,8 +687,8 @@ module Encoding = struct
     List.fold_left
       (fun others (Case { tag }) ->
          match tag with
-         | None -> others
-         | Some tag ->
+         | Json_only -> others
+         | Tag tag ->
              if List.mem tag others then raise (Duplicated_tag tag) ;
              if tag < 0 || max_tag <= tag then
                raise (Invalid_tag (tag, tag_size)) ;
@@ -700,14 +702,14 @@ module Encoding = struct
       List.map (fun (Case { encoding }) -> classify encoding) cases in
     let kind = Kind.merge_list tag_size kinds in
     make @@ Union (kind, tag_size, cases)
-  let case ?tag encoding proj inj = Case { encoding ; proj ; inj ; tag }
+  let case tag encoding proj inj = Case { encoding ; proj ; inj ; tag }
   let option ty =
     union
       ~tag_size:`Uint8
-      [ case ~tag:1 ty
+      [ case (Tag 1) ty
           (fun x -> x)
           (fun x -> Some x) ;
-        case ~tag:0 empty
+        case (Tag 0) empty
           (function None -> Some () | Some _ -> None)
           (fun () -> None) ;
       ]
@@ -725,10 +727,10 @@ module Encoding = struct
   let result ok_enc error_enc =
     union
       ~tag_size:`Uint8
-      [ case ~tag:1 ok_enc
+      [ case (Tag 1) ok_enc
           (function Ok x -> Some x | Error _ -> None)
           (fun x -> Ok x) ;
-        case ~tag:0 error_enc
+        case (Tag 0) error_enc
           (function Ok _ -> None | Error x -> Some x)
           (fun x -> Error x) ;
       ]
@@ -782,12 +784,10 @@ module Binary = struct
         let length2 = length e2 in
         fun (v1, v2) -> length1 v1 + length2 v2
     | Union (`Dynamic, sz, cases) ->
-        let case_length = function
-          | Case { tag = None } -> None
-          | Case { encoding = e ; proj ; tag = Some _ } ->
-              let length v = tag_size sz + length e v in
-              Some (fun v -> Option.map ~f:length (proj v)) in
-        apply (TzList.filter_map case_length cases)
+        let case_length (Case { encoding = e ; proj }) =
+          let length v = tag_size sz + length e v in
+          fun v -> Option.map ~f:length (proj v) in
+        apply (List.map case_length cases)
     | Mu (`Dynamic, _name, self) ->
         fun v -> length (self e) v
     | Obj (Opt (`Dynamic, _, e)) ->
@@ -828,15 +828,24 @@ module Binary = struct
         let length = length e in
         (function None -> 0 | Some x -> length x)
     | Union (`Variable, sz, cases) ->
-        let case_length = function
-          | Case { tag = None } -> None
-          | Case { encoding = e ; proj ; tag = Some _ } ->
+        let rec case_lengths json_only_cases acc = function
+          | [] -> (List.rev acc, json_only_cases)
+          | Case { tag = Json_only } :: tl -> case_lengths true acc tl
+          | Case { encoding = e ; proj ; tag = Tag _ } :: tl ->
               let length v = tag_size sz + length e v in
-              Some (fun v ->
-                  match proj v with
-                  | None -> None
-                  | Some v -> Some (length v)) in
-        apply (TzList.filter_map case_length cases)
+              case_lengths
+                json_only_cases
+                ((fun v ->
+                    match proj v with
+                    | None -> None
+                    | Some v -> Some (length v)) :: acc)
+                tl in
+        let cases, json_only = case_lengths false [] cases in
+        apply
+          ~error:(if json_only
+                  then Failure "No case matched, but JSON only cases were present in union"
+                  else No_case_matched)
+          cases
     | Mu (`Variable, _name, self) ->
         fun v -> length (self e) v
     (* Recursive*)
@@ -944,17 +953,16 @@ module Binary = struct
 
     let union w sz cases =
       let writes_case = function
-        | Case { tag = None } ->
-            (fun _ -> None)
-        | Case { encoding = e ; proj ; tag = Some tag } ->
+        | Case { tag = Json_only } -> None
+        | Case { encoding = e ; proj ; tag = Tag tag } ->
             let write = w.write e in
             let write v buf ofs =
               write_tag sz tag buf ofs |> write v buf in
-            fun v ->
-              match proj v with
-              | None -> None
-              | Some v -> Some (write v) in
-      apply (List.map writes_case cases)
+            Some (fun v ->
+                match proj v with
+                | None -> None
+                | Some v -> Some (write v)) in
+      apply (TzList.filter_map writes_case cases)
 
   end
 
@@ -1150,8 +1158,8 @@ module Binary = struct
       let read_cases =
         TzList.filter_map
           (function
-            | (Case { tag = None }) -> None
-            | (Case { encoding = e ; inj ; tag = Some tag }) ->
+            | (Case { tag = Json_only }) -> None
+            | (Case { encoding = e ; inj ; tag = Tag tag }) ->
                 let read = r.read e in
                 Some (tag, fun len buf ofs ->
                     let ofs, v = read len buf ofs in
@@ -1510,7 +1518,7 @@ module Binary = struct
               let opt =
                 List.fold_left
                   (fun acc c -> match c with
-                     | (Case { encoding ; tag = Some tag })
+                     | (Case { encoding ; tag = Tag tag })
                        when tag == ctag ->
                          assert (acc == None) ;
                          Some (data_checker path encoding buf)

@@ -37,11 +37,11 @@ module Error = struct
 
   let wrap param_encoding =
     union [
-      case
+      case (Tag 0)
         (obj1 (req "ok" param_encoding))
         (function Ok x -> Some x | _ -> None)
         (fun x -> Ok x) ;
-      case
+      case (Tag 1)
         (obj1 (req "error" encoding))
         (function Error x -> Some x | _ -> None)
         (fun x -> Error x) ;

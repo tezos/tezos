@@ -100,7 +100,7 @@ module Encoding = struct
        (opt "parameters" Script_repr.expr_encoding))
 
   let transaction_case tag =
-    case ~tag transaction_encoding
+    case tag transaction_encoding
       (function
         | Transaction { amount ; destination ; parameters } ->
             Some ((), amount, destination, parameters)
@@ -119,7 +119,7 @@ module Encoding = struct
        (opt "script" Script_repr.encoding))
 
   let origination_case tag =
-    case ~tag origination_encoding
+    case tag origination_encoding
       (function
         | Origination { manager ; credit ; spendable ;
                         delegatable ; delegate ; script } ->
@@ -140,7 +140,7 @@ module Encoding = struct
        (opt "delegate" Ed25519.Public_key_hash.encoding))
 
   let delegation_case tag =
-    case ~tag delegation_encoding
+    case tag delegation_encoding
       (function Delegation key -> Some ((), key) | _ -> None)
       (fun ((), key) -> Delegation key)
 
@@ -152,13 +152,13 @@ module Encoding = struct
        (req "counter" int32)
        (req "operations"
           (list (union ~tag_size:`Uint8 [
-               transaction_case 0 ;
-               origination_case 1 ;
-               delegation_case 2 ;
+               transaction_case (Tag 0) ;
+               origination_case (Tag 1) ;
+               delegation_case (Tag 2) ;
              ]))))
 
   let manager_kind_case tag =
-    case ~tag manager_kind_encoding
+    case tag manager_kind_encoding
       (function
         | Manager_operations { source; public_key ; fee ; counter ;operations } ->
             Some (source, public_key, fee, counter, operations)
@@ -173,7 +173,7 @@ module Encoding = struct
        (req "slot" int31))
 
   let endorsement_case tag =
-    case ~tag endorsement_encoding
+    case tag endorsement_encoding
       (function
         | Endorsement { block ; slot } ->
             Some ((), block, slot)
@@ -188,7 +188,7 @@ module Encoding = struct
        (req "proposals" (list Protocol_hash.encoding)))
 
   let proposal_case tag =
-    case ~tag proposal_encoding
+    case tag proposal_encoding
       (function
         | Proposals { period ; proposals } ->
             Some ((), period, proposals)
@@ -204,7 +204,7 @@ module Encoding = struct
        (req "ballot" Vote_repr.ballot_encoding))
 
   let ballot_case tag =
-    case ~tag ballot_encoding
+    case tag ballot_encoding
       (function
         | Ballot { period ; proposal ; ballot } ->
             Some ((), period, proposal, ballot)
@@ -217,13 +217,13 @@ module Encoding = struct
        (req "source" Ed25519.Public_key.encoding)
        (req "operations"
           (list (union [
-               endorsement_case 0 ;
-               proposal_case 1 ;
-               ballot_case 2 ;
+               endorsement_case (Tag 0) ;
+               proposal_case (Tag 1) ;
+               ballot_case (Tag 2) ;
              ]))))
 
   let delegate_kind_case tag =
-    case ~tag delegate_kind_encoding
+    case tag delegate_kind_encoding
       (function
         | Delegate_operations { source ; operations } ->
             Some (source, operations)
@@ -241,12 +241,12 @@ module Encoding = struct
            args) in
     let open Data_encoding in
     union ~tag_size:`Uint8 [
-      case ~tag:0
+      case (Tag 0)
         (mk_case "activate"
            (obj1 (req "hash" Protocol_hash.encoding)))
         (function (Activate hash) -> Some hash | _ -> None)
         (fun hash -> Activate hash) ;
-      case ~tag:1
+      case (Tag 1)
         (mk_case "activate_testnet"
            (obj1 (req "hash" Protocol_hash.encoding)))
         (function (Activate_testnet hash) -> Some hash | _ -> None)
@@ -254,16 +254,16 @@ module Encoding = struct
     ]
 
   let dictator_kind_case tag =
-    case ~tag dictator_kind_encoding
+    case tag dictator_kind_encoding
       (function Dictator_operation op -> Some op | _ -> None)
       (fun op -> Dictator_operation op)
 
   let signed_operations_case tag =
-    case ~tag
+    case tag
       (union [
-          manager_kind_case 0 ;
-          delegate_kind_case 1 ;
-          dictator_kind_case 2 ;
+          manager_kind_case (Tag 0) ;
+          delegate_kind_case (Tag 1) ;
+          dictator_kind_case (Tag 2) ;
         ])
       (function Sourced_operations ops -> Some ops | _ -> None)
       (fun ops -> Sourced_operations ops)
@@ -275,7 +275,7 @@ module Encoding = struct
        (req "nonce" Seed_repr.nonce_encoding))
 
   let seed_nonce_revelation_case tag =
-    case ~tag seed_nonce_revelation_encoding
+    case tag seed_nonce_revelation_encoding
       (function
         | Seed_nonce_revelation { level ; nonce } -> Some ((), level, nonce)
         | _ -> None
@@ -289,7 +289,7 @@ module Encoding = struct
        (req "nonce" (Fixed.bytes 16)))
 
   let faucet_case tag =
-    case ~tag faucet_encoding
+    case tag faucet_encoding
       (function
         | Faucet { id ; nonce } -> Some ((), id, nonce)
         | _ -> None
@@ -297,21 +297,21 @@ module Encoding = struct
       (fun ((), id, nonce) -> Faucet { id ; nonce })
 
   let unsigned_operation_case tag =
-    case ~tag
+    case tag
       (obj1
          (req "operations"
             (list
                (union [
-                   seed_nonce_revelation_case 0 ;
-                   faucet_case 1 ;
+                   seed_nonce_revelation_case (Tag 0) ;
+                   faucet_case (Tag 1) ;
                  ]))))
       (function Anonymous_operations ops -> Some ops | _ -> None)
       (fun ops -> Anonymous_operations ops)
 
   let proto_operation_encoding =
     union [
-      signed_operations_case 0 ;
-      unsigned_operation_case 1 ;
+      signed_operations_case (Tag 0) ;
+      unsigned_operation_case (Tag 1) ;
     ]
 
   let unsigned_operation_encoding =

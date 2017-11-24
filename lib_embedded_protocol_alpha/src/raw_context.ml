@@ -48,21 +48,21 @@ type storage_error =
 let storage_error_encoding =
   let open Data_encoding in
   union [
-    case ~tag:0
+    case (Tag 0)
       (obj1 (req "incompatible_protocol_version" string))
       (function Incompatible_protocol_version arg -> Some arg | _ -> None)
       (fun arg -> Incompatible_protocol_version arg) ;
-    case ~tag:1
+    case (Tag 1)
       (obj2
          (req "missing_key" (list string))
          (req "function" (string_enum ["get", `Get ; "set", `Set])))
       (function Missing_key (key, f) -> Some (key, f) | _ -> None)
       (fun (key, f) -> Missing_key (key, f)) ;
-    case ~tag:2
+    case (Tag 2)
       (obj1 (req "existing_key" (list string)))
       (function Existing_key key -> Some key | _ -> None)
       (fun key -> Existing_key key) ;
-    case ~tag:3
+    case (Tag 3)
       (obj1 (req "corrupted_data" (list string)))
       (function Corrupted_data key -> Some key | _ -> None)
       (fun key -> Corrupted_data key) ;

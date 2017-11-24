@@ -46,10 +46,10 @@ let encoding =
   splitted
     ~binary:
       (union ~tag_size:`Uint8 [
-          case ~tag:0 Ed25519.Public_key_hash.encoding
+          case (Tag 0) Ed25519.Public_key_hash.encoding
             (function Default k -> Some k | _ -> None)
             (fun k -> Default k) ;
-          case ~tag:1 Contract_hash.encoding
+          case (Tag 1) Contract_hash.encoding
             (function Originated k -> Some k | _ -> None)
             (fun k -> Originated k) ;
         ])

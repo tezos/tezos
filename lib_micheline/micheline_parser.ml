@@ -65,23 +65,23 @@ type token_value =
 let token_value_encoding =
   let open Data_encoding in
   union
-    [ case (obj1 (req "string" string))
+    [ case (Tag 0) (obj1 (req "string" string))
         (function String s -> Some s | _ -> None)
         (fun s -> String s) ;
-      case (obj1 (req "int" string))
+      case (Tag 1) (obj1 (req "int" string))
         (function Int s -> Some s | _ -> None)
         (fun s -> Int s) ;
-      case (obj1 (req "annot" string))
+      case (Tag 2) (obj1 (req "annot" string))
         (function Annot s -> Some s | _ -> None)
         (fun s -> Annot s) ;
-      case (obj2 (req "comment" string) (dft "end_of_line" bool false))
+      case (Tag 3) (obj2 (req "comment" string) (dft "end_of_line" bool false))
         (function
           | Comment s -> Some (s, false)
           | Eol_comment s -> Some (s, true) | _ -> None)
         (function
           | (s, false) -> Comment s
           | (s, true) -> Eol_comment s) ;
-      case
+      case (Tag 4)
         (obj1 (req "punctuation" (string_enum [
              "(", Open_paren ;
              ")", Close_paren ;

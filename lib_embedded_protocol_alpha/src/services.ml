@@ -24,11 +24,11 @@ let error_encoding =
 let wrap_tzerror encoding =
   let open Data_encoding in
   union [
-    case
+    case (Tag 0)
       (obj1 (req "ok" encoding))
       (function Ok x -> Some x | _ -> None)
       (fun x -> Ok x) ;
-    case
+    case (Tag 1)
       (obj1 (req "error" error_encoding))
       (function Error x -> Some x | _ -> None)
       (fun x -> Error x) ;
@@ -229,15 +229,15 @@ module Context = struct
 
     let nonce_encoding =
       union [
-        case
+        case (Tag 0)
           (obj1 (req "nonce" Nonce.encoding))
           (function Revealed nonce -> Some nonce | _ -> None)
           (fun nonce -> Revealed nonce) ;
-        case
+        case (Tag 1)
           (obj1 (req "hash" Nonce_hash.encoding))
           (function Missing nonce -> Some nonce | _ -> None)
           (fun nonce -> Missing nonce) ;
-        case
+        case (Tag 2)
           empty
           (function Forgotten -> Some () | _ -> None)
           (fun () -> Forgotten) ;

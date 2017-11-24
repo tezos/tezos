@@ -321,19 +321,19 @@ module Generic_Merkle_tree (H : sig
     mu "path"
       (fun path_encoding ->
          union [
-           case ~tag:240
+           case (Tag 240)
              (obj2
                 (req "path" path_encoding)
                 (req "right" H.encoding))
              (function Left (p, r) -> Some (p, r) | _ -> None)
              (fun (p, r) -> Left (p, r)) ;
-           case ~tag:15
+           case (Tag 15)
              (obj2
                 (req "left" H.encoding)
                 (req "path" path_encoding))
              (function Right (r, p) -> Some (r, p) | _ -> None)
              (fun (r, p) -> Right (r, p)) ;
-           case ~tag:0
+           case (Tag 0)
              unit
              (function Op -> Some () | _ -> None)
              (fun () -> Op)

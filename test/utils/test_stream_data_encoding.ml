@@ -323,19 +323,19 @@ let prn_t = function
 let test_union _ =
   let enc =
     (union [
-        case ~tag:1
+        case (Tag 1)
           int8
           (function A i -> Some i | _ -> None)
           (fun i -> A i) ;
-        case ~tag:2
+        case (Tag 2)
           string
           (function B s -> Some s | _ -> None)
           (fun s -> B s) ;
-        case ~tag:3
+        case (Tag 3)
           int8
           (function C i -> Some i | _ -> None)
           (fun i -> C i) ;
-        case ~tag:4
+        case (Tag 4)
           (obj2
              (req "kind" (constant "D"))
              (req "data" (string)))
@@ -398,11 +398,11 @@ let test_splitted _ =
        ~binary:string
        ~json:
          (union [
-             case ~tag:1
+             case (Tag 1)
                string
                (fun _ -> None)
                (fun s -> s) ;
-             case ~tag:2
+             case (Tag 2)
                s_enc
                (fun s -> Some { field = int_of_string s })
                (fun s -> string_of_int s.field) ;

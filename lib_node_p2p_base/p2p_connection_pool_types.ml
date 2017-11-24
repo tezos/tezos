@@ -37,31 +37,31 @@ module Point_info = struct
           (merge_objs
              (obj1 (req "event_kind" (constant name))) obj) in
       union ~tag_size:`Uint8 [
-        case ~tag:0 (branch_encoding "outgoing_request" empty)
+        case (Tag 0) (branch_encoding "outgoing_request" empty)
           (function Outgoing_request -> Some () | _ -> None)
           (fun () -> Outgoing_request) ;
-        case ~tag:1 (branch_encoding "accepting_request"
-                       (obj1 (req "peer_id" Peer_id.encoding)))
+        case (Tag 1) (branch_encoding "accepting_request"
+                        (obj1 (req "peer_id" Peer_id.encoding)))
           (function Accepting_request peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> Accepting_request peer_id) ;
-        case ~tag:2 (branch_encoding "rejecting_request"
-                       (obj1 (req "peer_id" Peer_id.encoding)))
+        case (Tag 2) (branch_encoding "rejecting_request"
+                        (obj1 (req "peer_id" Peer_id.encoding)))
           (function Rejecting_request peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> Rejecting_request peer_id) ;
-        case ~tag:3 (branch_encoding "request_rejected"
-                       (obj1 (opt "peer_id" Peer_id.encoding)))
+        case (Tag 3) (branch_encoding "request_rejected"
+                        (obj1 (opt "peer_id" Peer_id.encoding)))
           (function Request_rejected peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> Request_rejected peer_id) ;
-        case ~tag:4 (branch_encoding "rejecting_request"
-                       (obj1 (req "peer_id" Peer_id.encoding)))
+        case (Tag 4) (branch_encoding "rejecting_request"
+                        (obj1 (req "peer_id" Peer_id.encoding)))
           (function Connection_established peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> Connection_established peer_id) ;
-        case ~tag:5 (branch_encoding "rejecting_request"
-                       (obj1 (req "peer_id" Peer_id.encoding)))
+        case (Tag 5) (branch_encoding "rejecting_request"
+                        (obj1 (req "peer_id" Peer_id.encoding)))
           (function Disconnection peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> Disconnection peer_id) ;
-        case ~tag:6 (branch_encoding "rejecting_request"
-                       (obj1 (req "peer_id" Peer_id.encoding)))
+        case (Tag 6) (branch_encoding "rejecting_request"
+                        (obj1 (req "peer_id" Peer_id.encoding)))
           (function External_disconnection peer_id -> Some peer_id | _ -> None)
           (fun peer_id -> External_disconnection peer_id) ;
       ]

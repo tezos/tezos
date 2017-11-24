@@ -98,11 +98,11 @@ module T = struct
       ~binary: int64
       ~json:
         (union [
-            case
+            case Json_only
               rfc_encoding
               (fun i -> Some i)
               (fun i -> i) ;
-            case
+            case Json_only
               int64
               (fun _ -> None)
               (fun i -> i) ;

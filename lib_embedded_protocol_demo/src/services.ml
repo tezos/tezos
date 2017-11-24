@@ -21,11 +21,11 @@ let error_encoding =
 let wrap_tzerror encoding =
   let open Data_encoding in
   union [
-    case
+    case (Tag 0)
       (obj1 (req "ok" encoding))
       (function Ok x -> Some x | _ -> None)
       (fun x -> Ok x) ;
-    case
+    case (Tag 1)
       (obj1 (req "error" error_encoding))
       (function Error x -> Some x | _ -> None)
       (fun x -> Error x) ;

@@ -35,7 +35,7 @@ module Command = struct
   let encoding =
     let open Data_encoding in
     union ~tag_size:`Uint8 [
-      case ~tag:0
+      case (Tag 0)
         (mk_case "activate"
            (obj2
               (req "hash" Protocol_hash.encoding)
@@ -47,7 +47,7 @@ module Command = struct
           | _ -> None)
         (fun (protocol, validation_passes) ->
            Activate { protocol ; validation_passes }) ;
-      case ~tag:1
+      case (Tag 1)
         (mk_case "activate_testnet"
            (obj3
               (req "hash" Protocol_hash.encoding)

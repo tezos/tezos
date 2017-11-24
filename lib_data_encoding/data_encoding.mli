@@ -335,6 +335,8 @@ val assoc : 'a encoding -> (string * 'a) list encoding
     the union type. *)
 type 't case
 
+type case_tag = Tag of int | Json_only
+
 (** Encodes a variant constructor. Takes the encoding for the specific
     parameters, a recognizer function that will extract the parameters
     in case the expected case of the variant is being serialized, and
@@ -346,7 +348,7 @@ type 't case
 
     If no tag is specified, tags are assigned by the union combinator. *)
 val case :
-  ?tag:int ->
+  case_tag ->
   'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 
 (** Create a single encoding from a series of cases.

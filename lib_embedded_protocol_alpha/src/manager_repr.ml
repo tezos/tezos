@@ -18,14 +18,14 @@ type t = manager_key
 open Data_encoding
 
 let hash_case tag =
-  case ~tag Ed25519.Public_key_hash.encoding
+  case tag Ed25519.Public_key_hash.encoding
     (function
       | Hash hash -> Some hash
       | _ -> None)
     (fun hash -> Hash hash)
 
 let pubkey_case tag =
-  case ~tag Ed25519.Public_key.encoding
+  case tag Ed25519.Public_key.encoding
     (function
       | Public_key hash -> Some hash
       | _ -> None)
@@ -34,7 +34,7 @@ let pubkey_case tag =
 
 let encoding =
   union [
-    hash_case 0 ;
-    pubkey_case 1 ;
+    hash_case (Tag 0) ;
+    pubkey_case (Tag 1) ;
   ]
 

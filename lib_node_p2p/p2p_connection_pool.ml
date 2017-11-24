@@ -42,21 +42,21 @@ module Message = struct
     let open Data_encoding in
     dynamic_size @@
     union ~tag_size:`Uint16
-      ([ case ~tag:0x01 null
+      ([ case (Tag 0x01) null
            (function Disconnect -> Some () | _ -> None)
            (fun () -> Disconnect);
-         case ~tag:0x02 null
+         case (Tag 0x02) null
            (function Bootstrap -> Some () | _ -> None)
            (fun () -> Bootstrap);
-         case ~tag:0x03 (Variable.list Point.encoding)
+         case (Tag 0x03) (Variable.list Point.encoding)
            (function Advertise points -> Some points | _ -> None)
            (fun points -> Advertise points);
-         case ~tag:0x04 (tup2 Point.encoding Peer_id.encoding)
+         case (Tag 0x04) (tup2 Point.encoding Peer_id.encoding)
            (function
              | Swap_request (point, peer_id) -> Some (point, peer_id)
              | _ -> None)
            (fun (point, peer_id) -> Swap_request (point, peer_id)) ;
-         case ~tag:0x05 (tup2 Point.encoding Peer_id.encoding)
+         case (Tag 0x05) (tup2 Point.encoding Peer_id.encoding)
            (function
              | Swap_ack (point, peer_id) -> Some (point, peer_id)
              | _ -> None)
@@ -64,7 +64,7 @@ module Message = struct
        ] @
        ListLabels.map msg_encoding
          ~f:(function Encoding { tag ; encoding ; wrap ; unwrap } ->
-             case ~tag encoding
+             case (Tag tag) encoding
                (function Message msg -> unwrap msg | _ -> None)
                (fun msg -> Message (wrap msg))))
 

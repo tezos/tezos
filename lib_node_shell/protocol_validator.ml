@@ -34,13 +34,13 @@ let protocol_error_encoding =
   let open Data_encoding in
   union
     [
-      case
+      case (Tag 0)
         (obj1
            (req "error" (constant "compilation_failed")))
         (function Compilation_failed -> Some ()
                 | _ -> None)
         (fun () -> Compilation_failed) ;
-      case
+      case (Tag 1)
         (obj1
            (req "error" (constant "dynlinking_failed")))
         (function Dynlinking_failed -> Some ()

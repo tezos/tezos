@@ -127,18 +127,18 @@ let canonical_encoding prim_encoding =
       describe
         ~title: "Script expression (data, type or code)" @@
       union ~tag_size:`Uint8
-        [ case ~tag:0 int_encoding
+        [ case (Tag 0) int_encoding
             (function Int (_, v) -> Some v | _ -> None)
             (fun v -> Int (0, v)) ;
-          case ~tag:1 string_encoding
+          case (Tag 1) string_encoding
             (function String (_, v) -> Some v | _ -> None)
             (fun v -> String (0, v)) ;
-          case ~tag:2 (application_encoding expr_encoding)
+          case (Tag 2) (application_encoding expr_encoding)
             (function
               | Prim (_, v, args, annot) -> Some (v, args, annot)
               | _ -> None)
             (function (prim, args, annot) -> Prim (0, prim, args, annot)) ;
-          case ~tag:3 (seq_encoding expr_encoding)
+          case (Tag 3) (seq_encoding expr_encoding)
             (function Seq (_, v, _annot) -> Some v | _ -> None)
             (fun args -> Seq (0, args, None)) ]) in
   conv

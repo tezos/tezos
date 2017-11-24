@@ -135,11 +135,11 @@ let prn_t = function
 let test_tag_errors _ =
   let duplicate_tag () =
     union [
-      case ~tag:1
+      case (Tag 1)
         int8
         (fun i -> i)
         (fun i -> Some i) ;
-      case ~tag:1
+      case (Tag 1)
         int8
         (fun i -> i)
         (fun i -> Some i)] in
@@ -148,7 +148,7 @@ let test_tag_errors _ =
             | _ -> false) ;
   let invalid_tag () =
     union [
-      case ~tag:(2 lsl 7)
+      case (Tag (2 lsl 7))
         int8
         (fun i -> i)
         (fun i -> Some i)] in
@@ -160,19 +160,19 @@ let test_tag_errors _ =
 let test_union _ =
   let enc =
     (union [
-        case ~tag:1
+        case (Tag 1)
           int8
           (function A i -> Some i | _ -> None)
           (fun i -> A i) ;
-        case ~tag:2
+        case (Tag 2)
           string
           (function B s -> Some s | _ -> None)
           (fun s -> B s) ;
-        case ~tag:3
+        case (Tag 3)
           int8
           (function C i -> Some i | _ -> None)
           (fun i -> C i) ;
-        case ~tag:4
+        case (Tag 4)
           (obj2
              (req "kind" (constant "D"))
              (req "data" (string)))
@@ -182,7 +182,7 @@ let test_union _ =
   let jsonA = Json.construct enc (A 1) in
   let jsonB = Json.construct enc (B "2") in
   let jsonC = Json.construct enc (C 3) in
-  let jsonD = Json.construct enc (D"4") in
+  let jsonD = Json.construct enc (D "4") in
   Assert.test_fail
     ~msg:__LOC__ (fun () -> Json.construct enc E) is_invalid_arg ;
   Assert.equal ~prn:prn_t ~msg:__LOC__ (A 1) (Json.destruct enc jsonA) ;
@@ -225,11 +225,11 @@ let test_splitted _ =
        ~binary:string
        ~json:
          (union [
-             case ~tag:1
+             case (Tag 1)
                string
                (fun _ -> None)
                (fun s -> s) ;
-             case ~tag:2
+             case (Tag 2)
                s_enc
                (fun s -> Some { field = int_of_string s })
                (fun s -> string_of_int s.field) ;
@@ -315,6 +315,23 @@ let wrap_test f base_dir =
   f base_dir >>= fun result ->
   return result
 
+let test_wrapped_binary _ =
+  let open Data_encoding in
+  let enc = union [
+      case (Tag 0)
+        (obj1 (req "ok" string))
+        (function Ok x -> Some x | _ -> None)
+        (fun x -> Ok x) ;
+      case (Tag 1)
+        (obj1 (req "error" string))
+        (function Error x -> Some x | _ -> None)
+        (fun x -> Error x) ;
+    ] in
+  let data = (Ok "") in
+  let encoded = Data_encoding.Binary.to_bytes enc data in
+  let decoded = Data_encoding.Binary.of_bytes_exn enc encoded in
+  Lwt.return @@ Assert.equal data decoded
+
 let tests = [
   "simple", test_simple_values ;
   "json", test_json ;
@@ -322,6 +339,7 @@ let tests = [
   "splitted", test_splitted ;
   "json.input", test_json_input ;
   "tags", test_tag_errors ;
+  "wrapped_binary", test_wrapped_binary ;
 ]
 
 let () =

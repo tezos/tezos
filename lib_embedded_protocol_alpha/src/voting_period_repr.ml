@@ -43,19 +43,19 @@ type kind =
 let kind_encoding =
   let open Data_encoding in
   union ~tag_size:`Uint8 [
-    case ~tag:0
+    case (Tag 0)
       (constant "proposal")
       (function Proposal -> Some () | _ -> None)
       (fun () -> Proposal) ;
-    case ~tag:1
+    case (Tag 1)
       (constant "testing_vote")
       (function Testing_vote -> Some () | _ -> None)
       (fun () -> Testing_vote) ;
-    case ~tag:2
+    case (Tag 2)
       (constant "testing")
       (function Testing -> Some () | _ -> None)
       (fun () -> Testing) ;
-    case ~tag:3
+    case (Tag 3)
       (constant "promotion_vote")
       (function Promotion_vote -> Some () | _ -> None)
       (fun () -> Promotion_vote) ;
