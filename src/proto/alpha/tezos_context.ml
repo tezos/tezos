@@ -91,6 +91,9 @@ module Constants = struct
   let max_operation_data_length c =
     let constants = Raw_context.constants c in
     constants.max_operation_data_length
+  let michelson_maximum_type_size c =
+    let constants = Raw_context.constants c in
+    constants.michelson_maximum_type_size
 end
 
 module Delegates_pubkey = Public_key_storage

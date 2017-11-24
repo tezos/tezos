@@ -43,6 +43,7 @@ type constants = {
   max_number_of_operations: int list ;
   max_operation_data_length: int ;
   initial_roll_value: Tez_repr.t ;
+  michelson_maximum_type_size: int;
 }
 
 let read_public_key s =
@@ -79,6 +80,7 @@ let default = {
     16 * 1024 ; (* 16kB *)
   initial_roll_value =
     Tez_repr.of_cents_exn 10000_00L ;
+  michelson_maximum_type_size = 1000 ;
 }
 
 let opt (=) def v = if def = v then None else Some v
@@ -136,6 +138,9 @@ let constants_encoding =
        and initial_roll_value =
          opt Tez_repr.(=)
            default.initial_roll_value c.initial_roll_value
+       and michelson_maximum_type_size =
+         opt Compare.Int.(=)
+           default.michelson_maximum_type_size c.michelson_maximum_type_size
        in
        ((( cycle_length,
            voting_period_length,
@@ -149,7 +154,8 @@ let constants_encoding =
            dictator_pubkey),
          (max_number_of_operations,
           max_operation_data_length,
-          initial_roll_value)), ()) )
+          initial_roll_value,
+          michelson_maximum_type_size)), ()) )
     (fun ((( cycle_length,
              voting_period_length,
              time_before_reward,
@@ -162,7 +168,8 @@ let constants_encoding =
              dictator_pubkey),
            (max_number_of_operations,
             max_operation_data_length,
-            initial_roll_value)), ()) ->
+            initial_roll_value,
+            michelson_maximum_type_size)), ()) ->
       { cycle_length =
           unopt default.cycle_length cycle_length ;
         voting_period_length =
@@ -191,6 +198,8 @@ let constants_encoding =
           unopt default.max_operation_data_length max_operation_data_length ;
         initial_roll_value =
           unopt default.initial_roll_value initial_roll_value ;
+        michelson_maximum_type_size =
+          unopt default.michelson_maximum_type_size michelson_maximum_type_size ;
       } )
     Data_encoding.(
       merge_objs
@@ -206,10 +215,11 @@ let constants_encoding =
               (opt "proof_of_work_threshold" int64)
               (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
               (opt "dictator_pubkey" Ed25519.Public_key.encoding))
-           (obj3
+           (obj4
               (opt "max_number_of_operations" (list uint16))
               (opt "max_number_of_operations" int31)
               (opt "initial_roll_value" Tez_repr.encoding)
+              (opt "michelson_maximum_type_size" uint16)
            ))
         unit)
 

@@ -280,7 +280,7 @@ module Constants : sig
   val dictator_pubkey: context -> Ed25519.Public_key.t
   val max_number_of_operations: context -> int list
   val max_operation_data_length: context -> int
-
+  val michelson_maximum_type_size: context -> int
 end
 
 (** Global storage for all delegates public keys *)

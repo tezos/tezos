@@ -44,6 +44,7 @@ type error += Unexpected_annotation of Script.location
 type error += Invalid_map_body : Script.location * _ stack_ty -> error
 type error += Invalid_map_block_fail of Script.location
 type error += Invalid_iter_body : Script.location * _ stack_ty * _ stack_ty -> error
+type error += Type_too_large : Script.location * int * int -> error
 
 (* Value typing errors *)
 type error += Invalid_constant : Script.location * Script.expr * _ ty -> error
@@ -80,6 +81,58 @@ let default_arg_annot = Some "@arg"
 let default_annot ~default = function
   | None -> default
   | annot -> annot
+
+(* ---- Type size accounting ------------------------------------------------*)
+
+let comparable_type_size : type t. t comparable_ty -> int = function
+  (* No wildcard to force the update when comparable_ty chages. *)
+  | Int_key -> 1
+  | Nat_key -> 1
+  | String_key -> 1
+  | Tez_key -> 1
+  | Bool_key -> 1
+  | Key_hash_key -> 1
+  | Timestamp_key -> 1
+
+let rec type_size : type t. t ty -> int = function
+  | Unit_t -> 1
+  | Int_t -> 1
+  | Nat_t -> 1
+  | Signature_t -> 1
+  | String_t -> 1
+  | Tez_t -> 1
+  | Key_hash_t -> 1
+  | Key_t -> 1
+  | Timestamp_t -> 1
+  | Bool_t -> 1
+  | Pair_t ((l, _), (r, _)) ->
+      1 + type_size l + type_size r
+  | Union_t ((l, _), (r, _)) ->
+      1 + type_size l + type_size r
+  | Lambda_t (arg, ret) ->
+      1 + type_size arg + type_size ret
+  | Option_t t ->
+      1 + type_size t
+  | List_t t ->
+      1 + type_size t
+  | Set_t k ->
+      1 + comparable_type_size k
+  | Map_t (k, v) ->
+      1 + comparable_type_size k + type_size v
+  | Contract_t (arg, ret) ->
+      1 + type_size arg + type_size ret
+
+let rec type_size_of_stack_head
+  : type st. st stack_ty -> up_to:int -> int
+  = fun stack ~up_to ->
+    match stack with
+    | Empty_t -> 0
+    | Item_t (head, tail, _annot) ->
+        if Compare.Int.(up_to > 0) then
+          Compare.Int.max (type_size head)
+            (type_size_of_stack_head tail ~up_to:(up_to - 1))
+        else
+          0
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -1040,7 +1093,18 @@ and parse_instr
     ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
     Script.node -> bef stack_ty -> bef judgement tzresult Lwt.t =
   fun tc_context ctxt ?type_logger script_instr stack_ty ->
-    let return : bef judgement -> bef judgement tzresult Lwt.t = return in
+    let return (judgement : bef judgement) : bef judgement tzresult Lwt.t =
+      match judgement with
+      | Typed { loc; aft } ->
+          (* No instruction builds more than two new stack slots. *)
+          let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
+          let type_size = type_size_of_stack_head aft ~up_to:2 in
+          if Compare.Int.(type_size > maximum_type_size) then
+            fail (Type_too_large (loc, type_size, maximum_type_size))
+          else
+            return judgement
+      | Failed _ ->
+          return judgement in
     let keep_or_rewrite_annot value_annot instr_annot =
       match value_annot, instr_annot with
       | annot, None -> annot
@@ -2307,7 +2371,7 @@ let () =
     `Permanent
     ~id:"invalidMapBlockFail"
     ~title:"FAIL instruction occurred as body of map block"
-    ~description:"FAIL cannot be the only instruction in the body.\
+    ~description:"FAIL cannot be the only instruction in the body. \
                   The propper type of the return list cannot be inferred."
     (obj1 (req "loc" Script.location_encoding))
     (function
@@ -2318,8 +2382,8 @@ let () =
     `Permanent
     ~id:"invalidIterBody"
     ~title:"ITER body returned wrong stack type"
-    ~description:"The body of an ITER instruction\
-                  must result in the same stack type as before\
+    ~description:"The body of an ITER instruction \
+                  must result in the same stack type as before \
                   the ITER."
     (obj3
        (req "loc" Script.location_encoding)
@@ -2329,6 +2393,19 @@ let () =
       | Invalid_iter_body (loc, bef, aft) -> Some (loc, Ex_stack_ty bef, Ex_stack_ty aft)
       | _ -> None)
     (fun (loc, Ex_stack_ty bef, Ex_stack_ty aft) -> Invalid_iter_body (loc, bef, aft)) ;
+  register_error_kind
+    `Permanent
+    ~id:"typeTooLarge"
+    ~title:"Stack item type too large"
+    ~description:"An instruction generated a type larger than the limit."
+    (obj3
+       (req "loc" Script.location_encoding)
+       (req "typeSize" uint16)
+       (req "maximumTypeSize" uint16))
+    (function
+      | Type_too_large (loc, ts, maxts) -> Some (loc, ts, maxts)
+      | _ -> None)
+    (fun (loc, ts, maxts) -> Type_too_large (loc, ts, maxts)) ;
   (* Toplevel errors *)
   register_error_kind
     `Permanent
@@ -2347,7 +2424,6 @@ let () =
       | _ -> None)
     (fun (name, Ex_ty ty,  expr) ->
        Ill_typed_data (name, expr, ty)) ;
-  (* type error += Ill_formed_type of string option * Script.expr *)
   register_error_kind
     `Permanent
     ~id:"illFormedTypeTypeError"
