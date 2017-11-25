@@ -1,1 +1,1 @@
-.gitlab/issue_templates/issues.md
+../.gitlab/issue_templates/issues.md
