@@ -416,7 +416,7 @@ module Blocks = struct
                  (obj3
                     (req "block" Block_hash.encoding)
                     (req "level" int32)
-                    (req "errors" (Data_encoding.list error_encoding))))
+                    (req "errors" Error.encoding)))
       RPC.Path.(root / "invalid_blocks")
 
 end
