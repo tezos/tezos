@@ -96,7 +96,7 @@ let register name commands =
   let previous =
     try Protocol_hash.Table.find versions name
     with Not_found -> [] in
-  Protocol_hash.Table.add versions name (commands @ previous)
+  Protocol_hash.Table.replace versions name (commands @ previous)
 
 let commands_for_version version =
   try Protocol_hash.Table.find versions version
