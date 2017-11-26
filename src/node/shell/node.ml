@@ -589,6 +589,9 @@ module RPC = struct
       heads >>= fun (_, blocks) ->
     Lwt.return (List.rev blocks)
 
+  let list_invalid node =
+    State.Block.list_invalid (Net_validator.net_state node.mainnet_validator)
+
   let block_header_watcher node =
     Distributed_db.watch_block_header node.distributed_db
 

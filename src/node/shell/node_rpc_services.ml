@@ -406,6 +406,19 @@ module Blocks = struct
       ~output: (obj1 (req "blocks" (list (list block_info_encoding))))
       RPC.Path.(root / "blocks")
 
+  let list_invalid =
+    RPC.service
+      ~description:
+        "Lists blocks that have been declared invalid along with the errors\
+         that led to them being declared invalid"
+      ~input:empty
+      ~output:(Data_encoding.list
+                 (obj3
+                    (req "block" Block_hash.encoding)
+                    (req "level" int32)
+                    (req "errors" (Data_encoding.list error_encoding))))
+      RPC.Path.(root / "invalid_blocks")
+
 end
 
 module Protocols = struct

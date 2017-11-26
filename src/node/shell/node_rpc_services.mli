@@ -87,6 +87,9 @@ module Blocks : sig
   val list:
     (unit, unit, list_param, block_info list list) RPC.service
 
+  val list_invalid:
+    (unit, unit, unit, (Block_hash.t * int32 * error list) list) RPC.service
+
   type preapply_param = {
     timestamp: Time.t ;
     proto_header: MBytes.t ;

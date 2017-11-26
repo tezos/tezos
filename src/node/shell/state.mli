@@ -98,6 +98,7 @@ module Block : sig
   val known_valid: Net.t -> Block_hash.t -> bool Lwt.t
   val known_invalid: Net.t -> Block_hash.t -> bool Lwt.t
   val read_invalid: Net.t -> Block_hash.t -> Store.Block.invalid_block option Lwt.t
+  val list_invalid: Net.t -> (Block_hash.t * int32 * error list) list Lwt.t
 
   val read: Net.t -> Block_hash.t -> block tzresult Lwt.t
   val read_opt: Net.t -> Block_hash.t -> block option Lwt.t

@@ -329,6 +329,10 @@ let list_blocks
     RPC.Answer.return_stream { next ; shutdown }
   end
 
+let list_invalid node () =
+  Node.RPC.list_invalid node >>= fun l ->
+  RPC.Answer.return l
+
 let list_protocols node {Services.Protocols.monitor; contents} =
   let monitor = match monitor with None -> false | Some x -> x in
   let include_contents = match contents with None -> false | Some x -> x in
@@ -369,6 +373,8 @@ let build_rpc_directory node =
   let dir = RPC.empty in
   let dir =
     RPC.register0 dir Services.Blocks.list (list_blocks node) in
+  let dir =
+    RPC.register0 dir Services.Blocks.list_invalid (list_invalid node) in
   let dir = register_bi_dir node dir in
   let dir =
     let implementation block =

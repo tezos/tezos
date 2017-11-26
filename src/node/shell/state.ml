@@ -380,6 +380,12 @@ module Block = struct
     Shared.use net_state.block_store begin fun store ->
       Store.Block.Invalid_block.read_opt store hash
     end
+  let list_invalid net_state =
+    Shared.use net_state.block_store begin fun store ->
+      Store.Block.Invalid_block.fold store ~init:[]
+        ~f:(fun hash { level ; errors } acc ->
+            Lwt.return ((hash, level, errors) :: acc))
+    end
 
   let known net_state hash =
     Shared.use net_state.block_store begin fun store ->

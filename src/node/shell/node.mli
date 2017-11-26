@@ -64,6 +64,9 @@ module RPC : sig
   val list:
     t -> int -> Block_hash.t list -> block_info list list Lwt.t
 
+  val list_invalid:
+    t -> (Block_hash.t * int32 * error list) list Lwt.t
+
   val block_info:
     t -> block -> block_info Lwt.t
 
