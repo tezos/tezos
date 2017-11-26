@@ -192,6 +192,26 @@ type test_network =
       expiration: Time.t ;
     }
 
+let pp_test_network ppf = function
+  | Not_running -> Format.fprintf ppf "@[<v 2>Not running@]"
+  | Forking { protocol ; expiration } ->
+      Format.fprintf ppf
+        "@[<v 2>Forking %a (expires %a)@]"
+        Hash.Protocol_hash.pp
+        protocol
+        Time.pp_hum
+        expiration
+  | Running { net_id ; genesis ; protocol ; expiration } ->
+      Format.fprintf ppf
+        "@[<v 2>Running %a\
+         @ Genesis: %a\
+         @ Net id: %a\
+         @ Expiration: %a@]"
+        Hash.Protocol_hash.pp protocol
+        Hash.Block_hash.pp genesis
+        Hash.Net_id.pp net_id
+        Time.pp_hum expiration
+
 let test_network_encoding =
   let open Data_encoding in
   union [

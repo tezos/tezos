@@ -90,6 +90,8 @@ type test_network =
       expiration: Time.t ;
     }
 
+val pp_test_network : Format.formatter -> test_network -> unit
+
 val test_network_encoding: test_network Data_encoding.t
 
 val get_test_network: context -> test_network Lwt.t

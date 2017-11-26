@@ -86,6 +86,7 @@ let main () =
         Client_keys.commands () @
         Client_protocols.commands () @
         Client_helpers.commands () @
+        Client_debug.commands () @
         commands_for_version in
       let config : Client_commands.cfg = {
         base_dir = parsed_config_file.base_dir ;
