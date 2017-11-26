@@ -91,7 +91,6 @@ let main () =
         base_dir = parsed_config_file.base_dir ;
         force = parsed_args.force ;
         block = parsed_args.block ;
-        web_port = Client_commands.default_cfg.web_port ;
       } in
       let rpc_config =
         if parsed_args.print_timings then

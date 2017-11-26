@@ -11,15 +11,9 @@ type ('a, 'b) lwt_format =
   ('a, Format.formatter, unit, 'b Lwt.t) format4
 
 type cfg = {
-
-  (* webclient options *)
-  web_port : int ;
-
-  (* misc options *)
   base_dir : string ;
   force : bool ;
   block : Node_rpc_services.Blocks.block ;
-
 }
 
 type context = {
@@ -42,8 +36,6 @@ let default_cfg_of_base_dir base_dir = {
   base_dir ;
   force = false ;
   block = `Prevalidation ;
-
-  web_port = 8080 ;
 }
 
 let home =

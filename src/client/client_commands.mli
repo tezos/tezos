@@ -11,15 +11,9 @@ type ('a, 'b) lwt_format =
   ('a, Format.formatter, unit, 'b Lwt.t) format4
 
 type cfg = {
-
-  (* webclient options *)
-  web_port : int ;
-
-  (* misc options *)
   base_dir : string ;
   force : bool ;
   block : Node_rpc_services.Blocks.block ;
-
 }
 
 type context = {
