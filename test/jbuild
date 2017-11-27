@@ -2,8 +2,8 @@
 
 (alias
  ((name runtest_basic.sh)
-  (deps (../src/node_main.exe
-         ../src/client_main.exe
+  (deps (../bin_node/main.exe
+         ../bin_client/main.exe
          sandbox.json
          test_basic.sh
          lib/test_lib.inc.sh
@@ -17,8 +17,8 @@
 
 (alias
  ((name runtest_contracts.sh)
-  (deps (../src/node_main.exe
-         ../src/client_main.exe
+  (deps (../bin_node/main.exe
+         ../bin_client/main.exe
          sandbox.json
          test_contracts.sh
          lib/test_lib.inc.sh
@@ -32,8 +32,8 @@
 
 (alias
  ((name runtest_multinode.sh)
-  (deps (../src/node_main.exe
-         ../src/client_main.exe
+  (deps (../bin_node/main.exe
+         ../bin_client/main.exe
          sandbox.json
          test_multinode.sh
          lib/test_lib.inc.sh

@@ -1,18 +1,21 @@
 (jbuild_version 1)
 
 (library
- ((name node_updater)
-  (public_name tezos.node.updater)
+ ((name tezos_node_updater)
+  (public_name tezos-node-updater)
   (libraries (tezos-base
               tezos-micheline
               tezos-protocol-compiler
-              node_net
-              node_db
+              tezos-node-net
+              tezos-node-db
               dynlink))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
-                    -open Tezos_base__TzPervasives))
-  (wrapped false)))
+                    -open Tezos_base__TzPervasives
+                    -open Tezos_micheline
+                    -open Tezos_protocol_compiler
+                    -open Tezos_node_net
+                    -open Tezos_node_db))))
 
 (alias
  ((name runtest_indent)

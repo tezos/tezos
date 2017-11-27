@@ -1,13 +1,14 @@
 (jbuild_version 1)
 
 (library
- ((name node_main_lib)
-  (public_name tezos.node.main)
-  (libraries (tezos-base cmdliner node_net node_shell))
+ ((name tezos_node_db)
+  (public_name tezos-node-db)
+  (libraries (tezos-base
+              leveldb
+              irmin-leveldb))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
-                    -open Tezos_base__TzPervasives))
-  (wrapped false)))
+                    -open Tezos_base__TzPervasives))))
 
 (alias
  ((name runtest_indent)

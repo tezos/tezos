@@ -1,20 +1,23 @@
 (jbuild_version 1)
 
 (library
- ((name client_embedded_genesis)
-  (public_name tezos.client.embedded.genesis)
+ ((name tezos_embedded_client_genesis)
+  (public_name tezos-embedded-client-genesis)
   (libraries (tezos-base
               tezos-embedded-protocol-genesis
               tezos-embedded-protocol-genesis.raw
               tezos-embedded-protocol-alpha.environment
               tezos-embedded-protocol-alpha.raw
-              client_lib))
+              tezos-node-shell
+              tezos-client-base))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_embedded_protocol_environment_genesis
-                    -open Tezos_embedded_raw_protocol_genesis))))
+                    -open Tezos_embedded_raw_protocol_genesis
+                    -open Tezos_node_shell
+                    -open Tezos_client_base))))
 
 (alias
  ((name runtest_indent)

@@ -13,7 +13,7 @@ init_sandboxed_client() {
     rpc=$((18730 + id))
     client_dir="$(mktemp -d -t tezos-client.XXXXXXXX)"
     client_dirs+=("$client_dir")
-    local_client=${local_client:-$src_dir/_build/default/src/client_main.exe}
+    local_client=${local_client:-$src_dir/_build/default/bin_client/main.exe}
     client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
 
 }

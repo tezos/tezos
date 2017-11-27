@@ -4,7 +4,7 @@
  ((targets (environment.ml))
   (action
     (write-file ${@}
-      "include Tezos_protocol_environment.Make(struct let name = \"alpha\" end)()"))))
+      "include Tezos_node_updater.Tezos_protocol_environment.Make(struct let name = \"alpha\" end)()"))))
 
 (rule
  ((targets (registerer.ml))
@@ -12,7 +12,7 @@
     (write-file ${@}
        "
 let () =
-  let module Ignored = State.Register_embedded_protocol
+  let module Ignored = Tezos_node_shell.State.Register_embedded_protocol
     (Tezos_embedded_protocol_environment_alpha.Environment)
     (Tezos_embedded_raw_protocol_alpha.Main)
     (struct
@@ -28,7 +28,7 @@ let () =
  ((name tezos_embedded_protocol_environment_alpha)
   (public_name tezos-embedded-protocol-alpha.environment)
   (library_flags (:standard -linkall))
-  (libraries (tezos.node.updater))
+  (libraries (tezos-node-updater))
   (modules (Environment))))
 
 (library
@@ -49,5 +49,5 @@ let () =
  ((name tezos_embedded_protocol_alpha)
   (public_name tezos-embedded-protocol-alpha)
   (library_flags (:standard -linkall))
-  (libraries (tezos_embedded_raw_protocol_alpha tezos.node.shell))
+  (libraries (tezos_embedded_raw_protocol_alpha tezos-node-shell))
   (modules (Registerer))))

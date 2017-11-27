@@ -7,16 +7,18 @@
           test_transaction
           test_vote))
   (libraries (tezos-base
-              test_lib
-              client_lib
-              client_embedded_genesis
-              client_embedded_alpha))
+              tezos-client-base
+              tezos-embedded-client-genesis
+              tezos-embedded-client-alpha
+              test_lib))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_embedded_protocol_environment_alpha
                     -open Tezos_embedded_raw_protocol_alpha
-                    -open Tezos_context
-                    -open Client_embedded_alpha))))
+                    -open Tezos_client_base
+                    -open Tezos_embedded_client_genesis
+                    -open Tezos_embedded_client_alpha
+                    -open Tezos_context))))
 
 (alias
  ((name buildtest)
@@ -28,28 +30,28 @@
 
 (alias
  ((name runtest_endorsement)
-  (deps (../../src/node_main.exe
+  (deps (../../bin_node/main.exe
          sandbox.json))
   (locks  (/tcp-port/18100))
   (action (run ${exe:test_endorsement.exe}))))
 
 (alias
  ((name runtest_origination)
-  (deps (../../src/node_main.exe
+  (deps (../../bin_node/main.exe
          sandbox.json))
   (locks  (/tcp-port/18200))
   (action (run ${exe:test_origination.exe}))))
 
 (alias
  ((name runtest_transaction)
-  (deps (../../src/node_main.exe
+  (deps (../../bin_node/main.exe
          sandbox.json))
   (locks  (/tcp-port/18300))
   (action (run ${exe:test_transaction.exe}))))
 
 (alias
  ((name runtest_vote)
-  (deps (../../src/node_main.exe
+  (deps (../../bin_node/main.exe
          sandbox-vote.json))
   (locks  (/tcp-port/18400))
   (action (run ${exe:test_vote.exe}))))

@@ -6,8 +6,8 @@ src_dir="$(dirname "$test_dir")"
 cd "$test_dir"
 
 sandbox_file="$test_dir/sandbox.json"
-local_node="$src_dir/src/node_main.exe"
-local_client="$src_dir/src/client_main.exe"
+local_node="$src_dir/bin_node/main.exe"
+local_client="$src_dir/bin_client/main.exe"
 
 source $src_dir/scripts/node_lib.inc.sh
 source $src_dir/scripts/client_lib.inc.sh

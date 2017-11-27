@@ -4,7 +4,7 @@
  ((targets (environment.ml))
   (action
     (write-file ${@}
-      "include Tezos_protocol_environment.Make(struct let name = \"demo\" end)()"))))
+      "include Tezos_node_updater.Tezos_protocol_environment.Make(struct let name = \"demo\" end)()"))))
 
 (rule
  ((targets (registerer.ml))
@@ -12,7 +12,7 @@
     (write-file ${@}
        "
 let () =
-  let module Ignored = State.Register_embedded_protocol
+  let module Ignored = Tezos_node_shell.State.Register_embedded_protocol
     (Tezos_embedded_protocol_environment_demo.Environment)
     (Tezos_embedded_raw_protocol_demo.Main)
     (struct
@@ -28,7 +28,7 @@ let () =
  ((name tezos_embedded_protocol_environment_demo)
   (public_name tezos-embedded-protocol-demo.environment)
   (library_flags (:standard -linkall))
-  (libraries (tezos.node.updater))
+  (libraries (tezos-node-updater))
   (modules (Environment))))
 
 (library
@@ -49,5 +49,5 @@ let () =
  ((name tezos_embedded_protocol_demo)
   (public_name tezos-embedded-protocol-demo)
   (library_flags (:standard -linkall))
-  (libraries (tezos_embedded_raw_protocol_demo tezos.node.shell))
+  (libraries (tezos_embedded_raw_protocol_demo tezos-node-shell))
   (modules (Registerer))))

@@ -1,0 +1,20 @@
+(jbuild_version 1)
+
+(library
+ ((name tezos_node_shell)
+  (public_name tezos-node-shell)
+  (libraries (tezos-base
+              tezos-node-net
+              tezos-node-db
+              tezos-node-updater))
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
+                    -open Tezos_base__TzPervasives
+                    -open Tezos_node_db
+                    -open Tezos_node_net
+                    -open Tezos_node_updater))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

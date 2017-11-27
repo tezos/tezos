@@ -20,7 +20,7 @@ start_sandboxed_node() {
         peers+=("127.0.0.1:$peer_port")
     done
     peers+=("--closed")
-    local_node="${local_node:-$src_dir/_build/default/src/node_main.exe}"
+    local_node="${local_node:-$src_dir/_build/default/bin_node/main.exe}"
     node="$local_node"
     sandbox_file="${sandbox_file:-$script_dir/sandbox.json}"
     sandbox_param="--sandbox=$sandbox_file"

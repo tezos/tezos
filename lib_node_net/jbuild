@@ -1,17 +1,14 @@
 (jbuild_version 1)
 
 (library
- ((name client_lib)
-  (public_name tezos.client)
+ ((name tezos_node_net)
+  (public_name tezos-node-net)
   (libraries (tezos-base
-              node_shell
-              node_db
-              node_updater
-              tezos-protocol-compiler))
+              mtime.clock.os
+              ocplib-resto-cohttp))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
-                    -open Tezos_base__TzPervasives))
-  (wrapped false)))
+                    -open Tezos_base__TzPervasives))))
 
 (alias
  ((name runtest_indent)
