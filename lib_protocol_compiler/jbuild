@@ -11,7 +11,7 @@
 
 (library
  ((name tezos_protocol_compiler)
-  (public_name tezos.protocol_compiler)
+  (public_name tezos-protocol-compiler)
   (libraries (tezos-base
               tezos-protocol-environment-sigs
               compiler-libs
@@ -23,7 +23,17 @@
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -opaque
-                    -open Tezos_base__TzPervasives))))
+                    -open Tezos_base__TzPervasives))
+  (modules (:standard \ Main))))
+
+(executable
+ ((name main)
+  (public_name tezos-protocol-compiler)
+  (package tezos-protocol-compiler)
+  (modes (native))
+  (libraries (tezos-protocol-compiler))
+  (flags (:standard -linkall))
+  (modules (Main))))
 
 (alias
  ((name runtest_indent)

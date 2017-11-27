@@ -1,16 +1,6 @@
 (jbuild_version 1)
 
 (executable
- ((name compiler_main)
-  (public_name tezos-protocol-compiler)
-  (package tezos)
-  (libraries (tezos_protocol_compiler))
-  (flags (:standard -w -9+27-30-32-40@8
-                    -safe-string
-                    -linkall))
-  (modules (Compiler_main))))
-
-(executable
  ((name node_main)
   (public_name tezos-node)
   (package tezos)
