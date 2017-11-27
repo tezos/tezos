@@ -3,7 +3,7 @@
 (library
  ((name node_net)
   (public_name tezos.node.net)
-  (libraries (utils minutils conduit-lwt-unix cohttp cohttp-lwt-unix))
+  (libraries (utils minutils lwt.unix ocplib-resto-cohttp))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Error_monad

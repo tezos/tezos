@@ -73,11 +73,6 @@ val call_err_service2:
   (unit, (unit * 'a) * 'b, 'i, 'o tzresult) RPC.service ->
   'a -> 'b -> 'i -> 'o tzresult Lwt.t
 
-val call_describe0:
-  config ->
-  (unit, unit, 'a, 'b) RPC.service ->
-  string list -> 'a -> 'b tzresult Lwt.t
-
 type block = Node_rpc_services.Blocks.block
 
 val last_baked_block:

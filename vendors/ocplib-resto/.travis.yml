@@ -1,0 +1,12 @@
+language: c
+sudo: false
+services:
+  - docker
+install: wget https://raw.githubusercontent.com/ocaml/ocaml-travisci-skeleton/master/.travis-docker.sh
+script: bash ./.travis-docker.sh
+env:
+  global:
+    - PACKAGE="ocplib-resto"
+  matrix:
+    - DISTRO=debian-stable OCAML_VERSION=4.03.0
+    - DISTRO=debian-stable OCAML_VERSION=4.02.3

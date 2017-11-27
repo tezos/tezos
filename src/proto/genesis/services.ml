@@ -59,11 +59,11 @@ let operations_hash =
   Operation_list_list_hash.compute []
 
 let rpc_services : Updater.rpc_context RPC.directory =
-  let dir = RPC.empty in
+  let dir = RPC.Directory.empty in
   let dir =
     RPC.register
       dir
-      (Forge.block RPC.Path.root)
+      (Forge.block RPC.Path.open_root)
       (fun _ctxt ((_net_id, level, proto_level, predecessor,
                    timestamp, fitness), command) ->
         let shell = { Block_header.level ; proto_level ; predecessor ;

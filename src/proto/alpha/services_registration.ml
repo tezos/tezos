@@ -26,11 +26,11 @@ let rpc_init
   Tezos_context.init ~level ~timestamp ~fitness context >>=? fun context ->
   return { block_hash ; block_header ; operation_hashes ; operations ; context }
 
-let rpc_services = ref (RPC.empty : Updater.rpc_context RPC.directory)
+let rpc_services = ref (RPC.Directory.empty : Updater.rpc_context RPC.directory)
 
 let register0_fullctxt s f =
   rpc_services :=
-    RPC.register !rpc_services (s RPC.Path.root)
+    RPC.register !rpc_services (s RPC.Path.open_root)
       (fun ctxt () ->
          ( rpc_init ctxt >>=? fun ctxt ->
            f ctxt ) >>= RPC.Answer.return)
@@ -38,19 +38,19 @@ let register0 s f = register0_fullctxt s (fun { context } -> f context)
 
 let register1_fullctxt s f =
   rpc_services :=
-    RPC.register !rpc_services (s RPC.Path.root)
+    RPC.register !rpc_services (s RPC.Path.open_root)
       (fun ctxt arg ->
          ( rpc_init ctxt >>=? fun ctxt ->
            f ctxt arg ) >>= RPC.Answer.return)
 let register1 s f = register1_fullctxt s (fun { context } x -> f context x)
 let register1_noctxt s f =
   rpc_services :=
-    RPC.register !rpc_services (s RPC.Path.root)
+    RPC.register !rpc_services (s RPC.Path.open_root)
       (fun _ arg -> f arg >>= RPC.Answer.return)
 
 let register2_fullctxt s f =
   rpc_services :=
-    RPC.register !rpc_services (s RPC.Path.root)
+    RPC.register !rpc_services (s RPC.Path.open_root)
       (fun (ctxt, arg1) arg2 ->
          ( rpc_init ctxt >>=? fun ctxt ->
            f ctxt arg1 arg2 ) >>= RPC.Answer.return)
@@ -208,7 +208,7 @@ let () =
 let () =
   let register2 s f =
     rpc_services :=
-      RPC.register !rpc_services (s RPC.Path.root)
+      RPC.register !rpc_services (s RPC.Path.open_root)
         (fun (ctxt, contract) arg ->
            ( rpc_init ctxt >>=? fun { context = ctxt } ->
              Contract.exists ctxt contract >>=? function

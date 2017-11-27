@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+ ((name resto_json)
+  (public_name ocplib-resto-json)
+  (libraries (ocplib-json-typed ocplib-json-typed.bson ocplib-resto))
+  (modules (RestoJson))
+  (wrapped false)))

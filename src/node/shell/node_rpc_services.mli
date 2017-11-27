@@ -201,5 +201,4 @@ val bootstrapped: (unit, unit, unit, Block_hash.t * Time.t) RPC.service
 
 val complete: (unit, unit * string, unit, string list) RPC.service
 
-val describe:
-  (unit, unit, bool option, RPC.Description.directory_descr) RPC.service
+val describe: (unit, unit) RPC.Service.description_service

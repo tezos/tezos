@@ -1,0 +1,9 @@
+(jbuild_version 1)
+
+(library
+ ((name resto_cohttp)
+  (public_name ocplib-resto-cohttp)
+  (libraries (ocplib-resto-directory cohttp-lwt-unix))
+  (modules (RestoCohttp))
+  (wrapped false)))
+

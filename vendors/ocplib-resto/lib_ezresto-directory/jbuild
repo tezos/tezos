@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+ ((name ezresto_directory)
+  (public_name ocplib-ezresto-directory)
+  (libraries (ocplib-ezresto ocplib-resto-directory))
+  (modules (EzRestoDirectory))
+  (wrapped false)))

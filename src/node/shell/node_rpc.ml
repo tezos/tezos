@@ -533,5 +533,5 @@ let build_rpc_directory node =
         Node.RPC.Network.Point.events node point |> RPC.Answer.return in
     RPC.register1 dir Services.Network.Point.events implementation in
   let dir =
-    RPC.register_describe_directory_service dir Services.describe in
+    RPC.Directory.register_describe_directory_service dir Services.describe in
   dir

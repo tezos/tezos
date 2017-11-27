@@ -177,4 +177,4 @@ val complete:
 val describe:
   config ->
   ?recurse:bool -> string list ->
-  RPC.Description.directory_descr tzresult Lwt.t
+  Data_encoding.json_schema RPC.Description.directory tzresult Lwt.t

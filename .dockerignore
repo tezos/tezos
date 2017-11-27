@@ -1,6 +1,6 @@
 
 _build
-tezos.install
+**/*.install
 
 tezos-node
 tezos-protocol-compiler

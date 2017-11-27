@@ -99,7 +99,7 @@ module Node_protocol_environment_sigs : sig
        and type Tezos_data.Operation.t = Tezos_data.Operation.t
        and type Tezos_data.Block_header.shell_header = Tezos_data.Block_header.shell_header
        and type Tezos_data.Block_header.t = Tezos_data.Block_header.t
-       and type 'a RPC.directory = 'a RPC.directory
+       and type 'a RPC.Directory.t = 'a RPC.Directory.t
        and type Updater.validation_result = validation_result
        and type Updater.rpc_context = rpc_context
 

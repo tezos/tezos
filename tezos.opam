@@ -27,7 +27,6 @@ depends: [
   "ocp-ocamlres" { >= "dev" }
   "ocplib-endian"
   "ocplib-json-typed"
-  "ocplib-resto" { >= "dev" }
   "reactiveData"
   "sodium" { >= "0.3.0" }
   "magic-mime"
@@ -39,5 +38,5 @@ build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]
 ]
 build-test: [
-  [ "jbuilder" "runtest" ]
+  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
 ]

@@ -176,12 +176,10 @@ module StringMap = Map.Make(String)
 let rec count =
   let open RPC.Description in
   function
+  | Empty -> 0
   | Dynamic _ -> 1
-  | Static { service ; subdirs } ->
-      let service =
-        match service with
-        | None -> 0
-        | Some _ -> 1 in
+  | Static { services ; subdirs } ->
+      let service = RPC.MethMap.cardinal services in
       let subdirs =
         match subdirs with
         | None -> 0
@@ -213,10 +211,18 @@ let list url cctxt =
         Format.fprintf ppf "<%s>%a" arg.RPC.Arg.name display_paragraph descr
   in
   let display_service ppf (_path, tpath, service) =
-    Format.fprintf ppf "- /%s" (String.concat "/" tpath) ;
+    Format.fprintf ppf "- %s /%s"
+      (RPC.string_of_meth service.meth)
+      (String.concat "/" tpath) ;
     match service.description with
     | None | Some "" -> ()
     | Some description -> display_paragraph ppf description
+  in
+  let display_services ppf (_path, tpath, services) =
+    Format.pp_print_list
+      (fun ppf (_,s) -> display_service ppf (_path, tpath, s))
+      ppf
+      (RPC.MethMap.bindings services)
   in
   let rec display ppf (path, tpath, tree) =
     match tree with
@@ -226,23 +232,23 @@ let list url cctxt =
         | None | Some "" -> ()
         | Some description -> display_paragraph ppf description
       end
-    | Static { service = None ; subdirs = None } -> ()
-    | Static { service = Some service ; subdirs = None } ->
-        display_service ppf (path, tpath, service)
-    | Static { service ; subdirs = Some (Suffixes subdirs) } -> begin
-        match service, StringMap.bindings subdirs with
-        | None, [] -> ()
-        | None, [ n, solo ] ->
+    | Empty -> ()
+    | Static { services ; subdirs = None } ->
+        display_services ppf (path, tpath, services)
+    | Static { services ; subdirs = Some (Suffixes subdirs) } -> begin
+        match RPC.MethMap.cardinal services, StringMap.bindings subdirs with
+        | 0, [] -> ()
+        | 0, [ n, solo ] ->
             display ppf (path @ [ n ], tpath @ [ n ], solo)
-        | None, items when count tree >= 3 && path <> [] ->
+        | _, items when count tree >= 3 && path <> [] ->
             Format.fprintf ppf "@[<v 2>+ %s/@,%a@]"
               (String.concat "/" path) (display_list tpath) items
-        | Some service, items when count tree >= 3 && path <> [] ->
+        | _, items when count tree >= 3 && path <> [] ->
             Format.fprintf ppf "@[<v 2>+ %s@,%a@,%a@]"
               (String.concat "/" path)
-              display_service (path, tpath, service)
+              display_services (path, tpath, services)
               (display_list tpath) items
-        | None, (n, t) :: items ->
+        | 0, (n, t) :: items ->
             Format.fprintf ppf "%a"
               display (path @ [ n ], tpath @ [ n ], t) ;
             List.iter
@@ -250,22 +256,23 @@ let list url cctxt =
                  Format.fprintf ppf "@,%a"
                    display (path @ [ n ], tpath @ [ n ], t))
               items
-        | Some service, items ->
-            display_service ppf (path, tpath, service) ;
+        | _, items ->
+            display_services ppf (path, tpath, services) ;
             List.iter
               (fun (n, t) ->
                  Format.fprintf ppf "@,%a"
                    display (path @ [ n ], tpath @ [ n ], t))
               items
       end
-    | Static { service = None ; subdirs = Some (Arg (arg, solo)) } ->
+    | Static { services ; subdirs = Some (Arg (arg, solo)) }
+      when RPC.MethMap.cardinal services = 0 ->
         collect arg ;
         let name = Printf.sprintf "<%s>" arg.RPC.Arg.name in
         display ppf (path @ [ name ], tpath @ [ name ], solo)
-    | Static { service = Some service ;
+    | Static { services;
                subdirs = Some (Arg (arg, solo)) } ->
         collect arg ;
-        display_service ppf (path, tpath, service) ;
+        display_services ppf (path, tpath, services) ;
         Format.fprintf ppf "@," ;
         let name = Printf.sprintf "<%s>" arg.RPC.Arg.name in
         display ppf (path @ [ name ], tpath @ [ name ], solo)
@@ -286,11 +293,22 @@ let schema url cctxt =
   let args = Utils.split '/' url in
   let open RPC.Description in
   Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
-  | Static { service = Some { input ; output } } ->
-      let json = `O [ "input", Json_schema.to_json input ;
-                      "output", Json_schema.to_json output ] in
-      cctxt.message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
-      return ()
+  | Static { services } -> begin
+      match RPC.MethMap.find `POST services with
+      | exception Not_found ->
+          cctxt.message
+            "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
+          return ()
+      | { input = Some input ; output } ->
+          let json = `O [ "input", Json_schema.to_json input ;
+                          "output", Json_schema.to_json output ] in
+          cctxt.message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
+          return ()
+      | { input = None ; output } ->
+          let json = `O [ "output", Json_schema.to_json output ] in
+          cctxt.message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
+          return ()
+    end
   | _ ->
       cctxt.message
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
@@ -300,15 +318,29 @@ let format url cctxt =
   let args = Utils.split '/' url in
   let open RPC.Description in
   Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
-  | Static { service = Some { input ; output } } ->
-      cctxt.message
-        "@[<v 0>\
-         @[<v 2>Input format:@,%a@]@,\
-         @[<v 2>Output format:@,%a@]@,\
-         @]"
-        Json_schema.pp input
-        Json_schema.pp output >>= fun () ->
-      return ()
+  | Static { services } -> begin
+      match RPC.MethMap.find `POST services with
+      | exception Not_found ->
+          cctxt.message
+            "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
+          return ()
+      | { input = Some input ; output } ->
+          cctxt.message
+            "@[<v 0>\
+             @[<v 2>Input format:@,%a@]@,\
+             @[<v 2>Output format:@,%a@]@,\
+             @]"
+            Json_schema.pp input
+            Json_schema.pp output >>= fun () ->
+          return ()
+      | { input = None ; output } ->
+          cctxt.message
+            "@[<v 0>\
+             @[<v 2>Output format:@,%a@]@,\
+             @]"
+            Json_schema.pp output >>= fun () ->
+          return ()
+    end
   | _ ->
       cctxt.message
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
@@ -325,16 +357,23 @@ let call url cctxt =
   let args = Utils.split '/' url in
   let open RPC.Description in
   Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
-  | Static { service = Some { input } } -> begin
-      fill_in input >>= function
-      | Error msg ->
-          cctxt.error "%s" msg >>= fun () ->
+  | Static { services } -> begin
+      match RPC.MethMap.find `POST services with
+      | exception Not_found ->
+          cctxt.message
+            "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
           return ()
-      | Ok json ->
-          Client_rpcs.get_json cctxt.rpc_config `POST args json >>=? fun json ->
-          cctxt.message "%a"
-            Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
-          return ()
+      | { input = None } -> assert false (* TODO *)
+      | { input = Some input } ->
+          fill_in input >>= function
+          | Error msg ->
+              cctxt.error "%s" msg >>= fun () ->
+              return ()
+          | Ok json ->
+              Client_rpcs.get_json cctxt.rpc_config `POST args json >>=? fun json ->
+              cctxt.message "%a"
+                Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
+              return ()
     end
   | _ ->
       cctxt.message

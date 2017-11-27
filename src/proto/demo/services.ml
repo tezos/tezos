@@ -46,17 +46,17 @@ let failing_service custom_root =
     RPC.Path.(custom_root / "failing")
 
 let rpc_services : Updater.rpc_context RPC.directory =
-  let dir = RPC.empty in
+  let dir = RPC.Directory.empty in
   let dir =
     RPC.register
       dir
-      (failing_service RPC.Path.root)
+      (failing_service RPC.Path.open_root)
       (fun _ctxt x -> Error.demo_error x >>= RPC.Answer.return)
   in
   let dir =
     RPC.register
       dir
-      (echo_service RPC.Path.root)
+      (echo_service RPC.Path.open_root)
       (fun _ctxt x -> RPC.Answer.return x)
   in
   dir

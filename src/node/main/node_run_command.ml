@@ -176,7 +176,9 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
             port
             (if rpc_config.tls = None then "" else " (TLS enabled)") >>= fun () ->
           RPC_server.launch ~host mode dir
-            rpc_config.cors_origins rpc_config.cors_headers >>= fun server ->
+            ~media_types:RPC_server.[ json ; octet_stream ]
+            ~cors:{ allowed_origins = rpc_config.cors_origins ;
+                    allowed_headers = rpc_config.cors_headers } >>= fun server ->
           return (Some server)
 
 let init_signal () =

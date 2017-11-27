@@ -192,7 +192,9 @@ let make_request config log_request meth service json =
   let reqbody = Data_encoding_ezjsonm.to_string json in
   Lwt.catch begin fun () ->
     let body = Cohttp_lwt_body.of_string reqbody in
-    Cohttp_lwt_unix.Client.call meth ~body uri >>= fun (code, ansbody) ->
+    Cohttp_lwt_unix.Client.call
+      (meth :> Cohttp.Code.meth)
+      ~body uri >>= fun (code, ansbody) ->
     log_request uri json >>= fun reqid ->
     return (reqid, code.Cohttp.Response.status, ansbody)
   end begin fun exn ->
@@ -257,10 +259,12 @@ let get_json config meth service json =
       fail config (Request_failed (service, err))
 
 let parse_answer config service path json =
-  match RPC.read_answer service json with
-  | Error msg ->
+  match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
+  | exception msg ->
+      let msg =
+        Format.asprintf "%a" (fun x -> Data_encoding.Json.print_error x) msg in
       fail config (Unexpected_json (path, json, msg))
-  | Ok v -> return v
+  | v -> return v
 
 let call_service0 cctxt service arg =
   let meth, path, arg = RPC.forge_request service () arg in
@@ -302,10 +306,12 @@ let call_streamed_service1 cctxt service arg1 arg2 =
   call_streamed cctxt service (RPC.forge_request service ((), arg1) arg2)
 
 let parse_err_answer config service path json =
-  match RPC.read_answer service json with
-  | Error msg -> (* TODO print_error *)
+  match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
+  | exception msg -> (* TODO print_error *)
+      let msg =
+        Format.asprintf "%a" (fun x -> Data_encoding.Json.print_error x) msg in
       fail config (Unexpected_json (path, json, msg))
-  | Ok v -> Lwt.return v
+  | v -> Lwt.return v
 
 let call_err_service0 cctxt service arg =
   let meth, path, arg = RPC.forge_request service () arg in
@@ -321,11 +327,6 @@ let call_err_service2 cctxt service a1 a2 arg =
   let meth, path, arg = RPC.forge_request service (((), a1), a2) arg in
   get_json cctxt meth path arg >>=? fun json ->
   parse_err_answer cctxt service path json
-
-let call_describe0 cctxt service path arg =
-  let meth, prefix, arg = RPC.forge_request service () arg in
-  get_json cctxt meth (prefix @ path) arg >>=? fun json ->
-  parse_answer cctxt service prefix json
 
 type block = Node_rpc_services.Blocks.block
 
