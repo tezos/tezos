@@ -1,17 +1,8 @@
 diff --git a/src/proto/alpha/constants_repr.ml b/src/proto/alpha/constants_repr.ml
-index 3780bec2..36f91ff6 100644
+index 61e79c8a..f91ce282 100644
 --- a/src/proto/alpha/constants_repr.ml
 +++ b/src/proto/alpha/constants_repr.ml
-@@ -15,7 +15,7 @@ let proof_of_work_nonce_size = 8
- let nonce_length = 32
- 
- let roll_value =
--  Tez_repr.of_cents_exn 10000_00L
-+  Tez_repr.of_cents_exn 30000_00L
- let seed_nonce_revelation_tip =
-   Tez_repr.of_cents_exn 10_00L
- let origination_burn =
-@@ -50,15 +50,14 @@ let read_public_key s =
+@@ -49,15 +49,14 @@ let read_public_key s =
    Ed25519.Public_key.of_bytes (Bytes.of_string (Hex_encode.hex_decode s))
  
  let default = {
