@@ -214,14 +214,16 @@ module MakeEncodings(E: sig
         l p enc.encoded_length
 
   let decode ?alphabet s =
-    let rec find s = function
-      | [] -> None
-      | Encoding { prefix ; of_raw ; wrap } :: encodings ->
-          match remove_prefix ~prefix s with
-          | None -> find s encodings
-          | Some msg -> of_raw msg |> Utils.map_option ~f:wrap in
-    let s = safe_decode ?alphabet s in
-    find s !encodings
+    try
+      let rec find s = function
+        | [] -> None
+        | Encoding { prefix ; of_raw ; wrap } :: encodings ->
+            match remove_prefix ~prefix s with
+            | None -> find s encodings
+            | Some msg -> of_raw msg |> Utils.map_option ~f:wrap in
+      let s = safe_decode ?alphabet s in
+      find s !encodings
+    with Invalid_argument _ -> None
 
 end
 
