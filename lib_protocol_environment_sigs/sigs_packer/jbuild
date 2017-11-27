@@ -2,9 +2,7 @@
 
 (executable
   ((name sigs_packer)
-   (public_name tezos-protocol-environment-sigs-packer)
-   (package tezos)
-   (flags (:standard -w -9-32 -safe-string))))
+   (public_name tezos-protocol-environment-sigs.packer)))
 
 (alias
  ((name runtest_indent)

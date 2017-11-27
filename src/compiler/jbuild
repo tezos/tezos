@@ -6,14 +6,14 @@
     (run ${bin:ocp-ocamlres} -format ocaml -o ${@}
            ${lib:stdlib:camlinternalFormatBasics.cmi}
            ${path:tezos_protocol_compiler__Registerer.cmi}
-           ${path:../environment/tezos_protocol_environment_sigs.cmi}
-           ${path:../environment/tezos_protocol_environment_sigs__V1.cmi}))))
+           ${lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}
+           ${lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi}))))
 
 (library
  ((name tezos_protocol_compiler)
   (public_name tezos.protocol_compiler)
   (libraries (tezos-base
-              tezos_protocol_environment_sigs
+              tezos-protocol-environment-sigs
               compiler-libs
               compiler-libs.optcomp
               lwt.unix
