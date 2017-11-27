@@ -6,9 +6,9 @@
   (package tezos)
   (libraries (tezos-base
               node_db node_main_lib node_net cmdliner
-              tezos_embedded_protocol_genesis
-              tezos_embedded_protocol_demo
-              tezos_embedded_protocol_alpha))
+              tezos-embedded-protocol-genesis
+              tezos-embedded-protocol-demo
+              tezos-embedded-protocol-alpha))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives

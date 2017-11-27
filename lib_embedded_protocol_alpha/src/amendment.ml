@@ -9,6 +9,8 @@
 
 open Tezos_context
 
+let () = ()
+
 let select_winning_proposal proposals =
   let merge proposal vote winners =
     match winners with

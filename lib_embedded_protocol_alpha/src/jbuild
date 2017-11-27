@@ -13,7 +13,7 @@
        "
 let () =
   let module Ignored = State.Register_embedded_protocol
-    (Tezos_protocol_environment_alpha.Environment)
+    (Tezos_embedded_protocol_environment_alpha.Environment)
     (Tezos_embedded_raw_protocol_alpha.Main)
     (struct
        let hash =
@@ -25,21 +25,21 @@ let () =
     } end) in ()"))))
 
 (library
- ((name tezos_protocol_environment_alpha)
-  (public_name tezos.protocol_environment.alpha)
-  (library_flags (:standard -linkall -w -9 -safe-string))
-  (libraries (node_updater))
+ ((name tezos_embedded_protocol_environment_alpha)
+  (public_name tezos-embedded-protocol-alpha.environment)
+  (library_flags (:standard -linkall))
+  (libraries (tezos.node.updater))
   (modules (Environment))))
 
 (library
  ((name tezos_embedded_raw_protocol_alpha)
-  (public_name tezos.embedded_raw_protocol.alpha)
-  (libraries (tezos_protocol_environment_alpha))
+  (public_name tezos-embedded-protocol-alpha.raw)
+  (libraries (tezos_embedded_protocol_environment_alpha))
   (library_flags (:standard -linkall))
   (flags (:standard -nopervasives -nostdlib -safe-string
                     -w +a-4-6-7-9-29-32-40..42-44-45-48
                     -warn-error -a+8
-                    -open Tezos_protocol_environment_alpha__Environment
+                    -open Tezos_embedded_protocol_environment_alpha__Environment
                     -open Error_monad
                     -open Hash
                     -open Tezos_data))
@@ -47,20 +47,7 @@ let () =
 
 (library
  ((name tezos_embedded_protocol_alpha)
-  (public_name tezos.embedded_protocol.alpha)
-  (library_flags (:standard -linkall -w -9-32 -safe-string))
-  (libraries (tezos_embedded_raw_protocol_alpha node_shell))
+  (public_name tezos-embedded-protocol-alpha)
+  (library_flags (:standard -linkall))
+  (libraries (tezos_embedded_raw_protocol_alpha tezos.node.shell))
   (modules (Registerer))))
-
-(alias
- ((name runtest_sandboxing)
-  (deps ((glob_files *.ml)
-         (glob_files *.mli)
-         TEZOS_PROTOCOL))
-  (action (chdir ${ROOT}
-          (run ${exe:../../compiler_main.exe} dummy_alpha ${path-no-dep:.})))))
-
-(alias
- ((name runtest_indent)
-  (deps ((glob_files *.ml) (glob_files *.mli)))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))
