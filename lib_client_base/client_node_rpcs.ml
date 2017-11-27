@@ -71,7 +71,7 @@ module Blocks = struct
     data: MBytes.t ;
     operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
-    test_network: Context.test_network;
+    test_network: Test_network_status.t;
   }
   type preapply_param = Services.Blocks.preapply_param = {
     timestamp: Time.t ;
@@ -81,7 +81,7 @@ module Blocks = struct
   }
   type preapply_result = Services.Blocks.preapply_result = {
     shell_header: Block_header.shell_header ;
-    operations: error Prevalidation.preapply_result ;
+    operations: error Preapply_result.t ;
   }
   let net_id cctxt h =
     call_service1 cctxt Services.Blocks.net_id h ()

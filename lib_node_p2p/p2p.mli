@@ -209,9 +209,9 @@ module RPC : sig
 
   val stat : ('msg, 'meta) net -> Stat.t
 
-  module Event = P2p_connection_pool.Log_event
-
-  val watch : ('msg, 'meta) net -> Event.t Lwt_stream.t * Lwt_watcher.stopper
+  val watch :
+    ('msg, 'meta) net ->
+    P2p_types.Connection_pool_log_event.t Lwt_stream.t * Lwt_watcher.stopper
   val connect : ('msg, 'meta) net -> Point.t -> float -> unit tzresult Lwt.t
 
   module Connection : sig
@@ -222,79 +222,41 @@ module RPC : sig
   end
 
   module Point : sig
-    include module type of Point
-
-    type state =
-      | Requested
-      | Accepted of Peer_id.t
-      | Running of Peer_id.t
-      | Disconnected
-
-    val pp_state_digram : Format.formatter -> state -> unit
-    val state_encoding : state Data_encoding.t
-
-    type info = {
-      trusted : bool ;
-      greylisted_until : Time.t ;
-      state : state ;
-      last_failed_connection : Time.t option ;
-      last_rejected_connection : (Peer_id.t * Time.t) option ;
-      last_established_connection : (Peer_id.t * Time.t) option ;
-      last_disconnection : (Peer_id.t * Time.t) option ;
-      last_seen : (Peer_id.t * Time.t) option ;
-      last_miss : Time.t option ;
-    }
-
-    val info_encoding : info Data_encoding.t
-
-    module Event = P2p_connection_pool_types.Point_info.Event
 
     val info :
-      ('msg, 'meta) net -> Point.t -> info option
+      ('msg, 'meta) net -> Point.t -> P2p_types.Point_info.t option
+
     val list :
-      ?restrict:state list -> ('msg, 'meta) net -> (Point.t * info) list
+      ?restrict: P2p_types.Point_state.t list ->
+      ('msg, 'meta) net -> (Point.t * P2p_types.Point_info.t) list
+
     val events :
-      ?max:int -> ?rev:bool -> ('msg, 'meta) net -> Point.t -> Event.t list
+      ?max:int -> ?rev:bool -> ('msg, 'meta) net -> Point.t ->
+      P2p_connection_pool_types.Point_info.Event.t list
+
     val watch :
-      ('msg, 'meta) net -> Point.t -> Event.t Lwt_stream.t * Lwt_watcher.stopper
+      ('msg, 'meta) net -> Point.t ->
+      P2p_connection_pool_types.Point_info.Event.t Lwt_stream.t * Lwt_watcher.stopper
+
   end
 
   module Peer_id : sig
-    include module type of Peer_id
-
-    type state =
-      | Accepted
-      | Running
-      | Disconnected
-
-    val pp_state_digram : Format.formatter -> state -> unit
-    val state_encoding : state Data_encoding.t
-
-    type info = {
-      score : float ;
-      trusted : bool ;
-      state : state ;
-      id_point : Id_point.t option ;
-      stat : Stat.t ;
-      last_failed_connection : (Id_point.t * Time.t) option ;
-      last_rejected_connection : (Id_point.t * Time.t) option ;
-      last_established_connection : (Id_point.t * Time.t) option ;
-      last_disconnection : (Id_point.t * Time.t) option ;
-      last_seen : (Id_point.t * Time.t) option ;
-      last_miss : (Id_point.t * Time.t) option ;
-    }
-    val info_encoding : info Data_encoding.t
-
-    module Event = P2p_connection_pool_types.Peer_info.Event
 
     val info :
-      ('msg, 'meta) net -> Peer_id.t -> info option
+      ('msg, 'meta) net -> Peer_id.t -> P2p_types.Peer_info.t option
+
     val list :
-      ?restrict:state list -> ('msg, 'meta) net -> (Peer_id.t * info) list
+      ?restrict: P2p_types.Peer_state.t list ->
+      ('msg, 'meta) net -> (Peer_id.t * P2p_types.Peer_info.t) list
+
     val events :
-      ?max:int -> ?rev:bool -> ('msg, 'meta) net -> Peer_id.t -> Event.t list
+      ?max: int -> ?rev: bool ->
+      ('msg, 'meta) net -> Peer_id.t ->
+      P2p_connection_pool_types.Peer_info.Event.t list
+
     val watch :
-      ('msg, 'meta) net -> Peer_id.t -> Event.t Lwt_stream.t * Lwt_watcher.stopper
+      ('msg, 'meta) net -> Peer_id.t ->
+      P2p_connection_pool_types.Peer_info.Event.t Lwt_stream.t * Lwt_watcher.stopper
 
   end
 
@@ -313,6 +275,7 @@ val on_new_connection :
   (Peer_id.t -> ('msg, 'meta) connection -> unit) -> unit
 
 (**/**)
+
 module Raw : sig
   type 'a t =
     | Bootstrap

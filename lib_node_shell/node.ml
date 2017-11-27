@@ -152,7 +152,7 @@ module RPC = struct
     data: MBytes.t ;
     operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
-    test_network: Context.test_network;
+    test_network: Test_network_status.t ;
   }
 
   let convert (block: State.Block.t) =
@@ -377,7 +377,7 @@ module RPC = struct
     | (`Prevalidation | `Test_prevalidation) as block ->
         let validator = get_validator node block in
         let pv = Net_validator.prevalidator validator in
-        let { Prevalidation.applied }, _ = Prevalidator.operations pv in
+        let { Preapply_result.applied }, _ = Prevalidator.operations pv in
         Lwt.return [List.map fst applied]
     | `Hash hash ->
         read_valid_block node hash >>= function
@@ -398,7 +398,7 @@ module RPC = struct
     | (`Prevalidation | `Test_prevalidation) as block ->
         let validator = get_validator node block in
         let pv = Net_validator.prevalidator validator in
-        let { Prevalidation.applied }, _ = Prevalidator.operations pv in
+        let { Preapply_result.applied }, _ = Prevalidator.operations pv in
         Lwt.return [List.map snd applied]
     | `Hash hash ->
         read_valid_block node hash >>= function
@@ -421,24 +421,24 @@ module RPC = struct
         Chain.head net_state >>= fun head ->
         predecessor net_db n head >>= fun b ->
         Prevalidator.pending ~block:b prevalidator >|= fun ops ->
-        Prevalidation.empty_result, ops
+        Preapply_result.empty, ops
     | `Genesis ->
         let net_state = Net_validator.net_state node.mainnet_validator in
         let prevalidator =
           Net_validator.prevalidator node.mainnet_validator in
         Chain.genesis net_state >>= fun b ->
         Prevalidator.pending ~block:b prevalidator >|= fun ops ->
-        Prevalidation.empty_result, ops
+        Preapply_result.empty, ops
     | `Hash h -> begin
         get_validator_per_hash node h >>= function
         | None ->
-            Lwt.return (Prevalidation.empty_result, Operation_hash.Map.empty)
+            Lwt.return (Preapply_result.empty, Operation_hash.Map.empty)
         | Some validator ->
             let net_state = Net_validator.net_state validator in
             let prevalidator = Net_validator.prevalidator validator in
             State.Block.read_exn net_state h >>= fun block ->
             Prevalidator.pending ~block prevalidator >|= fun ops ->
-            Prevalidation.empty_result, ops
+            Preapply_result.empty, ops
       end
 
   let protocols { state } =
@@ -522,8 +522,8 @@ module RPC = struct
     | Some rpc_context ->
         Context.get_protocol rpc_context.context >>= fun protocol_hash ->
         let (module Proto) = State.Registred_protocol.get_exn protocol_hash in
-        let dir = RPC.Directory.map (fun () -> rpc_context) Proto.rpc_services in
-        Lwt.return (Some (RPC.Directory.map (fun _ -> ()) dir))
+        let dir = RPC_server.Directory.map (fun () -> rpc_context) Proto.rpc_services in
+        Lwt.return (Some (RPC_server.Directory.map (fun _ -> ()) dir))
 
   let heads node =
     let net_state = Net_validator.net_state node.mainnet_validator in
@@ -627,7 +627,7 @@ module RPC = struct
         ]
       end in
     let shutdown () = Lwt_watcher.shutdown stopper in
-    RPC.Answer.{ next ; shutdown }
+    RPC_server.Answer.{ next ; shutdown }
 
   module Network = struct
 
@@ -661,11 +661,11 @@ module RPC = struct
       let info (node : t) =
         P2p.RPC.Point.info node.p2p
 
-      let list (node : t) restrict =
-        P2p.RPC.Point.list ~restrict node.p2p
+      let list ?restrict (node : t) =
+        P2p.RPC.Point.list ?restrict node.p2p
 
-      let events (node : t) =
-        P2p.RPC.Point.events node.p2p
+      let events ?max ?rev (node : t) =
+        P2p.RPC.Point.events node.p2p ?max ?rev
 
       let watch (node : t) =
         P2p.RPC.Point.watch node.p2p
@@ -677,11 +677,11 @@ module RPC = struct
       let info (node : t) =
         P2p.RPC.Peer_id.info node.p2p
 
-      let list (node : t) restrict =
-        P2p.RPC.Peer_id.list ~restrict node.p2p
+      let list ?restrict (node : t) =
+        P2p.RPC.Peer_id.list ?restrict node.p2p
 
-      let events (node : t) =
-        P2p.RPC.Peer_id.events node.p2p
+      let events ?max ?rev (node : t) =
+        P2p.RPC.Peer_id.events node.p2p ?max ?rev
 
       let watch (node : t) =
         P2p.RPC.Peer_id.watch node.p2p

@@ -5,13 +5,16 @@
           test_p2p_connection_pool
           test_p2p_io_scheduler))
   (libraries (tezos-base
-              tezos-node-net
+              tezos-node-p2p-base
+              tezos-node-p2p
+              lwt.unix
               test_lib))
   (flags (:standard -w -9-32
                     -linkall
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_node_net))))
+                    -open Tezos_node_p2p_base
+                    -open Tezos_node_p2p))))
 
 (alias
  ((name buildtest)

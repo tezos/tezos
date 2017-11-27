@@ -163,11 +163,11 @@ module Point_info = struct
     | (Some t1 as a1 , (Some t2 as a2)) ->
         if Time.compare t1 t2 < 0 then a2 else a1
 
-  let fold_events { events } ~init ~f = Ring.fold events ~init ~f
+  let fold_events { events ; _ } ~init ~f = Ring.fold events ~init ~f
 
-  let watch { watchers } = Lwt_watcher.create_stream watchers
+  let watch { watchers ; _ } = Lwt_watcher.create_stream watchers
 
-  let log { events ; watchers } ?(timestamp = Time.now ()) kind =
+  let log { events ; watchers ; _ } ?(timestamp = Time.now ()) kind =
     let event = { Event.kind ; timestamp } in
     Ring.add events event ;
     Lwt_watcher.notify watchers event
@@ -189,16 +189,16 @@ module Point_info = struct
     let pp ppf = function
       | Requested _ ->
           Format.fprintf ppf "requested"
-      | Accepted { current_peer_id } ->
+      | Accepted { current_peer_id ; _ } ->
           Format.fprintf ppf "accepted %a" Peer_id.pp current_peer_id
-      | Running { current_peer_id } ->
+      | Running { current_peer_id ; _ } ->
           Format.fprintf ppf "running %a" Peer_id.pp current_peer_id
       | Disconnected ->
           Format.fprintf ppf "disconnected"
 
-    let get { state } = state
+    let get { state ; _ } = state
 
-    let is_disconnected { state } =
+    let is_disconnected { state ; _ } =
       match state with
       | Disconnected -> true
       | Requested _ | Accepted _ | Running _ -> false
@@ -232,7 +232,7 @@ module Point_info = struct
         match point_info.state with
         | Disconnected -> true (* request to unknown peer_id. *)
         | Running _ -> false
-        | Accepted { current_peer_id } -> Peer_id.equal peer_id current_peer_id
+        | Accepted { current_peer_id ; _ } -> Peer_id.equal peer_id current_peer_id
         | Requested _ -> true
       end ;
       point_info.state <- Running { data ; current_peer_id = peer_id } ;
@@ -255,12 +255,12 @@ module Point_info = struct
             set_greylisted timestamp point_info ;
             point_info.last_failed_connection <- Some timestamp ;
             Request_rejected None
-        | Accepted { current_peer_id } ->
+        | Accepted { current_peer_id ; _ } ->
             set_greylisted timestamp point_info ;
             point_info.last_rejected_connection <-
               Some (current_peer_id, timestamp) ;
             Request_rejected (Some current_peer_id)
-        | Running { current_peer_id } ->
+        | Running { current_peer_id ; _ } ->
             point_info.greylisting_delay <-
               float_of_int point_info.greylisting.initial_delay ;
             point_info.greylisting_end <-
@@ -368,7 +368,7 @@ module Peer_info = struct
     conv
       (fun { peer_id ; trusted ; metadata ; events ; created ;
              last_failed_connection ; last_rejected_connection ;
-             last_established_connection ; last_disconnection } ->
+             last_established_connection ; last_disconnection ; _ } ->
         (peer_id, created, trusted, metadata, Ring.elements events,
          last_failed_connection, last_rejected_connection,
          last_established_connection, last_disconnection))
@@ -402,14 +402,14 @@ module Peer_info = struct
          (opt "last_disconnection"
             (tup2 Id_point.encoding Time.encoding)))
 
-  let peer_id { peer_id } = peer_id
-  let created { created } = created
-  let metadata { metadata } = metadata
+  let peer_id { peer_id ; _ } = peer_id
+  let created { created ; _ } = created
+  let metadata { metadata ; _ } = metadata
   let set_metadata gi metadata = gi.metadata <- metadata
-  let trusted { trusted } = trusted
+  let trusted { trusted ; _ } = trusted
   let set_trusted gi = gi.trusted <- true
   let unset_trusted gi = gi.trusted <- false
-  let fold_events { events } ~init ~f = Ring.fold events ~init ~f
+  let fold_events { events ; _ } ~init ~f = Ring.fold events ~init ~f
 
   let last_established_connection s = s.last_established_connection
   let last_disconnection s = s.last_disconnection
@@ -426,12 +426,12 @@ module Peer_info = struct
       s.last_failed_connection
       (recent s.last_rejected_connection s.last_disconnection)
 
-  let log { events ; watchers } ?(timestamp = Time.now ()) point kind =
+  let log { events ; watchers ; _ } ?(timestamp = Time.now ()) point kind =
     let event = { Event.kind ; timestamp ; point } in
     Ring.add events event ;
     Lwt_watcher.notify watchers event
 
-  let watch { watchers } = Lwt_watcher.create_stream watchers
+  let watch { watchers ; _ } = Lwt_watcher.create_stream watchers
 
   let log_incoming_rejection ?timestamp peer_info point =
     log peer_info ?timestamp point Rejecting_request
@@ -447,16 +447,16 @@ module Peer_info = struct
     type 'data state = 'data t
 
     let pp ppf = function
-      | Accepted { current_point } ->
+      | Accepted { current_point ; _ } ->
           Format.fprintf ppf "accepted %a" Id_point.pp current_point
-      | Running { current_point } ->
+      | Running { current_point ; _ } ->
           Format.fprintf ppf "running %a" Id_point.pp current_point
       | Disconnected ->
           Format.fprintf ppf "disconnected"
 
-    let get { state } = state
+    let get { state ; _ } = state
 
-    let is_disconnected { state } =
+    let is_disconnected { state ; _ } =
       match state with
       | Disconnected -> true
       | Accepted _ | Running _ -> false
@@ -479,7 +479,7 @@ module Peer_info = struct
         match peer_info.state with
         | Disconnected -> true (* request to unknown peer_id. *)
         | Running _ -> false
-        | Accepted { current_point } ->
+        | Accepted { current_point ; _ } ->
             Id_point.equal point current_point
       end ;
       peer_info.state <- Running { data ; current_point = point } ;
@@ -490,11 +490,11 @@ module Peer_info = struct
         ?(timestamp = Time.now ()) ?(requested = false) peer_info =
       let current_point, (event : Event.kind) =
         match peer_info.state with
-        | Accepted { current_point } ->
+        | Accepted { current_point ; _ } ->
             peer_info.last_rejected_connection <-
               Some (current_point, timestamp) ;
             current_point, Request_rejected
-        | Running { current_point } ->
+        | Running { current_point ; _ } ->
             peer_info.last_disconnection <-
               Some (current_point, timestamp) ;
             current_point,

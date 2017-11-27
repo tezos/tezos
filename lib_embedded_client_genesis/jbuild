@@ -8,7 +8,7 @@
               tezos-embedded-protocol-genesis.raw
               tezos-embedded-protocol-alpha.environment
               tezos-embedded-protocol-alpha.raw
-              tezos-node-shell
+              tezos-node-services
               tezos-client-base))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
@@ -16,7 +16,7 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_embedded_protocol_environment_genesis
                     -open Tezos_embedded_raw_protocol_genesis
-                    -open Tezos_node_shell
+                    -open Tezos_node_services
                     -open Tezos_client_base))))
 
 (alias

@@ -135,14 +135,10 @@ module Data = struct
 end
 
 include Resto
-include RestoDirectory
-module Directory = RestoDirectory.MakeDirectory(Data)
-module Service = Directory.Service
-
+module Service = Resto.MakeService(Data)
 
 (* Compatibility layer, to be removed ASAP. *)
 
-type 'a directory = 'a Directory.t
 type ('prefix, 'params, 'input, 'output) service =
   ([ `POST ], 'prefix, 'params, unit, 'input, 'output, unit) Service.t
 
@@ -156,20 +152,6 @@ let service ?description ~input ~output path =
     path
 
 type directory_descr = Data_encoding.json_schema Description.directory
-
-let empty = Directory.empty
-let register d s f = Directory.register d s (fun p () i -> f p i)
-
-open Directory.Curry
-let register0 root s f = register root s (curry Z f)
-let register1 root s f = register root s (curry (S Z) f)
-let register2 root s f = register root s (curry (S (S Z)) f)
-(* let register3 root s f = register root s (curry (S (S (S Z))) f) *)
-(* let register4 root s f = register root s (curry (S (S (S (S Z)))) f) *)
-(* let register5 root s f = register root s (curry (S (S (S (S (S Z))))) f) *)
-
-let register_dynamic_directory1 =
-  Directory.register_dynamic_directory1
 
 let forge_request (type i) (service: (_,_,_,_,i,_,_) Service.t) params body =
   let { Service.meth ; path } =

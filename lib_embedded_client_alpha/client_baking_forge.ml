@@ -110,7 +110,7 @@ let forge_block cctxt block
           Operation_hash.Map.bindings @@
           Operation_hash.Map.fold
             Operation_hash.Map.add
-            (Prevalidation.preapply_result_operations ops)
+            (Preapply_result.operations ops)
             pendings in
         return ops
     | Some operations -> return operations
@@ -465,7 +465,7 @@ let bake cctxt state =
          List.map snd @@
          Operation_hash.Map.bindings @@
          Operation_hash.Map.(fold add)
-           ops (Prevalidation.preapply_result_operations res) in
+           ops (Preapply_result.operations res) in
        let request = List.length operations in
        let proto_header =
          forge_faked_proto_header ~priority ~seed_nonce_hash in

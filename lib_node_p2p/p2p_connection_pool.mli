@@ -333,66 +333,7 @@ module Points : sig
 
 end
 
-module Log_event : sig
-
-  type t =
-
-    (* Pool-level events *)
-
-    | Too_few_connections
-    | Too_many_connections
-
-    | New_point of Point.t
-    | New_peer of Peer_id.t
-
-    | Gc_points
-    (** Garbage collection of known point table has been triggered. *)
-
-    | Gc_peer_ids
-    (** Garbage collection of known peer_ids table has been triggered. *)
-
-    (* Connection-level events *)
-
-    | Incoming_connection of Point.t
-    (** We accept(2)-ed an incoming connection *)
-    | Outgoing_connection of Point.t
-    (** We connect(2)-ed to a remote endpoint *)
-    | Authentication_failed of Point.t
-    (** Remote point failed authentication *)
-
-    | Accepting_request of Point.t * Id_point.t * Peer_id.t
-    (** We accepted a connection after authentifying the remote peer. *)
-    | Rejecting_request of Point.t * Id_point.t * Peer_id.t
-    (** We rejected a connection after authentifying the remote peer. *)
-    | Request_rejected of Point.t * (Id_point.t * Peer_id.t) option
-    (** The remote peer rejected our connection. *)
-
-    | Connection_established of Id_point.t * Peer_id.t
-    (** We succesfully established a authentified connection. *)
-
-    | Swap_request_received of { source : Peer_id.t }
-    (** A swap request has been received. *)
-    | Swap_ack_received of { source : Peer_id.t }
-    (** A swap ack has been received *)
-    | Swap_request_sent of { source : Peer_id.t }
-    (** A swap request has been sent *)
-    | Swap_ack_sent of { source : Peer_id.t }
-    (** A swap ack has been sent *)
-    | Swap_request_ignored of { source : Peer_id.t }
-    (** A swap request has been ignored *)
-    | Swap_success of { source : Peer_id.t }
-    (** A swap operation has succeeded *)
-    | Swap_failure of { source : Peer_id.t }
-    (** A swap operation has failed *)
-
-    | Disconnection of Peer_id.t
-    (** We decided to close the connection. *)
-    | External_disconnection of Peer_id.t
-    (** The connection was closed for external reason. *)
-
-  val encoding : t Data_encoding.t
-
-end
+module Log_event = Connection_pool_log_event
 
 val watch: ('msg, 'meta) pool -> Log_event.t Lwt_stream.t * Lwt_watcher.stopper
 (** [watch pool] is a [stream, close] a [stream] of events and a

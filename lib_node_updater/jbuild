@@ -7,7 +7,9 @@
               tezos-micheline
               tezos-protocol-compiler
               tezos-storage
-              tezos-node-net
+              tezos-node-services
+              tezos-node-p2p-base
+              tezos-node-http
               dynlink))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
@@ -15,7 +17,9 @@
                     -open Tezos_micheline
                     -open Tezos_protocol_compiler
                     -open Tezos_storage
-                    -open Tezos_node_net))))
+                    -open Tezos_node_services
+                    -open Tezos_node_http
+                    -open Tezos_node_p2p_base))))
 
 (alias
  ((name runtest_indent)

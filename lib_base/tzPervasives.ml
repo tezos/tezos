@@ -29,5 +29,8 @@ module Block_header = Block_header
 module Operation = Operation
 module Protocol = Protocol
 
+module Test_network_status = Test_network_status
+module Preapply_result = Preapply_result
+
 include Utils.Infix
 include Error_monad

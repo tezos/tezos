@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(library
+ ((name tezos_node_p2p_base)
+  (public_name tezos-node-p2p-base)
+  (libraries (tezos-base))
+  (flags (:standard -open Tezos_base__TzPervasives))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

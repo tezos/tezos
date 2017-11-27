@@ -28,6 +28,8 @@ module Fitness = Fitness
 module Block_header = Block_header
 module Operation = Operation
 module Protocol = Protocol
+module Test_network_status = Test_network_status
+module Preapply_result = Preapply_result
 
 include (module type of (struct include Utils.Infix end))
 include (module type of (struct include Error_monad end))

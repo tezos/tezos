@@ -56,7 +56,10 @@ module Make(Param : sig val name: string end)() = struct
     module Block_header = Block_header
     module Protocol = Protocol
   end
-  module RPC = RPC
+  module RPC = struct
+    include RPC
+    include RPC_server
+  end
   module Micheline = Tezos_micheline.Micheline
   module Fitness = Fitness
   module Error_monad = struct

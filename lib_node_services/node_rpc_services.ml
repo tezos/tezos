@@ -69,7 +69,7 @@ module Blocks = struct
     data: MBytes.t ;
     operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
-    test_network: Context.test_network;
+    test_network: Test_network_status.t ;
   }
 
   let block_info_encoding =
@@ -104,7 +104,7 @@ module Blocks = struct
                (opt "operations" (dynamic_size (list (dynamic_size (list (dynamic_size operation_encoding))))))
                (req "protocol" Protocol_hash.encoding)
                (dft "test_network"
-                  Context.test_network_encoding Context.Not_running))
+                  Test_network_status.encoding Not_running))
             Block_header.encoding))
 
   let parse_block s =
@@ -243,7 +243,7 @@ module Blocks = struct
     RPC.service
       ~description:"Returns the status of the associated test network."
       ~input: empty
-      ~output: Context.test_network_encoding
+      ~output: Test_network_status.encoding
       RPC.Path.(block_path / "test_network")
 
   let pending_operations =
@@ -259,7 +259,8 @@ module Blocks = struct
       ~output:
         (conv
            (fun (preapplied, unprocessed) ->
-              ({ preapplied with Prevalidation.refused = Operation_hash.Map.empty },
+              ({ preapplied with
+                 Preapply_result.refused = Operation_hash.Map.empty },
                Operation_hash.Map.bindings unprocessed))
            (fun (preapplied, unprocessed) ->
               (preapplied,
@@ -268,7 +269,7 @@ module Blocks = struct
                  unprocessed Operation_hash.Map.empty))
            (merge_objs
               (dynamic_size
-                 (Prevalidation.preapply_result_encoding Error.encoding))
+                 (Preapply_result.encoding Error.encoding))
               (obj1 (req "unprocessed" (list (dynamic_size operation_encoding))))))
       RPC.Path.(block_path / "pending_operations")
 
@@ -296,7 +297,7 @@ module Blocks = struct
 
   type preapply_result = {
     shell_header: Block_header.shell_header ;
-    operations: error Prevalidation.preapply_result ;
+    operations: error Preapply_result.t ;
   }
 
   let preapply_result_encoding =
@@ -308,7 +309,7 @@ module Blocks = struct
        (obj2
           (req "shell_header" Block_header.shell_header_encoding)
           (req "operations"
-             (Prevalidation.preapply_result_encoding Error.encoding))))
+             (Preapply_result.encoding Error.encoding))))
 
   let preapply =
     RPC.service
@@ -498,21 +499,21 @@ module Network = struct
     RPC.service
       ~description:"Supported network layer versions."
       ~input: empty
-      ~output: (list P2p.Version.encoding)
+      ~output: (list P2p_types.Version.encoding)
       RPC.Path.(root / "network" / "versions")
 
   let stat =
     RPC.service
       ~description:"Global network bandwidth statistics in B/s."
       ~input: empty
-      ~output: P2p.Stat.encoding
+      ~output: P2p_types.Stat.encoding
       RPC.Path.(root / "network" / "stat")
 
   let events =
     RPC.service
       ~description:"Stream of all network events"
       ~input: empty
-      ~output: P2p.RPC.Event.encoding
+      ~output: P2p_types.Connection_pool_log_event.encoding
       RPC.Path.(root / "network" / "log")
 
   let connect =
@@ -530,13 +531,13 @@ module Network = struct
       RPC.service
         ~description:"List the running P2P connection."
         ~input: empty
-        ~output: (list P2p.Connection_info.encoding)
+        ~output: (list P2p_types.Connection_info.encoding)
         RPC.Path.(root / "network" / "connection")
 
     let info =
       RPC.service
         ~input: empty
-        ~output: (option P2p.Connection_info.encoding)
+        ~output: (option P2p_types.Connection_info.encoding)
         ~description:"Details about the current P2P connection to the given peer."
         RPC.Path.(root / "network" / "connection" /: peer_id_arg)
 
@@ -554,23 +555,26 @@ module Network = struct
     let info =
       RPC.service
         ~input: empty
-        ~output: (option P2p.RPC.Point.info_encoding)
+        ~output: (option P2p_types.Point_info.encoding)
         ~description: "Details about a given `IP:addr`."
         RPC.Path.(root / "network" / "point" /: point_arg)
 
     let events =
       RPC.service
         ~input: monitor_encoding
-        ~output: (list P2p.RPC.Point.Event.encoding)
+        ~output: (list P2p_connection_pool_types.Point_info.Event.encoding)
         ~description: "Monitor network events related to an `IP:addr`."
         RPC.Path.(root / "network" / "point" /: point_arg / "log")
 
     let list =
       let filter =
-        obj1 (dft "filter" (list P2p.RPC.Point.state_encoding) []) in
+        obj1 (dft "filter" (list P2p_types.Point_state.encoding) []) in
       RPC.service
         ~input: filter
-        ~output: (list (tup2 P2p.Point.encoding P2p.RPC.Point.info_encoding))
+        ~output:
+          (list (tup2
+                   P2p_types.Point.encoding
+                   P2p_types.Point_info.encoding))
         ~description:"List the pool of known `IP:port` \
                       used for establishing P2P connections ."
         RPC.Path.(root / "network" / "point")
@@ -582,23 +586,26 @@ module Network = struct
     let info =
       RPC.service
         ~input: empty
-        ~output: (option P2p.RPC.Peer_id.info_encoding)
+        ~output: (option P2p_types.Peer_info.encoding)
         ~description:"Details about a given peer."
         RPC.Path.(root / "network" / "peer_id" /: peer_id_arg)
 
     let events =
       RPC.service
         ~input: monitor_encoding
-        ~output: (list P2p.RPC.Peer_id.Event.encoding)
+        ~output: (list P2p_connection_pool_types.Peer_info.Event.encoding)
         ~description:"Monitor network events related to a given peer."
         RPC.Path.(root / "network" / "peer_id" /: peer_id_arg / "log")
 
     let list =
       let filter =
-        obj1 (dft "filter" (list P2p.RPC.Peer_id.state_encoding) []) in
+        obj1 (dft "filter" (list P2p_types.Peer_state.encoding) []) in
       RPC.service
         ~input: filter
-        ~output: (list (tup2 P2p.Peer_id.encoding P2p.RPC.Peer_id.info_encoding))
+        ~output:
+          (list (tup2
+                   P2p_types.Peer_id.encoding
+                   P2p_types.Peer_info.encoding))
         ~description:"List the peers the node ever met."
         RPC.Path.(root / "network" / "peer_id")
 

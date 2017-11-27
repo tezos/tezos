@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 open Client_commands
+open P2p_types
 
 let group =
   { Cli_entries.name = "network" ;
@@ -23,32 +24,31 @@ let commands () = [
     Client_node_rpcs.Network.peers cctxt.rpc_config >>=? fun peers ->
     Client_node_rpcs.Network.points cctxt.rpc_config >>=? fun points ->
     cctxt.message "GLOBAL STATS" >>= fun () ->
-    cctxt.message "  %a" P2p_types.Stat.pp stat >>= fun () ->
+    cctxt.message "  %a" Stat.pp stat >>= fun () ->
     cctxt.message "CONNECTIONS" >>= fun () ->
     let incoming, outgoing =
-      List.partition (fun c -> c.P2p_types.Connection_info.incoming) conns in
+      List.partition (fun c -> c.Connection_info.incoming) conns in
     Lwt_list.iter_s begin fun conn ->
-      cctxt.message "  %a" P2p_types.Connection_info.pp conn
+      cctxt.message "  %a" Connection_info.pp conn
     end incoming >>= fun () ->
     Lwt_list.iter_s begin fun conn ->
-      cctxt.message "  %a" P2p_types.Connection_info.pp conn
+      cctxt.message "  %a" Connection_info.pp conn
     end outgoing >>= fun () ->
     cctxt.message "KNOWN PEERS" >>= fun () ->
     Lwt_list.iter_s begin fun (p, pi) ->
-      let open P2p.RPC.Peer_id in
       cctxt.message "  %a  %.0f %a %a %s"
-        pp_state_digram pi.state
+        Peer_state.pp_digram pi.Peer_info.state
         pi.score
-        pp p P2p_types.Stat.pp pi.stat
+        Peer_id.pp p
+        Stat.pp pi.stat
         (if pi.trusted then "★" else " ")
     end peers >>= fun () ->
     cctxt.message "KNOWN POINTS" >>= fun () ->
     Lwt_list.iter_s begin fun (p, pi) ->
-      let open P2p.RPC in
-      match pi.Point.state with
+      match pi.Point_info.state with
       | Running peer_id ->
           cctxt.message "  %a  %a %a %s"
-            Point.pp_state_digram pi.state
+            Point_state.pp_digram pi.state
             Point.pp p
             Peer_id.pp peer_id
             (if pi.trusted then "★" else " ")
@@ -56,14 +56,14 @@ let commands () = [
           match pi.last_seen with
           | Some (peer_id, ts) ->
               cctxt.message "  %a  %a (last seen: %a %a) %s"
-                Point.pp_state_digram pi.state
+                Point_state.pp_digram pi.state
                 Point.pp p
                 Peer_id.pp peer_id
                 Time.pp_hum ts
                 (if pi.trusted then "★" else " ")
           | None ->
               cctxt.message "  %a  %a %s"
-                Point.pp_state_digram pi.state
+                Point_state.pp_digram pi.state
                 Point.pp p
                 (if pi.trusted then "★" else " ")
     end points >>= fun () ->

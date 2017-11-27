@@ -36,70 +36,70 @@ let monitor_operations node contents =
         Lwt.return_some @@
         List.map (List.map (fun h -> h, None)) hashes
     end in
-  RPC.Answer.return_stream { next ; shutdown }
+  RPC_server.Answer.return_stream { next ; shutdown }
 
 let register_bi_dir node dir =
   let dir =
     let implementation b include_ops =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return (filter_bi include_ops bi) in
-    RPC.register1 dir
+      RPC_server.Answer.return (filter_bi include_ops bi) in
+    RPC_server.register1 dir
       Services.Blocks.info implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.hash in
-    RPC.register1 dir
+      RPC_server.Answer.return bi.hash in
+    RPC_server.register1 dir
       Services.Blocks.hash
       implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.net_id in
-    RPC.register1 dir
+      RPC_server.Answer.return bi.net_id in
+    RPC_server.register1 dir
       Services.Blocks.net_id implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.level in
-    RPC.register1 dir
+      RPC_server.Answer.return bi.level in
+    RPC_server.register1 dir
       Services.Blocks.level implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.predecessor in
-    RPC.register1 dir
+      RPC_server.Answer.return bi.predecessor in
+    RPC_server.register1 dir
       Services.Blocks.predecessor implementation in
   let dir =
     let implementation b len =
       Node.RPC.block_info node b >>= fun bi ->
       Node.RPC.predecessors node len bi.hash >>= fun hashes ->
-      RPC.Answer.return hashes in
-    RPC.register1 dir
+      RPC_server.Answer.return hashes in
+    RPC_server.register1 dir
       Services.Blocks.predecessors implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.fitness in
-    RPC.register1 dir
+      RPC_server.Answer.return bi.fitness in
+    RPC_server.register1 dir
       Services.Blocks.fitness implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.timestamp in
-    RPC.register1 dir
+      RPC_server.Answer.return bi.timestamp in
+    RPC_server.register1 dir
       Services.Blocks.timestamp implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.protocol in
-    RPC.register1 dir
+      RPC_server.Answer.return bi.protocol in
+    RPC_server.register1 dir
       Services.Blocks.protocol implementation in
   let dir =
     let implementation b () =
       Node.RPC.block_info node b >>= fun bi ->
-      RPC.Answer.return bi.test_network in
-    RPC.register1 dir
+      RPC_server.Answer.return bi.test_network in
+    RPC_server.register1 dir
       Services.Blocks.test_network implementation in
   let dir =
     let implementation b { Node_rpc_services.Blocks.contents ; monitor } =
@@ -110,19 +110,19 @@ let register_bi_dir node dir =
           Node.RPC.operation_hashes node b >>= fun hashes ->
           if contents then
             Node.RPC.operations node b >>= fun ops ->
-            RPC.Answer.return @@
+            RPC_server.Answer.return @@
             List.map2 (List.map2 (fun h op -> h, Some op)) hashes ops
           else
-            RPC.Answer.return @@
+            RPC_server.Answer.return @@
             List.map (List.map (fun h -> h, None)) hashes
     in
-    RPC.register1 dir
+    RPC_server.register1 dir
       Services.Blocks.operations implementation in
   let dir =
     let implementation b () =
       Node.RPC.pending_operations node b >>= fun res ->
-      RPC.Answer.return res in
-    RPC.register1 dir
+      RPC_server.Answer.return res in
+    RPC_server.register1 dir
       Services.Blocks.pending_operations
       implementation in
   let dir =
@@ -132,15 +132,15 @@ let register_bi_dir node dir =
       Node.RPC.preapply node b
         ~timestamp ~proto_header ~sort_operations operations >>= function
       | Ok (shell_header, operations) ->
-          RPC.Answer.return
+          RPC_server.Answer.return
             (Ok { Services.Blocks.shell_header ; operations })
-      | Error _ as err -> RPC.Answer.return err in
-    RPC.register1 dir
+      | Error _ as err -> RPC_server.Answer.return err in
+    RPC_server.register1 dir
       Services.Blocks.preapply implementation in
   dir
 
 let ops_dir _node =
-  let ops_dir = RPC.empty in
+  let ops_dir = RPC_server.empty in
   ops_dir
 
 let rec insert_future_block (bi: Services.Blocks.block_info) = function
@@ -303,7 +303,7 @@ let list_blocks
       List.map
         (List.map (filter_bi include_ops))
         requested_blocks in
-    RPC.Answer.return infos
+    RPC_server.Answer.return infos
   else begin
     let (bi_stream, stopper) = Node.RPC.block_watcher node in
     let stream =
@@ -325,12 +325,12 @@ let list_blocks
           List.map (List.map (filter_bi include_ops)) requested_blocks in
         Lwt.return (Some infos)
       end in
-    RPC.Answer.return_stream { next ; shutdown }
+    RPC_server.Answer.return_stream { next ; shutdown }
   end
 
 let list_invalid node () =
   Node.RPC.list_invalid node >>= fun l ->
-  RPC.Answer.return l
+  RPC_server.Answer.return l
 
 let list_protocols node {Services.Protocols.monitor; contents} =
   let monitor = match monitor with None -> false | Some x -> x in
@@ -346,7 +346,7 @@ let list_protocols node {Services.Protocols.monitor; contents} =
          Lwt.return (hash, None))
     protocols >>= fun protocols ->
   if not monitor then
-    RPC.Answer.return protocols
+    RPC_server.Answer.return protocols
   else
     let stream, stopper = Node.RPC.protocol_watcher node in
     let shutdown () = Lwt_watcher.shutdown stopper in
@@ -361,19 +361,19 @@ let list_protocols node {Services.Protocols.monitor; contents} =
         first_request := false ;
         Lwt.return (Some protocols)
       end in
-    RPC.Answer.return_stream { next ; shutdown }
+    RPC_server.Answer.return_stream { next ; shutdown }
 
 let get_protocols node hash () =
   Node.RPC.protocol_content node hash >>= function
-  | Ok bytes -> RPC.Answer.return bytes
+  | Ok bytes -> RPC_server.Answer.return bytes
   | Error _ -> raise Not_found
 
 let build_rpc_directory node =
-  let dir = RPC.empty in
+  let dir = RPC_server.empty in
   let dir =
-    RPC.register0 dir Services.Blocks.list (list_blocks node) in
+    RPC_server.register0 dir Services.Blocks.list (list_blocks node) in
   let dir =
-    RPC.register0 dir Services.Blocks.list_invalid (list_invalid node) in
+    RPC_server.register0 dir Services.Blocks.list_invalid (list_invalid node) in
   let dir = register_bi_dir node dir in
   let dir =
     let implementation block =
@@ -381,21 +381,21 @@ let build_rpc_directory node =
           Node.RPC.context_dir node block >>= function
           | None -> Lwt.fail Not_found
           | Some context_dir -> Lwt.return context_dir)
-        (fun _ -> Lwt.return RPC.empty) in
-    RPC.register_dynamic_directory1
+        (fun _ -> Lwt.return RPC_server.empty) in
+    RPC_server.register_dynamic_directory1
       ~descr:
         "All the RPCs which are specific to the protocol version."
       dir Services.Blocks.proto_path implementation in
   let dir =
-    RPC.register0 dir Services.Protocols.list (list_protocols node) in
+    RPC_server.register0 dir Services.Protocols.list (list_protocols node) in
   let dir =
-    RPC.register1 dir Services.Protocols.contents (get_protocols node) in
+    RPC_server.register1 dir Services.Protocols.contents (get_protocols node) in
   let dir =
     let implementation header =
       let res =
         Data_encoding.Binary.to_bytes Block_header.encoding header in
-      RPC.Answer.return res in
-    RPC.register0 dir Services.forge_block_header implementation in
+      RPC_server.Answer.return res in
+    RPC_server.register0 dir Services.forge_block_header implementation in
   let dir =
     let implementation
         { Node_rpc_services.raw ; blocking ; force ; operations } =
@@ -404,88 +404,88 @@ let build_rpc_directory node =
           node ~force
           raw operations >>=? fun (hash, wait) ->
         (if blocking then wait else return ()) >>=? fun () -> return hash
-      end >>= RPC.Answer.return in
-    RPC.register0 dir Services.inject_block implementation in
+      end >>= RPC_server.Answer.return in
+    RPC_server.register0 dir Services.inject_block implementation in
   let dir =
     let implementation (contents, blocking, net_id, force) =
       Node.RPC.inject_operation
         node ?force ?net_id contents >>= fun (hash, wait) ->
       begin
         (if blocking then wait else return ()) >>=? fun () -> return hash
-      end >>= RPC.Answer.return in
-    RPC.register0 dir Services.inject_operation implementation in
+      end >>= RPC_server.Answer.return in
+    RPC_server.register0 dir Services.inject_operation implementation in
   let dir =
     let implementation (proto, blocking, force) =
       Node.RPC.inject_protocol ?force node proto >>= fun (hash, wait) ->
       begin
         (if blocking then wait else return ()) >>=? fun () -> return hash
-      end >>= RPC.Answer.return in
-    RPC.register0 dir Services.inject_protocol implementation in
+      end >>= RPC_server.Answer.return in
+    RPC_server.register0 dir Services.inject_protocol implementation in
   let dir =
     let implementation () =
-      RPC.Answer.return_stream (Node.RPC.bootstrapped node) in
-    RPC.register0 dir Services.bootstrapped implementation in
+      RPC_server.Answer.return_stream (Node.RPC.bootstrapped node) in
+    RPC_server.register0 dir Services.bootstrapped implementation in
   let dir =
     let implementation () =
-      RPC.Answer.return
+      RPC_server.Answer.return
         Data_encoding.Json.(schema Error_monad.error_encoding) in
-    RPC.register0 dir Services.Error.service implementation in
+    RPC_server.register0 dir Services.Error.service implementation in
   let dir =
-    RPC.register1 dir Services.complete
+    RPC_server.register1 dir Services.complete
       (fun s () ->
-         Node.RPC.complete node s >>= RPC.Answer.return) in
+         Node.RPC.complete node s >>= RPC_server.Answer.return) in
   let dir =
-    RPC.register2 dir Services.Blocks.complete
+    RPC_server.register2 dir Services.Blocks.complete
       (fun block s () ->
-         Node.RPC.complete node ~block s >>= RPC.Answer.return) in
+         Node.RPC.complete node ~block s >>= RPC_server.Answer.return) in
 
   (* Network : Global *)
 
   let dir =
     let implementation () =
-      Node.RPC.Network.stat node |> RPC.Answer.return in
-    RPC.register0 dir Services.Network.stat implementation in
+      Node.RPC.Network.stat node |> RPC_server.Answer.return in
+    RPC_server.register0 dir Services.Network.stat implementation in
   let dir =
     let implementation () =
-      RPC.Answer.return Distributed_db.Raw.supported_versions in
-    RPC.register0 dir Services.Network.versions implementation in
+      RPC_server.Answer.return Distributed_db.Raw.supported_versions in
+    RPC_server.register0 dir Services.Network.versions implementation in
   let dir =
     let implementation () =
       let stream, stopper = Node.RPC.Network.watch node in
       let shutdown () = Lwt_watcher.shutdown stopper in
       let next () = Lwt_stream.get stream in
-      RPC.Answer.return_stream { next ; shutdown } in
-    RPC.register0 dir Services.Network.events implementation in
+      RPC_server.Answer.return_stream { next ; shutdown } in
+    RPC_server.register0 dir Services.Network.events implementation in
   let dir =
     let implementation point timeout =
-      Node.RPC.Network.connect node point timeout >>= RPC.Answer.return in
-    RPC.register1 dir Services.Network.connect implementation in
+      Node.RPC.Network.connect node point timeout >>= RPC_server.Answer.return in
+    RPC_server.register1 dir Services.Network.connect implementation in
 
   (* Network : Connection *)
 
   let dir =
     let implementation peer_id () =
-      Node.RPC.Network.Connection.info node peer_id |> RPC.Answer.return in
-    RPC.register1 dir Services.Network.Connection.info implementation in
+      Node.RPC.Network.Connection.info node peer_id |> RPC_server.Answer.return in
+    RPC_server.register1 dir Services.Network.Connection.info implementation in
   let dir =
     let implementation peer_id wait =
-      Node.RPC.Network.Connection.kick node peer_id wait >>= RPC.Answer.return in
-    RPC.register1 dir Services.Network.Connection.kick implementation in
+      Node.RPC.Network.Connection.kick node peer_id wait >>= RPC_server.Answer.return in
+    RPC_server.register1 dir Services.Network.Connection.kick implementation in
   let dir =
     let implementation () =
-      Node.RPC.Network.Connection.list node |> RPC.Answer.return in
-    RPC.register0 dir Services.Network.Connection.list implementation in
+      Node.RPC.Network.Connection.list node |> RPC_server.Answer.return in
+    RPC_server.register0 dir Services.Network.Connection.list implementation in
 
   (* Network : Peer_id *)
 
   let dir =
     let implementation state =
-      Node.RPC.Network.Peer_id.list node state |> RPC.Answer.return in
-    RPC.register0 dir Services.Network.Peer_id.list implementation in
+      Node.RPC.Network.Peer_id.list node ~restrict:state |> RPC_server.Answer.return in
+    RPC_server.register0 dir Services.Network.Peer_id.list implementation in
   let dir =
     let implementation peer_id () =
-      Node.RPC.Network.Peer_id.info node peer_id |> RPC.Answer.return in
-    RPC.register1 dir Services.Network.Peer_id.info implementation in
+      Node.RPC.Network.Peer_id.info node peer_id |> RPC_server.Answer.return in
+    RPC_server.register1 dir Services.Network.Peer_id.info implementation in
   let dir =
     let implementation peer_id monitor =
       if monitor then
@@ -499,21 +499,21 @@ let build_rpc_directory node =
             first_request := false ;
             Lwt.return_some @@ Node.RPC.Network.Peer_id.events node peer_id
           end in
-        RPC.Answer.return_stream { next ; shutdown }
+        RPC_server.Answer.return_stream { next ; shutdown }
       else
-        Node.RPC.Network.Peer_id.events node peer_id |> RPC.Answer.return in
-    RPC.register1 dir Services.Network.Peer_id.events implementation in
+        Node.RPC.Network.Peer_id.events node peer_id |> RPC_server.Answer.return in
+    RPC_server.register1 dir Services.Network.Peer_id.events implementation in
 
   (* Network : Point *)
 
   let dir =
     let implementation state =
-      Node.RPC.Network.Point.list node state |> RPC.Answer.return in
-    RPC.register0 dir Services.Network.Point.list implementation in
+      Node.RPC.Network.Point.list node ~restrict:state |> RPC_server.Answer.return in
+    RPC_server.register0 dir Services.Network.Point.list implementation in
   let dir =
     let implementation point () =
-      Node.RPC.Network.Point.info node point |> RPC.Answer.return in
-    RPC.register1 dir Services.Network.Point.info implementation in
+      Node.RPC.Network.Point.info node point |> RPC_server.Answer.return in
+    RPC_server.register1 dir Services.Network.Point.info implementation in
   let dir =
     let implementation point monitor =
       if monitor then
@@ -527,10 +527,10 @@ let build_rpc_directory node =
             first_request := false ;
             Lwt.return_some @@ Node.RPC.Network.Point.events node point
           end in
-        RPC.Answer.return_stream { next ; shutdown }
+        RPC_server.Answer.return_stream { next ; shutdown }
       else
-        Node.RPC.Network.Point.events node point |> RPC.Answer.return in
-    RPC.register1 dir Services.Network.Point.events implementation in
+        Node.RPC.Network.Point.events node point |> RPC_server.Answer.return in
+    RPC_server.register1 dir Services.Network.Point.events implementation in
   let dir =
-    RPC.Directory.register_describe_directory_service dir Services.describe in
+    RPC_server.Directory.register_describe_directory_service dir Services.describe in
   dir

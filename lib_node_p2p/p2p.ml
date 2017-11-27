@@ -515,107 +515,16 @@ module RPC = struct
   end
 
   module Point = struct
-    include Point
 
-    type state =
-      | Requested
-      | Accepted of Peer_id.t
-      | Running of Peer_id.t
-      | Disconnected
-
-    let peer_id_of_state = function
-      | Requested -> None
-      | Accepted pi -> Some pi
-      | Running pi -> Some pi
-      | Disconnected -> None
-
-    let state_of_state_peerid state pi = match state, pi with
-      | Requested, _ -> Requested
-      | Accepted _, Some pi -> Accepted pi
-      | Running _, Some pi -> Running pi
-      | Disconnected, _ -> Disconnected
-      | _ -> invalid_arg "state_of_state_peerid"
-
-    let pp_state_digram ppf = function
-      | Requested -> Format.fprintf ppf "⚎"
-      | Accepted _ -> Format.fprintf ppf "⚍"
-      | Running _ -> Format.fprintf ppf "⚌"
-      | Disconnected -> Format.fprintf ppf "⚏"
-
-    let state_encoding =
-      let open Data_encoding in
-      let branch_encoding name obj =
-        conv (fun x -> (), x) (fun ((), x) -> x)
-          (merge_objs
-             (obj1 (req "event_kind" (constant name))) obj) in
-      union ~tag_size:`Uint8 [
-        case ~tag:0 (branch_encoding "requested" empty)
-          (function Requested -> Some () | _ -> None)
-          (fun () -> Requested) ;
-        case ~tag:1 (branch_encoding "accepted"
-                       (obj1 (req "peer_id" Peer_id.encoding)))
-          (function Accepted peer_id -> Some peer_id | _ -> None)
-          (fun peer_id -> Accepted peer_id) ;
-        case ~tag:2 (branch_encoding "running"
-                       (obj1 (req "peer_id" Peer_id.encoding)))
-          (function Running peer_id -> Some peer_id | _ -> None)
-          (fun peer_id -> Running peer_id) ;
-        case ~tag:3 (branch_encoding "disconnected" empty)
-          (function Disconnected -> Some () | _ -> None)
-          (fun () -> Disconnected) ;
-      ]
-
-    type info = {
-      trusted : bool ;
-      greylisted_until : Time.t ;
-      state : state ;
-      last_failed_connection : Time.t option ;
-      last_rejected_connection : (Peer_id.t * Time.t) option ;
-      last_established_connection : (Peer_id.t * Time.t) option ;
-      last_disconnection : (Peer_id.t * Time.t) option ;
-      last_seen : (Peer_id.t * Time.t) option ;
-      last_miss : Time.t option ;
-    }
-
-    let info_encoding =
-      let open Data_encoding in
-      conv
-        (fun { trusted ; greylisted_until ; state ;
-               last_failed_connection ; last_rejected_connection ;
-               last_established_connection ; last_disconnection ;
-               last_seen ; last_miss } ->
-          let peer_id = peer_id_of_state state in
-          (trusted, greylisted_until, state, peer_id,
-           last_failed_connection, last_rejected_connection,
-           last_established_connection, last_disconnection,
-           last_seen, last_miss))
-        (fun (trusted, greylisted_until, state, peer_id,
-              last_failed_connection, last_rejected_connection,
-              last_established_connection, last_disconnection,
-              last_seen, last_miss) ->
-          let state = state_of_state_peerid state peer_id in
-          { trusted ; greylisted_until ; state ;
-            last_failed_connection ; last_rejected_connection ;
-            last_established_connection ; last_disconnection ;
-            last_seen ; last_miss })
-        (obj10
-           (req "trusted" bool)
-           (dft "greylisted_until" Time.encoding Time.epoch)
-           (req "state" state_encoding)
-           (opt "peer_id" Peer_id.encoding)
-           (opt "last_failed_connection" Time.encoding)
-           (opt "last_rejected_connection" (tup2 Peer_id.encoding Time.encoding))
-           (opt "last_established_connection" (tup2 Peer_id.encoding Time.encoding))
-           (opt "last_disconnection" (tup2 Peer_id.encoding Time.encoding))
-           (opt "last_seen" (tup2 Peer_id.encoding Time.encoding))
-           (opt "last_miss" Time.encoding))
+    open P2p_types.Point_info
+    open P2p_types.Point_state
 
     let info_of_point_info i =
       let open P2p_connection_pool_types in
       let state = match Point_info.State.get i with
         | Requested _ -> Requested
-        | Accepted { current_peer_id } -> Accepted current_peer_id
-        | Running { current_peer_id } -> Running current_peer_id
+        | Accepted { current_peer_id ; _ } -> Accepted current_peer_id
+        | Running { current_peer_id ; _ } -> Running current_peer_id
         | Disconnected -> Disconnected in
       Point_info.{
         trusted = trusted i ;
@@ -677,74 +586,9 @@ module RPC = struct
   end
 
   module Peer_id = struct
-    include Peer_id
 
-    type state =
-      | Accepted
-      | Running
-      | Disconnected
-
-    let pp_state_digram ppf = function
-      | Accepted -> Format.fprintf ppf "⚎"
-      | Running -> Format.fprintf ppf "⚌"
-      | Disconnected -> Format.fprintf ppf "⚏"
-
-    let state_encoding =
-      let open Data_encoding in
-      string_enum [
-        "accepted", Accepted ;
-        "running", Running ;
-        "disconnected", Disconnected ;
-      ]
-
-    type info = {
-      score : float ;
-      trusted : bool ;
-      state : state ;
-      id_point : Id_point.t option ;
-      stat : Stat.t ;
-      last_failed_connection : (Id_point.t * Time.t) option ;
-      last_rejected_connection : (Id_point.t * Time.t) option ;
-      last_established_connection : (Id_point.t * Time.t) option ;
-      last_disconnection : (Id_point.t * Time.t) option ;
-      last_seen : (Id_point.t * Time.t) option ;
-      last_miss : (Id_point.t * Time.t) option ;
-    }
-
-    let info_encoding =
-      let open Data_encoding in
-      conv
-        (fun (
-           { score ; trusted ; state ; id_point ; stat ;
-             last_failed_connection ; last_rejected_connection ;
-             last_established_connection ; last_disconnection ;
-             last_seen ; last_miss }) ->
-           ((score, trusted, state, id_point, stat),
-            (last_failed_connection, last_rejected_connection,
-             last_established_connection, last_disconnection,
-             last_seen, last_miss)))
-        (fun ((score, trusted, state, id_point, stat),
-              (last_failed_connection, last_rejected_connection,
-               last_established_connection, last_disconnection,
-               last_seen, last_miss)) ->
-          { score ; trusted ; state ; id_point ; stat ;
-            last_failed_connection ; last_rejected_connection ;
-            last_established_connection ; last_disconnection ;
-            last_seen ; last_miss })
-        (merge_objs
-           (obj5
-              (req "score" float)
-              (req "trusted" bool)
-              (req "state" state_encoding)
-              (opt "reachable_at" Id_point.encoding)
-              (req "stat" Stat.encoding))
-           (obj6
-              (opt "last_failed_connection" (tup2 Id_point.encoding Time.encoding))
-              (opt "last_rejected_connection" (tup2 Id_point.encoding Time.encoding))
-              (opt "last_established_connection" (tup2 Id_point.encoding Time.encoding))
-              (opt "last_disconnection" (tup2 Id_point.encoding Time.encoding))
-              (opt "last_seen" (tup2 Id_point.encoding Time.encoding))
-              (opt "last_miss" (tup2 Id_point.encoding Time.encoding))))
+    open P2p_types.Peer_info
+    open P2p_types.Peer_state
 
     let info_of_peer_info pool i =
       let open P2p_connection_pool in
@@ -782,8 +626,6 @@ module RPC = struct
           | Some info -> Some (info_of_peer_info pool info)
           | None -> None
         end
-
-    module Event = P2p_connection_pool_types.Peer_info.Event
 
     let events ?(max=max_int) ?(rev=false) net peer_id =
       match net.pool with

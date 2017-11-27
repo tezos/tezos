@@ -78,7 +78,8 @@ module RPC : sig
     t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Lwt_watcher.stopper
 
   val pending_operations:
-    t -> block -> (error Prevalidation.preapply_result * Operation.t Operation_hash.Map.t) Lwt.t
+    t -> block ->
+    (error Preapply_result.t * Operation.t Operation_hash.Map.t) Lwt.t
 
   val protocols:
     t -> Protocol_hash.t list Lwt.t
@@ -88,52 +89,78 @@ module RPC : sig
     t -> (Protocol_hash.t * Protocol.t) Lwt_stream.t * Lwt_watcher.stopper
 
   val context_dir:
-    t -> block -> 'a RPC.directory option Lwt.t
+    t -> block -> 'a RPC_server.directory option Lwt.t
 
   val preapply:
     t -> block ->
     timestamp:Time.t -> proto_header:MBytes.t ->
     sort_operations:bool -> Operation.t list ->
-    (Block_header.shell_header * error Prevalidation.preapply_result) tzresult Lwt.t
+    (Block_header.shell_header * error Preapply_result.t) tzresult Lwt.t
 
   val context_dir:
-    t -> block -> 'a RPC.directory option Lwt.t
+    t -> block -> 'a RPC_server.directory option Lwt.t
 
   val complete:
     t -> ?block:block -> string -> string list Lwt.t
 
   val bootstrapped:
-    t -> (Block_hash.t * Time.t) RPC.Answer.stream
+    t -> (Block_hash.t * Time.t) RPC_server.Answer.stream
 
   module Network : sig
 
-    val stat : t -> P2p.Stat.t
-    val watch : t -> P2p.RPC.Event.t Lwt_stream.t * Lwt_watcher.stopper
-    val connect : t -> P2p.Point.t -> float -> unit tzresult Lwt.t
+    open P2p_types
+
+    val stat : t -> Stat.t
+
+    val watch :
+      t ->
+      P2p_types.Connection_pool_log_event.t Lwt_stream.t * Lwt_watcher.stopper
+    val connect : t -> Point.t -> float -> unit tzresult Lwt.t
 
     module Connection : sig
-      val info : t -> P2p.Peer_id.t -> P2p.Connection_info.t option
-      val kick : t -> P2p.Peer_id.t -> bool -> unit Lwt.t
-      val list : t -> P2p.Connection_info.t list
+      val info : t -> Peer_id.t -> Connection_info.t option
+      val kick : t -> Peer_id.t -> bool -> unit Lwt.t
+      val list : t -> Connection_info.t list
       val count : t -> int
     end
 
-    module Peer_id : sig
-      val list : t ->
-        P2p.RPC.Peer_id.state list -> (P2p.Peer_id.t * P2p.RPC.Peer_id.info) list
-      val info : t -> P2p.Peer_id.t -> P2p.RPC.Peer_id.info option
-      val events : t -> P2p.Peer_id.t -> P2p.RPC.Peer_id.Event.t list
-      val watch : t -> P2p.Peer_id.t ->
-        P2p.RPC.Peer_id.Event.t Lwt_stream.t * Lwt_watcher.stopper
+    module Point : sig
+
+      val info :
+        t -> Point.t -> P2p_types.Point_info.t option
+
+      val list :
+        ?restrict: P2p_types.Point_state.t list ->
+        t -> (Point.t * P2p_types.Point_info.t) list
+
+      val events :
+        ?max:int -> ?rev:bool -> t -> Point.t ->
+        P2p_connection_pool_types.Point_info.Event.t list
+
+      val watch :
+        t -> Point.t ->
+        P2p_connection_pool_types.Point_info.Event.t Lwt_stream.t * Lwt_watcher.stopper
+
     end
 
-    module Point : sig
-      val list : t ->
-        P2p.RPC.Point.state list -> (P2p.Point.t * P2p.RPC.Point.info) list
-      val info : t -> P2p.Point.t -> P2p.RPC.Point.info option
-      val events : t -> P2p.Point.t -> P2p.RPC.Point.Event.t list
-      val watch : t -> P2p.Point.t ->
-        P2p.RPC.Point.Event.t Lwt_stream.t * Lwt_watcher.stopper
+    module Peer_id : sig
+
+      val info :
+        t -> Peer_id.t -> P2p_types.Peer_info.t option
+
+      val list :
+        ?restrict: P2p_types.Peer_state.t list ->
+        t -> (Peer_id.t * P2p_types.Peer_info.t) list
+
+      val events :
+        ?max: int -> ?rev: bool ->
+        t -> Peer_id.t ->
+        P2p_connection_pool_types.Peer_info.Event.t list
+
+      val watch :
+        t -> Peer_id.t ->
+        P2p_connection_pool_types.Peer_info.Event.t Lwt_stream.t * Lwt_watcher.stopper
+
     end
 
   end

@@ -77,25 +77,9 @@ val set_master: index -> commit -> unit Lwt.t
 val get_protocol: context -> Protocol_hash.t Lwt.t
 val set_protocol: context -> Protocol_hash.t -> context Lwt.t
 
-type test_network =
-  | Not_running
-  | Forking of {
-      protocol: Protocol_hash.t ;
-      expiration: Time.t ;
-    }
-  | Running of {
-      net_id: Net_id.t ;
-      genesis: Block_hash.t ;
-      protocol: Protocol_hash.t ;
-      expiration: Time.t ;
-    }
+val get_test_network: context -> Test_network_status.t Lwt.t
+val set_test_network: context -> Test_network_status.t -> context Lwt.t
 
-val pp_test_network : Format.formatter -> test_network -> unit
-
-val test_network_encoding: test_network Data_encoding.t
-
-val get_test_network: context -> test_network Lwt.t
-val set_test_network: context -> test_network -> context Lwt.t
 val del_test_network: context -> context Lwt.t
 
 val reset_test_network: context -> Block_hash.t -> Time.t -> context Lwt.t

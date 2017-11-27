@@ -28,7 +28,7 @@ let pp_block ppf
      @ Operations: @[<v>%a@]\
      @ Data (hex encoded): \"%s\"@]"
     Block_hash.pp hash
-    Context.pp_test_network test_network
+    Test_network_status.pp test_network
     level
     proto_level
     Block_hash.pp predecessor

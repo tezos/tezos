@@ -7,25 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type 'error preapply_result = {
-  applied: (Operation_hash.t * Operation.t) list;
-  refused: (Operation.t * 'error list) Operation_hash.Map.t;
-  (* e.g. invalid signature *)
-  branch_refused: (Operation.t * 'error list) Operation_hash.Map.t;
-  (* e.g. insufficent balance *)
-  branch_delayed: (Operation.t * 'error list) Operation_hash.Map.t;
-  (* e.g. timestamp in the future *)
-}
-
-val empty_result : 'error preapply_result
-
-val preapply_result_operations :
-  'error preapply_result -> Operation.t Operation_hash.Map.t
-
-val preapply_result_encoding :
-  'error list Data_encoding.t ->
-  'error preapply_result Data_encoding.t
-
 type prevalidation_state
 
 val start_prevalidation :
@@ -38,7 +19,7 @@ val start_prevalidation :
 val prevalidate :
   prevalidation_state -> sort:bool ->
   (Operation_hash.t * Operation.t) list ->
-  (prevalidation_state * error preapply_result) Lwt.t
+  (prevalidation_state * error Preapply_result.t) Lwt.t
 
 val end_prevalidation :
   prevalidation_state -> Updater.validation_result tzresult Lwt.t

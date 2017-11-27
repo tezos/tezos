@@ -39,7 +39,7 @@ module Blocks : sig
     data: MBytes.t ;
     operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
-    test_network: Context.test_network;
+    test_network: Test_network_status.t ;
   }
 
   val info:
@@ -70,10 +70,10 @@ module Blocks : sig
   val protocol:
     (unit, unit * block, unit, Protocol_hash.t) RPC.service
   val test_network:
-    (unit, unit * block, unit, Context.test_network) RPC.service
+    (unit, unit * block, unit, Test_network_status.t) RPC.service
   val pending_operations:
     (unit, unit * block, unit,
-     error Prevalidation.preapply_result * Operation.t Operation_hash.Map.t) RPC.service
+     error Preapply_result.t * Operation.t Operation_hash.Map.t) RPC.service
 
   type list_param = {
     include_ops: bool ;
@@ -99,7 +99,7 @@ module Blocks : sig
 
   type preapply_result = {
     shell_header: Block_header.shell_header ;
-    operations: error Prevalidation.preapply_result ;
+    operations: error Preapply_result.t ;
   }
   val preapply:
     (unit, unit * block, preapply_param, preapply_result tzresult) RPC.service
@@ -131,44 +131,56 @@ end
 module Network : sig
 
   val stat :
-    (unit, unit, unit, P2p.Stat.t) RPC.service
+    (unit, unit, unit, P2p_types.Stat.t) RPC.service
 
   val versions :
-    (unit, unit, unit, P2p.Version.t list) RPC.service
+    (unit, unit, unit, P2p_types.Version.t list) RPC.service
 
   val events :
-    (unit, unit, unit, P2p.RPC.Event.t) RPC.service
+    (unit, unit, unit, P2p_types.Connection_pool_log_event.t) RPC.service
 
   val connect :
-    (unit, unit * P2p.Point.t, float, unit tzresult) RPC.service
+    (unit, unit * P2p_types.Point.t, float, unit tzresult) RPC.service
 
   module Connection : sig
+
     val list :
-      (unit, unit, unit, P2p.Connection_info.t list) RPC.service
+      (unit, unit, unit, P2p_types.Connection_info.t list) RPC.service
+
     val info :
-      (unit, unit * P2p.Peer_id.t, unit, P2p.Connection_info.t option) RPC.service
+      (unit, unit * P2p_types.Peer_id.t, unit,
+       P2p_types.Connection_info.t option) RPC.service
+
     val kick :
-      (unit, unit * P2p.Peer_id.t, bool, unit) RPC.service
+      (unit, unit * P2p_types.Peer_id.t, bool, unit) RPC.service
+
   end
 
   module Point : sig
     val list :
-      (unit, unit, P2p.RPC.Point.state list,
-       (P2p.Point.t * P2p.RPC.Point.info) list) RPC.service
+      (unit, unit, P2p_types.Point_state.t list,
+       (P2p_types.Point.t * P2p_types.Point_info.t) list) RPC.service
     val info :
-      (unit, unit * P2p.Point.t, unit, P2p.RPC.Point.info option) RPC.service
+      (unit, unit * P2p_types.Point.t, unit, P2p_types.Point_info.t option) RPC.service
     val events :
-      (unit, unit * P2p.Point.t, bool, P2p.RPC.Point.Event.t list) RPC.service
+      (unit, unit * P2p_types.Point.t, bool,
+       P2p_connection_pool_types.Point_info.Event.t list) RPC.service
   end
 
   module Peer_id : sig
+
     val list :
-      (unit, unit, P2p.RPC.Peer_id.state list,
-       (P2p.Peer_id.t * P2p.RPC.Peer_id.info) list) RPC.service
+      (unit, unit, P2p_types.Peer_state.t list,
+       (P2p_types.Peer_id.t * P2p_types.Peer_info.t) list) RPC.service
+
     val info :
-      (unit, unit * P2p.Peer_id.t, unit, P2p.RPC.Peer_id.info option) RPC.service
+      (unit, unit * P2p_types.Peer_id.t, unit,
+       P2p_types.Peer_info.t option) RPC.service
+
     val events :
-      (unit, unit * P2p.Peer_id.t, bool, P2p.RPC.Peer_id.Event.t list) RPC.service
+      (unit, unit * P2p_types.Peer_id.t, bool,
+       P2p_connection_pool_types.Peer_info.Event.t list) RPC.service
+
   end
 
 end

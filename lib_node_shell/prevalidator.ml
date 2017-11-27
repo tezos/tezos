@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 open Logging.Node.Prevalidator
+open Preapply_result
 
 let list_pendings ?maintain_net_db  ~from_block ~to_block old_mempool =
   let rec pop_blocks ancestor block mempool =
@@ -59,8 +60,8 @@ type t = {
   notify_operations: P2p.Peer_id.t -> Mempool.t -> unit ;
   prevalidate_operations:
     bool -> Operation.t list ->
-    (Operation_hash.t list * error preapply_result) tzresult Lwt.t ;
-  operations: unit -> error preapply_result * Operation.t Operation_hash.Map.t ;
+    (Operation_hash.t list * error Preapply_result.t) tzresult Lwt.t ;
+  operations: unit -> error Preapply_result.t * Operation.t Operation_hash.Map.t ;
   pending: ?block:State.Block.t -> unit -> Operation.t Operation_hash.Map.t Lwt.t ;
   timestamp: unit -> Time.t ;
   context: unit -> Updater.validation_result tzresult Lwt.t ;
@@ -95,7 +96,7 @@ let create
   let pending = Operation_hash.Table.create 53 in
   let head = ref head in
   let mempool = ref Mempool.empty in
-  let operations = ref empty_result in
+  let operations = ref Preapply_result.empty in
   let operation_count = ref 0 in (* unprocessed + operations/mempool *)
   Chain_traversal.live_blocks
     !head
@@ -171,7 +172,7 @@ let create
               Lwt.return (Ok state, r)
           | Error err ->
               let r =
-                { empty_result with
+                { Preapply_result.empty with
                   branch_delayed =
                     List.fold_left
                       (fun m (h, op) -> Operation_hash.Map.add h (op, err) m)
@@ -354,7 +355,7 @@ let create
                   list_pendings
                     ~maintain_net_db:net_db
                     ~from_block:!head ~to_block:new_head
-                    (preapply_result_operations !operations) >>= fun new_mempool ->
+                    (Preapply_result.operations !operations) >>= fun new_mempool ->
                   Chain_traversal.live_blocks
                     new_head
                     (State.Block.max_operations_ttl new_head)
@@ -365,7 +366,7 @@ let create
                   (* Reset the pre-validation context *)
                   head := new_head ;
                   mempool := Mempool.empty ;
-                  operations := empty_result ;
+                  operations := Preapply_result.empty ;
                   broadcast_unprocessed := false ;
                   unprocessed := new_mempool ;
                   operation_count := Operation_hash.Map.cardinal new_mempool ;
@@ -410,7 +411,7 @@ let create
     cancel () >>= fun () ->
     prevalidation_worker in
   let pending ?block () =
-    let ops = preapply_result_operations !operations in
+    let ops = Preapply_result.operations !operations in
     match block with
     | None -> Lwt.return ops
     | Some to_block -> list_pendings ~from_block:!head ~to_block ops in

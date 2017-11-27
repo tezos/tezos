@@ -139,7 +139,7 @@ module Block : sig
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
-  val test_network: t -> Context.test_network Lwt.t
+  val test_network: t -> Test_network_status.t Lwt.t
 
   val operation_hashes:
     t -> int ->

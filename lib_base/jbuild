@@ -13,8 +13,9 @@
               tezos-crypto
               tezos-data-encoding
               tezos-error-monad
+              calendar
               ezjsonm
-              calendar))))
+              mtime.clock.os))))
 
 (alias
  ((name runtest_indent)

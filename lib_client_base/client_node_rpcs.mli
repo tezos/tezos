@@ -74,12 +74,12 @@ module Blocks : sig
     block -> Protocol_hash.t tzresult Lwt.t
   val test_network:
     config ->
-    block -> Context.test_network tzresult Lwt.t
+    block -> Test_network_status.t tzresult Lwt.t
 
   val pending_operations:
     config ->
     block ->
-    (error Prevalidation.preapply_result * Operation.t Operation_hash.Map.t) tzresult Lwt.t
+    (error Preapply_result.t * Operation.t Operation_hash.Map.t) tzresult Lwt.t
 
   type block_info = {
     hash: Block_hash.t ;
@@ -94,7 +94,7 @@ module Blocks : sig
     data: MBytes.t ;
     operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
-    test_network: Context.test_network;
+    test_network: Test_network_status.t ;
   }
 
   val info:
@@ -115,7 +115,7 @@ module Blocks : sig
 
   type preapply_result = {
     shell_header: Block_header.shell_header ;
-    operations: error Prevalidation.preapply_result ;
+    operations: error Preapply_result.t ;
   }
 
   val preapply:
@@ -156,17 +156,19 @@ val bootstrapped:
 
 module Network : sig
 
+  open P2p_types
+
   val stat:
-    config -> P2p_types.Stat.t tzresult Lwt.t
+    config -> Stat.t tzresult Lwt.t
 
   val connections:
-    config -> P2p_types.Connection_info.t list tzresult Lwt.t
+    config -> Connection_info.t list tzresult Lwt.t
 
   val peers:
-    config -> (P2p.Peer_id.t * P2p.RPC.Peer_id.info) list tzresult Lwt.t
+    config -> (Peer_id.t * P2p_types.Peer_info.t) list tzresult Lwt.t
 
   val points:
-    config -> (P2p.Point.t * P2p.RPC.Point.info) list tzresult Lwt.t
+    config -> (Point.t * P2p_types.Point_info.t) list tzresult Lwt.t
 
 end
 

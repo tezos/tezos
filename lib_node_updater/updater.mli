@@ -68,7 +68,7 @@ module type RAW_PROTOCOL = sig
     validation_state -> operation -> validation_state tzresult Lwt.t
   val finalize_block:
     validation_state -> validation_result tzresult Lwt.t
-  val rpc_services: rpc_context RPC.directory
+  val rpc_services: rpc_context RPC_server.directory
   val configure_sandbox:
     Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 end
@@ -99,7 +99,7 @@ module Node_protocol_environment_sigs : sig
        and type Tezos_data.Operation.t = Operation.t
        and type Tezos_data.Block_header.shell_header = Block_header.shell_header
        and type Tezos_data.Block_header.t = Block_header.t
-       and type 'a RPC.Directory.t = 'a RPC.Directory.t
+       and type 'a RPC.Directory.t = 'a RPC_server.Directory.t
        and type Updater.validation_result = validation_result
        and type Updater.rpc_context = rpc_context
 

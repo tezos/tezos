@@ -12,6 +12,9 @@ type cors = RestoCohttp.cors = {
   allowed_origins : string list ;
 }
 
+include RestoDirectory
+module Directory = RestoDirectory.MakeDirectory(RPC.Data)
+
 include RestoCohttp.Make(RPC.Data)(Logging.RPC)
 
 let json  = {
@@ -44,3 +47,21 @@ let octet_stream = {
     | Some data -> Ok data
   end ;
 }
+
+(* Compatibility layer, to be removed ASAP. *)
+
+type 'a directory = 'a Directory.t
+
+let empty = Directory.empty
+let register d s f = Directory.register d s (fun p () i -> f p i)
+
+open Directory.Curry
+let register0 root s f = register root s (curry Z f)
+let register1 root s f = register root s (curry (S Z) f)
+let register2 root s f = register root s (curry (S (S Z)) f)
+(* let register3 root s f = register root s (curry (S (S (S Z))) f) *)
+(* let register4 root s f = register root s (curry (S (S (S (S Z)))) f) *)
+(* let register5 root s f = register root s (curry (S (S (S (S (S Z))))) f) *)
+
+let register_dynamic_directory1 =
+  Directory.register_dynamic_directory1
