@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Tezos_micheline
+
 type 'l node = ('l, string) Micheline.node
 
 val expand : 'l node -> 'l node

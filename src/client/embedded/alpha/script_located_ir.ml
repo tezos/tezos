@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Tezos_micheline
+
 type point = Micheline_parser.point =
   { point : int ;
     byte : int ;

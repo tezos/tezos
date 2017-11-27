@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Tezos_micheline
 open Client_proto_args
 open Client_proto_contracts
 open Client_proto_programs

@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Tezos_micheline
 open Micheline
 
 let print_expr ppf expr =

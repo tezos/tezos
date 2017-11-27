@@ -57,7 +57,7 @@ module Make(Param : sig val name: string end)() = struct
     module Protocol = Protocol
   end
   module RPC = RPC
-  module Micheline = Micheline
+  module Micheline = Tezos_micheline.Micheline
   module Fitness = Fitness
   module Error_monad = struct
     type error_category = [ `Branch | `Temporary | `Permanent ]

@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Tezos_micheline
+
 module Program : Client_aliases.Alias
   with type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 

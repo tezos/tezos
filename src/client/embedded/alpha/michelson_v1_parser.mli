@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Tezos_micheline
+
 (** The result of parsing and expanding a Michelson V1 script or data. *)
 type parsed =
   {

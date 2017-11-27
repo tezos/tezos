@@ -4,7 +4,7 @@
  ((name node_updater)
   (public_name tezos.node.updater)
   (libraries (tezos-base
-              micheline
+              tezos-micheline
               tezos_protocol_compiler
               node_net
               node_db

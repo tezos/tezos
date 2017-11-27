@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Tezos_micheline
 open Micheline
 open Micheline_printer
 

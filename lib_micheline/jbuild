@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name micheline)
-  (public_name tezos.micheline)
+ ((name tezos_micheline)
+  (public_name tezos-micheline)
   (libraries
    (
     ;; External
@@ -12,8 +12,7 @@
     ))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
-                    -open Tezos_base__TzPervasives))
-  (wrapped false)))
+                    -open Tezos_base__TzPervasives))))
 
 (alias
  ((name runtest_indent)

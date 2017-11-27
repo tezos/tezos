@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Tezos_micheline
 open Micheline
 
 type 'l node = ('l, string) Micheline.node

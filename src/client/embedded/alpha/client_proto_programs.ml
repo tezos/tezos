@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Tezos_micheline
 open Client_proto_args
 
 open Michelson_v1_printer
