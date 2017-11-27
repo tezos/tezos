@@ -20,10 +20,10 @@ opam pin --yes add --no-action --dev-repo sodium
 opam pin --yes add --no-action --dev-repo ocp-ocamlres
 opam pin --yes add --no-action --dev-repo ocplib-json-typed
 ## Force opam to take account of the new `tezos-deps.opam`
-opam pin --yes remove tezos
-opam pin --yes add --no-action tezos $src_dir
+opam pin --yes remove tezos-deps
+opam pin --yes add --no-action tezos-deps $src_dir
 
 opam list --installed depext || opam install depext
-opam depext tezos
+opam depext tezos-deps
 
-opam install tezos --deps-only
+opam install tezos-deps --deps-only

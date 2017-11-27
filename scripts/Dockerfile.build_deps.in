@@ -1,7 +1,7 @@
 FROM $base_image
 
 COPY scripts/install_build_deps.sh scripts/version.sh tezos/scripts/
-COPY tezos.opam tezos/
+COPY tezos-deps.opam tezos/
 RUN sudo apk update && \
     opam config exec -- ./tezos/scripts/install_build_deps.sh && \
     opam install ocp-indent && \

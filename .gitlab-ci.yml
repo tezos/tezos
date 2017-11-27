@@ -144,10 +144,10 @@ test:multinode.sh:
     - jbuilder build @test/runtest_multinode.sh
   retry: 1
 
-test:proto:sandboxing:
+test:proto:sandbox:
   <<: *test_definition
   script:
-    - jbuilder build @src/proto/runtest_sandboxing
+    - jbuilder build @runtest_sandbox
 
 ## Publishing (small) docker images with tezos binaries
 
