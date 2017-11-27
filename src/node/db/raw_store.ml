@@ -44,7 +44,7 @@ let known t key =
   Lwt.return (LevelDB.mem t (concat key))
 
 let read_opt t key =
-  Lwt.return (map_option ~f:MBytes.of_string (LevelDB.get t (concat key)))
+  Lwt.return (Option.map ~f:MBytes.of_string (LevelDB.get t (concat key)))
 
 let read t key =
   match LevelDB.get t (concat key) with

@@ -231,7 +231,7 @@ let next_conn_id =
 module Reader = struct
 
   type 'msg t = {
-    canceler: Canceler.t ;
+    canceler: Lwt_canceler.t ;
     conn: connection ;
     encoding: 'msg Data_encoding.t ;
     messages: (int * 'msg) tzresult Lwt_pipe.t ;
@@ -278,7 +278,7 @@ module Reader = struct
     | Ok Some rem_mbytes ->
         worker_loop st rem_mbytes
     | Ok None ->
-        Canceler.cancel st.canceler >>= fun () ->
+        Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
     | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
         lwt_debug "connection closed to %a"
@@ -286,7 +286,7 @@ module Reader = struct
         Lwt.return_unit
     | Error _ as err ->
         Lwt_pipe.safe_push_now st.messages err ;
-        Canceler.cancel st.canceler >>= fun () ->
+        Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
 
   let run ?size conn encoding canceler =
@@ -294,24 +294,24 @@ module Reader = struct
       | Ok (size, _) -> (Sys.word_size / 8) * 11 + size + Lwt_pipe.push_overhead
       | Error _ -> 0 (* we push Error only when we close the socket,
                         we don't fear memory leaks in that case... *) in
-    let size = map_option size ~f:(fun max -> (max, compute_size)) in
+    let size = Option.map size ~f:(fun max -> (max, compute_size)) in
     let st =
       { canceler ; conn ; encoding ;
         messages = Lwt_pipe.create ?size () ;
         worker = Lwt.return_unit ;
       } in
-    Canceler.on_cancel st.canceler begin fun () ->
+    Lwt_canceler.on_cancel st.canceler begin fun () ->
       Lwt_pipe.close st.messages ;
       Lwt.return_unit
     end ;
     st.worker <-
       Lwt_utils.worker "reader"
         ~run:(fun () -> worker_loop st [])
-        ~cancel:(fun () -> Canceler.cancel st.canceler) ;
+        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
     st
 
   let shutdown st =
-    Canceler.cancel st.canceler >>= fun () ->
+    Lwt_canceler.cancel st.canceler >>= fun () ->
     st.worker
 
 end
@@ -319,7 +319,7 @@ end
 module Writer = struct
 
   type 'msg t = {
-    canceler: Canceler.t ;
+    canceler: Lwt_canceler.t ;
     conn: connection ;
     encoding: 'msg Data_encoding.t ;
     messages: (MBytes.t list * unit tzresult Lwt.u option) Lwt_pipe.t ;
@@ -356,16 +356,16 @@ module Writer = struct
         lwt_log_error
           "@[<v 2>error writing to %a@ %a@]"
           Connection_info.pp st.conn.info pp_print_error err >>= fun () ->
-        Canceler.cancel st.canceler >>= fun () ->
+        Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
     | Ok (buf, wakener) ->
         send_message st buf >>= fun res ->
         match res with
         | Ok () ->
-            iter_option wakener ~f:(fun u -> Lwt.wakeup_later u res) ;
+            Option.iter wakener ~f:(fun u -> Lwt.wakeup_later u res) ;
             worker_loop st
         | Error err ->
-            iter_option wakener
+            Option.iter wakener
               ~f:(fun u ->
                   Lwt.wakeup_later u
                     (Error [P2p_io_scheduler.Connection_closed])) ;
@@ -377,14 +377,14 @@ module Writer = struct
             | [ P2p_io_scheduler.Connection_closed ] ->
                 lwt_debug "connection closed to %a"
                   Connection_info.pp st.conn.info >>= fun () ->
-                Canceler.cancel st.canceler >>= fun () ->
+                Lwt_canceler.cancel st.canceler >>= fun () ->
                 Lwt.return_unit
             | err ->
                 lwt_log_error
                   "@[<v 2>error writing to %a@ %a@]"
                   Connection_info.pp st.conn.info
                   pp_print_error err >>= fun () ->
-                Canceler.cancel st.canceler >>= fun () ->
+                Lwt_canceler.cancel st.canceler >>= fun () ->
                 Lwt.return_unit
 
   let run
@@ -411,18 +411,18 @@ module Writer = struct
       | buf_l, Some _ ->
           2 * Sys.word_size + buf_list_size buf_l + Lwt_pipe.push_overhead
     in
-    let size = map_option size ~f:(fun max -> max, compute_size) in
+    let size = Option.map size ~f:(fun max -> max, compute_size) in
     let st =
       { canceler ; conn ; encoding ;
         messages = Lwt_pipe.create ?size () ;
         worker = Lwt.return_unit ;
         binary_chunks_size = binary_chunks_size ;
       } in
-    Canceler.on_cancel st.canceler begin fun () ->
+    Lwt_canceler.on_cancel st.canceler begin fun () ->
       Lwt_pipe.close st.messages ;
       while not (Lwt_pipe.is_empty st.messages) do
         let _, w = Lwt_pipe.pop_now_exn st.messages in
-        iter_option w
+        Option.iter w
           ~f:(fun u -> Lwt.wakeup_later u (Error [Exn Lwt_pipe.Closed]))
       done ;
       Lwt.return_unit
@@ -430,11 +430,11 @@ module Writer = struct
     st.worker <-
       Lwt_utils.worker "writer"
         ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Canceler.cancel st.canceler) ;
+        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
     st
 
   let shutdown st =
-    Canceler.cancel st.canceler >>= fun () ->
+    Lwt_canceler.cancel st.canceler >>= fun () ->
     st.worker
 
 end
@@ -464,7 +464,7 @@ let accept
     | err -> Lwt.return (Error err)
   end >>=? fun accepted ->
   fail_unless accepted Rejected >>=? fun () ->
-  let canceler = Canceler.create () in
+  let canceler = Lwt_canceler.create () in
   let conn = { id = next_conn_id () ; fd ; info ; cryptobox_data } in
   let reader =
     Reader.run ?size:incoming_message_queue_size conn encoding canceler
@@ -474,7 +474,7 @@ let accept
       conn encoding canceler
   in
   let conn = { conn ; reader ; writer } in
-  Canceler.on_cancel canceler begin fun () ->
+  Lwt_canceler.on_cancel canceler begin fun () ->
     P2p_io_scheduler.close fd >>= fun _ ->
     Lwt.return_unit
   end ;

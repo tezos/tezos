@@ -11,8 +11,6 @@ let () = Lwt_unix.set_default_async_method Async_none
 
 include Logging.Make (struct let name = "process" end)
 
-open Error_monad
-
 exception Exited of int
 
 let handle_error f =

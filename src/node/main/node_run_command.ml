@@ -60,7 +60,7 @@ let init_logger ?verbosity (log_config : Node_config_file.log) =
               match Sys.getenv "LWT_LOG" with
               | rules -> Some rules
               | exception Not_found -> log_config.rules in
-        Utils.iter_option ~f:Lwt_log_core.load_rules rules
+        Option.iter ~f:Lwt_log_core.load_rules rules
   end ;
   Logging.init ~template:log_config.template log_config.output
 
@@ -191,7 +191,7 @@ let init_signal () =
 
 let run ?verbosity ?sandbox (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
-  Lwt_utils.Lock_file.create
+  Lwt_lock_file.create
     ~unlink_on_exit:true (lock_file config.data_dir) >>=? fun () ->
   init_signal () ;
   init_logger ?verbosity config.log >>= fun () ->
@@ -228,7 +228,7 @@ let process sandbox verbosity args =
           else return ()
       | None -> return ()
     end >>=? fun () ->
-    Lwt_utils.Lock_file.is_locked
+    Lwt_lock_file.is_locked
       (lock_file config.data_dir) >>=? function
     | false ->
         run ?sandbox ?verbosity config

@@ -8,13 +8,12 @@
 (**************************************************************************)
 
 include Logging.Make (struct let name = "p2p.welcome" end)
-open P2p_types
 
 type pool = Pool : ('msg, 'meta) P2p_connection_pool.t -> pool
 
 type t = {
   socket: Lwt_unix.file_descr ;
-  canceler: Canceler.t ;
+  canceler: Lwt_canceler.t ;
   pool: pool ;
   mutable worker: unit Lwt.t ;
 }
@@ -52,8 +51,8 @@ let run ~backlog pool ?addr port  =
   Lwt.catch begin fun () ->
     create_listening_socket
       ~backlog ?addr port >>= fun socket ->
-    let canceler = Canceler.create () in
-    Canceler.on_cancel canceler begin fun () ->
+    let canceler = Lwt_canceler.create () in
+    Lwt_canceler.on_cancel canceler begin fun () ->
       Lwt_utils.safe_close socket
     end ;
     let st = {
@@ -63,7 +62,7 @@ let run ~backlog pool ?addr port  =
     st.worker <-
       Lwt_utils.worker "welcome"
         ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Canceler.cancel st.canceler) ;
+        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
     Lwt.return st
   end begin fun exn ->
     lwt_log_error
@@ -73,5 +72,5 @@ let run ~backlog pool ?addr port  =
   end
 
 let shutdown st =
-  Canceler.cancel st.canceler >>= fun () ->
+  Lwt_canceler.cancel st.canceler >>= fun () ->
   st.worker

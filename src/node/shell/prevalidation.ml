@@ -211,12 +211,12 @@ let prevalidate
          (h, op, Proto.parse_operation h op |> record_trace Parse_error))
       ops in
   let invalid_ops =
-    Utils.filter_map
+    List.filter_map
       (fun (h, op, parsed_op) -> match parsed_op with
          | Ok _ -> None
          | Error err -> Some (h, op, err)) ops
   and parsed_ops =
-    Utils.filter_map
+    List.filter_map
       (fun (h, op, parsed_op) -> match parsed_op with
          | Ok parsed_op -> Some (h, op, parsed_op)
          | Error _ -> None) ops in

@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Canceler = Lwt_utils.Canceler
-
 module Version = struct
   type t = {
     name : string ;
@@ -150,8 +148,51 @@ module Point = struct
     let is_local (addr, _) = Ipaddr.V6.is_private addr
     let is_global (addr, _) = not @@ Ipaddr.V6.is_private addr
 
+    let check_port port =
+      if String.mem_char port '[' ||
+         String.mem_char port ']' ||
+         String.mem_char port ':' then
+        invalid_arg "Utils.parse_addr_port (invalid character in port)"
+
+    let parse_addr_port s =
+      let len = String.length s in
+      if len = 0 then
+        ("", "")
+      else if s.[0] = '[' then begin (* inline IPv6 *)
+        match String.rindex s ']' with
+        | exception Not_found ->
+            invalid_arg "Utils.parse_addr_port (missing ']')"
+        | pos ->
+            let addr = String.sub s 1 (pos - 1) in
+            let port =
+              if pos = len - 1 then
+                ""
+              else if s.[pos+1] <> ':' then
+                invalid_arg "Utils.parse_addr_port (unexpected char after ']')"
+              else
+                String.sub s (pos + 2) (len - pos - 2) in
+            check_port port ;
+            addr, port
+      end else begin
+        match String.rindex s ']' with
+        | _pos ->
+            invalid_arg "Utils.parse_addr_port (unexpected char ']')"
+        | exception Not_found ->
+            match String.index s ':' with
+            | exception _ -> s, ""
+            | pos ->
+                match String.index_from s (pos+1) ':'  with
+                | exception _ ->
+                    let addr = String.sub s 0 pos in
+                    let port = String.sub s (pos + 1) (len - pos - 1) in
+                    check_port port ;
+                    addr, port
+                | _pos ->
+                    invalid_arg "Utils.parse_addr_port: IPv6 addresses must be bracketed"
+      end
+
     let of_string_exn str =
-      let addr, port = Utils.parse_addr_port str in
+      let addr, port = parse_addr_port str in
       let port = int_of_string port in
       if port < 0 && port > 1 lsl 16 - 1 then
         invalid_arg "port must be between 0 and 65535" ;

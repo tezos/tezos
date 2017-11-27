@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Ed25519 = Tezos_protocol_environment.Ed25519
-
 module Public_key_hash = Client_aliases.Alias (struct
     type t = Ed25519.Public_key_hash.t
     let encoding = Ed25519.Public_key_hash.encoding
@@ -33,33 +31,12 @@ module Secret_key = Client_aliases.Alias (struct
     let name = "secret key"
   end)
 
-module Seed = struct
-
-  let to_hex s =
-    Sodium.Sign.Bytes.of_seed s
-    |> Bytes.to_string
-    |> Hex_encode.hex_encode
-
-  let of_hex s =
-    Hex_encode.hex_decode s
-    |> Bytes.of_string
-    |> Sodium.Sign.Bytes.to_seed
-
-  let generate () =
-    (* Seed is 32 bytes long *)
-    Sodium.Random.Bytes.generate Sodium.Sign.seed_size
-    |> Sodium.Sign.Bytes.to_seed
-
-  let extract =
-    Sodium.Sign.secret_key_to_seed
-end
-
 let gen_keys ?seed cctxt name =
   let seed =
     match seed with
-    | None -> Seed.generate ()
+    | None -> Ed25519.Seed.generate ()
     | Some s -> s in
-  let secret_key, public_key = Sodium.Sign.seed_keypair seed in
+  let _, public_key, secret_key = Ed25519.generate_seeded_key seed in
   Secret_key.add cctxt name secret_key >>=? fun () ->
   Public_key.add cctxt name public_key >>=? fun () ->
   Public_key_hash.add
@@ -102,8 +79,8 @@ let gen_keys_containing ?(prefix=false) ~containing ~name (cctxt : Client_comman
               (fun key -> try ignore (Str.search_forward re key 0); true
                 with Not_found -> false) in
           let rec loop attempts =
-            let seed = Seed.generate () in
-            let secret_key, public_key = Sodium.Sign.seed_keypair seed in
+            let seed = Ed25519.Seed.generate () in
+            let _, public_key, secret_key = Ed25519.generate_seeded_key seed in
             let hash = Ed25519.Public_key_hash.to_b58check @@ Ed25519.Public_key.hash public_key in
             if matches hash
             then
@@ -208,7 +185,7 @@ let commands () =
       (fun () name sk cctxt ->
          Public_key.find_opt cctxt name >>=? function
          | None ->
-             let pk = Sodium.Sign.secret_key_to_public_key sk in
+             let pk = Ed25519.Secret_key.to_public_key sk in
              Public_key_hash.add cctxt
                name (Ed25519.Public_key.hash pk) >>=? fun () ->
              Public_key.add cctxt name pk >>=? fun () ->

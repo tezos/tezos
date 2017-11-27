@@ -10,7 +10,6 @@
 (* TODO Use Kaputt on the client side and remove `assert` from the
         server. *)
 
-open Error_monad
 open P2p_types
 include Logging.Make (struct let name = "test.p2p.connection" end)
 

@@ -41,7 +41,7 @@ module type DISTRIBUTED_DB = sig
 
   val clear_or_cancel: t -> key -> unit
   val inject: t -> key -> value -> bool Lwt.t
-  val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
+  val watch: t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
 
   val pending: t -> key -> bool
 
@@ -105,7 +105,7 @@ module Make_table
                           and type value = Disk_table.value
                           and type param = Precheck.param
   val create:
-    ?global_input:(key * value) Watcher.input ->
+    ?global_input:(key * value) Lwt_watcher.input ->
     Scheduler.t -> Disk_table.store -> t
   val notify: t -> P2p.Peer_id.t -> key -> Precheck.notified_value -> unit Lwt.t
 

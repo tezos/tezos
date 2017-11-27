@@ -19,28 +19,28 @@ module Prefix = struct
 
 end
 
-module State_hash = Hash.Make_Blake2B(Base58)(struct
+module State_hash = Blake2B.Make(Base58)(struct
     let name = "random"
     let title = "A random generation state"
     let b58check_prefix = Prefix.random_state_hash
     let size = None
   end)
 
-module Nonce_hash = Hash.Make_Blake2B(Base58)(struct
+module Nonce_hash = Blake2B.Make(Base58)(struct
     let name = "cycle_nonce"
     let title = "A nonce hash"
     let b58check_prefix = Prefix.nonce_hash
     let size = None
   end)
 
-module Script_expr_hash = Hash.Make_Blake2B(Base58)(struct
+module Script_expr_hash = Blake2B.Make(Base58)(struct
     let name = "script_expr"
     let title = "A script expression ID"
     let b58check_prefix = Prefix.script_expr_hash
     let size = None
   end)
 
-module Contract_hash = Hash.Make_Blake2B(Base58)(struct
+module Contract_hash = Blake2B.Make(Base58)(struct
     let name = "Contract_hash"
     let title = "A contract ID"
     let b58check_prefix = Prefix.contract_hash

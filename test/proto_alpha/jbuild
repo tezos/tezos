@@ -6,14 +6,13 @@
           test_origination
           test_transaction
           test_vote))
-  (libraries (test_lib
+  (libraries (tezos-base
+              test_lib
               client_lib
               client_embedded_genesis
               client_embedded_alpha))
   (flags (:standard -w -9-32 -safe-string
-                    -open Error_monad
-                    -open Hash
-                    -open Tezos_data
+                    -open Tezos_base__TzPervasives
                     -open Tezos_protocol_environment_alpha
                     -open Tezos_embedded_raw_protocol_alpha
                     -open Tezos_context
@@ -61,3 +60,8 @@
          (alias runtest_origination)
          (alias runtest_transaction)
          (alias runtest_vote)))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

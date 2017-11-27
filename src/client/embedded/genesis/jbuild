@@ -3,16 +3,19 @@
 (library
  ((name client_embedded_genesis)
   (public_name tezos.client.embedded.genesis)
-  (libraries (tezos_embedded_raw_protocol_genesis
+  (libraries (tezos-base
+              tezos_embedded_raw_protocol_genesis
               tezos_embedded_protocol_genesis
               tezos_protocol_environment_alpha
               client_lib))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
-                    -open Error_monad
-                    -open Hash
-                    -open Utils
-                    -open Tezos_data
+                    -open Tezos_base__TzPervasives
                     -open Tezos_protocol_environment_genesis
                     -open Tezos_embedded_raw_protocol_genesis))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

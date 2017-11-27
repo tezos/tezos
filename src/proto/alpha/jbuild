@@ -17,9 +17,9 @@ let () =
     (Tezos_embedded_raw_protocol_alpha.Main)
     (struct
        let hash =
-         Some (Hash.Protocol_hash.of_b58check_exn
+         Some (Tezos_crypto.Protocol_hash.of_b58check_exn
                  \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\")
-       let sources = Tezos_data.Protocol.{
+       let sources = Tezos_base.Protocol.{
          expected_env = V1 ;
          components = [(* FIXME ?? *)] ;
     } end) in ()"))))
@@ -59,3 +59,8 @@ let () =
          TEZOS_PROTOCOL))
   (action (chdir ${ROOT}
           (run ${exe:../../compiler_main.exe} dummy_alpha ${path-no-dep:.})))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

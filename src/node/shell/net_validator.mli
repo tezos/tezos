@@ -22,7 +22,7 @@ val create:
   ?bootstrap_threshold:int ->
   timeout ->
   Block_validator.t ->
-  State.Block.t Watcher.input ->
+  State.Block.t Lwt_watcher.input ->
   Distributed_db.t ->
   State.Net.t ->
   t Lwt.t
@@ -43,6 +43,6 @@ val validate_block:
 
 val shutdown: t -> unit Lwt.t
 
-val valid_block_watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
-val new_head_watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
+val valid_block_watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
+val new_head_watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
 

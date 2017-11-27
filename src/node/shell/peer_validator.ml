@@ -10,7 +10,6 @@
 (* FIXME ignore/postpone fetching/validating of block in the future... *)
 
 include Logging.Make(struct let name = "node.validator.peer" end)
-module Canceler = Lwt_utils.Canceler
 
 type msg =
   | New_head of Block_hash.t * Block_header.t
@@ -37,7 +36,7 @@ type t = {
 
   mutable worker: unit Lwt.t ;
   dropbox: msg Lwt_dropbox.t ;
-  canceler: Canceler.t ;
+  canceler: Lwt_canceler.t ;
 
 }
 
@@ -198,7 +197,7 @@ let rec worker_loop pv =
       (* TODO ban the peer_id... *)
       lwt_log_info "Terminating the validation worker for peer %a (kickban)."
         P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
-      Canceler.cancel pv.canceler >>= fun () ->
+      Lwt_canceler.cancel pv.canceler >>= fun () ->
       Lwt.return_unit
   | Error [Block_validator.Unavailable_protocol { protocol } ] -> begin
       Block_validator.fetch_and_compile_protocol
@@ -213,7 +212,7 @@ let rec worker_loop pv =
                        \ (missing protocol %a)."
             P2p.Peer_id.pp_short pv.peer_id
             Protocol_hash.pp_short protocol >>= fun () ->
-          Canceler.cancel pv.canceler >>= fun () ->
+          Lwt_canceler.cancel pv.canceler >>= fun () ->
           Lwt.return_unit
     end
   | Error [Exn Lwt.Canceled | Lwt_utils.Canceled | Exn Lwt_dropbox.Closed] ->
@@ -226,7 +225,7 @@ let rec worker_loop pv =
         \ %a@]"
         P2p.Peer_id.pp_short pv.peer_id
         pp_print_error err >>= fun () ->
-      Canceler.cancel pv.canceler >>= fun () ->
+      Lwt_canceler.cancel pv.canceler >>= fun () ->
       Lwt.return_unit
 
 let create
@@ -240,7 +239,7 @@ let create
     block_validator net_db peer_id =
   lwt_debug "creating validator for peer %a."
     P2p.Peer_id.pp_short peer_id >>= fun () ->
-  let canceler = Canceler.create () in
+  let canceler = Lwt_canceler.create () in
   let dropbox = Lwt_dropbox.create () in
   let net_state = Distributed_db.net_state net_db in
   State.Block.read_exn net_state
@@ -265,7 +264,7 @@ let create
     dropbox ;
     worker = Lwt.return_unit ;
   } in
-  Canceler.on_cancel pv.canceler begin fun () ->
+  Lwt_canceler.on_cancel pv.canceler begin fun () ->
     Lwt_dropbox.close pv.dropbox ;
     Distributed_db.disconnect pv.net_db pv.peer_id >>= fun () ->
     notify_termination pv ;
@@ -276,7 +275,7 @@ let create
       (Format.asprintf "peer_validator.%a.%a"
          Net_id.pp (State.Net.id net_state) P2p.Peer_id.pp_short peer_id)
       ~run:(fun () -> worker_loop pv)
-      ~cancel:(fun () -> Canceler.cancel pv.canceler) ;
+      ~cancel:(fun () -> Lwt_canceler.cancel pv.canceler) ;
   Lwt.return pv
 
 let notify_branch pv locator =
@@ -298,7 +297,7 @@ let notify_head pv header =
       with Lwt_dropbox.Closed -> ()
 
 let shutdown pv =
-  Canceler.cancel pv.canceler >>= fun () ->
+  Lwt_canceler.cancel pv.canceler >>= fun () ->
   pv.worker
 
 let peer_id pv = pv.peer_id

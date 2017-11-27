@@ -6,13 +6,10 @@
           test_merkle
           test_stream_data_encoding
           test_utils))
-  (libraries (minutils utils test_lib))
+  (libraries (tezos-base test_lib))
   (flags (:standard -w -9-32
                     -safe-string
-                    -open Error_monad
-                    -open Hash
-                    -open Utils
-                    -open Tezos_data))))
+                    -open Tezos_base__TzPervasives))))
 
 (alias
   ((name buildtest)
@@ -49,3 +46,8 @@
          (alias runtest_merkle)
          (alias runtest_stream_data_encoding)
          (alias runtest_utils)))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

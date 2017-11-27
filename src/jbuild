@@ -3,6 +3,7 @@
 (executable
  ((name compiler_main)
   (public_name tezos-protocol-compiler)
+  (package tezos)
   (libraries (tezos_protocol_compiler))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
@@ -12,22 +13,32 @@
 (executable
  ((name node_main)
   (public_name tezos-node)
-  (libraries (node_db node_main_lib node_net cmdliner
+  (package tezos)
+  (libraries (tezos-base
+              node_db node_main_lib node_net cmdliner
               tezos_embedded_protocol_genesis
               tezos_embedded_protocol_demo
               tezos_embedded_protocol_alpha))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
+                    -open Tezos_base__TzPervasives
                     -linkall))
   (modules (Node_main))))
 
 (executable
  ((name client_main)
   (public_name tezos-client)
-  (libraries (lwt utils client_lib
+  (package tezos)
+  (libraries (tezos-base client_lib
               client_embedded_genesis
               client_embedded_alpha))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
+                    -open Tezos_base__TzPervasives
                     -linkall))
   (modules (Client_main))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

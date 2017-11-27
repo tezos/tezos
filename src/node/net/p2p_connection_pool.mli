@@ -394,7 +394,7 @@ module Log_event : sig
 
 end
 
-val watch: ('msg, 'meta) pool -> Log_event.t Lwt_stream.t * Watcher.stopper
+val watch: ('msg, 'meta) pool -> Log_event.t Lwt_stream.t * Lwt_watcher.stopper
 (** [watch pool] is a [stream, close] a [stream] of events and a
     [close] function for this stream. *)
 

@@ -8,10 +8,9 @@
 (**************************************************************************)
 
 include Logging.Make(struct let name = "node.validator.bootstrap_pipeline" end)
-module Canceler = Lwt_utils.Canceler
 
 type t = {
-  canceler: Canceler.t ;
+  canceler: Lwt_canceler.t ;
   block_header_timeout: float ;
   block_operations_timeout: float ;
   mutable headers_fetch_worker: unit Lwt.t ;
@@ -94,13 +93,13 @@ let headers_fetch_worker_loop pipeline =
       lwt_log_info "request for header %a from peer %a timed out."
         Block_hash.pp_short bh
         P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
-      Canceler.cancel pipeline.canceler >>= fun () ->
+      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       lwt_log_error "@[Unexpected error (headers fetch):@ %a@]"
         pp_print_error err >>= fun () ->
-      Canceler.cancel pipeline.canceler >>= fun () ->
+      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
 
 let rec operations_fetch_worker_loop pipeline =
@@ -138,13 +137,13 @@ let rec operations_fetch_worker_loop pipeline =
       lwt_log_info "request for operations %a:%d from peer %a timed out."
         Block_hash.pp_short bh n
         P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
-      Canceler.cancel pipeline.canceler >>= fun () ->
+      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       lwt_log_error "@[Unexpected error (operations fetch):@ %a@]"
         pp_print_error err >>= fun () ->
-      Canceler.cancel pipeline.canceler >>= fun () ->
+      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
 
 let rec validation_worker_loop pipeline =
@@ -175,20 +174,20 @@ let rec validation_worker_loop pipeline =
            | Block_validator.Unavailable_protocol _ ] as err ) ->
       (* Propagate the error to the peer validator. *)
       pipeline.errors <- pipeline.errors @ err ;
-      Canceler.cancel pipeline.canceler >>= fun () ->
+      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       lwt_log_error "@[Unexpected error (validator):@ %a@]"
         pp_print_error err >>= fun () ->
-      Canceler.cancel pipeline.canceler >>= fun () ->
+      Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
 
 let create
     ?(notify_new_block = fun _ -> ())
     ~block_header_timeout ~block_operations_timeout
     block_validator peer_id net_db locator =
-  let canceler = Canceler.create () in
+  let canceler = Lwt_canceler.create () in
   let fetched_headers =
     Lwt_pipe.create ~size:(50, fun _ -> 1) () in
   let fetched_blocks =
@@ -205,7 +204,7 @@ let create
     fetched_headers ; fetched_blocks ;
     errors = [] ;
   } in
-  Canceler.on_cancel pipeline.canceler begin fun () ->
+  Lwt_canceler.on_cancel pipeline.canceler begin fun () ->
     Lwt_pipe.close fetched_blocks ;
     Lwt_pipe.close fetched_headers ;
     Lwt.return_unit
@@ -217,19 +216,19 @@ let create
       (Format.asprintf "bootstrap_pipeline-headers_fetch.%a.%a"
          P2p.Peer_id.pp_short peer_id Block_hash.pp_short hash)
       ~run:(fun () -> headers_fetch_worker_loop pipeline)
-      ~cancel:(fun () -> Canceler.cancel pipeline.canceler) ;
+      ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
   pipeline.operations_fetch_worker <-
     Lwt_utils.worker
       (Format.asprintf "bootstrap_pipeline-operations_fetch.%a.%a"
          P2p.Peer_id.pp_short peer_id Block_hash.pp_short hash)
       ~run:(fun () -> operations_fetch_worker_loop pipeline)
-      ~cancel:(fun () -> Canceler.cancel pipeline.canceler) ;
+      ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
   pipeline.validation_worker <-
     Lwt_utils.worker
       (Format.asprintf "bootstrap_pipeline-validation.%a.%a"
          P2p.Peer_id.pp_short peer_id Block_hash.pp_short hash)
       ~run:(fun () -> validation_worker_loop pipeline)
-      ~cancel:(fun () -> Canceler.cancel pipeline.canceler) ;
+      ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
   pipeline
 
 let wait_workers pipeline =
@@ -245,5 +244,5 @@ let wait pipeline =
   | errors -> Lwt.return_error errors
 
 let cancel pipeline =
-  Canceler.cancel pipeline.canceler >>= fun () ->
+  Lwt_canceler.cancel pipeline.canceler >>= fun () ->
   wait_workers pipeline

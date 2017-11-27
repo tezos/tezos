@@ -46,7 +46,7 @@ val create:
 
 val validate:
   t ->
-  ?canceler:Lwt_utils.Canceler.t ->
+  ?canceler:Lwt_canceler.t ->
   ?peer:P2p.Peer_id.t ->
   ?notify_new_block:(State.Block.t -> unit) ->
   Distributed_db.net_db ->

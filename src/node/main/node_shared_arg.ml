@@ -44,13 +44,13 @@ let wrap
     cors_origins cors_headers log_output =
 
   let actual_data_dir =
-    Utils.unopt ~default:Node_config_file.default_data_dir data_dir in
+    Option.unopt ~default:Node_config_file.default_data_dir data_dir in
 
   let config_file =
-    Utils.unopt ~default:(actual_data_dir // "config.json") config_file in
+    Option.unopt ~default:(actual_data_dir // "config.json") config_file in
 
   let rpc_tls =
-    Utils.map_option
+    Option.map
       ~f:(fun (cert, key) -> { Node_config_file.cert ; key })
       rpc_tls in
 

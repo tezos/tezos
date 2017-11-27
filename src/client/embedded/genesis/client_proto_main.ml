@@ -42,7 +42,7 @@ let bake rpc_config ?timestamp block command fitness seckey =
   Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
   forge_block
     rpc_config ?timestamp block bi.net_id command fitness >>=? fun blk ->
-  let signed_blk = Environment.Ed25519.Signature.append seckey blk in
+  let signed_blk = Ed25519.Signature.append seckey blk in
   Client_node_rpcs.inject_block rpc_config signed_blk []
 
 let int64_parameter =
@@ -107,7 +107,7 @@ let commands () =
          ~desc:"Hardcoded number of validation passes (integer)"
          int_parameter
        @@ prefixes [ "and" ; "key" ]
-       @@ Environment.Ed25519.Secret_key.param
+       @@ Ed25519.Secret_key.param
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
       begin fun timestamp hash fitness validation_passes seckey cctxt ->

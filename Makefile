@@ -2,7 +2,10 @@
 DEV ?= --dev
 
 all:
-	@jbuilder build tezos.install ${DEV}
+	@jbuilder build ${DEV} \
+		src/node_main.exe \
+		src/client_main.exe \
+		src/compiler_main.exe
 	@cp _build/default/src/node_main.exe tezos-node
 	@cp _build/default/src/client_main.exe tezos-client
 	@cp _build/default/src/compiler_main.exe tezos-protocol-compiler

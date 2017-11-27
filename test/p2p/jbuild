@@ -4,14 +4,11 @@
  ((names (test_p2p_connection
           test_p2p_connection_pool
           test_p2p_io_scheduler))
-  (libraries (minutils utils test_lib node_net))
+  (libraries (tezos-base test_lib node_net))
   (flags (:standard -w -9-32
                     -linkall
                     -safe-string
-                    -open Error_monad
-                    -open Hash
-                    -open Utils
-                    -open Tezos_data))))
+                    -open Tezos_base__TzPervasives))))
 
 (alias
  ((name buildtest)
@@ -40,3 +37,8 @@
   (deps ((alias runtest_p2p_connection)
          (alias runtest_p2p_connection_pool)
          (alias runtest_p2p_io_scheduler)))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

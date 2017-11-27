@@ -53,9 +53,9 @@ module RPC : sig
   val raw_block_info:
     t -> Block_hash.t -> block_info Lwt.t
   val block_header_watcher:
-    t -> (Block_hash.t * Block_header.t) Lwt_stream.t * Watcher.stopper
+    t -> (Block_hash.t * Block_header.t) Lwt_stream.t * Lwt_watcher.stopper
   val block_watcher:
-    t -> (block_info Lwt_stream.t * Watcher.stopper)
+    t -> (block_info Lwt_stream.t * Lwt_watcher.stopper)
   val heads: t -> block_info Block_hash.Map.t Lwt.t
 
   val predecessors:
@@ -75,7 +75,7 @@ module RPC : sig
   val operations:
     t -> block -> Operation.t list list Lwt.t
   val operation_watcher:
-    t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Watcher.stopper
+    t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Lwt_watcher.stopper
 
   val pending_operations:
     t -> block -> (error Prevalidation.preapply_result * Operation.t Operation_hash.Map.t) Lwt.t
@@ -85,7 +85,7 @@ module RPC : sig
   val protocol_content:
     t -> Protocol_hash.t -> Protocol.t tzresult Lwt.t
   val protocol_watcher:
-    t -> (Protocol_hash.t * Protocol.t) Lwt_stream.t * Watcher.stopper
+    t -> (Protocol_hash.t * Protocol.t) Lwt_stream.t * Lwt_watcher.stopper
 
   val context_dir:
     t -> block -> 'a RPC.directory option Lwt.t
@@ -108,7 +108,7 @@ module RPC : sig
   module Network : sig
 
     val stat : t -> P2p.Stat.t
-    val watch : t -> P2p.RPC.Event.t Lwt_stream.t * Watcher.stopper
+    val watch : t -> P2p.RPC.Event.t Lwt_stream.t * Lwt_watcher.stopper
     val connect : t -> P2p.Point.t -> float -> unit tzresult Lwt.t
 
     module Connection : sig
@@ -124,7 +124,7 @@ module RPC : sig
       val info : t -> P2p.Peer_id.t -> P2p.RPC.Peer_id.info option
       val events : t -> P2p.Peer_id.t -> P2p.RPC.Peer_id.Event.t list
       val watch : t -> P2p.Peer_id.t ->
-        P2p.RPC.Peer_id.Event.t Lwt_stream.t * Watcher.stopper
+        P2p.RPC.Peer_id.Event.t Lwt_stream.t * Lwt_watcher.stopper
     end
 
     module Point : sig
@@ -133,7 +133,7 @@ module RPC : sig
       val info : t -> P2p.Point.t -> P2p.RPC.Point.info option
       val events : t -> P2p.Point.t -> P2p.RPC.Point.Event.t list
       val watch : t -> P2p.Point.t ->
-        P2p.RPC.Point.Event.t Lwt_stream.t * Watcher.stopper
+        P2p.RPC.Point.Event.t Lwt_stream.t * Lwt_watcher.stopper
     end
 
   end

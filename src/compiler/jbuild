@@ -12,8 +12,7 @@
 (library
  ((name tezos_protocol_compiler)
   (public_name tezos.protocol_compiler)
-  (libraries (utils
-              minutils
+  (libraries (tezos-base
               tezos_protocol_environment_sigs
               compiler-libs
               compiler-libs.optcomp
@@ -24,7 +23,9 @@
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -opaque
-                    -open Error_monad
-                    -open Hash
-                    -open Utils
-                    -open Tezos_data))))
+                    -open Tezos_base__TzPervasives))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
-open Hash
 open Store
 
 let (>>=) = Lwt.bind
@@ -62,13 +60,13 @@ let net_id = Net_id.of_block_hash genesis_block
 
 (** Operation store *)
 
-let make proto : Tezos_data.Operation.t =
+let make proto : Operation.t =
   { shell = { branch = genesis_block } ; proto }
 
 let op1 = make (MBytes.of_string "Capadoce")
-let oph1 = Tezos_data.Operation.hash op1
+let oph1 = Operation.hash op1
 let op2 = make (MBytes.of_string "Kivu")
-let oph2 = Tezos_data.Operation.hash op2
+let oph2 = Operation.hash op2
 
 
 (** Block store *)

@@ -7,9 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
-open Lwt.Infix
-
 type logger = Logger : {
     log_request: Uri.t -> Data_encoding.json -> 'a Lwt.t ;
     log_success:
@@ -158,7 +155,7 @@ let pp_error ppf (config, err) =
         msg
         (Format.pp_print_list
            (fun ppf s -> Format.fprintf ppf "> %s" s))
-        (Utils.split '\n' json)
+        (String.split '\n' json)
   | Unexpected_json (path, json, msg) ->
       Format.fprintf ppf "@[<v 2>RPC request returned unexpected JSON:@,\
                           Path: %a@,\
@@ -166,7 +163,7 @@ let pp_error ppf (config, err) =
                           @[<v 2>JSON data:@,%a@]@]"
         pp_path path
         (Format.pp_print_list (fun ppf s -> Format.fprintf ppf "%s" s))
-        (Utils.split '\n' msg)
+        (String.split '\n' msg)
         Json_repr.(pp (module Ezjsonm)) json
 
 let () =

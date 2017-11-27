@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 include Logging.Make(struct let name = "node.validator" end)
-module Canceler = Lwt_utils.Canceler
 
 type t = {
 
@@ -17,7 +16,7 @@ type t = {
   block_validator: Block_validator.t ;
   timeout: Net_validator.timeout ;
 
-  valid_block_input: State.Block.t Watcher.input ;
+  valid_block_input: State.Block.t Lwt_watcher.input ;
   active_nets: Net_validator.t Lwt.t Net_id.Table.t ;
 
 }
@@ -27,7 +26,7 @@ let create state db timeout =
     Block_validator.create
       ~protocol_timeout:timeout.Net_validator.protocol
       db in
-  let valid_block_input = Watcher.create_input () in
+  let valid_block_input = Lwt_watcher.create_input () in
   { state ; db ; timeout ; block_validator ;
     valid_block_input ;
     active_nets = Net_id.Table.create 7 ;
@@ -113,7 +112,7 @@ let shutdown { active_nets ; block_validator } =
   Lwt.return_unit
 
 let watcher { valid_block_input } =
-  Watcher.create_stream valid_block_input
+  Lwt_watcher.create_stream valid_block_input
 
 let inject_operation v ?(force = false) ?net_id op =
   begin

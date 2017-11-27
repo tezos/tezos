@@ -211,7 +211,7 @@ module RPC : sig
 
   module Event = P2p_connection_pool.Log_event
 
-  val watch : ('msg, 'meta) net -> Event.t Lwt_stream.t * Watcher.stopper
+  val watch : ('msg, 'meta) net -> Event.t Lwt_stream.t * Lwt_watcher.stopper
   val connect : ('msg, 'meta) net -> Point.t -> float -> unit tzresult Lwt.t
 
   module Connection : sig
@@ -256,7 +256,7 @@ module RPC : sig
     val events :
       ?max:int -> ?rev:bool -> ('msg, 'meta) net -> Point.t -> Event.t list
     val watch :
-      ('msg, 'meta) net -> Point.t -> Event.t Lwt_stream.t * Watcher.stopper
+      ('msg, 'meta) net -> Point.t -> Event.t Lwt_stream.t * Lwt_watcher.stopper
   end
 
   module Peer_id : sig
@@ -294,7 +294,7 @@ module RPC : sig
     val events :
       ?max:int -> ?rev:bool -> ('msg, 'meta) net -> Peer_id.t -> Event.t list
     val watch :
-      ('msg, 'meta) net -> Peer_id.t -> Event.t Lwt_stream.t * Watcher.stopper
+      ('msg, 'meta) net -> Peer_id.t -> Event.t Lwt_stream.t * Lwt_watcher.stopper
 
   end
 

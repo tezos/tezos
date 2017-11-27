@@ -11,7 +11,6 @@ open Format
 include Logging.Make(struct let name = "attacker" end)
 
 module Proto = Client_embedded_proto_alpha
-module Ed25519 = Proto.Local_environment.Environment.Ed25519
 
 (* the genesis block and network *)
 let genesis_block_hashed = Block_hash.of_b58check

@@ -70,7 +70,7 @@ and net_state = {
   allow_forked_network: bool ;
   block_store: Store.Block.store Shared.t ;
   context_index: Context.index Shared.t ;
-  block_watcher: block Watcher.input ;
+  block_watcher: block Lwt_watcher.input ;
   chain_state: chain_state Shared.t ;
 }
 
@@ -210,7 +210,7 @@ module Net = struct
       allow_forked_network ;
       block_store = Shared.create block_store ;
       context_index = Shared.create context_index ;
-      block_watcher = Watcher.create_input () ;
+      block_watcher = Lwt_watcher.create_input () ;
     } in
     Lwt.return net_state
 
@@ -483,7 +483,7 @@ module Block = struct
           Store.Chain.Known_heads.store store hash
         end >>= fun () ->
         let block = { net_state ; hash ; contents } in
-        Watcher.notify net_state.block_watcher block ;
+        Lwt_watcher.notify net_state.block_watcher block ;
         return (Some block)
       end
     end
@@ -504,7 +504,7 @@ module Block = struct
     end
 
   let watcher net_state =
-    Watcher.create_stream net_state.block_watcher
+    Lwt_watcher.create_stream net_state.block_watcher
 
   let operation_hashes { net_state ; hash ; contents } i =
     if i < 0 || contents.header.shell.validation_passes <= i then
@@ -594,6 +594,8 @@ let fork_testnet block protocol expiration =
   end
 
 module Protocol = struct
+
+  include Protocol
 
   let known global_state hash =
     Shared.use global_state.protocol_store begin fun store ->
@@ -708,13 +710,13 @@ module Register_embedded_protocol
     (Proto : Env.Updater.PROTOCOL)
     (Source : sig
        val hash: Protocol_hash.t option
-       val sources: Tezos_data.Protocol.t
+       val sources: Protocol.t
      end) = struct
 
   let () =
     let hash =
       match Source.hash with
-      | None -> Tezos_data.Protocol.hash Source.sources
+      | None -> Protocol.hash Source.sources
       | Some hash -> hash in
     let module Name = struct
       let name = Protocol_hash.to_b58check hash

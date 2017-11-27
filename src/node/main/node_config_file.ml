@@ -333,70 +333,69 @@ let update
     ?rpc_tls
     ?log_output
     ?bootstrap_threshold
-    cfg =
-  let data_dir = Utils.unopt ~default:cfg.data_dir data_dir in
+    cfg = let data_dir = Option.unopt ~default:cfg.data_dir data_dir in
   Node_data_version.ensure_data_dir data_dir >>=? fun () ->
   let peer_table_size =
-    map_option peer_table_size ~f:(fun i -> i, i / 4 * 3) in
+    Option.map peer_table_size ~f:(fun i -> i, i / 4 * 3) in
   let unopt_list ~default = function
     | [] -> default
     | l -> l in
   let limits : P2p.limits = {
     cfg.net.limits with
     min_connections =
-      Utils.unopt
+      Option.unopt
         ~default:cfg.net.limits.min_connections
         min_connections ;
     expected_connections =
-      Utils.unopt
+      Option.unopt
         ~default:cfg.net.limits.expected_connections
         expected_connections ;
     max_connections =
-      Utils.unopt
+      Option.unopt
         ~default:cfg.net.limits.max_connections
         max_connections ;
     max_download_speed =
-      Utils.first_some
+      Option.first_some
         max_download_speed cfg.net.limits.max_download_speed ;
     max_upload_speed =
-      Utils.first_some
+      Option.first_some
         max_upload_speed cfg.net.limits.max_upload_speed ;
     max_known_points =
-      Utils.first_some
+      Option.first_some
         peer_table_size cfg.net.limits.max_known_points ;
     max_known_peer_ids =
-      Utils.first_some
+      Option.first_some
         peer_table_size cfg.net.limits.max_known_peer_ids ;
     binary_chunks_size =
-      Utils.map_option ~f:(fun x -> x lsl 10) binary_chunks_size ;
+      Option.map ~f:(fun x -> x lsl 10) binary_chunks_size ;
   } in
   let net : net = {
     expected_pow =
-      Utils.unopt ~default:cfg.net.expected_pow expected_pow ;
+      Option.unopt ~default:cfg.net.expected_pow expected_pow ;
     bootstrap_peers =
-      Utils.unopt ~default:cfg.net.bootstrap_peers bootstrap_peers ;
+      Option.unopt ~default:cfg.net.bootstrap_peers bootstrap_peers ;
     listen_addr =
-      Utils.first_some listen_addr cfg.net.listen_addr ;
+      Option.first_some listen_addr cfg.net.listen_addr ;
     closed = cfg.net.closed || closed ;
     limits ;
   }
   and rpc : rpc = {
     listen_addr =
-      Utils.first_some rpc_listen_addr cfg.rpc.listen_addr ;
+      Option.first_some rpc_listen_addr cfg.rpc.listen_addr ;
     cors_origins =
       unopt_list ~default:cfg.rpc.cors_origins cors_origins ;
     cors_headers =
       unopt_list ~default:cfg.rpc.cors_headers cors_headers ;
     tls =
-      Utils.first_some rpc_tls cfg.rpc.tls ;
+      Option.first_some rpc_tls cfg.rpc.tls ;
   }
   and log : log = {
     cfg.log with
-    output = Utils.unopt ~default:cfg.log.output log_output ;
+    output = Option.unopt ~default:cfg.log.output log_output ;
   }
   and shell : shell = {
     bootstrap_threshold =
-      Utils.unopt
+      Option.unopt
         ~default:cfg.shell.bootstrap_threshold
         bootstrap_threshold ;
     timeout = cfg.shell.timeout ;
@@ -405,7 +404,7 @@ let update
   return { data_dir ; net ; rpc ; log ; shell }
 
 let resolve_addr ?default_port ?(passive = false) peer =
-  let addr, port = Utils.parse_addr_port peer in
+  let addr, port = P2p.Point.parse_addr_port peer in
   let node = if addr = "" || addr = "_" then "::" else addr
   and service =
     match port, default_port with

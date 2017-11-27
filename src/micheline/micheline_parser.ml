@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
 open Micheline
 
 type 'a parsing_result = 'a * error list

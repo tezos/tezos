@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Ed25519 = Environment.Ed25519
-
 type operation = {
   hash: Operation_hash.t ;
   content: Operation.t option

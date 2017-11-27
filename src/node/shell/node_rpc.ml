@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Utils
 open Logging.RPC
 
 module Services = Node_rpc_services
@@ -18,7 +17,7 @@ let filter_bi operations (bi: Services.Blocks.block_info)  =
 
 let monitor_operations node contents =
   let stream, stopper = Node.RPC.operation_watcher node in
-  let shutdown () = Watcher.shutdown stopper in
+  let shutdown () = Lwt_watcher.shutdown stopper in
   let first_request = ref true in
   let next () =
     if not !first_request then
@@ -315,7 +314,7 @@ let list_blocks
           let filtering = heads <> None in
           create_delayed_stream
             ~filtering ~include_ops requested_heads bi_stream delay in
-    let shutdown () = Watcher.shutdown stopper in
+    let shutdown () = Lwt_watcher.shutdown stopper in
     let first_request = ref true in
     let next () =
       if not !first_request then begin
@@ -350,7 +349,7 @@ let list_protocols node {Services.Protocols.monitor; contents} =
     RPC.Answer.return protocols
   else
     let stream, stopper = Node.RPC.protocol_watcher node in
-    let shutdown () = Watcher.shutdown stopper in
+    let shutdown () = Lwt_watcher.shutdown stopper in
     let first_request = ref true in
     let next () =
       if not !first_request then
@@ -453,7 +452,7 @@ let build_rpc_directory node =
   let dir =
     let implementation () =
       let stream, stopper = Node.RPC.Network.watch node in
-      let shutdown () = Watcher.shutdown stopper in
+      let shutdown () = Lwt_watcher.shutdown stopper in
       let next () = Lwt_stream.get stream in
       RPC.Answer.return_stream { next ; shutdown } in
     RPC.register0 dir Services.Network.events implementation in
@@ -491,11 +490,11 @@ let build_rpc_directory node =
     let implementation peer_id monitor =
       if monitor then
         let stream, stopper = Node.RPC.Network.Peer_id.watch node peer_id in
-        let shutdown () = Watcher.shutdown stopper in
+        let shutdown () = Lwt_watcher.shutdown stopper in
         let first_request = ref true in
         let next () =
           if not !first_request then begin
-            Lwt_stream.get stream >|= map_option ~f:(fun i -> [i])
+            Lwt_stream.get stream >|= Option.map ~f:(fun i -> [i])
           end else begin
             first_request := false ;
             Lwt.return_some @@ Node.RPC.Network.Peer_id.events node peer_id
@@ -519,11 +518,11 @@ let build_rpc_directory node =
     let implementation point monitor =
       if monitor then
         let stream, stopper = Node.RPC.Network.Point.watch node point in
-        let shutdown () = Watcher.shutdown stopper in
+        let shutdown () = Lwt_watcher.shutdown stopper in
         let first_request = ref true in
         let next () =
           if not !first_request then begin
-            Lwt_stream.get stream >|= map_option ~f:(fun i -> [i])
+            Lwt_stream.get stream >|= Option.map ~f:(fun i -> [i])
           end else begin
             first_request := false ;
             Lwt.return_some @@ Node.RPC.Network.Point.events node point

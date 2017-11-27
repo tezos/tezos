@@ -8,10 +8,14 @@
     ;; External
     uutf
     ;; Internal
-    minutils
-    utils
+    tezos-base
     ))
-  (flags (:standard -w -9+27-30-32-40@8 -safe-string))
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
+                    -open Tezos_base__TzPervasives))
   (wrapped false)))
 
-
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Canceler = Lwt_utils.Canceler
-
 module type DISTRIBUTED_DB = sig
 
   type t
@@ -40,7 +38,7 @@ module type DISTRIBUTED_DB = sig
 
   val clear_or_cancel: t -> key -> unit
   val inject: t -> key -> value -> bool Lwt.t
-  val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
+  val watch: t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
 
   val pending: t -> key -> bool
 
@@ -103,7 +101,7 @@ module Make_table
                           and type value = Disk_table.value
                           and type param = Precheck.param
   val create:
-    ?global_input:(key * value) Watcher.input ->
+    ?global_input:(key * value) Lwt_watcher.input ->
     Scheduler.t -> Disk_table.store -> t
   val notify: t -> P2p.Peer_id.t -> key -> Precheck.notified_value -> unit Lwt.t
 
@@ -117,8 +115,8 @@ end = struct
     scheduler: Scheduler.t ;
     disk: Disk_table.store ;
     memory: status Memory_table.t ;
-    global_input: (key * value) Watcher.input option ;
-    input: (key * value) Watcher.input ;
+    global_input: (key * value) Lwt_watcher.input option ;
+    input: (key * value) Lwt_watcher.input ;
   }
 
   and status =
@@ -257,9 +255,9 @@ end = struct
             Scheduler.notify s.scheduler p k ;
             Memory_table.replace s.memory k (Found v) ;
             Lwt.wakeup_later w (Ok v) ;
-            iter_option s.global_input
-              ~f:(fun input -> Watcher.notify input (k, v)) ;
-            Watcher.notify s.input (k, v) ;
+            Option.iter s.global_input
+              ~f:(fun input -> Lwt_watcher.notify input (k, v)) ;
+            Lwt_watcher.notify s.input (k, v) ;
             Lwt.return_unit
       end
     | Found _ ->
@@ -289,11 +287,11 @@ end = struct
         Lwt.wakeup_later w (Error [Canceled k])
     | Found _ -> Memory_table.remove s.memory k
 
-  let watch s = Watcher.create_stream s.input
+  let watch s = Lwt_watcher.create_stream s.input
 
   let create ?global_input scheduler disk =
     let memory = Memory_table.create 17 in
-    let input = Watcher.create_input () in
+    let input = Lwt_watcher.create_input () in
     { scheduler ; disk ; memory ; input ; global_input }
 
   let pending s k =
@@ -339,7 +337,7 @@ end = struct
     queue: event Lwt_pipe.t ;
     mutable events: event list Lwt.t ;
 
-    canceler: Canceler.t ;
+    canceler: Lwt_canceler.t ;
     mutable worker: unit Lwt.t ;
   }
 
@@ -464,7 +462,7 @@ end = struct
         Lwt.return_unit
 
   let rec worker_loop state =
-    let shutdown = Canceler.cancelation state.canceler
+    let shutdown = Lwt_canceler.cancelation state.canceler
     and timeout = compute_timeout state in
     Lwt.choose
       [ (state.events >|= fun _ -> ()) ; timeout ; shutdown ] >>= fun () ->
@@ -523,17 +521,17 @@ end = struct
       queue = Lwt_pipe.create () ;
       pending = Table.create 17 ;
       events = Lwt.return [] ;
-      canceler = Canceler.create () ;
+      canceler = Lwt_canceler.create () ;
       worker = Lwt.return_unit ;
     } in
     state.worker <-
       Lwt_utils.worker "db_request_scheduler"
         ~run:(fun () -> worker_loop state)
-        ~cancel:(fun () -> Canceler.cancel state.canceler) ;
+        ~cancel:(fun () -> Lwt_canceler.cancel state.canceler) ;
     state
 
   let shutdown s =
-    Canceler.cancel s.canceler >>= fun () ->
+    Lwt_canceler.cancel s.canceler >>= fun () ->
     s.worker
 
 end

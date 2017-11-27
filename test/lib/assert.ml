@@ -7,9 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
-open Hash
-
 include Kaputt.Assertion
 
 module Assert = Kaputt.Abbreviations.Assert

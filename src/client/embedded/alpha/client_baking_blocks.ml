@@ -74,7 +74,7 @@ let blocks_from_cycle cctxt block cycle =
   let length = Int32.to_int (Raw_level.diff level.level first) in
   Client_node_rpcs.Blocks.predecessors cctxt block length >>=? fun blocks ->
   let blocks =
-    Utils.remove_elem_from_list
+    List.remove
       (length - (1 + Int32.to_int (Raw_level.diff last first))) blocks in
   if Raw_level.(level.level = last) then
     Client_node_rpcs.Blocks.hash cctxt block >>=? fun last ->

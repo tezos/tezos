@@ -22,7 +22,7 @@ type bounds = {
 type 'meta pool = Pool : ('msg, 'meta) P2p_connection_pool.t -> 'meta pool
 
 type 'meta t = {
-  canceler: Canceler.t ;
+  canceler: Lwt_canceler.t ;
   connection_timeout: float ;
   bounds: bounds ;
   pool: 'meta pool ;
@@ -40,7 +40,7 @@ let connectable st start_time expected =
   let Pool pool = st.pool in
   let now = Time.now () in
   let module Bounded_point_info =
-    Utils.Bounded(struct
+    List.Bounded(struct
       type t = (Time.t option * Point.t)
       let compare (t1, _) (t2, _) =
         match t1, t2 with
@@ -120,7 +120,7 @@ and too_few_connections st n_connected =
   end else begin
     (* not enough contacts, ask the pals of our pals,
        discover the local network and then wait *)
-    iter_option ~f:P2p_discovery.restart st.disco ;
+    Option.iter ~f:P2p_discovery.restart st.disco ;
     P2p_connection_pool.broadcast_bootstrap_msg pool ;
     Lwt_utils.protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
@@ -172,7 +172,7 @@ let rec worker_loop st =
   | Error _ -> Lwt.return_unit
 
 let run ~connection_timeout bounds pool disco =
-  let canceler = Canceler.create () in
+  let canceler = Lwt_canceler.create () in
   let st = {
     canceler ;
     connection_timeout ;
@@ -186,7 +186,7 @@ let run ~connection_timeout bounds pool disco =
   st.maintain_worker <-
     Lwt_utils.worker "maintenance"
       ~run:(fun () -> worker_loop st)
-      ~cancel:(fun () -> Canceler.cancel canceler) ;
+      ~cancel:(fun () -> Lwt_canceler.cancel canceler) ;
   st
 
 let maintain { just_maintained ; please_maintain } =
@@ -198,7 +198,7 @@ let shutdown {
     canceler ;
     maintain_worker ;
     just_maintained } =
-  Canceler.cancel canceler >>= fun () ->
+  Lwt_canceler.cancel canceler >>= fun () ->
   maintain_worker >>= fun () ->
   Lwt_condition.broadcast just_maintained () ;
   Lwt.return_unit

@@ -1,0 +1,15 @@
+(jbuild_version 1)
+
+(library
+ ((name tezos_stdlib)
+  (public_name tezos-stdlib)
+  (libraries (ocplib-endian.bigstring cstruct stringext))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${path:test-ocp-indent.sh} ${<}))))
+
+(install
+ ((section libexec)
+  (files ((test-ocp-indent.sh as test-ocp-indent.sh)))))

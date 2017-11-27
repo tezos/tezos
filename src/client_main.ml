@@ -10,7 +10,6 @@
 (* Tezos Command line interface - Main Program *)
 
 open Client_commands
-open Error_monad
 
 let cctxt config rpc_config =
   let startup =
@@ -58,13 +57,13 @@ let main () =
             | None ->
                 return (Some version, Client_commands.commands_for_version version)
             | Some given_version -> begin
-                if not (Hash.Protocol_hash.equal version given_version) then
+                if not (Protocol_hash.equal version given_version) then
                   Format.eprintf
                     "@[<v 2>Warning:@,\
                      The protocol provided via `-protocol` (%a)@,\
                      is not the one retrieved from the node (%a).@."
-                    Hash.Protocol_hash.pp_short given_version
-                    Hash.Protocol_hash.pp_short version ;
+                    Protocol_hash.pp_short given_version
+                    Protocol_hash.pp_short version ;
                 return (Some version, Client_commands.commands_for_version given_version)
               end
           end

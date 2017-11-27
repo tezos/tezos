@@ -171,8 +171,6 @@ let editor_fill_in schema =
 
 (*-- Nice list display ------------------------------------------------------*)
 
-module StringMap = Map.Make(String)
-
 let rec count =
   let open RPC.Description in
   function
@@ -184,14 +182,14 @@ let rec count =
         match subdirs with
         | None -> 0
         | Some (Suffixes subdirs) ->
-            StringMap.fold (fun _ t r -> r + count t) subdirs 0
+            RPC.StringMap.fold (fun _ t r -> r + count t) subdirs 0
         | Some (Arg (_, subdir)) -> count subdir in
       service + subdirs
 
 (*-- Commands ---------------------------------------------------------------*)
 
 let list url cctxt =
-  let args = Utils.split '/' url in
+  let args = String.split '/' url in
   Client_node_rpcs.describe cctxt.rpc_config
     ~recurse:true args >>=? fun tree ->
   let open RPC.Description in
@@ -202,7 +200,7 @@ let list url cctxt =
   let display_paragraph ppf description =
     Format.fprintf ppf "@,    @[%a@]"
       (fun ppf words -> List.iter (Format.fprintf ppf "%s@ ") words)
-      (Utils.split ' ' description)
+      (String.split ' ' description)
   in
   let display_arg ppf arg =
     match arg.RPC.Arg.descr with
@@ -236,7 +234,7 @@ let list url cctxt =
     | Static { services ; subdirs = None } ->
         display_services ppf (path, tpath, services)
     | Static { services ; subdirs = Some (Suffixes subdirs) } -> begin
-        match RPC.MethMap.cardinal services, StringMap.bindings subdirs with
+        match RPC.MethMap.cardinal services, RPC.StringMap.bindings subdirs with
         | 0, [] -> ()
         | 0, [ n, solo ] ->
             display ppf (path @ [ n ], tpath @ [ n ], solo)
@@ -290,7 +288,7 @@ let list url cctxt =
 
 
 let schema url cctxt =
-  let args = Utils.split '/' url in
+  let args = String.split '/' url in
   let open RPC.Description in
   Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
   | Static { services } -> begin
@@ -315,7 +313,7 @@ let schema url cctxt =
       return ()
 
 let format url cctxt =
-  let args = Utils.split '/' url in
+  let args = String.split '/' url in
   let open RPC.Description in
   Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
   | Static { services } -> begin
@@ -354,7 +352,7 @@ let fill_in schema =
   | _ -> editor_fill_in schema
 
 let call url cctxt =
-  let args = Utils.split '/' url in
+  let args = String.split '/' url in
   let open RPC.Description in
   Client_node_rpcs.describe cctxt.rpc_config ~recurse:false args >>=? function
   | Static { services } -> begin
@@ -381,7 +379,7 @@ let call url cctxt =
       return ()
 
 let call_with_json url json (cctxt: Client_commands.context) =
-  let args = Utils.split '/' url in
+  let args = String.split '/' url in
   match Data_encoding_ezjsonm.from_string json with
   | Error err ->
       cctxt.error

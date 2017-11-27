@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 include Logging.Make(struct let name = "node.validator.net" end)
-module Canceler = Lwt_utils.Canceler
 
 type t = {
 
@@ -21,9 +20,9 @@ type t = {
   bootstrap_threshold: int ;
   mutable bootstrapped: bool ;
   bootstrapped_wakener: unit Lwt.u ;
-  valid_block_input: State.Block.t Watcher.input ;
-  global_valid_block_input: State.Block.t Watcher.input ;
-  new_head_input: State.Block.t Watcher.input ;
+  valid_block_input: State.Block.t Lwt_watcher.input ;
+  global_valid_block_input: State.Block.t Lwt_watcher.input ;
+  new_head_input: State.Block.t Lwt_watcher.input ;
 
   parent: t option ;
   max_child_ttl: int option ;
@@ -35,7 +34,7 @@ type t = {
 
   mutable worker: unit Lwt.t ;
   queue: State.Block.t Lwt_pipe.t ;
-  canceler: Canceler.t ;
+  canceler: Lwt_canceler.t ;
 
 }
 
@@ -49,7 +48,7 @@ and timeout = {
 
 
 let rec shutdown nv =
-  Canceler.cancel nv.canceler >>= fun () ->
+  Lwt_canceler.cancel nv.canceler >>= fun () ->
   Distributed_db.deactivate nv.net_db >>= fun () ->
   Lwt.join
     ( nv.worker ::
@@ -64,10 +63,10 @@ let shutdown_child nv =
   Lwt_utils.may ~f:shutdown nv.child
 
 let notify_new_block nv block =
-  iter_option nv.parent
-    ~f:(fun nv -> Watcher.notify nv.valid_block_input block) ;
-  Watcher.notify nv.valid_block_input block ;
-  Watcher.notify nv.global_valid_block_input block ;
+  Option.iter nv.parent
+    ~f:(fun nv -> Lwt_watcher.notify nv.valid_block_input block) ;
+  Lwt_watcher.notify nv.valid_block_input block ;
+  Lwt_watcher.notify nv.global_valid_block_input block ;
   assert (Lwt_pipe.push_now nv.queue block)
 
 let may_toggle_bootstrapped_network nv =
@@ -128,9 +127,9 @@ let rec create
   Prevalidator.create
     ~max_operations:2000 (* FIXME temporary constant *)
     ~operation_timeout:timeout.operation net_db >>= fun prevalidator ->
-  let valid_block_input = Watcher.create_input () in
-  let new_head_input = Watcher.create_input () in
-  let canceler = Canceler.create () in
+  let valid_block_input = Lwt_watcher.create_input () in
+  let new_head_input = Lwt_watcher.create_input () in
+  let canceler = Lwt_canceler.create () in
   let _, bootstrapped_wakener = Lwt.wait () in
   let nv = {
     db ; net_state ; net_db ; block_validator ;
@@ -180,7 +179,7 @@ let rec create
     Lwt_utils.worker
       (Format.asprintf "net_validator.%a" Net_id.pp (State.Net.id net_state))
       ~run:(fun () -> worker_loop nv)
-      ~cancel:(fun () -> Canceler.cancel nv.canceler) ;
+      ~cancel:(fun () -> Lwt_canceler.cancel nv.canceler) ;
   Lwt.return nv
 
 (** Current block computation *)
@@ -208,7 +207,7 @@ and worker_loop nv =
       broadcast_head nv ~previous block >>= fun () ->
       Prevalidator.flush nv.prevalidator block ; (* FIXME *)
       may_switch_test_network nv block >>= fun () ->
-      Watcher.notify nv.new_head_input block ;
+      Lwt_watcher.notify nv.new_head_input block ;
       lwt_log_notice "update current head %a %a %a(%t)"
         Block_hash.pp_short block_hash
         Fitness.pp block_header.shell.fitness
@@ -228,7 +227,7 @@ and worker_loop nv =
   | Error err ->
       lwt_log_error "@[Unexpected error:@ %a@]"
         pp_print_error err >>= fun () ->
-      Canceler.cancel nv.canceler >>= fun () ->
+      Lwt_canceler.cancel nv.canceler >>= fun () ->
       Lwt.return_unit
 
 and may_switch_test_network nv block =
@@ -245,8 +244,8 @@ and may_switch_test_network nv block =
             State.fork_testnet
               genesis protocol expiration >>=? fun net_state ->
             Chain.head net_state >>= fun new_genesis_block ->
-            Watcher.notify nv.global_valid_block_input new_genesis_block ;
-            Watcher.notify nv.valid_block_input new_genesis_block ;
+            Lwt_watcher.notify nv.global_valid_block_input new_genesis_block ;
+            Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
             return net_state
       end >>=? fun net_state ->
       create
@@ -341,7 +340,7 @@ let bootstrapped { bootstrapped_wakener } =
   Lwt.protected (Lwt.waiter_of_wakener bootstrapped_wakener)
 
 let valid_block_watcher { valid_block_input } =
-  Watcher.create_stream valid_block_input
+  Lwt_watcher.create_stream valid_block_input
 
 let new_head_watcher { new_head_input } =
-  Watcher.create_stream new_head_input
+  Lwt_watcher.create_stream new_head_input

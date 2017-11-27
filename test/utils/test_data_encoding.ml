@@ -1,5 +1,4 @@
 open Data_encoding
-open Error_monad
 
 let (>>=) = Lwt.bind
 let (>|=) = Lwt.(>|=)

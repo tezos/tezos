@@ -111,21 +111,6 @@ module type PrefixedName = sig
   val b58check_prefix : string
 end
 
-(** Builds a new Hash type using Blake2B. *)
-
-module Make_minimal_Blake2B (Name : Name) : MINIMAL_HASH
-module Make_Blake2B
-    (Register : sig
-       val register_encoding:
-         prefix: string ->
-         length: int ->
-         to_raw: ('a -> string) ->
-         of_raw: (string -> 'a option) ->
-         wrap: ('a -> Base58.data) ->
-         'a Base58.encoding
-     end)
-    (Name : PrefixedName) : HASH
-
 (** {2 Predefined Hashes } ****************************************************)
 
 (** Blocks hashes / IDs. *)

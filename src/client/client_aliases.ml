@@ -266,7 +266,7 @@ module Alias = functor (Entity : Entity) -> struct
              >>=? fun content ->
              of_source cctxt content in
            begin
-             match Utils.split ~limit:1 ':' s with
+             match String.split ~limit:1 ':' s with
              | [ "alias" ; alias ]->
                  find cctxt alias
              | [ "text" ; text ] ->

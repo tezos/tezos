@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
 open Client_commands
 open Logging.Client.Baking
 
@@ -30,7 +29,7 @@ let forge_block_header
       Tezos_context.Block_header.forge_unsigned
         shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
     let signed_header =
-      Environment.Ed25519.Signature.append delegate_sk unsigned_header in
+      Ed25519.Signature.append delegate_sk unsigned_header in
     let block_hash = Block_hash.hash_bytes [signed_header] in
     if Baking.check_hash block_hash stamp_threshold then
       signed_header
@@ -52,10 +51,10 @@ let assert_valid_operations_hash shell_header operations =
     Operation_list_list_hash.compute
       (List.map Operation_list_hash.compute
          (List.map
-            (List.map Tezos_data.Operation.hash) operations)) in
+            (List.map Tezos_base.Operation.hash) operations)) in
   fail_unless
     (Operation_list_list_hash.equal
-       operations_hash shell_header.Tezos_data.Block_header.operations_hash)
+       operations_hash shell_header.Tezos_base.Block_header.operations_hash)
     (failure
        "Client_baking_forge.inject_block: \
         inconsistent header.")
@@ -64,7 +63,7 @@ let inject_block cctxt
     ?force ?net_id
     ~shell_header ~priority ~seed_nonce_hash ~src_sk operations =
   assert_valid_operations_hash shell_header operations >>=? fun () ->
-  let block = `Hash shell_header.Tezos_data.Block_header.predecessor in
+  let block = `Hash shell_header.Tezos_base.Block_header.predecessor in
   forge_block_header cctxt block
     src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
   Client_node_rpcs.inject_block cctxt
@@ -72,7 +71,7 @@ let inject_block cctxt
   return block_hash
 
 type error +=
-  | Failed_to_preapply of Tezos_data.Operation.t * error list
+  | Failed_to_preapply of Tezos_base.Operation.t * error list
 
 let () =
   register_error_kind
@@ -81,13 +80,13 @@ let () =
     ~title: "Fail to preapply an operation"
     ~description: ""
     ~pp:(fun ppf (op, err) ->
-        let h = Tezos_data.Operation.hash op in
+        let h = Tezos_base.Operation.hash op in
         Format.fprintf ppf "@[Failed to preapply %a:@ %a@]"
           Operation_hash.pp_short h
           pp_print_error err)
     Data_encoding.
       (obj2
-         (req "operation" (dynamic_size Tezos_data.Operation.encoding))
+         (req "operation" (dynamic_size Tezos_base.Operation.encoding))
          (req "error" Node_rpc_services.Error.encoding))
     (function
       | Failed_to_preapply (hash, err) -> Some (hash, err)
@@ -181,9 +180,9 @@ let forge_block cctxt block
       [operations]
   else
     Lwt.return_error @@
-    Utils.filter_map
+    List.filter_map
       (fun op ->
-         let h = Tezos_data.Operation.hash op in
+         let h = Tezos_base.Operation.hash op in
          try Some (Failed_to_preapply
                      (op, snd @@ Operation_hash.Map.find h result.refused))
          with Not_found ->
@@ -491,7 +490,7 @@ let bake cctxt state =
     List.sort
       (fun (_,_,h1,_,_) (_,_,h2,_,_) ->
          match
-           Fitness.compare h1.Tezos_data.Block_header.fitness h2.fitness
+           Fitness.compare h1.Tezos_base.Block_header.fitness h2.fitness
          with
          | 0 ->
              Time.compare h1.timestamp h2.timestamp

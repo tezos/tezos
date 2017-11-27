@@ -7,9 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Hash
-open Error_monad
-
 let (//) = Filename.concat
 
 (** Basic blocks *)
@@ -41,7 +38,7 @@ let incr_fitness fitness =
     | [ fitness ] ->
         Pervasives.(
           Data_encoding.Binary.of_bytes Data_encoding.int64 fitness
-          |> Utils.unopt ~default:0L
+          |> Option.unopt ~default:0L
           |> Int64.succ
           |> Data_encoding.Binary.to_bytes Data_encoding.int64
         )
@@ -86,7 +83,7 @@ let equal_operation ?msg op1 op2 =
     | _ -> false in
   let prn = function
     | None -> "none"
-    | Some op -> Hash.Operation_hash.to_hex (Operation.hash op) in
+    | Some op -> Operation_hash.to_hex (Operation.hash op) in
   Assert.equal ?msg ~prn ~eq op1 op2
 
 let equal_block ?msg st1 st2 =
@@ -98,8 +95,7 @@ let equal_block ?msg st1 st2 =
     | _ -> false in
   let prn = function
     | None -> "none"
-    | Some st ->
-        Hash.Block_hash.to_hex (Block_header.hash st) in
+    | Some st -> Block_hash.to_hex (Block_header.hash st) in
   Assert.equal ?msg ~prn ~eq st1 st2
 
 let block _state ?(operations = []) (pred: State.Block.t) name

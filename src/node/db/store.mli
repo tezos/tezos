@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 open Store_sigs
-open Tezos_data
 
 type t
 type global_store = t

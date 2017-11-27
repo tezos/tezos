@@ -150,7 +150,7 @@ module Block : sig
     t -> int -> (Operation.t list * Operation_list_list_hash.path) Lwt.t
   val all_operations: t -> Operation.t list list Lwt.t
 
-  val watcher: Net.t -> block Lwt_stream.t * Watcher.stopper
+  val watcher: Net.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
 end
 
@@ -191,6 +191,8 @@ val update_chain_store:
 (** {2 Protocol database} ***************************************************)
 
 module Protocol : sig
+
+  include (module type of (struct include Protocol end))
 
   (** Is a value stored in the local database ? *)
   val known: global_state -> Protocol_hash.t -> bool Lwt.t
@@ -236,5 +238,5 @@ module Register_embedded_protocol
     (Proto : Env.Updater.PROTOCOL)
     (Source : sig
        val hash: Protocol_hash.t option
-       val sources: Tezos_data.Protocol.t
+       val sources: Protocol.t
      end) : sig end

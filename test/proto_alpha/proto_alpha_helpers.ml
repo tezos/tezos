@@ -88,7 +88,7 @@ module Account = struct
   let create ?keys alias =
     let sk, pk = match keys with
       | Some keys -> keys
-      | None -> Sodium.Sign.random_keypair () in
+      | None -> let _, pk, sk = Ed25519.generate_key () in sk, pk in
     let pkh = Ed25519.Public_key.hash pk in
     let contract = Contract.default_contract pkh in
     { alias ; contract ; pkh ; pk ; sk }
@@ -266,7 +266,7 @@ module Protocol = struct
       ~proposals
       () >>=? fun bytes ->
     let signed_bytes = Ed25519.Signature.append sk bytes in
-    return (Tezos_data.Operation.of_bytes_exn signed_bytes)
+    return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let ballot ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
     Client_node_rpcs.Blocks.info !rpc_config block >>=? fun block_info ->
@@ -279,7 +279,7 @@ module Protocol = struct
       ~ballot
       () >>=? fun bytes ->
     let signed_bytes = Ed25519.Signature.append sk bytes in
-    return (Tezos_data.Operation.of_bytes_exn signed_bytes)
+    return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
 end
 
@@ -323,7 +323,7 @@ module Assert = struct
         List.exists f errors
     | _ -> false
 
-  let hash op = Tezos_data.Operation.hash op
+  let hash op = Tezos_base.Operation.hash op
 
   let failed_to_preapply ~msg ?op f =
     Assert.contain_error ~msg ~f:begin function
@@ -464,7 +464,7 @@ module Endorse = struct
       ~slot:slot
       () >>=? fun bytes ->
     let signed_bytes = Ed25519.Signature.append src_sk bytes in
-    return (Tezos_data.Operation.of_bytes_exn signed_bytes)
+    return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
   let signing_slots
       ?(max_priority = 1024)

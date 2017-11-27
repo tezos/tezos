@@ -8,13 +8,12 @@
 (**************************************************************************)
 
 include Logging.Make(struct let name = "node.validator.block" end)
-module Canceler = Lwt_utils.Canceler
 
 type 'a request =
   | Request_validation: {
       net_db: Distributed_db.net_db ;
       notify_new_block: State.Block.t -> unit ;
-      canceler: Canceler.t option ;
+      canceler: Lwt_canceler.t option ;
       peer: P2p.Peer_id.t option ;
       hash: Block_hash.t ;
       header: Block_header.t ;
@@ -28,7 +27,7 @@ type t = {
   protocol_timeout: float ;
   mutable worker: unit Lwt.t ;
   messages: message Lwt_pipe.t ;
-  canceler: Canceler.t ;
+  canceler: Lwt_canceler.t ;
 }
 
 (** Block validation *)
@@ -533,30 +532,30 @@ let rec worker_loop bv =
   | Error err ->
       lwt_log_error "@[Unexpected error:@ %a@]"
         pp_print_error err >>= fun () ->
-      Canceler.cancel bv.canceler >>= fun () ->
+      Lwt_canceler.cancel bv.canceler >>= fun () ->
       Lwt.return_unit
 
 let create ~protocol_timeout db =
   let protocol_validator = Protocol_validator.create db in
-  let canceler = Canceler.create () in
+  let canceler = Lwt_canceler.create () in
   let messages = Lwt_pipe.create () in
   let bv = {
     protocol_validator ;
     protocol_timeout ;
     canceler ; messages ;
     worker = Lwt.return_unit } in
-  Canceler.on_cancel bv.canceler begin fun () ->
+  Lwt_canceler.on_cancel bv.canceler begin fun () ->
     Lwt_pipe.close bv.messages ;
     Lwt.return_unit
   end ;
   bv.worker <-
     Lwt_utils.worker "block_validator"
       ~run:(fun () -> worker_loop bv)
-      ~cancel:(fun () -> Canceler.cancel bv.canceler) ;
+      ~cancel:(fun () -> Lwt_canceler.cancel bv.canceler) ;
   bv
 
 let shutdown { canceler ; worker } =
-  Canceler.cancel canceler >>= fun () ->
+  Lwt_canceler.cancel canceler >>= fun () ->
   worker
 
 let validate { messages ; protocol_validator ; protocol_timeout }

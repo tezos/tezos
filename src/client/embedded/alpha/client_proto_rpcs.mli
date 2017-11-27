@@ -151,7 +151,7 @@ module Helpers : sig
 
   val apply_operation:
     Client_rpcs.config ->
-    block -> Block_hash.t -> Operation_hash.t -> MBytes.t -> MBytes.t option ->
+    block -> Block_hash.t -> Operation_hash.t -> MBytes.t -> Ed25519.Signature.t option ->
     (Contract.t list) tzresult Lwt.t
   val run_code:
     Client_rpcs.config ->
@@ -289,7 +289,7 @@ module Helpers : sig
         branch:Block_hash.t ->
         source:public_key ->
         period:Voting_period.t ->
-        proposals:Hash.Protocol_hash.t list ->
+        proposals:Protocol_hash.t list ->
         unit -> MBytes.t tzresult Lwt.t
       val ballot:
         Client_rpcs.config ->
@@ -297,7 +297,7 @@ module Helpers : sig
         branch:Block_hash.t ->
         source:public_key ->
         period:Voting_period.t ->
-        proposal:Hash.Protocol_hash.t ->
+        proposal:Protocol_hash.t ->
         ballot:Vote.ballot ->
         unit -> MBytes.t tzresult Lwt.t
     end

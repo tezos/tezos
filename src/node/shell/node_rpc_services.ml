@@ -109,7 +109,7 @@ module Blocks = struct
 
   let parse_block s =
     try
-      match Utils.split '~' s with
+      match String.split '~' s with
       | ["genesis"] -> Ok `Genesis
       | ["head"] -> Ok (`Head 0)
       | ["prevalidation"] -> Ok `Prevalidation

@@ -76,11 +76,10 @@ module Cfg_file = struct
          (base_dir, Some node_addr, Some node_port,
           Some tls, Some web_port))
       (fun (base_dir, node_addr, node_port, tls, web_port) ->
-         let open Utils in
-         let node_addr = unopt ~default:default.node_addr node_addr in
-         let node_port = unopt ~default:default.node_port node_port in
-         let tls = unopt ~default:default.tls tls in
-         let web_port = unopt ~default:default.web_port web_port in
+         let node_addr = Option.unopt ~default:default.node_addr node_addr in
+         let node_port = Option.unopt ~default:default.node_port node_port in
+         let tls = Option.unopt ~default:default.tls tls in
+         let web_port = Option.unopt ~default:default.web_port web_port in
          { base_dir ; node_addr ; node_port ; tls ; web_port })
       (obj5
          (req "base_dir" string)
@@ -272,11 +271,11 @@ let parse_config_args (ctx : Client_commands.context) argv =
     Format.eprintf "Error: %s is not a directory.@." base_dir ;
     exit 1 ;
   end ;
-  IO.mkdir base_dir ;
+  Utils.mkdir base_dir ;
   if Sys.file_exists config_dir && not (Sys.is_directory config_dir) then begin
     Format.eprintf "Error: %s is not a directory.@." config_dir ;
     exit 1 ;
   end ;
-  IO.mkdir config_dir ;
+  Utils.mkdir config_dir ;
   if not (Sys.file_exists config_file) then Cfg_file.write config_file cfg ;
   (cfg, { block ; print_timings = timings ; log_requests ; force ; protocol }, remaining)

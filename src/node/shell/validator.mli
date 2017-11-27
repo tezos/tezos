@@ -35,7 +35,7 @@ val validate_block:
   (Block_hash.t * State.Block.t tzresult Lwt.t) tzresult Lwt.t
 
 (** Monitor all the valid block (for all activate networks). *)
-val watcher: t -> State.Block.t Lwt_stream.t * Watcher.stopper
+val watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
 val inject_operation:
   t ->

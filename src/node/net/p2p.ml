@@ -74,9 +74,9 @@ type limits = {
 
 let create_scheduler limits =
   let max_upload_speed =
-    map_option limits.max_upload_speed ~f:(( * ) 1024) in
+    Option.map limits.max_upload_speed ~f:(( * ) 1024) in
   let max_download_speed =
-    map_option limits.max_upload_speed ~f:(( * ) 1024) in
+    Option.map limits.max_upload_speed ~f:(( * ) 1024) in
   P2p_io_scheduler.create
     ~read_buffer_size:limits.read_buffer_size
     ?max_upload_speed
@@ -472,7 +472,7 @@ module RPC = struct
 
   let watch net =
     match net.pool with
-    | None -> Watcher.create_fake_stream ()
+    | None -> Lwt_watcher.create_fake_stream ()
     | Some pool -> P2p_connection_pool.watch pool
 
   let connect net point timeout =
@@ -486,7 +486,7 @@ module RPC = struct
       match net.pool with
       | None -> None
       | Some pool ->
-          map_option
+          Option.map
             (P2p_connection_pool.Connection.find_by_peer_id pool peer_id)
             ~f:P2p_connection_pool.Connection.info
 
@@ -632,8 +632,7 @@ module RPC = struct
     let info net point =
       match net.pool with
       | None -> None
-      | Some pool ->
-          map_option
+      | Some pool -> Option.map
             (P2p_connection_pool.Points.info pool point)
             ~f:info_of_point_info
 
@@ -643,14 +642,14 @@ module RPC = struct
       match net.pool with
       | None -> []
       | Some pool ->
-          unopt_map
+          Option.unopt_map
             (P2p_connection_pool.Points.info pool point)
             ~default:[]
             ~f:begin fun pi ->
               let evts =
                 P2p_connection_pool_types.Point_info.fold_events
                   pi ~init:[] ~f:(fun a e -> e :: a) in
-              (if rev then list_rev_sub else list_sub) evts max
+              (if rev then List.rev_sub else List.sub) evts max
             end
 
     let watch net point =
@@ -790,13 +789,13 @@ module RPC = struct
       match net.pool with
       | None -> []
       | Some pool ->
-          unopt_map
+          Option.unopt_map
             (P2p_connection_pool.Peer_ids.info pool peer_id)
             ~default:[]
             ~f:begin fun gi ->
               let evts = P2p_connection_pool_types.Peer_info.fold_events gi
                   ~init:[] ~f:(fun a e -> e :: a) in
-              (if rev then list_rev_sub else list_sub) evts max
+              (if rev then List.rev_sub else List.sub) evts max
             end
 
     let watch net peer_id =

@@ -100,7 +100,7 @@ module Block_header_storage = struct
     return (State.Block.header b)
   let read_opt net_state h =
     State.Block.read_opt net_state h >>= fun b ->
-    Lwt.return (Utils.map_option ~f:State.Block.header b)
+    Lwt.return (Option.map ~f:State.Block.header b)
   let read_exn net_state h =
     State.Block.read_exn net_state h >>= fun b ->
     Lwt.return (State.Block.header b)
@@ -304,8 +304,8 @@ type db = {
   disk: State.t ;
   active_nets: net_db Net_id.Table.t ;
   protocol_db: Raw_protocol.t ;
-  block_input: (Block_hash.t * Block_header.t) Watcher.input ;
-  operation_input: (Operation_hash.t * Operation.t) Watcher.input ;
+  block_input: (Block_hash.t * Block_header.t) Lwt_watcher.input ;
+  operation_input: (Operation_hash.t * Operation.t) Lwt_watcher.input ;
 }
 
 and net_db = {
@@ -324,7 +324,7 @@ and p2p_reader = {
   gid: P2p.Peer_id.t ;
   conn: connection ;
   peer_active_nets: net_db Net_id.Table.t ;
-  canceler: Lwt_utils.Canceler.t ;
+  canceler: Lwt_canceler.t ;
   mutable worker: unit Lwt.t ;
 }
 
@@ -644,7 +644,7 @@ module P2p_reader = struct
         Lwt.return_unit
 
   let run db gid conn =
-    let canceler = Lwt_utils.Canceler.create () in
+    let canceler = Lwt_canceler.create () in
     let state = {
       conn ; gid ; canceler ;
       peer_active_nets = Net_id.Table.create 17 ;
@@ -660,11 +660,11 @@ module P2p_reader = struct
         (Format.asprintf "db_network_reader.%a"
            P2p.Peer_id.pp_short gid)
         ~run:(fun () -> worker_loop db state)
-        ~cancel:(fun () -> Lwt_utils.Canceler.cancel canceler) ;
+        ~cancel:(fun () -> Lwt_canceler.cancel canceler) ;
     P2p.Peer_id.Table.add db.p2p_readers gid state
 
   let shutdown s =
-    Lwt_utils.Canceler.cancel s.canceler >>= fun () ->
+    Lwt_canceler.cancel s.canceler >>= fun () ->
     s.worker
 
 end
@@ -691,8 +691,8 @@ let create disk p2p =
   let protocol_db = Raw_protocol.create global_request disk in
   let active_nets = Net_id.Table.create 17 in
   let p2p_readers = P2p.Peer_id.Table.create 17 in
-  let block_input = Watcher.create_input () in
-  let operation_input = Watcher.create_input () in
+  let block_input = Lwt_watcher.create_input () in
+  let operation_input = Lwt_watcher.create_input () in
   let db =
     { p2p ; p2p_readers ; disk ;
       active_nets ; protocol_db ;
@@ -809,9 +809,9 @@ let commit_protocol db h p =
   return (res <> None)
 
 let watch_block_header { block_input } =
-  Watcher.create_stream block_input
+  Lwt_watcher.create_stream block_input
 let watch_operation { operation_input } =
-  Watcher.create_stream operation_input
+  Lwt_watcher.create_stream operation_input
 
 module Raw = struct
   let encoding = P2p.Raw.encoding Message.cfg.encoding
@@ -841,7 +841,7 @@ module type DISTRIBUTED_DB = sig
     key -> param -> unit
   type error += Canceled of key
   val clear_or_cancel: t -> key -> unit
-  val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
+  val watch: t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
 end
 
 module Make

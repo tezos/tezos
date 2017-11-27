@@ -27,25 +27,25 @@ let pp_block ppf
      @ Operations hash: %a\
      @ Operations: @[<v>%a@]\
      @ Data (hex encoded): \"%s\"@]"
-    Hash.Block_hash.pp hash
+    Block_hash.pp hash
     Context.pp_test_network test_network
     level
     proto_level
-    Hash.Block_hash.pp predecessor
-    Hash.Protocol_hash.pp protocol
-    Hash.Net_id.pp net_id
+    Block_hash.pp predecessor
+    Protocol_hash.pp protocol
+    Net_id.pp net_id
     Time.pp_hum timestamp
     (Format.pp_print_list
        ~pp_sep:Format.pp_print_space
        Format.pp_print_string)
     (List.map Hex_encode.hex_of_bytes fitness)
-    Hash.Operation_list_list_hash.pp operations_hash
+    Operation_list_list_hash.pp operations_hash
     (fun ppf -> function
        | None -> Format.fprintf ppf "None"
        | Some operations ->
            Format.pp_print_list ~pp_sep:Format.pp_print_newline
              (Format.pp_print_list ~pp_sep:Format.pp_print_space
-                (fun ppf (oph, _) -> Hash.Operation_hash.pp ppf oph))
+                (fun ppf (oph, _) -> Operation_hash.pp ppf oph))
              ppf operations)
     operations
     (Hex_encode.hex_of_bytes data)
@@ -65,7 +65,7 @@ let stuck_node_report (cctxt : Client_commands.context) file =
   print_title "Registered protocols:" 2 >>=? fun () ->
   return @@ Format.pp_print_list
     ~pp_sep:Format.pp_print_newline
-    (fun ppf (protocol, _) -> Hash.Protocol_hash.pp ppf protocol)
+    (fun ppf (protocol, _) -> Protocol_hash.pp ppf protocol)
     ppf
     (Client_commands.get_versions ()) >>=? fun () ->
   skip_line () >>=? fun () ->

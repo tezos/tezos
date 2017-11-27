@@ -3,11 +3,15 @@
 (library
  ((name node_net)
   (public_name tezos.node.net)
-  (libraries (utils minutils lwt.unix ocplib-resto-cohttp))
+  (libraries (tezos-base
+              mtime.clock.os
+              ocplib-resto-cohttp))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
-                    -open Error_monad
-                    -open Hash
-                    -open Utils
-                    -open Tezos_data))
+                    -open Tezos_base__TzPervasives))
   (wrapped false)))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

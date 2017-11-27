@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Ed25519 = Environment.Ed25519
-
 module ContractEntity = struct
   type t = Contract.t
   let encoding = Contract.encoding
@@ -50,7 +48,7 @@ module ContractAlias = struct
     | None -> RawContractAlias.rev_find cctxt c
 
   let get_contract cctxt s =
-    match Utils.split ~limit:1 ':' s with
+    match String.split ~limit:1 ':' s with
     | [ "key" ; key ]->
         find_key cctxt key
     | _ -> find cctxt s
@@ -85,7 +83,7 @@ module ContractAlias = struct
                return (list1 @ list2))
            (fun cctxt s ->
               begin
-                match Utils.split ~limit:1 ':' s with
+                match String.split ~limit:1 ':' s with
                 | [ "alias" ; alias ]->
                     find cctxt alias
                 | [ "key" ; text ] ->
@@ -236,7 +234,7 @@ let commands  () =
          let new_tags =
            match tags with
            | None -> new_tags
-           | Some tags -> Utils.merge_list2 tags new_tags in
+           | Some tags -> List.merge2 tags new_tags in
          Contract_tags.update cctxt alias new_tags) ;
 
     command ~group ~desc: "remove tag(s) from a contract in the wallet"
@@ -252,7 +250,7 @@ let commands  () =
            match tags with
            | None -> []
            | Some tags ->
-               Utils.merge_filter_list2
+               List.merge_filter2
                  ~f:(fun x1 x2 -> match x1, x2 with
                      | None, None -> assert false
                      | None, Some _ -> None

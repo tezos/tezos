@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
 open P2p_types
 include Logging.Make (struct let name = "test-p2p-io-scheduler" end)
 
@@ -154,7 +153,7 @@ let run
       Lwt_utils.safe_close main_socket >>= fun () ->
       client ?max_upload_speed ?write_queue_size addr port time n
     end in
-  Lwt_list.map_p client Utils.(1 -- n) >>= fun client_nodes ->
+  Lwt_list.map_p client (1 -- n) >>= fun client_nodes ->
   Process.wait_all (server_node :: client_nodes)
 
 let () = Random.self_init ()

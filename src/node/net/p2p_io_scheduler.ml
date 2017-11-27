@@ -34,7 +34,7 @@ type error += Connection_closed
 module Scheduler(IO : IO) = struct
 
   type t = {
-    canceler: Canceler.t ;
+    canceler: Lwt_canceler.t ;
     mutable worker: unit Lwt.t ;
     counter: Moving_average.t ;
     max_speed: int option ;
@@ -48,7 +48,7 @@ module Scheduler(IO : IO) = struct
   and connection = {
     id: int ;
     mutable closed: bool ;
-    canceler: Canceler.t ;
+    canceler: Lwt_canceler.t ;
     in_param: IO.in_param ;
     out_param: IO.out_param ;
     mutable current_pop: MBytes.t tzresult Lwt.t ;
@@ -65,7 +65,7 @@ module Scheduler(IO : IO) = struct
       Lwt.catch
         (fun () -> IO.close conn.out_param err)
         (fun _ -> Lwt.return_unit) >>= fun () ->
-      Canceler.cancel conn.canceler
+      Lwt_canceler.cancel conn.canceler
     end
 
   let waiter st conn =
@@ -100,10 +100,10 @@ module Scheduler(IO : IO) = struct
     check_quota st >>= fun () ->
     lwt_debug "scheduler.wait(%s)" IO.name >>= fun () ->
     Lwt.pick [
-      Canceler.cancelation st.canceler ;
+      Lwt_canceler.cancelation st.canceler ;
       wait_data st
     ] >>= fun () ->
-    if Canceler.canceled st.canceler then
+    if Lwt_canceler.canceled st.canceler then
       Lwt.return_unit
     else
       let prio, (conn, msg) =
@@ -160,10 +160,10 @@ module Scheduler(IO : IO) = struct
 
   let create max_speed =
     let st = {
-      canceler = Canceler.create () ;
+      canceler = Lwt_canceler.create () ;
       worker = Lwt.return_unit ;
       counter = Moving_average.create ~init:0 ~alpha ;
-      max_speed ; quota = unopt ~default:0 max_speed ;
+      max_speed ; quota = Option.unopt ~default:0 max_speed ;
       quota_updated = Lwt_condition.create () ;
       readys = Lwt_condition.create () ;
       readys_high = Queue.create () ;
@@ -172,7 +172,7 @@ module Scheduler(IO : IO) = struct
     st.worker <-
       Lwt_utils.worker IO.name
         ~run:(fun () -> worker_loop st)
-        ~cancel:(fun () -> Canceler.cancel st.canceler) ;
+        ~cancel:(fun () -> Lwt_canceler.cancel st.canceler) ;
     st
 
   let create_connection st in_param out_param canceler id =
@@ -191,7 +191,7 @@ module Scheduler(IO : IO) = struct
 
   let update_quota st =
     debug "scheduler(%s).update_quota" IO.name ;
-    iter_option st.max_speed ~f:begin fun quota ->
+    Option.iter st.max_speed ~f:begin fun quota ->
       st.quota <- (min st.quota 0) + quota ;
       Lwt_condition.broadcast st.quota_updated ()
     end ;
@@ -210,7 +210,7 @@ module Scheduler(IO : IO) = struct
 
   let shutdown st =
     lwt_debug "--> scheduler(%s).shutdown" IO.name >>= fun () ->
-    Canceler.cancel st.canceler >>= fun () ->
+    Lwt_canceler.cancel st.canceler >>= fun () ->
     st.worker >>= fun () ->
     lwt_debug "<-- scheduler(%s).shutdown" IO.name >>= fun () ->
     Lwt.return_unit
@@ -273,7 +273,7 @@ type connection = {
   id: int ;
   sched: t ;
   conn: Lwt_unix.file_descr ;
-  canceler: Canceler.t ;
+  canceler: Lwt_canceler.t ;
   read_conn: ReadScheduler.connection ;
   read_queue: MBytes.t tzresult Lwt_pipe.t ;
   write_conn: WriteScheduler.connection ;
@@ -354,11 +354,11 @@ let register =
       raise Closed
     end else begin
       let id = incr cpt; !cpt in
-      let canceler = Canceler.create () in
+      let canceler = Lwt_canceler.create () in
       let read_size =
-        map_option st.read_queue_size ~f:(fun v -> v, read_size) in
+        Option.map st.read_queue_size ~f:(fun v -> v, read_size) in
       let write_size =
-        map_option st.write_queue_size ~f:(fun v -> v, write_size) in
+        Option.map st.write_queue_size ~f:(fun v -> v, write_size) in
       let read_queue = Lwt_pipe.create ?size:read_size () in
       let write_queue = Lwt_pipe.create ?size:write_size () in
       let read_conn =
@@ -367,7 +367,7 @@ let register =
       and write_conn =
         WriteScheduler.create_connection
           st.write_scheduler write_queue conn canceler id in
-      Canceler.on_cancel canceler begin fun () ->
+      Lwt_canceler.on_cancel canceler begin fun () ->
         Inttbl.remove st.connected id ;
         Moving_average.destroy read_conn.counter ;
         Moving_average.destroy write_conn.counter ;
@@ -394,9 +394,9 @@ let write_now { write_queue } msg = Lwt_pipe.push_now write_queue msg
 
 let read_from conn ?pos ?len buf msg =
   let maxlen = MBytes.length buf in
-  let pos = unopt ~default:0 pos in
+  let pos = Option.unopt ~default:0 pos in
   assert (0 <= pos && pos < maxlen) ;
-  let len = unopt ~default:(maxlen - pos) len in
+  let len = Option.unopt ~default:(maxlen - pos) len in
   assert (len <= maxlen - pos) ;
   match msg with
   | Ok msg ->
@@ -417,7 +417,7 @@ let read_now conn ?pos ?len buf =
       Some (read_from conn ?pos ?len buf (Ok msg))
   | None ->
       try
-        map_option
+        Option.map
           ~f:(read_from conn ?pos ?len buf)
           (Lwt_pipe.pop_now conn.read_queue)
       with Lwt_pipe.Closed -> Some (Error [Connection_closed])
@@ -436,8 +436,8 @@ let read conn ?pos ?len buf =
 
 let read_full conn ?pos ?len buf =
   let maxlen = MBytes.length buf in
-  let pos = unopt ~default:0 pos in
-  let len = unopt ~default:(maxlen - pos) len in
+  let pos = Option.unopt ~default:0 pos in
+  let len = Option.unopt ~default:(maxlen - pos) len in
   assert (0 <= pos && pos < maxlen) ;
   assert (len <= maxlen - pos) ;
   let rec loop pos len =
@@ -472,11 +472,11 @@ let close ?timeout conn =
   begin
     match timeout with
     | None ->
-        return (Canceler.cancelation conn.canceler)
+        return (Lwt_canceler.cancelation conn.canceler)
     | Some timeout ->
         Lwt_utils.with_timeout
           ~canceler:conn.canceler timeout begin fun canceler ->
-          return (Canceler.cancelation canceler)
+          return (Lwt_canceler.cancelation canceler)
         end
   end >>=? fun _ ->
   conn.write_conn.current_push >>= fun res ->

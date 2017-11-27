@@ -1,0 +1,21 @@
+(jbuild_version 1)
+
+(library
+ ((name tezos_crypto)
+  (public_name tezos-crypto)
+  (flags (:standard -open Tezos_stdlib
+                    -open Tezos_data_encoding
+                    -open Tezos_stdlib_lwt
+                    -open Tezos_error_monad__Error_monad))
+  (libraries (tezos-stdlib
+              tezos-stdlib-lwt
+              tezos-data-encoding
+              tezos-error-monad
+              nocrypto
+              sodium
+              zarith))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

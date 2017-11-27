@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
-
 let rec (--) i j =
   if j < i then []
   else i :: (i+1) -- j
@@ -27,7 +25,7 @@ let rec list_of_tree = function
       assert (sx = sy) ;
       x @ y, sx + sy
 
-module Merkle = Hash.Generic_Merkle_tree(struct
+module Merkle = Blake2B.Generic_Merkle_tree(struct
     type t = tree
     type elt = int
     let empty = Empty

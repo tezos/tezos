@@ -12,7 +12,6 @@ open Client_proto_contracts
 open Client_proto_programs
 open Client_keys
 open Client_commands
-module Ed25519 = Environment.Ed25519
 
 let get_balance cctxt block contract =
   Client_proto_rpcs.Context.Contract.balance cctxt block contract
@@ -28,7 +27,7 @@ let rec find_predecessor rpc_config h n =
     find_predecessor rpc_config h (n-1)
 
 let get_branch rpc_config block branch =
-  let branch = Utils.unopt ~default:0 branch in (* TODO export parameter *)
+  let branch = Option.unopt ~default:0 branch in (* TODO export parameter *)
   let block = Client_rpcs.last_baked_block block in
   begin
     match block with
@@ -64,7 +63,7 @@ let transfer rpc_config
     ~destination ?parameters ~fee () >>=? fun bytes ->
   Client_node_rpcs.Blocks.predecessor rpc_config block >>=? fun predecessor ->
   let signature = Ed25519.sign src_sk bytes in
-  let signed_bytes = MBytes.concat bytes signature in
+  let signed_bytes = Ed25519.Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_proto_rpcs.Helpers.apply_operation rpc_config block
     predecessor oph bytes (Some signature) >>=? fun contracts ->
@@ -77,7 +76,7 @@ let originate rpc_config ?force ?net_id ~block ?signature bytes =
   let signed_bytes =
     match signature with
     | None -> bytes
-    | Some signature -> MBytes.concat bytes signature in
+    | Some signature -> Ed25519.Signature.concat bytes signature in
   Client_node_rpcs.Blocks.predecessor rpc_config block >>=? fun predecessor ->
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_proto_rpcs.Helpers.apply_operation rpc_config block
@@ -141,8 +140,8 @@ let delegate_contract rpc_config
   Client_proto_rpcs.Helpers.Forge.Manager.delegation rpc_config block
     ~branch ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
   >>=? fun bytes ->
-  let signature = Environment.Ed25519.sign manager_sk bytes in
-  let signed_bytes = MBytes.concat bytes signature in
+  let signature = Ed25519.sign manager_sk bytes in
+  let signed_bytes = Ed25519.Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_node_rpcs.inject_operation
     rpc_config ?force ~net_id signed_bytes >>=? fun injected_oph ->
@@ -225,7 +224,7 @@ let dictate rpc_config ?force block command seckey =
   Client_proto_rpcs.Helpers.Forge.Dictator.operation
     rpc_config block ~branch command >>=? fun bytes ->
   let signature = Ed25519.sign seckey bytes in
-  let signed_bytes = MBytes.concat bytes signature in
+  let signed_bytes = Ed25519.Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_node_rpcs.inject_operation
     rpc_config ?force ~net_id signed_bytes >>=? fun injected_oph ->
@@ -469,7 +468,7 @@ let commands () =
        @@ Protocol_hash.param ~name:"version"
          ~desc:"Protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
-       @@ Environment.Ed25519.Secret_key.param
+       @@ Ed25519.Secret_key.param
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
       begin fun force hash seckey cctxt ->
@@ -485,7 +484,7 @@ let commands () =
        @@ Protocol_hash.param ~name:"version"
          ~desc:"Protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
-       @@ Environment.Ed25519.Secret_key.param
+       @@ Ed25519.Secret_key.param
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
       begin fun force hash seckey cctxt ->

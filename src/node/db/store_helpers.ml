@@ -57,7 +57,7 @@ module Make_substore (S : STORE) (N : NAME)
   type value = MBytes.t
   let name_length = List.length N.name
   let to_key k = N.name @ k
-  let of_key k = Utils.remove_elem_from_list name_length k
+  let of_key k = List.remove name_length k
   let known t k = S.known t (to_key k)
   let known_dir t k = S.known_dir t (to_key k)
   let read t k = S.read t (to_key k)
@@ -86,7 +86,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
     let to_key i k =
       assert (List.length (I.to_path i []) = I.path_length) ;
       I.to_path i k
-    let of_key k = Utils.remove_elem_from_list I.path_length k
+    let of_key k = List.remove I.path_length k
     let known (t,i) k = S.known t (to_key i k)
     let known_dir (t,i) k = S.known_dir t (to_key i k)
     let read (t,i) k = S.read t (to_key i k)
@@ -140,7 +140,7 @@ module Make_indexed_substore (S : STORE) (I : INDEX) = struct
           list t prefix >>= fun prefixes ->
           Lwt_list.map_p (function
               | `Key prefix | `Dir prefix ->
-                  match Utils.remove_prefix ~prefix:d (List.hd (List.rev prefix)) with
+                  match String.remove_prefix ~prefix:d (List.hd (List.rev prefix)) with
                   | None -> Lwt.return_nil
                   | Some _ -> loop (i+1) prefix [])
             prefixes

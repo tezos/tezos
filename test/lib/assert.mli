@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Hash
-open Error_monad
 include module type of Kaputt.Assertion
 
 val format_msg : string option -> string option

@@ -75,10 +75,10 @@ module Point_info : sig
   module State : sig
 
     type 'conn t =
-      | Requested of { cancel: Canceler.t }
+      | Requested of { cancel: Lwt_canceler.t }
       (** We initiated a connection. *)
       | Accepted of { current_peer_id: Peer_id.t ;
-                      cancel: Canceler.t }
+                      cancel: Lwt_canceler.t }
       (** We accepted a incoming connection. *)
       | Running of { data: 'conn ;
                      current_peer_id: Peer_id.t }
@@ -95,11 +95,11 @@ module Point_info : sig
 
     val set_requested :
       ?timestamp:Time.t ->
-      'conn point_info -> Canceler.t -> unit
+      'conn point_info -> Lwt_canceler.t -> unit
 
     val set_accepted :
       ?timestamp:Time.t ->
-      'conn point_info -> Peer_id.t -> Canceler.t -> unit
+      'conn point_info -> Peer_id.t -> Lwt_canceler.t -> unit
 
     val set_running :
       ?timestamp:Time.t -> 'conn point_info -> Peer_id.t -> 'conn -> unit
@@ -140,7 +140,7 @@ module Point_info : sig
     'conn point_info -> init:'a -> f:('a -> Event.t -> 'a) -> 'a
 
   val watch :
-    'conn point_info -> Event.t Lwt_stream.t * Watcher.stopper
+    'conn point_info -> Event.t Lwt_stream.t * Lwt_watcher.stopper
 
   val log_incoming_rejection :
     ?timestamp:Time.t -> 'conn point_info -> Peer_id.t -> unit
@@ -206,7 +206,7 @@ module Peer_info : sig
 
     type 'conn t =
       | Accepted of { current_point: Id_point.t ;
-                      cancel: Canceler.t }
+                      cancel: Lwt_canceler.t }
       (** We accepted a incoming connection, we greeted back and
           we are waiting for an acknowledgement. *)
       | Running of { data: 'conn ;
@@ -224,7 +224,7 @@ module Peer_info : sig
 
     val set_accepted :
       ?timestamp:Time.t ->
-      ('conn, 'meta) peer_info -> Id_point.t -> Canceler.t -> unit
+      ('conn, 'meta) peer_info -> Id_point.t -> Lwt_canceler.t -> unit
 
     val set_running :
       ?timestamp:Time.t ->
@@ -266,7 +266,7 @@ module Peer_info : sig
     ('conn, 'meta) peer_info -> init:'a -> f:('a -> Event.t -> 'a) -> 'a
 
   val watch :
-    ('conn, 'meta) peer_info -> Event.t Lwt_stream.t * Watcher.stopper
+    ('conn, 'meta) peer_info -> Event.t Lwt_stream.t * Lwt_watcher.stopper
 
   val log_incoming_rejection :
     ?timestamp:Time.t ->

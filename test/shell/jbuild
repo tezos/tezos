@@ -4,8 +4,7 @@
  ((names (test_context
           test_state
           test_store))
-  (libraries (minutils
-              utils
+  (libraries (tezos-base
               test_lib
               node_shell
               tezos_embedded_protocol_demo
@@ -13,10 +12,7 @@
               tezos_embedded_protocol_genesis))
   (flags (:standard -w -9-32
                     -safe-string
-                    -open Error_monad
-                    -open Hash
-                    -open Utils
-                    -open Tezos_data))))
+                    -open Tezos_base__TzPervasives))))
 
 (alias
  ((name buildtest)
@@ -41,3 +37,8 @@
   (deps ((alias runtest_context)
          (alias runtest_state)
          (alias runtest_store)))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

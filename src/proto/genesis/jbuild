@@ -16,9 +16,9 @@
     (Tezos_embedded_raw_protocol_genesis.Main)
     (struct
        let hash =
-         Some (Hash.Protocol_hash.of_b58check_exn
+         Some (Tezos_crypto.Protocol_hash.of_b58check_exn
                  \"ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im\")
-       let sources = Tezos_data.Protocol.{
+       let sources = Tezos_base.Protocol.{
          expected_env = V1 ;
          components = [(* FIXME ?? *)] ;
     } end)"))))
@@ -56,3 +56,8 @@
          (glob_files *.mli)
          TEZOS_PROTOCOL))
   (action (chdir ${ROOT} (run ${exe:../../compiler_main.exe} dummy_genesis ${path-no-dep:.})))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))

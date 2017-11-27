@@ -9,8 +9,6 @@
 
 (** Tezos - Versioned (key x value) store (over Irmin) *)
 
-open Hash
-
 module IrminPath = Irmin.Path.String_list
 
 module MBytesContent = struct
@@ -197,7 +195,7 @@ let pp_test_network ppf = function
   | Forking { protocol ; expiration } ->
       Format.fprintf ppf
         "@[<v 2>Forking %a (expires %a)@]"
-        Hash.Protocol_hash.pp
+        Protocol_hash.pp
         protocol
         Time.pp_hum
         expiration
@@ -207,9 +205,9 @@ let pp_test_network ppf = function
          @ Genesis: %a\
          @ Net id: %a\
          @ Expiration: %a@]"
-        Hash.Protocol_hash.pp protocol
-        Hash.Block_hash.pp genesis
-        Hash.Net_id.pp net_id
+        Protocol_hash.pp protocol
+        Block_hash.pp genesis
+        Net_id.pp net_id
         Time.pp_hum expiration
 
 let test_network_encoding =

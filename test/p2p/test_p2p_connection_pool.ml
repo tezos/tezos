@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
 open P2p_types
 include Logging.Make (struct let name = "test.p2p.connection-pool" end)
 
@@ -58,7 +57,7 @@ let sync_nodes nodes =
       Lwt.return err
 
 let detach_node f points n =
-  let (addr, port), points = Utils.select n points in
+  let (addr, port), points = List.select n points in
   let proof_of_work_target = Crypto_box.make_target 0. in
   let identity = Identity.generate proof_of_work_target in
   let nb_points = List.length points in
@@ -102,7 +101,6 @@ let detach_node f points n =
     end
 
 let detach_nodes run_node points =
-  let open Utils in
   let clients = List.length points in
   Lwt_list.map_p
     (detach_node run_node points) (0 -- (clients - 1)) >>= fun nodes ->
@@ -267,7 +265,6 @@ let spec = Arg.[
   ]
 
 let main () =
-  let open Utils in
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;

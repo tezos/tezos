@@ -166,7 +166,7 @@ module type DISTRIBUTED_DB = sig
 
   (** Monitor all the fetched data. A given data will appear only
       once. *)
-  val watch: t -> (key * value) Lwt_stream.t * Watcher.stopper
+  val watch: t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
 
 end
 
@@ -216,7 +216,7 @@ val commit_invalid_block:
 
 (** Monitor all the fetched block headers (for all activate networks). *)
 val watch_block_header:
-  t -> (Block_hash.t * Block_header.t) Lwt_stream.t * Watcher.stopper
+  t -> (Block_hash.t * Block_header.t) Lwt_stream.t * Lwt_watcher.stopper
 
 
 (** {2 Operations index} *)
@@ -236,7 +236,7 @@ val inject_operation:
 
 (** Monitor all the fetched operations (for all activate networks). *)
 val watch_operation:
-  t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Watcher.stopper
+  t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Lwt_watcher.stopper
 
 (** {2 Protocol index} *)
 

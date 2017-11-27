@@ -34,6 +34,7 @@
     v1/time.mli
     v1/base58.mli
     v1/hash.mli
+    v1/blake2B.mli
     v1/ed25519.mli
 
     ;; Tezos specifics

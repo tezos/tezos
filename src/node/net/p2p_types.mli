@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Canceler = Lwt_utils.Canceler
-
 (** Protocol version *)
 
 module Version : sig
@@ -27,7 +25,7 @@ end
 
 (** Peer_id, i.e. persistent peer identifier *)
 
-module Peer_id : Hash.INTERNAL_HASH
+module Peer_id : Tezos_crypto.S.INTERNAL_HASH
   with type t = Crypto_box.Public_key_hash.t
 
 type addr = Ipaddr.V6.t
@@ -48,6 +46,7 @@ module Point : sig
   val encoding : t Data_encoding.t
   val is_local : t -> bool
   val is_global : t -> bool
+  val parse_addr_port : string -> string * string
   module Map : Map.S with type key = t
   module Set : Set.S with type elt = t
   module Table : Hashtbl.S with type key = t

@@ -12,9 +12,9 @@ open P2p_types
 module Point_info = struct
 
   type 'data state =
-    | Requested of { cancel: Canceler.t }
+    | Requested of { cancel: Lwt_canceler.t }
     | Accepted of { current_peer_id: Peer_id.t ;
-                    cancel: Canceler.t }
+                    cancel: Lwt_canceler.t }
     | Running of { data: 'data ;
                    current_peer_id: Peer_id.t }
     | Disconnected
@@ -99,7 +99,7 @@ module Point_info = struct
     mutable greylisting_delay : float ;
     mutable greylisting_end : Time.t ;
     events : Event.t Ring.t ;
-    watchers : Event.t Watcher.input ;
+    watchers : Event.t Lwt_watcher.input ;
   }
   type 'data point_info = 'data t
 
@@ -127,7 +127,7 @@ module Point_info = struct
     greylisting = greylisting_config ;
     greylisting_delay = 1. ;
     greylisting_end = Time.epoch ;
-    watchers = Watcher.create_input () ;
+    watchers = Lwt_watcher.create_input () ;
   }
 
   let point s = s.point
@@ -155,7 +155,7 @@ module Point_info = struct
   let last_miss s =
     match
       s.last_failed_connection,
-      (map_option ~f:(fun (_, time) -> time) @@
+      (Option.map ~f:(fun (_, time) -> time) @@
        recent s.last_rejected_connection s.last_disconnection) with
     | (None, None) -> None
     | (None, (Some _ as a))
@@ -165,12 +165,12 @@ module Point_info = struct
 
   let fold_events { events } ~init ~f = Ring.fold events ~init ~f
 
-  let watch { watchers } = Watcher.create_stream watchers
+  let watch { watchers } = Lwt_watcher.create_stream watchers
 
   let log { events ; watchers } ?(timestamp = Time.now ()) kind =
     let event = { Event.kind ; timestamp } in
     Ring.add events event ;
-    Watcher.notify watchers event
+    Lwt_watcher.notify watchers event
 
   let log_incoming_rejection ?timestamp point_info peer_id =
     log point_info ?timestamp (Rejecting_request peer_id)
@@ -178,9 +178,9 @@ module Point_info = struct
   module State = struct
 
     type 'data t = 'data state =
-      | Requested of { cancel: Canceler.t }
+      | Requested of { cancel: Lwt_canceler.t }
       | Accepted of { current_peer_id: Peer_id.t ;
-                      cancel: Canceler.t }
+                      cancel: Lwt_canceler.t }
       | Running of { data: 'data ;
                      current_peer_id: Peer_id.t }
       | Disconnected
@@ -284,7 +284,7 @@ module Peer_info = struct
 
   type 'data state =
     | Accepted of { current_point: Id_point.t ;
-                    cancel: Canceler.t }
+                    cancel: Lwt_canceler.t }
     | Running of { data: 'data ;
                    current_point: Id_point.t }
     | Disconnected
@@ -341,7 +341,7 @@ module Peer_info = struct
     mutable last_established_connection : (Id_point.t * Time.t) option ;
     mutable last_disconnection : (Id_point.t * Time.t) option ;
     events : Event.t Ring.t ;
-    watchers : Event.t Watcher.input ;
+    watchers : Event.t Lwt_watcher.input ;
   }
   type ('conn, 'meta) peer_info = ('conn, 'meta) t
 
@@ -360,7 +360,7 @@ module Peer_info = struct
       last_established_connection = None ;
       last_disconnection = None ;
       events = Ring.create log_size ;
-      watchers = Watcher.create_input () ;
+      watchers = Lwt_watcher.create_input () ;
     }
 
   let encoding metadata_encoding =
@@ -385,7 +385,7 @@ module Peer_info = struct
           last_established_connection ;
           last_disconnection ;
           events ;
-          watchers = Watcher.create_input () ;
+          watchers = Lwt_watcher.create_input () ;
         })
       (obj9
          (req "peer_id" Peer_id.encoding)
@@ -429,9 +429,9 @@ module Peer_info = struct
   let log { events ; watchers } ?(timestamp = Time.now ()) point kind =
     let event = { Event.kind ; timestamp ; point } in
     Ring.add events event ;
-    Watcher.notify watchers event
+    Lwt_watcher.notify watchers event
 
-  let watch { watchers } = Watcher.create_stream watchers
+  let watch { watchers } = Lwt_watcher.create_stream watchers
 
   let log_incoming_rejection ?timestamp peer_info point =
     log peer_info ?timestamp point Rejecting_request
@@ -440,7 +440,7 @@ module Peer_info = struct
 
     type 'data t = 'data state =
       | Accepted of { current_point: Id_point.t ;
-                      cancel: Canceler.t }
+                      cancel: Lwt_canceler.t }
       | Running of { data: 'data ;
                      current_point: Id_point.t }
       | Disconnected

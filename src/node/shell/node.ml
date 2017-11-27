@@ -621,12 +621,12 @@ module RPC = struct
       end else begin
         Lwt.pick [
           ( Lwt_stream.get block_stream >|=
-            map_option ~f:(fun b ->
+            Option.map ~f:(fun b ->
                 (State.Block.hash b, (State.Block.header b).shell.timestamp)) ) ;
           (Net_validator.bootstrapped node.mainnet_validator >|= fun () -> None) ;
         ]
       end in
-    let shutdown () = Watcher.shutdown stopper in
+    let shutdown () = Lwt_watcher.shutdown stopper in
     RPC.Answer.{ next ; shutdown }
 
   module Network = struct
