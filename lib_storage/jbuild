@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_node_db)
-  (public_name tezos-node-db)
+ ((name tezos_storage)
+  (public_name tezos-storage)
   (libraries (tezos-base
               leveldb
               irmin-leveldb))

@@ -6,16 +6,16 @@
   (libraries (tezos-base
               tezos-micheline
               tezos-protocol-compiler
+              tezos-storage
               tezos-node-net
-              tezos-node-db
               dynlink))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_micheline
                     -open Tezos_protocol_compiler
-                    -open Tezos_node_net
-                    -open Tezos_node_db))))
+                    -open Tezos_storage
+                    -open Tezos_node_net))))
 
 (alias
  ((name runtest_indent)

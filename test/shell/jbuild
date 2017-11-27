@@ -5,8 +5,8 @@
           test_state
           test_store))
   (libraries (tezos-base
+              tezos-storage
               tezos-node-shell
-              tezos-node-db
               tezos-embedded-protocol-demo
               tezos-embedded-protocol-alpha
               tezos-embedded-protocol-genesis
@@ -14,8 +14,8 @@
   (flags (:standard -w -9-32
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_node_shell
-                    -open Tezos_node_db))))
+                    -open Tezos_storage
+                    -open Tezos_node_shell))))
 
 (alias
  ((name buildtest)
