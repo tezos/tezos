@@ -117,7 +117,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
            config.net.bootstrap_peers) >>= fun trusted_points ->
         Node_identity_file.read
           (config.data_dir //
-           Node_identity_file.default_name) >>=? fun identity ->
+           Node_data_version.default_identity_file_name) >>=? fun identity ->
         lwt_log_notice
           "Peer's global id: %a"
           P2p.Peer_id.pp identity.peer_id >>= fun () ->
