@@ -90,6 +90,12 @@ let headers_fetch_worker_loop pipeline =
       Lwt.return_unit
   | Error [Exn Lwt.Canceled | Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
       Lwt.return_unit
+  | Error [ Distributed_db.Block_header.Timeout bh ] ->
+      lwt_log_info "request for header %a from peer %a timed out."
+        Block_hash.pp_short bh
+        P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+      Canceler.cancel pipeline.canceler >>= fun () ->
+      Lwt.return_unit
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;
       lwt_log_error "@[Unexpected error (headers fetch):@ %a@]"
@@ -127,6 +133,12 @@ let rec operations_fetch_worker_loop pipeline =
       operations_fetch_worker_loop pipeline
   | Error [Exn Lwt.Canceled | Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
       Lwt_pipe.close pipeline.fetched_blocks ;
+      Lwt.return_unit
+  | Error [ Distributed_db.Operations.Timeout (bh, n) ] ->
+      lwt_log_info "request for operations %a:%d from peer %a timed out."
+        Block_hash.pp_short bh n
+        P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+      Canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
   | Error err ->
       pipeline.errors <- pipeline.errors @ err ;

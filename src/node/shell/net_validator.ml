@@ -198,6 +198,10 @@ and worker_loop nv =
     if
       Fitness.(block_header.shell.fitness <= head_header.shell.fitness)
     then
+      lwt_log_info "current head is better than %a %a %a, we do not switch"
+        Block_hash.pp_short block_hash
+        Fitness.pp block_header.shell.fitness
+        Time.pp_hum block_header.shell.timestamp >>= fun () ->
       return ()
     else begin
       Chain.set_head nv.net_state block >>= fun previous ->

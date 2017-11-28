@@ -768,12 +768,20 @@ and authenticate pool ?point_info canceler fd point =
       ?listening_port:pool.config.listening_port
       pool.config.identity pool.message_config.versions
   end ~on_error: begin fun err ->
-    (* Authentication incorrect! *)
     (* TODO do something when the error is Not_enough_proof_of_work ?? *)
-    lwt_debug "@[authenticate: %a%s -> failed@ %a@]"
-      Point.pp point
-      (if incoming then " incoming" else "")
-      pp_print_error err >>= fun () ->
+    begin match err with
+      | [ Lwt_utils.Canceled ] ->
+          (* Currently only on time out *)
+          lwt_debug "authenticate: %a%s -> canceled"
+            Point.pp point
+            (if incoming then " incoming" else "")
+      | err ->
+          (* Authentication incorrect! *)
+          lwt_debug "@[authenticate: %a%s -> failed@ %a@]"
+            Point.pp point
+            (if incoming then " incoming" else "")
+            pp_print_error err
+    end >>= fun () ->
     may_register_my_id_point pool err ;
     log pool (Authentication_failed point) ;
     if incoming then
