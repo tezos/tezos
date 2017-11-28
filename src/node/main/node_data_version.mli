@@ -13,6 +13,7 @@ type error += Invalid_data_dir_version of t * t
 type error += Could_not_read_data_dir_version of string
 
 val data_version : t
+val default_identity_file_name : string
 
 val pp : Format.formatter -> t -> unit
 

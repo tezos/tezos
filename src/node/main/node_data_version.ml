@@ -13,6 +13,8 @@ type t = string
 
 let data_version = "0.0.1"
 
+let default_identity_file_name = "identity.json"
+
 let version_encoding = Data_encoding.(obj1 (req "version" string))
 
 let version_file_name = "version.json"
@@ -83,12 +85,15 @@ let check_data_dir_version data_dir =
   return ()
 
 let ensure_data_dir data_dir =
-  if Sys.file_exists data_dir &&
-     (Array.length (Sys.readdir data_dir)) > 0
-  then
-    check_data_dir_version data_dir
-  else
-    Lwt_utils.create_dir ~perm:0o700 data_dir >>= fun () ->
+  let write_version () =
     Data_encoding_ezjsonm.write_file
       (version_file data_dir)
-      (Data_encoding.Json.construct version_encoding data_version)
+      (Data_encoding.Json.construct version_encoding data_version) in
+  if Sys.file_exists data_dir then
+    match Sys.readdir data_dir with
+    | [||] -> write_version ()
+    | [| single |] when single = default_identity_file_name -> write_version ()
+    | _ -> check_data_dir_version data_dir
+  else
+    Lwt_utils.create_dir ~perm:0o700 data_dir >>= fun () ->
+    write_version ()

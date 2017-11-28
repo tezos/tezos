@@ -11,7 +11,7 @@ let (//) = Filename.concat
 
 (** Commands *)
 
-let identity_file data_dir = data_dir // Node_identity_file.default_name
+let identity_file data_dir = data_dir // Node_data_version.default_identity_file_name
 
 let show { Node_config_file.data_dir } =
   Node_identity_file.read (identity_file data_dir) >>=? fun id ->

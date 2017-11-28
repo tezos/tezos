@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val default_name: string
-
 type error += No_identity_file of string
 type error += Insufficient_proof_of_work of { expected: float }
 
