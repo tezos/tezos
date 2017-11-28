@@ -117,9 +117,9 @@ let create { genesis ; store_root ; context_root ;
     ~bootstrap_threshold
     ?max_child_ttl mainnet_state >>= fun mainnet_validator ->
   let shutdown () =
-    State.close state >>= fun () ->
     P2p.shutdown p2p >>= fun () ->
     Validator.shutdown validator >>= fun () ->
+    State.close state >>= fun () ->
     Lwt.return_unit
   in
   return {
