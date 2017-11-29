@@ -102,7 +102,22 @@ type t = {
   mutable advertisement : [ `Pending of Mempool.t | `None ] ;
 }
 
-type error += Closed
+type error += Closed of Net_id.t
+
+let () =
+  register_error_kind `Permanent
+    ~id:"prevalidator.closed"
+    ~title:"Prevalidator closed"
+    ~description:
+      "An operation on the prevalidator could not complete \
+       before the prevalidator was shut down."
+    ~pp: (fun ppf net_id ->
+        Format.fprintf ppf
+          "Prevalidator for network %a has been shut down."
+          Net_id.pp_short net_id)
+    Data_encoding.(obj1 (req "net_id" Net_id.encoding))
+    (function Closed net_id -> Some net_id | _ -> None)
+    (fun net_id -> Closed net_id)
 
 let push_request pv request =
   Lwt_pipe.safe_push_now pv.message_queue (Message (request, None))
@@ -114,14 +129,18 @@ let push_request_and_wait pv request =
        Lwt_pipe.push_now_exn pv.message_queue (Message (request, Some u)) ;
        t)
     (function
-      | Lwt_pipe.Closed -> fail Closed
+      | Lwt_pipe.Closed ->
+          let net_id = (State.Net.id (Distributed_db.net_state pv.net_db)) in
+          fail (Closed net_id)
       | exn -> fail (Exn exn))
 
 let close_queue pv =
   let messages = Lwt_pipe.pop_all_now pv.message_queue in
   List.iter
     (function
-      | Message (_, Some u) -> Lwt.wakeup_later u (Error [ Closed ])
+      | Message (_, Some u) ->
+          let net_id = (State.Net.id (Distributed_db.net_state pv.net_db)) in
+          Lwt.wakeup_later u (Error [ Closed net_id ])
       | _ -> ())
     messages ;
   Lwt_pipe.close pv.message_queue

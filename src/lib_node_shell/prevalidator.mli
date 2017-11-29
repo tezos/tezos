@@ -35,6 +35,8 @@ type limits = {
   operation_timeout : float
 }
 
+type error += Closed of Net_id.t
+
 (** Creation and destruction of a "prevalidation" worker. *)
 val create: limits -> Distributed_db.net_db -> t Lwt.t
 val shutdown: t -> unit Lwt.t
