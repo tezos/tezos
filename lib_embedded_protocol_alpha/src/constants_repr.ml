@@ -12,22 +12,33 @@ let version_number = "\000"
 let proof_of_work_nonce_size = 8
 let nonce_length = 32
 
+(* 10 tez *)
 let seed_nonce_revelation_tip =
-  Tez_repr.of_cents_exn 10_00L
+  Tez_repr.(mul_exn one 10)
+(* 1 tez *)
 let origination_burn =
-  Tez_repr.of_cents_exn 1_00L
+  Tez_repr.one
+(* 1 tez *)
 let minimal_contract_balance =
-  Tez_repr.of_cents_exn 1_00L
+  Tez_repr.one
+(* 1000 tez *)
 let baking_bond_cost =
-  Tez_repr.of_cents_exn 1000_00L
+  Tez_repr.(mul_exn one 1000)
+(* 1000 tez *)
 let endorsement_bond_cost =
-  Tez_repr.of_cents_exn 1000_00L
+  Tez_repr.(mul_exn one 1000)
+(* 150 tez *)
 let baking_reward =
-  Tez_repr.of_cents_exn 150_00L
+  Tez_repr.(mul_exn one 150)
+(* 150 tez *)
 let endorsement_reward =
-  Tez_repr.of_cents_exn 150_00L
+  Tez_repr.(mul_exn one 150)
+(* 100,000 tez *)
 let faucet_credit =
-  Tez_repr.of_cents_exn 100_000_00L
+  Tez_repr.(mul_exn one 100_000)
+(* 4,000,000 tez *)
+let bootstrap_wealth =
+  Tez_repr.(mul_exn one 4_000_000)
 
 type constants = {
   cycle_length: int32 ;
@@ -79,7 +90,7 @@ let default = {
   max_operation_data_length =
     16 * 1024 ; (* 16kB *)
   initial_roll_value =
-    Tez_repr.of_cents_exn 10000_00L ;
+    Tez_repr.(mul_exn one 10_000) ;
   michelson_maximum_type_size = 1000 ;
 }
 

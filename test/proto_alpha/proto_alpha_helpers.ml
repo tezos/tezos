@@ -190,12 +190,10 @@ module Account = struct
 
   let transfer
       ?(block = `Prevalidation)
-      ?(fee = 5L)
+      ?(fee = Tez.fifty_cents)
       ~(account:t)
       ~destination
       ~amount () =
-    let amount = match Tez.of_cents amount with None -> Tez.zero | Some a -> a in
-    let fee = match Tez.of_cents fee with None -> Tez.zero | Some a -> a in
     Client_proto_context.transfer (new Client_rpcs.rpc !rpc_config)
       block
       ~source:account.contract
@@ -208,17 +206,11 @@ module Account = struct
   let originate
       ?(block = `Prevalidation)
       ?delegate
-      ?(fee=5L)
+      ?(fee = Tez.fifty_cents)
       ~(src:t)
       ~manager_pkh
       ~balance
       () =
-    let fee = match Tez.of_cents fee with
-      | None -> Tez.zero
-      | Some amount -> amount in
-    let balance = match Tez.of_cents balance with
-      | None -> Tez.zero
-      | Some amount -> amount in
     let delegatable, delegate = match delegate with
       | None -> false, None
       | Some delegate -> true, Some delegate in
@@ -237,14 +229,11 @@ module Account = struct
 
   let set_delegate
       ?(block = `Prevalidation)
-      ?(fee = 5L)
+      ?(fee = Tez.fifty_cents)
       ~contract
       ~manager_sk
       ~src_pk
       delegate_opt =
-    let fee = match Tez.of_cents fee with
-      | None -> Tez.zero
-      | Some amount -> amount in
     Client_proto_context.set_delegate
       (new Client_rpcs.rpc !rpc_config)
       block
@@ -319,21 +308,21 @@ module Assert = struct
 
   let equal_tez ?msg tz1 tz2 =
     let msg = Assert.format_msg msg in
-    let eq tz1 tz2 = Int64.equal (Tez.to_cents tz1) (Tez.to_cents tz2) in
+    let eq tz1 tz2 = Int64.equal (Tez.to_mutez tz1) (Tez.to_mutez tz2) in
     let prn = Tez.to_string in
     Assert.equal ?msg ~prn ~eq tz1 tz2
 
   let balance_equal ?block ~msg account expected_balance =
     Account.balance ?block account >>=? fun actual_balance ->
-    match Tez.of_cents expected_balance with
+    match Tez.of_mutez expected_balance with
     | None ->
         failwith "invalid tez constant"
     | Some expected_balance ->
-        return (equal_tez ~msg actual_balance expected_balance)
+        return (equal_tez ~msg expected_balance actual_balance)
 
   let delegate_equal ?block ~msg contract expected_delegate =
     Account.delegate ?block contract >>|? fun actual_delegate ->
-    equal_pkh ~msg actual_delegate expected_delegate
+    equal_pkh ~msg expected_delegate actual_delegate
 
   let ecoproto_error f = function
     | Environment.Ecoproto_error errors ->
@@ -460,7 +449,7 @@ module Baking = struct
     Client_proto_rpcs.Header.priority (new Client_rpcs.rpc !rpc_config) block >>=? fun prio ->
     Baking.endorsement_reward ~block_priority:prio >|=
     Environment.wrap_error >>|?
-    Tez.to_cents
+    Tez.to_mutez
 
 end
 

@@ -64,7 +64,7 @@ let print_trace_result (cctxt : #Client_commands.logger) ~show_source ~parsed =
       print_errors cctxt errs ~show_source ~parsed
 
 let run
-    ?(amount = Tez.default_fee)
+    ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
@@ -74,7 +74,7 @@ let run
     block program.expanded (storage.expanded, input.expanded, amount)
 
 let trace
-    ?(amount = Tez.default_fee)
+    ?(amount = Tez.fifty_cents)
     ~(program : Michelson_v1_parser.parsed)
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)

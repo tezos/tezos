@@ -218,16 +218,16 @@ assert_output $CONTRACT_PATH/exec_concat.tz Unit '"test"' '"test_abc"'
 assert_output $CONTRACT_PATH/steps_to_quota.tz Unit Unit 16382
 
 # Get the current balance of the contract
-assert_output $CONTRACT_PATH/balance.tz Unit Unit '"4,000,000.00"'
+assert_output $CONTRACT_PATH/balance.tz Unit Unit '"4,000,000"'
 
 # Test comparisons on tez (List EQ GT LT GE LE)
-assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "1.00" "2.00")' '(List False False True False True)'
-assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "2.00" "1.00")' '(List False True False True False)'
+assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "1" "2")' '(List False False True False True)'
+assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "2" "1")' '(List False True False True False)'
 assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "2.37" "2.37")' '(List True False False True True)'
 
 # Test addition and subtraction on tez
-assert_output $CONTRACT_PATH/tez_add_sub.tz Unit '(Pair "2.00" "1.00")' '(Pair "3.00" "1.00")'
-assert_output $CONTRACT_PATH/tez_add_sub.tz Unit '(Pair "2.31" "1.01")' '(Pair "3.32" "1.30")'
+assert_output $CONTRACT_PATH/tez_add_sub.tz Unit '(Pair "2" "1")' '(Pair "3" "1")'
+assert_output $CONTRACT_PATH/tez_add_sub.tz Unit '(Pair "2.31" "1.01")' '(Pair "3.32" "1.3")'
 
 # Test get first element of list
 assert_output $CONTRACT_PATH/first.tz Unit '(List 1 2 3 4)' '1'
@@ -308,14 +308,14 @@ assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 500)' '3' '(Pair "hello"
 assert_output  $CONTRACT_PATH/set_cdr.tz '(Pair "hello" 7)' '100' '(Pair "hello" 100)'
 
 assert_storage  $CONTRACT_PATH/set_caddaadr.tz \
-'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0.00") 4) 5))) 6)' \
-'"3.00"' \
-'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "3.00") 4) 5))) 6)'
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0") 4) 5))) 6)' \
+'"3"' \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "3") 4) 5))) 6)'
 
 assert_storage  $CONTRACT_PATH/map_caddaadr.tz \
-'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0.00") 4) 5))) 6)' \
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "0") 4) 5))) 6)' \
 'Unit' \
-'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "1.00") 4) 5))) 6)'
+'(Pair (Pair 1 (Pair 2 (Pair (Pair (Pair 3 "1") 4) 5))) 6)'
 
 # Did the given key sign the string? (key is bootstrap1)
 assert_output $CONTRACT_PATH/check_signature.tz \
@@ -330,16 +330,16 @@ assert_output $CONTRACT_PATH/check_signature.tz \
 assert_output $CONTRACT_PATH/hash_key.tz Unit '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"' '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
 assert_output $CONTRACT_PATH/hash_key.tz Unit '"edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES"' '"tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k"'
 
-$client transfer 1000 from bootstrap1 to $key1
-$client transfer 2000 from bootstrap1 to $key2
+$client transfer 1,000 from bootstrap1 to $key1
+$client transfer 2,000 from bootstrap1 to $key2
 
-assert_balance $key1 "1,000.00 ꜩ"
-assert_balance $key2 "2,000.00 ꜩ"
+assert_balance $key1 "1,000 ꜩ"
+assert_balance $key2 "2,000 ꜩ"
 
 # Create a contract and transfer 100 ꜩ to it
 init_with_transfer $CONTRACT_PATH/store_input.tz $key1 '""' 100 bootstrap1
 $client transfer 100 from bootstrap1 to store_input -arg '"abcdefg"'
-assert_balance store_input "200.00 ꜩ"
+assert_balance store_input "200 ꜩ"
 assert_storage_contains store_input '"abcdefg"'
 $client transfer 100 from bootstrap1 to store_input -arg '"xyz"'
 assert_storage_contains store_input '"xyz"'
@@ -375,35 +375,35 @@ assert_output $CONTRACT_PATH/diff_timestamps.tz Unit '(Pair "1970-01-01T00:03:20
 # Tests TRANSFER_TO
 $client originate account "test_transfer_account1" for $key1 transferring 100 from bootstrap1
 $client originate account "test_transfer_account2" for $key1 transferring 20 from bootstrap1
-init_with_transfer $CONTRACT_PATH/transfer_to.tz $key2 Unit 1000 bootstrap1
-assert_balance test_transfer_account1 "100.00 ꜩ"
+init_with_transfer $CONTRACT_PATH/transfer_to.tz $key2 Unit 1,000 bootstrap1
+assert_balance test_transfer_account1 "100 ꜩ"
 $client transfer 100 from bootstrap1 to transfer_to \
             -arg "\"$(get_contract_addr test_transfer_account1)\""
-assert_balance test_transfer_account1 "200.00 ꜩ" # Why isn't this 200 ꜩ? Baking fee?
+assert_balance test_transfer_account1 "200 ꜩ" # Why isn't this 200 ꜩ? Baking fee?
 $client transfer 100 from bootstrap1 to transfer_to \
             -arg "\"$(get_contract_addr test_transfer_account2)\""
-assert_balance test_transfer_account2 "120.00 ꜩ" # Why isn't this 120 ꜩ? Baking fee?
+assert_balance test_transfer_account2 "120 ꜩ" # Why isn't this 120 ꜩ? Baking fee?
 
 # Tests create_account
 init_with_transfer $CONTRACT_PATH/create_account.tz $key2 \
-                   "\"$(get_contract_addr test_transfer_account1)\"" 1000 bootstrap1
+                   "\"$(get_contract_addr test_transfer_account1)\"" 1,000 bootstrap1
 $client transfer 100 from bootstrap1 to create_account \
             -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' | assert_in_output "New contract"
 
 # Creates a contract, transfers data to it and stores the data
 init_with_transfer $CONTRACT_PATH/create_contract.tz $key2 \
-                   "\"$(get_contract_addr test_transfer_account1)\"" 1000 bootstrap1
-$client transfer 0.00 from bootstrap1 to create_contract -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
+                   "\"$(get_contract_addr test_transfer_account1)\"" 1,000 bootstrap1
+$client transfer 0 from bootstrap1 to create_contract -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
 assert_storage_contains create_contract '"abcdefg"'
 
 # Test DEFAULT_ACCOUNT
 init_with_transfer $CONTRACT_PATH/default_account.tz $key1 \
-				   Unit 1000 bootstrap1
-$client transfer 0.00 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\""
-assert_balance $BOOTSTRAP4_IDENTITY "4,000,100.00 ꜩ"
+				   Unit 1,000 bootstrap1
+$client transfer 0 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\""
+assert_balance $BOOTSTRAP4_IDENTITY "4,000,100 ꜩ"
 account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
-$client transfer 0.00 from bootstrap1 to default_account  -arg "\"$account\""
-assert_balance $account "100.00 ꜩ"
+$client transfer 0 from bootstrap1 to default_account  -arg "\"$account\""
+assert_balance $account "100 ꜩ"
 
 assert_fails $client typecheck data '(Map (Item 0 1) (Item 0 1))' against type '(map nat nat)'
 assert_fails $client typecheck data '(Map (Item 0 1) (Item 10 1) (Item 5 1))' against type '(map nat nat)'

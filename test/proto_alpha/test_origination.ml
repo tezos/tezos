@@ -12,6 +12,11 @@ module Assert = Helpers.Assert
 
 let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
 
+  let cents v =
+    match Tez.( *? ) Tez.one_cent v with
+    | Error _ -> Pervasives.failwith "cents"
+    | Ok r -> r in
+
   Helpers.Baking.bake blkid b1 [] >>=? fun blkh ->
   let foo = Helpers.Account.create "foo" in
 
@@ -19,46 +24,46 @@ let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
   Helpers.Account.originate
     ~src:foo
     ~manager_pkh:foo.pkh
-    ~balance:0L () >>= fun result ->
+    ~balance:Tez.zero () >>= fun result ->
   Assert.unknown_contract ~msg:__LOC__ result ;
 
   (* Origination with amount = .5 tez *)
   Helpers.Account.originate
     ~src:b1
     ~manager_pkh:foo.pkh
-    ~balance:50L () >>= fun result ->
+    ~balance:Tez.fifty_cents () >>= fun result ->
   Assert.initial_amount_too_low ~msg:__LOC__ result ;
 
   (* Origination with amount = 1 tez *)
   Helpers.Account.originate
     ~src:b1
     ~manager_pkh:foo.pkh
-    ~balance:99L () >>= fun result ->
+    ~balance:(cents 99L) () >>= fun result ->
   Assert.initial_amount_too_low ~msg:__LOC__ result ;
 
   (* Origination with amount > 1 tez *)
   Helpers.Account.originate
     ~src:b1
     ~manager_pkh:foo.pkh
-    ~balance:100L () >>= fun _result ->
+    ~balance:Tez.one () >>=? fun _result ->
   (* TODO: test if new contract exists *)
 
   (* Non-delegatable contract *)
   Helpers.Account.originate
     ~src:b1
     ~manager_pkh:b1.pkh
-    ~balance:500L () >>=? fun (_oph, nd_contract) ->
+    ~balance:(cents 1000L) () >>=? fun (_oph, nd_contract) ->
 
   (* Delegatable contract *)
   Helpers.Account.originate
     ~src:b1
     ~manager_pkh:b1.pkh
     ~delegate:b1.pkh
-    ~balance:500L () >>=? fun (_oph, d_contract) ->
+    ~balance:(cents 1000L) () >>=? fun (_oph, d_contract) ->
 
   (* Change delegate of a non-delegatable contract *)
   Helpers.Account.set_delegate
-    ~fee:5L
+    ~fee:(cents 5L)
     ~contract:nd_contract
     ~manager_sk:b1.sk
     ~src_pk:b1.pk
@@ -70,7 +75,7 @@ let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
     ~contract:d_contract
     ~manager_sk:b1.sk
     ~src_pk:b1.pk
-    (Some b2.pkh) >>= fun _result ->
+    (Some b2.pkh) >>=? fun _result ->
   Assert.delegate_equal ~msg:__LOC__ d_contract (Some b2.pkh) >>=? fun () ->
 
   return blkh

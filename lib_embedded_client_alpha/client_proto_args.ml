@@ -101,7 +101,7 @@ let delegatable_switch =
     ~parameter:"-delegatable"
     ~doc:"Set the created contract to be delegatable"
 
-let tez_format = "text format: D,DDD,DDD.DD (centiles are optional, commas are optional)"
+let tez_format = "text format: D,DDD,DDD.DDD,DDD (centiles are optional, commas are optional)"
 
 let tez_parameter param =
   parameter

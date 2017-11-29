@@ -17,13 +17,7 @@ module type BASIC_DATA = sig
   val pp: Format.formatter -> t -> unit
 end
 
-module Tez = struct
-  include Tez_repr
-  let default_fee =
-    match of_cents 5L with
-    | None -> raise (Failure "internal error: Could not parse default_fee literal")
-    | Some fee -> fee
-end
+module Tez = Tez_repr
 module Period = Period_repr
 
 module Timestamp = struct

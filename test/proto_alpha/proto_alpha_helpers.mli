@@ -58,25 +58,25 @@ module Account : sig
 
   val transfer :
     ?block:Client_proto_rpcs.block ->
-    ?fee:int64 ->
+    ?fee: Tez.t ->
     account:t ->
     destination:Contract.t ->
-    amount:int64 ->
+    amount: Tez.t ->
     unit ->
     (Operation_hash.t * Contract.t list) tzresult Lwt.t
 
   val originate :
     ?block:Client_proto_rpcs.block ->
     ?delegate:public_key_hash ->
-    ?fee:int64 ->
+    ?fee: Tez.t ->
     src:t ->
     manager_pkh:public_key_hash ->
-    balance:int64 ->
+    balance: Tez.t ->
     unit -> (Operation_hash.t * Contract.t) tzresult Lwt.t
 
   val set_delegate :
     ?block:Client_proto_rpcs.block ->
-    ?fee:int64 ->
+    ?fee: Tez.t ->
     contract:Contract.t ->
     manager_sk:secret_key ->
     src_pk:public_key ->

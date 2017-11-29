@@ -12,14 +12,12 @@ type account = {
   public_key : Ed25519.Public_key.t ;
 }
 
-let wealth = Tez_repr.of_cents_exn 4_000_000_00L
-
 let init_account ctxt account =
   Storage.Public_key.init ctxt account.public_key_hash account.public_key >>=? fun ctxt ->
   Contract_storage.credit
     ctxt
     (Contract_repr.default_contract account.public_key_hash)
-    wealth >>=? fun ctxt ->
+    Constants_repr.bootstrap_wealth >>=? fun ctxt ->
   return ctxt
 
 

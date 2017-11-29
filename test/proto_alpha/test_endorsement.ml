@@ -106,7 +106,7 @@ let test_endorsement_rewards block0 =
     done ;
     return (!account, !cpt) in
 
-  let bond = Tez.to_cents Constants.endorsement_bond_cost in
+  let bond = Tez.to_mutez Constants.endorsement_bond_cost in
 
   (* Endorsement Rights *)
   (* #1 endorse & inject in a block *)
@@ -117,7 +117,7 @@ let test_endorsement_rewards block0 =
   Helpers.Baking.bake block0 b1 [ op ] >>=? fun hash1 ->
   Helpers.display_level (`Hash hash1) >>=? fun () ->
   Assert.balance_equal ~block:(`Hash hash1) ~msg:__LOC__ account0
-    (Int64.sub (Tez.to_cents balance0) bond) >>=? fun () ->
+    (Int64.sub (Tez.to_mutez balance0) bond) >>=? fun () ->
 
   (* #2 endorse & inject in a block  *)
   let block1 = `Hash hash1 in
@@ -128,7 +128,7 @@ let test_endorsement_rewards block0 =
   Helpers.Baking.bake block1 b1 [ op ] >>=? fun hash2 ->
   Helpers.display_level (`Hash hash2) >>=? fun () ->
   Assert.balance_equal ~block:(`Hash hash2) ~msg:__LOC__ account1
-    (Int64.sub (Tez.to_cents balance1) bond) >>=? fun () ->
+    (Int64.sub (Tez.to_mutez balance1) bond) >>=? fun () ->
 
   (* Check rewards after one cycle for account0 *)
   Helpers.Baking.bake (`Hash hash2) b1 [] >>=? fun hash3 ->
@@ -139,12 +139,12 @@ let test_endorsement_rewards block0 =
   Helpers.display_level (`Hash hash5) >>=? fun () ->
   Helpers.Baking.endorsement_reward block1 >>=? fun rw0 ->
   Assert.balance_equal ~block:(`Hash hash5) ~msg:__LOC__ account0
-    (Int64.add (Tez.to_cents balance0) rw0) >>=? fun () ->
+    (Int64.add (Tez.to_mutez balance0) rw0) >>=? fun () ->
 
   (* Check rewards after one cycle for account1 *)
   Helpers.Baking.endorsement_reward (`Hash hash2) >>=? fun rw1 ->
   Assert.balance_equal ~block:(`Hash hash5) ~msg:__LOC__ account1
-    (Int64.add (Tez.to_cents balance1) rw1) >>=? fun () ->
+    (Int64.add (Tez.to_mutez balance1) rw1) >>=? fun () ->
 
   (* #2 endorse and check reward only on the good chain  *)
   Helpers.Baking.bake (`Hash hash5) b1 []>>=? fun hash6a ->
@@ -178,14 +178,14 @@ let test_endorsement_rewards block0 =
   (* Check rewards after one cycle *)
   Helpers.Baking.endorsement_reward (`Hash hash7a) >>=? fun reward ->
   Assert.balance_equal ~block:(`Hash hash9a) ~msg:__LOC__ account3
-    (Int64.add (Tez.to_cents balance3) reward) >>=? fun () ->
+    (Int64.add (Tez.to_mutez balance3) reward) >>=? fun () ->
 
   (* Check no reward for the fork *)
   begin
     if account3 = account4 then return ()
     (* if account4 is different from account3, we need to check that there
        is no reward for him since the endorsement was in the fork branch *)
-    else Assert.balance_equal ~block:(`Hash hash9a) ~msg:__LOC__ account4 (Tez.to_cents balance4)
+    else Assert.balance_equal ~block:(`Hash hash9a) ~msg:__LOC__ account4 (Tez.to_mutez balance4)
   end >>=? fun () ->
   return ()
 
@@ -207,15 +207,15 @@ let run genesis =
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse true ;
 
   Assert.balance_equal
-    ~block:block ~msg:__LOC__ b1 3_999_000_00L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b1 3_999_000_000_000L >>=? fun () ->
   Assert.balance_equal
-    ~block:block ~msg:__LOC__ b2 4_000_000_00L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b2 4_000_000_000_000L >>=? fun () ->
   Assert.balance_equal
-    ~block:block ~msg:__LOC__ b3 4_000_000_00L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b3 4_000_000_000_000L >>=? fun () ->
   Assert.balance_equal
-    ~block:block ~msg:__LOC__ b4 4_000_000_00L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b4 4_000_000_000_000L >>=? fun () ->
   Assert.balance_equal
-    ~block:block ~msg:__LOC__ b5 4_000_000_00L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b5 4_000_000_000_000L >>=? fun () ->
 
   (* Check Rewards *)
   test_endorsement_rewards block >>=? fun () ->

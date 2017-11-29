@@ -44,10 +44,8 @@ module Tez : sig
   val of_string: string -> tez option
   val to_string: tez -> string
 
-  val of_cents: int64 -> tez option
-  val to_cents: tez -> int64
-
-  val default_fee : t
+  val of_mutez: int64 -> tez option
+  val to_mutez: tez -> int64
 
 end
 

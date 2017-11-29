@@ -23,6 +23,7 @@ module type S = sig
 
   val id : string
   val zero : qty
+  val one_mutez : qty
   val one_cent : qty
   val fifty_cents : qty
   val one : qty
@@ -32,17 +33,20 @@ module type S = sig
   val ( *? ) : qty -> int64 -> qty tzresult
   val ( /? ) : qty -> int64 -> qty tzresult
 
-  val to_cents : qty -> int64
+  val to_mutez : qty -> int64
 
-  (** [of_cents n] is None if n is negative *)
-  val of_cents : int64 -> qty option
+  (** [of_mutez n] (micro tez) is None if n is negative *)
+  val of_mutez : int64 -> qty option
 
-  (** [of_cents_exn n] fails if n is negative.
+  (** [of_mutez_exn n] fails if n is negative.
       It should only be used at toplevel for constants. *)
-  val of_cents_exn : int64 -> qty
+  val of_mutez_exn : int64 -> qty
 
   (** It should only be used at toplevel for constants. *)
   val add_exn : qty -> qty -> qty
+
+  (** It should only be used at toplevel for constants. *)
+  val mul_exn : qty -> int -> qty
 
   val encoding : qty Data_encoding.t
 
@@ -70,63 +74,70 @@ module Make (T: QTY) : S = struct
 
   include Compare.Int64
   let zero = 0L
-  let one_cent = 1L
-  let fifty_cents = 50L
-  let one = 100L
+  (* all other constant are defined from the value of one micro tez *)
+  let one_mutez = 1L
+  let one_cent = Int64.mul one_mutez 10_000L
+  let fifty_cents = Int64.mul one_cent 50L
+  (* 1 tez = 100 cents = 10_000_000 mutez *)
+  let one = Int64.mul one_cent 100L
   let id = T.id
 
-  let of_cents t =
-    if t < 0L
-    then None
-    else Some t
-
   let of_string s =
-    let len = String.length s in
-    let rec dec i len acc =
-      if Compare.Int.(i = len) then acc
+    let triplets = function
+      | hd :: tl ->
+          let len = String.length hd in
+          Compare.Int.(
+            len <= 3 && len > 0 &&
+            List.for_all (fun s -> String.length s = 3) tl
+          )
+      | [] -> false in
+    let integers s = triplets (String.split_on_char ',' s) in
+    let decimals s =
+      let l = String.split_on_char ',' s in
+      if Compare.Int.(List.length l > 2) then
+        false
       else
-        dec (succ i) len
-          (Int64.add (Int64.mul 10L acc)
-             (match String.get s i with
-              | '0' -> 0L | '1' -> 1L | '2' -> 2L | '3' -> 3L | '4' -> 4L
-              | '5' -> 5L | '6' -> 6L | '7' -> 7L | '8' -> 8L | '9' -> 9L
-              | _ -> raise Exit)) in
-    let rec loop acc m len =
-      if Compare.Int.(len >= 4) && Compare.Char.(String.get s (len - 4) = ',') then
-        let acc = Int64.add acc Int64.(mul (dec (len - 3) len 0L) m) in
-        loop acc Int64.(mul 1000L m) (len - 4)
-      else
-        Int64.add acc Int64.(mul (dec 0 len 0L) m) in
-    let cents, len =
-      if Compare.Int.(len >= 3) && Compare.Char.(String.get s (len - 3) = '.') then
-        dec (len - 2) len 0L, len - 3
-      else
-        0L, len in
-    let res =
-      if Compare.Int.(len >= 4) && Compare.Char.(String.get s (len - 4) = ',') then
-        loop cents 100L len
-      else if Compare.Int.(len = 0) && Compare.Int.(String.length s = 3) then
-        cents
-      else
-        try
-          Int64.(add (mul 100L (of_string (String.sub s 0 len))) cents)
-        with _ -> raise Exit in
-    match of_cents res with
-    | None -> raise Exit
-    | Some tez -> tez
-
-  let of_string s =
-    try Some (of_string s) with Exit -> None
+        triplets (List.rev l) in
+    let parse left right =
+      let remove_commas s = String.concat "" (String.split_on_char ',' s) in
+      let pad_to_six s =
+        let len = String.length s in
+        String.init 6 (fun i -> if Compare.Int.(i < len) then String.get s i else '0') in
+      try
+        Some (Int64.of_string (remove_commas left ^ pad_to_six (remove_commas right)))
+      with _ -> None in
+    match String.split_on_char '.' s with
+    | [ left ; right ] when (integers left && decimals right) -> parse left right
+    | [ left ] when integers left -> parse left ""
+    | _ -> None
 
   let pp ppf amount =
-    let rec loop ppf amount=
-      let d, r = Int64.div amount 1000L, Int64.rem amount 1000L in
+    let mult_int = 1_000_000L in
+    let rec left ppf amount =
+      let d, r = Int64.(div amount 1000L), Int64.(rem amount 1000L) in
       if d > 0L then
-        Format.fprintf ppf "%a,%03Ld" loop d r
+        Format.fprintf ppf "%a,%03Ld" left d r
       else
         Format.fprintf ppf "%Ld" r in
-    let i, c = Int64.div amount 100L, Int64.rem amount 100L in
-    Format.fprintf ppf "%a.%02Ld" loop i c
+    let right ppf amount =
+      let triplet ppf v =
+        if Compare.Int.(v mod 10 > 0) then
+          Format.fprintf ppf "%03d" v
+        else if Compare.Int.(v mod 100 > 0) then
+          Format.fprintf ppf "%02d" (v / 10)
+        else
+          Format.fprintf ppf "%d" (v / 100) in
+      let hi, lo = amount / 1000, amount mod 1000 in
+      if Compare.Int.(lo = 0) then
+        Format.fprintf ppf "%a" triplet hi
+      else
+        Format.fprintf ppf "%03d,%a" hi triplet lo in
+    let ints, decs =
+      Int64.(div amount mult_int),
+      Int64.(to_int (rem amount mult_int)) in
+    Format.fprintf ppf "%a" left ints ;
+    if Compare.Int.(decs > 0) then
+      Format.fprintf ppf ".%a" right decs
 
   let to_string t =
     Format.asprintf "%a" pp t
@@ -181,20 +192,28 @@ module Make (T: QTY) : S = struct
     then invalid_arg "add_exn"
     else t
 
-  let to_cents t = t
+  let mul_exn t m =
+    match t *? Int64.(of_int m) with
+    | Ok v -> v
+    | Error _ -> invalid_arg "mul_exn"
 
-  let of_cents_exn x =
-    match of_cents x with
-    | None -> invalid_arg "Qty.of_cents"
+  let of_mutez t =
+    if t < 0L then None
+    else Some t
+
+  let of_mutez_exn x =
+    match of_mutez x with
+    | None -> invalid_arg "Qty.of_mutez"
     | Some v -> v
 
   let to_int64 t = t
+  let to_mutez t = t
 
   let encoding =
     let open Data_encoding in
     describe
-      ~title: "Amount in centiles"
-      (conv to_int64 (Json.wrap_error of_cents_exn) int64)
+      ~title: "Amount in mutez"
+      (conv to_int64 (Json.wrap_error of_mutez_exn) int64)
 
   let () =
     let open Data_encoding in

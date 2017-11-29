@@ -16,20 +16,26 @@ let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
   let foo = Helpers.Account.create "foo" in
   let bar = Helpers.Account.create "bar" in
 
+  let tez v =
+    match Tez.( *? ) Tez.one v with
+    | Error _ -> Pervasives.failwith "cents"
+    | Ok r -> r in
+
   (* Send from a sender with no balance (never seen). *)
   (* TODO: Is it OK to get Storage_error and not something more specific? *)
   Helpers.Account.transfer
     ~account:foo
     ~destination:b1.contract
-    ~amount:1000_00L () >>= fun result ->
+    ~amount:(tez 1000L) () >>= fun result ->
   Assert.unknown_contract ~msg:__LOC__ result ;
 
   (* Send 1000 tz to "foo". *)
   Helpers.Account.transfer
     ~account:b1
     ~destination:foo.contract
-    ~amount:1000_00L () >>=? fun (_oph, contracts) ->
-  Assert.balance_equal ~msg:__LOC__ foo 1000_00L >>=? fun () ->
+    ~fee:Tez.zero
+    ~amount:(tez 1000L) () >>=? fun (_oph, contracts) ->
+  Assert.balance_equal ~msg:__LOC__ foo 1000_000_000L >>=? fun () ->
 
   (* Check that a basic transfer originates no contracts. *)
   Assert.equal_int ~msg:__LOC__ 0 (List.length contracts) ;
@@ -38,35 +44,36 @@ let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
   Helpers.Account.transfer
     ~account:foo
     ~destination:bar.contract
-    ~amount:50_00L () >>=? fun _contracts ->
-  Assert.balance_equal ~msg:__LOC__ foo 949_95L >>=? fun () ->
-  Assert.balance_equal ~msg:__LOC__ bar 50_00L >>=? fun () ->
+    ~fee:Tez.zero
+    ~amount:(tez 50L) () >>=? fun _contracts ->
+  Assert.balance_equal ~msg:__LOC__ foo 950_000_000L >>=? fun () ->
+  Assert.balance_equal ~msg:__LOC__ bar 50_000_000L >>=? fun () ->
 
   (* Check balance too low. *)
   Helpers.Account.transfer
     ~account:bar
     ~destination:foo.contract
-    ~amount:1000_00L () >>= fun result ->
+    ~amount:(tez 1000L) () >>= fun result ->
   Assert.balance_too_low ~msg:__LOC__ result ;
 
   (* Check spendability of a spendable contract *)
   Helpers.Account.originate
     ~src:foo
     ~manager_pkh:foo.pkh
-    ~balance:50_00L () >>=? fun (_oph, spendable) ->
+    ~balance:(tez 50L) () >>=? fun (_oph, spendable) ->
   Format.printf "Created contract %a@." Contract.pp spendable ;
   let account = { foo with contract = spendable } in
   Helpers.Account.transfer
     ~account
     ~destination:foo.contract
-    ~amount:10_00L () >>=? fun _contracts ->
+    ~amount:(tez 10L) () >>=? fun _contracts ->
 
   (* Try spending a default account with unmatching pk/sk pairs. *)
   let account = { b1 with sk = b2.sk } in
   Helpers.Account.transfer
     ~account
     ~destination:b2.contract
-    ~amount:10_00L () >>= fun result ->
+    ~amount:(tez 10L) () >>= fun result ->
   Assert.generic_economic_error ~msg:__LOC__ result ;
 
   (* Try spending a default account with keys not matching the
@@ -75,7 +82,7 @@ let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
   Helpers.Account.transfer
     ~account
     ~destination:b3.contract
-    ~amount:10_00L () >>= fun result ->
+    ~amount:(tez 10L) () >>= fun result ->
   Assert.inconsistent_pkh ~msg:__LOC__ result ;
 
   (* Try spending an originated contract without the manager's key. *)
@@ -83,7 +90,7 @@ let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
   Helpers.Account.transfer
     ~account
     ~destination:b2.contract
-    ~amount:10_00L () >>= fun result ->
+    ~amount:(tez 10L) () >>= fun result ->
   Assert.inconsistent_public_key ~msg:__LOC__ result ;
 
   return blkh

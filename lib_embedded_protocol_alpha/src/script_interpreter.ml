@@ -325,7 +325,7 @@ let rec interp
               logged_return (Item (Script_int.mul_n x y, rest), qta - 1, ctxt)
 
           | Ediv_teznat, Item (x, Item (y, rest)) ->
-              let x = Script_int.of_int64 (Tez.to_cents x) in
+              let x = Script_int.of_int64 (Tez.to_mutez x) in
               let result =
                 match Script_int.ediv x y with
                 | None -> None
@@ -334,7 +334,7 @@ let rec interp
                           Script_int.to_int64 r with
                     | Some q, Some r ->
                         begin
-                          match Tez.of_cents q, Tez.of_cents r with
+                          match Tez.of_mutez q, Tez.of_mutez r with
                           | Some q, Some r -> Some (q,r)
                           (* Cannot overflow *)
                           | _ -> assert false
@@ -345,8 +345,8 @@ let rec interp
               logged_return (Item (result, rest), qta -1, ctxt)
 
           | Ediv_tez, Item (x, Item (y, rest)) ->
-              let x = Script_int.abs (Script_int.of_int64 (Tez.to_cents x)) in
-              let y = Script_int.abs (Script_int.of_int64 (Tez.to_cents y)) in
+              let x = Script_int.abs (Script_int.of_int64 (Tez.to_mutez x)) in
+              let y = Script_int.abs (Script_int.of_int64 (Tez.to_mutez y)) in
               begin match Script_int.ediv_n x y with
                 | None ->
                     logged_return (Item (None, rest), qta -1, ctxt)
@@ -355,7 +355,7 @@ let rec interp
                       match Script_int.to_int64 r with
                       | None -> assert false (* Cannot overflow *)
                       | Some r ->
-                          match Tez.of_cents r with
+                          match Tez.of_mutez r with
                           | None -> assert false (* Cannot overflow *)
                           | Some r -> r in
                     logged_return (Item (Some (q, r), rest), qta -1, ctxt)
