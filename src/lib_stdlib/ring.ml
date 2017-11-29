@@ -30,6 +30,16 @@ let add r v =
           s.pos + 1 ;
       s.data.(s.pos mod Array.length s.data) <- v
 
+let add_and_return_erased r v =
+  let replaced = match !r with
+    | Empty _ -> None
+    | Inited s ->
+        if s.pos >= Array.length s.data - 1 then
+          Some (s.data.(s.pos mod Array.length s.data))
+        else
+          None in
+  add r v ; replaced
+
 let add_list r l = List.iter (add r) l
 
 let last r =
