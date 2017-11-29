@@ -30,11 +30,13 @@
 
 type t
 
+type limits = {
+  max_refused_operations : int ;
+  operation_timeout : float
+}
+
 (** Creation and destruction of a "prevalidation" worker. *)
-val create:
-  max_operations: int ->
-  operation_timeout: float ->
-  Distributed_db.net_db -> t Lwt.t
+val create: limits -> Distributed_db.net_db -> t Lwt.t
 val shutdown: t -> unit Lwt.t
 
 val notify_operations: t -> P2p.Peer_id.t -> Mempool.t -> unit

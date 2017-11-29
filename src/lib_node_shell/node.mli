@@ -20,14 +20,17 @@ type config = {
 }
 
 and timeout = {
-  operation: float ;
   block_header: float ;
   block_operations: float ;
   protocol: float ;
   new_head_request: float ;
 }
+and prevalidator_limits = {
+  max_refused_operations: int ;
+  operation_timeout: float
+}
 
-val create: config -> timeout -> t tzresult Lwt.t
+val create: config -> timeout -> prevalidator_limits -> t tzresult Lwt.t
 
 module RPC : sig
 

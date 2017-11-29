@@ -10,7 +10,6 @@
 type t
 
 type timeout = {
-  operation: float ;
   block_header: float ;
   block_operations: float ;
   protocol: float ;
@@ -21,6 +20,7 @@ val create:
   ?max_child_ttl:int ->
   ?bootstrap_threshold:int ->
   timeout ->
+  Prevalidator.limits ->
   Block_validator.t ->
   State.Block.t Lwt_watcher.input ->
   Distributed_db.t ->

@@ -54,6 +54,7 @@ and log = {
 
 and shell = {
   bootstrap_threshold : int ;
+  prevalidator_limits : Node.prevalidator_limits ;
   timeout : Node.timeout ;
 }
 
@@ -104,8 +105,11 @@ let default_log = {
 
 let default_shell = {
   bootstrap_threshold = 4 ;
+  prevalidator_limits = {
+    operation_timeout = 10. ;
+    max_refused_operations = 1000 ;
+  } ;
   timeout = {
-    operation = 10. ;
     block_header = 60. ;
     block_operations = 60. ;
     protocol = 120. ;
@@ -253,20 +257,33 @@ let log =
        (opt "rules" string)
        (dft "template" string default_log.template))
 
+let prevalidator_limits_encoding =
+  let open Data_encoding in
+  let uint8 = conv int_of_float float_of_int uint8 in
+  conv
+    (fun { Node.operation_timeout ; max_refused_operations } ->
+       (operation_timeout, max_refused_operations))
+    (fun (operation_timeout, max_refused_operations) ->
+       { operation_timeout ; max_refused_operations })
+    (obj2
+       (dft "operations_timeout" uint8
+          default_shell.prevalidator_limits.operation_timeout)
+       (dft "max_refused_operations" uint16
+          default_shell.prevalidator_limits.max_refused_operations))
+
 let timeout_encoding =
   let open Data_encoding in
   let uint8 = conv int_of_float float_of_int uint8 in
   conv
-    (fun { Node.operation ; block_header ; block_operations ;
+    (fun { Node.block_header ; block_operations ;
            protocol ; new_head_request } ->
-      (operation, block_header, block_operations,
+      (block_header, block_operations,
        protocol, new_head_request))
-    (fun (operation, block_header, block_operations,
+    (fun (block_header, block_operations,
           protocol, new_head_request) ->
-      { operation ; block_header ; block_operations ;
+      { block_header ; block_operations ;
         protocol ; new_head_request })
-    (obj5
-       (dft "operation" uint8 default_shell.timeout.operation)
+    (obj4
        (dft "block_header" uint8 default_shell.timeout.block_header)
        (dft "block_operations" uint8 default_shell.timeout.block_operations)
        (dft "protocol" uint8 default_shell.timeout.protocol)
@@ -276,11 +293,14 @@ let timeout_encoding =
 let shell =
   let open Data_encoding in
   conv
-    (fun { bootstrap_threshold ; timeout } -> bootstrap_threshold, timeout)
-    (fun (bootstrap_threshold, timeout) -> { bootstrap_threshold ; timeout })
-    (obj2
+    (fun { bootstrap_threshold ; timeout ; prevalidator_limits } ->
+       bootstrap_threshold, timeout, prevalidator_limits)
+    (fun (bootstrap_threshold, timeout, prevalidator_limits) ->
+       { bootstrap_threshold ; timeout ; prevalidator_limits })
+    (obj3
        (dft "bootstrap_threshold" uint8 default_shell.bootstrap_threshold)
        (dft "timeout" timeout_encoding default_shell.timeout)
+       (dft "prevalidator" prevalidator_limits_encoding default_shell.prevalidator_limits)
     )
 
 let encoding =
@@ -399,6 +419,7 @@ let update
         ~default:cfg.shell.bootstrap_threshold
         bootstrap_threshold ;
     timeout = cfg.shell.timeout ;
+    prevalidator_limits = cfg.shell.prevalidator_limits ;
   }
   in
   return { data_dir ; net ; rpc ; log ; shell }

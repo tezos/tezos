@@ -11,7 +11,12 @@
 
 type t
 
-val create: State.t -> Distributed_db.t -> Net_validator.timeout -> t
+val create:
+  State.t ->
+  Distributed_db.t ->
+  Net_validator.timeout ->
+  Prevalidator.limits ->
+  t
 val shutdown: t -> unit Lwt.t
 
 (** Start the validation scheduler of a given network. *)

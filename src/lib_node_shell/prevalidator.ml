@@ -70,15 +70,19 @@ let wakeup_with_result
         Lwt.wakeup_later u res ;
         Lwt.return (res >>? fun _res -> ok ())
 
+type limits = {
+  max_refused_operations : int ;
+  operation_timeout : float
+}
+
 (* Invariants:
    - an operation is in only one of these sets (map domains):
-     pv.refused pv.pending pv.fetching pv.live_operations pv.in_mempool
+     pv.refusals pv.pending pv.fetching pv.live_operations pv.in_mempool
    - pv.in_mempool is the domain of all fields of pv.prevalidation_result
    - pv.prevalidation_result.refused = Ø, refused ops are in pv.refused *)
 type t = {
   net_db : Distributed_db.net_db ;
-  operation_timeout : float ;
-  max_operations : int ; (* TODO: not sure if we should use that ? *)
+  limits : limits ;
   canceler : Lwt_canceler.t ;
   message_queue : message Lwt_pipe.t ;
   mutable (* just for init *) worker : unit Lwt.t ;
@@ -86,7 +90,8 @@ type t = {
   mutable timestamp : Time.t ;
   mutable live_blocks : Block_hash.Set.t ; (* just a cache *)
   mutable live_operations : Operation_hash.Set.t ; (* just a cache *)
-  mutable refused : (Time.t * error list) Operation_hash.Map.t ;
+  refused : Operation_hash.t Ring.t ;
+  mutable refusals : error list Operation_hash.Map.t ;
   mutable fetching : Operation_hash.Set.t ;
   mutable pending : Operation.t Operation_hash.Map.t ;
   mutable mempool : Mempool.t ;
@@ -120,7 +125,7 @@ let close_queue pv =
   Lwt_pipe.close pv.message_queue
 
 let already_handled pv oph =
-  Operation_hash.Map.mem oph pv.refused
+  Operation_hash.Map.mem oph pv.refusals
   || Operation_hash.Map.mem oph pv.pending
   || Operation_hash.Set.mem oph pv.fetching
   || Operation_hash.Set.mem oph pv.live_operations
@@ -191,12 +196,13 @@ let handle_unprocessed pv =
                (fun h _ in_mempool -> Operation_hash.Set.remove h in_mempool)
                pv.validation_result.refused @@
              pv.in_mempool) ;
-          pv.refused <- (* TODO: cleanup *)
-            (let now = Time.now () in
-             Operation_hash.Map.fold
-               (fun h (_, errs) refused ->
-                  Operation_hash.Map.add h (now, errs) refused)
-               pv.validation_result.refused pv.refused) ;
+          Operation_hash.Map.iter
+            (fun h (_, errs) ->
+               Option.iter (Ring.add_and_return_erased pv.refused h)
+                 ~f:(fun e -> pv.refusals <- Operation_hash.Map.remove e pv.refusals) ;
+               pv.refusals <-
+                 Operation_hash.Map.add h errs pv.refusals)
+            pv.validation_result.refused ;
           Operation_hash.Map.iter
             (fun oph _ -> Distributed_db.Operation.clear_or_cancel pv.net_db oph)
             pv.validation_result.refused ;
@@ -230,7 +236,7 @@ let handle_unprocessed pv =
 let fetch_operation pv ?peer oph =
   debug "fetching operation %a" Operation_hash.pp_short oph ;
   Distributed_db.Operation.fetch
-    ~timeout:pv.operation_timeout
+    ~timeout:pv.limits.operation_timeout
     pv.net_db ?peer oph () >>= function
   | Ok op ->
       push_request pv (Arrived (oph, op)) ;
@@ -279,14 +285,14 @@ let on_inject pv op =
     if List.mem_assoc oph result.applied then
       return ()
     else
-      let try_in_map map or_else =
+      let try_in_map map proj or_else =
         try
-          Lwt.return (Error (snd (Operation_hash.Map.find oph map)))
+          Lwt.return (Error (proj (Operation_hash.Map.find oph map)))
         with Not_found -> or_else () in
-      try_in_map pv.refused @@ fun () ->
-      try_in_map result.refused @@ fun () ->
-      try_in_map result.branch_refused @@ fun () ->
-      try_in_map result.branch_delayed @@ fun () ->
+      try_in_map pv.refusals (fun h -> h)  @@ fun () ->
+      try_in_map result.refused snd @@ fun () ->
+      try_in_map result.branch_refused snd @@ fun () ->
+      try_in_map result.branch_delayed snd @@ fun () ->
       if Operation_hash.Set.mem oph pv.live_operations then
         failwith "Injected operation %a included in a previous block."
           Operation_hash.pp oph
@@ -380,7 +386,7 @@ let rec worker_loop pv =
       Lwt_canceler.cancel pv.canceler >>= fun () ->
       Lwt.return_unit
 
-let create ~max_operations ~operation_timeout net_db =
+let create limits net_db =
   let net_state = Distributed_db.net_state net_db in
   let canceler = Lwt_canceler.create () in
   let message_queue = Lwt_pipe.create () in
@@ -404,12 +410,12 @@ let create ~max_operations ~operation_timeout net_db =
       (fun s h -> Operation_hash.Set.add h s)
       Operation_hash.Set.empty mempool.known_valid in
   let pv =
-    { operation_timeout ; max_operations ;
-      net_db ; canceler ;
+    { limits ; net_db ; canceler ;
       worker = Lwt.return_unit ; message_queue ;
       predecessor ; timestamp ; live_blocks ; live_operations ;
       mempool = { known_valid = [] ; pending = Operation_hash.Set.empty };
-      refused = Operation_hash.Map.empty ;
+      refused = Ring.create limits.max_refused_operations ;
+      refusals = Operation_hash.Map.empty ;
       fetching ;
       pending = Operation_hash.Map.empty ;
       in_mempool = Operation_hash.Set.empty ;

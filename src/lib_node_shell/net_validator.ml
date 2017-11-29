@@ -17,6 +17,7 @@ type t = {
   block_validator: Block_validator.t ;
 
   timeout: timeout ;
+  prevalidator_limits: Prevalidator.limits ;
   bootstrap_threshold: int ;
   mutable bootstrapped: bool ;
   bootstrapped_waiter: unit Lwt.t ;
@@ -40,7 +41,6 @@ type t = {
 }
 
 and timeout = {
-  operation: float ;
   block_header: float ;
   block_operations: float ;
   protocol: float ;
@@ -122,13 +122,12 @@ let broadcast_head nv ~previous block =
 let rec create
     ?max_child_ttl ?parent
     ?(bootstrap_threshold = 1)
-    timeout block_validator
+    timeout prevalidator_limits block_validator
     global_valid_block_input db net_state =
   Chain.init_head net_state >>= fun () ->
   let net_db = Distributed_db.activate db net_state in
   Prevalidator.create
-    ~max_operations:2000 (* FIXME temporary constant *)
-    ~operation_timeout:timeout.operation net_db >>= fun prevalidator ->
+    prevalidator_limits net_db >>= fun prevalidator ->
   let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let canceler = Lwt_canceler.create () in
@@ -136,7 +135,7 @@ let rec create
   let nv = {
     db ; net_state ; net_db ; block_validator ;
     prevalidator ;
-    timeout ;
+    timeout ; prevalidator_limits ;
     valid_block_input ; global_valid_block_input ;
     new_head_input ;
     parent ; max_child_ttl ; child = None ;
@@ -252,7 +251,7 @@ and may_switch_test_network nv block =
             return net_state
       end >>=? fun net_state ->
       create
-        ~parent:nv nv.timeout nv.block_validator
+        ~parent:nv nv.timeout nv.prevalidator_limits nv.block_validator
         nv.global_valid_block_input
         nv.db net_state >>= fun child ->
       nv.child <- Some child ;
