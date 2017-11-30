@@ -73,7 +73,7 @@ module Make
     | Dropbox_buffer : (Time.t * message) Lwt_dropbox.t -> dropbox buffer
 
   and 'kind t = {
-    limits : Worker_state.limits ;
+    limits : Worker_types.limits ;
     timeout : float option ;
     parameters : Types.parameters ;
     mutable (* only for init *) worker : unit Lwt.t ;
@@ -83,7 +83,7 @@ module Make
     canceler : Lwt_canceler.t ;
     name : Name.t ;
     id : int ;
-    mutable status : Worker_state.worker_status ;
+    mutable status : Worker_types.worker_status ;
     mutable current_request : (Time.t * Time.t * Request.view) option ;
     table : 'kind table ;
   }
@@ -236,9 +236,9 @@ module Make
     val on_close :
       self -> unit Lwt.t
     val on_error :
-      self -> Request.view -> Worker_state.request_status -> error list -> unit tzresult Lwt.t
+      self -> Request.view -> Worker_types.request_status -> error list -> unit tzresult Lwt.t
     val on_completion :
-      self -> 'a Request.t -> 'a -> Worker_state.request_status -> unit Lwt.t
+      self -> 'a Request.t -> 'a -> Worker_types.request_status -> unit Lwt.t
   end
 
   let create_table buffer_kind =
@@ -287,7 +287,7 @@ module Make
                 let completed = Time.now () in
                 w.current_request <- None ;
                 Handlers.on_completion w
-                  request res Worker_state.{ pushed ; treated ; completed } >>= fun () ->
+                  request res Worker_types.{ pushed ; treated ; completed } >>= fun () ->
                 return ()
             | Some u ->
                 Handlers.on_request w request >>= fun res ->
@@ -296,7 +296,7 @@ module Make
                 let completed = Time.now () in
                 w.current_request <- None ;
                 Handlers.on_completion w
-                  request res Worker_state.{ pushed ; treated ; completed } >>= fun () ->
+                  request res Worker_types.{ pushed ; treated ; completed } >>= fun () ->
                 return ()
       end >>= function
       | Ok () ->
@@ -312,7 +312,7 @@ module Make
                 let completed = Time.now () in
                 w.current_request <- None ;
                 Handlers.on_error w
-                  request Worker_state.{ pushed ; treated ; completed } errs
+                  request Worker_types.{ pushed ; treated ; completed } errs
             | None -> assert false
           end >>= function
           | Ok () ->
@@ -328,7 +328,7 @@ module Make
   let launch
     : type kind.
       kind table -> ?timeout:float ->
-      Worker_state.limits -> Name.t -> Types.parameters ->
+      Worker_types.limits -> Name.t -> Types.parameters ->
       (module HANDLERS with type self = kind t) ->
       kind t Lwt.t
     = fun table ?timeout limits name parameters (module Handlers) ->

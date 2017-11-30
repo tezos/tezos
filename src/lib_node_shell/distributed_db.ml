@@ -491,7 +491,7 @@ module P2p_reader = struct
 
     | Get_current_head net_id ->
         may_handle state net_id @@ fun net_db ->
-        Mempool.get net_db.net_state >>= fun (head, mempool) ->
+        State.Current_mempool.get net_db.net_state >>= fun (head, mempool) ->
         (* TODO bound the sent mempool size *)
         ignore
         @@ P2p.try_send global_db.p2p state.conn

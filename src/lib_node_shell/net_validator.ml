@@ -207,7 +207,7 @@ and worker_loop nv =
     else begin
       Chain.set_head nv.net_state block >>= fun previous ->
       broadcast_head nv ~previous block >>= fun () ->
-      Prevalidator.flush nv.prevalidator block ; (* FIXME *)
+      Prevalidator.flush nv.prevalidator block_hash >>=? fun () ->
       may_switch_test_network nv block >>= fun () ->
       Lwt_watcher.notify nv.new_head_input block ;
       lwt_log_notice "update current head %a %a %a(%t)"

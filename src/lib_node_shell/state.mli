@@ -168,17 +168,9 @@ val compute_locator: Net.t -> ?size:int -> Block.t -> Block_locator.t Lwt.t
 val fork_testnet:
   Block.t -> Protocol_hash.t -> Time.t -> Net.t tzresult Lwt.t
 
-type mempool = {
-  known_valid: Operation_hash.t list ;
-  pending: Operation_hash.Set.t ;
-}
-
-val empty_mempool: mempool
-val mempool_encoding: mempool Data_encoding.t
-
 type chain_data = {
   current_head: Block.t ;
-  current_mempool: mempool ;
+  current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
   locator: Block_locator.t Lwt.t lazy_t ;
@@ -236,6 +228,17 @@ module Registred_protocol : sig
 
   val get: Protocol_hash.t -> t option
   val get_exn: Protocol_hash.t -> t
+
+end
+
+module Current_mempool : sig
+
+  val get: Net.t -> (Block_header.t * Mempool.t) Lwt.t
+  (** The current mempool. *)
+
+  val set: Net.t -> head:Block_hash.t -> Mempool.t -> unit Lwt.t
+  (** Set the current mempool. It is ignored if the current head is
+      not the provided one. *)
 
 end
 

@@ -101,35 +101,16 @@ and chain_state = {
 
 and chain_data = {
   current_head: block ;
-  current_mempool: mempool ;
+  current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
   locator: Block_locator.t Lwt.t lazy_t ;
-}
-
-and mempool = {
-  known_valid: Operation_hash.t list ;
-  pending: Operation_hash.Set.t ;
 }
 
 and block = {
   net_state: net_state ;
   hash: Block_hash.t ;
   contents: Store.Block.contents ;
-}
-
-let mempool_encoding =
-  let open Data_encoding in
-  conv
-    (fun { known_valid ; pending } -> (known_valid, pending))
-    (fun (known_valid, pending) -> { known_valid ; pending })
-    (obj2
-       (req "known_valid" (dynamic_size (list Operation_hash.encoding)))
-       (req "pending" (dynamic_size Operation_hash.Set.encoding)))
-
-let empty_mempool = {
-  known_valid = [] ;
-  pending = Operation_hash.Set.empty ;
 }
 
 let read_chain_store { chain_state } f =
@@ -219,7 +200,7 @@ module Net = struct
           hash = current_head ;
           contents = current_block ;
         } ;
-        current_mempool = empty_mempool ;
+        current_mempool = Mempool.empty ;
         live_blocks = Block_hash.Set.singleton genesis.block ;
         live_operations = Operation_hash.Set.empty ;
         locator = lazy (compute_locator_from_hash net_state current_head) ;
@@ -773,6 +754,24 @@ module Register_embedded_protocol
         include Updater.LiftProtocol(Name)(Env)(Proto)
         let complete_b58prefix = Env.Context.complete
       end : Registred_protocol.T)
+
+end
+
+module Current_mempool = struct
+
+  let set net_state ~head mempool =
+    update_chain_store net_state begin fun _chain_store data ->
+      if Block_hash.equal head (Block.hash data.current_head) then
+        Lwt.return (Some { data with current_mempool = mempool },
+                    ())
+      else
+        Lwt.return (None, ())
+    end
+
+  let get net_state =
+    read_chain_store net_state begin fun _chain_store data ->
+      Lwt.return (Block.header data.current_head, data.current_mempool)
+    end
 
 end
 

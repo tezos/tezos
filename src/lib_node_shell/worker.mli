@@ -40,7 +40,7 @@ module type EVENT = sig
   (** Assigns a logging level to each event.
       Events can be ignored for logging w.r.t. the global node configuration.
       Events can be ignored for introspection w.r.t. to the worker's
-      {!Worker_state.limits}. *)
+      {!Worker_types.limits}. *)
   val level : t -> Logging.level
 
   (** Serializer for the introspection RPCs *)
@@ -178,7 +178,7 @@ module Make
     val on_error :
       self ->
       Request.view ->
-      Worker_state.request_status ->
+      Worker_types.request_status ->
       error list ->
       unit tzresult Lwt.t
 
@@ -187,7 +187,7 @@ module Make
     val on_completion :
       self ->
       'a Request.t -> 'a ->
-      Worker_state.request_status ->
+      Worker_types.request_status ->
       unit Lwt.t
   end
 
@@ -195,7 +195,7 @@ module Make
       Parameter [queue_size] not passed means unlimited queue. *)
   val launch :
     'kind table -> ?timeout:float ->
-    Worker_state.limits -> Name.t -> Types.parameters ->
+    Worker_types.limits -> Name.t -> Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
     'kind t Lwt.t
 
@@ -257,7 +257,7 @@ module Make
   val pending_requests : _ queue t -> (Time.t * Request.view) list
 
   (** Get the running status of a worker. *)
-  val status : _ t -> Worker_state.worker_status
+  val status : _ t -> Worker_types.worker_status
 
   (** Get the request being treated by a worker.
       Gives the time the request was pushed, and the time its
@@ -269,7 +269,7 @@ module Make
 
   (** Lists the running workers in this group.
       After they are killed, workers are kept in the table
-      for a number of seconds given in the {!Worker_state.limits}. *)
+      for a number of seconds given in the {!Worker_types.limits}. *)
   val list : 'a table -> (Name.t * 'a t) list
 
 end

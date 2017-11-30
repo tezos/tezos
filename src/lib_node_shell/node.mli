@@ -27,7 +27,8 @@ and timeout = {
 }
 and prevalidator_limits = {
   max_refused_operations: int ;
-  operation_timeout: float
+  operation_timeout: float ;
+  worker_limits : Worker_types.limits ;
 }
 
 val create: config -> timeout -> prevalidator_limits -> t tzresult Lwt.t

@@ -32,26 +32,25 @@ type t
 
 type limits = {
   max_refused_operations : int ;
-  operation_timeout : float
+  operation_timeout : float ;
+  worker_limits : Worker_types.limits ;
 }
 
 type error += Closed of Net_id.t
 
-(** Creation and destruction of a "prevalidation" worker. *)
 val create: limits -> Distributed_db.net_db -> t Lwt.t
 val shutdown: t -> unit Lwt.t
-
 val notify_operations: t -> P2p.Peer_id.t -> Mempool.t -> unit
-
-(** Conditionnaly inject a new operation in the node: the operation will
-    be ignored when it is (strongly) refused This is the
-    entry-point used by the P2P layer. The operation content has been
-    previously stored on disk. *)
 val inject_operation: t -> Operation.t -> unit tzresult Lwt.t
-
-val flush: t -> State.Block.t -> unit
+val flush: t -> Block_hash.t -> unit tzresult Lwt.t
 val timestamp: t -> Time.t
 val operations: t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
 val context: t -> Updater.validation_result tzresult Lwt.t
-
 val pending: ?block:State.Block.t -> t -> Operation.t Operation_hash.Map.t Lwt.t
+
+val running_workers: unit -> (Net_id.t * t) list
+val status: t -> Worker_types.worker_status
+
+val pending_requests : t -> (Time.t * Prevalidator_worker_state.Request.view) list
+val current_request : t -> (Time.t * Time.t * Prevalidator_worker_state.Request.view) option
+val last_events : t -> (Lwt_log_core.level * Prevalidator_worker_state.Event.t list) list

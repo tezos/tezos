@@ -7,26 +7,22 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Tezos Shell Module - Mempool, a.k.a. the operations safe to be
-    broadcasted. *)
-
-type t = State.mempool = {
+type t = {
   known_valid: Operation_hash.t list ;
-  (** A valid sequence of operations on top of the current head. *)
   pending: Operation_hash.Set.t ;
-  (** Set of known not-invalid operation. *)
 }
 type mempool = t
 
-val encoding: mempool Data_encoding.t
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun { known_valid ; pending } -> (known_valid, pending))
+    (fun (known_valid, pending) -> { known_valid ; pending })
+    (obj2
+       (req "known_valid" (dynamic_size (list Operation_hash.encoding)))
+       (req "pending" (dynamic_size Operation_hash.Set.encoding)))
 
-val empty: mempool
-(** Empty mempool. *)
-
-val get: State.Net.t -> (Block_header.t * mempool) Lwt.t
-(** The current mempool,  *)
-
-val set: State.Net.t -> head:Block_hash.t -> mempool -> unit Lwt.t
-(** Set the current mempool. It is ignored if the current head is
-    not the provided one. *)
-
+let empty = {
+  known_valid = [] ;
+  pending = Operation_hash.Set.empty ;
+}

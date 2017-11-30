@@ -22,7 +22,7 @@ val locator: Net.t -> Block_locator.t Lwt.t
 (** All the available chain data. *)
 type data = {
   current_head: Block.t ;
-  current_mempool: mempool ;
+  current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
   locator: Block_locator.t Lwt.t lazy_t ;

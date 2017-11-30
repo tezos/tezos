@@ -10,7 +10,7 @@
 open Logging.Node.State
 open State
 
-let mempool_encoding = State.mempool_encoding
+let mempool_encoding = Mempool.encoding
 
 let genesis net_state =
   let genesis = Net.genesis net_state in
@@ -37,7 +37,7 @@ let mem net_state hash =
 
 type data = State.chain_data = {
   current_head: Block.t ;
-  current_mempool: mempool ;
+  current_mempool: Mempool.t ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
   locator: Block_locator.t Lwt.t lazy_t ;
@@ -86,7 +86,7 @@ let locked_set_head net_state chain_store data block =
     block (State.Block.max_operations_ttl block) >>= fun (live_blocks,
                                                           live_operations) ->
   Lwt.return { current_head = block  ;
-               current_mempool = State.empty_mempool ;
+               current_mempool = Mempool.empty ;
                live_blocks ;
                live_operations ;
                locator = lazy (State.compute_locator net_state block) ;

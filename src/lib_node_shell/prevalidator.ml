@@ -7,7 +7,78 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Logging.Node.Prevalidator
+open Prevalidator_worker_state
+
+type limits = {
+  max_refused_operations : int ;
+  operation_timeout : float ;
+  worker_limits : Worker_types.limits ;
+}
+
+module Name = struct
+  type t = Net_id.t
+  let encoding = Net_id.encoding
+  let base = [ "prevalidator" ]
+  let pp = Net_id.pp_short
+end
+
+module Types = struct
+  (* Invariants:
+     - an operation is in only one of these sets (map domains):
+       pv.refusals pv.pending pv.fetching pv.live_operations pv.in_mempool
+     - pv.in_mempool is the domain of all fields of pv.prevalidation_result
+     - pv.prevalidation_result.refused = Ø, refused ops are in pv.refused
+     - the 'applied' operations in pv.validation_result are in reverse order. *)
+  type state = {
+    net_db : Distributed_db.net_db ;
+    limits : limits ;
+    mutable predecessor : State.Block.t ;
+    mutable timestamp : Time.t ;
+    mutable live_blocks : Block_hash.Set.t ; (* just a cache *)
+    mutable live_operations : Operation_hash.Set.t ; (* just a cache *)
+    refused : Operation_hash.t Ring.t ;
+    mutable refusals : error list Operation_hash.Map.t ;
+    mutable fetching : Operation_hash.Set.t ;
+    mutable pending : Operation.t Operation_hash.Map.t ;
+    mutable mempool : Mempool.t ;
+    mutable in_mempool : Operation_hash.Set.t ;
+    mutable validation_result : error Preapply_result.t ;
+    mutable validation_state : Prevalidation.prevalidation_state tzresult ;
+    mutable advertisement : [ `Pending of Mempool.t | `None ] ;
+  }
+  type parameters = limits * Distributed_db.net_db
+
+  include Worker_state
+
+  let view (state : state) _ : view =
+    let domain map =
+      Operation_hash.Map.fold
+        (fun elt _ acc -> Operation_hash.Set.add elt acc)
+        map Operation_hash.Set.empty in
+    { head = State.Block.hash state.predecessor ;
+      timestamp = state.timestamp ;
+      fetching = state.fetching ;
+      pending = domain state.pending ;
+      applied =
+        List.rev
+          (List.map (fun (h, _) -> h)
+             state.validation_result.applied) ;
+      delayed =
+        Operation_hash.Set.union
+          (domain state.validation_result.branch_delayed)
+          (domain state.validation_result.branch_refused) }
+
+end
+
+module Worker = Worker.Make (Name) (Event) (Request) (Types)
+
+open Types
+
+type t = Worker.infinite Worker.queue Worker.t
+type error += Closed = Worker.Closed
+
+let debug w =
+  Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
 
 let list_pendings ?maintain_net_db  ~from_block ~to_block old_mempool =
   let rec pop_blocks ancestor block mempool =
@@ -48,103 +119,6 @@ let list_pendings ?maintain_net_db  ~from_block ~to_block old_mempool =
   Lwt_list.fold_left_s push_block mempool path >>= fun new_mempool ->
   Lwt.return new_mempool
 
-type 'a request =
-  | Flush : State.Block.t -> unit request
-  | Notify : P2p.Peer_id.t * Mempool.t -> unit request
-  | Inject : Operation.t -> unit tzresult request
-  | Arrived : Operation_hash.t * Operation.t -> unit request
-  | Advertise : unit request
-
-type message = Message: 'a request * 'a tzresult Lwt.u option -> message
-
-let wakeup_with_result
-  : type t.
-    t request ->
-    t tzresult Lwt.u option ->
-    (t request -> t tzresult Lwt.t) ->
-    unit tzresult Lwt.t
-  = fun req u cb -> match u with
-    | None ->
-        cb req >>=? fun _res -> return ()
-    | Some u ->
-        cb req >>= fun res ->
-        Lwt.wakeup_later u res ;
-        Lwt.return (res >>? fun _res -> ok ())
-
-type limits = {
-  max_refused_operations : int ;
-  operation_timeout : float
-}
-
-(* Invariants:
-   - an operation is in only one of these sets (map domains):
-     pv.refusals pv.pending pv.fetching pv.live_operations pv.in_mempool
-   - pv.in_mempool is the domain of all fields of pv.prevalidation_result
-   - pv.prevalidation_result.refused = Ø, refused ops are in pv.refused *)
-type t = {
-  net_db : Distributed_db.net_db ;
-  limits : limits ;
-  canceler : Lwt_canceler.t ;
-  message_queue : message Lwt_pipe.t ;
-  mutable (* just for init *) worker : unit Lwt.t ;
-  mutable predecessor : State.Block.t ;
-  mutable timestamp : Time.t ;
-  mutable live_blocks : Block_hash.Set.t ; (* just a cache *)
-  mutable live_operations : Operation_hash.Set.t ; (* just a cache *)
-  refused : Operation_hash.t Ring.t ;
-  mutable refusals : error list Operation_hash.Map.t ;
-  mutable fetching : Operation_hash.Set.t ;
-  mutable pending : Operation.t Operation_hash.Map.t ;
-  mutable mempool : Mempool.t ;
-  mutable in_mempool : Operation_hash.Set.t ;
-  mutable validation_result : error Preapply_result.t ;
-  mutable validation_state : Prevalidation.prevalidation_state tzresult ;
-  mutable advertisement : [ `Pending of Mempool.t | `None ] ;
-}
-
-type error += Closed of Net_id.t
-
-let () =
-  register_error_kind `Permanent
-    ~id:"prevalidator.closed"
-    ~title:"Prevalidator closed"
-    ~description:
-      "An operation on the prevalidator could not complete \
-       before the prevalidator was shut down."
-    ~pp: (fun ppf net_id ->
-        Format.fprintf ppf
-          "Prevalidator for network %a has been shut down."
-          Net_id.pp_short net_id)
-    Data_encoding.(obj1 (req "net_id" Net_id.encoding))
-    (function Closed net_id -> Some net_id | _ -> None)
-    (fun net_id -> Closed net_id)
-
-let push_request pv request =
-  Lwt_pipe.safe_push_now pv.message_queue (Message (request, None))
-
-let push_request_and_wait pv request =
-  let t, u = Lwt.wait () in
-  Lwt.catch
-    (fun () ->
-       Lwt_pipe.push_now_exn pv.message_queue (Message (request, Some u)) ;
-       t)
-    (function
-      | Lwt_pipe.Closed ->
-          let net_id = (State.Net.id (Distributed_db.net_state pv.net_db)) in
-          fail (Closed net_id)
-      | exn -> fail (Exn exn))
-
-let close_queue pv =
-  let messages = Lwt_pipe.pop_all_now pv.message_queue in
-  List.iter
-    (function
-      | Message (_, Some u) ->
-          let net_id = (State.Net.id (Distributed_db.net_state pv.net_db)) in
-          Lwt.wakeup_later u (Error [ Closed net_id ])
-      | _ -> ())
-    messages ;
-  Lwt_pipe.close pv.message_queue
-
 let already_handled pv oph =
   Operation_hash.Map.mem oph pv.refusals
   || Operation_hash.Map.mem oph pv.pending
@@ -153,7 +127,7 @@ let already_handled pv oph =
   || Operation_hash.Set.mem oph pv.in_mempool
 
 let mempool_of_prevalidation_result (r : error Preapply_result.t) : Mempool.t =
-  { Mempool.known_valid = fst (List.split r.applied) ;
+  { Mempool.known_valid = List.map fst r.applied ;
     pending =
       Operation_hash.Map.fold
         (fun k _ s -> Operation_hash.Set.add k s)
@@ -184,7 +158,7 @@ let merge_validation_results ~old ~neu =
         (filter_out neu.applied old.branch_delayed)
         neu.branch_delayed }
 
-let advertise pv mempool =
+let advertise (w : t) pv mempool =
   match pv.advertisement with
   | `Pending { Mempool.known_valid ; pending } ->
       pv.advertisement <-
@@ -195,10 +169,10 @@ let advertise pv mempool =
       pv.advertisement <- `Pending mempool ;
       Lwt.async (fun () ->
           Lwt_unix.sleep 0.01 >>= fun () ->
-          push_request pv Advertise ;
+          Worker.push_request_now w Advertise ;
           Lwt.return_unit)
 
-let handle_unprocessed pv =
+let handle_unprocessed w pv =
   begin match pv.validation_state with
     | Error err ->
         pv.validation_result <-
@@ -211,49 +185,45 @@ let handle_unprocessed pv =
           Operation_hash.Map.empty ;
         Lwt.return ()
     | Ok validation_state ->
-        if Operation_hash.Map.is_empty pv.pending then
-          Lwt.return ()
-        else
-          begin match Operation_hash.Map.cardinal pv.pending with
-            | 0 -> Lwt.return ()
-            | n -> lwt_debug "processing %d operations" n
-          end >>= fun () ->
-          Prevalidation.prevalidate validation_state ~sort:true
-            (Operation_hash.Map.bindings pv.pending)
-          >>= fun (validation_state, validation_result) ->
-          pv.validation_state <-
-            Ok validation_state ;
-          pv.in_mempool <-
-            (Operation_hash.Map.fold
-               (fun h _ in_mempool -> Operation_hash.Set.add h in_mempool)
-               pv.pending @@
-             Operation_hash.Map.fold
-               (fun h _ in_mempool -> Operation_hash.Set.remove h in_mempool)
-               pv.validation_result.refused @@
-             pv.in_mempool) ;
-          Operation_hash.Map.iter
-            (fun h (_, errs) ->
-               Option.iter (Ring.add_and_return_erased pv.refused h)
-                 ~f:(fun e -> pv.refusals <- Operation_hash.Map.remove e pv.refusals) ;
-               pv.refusals <-
-                 Operation_hash.Map.add h errs pv.refusals)
-            pv.validation_result.refused ;
-          Operation_hash.Map.iter
-            (fun oph _ -> Distributed_db.Operation.clear_or_cancel pv.net_db oph)
-            pv.validation_result.refused ;
-          pv.validation_result <-
-            merge_validation_results
-              ~old:pv.validation_result
-              ~neu:validation_result ;
-          pv.pending <-
-            Operation_hash.Map.empty ;
-          advertise pv
-            (mempool_of_prevalidation_result validation_result) ;
-          Lwt.return ()
+        match Operation_hash.Map.cardinal pv.pending with
+        | 0 -> Lwt.return ()
+        | n -> debug w "processing %d operations" n ;
+            Prevalidation.prevalidate validation_state ~sort:true
+              (Operation_hash.Map.bindings pv.pending)
+            >>= fun (validation_state, validation_result) ->
+            pv.validation_state <-
+              Ok validation_state ;
+            pv.in_mempool <-
+              (Operation_hash.Map.fold
+                 (fun h _ in_mempool -> Operation_hash.Set.add h in_mempool)
+                 pv.pending @@
+               Operation_hash.Map.fold
+                 (fun h _ in_mempool -> Operation_hash.Set.remove h in_mempool)
+                 pv.validation_result.refused @@
+               pv.in_mempool) ;
+            Operation_hash.Map.iter
+              (fun h (_, errs) ->
+                 Option.iter (Ring.add_and_return_erased pv.refused h)
+                   ~f:(fun e -> pv.refusals <- Operation_hash.Map.remove e pv.refusals) ;
+                 pv.refusals <-
+                   Operation_hash.Map.add h errs pv.refusals)
+              pv.validation_result.refused ;
+            Operation_hash.Map.iter
+              (fun oph _ -> Distributed_db.Operation.clear_or_cancel pv.net_db oph)
+              pv.validation_result.refused ;
+            pv.validation_result <-
+              merge_validation_results
+                ~old:pv.validation_result
+                ~neu:validation_result ;
+            pv.pending <-
+              Operation_hash.Map.empty ;
+            advertise w pv
+              (mempool_of_prevalidation_result validation_result) ;
+            Lwt.return ()
   end >>= fun () ->
   pv.mempool <-
     { Mempool.known_valid =
-        fst (List.split pv.validation_result.applied) ;
+        List.rev_map fst pv.validation_result.applied ;
       pending =
         Operation_hash.Map.fold
           (fun k _ s -> Operation_hash.Set.add k s)
@@ -262,33 +232,29 @@ let handle_unprocessed pv =
           (fun k _ s -> Operation_hash.Set.add k s)
           pv.validation_result.branch_refused @@
         Operation_hash.Set.empty } ;
-  Mempool.set (Distributed_db.net_state pv.net_db)
+  State.Current_mempool.set (Distributed_db.net_state pv.net_db)
     ~head:(State.Block.hash pv.predecessor) pv.mempool >>= fun () ->
   Lwt.return ()
 
-let fetch_operation pv ?peer oph =
-  debug "fetching operation %a" Operation_hash.pp_short oph ;
+let fetch_operation w pv ?peer oph =
+  debug w
+    "fetching operation %a"
+    Operation_hash.pp_short oph ;
   Distributed_db.Operation.fetch
     ~timeout:pv.limits.operation_timeout
     pv.net_db ?peer oph () >>= function
   | Ok op ->
-      push_request pv (Arrived (oph, op)) ;
+      Worker.push_request_now w (Arrived (oph, op)) ;
       Lwt.return_unit
   | Error [ Distributed_db.Operation.Canceled _ ] ->
-      lwt_debug
+      debug w
         "operation %a included before being prevalidated"
-        Operation_hash.pp_short oph >>= fun () ->
+        Operation_hash.pp_short oph ;
       Lwt.return_unit
   | Error _ -> (* should not happen *)
       Lwt.return_unit
 
-let clear_fetching pv =
-  Operation_hash.Set.iter
-    (Distributed_db.Operation.clear_or_cancel pv.net_db)
-    pv.fetching
-
-let on_operation_arrived pv oph op =
-  debug "operation %a retrieved" Operation_hash.pp_short oph ;
+let on_operation_arrived (pv : state) oph op =
   pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
   if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks) then begin
     Distributed_db.Operation.clear_or_cancel pv.net_db oph
@@ -299,43 +265,40 @@ let on_operation_arrived pv oph op =
 
 let on_inject pv op =
   let oph = Operation.hash op in
-  log_notice "injection of operation %a" Operation_hash.pp_short oph ;
   begin
-    begin if already_handled pv oph then
-        return pv.validation_result
-      else
-        Lwt.return pv.validation_state >>=? fun validation_state ->
-        Prevalidation.prevalidate
-          validation_state ~sort:false [ (oph, op) ] >>= fun (_, result) ->
-        match result.applied with
-        | [ app_oph, _ ] when Operation_hash.equal app_oph oph ->
-            Distributed_db.inject_operation pv.net_db oph op >>= fun (_ : bool) ->
-            pv.pending <- Operation_hash.Map.add oph op pv.pending ;
-            return result
-        | _ ->
-            return result
-    end >>=? fun result ->
-    if List.mem_assoc oph result.applied then
-      return ()
+    if already_handled pv oph then
+      return pv.validation_result
     else
-      let try_in_map map proj or_else =
-        try
-          Lwt.return (Error (proj (Operation_hash.Map.find oph map)))
-        with Not_found -> or_else () in
-      try_in_map pv.refusals (fun h -> h)  @@ fun () ->
-      try_in_map result.refused snd @@ fun () ->
-      try_in_map result.branch_refused snd @@ fun () ->
-      try_in_map result.branch_delayed snd @@ fun () ->
-      if Operation_hash.Set.mem oph pv.live_operations then
-        failwith "Injected operation %a included in a previous block."
-          Operation_hash.pp oph
-      else
-        failwith "Injected operation %a is not in prevalidation result."
-          Operation_hash.pp oph
-  end >>= fun tzresult ->
-  return tzresult
+      Lwt.return pv.validation_state >>=? fun validation_state ->
+      Prevalidation.prevalidate
+        validation_state ~sort:false [ (oph, op) ] >>= fun (_, result) ->
+      match result.applied with
+      | [ app_oph, _ ] when Operation_hash.equal app_oph oph ->
+          Distributed_db.inject_operation pv.net_db oph op >>= fun (_ : bool) ->
+          pv.pending <- Operation_hash.Map.add oph op pv.pending ;
+          return result
+      | _ ->
+          return result
+  end >>=? fun result ->
+  if List.mem_assoc oph result.applied then
+    return ()
+  else
+    let try_in_map map proj or_else =
+      try
+        Lwt.return (Error (proj (Operation_hash.Map.find oph map)))
+      with Not_found -> or_else () in
+    try_in_map pv.refusals (fun h -> h) @@ fun () ->
+    try_in_map result.refused snd @@ fun () ->
+    try_in_map result.branch_refused snd @@ fun () ->
+    try_in_map result.branch_delayed snd @@ fun () ->
+    if Operation_hash.Set.mem oph pv.live_operations then
+      failwith "Injected operation %a included in a previous block."
+        Operation_hash.pp oph
+    else
+      failwith "Injected operation %a is not in prevalidation result."
+        Operation_hash.pp oph
 
-let on_notify pv peer mempool =
+let on_notify w pv peer mempool =
   let all_ophs =
     List.fold_left
       (fun s oph -> Operation_hash.Set.add oph s)
@@ -344,16 +307,15 @@ let on_notify pv peer mempool =
     Operation_hash.Set.filter
       (fun oph -> not (already_handled pv oph))
       all_ophs in
-  debug "notification of %d new operations" (Operation_hash.Set.cardinal to_fetch) ;
   pv.fetching <-
     Operation_hash.Set.union
       to_fetch
       pv.fetching ;
   Operation_hash.Set.iter
-    (fun oph -> Lwt.ignore_result (fetch_operation ~peer pv oph))
+    (fun oph -> Lwt.ignore_result (fetch_operation w pv ~peer oph))
     to_fetch
 
-let on_flush pv predecessor =
+let on_flush w pv predecessor =
   list_pendings
     ~maintain_net_db:pv.net_db
     ~from_block:pv.predecessor ~to_block:predecessor
@@ -372,9 +334,8 @@ let on_flush pv predecessor =
           validation_state ~sort:false [] >>= fun (state, result) ->
         Lwt.return (Ok state, result)
   end >>= fun (validation_state, validation_result) ->
-  lwt_log_notice "flushing the mempool for new head %a (%d operations)"
-    Block_hash.pp_short (State.Block.hash predecessor)
-    (Operation_hash.Map.cardinal pending) >>= fun () ->
+  debug w "%d operations were not washed by the flush"
+    (Operation_hash.Map.cardinal pending) ;
   pv.predecessor <- predecessor ;
   pv.live_blocks <- new_live_blocks ;
   pv.live_operations <- new_live_operations ;
@@ -393,48 +354,43 @@ let on_advertise pv =
       pv.advertisement <- `None ;
       Distributed_db.Advertise.current_head pv.net_db ~mempool pv.predecessor
 
-let rec worker_loop pv =
-  begin
-    handle_unprocessed pv >>= fun () ->
-    Lwt_utils.protect ~canceler:pv.canceler begin fun () ->
-      Lwt_pipe.pop pv.message_queue >>= return
-    end >>=? fun (Message (message, u)) ->
-    wakeup_with_result message u @@ function
-    | Flush block ->
-        on_advertise pv ;
-        (* TODO: rebase the advertisement instead *)
-        on_flush pv block >>=? fun () ->
-        return ()
-    | Notify (peer, mempool) ->
-        on_notify pv peer mempool ;
-        return ()
-    | Inject op ->
-        on_inject pv op
-    | Arrived (oph, op) ->
-        on_operation_arrived pv oph op ;
-        return ()
-    | Advertise ->
-        on_advertise pv ;
-        return ()
-  end >>= function
-  | Ok () ->
-      worker_loop pv
-  | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
-      clear_fetching pv ;
-      close_queue pv ;
-      Lwt.return_unit
-  | Error err ->
-      lwt_log_error "@[Unexpected error:@ %a@]"
-        pp_print_error err >>= fun () ->
-      close_queue pv ;
-      clear_fetching pv ;
-      Lwt_canceler.cancel pv.canceler >>= fun () ->
-      Lwt.return_unit
+let on_request
+  : type r. t -> r Request.t -> r tzresult Lwt.t
+  = fun w request ->
+    let pv = Worker.state w in
+    begin match request with
+      | Request.Flush hash ->
+          on_advertise pv ;
+          (* TODO: rebase the advertisement instead *)
+          let net_state = Distributed_db.net_state pv.net_db in
+          State.Block.read net_state hash >>=? fun block ->
+          on_flush w pv block >>=? fun () ->
+          return (() : r)
+      | Request.Notify (peer, mempool) ->
+          on_notify w pv peer mempool ;
+          return ()
+      | Request.Inject op ->
+          on_inject pv op >>= fun tzresult ->
+          return tzresult
+      | Request.Arrived (oph, op) ->
+          on_operation_arrived pv oph op ;
+          return ()
+      | Request.Advertise ->
+          on_advertise pv ;
+          return ()
+    end >>=? fun r ->
+    handle_unprocessed w pv >>= fun () ->
+    return r
 
-let create limits net_db =
+let on_close w =
+  let pv = Worker.state w in
+  Operation_hash.Set.iter
+    (Distributed_db.Operation.clear_or_cancel pv.net_db)
+    pv.fetching ;
+  Lwt.return_unit
+
+let on_launch w _ (limits, net_db) =
   let net_state = Distributed_db.net_state net_db in
-  let canceler = Lwt_canceler.create () in
-  let message_queue = Lwt_pipe.create () in
   State.read_chain_store net_state
     (fun _ { current_head ; current_mempool ; live_blocks ; live_operations } ->
        Lwt.return (current_head, current_mempool, live_blocks, live_operations))
@@ -455,8 +411,7 @@ let create limits net_db =
       (fun s h -> Operation_hash.Set.add h s)
       Operation_hash.Set.empty mempool.known_valid in
   let pv =
-    { limits ; net_db ; canceler ;
-      worker = Lwt.return_unit ; message_queue ;
+    { limits ; net_db ;
       predecessor ; timestamp ; live_blocks ; live_operations ;
       mempool = { known_valid = [] ; pending = Operation_hash.Set.empty };
       refused = Ring.create limits.max_refused_operations ;
@@ -467,32 +422,52 @@ let create limits net_db =
       validation_result ; validation_state ;
       advertisement = `None } in
   List.iter
-    (fun oph -> Lwt.ignore_result (fetch_operation pv oph))
+    (fun oph -> Lwt.ignore_result (fetch_operation w pv oph))
     mempool.known_valid ;
-  pv.worker <-
-    Lwt_utils.worker
-      (Format.asprintf "net_prevalidator.%a" Net_id.pp (State.Net.id net_state))
-      ~run:(fun () -> worker_loop pv)
-      ~cancel:(fun () -> Lwt_canceler.cancel pv.canceler) ;
   Lwt.return pv
 
-let shutdown pv =
-  lwt_debug "shutdown" >>= fun () ->
-  Lwt_canceler.cancel pv.canceler >>= fun () ->
-  pv.worker
+let on_error w r st errs =
+  Worker.record_event w (Event.Request (r, st, Some errs)) ;
+  Lwt.return (Error errs)
 
-let flush pv head =
-  push_request pv (Flush head)
+let on_completion w r _ st =
+  Worker.record_event w (Event.Request (Request.view r, st, None )) ;
+  Lwt.return ()
 
-let notify_operations pv peer mempool =
-  push_request pv (Notify (peer, mempool))
+let table = Worker.create_table Queue
 
-let operations pv =
+let create limits net_db =
+  let net_state = Distributed_db.net_state net_db in
+  let module Handlers = struct
+    type self = t
+    let on_launch = on_launch
+    let on_request = on_request
+    let on_close = on_close
+    let on_error = on_error
+    let on_completion = on_completion
+    let on_no_request _ = return ()
+  end in
+  Worker.launch table limits.worker_limits
+    (State.Net.id net_state)
+    (limits, net_db)
+    (module Handlers)
+
+let shutdown = Worker.shutdown
+
+let flush w head =
+  Worker.push_request_and_wait w (Flush head)
+
+let notify_operations w peer mempool =
+  Worker.push_request_now w (Notify (peer, mempool))
+
+let operations w =
+  let pv = Worker.state w in
   { pv.validation_result with
     applied = List.rev pv.validation_result.applied },
   pv.pending
 
-let pending ?block pv =
+let pending ?block w =
+  let pv = Worker.state w in
   let ops = Preapply_result.operations pv.validation_result in
   match block with
   | Some to_block ->
@@ -501,12 +476,25 @@ let pending ?block pv =
         ~from_block:pv.predecessor ~to_block ops
   | None -> Lwt.return ops
 
-let timestamp pv = pv.timestamp
+let timestamp w =
+  let pv = Worker.state w in
+  pv.timestamp
 
-let context pv =
+let context w =
+  let pv = Worker.state w in
   Lwt.return pv.validation_state >>=? fun validation_state ->
   Prevalidation.end_prevalidation validation_state
 
-let inject_operation pv op =
-  push_request_and_wait pv (Inject op) >>=? fun result ->
+let inject_operation w op =
+  Worker.push_request_and_wait w (Inject op) >>=? fun result ->
   Lwt.return result
+
+let status = Worker.status
+
+let running_workers () = Worker.list table
+
+let pending_requests t = Worker.pending_requests t
+
+let current_request t = Worker.current_request t
+
+let last_events = Worker.last_events

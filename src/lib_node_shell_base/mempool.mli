@@ -7,28 +7,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open State
+(** Tezos Shell Module - Mempool, a.k.a. the operations safe to be
+    broadcasted. *)
 
-type t = State.mempool = {
+type t = {
   known_valid: Operation_hash.t list ;
+  (** A valid sequence of operations on top of the current head. *)
   pending: Operation_hash.Set.t ;
+  (** Set of known not-invalid operation. *)
 }
 type mempool = t
 
-let encoding = State.mempool_encoding
-let empty = State.empty_mempool
+val encoding: mempool Data_encoding.t
 
-let set net_state ~head mempool =
-  update_chain_store net_state begin fun _chain_store data ->
-    if Block_hash.equal head (Block.hash data.current_head) then
-      Lwt.return (Some { data with current_mempool = mempool },
-                  ())
-    else
-      Lwt.return (None, ())
-  end
-
-let get net_state =
-  read_chain_store net_state begin fun _chain_store data ->
-    Lwt.return (Block.header data.current_head, data.current_mempool)
-  end
-
+val empty: mempool
+(** Empty mempool. *)

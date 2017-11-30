@@ -98,7 +98,8 @@ and timeout = Net_validator.timeout = {
 
 and prevalidator_limits = Prevalidator.limits = {
   max_refused_operations: int ;
-  operation_timeout: float
+  operation_timeout: float ;
+  worker_limits : Worker_types.limits ;
 }
 
 let may_create_net state genesis =

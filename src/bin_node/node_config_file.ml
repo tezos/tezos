@@ -108,6 +108,12 @@ let default_shell = {
   prevalidator_limits = {
     operation_timeout = 10. ;
     max_refused_operations = 1000 ;
+    worker_limits = {
+      backlog_size = 1000 ;
+      backlog_level = Logging.Info ;
+      zombie_lifetime = 600. ;
+      zombie_memory = 120. ;
+    }
   } ;
   timeout = {
     block_header = 60. ;
@@ -257,19 +263,45 @@ let log =
        (opt "rules" string)
        (dft "template" string default_log.template))
 
+
+let worker_limits_encoding
+    default_size
+    default_level
+    default_zombie_lifetime
+    default_zombie_memory =
+  let open Data_encoding in
+  conv
+    (fun { Worker_types.backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory } ->
+       (backlog_size, backlog_level, zombie_lifetime, zombie_memory))
+    (fun (backlog_size, backlog_level, zombie_lifetime, zombie_memory) ->
+       { backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory })
+    (obj4
+       (dft "worker_backlog_size" uint16 default_size)
+       (dft "worker_backlog_level" Logging.level_encoding default_level)
+       (dft "worker_zombie_lifetime" float default_zombie_lifetime)
+       (dft "worker_zombie_memory" float default_zombie_memory))
+
+let timeout_encoding =
+  Data_encoding.ranged_float 0. 500.
+
 let prevalidator_limits_encoding =
   let open Data_encoding in
-  let uint8 = conv int_of_float float_of_int uint8 in
   conv
-    (fun { Node.operation_timeout ; max_refused_operations } ->
-       (operation_timeout, max_refused_operations))
-    (fun (operation_timeout, max_refused_operations) ->
-       { operation_timeout ; max_refused_operations })
-    (obj2
-       (dft "operations_timeout" uint8
-          default_shell.prevalidator_limits.operation_timeout)
-       (dft "max_refused_operations" uint16
-          default_shell.prevalidator_limits.max_refused_operations))
+    (fun { Node.operation_timeout ; max_refused_operations ; worker_limits } ->
+       ((operation_timeout, max_refused_operations), worker_limits))
+    (fun ((operation_timeout, max_refused_operations), worker_limits) ->
+       { operation_timeout ; max_refused_operations ; worker_limits})
+    (merge_objs
+       (obj2
+          (dft "operations_request_timeout" timeout_encoding
+             default_shell.prevalidator_limits.operation_timeout)
+          (dft "max_refused_operations" uint16
+             default_shell.prevalidator_limits.max_refused_operations))
+       (worker_limits_encoding
+          default_shell.prevalidator_limits.worker_limits.backlog_size
+          default_shell.prevalidator_limits.worker_limits.backlog_level
+          default_shell.prevalidator_limits.worker_limits.zombie_lifetime
+          default_shell.prevalidator_limits.worker_limits.zombie_memory))
 
 let timeout_encoding =
   let open Data_encoding in
