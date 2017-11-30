@@ -383,14 +383,20 @@ end = struct
   let compute_timeout state =
     let next =
       Table.fold
-        (fun _ { next_request } acc -> min next_request acc)
-        state.pending infinity in
-    let now = Unix.gettimeofday () in
-    let delay = next -. now in
-    if delay <= 0. then Lwt.return_unit else begin
-      (* lwt_debug "waiting at least %.2fs" delay >>= fun () -> *)
-      Lwt_unix.sleep delay
-    end
+        (fun _ { next_request } acc ->
+           match acc with
+           | None -> Some next_request
+           | Some x -> Some (min x next_request))
+        state.pending None in
+    match next with
+    | None -> fst @@ Lwt.task ()
+    | Some next ->
+        let now = Unix.gettimeofday () in
+        let delay = next -. now in
+        if delay <= 0. then Lwt.return_unit else begin
+          (* lwt_debug "waiting at least %.2fs" delay >>= fun () -> *)
+          Lwt_unix.sleep delay
+        end
 
   let may_pp_peer ppf = function
     | None -> ()
