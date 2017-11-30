@@ -134,6 +134,117 @@ let rec type_size_of_stack_head
         else
           0
 
+(* This is the depth of the stack to inspect for sizes overflow. We
+   only need to check the produced types that can be larger than the
+   arguments. That's why Swap is 0 for instance as no type grows.
+   Constant sized types are not checked: it is assumed they are lower
+   than the bound (otherwise every program would be rejected). *)
+let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
+  | Drop -> 0
+  | Dup -> 0
+  | Swap -> 0
+  | Const _ -> 1
+  | Cons_pair -> 1
+  | Car -> 0
+  | Cdr -> 0
+  | Cons_some -> 1
+  | Cons_none _ -> 1
+  | If_none _ -> 0
+  | Left -> 0
+  | Right -> 0
+  | If_left _ -> 0
+  | Cons_list -> 1
+  | Nil -> 1
+  | If_cons _ -> 0
+  | List_map -> 1
+  | List_map_body _ -> 1
+  | List_reduce -> 0
+  | List_size -> 0
+  | List_iter _ -> 1
+  | Empty_set _ -> 1
+  | Set_map _ -> 1
+  | Set_reduce -> 0
+  | Set_iter _ -> 0
+  | Set_mem -> 0
+  | Set_update -> 0
+  | Set_size -> 0
+  | Empty_map _ -> 1
+  | Map_map -> 1
+  | Map_reduce -> 0
+  | Map_iter _ -> 1
+  | Map_mem -> 0
+  | Map_get -> 0
+  | Map_update -> 0
+  | Map_size -> 0
+  | Concat -> 0
+  | Add_seconds_to_timestamp -> 0
+  | Add_timestamp_to_seconds -> 0
+  | Sub_timestamp_seconds -> 0
+  | Diff_timestamps -> 0
+  | Add_tez -> 0
+  | Sub_tez -> 0
+  | Mul_teznat -> 0
+  | Mul_nattez -> 0
+  | Ediv_teznat -> 0
+  | Ediv_tez -> 0
+  | Or -> 0
+  | And -> 0
+  | Xor -> 0
+  | Not -> 0
+  | Neg_nat -> 0
+  | Neg_int -> 0
+  | Abs_int -> 0
+  | Int_nat -> 0
+  | Add_intint -> 0
+  | Add_intnat -> 0
+  | Add_natint -> 0
+  | Add_natnat -> 0
+  | Sub_int -> 0
+  | Mul_intint -> 0
+  | Mul_intnat -> 0
+  | Mul_natint -> 0
+  | Mul_natnat -> 0
+  | Ediv_intint -> 0
+  | Ediv_intnat -> 0
+  | Ediv_natint -> 0
+  | Ediv_natnat -> 0
+  | Lsl_nat -> 0
+  | Lsr_nat -> 0
+  | Or_nat -> 0
+  | And_nat -> 0
+  | Xor_nat -> 0
+  | Not_nat -> 0
+  | Not_int -> 0
+  | Seq _ -> 0
+  | If _ -> 0
+  | Loop _ -> 0
+  | Loop_left _ -> 0
+  | Dip _ -> 0
+  | Exec -> 0
+  | Lambda _ -> 1
+  | Fail -> 1
+  | Nop -> 0
+  | Compare _ -> 1
+  | Eq -> 0
+  | Neq -> 0
+  | Lt -> 0
+  | Gt -> 0
+  | Le -> 0
+  | Ge -> 0
+  | Manager -> 0
+  | Transfer_tokens _ -> 1
+  | Create_account -> 0
+  | Default_account -> 0
+  | Create_contract _ -> 1
+  | Now -> 0
+  | Balance -> 0
+  | Check_signature -> 0
+  | Hash_key -> 0
+  | H _ -> 0
+  | Steps_to_quota -> 0
+  | Source _ -> 1
+  | Amount -> 0
+
 (* ---- Error helpers -------------------------------------------------------*)
 
 let location = function
@@ -1095,10 +1206,11 @@ and parse_instr
   fun tc_context ctxt ?type_logger script_instr stack_ty ->
     let return (judgement : bef judgement) : bef judgement tzresult Lwt.t =
       match judgement with
-      | Typed { loc; aft } ->
-          (* No instruction builds more than two new stack slots. *)
+      | Typed { instr; loc; aft } ->
           let maximum_type_size = Constants.michelson_maximum_type_size ctxt in
-          let type_size = type_size_of_stack_head aft ~up_to:2 in
+          let type_size =
+            type_size_of_stack_head aft
+              ~up_to:(number_of_generated_growing_types instr) in
           if Compare.Int.(type_size > maximum_type_size) then
             fail (Type_too_large (loc, type_size, maximum_type_size))
           else
