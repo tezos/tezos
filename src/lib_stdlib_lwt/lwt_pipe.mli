@@ -42,6 +42,10 @@ val peek : 'a t -> 'a Lwt.t
 (** [peek] is like [pop] except it does not removes the first
     element. *)
 
+val peek_all : 'a t -> 'a list
+(** [peek_all q] returns the elements in the [q] (oldest first),
+    or [[]] if empty. *)
+
 val values_available : 'a t -> unit Lwt.t
 (** [values_available] is like [peek] but it ignores the value
     returned. *)

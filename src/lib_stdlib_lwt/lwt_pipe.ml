@@ -136,6 +136,12 @@ let rec peek ({ closed ; queue ; _ } as q) =
     wait_push q >>= fun () ->
     peek q
 
+let peek_all { queue ; closed } =
+  if closed then
+    []
+  else
+    List.rev (Queue.fold (fun acc (_, e) -> e :: acc) [] queue)
+
 exception Empty
 
 let pop_now_exn ({ closed ; queue ; empty ; current_size ; _ } as q) =
