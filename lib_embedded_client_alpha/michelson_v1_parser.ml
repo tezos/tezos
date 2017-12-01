@@ -18,18 +18,34 @@ type parsed =
     expansion_table : (int * (Micheline_parser.location * int list)) list ;
     unexpansion_table : (int * int) list }
 
+(* Unexpanded toplevel expression should be a sequence *)
 let expand_all source ast errors =
   let unexpanded, loc_table =
     extract_locations ast in
+  let rec error_map (expanded, errors) f = function
+    | [] -> (List.rev expanded, List.rev errors)
+    | hd :: tl ->
+        let (new_expanded, new_errors) = f hd in
+        error_map
+          (new_expanded :: expanded, List.rev_append new_errors errors)
+          f tl in
+  let error_map = error_map ([], []) in
   let rec expand expr =
     match Michelson_macros.expand expr with
-    | Seq (loc, items, annot) ->
-        Seq (loc, List.map expand items, annot)
-    | Prim (loc, name, args, annot) ->
-        Prim (loc, name, List.map expand args, annot)
-    | Int _ | String _ as atom -> atom in
+    | Ok expanded ->
+        begin
+          match expanded with
+          | Seq (loc, items, annot) ->
+              let items, errors = error_map expand items in
+              (Seq (loc, items, annot), errors)
+          | Prim (loc, name, args, annot) ->
+              let args, errors = error_map expand args in
+              (Prim (loc, name, args, annot), errors)
+          | Int _ | String _ as atom -> (atom, []) end
+    | Error errors -> (expr, errors) in
+  let expanded, expansion_errors = expand (root unexpanded) in
   let expanded, unexpansion_table =
-    extract_locations (expand (root unexpanded)) in
+    extract_locations expanded in
   let expansion_table =
     let sorted =
       List.sort (fun (_, a) (_, b) -> compare a b) unexpansion_table in
@@ -54,12 +70,12 @@ let expand_all source ast errors =
   | Ok expanded ->
       { source ; unexpanded ; expanded ;
         expansion_table ; unexpansion_table },
-      errors
+      errors @ expansion_errors
   | Error errs ->
       { source ; unexpanded ;
         expanded = Micheline.strip_locations (Seq ((), [], None)) ;
         expansion_table ; unexpansion_table },
-      errs @ errors
+      errs @ errors @ expansion_errors
 
 let parse_toplevel ?check source =
   let tokens, lexing_errors = Micheline_parser.tokenize source in

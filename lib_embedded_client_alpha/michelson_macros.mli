@@ -11,19 +11,22 @@ open Tezos_micheline
 
 type 'l node = ('l, string) Micheline.node
 
-val expand : 'l node -> 'l node
+type error += Unexpected_macro_annotation of string
+type error += Dip_expects_sequence
 
-val expand_caddadr : 'l node -> 'l node option
-val expand_set_caddadr : 'l node -> 'l node option
-val expand_map_caddadr : 'l node -> 'l node option
-val expand_dxiiivp : 'l node -> 'l node option
-val expand_paaiair : 'l node -> 'l node option
-val expand_duuuuup : 'l node -> 'l node option
-val expand_compare : 'l node -> 'l node option
-val expand_asserts : 'l node -> 'l node option
-val expand_unpaaiair : 'l node -> 'l node option
-val expand_if_some : 'l node -> 'l node option
-val expand_if_right : 'l node -> 'l node option
+val expand : 'l node -> 'l node tzresult
+
+val expand_caddadr : 'l node -> 'l node option tzresult
+val expand_set_caddadr : 'l node -> 'l node option tzresult
+val expand_map_caddadr : 'l node -> 'l node option tzresult
+val expand_dxiiivp : 'l node -> 'l node option tzresult
+val expand_paaiair : 'l node -> 'l node option tzresult
+val expand_duuuuup : 'l node -> 'l node option tzresult
+val expand_compare : 'l node -> 'l node option tzresult
+val expand_asserts : 'l node -> 'l node option tzresult
+val expand_unpaaiair : 'l node -> 'l node option tzresult
+val expand_if_some : 'l node -> 'l node option tzresult
+val expand_if_right : 'l node -> 'l node option tzresult
 
 val unexpand : 'l node -> 'l node
 

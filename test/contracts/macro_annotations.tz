@@ -1,0 +1,6 @@
+return unit;
+parameter unit;
+storage unit;
+code { PUSH unit Unit ;
+       DUUP @truc ;
+       DROP ; DROP }

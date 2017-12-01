@@ -12,8 +12,11 @@ open Micheline
 
 type 'l node = ('l, string) Micheline.node
 
+type error += Unexpected_macro_annotation of string
+type error += Dip_expects_sequence
+
 let expand_caddadr original =
-  match original with
+  ok @@ match original with
   | Prim (loc, str, [], annot) ->
       let len = String.length str in
       if len > 3
@@ -23,6 +26,7 @@ let expand_caddadr original =
           if i = 0 then
             Some (Seq (loc, acc, None))
           else
+            let annot = if i = (String.length str - 2) then annot else None in
             match String.get str i with
             | 'A' -> parse (i - 1) (Prim (loc, "CAR", [], annot) :: acc)
             | 'D' -> parse (i - 1) (Prim (loc, "CDR", [], annot) :: acc)
@@ -33,8 +37,8 @@ let expand_caddadr original =
   | _ -> None
 
 let expand_set_caddadr original =
-  match original with
-  | Prim (loc, str, [], None) ->
+  ok @@ match original with
+  | Prim (loc, str, [], annot) ->
       let len = String.length str in
       if len >= 7
       && String.sub str 0 5 = "SET_C"
@@ -73,14 +77,19 @@ let expand_set_caddadr original =
             let init =
               Seq (loc,
                    [ Prim (loc, "CDR", [], None) ;
-                     Prim (loc, "SWAP", [], None) ;
+                     Prim (loc, "SWAP", [], annot) ;
                      Prim (loc, "PAIR", [], None) ], None) in
             parse (len - 3) init
         | 'D' ->
             let init =
               Seq (loc,
-                   [ Prim (loc, "CAR", [], None) ;
-                     Prim (loc, "PAIR", [], None) ], None) in
+                   (Prim (loc, "CAR", [], None)) ::
+                   (let pair = Prim (loc, "PAIR", [], None) in
+                    match annot with
+                    | None -> [ pair ]
+                    | Some _ -> [ Prim (loc, "SWAP", [], annot) ;
+                                  Prim (loc, "SWAP", [], None) ;
+                                  pair]), None) in
             parse (len - 3) init
         | _ -> None
       else
@@ -89,7 +98,10 @@ let expand_set_caddadr original =
 
 let expand_map_caddadr original =
   match original with
-  | Prim (loc, str, [ Seq _ as code ], None) ->
+  | Prim (loc, str, [ Seq _ as code ], annot) ->
+      begin match annot with
+        | Some _ -> (error (Unexpected_macro_annotation str))
+        | None -> ok () end >|? fun () ->
       let len = String.length str in
       if len >= 7
       && String.sub str 0 5 = "MAP_C"
@@ -129,9 +141,9 @@ let expand_map_caddadr original =
               Seq (loc,
                    [ Prim (loc, "DUP", [], None) ;
                      Prim (loc, "CDR", [], None) ;
+                     Prim (loc, "DIP",
+                           [ Seq (loc, [ Prim (loc, "CAR", [], None) ; code ], None) ], None) ;
                      Prim (loc, "SWAP", [], None) ;
-                     Prim (loc, "CAR", [], None) ;
-                     code ;
                      Prim (loc, "PAIR", [], None) ], None) in
             parse (len - 3) init
         | 'D' ->
@@ -147,7 +159,7 @@ let expand_map_caddadr original =
         | _ -> None
       else
         None
-  | _ -> None
+  | _ -> ok None
 
 exception Not_a_roman
 
@@ -165,7 +177,7 @@ let decimal_of_roman roman =
       | 'X' -> 10
       | 'V' -> 5
       | 'I' -> 1
-      | _ -> raise Not_a_roman
+      | _ -> raise_notrace Not_a_roman
     in
     if Compare.Int.(n < !lastval)
     then arabic := !arabic - n
@@ -176,7 +188,7 @@ let decimal_of_roman roman =
 
 let expand_dxiiivp original =
   match original with
-  | Prim (loc, str, [ arg ], None) ->
+  | Prim (loc, str, args, annot) ->
       let len = String.length str in
       if len > 3
       && String.get str 0 = 'D'
@@ -188,17 +200,19 @@ let expand_dxiiivp original =
               acc
             else
               make (i - 1)
-                (Seq (loc, [ Prim (loc, "DIP", [ acc ], None) ], None)) in
-          Some (make depth arg)
-        with Not_a_roman -> None
-      else None
-  | _ -> None
+                (Seq (loc, [ Prim (loc, "DIP", [ acc ], annot) ], None)) in
+          match args with
+          | [ Seq (_, _, _) as arg ] -> ok @@ Some (make depth arg)
+          | _ -> error Dip_expects_sequence
+        with Not_a_roman -> ok None
+      else ok None
+  | _ -> ok None
 
 exception Not_a_pair
 
 let expand_paaiair original =
   match original with
-  | Prim (loc, str, [], None) ->
+  | Prim (loc, str, [], annot) ->
       let len = String.length str in
       if len > 4
       && String.get str 0 = 'P'
@@ -209,25 +223,25 @@ let expand_paaiair original =
               acc
             else if String.get str i = 'I'
                  && String.get str (i - 1) = 'A' then
-              parse (i - 2) (Prim (loc, "PAIR", [], None) :: acc)
+              parse (i - 2) (Prim (loc, "PAIR", [], if i = (len - 2) then annot else None) :: acc)
             else if String.get str i = 'A' then
               match acc with
               | [] ->
-                  raise Not_a_pair
+                  raise_notrace Not_a_pair
               | acc :: accs ->
                   parse (i - 1)
                     (Prim (loc, "DIP", [ Seq (loc, [ acc ], None) ], None)
                      :: accs)
             else
-              raise Not_a_pair in
-          Some (Seq (loc, parse (len - 2) [], None))
-        with Not_a_pair -> None
+              raise_notrace Not_a_pair in
+          ok @@ Some (Seq (loc, parse (len - 2) [], None))
+        with Not_a_pair -> ok None
       else
-        None
-  | _ -> None
+        ok None
+  | _ -> ok None
 
 let expand_unpaaiair original =
-  match original with
+  ok @@ match original with
   | Prim (loc, str, [], None) ->
       let len = String.length str in
       if len >= 6
@@ -252,7 +266,7 @@ let expand_unpaaiair original =
             else if String.get str i = 'A' then
               match acc with
               | [] ->
-                  raise Not_a_pair
+                  raise_notrace Not_a_pair
               | (Seq _ as acc) :: accs ->
                   parse (i - 1)
                     (Prim (loc, "DIP", [ acc ], None) :: accs)
@@ -262,7 +276,7 @@ let expand_unpaaiair original =
                            [ Seq (loc, [ acc ], None) ],
                            None) :: accs)
             else
-              raise Not_a_pair in
+              raise_notrace Not_a_pair in
           Some (parse (len - 2) [])
         with Not_a_pair -> None
       else
@@ -272,8 +286,8 @@ let expand_unpaaiair original =
 exception Not_a_dup
 
 let expand_duuuuup original =
-  match original with
-  | Prim (loc, str, [], None) ->
+  ok @@ match original with
+  | Prim (loc, str, [], annot) ->
       let len = String.length str in
       if len > 3
       && String.get str 0 = 'D'
@@ -287,15 +301,15 @@ let expand_duuuuup original =
                 (Seq (loc, [ Prim (loc, "DIP", [ acc ], None) ;
                              Prim (loc, "SWAP", [], None) ], None))
             else
-              raise Not_a_dup in
-          Some (parse (len - 2) (Seq (loc, [ Prim (loc, "DUP", [], None) ], None)))
+              raise_notrace Not_a_dup in
+          Some (parse (len - 2) (Seq (loc, [ Prim (loc, "DUP", [], annot) ], None)))
         with Not_a_dup -> None
       else
         None
   | _ -> None
 
 let expand_compare original =
-  match original with
+  ok @@ match original with
   | Prim (loc, "CMPEQ", [], None) ->
       Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
                         Prim (loc, "EQ", [], None) ], None))
@@ -356,7 +370,7 @@ let expand_compare original =
   | Prim (loc, "IFGE", args, None) ->
       Some (Seq (loc, [ Prim (loc, "GE", [], None) ;
                         Prim (loc, "IF", args, None) ], None))
-  | _ -> None;;
+  | _ -> None
 
 
 let expand_asserts original =
@@ -366,15 +380,15 @@ let expand_asserts original =
     [ Seq(loc, [ Prim (loc, "FAIL", [], None) ], None) ; Seq(loc, [], None) ] in
   match original with
   | Prim (loc, "ASSERT", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "IF", fail_false loc, None) ], None))
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF", fail_false loc, None) ], None))
   | Prim (loc, "ASSERT_NONE", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_false loc, None) ], None))
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_false loc, None) ], None))
   | Prim (loc, "ASSERT_SOME", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_true loc, None) ], None))
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", fail_true loc, None) ], None))
   | Prim (loc, "ASSERT_LEFT", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_false loc, None) ], None))
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_false loc, None) ], None))
   | Prim (loc, "ASSERT_RIGHT", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_true loc, None) ], None))
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_true loc, None) ], None))
   | Prim (loc, s, [], None)
     when String.(length s >  7 && equal (sub s 0 7) "ASSERT_") ->
       begin
@@ -382,41 +396,37 @@ let expand_asserts original =
         let remaining_prim = Prim(loc, remaining, [], None) in
         match remaining with
         | "EQ" | "NEQ" | "LT" | "LE" | "GE" | "GT" ->
-            Some (Seq (loc, [ remaining_prim ;
-                              Prim (loc, "IF", fail_false loc, None) ], None))
+            ok @@ Some (Seq (loc, [ remaining_prim ;
+                                    Prim (loc, "IF", fail_false loc, None) ], None))
         | _ ->
             begin
-              match expand_compare remaining_prim with
+              expand_compare remaining_prim >|? function
               | None -> None
               | Some seq ->
                   Some (Seq (loc, [ seq ;
                                     Prim (loc, "IF", fail_false loc, None) ], None))
             end
       end
-  | _ -> None
+  | _ -> ok None
 
 
 let expand_if_some = function
   | Prim (loc, "IF_SOME", [ right ; left ], None) ->
-      Some (Seq (loc, [ Prim (loc, "IF_NONE", [ left ; right ], None) ], None))
-  | _ -> None
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", [ left ; right ], None) ], None))
+  | _ -> ok @@ None
 
 let expand_if_right = function
   | Prim (loc, "IF_RIGHT", [ right ; left ], None) ->
-      Some (Seq (loc, [ Prim (loc, "IF_LEFT", [ left ; right ], None) ], None))
-  | _ -> None
+      ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", [ left ; right ], None) ], None))
+  | _ -> ok @@ None
 
 let expand original =
-  let try_expansions expanders =
-    match
-      List.fold_left
-        (fun acc f ->
-           match acc with
-           | None -> f original
-           | Some rewritten -> Some rewritten)
-        None expanders with
-    | None -> original
-    | Some rewritten -> rewritten in
+  let rec try_expansions = function
+    | [] -> ok @@ original
+    | expander :: expanders ->
+        expander original >>? function
+        | None -> try_expansions expanders
+        | Some rewritten -> ok rewritten in
   try_expansions
     [ expand_caddadr ;
       expand_set_caddadr ;
@@ -744,7 +754,7 @@ let unexpand_if_right = function
   | _ -> None
 
 let unexpand original =
-  let try_expansions unexpanders =
+  let try_unexpansions unexpanders =
     match
       List.fold_left
         (fun acc f ->
@@ -754,7 +764,7 @@ let unexpand original =
         None unexpanders with
     | None -> original
     | Some rewritten -> rewritten in
-  try_expansions
+  try_unexpansions
     [ unexpand_asserts ;
       unexpand_caddadr ;
       unexpand_set_caddadr ;
@@ -766,3 +776,33 @@ let unexpand original =
       unexpand_compare ;
       unexpand_if_some ;
       unexpand_if_right ]
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"unexpectedMacroAnnotation"
+    ~title:"Unexpected annotation"
+    ~description:"A macro had an annotation, but no annotation was permitted on this macro."
+    ~pp:(fun ppf ->
+        Format.fprintf ppf
+          "@[<hov 0>@[<hov 2>Unexpected annotation on instruction %s.@]@]")
+    (obj1
+       (req "instrName" string))
+    (function
+      | Unexpected_macro_annotation str -> Some str
+      | _ -> None)
+    (fun s -> Unexpected_macro_annotation s) ;
+  register_error_kind
+    `Permanent
+    ~id:"dipExpectsSequence"
+    ~title:"Dip instruction expects a sequence"
+    ~description:"A dip instruction expects a sequence, but a sequence was not provided"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf
+          "@[<hov 0>@[<hov 2>DIP instructionf expects a sequence, but did not receive one.@]@]")
+    empty
+    (function
+      | Dip_expects_sequence -> Some ()
+      | _ -> None)
+    (fun () -> Dip_expects_sequence)

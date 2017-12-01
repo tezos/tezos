@@ -2,5 +2,5 @@ parameter tez;
 storage (pair (pair nat (pair nat (pair (pair (pair nat tez) nat) nat))) nat);
 return unit;
 code { DUP ; CAR ; SWAP ; CDR ;
-       SET_CADDAADR ;
+       SET_CADDAADR @annot ;
        UNIT ; PAIR };

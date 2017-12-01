@@ -609,7 +609,7 @@ let () =
     ~title: "Unknown primitive name (typechecking error)"
     ~description:
       "In a script or data expression, a primitive was unknown."
-    ~pp:(fun ppf n -> Format.fprintf ppf "Unknown primitive %s." n)
+    ~pp:(fun ppf n -> Format.fprintf ppf "Unknown primitive %s.@," n)
     Data_encoding.(obj1 (req "wrongPrimitiveName" string))
     (function
       | Unknown_primitive_name got -> Some got

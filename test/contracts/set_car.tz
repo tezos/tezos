@@ -1,4 +1,4 @@
 parameter string;
 storage (pair string nat);
 return (pair string nat);
-code {DUP; CDR; DIP{CAR}; SET_CAR; DUP; PAIR};
+code { DUP; CDR; DIP{CAR}; SET_CAR @hello; DUP; PAIR };
