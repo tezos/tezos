@@ -9,6 +9,14 @@
 
 (* TODO decide whether we need to preallocate buffers or not. *)
 
+let () =
+  (* Otherwise some writes trigger a SIGPIPE instead of raising an
+     Lwt_unit exception. In the node, this is already done by
+     Cohttp, so this is only useful when using the P2P layer as a
+     stand alone library.  *)
+  if Sys.os_type <> "Win32" then
+    Sys.(set_signal sigpipe Signal_ignore)
+
 open P2p_types
 include Logging.Make (struct let name = "p2p.io-scheduler" end)
 
