@@ -176,8 +176,8 @@ How to play with smart-contracts ?
 
 An advanced documentation of the smart contract language is in
 
-  `/src/proto/alpha/docs/language.md`
-  
+  `/docs/language.md`
+
 Some test contracts are in
 
    `/tests/contracts/`
