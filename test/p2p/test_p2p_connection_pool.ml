@@ -124,10 +124,23 @@ module Simple = struct
              | P2p_connection.Rejected
              | Lwt_utils.Canceled
              | Lwt_utils.Timeout
-             | P2p_connection_pool.Rejected _
-             ] as err) ->
-        lwt_log_info "@[Connection to %a failed:@ %a@]"
-          Point.pp point pp_print_error err >>= fun () ->
+             | P2p_connection_pool.Rejected _ as err ]) ->
+        lwt_log_info "Connection to %a failed (%a)"
+          Point.pp point
+          (fun ppf err -> match err with
+             | P2p_connection_pool.Connection_refused ->
+                 Format.fprintf ppf "connection refused"
+             | P2p_connection_pool.Pending_connection ->
+                 Format.fprintf ppf "pending connection"
+             | P2p_connection.Rejected ->
+                 Format.fprintf ppf "rejected"
+             | Lwt_utils.Canceled ->
+                 Format.fprintf ppf "canceled"
+             | Lwt_utils.Timeout ->
+                 Format.fprintf ppf "timeout"
+             | P2p_connection_pool.Rejected peer ->
+                 Format.fprintf ppf "rejected (%a)" Peer_id.pp peer
+             | _ -> assert false) err >>= fun () ->
         Lwt_unix.sleep (0.5 +. Random.float 2.) >>= fun () ->
         connect ~timeout pool point
     | Ok _ | Error _ as res -> Lwt.return res
@@ -233,6 +246,8 @@ module Garbled = struct
   let run points = detach_nodes node points
 
 end
+
+let () = Random.self_init ()
 
 let addr = ref Ipaddr.V6.localhost
 let port = ref (1024 + Random.int 8192)

@@ -12,6 +12,8 @@ let () = Lwt_unix.set_default_async_method Async_none
 include Logging.Make (struct let name = "process" end)
 
 exception Exited of int
+exception Signaled of int
+exception Stopped of int
 
 let handle_error f =
   Lwt.catch
@@ -42,9 +44,10 @@ let wait pid =
            return ()
        | (_,Lwt_unix.WEXITED n) ->
            fail (Exn (Exited n))
-       | (_,Lwt_unix.WSIGNALED _)
-       | (_,Lwt_unix.WSTOPPED _) ->
-           Lwt.fail Exit)
+       | (_,Lwt_unix.WSIGNALED n) ->
+           fail (Exn (Signaled n))
+       | (_,Lwt_unix.WSTOPPED n) ->
+           fail (Exn (Stopped n)))
     (function
       | Lwt.Canceled ->
           Unix.kill pid Sys.sigkill ;
@@ -70,7 +73,7 @@ let detach ?(prefix = "") f =
         Lwt_io.close main_in >>= fun () ->
         Lwt_io.close main_out >>= fun () ->
         Logging.init ~template Stderr >>= fun () ->
-        lwt_log_info "PID: %d" (Unix.getpid ()) >>= fun () ->
+        lwt_log_notice "PID: %d" (Unix.getpid ()) >>= fun () ->
         handle_error (fun () -> f (child_in, child_out))
       end ;
       exit 0
@@ -78,7 +81,39 @@ let detach ?(prefix = "") f =
       let termination = wait pid in
       Lwt_io.close child_in >>= fun () ->
       Lwt_io.close child_out >>= fun () ->
-      Lwt.return { termination ; channel = (main_in, main_out) }
+      Lwt.return ({ termination ; channel = (main_in, main_out) })
+
+let signal_name =
+  let names =
+    [ Sys.sigabrt, "ABRT" ;
+      Sys.sigalrm, "ALRM" ;
+      Sys.sigfpe, "FPE" ;
+      Sys.sighup, "HUP" ;
+      Sys.sigill, "ILL" ;
+      Sys.sigint, "INT" ;
+      Sys.sigkill, "KILL" ;
+      Sys.sigpipe, "PIPE" ;
+      Sys.sigquit, "QUIT" ;
+      Sys.sigsegv, "SEGV" ;
+      Sys.sigterm, "TERM" ;
+      Sys.sigusr1, "USR1" ;
+      Sys.sigusr2, "USR2" ;
+      Sys.sigchld, "CHLD" ;
+      Sys.sigcont, "CONT" ;
+      Sys.sigstop, "STOP" ;
+      Sys.sigtstp, "TSTP" ;
+      Sys.sigttin, "TTIN" ;
+      Sys.sigttou, "TTOU" ;
+      Sys.sigvtalrm, "VTALRM" ;
+      Sys.sigprof, "PROF" ;
+      Sys.sigbus, "BUS" ;
+      Sys.sigpoll, "POLL" ;
+      Sys.sigsys, "SYS" ;
+      Sys.sigtrap, "TRAP" ;
+      Sys.sigurg, "URG" ;
+      Sys.sigxcpu, "XCPU" ;
+      Sys.sigxfsz, "XFSZ" ] in
+  fun n -> List.assoc n names
 
 let wait_all processes =
   let rec loop processes =
@@ -102,8 +137,18 @@ let wait_all processes =
       List.iter Lwt.cancel remaining ;
       join remaining >>= fun _ ->
       failwith "A process finished with error %d !" n
+  | Some ([Exn (Signaled n)], remaining) ->
+      lwt_log_error "Early error!" >>= fun () ->
+      List.iter Lwt.cancel remaining ;
+      join remaining >>= fun _ ->
+      failwith "A process was killed by a SIG%s !" (signal_name n)
+  | Some ([Exn (Stopped n)], remaining) ->
+      lwt_log_error "Early error!" >>= fun () ->
+      List.iter Lwt.cancel remaining ;
+      join remaining >>= fun _ ->
+      failwith "A process was stopped by a SIG%s !" (signal_name n)
   | Some (err, remaining) ->
-      lwt_log_error "Unexpected error!%a"
+      lwt_log_error "@[<v 2>Unexpected error!@,%a@]"
         pp_print_error err >>= fun () ->
       List.iter Lwt.cancel remaining ;
       join remaining >>= fun _ ->
