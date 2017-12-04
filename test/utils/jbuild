@@ -5,7 +5,9 @@
           test_lwt_pipe
           test_merkle
           test_stream_data_encoding
-          test_utils))
+          test_utils
+          bench_data_encoding
+          test_mbytes_buffer))
   (libraries (tezos-base test_lib))
   (flags (:standard -w -9-32
                     -safe-string
@@ -17,7 +19,8 @@
           test_lwt_pipe.exe
           test_merkle.exe
           test_stream_data_encoding.exe
-          test_utils.exe))))
+          test_utils.exe
+          test_mbytes_buffer.exe))))
 
 (alias
  ((name runtest_data_encoding)
@@ -40,12 +43,17 @@
   (action (run ${exe:test_utils.exe}))))
 
 (alias
+ ((name runtest_mbytes_buffer)
+  (action (run ${exe:test_mbytes_buffer.exe}))))
+
+(alias
  ((name runtest)
   (deps ((alias runtest_data_encoding)
          (alias runtest_lwt_pipe)
          (alias runtest_merkle)
          (alias runtest_stream_data_encoding)
-         (alias runtest_utils)))))
+         (alias runtest_utils)
+         (alias runtest_mbytes_buffer)))))
 
 (alias
  ((name runtest_indent)

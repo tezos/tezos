@@ -364,6 +364,53 @@ let test_out_of_range _ =
   assert_exception enc_float 100.1 ;
   Lwt.return_unit
 
+let test_string_enum_boundary _ =
+  let open Data_encoding in
+  let entries = List.rev_map (fun x -> string_of_int x, x) (0 -- 254) in
+  let run_test cases =
+    List.iter (fun (_, num)  ->
+        let enc = string_enum cases in
+        let encoded = Data_encoding.Binary.to_bytes enc num in
+        let decoded = Data_encoding.Binary.of_bytes_exn enc encoded in
+        Assert.equal num decoded) cases in
+  run_test entries ;
+  let entries2 = (("255", 255) :: entries) in
+  run_test entries2 ;
+  run_test (("256", 256) :: entries2) ;
+  Lwt.return_unit
+
+(** Generate encodings of the encoding and the randomized generator *)
+let test_generator ?(iterations=50) encoding generator =
+  for _ = 0 to iterations - 1 do
+    let encode = generator () in
+    let bytes = Data_encoding.Binary.to_bytes encoding encode in
+    let decode = Data_encoding.Binary.of_bytes_exn encoding bytes in
+    Assert.equal encode decode
+  done ;
+  Lwt.return ()
+
+let rec make_int_list acc len () =
+  if len = 0
+  then acc
+  else make_int_list (Random.int64 Int64.max_int :: acc) (len - 1) ()
+
+let test_randomized_int_list _ =
+  test_generator Data_encoding.(list int64) (make_int_list [] 100)
+
+let test_randomized_string_list _ =
+  test_generator (list string) (fun () -> List.map Int64.to_string (make_int_list [] 100 ()))
+
+let test_randomized_variant_list _ =
+  test_generator (list (result (option string) string))
+    (fun () ->
+       List.map
+         (fun x ->
+            let str = Int64.to_string x in
+            if Random.bool ()
+            then if Random.bool () then Ok (Some str) else Ok None
+            else Error str)
+         (make_int_list [] 100 ()))
+
 let tests = [
   "simple", test_simple_values ;
   "json", test_json ;
@@ -373,7 +420,12 @@ let tests = [
   "tags", test_tag_errors ;
   "wrapped_binary", test_wrapped_binary ;
   "out_of_range", test_out_of_range ;
+  "string_enum_boundary", test_string_enum_boundary ;
+  "randomized_int_list", test_randomized_int_list ;
+  "randomized_string_list", test_randomized_string_list ;
+  "randomized_variant_list", test_randomized_variant_list ;
 ]
 
 let () =
+  Random.init 100 ;
   Test.run "data_encoding." (List.map (fun (s, f) -> s, wrap_test f) tests)

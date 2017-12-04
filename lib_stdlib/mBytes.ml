@@ -73,11 +73,6 @@ let substring src srcoff len =
 
 include EndianBigstring.BigEndian
 
-let of_float f =
-  let buf = create 8 in
-  set_float buf 0 f;
-  buf
-
 module LE = struct
   include EndianBigstring.LittleEndian
 end

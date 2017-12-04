@@ -14,7 +14,7 @@
 
 open Bigarray
 
-(* Arrays are of characters, represented as uint8's, in row-major layout. *)
+(** Arrays are of characters, represented as uint8's, in row-major layout. *)
 type t = (char, int8_unsigned_elt, c_layout) Array1.t
 
 val create: int -> t
@@ -108,8 +108,6 @@ val set_float: t -> int -> float -> unit
 
 val set_double: t -> int -> float -> unit
 (** [set_double buff i v] writes [v] to [buff] at offset [i] *)
-
-val of_float: float -> t
 
 module LE: sig
 

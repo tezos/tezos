@@ -36,6 +36,15 @@ let apply ?(error=No_case_matched) fs v =
         | None -> loop fs in
   loop fs
 
+let apply_map ?(error=No_case_matched) f fs v =
+  let rec loop = function
+    | [] -> raise error
+    | x :: fs ->
+        match (f x) v with
+        | Some l -> l
+        | None -> loop fs in
+  loop fs
+
 module Size = struct
   let bool = 1
   let int8 = 1
@@ -131,7 +140,7 @@ type 'a desc =
   | Float : float desc
   | Bytes : Kind.length -> MBytes.t desc
   | String : Kind.length -> string desc
-  | String_enum : Kind.length * (string * 'a) list -> 'a desc
+  | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
   | Array : 'a t -> 'a array desc
   | List : 'a t -> 'a list desc
   | Obj : 'a field -> 'a desc
@@ -211,6 +220,9 @@ let range_to_size ~minimum ~maximum : integer =
   then signed_range_to_size minimum maximum
   else unsigned_range_to_size (maximum - minimum)
 
+let enum_size arr =
+  unsigned_range_to_size (Array.length arr)
+
 type 'a encoding = 'a t
 
 let rec classify : type a. a t -> Kind.t = fun e ->
@@ -234,7 +246,8 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   (* Tagged *)
   | Bytes kind -> (kind :> Kind.t)
   | String kind -> (kind :> Kind.t)
-  | String_enum (kind, _) -> (kind :> Kind.t)
+  | String_enum (_, cases) ->
+      `Fixed (integer_to_size (enum_size cases))
   | Obj (Opt (kind, _, _)) -> (kind :> Kind.t)
   | Objs (kind, _, _) -> kind
   | Tups (kind, _, _) -> kind
@@ -384,7 +397,7 @@ module Json = struct
     | RangedFloat { minimum; maximum } -> ranged_float ~minimum ~maximum "rangedFloat"
     | String _ -> string (* TODO: check length *)
     | Bytes _ -> bytes_jsont (* TODO check length *)
-    | String_enum (_, l) -> string_enum l
+    | String_enum (tbl, _) -> string_enum (Hashtbl.fold (fun a (str, _) acc -> (str, a) :: acc) tbl [])
     | Array e -> array (get_json e)
     | List e -> list (get_json e)
     | Obj f -> obj1 (field_json f)
@@ -487,7 +500,6 @@ module Encoding = struct
     let list e =
       check_not_variable "a list" e ;
       make @@ List e
-    let string_enum l = make @@ String_enum (`Variable, l)
   end
 
   let dynamic_size e =
@@ -520,10 +532,14 @@ module Encoding = struct
   let array e = dynamic_size (Variable.array e)
   let list e = dynamic_size (Variable.list e)
 
+  let string_enum cases =
+    let arr = Array.of_list (List.map snd cases) in
+    let tbl = Hashtbl.create (Array.length arr) in
+    List.iteri (fun ind (str, a) -> Hashtbl.add tbl a (str, ind)) cases ;
+    make @@ String_enum (tbl, arr)
+
   let conv proj inj ?schema encoding =
     make @@ Conv { proj ; inj ; encoding ; schema }
-
-  let string_enum l = dynamic_size (Variable.string_enum l)
 
   let describe ?title ?description encoding =
     match title, description with
@@ -827,7 +843,8 @@ module Binary = struct
     | RangedFloat _ -> fun _ -> Size.float
     | Bytes `Fixed n -> fun _ -> n
     | String `Fixed n -> fun _ -> n
-    | String_enum (`Fixed n, _) -> fun _ -> n
+    | String_enum (_, arr) ->
+        fun _ -> integer_to_size @@ enum_size arr
     | Objs (`Fixed n, _, _) -> fun _ -> n
     | Tups (`Fixed n, _, _) -> fun _ -> n
     | Union (`Fixed n, _, _) -> fun _ -> n
@@ -841,8 +858,9 @@ module Binary = struct
         let length2 = length e2 in
         fun (v1, v2) -> length1 v1 + length2 v2
     | Union (`Dynamic, sz, cases) ->
+        let tag_size = tag_size sz in
         let case_length (Case { encoding = e ; proj }) =
-          let length v = tag_size sz + length e v in
+          let length v = tag_size + length e v in
           fun v -> Option.map ~f:length (proj v) in
         apply (List.map case_length cases)
     | Mu (`Dynamic, _name, self) ->
@@ -854,13 +872,6 @@ module Binary = struct
     | Ignore -> fun _ -> 0
     | Bytes `Variable -> MBytes.length
     | String `Variable -> String.length
-    | String_enum (`Variable, l) -> begin
-        fun v ->
-          try
-            let l = List.map (fun (x,y) -> (y,x)) l in
-            String.length (List.assoc v l)
-          with Not_found -> raise No_case_matched
-      end
     | Array e ->
         let length = length e in
         fun v ->
@@ -1023,6 +1034,80 @@ module Binary = struct
 
   end
 
+  module BufferedWriter = struct
+
+    let int8 v buf =
+      if (v < - (1 lsl 7) || v >= 1 lsl 7) then
+        invalid_arg "Data_encoding.Binary.Writer.int8" ;
+      MBytes_buffer.write_int8 buf v
+
+    let uint8 v buf =
+      if (v < 0 || v >= 1 lsl 8) then
+        invalid_arg "Data_encoding.Binary.Writer.uint8" ;
+      MBytes_buffer.write_int8 buf v
+
+    let char v buf =
+      MBytes_buffer.write_char buf v
+
+    let bool v buf =
+      uint8 (if v then 255 else 0) buf
+
+    let int16 v buf =
+      if (v < - (1 lsl 15) || v >= 1 lsl 15) then
+        invalid_arg "Data_encoding.Binary.Writer.int16" ;
+      MBytes_buffer.write_int16 buf v
+
+    let uint16 v buf =
+      if (v < 0 || v >= 1 lsl 16) then
+        invalid_arg "Data_encoding.Binary.Writer.uint16" ;
+      MBytes_buffer.write_int16 buf v
+
+    let int31 v buf =
+      MBytes_buffer.write_int32 buf (Int32.of_int v)
+
+    let int32 v buf =
+      MBytes_buffer.write_int32 buf v
+
+    let int64 v buf =
+      MBytes_buffer.write_int64 buf v
+
+    (** write a float64 (double) **)
+    let float v buf =
+      MBytes_buffer.write_double buf v
+
+    let fixed_kind_bytes length s buf =
+      MBytes_buffer.write_mbytes buf s 0 length
+
+    let variable_length_bytes s buf =
+      let length = MBytes.length s in
+      MBytes_buffer.write_mbytes buf s 0 length
+
+    let fixed_kind_string length s buf =
+      if String.length s <> length then invalid_arg "fixed_kind_string";
+      MBytes_buffer.write_string_data buf s
+
+    let variable_length_string s buf =
+      MBytes_buffer.write_string_data buf s
+
+    let write_tag = function
+      | `Uint8 -> uint8
+      | `Uint16 -> uint16
+
+  end
+
+  let rec assoc_snd target = function
+    | [] -> raise No_case_matched
+    | (value, hd) :: tl ->
+        if hd = target
+        then value
+        else assoc_snd target tl
+
+  let get_string_enum_case tbl v =
+    try
+      snd (Hashtbl.find tbl v)
+    with _ ->
+      raise No_case_matched
+
   let rec write_rec
     : type a. a t -> a -> MBytes.t -> int -> int = fun e ->
     let open Writer in
@@ -1065,13 +1150,14 @@ module Binary = struct
     | String `Variable -> variable_length_string
     | Array t -> array (write_rec t)
     | List t -> list (write_rec t)
-    | String_enum (kind, l) -> begin
-        fun v ->
-          try
-            let l = List.map (fun (x,y) -> (y,x)) l in
-            write_rec (make @@ String kind) (List.assoc v l)
-          with Not_found -> raise No_case_matched
-      end
+    | String_enum (tbl, arr) ->
+        (fun v ->
+           let value = get_string_enum_case tbl v in
+           match enum_size arr with
+           | `Int64 -> int64 (Int64.of_int value)
+           | `Uint16 -> uint16 value
+           | `Uint8 -> uint8 value
+           | `Int32 -> int32 (Int32.of_int value))
     | Obj (Req (_, e)) -> write_rec e
     | Obj (Opt (`Dynamic, _, e)) ->
         let write = write_rec e in
@@ -1100,16 +1186,112 @@ module Binary = struct
           int32 (Int32.of_int @@ length v) buf ofs |> write v buf
     | Delayed f -> write_rec (f ())
 
+  let rec write_rec_buffer
+    : type a. a encoding -> a -> MBytes_buffer.t -> unit =
+    fun encoding value buffer ->
+      let open BufferedWriter in
+      match encoding.encoding with
+      | Null -> ()
+      | Empty -> ()
+      | Constant _ -> ()
+      | Ignore -> ()
+      | Bool -> bool value buffer
+      | Int8 -> int8 value buffer
+      | Uint8 -> uint8 value buffer
+      | Int16 -> int16 value buffer
+      | Uint16 -> uint16 value buffer
+      | Int31 -> int31 value buffer
+      | Int32 -> int32 value buffer
+      | Int64 -> int64 value buffer
+      | Float -> float value buffer
+      | Bytes (`Fixed n) -> fixed_kind_bytes n value buffer
+      | String (`Fixed n) -> fixed_kind_string n value buffer
+      | Bytes `Variable -> variable_length_bytes value buffer
+      | String `Variable -> variable_length_string value buffer
+      | Array t -> Array.iter (fun x -> write_rec_buffer t x buffer) value
+      | List t -> List.iter (fun x -> write_rec_buffer t x buffer) value
+      | RangedInt { minimum ; maximum } ->
+          if value < minimum || value > maximum
+          then invalid_arg (Printf.sprintf "Integer %d not in range [%d, %d]."
+                              value minimum maximum) ;
+          let value = if minimum >= 0 then value - minimum else value in
+          begin
+            match range_to_size ~minimum ~maximum with
+            | `Uint16 -> uint16 value buffer
+            | `Uint8 -> uint8 value buffer
+            | `Int8 -> int8 value buffer
+            | `Int64 -> int64 (Int64.of_int value) buffer
+            | `Int16 -> int16 value buffer
+            | `Int32 -> int32 (Int32.of_int value) buffer
+          end
+      | RangedFloat { minimum ; maximum } ->
+          if value < minimum || value > maximum
+          then invalid_arg (Printf.sprintf "Float %f not in range [%f, %f]."
+                              value minimum maximum) ;
+          float value buffer
+      | String_enum (tbl, arr) ->
+          (match enum_size arr with
+           | `Uint16 -> BufferedWriter.uint16
+           | `Uint8 -> BufferedWriter.uint8
+           | `Int64 -> (fun x -> BufferedWriter.int64 (Int64.of_int x))
+           | `Int32 -> (fun x -> BufferedWriter.int32 (Int32.of_int x)))
+            (get_string_enum_case tbl value)
+            buffer
+      | Obj (Req (_, e)) -> write_rec_buffer e value buffer
+      | Obj (Opt (`Dynamic, _, e)) ->
+          (match value with
+           | None -> int8 0 buffer
+           | Some x ->
+               begin
+                 int8 1 buffer ;
+                 write_rec_buffer e x buffer
+               end)
+      | Obj (Opt (`Variable, _, e)) ->
+          (match value with
+           | None -> ()
+           | Some x -> write_rec_buffer e x buffer)
+      | Obj (Dft (_, e, _)) -> write_rec_buffer e value buffer
+      | Objs (_, e1, e2) ->
+          let v1, v2 = value in
+          write_rec_buffer e1 v1 buffer ;
+          write_rec_buffer e2 v2 buffer
+      | Tup e -> write_rec_buffer e value buffer
+      | Tups (_, e1, e2) ->
+          let v1, v2 = value in
+          write_rec_buffer e1 v1 buffer ;
+          write_rec_buffer e2 v2 buffer
+      | Conv { encoding = e; proj } ->
+          write_rec_buffer e (proj value) buffer
+      | Describe { encoding = e } -> write_rec_buffer e value buffer
+      | Def { encoding = e } -> write_rec_buffer e value buffer
+      | Splitted { encoding = e } -> write_rec_buffer e value buffer
+      | Union (_, sz, cases) ->
+          let rec write_case = function
+            | [] -> raise No_case_matched
+            | Case { tag = Json_only } :: tl -> write_case tl
+            | Case { encoding = e ; proj ; tag = Tag tag } :: tl ->
+                begin
+                  match proj value with
+                  | None -> write_case tl
+                  | Some data ->
+                      write_tag sz tag buffer ;
+                      write_rec_buffer e data buffer
+                end  in
+          write_case cases
+      | Mu (_, _, self) ->
+          write_rec_buffer (self encoding) value buffer
+      | Dynamic_size e ->
+          MBytes_buffer.write_sized buffer (fun () -> write_rec_buffer e value buffer)
+      | Delayed f -> write_rec_buffer (f ()) value buffer
+
   let write t v buf ofs =
     try Some (write_rec t v buf ofs)
     with _ -> None
 
   let to_bytes t v =
-    let length = length t v in
-    let bytes = MBytes.create length in
-    let ofs = write_rec t v bytes 0 in
-    assert(ofs = length);
-    bytes
+    let bytes = MBytes_buffer.create () in
+    write_rec_buffer t v bytes ;
+    MBytes_buffer.to_mbytes bytes
 
   let to_bytes_list ?(copy_blocks=false) block_sz t v =
     assert (block_sz > 0);
@@ -1288,11 +1470,17 @@ module Binary = struct
     | String (`Fixed n) -> fixed_length_string n
     | Bytes `Variable -> fun buf ofs len -> fixed_length_bytes len buf ofs len
     | String `Variable -> fun buf ofs len -> fixed_length_string len buf ofs len
-    | String_enum (kind, l) -> begin
-        fun buf ofs len ->
-          let ofs, str = read_rec (make @@ (String kind)) buf ofs len in
-          try ofs, List.assoc str l
-          with Not_found -> raise (Unexpected_enum (str, List.map fst l))
+    | String_enum (_, arr) -> begin
+        fun buf ofs a ->
+          let ofs, ind =
+            match enum_size arr with
+            | `Uint8 -> uint8 buf ofs a
+            | `Uint16 -> uint16 buf ofs a
+            | `Int64 -> let ofs, i64 = int64 buf ofs a in (ofs, Int64.to_int i64)
+            | `Int32 -> let ofs, i64 = int32 buf ofs a in (ofs, Int32.to_int i64) in
+          if ind >= Array.length arr
+          then raise No_case_matched
+          else (ofs, arr.(ind))
       end
     | Array e -> array (read_rec e)
     | List e -> list (read_rec e)
@@ -1563,9 +1751,13 @@ module Binary = struct
           | String `Variable ->
               next_path path (fst (fixed_length_string len buf))
 
-          | String_enum (kind, _) -> (* ! approx! *)
-              data_checker path (make @@ (String kind)) buf len
-
+          | String_enum (_, arr) ->
+              next_path path
+                (match enum_size arr with
+                 | `Int64 -> fst @@ int64 buf
+                 | `Uint16 -> fst @@ uint16 buf
+                 | `Uint8 -> fst @@ uint8 buf
+                 | `Int32 -> fst @@ int32 buf)
           | Array e ->
               let p = P_list { path ; encoding = e ; base_ofs = buf.ofs ;
                                data_len = len ; nb_elts_read = 0 } in
