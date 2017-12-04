@@ -143,6 +143,12 @@ val result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
 val string_enum : (string * 'a) list -> 'a encoding
 
 
+(** Is the given encoding serialized as a JSON object? *)
+val is_obj : 'a encoding -> bool
+
+(** Does the given encoding encode a tuple? *)
+val is_tup : 'a encoding -> bool
+
 (** Create encodings that produce data of a fixed length when binary encoded.
     See the preamble for an explanation. *)
 module Fixed : sig

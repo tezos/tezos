@@ -60,6 +60,11 @@ module Make() = struct
       invalid_arg
         (Printf.sprintf
            "register_error_kind: duplicate error name: %s" name) ;
+    if not (Data_encoding.is_obj encoding)
+    then invalid_arg
+        (Printf.sprintf
+           "Specified encoding for \"%s\" is not an object, but error encodings must be objects."
+           name) ;
     let encoding_case =
       let open Data_encoding in
       case

@@ -550,18 +550,29 @@ module Encoding = struct
   let obj10 f10 f9 f8 f7 f6 f5 f4 f3 f2 f1 =
     raw_merge_objs (obj2 f10 f9) (obj8 f8 f7 f6 f5 f4 f3 f2 f1)
 
+  let rec is_obj : type a. a t -> bool = fun e ->
+    match e.encoding with
+    | Obj _ -> true
+    | Objs _ (* by construction *) -> true
+    | Conv { encoding = e } -> is_obj e
+    | Dynamic_size e  -> is_obj e
+    | Union (_,_,cases) ->
+        List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
+    | Empty -> true
+    | Ignore -> true
+    | _ -> false
+
+  let rec is_tup : type a. a t -> bool = fun e ->
+    match e.encoding with
+    | Tup _ -> true
+    | Tups _ (* by construction *) -> true
+    | Conv { encoding = e } -> is_tup e
+    | Dynamic_size e  -> is_tup e
+    | Union (_,_,cases) ->
+        List.for_all (function Case { encoding = e} -> is_tup e) cases
+    | _ -> false
+
   let merge_objs o1 o2 =
-    let rec is_obj : type a. a t -> bool = fun e ->
-      match e.encoding with
-      | Obj _ -> true
-      | Objs _ (* by construction *) -> true
-      | Conv { encoding = e } -> is_obj e
-      | Dynamic_size e  -> is_obj e
-      | Union (_,_,cases) ->
-          List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
-      | Empty -> true
-      | Ignore -> true
-      | _ -> false in
     if is_obj o1 && is_obj o2 then
       raw_merge_objs o1 o2
     else
@@ -592,15 +603,6 @@ module Encoding = struct
     raw_merge_tups (tup2 e10 e9) (tup8 e8 e7 e6 e5 e4 e3 e2 e1)
 
   let merge_tups t1 t2 =
-    let rec is_tup : type a. a t -> bool = fun e ->
-      match e.encoding with
-      | Tup _ -> true
-      | Tups _ (* by construction *) -> true
-      | Conv { encoding = e } -> is_tup e
-      | Dynamic_size e  -> is_tup e
-      | Union (_,_,cases) ->
-          List.for_all (function Case { encoding = e} -> is_tup e) cases
-      | _ -> false in
     if is_tup t1 && is_tup t2 then
       raw_merge_tups t1 t2
     else
