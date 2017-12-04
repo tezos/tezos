@@ -90,7 +90,7 @@ let default_config = {
 }
 
 type rpc_error =
-  | Cannot_connect_to_RPC_server of string
+  | Connection_failed of string
   | Request_failed of string list * Cohttp.Code.status_code
   | Malformed_json of string list * string * string
   | Unexpected_json of string list * Data_encoding.json * string
@@ -102,10 +102,10 @@ let rpc_error_encoding =
   union
     [ case ~tag: 1
         (obj2
-           (req "rpc_error_kind" (constant "cannot_connect"))
+           (req "rpc_error_kind" (constant "connection_failed"))
            (req "message" string))
-        (function Cannot_connect_to_RPC_server msg -> Some ((), msg) | _ -> None)
-        (function (), msg -> Cannot_connect_to_RPC_server msg) ;
+        (function Connection_failed msg -> Some ((), msg) | _ -> None)
+        (function (), msg -> Connection_failed msg) ;
       case ~tag: 2
         (obj3
            (req "rpc_error_kind" (constant "request_failed"))
@@ -137,8 +137,13 @@ let pp_error ppf (config, err) =
       config.host config.port
       (String.concat "/" path) in
   match err with
-  | Cannot_connect_to_RPC_server msg ->
-      Format.fprintf ppf "Cannot contact RPC server: %s" msg
+  | Connection_failed msg ->
+      Format.fprintf ppf
+        "@[<v 2>Unable to connect to the node:@,\
+         Node's address: %s@,\
+         Node's RPC port: %d@,\
+         Error: %s@]"
+        config.host config.port msg
   | Request_failed (path, code) ->
       let code = Cohttp.Code.code_of_status code in
       Format.fprintf ppf "@[<v 2>RPC Request failed:@,\
@@ -232,8 +237,10 @@ class rpc config = object (self)
       end begin fun exn ->
         let msg = match exn with
           | Unix.Unix_error (e, _, _) -> Unix.error_message e
+          | Failure msg -> msg
+          | Invalid_argument msg -> msg
           | e -> Printexc.to_string e in
-        fail config (Cannot_connect_to_RPC_server msg)
+        fail config (Connection_failed msg)
       end
 
   method get_streamed_json meth service json =
@@ -334,7 +341,7 @@ let make_request config log_request meth service json =
     let msg = match exn with
       | Unix.Unix_error (e, _, _) -> Unix.error_message e
       | e -> Printexc.to_string e in
-    fail config (Cannot_connect_to_RPC_server msg)
+    fail config (Connection_failed msg)
   end
 
 let call_service0 (rpc : #rpc_sig) service arg =
