@@ -188,64 +188,6 @@ let compile_ml ?for_pack ml =
   Clflags.for_package := None ;
   target ^ ".cmx"
 
-module Meta = struct
-
-  let name = "TEZOS_PROTOCOL"
-
-  let config_file_encoding =
-    let open Data_encoding in
-    obj3
-      (opt "hash"
-         ~description:"Used to force the hash of the protocol"
-         Protocol_hash.encoding)
-      (opt "expected_env_version"
-         Protocol.env_version_encoding)
-      (req "modules"
-         ~description:"Modules comprising the protocol"
-         (list string))
-
-  let to_file dirname ?hash ?env_version modules =
-    let config_file =
-      Data_encoding.Json.construct
-        config_file_encoding
-        (hash, env_version, modules) in
-    Utils.write_file ~bin:false (dirname // name) @@
-    Data_encoding_ezjsonm.to_string config_file
-
-  let of_file dirname =
-    Utils.read_file ~bin:false (dirname // name) |>
-    Data_encoding_ezjsonm.from_string |> function
-    | Error err -> Pervasives.failwith err
-    | Ok json -> Data_encoding.Json.destruct config_file_encoding json
-
-end
-
-let find_component dirname module_name =
-  let open Protocol in
-  let name_lowercase = String.uncapitalize_ascii module_name in
-  let implementation = dirname // name_lowercase ^ ".ml" in
-  let interface = implementation ^ "i" in
-  match Sys.file_exists implementation, Sys.file_exists interface with
-  | false, _ -> Pervasives.failwith @@ "Not such file: " ^ implementation
-  | true, false ->
-      let implementation = Utils.read_file ~bin:false implementation in
-      { name = module_name; interface = None; implementation }
-  | _ ->
-      let interface = Utils.read_file ~bin:false interface in
-      let implementation = Utils.read_file ~bin:false implementation in
-      { name = module_name; interface = Some interface; implementation }
-
-let read_dir dirname =
-  let hash, expected_env, modules = Meta.of_file dirname in
-  let components = List.map (find_component dirname) modules in
-  let expected_env = match expected_env with None -> Protocol.V1 | Some v -> v in
-  let protocol = Protocol.{ expected_env ; components } in
-  let hash =
-    match hash with
-    | None -> Protocol.hash protocol
-    | Some hash -> hash in
-  hash, protocol
-
 (** Main *)
 
 let mktemp_dir () =
@@ -282,7 +224,7 @@ let main () =
     | Some dir -> dir in
   Lwt_main.run (Lwt_utils.create_dir ~perm:0o755 build_dir) ;
   Lwt_main.run (Lwt_utils.create_dir ~perm:0o755 (Filename.dirname output)) ;
-  let hash, protocol = read_dir source_dir in
+  let hash, protocol = Protocol.read_dir source_dir in
   (* Generate the 'functor' *)
   let functor_file = build_dir // "functor.ml" in
   let oc = open_out functor_file in

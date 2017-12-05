@@ -44,46 +44,17 @@ let get_datadir () =
 let init dir =
   datadir := Some dir
 
-let create_files dir units =
-  Lwt_utils.remove_dir dir >>= fun () ->
-  Lwt_utils.create_dir dir >>= fun () ->
-  Lwt_list.map_s
-    (fun { Protocol.name; interface; implementation } ->
-       let name = String.lowercase_ascii name in
-       let ml = dir // (name ^ ".ml") in
-       let mli = dir // (name ^ ".mli") in
-       Lwt_utils.create_file ml implementation >>= fun () ->
-       match interface with
-       | None -> Lwt.return [ml]
-       | Some content ->
-           Lwt_utils.create_file mli content >>= fun () ->
-           Lwt.return [mli;ml])
-    units >>= fun files ->
-  let files = List.concat files in
-  Lwt.return files
-
-let extract dir ?hash (p: Protocol.t) =
-  create_files dir p.components >>= fun _files ->
-  Tezos_protocol_compiler.Native.Meta.to_file dir
-    ?hash
-    ~env_version:p.expected_env
-    (List.map (fun {Protocol.name} -> String.capitalize_ascii name) p.components) ;
-  Lwt.return_unit
-
 let compiler_name = "tezos-protocol-compiler"
 
 let do_compile hash p =
   assert (p.Protocol.expected_env = V1) ;
-  let units = p.components in
   let datadir = get_datadir () in
   let source_dir = datadir // Protocol_hash.to_short_b58check hash // "src" in
   let log_file = datadir // Protocol_hash.to_short_b58check hash // "LOG" in
   let plugin_file = datadir // Protocol_hash.to_short_b58check hash //
                     Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp hash
   in
-  create_files source_dir units >>= fun _files ->
-  Tezos_protocol_compiler.Native.Meta.to_file source_dir ~hash
-    (List.map (fun {Protocol.name} -> String.capitalize_ascii name) units);
+  Protocol.write_dir source_dir ~hash p >>= fun () ->
   let compiler_command =
     (Sys.executable_name,
      Array.of_list [compiler_name; plugin_file; source_dir]) in

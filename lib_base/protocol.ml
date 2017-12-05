@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+let (//) = Filename.concat
+
 type t = {
   expected_env: env_version ;
   components: component list ;
@@ -69,3 +71,104 @@ let of_bytes b = Data_encoding.Binary.of_bytes encoding b
 let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
 let hash proto = Protocol_hash.hash_bytes [to_bytes proto]
 let hash_raw proto = Protocol_hash.hash_bytes [proto]
+
+module Meta = struct
+
+  type t = {
+    hash: Protocol_hash.t option ;
+    expected_env_version: env_version option ;
+    modules: string list ;
+  }
+
+  let name = "TEZOS_PROTOCOL"
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun { hash ; expected_env_version ; modules } ->
+         (hash, expected_env_version, modules))
+      (fun (hash, expected_env_version, modules) ->
+         { hash ; expected_env_version ; modules }) @@
+    obj3
+      (opt "hash"
+         ~description:"Used to force the hash of the protocol"
+         Protocol_hash.encoding)
+      (opt "expected_env_version"
+         env_version_encoding)
+      (req "modules"
+         ~description:"Modules comprising the protocol"
+         (list string))
+
+  let to_file ~dir:dirname ?hash ?env_version modules =
+    let config_file =
+      Data_encoding.Json.construct
+        encoding
+        { hash ; expected_env_version = env_version ; modules } in
+    Utils.write_file ~bin:false (dirname // name) @@
+    Data_encoding_ezjsonm.to_string config_file
+
+  let of_file ~dir:dirname =
+    Utils.read_file ~bin:false (dirname // name) |>
+    Data_encoding_ezjsonm.from_string |> function
+    | Error err -> Pervasives.failwith err
+    | Ok json -> Data_encoding.Json.destruct encoding json
+
+end
+
+let find_component dirname module_name =
+  let name_lowercase = String.uncapitalize_ascii module_name in
+  let implementation = dirname // name_lowercase ^ ".ml" in
+  let interface = implementation ^ "i" in
+  match Sys.file_exists implementation, Sys.file_exists interface with
+  | false, _ -> Pervasives.failwith @@ "Not such file: " ^ implementation
+  | true, false ->
+      let implementation = Utils.read_file ~bin:false implementation in
+      { name = module_name; interface = None; implementation }
+  | _ ->
+      let interface = Utils.read_file ~bin:false interface in
+      let implementation = Utils.read_file ~bin:false implementation in
+      { name = module_name; interface = Some interface; implementation }
+
+let read_dir dir =
+  let meta = Meta.of_file ~dir in
+  let components = List.map (find_component dir) meta.modules in
+  let expected_env =
+    match meta.expected_env_version with
+    | None -> V1
+    | Some v -> v in
+  let protocol = { expected_env ; components } in
+  let hash =
+    match meta.hash with
+    | None -> hash protocol
+    | Some hash -> hash in
+  hash, protocol
+
+open Lwt.Infix
+
+let create_files dir units =
+  Lwt_utils.remove_dir dir >>= fun () ->
+  Lwt_utils.create_dir dir >>= fun () ->
+  Lwt_list.map_s
+    (fun { name ; interface ; implementation } ->
+       let name = String.lowercase_ascii name in
+       let ml = dir // (name ^ ".ml") in
+       let mli = dir // (name ^ ".mli") in
+       Lwt_utils.create_file ml implementation >>= fun () ->
+       match interface with
+       | None -> Lwt.return [ml]
+       | Some content ->
+           Lwt_utils.create_file mli content >>= fun () ->
+           Lwt.return [ mli ; ml ])
+    units >>= fun files ->
+  let files = List.concat files in
+  Lwt.return files
+
+let write_dir dir ?hash (p: t) =
+  create_files dir p.components >>= fun _files ->
+  Meta.to_file
+    ~dir
+    ?hash
+    ~env_version:p.expected_env
+    (List.map (fun { name ; _ } -> String.capitalize_ascii name) p.components) ;
+  Lwt.return_unit
+

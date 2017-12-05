@@ -27,3 +27,17 @@ include S.HASHABLE with type t := t
                     and type hash := Protocol_hash.t
 val of_bytes_exn: MBytes.t -> t
 
+module Meta: sig
+
+  type t = {
+    hash: Protocol_hash.t option ;
+    expected_env_version: env_version option ;
+    modules: string list ;
+  }
+
+  val encoding: t Data_encoding.t
+
+end
+
+val read_dir: string -> Protocol_hash.t * t
+val write_dir: string -> ?hash:Protocol_hash.t -> t -> unit Lwt.t

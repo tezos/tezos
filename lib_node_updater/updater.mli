@@ -14,7 +14,6 @@ val activate: Context.t -> Protocol_hash.t -> Context.t Lwt.t
 val fork_test_network:
   Context.t -> protocol:Protocol_hash.t -> expiration:Time.t -> Context.t Lwt.t
 
-val extract: Lwt_io.file_name -> ?hash:Protocol_hash.t -> Protocol.t -> unit Lwt.t
 val init: string -> unit
 
 type validation_result = {
