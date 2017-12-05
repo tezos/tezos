@@ -28,7 +28,7 @@ sed -e 's|$base_image|'"$base_image"'|g' \
     scripts/Dockerfile.build_deps.in > Dockerfile
 
 ## Lookup for for prebuilt dependencies...
-dependencies="scripts/install_build_deps.sh tezos.opam Dockerfile"
+dependencies="scripts/install_build_deps.sh scripts/version.sh tezos-deps.opam Dockerfile"
 dependencies_sha1=$(docker inspect --format="{{ .RootFS.Layers }}" --type=image $base_image | sha1sum - $dependencies | sha1sum | tr -d ' -')
 if [ ! -z "$cached_image" ]; then
     echo

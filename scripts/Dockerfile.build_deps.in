@@ -1,7 +1,14 @@
 FROM $base_image
 
+## /!\ /!\ /!\ /!\/!\ /!\ /!\
+## /!\ Don't forget fu update the variables 'dependencies' in
+## /!\ `create_docker_image.build_deps.sh` when modifyiing the
+## /!\  'COPY'edfiles.
+## /!\ /!\ /!\ /!\/!\ /!\ /!\
+
 COPY scripts/install_build_deps.sh scripts/version.sh tezos/scripts/
 COPY tezos-deps.opam tezos/
+
 RUN sudo apk update && \
     opam config exec -- ./tezos/scripts/install_build_deps.sh && \
     opam install ocp-indent && \
