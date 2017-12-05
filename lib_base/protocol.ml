@@ -50,9 +50,31 @@ let encoding =
        (req "expected_env_version" env_version_encoding)
        (req "components" (list component_encoding)))
 
-let pp fmt op =
-  Format.pp_print_string fmt @@
+let pp ppf op =
+  Format.pp_print_string ppf @@
   Data_encoding_ezjsonm.to_string (Data_encoding.Json.construct encoding op)
+
+let env_version_to_string = function
+  | V1 -> "V1"
+
+let pp_ocaml_component ppf { name ; interface ; implementation } =
+  Format.fprintf ppf
+    "@[{@[<v 1> name = %S ;@ interface = %a ;@ implementation = %S ;@]@ }@]"
+    name
+    (fun ppf -> function
+       | None -> Format.fprintf ppf "None"
+       | Some s -> Format.fprintf ppf "Some %S" s)
+    interface
+    implementation
+
+let pp_ocaml ppf { expected_env ; components } =
+  Format.fprintf ppf
+    "@[{@[<v 1> expected_env = %s ;@ components = [@[<v>%a@]] ;@]@ }@]"
+    (env_version_to_string expected_env)
+    (Format.pp_print_list
+       ~pp_sep:(fun ppf () -> Format.fprintf ppf " ;@ ")
+       pp_ocaml_component)
+    components
 
 let compare = Pervasives.compare
 let equal = (=)

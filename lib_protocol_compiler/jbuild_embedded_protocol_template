@@ -1,0 +1,58 @@
+(* -*- tuareg -*- *)
+
+let prefix = "lib_embedded_protocol_"
+let dirname = Filename.basename @@ Filename.dirname @@ Sys.getcwd ()
+
+let version =
+  let x = String.length prefix in
+  let n = String.length dirname in
+  if not (n >= x && String.sub dirname 0 x = prefix) then
+    failwith "unexpected directory name" ;
+  String.sub dirname x (n - x)
+
+let () = Format.kasprintf Jbuild_plugin.V1.send {|
+(jbuild_version 1)
+
+(rule
+ ((targets (environment.ml))
+  (action
+    (write-file ${@@}
+      "include Tezos_node_updater.Tezos_protocol_environment.Make(struct let name = \"%s\" end)()"))))
+
+(rule
+ ((targets (registerer.ml))
+  (deps (tezos_embedded_protocol_environment_%s.cmxa TEZOS_PROTOCOL))
+  (action
+    (with-stdout-to ${@@}
+      (chdir ${ROOT} (run ${bin:tezos-embedded-protocol-packer} ${path-no-dep:.} "%s"))))))
+
+(library
+ ((name tezos_embedded_protocol_environment_%s)
+  (public_name tezos-embedded-protocol-%s.environment)
+  (library_flags (:standard -linkall))
+  (libraries (tezos-node-updater))
+  (modules (Environment))))
+
+(library
+ ((name tezos_embedded_raw_protocol_%s)
+  (public_name tezos-embedded-protocol-%s.raw)
+  (libraries (tezos_embedded_protocol_environment_%s))
+  (library_flags (:standard -linkall))
+  (flags (:standard -nopervasives -nostdlib -safe-string
+                    -w +a-4-6-7-9-29-32-40..42-44-45-48
+                    -warn-error -a+8
+                    -open Tezos_embedded_protocol_environment_%s__Environment
+                    -open Error_monad
+                    -open Hash
+                    -open Tezos_data))
+  (modules (:standard \ Environment Registerer))))
+
+(library
+ ((name tezos_embedded_protocol_%s)
+  (public_name tezos-embedded-protocol-%s)
+  (library_flags (:standard -linkall))
+  (libraries (tezos_embedded_raw_protocol_%s tezos-node-shell))
+  (modules (Registerer))))
+|}
+    version version version version version version version version
+    version version version version

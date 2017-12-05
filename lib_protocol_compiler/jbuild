@@ -24,16 +24,29 @@
                     -safe-string
                     -opaque
                     -open Tezos_base__TzPervasives))
-  (modules (:standard \ Main))))
+  (modules (:standard \ Main Main_embedded_packer))))
 
 (executable
  ((name main)
   (public_name tezos-protocol-compiler)
-  (package tezos-protocol-compiler)
   (modes (native))
-  (libraries (tezos-protocol-compiler))
+  (libraries (tezos_protocol_compiler))
   (flags (:standard -linkall))
   (modules (Main))))
+
+(executable
+ ((name main_embedded_packer)
+  (public_name tezos-embedded-protocol-packer)
+  (modes (native))
+  (libraries (tezos-base))
+  (flags (:standard -linkall
+                    -open Tezos_base__TzPervasives))
+  (modules (Main_embedded_packer))))
+
+(install
+ ((section share)
+  (files (jbuild_protocol_template
+          jbuild_embedded_protocol_template))))
 
 (alias
  ((name runtest_indent)
