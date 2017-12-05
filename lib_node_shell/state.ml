@@ -159,6 +159,7 @@ module Locked_block = struct
       fitness = [] ;
       validation_passes = 0 ;
       operations_hash = Operation_list_list_hash.empty ;
+      context ;
     } in
     let header : Block_header.t = { shell ; proto = MBytes.create 0 } in
     Store.Block.Contents.store (store, genesis.block)

@@ -91,6 +91,7 @@ module Node_protocol_environment_sigs : sig
        and type Hash.Block_hash.t = Block_hash.t
        and type Hash.Operation_hash.t = Operation_hash.t
        and type Hash.Operation_list_list_hash.t = Operation_list_list_hash.t
+       and type Hash.Context_hash.t = Context_hash.t
        and type Context.t = Context.t
        and type Time.t = Time.t
        and type MBytes.t = MBytes.t

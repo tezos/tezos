@@ -149,6 +149,7 @@ module RPC = struct
     validation_passes: int ; (* uint8 *)
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
+    context: Context_hash.t ;
     data: MBytes.t ;
     operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
@@ -174,6 +175,7 @@ module RPC = struct
       validation_passes = header.shell.validation_passes ;
       operations_hash = header.shell.operations_hash ;
       fitness = header.shell.fitness ;
+      context = header.shell.context ;
       data = header.proto ;
       operations = Some operations ;
       protocol ;
@@ -281,6 +283,7 @@ module RPC = struct
                        (fun ops -> Operation_list_hash.compute (List.map fst ops))
                        operations) ;
                 operations = Some operations ;
+                context = Context_hash.zero ;
                 data = MBytes.of_string "" ;
                 net_id = head_net_id ;
                 test_network ;
@@ -356,6 +359,7 @@ module RPC = struct
                     validation_passes = List.length operation_hashes ;
                     operations_hash ;
                     fitness ;
+                    context = Context_hash.zero ;
                   } ;
                   proto = MBytes.create 0 ;
                 } ;
@@ -490,7 +494,7 @@ module RPC = struct
                 (List.map fst r.Preapply_result.applied))
            rs) in
     Prevalidation.end_prevalidation
-      validation_state >>=? fun { fitness ; context } ->
+      validation_state >>=? fun { fitness ; context ; message } ->
     let pred_shell_header = State.Block.shell_header predecessor in
     State.Block.protocol_hash predecessor >>= fun pred_protocol ->
     Context.get_protocol context >>= fun protocol ->
@@ -499,6 +503,7 @@ module RPC = struct
         pred_shell_header.proto_level
       else
         ((pred_shell_header.proto_level + 1) mod 256) in
+    Context.commit ?message ~time:timestamp context >>= fun context ->
     let shell_header : Block_header.shell_header = {
       level = Int32.succ pred_shell_header.level ;
       proto_level ;
@@ -507,6 +512,7 @@ module RPC = struct
       validation_passes = List.length rs ;
       operations_hash ;
       fitness ;
+      context ;
     } in
     return (shell_header, rs)
 

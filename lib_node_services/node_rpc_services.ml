@@ -68,6 +68,7 @@ module Blocks = struct
     validation_passes: int ; (* uint8 *)
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
+    context: Context_hash.t ;
     data: MBytes.t ;
     operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
@@ -82,21 +83,23 @@ module Blocks = struct
     conv
       (fun { hash ; net_id ; level ; proto_level ; predecessor ;
              fitness ; timestamp ; protocol ;
-             validation_passes ; operations_hash ; data ;
+             validation_passes ; operations_hash ; context ; data ;
              operations ; test_network } ->
         ((hash, net_id, operations, protocol, test_network),
          { Block_header.shell =
              { level ; proto_level ; predecessor ;
-               timestamp ; validation_passes ; operations_hash ; fitness } ;
+               timestamp ; validation_passes ; operations_hash ; fitness ;
+               context } ;
            proto = data }))
       (fun ((hash, net_id, operations, protocol, test_network),
             { Block_header.shell =
                 { level ; proto_level ; predecessor ;
-                  timestamp ; validation_passes ; operations_hash ; fitness } ;
+                  timestamp ; validation_passes ; operations_hash ; fitness ;
+                  context } ;
               proto = data }) ->
         { hash ; net_id ; level ; proto_level ; predecessor ;
           fitness ; timestamp ; protocol ;
-          validation_passes ; operations_hash ; data ;
+          validation_passes ; operations_hash ; context ; data ;
           operations ; test_network })
       (dynamic_size
          (merge_objs
@@ -213,6 +216,15 @@ module Blocks = struct
       ~output: (obj1 (req "fitness" Fitness.encoding))
       ~error: Data_encoding.empty
       RPC_path.(block_path / "fitness")
+
+  let context =
+    RPC_service.post_service
+      ~description:"Returns the hash of the resulting context."
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req "context" Context_hash.encoding))
+      ~error: Data_encoding.empty
+      RPC_path.(block_path / "context")
 
   let timestamp =
     RPC_service.post_service

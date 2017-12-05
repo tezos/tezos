@@ -85,6 +85,7 @@ module Block_header : sig
     validation_passes: int ;
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
+    context: Context_hash.t ;
   }
 
   val shell_header_encoding: shell_header Data_encoding.t

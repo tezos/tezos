@@ -89,6 +89,7 @@ module Blocks : sig
     validation_passes: int ; (* uint8 *)
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
+    context: Context_hash.t ;
     data: MBytes.t ;
     operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;

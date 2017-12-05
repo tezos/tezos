@@ -58,21 +58,6 @@ let operation op =
   op,
   Data_encoding.Binary.to_bytes Operation.encoding op
 
-let block _state ?(operations = []) pred_hash pred name : Block_header.t =
-  let operations_hash =
-    Operation_list_list_hash.compute
-      [Operation_list_hash.compute operations] in
-  let fitness = incr_fitness pred.Block_header.shell.fitness in
-  let timestamp = incr_timestamp pred.shell.timestamp in
-  { shell = {
-        level = Int32.succ pred.shell.level ;
-        proto_level = pred.shell.proto_level ;
-        predecessor = pred_hash ;
-        validation_passes = 1 ;
-        timestamp ; operations_hash ; fitness } ;
-    proto = MBytes.of_string name ;
-  }
-
 let equal_operation ?msg op1 op2 =
   let msg = Assert.format_msg msg in
   let eq op1 op2 =
@@ -98,7 +83,7 @@ let equal_block ?msg st1 st2 =
     | Some st -> Block_hash.to_hex (Block_header.hash st) in
   Assert.equal ?msg ~prn ~eq st1 st2
 
-let block _state ?(operations = []) (pred: State.Block.t) name
+let block _state ?(context = Context_hash.zero) ?(operations = []) (pred: State.Block.t) name
   : Block_header.t =
   let operations_hash =
     Operation_list_list_hash.compute
@@ -110,37 +95,43 @@ let block _state ?(operations = []) (pred: State.Block.t) name
               proto_level = pred_header.proto_level ;
               predecessor = State.Block.hash pred ;
               validation_passes = 1 ;
-              timestamp ; operations_hash ; fitness } ;
+              timestamp ; operations_hash ; fitness ;
+              context } ;
     proto = MBytes.of_string name ;
   }
 
 let build_valid_chain state vtbl pred names =
   Lwt_list.fold_left_s
     (fun pred name ->
-       begin
-         let oph, op, _bytes = operation name in
-         let block = block state ~operations:[oph] pred name in
-         let hash = Block_header.hash block in
-         let pred_header = State.Block.header pred in
-         State.Block.context pred >>= fun predecessor_context ->
+       State.Block.context pred >>= fun predecessor_context ->
+       let rec attempt context =
          begin
-           Proto.begin_application
-             ~predecessor_context
-             ~predecessor_timestamp: pred_header.shell.timestamp
-             ~predecessor_fitness: pred_header.shell.fitness
-             block >>=? fun vstate ->
-           (* no operations *)
-           Proto.finalize_block vstate
-         end >>=? fun ctxt ->
-         State.Block.store state block [[op]] ctxt >>=? fun _vblock ->
-         State.Block.read state hash >>=? fun vblock ->
-         Hashtbl.add vtbl name vblock ;
-         return vblock
-       end >>= function
-       | Ok v -> Lwt.return v
-       | Error err ->
-           Error_monad.pp_print_error Format.err_formatter err ;
-           assert false)
+           let oph, op, _bytes = operation name in
+           let block = block ?context state ~operations:[oph] pred name in
+           let hash = Block_header.hash block in
+           let pred_header = State.Block.header pred in
+           begin
+             Proto.begin_application
+               ~predecessor_context
+               ~predecessor_timestamp: pred_header.shell.timestamp
+               ~predecessor_fitness: pred_header.shell.fitness
+               block >>=? fun vstate ->
+             (* no operations *)
+             Proto.finalize_block vstate
+           end >>=? fun ctxt ->
+           State.Block.store state block [[op]] ctxt >>=? fun _vblock ->
+           State.Block.read state hash >>=? fun vblock ->
+           Hashtbl.add vtbl name vblock ;
+           return vblock
+         end >>= function
+         | Ok v -> Lwt.return v
+         | Error [ State.Block.Inconsistent_hash (got, _) ] ->
+             (* Kind of a hack, but at least it tests idempotence to some extent. *)
+             attempt (Some got)
+         | Error err ->
+             Error_monad.pp_print_error Format.err_formatter err ;
+             assert false in
+       attempt None)
     pred
     names >>= fun _ ->
   Lwt.return ()

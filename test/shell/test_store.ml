@@ -83,7 +83,8 @@ let lolblock ?(operations = []) header =
             validation_passes = Random.int 32 ;
             predecessor = genesis_block ; operations_hash ;
             fitness = [MBytes.of_string @@ string_of_int @@ String.length header;
-                       MBytes.of_string @@ string_of_int @@ 12] } ;
+                       MBytes.of_string @@ string_of_int @@ 12] ;
+            context = Context_hash.zero } ;
         proto = MBytes.of_string header ;
       } ;
     max_operations_ttl = 0 ;

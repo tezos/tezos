@@ -15,27 +15,33 @@ type shell_header = {
   validation_passes: int ; (* uint8 *)
   operations_hash: Operation_list_list_hash.t ;
   fitness: MBytes.t list ;
+  context: Context_hash.t ;
 }
 
 let shell_header_encoding =
   let open Data_encoding in
   conv
     (fun { level ; proto_level ; predecessor ;
-           timestamp ; validation_passes ; operations_hash ; fitness } ->
+           timestamp ; validation_passes ; operations_hash ; fitness ;
+           context } ->
       (level, proto_level, predecessor,
-       timestamp, validation_passes, operations_hash, fitness))
+       timestamp, validation_passes, operations_hash, fitness,
+       context))
     (fun (level, proto_level, predecessor,
-          timestamp, validation_passes, operations_hash, fitness) ->
+          timestamp, validation_passes, operations_hash, fitness,
+          context) ->
       { level ; proto_level ; predecessor ;
-        timestamp ; validation_passes ; operations_hash ; fitness })
-    (obj7
+        timestamp ; validation_passes ; operations_hash ; fitness ;
+        context })
+    (obj8
        (req "level" int32)
        (req "proto" uint8)
        (req "predecessor" Block_hash.encoding)
        (req "timestamp" Time.encoding)
        (req "validation_pass" uint8)
        (req "operations_hash" Operation_list_list_hash.encoding)
-       (req "fitness" Fitness.encoding))
+       (req "fitness" Fitness.encoding)
+       (req "context" Context_hash.encoding))
 
 type t = {
   shell: shell_header ;

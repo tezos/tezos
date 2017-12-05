@@ -37,6 +37,7 @@ module Blocks : sig
     validation_passes: int ; (* uint8 *)
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
+    context: Context_hash.t ;
     data: MBytes.t ;
     operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
@@ -75,6 +76,10 @@ module Blocks : sig
     ([ `POST ], unit,
      unit * block, unit, unit,
      MBytes.t list, unit) RPC_service.t
+  val context:
+    ([ `POST ], unit,
+     unit * block, unit, unit,
+     Context_hash.t, unit) RPC_service.t
 
   type operations_param = {
     contents: bool ;
