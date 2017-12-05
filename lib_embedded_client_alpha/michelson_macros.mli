@@ -12,7 +12,8 @@ open Tezos_micheline
 type 'l node = ('l, string) Micheline.node
 
 type error += Unexpected_macro_annotation of string
-type error += Dip_expects_sequence
+type error += Sequence_expected of string
+type error += Invalid_arity of string * int * int
 
 val expand : 'l node -> 'l node tzresult
 

@@ -13,39 +13,55 @@ open Micheline
 type 'l node = ('l, string) Micheline.node
 
 type error += Unexpected_macro_annotation of string
-type error += Dip_expects_sequence
+type error += Sequence_expected of string
+type error += Invalid_arity of string * int * int
+
+let rec check_letters str i j f =
+  i > j || f (String.get str i) && check_letters str (i + 1) j f
 
 let expand_caddadr original =
-  ok @@ match original with
-  | Prim (loc, str, [], annot) ->
+  match original with
+  | Prim (loc, str, args, annot) ->
       let len = String.length str in
       if len > 3
       && String.get str 0 = 'C'
-      && String.get str (len - 1) = 'R' then
+      && String.get str (len - 1) = 'R'
+      && check_letters str 1 (len - 2)
+           (function 'A' | 'D' -> true | _ -> false) then
+        begin match args with
+          | [] -> ok ()
+          | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
+        end >>? fun () ->
         let rec parse i ?annot acc =
           if i = 0 then
-            Some (Seq (loc, acc, None))
+            Seq (loc, acc, None)
           else
             let annot = if i = (String.length str - 2) then annot else None in
             match String.get str i with
             | 'A' -> parse (i - 1) (Prim (loc, "CAR", [], annot) :: acc)
             | 'D' -> parse (i - 1) (Prim (loc, "CDR", [], annot) :: acc)
-            | _ -> None in
-        parse (len - 2) ?annot []
+            | _ -> assert false in
+        ok (Some (parse (len - 2) ?annot []))
       else
-        None
-  | _ -> None
+        ok None
+  | _ -> ok None
 
 let expand_set_caddadr original =
-  ok @@ match original with
-  | Prim (loc, str, [], annot) ->
+  match original with
+  | Prim (loc, str, args, annot) ->
       let len = String.length str in
       if len >= 7
       && String.sub str 0 5 = "SET_C"
-      && String.get str (len - 1) = 'R' then
+      && String.get str (len - 1) = 'R'
+      && check_letters str 5 (len - 2)
+           (function 'A' | 'D' -> true | _ -> false) then
+        begin match args with
+          | [] -> ok ()
+          | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
+        end >>? fun () ->
         let rec parse i acc =
           if i = 4 then
-            Some acc
+            acc
           else
             match String.get str i with
             | 'A' ->
@@ -71,7 +87,7 @@ let expand_set_caddadr original =
                          Prim (loc, "CAR", [], None) ;
                          Prim (loc, "PAIR", [], None) ], None) in
                 parse (i - 1) acc
-            | _ -> None in
+            | _ -> assert false in
         match String.get str (len - 2) with
         | 'A' ->
             let init =
@@ -79,7 +95,7 @@ let expand_set_caddadr original =
                    [ Prim (loc, "CDR", [], None) ;
                      Prim (loc, "SWAP", [], annot) ;
                      Prim (loc, "PAIR", [], None) ], None) in
-            parse (len - 3) init
+            ok (Some (parse (len - 3) init))
         | 'D' ->
             let init =
               Seq (loc,
@@ -90,25 +106,33 @@ let expand_set_caddadr original =
                     | Some _ -> [ Prim (loc, "SWAP", [], annot) ;
                                   Prim (loc, "SWAP", [], None) ;
                                   pair]), None) in
-            parse (len - 3) init
-        | _ -> None
+            ok (Some (parse (len - 3) init))
+        | _ -> assert false
       else
-        None
-  | _ -> None
+        ok None
+  | _ -> ok None
 
 let expand_map_caddadr original =
   match original with
-  | Prim (loc, str, [ Seq _ as code ], annot) ->
-      begin match annot with
-        | Some _ -> (error (Unexpected_macro_annotation str))
-        | None -> ok () end >|? fun () ->
+  | Prim (loc, str, args, annot) ->
       let len = String.length str in
       if len >= 7
       && String.sub str 0 5 = "MAP_C"
-      && String.get str (len - 1) = 'R' then
+      && String.get str (len - 1) = 'R'
+      && check_letters str 5 (len - 2)
+           (function 'A' | 'D' -> true | _ -> false) then
+        begin match annot with
+          | Some _ -> (error (Unexpected_macro_annotation str))
+          | None -> ok ()
+        end >>? fun () ->
+        begin match args with
+          | [ Seq _ as code ] -> ok code
+          | [ _ ] -> error (Sequence_expected str)
+          | [] | _ :: _ :: _ -> error (Invalid_arity (str, List.length args, 1))
+        end >>? fun code ->
         let rec parse i acc =
           if i = 4 then
-            Some acc
+            acc
           else
             match String.get str i with
             | 'A' ->
@@ -134,7 +158,7 @@ let expand_map_caddadr original =
                          Prim (loc, "CAR", [], None) ;
                          Prim (loc, "PAIR", [], None) ], None) in
                 parse (i - 1) acc
-            | _ -> None in
+            | _ -> assert false in
         match String.get str (len - 2) with
         | 'A' ->
             let init =
@@ -145,7 +169,7 @@ let expand_map_caddadr original =
                            [ Seq (loc, [ Prim (loc, "CAR", [], None) ; code ], None) ], None) ;
                      Prim (loc, "SWAP", [], None) ;
                      Prim (loc, "PAIR", [], None) ], None) in
-            parse (len - 3) init
+            ok (Some (parse (len - 3) init))
         | 'D' ->
             let init =
               Seq (loc,
@@ -155,10 +179,10 @@ let expand_map_caddadr original =
                      Prim (loc, "SWAP", [], None) ;
                      Prim (loc, "CAR", [], None) ;
                      Prim (loc, "PAIR", [], None) ], None) in
-            parse (len - 3) init
-        | _ -> None
+            ok (Some (parse (len - 3) init))
+        | _ -> assert false
       else
-        None
+        ok None
   | _ -> ok None
 
 exception Not_a_roman
@@ -203,7 +227,8 @@ let expand_dxiiivp original =
                 (Seq (loc, [ Prim (loc, "DIP", [ acc ], annot) ], None)) in
           match args with
           | [ Seq (_, _, _) as arg ] -> ok @@ Some (make depth arg)
-          | _ -> error Dip_expects_sequence
+          | [ _ ] -> error (Sequence_expected str)
+          | [] | _ :: _ :: _ -> error (Invalid_arity (str, List.length args, 1))
         with Not_a_roman -> ok None
       else ok None
   | _ -> ok None
@@ -212,11 +237,13 @@ exception Not_a_pair
 
 let expand_paaiair original =
   match original with
-  | Prim (loc, str, [], annot) ->
+  | Prim (loc, str, args, annot) ->
       let len = String.length str in
       if len > 4
       && String.get str 0 = 'P'
-      && String.get str (len - 1) = 'R' then
+      && String.get str (len - 1) = 'R'
+      && check_letters str 1 (len - 2)
+           (function 'A' | 'I' -> true | _ -> false) then
         try
           let rec parse i acc =
             if i = 0 then
@@ -234,19 +261,26 @@ let expand_paaiair original =
                      :: accs)
             else
               raise_notrace Not_a_pair in
-          ok @@ Some (Seq (loc, parse (len - 2) [], None))
+          let expanded = parse (len - 2) [] in
+          begin match args with
+            | [] -> ok ()
+            | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
+          end >>? fun () ->
+          ok (Some (Seq (loc, expanded, None)))
         with Not_a_pair -> ok None
       else
         ok None
   | _ -> ok None
 
 let expand_unpaaiair original =
-  ok @@ match original with
-  | Prim (loc, str, [], None) ->
+  match original with
+  | Prim (loc, str, args, None) ->
       let len = String.length str in
       if len >= 6
       && String.sub str 0 3 = "UNP"
-      && String.get str (len - 1) = 'R' then
+      && String.get str (len - 1) = 'R'
+      && check_letters str 3 (len - 2)
+           (function 'A' | 'I' -> true | _ -> false) then
         try
           let rec parse i acc =
             if i = 2 then
@@ -277,22 +311,31 @@ let expand_unpaaiair original =
                            None) :: accs)
             else
               raise_notrace Not_a_pair in
-          Some (parse (len - 2) [])
-        with Not_a_pair -> None
+          let expanded = parse (len - 2) [] in
+          begin match args with
+            | [] -> ok ()
+            | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
+          end >>? fun () ->
+          ok (Some expanded)
+        with Not_a_pair -> ok None
       else
-        None
-  | _ -> None
+        ok None
+  | _ -> ok None
 
 exception Not_a_dup
 
 let expand_duuuuup original =
-  ok @@ match original with
-  | Prim (loc, str, [], annot) ->
+  match original with
+  | Prim (loc, str, args, annot) ->
       let len = String.length str in
       if len > 3
       && String.get str 0 = 'D'
-      && String.get str 1 = 'U'
-      && String.get str (len - 1) = 'P' then
+      && String.get str (len - 1) = 'P'
+      && check_letters str 1 (len - 2) ((=) 'U') then
+        begin match args with
+          | [] -> ok ()
+          | _ :: _ -> error (Invalid_arity (str, List.length args, 0))
+        end >>? fun () ->
         try
           let rec parse i acc =
             if i = 1 then acc
@@ -302,76 +345,75 @@ let expand_duuuuup original =
                              Prim (loc, "SWAP", [], None) ], None))
             else
               raise_notrace Not_a_dup in
-          Some (parse (len - 2) (Seq (loc, [ Prim (loc, "DUP", [], annot) ], None)))
-        with Not_a_dup -> None
+          ok (Some (parse (len - 2) (Seq (loc, [ Prim (loc, "DUP", [], annot) ], None))))
+        with Not_a_dup -> ok None
       else
-        None
-  | _ -> None
+        ok None
+  | _ -> ok None
 
 let expand_compare original =
-  ok @@ match original with
+  let cmp loc is =
+    let is =
+      List.map (fun i -> Prim (loc, i, [], None)) is in
+    ok (Some (Seq (loc, is, None))) in
+  let ifcmp loc is l r =
+    let is =
+      List.map (fun i -> Prim (loc, i, [], None)) is @
+      [ Prim (loc, "IF", [ l ; r ], None) ] in
+    ok (Some (Seq (loc, is, None))) in
+  match original with
   | Prim (loc, "CMPEQ", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "EQ", [], None) ], None))
+      cmp loc [ "COMPARE" ; "EQ" ]
   | Prim (loc, "CMPNEQ", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "NEQ", [], None) ], None))
+      cmp loc [ "COMPARE" ; "NEQ" ]
   | Prim (loc, "CMPLT", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "LT", [], None) ], None))
+      cmp loc [ "COMPARE" ; "LT" ]
   | Prim (loc, "CMPGT", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "GT", [], None) ], None))
+      cmp loc [ "COMPARE" ; "GT" ]
   | Prim (loc, "CMPLE", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "LE", [], None) ], None))
+      cmp loc [ "COMPARE" ; "LE" ]
   | Prim (loc, "CMPGE", [], None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "GE", [], None) ], None))
-  | Prim (loc, "IFCMPEQ", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "EQ", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFCMPNEQ", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "NEQ", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFCMPLT", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "LT", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFCMPGT", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "GT", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFCMPLE", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "LE", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFCMPGE", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "COMPARE", [], None) ;
-                        Prim (loc, "GE", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFEQ", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "EQ", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFNEQ", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "NEQ", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFLT", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "LT", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFGT", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "GT", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFLE", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "LE", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | Prim (loc, "IFGE", args, None) ->
-      Some (Seq (loc, [ Prim (loc, "GE", [], None) ;
-                        Prim (loc, "IF", args, None) ], None))
-  | _ -> None
-
+      cmp loc [ "COMPARE" ; "GE" ]
+  | Prim (_, ("CMPEQ" |  "CMPNEQ" |  "CMPLT"
+               |  "CMPGT" |  "CMPLE" | "CMPGE" as str), args, None) ->
+      error (Invalid_arity (str, List.length args, 0))
+  | Prim (loc, "IFCMPEQ", [ l ; r ], None) ->
+      ifcmp loc [ "COMPARE" ; "EQ" ] l r
+  | Prim (loc, "IFCMPNEQ", [ l ; r ], None) ->
+      ifcmp loc [ "COMPARE" ; "NEQ" ] l r
+  | Prim (loc, "IFCMPLT", [ l ; r ], None) ->
+      ifcmp loc [ "COMPARE" ; "LT" ] l r
+  | Prim (loc, "IFCMPGT", [ l ; r ], None) ->
+      ifcmp loc [ "COMPARE" ; "GT" ] l r
+  | Prim (loc, "IFCMPLE", [ l ; r ], None) ->
+      ifcmp loc [ "COMPARE" ; "LE" ] l r
+  | Prim (loc, "IFCMPGE", [ l ; r ], None) ->
+      ifcmp loc [ "COMPARE" ; "GE" ] l r
+  | Prim (loc, "IFEQ", [ l ; r ], None) ->
+      ifcmp loc [ "EQ" ] l r
+  | Prim (loc, "IFNEQ", [ l ; r ], None) ->
+      ifcmp loc [ "NEQ" ] l r
+  | Prim (loc, "IFLT", [ l ; r ], None) ->
+      ifcmp loc [ "LT" ] l r
+  | Prim (loc, "IFGT", [ l ; r ], None) ->
+      ifcmp loc [ "GT" ] l r
+  | Prim (loc, "IFLE", [ l ; r ], None) ->
+      ifcmp loc [ "LE" ] l r
+  | Prim (loc, "IFGE", [ l ; r ], None) ->
+      ifcmp loc [ "GE" ] l r
+  | Prim (_, ("IFCMPEQ" | "IFCMPNEQ" | "IFCMPLT"
+               | "IFCMPGT" | "IFCMPLE" | "IFCMPGE"
+               | "IFEQ" | "IFNEQ" | "IFLT"
+               | "IFGT" | "IFLE" | "IFGE" as str), args, None) ->
+      error (Invalid_arity (str, List.length args, 2))
+  | Prim (_, ("IFCMPEQ" | "IFCMPNEQ" | "IFCMPLT"
+               | "IFCMPGT" | "IFCMPLE" | "IFCMPGE"
+               | "IFEQ" | "IFNEQ" | "IFLT"
+               | "IFGT" | "IFLE" | "IFGE"
+               | "CMPEQ" |  "CMPNEQ" |  "CMPLT"
+               | "CMPGT" |  "CMPLE" | "CMPGE" as str), [], Some _) ->
+      error (Unexpected_macro_annotation str)
+  | _ -> ok None
 
 let expand_asserts original =
   let fail_false loc =
@@ -389,8 +431,21 @@ let expand_asserts original =
       ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_false loc, None) ], None))
   | Prim (loc, "ASSERT_RIGHT", [], None) ->
       ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", fail_true loc, None) ], None))
-  | Prim (loc, s, [], None)
+  | Prim (_, ("ASSERT" | "ASSERT_NONE" | "ASSERT_SOME"
+             | "ASSERT_LEFT" | "ASSERT_RIGHT" as str), args, None) ->
+      error (Invalid_arity (str, List.length args, 0))
+  | Prim (_, ("ASSERT" | "ASSERT_NONE" | "ASSERT_SOME"
+             | "ASSERT_LEFT" | "ASSERT_RIGHT" as str), [], Some _) ->
+      error (Unexpected_macro_annotation str)
+  | Prim (loc, s, args, annot)
     when String.(length s >  7 && equal (sub s 0 7) "ASSERT_") ->
+      begin match args with
+        | [] -> ok ()
+        | _ :: _ -> error (Invalid_arity (s, List.length args, 0))
+      end >>? fun () ->
+      begin match annot with
+        | Some _ -> (error (Unexpected_macro_annotation s))
+        | None -> ok () end >>? fun () ->
       begin
         let remaining = String.(sub s 7 ((length s) - 7)) in
         let remaining_prim = Prim(loc, remaining, [], None) in
@@ -413,11 +468,19 @@ let expand_asserts original =
 let expand_if_some = function
   | Prim (loc, "IF_SOME", [ right ; left ], None) ->
       ok @@ Some (Seq (loc, [ Prim (loc, "IF_NONE", [ left ; right ], None) ], None))
+  | Prim (_, "IF_SOME", args, None) ->
+      error (Invalid_arity ("IF_SOME", List.length args, 2))
+  | Prim (_, "IF_SOME", [], Some _) ->
+      error (Unexpected_macro_annotation "IF_SOME")
   | _ -> ok @@ None
 
 let expand_if_right = function
   | Prim (loc, "IF_RIGHT", [ right ; left ], None) ->
       ok @@ Some (Seq (loc, [ Prim (loc, "IF_LEFT", [ left ; right ], None) ], None))
+  | Prim (_, "IF_RIGHT", args, None) ->
+      error (Invalid_arity ("IF_RIGHT", List.length args, 2))
+  | Prim (_, "IF_RIGHT", [], Some _) ->
+      error (Unexpected_macro_annotation "IF_RIGHT")
   | _ -> ok @@ None
 
 let expand original =
@@ -781,28 +844,45 @@ let () =
   let open Data_encoding in
   register_error_kind
     `Permanent
-    ~id:"unexpectedMacroAnnotation"
+    ~id:"michelson.macros.unexpected_annotation"
     ~title:"Unexpected annotation"
     ~description:"A macro had an annotation, but no annotation was permitted on this macro."
     ~pp:(fun ppf ->
         Format.fprintf ppf
-          "@[<hov 0>@[<hov 2>Unexpected annotation on instruction %s.@]@]")
+          "Unexpected annotation on macro %s.")
     (obj1
-       (req "instrName" string))
+       (req "macro_name" string))
     (function
       | Unexpected_macro_annotation str -> Some str
       | _ -> None)
     (fun s -> Unexpected_macro_annotation s) ;
   register_error_kind
     `Permanent
-    ~id:"dipExpectsSequence"
-    ~title:"Dip instruction expects a sequence"
-    ~description:"A dip instruction expects a sequence, but a sequence was not provided"
-    ~pp:(fun ppf () ->
+    ~id:"michelson.macros.sequence_expected"
+    ~title:"Macro expects a sequence"
+    ~description:"An macro expects a sequence, but a sequence was not provided"
+    ~pp:(fun ppf name ->
         Format.fprintf ppf
-          "@[<hov 0>@[<hov 2>DIP instructionf expects a sequence, but did not receive one.@]@]")
-    empty
+          "Macro %s expects a sequence, but did not receive one." name)
+    (obj1
+       (req "macro_name" string))
     (function
-      | Dip_expects_sequence -> Some ()
+      | Sequence_expected name -> Some name
       | _ -> None)
-    (fun () -> Dip_expects_sequence)
+    (fun name -> Sequence_expected name) ;
+  register_error_kind
+    `Permanent
+    ~id:"michelson.macros.bas_arity"
+    ~title:"Wrong number of arguments to macro"
+    ~description:"A wrong number of arguments was provided to a macro"
+    ~pp:(fun ppf (name, got, exp) ->
+        Format.fprintf ppf
+          "Macro %s expects %d arguments, was given %d." name got exp)
+    (obj3
+       (req "macro_name" string)
+       (req "given_number_of_arguments" uint16)
+       (req "expected_number_of_arguments" uint16))
+    (function
+      | Invalid_arity (name, got, exp) -> Some (name, got, exp)
+      | _ -> None)
+    (fun (name, got, exp) -> Invalid_arity (name, got, exp))
