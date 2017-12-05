@@ -71,7 +71,7 @@ let commands () =
        @@ Program.alias_param
        @@ stop)
       (fun () (_, program) (cctxt : Client_commands.full_context) ->
-         Program.to_source cctxt program >>=? fun source ->
+         Program.to_source program >>=? fun source ->
          cctxt#message "%s\n" source >>= fun () ->
          return ()) ;
 

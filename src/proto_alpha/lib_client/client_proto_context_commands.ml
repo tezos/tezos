@@ -99,7 +99,7 @@ let commands () =
         Client_proto_contracts.get_manager
           cctxt cctxt#block contract >>=? fun manager ->
         Public_key_hash.rev_find cctxt manager >>=? fun mn ->
-        Public_key_hash.to_source cctxt manager >>=? fun m ->
+        Public_key_hash.to_source manager >>=? fun m ->
         cctxt#message "%s (%s)" m
           (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
         return ()
@@ -114,7 +114,7 @@ let commands () =
         Client_proto_contracts.get_delegate
           cctxt cctxt#block contract >>=? fun delegate ->
         Public_key_hash.rev_find cctxt delegate >>=? fun mn ->
-        Public_key_hash.to_source cctxt delegate >>=? fun m ->
+        Public_key_hash.to_source delegate >>=? fun m ->
         cctxt#message "%s (%s)" m
           (match mn with None -> "unknown" | Some n -> "known as " ^ n) >>= fun () ->
         return ()

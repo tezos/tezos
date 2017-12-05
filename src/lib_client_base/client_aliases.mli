@@ -11,12 +11,8 @@
 module type Entity = sig
   type t
   val encoding : t Data_encoding.t
-  val of_source :
-    #Client_commands.wallet ->
-    string -> t tzresult Lwt.t
-  val to_source :
-    #Client_commands.wallet ->
-    t -> string tzresult Lwt.t
+  val of_source : string -> t tzresult Lwt.t
+  val to_source : t -> string tzresult Lwt.t
   val name : string
 end
 
@@ -55,12 +51,8 @@ module type Alias = sig
   val update :
     #Client_commands.wallet ->
     string -> t -> unit tzresult Lwt.t
-  val of_source  :
-    #Client_commands.wallet ->
-    string -> t tzresult Lwt.t
-  val to_source  :
-    #Client_commands.wallet ->
-    t -> string tzresult Lwt.t
+  val of_source  : string -> t tzresult Lwt.t
+  val to_source  : t -> string tzresult Lwt.t
   val alias_param :
     ?name:string ->
     ?desc:string ->

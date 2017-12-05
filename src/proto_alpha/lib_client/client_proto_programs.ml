@@ -20,9 +20,9 @@ module Program = Client_aliases.Alias (struct
         (fun ({ Michelson_v1_parser.source }, _) -> source)
         (fun source -> Michelson_v1_parser.parse_toplevel source)
         Data_encoding.string
-    let of_source _cctxt source =
+    let of_source source =
       return (Michelson_v1_parser.parse_toplevel source)
-    let to_source _ ({ Michelson_v1_parser.source }, _) = return source
+    let to_source ({ Michelson_v1_parser.source }, _) = return source
     let name = "program"
   end)
 

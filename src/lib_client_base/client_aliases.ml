@@ -15,12 +15,8 @@ open Cli_entries
 module type Entity = sig
   type t
   val encoding : t Data_encoding.t
-  val of_source :
-    #Client_commands.wallet ->
-    string -> t tzresult Lwt.t
-  val to_source :
-    #Client_commands.wallet ->
-    t -> string tzresult Lwt.t
+  val of_source : string -> t tzresult Lwt.t
+  val to_source : t -> string tzresult Lwt.t
   val name : string
 end
 
@@ -59,12 +55,8 @@ module type Alias = sig
   val update :
     #Client_commands.wallet ->
     string -> t -> unit tzresult Lwt.t
-  val of_source :
-    #Client_commands.wallet ->
-    string -> t tzresult Lwt.t
-  val to_source :
-    #Client_commands.wallet ->
-    t -> string tzresult Lwt.t
+  val of_source : string -> t tzresult Lwt.t
+  val to_source : t -> string tzresult Lwt.t
   val alias_param :
     ?name:string ->
     ?desc:string ->
@@ -106,7 +98,6 @@ module Alias = functor (Entity : Entity) -> struct
 
   let set (wallet : #wallet) entries =
     wallet#write Entity.name entries wallet_encoding
-
 
   let autocomplete wallet =
     load wallet >>= function
@@ -204,9 +195,9 @@ module Alias = functor (Entity : Entity) -> struct
         return ()
       else
         iter_s
-          (fun (n, _v) ->
+          (fun (n, v) ->
              if n = s then
-               Entity.to_source wallet _v >>=? fun value ->
+               Entity.to_source v >>=? fun value ->
                failwith
                  "@[<v 2>The %s alias %s already exists.@,\
                   The current value is %s.@,\
@@ -247,13 +238,13 @@ module Alias = functor (Entity : Entity) -> struct
                   failwith
                     "cannot read file (%s)" (Printexc.to_string exn))
              >>=? fun content ->
-             of_source cctxt content in
+             of_source content in
            begin
              match String.split ~limit:1 ':' s with
              | [ "alias" ; alias ]->
                  find cctxt alias
              | [ "text" ; text ] ->
-                 of_source cctxt text
+                 of_source text
              | [ "file" ; path ] ->
                  read path
              | _ ->
@@ -263,7 +254,7 @@ module Alias = functor (Entity : Entity) -> struct
                      read s >>= function
                      | Ok v -> return v
                      | Error r_errs ->
-                         of_source cctxt s >>= function
+                         of_source s >>= function
                          | Ok v -> return v
                          | Error s_errs ->
                              let all_errs =
@@ -278,7 +269,7 @@ module Alias = functor (Entity : Entity) -> struct
 
   let name (wallet : #wallet) d =
     rev_find wallet d >>=? function
-    | None -> Entity.to_source wallet d
+    | None -> Entity.to_source d
     | Some name -> return name
 
 end

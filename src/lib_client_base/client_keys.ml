@@ -10,24 +10,24 @@
 module Public_key_hash = Client_aliases.Alias (struct
     type t = Ed25519.Public_key_hash.t
     let encoding = Ed25519.Public_key_hash.encoding
-    let of_source _ s = Lwt.return (Ed25519.Public_key_hash.of_b58check s)
-    let to_source _ p = return (Ed25519.Public_key_hash.to_b58check p)
+    let of_source s = Lwt.return (Ed25519.Public_key_hash.of_b58check s)
+    let to_source p = return (Ed25519.Public_key_hash.to_b58check p)
     let name = "public key hash"
   end)
 
 module Public_key = Client_aliases.Alias (struct
     type t = Ed25519.Public_key.t
     let encoding = Ed25519.Public_key.encoding
-    let of_source _ s = Lwt.return (Ed25519.Public_key.of_b58check s)
-    let to_source _ p = return (Ed25519.Public_key.to_b58check p)
+    let of_source s = Lwt.return (Ed25519.Public_key.of_b58check s)
+    let to_source p = return (Ed25519.Public_key.to_b58check p)
     let name = "public key"
   end)
 
 module Secret_key = Client_aliases.Alias (struct
     type t = Ed25519.Secret_key.t
     let encoding = Ed25519.Secret_key.encoding
-    let of_source _ s = Lwt.return (Ed25519.Secret_key.of_b58check s)
-    let to_source _ p = return (Ed25519.Secret_key.to_b58check p)
+    let of_source s = Lwt.return (Ed25519.Secret_key.of_b58check s)
+    let to_source p = return (Ed25519.Secret_key.to_b58check p)
     let name = "secret key"
   end)
 
@@ -233,7 +233,7 @@ let commands () =
          list_keys cctxt >>=? fun l ->
          iter_s
            (fun (name, pkh, pkm, pks) ->
-              Public_key_hash.to_source cctxt pkh >>=? fun v ->
+              Public_key_hash.to_source pkh >>=? fun v ->
               cctxt#message "%s: %s%s%s" name v
                 (if pkm then " (public key known)" else "")
                 (if pks then " (secret key known)" else "") >>= fun () ->
@@ -251,18 +251,18 @@ let commands () =
          match key_info with
          | None -> ok_lwt @@ cctxt#message "No keys found for identity"
          | Some (hash, pub, priv) ->
-             Public_key_hash.to_source cctxt hash >>=? fun hash ->
+             Public_key_hash.to_source hash >>=? fun hash ->
              ok_lwt @@ cctxt#message "Hash: %s" hash >>=? fun () ->
              match pub with
              | None -> return ()
              | Some pub ->
-                 Public_key.to_source cctxt pub >>=? fun pub ->
+                 Public_key.to_source pub >>=? fun pub ->
                  ok_lwt @@ cctxt#message "Public Key: %s" pub >>=? fun () ->
                  if show_private then
                    match priv with
                    | None -> return ()
                    | Some priv ->
-                       Secret_key.to_source cctxt priv >>=? fun priv ->
+                       Secret_key.to_source priv >>=? fun priv ->
                        ok_lwt @@ cctxt#message "Secret Key: %s" priv
                  else return ()) ;
 

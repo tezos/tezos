@@ -13,13 +13,13 @@ open Tezos_context
 module ContractEntity = struct
   type t = Contract.t
   let encoding = Contract.encoding
-  let of_source _ s =
+  let of_source s =
     match Contract.of_b58check s with
     | Error _ as err ->
         Lwt.return (Environment.wrap_error err)
         |> trace (failure "bad contract notation")
     | Ok s -> return s
-  let to_source _ s = return (Contract.to_b58check s)
+  let to_source s = return (Contract.to_b58check s)
   let name = "contract"
 end
 
@@ -96,7 +96,7 @@ module ContractAlias = struct
                     find cctxt s >>= function
                     | Ok v -> return v
                     | Error k_errs ->
-                        ContractEntity.of_source cctxt s >>= function
+                        ContractEntity.of_source s >>= function
                         | Ok v -> return (s, v)
                         | Error c_errs ->
                             Lwt.return (Error (k_errs @ c_errs))

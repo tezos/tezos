@@ -40,7 +40,7 @@ module Tags (Entity : Entity) = struct
       let encoding = Tag.encoding
 
       (* Split a string of tags separated by commas, and possibly spaces *)
-      let of_source _ tags_str =
+      let of_source tags_str =
         let rec aux tags s =
           try
             let idx = String.index s ',' in
@@ -53,7 +53,7 @@ module Tags (Entity : Entity) = struct
         in
         return (aux [] tags_str)
 
-      let to_source _ tags =
+      let to_source tags =
         return (String.concat ", " tags)
 
       let name = Entity.name ^ " tag"
@@ -66,7 +66,7 @@ module Tags (Entity : Entity) = struct
       ^ "can be one or multiple tags separated by commas" in
     Cli_entries.(
       param ~name ~desc
-        (parameter (fun cctxt s -> of_source cctxt s))
+        (parameter (fun _ s -> of_source s))
         next)
 
   let rev_find_by_tag cctxt tag =
