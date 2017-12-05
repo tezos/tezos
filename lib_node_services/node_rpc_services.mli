@@ -120,13 +120,13 @@ module Blocks : sig
   type preapply_param = {
     timestamp: Time.t ;
     proto_header: MBytes.t ;
-    operations: Operation.t list ;
+    operations: Operation.t list list ;
     sort_operations: bool ;
   }
 
   type preapply_result = {
     shell_header: Block_header.shell_header ;
-    operations: error Preapply_result.t ;
+    operations: error Preapply_result.t list ;
   }
   val preapply:
     ([ `POST ], unit,

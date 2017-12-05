@@ -158,8 +158,9 @@ let forge_block cctxt block
   let request = List.length operations in
   let proto_header = forge_faked_proto_header ~priority ~seed_nonce_hash in
   Client_node_rpcs.Blocks.preapply
-    cctxt block ~timestamp ~sort ~proto_header operations >>=?
+    cctxt block ~timestamp ~sort ~proto_header [operations] >>=?
   fun { operations = result ; shell_header } ->
+  let result = List.hd result in
   let valid = List.length result.applied in
   lwt_log_info "Found %d valid operations (%d refused) for timestamp %a"
     valid (request - valid)
@@ -446,13 +447,14 @@ let bake (cctxt : Client_commands.full_context) state =
        let proto_header =
          forge_faked_proto_header ~priority ~seed_nonce_hash in
        Client_node_rpcs.Blocks.preapply cctxt block
-         ~timestamp ~sort:true ~proto_header operations >>= function
+         ~timestamp ~sort:true ~proto_header [operations] >>= function
        | Error errs ->
            lwt_log_error "Error while prevalidating operations:\n%a"
              pp_print_error
              errs >>= fun () ->
            return None
        | Ok { operations ; shell_header } ->
+           let operations = List.hd operations in
            lwt_debug
              "Computed condidate block after %a (slot %d): %d/%d fitness: %a"
              Block_hash.pp_short bi.hash priority

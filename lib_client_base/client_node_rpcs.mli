@@ -113,7 +113,7 @@ module Blocks : sig
 
   type preapply_result = {
     shell_header: Block_header.shell_header ;
-    operations: error Preapply_result.t ;
+    operations: error Preapply_result.t list ;
   }
 
   val preapply:
@@ -122,7 +122,7 @@ module Blocks : sig
     ?timestamp:Time.t ->
     ?sort:bool ->
     proto_header:MBytes.t ->
-    Operation.t list -> preapply_result tzresult Lwt.t
+    Operation.t list list -> preapply_result tzresult Lwt.t
 
 end
 

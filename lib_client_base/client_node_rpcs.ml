@@ -69,12 +69,12 @@ module Blocks = struct
   type preapply_param = Services.Blocks.preapply_param = {
     timestamp: Time.t ;
     proto_header: MBytes.t ;
-    operations: Operation.t list ;
+    operations: Operation.t list list ;
     sort_operations: bool ;
   }
   type preapply_result = Services.Blocks.preapply_result = {
     shell_header: Block_header.shell_header ;
-    operations: error Preapply_result.t ;
+    operations: error Preapply_result.t list ;
   }
   let net_id cctxt h =
     call_service1 cctxt Services.Blocks.net_id h ()

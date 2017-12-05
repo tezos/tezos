@@ -305,7 +305,7 @@ module Blocks = struct
   type preapply_param = {
     timestamp: Time.t ;
     proto_header: MBytes.t ;
-    operations: Operation.t list ;
+    operations: Operation.t list list ;
     sort_operations: bool ;
   }
 
@@ -318,12 +318,12 @@ module Blocks = struct
        (obj4
           (req "timestamp" Time.encoding)
           (req "proto_header" bytes)
-          (req "operations" (list (dynamic_size Operation.encoding)))
+          (req "operations" (list (dynamic_size (list (dynamic_size Operation.encoding)))))
           (dft "sort_operations" bool false)))
 
   type preapply_result = {
     shell_header: Block_header.shell_header ;
-    operations: error Preapply_result.t ;
+    operations: error Preapply_result.t list ;
   }
 
   let preapply_result_encoding =
@@ -335,7 +335,7 @@ module Blocks = struct
        (obj2
           (req "shell_header" Block_header.shell_header_encoding)
           (req "operations"
-             (Preapply_result.encoding Error.encoding))))
+             (list (Preapply_result.encoding Error.encoding)))))
 
   let preapply =
     RPC_service.post_service

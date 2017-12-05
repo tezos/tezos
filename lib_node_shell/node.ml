@@ -475,12 +475,20 @@ module RPC = struct
     end >>=? fun predecessor ->
     Prevalidation.start_prevalidation
       ~proto_header ~predecessor ~timestamp () >>=? fun validation_state ->
-    let ops = List.map (fun x -> Operation.hash x, x) ops in
-    Prevalidation.prevalidate
-      validation_state ~sort ops >>= fun (validation_state, r) ->
+    let ops = List.map (List.map (fun x -> Operation.hash x, x)) ops in
+    Lwt_list.fold_left_s
+      (fun (validation_state, rs) ops ->
+         Prevalidation.prevalidate
+           validation_state ~sort ops >>= fun (validation_state, r) ->
+         Lwt.return (validation_state, rs @ [r]))
+      (validation_state, []) ops >>= fun (validation_state, rs) ->
     let operations_hash =
       Operation_list_list_hash.compute
-        [Operation_list_hash.compute (List.map fst r.applied)] in
+        (List.map
+           (fun r ->
+              Operation_list_hash.compute
+                (List.map fst r.Preapply_result.applied))
+           rs) in
     Prevalidation.end_prevalidation
       validation_state >>=? fun { fitness ; context } ->
     let pred_shell_header = State.Block.shell_header predecessor in
@@ -496,11 +504,11 @@ module RPC = struct
       proto_level ;
       predecessor = State.Block.hash predecessor ;
       timestamp ;
-      validation_passes = 1 ;
+      validation_passes = List.length rs ;
       operations_hash ;
       fitness ;
     } in
-    return (shell_header, r)
+    return (shell_header, rs)
 
   let complete node ?block str =
     match block with
