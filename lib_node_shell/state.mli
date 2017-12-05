@@ -104,6 +104,8 @@ module Block : sig
   val read_opt: Net.t -> Block_hash.t -> block option Lwt.t
   val read_exn: Net.t -> Block_hash.t -> block Lwt.t
 
+  type error += Inconsistent_hash of Context_hash.t * Context_hash.t
+
   val store:
     Net.t ->
     Block_header.t ->

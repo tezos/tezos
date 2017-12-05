@@ -486,8 +486,6 @@ let rec worker_loop bv =
                   end
                 end >>= function
                 | Ok result -> begin
-                    lwt_log_info "validated block %a"
-                      Block_hash.pp_short hash >>= fun () ->
                     Lwt_utils.protect ~canceler:bv.canceler begin fun () ->
                       Distributed_db.commit_block
                         net_db hash header operations result
@@ -495,6 +493,8 @@ let rec worker_loop bv =
                     | None ->
                         assert false (* should not happen *)
                     | Some block ->
+                        lwt_log_info "validated block %a"
+                          Block_hash.pp_short hash >>= fun () ->
                         Protocol_validator.prefetch_and_compile_protocols
                           bv.protocol_validator
                           ?peer ~timeout:bv.protocol_timeout

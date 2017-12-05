@@ -441,6 +441,22 @@ module Block = struct
       read_exn net_state header.shell.predecessor >>= fun block ->
       Lwt.return (Some block)
 
+  type error += Inconsistent_hash of Context_hash.t * Context_hash.t
+
+  let () =
+    Error_monad.register_error_kind
+      `Permanent
+      ~id:"inconsistentContextHash"
+      ~title:"Inconsistent commit hash"
+      ~description:
+        "When commiting the context of a block, the announced context \
+         hash was not the one computed at commit time."
+      Data_encoding.(obj2
+                       (req "wrong_context_hash" Context_hash.encoding)
+                       (req "expected_context_hash" Context_hash.encoding))
+      (function Inconsistent_hash (got, exp) -> Some (got, exp) | _ -> None)
+      (fun (got, exp) -> Inconsistent_hash (got, exp))
+
   let store
       net_state block_header operations
       { Updater.context ; message ; max_operations_ttl ;
@@ -457,6 +473,9 @@ module Block = struct
       else begin
         Context.commit
           ~time:block_header.shell.timestamp ?message context >>= fun commit ->
+        fail_unless
+          (Context_hash.equal block_header.shell.context commit)
+          (Inconsistent_hash (commit, block_header.shell.context)) >>=? fun () ->
         let contents = {
           Store.Block.header = block_header ;
           message ;
@@ -544,7 +563,7 @@ module Block = struct
   let context { net_state ; hash } =
     Shared.use net_state.block_store begin fun block_store ->
       Store.Block.Contents.read_exn (block_store, hash)
-    end  >>= fun { context = commit } ->
+    end >>= fun { context = commit } ->
     Shared.use net_state.context_index begin fun context_index ->
       Context.checkout_exn context_index commit
     end
