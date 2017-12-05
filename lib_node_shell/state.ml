@@ -150,7 +150,7 @@ type t = global_state
 
 module Locked_block = struct
 
-  let store_genesis store genesis commit =
+  let store_genesis store genesis context =
     let shell : Block_header.shell_header = {
       level = 0l ;
       proto_level = 0 ;
@@ -162,8 +162,8 @@ module Locked_block = struct
     } in
     let header : Block_header.t = { shell ; proto = MBytes.create 0 } in
     Store.Block.Contents.store (store, genesis.block)
-      { Store.Block.header ; message = "Genesis" ;
-        max_operations_ttl = 0 ; context = commit ;
+      { Store.Block.header ; message = Some "Genesis" ;
+        max_operations_ttl = 0 ; context ;
         max_number_of_operations = [];
         max_operation_data_length = 0;
       } >>= fun () ->
@@ -442,19 +442,11 @@ module Block = struct
 
   let store
       net_state block_header operations
-      { Updater.context ; fitness ; message ; max_operations_ttl ;
+      { Updater.context ; message ; max_operations_ttl ;
         max_number_of_operations ; max_operation_data_length } =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     (* let's the validator check the consistency... of fitness, level, ... *)
-    let message =
-      match message with
-      | Some message -> message
-      | None ->
-          Format.asprintf "%a(%ld): %a"
-            Block_hash.pp_short hash
-            block_header.shell.level
-            Fitness.pp fitness in
     Shared.use net_state.block_store begin fun store ->
       Store.Block.Invalid_block.known store hash >>= fun known_invalid ->
       fail_when known_invalid (failure "Known invalid") >>=? fun () ->
@@ -463,7 +455,7 @@ module Block = struct
         return None
       else begin
         Context.commit
-          ~time:block_header.shell.timestamp ~message context >>= fun commit ->
+          ~time:block_header.shell.timestamp ?message context >>= fun commit ->
         let contents = {
           Store.Block.header = block_header ;
           message ;

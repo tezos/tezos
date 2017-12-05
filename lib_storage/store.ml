@@ -82,7 +82,7 @@ module Block = struct
 
   type contents = {
     header: Block_header.t ;
-    message: string ;
+    message: string option ;
     max_operations_ttl: int ;
     max_number_of_operations: int list;
     max_operation_data_length: int;
@@ -111,7 +111,7 @@ module Block = struct
                  max_number_of_operations ; max_operation_data_length ;
                  context })
              (obj6
-                (req "message" string)
+                (opt "message" string)
                 (req "max_operations_ttl" uint16)
                 (req "max_number_of_operations" (list uint16))
                 (req "max_operation_data_length" uint16)

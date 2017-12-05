@@ -86,7 +86,7 @@ module Block : sig
 
   type contents = {
     header: Block_header.t ;
-    message: string ;
+    message: string option ;
     max_operations_ttl: int ;
     max_number_of_operations: int list;
     max_operation_data_length: int;

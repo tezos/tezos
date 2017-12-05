@@ -111,14 +111,14 @@ let checkout_exn index key =
   | Some p -> Lwt.return p
 
 
-let raw_commit ~time ~message context =
+let raw_commit ~time ?(message = "") context =
   let info =
     Irmin.Info.v ~date:(Time.to_seconds time) ~author:"Tezos" message in
   GitStore.Commit.v
     context.index.repo ~info ~parents:context.parents context.tree
 
-let commit ~time ~message context =
-  raw_commit ~time ~message context >>= fun commit ->
+let commit ~time ?message context =
+  raw_commit ~time ?message context >>= fun commit ->
   Lwt.return (GitStore.Commit.hash commit)
 
 (*-- Generic Store Primitives ------------------------------------------------*)
