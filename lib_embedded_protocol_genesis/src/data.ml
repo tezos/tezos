@@ -14,6 +14,7 @@ module Command = struct
     | Activate of {
         protocol: Protocol_hash.t ;
         validation_passes: int ;
+        fitness: Fitness.t ;
       }
 
     (* Activate a protocol as a testnet *)
@@ -37,16 +38,17 @@ module Command = struct
     union ~tag_size:`Uint8 [
       case (Tag 0)
         (mk_case "activate"
-           (obj2
+           (obj3
               (req "hash" Protocol_hash.encoding)
               (req "validation_passes" uint8)
+              (req "fitness" Fitness.encoding)
            ))
         (function
-          | Activate { protocol ; validation_passes } ->
-              Some (protocol, validation_passes)
+          | Activate { protocol ; validation_passes ; fitness} ->
+              Some (protocol, validation_passes, fitness)
           | _ -> None)
-        (fun (protocol, validation_passes) ->
-           Activate { protocol ; validation_passes }) ;
+        (fun (protocol, validation_passes, fitness) ->
+           Activate { protocol ; validation_passes ; fitness }) ;
       case (Tag 1)
         (mk_case "activate_testnet"
            (obj3

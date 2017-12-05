@@ -81,17 +81,9 @@ let precheck_block
   Lwt.return (parse_block raw_block) >>=? fun _ ->
   return ()
 
-let begin_application
-    ~predecessor_context:ctxt
-    ~predecessor_timestamp:_
-    ~predecessor_fitness:_
-    raw_block =
-  Data.Init.may_initialize ctxt >>=? fun ctxt ->
-  Lwt.return (parse_block raw_block) >>=? fun block ->
-  check_signature ctxt block >>=? fun () ->
-  let fitness = raw_block.shell.fitness in
-  match block.command with
-  | Data.Command.Activate { protocol = hash ; validation_passes } ->
+let prepare_application ctxt command timestamp fitness =
+  match command with
+  | Data.Command.Activate { protocol = hash ; validation_passes ; fitness } ->
       let message =
         Some (Format.asprintf "activate %a" Protocol_hash.pp_short hash) in
       Updater.activate ctxt hash >>= fun ctxt ->
@@ -103,7 +95,7 @@ let begin_application
   | Activate_testnet { protocol = hash ; validation_passes ; delay } ->
       let message =
         Some (Format.asprintf "activate testnet %a" Protocol_hash.pp_short hash) in
-      let expiration = Time.add raw_block.shell.timestamp delay in
+      let expiration = Time.add timestamp delay in
       Updater.fork_test_network ctxt ~protocol:hash ~expiration >>= fun ctxt ->
       return { Updater.message ; context = ctxt ; fitness ;
                max_operations_ttl = 0 ;
@@ -111,21 +103,40 @@ let begin_application
                  Array.to_list (Array.make validation_passes 0) ;
                max_operation_data_length = 0 }
 
+
+let begin_application
+    ~predecessor_context:ctxt
+    ~predecessor_timestamp:_
+    ~predecessor_fitness:_
+    raw_block =
+  Data.Init.may_initialize ctxt >>=? fun ctxt ->
+  Lwt.return (parse_block raw_block) >>=? fun block ->
+  check_signature ctxt block >>=? fun () ->
+  prepare_application ctxt block.command block.shell.timestamp block.shell.fitness
+
 let begin_construction
-    ~predecessor_context:context
+    ~predecessor_context:ctxt
     ~predecessor_timestamp:_
     ~predecessor_level:_
     ~predecessor_fitness:fitness
     ~predecessor:_
-    ~timestamp:_
-    ?proto_header:_
+    ~timestamp
+    ?proto_header
     () =
-  (* Dummy result. *)
-  return { Updater.message = None ; context ;
-           fitness ; max_operations_ttl = 0 ;
-           max_operation_data_length = 0 ;
-           max_number_of_operations = [] ;
-         }
+  match proto_header with
+  | None ->
+      (* Dummy result. *)
+      return { Updater.message = None ; context = ctxt ;
+               fitness ; max_operations_ttl = 0 ;
+               max_operation_data_length = 0 ;
+               max_number_of_operations = [] ;
+             }
+  | Some command ->
+      match Data_encoding.Binary.of_bytes Data.Command.encoding command with
+      | None -> failwith "Failed to parse proto header"
+      | Some command ->
+          Data.Init.may_initialize ctxt >>=? fun ctxt ->
+          prepare_application ctxt command timestamp fitness
 
 let apply_operation _vctxt _ =
   Lwt.return (Error []) (* absurd *)

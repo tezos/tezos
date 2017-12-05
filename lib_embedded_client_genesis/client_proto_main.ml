@@ -23,24 +23,14 @@ let call_error_service1 rpc_config s block a1 =
   | Ok (Ok v) -> return v
   | Error _ as err -> Lwt.return err
 
-let forge_block
-    rpc_config block net_id ?(timestamp = Time.now ()) command fitness =
+let bake rpc_config ?(timestamp = Time.now ()) block command seckey =
   let block = Client_rpcs.last_baked_block block in
-  Client_node_rpcs.Blocks.info rpc_config block >>=? fun pred ->
-  let proto_level =
-    match command with
-    | Data.Command.Activate _ -> 1
-    | Data.Command.Activate_testnet _ -> 0 in
-  call_service1 rpc_config
-    Services.Forge.block block
-    ((net_id, Int32.succ pred.level, proto_level,
-      pred.hash, timestamp, fitness), command)
-
-let bake rpc_config ?timestamp block command fitness seckey =
-  let block = Client_rpcs.last_baked_block block in
-  Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
-  forge_block
-    rpc_config ?timestamp block bi.net_id command fitness >>=? fun blk ->
+  let proto_header = Data_encoding.Binary.to_bytes Data.Command.encoding command in
+  Client_node_rpcs.Blocks.preapply
+    rpc_config block ~timestamp ~proto_header [] >>=? fun { shell_header } ->
+  let blk =
+    Data_encoding.Binary.to_bytes Block_header.encoding
+      { shell = shell_header ; proto = proto_header } in
   let signed_blk = Ed25519.Signature.append seckey blk in
   Client_node_rpcs.inject_block rpc_config signed_blk []
 
@@ -87,7 +77,8 @@ let commands () =
         let fitness =
           Tezos_embedded_raw_protocol_alpha.Fitness_repr.from_int64 fitness in
         bake cctxt ?timestamp cctxt#block
-          (Activate { protocol = hash ; validation_passes }) fitness seckey >>=? fun hash ->
+          (Activate { protocol = hash ; validation_passes ; fitness })
+          seckey >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return ()
       end ;
@@ -96,11 +87,7 @@ let commands () =
       args
       (prefixes [ "fork" ; "test" ; "protocol" ]
        @@ Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)"
-       @@ prefixes [ "with" ; "fitness" ]
-       @@ param ~name:"fitness"
-         ~desc:"Hardcoded fitness of the first block (integer)"
-         int64_parameter
-       @@ prefixes [ "and" ; "passes" ]
+       @@ prefixes [ "with" ; "passes" ]
        @@ param ~name:"passes"
          ~desc:"Hardcoded number of validation passes (integer)"
          int_parameter
@@ -108,14 +95,12 @@ let commands () =
        @@ Ed25519.Secret_key.param
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
-      begin fun timestamp hash fitness validation_passes seckey cctxt ->
-        let fitness =
-          Tezos_embedded_raw_protocol_alpha.Fitness_repr.from_int64 fitness in
+      begin fun timestamp hash validation_passes seckey cctxt ->
         bake cctxt ?timestamp cctxt#block
           (Activate_testnet { protocol = hash ;
                               validation_passes ;
                               delay = Int64.mul 24L 3600L })
-          fitness seckey >>=? fun hash ->
+          seckey >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return ()
       end ;
