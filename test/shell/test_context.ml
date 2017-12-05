@@ -84,10 +84,10 @@ let create_block3b idx block2_commit =
 
 type t = {
   idx: Context.index ;
-  genesis: Context.commit ;
-  block2: Context.commit ;
-  block3a: Context.commit ;
-  block3b: Context.commit ;
+  genesis: Context_hash.t ;
+  block2: Context_hash.t ;
+  block3a: Context_hash.t ;
+  block3b: Context_hash.t ;
 }
 
 let wrap_context_init f base_dir =

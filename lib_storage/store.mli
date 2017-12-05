@@ -90,7 +90,7 @@ module Block : sig
     max_operations_ttl: int ;
     max_number_of_operations: int list;
     max_operation_data_length: int;
-    context: Context.commit ;
+    context: Context_hash.t ;
   }
 
   module Contents : SINGLE_STORE

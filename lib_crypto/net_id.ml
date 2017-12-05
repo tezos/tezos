@@ -148,3 +148,8 @@ end
 
 let () =
   Base58.check_encoded_prefix b58check_encoding "Net" 15
+
+let zero =
+  match of_hex (String.make (size * 2) '0') with
+  | Some c -> c
+  | None -> assert false

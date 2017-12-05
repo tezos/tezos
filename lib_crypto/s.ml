@@ -94,6 +94,7 @@ module type INTERNAL_HASH = sig
     (t -> 'a, 'arg, 'ret) Cli_entries.params
   val random_set_elt: Set.t -> t
   module Table : Hashtbl.S with type key = t
+  val zero: t
 end
 
 module type INTERNAL_MERKLE_TREE = sig

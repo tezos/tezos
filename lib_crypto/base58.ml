@@ -301,6 +301,7 @@ module Prefix = struct
   let operation_list_hash = "\133\233" (* Lo(52) *)
   let operation_list_list_hash = "\029\159\109" (* LLo(53) *)
   let protocol_hash = "\002\170" (* P(51) *)
+  let context_hash = "\079\199" (* Co(52) *)
 
   (* 20 *)
   let ed25519_public_key_hash = "\006\161\159" (* tz1(36) *)

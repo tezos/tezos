@@ -29,13 +29,49 @@ module Metadata = struct
   let merge = Irmin.Merge.default t
 end
 
+module IrminBlake2B : Irmin.Hash.S with type t = Context_hash.t = struct
+
+  type t = Context_hash.t
+
+  let digest_size = Context_hash.size
+
+  let to_raw t = Cstruct.of_bigarray (Context_hash.to_bytes t)
+  let of_raw t =
+    match Context_hash.of_bytes (Cstruct.to_bigarray t) with
+    | Some t -> t
+    | None ->
+        let str = Cstruct.to_string t in
+        Format.kasprintf invalid_arg "%s (%d)" str (String.length str)
+
+  let t = Irmin.Type.like Irmin.Type.cstruct of_raw to_raw
+
+  let digest t x =
+    Context_hash.hash_bytes
+      [Cstruct.to_bigarray (Irmin.Type.encode_cstruct t x)]
+
+  let pp = Context_hash.pp
+
+  let of_string x =
+    match Context_hash.of_b58check_exn x with
+    | exception (Invalid_argument s) -> Error (`Msg s)
+    | h -> Ok h
+
+  let has_kind = function
+    | `SHA1 -> true
+    | _ -> false
+
+  let to_raw_int c =
+    Int64.to_int @@ MBytes.get_int64 (Context_hash.to_bytes c) 0
+
+end
+
 module GitStore =
   Irmin_leveldb.Make
     (Metadata)
     (MBytesContent)
     (Irmin.Path.String_list)
     (Irmin.Branch.String)
-    (Irmin.Hash.SHA1)
+    (IrminBlake2B)
 
 type index = {
   path: string ;
@@ -49,30 +85,6 @@ and context = {
   tree: GitStore.tree ;
 }
 type t = context
-
-type commit = GitStore.Commit.Hash.t
-
-let dummy_commit =
-  match
-    GitStore.Commit.Hash.of_string "0000000000000000000000000000000000000000"
-  with
-  | Ok c -> c
-  | Error _ -> assert false
-
-let commit_encoding : commit Data_encoding.t =
-  let open Data_encoding in
-  conv
-    (fun c -> Cstruct.to_bigarray (Irmin.Type.encode_cstruct GitStore.Commit.Hash.t c))
-    (fun c ->
-       match
-         Irmin.Type.decode_cstruct
-           GitStore.Commit.Hash.t
-           (Cstruct.of_bigarray c)
-       with
-       | Ok x -> x
-       | _ -> assert false
-    )
-    bytes
 
 (*-- Version Access and Update -----------------------------------------------*)
 

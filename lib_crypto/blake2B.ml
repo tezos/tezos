@@ -209,6 +209,11 @@ module Make (R : sig
         Data_encoding.(list (tup2 encoding arg_encoding))
   end
 
+  let zero =
+    match of_hex (String.make (size * 2) '0') with
+    | Some c -> c
+    | None -> assert false
+
 end
 
 module Generic_Merkle_tree (H : sig

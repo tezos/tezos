@@ -16,6 +16,7 @@ module Prefix : sig
   val operation_list_hash: string
   val operation_list_list_hash: string
   val protocol_hash: string
+  val context_hash: string
   val ed25519_public_key_hash: string
   val cryptobox_public_key_hash: string
   val ed25519_public_key: string

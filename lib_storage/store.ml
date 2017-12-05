@@ -86,7 +86,7 @@ module Block = struct
     max_operations_ttl: int ;
     max_number_of_operations: int list;
     max_operation_data_length: int;
-    context: Context.commit ;
+    context: Context_hash.t ;
   }
 
   module Contents =
@@ -115,7 +115,7 @@ module Block = struct
                 (req "max_operations_ttl" uint16)
                 (req "max_number_of_operations" (list uint16))
                 (req "max_operation_data_length" uint16)
-                (req "context" Context.commit_encoding)
+                (req "context" Context_hash.encoding)
                 (req "header" Block_header.encoding))
        end))
 
