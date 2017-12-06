@@ -25,7 +25,7 @@ stages:
 
 ## Prepare docker image with precompiled OCaml/opam
 
-prepare:
+prepare:opam:
   <<: *dind_definition
   stage: prepare
   only:
@@ -40,6 +40,22 @@ prepare:
     - docker tag "tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
                  "tezos/opam:latest"
     - docker push "tezos/opam:latest"
+
+prepare:opam2:
+  <<: *dind_definition
+  stage: prepare
+  only:
+    - schedules
+  before_script:
+    - . ./scripts/version.sh
+  script:
+    - ./scripts/create_docker_image.alpine.opam2.sh
+    - mkdir ~/.docker || true
+    - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
+    - docker push "tezos/opam2:alpine-${alpine_version}_ocaml-${ocaml_version}"
+    - docker tag "tezos/opam2:alpine-${alpine_version}_ocaml-${ocaml_version}"
+                 "tezos/opam2:latest"
+    - docker push "tezos/opam2:latest"
 
 ## Tezos
 
