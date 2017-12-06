@@ -19,6 +19,7 @@ build-test: [
 depends: [
   "ocamlfind" {build}
   "jbuilder" {build}
-  "ocplib-resto"
+  "ocplib-resto" {= "dev" }
   "ocplib-json-typed" { >= "0.4" }
+  "ocplib-endian" ## for `ocplib-json-typed.bson` to be built
 ]

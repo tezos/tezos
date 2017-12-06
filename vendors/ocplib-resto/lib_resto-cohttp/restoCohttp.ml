@@ -215,10 +215,10 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
           end >>=? fun query ->
           let output = output_media_type.construct s.types.output
           and error = function
-            | None -> Cohttp_lwt_body.empty, Transfer.Fixed 0L
+            | None -> Cohttp_lwt.Body.empty, Transfer.Fixed 0L
             | Some e ->
                 let s = output_media_type.construct s.types.error e in
-                Cohttp_lwt_body.of_string s,
+                Cohttp_lwt.Body.of_string s,
                 Transfer.Fixed (Int64.of_int (String.length s)) in
           let headers = Header.init () in
           let headers =
@@ -228,7 +228,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
             | Service.No_input ->
                 s.handler query () >>= Lwt.return_ok
             | Service.Input input ->
-                Cohttp_lwt_body.to_string body >>= fun body ->
+                Cohttp_lwt.Body.to_string body >>= fun body ->
                 match
                   input_media_type.destruct input body
                 with
@@ -243,13 +243,13 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
                 Transfer.Fixed (Int64.of_int (String.length body)) in
               Lwt.return_ok
                 (Response.make ~status:`OK ~encoding ~headers (),
-                 Cohttp_lwt_body.of_string body)
+                 Cohttp_lwt.Body.of_string body)
           | `OkStream o ->
               let body = create_stream server con output o in
               let encoding = Transfer.Chunked in
               Lwt.return_ok
                 (Response.make ~status:`OK ~encoding ~headers (),
-                 Cohttp_lwt_body.of_stream body)
+                 Cohttp_lwt.Body.of_stream body)
           | `Created s ->
               let headers = Header.init () in
               let headers =
@@ -258,11 +258,11 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
                 | Some s -> Header.add headers "location" s in
               Lwt.return_ok
                 (Response.make ~status:`Created  ~headers (),
-                 Cohttp_lwt_body.empty)
+                 Cohttp_lwt.Body.empty)
           | `No_content ->
               Lwt.return_ok
                 (Response.make ~status:`No_content (),
-                 Cohttp_lwt_body.empty)
+                 Cohttp_lwt.Body.empty)
           | `Unauthorized e ->
               let body, encoding = error e in
               let status = `Unauthorized in
@@ -322,7 +322,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
           let headers = Cors.add_headers headers server.cors origin_header in
           Lwt.return_ok
             (Response.make ~flush:true ~status:`OK ~headers (),
-             Cohttp_lwt_body.empty)
+             Cohttp_lwt.Body.empty)
       | _ ->
           Lwt.return_error `Not_implemented
     end >>= function
@@ -330,7 +330,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
     | Error `Not_implemented ->
         Lwt.return
           (Response.make ~status:`Not_implemented (),
-           Cohttp_lwt_body.empty)
+           Cohttp_lwt.Body.empty)
     | Error `Method_not_allowed methods ->
         let headers = Header.init () in
         let headers =
@@ -338,14 +338,14 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
             (List.map Resto.string_of_meth methods) in
         Lwt.return
           (Response.make ~status:`Method_not_allowed ~headers (),
-           Cohttp_lwt_body.empty)
+           Cohttp_lwt.Body.empty)
     | Error `Cannot_parse_path (context, arg, value) ->
         let headers = Header.init () in
         let headers =
           Header.add headers "content-type" "text/plain" in
         Lwt.return
           (Response.make ~status:`Bad_request ~headers (),
-           Format.kasprintf Cohttp_lwt_body.of_string
+           Format.kasprintf Cohttp_lwt.Body.of_string
              "Failed to parsed an argument in path. After \"%s\", \
               the value \"%s\" is not acceptable for type \"%s\""
              (String.concat "/" context) value arg.name)
@@ -355,7 +355,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
           Header.add headers "content-type" "text/plain" in
         Lwt.return
           (Response.make ~status:`Bad_request ~headers (),
-           Format.kasprintf Cohttp_lwt_body.of_string
+           Format.kasprintf Cohttp_lwt.Body.of_string
              "Failed to parse the request body: %s" s)
     | Error `Cannot_parse_query s ->
         let headers = Header.init () in
@@ -363,7 +363,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
           Header.add headers "content-type" "text/plain" in
         Lwt.return
           (Response.make ~status:`Bad_request ~headers (),
-           Format.kasprintf Cohttp_lwt_body.of_string
+           Format.kasprintf Cohttp_lwt.Body.of_string
              "Failed to parse the query string: %s" s)
     | Error `Not_acceptable ->
         let accepted_encoding =
@@ -372,15 +372,15 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
                server.media_types) in
         Lwt.return
           (Response.make ~status:`Not_acceptable (),
-           Cohttp_lwt_body.of_string accepted_encoding)
+           Cohttp_lwt.Body.of_string accepted_encoding)
     | Error `Unsupported_media_type _ ->
         Lwt.return
           (Response.make ~status:`Unsupported_media_type (),
-           Cohttp_lwt_body.empty)
+           Cohttp_lwt.Body.empty)
     | Error `Not_found ->
         Lwt.return
           (Response.make ~status:`Not_found (),
-           Cohttp_lwt_body.empty)
+           Cohttp_lwt.Body.empty)
 
   (* Promise a running RPC server. *)
 
@@ -402,9 +402,8 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
       stopper ;
       worker = Lwt.return_unit ;
     } in
-    let open Cohttp_lwt_unix in
     Conduit_lwt_unix.init ~src:host () >>= fun ctx ->
-    let ctx = Cohttp_lwt_unix_net.init ~ctx () in
+    let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
     server.worker <- begin
       let conn_closed (_, con) =
         log_info "connection closed %s" (Connection.to_string con) ;
@@ -426,12 +425,12 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
             let headers =
               Header.add headers "content-type" "text/ocaml.exception" in
             let status = `Internal_server_error in
-            let body = Cohttp_lwt_body.of_string (Printexc.to_string exn) in
+            let body = Cohttp_lwt.Body.of_string (Printexc.to_string exn) in
             Lwt.return (Response.make ~status ~headers (), body)
           end
       in
-      Server.create ~stop ~ctx ~mode ~on_exn
-        (Server.make ~callback ~conn_closed ())
+      Cohttp_lwt_unix.Server.create ~stop ~ctx ~mode ~on_exn
+        (Cohttp_lwt_unix.Server.make ~callback ~conn_closed ())
     end ;
     Lwt.return server
 

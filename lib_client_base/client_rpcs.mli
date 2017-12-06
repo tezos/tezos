@@ -39,7 +39,7 @@ class type rpc_sig = object
     RPC.meth ->
     string list ->
     Data_encoding.json ->
-    ('a * Cohttp.Code.status_code * Cohttp_lwt_body.t)
+    ('a * Cohttp.Code.status_code * Cohttp_lwt.Body.t)
       Error_monad.tzresult Lwt.t
   method parse_answer :
     (unit, 'b, 'c, 'd) RPC.service ->

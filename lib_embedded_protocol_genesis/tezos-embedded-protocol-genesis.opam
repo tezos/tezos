@@ -9,11 +9,14 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
-  "base-bigarray"
-  "tezos-base"
-  "uutf"
+  "tezos-protocol-compiler"
+  "tezos-node-updater"
+  "tezos-node-shell"
 ]
 build: [
+  [ "rm" "jbuild" "src/jbuild" ]
+  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_embedded_protocol_template" "src/jbuild" ]
+  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"genesis\"/" "src/jbuild" ]
   [ "jbuilder" "build" "-p" name "-j" jobs ]
 ]
 build-test: [

@@ -19,6 +19,6 @@ build-test: [
 depends: [
   "ocamlfind" {build}
   "jbuilder" {build}
-  "ocplib-resto-directory"
-  "cohttp-lwt-unix"
+  "ocplib-resto-directory" {= "dev" }
+  "cohttp-lwt-unix" { >= "1.0.0" }
 ]

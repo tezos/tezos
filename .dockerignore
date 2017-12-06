@@ -6,6 +6,8 @@ tezos-node
 tezos-protocol-compiler
 tezos-client
 
+scripts/opam-test-all.sh.DONE
+
 **/.merlin
 
 **/*~

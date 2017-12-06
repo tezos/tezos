@@ -9,9 +9,8 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
-  "base-bigarray"
-  "mtime.clock.os"
-  "ocplib-resto-cohttp"
+  "tezos-base"
+  "tezos-node-p2p-base"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

@@ -13,13 +13,10 @@ depends: [
   "base-threads"
   "conf-libev"
   "calendar"
-  "cohttp" { >= "0.21" }
+  "cohttp" { >= "1.0.0" }
   "conduit"
   "ezjsonm" { >= "0.5.0" }
-  "git"
-  "git-unix"
   "irmin" { >= "1.3" }
-  "irmin-unix" { >= "1.3" }
   "lwt" { >= "3.0.0" }
   "lwt_ssl"
   "menhir"

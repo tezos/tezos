@@ -12,7 +12,8 @@
               tezos-embedded-protocol-genesis
               tezos-embedded-protocol-demo
               tezos-embedded-protocol-alpha
-              cmdliner))
+              cmdliner
+              ssl))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives

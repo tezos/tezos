@@ -9,12 +9,11 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
-  "base-bigarray"
   "tezos-stdlib"
   "tezos-data-encoding"
   "tezos-error-monad"
-  "lwt.unix"
-  "ipaddr.unix"
+  "lwt" { >= "3.0.0" }
+  "ipaddr"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

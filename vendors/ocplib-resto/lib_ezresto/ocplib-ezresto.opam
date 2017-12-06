@@ -19,6 +19,6 @@ build-test: [
 depends: [
   "ocamlfind" {build}
   "jbuilder" {build}
-  "ocplib-resto"
-  "ocplib-resto-json"
+  "ocplib-resto" {= "dev" }
+  "ocplib-resto-json" {= "dev" }
 ]

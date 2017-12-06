@@ -9,9 +9,8 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
-  "base-bigarray"
   "cstruct"
-  "ocplib-endian.bigstring"
+  "ocplib-endian"
   "stringext"
 ]
 build: [

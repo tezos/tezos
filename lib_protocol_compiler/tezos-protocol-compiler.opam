@@ -9,14 +9,12 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
+  "base-unix"
   "tezos-base"
   "tezos-protocol-environment-sigs"
-  "compiler-libs"
-  "compiler-libs.optcomp"
-  "lwt.unix"
+  "lwt"
   "ocplib-endian"
-  "ocplib-ocamlres"
-  "unix"
+  "ocp-ocamlres" { >= "dev" }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

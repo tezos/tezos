@@ -19,6 +19,6 @@ build-test: [
 depends: [
   "ocamlfind" {build}
   "jbuilder" {build}
-  "ocplib-ezresto"
-  "ocplib-resto-directory"
+  "ocplib-ezresto" {= "dev" }
+  "ocplib-resto-directory" {= "dev" }
 ]
