@@ -23,12 +23,20 @@ cleanup () {
 }
 trap cleanup EXIT INT
 
+opam_files=$(find -name \*.opam | sort)
+dependencies="$opam_files scripts/install_build_deps.sh scripts/version.sh scripts/opam-pin.sh scripts/opam-unpin.sh scripts/opam-remove.sh Dockerfile"
+
+for file in $dependencies; do
+    if [ "$file" = Dockerfile ]; then continue; fi
+    copy_files="$copy_files\nCOPY $file ./tezos/$file"
+done
+
 sed -e 's|$base_image|'"$base_image"'|g' \
     -e 's|$ocaml_version|'"$ocaml_version"'|g' \
+    -e 's|$copy_files|'"$copy_files"'|g' \
     scripts/Dockerfile.build_deps.in > Dockerfile
 
 ## Lookup for for prebuilt dependencies...
-dependencies="scripts/install_build_deps.sh scripts/version.sh tezos-deps.opam Dockerfile"
 dependencies_sha1=$(docker inspect --format="{{ .RootFS.Layers }}" --type=image $base_image | sha1sum - $dependencies | sha1sum | tr -d ' -')
 if [ ! -z "$cached_image" ]; then
     echo

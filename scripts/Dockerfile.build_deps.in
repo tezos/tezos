@@ -6,8 +6,7 @@ FROM $base_image
 ## /!\  'COPY'edfiles.
 ## /!\ /!\ /!\ /!\/!\ /!\ /!\
 
-COPY scripts/install_build_deps.sh scripts/version.sh tezos/scripts/
-COPY tezos-deps.opam tezos/
+$copy_files
 
 RUN sudo apk update && \
     opam config exec -- ./tezos/scripts/install_build_deps.sh && \

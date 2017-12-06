@@ -38,7 +38,14 @@ let fork_node ?(timeout = 4) ?(port = 18732) ?sandbox () =
   let null_fd = Unix.(openfile "/dev/null" [O_RDONLY] 0o644) in
   let exe =
     let (//) = Filename.concat in
-    Sys.getcwd () // ".." // "bin_node" // "main.exe" in
+    try
+      let path = Sys.argv.(1) in
+      if Filename.is_relative path then
+        Sys.getcwd () // ".." // path
+      else
+        path
+    with _ -> Sys.getcwd () // ".." // "bin_node" // "main.exe" in
+  Format.eprintf "EXE %s@." exe ;
   let pid =
     Unix.create_process exe
       [| "tezos-node" ;

@@ -30,31 +30,27 @@
 
 (alias
  ((name runtest_endorsement)
-  (deps (../../bin_node/main.exe
-         sandbox.json))
+  (deps (sandbox.json))
   (locks  (/tcp-port/18100))
-  (action (run ${exe:test_endorsement.exe}))))
+  (action (chdir ${ROOT} (run ${exe:test_endorsement.exe} ${bin:tezos-node})))))
 
 (alias
  ((name runtest_origination)
-  (deps (../../bin_node/main.exe
-         sandbox.json))
+  (deps (sandbox.json))
   (locks  (/tcp-port/18200))
-  (action (run ${exe:test_origination.exe}))))
+  (action (chdir ${ROOT} (run ${exe:test_origination.exe} ${bin:tezos-node})))))
 
 (alias
  ((name runtest_transaction)
-  (deps (../../bin_node/main.exe
-         sandbox.json))
+  (deps (sandbox.json))
   (locks  (/tcp-port/18300))
-  (action (run ${exe:test_transaction.exe}))))
+  (action (chdir ${ROOT} (run ${exe:test_transaction.exe} ${bin:tezos-node})))))
 
 (alias
  ((name runtest_vote)
-  (deps (../../bin_node/main.exe
-         sandbox-vote.json))
+  (deps (sandbox-vote.json))
   (locks  (/tcp-port/18400))
-  (action (run ${exe:test_vote.exe}))))
+  (action (chdir ${ROOT} (run ${exe:test_vote.exe} ${bin:tezos-node})))))
 
 (alias
  ((name runtest)

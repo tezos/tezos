@@ -12,7 +12,7 @@ Build instructions
 ------------------
 
 To compile Tezos, you need an OCaml compiler (version 4.04.2) and all the
-libraries listed in `src/tezos-deps.opam`.
+libraries listed in the various `tezos-*.opam` files.
 
 The best way to install all dependencies is by first installing
 [OPAM](https://opam.ocaml.org/), the OCaml package manager.

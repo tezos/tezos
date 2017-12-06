@@ -11,7 +11,7 @@ opam pin remove $packages
 
 ### Temporary HACK
 
-## Should be in sync with `install-build-deps.sh` and `opam-pin.sh`
+## Should be in sync with `opam-pin.sh`
 opam pin remove --no-action sodium
 opam pin remove --no-action ocp-ocamlres
 opam pin remove --no-action ocplib-json-typed
