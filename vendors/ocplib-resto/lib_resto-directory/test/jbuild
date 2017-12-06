@@ -1,0 +1,14 @@
+(jbuild_version 1)
+
+(executable
+ ((name resto_test)
+  (modules (Services Directory Resto_test))
+  (libraries (ocplib-resto-directory ocplib-resto-json lwt.unix))))
+
+(alias
+((name runtest_resto)
+ (action (run ${path:resto_test.exe}))))
+
+(alias
+((name runtest)
+ (deps ((alias runtest_resto)))))

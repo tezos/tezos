@@ -1,0 +1,14 @@
+(jbuild_version 1)
+
+(executable
+ ((name ezResto_test)
+  (modules (EzServices EzDirectory EzResto_test))
+  (libraries (ocplib-ezresto-directory lwt.unix))))
+
+(alias
+((name runtest_ezresto)
+ (action (run ${path:ezResto_test.exe}))))
+
+(alias
+((name runtest)
+ (deps ((alias runtest_ezresto)))))

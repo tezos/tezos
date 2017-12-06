@@ -19,6 +19,7 @@ build-test: [
 depends: [
   "ocamlfind" {build}
   "jbuilder" {build}
-  "ocplib-resto"
-  "lwt"
+  "ocplib-resto" {= "dev" }
+  "ocplib-resto-json" {= "dev" & test }
+  "lwt" { >= "3.0.0" }
 ]
