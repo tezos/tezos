@@ -24,6 +24,10 @@
                     -open Tezos_node_shell
                     -linkall))))
 
+(install
+ ((section bin)
+  (files ((tezos-sandboxed-node.sh as tezos-sandboxed-node.sh)))))
+
 (alias
  ((name runtest_indent)
   (deps ((glob_files *.ml) (glob_files *.mli)))

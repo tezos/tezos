@@ -13,6 +13,10 @@
                     -open Tezos_client_base
                     -linkall))))
 
+(install
+ ((section bin)
+  (files ((tezos-init-sandboxed-client.sh as tezos-init-sandboxed-client.sh)))))
+
 (alias
  ((name runtest_indent)
   (deps ((glob_files *.ml) (glob_files *.mli)))

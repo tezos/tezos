@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+set -e
+
 node_dirs=()
 node_pids=()
 
@@ -20,8 +22,7 @@ start_sandboxed_node() {
         peers+=("127.0.0.1:$peer_port")
     done
     peers+=("--closed")
-    local_node="${local_node:-$src_dir/_build/default/bin_node/main.exe}"
-    node="$local_node"
+    node="${local_node:-tezos-node}"
     sandbox_file="${sandbox_file:-$script_dir/sandbox.json}"
     sandbox_param="--sandbox=$sandbox_file"
 
@@ -44,3 +45,36 @@ cleanup_nodes() {
     for pid in "${node_pids[@]}" ; do wait "$pid" ; done
     rm -rf "${node_dirs[@]}"
 }
+
+
+main() {
+
+    local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+    if [ $(basename "$bin_dir") = "bin_node" ]; then
+        local_node="${local_node:-$bin_dir/../_build/default/bin_node/main.exe}"
+        sandbox_file="${sandbox_file:-$bin_dir/../scripts/sandbox.json}"
+    fi
+
+    if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
+        echo "Small script to launch local and closed test network with a maximum of 9 nodes."
+        echo
+        echo "Usage: $0 <id>"
+        echo "  where <id> should be an integer between 1 and 9."
+        exit 1
+    fi
+
+    cleanup () {
+        set +e
+        echo Cleaning up...
+        cleanup_nodes
+    }
+    trap cleanup EXIT INT
+
+    start_sandboxed_node "$@"
+    wait $node_pids
+
+}
+
+if [ "$0" == "$BASH_SOURCE" ]; then
+    main "$@"
+fi

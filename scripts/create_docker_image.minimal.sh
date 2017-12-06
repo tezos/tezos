@@ -14,17 +14,14 @@ build_image_name="${3:-${image_name}_build:${image_version}}"
 cleanup () {
     set +e
     echo Cleaning up...
-    [ -z "$tmp_container" ] || docker rm -f "$tmp_container"
     rm -rf Dockerfile bin
 }
 trap cleanup EXIT INT
 
-tmp_container="$(docker run -dit "$build_image_name" /bin/sh -c "mkdir /home/opam/bin && cp /home/opam/tezos/tezos-* /home/opam/bin")"
+docker run -dit --rm  --volume $(pwd)/bin:/home/opam/bin "$build_image_name" \
+       /bin/sh -c "sudo cp -L /home/opam/tezos/_build/install/default/bin/* /home/opam/bin"
 
-ret=$(docker wait "$tmp_container")
-if [ "$ret" -ne 0 ]; then exit $ret; fi
-
-docker cp "$tmp_container":/home/opam/bin/ bin
+ls bin
 
 echo
 echo "### Building minimal docker image..."
@@ -37,3 +34,5 @@ docker build -t "$image_name:$image_version" .
 echo
 echo "### Succesfully build docker image: $image_name:$image_version"
 echo
+
+rm -r bin

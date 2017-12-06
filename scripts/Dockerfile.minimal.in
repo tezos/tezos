@@ -39,7 +39,6 @@ RUN sudo chown root:root bin/* && \
 
 RUN sudo cp scripts/docker_entrypoint.sh /usr/local/bin/tezos && \
     sudo cp scripts/docker_entrypoint.inc.sh \
-            scripts/client_lib.inc.sh \
             /usr/local/bin/ && \
     sudo chmod a+rx /usr/local/bin/tezos
 

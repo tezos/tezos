@@ -6,11 +6,14 @@ src_dir="$(dirname "$test_dir")"
 cd "$test_dir"
 
 sandbox_file="$test_dir/sandbox.json"
-local_node="$src_dir/bin_node/main.exe"
-local_client="$src_dir/bin_client/main.exe"
 
-source $src_dir/scripts/node_lib.inc.sh
-source $src_dir/scripts/client_lib.inc.sh
+tezos_sandboxed_node="${1:-$test_dir/../bin_node/tezos-sandboxed-node.sh}"
+local_node="${2:-$test_dir/../_build/default/bin_node/main.exe}"
+tezos_init_sandboxed_client="${3:-$test_dir/../bin_client/tezos-init-sandboxed-client.sh}"
+local_client="${4:-$test_dir/../_build/default/bin_client/main.exe}"
+
+source $tezos_sandboxed_node
+source $tezos_init_sandboxed_client
 
 ### Log files handling
 

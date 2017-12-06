@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+set -e
+
 client_dir="${client_dir:=$HOME/.tezos-client}"
 client="${client:=tezos-client -base-dir $client_dir}"
 
@@ -13,7 +15,6 @@ init_sandboxed_client() {
     rpc=$((18730 + id))
     client_dir="$(mktemp -d -t tezos-client.XXXXXXXX)"
     client_dirs+=("$client_dir")
-    local_client=${local_client:-$src_dir/_build/default/bin_client/main.exe}
     client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
 
 }
@@ -211,3 +212,65 @@ activate_alpha() {
         and key dictator
 
 }
+
+usage() {
+    echo "Small script to initialize a client to a local and closed test network with a maximum of 9 nodes."
+    echo
+    echo "Usage: eval \`$0 <id>\`"
+    echo "  where <id> should be an integer between 1 and 9."
+}
+
+main () {
+
+    local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
+    if [ $(basename "$bin_dir") = "bin_client" ]; then
+      local_client="${local_client:-$bin_dir/../_build/default/bin_client/main.exe}"
+    fi
+
+    if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
+        usage
+        exit 1
+    fi
+
+    init_sandboxed_client "$1"
+
+    add_sandboxed_bootstrap_identities | sed -e 's/^/## /' 1>&2
+
+    cat <<EOF
+if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
+alias tezos-client="$client" ;
+alias tezos-activate-alpha="$client -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and passes 1 and key dictator" ;
+alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-client tezos-activate-alpha tezos-client-reset" ;
+alias tezos-autocomplete="source \"$script_dir/bash-completion.sh\"" ;
+trap tezos-client-reset EXIT ;
+EOF
+
+    (cat | sed -e 's/^/## /') 1>&2 <<EOF
+
+The client is now properly initialized. In the rest of this shell
+session, you might now run \`tezos-client\` to communicate with a
+tezos node launched with \`launch-sandboxed-node $1\`. For instance:
+
+  tezos-client rpc call blocks/head/protocol
+
+Note: if the current protocol version, as reported by the previous
+command, is "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im", you
+may have to activate in your "sandboxed network" the same economic
+protocol than used by the alphanet by running:
+
+  tezos-activate-alpha
+
+Warning: all the client data will be removed when you close this shell
+or if you run this command a second time.
+
+Activate tab completion by running:
+
+  tezos-autocomplete
+
+EOF
+
+}
+
+if [ "$0" == "$BASH_SOURCE" ]; then
+    main "$@"
+fi

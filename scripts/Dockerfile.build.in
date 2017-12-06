@@ -4,5 +4,5 @@ COPY . tezos
 
 RUN sudo chown -R opam /home/opam/tezos && \
     cd tezos && \
-    opam config exec -- make all && \
-    opam config exec -- make build-test
+    opam config exec -- jbuilder build @install && \
+    opam config exec -- jbuilder install

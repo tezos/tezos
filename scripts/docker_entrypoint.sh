@@ -12,7 +12,7 @@ export client_dir="$data_dir/client"
 export node="tezos-node"
 export client="tezos-client -base-dir $client_dir"
 
-. "${script_dir}"/client_lib.inc.sh
+. tezos-init-sandboxed-client.sh
 . "${script_dir}"/docker_entrypoint.inc.sh
 
 usage() {
