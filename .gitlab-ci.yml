@@ -5,6 +5,7 @@ stages:
   - prepare
   - build
   - test
+  - opam
   - publish
   - deploy
   - cleanup
@@ -78,11 +79,13 @@ build:
     ## Saving the docker image...
     - docker push "${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}"
 
-## Basic tests
+## Basic tests (run on merge requests)
 
 .test_template: &test_definition
   stage: test
   image: ${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}
+  except:
+    - master@tezos/tezos
   before_script:
     - cd /home/opam/tezos
   dependencies:
@@ -164,6 +167,199 @@ test:proto:sandbox:
   <<: *test_definition
   script:
     - jbuilder build @runtest_sandbox
+
+## Basic tests through opam packaged (run on master only)
+##
+## We use opam2-beta because we want to run the testsuite,
+## i.e. `opam install --with-test`, and it is buggy in opam.1.2.1. It
+## insists on building the testsuite of all the dependencies... and many
+## package in opam-repository have buggy testsuite packaging.
+
+.opam_template: &opam_definition
+  image: tezos/opam2
+  stage: opam
+  only:
+    - master@tezos/tezos
+  script:
+    - ./scripts/opam-pin.sh
+    - opam depext --yes ${package}
+    - opam install --yes --deps-only ${package}
+    - opam install --yes --with-test ${package}
+
+opam:01:ocplib-resto:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto
+
+opam:02:ocplib-resto-directory:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto-directory
+
+opam:03:ocplib-resto-cohttp:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto-cohttp
+
+opam:04:ocplib-resto-json:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto-json
+
+opam:05:ocplib-ezresto:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto
+
+opam:06:ocplib-ezresto-directory:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto-directory
+
+opam:07:tezos-stdlib:
+  <<: *opam_definition
+  variables:
+    package: tezos-stdlib
+
+opam:08:tezos-data-encoding:
+  <<: *opam_definition
+  variables:
+    package: tezos-data-encoding
+
+opam:09:tezos-error-monad:
+  <<: *opam_definition
+  variables:
+    package: tezos-error-monad
+
+opam:10:tezos-stdlib-lwt:
+  <<: *opam_definition
+  variables:
+    package: tezos-stdlib-lwt
+
+opam:11:tezos-crypto:
+  <<: *opam_definition
+  variables:
+    package: tezos-crypto
+
+opam:12:tezos-base:
+  <<: *opam_definition
+  variables:
+    package: tezos-base
+
+opam:13:tezos-node-p2p-base:
+  <<: *opam_definition
+  variables:
+    package: tezos-node-p2p-base
+
+opam:14:tezos-node-services:
+  <<: *opam_definition
+  variables:
+    package: tezos-node-services
+
+opam:15:tezos-protocol-environment-sigs:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-environment-sigs
+
+opam:16:irmin-leveldb:
+  <<: *opam_definition
+  variables:
+    package: irmin-leveldb
+
+opam:17:tezos-micheline:
+  <<: *opam_definition
+  variables:
+    package: tezos-micheline
+
+opam:18:tezos-node-http:
+  <<: *opam_definition
+  variables:
+    package: tezos-node-http
+
+opam:19:tezos-protocol-compiler:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-compiler
+
+opam:20:tezos-storage:
+  <<: *opam_definition
+  variables:
+    package: tezos-storage
+
+opam:21:tezos-node-p2p:
+  <<: *opam_definition
+  variables:
+    package: tezos-node-p2p
+
+opam:22:tezos-node-updater:
+  <<: *opam_definition
+  variables:
+    package: tezos-node-updater
+
+opam:23:tezos-node-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-node-shell
+
+opam:24:tezos-embedded-protocol-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-alpha
+
+opam:25:tezos-embedded-protocol-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-demo
+
+opam:26:tezos-embedded-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-protocol-genesis
+
+opam:27:tezos-client-base:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-base
+
+opam:28:tezos-embedded-client-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-client-alpha
+
+opam:29:tezos-embedded-client-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-embedded-client-genesis
+
+opam:30:tezos-protocol-demo:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-demo
+
+opam:31:tezos-client:
+  <<: *opam_definition
+  variables:
+    package: tezos-client
+
+opam:32:tezos-node:
+  <<: *opam_definition
+  variables:
+    package: tezos-node
+
+opam:33:tezos-protocol-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-alpha
+
+opam:34:tezos-protocol-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-genesis
+
+opam:35:tezos-test:
+  <<: *opam_definition
+  variables:
+    package: tezos-test
 
 ## Publishing (small) docker images with tezos binaries
 
@@ -253,8 +449,6 @@ deploy:bootstrap6:
   <<: *bootstrap_definition
   script:
     - ssh bootstrap6
-
-## Cleanup...
 
 # cleanup:
   # <<: *dind_definition
