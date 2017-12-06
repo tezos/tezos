@@ -19,3 +19,14 @@ for opam in $opams; do
 done
 
 packages=$(opam list --short --all --sort $packages)
+
+### Temporary HACK
+
+## Should be in sync with `install-build-deps.sh` and `opam-unpin.sh`
+opam pin add --no-action --dev-repo sodium
+opam pin add --no-action --dev-repo ocp-ocamlres
+opam pin add --no-action --dev-repo ocplib-json-typed
+
+opam remove tezos-deps || true
+
+### End of temporary HACK

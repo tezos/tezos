@@ -9,3 +9,14 @@ src_dir="$(dirname "$script_dir")"
 
 opam pin remove $packages
 
+### Temporary HACK
+
+## Should be in sync with `install-build-deps.sh` and `opam-pin.sh`
+opam pin remove --no-action sodium
+opam pin remove --no-action ocp-ocamlres
+opam pin remove --no-action ocplib-json-typed
+
+## Unpin package we used to pin...
+opam pin remove --no-action ocplib-resto
+
+### End of temporary HACK
