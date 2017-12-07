@@ -90,6 +90,9 @@ val trace : error -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
 (** Erroneous return on failed assertion *)
 val fail_unless : bool -> error -> unit tzresult Lwt.t
 
+(** Erroneous return on successful assertion *)
+val fail_when : bool -> error -> unit tzresult Lwt.t
+
 (** {2 In-monad list iterators} **********************************************)
 
 (** A {!List.iter} in the monad *)
