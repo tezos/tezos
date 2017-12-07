@@ -9,7 +9,7 @@
 (**************************************************************************)
 
 open Resto
-module Service = MakeService(RestoJson.Encoding)
+module Service = MakeService(Resto_json.Encoding)
 open Service
 
 (** Shared part *)

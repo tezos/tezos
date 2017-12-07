@@ -1,6 +1,5 @@
 version: "dev"
 opam-version: "1.2"
-name: "ocplib-resto-directory"
 maintainer: "Grégoire Henry <gregoire.henry@tezos.com>"
 authors: "Grégoire Henry <gregoire.henry@tezos.com>"
 license: "LGPL-2.1-with-OCaml-exception"
@@ -9,7 +8,6 @@ bug-reports: "https://github.com/OCamlPro/ocplib-resto/issues"
 dev-repo: "git+https://github.com/OCamlPro/ocplib-resto"
 
 build: [
-  [ "jbuilder" "subst" "-n" "ocplib-resto" ] {pinned}
   [ "jbuilder" "build" "-p" name "-j" jobs ]
 ]
 build-test: [

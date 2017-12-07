@@ -9,7 +9,7 @@
 (**************************************************************************)
 
 open EzServices
-include EzRestoDirectory
+include EzResto_directory
 
 let rec repeat i json =
   if i <= 0 then []

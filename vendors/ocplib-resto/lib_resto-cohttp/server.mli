@@ -48,7 +48,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
     ?cors:cors ->
     media_types:media_type list ->
     Conduit_lwt_unix.server ->
-    unit RestoDirectory.MakeDirectory(Encoding).t ->
+    unit Resto_directory.Make(Encoding).t ->
     server Lwt.t
 
   (** Kill an RPC server. *)

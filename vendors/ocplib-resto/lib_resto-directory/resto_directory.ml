@@ -42,7 +42,7 @@ module Answer = struct
 
 end
 
-module MakeDirectory (Encoding : ENCODING) = struct
+module Make (Encoding : ENCODING) = struct
 
   module Service = Resto.MakeService(Encoding)
 

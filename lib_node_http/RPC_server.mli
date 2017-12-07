@@ -9,8 +9,8 @@
 
 
 module Directory :
-  (module type of struct include RestoDirectory.MakeDirectory(RPC.Data) end)
-include (module type of struct include RestoDirectory end)
+  (module type of struct include Resto_directory.Make(RPC.Data) end)
+include (module type of struct include Resto_directory end)
 
 (** Typed RPC services: server implementation. *)
 

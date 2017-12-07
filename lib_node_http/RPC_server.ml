@@ -7,15 +7,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type cors = RestoCohttp.cors = {
+type cors = Resto_cohttp.Server.cors = {
   allowed_headers : string list ;
   allowed_origins : string list ;
 }
 
-include RestoDirectory
-module Directory = RestoDirectory.MakeDirectory(RPC.Data)
+include Resto_directory
+module Directory = Resto_directory.Make(RPC.Data)
 
-include RestoCohttp.Make(RPC.Data)(Logging.RPC)
+include Resto_cohttp.Server.Make(RPC.Data)(Logging.RPC)
 
 let json  = {
   name = "application/json" ;

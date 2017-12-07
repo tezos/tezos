@@ -80,7 +80,7 @@ end
 
 (** Services. *)
 type ('meth, 'params, 'query, 'input, 'output, 'error) service =
-  ('meth, unit, 'params, 'query, 'input, 'output, 'error) Resto.MakeService(RestoJson.Encoding).service
+  ('meth, unit, 'params, 'query, 'input, 'output, 'error) Resto.MakeService(Resto_json.Encoding).service
 
 val get_service:
   ?description: string ->

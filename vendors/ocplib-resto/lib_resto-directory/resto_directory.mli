@@ -35,7 +35,7 @@ module Answer : sig
 
 end
 
-module MakeDirectory (Encoding : ENCODING) : sig
+module Make (Encoding : ENCODING) : sig
 
   module Service : (module type of (struct include Resto.MakeService(Encoding) end))
 

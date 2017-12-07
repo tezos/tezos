@@ -4,6 +4,5 @@
  ((name resto_directory)
   (public_name ocplib-resto-directory)
   (libraries (lwt ocplib-resto))
-  (modules (RestoDirectory))
   (wrapped false)))
 

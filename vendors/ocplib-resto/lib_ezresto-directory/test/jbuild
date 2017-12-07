@@ -2,7 +2,6 @@
 
 (executable
  ((name ezResto_test)
-  (modules (EzServices EzDirectory EzResto_test))
   (libraries (ocplib-ezresto-directory lwt.unix))))
 
 (alias

@@ -4,5 +4,4 @@
  ((name ezresto)
   (public_name ocplib-ezresto)
   (libraries (ocplib-resto-json))
-  (modules (EzResto))
   (wrapped false)))

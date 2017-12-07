@@ -3,6 +3,5 @@
 (library
  ((name resto)
   (public_name ocplib-resto)
-  (modules (Resto))
   (flags (-w -30))
   (wrapped false)))

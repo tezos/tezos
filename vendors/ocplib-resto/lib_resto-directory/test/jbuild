@@ -2,7 +2,6 @@
 
 (executable
  ((name resto_test)
-  (modules (Services Directory Resto_test))
   (libraries (ocplib-resto-directory ocplib-resto-json lwt.unix))))
 
 (alias

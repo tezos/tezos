@@ -10,7 +10,7 @@
 
 open Services
 
-include RestoDirectory.MakeDirectory(RestoJson.Encoding)
+include Resto_directory.Make(Resto_json.Encoding)
 
 let rec repeat i json =
   if i <= 0 then []

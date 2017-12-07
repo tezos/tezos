@@ -10,7 +10,7 @@
 
 open Services
 open Directory
-open RestoDirectory
+open Resto_directory
 open Lwt.Infix
 
 let () =

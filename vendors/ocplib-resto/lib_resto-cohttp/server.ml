@@ -104,7 +104,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
   open Cohttp
 
   module Service = Resto.MakeService(Encoding)
-  module Directory = RestoDirectory.MakeDirectory(Encoding)
+  module Directory = Resto_directory.Make(Encoding)
 
   type media_type = {
     name: string ;
@@ -158,7 +158,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
            if not !running then
              Lwt.return None
            else
-             s.RestoDirectory.Answer.next () >|= function
+             s.Resto_directory.Answer.next () >|= function
              | None -> None
              | Some x -> Some (to_string x)) in
     let shutdown () =

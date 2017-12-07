@@ -10,7 +10,7 @@
 
 
 open Resto
-module Service = Resto.MakeService(RestoJson.Encoding)
+module Service = Resto.MakeService(Resto_json.Encoding)
 open Service
 
 type meth = [ `GET | `POST | `DELETE | `PUT | `PATCH ]
