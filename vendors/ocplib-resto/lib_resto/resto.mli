@@ -247,6 +247,8 @@ module type ENCODING = sig
   type 'a t
   type schema
   val unit : unit t
+  val untyped : string t
+  val conv : ('a -> 'b) -> ('b -> 'a) -> 'b t -> 'a t
   val schema : 'a t -> schema
   val description_request_encoding : Description.request t
   val description_answer_encoding : schema Description.directory t

@@ -113,7 +113,7 @@ let test_json testdir =
   let open Data_encoding_ezjsonm in
   let file = testdir // "testing_data_encoding.tezos" in
   let v = `Float 42. in
-  let f_str = to_string v in
+  let f_str = to_string ~minify:false v in
   Assert.equal_string  ~msg:__LOC__ f_str "[\n  42\n]";
   read_file (testdir // "NONEXISTINGFILE") >>= fun rf ->
   Assert.is_error ~msg:__LOC__ rf ;

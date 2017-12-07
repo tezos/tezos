@@ -15,6 +15,7 @@ module Make (Encoding : Resto.ENCODING) = struct
   type t = {
     name: Cohttp.Accept.media_range ;
     q: int option ;
+    pp: 'a. 'a Encoding.t -> Format.formatter -> string -> unit ;
     construct: 'a. 'a Encoding.t -> 'a -> string ;
     destruct: 'a. 'a Encoding.t -> string -> ('a, string) result ;
   }

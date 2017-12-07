@@ -13,6 +13,8 @@ module Encoding = struct
   include Json_encoding
   type 'a t = 'a encoding
   type schema = Json_schema.schema
+  let untyped = obj1 (req "untyped" string)
+  let conv f g t = conv ~schema:(schema t) f g t
 
   module StringMap = Map.Make(String)
 

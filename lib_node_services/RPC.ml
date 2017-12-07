@@ -7,10 +7,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
+let meth_encoding =
+  Data_encoding.string_enum
+    [ "GET", `GET ;
+      "POST", `POST ;
+      "DELETE", `DELETE ;
+      "PUT", `PUT ;
+      "PATCH", `PATCH ]
+
 module Data = struct
   type 'a t = 'a Data_encoding.t
   type schema = Data_encoding.json_schema
   let unit = Data_encoding.empty
+  let untyped = Data_encoding.(obj1 (req "untyped" string))
+  let conv f g t = Data_encoding.conv ~schema:(Data_encoding.Json.schema t) f g t
   let schema = Data_encoding.Json.schema
 
   module StringMap = Resto.StringMap
@@ -23,14 +33,6 @@ module Data = struct
       (obj2 (req "name" string) (opt "descr" string))
 
   open Resto.Description
-
-  let meth_encoding =
-    Data_encoding.string_enum
-      [ "GET", `GET ;
-        "POST", `POST ;
-        "DELETE", `DELETE ;
-        "PUT", `PUT ;
-        "PATCH", `PATCH ]
 
   let path_item_encoding =
     let open Data_encoding in

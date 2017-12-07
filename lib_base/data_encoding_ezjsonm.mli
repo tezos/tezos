@@ -19,7 +19,9 @@ val from_stream : string Lwt_stream.t -> (Data_encoding.json, string) result Lwt
 
 (** Write a JSON document to a string. This goes via an intermediate
     buffer and so may be slow on large documents. *)
-val to_string : Data_encoding.json -> string
+val to_string : ?minify:bool -> Data_encoding.json -> string
+
+val pp : Format.formatter -> Data_encoding.json -> unit
 
 (** Loads a JSON file in memory *)
 val read_file : string -> Data_encoding.json tzresult Lwt.t

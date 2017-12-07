@@ -15,3 +15,4 @@ module Data : Resto.ENCODING with type 'a t = 'a Data_encoding.t
 include (module type of struct include Resto end)
 module Service : (module type of struct include Resto.MakeService(Data) end)
 
+val meth_encoding: meth Data_encoding.t

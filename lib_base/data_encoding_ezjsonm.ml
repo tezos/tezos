@@ -15,7 +15,9 @@ let to_root = function
   | `Null -> `O []
   | oth -> `A [ oth ]
 
-let to_string j = Ezjsonm.to_string ~minify:false (to_root j)
+let to_string ?minify j = Ezjsonm.to_string ?minify (to_root j)
+
+let pp = Json_repr.(pp (module Ezjsonm))
 
 let from_string s =
   try Ok (Ezjsonm.from_string s :> Data_encoding.json)

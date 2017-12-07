@@ -10,9 +10,12 @@
 type t = Resto_cohttp.Media_type.Make(RPC.Data).t = {
   name: Cohttp.Accept.media_range ;
   q: int option ;
+  pp: 'a. 'a Data_encoding.t -> Format.formatter -> string -> unit ;
   construct: 'a. 'a Data_encoding.t -> 'a -> string ;
   destruct: 'a. 'a Data_encoding.t -> string -> ('a, string) result ;
 }
+
+val name : t -> string
 
 val json : t
 val octet_stream : t
