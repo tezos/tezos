@@ -153,3 +153,6 @@ let fork_test_network = Raw_context.fork_test_network
 
 let faucet_count = Raw_context.faucet_count
 let incr_faucet_count = Raw_context.incr_faucet_count
+
+let endorsement_already_recorded = Raw_context.endorsement_already_recorded
+let record_endorsement = Raw_context.record_endorsement

@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Int_set = Set.Make (Compare.Int)
+
 type t = {
   context: Context.t ;
   constants: Constants_repr.constants ;
@@ -16,7 +18,9 @@ type t = {
   fitness: Int64.t ;
   roll_value: Tez_repr.t ;
   faucet_count: int;
+  endorsements_received: Int_set.t;
 }
+
 type context = t
 type root_context = t
 
@@ -28,6 +32,9 @@ let faucet_count ctxt = ctxt.faucet_count
 let constants ctxt = ctxt.constants
 let roll_value ctxt = ctxt.roll_value
 let recover ctxt = ctxt.context
+
+let record_endorsement ctxt k = { ctxt with endorsements_received = Int_set.add k ctxt.endorsements_received }
+let endorsement_already_recorded ctxt k = Int_set.mem k ctxt.endorsements_received
 
 let incr_faucet_count ctxt = { ctxt with faucet_count = ctxt.faucet_count + 1 }
 let set_current_fitness ctxt fitness = { ctxt with fitness }
@@ -228,7 +235,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
       level in
   return ({ context = ctxt ; constants ; level ;
             timestamp ; fitness ; first_level ; roll_value ;
-            faucet_count = 0 ;
+            faucet_count = 0 ; endorsements_received = Int_set.empty ;
           },
           first_block)
 
@@ -257,6 +264,7 @@ let register_resolvers enc resolve =
       fitness = 0L ;
       roll_value = Tez_repr.zero ;
       faucet_count = 0 ;
+      endorsements_received = Int_set.empty ;
     } in
     resolve faked_context str in
   Context.register_resolver enc  resolve

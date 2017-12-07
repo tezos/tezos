@@ -726,6 +726,9 @@ val configure_sandbox:
 val activate: context -> Protocol_hash.t -> context Lwt.t
 val fork_test_network: context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
+val endorsement_already_recorded: context -> int -> bool
+val record_endorsement: context -> int -> context
+
 (**/**)
 
 (* HACK alphanet *)

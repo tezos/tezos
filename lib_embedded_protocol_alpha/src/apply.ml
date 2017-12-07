@@ -13,6 +13,7 @@ open Tezos_context
 
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
+type error += Duplicate_endorsement of int (* `Permanent *)
 type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.expr option (* `Permanent *)
 type error += Too_many_faucet
 
@@ -61,6 +62,16 @@ let () =
        Some (c, expected, supplied) | _ -> None)
     (fun (c, expected, supplied) -> Bad_contract_parameter (c, expected, supplied)) ;
   register_error_kind
+    `Permanent
+    ~id:"operation.duplicate_endorsement"
+    ~title:"Duplicate endorsement"
+    ~description:"Two endorsements received for the same slot"
+    ~pp:(fun ppf k ->
+        Format.fprintf ppf "Duplicate endorsement for slot %d." k)
+    Data_encoding.(obj1 (req "slot" uint16))
+    (function Duplicate_endorsement k -> Some k | _ -> None)
+    (fun k -> Duplicate_endorsement k);
+  register_error_kind
     `Temporary
     ~id:"operation.too_many_faucet"
     ~title:"Too many faucet"
@@ -79,7 +90,11 @@ let apply_delegate_operation_content
       fail_unless
         (Block_hash.equal block pred_block)
         (Wrong_endorsement_predecessor (pred_block, block)) >>=? fun () ->
+      fail_when
+        (endorsement_already_recorded ctxt slot)
+        (Duplicate_endorsement (slot)) >>=? fun () ->
       Baking.check_signing_rights ctxt slot delegate >>=? fun () ->
+      let ctxt = record_endorsement ctxt slot in
       let ctxt = Fitness.increase ctxt in
       Baking.pay_endorsement_bond ctxt delegate >>=? fun (ctxt, bond) ->
       Baking.endorsement_reward ~block_priority >>=? fun reward ->
