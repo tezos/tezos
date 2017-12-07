@@ -9,77 +9,6 @@
 
 open Lwt.Infix
 
-module Utils = struct
-
-  let split_path path =
-    let l = String.length path in
-    let rec do_slashes acc i =
-      if i >= l then
-        List.rev acc
-      else if String.get path i = '/' then
-        do_slashes acc (i + 1)
-      else
-        do_component acc i i
-    and do_component acc i j =
-      if j >= l then
-        if i = j then
-          List.rev acc
-        else
-          List.rev (String.sub path i (j - i) :: acc)
-      else if String.get path j = '/' then
-        do_slashes (String.sub path i (j - i) :: acc) j
-      else
-        do_component acc i (j + 1) in
-    do_slashes [] 0
-
-end
-
-type cors = {
-  allowed_headers : string list ;
-  allowed_origins : string list ;
-}
-
-module Cors = struct
-
-  let default = { allowed_headers = [] ; allowed_origins = [] }
-
-  let check_origin_matches origin allowed_origin =
-    String.equal "*" allowed_origin ||
-    String.equal allowed_origin origin ||
-    begin
-      let allowed_w_slash = allowed_origin ^ "/" in
-      let len_a_w_s = String.length allowed_w_slash in
-      let len_o = String.length origin in
-      (len_o >= len_a_w_s) &&
-      String.equal allowed_w_slash @@ String.sub origin 0 len_a_w_s
-    end
-
-  let find_matching_origin allowed_origins origin =
-    let matching_origins =
-      List.filter (check_origin_matches origin) allowed_origins in
-    let compare_by_length_neg a b =
-      ~- (compare (String.length a) (String.length b)) in
-    let matching_origins_sorted =
-      List.sort compare_by_length_neg matching_origins in
-    match matching_origins_sorted with
-    | [] -> None
-    | x :: _ -> Some x
-
-  let add_headers headers cors origin_header =
-    let cors_headers =
-      Cohttp.Header.add_multi headers
-        "Access-Control-Allow-Headers" cors.allowed_headers in
-    match origin_header with
-    | None -> cors_headers
-    | Some origin ->
-        match find_matching_origin cors.allowed_origins origin with
-        | None -> cors_headers
-        | Some allowed_origin ->
-            Cohttp.Header.add_multi cors_headers
-              "Access-Control-Allow-Origin" [allowed_origin]
-
-end
-
 module ConnectionMap = Map.Make(Cohttp.Connection)
 
 module type LOGGING = sig
@@ -106,46 +35,14 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
   module Service = Resto.MakeService(Encoding)
   module Directory = Resto_directory.Make(Encoding)
 
-  type media_type = {
-    name: string ;
-    construct: 'a. 'a Encoding.t -> 'a -> string ;
-    destruct: 'a. 'a Encoding.t -> string -> ('a, string) result ;
-  }
-
-  module Media_type = struct
-
-    (* Inspired from ocaml-webmachine *)
-
-    let media_match (_, (range, _)) media =
-      let type_, subtype =
-        match Utils.split_path media.name with
-        | [x ; y] -> x, y
-        | _      ->
-            Format.kasprintf invalid_arg "invalid media_type '%s'" media.name in
-      let open Accept in
-      match range with
-      | AnyMedia                     -> true
-      | AnyMediaSubtype type_'       -> type_' = type_
-      | MediaType (type_', subtype') -> type_' = type_ && subtype' = subtype
-
-    let match_header provided header =
-      let ranges = Accept.(media_ranges header |> qsort) in
-      let rec loop = function
-        | [] -> None
-        | r :: rs ->
-            try Some(List.find (media_match r) provided)
-            with Not_found -> loop rs
-      in
-      loop ranges
-
-  end
+  module Media_type = Media_type.Make(Encoding)
 
   type server = {
     root : unit Directory.directory ;
     mutable streams : (unit -> unit) ConnectionMap.t ;
-    cors : cors ;
-    media_types : media_type list ;
-    default_media_type : media_type ;
+    cors : Cors.t ;
+    media_types : Media_type.t list ;
+    default_media_type : string * Media_type.t ;
     stopper : unit Lwt.u ;
     mutable worker : unit Lwt.t ;
   }
@@ -187,23 +84,31 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
             meth path >>=? fun (Directory.Service s) ->
           begin
             match Header.get req_headers "content-type" with
-            | None -> Lwt.return_ok server.default_media_type
+            | None -> Lwt.return_ok (snd server.default_media_type)
             | Some content_type ->
-                match List.find (fun { name ; _ } -> name = content_type)
-                        server.media_types with
-                | exception Not_found ->
+                match Utils.split_path content_type with
+                | [x ; y] -> begin
+                    match Media_type.find_media (x, y) server.media_types with
+                    | None ->
+                        Lwt.return_error (`Unsupported_media_type content_type)
+                    | Some media_type ->
+                        Lwt.return_ok media_type
+                  end
+                | _ ->
                     Lwt.return_error (`Unsupported_media_type content_type)
-                | media_type -> Lwt.return_ok media_type
           end >>=? fun input_media_type ->
+          lwt_debug "(%s) input media type %s"
+            (Connection.to_string con)
+            (Media_type.name input_media_type) >>= fun () ->
           begin
             match Header.get req_headers "accept" with
             | None -> Lwt.return_ok server.default_media_type
             | Some accepted ->
-                match Media_type.match_header
+                match Media_type.resolve_accept_header
                         server.media_types (Some accepted) with
                 | None -> Lwt.return_error `Not_acceptable
                 | Some media_type -> Lwt.return_ok media_type
-          end >>=? fun output_media_type ->
+          end >>=? fun (output_content_type, output_media_type) ->
           begin
             match Resto.Query.parse s.types.query
                     (List.map
@@ -213,6 +118,9 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
                 Lwt.return_error (`Cannot_parse_query s)
             | query -> Lwt.return_ok query
           end >>=? fun query ->
+          lwt_debug "(%s) ouput media type %s"
+            (Connection.to_string con)
+            (Media_type.name output_media_type) >>= fun () ->
           let output = output_media_type.construct s.types.output
           and error = function
             | None -> Cohttp_lwt.Body.empty, Transfer.Fixed 0L
@@ -222,7 +130,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
                 Transfer.Fixed (Int64.of_int (String.length s)) in
           let headers = Header.init () in
           let headers =
-            Header.add headers "content-type" output_media_type.name in
+            Header.add headers "content-type" output_content_type in
           begin
             match s.types.input with
             | Service.No_input ->
@@ -367,9 +275,7 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
              "Failed to parse the query string: %s" s)
     | Error `Not_acceptable ->
         let accepted_encoding =
-          String.concat ", "
-            (List.map (fun f -> f.name)
-               server.media_types) in
+          Media_type.acceptable_encoding server.media_types in
         Lwt.return
           (Response.make ~status:`Not_acceptable (),
            Cohttp_lwt.Body.of_string accepted_encoding)
@@ -389,9 +295,10 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
       ?(cors = Cors.default)
       ~media_types
       mode root =
-    if media_types = [] then
-      invalid_arg "RestoCohttp.launch(empty media type list)" ;
-    let default_media_type = List.hd media_types in
+    let default_media_type =
+      match Media_type.first_complete_media media_types with
+      | None -> invalid_arg "RestoCohttp.launch(empty media type list)"
+      | Some ((l, r), m) -> l^"/"^r, m in
     let stop, stopper = Lwt.wait () in
     let server = {
       root ;

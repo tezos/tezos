@@ -7,29 +7,23 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
-module Directory :
-  (module type of struct include Resto_directory.Make(RPC.Data) end)
-include (module type of struct include Resto_directory end)
-
-(** Typed RPC services: server implementation. *)
-
-type cors = {
-  allowed_headers : string list ;
-  allowed_origins : string list ;
-}
-
-(** A handle on the server worker. *)
-type server
-
-(** Promise a running RPC server.*)
-val launch :
-  ?host:string ->
-  ?cors:cors ->
-  media_types:Media_type.t list ->
-  Conduit_lwt_unix.server ->
-  unit Directory.t ->
-  server Lwt.t
-
-(** Kill an RPC server. *)
-val shutdown : server -> unit Lwt.t
+let split_path path =
+  let l = String.length path in
+  let rec do_slashes acc i =
+    if i >= l then
+      List.rev acc
+    else if String.get path i = '/' then
+      do_slashes acc (i + 1)
+    else
+      do_component acc i i
+  and do_component acc i j =
+    if j >= l then
+      if i = j then
+        List.rev acc
+      else
+        List.rev (String.sub path i (j - i) :: acc)
+    else if String.get path j = '/' then
+      do_slashes (String.sub path i (j - i) :: acc) j
+    else
+      do_component acc i (j + 1) in
+  do_slashes [] 0

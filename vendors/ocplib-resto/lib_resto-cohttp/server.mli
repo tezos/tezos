@@ -10,11 +10,6 @@
 
 (** Typed RPC services: server implementation. *)
 
-type cors = {
-  allowed_headers : string list ;
-  allowed_origins : string list ;
-}
-
 module type LOGGING = sig
 
   val debug: ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -33,20 +28,14 @@ end
 
 module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
 
-  type media_type = {
-    name: string ;
-    construct: 'a. 'a Encoding.t -> 'a -> string ;
-    destruct: 'a. 'a Encoding.t -> string -> ('a, string) result ;
-  }
-
   (** A handle on the server worker. *)
   type server
 
   (** Promise a running RPC server.*)
   val launch :
     ?host:string ->
-    ?cors:cors ->
-    media_types:media_type list ->
+    ?cors:Cors.t ->
+    media_types:Media_type.Make(Encoding).t list ->
     Conduit_lwt_unix.server ->
     unit Resto_directory.Make(Encoding).t ->
     server Lwt.t

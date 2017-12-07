@@ -7,29 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
-module Directory :
-  (module type of struct include Resto_directory.Make(RPC.Data) end)
-include (module type of struct include Resto_directory end)
-
-(** Typed RPC services: server implementation. *)
-
-type cors = {
+type t = {
   allowed_headers : string list ;
   allowed_origins : string list ;
 }
 
-(** A handle on the server worker. *)
-type server
+val default: t
 
-(** Promise a running RPC server.*)
-val launch :
-  ?host:string ->
-  ?cors:cors ->
-  media_types:Media_type.t list ->
-  Conduit_lwt_unix.server ->
-  unit Directory.t ->
-  server Lwt.t
+val add_headers:
+  Cohttp.Header.t -> t -> string option -> Cohttp.Header.t
 
-(** Kill an RPC server. *)
-val shutdown : server -> unit Lwt.t
