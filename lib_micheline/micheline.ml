@@ -119,28 +119,92 @@ let canonical_encoding prim_encoding =
     obj1 (req "int" string) in
   let string_encoding =
     obj1 (req "string" string) in
-  let application_encoding expr_encoding =
-    obj3 (req "prim" prim_encoding) (req "args" (list expr_encoding)) (opt "annot" string) in
-  let seq_encoding expr_encoding =
-    list expr_encoding in
+  let int_encoding tag =
+    case tag int_encoding
+      (function Int (_, v) -> Some v | _ -> None)
+      (fun v -> Int (0, v)) in
+  let string_encoding tag =
+    case tag string_encoding
+      (function String (_, v) -> Some v | _ -> None)
+      (fun v -> String (0, v)) in
+  let seq_encoding tag expr_encoding =
+    case tag (list expr_encoding)
+      (function Seq (_, v, _annot) -> Some v | _ -> None)
+      (fun args -> Seq (0, args, None)) in
+  let application_encoding tag expr_encoding =
+    case tag
+      (obj3 (req "prim" prim_encoding)
+         (req "args" (list expr_encoding))
+         (opt "annot" string))
+      (function Prim (_, prim, args, annot) -> Some (prim, args, annot)
+              | _ -> None)
+      (fun (prim, args, annot) -> Prim (0, prim, args, annot)) in
   let node_encoding = mu "tezosScriptExpression" (fun expr_encoding ->
       describe
         ~title: "Script expression (data, type or code)" @@
-      union ~tag_size:`Uint8
-        [ case (Tag 0) int_encoding
-            (function Int (_, v) -> Some v | _ -> None)
-            (fun v -> Int (0, v)) ;
-          case (Tag 1) string_encoding
-            (function String (_, v) -> Some v | _ -> None)
-            (fun v -> String (0, v)) ;
-          case (Tag 2) (application_encoding expr_encoding)
-            (function
-              | Prim (_, v, args, annot) -> Some (v, args, annot)
-              | _ -> None)
-            (function (prim, args, annot) -> Prim (0, prim, args, annot)) ;
-          case (Tag 3) (seq_encoding expr_encoding)
-            (function Seq (_, v, _annot) -> Some v | _ -> None)
-            (fun args -> Seq (0, args, None)) ]) in
+      splitted
+        ~json:(union ~tag_size:`Uint8
+                 [ int_encoding Json_only;
+                   string_encoding Json_only ;
+                   seq_encoding Json_only expr_encoding ;
+                   application_encoding Json_only expr_encoding ])
+        ~binary:(union ~tag_size:`Uint8
+                   [ int_encoding (Tag 0) ;
+                     string_encoding (Tag 1) ;
+                     seq_encoding (Tag 2) expr_encoding ;
+                     (* No args, no annot *)
+                     case (Tag 3)
+                       (obj1 (req "prim" prim_encoding))
+                       (function Prim (_, v, [], None) -> Some v
+                               | _ -> None)
+                       (fun v -> Prim (0, v, [], None)) ;
+                     (* No args, with annot *)
+                     case (Tag 4)
+                       (obj2 (req "prim" prim_encoding)
+                          (req "annot" string))
+                       (function
+                         | Prim (_, v, [], Some annot) -> Some (v, annot)
+                         | _ -> None)
+                       (function (prim, annot) -> Prim (0, prim, [], Some annot)) ;
+                     (* Single arg, no annot *)
+                     case (Tag 5)
+                       (obj2 (req "prim" prim_encoding)
+                          (req "arg" expr_encoding))
+                       (function
+                         | Prim (_, v, [ arg ], None) -> Some (v, arg)
+                         | _ -> None)
+                       (function (prim, arg) -> Prim (0, prim, [ arg ], None)) ;
+                     (* Single arg, with annot *)
+                     case (Tag 6)
+                       (obj3 (req "prim" prim_encoding)
+                          (req "arg" expr_encoding)
+                          (req "annot" string))
+                       (function
+                         | Prim (_, prim, [ arg ], Some annot) -> Some (prim, arg, annot)
+                         | _ -> None)
+                       (fun (prim, arg, annot) -> Prim (0, prim, [ arg ], Some annot)) ;
+                     (* Two args, no annot *)
+                     case (Tag 7)
+                       (obj3 (req "prim" prim_encoding)
+                          (req "arg1" expr_encoding)
+                          (req "arg2" expr_encoding))
+                       (function
+                         | Prim (_, prim, [ arg1 ; arg2 ], None) -> Some (prim, arg1, arg2)
+                         | _ -> None)
+                       (fun (prim, arg1, arg2) -> Prim (0, prim, [ arg1 ; arg2 ], None)) ;
+                     (* Two args, with annot *)
+                     case (Tag 8)
+                       (obj4 (req "prim" prim_encoding)
+                          (req "arg1" expr_encoding)
+                          (req "arg2" expr_encoding)
+                          (req "annot" string))
+                       (function
+                         | Prim (_, prim, [ arg1 ; arg2 ], Some annot) -> Some (prim, arg1, arg2, annot)
+                         | _ -> None)
+                       (fun (prim, arg1, arg2, annot) -> Prim (0, prim, [ arg1 ; arg2 ], Some annot)) ;
+                     (* General case *)
+                     application_encoding (Tag 9) expr_encoding ]))
+  in
   conv
     (function Canonical node -> node)
     (fun node -> strip_locations node)
