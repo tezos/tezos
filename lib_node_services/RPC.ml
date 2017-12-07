@@ -136,14 +136,3 @@ end
 
 include Resto
 module Service = Resto.MakeService(Data)
-
-(* Compatibility layer, to be removed ASAP. *)
-
-let forge_request (type i) (service: (_,_,_,_,i,_,_) Service.t) params body =
-  let { Service.meth ; path } =
-    Service.forge_request service params () in
-  let json =
-    match Service.input_encoding service with
-    | Service.No_input -> assert false (* TODO *)
-    | Service.Input input -> Data_encoding.Json.construct input body in
-  meth, path, json

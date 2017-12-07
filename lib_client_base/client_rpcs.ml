@@ -346,18 +346,27 @@ let make_request config log_request meth service json =
     fail config (Connection_failed msg)
   end
 
+let forge_request (type i) (service: (_,_,_,_,i,_,_) RPC.Service.t) params body =
+  let { RPC.Service.meth ; path } =
+    RPC.Service.forge_request service params () in
+  let json =
+    match RPC.Service.input_encoding service with
+    | RPC.Service.No_input -> assert false (* TODO *)
+    | RPC.Service.Input input -> Data_encoding.Json.construct input body in
+  meth, path, json
+
 let call_service0 (rpc : #rpc_sig) service arg =
-  let meth, path, arg = RPC.forge_request service () arg in
+  let meth, path, arg = forge_request service () arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_answer service path json
 
 let call_service1 (rpc : #rpc_sig) service a1 arg =
-  let meth, path, arg = RPC.forge_request service ((), a1) arg in
+  let meth, path, arg = forge_request service ((), a1) arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_answer service path json
 
 let call_service2 (rpc : #rpc_sig) service a1 a2 arg =
-  let meth, path, arg = RPC.forge_request service (((), a1), a2) arg in
+  let meth, path, arg = forge_request service (((), a1), a2) arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_answer service path json
 
@@ -380,23 +389,23 @@ let call_streamed (rpc : #rpc_sig) service (meth, path, arg) =
   return parsed_st
 
 let call_streamed_service0 (rpc : #rpc_sig) service arg =
-  call_streamed rpc service (RPC.forge_request service () arg)
+  call_streamed rpc service (forge_request service () arg)
 
 let call_streamed_service1 cctxt service arg1 arg2 =
-  call_streamed cctxt service (RPC.forge_request service ((), arg1) arg2)
+  call_streamed cctxt service (forge_request service ((), arg1) arg2)
 
 let call_err_service0 (rpc : #rpc_sig) service arg =
-  let meth, path, arg = RPC.forge_request service () arg in
+  let meth, path, arg = forge_request service () arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_err_answer service path json
 
 let call_err_service1 (rpc : #rpc_sig) service a1 arg =
-  let meth, path, arg = RPC.forge_request service ((), a1) arg in
+  let meth, path, arg = forge_request service ((), a1) arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_err_answer service path json
 
 let call_err_service2 (rpc : #rpc_sig) service a1 a2 arg =
-  let meth, path, arg = RPC.forge_request service (((), a1), a2) arg in
+  let meth, path, arg = forge_request service (((), a1), a2) arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_err_answer service path json
 
