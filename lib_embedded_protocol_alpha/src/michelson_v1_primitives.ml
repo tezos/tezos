@@ -19,14 +19,11 @@ type prim =
   | K_storage
   | K_code
   | D_False
-  | D_Item
+  | D_Elt
   | D_Left
-  | D_List
-  | D_Map
   | D_None
   | D_Pair
   | D_Right
-  | D_Set
   | D_Some
   | D_True
   | D_Unit
@@ -141,14 +138,11 @@ let string_of_prim = function
   | K_storage -> "storage"
   | K_code -> "code"
   | D_False -> "False"
-  | D_Item -> "Item"
+  | D_Elt -> "Elt"
   | D_Left -> "Left"
-  | D_List -> "List"
-  | D_Map -> "Map"
   | D_None -> "None"
   | D_Pair -> "Pair"
   | D_Right -> "Right"
-  | D_Set -> "Set"
   | D_Some -> "Some"
   | D_True -> "True"
   | D_Unit -> "Unit"
@@ -244,14 +238,11 @@ let prim_of_string = function
   | "storage" -> ok K_storage
   | "code" -> ok K_code
   | "False" -> ok D_False
-  | "Item" -> ok D_Item
+  | "Elt" -> ok D_Elt
   | "Left" -> ok D_Left
-  | "List" -> ok D_List
-  | "Map" -> ok D_Map
   | "None" -> ok D_None
   | "Pair" -> ok D_Pair
   | "Right" -> ok D_Right
-  | "Set" -> ok D_Set
   | "Some" -> ok D_Some
   | "True" -> ok D_True
   | "Unit" -> ok D_Unit
@@ -391,14 +382,11 @@ let prim_encoding =
     ("storage", K_storage) ;
     ("code", K_code) ;
     ("False", D_False) ;
-    ("Item", D_Item) ;
+    ("Elt", D_Elt) ;
     ("Left", D_Left) ;
-    ("List", D_List) ;
-    ("Map", D_Map) ;
     ("None", D_None) ;
     ("Pair", D_Pair) ;
     ("Right", D_Right) ;
-    ("Set", D_Set) ;
     ("Some", D_Some) ;
     ("True", D_True) ;
     ("Unit", D_Unit) ;

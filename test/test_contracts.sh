@@ -73,124 +73,124 @@ assert_output $CONTRACT_PATH/xor.tz Unit "(Pair True True)" False
 
 
 # Build list
-assert_output $CONTRACT_PATH/build_list.tz Unit 0 "(List 0)"
-assert_output $CONTRACT_PATH/build_list.tz Unit 3 "(List 0 1 2 3)"
+assert_output $CONTRACT_PATH/build_list.tz Unit 0 "{ 0 }"
+assert_output $CONTRACT_PATH/build_list.tz Unit 3 "{ 0 ; 1 ; 2 ; 3 }"
 assert_output $CONTRACT_PATH/build_list.tz Unit 10 \
-			  "(List 0 1 2 3 4 5 6 7 8 9 10)"
+			  "{ 0 ; 1 ; 2 ; 3 ; 4 ; 5 ; 6 ; 7 ; 8 ; 9 ; 10 }"
 
 # Concatenate all strings of a list into one string
-assert_output $CONTRACT_PATH/concat_list.tz Unit '(List "a" "b" "c")' '"abc"'
-assert_output $CONTRACT_PATH/concat_list.tz Unit '(List )' '""'
+assert_output $CONTRACT_PATH/concat_list.tz Unit '{ "a" ; "b" ; "c" }' '"abc"'
+assert_output $CONTRACT_PATH/concat_list.tz Unit '{}' '""'
 assert_output $CONTRACT_PATH/concat_list.tz \
-			  Unit '(List "Hello" " " "World" "!")' '"Hello World!"'
+			  Unit '{ "Hello" ; " " ; "World" ; "!" }' '"Hello World!"'
 
 # Find maximum int in list -- returns None if not found
-assert_output $CONTRACT_PATH/max_in_list.tz Unit '(List)' 'None'
-assert_output $CONTRACT_PATH/max_in_list.tz Unit '(List 1)' '(Some 1)'
-assert_output $CONTRACT_PATH/max_in_list.tz Unit '(List -1)' '(Some -1)'
+assert_output $CONTRACT_PATH/max_in_list.tz Unit '{}' 'None'
+assert_output $CONTRACT_PATH/max_in_list.tz Unit '{ 1 }' '(Some 1)'
+assert_output $CONTRACT_PATH/max_in_list.tz Unit '{ -1 }' '(Some -1)'
 assert_output $CONTRACT_PATH/max_in_list.tz Unit \
-			  '(List 10 -1 -20 100 0)' '(Some 100)'
+			  '{ 10 ; -1 ; -20 ; 100 ; 0 }' '(Some 100)'
 assert_output $CONTRACT_PATH/max_in_list.tz Unit \
-			  '(List 10 -1 -20 100 0)' '(Some 100)'
+			  '{ 10 ; -1 ; -20 ; 100 ; 0 }' '(Some 100)'
 assert_output $CONTRACT_PATH/max_in_list.tz Unit \
-			  '(List -10 -1 -20 -100)' '(Some -1)'
+			  '{ -10 ; -1 ; -20 ; -100 }' '(Some -1)'
 
 # Identity on lists
-assert_output $CONTRACT_PATH/list_id.tz Unit '(List "1" "2" "3")' '(List "1" "2" "3")'
-assert_output $CONTRACT_PATH/list_id.tz Unit '(List)' 'List'
-assert_output $CONTRACT_PATH/list_id.tz Unit '(List "a" "b" "c")' '(List "a" "b" "c")'
+assert_output $CONTRACT_PATH/list_id.tz Unit '{ "1" ; "2" ; "3" }' '{ "1" ; "2" ; "3" }'
+assert_output $CONTRACT_PATH/list_id.tz Unit '{}' '{}'
+assert_output $CONTRACT_PATH/list_id.tz Unit '{ "a" ; "b" ; "c" }' '{ "a" ; "b" ; "c" }'
 
-assert_output $CONTRACT_PATH/list_id_map.tz Unit '(List "1" "2" "3")' '(List "1" "2" "3")'
-assert_output $CONTRACT_PATH/list_id_map.tz Unit '(List)' 'List'
-assert_output $CONTRACT_PATH/list_id_map.tz Unit '(List "a" "b" "c")' '(List "a" "b" "c")'
+assert_output $CONTRACT_PATH/list_id_map.tz Unit '{ "1" ; "2" ; "3" }' '{ "1" ; "2" ; "3" }'
+assert_output $CONTRACT_PATH/list_id_map.tz Unit '{}' '{}'
+assert_output $CONTRACT_PATH/list_id_map.tz Unit '{ "a" ; "b" ; "c" }' '{ "a" ; "b" ; "c" }'
 
 
 # Identity on maps
-assert_output $CONTRACT_PATH/map_id.tz Unit '(Map (Item 0 1))' '(Map (Item 0 1))'
-assert_output $CONTRACT_PATH/map_id.tz Unit '(Map (Item 0 0))' '(Map (Item 0 0))'
-assert_output $CONTRACT_PATH/map_id.tz Unit '(Map (Item 0 0) (Item 3 4))' '(Map (Item 0 0) (Item 3 4))'
+assert_output $CONTRACT_PATH/map_id.tz Unit '{ Elt 0 1 }' '{ Elt 0 1 }'
+assert_output $CONTRACT_PATH/map_id.tz Unit '{ Elt 0 0 }' '{ Elt 0 0 }'
+assert_output $CONTRACT_PATH/map_id.tz Unit '{ Elt 0 0 ; Elt 3 4 }' '{ Elt 0 0 ; Elt 3 4 }'
 
 # Map block on lists
-assert_output $CONTRACT_PATH/list_map_block.tz Unit '(List)' 'List'
-assert_output $CONTRACT_PATH/list_map_block.tz Unit '(List 1 1 1 1)' '(List 1 2 3 4)'
-assert_output $CONTRACT_PATH/list_map_block.tz Unit '(List 1 2 3 0)' '(List 1 3 5 3)'
+assert_output $CONTRACT_PATH/list_map_block.tz Unit '{}' '{}'
+assert_output $CONTRACT_PATH/list_map_block.tz Unit '{ 1 ; 1 ; 1 ; 1 }' '{ 1 ; 2 ; 3 ; 4 }'
+assert_output $CONTRACT_PATH/list_map_block.tz Unit '{ 1 ; 2 ; 3 ; 0 }' '{ 1 ; 3 ; 5 ; 3 }'
 
 # List iter
-assert_output $CONTRACT_PATH/list_iter.tz Unit '(List 10 2 1)' 20
-assert_output $CONTRACT_PATH/list_iter.tz Unit '(List 3 6 9)' 162
+assert_output $CONTRACT_PATH/list_iter.tz Unit '{ 10 ; 2 ; 1 }' 20
+assert_output $CONTRACT_PATH/list_iter.tz Unit '{ 3 ; 6 ; 9 }' 162
 
-assert_output $CONTRACT_PATH/list_iter2.tz Unit '(List "a" "b" "c")' '"cba"'
-assert_output $CONTRACT_PATH/list_iter2.tz Unit '(List)' '""'
+assert_output $CONTRACT_PATH/list_iter2.tz Unit '{ "a" ; "b" ; "c" }' '"cba"'
+assert_output $CONTRACT_PATH/list_iter2.tz Unit '{}' '""'
 
 
 # Identity on sets
-assert_output $CONTRACT_PATH/set_id.tz Unit '(Set "a" "b" "c")' '(Set "a" "b" "c")'
-assert_output $CONTRACT_PATH/set_id.tz Unit '(Set)' 'Set'
-assert_output $CONTRACT_PATH/set_id.tz Unit '(Set "asdf" "bcde")' '(Set "asdf" "bcde")'
+assert_output $CONTRACT_PATH/set_id.tz Unit '{ "a" ; "b" ; "c" }' '{ "a" ; "b" ; "c" }'
+assert_output $CONTRACT_PATH/set_id.tz Unit '{}' '{}'
+assert_output $CONTRACT_PATH/set_id.tz Unit '{ "asdf" ; "bcde" }' '{ "asdf" ; "bcde" }'
 
 # Set member -- set is in storage
-assert_output $CONTRACT_PATH/set_member.tz '(Set)' '"Hi"' 'False'
-assert_output $CONTRACT_PATH/set_member.tz '(Set "Hi")' '"Hi"' 'True'
-assert_output $CONTRACT_PATH/set_member.tz '(Set "Hello" "World")' '""' 'False'
+assert_output $CONTRACT_PATH/set_member.tz '{}' '"Hi"' 'False'
+assert_output $CONTRACT_PATH/set_member.tz '{ "Hi" }' '"Hi"' 'True'
+assert_output $CONTRACT_PATH/set_member.tz '{ "Hello" ; "World" }' '""' 'False'
 
 # Set size
-assert_output $CONTRACT_PATH/set_size.tz Unit '(Set)' 0
-assert_output $CONTRACT_PATH/set_size.tz Unit '(Set 1)' 1
-assert_output $CONTRACT_PATH/set_size.tz Unit '(Set 1 2 3)' 3
-assert_output $CONTRACT_PATH/set_size.tz Unit '(Set 1 2 3 4 5 6)' 6
+assert_output $CONTRACT_PATH/set_size.tz Unit '{}' 0
+assert_output $CONTRACT_PATH/set_size.tz Unit '{ 1 }' 1
+assert_output $CONTRACT_PATH/set_size.tz Unit '{ 1 ; 2 ; 3 }' 3
+assert_output $CONTRACT_PATH/set_size.tz Unit '{ 1 ; 2 ; 3 ; 4 ; 5 ; 6 }' 6
 
 # Set iter
-assert_output $CONTRACT_PATH/set_iter.tz Unit '(Set)' 0
-assert_output $CONTRACT_PATH/set_iter.tz Unit '(Set 1)' 1
-assert_output $CONTRACT_PATH/set_iter.tz Unit '(Set -100 1 2 3)' '-94'
+assert_output $CONTRACT_PATH/set_iter.tz Unit '{}' 0
+assert_output $CONTRACT_PATH/set_iter.tz Unit '{ 1 }' 1
+assert_output $CONTRACT_PATH/set_iter.tz Unit '{ -100 ; 1 ; 2 ; 3 }' '-94'
 
 # Map size
-assert_output $CONTRACT_PATH/map_size.tz Unit '(Map)' 0
-assert_output $CONTRACT_PATH/map_size.tz Unit '(Map (Item "a" 1))' 1
+assert_output $CONTRACT_PATH/map_size.tz Unit '{}' 0
+assert_output $CONTRACT_PATH/map_size.tz Unit '{ Elt "a" 1 }' 1
 assert_output $CONTRACT_PATH/map_size.tz Unit \
-              '(Map (Item "a" 1) (Item "b" 2) (Item "c" 3))' 3
+              '{ Elt "a" 1 ; Elt "b" 2 ; Elt "c" 3 }' 3
 assert_output $CONTRACT_PATH/map_size.tz Unit \
-              '(Map (Item "a" 1) (Item "b" 2) (Item "c" 3) (Item "d" 4) (Item "e" 5) (Item "f" 6))' 6
+              '{ Elt "a" 1 ; Elt "b" 2 ; Elt "c" 3 ; Elt "d" 4 ; Elt "e" 5 ; Elt "f" 6 }' 6
 
 # Contains all elements -- does the second list contain all of the same elements
 # as the first one? I'm ignoring element multiplicity
 assert_output $CONTRACT_PATH/contains_all.tz \
-			  Unit '(Pair (List) (List))' 'True'
+			  Unit '(Pair {} {})' 'True'
 assert_output $CONTRACT_PATH/contains_all.tz \
-			  Unit '(Pair (List "a") (List "B"))' 'False'
+			  Unit '(Pair { "a" } { "B" })' 'False'
 assert_output $CONTRACT_PATH/contains_all.tz \
-			  Unit '(Pair (List "A") (List "B"))' 'False'
+			  Unit '(Pair { "A" } { "B" })' 'False'
 assert_output $CONTRACT_PATH/contains_all.tz \
-			  Unit '(Pair (List "B") (List "B"))' 'True'
+			  Unit '(Pair { "B" } { "B" })' 'True'
 assert_output $CONTRACT_PATH/contains_all.tz Unit \
-			  '(Pair (List "B" "C" "asdf") (List "B" "B" "asdf" "C"))' 'True'
+			  '(Pair { "B" ; "C" ; "asdf" } { "B" ; "B" ; "asdf" ; "C" })' 'True'
 assert_output $CONTRACT_PATH/contains_all.tz Unit \
-			  '(Pair (List "B" "B" "asdf" "C") (List "B" "C" "asdf"))' 'True'
+			  '(Pair { "B" ; "B" ; "asdf" ; "C" } { "B" ; "C" ; "asdf" })' 'True'
 
 # Concatenate the string in storage with all strings in the given list
 assert_output $CONTRACT_PATH/concat_hello.tz Unit \
-			  '(List "World!")' '(List "Hello World!")'
+			  '{ "World!" }' '{ "Hello World!" }'
 assert_output $CONTRACT_PATH/concat_hello.tz Unit \
-			  '(List)' 'List'
+			  '{}' '{}'
 assert_output $CONTRACT_PATH/concat_hello.tz Unit \
-			  '(List "test1" "test2")' '(List "Hello test1" "Hello test2")'
+			  '{ "test1" ; "test2" }' '{ "Hello test1" ; "Hello test2" }'
 
 # Create an empty map and add a string to it
 assert_output $CONTRACT_PATH/empty_map.tz Unit Unit \
-			  '(Map (Item "hello" "world"))'
+			  '{ Elt "hello" "world" }'
 
 # Get the value stored at the given key in the map
-assert_output $CONTRACT_PATH/get_map_value.tz '(Map (Item "hello" "hi"))' \
+assert_output $CONTRACT_PATH/get_map_value.tz '{ Elt "hello" "hi" }' \
 			  '"hello"' '(Some "hi")'
-assert_output $CONTRACT_PATH/get_map_value.tz '(Map (Item "hello" "hi"))' \
+assert_output $CONTRACT_PATH/get_map_value.tz '{ Elt "hello" "hi" }' \
 			  '""' 'None'
 assert_output $CONTRACT_PATH/get_map_value.tz \
-			  '(Map (Item "1" "one") (Item "2" "two"))' \
+			  '{ Elt "1" "one" ; Elt "2" "two" }' \
 			  '"1"' '(Some "one")'
 
 # Map iter
-assert_output $CONTRACT_PATH/map_iter.tz Unit '(Map (Item 0 100) (Item 2 100))' '(Pair 2 200)'
-assert_output $CONTRACT_PATH/map_iter.tz Unit '(Map (Item 1 1) (Item 2 100))' '(Pair 3 101)'
+assert_output $CONTRACT_PATH/map_iter.tz Unit '{ Elt 0 100 ; Elt 2 100 }' '(Pair 2 200)'
+assert_output $CONTRACT_PATH/map_iter.tz Unit '{ Elt 1 1 ; Elt 2 100 }' '(Pair 3 101)'
 
 # Return True if True branch of if was taken and False otherwise
 assert_output $CONTRACT_PATH/if.tz Unit True True
@@ -201,14 +201,14 @@ assert_output $CONTRACT_PATH/swap_left_right.tz Unit '(Left True)' '(Right True)
 assert_output $CONTRACT_PATH/swap_left_right.tz Unit '(Right "a")' '(Left "a")'
 
 # Reverse a list
-assert_output $CONTRACT_PATH/reverse.tz Unit '(List )' 'List'
-assert_output $CONTRACT_PATH/reverse.tz Unit '(List "c" "b" "a")' '(List "a" "b" "c")'
-assert_output $CONTRACT_PATH/reverse_loop.tz Unit '(List )' 'List'
-assert_output $CONTRACT_PATH/reverse_loop.tz Unit '(List "c" "b" "a")' '(List "a" "b" "c")'
+assert_output $CONTRACT_PATH/reverse.tz Unit '{}' '{}'
+assert_output $CONTRACT_PATH/reverse.tz Unit '{ "c" ; "b" ; "a" }' '{ "a" ; "b" ; "c" }'
+assert_output $CONTRACT_PATH/reverse_loop.tz Unit '{}' '{}'
+assert_output $CONTRACT_PATH/reverse_loop.tz Unit '{ "c" ; "b" ; "a" }' '{ "a" ; "b" ; "c" }'
 
 # Reverse using LOOP_LEFT
-assert_output $CONTRACT_PATH/loop_left.tz Unit '(List )' 'List'
-assert_output $CONTRACT_PATH/loop_left.tz Unit '(List "c" "b" "a")' '(List "a" "b" "c")'
+assert_output $CONTRACT_PATH/loop_left.tz Unit '{}' '{}'
+assert_output $CONTRACT_PATH/loop_left.tz Unit '{ "c" ; "b" ; "a" }' '{ "a" ; "b" ; "c" }'
 
 # Exec concat contract
 assert_output $CONTRACT_PATH/exec_concat.tz Unit '""' '"_abc"'
@@ -220,18 +220,18 @@ assert_output $CONTRACT_PATH/steps_to_quota.tz Unit Unit 39991
 # Get the current balance of the contract
 assert_output $CONTRACT_PATH/balance.tz Unit Unit '"4,000,000"'
 
-# Test comparisons on tez (List EQ GT LT GE LE)
-assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "1" "2")' '(List False False True False True)'
-assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "2" "1")' '(List False True False True False)'
-assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "2.37" "2.37")' '(List True False False True True)'
+# Test comparisons on tez { EQ ; GT ; LT ; GE ; LE }
+assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "1.00" "2.00")' '{ False ; False ; True ; False ; True }'
+assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "2.00" "1.00")' '{ False ; True ; False ; True ; False }'
+assert_output $CONTRACT_PATH/compare.tz Unit '(Pair "2.37" "2.37")' '{ True ; False ; False ; True ; True }'
 
 # Test addition and subtraction on tez
 assert_output $CONTRACT_PATH/tez_add_sub.tz Unit '(Pair "2" "1")' '(Pair "3" "1")'
 assert_output $CONTRACT_PATH/tez_add_sub.tz Unit '(Pair "2.31" "1.01")' '(Pair "3.32" "1.3")'
 
 # Test get first element of list
-assert_output $CONTRACT_PATH/first.tz Unit '(List 1 2 3 4)' '1'
-assert_output $CONTRACT_PATH/first.tz Unit '(List 4)' '4'
+assert_output $CONTRACT_PATH/first.tz Unit '{ 1 ; 2 ; 3 ; 4 }' '1'
+assert_output $CONTRACT_PATH/first.tz Unit '{ 4 }' '4'
 
 # Hash input string
 # Test assumed to be correct -- hash is based on encoding of AST
@@ -405,10 +405,10 @@ account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
 $client transfer 0 from bootstrap1 to default_account  -arg "\"$account\""
 assert_balance $account "100 ꜩ"
 
-assert_fails $client typecheck data '(Map (Item 0 1) (Item 0 1))' against type '(map nat nat)'
-assert_fails $client typecheck data '(Map (Item 0 1) (Item 10 1) (Item 5 1))' against type '(map nat nat)'
-assert_fails $client typecheck data '(Set "A" "C" "B")' against type '(set string)'
-assert_fails $client typecheck data '(Set "A" "B" "B")' against type '(set string)'
+assert_fails $client typecheck data '{ Elt 0 1 ; Elt 0 1 }' against type '(map nat nat)'
+assert_fails $client typecheck data '{ Elt 0 1 ; Elt 10 1 ; Elt 5 1 }' against type '(map nat nat)'
+assert_fails $client typecheck data '{ "A" ; "C" ; "B" }' against type '(set string)'
+assert_fails $client typecheck data '{ "A" ; "B" ; "B" }' against type '(set string)'
 
 hash_result=`$client hash data '(Pair "22220.00" (Pair "2017-12-13T04:49:00Z" 034))' \
                      of type '(pair tez (pair timestamp int))'`

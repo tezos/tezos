@@ -132,14 +132,11 @@ module Script : sig
     | K_storage
     | K_code
     | D_False
-    | D_Item
+    | D_Elt
     | D_Left
-    | D_List
-    | D_Map
     | D_None
     | D_Pair
     | D_Right
-    | D_Set
     | D_Some
     | D_True
     | D_Unit

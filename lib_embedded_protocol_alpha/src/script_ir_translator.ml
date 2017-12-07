@@ -266,14 +266,11 @@ let namespace = function
   | K_storage
   | K_code -> Keyword_namespace
   | D_False
-  | D_Item
+  | D_Elt
   | D_Left
-  | D_List
-  | D_Map
   | D_None
   | D_Pair
   | D_Right
-  | D_Set
   | D_Some
   | D_True
   | D_Unit -> Constant_namespace
@@ -625,7 +622,7 @@ let rec unparse_data
         Prim (-1, D_None, [], None)
     | List_t t, items ->
         let items = List.map (unparse_data t) items in
-        Prim (-1, D_List, items, None)
+        Seq (-1, items, None)
     | Set_t t, set ->
         let t = ty_of_comparable_ty t in
         let items =
@@ -633,18 +630,18 @@ let rec unparse_data
             (fun item acc ->
                unparse_data t item :: acc )
             set [] in
-        Prim (-1, D_Set, List.rev items, None)
+        Seq (-1, List.rev items, None)
     | Map_t (kt, vt), map ->
         let kt = ty_of_comparable_ty kt in
         let items =
           map_fold (fun k v acc ->
-              Prim (-1, D_Item,
+              Prim (-1, D_Elt,
                     [ unparse_data kt k;
                       unparse_data vt v ],
                     None)
               :: acc)
             map [] in
-        Prim (-1, D_Map, List.rev items, None)
+        Seq (-1, List.rev items, None)
     | Lambda_t _, Lam (_, original_code) ->
         root original_code
 
@@ -1133,17 +1130,19 @@ let rec parse_data
     | Option_t _, expr ->
         traced (fail (unexpected expr [] Constant_namespace [ D_Some ; D_None ]))
     (* Lists *)
-    | List_t t, Prim (_, D_List, vs, _) ->
+    | List_t t, Seq (loc, items, annot) ->
+        fail_unexpected_annot loc annot >>=? fun () ->
         traced @@
         fold_right_s
           (fun v rest ->
              parse_data ?type_logger ctxt t v >>=? fun v ->
              return (v :: rest))
-          vs []
+          items []
     | List_t _, expr ->
-        traced (fail (unexpected expr [] Constant_namespace [ D_List ]))
+        traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Sets *)
-    | Set_t t, (Prim (loc, D_Set, vs, _) as expr) ->
+    | Set_t t, (Seq (loc, vs, annot) as expr) ->
+        fail_unexpected_annot loc annot >>=? fun () ->
         fold_left_s
           (fun (last_value, set) v ->
              parse_comparable_data ?type_logger ctxt t v >>=? fun v ->
@@ -1160,12 +1159,13 @@ let rec parse_data
              return (Some v, set_update v true set))
           (None, empty_set t) vs >>|? snd |> traced
     | Set_t _, expr ->
-        traced (fail (unexpected expr [] Constant_namespace [ D_Set ]))
+        traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Maps *)
-    | Map_t (tk, tv), (Prim (loc, D_Map, vs, _) as expr) ->
+    | Map_t (tk, tv), (Seq (loc, vs, annot) as expr) ->
+        fail_unexpected_annot loc annot >>=? fun () ->
         (fold_left_s
            (fun (last_value, map) -> function
-              | Prim (_, D_Item, [ k; v ], _) ->
+              | Prim (_, D_Elt, [ k; v ], _) ->
                   parse_comparable_data ?type_logger ctxt tk k >>=? fun k ->
                   parse_data ?type_logger ctxt tv v >>=? fun v ->
                   begin match last_value with
@@ -1179,15 +1179,15 @@ let rec parse_data
                     | None -> return ()
                   end >>=? fun () ->
                   return (Some k, map_update k (Some v) map)
-              | Prim (loc, D_Item, l, _) ->
-                  fail @@ Invalid_arity (loc, D_Item, 2, List.length l)
+              | Prim (loc, D_Elt, l, _) ->
+                  fail @@ Invalid_arity (loc, D_Elt, 2, List.length l)
               | Prim (loc, name, _, _) ->
-                  fail @@ Invalid_primitive (loc, [ D_Item ], name)
+                  fail @@ Invalid_primitive (loc, [ D_Elt ], name)
               | Int _ | String _ | Seq _ ->
                   fail (error ()))
            (None, empty_map tk) vs) >>|? snd |> traced
     | Map_t _, expr ->
-        traced (fail (unexpected expr [] Constant_namespace [ D_Map ]))
+        traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
 
 and parse_comparable_data
   : type a. ?type_logger:(int -> Script.expr list -> Script.expr list -> unit) ->
