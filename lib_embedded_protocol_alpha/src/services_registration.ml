@@ -30,31 +30,31 @@ let rpc_services = ref (RPC.Directory.empty : Updater.rpc_context RPC.Directory.
 
 let register0_fullctxt s f =
   rpc_services :=
-    RPC.register !rpc_services (s RPC.Path.open_root)
-      (fun ctxt () ->
+    RPC.Directory.register !rpc_services (s RPC.Path.open_root)
+      (fun ctxt q () ->
          ( rpc_init ctxt >>=? fun ctxt ->
-           f ctxt ) >>= RPC.Answer.return)
-let register0 s f = register0_fullctxt s (fun { context } -> f context)
+           f ctxt q) >>= RPC.Answer.return)
+let register0 s f = register0_fullctxt s (fun { context ; _ } -> f context)
 
 let register1_fullctxt s f =
   rpc_services :=
-    RPC.register !rpc_services (s RPC.Path.open_root)
-      (fun ctxt arg ->
+    RPC.Directory.register !rpc_services (s RPC.Path.open_root)
+      (fun ctxt q arg ->
          ( rpc_init ctxt >>=? fun ctxt ->
-           f ctxt arg ) >>= RPC.Answer.return)
-let register1 s f = register1_fullctxt s (fun { context } x -> f context x)
+           f ctxt q arg ) >>= RPC.Answer.return)
+let register1 s f = register1_fullctxt s (fun { context ; _ } x -> f context x)
 let register1_noctxt s f =
   rpc_services :=
-    RPC.register !rpc_services (s RPC.Path.open_root)
-      (fun _ arg -> f arg >>= RPC.Answer.return)
+    RPC.Directory.register !rpc_services (s RPC.Path.open_root)
+      (fun _ q arg -> f q arg >>= RPC.Answer.return)
 
 let register2_fullctxt s f =
   rpc_services :=
-    RPC.register !rpc_services (s RPC.Path.open_root)
-      (fun (ctxt, arg1) arg2 ->
+    RPC.Directory.register !rpc_services (s RPC.Path.open_root)
+      (fun (ctxt, arg1) q arg2 ->
          ( rpc_init ctxt >>=? fun ctxt ->
-           f ctxt arg1 arg2 ) >>= RPC.Answer.return)
-let register2 s f = register2_fullctxt s (fun { context } x y -> f context x y)
+           f ctxt q arg1 arg2 ) >>= RPC.Answer.return)
+let register2 s f = register2_fullctxt s (fun { context ; _ } q x y -> f context q x y)
 
 
 (*-- Operations --------------------------------------------------------------*)
@@ -62,7 +62,7 @@ let register2 s f = register2_fullctxt s (fun { context } x y -> f context x y)
 let () =
   register0_fullctxt
     Services.operations
-    (fun { operation_hashes ; operations } ->
+    (fun { operation_hashes ; operations ; _ } () ->
        operation_hashes () >>= fun operation_hashes ->
        operations () >>= fun operations ->
        map2_s
@@ -72,29 +72,29 @@ let () =
 let () =
   register0_fullctxt
     Services.header
-    (fun { block_header } ->
+    (fun { block_header ; _ } () ->
        Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
        return block_header) ;
   register0_fullctxt
     Services.Header.priority
-    (fun { block_header } ->
+    (fun { block_header ; _ } () ->
        Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
        return block_header.proto.priority) ;
   register0_fullctxt
     Services.Header.seed_nonce_hash
-    (fun { block_header } ->
+    (fun { block_header ; _ } () ->
        Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
        return block_header.proto.seed_nonce_hash)
 
 
 (*-- Constants ---------------------------------------------------------------*)
 
-let cycle_length ctxt =
+let cycle_length ctxt () =
   return @@ Constants.cycle_length ctxt
 
 let () = register0 Services.Constants.cycle_length cycle_length
 
-let voting_period_length ctxt =
+let voting_period_length ctxt () =
   return @@ Constants.voting_period_length ctxt
 
 let () =
@@ -102,50 +102,52 @@ let () =
     Services.Constants.voting_period_length
     voting_period_length
 
-let time_before_reward ctxt =
+let time_before_reward ctxt () =
   return @@ Constants.time_before_reward ctxt
 
 let () = register0 Services.Constants.time_before_reward time_before_reward
 
-let slot_durations ctxt =
+let slot_durations ctxt () =
   return @@ Constants.slot_durations ctxt
 
 let () = register0 Services.Constants.slot_durations slot_durations
 
-let first_free_baking_slot ctxt =
+let first_free_baking_slot ctxt () =
   return @@ Constants.first_free_baking_slot ctxt
 
 let () =
   register0 Services.Constants.first_free_baking_slot first_free_baking_slot
 
-let max_signing_slot ctxt =
+let max_signing_slot ctxt () =
   return @@ Constants.max_signing_slot ctxt
 
 let () = register0 Services.Constants.max_signing_slot max_signing_slot
 
-let instructions_per_transaction ctxt =
+let instructions_per_transaction ctxt () =
   return @@ Constants.instructions_per_transaction ctxt
 
 let () =
   register0
-    Services.Constants.instructions_per_transaction instructions_per_transaction
+    Services.Constants.instructions_per_transaction
+    instructions_per_transaction
 
-let proof_of_work_threshold ctxt =
+let proof_of_work_threshold ctxt () =
   return @@ Constants.proof_of_work_threshold ctxt
 
 let () =
-  register0 Services.Constants.proof_of_work_threshold proof_of_work_threshold
+  register0 Services.Constants.proof_of_work_threshold
+    proof_of_work_threshold
 
 let () =
   register1_noctxt Services.Constants.errors
-    (fun () ->
+    (fun () () ->
        Lwt.return (Data_encoding.Json.(schema error_encoding)))
 
 (*-- Context -----------------------------------------------------------------*)
 
 type error += Unexpected_level_in_context
 
-let level ctxt =
+let level ctxt () =
   let level = Level.current ctxt in
   match Level.pred ctxt level with
   | None -> fail Unexpected_level_in_context
@@ -153,64 +155,68 @@ let level ctxt =
 
 let () = register0 Services.Context.level level
 
-let next_level ctxt =
+let next_level ctxt () =
   return (Level.current ctxt)
 
-let () = register0 Services.Context.next_level next_level
-
-let roll_value ctxt =
-  return (Roll.value ctxt)
-let () = register0 Services.Context.roll_value roll_value
-
-let () = register0 Services.Context.next_roll Roll.next
+let () =
+  register0 Services.Context.next_level next_level
 
 let () =
-  register0 Services.Context.voting_period_kind Vote.get_current_period_kind
+  register0 Services.Context.roll_value
+    (fun ctxt () -> return (Roll.value ctxt))
+
+let () =
+  register0 Services.Context.next_roll
+    (fun ctxt () -> Roll.next ctxt)
+
+let () =
+  register0 Services.Context.voting_period_kind
+    (fun ctxt () -> Vote.get_current_period_kind ctxt)
 
 
 (*-- Context.Nonce -----------------------------------------------------------*)
 
-let nonce ctxt raw_level () =
+let nonce ctxt () raw_level () =
   let level = Level.from_raw ctxt raw_level in
   Nonce.get ctxt level >>= function
   | Ok (Revealed nonce) -> return (Services.Context.Nonce.Revealed nonce)
-  | Ok (Unrevealed { nonce_hash }) ->
+  | Ok (Unrevealed { nonce_hash ; _ }) ->
       return (Services.Context.Nonce.Missing nonce_hash)
   | Error _ -> return Services.Context.Nonce.Forgotten
 
 let () = register2 Services.Context.Nonce.get nonce
 
-let nonce_hash ctxt =
-  level ctxt >>=? fun level ->
+let nonce_hash ctxt () =
+  level ctxt () >>=? fun level ->
   Nonce.get ctxt level >>=? function
-  | Unrevealed { nonce_hash } -> return nonce_hash
+  | Unrevealed { nonce_hash ; _ } -> return nonce_hash
   | _ -> assert false
 
 let () = register0 Services.Context.Nonce.hash nonce_hash
 
 (*-- Context.Key -------------------------------------------------------------*)
 
-let get_key ctxt hash () =
+let get_key ctxt () hash () =
   Delegates_pubkey.get ctxt hash >>=? fun pk ->
   return (hash, pk)
 
 let () = register2 Services.Context.Key.get get_key
 let () =
   register0 Services.Context.Key.list
-    (fun t -> Delegates_pubkey.list t >>= return)
+    (fun t () -> Delegates_pubkey.list t >>= return)
 
 (*-- Context.Contract --------------------------------------------------------*)
 
 let () =
   register0 Services.Context.Contract.list
-    (fun ctxt -> Contract.list ctxt >>= return)
+    (fun ctxt () -> Contract.list ctxt >>= return)
 
 let () =
   let register2 s f =
     rpc_services :=
-      RPC.register !rpc_services (s RPC.Path.open_root)
-        (fun (ctxt, contract) arg ->
-           ( rpc_init ctxt >>=? fun { context = ctxt } ->
+      RPC.Directory.register !rpc_services (s RPC.Path.open_root)
+        (fun (ctxt, contract) () arg ->
+           ( rpc_init ctxt >>=? fun { context = ctxt ; _ } ->
              Contract.exists ctxt contract >>=? function
              | true -> f ctxt contract arg
              | false -> raise Not_found ) >>= RPC.Answer.return) in
@@ -244,14 +250,14 @@ let minimal_timestamp ctxt prio =
 
 let () = register1
     Services.Helpers.minimal_timestamp
-    (fun ctxt slot ->
+    (fun ctxt () slot ->
        let timestamp = Tezos_context.Timestamp.current ctxt in
        minimal_timestamp ctxt slot timestamp)
 
 let () =
   (* ctxt accept_failing_script baker_contract pred_block block_prio operation *)
   register1 Services.Helpers.apply_operation
-    (fun ctxt (pred_block, hash, forged_operation, signature) ->
+    (fun ctxt () (pred_block, hash, forged_operation, signature) ->
        match Data_encoding.Binary.of_bytes
                Operation.unsigned_operation_encoding
                forged_operation with
@@ -284,7 +290,7 @@ let () =
             (Operation_hash.hash_string [ "FAKE " ; "FAKE" ; "FAKE" ]) in
     (script, storage, input, amount, contract, qta, origination_nonce) in
   register1 Services.Helpers.run_code
-    (fun ctxt parameters ->
+    (fun ctxt () parameters ->
        let (code, storage, input, amount, contract, qta, origination_nonce) =
          run_parameters ctxt parameters in
        Script_interpreter.execute
@@ -295,7 +301,7 @@ let () =
          qta >>=? fun (sto, ret, _qta, _ctxt, _) ->
        Error_monad.return (sto, ret)) ;
   register1 Services.Helpers.trace_code
-    (fun ctxt parameters ->
+    (fun ctxt () parameters ->
        let (code, storage, input, amount, contract, qta, origination_nonce) =
          run_parameters ctxt parameters in
        Script_interpreter.trace
@@ -308,28 +314,27 @@ let () =
 
 let () =
   register1 Services.Helpers.typecheck_code
-    Script_ir_translator.typecheck_code
+    (fun ctxt () -> Script_ir_translator.typecheck_code ctxt)
 
 let () =
   register1 Services.Helpers.typecheck_data
-    Script_ir_translator.typecheck_data
+    (fun ctxt () -> Script_ir_translator.typecheck_data ctxt)
 
 let () =
   register1 Services.Helpers.hash_data
-    (fun _ctxt expr -> return (Script.hash_expr expr))
+    (fun _ctxt () expr -> return (Script.hash_expr expr))
 
-let compute_level ctxt raw offset =
-  return (Level.from_raw ctxt ?offset raw)
+let () =
+  register2 Services.Helpers.level
+    (fun ctxt () raw offset -> return (Level.from_raw ctxt ?offset raw))
 
-let () = register2 Services.Helpers.level compute_level
-
-let levels ctxt cycle () =
-  let levels = Level.levels_in_cycle ctxt cycle in
-  let first = List.hd (List.rev levels) in
-  let last = List.hd levels in
-  return (first.level, last.level)
-
-let () = register2 Services.Helpers.levels levels
+let () =
+  register2 Services.Helpers.levels
+    (fun ctxt () cycle () ->
+       let levels = Level.levels_in_cycle ctxt cycle in
+       let first = List.hd (List.rev levels) in
+       let last = List.hd levels in
+       return (first.level, last.level))
 
 
 (*-- Helpers.Rights ----------------------------------------------------------*)
@@ -357,7 +362,7 @@ let baking_rights ctxt level max =
 
 let () =
   register1 Services.Helpers.Rights.baking_rights
-    (fun ctxt max ->
+    (fun ctxt () max ->
        let level = Level.current ctxt in
        baking_rights ctxt level max >>=? fun (raw_level, slots) ->
        begin
@@ -374,12 +379,12 @@ let () =
 
 let () =
   register2 Services.Helpers.Rights.baking_rights_for_level
-    (fun ctxt raw_level max ->
+    (fun ctxt () raw_level max ->
        let level = Level.from_raw ctxt raw_level in
        baking_rights ctxt level max)
 
 let baking_rights_for_delegate
-    ctxt contract (max_priority, min_level, max_level) =
+    ctxt () contract (max_priority, min_level, max_level) =
   let max_priority = default_max_baking_priority ctxt max_priority in
   let current_level = Level.current ctxt in
   let min_level = match min_level with
@@ -436,16 +441,16 @@ let endorsement_rights ctxt level max =
 
 let () =
   register1 Services.Helpers.Rights.endorsement_rights
-    (fun ctxt max ->
+    (fun ctxt () max ->
        let level = Level.current ctxt in
        endorsement_rights ctxt (Level.succ ctxt level) max) ;
   register2 Services.Helpers.Rights.endorsement_rights_for_level
-    (fun ctxt raw_level max ->
+    (fun ctxt () raw_level max ->
        let level = Level.from_raw ctxt raw_level in
        endorsement_rights ctxt level max)
 
 let endorsement_rights_for_delegate
-    ctxt contract (max_priority, min_level, max_level) =
+    ctxt () contract (max_priority, min_level, max_level) =
   let current_level = Level.current ctxt in
   let max_priority = default_max_endorsement_priority ctxt max_priority in
   let min_level = match min_level with
@@ -482,7 +487,7 @@ let operation_public_key ctxt = function
       | None -> return (Some public_key)
       | Some _ -> return None
 
-let forge_operations _ctxt (shell, proto) =
+let forge_operations _ctxt () (shell, proto) =
   return (Operation.forge shell proto)
 
 let () = register1 Services.Helpers.Forge.operations forge_operations
@@ -493,7 +498,8 @@ let forge_block_proto_header _ctxt
             { priority ; seed_nonce_hash ; proof_of_work_nonce })
 
 let () =
-  register1 Services.Helpers.Forge.block_proto_header forge_block_proto_header
+  register1 Services.Helpers.Forge.block_proto_header
+    (fun ctxt () -> forge_block_proto_header ctxt)
 
 (*-- Helpers.Parse -----------------------------------------------------------*)
 
@@ -512,7 +518,7 @@ let check_signature ctxt signature shell contents =
       end >>=? fun public_key ->
       Operation.check_signature public_key
         { signature ; shell ; contents ; hash = dummy_hash }
-  | Sourced_operations (Delegate_operations { source }) ->
+  | Sourced_operations (Delegate_operations { source ; _ }) ->
       Operation.check_signature source
         { signature ; shell ; contents ; hash = dummy_hash }
   | Sourced_operations (Dictator_operation _) ->
@@ -520,7 +526,7 @@ let check_signature ctxt signature shell contents =
       Operation.check_signature key
         { signature ; shell ; contents ; hash = dummy_hash }
 
-let parse_operations ctxt (operations, check) =
+let parse_operations ctxt () (operations, check) =
   map_s begin fun raw ->
     begin
       Lwt.return
@@ -532,13 +538,14 @@ let parse_operations ctxt (operations, check) =
     end
   end operations
 
-let () = register1 Services.Helpers.Parse.operations parse_operations
+let () =
+  register1 Services.Helpers.Parse.operations parse_operations
 
-let parse_block _ctxt raw_block =
-  Lwt.return (Block_header.parse raw_block) >>=? fun { proto } ->
-  return proto
-
-let () = register1 Services.Helpers.Parse.block parse_block
+let () =
+  register1 Services.Helpers.Parse.block
+    (fun _ctxt () raw_block ->
+       Lwt.return (Block_header.parse raw_block) >>=? fun { proto ; _ } ->
+       return proto)
 
 (*****)
 
