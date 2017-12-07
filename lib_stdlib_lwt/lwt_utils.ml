@@ -340,7 +340,7 @@ let protect ?on_error ?canceler t =
   | Ok _ -> res
   | Error err ->
       let canceled =
-       Option.unopt_map canceler ~default:false ~f:Lwt_canceler.canceled in
+        Option.unopt_map canceler ~default:false ~f:Lwt_canceler.canceled in
       let err = if canceled then [Canceled] else err in
       match on_error with
       | None -> Lwt.return (Error err)

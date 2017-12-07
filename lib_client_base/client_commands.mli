@@ -48,7 +48,6 @@ class type full_context = object
   inherit block
 end
 (** The [full_context] allows the client {!command} handlers to work in
->>>>>>> 3ab6ecd4... Client library refactor
      various modes (command line, batch mode, web client, etc.) by
      abstracting some basic operations such as logging and reading
      configuration options. It is passed as parameter to the command

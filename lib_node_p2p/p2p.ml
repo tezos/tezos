@@ -541,7 +541,8 @@ module RPC = struct
     let info net point =
       match net.pool with
       | None -> None
-      | Some pool -> Option.map
+      | Some pool ->
+          Option.map
             (P2p_connection_pool.Points.info pool point)
             ~f:info_of_point_info
 

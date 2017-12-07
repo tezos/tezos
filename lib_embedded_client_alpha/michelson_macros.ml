@@ -375,7 +375,7 @@ let expand_compare original =
   | Prim (loc, "CMPGE", [], None) ->
       cmp loc [ "COMPARE" ; "GE" ]
   | Prim (_, ("CMPEQ" |  "CMPNEQ" |  "CMPLT"
-               |  "CMPGT" |  "CMPLE" | "CMPGE" as str), args, None) ->
+             |  "CMPGT" |  "CMPLE" | "CMPGE" as str), args, None) ->
       error (Invalid_arity (str, List.length args, 0))
   | Prim (loc, "IFCMPEQ", [ l ; r ], None) ->
       ifcmp loc [ "COMPARE" ; "EQ" ] l r
@@ -402,16 +402,16 @@ let expand_compare original =
   | Prim (loc, "IFGE", [ l ; r ], None) ->
       ifcmp loc [ "GE" ] l r
   | Prim (_, ("IFCMPEQ" | "IFCMPNEQ" | "IFCMPLT"
-               | "IFCMPGT" | "IFCMPLE" | "IFCMPGE"
-               | "IFEQ" | "IFNEQ" | "IFLT"
-               | "IFGT" | "IFLE" | "IFGE" as str), args, None) ->
+             | "IFCMPGT" | "IFCMPLE" | "IFCMPGE"
+             | "IFEQ" | "IFNEQ" | "IFLT"
+             | "IFGT" | "IFLE" | "IFGE" as str), args, None) ->
       error (Invalid_arity (str, List.length args, 2))
   | Prim (_, ("IFCMPEQ" | "IFCMPNEQ" | "IFCMPLT"
-               | "IFCMPGT" | "IFCMPLE" | "IFCMPGE"
-               | "IFEQ" | "IFNEQ" | "IFLT"
-               | "IFGT" | "IFLE" | "IFGE"
-               | "CMPEQ" |  "CMPNEQ" |  "CMPLT"
-               | "CMPGT" |  "CMPLE" | "CMPGE" as str), [], Some _) ->
+             | "IFCMPGT" | "IFCMPLE" | "IFCMPGE"
+             | "IFEQ" | "IFNEQ" | "IFLT"
+             | "IFGT" | "IFLE" | "IFGE"
+             | "CMPEQ" |  "CMPNEQ" |  "CMPLT"
+             | "CMPGT" |  "CMPLE" | "CMPGE" as str), [], Some _) ->
       error (Unexpected_macro_annotation str)
   | _ -> ok None
 
