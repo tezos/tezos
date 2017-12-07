@@ -139,9 +139,6 @@ module Service = Resto.MakeService(Data)
 
 (* Compatibility layer, to be removed ASAP. *)
 
-type ('prefix, 'params, 'input, 'output) service =
-  ([ `POST ], 'prefix, 'params, unit, 'input, 'output, unit) Service.t
-
 let service ?description ~input ~output path =
   Service.post_service
     ?description

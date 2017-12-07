@@ -293,36 +293,41 @@ end
 
 type 'a directory = 'a Directory.t
 
-type ('prefix, 'params, 'input, 'output) service =
-  ([ `POST ], 'prefix, 'params, unit, 'input, 'output, unit) Service.t
-
 val service:
   ?description: string ->
   input: 'input Data_encoding.t ->
   output: 'output Data_encoding.t ->
   ('prefix, 'params) Path.t ->
-  ('prefix, 'params, 'input, 'output) service
+  ([ `POST], 'prefix, 'params, unit, 'input, 'output, unit) Service.t
 
 val register:
   'prefix directory ->
-  ('prefix, 'params, 'input, 'output) service ->
+  ([ `POST ], 'prefix,
+   'params, unit, 'input,
+   'output, unit) Service.t ->
   ('params -> 'input -> [< ('output, unit) Answer.t ] Lwt.t) ->
   'prefix directory
 
 val register0:
   unit directory ->
-  (unit, unit, 'i, 'o) service ->
+  ([ `POST ], unit,
+   unit, unit, 'i,
+   'o, unit) Service.t ->
   ('i -> [< ('o, unit) Answer.t ] Lwt.t) ->
   unit directory
 
 val register1:
   'prefix directory ->
-  ('prefix, unit * 'a, 'i, 'o) service ->
+  ([ `POST ], 'prefix,
+   unit * 'a, unit, 'i,
+   'o, unit) Service.t ->
   ('a -> 'i -> [< ('o, unit) Answer.t ] Lwt.t) ->
   'prefix directory
 
 val register2:
   'prefix directory ->
-  ('prefix, (unit * 'a) * 'b, 'i, 'o) service ->
+  ([ `POST ], 'prefix,
+   (unit * 'a) * 'b, unit, 'i,
+   'o, unit) Service.t ->
   ('a -> 'b -> 'i -> [< ('o, unit) Answer.t ] Lwt.t) ->
   'prefix directory

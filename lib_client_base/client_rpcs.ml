@@ -202,16 +202,18 @@ class type rpc_sig = object
     Data_encoding.json ->
     ('a * Cohttp.Code.status_code * Cohttp_lwt.Body.t) tzresult Lwt.t
   method parse_answer :
-    (unit, 'b, 'c, 'd) RPC.service ->
+    'meth 'params 'input 'output.
+    ([< Resto.meth ] as 'meth, unit, 'params, unit, 'input, 'output, unit) RPC.Service.t ->
     string list ->
-    Data_encoding.json -> 'd tzresult Lwt.t
+    Data_encoding.json -> 'output tzresult Lwt.t
   method parse_err_answer :
-    (unit, 'e, 'f, 'g tzresult) RPC.service ->
+    'meth 'params 'input 'output.
+    ([< Resto.meth ] as 'meth, unit, 'params, unit, 'input, 'output tzresult, unit) RPC.Service.t ->
     string list ->
-    Data_encoding.json -> 'g tzresult Lwt.t
+    Data_encoding.json -> 'output tzresult Lwt.t
 end
 
-class rpc config = object (self)
+class rpc config : rpc_sig = object (self)
   val config = config
   method make_request :
     type a. (Uri.t -> Data_encoding.json -> a Lwt.t) ->
@@ -272,9 +274,11 @@ class rpc config = object (self)
         logger.log_error reqid code ansbody >>= fun () ->
         fail config (Request_failed (service, err))
 
-  method parse_answer : type b c d. (unit, b, c, d) RPC.service ->
-    string list ->
-    Data_encoding.json -> d tzresult Lwt.t =
+  method parse_answer
+    : 'm 'p 'i 'o.
+      ([< Resto.meth ] as 'm, unit, 'p, unit, 'i, 'o, unit) RPC.Service.t ->
+      string list ->
+      Data_encoding.json -> 'o tzresult Lwt.t =
     fun service path json ->
       match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
       | exception msg ->
@@ -308,10 +312,11 @@ class rpc config = object (self)
           logger.log_error reqid code ansbody >>= fun () ->
           fail config (Request_failed (service, err))
 
-  method parse_err_answer : type e f g.
-    (unit, e, f, g tzresult) RPC.service ->
-    string list ->
-    Data_encoding.json -> g tzresult Lwt.t =
+  method parse_err_answer
+    : 'm 'p 'i 'o.
+      ([< Resto.meth ] as 'm, unit, 'p, unit, 'i, 'o tzresult, unit) RPC.Service.t ->
+      string list ->
+      Data_encoding.json -> 'o tzresult Lwt.t =
     fun service path json ->
       match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
       | exception msg -> (* TODO print_error *)

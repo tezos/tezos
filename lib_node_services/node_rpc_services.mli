@@ -8,7 +8,8 @@
 (**************************************************************************)
 
 module Error : sig
-  val service: (unit, unit, unit, Json_schema.schema) RPC.service
+  val service:
+    ([ `POST ], unit, unit, unit, unit, Json_schema.schema, unit) RPC.Service.t
   val encoding: error list Data_encoding.t
   val wrap: 'a Data_encoding.t -> 'a tzresult Data_encoding.encoding
 end
@@ -43,37 +44,59 @@ module Blocks : sig
   }
 
   val info:
-    (unit, unit * block, bool, block_info) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, bool,
+     block_info, unit) RPC.Service.t
   val net_id:
-    (unit, unit * block, unit, Net_id.t) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, unit,
+     Net_id.t, unit) RPC.Service.t
   val level:
-    (unit, unit * block, unit, Int32.t) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, unit,
+     Int32.t, unit) RPC.Service.t
   val predecessor:
-    (unit, unit * block, unit, Block_hash.t) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, unit,
+     Block_hash.t, unit) RPC.Service.t
   val predecessors:
-    (unit, unit * block , int, Block_hash.t list) RPC.service
+    ([ `POST ], unit,
+     unit * block , unit, int,
+     Block_hash.t list, unit) RPC.Service.t
   val hash:
-    (unit, unit * block, unit, Block_hash.t) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, unit,
+     Block_hash.t, unit) RPC.Service.t
   val timestamp:
-    (unit, unit * block, unit, Time.t) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, unit,
+     Time.t, unit) RPC.Service.t
   val fitness:
-    (unit, unit * block, unit, MBytes.t list) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, unit,
+     MBytes.t list, unit) RPC.Service.t
 
   type operations_param = {
     contents: bool ;
     monitor: bool ;
   }
   val operations:
-    (unit, unit * block, operations_param,
-     (Operation_hash.t * Operation.t option) list list) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, operations_param,
+     (Operation_hash.t * Operation.t option) list list, unit) RPC.Service.t
 
   val protocol:
-    (unit, unit * block, unit, Protocol_hash.t) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, unit,
+     Protocol_hash.t, unit) RPC.Service.t
   val test_network:
-    (unit, unit * block, unit, Test_network_status.t) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, unit,
+     Test_network_status.t, unit) RPC.Service.t
   val pending_operations:
-    (unit, unit * block, unit,
-     error Preapply_result.t * Operation.t Operation_hash.Map.t) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, unit,
+     error Preapply_result.t * Operation.t Operation_hash.Map.t, unit) RPC.Service.t
 
   type list_param = {
     include_ops: bool ;
@@ -85,10 +108,14 @@ module Blocks : sig
     min_heads: int option;
   }
   val list:
-    (unit, unit, list_param, block_info list list) RPC.service
+    ([ `POST ], unit,
+     unit, unit, list_param,
+     block_info list list, unit) RPC.Service.t
 
   val list_invalid:
-    (unit, unit, unit, (Block_hash.t * int32 * error list) list) RPC.service
+    ([ `POST ], unit,
+     unit, unit, unit,
+     (Block_hash.t * int32 * error list) list, unit) RPC.Service.t
 
   type preapply_param = {
     timestamp: Time.t ;
@@ -102,9 +129,14 @@ module Blocks : sig
     operations: error Preapply_result.t ;
   }
   val preapply:
-    (unit, unit * block, preapply_param, preapply_result tzresult) RPC.service
+    ([ `POST ], unit,
+     unit * block, unit, preapply_param,
+     preapply_result tzresult, unit) RPC.Service.t
 
-  val complete: (unit, (unit * block) * string, unit, string list) RPC.service
+  val complete:
+    ([ `POST ], unit,
+     (unit * block) * string, unit, unit,
+     string list, unit) RPC.Service.t
 
   val proto_path: (unit, unit * block) RPC.Path.path
 
@@ -114,7 +146,9 @@ end
 module Protocols : sig
 
   val contents:
-    (unit, unit * Protocol_hash.t, unit, Protocol.t) RPC.service
+    ([ `POST ], unit,
+     unit * Protocol_hash.t, unit, unit,
+     Protocol.t, unit) RPC.Service.t
 
   type list_param = {
     contents: bool option ;
@@ -122,71 +156,93 @@ module Protocols : sig
   }
 
   val list:
-    (unit, unit,
-     list_param,
-     (Protocol_hash.t * Protocol.t option) list) RPC.service
+    ([ `POST ], unit,
+     unit, unit, list_param,
+     (Protocol_hash.t * Protocol.t option) list, unit) RPC.Service.t
 
 end
 
 module Network : sig
 
   val stat :
-    (unit, unit, unit, P2p_types.Stat.t) RPC.service
+    ([ `POST ], unit,
+     unit, unit, unit,
+     P2p_types.Stat.t, unit) RPC.Service.t
 
   val versions :
-    (unit, unit, unit, P2p_types.Version.t list) RPC.service
+    ([ `POST ], unit,
+     unit, unit, unit,
+     P2p_types.Version.t list, unit) RPC.Service.t
 
   val events :
-    (unit, unit, unit, P2p_types.Connection_pool_log_event.t) RPC.service
+    ([ `POST ], unit,
+     unit, unit, unit,
+     P2p_types.Connection_pool_log_event.t, unit) RPC.Service.t
 
   val connect :
-    (unit, unit * P2p_types.Point.t, float, unit tzresult) RPC.service
+    ([ `POST ], unit,
+     unit * P2p_types.Point.t, unit, float,
+     unit tzresult, unit) RPC.Service.t
 
   module Connection : sig
 
     val list :
-      (unit, unit, unit, P2p_types.Connection_info.t list) RPC.service
+      ([ `POST ], unit,
+       unit, unit, unit,
+       P2p_types.Connection_info.t list, unit) RPC.Service.t
 
     val info :
-      (unit, unit * P2p_types.Peer_id.t, unit,
-       P2p_types.Connection_info.t option) RPC.service
+      ([ `POST ], unit,
+       unit * P2p_types.Peer_id.t, unit, unit,
+       P2p_types.Connection_info.t option, unit) RPC.Service.t
 
     val kick :
-      (unit, unit * P2p_types.Peer_id.t, bool, unit) RPC.service
+      ([ `POST ], unit,
+       unit * P2p_types.Peer_id.t, unit, bool,
+       unit, unit) RPC.Service.t
 
   end
 
   module Point : sig
     val list :
-      (unit, unit, P2p_types.Point_state.t list,
-       (P2p_types.Point.t * P2p_types.Point_info.t) list) RPC.service
+      ([ `POST ], unit,
+       unit, unit, P2p_types.Point_state.t list,
+       (P2p_types.Point.t * P2p_types.Point_info.t) list, unit) RPC.Service.t
     val info :
-      (unit, unit * P2p_types.Point.t, unit, P2p_types.Point_info.t option) RPC.service
+      ([ `POST ], unit,
+       unit * P2p_types.Point.t, unit, unit,
+       P2p_types.Point_info.t option, unit) RPC.Service.t
     val events :
-      (unit, unit * P2p_types.Point.t, bool,
-       P2p_connection_pool_types.Point_info.Event.t list) RPC.service
+      ([ `POST ], unit,
+       unit * P2p_types.Point.t, unit, bool,
+       P2p_connection_pool_types.Point_info.Event.t list, unit) RPC.Service.t
   end
 
   module Peer_id : sig
 
     val list :
-      (unit, unit, P2p_types.Peer_state.t list,
-       (P2p_types.Peer_id.t * P2p_types.Peer_info.t) list) RPC.service
+      ([ `POST ], unit,
+       unit, unit, P2p_types.Peer_state.t list,
+       (P2p_types.Peer_id.t * P2p_types.Peer_info.t) list, unit) RPC.Service.t
 
     val info :
-      (unit, unit * P2p_types.Peer_id.t, unit,
-       P2p_types.Peer_info.t option) RPC.service
+      ([ `POST ], unit,
+       unit * P2p_types.Peer_id.t, unit, unit,
+       P2p_types.Peer_info.t option, unit) RPC.Service.t
 
     val events :
-      (unit, unit * P2p_types.Peer_id.t, bool,
-       P2p_connection_pool_types.Peer_info.Event.t list) RPC.service
+      ([ `POST ], unit,
+       unit * P2p_types.Peer_id.t, unit, bool,
+       P2p_connection_pool_types.Peer_info.Event.t list, unit) RPC.Service.t
 
   end
 
 end
 
 val forge_block_header:
-  (unit, unit, Block_header.t, MBytes.t) RPC.service
+  ([ `POST ], unit,
+   unit, unit, Block_header.t,
+   MBytes.t, unit) RPC.Service.t
 
 type inject_block_param = {
   raw: MBytes.t ;
@@ -197,20 +253,28 @@ type inject_block_param = {
 }
 
 val inject_block:
-  (unit, unit, inject_block_param, Block_hash.t tzresult) RPC.service
+  ([ `POST ], unit,
+   unit, unit, inject_block_param,
+   Block_hash.t tzresult, unit) RPC.Service.t
 
 val inject_operation:
-  (unit, unit,
-   (MBytes.t * bool * Net_id.t option * bool option),
-   Operation_hash.t tzresult) RPC.service
+  ([ `POST ], unit,
+   unit, unit, (MBytes.t * bool * Net_id.t option * bool option),
+   Operation_hash.t tzresult, unit) RPC.Service.t
 
 val inject_protocol:
-  (unit, unit,
-   (Protocol.t * bool * bool option),
-   Protocol_hash.t tzresult) RPC.service
+  ([ `POST ], unit,
+   unit, unit, (Protocol.t * bool * bool option),
+   Protocol_hash.t tzresult, unit) RPC.Service.t
 
-val bootstrapped: (unit, unit, unit, Block_hash.t * Time.t) RPC.service
+val bootstrapped:
+  ([ `POST ], unit,
+   unit, unit, unit,
+   Block_hash.t * Time.t, unit) RPC.Service.t
 
-val complete: (unit, unit * string, unit, string list) RPC.service
+val complete:
+  ([ `POST ], unit,
+   unit * string, unit, unit,
+   string list, unit) RPC.Service.t
 
 val describe: (unit, unit) RPC.Service.description_service

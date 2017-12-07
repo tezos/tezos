@@ -50,25 +50,25 @@ type 'a directory = 'a Directory.t
 val empty: 'a directory
 val register:
   'prefix directory ->
-  ('prefix, 'params, 'input, 'output) RPC.service ->
+  ([`POST], 'prefix, 'params, unit, 'input, 'output, unit) RPC.Service.t ->
   ('params -> 'input -> [< ('output, unit) RestoDirectory.Answer.t ] Lwt.t) ->
   'prefix directory
 
 val register0:
   unit directory ->
-  (unit, unit, 'i, 'o) RPC.service ->
+  ([`POST], unit, unit, unit, 'i, 'o, unit) RPC.Service.t ->
   ('i -> [< ('o, unit) Answer.t ] Lwt.t) ->
   unit directory
 
 val register1:
   'prefix directory ->
-  ('prefix, unit * 'a, 'i, 'o) RPC.service ->
+  ([`POST], 'prefix, unit * 'a, unit, 'i, 'o, unit) RPC.Service.t ->
   ('a -> 'i -> [< ('o, unit) Answer.t ] Lwt.t) ->
   'prefix directory
 
 val register2:
   'prefix directory ->
-  ('prefix, (unit * 'a) * 'b, 'i, 'o) RPC.service ->
+  ([`POST], 'prefix, (unit * 'a) * 'b, unit, 'i, 'o, unit) RPC.Service.t ->
   ('a -> 'b -> 'i -> [< ('o, unit) Answer.t ] Lwt.t) ->
   'prefix directory
 
