@@ -384,223 +384,109 @@ let strings_of_prims expr =
   strip_locations (convert (root expr))
 
 let prim_encoding =
-  let to_int = function
-    | K_parameter -> 0
-    | K_return -> 1
-    | K_storage -> 2
-    | K_code -> 3
-    | D_False -> 4
-    | D_Item -> 5
-    | D_Left -> 6
-    | D_List -> 7
-    | D_Map -> 8
-    | D_None -> 9
-    | D_Pair -> 10
-    | D_Right -> 11
-    | D_Set -> 12
-    | D_Some -> 13
-    | D_True -> 14
-    | D_Unit -> 15
-    | I_H -> 16
-    | I_ABS -> 17
-    | I_ADD -> 18
-    | I_AMOUNT -> 19
-    | I_AND -> 20
-    | I_BALANCE -> 21
-    | I_CAR -> 22
-    | I_CDR -> 23
-    | I_CHECK_SIGNATURE -> 24
-    | I_COMPARE -> 25
-    | I_CONCAT -> 26
-    | I_CONS -> 27
-    | I_CREATE_ACCOUNT -> 28
-    | I_CREATE_CONTRACT -> 29
-    | I_DEFAULT_ACCOUNT -> 30
-    | I_DIP -> 31
-    | I_DROP -> 32
-    | I_DUP -> 33
-    | I_EDIV -> 34
-    | I_EMPTY_MAP -> 35
-    | I_EMPTY_SET -> 36
-    | I_EQ -> 37
-    | I_EXEC -> 38
-    | I_FAIL -> 39
-    | I_GE -> 40
-    | I_GET -> 41
-    | I_GT -> 42
-    | I_HASH_KEY -> 43
-    | I_IF -> 44
-    | I_IF_CONS -> 45
-    | I_IF_LEFT -> 46
-    | I_IF_NONE -> 47
-    | I_INT -> 48
-    | I_LAMBDA -> 49
-    | I_LE -> 50
-    | I_LEFT -> 51
-    | I_LOOP -> 52
-    | I_LSL -> 53
-    | I_LSR -> 54
-    | I_LT -> 55
-    | I_MANAGER -> 56
-    | I_MAP -> 57
-    | I_MEM -> 58
-    | I_MUL -> 59
-    | I_NEG -> 60
-    | I_NEQ -> 61
-    | I_NIL -> 62
-    | I_NONE -> 63
-    | I_NOT -> 64
-    | I_NOW -> 65
-    | I_OR -> 66
-    | I_PAIR -> 67
-    | I_PUSH -> 68
-    | I_REDUCE -> 69
-    | I_RIGHT -> 70
-    | I_SIZE -> 71
-    | I_SOME -> 72
-    | I_SOURCE -> 73
-    | I_STEPS_TO_QUOTA -> 74
-    | I_SUB -> 75
-    | I_SWAP -> 76
-    | I_TRANSFER_TOKENS -> 77
-    | I_UNIT -> 78
-    | I_UPDATE -> 79
-    | I_XOR -> 80
-    | I_ITER -> 81
-    | I_LOOP_LEFT -> 82
-    | T_bool -> 83
-    | T_contract -> 84
-    | T_int -> 85
-    | T_key -> 86
-    | T_key_hash -> 87
-    | T_lambda -> 88
-    | T_list -> 89
-    | T_map -> 90
-    | T_nat -> 91
-    | T_option -> 92
-    | T_or -> 93
-    | T_pair -> 94
-    | T_set -> 95
-    | T_signature -> 96
-    | T_string -> 97
-    | T_tez -> 98
-    | T_timestamp -> 99
-    | T_unit -> 100 in
-  let of_int_map = [|
-    K_parameter ;
-    K_return ;
-    K_storage ;
-    K_code ;
-    D_False ;
-    D_Item ;
-    D_Left ;
-    D_List ;
-    D_Map ;
-    D_None ;
-    D_Pair ;
-    D_Right ;
-    D_Set ;
-    D_Some ;
-    D_True ;
-    D_Unit ;
-    I_H ;
-    I_ABS ;
-    I_ADD ;
-    I_AMOUNT ;
-    I_AND ;
-    I_BALANCE ;
-    I_CAR ;
-    I_CDR ;
-    I_CHECK_SIGNATURE ;
-    I_COMPARE ;
-    I_CONCAT ;
-    I_CONS ;
-    I_CREATE_ACCOUNT ;
-    I_CREATE_CONTRACT ;
-    I_DEFAULT_ACCOUNT ;
-    I_DIP ;
-    I_DROP ;
-    I_DUP ;
-    I_EDIV ;
-    I_EMPTY_MAP ;
-    I_EMPTY_SET ;
-    I_EQ ;
-    I_EXEC ;
-    I_FAIL ;
-    I_GE ;
-    I_GET ;
-    I_GT ;
-    I_HASH_KEY ;
-    I_IF ;
-    I_IF_CONS ;
-    I_IF_LEFT ;
-    I_IF_NONE ;
-    I_INT ;
-    I_LAMBDA ;
-    I_LE ;
-    I_LEFT ;
-    I_LOOP ;
-    I_LSL ;
-    I_LSR ;
-    I_LT ;
-    I_MANAGER ;
-    I_MAP ;
-    I_MEM ;
-    I_MUL ;
-    I_NEG ;
-    I_NEQ ;
-    I_NIL ;
-    I_NONE ;
-    I_NOT ;
-    I_NOW ;
-    I_OR ;
-    I_PAIR ;
-    I_PUSH ;
-    I_REDUCE ;
-    I_RIGHT ;
-    I_SIZE ;
-    I_SOME ;
-    I_SOURCE ;
-    I_STEPS_TO_QUOTA ;
-    I_SUB ;
-    I_SWAP ;
-    I_TRANSFER_TOKENS ;
-    I_UNIT ;
-    I_UPDATE ;
-    I_XOR ;
-    I_ITER ;
-    I_LOOP_LEFT ;
-    T_bool ;
-    T_contract ;
-    T_int ;
-    T_key ;
-    T_key_hash ;
-    T_lambda ;
-    T_list ;
-    T_map ;
-    T_nat ;
-    T_option ;
-    T_or ;
-    T_pair ;
-    T_set ;
-    T_signature ;
-    T_string ;
-    T_tez ;
-    T_timestamp ;
-    T_unit |] in
-  let of_int i =
-    if Compare.Int.(i >= 0 || i <= 100) then
-      of_int_map.(i)
-    else
-      raise Data_encoding.No_case_matched in
   let open Data_encoding in
-  let binary =
-    conv to_int of_int uint8 in
-  let json =
-    string_enum
-      (List.map (fun op -> string_of_prim op, op)
-         (Array.to_list of_int_map)) in
-  splitted ~json ~binary
+  string_enum [
+    ("parameter", K_parameter) ;
+    ("return", K_return) ;
+    ("storage", K_storage) ;
+    ("code", K_code) ;
+    ("False", D_False) ;
+    ("Item", D_Item) ;
+    ("Left", D_Left) ;
+    ("List", D_List) ;
+    ("Map", D_Map) ;
+    ("None", D_None) ;
+    ("Pair", D_Pair) ;
+    ("Right", D_Right) ;
+    ("Set", D_Set) ;
+    ("Some", D_Some) ;
+    ("True", D_True) ;
+    ("Unit", D_Unit) ;
+    ("H", I_H) ;
+    ("ABS", I_ABS) ;
+    ("ADD", I_ADD) ;
+    ("AMOUNT", I_AMOUNT) ;
+    ("AND", I_AND) ;
+    ("BALANCE", I_BALANCE) ;
+    ("CAR", I_CAR) ;
+    ("CDR", I_CDR) ;
+    ("CHECK_SIGNATURE", I_CHECK_SIGNATURE) ;
+    ("COMPARE", I_COMPARE) ;
+    ("CONCAT", I_CONCAT) ;
+    ("CONS", I_CONS) ;
+    ("CREATE_ACCOUNT", I_CREATE_ACCOUNT) ;
+    ("CREATE_CONTRACT", I_CREATE_CONTRACT) ;
+    ("DEFAULT_ACCOUNT", I_DEFAULT_ACCOUNT) ;
+    ("DIP", I_DIP) ;
+    ("DROP", I_DROP) ;
+    ("DUP", I_DUP) ;
+    ("EDIV", I_EDIV) ;
+    ("EMPTY_MAP", I_EMPTY_MAP) ;
+    ("EMPTY_SET", I_EMPTY_SET) ;
+    ("EQ", I_EQ) ;
+    ("EXEC", I_EXEC) ;
+    ("FAIL", I_FAIL) ;
+    ("GE", I_GE) ;
+    ("GET", I_GET) ;
+    ("GT", I_GT) ;
+    ("HASH_KEY", I_HASH_KEY) ;
+    ("IF", I_IF) ;
+    ("IF_CONS", I_IF_CONS) ;
+    ("IF_LEFT", I_IF_LEFT) ;
+    ("IF_NONE", I_IF_NONE) ;
+    ("INT", I_INT) ;
+    ("LAMBDA", I_LAMBDA) ;
+    ("LE", I_LE) ;
+    ("LEFT", I_LEFT) ;
+    ("LOOP", I_LOOP) ;
+    ("LSL", I_LSL) ;
+    ("LSR", I_LSR) ;
+    ("LT", I_LT) ;
+    ("MANAGER", I_MANAGER) ;
+    ("MAP", I_MAP) ;
+    ("MEM", I_MEM) ;
+    ("MUL", I_MUL) ;
+    ("NEG", I_NEG) ;
+    ("NEQ", I_NEQ) ;
+    ("NIL", I_NIL) ;
+    ("NONE", I_NONE) ;
+    ("NOT", I_NOT) ;
+    ("NOW", I_NOW) ;
+    ("OR", I_OR) ;
+    ("PAIR", I_PAIR) ;
+    ("PUSH", I_PUSH) ;
+    ("REDUCE", I_REDUCE) ;
+    ("RIGHT", I_RIGHT) ;
+    ("SIZE", I_SIZE) ;
+    ("SOME", I_SOME) ;
+    ("SOURCE", I_SOURCE) ;
+    ("STEPS_TO_QUOTA", I_STEPS_TO_QUOTA) ;
+    ("SUB", I_SUB) ;
+    ("SWAP", I_SWAP) ;
+    ("TRANSFER_TOKENS", I_TRANSFER_TOKENS) ;
+    ("UNIT", I_UNIT) ;
+    ("UPDATE", I_UPDATE) ;
+    ("XOR", I_XOR) ;
+    ("ITER", I_ITER) ;
+    ("LOOP_LEFT", I_LOOP_LEFT) ;
+    ("bool", T_bool) ;
+    ("contract", T_contract) ;
+    ("int", T_int) ;
+    ("key", T_key) ;
+    ("key_hash", T_key_hash) ;
+    ("lambda", T_lambda) ;
+    ("list", T_list) ;
+    ("map", T_map) ;
+    ("nat", T_nat) ;
+    ("option", T_option) ;
+    ("or", T_or) ;
+    ("pair", T_pair) ;
+    ("set", T_set) ;
+    ("signature", T_signature) ;
+    ("string", T_string) ;
+    ("tez", T_tez) ;
+    ("timestamp", T_timestamp) ;
+    ("unit", T_unit) ]
 
 let () =
   register_error_kind
