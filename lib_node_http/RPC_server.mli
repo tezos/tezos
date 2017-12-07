@@ -46,36 +46,34 @@ val shutdown : server -> unit Lwt.t
 
 (** Compatibility layer, to be removed ASAP. *)
 
-type 'a directory = 'a Directory.t
-val empty: 'a directory
 val register:
-  'prefix directory ->
+  'prefix Directory.t ->
   ([`POST], 'prefix, 'params, unit, 'input, 'output, unit) RPC.Service.t ->
   ('params -> 'input -> [< ('output, unit) RestoDirectory.Answer.t ] Lwt.t) ->
-  'prefix directory
+  'prefix Directory.t
 
 val register0:
-  unit directory ->
+  unit Directory.t ->
   ([`POST], unit, unit, unit, 'i, 'o, unit) RPC.Service.t ->
   ('i -> [< ('o, unit) Answer.t ] Lwt.t) ->
-  unit directory
+  unit Directory.t
 
 val register1:
-  'prefix directory ->
+  'prefix Directory.t ->
   ([`POST], 'prefix, unit * 'a, unit, 'i, 'o, unit) RPC.Service.t ->
   ('a -> 'i -> [< ('o, unit) Answer.t ] Lwt.t) ->
-  'prefix directory
+  'prefix Directory.t
 
 val register2:
-  'prefix directory ->
+  'prefix Directory.t ->
   ([`POST], 'prefix, (unit * 'a) * 'b, unit, 'i, 'o, unit) RPC.Service.t ->
   ('a -> 'b -> 'i -> [< ('o, unit) Answer.t ] Lwt.t) ->
-  'prefix directory
+  'prefix Directory.t
 
 val register_dynamic_directory1:
   ?descr:string ->
-  'prefix directory ->
+  'prefix Directory.t ->
   ('prefix, unit * 'a) RPC.Path.path ->
-  ('a -> (unit * 'a) directory Lwt.t) ->
-  'prefix directory
+  ('a -> (unit * 'a) Directory.t Lwt.t) ->
+  'prefix Directory.t
 

@@ -67,7 +67,7 @@ module type RAW_PROTOCOL = sig
     validation_state -> operation -> validation_state tzresult Lwt.t
   val finalize_block:
     validation_state -> validation_result tzresult Lwt.t
-  val rpc_services: rpc_context RPC_server.directory
+  val rpc_services: rpc_context RPC_server.Directory.t
   val configure_sandbox:
     Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 end

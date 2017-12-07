@@ -26,7 +26,7 @@ let rpc_init
   Tezos_context.init ~level ~timestamp ~fitness context >>=? fun context ->
   return { block_hash ; block_header ; operation_hashes ; operations ; context }
 
-let rpc_services = ref (RPC.Directory.empty : Updater.rpc_context RPC.directory)
+let rpc_services = ref (RPC.Directory.empty : Updater.rpc_context RPC.Directory.t)
 
 let register0_fullctxt s f =
   rpc_services :=

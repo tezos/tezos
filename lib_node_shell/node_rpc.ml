@@ -140,7 +140,7 @@ let register_bi_dir node dir =
   dir
 
 let ops_dir _node =
-  let ops_dir = RPC_server.empty in
+  let ops_dir = RPC_server.Directory.empty in
   ops_dir
 
 let rec insert_future_block (bi: Services.Blocks.block_info) = function
@@ -369,7 +369,7 @@ let get_protocols node hash () =
   | Error _ -> raise Not_found
 
 let build_rpc_directory node =
-  let dir = RPC_server.empty in
+  let dir = RPC_server.Directory.empty in
   let dir =
     RPC_server.register0 dir Services.Blocks.list (list_blocks node) in
   let dir =
@@ -381,7 +381,7 @@ let build_rpc_directory node =
           Node.RPC.context_dir node block >>= function
           | None -> Lwt.fail Not_found
           | Some context_dir -> Lwt.return context_dir)
-        (fun _ -> Lwt.return RPC_server.empty) in
+        (fun _ -> Lwt.return RPC_server.Directory.empty) in
     RPC_server.register_dynamic_directory1
       ~descr:
         "All the RPCs which are specific to the protocol version."

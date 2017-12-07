@@ -49,7 +49,7 @@ let failing_service custom_root =
     ~error: Data_encoding.empty
     RPC.Path.(custom_root / "failing")
 
-let rpc_services : Updater.rpc_context RPC.directory =
+let rpc_services : Updater.rpc_context RPC.Directory.t =
   let dir = RPC.Directory.empty in
   let dir =
     RPC.register

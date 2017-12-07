@@ -288,39 +288,3 @@ module Directory : sig
     'prefix directory
 
 end
-
-(** Compatibility layer, to be removed ASAP. *)
-
-type 'a directory = 'a Directory.t
-
-val register:
-  'prefix directory ->
-  ([ `POST ], 'prefix,
-   'params, unit, 'input,
-   'output, unit) Service.t ->
-  ('params -> 'input -> [< ('output, unit) Answer.t ] Lwt.t) ->
-  'prefix directory
-
-val register0:
-  unit directory ->
-  ([ `POST ], unit,
-   unit, unit, 'i,
-   'o, unit) Service.t ->
-  ('i -> [< ('o, unit) Answer.t ] Lwt.t) ->
-  unit directory
-
-val register1:
-  'prefix directory ->
-  ([ `POST ], 'prefix,
-   unit * 'a, unit, 'i,
-   'o, unit) Service.t ->
-  ('a -> 'i -> [< ('o, unit) Answer.t ] Lwt.t) ->
-  'prefix directory
-
-val register2:
-  'prefix directory ->
-  ([ `POST ], 'prefix,
-   (unit * 'a) * 'b, unit, 'i,
-   'o, unit) Service.t ->
-  ('a -> 'b -> 'i -> [< ('o, unit) Answer.t ] Lwt.t) ->
-  'prefix directory

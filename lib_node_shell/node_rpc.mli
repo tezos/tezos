@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val build_rpc_directory: Node.t -> unit RPC_server.directory
+val build_rpc_directory: Node.t -> unit RPC_server.Directory.t

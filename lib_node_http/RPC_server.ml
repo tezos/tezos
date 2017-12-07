@@ -50,8 +50,6 @@ let octet_stream = {
 
 (* Compatibility layer, to be removed ASAP. *)
 
-type 'a directory = 'a Directory.t
-
 let empty = Directory.empty
 let register d s f = Directory.register d s (fun p () i -> f p i)
 
