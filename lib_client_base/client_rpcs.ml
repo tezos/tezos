@@ -189,28 +189,26 @@ let fail config err = fail (RPC_error (config, err))
 class type rpc_sig = object
   method get_json :
     RPC.meth ->
-    string list -> Data_encoding.json -> Data_encoding.json Error_monad.tzresult Lwt.t
+    string list -> Data_encoding.json -> Data_encoding.json tzresult Lwt.t
   method get_streamed_json :
     RPC.meth ->
     string list ->
     Data_encoding.json ->
-    (Data_encoding.json, Error_monad.error list) result Lwt_stream.t
-      Error_monad.tzresult Lwt.t
+    Data_encoding.json tzresult Lwt_stream.t tzresult Lwt.t
   method make_request :
     (Uri.t -> Data_encoding.json -> 'a Lwt.t) ->
     RPC.meth ->
     string list ->
     Data_encoding.json ->
-    ('a * Cohttp.Code.status_code * Cohttp_lwt.Body.t)
-      Error_monad.tzresult Lwt.t
+    ('a * Cohttp.Code.status_code * Cohttp_lwt.Body.t) tzresult Lwt.t
   method parse_answer :
     (unit, 'b, 'c, 'd) RPC.service ->
     string list ->
-    Data_encoding.json -> 'd Error_monad.tzresult Lwt.t
+    Data_encoding.json -> 'd tzresult Lwt.t
   method parse_err_answer :
-    (unit, 'e, 'f, 'g Error_monad.tzresult) RPC.service ->
+    (unit, 'e, 'f, 'g tzresult) RPC.service ->
     string list ->
-    Data_encoding.json -> 'g Error_monad.tzresult Lwt.t
+    Data_encoding.json -> 'g tzresult Lwt.t
 end
 
 class rpc config = object (self)
@@ -220,8 +218,7 @@ class rpc config = object (self)
     RPC.meth ->
     string list ->
     Data_encoding.json ->
-    (a * Cohttp.Code.status_code * Cohttp_lwt.Body.t)
-      Error_monad.tzresult Lwt.t =
+    (a * Cohttp.Code.status_code * Cohttp_lwt.Body.t) tzresult Lwt.t =
     fun log_request meth service json ->
       let scheme = if config.tls then "https" else "http" in
       let path = String.concat "/" service in
@@ -277,7 +274,7 @@ class rpc config = object (self)
 
   method parse_answer : type b c d. (unit, b, c, d) RPC.service ->
     string list ->
-    Data_encoding.json -> d Error_monad.tzresult Lwt.t =
+    Data_encoding.json -> d tzresult Lwt.t =
     fun service path json ->
       match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
       | exception msg ->
@@ -288,7 +285,7 @@ class rpc config = object (self)
 
 
   method get_json : RPC.meth ->
-    string list -> Data_encoding.json -> Data_encoding.json Error_monad.tzresult Lwt.t =
+    string list -> Data_encoding.json -> Data_encoding.json tzresult Lwt.t =
     fun meth service json ->
       let Logger logger = config.logger in
       self#make_request logger.log_request
@@ -312,9 +309,9 @@ class rpc config = object (self)
           fail config (Request_failed (service, err))
 
   method parse_err_answer : type e f g.
-    (unit, e, f, g Error_monad.tzresult) RPC.service ->
+    (unit, e, f, g tzresult) RPC.service ->
     string list ->
-    Data_encoding.json -> g Error_monad.tzresult Lwt.t =
+    Data_encoding.json -> g tzresult Lwt.t =
     fun service path json ->
       match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
       | exception msg -> (* TODO print_error *)

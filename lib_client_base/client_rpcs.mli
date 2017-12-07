@@ -27,28 +27,26 @@ class type rpc_sig = object
   method get_json :
     RPC.meth ->
     string list -> Data_encoding.json ->
-    Data_encoding.json Error_monad.tzresult Lwt.t
+    Data_encoding.json tzresult Lwt.t
   method get_streamed_json :
     RPC.meth ->
     string list ->
     Data_encoding.json ->
-    (Data_encoding.json, Error_monad.error list) result Lwt_stream.t
-      Error_monad.tzresult Lwt.t
+    Data_encoding.json tzresult Lwt_stream.t tzresult Lwt.t
   method make_request :
     (Uri.t -> Data_encoding.json -> 'a Lwt.t) ->
     RPC.meth ->
     string list ->
     Data_encoding.json ->
-    ('a * Cohttp.Code.status_code * Cohttp_lwt.Body.t)
-      Error_monad.tzresult Lwt.t
+    ('a * Cohttp.Code.status_code * Cohttp_lwt.Body.t) tzresult Lwt.t
   method parse_answer :
     (unit, 'b, 'c, 'd) RPC.service ->
     string list ->
-    Data_encoding.json -> 'd Error_monad.tzresult Lwt.t
+    Data_encoding.json -> 'd tzresult Lwt.t
   method parse_err_answer :
-    (unit, 'e, 'f, 'g Error_monad.tzresult) RPC.service ->
+    (unit, 'e, 'f, 'g tzresult) RPC.service ->
     string list ->
-    Data_encoding.json -> 'g Error_monad.tzresult Lwt.t
+    Data_encoding.json -> 'g tzresult Lwt.t
 end
 
 class rpc : config -> rpc_sig
@@ -76,12 +74,12 @@ val call_service2:
 val call_streamed_service0:
   #rpc_sig ->
   (unit, unit, 'a, 'b) RPC.service ->
-  'a -> ('b, error list) result Lwt_stream.t tzresult Lwt.t
+  'a -> 'b tzresult Lwt_stream.t tzresult Lwt.t
 
 val call_streamed_service1:
   #rpc_sig ->
   (unit, unit * 'a, 'b, 'c) RPC.service ->
-  'a -> 'b -> ('c, error list) result Lwt_stream.t tzresult Lwt.t
+  'a -> 'b -> 'c tzresult Lwt_stream.t tzresult Lwt.t
 
 val call_err_service0:
   #rpc_sig ->
