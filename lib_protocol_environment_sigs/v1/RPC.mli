@@ -293,13 +293,6 @@ end
 
 type 'a directory = 'a Directory.t
 
-val service:
-  ?description: string ->
-  input: 'input Data_encoding.t ->
-  output: 'output Data_encoding.t ->
-  ('prefix, 'params) Path.t ->
-  ([ `POST], 'prefix, 'params, unit, 'input, 'output, unit) Service.t
-
 val register:
   'prefix directory ->
   ([ `POST ], 'prefix,

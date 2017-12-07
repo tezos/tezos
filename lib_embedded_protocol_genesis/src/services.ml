@@ -34,8 +34,9 @@ let wrap_tzerror encoding =
 module Forge = struct
   let block custom_root =
     let open Data_encoding in
-    RPC.service
+    RPC.Service.post_service
       ~description: "Forge a block"
+      ~query: RPC.Query.empty
       ~input:
         (merge_objs
            (obj6
@@ -47,6 +48,7 @@ module Forge = struct
               (req "fitness" Fitness.encoding))
            Data.Command.encoding)
       ~output: (obj1 (req "payload" bytes))
+      ~error: Data_encoding.empty
       RPC.Path.(custom_root / "helpers" / "forge" / "block")
 end
 

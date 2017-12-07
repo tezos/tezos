@@ -139,17 +139,6 @@ module Service = Resto.MakeService(Data)
 
 (* Compatibility layer, to be removed ASAP. *)
 
-let service ?description ~input ~output path =
-  Service.post_service
-    ?description
-    ~query: Query.empty
-    ~input
-    ~output
-    ~error: Data_encoding.null
-    path
-
-type directory_descr = Data_encoding.json_schema Description.directory
-
 let forge_request (type i) (service: (_,_,_,_,i,_,_) Service.t) params body =
   let { Service.meth ; path } =
     Service.forge_request service params () in

@@ -32,17 +32,21 @@ let wrap_tzerror encoding =
   ]
 
 let echo_service custom_root =
-  RPC.service
+  RPC.Service.post_service
     ~description: "An dummy echo service"
+    ~query: RPC.Query.empty
     ~input: Data_encoding.(obj1 (req "msg" string))
     ~output: Data_encoding.(obj1 (req "msg" string))
+    ~error: Data_encoding.empty
     RPC.Path.(custom_root / "echo")
 
 let failing_service custom_root =
-  RPC.service
+  RPC.Service.post_service
     ~description: "A failing service"
+    ~query: RPC.Query.empty
     ~input: Data_encoding.(obj1 (req "arg" int31))
     ~output: (wrap_tzerror Data_encoding.empty)
+    ~error: Data_encoding.empty
     RPC.Path.(custom_root / "failing")
 
 let rpc_services : Updater.rpc_context RPC.directory =
