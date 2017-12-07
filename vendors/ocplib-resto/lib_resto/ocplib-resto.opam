@@ -17,4 +17,5 @@ build-test: [
 depends: [
   "ocamlfind" {build}
   "jbuilder" {build}
+  "uri"
 ]

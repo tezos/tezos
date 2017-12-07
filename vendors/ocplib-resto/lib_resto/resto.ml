@@ -17,6 +17,14 @@ let string_of_meth = function
   | `PUT -> "PUT"
   | `PATCH -> "PATCH"
 
+let meth_of_string = function
+  | "GET" -> Some `GET
+  | "POST" -> Some `POST
+  | "DELETE" -> Some `DELETE
+  | "PUT" -> Some `PUT
+  | "PATCH" -> Some `PATCH
+  | _ -> None
+
 module MethMap = Map.Make(struct type t = meth let compare = compare end)
 module StringMap = Map.Make(String)
 
@@ -498,6 +506,8 @@ module MakeService(Encoding : ENCODING) = struct
     { s with path = Path.map f g s.path }
 
 
+  let meth = fun { meth } -> meth
+
   let query
     : type pr p i q o e.
       (_, pr, p, q, i, o, e) service -> q Query.t
@@ -537,8 +547,7 @@ module MakeService(Encoding : ENCODING) = struct
 
   type 'input request = {
     meth: meth ;
-    path: string list ;
-    query: (string * string) list ;
+    uri: Uri.t ;
     input: 'input input ;
   }
 
@@ -573,13 +582,14 @@ module MakeService(Encoding : ENCODING) = struct
 
   let forge_request
     : type p i q o e.
-      (_, unit, p, q, i, o, e) service -> p -> q -> i request
-    = fun s args query ->
-      { meth = s.meth ;
-        path = forge_request_args s.path args ;
-        query = forge_request_query s.types.query query ;
-        input = s.types.input ;
-      }
+      (_, unit, p, q, i, o, e) service -> ?base:Uri.t -> p -> q -> i request
+    = fun s ?base:(uri = Uri.empty) args query ->
+      let path = String.concat "/" (forge_request_args s.path args) in
+      let prefix = Uri.path uri in
+      let prefixed_path = if prefix = "" then path else prefix ^ "/" ^ path in
+      let uri = Uri.with_path uri prefixed_path in
+      let uri = Uri.with_query' uri (forge_request_query s.types.query query) in
+      { meth = s.meth ; uri ; input = s.types.input }
 
   let forge_request =
     (forge_request

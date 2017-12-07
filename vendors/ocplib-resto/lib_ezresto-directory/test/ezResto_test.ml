@@ -52,15 +52,37 @@ module Test(Request : sig
     ()
 end
 
+let split_path path =
+  let l = String.length path in
+  let rec do_slashes acc i =
+    if i >= l then
+      List.rev acc
+    else if String.get path i = '/' then
+      do_slashes acc (i + 1)
+    else
+      do_component acc i i
+  and do_component acc i j =
+    if j >= l then
+      if i = j then
+        List.rev acc
+      else
+        List.rev (String.sub path i (j - i) :: acc)
+    else if String.get path j = '/' then
+      do_slashes (String.sub path i (j - i) :: acc) j
+    else
+      do_component acc i (j + 1) in
+  do_slashes [] 0
 
 module Faked = Test(struct
     (** Testing faked client/server communication. *)
     let request (type i) (service: (_,_,_,i,_,_) service) params query (arg: i) =
-      let { meth ; path ; query ; input } = forge_request service params query in
-      let uri =
-        Uri.make
-          ~path:(String.concat "/" path)
-          ~query:(List.map (fun (k,v) -> k, [v]) query) () in
+      let { meth ; uri ; input } = forge_request service params query in
+      Format.eprintf "\nREQUEST: %a@." Uri.pp_hum uri ;
+      let path = split_path (Uri.path uri) in
+      let query =
+        List.map
+          (fun (n,vs) -> (n, String.concat "," vs))
+          (Uri.query uri) in
       Format.eprintf "\nREQUEST: %a@." Uri.pp_hum uri ;
       let json =
         match input with

@@ -347,12 +347,13 @@ let make_request config log_request meth service json =
   end
 
 let forge_request (type i) (service: (_,_,_,_,i,_,_) RPC.Service.t) params body =
-  let { RPC.Service.meth ; path } =
+  let { RPC.Service.meth ; uri } =
     RPC.Service.forge_request service params () in
   let json =
     match RPC.Service.input_encoding service with
     | RPC.Service.No_input -> assert false (* TODO *)
     | RPC.Service.Input input -> Data_encoding.Json.construct input body in
+  let path = String.split_path (Uri.path uri) in (* Temporary *)
   meth, path, json
 
 let call_service0 (rpc : #rpc_sig) service arg =

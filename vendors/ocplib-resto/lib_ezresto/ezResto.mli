@@ -132,14 +132,13 @@ type 'input input =
 
 type 'input request = {
   meth: meth ;
-  path: string list ;
-  query: (string * string) list ;
+  uri: Uri.t ;
   input: 'input input ;
 }
 
 val forge_request:
   ('meth, 'params, 'query, 'input, 'output, 'error) service ->
-  'params -> 'query -> 'input request
+  ?base:Uri.t -> 'params -> 'query -> 'input request
 
 val query:
   ('meth, 'params, 'query, 'input, 'output, 'error) service ->

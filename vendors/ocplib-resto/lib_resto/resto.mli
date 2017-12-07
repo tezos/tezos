@@ -10,7 +10,8 @@
 
 type meth = [ `GET | `POST | `DELETE | `PUT | `PATCH ]
 
-val string_of_meth: meth -> string
+val string_of_meth: [< meth ] -> string
+val meth_of_string: string -> [> meth ] option
 
 module MethMap : Map.S with type key = meth
 module StringMap : Map.S with type key = string
@@ -229,6 +230,11 @@ module MakeService(Encoding : ENCODING) : sig
   type (+'meth, 'prefix, 'params, 'query, 'input, 'output, 'error) service =
     ('meth, 'prefix, 'params, 'query, 'input, 'output, 'error) t
 
+
+  val meth:
+    ('meth, 'prefix, 'params, 'query, 'input, 'output, 'error) service ->
+    'meth
+
   val query:
     ('meth, 'prefix, 'params, 'query, 'input, 'output, 'error) service ->
     'query Query.t
@@ -316,14 +322,13 @@ module MakeService(Encoding : ENCODING) : sig
 
   type 'input request = {
     meth: meth ;
-    path: string list ;
-    query: (string * string) list ;
+    uri: Uri.t ;
     input: 'input input ;
   }
 
   val forge_request:
     ('meth, unit, 'params, 'query, 'input, 'output, 'error) service ->
-    'params -> 'query -> 'input request
+    ?base:Uri.t -> 'params -> 'query -> 'input request
 
   module Internal : sig
 
