@@ -23,7 +23,7 @@ and logger =
         'a -> Cohttp.Code.status_code -> string  -> unit Lwt.t ;
     } -> logger
 
-class type rpc_sig = object
+class type ctxt = object
   method get_json :
     RPC.meth ->
     string list -> Data_encoding.json ->
@@ -51,7 +51,7 @@ class type rpc_sig = object
     Data_encoding.json -> 'output tzresult Lwt.t
 end
 
-class rpc : config -> rpc_sig
+class rpc : config -> ctxt
 
 val default_config: config
 val null_logger: logger
@@ -59,56 +59,56 @@ val timings_logger: Format.formatter -> logger
 val full_logger: Format.formatter -> logger
 
 val call_service0:
-  #rpc_sig ->
+  #ctxt ->
   ([ `POST ], unit,
    unit, unit, 'i,
    'o, unit) RPC.Service.t ->
   'i -> 'o tzresult Lwt.t
 
 val call_service1:
-  #rpc_sig ->
+  #ctxt ->
   ([ `POST ], unit,
    unit * 'a, unit, 'i,
    'o, unit) RPC.Service.t ->
   'a -> 'i -> 'o tzresult Lwt.t
 
 val call_service2:
-  #rpc_sig ->
+  #ctxt ->
   ([ `POST ], unit,
    (unit * 'a) * 'b, unit, 'i,
    'o, unit) RPC.Service.t ->
   'a -> 'b -> 'i -> 'o tzresult Lwt.t
 
 val call_streamed_service0:
-  #rpc_sig ->
+  #ctxt ->
   ([ `POST ], unit,
    unit, unit, 'a,
    'b, unit) RPC.Service.t ->
   'a -> 'b tzresult Lwt_stream.t tzresult Lwt.t
 
 val call_streamed_service1:
-  #rpc_sig ->
+  #ctxt ->
   ([ `POST ], unit,
    unit * 'a, unit, 'b,
    'c, unit) RPC.Service.t ->
   'a -> 'b -> 'c tzresult Lwt_stream.t tzresult Lwt.t
 
 val call_err_service0:
-  #rpc_sig ->
+  #ctxt ->
   ([ `POST ], unit,
    unit, unit, 'i,
    'o tzresult, unit) RPC.Service.t ->
   'i -> 'o tzresult Lwt.t
 
 val call_err_service1:
-  #rpc_sig ->
+  #ctxt ->
   ([ `POST ], unit,
    unit * 'a, unit, 'i,
    'o tzresult, unit) RPC.Service.t ->
   'a -> 'i -> 'o tzresult Lwt.t
 
 val call_err_service2:
-  #rpc_sig ->
+  #ctxt ->
   ([ `POST ], unit,
    (unit * 'a) * 'b, unit, 'i,
    'o tzresult, unit) RPC.Service.t ->

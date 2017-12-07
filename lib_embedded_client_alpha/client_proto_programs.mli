@@ -18,7 +18,7 @@ val run :
   storage:Michelson_v1_parser.parsed ->
   input:Michelson_v1_parser.parsed ->
   Client_rpcs.block ->
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   (Script.expr * Script.expr) tzresult Lwt.t
 
 val trace :
@@ -27,7 +27,7 @@ val trace :
   storage:Michelson_v1_parser.parsed ->
   input:Michelson_v1_parser.parsed ->
   Client_rpcs.block ->
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   (Script.expr * Script.expr * (int * int * Script.expr list) list) tzresult Lwt.t
 
 val print_trace_result :
@@ -49,20 +49,20 @@ val hash_and_sign :
   Michelson_v1_parser.parsed ->
   Ed25519.Secret_key.t ->
   Client_proto_rpcs.block ->
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   (string * string) tzresult Lwt.t
 
 val typecheck_data :
   data:Michelson_v1_parser.parsed ->
   ty:Michelson_v1_parser.parsed ->
   Client_proto_rpcs.block ->
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   unit tzresult Lwt.t
 
 val typecheck_program :
   Michelson_v1_parser.parsed ->
   Client_proto_rpcs.block ->
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   Script_ir_translator.type_map tzresult Lwt.t
 
 val print_typecheck_result :

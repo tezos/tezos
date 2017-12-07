@@ -15,7 +15,7 @@ val list_contract_labels :
   (string * string * string) list tzresult Lwt.t
 
 val get_storage :
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
@@ -27,13 +27,13 @@ val get_manager :
   (string * public_key_hash * public_key * secret_key) tzresult Lwt.t
 
 val get_balance:
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->
   Contract.t ->
   Tez.t tzresult Lwt.t
 
 val set_delegate :
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->
   fee:Tez.tez ->
   Contract.t ->
@@ -66,7 +66,7 @@ val originate_account :
   balance:Tez.tez ->
   fee:Tez.tez ->
   Client_rpcs.block ->
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   unit -> (Operation_list_hash.elt * Contract.t) tzresult Lwt.t
 
 val save_contract :
@@ -104,11 +104,11 @@ val faucet :
   ?branch:int ->
   manager_pkh:public_key_hash ->
   Client_rpcs.block ->
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   unit -> (Operation_list_hash.elt * Contract.t) tzresult Lwt.t
 
 val transfer :
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   ?branch:int ->
@@ -123,7 +123,7 @@ val transfer :
   (Operation_hash.t * Contract.t list) tzresult Lwt.t
 
 val dictate :
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->
   dictator_operation ->
   secret_key ->

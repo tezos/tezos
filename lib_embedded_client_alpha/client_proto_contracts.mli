@@ -38,19 +38,19 @@ val list_contracts:
   (string * string * RawContractAlias.t) list tzresult Lwt.t
 
 val get_manager:
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->
   Contract.t ->
   public_key_hash tzresult Lwt.t
 
 val get_delegate:
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->
   Contract.t ->
   public_key_hash tzresult Lwt.t
 
 val check_public_key :
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->
   ?src_pk:public_key ->
   public_key_hash ->

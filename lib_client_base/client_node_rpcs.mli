@@ -7,18 +7,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_rpcs
-
 val errors:
-  #rpc_sig -> Json_schema.schema tzresult Lwt.t
+  #Client_rpcs.ctxt -> Json_schema.schema tzresult Lwt.t
 
 val forge_block_header:
-  #rpc_sig ->
+  #Client_rpcs.ctxt ->
   Block_header.t ->
   MBytes.t tzresult Lwt.t
 
 val inject_block:
-  #rpc_sig ->
+  #Client_rpcs.ctxt ->
   ?async:bool -> ?force:bool -> ?net_id:Net_id.t ->
   MBytes.t -> Operation.t list list ->
   Block_hash.t tzresult Lwt.t
@@ -29,13 +27,13 @@ val inject_block:
     fitness. *)
 
 val inject_operation:
-  #rpc_sig ->
+  #Client_rpcs.ctxt ->
   ?async:bool -> ?force:bool -> ?net_id:Net_id.t ->
   MBytes.t ->
   Operation_hash.t tzresult Lwt.t
 
 val inject_protocol:
-  #rpc_sig ->
+  #Client_rpcs.ctxt ->
   ?async:bool -> ?force:bool ->
   Protocol.t ->
   Protocol_hash.t tzresult Lwt.t
@@ -45,39 +43,39 @@ module Blocks : sig
   type block = Node_rpc_services.Blocks.block
 
   val net_id:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block -> Net_id.t tzresult Lwt.t
   val level:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block -> Int32.t tzresult Lwt.t
   val predecessor:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block -> Block_hash.t tzresult Lwt.t
   val predecessors:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block -> int -> Block_hash.t list tzresult Lwt.t
   val hash:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block -> Block_hash.t tzresult Lwt.t
   val timestamp:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block -> Time.t tzresult Lwt.t
   val fitness:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block -> MBytes.t list tzresult Lwt.t
   val operations:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     ?contents:bool ->
     block -> (Operation_hash.t * Operation.t option) list list tzresult Lwt.t
   val protocol:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block -> Protocol_hash.t tzresult Lwt.t
   val test_network:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block -> Test_network_status.t tzresult Lwt.t
 
   val pending_operations:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block ->
     (error Preapply_result.t * Operation.t Operation_hash.Map.t) tzresult Lwt.t
 
@@ -98,17 +96,17 @@ module Blocks : sig
   }
 
   val info:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     ?include_ops:bool -> block -> block_info tzresult Lwt.t
 
   val list:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     ?include_ops:bool -> ?length:int -> ?heads:Block_hash.t list ->
     ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
     unit -> block_info list list tzresult Lwt.t
 
   val monitor:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     ?include_ops:bool -> ?length:int -> ?heads:Block_hash.t list ->
     ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
     unit -> block_info list list tzresult Lwt_stream.t tzresult Lwt.t
@@ -119,7 +117,7 @@ module Blocks : sig
   }
 
   val preapply:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     block ->
     ?timestamp:Time.t ->
     ?sort:bool ->
@@ -131,7 +129,7 @@ end
 module Operations : sig
 
   val monitor:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     ?contents:bool ->
     unit ->
     (Operation_hash.t * Operation.t option) list list tzresult Lwt_stream.t tzresult Lwt.t
@@ -141,42 +139,42 @@ end
 module Protocols : sig
 
   val contents:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     Protocol_hash.t -> Protocol.t tzresult Lwt.t
 
   val list:
-    #rpc_sig ->
+    #Client_rpcs.ctxt ->
     ?contents:bool -> unit ->
     (Protocol_hash.t * Protocol.t option) list tzresult Lwt.t
 
 end
 
 val bootstrapped:
-  #rpc_sig -> (Block_hash.t * Time.t) tzresult Lwt_stream.t tzresult Lwt.t
+  #Client_rpcs.ctxt -> (Block_hash.t * Time.t) tzresult Lwt_stream.t tzresult Lwt.t
 
 module Network : sig
 
   open P2p_types
 
   val stat:
-    #rpc_sig -> Stat.t tzresult Lwt.t
+    #Client_rpcs.ctxt -> Stat.t tzresult Lwt.t
 
   val connections:
-    #rpc_sig -> Connection_info.t list tzresult Lwt.t
+    #Client_rpcs.ctxt -> Connection_info.t list tzresult Lwt.t
 
   val peers:
-    #rpc_sig -> (Peer_id.t * P2p_types.Peer_info.t) list tzresult Lwt.t
+    #Client_rpcs.ctxt -> (Peer_id.t * P2p_types.Peer_info.t) list tzresult Lwt.t
 
   val points:
-    #rpc_sig -> (Point.t * P2p_types.Point_info.t) list tzresult Lwt.t
+    #Client_rpcs.ctxt -> (Point.t * P2p_types.Point_info.t) list tzresult Lwt.t
 
 end
 
 val complete:
-  #rpc_sig ->
+  #Client_rpcs.ctxt ->
   ?block:Blocks.block -> string -> string list tzresult Lwt.t
 
 val describe:
-  #rpc_sig ->
+  #Client_rpcs.ctxt ->
   ?recurse:bool -> string list ->
   Data_encoding.json_schema RPC.Description.directory tzresult Lwt.t

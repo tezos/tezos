@@ -38,13 +38,13 @@ end
 
 class type logging_rpcs = object
   inherit logger_sig
-  inherit Client_rpcs.rpc_sig
+  inherit Client_rpcs.ctxt
 end
 
 class type full_context = object
   inherit logger_sig
   inherit wallet
-  inherit Client_rpcs.rpc_sig
+  inherit Client_rpcs.ctxt
   inherit block
 end
 (** The [full_context] allows the client {!command} handlers to work in

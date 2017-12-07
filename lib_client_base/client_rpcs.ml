@@ -186,7 +186,7 @@ let () =
 
 let fail config err = fail (RPC_error (config, err))
 
-class type rpc_sig = object
+class type ctxt = object
   method get_json :
     RPC.meth ->
     string list -> Data_encoding.json -> Data_encoding.json tzresult Lwt.t
@@ -213,7 +213,7 @@ class type rpc_sig = object
     Data_encoding.json -> 'output tzresult Lwt.t
 end
 
-class rpc config : rpc_sig = object (self)
+class rpc config : ctxt = object (self)
   val config = config
   method make_request :
     type a. (Uri.t -> Data_encoding.json -> a Lwt.t) ->
@@ -356,22 +356,22 @@ let forge_request (type i) (service: (_,_,_,_,i,_,_) RPC.Service.t) params body 
   let path = String.split_path (Uri.path uri) in (* Temporary *)
   meth, path, json
 
-let call_service0 (rpc : #rpc_sig) service arg =
+let call_service0 (rpc : #ctxt) service arg =
   let meth, path, arg = forge_request service () arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_answer service path json
 
-let call_service1 (rpc : #rpc_sig) service a1 arg =
+let call_service1 (rpc : #ctxt) service a1 arg =
   let meth, path, arg = forge_request service ((), a1) arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_answer service path json
 
-let call_service2 (rpc : #rpc_sig) service a1 a2 arg =
+let call_service2 (rpc : #ctxt) service a1 a2 arg =
   let meth, path, arg = forge_request service (((), a1), a2) arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_answer service path json
 
-let call_streamed (rpc : #rpc_sig) service (meth, path, arg) =
+let call_streamed (rpc : #ctxt) service (meth, path, arg) =
   rpc#get_streamed_json meth path arg >>=? fun json_st ->
   let parsed_st, push = Lwt_stream.create () in
   let rec loop () =
@@ -389,23 +389,23 @@ let call_streamed (rpc : #rpc_sig) service (meth, path, arg) =
   Lwt.async loop ;
   return parsed_st
 
-let call_streamed_service0 (rpc : #rpc_sig) service arg =
+let call_streamed_service0 (rpc : #ctxt) service arg =
   call_streamed rpc service (forge_request service () arg)
 
 let call_streamed_service1 cctxt service arg1 arg2 =
   call_streamed cctxt service (forge_request service ((), arg1) arg2)
 
-let call_err_service0 (rpc : #rpc_sig) service arg =
+let call_err_service0 (rpc : #ctxt) service arg =
   let meth, path, arg = forge_request service () arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_err_answer service path json
 
-let call_err_service1 (rpc : #rpc_sig) service a1 arg =
+let call_err_service1 (rpc : #ctxt) service a1 arg =
   let meth, path, arg = forge_request service ((), a1) arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_err_answer service path json
 
-let call_err_service2 (rpc : #rpc_sig) service a1 a2 arg =
+let call_err_service2 (rpc : #ctxt) service a1 a2 arg =
   let meth, path, arg = forge_request service (((), a1), a2) arg in
   rpc#get_json meth path arg >>=? fun json ->
   rpc#parse_err_answer service path json

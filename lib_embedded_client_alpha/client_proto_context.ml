@@ -11,10 +11,10 @@ open Tezos_micheline
 open Client_proto_contracts
 open Client_keys
 
-let get_balance (rpc : #Client_rpcs.rpc_sig) block contract =
+let get_balance (rpc : #Client_rpcs.ctxt) block contract =
   Client_proto_rpcs.Context.Contract.balance rpc block contract
 
-let get_storage (rpc : #Client_rpcs.rpc_sig) block contract =
+let get_storage (rpc : #Client_rpcs.ctxt) block contract =
   Client_proto_rpcs.Context.Contract.storage rpc block contract
 
 let rec find_predecessor rpc_config h n =
@@ -192,7 +192,7 @@ let dictate rpc_config block command seckey =
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
 
-let set_delegate (cctxt : #Client_rpcs.rpc_sig) block ~fee contract ~src_pk ~manager_sk opt_delegate =
+let set_delegate (cctxt : #Client_rpcs.ctxt) block ~fee contract ~src_pk ~manager_sk opt_delegate =
   delegate_contract
     cctxt block ~source:contract
     ~src_pk ~manager_sk ~fee opt_delegate

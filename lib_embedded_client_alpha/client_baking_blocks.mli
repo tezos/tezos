@@ -18,21 +18,21 @@ type block_info = {
 }
 
 val info:
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   ?include_ops:bool -> Client_node_rpcs.Blocks.block -> block_info tzresult Lwt.t
 
 val compare:
   block_info -> block_info -> int
 
 val monitor:
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   ?include_ops:bool -> ?length:int -> ?heads:Block_hash.t list ->
   ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
   ?compare:(block_info -> block_info -> int) ->
   unit -> block_info list tzresult Lwt_stream.t tzresult Lwt.t
 
 val blocks_from_cycle:
-  #Client_rpcs.rpc_sig ->
+  #Client_rpcs.ctxt ->
   Client_node_rpcs.Blocks.block ->
   Cycle.t ->
   Block_hash.t list tzresult Lwt.t

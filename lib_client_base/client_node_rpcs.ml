@@ -12,7 +12,7 @@
 open Client_rpcs
 module Services = Node_rpc_services
 
-let errors (rpc : #rpc_sig) =
+let errors (rpc : #Client_rpcs.ctxt) =
   call_service0 rpc Services.Error.service ()
 
 let forge_block_header rpc header =
