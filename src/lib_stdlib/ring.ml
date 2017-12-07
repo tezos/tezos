@@ -40,6 +40,12 @@ let add_and_return_erased r v =
           None in
   add r v ; replaced
 
+let clear r =
+  match !r with
+  | Empty _ -> ()
+  | Inited { data ; _ } ->
+      r := Empty (Array.length data)
+
 let add_list r l = List.iter (add r) l
 
 let last r =

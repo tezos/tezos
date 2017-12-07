@@ -27,6 +27,9 @@ val add_and_return_erased : 'a t -> 'a -> 'a option
 (** Adds the values of a list, in order. *)
 val add_list : 'a t -> 'a list -> unit
 
+(** Removes all values in the ring buffer. *)
+val clear : 'a t -> unit
+
 (** Retrieves the most recent value, or [None] when empty. *)
 val last : 'a t -> 'a option
 
