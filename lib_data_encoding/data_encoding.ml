@@ -24,6 +24,8 @@ exception Duplicated_tag of int
 exception Invalid_tag of int * [ `Uint8 | `Uint16 ]
 exception Unexpected_enum of string * string list
 exception Invalid_size of int
+exception Int_out_of_range of int * int * int
+exception Float_out_of_range of float * float * float
 
 let apply ?(error=No_case_matched) fs v =
   let rec loop = function
@@ -41,6 +43,8 @@ module Size = struct
   let char = 1
   let int16 = 2
   let uint16 = 2
+  let uint32 = 4
+  let uint64 = 8
   let int31 = 4
   let int32 = 4
   let int64 = 8
@@ -122,6 +126,8 @@ type 'a desc =
   | Int31 : int desc
   | Int32 : Int32.t desc
   | Int64 : Int64.t desc
+  | RangedInt : { minimum : int ; maximum : int } -> int desc
+  | RangedFloat : { minimum : float ; maximum : float } -> float desc
   | Float : float desc
   | Bytes : Kind.length -> MBytes.t desc
   | String : Kind.length -> string desc
@@ -167,6 +173,44 @@ and 'a t = {
   mutable json_encoding: 'a Json_encoding.encoding option ;
 }
 
+type signed_integer = [ `Int64 | `Int32 | `Int16 | `Int8 ]
+type unsigned_integer = [ `Int64 | `Int32 | `Uint16 | `Uint8 ]
+type integer = [ signed_integer | unsigned_integer ]
+
+let signed_range_to_size min max : [> signed_integer ] =
+  if min >= ~-128 && max <= 127
+  then `Int8
+  else if min >= ~-32_768 && max <= 32_767
+  then `Int16
+  else if min >= ~-2_147_483_648 && max <= 2_147_483_647
+  then `Int32
+  else `Int64
+
+(* max should be centered at zero *)
+let unsigned_range_to_size max : [> unsigned_integer ] =
+  if max <= 255
+  then `Uint8
+  else if max <= 65535
+  then `Uint16
+  else if max <= 2_147_483_647 (* Unsigned int32 and int64 are not supported *)
+  then `Int32
+  else `Int64
+
+let integer_to_size = function
+  | `Int64 -> Size.int64
+  | `Int32 -> Size.int32
+  | `Int16 -> Size.int16
+  | `Int8 -> Size.int8
+  | `Uint64 -> Size.uint64
+  | `Uint32 -> Size.uint32
+  | `Uint16 -> Size.uint16
+  | `Uint8 -> Size.uint8
+
+let range_to_size ~minimum ~maximum : integer =
+  if minimum < 0
+  then signed_range_to_size minimum maximum
+  else unsigned_range_to_size (maximum - minimum)
+
 type 'a encoding = 'a t
 
 let rec classify : type a. a t -> Kind.t = fun e ->
@@ -183,7 +227,10 @@ let rec classify : type a. a t -> Kind.t = fun e ->
   | Int31 -> `Fixed Size.int31
   | Int32 -> `Fixed Size.int32
   | Int64 -> `Fixed Size.int64
+  | RangedInt { minimum ; maximum } ->
+      `Fixed (integer_to_size @@ range_to_size ~minimum ~maximum)
   | Float -> `Fixed Size.float
+  | RangedFloat _ -> `Fixed Size.float
   (* Tagged *)
   | Bytes kind -> (kind :> Kind.t)
   | String kind -> (kind :> Kind.t)
@@ -328,11 +375,13 @@ module Json = struct
     | Uint8 -> ranged_int ~minimum:0 ~maximum:((1 lsl 8) - 1) "uint8"
     | Int16 -> ranged_int ~minimum:~-(1 lsl 15) ~maximum:((1 lsl 15) - 1) "int16"
     | Uint16 -> ranged_int ~minimum:0 ~maximum:((1 lsl 16) - 1) "uint16"
+    | RangedInt { minimum ; maximum } -> ranged_int ~minimum ~maximum "rangedInt"
     | Int31 -> int
     | Int32 -> int32
     | Int64 -> int64_encoding
     | Bool -> bool
     | Float -> float
+    | RangedFloat { minimum; maximum } -> ranged_float ~minimum ~maximum "rangedFloat"
     | String _ -> string (* TODO: check length *)
     | Bytes _ -> bytes_jsont (* TODO check length *)
     | String_enum (_, l) -> string_enum l
@@ -458,6 +507,11 @@ module Encoding = struct
   let uint16 = make @@ Uint16
   let int31 = make @@ Int31
   let int32 = make @@ Int32
+  let ranged_int minimum maximum = make @@ RangedInt { minimum = min minimum maximum ;
+                                                       maximum = max minimum maximum }
+
+  let ranged_float minimum maximum = make @@ RangedFloat { minimum = min minimum maximum ;
+                                                           maximum = max minimum maximum }
   let int64 = make @@ Int64
   let float = make @@ Float
 
@@ -767,7 +821,10 @@ module Binary = struct
     | Int31 -> fun _ -> Size.int31
     | Int32 -> fun _ -> Size.int32
     | Int64 -> fun _ -> Size.int64
+    | RangedInt { minimum ; maximum } ->
+        fun _ -> integer_to_size @@ range_to_size ~minimum ~maximum
     | Float -> fun _ -> Size.float
+    | RangedFloat _ -> fun _ -> Size.float
     | Bytes `Fixed n -> fun _ -> n
     | String `Fixed n -> fun _ -> n
     | String_enum (`Fixed n, _) -> fun _ -> n
@@ -982,7 +1039,26 @@ module Binary = struct
     | Int31 -> int31
     | Int32 -> int32
     | Int64 -> int64
+    | RangedInt { minimum ; maximum } ->
+        fun v ->
+          begin
+            if v < minimum || v > maximum
+            then invalid_arg (Printf.sprintf "Integer %d not in range [%d, %d]." v minimum maximum) ;
+            let v = if minimum >= 0 then v - minimum else v in
+            match range_to_size ~minimum ~maximum with
+            | `Uint16 -> uint16 v
+            | `Uint8 -> uint8 v
+            | `Int8 -> int8 v
+            | `Int64 -> int64 (Int64.of_int v)
+            | `Int16 -> int16 v
+            | `Int32 -> int32 (Int32.of_int v)
+          end
     | Float -> float
+    | RangedFloat { minimum ; maximum } ->
+        fun v ->
+          if v < minimum || v > maximum
+          then invalid_arg (Printf.sprintf "Integer %f not in range [%f, %f]." v minimum maximum) ;
+          float v
     | Bytes (`Fixed n) -> fixed_kind_bytes n
     | String (`Fixed n) -> fixed_kind_string n
     | Bytes `Variable -> variable_length_bytes
@@ -1187,7 +1263,27 @@ module Binary = struct
     | Int31 -> int31
     | Int32 -> int32
     | Int64 -> int64
+    | RangedInt { minimum ; maximum } ->
+        (fun buf ofs alpha ->
+           let ofs, value =
+             match range_to_size ~minimum ~maximum with
+             | `Int8 -> int8 buf ofs alpha
+             | `Int64 -> let ofs, int64 = int64 buf ofs alpha in (ofs, Int64.to_int int64)
+             | `Uint16 -> uint16 buf ofs alpha
+             | `Int16 -> int16 buf ofs alpha
+             | `Uint8 -> uint8 buf ofs alpha
+             | `Int32 -> let ofs, int32 = int32 buf ofs alpha in (ofs, Int32.to_int int32) in
+           let value = if minimum > 0 then value + minimum else value in
+           if value < minimum || value > maximum
+           then raise (Int_out_of_range (value, minimum, maximum)) ;
+           (ofs, value))
     | Float -> float
+    | RangedFloat { minimum ; maximum } ->
+        (fun buf ofs len ->
+           let offset, value = float buf ofs len in
+           if value < minimum || value > maximum
+           then raise (Float_out_of_range (value, minimum, maximum)) ;
+           (offset, value))
     | Bytes (`Fixed n) -> fixed_length_bytes n
     | String (`Fixed n) -> fixed_length_string n
     | Bytes `Variable -> fun buf ofs len -> fixed_length_bytes len buf ofs len
@@ -1438,7 +1534,23 @@ module Binary = struct
           | Int31  -> next_path path (fst (int31  buf))
           | Int32  -> next_path path (fst (int32  buf))
           | Int64  -> next_path path (fst (int64  buf))
-          | Float  -> next_path path (fst (float  buf))
+          | RangedInt { minimum ; maximum }  ->
+              let (stream, ranged) =
+                (match range_to_size ~minimum ~maximum with
+                 | `Int8 -> int8 buf
+                 | `Int64 -> let stream, int = int64 buf in (stream, Int64.to_int int)
+                 | `Uint16 -> uint16 buf
+                 | `Int16 -> int16 buf
+                 | `Uint8 -> uint8 buf
+                 | `Int32 -> let stream, int = int32 buf in (stream, Int32.to_int int)) in
+              let ranged = if minimum > 0 then ranged + minimum else ranged in
+              assert (minimum < ranged && ranged < maximum) ;
+              next_path path stream
+          | Float  -> next_path path (fst (float buf))
+          | RangedFloat { minimum ; maximum } ->
+              let stream, float = float buf in
+              assert (minimum < float && maximum > float) ;
+              next_path path stream
           | Bytes (`Fixed n) ->
               next_path path (fst (fixed_length_bytes n buf))
 

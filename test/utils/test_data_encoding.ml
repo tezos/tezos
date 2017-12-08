@@ -80,6 +80,14 @@ let test_simple_values _ =
   test_simple ~msg:__LOC__ int32 Int32.max_int;
   test_simple ~msg:__LOC__ int64 Int64.min_int;
   test_simple ~msg:__LOC__ int64 Int64.max_int;
+  test_simple ~msg:__LOC__ (ranged_int 100 400) 399;
+  test_simple ~msg:__LOC__ (ranged_int 19000 19254) 19000;
+  test_simple ~msg:__LOC__ (ranged_int 19000 19254) 19254;
+  test_simple ~msg:__LOC__ (ranged_int ~-100 300) 200;
+  test_simple ~msg:__LOC__ (ranged_int ~-3_000_000_000 3_000_000_000) 200;
+  test_simple ~msg:__LOC__ (ranged_int ~-3_000_000_000 3_000_000_000) 2_000_000_000;
+  test_simple ~msg:__LOC__ (ranged_float 100. 200.) 150.;
+  test_simple ~msg:__LOC__ (ranged_float ~-.100. 200.) ~-.75.;
   test_simple ~msg:__LOC__ bool true;
   test_simple ~msg:__LOC__ bool false;
   test_simple ~msg:__LOC__ string "tutu";
@@ -332,6 +340,30 @@ let test_wrapped_binary _ =
   let decoded = Data_encoding.Binary.of_bytes_exn enc encoded in
   Lwt.return @@ Assert.equal data decoded
 
+let test_out_of_range _ =
+  let assert_exception enc x =
+    begin try
+        ignore (Data_encoding.Json.construct enc x) ;
+        assert false
+      with Invalid_argument _ ->
+        Assert.is_true true
+    end ;
+    begin
+      try
+        ignore (Data_encoding.Binary.to_bytes enc x) ;
+        assert false
+      with Invalid_argument _ ->
+        Assert.is_true true
+    end in
+  let enc_int = Data_encoding.ranged_int ~-30 100 in
+  let enc_float = Data_encoding.ranged_float ~-.30. 100. in
+  assert_exception enc_int 101 ;
+  assert_exception enc_int ~-32 ;
+  assert_exception enc_float ~-.31. ;
+  assert_exception enc_float 101. ;
+  assert_exception enc_float 100.1 ;
+  Lwt.return_unit
+
 let tests = [
   "simple", test_simple_values ;
   "json", test_json ;
@@ -340,6 +372,7 @@ let tests = [
   "json.input", test_json_input ;
   "tags", test_tag_errors ;
   "wrapped_binary", test_wrapped_binary ;
+  "out_of_range", test_out_of_range ;
 ]
 
 let () =

@@ -109,6 +109,12 @@ val int32 : int32 encoding
     (data is encodedas a 64-bit int in binary and a decimal string in JSON). *)
 val int64 : int64 encoding
 
+(** Integer with bounds in a given range. Both bounds are inclusive *)
+val ranged_int : int -> int -> int encoding
+
+(** Float with bounds in a given range. Both bounds are inclusive *)
+val ranged_float : float -> float -> float encoding
+
 (** Encoding of a boolean
     (data is encoded as a byte in binary and a boolean in JSON). *)
 val bool : bool encoding
