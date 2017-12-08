@@ -31,7 +31,7 @@ let main () =
         port = parsed_config_file.node_port ;
         tls = parsed_config_file.tls ;
       } in
-      let ctxt = new Client_rpcs.rpc rpc_config in
+      let ctxt = new Client_rpcs.http_ctxt rpc_config in
       begin
         Client_node_rpcs.Blocks.protocol ctxt parsed_args.block >>= function
         | Ok version -> begin
@@ -72,9 +72,9 @@ let main () =
       let rpc_config =
         if parsed_args.print_timings then
           { rpc_config with
-            logger = Client_rpcs.timings_logger Format.err_formatter }
+            logger = RPC_client.timings_logger Format.err_formatter }
         else if parsed_args.log_requests
-        then { rpc_config with logger = Client_rpcs.full_logger Format.err_formatter }
+        then { rpc_config with logger = RPC_client.full_logger Format.err_formatter }
         else rpc_config
       in
       let client_config =

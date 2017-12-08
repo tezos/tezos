@@ -142,7 +142,7 @@ let make_context
   object
     inherit logger log
     inherit file_wallet base_dir
-    inherit Client_rpcs.rpc rpc_config
+    inherit Client_rpcs.http_ctxt rpc_config
     method block = block
   end
 

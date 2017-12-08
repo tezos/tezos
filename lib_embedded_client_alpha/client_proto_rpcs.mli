@@ -13,13 +13,13 @@ val handle_error: Client_commands.full_context -> 'a tzresult -> 'a Lwt.t
 type block = Node_rpc_services.Blocks.block
 
 val header:
-  Client_rpcs.rpc -> block -> Block_header.t tzresult Lwt.t
+  #Client_rpcs.ctxt -> block -> Block_header.t tzresult Lwt.t
 
 module Header : sig
   val priority:
-    Client_rpcs.rpc -> block -> int tzresult Lwt.t
+    #Client_rpcs.ctxt -> block -> int tzresult Lwt.t
   val seed_nonce_hash:
-    Client_rpcs.rpc -> block -> Nonce_hash.t tzresult Lwt.t
+    #Client_rpcs.ctxt -> block -> Nonce_hash.t tzresult Lwt.t
 end
 
 module Constants : sig

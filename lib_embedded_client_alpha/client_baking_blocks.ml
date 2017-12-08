@@ -63,7 +63,6 @@ let monitor cctxt
     ?include_ops ?length ?heads ?delay ?min_date ?min_heads
     () >>=? fun block_stream ->
   let convert blocks =
-    Lwt.return blocks >>=? fun blocks ->
     sort_blocks cctxt ?compare (List.flatten blocks) >>= return in
   return (Lwt_stream.map_s convert block_stream)
 

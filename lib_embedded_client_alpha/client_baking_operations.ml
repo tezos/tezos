@@ -15,7 +15,6 @@ type operation = {
 let monitor cctxt ?contents ?check () =
   Client_node_rpcs.Operations.monitor cctxt ?contents () >>=? fun ops_stream ->
   let convert ops =
-    Lwt.return ops >>=? fun ops ->
     map_s
       (fun (hash, op) ->
          match op with

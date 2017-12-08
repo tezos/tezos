@@ -40,15 +40,11 @@ let commands () = Cli_entries.[
        stop)
       (fun () (cctxt : Client_commands.full_context) ->
          Client_node_rpcs.bootstrapped cctxt >>=? fun stream ->
-         Lwt_stream.iter_s (function
-             | Ok (hash, time) ->
-                 cctxt#message "Current head: %a (%a)"
-                   Block_hash.pp_short hash
-                   Time.pp_hum time
-             | Error err ->
-                 cctxt#error "Error: %a"
-                   pp_print_error err
-           ) stream >>= fun () ->
+         Lwt_stream.iter_s
+           (fun (hash, time) ->
+              cctxt#message "Current head: %a (%a)"
+                Block_hash.pp_short hash
+                Time.pp_hum time) stream >>= fun () ->
          cctxt#answer "Bootstrapped." >>= fun () ->
          return ()
       )

@@ -109,7 +109,7 @@ module Blocks : sig
     #Client_rpcs.ctxt ->
     ?include_ops:bool -> ?length:int -> ?heads:Block_hash.t list ->
     ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
-    unit -> block_info list list tzresult Lwt_stream.t tzresult Lwt.t
+    unit -> block_info list list Lwt_stream.t tzresult Lwt.t
 
   type preapply_result = {
     shell_header: Block_header.shell_header ;
@@ -132,7 +132,7 @@ module Operations : sig
     #Client_rpcs.ctxt ->
     ?contents:bool ->
     unit ->
-    (Operation_hash.t * Operation.t option) list list tzresult Lwt_stream.t tzresult Lwt.t
+    (Operation_hash.t * Operation.t option) list list Lwt_stream.t tzresult Lwt.t
 
 end
 
@@ -150,7 +150,7 @@ module Protocols : sig
 end
 
 val bootstrapped:
-  #Client_rpcs.ctxt -> (Block_hash.t * Time.t) tzresult Lwt_stream.t tzresult Lwt.t
+  #Client_rpcs.ctxt -> (Block_hash.t * Time.t) Lwt_stream.t tzresult Lwt.t
 
 module Network : sig
 

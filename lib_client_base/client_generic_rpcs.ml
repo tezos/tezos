@@ -350,9 +350,21 @@ let fill_in schema =
   | Any | Object { properties = [] } -> Lwt.return (Ok (`O []))
   | _ -> editor_fill_in schema
 
-let call url (cctxt : Client_commands.full_context) =
-  let args = String.split '/' url in
-  let open RPC_description in
+let display_answer (cctxt : #Client_commands.full_context) = function
+  | `Ok json ->
+      cctxt#message "%a"
+        Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
+      return ()
+  | `Not_found _ ->
+      cctxt#message "No service found at this URL\n%!" >>= fun () ->
+      return ()
+  | `Unauthorized _ | `Error _ | `Forbidden _ | `Conflict _ ->
+      cctxt#message "Unexpected server answer\n%!" >>= fun () ->
+      return ()
+
+let call raw_url (cctxt : #Client_commands.full_context) =
+  let uri = Uri.of_string raw_url in
+  let args = String.split_path (Uri.path uri) in
   Client_node_rpcs.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
       match RPC_service.MethMap.find `POST services with
@@ -360,35 +372,32 @@ let call url (cctxt : Client_commands.full_context) =
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
           return ()
-      | { input = None } -> assert false (* TODO *)
+      | { input = None } ->
+          cctxt#generic_json_call `POST uri >>=?
+          display_answer cctxt
       | { input = Some input } ->
           fill_in input >>= function
           | Error msg ->
               cctxt#error "%s" msg >>= fun () ->
               return ()
           | Ok json ->
-              cctxt#get_json `POST args json >>=? fun json ->
-              cctxt#message "%a"
-                Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
-              return ()
+              cctxt#generic_json_call `POST ~body:json uri >>=?
+              display_answer cctxt
     end
   | _ ->
-      cctxt#message
-        "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
+      cctxt#message "No service found at this URL\n%!" >>= fun () ->
       return ()
 
-let call_with_json url json (cctxt: Client_commands.full_context) =
-  let args = String.split '/' url in
+let call_with_json raw_url json (cctxt: Client_commands.full_context) =
+  let uri = Uri.of_string raw_url in
   match Data_encoding_ezjsonm.from_string json with
   | Error err ->
       cctxt#error
         "Failed to parse the provided json: %s\n%!"
         err
-  | Ok json ->
-      cctxt#get_json `POST args json >>=? fun json ->
-      cctxt#message "%a"
-        Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
-      return ()
+  | Ok body ->
+      cctxt#generic_json_call `POST ~body uri >>=?
+      display_answer cctxt
 
 let group =
   { Cli_entries.name = "rpc" ;

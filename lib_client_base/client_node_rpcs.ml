@@ -42,18 +42,10 @@ let complete cctxt ?block prefix =
   | Some block ->
       call_service2 cctxt Services.Blocks.complete block prefix ()
 
-let describe config ?(recurse = true) path =
-  let { RPC_service.meth ; uri } =
-    RPC_service.forge_request Node_rpc_services.describe
-      ((), path) { RPC_description.recurse } in
-  let path = String.split_path (Uri.path uri) in (* Temporary *)
-  config#get_json meth path (`O []) >>=? fun json ->
-  match Data_encoding.Json.destruct (RPC_service.output_encoding Node_rpc_services.describe) json with
-  | exception msg ->
-      let msg =
-        Format.asprintf "%a" (fun x -> Data_encoding.Json.print_error x) msg in
-      failwith "Failed to parse Json answer: %s" msg
-  | v -> return v
+let describe cctxt ?(recurse = true) path =
+  Client_rpcs.call_service cctxt
+    Node_rpc_services.describe
+    ((), path) { recurse } ()
 
 module Blocks = struct
 
