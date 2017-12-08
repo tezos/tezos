@@ -29,23 +29,25 @@
     v1/compare.mli
     v1/data_encoding.mli
     v1/error_monad.mli
-    v1/micheline.mli
     v1/logging.mli
     v1/time.mli
-    v1/base58.mli
-    v1/hash.mli
-    v1/blake2B.mli
-    v1/ed25519.mli
 
-    ;; Tezos specifics
-    v1/tezos_data.mli
-    v1/context.mli
     v1/RPC_arg.mli
     v1/RPC_path.mli
     v1/RPC_query.mli
     v1/RPC_service.mli
     v1/RPC_answer.mli
     v1/RPC_directory.mli
+
+    v1/base58.mli
+    v1/hash.mli
+    v1/blake2B.mli
+    v1/ed25519.mli
+
+    ;; Tezos specifics
+    v1/micheline.mli
+    v1/tezos_data.mli
+    v1/context.mli
     v1/updater.mli
 
   ))

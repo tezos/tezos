@@ -161,6 +161,21 @@ module Make (R : sig
   let to_short_b58check s =
     String.sub (to_b58check s) 0 (10 + 2 * String.length K.b58check_prefix)
 
+  let rpc_arg =
+    RPC_arg.make
+      ~name:(Format.asprintf "hash.%s" K.name)
+      ~descr:(Format.asprintf "A b58check-encoded hash (%s)" K.name)
+      ~destruct:
+        (fun s ->
+           match of_b58check_opt s with
+           | None ->
+               Error (Format.asprintf
+                        "failed to decode b58check-encoded hash (%s): %S"
+                        K.name s)
+           | Some v -> Ok v)
+      ~construct:to_b58check
+      ()
+
   let encoding =
     let open Data_encoding in
     splitted

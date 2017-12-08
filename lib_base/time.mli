@@ -40,6 +40,8 @@ val now : unit -> t
 val encoding : t Data_encoding.t
 val rfc_encoding : t Data_encoding.t
 
+val rpc_arg : t RPC_arg.t
+
 val pp_hum : Format.formatter -> t -> unit
 
 type 'a timed_data = {

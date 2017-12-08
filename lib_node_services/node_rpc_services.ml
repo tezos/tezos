@@ -459,15 +459,7 @@ end
 
 module Protocols = struct
 
-  let protocols_arg =
-    let name = "protocol_id" in
-    let descr =
-      "A protocol identifier in hexadecimal." in
-    let construct = Protocol_hash.to_b58check in
-    let destruct h =
-      try Ok (Protocol_hash.of_b58check_exn h)
-      with _ -> Error "Can't parse hash" in
-    RPC_arg.make ~name ~descr ~construct ~destruct ()
+  let protocols_arg = Protocol_hash.rpc_arg
 
   let contents =
     RPC_service.post_service
@@ -516,14 +508,7 @@ module Network = struct
   open P2p_types
 
   let (peer_id_arg : P2p_types.Peer_id.t RPC_arg.arg) =
-    RPC_arg.make
-      ~name:"peer_id"
-      ~descr:"A network global identifier, also known as an identity."
-      ~destruct:(fun s -> try
-                    Ok (Crypto_box.Public_key_hash.of_b58check_exn s)
-                  with Failure msg -> Error msg)
-      ~construct:Crypto_box.Public_key_hash.to_b58check
-      ()
+    Crypto_box.Public_key_hash.rpc_arg
 
   let point_arg =
     RPC_arg.make

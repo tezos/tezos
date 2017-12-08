@@ -153,3 +153,16 @@ let zero =
   match of_hex (String.make (size * 2) '0') with
   | Some c -> c
   | None -> assert false
+
+
+let rpc_arg =
+  RPC_arg.make
+    ~name:(Format.asprintf "hash.%s" name)
+    ~descr:(Format.asprintf "A b58check-encoded hash (%s)" name)
+    ~destruct:
+      (fun s ->
+         match of_b58check_opt s with
+         | None -> Error ""
+         | Some v -> Ok v)
+    ~construct:to_b58check
+    ()

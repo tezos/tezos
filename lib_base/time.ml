@@ -108,6 +108,19 @@ module T = struct
               (fun i -> i) ;
           ])
 
+  let rpc_arg =
+    RPC_arg.make
+      ~name:(Format.asprintf "date")
+      ~descr:(Format.asprintf "A date in seconds from epoch")
+      ~destruct:
+        (fun s ->
+           match Int64.of_string s with
+           | exception _ ->
+               Error (Format.asprintf "failed to parse time (epoch): %S" s)
+           | v -> Ok v)
+      ~construct:Int64.to_string
+      ()
+
   type 'a timed_data = {
     data: 'a ;
     time: t ;

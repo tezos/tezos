@@ -68,6 +68,8 @@ module type HASH = sig
   type Base58.data += Hash of t
   val b58check_encoding: t Base58.encoding
 
+  val rpc_arg: t RPC_arg.t
+
   module Set : sig
     include Set.S with type elt = t
     val encoding: t Data_encoding.t

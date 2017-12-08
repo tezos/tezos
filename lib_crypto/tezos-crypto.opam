@@ -13,6 +13,7 @@ depends: [
   "tezos-stdlib-lwt"
   "tezos-data-encoding"
   "tezos-error-monad"
+  "tezos-rpc-base"
   "nocrypto"
   "sodium"
   "zarith"
