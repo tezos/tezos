@@ -2,7 +2,7 @@
 
 (executables
  ((names (test_endorsement
-          ;; test_michelson_parser
+          test_michelson_parser
           test_origination
           test_transaction
           test_vote))
@@ -23,7 +23,7 @@
 (alias
  ((name buildtest)
   (deps (test_endorsement.exe
-         ;; test_michelson_parser.exe
+         test_michelson_parser.exe
          test_origination.exe
          test_transaction.exe
          test_vote.exe))))
@@ -33,6 +33,10 @@
   (deps (sandbox.json))
   (locks  (/tcp-port/18100))
   (action (chdir ${ROOT} (run ${exe:test_endorsement.exe} ${bin:tezos-node})))))
+
+(alias
+ ((name runtest_michelson_parser)
+  (action (run ${exe:test_michelson_parser.exe}))))
 
 (alias
  ((name runtest_origination)
@@ -55,6 +59,7 @@
 (alias
  ((name runtest)
   (deps ((alias runtest_endorsement)
+         (alias runtest_michelson_parser)
          (alias runtest_origination)
          (alias runtest_transaction)
          (alias runtest_vote)))))

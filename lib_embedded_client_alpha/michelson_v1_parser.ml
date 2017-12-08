@@ -91,3 +91,6 @@ let parse_expression ?check source =
   let tokens, lexing_errors = Micheline_parser.tokenize source in
   let ast, parsing_errors = Micheline_parser.parse_expression ?check tokens in
   expand_all source ast (lexing_errors @ parsing_errors)
+
+let expand_all ~source ~original =
+  expand_all source original []

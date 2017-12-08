@@ -29,3 +29,4 @@ type parsed =
 
 val parse_toplevel : ?check:bool -> string -> parsed Micheline_parser.parsing_result
 val parse_expression : ?check:bool -> string -> parsed Micheline_parser.parsing_result
+val expand_all : source:string -> original:Micheline_parser.node -> parsed Micheline_parser.parsing_result
