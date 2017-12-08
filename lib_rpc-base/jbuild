@@ -1,14 +1,13 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_node_services)
-  (public_name tezos-node-services)
-  (libraries (tezos-base
-              tezos-node-p2p-base))
+ ((name tezos_rpc_base)
+  (public_name tezos-rpc-base)
+  (libraries (tezos-data-encoding
+              ocplib-resto))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
-                    -open Tezos_base__TzPervasives
-                    -open Tezos_node_p2p_base))))
+                    -open Tezos_data_encoding))))
 
 (alias
  ((name runtest_indent)

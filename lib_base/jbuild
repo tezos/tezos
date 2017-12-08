@@ -7,12 +7,14 @@
                     -open Tezos_stdlib_lwt
                     -open Tezos_crypto
                     -open Tezos_data_encoding
-                    -open Tezos_error_monad))
+                    -open Tezos_error_monad
+                    -open Tezos_rpc_base))
   (libraries (tezos-stdlib
               tezos-stdlib-lwt
               tezos-crypto
               tezos-data-encoding
               tezos-error-monad
+              tezos-rpc-base
               calendar
               ezjsonm
               mtime.clock.os))))

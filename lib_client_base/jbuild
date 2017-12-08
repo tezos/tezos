@@ -5,18 +5,18 @@
   (public_name tezos-client-base)
   (libraries (tezos-base
               tezos-storage
+              tezos-rpc-http
               tezos-node-p2p-base
               tezos-node-services
-              tezos-node-http
               tezos-node-updater
               tezos-protocol-compiler))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_storage
+                    -open Tezos_rpc_http
                     -open Tezos_node_p2p_base
                     -open Tezos_node_services
-                    -open Tezos_node_http
                     -open Tezos_node_updater))))
 
 (alias
