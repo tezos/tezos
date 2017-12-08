@@ -326,8 +326,9 @@ module Make (Encoding : ENCODING) = struct
       let rec loop : type a b. (a, b) query_fields -> _ = function
         | F0 -> []
         | F1 (f, fs) ->
-            { Description.name = f.fname ;
-              description = f.fdescription } :: loop fs in
+            { Description.name = field_name f ;
+              description = field_description f ;
+              kind = field_kind f } :: loop fs in
       loop fields
 
 

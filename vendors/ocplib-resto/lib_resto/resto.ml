@@ -93,13 +93,45 @@ module Internal = struct
     | F1: ('a, 'b) query_field * ('a, 'c) query_fields ->
       ('a, 'b -> 'c) query_fields
 
-  and ('a, 'b) query_field = {
-    fname : string ;
-    ftype : 'b arg ;
-    fdefault : 'b ;
-    fget : 'a -> 'b ;
-    fdescription : string option ;
-  }
+  and ('a, 'b) query_field =
+    | Single : {
+        name : string ; description : string option ;
+        ty : 'b arg ; default : 'b ; get : 'a -> 'b ;
+      } -> ('a, 'b) query_field
+    | Opt : {
+        name : string ; description : string option ;
+        ty : 'b arg ; get : 'a -> 'b option ;
+      } -> ('a, 'b option) query_field
+    | Flag : {
+        name : string ; description : string option ;
+        get : 'a -> bool ;
+      } -> ('a, bool) query_field
+    | Multi : {
+        name : string ; description : string option ;
+        ty : 'b arg ; get : 'a -> 'b list ;
+      } -> ('a, 'b list) query_field
+
+  type query_kind =
+    | Single of descr
+    | Optional of descr
+    | Flag
+    | Multi of descr
+
+  let field_name (type t) : (_,t) query_field -> _ = function
+    | Single { name } -> name
+    | Opt { name } -> name
+    | Flag { name } -> name
+    | Multi { name } -> name
+  let field_description (type t) : (_,t) query_field -> _ = function
+    | Single { description } -> description
+    | Opt { description } -> description
+    | Flag { description } -> description
+    | Multi { description } -> description
+  let field_kind (type t) : (_,t) query_field -> query_kind = function
+    | Single { ty ; _ } -> Single ty.descr
+    | Opt { ty ; _ } -> Optional ty.descr
+    | Flag _ -> Flag
+    | Multi { ty ; _ } -> Multi ty.descr
 
   let from_query x = x
   let to_query x = x
@@ -127,6 +159,10 @@ module Arg = struct
 
   let descr (ty: 'a arg) = ty.descr
 
+  let ignore : unit arg =
+    let destruct _ = Ok () in
+    let construct () = "" in
+    make ~name:"unit" ~destruct ~construct ()
   let bool : bool arg =
     let bool_of_string s =
       match String.lowercase_ascii s with
@@ -245,8 +281,17 @@ module Query = struct
   type ('a, 'b, 'c) open_query =
     ('a, 'c) query_fields -> 'b * ('a, 'b) query_fields
 
-  let field ?descr fname ftype fdefault fget =
-    { fname; ftype; fdefault ; fget ; fdescription = descr }
+  let field ?descr name ty default get : (_,_) query_field =
+    Single { name; description = descr ; ty ; default ; get }
+
+  let opt_field ?descr name ty get : (_,_) query_field =
+    Opt { name; description = descr ; ty ; get }
+
+  let flag ?descr name get : (_,_) query_field =
+    Flag { name; description = descr ; get }
+
+  let multi_field ?descr name ty get : (_,_) query_field =
+    Multi { name; description = descr ; ty ; get }
 
   let query : 'b -> ('a, 'b, 'b) open_query =
     fun c fs -> c, fs
@@ -281,18 +326,45 @@ module Query = struct
     = fun map fs f ->
       match fs with
       | F0 -> f
-      | F1 (field, fs) ->
-          let Parsed (field', v) = StringMap.find field.fname map in
-          let Ty.Eq = Ty.eq field.ftype.id field'.ftype.id in
-          let v = match v with None -> field.fdefault | Some v -> v in
-          rebuild map fs (f v)
+      | F1 (Single field, fs) -> begin
+          match StringMap.find field.name map with
+          | Parsed (Single field', v) ->
+              let Ty.Eq = Ty.eq field.ty.id field'.ty.id in
+              let v = match v with None -> field.default | Some v -> v in
+              rebuild map fs (f v)
+          | Parsed _ -> assert false
+        end
+      | F1 (Opt field, fs) -> begin
+          match StringMap.find field.name map with
+          | Parsed (Opt field', v) ->
+              let Ty.Eq = Ty.eq field.ty.id field'.ty.id in
+              let v = match v with None -> None | Some v -> v in
+              rebuild map fs (f v)
+          | Parsed _ -> assert false
+        end
+      | F1 (Flag field, fs) -> begin
+          match StringMap.find field.name map with
+          | Parsed (Flag _, v) ->
+              let v = match v with None -> false | Some v -> v in
+              rebuild map fs (f v)
+          | Parsed _ -> assert false
+        end
+      | F1 (Multi field, fs) -> begin
+          match StringMap.find field.name map with
+          | Parsed (Multi field', v) ->
+              let Ty.Eq = Ty.eq field.ty.id field'.ty.id in
+              let v = match v with None -> [] | Some v -> v in
+              rebuild map fs (f v)
+          | Parsed _ -> assert false
+        end
 
   exception Invalid of string
   type untyped = (string * string) list
   let parse (Fields (fs, f)) =
     let fields =
       fold_fields
-        ~f:(fun map (Field f) -> StringMap.add f.fname (Parsed (f, None)) map)
+        ~f:(fun map (Field f) ->
+            StringMap.add (field_name f) (Parsed (f, None)) map)
         ~init:StringMap.empty
         fs in
     fun query ->
@@ -302,15 +374,46 @@ module Query = struct
           begin fun fields (name, value) ->
             match StringMap.find name fields with
             | exception Not_found -> fields
-            | (Parsed (f, Some _)) ->
-                (* TODO add an option to parse multiple as list. *)
+            | (Parsed (Single f, Some _)) ->
                 fail "Duplicate argument '%s' in query string." name
-            | (Parsed (f, None)) ->
-                match f.ftype.destruct value with
+            | (Parsed (Opt f, Some _)) ->
+                fail "Duplicate argument '%s' in query string." name
+            | (Parsed (Flag f, Some _)) ->
+                fail "Duplicate argument '%s' in query string." name
+            | (Parsed (Single f, None)) -> begin
+                match f.ty.destruct value with
                 | Error error ->
                     fail "Failed to parse argument '%s' (%S): %s"
                       name value error
-                | Ok v -> StringMap.add name (Parsed (f, Some v)) fields
+                | Ok v -> StringMap.add name (Parsed (Single f, Some v)) fields
+              end
+            | (Parsed (Opt f, None)) -> begin
+                match f.ty.destruct value with
+                | Error error ->
+                    fail "Failed to parse argument '%s' (%S): %s"
+                      name value error
+                | Ok v -> StringMap.add name (Parsed (Opt f, Some (Some v))) fields
+              end
+            | (Parsed (Flag f, None)) -> begin
+                let v =
+                  match String.lowercase_ascii value with
+                  | "no" | "false" -> false
+                  | _ -> true
+                in
+                StringMap.add name (Parsed (Flag f, Some v)) fields
+              end
+            | (Parsed (Multi f, previous)) -> begin
+                match f.ty.destruct value with
+                | Error error ->
+                    fail "Failed to parse argument '%s' (%S): %s"
+                      name value error
+                | Ok v ->
+                    let v =
+                      match previous with
+                      | None -> [v]
+                      | Some l -> v :: l in
+                    StringMap.add name (Parsed (Multi f, Some v)) fields
+              end
           end
           fields query in
       rebuild fields fs f
@@ -328,6 +431,12 @@ module Description = struct
     query (fun recurse -> { recurse })
     |+ field "recurse" Arg.bool false (fun t -> t.recurse)
     |> seal
+
+  type nonrec query_kind = query_kind =
+    | Single of Arg.descr
+    | Optional of Arg.descr
+    | Flag
+    | Multi of Arg.descr
 
   type 'schema service = {
     description: string option ;
@@ -347,6 +456,7 @@ module Description = struct
   and query_item = {
     name: string ;
     description: string option ;
+    kind: query_kind ;
   }
 
   type 'schema directory =
@@ -576,8 +686,27 @@ module MakeService(Encoding : ENCODING) = struct
     = fun (Fields (fields, _)) q ->
       let rec loop : type t. (q, t) query_fields -> _ = function
         | F0 -> []
-        | F1 ({ fname ; ftype ; fget ; _ }, fields) ->
-            (fname, ftype.construct (fget q)) :: loop fields in
+        | F1 (Single { name ; ty ; get ; _ }, fields) ->
+            (name, ty.construct (get q)) :: loop fields
+        | F1 (Opt { name ; ty ; get ; _ }, fields) -> begin
+            match get q with
+            | None -> loop fields
+            | Some v -> (name, ty.construct v) :: loop fields
+          end
+        | F1 (Flag { name ; get ; _ }, fields) -> begin
+            match get q with
+            | false -> loop fields
+            | true -> (name, "true") :: loop fields
+          end
+        | F1 (Multi { name ; ty ; get ; _ }, fields) -> begin
+            match get q with
+            | [] -> loop fields
+            | l ->
+                List.fold_right
+                  (fun v acc -> (name, ty.construct v) :: acc)
+                  l
+                  (loop fields)
+          end in
       loop fields
 
   let forge_request

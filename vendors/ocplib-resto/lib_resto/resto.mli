@@ -104,7 +104,14 @@ module Description : sig
   and query_item = {
     name: string ;
     description: string option ;
+    kind: query_kind ;
   }
+
+  and query_kind =
+    | Single of Arg.descr
+    | Optional of Arg.descr
+    | Flag
+    | Multi of Arg.descr
 
   type 'schema directory =
     | Empty
@@ -137,6 +144,15 @@ module Query : sig
   val field:
     ?descr: string ->
     string -> 'a Arg.t -> 'a -> ('b -> 'a) -> ('b, 'a) field
+  val opt_field:
+    ?descr: string ->
+    string -> 'a Arg.t -> ('b -> 'a option) -> ('b, 'a option) field
+  val flag:
+    ?descr: string ->
+    string -> ('b -> bool) -> ('b, bool) field
+  val multi_field:
+    ?descr: string ->
+    string -> 'a Arg.t -> ('b -> 'a list) -> ('b, 'a list) field
 
   type ('a, 'b, 'c) open_query
   val query: 'b -> ('a, 'b, 'b) open_query
@@ -198,16 +214,30 @@ module Internal : sig
     | F1: ('a, 'b) query_field * ('a, 'c) query_fields ->
       ('a, 'b -> 'c) query_fields
 
-  and ('a, 'b) query_field = {
-    fname : string ;
-    ftype : 'b arg ;
-    fdefault : 'b ;
-    fget : 'a -> 'b ;
-    fdescription : string option ;
-  }
+  and ('a, 'b) query_field =
+    | Single : {
+        name : string ; description : string option ;
+        ty : 'b arg ; default : 'b ; get : 'a -> 'b ;
+      } -> ('a, 'b) query_field
+    | Opt : {
+        name : string ; description : string option ;
+        ty : 'b arg ; get : 'a -> 'b option ;
+      } -> ('a, 'b option) query_field
+    | Flag : {
+        name : string ; description : string option ;
+        get : 'a -> bool ;
+      } -> ('a, bool) query_field
+    | Multi : {
+        name : string ; description : string option ;
+        ty : 'b arg ; get : 'a -> 'b list ;
+      } -> ('a, 'b list) query_field
 
   val from_query : 'a query -> 'a Query.t
   val to_query : 'a Query.t -> 'a query
+
+  val field_name : ('a, 'b) query_field -> string
+  val field_description : ('a, 'b) query_field -> string option
+  val field_kind : ('a, 'b) query_field -> Description.query_kind
 
 end
 

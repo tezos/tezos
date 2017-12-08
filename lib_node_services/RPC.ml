@@ -43,12 +43,32 @@ module Data = struct
         (fun s -> PDynamic s) ;
     ]
 
+  let query_kind_encoding =
+    let open Data_encoding in
+    union [
+      case ~tag:0 (obj1 (req "single" arg_encoding))
+        (function Single s -> Some s | _ -> None)
+        (fun s -> Single s) ;
+      case ~tag:1 (obj1 (req "optional" arg_encoding))
+        (function Optional s -> Some s | _ -> None)
+        (fun s -> Optional s) ;
+      case ~tag:2 (obj1 (req "flag" unit))
+        (function Flag -> Some () | _ -> None)
+        (fun () -> Flag) ;
+      case ~tag:3 (obj1 (req "multi" arg_encoding))
+        (function Multi s -> Some s | _ -> None)
+        (fun s -> Multi s) ;
+    ]
+
   let query_item_encoding =
     let open Data_encoding in
     conv
-      (fun {name ; description} -> (name, description))
-      (fun (name, description) -> {name ; description})
-      (obj2 (req "name" string) (opt "description" string))
+      (fun { name ; description ; kind } -> (name, description, kind))
+      (fun (name, description, kind) -> { name ; description ; kind })
+      (obj3
+         (req "name" string)
+         (opt "description" string)
+         (req "kind" query_kind_encoding))
 
   let service_descr_encoding =
     let open Data_encoding in
@@ -61,7 +81,7 @@ module Data = struct
          (req "meth" meth_encoding)
          (req "path" (list path_item_encoding))
          (opt "description" string)
-         (req "query" (list query_item_encoding))
+         (req "query" (list (dynamic_size query_item_encoding)))
          (opt "input" json_schema)
          (req "output" json_schema)
          (req "erro" json_schema))

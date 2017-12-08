@@ -44,12 +44,36 @@ module Encoding = struct
         (fun s -> PDynamic s) ;
     ]
 
+  let query_kind_encoding =
+    let open Json_encoding in
+    union [
+      case
+        (obj1 (req "single" arg_encoding))
+        (function Single s -> Some s | _ -> None)
+        (fun s -> Single s) ;
+      case
+        (obj1 (req "optional" arg_encoding))
+        (function Optional s -> Some s | _ -> None)
+        (fun s -> Optional s) ;
+      case
+        (obj1 (req "flag" empty))
+        (function Flag -> Some () | _ -> None)
+        (fun () -> Flag) ;
+      case
+        (obj1 (req "multi" arg_encoding))
+        (function Multi s -> Some s | _ -> None)
+        (fun s -> Multi s) ;
+    ]
+
   let query_item_encoding =
     let open Json_encoding in
     conv
-      (fun {name ; description} -> (name, description))
-      (fun (name, description) -> {name ; description})
-      (obj2 (req "name" string) (opt "description" string))
+      (fun {name ; description ; kind} -> (name, description, kind))
+      (fun (name, description, kind) -> {name ; description ; kind})
+      (obj3
+         (req "name" string)
+         (opt "description" string)
+         (req "kind" query_kind_encoding))
 
   let service_descr_encoding =
     let open Json_encoding in
