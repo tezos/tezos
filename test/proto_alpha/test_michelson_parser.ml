@@ -10,6 +10,73 @@
 module Helpers = Proto_alpha_helpers
 module Assert = Helpers.Assert
 
+let known_ok_tez_litterals =
+  [ 0L, "0" ;
+    10L, "0.000,01" ;
+    100L, "0.000,1" ;
+    1_000L, "0.001" ;
+    10_000L, "0.01" ;
+    100_000L, "0.1" ;
+    1_000_000L, "1" ;
+    10_000_000L, "10" ;
+    100_000_000L, "100" ;
+    1_000_000_000L, "1,000" ;
+    10_000_000_000L, "10,000" ;
+    100_000_000_000L, "100,000" ;
+    1_000_000_000_000L, "1,000,000" ;
+    1_000_000_000_001L, "1,000,000.000,001" ;
+    1_000_000_000_010L, "1,000,000.000,01" ;
+    1_000_000_000_100L, "1,000,000.000,1" ;
+    1_000_000_001_000L, "1,000,000.001" ;
+    1_000_000_010_000L, "1,000,000.01" ;
+    1_000_000_100_000L, "1,000,000.1" ;
+    123_123_123_123_123_123L, "123,123,123,123.123,123" ;
+    999_999_999_999_999_999L, "999,999,999,999.999,999" ]
+
+let known_bad_tez_litterals =
+  [ "10000" ;
+    "1,0000" ;
+    "0.0000,1" ;
+    "0.00,1" ;
+    "0,1" ;
+    "0.0001" ;
+    "HAHA" ;
+    "0.000,000,1" ;
+    "9,999,999,999,999.999,999"]
+
+let test_known_tez_litterals () =
+  List.iter
+    (fun (v, s) ->
+       let vv = Tez_repr.of_mutez v in
+       let vs = Tez_repr.of_string s in
+       let vv = match vv with None -> Assert.fail_msg "could not unopt %Ld" v | Some vv -> vv in
+       let vs = match vs with None -> Assert.fail_msg "could not unopt %s" s | Some vs -> vs in
+       Assert.equal ~prn:Tez_repr.to_string vv vs ;
+       Assert.equal ~prn:(fun s -> s) (Tez_repr.to_string vv) s)
+    known_ok_tez_litterals ;
+  List.iter
+    (fun s ->
+       let vs = Tez_repr.of_string s in
+       Assert.is_none ~msg:("Unexpected successful parsing of " ^ s) vs)
+    known_bad_tez_litterals ;
+  return ()
+
+let test_random_tez_litterals () =
+  for _ = 0 to 100_000 do
+    let v = Random.int64 12L in
+    let vv = Tez_repr.of_mutez v in
+    let vv = match vv with None -> Assert.fail_msg "could not unopt %Ld" v | Some vv -> vv in
+    let s = Tez_repr.to_string vv in
+    let vs = Tez_repr.of_string s in
+    Assert.is_some ~msg:("Could not parse " ^ s ^ " back") vs ;
+    match vs with
+    | None -> assert false
+    | Some vs ->
+        let rev = Tez_repr.to_int64 vs in
+        Assert.equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev
+  done ;
+  return ()
+
 open Tezos_micheline
 open Micheline
 
@@ -342,6 +409,8 @@ let tests = [
   "parsing", (fun _ -> Lwt.return (test_parsing ())) ;
   "expansion", (fun _ -> Lwt.return (test_expansion ())) ;
   "consistency", (fun _ -> Lwt.return (test_unexpansion_consistency ())) ;
+  "tez-litterals", (fun _ -> test_known_tez_litterals ()) ;
+  "rnd-tez-litterals", (fun _ -> test_random_tez_litterals ()) ;
 ]
 
 let () =
