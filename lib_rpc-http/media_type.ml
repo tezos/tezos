@@ -39,9 +39,47 @@ let json  = {
   end ;
 }
 
+
+let bson  = {
+  name = Cohttp.Accept.MediaType ("application", "bson") ;
+  q = Some 100 ;
+  pp = begin fun _enc ppf raw ->
+    match Json_repr_bson.bytes_to_bson ~laziness:false ~copy:false
+            (Bytes.unsafe_of_string raw) with
+    | exception Json_repr_bson.Bson_decoding_error (msg, _, _) ->
+        Format.fprintf ppf
+          "@[Invalid BSON:@ %s@]"
+          msg
+    | bson ->
+        let json =
+          Json_repr.convert
+            (module Json_repr_bson.Repr)
+            (module Json_repr.Ezjsonm)
+            bson in
+        Data_encoding_ezjsonm.pp ppf json
+  end ;
+  construct = begin fun enc v ->
+    Bytes.unsafe_to_string @@
+    Json_repr_bson.bson_to_bytes @@
+    Data_encoding.Bson.construct enc v
+  end ;
+  destruct = begin fun enc body ->
+    match Json_repr_bson.bytes_to_bson ~laziness:false ~copy:false
+            (Bytes.unsafe_of_string body) with
+    | exception Json_repr_bson.Bson_decoding_error (msg, _, pos) ->
+        Error (Format.asprintf "(at offset: %d) %s" pos msg)
+    | bson ->
+        try Ok (Data_encoding.Bson.destruct enc bson)
+        with Data_encoding.Json.Cannot_destruct (_, exn) ->
+          Error (Format.asprintf "%a"
+                   (fun fmt -> Data_encoding.Json.print_error fmt)
+                   exn)
+  end ;
+}
+
 let octet_stream = {
   name = Cohttp.Accept.MediaType ("application", "octet-stream") ;
-  q = Some 500 ;
+  q = Some 200 ;
   pp = begin fun enc ppf raw ->
     match Data_encoding.Binary.of_bytes enc (MBytes.of_string raw) with
     | None -> Format.fprintf ppf "Invalid bonary data."
@@ -61,4 +99,4 @@ let octet_stream = {
   end ;
 }
 
-let all_media_types = [ json ; octet_stream ]
+let all_media_types = [ json ; bson ; octet_stream ]

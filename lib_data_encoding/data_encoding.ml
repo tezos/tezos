@@ -14,6 +14,7 @@ type json =
   | `A of json list
   | `Null
   | `String of string ]
+type bson = Json_repr_bson.bson
 
 type json_schema = Json_schema.schema
 
@@ -396,6 +397,19 @@ module Json = struct
     Format.kasprintf
       (fun msg -> raise (Cannot_destruct ([], Failure msg)))
       fmt
+
+  type t = json
+
+end
+
+module Bson = struct
+
+  type t = Json_repr_bson.bson
+
+  include Json_repr_bson.Json_encoding
+
+  let construct e v = construct (Json.get_json e) v
+  let destruct e v = destruct (Json.get_json e) v
 
 end
 

@@ -58,6 +58,7 @@ type json =
   | `A of json list
   | `Null
   | `String of string ]
+type bson = Json_repr_bson.bson
 
 type json_schema = Json_schema.schema
 
@@ -380,6 +381,8 @@ val mu : string -> ('a encoding -> 'a encoding) -> 'a encoding
 
 module Json : sig
 
+  type t = json
+
   (** Create a {!Json_encoding.encoding} from an {encoding}. *)
   val convert : 'a encoding -> 'a Json_encoding.encoding
 
@@ -435,6 +438,19 @@ module Json : sig
   (** Helpers for writing encoders. *)
   val cannot_destruct : ('a, Format.formatter, unit, 'b) format4 -> 'a
   val wrap_error : ('a -> 'b) -> 'a -> 'b
+
+end
+
+module Bson : sig
+
+  type t = Json_repr_bson.bson
+
+ (** Construct a BSON object from an encoding. *)
+  val construct : 't encoding -> 't -> bson
+
+  (** Destruct a BSON object into a value.
+      Fail with an exception if the JSON object and encoding do not match.. *)
+  val destruct : 't encoding -> bson -> 't
 
 end
 

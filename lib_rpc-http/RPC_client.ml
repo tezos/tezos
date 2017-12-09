@@ -271,7 +271,7 @@ let generic_json_call ?logger ?body meth uri : (Data_encoding.json, Data_encodin
       (Cohttp_lwt.Body.of_string (Data_encoding_ezjsonm.to_string b))
     end in
   let media = Media_type.json in
-  generic_call meth ?logger ~accept:[Media_type.json] ?body ~media uri >>=? function
+  generic_call meth ?logger ~accept:Media_type.[bson ; json] ?body ~media uri >>=? function
   | `Ok (body, (Some ("application", "json") | None), _) -> begin
       Cohttp_lwt.Body.to_string body >>= fun body ->
       match Data_encoding_ezjsonm.from_string body with
@@ -281,6 +281,22 @@ let generic_json_call ?logger ?body meth uri : (Data_encoding.json, Data_encodin
             (Unexpected_content { content = body ;
                                   media_type = Media_type.(name json) ;
                                   error = msg })
+    end
+  | `Ok (body, Some ("application", "bson"), _) -> begin
+      Cohttp_lwt.Body.to_string body >>= fun body ->
+      match Json_repr_bson.bytes_to_bson ~laziness:false ~copy:false
+              (Bytes.unsafe_of_string body) with
+      | exception Json_repr_bson.Bson_decoding_error (msg, _, pos) ->
+          let error = Format.asprintf "(at offset: %d) %s" pos msg in
+          request_failed meth uri
+            (Unexpected_content { content = body ;
+                                  media_type = Media_type.(name bson) ;
+                                  error })
+      | bson ->
+          return (`Ok (Json_repr.convert
+                         (module Json_repr_bson.Repr)
+                         (module Json_repr.Ezjsonm)
+                         bson))
     end
   | `Ok (_body, Some (l, r), _) ->
       request_failed meth uri

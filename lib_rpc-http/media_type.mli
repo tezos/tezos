@@ -18,6 +18,7 @@ type t = Resto_cohttp.Media_type.Make(RPC_encoding).t = {
 val name : t -> string
 
 val json : t
+val bson : t
 val octet_stream : t
 
 val all_media_types : t list
