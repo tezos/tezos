@@ -18,7 +18,7 @@ let arg =
     match Int32.of_string str with
     | exception _ -> Error "Cannot parse level"
     | raw_level -> Ok raw_level in
-  RPC.Arg.make
+  RPC_arg.make
     ~descr:"A level integer"
     ~name: "block_level"
     ~construct

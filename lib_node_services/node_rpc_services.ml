@@ -12,23 +12,23 @@ open Data_encoding
 module Error = struct
 
   let service =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description: "Schema for all the RPC errors from the shell"
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: Data_encoding.empty
       ~output: Data_encoding.json_schema
       ~error: Data_encoding.empty
-      RPC.Path.(root / "errors")
+      RPC_path.(root / "errors")
 
   let encoding =
-    let { RPC.Service.meth ; uri ; _ } =
-      RPC.Service.forge_request service () () in
+    let { RPC_service.meth ; uri ; _ } =
+      RPC_service.forge_request service () () in
     describe
       ~description:
         (Printf.sprintf
            "The full list of error is available with \
             the global RPC `%s %s`"
-           (RPC.string_of_meth meth) (Uri.path_and_query uri))
+           (RPC_service.string_of_meth meth) (Uri.path_and_query uri))
       (conv
          ~schema:Json_schema.any
          (fun exn -> `A (List.map json_of_error exn))
@@ -144,84 +144,84 @@ module Blocks = struct
        of 'head' or 'test_head'." in
     let construct = to_string in
     let destruct = parse_block in
-    RPC.Arg.make ~name ~descr ~construct ~destruct ()
+    RPC_arg.make ~name ~descr ~construct ~destruct ()
 
-  let block_path : (unit, unit * block) RPC.Path.path =
-    RPC.Path.(root / "blocks" /: blocks_arg )
+  let block_path : (unit, unit * block) RPC_path.path =
+    RPC_path.(root / "blocks" /: blocks_arg )
 
   let info =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"All the information about a block."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: (obj1 (dft "operations" bool true))
       ~output: block_info_encoding
       ~error: Data_encoding.empty
       block_path
 
   let net_id =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Returns the net of the chain in which the block belongs."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: (obj1 (req "net_id" Net_id.encoding))
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "net_id")
+      RPC_path.(block_path / "net_id")
 
   let level =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Returns the block's level."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: (obj1 (req "level" int32))
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "level")
+      RPC_path.(block_path / "level")
 
   let predecessor =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Returns the previous block's id."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: (obj1 (req "predecessor" Block_hash.encoding))
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "predecessor")
+      RPC_path.(block_path / "predecessor")
 
   let predecessors =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:
         "...."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: (obj1 (req "length" Data_encoding.uint16))
       ~output: (obj1
                   (req "blocks" (Data_encoding.list Block_hash.encoding)))
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "predecessors")
+      RPC_path.(block_path / "predecessors")
 
   let hash =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Returns the block's id."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: (obj1 (req "hash" Block_hash.encoding))
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "hash")
+      RPC_path.(block_path / "hash")
 
   let fitness =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Returns the block's fitness."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: (obj1 (req "fitness" Fitness.encoding))
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "fitness")
+      RPC_path.(block_path / "fitness")
 
   let timestamp =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Returns the block's timestamp."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: (obj1 (req "timestamp" Time.encoding))
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "timestamp")
+      RPC_path.(block_path / "timestamp")
 
   type operations_param = {
     contents: bool ;
@@ -238,9 +238,9 @@ module Blocks = struct
          (dft "monitor" bool false))
 
   let operations =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"List the block operations."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: operations_param_encoding
       ~output: (obj1
                   (req "operations"
@@ -250,25 +250,25 @@ module Blocks = struct
                                  (opt "contents"
                                     (dynamic_size Operation.encoding)))))))
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "operations")
+      RPC_path.(block_path / "operations")
 
   let protocol =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"List the block protocol."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: (obj1 (req "protocol" Protocol_hash.encoding))
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "protocol")
+      RPC_path.(block_path / "protocol")
 
   let test_network =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Returns the status of the associated test network."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: Test_network_status.encoding
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "test_network")
+      RPC_path.(block_path / "test_network")
 
   let pending_operations =
     let operation_encoding =
@@ -276,10 +276,10 @@ module Blocks = struct
         (obj1 (req "hash" Operation_hash.encoding))
         Operation.encoding in
     (* TODO: branch_delayed/... *)
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:
         "List the not-yet-prevalidated operations."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output:
         (conv
@@ -297,10 +297,10 @@ module Blocks = struct
                  (Preapply_result.encoding Error.encoding))
               (obj1 (req "unprocessed" (list (dynamic_size operation_encoding))))))
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "pending_operations")
+      RPC_path.(block_path / "pending_operations")
 
   let proto_path =
-    RPC.Path.(block_path / "proto")
+    RPC_path.(block_path / "proto")
 
   type preapply_param = {
     timestamp: Time.t ;
@@ -338,30 +338,30 @@ module Blocks = struct
              (Preapply_result.encoding Error.encoding))))
 
   let preapply =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:
         "Simulate the validation of a block that would contain \
          the given operations and return the resulting fitness."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: preapply_param_encoding
       ~output: (Error.wrap preapply_result_encoding)
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "preapply")
+      RPC_path.(block_path / "preapply")
 
   let complete =
     let prefix_arg =
       let destruct s = Ok s
       and construct s = s in
-      RPC.Arg.make ~name:"prefix" ~destruct ~construct () in
-    RPC.Service.post_service
+      RPC_arg.make ~name:"prefix" ~destruct ~construct () in
+    RPC_service.post_service
       ~description: "Try to complete a prefix of a Base58Check-encoded data. \
                      This RPC is actually able to complete hashes of \
                      block, operations, public_keys and contracts."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: (list string)
       ~error: Data_encoding.empty
-      RPC.Path.(block_path / "complete" /: prefix_arg )
+      RPC_path.(block_path / "complete" /: prefix_arg )
 
   type list_param = {
     include_ops: bool ;
@@ -429,23 +429,23 @@ module Blocks = struct
                int31)))
 
   let list =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:
         "Lists known heads of the blockchain sorted with decreasing fitness. \
          Optional arguments allows to returns the list of predecessors for \
          known heads or the list of predecessors for a given list of blocks."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: list_param_encoding
       ~output: (obj1 (req "blocks" (list (list block_info_encoding))))
       ~error: Data_encoding.empty
-      RPC.Path.(root / "blocks")
+      RPC_path.(root / "blocks")
 
   let list_invalid =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:
         "Lists blocks that have been declared invalid along with the errors\
          that led to them being declared invalid"
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input:empty
       ~output:(Data_encoding.list
                  (obj3
@@ -453,7 +453,7 @@ module Blocks = struct
                     (req "level" int32)
                     (req "errors" Error.encoding)))
       ~error: Data_encoding.empty
-      RPC.Path.(root / "invalid_blocks")
+      RPC_path.(root / "invalid_blocks")
 
 end
 
@@ -467,18 +467,18 @@ module Protocols = struct
     let destruct h =
       try Ok (Protocol_hash.of_b58check_exn h)
       with _ -> Error "Can't parse hash" in
-    RPC.Arg.make ~name ~descr ~construct ~destruct ()
+    RPC_arg.make ~name ~descr ~construct ~destruct ()
 
   let contents =
-    RPC.Service.post_service
-      ~query: RPC.Query.empty
+    RPC_service.post_service
+      ~query: RPC_query.empty
       ~input: empty
       ~output:
         (obj1 (req "data"
                  (describe ~title: "Tezos protocol"
                     (Protocol.encoding))))
       ~error: Data_encoding.empty
-      RPC.Path.(root / "protocols" /: protocols_arg)
+      RPC_path.(root / "protocols" /: protocols_arg)
 
   type list_param = {
     contents: bool option ;
@@ -494,8 +494,8 @@ module Protocols = struct
          (opt "monitor" bool))
 
   let list =
-    RPC.Service.post_service
-      ~query: RPC.Query.empty
+    RPC_service.post_service
+      ~query: RPC_query.empty
       ~input: list_param_encoding
       ~output:
         (obj1
@@ -507,7 +507,7 @@ module Protocols = struct
                        (dynamic_size Protocol.encoding)))
               )))
       ~error: Data_encoding.empty
-      RPC.Path.(root / "protocols")
+      RPC_path.(root / "protocols")
 
 end
 
@@ -515,8 +515,8 @@ module Network = struct
 
   open P2p_types
 
-  let (peer_id_arg : P2p_types.Peer_id.t RPC.Arg.arg) =
-    RPC.Arg.make
+  let (peer_id_arg : P2p_types.Peer_id.t RPC_arg.arg) =
+    RPC_arg.make
       ~name:"peer_id"
       ~descr:"A network global identifier, also known as an identity."
       ~destruct:(fun s -> try
@@ -526,7 +526,7 @@ module Network = struct
       ()
 
   let point_arg =
-    RPC.Arg.make
+    RPC_arg.make
       ~name:"point"
       ~descr:"A network point (ipv4:port or [ipv6]:port)."
       ~destruct:Point.of_string
@@ -534,99 +534,99 @@ module Network = struct
       ()
 
   let versions =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Supported network layer versions."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: (list P2p_types.Version.encoding)
       ~error: Data_encoding.empty
-      RPC.Path.(root / "network" / "versions")
+      RPC_path.(root / "network" / "versions")
 
   let stat =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Global network bandwidth statistics in B/s."
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: P2p_types.Stat.encoding
       ~error: Data_encoding.empty
-      RPC.Path.(root / "network" / "stat")
+      RPC_path.(root / "network" / "stat")
 
   let events =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Stream of all network events"
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: empty
       ~output: P2p_types.Connection_pool_log_event.encoding
       ~error: Data_encoding.empty
-      RPC.Path.(root / "network" / "log")
+      RPC_path.(root / "network" / "log")
 
   let connect =
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description:"Connect to a peer"
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input: (obj1 (dft "timeout" float 5.))
       ~output: (Error.wrap @@ empty)
       ~error: Data_encoding.empty
-      RPC.Path.(root / "network" / "connect" /: point_arg)
+      RPC_path.(root / "network" / "connect" /: point_arg)
 
   let monitor_encoding = obj1 (dft "monitor" bool false)
 
   module Connection = struct
 
     let list =
-      RPC.Service.post_service
+      RPC_service.post_service
         ~description:"List the running P2P connection."
-        ~query: RPC.Query.empty
+        ~query: RPC_query.empty
         ~input: empty
         ~output: (list P2p_types.Connection_info.encoding)
         ~error: Data_encoding.empty
-        RPC.Path.(root / "network" / "connection")
+        RPC_path.(root / "network" / "connection")
 
     let info =
-      RPC.Service.post_service
-        ~query: RPC.Query.empty
+      RPC_service.post_service
+        ~query: RPC_query.empty
         ~input: empty
         ~output: (option P2p_types.Connection_info.encoding)
         ~error: Data_encoding.empty
         ~description:"Details about the current P2P connection to the given peer."
-        RPC.Path.(root / "network" / "connection" /: peer_id_arg)
+        RPC_path.(root / "network" / "connection" /: peer_id_arg)
 
     let kick =
-      RPC.Service.post_service
-        ~query: RPC.Query.empty
+      RPC_service.post_service
+        ~query: RPC_query.empty
         ~input: (obj1 (req "wait" bool))
         ~output: empty
         ~error: Data_encoding.empty
         ~description:"Forced close of the current P2P connection to the given peer."
-        RPC.Path.(root / "network" / "connection" /: peer_id_arg / "kick")
+        RPC_path.(root / "network" / "connection" /: peer_id_arg / "kick")
 
   end
 
   module Point = struct
 
     let info =
-      RPC.Service.post_service
-        ~query: RPC.Query.empty
+      RPC_service.post_service
+        ~query: RPC_query.empty
         ~input: empty
         ~output: (option P2p_types.Point_info.encoding)
         ~error: Data_encoding.empty
         ~description: "Details about a given `IP:addr`."
-        RPC.Path.(root / "network" / "point" /: point_arg)
+        RPC_path.(root / "network" / "point" /: point_arg)
 
     let events =
-      RPC.Service.post_service
-        ~query: RPC.Query.empty
+      RPC_service.post_service
+        ~query: RPC_query.empty
         ~input: monitor_encoding
         ~output: (list P2p_connection_pool_types.Point_info.Event.encoding)
         ~error: Data_encoding.empty
         ~description: "Monitor network events related to an `IP:addr`."
-        RPC.Path.(root / "network" / "point" /: point_arg / "log")
+        RPC_path.(root / "network" / "point" /: point_arg / "log")
 
     let list =
       let filter =
         obj1 (dft "filter" (list P2p_types.Point_state.encoding) []) in
-      RPC.Service.post_service
-        ~query: RPC.Query.empty
+      RPC_service.post_service
+        ~query: RPC_query.empty
         ~input: filter
         ~output:
           (list (tup2
@@ -635,35 +635,35 @@ module Network = struct
         ~error: Data_encoding.empty
         ~description:"List the pool of known `IP:port` \
                       used for establishing P2P connections ."
-        RPC.Path.(root / "network" / "point")
+        RPC_path.(root / "network" / "point")
 
   end
 
   module Peer_id = struct
 
     let info =
-      RPC.Service.post_service
-        ~query: RPC.Query.empty
+      RPC_service.post_service
+        ~query: RPC_query.empty
         ~input: empty
         ~output: (option P2p_types.Peer_info.encoding)
         ~error: Data_encoding.empty
         ~description:"Details about a given peer."
-        RPC.Path.(root / "network" / "peer_id" /: peer_id_arg)
+        RPC_path.(root / "network" / "peer_id" /: peer_id_arg)
 
     let events =
-      RPC.Service.post_service
-        ~query: RPC.Query.empty
+      RPC_service.post_service
+        ~query: RPC_query.empty
         ~input: monitor_encoding
         ~output: (list P2p_connection_pool_types.Peer_info.Event.encoding)
         ~error: Data_encoding.empty
         ~description:"Monitor network events related to a given peer."
-        RPC.Path.(root / "network" / "peer_id" /: peer_id_arg / "log")
+        RPC_path.(root / "network" / "peer_id" /: peer_id_arg / "log")
 
     let list =
       let filter =
         obj1 (dft "filter" (list P2p_types.Peer_state.encoding) []) in
-      RPC.Service.post_service
-        ~query: RPC.Query.empty
+      RPC_service.post_service
+        ~query: RPC_query.empty
         ~input: filter
         ~output:
           (list (tup2
@@ -671,20 +671,20 @@ module Network = struct
                    P2p_types.Peer_info.encoding))
         ~error: Data_encoding.empty
         ~description:"List the peers the node ever met."
-        RPC.Path.(root / "network" / "peer_id")
+        RPC_path.(root / "network" / "peer_id")
 
   end
 
 end
 
 let forge_block_header =
-  RPC.Service.post_service
+  RPC_service.post_service
     ~description: "Forge a block header"
-    ~query: RPC.Query.empty
+    ~query: RPC_query.empty
     ~input: Block_header.encoding
     ~output: (obj1 (req "block" bytes))
     ~error: Data_encoding.empty
-    RPC.Path.(root / "forge_block_header")
+    RPC_path.(root / "forge_block_header")
 
 type inject_block_param = {
   raw: MBytes.t ;
@@ -723,7 +723,7 @@ let inject_block_param =
              (list (list (dynamic_size Operation.encoding))))))
 
 let inject_block =
-  RPC.Service.post_service
+  RPC_service.post_service
     ~description:
       "Inject a block in the node and broadcast it. The `operations` \
        embedded in `blockHeader` might be pre-validated using a \
@@ -731,16 +731,16 @@ let inject_block =
        (e.g. '/blocks/head/context/preapply'). Returns the ID of the \
        block. By default, the RPC will wait for the block to be \
        validated before answering."
-    ~query: RPC.Query.empty
+    ~query: RPC_query.empty
     ~input: inject_block_param
     ~output:
       (Error.wrap @@
        (obj1 (req "block_hash" Block_hash.encoding)))
     ~error: Data_encoding.empty
-    RPC.Path.(root / "inject_block")
+    RPC_path.(root / "inject_block")
 
 let inject_operation =
-  RPC.Service.post_service
+  RPC_service.post_service
     ~description:
       "Inject an operation in node and broadcast it. Returns the \
        ID of the operation. The `signedOperationContents` should be \
@@ -749,7 +749,7 @@ let inject_operation =
        the operation to be (pre-)validated before answering. See \
        RPCs under /blocks/prevalidation for more details on the \
        prevalidation context."
-    ~query: RPC.Query.empty
+    ~query: RPC_query.empty
     ~input:
       (obj4
          (req "signedOperationContents"
@@ -775,13 +775,13 @@ let inject_operation =
          ~title: "Hash of the injected operation" @@
        (obj1 (req "injectedOperation" Operation_hash.encoding)))
     ~error: Data_encoding.empty
-    RPC.Path.(root / "inject_operation")
+    RPC_path.(root / "inject_operation")
 
 let inject_protocol =
-  RPC.Service.post_service
+  RPC_service.post_service
     ~description:
       "Inject a protocol in node. Returns the ID of the protocol."
-    ~query: RPC.Query.empty
+    ~query: RPC_query.empty
     ~input:
       (obj3
          (req "protocol"
@@ -804,35 +804,35 @@ let inject_protocol =
          ~title: "Hash of the injected protocol" @@
        (obj1 (req "injectedProtocol" Protocol_hash.encoding)))
     ~error: Data_encoding.empty
-    RPC.Path.(root / "inject_protocol")
+    RPC_path.(root / "inject_protocol")
 
 let bootstrapped =
-  RPC.Service.post_service
+  RPC_service.post_service
     ~description:""
-    ~query: RPC.Query.empty
+    ~query: RPC_query.empty
     ~input: empty
     ~output: (obj2
                 (req "block" Block_hash.encoding)
                 (req "timestamp" Time.encoding))
     ~error: Data_encoding.empty
-    RPC.Path.(root / "bootstrapped")
+    RPC_path.(root / "bootstrapped")
 
 let complete =
   let prefix_arg =
     let destruct s = Ok s
     and construct s = s in
-    RPC.Arg.make ~name:"prefix" ~destruct ~construct () in
-  RPC.Service.post_service
+    RPC_arg.make ~name:"prefix" ~destruct ~construct () in
+  RPC_service.post_service
     ~description: "Try to complete a prefix of a Base58Check-encoded data. \
                    This RPC is actually able to complete hashes of \
                    block and hashes of operations."
-    ~query: RPC.Query.empty
+    ~query: RPC_query.empty
     ~input: empty
     ~output: (list string)
     ~error: Data_encoding.empty
-    RPC.Path.(root / "complete" /: prefix_arg )
+    RPC_path.(root / "complete" /: prefix_arg )
 
 let describe =
-  RPC.Service.description_service
+  RPC_service.description_service
     ~description: "RPCs documentation and input/output schema"
-    RPC.Path.(root / "describe")
+    RPC_path.(root / "describe")

@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Client = Resto_cohttp.Client.Make(RPC.Data)
+module Client = Resto_cohttp.Client.Make(RPC_encoding)
 
 module type LOGGER = Client.LOGGER
 type logger = (module LOGGER)
@@ -32,7 +32,7 @@ type rest_error =
   | Connection_failed of string
   | Not_found
   | Bad_request of string
-  | Method_not_allowed of RPC.meth list
+  | Method_not_allowed of RPC_service.meth list
   | Unsupported_media_type of string option
   | Not_acceptable of { proposed: string ; acceptable: string }
   | Unexpected_status_code of { code: Cohttp.Code.status_code ;
@@ -68,7 +68,7 @@ let rest_error_encoding =
       case ~tag: 3
         (obj2
            (req "kind" (constant "method_not_allowed"))
-           (req "allowed" (list RPC.meth_encoding)))
+           (req "allowed" (list RPC_service.meth_encoding)))
         (function Method_not_allowed meths -> Some ((), meths) | _ -> None)
         (function ((), meths) -> Method_not_allowed meths) ;
       case ~tag: 4
@@ -145,7 +145,7 @@ let pp_rest_error ppf err =
       Format.fprintf ppf
         "@[<v 2>The requested service only accepts the following method:@ %a@]"
         (Format.pp_print_list
-           (fun ppf m -> Format.pp_print_string ppf (RPC.string_of_meth m)))
+           (fun ppf m -> Format.pp_print_string ppf (RPC_service.string_of_meth m)))
         meths
   | Unsupported_media_type None ->
       Format.fprintf ppf
@@ -177,7 +177,7 @@ let pp_rest_error ppf err =
         "Generic error"
 
 type error +=
-  | Request_failed of { meth: RPC.meth ;
+  | Request_failed of { meth: RPC_service.meth ;
                         uri: Uri.t ;
                         error: rest_error }
 
@@ -199,11 +199,11 @@ let () =
           \ - meth: %s@ \
           \ - uri: %s@ \
           \ - error: %a@]"
-          (RPC.string_of_meth meth)
+          (RPC_service.string_of_meth meth)
           (Uri.to_string uri)
           pp_rest_error error)
     Data_encoding.(obj3
-                     (req "meth" RPC.meth_encoding)
+                     (req "meth" RPC_service.meth_encoding)
                      (req "uri" uri_encoding)
                      (req "error" rest_error_encoding))
     (function
@@ -212,7 +212,7 @@ let () =
     (fun (meth, uri, error) -> Request_failed { uri ; meth ; error })
 
 let request_failed meth uri error =
-  let meth = ( meth : [< RPC.meth ] :> RPC.meth) in
+  let meth = ( meth : [< RPC_service.meth ] :> RPC_service.meth) in
   fail (Request_failed { meth ; uri ; error })
 
 let generic_call ?logger ?accept ?body ?media meth uri : (content, content) rest_result Lwt.t =
@@ -230,7 +230,7 @@ let generic_call ?logger ?accept ?body ?media meth uri : (content, content) rest
       request_failed meth uri
         (Unexpected_status_code { code ; content ; media_type })
   | `Method_not_allowed allowed ->
-      let allowed = List.filter_map RPC.meth_of_string allowed in
+      let allowed = List.filter_map RPC_service.meth_of_string allowed in
       request_failed meth uri (Method_not_allowed allowed)
   | `Unsupported_media_type ->
       let media = Option.map media ~f:Media_type.name in
@@ -310,7 +310,7 @@ let handle accept (meth, uri, ans) =
       Cohttp_lwt.Body.to_string content >>= fun content ->
        request_failed meth uri (Unexpected_status_code { code ; content ; media_type })
   | `Method_not_allowed allowed ->
-      let allowed = List.filter_map RPC.meth_of_string allowed in
+      let allowed = List.filter_map RPC_service.meth_of_string allowed in
       request_failed meth uri (Method_not_allowed allowed)
   | `Unsupported_media_type ->
       let name =
@@ -340,7 +340,7 @@ let handle accept (meth, uri, ans) =
 
 let call_streamed_service
     (type p q i o )
-    accept ?logger ~base (service : (_,_,p,q,i,o,_) RPC.Service.t)
+    accept ?logger ~base (service : (_,_,p,q,i,o,_) RPC_service.t)
     ~on_chunk ~on_close
     (params : p) (query : q) (body : i) : (unit -> unit) tzresult Lwt.t =
   Client.call_streamed_service
@@ -350,7 +350,7 @@ let call_streamed_service
 
 let call_service
     (type p q i o )
-    accept ?logger ~base (service : (_,_,p,q,i,o,_) RPC.Service.t)
+    accept ?logger ~base (service : (_,_,p,q,i,o,_) RPC_service.t)
     (params : p)
     (query : q) (body : i) : o tzresult Lwt.t =
   Client.call_service

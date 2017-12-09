@@ -34,9 +34,9 @@ let wrap_tzerror encoding =
 module Forge = struct
   let block custom_root =
     let open Data_encoding in
-    RPC.Service.post_service
+    RPC_service.post_service
       ~description: "Forge a block"
-      ~query: RPC.Query.empty
+      ~query: RPC_query.empty
       ~input:
         (merge_objs
            (obj6
@@ -49,7 +49,7 @@ module Forge = struct
            Data.Command.encoding)
       ~output: (obj1 (req "payload" bytes))
       ~error: Data_encoding.empty
-      RPC.Path.(custom_root / "helpers" / "forge" / "block")
+      RPC_path.(custom_root / "helpers" / "forge" / "block")
 end
 
 let int64_to_bytes i =
@@ -60,16 +60,16 @@ let int64_to_bytes i =
 let operations_hash =
   Operation_list_list_hash.compute []
 
-let rpc_services : Updater.rpc_context RPC.Directory.t =
-  let dir = RPC.Directory.empty in
+let rpc_services : Updater.rpc_context RPC_directory.t =
+  let dir = RPC_directory.empty in
   let dir =
-    RPC.Directory.register
+    RPC_directory.register
       dir
-      (Forge.block RPC.Path.open_root)
+      (Forge.block RPC_path.open_root)
       (fun _ctxt () ((_net_id, level, proto_level, predecessor,
                       timestamp, fitness), command) ->
         let shell = { Block_header.level ; proto_level ; predecessor ;
                       timestamp ; fitness ; validation_passes = 0 ; operations_hash } in
         let bytes = Data.Command.forge shell command in
-        RPC.Answer.return bytes) in
+        RPC_answer.return bytes) in
   dir

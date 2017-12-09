@@ -31,8 +31,9 @@ let main () =
         port = parsed_config_file.node_port ;
         tls = parsed_config_file.tls ;
       } in
+      let ctxt = new Client_rpcs.rpc rpc_config in
       begin
-        Client_node_rpcs.Blocks.protocol (new Client_rpcs.rpc rpc_config) parsed_args.block >>= function
+        Client_node_rpcs.Blocks.protocol ctxt parsed_args.block >>= function
         | Ok version -> begin
             match parsed_args.protocol with
             | None ->

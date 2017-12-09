@@ -40,7 +40,12 @@
     ;; Tezos specifics
     v1/tezos_data.mli
     v1/context.mli
-    v1/RPC.mli
+    v1/RPC_arg.mli
+    v1/RPC_path.mli
+    v1/RPC_query.mli
+    v1/RPC_service.mli
+    v1/RPC_answer.mli
+    v1/RPC_directory.mli
     v1/updater.mli
 
   ))

@@ -17,7 +17,7 @@ let arg =
     match Int32.of_string str with
     | exception _ -> Error "Cannot parse cycle"
     | cycle -> Ok cycle in
-  RPC.Arg.make
+  RPC_arg.make
     ~descr:"A cycle integer"
     ~name: "block_cycle"
     ~construct

@@ -7,11 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
-module Directory :
-  (module type of struct include Resto_directory.Make(RPC.Data) end)
-include (module type of struct include Resto_directory end)
-
 (** Typed RPC services: server implementation. *)
 
 type cors = {
@@ -28,7 +23,7 @@ val launch :
   ?cors:cors ->
   media_types:Media_type.t list ->
   Conduit_lwt_unix.server ->
-  unit Directory.t ->
+  unit RPC_directory.t ->
   server Lwt.t
 
 (** Kill an RPC server. *)

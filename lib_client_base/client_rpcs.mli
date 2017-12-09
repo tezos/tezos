@@ -25,28 +25,28 @@ and logger =
 
 class type ctxt = object
   method get_json :
-    RPC.meth ->
+    RPC_service.meth ->
     string list -> Data_encoding.json ->
     Data_encoding.json tzresult Lwt.t
   method get_streamed_json :
-    RPC.meth ->
+    RPC_service.meth ->
     string list ->
     Data_encoding.json ->
     Data_encoding.json tzresult Lwt_stream.t tzresult Lwt.t
   method make_request :
     (Uri.t -> Data_encoding.json -> 'a Lwt.t) ->
-    RPC.meth ->
+    RPC_service.meth ->
     string list ->
     Data_encoding.json ->
     ('a * Cohttp.Code.status_code * Cohttp_lwt.Body.t) tzresult Lwt.t
   method parse_answer :
     'meth 'params 'input 'output.
-    ([< Resto.meth ] as 'meth, unit, 'params, unit, 'input, 'output, unit) RPC.Service.t ->
+    ([< Resto.meth ] as 'meth, unit, 'params, unit, 'input, 'output, unit) RPC_service.t ->
     string list ->
     Data_encoding.json -> 'output tzresult Lwt.t
   method parse_err_answer :
     'meth 'params 'input 'output.
-    ([< Resto.meth ] as 'meth, unit, 'params, unit, 'input, 'output tzresult, unit) RPC.Service.t ->
+    ([< Resto.meth ] as 'meth, unit, 'params, unit, 'input, 'output tzresult, unit) RPC_service.t ->
     string list ->
     Data_encoding.json -> 'output tzresult Lwt.t
 end
@@ -62,56 +62,56 @@ val call_service0:
   #ctxt ->
   ([ `POST ], unit,
    unit, unit, 'i,
-   'o, unit) RPC.Service.t ->
+   'o, unit) RPC_service.t ->
   'i -> 'o tzresult Lwt.t
 
 val call_service1:
   #ctxt ->
   ([ `POST ], unit,
    unit * 'a, unit, 'i,
-   'o, unit) RPC.Service.t ->
+   'o, unit) RPC_service.t ->
   'a -> 'i -> 'o tzresult Lwt.t
 
 val call_service2:
   #ctxt ->
   ([ `POST ], unit,
    (unit * 'a) * 'b, unit, 'i,
-   'o, unit) RPC.Service.t ->
+   'o, unit) RPC_service.t ->
   'a -> 'b -> 'i -> 'o tzresult Lwt.t
 
 val call_streamed_service0:
   #ctxt ->
   ([ `POST ], unit,
    unit, unit, 'a,
-   'b, unit) RPC.Service.t ->
+   'b, unit) RPC_service.t ->
   'a -> 'b tzresult Lwt_stream.t tzresult Lwt.t
 
 val call_streamed_service1:
   #ctxt ->
   ([ `POST ], unit,
    unit * 'a, unit, 'b,
-   'c, unit) RPC.Service.t ->
+   'c, unit) RPC_service.t ->
   'a -> 'b -> 'c tzresult Lwt_stream.t tzresult Lwt.t
 
 val call_err_service0:
   #ctxt ->
   ([ `POST ], unit,
    unit, unit, 'i,
-   'o tzresult, unit) RPC.Service.t ->
+   'o tzresult, unit) RPC_service.t ->
   'i -> 'o tzresult Lwt.t
 
 val call_err_service1:
   #ctxt ->
   ([ `POST ], unit,
    unit * 'a, unit, 'i,
-   'o tzresult, unit) RPC.Service.t ->
+   'o tzresult, unit) RPC_service.t ->
   'a -> 'i -> 'o tzresult Lwt.t
 
 val call_err_service2:
   #ctxt ->
   ([ `POST ], unit,
    (unit * 'a) * 'b, unit, 'i,
-   'o tzresult, unit) RPC.Service.t ->
+   'o tzresult, unit) RPC_service.t ->
   'a -> 'b -> 'i -> 'o tzresult Lwt.t
 
 type block = Node_rpc_services.Blocks.block

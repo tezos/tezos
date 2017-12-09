@@ -7,21 +7,23 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = Resto_cohttp.Media_type.Make(RPC_encoding).t = {
-  name: Cohttp.Accept.media_range ;
-  q: int option ;
-  pp: 'a. 'a Data_encoding.t -> Format.formatter -> string -> unit ;
-  construct: 'a. 'a Data_encoding.t -> 'a -> string ;
-  destruct: 'a. 'a Data_encoding.t -> string -> ('a, string) result ;
+(** Return type for service handler *)
+type ('o, 'e) t =
+  [ `Ok of 'o (* 200 *)
+  | `OkStream of 'o stream (* 200 *)
+  | `Created of string option (* 201 *)
+  | `No_content (* 204 *)
+  | `Unauthorized of 'e option (* 401 *)
+  | `Forbidden of 'e option (* 403 *)
+  | `Not_found of 'e option (* 404 *)
+  | `Conflict of 'e option (* 409 *)
+  | `Error of 'e option (* 500 *)
+  ]
+
+and 'a stream = {
+  next: unit -> 'a option Lwt.t ;
+  shutdown: unit -> unit ;
 }
 
-val name : t -> string
-
-val json : t
-val octet_stream : t
-
-val all_media_types : t list
-
-
-val accept_header : t list -> string
-val first_complete_media : t list -> ((string * string) * t) option
+val return: 'o -> ('o, 'e) t Lwt.t
+val return_stream: 'o stream -> ('o, 'e) t Lwt.t

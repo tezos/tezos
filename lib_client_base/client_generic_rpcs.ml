@@ -171,17 +171,17 @@ let editor_fill_in schema =
 (*-- Nice list display ------------------------------------------------------*)
 
 let rec count =
-  let open RPC.Description in
+  let open RPC_description in
   function
   | Empty -> 0
   | Dynamic _ -> 1
   | Static { services ; subdirs } ->
-      let service = RPC.MethMap.cardinal services in
+      let service = RPC_service.MethMap.cardinal services in
       let subdirs =
         match subdirs with
         | None -> 0
         | Some (Suffixes subdirs) ->
-            RPC.StringMap.fold (fun _ t r -> r + count t) subdirs 0
+            Resto.StringMap.fold (fun _ t r -> r + count t) subdirs 0
         | Some (Arg (_, subdir)) -> count subdir in
       service + subdirs
 
@@ -191,10 +191,10 @@ let list url (cctxt : Client_commands.full_context) =
   let args = String.split '/' url in
   Client_node_rpcs.describe cctxt
     ~recurse:true args >>=? fun tree ->
-  let open RPC.Description in
+  let open RPC_description in
   let collected_args = ref [] in
   let collect arg =
-    if not (arg.RPC.Arg.descr <> None && List.mem arg !collected_args) then
+    if not (arg.RPC_arg.descr <> None && List.mem arg !collected_args) then
       collected_args := arg :: !collected_args in
   let display_paragraph ppf description =
     Format.fprintf ppf "@,    @[%a@]"
@@ -202,14 +202,14 @@ let list url (cctxt : Client_commands.full_context) =
       (String.split ' ' description)
   in
   let display_arg ppf arg =
-    match arg.RPC.Arg.descr with
-    | None -> Format.fprintf ppf "%s" arg.RPC.Arg.name
+    match arg.RPC_arg.descr with
+    | None -> Format.fprintf ppf "%s" arg.RPC_arg.name
     | Some descr ->
-        Format.fprintf ppf "<%s>%a" arg.RPC.Arg.name display_paragraph descr
+        Format.fprintf ppf "<%s>%a" arg.RPC_arg.name display_paragraph descr
   in
   let display_service ppf (_path, tpath, service) =
     Format.fprintf ppf "- %s /%s"
-      (RPC.string_of_meth service.meth)
+      (RPC_service.string_of_meth service.meth)
       (String.concat "/" tpath) ;
     match service.description with
     | None | Some "" -> ()
@@ -219,7 +219,7 @@ let list url (cctxt : Client_commands.full_context) =
     Format.pp_print_list
       (fun ppf (_,s) -> display_service ppf (_path, tpath, s))
       ppf
-      (RPC.MethMap.bindings services)
+      (RPC_service.MethMap.bindings services)
   in
   let rec display ppf (path, tpath, tree) =
     match tree with
@@ -233,7 +233,7 @@ let list url (cctxt : Client_commands.full_context) =
     | Static { services ; subdirs = None } ->
         display_services ppf (path, tpath, services)
     | Static { services ; subdirs = Some (Suffixes subdirs) } -> begin
-        match RPC.MethMap.cardinal services, RPC.StringMap.bindings subdirs with
+        match RPC_service.MethMap.cardinal services, Resto.StringMap.bindings subdirs with
         | 0, [] -> ()
         | 0, [ n, solo ] ->
             display ppf (path @ [ n ], tpath @ [ n ], solo)
@@ -262,16 +262,16 @@ let list url (cctxt : Client_commands.full_context) =
               items
       end
     | Static { services ; subdirs = Some (Arg (arg, solo)) }
-      when RPC.MethMap.cardinal services = 0 ->
+      when RPC_service.MethMap.cardinal services = 0 ->
         collect arg ;
-        let name = Printf.sprintf "<%s>" arg.RPC.Arg.name in
+        let name = Printf.sprintf "<%s>" arg.RPC_arg.name in
         display ppf (path @ [ name ], tpath @ [ name ], solo)
     | Static { services;
                subdirs = Some (Arg (arg, solo)) } ->
         collect arg ;
         display_services ppf (path, tpath, services) ;
         Format.fprintf ppf "@," ;
-        let name = Printf.sprintf "<%s>" arg.RPC.Arg.name in
+        let name = Printf.sprintf "<%s>" arg.RPC_arg.name in
         display ppf (path @ [ name ], tpath @ [ name ], solo)
   and display_list tpath =
     Format.pp_print_list
@@ -288,10 +288,10 @@ let list url (cctxt : Client_commands.full_context) =
 
 let schema url (cctxt : Client_commands.full_context) =
   let args = String.split '/' url in
-  let open RPC.Description in
+  let open RPC_description in
   Client_node_rpcs.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
-      match RPC.MethMap.find `POST services with
+      match RPC_service.MethMap.find `POST services with
       | exception Not_found ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
@@ -313,10 +313,10 @@ let schema url (cctxt : Client_commands.full_context) =
 
 let format url (cctxt : #Client_commands.logging_rpcs) =
   let args = String.split '/' url in
-  let open RPC.Description in
+  let open RPC_description in
   Client_node_rpcs.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
-      match RPC.MethMap.find `POST services with
+      match RPC_service.MethMap.find `POST services with
       | exception Not_found ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
@@ -352,10 +352,10 @@ let fill_in schema =
 
 let call url (cctxt : Client_commands.full_context) =
   let args = String.split '/' url in
-  let open RPC.Description in
+  let open RPC_description in
   Client_node_rpcs.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
-      match RPC.MethMap.find `POST services with
+      match RPC_service.MethMap.find `POST services with
       | exception Not_found ->
           cctxt#message
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->

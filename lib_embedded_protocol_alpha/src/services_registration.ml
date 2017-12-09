@@ -26,34 +26,34 @@ let rpc_init
   Tezos_context.init ~level ~timestamp ~fitness context >>=? fun context ->
   return { block_hash ; block_header ; operation_hashes ; operations ; context }
 
-let rpc_services = ref (RPC.Directory.empty : Updater.rpc_context RPC.Directory.t)
+let rpc_services = ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
 
 let register0_fullctxt s f =
   rpc_services :=
-    RPC.Directory.register !rpc_services (s RPC.Path.open_root)
+    RPC_directory.register !rpc_services (s RPC_path.open_root)
       (fun ctxt q () ->
          ( rpc_init ctxt >>=? fun ctxt ->
-           f ctxt q) >>= RPC.Answer.return)
+           f ctxt q) >>= RPC_answer.return)
 let register0 s f = register0_fullctxt s (fun { context ; _ } -> f context)
 
 let register1_fullctxt s f =
   rpc_services :=
-    RPC.Directory.register !rpc_services (s RPC.Path.open_root)
+    RPC_directory.register !rpc_services (s RPC_path.open_root)
       (fun ctxt q arg ->
          ( rpc_init ctxt >>=? fun ctxt ->
-           f ctxt q arg ) >>= RPC.Answer.return)
+           f ctxt q arg ) >>= RPC_answer.return)
 let register1 s f = register1_fullctxt s (fun { context ; _ } x -> f context x)
 let register1_noctxt s f =
   rpc_services :=
-    RPC.Directory.register !rpc_services (s RPC.Path.open_root)
-      (fun _ q arg -> f q arg >>= RPC.Answer.return)
+    RPC_directory.register !rpc_services (s RPC_path.open_root)
+      (fun _ q arg -> f q arg >>= RPC_answer.return)
 
 let register2_fullctxt s f =
   rpc_services :=
-    RPC.Directory.register !rpc_services (s RPC.Path.open_root)
+    RPC_directory.register !rpc_services (s RPC_path.open_root)
       (fun (ctxt, arg1) q arg2 ->
          ( rpc_init ctxt >>=? fun ctxt ->
-           f ctxt q arg1 arg2 ) >>= RPC.Answer.return)
+           f ctxt q arg1 arg2 ) >>= RPC_answer.return)
 let register2 s f = register2_fullctxt s (fun { context ; _ } q x y -> f context q x y)
 
 
@@ -214,12 +214,12 @@ let () =
 let () =
   let register2 s f =
     rpc_services :=
-      RPC.Directory.register !rpc_services (s RPC.Path.open_root)
+      RPC_directory.register !rpc_services (s RPC_path.open_root)
         (fun (ctxt, contract) () arg ->
            ( rpc_init ctxt >>=? fun { context = ctxt ; _ } ->
              Contract.exists ctxt contract >>=? function
              | true -> f ctxt contract arg
-             | false -> raise Not_found ) >>= RPC.Answer.return) in
+             | false -> raise Not_found ) >>= RPC_answer.return) in
   let register2' s f = register2 s (fun ctxt a1 () -> f ctxt a1) in
   register2' Services.Context.Contract.balance Contract.get_balance ;
   register2' Services.Context.Contract.manager Contract.get_manager ;

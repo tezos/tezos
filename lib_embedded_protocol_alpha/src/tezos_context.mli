@@ -83,7 +83,7 @@ module Raw_level : sig
 
   include BASIC_DATA
   type raw_level = t
-  val arg: raw_level RPC.Arg.arg
+  val arg: raw_level RPC_arg.arg
 
   val diff: raw_level -> raw_level -> int32
 
@@ -98,7 +98,7 @@ module Cycle : sig
 
   include BASIC_DATA
   type cycle = t
-  val arg: cycle RPC.Arg.arg
+  val arg: cycle RPC_arg.arg
 
   val root: cycle
   val succ: cycle -> cycle
@@ -304,7 +304,7 @@ module Voting_period : sig
 
   include BASIC_DATA
   type voting_period = t
-  val arg: voting_period RPC.Arg.arg
+  val arg: voting_period RPC_arg.arg
 
   val root: voting_period
   val succ: voting_period -> voting_period
@@ -403,7 +403,7 @@ module Contract : sig
 
   include BASIC_DATA
   type contract = t
-  val arg: contract RPC.Arg.arg
+  val arg: contract RPC_arg.arg
 
   val to_b58check: contract -> string
   val of_b58check: string -> contract tzresult

@@ -522,8 +522,8 @@ module RPC = struct
     | Some rpc_context ->
         Context.get_protocol rpc_context.context >>= fun protocol_hash ->
         let (module Proto) = State.Registred_protocol.get_exn protocol_hash in
-        let dir = RPC_server.Directory.map (fun () -> rpc_context) Proto.rpc_services in
-        Lwt.return (Some (RPC_server.Directory.map (fun _ -> ()) dir))
+        let dir = RPC_directory.map (fun () -> rpc_context) Proto.rpc_services in
+        Lwt.return (Some (RPC_directory.map (fun _ -> ()) dir))
 
   let heads node =
     let net_state = Net_validator.net_state node.mainnet_validator in
@@ -627,7 +627,7 @@ module RPC = struct
         ]
       end in
     let shutdown () = Lwt_watcher.shutdown stopper in
-    RPC_server.Answer.{ next ; shutdown }
+    RPC_answer.{ next ; shutdown }
 
   module Network = struct
 

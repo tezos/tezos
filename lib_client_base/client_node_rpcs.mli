@@ -177,4 +177,4 @@ val complete:
 val describe:
   #Client_rpcs.ctxt ->
   ?recurse:bool -> string list ->
-  Data_encoding.json_schema RPC.Description.directory tzresult Lwt.t
+  Data_encoding.json_schema RPC_description.directory tzresult Lwt.t

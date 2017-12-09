@@ -14,7 +14,8 @@ val string_of_meth: [< meth ] -> string
 val meth_of_string: string -> [> meth ] option
 
 module MethMap : Map.S with type key = meth
-module StringMap : Map.S with type key = string
+module StringMap : Map.S with type 'a t = 'a Map.Make(String).t
+                          and type key = string
 
 (** Typed path argument. *)
 module Arg : sig

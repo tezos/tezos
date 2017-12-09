@@ -18,7 +18,7 @@ let arg =
     match Int32.of_string str with
     | exception _ -> Error "Cannot parse voting period"
     | voting_period -> Ok voting_period in
-  RPC.Arg.make
+  RPC_arg.make
     ~descr:"A voting period"
     ~name: "voting_period"
     ~construct

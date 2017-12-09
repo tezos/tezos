@@ -41,7 +41,7 @@ type rest_error =
   | Connection_failed of string
   | Not_found
   | Bad_request of string
-  | Method_not_allowed of RPC.meth list
+  | Method_not_allowed of RPC_service.meth list
   | Unsupported_media_type of string option
   | Not_acceptable of { proposed: string ; acceptable: string }
   | Unexpected_status_code of { code: Cohttp.Code.status_code ;
@@ -55,7 +55,7 @@ type rest_error =
   | Generic_error (* temporary *)
 
 type error +=
-  | Request_failed of { meth: RPC.meth ;
+  | Request_failed of { meth: RPC_service.meth ;
                         uri: Uri.t ;
                         error: rest_error }
 
@@ -64,27 +64,27 @@ val generic_call :
   ?accept:Media_type.t list ->
   ?body:Cohttp_lwt.Body.t ->
   ?media:Media_type.t ->
-  [< RPC.meth ] ->
+  [< RPC_service.meth ] ->
   Uri.t -> (content, content) rest_result Lwt.t
 
 val generic_json_call :
   ?logger:logger ->
   ?body:Data_encoding.json ->
-  [< RPC.meth ] -> Uri.t ->
+  [< RPC_service.meth ] -> Uri.t ->
   (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t
 
 val call_service :
   Media_type.t list ->
   ?logger:logger ->
   base:Uri.t ->
-  ([< Resto.meth ], unit, 'p, 'q, 'i, 'o, 'e) RPC.Service.t ->
+  ([< Resto.meth ], unit, 'p, 'q, 'i, 'o, 'e) RPC_service.t ->
   'p -> 'q -> 'i -> 'o tzresult Lwt.t
 
 val call_streamed_service :
   Media_type.t list ->
   ?logger:logger ->
   base:Uri.t ->
-  ([< Resto.meth ], unit, 'p, 'q, 'i, 'o, 'e) RPC.Service.t ->
+  ([< Resto.meth ], unit, 'p, 'q, 'i, 'o, 'e) RPC_service.t ->
   on_chunk: ('o -> unit) ->
   on_close: (unit -> unit) ->
   'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t

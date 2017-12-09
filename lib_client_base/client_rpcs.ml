@@ -188,27 +188,27 @@ let fail config err = fail (RPC_error (config, err))
 
 class type ctxt = object
   method get_json :
-    RPC.meth ->
+    RPC_service.meth ->
     string list -> Data_encoding.json -> Data_encoding.json tzresult Lwt.t
   method get_streamed_json :
-    RPC.meth ->
+    RPC_service.meth ->
     string list ->
     Data_encoding.json ->
     Data_encoding.json tzresult Lwt_stream.t tzresult Lwt.t
   method make_request :
     (Uri.t -> Data_encoding.json -> 'a Lwt.t) ->
-    RPC.meth ->
+    RPC_service.meth ->
     string list ->
     Data_encoding.json ->
     ('a * Cohttp.Code.status_code * Cohttp_lwt.Body.t) tzresult Lwt.t
   method parse_answer :
     'meth 'params 'input 'output.
-    ([< Resto.meth ] as 'meth, unit, 'params, unit, 'input, 'output, unit) RPC.Service.t ->
+    ([< Resto.meth ] as 'meth, unit, 'params, unit, 'input, 'output, unit) RPC_service.t ->
     string list ->
     Data_encoding.json -> 'output tzresult Lwt.t
   method parse_err_answer :
     'meth 'params 'input 'output.
-    ([< Resto.meth ] as 'meth, unit, 'params, unit, 'input, 'output tzresult, unit) RPC.Service.t ->
+    ([< Resto.meth ] as 'meth, unit, 'params, unit, 'input, 'output tzresult, unit) RPC_service.t ->
     string list ->
     Data_encoding.json -> 'output tzresult Lwt.t
 end
@@ -217,7 +217,7 @@ class rpc config : ctxt = object (self)
   val config = config
   method make_request :
     type a. (Uri.t -> Data_encoding.json -> a Lwt.t) ->
-    RPC.meth ->
+    RPC_service.meth ->
     string list ->
     Data_encoding.json ->
     (a * Cohttp.Code.status_code * Cohttp_lwt.Body.t) tzresult Lwt.t =
@@ -276,11 +276,11 @@ class rpc config : ctxt = object (self)
 
   method parse_answer
     : 'm 'p 'i 'o.
-      ([< Resto.meth ] as 'm, unit, 'p, unit, 'i, 'o, unit) RPC.Service.t ->
+      ([< Resto.meth ] as 'm, unit, 'p, unit, 'i, 'o, unit) RPC_service.t ->
       string list ->
       Data_encoding.json -> 'o tzresult Lwt.t =
     fun service path json ->
-      match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
+      match Data_encoding.Json.destruct (RPC_service.output_encoding service) json with
       | exception msg ->
           let msg =
             Format.asprintf "%a" (fun x -> Data_encoding.Json.print_error x) msg in
@@ -288,7 +288,7 @@ class rpc config : ctxt = object (self)
       | v -> return v
 
 
-  method get_json : RPC.meth ->
+  method get_json : RPC_service.meth ->
     string list -> Data_encoding.json -> Data_encoding.json tzresult Lwt.t =
     fun meth service json ->
       let Logger logger = config.logger in
@@ -314,11 +314,11 @@ class rpc config : ctxt = object (self)
 
   method parse_err_answer
     : 'm 'p 'i 'o.
-      ([< Resto.meth ] as 'm, unit, 'p, unit, 'i, 'o tzresult, unit) RPC.Service.t ->
+      ([< Resto.meth ] as 'm, unit, 'p, unit, 'i, 'o tzresult, unit) RPC_service.t ->
       string list ->
       Data_encoding.json -> 'o tzresult Lwt.t =
     fun service path json ->
-      match Data_encoding.Json.destruct (RPC.Service.output_encoding service) json with
+      match Data_encoding.Json.destruct (RPC_service.output_encoding service) json with
       | exception msg -> (* TODO print_error *)
           let msg =
             Format.asprintf "%a" (fun x -> Data_encoding.Json.print_error x) msg in
@@ -346,13 +346,13 @@ let make_request config log_request meth service json =
     fail config (Connection_failed msg)
   end
 
-let forge_request (type i) (service: (_,_,_,_,i,_,_) RPC.Service.t) params body =
-  let { RPC.Service.meth ; uri } =
-    RPC.Service.forge_request service params () in
+let forge_request (type i) (service: (_,_,_,_,i,_,_) RPC_service.t) params body =
+  let { RPC_service.meth ; uri } =
+    RPC_service.forge_request service params () in
   let json =
-    match RPC.Service.input_encoding service with
-    | RPC.Service.No_input -> assert false (* TODO *)
-    | RPC.Service.Input input -> Data_encoding.Json.construct input body in
+    match RPC_service.input_encoding service with
+    | RPC_service.No_input -> assert false (* TODO *)
+    | RPC_service.Input input -> Data_encoding.Json.construct input body in
   let path = String.split_path (Uri.path uri) in (* Temporary *)
   meth, path, json
 

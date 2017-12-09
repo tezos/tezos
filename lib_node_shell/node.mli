@@ -89,7 +89,7 @@ module RPC : sig
     t -> (Protocol_hash.t * Protocol.t) Lwt_stream.t * Lwt_watcher.stopper
 
   val context_dir:
-    t -> block -> 'a RPC_server.Directory.t option Lwt.t
+    t -> block -> 'a RPC_directory.t option Lwt.t
 
   val preapply:
     t -> block ->
@@ -98,13 +98,13 @@ module RPC : sig
     (Block_header.shell_header * error Preapply_result.t) tzresult Lwt.t
 
   val context_dir:
-    t -> block -> 'a RPC_server.Directory.t option Lwt.t
+    t -> block -> 'a RPC_directory.t option Lwt.t
 
   val complete:
     t -> ?block:block -> string -> string list Lwt.t
 
   val bootstrapped:
-    t -> (Block_hash.t * Time.t) RPC_server.Answer.stream
+    t -> (Block_hash.t * Time.t) RPC_answer.stream
 
   module Network : sig
 

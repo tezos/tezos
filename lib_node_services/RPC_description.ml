@@ -7,21 +7,5 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = Resto_cohttp.Media_type.Make(RPC_encoding).t = {
-  name: Cohttp.Accept.media_range ;
-  q: int option ;
-  pp: 'a. 'a Data_encoding.t -> Format.formatter -> string -> unit ;
-  construct: 'a. 'a Data_encoding.t -> 'a -> string ;
-  destruct: 'a. 'a Data_encoding.t -> string -> ('a, string) result ;
-}
+include Resto.Description
 
-val name : t -> string
-
-val json : t
-val octet_stream : t
-
-val all_media_types : t list
-
-
-val accept_header : t list -> string
-val first_complete_media : t list -> ((string * string) * t) option

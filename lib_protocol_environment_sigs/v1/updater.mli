@@ -132,7 +132,7 @@ module type PROTOCOL = sig
     validation_state -> validation_result tzresult Lwt.t
 
   (** The list of remote procedures exported by this implementation *)
-  val rpc_services: rpc_context RPC.Directory.t
+  val rpc_services: rpc_context RPC_directory.t
 
   (** An ad-hoc context patcher. It used only for debugging protocol
       while running in the "sandbox" mode. This function is never used

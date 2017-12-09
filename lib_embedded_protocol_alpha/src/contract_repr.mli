@@ -58,7 +58,7 @@ val encoding : contract Data_encoding.t
 
 val origination_nonce_encoding : origination_nonce Data_encoding.t
 
-val arg : contract RPC.Arg.arg
+val arg : contract RPC_arg.arg
 
 module Index : sig
   type t = contract

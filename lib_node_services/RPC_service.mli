@@ -7,21 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t = Resto_cohttp.Media_type.Make(RPC_encoding).t = {
-  name: Cohttp.Accept.media_range ;
-  q: int option ;
-  pp: 'a. 'a Data_encoding.t -> Format.formatter -> string -> unit ;
-  construct: 'a. 'a Data_encoding.t -> 'a -> string ;
-  destruct: 'a. 'a Data_encoding.t -> string -> ('a, string) result ;
-}
+type meth = [ `GET | `POST | `DELETE | `PUT | `PATCH ]
 
-val name : t -> string
+val string_of_meth: [< meth ] -> string
+val meth_of_string: string -> [> meth ] option
+val meth_encoding: meth Data_encoding.t
 
-val json : t
-val octet_stream : t
+module MethMap = Resto.MethMap
 
-val all_media_types : t list
-
-
-val accept_header : t list -> string
-val first_complete_media : t list -> ((string * string) * t) option
+include (module type of struct include Resto.MakeService(RPC_encoding) end)

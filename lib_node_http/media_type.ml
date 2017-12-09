@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Resto_cohttp.Media_type.Make(RPC.Data)
+include Resto_cohttp.Media_type.Make(RPC_encoding)
 
 let json  = {
   name = Cohttp.Accept.MediaType ("application", "json") ;

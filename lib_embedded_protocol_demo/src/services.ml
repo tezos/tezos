@@ -32,34 +32,34 @@ let wrap_tzerror encoding =
   ]
 
 let echo_service custom_root =
-  RPC.Service.post_service
+  RPC_service.post_service
     ~description: "An dummy echo service"
-    ~query: RPC.Query.empty
+    ~query: RPC_query.empty
     ~input: Data_encoding.(obj1 (req "msg" string))
     ~output: Data_encoding.(obj1 (req "msg" string))
     ~error: Data_encoding.empty
-    RPC.Path.(custom_root / "echo")
+    RPC_path.(custom_root / "echo")
 
 let failing_service custom_root =
-  RPC.Service.post_service
+  RPC_service.post_service
     ~description: "A failing service"
-    ~query: RPC.Query.empty
+    ~query: RPC_query.empty
     ~input: Data_encoding.(obj1 (req "arg" int31))
     ~output: (wrap_tzerror Data_encoding.empty)
     ~error: Data_encoding.empty
-    RPC.Path.(custom_root / "failing")
+    RPC_path.(custom_root / "failing")
 
-let rpc_services : Updater.rpc_context RPC.Directory.t = let dir = RPC.Directory.empty in
+let rpc_services : Updater.rpc_context RPC_directory.t = let dir = RPC_directory.empty in
   let dir =
-    RPC.Directory.register
+    RPC_directory.register
       dir
-      (failing_service RPC.Path.open_root)
-      (fun _ctxt () x -> Error.demo_error x >>= RPC.Answer.return)
+      (failing_service RPC_path.open_root)
+      (fun _ctxt () x -> Error.demo_error x >>= RPC_answer.return)
   in
   let dir =
-    RPC.Directory.register
+    RPC_directory.register
       dir
-      (echo_service RPC.Path.open_root)
-      (fun _ctxt () x -> RPC.Answer.return x)
+      (echo_service RPC_path.open_root)
+      (fun _ctxt () x -> RPC_answer.return x)
   in
   dir

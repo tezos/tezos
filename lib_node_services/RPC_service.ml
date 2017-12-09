@@ -7,12 +7,21 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Typed RPC services: definition, binding and dispatch. *)
+type meth = [ `GET | `POST | `DELETE | `PUT | `PATCH ]
 
-module Data : Resto.ENCODING with type 'a t = 'a Data_encoding.t
-                              and type schema = Data_encoding.json_schema
+let string_of_meth = Resto.string_of_meth
+let meth_of_string = Resto.meth_of_string
 
-include (module type of struct include Resto end)
-module Service : (module type of struct include Resto.MakeService(Data) end)
+let meth_encoding =
+  let open Data_encoding in
+  conv
+    string_of_meth
+    (fun m ->
+       match meth_of_string m with
+       | None -> Pervasives.failwith "Cannot parse methods"
+       | Some s -> s)
+    string
 
-val meth_encoding: meth Data_encoding.t
+module MethMap = Resto.MethMap
+
+include Resto.MakeService(RPC_encoding)

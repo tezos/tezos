@@ -11,7 +11,7 @@ type t
 type cycle = t
 include Compare.S with type t := t
 val encoding: cycle Data_encoding.t
-val arg: cycle RPC.Arg.arg
+val arg: cycle RPC_arg.arg
 val pp: Format.formatter -> cycle -> unit
 
 val root: cycle

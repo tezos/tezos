@@ -125,7 +125,7 @@ let arg =
     match of_b58check hash with
     | Error _ -> Error "Cannot parse contract id"
     | Ok contract -> Ok contract in
-  RPC.Arg.make
+  RPC_arg.make
     ~descr: "A contract identifier encoded in b58check."
     ~name: "contract_id"
     ~construct
