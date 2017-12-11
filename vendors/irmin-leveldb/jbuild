@@ -3,4 +3,5 @@
 (library
  ((name        irmin_leveldb)
   (public_name irmin-leveldb)
-  (libraries   (irmin leveldb))))
+  (libraries   (irmin leveldb))
+  (flags (:standard -safe-string))))

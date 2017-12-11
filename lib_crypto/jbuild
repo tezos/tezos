@@ -7,7 +7,8 @@
                     -open Tezos_data_encoding
                     -open Tezos_stdlib_lwt
                     -open Tezos_rpc_base
-                    -open Tezos_error_monad__Error_monad))
+                    -open Tezos_error_monad__Error_monad
+                    -safe-string))
   (libraries (tezos-stdlib
               tezos-stdlib-lwt
               tezos-data-encoding

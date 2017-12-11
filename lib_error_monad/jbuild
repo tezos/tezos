@@ -4,7 +4,8 @@
  ((name tezos_error_monad)
   (public_name tezos-error-monad)
   (flags (:standard -open Tezos_stdlib
-                    -open Tezos_data_encoding))
+                    -open Tezos_data_encoding
+                    -safe-string))
   (libraries (tezos-stdlib
               tezos-data-encoding
               lwt))))

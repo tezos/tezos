@@ -49,6 +49,7 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
  ((name tezos_protocol_%s)
   (public_name tezos-protocol-%s)
   (library_flags (:standard -linkall %s/tezos_protocol_%s.cmx))
+  (flags (:standard -safe-string))
   (wrapped false)
   (modes (native))
   (modules (Tezos_protocol_%s_dummy))))

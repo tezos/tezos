@@ -4,7 +4,7 @@
  ((name tezos_node_p2p_base)
   (public_name tezos-node-p2p-base)
   (libraries (tezos-base))
-  (flags (:standard -open Tezos_base__TzPervasives))))
+  (flags (:standard -open Tezos_base__TzPervasives -safe-string))))
 
 (alias
  ((name runtest_indent)

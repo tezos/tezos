@@ -58,5 +58,5 @@
 (library
  ((name tezos_protocol_environment_sigs)
   (public_name tezos-protocol-environment-sigs)
-  (flags (:standard -nopervasives))
+  (flags (:standard -nopervasives -safe-string))
   (modules ("V1"))))

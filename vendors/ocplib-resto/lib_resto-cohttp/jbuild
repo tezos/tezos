@@ -3,5 +3,5 @@
 (library
  ((name resto_cohttp)
   (public_name ocplib-resto-cohttp)
-  (libraries (ocplib-resto-directory cohttp-lwt-unix))))
-
+  (libraries (ocplib-resto-directory cohttp-lwt-unix))
+  (flags (:standard -safe-string))))

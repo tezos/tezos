@@ -4,4 +4,5 @@
  ((name ezresto)
   (public_name ocplib-ezresto)
   (libraries (ocplib-resto-json))
-  (wrapped false)))
+  (wrapped false)
+  (flags (:standard -safe-string))))

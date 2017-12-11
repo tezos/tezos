@@ -6,7 +6,8 @@
   (flags (:standard -w -9-30
                     -open Tezos_stdlib
                     -open Tezos_data_encoding
-                    -open Tezos_error_monad))
+                    -open Tezos_error_monad
+                    -safe-string))
   (libraries (tezos-stdlib
               tezos-data-encoding
               tezos-error-monad
