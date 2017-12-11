@@ -1,6 +1,39 @@
 For the next reset
 ==================
 
+[Alpha]
+
+- Do not allow revealing the same endorsement twice.
+
+- Tez values now have 6 decimals instead of two. The syntax used by
+  the client and Michelson requires comma separators every three
+  digits, before and after the dot. For instance, 3 million tez and 10
+  µtez is written `3,000,000.000,01`.
+
+[Node]
+
+- Rewrite of the RPC library to handle content types, to enable binary
+  RPCs and proper HTTP verbs. The next version will probably break the
+  HTTP API.
+
+- Now that we don't use the git backend anymore, we finally updated
+  the context hashing function from SHA1 to Blake2B.
+
+[Michelson]
+
+- Set a maximum type size, as a simple solution to avoid some type
+  checker abuses where types can grow exponentially.
+
+- Annotations are now correctly handled by macros.
+
+[Build]
+
+- Split the code base into separate OPAM packages.
+
+
+Reset 2017-11-20
+==================
+
 [Alphanet]
 
 - Limit the number of faucet operations at 5 per block.
@@ -10,6 +43,8 @@ For the next reset
 - Autocomplete scripts for bash.
 
 - Smart contracts are now non spendable by default.
+
+- Add a debug command to list invalid blocks.
 
 [Node]
 
