@@ -175,16 +175,14 @@ let log_requests_switch =
 
 (* Command-line args which can be set in config file as well *)
 let addr_arg =
-  default_arg
+  arg
     ~parameter:"-addr"
     ~doc:"The IP address of the node."
-    ~default:Cfg_file.default.node_addr
     string_parameter
 let port_arg =
-  default_arg
+  arg
     ~parameter:"-port"
     ~doc:"The RPC port of the node."
-    ~default:(string_of_int Cfg_file.default.node_port)
     (parameter
        (fun _ x -> try
            return (int_of_string x)
@@ -259,6 +257,8 @@ let parse_config_args (ctx : Client_commands.full_context) argv =
               config_file (fun ppf exn -> Json_encoding.print_error ppf exn) exn ;
             exit 1 in
   let tls = cfg.tls || tls in
+  let node_addr = Option.unopt ~default:cfg.node_addr node_addr in
+  let node_port = Option.unopt ~default:cfg.node_port node_port in
   let cfg = { cfg with tls ; node_port ; node_addr } in
   if Sys.file_exists base_dir && not (Sys.is_directory base_dir) then begin
     Format.eprintf "Error: %s is not a directory.@." base_dir ;
