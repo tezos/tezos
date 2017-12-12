@@ -271,10 +271,10 @@ opam:17:tezos-micheline:
   variables:
     package: tezos-micheline
 
-opam:18:tezos-node-http:
+opam:18:tezos-rpc-http:
   <<: *opam_definition
   variables:
-    package: tezos-node-http
+    package: tezos-rpc-http
 
 opam:19:tezos-protocol-compiler:
   <<: *opam_definition
