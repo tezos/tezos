@@ -318,6 +318,9 @@ and ('bef, 'aft) instr =
     (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t *
                                                                   (('p * 'g, 'r * 'g) lambda * ('g * 'rest)))))),
      ('p, 'r) typed_contract * 'rest) instr
+  | Create_contract_literal : 'g ty * 'p ty * 'r ty * ('p * 'g, 'r * 'g) lambda  ->
+    (public_key_hash * (public_key_hash option * (bool * (bool * (Tez.t * ('g * 'rest))))),
+     ('p, 'r) typed_contract * 'rest) instr
   | Now :
       ('rest, Script_timestamp.t * 'rest) instr
   | Balance :

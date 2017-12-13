@@ -156,6 +156,35 @@ let rec interp
             let gas = Gas.consume gas (cost x1 x2) in
             Gas.check gas >>=? fun () ->
             logged_return descr (Item (Script_int.of_int @@ op x1 x2, rest), gas, ctxt) in
+        let create_contract :
+          type param return rest storage.
+          (_, (param, return) typed_contract * rest) descr ->
+          manager:public_key_hash -> delegate:public_key_hash option -> spendable:bool ->
+          delegatable:bool -> credit:Tez.t -> code:prim Micheline.canonical ->
+          init:storage -> param_type:param ty -> storage_type:storage ty ->
+          return_type:return ty ->
+          rest:rest stack ->
+          (((param, return) typed_contract * rest) stack * Gas.t * context * Contract.origination_nonce) tzresult Lwt.t =
+          fun descr ~manager ~delegate ~spendable ~delegatable
+            ~credit ~code ~init ~param_type ~storage_type ~return_type ~rest ->
+            let gas = Gas.consume gas Gas.Cost_of.create_contract in
+            Gas.check gas >>=? fun () ->
+            let code =
+              Micheline.strip_locations
+                (Seq (0, [ Prim (0, K_parameter, [ unparse_ty None param_type ], None) ;
+                           Prim (0, K_return, [ unparse_ty None return_type ], None) ;
+                           Prim (0, K_storage, [ unparse_ty None storage_type ], None) ;
+                           Prim (0, K_code, [ Micheline.root code ], None) ], None)) in
+            let storage = Micheline.strip_locations (unparse_data storage_type init) in
+            Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
+            Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
+            Contract.originate ctxt
+              origination
+              ~manager ~delegate ~balance
+              ~script:({ code ; storage }, (dummy_code_fee, dummy_storage_fee))
+              ~spendable ~delegatable
+            >>=? fun (ctxt, contract, origination) ->
+            logged_return descr ~origination (Item ((param_type, return_type, contract), rest), gas, ctxt) in
         let logged_return : ?origination:Contract.origination_nonce ->
           a stack * Gas.t * context ->
           (a stack * Gas.t * context * Contract.origination_nonce) tzresult Lwt.t =
@@ -674,7 +703,7 @@ let rec interp
             Gas.check gas >>=? fun () ->
             let contract = Contract.default_contract key in
             logged_return (Item ((Unit_t, Unit_t, contract), rest), gas, ctxt)
-        | Create_contract (g, p, r),
+        | Create_contract (storage_type, param_type, return_type),
           Item (manager, Item
                   (delegate, Item
                      (spendable, Item
@@ -682,24 +711,17 @@ let rec interp
                            (credit, Item
                               (Lam (_, code), Item
                                  (init, rest))))))) ->
-            let gas = Gas.consume gas Gas.Cost_of.create_contract in
-            Gas.check gas >>=? fun () ->
-            let code =
-              Micheline.strip_locations
-                (Seq (0, [ Prim (0, K_parameter, [ unparse_ty None p ], None) ;
-                           Prim (0, K_return, [ unparse_ty None r ], None) ;
-                           Prim (0, K_storage, [ unparse_ty None g ], None) ;
-                           Prim (0, K_code, [ Micheline.root code ], None) ], None)) in
-            let storage = Micheline.strip_locations (unparse_data g init) in
-            Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
-            Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
-            Contract.originate ctxt
-              origination
-              ~manager ~delegate ~balance
-              ~script:({ code ; storage }, (dummy_code_fee, dummy_storage_fee))
-              ~spendable ~delegatable
-            >>=? fun (ctxt, contract, origination) ->
-            logged_return ~origination (Item ((p, r, contract), rest), gas, ctxt)
+            create_contract descr ~manager ~delegate ~spendable ~delegatable ~credit ~code ~init
+              ~param_type ~return_type ~storage_type ~rest
+        | Create_contract_literal (storage_type, param_type, return_type, Lam (_, code)),
+          Item (manager, Item
+                  (delegate, Item
+                     (spendable, Item
+                        (delegatable, Item
+                           (credit, Item
+                              (init, rest)))))) ->
+            create_contract descr ~manager ~delegate ~spendable ~delegatable ~credit ~code ~init
+              ~param_type ~return_type ~storage_type ~rest
         | Balance, rest ->
             let gas = Gas.consume gas Gas.Cost_of.balance in
             Gas.check gas >>=? fun () ->
@@ -733,8 +755,7 @@ let rec interp
         | Amount, rest ->
             let gas = Gas.consume gas Gas.Cost_of.amount in
             Gas.check gas >>=? fun () ->
-            logged_return (Item (amount, rest), gas, ctxt)
-    in
+            logged_return (Item (amount, rest), gas, ctxt) in
     let stack = (Item (arg, Empty)) in
     begin match log with
       | None -> ()

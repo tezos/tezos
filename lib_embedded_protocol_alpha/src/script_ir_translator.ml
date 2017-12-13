@@ -236,6 +236,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | Create_account -> 0
   | Default_account -> 0
   | Create_contract _ -> 1
+  | Create_contract_literal _ -> 1
   | Now -> 0
   | Balance -> 0
   | Check_signature -> 0
@@ -979,6 +980,8 @@ let rec unparse_stack
   = function
     | Empty_t -> []
     | Item_t (ty, rest, annot) -> strip_locations (unparse_ty annot ty) :: unparse_stack rest
+
+type ex_script = Ex_script : ('a, 'b, 'c) script -> ex_script
 
 let rec parse_data
   : type a.
@@ -1814,6 +1817,39 @@ and parse_instr
         check_item_ty ginit gp loc I_CREATE_CONTRACT 6 7 >>=? fun (Eq _) ->
         return (typed loc (Create_contract (gp, p, r),
                            Item_t (Contract_t (p, r), rest, instr_annot)))
+    | Prim (loc, I_CREATE_CONTRACT, [ (Seq (seq_loc, _, annot) as code)], instr_annot),
+      Item_t
+        (Key_hash_t, Item_t
+           (Option_t Key_hash_t, Item_t
+              (Bool_t, Item_t
+                 (Bool_t, Item_t
+                    (Tez_t, Item_t
+                       (ginit, rest, _), _), _), _), _), _) ->
+        fail_unexpected_annot seq_loc annot >>=? fun () ->
+        let cannonical_code = fst @@ Micheline.extract_locations code in
+        Lwt.return (parse_toplevel cannonical_code) >>=? fun (arg_type, ret_type, storage_type, code_field) ->
+        trace
+          (Ill_formed_type (Some "parameter", cannonical_code, location arg_type))
+          (Lwt.return (parse_ty arg_type)) >>=? fun (Ex_ty arg_type, param_annot) ->
+        trace
+          (Ill_formed_type (Some "return", cannonical_code, location ret_type))
+          (Lwt.return (parse_ty ret_type)) >>=? fun (Ex_ty ret_type, _) ->
+        trace
+          (Ill_formed_type (Some "storage", cannonical_code, location storage_type))
+          (Lwt.return (parse_ty storage_type)) >>=? fun (Ex_ty storage_type, storage_annot) ->
+        let arg_type_full = Pair_t ((arg_type, default_annot ~default:default_param_annot param_annot),
+                                    (storage_type, default_annot ~default:default_storage_annot storage_annot)) in
+        let ret_type_full = Pair_t ((ret_type, None), (storage_type, None)) in
+        trace
+          (Ill_typed_contract (cannonical_code, []))
+          (parse_returning (Toplevel { storage_type }) ctxt ?type_logger (arg_type_full, None) ret_type_full code_field) >>=?
+        fun (Lam ({ bef = Item_t (arg, Empty_t, _) ;
+                    aft = Item_t (ret, Empty_t, _) ; _ }, _) as lambda) ->
+        Lwt.return @@ ty_eq arg arg_type_full >>=? fun (Eq _) ->
+        Lwt.return @@ ty_eq ret ret_type_full >>=? fun (Eq _) ->
+        Lwt.return @@ ty_eq storage_type ginit >>=? fun (Eq _) ->
+        return (typed loc (Create_contract_literal (storage_type, arg_type, ret_type, lambda),
+                           Item_t (Contract_t (arg_type, ret_type), rest, instr_annot)))
     | Prim (loc, I_NOW, [], instr_annot),
       stack ->
         return (typed loc (Now, Item_t (Timestamp_t, stack, instr_annot)))
@@ -1947,7 +1983,7 @@ and parse_contract
                let contract : (arg, ret) typed_contract =
                  (arg, ret, contract) in
                ok contract)
-        | Some { code } ->
+        | Some { code ; _ } ->
             Lwt.return
               (parse_toplevel code >>? fun (arg_type, ret_type, _, _) ->
                parse_ty arg_type >>? fun (Ex_ty targ, _) ->
@@ -2003,8 +2039,6 @@ and parse_toplevel
         | (Some _, Some _, None, _) -> error (Missing_field K_storage)
         | (Some _, Some _, Some _, None) -> error (Missing_field K_code)
         | (Some p, Some r, Some s, Some c) -> ok (p, r, s, c)
-
-type ex_script = Ex_script : ('a, 'b, 'c) script -> ex_script
 
 let parse_script
   : ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
