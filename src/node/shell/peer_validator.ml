@@ -192,12 +192,13 @@ let rec worker_loop pv =
   end >>= function
   | Ok () ->
       worker_loop pv
-  | Error (( Unknown_ancestor
-           | Block_locator.Invalid_locator _
-           | Block_validator.Invalid_block _ ) :: _) ->
+  | Error ((( Unknown_ancestor
+            | Block_locator.Invalid_locator _
+            | Block_validator.Invalid_block _ ) :: _) as errors ) ->
       (* TODO ban the peer_id... *)
       lwt_log_info "Terminating the validation worker for peer %a (kickban)."
         P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
+      lwt_log_info "%a" Error_monad.pp_print_error errors >>= fun () ->
       Canceler.cancel pv.canceler >>= fun () ->
       Lwt.return_unit
   | Error [Block_validator.Unavailable_protocol { protocol } ] -> begin
