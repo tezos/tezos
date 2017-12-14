@@ -241,7 +241,7 @@ if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
 alias tezos-client="$client" ;
 alias tezos-activate-alpha="$client -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and passes 1 and key dictator" ;
 alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-client tezos-activate-alpha tezos-client-reset" ;
-alias tezos-autocomplete="source \"$script_dir/bash-completion.sh\"" ;
+alias tezos-autocomplete="source \"$bin_dir/bash-completion.sh\"" ;
 trap tezos-client-reset EXIT ;
 EOF
 
