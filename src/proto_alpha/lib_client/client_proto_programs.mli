@@ -21,7 +21,7 @@ val run :
   input:Michelson_v1_parser.parsed ->
   Client_rpcs.block ->
   #Client_rpcs.ctxt ->
-  (Script.expr * Script.expr) tzresult Lwt.t
+  (Script.expr * Script.expr * (Script.expr * Script.expr option) list option) tzresult Lwt.t
 
 val trace :
   ?amount:Tez.t ->
@@ -30,22 +30,23 @@ val trace :
   input:Michelson_v1_parser.parsed ->
   Client_rpcs.block ->
   #Client_rpcs.ctxt ->
-  (Script.expr * Script.expr * (int * Gas.t * Script.expr list) list) tzresult Lwt.t
+  (Script.expr * Script.expr * (int * Gas.t * Script.expr list) list * (Script.expr * Script.expr option) list option) tzresult Lwt.t
+
+val print_run_result :
+  #Client_commands.logger ->
+  show_source:bool ->
+  parsed:Michelson_v1_parser.parsed ->
+  (Script_repr.expr * Script_repr.expr *
+   (Script_repr.expr * Script_repr.expr option) list option) tzresult -> unit tzresult Lwt.t
 
 val print_trace_result :
   #Client_commands.logger ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr * Script_repr.expr *
-   (int * Gas.t * Script_repr.expr list) list)
+   (int * Gas.t * Script_repr.expr list) list *
+   (Script_repr.expr * Script_repr.expr option) list option)
     tzresult -> unit tzresult Lwt.t
-
-val print_run_result :
-  #Client_commands.logger ->
-  show_source:bool ->
-  parsed:Michelson_v1_parser.parsed ->
-  (Script.expr * Script.expr) tzresult ->
-  unit tzresult Lwt.t
 
 val hash_and_sign :
   Michelson_v1_parser.parsed ->

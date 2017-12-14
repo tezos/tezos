@@ -135,12 +135,17 @@ let apply_manager_operation_content
               source destination ctxt script amount argument
               (Gas.of_int (Constants.max_gas ctxt))
             >>= function
-            | Ok (storage_res, _res, _steps, ctxt, origination_nonce) ->
+            | Ok (storage_res, _res, _steps, ctxt, origination_nonce, maybe_big_map_diff) ->
                 (* TODO: pay for the steps and the storage diff:
                    update_script_storage checks the storage cost *)
                 Contract.update_script_storage_and_fees
                   ctxt destination
-                  Script_interpreter.dummy_storage_fee storage_res >>=? fun ctxt ->
+                  Script_interpreter.dummy_storage_fee
+                  storage_res
+                  (match maybe_big_map_diff with
+                   | None -> None
+                   | Some map ->
+                       Some (Script_ir_translator.to_serializable_big_map map)) >>=? fun ctxt ->
                 return (ctxt, origination_nonce, None)
             | Error err ->
                 return (ctxt, origination_nonce, Some err) in
@@ -161,18 +166,30 @@ let apply_manager_operation_content
   | Origination { manager ; delegate ; script ;
                   spendable ; delegatable ; credit } ->
       begin match script with
-        | None -> return None
+        | None -> return (None, None)
         | Some script ->
             Script_ir_translator.parse_script ctxt script >>=? fun _ ->
-            return (Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)))
-      end >>=? fun script ->
+            Script_ir_translator.erase_big_map_initialization ctxt script >>=? fun (script, big_map_diff) ->
+            return (Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)),
+                    big_map_diff)
+      end >>=? fun (script, big_map) ->
       Contract.spend ctxt source Constants.origination_burn >>=? fun ctxt ->
       Contract.spend ctxt source credit >>=? fun ctxt ->
       Contract.originate ctxt
         origination_nonce
         ~manager ~delegate ~balance:credit
         ?script
-        ~spendable ~delegatable >>=? fun (ctxt, _, origination_nonce) ->
+        ~spendable ~delegatable >>=? fun (ctxt, contract, origination_nonce) ->
+      begin match big_map with
+        | None -> return ctxt
+        | Some diff ->
+            fold_left_s (fun ctxt (key, value) ->
+                match value with
+                | None -> Contract.Big_map_storage.remove ctxt contract key
+                | Some v ->
+                    Contract.Big_map_storage.set ctxt contract key v)
+              ctxt diff
+      end >>=? fun ctxt ->
       return (ctxt, origination_nonce, None)
   | Delegation delegate ->
       Contract.set_delegate ctxt source delegate >>=? fun ctxt ->

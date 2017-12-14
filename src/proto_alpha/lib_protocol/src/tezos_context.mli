@@ -216,6 +216,7 @@ module Script : sig
     | T_lambda
     | T_list
     | T_map
+    | T_big_map
     | T_nat
     | T_option
     | T_or
@@ -466,13 +467,25 @@ module Contract : sig
     context -> contract -> Tez.t -> context tzresult Lwt.t
 
   val update_script_storage_and_fees:
-    context -> contract -> Tez.t -> Script.expr -> context tzresult Lwt.t
+    context -> contract -> Tez.t -> Script.expr ->
+    (string * Script.expr option) list option -> context tzresult Lwt.t
 
   val increment_counter:
     context -> contract -> context tzresult Lwt.t
 
   val check_counter_increment:
     context -> contract -> int32 -> unit tzresult Lwt.t
+
+  module Big_map_storage : sig
+    val set :
+      context -> contract ->
+      string -> Script.expr -> context tzresult Lwt.t
+    val remove :
+      context -> contract -> string -> context tzresult Lwt.t
+    val mem : context -> contract -> string -> bool Lwt.t
+    val get_opt :
+      context -> contract -> string -> Script_repr.expr option tzresult Lwt.t
+  end
 
 end
 

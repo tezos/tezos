@@ -103,6 +103,7 @@ type prim =
   | T_lambda
   | T_list
   | T_map
+  | T_big_map
   | T_nat
   | T_option
   | T_or
@@ -223,6 +224,7 @@ let string_of_prim = function
   | T_lambda -> "lambda"
   | T_list -> "list"
   | T_map -> "map"
+  | T_big_map -> "big_map"
   | T_nat -> "nat"
   | T_option -> "option"
   | T_or -> "or"
@@ -324,6 +326,7 @@ let prim_of_string = function
   | "lambda" -> ok T_lambda
   | "list" -> ok T_list
   | "map" -> ok T_map
+  | "big_map" -> ok T_big_map
   | "nat" -> ok T_nat
   | "option" -> ok T_option
   | "or" -> ok T_or
@@ -469,6 +472,7 @@ let prim_encoding =
     ("lambda", T_lambda) ;
     ("list", T_list) ;
     ("map", T_map) ;
+    ("big_map", T_big_map) ;
     ("nat", T_nat) ;
     ("option", T_option) ;
     ("or", T_or) ;

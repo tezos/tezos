@@ -17,7 +17,6 @@ type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 type ex_stack_ty = Ex_stack_ty : 'a Script_typed_ir.stack_ty -> ex_stack_ty
 type ex_script = Ex_script : ('a, 'b, 'c) Script_typed_ir.script -> ex_script
 
-
 (* ---- Sets and Maps -------------------------------------------------------*)
 
 val empty_set : 'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.set
@@ -39,6 +38,14 @@ val map_get : 'key -> ('key, 'value) Script_typed_ir.map -> 'value option
 val map_key_ty : ('a, 'b) Script_typed_ir.map -> 'a Script_typed_ir.comparable_ty
 val map_size : ('a, 'b) Script_typed_ir.map -> Script_int.n Script_int.num
 
+val big_map_mem : context -> Tezos_context.Contract.t -> 'key -> ('key, 'value) Script_typed_ir.big_map -> bool Lwt.t
+val big_map_get :
+  context -> Tezos_context.Contract.t -> 'key -> ('key, 'value) Script_typed_ir.big_map ->
+  'value option tzresult Lwt.t
+val big_map_update :
+  'key -> 'value option -> ('key, 'value) Script_typed_ir.big_map ->
+  ('key, 'value) Script_typed_ir.big_map
+
 val ty_eq :
   'ta Script_typed_ir.ty -> 'tb Script_typed_ir.ty ->
   ('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq tzresult
@@ -49,7 +56,7 @@ val parse_data :
 val unparse_data :
   'a Script_typed_ir.ty -> 'a -> Script.node
 
-val parse_ty :
+val parse_ty : bool ->
   Script.node -> (ex_ty * Script_typed_ir.annot) tzresult
 val unparse_ty :
   string option -> 'a Script_typed_ir.ty -> Script.node
@@ -69,3 +76,12 @@ val parse_script :
   context -> Script.t -> ex_script tzresult Lwt.t
 
 val hash_data : 'a Script_typed_ir.ty -> 'a -> string
+
+val extract_big_map : 'a Script_typed_ir.ty -> 'a -> Script_typed_ir.ex_big_map option
+
+val to_serializable_big_map : Script_typed_ir.ex_big_map -> Contract_storage.big_map_diff
+
+val to_printable_big_map : Script_typed_ir.ex_big_map -> (Script.expr * Script.expr option) list
+
+val erase_big_map_initialization : context -> Script.t ->
+  (Script.t * Contract_storage.big_map_diff option) tzresult Lwt.t

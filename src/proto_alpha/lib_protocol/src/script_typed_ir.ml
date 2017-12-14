@@ -41,6 +41,8 @@ end
 
 type ('key, 'value) map = (module Boxed_map with type key = 'key and type value = 'value)
 
+type annot = string option
+
 type ('arg, 'ret, 'storage) script =
   { code : (('arg, 'storage) pair, ('ret, 'storage) pair) lambda ;
     arg_type : 'arg ty ;
@@ -60,8 +62,6 @@ and ('arg, 'ret) lambda =
 and ('arg, 'ret) typed_contract =
   'arg ty * 'ret ty * Contract.t
 
-and annot = string option
-
 and 'ty ty =
   | Unit_t : unit ty
   | Int_t : z num ty
@@ -80,11 +80,16 @@ and 'ty ty =
   | List_t : 'v ty -> 'v list ty
   | Set_t : 'v comparable_ty -> 'v set ty
   | Map_t : 'k comparable_ty * 'v ty -> ('k, 'v) map ty
+  | Big_map_t : 'k comparable_ty * 'v ty -> ('k, 'v) big_map ty
   | Contract_t : 'arg ty * 'ret ty -> ('arg, 'ret) typed_contract ty
 
 and 'ty stack_ty =
   | Item_t : 'ty ty * 'rest stack_ty * annot -> ('ty * 'rest) stack_ty
   | Empty_t : end_of_stack stack_ty
+
+and ('key, 'value) big_map = { diff : ('key, 'value option) map ;
+                               key_type : 'key ty ;
+                               value_type : 'value ty }
 
 (* ---- Instructions --------------------------------------------------------*)
 
@@ -176,6 +181,13 @@ and ('bef, 'aft) instr =
   | Map_update :
       ('a * ('v option * (('a, 'v) map * 'rest)), ('a, 'v) map * 'rest) instr
   | Map_size : (('a, 'b) map * 'rest, n num * 'rest) instr
+  (* big maps *)
+  | Big_map_mem :
+      ('a * (('a, 'v) big_map * 'rest), bool * 'rest) instr
+  | Big_map_get :
+      ('a * (('a, 'v) big_map * 'rest), 'v option * 'rest) instr
+  | Big_map_update :
+      ('key * ('value option * (('key, 'value) big_map * 'rest)), ('key, 'value) big_map * 'rest) instr
   (* string operations *)
   | Concat :
       (string * (string * 'rest), string * 'rest) instr
@@ -343,3 +355,5 @@ and ('bef, 'aft) descr =
     bef : 'bef stack_ty ;
     aft : 'aft stack_ty ;
     instr : ('bef, 'aft)  instr }
+
+type ex_big_map = Ex_bm : ('key, 'value) big_map -> ex_big_map

@@ -445,9 +445,10 @@ module Helpers = struct
       ~query: RPC_query.empty
       ~input: run_code_input_encoding
       ~output: (wrap_tzerror
-                  (obj2
+                  (obj3
                      (req "storage" Script.expr_encoding)
-                     (req "output" Script.expr_encoding)))
+                     (req "output" Script.expr_encoding)
+                     (opt "big_map_diff" (list (tup2 Script.expr_encoding (option Script.expr_encoding))))))
       ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "run_code")
 
@@ -473,14 +474,15 @@ module Helpers = struct
       ~query: RPC_query.empty
       ~input: run_code_input_encoding
       ~output: (wrap_tzerror
-                  (obj3
+                  (obj4
                      (req "storage" Script.expr_encoding)
                      (req "output" Script.expr_encoding)
                      (req "trace"
                         (list @@ obj3
                            (req "location" Script.location_encoding)
                            (req "gas" Gas.encoding)
-                           (req "stack" (list (Script.expr_encoding)))))))
+                           (req "stack" (list (Script.expr_encoding)))))
+                     (opt "big_map_diff" (list (tup2 Script.expr_encoding (option Script.expr_encoding))))))
       ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "trace_code")
 
@@ -509,12 +511,12 @@ module Helpers = struct
     RPC_service.post_service
       ~description: "Computes the hash of some data expression \
                      using the same algorithm as script instruction H"
-      ~query: RPC_query.empty
       ~input: (obj2 (req "data" Script.expr_encoding)
                  (req "type" Script.expr_encoding))
       ~output: (wrap_tzerror @@
                 obj1 (req "hash" string))
       ~error: Data_encoding.empty
+      ~query: RPC_query.empty
       RPC_path.(custom_root / "helpers" / "hash_data")
 
   let level custom_root =

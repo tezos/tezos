@@ -147,6 +147,13 @@ module Contract : sig
      and type value = Tez_repr.t
      and type t := Raw_context.t
 
+  type bigmap_key = Raw_context.t * Contract_repr.t
+
+  module Big_map : Indexed_data_storage
+    with type key = string
+     and type value = Script_repr.expr
+     and type t := bigmap_key
+
 end
 
 (** Votes *)

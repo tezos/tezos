@@ -107,6 +107,14 @@ end
 module Contract = struct
   include Contract_repr
   include Contract_storage
+
+  module Big_map_storage = struct
+    let set ctx contract = Contract_storage.Big_map.set (ctx, contract)
+    let remove ctx contract = Contract_storage.Big_map.remove (ctx, contract)
+    let mem ctx contract = Contract_storage.Big_map.mem (ctx, contract)
+    let get_opt ctx contract = Contract_storage.Big_map.get_opt (ctx, contract)
+  end
+
 end
 module Roll = struct
   include Roll_repr

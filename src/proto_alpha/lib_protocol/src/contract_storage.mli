@@ -46,7 +46,12 @@ val get_counter: Raw_context.t -> Contract_repr.t -> int32 tzresult Lwt.t
 val get_script: Raw_context.t -> Contract_repr.t -> Script_repr.t option tzresult Lwt.t
 val get_storage: Raw_context.t -> Contract_repr.t -> Script_repr.expr option tzresult Lwt.t
 
-val update_script_storage_and_fees: Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Script_repr.expr -> Raw_context.t tzresult Lwt.t
+type big_map_diff = (string * Script_repr.expr option) list
+
+val update_script_storage_and_fees:
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Script_repr.expr ->
+  big_map_diff option ->
+  Raw_context.t tzresult Lwt.t
 
 (** fails if the contract is not delegatable *)
 val set_delegate : Raw_context.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option -> Raw_context.t tzresult Lwt.t
@@ -72,3 +77,14 @@ val originate :
 
 val init :
   Raw_context.t -> Raw_context.t tzresult Lwt.t
+
+module Big_map : sig
+  val set :
+    Storage.Contract.bigmap_key ->
+    string -> Script_repr.expr -> Raw_context.t tzresult Lwt.t
+  val remove :
+    Storage.Contract.bigmap_key -> string -> Raw_context.t tzresult Lwt.t
+  val mem : Storage.Contract.bigmap_key -> string -> bool Lwt.t
+  val get_opt :
+    Storage.Contract.bigmap_key -> string -> Script_repr.expr option tzresult Lwt.t
+end

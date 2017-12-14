@@ -26,6 +26,7 @@ type error += Invalid_primitive of Script.location * prim list * prim
 type error += Invalid_kind of Script.location * kind list * kind
 type error += Missing_field of prim
 type error += Duplicate_field of Script.location * prim
+type error += Unexpected_big_map of Script.location
 
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location

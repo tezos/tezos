@@ -297,8 +297,8 @@ let () =
          contract (* transaction initiator *)
          contract (* script owner *)
          ctxt { storage ; code } amount input
-         (Gas.of_int gas) >>=? fun (sto, ret, _gas, _ctxt, _) ->
-       Error_monad.return (sto, ret)) ;
+         (Gas.of_int gas) >>=? fun (sto, ret, _gas, _ctxt, _, maybe_big_map_diff) ->
+       Error_monad.return (sto, ret, Option.map ~f:Script_ir_translator.to_printable_big_map maybe_big_map_diff)) ;
   register1 Services.Helpers.trace_code
     (fun ctxt () parameters ->
        let (code, storage, input, amount, contract, gas, origination_nonce) =
@@ -308,8 +308,8 @@ let () =
          contract (* transaction initiator *)
          contract (* script owner *)
          ctxt { storage ; code } amount input
-         (Gas.of_int gas) >>=? fun ((sto, ret, _gas, _ctxt, _), trace) ->
-       Error_monad.return (sto, ret, trace))
+         (Gas.of_int gas) >>=? fun ((sto, ret, _gas, _ctxt, _, maybe_big_map_diff), trace) ->
+       Error_monad.return (sto, ret, trace, Option.map ~f:Script_ir_translator.to_printable_big_map maybe_big_map_diff))
 
 let () =
   register1 Services.Helpers.typecheck_code
@@ -323,7 +323,7 @@ let () =
   register1 Services.Helpers.hash_data
     (fun ctxt () (expr, typ) ->
        let open Script_ir_translator in
-       Lwt.return @@ parse_ty (Micheline.root typ) >>=? fun (Ex_ty typ, _) ->
+       Lwt.return @@ parse_ty false (Micheline.root typ) >>=? fun (Ex_ty typ, _) ->
        parse_data ctxt typ (Micheline.root expr) >>=? fun data ->
        return (Script_ir_translator.hash_data typ data))
 

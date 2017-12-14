@@ -160,13 +160,14 @@ module Helpers : sig
     #Client_rpcs.ctxt ->
     block -> Script.expr ->
     (Script.expr * Script.expr * Tez.t) ->
-    (Script.expr * Script.expr) tzresult Lwt.t
+    (Script.expr * Script.expr * (Script.expr * Script.expr option) list option) tzresult Lwt.t
   val trace_code:
     #Client_rpcs.ctxt ->
     block -> Script.expr ->
     (Script.expr * Script.expr * Tez.t) ->
     (Script.expr * Script.expr *
-     (Script.location * Gas.t * Script.expr list) list) tzresult Lwt.t
+     (Script.location * Gas.t * Script.expr list) list *
+     (Script.expr * Script.expr option) list option) tzresult Lwt.t
   val typecheck_code:
     #Client_rpcs.ctxt ->
     block -> Script.expr -> Script_tc_errors.type_map tzresult Lwt.t

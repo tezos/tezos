@@ -392,6 +392,21 @@ let rec interp
             gas_check_terop descr (map_update, k, v, map) Gas.Cost_of.map_update rest
         | Map_size, Item (map, rest) ->
             gas_check_unop descr (map_size, map) (fun _ -> Gas.Cost_of.map_size) rest ctxt
+        (* Big map operations *)
+        | Big_map_mem, Item (key, Item (map, rest)) ->
+            let gas = Gas.consume gas (Gas.Cost_of.big_map_mem key map) in
+            Gas.check gas >>=? fun () ->
+            Script_ir_translator.big_map_mem ctxt source key map >>= fun res ->
+            logged_return (Item (res, rest), gas, ctxt)
+        | Big_map_get, Item (key, Item (map, rest)) ->
+            let gas = Gas.consume gas (Gas.Cost_of.big_map_get key map) in
+            Gas.check gas >>=? fun () ->
+            Script_ir_translator.big_map_get ctxt source key map >>=? fun res ->
+            logged_return (Item (res, rest), gas, ctxt)
+        | Big_map_update, Item (key, Item (maybe_value, Item (map, rest))) ->
+            gas_check_terop descr
+              (Script_ir_translator.big_map_update, key, maybe_value, map)
+              Gas.Cost_of.big_map_update rest
         (* timestamp operations *)
         | Add_seconds_to_timestamp, Item (n, Item (t, rest)) ->
             gas_check_binop descr
@@ -633,14 +648,16 @@ let rec interp
             Contract.get_manager ctxt contract >>=? fun manager ->
             logged_return (Item (manager, rest), gas, ctxt)
         | Transfer_tokens storage_type,
-          Item (p, Item (amount, Item ((tp, Unit_t, destination), Item (sto, Empty)))) -> begin
+          Item (p, Item (amount, Item ((tp, Unit_t, destination), Item (storage, Empty)))) -> begin
             let gas = Gas.consume gas Gas.Cost_of.transfer in
             Gas.check gas >>=? fun () ->
             Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
             Contract.credit ctxt destination amount >>=? fun ctxt ->
             Contract.get_script ctxt destination >>=? fun destination_script ->
-            let sto = Micheline.strip_locations (unparse_data storage_type sto) in
-            Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto >>=? fun ctxt ->
+            let sto = Micheline.strip_locations (unparse_data storage_type storage) in
+            Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto
+              (Option.map ~f:Script_ir_translator.to_serializable_big_map
+                 (Script_ir_translator.extract_big_map storage_type storage)) >>=? fun ctxt ->
             begin match destination_script with
               | None ->
                   (* we see non scripted contracts as (unit, unit) contract *)
@@ -650,8 +667,9 @@ let rec interp
               | Some script ->
                   let p = unparse_data tp p in
                   execute origination source destination ctxt script amount p gas
-                  >>=? fun (csto, ret, gas, ctxt, origination) ->
-                  Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee csto >>=? fun ctxt ->
+                  >>=? fun (csto, ret, gas, ctxt, origination, maybe_diff) ->
+                  Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee csto
+                    (Option.map ~f:Script_ir_translator.to_serializable_big_map maybe_diff) >>=? fun ctxt ->
                   trace
                     (Invalid_contract (loc, destination))
                     (parse_data ctxt Unit_t ret) >>=? fun () ->
@@ -672,12 +690,16 @@ let rec interp
             Contract.get_script ctxt destination >>=? function
             | None -> fail (Invalid_contract (loc, destination))
             | Some script ->
+                let maybe_diff = Script_ir_translator.(
+                    Option.map ~f:to_serializable_big_map
+                    @@ extract_big_map storage_type sto) in
                 let sto = Micheline.strip_locations (unparse_data storage_type sto) in
-                Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto >>=? fun ctxt ->
+                Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto maybe_diff >>=? fun ctxt ->
                 let p = unparse_data tp p in
                 execute origination source destination ctxt script amount p gas
-                >>=? fun (sto, ret, gas, ctxt, origination) ->
-                Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee sto >>=? fun ctxt ->
+                >>=? fun (sto, ret, gas, ctxt, origination, maybe_diff) ->
+                Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee sto
+                  (Option.map ~f:Script_ir_translator.to_serializable_big_map maybe_diff) >>=? fun ctxt ->
                 trace
                   (Invalid_contract (loc, destination))
                   (parse_data ctxt tr ret) >>=? fun v ->
@@ -771,7 +793,9 @@ let rec interp
 
 (* ---- contract handling ---------------------------------------------------*)
 
-and execute ?log origination orig source ctxt script amount arg gas =
+and execute ?log origination orig source ctxt script amount arg gas :
+  (Script.expr * Script.node * Gas.t * context * Contract.origination_nonce *
+   Script_typed_ir.ex_big_map option) tzresult Lwt.t =
   parse_script ctxt script
   >>=? fun (Ex_script { code; arg_type; ret_type; storage; storage_type }) ->
   parse_data ctxt arg_type arg >>=? fun arg ->
@@ -781,15 +805,16 @@ and execute ?log origination orig source ctxt script amount arg gas =
   >>=? fun ((ret, storage), gas, ctxt, origination) ->
   return (Micheline.strip_locations (unparse_data storage_type storage),
           unparse_data ret_type ret,
-          gas, ctxt, origination)
+          gas, ctxt, origination,
+          Script_ir_translator.extract_big_map storage_type storage)
 
 let trace origination orig source ctxt script amount arg gas =
   let log = ref [] in
   execute ~log origination orig source ctxt script amount (Micheline.root arg) gas
-  >>=? fun (sto, res, gas, ctxt, origination) ->
-  return ((sto, Micheline.strip_locations res, gas, ctxt, origination), List.rev !log)
+  >>=? fun (sto, res, gas, ctxt, origination, maybe_big_map) ->
+  return ((sto, Micheline.strip_locations res, gas, ctxt, origination, maybe_big_map), List.rev !log)
 
 let execute origination orig source ctxt script amount arg gas =
   execute origination orig source ctxt script amount (Micheline.root arg) gas
-  >>=? fun (sto, res, gas, ctxt, origination) ->
-  return (sto, Micheline.strip_locations res, gas, ctxt, origination)
+  >>=? fun (sto, res, gas, ctxt, origination, maybe_big_map) ->
+  return (sto, Micheline.strip_locations res, gas, ctxt, origination, maybe_big_map)

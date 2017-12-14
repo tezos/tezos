@@ -66,6 +66,7 @@ let collect_error_locations errs =
       | Invalid_primitive (loc, _, _)
       | Invalid_kind (loc, _, _)
       | Duplicate_field (loc, _)
+      | Unexpected_big_map loc
       | Fail_not_in_tail_position loc
       | Undefined_binop (loc, _, _, _)
       | Undefined_unop (loc, _, _)
@@ -166,6 +167,10 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         Format.fprintf ppf "@[<v 0>%aduplicate contract field: %s@]"
           print_loc loc
           (Michelson_v1_primitives.string_of_prim prim) ;
+        print_trace locations rest
+    | Unexpected_big_map loc :: rest ->
+        Format.fprintf ppf "%abig_map type only allowed on the left of the toplevel storage pair"
+          print_loc loc ;
         print_trace locations rest
     | Runtime_contract_error (contract, expr) :: rest ->
         let parsed =

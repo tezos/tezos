@@ -20,6 +20,15 @@ module Bool = struct
   let encoding = Data_encoding.bool
 end
 
+module String_index = struct
+  type t = string
+  let path_length = 1
+  let to_path c l = c :: l
+  let of_path = function
+    | [ c ] -> Some c
+    | [] | _ :: _ :: _ -> None
+end
+
 (** Contracts handling *)
 
 module Contract = struct
@@ -83,6 +92,18 @@ module Contract = struct
     Indexed_context.Make_map
       (struct let name = ["storage"] end)
       (Make_value(struct
+         type t = Script_repr.expr
+         let encoding = Script_repr.expr_encoding
+       end))
+  type bigmap_key = Raw_context.t * Contract_repr.t
+
+  module Big_map =
+    Storage_functors.Make_indexed_data_storage
+      (Make_subcontext
+         (Indexed_context.Raw_context)
+         (struct let name = ["big_map"] end))
+      (String_index)
+      (Make_value (struct
          type t = Script_repr.expr
          let encoding = Script_repr.expr_encoding
        end))

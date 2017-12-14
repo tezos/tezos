@@ -21,12 +21,13 @@ val execute:
   Contract.t -> Contract.t -> Tezos_context.t ->
   Script.t -> Tez.t ->
   Script.expr -> Gas.t ->
-  (Script.expr * Script.expr * Gas.t * context * Contract.origination_nonce) tzresult Lwt.t
+  (Script.expr * Script.expr * Gas.t * context * Contract.origination_nonce *
+   Script_typed_ir.ex_big_map option) tzresult Lwt.t
 
 val trace:
   Contract.origination_nonce ->
   Contract.t -> Contract.t -> Tezos_context.t ->
   Script.t -> Tez.t ->
   Script.expr -> Gas.t ->
-  ((Script.expr * Script.expr * Gas.t * context * Contract.origination_nonce) *
+  ((Script.expr * Script.expr * Gas.t * context * Contract.origination_nonce * Script_typed_ir.ex_big_map option) *
    (Script.location * Gas.t * Script.expr list) list) tzresult Lwt.t

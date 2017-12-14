@@ -4,11 +4,13 @@
  ((name main)
   (libraries (tezos-base
               tezos-test-helpers
+              tezos-micheline
               tezos_proto_alpha_isolate_helpers
               tezos_proto_alpha_isolate_michelson_parser))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_test_helpers
+                    -open Tezos_micheline
                     -open Tezos_proto_alpha_isolate_michelson_parser))))
 
 (alias

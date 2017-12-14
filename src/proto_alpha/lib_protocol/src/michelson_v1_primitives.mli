@@ -101,6 +101,7 @@ type prim =
   | T_lambda
   | T_list
   | T_map
+  | T_big_map
   | T_nat
   | T_option
   | T_or

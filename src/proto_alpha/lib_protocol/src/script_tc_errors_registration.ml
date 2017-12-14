@@ -30,7 +30,7 @@ let ex_ty_enc =
   Data_encoding.conv
     (fun (Ex_ty ty) -> strip_locations (unparse_ty None ty))
     (fun expr ->
-       match parse_ty (root expr) with
+       match parse_ty true (root expr) with
        | Ok (Ex_ty ty, _) -> Ex_ty ty
        | _ -> Ex_ty Unit_t (* FIXME: ? *))
     Script.expr_encoding
@@ -164,6 +164,18 @@ let () =
        (req "prim" prim_encoding))
     (function Duplicate_field (loc, prim) -> Some (loc, prim) | _ -> None)
     (fun (loc, prim) -> Duplicate_field (loc, prim)) ;
+  (* Unexpected big_map *)
+  register_error_kind
+    `Permanent
+    ~id:"unexpectedBigMap"
+    ~title: "Big map in unauthorized position (type error)"
+    ~description:
+      "When parsing script, a big_map type was found somewhere else \
+       than in the left component of the toplevel storage pair."
+    (obj1
+       (req "loc" location_encoding))
+    (function Unexpected_big_map loc -> Some loc | _ -> None)
+    (fun loc -> Unexpected_big_map loc) ;
   (* -- Value typing errors ---------------------- *)
   (* Unordered map keys *)
   register_error_kind

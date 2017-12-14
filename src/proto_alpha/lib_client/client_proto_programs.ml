@@ -35,23 +35,44 @@ let print_errors (cctxt : #Client_commands.logger) errs ~show_source ~parsed =
   cctxt#error "error running program" >>= fun () ->
   return ()
 
+let print_big_map_diff ppf = function
+  | None -> ()
+  | Some diff ->
+      Format.fprintf ppf
+        "@[<v 2>map diff:@,%a@]@,"
+        (Format.pp_print_list
+           ~pp_sep:Format.pp_print_space
+           (fun ppf (key, value) ->
+              Format.fprintf ppf "%s %a%a"
+                (match value with
+                 | None -> "-"
+                 | Some _ -> "+")
+                print_expr key
+                (fun ppf -> function
+                   | None -> ()
+                   | Some x -> Format.fprintf ppf "-> %a" print_expr x)
+                value))
+        diff
+
 let print_run_result (cctxt : #Client_commands.logger) ~show_source ~parsed = function
-  | Ok (storage, output) ->
-      cctxt#message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@]@."
+  | Ok (storage, output, maybe_diff) ->
+      cctxt#message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[%a@]@]@."
         print_expr storage
-        print_expr output >>= fun () ->
+        print_expr output
+        print_big_map_diff maybe_diff >>= fun () ->
       return ()
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
 
 let print_trace_result (cctxt : #Client_commands.logger) ~show_source ~parsed =
   function
-  | Ok (storage, output, trace) ->
+  | Ok (storage, output, trace, maybe_big_map_diff) ->
       cctxt#message
         "@[<v 0>@[<v 2>storage@,%a@]@,\
-         @[<v 2>output@,%a@]@,@[<v 2>trace@,%a@]@]@."
+         @[<v 2>output@,%a@]@,%a@[<v 2>@[<v 2>trace@,%a@]@]@."
         print_expr storage
         print_expr output
+        print_big_map_diff maybe_big_map_diff
         (Format.pp_print_list
            (fun ppf (loc, gas, stack) ->
               Format.fprintf ppf

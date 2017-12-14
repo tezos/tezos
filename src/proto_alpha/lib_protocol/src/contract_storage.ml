@@ -237,6 +237,7 @@ let delete c contract =
   Storage.Contract.Storage.remove c contract >>= fun c ->
   Storage.Contract.Code_fees.remove c contract >>= fun c ->
   Storage.Contract.Storage_fees.remove c contract >>= fun c ->
+  Storage.Contract.Big_map.clear (c, contract) >>= fun c ->
   return c
 
 let exists c contract =
@@ -372,7 +373,9 @@ let contract_fee c contract =
       Lwt.return Tez_repr.(code_fees +? storage_fees) >>=? fun script_fees ->
       Lwt.return Tez_repr.(Constants_repr.minimal_contract_balance +? script_fees)
 
-let update_script_storage_and_fees c contract storage_fees storage =
+type big_map_diff = (string * Script_repr.expr option) list
+
+let update_script_storage_and_fees c contract storage_fees storage big_map  =
   Storage.Contract.Balance.get_option c contract >>=? function
   | None ->
       (* The contract was destroyed *)
@@ -382,6 +385,16 @@ let update_script_storage_and_fees c contract storage_fees storage =
       contract_fee c contract >>=? fun fee ->
       fail_unless Tez_repr.(balance > fee)
         (Cannot_pay_storage_fee (contract, balance, fee)) >>=? fun () ->
+      begin match big_map with
+        | None -> return c
+        | Some diff ->
+            fold_left_s (fun c (key, value) ->
+                match value with
+                | None -> Storage.Contract.Big_map.remove (c, contract) key >>= return
+                | Some v ->
+                    Storage.Contract.Big_map.init_set (c, contract) key v >>= return)
+              c diff
+      end >>=? fun c ->
       Storage.Contract.Storage.set c contract storage
 
 let spend_from_script c contract amount =
@@ -432,3 +445,10 @@ let originate c nonce ~balance ~manager ?script ~delegate ~spendable ~delegatabl
 
 let init c =
   Storage.Contract.Global_counter.init c 0l
+
+module Big_map = struct
+  let set handle key value = Storage.Contract.Big_map.init_set handle key value >>= return
+  let remove = Storage.Contract.Big_map.delete
+  let mem = Storage.Contract.Big_map.mem
+  let get_opt = Storage.Contract.Big_map.get_option
+end

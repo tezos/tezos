@@ -48,6 +48,9 @@ module Cost_of : sig
   val map_update :
     'a -> 'b -> ('c, 'd) Script_typed_ir.map -> cost
   val map_size : cost
+  val big_map_mem : 'key -> ('key, 'value) Script_typed_ir.big_map -> cost
+  val big_map_get : 'key -> ('key, 'value) Script_typed_ir.big_map -> cost
+  val big_map_update : 'key -> 'value option -> ('key, 'value) Script_typed_ir.big_map -> cost
   val set_to_list : 'a Script_typed_ir.set -> cost
   val set_update : 'a -> 'b -> 'a Script_typed_ir.set -> cost
   val set_mem : 'a -> 'a Script_typed_ir.set -> cost

@@ -149,6 +149,10 @@ module Cost_of = struct
 
   let map_size = step_cost 2
 
+  let big_map_mem _key _map = step_cost 200
+  let big_map_get _key _map = step_cost 200
+  let big_map_update _key _value _map = step_cost 200
+
   let set_access : type elt. elt -> elt Script_typed_ir.set -> int
     = fun _key (module Box) ->
       log2 @@ Box.size

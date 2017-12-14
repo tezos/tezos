@@ -1,0 +1,6 @@
+# Fails if the boolean does not match the membership criteria
+parameter (pair int bool) ;
+storage (pair (big_map int unit) unit) ;
+return unit ;
+code { DUP ; DUP ; CADR ; DIP { CAAR ; DIP { CDAR ; DUP } ; MEM } ;
+       ASSERT_CMPEQ ; UNIT ; SWAP ; PAIR ; UNIT ; PAIR }

@@ -25,8 +25,6 @@ open Shorthands
 let (>>??) = Assert.(>>??)
 let (>>=??) = Assert.(>>=??)
 
-open Tezos_micheline
-
 let parse_param s : Proto_alpha.Tezos_context.Script.expr =
   let (parsed, _) = Michelson_v1_parser.parse_expression s in
   parsed.expanded
@@ -50,9 +48,9 @@ let quote s = "\"" ^ s ^ "\""
 let parse_execute sb ?tc code_str param_str storage_str =
   let param = parse_param param_str in
   let script = parse_script code_str storage_str in
-  Script.execute_code_pred ?tc sb script param >>=?? fun (ret, st, _, tc, nonce) ->
+  Script.execute_code_pred ?tc sb script param >>=?? fun (ret, st, _, tc, nonce, bgm) ->
   let contracts = Contract.originated_contracts nonce in
-  return (ret, st, tc, contracts)
+  return (ret, st, tc, contracts, bgm)
 
 let test ctxt ?tc (file_name: string) (storage: string) (input: string) =
   let full_path = contract_path // file_name ^ ".tz" in
@@ -79,7 +77,7 @@ let string_of_canon output_prim =
   output
 
 let test_print ctxt fn s i =
-  test ctxt fn s i >>=? fun (sp, op, _, _) ->
+  test ctxt fn s i >>=? fun (sp, op, _, _, _bgm) ->
   let ss = string_of_canon sp in
   let os = string_of_canon op in
   debug "Storage : %s" ss ;
@@ -88,7 +86,7 @@ let test_print ctxt fn s i =
 
 
 let test_output ctxt ?location (file_name: string) (storage: string) (input: string) (expected_output: string) =
-  test ctxt file_name storage input >>=? fun (_storage_prim, output_prim, _tc, _contracts) ->
+  test ctxt file_name storage input >>=? fun (_storage_prim, output_prim, _tc, _contracts, _bgm) ->
   let output = string_of_canon output_prim in
   let msg = Option.unopt ~default:"strings aren't equal" location in
   Assert.equal_string ~msg expected_output output ;
@@ -96,18 +94,18 @@ let test_output ctxt ?location (file_name: string) (storage: string) (input: str
 
 
 let test_tc ctxt ?tc (file_name: string) (storage: string) (input: string) =
-  test ctxt ?tc file_name storage input >>=? fun (_storage_prim, _output_prim, tc, _contracts) ->
+  test ctxt ?tc file_name storage input >>=? fun (_storage_prim, _output_prim, tc, _contracts, _bgm) ->
   return (tc)
 
 
 let test_contract ctxt ?tc (file_name: string) (storage: string) (input: string) =
-  test ctxt ?tc file_name storage input >>=? fun (_storage_prim, _output_prim, tc, contracts) ->
+  test ctxt ?tc file_name storage input >>=? fun (_storage_prim, _output_prim, tc, contracts, _bgm) ->
   return (contracts, tc)
 
 
 
 let test_storage ctxt ?location (file_name: string) (storage: string) (input: string) (expected_storage: string) =
-  test ctxt file_name storage input >>=? fun (storage_prim, _output_prim, _tc, _contracts) ->
+  test ctxt file_name storage input >>=? fun (storage_prim, _output_prim, _tc, _contracts, _bgm) ->
   let storage = string_of_canon storage_prim in
   let msg = Option.unopt ~default:"strings aren't equal" location in
   Assert.equal_string ~msg expected_storage storage ;
@@ -439,7 +437,7 @@ let test_example () =
   let contract = List.hd cs in
   Proto_alpha.Tezos_context.Contract.get_script tc contract >>=?? fun res ->
   let script = Option.unopt_exn (Failure "get_script") res in
-  Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun (_, ret, _, _, _) ->
+  Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun (_, ret, _, _, _, _) ->
   Assert.equal_string ~msg: __LOC__ "\"abc\"" @@ string_of_canon ret ;
 
   (* Test DEFAULT_ACCOUNT *)

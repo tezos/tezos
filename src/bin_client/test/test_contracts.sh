@@ -405,12 +405,13 @@ init_with_transfer $contract_dir/self.tz $key1 \
 $client transfer 0 from bootstrap1 to self
 assert_storage_contains self "\"$(get_contract_addr self)\""
 
-
+# Test sets and map literals
 assert_fails $client typecheck data '{ Elt 0 1 ; Elt 0 1 }' against type '(map nat nat)'
 assert_fails $client typecheck data '{ Elt 0 1 ; Elt 10 1 ; Elt 5 1 }' against type '(map nat nat)'
 assert_fails $client typecheck data '{ "A" ; "C" ; "B" }' against type '(set string)'
 assert_fails $client typecheck data '{ "A" ; "B" ; "B" }' against type '(set string)'
 
+# Test hash consistency between Michelson and the CLI
 hash_result=`$client hash data '(Pair "22220.00" (Pair "2017-12-13T04:49:00Z" 034))' \
                      of type '(pair tez (pair timestamp int))'`
 
@@ -419,6 +420,33 @@ assert_output $contract_dir/hash_consistency_checker.tz Unit \
 
 assert_output $contract_dir/hash_consistency_checker.tz Unit \
               '(Pair "22,220" (Pair "2017-12-13T04:49:00+00:00" 34))' "$hash_result"
+
+# Test for big maps
+init_with_transfer $contract_dir/big_map_mem.tz $key1\
+                   '(Pair { Elt 1 Unit ; Elt 2 Unit ; Elt 3 Unit } Unit)' \
+                   100 bootstrap1
+$client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 False)'
+assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 True)'
+$client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 True)'
+assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 False)'
+$client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 True)'
+assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 False)'
+$client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 True)'
+assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 False)'
+$client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 False)'
+assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 True)'
+
+init_with_transfer $contract_dir/big_map_get_add.tz $key1\
+                   '(Pair { Elt 0 1 ; Elt 1 2 ; Elt 2 3 } Unit)' \
+                   100 bootstrap1
+
+$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 (Some 2)) (Pair 200 (Some 2)))'
+$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 200 None))'
+$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 300 None))'
+$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 None) (Pair 200 None))'
+$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 (Some 2)) (Pair 0 (Some 1)))'
+$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 400 (Some 1232)) (Pair 400 (Some 1232)))'
+$client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 401 (Some 0)) (Pair 400 (Some 1232)))'
 
 printf "\nEnd of test\n"
 
