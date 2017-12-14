@@ -721,7 +721,7 @@ let rec interp
         | H ty, Item (v, rest) ->
             let gas = Gas.consume gas (Gas.Cost_of.hash v) in
             Gas.check gas >>=? fun () ->
-            let hash = Script.hash_expr (Micheline.strip_locations (unparse_data ty v)) in
+            let hash = hash_data ty v in
             logged_return (Item (hash, rest), gas, ctxt)
         | Steps_to_quota, rest ->
             let gas = Gas.consume gas Gas.Cost_of.steps_to_quota in

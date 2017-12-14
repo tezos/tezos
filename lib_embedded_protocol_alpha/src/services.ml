@@ -510,7 +510,8 @@ module Helpers = struct
       ~description: "Computes the hash of some data expression \
                      using the same algorithm as script instruction H"
       ~query: RPC_query.empty
-      ~input: (obj1 (req "data" Script.expr_encoding))
+      ~input: (obj2 (req "data" Script.expr_encoding)
+                 (req "type" Script.expr_encoding))
       ~output: (wrap_tzerror @@
                 obj1 (req "hash" string))
       ~error: Data_encoding.empty

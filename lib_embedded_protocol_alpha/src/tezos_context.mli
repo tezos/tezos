@@ -243,9 +243,6 @@ module Script : sig
   val expr_encoding: expr Data_encoding.t
   val prim_encoding: prim Data_encoding.t
   val encoding: t Data_encoding.t
-
-  val hash_expr : expr -> string
-
 end
 
 module Bootstrap : sig

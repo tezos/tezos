@@ -141,10 +141,13 @@ let commands () =
       (prefixes [ "hash" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
          data_parameter
+       @@ prefixes [ "of" ; "type" ]
+       @@ Cli_entries.param ~name:"type" ~desc:"the type of the data"
+         data_parameter
        @@ stop)
-      (fun () data cctxt ->
+      (fun () data typ cctxt ->
          Client_proto_rpcs.Helpers.hash_data cctxt
-           cctxt#block (data.expanded) >>= function
+           cctxt#block (data.expanded, typ.expanded) >>= function
          | Ok hash ->
              cctxt#message "%S" hash >>= fun () ->
              return ()
@@ -161,13 +164,16 @@ let commands () =
       (prefixes [ "hash" ; "and" ; "sign" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
          data_parameter
+       @@ prefixes [ "of" ; "type" ]
+       @@ Cli_entries.param ~name:"type" ~desc:"the type of the data"
+         data_parameter
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.alias_param
        @@ stop)
-      (fun () data (_, key) cctxt ->
-         Client_proto_programs.hash_and_sign data key cctxt#block cctxt >>= begin function
-           |Ok (hash, signature) ->
-               cctxt#message "Hash: %S@.Signature: %S" hash signature
+      (fun () data typ (_, key) cctxt ->
+         Client_proto_programs.hash_and_sign data typ key cctxt#block cctxt >>= begin function
+           | Ok (hash, signature) ->
+               cctxt#message "@[<v 0>Hash: %S@,Signature: %S@]" hash signature
            | Error errs ->
                cctxt#warning "%a" pp_print_error errs >>= fun () ->
                cctxt#error "ill-formed data"

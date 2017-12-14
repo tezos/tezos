@@ -764,6 +764,12 @@ let error_unexpected_annot loc annot =
   | None -> ok ()
   | Some _ -> error (Unexpected_annotation loc)
 
+let rec strip_annotations = function
+  | (Int (_,_) as i) -> i
+  | (String (_,_) as s) -> s
+  | Prim (loc, prim, args, _) -> Prim (loc, prim, List.map strip_annotations args, None)
+  | Seq (loc, items, _) -> Seq (loc, List.map strip_annotations items, None)
+
 let fail_unexpected_annot loc annot =
   Lwt.return (error_unexpected_annot loc annot)
 
@@ -2077,6 +2083,11 @@ let typecheck_data
       (Ill_typed_data (None, data, exp_ty))
       (parse_data ?type_logger ctxt exp_ty (root data)) >>=? fun _ ->
     return ()
+
+let hash_data typ data =
+  let unparsed = strip_annotations @@ unparse_data typ data in
+  let bytes = Data_encoding.Binary.to_bytes expr_encoding (Micheline.strip_locations unparsed) in
+  Tezos_hash.Script_expr_hash.(hash_bytes [ bytes ] |> to_b58check)
 
 (* ---- Error registration --------------------------------------------------*)
 

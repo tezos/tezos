@@ -17,8 +17,6 @@ val location_encoding : location Data_encoding.t
 
 val expr_encoding : expr Data_encoding.t
 
-val hash_expr : expr -> string
-
 type t = { code : expr ; storage : expr }
 
 val encoding : t Data_encoding.encoding

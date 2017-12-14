@@ -321,7 +321,11 @@ let () =
 
 let () =
   register1 Services.Helpers.hash_data
-    (fun _ctxt () expr -> return (Script.hash_expr expr))
+    (fun ctxt () (expr, typ) ->
+       let open Script_ir_translator in
+       Lwt.return @@ parse_ty (Micheline.root typ) >>=? fun (Ex_ty typ, _) ->
+       parse_data ctxt typ (Micheline.root expr) >>=? fun data ->
+       return (Script_ir_translator.hash_data typ data))
 
 let () =
   register2 Services.Helpers.level

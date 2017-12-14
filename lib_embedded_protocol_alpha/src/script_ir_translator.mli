@@ -118,3 +118,5 @@ val typecheck_data :
 val parse_script :
   ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
   context -> Script.t -> ex_script tzresult Lwt.t
+
+val hash_data : 'a Script_typed_ir.ty -> 'a -> string

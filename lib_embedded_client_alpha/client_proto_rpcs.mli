@@ -172,7 +172,7 @@ module Helpers : sig
     block -> Script.expr * Script.expr -> unit tzresult Lwt.t
   val hash_data:
     #Client_rpcs.ctxt ->
-    block -> Script.expr -> string tzresult Lwt.t
+    block -> Script.expr * Script.expr -> string tzresult Lwt.t
   val level:
     #Client_rpcs.ctxt ->
     block -> ?offset:int32 -> Raw_level.t -> Level.t tzresult Lwt.t
