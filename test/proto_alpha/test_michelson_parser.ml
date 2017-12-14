@@ -34,14 +34,16 @@ let known_ok_tez_litterals =
     999_999_999_999_999_999L, "999,999,999,999.999,999" ]
 
 let known_bad_tez_litterals =
-  [ "10000" ;
+  [ "10000." ;
+    "100,." ;
+    "100," ;
     "1,0000" ;
     "0.0000,1" ;
     "0.00,1" ;
     "0,1" ;
-    "0.0001" ;
     "HAHA" ;
     "0.000,000,1" ;
+    "0.0000000" ;
     "9,999,999,999,999.999,999"]
 
 let test_known_tez_litterals () =
@@ -49,9 +51,12 @@ let test_known_tez_litterals () =
     (fun (v, s) ->
        let vv = Tez_repr.of_mutez v in
        let vs = Tez_repr.of_string s in
+       let vs' = Tez_repr.of_string (String.concat "" (String.split_on_char ',' s)) in
        let vv = match vv with None -> Assert.fail_msg "could not unopt %Ld" v | Some vv -> vv in
        let vs = match vs with None -> Assert.fail_msg "could not unopt %s" s | Some vs -> vs in
+       let vs' = match vs' with None -> Assert.fail_msg "could not unopt %s" s | Some vs' -> vs' in
        Assert.equal ~prn:Tez_repr.to_string vv vs ;
+       Assert.equal ~prn:Tez_repr.to_string vv vs' ;
        Assert.equal ~prn:(fun s -> s) (Tez_repr.to_string vv) s)
     known_ok_tez_litterals ;
   List.iter
@@ -68,12 +73,22 @@ let test_random_tez_litterals () =
     let vv = match vv with None -> Assert.fail_msg "could not unopt %Ld" v | Some vv -> vv in
     let s = Tez_repr.to_string vv in
     let vs = Tez_repr.of_string s in
+    let s' = String.concat "" (String.split_on_char ',' s) in
+    let vs' = Tez_repr.of_string s' in
     Assert.is_some ~msg:("Could not parse " ^ s ^ " back") vs ;
-    match vs with
-    | None -> assert false
-    | Some vs ->
-        let rev = Tez_repr.to_int64 vs in
-        Assert.equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev
+    Assert.is_some ~msg:("Could not parse " ^ s ^ " back") vs' ;
+    begin match vs with
+      | None -> assert false
+      | Some vs ->
+          let rev = Tez_repr.to_int64 vs in
+          Assert.equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev
+    end ;
+    begin match vs' with
+      | None -> assert false
+      | Some vs' ->
+          let rev = Tez_repr.to_int64 vs' in
+          Assert.equal ~prn:Int64.to_string ~msg:(Tez_repr.to_string vv) v rev
+    end
   done ;
   return ()
 

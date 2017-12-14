@@ -107,8 +107,20 @@ module Make (T: QTY) : S = struct
         Some (Int64.of_string (remove_commas left ^ pad_to_six (remove_commas right)))
       with _ -> None in
     match String.split_on_char '.' s with
-    | [ left ; right ] when (integers left && decimals right) -> parse left right
-    | [ left ] when integers left -> parse left ""
+    | [ left ; right ] ->
+        if String.contains s ',' then
+          if integers left && decimals right then
+            parse left right
+          else
+            None
+        else if Compare.Int.(String.length right > 0)
+             && Compare.Int.(String.length right <= 6) then
+          parse left right
+        else None
+    | [ left ] ->
+        if not (String.contains s ',') || integers left then
+          parse left ""
+        else None
     | _ -> None
 
   let pp ppf amount =

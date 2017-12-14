@@ -6,9 +6,11 @@ For the next reset
 - Do not allow revealing the same endorsement twice.
 
 - Tez values now have 6 decimals instead of two. The syntax used by
-  the client and Michelson requires comma separators every three
+  the client and Michelson use comma separators every three
   digits, before and after the dot. For instance, 3 million tez and 10
-  µtez is written `3,000,000.000,01`.
+  µtez is written `3,000,000.000,01`. The syntax in JSON is the raw
+  amount in µtez, either as a number without decimals or as a decimal
+  string, for the same example we would get `"3000000000010"`.
 
 [Node]
 
