@@ -98,3 +98,9 @@ let test_and_set_head net_state ~old block =
       locked_set_head chain_store data block >>= fun new_chain_data ->
       Lwt.return (Some new_chain_data, true)
   end
+
+let init net_state =
+  head net_state >>= fun block ->
+  set_head net_state block >>= fun _ ->
+  Lwt.return_unit
+
