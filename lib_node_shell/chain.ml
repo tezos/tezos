@@ -73,7 +73,9 @@ let locked_set_head chain_store data block =
   Lwt_list.fold_left_s push_block ancestor path >>= fun _ ->
   Store.Chain.Current_head.store chain_store (Block.hash block) >>= fun () ->
   (* TODO more optimized updated of live_{blocks/operations} when the
-     new head is a direct successor of the current head... *)
+     new head is a direct successor of the current head...
+     Make sure to do the live blocks computation in `init_head`
+     when this TODO is resolved. *)
   Chain_traversal.live_blocks
     block (State.Block.max_operations_ttl block) >>= fun (live_blocks,
                                                           live_operations) ->
@@ -98,3 +100,9 @@ let test_and_set_head net_state ~old block =
       locked_set_head chain_store data block >>= fun new_chain_data ->
       Lwt.return (Some new_chain_data, true)
   end
+
+let init_head net_state =
+  head net_state >>= fun block ->
+  set_head net_state block >>= fun _ ->
+  Lwt.return_unit
+

@@ -117,12 +117,12 @@ let broadcast_head nv ~previous block =
     end
   end
 
-
 let rec create
     ?max_child_ttl ?parent
     ?(bootstrap_threshold = 1)
     timeout block_validator
     global_valid_block_input db net_state =
+  Chain.init_head net_state >>= fun () ->
   let net_db = Distributed_db.activate db net_state in
   Prevalidator.create
     ~max_operations:2000 (* FIXME temporary constant *)

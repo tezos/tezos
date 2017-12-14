@@ -45,3 +45,6 @@ val set_head: Net.t -> Block.t -> Block.t Lwt.t
 val test_and_set_head:
   Net.t -> old:Block.t -> Block.t -> bool Lwt.t
 
+(** Restores the data about the current head at startup
+    (recomputes the sets of live blocks and operations). *)
+val init_head: Net.t -> unit Lwt.t
