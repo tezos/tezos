@@ -499,7 +499,8 @@ let rec parse ?(check = true) errors tokens stack =
               | Open_paren -> Close_paren
               | Open_brace -> Close_brace
               | _ -> assert false } in
-      parse ~check errors (fake :: (* insert *) tokens) stack
+      let tokens = token :: (* insert *) fake :: List.tl tokens in
+      parse ~check errors tokens stack
   (* Valid states *)
   | (Toplevel _ | Sequence (_, _, _)) :: _ ,
     { token = Ident name ; loc } :: { token = Annot annot } :: rest ->
