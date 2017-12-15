@@ -2166,7 +2166,7 @@ let () =
                   "constant", Constant_namespace ;
                   "instruction", Instr_namespace ] in
   let kind_enc =
-    def "primitiveNamespace" @@
+    def "expressionKind" @@
     describe
       ~title: "Expression kind"
       ~description:
