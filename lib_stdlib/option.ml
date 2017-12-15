@@ -32,3 +32,5 @@ let first_some a b = match a, b with
   | None, Some v -> Some v
   | Some v, _ -> Some v
 
+let try_with f =
+  try Some (f ()) with _ -> None

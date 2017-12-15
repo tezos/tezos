@@ -25,3 +25,5 @@ val unopt_map: f:('a -> 'b) -> default:'b -> 'a option -> 'b
 (** First input of form [Some x], or [None] if none **)
 val first_some: 'a option -> 'a option -> 'a option
 
+(** [Some (f ())] if [f] does not raise, [None] otherwise *)
+val try_with : (unit -> 'a) -> 'a option
