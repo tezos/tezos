@@ -46,6 +46,18 @@ let context_dir data_dir = data_dir // "context"
 let protocol_dir data_dir = data_dir // "protocol"
 let lock_file data_dir = data_dir // "lock"
 
+let find_log_rules default =
+  match Option.try_with (fun () -> Sys.getenv "TEZOS_LOG"),
+        Option.try_with (fun () -> Sys.getenv "LWT_LOG")
+  with
+  | Some rules, None -> "environment variable TEZOS_LOG", Some rules
+  | None, Some rules -> "environment variable LWT_LOG", Some rules
+  | None, None -> "configuration file", default
+  | Some rules, Some _ ->
+      warn "Both environment variables TEZOS_LOG and LWT_LOG \
+            defined, using TEZOS_LOG." ;
+      "environment varible TEZOS_LOG", Some rules
+
 let init_logger ?verbosity (log_config : Node_config_file.log) =
   begin
     match verbosity with
@@ -53,14 +65,13 @@ let init_logger ?verbosity (log_config : Node_config_file.log) =
         Lwt_log_core.add_rule "*" level
     | None ->
         Lwt_log_core.add_rule "*" log_config.default_level ;
-        let rules =
-          match Sys.getenv "TEZOS_LOG" with
-          | rules -> Some rules
-          | exception Not_found ->
-              match Sys.getenv "LWT_LOG" with
-              | rules -> Some rules
-              | exception Not_found -> log_config.rules in
-        Option.iter ~f:Lwt_log_core.load_rules rules
+        let origin, rules = find_log_rules log_config.rules in
+        Option.iter rules ~f:begin fun rules ->
+          try Lwt_log_core.load_rules rules ~fail_on_error:true
+          with _ ->
+            fatal_error "Incorrect log rules defined in %s, exiting." origin ;
+            exit 1
+        end
   end ;
   Logging.init ~template:log_config.template log_config.output
 
