@@ -410,6 +410,15 @@ assert_fails $client typecheck data '(Map (Item 0 1) (Item 10 1) (Item 5 1))' ag
 assert_fails $client typecheck data '(Set "A" "C" "B")' against type '(set string)'
 assert_fails $client typecheck data '(Set "A" "B" "B")' against type '(set string)'
 
+hash_result=`$client hash data '(Pair "22220.00" (Pair "2017-12-13T04:49:00Z" 034))' \
+                     of type '(pair tez (pair timestamp int))'`
+
+assert_output $CONTRACT_PATH/hash_consistency_checker.tz Unit \
+              '(Pair "22220.00" (Pair "2017-12-13T04:49:00Z" 034))' "$hash_result"
+
+assert_output $CONTRACT_PATH/hash_consistency_checker.tz Unit \
+              '(Pair "22,220" (Pair "2017-12-13T04:49:00+00:00" 34))' "$hash_result"
+
 printf "\nEnd of test\n"
 
 show_logs="no"
