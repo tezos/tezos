@@ -114,7 +114,8 @@ let broadcast_head nv ~previous block =
       Distributed_db.Advertise.current_head nv.net_db block ;
       Lwt.return_unit
     end else begin
-      Distributed_db.Advertise.current_branch nv.net_db block
+      Chain.locator (Distributed_db.net_state nv.net_db) >>= fun locator ->
+      Distributed_db.Advertise.current_branch nv.net_db locator
     end
   end
 

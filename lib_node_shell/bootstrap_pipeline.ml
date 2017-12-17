@@ -9,6 +9,8 @@
 
 include Logging.Make(struct let name = "node.validator.bootstrap_pipeline" end)
 
+type error += Invalid_locator of P2p.Peer_id.t * Block_locator.t
+
 type t = {
   canceler: Lwt_canceler.t ;
   block_header_timeout: float ;
@@ -29,7 +31,7 @@ type t = {
   mutable errors: Error_monad.error list ;
 }
 
-let fetch_step pipeline (step : Block_locator.step)  =
+let fetch_step pipeline (step : Block_locator_iterator.step)  =
   lwt_log_info "fetching step %a -> %a (%d%s) from peer %a."
     Block_hash.pp_short step.block
     Block_hash.pp_short step.predecessor
@@ -41,14 +43,12 @@ let fetch_step pipeline (step : Block_locator.step)  =
     if cpt < 0 then
       lwt_log_info "invalid step from peer %a (too long)."
         P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
-      fail (Block_locator.Invalid_locator
-              (pipeline.peer_id, pipeline.locator))
+      fail (Invalid_locator (pipeline.peer_id, pipeline.locator))
     else if Block_hash.equal hash step.predecessor then
       if step.strict_step && cpt <> 0 then
         lwt_log_info "invalid step from peer %a (too short)."
           P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
-        fail (Block_locator.Invalid_locator
-                (pipeline.peer_id, pipeline.locator))
+        fail (Invalid_locator (pipeline.peer_id, pipeline.locator))
       else
         return acc
     else
@@ -78,7 +78,7 @@ let fetch_step pipeline (step : Block_locator.step)  =
 
 let headers_fetch_worker_loop pipeline =
   begin
-    let steps = Block_locator.to_steps pipeline.locator in
+    let steps = Block_locator_iterator.to_steps pipeline.locator in
     iter_s (fetch_step pipeline) steps >>=? fun () ->
     return ()
   end >>= function

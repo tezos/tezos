@@ -84,7 +84,7 @@ module Advertise : sig
       network, of a new head and its sparse history. *)
   val current_branch:
     net_db -> ?peer:P2p.Peer_id.t ->
-    State.Block.t -> unit Lwt.t
+    Block_locator.t -> unit Lwt.t
 
 end
 

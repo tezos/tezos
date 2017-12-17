@@ -271,8 +271,8 @@ let test_ancestor s =
 
 let test_locator s =
   let check_locator h1 expected =
-    Block_locator.compute
-      (vblock s h1) (List.length expected) >>= fun l ->
+    State.compute_locator s.net
+      ~size:(List.length expected) (vblock s h1) >>= fun l ->
     let _, l = (l : Block_locator.t :> _ * _) in
     if List.length l <> List.length expected then
       Assert.fail_msg
@@ -415,8 +415,9 @@ let test_new_blocks s =
 
 let test_find_new s =
   let test s h expected =
-    Block_locator.compute (vblock s h) 50 >>= fun loc ->
-    Block_locator.find_new s.net loc (List.length expected) >>= fun blocks ->
+    State.compute_locator s.net ~size:50 (vblock s h) >>= fun loc ->
+    Block_locator_iterator.find_new
+      s.net loc (List.length expected) >>= fun blocks ->
     if List.length blocks <> List.length expected then
       Assert.fail_msg
         "Invalid find new length %s (found: %d, expected: %d)"

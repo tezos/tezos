@@ -9,6 +9,8 @@
 
 type t
 
+type error += Invalid_locator of P2p.Peer_id.t * Block_locator.t
+
 val create:
   ?notify_new_block: (State.Block.t -> unit) ->
   block_header_timeout:float ->

@@ -51,7 +51,7 @@ let set_bootstrapped pv =
   end
 
 let bootstrap_new_branch pv _ancestor _head unknown_prefix =
-  let len = Block_locator.estimated_length unknown_prefix in
+  let len = Block_locator_iterator.estimated_length unknown_prefix in
   lwt_log_info
     "validating new branch from peer %a (approx. %d blocks)"
     P2p.Peer_id.pp_short pv.peer_id len >>= fun () ->
@@ -154,7 +154,7 @@ let may_validate_new_branch pv distant_hash locator =
     return ()
   end else begin
     let net_state = Distributed_db.net_state pv.net_db in
-    Block_locator.known_ancestor net_state locator >>= function
+    Block_locator_iterator.known_ancestor net_state locator >>= function
     | None ->
         lwt_log_info
           "ignoring branch %a without common ancestor from peer: %a."
@@ -192,7 +192,7 @@ let rec worker_loop pv =
   | Ok () ->
       worker_loop pv
   | Error ((( Unknown_ancestor
-           | Block_locator.Invalid_locator _
+           | Bootstrap_pipeline.Invalid_locator _
            | Block_validator.Invalid_block _ ) :: _) as errors ) ->
       (* TODO ban the peer_id... *)
       lwt_log_info "Terminating the validation worker for peer %a (kickban)."

@@ -17,6 +17,7 @@ val genesis: Net.t -> Block.t Lwt.t
 
 (** The current head of the network's blockchain. *)
 val head: Net.t -> Block.t Lwt.t
+val locator: Net.t -> Block_locator.t Lwt.t
 
 (** All the available chain data. *)
 type data = {
@@ -24,10 +25,12 @@ type data = {
   current_mempool: mempool ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
+  locator: Block_locator.t Lwt.t lazy_t ;
 }
 
 (** Reading atomically all the chain data. *)
 val data: Net.t -> data Lwt.t
+
 
 (** The current head and all the known (valid) alternate heads. *)
 val known_heads: Net.t -> Block.t list Lwt.t

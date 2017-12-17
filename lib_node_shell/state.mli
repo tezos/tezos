@@ -160,6 +160,8 @@ val read_block:
 val read_block_exn:
   global_state -> Block_hash.t -> Block.t Lwt.t
 
+val compute_locator: Net.t -> ?size:int -> Block.t -> Block_locator.t Lwt.t
+
 val fork_testnet:
   Block.t -> Protocol_hash.t -> Time.t -> Net.t tzresult Lwt.t
 
@@ -176,6 +178,7 @@ type chain_data = {
   current_mempool: mempool ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
+  locator: Block_locator.t Lwt.t lazy_t ;
 }
 
 val read_chain_store:

@@ -466,8 +466,7 @@ module P2p_reader = struct
           ignore
           @@ P2p.try_send global_db.p2p state.conn
           @@ Get_current_branch net_id ;
-        Chain.head net_db.net_state >>= fun head ->
-        Block_locator.compute head 200 >>= fun locator ->
+        Chain.locator net_db.net_state >>= fun locator ->
         ignore
         @@ P2p.try_send global_db.p2p state.conn
         @@ Current_branch (net_id, locator) ;
@@ -951,10 +950,8 @@ module Advertise = struct
     send net_db ?peer @@
     Current_head (net_id, State.Block.header head, mempool)
 
-  let current_branch net_db ?peer head =
+  let current_branch net_db ?peer locator =
     let net_id = State.Net.id net_db.net_state in
-    assert (Net_id.equal net_id (State.Block.net_id head)) ;
-    Block_locator.compute head 200 >>= fun locator ->
     send net_db ?peer @@ Current_branch (net_id, locator) ;
     Lwt.return_unit
 

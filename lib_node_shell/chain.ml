@@ -40,6 +40,7 @@ type data = State.chain_data = {
   current_mempool: mempool ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
+  locator: Block_locator.t Lwt.t lazy_t ;
 }
 
 let data net_state =
@@ -47,7 +48,12 @@ let data net_state =
     Lwt.return data
   end
 
-let locked_set_head chain_store data block =
+let locator net_state =
+  data net_state >>= begin fun data ->
+    Lazy.force data.locator
+  end
+
+let locked_set_head net_state chain_store data block =
   let rec pop_blocks ancestor block =
     let hash = Block.hash block in
     if Block_hash.equal hash ancestor then
@@ -83,11 +89,12 @@ let locked_set_head chain_store data block =
                current_mempool = State.empty_mempool ;
                live_blocks ;
                live_operations ;
+               locator = lazy (State.compute_locator net_state block) ;
              }
 
 let set_head net_state block =
   update_chain_store net_state begin fun chain_store data ->
-    locked_set_head chain_store data block >>= fun new_chain_data ->
+    locked_set_head net_state chain_store data block >>= fun new_chain_data ->
     Lwt.return (Some new_chain_data,
                 data.current_head)
   end
@@ -97,7 +104,7 @@ let test_and_set_head net_state ~old block =
     if not (Block.equal data.current_head old) then
       Lwt.return (None, false)
     else
-      locked_set_head chain_store data block >>= fun new_chain_data ->
+      locked_set_head net_state chain_store data block >>= fun new_chain_data ->
       Lwt.return (Some new_chain_data, true)
   end
 
