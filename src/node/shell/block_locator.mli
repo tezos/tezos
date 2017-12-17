@@ -9,16 +9,12 @@
 
 open State
 
-type t = private (Block_header.t * Block_hash.t list)
+type t = Block_store_locator.t
 (** A type for sparse block locator (/à la/ Bitcoin) *)
 
 val encoding: t Data_encoding.t
 
 type error += Invalid_locator of P2p.Peer_id.t * t
-
-val compute: Block.t -> int -> t Lwt.t
-(** [compute block max_length] compute the sparse block locator for
-    the [block]. The locator contains at most [max_length] elements. *)
 
 val fold:
   f:('a ->

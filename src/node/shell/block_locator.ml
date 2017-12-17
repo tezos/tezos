@@ -9,41 +9,17 @@
 
 open State
 
-type t = Block_header.t * Block_hash.t list
+type t = Block_store_locator.t
+
+(** Non private version of Block_store_locator.t for coercions *)
+type locator = Block_header.t * Block_hash.t list
+
+let encoding = Block_store_locator.encoding
 
 type error += Invalid_locator of P2p.Peer_id.t * t
 
-let encoding =
-  let open Data_encoding in
-  (* TODO add a [description] *)
-  (obj2
-     (req "current_head" (dynamic_size Block_header.encoding))
-     (req "history" (dynamic_size (list Block_hash.encoding))))
-
-let compute (b: Block.t) sz =
-  let rec loop acc sz step cpt b =
-    if sz = 0 then
-      Lwt.return (List.rev acc)
-    else
-      Block.predecessor b >>= function
-      | None ->
-          Lwt.return (List.rev (Block.hash b :: acc))
-      | Some predecessor ->
-          if cpt = 0 then
-            loop (Block.hash b :: acc) (sz - 1)
-              (step * 2) (step * 20 - 1) predecessor
-          else if cpt mod step = 0 then
-            loop (Block.hash b :: acc) (sz - 1)
-              step (cpt - 1) predecessor
-          else
-            loop acc sz step (cpt - 1) predecessor in
-  Block.predecessor b >>= function
-  | None -> Lwt.return (State.Block.header b, [])
-  | Some p ->
-      loop [] sz 1 9 p >>= fun hist ->
-      Lwt.return (State.Block.header b, hist)
-
-let estimated_length (_head, hist) =
+let estimated_length locator =
+  let (_head, hist) = (locator : t :> locator) in
   let rec loop acc step cpt = function
     | [] -> acc
     | _ :: hist ->
@@ -54,7 +30,8 @@ let estimated_length (_head, hist) =
   in
   loop 1 1 9 hist
 
-let fold ~f acc (head, hist) =
+let fold ~f acc locator =
+  let (head, hist) = (locator : t :> locator) in
   let rec loop step cpt acc = function
     | [] | [_] -> acc
     | block :: (pred :: rem as hist) ->
@@ -83,31 +60,32 @@ let to_steps locator =
     end
     [] locator
 
-let rec known_ancestor net_state acc hist =
-  match hist with
-  | [] -> Lwt.return_none
-  | h :: hist ->
-      Block.read_opt net_state h >>= function
-      | Some block -> Lwt.return (Some (block, List.rev (h :: acc)))
-      | None ->
-          Block.known_invalid net_state h >>= function
-          | true -> Lwt.return_none
-          | false -> known_ancestor net_state (h :: acc) hist
+let block_validity net_state block : Block_store_locator.validity Lwt.t =
+  Block.known net_state block >>= function
+  | false ->
+      if Block_hash.equal block (State.Net.faked_genesis_hash net_state) then
+        Lwt.return Block_store_locator.Known_valid
+      else
+        Lwt.return Block_store_locator.Unknown
+  | true ->
+      Block.known_invalid net_state block >>= function
+      | true ->
+          Lwt.return Block_store_locator.Known_invalid
+      | false ->
+          Lwt.return Block_store_locator.Known_valid
 
-let known_ancestor net_state (head, hist) =
-  let hash = Block_header.hash head in
-  if Block_hash.equal hash (State.Net.faked_genesis_hash net_state) then
-    State.Block.read_exn
-      net_state (State.Net.genesis net_state).block >>= fun genesis ->
-    Lwt.return_some (genesis, (head, []))
-  else
-    State.Block.read_opt net_state hash >>= function
-    | Some ancestor -> Lwt.return_some (ancestor, (head, []))
-    | None ->
-        known_ancestor net_state [] hist >>= function
-        | None -> Lwt.return_none
-        | Some (ancestor, prefix) ->
-            Lwt.return_some (ancestor, (head, prefix))
+let known_ancestor net_state locator =
+  Block_store_locator.unknown_prefix (block_validity net_state) locator
+  >>= function
+  | None -> Lwt.return_none
+  | Some (tail, locator) ->
+      if Block_hash.equal tail (State.Net.faked_genesis_hash net_state) then
+        Block.read_exn
+          net_state (State.Net.genesis net_state).block >>= fun genesis ->
+        Lwt.return_some (genesis, locator)
+      else
+        Block.read_exn net_state tail >>= fun block ->
+        Lwt.return_some (block, locator)
 
 let find_new net_state locator sz =
   let rec path sz acc h =

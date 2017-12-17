@@ -24,6 +24,7 @@ type data = {
   current_mempool: mempool ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
+  locator: Block_store_locator.t Lwt.t lazy_t ;
 }
 
 (** Reading atomically all the chain data. *)

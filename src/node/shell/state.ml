@@ -90,6 +90,7 @@ and chain_data = {
   current_mempool: mempool ;
   live_blocks: Block_hash.Set.t ;
   live_operations: Operation_hash.Set.t ;
+  locator: Block_store_locator.t Lwt.t lazy_t ;
 }
 
 and mempool = {
@@ -136,6 +137,23 @@ let update_chain_store { net_id ; context_index ; chain_state } f =
       end >>= fun () ->
     Lwt.return res
   end
+
+let locator_size = 200
+
+let compute_locator_from_head net head =
+  Shared.use net.block_store begin fun block_store ->
+    Block_store_locator.compute block_store head.hash locator_size
+  end
+
+let compute_locator_from_head_hash net head =
+  Shared.use net.block_store begin fun block_store ->
+    Block_store_locator.compute block_store head locator_size
+  end
+
+let compute_locator net =
+  Shared.use net.chain_state begin fun chain_state ->
+    Lwt.return chain_state.data.locator
+  end >>= Lazy.force
 
 type t = global_state
 
@@ -198,6 +216,7 @@ module Net = struct
         current_mempool = empty_mempool ;
         live_blocks = Block_hash.Set.singleton genesis.block ;
         live_operations = Operation_hash.Set.empty ;
+        locator = lazy (compute_locator_from_head_hash net_state current_head) ;
       } ;
       chain_store ;
     }
