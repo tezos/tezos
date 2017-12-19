@@ -126,6 +126,27 @@ let rec pop ({ closed ; queue ; empty ; current_size ; _ } as q) =
     wait_push q >>= fun () ->
     pop q
 
+let rec pop_with_timeout timeout q =
+  if not (Queue.is_empty q.queue) then begin
+    Lwt.cancel timeout ;
+    pop q >>= Lwt.return_some
+  end else if Lwt.is_sleeping timeout then
+    if q.closed then begin
+      Lwt.cancel timeout ;
+      Lwt.fail Closed
+    end else
+      let waiter = wait_push q in
+      Lwt.choose [
+        timeout ;
+        Lwt.protected waiter ;
+      ] >>= fun () ->
+      pop_with_timeout timeout q
+  else
+    Lwt.return_none
+
+let pop_with_timeout timeout q =
+  pop_with_timeout (Lwt_unix.sleep timeout) q
+
 let rec peek ({ closed ; queue ; _ } as q) =
   if not (Queue.is_empty queue) then
     let (_elt_size, elt) = Queue.peek queue in

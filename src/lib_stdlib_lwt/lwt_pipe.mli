@@ -29,6 +29,14 @@ val pop : 'a t -> 'a Lwt.t
 (** [pop q] is a thread that blocks while [q] is empty, then
     removes and returns the first element in [q]. *)
 
+val pop_with_timeout : float -> 'a t -> 'a option Lwt.t
+(** [pop t q] is a thread that blocks while [q] is empty, then
+    removes and returns the first element [v] in [q] and
+    to return [Some v], unless no message could be popped
+    in [t] seconds, in which case it returns [None].
+    As concurrent readers are allowed, [None] does not
+    necessarily mean that no value has been pushed. *)
+
 val pop_all : 'a t -> 'a list Lwt.t
 (** [pop_all q] is a thread that blocks while [q] is empty, then
     removes and returns all the element in [q] (in the order they
