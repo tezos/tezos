@@ -275,8 +275,7 @@ let test_ancestor s =
 
 let test_locator s =
   let check_locator h1 expected =
-    Block_locator.compute
-      (vblock s h1) (List.length expected) >>= fun l ->
+    State.compute_locator_from_head s.net (vblock s h1) >>= fun l ->
     let _, l = (l : Block_locator.t :> _ * _) in
     if List.length l <> List.length expected then
       Assert.fail_msg
@@ -288,9 +287,7 @@ let test_locator s =
            Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
       l expected ;
     Lwt.return_unit in
-  check_locator "A8" ["A7";"A6";"A5";"A4";"A3";"A2"] >>= fun () ->
-  check_locator "B8" ["B7";"B6";"B5";"B4";"B3";"B2";"B1";"A3"] >>= fun () ->
-  check_locator "B8" ["B7";"B6";"B5";"B4"] >>= fun () ->
+  check_locator "B8" ["B7";"B6";"B5";"B4";"B3";"B2";"B1";"A3";"A2";"A1";"Genesis"] >>= fun () ->
   return ()
 
 
@@ -419,7 +416,7 @@ let test_new_blocks s =
 
 let test_find_new s =
   let test s h expected =
-    Block_locator.compute (vblock s h) 50 >>= fun loc ->
+    State.compute_locator_from_head s.net (vblock s h) >>= fun loc ->
     Block_locator.find_new s.net loc (List.length expected) >>= fun blocks ->
     if List.length blocks <> List.length expected then
       Assert.fail_msg

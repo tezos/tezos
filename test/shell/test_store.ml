@@ -150,6 +150,54 @@ let test_expand s =
     [Block_hash.to_b58check bh3' ; Block_hash.to_b58check bh3] ;
   Lwt.return_unit
 
+(** Block_store_locator *)
+
+let lolchained_block ?(operations = []) predecessor header =
+  let operations_hash =
+    Operation_list_list_hash.compute
+      [Operation_list_hash.compute operations] in
+  { Store.Block.header =
+      { Block_header.shell =
+          { timestamp = Time.of_seconds (Random.int64 1500L) ;
+            level = 0l ; (* dummy *)
+            proto_level = 0 ; (* dummy *)
+            validation_passes = Random.int 32 ;
+            predecessor ; operations_hash ;
+            fitness = [MBytes.of_string @@ string_of_int @@ String.length header;
+                       MBytes.of_string @@ string_of_int @@ 12] } ;
+        proto = MBytes.of_string header ;
+      } ;
+    max_operations_ttl = 0 ;
+    message = "" ;
+    context = Context.dummy_commit ;
+    max_number_of_operations = [] ;
+    max_operation_data_length = 0 ;
+  }
+
+let rec lolchain n =
+  if n <= 1 then [], genesis_block
+  else
+    let chain, pred = lolchain (n - 1) in
+    let block = lolchained_block pred (Printf.sprintf "lol %i" n) in
+    block :: chain, Block_header.hash block.header
+
+let make_blocks s n =
+  let blocks, head = lolchain n in
+  Lwt_list.iter_s (fun b ->
+      let hash = Block_header.hash b.Block.header in
+      Block.Contents.store (s, hash) b)
+    blocks >>= fun () ->
+  Lwt.return (blocks, head)
+
+let test_locator s =
+  let s = Store.Net.get s net_id in
+  let s = Store.Block.get s in
+  make_blocks s 1000 >>= fun (_seq, head) ->
+  Block_store_locator.compute s head 5 >>= fun loc ->
+  assert(List.length (snd (loc : Block_store_locator.t :> _ * _)) = 5);
+  Block_store_locator.compute s head 15 >>= fun loc ->
+  assert(List.length (snd (loc : Block_store_locator.t :> _ * _)) = 15);
+  Lwt.return_unit
 
 (** Generic store *)
 
@@ -433,6 +481,7 @@ let tests_raw : (string * (Raw_store.t -> unit Lwt.t)) list = [
 let tests : (string * (Store.t -> unit Lwt.t)) list = [
   "expand", test_expand ;
   "block", test_block ;
+  "locator", test_locator ;
 ]
 
 let () =
