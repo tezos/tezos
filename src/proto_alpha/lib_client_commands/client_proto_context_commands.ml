@@ -32,6 +32,53 @@ let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_conte
   | Ok data ->
       Lwt.return (Some data)
 
+let wait_for_operation_inclusion
+    (ctxt : Proto_alpha.full)
+    ?(predecessors = 10)
+    ?(confirmations = 1)
+    operation_hash =
+  let confirmed_blocks = Hashtbl.create confirmations in
+  Block_services.monitor ctxt
+    ~include_ops:true
+    ~length:predecessors >>=? fun (stream, stop) ->
+  let stream = Lwt_stream.flatten @@ Lwt_stream.flatten @@ stream in
+  Lwt_stream.find_s begin fun bi ->
+    match Hashtbl.find_opt confirmed_blocks bi.Block_services.predecessor with
+    | Some n ->
+        ctxt#answer
+          "Operation received %d confirmations as of block: %a"
+          (n+1) Block_hash.pp bi.hash >>= fun () ->
+        if n < confirmations then begin
+          Hashtbl.add confirmed_blocks bi.hash (n+1) ;
+          Lwt.return_false
+        end else
+          Lwt.return_true
+    | None ->
+        let in_block =
+          match bi.operations with
+          | None -> false
+          | Some operations ->
+              List.exists
+                (List.exists
+                   (fun (hash, _) ->
+                      Operation_hash.equal operation_hash hash))
+                operations in
+        if not in_block then
+          Lwt.return_false
+        else begin
+          ctxt#answer
+            "Operation found in block: %a"
+            Block_hash.pp bi.hash >>= fun () ->
+          if confirmations <= 0 then
+            Lwt.return_true
+          else begin
+            Hashtbl.add confirmed_blocks bi.hash 0 ;
+            Lwt.return_false
+          end
+        end
+  end stream >>= fun _ ->
+  stop () ;
+  return ()
 
 let group =
   { Cli_entries.name = "context" ;
@@ -275,6 +322,44 @@ let commands () =
         operation_submitted_message cctxt oph
       end ;
 
+    command ~desc:"Wait until an operation is included in a block"
+      (let int_param =
+         parameter
+           (fun _ s ->
+              try return (int_of_string s)
+              with _ -> failwith "Given an invalid integer literal: '%s'" s) in
+       args2
+         (default_arg
+            ~long:"-confirmations"
+            ~placeholder:"num_blocks"
+            ~doc:"do not end until after 'N' additional blocks after the operation appears"
+            ~default:"0"
+            int_param)
+         (default_arg
+            ~long:"-check-previous"
+            ~placeholder:"num_blocks"
+            ~doc:"number of previous blocks to check"
+            ~default:"10"
+            int_param))
+      (prefixes [ "wait" ; "for" ]
+       @@ param
+         ~name:"operation"
+         ~desc:"Operation to be included"
+         (parameter
+            (fun _ x ->
+               match Operation_hash.of_b58check_opt x with
+               | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
+               | Some hash -> return hash))
+       @@ prefixes [ "to" ; "be" ; "included" ]
+       @@ stop)
+      begin fun (confirmations, predecessors) operation_hash (ctxt : Proto_alpha.full) ->
+        fail_when (confirmations < 0)
+          (failure "confirmations cannot be negative") >>=? fun () ->
+        fail_when (predecessors < 0)
+          (failure "check-previous cannot be negative") >>=? fun () ->
+        wait_for_operation_inclusion ctxt
+          ~confirmations ~predecessors operation_hash
+      end ;
     command ~group:alphanet ~desc: "Fork a test protocol (Alphanet dictator only)."
       no_options
       (prefixes [ "fork" ; "test" ; "protocol" ]
