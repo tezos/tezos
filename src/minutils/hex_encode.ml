@@ -9,13 +9,23 @@
 
 (* Tezos Utility library - Hexadecimal encoding *)
 
+let hex_char i =
+  if i < 10 then
+    Char.unsafe_chr ((Char.code '0') + i)
+  else
+    Char.unsafe_chr (((Char.code 'a') - 10) + i)
+
 (* From OCaml's stdlib. See [Digest.to_hex], and [hex_of_bytes], [hex_encode]
    below for examples. *)
 let gen_encode length get s =
   let n = length s in
   let result = Bytes.create (n*2) in
   for i = 0 to n-1 do
-    Bytes.blit_string (Printf.sprintf "%02x" (get s i)) 0 result (2*i) 2;
+    let v = get s i in
+    let low = v land 0x0F in
+    let high = (v land 0xF0) lsr 4 in
+    Bytes.set result (2*i) (hex_char high);
+    Bytes.set result (2*i + 1) (hex_char low)
   done;
   Bytes.unsafe_to_string result
 
