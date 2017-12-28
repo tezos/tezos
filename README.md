@@ -2,7 +2,7 @@ TEZOS
 =====
 
 Tezos is a distributed consensus platform with meta-consensus capability. Tezos
-not only comes to consensus about state, like BTC or ETH. It also comes to
+not only comes to consensus about state, like BTC or ETH, it also comes to
 consensus about how the protocol and the nodes should adapt and upgrade.
 
 See https://www.tezos.com/ for more information about the project.
