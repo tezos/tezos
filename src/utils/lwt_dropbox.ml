@@ -14,7 +14,7 @@ exception Closed
 type 'a t =
   { mutable data : 'a option ;
     mutable closed : bool ;
-    mutable put_waiter : unit Lwt.u option ;
+    mutable put_waiter : (unit Lwt.t * unit Lwt.u) option ;
   }
 
 let create () =
@@ -26,9 +26,9 @@ let create () =
 let notify_put dropbox =
   match dropbox.put_waiter with
   | None -> ()
-  | Some w ->
+  | Some (_waiter, wakener) ->
       dropbox.put_waiter <- None ;
-      Lwt.wakeup_later w ()
+      Lwt.wakeup_later wakener ()
 
 let put dropbox elt =
   if dropbox.closed then
@@ -48,14 +48,14 @@ let close dropbox =
 
 let wait_put ~timeout dropbox =
   match dropbox.put_waiter with
-  | Some w ->
+  | Some (waiter, _wakener) ->
       Lwt.choose [
         timeout ;
-        Lwt.protected (Lwt.waiter_of_wakener w)
+        Lwt.protected waiter
       ]
   | None ->
       let waiter, wakener = Lwt.wait () in
-      dropbox.put_waiter <- Some wakener ;
+      dropbox.put_waiter <- Some (waiter, wakener) ;
       Lwt.choose [
         timeout ;
         Lwt.protected waiter ;
