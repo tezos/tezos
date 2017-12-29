@@ -65,7 +65,7 @@ end
 type trigger =
   | Absent
   | Present
-  | Waiting of unit Lwt.u
+  | Waiting of unit Lwt.t * unit Lwt.u
 
 let trigger () : (unit -> unit) * (unit -> unit Lwt.t) =
   let state = ref Absent in
@@ -73,28 +73,28 @@ let trigger () : (unit -> unit) * (unit -> unit Lwt.t) =
     match !state with
     | Absent -> state := Present
     | Present -> ()
-    | Waiting u ->
+    | Waiting (_waiter, wakener) ->
         state := Absent;
-        Lwt.wakeup u ()
+        Lwt.wakeup wakener ()
   in
   let wait () =
     match !state with
     | Absent ->
-        let waiter, u = Lwt.wait () in
-        state := Waiting u;
+        let waiter, wakener = Lwt.wait () in
+        state := Waiting (waiter, wakener) ;
         waiter
     | Present ->
         state := Absent;
         Lwt.return_unit
-    | Waiting u ->
-        Lwt.waiter_of_wakener u
+    | Waiting (waiter, _wakener)  ->
+        waiter
   in
   trigger, wait
 
 type 'a queue =
   | Absent
   | Present of 'a list ref
-  | Waiting of 'a list Lwt.u
+  | Waiting of ('a list Lwt.t * 'a list Lwt.u)
 
 let queue () : ('a -> unit) * (unit -> 'a list Lwt.t) =
   let state = ref Absent in
@@ -102,21 +102,21 @@ let queue () : ('a -> unit) * (unit -> 'a list Lwt.t) =
     match !state with
     | Absent -> state := Present (ref [v])
     | Present r -> r := v :: !r
-    | Waiting u ->
+    | Waiting (_waiter, wakener) ->
         state := Absent;
-        Lwt.wakeup u [v]
+        Lwt.wakeup wakener [v]
   in
   let wait () =
     match !state with
     | Absent ->
-        let waiter, u = Lwt.wait () in
-        state := Waiting u;
+        let waiter, wakener = Lwt.wait () in
+        state := Waiting (waiter, wakener) ;
         waiter
     | Present r ->
         state := Absent;
         Lwt.return (List.rev !r)
-    | Waiting u ->
-        Lwt.waiter_of_wakener u
+    | Waiting (waiter, _wakener) ->
+        waiter
   in
   queue, wait
 
