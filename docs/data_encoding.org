@@ -1,7 +1,7 @@
 * The data_encoding library
 Throughout the Tezos protocol, data is serialized so that it can be used via RPC, 
 written to disk, or placed in a block. This serialization/deserialization is handled 
-via the [[../src/minutils/data_encoding.mli][data_encoding library]]
+via the [[../lib_data_encoding/data_encoding.mli][data_encoding library]]
 by providing a set primitive encodings and a variety of combinators.
 
 ** Examples/Tutorial
