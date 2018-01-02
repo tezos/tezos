@@ -91,35 +91,6 @@ let trigger () : (unit -> unit) * (unit -> unit Lwt.t) =
   in
   trigger, wait
 
-type 'a queue =
-  | Absent
-  | Present of 'a list ref
-  | Waiting of ('a list Lwt.t * 'a list Lwt.u)
-
-let queue () : ('a -> unit) * (unit -> 'a list Lwt.t) =
-  let state = ref Absent in
-  let queue v =
-    match !state with
-    | Absent -> state := Present (ref [v])
-    | Present r -> r := v :: !r
-    | Waiting (_waiter, wakener) ->
-        state := Absent;
-        Lwt.wakeup wakener [v]
-  in
-  let wait () =
-    match !state with
-    | Absent ->
-        let waiter, wakener = Lwt.wait () in
-        state := Waiting (waiter, wakener) ;
-        waiter
-    | Present r ->
-        state := Absent;
-        Lwt.return (List.rev !r)
-    | Waiting (waiter, _wakener) ->
-        waiter
-  in
-  queue, wait
-
 (* A worker launcher, takes a cancel callback to call upon *)
 let worker name ~run ~cancel =
   let stop = LC.create () in

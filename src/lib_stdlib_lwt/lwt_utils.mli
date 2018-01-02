@@ -23,7 +23,6 @@ val worker:
   unit Lwt.t
 
 val trigger: unit -> (unit -> unit) * (unit -> unit Lwt.t)
-val queue: unit -> ('a -> unit) * (unit -> 'a list Lwt.t)
 val sort: ('a -> 'a -> int Lwt.t) -> 'a list -> 'a list Lwt.t
 
 val read_bytes:
