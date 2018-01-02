@@ -466,7 +466,7 @@ let rec parse ?(check = true) errors tokens stack =
       parse ~check errors rem (* skip *) stack
   | (Sequence _ | Toplevel _) :: _ ,
     ({ token = Semi } as valid) :: ({ token = Semi } as token) :: rem ->
-      let errors = Unexpected token :: errors in
+      let errors = Extra token :: errors in
       parse ~check errors (valid (* skip *) :: rem) stack
   | (Wrapped _ | Unwrapped _) :: _ ,
     { token = Open_paren }
@@ -480,26 +480,28 @@ let rec parse ?(check = true) errors tokens stack =
   | Toplevel _ :: [],
     ({ token = Close_paren } as token) :: rem
   | Toplevel _ :: [],
+    ({ token = Open_paren } as token) :: rem
+  | Toplevel _ :: [],
     ({ token = Close_brace } as token) :: rem
+  | Sequence _ :: _,
+    ({ token = Open_paren } as token) :: rem
+  | Sequence _ :: _,
+    ({ token = Close_paren } as token :: rem)
+  | (Wrapped _ | Unwrapped _) :: _,
+    ({ token = Open_paren } as token) :: ({ token = Close_brace | Semi } :: _ | [] as rem)
   | _,
     ({ token = Annot _ } as token) :: rem ->
       let errors = Unexpected token :: errors in
       parse ~check errors rem (* skip *) stack
-  | Wrapped (token, _, _, _) :: _,
-    ({ token = Close_brace | Semi } :: _ | [])
-  | (Sequence _ | Toplevel _) :: _,
-    ({ token = Open_paren } as token) :: _
-  | (Wrapped _ | Unwrapped _) :: _,
-    ({ token = Open_paren } as token) :: ({ token = Close_brace | Semi } :: _ | [])
-  | (Sequence (token, _, _) :: _ | Unwrapped _ :: Sequence (token, _, _) :: _),
-    ({ token = Close_paren } :: _ | [])->
+  | Wrapped (token, _, _, _) :: _, ([] | { token = Close_brace | Semi } :: _) ->
       let errors = Unclosed token :: errors in
-      let fake =
-        { token with token = match token.token with
-              | Open_paren -> Close_paren
-              | Open_brace -> Close_brace
-              | _ -> assert false } in
-      let tokens = token :: (* insert *) fake :: List.tl tokens in
+      let fake = { token with token = Close_paren } in
+      let tokens = (* insert *) fake :: tokens  in
+      parse ~check errors tokens stack
+  | (Sequence (token, _, _) :: _ | Unwrapped _ :: Sequence (token, _, _) :: _), [] ->
+      let errors = Unclosed token :: errors in
+      let fake = { token with token = Close_brace } in
+      let tokens = (* insert *) fake :: tokens  in
       parse ~check errors tokens stack
   (* Valid states *)
   | (Toplevel _ | Sequence (_, _, _)) :: _ ,
