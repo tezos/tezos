@@ -159,6 +159,22 @@ let validate_new_head w hash (header : Block_header.t) =
       set_bootstrapped pv ;
       return ()
 
+let only_if_fitness_increases w distant_header cont =
+  let pv = Worker.state w in
+  let net_state = Distributed_db.net_state pv.parameters.net_db in
+  Chain.head net_state >>= fun local_header ->
+  if Fitness.compare
+      distant_header.Block_header.shell.fitness
+      (State.Block.fitness local_header) <= 0 then begin
+    set_bootstrapped pv ;
+    debug w
+      "ignoring head %a with non increasing fitness from peer: %a."
+      Block_hash.pp_short (Block_header.hash distant_header)
+      P2p.Peer_id.pp_short pv.peer_id ;
+    (* Don't download a branch that cannot beat the current head. *)
+    return ()
+  end else cont ()
+
 let may_validate_new_head w hash header =
   let pv = Worker.state w in
   let net_state = Distributed_db.net_state pv.parameters.net_db in
@@ -181,35 +197,23 @@ let may_validate_new_head w hash header =
           fail Known_invalid
     end
   | false ->
+      only_if_fitness_increases w header @@ fun () ->
       validate_new_head w hash header
 
 let may_validate_new_branch w distant_hash locator =
   let pv = Worker.state w in
   let distant_header, _ = (locator : Block_locator.t :> Block_header.t * _) in
+  only_if_fitness_increases w distant_header @@ fun () ->
   let net_state = Distributed_db.net_state pv.parameters.net_db in
-  Chain.head net_state >>= fun local_header ->
-  if Fitness.compare
-      distant_header.Block_header.shell.fitness
-      (State.Block.fitness local_header) < 0 then begin
-    set_bootstrapped pv ;
-    debug w
-      "ignoring branch %a with low fitness from peer: %a."
-      Block_hash.pp_short distant_hash
-      P2p.Peer_id.pp_short pv.peer_id ;
-    (* Don't bother with downloading a branch with a low fitness. *)
-    return ()
-  end else begin
-    let net_state = Distributed_db.net_state pv.parameters.net_db in
-    Block_locator_iterator.known_ancestor net_state locator >>= function
-    | None ->
-        debug w
-          "ignoring branch %a without common ancestor from peer: %a."
-          Block_hash.pp_short distant_hash
-          P2p.Peer_id.pp_short pv.peer_id ;
-        fail Unknown_ancestor
-    | Some (ancestor, unknown_prefix) ->
-        bootstrap_new_branch w ancestor distant_header unknown_prefix
-  end
+  Block_locator_iterator.known_ancestor net_state locator >>= function
+  | None ->
+      debug w
+        "ignoring branch %a without common ancestor from peer: %a."
+        Block_hash.pp_short distant_hash
+        P2p.Peer_id.pp_short pv.peer_id ;
+      fail Unknown_ancestor
+  | Some (ancestor, unknown_prefix) ->
+      bootstrap_new_branch w ancestor distant_header unknown_prefix
 
 let on_no_request w =
   let pv = Worker.state w in
