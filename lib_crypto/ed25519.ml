@@ -115,7 +115,7 @@ module Secret_key = struct
   let of_b58check s =
     match Base58.simple_decode b58check_encoding s with
     | Some x -> Ok x
-    | None -> generic_error "Unexpected hash (ed25519 public key)"
+    | None -> generic_error "Unexpected hash (ed25519 secret key)"
   let to_b58check s = Base58.simple_encode b58check_encoding s
 
   let of_bytes s = Sodium.Sign.Bytes.to_secret_key s
@@ -174,7 +174,7 @@ module Signature = struct
   let of_b58check s =
     match Base58.simple_decode b58check_encoding s with
     | Some x -> Ok x
-    | None -> generic_error "Unexpected hash (ed25519 public key)"
+    | None -> generic_error "Unexpected hash (ed25519 signature)"
   let to_b58check s = Base58.simple_encode b58check_encoding s
 
   let of_bytes s = MBytes.of_string (Bytes.to_string s)
