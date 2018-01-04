@@ -120,13 +120,13 @@ end
 
 (** Base58Check-encoding/decoding functions (with error detections). *)
 val safe_encode: ?alphabet:Alphabet.t -> string -> string
-val safe_decode: ?alphabet:Alphabet.t -> string -> string
+val safe_decode: ?alphabet:Alphabet.t -> string -> string option
 
 (** Base58-encoding/decoding functions (without error detections). *)
 val raw_encode: ?alphabet:Alphabet.t -> string -> string
-val raw_decode: ?alphabet:Alphabet.t -> string -> string
+val raw_decode: ?alphabet:Alphabet.t -> string -> string option
 
 (**/**)
 
-val partial_decode: ?alphabet:Alphabet.t -> string -> int -> string
+val partial_decode: ?alphabet:Alphabet.t -> string -> int -> string option
 val make_encoded_prefix: string -> int -> string * int

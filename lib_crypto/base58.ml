@@ -70,8 +70,9 @@ let count_leading_char s c =
 
 let of_char ?(alphabet=Alphabet.default) x =
   let pos = String.get alphabet.decode (int_of_char x) in
-  if pos = '\255' then Pervasives.failwith "Invalid data" ;
-  int_of_char pos
+  match pos with
+  | '\255' -> None
+  | _ -> Some (int_of_char pos)
 
 let to_char ?(alphabet=Alphabet.default) x =
   alphabet.encode.[x]
@@ -95,20 +96,19 @@ let raw_encode ?(alphabet=Alphabet.default) s =
   String.make zeros zero ^ res
 
 let raw_decode ?(alphabet=Alphabet.default) s =
-  let zero = alphabet.encode.[0] in
-  let zeros = count_leading_char s zero in
-  let len = String.length s in
-  let rec loop res i =
-    if i = len then res else
-      let x = Z.of_int (of_char ~alphabet (String.get s i)) in
-      let res = Z.(add x (mul res zbase)) in
-      loop res (i+1)
-  in
-  let res = Z.to_bits @@ loop Z.zero zeros in
-  let res_tzeros = count_trailing_char res '\000' in
-  let len = String.length res - res_tzeros in
-  String.make zeros '\000' ^
-  String.init len (fun i -> String.get res (len - i - 1))
+  TzString.fold_left begin fun a c ->
+    match a, of_char ~alphabet c with
+    | Some a, Some i -> Some Z.(add (of_int i) (mul a zbase))
+    | _ -> None
+  end (Some Z.zero) s |>
+  Option.map ~f:begin fun res ->
+    let res = Z.to_bits res in
+    let res_tzeros = count_trailing_char res '\000' in
+    let len = String.length res - res_tzeros in
+    let zeros = count_leading_char s alphabet.encode.[0] in
+    String.make zeros '\000' ^
+    String.init len (fun i -> String.get res (len - i - 1))
+  end
 
 let checksum s =
   let hash =
@@ -124,13 +124,13 @@ let safe_encode ?alphabet s =
   raw_encode ?alphabet (s ^ checksum s)
 
 let safe_decode ?alphabet s =
-  let s = raw_decode ?alphabet s in
-  let len = String.length s in
-  let msg = String.sub s 0 (len-4)
-  and msg_hash = String.sub s (len-4) 4 in
-  if msg_hash <> checksum msg then
-    invalid_arg "safe_decode" ;
-  msg
+  raw_decode ?alphabet s |> Option.apply ~f:begin fun s ->
+    let len = String.length s in
+    let msg = String.sub s 0 (len-4) in
+    let msg_hash = String.sub s (len-4) 4 in
+    if msg_hash <> checksum msg then None
+    else Some msg
+  end
 
 type data = ..
 
@@ -146,7 +146,7 @@ type 'a encoding = {
 
 let simple_decode ?alphabet { prefix ; of_raw ; _ } s =
   safe_decode ?alphabet s |>
-  TzString.remove_prefix ~prefix |>
+  Option.apply ~f:(TzString.remove_prefix ~prefix) |>
   Option.apply ~f:of_raw
 
 let simple_encode ?alphabet { prefix ; to_raw ; _ } d =
@@ -209,17 +209,14 @@ module MakeEncodings(E: sig
         l p enc.encoded_length
 
   let decode ?alphabet s =
-    try
-      let rec find s = function
-        | [] -> None
-        | Encoding { prefix ; of_raw ; wrap ; _ } :: encodings ->
-            match TzString.remove_prefix ~prefix s with
-            | None -> find s encodings
-            | Some msg -> of_raw msg |> Option.map ~f:wrap in
-      let s = safe_decode ?alphabet s in
-      find s !encodings
-    with Invalid_argument _ -> None
-
+    let rec find s = function
+      | [] -> None
+      | Encoding { prefix ; of_raw ; wrap ; _ } :: encodings ->
+          match TzString.remove_prefix ~prefix s with
+          | None -> find s encodings
+          | Some msg -> of_raw msg |> Option.map ~f:wrap in
+    safe_decode ?alphabet s |>
+    Option.apply ~f:(fun s -> find s !encodings)
 
 end
 
@@ -247,8 +244,11 @@ module MakeResolvers(R: sig
     let n = String.length request in
     let min = raw_decode ~alphabet (request ^ String.make (len - n) zero) in
     let max = raw_decode ~alphabet (request ^ String.make (len - n) last) in
-    let prefix_len = TzString.common_prefix min max in
-    String.sub min 0 prefix_len
+    match min, max with
+    | Some min, Some max ->
+        let prefix_len = TzString.common_prefix min max in
+        Some (String.sub min 0 prefix_len)
+    | _ -> None
 
   let complete ?alphabet context request =
     let rec find s = function
@@ -257,23 +257,24 @@ module MakeResolvers(R: sig
           if not (TzString.has_prefix ~prefix:encoding.encoded_prefix s) then
             find s resolvers
           else
-            let prefix =
-              partial_decode ?alphabet request encoding.encoded_length in
-            let len = String.length prefix in
-            let ignored = String.length encoding.prefix in
-            let msg =
-              if len <= ignored then ""
-              else begin
-                assert (String.sub prefix 0 ignored  = encoding.prefix) ;
-                String.sub prefix ignored (len - ignored)
-              end in
-            resolver context msg >|= fun msgs ->
-            TzList.filter_map
-              (fun msg ->
-                 let res = simple_encode encoding ?alphabet msg in
-                 TzString.remove_prefix ~prefix:request res |>
-                 Option.map ~f:(fun _ -> res))
-              msgs in
+            match partial_decode ?alphabet request encoding.encoded_length with
+            | None -> find s resolvers
+            | Some prefix ->
+                let len = String.length prefix in
+                let ignored = String.length encoding.prefix in
+                let msg =
+                  if len <= ignored then ""
+                  else begin
+                    assert (String.sub prefix 0 ignored  = encoding.prefix) ;
+                    String.sub prefix ignored (len - ignored)
+                  end in
+                resolver context msg >|= fun msgs ->
+                TzList.filter_map
+                  (fun msg ->
+                     let res = simple_encode encoding ?alphabet msg in
+                     TzString.remove_prefix ~prefix:request res |>
+                     Option.map ~f:(fun _ -> res))
+                  msgs in
     find request !resolvers
 
 end
