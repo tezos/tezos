@@ -73,3 +73,8 @@ let mem_char s c =
   match String.index s c with
   | exception Not_found -> false
   | _ -> true
+
+let fold_left f init s =
+  let acc = ref init in
+  String.iter (fun c -> acc := f !acc c) s ;
+  !acc
