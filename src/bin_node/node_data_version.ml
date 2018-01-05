@@ -20,10 +20,22 @@ let version_file_name = "version.json"
 let pp ppf version = Format.pp_print_string ppf version
 
 type error += Invalid_data_dir_version of t * t
+type error += Invalid_data_dir of string
 type error += No_data_dir_version_file of string
 type error += Could_not_read_data_dir_version of string
 
 let () =
+  register_error_kind
+    `Permanent
+    ~id: "invalidDataDir"
+    ~title: "Invalid data directory"
+    ~description: "The data directory cannot be accessed or created"
+    Data_encoding.(obj1 (req "datadirPath" string))
+    (function
+      | Invalid_data_dir path ->
+          Some path
+      | _ -> None)
+    (fun path -> Invalid_data_dir path) ;
   register_error_kind
     `Permanent
     ~id: "invalidDataDirVersion"
@@ -87,11 +99,14 @@ let ensure_data_dir data_dir =
     Data_encoding_ezjsonm.write_file
       (version_file data_dir)
       (Data_encoding.Json.construct version_encoding data_version) in
-  if Sys.file_exists data_dir then
-    match Sys.readdir data_dir with
-    | [||] -> write_version ()
-    | [| single |] when single = default_identity_file_name -> write_version ()
-    | _ -> check_data_dir_version data_dir
-  else
-    Lwt_utils.create_dir ~perm:0o700 data_dir >>= fun () ->
-    write_version ()
+  try if Sys.file_exists data_dir then
+      match Sys.readdir data_dir with
+      | [||] -> write_version ()
+      | [| single |] when single = default_identity_file_name -> write_version ()
+      | _ -> check_data_dir_version data_dir
+    else begin
+      Utils.mkdir ~perm:0o700 data_dir ;
+      write_version ()
+    end
+  with Sys_error _ | Unix.Unix_error _ ->
+    fail (Invalid_data_dir data_dir)

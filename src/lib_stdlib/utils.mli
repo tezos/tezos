@@ -29,4 +29,4 @@ val read_file: ?bin:bool -> string -> string
 (** [write_file p c] writes c to file at path p **)
 val write_file: ?bin:bool -> string -> string -> unit
 
-val mkdir: string -> unit
+val mkdir: ?perm:Unix.file_perm -> string -> unit

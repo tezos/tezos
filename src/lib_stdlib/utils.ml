@@ -48,10 +48,10 @@ let write_file ?(bin=false) fn contents =
     )
     (fun () -> close_out oc)
 
-let mkdir dir =
+let mkdir ?(perm=0o755) dir =
   let safe_mkdir dir =
     if not (Sys.file_exists dir) then
-      try Unix.mkdir dir 0o755
+      try Unix.mkdir dir perm
       with Unix.Unix_error(Unix.EEXIST,_,_) -> () in
   let rec aux dir =
     if not (Sys.file_exists dir) then begin
