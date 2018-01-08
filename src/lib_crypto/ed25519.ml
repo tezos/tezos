@@ -122,31 +122,55 @@ module Secret_key = struct
   type Base58.data +=
     | Secret_key of t
 
-  let b58check_encoding =
+  let seed_encoding =
     Base58.register_encoding
-      ~prefix: Base58.Prefix.ed25519_secret_key
-      ~length:Sodium.Sign.secret_key_size
-      ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_secret_key x))
+      ~prefix: Base58.Prefix.ed25519_seed
+      ~length:Sodium.Sign.seed_size
+      ~to_raw:(fun x -> Sodium.Sign.secret_key_to_seed x |>
+                        Sodium.Sign.Bytes.of_seed |>
+                        Bytes.unsafe_to_string)
       ~of_raw:(fun x ->
-          try Some (Sodium.Sign.Bytes.to_secret_key (Bytes.of_string x))
+          try Some (Bytes.unsafe_of_string x |>
+                    Sodium.Sign.Bytes.to_seed |>
+                    Sodium.Sign.seed_keypair |>
+                    fst)
           with _ -> None)
       ~wrap:(fun x -> Secret_key x)
 
-  let of_b58check_opt s = Base58.simple_decode b58check_encoding s
+  let secret_key_encoding =
+    Base58.register_encoding
+      ~prefix: Base58.Prefix.ed25519_secret_key
+      ~length:Sodium.Sign.secret_key_size
+      ~to_raw:(fun x -> Sodium.Sign.Bytes.of_secret_key x |>
+                        Bytes.unsafe_to_string)
+      ~of_raw:(fun x ->
+          try Some (Bytes.unsafe_of_string x |>
+                    Sodium.Sign.Bytes.to_secret_key)
+          with _ -> None)
+      ~wrap:(fun x -> Secret_key x)
+
+  let of_b58check_opt s =
+    match Base58.simple_decode seed_encoding s with
+    | Some x -> Some x
+    | None -> Base58.simple_decode secret_key_encoding s
+
   let of_b58check_exn s =
-    match Base58.simple_decode b58check_encoding s with
+    match of_b58check_opt s with
     | Some x -> x
     | None -> Pervasives.failwith "Unexpected hash (ed25519 secret key)"
   let of_b58check s =
-    match Base58.simple_decode b58check_encoding s with
+    match of_b58check_opt s with
     | Some x -> Ok x
     | None -> generic_error "Unexpected hash (ed25519 secret key)"
-  let to_b58check s = Base58.simple_encode b58check_encoding s
+  let to_b58check s = Base58.simple_encode seed_encoding s
 
   let of_bytes_opt s =
     match Sodium.Sign.Bigbytes.to_seed s with
-    | exception _ -> None
     | seed -> Some (seed |> Sodium.Sign.seed_keypair |> fst)
+    | exception _ ->
+        match Sodium.Sign.Bigbytes.to_secret_key s with
+        | exception _ -> None
+        | sk -> Some sk
 
   let of_bytes s =
     match of_bytes_opt s with
@@ -167,7 +191,8 @@ module Secret_key = struct
     Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
 
   let () =
-    Base58.check_encoded_prefix b58check_encoding "edsk" 98
+    Base58.check_encoded_prefix seed_encoding "edsk" 54 ;
+    Base58.check_encoded_prefix secret_key_encoding "edsk" 98
 
   let encoding =
     let open Data_encoding in
@@ -176,18 +201,23 @@ module Secret_key = struct
         (describe
            ~title: "An Ed25519 secret key (Base58Check encoded)" @@
          conv
-           (fun s -> Base58.simple_encode b58check_encoding s)
+           (fun s -> Base58.simple_encode seed_encoding s)
            (fun s ->
-              match Base58.simple_decode b58check_encoding s with
+              match of_b58check_opt s with
               | Some x -> x
               | None -> Data_encoding.Json.cannot_destruct
                           "Ed25519 secret key: unexpected prefix.")
            string)
       ~binary:
         (conv
-           Sodium.Sign.Bigbytes.of_secret_key
-           Sodium.Sign.Bigbytes.to_secret_key
-           (Fixed.bytes Sodium.Sign.secret_key_size))
+           (fun sk -> Sodium.Sign.secret_key_to_seed sk |>
+                      Sodium.Sign.Bigbytes.of_seed)
+           (fun bytes ->
+              if MBytes.length bytes = Sodium.Sign.seed_size
+              then Sodium.Sign.Bigbytes.to_seed bytes |>
+                   Sodium.Sign.seed_keypair |> fst
+              else Sodium.Sign.Bigbytes.to_secret_key bytes)
+           (dynamic_size (Variable.bytes)))
 
 end
 

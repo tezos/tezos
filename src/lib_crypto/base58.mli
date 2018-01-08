@@ -19,6 +19,7 @@ module Prefix : sig
   val context_hash: string
   val ed25519_public_key_hash: string
   val cryptobox_public_key_hash: string
+  val ed25519_seed: string
   val ed25519_public_key: string
   val ed25519_secret_key: string
   val ed25519_signature: string

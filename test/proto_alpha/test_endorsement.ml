@@ -46,8 +46,7 @@ let test_invalid_signature block =
       "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" in
   let secret_key =
     Environment.Ed25519.Secret_key.of_b58check_exn
-      "edskRuR1azSfboG86YPTyxrQgosh5zChf5bVDmptqLTb5EuXAm9rsn\
-       DYfTKhq7rDQujdn5WWzwUMeV3agaZ6J2vPQT58jJAJPi" in
+      "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh" in
   let account =
     Helpers.Account.create ~keys:(secret_key, public_key) "WRONG SIGNATURE" in
   Helpers.Baking.bake block account [] >>= fun res ->

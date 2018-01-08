@@ -160,11 +160,11 @@ module MakeEncodings(E: sig
 
   let encodings = ref E.encodings
 
-  let check_ambiguous_prefix prefix encodings =
+  let check_ambiguous_prefix prefix length encodings =
     List.iter
-      (fun (Encoding { encoded_prefix = s ; _ }) ->
-         if TzString.remove_prefix ~prefix:s prefix <> None ||
-            TzString.remove_prefix ~prefix s <> None then
+      (fun (Encoding { encoded_prefix = s ; length = l ; _ }) ->
+         if length = l && (TzString.remove_prefix ~prefix:s prefix <> None ||
+                           TzString.remove_prefix ~prefix s <> None) then
            Format.ksprintf invalid_arg
              "Base58.register_encoding: duplicate prefix: %S, %S." s prefix)
       encodings
@@ -191,7 +191,7 @@ module MakeEncodings(E: sig
       let s = to_raw x in assert (String.length s = length) ; s in
     let of_raw s = assert (String.length s = length) ; of_raw s in
     let encoded_prefix, encoded_length = make_encoded_prefix prefix length in
-    check_ambiguous_prefix encoded_prefix !encodings ;
+    check_ambiguous_prefix encoded_prefix encoded_length !encodings ;
     let encoding =
       { prefix ; length ; encoded_prefix ; encoded_length ;
         to_raw ; of_raw ; wrap } in
@@ -311,6 +311,7 @@ module Prefix = struct
   let cryptobox_public_key_hash = "\153\103" (* id(30) *)
 
   (* 32 *)
+  let ed25519_seed = "\013\015\058\007" (* edsk(54) *)
   let ed25519_public_key = "\013\015\037\217" (* edpk(54) *)
 
   (* 64 *)

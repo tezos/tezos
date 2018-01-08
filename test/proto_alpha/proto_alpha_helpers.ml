@@ -35,8 +35,7 @@ end
 
 let dictator_sk =
   Ed25519.Secret_key.of_b58check_exn
-    "edskRhxswacLW6jF6ULavDdzwqnKJVS4UcDTNiCyiH6H8ZNnn2pmNviL7\
-     pRNz9kRxxaWQFzEQEcZExGHKbwmuaAcoMegj5T99z"
+    "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
 
 let activate_alpha () =
   let fitness = Fitness_repr.from_int64 0L in
@@ -155,24 +154,19 @@ module Account = struct
         "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" in
     let bootstrap1_sk =
       Ed25519.Secret_key.of_b58check_exn
-        "edskRuR1azSfboG86YPTyxrQgosh5zChf5bVDmptqLTb5EuXAm9\
-         rsnDYfTKhq7rDQujdn5WWzwUMeV3agaZ6J2vPQT58jJAJPi" in
+        "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh" in
     let bootstrap2_sk =
       Ed25519.Secret_key.of_b58check_exn
-        "edskRkJz4Rw2rM5NtabEWMbbg2bF4b1nfFajaqEuEk4SgU7eeDby\
-         m9gVQtBTbYo32WUg2zb5sNBkD1whRN7zX43V9bftBbtaKc" in
+        "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo" in
     let bootstrap3_sk =
       Ed25519.Secret_key.of_b58check_exn
-        "edskS3qsqsNgdjUqeMsVcEwBn8dkZ5iDRz6aF21KhcCtRiAkWByp\
-         USbicccR4Vgqm9UdW2Vabuos6seezqgbXTrmcbLUG4rdAC" in
+        "edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ" in
     let bootstrap4_sk =
       Ed25519.Secret_key.of_b58check_exn
-        "edskRg9qcPqaVQa6jXWNMU5p71tseSuR7NzozgqZ9URsVDi81wTyP\
-         JdFSBdeakobyHUi4Xgu61jgKRQvkhXrPmEdEUfiqfiJFL" in
+        "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3" in
     let bootstrap5_sk =
       Ed25519.Secret_key.of_b58check_exn
-        "edskS7rLN2Df3nbS1EYvwJbWo4umD7yPM1SUeX7gp1WhCVpMFXjcC\
-         yM58xs6xsnTsVqHQmJQ2RxoAjJGedWfvFmjQy6etA3dgZ" in
+        "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm" in
     let cpt = ref 0 in
     match List.map begin fun (pk, sk) ->
         incr cpt ;
