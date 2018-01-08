@@ -421,6 +421,12 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
                     (display-buffer-below-selected buffer nil))))
     (window-body-width message-window)))
 
+(defvar michelson-output-buffer-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map special-mode-map)
+    (define-key map "g" nil)
+    map)
+  "Keymap for types buffer.")
 
 (defun michelson-write-output-buffer (data &optional do-not-overwrite)
   "Write the given `DATA' to the output buffer.
@@ -455,6 +461,7 @@ If `DO-NOT-OVERWRITE' is non-nil, the existing contents of the buffer are mainta
                                'face 'michelson-stack-highlight-face))
                 (setq michelson-highlighting (not michelson-highlighting)))))
         (insert data))
+      (use-local-map michelson-output-buffer-map)
       (read-only-mode 1)
       (goto-char (point-min))
       (while (not (eobp))
