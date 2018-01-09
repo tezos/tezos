@@ -1099,6 +1099,20 @@ for under/overflows.
      executed contract. The contract is returned as a first class
      value to be called immediately or stored.
 
+   * `CREATE_CONTRACT { storage 'g ; parameter 'p ; return 'r ; code ... }`:
+     Forge a new contract from a literal.
+
+
+        :: key_hash : key_hash? : bool : bool : tez : 'g : 'S
+           -> contract 'p 'r : 'S
+
+     Originate a contract based on a literal. This is currently the only way to include
+     transfers inside of an originated contract. The first parameters are
+     the manager, optional delegate, then spendable and delegatable
+     flags and finally the initial amount taken from the currently
+     executed contract. The contract is returned as a first class
+     value to be called immediately or stored.
+
    * `CREATE_ACCOUNT`:
      Forge an account (a contract without code).
 
