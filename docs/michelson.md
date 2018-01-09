@@ -357,8 +357,9 @@ III - Core data types and notations
 
    * `list (t)`:
      A single, immutable, homogeneous linked list, whose elements are
-     of type `(t)`, and that we note `Nil` for the empty list or
-     `(Cons (head) (tail))`.
+     of type `(t)`, and that we note `{}` for the empty list or
+     `{ first ; ... }`. In the semantics, we use chevrons to denote
+     a subsequence of elements. For instance `{ head ; <tail> }`.
 
    * `pair (l) (r)`:
      A pair of values `a` and `b` of types `(l)` and `(r)`, that we
@@ -373,12 +374,12 @@ III - Core data types and notations
      `(Right b)`.
 
    * `set (t)`:
-     Immutable sets of values of type `(t)` that we note
-     `(Set (item) ...)`.
+     Immutable sets of values of type `(t)` that we note as lists
+     `{ item ; ... }`, of course with their elements unique, and sorted.
 
    * `map (k) (t)`:
      Immutable maps from keys of type `(k)` of values of type `(t)`
-     that we note `(Map (Item (key) (value)) ...)`.
+     that we note `{ Elt key value ; ... }`, with keys sorted.
 
 
 IV - Core instructions
@@ -920,14 +921,14 @@ constants as is, concatenate them and use them as keys.
 
         :: 'a : list 'a : 'S   ->   list 'a : 'S
 
-        > CONS ; C / a : l : S   =>   C / (Cons a l) : S
+        > CONS ; C / a : { <l> } : S   =>   C / { a ; <l> } : S
 
    * `NIL 'a`:
      The empty list.
 
         :: 'S   ->   list 'a : 'S
 
-        > NIL ; C / S   =>   C / Nil : S
+        > NIL ; C / S   =>   C / {} : S
 
    * `IF_CONS bt bf`:
      Inspect an optional value.
@@ -936,8 +937,8 @@ constants as is, concatenate them and use them as keys.
            iff   bt :: [ 'a : list 'a : 'S -> 'b : 'S]
                  bf :: [ 'S -> 'b : 'S]
 
-        > IF_CONS ; C / (Cons a rest) : S   =>    bt ; C / a : rest : S
-        > IF_CONS ; C / Nil : S   =>    bf ; C / S
+        > IF_CONS ; C / { a ; <rest> } : S   =>    bt ; C / a : { <rest> } : S
+        > IF_CONS ; C / {} : S   =>    bf ; C / S
 
    * `MAP`:
      Apply a function on a list from left to right and
@@ -1426,10 +1427,6 @@ The concrete syntax follows the same lexical conventions as the
 specification: instructions are represented by uppercase identifiers,
 type constructors by lowercase identifiers, and constant constructors
 are Capitalized.
-
-Lists can be written in a single shot instead of a succession of `Cons`
-
-    (List 1 2 3) = (Cons 1 (Cons 2 (Cons 3 Nil)))
 
 All domain specific constants are Micheline strings with specific formats:
 
@@ -1953,9 +1950,8 @@ XII - Full grammar
       | Right <data>
       | Some <data>
       | None
-      | List <data> ...
-      | Set <data> ...
-      | Map (Item <data> <data>) ...
+      | { <data> ; ... }
+      | { Elt <data> <data> ; ... }
       | instruction
     <instruction> ::=
       | { <instruction> ... }
