@@ -40,7 +40,10 @@ module Public_key : sig
   val of_hex: Hex.t -> t option
   val of_hex_exn: Hex.t -> t
 
-  val of_bytes: Bytes.t -> t
+  val of_bytes: MBytes.t -> t tzresult
+  val of_bytes_exn: MBytes.t -> t
+  val of_bytes_opt: MBytes.t -> t option
+  val to_bytes: t -> MBytes.t
 
 end
 
@@ -65,7 +68,10 @@ module Secret_key : sig
   val of_b58check_opt: string -> t option
   val to_b58check: t -> string
 
-  val of_bytes: Bytes.t -> t
+  val of_bytes: MBytes.t -> t tzresult
+  val of_bytes_exn: MBytes.t -> t
+  val of_bytes_opt: MBytes.t -> t option
+  val to_bytes: t -> MBytes.t
 
 end
 
@@ -88,7 +94,10 @@ module Signature : sig
   val of_b58check_opt: string -> t option
   val to_b58check: t -> string
 
-  val of_bytes: Bytes.t -> t
+  val of_bytes: MBytes.t -> t tzresult
+  val of_bytes_exn: MBytes.t -> t
+  val of_bytes_opt: MBytes.t -> t option
+  val to_bytes: t -> MBytes.t
 
   (** Checks a signature *)
   val check: Public_key.t -> t -> MBytes.t -> bool

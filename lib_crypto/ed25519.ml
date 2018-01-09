@@ -62,7 +62,24 @@ module Public_key = struct
   let of_hex_exn s = of_string_exn (Hex.to_string s)
   let to_hex s = Hex.of_string (to_string s)
 
-  let of_bytes s = Sodium.Sign.Bytes.to_public_key s
+  let of_bytes_opt s =
+    match Sodium.Sign.Bigbytes.to_public_key s with
+    | exception _ -> None
+    | pk -> Some pk
+
+  let of_bytes s =
+    match of_bytes_opt s with
+    | None ->
+        generic_error "Could not deserialize Ed25519 public key (invalid format)"
+    | Some pk -> ok pk
+
+  let of_bytes_exn s =
+    match of_bytes_opt s with
+    | None ->
+        Pervasives.invalid_arg "Ed25519.Public_key.of_bytes_exn: argument is not a serialized public key"
+    | Some pk -> pk
+
+  let to_bytes = Sodium.Sign.Bigbytes.of_public_key
 
   let param ?(name="ed25519-public") ?(desc="Ed25519 public key (b58check-encoded)") t =
     Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
@@ -126,7 +143,25 @@ module Secret_key = struct
     | None -> generic_error "Unexpected hash (ed25519 secret key)"
   let to_b58check s = Base58.simple_encode b58check_encoding s
 
-  let of_bytes s = Sodium.Sign.Bytes.to_secret_key s
+  let of_bytes_opt s =
+    match Sodium.Sign.Bigbytes.to_seed s with
+    | exception _ -> None
+    | seed -> Some (seed |> Sodium.Sign.seed_keypair |> fst)
+
+  let of_bytes s =
+    match of_bytes_opt s with
+    | None ->
+        generic_error "Could not deserialize Ed25519 seed (invalid format)"
+    | Some sk -> ok sk
+
+  let of_bytes_exn s =
+    match of_bytes_opt s with
+    | None ->
+        Pervasives.invalid_arg "Ed25519.Secret_key.of_bytes_exn: argument is not a serialized seed"
+    | Some sk -> sk
+
+  let to_bytes sk =
+    Sodium.Sign.(sk |> secret_key_to_seed |> Bigbytes.of_seed)
 
   let param ?(name="ed25519-secret") ?(desc="Ed25519 secret key (b58check-encoded)") t =
     Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
@@ -185,7 +220,24 @@ module Signature = struct
     | None -> generic_error "Unexpected hash (ed25519 signature)"
   let to_b58check s = Base58.simple_encode b58check_encoding s
 
-  let of_bytes s = MBytes.of_string (Bytes.to_string s)
+  let of_bytes_opt s =
+    match Sodium.Sign.Bigbytes.to_signature s with
+    | exception _ -> None
+    | _signature -> Some s
+
+  let of_bytes s =
+    match of_bytes_opt s with
+    | None ->
+        generic_error "Could not deserialize Ed25519 signature (invalid format)"
+    | Some signature -> ok signature
+
+  let of_bytes_exn s =
+    match of_bytes_opt s with
+    | None ->
+        Pervasives.invalid_arg "Ed25519.Signature.of_bytes_exn: argument is not a serialized signature"
+    | Some signature -> signature
+
+  let to_bytes x = x
 
   let param ?(name="signature") ?(desc="Signature (b58check-encoded)") t =
     Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
