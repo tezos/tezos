@@ -21,6 +21,7 @@ let genesis : State.Net.genesis = {
 }
 
 type error += Non_private_sandbox of P2p_types.addr
+type error += RPC_Port_already_in_use of P2p_types.addr
 
 let () =
   register_error_kind
@@ -37,7 +38,21 @@ let () =
     end
     Data_encoding.(obj1 (req "addr" P2p_types.addr_encoding))
     (function Non_private_sandbox addr -> Some addr | _ -> None)
-    (fun addr -> Non_private_sandbox addr)
+    (fun addr -> Non_private_sandbox addr);
+  register_error_kind
+    `Permanent
+    ~id:"main.run.port_already_in_use"
+    ~title:"Cannot start sode: RPC port already in use"
+    ~description:"An other tezos node is probably running on the same RPC port."
+    ~pp:begin fun ppf addr ->
+      Format.fprintf ppf
+        "An other tezos node is probably running on port (%a). \
+         Please choose another RPC port."
+        Ipaddr.V6.pp_hum addr
+    end
+    Data_encoding.(obj1 (req "addr" P2p_types.addr_encoding))
+    (function RPC_Port_already_in_use addr -> Some addr | _ -> None)
+    (fun addr -> RPC_Port_already_in_use addr)
 
 let (//) = Filename.concat
 
@@ -186,11 +201,18 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
             "Starting the RPC server listening on port %d%s."
             port
             (if rpc_config.tls = None then "" else " (TLS enabled)") >>= fun () ->
-          RPC_server.launch ~host mode dir
-            ~media_types:Media_type.all_media_types
-            ~cors:{ allowed_origins = rpc_config.cors_origins ;
-                    allowed_headers = rpc_config.cors_headers } >>= fun server ->
-          return (Some server)
+          Lwt.catch
+            (fun () ->
+             RPC_server.launch ~host mode dir
+              ~media_types:Media_type.all_media_types
+              ~cors:{ allowed_origins = rpc_config.cors_origins ;
+                      allowed_headers = rpc_config.cors_headers } >>= fun server ->
+             return (Some server))
+            (function
+              |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
+                  fail (RPC_Port_already_in_use addr)
+              | exn -> Lwt.return (error_exn exn)
+            )
 
 let init_signal () =
   let handler name id = try
