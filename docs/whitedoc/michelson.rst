@@ -392,6 +392,13 @@ III - Core data types and notations
 -  ``map (k) (t)``: Immutable maps from keys of type ``(k)`` of values
    of type ``(t)`` that we note ``{ Elt key value ; ... }``, with keys
    sorted.
+-  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
+   ``(k)`` of values of type ``(t)`` that we note ``{ Elt key value ... }``,
+   with keys sorted.  These maps should be used if you intend to store
+   large amounts of data in a map. They have higher gas costs than
+   standard maps as data is lazily deserialized.  You are limited to a
+   single ``big_map`` per program, which must appear on the left hand
+   side of a pair in the contract's storage.
 
 IV - Core instructions
 ----------------------
@@ -1046,6 +1053,35 @@ Operations on maps
     > SIZE / {} : S  =>  0 : S
     > SIZE / { _ ; <tl> } : S  =>  1 + s : S
         where  SIZE / { <tl> } : S  =>  s : S
+
+
+Operations on big_maps
+~~~~~~~~~~~~~~~~~~~~~~
+
+The behaviour of these operations is the same as if they were normal
+maps, except that under the hood, the elements are loaded and
+deserialized on demand.
+
+
+-  ``GET``: Access an element in a big_map, returns an optional value to be
+   checked with ``IF_SOME``.
+
+::
+
+    :: 'key : big_map 'key 'val : 'S   ->   option 'val : 'S
+
+-  ``MEM``: Check for the presence of an element in a big_map.
+
+::
+
+    :: 'key : big_map 'key 'val : 'S   ->  bool : 'S
+
+-  ``UPDATE``: Assign or remove an element in a map.
+
+::
+
+    :: 'key : option 'val : big_map 'key 'val : 'S   ->   big_map 'key 'val : 'S
+
 
 Operations on optional values
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2438,6 +2474,7 @@ XII - Full grammar
       | or <type> <type>
       | lambda <type> <type>
       | map <comparable type> <type>
+      | big_map <comparable type> <type>
     <comparable type> ::=
       | int
       | nat
