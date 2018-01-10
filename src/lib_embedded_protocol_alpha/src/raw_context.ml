@@ -55,7 +55,7 @@ let storage_error_encoding =
     case (Tag 1)
       (obj2
          (req "missing_key" (list string))
-         (req "function" (string_enum ["get", `Get ; "set", `Set])))
+         (req "function" (string_enum ["get", `Get ; "set", `Set ; "del", `Del ])))
       (function Missing_key (key, f) -> Some (key, f) | _ -> None)
       (fun (key, f) -> Missing_key (key, f)) ;
     case (Tag 2)
