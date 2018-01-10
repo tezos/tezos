@@ -13,7 +13,7 @@ open Tezos_context
 
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
-type error += Duplicate_endorsement of int (* `Permanent *)
+type error += Duplicate_endorsement of int (* `Branch *)
 type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.expr option (* `Permanent *)
 type error += Too_many_faucet
 
@@ -62,7 +62,7 @@ let () =
        Some (c, expected, supplied) | _ -> None)
     (fun (c, expected, supplied) -> Bad_contract_parameter (c, expected, supplied)) ;
   register_error_kind
-    `Permanent
+    `Branch
     ~id:"operation.duplicate_endorsement"
     ~title:"Duplicate endorsement"
     ~description:"Two endorsements received for the same slot"
