@@ -83,6 +83,7 @@ type prim =
   | I_SIZE
   | I_SOME
   | I_SOURCE
+  | I_SELF
   | I_STEPS_TO_QUOTA
   | I_SUB
   | I_SWAP

@@ -90,6 +90,7 @@ module Cost_of : sig
   val get_steps_to_quota : t -> Script_int.n Script_int.num
   val steps_to_quota : cost
   val source : cost
+  val self : cost
   val amount : cost
   val wrap : cost
   val compare_bool : 'a -> 'b -> cost

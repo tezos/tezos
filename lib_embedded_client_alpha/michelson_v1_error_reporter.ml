@@ -68,6 +68,7 @@ let collect_error_locations errs =
       | Bad_stack (loc, _, _, _)
       | Unmatched_branches (loc, _, _)
       | Transfer_in_lambda loc
+      | Self_in_lambda loc
       | Transfer_in_dip loc
       | Invalid_constant (loc, _, _)
       | Invalid_contract (loc, _)
@@ -311,6 +312,10 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           | Transfer_in_dip loc ->
               Format.fprintf ppf
                 "%aThe TRANSFER_TOKENS instruction cannot appear within a DIP."
+                print_loc loc
+          | Self_in_lambda loc ->
+              Format.fprintf ppf
+                "%aThe SELF instruction cannot appear in a lambda."
                 print_loc loc
           | Bad_stack_length ->
               Format.fprintf ppf

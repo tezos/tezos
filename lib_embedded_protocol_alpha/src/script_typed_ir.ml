@@ -335,6 +335,8 @@ and ('bef, 'aft) instr =
       ('rest, n num * 'rest) instr
   | Source : 'p ty * 'r ty ->
     ('rest, ('p, 'r) typed_contract * 'rest) instr
+  | Self : 'p ty * 'r ty ->
+    ('rest, ('p, 'r) typed_contract * 'rest) instr
   | Amount :
       ('rest, Tez.t * 'rest) instr
 

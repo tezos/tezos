@@ -45,6 +45,7 @@ type error += Unexpected_annotation of Script.location
 
 type error += Transfer_in_lambda of Script.location
 type error += Transfer_in_dip of Script.location
+type error += Self_in_lambda of Script.location
 type error += Bad_stack_length
 type error += Bad_stack_item of int
 type error += Invalid_map_body : Script.location * _ Script_typed_ir.stack_ty -> error

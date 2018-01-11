@@ -263,6 +263,7 @@ module Cost_of = struct
   let steps_to_quota = step_cost 1
   let get_steps_to_quota gas = Script_int.abs @@ Script_int.of_int gas.remaining
   let source = step_cost 3
+  let self = step_cost 3
   let amount = step_cost 1
   let compare_bool _ _ = step_cost 1
   let compare_string s1 s2 =

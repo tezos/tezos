@@ -36,6 +36,7 @@ type error += Bad_stack : Script.location * prim * int * _ stack_ty -> error
 type error += Unmatched_branches : Script.location * _ stack_ty * _ stack_ty -> error
 type error += Transfer_in_lambda of Script.location
 type error += Transfer_in_dip of Script.location
+type error += Self_in_lambda of Script.location
 type error += Bad_stack_length
 type error += Bad_stack_item of int
 type error += Inconsistent_annotations of string * string
@@ -67,12 +68,15 @@ type ex_stack_ty = Ex_stack_ty : 'a stack_ty -> ex_stack_ty
 
 type tc_context =
   | Lambda : tc_context
-  | Dip : 'a stack_ty -> tc_context
-  | Toplevel : { storage_type : 'a ty } -> tc_context
+  | Dip : 'a stack_ty * tc_context -> tc_context
+  | Toplevel : { storage_type : 'sto ty ;
+                 param_type : 'param ty ;
+                 ret_type : 'ret ty } -> tc_context
 
-let add_dip ty annot = function
-  | Lambda | Toplevel _ -> Dip (Item_t (ty, Empty_t, annot))
-  | Dip stack -> Dip (Item_t (ty, stack, annot))
+let add_dip ty annot prev =
+  match prev with
+  | Lambda | Toplevel _ -> Dip (Item_t (ty, Empty_t, annot), prev)
+  | Dip (stack, _) -> Dip (Item_t (ty, stack, annot), prev)
 
 let default_param_annot = Some "@parameter"
 let default_storage_annot = Some "@storage"
@@ -244,6 +248,7 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | H _ -> 0
   | Steps_to_quota -> 0
   | Source _ -> 1
+  | Self _ -> 1
   | Amount -> 0
 
 (* ---- Error helpers -------------------------------------------------------*)
@@ -332,6 +337,7 @@ let namespace = function
   | I_SIZE
   | I_SOME
   | I_SOURCE
+  | I_SELF
   | I_STEPS_TO_QUOTA
   | I_SUB
   | I_SWAP
@@ -1842,7 +1848,8 @@ and parse_instr
         let ret_type_full = Pair_t ((ret_type, None), (storage_type, None)) in
         trace
           (Ill_typed_contract (cannonical_code, []))
-          (parse_returning (Toplevel { storage_type }) ctxt ?type_logger (arg_type_full, None) ret_type_full code_field) >>=?
+          (parse_returning (Toplevel { storage_type ; param_type = arg_type ; ret_type })
+             ctxt ?type_logger (arg_type_full, None) ret_type_full code_field) >>=?
         fun (Lam ({ bef = Item_t (arg, Empty_t, _) ;
                     aft = Item_t (ret, Empty_t, _) ; _ }, _) as lambda) ->
         Lwt.return @@ ty_eq arg arg_type_full >>=? fun (Eq _) ->
@@ -1876,6 +1883,15 @@ and parse_instr
         (Lwt.return (parse_ty ta)) >>=? fun (Ex_ty ta, _) ->
         (Lwt.return (parse_ty tb)) >>=? fun (Ex_ty tb, _) ->
         return (typed loc (Source (ta, tb), Item_t (Contract_t (ta, tb), stack, instr_annot)))
+    | Prim (loc, I_SELF, [], instr_annot),
+      stack ->
+        let rec get_toplevel_type : tc_context -> bef judgement tzresult Lwt.t = function
+          | Lambda -> fail (Self_in_lambda loc)
+          | Dip (_, prev) -> get_toplevel_type prev
+          | Toplevel { param_type ; ret_type ; _ } ->
+              return (typed loc (Self (param_type, ret_type),
+                                 Item_t (Contract_t (param_type, ret_type), stack, instr_annot))) in
+        get_toplevel_type tc_context
     (* Primitive parsing errors *)
     | Prim (loc, (I_DROP | I_DUP | I_SWAP | I_SOME | I_UNIT
                  | I_PAIR | I_CAR | I_CDR | I_CONS
@@ -1964,7 +1980,7 @@ and parse_instr
             I_PUSH ; I_NONE ; I_LEFT ; I_RIGHT ; I_NIL ;
             I_EMPTY_SET ; I_DIP ; I_LOOP ;
             I_IF_NONE ; I_IF_LEFT ; I_IF_CONS ;
-            I_EMPTY_MAP ; I_IF ; I_SOURCE ; I_LAMBDA ]
+            I_EMPTY_MAP ; I_IF ; I_SOURCE ; I_SELF ; I_LAMBDA ]
 
 and parse_contract
   : type arg ret. context -> arg ty -> ret ty -> Script.location -> Contract.t ->
@@ -2062,7 +2078,8 @@ let parse_script
       (parse_data ?type_logger ctxt storage_type (root storage)) >>=? fun storage ->
     trace
       (Ill_typed_contract (code, []))
-      (parse_returning (Toplevel { storage_type }) ctxt ?type_logger (arg_type_full, None) ret_type_full code_field)
+      (parse_returning (Toplevel { storage_type ; param_type = arg_type ; ret_type })
+         ctxt ?type_logger (arg_type_full, None) ret_type_full code_field)
     >>=? fun code ->
     return (Ex_script { code; arg_type; ret_type; storage; storage_type })
 
@@ -2097,7 +2114,7 @@ let typecheck_code
     let ret_type_full = Pair_t ((ret_type, None), (storage_type, None)) in
     let result =
       parse_returning
-        (Toplevel { storage_type })
+        (Toplevel { storage_type ; param_type = arg_type ; ret_type })
         ctxt
         ~type_logger: (fun loc bef aft -> type_map := (loc, (bef, aft)) :: !type_map)
         (arg_type_full, None) ret_type_full code_field in
@@ -2442,6 +2459,18 @@ let () =
       | _ -> None)
     (fun (loc, ()) ->
        Transfer_in_lambda loc) ;
+  register_error_kind
+    `Permanent
+    ~id:"selfInLambda"
+    ~title: "SELF instruction in lambda (typechecking error)"
+    ~description:
+      "A SELF instruction was encountered in a lambda expression."
+    (located empty)
+    (function
+      | Self_in_lambda loc -> Some (loc, ())
+      | _ -> None)
+    (fun (loc, ()) ->
+       Self_in_lambda loc) ;
   register_error_kind
     `Permanent
     ~id:"inconsistentStackLengthsTypeError"

@@ -405,6 +405,13 @@ account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
 $client transfer 0 from bootstrap1 to default_account  -arg "\"$account\""
 assert_balance $account "100 ꜩ"
 
+# Test SELF
+init_with_transfer $CONTRACT_PATH/self.tz $key1 \
+				   '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' 1,000 bootstrap1
+$client transfer 0 from bootstrap1 to self
+assert_storage_contains self "\"$(get_contract_addr self)\""
+
+
 assert_fails $client typecheck data '{ Elt 0 1 ; Elt 0 1 }' against type '(map nat nat)'
 assert_fails $client typecheck data '{ Elt 0 1 ; Elt 10 1 ; Elt 5 1 }' against type '(map nat nat)'
 assert_fails $client typecheck data '{ "A" ; "C" ; "B" }' against type '(set string)'

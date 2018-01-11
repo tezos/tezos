@@ -85,6 +85,7 @@ type prim =
   | I_SIZE
   | I_SOME
   | I_SOURCE
+  | I_SELF
   | I_STEPS_TO_QUOTA
   | I_SUB
   | I_SWAP
@@ -204,6 +205,7 @@ let string_of_prim = function
   | I_SIZE -> "SIZE"
   | I_SOME -> "SOME"
   | I_SOURCE -> "SOURCE"
+  | I_SELF -> "SELF"
   | I_STEPS_TO_QUOTA -> "STEPS_TO_QUOTA"
   | I_SUB -> "SUB"
   | I_SWAP -> "SWAP"
@@ -304,6 +306,7 @@ let prim_of_string = function
   | "SIZE" -> ok I_SIZE
   | "SOME" -> ok I_SOME
   | "SOURCE" -> ok I_SOURCE
+  | "SELF" -> ok I_SELF
   | "STEPS_TO_QUOTA" -> ok I_STEPS_TO_QUOTA
   | "SUB" -> ok I_SUB
   | "SWAP" -> ok I_SWAP
@@ -448,6 +451,7 @@ let prim_encoding =
     ("SIZE", I_SIZE) ;
     ("SOME", I_SOME) ;
     ("SOURCE", I_SOURCE) ;
+    ("SELF", I_SELF) ;
     ("STEPS_TO_QUOTA", I_STEPS_TO_QUOTA) ;
     ("SUB", I_SUB) ;
     ("SWAP", I_SWAP) ;

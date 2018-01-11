@@ -752,6 +752,10 @@ let rec interp
             let gas = Gas.consume gas Gas.Cost_of.source in
             Gas.check gas >>=? fun () ->
             logged_return (Item ((ta, tb, orig), rest), gas, ctxt)
+        | Self (ta, tb), rest ->
+            let gas = Gas.consume gas Gas.Cost_of.self in
+            Gas.check gas >>=? fun () ->
+            logged_return (Item ((ta, tb, source), rest), gas, ctxt)
         | Amount, rest ->
             let gas = Gas.consume gas Gas.Cost_of.amount in
             Gas.check gas >>=? fun () ->
