@@ -535,11 +535,14 @@ module Encoding = struct
   let array e = dynamic_size (Variable.array e)
   let list e = dynamic_size (Variable.list e)
 
-  let string_enum cases =
-    let arr = Array.of_list (List.map snd cases) in
-    let tbl = Hashtbl.create (Array.length arr) in
-    List.iteri (fun ind (str, a) -> Hashtbl.add tbl a (str, ind)) cases ;
-    make @@ String_enum (tbl, arr)
+  let string_enum = function
+    | [] -> invalid_arg "data_encoding.string_enum: cannot have zero cases"
+    | [ _case ] -> invalid_arg "data_encoding.string_enum: cannot have a single case, use constant instead"
+    | _ :: _ as cases ->
+        let arr = Array.of_list (List.map snd cases) in
+        let tbl = Hashtbl.create (Array.length arr) in
+        List.iteri (fun ind (str, a) -> Hashtbl.add tbl a (str, ind)) cases ;
+        make @@ String_enum (tbl, arr)
 
   let conv proj inj ?schema encoding =
     make @@ Conv { proj ; inj ; encoding ; schema }
