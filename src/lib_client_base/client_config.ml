@@ -143,10 +143,10 @@ let protocol_parameter =
 
 (* Command-line only args (not in config file) *)
 let base_dir_arg =
-  default_arg
+  arg
     ~parameter:"-base-dir"
-    ~doc:"The directory where the Tezos client will store all its data."
-    ~default:Client_commands.default_base_dir
+    ~doc:("The directory where the Tezos client will store all its data. By default "
+          ^ Client_commands.default_base_dir)
     string_parameter
 let config_file_arg =
   arg
@@ -193,6 +193,72 @@ let tls_switch =
     ~parameter:"-tls"
     ~doc:"Use TLS to connect to node."
 
+let read_config_file config_file = match
+    Utils.read_file ~bin:false config_file
+    |> Data_encoding_ezjsonm.from_string
+  with
+  | exception (Sys_error msg) ->
+      failwith
+        "Error: can't read the configuration file: %s@,%s"
+        config_file msg
+  | Error msg ->
+      failwith
+        "Can't parse the configuration file: %s@,%s"
+        config_file msg
+  | Ok cfg_json ->
+      try return @@ Cfg_file.from_json cfg_json
+      with exn ->
+        failwith
+          "Can't parse the configuration file: %s@,%a"
+          config_file (fun ppf exn -> Json_encoding.print_error ppf exn) exn
+
+let default_config_file_name = "config"
+
+let commands config_file cfg =
+  let open Cli_entries in
+  let group = { Cli_entries.name = "config" ;
+                title = "Commands for editing and viewing the client's config file." } in
+  [ command ~group ~desc:"show the config file"
+      no_options
+      (fixed [ "config" ; "show" ])
+      (fun () (cctxt : Client_commands.full_context) ->
+         let pp_cfg ppf cfg = Format.fprintf ppf "%a" Data_encoding_ezjsonm.pp (Data_encoding.Json.construct Cfg_file.encoding cfg) in
+         if not @@ Sys.file_exists config_file then
+           cctxt#warning
+             "@[<v 2>Warning: no config file at %s,@,\
+              displaying the default configuration.@]"
+             config_file >>= fun () ->
+           cctxt#warning "%a@," pp_cfg Cfg_file.default >>= return
+         else
+           read_config_file config_file >>=? fun cfg ->
+           cctxt#message "%a@," pp_cfg cfg >>= return) ;
+
+    command ~group ~desc:"reset the config file to the factory defaults"
+      no_options
+      (fixed [ "config" ; "reset" ])
+      (fun () _cctxt ->
+         return Cfg_file.(write config_file default)) ;
+
+    command ~group ~desc:"update the config based on the current cli values"
+      no_options
+      (fixed [ "config" ; "update" ])
+      (fun () _cctxt ->
+         return Cfg_file.(write config_file cfg)) ;
+
+    command ~group ~desc:"create a config file based on the current CLI values"
+      (args1
+         (default_arg
+            ~parameter:"-path"
+            ~doc:"path at which to create the file"
+            ~default:(cfg.base_dir // default_config_file_name)
+            (parameter (fun _ctx str -> return str))))
+      (fixed [ "config" ; "init" ])
+      (fun config_file _cctxt ->
+         if not (Sys.file_exists config_file)
+         then return Cfg_file.(write config_file cfg) (* Should be default or command would have failed *)
+         else failwith "Config file already exists at location") ;
+  ]
+
 let global_options =
   args9 base_dir_arg
     config_file_arg
@@ -208,7 +274,7 @@ let parse_config_args (ctx : Client_commands.full_context) argv =
   parse_initial_options
     global_options
     ctx
-    argv >>|?
+    argv >>=?
   fun ((base_dir,
         config_file,
         timings,
@@ -218,57 +284,49 @@ let parse_config_args (ctx : Client_commands.full_context) argv =
         node_addr,
         node_port,
         tls), remaining) ->
-  let config_file =
-    match config_file with
-    | None -> base_dir // "config"
-    | Some config_file -> config_file in
+  begin match base_dir with
+    | None ->
+        let base_dir = Client_commands.default_base_dir in
+        if not (Sys.file_exists base_dir)
+        then Utils.mkdir base_dir ;
+        return base_dir
+    | Some dir ->
+        if not (Sys.file_exists dir)
+        then failwith "Specified -base-dir does not exist. Please create the directory and try again."
+        else if Sys.is_directory dir
+        then return dir
+        else failwith "Specified -base-dir must be a directory"
+  end >>=? fun base_dir ->
+  begin match config_file with
+    | None -> return @@ base_dir // default_config_file_name
+    | Some config_file ->
+        if Sys.file_exists config_file
+        then return config_file
+        else failwith "Config file specified in option does not exist. Use `client config init` to create one."
+  end >>=? fun config_file ->
   let config_dir = Filename.dirname config_file in
   let protocol =
     match protocol with
     | None -> None
     | Some p -> p
   in
-  let cfg =
+  begin
     if not (Sys.file_exists config_file) then
-      { Cfg_file.default with base_dir = base_dir }
+      return { Cfg_file.default with base_dir = base_dir }
     else
-      match
-        Utils.read_file ~bin:false config_file
-        |> Data_encoding_ezjsonm.from_string
-      with
-      | exception (Sys_error msg) ->
-          Format.eprintf
-            "Error: can't read the configuration file: %s\n%s@."
-            config_file msg ;
-          exit 1
-      | exception _ ->
-          Format.eprintf "Warning: config file not found@." ;
-          { Cfg_file.default with base_dir = base_dir }
-      | Error msg ->
-          Format.eprintf
-            "Error: can't parse the configuration file: %s\n%s@."
-            config_file msg ;
-          exit 1
-      | Ok cfg_json ->
-          try Cfg_file.from_json cfg_json
-          with exn ->
-            Format.eprintf
-              "Error: can't parse the configuration file: %s\n%a@."
-              config_file (fun ppf exn -> Json_encoding.print_error ppf exn) exn ;
-            exit 1 in
+      read_config_file config_file
+  end >>|? fun cfg ->
   let tls = cfg.tls || tls in
   let node_addr = Option.unopt ~default:cfg.node_addr node_addr in
   let node_port = Option.unopt ~default:cfg.node_port node_port in
   let cfg = { cfg with tls ; node_port ; node_addr } in
   if Sys.file_exists base_dir && not (Sys.is_directory base_dir) then begin
-    Format.eprintf "Error: %s is not a directory.@." base_dir ;
+    Format.eprintf "%s is not a directory.@." base_dir ;
     exit 1 ;
   end ;
-  Utils.mkdir base_dir ;
   if Sys.file_exists config_dir && not (Sys.is_directory config_dir) then begin
-    Format.eprintf "Error: %s is not a directory.@." config_dir ;
+    Format.eprintf "%s is not a directory.@." config_dir ;
     exit 1 ;
   end ;
   Utils.mkdir config_dir ;
-  if not (Sys.file_exists config_file) then Cfg_file.write config_file cfg ;
-  (cfg, { block ; print_timings = timings ; log_requests ; protocol }, remaining)
+  (cfg, { block ; print_timings = timings ; log_requests ; protocol }, commands config_file cfg, remaining)

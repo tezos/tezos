@@ -53,7 +53,7 @@ let main ?only_commands () =
            ~block:Client_commands.default_block
            Client_rpcs.default_config)
         original_args
-      >>=? fun (parsed_config_file, parsed_args, remaining) ->
+      >>=? fun (parsed_config_file, parsed_args, config_commands, remaining) ->
       let rpc_config : Client_rpcs.config = {
         Client_rpcs.default_config with
         host = parsed_config_file.node_addr ;
@@ -71,8 +71,11 @@ let main ?only_commands () =
             Client_keys.commands () @
             Client_protocols.commands () @
             Client_helpers.commands () @
+            config_commands @
             commands_for_version
-        | Some commands -> return commands end >>=? fun commands ->
+        | Some commands ->
+            return (config_commands @ commands)
+      end >>=? fun commands ->
       let rpc_config =
         if parsed_args.print_timings then
           { rpc_config with
