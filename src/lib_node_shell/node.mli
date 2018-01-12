@@ -67,6 +67,9 @@ module RPC : sig
   val list_invalid:
     t -> (Block_hash.t * int32 * error list) list Lwt.t
 
+  val unmark_invalid:
+    t -> Block_hash.t -> unit tzresult Lwt.t
+
   val block_info:
     t -> block -> block_info Lwt.t
 

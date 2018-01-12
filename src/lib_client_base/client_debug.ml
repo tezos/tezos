@@ -107,12 +107,23 @@ let stuck_node_report cctxt file =
 
 let commands () =
   let open Cli_entries in
+  let group = { name = "debug" ;
+                title = "commands to debug and fix problems with the node" } in
   [
-    command ~desc: "debug report"
+    command ~group ~desc: "debug report"
       no_options
       (prefixes [ "debug" ; "stuck" ; "node" ]
        @@ string ~name:"file" ~desc:"file in which to save report"
        @@ stop)
-      (fun () file cctxt ->
-         stuck_node_report cctxt file)
+      (fun () file (cctxt : Client_commands.full_context) ->
+         stuck_node_report cctxt file) ;
+    command ~group ~desc: "unmark invalid"
+      no_options
+      (prefixes [ "debug" ; "unmark" ; "invalid" ]
+       @@ Block_hash.param ~name:"block" ~desc:"block to remove from invalid list"
+       @@ stop)
+      (fun () block (cctxt : Client_commands.full_context) ->
+         Client_rpcs.call_err_service0 cctxt Node_rpc_services.Blocks.unmark_invalid block >>=? fun () ->
+         cctxt#message "Block %a no longer marked invalid" Block_hash.pp block >>= return
+      )
   ]

@@ -606,6 +606,9 @@ module RPC = struct
   let list_invalid node =
     State.Block.list_invalid (Net_validator.net_state node.mainnet_validator)
 
+  let unmark_invalid node block =
+    State.Block.unmark_invalid (Net_validator.net_state node.mainnet_validator) block
+
   let block_header_watcher node =
     Distributed_db.watch_block_header node.distributed_db
 

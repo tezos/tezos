@@ -467,6 +467,16 @@ module Blocks = struct
       ~error: Data_encoding.empty
       RPC_path.(root / "invalid_blocks")
 
+  let unmark_invalid =
+    RPC_service.post_service
+      ~description:
+        "Unmark an invalid block"
+      ~query: RPC_query.empty
+      ~input:Data_encoding.(obj1 (req "block" Block_hash.encoding))
+      ~output:(Error.wrap Data_encoding.empty)
+      ~error: Data_encoding.empty
+      RPC_path.(root / "unmark_invalid")
+
 end
 
 module Protocols = struct

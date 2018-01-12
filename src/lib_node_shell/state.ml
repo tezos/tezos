@@ -14,8 +14,11 @@ type error +=
 
 type error += Bad_data_dir
 
+type error += Block_not_invalid of Block_hash.t
+
 let () =
-  Error_monad.register_error_kind
+  let open Error_monad in
+  register_error_kind
     `Temporary
     ~id:"state.unknown_network"
     ~title:"Unknown network"
@@ -25,7 +28,7 @@ let () =
     Data_encoding.(obj1 (req "net" Net_id.encoding))
     (function Unknown_network x -> Some x | _ -> None)
     (fun x -> Unknown_network x) ;
-  Error_monad.register_error_kind
+  register_error_kind
     `Permanent
     ~id:"badDataDir"
     ~title:"Bad data directory"
@@ -37,6 +40,17 @@ let () =
     Data_encoding.empty
     (function Bad_data_dir -> Some () | _ -> None)
     (fun () -> Bad_data_dir) ;
+  register_error_kind
+    `Permanent
+    ~id:"blockNotInvalid"
+    ~title:"Block not invalid"
+    ~description:"The invalid block to be unmarked was not actually invalid."
+    ~pp:(fun ppf block ->
+        Format.fprintf ppf "Block %a was expected to be invalid, but was not actually invalid."
+          Block_hash.pp block)
+    Data_encoding.(obj1 (req "block" Block_hash.encoding))
+    (function Block_not_invalid block -> Some block | _ -> None)
+    (fun block -> Block_not_invalid block) ;
 
   (** *)
 
@@ -396,6 +410,13 @@ module Block = struct
       Store.Block.Invalid_block.fold store ~init:[]
         ~f:(fun hash { level ; errors } acc ->
             Lwt.return ((hash, level, errors) :: acc))
+    end
+  let unmark_invalid net_state block =
+    Shared.use net_state.block_store begin fun store ->
+      Store.Block.Invalid_block.known store block >>= fun mem ->
+      if mem
+      then Store.Block.Invalid_block.remove store block >>= return
+      else fail (Block_not_invalid block)
     end
 
   let known net_state hash =

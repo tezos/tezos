@@ -8,4 +8,4 @@
 (**************************************************************************)
 
 
-val commands : unit -> (#Client_commands.logging_rpcs, unit) Cli_entries.command list
+val commands : unit -> (Client_commands.full_context, unit) Cli_entries.command list

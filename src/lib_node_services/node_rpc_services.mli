@@ -122,6 +122,9 @@ module Blocks : sig
      unit, unit, unit,
      (Block_hash.t * int32 * error list) list, unit) RPC_service.t
 
+  val unmark_invalid:
+    ([ `POST ], unit, unit, unit, Block_hash.t, unit tzresult, unit) RPC_service.t
+
   type preapply_param = {
     timestamp: Time.t ;
     proto_header: MBytes.t ;
