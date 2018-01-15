@@ -36,9 +36,11 @@ let of_string_exn s =
   | Some h -> h
 let to_string s = s
 
-let of_hex s = of_string (Hex_encode.hex_decode s)
-let of_hex_exn s = of_string_exn (Hex_encode.hex_decode s)
-let to_hex s = Hex_encode.hex_encode (to_string s)
+let of_hex s = of_string (Hex.to_string (`Hex s))
+let of_hex_exn s = of_string_exn (Hex.to_string (`Hex s))
+let to_hex s =
+  let `Hex s = Hex.of_string (to_string s) in
+  s
 
 let compare = String.compare
 let equal = String.equal
@@ -135,7 +137,7 @@ let of_path_exn path =
   of_hex_exn path
 
 let prefix_path p =
-  let p = Hex_encode.hex_encode p in
+  let `Hex p = Hex.of_string p in
   [ p ]
 
 module Table = struct

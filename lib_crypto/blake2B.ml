@@ -46,9 +46,11 @@ module Make_minimal (K : S.Name) = struct
     | Some h -> h
   let to_string s = Bytes.to_string (Sodium.Generichash.Bytes.of_hash s)
 
-  let of_hex s = of_string (Hex_encode.hex_decode s)
-  let of_hex_exn s = of_string_exn (Hex_encode.hex_decode s)
-  let to_hex s = Hex_encode.hex_encode (to_string s)
+  let of_hex s = of_string (Hex.to_string (`Hex s))
+  let of_hex_exn s = of_string_exn (Hex.to_string (`Hex s))
+  let to_hex s =
+    let `Hex s = Hex.of_string (to_string s) in
+    s
 
   let compare = Sodium.Generichash.compare
   let equal x y = compare x y = 0
@@ -99,7 +101,7 @@ module Make_minimal (K : S.Name) = struct
     of_hex_exn path
 
   let prefix_path p =
-    let p = Hex_encode.hex_encode p in
+    let `Hex p = Hex.of_string p in
     let len = String.length p in
     let p1 = if len >= 2 then String.sub p 0 2 else ""
     and p2 = if len >= 4 then String.sub p 2 2 else ""

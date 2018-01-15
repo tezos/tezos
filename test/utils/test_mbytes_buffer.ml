@@ -8,8 +8,8 @@
 (**************************************************************************)
 
 let hex_of_buffer buf =
-  Hex_encode.hex_of_bytes (MBytes_buffer.to_mbytes buf)
-
+  let `Hex s = MBytes.to_hex (MBytes_buffer.to_mbytes buf) in
+  s
 
 let assert_hex_eq buf =
   Assert.equal ~prn:(fun x -> x) (hex_of_buffer buf)

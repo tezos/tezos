@@ -33,14 +33,18 @@ module Public_key = struct
   type Base58.data +=
     | Public_key of t
 
+  let to_string s = Bytes.to_string (Sodium.Sign.Bytes.of_public_key s)
+  let of_string_exn x = Sodium.Sign.Bytes.to_public_key (Bytes.of_string x)
+  let of_string x =
+    try Some (of_string_exn x)
+    with _ -> None
+
   let b58check_encoding =
     Base58.register_encoding
       ~prefix: Base58.Prefix.ed25519_public_key
       ~length:Sodium.Sign.public_key_size
-      ~to_raw:(fun x -> Bytes.to_string (Sodium.Sign.Bytes.of_public_key x))
-      ~of_raw:(fun x ->
-          try Some (Sodium.Sign.Bytes.to_public_key (Bytes.of_string x))
-          with _ -> None)
+      ~to_raw:to_string
+      ~of_raw:of_string
       ~wrap:(fun x -> Public_key x)
 
   let of_b58check_opt s = Base58.simple_decode b58check_encoding s
@@ -53,6 +57,10 @@ module Public_key = struct
     | Some x -> Ok x
     | None -> generic_error "Unexpected hash (ed25519 public key)"
   let to_b58check s = Base58.simple_encode b58check_encoding s
+
+  let of_hex s = of_string (Hex.to_string s)
+  let of_hex_exn s = of_string_exn (Hex.to_string s)
+  let to_hex s = Hex.of_string (to_string s)
 
   let of_bytes s = Sodium.Sign.Bytes.to_public_key s
 
@@ -222,10 +230,11 @@ module Seed = struct
   let to_hex s =
     Sodium.Sign.Bytes.of_seed s
     |> Bytes.to_string
-    |> Hex_encode.hex_encode
+    |> Hex.of_string
+    |> (fun (`Hex s) -> s)
 
   let of_hex s =
-    Hex_encode.hex_decode s
+    Hex.to_string (`Hex s)
     |> Bytes.of_string
     |> Sodium.Sign.Bytes.to_seed
 

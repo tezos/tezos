@@ -149,3 +149,6 @@ val compare : t -> t -> int
 
 val concat: t -> t -> t
 (** Returns a new array with adjacent copies of the two input arrays **)
+
+val to_hex: t -> Hex.t
+val of_hex: Hex.t -> t

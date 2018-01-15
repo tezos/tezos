@@ -601,9 +601,9 @@ let rec unparse_data
     | Contract_t _, (_, _, c)  ->
         String (-1, Contract.to_b58check c)
     | Signature_t, s ->
-        let text =
-          Hex_encode.hex_encode
-            (MBytes.to_string (Data_encoding.Binary.to_bytes Ed25519.Signature.encoding s)) in
+        let `Hex text =
+          MBytes.to_hex
+            (Data_encoding.Binary.to_bytes Ed25519.Signature.encoding s) in
         String (-1, text)
     | Tez_t, v ->
         String (-1, Tez.to_string v)
@@ -1075,7 +1075,7 @@ let rec parse_data
     | Signature_t, String (_, s) -> begin try
           match Data_encoding.Binary.of_bytes
                   Ed25519.Signature.encoding
-                  (MBytes.of_string (Hex_encode.hex_decode s)) with
+                  (MBytes.of_hex (`Hex s)) with
           | Some s -> return s
           | None -> raise Not_found
         with _ ->

@@ -31,7 +31,6 @@ module Make(Param : sig val name: string end)() = struct
   module Nativeint = Nativeint
   module Buffer = Buffer
   module Format = Format
-  module Hex_encode = Hex_encode
   module Z = Z
   module Lwt_sequence = Lwt_sequence
   module Lwt = Lwt

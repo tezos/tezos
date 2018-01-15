@@ -315,9 +315,12 @@ module Json = struct
           format = None ;
           id = None } in
     conv ~schema
-      Hex_encode.hex_of_bytes
-      (wrap_error Hex_encode.bytes_of_hex)
-      string
+      MBytes.to_hex
+      (wrap_error MBytes.of_hex)
+      (conv
+         (fun (`Hex h) -> h)
+         (fun h -> `Hex h)
+         string)
 
   let rec lift_union : type a. a t -> a t = fun e ->
     match e.encoding with

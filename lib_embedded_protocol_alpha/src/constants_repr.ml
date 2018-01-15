@@ -57,8 +57,7 @@ type constants = {
   michelson_maximum_type_size: int;
 }
 
-let read_public_key s =
-  Ed25519.Public_key.of_bytes (Bytes.of_string (Hex_encode.hex_decode s))
+let read_public_key s = Ed25519.Public_key.of_hex_exn (`Hex s)
 
 let default = {
   cycle_length = 2048l ;

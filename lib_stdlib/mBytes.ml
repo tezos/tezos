@@ -64,6 +64,9 @@ let of_string buf =
   unsafe_blit_string_to_bigstring buf 0 c 0 buflen;
   c
 
+let to_hex s = Hex.of_cstruct (Cstruct.of_bigarray s)
+let of_hex s = Cstruct.to_bigarray (Hex.to_cstruct s)
+
 let substring src srcoff len =
   if len < 0 || srcoff < 0 || length src - srcoff < len then
     raise (Invalid_argument (invalid_bounds srcoff len));

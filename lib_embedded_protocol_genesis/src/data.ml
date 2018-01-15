@@ -81,8 +81,7 @@ module Pubkey = struct
   let default =
     let pubkey =
       "4d5373455738070434f214826d301a1c206780d7f789fcbf94c2149b2e0718cc" in
-    Ed25519.Public_key.of_bytes
-      (Bytes.of_string (Hex_encode.hex_decode pubkey))
+    Ed25519.Public_key.of_hex_exn (`Hex pubkey)
 
   let get_pubkey ctxt =
     Context.get ctxt pubkey_key >>= function

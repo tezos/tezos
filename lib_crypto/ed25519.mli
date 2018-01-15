@@ -36,6 +36,10 @@ module Public_key : sig
   val of_b58check_opt: string -> t option
   val to_b58check: t -> string
 
+  val to_hex: t -> Hex.t
+  val of_hex: Hex.t -> t option
+  val of_hex_exn: Hex.t -> t
+
   val of_bytes: Bytes.t -> t
 
 end

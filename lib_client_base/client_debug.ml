@@ -26,7 +26,7 @@ let pp_block ppf
      @ Fitness: @[<v>%a@]\
      @ Operations hash: %a\
      @ Operations: @[<v>%a@]\
-     @ Data (hex encoded): \"%s\"@]"
+     @ Data (hex encoded): \"%a\"@]"
     Block_hash.pp hash
     Test_network_status.pp test_network
     level
@@ -35,10 +35,7 @@ let pp_block ppf
     Protocol_hash.pp protocol
     Net_id.pp net_id
     Time.pp_hum timestamp
-    (Format.pp_print_list
-       ~pp_sep:Format.pp_print_space
-       Format.pp_print_string)
-    (List.map Hex_encode.hex_of_bytes fitness)
+    Fitness.pp fitness
     Operation_list_list_hash.pp operations_hash
     (fun ppf -> function
        | None -> Format.fprintf ppf "None"
@@ -48,7 +45,7 @@ let pp_block ppf
                 (fun ppf (oph, _) -> Operation_hash.pp ppf oph))
              ppf operations)
     operations
-    (Hex_encode.hex_of_bytes data)
+    Hex.pp (MBytes.to_hex data)
 
 let stuck_node_report cctxt file =
   let ppf = Format.formatter_of_out_channel (open_out file) in

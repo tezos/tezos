@@ -53,8 +53,8 @@ let max x y = if x <= y then y else x
 
 let rec pp fmt = function
   | [] -> ()
-  | [f] -> Format.fprintf fmt "%s" (Hex_encode.hex_of_bytes f)
-  | f1 :: f -> Format.fprintf fmt "%s::%a" (Hex_encode.hex_of_bytes f1) pp f
+  | [f] -> Format.fprintf fmt "%a" Hex.pp (MBytes.to_hex f)
+  | f1 :: f -> Format.fprintf fmt "%a::%a" Hex.pp (MBytes.to_hex f1) pp f
 
 let encoding =
   let open Data_encoding in

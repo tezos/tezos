@@ -89,7 +89,8 @@ let hash_and_sign (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser
   return (hash,
           signature |>
           Data_encoding.Binary.to_bytes Ed25519.Signature.encoding |>
-          Hex_encode.hex_of_bytes)
+          MBytes.to_hex |>
+          (fun (`Hex s) -> s))
 
 let typecheck_data
     ~(data : Michelson_v1_parser.parsed)

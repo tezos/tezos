@@ -32,6 +32,10 @@ module Public_key : sig
 
   val of_bytes: Bytes.t -> t
 
+  val to_hex: t -> [ `Hex of string ]
+  val of_hex: [ `Hex of string ] -> t option
+  val of_hex_exn: [ `Hex of string ] -> t
+
 end
 
 module Secret_key : sig

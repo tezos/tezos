@@ -25,7 +25,6 @@
 
     ;; Tezos extended stdlib
     v1/mBytes.mli
-    v1/hex_encode.mli
     v1/compare.mli
     v1/data_encoding.mli
     v1/error_monad.mli

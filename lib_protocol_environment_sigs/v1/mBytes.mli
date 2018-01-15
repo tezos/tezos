@@ -130,3 +130,6 @@ val (>) : t -> t -> bool
 val compare : t -> t -> int
 
 val concat: t -> t -> t
+
+val to_hex: t -> [ `Hex of string ]
+val of_hex: [ `Hex of string ] -> t
