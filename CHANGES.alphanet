@@ -1,5 +1,13 @@
-For the next reset
-==================
+Patch 2018-01-15
+================
+
+[Node]
+
+- Fix a performance issue in block locator computation
+
+
+Reset 2017-11-20
+================
 
 [Alphanet]
 
