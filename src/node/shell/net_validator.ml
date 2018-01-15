@@ -20,6 +20,7 @@ type t = {
   timeout: timeout ;
   bootstrap_threshold: int ;
   mutable bootstrapped: bool ;
+  bootstrapped_waiter: unit Lwt.t ;
   bootstrapped_wakener: unit Lwt.u ;
   valid_block_input: State.Block.t Watcher.input ;
   global_valid_block_input: State.Block.t Watcher.input ;
@@ -131,7 +132,7 @@ let rec create
   let valid_block_input = Watcher.create_input () in
   let new_head_input = Watcher.create_input () in
   let canceler = Canceler.create () in
-  let _, bootstrapped_wakener = Lwt.wait () in
+  let bootstrapped_waiter, bootstrapped_wakener = Lwt.wait () in
   let nv = {
     db ; net_state ; net_db ; block_validator ;
     prevalidator ;
@@ -140,6 +141,7 @@ let rec create
     new_head_input ;
     parent ; max_child_ttl ; child = None ;
     bootstrapped = (bootstrap_threshold <= 0) ;
+    bootstrapped_waiter ;
     bootstrapped_wakener ;
     bootstrap_threshold ;
     active_peers =
@@ -337,8 +339,8 @@ let validate_block nv ?(force = false) hash block operations =
   else
     failwith "Fitness too low"
 
-let bootstrapped { bootstrapped_wakener } =
-  Lwt.protected (Lwt.waiter_of_wakener bootstrapped_wakener)
+let bootstrapped { bootstrapped_waiter } =
+  Lwt.protected bootstrapped_waiter
 
 let valid_block_watcher { valid_block_input } =
   Watcher.create_stream valid_block_input

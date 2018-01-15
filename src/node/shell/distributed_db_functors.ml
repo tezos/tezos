@@ -122,7 +122,8 @@ end = struct
   }
 
   and status =
-    | Pending of { wakener : value tzresult Lwt.u ;
+    | Pending of { waiter : value tzresult Lwt.t ;
+                   wakener : value tzresult Lwt.u ;
                    mutable waiters : int ;
                    param : param }
     | Found of value
@@ -218,20 +219,20 @@ end = struct
             | exception Not_found -> begin
                 let waiter, wakener = Lwt.wait () in
                 Memory_table.add s.memory k
-                  (Pending { wakener ; waiters =  1 ; param }) ;
+                  (Pending { waiter ; wakener ; waiters =  1 ; param }) ;
                 Scheduler.request s.scheduler peer k ;
                 wrap s k ?timeout waiter
               end
             | Pending data ->
                 Scheduler.request s.scheduler peer k ;
                 data.waiters <- data.waiters + 1 ;
-                wrap s k ?timeout (Lwt.waiter_of_wakener data.wakener)
+                wrap s k ?timeout data.waiter
             | Found v -> return v
       end
     | Pending data ->
         Scheduler.request s.scheduler peer k ;
         data.waiters <- data.waiters + 1 ;
-        wrap s k ?timeout (Lwt.waiter_of_wakener data.wakener)
+        wrap s k ?timeout data.waiter
     | Found v -> return v
 
   let prefetch s ?peer ?timeout k param =

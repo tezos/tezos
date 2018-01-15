@@ -92,13 +92,13 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
              else
                let body = match body with
                  | Answer.Empty ->
-                     Cohttp_lwt_body.empty
+                     Cohttp_lwt.Body.empty
                  | Single body ->
-                     Cohttp_lwt_body.of_string body
+                     Cohttp_lwt.Body.of_string body
                  | Stream s ->
                      let stream =
                        create_stream io con (fun s -> s) s in
-                     Cohttp_lwt_body.of_stream stream in
+                     Cohttp_lwt.Body.of_stream stream in
                Lwt.return_some
                  (Response.make ~flush:true ~status:(`Code code) ~headers (),
                   body))
@@ -115,7 +115,7 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
         | None -> Cohttp.Header.init ()
         | Some headers -> headers in
       let body = match body with
-        | None -> Cohttp_lwt_body.empty
+        | None -> Cohttp_lwt.Body.empty
         | Some body -> body in
       let headers =
         make_cors_headers ~headers
@@ -179,7 +179,7 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
                    | `PUT
                    | `PATCH
                    | `DELETE -> begin
-                       Cohttp_lwt_body.to_string body >>= fun body ->
+                       Cohttp_lwt.Body.to_string body >>= fun body ->
                        match Data_encoding_ezjsonm.from_string body with
                        | Error msg -> Lwt.fail (Cannot_parse_body msg)
                        | Ok body -> Lwt.return (Some body)
@@ -194,13 +194,13 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
                  handler body >>= fun { Answer.code ; body } ->
                  let body = match body with
                    | Empty ->
-                       Cohttp_lwt_body.empty
+                       Cohttp_lwt.Body.empty
                    | Single json ->
-                       Cohttp_lwt_body.of_string (Data_encoding_ezjsonm.to_string json)
+                       Cohttp_lwt.Body.of_string (Data_encoding_ezjsonm.to_string json)
                    | Stream s ->
                        let stream =
                          create_stream io con Data_encoding_ezjsonm.to_string s in
-                       Cohttp_lwt_body.of_stream stream in
+                       Cohttp_lwt.Body.of_stream stream in
                  lwt_log_info "(%s) RPC %s"
                    (Cohttp.Connection.to_string con)
                    (if Cohttp.Code.is_error code
@@ -227,14 +227,14 @@ let launch ?pre_hook ?post_hook ?(host="::") mode root cors_allowed_origins cors
         | Cannot_parse_body msg ->
             lwt_log_info "(%s) can't parse RPC body"
               (Cohttp.Connection.to_string con) >>= fun () ->
-            let body = Cohttp_lwt_body.of_string msg in
+            let body = Cohttp_lwt.Body.of_string msg in
             answer_with_cors_headers ~body `Bad_request
         | e -> Lwt.fail e)
   and conn_closed (_, con) =
     log_info "connection closed %s" (Cohttp.Connection.to_string con) ;
     shutdown_stream con  in
   Conduit_lwt_unix.init ~src:host () >>= fun ctx ->
-  let ctx = Cohttp_lwt_unix_net.init ~ctx () in
+  let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
   let stop = cancelation () in
   let on_exn = function
     | Unix.Unix_error (Unix.EADDRINUSE, "bind", _) ->

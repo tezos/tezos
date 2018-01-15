@@ -191,7 +191,7 @@ let make_request config log_request meth service json =
     Uri.make ~scheme ~host:config.host ~port:config.port ~path () in
   let reqbody = Data_encoding_ezjsonm.to_string json in
   Lwt.catch begin fun () ->
-    let body = Cohttp_lwt_body.of_string reqbody in
+    let body = Cohttp_lwt.Body.of_string reqbody in
     Cohttp_lwt_unix.Client.call meth ~body uri >>= fun (code, ansbody) ->
     log_request uri json >>= fun reqid ->
     return (reqid, code.Cohttp.Response.status, ansbody)
@@ -208,7 +208,7 @@ let get_streamed_json config meth service json =
     meth service json >>=? fun (reqid, code, ansbody) ->
   match code with
   | #Cohttp.Code.success_status ->
-      let ansbody = Cohttp_lwt_body.to_stream ansbody in
+      let ansbody = Cohttp_lwt.Body.to_stream ansbody in
       let json_st = Data_encoding_ezjsonm.from_stream ansbody in
       let parsed_st, push = Lwt_stream.create () in
       let rec loop () =
@@ -230,7 +230,7 @@ let get_streamed_json config meth service json =
       Lwt.async loop ;
       return parsed_st
   | err ->
-      Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
+      Cohttp_lwt.Body.to_string ansbody >>= fun ansbody ->
       logger.log_error reqid code ansbody >>= fun () ->
       fail config (Request_failed (service, err))
 
@@ -238,7 +238,7 @@ let get_json config meth service json =
   let Logger logger = config.logger in
   make_request config logger.log_request
     meth service json >>=? fun (reqid, code, ansbody) ->
-  Cohttp_lwt_body.to_string ansbody >>= fun ansbody ->
+  Cohttp_lwt.Body.to_string ansbody >>= fun ansbody ->
   match code with
   | #Cohttp.Code.success_status -> begin
       if ansbody = "" then
