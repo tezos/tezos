@@ -1,0 +1,38 @@
+(jbuild_version 1)
+
+(rule
+ ((targets (michelson_v1_parser.ml))
+  (action (copy# ../../src/proto_alpha/lib_client/michelson_v1_parser.ml michelson_v1_parser.ml))))
+
+(rule
+ ((targets (michelson_macros.ml))
+  (action (copy# ../../src/proto_alpha/lib_client/michelson_macros.ml michelson_macros.ml))))
+
+(executables
+ ((names (test_isolate_main))
+  (libraries (tezos-base
+              tezos-rpc-http
+              tezos-shell
+              test_lib
+              tezos_proto_alpha_isolate_helpers))
+  (flags (:standard -w -9-32 -safe-string
+                    -open Tezos_base__TzPervasives
+                    -open Tezos_rpc_http))))
+
+(alias
+ ((name buildtest)
+  (deps (test_isolate_main.exe))))
+
+(alias
+ ((name runtest_isolate_main)
+  (deps (../proto_alpha/sandbox.json (glob_files ../contracts/*.tz)))
+  (action (chdir ${ROOT} (run ${exe:test_isolate_main.exe})))))
+
+(alias
+ ((name runtest)
+  (deps ((alias runtest_isolate_main)))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

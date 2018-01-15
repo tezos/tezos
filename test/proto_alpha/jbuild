@@ -11,6 +11,7 @@
               tezos-client-base
               tezos-client-genesis
               tezos-client-alpha
+              tezos-shell
               test_lib))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
