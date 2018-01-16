@@ -1,11 +1,10 @@
 (**************************************************************************)
 (*                                                                        *)
-(*    Copyright (c) 2014 - 2017.                                          *)
+(*    Copyright (c) 2014 - 2016.                                          *)
 (*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
 (*                                                                        *)
 (*    All rights reserved. No warranty, explicit or implicit, provided.   *)
 (*                                                                        *)
 (**************************************************************************)
 
-(* Where all the user friendliness starts *)
-let () = Pervasives.exit (Lwt_main.run (Main_lib.main ()))
+val commands : unit -> (Client_commands.full_context, unit) Cli_entries.command list

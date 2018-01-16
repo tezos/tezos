@@ -47,26 +47,21 @@ let pp_block ppf
     operations
     Hex.pp (MBytes.to_hex data)
 
-let stuck_node_report cctxt file =
-  let ppf = Format.formatter_of_out_channel (open_out file) in
-  let skip_line () =
-    Format.pp_print_newline ppf ();
-    return @@ Format.pp_print_newline ppf () in
-  let print_title title level =
-    Format.fprintf ppf "%s %s@.@." (String.init level (fun _ -> '#')) title;
-    return () in
-  print_title "Stuck node report:" 1 >>=? fun () ->
-  return @@ Format.fprintf ppf "Date: %a@;"
-    Time.pp_hum (Time.now ()) >>=? fun () ->
-  skip_line () >>=? fun () ->
-  print_title "Registered protocols:" 2 >>=? fun () ->
-  return @@ Format.pp_print_list
+let print_md_title ppf title level =
+  Format.fprintf ppf "%s %s@.@." (String.init level (fun _ -> '#')) title
+
+let skip_line ppf =
+  Format.pp_print_newline ppf ();
+  return @@ Format.pp_print_newline ppf ()
+
+let registered_protocols ppf =
+  Format.pp_print_list
     ~pp_sep:Format.pp_print_newline
     (fun ppf (protocol, _) -> Protocol_hash.pp ppf protocol)
     ppf
-    (Client_commands.get_versions ()) >>=? fun () ->
-  skip_line () >>=? fun () ->
-  print_title "Heads:" 2 >>=? fun () ->
+    (Client_commands.get_versions ())
+
+let print_heads ppf cctxt =
   Client_rpcs.call_service0 cctxt Node_rpc_services.Blocks.list
     { include_ops = true ;
       length = Some 1 ;
@@ -83,9 +78,9 @@ let stuck_node_report cctxt file =
          pp_block
          ppf
          blocks)
-    ppf heads >>=? fun () ->
-  skip_line () >>=? fun () ->
-  print_title "Rejected blocks:" 2 >>=? fun () ->
+    ppf heads
+
+let print_rejected ppf cctxt =
   Client_rpcs.call_service0 cctxt
     Node_rpc_services.Blocks.list_invalid () >>=? fun invalid ->
   return @@
@@ -108,22 +103,55 @@ let stuck_node_report cctxt file =
 let commands () =
   let open Cli_entries in
   let group = { name = "debug" ;
-                title = "commands to debug and fix problems with the node" } in
+                title = "commands to report debug information" } in
+  let output_arg =
+    arg
+      ~doc:"Write output of debug command to file"
+      ~parameter:"-file"
+    @@ parameter (fun _ str -> return str) in
+  let output_to_ppf = function
+    | None -> Format.std_formatter
+    | Some file -> Format.formatter_of_out_channel (open_out file) in
   [
-    command ~group ~desc: "debug report"
-      no_options
-      (prefixes [ "debug" ; "stuck" ; "node" ]
-       @@ string ~name:"file" ~desc:"file in which to save report"
-       @@ stop)
-      (fun () file (cctxt : Client_commands.full_context) ->
-         stuck_node_report cctxt file) ;
-    command ~group ~desc: "unmark invalid"
-      no_options
-      (prefixes [ "debug" ; "unmark" ; "invalid" ]
-       @@ Block_hash.param ~name:"block" ~desc:"block to remove from invalid list"
-       @@ stop)
-      (fun () block (cctxt : Client_commands.full_context) ->
-         Client_rpcs.call_err_service0 cctxt Node_rpc_services.Blocks.unmark_invalid block >>=? fun () ->
-         cctxt#message "Block %a no longer marked invalid" Block_hash.pp block >>= return
-      )
+    command ~group ~desc: "list protocols"
+      (args1 output_arg)
+      (fixed [ "list" ; "registered" ; "protocols" ])
+      (fun output (_cctxt : Client_commands.full_context) ->
+         let ppf = output_to_ppf output in
+         registered_protocols ppf ;
+         Format.fprintf ppf "@." ;
+         return ()) ;
+    command ~group ~desc: "current heads"
+      (args1 output_arg)
+      (fixed [ "list" ; "heads" ])
+      (fun output cctxt ->
+         let ppf = output_to_ppf output in
+         print_heads ppf cctxt >>=? fun () ->
+         Format.fprintf ppf "@." ;
+         return ()) ;
+    command ~group ~desc: "rejected blocks"
+      (args1 output_arg)
+      (fixed [ "list" ; "rejected" ; "blocks" ])
+      (fun output cctxt ->
+         let ppf = output_to_ppf output in
+         print_rejected ppf cctxt >>|? fun () ->
+         Format.fprintf ppf "@.") ;
+    command ~group ~desc: "report on current node state"
+      (args1 output_arg)
+      (fixed [ "full" ; "report" ])
+      (fun output cctxt ->
+         let ppf = output_to_ppf output in
+         print_md_title ppf "Node report:" 1 ;
+         return @@ Format.fprintf ppf "Date: %a@;"
+           Time.pp_hum (Time.now ()) >>=? fun () ->
+         skip_line ppf >>=? fun () ->
+         print_md_title ppf "Registered protocols:" 2 ;
+         registered_protocols ppf ;
+         skip_line ppf >>=? fun () ->
+         print_md_title ppf "Heads:" 2 ;
+         print_heads ppf cctxt >>=? fun () ->
+         skip_line ppf >>=? fun () ->
+         print_md_title ppf "Rejected blocks:" 2 ;
+         print_rejected ppf cctxt >>|? fun () ->
+         Format.fprintf ppf "@.") ;
   ]

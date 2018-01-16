@@ -8,4 +8,8 @@
 (**************************************************************************)
 
 (* Where all the user friendliness starts *)
-let () = Pervasives.exit (Lwt_main.run (Main_lib.main ()))
+let () = Pervasives.exit (Lwt_main.run (
+    Main_lib.main ~only_commands:(Client_debug.commands ()
+                                  @ Client_admin.commands ()
+                                  @ Client_network.commands ()
+                                  @ Client_generic_rpcs.commands) ()))

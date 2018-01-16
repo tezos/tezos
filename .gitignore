@@ -10,6 +10,7 @@ _build
 /tezos-node
 /tezos-protocol-compiler
 /tezos-client
+/tezos-admin-client
 
 /scripts/opam-test-all.sh.DONE
 
