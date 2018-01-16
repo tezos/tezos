@@ -3,12 +3,12 @@ DEV ?= --dev
 
 all:
 	@jbuilder build ${DEV} \
-		bin_node/main.exe \
-		bin_client/main.exe \
-		lib_protocol_compiler/main.exe
-	@cp _build/default/bin_node/main.exe tezos-node
-	@cp _build/default/bin_client/main.exe tezos-client
-	@cp _build/default/lib_protocol_compiler/main.exe tezos-protocol-compiler
+		src/bin_node/main.exe \
+		src/bin_client/main.exe \
+		src/lib_protocol_compiler/main.exe
+	@cp _build/default/src/bin_node/main.exe tezos-node
+	@cp _build/default/src/bin_client/main.exe tezos-client
+	@cp _build/default/src/lib_protocol_compiler/main.exe tezos-protocol-compiler
 
 doc-html:
 	@jbuilder build @doc ${DEV}

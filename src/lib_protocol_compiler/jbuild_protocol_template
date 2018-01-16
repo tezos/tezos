@@ -26,7 +26,7 @@ let version =
 
 let path =
   match predefined_version with
-  | None -> "lib_embedded_protocol_" ^ version
+  | None -> "src/lib_embedded_protocol_" ^ version
   | Some _ -> "."
 
 let () = Format.kasprintf Jbuild_plugin.V1.send {|
