@@ -1,12 +1,20 @@
 
+## /!\ /!\ Update .dockerignore accordingly /!\ /!\
+
+.DS_Store
+__pycache__
+
 _build
 **/*.install
 
 tezos-node
 tezos-protocol-compiler
 tezos-client
+tezos-admin-client
 
 scripts/opam-test-all.sh.DONE
+
+docs/introduction/readme.rst
 
 **/.merlin
 
@@ -17,6 +25,8 @@ scripts/opam-test-all.sh.DONE
 **/*.orig
 
 _opam
+
+## Not in .gitignore
 
 .git
 .gitignore

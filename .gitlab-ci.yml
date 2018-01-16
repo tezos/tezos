@@ -1,3 +1,4 @@
+
 variables:
   public_docker_image: docker.io/tezos/tezos
 
@@ -22,9 +23,7 @@ stages:
     - docker info
     - docker login -u gitlab-ci-token -p "$CI_BUILD_TOKEN" "${CI_REGISTRY}"
   tags:
-    - safe_docker
-
-## Prepare docker image with precompiled OCaml/opam
+    - docker
 
 prepare:opam:
   <<: *dind_definition
@@ -34,29 +33,13 @@ prepare:opam:
   before_script:
     - . ./scripts/version.sh
   script:
-    - ./scripts/create_docker_image.alpine.sh
-    - mkdir ~/.docker || true
+    - mkdir -p ~/.docker
     - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
+    - ./scripts/create_docker_image.opam.sh
     - docker push "tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
     - docker tag "tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
                  "tezos/opam:latest"
     - docker push "tezos/opam:latest"
-
-prepare:opam2:
-  <<: *dind_definition
-  stage: prepare
-  only:
-    - schedules
-  before_script:
-    - . ./scripts/version.sh
-  script:
-    - ./scripts/create_docker_image.alpine.opam2.sh
-    - mkdir ~/.docker || true
-    - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
-    - docker push "tezos/opam2:alpine-${alpine_version}_ocaml-${ocaml_version}"
-    - docker tag "tezos/opam2:alpine-${alpine_version}_ocaml-${ocaml_version}"
-                 "tezos/opam2:latest"
-    - docker push "tezos/opam2:latest"
 
 ## Tezos
 
@@ -125,43 +108,36 @@ test:proto_alpha:transaction:
   <<: *test_definition
   script:
     - jbuilder build @test/proto_alpha/runtest_transaction
-  retry: 1
 
 test:proto_alpha:origination:
   <<: *test_definition
   script:
     - jbuilder build @test/proto_alpha/runtest_origination
-  retry: 1
 
 test:proto_alpha:endorsement:
   <<: *test_definition
   script:
     - jbuilder build @test/proto_alpha/runtest_endorsement
-  retry: 1
 
 test:proto_alpha:vote:
   <<: *test_definition
   script:
     - jbuilder build @test/proto_alpha/runtest_vote
-  retry: 1
 
 test:basic.sh:
   <<: *test_definition
   script:
     - jbuilder build @test/runtest_basic.sh
-  retry: 1
 
 test:contracts.sh:
   <<: *test_definition
   script:
     - jbuilder build @test/runtest_contracts.sh
-  retry: 1
 
 test:multinode.sh:
   <<: *test_definition
   script:
     - jbuilder build @test/runtest_multinode.sh
-  retry: 1
 
 test:proto:sandbox:
   <<: *test_definition

@@ -1,8 +1,0 @@
-FROM $base_image
-
-COPY . tezos
-
-RUN sudo chown -R opam /home/opam/tezos && \
-    cd tezos && \
-    opam config exec -- jbuilder build @install && \
-    opam config exec -- jbuilder install

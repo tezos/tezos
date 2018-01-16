@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 set -e
 
@@ -13,28 +13,40 @@ cached_image="${3:-}"
 
 base_image="tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
 if ! docker pull "$base_image" ; then
-    ./scripts/create_docker_image.alpine.sh
+    ./scripts/create_docker_image.alpine.opam2.sh
 fi
 
 cleanup () {
     set +e
     echo Cleaning up...
-    rm -rf Dockerfile
+    rm -f Dockerfile opams.tar.gz scripts.tar.gz
 }
 trap cleanup EXIT INT
 
-opam_files=$(find -name \*.opam | sort)
-dependencies="$opam_files scripts/install_build_deps.sh scripts/version.sh scripts/opam-pin.sh scripts/opam-unpin.sh scripts/opam-remove.sh Dockerfile"
+dependencies="scripts/install_build_deps.sh scripts/version.sh scripts/opam-pin.sh scripts/opam-unpin.sh scripts/opam-remove.sh"
+tar czvf scripts.tar.gz $dependencies
 
-for file in $dependencies; do
-    if [ "$file" = Dockerfile ]; then continue; fi
-    copy_files="$copy_files\nCOPY $file ./tezos/$file"
-done
+opams=$(find -name \*.opam -type f)
+tar czvf opams.tar.gz $opams
 
-sed -e 's|$base_image|'"$base_image"'|g' \
-    -e 's|$ocaml_version|'"$ocaml_version"'|g' \
-    -e 's|$copy_files|'"$copy_files"'|g' \
-    scripts/Dockerfile.build_deps.in > Dockerfile
+cat <<EOF >Dockerfile
+FROM $base_image
+
+# these two archives are created in the file
+# scripts/create_docker_image.build_deps.sh and removed
+# automatically after
+ADD opams.tar.gz tezos/
+ADD scripts.tar.gz tezos/
+
+USER opam
+
+RUN opam config exec -- ./tezos/scripts/install_build_deps.sh
+ENV OPAMYES=yes
+RUN opam config exec -- opam install ocp-indent && \
+  rm -fr ~/.opam/log/ && \
+  rm -fr "\$(opam config exec -- ocamlfind query stdlib)"/topdirs.cmi
+
+EOF
 
 ## Lookup for for prebuilt dependencies...
 dependencies_sha1=$(docker inspect --format="{{ .RootFS.Layers }}" --type=image $base_image | sha1sum - $dependencies | sha1sum | tr -d ' -')
@@ -54,12 +66,12 @@ if [ ! -z "$cached_image" ]; then
 fi
 
 echo
-echo "### Building tezos dependencies..."
+echo "### Building tezos dependencies... $image_name:$image_version"
 echo
 
-docker build -t "$image_name:$image_version" .
+docker build --pull -t "$image_name:$image_version" .
 
-rm Dockerfile
+rm -f Dockerfile opams.tar.gz scripts.tar.gz
 
 echo
 echo "### Succesfully build docker image: $image_name:$image_version"

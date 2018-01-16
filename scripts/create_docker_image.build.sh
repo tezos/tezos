@@ -18,15 +18,30 @@ cleanup () {
 }
 trap cleanup EXIT INT
 
-sed -e 's|$base_image|'"$build_deps_image_name"'|g' \
-    scripts/Dockerfile.build.in > Dockerfile
+cat <<EOF > Dockerfile
+FROM $build_deps_image_name
+
+COPY . tezos
+USER root
+RUN chown -R opam /home/opam/tezos
+
+# build tezos and friends
+USER opam
+
+RUN cd tezos && \
+    opam config exec -- jbuilder build @install && \
+    opam config exec -- jbuilder install
+
+USER root
+
+ENTRYPOINT [ "/sbin/su-exec", "opam", "opam", "config", "exec", "--" ]
+EOF
 
 echo
 echo "### Building tezos..."
 echo
 
 docker build -t "$image_name:$image_version" .
-
 rm Dockerfile
 
 echo
