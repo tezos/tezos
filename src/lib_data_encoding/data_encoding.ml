@@ -385,7 +385,7 @@ module Json = struct
     function
     | Null -> null
     | Empty -> empty
-    | Constant s -> string_enum [s, ()]
+    | Constant s -> constant s
     | Ignore -> unit
     | Int8 -> ranged_int ~minimum:~-(1 lsl 7) ~maximum:((1 lsl 7) - 1) "int8"
     | Uint8 -> ranged_int ~minimum:0 ~maximum:((1 lsl 8) - 1) "uint8"
