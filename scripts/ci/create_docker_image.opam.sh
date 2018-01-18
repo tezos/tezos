@@ -74,7 +74,7 @@ RUN mkdir ~/.ssh && \
     git config --global user.name "Tezos CI" && \
     opam init --bare --no-setup --yes \
               tezos_deps /home/opam/opam-repository-tezos_deps && \
-    opam switch create --yes tezos ocaml-base-compiler.4.04.2
+    opam switch create --yes tezos ocaml-base-compiler.${ocaml_version}
 
 RUN opam install --yes opam-depext
 

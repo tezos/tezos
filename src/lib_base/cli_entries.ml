@@ -293,7 +293,7 @@ let setup_formatter ppf format verbosity =
     Format.pp_get_formatter_tag_functions ppf (),
     Format.pp_get_print_tags ppf () in
   begin
-    Format.pp_flush_formatter ppf ;
+    Format.pp_print_flush ppf () ;
     Format.pp_set_formatter_out_functions ppf
       { out_string =
           (fun s b a ->
@@ -302,7 +302,8 @@ let setup_formatter ppf format verbosity =
              else if not !skip then orig_out_functions.out_string s b a) ;
         out_spaces = (fun n -> if not !skip then orig_out_functions.out_spaces n) ;
         out_newline = (fun () -> if not !skip then orig_out_functions.out_newline ()) ;
-        out_flush = (fun () -> if not !skip then orig_out_functions.out_flush ()) } ;
+        out_flush = (fun () -> if not !skip then orig_out_functions.out_flush ()) ;
+        out_indent = orig_out_functions.out_indent } ;
     let levels = ref [] in
     let setup_level (level, op) =
       if op level verbosity then
@@ -499,7 +500,7 @@ let setup_formatter ppf format verbosity =
   orig_state
 
 let restore_formatter ppf (out_functions, tag_functions, tags) =
-  Format.pp_flush_formatter ppf ;
+  Format.pp_print_flush ppf () ;
   Format.pp_set_formatter_out_functions ppf out_functions ;
   Format.pp_set_formatter_tag_functions ppf tag_functions ;
   Format.pp_set_print_tags ppf tags

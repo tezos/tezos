@@ -86,6 +86,19 @@ sig
       of [x] in [m] disappears.
       @before 4.03 Physical equality was not ensured. *)
 
+  val update: key -> ('a option -> 'a option) -> 'a t -> 'a t
+  (** [update x f m] returns a map containing the same bindings as
+      [m], except for the binding of [x]. Depending on the value of
+      [y] where [y] is [f (find_opt x m)], the binding of [x] is
+      added, removed or updated. If [y] is [None], the binding is
+      removed if it exists; otherwise, if [y] is [Some z] then [x]
+      is associated to [z] in the resulting map.  If [x] was already
+      bound in [m] to a value that is physically equal to [z], [m]
+      is returned unchanged (the result of the function is then
+      physically equal to [m]).
+      @since 4.06.0
+  *)
+
   val singleton: key -> 'a -> 'a t
   (** [singleton x y] returns the one-element map that contains a binding [y]
       for [x].
@@ -184,10 +197,23 @@ sig
       @since 3.12.0
   *)
 
+  val min_binding_opt: 'a t -> (key * 'a) option
+  (** Return the smallest binding of the given map
+      (with respect to the [Ord.compare] ordering), or [None]
+      if the map is empty.
+      @since 4.05
+  *)
+
   val max_binding: 'a t -> (key * 'a)
   (** Same as {!Map.S.min_binding}, but returns the largest binding
       of the given map.
       @since 3.12.0
+  *)
+
+  val max_binding_opt: 'a t -> (key * 'a) option
+  (** Same as {!Map.S.min_binding_opt}, but returns the largest binding
+      of the given map.
+      @since 4.05
   *)
 
   val choose: 'a t -> (key * 'a)
@@ -195,6 +221,13 @@ sig
       the map is empty. Which binding is chosen is unspecified,
       but equal bindings will be chosen for equal maps.
       @since 3.12.0
+  *)
+
+  val choose_opt: 'a t -> (key * 'a) option
+  (** Return one binding of the given map, or [None] if
+      the map is empty. Which binding is chosen is unspecified,
+      but equal bindings will be chosen for equal maps.
+      @since 4.05
   *)
 
   val split: key -> 'a t -> 'a t * 'a option * 'a t
@@ -211,6 +244,47 @@ sig
   val find: key -> 'a t -> 'a
   (** [find x m] returns the current binding of [x] in [m],
       or raises [Not_found] if no such binding exists. *)
+
+
+  val find_opt: key -> 'a t -> 'a option
+  (** [find_opt x m] returns [Some v] if the current binding of [x]
+      in [m] is [v], or [None] if no such binding exists.
+      @since 4.05
+  *)
+
+  val find_first: (key -> bool) -> 'a t -> key * 'a
+  (** [find_first f m], where [f] is a monotonically increasing function,
+      returns the binding of [m] with the lowest key [k] such that [f k],
+      or raises [Not_found] if no such key exists.
+
+      For example, [find_first (fun k -> Ord.compare k x >= 0) m] will return
+      the first binding [k, v] of [m] where [Ord.compare k x >= 0]
+      (intuitively: [k >= x]), or raise [Not_found] if [x] is greater than any
+      element of [m].
+
+      @since 4.05
+  *)
+
+  val find_first_opt: (key -> bool) -> 'a t -> (key * 'a) option
+  (** [find_first_opt f m], where [f] is a monotonically increasing function,
+      returns an option containing the binding of [m] with the lowest key [k]
+      such that [f k], or [None] if no such key exists.
+      @since 4.05
+  *)
+
+  val find_last: (key -> bool) -> 'a t -> key * 'a
+  (** [find_last f m], where [f] is a monotonically decreasing function,
+      returns the binding of [m] with the highest key [k] such that [f k],
+      or raises [Not_found] if no such key exists.
+      @since 4.05
+  *)
+
+  val find_last_opt: (key -> bool) -> 'a t -> (key * 'a) option
+  (** [find_last_opt f m], where [f] is a monotonically decreasing function,
+      returns an option containing the binding of [m] with the highest key [k]
+      such that [f k], or [None] if no such key exists.
+      @since 4.05
+  *)
 
   val map: ('a -> 'b) -> 'a t -> 'b t
   (** [map f m] returns a map with same domain as [m], where the

@@ -77,7 +77,7 @@ COPY opam-repository-master opam-repository-master
 COPY opam /usr/local/bin/opam
 RUN apk add --no-cache ocaml build-base m4 tar xz bzip2 curl perl rsync
 RUN cd ./opam-repository-master/compilers && \
-    ( ls -1 | grep -v \$(ocamlc --version) | xargs rm -r )
+    ( ls -1 | grep -v ${ocaml_version} | xargs rm -r )
 RUN opam init --no-setup --yes default ./opam-repository-master
 RUN opam install --yes opam-bundle
 COPY opam-repository-tezos opam-repository-tezos

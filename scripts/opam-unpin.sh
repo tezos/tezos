@@ -12,7 +12,7 @@ opam pin remove $packages
 ### Temporary HACK
 
 ## Should be in sync with `opam-pin.sh`
-opam pin remove --no-action sodium
+opam pin remove --no-action leveldb
 opam pin remove --no-action ocplib-json-typed
 
 ### End of temporary HACK

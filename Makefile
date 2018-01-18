@@ -2,6 +2,13 @@
 DEV ?= --dev
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find -name *.opam)))
 
+current_ocaml_version := $(shell ocamlc -version)
+include scripts/version.sh
+
+ifneq (${current_ocaml_version},${ocaml_version})
+$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
+endif
+
 all:
 	@jbuilder build ${DEV} \
 		src/bin_node/main.exe \

@@ -23,4 +23,4 @@ build-test: [
   [ "jbuilder" "runtest" "-p" name "-j" jobs ]
 ]
 ## ocaml-version should be in sync with `script/version.sh`
-available: [ ocaml-version = "4.04.2" ]
+available: [ ocaml-version = "4.06.1" ]
