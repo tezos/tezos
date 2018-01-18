@@ -51,8 +51,8 @@ main() {
 
     local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
     if [ $(basename "$bin_dir") = "bin_node" ]; then
-        local_node="${local_node:-$bin_dir/../_build/default/bin_node/main.exe}"
-        sandbox_file="${sandbox_file:-$bin_dir/../scripts/sandbox.json}"
+        local_node="${local_node:-$bin_dir/../../_build/default/src/bin_node/main.exe}"
+        sandbox_file="${sandbox_file:-$bin_dir/../../scripts/sandbox.json}"
     fi
 
     if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
