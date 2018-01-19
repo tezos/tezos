@@ -109,4 +109,6 @@ module Make(Param : sig val name: string end)() = struct
     | Ok _ as ok -> ok
     | Error errors -> Error [Ecoproto_error errors]
 
+  module Option = Option
+
 end

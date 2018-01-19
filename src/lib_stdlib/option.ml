@@ -34,3 +34,5 @@ let first_some a b = match a, b with
 
 let try_with f =
   try Some (f ()) with _ -> None
+
+let some x = Some x

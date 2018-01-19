@@ -30,6 +30,7 @@
     v1/error_monad.mli
     v1/logging.mli
     v1/time.mli
+    v1/option.mli
 
     v1/RPC_arg.mli
     v1/RPC_path.mli

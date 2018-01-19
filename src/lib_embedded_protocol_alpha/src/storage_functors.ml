@@ -35,10 +35,6 @@ let map_key f = function
   | `Key k -> `Key (f k)
   | `Dir k -> `Dir (f k)
 
-let map_option f = function
-  | None -> None
-  | Some x -> Some (f x)
-
 module Make_subcontext (C : Raw_context.T) (N : NAME)
   : Raw_context.T with type t = C.t = struct
   type t = C.t
@@ -94,7 +90,7 @@ module Make_single_data_storage (C : Raw_context.T) (N : NAME) (V : VALUE)
     C.init_set t N.name (V.to_bytes v) >>= fun t ->
     Lwt.return (C.project t)
   let set_option t v =
-    C.set_option t N.name (map_option V.to_bytes v) >>= fun t ->
+    C.set_option t N.name (Option.map ~f:V.to_bytes v) >>= fun t ->
     Lwt.return (C.project t)
   let remove t =
     C.remove t N.name >>= fun t ->
@@ -203,7 +199,7 @@ module Make_indexed_data_storage
     C.init_set s (I.to_path i []) (V.to_bytes v) >>= fun t ->
     Lwt.return (C.project t)
   let set_option s i v =
-    C.set_option s (I.to_path i []) (map_option V.to_bytes v) >>= fun t ->
+    C.set_option s (I.to_path i []) (Option.map ~f:V.to_bytes v) >>= fun t ->
     Lwt.return (C.project t)
   let remove s i =
     C.remove s (I.to_path i []) >>= fun t ->
@@ -411,7 +407,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       Lwt.return (C.project s)
     let set_option s i v =
       Raw_context.set_option (s,i)
-        N.name (map_option V.to_bytes v) >>= fun (s, _) ->
+        N.name (Option.map ~f:V.to_bytes v) >>= fun (s, _) ->
       Lwt.return (C.project s)
     let remove s i =
       Raw_context.remove (s,i) N.name >>= fun (s, _) ->
