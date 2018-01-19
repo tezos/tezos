@@ -22,13 +22,6 @@ CONTRACT_PATH=contracts
 
 printf "\n\n"
 
-# Assert well typed
-echo "Typechecking contracts in '${CONTRACT_PATH}'"
-ls $CONTRACT_PATH \
-    | xargs -I{} $client typecheck program $CONTRACT_PATH/{} > /dev/null
-
-printf "All contracts are well typed\n\n"
-
 # Assert all contracts typecheck
 for contract in `ls $CONTRACT_PATH/*.tz`; do
     printf "[Typechecking %s]\n" "$contract";
