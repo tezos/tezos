@@ -184,7 +184,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 print_expr expected
           | Apply.Bad_contract_parameter (c, Some expected, Some argument) ->
               Format.fprintf ppf
-                "@[<v 0>Contract %a expected an argument of type@,  %a@but received@,  %a@]"
+                "@[<v 0>Contract %a expected an argument of type@,  %a@,but received@,  %a@]"
                 Contract.pp c
                 print_expr expected
                 print_expr argument
