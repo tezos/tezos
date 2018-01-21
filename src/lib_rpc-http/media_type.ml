@@ -82,7 +82,7 @@ let octet_stream = {
   q = Some 200 ;
   pp = begin fun enc ppf raw ->
     match Data_encoding.Binary.of_bytes enc (MBytes.of_string raw) with
-    | None -> Format.fprintf ppf "Invalid bonary data."
+    | None -> Format.fprintf ppf "Invalid binary data."
     | Some v ->
         Format.fprintf ppf
           ";; binary equivalent of the following json@.%a"
