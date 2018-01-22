@@ -23,6 +23,7 @@ module type LOG = sig
   val lwt_log_notice: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   val lwt_warn: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   val lwt_log_error: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+  val lwt_fatal_error: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
 end
 
@@ -63,6 +64,7 @@ module Make(S : sig val name: string end) : LOG = struct
   let lwt_log_notice fmt = log_f ~section ~level:Lwt_log.Notice fmt
   let lwt_warn fmt = log_f ~section ~level:Lwt_log.Warning fmt
   let lwt_log_error fmt = log_f ~section ~level:Lwt_log.Error fmt
+  let lwt_fatal_error fmt = log_f ~section ~level:Lwt_log.Fatal fmt
 
 end
 

@@ -21,6 +21,7 @@ module type LOG = sig
   val lwt_log_notice: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   val lwt_warn: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
   val lwt_log_error: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
+  val lwt_fatal_error: ('a, Format.formatter, unit, unit Lwt.t) format4 -> 'a
 
 end
 
