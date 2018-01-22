@@ -637,6 +637,47 @@ module Workers = struct
 
   end
 
+  module Net_validators = struct
+
+    let (net_id_arg : Net_id.t RPC_arg.t) =
+      RPC_arg.make
+        ~name:"net_id"
+        ~descr:"The network identifier of whom the net validator is responsible."
+        ~destruct:(fun s -> try
+                      Ok (Net_id.of_b58check_exn s)
+                    with Failure msg -> Error msg)
+        ~construct:Net_id.to_b58check
+        ()
+
+    let list =
+      RPC_service.post_service
+        ~description:"Lists the net validator workers and their status."
+        ~query: RPC_query.empty
+        ~error: Data_encoding.empty
+        ~input: empty
+        ~output:
+          (list
+             (obj2
+                (req "net_id" Net_id.encoding)
+                (req "status" (Worker_types.worker_status_encoding Error.encoding))))
+        RPC_path.(root / "workers" / "net_validators")
+
+    let state =
+      let open Data_encoding in
+      RPC_service.post_service
+        ~description:"Introspect the state of a net validator worker."
+        ~query: RPC_query.empty
+        ~error: Data_encoding.empty
+        ~input: empty
+        ~output:
+          (Worker_types.full_status_encoding
+             Net_validator_worker_state.Request.encoding
+             (Net_validator_worker_state.Event.encoding Error.encoding)
+             Error.encoding)
+        RPC_path.(root / "workers" / "net_validators" /: net_id_arg )
+
+  end
+
 end
 
 

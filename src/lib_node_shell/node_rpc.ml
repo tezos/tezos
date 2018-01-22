@@ -505,6 +505,25 @@ let build_rpc_directory node =
              backlog = Peer_validator.last_events w ;
              current_request = Peer_validator.current_request w }) in
 
+  (* Workers : Net validators *)
+
+  let dir  =
+    RPC_directory.register0 dir Services.Workers.Net_validators.list
+      (fun () () ->
+         RPC_answer.return
+           (List.map
+              (fun (id, w) -> (id, Net_validator.status w))
+              (Net_validator.running_workers ()))) in
+  let dir  =
+    RPC_directory.register1 dir Services.Workers.Net_validators.state
+      (fun net_id () () ->
+         let w = List.assoc net_id (Net_validator.running_workers ()) in
+         RPC_answer.return
+           { Worker_types.status = Net_validator.status w ;
+             pending_requests = Net_validator.pending_requests w ;
+             backlog = Net_validator.last_events w ;
+             current_request = Net_validator.current_request w }) in
+
   (* Network : Global *)
 
   let dir =

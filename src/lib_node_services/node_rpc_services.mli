@@ -218,6 +218,23 @@ module Workers : sig
 
   end
 
+  module Net_validators : sig
+
+    open Net_validator_worker_state
+
+    val list :
+      ([ `POST ],  unit,
+       unit, unit, unit,
+       (Net_id.t * Worker_types.worker_status) list, unit) RPC_service.t
+
+    val state :
+      ([ `POST ], unit,
+       unit * Net_id.t, unit, unit,
+       (Request.view, Event.t) Worker_types.full_status, unit)
+        RPC_service.t
+
+  end
+
 end
 
 module Network : sig
