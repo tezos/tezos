@@ -30,6 +30,10 @@ let () =
     ~id: "invalidDataDir"
     ~title: "Invalid data directory"
     ~description: "The data directory cannot be accessed or created"
+    ~pp:(fun ppf path ->
+        Format.fprintf ppf
+          "Invalid data directory '%s'."
+          path)
     Data_encoding.(obj1 (req "datadirPath" string))
     (function
       | Invalid_data_dir path ->
@@ -41,6 +45,10 @@ let () =
     ~id: "invalidDataDirVersion"
     ~title: "Invalid data directory version"
     ~description: "The data directory version was not the one that was expected"
+    ~pp:(fun ppf (exp, got) ->
+        Format.fprintf ppf
+          "Invalid data directory version '%s' (expected '%s')."
+          got exp)
     Data_encoding.(obj2
                      (req "expectedVersion" string)
                      (req "actualVersion" string))
