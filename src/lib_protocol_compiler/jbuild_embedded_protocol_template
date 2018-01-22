@@ -1,6 +1,6 @@
 (* -*- tuareg -*- *)
 
-let prefix = "lib_embedded_protocol_"
+let prefix = "lib_protocol_"
 let dirname = Filename.basename @@ Filename.dirname @@ Sys.getcwd ()
 
 let predefined_version = None (* to be substituted in opam packages *)

@@ -1,7 +1,7 @@
-diff --git a/src/lib_embedded_protocol_alpha/src/constants_repr.ml b/src/lib_embedded_protocol_alpha/src/constants_repr.ml
+diff --git a/src/proto_alpha/lib_protocol_alpha/src/constants_repr.ml b/src/proto_alpha/lib_protocol_alpha/src/constants_repr.ml
 index 61e79c8a..f91ce282 100644
---- a/src/lib_embedded_protocol_alpha/src/constants_repr.ml
-+++ b/src/lib_embedded_protocol_alpha/src/constants_repr.ml
+--- a/src/proto_alpha/lib_protocol_alpha/src/constants_repr.ml
++++ b/src/proto_alpha/lib_protocol_alpha/src/constants_repr.ml
 @@ -49,15 +49,14 @@ let read_public_key s =
    Ed25519.Public_key.of_bytes (Bytes.of_string (Hex_encode.hex_decode s))
  
