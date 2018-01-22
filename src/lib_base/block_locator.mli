@@ -17,9 +17,10 @@ val raw: t -> raw
 
 val encoding: t Data_encoding.t
 
-val compute: Store.Block.store -> Block_hash.t -> int -> t Lwt.t
-(** [compute block max_length] compute the sparse block locator for
-    the [block]. The locator contains at most [max_length] elements. *)
+val compute:
+  pred:(Block_hash.t -> int -> Block_hash.t option Lwt.t) ->
+  Block_hash.t -> Block_header.t -> int ->
+  t Lwt.t
 
 type validity =
   | Unknown

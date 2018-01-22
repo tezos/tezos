@@ -31,6 +31,8 @@ module Operation = Operation
 module Protocol = Protocol
 module Test_network_status = Test_network_status
 module Preapply_result = Preapply_result
+module Block_locator = Block_locator
+module Mempool = Mempool
 
 include (module type of (struct include Utils.Infix end))
 include (module type of (struct include Error_monad end))

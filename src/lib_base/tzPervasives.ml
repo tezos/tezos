@@ -33,5 +33,8 @@ module Protocol = Protocol
 module Test_network_status = Test_network_status
 module Preapply_result = Preapply_result
 
+module Block_locator = Block_locator
+module Mempool = Mempool
+
 include Utils.Infix
 include Error_monad

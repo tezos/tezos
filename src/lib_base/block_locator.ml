@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Lwt.Infix
+
 type t = raw
 
 (** Non private version of Block_store_locator.t for coercions *)
@@ -21,37 +23,24 @@ let encoding =
      (req "current_head" (dynamic_size Block_header.encoding))
      (req "history" (dynamic_size (list Block_hash.encoding))))
 
-let predecessor (store : Store.Block.store) (b: Block_hash.t) =
-  Store.Block.Contents.read_exn (store, b) >>= fun contents ->
-  let predecessor = contents.header.shell.predecessor in
-  if Block_hash.equal b predecessor then
-    Lwt.return_none
-  else
-    Lwt.return_some predecessor
-
-let compute (store : Store.Block.store) (b: Block_hash.t) sz =
+let compute ~pred (h: Block_hash.t) (bh: Block_header.t) sz =
   let rec loop acc ~sz step cpt b =
     if sz = 0 then
       Lwt.return (List.rev acc)
     else
-      predecessor store b >>= function
+      pred b step >>= function
       | None ->
           Lwt.return (List.rev (b :: acc))
       | Some predecessor ->
           if cpt = 0 then
-            loop (b :: acc) ~sz:(sz - 1)
-              (step * 2) (step * 20 - 1) predecessor
-          else if cpt mod step = 0 then
-            loop (b :: acc) ~sz:(sz - 1)
-              step (cpt - 1) predecessor
+            loop (b :: acc) ~sz:(sz - 1) (step * 2) 10 predecessor
           else
-            loop acc ~sz step (cpt - 1) predecessor in
-  Store.Block.Contents.read_exn (store, b) >>= fun { header } ->
-  predecessor store b >>= function
-  | None -> Lwt.return (header, [])
+            loop (b :: acc) ~sz:(sz - 1) step (cpt - 1) predecessor in
+  pred h 1 >>= function
+  | None -> Lwt.return (bh, [])
   | Some p ->
       loop [] ~sz 1 9 p >>= fun hist ->
-      Lwt.return (header, hist)
+      Lwt.return (bh, hist)
 
 type validity =
   | Unknown
