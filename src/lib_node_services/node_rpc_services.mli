@@ -201,6 +201,23 @@ module Workers : sig
 
   end
 
+  module Peer_validators : sig
+
+    open Peer_validator_worker_state
+
+    val list :
+      ([ `POST ],  unit,
+       unit * Net_id.t, unit, unit,
+       (P2p_types.Peer_id.t * Worker_types.worker_status) list, unit) RPC_service.t
+
+    val state :
+      ([ `POST ], unit,
+       (unit * Net_id.t) * P2p_types.Peer_id.t, unit, unit,
+       (Request.view, Event.t) Worker_types.full_status, unit)
+        RPC_service.t
+
+  end
+
 end
 
 module Network : sig

@@ -586,6 +586,57 @@ module Workers = struct
 
   end
 
+  module Peer_validators = struct
+
+    let (net_id_arg : Net_id.t RPC_arg.t) =
+      RPC_arg.make
+        ~name:"net_id"
+        ~descr:"The network identifier the peer validator is associated to."
+        ~destruct:(fun s -> try
+                      Ok (Net_id.of_b58check_exn s)
+                    with Failure msg -> Error msg)
+        ~construct:Net_id.to_b58check
+        ()
+
+    let (peer_id_arg : P2p_types.Peer_id.t RPC_arg.t) =
+      RPC_arg.make
+        ~name:"peer_id"
+        ~descr:"The peer identifier of whom the prevalidator is responsible."
+        ~destruct:(fun s -> try
+                      Ok (P2p_types.Peer_id.of_b58check_exn s)
+                    with Failure msg -> Error msg)
+        ~construct:P2p_types.Peer_id.to_b58check
+        ()
+
+    let list =
+      RPC_service.post_service
+        ~description:"Lists the peer validator workers and their status."
+        ~query: RPC_query.empty
+        ~error: Data_encoding.empty
+        ~input: empty
+        ~output:
+          (list
+             (obj2
+                (req "peer_id" P2p_types.Peer_id.encoding)
+                (req "status" (Worker_types.worker_status_encoding Error.encoding))))
+        RPC_path.(root / "workers" / "peer_validators" /: net_id_arg)
+
+    let state =
+      let open Data_encoding in
+      RPC_service.post_service
+        ~description:"Introspect the state of a peer validator worker."
+        ~query: RPC_query.empty
+        ~error: Data_encoding.empty
+        ~input: empty
+        ~output:
+          (Worker_types.full_status_encoding
+             Peer_validator_worker_state.Request.encoding
+             (Peer_validator_worker_state.Event.encoding Error.encoding)
+             Error.encoding)
+        RPC_path.(root / "workers" / "peer_validators" /: net_id_arg /: peer_id_arg)
+
+  end
+
 end
 
 
