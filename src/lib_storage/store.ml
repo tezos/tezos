@@ -176,6 +176,14 @@ module Block = struct
         end
     end
 
+  module Predecessors =
+    Store_helpers.Make_map
+      (Store_helpers.Make_substore
+         (Indexed_store.Store)
+         (struct let name = ["predecessors"] end))
+      (Store_helpers.Integer_index)
+      (Store_helpers.Make_value(Block_hash))
+
 end
 
 

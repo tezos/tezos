@@ -121,6 +121,16 @@ module Block : sig
      and type key = Block_hash.t
      and type value = invalid_block
 
+  (**
+     Block predecessors under
+     [/blocks/<block_id>/predecessors/<distance>/<block_id>].
+     Used to compute block predecessors in [lib_node_shell/state.ml].
+  *)
+  module Predecessors : MAP_STORE
+    with type t = store * Block_hash.t
+     and type key = int
+     and type value = Block_hash.t
+
 end
 
 
