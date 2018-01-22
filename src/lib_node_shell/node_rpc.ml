@@ -471,6 +471,18 @@ let build_rpc_directory node =
              backlog = Prevalidator.last_events w ;
              current_request = Prevalidator.current_request w }) in
 
+  (* Workers : Block_validator *)
+
+  let dir  =
+    RPC_directory.register0 dir Services.Workers.Block_validator.state
+      (fun () () ->
+         let w = Block_validator.running_worker () in
+         RPC_answer.return
+           { Worker_types.status = Block_validator.status w ;
+             pending_requests = Block_validator.pending_requests w ;
+             backlog = Block_validator.last_events w ;
+             current_request = Block_validator.current_request w }) in
+
   (* Network : Global *)
 
   let dir =

@@ -188,6 +188,19 @@ module Workers : sig
         RPC_service.t
 
   end
+
+  module Block_validator : sig
+
+    open Block_validator_worker_state
+
+    val state :
+      ([ `POST ], unit,
+       unit, unit, unit,
+       (Request.view, Event.t) Worker_types.full_status, unit)
+        RPC_service.t
+
+  end
+
 end
 
 module Network : sig

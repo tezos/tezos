@@ -568,6 +568,24 @@ module Workers = struct
 
   end
 
+  module Block_validator = struct
+
+    let state =
+      let open Data_encoding in
+      RPC_service.post_service
+        ~description:"Introspect the state of the block_validator worker."
+        ~query: RPC_query.empty
+        ~error: Data_encoding.empty
+        ~input: empty
+        ~output:
+          (Worker_types.full_status_encoding
+             Block_validator_worker_state.Request.encoding
+             (Block_validator_worker_state.Event.encoding Error.encoding)
+             Error.encoding)
+        RPC_path.(root / "workers" / "block_validator")
+
+  end
+
 end
 
 
