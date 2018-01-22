@@ -14,7 +14,7 @@ type t = {
   state: State.t ;
   db: Distributed_db.t ;
   block_validator: Block_validator.t ;
-  timeout: Net_validator.timeout ;
+  net_validator_limits: Net_validator.limits ;
   peer_validator_limits: Peer_validator.limits ;
   block_validator_limits: Block_validator.limits ;
   prevalidator_limits: Prevalidator.limits ;
@@ -24,31 +24,31 @@ type t = {
 
 }
 
-let create state db timeout
+let create state db
     peer_validator_limits
     block_validator_limits
-    prevalidator_limits =
+    prevalidator_limits
+    net_validator_limits =
   Block_validator.create block_validator_limits db >>= fun block_validator ->
   let valid_block_input = Lwt_watcher.create_input () in
   Lwt.return
-    { state ; db ; timeout ; block_validator ;
-      prevalidator_limits ;
-      peer_validator_limits ; block_validator_limits ;
+    { state ; db ; block_validator ;
+      block_validator_limits ; prevalidator_limits ;
+      peer_validator_limits ; net_validator_limits ;
       valid_block_input ;
-      active_nets = Net_id.Table.create 7 ;
-    }
+      active_nets = Net_id.Table.create 7 }
 
-let activate v ?bootstrap_threshold ?max_child_ttl net_state =
+let activate v ?max_child_ttl net_state =
   let net_id = State.Net.id net_state in
   lwt_log_notice "activate network %a" Net_id.pp net_id >>= fun () ->
   try Net_id.Table.find v.active_nets net_id
   with Not_found ->
     let nv =
       Net_validator.create
-        ?bootstrap_threshold
         ?max_child_ttl
-        v.timeout v.peer_validator_limits v.prevalidator_limits
-        v.block_validator v.valid_block_input v.db net_state in
+        v.peer_validator_limits v.prevalidator_limits
+        v.block_validator v.valid_block_input v.db net_state
+        v.net_validator_limits in
     Net_id.Table.add v.active_nets net_id nv ;
     nv
 

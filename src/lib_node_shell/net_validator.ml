@@ -7,252 +7,152 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Logging.Make(struct let name = "node.validator.net" end)
+open Net_validator_worker_state
 
-type t = {
+module Name = struct
+  type t = Net_id.t
+  let encoding = Net_id.encoding
+  let base = [ "net_validator" ]
+  let pp = Net_id.pp_short
+end
 
-  db: Distributed_db.t ;
-  net_state: State.Net.t ;
-  net_db: Distributed_db.net_db ;
-  block_validator: Block_validator.t ;
+module Request = struct
+  include Request
+  type _ t = Validated : State.Block.t -> Event.update t
+  let view (type a) (Validated block : a t) : view =
+    State.Block.hash block
+end
 
-  timeout: timeout ;
-  prevalidator_limits: Prevalidator.limits ;
-  peer_validator_limits: Peer_validator.limits ;
+type limits = {
   bootstrap_threshold: int ;
-  mutable bootstrapped: bool ;
-  bootstrapped_waiter: unit Lwt.t ;
-  bootstrapped_wakener: unit Lwt.u ;
-  valid_block_input: State.Block.t Lwt_watcher.input ;
-  global_valid_block_input: State.Block.t Lwt_watcher.input ;
-  new_head_input: State.Block.t Lwt_watcher.input ;
-
-  parent: t option ;
-  max_child_ttl: int option ;
-
-  mutable child: t option ;
-  prevalidator: Prevalidator.t ;
-  active_peers: Peer_validator.t Lwt.t P2p.Peer_id.Table.t ;
-  bootstrapped_peers: unit P2p.Peer_id.Table.t ;
-
-  mutable worker: unit Lwt.t ;
-  queue: State.Block.t Lwt_pipe.t ;
-  canceler: Lwt_canceler.t ;
-
+  worker_limits: Worker_types.limits
 }
 
-and timeout = {
-  block_header: float ;
-  block_operations: float ;
-  protocol: float ;
-  new_head_request: float ;
-}
+module Types = struct
+  include Worker_state
 
+  type parameters = {
+    parent: Name.t option ;
+    db: Distributed_db.t ;
+    net_state: State.Net.t ;
+    net_db: Distributed_db.net_db ;
+    block_validator: Block_validator.t ;
+    global_valid_block_input: State.Block.t Lwt_watcher.input ;
 
-let rec shutdown nv =
-  Lwt_canceler.cancel nv.canceler >>= fun () ->
-  Distributed_db.deactivate nv.net_db >>= fun () ->
-  Lwt.join
-    ( nv.worker ::
-      Prevalidator.shutdown nv.prevalidator ::
-      Lwt_utils.may ~f:shutdown nv.child ::
-      P2p.Peer_id.Table.fold
-        (fun _ pv acc -> (pv >>= Peer_validator.shutdown) :: acc)
-        nv.active_peers [] ) >>= fun () ->
-  Lwt.return_unit
+    prevalidator_limits: Prevalidator.limits ;
+    peer_validator_limits: Peer_validator.limits ;
+    max_child_ttl: int option ;
+    limits: limits;
+  }
+
+  type state = {
+    parameters: parameters ;
+
+    mutable bootstrapped: bool ;
+    bootstrapped_waiter: unit Lwt.t ;
+    bootstrapped_wakener: unit Lwt.u ;
+    valid_block_input: State.Block.t Lwt_watcher.input ;
+    new_head_input: State.Block.t Lwt_watcher.input ;
+
+    mutable child:
+      (state * (unit -> unit Lwt.t (* shutdown *))) option ;
+    prevalidator: Prevalidator.t ;
+    active_peers: Peer_validator.t Lwt.t P2p.Peer_id.Table.t ;
+    bootstrapped_peers: unit P2p.Peer_id.Table.t ;
+  }
+
+  let view (state : state) _ : view =
+    let { bootstrapped ; active_peers ; bootstrapped_peers } = state in
+    { bootstrapped ;
+      active_peers =
+        P2p.Peer_id.Table.fold (fun id _ l -> id :: l) active_peers [] ;
+      bootstrapped_peers =
+        P2p.Peer_id.Table.fold (fun id _ l -> id :: l) bootstrapped_peers [] }
+end
+
+module Worker = Worker.Make (Name) (Event) (Request) (Types)
+
+open Types
+
+type t = Worker.infinite Worker.queue Worker.t
+
+let table = Worker.create_table Queue
+
+let shutdown w =
+  Worker.shutdown w
 
 let shutdown_child nv =
-  Lwt_utils.may ~f:shutdown nv.child
+  Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child
 
-let notify_new_block nv block =
-  Option.iter nv.parent
-    ~f:(fun nv -> Lwt_watcher.notify nv.valid_block_input block) ;
+let notify_new_block w block =
+  let nv = Worker.state w in
+  Option.iter nv.parameters.parent
+    ~f:(fun id -> try
+           let w = List.assoc id (Worker.list table) in
+           let nv = Worker.state w in
+           Lwt_watcher.notify nv.valid_block_input block
+         with Not_found -> ()) ;
   Lwt_watcher.notify nv.valid_block_input block ;
-  Lwt_watcher.notify nv.global_valid_block_input block ;
-  assert (Lwt_pipe.push_now nv.queue block)
+  Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
+  Worker.push_request_now w (Validated block)
 
-let may_toggle_bootstrapped_network nv =
+let may_toggle_bootstrapped_network w =
+  let nv = Worker.state w in
   if not nv.bootstrapped &&
-     P2p.Peer_id.Table.length nv.bootstrapped_peers >= nv.bootstrap_threshold
+     P2p.Peer_id.Table.length nv.bootstrapped_peers >= nv.parameters.limits.bootstrap_threshold
   then begin
     nv.bootstrapped <- true ;
     Lwt.wakeup_later nv.bootstrapped_wakener () ;
   end
 
-let may_activate_peer_validator nv peer_id =
+let may_activate_peer_validator w peer_id =
+  let nv = Worker.state w in
   try P2p.Peer_id.Table.find nv.active_peers peer_id
   with Not_found ->
     let pv =
       Peer_validator.create
-        ~notify_new_block:(notify_new_block nv)
+        ~notify_new_block:(notify_new_block w)
         ~notify_bootstrapped: begin fun () ->
           P2p.Peer_id.Table.add nv.bootstrapped_peers peer_id () ;
-          may_toggle_bootstrapped_network nv
+          may_toggle_bootstrapped_network w
         end
         ~notify_termination: begin fun _pv ->
           P2p.Peer_id.Table.remove nv.active_peers peer_id ;
           P2p.Peer_id.Table.remove nv.bootstrapped_peers peer_id ;
         end
-        nv.peer_validator_limits
-        nv.block_validator nv.net_db peer_id in
+        nv.parameters.peer_validator_limits
+        nv.parameters.block_validator
+        nv.parameters.net_db
+        peer_id in
     P2p.Peer_id.Table.add nv.active_peers peer_id pv ;
     pv
 
-let broadcast_head nv ~previous block =
-  if not nv.bootstrapped then
-    Lwt.return_unit
-  else begin
-    begin
-      State.Block.predecessor block >>= function
-      | None -> Lwt.return_true
-      | Some predecessor ->
-          Lwt.return (State.Block.equal predecessor previous)
-    end >>= fun successor ->
-    if successor then begin
-      Distributed_db.Advertise.current_head nv.net_db block ;
-      Lwt.return_unit
-    end else begin
-      Chain.locator (Distributed_db.net_state nv.net_db) >>= fun locator ->
-      Distributed_db.Advertise.current_branch nv.net_db locator
-    end
-  end
-
-let rec create
-    ?max_child_ttl ?parent
-    ?(bootstrap_threshold = 1)
-    timeout peer_validator_limits prevalidator_limits block_validator
-    global_valid_block_input db net_state =
-  Chain.init_head net_state >>= fun () ->
-  let net_db = Distributed_db.activate db net_state in
-  Prevalidator.create
-    prevalidator_limits net_db >>= fun prevalidator ->
-  let valid_block_input = Lwt_watcher.create_input () in
-  let new_head_input = Lwt_watcher.create_input () in
-  let canceler = Lwt_canceler.create () in
-  let bootstrapped_waiter, bootstrapped_wakener = Lwt.wait () in
-  let nv = {
-    db ; net_state ; net_db ; block_validator ;
-    prevalidator ;
-    timeout ; prevalidator_limits ; peer_validator_limits ;
-    valid_block_input ; global_valid_block_input ;
-    new_head_input ;
-    parent ; max_child_ttl ; child = None ;
-    bootstrapped = (bootstrap_threshold <= 0) ;
-    bootstrapped_waiter ;
-    bootstrapped_wakener ;
-    bootstrap_threshold ;
-    active_peers =
-      P2p.Peer_id.Table.create 50 ; (* TODO use `2 * max_connection` *)
-    bootstrapped_peers =
-      P2p.Peer_id.Table.create 50 ; (* TODO use `2 * max_connection` *)
-    worker = Lwt.return_unit ;
-    queue = Lwt_pipe.create () ;
-    canceler ;
-  } in
-  if nv.bootstrapped then Lwt.wakeup_later bootstrapped_wakener () ;
-  Distributed_db.set_callback net_db {
-    notify_branch = begin fun peer_id locator ->
-      Lwt.async begin fun () ->
-        may_activate_peer_validator nv peer_id >>= fun pv ->
-        Peer_validator.notify_branch pv locator ;
-        Lwt.return_unit
-      end
-    end ;
-    notify_head = begin fun peer_id block ops ->
-      Lwt.async begin fun () ->
-        may_activate_peer_validator nv peer_id >>= fun pv ->
-        Peer_validator.notify_head pv block ;
-        (* TODO notify prevalidator only if head is known ??? *)
-        Prevalidator.notify_operations nv.prevalidator peer_id ops ;
-        Lwt.return_unit
-      end;
-    end ;
-    disconnection = begin fun peer_id ->
-      Lwt.async begin fun () ->
-        may_activate_peer_validator nv peer_id >>= fun pv ->
-        Peer_validator.shutdown pv >>= fun () ->
-        Lwt.return_unit
-      end
-    end ;
-  } ;
-  nv.worker <-
-    Lwt_utils.worker
-      (Format.asprintf "net_validator.%a" Net_id.pp (State.Net.id net_state))
-      ~run:(fun () -> worker_loop nv)
-      ~cancel:(fun () -> Lwt_canceler.cancel nv.canceler) ;
-  Lwt.return nv
-
-(** Current block computation *)
-
-and worker_loop nv =
-  begin
-    Lwt_utils.protect ~canceler:nv.canceler begin fun () ->
-      Lwt_pipe.pop nv.queue >>= return
-    end >>=? fun block ->
-    Chain.head nv.net_state >>= fun head ->
-    let head_header = State.Block.header head
-    and head_hash = State.Block.hash head
-    and block_header = State.Block.header block
-    and block_hash = State.Block.hash block in
-    if
-      Fitness.(block_header.shell.fitness <= head_header.shell.fitness)
-    then
-      lwt_log_info "current head is better than %a %a %a, we do not switch"
-        Block_hash.pp_short block_hash
-        Fitness.pp block_header.shell.fitness
-        Time.pp_hum block_header.shell.timestamp >>= fun () ->
-      return ()
-    else begin
-      Chain.set_head nv.net_state block >>= fun previous ->
-      broadcast_head nv ~previous block >>= fun () ->
-      Prevalidator.flush nv.prevalidator block_hash >>=? fun () ->
-      may_switch_test_network nv block >>= fun () ->
-      Lwt_watcher.notify nv.new_head_input block ;
-      lwt_log_notice "update current head %a %a %a(%t)"
-        Block_hash.pp_short block_hash
-        Fitness.pp block_header.shell.fitness
-        Time.pp_hum block_header.shell.timestamp
-        (fun ppf ->
-           if Block_hash.equal head_hash block_header.shell.predecessor then
-             Format.fprintf ppf "same branch"
-           else
-             Format.fprintf ppf "changing branch") >>= fun () ->
-      return ()
-    end
-  end >>= function
-  | Ok () ->
-      worker_loop nv
-  | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
-      Lwt.return_unit
-  | Error err ->
-      lwt_log_error "@[Unexpected error:@ %a@]"
-        pp_print_error err >>= fun () ->
-      Lwt_canceler.cancel nv.canceler >>= fun () ->
-      Lwt.return_unit
-
-and may_switch_test_network nv block =
-
+let may_switch_test_network w spawn_child block =
+  let nv = Worker.state w in
   let create_child genesis protocol expiration =
-    if State.Net.allow_forked_network nv.net_state then begin
+    if State.Net.allow_forked_network nv.parameters.net_state then begin
       shutdown_child nv >>= fun () ->
       begin
         let net_id = Net_id.of_block_hash (State.Block.hash genesis) in
         State.Net.get
-          (State.Net.global_state nv.net_state) net_id >>= function
+          (State.Net.global_state nv.parameters.net_state) net_id >>= function
         | Ok net_state -> return net_state
         | Error _ ->
             State.fork_testnet
               genesis protocol expiration >>=? fun net_state ->
             Chain.head net_state >>= fun new_genesis_block ->
-            Lwt_watcher.notify nv.global_valid_block_input new_genesis_block ;
+            Lwt_watcher.notify nv.parameters.global_valid_block_input new_genesis_block ;
             Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
             return net_state
       end >>=? fun net_state ->
-      create
-        ~parent:nv nv.timeout nv.peer_validator_limits
-        nv.prevalidator_limits nv.block_validator
-        nv.global_valid_block_input
-        nv.db net_state >>= fun child ->
+      spawn_child
+        ~parent:(State.Net.id net_state)
+        nv.parameters.peer_validator_limits
+        nv.parameters.prevalidator_limits
+        nv.parameters.block_validator
+        nv.parameters.global_valid_block_input
+        nv.parameters.db net_state
+        nv.parameters.limits (* TODO: different limits main/test ? *) >>= fun child ->
       nv.child <- Some child ;
       return ()
     end else begin
@@ -264,13 +164,13 @@ and may_switch_test_network nv block =
     let activated =
       match nv.child with
       | None -> false
-      | Some child ->
+      | Some (child , _) ->
           Block_hash.equal
-            (State.Net.genesis child.net_state).block
+            (State.Net.genesis child.parameters.net_state).block
             genesis in
-    State.Block.read nv.net_state genesis >>=? fun genesis ->
+    State.Block.read nv.parameters.net_state genesis >>=? fun genesis ->
     begin
-      match nv.max_child_ttl with
+      match nv.parameters.max_child_ttl with
       | None -> Lwt.return expiration
       | Some ttl ->
           Lwt.return
@@ -297,51 +197,225 @@ and may_switch_test_network nv block =
   end >>= function
   | Ok () -> Lwt.return_unit
   | Error err ->
-      lwt_log_error "@[<v 2>Error while switch test network:@ %a@]"
-        Error_monad.pp_print_error err >>= fun () ->
+      Worker.record_event w (Could_not_switch_testnet err) ;
       Lwt.return_unit
 
+let broadcast_head w ~previous block =
+  let nv = Worker.state w in
+  if not nv.bootstrapped then
+    Lwt.return_unit
+  else begin
+    begin
+      State.Block.predecessor block >>= function
+      | None -> Lwt.return_true
+      | Some predecessor ->
+          Lwt.return (State.Block.equal predecessor previous)
+    end >>= fun successor ->
+    if successor then begin
+      Distributed_db.Advertise.current_head
+        nv.parameters.net_db block ;
+      Lwt.return_unit
+    end else begin
+      let net_state = Distributed_db.net_state nv.parameters.net_db in
+      Chain.locator net_state >>= fun locator ->
+      Distributed_db.Advertise.current_branch
+        nv.parameters.net_db locator
+    end
+  end
 
-(* TODO check the initial sequence of message when connecting to a new
-        peer, and the one when activating a network. *)
+let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
+  let Request.Validated block = req in
+  let nv = Worker.state w in
+  Chain.head nv.parameters.net_state >>= fun head ->
+  let head_header = State.Block.header head
+  and head_hash = State.Block.hash head
+  and block_header = State.Block.header block
+  and block_hash = State.Block.hash block in
+  if
+    Fitness.(block_header.shell.fitness <= head_header.shell.fitness)
+  then
+    return Event.Ignored_head
+  else begin
+    Chain.set_head nv.parameters.net_state block >>= fun previous ->
+    broadcast_head w ~previous block >>= fun () ->
+    Prevalidator.flush nv.prevalidator block_hash >>=? fun () ->
+    may_switch_test_network w spawn_child block >>= fun () ->
+    Lwt_watcher.notify nv.new_head_input block ;
+    if Block_hash.equal head_hash block_header.shell.predecessor then
+      return Event.Head_incrememt
+    else
+      return Event.Branch_switch
+  end
 
+let on_completion (type a) w  (req : a Request.t) (update : a) request_status =
+  let Request.Validated block = req in
+  let fitness = State.Block.fitness block in
+  let request = State.Block.hash block in
+  Worker.record_event w (Processed_block { request ; request_status ; update ; fitness }) ;
+  Lwt.return ()
+
+let on_close w =
+  let nv = Worker.state w in
+  Distributed_db.deactivate nv.parameters.net_db >>= fun () ->
+  Lwt.join
+    (Prevalidator.shutdown nv.prevalidator ::
+     Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child ::
+     P2p.Peer_id.Table.fold
+       (fun _ pv acc -> (pv >>= Peer_validator.shutdown) :: acc)
+       nv.active_peers []) >>= fun () ->
+  Lwt.return_unit
+
+let on_launch w _ parameters =
+  Chain.init_head parameters.net_state >>= fun () ->
+  Prevalidator.create
+    parameters.prevalidator_limits parameters.net_db >>= fun prevalidator ->
+  let valid_block_input = Lwt_watcher.create_input () in
+  let new_head_input = Lwt_watcher.create_input () in
+  let bootstrapped_waiter, bootstrapped_wakener = Lwt.wait () in
+  let nv =
+    { parameters ;
+      valid_block_input ;
+      new_head_input ;
+      bootstrapped_wakener ;
+      bootstrapped_waiter ;
+      bootstrapped = (parameters.limits.bootstrap_threshold <= 0) ;
+      active_peers =
+        P2p.Peer_id.Table.create 50 ; (* TODO use `2 * max_connection` *)
+      bootstrapped_peers =
+        P2p.Peer_id.Table.create 50 ; (* TODO use `2 * max_connection` *)
+      child = None ;
+      prevalidator } in
+  if nv.bootstrapped then Lwt.wakeup_later bootstrapped_wakener () ;
+  Distributed_db.set_callback parameters.net_db {
+    notify_branch = begin fun peer_id locator ->
+      Lwt.async begin fun () ->
+        may_activate_peer_validator w peer_id >>= fun pv ->
+        Peer_validator.notify_branch pv locator ;
+        Lwt.return_unit
+      end
+    end ;
+    notify_head = begin fun peer_id block ops ->
+      Lwt.async begin fun () ->
+        may_activate_peer_validator w peer_id >>= fun pv ->
+        Peer_validator.notify_head pv block ;
+        (* TODO notify prevalidator only if head is known ??? *)
+        Prevalidator.notify_operations nv.prevalidator peer_id ops ;
+        Lwt.return_unit
+      end;
+    end ;
+    disconnection = begin fun peer_id ->
+      Lwt.async begin fun () ->
+        may_activate_peer_validator w peer_id >>= fun pv ->
+        Peer_validator.shutdown pv >>= fun () ->
+        Lwt.return_unit
+      end
+    end ;
+  } ;
+  Lwt.return nv
+
+let rec create
+    ?max_child_ttl ?parent
+    peer_validator_limits prevalidator_limits block_validator
+    global_valid_block_input db net_state limits =
+  let spawn_child ~parent pvl pl bl gvbi db n l =
+    create ~parent pvl pl bl gvbi db n l >>= fun w ->
+    Lwt.return (Worker.state w, (fun () -> Worker.shutdown w)) in
+  let module Handlers = struct
+    type self = t
+    let on_launch = on_launch
+    let on_request w = on_request w spawn_child
+    let on_close = on_close
+    let on_error _ _ _ errs = Lwt.return (Error errs)
+    let on_completion = on_completion
+    let on_no_request _ = return ()
+  end in
+  let parameters =
+    { max_child_ttl ;
+      parent ;
+      peer_validator_limits ;
+      prevalidator_limits ;
+      block_validator ;
+      global_valid_block_input ;
+      db ;
+      net_db = Distributed_db.activate db net_state ;
+      net_state ;
+      limits } in
+  Worker.launch table
+    prevalidator_limits.worker_limits
+    (State.Net.id net_state)
+    parameters
+    (module Handlers)
+
+(** Current block computation *)
 
 let create
     ?max_child_ttl
-    ?bootstrap_threshold
-    timeout
-    block_validator global_valid_block_input global_db state =
+    peer_validator_limits prevalidator_limits
+    block_validator global_valid_block_input global_db state limits =
   (* hide the optional ?parent *)
   create
     ?max_child_ttl
-    ?bootstrap_threshold
-    timeout block_validator global_valid_block_input global_db state
+    peer_validator_limits prevalidator_limits
+    block_validator global_valid_block_input global_db state limits
 
-let net_id { net_state } = State.Net.id net_state
-let net_state { net_state } = net_state
-let prevalidator { prevalidator } = prevalidator
-let net_db { net_db } = net_db
-let child { child } = child
+let net_id w =
+  let { parameters = { net_state } } = Worker.state w in
+  State.Net.id net_state
 
-let validate_block nv ?(force = false) hash block operations =
+let net_state w =
+  let { parameters = { net_state } } = Worker.state w in
+  net_state
+
+let prevalidator w =
+  let { prevalidator } = Worker.state w in
+  prevalidator
+
+let net_db w =
+  let { parameters = { net_db } } = Worker.state w in
+  net_db
+
+let child w =
+  match (Worker.state w).child with
+  | None -> None
+  | Some ({ parameters = { net_state } }, _) ->
+      try Some (List.assoc (State.Net.id net_state) (Worker.list table))
+      with Not_found -> None
+
+let validate_block w ?(force = false) hash block operations =
+  let nv = Worker.state w in
   assert (Block_hash.equal hash (Block_header.hash block)) ;
-  Chain.head nv.net_state >>= fun head ->
+  Chain.head nv.parameters.net_state >>= fun head ->
   let head = State.Block.header head in
   if
     force || Fitness.(head.shell.fitness <= block.shell.fitness)
   then
     Block_validator.validate
-      ~canceler:nv.canceler
-      ~notify_new_block:(notify_new_block nv)
-      nv.block_validator nv.net_db hash block operations
+      ~canceler:(Worker.canceler w)
+      ~notify_new_block:(notify_new_block w)
+      nv.parameters.block_validator
+      nv.parameters.net_db
+      hash block operations
   else
     failwith "Fitness too low"
 
-let bootstrapped { bootstrapped_waiter } =
+let bootstrapped w =
+  let { bootstrapped_waiter } = Worker.state w in
   Lwt.protected bootstrapped_waiter
 
-let valid_block_watcher { valid_block_input } =
+let valid_block_watcher w =
+  let{ valid_block_input } = Worker.state w in
   Lwt_watcher.create_stream valid_block_input
 
-let new_head_watcher { new_head_input } =
+let new_head_watcher w =
+  let { new_head_input } = Worker.state w in
   Lwt_watcher.create_stream new_head_input
+
+let status = Worker.status
+
+let running_workers () = Worker.list table
+
+let pending_requests t = Worker.pending_requests t
+
+let current_request t = Worker.current_request t
+
+let last_events = Worker.last_events

@@ -9,23 +9,20 @@
 
 type t
 
-type timeout = {
-  block_header: float ;
-  block_operations: float ;
-  protocol: float ;
-  new_head_request: float ;
+type limits = {
+  bootstrap_threshold: int ;
+  worker_limits: Worker_types.limits
 }
 
 val create:
   ?max_child_ttl:int ->
-  ?bootstrap_threshold:int ->
-  timeout ->
   Peer_validator.limits ->
   Prevalidator.limits ->
   Block_validator.t ->
   State.Block.t Lwt_watcher.input ->
   Distributed_db.t ->
   State.Net.t ->
+  limits ->
   t Lwt.t
 
 val bootstrapped: t -> unit Lwt.t
@@ -47,3 +44,9 @@ val shutdown: t -> unit Lwt.t
 val valid_block_watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
 val new_head_watcher: t -> State.Block.t Lwt_stream.t * Lwt_watcher.stopper
 
+val running_workers: unit -> (Net_id.t * t) list
+val status: t -> Worker_types.worker_status
+
+val pending_requests : t -> (Time.t * Net_validator_worker_state.Request.view) list
+val current_request : t -> (Time.t * Time.t * Net_validator_worker_state.Request.view) option
+val last_events : t -> (Lwt_log_core.level * Net_validator_worker_state.Event.t list) list

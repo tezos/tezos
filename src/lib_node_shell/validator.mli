@@ -14,17 +14,16 @@ type t
 val create:
   State.t ->
   Distributed_db.t ->
-  Net_validator.timeout ->
   Peer_validator.limits ->
   Block_validator.limits ->
   Prevalidator.limits ->
+  Net_validator.limits ->
   t Lwt.t
 val shutdown: t -> unit Lwt.t
 
 (** Start the validation scheduler of a given network. *)
 val activate:
   t ->
-  ?bootstrap_threshold:int ->
   ?max_child_ttl:int ->
   State.Net.t -> Net_validator.t Lwt.t
 

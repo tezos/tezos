@@ -86,15 +86,8 @@ type config = {
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
   test_network_max_tll: int option ;
-  bootstrap_threshold: int ;
 }
 
-and timeout = Net_validator.timeout = {
-  block_header: float ;
-  block_operations: float ;
-  protocol: float ;
-  new_head_request: float ;
-}
 and peer_validator_limits = Peer_validator.limits = {
   new_head_request_timeout: float ;
   block_header_timeout: float ;
@@ -114,6 +107,11 @@ and block_validator_limits = Block_validator.limits = {
   worker_limits : Worker_types.limits ;
 }
 
+and net_validator_limits = Net_validator.limits = {
+  bootstrap_threshold: int ;
+  worker_limits : Worker_types.limits ;
+}
+
 let may_create_net state genesis =
   State.Net.get state (Net_id.of_block_hash genesis.State.Net.block) >>= function
   | Ok net -> Lwt.return net
@@ -122,22 +120,22 @@ let may_create_net state genesis =
 
 let create { genesis ; store_root ; context_root ;
              patch_context ; p2p = net_params ;
-             test_network_max_tll = max_child_ttl ;
-             bootstrap_threshold }
-    timeout
+             test_network_max_tll = max_child_ttl }
     peer_validator_limits
     block_validator_limits
-    prevalidator_limits =
+    prevalidator_limits
+    net_validator_limits =
   init_p2p net_params >>=? fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context () >>=? fun state ->
   let distributed_db = Distributed_db.create state p2p in
-  Validator.create state distributed_db timeout
+  Validator.create state distributed_db
     peer_validator_limits
-    block_validator_limits prevalidator_limits >>= fun validator ->
+    block_validator_limits
+    prevalidator_limits
+    net_validator_limits >>= fun validator ->
   may_create_net state genesis >>= fun mainnet_state ->
   Validator.activate validator
-    ~bootstrap_threshold
     ?max_child_ttl mainnet_state >>= fun mainnet_validator ->
   let shutdown () =
     P2p.shutdown p2p >>= fun () ->

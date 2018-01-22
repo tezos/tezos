@@ -161,7 +161,7 @@ module Make
       self -> 'a Request.t -> 'a tzresult Lwt.t
 
     (** Called when no request has been made before the timeout, if
-       the parameter has been passed to {!launch}. *)
+        the parameter has been passed to {!launch}. *)
     val on_no_request :
       self -> unit tzresult Lwt.t
 
@@ -183,12 +183,13 @@ module Make
       unit tzresult Lwt.t
 
     (** A function called at the end of the worker loop in case of a
-       successful treatment of the current request. *)
+        successful treatment of the current request. *)
     val on_completion :
       self ->
       'a Request.t -> 'a ->
       Worker_types.request_status ->
       unit Lwt.t
+
   end
 
   (** Creates a new worker instance.

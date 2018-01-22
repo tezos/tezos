@@ -168,14 +168,13 @@ let init_node ?sandbox (config : Node_config_file.t) =
     context_root = context_dir config.data_dir ;
     p2p = p2p_config ;
     test_network_max_tll = Some (48 * 3600) ; (* 2 days *)
-    bootstrap_threshold = config.shell.bootstrap_threshold ;
   } in
   Node.create
     node_config
-    config.shell.timeout
     config.shell.peer_validator_limits
     config.shell.block_validator_limits
     config.shell.prevalidator_limits
+    config.shell.net_validator_limits
 
 let () =
   let old_hook = !Lwt.async_exception_hook in

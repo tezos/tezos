@@ -43,11 +43,10 @@ and log = {
 }
 
 and shell = {
-  bootstrap_threshold : int ;
   block_validator_limits : Node.block_validator_limits ;
   prevalidator_limits : Node.prevalidator_limits ;
-  timeout : Node.timeout ;
   peer_validator_limits : Node.peer_validator_limits ;
+  net_validator_limits : Node.net_validator_limits ;
 }
 
 val default_data_dir: string
