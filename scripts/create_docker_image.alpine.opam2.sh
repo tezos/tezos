@@ -17,7 +17,8 @@ cleanup () {
 }
 trap cleanup EXIT INT
 
-opam_tag=2.0.0-beta5
+#opam_tag=2.0.0-beta5
+opam_tag=master
 
 sed scripts/Dockerfile.alpine.opam2.in \
     -e 's|$alpine_version|'"$alpine_version"'|g' \
