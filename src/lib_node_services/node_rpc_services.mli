@@ -170,6 +170,26 @@ module Protocols : sig
 
 end
 
+module Workers : sig
+
+  module Prevalidators : sig
+
+    open Prevalidator_worker_state
+
+    val list :
+      ([ `POST ],  unit,
+       unit, unit, unit,
+       (Net_id.t * Worker_types.worker_status) list, unit) RPC_service.t
+
+    val state :
+      ([ `POST ], unit,
+       unit * Net_id.t, unit, unit,
+       (Request.view, Event.t) Worker_types.full_status, unit)
+        RPC_service.t
+
+  end
+end
+
 module Network : sig
 
   val stat :

@@ -452,6 +452,25 @@ let build_rpc_directory node =
       (fun block s () () ->
          Node.RPC.complete node ~block s >>= RPC_answer.return) in
 
+  (* Workers : Prevalidators *)
+
+  let dir  =
+    RPC_directory.register0 dir Services.Workers.Prevalidators.list
+      (fun () () ->
+         RPC_answer.return
+           (List.map
+              (fun (id, w) -> (id, Prevalidator.status w))
+              (Prevalidator.running_workers ()))) in
+  let dir  =
+    RPC_directory.register1 dir Services.Workers.Prevalidators.state
+      (fun net_id () () ->
+         let w = List.assoc net_id (Prevalidator.running_workers ()) in
+         RPC_answer.return
+           { Worker_types.status = Prevalidator.status w ;
+             pending_requests = Prevalidator.pending_requests w ;
+             backlog = Prevalidator.last_events w ;
+             current_request = Prevalidator.current_request w }) in
+
   (* Network : Global *)
 
   let dir =
