@@ -224,7 +224,9 @@ main () {
 
     local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
     if [ $(basename "$bin_dir") = "bin_client" ]; then
-      local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main.exe}"
+        local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main.exe}"
+    else
+        local_client="${local_client:-tezos-client}"
     fi
 
     if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then

@@ -22,9 +22,24 @@ start_sandboxed_node() {
         peers+=("127.0.0.1:$peer_port")
     done
     peers+=("--closed")
-    node="${local_node:-tezos-node}"
-    sandbox_file="${sandbox_file:-$script_dir/sandbox.json}"
+    node="${local_node}"
     sandbox_param="--sandbox=$sandbox_file"
+
+    if ! [ -f "$sandbox_file" ]; then
+        cat > "$sandbox_file" <<EOF
+{
+    "genesis_pubkey":
+      "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2",
+    "bootstrap_keys": [
+        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+        "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9",
+        "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV",
+        "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU",
+        "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n"
+    ]
+}
+EOF
+    fi
 
     node_dirs+=("$node_dir")
 
@@ -53,6 +68,9 @@ main() {
     if [ $(basename "$bin_dir") = "bin_node" ]; then
         local_node="${local_node:-$bin_dir/../../_build/default/src/bin_node/main.exe}"
         sandbox_file="${sandbox_file:-$bin_dir/../../scripts/sandbox.json}"
+    else
+        local_node="${local_node:-tezos-node}"
+        sandbox_file="${sandbox_file:-sandbox.json}"
     fi
 
     if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
