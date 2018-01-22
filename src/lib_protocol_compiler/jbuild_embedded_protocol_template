@@ -56,7 +56,7 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
  ((name tezos_embedded_protocol_%s)
   (public_name tezos-embedded-protocol-%s)
   (library_flags (:standard -linkall))
-  (libraries (tezos_embedded_raw_protocol_%s tezos-node-shell))
+  (libraries (tezos_embedded_raw_protocol_%s tezos-shell))
   (modules (Registerer))))
 |}
     version version version version version version version version

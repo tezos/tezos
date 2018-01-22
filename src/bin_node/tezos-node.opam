@@ -11,11 +11,8 @@ depends: [
   "jbuilder" { build & >= "1.0+beta15" }
   "tezos-base"
   "tezos-rpc-http"
-  "tezos-p2p-services"
   "tezos-p2p"
-  "tezos-shell-services"
-  "tezos-node-shell"
-  "tezos-node-updater"
+  "tezos-shell"
   "tezos-embedded-protocol-genesis"
   "tezos-embedded-protocol-demo"
   "tezos-embedded-protocol-alpha"

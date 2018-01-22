@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_node_shell)
-  (public_name tezos-node-shell)
+ ((name tezos_shell)
+  (public_name tezos-shell)
   (libraries (tezos-base
               tezos-storage
               tezos-rpc-http
