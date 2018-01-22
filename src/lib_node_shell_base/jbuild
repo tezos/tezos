@@ -4,9 +4,9 @@
  ((name tezos_node_shell_base)
   (public_name tezos-node-shell-base)
   (libraries (tezos-base
-              tezos-node-p2p-base))
+              tezos-p2p-services))
   (flags (:standard -open Tezos_base__TzPervasives
-                    -open Tezos_node_p2p_base))))
+                    -open Tezos_p2p_services))))
 
 (alias
  ((name runtest_indent)

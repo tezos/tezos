@@ -12,7 +12,7 @@ depends: [
   "tezos-base"
   "tezos-storage"
   "tezos-rpc-http"
-  "tezos-node-p2p-base"
+  "tezos-p2p-services"
   "tezos-node-services"
   "tezos-node-updater"
   "tezos-protocol-compiler"

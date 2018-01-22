@@ -6,7 +6,7 @@
   (libraries (tezos-base
               tezos-storage
               tezos-rpc-http
-              tezos-node-p2p-base
+              tezos-p2p-services
               tezos-node-shell-base
               tezos-node-services
               tezos-node-updater
@@ -16,7 +16,7 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_storage
                     -open Tezos_rpc_http
-                    -open Tezos_node_p2p_base
+                    -open Tezos_p2p_services
                     -open Tezos_node_services
                     -open Tezos_node_updater))))
 

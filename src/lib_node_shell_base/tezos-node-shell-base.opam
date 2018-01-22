@@ -13,7 +13,7 @@ depends: [
   "mtime"
   "ocplib-resto-cohttp"
   "tezos-base"
-  "tezos-node-p2p-base"
+  "tezos-p2p-services"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

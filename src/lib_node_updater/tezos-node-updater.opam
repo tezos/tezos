@@ -14,8 +14,8 @@ depends: [
   "tezos-protocol-compiler"
   "tezos-storage"
   "tezos-rpc-http"
+  "tezos-p2p-services"
   "tezos-node-services"
-  "tezos-node-p2p-base"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

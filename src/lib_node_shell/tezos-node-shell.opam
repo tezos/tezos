@@ -12,8 +12,8 @@ depends: [
   "tezos-base"
   "tezos-storage"
   "tezos-node-services"
-  "tezos-node-p2p-base"
-  "tezos-node-p2p"
+  "tezos-p2p-services"
+  "tezos-p2p"
   "tezos-node-updater"
 ]
 build: [

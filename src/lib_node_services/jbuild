@@ -4,12 +4,12 @@
  ((name tezos_node_services)
   (public_name tezos-node-services)
   (libraries (tezos-base
-              tezos-node-p2p-base
+              tezos-p2p-services
               tezos-node-shell-base))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_node_p2p_base
+                    -open Tezos_p2p_services
                     -open Tezos_node_shell_base))))
 
 (alias
