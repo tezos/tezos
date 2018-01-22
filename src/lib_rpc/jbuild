@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_rpc_base)
-  (public_name tezos-rpc-base)
+ ((name tezos_rpc)
+  (public_name tezos-rpc)
   (libraries (tezos-data-encoding
               ocplib-resto))
   (flags (:standard -w -9+27-30-32-40@8

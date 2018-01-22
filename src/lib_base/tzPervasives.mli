@@ -12,7 +12,7 @@ include (module type of (struct include Tezos_data_encoding end))
 include (module type of (struct include Tezos_stdlib_lwt end))
 include (module type of (struct include Tezos_crypto end))
 include (module type of (struct include Tezos_error_monad end))
-include (module type of (struct include Tezos_rpc_base end))
+include (module type of (struct include Tezos_rpc end))
 
 module List : sig
   include (module type of (struct include List end))

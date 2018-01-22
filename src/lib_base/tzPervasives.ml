@@ -12,7 +12,7 @@ include Tezos_stdlib_lwt
 include Tezos_crypto
 include Tezos_data_encoding
 include Tezos_error_monad
-include Tezos_rpc_base
+include Tezos_rpc
 
 module List = struct
   include List
