@@ -13,7 +13,7 @@ open Client_rpcs
 module Services = Node_rpc_services
 
 let errors (rpc : #Client_rpcs.ctxt) =
-  call_service0 rpc Services.Error.service ()
+  call_service0 rpc RPC_error.service ()
 
 let forge_block_header rpc header =
   call_service0 rpc Services.forge_block_header header
@@ -147,15 +147,15 @@ end
 module Network = struct
 
   let stat cctxt =
-    call_service0 cctxt Services.Network.stat ()
+    call_service0 cctxt P2p_services.stat ()
 
   let connections cctxt =
-    call_service0 cctxt Services.Network.Connection.list ()
+    call_service0 cctxt P2p_services.Connection.list ()
 
   let peers cctxt =
-    call_service0 cctxt Services.Network.Peer_id.list []
+    call_service0 cctxt P2p_services.Peer_id.list []
 
   let points cctxt =
-    call_service0 cctxt Services.Network.Point.list []
+    call_service0 cctxt P2p_services.Point.list []
 
 end

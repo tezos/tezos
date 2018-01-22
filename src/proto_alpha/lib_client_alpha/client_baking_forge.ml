@@ -86,7 +86,7 @@ let () =
     Data_encoding.
       (obj2
          (req "operation" (dynamic_size Tezos_base.Operation.encoding))
-         (req "error" Node_rpc_services.Error.encoding))
+         (req "error" RPC_error.encoding))
     (function
       | Failed_to_preapply (hash, err) -> Some (hash, err)
       | _ -> None)

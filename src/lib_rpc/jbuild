@@ -4,10 +4,12 @@
  ((name tezos_rpc)
   (public_name tezos-rpc)
   (libraries (tezos-data-encoding
+              tezos-error-monad
               ocplib-resto))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
-                    -open Tezos_data_encoding))))
+                    -open Tezos_data_encoding
+                    -open Tezos_error_monad))))
 
 (alias
  ((name runtest_indent)

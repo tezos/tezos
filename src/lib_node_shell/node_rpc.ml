@@ -442,7 +442,7 @@ let build_rpc_directory node =
     let implementation () () =
       RPC_answer.return
         Data_encoding.Json.(schema Error_monad.error_encoding) in
-    RPC_directory.register0 dir Services.Error.service implementation in
+    RPC_directory.register0 dir RPC_error.service implementation in
   let dir =
     RPC_directory.register1 dir Services.complete
       (fun s () () ->
@@ -527,50 +527,49 @@ let build_rpc_directory node =
   (* Network : Global *)
 
   let dir =
-    let implementation () () =
-      Node.RPC.Network.stat node |> RPC_answer.return in
-    RPC_directory.register0 dir Services.Network.stat implementation in
+    let implementation () () = Node.RPC.Network.stat node |> RPC_answer.return in
+    RPC_directory.register0 dir P2p_services.stat implementation in
   let dir =
     let implementation () () =
       RPC_answer.return Distributed_db.Raw.supported_versions in
-    RPC_directory.register0 dir Services.Network.versions implementation in
+    RPC_directory.register0 dir P2p_services.versions implementation in
   let dir =
     let implementation () () =
       let stream, stopper = Node.RPC.Network.watch node in
       let shutdown () = Lwt_watcher.shutdown stopper in
       let next () = Lwt_stream.get stream in
       RPC_answer.return_stream { next ; shutdown } in
-    RPC_directory.register0 dir Services.Network.events implementation in
+    RPC_directory.register0 dir P2p_services.events implementation in
   let dir =
     let implementation point () timeout =
       Node.RPC.Network.connect node point timeout >>= RPC_answer.return in
-    RPC_directory.register1 dir Services.Network.connect implementation in
+    RPC_directory.register1 dir P2p_services.connect implementation in
 
   (* Network : Connection *)
 
   let dir =
     let implementation peer_id () () =
       Node.RPC.Network.Connection.info node peer_id |> RPC_answer.return in
-    RPC_directory.register1 dir Services.Network.Connection.info implementation in
+    RPC_directory.register1 dir P2p_services.Connection.info implementation in
   let dir =
     let implementation peer_id () wait =
       Node.RPC.Network.Connection.kick node peer_id wait >>= RPC_answer.return in
-    RPC_directory.register1 dir Services.Network.Connection.kick implementation in
+    RPC_directory.register1 dir P2p_services.Connection.kick implementation in
   let dir =
     let implementation () () =
       Node.RPC.Network.Connection.list node |> RPC_answer.return in
-    RPC_directory.register0 dir Services.Network.Connection.list implementation in
+    RPC_directory.register0 dir P2p_services.Connection.list implementation in
 
   (* Network : Peer_id *)
 
   let dir =
     let implementation () state =
       Node.RPC.Network.Peer_id.list node ~restrict:state |> RPC_answer.return in
-    RPC_directory.register0 dir Services.Network.Peer_id.list implementation in
+    RPC_directory.register0 dir P2p_services.Peer_id.list implementation in
   let dir =
     let implementation peer_id () () =
       Node.RPC.Network.Peer_id.info node peer_id |> RPC_answer.return in
-    RPC_directory.register1 dir Services.Network.Peer_id.info implementation in
+    RPC_directory.register1 dir P2p_services.Peer_id.info implementation in
   let dir =
     let implementation peer_id () monitor =
       if monitor then
@@ -587,18 +586,18 @@ let build_rpc_directory node =
         RPC_answer.return_stream { next ; shutdown }
       else
         Node.RPC.Network.Peer_id.events node peer_id |> RPC_answer.return in
-    RPC_directory.register1 dir Services.Network.Peer_id.events implementation in
+    RPC_directory.register1 dir P2p_services.Peer_id.events implementation in
 
   (* Network : Point *)
 
   let dir =
     let implementation () state =
       Node.RPC.Network.Point.list node ~restrict:state |> RPC_answer.return in
-    RPC_directory.register0 dir Services.Network.Point.list implementation in
+    RPC_directory.register0 dir P2p_services.Point.list implementation in
   let dir =
     let implementation point () () =
       Node.RPC.Network.Point.info node point |> RPC_answer.return in
-    RPC_directory.register1 dir Services.Network.Point.info implementation in
+    RPC_directory.register1 dir P2p_services.Point.info implementation in
   let dir =
     let implementation point () monitor =
       if monitor then
@@ -615,7 +614,7 @@ let build_rpc_directory node =
         RPC_answer.return_stream { next ; shutdown }
       else
         Node.RPC.Network.Point.events node point |> RPC_answer.return in
-    RPC_directory.register1 dir Services.Network.Point.events implementation in
+    RPC_directory.register1 dir P2p_services.Point.events implementation in
   let dir =
     RPC_directory.register_describe_directory_service dir Services.describe in
   dir
