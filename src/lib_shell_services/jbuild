@@ -1,16 +1,14 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_node_services)
-  (public_name tezos-node-services)
+ ((name tezos_shell_services)
+  (public_name tezos-shell-services)
   (libraries (tezos-base
-              tezos-p2p-services
-              tezos-node-shell-base))
+              tezos-p2p-services))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_p2p_services
-                    -open Tezos_node_shell_base))))
+                    -open Tezos_p2p_services))))
 
 (alias
  ((name runtest_indent)

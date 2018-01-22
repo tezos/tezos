@@ -8,8 +8,7 @@
               tezos-rpc-http
               tezos-p2p-services
               tezos-p2p
-              tezos-node-services
-              tezos-node-shell-base
+              tezos-shell-services
               tezos-node-updater))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
@@ -18,8 +17,7 @@
                     -open Tezos_rpc_http
                     -open Tezos_p2p_services
                     -open Tezos_p2p
-                    -open Tezos_node_services
-                    -open Tezos_node_shell_base
+                    -open Tezos_shell_services
                     -open Tezos_node_updater))))
 
 (alias

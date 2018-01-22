@@ -10,7 +10,7 @@
 (* Tezos Command line interface - RPC Calls *)
 
 open Client_rpcs
-module Services = Node_rpc_services
+module Services = Shell_services
 
 let errors (rpc : #Client_rpcs.ctxt) =
   call_service0 rpc RPC_error.service ()
@@ -44,7 +44,7 @@ let complete cctxt ?block prefix =
 
 let describe cctxt ?(recurse = true) path =
   Client_rpcs.call_service cctxt
-    Node_rpc_services.describe
+    Shell_services.describe
     ((), path) { recurse } ()
 
 module Blocks = struct

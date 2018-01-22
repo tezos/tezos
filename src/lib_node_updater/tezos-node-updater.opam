@@ -15,7 +15,7 @@ depends: [
   "tezos-storage"
   "tezos-rpc-http"
   "tezos-p2p-services"
-  "tezos-node-services"
+  "tezos-shell-services"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

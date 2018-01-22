@@ -7,7 +7,7 @@
               tezos-rpc-http
               tezos-p2p-services
               tezos-p2p
-              tezos-node-shell-base
+              tezos-shell-services
               tezos-node-shell
               tezos-node-updater
               tezos-embedded-protocol-genesis
@@ -21,7 +21,7 @@
                     -open Tezos_rpc_http
                     -open Tezos_p2p_services
                     -open Tezos_p2p
-                    -open Tezos_node_shell_base
+                    -open Tezos_shell_services
                     -open Tezos_node_shell
                     -open Tezos_node_updater
                     -linkall))))

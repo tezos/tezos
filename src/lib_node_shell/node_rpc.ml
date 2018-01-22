@@ -9,7 +9,7 @@
 
 open Logging.RPC
 
-module Services = Node_rpc_services
+module Services = Shell_services
 
 let filter_bi operations (bi: Services.Blocks.block_info)  =
   let bi = if operations then bi else { bi with operations = None } in
@@ -102,7 +102,7 @@ let register_bi_dir node dir =
     RPC_directory.register1 dir
       Services.Blocks.test_network implementation in
   let dir =
-    let implementation b () { Node_rpc_services.Blocks.contents ; monitor } =
+    let implementation b () { Shell_services.Blocks.contents ; monitor } =
       match b with
       | `Prevalidation when monitor ->
           monitor_operations node contents
@@ -411,7 +411,7 @@ let build_rpc_directory node =
       implementation in
   let dir =
     let implementation ()
-        { Node_rpc_services.raw ; blocking ; force ; operations } =
+        { Shell_services.raw ; blocking ; force ; operations } =
       begin
         Node.RPC.inject_block
           node ~force
@@ -455,14 +455,14 @@ let build_rpc_directory node =
   (* Workers : Prevalidators *)
 
   let dir  =
-    RPC_directory.register0 dir Services.Workers.Prevalidators.list
+    RPC_directory.register0 dir Shell_services.Workers.Prevalidators.list
       (fun () () ->
          RPC_answer.return
            (List.map
               (fun (id, w) -> (id, Prevalidator.status w))
               (Prevalidator.running_workers ()))) in
   let dir  =
-    RPC_directory.register1 dir Services.Workers.Prevalidators.state
+    RPC_directory.register1 dir Shell_services.Workers.Prevalidators.state
       (fun net_id () () ->
          let w = List.assoc net_id (Prevalidator.running_workers ()) in
          RPC_answer.return
@@ -474,7 +474,7 @@ let build_rpc_directory node =
   (* Workers : Block_validator *)
 
   let dir  =
-    RPC_directory.register0 dir Services.Workers.Block_validator.state
+    RPC_directory.register0 dir Shell_services.Workers.Block_validator.state
       (fun () () ->
          let w = Block_validator.running_worker () in
          RPC_answer.return
@@ -486,7 +486,7 @@ let build_rpc_directory node =
   (* Workers : Peer validators *)
 
   let dir  =
-    RPC_directory.register1 dir Services.Workers.Peer_validators.list
+    RPC_directory.register1 dir Shell_services.Workers.Peer_validators.list
       (fun net_id () () ->
          RPC_answer.return
            (List.filter_map
@@ -496,7 +496,7 @@ let build_rpc_directory node =
                  else None)
               (Peer_validator.running_workers ()))) in
   let dir  =
-    RPC_directory.register2 dir Services.Workers.Peer_validators.state
+    RPC_directory.register2 dir Shell_services.Workers.Peer_validators.state
       (fun net_id peer_id () () ->
          let w = List.assoc (net_id, peer_id) (Peer_validator.running_workers ()) in
          RPC_answer.return
@@ -508,14 +508,14 @@ let build_rpc_directory node =
   (* Workers : Net validators *)
 
   let dir  =
-    RPC_directory.register0 dir Services.Workers.Net_validators.list
+    RPC_directory.register0 dir Shell_services.Workers.Net_validators.list
       (fun () () ->
          RPC_answer.return
            (List.map
               (fun (id, w) -> (id, Net_validator.status w))
               (Net_validator.running_workers ()))) in
   let dir  =
-    RPC_directory.register1 dir Services.Workers.Net_validators.state
+    RPC_directory.register1 dir Shell_services.Workers.Net_validators.state
       (fun net_id () () ->
          let w = List.assoc net_id (Net_validator.running_workers ()) in
          RPC_answer.return

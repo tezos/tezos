@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Node_rpc_services
+open Shell_services
 
 val echo:
   Client_rpcs.config ->

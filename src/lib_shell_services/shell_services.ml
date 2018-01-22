@@ -640,7 +640,6 @@ module Workers = struct
 
 end
 
-
 let forge_block_header =
   RPC_service.post_service
     ~description: "Forge a block header"

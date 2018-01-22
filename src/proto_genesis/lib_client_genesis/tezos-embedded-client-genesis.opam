@@ -12,7 +12,7 @@ depends: [
   "tezos-base"
   "tezos-embedded-protocol-genesis"
   "tezos-embedded-protocol-alpha"
-  "tezos-node-services"
+  "tezos-shell-services"
   "tezos-client-base"
 ]
 build: [

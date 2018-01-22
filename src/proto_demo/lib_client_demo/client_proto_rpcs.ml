@@ -9,7 +9,7 @@
 
 let call_service1 cctxt s block a1 =
   Client_rpcs.call_service1 cctxt
-    (s Node_rpc_services.Blocks.proto_path) block a1
+    (s Shell_services.Blocks.proto_path) block a1
 let call_error_service1 cctxt s block a1 =
   call_service1 cctxt s block a1 >>= function
   | Ok (Error _ as err) -> Lwt.return (Environment.wrap_error err)

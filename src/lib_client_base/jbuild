@@ -7,8 +7,7 @@
               tezos-storage
               tezos-rpc-http
               tezos-p2p-services
-              tezos-node-shell-base
-              tezos-node-services
+              tezos-shell-services
               tezos-node-updater
               tezos-protocol-compiler))
   (flags (:standard -w -9+27-30-32-40@8
@@ -17,7 +16,7 @@
                     -open Tezos_storage
                     -open Tezos_rpc_http
                     -open Tezos_p2p_services
-                    -open Tezos_node_services
+                    -open Tezos_shell_services
                     -open Tezos_node_updater))))
 
 (alias

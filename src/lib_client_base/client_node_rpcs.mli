@@ -40,7 +40,7 @@ val inject_protocol:
 
 module Blocks : sig
 
-  type block = Node_rpc_services.Blocks.block
+  type block = Shell_services.Blocks.block
 
   val net_id:
     #Client_rpcs.ctxt ->

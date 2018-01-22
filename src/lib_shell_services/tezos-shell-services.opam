@@ -10,8 +10,6 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
   "tezos-base"
-  "tezos-p2p-services"
-  "ocplib-resto"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

@@ -13,7 +13,7 @@ depends: [
   "tezos-storage"
   "tezos-rpc-http"
   "tezos-p2p-services"
-  "tezos-node-services"
+  "tezos-shell-services"
   "tezos-node-updater"
   "tezos-protocol-compiler"
   "tezos-embedded-protocol-genesis"
