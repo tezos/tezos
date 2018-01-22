@@ -283,10 +283,10 @@ opam:21:tezos-node-p2p:
   variables:
     package: tezos-node-p2p
 
-opam:22:tezos-node-updater:
+opam:22:tezos-protocol-updater:
   <<: *opam_definition
   variables:
-    package: tezos-node-updater
+    package: tezos-protocol-updater
 
 opam:23:tezos-node-shell:
   <<: *opam_definition

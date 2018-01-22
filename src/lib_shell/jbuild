@@ -9,7 +9,7 @@
               tezos-p2p-services
               tezos-p2p
               tezos-shell-services
-              tezos-node-updater))
+              tezos-protocol-updater))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
@@ -18,7 +18,7 @@
                     -open Tezos_p2p_services
                     -open Tezos_p2p
                     -open Tezos_shell_services
-                    -open Tezos_node_updater))))
+                    -open Tezos_protocol_updater))))
 
 (alias
  ((name runtest_indent)

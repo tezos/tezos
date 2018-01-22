@@ -9,7 +9,7 @@
               tezos-p2p
               tezos-shell-services
               tezos-shell
-              tezos-node-updater
+              tezos-protocol-updater
               tezos-embedded-protocol-genesis
               tezos-embedded-protocol-demo
               tezos-embedded-protocol-alpha
@@ -23,7 +23,7 @@
                     -open Tezos_p2p
                     -open Tezos_shell_services
                     -open Tezos_shell
-                    -open Tezos_node_updater
+                    -open Tezos_protocol_updater
                     -linkall))))
 
 (install

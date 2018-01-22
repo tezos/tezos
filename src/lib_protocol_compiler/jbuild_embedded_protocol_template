@@ -22,7 +22,7 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
  ((targets (environment.ml))
   (action
     (write-file ${@@}
-      "include Tezos_node_updater.Tezos_protocol_environment.Make(struct let name = \"%s\" end)()"))))
+      "include Tezos_protocol_updater.Tezos_protocol_environment.Make(struct let name = \"%s\" end)()"))))
 
 (rule
  ((targets (registerer.ml))
@@ -35,7 +35,7 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
  ((name tezos_embedded_protocol_environment_%s)
   (public_name tezos-embedded-protocol-%s.environment)
   (library_flags (:standard -linkall))
-  (libraries (tezos-node-updater))
+  (libraries (tezos-protocol-updater))
   (modules (Environment))))
 
 (library

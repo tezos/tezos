@@ -14,7 +14,7 @@ depends: [
   "tezos-p2p-services"
   "tezos-p2p"
   "tezos-shell-services"
-  "tezos-node-updater"
+  "tezos-protocol-updater"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]
