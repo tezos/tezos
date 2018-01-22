@@ -15,6 +15,7 @@ type t = {
   db: Distributed_db.t ;
   block_validator: Block_validator.t ;
   timeout: Net_validator.timeout ;
+  peer_validator_limits: Peer_validator.limits ;
   block_validator_limits: Block_validator.limits ;
   prevalidator_limits: Prevalidator.limits ;
 
@@ -24,13 +25,15 @@ type t = {
 }
 
 let create state db timeout
+    peer_validator_limits
     block_validator_limits
     prevalidator_limits =
   Block_validator.create block_validator_limits db >>= fun block_validator ->
   let valid_block_input = Lwt_watcher.create_input () in
   Lwt.return
     { state ; db ; timeout ; block_validator ;
-      prevalidator_limits ; block_validator_limits ;
+      prevalidator_limits ;
+      peer_validator_limits ; block_validator_limits ;
       valid_block_input ;
       active_nets = Net_id.Table.create 7 ;
     }
@@ -44,7 +47,7 @@ let activate v ?bootstrap_threshold ?max_child_ttl net_state =
       Net_validator.create
         ?bootstrap_threshold
         ?max_child_ttl
-        v.timeout v.prevalidator_limits
+        v.timeout v.peer_validator_limits v.prevalidator_limits
         v.block_validator v.valid_block_input v.db net_state in
     Net_id.Table.add v.active_nets net_id nv ;
     nv

@@ -57,6 +57,7 @@ and shell = {
   block_validator_limits : Node.block_validator_limits ;
   prevalidator_limits : Node.prevalidator_limits ;
   timeout : Node.timeout ;
+  peer_validator_limits : Node.peer_validator_limits ;
 }
 
 let default_net_limits : P2p.limits = {
@@ -130,7 +131,19 @@ let default_shell = {
     block_operations = 60. ;
     protocol = 120. ;
     new_head_request = 90. ;
-  }
+  } ;
+  peer_validator_limits = {
+    block_header_timeout = 60. ;
+    block_operations_timeout = 60. ;
+    protocol_timeout = 120. ;
+    new_head_request_timeout = 90. ;
+    worker_limits = {
+      backlog_size = 1000 ;
+      backlog_level = Logging.Info ;
+      zombie_lifetime = 600. ;
+      zombie_memory = 120. ;
+    }
+  } ;
 }
 
 let default_config = {
@@ -330,6 +343,30 @@ let prevalidator_limits_encoding =
           default_shell.prevalidator_limits.worker_limits.zombie_lifetime
           default_shell.prevalidator_limits.worker_limits.zombie_memory))
 
+let peer_validator_limits_encoding =
+  let open Data_encoding in
+  let default_limits = default_shell.peer_validator_limits in
+  conv
+    (fun { Node.block_header_timeout ; block_operations_timeout ;
+           protocol_timeout ; new_head_request_timeout ; worker_limits } ->
+      ((block_header_timeout, block_operations_timeout,
+        protocol_timeout, new_head_request_timeout), worker_limits))
+    (fun ((block_header_timeout, block_operations_timeout,
+           protocol_timeout, new_head_request_timeout), worker_limits) ->
+      { block_header_timeout ; block_operations_timeout ;
+        protocol_timeout ; new_head_request_timeout ; worker_limits })
+    (merge_objs
+       (obj4
+          (dft "block_header_request_timeout" timeout_encoding default_limits.block_header_timeout)
+          (dft "block_operations_request_timeout" timeout_encoding default_limits.block_operations_timeout)
+          (dft "protocol_request_timeout" timeout_encoding default_limits.protocol_timeout)
+          (dft "new_head_request_timeout" timeout_encoding default_limits.new_head_request_timeout))
+       (worker_limits_encoding
+          default_limits.worker_limits.backlog_size
+          default_limits.worker_limits.backlog_level
+          default_limits.worker_limits.zombie_lifetime
+          default_limits.worker_limits.zombie_memory))
+
 let timeout_encoding =
   let open Data_encoding in
   let uint8 = conv int_of_float float_of_int uint8 in
@@ -352,18 +389,20 @@ let timeout_encoding =
 let shell =
   let open Data_encoding in
   conv
-    (fun { bootstrap_threshold ; timeout ;
+    (fun { bootstrap_threshold ; timeout ; peer_validator_limits ;
            block_validator_limits ; prevalidator_limits } ->
-      bootstrap_threshold, timeout,
+      bootstrap_threshold, timeout, peer_validator_limits,
       block_validator_limits, prevalidator_limits)
-    (fun (bootstrap_threshold, timeout,
+    (fun (bootstrap_threshold, timeout, peer_validator_limits,
           block_validator_limits, prevalidator_limits) ->
       { bootstrap_threshold ; timeout ;
+        peer_validator_limits ;
         block_validator_limits ;
         prevalidator_limits })
-    (obj4
+    (obj5
        (dft "bootstrap_threshold" uint8 default_shell.bootstrap_threshold)
        (dft "timeout" timeout_encoding default_shell.timeout)
+       (dft "peer_validator" peer_validator_limits_encoding default_shell.peer_validator_limits)
        (dft "block_validator" block_validator_limits_encoding default_shell.block_validator_limits)
        (dft "prevalidator" prevalidator_limits_encoding default_shell.prevalidator_limits)
     )
@@ -484,6 +523,7 @@ let update
         ~default:cfg.shell.bootstrap_threshold
         bootstrap_threshold ;
     timeout = cfg.shell.timeout ;
+    peer_validator_limits = cfg.shell.peer_validator_limits ;
     block_validator_limits = cfg.shell.block_validator_limits ;
     prevalidator_limits = cfg.shell.prevalidator_limits ;
   }

@@ -15,6 +15,7 @@ val create:
   State.t ->
   Distributed_db.t ->
   Net_validator.timeout ->
+  Peer_validator.limits ->
   Block_validator.limits ->
   Prevalidator.limits ->
   t Lwt.t

@@ -20,6 +20,7 @@ val create:
   ?max_child_ttl:int ->
   ?bootstrap_threshold:int ->
   timeout ->
+  Peer_validator.limits ->
   Prevalidator.limits ->
   Block_validator.t ->
   State.Block.t Lwt_watcher.input ->

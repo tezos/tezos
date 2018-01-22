@@ -9,36 +9,77 @@
 
 (* FIXME ignore/postpone fetching/validating of block in the future... *)
 
-include Logging.Make(struct let name = "node.validator.peer" end)
+open Peer_validator_worker_state
 
-type msg =
-  | New_head of Block_hash.t * Block_header.t
-  | New_branch of Block_hash.t * Block_locator.t
+module Name = struct
+  type t = Net_id.t * P2p.Peer_id.t
+  let encoding =
+    Data_encoding.tup2 Net_id.encoding P2p.Peer_id.encoding
+  let base = [ "peer_validator" ]
+  let pp ppf (net, peer) =
+    Format.fprintf ppf "%a:%a"
+      Net_id.pp_short net P2p.Peer_id.pp_short peer
+end
 
-type t = {
+module Request = struct
+  include Request
 
-  peer_id: P2p.Peer_id.t ;
-  net_db: Distributed_db.net_db ;
-  block_validator: Block_validator.t ;
+  type _ t =
+    | New_head : Block_hash.t * Block_header.t -> unit t
+    | New_branch : Block_hash.t * Block_locator.t -> unit t
 
+  let view (type a) (req : a t) : view = match req with
+    | New_head (hash, _) ->
+        New_head hash
+    | New_branch (hash, locator) ->
+        New_branch (hash, Block_locator_iterator.estimated_length locator)
+end
+
+type limits = {
   new_head_request_timeout: float ;
   block_header_timeout: float ;
   block_operations_timeout: float ;
   protocol_timeout: float ;
-
-  (* callback to net_validator *)
-  notify_new_block: State.Block.t -> unit ;
-  notify_bootstrapped: unit -> unit ;
-
-  mutable bootstrapped: bool ;
-  mutable last_validated_head: Block_header.t ;
-  mutable last_advertised_head: Block_header.t ;
-
-  mutable worker: unit Lwt.t ;
-  dropbox: msg Lwt_dropbox.t ;
-  canceler: Lwt_canceler.t ;
-
+  worker_limits: Worker_types.limits
 }
+
+module Types = struct
+  include Worker_state
+
+  type parameters = {
+    net_db: Distributed_db.net_db ;
+    block_validator: Block_validator.t ;
+    (* callback to net_validator *)
+    notify_new_block: State.Block.t -> unit ;
+    notify_bootstrapped: unit -> unit ;
+    notify_termination: unit -> unit ;
+    limits: limits;
+  }
+
+  type state = {
+    peer_id: P2p.Peer_id.t ;
+    parameters : parameters ;
+    mutable bootstrapped: bool ;
+    mutable last_validated_head: Block_header.t ;
+    mutable last_advertised_head: Block_header.t ;
+  }
+
+  let view (state : state) _ : view =
+    let { bootstrapped ; last_validated_head ; last_advertised_head } = state in
+    { bootstrapped ;
+      last_validated_head = Block_header.hash last_validated_head ;
+      last_advertised_head = Block_header.hash last_advertised_head }
+
+end
+
+module Worker = Worker.Make (Name) (Event) (Request) (Types)
+
+open Types
+
+type t = Worker.dropbox Worker.t
+
+let debug w =
+  Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
 
 type error +=
   | Unknown_ancestor
@@ -47,22 +88,23 @@ type error +=
 let set_bootstrapped pv =
   if not pv.bootstrapped then begin
     pv.bootstrapped <- true ;
-    pv.notify_bootstrapped () ;
+    pv.parameters.notify_bootstrapped () ;
   end
 
-let bootstrap_new_branch pv _ancestor _head unknown_prefix =
+let bootstrap_new_branch w _ancestor _head unknown_prefix =
+  let pv = Worker.state w in
   let len = Block_locator_iterator.estimated_length unknown_prefix in
-  lwt_log_info
+  debug w
     "validating new branch from peer %a (approx. %d blocks)"
-    P2p.Peer_id.pp_short pv.peer_id len >>= fun () ->
+    P2p.Peer_id.pp_short pv.peer_id len ;
   let pipeline =
     Bootstrap_pipeline.create
-      ~notify_new_block:pv.notify_new_block
-      ~block_header_timeout:pv.block_header_timeout
-      ~block_operations_timeout:pv.block_operations_timeout
-      pv.block_validator
-      pv.peer_id pv.net_db unknown_prefix in
-  Lwt_utils.protect ~canceler:pv.canceler
+      ~notify_new_block:pv.parameters.notify_new_block
+      ~block_header_timeout:pv.parameters.limits.block_header_timeout
+      ~block_operations_timeout:pv.parameters.limits.block_operations_timeout
+      pv.parameters.block_validator
+      pv.peer_id pv.parameters.net_db unknown_prefix in
+  Worker.protect w
     ~on_error:begin fun error ->
       (* if the peer_validator is killed, let's cancel the pipeline *)
       Bootstrap_pipeline.cancel pipeline >>= fun () ->
@@ -72,235 +114,263 @@ let bootstrap_new_branch pv _ancestor _head unknown_prefix =
       Bootstrap_pipeline.wait pipeline
     end >>=? fun () ->
   set_bootstrapped pv ;
-  lwt_log_info
+  debug w
     "done validating new branch from peer %a."
-    P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
+    P2p.Peer_id.pp_short pv.peer_id ;
   return ()
 
-let validate_new_head pv hash (header : Block_header.t) =
-  let net_state = Distributed_db.net_state pv.net_db in
+let validate_new_head w hash (header : Block_header.t) =
+  let pv = Worker.state w in
+  let net_state = Distributed_db.net_state pv.parameters.net_db in
   State.Block.known net_state header.shell.predecessor >>= function
   | false ->
-      lwt_debug
+      debug w
         "missing predecessor for new head %a from peer %a"
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
-      Distributed_db.Request.current_branch pv.net_db ~peer:pv.peer_id () ;
+        P2p.Peer_id.pp_short pv.peer_id ;
+      Distributed_db.Request.current_branch pv.parameters.net_db ~peer:pv.peer_id () ;
       return ()
   | true ->
-      lwt_debug
+      debug w
         "fetching operations for new head %a from peer %a"
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
+        P2p.Peer_id.pp_short pv.peer_id ;
       map_p
         (fun i ->
-           Lwt_utils.protect ~canceler:pv.canceler begin fun () ->
+           Worker.protect w begin fun () ->
              Distributed_db.Operations.fetch
-               ~timeout:pv.block_operations_timeout
-               pv.net_db ~peer:pv.peer_id
+               ~timeout:pv.parameters.limits.block_operations_timeout
+               pv.parameters.net_db ~peer:pv.peer_id
                (hash, i) header.shell.operations_hash
            end)
         (0 -- (header.shell.validation_passes - 1)) >>=? fun operations ->
-      lwt_debug
+      debug w
         "requesting validation for new head %a from peer %a"
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
+        P2p.Peer_id.pp_short pv.peer_id ;
       Block_validator.validate
-        ~notify_new_block:pv.notify_new_block
-        pv.block_validator pv.net_db
+        ~notify_new_block:pv.parameters.notify_new_block
+        pv.parameters.block_validator pv.parameters.net_db
         hash header operations >>=? fun _block ->
-      lwt_debug "end of validation for new head %a from peer %a"
+      debug w
+        "end of validation for new head %a from peer %a"
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
+        P2p.Peer_id.pp_short pv.peer_id ;
       set_bootstrapped pv ;
       return ()
 
-let may_validate_new_head pv hash header =
-  let net_state = Distributed_db.net_state pv.net_db in
+let may_validate_new_head w hash header =
+  let pv = Worker.state w in
+  let net_state = Distributed_db.net_state pv.parameters.net_db in
   State.Block.known net_state hash >>= function
   | true -> begin
       State.Block.known_valid net_state hash >>= function
       | true ->
-          lwt_debug
+          debug w
             "ignoring previously validated block %a from peer %a"
             Block_hash.pp_short hash
-            P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
+            P2p.Peer_id.pp_short pv.peer_id ;
           set_bootstrapped pv ;
           pv.last_validated_head <- header ;
           return ()
       | false ->
-          lwt_log_info
+          debug w
             "ignoring known invalid block %a from peer %a"
             Block_hash.pp_short hash
-            P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
+            P2p.Peer_id.pp_short pv.peer_id ;
           fail Known_invalid
     end
   | false ->
-      validate_new_head pv hash header
+      validate_new_head w hash header
 
-let may_validate_new_branch pv distant_hash locator =
+let may_validate_new_branch w distant_hash locator =
+  let pv = Worker.state w in
   let distant_header, _ = (locator : Block_locator.t :> Block_header.t * _) in
-  let net_state = Distributed_db.net_state pv.net_db in
+  let net_state = Distributed_db.net_state pv.parameters.net_db in
   Chain.head net_state >>= fun local_header ->
   if Fitness.compare
       distant_header.Block_header.shell.fitness
       (State.Block.fitness local_header) < 0 then begin
     set_bootstrapped pv ;
-    lwt_debug
+    debug w
       "ignoring branch %a with low fitness from peer: %a."
       Block_hash.pp_short distant_hash
-      P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
+      P2p.Peer_id.pp_short pv.peer_id ;
     (* Don't bother with downloading a branch with a low fitness. *)
     return ()
   end else begin
-    let net_state = Distributed_db.net_state pv.net_db in
+    let net_state = Distributed_db.net_state pv.parameters.net_db in
     Block_locator_iterator.known_ancestor net_state locator >>= function
     | None ->
-        lwt_log_info
+        debug w
           "ignoring branch %a without common ancestor from peer: %a."
           Block_hash.pp_short distant_hash
-          P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
+          P2p.Peer_id.pp_short pv.peer_id ;
         fail Unknown_ancestor
     | Some (ancestor, unknown_prefix) ->
-        bootstrap_new_branch pv ancestor distant_header unknown_prefix
+        bootstrap_new_branch w ancestor distant_header unknown_prefix
   end
 
-let rec worker_loop pv =
-  begin
-    Lwt_utils.protect ~canceler:pv.canceler begin fun () ->
-      Lwt_dropbox.take_with_timeout
-        pv.new_head_request_timeout
-        pv.dropbox >>= return
-    end >>=? function
-    | None ->
-        lwt_log_info "no new head from peer %a for 90 seconds."
-          P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
-        Distributed_db.Request.current_head pv.net_db ~peer:pv.peer_id () ;
-        return ()
-    | Some (New_head (hash, header)) ->
-        lwt_log_info "processing new head %a from peer %a."
-          Block_hash.pp_short hash
-          P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
-        may_validate_new_head pv hash header
-    | Some (New_branch (hash, locator)) ->
-        (* TODO penalize empty locator... ?? *)
-        lwt_log_info "processing new branch %a from peer %a."
-          Block_hash.pp_short hash
-          P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
-        may_validate_new_branch pv hash locator
-  end >>= function
-  | Ok () ->
-      worker_loop pv
-  | Error ((( Unknown_ancestor
-            | Bootstrap_pipeline.Invalid_locator _
-            | Block_validator.Invalid_block _ ) :: _) as errors ) ->
+let on_no_request w =
+  let pv = Worker.state w in
+  debug w "no new head from peer %a for %g seconds."
+    P2p.Peer_id.pp_short pv.peer_id
+    pv.parameters.limits.new_head_request_timeout ;
+  Distributed_db.Request.current_head pv.parameters.net_db ~peer:pv.peer_id () ;
+  return ()
+
+let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
+  let pv = Worker.state w in
+  match req with
+  | Request.New_head (hash, header) ->
+      debug w
+        "processing new head %a from peer %a."
+        Block_hash.pp_short hash
+        P2p.Peer_id.pp_short pv.peer_id ;
+      may_validate_new_head w hash header
+  | Request.New_branch (hash, locator) ->
+      (* TODO penalize empty locator... ?? *)
+      debug w "processing new branch %a from peer %a."
+        Block_hash.pp_short hash
+        P2p.Peer_id.pp_short pv.peer_id ;
+      may_validate_new_branch w hash locator
+
+let on_completion w r _ st =
+  Worker.record_event w (Event.Request (Request.view r, st, None )) ;
+  Lwt.return ()
+
+let on_error w r st errs =
+  let pv = Worker.state w in
+  match errs with
+    ((( Unknown_ancestor
+      | Bootstrap_pipeline.Invalid_locator _
+      | Block_validator_errors.Invalid_block _ ) :: _) as errors ) ->
       (* TODO ban the peer_id... *)
-      lwt_log_info "Terminating the validation worker for peer %a (kickban)."
-        P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
-      lwt_debug "%a" Error_monad.pp_print_error errors >>= fun () ->
-      Lwt_canceler.cancel pv.canceler >>= fun () ->
-      Lwt.return_unit
-  | Error [Block_validator_errors.Unavailable_protocol { protocol } ] -> begin
+      debug w
+        "Terminating the validation worker for peer %a (kickban)."
+        P2p.Peer_id.pp_short pv.peer_id ;
+      debug w "%a" Error_monad.pp_print_error errors ;
+      Worker.trigger_shutdown w ;
+      Worker.record_event w (Event.Request (r, st, Some errs)) ;
+      Lwt.return (Error errs)
+  | [Block_validator_errors.Unavailable_protocol { protocol } ] -> begin
       Block_validator.fetch_and_compile_protocol
-        pv.block_validator
+        pv.parameters.block_validator
         ~peer:pv.peer_id
-        ~timeout:pv.protocol_timeout
+        ~timeout:pv.parameters.limits.protocol_timeout
         protocol >>= function
-      | Ok _ -> worker_loop pv
+      | Ok _ -> return ()
       | Error _ ->
           (* TODO penality... *)
-          lwt_log_info "Terminating the validation worker for peer %a \
-                       \ (missing protocol %a)."
+          debug w
+            "Terminating the validation worker for peer %a \
+             (missing protocol %a)."
             P2p.Peer_id.pp_short pv.peer_id
-            Protocol_hash.pp_short protocol >>= fun () ->
-          Lwt_canceler.cancel pv.canceler >>= fun () ->
-          Lwt.return_unit
+            Protocol_hash.pp_short protocol ;
+          Worker.record_event w (Event.Request (r, st, Some errs)) ;
+          Lwt.return (Error errs)
     end
-  | Error [Exn Lwt.Canceled | Lwt_utils.Canceled | Exn Lwt_dropbox.Closed] ->
-      lwt_log_info "Terminating the validation worker for peer %a."
-        P2p.Peer_id.pp_short pv.peer_id >>= fun () ->
-      Lwt.return_unit
-  | Error err ->
-      lwt_log_error
-        "@[<v 2>Unexpected error in the validation worker for peer %a:@ \
-        \ %a@]"
-        P2p.Peer_id.pp_short pv.peer_id
-        pp_print_error err >>= fun () ->
-      Lwt_canceler.cancel pv.canceler >>= fun () ->
-      Lwt.return_unit
+  | _ ->
+      Worker.record_event w (Event.Request (r, st, Some errs)) ;
+      Lwt.return (Error errs)
 
-let create
-    ?notify_new_block:(external_notify_new_block = fun _ -> ())
-    ?(notify_bootstrapped = fun () -> ())
-    ?(notify_termination = fun _ -> ())
-    ~new_head_request_timeout
-    ~block_header_timeout
-    ~block_operations_timeout
-    ~protocol_timeout
-    block_validator net_db peer_id =
-  lwt_debug "creating validator for peer %a."
-    P2p.Peer_id.pp_short peer_id >>= fun () ->
-  let canceler = Lwt_canceler.create () in
-  let dropbox = Lwt_dropbox.create () in
-  let net_state = Distributed_db.net_state net_db in
+let on_close w =
+  let pv = Worker.state w in
+  pv.parameters.notify_termination () ;
+  Distributed_db.disconnect pv.parameters.net_db pv.peer_id >>= fun () ->
+  Lwt.return ()
+
+let on_launch _ name parameters =
+  let net_state = Distributed_db.net_state parameters.net_db in
   State.Block.read_exn net_state
     (State.Net.genesis net_state).block >>= fun genesis ->
-  let rec notify_new_block block =
-    pv.last_validated_head <- State.Block.header block ;
-    external_notify_new_block block
-  and pv = {
-    block_validator ;
-    notify_new_block ;
-    notify_bootstrapped ;
-    new_head_request_timeout ;
-    block_header_timeout ;
-    block_operations_timeout ;
-    protocol_timeout ;
-    net_db ;
-    peer_id ;
+  let rec pv = {
+    peer_id = snd name ;
+    parameters = { parameters with notify_new_block } ;
     bootstrapped = false ;
     last_validated_head = State.Block.header genesis ;
     last_advertised_head = State.Block.header genesis ;
-    canceler ;
-    dropbox ;
-    worker = Lwt.return_unit ;
-  } in
-  Lwt_canceler.on_cancel pv.canceler begin fun () ->
-    Lwt_dropbox.close pv.dropbox ;
-    Distributed_db.disconnect pv.net_db pv.peer_id >>= fun () ->
-    notify_termination pv ;
-    Lwt.return_unit
-  end ;
-  pv.worker <-
-    Lwt_utils.worker
-      (Format.asprintf "peer_validator.%a.%a"
-         Net_id.pp (State.Net.id net_state) P2p.Peer_id.pp_short peer_id)
-      ~run:(fun () -> worker_loop pv)
-      ~cancel:(fun () -> Lwt_canceler.cancel pv.canceler) ;
+  }
+  and notify_new_block block =
+    pv.last_validated_head <- State.Block.header block ;
+    parameters.notify_new_block block in
   Lwt.return pv
 
-let notify_branch pv locator =
+let table =
+  let merge w (Worker.Any_request neu) old =
+    let pv = Worker.state w in
+    match neu with
+    | Request.New_branch (_, locator) ->
+        let header, _ = (locator : Block_locator.t :> _ * _) in
+        pv.last_advertised_head <- header ;
+        Some (Worker.Any_request neu)
+    | Request.New_head (_, header) ->
+        pv.last_advertised_head <- header ;
+        (* TODO penalize decreasing fitness *)
+        match old with
+        | Some (Worker.Any_request (Request.New_branch _) as old) ->
+            Some old (* ignore *)
+        | Some (Worker.Any_request (Request.New_head _)) ->
+            Some (Any_request neu)
+        | None ->
+            Some (Any_request neu) in
+  Worker.create_table (Dropbox { merge })
+
+let create
+    ?(notify_new_block = fun _ -> ())
+    ?(notify_bootstrapped = fun () -> ())
+    ?(notify_termination = fun _ -> ())
+    limits block_validator net_db peer_id =
+  let name = (State.Net.id (Distributed_db.net_state net_db), peer_id) in
+  let parameters = {
+    net_db ;
+    notify_termination ;
+    block_validator ;
+    notify_new_block ;
+    notify_bootstrapped ;
+    limits ;
+  } in
+  let module Handlers = struct
+    type self = t
+    let on_launch = on_launch
+    let on_request = on_request
+    let on_close = on_close
+    let on_error = on_error
+    let on_completion = on_completion
+    let on_no_request _ = return ()
+  end in
+  Worker.launch table ~timeout: limits.new_head_request_timeout limits.worker_limits
+    name parameters
+    (module Handlers)
+
+let notify_branch w locator =
   let header, _ = (locator : Block_locator.t :> _ * _) in
   let hash = Block_header.hash header in
-  (* TODO penalize decreasing fitness *)
-  pv.last_advertised_head <- header ;
-  try Lwt_dropbox.put pv.dropbox (New_branch (hash, locator))
-  with Lwt_dropbox.Closed -> ()
+  Worker.drop_request w (New_branch (hash, locator))
 
-let notify_head pv header =
+let notify_head w header =
   let hash = Block_header.hash header in
-  pv.last_advertised_head <- header ;
-  (* TODO penalize decreasing fitness *)
-  match Lwt_dropbox.peek pv.dropbox with
-  | Some (New_branch _) -> () (* ignore *)
-  | None | Some (New_head _) ->
-      try Lwt_dropbox.put pv.dropbox (New_head (hash, header))
-      with Lwt_dropbox.Closed -> ()
+  Worker.drop_request w (New_head (hash, header))
 
-let shutdown pv =
-  Lwt_canceler.cancel pv.canceler >>= fun () ->
-  pv.worker
+let shutdown w =
+  Worker.shutdown w
 
-let peer_id pv = pv.peer_id
-let bootstrapped pv = pv.bootstrapped
-let current_head pv = pv.last_validated_head
+let peer_id w =
+  let pv = Worker.state w in
+  pv.peer_id
+
+let bootstrapped w =
+  let pv = Worker.state w in
+  pv.bootstrapped
+
+let current_head w =
+  let pv = Worker.state w in
+  pv.last_validated_head
+
+let status = Worker.status
+
+let running_workers () = Worker.list table
+
+let current_request t = Worker.current_request t
+
+let last_events = Worker.last_events

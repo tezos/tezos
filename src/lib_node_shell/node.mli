@@ -25,6 +25,13 @@ and timeout = {
   protocol: float ;
   new_head_request: float ;
 }
+and peer_validator_limits = {
+  new_head_request_timeout: float ;
+  block_header_timeout: float ;
+  block_operations_timeout: float ;
+  protocol_timeout: float ;
+  worker_limits: Worker_types.limits
+}
 and prevalidator_limits = {
   max_refused_operations: int ;
   operation_timeout: float ;
@@ -38,6 +45,7 @@ and block_validator_limits = {
 val create:
   config ->
   timeout ->
+  peer_validator_limits ->
   block_validator_limits ->
   prevalidator_limits ->
   t tzresult Lwt.t

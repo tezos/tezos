@@ -18,6 +18,7 @@ type t = {
 
   timeout: timeout ;
   prevalidator_limits: Prevalidator.limits ;
+  peer_validator_limits: Peer_validator.limits ;
   bootstrap_threshold: int ;
   mutable bootstrapped: bool ;
   bootstrapped_waiter: unit Lwt.t ;
@@ -83,10 +84,6 @@ let may_activate_peer_validator nv peer_id =
   with Not_found ->
     let pv =
       Peer_validator.create
-        ~new_head_request_timeout:nv.timeout.new_head_request
-        ~block_header_timeout:nv.timeout.block_header
-        ~block_operations_timeout:nv.timeout.block_operations
-        ~protocol_timeout:nv.timeout.protocol
         ~notify_new_block:(notify_new_block nv)
         ~notify_bootstrapped: begin fun () ->
           P2p.Peer_id.Table.add nv.bootstrapped_peers peer_id () ;
@@ -96,6 +93,7 @@ let may_activate_peer_validator nv peer_id =
           P2p.Peer_id.Table.remove nv.active_peers peer_id ;
           P2p.Peer_id.Table.remove nv.bootstrapped_peers peer_id ;
         end
+        nv.peer_validator_limits
         nv.block_validator nv.net_db peer_id in
     P2p.Peer_id.Table.add nv.active_peers peer_id pv ;
     pv
@@ -122,7 +120,7 @@ let broadcast_head nv ~previous block =
 let rec create
     ?max_child_ttl ?parent
     ?(bootstrap_threshold = 1)
-    timeout prevalidator_limits block_validator
+    timeout peer_validator_limits prevalidator_limits block_validator
     global_valid_block_input db net_state =
   Chain.init_head net_state >>= fun () ->
   let net_db = Distributed_db.activate db net_state in
@@ -135,7 +133,7 @@ let rec create
   let nv = {
     db ; net_state ; net_db ; block_validator ;
     prevalidator ;
-    timeout ; prevalidator_limits ;
+    timeout ; prevalidator_limits ; peer_validator_limits ;
     valid_block_input ; global_valid_block_input ;
     new_head_input ;
     parent ; max_child_ttl ; child = None ;
@@ -251,7 +249,8 @@ and may_switch_test_network nv block =
             return net_state
       end >>=? fun net_state ->
       create
-        ~parent:nv nv.timeout nv.prevalidator_limits nv.block_validator
+        ~parent:nv nv.timeout nv.peer_validator_limits
+        nv.prevalidator_limits nv.block_validator
         nv.global_valid_block_input
         nv.db net_state >>= fun child ->
       nv.child <- Some child ;
