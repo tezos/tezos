@@ -22,7 +22,10 @@
    * Remove pp_set/get_formatter_out_functions and
      the formatter_out_functions type (removed upstream)
    * Remove pp_flush_formatter (removed upstream)
-
+   * Remove formatter_tag functions (too complex and imperative
+     for the need of error message generation)
+   * Remov pp_set_formatter_output_functions and
+     pp_get_formatter_output_functions
 *)
 
 (** Pretty printing.
@@ -89,21 +92,6 @@
 (** {6:tags Semantic Tags} *)
 
 type tag = string
-
-(** {6:tagsmeaning Changing the meaning of printing semantic tags} *)
-
-type formatter_tag_functions = {
-  mark_open_tag : tag -> string;
-  mark_close_tag : tag -> string;
-  print_open_tag : tag -> unit;
-  print_close_tag : tag -> unit;
-}
-(** The tag handling functions specific to a formatter:
-    [mark] versions are the 'tag marking' functions that associate a string
-    marker to a tag in order for the pretty-printing engine to flush
-    those markers as 0 length tokens in the output device of the formatter.
-    [print] versions are the 'tag printing' functions that can perform
-    regular printing when a tag is closed or opened. *)
 
 (** {6 Multiple formatted output} *)
 
@@ -175,18 +163,6 @@ val pp_get_max_boxes : formatter -> unit -> int
 val pp_over_max_boxes : formatter -> unit -> bool
 val pp_set_ellipsis_text : formatter -> string -> unit
 val pp_get_ellipsis_text : formatter -> unit -> string
-
-val pp_set_formatter_output_functions :
-  formatter -> (string -> int -> int -> unit) -> (unit -> unit) -> unit
-
-val pp_get_formatter_output_functions :
-  formatter -> unit -> (string -> int -> int -> unit) * (unit -> unit)
-
-val pp_set_formatter_tag_functions :
-  formatter -> formatter_tag_functions -> unit
-
-val pp_get_formatter_tag_functions :
-  formatter -> unit -> formatter_tag_functions
 
 (** {6 Convenience formatting functions.} *)
 
