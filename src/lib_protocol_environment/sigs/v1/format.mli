@@ -19,6 +19,9 @@
    * Remove channel functions
    * Remove toplevel effect based functions
    * Remove deprecated functions
+   * Remove pp_set/get_formatter_out_functions and
+     the formatter_out_functions type (removed upstream)
+   * Remove pp_flush_formatter (removed upstream)
 
 *)
 
@@ -86,20 +89,6 @@
 (** {6:tags Semantic Tags} *)
 
 type tag = string
-
-(** {6:meaning Changing the meaning of standard formatter pretty printing} *)
-
-(** The [Format] module is versatile enough to let you completely redefine
-    the meaning of pretty printing: you may provide your own functions to define
-    how to handle indentation, line splitting, and even printing of all the
-    characters that have to be printed! *)
-
-type formatter_out_functions = {
-  out_string : string -> int -> int -> unit;
-  out_flush : unit -> unit;
-  out_newline : unit -> unit;
-  out_spaces : int -> unit;
-}
 
 (** {6:tagsmeaning Changing the meaning of printing semantic tags} *)
 
@@ -198,24 +187,6 @@ val pp_set_formatter_tag_functions :
 
 val pp_get_formatter_tag_functions :
   formatter -> unit -> formatter_tag_functions
-
-val pp_set_formatter_out_functions :
-  formatter -> formatter_out_functions -> unit
-
-val pp_get_formatter_out_functions :
-  formatter -> unit -> formatter_out_functions
-(** These functions are the basic ones: usual functions
-    operating on the standard formatter are defined via partial
-    evaluation of these primitives. For instance,
-    [print_string] is equal to [pp_print_string std_formatter]. *)
-
-val pp_flush_formatter : formatter -> unit
-(** [pp_flush_formatter fmt] flushes [fmt]'s internal queue, ensuring that all
-    the printing and flushing actions have been performed. In addition, this
-    operation will close all boxes and reset the state of the formatter.
-
-    This will not flush [fmt]'s output. In most cases, the user may want to use
-    {!pp_print_flush} instead. *)
 
 (** {6 Convenience formatting functions.} *)
 
