@@ -22,4 +22,4 @@ html: Makefile introduction/readme.rst
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm introduction/readme.rst
+	@-rm -Rf introduction/readme.rst
