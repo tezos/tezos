@@ -19,7 +19,6 @@
 
     ;; Part of external libraries
     v1/z.mli
-    v1/lwt_sequence.mli
     v1/lwt.mli
     v1/lwt_list.mli
 

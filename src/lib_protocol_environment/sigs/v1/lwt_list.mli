@@ -25,19 +25,13 @@
 (* TEZOS CHANGES
 
    * import version 2.4.5
-
+   * Remove iter/iteri
 *)
 
 (** Note: this module use the same naming convention as
     {!Lwt_stream}. *)
 
 (** {2 List iterators} *)
-
-val iter_s : ('a -> unit Lwt.t) -> 'a list -> unit Lwt.t
-val iter_p : ('a -> unit Lwt.t) -> 'a list -> unit Lwt.t
-
-val iteri_s : (int -> 'a -> unit Lwt.t) -> 'a list -> unit Lwt.t
-val iteri_p : (int -> 'a -> unit Lwt.t) -> 'a list -> unit Lwt.t
 
 val map_s : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
 val map_p : ('a -> 'b Lwt.t) -> 'a list -> 'b list Lwt.t
