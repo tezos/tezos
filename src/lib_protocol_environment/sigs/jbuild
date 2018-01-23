@@ -13,7 +13,6 @@
     v1/map.mli
     v1/int32.mli
     v1/int64.mli
-    v1/buffer.mli
     v1/format.mli
 
     ;; Part of external libraries
