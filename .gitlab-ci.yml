@@ -91,6 +91,11 @@ build:
   dependencies:
     - build
 
+test:opam:
+  <<: *test_definition
+  script:
+    - ./scripts/check_opam_test.sh "$CI_PROJECT_DIR/$CI_CONFIG_PATH"
+
 test:ocp-indent:
   <<: *test_definition
   script:
@@ -178,180 +183,184 @@ test:proto:sandbox:
   tags:
     - gitlab-org
 
+##BEGIN_OPAM##
+opam:00:tezos-stdlib:
+  <<: *opam_definition
+  variables:
+    package: tezos-stdlib
+
 opam:01:ocplib-resto:
   <<: *opam_definition
   variables:
     package: ocplib-resto
 
-opam:02:ocplib-resto-directory:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-directory
-
-opam:03:ocplib-resto-cohttp:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-cohttp
-
-opam:04:ocplib-resto-json:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto-json
-
-opam:05:ocplib-ezresto:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto
-
-opam:06:ocplib-ezresto-directory:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto-directory
-
-opam:07:tezos-stdlib:
-  <<: *opam_definition
-  variables:
-    package: tezos-stdlib
-
-opam:08:tezos-data-encoding:
+opam:02:tezos-data-encoding:
   <<: *opam_definition
   variables:
     package: tezos-data-encoding
 
-opam:09:tezos-error-monad:
+opam:03:ocplib-resto-directory:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto-directory
+
+opam:04:tezos-error-monad:
   <<: *opam_definition
   variables:
     package: tezos-error-monad
 
-opam:10:tezos-stdlib-lwt:
+opam:05:tezos-rpc:
+  <<: *opam_definition
+  variables:
+    package: tezos-rpc
+
+opam:06:tezos-stdlib-lwt:
   <<: *opam_definition
   variables:
     package: tezos-stdlib-lwt
 
-opam:11:tezos-crypto:
+opam:07:tezos-crypto:
   <<: *opam_definition
   variables:
     package: tezos-crypto
 
-opam:12:tezos-base:
+opam:08:tezos-base:
   <<: *opam_definition
   variables:
     package: tezos-base
 
-opam:13:tezos-node-p2p-base:
-  <<: *opam_definition
-  variables:
-    package: tezos-node-p2p-base
-
-opam:14:tezos-node-services:
-  <<: *opam_definition
-  variables:
-    package: tezos-node-services
-
-opam:15:tezos-protocol-environment-sigs:
+opam:09:tezos-protocol-environment-sigs:
   <<: *opam_definition
   variables:
     package: tezos-protocol-environment-sigs
 
-opam:16:irmin-leveldb:
+opam:10:irmin-leveldb:
   <<: *opam_definition
   variables:
     package: irmin-leveldb
 
-opam:17:tezos-micheline:
+opam:11:tezos-micheline:
   <<: *opam_definition
   variables:
     package: tezos-micheline
 
-opam:18:tezos-rpc-http:
-  <<: *opam_definition
-  variables:
-    package: tezos-rpc-http
-
-opam:19:tezos-protocol-compiler:
+opam:12:tezos-protocol-compiler:
   <<: *opam_definition
   variables:
     package: tezos-protocol-compiler
 
-opam:20:tezos-storage:
+opam:13:tezos-storage:
   <<: *opam_definition
   variables:
     package: tezos-storage
 
-opam:21:tezos-node-p2p:
+opam:14:ocplib-resto-cohttp:
   <<: *opam_definition
   variables:
-    package: tezos-node-p2p
+    package: ocplib-resto-cohttp
 
-opam:22:tezos-protocol-updater:
+opam:15:tezos-p2p:
+  <<: *opam_definition
+  variables:
+    package: tezos-p2p
+
+opam:16:tezos-protocol-updater:
   <<: *opam_definition
   variables:
     package: tezos-protocol-updater
 
-opam:23:tezos-node-shell:
+opam:17:tezos-rpc-http:
   <<: *opam_definition
   variables:
-    package: tezos-node-shell
+    package: tezos-rpc-http
 
-opam:24:tezos-embedded-protocol-alpha:
+opam:18:tezos-shell-services:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell-services
+
+opam:19:tezos-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-shell
+
+opam:20:tezos-embedded-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-alpha
 
-opam:25:tezos-embedded-protocol-demo:
+opam:21:tezos-embedded-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-demo
 
-opam:26:tezos-embedded-protocol-genesis:
+opam:22:tezos-embedded-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-protocol-genesis
 
-opam:27:tezos-client-base:
+opam:23:tezos-client-base:
   <<: *opam_definition
   variables:
     package: tezos-client-base
 
-opam:28:tezos-embedded-client-alpha:
+opam:24:ocplib-resto-json:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto-json
+
+opam:25:tezos-embedded-client-alpha:
   <<: *opam_definition
   variables:
     package: tezos-embedded-client-alpha
 
-opam:29:tezos-embedded-client-genesis:
+opam:26:tezos-embedded-client-genesis:
   <<: *opam_definition
   variables:
     package: tezos-embedded-client-genesis
 
-opam:30:tezos-protocol-demo:
+opam:27:ocplib-ezresto:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-demo
+    package: ocplib-ezresto
 
-opam:31:tezos-client:
+opam:28:tezos-client:
   <<: *opam_definition
   variables:
     package: tezos-client
 
-opam:32:tezos-node:
+opam:29:tezos-node:
   <<: *opam_definition
   variables:
     package: tezos-node
 
-opam:33:tezos-protocol-alpha:
+opam:30:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-alpha
+    package: ocplib-ezresto-directory
 
-opam:34:tezos-protocol-genesis:
+opam:31:tezos-test:
+  <<: *opam_definition
+  variables:
+    package: tezos-test
+
+opam:32:tezos-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-protocol-genesis
 
-opam:35:tezos-test:
+opam:33:tezos-protocol-demo:
   <<: *opam_definition
   variables:
-    package: tezos-test
+    package: tezos-protocol-demo
+
+opam:34:tezos-protocol-alpha:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-alpha
+
+
+##END_OPAM##
 
 ## Publishing (small) docker images with tezos binaries
 
