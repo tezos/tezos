@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include S.INTERNAL_HASH
+include Tezos_crypto.S.INTERNAL_HASH

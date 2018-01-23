@@ -16,7 +16,7 @@ let () =
   Format.printf {|
 module Source = struct
   let hash =
-    Some (Tezos_crypto.Protocol_hash.of_b58check_exn %S)
+    Some (Tezos_base.Protocol_hash.of_b58check_exn %S)
   let sources = Tezos_base.Protocol.%a
 end
 @.|}
