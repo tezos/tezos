@@ -89,7 +89,7 @@ and 'ty stack_ty =
 (* ---- Instructions --------------------------------------------------------*)
 
 (* The low-level, typed instructions, as a GADT whose parameters
-   encode the typing rules. The eft parameter is the typed shape of
+   encode the typing rules. The left parameter is the typed shape of
    the stack before the instruction, the right one the shape
    after. Any program whose construction is accepted by OCaml's
    type-checker is guaranteed to be type-safe.  Overloadings of the

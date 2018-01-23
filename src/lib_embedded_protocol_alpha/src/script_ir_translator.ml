@@ -512,7 +512,7 @@ let map_size
   fun (module Box) ->
     Script_int.(abs (of_int (snd Box.boxed)))
 
-(* ---- Unparsing (Typed IR -> Untyped epressions) --------------------------*)
+(* ---- Unparsing (Typed IR -> Untyped expressions) --------------------------*)
 
 let ty_of_comparable_ty
   : type a. a comparable_ty -> a ty = function
@@ -653,77 +653,73 @@ let rec unparse_data
 
 (* ---- Equality witnesses --------------------------------------------------*)
 
-type ('ta, 'tb) eq = Eq : 'same * 'same -> ('same, 'same) eq
-
-let eq
-  : type t. t -> t -> (t, t) eq tzresult
-  = fun ta tb -> Ok (Eq (ta, tb))
+type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
 let comparable_ty_eq
   : type ta tb.
     ta comparable_ty -> tb comparable_ty ->
     (ta comparable_ty, tb comparable_ty) eq tzresult
   = fun ta tb -> match ta, tb with
-    | Int_key, Int_key -> eq ta tb
-    | Nat_key, Nat_key -> eq ta tb
-    | String_key, String_key -> eq ta tb
-    | Tez_key, Tez_key -> eq ta tb
-    | Bool_key, Bool_key -> eq ta tb
-    | Key_hash_key, Key_hash_key -> eq ta tb
-    | Timestamp_key, Timestamp_key -> eq ta tb
+    | Int_key, Int_key -> Ok Eq
+    | Nat_key, Nat_key -> Ok Eq
+    | String_key, String_key -> Ok Eq
+    | Tez_key, Tez_key -> Ok Eq
+    | Bool_key, Bool_key -> Ok Eq
+    | Key_hash_key, Key_hash_key -> Ok Eq
+    | Timestamp_key, Timestamp_key -> Ok Eq
     | _, _ -> error (Inconsistent_types (ty_of_comparable_ty ta, ty_of_comparable_ty tb))
 
 let rec ty_eq
   : type ta tb. ta ty -> tb ty -> (ta ty, tb ty) eq tzresult
   = fun ta tb ->
     match ta, tb with
-    | Unit_t, Unit_t -> eq ta tb
-    | Int_t, Int_t -> eq ta tb
-    | Nat_t, Nat_t -> eq ta tb
-    | Key_t, Key_t -> eq ta tb
-    | Key_hash_t, Key_hash_t -> eq ta tb
-    | String_t, String_t -> eq ta tb
-    | Signature_t, Signature_t -> eq ta tb
-    | Tez_t, Tez_t -> eq ta tb
-    | Timestamp_t, Timestamp_t -> eq ta tb
-    | Bool_t, Bool_t -> eq ta tb
+    | Unit_t, Unit_t -> Ok Eq
+    | Int_t, Int_t -> Ok Eq
+    | Nat_t, Nat_t -> Ok Eq
+    | Key_t, Key_t -> Ok Eq
+    | Key_hash_t, Key_hash_t -> Ok Eq
+    | String_t, String_t -> Ok Eq
+    | Signature_t, Signature_t -> Ok Eq
+    | Tez_t, Tez_t -> Ok Eq
+    | Timestamp_t, Timestamp_t -> Ok Eq
+    | Bool_t, Bool_t -> Ok Eq
     | Map_t (tal, tar), Map_t (tbl, tbr) ->
-        (comparable_ty_eq tal tbl >>? fun (Eq _) ->
-         ty_eq tar tbr >>? fun (Eq _) ->
-         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
+        (comparable_ty_eq tal tbl >>? fun Eq ->
+         ty_eq tar tbr >>? fun Eq ->
+         (Ok Eq : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (ta, tb))
     | Set_t ea, Set_t eb ->
-        (comparable_ty_eq ea eb >>? fun (Eq _) ->
-         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
+        (comparable_ty_eq ea eb >>? fun Eq ->
+         (Ok Eq : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (ta, tb))
     | Pair_t ((tal, _), (tar, _)),
       Pair_t ((tbl, _), (tbr, _)) ->
-        (ty_eq tal tbl >>? fun (Eq _) ->
-         ty_eq tar tbr >>? fun (Eq _) ->
-         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
+        (ty_eq tal tbl >>? fun Eq ->
+         ty_eq tar tbr >>? fun Eq ->
+         (Ok Eq : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (ta, tb))
     | Union_t ((tal, _), (tar, _)), Union_t ((tbl, _), (tbr, _)) ->
-        (ty_eq tal tbl >>? fun (Eq _) ->
-         ty_eq tar tbr >>? fun (Eq _) ->
-         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
+        (ty_eq tal tbl >>? fun Eq ->
+         ty_eq tar tbr >>? fun Eq ->
+         (Ok Eq : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (ta, tb))
     | Lambda_t (tal, tar), Lambda_t (tbl, tbr) ->
-        (ty_eq tal tbl >>? fun (Eq _) ->
-         ty_eq tar tbr >>? fun (Eq _) ->
-         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
+        (ty_eq tal tbl >>? fun Eq ->
+         ty_eq tar tbr >>? fun Eq ->
+         (Ok Eq : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (ta, tb))
     | Contract_t (tal, tar), Contract_t (tbl, tbr) ->
-        (ty_eq tal tbl >>? fun (Eq _) ->
-         ty_eq tar tbr >>? fun (Eq _) ->
-         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
+        (ty_eq tal tbl >>? fun Eq ->
+         ty_eq tar tbr >>? fun Eq ->
+         (Ok Eq : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (ta, tb))
     | Option_t tva, Option_t tvb ->
-        (ty_eq tva tvb >>? fun (Eq _) ->
-         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
+        (ty_eq tva tvb >>? fun Eq ->
+         (Ok Eq : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (ta, tb))
     | List_t tva, List_t tvb ->
-        (ty_eq tva tvb >>? fun (Eq _) ->
-         (eq ta tb : (ta ty, tb ty) eq tzresult)) |>
+        (ty_eq tva tvb >>? fun Eq ->
+         (Ok Eq : (ta ty, tb ty) eq tzresult)) |>
         record_trace (Inconsistent_types (ta, tb))
     | _, _ -> error (Inconsistent_types (ta, tb))
 
@@ -733,10 +729,10 @@ let rec stack_ty_eq
   match ta, tb with
   | Item_t (tva, ra, _), Item_t (tvb, rb, _) ->
       ty_eq tva tvb |>
-      record_trace (Bad_stack_item lvl) >>? fun  (Eq _) ->
-      stack_ty_eq (lvl + 1) ra rb >>? fun (Eq _) ->
-      (eq ta tb : (ta stack_ty, tb stack_ty) eq tzresult)
-  | Empty_t, Empty_t -> eq ta tb
+      record_trace (Bad_stack_item lvl) >>? fun  Eq ->
+      stack_ty_eq (lvl + 1) ra rb >>? fun Eq ->
+      (Ok Eq : (ta stack_ty, tb stack_ty) eq tzresult)
+  | Empty_t, Empty_t -> Ok Eq
   | _, _ -> error Bad_stack_length
 
 let merge_annot annot1 annot2 =
@@ -794,7 +790,7 @@ let merge_types :
       | Bool_t, Bool_t -> ok Bool_t
       | Map_t (tal, tar), Map_t (tbl, tbr) ->
           help tar tbr >>? fun value ->
-          ty_eq tar value >>? fun (Eq _) ->
+          ty_eq tar value >>? fun Eq ->
           ok (Map_t (merge_comparable_types tal tbl, value))
       | Set_t ea, Set_t eb ->
           ok (Set_t (merge_comparable_types ea eb))
@@ -847,7 +843,7 @@ let merge_stacks
             Item_t (ty, rest, annot)
     in help
 
-(* ---- Type checker resuls -------------------------------------------------*)
+(* ---- Type checker results -------------------------------------------------*)
 
 type 'bef judgement =
   | Typed : ('bef, 'aft) descr -> 'bef judgement
@@ -869,7 +865,7 @@ let merge_branches
         let unmatched_branches = (Unmatched_branches (loc, aftbt, aftbf)) in
         trace
           unmatched_branches
-          (Lwt.return (stack_ty_eq 1 aftbt aftbf) >>=? fun (Eq _) ->
+          (Lwt.return (stack_ty_eq 1 aftbt aftbf) >>=? fun Eq ->
            Lwt.return (merge_stacks loc aftbt aftbf) >>=? fun merged_stack ->
            return (Typed (branch {dbt with aft=merged_stack} {dbf with aft=merged_stack})))
     | Failed { descr = descrt }, Failed { descr = descrf } ->
@@ -1211,7 +1207,7 @@ and parse_returning
     | Typed ({ loc ; aft = (Item_t (ty, Empty_t, _) as stack_ty) } as descr) ->
         trace
           (Bad_return (loc, stack_ty, ret))
-          (Lwt.return (ty_eq ty ret)) >>=? fun (Eq _) ->
+          (Lwt.return (ty_eq ty ret)) >>=? fun Eq ->
         return (Lam (descr, strip_locations script_instr) : (arg, ret) lambda)
     | Typed { loc ; aft = stack_ty } ->
         fail (Bad_return (loc, stack_ty, ret))
@@ -1333,7 +1329,7 @@ and parse_instr
         return (typed loc (Nil, Item_t (List_t t, stack, instr_annot)))
     | Prim (loc, I_CONS, [], instr_annot),
       Item_t (tv, Item_t (List_t t, rest, _), _) ->
-        check_item_ty tv t loc I_CONS 1 2 >>=? fun (Eq _) ->
+        check_item_ty tv t loc I_CONS 1 2 >>=? fun Eq ->
         return (typed loc (Cons_list, Item_t (List_t t, rest, instr_annot)))
     | Prim (loc, I_IF_CONS, [ bt ; bf ], instr_annot),
       (Item_t (List_t t, rest, stack_annot) as bef) ->
@@ -1350,7 +1346,7 @@ and parse_instr
         return (typed loc (List_size, Item_t (Nat_t, rest, instr_annot)))
     | Prim (loc, I_MAP, [], instr_annot),
       Item_t (Lambda_t (param, ret), Item_t (List_t elt, rest, _), _) ->
-        check_item_ty elt param loc I_MAP 2 2 >>=? fun (Eq _) ->
+        check_item_ty elt param loc I_MAP 2 2 >>=? fun Eq ->
         return (typed loc (List_map, Item_t (List_t ret, rest, instr_annot)))
     | Prim (loc, I_MAP, [ body ], instr_annot),
       (Item_t (List_t elt, starting_rest, _)) ->
@@ -1359,7 +1355,7 @@ and parse_instr
           | Typed ({ aft = Item_t (ret, rest, _) } as ibody) ->
               trace
                 (Invalid_map_body (loc, ibody.aft))
-                (Lwt.return (stack_ty_eq 1 rest starting_rest)) >>=? fun (Eq _) ->
+                (Lwt.return (stack_ty_eq 1 rest starting_rest)) >>=? fun Eq ->
               return (typed loc (List_map_body ibody, Item_t (List_t ret, rest, instr_annot)))
           | Typed { aft } -> fail (Invalid_map_body (loc, aft))
           | Failed _ -> fail (Invalid_map_block_fail loc)
@@ -1367,9 +1363,9 @@ and parse_instr
     | Prim (loc, I_REDUCE, [], instr_annot),
       Item_t (Lambda_t (Pair_t ((pelt, _), (pr, _)), r),
               Item_t (List_t elt, Item_t (init, rest, _), _), _) ->
-        check_item_ty r pr loc I_REDUCE 1 3 >>=? fun (Eq _) ->
-        check_item_ty elt pelt loc I_REDUCE 2 3 >>=? fun (Eq _) ->
-        check_item_ty init r loc I_REDUCE 3 3 >>=? fun (Eq _) ->
+        check_item_ty r pr loc I_REDUCE 1 3 >>=? fun Eq ->
+        check_item_ty elt pelt loc I_REDUCE 2 3 >>=? fun Eq ->
+        check_item_ty init r loc I_REDUCE 3 3 >>=? fun Eq ->
         return (typed loc (List_reduce, Item_t (r, rest, instr_annot)))
     | Prim (loc, I_ITER, [ body ], instr_annot),
       Item_t (List_t elt, rest, _) ->
@@ -1379,7 +1375,7 @@ and parse_instr
           | Typed ({ aft } as ibody) ->
               trace
                 (Invalid_iter_body (loc, rest, ibody.aft))
-                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun (Eq _) ->
+                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun Eq ->
               return (typed loc (List_iter ibody, rest))
           | Failed { descr } ->
               let ibody = descr rest in
@@ -1394,15 +1390,15 @@ and parse_instr
       Item_t (Lambda_t (param, ret), Item_t (Set_t elt, rest, _), _) ->
         let elt = ty_of_comparable_ty elt in
         (Lwt.return (comparable_ty_of_ty loc ret)) >>=? fun ret ->
-        check_item_ty elt param loc I_MAP 1 2 >>=? fun (Eq _) ->
+        check_item_ty elt param loc I_MAP 1 2 >>=? fun Eq ->
         return (typed loc (Set_map ret, Item_t (Set_t ret, rest, instr_annot)))
     | Prim (loc, I_REDUCE, [], instr_annot),
       Item_t (Lambda_t (Pair_t ((pelt, _), (pr, _)), r),
               Item_t (Set_t elt, Item_t (init, rest, _), _), _) ->
         let elt = ty_of_comparable_ty elt in
-        check_item_ty r pr loc I_REDUCE 1 3 >>=? fun (Eq _) ->
-        check_item_ty elt pelt loc I_REDUCE 2 3 >>=? fun (Eq _) ->
-        check_item_ty init r loc I_REDUCE 3 3 >>=? fun (Eq _) ->
+        check_item_ty r pr loc I_REDUCE 1 3 >>=? fun Eq ->
+        check_item_ty elt pelt loc I_REDUCE 2 3 >>=? fun Eq ->
+        check_item_ty init r loc I_REDUCE 3 3 >>=? fun Eq ->
         return (typed loc (Set_reduce, Item_t (r, rest, instr_annot)))
     | Prim (loc, I_ITER, [ body ], annot),
       Item_t (Set_t comp_elt, rest, _) ->
@@ -1413,7 +1409,7 @@ and parse_instr
           | Typed ({ aft } as ibody) ->
               trace
                 (Invalid_iter_body (loc, rest, ibody.aft))
-                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun (Eq _) ->
+                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun Eq ->
               return (typed loc (Set_iter ibody, rest))
           | Failed { descr } ->
               let ibody = descr rest in
@@ -1422,12 +1418,12 @@ and parse_instr
     | Prim (loc, I_MEM, [], instr_annot),
       Item_t (v, Item_t (Set_t elt, rest, _), _) ->
         let elt = ty_of_comparable_ty elt in
-        check_item_ty elt v loc I_MEM 1 2 >>=? fun (Eq _) ->
+        check_item_ty elt v loc I_MEM 1 2 >>=? fun Eq ->
         return (typed loc (Set_mem, Item_t (Bool_t, rest, instr_annot)))
     | Prim (loc, I_UPDATE, [], instr_annot),
       Item_t (v, Item_t (Bool_t, Item_t (Set_t elt, rest, _), _), _) ->
         let ty = ty_of_comparable_ty elt in
-        check_item_ty ty v loc I_UPDATE 1 3 >>=? fun (Eq _) ->
+        check_item_ty ty v loc I_UPDATE 1 3 >>=? fun Eq ->
         return (typed loc (Set_update, Item_t (Set_t elt, rest, instr_annot)))
     | Prim (loc, I_SIZE, [], instr_annot),
       Item_t (Set_t _, rest, _) ->
@@ -1442,18 +1438,18 @@ and parse_instr
       Item_t (Lambda_t (Pair_t ((pk, _), (pv, _)), ret),
               Item_t (Map_t (ck, v), rest, _), _) ->
         let k = ty_of_comparable_ty ck in
-        check_item_ty pk k loc I_MAP 1 2 >>=? fun (Eq _) ->
-        check_item_ty pv v loc I_MAP 1 2 >>=? fun (Eq _) ->
+        check_item_ty pk k loc I_MAP 1 2 >>=? fun Eq ->
+        check_item_ty pv v loc I_MAP 1 2 >>=? fun Eq ->
         return (typed loc (Map_map, Item_t (Map_t (ck, ret), rest, instr_annot)))
     | Prim (loc, I_REDUCE, [], instr_annot),
       Item_t (Lambda_t (Pair_t ((Pair_t ((pk, _), (pv, _)), _), (pr, _)), r),
               Item_t (Map_t (ck, v),
                       Item_t (init, rest, _), _), _) ->
         let k = ty_of_comparable_ty ck in
-        check_item_ty pk k loc I_REDUCE 2 3 >>=? fun (Eq _) ->
-        check_item_ty pv v loc I_REDUCE 2 3 >>=? fun (Eq _) ->
-        check_item_ty r pr loc I_REDUCE 1 3 >>=? fun (Eq _) ->
-        check_item_ty init r loc I_REDUCE 3 3 >>=? fun (Eq _) ->
+        check_item_ty pk k loc I_REDUCE 2 3 >>=? fun Eq ->
+        check_item_ty pv v loc I_REDUCE 2 3 >>=? fun Eq ->
+        check_item_ty r pr loc I_REDUCE 1 3 >>=? fun Eq ->
+        check_item_ty init r loc I_REDUCE 3 3 >>=? fun Eq ->
         return (typed loc (Map_reduce, Item_t (r, rest, instr_annot)))
     | Prim (loc, I_ITER, [ body ], instr_annot),
       Item_t (Map_t (comp_elt, element_ty), rest, _) ->
@@ -1466,7 +1462,7 @@ and parse_instr
           | Typed ({ aft } as ibody) ->
               trace
                 (Invalid_iter_body (loc, rest, ibody.aft))
-                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun (Eq _) ->
+                (Lwt.return (stack_ty_eq 1 aft rest)) >>=? fun Eq ->
               return (typed loc (Map_iter ibody, rest))
           | Failed { descr } ->
               let ibody = descr rest in
@@ -1475,18 +1471,18 @@ and parse_instr
     | Prim (loc, I_MEM, [], instr_annot),
       Item_t (vk, Item_t (Map_t (ck, _), rest, _), _) ->
         let k = ty_of_comparable_ty ck in
-        check_item_ty vk k loc I_MEM 1 2 >>=? fun (Eq _) ->
+        check_item_ty vk k loc I_MEM 1 2 >>=? fun Eq ->
         return (typed loc (Map_mem, Item_t (Bool_t, rest, instr_annot)))
     | Prim (loc, I_GET, [], instr_annot),
       Item_t (vk, Item_t (Map_t (ck, elt), rest, _), _) ->
         let k = ty_of_comparable_ty ck in
-        check_item_ty vk k loc I_GET 1 2 >>=? fun (Eq _) ->
+        check_item_ty vk k loc I_GET 1 2 >>=? fun Eq ->
         return (typed loc (Map_get, Item_t (Option_t elt, rest, instr_annot)))
     | Prim (loc, I_UPDATE, [], instr_annot),
       Item_t (vk, Item_t (Option_t vv, Item_t (Map_t (ck, v), rest, _), _), _) ->
         let k = ty_of_comparable_ty ck in
-        check_item_ty vk k loc I_UPDATE 1 3 >>=? fun (Eq _) ->
-        check_item_ty vv v loc I_UPDATE 2 3 >>=? fun (Eq _) ->
+        check_item_ty vk k loc I_UPDATE 1 3 >>=? fun Eq ->
+        check_item_ty vv v loc I_UPDATE 2 3 >>=? fun Eq ->
         return (typed loc (Map_update, Item_t (Map_t (ck, v), rest, instr_annot)))
     | Prim (loc, I_SIZE, [], instr_annot),
       Item_t (Map_t (_, _), rest, _) ->
@@ -1542,7 +1538,7 @@ and parse_instr
           | Typed ibody ->
               trace
                 (Unmatched_branches (loc, ibody.aft, stack))
-                (Lwt.return (stack_ty_eq 1 ibody.aft stack)) >>=? fun (Eq _) ->
+                (Lwt.return (stack_ty_eq 1 ibody.aft stack)) >>=? fun Eq ->
               return (typed loc (Loop ibody, rest))
           | Failed { descr } ->
               let ibody = descr (Item_t (Bool_t, rest, stack_annot)) in
@@ -1556,7 +1552,7 @@ and parse_instr
           | Typed ibody ->
               trace
                 (Unmatched_branches (loc, ibody.aft, stack))
-                (Lwt.return (stack_ty_eq 1 ibody.aft stack)) >>=? fun (Eq _) ->
+                (Lwt.return (stack_ty_eq 1 ibody.aft stack)) >>=? fun Eq ->
               return (typed loc (Loop_left ibody, (Item_t (tr, rest, tr_annot))))
           | Failed { descr } ->
               let ibody = descr (Item_t (Union_t ((tl, tl_annot), (tr, tr_annot)), rest, None)) in
@@ -1573,7 +1569,7 @@ and parse_instr
         return (typed loc (Lambda lambda, Item_t (Lambda_t (arg, ret), stack, instr_annot)))
     | Prim (loc, I_EXEC, [], instr_annot),
       Item_t (arg, Item_t (Lambda_t (param, ret), rest, _), _) ->
-        check_item_ty arg param loc I_EXEC 1 2 >>=? fun (Eq _) ->
+        check_item_ty arg param loc I_EXEC 1 2 >>=? fun Eq ->
         return (typed loc (Exec, Item_t (ret, rest, instr_annot)))
     | Prim (loc, I_DIP, [ code ], instr_annot),
       Item_t (v, rest, stack_annot) ->
@@ -1787,12 +1783,12 @@ and parse_instr
                 (Tez_t, Item_t
                    (Contract_t (cp, cr), Item_t
                       (storage, Empty_t, storage_annot), _), _), _) ->
-        check_item_ty p cp loc I_TRANSFER_TOKENS 1 4 >>=? fun (Eq _) ->
+        check_item_ty p cp loc I_TRANSFER_TOKENS 1 4 >>=? fun Eq ->
         begin match tc_context with
           | Dip _ -> fail (Transfer_in_dip loc)
           | Lambda -> fail (Transfer_in_lambda loc)
           | Toplevel { storage_type } ->
-              check_item_ty storage storage_type loc I_TRANSFER_TOKENS 3 4 >>=? fun (Eq _) ->
+              check_item_ty storage storage_type loc I_TRANSFER_TOKENS 3 4 >>=? fun Eq ->
               return (typed loc (Transfer_tokens storage,
                                  Item_t (cr, Item_t (storage, Empty_t, storage_annot),
                                          instr_annot)))
@@ -1819,8 +1815,8 @@ and parse_instr
                        (Lambda_t (Pair_t ((p, _), (gp, _)),
                                   Pair_t ((r, _), (gr, _))), Item_t
                           (ginit, rest, _), _), _), _), _), _), _) ->
-        check_item_ty gp gr loc I_CREATE_CONTRACT 5 7 >>=? fun (Eq _) ->
-        check_item_ty ginit gp loc I_CREATE_CONTRACT 6 7 >>=? fun (Eq _) ->
+        check_item_ty gp gr loc I_CREATE_CONTRACT 5 7 >>=? fun Eq ->
+        check_item_ty ginit gp loc I_CREATE_CONTRACT 6 7 >>=? fun Eq ->
         return (typed loc (Create_contract (gp, p, r),
                            Item_t (Contract_t (p, r), rest, instr_annot)))
     | Prim (loc, I_CREATE_CONTRACT, [ (Seq (seq_loc, _, annot) as code)], instr_annot),
@@ -1852,9 +1848,9 @@ and parse_instr
              ctxt ?type_logger (arg_type_full, None) ret_type_full code_field) >>=?
         fun (Lam ({ bef = Item_t (arg, Empty_t, _) ;
                     aft = Item_t (ret, Empty_t, _) ; _ }, _) as lambda) ->
-        Lwt.return @@ ty_eq arg arg_type_full >>=? fun (Eq _) ->
-        Lwt.return @@ ty_eq ret ret_type_full >>=? fun (Eq _) ->
-        Lwt.return @@ ty_eq storage_type ginit >>=? fun (Eq _) ->
+        Lwt.return @@ ty_eq arg arg_type_full >>=? fun Eq ->
+        Lwt.return @@ ty_eq ret ret_type_full >>=? fun Eq ->
+        Lwt.return @@ ty_eq storage_type ginit >>=? fun Eq ->
         return (typed loc (Create_contract_literal (storage_type, arg_type, ret_type, lambda),
                            Item_t (Contract_t (arg_type, ret_type), rest, instr_annot)))
     | Prim (loc, I_NOW, [], instr_annot),
@@ -1994,8 +1990,8 @@ and parse_contract
         Contract.get_script ctxt contract >>=? function
         | None ->
             Lwt.return
-              (ty_eq arg Unit_t >>? fun (Eq _) ->
-               ty_eq ret Unit_t >>? fun (Eq _) ->
+              (ty_eq arg Unit_t >>? fun Eq ->
+               ty_eq ret Unit_t >>? fun Eq ->
                let contract : (arg, ret) typed_contract =
                  (arg, ret, contract) in
                ok contract)
@@ -2004,8 +2000,8 @@ and parse_contract
               (parse_toplevel code >>? fun (arg_type, ret_type, _, _) ->
                parse_ty arg_type >>? fun (Ex_ty targ, _) ->
                parse_ty ret_type >>? fun (Ex_ty tret, _) ->
-               ty_eq targ arg >>? fun (Eq _) ->
-               ty_eq tret ret >>? fun (Eq _) ->
+               ty_eq targ arg >>? fun Eq ->
+               ty_eq tret ret >>? fun Eq ->
                let contract : (arg, ret) typed_contract =
                  (arg, ret, contract) in
                ok contract)

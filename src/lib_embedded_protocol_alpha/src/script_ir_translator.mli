@@ -9,7 +9,7 @@
 
 open Tezos_context
 
-type ('ta, 'tb) eq = Eq : 'same * 'same -> ('same, 'same) eq
+type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
 type ex_comparable_ty = Ex_comparable_ty : 'a Script_typed_ir.comparable_ty -> ex_comparable_ty
 type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
