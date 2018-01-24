@@ -22,7 +22,7 @@ val create:
 val validate:
   t ->
   ?canceler:Lwt_canceler.t ->
-  ?peer:P2p.Peer_id.t ->
+  ?peer:P2p_peer.Id.t ->
   ?notify_new_block:(State.Block.t -> unit) ->
   Distributed_db.net_db ->
   Block_hash.t -> Block_header.t -> Operation.t list list ->
@@ -30,7 +30,7 @@ val validate:
 
 val fetch_and_compile_protocol:
   t ->
-  ?peer:P2p.Peer_id.t ->
+  ?peer:P2p_peer.Id.t ->
   ?timeout:float ->
   Protocol_hash.t -> State.Registred_protocol.t tzresult Lwt.t
 

@@ -57,17 +57,17 @@ module Types = struct
     mutable child:
       (state * (unit -> unit Lwt.t (* shutdown *))) option ;
     prevalidator: Prevalidator.t ;
-    active_peers: Peer_validator.t Lwt.t P2p.Peer_id.Table.t ;
-    bootstrapped_peers: unit P2p.Peer_id.Table.t ;
+    active_peers: Peer_validator.t Lwt.t P2p_peer.Table.t ;
+    bootstrapped_peers: unit P2p_peer.Table.t ;
   }
 
   let view (state : state) _ : view =
     let { bootstrapped ; active_peers ; bootstrapped_peers } = state in
     { bootstrapped ;
       active_peers =
-        P2p.Peer_id.Table.fold (fun id _ l -> id :: l) active_peers [] ;
+        P2p_peer.Table.fold (fun id _ l -> id :: l) active_peers [] ;
       bootstrapped_peers =
-        P2p.Peer_id.Table.fold (fun id _ l -> id :: l) bootstrapped_peers [] }
+        P2p_peer.Table.fold (fun id _ l -> id :: l) bootstrapped_peers [] }
 end
 
 module Worker = Worker.Make (Name) (Event) (Request) (Types)
@@ -99,7 +99,7 @@ let notify_new_block w block =
 let may_toggle_bootstrapped_network w =
   let nv = Worker.state w in
   if not nv.bootstrapped &&
-     P2p.Peer_id.Table.length nv.bootstrapped_peers >= nv.parameters.limits.bootstrap_threshold
+     P2p_peer.Table.length nv.bootstrapped_peers >= nv.parameters.limits.bootstrap_threshold
   then begin
     nv.bootstrapped <- true ;
     Lwt.wakeup_later nv.bootstrapped_wakener () ;
@@ -107,24 +107,24 @@ let may_toggle_bootstrapped_network w =
 
 let may_activate_peer_validator w peer_id =
   let nv = Worker.state w in
-  try P2p.Peer_id.Table.find nv.active_peers peer_id
+  try P2p_peer.Table.find nv.active_peers peer_id
   with Not_found ->
     let pv =
       Peer_validator.create
         ~notify_new_block:(notify_new_block w)
         ~notify_bootstrapped: begin fun () ->
-          P2p.Peer_id.Table.add nv.bootstrapped_peers peer_id () ;
+          P2p_peer.Table.add nv.bootstrapped_peers peer_id () ;
           may_toggle_bootstrapped_network w
         end
         ~notify_termination: begin fun _pv ->
-          P2p.Peer_id.Table.remove nv.active_peers peer_id ;
-          P2p.Peer_id.Table.remove nv.bootstrapped_peers peer_id ;
+          P2p_peer.Table.remove nv.active_peers peer_id ;
+          P2p_peer.Table.remove nv.bootstrapped_peers peer_id ;
         end
         nv.parameters.peer_validator_limits
         nv.parameters.block_validator
         nv.parameters.net_db
         peer_id in
-    P2p.Peer_id.Table.add nv.active_peers peer_id pv ;
+    P2p_peer.Table.add nv.active_peers peer_id pv ;
     pv
 
 let may_switch_test_network w spawn_child block =
@@ -260,7 +260,7 @@ let on_close w =
   Lwt.join
     (Prevalidator.shutdown nv.prevalidator ::
      Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child ::
-     P2p.Peer_id.Table.fold
+     P2p_peer.Table.fold
        (fun _ pv acc -> (pv >>= Peer_validator.shutdown) :: acc)
        nv.active_peers []) >>= fun () ->
   Lwt.return_unit
@@ -280,9 +280,9 @@ let on_launch w _ parameters =
       bootstrapped_waiter ;
       bootstrapped = (parameters.limits.bootstrap_threshold <= 0) ;
       active_peers =
-        P2p.Peer_id.Table.create 50 ; (* TODO use `2 * max_connection` *)
+        P2p_peer.Table.create 50 ; (* TODO use `2 * max_connection` *)
       bootstrapped_peers =
-        P2p.Peer_id.Table.create 50 ; (* TODO use `2 * max_connection` *)
+        P2p_peer.Table.create 50 ; (* TODO use `2 * max_connection` *)
       child = None ;
       prevalidator } in
   if nv.bootstrapped then Lwt.wakeup_later bootstrapped_wakener () ;

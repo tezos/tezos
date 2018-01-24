@@ -32,8 +32,8 @@ end
 
 module Worker_state : sig
   type view =
-    { active_peers : P2p_types.Peer_id.t list ;
-      bootstrapped_peers : P2p_types.Peer_id.t list ;
+    { active_peers : P2p_peer.Id.t list ;
+      bootstrapped_peers : P2p_peer.Id.t list ;
       bootstrapped : bool }
   val encoding : view Data_encoding.encoding
   val pp : Format.formatter -> view -> unit

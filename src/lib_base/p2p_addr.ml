@@ -7,19 +7,22 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Welcome worker. Accept incoming connections and add them to its
-    connection pool. *)
+type t = Ipaddr.V6.t
 
-type t
-(** Type of a welcome worker, parametrized like a
-    [P2p_connection_pool.pool]. *)
+let encoding =
+  let open Data_encoding in
+  splitted
+    ~json:begin
+      conv
+        Ipaddr.V6.to_string
+        Ipaddr.V6.of_string_exn
+        string
+    end
+    ~binary:begin
+      conv
+        Ipaddr.V6.to_bytes
+        Ipaddr.V6.of_bytes_exn
+        string
+    end
 
-val run:
-  backlog:int ->
-  ('msg, 'meta) P2p_pool.t ->
-  ?addr:P2p_addr.t -> P2p_addr.port -> t Lwt.t
-(** [run ~backlog ~addr pool port] returns a running welcome worker
-    feeding [pool] listening at [(addr, port)]. [backlog] is the
-    argument passed to [Lwt_unix.accept]. *)
-
-val shutdown: t -> unit Lwt.t
+type port = int

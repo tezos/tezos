@@ -201,11 +201,11 @@ module Workers : sig
     val list :
       ([ `POST ],  unit,
        unit * Net_id.t, unit, unit,
-       (P2p_types.Peer_id.t * Worker_types.worker_status) list, unit) RPC_service.t
+       (P2p_peer.Id.t * Worker_types.worker_status) list, unit) RPC_service.t
 
     val state :
       ([ `POST ], unit,
-       (unit * Net_id.t) * P2p_types.Peer_id.t, unit, unit,
+       (unit * Net_id.t) * P2p_peer.Id.t, unit, unit,
        (Request.view, Event.t) Worker_types.full_status, unit)
         RPC_service.t
 

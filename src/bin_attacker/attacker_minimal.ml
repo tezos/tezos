@@ -103,7 +103,7 @@ let ballot_forged period prop vote =
       operations = [ballot] }) in
   forge { net_id = network } op
 
-let identity = P2p_types.Identity.generate Crypto_box.default_target
+let identity = P2p_identity.generate Crypto_box.default_target
 
 (* connect to the network, run an action and then disconnect *)
 let try_action addr port action =

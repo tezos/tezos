@@ -111,15 +111,15 @@ test:p2p:io-scheduler:
   script:
     - jbuilder build @test/p2p/runtest_p2p_io_scheduler
 
-test:p2p:connection:
+test:p2p:socket:
   <<: *test_definition
   script:
-    - jbuilder build @test/p2p/runtest_p2p_connection
+    - jbuilder build @test/p2p/runtest_p2p_socket
 
-test:p2p:connection-pool:
+test:p2p:pool:
   <<: *test_definition
   script:
-    - jbuilder build @test/p2p/runtest_p2p_connection_pool
+    - jbuilder build @test/p2p/runtest_p2p_pool
 
 test:proto_alpha:transaction:
   <<: *test_definition

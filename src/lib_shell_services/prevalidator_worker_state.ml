@@ -10,7 +10,7 @@
 module Request = struct
   type 'a t =
     | Flush : Block_hash.t -> unit t
-    | Notify : P2p_types.Peer_id.t * Mempool.t -> unit t
+    | Notify : P2p_peer.Id.t * Mempool.t -> unit t
     | Inject : Operation.t -> unit tzresult t
     | Arrived : Operation_hash.t * Operation.t -> unit t
     | Advertise : unit t
@@ -30,7 +30,7 @@ module Request = struct
         case (Tag 1)
           (obj3
              (req "request" (constant "notify"))
-             (req "peer" P2p_types.Peer_id.encoding)
+             (req "peer" P2p_peer.Id.encoding)
              (req "mempool" Mempool.encoding))
           (function View (Notify (peer, mempool)) -> Some ((), peer, mempool) | _ -> None)
           (fun ((), peer, mempool) -> View (Notify (peer, mempool))) ;
@@ -58,7 +58,7 @@ module Request = struct
           Block_hash.pp hash
     | Notify (id, { Mempool.known_valid ; pending }) ->
         Format.fprintf ppf "@[<v 2>notified by %a of operations"
-          P2p_types.Peer_id.pp id ;
+          P2p_peer.Id.pp id ;
         List.iter
           (fun oph ->
              Format.fprintf ppf "@,%a (applied)"

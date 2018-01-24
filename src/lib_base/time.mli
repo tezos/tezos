@@ -56,3 +56,6 @@ val timed_encoding : 'a Data_encoding.t -> 'a timed_data Data_encoding.t
 module Set : Set.S with type elt = t
 module Map : Map.S with type key = t
 module Table : Hashtbl.S with type key = t
+
+val recent :
+  ('a * t) option -> ('a * t) option -> ('a * t) option

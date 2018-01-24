@@ -29,13 +29,13 @@ module type DISTRIBUTED_DB = sig
 
   val prefetch:
     t ->
-    ?peer:P2p.Peer_id.t ->
+    ?peer:P2p_peer.Id.t ->
     ?timeout:float ->
     key -> param -> unit
 
   val fetch:
     t ->
-    ?peer:P2p.Peer_id.t ->
+    ?peer:P2p_peer.Id.t ->
     ?timeout:float ->
     key -> param -> value tzresult Lwt.t
 
@@ -72,12 +72,12 @@ end
 module type SCHEDULER_EVENTS = sig
   type t
   type key
-  val request: t -> P2p.Peer_id.t option -> key -> unit
-  val notify: t -> P2p.Peer_id.t -> key -> unit
+  val request: t -> P2p_peer.Id.t option -> key -> unit
+  val notify: t -> P2p_peer.Id.t -> key -> unit
   val notify_cancelation: t -> key -> unit
-  val notify_unrequested: t -> P2p.Peer_id.t -> key -> unit
-  val notify_duplicate: t -> P2p.Peer_id.t -> key -> unit
-  val notify_invalid: t -> P2p.Peer_id.t -> key -> unit
+  val notify_unrequested: t -> P2p_peer.Id.t -> key -> unit
+  val notify_duplicate: t -> P2p_peer.Id.t -> key -> unit
+  val notify_invalid: t -> P2p_peer.Id.t -> key -> unit
 end
 
 module type PRECHECK = sig
@@ -107,15 +107,15 @@ module Make_table
   val create:
     ?global_input:(key * value) Lwt_watcher.input ->
     Scheduler.t -> Disk_table.store -> t
-  val notify: t -> P2p.Peer_id.t -> key -> Precheck.notified_value -> unit Lwt.t
+  val notify: t -> P2p_peer.Id.t -> key -> Precheck.notified_value -> unit Lwt.t
 
 end
 
 module type REQUEST = sig
   type key
   type param
-  val active : param -> P2p.Peer_id.Set.t
-  val send : param -> P2p.Peer_id.t -> key list -> unit
+  val active : param -> P2p_peer.Set.t
+  val send : param -> P2p_peer.Id.t -> key list -> unit
 end
 
 module Make_request_scheduler

@@ -40,7 +40,7 @@ module Request = struct
         net_db: Distributed_db.net_db ;
         notify_new_block: State.Block.t -> unit ;
         canceler: Lwt_canceler.t option ;
-        peer: P2p.Peer_id.t option ;
+        peer: P2p_peer.Id.t option ;
         hash: Block_hash.t ;
         header: Block_header.t ;
         operations: Operation.t list list ;

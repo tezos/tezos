@@ -22,9 +22,6 @@
     worker and thus never propagated above.
 *)
 
-open P2p_types
-open P2p_connection_pool_types
-
 type 'msg encoding = Encoding : {
     tag: int ;
     encoding: 'a Data_encoding.t ;
@@ -43,13 +40,13 @@ type ('msg, 'meta) pool = ('msg, 'meta) t
 
 type config = {
 
-  identity : Identity.t ;
+  identity : P2p_identity.t ;
   (** Our identity. *)
 
   proof_of_work_target : Crypto_box.target ;
   (** The proof of work target we require from peers. *)
 
-  trusted_points : Point.t list ;
+  trusted_points : P2p_point.Id.t list ;
   (** List of hard-coded known peers to bootstrap the network from. *)
 
   peers_file : string ;
@@ -60,7 +57,7 @@ type config = {
   (** If [true], the only accepted connections are from peers whose
       addresses are in [trusted_peers]. *)
 
-  listening_port : port option ;
+  listening_port : P2p_addr.port option ;
   (** If provided, it will be passed to [P2p_connection.authenticate]
       when we authenticate against a new peer. *)
 
@@ -126,7 +123,7 @@ type 'meta meta_config = {
 
 type 'msg message_config = {
   encoding : 'msg encoding list ;
-  versions : P2p_types.Version.t list;
+  versions : P2p_version.t list;
 }
 
 val create:
@@ -146,7 +143,7 @@ val active_connections: ('msg, 'meta) pool -> int
 (** [active_connections pool] is the number of connections inside
     [pool]. *)
 
-val pool_stat: ('msg, 'meta) pool -> Stat.t
+val pool_stat: ('msg, 'meta) pool -> P2p_stat.t
 (** [pool_stat pool] is a snapshot of current bandwidth usage for the
     entire [pool]. *)
 
@@ -186,19 +183,19 @@ type ('msg, 'meta) connection
 type error += Pending_connection
 type error += Connected
 type error += Connection_refused
-type error += Rejected of Peer_id.t
+type error += Rejected of P2p_peer.Id.t
 type error += Too_many_connections
 type error += Closed_network
 
 val connect:
   timeout:float ->
-  ('msg, 'meta) pool -> Point.t ->
+  ('msg, 'meta) pool -> P2p_point.Id.t ->
   ('msg, 'meta) connection tzresult Lwt.t
 (** [connect ~timeout pool point] tries to add a
     connection to [point] in [pool] in less than [timeout] seconds. *)
 
 val accept:
-  ('msg, 'meta) pool -> Lwt_unix.file_descr -> Point.t -> unit
+  ('msg, 'meta) pool -> Lwt_unix.file_descr -> P2p_point.Id.t -> unit
 (** [accept pool fd point] instructs [pool] to start the process of
     accepting a connection from [fd]. Used by [P2p]. *)
 
@@ -209,32 +206,32 @@ val disconnect:
 
 module Connection : sig
 
-  val info: ('msg, 'meta) connection -> Connection_info.t
+  val info: ('msg, 'meta) connection -> P2p_connection.Info.t
 
-  val stat:  ('msg, 'meta) connection -> Stat.t
+  val stat:  ('msg, 'meta) connection -> P2p_stat.t
   (** [stat conn] is a snapshot of current bandwidth usage for
       [conn]. *)
 
   val fold:
     ('msg, 'meta) pool ->
     init:'a ->
-    f:(Peer_id.t ->  ('msg, 'meta) connection -> 'a -> 'a) ->
+    f:(P2p_peer.Id.t ->  ('msg, 'meta) connection -> 'a -> 'a) ->
     'a
 
   val list:
-    ('msg, 'meta) pool -> (Peer_id.t * ('msg, 'meta) connection) list
+    ('msg, 'meta) pool -> (P2p_peer.Id.t * ('msg, 'meta) connection) list
 
   val find_by_point:
-    ('msg, 'meta) pool -> Point.t ->  ('msg, 'meta) connection option
+    ('msg, 'meta) pool -> P2p_point.Id.t ->  ('msg, 'meta) connection option
 
   val find_by_peer_id:
-    ('msg, 'meta) pool -> Peer_id.t ->  ('msg, 'meta) connection option
+    ('msg, 'meta) pool -> P2p_peer.Id.t ->  ('msg, 'meta) connection option
 
 end
 
 val on_new_connection:
   ('msg, 'meta) pool ->
-  (Peer_id.t -> ('msg, 'meta) connection -> unit) -> unit
+  (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit
 
 (** {1 I/O on connections} *)
 
@@ -277,31 +274,31 @@ val broadcast_bootstrap_msg:  ('msg, 'meta) pool -> unit
 
 (** {1 Functions on [Peer_id]} *)
 
-module Peer_ids : sig
+module Peers : sig
 
-  type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) Peer_info.t
+  type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) P2p_peer.Pool_info.t
 
   val info:
-    ('msg, 'meta) pool -> Peer_id.t -> ('msg, 'meta) info option
+    ('msg, 'meta) pool -> P2p_peer.Id.t -> ('msg, 'meta) info option
 
-  val get_metadata: ('msg, 'meta) pool -> Peer_id.t -> 'meta
-  val set_metadata: ('msg, 'meta) pool -> Peer_id.t -> 'meta -> unit
-  val get_score: ('msg, 'meta) pool -> Peer_id.t -> float
+  val get_metadata: ('msg, 'meta) pool -> P2p_peer.Id.t -> 'meta
+  val set_metadata: ('msg, 'meta) pool -> P2p_peer.Id.t -> 'meta -> unit
+  val get_score: ('msg, 'meta) pool -> P2p_peer.Id.t -> float
 
-  val get_trusted: ('msg, 'meta) pool -> Peer_id.t -> bool
-  val set_trusted: ('msg, 'meta) pool -> Peer_id.t -> unit
-  val unset_trusted: ('msg, 'meta) pool -> Peer_id.t -> unit
+  val get_trusted: ('msg, 'meta) pool -> P2p_peer.Id.t -> bool
+  val set_trusted: ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
+  val unset_trusted: ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
 
   val fold_known:
     ('msg, 'meta) pool ->
     init:'a ->
-    f:(Peer_id.t ->  ('msg, 'meta) info -> 'a -> 'a) ->
+    f:(P2p_peer.Id.t ->  ('msg, 'meta) info -> 'a -> 'a) ->
     'a
 
   val fold_connected:
     ('msg, 'meta) pool ->
     init:'a ->
-    f:(Peer_id.t ->  ('msg, 'meta) info -> 'a -> 'a) ->
+    f:(P2p_peer.Id.t ->  ('msg, 'meta) info -> 'a -> 'a) ->
     'a
 
 end
@@ -310,32 +307,30 @@ end
 
 module Points : sig
 
-  type ('msg, 'meta) info = ('msg, 'meta) connection Point_info.t
+  type ('msg, 'meta) info = ('msg, 'meta) connection P2p_point.Pool_info.t
 
   val info:
-    ('msg, 'meta) pool -> Point.t -> ('msg, 'meta) info option
+    ('msg, 'meta) pool -> P2p_point.Id.t -> ('msg, 'meta) info option
 
-  val get_trusted: ('msg, 'meta) pool -> Point.t -> bool
-  val set_trusted: ('msg, 'meta) pool -> Point.t -> unit
-  val unset_trusted: ('msg, 'meta) pool -> Point.t -> unit
+  val get_trusted: ('msg, 'meta) pool -> P2p_point.Id.t -> bool
+  val set_trusted: ('msg, 'meta) pool -> P2p_point.Id.t -> unit
+  val unset_trusted: ('msg, 'meta) pool -> P2p_point.Id.t -> unit
 
   val fold_known:
     ('msg, 'meta) pool ->
     init:'a ->
-    f:(Point.t -> ('msg, 'meta) info  -> 'a -> 'a) ->
+    f:(P2p_point.Id.t -> ('msg, 'meta) info  -> 'a -> 'a) ->
     'a
 
   val fold_connected:
     ('msg, 'meta) pool ->
     init:'a ->
-    f:(Point.t -> ('msg, 'meta) info  -> 'a -> 'a) ->
+    f:(P2p_point.Id.t -> ('msg, 'meta) info  -> 'a -> 'a) ->
     'a
 
 end
 
-module Log_event = Connection_pool_log_event
-
-val watch: ('msg, 'meta) pool -> Log_event.t Lwt_stream.t * Lwt_watcher.stopper
+val watch: ('msg, 'meta) pool -> P2p_connection.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
 (** [watch pool] is a [stream, close] a [stream] of events and a
     [close] function for this stream. *)
 
@@ -345,9 +340,9 @@ module Message : sig
 
   type 'msg t =
     | Bootstrap
-    | Advertise of Point.t list
-    | Swap_request of Point.t * Peer_id.t
-    | Swap_ack of Point.t * Peer_id.t
+    | Advertise of P2p_point.Id.t list
+    | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
+    | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
     | Message of 'msg
     | Disconnect
 

@@ -558,14 +558,14 @@ module Workers = struct
         ~construct:Net_id.to_b58check
         ()
 
-    let (peer_id_arg : P2p_types.Peer_id.t RPC_arg.t) =
+    let (peer_id_arg : P2p_peer.Id.t RPC_arg.t) =
       RPC_arg.make
         ~name:"peer_id"
         ~descr:"The peer identifier of whom the prevalidator is responsible."
         ~destruct:(fun s -> try
-                      Ok (P2p_types.Peer_id.of_b58check_exn s)
+                      Ok (P2p_peer.Id.of_b58check_exn s)
                     with Failure msg -> Error msg)
-        ~construct:P2p_types.Peer_id.to_b58check
+        ~construct:P2p_peer.Id.to_b58check
         ()
 
     let list =
@@ -577,7 +577,7 @@ module Workers = struct
         ~output:
           (list
              (obj2
-                (req "peer_id" P2p_types.Peer_id.encoding)
+                (req "peer_id" P2p_peer.Id.encoding)
                 (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))))
         RPC_path.(root / "workers" / "peer_validators" /: net_id_arg)
 

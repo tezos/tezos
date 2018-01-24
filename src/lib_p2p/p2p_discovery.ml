@@ -20,7 +20,7 @@ let inet_addr = Unix.inet_addr_of_string "ff0e::54:455a:3053"
 module Message = struct
 
   let encoding =
-    Data_encoding.(tup3 (Fixed.string 10) Peer_id.encoding int16)
+    Data_encoding.(tup3 (Fixed.string 10) P2p_peer.Id.encoding int16)
 
   let length = Data_encoding.Binary.fixed_length_exn encoding
 
@@ -40,7 +40,7 @@ let sender sock saddr my_peer_id inco_port cancelation restart =
          Lwt.return_unit)
         (fun exn ->
           lwt_debug "(%a) error broadcasting a discovery request: %a"
-            Peer_id.pp my_peer_id Error_monad.pp (Exn exn)) >>= fun () ->
+            P2p_peer.Id.pp my_peer_id Error_monad.pp (Exn exn)) >>= fun () ->
     Lwt.pick
       [ (Lwt_unix.sleep delay >>= fun () -> Lwt.return (Some (delay, n + 1))) ;
         (cancelation () >>= fun () -> Lwt.return_none) ;
@@ -100,7 +100,7 @@ module Answerer = struct
     Lwt.catch
       (fun () ->
          Lwt_utils.worker
-           (Format.asprintf "(%a) discovery answerer" Peer_id.pp my_peer_id)
+           (Format.asprintf "(%a) discovery answerer" P2p_peer.Id.pp my_peer_id)
            (fun () -> answerer fd my_peer_id cancelation callback)
            cancel)
       (fun exn ->
@@ -118,7 +118,7 @@ let discovery_sender =
              Discovery.sender fd
                saddr my_peer_id inco_port cancelation restart_discovery in
            Lwt_utils.worker
-             (Format.asprintf "(%a) discovery sender" Peer_id.pp my_peer_id)
+             (Format.asprintf "(%a) discovery sender" P2p_peer.Id.pp my_peer_id)
              sender cancel)
         (fun exn ->
            lwt_log_error "Discovery sender not started: %a"

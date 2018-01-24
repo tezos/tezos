@@ -12,13 +12,13 @@
 open Peer_validator_worker_state
 
 module Name = struct
-  type t = Net_id.t * P2p.Peer_id.t
+  type t = Net_id.t * P2p_peer.Id.t
   let encoding =
-    Data_encoding.tup2 Net_id.encoding P2p.Peer_id.encoding
+    Data_encoding.tup2 Net_id.encoding P2p_peer.Id.encoding
   let base = [ "peer_validator" ]
   let pp ppf (net, peer) =
     Format.fprintf ppf "%a:%a"
-      Net_id.pp_short net P2p.Peer_id.pp_short peer
+      Net_id.pp_short net P2p_peer.Id.pp_short peer
 end
 
 module Request = struct
@@ -57,7 +57,7 @@ module Types = struct
   }
 
   type state = {
-    peer_id: P2p.Peer_id.t ;
+    peer_id: P2p_peer.Id.t ;
     parameters : parameters ;
     mutable bootstrapped: bool ;
     mutable last_validated_head: Block_header.t ;
@@ -96,7 +96,7 @@ let bootstrap_new_branch w _ancestor _head unknown_prefix =
   let len = Block_locator_iterator.estimated_length unknown_prefix in
   debug w
     "validating new branch from peer %a (approx. %d blocks)"
-    P2p.Peer_id.pp_short pv.peer_id len ;
+    P2p_peer.Id.pp_short pv.peer_id len ;
   let pipeline =
     Bootstrap_pipeline.create
       ~notify_new_block:pv.parameters.notify_new_block
@@ -116,7 +116,7 @@ let bootstrap_new_branch w _ancestor _head unknown_prefix =
   set_bootstrapped pv ;
   debug w
     "done validating new branch from peer %a."
-    P2p.Peer_id.pp_short pv.peer_id ;
+    P2p_peer.Id.pp_short pv.peer_id ;
   return ()
 
 let validate_new_head w hash (header : Block_header.t) =
@@ -127,14 +127,14 @@ let validate_new_head w hash (header : Block_header.t) =
       debug w
         "missing predecessor for new head %a from peer %a"
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pv.peer_id ;
+        P2p_peer.Id.pp_short pv.peer_id ;
       Distributed_db.Request.current_branch pv.parameters.net_db ~peer:pv.peer_id () ;
       return ()
   | true ->
       debug w
         "fetching operations for new head %a from peer %a"
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pv.peer_id ;
+        P2p_peer.Id.pp_short pv.peer_id ;
       map_p
         (fun i ->
            Worker.protect w begin fun () ->
@@ -147,7 +147,7 @@ let validate_new_head w hash (header : Block_header.t) =
       debug w
         "requesting validation for new head %a from peer %a"
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pv.peer_id ;
+        P2p_peer.Id.pp_short pv.peer_id ;
       Block_validator.validate
         ~notify_new_block:pv.parameters.notify_new_block
         pv.parameters.block_validator pv.parameters.net_db
@@ -155,7 +155,7 @@ let validate_new_head w hash (header : Block_header.t) =
       debug w
         "end of validation for new head %a from peer %a"
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pv.peer_id ;
+        P2p_peer.Id.pp_short pv.peer_id ;
       set_bootstrapped pv ;
       return ()
 
@@ -170,7 +170,7 @@ let only_if_fitness_increases w distant_header cont =
     debug w
       "ignoring head %a with non increasing fitness from peer: %a."
       Block_hash.pp_short (Block_header.hash distant_header)
-      P2p.Peer_id.pp_short pv.peer_id ;
+      P2p_peer.Id.pp_short pv.peer_id ;
     (* Don't download a branch that cannot beat the current head. *)
     return ()
   end else cont ()
@@ -185,7 +185,7 @@ let may_validate_new_head w hash header =
           debug w
             "ignoring previously validated block %a from peer %a"
             Block_hash.pp_short hash
-            P2p.Peer_id.pp_short pv.peer_id ;
+            P2p_peer.Id.pp_short pv.peer_id ;
           set_bootstrapped pv ;
           pv.last_validated_head <- header ;
           return ()
@@ -193,7 +193,7 @@ let may_validate_new_head w hash header =
           debug w
             "ignoring known invalid block %a from peer %a"
             Block_hash.pp_short hash
-            P2p.Peer_id.pp_short pv.peer_id ;
+            P2p_peer.Id.pp_short pv.peer_id ;
           fail Known_invalid
     end
   | false ->
@@ -210,7 +210,7 @@ let may_validate_new_branch w distant_hash locator =
       debug w
         "ignoring branch %a without common ancestor from peer: %a."
         Block_hash.pp_short distant_hash
-        P2p.Peer_id.pp_short pv.peer_id ;
+        P2p_peer.Id.pp_short pv.peer_id ;
       fail Unknown_ancestor
   | Some (ancestor, unknown_prefix) ->
       bootstrap_new_branch w ancestor distant_header unknown_prefix
@@ -218,7 +218,7 @@ let may_validate_new_branch w distant_hash locator =
 let on_no_request w =
   let pv = Worker.state w in
   debug w "no new head from peer %a for %g seconds."
-    P2p.Peer_id.pp_short pv.peer_id
+    P2p_peer.Id.pp_short pv.peer_id
     pv.parameters.limits.new_head_request_timeout ;
   Distributed_db.Request.current_head pv.parameters.net_db ~peer:pv.peer_id () ;
   return ()
@@ -230,13 +230,13 @@ let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
       debug w
         "processing new head %a from peer %a."
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pv.peer_id ;
+        P2p_peer.Id.pp_short pv.peer_id ;
       may_validate_new_head w hash header
   | Request.New_branch (hash, locator) ->
       (* TODO penalize empty locator... ?? *)
       debug w "processing new branch %a from peer %a."
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pv.peer_id ;
+        P2p_peer.Id.pp_short pv.peer_id ;
       may_validate_new_branch w hash locator
 
 let on_completion w r _ st =
@@ -252,7 +252,7 @@ let on_error w r st errs =
       (* TODO ban the peer_id... *)
       debug w
         "Terminating the validation worker for peer %a (kickban)."
-        P2p.Peer_id.pp_short pv.peer_id ;
+        P2p_peer.Id.pp_short pv.peer_id ;
       debug w "%a" Error_monad.pp_print_error errors ;
       Worker.trigger_shutdown w ;
       Worker.record_event w (Event.Request (r, st, Some errs)) ;
@@ -269,7 +269,7 @@ let on_error w r st errs =
           debug w
             "Terminating the validation worker for peer %a \
              (missing protocol %a)."
-            P2p.Peer_id.pp_short pv.peer_id
+            P2p_peer.Id.pp_short pv.peer_id
             Protocol_hash.pp_short protocol ;
           Worker.record_event w (Event.Request (r, st, Some errs)) ;
           Lwt.return (Error errs)

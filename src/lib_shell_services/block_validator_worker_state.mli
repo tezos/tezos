@@ -11,7 +11,7 @@ module Request : sig
   type view = {
     net_id : Net_id.t ;
     block : Block_hash.t ;
-    peer: P2p_types.Peer_id.t option ;
+    peer: P2p_peer.Id.t option ;
   }
   val encoding : view Data_encoding.encoding
   val pp : Format.formatter -> view -> unit

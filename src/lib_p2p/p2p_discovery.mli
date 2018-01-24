@@ -8,6 +8,6 @@
 (**************************************************************************)
 
 type t
-val create : ('msg, 'meta) P2p_connection_pool.pool -> t
+val create : ('msg, 'meta) P2p_pool.t -> t
 val restart : t -> unit
 val shutdown : t -> unit Lwt.t

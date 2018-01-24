@@ -169,7 +169,7 @@ let encoding =
   ]
 
 let versions =
-  let open P2p.Version in
+  let open P2p_version in
   [ { name = "TEZOS" ;
       major = 0 ;
       minor = 27 ;

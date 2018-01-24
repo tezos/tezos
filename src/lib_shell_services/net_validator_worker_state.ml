@@ -89,8 +89,8 @@ end
 
 module Worker_state = struct
   type view =
-    { active_peers : P2p_types.Peer_id.t list ;
-      bootstrapped_peers : P2p_types.Peer_id.t list ;
+    { active_peers : P2p_peer.Id.t list ;
+      bootstrapped_peers : P2p_peer.Id.t list ;
       bootstrapped : bool }
   let encoding =
     let open Data_encoding in
@@ -101,8 +101,8 @@ module Worker_state = struct
          { bootstrapped ; bootstrapped_peers ; active_peers })
       (obj3
          (req "bootstrapped" bool)
-         (req "bootstrapped_peers" (list P2p_types.Peer_id.encoding))
-         (req "active_peers" (list P2p_types.Peer_id.encoding)))
+         (req "bootstrapped_peers" (list P2p_peer.Id.encoding))
+         (req "active_peers" (list P2p_peer.Id.encoding)))
 
   let pp ppf { bootstrapped ; bootstrapped_peers ; active_peers } =
     Format.fprintf ppf
@@ -110,8 +110,8 @@ module Worker_state = struct
        @[<v 2>Active peers:%a@]@,\
        @[<v 2>Bootstrapped peers:%a@]@]"
       (if bootstrapped then "" else " not yet")
-      (fun ppf -> List.iter (Format.fprintf ppf "@,- %a" P2p_types.Peer_id.pp))
+      (fun ppf -> List.iter (Format.fprintf ppf "@,- %a" P2p_peer.Id.pp))
       active_peers
-      (fun ppf -> List.iter (Format.fprintf ppf "@,- %a" P2p_types.Peer_id.pp))
+      (fun ppf -> List.iter (Format.fprintf ppf "@,- %a" P2p_peer.Id.pp))
       bootstrapped_peers
 end

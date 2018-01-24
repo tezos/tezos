@@ -9,28 +9,6 @@
 
 (** Tezos Shell Net - Low level API for the Gossip network *)
 
-(** A peer connection address *)
-type addr = Ipaddr.V6.t
-
-(** A peer connection port *)
-type port = int
-
-(** A p2p protocol version *)
-module Version = P2p_types.Version
-
-(** A global identifier for a peer, a.k.a. an identity *)
-module Peer_id = P2p_types.Peer_id
-
-module Identity = P2p_types.Identity
-
-module Point = P2p_types.Point
-
-module Id_point = P2p_types.Id_point
-
-module Connection_info = P2p_types.Connection_info
-
-module Stat = P2p_types.Stat
-
 type 'meta meta_config = {
   encoding : 'meta Data_encoding.t;
   initial : 'meta;
@@ -47,21 +25,21 @@ type 'msg app_message_encoding = Encoding : {
 
 type 'msg message_config = {
   encoding : 'msg app_message_encoding list ;
-  versions : Version.t list;
+  versions : P2p_version.t list;
 }
 
 (** Network configuration *)
 type config = {
 
-  listening_port : port option;
+  listening_port : P2p_addr.port option;
   (** Tells if incoming connections accepted, precising the TCP port
       on which the peer can be reached *)
 
-  listening_addr : addr option;
+  listening_addr : P2p_addr.t option;
   (** When incoming connections are accepted, precising on which
       IP adddress the node listen (default: [[::]]). *)
 
-  trusted_points : Point.t list ;
+  trusted_points : P2p_point.Id.t list ;
   (** List of hard-coded known peers to bootstrap the network from. *)
 
   peers_file : string ;
@@ -72,7 +50,7 @@ type config = {
   (** If [true], the only accepted connections are from peers whose
       addresses are in [trusted_peers]. *)
 
-  identity : Identity.t ;
+  identity : P2p_identity.t ;
   (** Cryptographic identity of the peer. *)
 
   proof_of_work_target : Crypto_box.target ;
@@ -148,7 +126,7 @@ val create :
   'meta meta_config -> 'msg message_config ->  ('msg, 'meta) net tzresult Lwt.t
 
 (** Return one's peer_id *)
-val peer_id : ('msg, 'meta) net -> Peer_id.t
+val peer_id : ('msg, 'meta) net -> P2p_peer.Id.t
 
 (** A maintenance operation : try and reach the ideal number of peers *)
 val maintain : ('msg, 'meta) net -> unit Lwt.t
@@ -166,23 +144,23 @@ type ('msg, 'meta) connection
 val connections : ('msg, 'meta) net -> ('msg, 'meta) connection list
 
 (** Return the active peer with identity [peer_id] *)
-val find_connection : ('msg, 'meta) net -> Peer_id.t -> ('msg, 'meta) connection option
+val find_connection : ('msg, 'meta) net -> P2p_peer.Id.t -> ('msg, 'meta) connection option
 
 (** Access the info of an active peer, if available *)
 val connection_info :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> Connection_info.t
+  ('msg, 'meta) net -> ('msg, 'meta) connection -> P2p_connection.Info.t
 val connection_stat :
-  ('msg, 'meta) net -> ('msg, 'meta) connection -> Stat.t
+  ('msg, 'meta) net -> ('msg, 'meta) connection -> P2p_stat.t
 
 (** Cleanly closes a connection. *)
 val disconnect :
   ('msg, 'meta) net -> ?wait:bool -> ('msg, 'meta) connection -> unit Lwt.t
 
-val global_stat : ('msg, 'meta) net -> Stat.t
+val global_stat : ('msg, 'meta) net -> P2p_stat.t
 
 (** Accessors for meta information about a global identifier *)
-val get_metadata : ('msg, 'meta) net -> Peer_id.t -> 'meta
-val set_metadata : ('msg, 'meta) net -> Peer_id.t -> 'meta -> unit
+val get_metadata : ('msg, 'meta) net -> P2p_peer.Id.t -> 'meta
+val set_metadata : ('msg, 'meta) net -> P2p_peer.Id.t -> 'meta -> unit
 
 (** Wait for a message from a given connection. *)
 val recv :
@@ -207,56 +185,56 @@ val broadcast : ('msg, 'meta) net -> 'msg -> unit
 
 module RPC : sig
 
-  val stat : ('msg, 'meta) net -> Stat.t
+  val stat : ('msg, 'meta) net -> P2p_stat.t
 
   val watch :
     ('msg, 'meta) net ->
-    P2p_types.Connection_pool_log_event.t Lwt_stream.t * Lwt_watcher.stopper
-  val connect : ('msg, 'meta) net -> Point.t -> float -> unit tzresult Lwt.t
+    P2p_connection.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
+  val connect : ('msg, 'meta) net -> P2p_point.Id.t -> float -> unit tzresult Lwt.t
 
   module Connection : sig
-    val info : ('msg, 'meta) net -> Peer_id.t -> Connection_info.t option
-    val kick : ('msg, 'meta) net -> Peer_id.t -> bool -> unit Lwt.t
-    val list : ('msg, 'meta) net -> Connection_info.t list
+    val info : ('msg, 'meta) net -> P2p_peer.Id.t -> P2p_connection.Info.t option
+    val kick : ('msg, 'meta) net -> P2p_peer.Id.t -> bool -> unit Lwt.t
+    val list : ('msg, 'meta) net -> P2p_connection.Info.t list
     val count : ('msg, 'meta) net -> int
   end
 
   module Point : sig
 
     val info :
-      ('msg, 'meta) net -> Point.t -> P2p_types.Point_info.t option
+      ('msg, 'meta) net -> P2p_point.Id.t -> P2p_point.Info.t option
 
     val list :
-      ?restrict: P2p_types.Point_state.t list ->
-      ('msg, 'meta) net -> (Point.t * P2p_types.Point_info.t) list
+      ?restrict: P2p_point.State.t list ->
+      ('msg, 'meta) net -> (P2p_point.Id.t * P2p_point.Info.t) list
 
     val events :
-      ?max:int -> ?rev:bool -> ('msg, 'meta) net -> Point.t ->
-      P2p_connection_pool_types.Point_info.Event.t list
+      ?max:int -> ?rev:bool -> ('msg, 'meta) net -> P2p_point.Id.t ->
+      P2p_point.Pool_event.t list
 
     val watch :
-      ('msg, 'meta) net -> Point.t ->
-      P2p_connection_pool_types.Point_info.Event.t Lwt_stream.t * Lwt_watcher.stopper
+      ('msg, 'meta) net -> P2p_point.Id.t ->
+      P2p_point.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
 
   end
 
   module Peer_id : sig
 
     val info :
-      ('msg, 'meta) net -> Peer_id.t -> P2p_types.Peer_info.t option
+      ('msg, 'meta) net -> P2p_peer.Id.t -> P2p_peer.Info.t option
 
     val list :
-      ?restrict: P2p_types.Peer_state.t list ->
-      ('msg, 'meta) net -> (Peer_id.t * P2p_types.Peer_info.t) list
+      ?restrict: P2p_peer.State.t list ->
+      ('msg, 'meta) net -> (P2p_peer.Id.t * P2p_peer.Info.t) list
 
     val events :
       ?max: int -> ?rev: bool ->
-      ('msg, 'meta) net -> Peer_id.t ->
-      P2p_connection_pool_types.Peer_info.Event.t list
+      ('msg, 'meta) net -> P2p_peer.Id.t ->
+      P2p_peer.Pool_event.t list
 
     val watch :
-      ('msg, 'meta) net -> Peer_id.t ->
-      P2p_connection_pool_types.Peer_info.Event.t Lwt_stream.t * Lwt_watcher.stopper
+      ('msg, 'meta) net -> P2p_peer.Id.t ->
+      P2p_peer.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
 
   end
 
@@ -264,24 +242,24 @@ end
 
 val fold_connections :
   ('msg, 'meta) net ->
-  init:'a -> f:(Peer_id.t -> ('msg, 'meta) connection -> 'a -> 'a) -> 'a
+  init:'a -> f:(P2p_peer.Id.t -> ('msg, 'meta) connection -> 'a -> 'a) -> 'a
 
 val iter_connections :
   ('msg, 'meta) net ->
-  (Peer_id.t -> ('msg, 'meta) connection -> unit) -> unit
+  (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit
 
 val on_new_connection :
   ('msg, 'meta) net ->
-  (Peer_id.t -> ('msg, 'meta) connection -> unit) -> unit
+  (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit
 
 (**/**)
 
 module Raw : sig
   type 'a t =
     | Bootstrap
-    | Advertise of P2p_types.Point.t list
-    | Swap_request of Point.t * Peer_id.t
-    | Swap_ack of Point.t * Peer_id.t
+    | Advertise of P2p_point.Id.t list
+    | Swap_request of P2p_point.Id.t * P2p_peer.Id.t
+    | Swap_ack of P2p_point.Id.t * P2p_peer.Id.t
     | Message of 'a
     | Disconnect
   val encoding: 'msg app_message_encoding list -> 'msg t Data_encoding.t

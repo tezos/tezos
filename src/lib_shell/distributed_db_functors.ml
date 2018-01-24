@@ -26,13 +26,13 @@ module type DISTRIBUTED_DB = sig
 
   val prefetch:
     t ->
-    ?peer:P2p.Peer_id.t ->
+    ?peer:P2p_peer.Id.t ->
     ?timeout:float ->
     key -> param -> unit
 
   val fetch:
     t ->
-    ?peer:P2p.Peer_id.t ->
+    ?peer:P2p_peer.Id.t ->
     ?timeout:float ->
     key -> param -> value tzresult Lwt.t
 
@@ -68,12 +68,12 @@ end
 module type SCHEDULER_EVENTS = sig
   type t
   type key
-  val request: t -> P2p.Peer_id.t option -> key -> unit
-  val notify: t -> P2p.Peer_id.t -> key -> unit
+  val request: t -> P2p_peer.Id.t option -> key -> unit
+  val notify: t -> P2p_peer.Id.t -> key -> unit
   val notify_cancelation: t -> key -> unit
-  val notify_unrequested: t -> P2p.Peer_id.t -> key -> unit
-  val notify_duplicate: t -> P2p.Peer_id.t -> key -> unit
-  val notify_invalid: t -> P2p.Peer_id.t -> key -> unit
+  val notify_unrequested: t -> P2p_peer.Id.t -> key -> unit
+  val notify_duplicate: t -> P2p_peer.Id.t -> key -> unit
+  val notify_invalid: t -> P2p_peer.Id.t -> key -> unit
 end
 
 module type PRECHECK = sig
@@ -103,7 +103,7 @@ module Make_table
   val create:
     ?global_input:(key * value) Lwt_watcher.input ->
     Scheduler.t -> Disk_table.store -> t
-  val notify: t -> P2p.Peer_id.t -> key -> Precheck.notified_value -> unit Lwt.t
+  val notify: t -> P2p_peer.Id.t -> key -> Precheck.notified_value -> unit Lwt.t
 
 end = struct
 
@@ -306,8 +306,8 @@ end
 module type REQUEST = sig
   type key
   type param
-  val active : param -> P2p.Peer_id.Set.t
-  val send : param -> P2p.Peer_id.t -> key list -> unit
+  val active : param -> P2p_peer.Set.t
+  val send : param -> P2p_peer.Id.t -> key list -> unit
 end
 
 module Make_request_scheduler
@@ -343,24 +343,24 @@ end = struct
   }
 
   and status = {
-    peers: P2p.Peer_id.Set.t ;
+    peers: P2p_peer.Set.t ;
     next_request: float ;
     delay: float ;
   }
 
   and event =
-    | Request of P2p.Peer_id.t option * key
-    | Notify of P2p.Peer_id.t * key
+    | Request of P2p_peer.Id.t option * key
+    | Notify of P2p_peer.Id.t * key
     | Notify_cancelation of key
-    | Notify_invalid of P2p.Peer_id.t * key
-    | Notify_duplicate of P2p.Peer_id.t * key
-    | Notify_unrequested of P2p.Peer_id.t * key
+    | Notify_invalid of P2p_peer.Id.t * key
+    | Notify_duplicate of P2p_peer.Id.t * key
+    | Notify_unrequested of P2p_peer.Id.t * key
 
   let request t p k =
     assert (Lwt_pipe.push_now t.queue (Request (p, k)))
   let notify t p k =
     debug "push received %a from %a"
-      Hash.pp k P2p.Peer_id.pp_short p ;
+      Hash.pp k P2p_peer.Id.pp_short p ;
     assert (Lwt_pipe.push_now t.queue (Notify (p, k)))
   let notify_cancelation t k =
     debug "push cancelation %a"
@@ -368,15 +368,15 @@ end = struct
     assert (Lwt_pipe.push_now t.queue (Notify_cancelation k))
   let notify_invalid t p k =
     debug "push received invalid %a from %a"
-      Hash.pp k P2p.Peer_id.pp_short p ;
+      Hash.pp k P2p_peer.Id.pp_short p ;
     assert (Lwt_pipe.push_now t.queue (Notify_invalid (p, k)))
   let notify_duplicate t p k =
     debug "push received duplicate %a from %a"
-      Hash.pp k P2p.Peer_id.pp_short p ;
+      Hash.pp k P2p_peer.Id.pp_short p ;
     assert (Lwt_pipe.push_now t.queue (Notify_duplicate (p, k)))
   let notify_unrequested t p k =
     debug "push received unrequested %a from %a"
-      Hash.pp k P2p.Peer_id.pp_short p ;
+      Hash.pp k P2p_peer.Id.pp_short p ;
     assert (Lwt_pipe.push_now t.queue (Notify_unrequested (p, k)))
 
   let compute_timeout state =
@@ -399,7 +399,7 @@ end = struct
 
   let may_pp_peer ppf = function
     | None -> ()
-    | Some peer -> P2p.Peer_id.pp_short ppf peer
+    | Some peer -> P2p_peer.Id.pp_short ppf peer
 
   (* TODO should depend on the ressource kind... *)
   let initial_delay = 0.1
@@ -413,7 +413,7 @@ end = struct
           let peers =
             match peer with
             | None -> data.peers
-            | Some peer -> P2p.Peer_id.Set.add peer data.peers in
+            | Some peer -> P2p_peer.Set.add peer data.peers in
           Table.replace state.pending key {
             delay = initial_delay ;
             next_request = min data.next_request (now +. initial_delay) ;
@@ -425,8 +425,8 @@ end = struct
         with Not_found ->
           let peers =
             match peer with
-            | None -> P2p.Peer_id.Set.empty
-            | Some peer -> P2p.Peer_id.Set.singleton peer in
+            | None -> P2p_peer.Set.empty
+            | Some peer -> P2p_peer.Set.singleton peer in
           Table.add state.pending key {
             peers ;
             next_request = now ;
@@ -439,7 +439,7 @@ end = struct
     | Notify (peer, key) ->
         Table.remove state.pending key ;
         lwt_debug "received %a from %a"
-          Hash.pp key P2p.Peer_id.pp_short peer >>= fun () ->
+          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
         Lwt.return_unit
     | Notify_cancelation key ->
         Table.remove state.pending key ;
@@ -448,17 +448,17 @@ end = struct
         Lwt.return_unit
     | Notify_invalid (peer, key) ->
         lwt_debug "received invalid %a from %a"
-          Hash.pp key P2p.Peer_id.pp_short peer >>= fun () ->
+          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
         (* TODO *)
         Lwt.return_unit
     | Notify_unrequested (peer, key) ->
         lwt_debug "received unrequested %a from %a"
-          Hash.pp key P2p.Peer_id.pp_short peer >>= fun () ->
+          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
         (* TODO *)
         Lwt.return_unit
     | Notify_duplicate (peer, key) ->
         lwt_debug "received duplicate %a from %a"
-          Hash.pp key P2p.Peer_id.pp_short peer >>= fun () ->
+          Hash.pp key P2p_peer.Id.pp_short peer >>= fun () ->
         (* TODO *)
         Lwt.return_unit
 
@@ -487,14 +487,14 @@ end = struct
                acc
              else
                let remaining_peers =
-                 P2p.Peer_id.Set.inter peers active_peers in
-               if P2p.Peer_id.Set.is_empty remaining_peers &&
-                  not (P2p.Peer_id.Set.is_empty peers) then
+                 P2p_peer.Set.inter peers active_peers in
+               if P2p_peer.Set.is_empty remaining_peers &&
+                  not (P2p_peer.Set.is_empty peers) then
                  ( Table.remove state.pending key ; acc )
                else
                  let requested_peer =
-                   P2p.Peer_id.random_set_elt
-                     (if P2p.Peer_id.Set.is_empty remaining_peers
+                   P2p_peer.Id.random_set_elt
+                     (if P2p_peer.Set.is_empty remaining_peers
                       then active_peers
                       else remaining_peers) in
                  let next = { peers = remaining_peers ;
@@ -502,16 +502,16 @@ end = struct
                               delay = delay *. 1.2 } in
                  Table.replace state.pending key next ;
                  let requests =
-                   try key :: P2p_types.Peer_id.Map.find requested_peer acc
+                   try key :: P2p_peer.Map.find requested_peer acc
                    with Not_found -> [key] in
-                 P2p_types.Peer_id.Map.add requested_peer requests acc)
-          state.pending P2p_types.Peer_id.Map.empty in
-      P2p_types.Peer_id.Map.iter (Request.send state.param) requests ;
-      P2p_types.Peer_id.Map.fold begin fun peer request acc ->
+                 P2p_peer.Map.add requested_peer requests acc)
+          state.pending P2p_peer.Map.empty in
+      P2p_peer.Map.iter (Request.send state.param) requests ;
+      P2p_peer.Map.fold begin fun peer request acc ->
         acc >>= fun () ->
         Lwt_list.iter_s (fun key ->
             lwt_debug "requested %a from %a"
-              Hash.pp key P2p.Peer_id.pp_short peer)
+              Hash.pp key P2p_peer.Id.pp_short peer)
           request
       end requests Lwt.return_unit >>= fun () ->
       worker_loop state

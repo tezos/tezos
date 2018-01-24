@@ -9,7 +9,7 @@
 
 include Logging.Make (struct let name = "p2p.welcome" end)
 
-type pool = Pool : ('msg, 'meta) P2p_connection_pool.t -> pool
+type pool = Pool : ('msg, 'meta) P2p_pool.t -> pool
 
 type t = {
   socket: Lwt_unix.file_descr ;
@@ -30,7 +30,7 @@ let rec worker_loop st =
         | Lwt_unix.ADDR_UNIX _ -> assert false
         | Lwt_unix.ADDR_INET (addr, port) ->
             (Ipaddr_unix.V6.of_inet_addr_exn addr, port) in
-      P2p_connection_pool.accept pool fd point ;
+      P2p_pool.accept pool fd point ;
       worker_loop st
   | Error [Lwt_utils.Canceled] ->
       Lwt.return_unit

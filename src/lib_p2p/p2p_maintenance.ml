@@ -7,9 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open P2p_types
-open P2p_connection_pool_types
-
 include Logging.Make (struct let name = "p2p.maintenance" end)
 
 type bounds = {
@@ -19,7 +16,7 @@ type bounds = {
   max_threshold: int ;
 }
 
-type 'meta pool = Pool : ('msg, 'meta) P2p_connection_pool.t -> 'meta pool
+type 'meta pool = Pool : ('msg, 'meta) P2p_pool.t -> 'meta pool
 
 type 'meta t = {
   canceler: Lwt_canceler.t ;
@@ -41,7 +38,7 @@ let connectable st start_time expected =
   let now = Time.now () in
   let module Bounded_point_info =
     List.Bounded(struct
-      type t = (Time.t option * Point.t)
+      type t = (Time.t option * P2p_point.Id.t)
       let compare (t1, _) (t2, _) =
         match t1, t2 with
         | None, None -> 0
@@ -50,13 +47,13 @@ let connectable st start_time expected =
         | Some t1, Some t2 -> Time.compare t2 t1
     end) in
   let acc = Bounded_point_info.create expected in
-  P2p_connection_pool.Points.fold_known pool ~init:()
+  P2p_pool.Points.fold_known pool ~init:()
     ~f:begin fun point pi () ->
-      match Point_info.State.get pi with
+      match P2p_point.Pool_state.get pi with
       | Disconnected -> begin
-          match Point_info.last_miss pi with
+          match P2p_point.Pool_info.last_miss pi with
           | Some last when Time.(start_time < last)
-                        || Point_info.greylisted ~now pi -> ()
+                        || P2p_point.Pool_info.greylisted ~now pi -> ()
           | last ->
               Bounded_point_info.insert (last, point) acc
         end
@@ -83,7 +80,7 @@ let rec try_to_contact
     else
       List.fold_left
         (fun acc point ->
-           P2p_connection_pool.connect
+           P2p_pool.connect
              ~timeout:st.connection_timeout pool point >>= function
            | Ok _ -> acc >|= succ
            | Error _ -> acc)
@@ -96,7 +93,7 @@ let rec try_to_contact
     of connections is between `min_threshold` and `max_threshold`. *)
 let rec maintain st =
   let Pool pool = st.pool in
-  let n_connected = P2p_connection_pool.active_connections pool in
+  let n_connected = P2p_pool.active_connections pool in
   if n_connected < st.bounds.min_threshold then
     too_few_connections st n_connected
   else if st.bounds.max_threshold < n_connected then
@@ -121,10 +118,10 @@ and too_few_connections st n_connected =
     (* not enough contacts, ask the pals of our pals,
        discover the local network and then wait *)
     Option.iter ~f:P2p_discovery.restart st.disco ;
-    P2p_connection_pool.broadcast_bootstrap_msg pool ;
+    P2p_pool.broadcast_bootstrap_msg pool ;
     Lwt_utils.protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
-        P2p_connection_pool.Pool_event.wait_new_peer pool ;
+        P2p_pool.Pool_event.wait_new_peer pool ;
         Lwt_unix.sleep 5.0 (* TODO exponential back-off ??
                                    or wait for the existence of a
                                    non grey-listed peer ?? *)
@@ -138,11 +135,11 @@ and too_many_connections st n_connected =
   (* too many connections, start the russian roulette *)
   let to_kill = n_connected - st.bounds.max_target in
   lwt_debug "Too many connections, will kill %d" to_kill >>= fun () ->
-  snd @@ P2p_connection_pool.Connection.fold pool
+  snd @@ P2p_pool.Connection.fold pool
     ~init:(to_kill, Lwt.return_unit)
     ~f:(fun _ conn (i, t) ->
         if i = 0 then (0, t)
-        else (i - 1, t >>= fun () -> P2p_connection_pool.disconnect conn))
+        else (i - 1, t >>= fun () -> P2p_pool.disconnect conn))
   >>= fun () ->
   maintain st
 
@@ -153,17 +150,17 @@ let rec worker_loop st =
       Lwt.pick [
         Lwt_unix.sleep 120. ; (* every two minutes *)
         Lwt_condition.wait st.please_maintain ; (* when asked *)
-        P2p_connection_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
-        P2p_connection_pool.Pool_event.wait_too_many_connections pool
+        P2p_pool.Pool_event.wait_too_few_connections pool ; (* limits *)
+        P2p_pool.Pool_event.wait_too_many_connections pool
       ] >>= fun () ->
       return ()
     end >>=? fun () ->
-    let n_connected = P2p_connection_pool.active_connections pool in
+    let n_connected = P2p_pool.active_connections pool in
     if n_connected < st.bounds.min_threshold
     || st.bounds.max_threshold < n_connected then
       maintain st
     else begin
-      P2p_connection_pool.send_swap_request pool ;
+      P2p_pool.send_swap_request pool ;
       return ()
     end
   end >>= function

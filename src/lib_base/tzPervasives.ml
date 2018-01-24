@@ -44,5 +44,13 @@ module Preapply_result = Preapply_result
 module Block_locator = Block_locator
 module Mempool = Mempool
 
+module P2p_addr = P2p_addr
+module P2p_identity = P2p_identity
+module P2p_peer = P2p_peer
+module P2p_point = P2p_point
+module P2p_connection = P2p_connection
+module P2p_stat = P2p_stat
+module P2p_version = P2p_version
+
 include Utils.Infix
 include Error_monad

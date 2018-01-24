@@ -23,8 +23,6 @@
     num_connections).
 *)
 
-open P2p_types
-
 type connection
 (** Type of a connection. *)
 
@@ -71,11 +69,11 @@ val read_full:
   connection -> ?pos:int -> ?len:int -> MBytes.t -> unit tzresult Lwt.t
 (** Like [read], but blits exactly [len] bytes in [buf]. *)
 
-val stat: connection -> Stat.t
+val stat: connection -> P2p_stat.t
 (** [stat conn] is a snapshot of current bandwidth usage for
     [conn]. *)
 
-val global_stat: t -> Stat.t
+val global_stat: t -> P2p_stat.t
 (** [global_stat sched] is a snapshot of [sched]'s bandwidth usage
     (sum of [stat conn] for each [conn] in [sched]). *)
 

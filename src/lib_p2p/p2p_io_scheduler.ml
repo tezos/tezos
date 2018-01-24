@@ -17,7 +17,6 @@ let () =
   if Sys.os_type <> "Win32" then
     Sys.(set_signal sigpipe Signal_ignore)
 
-open P2p_types
 include Logging.Make (struct let name = "p2p.io-scheduler" end)
 
 module Inttbl = Hashtbl.Make(struct
@@ -457,7 +456,7 @@ let read_full conn ?pos ?len buf =
   loop pos len
 
 let convert ~ws ~rs =
-  { Stat.total_sent = ws.Moving_average.total ;
+  { P2p_stat.total_sent = ws.Moving_average.total ;
     total_recv = rs.Moving_average.total ;
     current_outflow = ws.average ;
     current_inflow = rs.average ;

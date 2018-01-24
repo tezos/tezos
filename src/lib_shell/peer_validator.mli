@@ -17,7 +17,7 @@ type limits = {
   worker_limits: Worker_types.limits
 }
 
-val peer_id: t -> P2p.Peer_id.t
+val peer_id: t -> P2p_peer.Id.t
 val bootstrapped: t -> bool
 val current_head: t -> Block_header.t
 
@@ -27,13 +27,13 @@ val create:
   ?notify_termination: (unit -> unit) ->
   limits ->
   Block_validator.t ->
-  Distributed_db.net_db -> P2p.Peer_id.t -> t Lwt.t
+  Distributed_db.net_db -> P2p_peer.Id.t -> t Lwt.t
 val shutdown: t -> unit Lwt.t
 
 val notify_branch: t -> Block_locator.t -> unit
 val notify_head: t -> Block_header.t -> unit
 
-val running_workers: unit -> ((Net_id.t * P2p.Peer_id.t) * t) list
+val running_workers: unit -> ((Net_id.t * P2p_peer.Id.t) * t) list
 val status: t -> Worker_types.worker_status
 
 val current_request : t -> (Time.t * Time.t * Peer_validator_worker_state.Request.view) option

@@ -9,7 +9,7 @@
 
 include Logging.Make(struct let name = "node.validator.bootstrap_pipeline" end)
 
-type error += Invalid_locator of P2p.Peer_id.t * Block_locator.t
+type error += Invalid_locator of P2p_peer.Id.t * Block_locator.t
 
 type t = {
   canceler: Lwt_canceler.t ;
@@ -18,7 +18,7 @@ type t = {
   mutable headers_fetch_worker: unit Lwt.t ;
   mutable operations_fetch_worker: unit Lwt.t ;
   mutable validation_worker: unit Lwt.t ;
-  peer_id: P2p.Peer_id.t ;
+  peer_id: P2p_peer.Id.t ;
   net_db: Distributed_db.net_db ;
   locator: Block_locator.t ;
   block_validator: Block_validator.t ;
@@ -37,24 +37,24 @@ let fetch_step pipeline (step : Block_locator_iterator.step)  =
     Block_hash.pp_short step.predecessor
     step.step
     (if step.strict_step then "" else " max")
-    P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+    P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
   let rec fetch_loop acc hash cpt =
     Lwt_unix.yield () >>= fun () ->
     if cpt < 0 then
       lwt_log_info "invalid step from peer %a (too long)."
-        P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       fail (Invalid_locator (pipeline.peer_id, pipeline.locator))
     else if Block_hash.equal hash step.predecessor then
       if step.strict_step && cpt <> 0 then
         lwt_log_info "invalid step from peer %a (too short)."
-          P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+          P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
         fail (Invalid_locator (pipeline.peer_id, pipeline.locator))
       else
         return acc
     else
       lwt_debug "fetching block header %a from peer %a."
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_utils.protect ~canceler:pipeline.canceler begin fun () ->
         Distributed_db.Block_header.fetch
           ~timeout:pipeline.block_header_timeout
@@ -63,7 +63,7 @@ let fetch_step pipeline (step : Block_locator_iterator.step)  =
       end >>=? fun header ->
       lwt_debug "fetched block header %a from peer %a."
         Block_hash.pp_short hash
-        P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       fetch_loop ((hash, header) :: acc) header.shell.predecessor (cpt - 1)
   in
   fetch_loop [] step.block step.step >>=? fun headers ->
@@ -84,7 +84,7 @@ let headers_fetch_worker_loop pipeline =
   end >>= function
   | Ok () ->
       lwt_log_info "fetched all step from peer %a."
-        P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_pipe.close pipeline.fetched_headers ;
       Lwt.return_unit
   | Error [Exn Lwt.Canceled | Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
@@ -92,7 +92,7 @@ let headers_fetch_worker_loop pipeline =
   | Error [ Distributed_db.Block_header.Timeout bh ] ->
       lwt_log_info "request for header %a from peer %a timed out."
         Block_hash.pp_short bh
-        P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
   | Error err ->
@@ -110,7 +110,7 @@ let rec operations_fetch_worker_loop pipeline =
     end >>=? fun (hash, header) ->
     lwt_log_info "fetching operations of block %a from peer %a."
       Block_hash.pp_short hash
-      P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+      P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
     map_p
       (fun i ->
          Lwt_utils.protect ~canceler:pipeline.canceler begin fun () ->
@@ -122,7 +122,7 @@ let rec operations_fetch_worker_loop pipeline =
       (0 -- (header.shell.validation_passes - 1)) >>=? fun operations ->
     lwt_log_info "fetched operations of block %a from peer %a."
       Block_hash.pp_short hash
-      P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+      P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
     Lwt_utils.protect ~canceler:pipeline.canceler begin fun () ->
       Lwt_pipe.push pipeline.fetched_blocks
         (hash, header, operations) >>= return
@@ -136,7 +136,7 @@ let rec operations_fetch_worker_loop pipeline =
   | Error [ Distributed_db.Operations.Timeout (bh, n) ] ->
       lwt_log_info "request for operations %a:%d from peer %a timed out."
         Block_hash.pp_short bh n
-        P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+        P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_canceler.cancel pipeline.canceler >>= fun () ->
       Lwt.return_unit
   | Error err ->
@@ -154,7 +154,7 @@ let rec validation_worker_loop pipeline =
     end >>=? fun (hash, header, operations) ->
     lwt_log_info "requesting validation for block %a from peer %a."
       Block_hash.pp_short hash
-      P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+      P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
     Lwt_utils.protect ~canceler:pipeline.canceler begin fun () ->
       Block_validator.validate
         ~canceler:pipeline.canceler
@@ -164,7 +164,7 @@ let rec validation_worker_loop pipeline =
     end >>=? fun _block ->
     lwt_log_info "validated block %a from peer %a."
       Block_hash.pp_short hash
-      P2p.Peer_id.pp_short pipeline.peer_id >>= fun () ->
+      P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
     return ()
   end >>= function
   | Ok () -> validation_worker_loop pipeline
@@ -214,19 +214,19 @@ let create
   pipeline.headers_fetch_worker <-
     Lwt_utils.worker
       (Format.asprintf "bootstrap_pipeline-headers_fetch.%a.%a"
-         P2p.Peer_id.pp_short peer_id Block_hash.pp_short hash)
+         P2p_peer.Id.pp_short peer_id Block_hash.pp_short hash)
       ~run:(fun () -> headers_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
   pipeline.operations_fetch_worker <-
     Lwt_utils.worker
       (Format.asprintf "bootstrap_pipeline-operations_fetch.%a.%a"
-         P2p.Peer_id.pp_short peer_id Block_hash.pp_short hash)
+         P2p_peer.Id.pp_short peer_id Block_hash.pp_short hash)
       ~run:(fun () -> operations_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
   pipeline.validation_worker <-
     Lwt_utils.worker
       (Format.asprintf "bootstrap_pipeline-validation.%a.%a"
-         P2p.Peer_id.pp_short peer_id Block_hash.pp_short hash)
+         P2p_peer.Id.pp_short peer_id Block_hash.pp_short hash)
       ~run:(fun () -> validation_worker_loop pipeline)
       ~cancel:(fun () -> Lwt_canceler.cancel pipeline.canceler) ;
   pipeline

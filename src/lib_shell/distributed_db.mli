@@ -40,9 +40,9 @@ val get_net: t -> Net_id.t -> net_db option
 val deactivate: net_db -> unit Lwt.t
 
 type callback = {
-  notify_branch: P2p.Peer_id.t -> Block_locator.t -> unit ;
-  notify_head: P2p.Peer_id.t -> Block_header.t -> Mempool.t -> unit ;
-  disconnection: P2p.Peer_id.t -> unit ;
+  notify_branch: P2p_peer.Id.t -> Block_locator.t -> unit ;
+  notify_head: P2p_peer.Id.t -> Block_header.t -> Mempool.t -> unit ;
+  disconnection: P2p_peer.Id.t -> unit ;
 }
 
 (** Register all the possible callback from the distributed DB to the
@@ -50,7 +50,7 @@ type callback = {
 val set_callback: net_db -> callback -> unit
 
 (** Kick a given peer. *)
-val disconnect: net_db -> P2p.Peer_id.t -> unit Lwt.t
+val disconnect: net_db -> P2p_peer.Id.t -> unit Lwt.t
 
 (** Various accessors. *)
 val net_state: net_db -> State.Net.t
@@ -63,12 +63,12 @@ module Request : sig
   (** Send to a given peer, or to all known active peers for the
       network, a friendly request "Hey, what's your current branch
       ?". The expected answer is a `Block_locator.t.`. *)
-  val current_branch: net_db -> ?peer:P2p.Peer_id.t -> unit -> unit
+  val current_branch: net_db -> ?peer:P2p_peer.Id.t -> unit -> unit
 
   (** Send to a given peer, or to all known active peers for the
       given network, a friendly request "Hey, what's your current
       branch ?". The expected answer is a `Block_locator.t.`. *)
-  val current_head: net_db -> ?peer:P2p.Peer_id.t -> unit -> unit
+  val current_head: net_db -> ?peer:P2p_peer.Id.t -> unit -> unit
 
 end
 
@@ -77,13 +77,13 @@ module Advertise : sig
   (** Notify a given peer, or all known active peers for the
       network, of a new head and possibly of new operations. *)
   val current_head:
-    net_db -> ?peer:P2p.Peer_id.t ->
+    net_db -> ?peer:P2p_peer.Id.t ->
     ?mempool:Mempool.t -> State.Block.t -> unit
 
   (** Notify a given peer, or all known active peers for the
       network, of a new head and its sparse history. *)
   val current_branch:
-    net_db -> ?peer:P2p.Peer_id.t ->
+    net_db -> ?peer:P2p_peer.Id.t ->
     Block_locator.t -> unit Lwt.t
 
 end
@@ -145,7 +145,7 @@ module type DISTRIBUTED_DB = sig
       peer (at each retry). *)
   val fetch:
     t ->
-    ?peer:P2p.Peer_id.t ->
+    ?peer:P2p_peer.Id.t ->
     ?timeout:float ->
     key -> param -> value tzresult Lwt.t
 
@@ -153,7 +153,7 @@ module type DISTRIBUTED_DB = sig
       stored in the local index when received. *)
   val prefetch:
     t ->
-    ?peer:P2p.Peer_id.t ->
+    ?peer:P2p_peer.Id.t ->
     ?timeout:float ->
     key -> param -> unit
 
@@ -257,6 +257,6 @@ val commit_protocol:
 
 module Raw : sig
   val encoding: Message.t P2p.Raw.t Data_encoding.t
-  val supported_versions: P2p_types.Version.t list
+  val supported_versions: P2p_version.t list
 end
 

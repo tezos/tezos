@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (executables
- ((names (test_p2p_connection
-          test_p2p_connection_pool
+ ((names (test_p2p_socket
+          test_p2p_pool
           test_p2p_io_scheduler))
   (libraries (tezos-base
               tezos-p2p-services
@@ -18,17 +18,17 @@
 
 (alias
  ((name buildtest)
-  (deps (test_p2p_connection.exe
-         test_p2p_connection_pool.exe
+  (deps (test_p2p_socket.exe
+         test_p2p_pool.exe
          test_p2p_io_scheduler.exe))))
 
 (alias
- ((name runtest_p2p_connection)
-  (action (run ${exe:test_p2p_connection.exe} -v))))
+ ((name runtest_p2p_socket)
+  (action (run ${exe:test_p2p_socket.exe} -v))))
 
 (alias
- ((name runtest_p2p_connection_pool)
-  (action (run ${exe:test_p2p_connection_pool.exe} --clients 10 --repeat 5 -v))))
+ ((name runtest_p2p_pool)
+  (action (run ${exe:test_p2p_pool.exe} --clients 10 --repeat 5 -v))))
 
 (alias
  ((name runtest_p2p_io_scheduler)
@@ -40,8 +40,8 @@
 
 (alias
  ((name runtest)
-  (deps ((alias runtest_p2p_connection)
-         (alias runtest_p2p_connection_pool)
+  (deps ((alias runtest_p2p_socket)
+         (alias runtest_p2p_pool)
          (alias runtest_p2p_io_scheduler)))))
 
 (alias

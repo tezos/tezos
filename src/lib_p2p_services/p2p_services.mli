@@ -7,26 +7,24 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open P2p_types
-
 val stat :
   ([ `POST ], unit,
    unit, unit, unit,
-   Stat.t, unit) RPC_service.t
+   P2p_stat.t, unit) RPC_service.t
 
 val versions :
   ([ `POST ], unit,
    unit, unit, unit,
-   Version.t list, unit) RPC_service.t
+   P2p_version.t list, unit) RPC_service.t
 
 val events :
   ([ `POST ], unit,
    unit, unit, unit,
-   Connection_pool_log_event.t, unit) RPC_service.t
+   P2p_connection.Pool_event.t, unit) RPC_service.t
 
 val connect :
   ([ `POST ], unit,
-   unit * Point.t, unit, float,
+   unit * P2p_point.Id.t, unit, float,
    unit tzresult, unit) RPC_service.t
 
 module Connection : sig
@@ -34,16 +32,16 @@ module Connection : sig
   val list :
     ([ `POST ], unit,
      unit, unit, unit,
-     Connection_info.t list, unit) RPC_service.t
+     P2p_connection.Info.t list, unit) RPC_service.t
 
   val info :
     ([ `POST ], unit,
-     unit * Peer_id.t, unit, unit,
-     Connection_info.t option, unit) RPC_service.t
+     unit * P2p_peer.Id.t, unit, unit,
+     P2p_connection.Info.t option, unit) RPC_service.t
 
   val kick :
     ([ `POST ], unit,
-     unit * Peer_id.t, unit, bool,
+     unit * P2p_peer.Id.t, unit, bool,
      unit, unit) RPC_service.t
 
 end
@@ -51,33 +49,33 @@ end
 module Point : sig
   val list :
     ([ `POST ], unit,
-     unit, unit, Point_state.t list,
-     (Point.t * Point_info.t) list, unit) RPC_service.t
+     unit, unit, P2p_point.State.t list,
+     (P2p_point.Id.t * P2p_point.Info.t) list, unit) RPC_service.t
   val info :
     ([ `POST ], unit,
-     unit * Point.t, unit, unit,
-     Point_info.t option, unit) RPC_service.t
+     unit * P2p_point.Id.t, unit, unit,
+     P2p_point.Info.t option, unit) RPC_service.t
   val events :
     ([ `POST ], unit,
-     unit * Point.t, unit, bool,
-     P2p_connection_pool_types.Point_info.Event.t list, unit) RPC_service.t
+     unit * P2p_point.Id.t, unit, bool,
+     P2p_point.Pool_event.t list, unit) RPC_service.t
 end
 
 module Peer_id : sig
 
   val list :
     ([ `POST ], unit,
-     unit, unit, Peer_state.t list,
-     (Peer_id.t * Peer_info.t) list, unit) RPC_service.t
+     unit, unit, P2p_peer.State.t list,
+     (P2p_peer.Id.t * P2p_peer.Info.t) list, unit) RPC_service.t
 
   val info :
     ([ `POST ], unit,
-     unit * Peer_id.t, unit, unit,
-     Peer_info.t option, unit) RPC_service.t
+     unit * P2p_peer.Id.t, unit, unit,
+     P2p_peer.Info.t option, unit) RPC_service.t
 
   val events :
     ([ `POST ], unit,
-     unit * Peer_id.t, unit, bool,
-     P2p_connection_pool_types.Peer_info.Event.t list, unit) RPC_service.t
+     unit * P2p_peer.Id.t, unit, bool,
+     P2p_peer.Pool_event.t list, unit) RPC_service.t
 
 end

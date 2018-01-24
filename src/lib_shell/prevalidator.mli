@@ -40,7 +40,7 @@ type error += Closed of Net_id.t
 
 val create: limits -> Distributed_db.net_db -> t Lwt.t
 val shutdown: t -> unit Lwt.t
-val notify_operations: t -> P2p.Peer_id.t -> Mempool.t -> unit
+val notify_operations: t -> P2p_peer.Id.t -> Mempool.t -> unit
 val inject_operation: t -> Operation.t -> unit tzresult Lwt.t
 val flush: t -> Block_hash.t -> unit tzresult Lwt.t
 val timestamp: t -> Time.t

@@ -36,7 +36,7 @@ type 'meta t
 val run:
   connection_timeout:float ->
   bounds ->
-  ('msg, 'meta) P2p_connection_pool.t ->
+  ('msg, 'meta) P2p_pool.t ->
   P2p_discovery.t option ->
   'meta t
 

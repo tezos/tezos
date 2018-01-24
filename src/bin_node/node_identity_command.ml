@@ -15,7 +15,7 @@ let identity_file data_dir = data_dir // Node_data_version.default_identity_file
 
 let show { Node_config_file.data_dir } =
   Node_identity_file.read (identity_file data_dir) >>=? fun id ->
-  Format.printf "Peer_id: %a.@." P2p_types.Peer_id.pp id.peer_id ;
+  Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
   return ()
 
 let generate { Node_config_file.data_dir ; net } =
@@ -26,11 +26,11 @@ let generate { Node_config_file.data_dir ; net } =
     let target = Crypto_box.make_target net.expected_pow in
     Format.eprintf "Generating a new identity... (level: %.2f) " net.expected_pow ;
     let id =
-      P2p.Identity.generate_with_animation Format.err_formatter target in
+      P2p_identity.generate_with_animation Format.err_formatter target in
     Node_identity_file.write identity_file id >>=? fun () ->
     Format.eprintf
       "Stored the new identity (%a) into '%s'.@."
-      P2p.Peer_id.pp id.peer_id identity_file ;
+      P2p_peer.Id.pp id.peer_id identity_file ;
     return ()
 
 let check { Node_config_file.data_dir ; net = { expected_pow } } =
@@ -38,7 +38,7 @@ let check { Node_config_file.data_dir ; net = { expected_pow } } =
     ~expected_pow (identity_file data_dir) >>=? fun id ->
   Format.printf
     "Peer_id: %a. Proof of work is higher than %.2f.@."
-    P2p_types.Peer_id.pp id.peer_id expected_pow ;
+    P2p_peer.Id.pp id.peer_id expected_pow ;
   return ()
 
 (** Main *)

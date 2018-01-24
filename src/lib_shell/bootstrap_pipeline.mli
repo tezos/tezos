@@ -9,14 +9,14 @@
 
 type t
 
-type error += Invalid_locator of P2p.Peer_id.t * Block_locator.t
+type error += Invalid_locator of P2p_peer.Id.t * Block_locator.t
 
 val create:
   ?notify_new_block: (State.Block.t -> unit) ->
   block_header_timeout:float ->
   block_operations_timeout: float ->
   Block_validator.t ->
-  P2p.Peer_id.t -> Distributed_db.net_db ->
+  P2p_peer.Id.t -> Distributed_db.net_db ->
   Block_locator.t -> t
 
 val wait: t -> unit tzresult Lwt.t

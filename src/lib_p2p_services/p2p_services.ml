@@ -7,17 +7,15 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open P2p_types
-
-let (peer_id_arg : P2p_types.Peer_id.t RPC_arg.arg) =
+let (peer_id_arg : P2p_peer.Id.t RPC_arg.arg) =
   Crypto_box.Public_key_hash.rpc_arg
 
 let point_arg =
   RPC_arg.make
     ~name:"point"
     ~descr:"A network point (ipv4:port or [ipv6]:port)."
-    ~destruct:Point.of_string
-    ~construct:Point.to_string
+    ~destruct:P2p_point.Id.of_string
+    ~construct:P2p_point.Id.to_string
     ()
 
 let versions =
@@ -25,7 +23,7 @@ let versions =
     ~description:"Supported network layer versions."
     ~query: RPC_query.empty
     ~input: Data_encoding.empty
-    ~output: (Data_encoding.list P2p_types.Version.encoding)
+    ~output: (Data_encoding.list P2p_version.encoding)
     ~error: Data_encoding.empty
     RPC_path.(root / "network" / "versions")
 
@@ -34,7 +32,7 @@ let stat =
     ~description:"Global network bandwidth statistics in B/s."
     ~query: RPC_query.empty
     ~input: Data_encoding.empty
-    ~output: P2p_types.Stat.encoding
+    ~output: P2p_stat.encoding
     ~error: Data_encoding.empty
     RPC_path.(root / "network" / "stat")
 
@@ -43,7 +41,7 @@ let events =
     ~description:"Stream of all network events"
     ~query: RPC_query.empty
     ~input: Data_encoding.empty
-    ~output: P2p_types.Connection_pool_log_event.encoding
+    ~output: P2p_connection.Pool_event.encoding
     ~error: Data_encoding.empty
     RPC_path.(root / "network" / "log")
 
@@ -65,7 +63,7 @@ module Connection = struct
       ~description:"List the running P2P connection."
       ~query: RPC_query.empty
       ~input: Data_encoding.empty
-      ~output: (Data_encoding.list P2p_types.Connection_info.encoding)
+      ~output: (Data_encoding.list P2p_connection.Info.encoding)
       ~error: Data_encoding.empty
       RPC_path.(root / "network" / "connection")
 
@@ -73,7 +71,7 @@ module Connection = struct
     RPC_service.post_service
       ~query: RPC_query.empty
       ~input: Data_encoding.empty
-      ~output: (Data_encoding.option P2p_types.Connection_info.encoding)
+      ~output: (Data_encoding.option P2p_connection.Info.encoding)
       ~error: Data_encoding.empty
       ~description:"Details about the current P2P connection to the given peer."
       RPC_path.(root / "network" / "connection" /: peer_id_arg)
@@ -95,7 +93,7 @@ module Point = struct
     RPC_service.post_service
       ~query: RPC_query.empty
       ~input: Data_encoding.empty
-      ~output: (Data_encoding.option P2p_types.Point_info.encoding)
+      ~output: (Data_encoding.option P2p_point.Info.encoding)
       ~error: Data_encoding.empty
       ~description: "Details about a given `IP:addr`."
       RPC_path.(root / "network" / "point" /: point_arg)
@@ -105,7 +103,7 @@ module Point = struct
       ~query: RPC_query.empty
       ~input: monitor_encoding
       ~output: (Data_encoding.list
-                  P2p_connection_pool_types.Point_info.Event.encoding)
+                  P2p_point.Pool_event.encoding)
       ~error: Data_encoding.empty
       ~description: "Monitor network events related to an `IP:addr`."
       RPC_path.(root / "network" / "point" /: point_arg / "log")
@@ -113,14 +111,14 @@ module Point = struct
   let list =
     let filter =
       let open Data_encoding in
-      obj1 (dft "filter" (list P2p_types.Point_state.encoding) []) in
+      obj1 (dft "filter" (list P2p_point.State.encoding) []) in
     RPC_service.post_service
       ~query: RPC_query.empty
       ~input: filter
       ~output:
         Data_encoding.(list (tup2
-                               P2p_types.Point.encoding
-                               P2p_types.Point_info.encoding))
+                               P2p_point.Id.encoding
+                               P2p_point.Info.encoding))
       ~error: Data_encoding.empty
       ~description:"List the pool of known `IP:port` \
                     used for establishing P2P connections ."
@@ -134,7 +132,7 @@ module Peer_id = struct
     RPC_service.post_service
       ~query: RPC_query.empty
       ~input: Data_encoding.empty
-      ~output: (Data_encoding.option P2p_types.Peer_info.encoding)
+      ~output: (Data_encoding.option P2p_peer.Info.encoding)
       ~error: Data_encoding.empty
       ~description:"Details about a given peer."
       RPC_path.(root / "network" / "peer_id" /: peer_id_arg)
@@ -144,7 +142,7 @@ module Peer_id = struct
       ~query: RPC_query.empty
       ~input: monitor_encoding
       ~output: (Data_encoding.list
-                  P2p_connection_pool_types.Peer_info.Event.encoding)
+                  P2p_peer.Pool_event.encoding)
       ~error: Data_encoding.empty
       ~description:"Monitor network events related to a given peer."
       RPC_path.(root / "network" / "peer_id" /: peer_id_arg / "log")
@@ -152,14 +150,14 @@ module Peer_id = struct
   let list =
     let filter =
       let open Data_encoding in
-      obj1 (dft "filter" (list P2p_types.Peer_state.encoding) []) in
+      obj1 (dft "filter" (list P2p_peer.State.encoding) []) in
     RPC_service.post_service
       ~query: RPC_query.empty
       ~input: filter
       ~output:
         Data_encoding.(list (tup2
-                               P2p_types.Peer_id.encoding
-                               P2p_types.Peer_info.encoding))
+                               P2p_peer.Id.encoding
+                               P2p_peer.Info.encoding))
       ~error: Data_encoding.empty
       ~description:"List the peers the node ever met."
       RPC_path.(root / "network" / "peer_id")

@@ -11,7 +11,7 @@ module Request = struct
   type view = {
     net_id : Net_id.t ;
     block : Block_hash.t ;
-    peer : P2p_types.Peer_id.t option ;
+    peer : P2p_peer.Id.t option ;
   }
   let encoding =
     let open Data_encoding in
@@ -21,7 +21,7 @@ module Request = struct
       (obj3
          (req "block" Block_hash.encoding)
          (req "net_id" Net_id.encoding)
-         (opt "peer" P2p_types.Peer_id.encoding))
+         (opt "peer" P2p_peer.Id.encoding))
 
   let pp ppf { net_id ; block ; peer } =
     Format.fprintf ppf "Validation of %a (net: %a)"
@@ -31,7 +31,7 @@ module Request = struct
     | None -> ()
     | Some peer ->
         Format.fprintf ppf "from peer %a"
-          P2p_types.Peer_id.pp_short peer
+          P2p_peer.Id.pp_short peer
 end
 
 module Event = struct

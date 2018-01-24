@@ -129,58 +129,56 @@ module RPC : sig
 
   module Network : sig
 
-    open P2p_types
-
-    val stat : t -> Stat.t
+    val stat : t -> P2p_stat.t
 
     val watch :
       t ->
-      P2p_types.Connection_pool_log_event.t Lwt_stream.t * Lwt_watcher.stopper
-    val connect : t -> Point.t -> float -> unit tzresult Lwt.t
+      P2p_connection.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
+    val connect : t -> P2p_point.Id.t -> float -> unit tzresult Lwt.t
 
     module Connection : sig
-      val info : t -> Peer_id.t -> Connection_info.t option
-      val kick : t -> Peer_id.t -> bool -> unit Lwt.t
-      val list : t -> Connection_info.t list
+      val info : t -> P2p_peer.Id.t -> P2p_connection.Info.t option
+      val kick : t -> P2p_peer.Id.t -> bool -> unit Lwt.t
+      val list : t -> P2p_connection.Info.t list
       val count : t -> int
     end
 
     module Point : sig
 
       val info :
-        t -> Point.t -> P2p_types.Point_info.t option
+        t -> P2p_point.Id.t -> P2p_point.Info.t option
 
       val list :
-        ?restrict: P2p_types.Point_state.t list ->
-        t -> (Point.t * P2p_types.Point_info.t) list
+        ?restrict: P2p_point.State.t list ->
+        t -> (P2p_point.Id.t * P2p_point.Info.t) list
 
       val events :
-        ?max:int -> ?rev:bool -> t -> Point.t ->
-        P2p_connection_pool_types.Point_info.Event.t list
+        ?max:int -> ?rev:bool -> t -> P2p_point.Id.t ->
+        P2p_point.Pool_event.t list
 
       val watch :
-        t -> Point.t ->
-        P2p_connection_pool_types.Point_info.Event.t Lwt_stream.t * Lwt_watcher.stopper
+        t -> P2p_point.Id.t ->
+        P2p_point.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
 
     end
 
     module Peer_id : sig
 
       val info :
-        t -> Peer_id.t -> P2p_types.Peer_info.t option
+        t -> P2p_peer.Id.t -> P2p_peer.Info.t option
 
       val list :
-        ?restrict: P2p_types.Peer_state.t list ->
-        t -> (Peer_id.t * P2p_types.Peer_info.t) list
+        ?restrict: P2p_peer.State.t list ->
+        t -> (P2p_peer.Id.t * P2p_peer.Info.t) list
 
       val events :
         ?max: int -> ?rev: bool ->
-        t -> Peer_id.t ->
-        P2p_connection_pool_types.Peer_info.Event.t list
+        t -> P2p_peer.Id.t ->
+        P2p_peer.Pool_event.t list
 
       val watch :
-        t -> Peer_id.t ->
-        P2p_connection_pool_types.Peer_info.Event.t Lwt_stream.t * Lwt_watcher.stopper
+        t -> P2p_peer.Id.t ->
+        P2p_peer.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
 
     end
 

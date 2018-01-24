@@ -19,8 +19,6 @@
         infinitly. This would avoid the real peer to talk with us. And
         this might also have an influence on its "score". *)
 
-open P2p_types
-
 include Logging.Make(struct let name = "p2p.connection" end)
 
 type error += Decipher_error
@@ -28,8 +26,8 @@ type error += Invalid_message_size
 type error += Encoding_error
 type error += Rejected
 type error += Decoding_error
-type error += Myself of Id_point.t
-type error += Not_enough_proof_of_work of Peer_id.t
+type error += Myself of P2p_connection.Id.t
+type error += Not_enough_proof_of_work of P2p_peer.Id.t
 type error += Invalid_auth
 type error += Invalid_chunks_size of { value: int ; min: int ; max: int }
 
@@ -94,7 +92,7 @@ module Connection_message = struct
 
   type t = {
     port : int option ;
-    versions : Version.t list ;
+    versions : P2p_version.t list ;
     public_key : Crypto_box.public_key ;
     proof_of_work_stamp : Crypto_box.nonce ;
     message_nonce : Crypto_box.nonce ;
@@ -118,7 +116,7 @@ module Connection_message = struct
          (req "pubkey" Crypto_box.public_key_encoding)
          (req "proof_of_work_stamp" Crypto_box.nonce_encoding)
          (req "message_nonce" Crypto_box.nonce_encoding)
-         (req "versions" (Variable.list Version.encoding)))
+         (req "versions" (Variable.list P2p_version.encoding)))
 
   let write fd message =
     let encoded_message_len =
@@ -172,7 +170,7 @@ module Ack = struct
 end
 
 type authenticated_fd =
-  P2p_io_scheduler.connection * Connection_info.t * Crypto.data
+  P2p_io_scheduler.connection * P2p_connection.Info.t * Crypto.data
 
 let kick (fd, _ , cryptobox_data) =
   Ack.write fd cryptobox_data Nack >>= fun _ ->
@@ -187,9 +185,9 @@ let authenticate
     ~incoming fd (remote_addr, remote_socket_port as point)
     ?listening_port identity supported_versions =
   let local_nonce = Crypto_box.random_nonce () in
-  lwt_debug "Sending authenfication to %a" Point.pp point >>= fun () ->
+  lwt_debug "Sending authenfication to %a" P2p_point.Id.pp point >>= fun () ->
   Connection_message.write fd
-    { public_key = identity.Identity.public_key ;
+    { public_key = identity.P2p_identity.public_key ;
       proof_of_work_stamp = identity.proof_of_work_stamp ;
       message_nonce = local_nonce ;
       port = listening_port ;
@@ -200,16 +198,16 @@ let authenticate
   let id_point = remote_addr, remote_listening_port in
   let remote_peer_id = Crypto_box.hash msg.public_key in
   fail_unless
-    (remote_peer_id <> identity.Identity.peer_id)
+    (remote_peer_id <> identity.P2p_identity.peer_id)
     (Myself id_point) >>=? fun () ->
   fail_unless
     (Crypto_box.check_proof_of_work
        msg.public_key msg.proof_of_work_stamp proof_of_work_target)
     (Not_enough_proof_of_work remote_peer_id) >>=? fun () ->
   let channel_key =
-    Crypto_box.precompute identity.Identity.secret_key msg.public_key in
+    Crypto_box.precompute identity.P2p_identity.secret_key msg.public_key in
   let info =
-    { Connection_info.peer_id = remote_peer_id ;
+    { P2p_connection.Info.peer_id = remote_peer_id ;
       versions = msg.versions ; incoming ;
       id_point ; remote_socket_port ;} in
   let cryptobox_data =
@@ -219,7 +217,7 @@ let authenticate
 
 type connection = {
   id : int ;
-  info : Connection_info.t ;
+  info : P2p_connection.Info.t ;
   fd : P2p_io_scheduler.connection ;
   cryptobox_data : Crypto.data ;
 }
@@ -254,7 +252,7 @@ module Reader = struct
           end >>=? fun buf ->
           lwt_debug
             "reading %d bytes from %a"
-            (MBytes.length buf) Connection_info.pp st.conn.info >>= fun () ->
+            (MBytes.length buf) P2p_connection.Info.pp st.conn.info >>= fun () ->
           loop (decode_next_buf buf) in
     loop
       (Data_encoding.Binary.read_stream_of_bytes ~init:init_mbytes st.encoding)
@@ -282,7 +280,7 @@ module Reader = struct
         Lwt.return_unit
     | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
         lwt_debug "connection closed to %a"
-          Connection_info.pp st.conn.info >>= fun () ->
+          P2p_connection.Info.pp st.conn.info >>= fun () ->
         Lwt.return_unit
     | Error _ as err ->
         Lwt_pipe.safe_push_now st.messages err ;
@@ -335,7 +333,7 @@ module Writer = struct
             Crypto.write_chunk st.conn.fd st.conn.cryptobox_data buf
           end >>=? fun () ->
           lwt_debug "writing %d bytes to %a"
-            (MBytes.length buf) Connection_info.pp st.conn.info >>= fun () ->
+            (MBytes.length buf) P2p_connection.Info.pp st.conn.info >>= fun () ->
           loop l in
     loop buf
 
@@ -350,12 +348,12 @@ module Writer = struct
     end >>= function
     | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
         lwt_debug "connection closed to %a"
-          Connection_info.pp st.conn.info >>= fun () ->
+          P2p_connection.Info.pp st.conn.info >>= fun () ->
         Lwt.return_unit
     | Error err ->
         lwt_log_error
           "@[<v 2>error writing to %a@ %a@]"
-          Connection_info.pp st.conn.info pp_print_error err >>= fun () ->
+          P2p_connection.Info.pp st.conn.info pp_print_error err >>= fun () ->
         Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
     | Ok (buf, wakener) ->
@@ -372,17 +370,17 @@ module Writer = struct
             match err with
             | [ Lwt_utils.Canceled | Exn Lwt_pipe.Closed ] ->
                 lwt_debug "connection closed to %a"
-                  Connection_info.pp st.conn.info >>= fun () ->
+                  P2p_connection.Info.pp st.conn.info >>= fun () ->
                 Lwt.return_unit
             | [ P2p_io_scheduler.Connection_closed ] ->
                 lwt_debug "connection closed to %a"
-                  Connection_info.pp st.conn.info >>= fun () ->
+                  P2p_connection.Info.pp st.conn.info >>= fun () ->
                 Lwt_canceler.cancel st.canceler >>= fun () ->
                 Lwt.return_unit
             | err ->
                 lwt_log_error
                   "@[<v 2>error writing to %a@ %a@]"
-                  Connection_info.pp st.conn.info
+                  P2p_connection.Info.pp st.conn.info
                   pp_print_error err >>= fun () ->
                 Lwt_canceler.cancel st.canceler >>= fun () ->
                 Lwt.return_unit
@@ -447,7 +445,7 @@ type 'msg t = {
 
 let equal { conn = { id = id1 } } { conn = { id = id2 } } = id1 = id2
 
-let pp ppf { conn } = Connection_info.pp ppf conn.info
+let pp ppf { conn } = P2p_connection.Info.pp ppf conn.info
 let info { conn } = conn.info
 
 let accept
@@ -497,7 +495,7 @@ let pp_json encoding ppf msg =
 let write { writer ; conn } msg =
   catch_closed_pipe begin fun () ->
     debug "Sending message to %a: %a"
-      P2p_types.Peer_id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
+      P2p_peer.Id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
     Lwt.return (Writer.encode_message writer msg) >>=? fun buf ->
     Lwt_pipe.push writer.messages (buf, None) >>= return
   end
@@ -506,7 +504,7 @@ let write_sync { writer ; conn } msg =
   catch_closed_pipe begin fun () ->
     let waiter, wakener = Lwt.wait () in
     debug "Sending message to %a: %a"
-      P2p_types.Peer_id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
+      P2p_peer.Id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
     Lwt.return (Writer.encode_message writer msg) >>=? fun buf ->
     Lwt_pipe.push writer.messages (buf, Some wakener) >>= fun () ->
     waiter
@@ -514,7 +512,7 @@ let write_sync { writer ; conn } msg =
 
 let write_now { writer ; conn } msg =
   debug "Try sending message to %a: %a"
-    P2p_types.Peer_id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
+    P2p_peer.Id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
   Writer.encode_message writer msg >>? fun buf ->
   try Ok (Lwt_pipe.push_now writer.messages (buf, None))
   with Lwt_pipe.Closed -> Error [P2p_io_scheduler.Connection_closed]

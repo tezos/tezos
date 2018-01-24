@@ -15,8 +15,6 @@
     limited by providing corresponding arguments to [accept].
 *)
 
-open P2p_types
-
 (** {1 Types} *)
 
 type error += Decipher_error
@@ -24,8 +22,8 @@ type error += Invalid_message_size
 type error += Encoding_error
 type error += Decoding_error
 type error += Rejected
-type error += Myself of Id_point.t
-type error += Not_enough_proof_of_work of Peer_id.t
+type error += Myself of P2p_connection.Id.t
+type error += Not_enough_proof_of_work of P2p_peer.Id.t
 type error += Invalid_auth
 type error += Invalid_chunks_size of { value: int ; min: int ; max: int }
 
@@ -40,17 +38,17 @@ type 'msg t
 val equal: 'mst t -> 'msg t -> bool
 
 val pp: Format.formatter -> 'msg t -> unit
-val info: 'msg t -> Connection_info.t
+val info: 'msg t -> P2p_connection.Info.t
 
 (** {1 Low-level functions (do not use directly)} *)
 
 val authenticate:
   proof_of_work_target:Crypto_box.target ->
   incoming:bool ->
-  P2p_io_scheduler.connection -> Point.t ->
+  P2p_io_scheduler.connection -> P2p_point.Id.t ->
   ?listening_port: int ->
-  Identity.t -> Version.t list ->
-  (Connection_info.t * authenticated_fd) tzresult Lwt.t
+  P2p_identity.t -> P2p_version.t list ->
+  (P2p_connection.Info.t * authenticated_fd) tzresult Lwt.t
 (** (Low-level) (Cancelable) Authentication function of a remote
     peer. Used in [P2p_connection_pool], to promote a
     [P2P_io_scheduler.connection] into an [authenticated_fd] (auth
@@ -112,7 +110,7 @@ val read_now: 'msg t -> (int * 'msg) tzresult option
     is not empty, [None] if it is empty, or fails with a correponding
     error otherwise. *)
 
-val stat: 'msg t -> Stat.t
+val stat: 'msg t -> P2p_stat.t
 (** [stat conn] is a snapshot of current bandwidth usage for
     [conn]. *)
 

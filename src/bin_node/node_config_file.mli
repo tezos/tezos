@@ -80,8 +80,8 @@ val to_string: t -> string
 val read: string -> t tzresult Lwt.t
 val write: string -> t -> unit tzresult Lwt.t
 
-val resolve_listening_addrs: string -> (P2p_types.addr * int) list Lwt.t
-val resolve_rpc_listening_addrs: string -> (P2p_types.addr * int) list Lwt.t
-val resolve_bootstrap_addrs: string list -> (P2p_types.addr * int) list Lwt.t
+val resolve_listening_addrs: string -> (P2p_addr.t * int) list Lwt.t
+val resolve_rpc_listening_addrs: string -> (P2p_addr.t * int) list Lwt.t
+val resolve_bootstrap_addrs: string list -> (P2p_addr.t * int) list Lwt.t
 
 val check: t -> unit Lwt.t

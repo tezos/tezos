@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open P2p_types
 include Logging.Make (struct let name = "test-p2p-io-scheduler" end)
 
 exception Error of error list
@@ -89,18 +88,18 @@ let server
       ~read_buffer_size
       () in
   Moving_average.on_update begin fun () ->
-    log_notice "Stat: %a" Stat.pp (P2p_io_scheduler.global_stat sched) ;
+    log_notice "Stat: %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
     if display_client_stat then
       P2p_io_scheduler.iter_connection sched
         (fun id conn ->
-           log_notice " client(%d) %a" id Stat.pp (P2p_io_scheduler.stat conn)) ;
+           log_notice " client(%d) %a" id P2p_stat.pp (P2p_io_scheduler.stat conn)) ;
   end ;
   (* Accept and read message until the connection is closed. *)
   accept_n main_socket n >>=? fun conns ->
   let conns = List.map (P2p_io_scheduler.register sched) conns in
   Lwt.join (List.map receive conns) >>= fun () ->
   iter_p P2p_io_scheduler.close conns >>=? fun () ->
-  log_notice "OK %a" Stat.pp (P2p_io_scheduler.global_stat sched) ;
+  log_notice "OK %a" P2p_stat.pp (P2p_io_scheduler.global_stat sched) ;
   return ()
 
 let max_size ?max_upload_speed () =
@@ -131,7 +130,7 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
              Lwt_unix.sleep time >>= return ] >>=? fun () ->
   P2p_io_scheduler.close conn >>=? fun () ->
   let stat = P2p_io_scheduler.stat conn in
-  lwt_log_notice "Client OK %a" Stat.pp stat >>= fun () ->
+  lwt_log_notice "Client OK %a" P2p_stat.pp stat >>= fun () ->
   return ()
 
 let run

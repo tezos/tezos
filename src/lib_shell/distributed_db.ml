@@ -15,8 +15,8 @@ type connection = (Message.t, Metadata.t) P2p.connection
 
 type 'a request_param = {
   data: 'a ;
-  active: unit -> P2p.Peer_id.Set.t ;
-  send: P2p.Peer_id.t -> Message.t -> unit ;
+  active: unit -> P2p_peer.Set.t ;
+  send: P2p_peer.Id.t -> Message.t -> unit ;
 }
 
 module Make_raw
@@ -292,15 +292,15 @@ module Raw_protocol =
 
 type callback = {
   notify_branch:
-    P2p.Peer_id.t -> Block_locator.t -> unit ;
+    P2p_peer.Id.t -> Block_locator.t -> unit ;
   notify_head:
-    P2p.Peer_id.t -> Block_header.t -> Mempool.t -> unit ;
-  disconnection: P2p.Peer_id.t -> unit ;
+    P2p_peer.Id.t -> Block_header.t -> Mempool.t -> unit ;
+  disconnection: P2p_peer.Id.t -> unit ;
 }
 
 type db = {
   p2p: p2p ;
-  p2p_readers: p2p_reader P2p.Peer_id.Table.t ;
+  p2p_readers: p2p_reader P2p_peer.Table.t ;
   disk: State.t ;
   active_nets: net_db Net_id.Table.t ;
   protocol_db: Raw_protocol.t ;
@@ -316,12 +316,12 @@ and net_db = {
   operation_hashes_db: Raw_operation_hashes.t ;
   operations_db: Raw_operations.t ;
   mutable callback: callback ;
-  active_peers: P2p.Peer_id.Set.t ref ;
-  active_connections: p2p_reader P2p.Peer_id.Table.t ;
+  active_peers: P2p_peer.Set.t ref ;
+  active_connections: p2p_reader P2p_peer.Table.t ;
 }
 
 and p2p_reader = {
-  gid: P2p.Peer_id.t ;
+  gid: P2p_peer.Id.t ;
   conn: connection ;
   peer_active_nets: net_db Net_id.Table.t ;
   canceler: Lwt_canceler.t ;
@@ -418,8 +418,8 @@ module P2p_reader = struct
         match Net_id.Table.find global_db.active_nets net_id with
         | net_db ->
             net_db.active_peers :=
-              P2p.Peer_id.Set.add state.gid !(net_db.active_peers) ;
-            P2p.Peer_id.Table.add net_db.active_connections
+              P2p_peer.Set.add state.gid !(net_db.active_peers) ;
+            P2p_peer.Table.add net_db.active_connections
               state.gid state ;
             Net_id.Table.add state.peer_active_nets net_id net_db ;
             f net_db
@@ -430,8 +430,8 @@ module P2p_reader = struct
   let deactivate state net_db =
     net_db.callback.disconnection state.gid ;
     net_db.active_peers :=
-      P2p.Peer_id.Set.remove state.gid !(net_db.active_peers) ;
-    P2p.Peer_id.Table.remove net_db.active_connections state.gid
+      P2p_peer.Set.remove state.gid !(net_db.active_peers) ;
+    P2p_peer.Table.remove net_db.active_connections state.gid
 
   let may_handle state net_id f =
     match Net_id.Table.find state.peer_active_nets net_id with
@@ -456,7 +456,7 @@ module P2p_reader = struct
     let open Logging in
 
     lwt_debug "Read message from %a: %a"
-      P2p.Peer_id.pp_short state.gid Message.pp_json msg >>= fun () ->
+      P2p_peer.Id.pp_short state.gid Message.pp_json msg >>= fun () ->
 
     match msg with
 
@@ -639,7 +639,7 @@ module P2p_reader = struct
         Net_id.Table.iter
           (fun _ -> deactivate state)
           state.peer_active_nets ;
-        P2p.Peer_id.Table.remove global_db.p2p_readers state.gid ;
+        P2p_peer.Table.remove global_db.p2p_readers state.gid ;
         Lwt.return_unit
 
   let run db gid conn =
@@ -657,10 +657,10 @@ module P2p_reader = struct
     state.worker <-
       Lwt_utils.worker
         (Format.asprintf "db_network_reader.%a"
-           P2p.Peer_id.pp_short gid)
+           P2p_peer.Id.pp_short gid)
         ~run:(fun () -> worker_loop db state)
         ~cancel:(fun () -> Lwt_canceler.cancel canceler) ;
-    P2p.Peer_id.Table.add db.p2p_readers gid state
+    P2p_peer.Table.add db.p2p_readers gid state
 
   let shutdown s =
     Lwt_canceler.cancel s.canceler >>= fun () ->
@@ -671,9 +671,9 @@ end
 let active_peer_ids p2p () =
   List.fold_left
     (fun acc conn ->
-       let { P2p.Connection_info.peer_id } = P2p.connection_info p2p conn in
-       P2p.Peer_id.Set.add peer_id acc)
-    P2p.Peer_id.Set.empty
+       let { P2p_connection.Info.peer_id } = P2p.connection_info p2p conn in
+       P2p_peer.Set.add peer_id acc)
+    P2p_peer.Set.empty
     (P2p.connections p2p)
 
 let raw_try_send p2p peer_id msg =
@@ -689,7 +689,7 @@ let create disk p2p =
     } in
   let protocol_db = Raw_protocol.create global_request disk in
   let active_nets = Net_id.Table.create 17 in
-  let p2p_readers = P2p.Peer_id.Table.create 17 in
+  let p2p_readers = P2p_peer.Table.create 17 in
   let block_input = Lwt_watcher.create_input () in
   let operation_input = Lwt_watcher.create_input () in
   let db =
@@ -704,7 +704,7 @@ let activate ({ p2p ; active_nets } as global_db) net_state =
   let net_id = State.Net.id net_state in
   match Net_id.Table.find active_nets net_id with
   | exception Not_found ->
-      let active_peers = ref P2p.Peer_id.Set.empty in
+      let active_peers = ref P2p_peer.Set.empty in
       let p2p_request =
         { data = () ;
           active = (fun () -> !active_peers) ;
@@ -724,7 +724,7 @@ let activate ({ p2p ; active_nets } as global_db) net_state =
         global_db ; operation_db ; block_header_db ;
         operation_hashes_db ; operations_db ;
         net_state ; callback = noop_callback ; active_peers ;
-        active_connections = P2p.Peer_id.Table.create 53 ;
+        active_connections = P2p_peer.Table.create 53 ;
       } in
       P2p.iter_connections p2p (fun _peer_id conn ->
           Lwt.async begin fun () ->
@@ -742,7 +742,7 @@ let deactivate net_db =
   let { active_nets ; p2p } = net_db.global_db in
   let net_id = State.Net.id net_db.net_state in
   Net_id.Table.remove active_nets net_id ;
-  P2p.Peer_id.Table.iter
+  P2p_peer.Table.iter
     (fun _peer_id reader ->
        P2p_reader.deactivate reader net_db  ;
        Lwt.async begin fun () ->
@@ -764,7 +764,7 @@ let disconnect { global_db = { p2p } } peer_id =
   | Some conn -> P2p.disconnect p2p conn
 
 let shutdown { p2p ; p2p_readers ; active_nets } =
-  P2p.Peer_id.Table.fold
+  P2p_peer.Table.fold
     (fun _peer_id reader acc ->
        P2p_reader.shutdown reader >>= fun () -> acc)
     p2p_readers
@@ -829,12 +829,12 @@ module type DISTRIBUTED_DB = sig
   type error += Timeout of key
   val fetch:
     t ->
-    ?peer:P2p.Peer_id.t ->
+    ?peer:P2p_peer.Id.t ->
     ?timeout:float ->
     key -> param -> value tzresult Lwt.t
   val prefetch:
     t ->
-    ?peer:P2p.Peer_id.t ->
+    ?peer:P2p_peer.Id.t ->
     ?timeout:float ->
     key -> param -> unit
   type error += Canceled of key
@@ -913,14 +913,14 @@ end
 
 
 let broadcast net_db msg =
-  P2p.Peer_id.Table.iter
+  P2p_peer.Table.iter
     (fun _peer_id state ->
        ignore (P2p.try_send net_db.global_db.p2p state.conn msg))
     net_db.active_connections
 
 let try_send net_db peer_id msg =
   try
-    let conn = P2p.Peer_id.Table.find net_db.active_connections peer_id in
+    let conn = P2p_peer.Table.find net_db.active_connections peer_id in
     ignore (P2p.try_send net_db.global_db.p2p conn.conn msg : bool)
   with Not_found -> ()
 

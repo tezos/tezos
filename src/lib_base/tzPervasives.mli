@@ -42,5 +42,13 @@ module Operation_list_list_hash = Operation_list_list_hash
 module Context_hash = Context_hash
 module Protocol_hash = Protocol_hash
 
+module P2p_addr = P2p_addr
+module P2p_identity = P2p_identity
+module P2p_peer = P2p_peer
+module P2p_point = P2p_point
+module P2p_connection = P2p_connection
+module P2p_stat = P2p_stat
+module P2p_version = P2p_version
+
 include (module type of (struct include Utils.Infix end))
 include (module type of (struct include Error_monad end))

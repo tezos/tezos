@@ -155,19 +155,17 @@ val bootstrapped:
 
 module Network : sig
 
-  open P2p_types
-
   val stat:
-    #Client_rpcs.ctxt -> Stat.t tzresult Lwt.t
+    #Client_rpcs.ctxt -> P2p_stat.t tzresult Lwt.t
 
   val connections:
-    #Client_rpcs.ctxt -> Connection_info.t list tzresult Lwt.t
+    #Client_rpcs.ctxt -> P2p_connection.Info.t list tzresult Lwt.t
 
   val peers:
-    #Client_rpcs.ctxt -> (Peer_id.t * P2p_types.Peer_info.t) list tzresult Lwt.t
+    #Client_rpcs.ctxt -> (P2p_peer.Id.t * P2p_peer.Info.t) list tzresult Lwt.t
 
   val points:
-    #Client_rpcs.ctxt -> (Point.t * P2p_types.Point_info.t) list tzresult Lwt.t
+    #Client_rpcs.ctxt -> (P2p_point.Id.t * P2p_point.Info.t) list tzresult Lwt.t
 
 end
 
