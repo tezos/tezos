@@ -261,9 +261,9 @@ let test_ancestor s =
 (** Chain_traversal.block_locator *)
 
 let test_locator s =
-  let check_locator h1 expected =
+  let check_locator length h1 expected =
     State.compute_locator s.net
-      ~size:(List.length expected) (vblock s h1) >>= fun l ->
+      ~size:length (vblock s h1) >>= fun l ->
     let _, l = (l : Block_locator.t :> _ * _) in
     if List.length l <> List.length expected then
       Assert.fail_msg
@@ -275,9 +275,11 @@ let test_locator s =
            Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
       l expected ;
     Lwt.return_unit in
-  check_locator "A8" ["A7";"A6";"A5";"A4";"A3";"A2"] >>= fun () ->
-  check_locator "B8" ["B7";"B6";"B5";"B4";"B3";"B2";"B1";"A3"] >>= fun () ->
-  check_locator "B8" ["B7";"B6";"B5";"B4"] >>= fun () ->
+  check_locator 6 "A8" ["A7";"A6";"A5";"A4";"A3";"A2"] >>= fun () ->
+  check_locator 8 "B8" ["B7";"B6";"B5";"B4";"B3";"B2";"B1";"A3"] >>= fun () ->
+  check_locator 4 "B8" ["B7";"B6";"B5";"B4"] >>= fun () ->
+  check_locator 0 "A5" [] >>= fun () ->
+  check_locator 100 "A5" ["A4";"A3";"A2";"A1";"Genesis"] >>= fun () ->
   return ()
 
 
