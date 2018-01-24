@@ -48,7 +48,8 @@ type rest_error =
                                 content: string ;
                                 media_type: string option }
   | Unexpected_content_type of { received: string ;
-                                 acceptable: string list }
+                                 acceptable: string list ;
+                                 body : string }
   | Unexpected_content of { content: string ;
                             media_type: string ;
                             error: string }

@@ -39,7 +39,8 @@ type rest_error =
                                 content: string ;
                                 media_type: string option }
   | Unexpected_content_type of { received: string ;
-                                 acceptable: string list }
+                                 acceptable: string list ;
+                                 body : string}
   | Unexpected_content of { content: string ;
                             media_type: string ;
                             error: string }
@@ -102,16 +103,17 @@ let rest_error_encoding =
            let code = Cohttp.Code.status_of_code code in
            Unexpected_status_code { code ; content ; media_type }) ;
       case (Tag  7)
-        (obj3
+        (obj4
            (req "kind" (constant "unexpected_content_type"))
            (req "received" string)
-           (req "acceptable" (list string)))
+           (req "acceptable" (list string))
+           (req "body" string))
         (function
-          | Unexpected_content_type { received ; acceptable } ->
-              Some ((), received, acceptable)
+          | Unexpected_content_type { received ; acceptable ; body } ->
+              Some ((), received, acceptable, body)
           | _ -> None)
-        (function ((), received, acceptable) ->
-           Unexpected_content_type { received ; acceptable }) ;
+        (function ((), received, acceptable, body) ->
+           Unexpected_content_type { received ; acceptable ; body }) ;
       case (Tag  8)
         (obj4
            (req "kind" (constant "unexpected_content"))
@@ -165,9 +167,11 @@ let pp_rest_error ppf err =
       Format.fprintf ppf
         "@[<v 2>Unexpected error %d:@,%S"
         (Cohttp.Code.code_of_status code) content
-  | Unexpected_content_type { received ; acceptable = _ } ->
+  | Unexpected_content_type { received ; acceptable = _ ; body } ->
       Format.fprintf ppf
-        "The server answered with a media type we do not understand: %s" received
+        "@[<v 0>The server answered with a media type we do not understand: %s.@,\
+         The response body was:@,\
+         %s@]" received body
   | Unexpected_content { content ; media_type ; error } ->
       Format.fprintf ppf
         "@[<v 2>Failed to parse the answer (%s):@,@[<v 2>error:@ %s@]@,@[<v 2>content:@ %S@]@]"
@@ -261,9 +265,11 @@ let handle_error meth uri (body, media, _) f =
                                     error = msg })
       end
     | Some (l, r) ->
+        Cohttp_lwt.Body.to_string body >>= fun body ->
         request_failed meth uri
           (Unexpected_content_type { received = l^"/"^r ;
-                                     acceptable = [Media_type.(name json)] })
+                                     acceptable = [Media_type.(name json)] ;
+                                     body })
 
 let generic_json_call ?logger ?body meth uri : (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t =
   let body =
@@ -298,10 +304,12 @@ let generic_json_call ?logger ?body meth uri : (Data_encoding.json, Data_encodin
                          (module Json_repr.Ezjsonm)
                          bson))
     end
-  | `Ok (_body, Some (l, r), _) ->
+  | `Ok (body, Some (l, r), _) ->
+      Cohttp_lwt.Body.to_string body >>= fun body ->
       request_failed meth uri
         (Unexpected_content_type { received = l^"/"^r ;
-                                   acceptable = [Media_type.(name json)] })
+                                   acceptable = [Media_type.(name json)] ;
+                                   body })
   | `Conflict body ->
       handle_error meth uri body (fun v -> `Conflict v)
   | `Error body ->
@@ -344,13 +352,15 @@ let handle accept (meth, uri, ans) =
   | `Unexpected_error_content ((content, media_type), error) ->
       let media_type = Media_type.name media_type in
       request_failed meth uri (Unexpected_content { content ; media_type ; error })
-  | `Unexpected_error_content_type (_, media)
-  | `Unexpected_content_type (_, media) ->
+  | `Unexpected_error_content_type (body, media)
+  | `Unexpected_content_type (body, media) ->
+      Cohttp_lwt.Body.to_string body >>= fun body ->
       let received =
         Option.unopt_map media ~default:"" ~f:(fun (l, r) -> l^"/"^r) in
       request_failed meth uri
         (Unexpected_content_type { received ;
-                                   acceptable = List.map Media_type.name accept })
+                                   acceptable = List.map Media_type.name accept ;
+                                   body})
   | `Connection_failed msg ->
       request_failed meth uri (Connection_failed msg)
 
