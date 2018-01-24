@@ -4,7 +4,6 @@
  ((name tezos_rpc_http)
   (public_name tezos-rpc-http)
   (libraries (tezos-base
-              ocplib-resto-directory
               ocplib-resto-cohttp))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
