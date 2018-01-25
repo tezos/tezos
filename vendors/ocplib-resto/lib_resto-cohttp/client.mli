@@ -31,7 +31,8 @@ module Make (Encoding : Resto.ENCODING) : sig
     | `Unsupported_media_type
     | `Not_acceptable of string
     | `Unexpected_status_code of Cohttp.Code.status_code * content
-    | `Connection_failed of string ]
+    | `Connection_failed of string
+    | `OCaml_exception of string ]
 
   module type LOGGER = sig
     type request

@@ -53,6 +53,7 @@ type rest_error =
   | Unexpected_content of { content: string ;
                             media_type: string ;
                             error: string }
+  | OCaml_exception of string
   | Generic_error (* temporary *)
 
 type error +=

@@ -44,6 +44,7 @@ type rest_error =
   | Unexpected_content of { content: string ;
                             media_type: string ;
                             error: string }
+  | OCaml_exception of string
   | Generic_error (* temporary *)
 
 let rest_error_encoding =
@@ -126,6 +127,12 @@ let rest_error_encoding =
           | _ -> None)
         (function ((), content, media_type, error) ->
            Unexpected_content { content ; media_type ; error  }) ;
+      case (Tag  9)
+        (obj2
+           (req "kind" (constant "ocaml_exception"))
+           (req "content" string))
+        (function OCaml_exception msg -> Some ((), msg) | _ -> None)
+        (function ((), msg) -> OCaml_exception msg) ;
     ]
 
 let pp_rest_error ppf err =
@@ -176,6 +183,10 @@ let pp_rest_error ppf err =
       Format.fprintf ppf
         "@[<v 2>Failed to parse the answer (%s):@,@[<v 2>error:@ %s@]@,@[<v 2>content:@ %S@]@]"
         media_type error content
+  | OCaml_exception msg ->
+      Format.fprintf ppf
+        "@[<v 2>The server failed with an unexpected exception:@ %s@]"
+        msg
   | Generic_error ->
       Format.fprintf ppf
         "Generic error"
@@ -247,6 +258,8 @@ let generic_call ?logger ?accept ?body ?media meth uri : (content, content) rest
       request_failed meth uri (Bad_request msg)
   | `Connection_failed msg ->
       request_failed meth uri (Connection_failed msg)
+  | `OCaml_exception msg ->
+      request_failed meth uri (OCaml_exception msg)
 
 let handle_error meth uri (body, media, _) f =
   Cohttp_lwt.Body.is_empty body >>= fun empty ->
@@ -363,6 +376,8 @@ let handle accept (meth, uri, ans) =
                                    body})
   | `Connection_failed msg ->
       request_failed meth uri (Connection_failed msg)
+  | `OCaml_exception msg ->
+      request_failed meth uri (OCaml_exception msg)
 
 let call_streamed_service
     (type p q i o )

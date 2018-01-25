@@ -32,7 +32,8 @@ module Make (Encoding : Resto.ENCODING) = struct
     | `Unsupported_media_type
     | `Not_acceptable of string
     | `Unexpected_status_code of Cohttp.Code.status_code * content
-    | `Connection_failed of string ]
+    | `Connection_failed of string
+    | `OCaml_exception of string ]
 
   type ('o, 'e) service_result =
     [ ('o, 'e option) generic_rest_result
@@ -174,7 +175,12 @@ module Make (Encoding : Resto.ENCODING) = struct
       | `Forbidden -> Lwt.return (`Forbidden (ansbody, media_name, media))
       | `Not_found -> Lwt.return (`Not_found (ansbody, media_name, media))
       | `Conflict -> Lwt.return (`Conflict (ansbody, media_name, media))
-      | `Internal_server_error -> Lwt.return (`Error (ansbody, media_name, media))
+      | `Internal_server_error ->
+          if media_name = Some ("text", "ocaml.exception") then
+            Cohttp_lwt.Body.to_string ansbody >>= fun msg ->
+            Lwt.return (`OCaml_exception msg)
+          else
+            Lwt.return (`Error (ansbody, media_name, media))
       | `Bad_request ->
           Cohttp_lwt.Body.to_string body >>= fun body ->
           Lwt.return (`Bad_request body)
@@ -286,7 +292,8 @@ module Make (Encoding : Resto.ENCODING) = struct
       | `Unsupported_media_type
       | `Not_acceptable _
       | `Unexpected_status_code _
-      | `Connection_failed _ as err -> Lwt.return err
+      | `Connection_failed _
+      | `OCaml_exception _ as err -> Lwt.return err
     end >>= fun ans ->
     Lwt.return (meth, uri, ans)
 
@@ -354,7 +361,8 @@ module Make (Encoding : Resto.ENCODING) = struct
       | `Unsupported_media_type
       | `Not_acceptable _
       | `Unexpected_status_code _
-      | `Connection_failed _ as err -> Lwt.return err
+      | `Connection_failed _
+      | `OCaml_exception _ as err -> Lwt.return err
     end >>= fun ans ->
     Lwt.return (meth, uri, ans)
 
