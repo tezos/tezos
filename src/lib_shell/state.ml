@@ -243,10 +243,11 @@ let predecessor_n (store: Store.Block.store) (b: Block_hash.t) (distance: int)
     in
     loop b distance
 
-let compute_locator_from_hash (net : net_state) ?(size = 200) head =
+let compute_locator_from_hash (net : net_state) ?(size = 200) head_hash =
   Shared.use net.block_store begin fun block_store ->
-    Store.Block.Contents.read_exn (block_store, head) >>= fun { header } ->
-    Block_locator.compute ~pred:(predecessor block_store) head header size
+    Store.Block.Contents.read_exn (block_store, head_hash) >>= fun { header } ->
+    Block_locator.compute ~predecessor:(predecessor_n block_store)
+      ~genesis:net.genesis.block head_hash header size
   end
 
 let compute_locator net ?size head =

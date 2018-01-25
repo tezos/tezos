@@ -23,24 +23,39 @@ let encoding =
      (req "current_head" (dynamic_size Block_header.encoding))
      (req "history" (dynamic_size (list Block_hash.encoding))))
 
-let compute ~pred (h: Block_hash.t) (bh: Block_header.t) sz =
-  let rec loop acc ~sz step cpt b =
-    if sz = 0 then
-      Lwt.return (List.rev acc)
-    else
-      pred b step >>= function
-      | None ->
-          Lwt.return (List.rev (b :: acc))
-      | Some predecessor ->
-          if cpt = 0 then
-            loop (b :: acc) ~sz:(sz - 1) (step * 2) 10 predecessor
-          else
-            loop (b :: acc) ~sz:(sz - 1) step (cpt - 1) predecessor in
-  pred h 1 >>= function
-  | None -> Lwt.return (bh, [])
-  | Some p ->
-      loop [] ~sz 1 9 p >>= fun hist ->
-      Lwt.return (bh, hist)
+(** 
+   Computes a locator for block [b] picking 10 times the immediate
+   predecessors of [b], then 10 times one predecessor every 2, then 
+   10 times one predecessor every 4, ..., until genesis or it reaches 
+   the desired size.
+*)
+let compute ~predecessor ~genesis b header size =
+  if size < 0 then invalid_arg "compute: negative size" else
+    let repeats = 10 in (* number of repetitions for each power of 2 *)
+    let rec loop acc size step cnt b =
+      if size = 0 then
+        Lwt.return (List.rev acc)
+      else
+        predecessor b step >>= function
+        | None ->      (* reached genesis before size *)
+            if Block_hash.equal b genesis then
+              Lwt.return (List.rev acc)
+            else
+              Lwt.return (List.rev (genesis :: acc))
+        | Some pred ->
+            if cnt = 1 then
+              loop (pred :: acc) (size - 1)
+                (step * 2) repeats pred
+            else
+              loop (pred :: acc) (size - 1)
+                step (cnt - 1) pred
+    in
+    if size = 0 then Lwt.return (header, []) else
+      predecessor b 1 >>= function
+      | None -> Lwt.return (header, [])
+      | Some p ->
+          loop [p] (size-1) 1 repeats p >>= fun hist ->
+          Lwt.return (header, hist)
 
 type validity =
   | Unknown
