@@ -144,6 +144,48 @@ let rec predecessor (store : Store.Block.store) (b: Block_hash.t) n =
       predecessor store pred (n-1)
   end
 
+(** The number of predecessors stored per block.
+    This value chosen to compute efficiently block locators that
+    can cover a chain of 2 months, at 1 block/min, which is ~86K
+    blocks at the cost in space of ~72MB.
+    |locator| = log2(|chain|/10) -1
+*)
+let stored_predecessors_size = 12
+
+(**
+   Takes a block and populates its predecessors store, under the
+   assumption that all its predecessors have their store already
+   populated. The precedecessors are distributed along the chain, up
+   to the genesis, at a distance from [b] that grows exponentially.
+   The store tabulates a function [p] from distances to block_ids such
+   that if [p(b,d)=b'] then [b'] is at distance 2^d from [b].
+   Example of how previous predecessors are used:
+   p(n,0) = n-1
+   p(n,1) = n-2  = p(n-1,0)
+   p(n,2) = n-4  = p(n-2,1)
+   p(n,3) = n-8  = p(n-4,2)
+   p(n,4) = n-16 = p(n-8,3)
+*)
+let store_predecessors (store: Store.Block.store) (b: Block_hash.t) : unit Lwt.t =
+  let rec loop pred dist =
+    if dist = stored_predecessors_size
+    then Lwt.return_unit
+    else
+      Store.Block.Predecessors.read_opt (store, pred) (dist-1) >>= function
+      | None -> Lwt.return_unit (* we reached genesis *)
+      | Some p ->
+          Store.Block.Predecessors.store (store, b) dist p >>= fun () ->
+          loop p (dist+1)
+  in
+  (* the first predecessor is fetched from the header *)
+  Store.Block.Contents.read_exn (store, b) >>= fun contents ->
+  let pred = contents.header.shell.predecessor in
+  if Block_hash.equal b pred then
+    Lwt.return_unit  (* genesis *)
+  else
+    Store.Block.Predecessors.store (store,b) 0 pred >>= fun () ->
+    loop pred 1
+
 let compute_locator_from_hash (net : net_state) ?(size = 200) head =
   Shared.use net.block_store begin fun block_store ->
     Store.Block.Contents.read_exn (block_store, head) >>= fun { header } ->
@@ -161,7 +203,7 @@ module Locked_block = struct
     let shell : Block_header.shell_header = {
       level = 0l ;
       proto_level = 0 ;
-      predecessor = genesis.block ;
+      predecessor = genesis.block ; (* genesis' predecessor is genesis *)
       timestamp = genesis.time ;
       fitness = [] ;
       validation_passes = 0 ;
@@ -447,7 +489,7 @@ module Block = struct
 
   let predecessor { net_state ; contents = { header } ; hash } =
     if Block_hash.equal hash header.shell.predecessor then
-      Lwt.return_none
+      Lwt.return_none           (* we are at genesis *)
     else
       read_exn net_state header.shell.predecessor >>= fun block ->
       Lwt.return (Some block)
@@ -507,6 +549,8 @@ module Block = struct
         Lwt_list.iteri_p
           (fun i ops -> Store.Block.Operations.store (store, hash) i ops)
           operations >>= fun () ->
+        (* Store predecessors *)
+        store_predecessors store hash >>= fun () ->
         (* Update the chain state. *)
         Shared.use net_state.chain_state begin fun chain_state ->
           let store = chain_state.chain_store in
