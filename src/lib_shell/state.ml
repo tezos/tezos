@@ -186,6 +186,63 @@ let store_predecessors (store: Store.Block.store) (b: Block_hash.t) : unit Lwt.t
     Store.Block.Predecessors.store (store,b) 0 pred >>= fun () ->
     loop pred 1
 
+(**
+   [predecessor s b d] returns the hash of the node at distance [d] from [b].
+   Returns [None] if [d] is greater than the distance of [b] from genesis or
+   if [b] is genesis.
+   Works in O(log|chain|) if the chain is shorter than 2^[stored_predecessors_size]
+   and in O(|chain|) after that.
+   @raise Invalid_argument "State.predecessors: negative distance"
+*)
+let predecessor_n (store: Store.Block.store) (b: Block_hash.t) (distance: int)
+  : Block_hash.t option Lwt.t =
+  (* helper functions *)
+  (* computes power of 2 w/o floats *)
+  let power_of_2 n =
+    if n < 0 then invalid_arg "negative argument" else
+      let rec loop cnt res =
+        if cnt<1 then res
+        else loop (cnt-1) (res*2)
+      in
+      loop n 1
+  in
+  (* computes the closest power of two smaller than a given
+     a number and the rest w/o floats *)
+  let closest_power_two_and_rest n =
+    if n < 0 then invalid_arg "negative argument" else
+      let rec loop cnt n rest =
+        if n<=1
+        then (cnt,rest)
+        else loop (cnt+1) (n/2) (rest + (power_of_2 cnt) * (n mod 2))
+      in
+      loop 0 n 0
+  in
+
+  (* actual predecessor function *)
+  if distance <= 0 then
+    invalid_arg ("State.predecessor: distance <= 0"^(string_of_int distance))
+  else
+    let rec loop b distance =
+      if distance = 1
+      then Store.Block.Predecessors.read_opt (store, b) 0
+      else
+        let (power,rest) = closest_power_two_and_rest distance in
+        let (power,rest) =
+          if power < stored_predecessors_size then (power,rest)
+          else
+            let power = stored_predecessors_size-1 in
+            let rest = distance - (power_of_2 power) in
+            (power,rest)
+        in
+        Store.Block.Predecessors.read_opt (store, b) power >>= function
+        | None -> Lwt.return_none (* reached genesis *)
+        | Some pred ->
+            if rest = 0
+            then Lwt.return_some pred (* landed on the requested predecessor *)
+            else loop pred rest       (* need to jump further back *)
+    in
+    loop b distance
+
 let compute_locator_from_hash (net : net_state) ?(size = 200) head =
   Shared.use net.block_store begin fun block_store ->
     Store.Block.Contents.read_exn (block_store, head) >>= fun { header } ->
