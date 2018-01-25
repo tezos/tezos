@@ -26,7 +26,7 @@ module Event : sig
           fitness : Fitness.t }
     | Could_not_switch_testnet of error list
   val level : t -> Logging.level
-  val encoding : error list Data_encoding.encoding -> t Data_encoding.encoding
+  val encoding : t Data_encoding.encoding
   val pp : Format.formatter -> t -> unit
 end
 

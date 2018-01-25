@@ -18,7 +18,7 @@ module type EVENT = sig
   type t
 
   val level : t -> Logging.level
-  val encoding : error list Data_encoding.t -> t Data_encoding.t
+  val encoding : t Data_encoding.t
   val pp : Format.formatter -> t -> unit
 end
 

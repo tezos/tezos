@@ -25,7 +25,7 @@ module Event : sig
     | Request of (Request.view * Worker_types.request_status * error list option)
     | Debug of string
   val level : t -> Logging.level
-  val encoding : error list Data_encoding.t -> t Data_encoding.t
+  val encoding : t Data_encoding.t
   val pp : Format.formatter -> t -> unit
 end
 

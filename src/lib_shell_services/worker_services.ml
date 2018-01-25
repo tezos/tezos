@@ -44,7 +44,7 @@ module Prevalidators = struct
       ~output:
         (Worker_types.full_status_encoding
            Prevalidator_worker_state.Request.encoding
-           (Prevalidator_worker_state.Event.encoding RPC_error.encoding)
+           Prevalidator_worker_state.Event.encoding
            RPC_error.encoding)
       RPC_path.(root / "workers" / "prevalidators" /: net_id_arg )
 
@@ -62,7 +62,7 @@ module Block_validator = struct
       ~output:
         (Worker_types.full_status_encoding
            Block_validator_worker_state.Request.encoding
-           (Block_validator_worker_state.Event.encoding RPC_error.encoding)
+           Block_validator_worker_state.Event.encoding
            RPC_error.encoding)
       RPC_path.(root / "workers" / "block_validator")
 
@@ -113,7 +113,7 @@ module Peer_validators = struct
       ~output:
         (Worker_types.full_status_encoding
            Peer_validator_worker_state.Request.encoding
-           (Peer_validator_worker_state.Event.encoding RPC_error.encoding)
+           Peer_validator_worker_state.Event.encoding
            RPC_error.encoding)
       RPC_path.(root / "workers" / "peer_validators" /: net_id_arg /: peer_id_arg)
 
@@ -154,10 +154,8 @@ module Net_validators = struct
       ~output:
         (Worker_types.full_status_encoding
            Net_validator_worker_state.Request.encoding
-           (Net_validator_worker_state.Event.encoding RPC_error.encoding)
+           Net_validator_worker_state.Event.encoding
            RPC_error.encoding)
       RPC_path.(root / "workers" / "net_validators" /: net_id_arg )
-
-end
 
 end

@@ -44,7 +44,7 @@ module type EVENT = sig
   val level : t -> Logging.level
 
   (** Serializer for the introspection RPCs *)
-  val encoding : error list Data_encoding.t -> t Data_encoding.t
+  val encoding : t Data_encoding.t
 
   (** Pretty printer, also used for logging *)
   val pp : Format.formatter -> t -> unit

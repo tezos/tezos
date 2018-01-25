@@ -46,7 +46,7 @@ module Event = struct
     | Validation_success _
     | Validation_failure _ -> Logging.Notice
 
-  let encoding error_encoding =
+  let encoding =
     let open Data_encoding in
     union
       [ case (Tag 0)
@@ -63,7 +63,7 @@ module Event = struct
           (obj3
              (req "failed_validation" Request.encoding)
              (req "status" Worker_types.request_status_encoding)
-             (dft "errors" error_encoding []))
+             (dft "errors" RPC_error.encoding []))
           (function Validation_failure (r, s, err) -> Some (r, s, err) | _ -> None)
           (fun (r, s, err) -> Validation_failure (r, s, err)) ]
 

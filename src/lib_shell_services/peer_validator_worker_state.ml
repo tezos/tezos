@@ -47,7 +47,7 @@ module Event = struct
     | Debug _ -> Logging.Info
     | Request _ -> Logging.Notice
 
-  let encoding error_encoding =
+  let encoding =
     let open Data_encoding in
     union
       [ case (Tag 0)
@@ -62,7 +62,7 @@ module Event = struct
           (fun (req, t) -> Request (req, t, None)) ;
         case (Tag 2)
           (obj3
-             (req "error" error_encoding)
+             (req "error" RPC_error.encoding)
              (req "failed_request" Request.encoding)
              (req "status" Worker_types.request_status_encoding))
           (function Request (req, t, Some errs) -> Some (errs, req, t) | _ -> None)

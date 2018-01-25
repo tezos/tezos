@@ -35,7 +35,7 @@ module Event = struct
         end
     | Could_not_switch_testnet _ -> Logging.Error
 
-  let encoding error_encoding =
+  let encoding =
     let open Data_encoding in
     union
       [ case (Tag 0)
@@ -54,7 +54,7 @@ module Event = struct
           (fun (request, request_status, update, fitness) ->
              Processed_block { request ; request_status ; update ; fitness }) ;
         case (Tag 1)
-          error_encoding
+          RPC_error.encoding
           (function
             | Could_not_switch_testnet err -> Some err
             | _ -> None)
