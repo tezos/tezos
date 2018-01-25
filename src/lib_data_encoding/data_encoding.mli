@@ -459,7 +459,7 @@ module Bson : sig
 
   type t = Json_repr_bson.bson
 
- (** Construct a BSON object from an encoding. *)
+  (** Construct a BSON object from an encoding. *)
   val construct : 't encoding -> 't -> bson
 
   (** Destruct a BSON object into a value.

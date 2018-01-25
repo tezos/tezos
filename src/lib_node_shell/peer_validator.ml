@@ -192,8 +192,8 @@ let rec worker_loop pv =
   | Ok () ->
       worker_loop pv
   | Error ((( Unknown_ancestor
-           | Bootstrap_pipeline.Invalid_locator _
-           | Block_validator.Invalid_block _ ) :: _) as errors ) ->
+            | Bootstrap_pipeline.Invalid_locator _
+            | Block_validator.Invalid_block _ ) :: _) as errors ) ->
       (* TODO ban the peer_id... *)
       lwt_log_info "Terminating the validation worker for peer %a (kickban)."
         P2p.Peer_id.pp_short pv.peer_id >>= fun () ->

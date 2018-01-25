@@ -203,11 +203,11 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
             (if rpc_config.tls = None then "" else " (TLS enabled)") >>= fun () ->
           Lwt.catch
             (fun () ->
-             RPC_server.launch ~host mode dir
-              ~media_types:Media_type.all_media_types
-              ~cors:{ allowed_origins = rpc_config.cors_origins ;
-                      allowed_headers = rpc_config.cors_headers } >>= fun server ->
-             return (Some server))
+               RPC_server.launch ~host mode dir
+                 ~media_types:Media_type.all_media_types
+                 ~cors:{ allowed_origins = rpc_config.cors_origins ;
+                         allowed_headers = rpc_config.cors_headers } >>= fun server ->
+               return (Some server))
             (function
               |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
                   fail (RPC_Port_already_in_use addr)

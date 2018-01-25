@@ -345,7 +345,7 @@ let handle accept (meth, uri, ans) =
   | `Unexpected_status_code (code, (content, _, media_type)) ->
       let media_type = Option.map media_type ~f:Media_type.name in
       Cohttp_lwt.Body.to_string content >>= fun content ->
-       request_failed meth uri (Unexpected_status_code { code ; content ; media_type })
+      request_failed meth uri (Unexpected_status_code { code ; content ; media_type })
   | `Method_not_allowed allowed ->
       let allowed = List.filter_map RPC_service.meth_of_string allowed in
       request_failed meth uri (Method_not_allowed allowed)

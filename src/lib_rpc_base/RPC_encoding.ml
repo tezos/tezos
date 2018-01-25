@@ -97,17 +97,17 @@ let directory_descr_encoding =
   let static_subdirectories_descr_encoding =
     union [
       case (Tag 0) (obj1 (req  "suffixes"
-                           (list (obj2 (req "name" string)
-                                    (req "tree" directory_descr_encoding)))))
+                            (list (obj2 (req "name" string)
+                                     (req "tree" directory_descr_encoding)))))
         (function Suffixes map ->
            Some (StringMap.bindings map) | _ -> None)
         (fun m ->
            let add acc (n,t) =  StringMap.add n t acc in
            Suffixes (List.fold_left add StringMap.empty m)) ;
       case (Tag 1) (obj1 (req "dynamic_dispatch"
-                           (obj2
-                              (req "arg" arg_encoding)
-                              (req "tree" directory_descr_encoding))))
+                            (obj2
+                               (req "arg" arg_encoding)
+                               (req "tree" directory_descr_encoding))))
         (function Arg (ty, tree) -> Some (ty, tree) | _ -> None)
         (fun (ty, tree) -> Arg (ty, tree))
     ] in

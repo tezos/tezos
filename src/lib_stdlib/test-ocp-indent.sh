@@ -21,7 +21,7 @@ for f in $files ; do
   ocp-indent $f > $tmp_dir/$ff
   diff -U 3 $f $tmp_dir/$ff
   if [ $? -ne 0 ]; then
-    if [ "$fix" = "fix" ]; then
+    if [ "$fix" = "yes" ]; then
       echo "Fix indentation $f"
       cp $tmp_dir/$ff $f
     else
