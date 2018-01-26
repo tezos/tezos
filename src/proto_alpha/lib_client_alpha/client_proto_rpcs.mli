@@ -10,7 +10,7 @@
 val string_of_errors: error list -> string
 val handle_error: Client_commands.full_context -> 'a tzresult -> 'a Lwt.t
 
-type block = Shell_services.Blocks.block
+type block = Block_services.block
 
 val header:
   #Client_rpcs.ctxt -> block -> Block_header.t tzresult Lwt.t

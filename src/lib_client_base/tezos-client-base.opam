@@ -10,10 +10,9 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
   "tezos-base"
+  "tezos-shell-services"
   "tezos-storage"
   "tezos-rpc-http"
-  "tezos-p2p-services"
-  "tezos-shell-services"
   "tezos-protocol-compiler"
   "tezos-protocol-updater"
   "tezos-embedded-protocol-genesis"

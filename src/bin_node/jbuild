@@ -4,10 +4,9 @@
  ((name main)
   (public_name tezos-node)
   (libraries (tezos-base
-              tezos-rpc-http
-              tezos-p2p-services
-              tezos-p2p
               tezos-shell-services
+              tezos-rpc-http
+              tezos-p2p
               tezos-shell
               tezos-protocol-updater
               tezos-embedded-protocol-genesis
@@ -18,10 +17,9 @@
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_rpc_http
-                    -open Tezos_p2p_services
-                    -open Tezos_p2p
                     -open Tezos_shell_services
+                    -open Tezos_rpc_http
+                    -open Tezos_p2p
                     -open Tezos_shell
                     -open Tezos_protocol_updater
                     -linkall))))

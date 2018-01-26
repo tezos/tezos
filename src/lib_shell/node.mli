@@ -49,8 +49,8 @@ val create:
 
 module RPC : sig
 
-  type block = Shell_services.Blocks.block
-  type block_info = Shell_services.Blocks.block_info
+  type block = Block_services.block
+  type block_info = Block_services.block_info
 
   val inject_block:
     t -> ?force:bool -> ?net_id:Net_id.t ->

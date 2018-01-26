@@ -10,37 +10,36 @@
 (* Tezos Command line interface - RPC Calls *)
 
 open Client_rpcs
-module Services = Shell_services
 
 let errors (rpc : #Client_rpcs.ctxt) =
   call_service0 rpc RPC_error.service ()
 
 let forge_block_header rpc header =
-  call_service0 rpc Services.forge_block_header header
+  call_service0 rpc Shell_services.forge_block_header header
 
 let inject_block cctxt
     ?(async = false) ?(force = false) ?net_id
     raw operations =
-  call_err_service0 cctxt Services.inject_block
+  call_err_service0 cctxt Shell_services.inject_block
     { raw ; blocking = not async ; force ; net_id ; operations }
 
 let inject_operation cctxt ?(async = false) ?net_id operation =
-  call_err_service0 cctxt Services.inject_operation
+  call_err_service0 cctxt Shell_services.inject_operation
     (operation, not async, net_id)
 
 let inject_protocol cctxt ?(async = false) ?force protocol =
-  call_err_service0 cctxt Services.inject_protocol
+  call_err_service0 cctxt Shell_services.inject_protocol
     (protocol, not async, force)
 
 let bootstrapped cctxt =
-  call_streamed_service0 cctxt Services.bootstrapped ()
+  call_streamed_service0 cctxt Shell_services.bootstrapped ()
 
 let complete cctxt ?block prefix =
   match block with
   | None ->
-      call_service1 cctxt Services.complete prefix ()
+      call_service1 cctxt Shell_services.complete prefix ()
   | Some block ->
-      call_service2 cctxt Services.Blocks.complete block prefix ()
+      call_service2 cctxt Block_services.complete block prefix ()
 
 let describe cctxt ?(recurse = true) path =
   Client_rpcs.call_service cctxt
@@ -49,9 +48,9 @@ let describe cctxt ?(recurse = true) path =
 
 module Blocks = struct
 
-  type block = Services.Blocks.block
+  type block = Block_services.block
 
-  type block_info = Services.Blocks.block_info = {
+  type block_info = Block_services.block_info = {
     hash: Block_hash.t ;
     net_id: Net_id.t ;
     level: Int32.t ;
@@ -67,57 +66,57 @@ module Blocks = struct
     protocol: Protocol_hash.t ;
     test_network: Test_network_status.t;
   }
-  type preapply_param = Services.Blocks.preapply_param = {
+  type preapply_param = Block_services.preapply_param = {
     timestamp: Time.t ;
     proto_header: MBytes.t ;
     operations: Operation.t list list ;
     sort_operations: bool ;
   }
-  type preapply_result = Services.Blocks.preapply_result = {
+  type preapply_result = Block_services.preapply_result = {
     shell_header: Block_header.shell_header ;
     operations: error Preapply_result.t list ;
   }
   let net_id cctxt h =
-    call_service1 cctxt Services.Blocks.net_id h ()
+    call_service1 cctxt Block_services.net_id h ()
   let level cctxt h =
-    call_service1 cctxt Services.Blocks.level h ()
+    call_service1 cctxt Block_services.level h ()
   let predecessor cctxt h =
-    call_service1 cctxt Services.Blocks.predecessor h ()
+    call_service1 cctxt Block_services.predecessor h ()
   let predecessors cctxt h l =
-    call_service1 cctxt Services.Blocks.predecessors h l
+    call_service1 cctxt Block_services.predecessors h l
   let hash cctxt h =
-    call_service1 cctxt Services.Blocks.hash h ()
+    call_service1 cctxt Block_services.hash h ()
   let timestamp cctxt h =
-    call_service1 cctxt Services.Blocks.timestamp h ()
+    call_service1 cctxt Block_services.timestamp h ()
   let fitness cctxt h =
-    call_service1 cctxt Services.Blocks.fitness h ()
+    call_service1 cctxt Block_services.fitness h ()
   let operations cctxt ?(contents = false) h =
-    call_service1 cctxt Services.Blocks.operations h
+    call_service1 cctxt Block_services.operations h
       { contents ; monitor = false }
   let protocol cctxt h =
-    call_service1 cctxt Services.Blocks.protocol h ()
+    call_service1 cctxt Block_services.protocol h ()
   let test_network cctxt h =
-    call_service1 cctxt Services.Blocks.test_network h ()
+    call_service1 cctxt Block_services.test_network h ()
 
   let preapply cctxt h
       ?(timestamp = Time.now ()) ?(sort = false) ~proto_header operations =
     call_err_service1
-      cctxt Services.Blocks.preapply h
+      cctxt Block_services.preapply h
       { timestamp ; proto_header ; sort_operations = sort ; operations }
   let pending_operations cctxt block =
-    call_service1 cctxt Services.Blocks.pending_operations block ()
+    call_service1 cctxt Block_services.pending_operations block ()
   let info cctxt ?(include_ops = true) h =
-    call_service1 cctxt Services.Blocks.info h include_ops
+    call_service1 cctxt Block_services.info h include_ops
   let complete cctxt block prefix =
-    call_service2 cctxt Services.Blocks.complete block prefix ()
+    call_service2 cctxt Block_services.complete block prefix ()
   let list cctxt ?(include_ops = false)
       ?length ?heads ?delay ?min_date ?min_heads () =
-    call_service0 cctxt Services.Blocks.list
+    call_service0 cctxt Block_services.list
       { include_ops ; length ; heads ; monitor = Some false ; delay ;
         min_date ; min_heads }
   let monitor cctxt ?(include_ops = false)
       ?length ?heads ?delay ?min_date ?min_heads () =
-    call_streamed_service0 cctxt Services.Blocks.list
+    call_streamed_service0 cctxt Block_services.list
       { include_ops ; length ; heads ; monitor = Some true ; delay ;
         min_date ; min_heads }
 
@@ -126,7 +125,7 @@ end
 module Operations = struct
 
   let monitor cctxt ?(contents = false) () =
-    call_streamed_service1 cctxt Services.Blocks.operations
+    call_streamed_service1 cctxt Block_services.operations
       `Prevalidation
       { contents ; monitor = true }
 
@@ -135,11 +134,11 @@ end
 module Protocols = struct
 
   let contents cctxt hash =
-    call_service1 cctxt Services.Protocols.contents hash ()
+    call_service1 cctxt Protocol_services.contents hash ()
 
   let list cctxt ?contents () =
     call_service0
-      cctxt Services.Protocols.list
+      cctxt Protocol_services.list
       { contents; monitor = Some false }
 
 end

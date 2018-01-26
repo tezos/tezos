@@ -5,7 +5,6 @@
           test_p2p_pool
           test_p2p_io_scheduler))
   (libraries (tezos-base
-              tezos-p2p-services
               tezos-p2p
               lwt.unix
               test_lib))
@@ -13,7 +12,6 @@
                     -linkall
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_p2p_services
                     -open Tezos_p2p))))
 
 (alias

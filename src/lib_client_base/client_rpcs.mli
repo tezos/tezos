@@ -106,7 +106,7 @@ val call_err_service2:
    'o tzresult, 'e) RPC_service.t ->
   'a -> 'b -> 'i -> 'o tzresult Lwt.t
 
-type block = Shell_services.Blocks.block
+type block = Block_services.block
 
 val last_baked_block:
   block -> [>

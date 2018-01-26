@@ -9,9 +9,7 @@
 
 open Logging.RPC
 
-module Services = Shell_services
-
-let filter_bi operations (bi: Services.Blocks.block_info)  =
+let filter_bi operations (bi: Block_services.block_info)  =
   let bi = if operations then bi else { bi with operations = None } in
   bi
 
@@ -44,65 +42,65 @@ let register_bi_dir node dir =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return (filter_bi include_ops bi) in
     RPC_directory.register1 dir
-      Services.Blocks.info implementation in
+      Block_services.info implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.hash in
     RPC_directory.register1 dir
-      Services.Blocks.hash
+      Block_services.hash
       implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.net_id in
     RPC_directory.register1 dir
-      Services.Blocks.net_id implementation in
+      Block_services.net_id implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.level in
     RPC_directory.register1 dir
-      Services.Blocks.level implementation in
+      Block_services.level implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.predecessor in
     RPC_directory.register1 dir
-      Services.Blocks.predecessor implementation in
+      Block_services.predecessor implementation in
   let dir =
     let implementation b () len =
       Node.RPC.block_info node b >>= fun bi ->
       Node.RPC.predecessors node len bi.hash >>= fun hashes ->
       RPC_answer.return hashes in
     RPC_directory.register1 dir
-      Services.Blocks.predecessors implementation in
+      Block_services.predecessors implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.fitness in
     RPC_directory.register1 dir
-      Services.Blocks.fitness implementation in
+      Block_services.fitness implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.timestamp in
     RPC_directory.register1 dir
-      Services.Blocks.timestamp implementation in
+      Block_services.timestamp implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.protocol in
     RPC_directory.register1 dir
-      Services.Blocks.protocol implementation in
+      Block_services.protocol implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.test_network in
     RPC_directory.register1 dir
-      Services.Blocks.test_network implementation in
+      Block_services.test_network implementation in
   let dir =
-    let implementation b () { Shell_services.Blocks.contents ; monitor } =
+    let implementation b () { Block_services.contents ; monitor } =
       match b with
       | `Prevalidation when monitor ->
           monitor_operations node contents
@@ -117,36 +115,36 @@ let register_bi_dir node dir =
             List.map (List.map (fun h -> h, None)) hashes
     in
     RPC_directory.register1 dir
-      Services.Blocks.operations implementation in
+      Block_services.operations implementation in
   let dir =
     let implementation b () () =
       Node.RPC.pending_operations node b >>= fun res ->
       RPC_answer.return res in
     RPC_directory.register1 dir
-      Services.Blocks.pending_operations
+      Block_services.pending_operations
       implementation in
   let dir =
     let implementation
         b ()
-        { Services.Blocks.operations ; sort_operations ;
+        { Block_services.operations ; sort_operations ;
           timestamp ; proto_header} =
       Node.RPC.preapply node b
         ~timestamp ~proto_header ~sort_operations operations >>= function
       | Ok (shell_header, operations) ->
           RPC_answer.return
-            (Ok { Services.Blocks.shell_header ; operations })
+            (Ok { Block_services.shell_header ; operations })
       | Error _ as err -> RPC_answer.return err in
     RPC_directory.register1 dir
-      Services.Blocks.preapply implementation in
+      Block_services.preapply implementation in
   dir
 
 let ops_dir _node =
   let ops_dir = RPC_directory.empty in
   ops_dir
 
-let rec insert_future_block (bi: Services.Blocks.block_info) = function
+let rec insert_future_block (bi: Block_services.block_info) = function
   | [] -> [bi]
-  | ({timestamp} as head: Services.Blocks.block_info) :: tail as all ->
+  | ({timestamp} as head: Block_services.block_info) :: tail as all ->
       if Time.compare bi.timestamp timestamp < 0 then
         bi :: all
       else
@@ -201,7 +199,7 @@ let create_delayed_stream
       | `Block None ->
           lwt_debug "WWW worker_loop None" >>= fun () ->
           Lwt.return_unit
-      | `Block (Some (bi : Services.Blocks.block_info)) ->
+      | `Block (Some (bi : Block_services.block_info)) ->
           lwt_debug "WWW worker_loop Some" >>= fun () ->
           begin
             if not filtering
@@ -242,7 +240,7 @@ let create_delayed_stream
 
 let list_blocks
     node ()
-    { Services.Blocks.include_ops ; length ; heads ; monitor ; delay ;
+    { Block_services.include_ops ; length ; heads ; monitor ; delay ;
       min_date; min_heads} =
   let len = match length with None -> 1 | Some x -> x in
   let monitor = match monitor with None -> false | Some x -> x in
@@ -285,12 +283,12 @@ let list_blocks
         let sorted_infos =
           List.sort
             (fun
-              (bi1: Services.Blocks.block_info)
-              (bi2: Services.Blocks.block_info) ->
+              (bi1: Block_services.block_info)
+              (bi2: Block_services.block_info) ->
               ~- (Fitness.compare bi1.fitness bi2.fitness))
             heads_info in
         List.map
-          (fun ({ hash } : Services.Blocks.block_info) -> hash)
+          (fun ({ hash } : Block_services.block_info) -> hash)
           sorted_infos
     | Some heads ->
         let known_block h =
@@ -337,7 +335,7 @@ let unmark_invalid node () block =
   Node.RPC.unmark_invalid node block >>= fun x ->
   RPC_answer.return x
 
-let list_protocols node () {Services.Protocols.monitor; contents} =
+let list_protocols node () { Protocol_services.monitor ; contents } =
   let monitor = match monitor with None -> false | Some x -> x in
   let include_contents = match contents with None -> false | Some x -> x in
   Node.RPC.protocols node >>= fun protocols ->
@@ -376,13 +374,13 @@ let get_protocols node hash () () =
 let build_rpc_directory node =
   let dir = RPC_directory.empty in
   let dir =
-    RPC_directory.register0 dir Services.Blocks.list
+    RPC_directory.register0 dir Block_services.list
       (list_blocks node) in
   let dir =
-    RPC_directory.register0 dir Services.Blocks.list_invalid
+    RPC_directory.register0 dir Block_services.list_invalid
       (list_invalid node) in
   let dir =
-    RPC_directory.register0 dir Services.Blocks.unmark_invalid
+    RPC_directory.register0 dir Block_services.unmark_invalid
       (unmark_invalid node) in
   let dir = register_bi_dir node dir in
   let dir =
@@ -395,19 +393,19 @@ let build_rpc_directory node =
     RPC_directory.register_dynamic_directory1
       ~descr:
         "All the RPCs which are specific to the protocol version."
-      dir Services.Blocks.proto_path implementation in
+      dir Block_services.proto_path implementation in
   let dir =
-    RPC_directory.register0 dir Services.Protocols.list
+    RPC_directory.register0 dir Protocol_services.list
       (list_protocols node) in
   let dir =
-    RPC_directory.register1 dir Services.Protocols.contents
+    RPC_directory.register1 dir Protocol_services.contents
       (get_protocols node) in
   let dir =
     let implementation () header =
       let res =
         Data_encoding.Binary.to_bytes Block_header.encoding header in
       RPC_answer.return res in
-    RPC_directory.register0 dir Services.forge_block_header
+    RPC_directory.register0 dir Shell_services.forge_block_header
       implementation in
   let dir =
     let implementation ()
@@ -418,7 +416,7 @@ let build_rpc_directory node =
           raw operations >>=? fun (hash, wait) ->
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end >>= RPC_answer.return in
-    RPC_directory.register0 dir Services.inject_block implementation in
+    RPC_directory.register0 dir Shell_services.inject_block implementation in
   let dir =
     let implementation () (contents, blocking, net_id) =
       Node.RPC.inject_operation
@@ -426,43 +424,43 @@ let build_rpc_directory node =
       begin
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end >>= RPC_answer.return in
-    RPC_directory.register0 dir Services.inject_operation implementation in
+    RPC_directory.register0 dir Shell_services.inject_operation implementation in
   let dir =
     let implementation () (proto, blocking, force) =
       Node.RPC.inject_protocol ?force node proto >>= fun (hash, wait) ->
       begin
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end >>= RPC_answer.return in
-    RPC_directory.register0 dir Services.inject_protocol implementation in
+    RPC_directory.register0 dir Shell_services.inject_protocol implementation in
   let dir =
     let implementation () () =
       RPC_answer.return_stream (Node.RPC.bootstrapped node) in
-    RPC_directory.register0 dir Services.bootstrapped implementation in
+    RPC_directory.register0 dir Shell_services.bootstrapped implementation in
   let dir =
     let implementation () () =
       RPC_answer.return
         Data_encoding.Json.(schema Error_monad.error_encoding) in
     RPC_directory.register0 dir RPC_error.service implementation in
   let dir =
-    RPC_directory.register1 dir Services.complete
+    RPC_directory.register1 dir Shell_services.complete
       (fun s () () ->
          Node.RPC.complete node s >>= RPC_answer.return) in
   let dir =
-    RPC_directory.register2 dir Services.Blocks.complete
+    RPC_directory.register2 dir Block_services.complete
       (fun block s () () ->
          Node.RPC.complete node ~block s >>= RPC_answer.return) in
 
   (* Workers : Prevalidators *)
 
   let dir  =
-    RPC_directory.register0 dir Shell_services.Workers.Prevalidators.list
+    RPC_directory.register0 dir Worker_services.Prevalidators.list
       (fun () () ->
          RPC_answer.return
            (List.map
               (fun (id, w) -> (id, Prevalidator.status w))
               (Prevalidator.running_workers ()))) in
   let dir  =
-    RPC_directory.register1 dir Shell_services.Workers.Prevalidators.state
+    RPC_directory.register1 dir Worker_services.Prevalidators.state
       (fun net_id () () ->
          let w = List.assoc net_id (Prevalidator.running_workers ()) in
          RPC_answer.return
@@ -474,7 +472,7 @@ let build_rpc_directory node =
   (* Workers : Block_validator *)
 
   let dir  =
-    RPC_directory.register0 dir Shell_services.Workers.Block_validator.state
+    RPC_directory.register0 dir Worker_services.Block_validator.state
       (fun () () ->
          let w = Block_validator.running_worker () in
          RPC_answer.return
@@ -486,7 +484,7 @@ let build_rpc_directory node =
   (* Workers : Peer validators *)
 
   let dir  =
-    RPC_directory.register1 dir Shell_services.Workers.Peer_validators.list
+    RPC_directory.register1 dir Worker_services.Peer_validators.list
       (fun net_id () () ->
          RPC_answer.return
            (List.filter_map
@@ -496,7 +494,7 @@ let build_rpc_directory node =
                  else None)
               (Peer_validator.running_workers ()))) in
   let dir  =
-    RPC_directory.register2 dir Shell_services.Workers.Peer_validators.state
+    RPC_directory.register2 dir Worker_services.Peer_validators.state
       (fun net_id peer_id () () ->
          let w = List.assoc (net_id, peer_id) (Peer_validator.running_workers ()) in
          RPC_answer.return
@@ -508,14 +506,14 @@ let build_rpc_directory node =
   (* Workers : Net validators *)
 
   let dir  =
-    RPC_directory.register0 dir Shell_services.Workers.Net_validators.list
+    RPC_directory.register0 dir Worker_services.Net_validators.list
       (fun () () ->
          RPC_answer.return
            (List.map
               (fun (id, w) -> (id, Net_validator.status w))
               (Net_validator.running_workers ()))) in
   let dir  =
-    RPC_directory.register1 dir Shell_services.Workers.Net_validators.state
+    RPC_directory.register1 dir Worker_services.Net_validators.state
       (fun net_id () () ->
          let w = List.assoc net_id (Net_validator.running_workers ()) in
          RPC_answer.return
@@ -616,5 +614,5 @@ let build_rpc_directory node =
         Node.RPC.Network.Point.events node point |> RPC_answer.return in
     RPC_directory.register1 dir P2p_services.Point.events implementation in
   let dir =
-    RPC_directory.register_describe_directory_service dir Services.describe in
+    RPC_directory.register_describe_directory_service dir Shell_services.describe in
   dir

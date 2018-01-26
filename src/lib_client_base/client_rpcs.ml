@@ -130,7 +130,7 @@ let call_err_service1 ctxt service a1 body =
 let call_err_service2 ctxt service a1 a2 body =
   call_err_service ctxt service (((), a1), a2) () body
 
-type block = Shell_services.Blocks.block
+type block = Block_services.block
 
 let last_baked_block = function
   | `Prevalidation -> `Head 0

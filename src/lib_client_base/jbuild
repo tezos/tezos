@@ -4,10 +4,9 @@
  ((name tezos_client_base)
   (public_name tezos-client-base)
   (libraries (tezos-base
+              tezos-shell-services
               tezos-storage
               tezos-rpc-http
-              tezos-p2p-services
-              tezos-shell-services
               tezos-protocol-updater
               tezos-protocol-compiler))
   (flags (:standard -w -9+27-30-32-40@8
@@ -15,7 +14,6 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_storage
                     -open Tezos_rpc_http
-                    -open Tezos_p2p_services
                     -open Tezos_shell_services
                     -open Tezos_protocol_updater))))
 

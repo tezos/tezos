@@ -159,8 +159,8 @@ let shutdown node = node.shutdown ()
 
 module RPC = struct
 
-  type block = Shell_services.Blocks.block
-  type block_info = Shell_services.Blocks.block_info = {
+  type block = Block_services.block
+  type block_info = Block_services.block_info = {
     hash: Block_hash.t ;
     net_id: Net_id.t ;
     level: Int32.t ;
