@@ -39,6 +39,10 @@ build-deps:
 docker-image:
 	@./scripts/create_docker_image.sh
 
+install:
+	@jbuilder build @install
+	@jbuilder install
+
 clean:
 	@-jbuilder clean
 	@-rm -f tezos-node tezos-client tezos-protocol-compiler
