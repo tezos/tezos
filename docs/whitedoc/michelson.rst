@@ -838,24 +838,6 @@ Operations on sets
 
     :: 'elt : bool : set 'elt : 'S   ->   set 'elt : 'S
 
--  ``MAP``: Apply a function on a map and return the map of results
-   under the same bindings.
-
-   The ``'b`` type must be comparable (the ``COMPARE`` primitive must be
-   defined over it).
-
-::
-
-    :: lambda 'elt 'b : set 'elt : 'S   ->   set 'b : 'S
-
--  ``MAP body``: Apply the body expression to each element of the set.
-   The body sequence has access to the stack.
-
-::
-
-    :: (set 'elt) : 'A   ->  (set 'b) : 'A
-       iff   body :: [ 'elt : 'A -> 'b : 'A ]
-
 -  ``REDUCE``: Apply a function on a set passing the result of each
    application to the next one and return the last.
 

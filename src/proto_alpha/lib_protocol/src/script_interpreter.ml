@@ -318,18 +318,6 @@ let rec interp
         (* sets *)
         | Empty_set t, rest ->
             logged_return (Item (empty_set t, rest), Gas.consume gas Gas.Cost_of.empty_set, ctxt)
-        | Set_map t, Item (lam, Item (set, rest)) ->
-            let gas = Gas.consume gas (Gas.Cost_of.set_to_list set) in
-            Gas.check gas >>=? fun () ->
-            let items =
-              List.rev (set_fold (fun e acc -> e :: acc) set []) in
-            fold_left_s
-              (fun (res, gas, ctxt, origination) arg ->
-                 interp ?log origination gas orig source amount ctxt lam arg >>=?
-                 fun (ret, gas, ctxt, origination) ->
-                 return (set_update ret true res, gas, ctxt, origination))
-              (empty_set t, gas, ctxt, origination) items >>=? fun (res, gas, ctxt, origination) ->
-            logged_return ~origination (Item (res, rest), gas, ctxt)
         | Set_reduce, Item (lam, Item (set, Item (init, rest))) ->
             let gas = Gas.consume gas (Gas.Cost_of.set_to_list set) in
             Gas.check gas >>=? fun () ->

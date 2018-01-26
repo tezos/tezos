@@ -147,8 +147,6 @@ and ('bef, 'aft) instr =
   (* sets *)
   | Empty_set : 'a comparable_ty ->
     ('rest, 'a set * 'rest) instr
-  | Set_map : 'ret comparable_ty ->
-    (('param, 'ret) lambda * ('param set * 'rest), 'ret set * 'rest) instr
   | Set_reduce :
       (('param * 'res, 'res) lambda *
        ('param set * ('res * 'rest)), 'res * 'rest) instr

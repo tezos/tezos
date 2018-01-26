@@ -117,7 +117,6 @@ let number_of_generated_growing_types : type b a. (b, a) instr -> int = function
   | List_size -> 0
   | List_iter _ -> 1
   | Empty_set _ -> 1
-  | Set_map _ -> 1
   | Set_reduce -> 0
   | Set_iter _ -> 0
   | Set_mem -> 0
@@ -1337,12 +1336,6 @@ and parse_instr
       rest ->
         (Lwt.return (parse_comparable_ty t)) >>=? fun (Ex_comparable_ty t) ->
         return (typed loc (Empty_set t, Item_t (Set_t t, rest, instr_annot)))
-    | Prim (loc, I_MAP, [], instr_annot),
-      Item_t (Lambda_t (param, ret), Item_t (Set_t elt, rest, _), _) ->
-        let elt = ty_of_comparable_ty elt in
-        (Lwt.return (comparable_ty_of_ty loc ret)) >>=? fun ret ->
-        check_item_ty elt param loc I_MAP 1 2 >>=? fun Eq ->
-        return (typed loc (Set_map ret, Item_t (Set_t ret, rest, instr_annot)))
     | Prim (loc, I_REDUCE, [], instr_annot),
       Item_t (Lambda_t (Pair_t ((pelt, _), (pr, _)), r),
               Item_t (Set_t elt, Item_t (init, rest, _), _), _) ->
