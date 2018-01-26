@@ -526,6 +526,8 @@ Stack operations
 
     :: 'A ->  (lambda 'a 'b) : 'A
 
+    > LAMBDA _ _ code / S => code : S
+
 Generic comparison
 ~~~~~~~~~~~~~~~~~~
 
@@ -779,11 +781,20 @@ constants as is, concatenate them and use them as keys.
 
     :: string : string : 'S   -> string : 'S
 
+    > CONCAT / s : t : S => (s ^ t) : S
+
 -  ``COMPARE``: Lexicographic comparison.
 
 ::
 
     :: string : string : 'S   ->   int : 'S
+
+    > COMPARE / s : t : S => -1 : S
+        iff s < t
+    > COMPARE / s : t : S => 0 : S
+        iff s = t
+    > COMPARE / s : t : S => 1 : S
+        iff s > t
 
 Operations on pairs
 ~~~~~~~~~~~~~~~~~~~
@@ -831,12 +842,35 @@ Operations on sets
 
     :: 'elt : set 'elt : 'S   ->  bool : 'S
 
+    > MEM / x : {} : S    =>   false : S
+    > MEM / x : { hd ; <tl> } : S    =>   r : S
+        iff COMPARE / x : hd : []   =>   1 : []
+        where MEM / x : v : { <tl> } : S    =>   r : S
+    > MEM / x : { hd ; <tl> } : S    =>   true : S
+        iff COMPARE / x : hd : []   =>   0 : []
+    > MEM / x : { hd ; <tl> } : S    =>   false : S
+        iff COMPARE / x : hd : []   =>   -1 : []
+
 -  ``UPDATE``: Inserts or removes an element in a set, replacing a
    previous value.
 
 ::
 
     :: 'elt : bool : set 'elt : 'S   ->   set 'elt : 'S
+
+    > UPDATE / x : false : {} : S    =>   {} : S
+    > UPDATE / x : true : {} : S    =>   { x } : S
+    > UPDATE / x : v : { hd ; <tl> } : S    =>   { hd ; <tl'> } : S
+        iff COMPARE / x : hd : []   =>   1 : []
+        where UPDATE / x : v : { <tl> } : S    =>   { <tl'> } : S
+    > UPDATE / x : false : { hd ; <tl> } : S    =>   { <tl> } : S
+        iff COMPARE / x : hd : []   =>   0 : []
+    > UPDATE / x : true : { hd ; <tl> } : S    =>   { hd ; <tl> } : S
+        iff COMPARE / x : hd : []   =>   0 : []
+    > UPDATE / x : false : { hd ; <tl> } : S    =>   { hd ; <tl> } : S
+        iff COMPARE / x : hd : []   =>   -1 : []
+    > UPDATE / x : true : { hd ; <tl> } : S    =>   { x ; hd ; <tl> } : S
+        iff COMPARE / x : hd : []   =>   -1 : []
 
 -  ``REDUCE``: Apply a function on a set passing the result of each
    application to the next one and return the last.
@@ -845,19 +879,30 @@ Operations on sets
 
     :: lambda (pair 'elt * 'b) 'b : set 'elt : 'b : 'S   ->   'b : 'S
 
+    > REDUCE / f : {} : b : S => b : S
+    > REDUCE / f : { hd : <tl> } : b : S => REDUCE / f : { <tl> } : c : S
+        where f / Pair hd b : [] => c : []
+
 -  ``ITER body``: Apply the body expression to each element of a set.
    The body sequence has access to the stack.
 
 ::
 
     :: (set 'elt) : 'A   ->  'A
-       iff   body :: [ 'elt : 'A -> 'A ]
+       iff body :: [ 'elt : 'A -> 'A ]
+
+    > ITER body / {} : S    =>    S
+    > ITER body / { hd ; <tl> } : S => body; ITER body / hd : { <tl> } : S
 
 -  ``SIZE``: Get the cardinality of the set.
 
 ::
 
     :: set 'elt : 'S -> nat : 'S
+
+    > SIZE / {} : S    =>    0 : S
+    > SIZE / { _ ; <tl> } : S   =>   1 + s : S
+        where SIZE / { <tl> } : S   =>   s : S
 
 Operations on maps
 ~~~~~~~~~~~~~~~~~~
@@ -871,6 +916,9 @@ Operations on maps
 
     :: 'S -> map 'key 'val : 'S
 
+    > EMPTY_MAP _ _ / S => {} : S
+
+
 -  ``GET``: Access an element in a map, returns an optional value to be
    checked with ``IF_SOME``.
 
@@ -878,11 +926,29 @@ Operations on maps
 
     :: 'key : map 'key 'val : 'S   ->   option 'val : 'S
 
--  ``MEM``: Check for the presence of an element in a map.
+    > GET / x : {} : S => None : S
+    > GET / x : { Elt k v ; <tl> } : S => opt_y : S
+        iff COMPARE / x : k : [] => 1 : []
+	where GET / x : { <tl> } : S => opt_y : S
+    > GET / x : { Elt k v ; <tl> } : S => Some v : S
+        iff COMPARE / x : k : [] => 0 : []
+    > GET / x : { Elt k v ; <tl> } : S => None : S
+        iff COMPARE / x : k : [] => -1 : []
+
+-  ``MEM``: Check for the presence of a binding for a key in a map.
 
 ::
 
     :: 'key : map 'key 'val : 'S   ->  bool : 'S
+
+    > MEM / x : {} : S => false : S
+    > MEM / x : { Elt k v ; <tl> } : S => r : S
+        iff COMPARE / x : k : [] => 1 : []
+        where MEM / x : { <tl> } : S => r : S
+    > MEM / x : { Elt k v ; <tl> } : S => true : S
+        iff COMPARE / x : k : [] => 0 : []
+    > MEM / x : { Elt k v ; <tl> } : S => false : S
+        iff COMPARE / x : k : [] => -1 : []
 
 -  ``UPDATE``: Assign or remove an element in a map.
 
@@ -890,12 +956,32 @@ Operations on maps
 
     :: 'key : option 'val : map 'key 'val : 'S   ->   map 'key 'val : 'S
 
+    > UPDATE / x : None : {} : S => {} : S
+    > UPDATE / x : Some y : {} : S => { Elt x y } : S
+    > UPDATE / x : opt_y : { Elt k v ; <tl> } : S => { Elt k v ; <tl'> } : S
+        iff COMPARE / x : k : [] => 1 : []
+	where UPDATE / x : opt_y : { <tl> } : S => { <tl'> } : S
+    > UPDATE / x : None : { Elt k v ; <tl> } : S => { <tl> } : S
+        iff COMPARE / x : k : [] => 0 : []
+    > UPDATE / x : Some y : { Elt k v ; <tl> } : S => { Elt k y ; <tl> } : S
+        iff COMPARE / x : k : [] => 0 : []
+    > UPDATE / x : None : { Elt k v ; <tl> } : S => { Elt k v ; <tl> } : S
+        iff COMPARE / x : k : [] => -1 : []
+    > UPDATE / x : Some y : { Elt k v ; <tl> } : S => { Elt x y ; Elt k v ; <tl> } : S
+        iff COMPARE / x : k : [] => -1 : []
+
+
 -  ``MAP``: Apply a function on a map and return the map of results
    under the same bindings.
 
 ::
 
     :: lambda (pair 'key 'val) 'b : map 'key 'val : 'S   ->   map 'key 'b : 'S
+
+    > MAP / f : {} : S => {} : S
+    > MAP / f : { Elt k v ; <tl> } : S => { Elt k (f (Pair k v)) ; <tl'> } : S
+        where MAP / f : { <tl> } : S => { <tl'> } : S
+
 
 -  ``MAP body``: Apply the body expression to each element of a map. The
    body sequence has access to the stack.
@@ -905,12 +991,21 @@ Operations on maps
     :: (map 'key 'val) : 'A   ->  (map 'key 'b) : 'A
        iff   body :: [ (pair 'key 'val) : 'A -> 'b : 'A ]
 
+    > MAP body / {} : S => {} : S
+    > MAP body / { Elt k v ; <tl> } : S => { Elt k (body (Pair k v)) ; <tl'> } : S
+        where MAP body / { <tl> } : S => { <tl'> } : S
+
+
 -  ``REDUCE``: Apply a function on a map passing the result of each
    application to the next one and return the last.
 
 ::
 
     :: lambda (pair (pair 'key 'val) 'b) 'b : map 'key 'val : 'b : 'S   ->   'b : 'S
+
+    > REDUCE / f : {} : b : S => b : S
+    > REDUCE / f : { Elt k v ; <tl> } : b : S => REDUCE / f : { <tl> } : c : S
+        where f / Pair (Pair k v) b : [] => c
 
 -  ``ITER body``: Apply the body expression to each element of a map.
    The body sequence has access to the stack.
@@ -920,11 +1015,18 @@ Operations on maps
     :: (map 'elt 'val) : 'A   ->  'A
        iff   body :: [ (pair 'elt 'val) : 'A -> 'A ]
 
+    > ITER body / {} : S    =>    S
+    > ITER body / { Elt k v ; <tl> } : S => body ; ITER body / (Pair k v) : { <tl> } : S
+
 -  ``SIZE``: Get the cardinality of the map.
 
 ::
 
     :: map 'key 'val : 'S -> nat : 'S
+
+    > SIZE / {} : S    =>    0 : S
+    > SIZE / { _ ; <tl> } : S   =>   1 + s : S
+        where  SIZE / { <tl> } : S   =>   s : S
 
 Operations on optional values
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1034,6 +1136,11 @@ Operations on lists
 
     :: lambda 'a 'b : list 'a : 'S -> list 'b : 'S
 
+    > MAP / f : { a ; <rest> } : S => { f a ; <rest'> } : S
+        where MAP / f : { <rest> } : S => { <rest'> } : S
+    > MAP / f : {} : S => {} : S
+
+
 -  ``MAP body``: Apply the body expression to each element of the list.
    The body sequence has access to the stack.
 
@@ -1042,6 +1149,11 @@ Operations on lists
     :: (list 'elt) : 'A   ->  (list 'b) : 'A
        iff   body :: [ 'elt : 'A -> 'b : 'A ]
 
+    > MAP body / { a ; <rest> } : S => { body a ; <rest'> } : S
+        where MAP body / { <rest> } : S => { <rest'> } : S
+    > MAP body / {} : S => {} : S
+
+
 -  ``REDUCE``: Apply a function on a list from left to right passing the
    result of each application to the next one and return the last.
 
@@ -1049,11 +1161,21 @@ Operations on lists
 
     :: lambda (pair 'a 'b) 'b : list 'a : 'b : 'S -> 'b : 'S
 
+    > REDUCE / f : { a : <rest> } : b : S  => REDUCE / f : { <rest> } : c : S
+        where f / Pair a b : [] => c
+    > REDUCE / f : {} : b : S => b : S
+
+
 -  ``SIZE``: Get the number of elements in the list.
 
 ::
 
     :: list 'elt : 'S -> nat : 'S
+
+    > SIZE / { _ ; <rest> } : S   =>   1 + s : S
+        where  SIZE / { <rest> } : S   =>   s : S
+    > SIZE / {} : S    =>    0 : S
+
 
 -  ``ITER body``: Apply the body expression to each element of a list.
    The body sequence has access to the stack.
@@ -1061,7 +1183,10 @@ Operations on lists
 ::
 
     :: (list 'elt) : 'A   ->  'A
-       iff   body :: [ 'elt : 'A -> 'A ]
+         iff body :: [ 'elt : 'A -> 'A ]
+    > ITER body / { a ; <rest> } : S => body ; ITER body / a : { <rest> } : S
+    > ITER body / {} : S => S
+
 
 VI - Domain specific data types
 -------------------------------
@@ -1120,6 +1245,14 @@ retrieved from script parameters or globals.
 
     :: timestamp : timestamp : 'S   ->   int : 'S
 
+    > COMPARE / seconds(t1) : seconds(t2) : S => -1 : S
+        iff t1 < t2
+    > COMPARE / seconds(t1) : seconds(t2) : S => 0 : S
+        iff t1 = t2
+    > COMPARE / seconds(t1) : seconds(t2) : S => 1 : S
+        iff t1 > t2
+
+
 Operations on Tez
 ~~~~~~~~~~~~~~~~~
 
@@ -1167,8 +1300,16 @@ types by mistake. They are also mandatory checked for under/overflows.
     > EDIV ; C / x : y : S   =>   C / Some (Pair (x / y) (x % y)) : S
 
 -  ``COMPARE``:
+::
 
    :: tez : tez : ’S -> int : ’S
+
+   > COMPARE / x : y : S   =>   -1 : S
+       iff x < y
+   > COMPARE / x : y : S   =>   0 : S
+       iff x = y
+   > COMPARE / x : y : S   =>   1 : S
+       iff x > y
 
 Operations on contracts
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1325,6 +1466,13 @@ Cryptographic primitives
 ::
 
     :: key_hash : key_hash : 'S   ->   int : 'S
+
+    > COMPARE / x : y : S   =>   -1 : S
+        iff x < y
+    > COMPARE / x : y : S   =>   0 : S
+        iff x = y
+    > COMPARE / x : y : S   =>   1 : S
+        iff x > y
 
 VIII - Macros
 -------------
