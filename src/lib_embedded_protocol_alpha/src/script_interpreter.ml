@@ -645,7 +645,7 @@ let rec interp
               | None ->
                   (* we see non scripted contracts as (unit, unit) contract *)
                   Lwt.return (ty_eq tp Unit_t |>
-                              record_trace (Invalid_contract (loc, destination))) >>=? fun (Eq _) ->
+                              record_trace (Invalid_contract (loc, destination))) >>=? fun Eq ->
                   return (ctxt, gas, origination)
               | Some script ->
                   let p = unparse_data tp p in
