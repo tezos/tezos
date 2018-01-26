@@ -9,40 +9,15 @@
 
 type t
 
-type block_error =
-  | Cannot_parse_operation of Operation_hash.t
-  | Invalid_fitness of { expected: Fitness.t ; found: Fitness.t }
-  | Non_increasing_timestamp
-  | Non_increasing_fitness
-  | Invalid_level of { expected: Int32.t ; found: Int32.t }
-  | Invalid_proto_level of { expected: int ; found: int }
-  | Replayed_operation of Operation_hash.t
-  | Outdated_operation of
-      { operation: Operation_hash.t;
-        originating_block: Block_hash.t }
-  | Expired_network of
-      { net_id: Net_id.t ;
-        expiration: Time.t ;
-        timestamp: Time.t ;
-      }
-  | Unexpected_number_of_validation_passes of int (* uint8 *)
-  | Too_many_operations of { pass: int; found: int; max: int }
-  | Oversized_operation of { operation: Operation_hash.t;
-                             size: int; max: int }
+type limits = {
+  protocol_timeout: float ;
+  worker_limits : Worker_types.limits ;
+}
 
-type error +=
-  | Invalid_block of
-      { block: Block_hash.t ; error: block_error }
-  | Unavailable_protocol of
-      { block: Block_hash.t ; protocol: Protocol_hash.t }
-  | Inconsistent_operations_hash of
-      { block: Block_hash.t ;
-        expected: Operation_list_list_hash.t ;
-        found: Operation_list_list_hash.t }
+type error += Closed of unit
 
 val create:
-  protocol_timeout:float ->
-  Distributed_db.t -> t
+  limits -> Distributed_db.t -> t Lwt.t
 
 val validate:
   t ->
@@ -60,3 +35,10 @@ val fetch_and_compile_protocol:
   Protocol_hash.t -> State.Registred_protocol.t tzresult Lwt.t
 
 val shutdown: t -> unit Lwt.t
+
+val running_worker: unit -> t
+val status: t -> Worker_types.worker_status
+
+val pending_requests : t -> (Time.t * Block_validator_worker_state.Request.view) list
+val current_request : t -> (Time.t * Time.t * Block_validator_worker_state.Request.view) option
+val last_events : t -> (Lwt_log_core.level * Block_validator_worker_state.Event.t list) list

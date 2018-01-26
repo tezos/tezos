@@ -200,7 +200,7 @@ let rec worker_loop pv =
       lwt_debug "%a" Error_monad.pp_print_error errors >>= fun () ->
       Lwt_canceler.cancel pv.canceler >>= fun () ->
       Lwt.return_unit
-  | Error [Block_validator.Unavailable_protocol { protocol } ] -> begin
+  | Error [Block_validator_errors.Unavailable_protocol { protocol } ] -> begin
       Block_validator.fetch_and_compile_protocol
         pv.block_validator
         ~peer:pv.peer_id

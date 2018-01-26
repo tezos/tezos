@@ -15,6 +15,7 @@ type t = {
   db: Distributed_db.t ;
   block_validator: Block_validator.t ;
   timeout: Net_validator.timeout ;
+  block_validator_limits: Block_validator.limits ;
   prevalidator_limits: Prevalidator.limits ;
 
   valid_block_input: State.Block.t Lwt_watcher.input ;
@@ -22,16 +23,17 @@ type t = {
 
 }
 
-let create state db timeout prevalidator_limits =
-  let block_validator =
-    Block_validator.create
-      ~protocol_timeout:timeout.Net_validator.protocol
-      db in
+let create state db timeout
+    block_validator_limits
+    prevalidator_limits =
+  Block_validator.create block_validator_limits db >>= fun block_validator ->
   let valid_block_input = Lwt_watcher.create_input () in
-  { state ; db ; timeout ; prevalidator_limits ; block_validator ;
-    valid_block_input ;
-    active_nets = Net_id.Table.create 7 ;
-  }
+  Lwt.return
+    { state ; db ; timeout ; block_validator ;
+      prevalidator_limits ; block_validator_limits ;
+      valid_block_input ;
+      active_nets = Net_id.Table.create 7 ;
+    }
 
 let activate v ?bootstrap_threshold ?max_child_ttl net_state =
   let net_id = State.Net.id net_state in

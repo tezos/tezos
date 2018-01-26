@@ -102,6 +102,11 @@ and prevalidator_limits = Prevalidator.limits = {
   worker_limits : Worker_types.limits ;
 }
 
+and block_validator_limits = Block_validator.limits = {
+  protocol_timeout: float ;
+  worker_limits : Worker_types.limits ;
+}
+
 let may_create_net state genesis =
   State.Net.get state (Net_id.of_block_hash genesis.State.Net.block) >>= function
   | Ok net -> Lwt.return net
@@ -112,13 +117,15 @@ let create { genesis ; store_root ; context_root ;
              patch_context ; p2p = net_params ;
              test_network_max_tll = max_child_ttl ;
              bootstrap_threshold }
-    timeout prevalidator_limits =
+    timeout
+    block_validator_limits
+    prevalidator_limits =
   init_p2p net_params >>=? fun p2p ->
   State.read
     ~store_root ~context_root ?patch_context () >>=? fun state ->
   let distributed_db = Distributed_db.create state p2p in
-  let validator =
-    Validator.create state distributed_db timeout prevalidator_limits in
+  Validator.create state distributed_db timeout
+    block_validator_limits prevalidator_limits >>= fun validator ->
   may_create_net state genesis >>= fun mainnet_state ->
   Validator.activate validator
     ~bootstrap_threshold

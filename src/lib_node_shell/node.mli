@@ -30,8 +30,17 @@ and prevalidator_limits = {
   operation_timeout: float ;
   worker_limits : Worker_types.limits ;
 }
+and block_validator_limits = {
+  protocol_timeout: float ;
+  worker_limits : Worker_types.limits ;
+}
 
-val create: config -> timeout -> prevalidator_limits -> t tzresult Lwt.t
+val create:
+  config ->
+  timeout ->
+  block_validator_limits ->
+  prevalidator_limits ->
+  t tzresult Lwt.t
 
 module RPC : sig
 

@@ -15,8 +15,9 @@ val create:
   State.t ->
   Distributed_db.t ->
   Net_validator.timeout ->
+  Block_validator.limits ->
   Prevalidator.limits ->
-  t
+  t Lwt.t
 val shutdown: t -> unit Lwt.t
 
 (** Start the validation scheduler of a given network. *)

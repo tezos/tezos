@@ -173,6 +173,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
   Node.create
     node_config
     config.shell.timeout
+    config.shell.block_validator_limits
     config.shell.prevalidator_limits
 
 let () =

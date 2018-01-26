@@ -44,6 +44,7 @@ and log = {
 
 and shell = {
   bootstrap_threshold : int ;
+  block_validator_limits : Node.block_validator_limits ;
   prevalidator_limits : Node.prevalidator_limits ;
   timeout : Node.timeout ;
 }

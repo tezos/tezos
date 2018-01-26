@@ -54,6 +54,7 @@ and log = {
 
 and shell = {
   bootstrap_threshold : int ;
+  block_validator_limits : Node.block_validator_limits ;
   prevalidator_limits : Node.prevalidator_limits ;
   timeout : Node.timeout ;
 }
@@ -105,6 +106,15 @@ let default_log = {
 
 let default_shell = {
   bootstrap_threshold = 4 ;
+  block_validator_limits = {
+    protocol_timeout = 120. ;
+    worker_limits = {
+      backlog_size = 1000 ;
+      backlog_level = Logging.Debug ;
+      zombie_lifetime = 3600. ;
+      zombie_memory = 1800. ;
+    }
+  } ;
   prevalidator_limits = {
     operation_timeout = 10. ;
     max_refused_operations = 1000 ;
@@ -284,6 +294,23 @@ let worker_limits_encoding
 let timeout_encoding =
   Data_encoding.ranged_float 0. 500.
 
+let block_validator_limits_encoding =
+  let open Data_encoding in
+  conv
+    (fun { Node.protocol_timeout ; worker_limits } ->
+       (protocol_timeout, worker_limits))
+    (fun (protocol_timeout, worker_limits) ->
+       { protocol_timeout ; worker_limits})
+    (merge_objs
+       (obj1
+          (dft "protocol_request_timeout" timeout_encoding
+             default_shell.block_validator_limits.protocol_timeout))
+       (worker_limits_encoding
+          default_shell.block_validator_limits.worker_limits.backlog_size
+          default_shell.block_validator_limits.worker_limits.backlog_level
+          default_shell.block_validator_limits.worker_limits.zombie_lifetime
+          default_shell.block_validator_limits.worker_limits.zombie_memory))
+
 let prevalidator_limits_encoding =
   let open Data_encoding in
   conv
@@ -325,13 +352,19 @@ let timeout_encoding =
 let shell =
   let open Data_encoding in
   conv
-    (fun { bootstrap_threshold ; timeout ; prevalidator_limits } ->
-       bootstrap_threshold, timeout, prevalidator_limits)
-    (fun (bootstrap_threshold, timeout, prevalidator_limits) ->
-       { bootstrap_threshold ; timeout ; prevalidator_limits })
-    (obj3
+    (fun { bootstrap_threshold ; timeout ;
+           block_validator_limits ; prevalidator_limits } ->
+      bootstrap_threshold, timeout,
+      block_validator_limits, prevalidator_limits)
+    (fun (bootstrap_threshold, timeout,
+          block_validator_limits, prevalidator_limits) ->
+      { bootstrap_threshold ; timeout ;
+        block_validator_limits ;
+        prevalidator_limits })
+    (obj4
        (dft "bootstrap_threshold" uint8 default_shell.bootstrap_threshold)
        (dft "timeout" timeout_encoding default_shell.timeout)
+       (dft "block_validator" block_validator_limits_encoding default_shell.block_validator_limits)
        (dft "prevalidator" prevalidator_limits_encoding default_shell.prevalidator_limits)
     )
 
@@ -451,6 +484,7 @@ let update
         ~default:cfg.shell.bootstrap_threshold
         bootstrap_threshold ;
     timeout = cfg.shell.timeout ;
+    block_validator_limits = cfg.shell.block_validator_limits ;
     prevalidator_limits = cfg.shell.prevalidator_limits ;
   }
   in
