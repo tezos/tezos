@@ -27,6 +27,7 @@ Welcome to Tezos's documentation!
 
    whitedoc/the_big_picture
    whitedoc/michelson
+   whitedoc/proof_of_stake
 
 .. toctree::
    :maxdepth: 2
