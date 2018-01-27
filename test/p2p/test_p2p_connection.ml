@@ -311,15 +311,17 @@ module Close_on_read = struct
 
   let simple_msg = random_bytes (1 lsl 4)
 
-  let server _ch sched socket =
+  let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
     P2p_connection.accept auth_fd encoding >>=? fun conn ->
+    sync ch >>=? fun () ->
     P2p_connection.close conn >>= fun _stat ->
     return ()
 
-  let client _ch sched addr port =
+  let client ch sched addr port =
     connect sched addr port id2 >>=? fun auth_fd ->
     P2p_connection.accept auth_fd encoding >>=? fun conn ->
+    sync ch >>=? fun () ->
     P2p_connection.read conn >>= fun err ->
     _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
     P2p_connection.close conn >>= fun _stat ->
@@ -346,6 +348,7 @@ module Close_on_write = struct
     connect sched addr port id2 >>=? fun auth_fd ->
     P2p_connection.accept auth_fd encoding >>=? fun conn ->
     sync ch >>=? fun ()->
+    Lwt_unix.sleep 0.1 >>= fun () ->
     P2p_connection.write_sync conn simple_msg >>= fun err ->
     _assert (is_connection_closed err) __LOC__ "" >>=? fun () ->
     P2p_connection.close conn >>= fun _stat ->

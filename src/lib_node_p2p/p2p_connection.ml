@@ -484,7 +484,10 @@ let catch_closed_pipe f =
   Lwt.catch f begin function
     | Lwt_pipe.Closed -> fail P2p_io_scheduler.Connection_closed
     | exn -> fail (Exn exn)
-  end
+  end >>= function
+  | Error [Exn Lwt_pipe.Closed] ->
+      fail P2p_io_scheduler.Connection_closed
+  | Error _ | Ok _ as v -> Lwt.return v
 
 let pp_json encoding ppf msg =
   Format.pp_print_string ppf
