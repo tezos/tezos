@@ -28,13 +28,19 @@ type ('a, 'ctx) arg
 (** [arg ~doc ~parameter converter] creates an argument to a command.
     The [~parameter] argument should begin with a [-].
     If the argument is not provided, [None] is returned *)
-val arg : doc:string -> parameter:string ->
+val arg :
+  doc:string ->
+  parameter:string ->
+  placeholder:string ->
   ('p, 'ctx) parameter ->
   ('p option, 'ctx) arg
 
 (** Create an argument that will contain the [~default] value if it is not provided.
     see arg *)
-val default_arg : doc:string -> parameter:string ->
+val default_arg :
+  doc:string ->
+  parameter:string ->
+  placeholder:string ->
   default:string ->
   ('p, 'ctx) parameter ->
   ('p, 'ctx) arg

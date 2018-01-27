@@ -50,6 +50,7 @@ let commands () =
     args1
       (arg
          ~parameter:"-timestamp"
+         ~placeholder:"date"
          ~doc:"Set the timestamp of the block (and initial time of the chain)"
          (parameter (fun _ t ->
               match (Time.of_notation t) with

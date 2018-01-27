@@ -27,23 +27,27 @@ let parameter ?autocomplete converter =
 type ('a, 'ctx) arg =
   | Arg : { doc : string ;
             parameter : string ;
+            placeholder : string ;
             kind : ('p, 'ctx) parameter } ->
     ('p option, 'ctx) arg
   | DefArg : { doc : string ;
                parameter : string ;
+               placeholder : string ;
                kind : ('p, 'ctx) parameter ;
                default : string } -> ('p, 'ctx) arg
   | Switch : { doc : string ;
                parameter : string } ->
     (bool, 'ctx) arg
 
-let arg ~doc ~parameter kind =
+let arg ~doc ~parameter ~placeholder kind =
   Arg { doc ;
         parameter ;
+        placeholder ;
         kind }
 
-let default_arg ~doc ~parameter ~default kind =
+let default_arg ~doc ~parameter ~placeholder ~default kind =
   DefArg { doc ;
+           placeholder ;
            parameter ;
            kind ;
            default }
@@ -331,6 +335,7 @@ let rec help_commands commands =
             ~parameter:"-verbose")
          (default_arg
             ~doc:"Select the manual's output format"
+            ~placeholder: "plain|colors"
             ~parameter: "-format"
             ~default: (if Unix.isatty Unix.stdout then "colors" else "plain")
             (parameter
@@ -525,12 +530,12 @@ let trim s = (* config-file wokaround *)
 let print_options_detailed (type ctx) =
   let help_option : type a.Format.formatter -> (a, ctx) arg -> unit =
     fun ppf -> function
-      | Arg { parameter ; doc } ->
-          Format.fprintf ppf "@[<v 2>@{<opt>%s _@}:@,@[<hov 0>%a@]@]"
-            parameter Format.pp_print_text doc
-      | DefArg { parameter ; doc ; default } ->
-          Format.fprintf ppf "@[<v 2>@{<opt>%s _@} (default %s):@,@[<hov 0>%a@]@]"
-            parameter default Format.pp_print_text doc
+      | Arg { parameter ; placeholder ; doc } ->
+          Format.fprintf ppf "@[<v 2>@{<opt>%s <%s>@}:@,@[<hov 0>%a@]@]"
+            parameter placeholder Format.pp_print_text doc
+      | DefArg { parameter ; placeholder ; doc ; default } ->
+          Format.fprintf ppf "@[<v 2>@{<opt>%s <%s>@} (default %s):@,@[<hov 0>%a@]@]"
+            parameter placeholder default Format.pp_print_text doc
       | Switch { parameter ; doc } ->
           Format.fprintf ppf "@[<v 2>@{<opt>%s@}:@,@[<hov 0>%a@]@]"
             parameter Format.pp_print_text doc
@@ -553,10 +558,10 @@ let print_options_brief (type ctx) =
   let help_option :
     type a. Format.formatter -> (a, ctx) arg -> unit =
     fun ppf -> function
-      | DefArg { parameter } ->
-          Format.fprintf ppf "[@{<opt>%s _@}]" parameter
-      | Arg { parameter } ->
-          Format.fprintf ppf "[@{<opt>%s _@}]" parameter
+      | DefArg { parameter ; placeholder } ->
+          Format.fprintf ppf "[@{<opt>%s <%s>@}]" parameter placeholder
+      | Arg { parameter ; placeholder } ->
+          Format.fprintf ppf "[@{<opt>%s <%s>@}]" parameter placeholder
       | Switch { parameter } ->
           Format.fprintf ppf "[@{<opt>%s@}]" parameter
   in let rec help : type b. Format.formatter -> (b, ctx) args -> unit =

@@ -145,12 +145,14 @@ let protocol_parameter =
 let base_dir_arg =
   arg
     ~parameter:"-base-dir"
+    ~placeholder:"path"
     ~doc:("The directory where the Tezos client will store all its data. By default "
           ^ Client_commands.default_base_dir)
     string_parameter
 let config_file_arg =
   arg
     ~parameter:"-config-file"
+    ~placeholder:"path"
     ~doc:"The main configuration file."
     string_parameter
 let timings_switch =
@@ -160,12 +162,14 @@ let timings_switch =
 let block_arg =
   default_arg
     ~parameter:"-block"
+    ~placeholder:"hash|head|head~n"
     ~doc:"The block on which to apply contextual commands."
     ~default:(Block_services.to_string default_cli_args.block)
     block_parameter
 let protocol_arg =
   arg
     ~parameter:"-protocol"
+    ~placeholder:"hash"
     ~doc:"Use contextual commands of a specific protocol."
     protocol_parameter
 let log_requests_switch =
@@ -177,11 +181,13 @@ let log_requests_switch =
 let addr_arg =
   arg
     ~parameter:"-addr"
+    ~placeholder:"IP addr|host"
     ~doc:"The IP address of the node."
     string_parameter
 let port_arg =
   arg
     ~parameter:"-port"
+    ~placeholder:"number"
     ~doc:"The RPC port of the node."
     (parameter
        (fun _ x -> try
@@ -248,7 +254,8 @@ let commands config_file cfg =
     command ~group ~desc:"create a config file based on the current CLI values"
       (args1
          (default_arg
-            ~parameter:"-path"
+            ~parameter:"-file"
+            ~placeholder:"path"
             ~doc:"path at which to create the file"
             ~default:(cfg.base_dir // default_config_file_name)
             (parameter (fun _ctx str -> return str))))

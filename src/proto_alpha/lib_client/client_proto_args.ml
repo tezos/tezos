@@ -61,6 +61,7 @@ let string_parameter =
 let init_arg =
   default_arg
     ~parameter:"-init"
+    ~placeholder:"data"
     ~doc:"The initial value of the contract's storage."
     ~default:"Unit"
     string_parameter
@@ -68,6 +69,7 @@ let init_arg =
 let arg_arg =
   default_arg
     ~parameter:"-arg"
+    ~placeholder:"data"
     ~doc:"The argument passed to the contract's script, if needed."
     ~default:"Unit"
     string_parameter
@@ -75,6 +77,7 @@ let arg_arg =
 let delegate_arg =
   arg
     ~parameter:"-delegate"
+    ~placeholder:"identity"
     ~doc:"Set the delegate of the contract.\
           Must be a known identity."
     string_parameter
@@ -82,6 +85,7 @@ let delegate_arg =
 let source_arg =
   arg
     ~parameter:"-source"
+    ~placeholder:"identity"
     ~doc:"Set the source of the bonds to be paid.\
           Must be a known identity."
     string_parameter
@@ -113,7 +117,7 @@ let tez_parameter param =
        | None -> fail (Bad_tez_arg (param, s)))
 
 let tez_arg ~default ~parameter ~doc =
-  default_arg ~parameter ~doc ~default (tez_parameter parameter)
+  default_arg ~parameter ~placeholder:"amount" ~doc ~default (tez_parameter parameter)
 
 let tez_param ~name ~desc next =
   Cli_entries.param
@@ -131,6 +135,7 @@ let fee_arg =
 let max_priority_arg =
   arg
     ~parameter:"-max-priority"
+    ~placeholder:"prio"
     ~doc:"Set the max_priority used when looking for baking slot."
     (parameter (fun _ s ->
          try return (int_of_string s)
@@ -144,6 +149,7 @@ let free_baking_switch =
 let endorsement_delay_arg =
   default_arg
     ~parameter:"-endorsement-delay"
+    ~placeholder:"seconds"
     ~doc:"Set the delay used before to endorse the current block."
     ~default:"15"
     (parameter (fun _ s ->

@@ -108,6 +108,7 @@ let commands () =
     arg
       ~doc:"Write output of debug command to file"
       ~parameter:"-file"
+      ~placeholder:"path"
     @@ parameter (fun _ str -> return str) in
   let output_to_ppf = function
     | None -> Format.std_formatter
