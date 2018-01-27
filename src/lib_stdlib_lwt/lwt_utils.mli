@@ -11,11 +11,6 @@ val may: f:('a -> unit Lwt.t) -> 'a option -> unit Lwt.t
 
 val never_ending: 'a Lwt.t
 
-val canceler: unit ->
-  (unit -> unit Lwt.t) *
-  (unit -> unit Lwt.t) *
-  ((unit -> unit Lwt.t) -> unit)
-
 val worker:
   string ->
   run:(unit -> unit Lwt.t) ->

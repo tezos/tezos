@@ -53,8 +53,9 @@ let worker_loop () =
 let worker =
   lazy begin
     Lwt.async begin fun () ->
-      let (_cancelation, cancel, _on_cancel) = Lwt_utils.canceler () in
-      Lwt_utils.worker "counter" ~run:worker_loop ~cancel
+      Lwt_utils.worker "counter"
+        ~run:worker_loop
+        ~cancel:(fun _ -> Lwt.return_unit)
     end
   end
 

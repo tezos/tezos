@@ -18,50 +18,6 @@ let may ~f = function
 
 let never_ending = fst (Lwt.wait ())
 
-(* A non exception-based cancelation mechanism. Builds a [cancelation]
-   thread to bind / pick on, awoken when a cancelation is requested by
-   [cancel ()]. [on_cancel cb] registers a callback to be called at
-   cancelation. [cancel ()] finishes when all calbacks have completed
-   (sequentially), instantly when called more than once. *)
-let canceler ()
-  : (unit -> unit Lwt.t) *
-    (unit -> unit Lwt.t) *
-    ((unit -> unit Lwt.t) -> unit) =
-  let cancelation = LC.create () in
-  let cancelation_complete = LC.create () in
-  let cancel_hook = ref (fun () -> Lwt.return ()) in
-  let canceling = ref false and canceled = ref false  in
-  let cancel () =
-    if !canceled then
-      Lwt.return ()
-    else if !canceling then
-      LC.wait cancelation_complete
-    else begin
-      canceling := true ;
-      LC.broadcast cancelation () ;
-      Lwt.finalize
-        !cancel_hook
-        (fun () ->
-           canceled := true ;
-           LC.broadcast cancelation_complete () ;
-           Lwt.return ()) >>= fun () ->
-      Lwt.return_unit
-    end
-  in
-  let on_cancel cb =
-    let hook = !cancel_hook in
-    cancel_hook := (fun () -> hook () >>= cb) ;
-  in
-  let cancelation () =
-    if !canceling then Lwt.return ()
-    else LC.wait cancelation
-  in
-  cancelation, cancel, on_cancel
-
-module Idle_waiter = struct
-
-end
-
 type trigger =
   | Absent
   | Present
