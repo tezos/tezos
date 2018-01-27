@@ -60,6 +60,7 @@ let collect_error_locations errs =
     | (Invalid_arity (loc, _, _, _)
       | Inconsistent_type_annotations (loc, _, _)
       | Unexpected_annotation loc
+      | Type_too_large (loc, _, _)
       | Invalid_namespace (loc, _, _, _)
       | Invalid_primitive (loc, _, _)
       | Invalid_kind (loc, _, _)
@@ -307,6 +308,11 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               Format.fprintf ppf
                 "@[<v 2>%aunexpected annotation."
                 print_loc loc
+          | Type_too_large (loc, size, maximum_size) ->
+              Format.fprintf ppf
+                "@[<v 2>%atype size (%d) exceeded maximum type size (%d)."
+                print_loc loc
+                size maximum_size
           | Transfer_in_lambda loc ->
               Format.fprintf ppf
                 "%aThe TRANSFER_TOKENS instruction cannot appear in a lambda."

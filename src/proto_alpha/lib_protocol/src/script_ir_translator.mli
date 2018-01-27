@@ -29,6 +29,7 @@ type error += Invalid_namespace of Script.location * Script.prim * namespace * n
 type error += Invalid_primitive of Script.location * Script.prim list * Script.prim
 type error += Invalid_kind of Script.location * kind list * kind
 type error += Missing_field of Script.prim
+type error += Type_too_large : Script.location * int * int -> error
 
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
