@@ -9,6 +9,8 @@
    A trick is to provide the `.cmx` through the `(library_flags)` and
    to generate a empty `.ml` to correctly handle the dependencies... *)
 
+#require "unix"
+
 let prefix = "lib_embedded_protocol_"
 let dirname = Filename.basename @@ Sys.getcwd ()
 
@@ -28,6 +30,26 @@ let path =
   match predefined_version with
   | None -> "src/lib_embedded_protocol_" ^ version
   | Some _ -> "."
+
+let sources =
+  let d = Unix.opendir "src" in
+  let rec loop acc =
+    match Unix.readdir d with
+    | exception End_of_file ->
+        Unix.closedir d ;
+        acc
+    | file ->
+        let acc =
+          if Filename.check_suffix file ".mli"
+          || Filename.check_suffix file ".ml" then
+            ("src/" ^ file) :: acc
+          else
+            acc
+        in
+        loop acc in
+  loop []
+
+module M = Unix
 
 let () = Format.kasprintf Jbuild_plugin.V1.send {|
 
@@ -60,10 +82,12 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files src/*.ml) (glob_files src/*.mli)))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))
+  (deps (@[<v>%a@]))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
 
 |}
     version version version version version version version version
     path
     version version version
+    Format.(pp_print_list (fun ppf -> Format.fprintf ppf "%S"))
+    sources

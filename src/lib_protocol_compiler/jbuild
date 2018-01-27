@@ -50,5 +50,17 @@
 
 (alias
  ((name runtest_indent)
-  (deps ((glob_files *.ml) (glob_files *.mli)))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))
+  ;; we would like (deps ((glob_files *.ml \ embedded_cmis.ml)))
+  ;; meanwhile, we hardcode the module list
+  (deps ("embedded_cmis.mli"
+         "main_embedded_packer.ml"
+         "main_embedded_packer.mli"
+         "main.ml"
+         "native.ml"
+         "native.mli"
+         "packer.ml"
+         "packer.mli"
+         "registerer.ml"
+         "registerer.mli"
+         ))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

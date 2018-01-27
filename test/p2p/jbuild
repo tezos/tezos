@@ -47,4 +47,4 @@
 (alias
  ((name runtest_indent)
   (deps ((glob_files *.ml) (glob_files *.mli)))
-  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${<}))))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

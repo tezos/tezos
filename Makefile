@@ -25,6 +25,9 @@ build-test:
 test:
 	@jbuilder runtest ${DEV}
 
+test-indent:
+	@jbuilder build @runtest_indent ${DEV}
+
 build-deps:
 	@./scripts/install_build_deps.sh
 
