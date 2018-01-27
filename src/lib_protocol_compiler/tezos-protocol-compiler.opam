@@ -14,7 +14,7 @@ depends: [
   "tezos-protocol-environment-sigs"
   "lwt"
   "ocplib-endian"
-  "ocp-ocamlres" { >= "dev" }
+  "ocp-ocamlres" { >= "0.4" }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

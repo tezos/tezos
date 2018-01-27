@@ -13,10 +13,6 @@ opam pin remove $packages
 
 ## Should be in sync with `opam-pin.sh`
 opam pin remove --no-action sodium
-opam pin remove --no-action ocp-ocamlres
 opam pin remove --no-action ocplib-json-typed
-
-## Unpin package we used to pin...
-opam pin remove --no-action ocplib-resto
 
 ### End of temporary HACK
