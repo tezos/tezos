@@ -64,6 +64,7 @@ let collect_error_locations errs =
       | Invalid_namespace (loc, _, _, _)
       | Invalid_primitive (loc, _, _)
       | Invalid_kind (loc, _, _)
+      | Duplicate_field (loc, _)
       | Fail_not_in_tail_position loc
       | Undefined_binop (loc, _, _, _)
       | Undefined_unop (loc, _, _)
@@ -158,6 +159,11 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         print_trace (parsed_locations parsed) rest
     | Missing_field prim :: rest ->
         Format.fprintf ppf "@[<v 0>Missing contract field: %s@]"
+          (Michelson_v1_primitives.string_of_prim prim) ;
+        print_trace locations rest
+    | Duplicate_field (loc, prim) :: rest ->
+        Format.fprintf ppf "@[<v 0>%aduplicate contract field: %s@]"
+          print_loc loc
           (Michelson_v1_primitives.string_of_prim prim) ;
         print_trace locations rest
     | Runtime_contract_error (contract, expr) :: rest ->

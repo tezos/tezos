@@ -2216,6 +2216,17 @@ let () =
     (fun prim -> Missing_field prim) ;
   register_error_kind
     `Permanent
+    ~id:"duplicateScriptField"
+    ~title:"Script has a duplicated field (parse error)"
+    ~description:
+      "When parsing script, a field was found more than once"
+    (obj2
+       (req "loc" location_encoding)
+       (req "prim" prim_encoding))
+    (function Duplicate_field (loc, prim) -> Some (loc, prim) | _ -> None)
+    (fun (loc, prim) -> Duplicate_field (loc, prim)) ;
+  register_error_kind
+    `Permanent
     ~id:"invalidPrimitiveTypeError"
     ~title: "Invalid primitive (typechecking error)"
     ~description:

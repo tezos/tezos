@@ -30,6 +30,7 @@ type error += Invalid_primitive of Script.location * Script.prim list * Script.p
 type error += Invalid_kind of Script.location * kind list * kind
 type error += Missing_field of Script.prim
 type error += Type_too_large : Script.location * int * int -> error
+type error += Duplicate_field of Script.location * Script.prim
 
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
