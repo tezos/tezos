@@ -10,10 +10,9 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
   "base-bigarray"
-  "mtime.clock.os"
+  "mtime"
   "ocplib-resto-cohttp"
   "tezos-base"
-  "tezos-worker"
   "tezos-node-p2p-base"
 ]
 build: [
