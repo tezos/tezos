@@ -27,7 +27,7 @@ stages:
     - apk add --no-cache curl jq
     - . ./scripts/version.sh
   tags:
-    - docker
+    - safe_docker
 
 prepare:opam:
   <<: *dind_definition
@@ -59,6 +59,8 @@ build_deps:
     - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
         ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
       fi
+  tags:
+    - gitlab-org
 
 ## Tezos
 
@@ -169,6 +171,8 @@ test:proto:sandbox:
     - opam depext --yes ${package}
     - opam install --yes --deps-only ${package}
     - opam install --yes --with-test ${package}
+  tags:
+    - gitlab-org
 
 opam:01:ocplib-resto:
   <<: *opam_definition
@@ -387,6 +391,8 @@ publish:github:
         ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
       fi
     - git push git@github.com:tezos/tezos.git -f HEAD:${CI_COMMIT_REF_NAME}
+  tags:
+    - gitlab-org
 
 ## Publish docs to gitlab...
 
@@ -405,6 +411,8 @@ publish:pages:
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
     - opam install odoc
     - make doc-html && sudo mv docs/_build "${CI_PROJECT_DIR}"/public
+  tags:
+    - gitlab-org
 
 ## Relaunching the bootstrap servers of the alphanet.zeronet
 
@@ -425,6 +433,8 @@ publish:pages:
     - echo "${CI_SSH_CONFIG}" | tr -d "\r" > ~/.ssh/config
     - chmod 600 ~/.ssh/id_ed25519
   allow_failure: true
+  tags:
+    - gitlab-org
 
 deploy:bootstrap1:
   <<: *bootstrap_definition
