@@ -4,8 +4,9 @@
 .DS_Store
 __pycache__
 
-_build
-*.install
+/_build
+/_opam
+/_docker_build
 
 /tezos-node
 /tezos-protocol-compiler
@@ -16,6 +17,7 @@ _build
 
 /docs/introduction/readme.rst
 
+*.install
 .merlin
 
 *~
@@ -24,9 +26,3 @@ _build
 *.rej
 *.orig
 
-/_opam
-
-## Not in .dockerignore
-
-/Dockerfile
-/_apk

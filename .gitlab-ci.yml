@@ -1,9 +1,12 @@
 
 variables:
+  opam_image: ${CI_REGISTRY_IMAGE}/opam
+  build_deps_image: ${CI_REGISTRY_IMAGE}/build_deps
   public_docker_image: docker.io/tezos/tezos
 
 stages:
   - prepare
+  - build_deps
   - build
   - test
   - opam
@@ -20,8 +23,9 @@ stages:
   services:
     - docker:dind
   before_script:
-    - docker info
-    - docker login -u gitlab-ci-token -p "$CI_BUILD_TOKEN" "${CI_REGISTRY}"
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
+    - apk add --no-cache curl jq
+    - . ./scripts/version.sh
   tags:
     - docker
 
@@ -30,47 +34,54 @@ prepare:opam:
   stage: prepare
   only:
     - schedules
-  before_script:
-    - . ./scripts/version.sh
   script:
-    - mkdir -p ~/.docker
-    - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
-    - ./scripts/create_docker_image.opam.sh
-    - docker push "tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
-    - docker tag "tezos/opam:alpine-${alpine_version}_ocaml-${ocaml_version}"
-                 "tezos/opam:latest"
-    - docker push "tezos/opam:latest"
+    - ./scripts/ci/create_docker_image.opam.sh "${opam_image}"
+    - docker push "${opam_image}:alpine-${alpine_version}_ocaml-${ocaml_version}"
+    - docker tag "${opam_image}:alpine-${alpine_version}_ocaml-${ocaml_version}"
+                 "${opam_image}:latest"
+    - docker push "${opam_image}:latest"
+
+## Tezos build dependencies
+
+build_deps:
+  <<: *dind_definition
+  stage: build_deps
+  script:
+    ## Building dependencies...
+    - ./scripts/ci/create_docker_image.build_deps.sh
+        "${build_deps_image}" "${CI_COMMIT_SHA}"
+        "${opam_image}:alpine-${alpine_version}_ocaml-${ocaml_version}"
+        "yes"
+
+.build_deps_template: &build_deps_definition
+  image: ${build_deps_image}:${CI_COMMIT_SHA}
+  before_script:
+    - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
+        ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
+      fi
 
 ## Tezos
 
 build:
-  <<: *dind_definition
+  <<: *build_deps_definition
   stage: build
   script:
-    ## Building dependencies...
-    - ./scripts/create_docker_image.build_deps.sh
-        "build_deps" "${CI_BUILD_REF}"
-        "${CI_REGISTRY_IMAGE}/build_deps"
-    ## Preparing sources for the alphanet or the zeronet...
-    - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
-        ./scripts/apply_patch.sh "${CI_BUILD_REF_NAME}" ;
-      fi
-    ## Building...
-    - ./scripts/create_docker_image.build.sh
-        "${CI_REGISTRY_IMAGE}/build" "${CI_BUILD_REF}"
-        "build_deps:${CI_BUILD_REF}"
-    ## Saving the docker image...
-    - docker push "${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}"
+    - make all
+    - make build-test
+  artifacts:
+    paths:
+    - _build
+    expire_in: 1 day
 
 ## Basic tests (run on merge requests)
 
 .test_template: &test_definition
+  <<: *build_deps_definition
   stage: test
-  image: ${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}
   except:
     - master@tezos/tezos
   before_script:
-    - cd /home/opam/tezos
+    - find _build -type f -exec touch {} \;
   dependencies:
     - build
 
@@ -145,17 +156,14 @@ test:proto:sandbox:
     - jbuilder build @runtest_sandbox
 
 ## Basic tests through opam packaged (run on master only)
-##
-## We use opam2-beta because we want to run the testsuite,
-## i.e. `opam install --with-test`, and it is buggy in opam.1.2.1. It
-## insists on building the testsuite of all the dependencies... and many
-## package in opam-repository have buggy testsuite packaging.
 
 .opam_template: &opam_definition
-  image: tezos/opam2
+  image: ${opam_image}
   stage: opam
+  dependencies: []
   only:
     - master@tezos/tezos
+    - /^.*opam.*$/
   script:
     - ./scripts/opam-pin.sh
     - opam depext --yes ${package}
@@ -347,22 +355,26 @@ publish:docker:minimal:
     - alphanet@tezos/tezos
     - zeronet@tezos/tezos
   script:
-    - docker pull "${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}"
+    - docker pull "${build_deps_image}:${CI_COMMIT_SHA}"
     - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
-        ./scripts/apply_patch.sh "${CI_BUILD_REF_NAME}" ;
+        ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
       fi
+    - ./scripts/create_docker_image.build.sh
+        "tezos_build" "${CI_COMMIT_REF_NAME}"
+        "${build_deps_image}:${CI_COMMIT_SHA}"
     - ./scripts/create_docker_image.minimal.sh
-        "${public_docker_image}" "${CI_BUILD_REF_NAME}"
-        "${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}"
+        "${public_docker_image}" "${CI_COMMIT_REF_NAME}"
+        "tezos_build:${CI_COMMIT_REF_NAME}"
     - mkdir ~/.docker || true
-    - echo "$CI_DOCKER_AUTH" > ~/.docker/config.json ;
-    - docker push "${public_docker_image}:${CI_BUILD_REF_NAME}"
+    - echo "${CI_DOCKER_AUTH}" > ~/.docker/config.json ;
+    - docker push "${public_docker_image}:${CI_COMMIT_REF_NAME}"
 
 ## Publish to github...
 
 publish:github:
-  image: tezos/opam
+  image: ${opam_image}
   stage: publish
+  dependencies: []
   only:
     - master@tezos/tezos
     - alphanet@tezos/tezos
@@ -372,22 +384,40 @@ publish:github:
     - chmod 400 ~/.ssh/id_rsa
     - rm -fr .git/refs/original
     - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
-        ./scripts/apply_patch.sh "${CI_BUILD_REF_NAME}" ;
+        ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
       fi
-    - git push git@github.com:tezos/tezos.git -f HEAD:${CI_BUILD_REF_NAME}
+    - git push git@github.com:tezos/tezos.git -f HEAD:${CI_COMMIT_REF_NAME}
 
+## Publish docs to gitlab...
+
+publish:pages:
+  image: ${build_deps_image}:${CI_COMMIT_SHA}
+  stage: publish
+  only:
+    - master@tezos/tezos
+  artifacts:
+    paths:
+    - public
+  script:
+    - cd /home/opam/tezos
+    - sudo apk update && sudo apk upgrade
+    - sudo apk add py3-sphinx py3-sphinx_rtd_theme
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - opam install odoc
+    - make doc-html && sudo mv docs/_build "${CI_PROJECT_DIR}"/public
 
 ## Relaunching the bootstrap servers of the alphanet.zeronet
 
 .bootstrap_template: &bootstrap_definition
-  image: tezos/opam
+  image: ${opam_image}
   stage: deploy
+  dependencies: []
   only:
     - alphanet@tezos/tezos
     - zeronet@tezos/tezos
   before_script:
     - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - if [ "${CI_BUILD_REF_NAME}" = "alphanet" ]; then
+    - if [ "${CI_COMMIT_REF_NAME}" = "alphanet" ]; then
         echo "${CI_PK_ALPHANET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
       else
         echo "${CI_PK_ZERONET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
@@ -429,26 +459,8 @@ deploy:bootstrap6:
 # cleanup:
   # <<: *dind_definition
   # stage: cleanup
+  # dependencies: []
   # script:
-    # - apk add -U curl jq
-    # - ./scripts/delete_ci_image.sh gitlab-ci-token "${CI_BUILD_TOKEN}"
-         # "${CI_PROJECT_PATH}/build"
-         # "${CI_BUILD_REF}"
-
-pages:
-  stage: publish
-  image: ${CI_REGISTRY_IMAGE}/build:${CI_BUILD_REF}
-  only:
-    - master@tezos/tezos
-  artifacts:
-    paths:
-    - public
-  script:
-    - cd /home/opam/tezos
-    - sudo apk update && sudo apk upgrade
-    - sudo apk add py3-sphinx py3-sphinx_rtd_theme
-    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - opam install odoc
-    - make doc-html && sudo mv docs/_build "${CI_PROJECT_DIR}"/public
-  dependencies:
-    - build
+    # - ./scripts/ci/docker_registry_delete.sh
+         # "${CI_REGISTRY_USER}" "${CI_REGISTRY_PASSWORD}"
+         # "${build_deps_image}" "${CI_COMMIT_SHA}"

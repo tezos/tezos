@@ -5,7 +5,8 @@
 __pycache__
 
 _build
-**/*.install
+_opam
+_docker_build
 
 tezos-node
 tezos-protocol-compiler
@@ -16,6 +17,7 @@ scripts/opam-test-all.sh.DONE
 
 docs/introduction/readme.rst
 
+**/*.install
 **/.merlin
 
 **/*~
@@ -23,8 +25,6 @@ docs/introduction/readme.rst
 
 **/*.rej
 **/*.orig
-
-_opam
 
 ## Not in .gitignore
 
