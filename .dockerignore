@@ -7,6 +7,7 @@ __pycache__
 _build
 _opam
 _docker_build
+docs/_build
 
 tezos-node
 tezos-protocol-compiler
