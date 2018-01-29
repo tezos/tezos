@@ -6,8 +6,8 @@
   (libraries (tezos-base
               tezos-rpc-http
               tezos-client-base
-              tezos-embedded-client-genesis
-              tezos-embedded-client-alpha))
+              tezos-client-genesis
+              tezos-client-alpha))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives

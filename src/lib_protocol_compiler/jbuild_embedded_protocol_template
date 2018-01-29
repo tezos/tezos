@@ -1,7 +1,7 @@
 (* -*- tuareg -*- *)
 
-let prefix = "lib_protocol_"
-let dirname = Filename.basename @@ Filename.dirname @@ Sys.getcwd ()
+let prefix = "proto_"
+let dirname = Filename.basename @@ Filename.dirname @@ Filename.dirname @@ Sys.getcwd ()
 
 let predefined_version = None (* to be substituted in opam packages *)
 

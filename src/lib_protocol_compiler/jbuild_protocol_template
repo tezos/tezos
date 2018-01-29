@@ -11,8 +11,8 @@
 
 #require "unix"
 
-let prefix = "lib_protocol_"
-let dirname = Filename.basename @@ Sys.getcwd ()
+let prefix = "proto_"
+let dirname = Filename.basename @@ Filename.dirname @@ Sys.getcwd ()
 
 let predefined_version = None (* to be substituted in opam packages *)
 
@@ -28,7 +28,7 @@ let version =
 
 let path =
   match predefined_version with
-  | None -> "src/proto_" ^ version ^ "/lib_protocol_" ^ version
+  | None -> "src/proto_" ^ version ^ "/lib_protocol"
   | Some _ -> "."
 
 let sources =

@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_embedded_client_alpha)
-  (public_name tezos-embedded-client-alpha)
+ ((name tezos_client_alpha)
+  (public_name tezos-client-alpha)
   (libraries (tezos-base
               tezos-protocol-alpha
               tezos-client-environment

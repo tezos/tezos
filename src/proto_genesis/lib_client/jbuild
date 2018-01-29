@@ -1,13 +1,13 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_embedded_client_genesis)
-  (public_name tezos-embedded-client-genesis)
+ ((name tezos_client_genesis)
+  (public_name tezos-client-genesis)
   (libraries (tezos-base
               tezos-shell-services
               tezos-client-base
               tezos-client-environment
-              tezos-embedded-client-alpha
+              tezos-client-alpha
               tezos-protocol-genesis))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
