@@ -1,36 +1,11 @@
-diff --git a/scripts/alphanet.sh b/scripts/alphanet.sh
---- a/scripts/alphanet.sh
-+++ b/scripts/alphanet.sh
-@@ -21,15 +21,15 @@ fi
- src_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
- cd "$src_dir"
- 
--default_port=9732
-+default_port=19732
- port="$default_port"
- 
--docker_image=docker.io/tezos/tezos:alphanet
--docker_volume=tezos-alphanet-data$suffix
-+docker_image=docker.io/tezos/tezos:zeronet
-+docker_volume=tezos-zeronet-data$suffix
- suffix=
- 
--data_dir="$HOME/.tezos-alphanet$suffix"
--docker_container="tezos-alphanet$suffix"
-+data_dir="$HOME/.tezos-zeronet$suffix"
-+docker_container="tezos-zeronet$suffix"
- 
- if [ $ALPHANET_EMACS ]; then
-     interactive_flags="-t"
-diff --git a/src/bin_node/node_config_file.ml b/src/bin_node/node_config_file.ml
---- a/src/bin_node/node_config_file.ml
-+++ b/src/bin_node/node_config_file.ml
-@@ -16,7 +16,7 @@ let home =
-   with Not_found -> "/root"
- 
- let default_data_dir = home // ".tezos-node"
--let default_net_port = 9732
-+let default_net_port = 19732
- let default_rpc_port = 8732
- 
- type t = {
+-diff --git a/src/bin_node/node_config_file.ml b/src/bin_node/node_config_file.ml
+---- a/src/bin_node/node_config_file.ml
+-+++ b/src/bin_node/node_config_file.ml
+-@@ -16,7 +16,7 @@ let home =
+-   with Not_found -> "/root"
+- 
+- let default_data_dir = home // ".tezos-node"
+--let default_net_port = 9732
+-+let default_net_port = 19732
+- let default_rpc_port = 8732
+- 

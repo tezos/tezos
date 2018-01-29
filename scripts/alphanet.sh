@@ -2,8 +2,13 @@
 
 set -e
 
-if ! docker > /dev/null 2>&1 ; then
+if ! which docker > /dev/null 2>&1 ; then
     echo "Docker does not seem to be installed."
+    exit 1
+fi
+
+if ! which docker-compose > /dev/null 2>&1 ; then
+    echo "Docker-compose does not seem to be installed."
     exit 1
 fi
 
@@ -22,197 +27,131 @@ current_dir="$(pwd -P)"
 src_dir="$(cd "$(dirname "$0")" && echo "$current_dir/")"
 cd "$src_dir"
 
-default_port=9732
-port="$default_port"
+update_compose_file() {
 
-docker_image=docker.io/tezos/tezos:alphanet
-docker_volume=tezos-alphanet-data$suffix
-suffix=
-
-data_dir="$HOME/.tezos-alphanet$suffix"
-docker_container="tezos-alphanet$suffix"
-
-if [ ! -z "$ALPHANET_EMACS" ]; then
-    interactive_flags="-t"
-else
-    interactive_flags="-it"
-fi
-
-
-## Saving state ############################################################
-
-save_identity() {
-    if [ ! -f "$data_dir/identity.json" ]; then
-        echo "Saving the generated identity into '$data_dir/identity.json'..."
-        mkdir -p "$data_dir/"
+    if [ "$#" -ge 2 ] && [ "$1" = "--rpc-port" ] ; then
+        export_rpc="
+      - \"$1:8732\""
+        shift 2
     fi
-    docker cp "$docker_container:var/run/tezos/node/identity.json" \
-              "$data_dir/"
+
+    cat > "$docker_compose_yml" <<EOF
+version: "3"
+services:
+
+  node:
+    image: $docker_image
+    hostname: node
+    command: tezos-node $@
+    ports:
+      - "$port:$port"$export_rpc
+    expose:
+      - "8732"
+    volumes:
+      - node_data:/var/run/tezos/node
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+    environment:
+      - P2P_PORT=$port
+
+  baker:
+    image: $docker_image
+    hostname: baker
+    command: tezos-baker --max-priority 128
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+  endorser:
+    image: $docker_image
+    hostname: endorser
+    command: tezos-endorser
+    links:
+      - node
+    volumes:
+      - client_data:/var/run/tezos/client
+    restart: on-failure
+
+volumes:
+  node_data:
+  client_data:
+EOF
+
 }
 
-
-may_restore_identity() {
-    if [ -f "$data_dir/identity.json" ]; then
-        echo "Restoring the peer identity from '$data_dir/identity.json'..."
-        docker exec "$docker_container" mkdir -p /var/run/tezos/node/
-        docker cp "$data_dir/identity.json" \
-                  "$docker_container:var/run/tezos/node/"
-        docker exec "$docker_container" \
-               sudo chown tezos "/var/run/tezos/node/identity.json"
-    fi
+call_docker_compose() {
+    docker-compose -f "$docker_compose_yml" -p "$docker_compose_name" "$@"
 }
 
-may_save_client_file() {
-    if docker exec "$docker_container" \
-              test -f "/var/run/tezos/client/$1" ; then
-        docker cp "$docker_container:var/run/tezos/client/$1" \
-               "$data_dir/$1"
-    elif [ -f "$data_dir/$1" ] ; then
-        mv "$data_dir/$1" "$data_dir/$1.bak"
+exec_docker() {
+    if [ -t 0 ] && [ -t 1 ] && [ -t 2 ] && [ -z "$ALPHANET_EMACS" ]; then
+        local interactive_flags="-it"
+    else
+        local interactive_flags="-t"
     fi
+    docker exec "$interactive_flags" "$docker_node_container" "$@"
 }
-
-may_restore_client_file() {
-    if [ -f "$data_dir/$1" ]; then
-        docker cp "$data_dir/$1" \
-                  "$docker_container:var/run/tezos/client/"
-        docker exec "$docker_container" \
-               sudo chown tezos "/var/run/tezos/client/$1"
-    fi
-}
-
-save_accounts() {
-    if ! docker exec "$docker_container" \
-         test -f "/var/run/tezos/client/secret keys" ; then
-        return
-    fi
-    if [ ! -f "$data_dir/secret keys" ]; then
-        echo "Saving the secrets into '$data_dir/secret keys'..."
-        echo
-        echo -e "\033[33mWARNING: THE SECRET KEYS FILE IS UNENCRYPTED!!!\033[0m"
-        echo
-        mkdir -p "$data_dir/"
-    fi
-    docker cp "$docker_container:var/run/tezos/client/secret keys" \
-           "$data_dir/"
-    may_save_client_file "public key hashs"
-    may_save_client_file "public keys"
-    may_save_client_file "contracts"
-}
-
-may_restore_accounts() {
-    docker exec "$docker_container" mkdir -p /var/run/tezos/client/
-    if [ -f "$data_dir/secret keys" ]; then
-        echo "Restoring the secret keys from '$data_dir/secret keys'..."
-        may_restore_client_file "secret keys"
-    fi
-    may_restore_client_file "public key hashs"
-    may_restore_client_file "public keys"
-    may_restore_client_file "contracts"
-}
-
 
 ## Container ###############################################################
 
 pull_image() {
-    if [ "$TEZOS_ALPHANET_DO_NOT_PULL" = "yes" ] ||  [ "$ALPHANET_EMACS" ] ; then
+    if [ "$TEZOS_ALPHANET_DO_NOT_PULL" = "yes" ] \
+           || [ "$ALPHANET_EMACS" ] \
+           || [ "$docker_image" = "$(echo $docker_image | tr -d '/')" ] ; then
         return ;
     fi
     docker pull "$docker_image"
+    date "+%s" > "$docker_pull_timestamp"
 }
 
-check_container() {
-    res=$(docker inspect \
-                 --format="{{ .State.Running }}" \
-                 --type=container "$docker_container" 2>/dev/null \
-              || echo false)
-    [ "$res" = true ]
-}
-
-check_volume() {
-    docker volume inspect "$docker_volume" > /dev/null 2>&1
-}
-
-clear_volume() {
-    if check_volume ; then
-        docker volume rm "$docker_volume" > /dev/null
-        echo -e "\033[32mThe blockchain data has been removed from the disk.\033[0m"
-    else
-        echo -e "\033[32mNo remaining data to be removed from the disk.\033[0m"
+may_pull_image() {
+    if [ ! -f "$docker_pull_timestamp" ] \
+         || [ 3600 -le $(($(date "+%s") - $(cat $docker_pull_timestamp))) ]; then
+        pull_image
     fi
 }
 
 uptodate_container() {
     running_image=$(docker inspect \
                            --format="{{ .Image }}" \
-                           --type=container "$docker_container")
+                           --type=container "$1")
     latest_image=$(docker inspect \
                           --format="{{ .Id }}" \
                           --type=image "$docker_image")
     [ "$latest_image" = "$running_image" ]
 }
 
-assert_container_uptodate() {
-    pull_image > /dev/null
-    if ! uptodate_container; then
-        echo "The current container is not the latest available."
-        echo "Please restart."
-        exit 1
-    fi
-}
-
 assert_container() {
-    if ! check_container; then
-        echo -e "\033[31mNo container currently running!\033[0m"
-        exit 1
-    fi
+    call_docker_compose up --no-start
 }
-
-start_container() {
-    if [ "$#" -ge 2 ] && [ "$1" = "--rpc-port" ] ; then
-        docker_export_rpc="-p $2:8732"
-    fi
-    if check_container; then
-        assert_container_uptodate
-    else
-        if ! check_volume; then
-            docker volume create "$docker_volume"
-        fi
-        docker rm "$docker_container" || true > /dev/null 2>&1
-        echo "Launching the docker container..."
-        docker run --rm -dit -p "$port:$port" $docker_export_rpc \
-               -v "$docker_volume:/var/run/tezos" \
-               --entrypoint /bin/sh \
-               --name "$docker_container" \
-               "$docker_image" > /dev/null
-        may_restore_identity
-        may_restore_accounts
-    fi
-}
-
-stop_container() {
-    if ! check_container; then
-        echo -e "\033[31mNo container to kill!\033[0m"
-        exit 1
-    fi
-    save_identity ## Saving again, just in case...
-    save_accounts
-    printf "Stopping the container... "
-    docker stop "$docker_container" >/dev/null
-    echo " done"
-}
-
 
 ## Node ####################################################################
 
-init_node() {
-    docker exec "$docker_container" tezos init \
-           "$@" --net-addr "[::]:$port"
-    save_identity
+check_node_volume() {
+    docker volume inspect "$docker_node_volume" > /dev/null 2>&1
+}
+
+clear_node_volume() {
+    if check_node; then
+        echo -e "\033[31mCannot clear data while the node is running.\033[0m"
+        exit 1
+    fi
+    if check_node_volume ; then
+        docker volume rm "$docker_node_volume" > /dev/null
+        echo -e "\033[32mThe chain data has been removed from the disk.\033[0m"
+    else
+        echo -e "\033[32mNo remaining data to be removed from the disk.\033[0m"
+    fi
 }
 
 check_node() {
-    check_container && docker exec "$interactive_flags" "$docker_container" tezos check_node
+    res=$(docker inspect \
+                 --format="{{ .State.Running }}" \
+                 --type=container "$docker_node_container" 2>/dev/null \
+              || echo false)
+    [ "$res" = true ]
 }
 
 assert_node() {
@@ -222,42 +161,67 @@ assert_node() {
     fi
 }
 
+warn_node_uptodate() {
+    if ! uptodate_container "$docker_node_container"; then
+        echo -e "\033[33mThe current node is not the latest available.\033[0m"
+    fi
+}
+
+assert_node_uptodate() {
+    may_pull_image
+    assert_node
+    if ! uptodate_container "$docker_node_container"; then
+        echo -e "\033[33mThe current node is not the latest available.\033[0m"
+        exit 1
+    fi
+}
+
 status_node() {
+    may_pull_image
     if check_node; then
         echo -e "\033[32mNode is running\033[0m"
+        warn_node_uptodate
     else
         echo -e "\033[33mNode is not running\033[0m"
     fi
 }
 
 start_node() {
+    pull_image
     if check_node; then
-        echo -e "\033[31mCannot run two nodes in the same container!\033[0m"
+        echo -e "\033[31mNode is already running\033[0m"
         exit 1
     fi
-    if $docker_1_13; then
-        tezos_log_env="-eTEZOS_LOG=${TEZOS_LOG:=* -> info}"
-    fi
-    docker exec -d "${tezos_log_env}" \
-           "$docker_container" tezos run_node
-    sleep 1
-    docker exec "$docker_container" tezos wait_node
+    update_compose_file "$@"
+    call_docker_compose up --no-start
+    call_docker_compose start node
     echo -e "\033[32mThe node is now running.\033[0m"
 }
 
 log_node() {
-    docker exec "$interactive_flags" "$docker_container" tezos log_node
+    may_pull_image
+    assert_node_uptodate
+    call_docker_compose logs -f node
 }
 
 stop_node() {
-    docker exec "$docker_container" tezos stop_node
+    if ! check_node; then
+        echo -e "\033[31mNo node to kill!\033[0m"
+        exit 1
+    fi
+    echo -e "\033[32mStopping the node...\033[0m"
+    call_docker_compose stop node
 }
 
 
 ## Baker ###################################################################
 
 check_baker() {
-    check_node && docker exec "$interactive_flags" "$docker_container" tezos check_baker
+    res=$(docker inspect \
+                 --format="{{ .State.Running }}" \
+                 --type=container "$docker_baker_container" 2>/dev/null \
+              || echo false)
+    [ "$res" = true ]
 }
 
 assert_baker() {
@@ -267,9 +231,25 @@ assert_baker() {
     fi
 }
 
+warn_baker_uptodate() {
+    if ! uptodate_container "$docker_baker_container"; then
+        echo -e "\033[33mThe current baker is not the latest available.\033[0m"
+    fi
+}
+
+assert_baker_uptodate() {
+    assert_baker
+    if ! uptodate_container "$docker_baker_container"; then
+        echo -e "\033[33mThe current baker is not the latest available.\033[0m"
+        exit 1
+    fi
+}
+
 status_baker() {
     if check_baker; then
         echo -e "\033[32mBaker is running\033[0m"
+        may_pull_image
+        warn_baker_uptodate
     else
         echo -e "\033[33mBaker is not running\033[0m"
     fi
@@ -277,26 +257,38 @@ status_baker() {
 
 start_baker() {
     if check_baker; then
-        echo -e "\033[31mCannot run two bakers in the same container!\033[0m"
+        echo -e "\033[31mBaker is already running\033[0m"
         exit 1
     fi
-    TEZOS_LOG="${TEZOS_LOG:=* -> info}"
-    docker exec -d "$docker_container" tezos run_baker
+    pull_image
+    assert_node_uptodate
+    call_docker_compose start baker
     echo -e "\033[32mThe baker is now running.\033[0m"
 }
 
 log_baker() {
-    docker exec "$interactive_flags" "$docker_container" tezos log_baker
+    may_pull_image
+    assert_baker_uptodate
+    call_docker_compose logs -f baker
 }
 
 stop_baker() {
-    docker exec "$docker_container" tezos stop_baker
+    if ! check_baker; then
+        echo -e "\033[31mNo baker to kill!\033[0m"
+        exit 1
+    fi
+    echo -e "\033[32mStopping the baker...\033[0m"
+    call_docker_compose stop baker
 }
 
-## Baker ###################################################################
+## Endorser ###################################################################
 
 check_endorser() {
-    check_node && docker exec "$interactive_flags" "$docker_container" tezos check_endorser
+    res=$(docker inspect \
+                 --format="{{ .State.Running }}" \
+                 --type=container "$docker_endorser_container" 2>/dev/null \
+              || echo false)
+    [ "$res" = true ]
 }
 
 assert_endorser() {
@@ -306,9 +298,25 @@ assert_endorser() {
     fi
 }
 
+warn_endorser_uptodate() {
+    if ! uptodate_container "$docker_endorser_container"; then
+        echo -e "\033[33mThe current endorser is not the latest available.\033[0m"
+    fi
+}
+
+assert_endorser_uptodate() {
+    assert_endorser
+    if ! uptodate_container "$docker_endorser_container"; then
+        echo -e "\033[33mThe current endorser is not the latest available.\033[0m"
+        exit 1
+    fi
+}
+
 status_endorser() {
     if check_endorser; then
         echo -e "\033[32mEndorser is running\033[0m"
+        may_pull_image
+        warn_endorser_uptodate
     else
         echo -e "\033[33mEndorser is not running\033[0m"
     fi
@@ -316,109 +324,103 @@ status_endorser() {
 
 start_endorser() {
     if check_endorser; then
-        echo -e "\033[31mCannot run two endorsers in the same container!\033[0m"
+        echo -e "\033[31mEndorser is already running\033[0m"
         exit 1
     fi
-    TEZOS_LOG="${TEZOS_LOG:=* -> info}"
-    docker exec -d "$docker_container" tezos run_endorser
+    pull_image
+    assert_node_uptodate
+    call_docker_compose start endorser
     echo -e "\033[32mThe endorser is now running.\033[0m"
 }
 
 log_endorser() {
-    docker exec "$interactive_flags" "$docker_container" tezos log_endorser
+    may_pull_image
+    assert_endorser_uptodate
+    call_docker_compose logs -f endorser
 }
 
 stop_endorser() {
-    docker exec "$docker_container" tezos stop_endorser
+    if ! check_baker; then
+        echo -e "\033[31mNo baker to kill!\033[0m"
+        exit 1
+    fi
+    echo -e "\033[32mStopping the baker...\033[0m"
+    call_docker_compose stop endorser
 }
 
 ## Misc ####################################################################
 
 
 run_client() {
+    assert_node_uptodate
     declare -a container_args=();
+    tmpdir=$(exec_docker mktemp)
     for arg in "$@"; do
         if [[ "$arg" == 'container:'* ]]; then
             local_path="${arg#container:}"
             if [[ "$local_path" != '/'* ]]; then
                 local_path="$current_dir/$local_path"
             fi
-            docker exec "$docker_container" mkdir -p -m 777 /tmp/copied/
+            docker exec "$docker_container" mkdir -p -m 777 "$tmpdir"
             file_name=$(basename "${local_path}")
-            docker_path="/tmp/copied/$file_name"
-            docker cp "${local_path}" "$docker_container:${docker_path}"
-            docker exec "$docker_container" sudo chmod 644 "${docker_path}"
+            docker_path="$tmpdir/$file_name"
+            docker cp "${local_path}" "$docker_node_container:${docker_path}"
+            exec_docker chmod 644 "${docker_path}"
             container_args+=("file:$docker_path");
         else
             container_args+=("${arg}");
         fi
     done
-    docker exec "$interactive_flags" "$docker_container" tezos client "${container_args[@]}"
-    docker exec "$docker_container" rm -rf /tmp/copied # Remove copied files
-    save_accounts
+    exec_docker tezos-client "${container_args[@]}"
+    exec_docker rm -rf $tmpdir # Remove copied files
 }
 
 run_shell() {
+    assert_node_uptodate
     if [ $# -eq 0 ]; then
-        docker exec -it "$docker_container" bash
+        exec_docker /bin/sh
     else
-        docker exec -it "$docker_container" bash -c "$@"
+        exec_docker /bin/sh -c "$@"
     fi
-    save_accounts
 }
 
 display_head() {
-    docker exec "$interactive_flags" "$docker_container" tezos \
-           client rpc call /blocks/head with '{}'
-    docker exec "$interactive_flags" "$docker_container" tezos \
-           client rpc call /blocks/head/proto/context/level with '{}'
+    assert_node_uptodate
+    exec_docker tezos-client rpc call /blocks/head with '{}'
+    exec_docker tezos-client rpc call /blocks/head/proto/context/level with '{}'
 }
 
 ## Main ####################################################################
 
 start() {
     pull_image
-    start_container "$@"
-    init_node "$@"
-    start_node
-    start_baker
-    start_endorser
-    save_accounts
+    update_compose_file "$@"
+    call_docker_compose up -d
     warn_script_uptodate
 }
 
-go_alpha_go() {
-    docker exec "$interactive_flags" "$docker_container" tezos client \
-           activate \
-           protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
-           with fitness 1 \
-           and key dictator
+stop() {
+    call_docker_compose down
 }
 
-stop() {
-    stop_node || true
-    stop_container
+kill_() {
+    call_docker_compose kill
+    stop
 }
 
 status() {
-    pull_image
-    if ! uptodate_container; then
-        echo -e "\033[31mThe container is running but not the latest available.\033[0m"
-        exit 1
-    fi
-    echo -e "\033[32mThe container is running and up to date.\033[0m"
-    warn_script_uptodate verbose
     status_node
     status_baker
     status_endorser
+    warn_script_uptodate verbose
 }
 
 warn_script_uptodate() {
     if [[ $ALPHANET_EMACS ]]; then
        return
     fi
-    docker cp "$docker_container:home/tezos/scripts/alphanet.sh" \
-              ".alphanet.sh.new"
+    docker run --entrypoint /bin/cat "$docker_image" \
+       "/usr/local/share/tezos/alphanet.sh" > ".alphanet.sh.new"
     if ! diff .alphanet.sh.new  "$0" >/dev/null 2>&1 ; then
         echo -e "\033[33mWarning: the container contains a new version of 'alphanet.sh'.\033[0m"
         echo -e "\033[33mYou might run '$0 update_script' to synchronize.\033[0m"
@@ -428,17 +430,9 @@ warn_script_uptodate() {
     rm .alphanet.sh.new
 }
 
-assert_uptodate() {
-    assert_container
-    assert_container_uptodate
-    warn_script_uptodate
-}
-
 update_script() {
-    pull_image
-    tmp="$(docker run --rm -dit --entrypoint /bin/sleep "$docker_image" 20)"
-    docker cp "$tmp:home/tezos/scripts/alphanet.sh" ".alphanet.sh.new"
-    docker stop "$tmp" > /dev/null
+    docker run --entrypoint /bin/cat "$docker_image" \
+       "/usr/local/share/tezos/alphanet.sh" > ".alphanet.sh.new"
     if ! diff .alphanet.sh.new  "$0" >/dev/null 2>&1 ; then
         mv .alphanet.sh.new "$0"
         echo -e "\033[32mThe script has been updated.\033[0m"
@@ -482,7 +476,6 @@ usage() {
     echo "    $0 update_script"
     echo "       Replace 'alphanet.sh' with the one found in the docker image."
     echo "  Advanced commands:"
-    echo "    $0 container <start|stop|status>"
     echo "    $0 node <start|stop|status|log>"
     echo "    $0 baker <start|stop|status|log>"
     echo "    $0 endorser <start|stop|status|log>"
@@ -502,13 +495,57 @@ usage() {
 
 if [ "$#" -ge 2 ] && [ "$1" = "--port" ] ; then
     port="$2"
-    suffix=".$port"
+    suffix="$port"
     shift 2
 fi
 
 command="$1"
 if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 
+case $(basename $0) in
+    localnet.sh)
+        docker_base_dir="$HOME/.tezos-localnet"
+        docker_image=tezos:latest
+        docker_compose_base_name=localnet
+        default_port=14732
+        ;;
+    zeronet.sh)
+        docker_base_dir="$HOME/.tezos-zeronet"
+        docker_image=tezos/tezos:zeronet
+        docker_compose_base_name=zeronet
+        default_port=19732
+        ;;
+    *)
+        docker_base_dir="$HOME/.tezos-alphanet"
+        docker_image=tezos:latest
+        docker_compose_base_name="alphanet"
+        default_port=9732
+        ;;
+esac
+
+if [ -n "$suffix" ] ; then
+    mkdir -p "$docker_base_dir"
+    echo "$port" > "$docker_base_dir/default_port"
+elif [ -f "$docker_base_dir/default_port" ]; then
+    port=$(cat "$docker_base_dir/default_port")
+    suffix="$port"
+else
+    port=$default_port
+fi
+
+docker_dir="$docker_base_dir$suffix"
+docker_compose_yml="$docker_dir/docker-compose.yml"
+docker_pull_timestamp="$docker_dir/docker_pull.timestamp"
+docker_compose_name="$docker_compose_base_name$suffix"
+
+docker_node_container=${docker_compose_name}_node_1
+docker_baker_container=${docker_compose_name}_baker_1
+docker_endorser_container=${docker_compose_name}_endorser_1
+
+docker_node_volume=${docker_compose_name}_node_data
+docker_client_volume=${docker_compose_name}_client_data
+
+mkdir -p "$docker_dir"
 
 case "$command" in
 
@@ -518,56 +555,23 @@ case "$command" in
         start "$@"
         ;;
     restart)
-        if check_container; then
-            stop_container
-        fi
+        stop
         update_script
         export TEZOS_ALPHANET_DO_NOT_PULL=yes
         exec "$0" start "$@"
         ;;
     clear)
-        if check_container; then
-            echo -e "\033[31mCannot clear data while the container is running.\033[0m"
-            exit 1
-        fi
-        clear_volume
+        clear_node_volume
         ;;
     status)
-        assert_container
         status
         ;;
     stop)
-        assert_container
         stop
         ;;
     kill)
-        stop_container
+        kill_
         ;;
-
-    ## Container
-
-    container)
-        subcommand="$1"
-        if [ "$#" -eq 0 ] ; then usage ; exit 1 ; else shift ; fi
-        case "$subcommand" in
-            start)
-                start_container "$@"
-                warn_script_uptodate
-                ;;
-            status)
-                if check_container; then
-                    echo -e "\033[32mContainer is running\033[0m"
-                else
-                    echo -e "\033[33mContainer is not running\033[0m"
-                fi
-                ;;
-            stop)
-                stop_container
-                ;;
-            *)
-                usage
-                exit 1
-        esac ;;
 
     ## Node
 
@@ -576,19 +580,15 @@ case "$command" in
         if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
         case "$subcommand" in
             start)
-                assert_uptodate
-                start_node
+                start_node "$@"
                 ;;
             status)
-                assert_uptodate
                 status_node
                 ;;
             log)
-                assert_uptodate
                 log_node
                 ;;
             stop)
-                assert_uptodate
                 stop_node
                 ;;
             *)
@@ -602,20 +602,15 @@ case "$command" in
         if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
         case "$subcommand" in
             status)
-                assert_uptodate
                 status_baker
                 ;;
             start)
-                assert_uptodate
-                assert_node
                 start_baker
                 ;;
             log)
-                assert_uptodate
                 log_baker
                 ;;
             stop)
-                assert_uptodate
                 stop_baker
                 ;;
             *)
@@ -630,20 +625,15 @@ case "$command" in
         if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
         case "$subcommand" in
             status)
-                assert_uptodate
                 status_endorser
                 ;;
             start)
-                assert_uptodate
-                assert_node
                 start_endorser
                 ;;
             log)
-                assert_uptodate
                 log_endorser
                 ;;
             stop)
-                assert_uptodate
                 stop_endorser
                 ;;
             *)
@@ -654,26 +644,16 @@ case "$command" in
     ## Misc.
 
     head)
-        assert_uptodate
-        assert_node
         display_head
         ;;
-    go_alpha_go)
-        assert_uptodate
-        assert_node
-        go_alpha_go
-        ;;
     shell)
-        assert_uptodate
         run_shell "$@"
         ;;
     client)
-        assert_uptodate
-        assert_node
         run_client "$@"
         ;;
     check_script)
-        assert_uptodate
+        warn_script_uptodate verbose
         ;;
     update_script)
         update_script

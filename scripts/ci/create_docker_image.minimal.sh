@@ -31,12 +31,14 @@ cp -a "$build_dir"/leveldb-$leveldb_version-r0.apk \
       "$tmp_dir"
 
 mkdir -p "$tmp_dir"/bin
+mkdir -p "$tmp_dir"/scripts
 container=$(docker create $build_image_name)
 for bin in tezos-client tezos-node; do
     docker cp -L $container:/home/opam/tezos/$bin "$tmp_dir"/bin
 done
-cp -a "$script_dir"/docker_entrypoint.sh "$tmp_dir"/bin/tezos
-cp -a "$script_dir"/docker_entrypoint.inc.sh "$tmp_dir"/bin/
+cp -a "$script_dir"/docker "$tmp_dir"/scripts/
+cp "$script_dir"/alphanet.sh "$tmp_dir"/scripts/
+cp "$script_dir"/alphanet_version "$tmp_dir"/scripts/
 
 echo
 echo "### Building minimal docker image..."
@@ -49,37 +51,32 @@ LABEL distro_style="apk" distro="alpine" distro_long="alpine-$alpine_version" ar
 
 COPY keys /etc/apk/keys/
 COPY leveldb-$leveldb_version-r0.apk .
-COPY bin .
+
+RUN apk --no-cache add \
+      libssl1.0 libsodium libev gmp \
+      leveldb-1.18-r0.apk && \
+    rm leveldb-$leveldb_version-r0.apk
+
+COPY bin/tezos-node \
+     bin/tezos-client \
+     scripts/docker/entrypoint.sh \
+     scripts/docker/entrypoint.inc.sh \
+     /usr/local/bin/
+
+COPY scripts/alphanet_version \
+     scripts/alphanet.sh \
+     /usr/local/share/tezos/
 
 RUN adduser -S tezos && \
-    adduser tezos abuild && \
-    apk add --no-cache sudo bash \
-            libssl1.0 libsodium libev gmp git snappy \
-            leveldb-$leveldb_version-r0.apk && \
-    echo 'tezos ALL=(ALL:ALL) NOPASSWD:ALL' > /etc/sudoers.d/tezos && \
-    chmod 440 /etc/sudoers.d/tezos && \
-    chown root:root /etc/sudoers.d/tezos && \
-    sed -i 's/^Defaults.*requiretty//g' /etc/sudoers
+    mkdir -p /var/run/tezos/node /var/run/tezos/client && \
+    chown -R tezos /var/run/tezos
 
 USER tezos
 
-COPY . /home/tezos
+VOLUME /var/run/tezos/node
+VOLUME /var/run/tezos/client
 
-WORKDIR /home/tezos
-
-RUN sudo chown root:root bin/* && \
-    sudo chmod a+rx bin/* && \
-    sudo mv bin/* /usr/local/bin && \
-    rmdir bin
-
-RUN sudo mkdir -p /var/run/tezos && \
-    sudo chown tezos /var/run/tezos
-
-ENV EDITOR=vi
-
-VOLUME /var/run/tezos
-
-ENTRYPOINT [ "/usr/local/bin/tezos" ]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 EOF
 
 docker build -t "$image_name:$image_version" "$tmp_dir"
