@@ -7,13 +7,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_genesis
+type t
 
-val bake:
-  #Client_rpcs.ctxt ->
-  ?timestamp: Time.t ->
-  Client_node_rpcs.Blocks.block ->
-  Data.Command.t ->
-  Environment.Ed25519.Secret_key.t ->
-  Block_hash.t tzresult Lwt.t
-
+type key = string list
+type value = MBytes.t
+let mem _ _ = assert false
+let dir_mem _ _ = assert false
+let get _ _ = assert false
+let set _ _ _ = assert false
+let del _ _ = assert false
+let remove_rec _ _ = assert false
+let fold _ _ ~init:_ ~f:_ = assert false
+let keys _ _ = assert false
+let fold_keys _ _ ~init:_ ~f:_ = assert false
+let register_resolver _ _ = ()
+let complete _ _ = assert false

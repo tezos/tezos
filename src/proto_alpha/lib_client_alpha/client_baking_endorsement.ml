@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 open Logging.Client.Endorsement
 
 module State : sig

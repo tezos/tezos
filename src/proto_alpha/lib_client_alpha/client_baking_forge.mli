@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 val generate_seed_nonce: unit -> Nonce.t
 (** [generate_seed_nonce ()] is a random nonce that is typically used
     in block headers. When baking, bakers generate random nonces whose

@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
 module Helpers = Proto_alpha_helpers
 module Assert = Helpers.Assert
 

@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 type operation = {
   hash: Operation_hash.t ;
   content: Operation.t option

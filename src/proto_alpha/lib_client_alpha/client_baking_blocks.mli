@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 type block_info = {
   hash: Block_hash.t ;
   net_id: Net_id.t ;

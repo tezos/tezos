@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 module RawContractAlias :
   Client_aliases.Alias with type t = Contract.t
 

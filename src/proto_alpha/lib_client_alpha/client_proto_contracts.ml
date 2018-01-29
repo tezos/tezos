@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 module ContractEntity = struct
   type t = Contract.t
   let encoding = Contract.encoding

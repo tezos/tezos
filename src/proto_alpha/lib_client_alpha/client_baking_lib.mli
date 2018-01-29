@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 (** Mine a block *)
 val bake_block:
   Client_commands.full_context ->
@@ -48,7 +51,7 @@ val run_daemon:
   Client_commands.full_context ->
   ?max_priority:int ->
   endorsement_delay:int ->
-  ('a * Tezos_embedded_raw_protocol_alpha.Tezos_context.public_key_hash) list ->
+  ('a * public_key_hash) list ->
   endorsement:bool ->
   baking:bool ->
   denunciation:bool ->

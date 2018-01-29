@@ -1,16 +1,15 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_client_base)
-  (public_name tezos-client-base)
+ ((name tezos_client_environment)
+  (public_name tezos-client-environment)
   (libraries (tezos-base
-              tezos-shell-services
-              tezos-rpc-http))
+              tezos-protocol-environment-sigs
+              tezos-micheline))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_rpc_http
-                    -open Tezos_shell_services))))
+                    -open Tezos_micheline))))
 
 (alias
  ((name runtest_indent)

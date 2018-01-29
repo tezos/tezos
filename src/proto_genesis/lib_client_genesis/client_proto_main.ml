@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_embedded_raw_protocol_genesis
+open Proto_genesis
 
 let protocol =
   Protocol_hash.of_b58check_exn
@@ -75,7 +75,7 @@ let commands () =
        @@ stop)
       begin fun timestamp hash fitness validation_passes seckey (cctxt : Client_commands.full_context) ->
         let fitness =
-          Tezos_embedded_raw_protocol_alpha.Fitness_repr.from_int64 fitness in
+          Tezos_embedded_client_alpha.Proto_alpha.Fitness_repr.from_int64 fitness in
         bake cctxt ?timestamp cctxt#block
           (Activate { protocol = hash ; validation_passes ; fitness })
           seckey >>=? fun hash ->

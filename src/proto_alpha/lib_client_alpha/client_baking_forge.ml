@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 open Logging.Client.Baking
 
 let generate_proof_of_work_nonce () =

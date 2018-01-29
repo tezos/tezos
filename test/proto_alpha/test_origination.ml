@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
 module Helpers = Proto_alpha_helpers
 module Assert = Helpers.Assert
 

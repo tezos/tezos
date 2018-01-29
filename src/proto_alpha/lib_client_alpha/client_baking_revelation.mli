@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 val inject_seed_nonce_revelation:
   #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->

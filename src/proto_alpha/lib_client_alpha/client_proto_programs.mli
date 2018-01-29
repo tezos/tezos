@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
 open Tezos_micheline
 
 module Program : Client_aliases.Alias

@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 val mem:
   #Client_commands.wallet ->
   Block_hash.t -> bool tzresult Lwt.t

@@ -12,6 +12,10 @@ all:
 	@cp _build/default/src/bin_client/admin_main.exe tezos-admin-client
 	@cp _build/default/src/lib_protocol_compiler/main.exe tezos-protocol-compiler
 
+%.pkg:
+	@jbuilder build --dev $(patsubst %.opam,%.install, \
+				   $(shell find -name tezos-$*.opam))
+
 doc-html:
 	@jbuilder build @doc ${DEV}
 	@mkdir -p $$(pwd)/docs/_build/api/odoc
@@ -40,3 +44,4 @@ clean:
 	@-make -C docs clean
 
 .PHONY: all test build-deps docker-image clean
+

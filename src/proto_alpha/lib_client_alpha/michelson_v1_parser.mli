@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 open Tezos_micheline
 
 (** The result of parsing and expanding a Michelson V1 script or data. *)

@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 val run:
   Client_commands.full_context ->
   ?max_priority: int ->

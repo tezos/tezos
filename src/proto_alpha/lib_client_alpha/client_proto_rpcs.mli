@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 val string_of_errors: error list -> string
 val handle_error: Client_commands.full_context -> 'a tzresult -> 'a Lwt.t
 

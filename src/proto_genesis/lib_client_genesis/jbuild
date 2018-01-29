@@ -4,18 +4,15 @@
  ((name tezos_embedded_client_genesis)
   (public_name tezos-embedded-client-genesis)
   (libraries (tezos-base
-              tezos-embedded-protocol-genesis
-              tezos-embedded-protocol-genesis.raw
-              tezos-embedded-protocol-alpha.environment
-              tezos-embedded-protocol-alpha.raw
               tezos-shell-services
-              tezos-client-base))
+              tezos-client-base
+              tezos-client-environment
+              tezos-embedded-client-alpha
+              tezos-protocol-genesis))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_embedded_protocol_environment_genesis
-                    -open Tezos_embedded_raw_protocol_genesis
                     -open Tezos_shell_services
                     -open Tezos_client_base))))
 

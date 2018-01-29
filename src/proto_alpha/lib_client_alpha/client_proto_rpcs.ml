@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 let string_of_errors exns =
   Format.asprintf "  @[<v>%a@]" pp_print_error exns
 

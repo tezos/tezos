@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
 open Tezos_micheline
 open Script_typed_ir
 open Script_ir_translator

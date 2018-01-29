@@ -7,6 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
+
 val forge_endorsement:
   Client_commands.full_context ->
   Client_proto_rpcs.block ->

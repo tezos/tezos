@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
 open Cli_entries
 
 type error += Bad_tez_arg of string * string (* Arg_name * value *)
