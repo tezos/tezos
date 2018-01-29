@@ -28,6 +28,7 @@ build-test:
 
 test:
 	@jbuilder runtest ${DEV}
+	@./scripts/check_opam_test.sh
 
 test-indent:
 	@jbuilder build @runtest_indent ${DEV}

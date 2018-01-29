@@ -46,8 +46,6 @@ prepare:opam:
 build_deps:
   <<: *dind_definition
   stage: build_deps
-  except:
-    - master@tezos/tezos
   script:
     ## Building dependencies...
     - ./scripts/ci/create_docker_image.build_deps.sh
@@ -304,57 +302,62 @@ opam:23:tezos-client-base:
   variables:
     package: tezos-client-base
 
-opam:24:ocplib-resto-json:
+opam:24:tezos-client-alpha:
   <<: *opam_definition
   variables:
-    package: ocplib-resto-json
+    package: tezos-client-alpha
 
-opam:25:tezos-embedded-client-alpha:
+opam:25:tezos-client-environment:
   <<: *opam_definition
   variables:
-    package: tezos-embedded-client-alpha
+    package: tezos-client-environment
 
-opam:26:tezos-embedded-client-genesis:
-  <<: *opam_definition
-  variables:
-    package: tezos-embedded-client-genesis
-
-opam:27:ocplib-ezresto:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto
-
-opam:28:tezos-client:
-  <<: *opam_definition
-  variables:
-    package: tezos-client
-
-opam:29:tezos-node:
-  <<: *opam_definition
-  variables:
-    package: tezos-node
-
-opam:30:ocplib-ezresto-directory:
-  <<: *opam_definition
-  variables:
-    package: ocplib-ezresto-directory
-
-opam:31:tezos-test:
-  <<: *opam_definition
-  variables:
-    package: tezos-test
-
-opam:32:tezos-protocol-genesis:
+opam:26:tezos-protocol-genesis:
   <<: *opam_definition
   variables:
     package: tezos-protocol-genesis
 
-opam:33:tezos-protocol-demo:
+opam:27:ocplib-resto-json:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto-json
+
+opam:28:tezos-client-genesis:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-genesis
+
+opam:29:ocplib-ezresto:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto
+
+opam:30:tezos-client:
+  <<: *opam_definition
+  variables:
+    package: tezos-client
+
+opam:31:tezos-node:
+  <<: *opam_definition
+  variables:
+    package: tezos-node
+
+opam:32:ocplib-ezresto-directory:
+  <<: *opam_definition
+  variables:
+    package: ocplib-ezresto-directory
+
+opam:33:tezos-test:
+  <<: *opam_definition
+  variables:
+    package: tezos-test
+
+opam:34:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
 
-opam:34:tezos-protocol-alpha:
+opam:35:tezos-protocol-alpha:
   <<: *opam_definition
   variables:
     package: tezos-protocol-alpha
@@ -375,10 +378,6 @@ publish:docker:minimal:
     - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
         ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
       fi
-    - ./scripts/ci/create_docker_image.build_deps.sh
-        "${build_deps_image}" "${CI_COMMIT_SHA}"
-        "${opam_image}:alpine-${alpine_version}_ocaml-${ocaml_version}"
-        "yes"
     - ./scripts/ci/create_docker_image.build.sh
         "tezos_build" "${CI_COMMIT_REF_NAME}"
         "${build_deps_image}:${CI_COMMIT_SHA}"
