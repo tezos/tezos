@@ -410,7 +410,7 @@ publish:pages:
     - sudo apk update && sudo apk upgrade
     - sudo apk add py3-sphinx py3-sphinx_rtd_theme
     - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
-    - opam install odoc
+    - opam install --yes odoc
     - make doc-html && sudo mv docs/_build "${CI_PROJECT_DIR}"/public
   tags:
     - gitlab-org
