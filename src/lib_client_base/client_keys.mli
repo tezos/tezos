@@ -32,4 +32,6 @@ val gen_keys:
   string ->
   unit tzresult Lwt.t
 
+val force_switch : (bool, Client_commands.full_context) Cli_entries.arg
+
 val commands: unit -> Client_commands.command list

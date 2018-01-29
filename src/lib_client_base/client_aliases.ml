@@ -75,6 +75,8 @@ module type Alias = sig
     ?desc:string ->
     ('a, (< .. > as 'obj), 'ret) Cli_entries.params ->
     (fresh_param -> 'a, 'obj, 'ret) Cli_entries.params
+  val force_switch :
+    (bool, Client_commands.full_context) arg
   val of_fresh :
     #Client_commands.wallet ->
     bool ->
@@ -225,9 +227,15 @@ module Alias = functor (Entity : Entity) -> struct
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
     let desc =
-      desc ^ "\n"
-      ^ "can be an alias, file or literal (autodetected in this order)\n\
-         use 'file:path', 'text:literal' or 'alias:name' to force" in
+      Format.asprintf
+        "%s\n\
+         Can be a %s name, a file or a raw %s literal. If the \
+         parameter is not the name of an existing %s, the client will \
+         look for a file containing a %s, and if it does not exist, \
+         the argument will be read as a raw %s.\n\
+         Use 'alias:name', 'file:path' or 'text:literal' to disable \
+         autodetect."
+        desc Entity.name Entity.name Entity.name Entity.name Entity.name in
     param ~name ~desc
       (parameter (fun cctxt s ->
            let read path =
@@ -263,6 +271,10 @@ module Alias = functor (Entity : Entity) -> struct
                              Lwt.return (Error all_errs)
            end))
       next
+
+  let force_switch =
+    Client_commands.force_switch
+      ~doc:("overwrite existing " ^ Entity.name) ()
 
   let name (wallet : #wallet) d =
     rev_find wallet d >>=? function

@@ -64,8 +64,8 @@ module ContractAlias = struct
   let alias_param ?(name = "name") ?(desc = "existing contract alias") next =
     let desc =
       desc ^ "\n"
-      ^ "can be a contract alias or a key alias (autodetected in this order)\n\
-         use 'key:name' to force the later" in
+      ^ "Can be a contract alias or a key alias (autodetected in order).\n\
+         Use 'key:name' to force the later." in
     Cli_entries.(
       param ~name ~desc
         (parameter ~autocomplete:autocomplete
@@ -75,8 +75,8 @@ module ContractAlias = struct
   let destination_param ?(name = "dst") ?(desc = "destination contract") next =
     let desc =
       desc ^ "\n"
-      ^ "can be an alias, a key alias, or a literal (autodetected in this order)\n\
-         use 'text:literal', 'alias:name', 'key:name' to force" in
+      ^ "Can be an alias, a key, or a literal (autodetected in order).\n\
+         Use 'text:literal', 'alias:name', 'key:name' to force." in
     Cli_entries.(
       param ~name ~desc
         (parameter

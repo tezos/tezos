@@ -28,7 +28,7 @@ let commands () =
            then (true, true, true)
            else (endorsement, baking, denunciation) in
          run_daemon cctxt ?max_priority ~endorsement_delay ~endorsement ~baking ~denunciation delegates) ;
-    command ~group ~desc: "Forge and inject an endorsement operation"
+    command ~group ~desc: "Forge and inject an endorsement operation."
       (args1 max_priority_arg)
       (prefixes [ "endorse"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
@@ -36,7 +36,7 @@ let commands () =
        @@ stop)
       (fun max_priority (_, delegate) cctxt ->
          endorse_block cctxt ?max_priority delegate) ;
-    command ~group ~desc: "Forge and inject block using the delegate rights"
+    command ~group ~desc: "Forge and inject block using the delegate rights."
       (args3 max_priority_arg force_switch free_baking_switch)
       (prefixes [ "bake"; "for" ]
        @@ Client_keys.Public_key_hash.alias_param
@@ -45,13 +45,13 @@ let commands () =
       (fun (max_priority, force, free_baking) (_, delegate) cctxt ->
          bake_block cctxt cctxt#block
            ~force ?max_priority ~free_baking delegate) ;
-    command ~group ~desc: "Forge and inject a seed-nonce revelation operation"
+    command ~group ~desc: "Forge and inject a seed-nonce revelation operation."
       no_options
       (prefixes [ "reveal"; "nonce"; "for" ]
        @@ seq_of_param Block_hash.param)
       (fun () block_hashes cctxt ->
          reveal_block_nonces cctxt block_hashes) ;
-    command ~group ~desc: "Forge and inject redemption operations"
+    command ~group ~desc: "Forge and inject redemption operations."
       no_options
       (prefixes [ "reveal"; "nonces" ]
        @@ stop)

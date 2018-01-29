@@ -71,6 +71,8 @@ module type Alias = sig
     ?desc:string ->
     ('a, (< .. > as 'obj), 'ret) Cli_entries.params ->
     (fresh_param -> 'a, 'obj, 'ret) Cli_entries.params
+  val force_switch :
+    (bool, Client_commands.full_context) Cli_entries.arg
   val of_fresh :
     #Client_commands.wallet ->
     bool ->

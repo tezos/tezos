@@ -146,49 +146,50 @@ let base_dir_arg =
   arg
     ~parameter:"-base-dir"
     ~placeholder:"path"
-    ~doc:("The directory where the Tezos client will store all its data. By default "
-          ^ Client_commands.default_base_dir)
+    ~doc:("client data directory\n\
+           The directory where the Tezos client will store all its data.\n\
+           By default " ^ Client_commands.default_base_dir)
     string_parameter
 let config_file_arg =
   arg
     ~parameter:"-config-file"
     ~placeholder:"path"
-    ~doc:"The main configuration file."
+    ~doc:"configuration file"
     string_parameter
 let timings_switch =
   switch
     ~parameter:"-timings"
-    ~doc:"Show RPC request times if present."
+    ~doc:"show RPC request times"
 let block_arg =
   default_arg
     ~parameter:"-block"
-    ~placeholder:"hash|head|head~n"
-    ~doc:"The block on which to apply contextual commands."
+    ~placeholder:"hash|tag"
+    ~doc:"block on which to apply contextual commands"
     ~default:(Block_services.to_string default_cli_args.block)
     block_parameter
 let protocol_arg =
   arg
     ~parameter:"-protocol"
     ~placeholder:"hash"
-    ~doc:"Use contextual commands of a specific protocol."
+    ~doc:"use commands of a specific protocol"
     protocol_parameter
 let log_requests_switch =
   switch
     ~parameter:"-log-requests"
-    ~doc:"Causes all requests and responses to the node to be logged."
+    ~doc:"log all requests to the node"
 
 (* Command-line args which can be set in config file as well *)
 let addr_arg =
   arg
     ~parameter:"-addr"
     ~placeholder:"IP addr|host"
-    ~doc:"The IP address of the node."
+    ~doc:"IP address of the node"
     string_parameter
 let port_arg =
   arg
     ~parameter:"-port"
     ~placeholder:"number"
-    ~doc:"The RPC port of the node."
+    ~doc:"RPC port of the node"
     (parameter
        (fun _ x -> try
            return (int_of_string x)
@@ -197,7 +198,7 @@ let port_arg =
 let tls_switch =
   switch
     ~parameter:"-tls"
-    ~doc:"Use TLS to connect to node."
+    ~doc:"use TLS to connect to node."
 
 let read_config_file config_file = match
     Utils.read_file ~bin:false config_file
@@ -205,7 +206,7 @@ let read_config_file config_file = match
   with
   | exception (Sys_error msg) ->
       failwith
-        "Error: can't read the configuration file: %s@,%s"
+        "Can't read the configuration file: %s@,%s"
         config_file msg
   | Error msg ->
       failwith
@@ -224,7 +225,7 @@ let commands config_file cfg =
   let open Cli_entries in
   let group = { Cli_entries.name = "config" ;
                 title = "Commands for editing and viewing the client's config file." } in
-  [ command ~group ~desc:"show the config file"
+  [ command ~group ~desc:"Show the config file."
       no_options
       (fixed [ "config" ; "show" ])
       (fun () (cctxt : Client_commands.full_context) ->
@@ -239,19 +240,34 @@ let commands config_file cfg =
            read_config_file config_file >>=? fun cfg ->
            cctxt#message "%a@," pp_cfg cfg >>= return) ;
 
-    command ~group ~desc:"reset the config file to the factory defaults"
+    command ~group ~desc:"Reset the config file to the factory defaults."
       no_options
       (fixed [ "config" ; "reset" ])
       (fun () _cctxt ->
          return Cfg_file.(write config_file default)) ;
 
-    command ~group ~desc:"update the config based on the current cli values"
+    command ~group
+      ~desc:"Update the config based on the current cli values.\n\
+             Loads the current configuration (default or as specified \
+             with `-config-file`), applies alterations from other \
+             command line arguments (such as the node's address, \
+             etc.), and overwrites the updated configuration file."
       no_options
       (fixed [ "config" ; "update" ])
       (fun () _cctxt ->
          return Cfg_file.(write config_file cfg)) ;
 
-    command ~group ~desc:"create a config file based on the current CLI values"
+    command ~group
+      ~desc:"Create a config file based on the current CLI values.\n\
+             If the `-file` option is not passed, this will initialize \
+             the default config file, based on default parameters, \
+             altered by other command line options (such as the node's \
+             address, etc.).\n\
+             Otherwise, it will create a new config file, based on the \
+             default parameters (or the the ones specified with \
+             `-config-file`), altered by other command line \
+             options.\n\
+             The command will always fail if the file already exists."
       (args1
          (default_arg
             ~parameter:"-file"

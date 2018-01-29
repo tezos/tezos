@@ -19,8 +19,8 @@ let commands  () =
   let open Cli_entries in
   [
 
-    command ~group ~desc: "add a contract to the wallet"
-      (args1 Client_commands.force_switch)
+    command ~group ~desc: "Add a contract to the wallet."
+      (args1 RawContractAlias.force_switch)
       (prefixes [ "remember" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
        @@ RawContractAlias.source_param
@@ -29,7 +29,7 @@ let commands  () =
          RawContractAlias.of_fresh cctxt force name >>=? fun name ->
          RawContractAlias.add ~force cctxt name hash) ;
 
-    command ~group ~desc: "remove a contract from the wallet"
+    command ~group ~desc: "Remove a contract from the wallet."
       no_options
       (prefixes [ "forget" ; "contract" ]
        @@ RawContractAlias.alias_param
@@ -37,7 +37,7 @@ let commands  () =
       (fun () (name, _) cctxt ->
          RawContractAlias.del cctxt name) ;
 
-    command ~group ~desc: "lists all known contracts"
+    command ~group ~desc: "Lists all known contracts in the wallet."
       no_options
       (fixed [ "list" ; "known" ; "contracts" ])
       (fun () (cctxt : Client_commands.full_context) ->
@@ -48,8 +48,8 @@ let commands  () =
                 (Contract.to_b58check contract) >>= return)
            contracts) ;
 
-    command ~group ~desc: "forget all known contracts"
-      (args1 Client_commands.force_switch)
+    command ~group ~desc: "Forget the entire wallet of known contracts."
+      (args1 RawContractAlias.force_switch)
       (fixed [ "forget" ; "all" ; "contracts" ])
       (fun force cctxt ->
          fail_unless
@@ -57,7 +57,7 @@ let commands  () =
            (failure "this can only used with option -force") >>=? fun () ->
          RawContractAlias.set cctxt []) ;
 
-    command ~group ~desc: "display a contract from the wallet"
+    command ~group ~desc: "Display a contract from the wallet."
       no_options
       (prefixes [ "show" ; "known" ; "contract" ]
        @@ RawContractAlias.alias_param
@@ -66,7 +66,7 @@ let commands  () =
          cctxt#message "%a\n%!" Contract.pp contract >>= fun () ->
          return ()) ;
 
-    command ~group ~desc: "tag a contract in the wallet"
+    command ~group ~desc: "Tag a contract in the wallet."
       no_options
       (prefixes [ "tag" ; "contract" ]
        @@ RawContractAlias.alias_param
@@ -81,7 +81,7 @@ let commands  () =
            | Some tags -> List.merge2 tags new_tags in
          Contract_tags.update cctxt alias new_tags) ;
 
-    command ~group ~desc: "remove tag(s) from a contract in the wallet"
+    command ~group ~desc: "Remove tag(s) from a contract in the wallet."
       no_options
       (prefixes [ "untag" ; "contract" ]
        @@ RawContractAlias.alias_param

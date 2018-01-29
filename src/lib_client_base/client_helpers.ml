@@ -14,15 +14,14 @@ let unique_switch =
 
 let commands () = Cli_entries.[
     command
-      ~desc: "Lookup for the possible completion of a \
-              given prefix of Base58Check-encoded hash. This actually \
-              works only for blocks, operations, public key and contract \
-              identifiers."
+      ~desc: "Autocomplete a prefix of Base58Check-encoded hash.\n\
+              This actually works only for blocks, operations, public \
+              key and contract identifiers."
       (args1 unique_switch)
       (prefixes [ "complete" ] @@
        string
          ~name: "prefix"
-         ~desc: "the prefix of the Base58Check-encoded hash to be completed" @@
+         ~desc: "the prefix of the hash to complete" @@
        stop)
       (fun unique prefix (cctxt : Client_commands.full_context) ->
          Client_node_rpcs.complete

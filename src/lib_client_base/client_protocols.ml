@@ -21,7 +21,7 @@ let commands () =
   let check_dir_parameter = parameter check_dir in
   [
 
-    command ~group ~desc: "list known protocols"
+    command ~group ~desc: "List protocols known by the node."
       no_options
       (prefixes [ "list" ; "protocols" ] stop)
       (fun () (cctxt : Client_commands.full_context) ->
@@ -30,7 +30,7 @@ let commands () =
          return ()
       );
 
-    command ~group ~desc: "inject a new protocol to the shell database"
+    command ~group ~desc: "Inject a new protocol into the node."
       no_options
       (prefixes [ "inject" ; "protocol" ]
        @@ param ~name:"dir" ~desc:"directory containing a protocol" check_dir_parameter
@@ -53,7 +53,7 @@ let commands () =
               return ())
       );
 
-    command ~group ~desc: "dump a protocol from the shell database"
+    command ~group ~desc: "Dump a protocol from the node's record of protocol."
       no_options
       (prefixes [ "dump" ; "protocol" ]
        @@ Protocol_hash.param ~name:"protocol hash" ~desc:""

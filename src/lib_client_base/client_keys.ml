@@ -145,21 +145,23 @@ let alias_keys cctxt name =
         else find_key tl
   in find_key l
 
+let force_switch =
+  Client_commands.force_switch ~doc:"overwrite existing keys" ()
+
 let group =
   { Cli_entries.name = "keys" ;
-    title = "Commands for managing cryptographic keys" }
+    title = "Commands for managing the wallet of cryptographic keys" }
 
 let commands () =
   let open Cli_entries in
-  let open Client_commands in
   let show_private_switch =
     switch
       ~parameter:"-show-secret"
-      ~doc:"Show the private key" in
+      ~doc:"show the private key" in
   [
 
-    command ~group ~desc: "generate a pair of keys"
-      (args1 Client_commands.force_switch)
+    command ~group ~desc: "Generate a pair of keys."
+      (args1 Secret_key.force_switch)
       (prefixes [ "gen" ; "keys" ]
        @@ Secret_key.fresh_alias_param
        @@ stop)
@@ -168,17 +170,19 @@ let commands () =
          gen_keys ~force cctxt name) ;
 
     command ~group ~desc: "Generate keys including the given string"
-      (args2 (switch ~doc:"The key must begin with tz1[containing]" ~parameter:"-prefix") force_switch)
+      (args2
+         (switch ~doc:"the key must begin with tz1[word]" ~parameter:"-prefix")
+         force_switch)
       (prefixes [ "gen" ; "vanity" ; "keys" ]
        @@ Public_key_hash.fresh_alias_param
        @@ prefix "matching"
-       @@ (seq_of_param @@ string ~name:"strs" ~desc:"String key must contain"))
+       @@ (seq_of_param @@ string ~name:"words" ~desc:"string key must contain one of these words"))
       (fun (prefix, force) name containing cctxt ->
          Public_key_hash.of_fresh cctxt force name >>=? fun name ->
          gen_keys_containing ~force ~prefix ~containing ~name cctxt) ;
 
-    command ~group ~desc: "add a secret key to the wallet"
-      (args1 Client_commands.force_switch)
+    command ~group ~desc: "Add a secret key to the wallet."
+      (args1 Secret_key.force_switch)
       (prefixes [ "add" ; "secret" ; "key" ]
        @@ Secret_key.fresh_alias_param
        @@ Secret_key.source_param
@@ -200,8 +204,8 @@ let commands () =
                    please don't use -force" name) >>=? fun () ->
              Secret_key.add ~force cctxt name sk) ;
 
-    command ~group ~desc: "add a public key to the wallet"
-      (args1 Client_commands.force_switch)
+    command ~group ~desc: "Add a public key to the wallet."
+      (args1 Public_key.force_switch)
       (prefixes [ "add" ; "public" ; "key" ]
        @@ Public_key.fresh_alias_param
        @@ Public_key.source_param
@@ -212,8 +216,8 @@ let commands () =
            name (Ed25519.Public_key.hash key) >>=? fun () ->
          Public_key.add ~force cctxt name key) ;
 
-    command ~group ~desc: "add a public key to the wallet"
-      (args1 Client_commands.force_switch)
+    command ~group ~desc: "Add a public key to the wallet."
+      (args1 Public_key.force_switch)
       (prefixes [ "add" ; "identity" ]
        @@ Public_key_hash.fresh_alias_param
        @@ Public_key_hash.source_param
@@ -222,7 +226,7 @@ let commands () =
          Public_key_hash.of_fresh cctxt force name >>=? fun name ->
          Public_key_hash.add ~force cctxt name hash) ;
 
-    command ~group ~desc: "list all public key hashes and associated keys"
+    command ~group ~desc: "List all public key hashes and associated keys."
       no_options
       (fixed [ "list" ; "known" ; "identities" ])
       (fun () (cctxt : Client_commands.full_context) ->
@@ -236,7 +240,7 @@ let commands () =
               return ())
            l) ;
 
-    command ~group ~desc: "show the keys associated with an identity"
+    command ~group ~desc: "Show the keys associated with an identity."
       (args1 show_private_switch)
       (prefixes [ "show" ; "identity"]
        @@ Public_key_hash.alias_param
@@ -262,8 +266,8 @@ let commands () =
                        ok_lwt @@ cctxt#message "Secret Key: %s" priv
                  else return ()) ;
 
-    command ~group ~desc: "forget all keys"
-      (args1 Client_commands.force_switch)
+    command ~group ~desc: "Forget the entire wallet of keys."
+      (args1 (Client_commands.force_switch ~doc:"you got to use the force for that" ()))
       (fixed [ "forget" ; "all" ; "keys" ])
       (fun force cctxt ->
          fail_unless force

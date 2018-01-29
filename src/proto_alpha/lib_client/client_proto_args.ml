@@ -62,7 +62,7 @@ let init_arg =
   default_arg
     ~parameter:"-init"
     ~placeholder:"data"
-    ~doc:"The initial value of the contract's storage."
+    ~doc:"initial value of the contract's storage"
     ~default:"Unit"
     string_parameter
 
@@ -70,7 +70,7 @@ let arg_arg =
   default_arg
     ~parameter:"-arg"
     ~placeholder:"data"
-    ~doc:"The argument passed to the contract's script, if needed."
+    ~doc:"argument passed to the contract's script, if needed"
     ~default:"Unit"
     string_parameter
 
@@ -78,7 +78,7 @@ let delegate_arg =
   arg
     ~parameter:"-delegate"
     ~placeholder:"identity"
-    ~doc:"Set the delegate of the contract.\
+    ~doc:"delegate of the contract\n\
           Must be a known identity."
     string_parameter
 
@@ -86,28 +86,33 @@ let source_arg =
   arg
     ~parameter:"-source"
     ~placeholder:"identity"
-    ~doc:"Set the source of the bonds to be paid.\
+    ~doc:"source of the bonds to be paid\n\
           Must be a known identity."
     string_parameter
 
 let spendable_switch =
   switch
     ~parameter:"-spendable"
-    ~doc:"Set the created contract to be spendable"
+    ~doc:"allow the manager to spend the contract's tokens"
 
 let force_switch =
   switch
     ~parameter:"-force"
-    ~doc:"Force the injection of branch-invalid operation or force \
+    ~doc:"disables the node's injection checks\n\
+          Force the injection of branch-invalid operation or force \
          \ the injection of block without a fitness greater than the \
          \ current head."
 
 let delegatable_switch =
   switch
     ~parameter:"-delegatable"
-    ~doc:"Set the created contract to be delegatable"
+    ~doc:"allow future delegate change"
 
-let tez_format = "text format: D,DDD,DDD.DDD,DDD (centiles are optional, commas are optional)"
+let tez_format =
+  "Text format: `D,DDD,DDD.DDD,DDD`.\n\
+   Tez and mutez and separated by a period sign. Trailing and pending \
+   zeroes are allowed. Commas are optional, but if present they must \
+   be placed every 3 digits."
 
 let tez_parameter param =
   parameter
@@ -130,13 +135,13 @@ let fee_arg =
   tez_arg
     ~default:"0.05"
     ~parameter:"-fee"
-    ~doc:"The fee in \xEA\x9C\xA9 to pay to the baker."
+    ~doc:"fee in \xEA\x9C\xA9 to pay to the baker"
 
 let max_priority_arg =
   arg
     ~parameter:"-max-priority"
-    ~placeholder:"prio"
-    ~doc:"Set the max_priority used when looking for baking slot."
+    ~placeholder:"slot"
+    ~doc:"maximum allowed baking slot"
     (parameter (fun _ s ->
          try return (int_of_string s)
          with _ -> fail (Bad_max_priority s)))
@@ -144,13 +149,15 @@ let max_priority_arg =
 let free_baking_switch =
   switch
     ~parameter:"-free-baking"
-    ~doc:"Only consider free baking slots."
+    ~doc:"only consider free baking slots"
 
 let endorsement_delay_arg =
   default_arg
     ~parameter:"-endorsement-delay"
     ~placeholder:"seconds"
-    ~doc:"Set the delay used before to endorse the current block."
+    ~doc:"delay before endorsing blocks\n\
+          Delay between notifications of new blocks from the node and \
+          production of endorsements for these blocks."
     ~default:"15"
     (parameter (fun _ s ->
          try return (int_of_string s)
@@ -159,20 +166,22 @@ let endorsement_delay_arg =
 let no_print_source_flag =
   switch
     ~parameter:"-no-print-source"
-    ~doc:"Don't print the source code if an error is encountered.\
-          This should be enabled for extremely large programs"
+    ~doc:"don't print the source code\n\
+          If an error is encountered, the client will print the \
+          contract's source code by default.\n\
+          This option disables this behaviour."
 
 module Daemon = struct
   let baking_switch =
     switch
       ~parameter:"-baking"
-      ~doc:"Run the baking daemon"
+      ~doc:"run the baking daemon"
   let endorsement_switch =
     switch
       ~parameter:"-endorsement"
-      ~doc:"Run the endorsement daemon"
+      ~doc:"run the endorsement daemon"
   let denunciation_switch =
     switch
       ~parameter:"-denunciation"
-      ~doc:"Run the denunciation daemon"
+      ~doc:"run the denunciation daemon"
 end

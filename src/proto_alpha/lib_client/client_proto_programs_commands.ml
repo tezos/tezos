@@ -9,7 +9,7 @@
 
 let group =
   { Cli_entries.name = "programs" ;
-    title = "Commands for managing the record of known programs" }
+    title = "Commands for managing the library of known programs" }
 
 open Tezos_micheline
 open Client_proto_programs
@@ -20,19 +20,19 @@ let commands () =
   let show_types_switch =
     switch
       ~parameter:"-details"
-      ~doc:"Show the types of each instruction" in
+      ~doc:"show the types of each instruction" in
   let emacs_mode_switch =
     switch
       ~parameter:"-emacs"
-      ~doc:"Output in michelson-mode.el compatible format" in
+      ~doc:"output in `michelson-mode.el` compatible format" in
   let trace_stack_switch =
     switch
       ~parameter:"-trace-stack"
-      ~doc:"Show the stack after each step" in
+      ~doc:"show the stack after each step" in
   let amount_arg =
     Client_proto_args.tez_arg
       ~parameter:"-amount"
-      ~doc:"The amount of the transfer in \xEA\x9C\xA9."
+      ~doc:"amount of the transfer in \xEA\x9C\xA9"
       ~default:"0.05" in
   let data_parameter =
     Cli_entries.parameter (fun _ data ->
@@ -40,7 +40,7 @@ let commands () =
                     @@ Michelson_v1_parser.parse_expression data)) in
   [
 
-    command ~group ~desc: "lists all known programs"
+    command ~group ~desc: "Lists all programs in the library."
       no_options
       (fixed [ "list" ; "known" ; "programs" ])
       (fun () (cctxt : Client_commands.full_context) ->
@@ -48,8 +48,8 @@ let commands () =
          Lwt_list.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
          return ()) ;
 
-    command ~group ~desc: "remember a program under some name"
-      (args1 Client_commands.force_switch)
+    command ~group ~desc: "Add a program to the library."
+      (args1 Program.force_switch)
       (prefixes [ "remember" ; "program" ]
        @@ Program.fresh_alias_param
        @@ Program.source_param
@@ -58,14 +58,14 @@ let commands () =
          Program.of_fresh cctxt force name >>=? fun name ->
          Program.add ~force cctxt name hash) ;
 
-    command ~group ~desc: "forget a remembered program"
+    command ~group ~desc: "Remove a program from the library."
       no_options
       (prefixes [ "forget" ; "program" ]
        @@ Program.alias_param
        @@ stop)
       (fun () (name, _) cctxt -> Program.del cctxt name) ;
 
-    command ~group ~desc: "display a program"
+    command ~group ~desc: "Display a program from the library."
       no_options
       (prefixes [ "show" ; "known" ; "program" ]
        @@ Program.alias_param
@@ -75,7 +75,7 @@ let commands () =
          cctxt#message "%s\n" source >>= fun () ->
          return ()) ;
 
-    command ~group ~desc: "ask the node to run a program"
+    command ~group ~desc: "Ask the node to run a program."
       (args3 trace_stack_switch amount_arg no_print_source_flag)
       (prefixes [ "run" ; "program" ]
        @@ Program.source_param
@@ -96,7 +96,7 @@ let commands () =
             run ~amount ~program ~storage ~input cctxt#block cctxt >>= fun res ->
             print_run_result cctxt ~show_source ~parsed:program res)) ;
 
-    command ~group ~desc: "ask the node to typecheck a program"
+    command ~group ~desc: "Ask the node to typecheck a program."
       (args3 show_types_switch emacs_mode_switch no_print_source_flag)
       (prefixes [ "typecheck" ; "program" ]
        @@ Program.source_param
@@ -112,7 +112,7 @@ let commands () =
            res
            cctxt) ;
 
-    command ~group ~desc: "ask the node to typecheck a data expression"
+    command ~group ~desc: "Ask the node to typecheck a data expression."
       (args1 no_print_source_flag)
       (prefixes [ "typecheck" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to typecheck"
@@ -135,14 +135,15 @@ let commands () =
              cctxt#error "ill-typed data") ;
 
     command ~group
-      ~desc: "ask the node to compute the hash of a data expression \
-              using the same algorithm as script instruction H"
+      ~desc: "Ask the node to hash a data expression.\n\
+              The returned hash is the same as what Michelson \
+              instruction `H` would have produced."
       no_options
       (prefixes [ "hash" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
          data_parameter
        @@ prefixes [ "of" ; "type" ]
-       @@ Cli_entries.param ~name:"type" ~desc:"the type of the data"
+       @@ Cli_entries.param ~name:"type" ~desc:"type of the data"
          data_parameter
        @@ stop)
       (fun () data typ cctxt ->
@@ -156,16 +157,17 @@ let commands () =
              cctxt#error "ill-formed data") ;
 
     command ~group
-      ~desc: "ask the node to compute the hash of a data expression \
-              using the same algorithm as script instruction H, sign it using \
-              a given secret key, and display it using the format expected by \
-              script instruction CHECK_SIGNATURE"
+      ~desc: "Ask the node to hash a data expression.\n\
+              Uses the same algorithm as Michelson instruction `H` to \
+              produce the hash, signs it using a given secret key, and \
+              displays it using the format expected by Michelson \
+              instruction `CHECK_SIGNATURE`."
       no_options
       (prefixes [ "hash" ; "and" ; "sign" ; "data" ]
        @@ Cli_entries.param ~name:"data" ~desc:"the data to hash"
          data_parameter
        @@ prefixes [ "of" ; "type" ]
-       @@ Cli_entries.param ~name:"type" ~desc:"the type of the data"
+       @@ Cli_entries.param ~name:"type" ~desc:"type of the data"
          data_parameter
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.alias_param

@@ -321,20 +321,23 @@ let search_command keyword (Command { params }) =
 let rec help_commands commands =
   [ command
       ~group:help_group
-      ~desc:"Print documentation of commands. \
-             Add search keywords to narrow list. \
+      ~desc:"Print documentation of commands.\n\
+             Add search keywords to narrow list.\n\
              Will display only the commands by default, \
              unless [-verbose] is passed or the list \
              of matching commands if less than 3."
       (args3
          (switch
-            ~doc:"Print terse output, regardless of number of commands returned"
+            ~doc:"Always print terse output.\n\
+                  Only shows command mnemonics, without documentation.\n\
+                  Disables automatic verbosity wrt. number of commands shown."
             ~parameter:"-terse")
          (switch
-            ~doc:"Print detailed output, regardless of number of commands returned"
+            ~doc:"Print detailed output.\n\
+                  Disables automatic verbosity wrt. number of commands shown."
             ~parameter:"-verbose")
          (default_arg
-            ~doc:"Select the manual's output format"
+            ~doc:"Select the manual's output format."
             ~placeholder: "plain|colors"
             ~parameter: "-format"
             ~default: (if Unix.isatty Unix.stdout then "colors" else "plain")
@@ -344,7 +347,10 @@ let rec help_commands commands =
                   | "colors" -> return `Ansi
                   | "plain" -> return `Plain
                   | _ -> failwith "Unknown manual format"))))
-      (prefix "man" @@ seq_of_param (string ~name:"keyword" ~desc:"Keyword to search for"))
+      (prefix "man"
+         (seq_of_param (string ~name:"keyword"
+                          ~desc:"Keyword to search for.\n\
+                                 If several are given they must all appear in the command.")))
       (fun (terse, details, format) keywords _ ->
          if terse && details
          then fail (Invalid_options_combination "Cannot specify both -verbose and -terse.")
@@ -531,13 +537,15 @@ let print_options_detailed (type ctx) =
   let help_option : type a.Format.formatter -> (a, ctx) arg -> unit =
     fun ppf -> function
       | Arg { parameter ; placeholder ; doc } ->
-          Format.fprintf ppf "@[<v 2>@{<opt>%s <%s>@}:@,@[<hov 0>%a@]@]"
+          Format.fprintf ppf "@[<hov 2>@{<opt>%s <%s>@}: %a@]"
             parameter placeholder Format.pp_print_text doc
       | DefArg { parameter ; placeholder ; doc ; default } ->
-          Format.fprintf ppf "@[<v 2>@{<opt>%s <%s>@} (default %s):@,@[<hov 0>%a@]@]"
-            parameter placeholder default Format.pp_print_text doc
+          Format.fprintf ppf "@[<hov 2>@{<opt>%s <%s>@}: %a@]"
+            parameter placeholder
+            Format.pp_print_text
+            (Format.asprintf "%s\nDefaults to `%s`." doc default)
       | Switch { parameter ; doc } ->
-          Format.fprintf ppf "@[<v 2>@{<opt>%s@}:@,@[<hov 0>%a@]@]"
+          Format.fprintf ppf "@[<hov 2>@{<opt>%s@}: %a@]"
             parameter Format.pp_print_text doc
   in let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
        fun ppf -> function
@@ -616,7 +624,7 @@ let rec print_params_detailed
   = fun spec ppf -> function
     | Stop -> print_options_detailed ppf spec
     | Seq (n, desc, _) ->
-        Format.fprintf ppf "@[<v 2>@{<arg>%s@}:@,@[<hov 0>%a@]@]"
+        Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]"
           n Format.pp_print_text (trim desc) ;
         begin match spec with
           | NoArgs -> ()
@@ -625,14 +633,14 @@ let rec print_params_detailed
     | Prefix (_, next) ->
         print_params_detailed spec ppf next
     | Param (n, desc, _, Stop) ->
-        Format.fprintf ppf "@[<v 2>@{<arg>%s@}:@,@[<hov 0>%a@]@]"
+        Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]"
           n Format.pp_print_text (trim desc);
         begin match spec with
           | NoArgs -> ()
           | _ -> Format.fprintf ppf "@,%a" print_options_detailed spec
         end
     | Param (n, desc, _, next) ->
-        Format.fprintf ppf "@[<v 2>@{<arg>%s@}:@,@[<hov 0>%a@]@]@,%a"
+        Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]@,%a"
           n Format.pp_print_text (trim desc) (print_params_detailed spec) next
 
 let contains_params_args :

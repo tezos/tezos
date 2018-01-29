@@ -37,11 +37,14 @@ let group =
   { Cli_entries.name = "context" ;
     title = "Block contextual commands (see option -block)" }
 
+let alphanet =
+  { Cli_entries.name = "alphanet" ;
+    title = "Alphanet only commands" }
+
 let commands () =
   let open Cli_entries in
-  let open Client_commands in
   [
-    command ~group ~desc: "access the timestamp of the block"
+    command ~group ~desc: "Access the timestamp of the block."
       no_options
       (fixed [ "get" ; "timestamp" ])
       begin fun () (cctxt : Client_commands.full_context) ->
@@ -51,7 +54,7 @@ let commands () =
         return ()
       end ;
 
-    command ~group ~desc: "lists all non empty contracts of the block"
+    command ~group ~desc: "Lists all non empty contracts of the block."
       no_options
       (fixed [ "list" ; "contracts" ])
       begin fun () (cctxt : Client_commands.full_context) ->
@@ -62,7 +65,7 @@ let commands () =
         return ()
       end ;
 
-    command ~group ~desc: "get the balance of a contract"
+    command ~group ~desc: "Get the balance of a contract."
       no_options
       (prefixes [ "get" ; "balance" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
@@ -73,7 +76,7 @@ let commands () =
         return ()
       end ;
 
-    command ~group ~desc: "get the storage of a contract"
+    command ~group ~desc: "Get the storage of a contract."
       no_options
       (prefixes [ "get" ; "storage" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
@@ -87,7 +90,7 @@ let commands () =
             return ()
       end ;
 
-    command ~group ~desc: "get the manager of a contract"
+    command ~group ~desc: "Get the manager of a contract."
       no_options
       (prefixes [ "get" ; "manager" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
@@ -102,7 +105,7 @@ let commands () =
         return ()
       end ;
 
-    command ~group ~desc: "get the delegate of a contract"
+    command ~group ~desc: "Get the delegate of a contract."
       no_options
       (prefixes [ "get" ; "delegate" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
@@ -117,13 +120,13 @@ let commands () =
         return ()
       end ;
 
-    command ~group ~desc: "set the delegate of a contract"
+    command ~group ~desc: "Set the delegate of a contract."
       (args1 fee_arg)
       (prefixes [ "set" ; "delegate" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ prefix "to"
        @@ Public_key_hash.alias_param
-         ~name: "mgr" ~desc: "New delegate of the contract"
+         ~name: "mgr" ~desc: "new delegate of the contract"
        @@ stop)
       begin fun fee (_, contract) (_, delegate) cctxt ->
         source_to_keys cctxt cctxt#block contract >>=? fun (src_pk, manager_sk) ->
@@ -131,8 +134,8 @@ let commands () =
         operation_submitted_message cctxt oph
       end ;
 
-    command ~group ~desc:"open a new account"
-      (args4 fee_arg delegate_arg delegatable_switch force_switch)
+    command ~group ~desc:"Open a new account."
+      (args4 fee_arg delegate_arg delegatable_switch Client_keys.force_switch)
       (prefixes [ "originate" ; "account" ]
        @@ RawContractAlias.fresh_alias_param
          ~name: "new" ~desc: "name of the new contract"
@@ -167,9 +170,9 @@ let commands () =
         operation_submitted_message ~contracts:[ contract ] cctxt oph
       end ;
 
-    command ~group ~desc: "Launch a smart contract on the blockchain"
+    command ~group ~desc: "Launch a smart contract on the blockchain."
       (args7
-         fee_arg delegate_arg force_switch
+         fee_arg delegate_arg Client_keys.force_switch
          delegatable_switch spendable_switch init_arg no_print_source_flag)
       (prefixes [ "originate" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
@@ -186,7 +189,7 @@ let commands () =
        @@ prefix "running"
        @@ Program.source_param
          ~name:"prg" ~desc: "script of the account\n\
-                             combine with -init if the storage type is not unit"
+                             Combine with -init if the storage type is not unit."
        @@ stop)
       begin fun (fee, delegate, force, delegatable, spendable, initial_storage, no_print_source)
         alias_name (_, manager) balance (_, source) program (cctxt : Client_commands.full_context) ->
@@ -204,24 +207,7 @@ let commands () =
               ~contracts:[contract] oph
       end ;
 
-    command ~group ~desc: "open a new (free) account"
-      (args1 force_switch)
-      (prefixes [ "originate" ; "free" ; "account" ]
-       @@ RawContractAlias.fresh_alias_param
-         ~name: "new" ~desc: "name of the new contract"
-       @@ prefix "for"
-       @@ Public_key_hash.alias_param
-         ~name: "mgr" ~desc: "manager of the new contract"
-       @@ stop)
-      begin fun force alias_name (_, manager_pkh) cctxt ->
-        RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
-        faucet ~manager_pkh cctxt#block cctxt () >>=? fun (oph, contract) ->
-        operation_submitted_message cctxt
-          ~contracts:[contract] oph >>=? fun () ->
-        save_contract ~force cctxt alias_name contract
-      end;
-
-    command ~group ~desc: "transfer tokens"
+    command ~group ~desc: "Transfer tokens / call a smart contract."
       (args3 fee_arg arg_arg no_print_source_flag)
       (prefixes [ "transfer" ]
        @@ tez_param
@@ -243,14 +229,31 @@ let commands () =
             operation_submitted_message cctxt ~contracts oph
       end;
 
-    command ~desc: "Activate a protocol"
+    command ~group:alphanet ~desc: "Open a new FREE account (Alphanet only)."
+      (args1 force_switch)
+      (prefixes [ "originate" ; "free" ; "account" ]
+       @@ RawContractAlias.fresh_alias_param
+         ~name: "new" ~desc: "name of the new contract"
+       @@ prefix "for"
+       @@ Public_key_hash.alias_param
+         ~name: "mgr" ~desc: "manager of the new contract"
+       @@ stop)
+      begin fun force alias_name (_, manager_pkh) cctxt ->
+        RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
+        faucet ~manager_pkh cctxt#block cctxt () >>=? fun (oph, contract) ->
+        operation_submitted_message cctxt
+          ~contracts:[contract] oph >>=? fun () ->
+        save_contract ~force cctxt alias_name contract
+      end;
+
+    command ~group:alphanet ~desc: "Activate a protocol (Alphanet dictator only)."
       no_options
       (prefixes [ "activate" ; "protocol" ]
        @@ Protocol_hash.param ~name:"version"
-         ~desc:"Protocol version (b58check)"
+         ~desc:"protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
        @@ Environment.Ed25519.Secret_key.param
-         ~name:"password" ~desc:"Dictator's key"
+         ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
         dictate cctxt cctxt#block
@@ -258,14 +261,14 @@ let commands () =
         operation_submitted_message cctxt oph
       end ;
 
-    command ~desc: "Fork a test protocol"
+    command ~group:alphanet ~desc: "Fork a test protocol (Alphanet dictator only)."
       no_options
       (prefixes [ "fork" ; "test" ; "protocol" ]
        @@ Protocol_hash.param ~name:"version"
-         ~desc:"Protocol version (b58check)"
+         ~desc:"protocol version (b58check)"
        @@ prefixes [ "with" ; "key" ]
        @@ Environment.Ed25519.Secret_key.param
-         ~name:"password" ~desc:"Dictator's key"
+         ~name:"password" ~desc:"dictator's key"
        @@ stop)
       begin fun () hash seckey cctxt ->
         dictate cctxt cctxt#block

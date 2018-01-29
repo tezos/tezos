@@ -425,7 +425,8 @@ let group =
 
 let commands = [
 
-  command ~desc: "list all understood protocol versions"
+  command
+    ~desc: "List the protocol versions that this client understands."
     no_options
     (fixed [ "list" ; "versions" ])
     (fun () (cctxt : Client_commands.full_context) ->
@@ -434,37 +435,50 @@ let commands = [
          (Client_commands.get_versions ()) >>= fun () ->
        return ()) ;
 
-  command ~group ~desc: "list available RPCs (low level command for advanced users)"
+  command ~group
+    ~desc: "List RPCs under a given URL prefix.\n\
+            Some parts of the RPC service hierarchy depend on parameters,\n\
+            they are marked by a suffix `<dynamic>`.\n\
+            You can list these sub-hierarchies by providing a concrete URL prefix \
+            whose arguments are set to a valid value."
+    no_options
+    (prefixes [ "rpc" ; "list" ] @@ string ~name:"url" ~desc: "the URL prefix" @@ stop)
+    (fun () -> list) ;
+
+  command ~group
+    ~desc: "Alias to `rpc list /`."
     no_options
     (prefixes [ "rpc" ; "list" ] @@ stop)
     (fun () -> (list "/"));
 
-  command ~group ~desc: "list available RPCs (low level command for advanced users)"
+  command ~group
+    ~desc: "Get the input and output JSON schemas of an RPC."
     no_options
-    (prefixes [ "rpc" ; "list" ] @@ string ~name:"url" ~desc: "the RPC's prefix to be described" @@ stop)
-    (fun () -> list) ;
-
-  command ~group ~desc: "get the input and output JSON schemas of an RPC"
-    no_options
-    (prefixes [ "rpc" ; "schema" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
+    (prefixes [ "rpc" ; "schema" ] @@ string ~name: "url" ~desc: "the RPC url" @@ stop)
     (fun () -> schema) ;
 
-  command ~group ~desc: "get the humanoid readable input and output formats of an RPC"
+  command ~group
+    ~desc: "Get the humanoid readable input and output formats of an RPC."
     no_options
-    (prefixes [ "rpc" ; "format" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
+    (prefixes [ "rpc" ; "format" ] @@ string ~name: "url" ~desc: "the RPC URL" @@ stop)
     (fun () -> format) ;
 
-  command ~group ~desc: "call an RPC (low level command for advanced users)"
+  command ~group
+    ~desc: "Call an RPC.\n\
+            If input data is needed, a text editor will be popped up."
     no_options
-    (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL" @@ stop)
+    (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC URL" @@ stop)
     (fun () -> call) ;
 
-  command ~group ~desc: "call an RPC (low level command for advanced users)"
+  command ~group
+    ~desc: "Call an RPC providing input data via the command line."
     no_options
-    (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC's URL"
+    (prefixes [ "rpc" ; "call" ] @@ string ~name: "url" ~desc: "the RPC URL"
      @@ prefix "with"
      @@ string ~name:"input"
-       ~desc:"the JSON input to the RPC or `file:FILENAME`, which is the path to a file containing the JSON"
+       ~desc:"the raw JSON input to the RPC\n\
+              For instance, use `{}` to send the empty document.\n\
+              Alternatively, use `file:path` to read the JSON data from a file."
      @@ stop)
     (fun () -> call_with_file_or_json)
 
