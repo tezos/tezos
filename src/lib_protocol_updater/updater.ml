@@ -57,7 +57,7 @@ let do_compile hash p =
   Protocol.write_dir source_dir ~hash p >>= fun () ->
   let compiler_command =
     (Sys.executable_name,
-     Array.of_list [compiler_name; plugin_file; source_dir]) in
+     Array.of_list [compiler_name; "-register"; plugin_file; source_dir]) in
   let fd = Unix.(openfile log_file [O_WRONLY; O_CREAT; O_TRUNC] 0o644) in
   let pi =
     Lwt_process.exec

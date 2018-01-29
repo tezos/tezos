@@ -198,9 +198,11 @@ let main () =
   Random.self_init () ;
   let anonymous = ref []
   and static = ref false
+  and register = ref false
   and build_dir = ref None in
   let args_spec = [
     "-static", Arg.Set static, " Only build the static library (no .cmxs)";
+    "-register", Arg.Set register, " Generete the `Registerer` module";
     "-bin-annot", Arg.Set Clflags.binary_annotations, " (see ocamlopt)" ;
     "-g", Arg.Set Clflags.debug, " (see ocamlopt)" ;
     "-build-dir", Arg.String (fun s -> build_dir := Some s),
@@ -253,21 +255,27 @@ let main () =
   load_embeded_cmis tezos_protocol_env ;
   let packed_protocol_object = compile_ml ~for_pack functor_file in
 
-  load_embeded_cmis register_env ;
-  load_cmi_from_file proto_cmi ;
-
-  (* Compiler the 'registering module' *)
-  let register_file = Filename.dirname functor_file // "register.ml" in
-  create_file register_file
-    (Printf.sprintf
-       "module Name = struct let name = %S end\n\
-       \ let () = Tezos_protocol_compiler__Registerer.register Name.name (module %s.Make)"
-       (Protocol_hash.to_b58check hash)
-       functor_unit) ;
-  let register_object = compile_ml ~for_pack register_file in
+  let register_objects =
+    if not !register then
+      []
+    else begin
+      load_embeded_cmis register_env ;
+      load_cmi_from_file proto_cmi ;
+      (* Compiler the 'registering module' *)
+      let register_file = Filename.dirname functor_file // "register.ml" in
+      create_file register_file
+        (Printf.sprintf
+           "module Name = struct let name = %S end\n\
+           \ let () = Tezos_protocol_compiler__Registerer.register Name.name (module %s.Make)"
+           (Protocol_hash.to_b58check hash)
+           functor_unit) ;
+      let register_object = compile_ml ~for_pack register_file in
+      [ register_object ]
+    end
+  in
 
   let resulting_object =
-    pack_objects output [ packed_protocol_object ; register_object ] in
+    pack_objects output (packed_protocol_object :: register_objects) in
 
   (* Create the final [cmxs] *)
   if not !static then begin
