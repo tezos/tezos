@@ -80,7 +80,7 @@ RUN opam bundle --yes --output="tezos_bundle-$ocaml_version" \
                 --repository=opam-repository-tezos \
                 --repository=opam-repository-master \
                 --ocaml=$ocaml_version \
-                $packages depext ocp-indent
+                $packages depext ocp-indent odoc
 EOF
 
 docker build --pull -t $tmp_image "$tmp_dir"
