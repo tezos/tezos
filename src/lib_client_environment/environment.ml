@@ -11,7 +11,6 @@ module Make(Param : sig val name: string end)() = struct
 
   include Tezos_base.Protocol_environment.Make(Param)()
 
-  module Micheline = Micheline
   module Updater = struct
     include Fake_updater.Make(Fake_context)
     module type PROTOCOL =

@@ -9,6 +9,7 @@
                     -open Tezos_data_encoding
                     -open Tezos_error_monad
                     -open Tezos_rpc
+                    -open Tezos_micheline
                     -safe-string))
   (libraries (tezos-stdlib
               tezos-stdlib-lwt
@@ -16,6 +17,7 @@
               tezos-data-encoding
               tezos-error-monad
               tezos-rpc
+              tezos-micheline
               calendar
               ezjsonm
               mtime.clock.os))))

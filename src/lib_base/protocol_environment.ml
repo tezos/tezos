@@ -67,6 +67,7 @@ module Make(Param : sig val name: string end)() = struct
     type error_category = [ `Branch | `Temporary | `Permanent ]
     include Error_monad.Make()
   end
+  module Micheline = Micheline
   module Logging = Logging.Make(Param)
 
   type error += Ecoproto_error of Error_monad.error list

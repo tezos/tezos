@@ -13,6 +13,7 @@ include Tezos_data_encoding
 include Tezos_error_monad
 include Tezos_rpc
 include Tezos_crypto
+include Tezos_micheline
 
 module List = struct
   include List
