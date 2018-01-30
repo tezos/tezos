@@ -6,13 +6,13 @@ all:
 		src/bin_node/main.exe \
 		src/bin_client/main.exe \
 		src/bin_client/admin_main.exe \
-		src/lib_protocol_compiler/main.exe
+		src/lib_protocol_compiler/main_native.exe
 	@cp _build/default/src/bin_node/main.exe tezos-node
 	@cp _build/default/src/bin_client/main.exe tezos-client
 	@cp _build/default/src/bin_client/admin_main.exe tezos-admin-client
-	@cp _build/default/src/lib_protocol_compiler/main.exe tezos-protocol-compiler
+	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
 
-%.pkg:
+tezos-%.pkg:
 	@jbuilder build --dev $(patsubst %.opam,%.install, \
 				   $(shell find -name tezos-$*.opam))
 

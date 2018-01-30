@@ -5,14 +5,14 @@
   (public_name tezos-protocol-updater)
   (libraries (tezos-base
               tezos-micheline
-              tezos-protocol-compiler
+              tezos-protocol-compiler.registerer
+              tezos-protocol-compiler.native
               tezos-storage
               dynlink))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_micheline
-                    -open Tezos_protocol_compiler
                     -open Tezos_storage))))
 
 (alias

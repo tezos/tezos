@@ -10,7 +10,8 @@
 let () =
   if Filename.basename Sys.argv.(0) = Updater.compiler_name then begin
     try
-      Tezos_protocol_compiler.Native.main ();
+      Tezos_protocol_compiler.Compiler.main
+        Tezos_protocol_compiler_native.Native.driver ;
       Pervasives.exit 0
     with exn ->
       Format.eprintf "%a\n%!" Opterrors.report_error exn;

@@ -7,7 +7,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val camlinternalFormatBasics_cmi: string
-val tezos_protocol_environment_sigs_cmi: string
-val tezos_protocol_environment_sigs__V1_cmi: string
-val tezos_protocol_registerer__Registerer_cmi: string
+let () =
+  try
+    Tezos_protocol_compiler.Compiler.main
+      Tezos_protocol_compiler_byte.Byte.driver ;
+    Pervasives.exit 0
+  with exn ->
+    Format.eprintf "%a\n%!" Errors.report_error exn;
+    Pervasives.exit 1

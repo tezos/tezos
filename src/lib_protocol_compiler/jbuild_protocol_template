@@ -56,6 +56,16 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
 (jbuild_version 1)
 
 (rule
+ ((targets (tezos_protocol_%s.cmo
+            tezos_protocol_%s_dummy_byte.ml))
+  (deps ((glob_files src/*.ml)
+         (glob_files src/*.mli)
+         src/TEZOS_PROTOCOL))
+  (action (with-stdout-to ${path-no-dep:tezos_protocol_%s_dummy_byte.ml}
+           (chdir ${ROOT}
+                  (run ${bin:tezos-protocol-compiler-byte} -static ${path-no-dep:tezos_protocol_%s} ${path-no-dep:src}))))))
+
+(rule
  ((targets (tezos_protocol_%s.o
             tezos_protocol_%s.cmx
             tezos_protocol_%s.cmi
@@ -76,6 +86,15 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
   (modes (native))
   (modules (Tezos_protocol_%s_dummy))))
 
+(library
+ ((name tezos_protocol_%s_byte)
+  (public_name tezos-protocol-%s.byte)
+  (library_flags (:standard -linkall %s/tezos_protocol_%s.cmo))
+  (flags (:standard -safe-string))
+  (wrapped false)
+  (modes (byte))
+  (modules (Tezos_protocol_%s_dummy_byte))))
+
 (install
   ((section lib)
    (files   ("tezos_protocol_%s.cmx" "tezos_protocol_%s.cmi"))
@@ -91,8 +110,13 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
 
 |}
-    version version version version version version version version
-    path
-    version version version version version version
+    version version version version
+    version version version version
+    version version version version
+    path version
+    version version version
+    path version
+    version version version
+    version version
     Format.(pp_print_list (fun ppf -> Format.fprintf ppf "%S"))
     sources
