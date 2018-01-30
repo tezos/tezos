@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name tezos_client_environment)
-  (public_name tezos-client-environment)
+ ((name tezos_protocol_environment_client)
+  (public_name tezos-protocol-environment-client)
   (libraries (tezos-base
               tezos-protocol-environment-sigs
               tezos-micheline))

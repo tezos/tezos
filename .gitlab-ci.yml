@@ -307,10 +307,10 @@ opam:24:tezos-client-alpha:
   variables:
     package: tezos-client-alpha
 
-opam:25:tezos-client-environment:
+opam:25:tezos-protocol-environment-client:
   <<: *opam_definition
   variables:
-    package: tezos-client-environment
+    package: tezos-protocol-environment-client
 
 opam:26:tezos-protocol-genesis:
   <<: *opam_definition

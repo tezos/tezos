@@ -6,7 +6,7 @@
   (libraries (tezos-base
               tezos-shell-services
               tezos-client-base
-              tezos-client-environment
+              tezos-protocol-environment-client
               tezos-client-alpha
               tezos-protocol-genesis))
   (library_flags (:standard -linkall))

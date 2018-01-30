@@ -5,7 +5,7 @@
   (public_name tezos-client-alpha)
   (libraries (tezos-base
               tezos-protocol-alpha
-              tezos-client-environment
+              tezos-protocol-environment-client
               tezos-shell-services
               tezos-client-base))
   (library_flags (:standard -linkall))
