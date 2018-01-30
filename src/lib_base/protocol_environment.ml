@@ -42,21 +42,17 @@ module Make(Param : sig val name: string end)() = struct
   module Data_encoding = Data_encoding
   module Time = Time
   module Ed25519 = Ed25519
-  module Hash = struct
-    include Tezos_crypto
+  module S = struct
     include Tezos_crypto.S
-    module Net_id = Net_id
-    module Block_hash = Block_hash
-    module Operation_hash = Operation_hash
-    module Operation_list_hash = Operation_list_hash
-    module Operation_list_list_hash = Operation_list_list_hash
-    module Context_hash = Context_hash
-    module Protocol_hash = Protocol_hash
-    module Make_minimal_Blake2B = Blake2B.Make_minimal
-    module Make_Blake2B = Blake2B.Make
+    include S
   end
+  module Block_hash = Block_hash
+  module Operation_hash = Operation_hash
+  module Operation_list_hash = Operation_list_hash
+  module Operation_list_list_hash = Operation_list_list_hash
+  module Context_hash = Context_hash
+  module Protocol_hash = Protocol_hash
   module Blake2B = Blake2B
-  module S = S
   module Fitness = Fitness
   module Operation = Operation
   module Block_header = Block_header

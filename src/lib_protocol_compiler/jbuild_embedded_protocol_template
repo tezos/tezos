@@ -47,8 +47,7 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
                     -w +a-4-6-7-9-29-32-40..42-44-45-48
                     -warn-error -a+8
                     -open Tezos_embedded_protocol_environment_%s__Environment
-                    -open Error_monad
-                    -open Hash))
+                    -open Error_monad))
   (modules (:standard \ Environment Registerer))))
 
 (library

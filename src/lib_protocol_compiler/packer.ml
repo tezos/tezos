@@ -43,7 +43,6 @@ let opened_modules = [
   "Tezos_protocol_environment" ;
   "Pervasives" ;
   "Error_monad" ;
-  "Hash" ;
   "Logging" ;
 ]
 

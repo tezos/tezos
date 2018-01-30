@@ -24,7 +24,6 @@ let dump_file oc file =
 let opened_modules = [
   "Pervasives" ;
   "Error_monad" ;
-  "Hash" ;
 ]
 
 let include_mli oc file =

@@ -13,8 +13,25 @@
 
 include S.INTERNAL_MINIMAL_HASH
 
+(** {2 Building Hashes} *******************************************************)
+
+(** The parameters for creating a new Hash type using
+    {!Make_Blake2B}. Both {!name} and {!title} are only informative,
+    used in error messages and serializers. *)
+
+module type Name = sig
+  val name : string
+  val title : string
+  val size : int option
+end
+
+module type PrefixedName = sig
+  include Name
+  val b58check_prefix : string
+end
+
 (** Builds a new Hash type using Blake2B. *)
-module Make_minimal (Name : S.Name) : S.INTERNAL_MINIMAL_HASH
+module Make_minimal (Name : Name) : S.INTERNAL_MINIMAL_HASH
 module Make
     (Register : sig
        val register_encoding:
@@ -25,7 +42,7 @@ module Make
          wrap: ('a -> Base58.data) ->
          'a Base58.encoding
      end)
-    (Name : S.PrefixedName) : S.INTERNAL_HASH
+    (Name : PrefixedName) : S.INTERNAL_HASH
 
 (**/**)
 
@@ -39,7 +56,7 @@ module Make_merkle_tree
          wrap: ('a -> Base58.data) ->
          'a Base58.encoding
      end)
-    (K : S.PrefixedName)
+    (K : PrefixedName)
     (Contents: sig
        type t
        val to_bytes: t -> MBytes.t

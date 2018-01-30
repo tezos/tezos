@@ -11,7 +11,7 @@
 
 (** {2 Hashed public keys for user ID} ***************************************)
 
-module Public_key_hash : Hash.HASH
+module Public_key_hash : S.HASH
 
 
 (** {2 Signature} ************************************************************)
