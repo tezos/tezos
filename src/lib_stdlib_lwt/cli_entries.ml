@@ -15,7 +15,6 @@ open Error_monad
 type error += Bad_argument of int * string
 type error += Option_expected_argument of string
 type error += Unknown_option of string
-type error += Invalid_options_combination of string
 
 type ('p, 'ctx) parameter =
   { converter: ('ctx -> string -> 'p tzresult Lwt.t) ;
@@ -260,7 +259,7 @@ type error += Extra_arguments : string list * (_, _) command -> error
 type error += Not_enough_args : string list * ('a, 'b) command list -> error
 type error += Command_not_found : string list * ('a, 'b) command list -> error
 type error += Help_flag : ('a, 'b) command list -> error (* when -help appears in input *)
-type error += Help_cmd : string list * ('a, 'b) command list * format * bool * bool -> error    (* ./tezos-client help *)
+type error += Help_cmd : string list * ('a, 'b) command list * format * [ `Terse | `Short | `Args | `Full ] -> error    (* ./tezos-client help *)
 type error += Bare_help : error   (* ./tezos-client or ./tezos-client -help *)
 type error += Autocomplete_command : string list -> error
 
@@ -324,20 +323,28 @@ let rec help_commands commands =
       ~desc:"Print documentation of commands.\n\
              Add search keywords to narrow list.\n\
              Will display only the commands by default, \
-             unless [-verbose] is passed or the list \
+             unless [-verbosity <2|3>] is passed or the list \
              of matching commands if less than 3."
-      (args3
-         (switch
-            ~doc:"Always print terse output.\n\
-                  Only shows command mnemonics, without documentation.\n\
-                  Disables automatic verbosity wrt. number of commands shown."
-            ~parameter:"-terse")
-         (switch
-            ~doc:"Print detailed output.\n\
-                  Disables automatic verbosity wrt. number of commands shown."
-            ~parameter:"-verbose")
+      (args2
          (default_arg
-            ~doc:"Select the manual's output format."
+            ~doc:"level of details\n\
+                  0. Only shows command mnemonics, without documentation.\n\
+                  1. Shows command mnemonics with short descriptions.\n\
+                  2. Show commands and arguments with short descriptions\n\
+                  3. Show everything"
+            ~parameter:"-verbosity"
+            ~placeholder:"0|1|2|3"
+            ~default: "1"
+            (parameter
+               ~autocomplete: (fun _ -> return [ "0" ; "1" ; "2" ; "3" ])
+               (fun _ arg -> match arg with
+                  | "0" -> return `Terse
+                  | "1" -> return `Short
+                  | "2" -> return `Args
+                  | "3" -> return `Full
+                  | _ -> failwith "Level of details out of range")))
+         (default_arg
+            ~doc:"the manual's output format"
             ~placeholder: "plain|colors"
             ~parameter: "-format"
             ~default: (if Unix.isatty Unix.stdout then "colors" else "plain")
@@ -349,20 +356,16 @@ let rec help_commands commands =
                   | _ -> failwith "Unknown manual format"))))
       (prefix "man"
          (seq_of_param (string ~name:"keyword"
-                          ~desc:"Keyword to search for.\n\
+                          ~desc:"keyword to search for\n\
                                  If several are given they must all appear in the command.")))
-      (fun (terse, details, format) keywords _ ->
-         if terse && details
-         then fail (Invalid_options_combination "Cannot specify both -verbose and -terse.")
-         else
-           fail (Help_cmd (keywords,
-                           List.fold_left
-                             (fun commands keyword -> List.filter (search_command keyword) commands)
-                             (help_commands [] @ commands)
-                             keywords,
-                           format,
-                           terse,
-                           details))) ]
+      (fun (verbosity, format) keywords _ ->
+         fail (Help_cmd (keywords,
+                         List.fold_left
+                           (fun commands keyword -> List.filter (search_command keyword) commands)
+                           (help_commands [] @ commands)
+                           keywords,
+                         format,
+                         verbosity))) ]
 
 (* Command execution *)
 let exec
@@ -533,21 +536,33 @@ let trim s = (* config-file wokaround *)
   List.map String.trim |>
   String.concat "\n"
 
+let print_desc ppf doc =
+  let short, long = try
+      let len = String.index doc '\n' in
+      String.sub doc 0 len,
+      Some (String.sub doc (len + 1) (String.length doc - len - 1))
+    with _ -> doc, None in
+  match long with
+  | None ->
+      Format.fprintf ppf "@[<hov 0>%a@]"
+        Format.pp_print_text short
+  | Some doc ->
+      Format.fprintf ppf "@[<hov 0>%a@]@{<full>@\n%a@}"
+        Format.pp_print_text short Format.pp_print_text doc
+
 let print_options_detailed (type ctx) =
   let help_option : type a.Format.formatter -> (a, ctx) arg -> unit =
     fun ppf -> function
       | Arg { parameter ; placeholder ; doc } ->
           Format.fprintf ppf "@[<hov 2>@{<opt>%s <%s>@}: %a@]"
-            parameter placeholder Format.pp_print_text doc
+            parameter placeholder print_desc doc ;
       | DefArg { parameter ; placeholder ; doc ; default } ->
           Format.fprintf ppf "@[<hov 2>@{<opt>%s <%s>@}: %a@]"
-            parameter placeholder
-            Format.pp_print_text
-            (Format.asprintf "%s\nDefaults to `%s`." doc default)
+            parameter placeholder print_desc (doc ^ "\nDefaults to `" ^ default ^ "`.")
       | Switch { parameter ; doc } ->
           Format.fprintf ppf "@[<hov 2>@{<opt>%s@}: %a@]"
-            parameter Format.pp_print_text doc
-  in let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
+            parameter print_desc doc in
+  let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
        fun ppf -> function
          | NoArgs -> ()
          | AddArg (arg, NoArgs) ->
@@ -594,7 +609,7 @@ let print_highlight highlight_strings formatter str =
                 (function
                   | Str.Text text -> Format.fprintf formatter "%s" text
                   | Str.Delim delimiter ->
-                      Format.fprintf formatter "@{<arg>%s@}" delimiter)
+                      Format.fprintf formatter "@{<hilight>%s@}" delimiter)
                 list
         end
   in print_string (List.map Str.regexp_string highlight_strings)
@@ -625,7 +640,7 @@ let rec print_params_detailed
     | Stop -> print_options_detailed ppf spec
     | Seq (n, desc, _) ->
         Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]"
-          n Format.pp_print_text (trim desc) ;
+          n print_desc (trim desc) ;
         begin match spec with
           | NoArgs -> ()
           | _ -> Format.fprintf ppf "@,%a" print_options_detailed spec
@@ -634,14 +649,14 @@ let rec print_params_detailed
         print_params_detailed spec ppf next
     | Param (n, desc, _, Stop) ->
         Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]"
-          n Format.pp_print_text (trim desc);
+          n print_desc (trim desc);
         begin match spec with
           | NoArgs -> ()
           | _ -> Format.fprintf ppf "@,%a" print_options_detailed spec
         end
     | Param (n, desc, _, next) ->
         Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]@,%a"
-          n Format.pp_print_text (trim desc) (print_params_detailed spec) next
+          n print_desc (trim desc) (print_params_detailed spec) next
 
 let contains_params_args :
   type a b arg ctx. (a, arg, ctx) params -> (b, _) args -> bool
@@ -654,20 +669,25 @@ let contains_params_args :
     in help params
 
 let print_command :
-  type ctx ret. ?prefix: string -> ?highlights:string list -> Format.formatter -> (ctx, ret) command -> unit
-  = fun ?(prefix = "") ?(highlights=[]) ppf (Command { params ; desc ; options=Argument { spec } }) ->
+  type ctx ret.
+  ?prefix:(Format.formatter -> unit -> unit) ->
+  ?highlights:string list -> Format.formatter -> (ctx, ret) command -> unit
+  = fun
+    ?(prefix = (fun _ () -> ()))
+    ?(highlights=[]) ppf
+    (Command { params ; desc ; options=Argument { spec } }) ->
     if contains_params_args params spec
     then
-      Format.fprintf ppf "@[<v 2>%s%a@,@[<hov 0>%a@]@,%a@]"
-        prefix
+      Format.fprintf ppf "@[<v 2>%a%a@{<short>@,@[<hov 0>%a@]@}@{<args>@,%a@}@]"
+        prefix ()
         print_commandline (highlights, spec, params)
-        Format.pp_print_text desc
+        print_desc desc
         (print_params_detailed spec) params
     else
-      Format.fprintf ppf "@[<v 2>%s%a@,@[<hov 0>%a@]@]"
-        prefix
+      Format.fprintf ppf "@[<v 2>%a%a@{<short>@,@[<hov 0>%a@]@}@]"
+        prefix ()
         print_commandline (highlights, spec, params)
-        Format.pp_print_text desc
+        print_desc desc
 
 let group_commands commands =
   let (grouped, ungrouped) =
@@ -701,7 +721,36 @@ let print_group print_command ppf ({ title }, commands) =
     title
     (Format.pp_print_list print_command) commands
 
-let setup_ppf ppf = function
+let setup_ppf ppf format verbosity =
+  let skip = ref false in
+  let orig_out_functions =
+    Format.pp_get_formatter_out_functions ppf () in
+  Format.pp_set_formatter_out_functions ppf
+    { out_string =
+        (fun s b a ->
+          if s = "\000\000\000" then skip := true
+          else if s = "\255\255\255" then skip := false
+          else if not !skip then orig_out_functions.out_string s b a) ;
+      out_spaces = (fun n -> if not !skip then orig_out_functions.out_spaces n) ;
+      out_newline = (fun () -> if not !skip then orig_out_functions.out_newline ()) ;
+      out_flush = (fun () -> if not !skip then orig_out_functions.out_flush ()) } ;
+  let levels = ref [] in
+  let setup_level level =
+    match verbosity, level with
+    | (`Full, (`Terse | `Short | `Args | `Full))
+    | (`Args, (`Terse | `Short | `Args))
+    | (`Short, (`Terse | `Short))
+    | `Terse, `Terse -> Format.fprintf ppf "@<0>%s" "\255\255\255"
+    | _ -> Format.fprintf ppf "@<0>%s" "\000\000\000" in
+  let push_level level =
+    levels := level :: !levels ;
+    setup_level level in
+  let pop_level _ =
+    match !levels with
+    | _ :: level :: rest -> levels := level :: rest ; setup_level level
+    | [ _ ] | [] -> Pervasives.failwith "Cli_entries: unclosed verbosity tag" in
+  push_level `Terse ;
+  match format with
   | `Ansi ->
       let color_num = function
         | `Black -> None
@@ -730,6 +779,11 @@ let setup_ppf ppf = function
             | "opt" -> Format.fprintf ppf "@<0>%a" ansi_format (`Green, `Black, false, false)
             | "arg" -> Format.fprintf ppf "@<0>%a<" ansi_format (`Yellow, `Black, false, false)
             | "cmd" -> Format.fprintf ppf "@<0>%a" ansi_format (`White, `Black, false, true)
+            | "hilight" -> Format.fprintf ppf "@<0>%a" ansi_format (`Black, `Yellow, false, true)
+            | "full" -> push_level `Full
+            | "args" -> push_level `Args
+            | "short" -> push_level `Short
+            | "terse" -> push_level `Terse
             | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
           end ;
           print_close_tag = begin function
@@ -737,6 +791,11 @@ let setup_ppf ppf = function
             | "opt" -> Format.fprintf ppf "@<0>%s" "\027[0m"
             | "arg" -> Format.fprintf ppf ">@<0>%s" "\027[0m"
             | "cmd" -> Format.fprintf ppf "@<0>%s" "\027[0m"
+            | "hilight" -> Format.fprintf ppf "@<0>%s" "\027[0m"
+            | "full" -> pop_level `Full
+            | "args" -> pop_level `Args
+            | "short" -> pop_level `Short
+            | "terse" -> pop_level `Terse
             | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
           end } ;
       Format.pp_set_print_tags ppf true
@@ -749,6 +808,11 @@ let setup_ppf ppf = function
             | "opt" -> ()
             | "arg" -> Format.fprintf ppf "<"
             | "cmd" -> ()
+            | "hilight" -> ()
+            | "full" -> push_level `Full
+            | "args" -> push_level `Args
+            | "short" -> push_level `Short
+            | "terse" -> push_level `Terse
             | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
           end ;
           print_close_tag = begin function
@@ -756,26 +820,23 @@ let setup_ppf ppf = function
             | "opt" -> ()
             | "arg" -> Format.fprintf ppf ">"
             | "cmd" -> ()
+            | "hilight" -> ()
+            | "full" -> pop_level `Full
+            | "args" -> pop_level `Args
+            | "short" -> pop_level `Short
+            | "terse" -> pop_level `Terse
             | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
           end } ;
       Format.pp_set_print_tags ppf true
 
-let usage
-    ppf
-    ?global_options
-    ~details
-    ?(highlights=[]) commands =
+let usage ppf ?global_options ?(highlights=[]) commands format verbosity =
+  setup_ppf ppf format verbosity ;
   let usage ppf (by_group, options) =
     let exe = Filename.basename Sys.executable_name in
     let print_groups =
       Format.pp_print_list
         ~pp_sep: (fun ppf () -> Format.fprintf ppf "@,@,")
-        (print_group (if details
-                      then
-                        print_command ?prefix:None ~highlights
-                      else
-                        fun ppf (Command { params ; options=Argument { spec }}) ->
-                          print_commandline ppf (highlights, spec, params))) in
+        (print_group (print_command ?prefix:None ~highlights)) in
     match options with
     | None ->
         Format.fprintf ppf
@@ -789,7 +850,7 @@ let usage
            %s @{<opt>[global options]@} command @{<opt>-help@} (for command options)@]@,@,\
            @[<v 2>@{<title>To browse the documentation@}@,\
            %s @{<opt>[global options]@} man (for a list of commands)@,\
-           %s @{<opt>[global options]@} man @{<opt>-details@} (for the full manual)@]@,@,\
+           %s @{<opt>[global options]@} man @{<opt>-verbosity 3@} (for the full manual)@]@,@,\
            @[<v 2>@{<title>Global options (must come before the command)@}@,@[<v 0>%a@]@]%a\
            %a@]"
           exe exe exe exe exe
@@ -797,17 +858,18 @@ let usage
           (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,") ()
           print_groups by_group in
   Format.fprintf ppf "@[<v 0>%a" usage (group_commands commands, global_options) ;
-  if not details then
-    Format.fprintf ppf "@,@,Use option [@{<opt>-verbose@}] for command options." ;
+  if List.mem verbosity [ `Terse ; `Short ] then
+    Format.fprintf ppf "@,@,Use option [@{<opt>-verbosity 3@}] for option descriptions." ;
   Format.fprintf ppf "@]"
 
-let command_usage
-    ppf commands =
+let command_usage ppf commands format verbosity =
+  setup_ppf ppf format verbosity ;
   let exe = Filename.basename Sys.executable_name in
-  let prefix = exe ^ " [global options] " in
+  let prefix ppf () =
+    Format.fprintf ppf "@{<cmd>%s@} @{<opt>[global options]@} " exe in
   Format.fprintf ppf
-    "@[<v 2>Command usage:@,\
-     %a@,%s -help (for global options)@]"
+    "@[<v 2>@{<title>Command usage@}@,\
+     %a@,@{<cmd>%s@} @{<opt>-help@} (for global options)@]"
     (Format.pp_print_list (print_command ~prefix ~highlights:[]))
     commands
     exe
@@ -980,13 +1042,13 @@ let handle_cli_errors ~stdout ~stderr ~global_options = function
   | Error [ e ] ->              (* Should only be one error here *)
       begin match e with
         | Extra_arguments (_, cmd) ->
-            setup_ppf stderr (if Unix.isatty Unix.stderr then `Ansi else `Plain) ;
+            setup_ppf stderr (if Unix.isatty Unix.stderr then `Ansi else `Plain) `Terse ;
             Format.fprintf stderr
               "Extra arguments provided for command:@;<1 2>@[%a@]@."
               (print_command ?prefix:None ~highlights:[]) cmd;
             return 1
         | Not_enough_args (_, cmds) ->
-            setup_ppf stderr (if Unix.isatty Unix.stderr then `Ansi else `Plain) ;
+            setup_ppf stderr (if Unix.isatty Unix.stderr then `Ansi else `Plain) `Terse ;
             Format.fprintf stderr
               "@[<v 2>Unterminated command, here are possible completions:@,%a@]@."
               (Format.pp_print_list
@@ -1020,13 +1082,10 @@ let handle_cli_errors ~stdout ~stderr ~global_options = function
               "While parsing options, encountered unexpected argument '%s'.@."
               option ;
             return 1
-        | Invalid_options_combination message ->
-            Format.fprintf stderr "%s@." message ;
-            return 1
-        | Help_cmd ([ highlight ], [], _, _, _) ->
+        | Help_cmd ([ highlight ], [], _, _) ->
             Format.fprintf stderr "No command found that match %s.@." highlight ;
             return 0
-        | Help_cmd (highlight :: highlights, [], _, _, _) ->
+        | Help_cmd (highlight :: highlights, [], _, _) ->
             Format.fprintf stderr "No command found that match %a%s and %s.@."
               (Format.pp_print_list
                  ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
@@ -1034,22 +1093,16 @@ let handle_cli_errors ~stdout ~stderr ~global_options = function
               (match highlights with [ _ ] | [] -> "" | _::_ -> ",")
               highlight ;
             return 0
-        | Help_cmd (highlights, commands, format, terse, details) ->
-            let details =
-              if terse || details then
-                details
-              else
-                List.length commands <= 3 in
+        | Help_cmd (highlights, commands, format, verbosity) ->
             let global_options =
-              if details && highlights = [] then Some global_options else None in
-            setup_ppf stdout format ;
-            Format.fprintf stdout "%a@."
-              (usage ?global_options ~details ~highlights) commands;
+              if highlights = [] then Some global_options else None in
+            usage stdout ?global_options ~highlights commands format verbosity ;
+            Format.fprintf stdout "@." ;
             return 0
         | Bare_help ->
-            setup_ppf stdout (if Unix.isatty Unix.stdout then `Ansi else `Plain) ;
-            Format.fprintf stdout "%a@."
-              (usage ~global_options ~details:true ?highlights:None) [] ;
+            let format = if Unix.isatty Unix.stdout then `Ansi else `Plain in
+            usage stdout ~global_options ?highlights:None [] format `Terse ;
+            Format.fprintf stdout "@." ;
             return 0
         | Autocomplete_command (completions) ->
             Format.pp_print_list
@@ -1059,7 +1112,9 @@ let handle_cli_errors ~stdout ~stderr ~global_options = function
               completions;
             return 0
         | Help_flag commands ->
-            Format.fprintf stdout "%a@." command_usage commands ;
+            let format = if Unix.isatty Unix.stdout then `Ansi else `Plain in
+            command_usage stdout commands format `Verbose ;
+            Format.fprintf stdout "@." ;
             return 0
         | e -> fail e
       end
