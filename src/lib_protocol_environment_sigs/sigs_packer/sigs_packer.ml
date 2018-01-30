@@ -25,7 +25,6 @@ let opened_modules = [
   "Pervasives" ;
   "Error_monad" ;
   "Hash" ;
-  "Tezos_data" ;
 ]
 
 let include_mli oc file =

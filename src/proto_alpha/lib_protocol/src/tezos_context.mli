@@ -605,6 +605,8 @@ module Operation : sig
   type t = operation
   val encoding: operation Data_encoding.t
 
+  val hash_raw: raw -> Operation_hash.t
+
   type error += Cannot_parse_operation (* `Branch *)
   val parse: Operation_hash.t -> Operation.t -> operation tzresult
 
@@ -641,8 +643,8 @@ module Block_header : sig
 
   type block_header = t
 
-  type raw = Tezos_data.Block_header.t
-  type shell_header = Tezos_data.Block_header.shell_header
+  type raw = Block_header.t
+  type shell_header = Block_header.shell_header
 
   val hash: block_header -> Block_hash.t
   val hash_raw: raw -> Block_hash.t

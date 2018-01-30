@@ -7,6 +7,19 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** The fitness of a block is defined as a list of bytes,
-    compared in a lexicographical order (longer list are greater). *)
-include S.T with type t = MBytes.t list
+(** Tezos operations. *)
+
+type shell_header = {
+  branch: Block_hash.t ;
+  (** The operation is only valid in a branch containing the
+      block [branch]. *)
+}
+val shell_header_encoding: shell_header Data_encoding.t
+
+type t = {
+  shell: shell_header ;
+  proto: MBytes.t ;
+}
+
+include S.HASHABLE with type t := t
+                    and type hash := Operation_hash.t

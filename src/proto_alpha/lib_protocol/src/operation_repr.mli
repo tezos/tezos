@@ -92,6 +92,8 @@ type error += Cannot_parse_operation (* `Branch *)
 
 val encoding: operation Data_encoding.t
 
+val hash_raw: raw -> Operation_hash.t
+
 val parse:
   Operation_hash.t -> Operation.t -> operation tzresult
 

@@ -533,7 +533,7 @@ let parse_operations ctxt () (operations, check) =
   map_s begin fun raw ->
     begin
       Lwt.return
-        (Operation.parse (Tezos_data.Operation.hash raw) raw) >>=? fun op ->
+        (Operation.parse (Operation.hash_raw raw) raw) >>=? fun op ->
       begin match check with
         | Some true -> check_signature ctxt op.signature op.shell op.contents
         | Some false | None -> return ()

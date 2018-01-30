@@ -413,3 +413,5 @@ let parse_proto bytes =
   | None -> fail Cannot_parse_operation
 
 include Encoding
+
+let hash_raw = Operation.hash

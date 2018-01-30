@@ -26,11 +26,11 @@ and proto_header = {
 
 type block_header = t
 
-type raw = Tezos_data.Block_header.t
-type shell_header = Tezos_data.Block_header.shell_header
+type raw = Block_header.t
+type shell_header = Block_header.shell_header
 
-let raw_encoding = Tezos_data.Block_header.encoding
-let shell_header_encoding = Tezos_data.Block_header.shell_header_encoding
+let raw_encoding = Block_header.encoding
+let shell_header_encoding = Block_header.shell_header_encoding
 
 let proto_header_encoding =
   let open Data_encoding in

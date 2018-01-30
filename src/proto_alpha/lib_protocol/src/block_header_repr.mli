@@ -24,8 +24,8 @@ and proto_header = {
 
 type block_header = t
 
-type raw = Tezos_data.Block_header.t
-type shell_header = Tezos_data.Block_header.shell_header
+type raw = Block_header.t
+type shell_header = Block_header.shell_header
 
 val encoding: block_header Data_encoding.encoding
 val raw_encoding: raw Data_encoding.t

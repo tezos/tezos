@@ -56,21 +56,17 @@ module Make(Param : sig val name: string end)() = struct
     module Make_Blake2B = Blake2B.Make
   end
   module Blake2B = Blake2B
-  module Tezos_data = struct
-    module type DATA = S.T
-    module type HASHABLE_DATA = S.HASHABLE
-    module Fitness = Fitness
-    module Operation = Operation
-    module Block_header = Block_header
-    module Protocol = Protocol
-  end
+  module S = S
+  module Fitness = Fitness
+  module Operation = Operation
+  module Block_header = Block_header
+  module Protocol = Protocol
   module RPC_arg = RPC_arg
   module RPC_path = RPC_path
   module RPC_query = RPC_query
   module RPC_service = RPC_service
   module RPC_answer = RPC_answer
   module RPC_directory = RPC_directory
-  module Fitness = Fitness
   module Error_monad = struct
     type error_category = [ `Branch | `Temporary | `Permanent ]
     include Error_monad.Make()

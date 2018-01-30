@@ -45,7 +45,6 @@ let opened_modules = [
   "Error_monad" ;
   "Hash" ;
   "Logging" ;
-  "Tezos_data" ;
 ]
 
 let dump oc files =
