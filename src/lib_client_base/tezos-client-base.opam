@@ -13,11 +13,6 @@ depends: [
   "tezos-shell-services"
   "tezos-storage"
   "tezos-rpc-http"
-  "tezos-protocol-compiler"
-  "tezos-protocol-updater"
-  "tezos-embedded-protocol-genesis"
-  "tezos-embedded-protocol-demo"
-  "tezos-embedded-protocol-alpha"
   "cmdliner"
 ]
 build: [
