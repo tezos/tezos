@@ -46,8 +46,6 @@ prepare:opam:
 build_deps:
   <<: *dind_definition
   stage: build_deps
-  except:
-    - master@tezos/tezos
   script:
     ## Building dependencies...
     - ./scripts/ci/create_docker_image.build_deps.sh
@@ -366,10 +364,6 @@ publish:docker:minimal:
     - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
         ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
       fi
-    - ./scripts/ci/create_docker_image.build_deps.sh
-        "${build_deps_image}" "${CI_COMMIT_SHA}"
-        "${opam_image}:alpine-${alpine_version}_ocaml-${ocaml_version}"
-        "yes"
     - ./scripts/ci/create_docker_image.build.sh
         "tezos_build" "${CI_COMMIT_REF_NAME}"
         "${build_deps_image}:${CI_COMMIT_SHA}"
