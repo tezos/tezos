@@ -1,7 +1,8 @@
 (jbuild_version 1)
 
 (executables
- ((names (test_state))
+ ((names (test_state
+          test_locator))
   (libraries (tezos-base
               tezos-storage
               tezos-protocol-updater
@@ -18,15 +19,25 @@
 
 (alias
  ((name buildtest)
-  (deps (test_state.exe))))
+  (deps (test_state.exe
+         test_locator.exe))))
 
 (alias
  ((name runtest_state)
   (action (run ${exe:test_state.exe}))))
 
 (alias
+ ((name runtest_locator)
+  (action (run ${exe:test_locator.exe} --no-bench))))
+
+(alias
+ ((name runbench_locator)
+  (action (run ${exe:test_locator.exe}))))
+
+(alias
  ((name runtest)
-  (deps ((alias runtest_state)))))
+  (deps ((alias runtest_state)
+         (alias runtest_locator)))))
 
 (alias
  ((name runtest_indent)
