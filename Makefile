@@ -16,8 +16,10 @@ tezos-%.pkg:
 	@jbuilder build --dev $(patsubst %.opam,%.install, \
 				   $(shell find -name tezos-$*.opam))
 
-doc-html:
+doc-html: all
 	@jbuilder build @doc ${DEV}
+	@./tezos-client -protocol ProtoALphaALph man -verbosity 3 -format html | sed "s/$HOME/\$HOME/g" > docs/api/tezos-client.html
+	@./tezos-admin-client man -verbosity 3 -format html | sed "s/$HOME/\$HOME/g" > docs/api/tezos-admin-client.html
 	@mkdir -p $$(pwd)/docs/_build/api/odoc
 	@rm -rf $$(pwd)/docs/_build/api/odoc/*
 	@cp -r $$(pwd)/_build/default/_doc/* $$(pwd)/docs/_build/api/odoc/

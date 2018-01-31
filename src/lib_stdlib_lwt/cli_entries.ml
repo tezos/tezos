@@ -929,18 +929,18 @@ let usage ppf ?global_options ?(highlights=[]) commands format verbosity =
           "@[<v>@{<title>Usage@}@,\
            @{<section>\
            @{<command>@{<commandline>\
-           %s @{<opt>[global options]@} command @{<opt>[command options]@}@}@}@,\
+           %s [@{<opt>global options@}] command @{<opt>[command options]@}@}@}@,\
            @{<command>@{<commandline>\
            %s @{<opt>-help@} (for global options)@}@}@,\
            @{<command>@{<commandline>\
-           %s @{<opt>[global options]@} command @{<opt>-help@} (for command options)@}@}\
+           %s [@{<opt>global options@}] command @{<opt>-help@} (for command options)@}@}\
            @}@,@,\
            @{<title>To browse the documentation@}@,\
            @{<section>\
            @{<command>@{<commandline>\
-           %s @{<opt>[global options]@} man (for a list of commands)@}@}@,\
+           %s [@{<opt>global options@}] man (for a list of commands)@}@}@,\
            @{<command>@{<commandline>\
-           %s @{<opt>[global options]@} man @{<opt>-verbosity 3@} (for the full manual)@}@}\
+           %s [@{<opt>global options@}] man @{<opt>-verbosity 3@} (for the full manual)@}@}\
            @}@,@,\
            @{<title>Global options (must come before the command)@}@,\
            @{<commanddoc>%a@}%a\

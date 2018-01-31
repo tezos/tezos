@@ -41,10 +41,11 @@ Welcome to Tezos's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: OCaml API:
+   :caption: APIs:
 
    README
    api/api-inline
+   api/cli-commands
 
 Indices and tables
 ==================

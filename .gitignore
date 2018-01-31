@@ -8,6 +8,8 @@ __pycache__
 /_opam
 /_docker_build
 /docs/_build
+/docs/api/tezos-client.html
+/docs/api/tezos-admin-client.html
 
 /tezos-node
 /tezos-protocol-compiler

@@ -404,6 +404,10 @@ simple HTTP request:
 The minimal CLI client
 ----------------------
 
-Work in progress.
+Tezos is distributed with two command line tools: a minimal command
+line wallet ``tezos-client``, and an administration tool
+``tezos-admin-client``.
 
-See ``./tezos-client -help`` for available commands.
+Their command line interfaces are described
+:ref:`here<tezos_client_commands>` and
+:ref:`here<tezos_admin_client_commands>`.
