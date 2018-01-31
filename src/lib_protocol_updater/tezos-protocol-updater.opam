@@ -11,8 +11,7 @@ depends: [
   "jbuilder" { build & >= "1.0+beta15" }
   "tezos-base"
   "tezos-micheline"
-  "tezos-protocol-compiler.registerer"
-  "tezos-protocol-compiler-native"
+  "tezos-protocol-compiler"
   "tezos-storage"
 ]
 build: [
