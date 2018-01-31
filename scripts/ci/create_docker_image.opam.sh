@@ -76,10 +76,7 @@ RUN mkdir ~/.ssh && \
               tezos_deps /home/opam/opam-repository-tezos_deps && \
     opam switch create --yes tezos ocaml-base-compiler.4.04.2
 
-## Temporary 'opam pin' for 'opam-depext' see:
-## https://github.com/ocaml/opam-depext/pull/89
-RUN opam pin --yes opam-depext git+https://github.com/jpdeplaix/opam-depext#2.0 && \
-    opam install --yes opam-depext
+RUN opam install --yes opam-depext
 
 ENTRYPOINT [ "opam", "exec", "--" ]
 CMD [ "/bin/bash" ]
