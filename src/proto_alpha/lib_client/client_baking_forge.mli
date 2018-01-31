@@ -24,7 +24,7 @@ val inject_block:
   priority:int ->
   seed_nonce_hash:Nonce_hash.t ->
   src_sk:Client_keys.sk_locator ->
-  Tezos_base.Operation.t list list ->
+  Operation.raw list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
     ~seed_nonce ~src_sk ops] tries to inject a block in the node. If
@@ -39,7 +39,7 @@ val forge_block:
   #Client_rpcs.ctxt ->
   Client_proto_rpcs.block ->
   ?force:bool ->
-  ?operations:Tezos_base.Operation.t list ->
+  ?operations:Operation.raw list ->
   ?best_effort:bool ->
   ?sort:bool ->
   ?timestamp:Time.t ->

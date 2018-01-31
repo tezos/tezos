@@ -9,4 +9,4 @@
 
 (** Tezos Protocol Implementation - Protocol Signature Instance *)
 
-include Updater.PROTOCOL
+include Updater.PROTOCOL with type operation = Tezos_context.Operation.t

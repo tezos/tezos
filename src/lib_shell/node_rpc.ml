@@ -138,10 +138,6 @@ let register_bi_dir node dir =
       Block_services.preapply implementation in
   dir
 
-let ops_dir _node =
-  let ops_dir = RPC_directory.empty in
-  ops_dir
-
 let rec insert_future_block (bi: Block_services.block_info) = function
   | [] -> [bi]
   | ({timestamp} as head: Block_services.block_info) :: tail as all ->

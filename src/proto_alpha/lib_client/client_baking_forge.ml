@@ -94,6 +94,20 @@ let () =
       | _ -> None)
     (fun (hash, err) -> Failed_to_preapply (hash, err))
 
+let classify_operations (ops: Operation.raw list) =
+  let t = Array.make (List.length Proto_alpha.Main.validation_passes) [] in
+  List.iter
+    (fun op ->
+       let h = Operation.hash_raw op in
+       match Operation.parse h op with
+       | Ok o ->
+           List.iter
+             (fun pass -> t.(pass) <- op :: t.(pass))
+             (Proto_alpha.Main.acceptable_passes o)
+       | Error _ -> ())
+    ops ;
+  Array.fold_right (fun ops acc -> List.rev ops :: acc) t []
+
 let forge_block cctxt block
     ?force
     ?operations ?(best_effort = operations = None) ?(sort = best_effort)
@@ -114,7 +128,8 @@ let forge_block cctxt block
             (Preapply_result.operations ops)
             pendings in
         return ops
-    | Some operations -> return operations
+    | Some operations ->
+        return operations
   end >>=? fun operations ->
   begin
     match priority with
@@ -159,28 +174,53 @@ let forge_block cctxt block
   end >>=? fun timestamp ->
   let request = List.length operations in
   let proto_header = forge_faked_proto_header ~priority ~seed_nonce_hash in
+  let operations = classify_operations operations in
   Client_node_rpcs.Blocks.preapply
-    cctxt block ~timestamp ~sort ~proto_header [operations] >>=?
+    cctxt block ~timestamp ~sort ~proto_header operations >>=?
   fun { operations = result ; shell_header } ->
-  let result = List.hd result in
-  let valid = List.length result.applied in
+  let valid = List.fold_left (fun acc r -> acc + List.length r.Preapply_result.applied) 0 result in
   lwt_log_info "Found %d valid operations (%d refused) for timestamp %a"
     valid (request - valid)
     Time.pp_hum timestamp >>= fun () ->
   lwt_log_info "Computed fitness %a"
     Fitness.pp shell_header.fitness >>= fun () ->
   if best_effort
-  || ( Operation_hash.Map.is_empty result.refused
-       && Operation_hash.Map.is_empty result.branch_refused
-       && Operation_hash.Map.is_empty result.branch_delayed ) then
+  || List.for_all (fun l ->
+         Operation_hash.Map.is_empty l.Preapply_result.refused
+         && Operation_hash.Map.is_empty l.branch_refused
+         && Operation_hash.Map.is_empty l.branch_delayed )
+       result
+  then
     let operations =
       if not best_effort then operations
-      else List.map snd result.applied in
+      else List.map (fun l -> List.map snd l.Preapply_result.applied) result in
     Client_node_rpcs.Blocks.info cctxt block >>=? fun {net_id} ->
     inject_block cctxt
       ?force ~net_id ~shell_header ~priority ~seed_nonce_hash ~src_sk
-      [operations]
+      operations
   else
+    let result =
+      let merge old neu =
+        let open Preapply_result in
+        let merge _key a b =
+          match a, b with
+          | None, None -> None
+          | Some x, None -> Some x
+          | _, Some y -> Some y in
+        { applied = [] ;
+          refused =
+            Operation_hash.Map.merge merge
+              old.refused
+              neu.refused ;
+          branch_refused =
+            Operation_hash.Map.merge merge
+              old.branch_refused
+              neu.branch_refused ;
+          branch_delayed =
+            Operation_hash.Map.merge merge
+              old.branch_delayed
+              neu.branch_delayed } in
+      List.fold_left merge Preapply_result.empty result in
     Lwt.return_error @@
     List.filter_map
       (fun op ->
@@ -194,8 +234,7 @@ let forge_block cctxt block
          try Some (Failed_to_preapply
                      (op, snd @@ Operation_hash.Map.find h result.branch_delayed))
          with Not_found -> None)
-      operations
-
+      (List.concat operations)
 
 (** Worker *)
 
