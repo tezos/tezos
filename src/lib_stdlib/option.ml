@@ -27,6 +27,10 @@ let unopt_map ~f ~default = function
   | None -> default
   | Some x -> f x
 
+let unopt_exn err = function
+  | Some x -> x
+  | _ -> raise err
+
 let first_some a b = match a, b with
   | None, None -> None
   | None, Some v -> Some v

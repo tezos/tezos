@@ -133,3 +133,11 @@ let select n l =
     | x :: xs -> loop (pred n) (x :: acc) xs
   in
   loop n [] l
+
+let shift = function
+  | [] -> []
+  | hd :: tl -> tl@[hd]
+
+let rec product a b = match a with
+  | [] -> []
+  | hd :: tl -> (List.map (fun x -> (hd , x)) b) @ product tl b
