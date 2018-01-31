@@ -34,6 +34,7 @@ let () =
 
 type operation = unit
 let parse_operation _h _op = Error []
+let acceptable_passes _op = []
 let compare_operations _ _ = 0
 let validation_passes = []
 

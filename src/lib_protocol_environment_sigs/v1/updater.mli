@@ -70,6 +70,12 @@ module type PROTOCOL = sig
   val parse_operation:
     Operation_hash.t -> Operation.t -> operation tzresult
 
+  (** The Validation passes in which an operation can appear.
+      For instance [[0]] if it only belongs to the first pass.
+      An answer of [[]] means that the operation is ill-formed
+      and cannot be included at all. *)
+  val acceptable_passes: operation -> int list
+
   (** Basic ordering of operations. [compare_operations op1 op2] means
       that [op1] should appear before [op2] in a block. *)
   val compare_operations: operation -> operation -> int

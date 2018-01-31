@@ -97,6 +97,8 @@ val hash_raw: raw -> Operation_hash.t
 val parse:
   Operation_hash.t -> Operation.t -> operation tzresult
 
+val acceptable_passes: operation -> int list
+
 val parse_proto:
   MBytes.t ->
   (proto_operation * Ed25519.Signature.t option) tzresult Lwt.t

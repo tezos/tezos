@@ -134,6 +134,7 @@ module type RAW_PROTOCOL = sig
   type operation
   val parse_operation:
     Operation_hash.t -> Operation.t -> operation tzresult
+  val acceptable_passes: operation -> int list
   val compare_operations: operation -> operation -> int
   type validation_state
   val current_context: validation_state -> Context.t tzresult Lwt.t

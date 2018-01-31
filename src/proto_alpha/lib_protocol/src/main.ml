@@ -12,6 +12,7 @@
 type operation = Tezos_context.operation
 
 let parse_operation = Tezos_context.Operation.parse
+let acceptable_passes = Tezos_context.Operation.acceptable_passes
 
 let max_block_length =
   Tezos_context.Block_header.max_header_length

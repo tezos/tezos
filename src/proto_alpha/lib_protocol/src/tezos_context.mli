@@ -609,6 +609,7 @@ module Operation : sig
 
   type error += Cannot_parse_operation (* `Branch *)
   val parse: Operation_hash.t -> Operation.t -> operation tzresult
+  val acceptable_passes: operation -> int list
 
   val parse_proto:
     MBytes.t -> (proto_operation * signature option) tzresult Lwt.t

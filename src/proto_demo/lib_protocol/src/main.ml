@@ -12,6 +12,7 @@ let max_operation_data_length = 42
 
 let max_block_length = 42
 let validation_passes = []
+let acceptable_passes _op = []
 
 let parse_operation h _ = Ok h
 

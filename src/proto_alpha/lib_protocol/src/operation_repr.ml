@@ -362,6 +362,8 @@ let parse hash (op: Operation.t) =
       ok { hash ; shell = op.shell ; contents ; signature }
   | None -> error Cannot_parse_operation
 
+let acceptable_passes _op = [0]
+
 type error += Invalid_signature (* `Permanent *)
 type error += Missing_signature (* `Permanent *)
 
