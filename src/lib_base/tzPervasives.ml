@@ -9,10 +9,11 @@
 
 include Tezos_stdlib
 include Tezos_stdlib_lwt
-include Tezos_crypto
 include Tezos_data_encoding
 include Tezos_error_monad
-include Tezos_rpc_base
+include Tezos_rpc
+include Tezos_crypto
+include Tezos_micheline
 
 module List = struct
   include List
@@ -30,8 +31,27 @@ module Block_header = Block_header
 module Operation = Operation
 module Protocol = Protocol
 
+module Net_id = Net_id
+module Block_hash = Block_hash
+module Operation_hash = Operation_hash
+module Operation_list_hash = Operation_list_hash
+module Operation_list_list_hash = Operation_list_list_hash
+module Context_hash = Context_hash
+module Protocol_hash = Protocol_hash
+
 module Test_network_status = Test_network_status
 module Preapply_result = Preapply_result
+
+module Block_locator = Block_locator
+module Mempool = Mempool
+
+module P2p_addr = P2p_addr
+module P2p_identity = P2p_identity
+module P2p_peer = P2p_peer
+module P2p_point = P2p_point
+module P2p_connection = P2p_connection
+module P2p_stat = P2p_stat
+module P2p_version = P2p_version
 
 include Utils.Infix
 include Error_monad

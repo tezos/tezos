@@ -7,7 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Ed25519 = Environment.Ed25519
+open Proto_alpha
+open Tezos_context
 
 val init :
   ?sandbox:string ->

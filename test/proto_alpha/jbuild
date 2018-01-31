@@ -9,18 +9,15 @@
   (libraries (tezos-base
               tezos-rpc-http
               tezos-client-base
-              tezos-embedded-client-genesis
-              tezos-embedded-client-alpha
+              tezos-client-genesis
+              tezos-client-alpha
               test_lib))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_rpc_http
-                    -open Tezos_embedded_protocol_environment_alpha
-                    -open Tezos_embedded_raw_protocol_alpha
                     -open Tezos_client_base
-                    -open Tezos_embedded_client_genesis
-                    -open Tezos_embedded_client_alpha
-                    -open Tezos_context))))
+                    -open Tezos_client_genesis
+                    -open Tezos_client_alpha))))
 
 (alias
  ((name buildtest)

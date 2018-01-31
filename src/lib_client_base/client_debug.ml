@@ -10,7 +10,7 @@
 (* Commands used to debug the node/alphanet *)
 
 let pp_block ppf
-    { Node_rpc_services.Blocks.hash ; net_id ; level ;
+    { Block_services.hash ; net_id ; level ;
       proto_level ; predecessor ; timestamp ;
       operations_hash ; fitness ; data ;
       operations ; protocol ; test_network } =
@@ -62,7 +62,7 @@ let registered_protocols ppf =
     (Client_commands.get_versions ())
 
 let print_heads ppf cctxt =
-  Client_rpcs.call_service0 cctxt Node_rpc_services.Blocks.list
+  Client_rpcs.call_service0 cctxt Block_services.list
     { include_ops = true ;
       length = Some 1 ;
       heads = None ;
@@ -82,7 +82,7 @@ let print_heads ppf cctxt =
 
 let print_rejected ppf cctxt =
   Client_rpcs.call_service0 cctxt
-    Node_rpc_services.Blocks.list_invalid () >>=? fun invalid ->
+    Block_services.list_invalid () >>=? fun invalid ->
   return @@
   Format.pp_print_list
     (fun ppf (hash, level, errors) ->

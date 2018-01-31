@@ -18,6 +18,6 @@ let commands () =
        @@ Block_hash.param ~name:"block" ~desc:"block to remove from invalid list"
        @@ stop)
       (fun () block (cctxt : Client_commands.full_context) ->
-         Client_rpcs.call_err_service0 cctxt Node_rpc_services.Blocks.unmark_invalid block >>=? fun () ->
+         Client_rpcs.call_err_service0 cctxt Block_services.unmark_invalid block >>=? fun () ->
          cctxt#message "Block %a no longer marked invalid" Block_hash.pp block >>= return) ;
   ]

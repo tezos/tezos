@@ -43,9 +43,7 @@ let opened_modules = [
   "Tezos_protocol_environment" ;
   "Pervasives" ;
   "Error_monad" ;
-  "Hash" ;
   "Logging" ;
-  "Tezos_data" ;
 ]
 
 let dump oc files =

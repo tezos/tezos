@@ -47,7 +47,7 @@ let read ?expected_pow file =
       fail (No_identity_file file)
   | true ->
       Data_encoding_ezjsonm.read_file file >>=? fun json ->
-      let id = Data_encoding.Json.destruct P2p.Identity.encoding json in
+      let id = Data_encoding.Json.destruct P2p_identity.encoding json in
       match expected_pow with
       | None -> return id
       | Some expected ->
@@ -81,4 +81,4 @@ let write file identity =
   else
     Node_data_version.ensure_data_dir (Filename.dirname file) >>=? fun () ->
     Data_encoding_ezjsonm.write_file file
-      (Data_encoding.Json.construct P2p.Identity.encoding identity)
+      (Data_encoding.Json.construct P2p_identity.encoding identity)

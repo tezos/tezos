@@ -11,8 +11,8 @@
 
 #require "unix"
 
-let prefix = "lib_embedded_protocol_"
-let dirname = Filename.basename @@ Sys.getcwd ()
+let prefix = "proto_"
+let dirname = Filename.basename @@ Filename.dirname @@ Sys.getcwd ()
 
 let predefined_version = None (* to be substituted in opam packages *)
 
@@ -28,7 +28,7 @@ let version =
 
 let path =
   match predefined_version with
-  | None -> "src/lib_embedded_protocol_" ^ version
+  | None -> "src/proto_" ^ version ^ "/lib_protocol"
   | Some _ -> "."
 
 let sources =
@@ -76,6 +76,11 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
   (modes (native))
   (modules (Tezos_protocol_%s_dummy))))
 
+(install
+  ((section lib)
+   (files   ("tezos_protocol_%s.cmx" "tezos_protocol_%s.cmi"))
+   (package tezos-protocol-%s)))
+
 (alias
  ((name runtest_sandbox)
   (deps (tezos_protocol_%s.cmx))))
@@ -88,6 +93,6 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
 |}
     version version version version version version version version
     path
-    version version version
+    version version version version version version
     Format.(pp_print_list (fun ppf -> Format.fprintf ppf "%S"))
     sources

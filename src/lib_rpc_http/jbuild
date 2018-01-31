@@ -4,14 +4,11 @@
  ((name tezos_rpc_http)
   (public_name tezos-rpc-http)
   (libraries (tezos-base
-              tezos-node-services
-              ocplib-resto-directory
               ocplib-resto-cohttp))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_rpc_base
-                    -open Tezos_node_services))))
+                    -open Tezos_rpc))))
 
 (alias
  ((name runtest_indent)

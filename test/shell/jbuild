@@ -6,7 +6,7 @@
           test_store))
   (libraries (tezos-base
               tezos-storage
-              tezos-node-shell
+              tezos-shell
               tezos-embedded-protocol-demo
               tezos-embedded-protocol-alpha
               tezos-embedded-protocol-genesis
@@ -15,7 +15,7 @@
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_storage
-                    -open Tezos_node_shell))))
+                    -open Tezos_shell))))
 
 (alias
  ((name buildtest)

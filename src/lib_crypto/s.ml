@@ -126,20 +126,3 @@ module type MERKLE_TREE = sig
   val check_path: path -> elt -> t * int
   val path_encoding: path Data_encoding.t
 end
-
-(** {2 Building Hashes} *******************************************************)
-
-(** The parameters for creating a new Hash type using
-    {!Make_Blake2B}. Both {!name} and {!title} are only informative,
-    used in error messages and serializers. *)
-
-module type Name = sig
-  val name : string
-  val title : string
-  val size : int option
-end
-
-module type PrefixedName = sig
-  include Name
-  val b58check_prefix : string
-end

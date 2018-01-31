@@ -7,7 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Ed25519 = Environment.Ed25519
+open Proto_alpha
+open Tezos_context
 
 let (//) = Filename.concat
 
@@ -39,7 +40,7 @@ let dictator_sk =
 
 let activate_alpha () =
   let fitness = Fitness_repr.from_int64 0L in
-  Tezos_embedded_client_genesis.Client_proto_main.bake
+  Tezos_client_genesis.Client_proto_main.bake
     (new Client_rpcs.http_ctxt !rpc_config) (`Head 0)
     (Activate  { protocol = Client_proto_main.protocol ; validation_passes = 1 ;
                  fitness })

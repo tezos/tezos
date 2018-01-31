@@ -44,7 +44,7 @@ class type wallet = object
 end
 
 class type block = object
-  method block : Node_rpc_services.Blocks.block
+  method block : Block_services.block
 end
 
 class type logging_wallet = object

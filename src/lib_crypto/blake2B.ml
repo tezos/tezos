@@ -20,7 +20,18 @@ let () =
 
 (*-- Type specific Hash builder ---------------------------------------------*)
 
-module Make_minimal (K : S.Name) = struct
+module type Name = sig
+  val name : string
+  val title : string
+  val size : int option
+end
+
+module type PrefixedName = sig
+  include Name
+  val b58check_prefix : string
+end
+
+module Make_minimal (K : Name) = struct
 
   type t = Sodium.Generichash.hash
 
@@ -133,7 +144,7 @@ module Make (R : sig
       of_raw: (string -> 'a option) ->
       wrap: ('a -> Base58.data) ->
       'a Base58.encoding
-  end) (K : S.PrefixedName) = struct
+  end) (K : PrefixedName) = struct
 
   include Make_minimal(K)
 
@@ -353,7 +364,7 @@ module Make_merkle_tree
          wrap: ('a -> Base58.data) ->
          'a Base58.encoding
      end)
-    (K : S.PrefixedName)
+    (K : PrefixedName)
     (Contents: sig
        type t
        val to_bytes: t -> MBytes.t

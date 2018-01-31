@@ -103,7 +103,7 @@ module Cfg_file = struct
 end
 
 type cli_args = {
-  block: Node_rpc_services.Blocks.block ;
+  block: Block_services.block ;
   protocol: Protocol_hash.t option ;
   print_timings: bool ;
   log_requests: bool ;
@@ -124,7 +124,7 @@ let string_parameter : (string, Client_commands.full_context) parameter =
 
 let block_parameter =
   parameter
-    (fun _ block -> match Node_rpc_services.Blocks.parse_block block with
+    (fun _ block -> match Block_services.parse_block block with
        | Error _ -> fail (Invalid_block_argument block)
        | Ok block -> return block)
 
@@ -161,7 +161,7 @@ let block_arg =
   default_arg
     ~parameter:"-block"
     ~doc:"The block on which to apply contextual commands."
-    ~default:(Node_rpc_services.Blocks.to_string default_cli_args.block)
+    ~default:(Block_services.to_string default_cli_args.block)
     block_parameter
 let protocol_arg =
   arg

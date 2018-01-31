@@ -7,10 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type fitness = MBytes.t list
-
-val compare: fitness -> fitness -> int
-val pp: Format.formatter -> fitness -> unit
-val to_string: fitness -> string
-
-val encoding: fitness Data_encoding.t
+(** The fitness of a block is defined as a list of bytes,
+    compared in a lexicographical order (longer list are greater). *)
+include S.T with type t = MBytes.t list

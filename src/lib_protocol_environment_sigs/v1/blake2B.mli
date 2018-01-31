@@ -9,7 +9,22 @@
 
 (** Builds a new Hash type using Blake2B. *)
 
-module Make_minimal (Name : Hash.Name) : Hash.MINIMAL_HASH
+(** The parameters for creating a new Hash type using
+    {!Make_Blake2B}. Both {!name} and {!title} are only informative,
+    used in error messages and serializers. *)
+
+module type Name = sig
+  val name : string
+  val title : string
+  val size : int option
+end
+
+module type PrefixedName = sig
+  include Name
+  val b58check_prefix : string
+end
+
+module Make_minimal (Name : Name) : S.MINIMAL_HASH
 module Make
     (Register : sig
        val register_encoding:
@@ -20,5 +35,5 @@ module Make
          wrap: ('a -> Base58.data) ->
          'a Base58.encoding
      end)
-    (Name : Hash.PrefixedName) : HASH
+    (Name : PrefixedName) : S.HASH
 

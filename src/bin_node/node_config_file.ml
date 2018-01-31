@@ -529,7 +529,7 @@ let update
   return { data_dir ; net ; rpc ; log ; shell }
 
 let resolve_addr ?default_port ?(passive = false) peer =
-  let addr, port = P2p.Point.parse_addr_port peer in
+  let addr, port = P2p_point.Id.parse_addr_port peer in
   let node = if addr = "" || addr = "_" then "::" else addr
   and service =
     match port, default_port with

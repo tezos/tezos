@@ -10,9 +10,9 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
   "tezos-base"
-  "tezos-embedded-client-genesis"
-  "tezos-embedded-client-alpha"
   "tezos-client-base"
+  "tezos-client-genesis"
+  "tezos-client-alpha"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

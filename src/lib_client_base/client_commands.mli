@@ -28,7 +28,7 @@ class type wallet = object
 end
 
 class type block = object
-  method block : Node_rpc_services.Blocks.block
+  method block : Block_services.block
 end
 
 class type logging_wallet = object
@@ -56,7 +56,7 @@ end
 
 val make_context :
   ?base_dir:string ->
-  ?block:Node_rpc_services.Blocks.block ->
+  ?block:Block_services.block ->
   ?rpc_config:Client_rpcs.config ->
   (string -> string -> unit Lwt.t) -> full_context
 (** [make_context ?config log_fun] builds a context whose logging
@@ -81,4 +81,4 @@ val get_versions: unit -> (Protocol_hash.t * (command list)) list
 val force_switch : (bool, full_context) Cli_entries.arg
 
 val default_base_dir : string
-val default_block : Node_rpc_services.Blocks.block
+val default_block : Block_services.block

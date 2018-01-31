@@ -20,8 +20,8 @@ let genesis : State.Net.genesis = {
       "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
 }
 
-type error += Non_private_sandbox of P2p_types.addr
-type error += RPC_Port_already_in_use of P2p_types.addr
+type error += Non_private_sandbox of P2p_addr.t
+type error += RPC_Port_already_in_use of P2p_addr.t
 
 let () =
   register_error_kind
@@ -36,7 +36,7 @@ let () =
            See `%s run --help` on how to change the listening address."
         Ipaddr.V6.pp_hum addr Sys.argv.(0)
     end
-    Data_encoding.(obj1 (req "addr" P2p_types.addr_encoding))
+    Data_encoding.(obj1 (req "addr" P2p_addr.encoding))
     (function Non_private_sandbox addr -> Some addr | _ -> None)
     (fun addr -> Non_private_sandbox addr);
   register_error_kind
@@ -50,7 +50,7 @@ let () =
          Please choose another RPC port."
         Ipaddr.V6.pp_hum addr
     end
-    Data_encoding.(obj1 (req "addr" P2p_types.addr_encoding))
+    Data_encoding.(obj1 (req "addr" P2p_addr.encoding))
     (function RPC_Port_already_in_use addr -> Some addr | _ -> None)
     (fun addr -> RPC_Port_already_in_use addr)
 
@@ -146,7 +146,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
            Node_data_version.default_identity_file_name) >>=? fun identity ->
         lwt_log_notice
           "Peer's global id: %a"
-          P2p.Peer_id.pp identity.peer_id >>= fun () ->
+          P2p_peer.Id.pp identity.peer_id >>= fun () ->
         let p2p_config : P2p.config =
           { listening_addr ;
             listening_port ;

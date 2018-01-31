@@ -300,7 +300,7 @@ check_endorser() {
 }
 
 assert_endorser() {
-    if ! check_baker; then
+    if ! check_endorser; then
         echo -e "\033[31mEndorser is not running!\033[0m"
         exit 0
     fi

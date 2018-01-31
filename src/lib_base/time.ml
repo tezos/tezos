@@ -24,6 +24,14 @@ module T = struct
     let incr_sign = res >= a in
     if sign = incr_sign then res else invalid_arg "Time.add" ;;
 
+  let recent a1 a2 =
+    match a1, a2 with
+    | (None, None) -> None
+    | (None, (Some _ as a))
+    | (Some _ as a, None) -> a
+    | (Some (_, t1), Some (_, t2)) ->
+        if compare t1 t2 < 0 then a2 else a1
+
   let hash = to_int
   let (=) = equal
   let (<>) x y = compare x y <> 0
