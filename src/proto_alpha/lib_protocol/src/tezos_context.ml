@@ -137,7 +137,6 @@ let finalize ?commit_message:message c =
   let constants = Raw_context.constants c in
   { Updater.context ; fitness ; message ; max_operations_ttl = 60 ;
     max_operation_data_length = constants.max_operation_data_length ;
-    max_number_of_operations = constants.max_number_of_operations ;
   }
 
 let configure_sandbox = Raw_context.configure_sandbox

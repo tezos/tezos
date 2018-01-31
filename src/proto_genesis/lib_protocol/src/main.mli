@@ -7,18 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type prevalidation_state
+(** Tezos Protocol Implementation - Protocol Signature Instance *)
 
-val start_prevalidation :
-  ?proto_header: MBytes.t ->
-  predecessor: State.Block.t ->
-  timestamp: Time.t ->
-  unit -> prevalidation_state tzresult Lwt.t
-
-val prevalidate :
-  prevalidation_state -> sort:bool ->
-  (Operation_hash.t * Operation.t) list ->
-  (prevalidation_state * error Preapply_result.t) Lwt.t
-
-val end_prevalidation :
-  prevalidation_state -> Updater.validation_result tzresult Lwt.t
+include Updater.PROTOCOL

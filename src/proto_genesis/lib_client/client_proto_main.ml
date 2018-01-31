@@ -66,19 +66,16 @@ let commands () =
        @@ param ~name:"fitness"
          ~desc:"Hardcoded fitness of the first block (integer)"
          int64_parameter
-       @@ prefixes [ "and" ; "passes" ]
-       @@ param ~name:"passes"
-         ~desc:"Hardcoded number of validation passes (integer)"
-         int_parameter
        @@ prefixes [ "and" ; "key" ]
        @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
-      begin fun timestamp hash fitness validation_passes sk (cctxt : Client_commands.full_context) ->
+      begin fun timestamp hash fitness sk (cctxt : Client_commands.full_context) ->
         let fitness =
           Tezos_client_alpha.Proto_alpha.Fitness_repr.from_int64 fitness in
         bake cctxt ?timestamp cctxt#block
-          (Activate { protocol = hash ; validation_passes ; fitness }) sk >>=? fun hash ->
+          (Activate { protocol = hash ; fitness })
+          sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return ()
       end ;
@@ -87,18 +84,13 @@ let commands () =
       args
       (prefixes [ "fork" ; "test" ; "protocol" ]
        @@ Protocol_hash.param ~name:"version" ~desc:"Protocol version (b58check)"
-       @@ prefixes [ "with" ; "passes" ]
-       @@ param ~name:"passes"
-         ~desc:"Hardcoded number of validation passes (integer)"
-         int_parameter
-       @@ prefixes [ "and" ; "key" ]
+       @@ prefixes [ "with" ; "key" ]
        @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
-      begin fun timestamp hash validation_passes sk cctxt ->
+      begin fun timestamp hash sk cctxt ->
         bake cctxt ?timestamp cctxt#block
           (Activate_testnet { protocol = hash ;
-                              validation_passes ;
                               delay = Int64.mul 24L 3600L })
           sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->

@@ -80,7 +80,6 @@ activate_alpha() {
                 activate \
                 protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK \
                 with fitness 1 \
-                and passes 1 \
                 and key edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6 \
                 > /dev/stderr
 }

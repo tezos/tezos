@@ -27,15 +27,20 @@ type validation_result = {
   max_operation_data_length: int ;
   (** The maximum size of operations in bytes. *)
 
-  max_number_of_operations: int list ;
-  (** The maximum number of operations allowed in one block
-      (per validation pass). *)
-
   max_operations_ttl: int ;
   (** The "time-to-live" of operation for the next block: any
       operations whose 'branch' is older than 'ttl' blocks in the
       past cannot be included in the next block. *)
 
+}
+
+type quota = {
+  max_size: int ;
+  (** The maximum size (in bytes) of the serialized list of
+      operations. *)
+  max_op: int option ;
+  (** The maximum number of operation.
+      [None] means no limit. *)
 }
 
 type rpc_context = {
@@ -52,6 +57,10 @@ module type PROTOCOL = sig
 
   (** The maximum size of block headers in bytes. *)
   val max_block_length: int
+
+  (** The number of validation passes (length of the list) and the
+      operation's quota for each pass. *)
+  val validation_passes: quota list
 
   (** The version specific type of operations. *)
   type operation

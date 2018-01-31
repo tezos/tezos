@@ -172,7 +172,6 @@ module Locked_block = struct
     Store.Block.Contents.store (store, genesis.block)
       { Store.Block.header ; message = Some "Genesis" ;
         max_operations_ttl = 0 ; context ;
-        max_number_of_operations = [];
         max_operation_data_length = 0;
       } >>= fun () ->
     Lwt.return header
@@ -379,8 +378,6 @@ module Block = struct
   let message { contents = { message } } = message
   let max_operations_ttl { contents = { max_operations_ttl } } =
     max_operations_ttl
-  let max_number_of_operations { contents = { max_number_of_operations } } =
-    max_number_of_operations
   let max_operation_data_length { contents = { max_operation_data_length } } =
     max_operation_data_length
 
@@ -474,7 +471,7 @@ module Block = struct
   let store
       net_state block_header operations
       { Updater.context ; message ; max_operations_ttl ;
-        max_number_of_operations ; max_operation_data_length } =
+        max_operation_data_length } =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     (* let's the validator check the consistency... of fitness, level, ... *)
@@ -494,7 +491,6 @@ module Block = struct
           Store.Block.header = block_header ;
           message ;
           max_operations_ttl ;
-          max_number_of_operations ;
           max_operation_data_length ;
           context = commit ;
         } in

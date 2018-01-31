@@ -61,7 +61,7 @@ let debug w =
   Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
 
 let check_header
-    (pred: State.Block.t) hash (header: Block_header.t) =
+    (pred: State.Block.t) validation_passes hash (header: Block_header.t) =
   let pred_header = State.Block.header pred in
   fail_unless
     (Int32.succ pred_header.shell.level = header.shell.level)
@@ -75,8 +75,7 @@ let check_header
     Fitness.(pred_header.shell.fitness < header.shell.fitness)
     (invalid_block hash Non_increasing_fitness) >>=? fun () ->
   fail_unless
-    (header.shell.validation_passes =
-     List.length (State.Block.max_number_of_operations pred))
+    (header.shell.validation_passes = validation_passes)
     (invalid_block hash
        (Unexpected_number_of_validation_passes header.shell.validation_passes)
     ) >>=? fun () ->
@@ -120,12 +119,14 @@ let apply_block
     operations =
   let pred_header = State.Block.header pred
   and pred_hash = State.Block.hash pred in
-  check_header pred hash header >>=? fun () ->
+  check_header pred (List.length Proto.validation_passes) hash header >>=? fun () ->
   iteri2_p
-    (fun i ops max ->
+    (fun i ops quota ->
        fail_unless
-         (List.length ops <= max)
-         (invalid_block hash @@
+         (Option.unopt_map ~default:true
+            ~f:(fun max -> List.length ops <= max) quota.Updater.max_op)
+         (let max = Option.unopt ~default:~-1 quota.Updater.max_op in
+          invalid_block hash @@
           Too_many_operations
             { pass = i + 1 ; found = List.length ops ; max }) >>=? fun () ->
        let max_size = State.Block.max_operation_data_length pred in
@@ -138,7 +139,7 @@ let apply_block
                 { operation = Operation.hash op ;
                   size ; max = max_size })) ops >>=? fun () ->
        return ())
-    operations (State.Block.max_number_of_operations pred) >>=? fun () ->
+    operations Proto.validation_passes >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
   check_liveness net_state pred hash operation_hashes operations >>=? fun () ->
   map2_s (map2_s begin fun op_hash raw ->

@@ -16,6 +16,9 @@ let parse_operation = Tezos_context.Operation.parse
 let max_block_length =
   Tezos_context.Block_header.max_header_length
 
+let validation_passes =
+  [ Updater.{ max_size = 1024 * 1024 ; max_op = None  } ] (* 1MB *)
+
 let rpc_services = Services_registration.rpc_services
 
 type validation_mode =

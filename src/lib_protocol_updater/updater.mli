@@ -21,8 +21,12 @@ type validation_result = {
   fitness: Fitness.t ;
   message: string option ;
   max_operation_data_length: int ;
-  max_number_of_operations: int list ;
   max_operations_ttl: int ;
+}
+
+type quota = {
+  max_size: int ;
+  max_op: int option ;
 }
 
 type rpc_context = {
@@ -37,6 +41,7 @@ module type RAW_PROTOCOL = sig
   type error = ..
   type 'a tzresult = ('a, error list) result
   val max_block_length: int
+  val validation_passes: quota list
   type operation
   val parse_operation:
     Operation_hash.t -> Operation.t -> operation tzresult
@@ -102,6 +107,7 @@ module Node_protocol_environment_sigs : sig
        and type Block_header.t = Block_header.t
        and type 'a RPC_directory.t = 'a RPC_directory.t
        and type Updater.validation_result = validation_result
+       and type Updater.quota = quota
        and type Updater.rpc_context = rpc_context
 
     type error += Ecoproto_error of Error_monad.error list

@@ -56,7 +56,7 @@ let get_activation_block baker context_hash head =
   let fitness =
     Tezos_embedded_raw_protocol_alpha.Fitness_repr.from_int64 100L in
   let command: Data.Command.t =
-    Data.Command.Activate({protocol = Helpers_constants.alpha_hash ; validation_passes = 0 ; fitness}) in
+    Data.Command.Activate({protocol = Helpers_constants.alpha_hash ; fitness}) in
   let content_bytes = Data.Command.forge shell_header command in
   let signature = Ed25519.sign baker.ppk content_bytes in
   let proto = (command , signature) in

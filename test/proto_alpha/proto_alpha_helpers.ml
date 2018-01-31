@@ -41,7 +41,7 @@ let activate_alpha () =
       ~location:"edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6" in
   Tezos_client_genesis.Client_proto_main.bake
     (new Client_rpcs.http_ctxt !rpc_config) (`Head 0)
-    (Activate  { protocol = Client_proto_main.protocol ; validation_passes = 1 ;
+    (Activate  { protocol = Client_proto_main.protocol ;
                  fitness })
     dictator_sk
 

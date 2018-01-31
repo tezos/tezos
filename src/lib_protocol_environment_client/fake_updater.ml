@@ -14,8 +14,12 @@ module Make(Context : sig type t end) = struct
     fitness: Fitness.t ;
     message: string option ;
     max_operation_data_length: int ;
-    max_number_of_operations: int list ;
     max_operations_ttl: int ;
+  }
+
+  type quota = {
+    max_size: int ;
+    max_op: int option ;
   }
 
   type rpc_context = {
@@ -30,6 +34,7 @@ module Make(Context : sig type t end) = struct
     type error = ..
     type 'a tzresult = ('a, error list) result
     val max_block_length: int
+    val validation_passes: quota list
     type operation
     val parse_operation:
       Operation_hash.t -> Operation.t -> operation tzresult

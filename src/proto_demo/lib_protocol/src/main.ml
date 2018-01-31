@@ -11,7 +11,7 @@ type operation = Operation_hash.t
 let max_operation_data_length = 42
 
 let max_block_length = 42
-let max_number_of_operations = 42
+let validation_passes = []
 
 let parse_operation h _ = Ok h
 
@@ -88,8 +88,7 @@ let finalize_block ctxt =
   let message = Some (Format.asprintf "fitness <- %Ld" fitness) in
   let fitness = Fitness.from_int64 fitness in
   return { Updater.message ; context = ctxt.context ; fitness ;
-           max_operations_ttl = 0 ; max_operation_data_length = 0 ;
-           max_number_of_operations = [] }
+           max_operations_ttl = 0 ; max_operation_data_length = 0 }
 
 let rpc_services = Services.rpc_services
 

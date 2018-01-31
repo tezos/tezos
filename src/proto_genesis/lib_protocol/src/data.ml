@@ -13,14 +13,12 @@ module Command = struct
     (* Activate a protocol *)
     | Activate of {
         protocol: Protocol_hash.t ;
-        validation_passes: int ;
         fitness: Fitness.t ;
       }
 
     (* Activate a protocol as a testnet *)
     | Activate_testnet of {
         protocol: Protocol_hash.t ;
-        validation_passes: int ;
         delay: Int64.t ;
       }
 
@@ -38,29 +36,27 @@ module Command = struct
     union ~tag_size:`Uint8 [
       case (Tag 0)
         (mk_case "activate"
-           (obj3
+           (obj2
               (req "hash" Protocol_hash.encoding)
-              (req "validation_passes" uint8)
               (req "fitness" Fitness.encoding)
            ))
         (function
-          | Activate { protocol ; validation_passes ; fitness} ->
-              Some (protocol, validation_passes, fitness)
+          | Activate { protocol ; fitness} ->
+              Some (protocol, fitness)
           | _ -> None)
-        (fun (protocol, validation_passes, fitness) ->
-           Activate { protocol ; validation_passes ; fitness }) ;
+        (fun (protocol, fitness) ->
+           Activate { protocol ; fitness }) ;
       case (Tag 1)
         (mk_case "activate_testnet"
-           (obj3
+           (obj2
               (req "hash" Protocol_hash.encoding)
-              (req "validation_passes" uint8)
               (req "validity_time" int64)))
         (function
-          | Activate_testnet { protocol ; validation_passes ; delay } ->
-              Some (protocol, validation_passes, delay)
+          | Activate_testnet { protocol ; delay } ->
+              Some (protocol, delay)
           | _ -> None)
-        (fun (protocol, validation_passes, delay) ->
-           Activate_testnet { protocol ; validation_passes ; delay }) ;
+        (fun (protocol, delay) ->
+           Activate_testnet { protocol ; delay }) ;
     ]
 
   let signed_encoding =

@@ -57,19 +57,12 @@ and 'a proto =
 
 let start_prevalidation
     ?proto_header
-    ?max_number_of_operations
     ~predecessor ~timestamp () =
   let { Block_header.shell =
           { fitness = predecessor_fitness ;
             timestamp = predecessor_timestamp ;
             level = predecessor_level } } =
     State.Block.header predecessor in
-  let max_number_of_operations =
-    match max_number_of_operations with
-    | Some max -> max
-    | None ->
-        try List.hd (State.Block.max_number_of_operations predecessor)
-        with _ -> 0 in
   let max_operation_data_length =
     State.Block.max_operation_data_length predecessor in
   State.Block.context predecessor >>= fun predecessor_context ->
@@ -98,6 +91,8 @@ let start_prevalidation
     ?proto_header
     ()
   >>=? fun state ->
+  (* FIXME arbitrary value, to be customisable *)
+  let max_number_of_operations = 1000 in
   return (State { proto = (module Proto) ; state ;
                   max_number_of_operations ; max_operation_data_length })
 

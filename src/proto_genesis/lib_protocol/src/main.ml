@@ -33,10 +33,9 @@ let () =
     (fun () -> Invalid_signature)
 
 type operation = unit
-let max_operation_data_length = 0
 let parse_operation _h _op = Error []
 let compare_operations _ _ = 0
-let max_number_of_operations = 0
+let validation_passes = []
 
 type block = {
   shell: Block_header.shell_header ;
@@ -48,7 +47,6 @@ let max_block_length =
   Data_encoding.Binary.length
     Data.Command.encoding
     (Activate_testnet { protocol = Protocol_hash.hash_bytes [] ;
-                        validation_passes = 0 ;
                         delay = 0L })
   +
   begin
@@ -83,24 +81,20 @@ let precheck_block
 
 let prepare_application ctxt command timestamp fitness =
   match command with
-  | Data.Command.Activate { protocol = hash ; validation_passes ; fitness } ->
+  | Data.Command.Activate { protocol = hash ; fitness } ->
       let message =
         Some (Format.asprintf "activate %a" Protocol_hash.pp_short hash) in
       Updater.activate ctxt hash >>= fun ctxt ->
       return { Updater.message ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
-               max_number_of_operations =
-                 Array.to_list (Array.make validation_passes 0) ;
                max_operation_data_length = 0 }
-  | Activate_testnet { protocol = hash ; validation_passes ; delay } ->
+  | Activate_testnet { protocol = hash ; delay } ->
       let message =
         Some (Format.asprintf "activate testnet %a" Protocol_hash.pp_short hash) in
       let expiration = Time.add timestamp delay in
       Updater.fork_test_network ctxt ~protocol:hash ~expiration >>= fun ctxt ->
       return { Updater.message ; context = ctxt ; fitness ;
                max_operations_ttl = 0 ;
-               max_number_of_operations =
-                 Array.to_list (Array.make validation_passes 0) ;
                max_operation_data_length = 0 }
 
 
@@ -129,7 +123,6 @@ let begin_construction
       return { Updater.message = None ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
                max_operation_data_length = 0 ;
-               max_number_of_operations = [] ;
              }
   | Some command ->
       match Data_encoding.Binary.of_bytes Data.Command.encoding command with
