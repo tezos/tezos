@@ -27,6 +27,9 @@ type block_error =
   | Too_many_operations of { pass: int; found: int; max: int }
   | Oversized_operation of { operation: Operation_hash.t;
                              size: int; max: int }
+  | Unallowed_pass of { operation: Operation_hash.t ;
+                        pass: int ;
+                        allowed_pass: int list }
 
 let block_error_encoding =
   let open Data_encoding in
@@ -132,6 +135,18 @@ let block_error_encoding =
           | _ -> None)
         (fun ((), operation, size, max) ->
            Oversized_operation { operation ; size ; max }) ;
+      case (Tag 11)
+        (obj4
+           (req "error" (constant "invalid_pass"))
+           (req "operation" Operation_hash.encoding)
+           (req "pass" uint8)
+           (req "allowed_pass" (list uint8)))
+        (function
+          | Unallowed_pass { operation ; pass ; allowed_pass } ->
+              Some ((), operation, pass, allowed_pass)
+          | _ -> None)
+        (fun ((), operation, pass, allowed_pass) ->
+           Unallowed_pass { operation ; pass ; allowed_pass }) ;
     ]
 
 let pp_block_error ppf = function
@@ -192,6 +207,12 @@ let pp_block_error ppf = function
       Format.fprintf ppf
         "Oversized operation %a (size: %d, max: %d)"
         Operation_hash.pp_short operation size max
+  | Unallowed_pass { operation ; pass ; allowed_pass } ->
+      Format.fprintf ppf
+        "Operation %a included in validation pass %d, \
+        \ while only the following passes are allowed: @[<h>%a@]"
+        Operation_hash.pp_short operation pass
+        Format.(pp_print_list pp_print_int) allowed_pass
 
 type error +=
   | Invalid_block of

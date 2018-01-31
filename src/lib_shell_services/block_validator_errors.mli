@@ -27,6 +27,9 @@ type block_error =
   | Too_many_operations of { pass: int; found: int; max: int }
   | Oversized_operation of { operation: Operation_hash.t;
                              size: int; max: int }
+  | Unallowed_pass of { operation: Operation_hash.t ;
+                        pass: int ;
+                        allowed_pass: int list }
 
 type error +=
   | Invalid_block of

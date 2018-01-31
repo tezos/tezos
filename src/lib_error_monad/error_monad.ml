@@ -263,6 +263,17 @@ module Make() = struct
         map2_s f t1 t2 >>=? fun rt ->
         return (rh :: rt)
 
+  let mapi2_s f l1 l2 =
+    let rec mapi2_s i f l1 l2 =
+      match l1, l2 with
+      | [], [] -> return []
+      | _ :: _, [] | [], _ :: _ -> invalid_arg "Error_monad.mapi2_s"
+      | h1 :: t1, h2 :: t2 ->
+          f i h1 h2 >>=? fun rh ->
+          mapi2_s (i+1) f t1 t2 >>=? fun rt ->
+          return (rh :: rt) in
+    mapi2_s 0 f l1 l2
+
   let rec map2 f l1 l2 =
     match l1, l2 with
     | [], [] -> Ok []

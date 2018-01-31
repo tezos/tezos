@@ -142,9 +142,15 @@ let apply_block
     operations Proto.validation_passes >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
   check_liveness net_state pred hash operation_hashes operations >>=? fun () ->
-  map2_s (map2_s begin fun op_hash raw ->
+  mapi2_s (fun pass -> map2_s begin fun op_hash raw ->
       Lwt.return (Proto.parse_operation op_hash raw)
-      |> trace (invalid_block hash (Cannot_parse_operation op_hash))
+      |> trace (invalid_block hash (Cannot_parse_operation op_hash)) >>=? fun op ->
+      let allowed_pass = Proto.acceptable_passes op in
+      fail_unless (List.mem pass allowed_pass)
+        (invalid_block hash
+           (Unallowed_pass { operation = op_hash ;
+                             pass ; allowed_pass } )) >>=? fun () ->
+      return op
     end)
     operation_hashes
     operations >>=? fun parsed_operations ->

@@ -130,10 +130,11 @@ module type S = sig
   (** A {!List.map2} in the monad *)
   val map2 :
     ('a -> 'b -> 'c tzresult) -> 'a list -> 'b list -> 'c list tzresult
-
-  (** A {!List.map2} in the monad *)
   val map2_s :
     ('a -> 'b -> 'c tzresult Lwt.t) -> 'a list -> 'b list ->
+    'c list tzresult Lwt.t
+  val mapi2_s :
+    (int -> 'a -> 'b -> 'c tzresult Lwt.t) -> 'a list -> 'b list ->
     'c list tzresult Lwt.t
 
   (** A {!List.filter_map} in the monad *)
