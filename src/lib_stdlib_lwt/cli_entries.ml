@@ -326,7 +326,7 @@ let rec help_commands commands =
              unless [-verbosity <2|3>] is passed or the list \
              of matching commands if less than 3."
       (args2
-         (default_arg
+         (arg
             ~doc:"level of details\n\
                   0. Only shows command mnemonics, without documentation.\n\
                   1. Shows command mnemonics with short descriptions.\n\
@@ -334,7 +334,6 @@ let rec help_commands commands =
                   3. Show everything"
             ~parameter:"-verbosity"
             ~placeholder:"0|1|2|3"
-            ~default: "1"
             (parameter
                ~autocomplete: (fun _ -> return [ "0" ; "1" ; "2" ; "3" ])
                (fun _ arg -> match arg with
@@ -360,13 +359,16 @@ let rec help_commands commands =
                           ~desc:"keyword to search for\n\
                                  If several are given they must all appear in the command.")))
       (fun (verbosity, format) keywords _ ->
-         fail (Help_cmd (keywords,
-                         List.fold_left
-                           (fun commands keyword -> List.filter (search_command keyword) commands)
-                           (help_commands [] @ commands)
-                           keywords,
-                         format,
-                         verbosity))) ]
+         let commands =
+           List.fold_left
+             (fun commands keyword -> List.filter (search_command keyword) commands)
+             (help_commands [] @ commands)
+             keywords in
+         let verbosity = match verbosity with
+           | Some verbosity -> verbosity
+           | None when List.length commands <= 3 -> `Full
+           | None -> `Short in
+         fail (Help_cmd (keywords, commands, format, verbosity))) ]
 
 (* Command execution *)
 let exec
@@ -871,9 +873,7 @@ let setup_ppf ppf format verbosity =
                    .cmdline { background: #343131; padding: 2px 8px;	border-radius:10px; color: white; margin: 5px; }\
                    .cmdline+.cmddoc { margin: -5px 5px 0 20px; padding: 5px }\
                    .opt,.arg { background: #343131; font-weight: bold;  padding: 2px 4px; border-radius:5px; }\
-                   .kwd { font-weight: bold; }\
-	                 .opt { color:#CF0; background: #460; }\
-                   .arg { color: #CEF; background: #369; }\
+                   .kwd { font-weight: bold; } .opt { color:#CF0; background: #460; } .arg { color: #CEF; background: #369; }\
                    \003/style\004@\n" ;
             | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
           end ;
