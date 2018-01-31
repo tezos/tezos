@@ -253,7 +253,7 @@ type ('arg, 'ret) command =
         group : group option }
     -> ('arg, 'ret) command
 
-type format = [ `Plain | `Ansi ]
+type format = [ `Plain | `Ansi | `Html ]
 
 type error += Extra_arguments : string list * (_, _) command -> error
 type error += Not_enough_args : string list * ('a, 'b) command list -> error
@@ -345,14 +345,15 @@ let rec help_commands commands =
                   | _ -> failwith "Level of details out of range")))
          (default_arg
             ~doc:"the manual's output format"
-            ~placeholder: "plain|colors"
+            ~placeholder: "plain|colors|html"
             ~parameter: "-format"
             ~default: (if Unix.isatty Unix.stdout then "colors" else "plain")
             (parameter
-               ~autocomplete: (fun _ -> return [ "colors" ; "plain" ])
+               ~autocomplete: (fun _ -> return [ "colors" ; "plain" ; "html" ])
                (fun _ arg -> match arg with
                   | "colors" -> return `Ansi
                   | "plain" -> return `Plain
+                  | "html" -> return `Html
                   | _ -> failwith "Unknown manual format"))))
       (prefix "man"
          (seq_of_param (string ~name:"keyword"
@@ -544,33 +545,31 @@ let print_desc ppf doc =
     with _ -> doc, None in
   match long with
   | None ->
-      Format.fprintf ppf "@[<hov 0>%a@]"
-        Format.pp_print_text short
+      Format.fprintf ppf "%s" short
   | Some doc ->
-      Format.fprintf ppf "@[<hov 0>%a@]@{<full>@\n%a@}"
-        Format.pp_print_text short Format.pp_print_text doc
+      Format.fprintf ppf "%s@{<full>@\n  @[<hov 0>%a@]@}" short Format.pp_print_text doc
 
 let print_options_detailed (type ctx) =
   let help_option : type a.Format.formatter -> (a, ctx) arg -> unit =
     fun ppf -> function
       | Arg { parameter ; placeholder ; doc } ->
-          Format.fprintf ppf "@[<hov 2>@{<opt>%s <%s>@}: %a@]"
+          Format.fprintf ppf "@{<opt>%s <%s>@}: %a"
             parameter placeholder print_desc doc ;
       | DefArg { parameter ; placeholder ; doc ; default } ->
-          Format.fprintf ppf "@[<hov 2>@{<opt>%s <%s>@}: %a@]"
+          Format.fprintf ppf "@{<opt>%s <%s>@}: %a"
             parameter placeholder print_desc (doc ^ "\nDefaults to `" ^ default ^ "`.")
       | Switch { parameter ; doc } ->
-          Format.fprintf ppf "@[<hov 2>@{<opt>%s@}: %a@]"
+          Format.fprintf ppf "@{<opt>%s@}: %a"
             parameter print_desc doc in
   let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
-       fun ppf -> function
-         | NoArgs -> ()
-         | AddArg (arg, NoArgs) ->
-             Format.fprintf ppf "%a"
-               help_option arg
-         | AddArg (arg, rest) ->
-             Format.fprintf ppf "%a@,%a"
-               help_option arg help rest
+    fun ppf -> function
+      | NoArgs -> ()
+      | AddArg (arg, NoArgs) ->
+          Format.fprintf ppf "%a"
+            help_option arg
+      | AddArg (arg, rest) ->
+          Format.fprintf ppf "%a@,%a"
+            help_option arg help rest
   in help
 
 let has_args : type a ctx. (a, ctx) args -> bool = function
@@ -624,22 +623,22 @@ let print_commandline ppf (highlights, options, args) =
       | Seq (n, _, _) ->
           Format.fprintf ppf "[@{<arg>%s@}...] %a" n print_options_brief options
       | Prefix (n, Stop) when not (has_args options) ->
-          Format.fprintf ppf "@{<cmd>%a@}" (print_highlight highlights) n
+          Format.fprintf ppf "@{<kwd>%a@}" (print_highlight highlights) n
       | Prefix (n, next) ->
-          Format.fprintf ppf "@{<cmd>%a@} %a"
+          Format.fprintf ppf "@{<kwd>%a@} %a"
             (print_highlight highlights) n print next
       | Param (n, _, _, Stop) when not (has_args options) ->
           Format.fprintf ppf "@{<arg>%s@}" n
       | Param (n, _, _, next) ->
           Format.fprintf ppf "@{<arg>%s@} %a" n print next in
-  Format.fprintf ppf "@[<hov 4>%a@]" print args
+  Format.fprintf ppf "@{<commandline>%a@}" print args
 
 let rec print_params_detailed
   : type a b ctx ret. (b, ctx) args -> Format.formatter -> (a, ctx, ret) params -> unit
   = fun spec ppf -> function
     | Stop -> print_options_detailed ppf spec
     | Seq (n, desc, _) ->
-        Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]"
+        Format.fprintf ppf "@{<arg>%s@}: %a"
           n print_desc (trim desc) ;
         begin match spec with
           | NoArgs -> ()
@@ -648,14 +647,14 @@ let rec print_params_detailed
     | Prefix (_, next) ->
         print_params_detailed spec ppf next
     | Param (n, desc, _, Stop) ->
-        Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]"
+        Format.fprintf ppf "@{<arg>%s@}: %a"
           n print_desc (trim desc);
         begin match spec with
           | NoArgs -> ()
           | _ -> Format.fprintf ppf "@,%a" print_options_detailed spec
         end
     | Param (n, desc, _, next) ->
-        Format.fprintf ppf "@[<hov 2>@{<arg>%s@}: %a@]@,%a"
+        Format.fprintf ppf "@{<arg>%s@}: %a@,%a"
           n print_desc (trim desc) (print_params_detailed spec) next
 
 let contains_params_args :
@@ -678,13 +677,13 @@ let print_command :
     (Command { params ; desc ; options=Argument { spec } }) ->
     if contains_params_args params spec
     then
-      Format.fprintf ppf "@[<v 2>%a%a@{<short>@,@[<hov 0>%a@]@}@{<args>@,%a@}@]"
+      Format.fprintf ppf "@{<command>%a%a@{<short>@,@{<commanddoc>%a@{<args>@,%a@}@}@}@}"
         prefix ()
         print_commandline (highlights, spec, params)
         print_desc desc
         (print_params_detailed spec) params
     else
-      Format.fprintf ppf "@[<v 2>%a%a@{<short>@,@[<hov 0>%a@]@}@]"
+      Format.fprintf ppf "@{<command>%a%a@{<short>@,@{<commanddoc>%a@}@}@}"
         prefix ()
         print_commandline (highlights, spec, params)
         print_desc desc
@@ -717,7 +716,7 @@ let group_commands commands =
                ref l ]))
 
 let print_group print_command ppf ({ title }, commands) =
-  Format.fprintf ppf "@[<v 2>@{<title>%s@}@,%a@]"
+  Format.fprintf ppf "@{<title>%s@}@,@{<section>%a@}"
     title
     (Format.pp_print_list print_command) commands
 
@@ -728,9 +727,9 @@ let setup_ppf ppf format verbosity =
   Format.pp_set_formatter_out_functions ppf
     { out_string =
         (fun s b a ->
-          if s = "\000\000\000" then skip := true
-          else if s = "\255\255\255" then skip := false
-          else if not !skip then orig_out_functions.out_string s b a) ;
+           if s = "\000\000\000" then skip := true
+           else if s = "\255\255\255" then skip := false
+           else if not !skip then orig_out_functions.out_string s b a) ;
       out_spaces = (fun n -> if not !skip then orig_out_functions.out_spaces n) ;
       out_newline = (fun () -> if not !skip then orig_out_functions.out_newline ()) ;
       out_flush = (fun () -> if not !skip then orig_out_functions.out_flush ()) } ;
@@ -776,26 +775,35 @@ let setup_ppf ppf format verbosity =
           mark_close_tag = (fun _ -> "") ;
           print_open_tag = begin function
             | "title" -> Format.fprintf ppf "@<0>%a" ansi_format (`White, `Black, true, true)
+            | "commandline" -> Format.fprintf ppf "@[<hov 4>"
+            | "commanddoc" -> Format.fprintf ppf "  @[<v 0>"
             | "opt" -> Format.fprintf ppf "@<0>%a" ansi_format (`Green, `Black, false, false)
             | "arg" -> Format.fprintf ppf "@<0>%a<" ansi_format (`Yellow, `Black, false, false)
-            | "cmd" -> Format.fprintf ppf "@<0>%a" ansi_format (`White, `Black, false, true)
+            | "kwd" -> Format.fprintf ppf "@<0>%a" ansi_format (`White, `Black, false, true)
             | "hilight" -> Format.fprintf ppf "@<0>%a" ansi_format (`Black, `Yellow, false, true)
+            | "section" -> Format.fprintf ppf "  @[<v 0>"
+            | "command" -> Format.fprintf ppf "@[<v 0>"
             | "full" -> push_level `Full
             | "args" -> push_level `Args
             | "short" -> push_level `Short
             | "terse" -> push_level `Terse
+            | "document" -> Format.fprintf ppf "@[<v 0>"
             | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
           end ;
           print_close_tag = begin function
             | "title" -> Format.fprintf ppf ":@<0>%s" "\027[0m"
+            | "commandline" -> Format.fprintf ppf "@]"
+            | "commanddoc" -> Format.fprintf ppf "@]"
             | "opt" -> Format.fprintf ppf "@<0>%s" "\027[0m"
             | "arg" -> Format.fprintf ppf ">@<0>%s" "\027[0m"
-            | "cmd" -> Format.fprintf ppf "@<0>%s" "\027[0m"
+            | "kwd" -> Format.fprintf ppf "@<0>%s" "\027[0m"
             | "hilight" -> Format.fprintf ppf "@<0>%s" "\027[0m"
+            | "command" | "section" -> Format.fprintf ppf "@]"
             | "full" -> pop_level `Full
             | "args" -> pop_level `Args
             | "short" -> pop_level `Short
             | "terse" -> pop_level `Terse
+            | "document" -> Format.fprintf ppf "@]"
             | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
           end } ;
       Format.pp_set_print_tags ppf true
@@ -805,28 +813,102 @@ let setup_ppf ppf format verbosity =
           mark_close_tag = (fun _ -> "") ;
           print_open_tag = begin function
             | "title" -> ()
+            | "commandline" -> Format.fprintf ppf "@[<hov 4>"
+            | "commanddoc" -> Format.fprintf ppf "  @[<v 0>"
             | "opt" -> ()
             | "arg" -> Format.fprintf ppf "<"
-            | "cmd" -> ()
+            | "kwd" -> ()
             | "hilight" -> ()
+            | "section" -> Format.fprintf ppf "  @[<v 0>"
+            | "command" -> Format.fprintf ppf "@[<v 0>"
             | "full" -> push_level `Full
             | "args" -> push_level `Args
             | "short" -> push_level `Short
             | "terse" -> push_level `Terse
+            | "document" -> Format.fprintf ppf "@[<v 0>"
             | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
           end ;
           print_close_tag = begin function
             | "title" -> Format.fprintf ppf ":"
+            | "commandline" -> Format.fprintf ppf "@]"
+            | "commanddoc" -> Format.fprintf ppf "@]"
             | "opt" -> ()
             | "arg" -> Format.fprintf ppf ">"
-            | "cmd" -> ()
+            | "kwd" -> ()
             | "hilight" -> ()
+            | "command" | "section" -> Format.fprintf ppf "@]"
             | "full" -> pop_level `Full
             | "args" -> pop_level `Args
             | "short" -> pop_level `Short
             | "terse" -> pop_level `Terse
+            | "document" -> Format.fprintf ppf "@]"
             | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
           end } ;
+      Format.pp_set_print_tags ppf true
+  | `Html ->
+      Format.pp_set_formatter_tag_functions ppf
+        { mark_open_tag = (fun _ -> "") ;
+          mark_close_tag = (fun _ -> "") ;
+          print_open_tag = begin function
+            | "title" -> Format.fprintf ppf "\003h3\004"
+            | "commandline" -> Format.fprintf ppf "\003div class='cmdline'\004@[<h>"
+            | "commanddoc" -> Format.fprintf ppf "\003div class='cmddoc'\004"
+            | "opt" -> Format.fprintf ppf "\003span class='opt'\004"
+            | "arg" -> Format.fprintf ppf "\003span class='arg'\004"
+            | "kwd" -> Format.fprintf ppf "\003span class='kwd'\004"
+            | "hilight" -> ()
+            | "section" -> Format.fprintf ppf "\003ul\004@\n"
+            | "command" -> Format.fprintf ppf "\003li\004@\n"
+            | "full" -> push_level `Full
+            | "args" -> push_level `Args
+            | "short" -> push_level `Short
+            | "terse" -> push_level `Terse
+            | "document" ->
+                Format.fprintf ppf
+                  "@[<v 0>\003style\004\
+                   .cmdline { font-family: monospace }\
+                   .cmddoc { white-space: pre-wrap ; font-family: monospace; line-height: 170%%; margin: 0 0 20px 0 }\
+                   .cmdline { background: #343131; padding: 2px 8px;	border-radius:10px; color: white; margin: 5px; }\
+                   .cmdline+.cmddoc { margin: -5px 5px 0 20px; padding: 5px }\
+                   .opt,.arg { background: #343131; font-weight: bold;  padding: 2px 4px; border-radius:5px; }\
+                   .kwd { font-weight: bold; }\
+	                 .opt { color:#CF0; background: #460; }\
+                   .arg { color: #CEF; background: #369; }\
+                   \003/style\004@\n" ;
+            | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
+          end ;
+          print_close_tag = begin function
+            | "title" -> Format.fprintf ppf "\003/h3\004@\n"
+            | "commandline" -> Format.fprintf ppf "@]\003/div\004@\n"
+            | "commanddoc" -> Format.fprintf ppf "\003/div\004@\n"
+            | "opt" -> Format.fprintf ppf "\003/span\004"
+            | "arg" -> Format.fprintf ppf "\003/span\004"
+            | "kwd" -> Format.fprintf ppf "\003/span\004"
+            | "hilight" -> ()
+            | "section" -> Format.fprintf ppf "\003/ul\004@\n"
+            | "command" -> Format.fprintf ppf "\003/li\004@\n"
+            | "full" -> pop_level `Full
+            | "args" -> pop_level `Args
+            | "short" -> pop_level `Short
+            | "terse" -> pop_level `Terse
+            | "document" -> Format.fprintf ppf "@]"
+            | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
+          end } ;
+      let orig_out_functions =
+        Format.pp_get_formatter_out_functions ppf () in
+      Format.pp_set_formatter_out_functions ppf
+        { orig_out_functions with
+          out_string = (fun s i j ->
+              let buf = Buffer.create (j - i) in
+              for n = i to j - 1 do match String.get s n with
+                | '\003' -> Buffer.add_char buf '<'
+                | '\004' -> Buffer.add_char buf '>'
+                | '>' -> Buffer.add_string buf "&gt;"
+                | '<' -> Buffer.add_string buf "&lt;"
+                | c -> Buffer.add_char buf c
+              done ;
+              let s' = Buffer.contents buf in
+              orig_out_functions.out_string s' 0 (String.length s'))} ;
       Format.pp_set_print_tags ppf true
 
 let usage ppf ?global_options ?(highlights=[]) commands format verbosity =
@@ -844,32 +926,42 @@ let usage ppf ?global_options ?(highlights=[]) commands format verbosity =
           print_groups by_group
     | Some (Argument { spec })->
         Format.fprintf ppf
-          "@[<v>@[<v 2>@{<title>Usage@}@,\
-           %s @{<opt>[global options]@} command @{<opt>[command options]@}@,\
-           %s @{<opt>-help@} (for global options)@,\
-           %s @{<opt>[global options]@} command @{<opt>-help@} (for command options)@]@,@,\
-           @[<v 2>@{<title>To browse the documentation@}@,\
-           %s @{<opt>[global options]@} man (for a list of commands)@,\
-           %s @{<opt>[global options]@} man @{<opt>-verbosity 3@} (for the full manual)@]@,@,\
-           @[<v 2>@{<title>Global options (must come before the command)@}@,@[<v 0>%a@]@]%a\
+          "@[<v>@{<title>Usage@}@,\
+           @{<section>\
+           @{<command>@{<commandline>\
+           %s @{<opt>[global options]@} command @{<opt>[command options]@}@}@}@,\
+           @{<command>@{<commandline>\
+           %s @{<opt>-help@} (for global options)@}@}@,\
+           @{<command>@{<commandline>\
+           %s @{<opt>[global options]@} command @{<opt>-help@} (for command options)@}@}\
+           @}@,@,\
+           @{<title>To browse the documentation@}@,\
+           @{<section>\
+           @{<command>@{<commandline>\
+           %s @{<opt>[global options]@} man (for a list of commands)@}@}@,\
+           @{<command>@{<commandline>\
+           %s @{<opt>[global options]@} man @{<opt>-verbosity 3@} (for the full manual)@}@}\
+           @}@,@,\
+           @{<title>Global options (must come before the command)@}@,\
+           @{<commanddoc>%a@}%a\
            %a@]"
           exe exe exe exe exe
           print_options_detailed spec
           (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,") ()
           print_groups by_group in
-  Format.fprintf ppf "@[<v 0>%a" usage (group_commands commands, global_options) ;
+  Format.fprintf ppf "@{<document>%a" usage (group_commands commands, global_options) ;
   if List.mem verbosity [ `Terse ; `Short ] then
-    Format.fprintf ppf "@,@,Use option [@{<opt>-verbosity 3@}] for option descriptions." ;
-  Format.fprintf ppf "@]"
+    Format.fprintf ppf "@\n@\nUse option [@{<opt>-verbosity 3@}] for option descriptions." ;
+  Format.fprintf ppf "@}"
 
 let command_usage ppf commands format verbosity =
   setup_ppf ppf format verbosity ;
   let exe = Filename.basename Sys.executable_name in
   let prefix ppf () =
-    Format.fprintf ppf "@{<cmd>%s@} @{<opt>[global options]@} " exe in
+    Format.fprintf ppf "@{<kwd>%s@} @{<opt>[global options]@} " exe in
   Format.fprintf ppf
     "@[<v 2>@{<title>Command usage@}@,\
-     %a@,@{<cmd>%s@} @{<opt>-help@} (for global options)@]"
+     %a@,@{<kwd>%s@} @{<opt>-help@} (for global options)@]"
     (Format.pp_print_list (print_command ~prefix ~highlights:[]))
     commands
     exe
