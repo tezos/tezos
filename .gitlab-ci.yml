@@ -124,6 +124,11 @@ test:p2p:pool:
   script:
     - jbuilder build @test/p2p/runtest_p2p_pool
 
+test:proto_alpha_isolate:
+  <<: *test_definition
+  script:
+    - jbuilder build @test/proto_alpha_isolate/runtest_isolate_main
+
 test:proto_alpha:transaction:
   <<: *test_definition
   script:
