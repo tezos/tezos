@@ -362,7 +362,20 @@ let parse hash (op: Operation.t) =
       ok { hash ; shell = op.shell ; contents ; signature }
   | None -> error Cannot_parse_operation
 
-let acceptable_passes _op = [0]
+let acceptable_passes op =
+  match op.contents with
+  | Anonymous_operations _
+  | Sourced_operations (Manager_operations _) -> [1]
+  | Sourced_operations (Delegate_operations { operations ; _ }) ->
+      let is_endorsement = function Endorsement _ -> true | _ -> false in
+      if List.exists is_endorsement operations then
+        if List.for_all is_endorsement operations then
+          [0]
+        else
+          []
+      else
+        [1]
+  | Sourced_operations (Dictator_operation _) -> [0]
 
 type error += Invalid_signature (* `Permanent *)
 type error += Missing_signature (* `Permanent *)
