@@ -14,6 +14,6 @@ val bake:
   ?timestamp: Time.t ->
   Client_node_rpcs.Blocks.block ->
   Data.Command.t ->
-  Environment.Ed25519.Secret_key.t ->
+  Client_keys.sk_locator ->
   Block_hash.t tzresult Lwt.t
 

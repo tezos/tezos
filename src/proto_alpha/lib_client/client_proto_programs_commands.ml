@@ -172,8 +172,8 @@ let commands () =
        @@ prefixes [ "for" ]
        @@ Client_keys.Secret_key.alias_param
        @@ stop)
-      (fun () data typ (_, key) cctxt ->
-         Client_proto_programs.hash_and_sign data typ key cctxt#block cctxt >>= begin function
+      (fun () data typ (_, sk) cctxt ->
+         Client_proto_programs.hash_and_sign data typ sk cctxt#block cctxt >>= begin function
            | Ok (hash, signature) ->
                cctxt#message "@[<v 0>Hash: %S@,Signature: %S@]" hash signature
            | Error errs ->

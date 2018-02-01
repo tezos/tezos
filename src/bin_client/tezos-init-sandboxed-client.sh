@@ -183,22 +183,13 @@ DICTATOR_SECRET="edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
 
 add_sandboxed_bootstrap_identities() {
 
-    ${client} add public key bootstrap1 ${BOOTSTRAP1_PUBLIC}
-    ${client} add secret key bootstrap1 ${BOOTSTRAP1_SECRET}
+    ${client} import unencrypted secret key bootstrap1 ${BOOTSTRAP1_SECRET}
+    ${client} import unencrypted secret key bootstrap2 ${BOOTSTRAP2_SECRET}
+    ${client} import unencrypted secret key bootstrap3 ${BOOTSTRAP3_SECRET}
+    ${client} import unencrypted secret key bootstrap4 ${BOOTSTRAP4_SECRET}
+    ${client} import unencrypted secret key bootstrap5 ${BOOTSTRAP5_SECRET}
 
-    ${client} add public key bootstrap2 ${BOOTSTRAP2_PUBLIC}
-    ${client} add secret key bootstrap2 ${BOOTSTRAP2_SECRET}
-
-    ${client} add public key bootstrap3 ${BOOTSTRAP3_PUBLIC}
-    ${client} add secret key bootstrap3 ${BOOTSTRAP3_SECRET}
-
-    ${client} add public key bootstrap4 ${BOOTSTRAP4_PUBLIC}
-    ${client} add secret key bootstrap4 ${BOOTSTRAP4_SECRET}
-
-    ${client} add public key bootstrap5 ${BOOTSTRAP5_PUBLIC}
-    ${client} add secret key bootstrap5 ${BOOTSTRAP5_SECRET}
-
-    ${client} add secret key dictator ${DICTATOR_SECRET}
+    ${client} import unencrypted secret key dictator ${DICTATOR_SECRET}
 
 }
 

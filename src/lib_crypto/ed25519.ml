@@ -51,12 +51,14 @@ module Public_key = struct
   let of_b58check_exn s =
     match Base58.simple_decode b58check_encoding s with
     | Some x -> x
-    | None -> Pervasives.failwith "Unexpected hash (ed25519 public key)"
+    | None -> Pervasives.failwith
+                (Printf.sprintf "%s is not an ed25519 public key" s)
   let of_b58check s =
     match Base58.simple_decode b58check_encoding s with
     | Some x -> Ok x
-    | None -> generic_error "Unexpected hash (ed25519 public key)"
+    | None -> generic_error "%s is not an ed25519 public key" s
   let to_b58check s = Base58.simple_encode b58check_encoding s
+  let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
   let of_hex s = of_string (Hex.to_string s)
   let of_hex_exn s = of_string_exn (Hex.to_string s)
@@ -157,12 +159,14 @@ module Secret_key = struct
   let of_b58check_exn s =
     match of_b58check_opt s with
     | Some x -> x
-    | None -> Pervasives.failwith "Unexpected hash (ed25519 secret key)"
+    | None -> Pervasives.failwith
+                (Printf.sprintf "%s is not an ed25519 secret key" s)
   let of_b58check s =
     match of_b58check_opt s with
     | Some x -> Ok x
-    | None -> generic_error "Unexpected hash (ed25519 secret key)"
+    | None -> generic_error "%s is not an ed25519 secret key" s
   let to_b58check s = Base58.simple_encode seed_encoding s
+  let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
   let of_bytes_opt s =
     match Sodium.Sign.Bigbytes.to_seed s with
@@ -243,12 +247,14 @@ module Signature = struct
   let of_b58check_exn s =
     match Base58.simple_decode b58check_encoding s with
     | Some x -> x
-    | None -> Pervasives.failwith "Unexpected hash (ed25519 signature)"
+    | None -> Pervasives.failwith
+                (Printf.sprintf "%s is not an ed25519 signature" s)
   let of_b58check s =
     match Base58.simple_decode b58check_encoding s with
     | Some x -> Ok x
-    | None -> generic_error "Unexpected hash (ed25519 signature)"
+    | None -> generic_error "%s is not an ed25519 signature" s
   let to_b58check s = Base58.simple_encode b58check_encoding s
+  let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
   let of_bytes_opt s =
     match Sodium.Sign.Bigbytes.to_signature s with

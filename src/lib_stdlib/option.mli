@@ -13,6 +13,9 @@ val map: f:('a -> 'b) -> 'a option -> 'b option
 (** [(f x)] if input is [Some x], or [None] if it's [None] **)
 val apply: f:('a -> 'b option) -> 'a option -> 'b option
 
+val (>>=) : 'a option -> ('a -> 'b option) -> 'b option
+val (>>|) : 'a option -> ('a -> 'b) -> 'b option
+
 (** Call [(f x)] if input is [Some x], noop if it's [None] **)
 val iter: f:('a -> unit) -> 'a option -> unit
 

@@ -30,14 +30,13 @@ let forge_block_header
     let unsigned_header =
       Tezos_context.Block_header.forge_unsigned
         shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
-    let signed_header =
-      Ed25519.Signature.append delegate_sk unsigned_header in
+    Client_keys.append delegate_sk unsigned_header >>=? fun signed_header ->
     let block_hash = Block_hash.hash_bytes [signed_header] in
     if Baking.check_hash block_hash stamp_threshold then
-      signed_header
+      return signed_header
     else
       loop () in
-  return (loop ())
+  loop ()
 
 let empty_proof_of_work_nonce =
   MBytes.of_string

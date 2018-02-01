@@ -50,7 +50,7 @@ val print_run_result :
 val hash_and_sign :
   Michelson_v1_parser.parsed ->
   Michelson_v1_parser.parsed ->
-  Ed25519.Secret_key.t ->
+  Client_keys.sk_locator ->
   Client_proto_rpcs.block ->
   #Client_rpcs.ctxt ->
   (string * string) tzresult Lwt.t

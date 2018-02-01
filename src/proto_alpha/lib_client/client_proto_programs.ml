@@ -85,9 +85,9 @@ let trace
   Client_proto_rpcs.Helpers.trace_code cctxt
     block program.expanded (storage.expanded, input.expanded, amount)
 
-let hash_and_sign (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser.parsed) key block cctxt =
+let hash_and_sign (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser.parsed) sk block cctxt =
   Client_proto_rpcs.Helpers.hash_data cctxt block (data.expanded, typ.expanded) >>=? fun hash ->
-  let signature = Ed25519.sign key (MBytes.of_string hash) in
+  Client_keys.sign sk (MBytes.of_string hash) >>=? fun signature ->
   return (hash,
           signature |>
           Data_encoding.Binary.to_bytes Ed25519.Signature.encoding |>

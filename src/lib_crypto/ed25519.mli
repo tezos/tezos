@@ -19,6 +19,7 @@ module Public_key : sig
 
   include Compare.S
   val encoding: t Data_encoding.t
+  val pp : Format.formatter -> t -> unit
 
   val param:
     ?name:string ->
@@ -51,6 +52,7 @@ module Secret_key : sig
 
   type t
   val encoding: t Data_encoding.t
+  val pp : Format.formatter -> t -> unit
 
   val param:
     ?name:string ->
@@ -79,6 +81,7 @@ module Signature : sig
 
   type t
   val encoding: t Data_encoding.t
+  val pp : Format.formatter -> t -> unit
 
   val param:
     ?name:string ->

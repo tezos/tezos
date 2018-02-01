@@ -79,7 +79,7 @@ module Account : sig
     ?block:Client_proto_rpcs.block ->
     ?fee: Tez.t ->
     contract:Contract.t ->
-    manager_sk:secret_key ->
+    manager_sk:Client_keys.Secret_key_locator.t ->
     src_pk:public_key ->
     public_key_hash option ->
     Operation_hash.t tzresult Lwt.t

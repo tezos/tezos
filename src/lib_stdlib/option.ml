@@ -15,6 +15,9 @@ let apply ~f = function
   | None -> None
   | Some x -> f x
 
+let (>>=) x f = apply ~f x
+let (>>|) x f = map ~f x
+
 let iter ~f = function
   | None -> ()
   | Some x -> f x

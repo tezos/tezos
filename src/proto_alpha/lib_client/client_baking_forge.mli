@@ -23,7 +23,7 @@ val inject_block:
   shell_header:Block_header.shell_header ->
   priority:int ->
   seed_nonce_hash:Nonce_hash.t ->
-  src_sk:secret_key ->
+  src_sk:Client_keys.sk_locator ->
   Tezos_base.Operation.t list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt blk ?force ~priority ~timestamp ~fitness
@@ -45,7 +45,7 @@ val forge_block:
   ?timestamp:Time.t ->
   priority:[`Set of int | `Auto of (public_key_hash * int option * bool)] ->
   seed_nonce_hash:Nonce_hash.t ->
-  src_sk:secret_key ->
+  src_sk:Client_keys.sk_locator ->
   unit ->
   Block_hash.t tzresult Lwt.t
 (** [forge_block cctxt parent_blk ?force ?operations ?best_effort

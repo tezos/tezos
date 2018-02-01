@@ -34,12 +34,11 @@ let no_write_context config block : Client_commands.full_context = object
   method block = block
 end
 
-let dictator_sk =
-  Ed25519.Secret_key.of_b58check_exn
-    "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"
-
 let activate_alpha () =
   let fitness = Fitness_repr.from_int64 0L in
+  let dictator_sk = Client_keys.Secret_key_locator.create
+      ~scheme:"unencrypted"
+      ~location:"edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6" in
   Tezos_client_genesis.Client_proto_main.bake
     (new Client_rpcs.http_ctxt !rpc_config) (`Head 0)
     (Activate  { protocol = Client_proto_main.protocol ; validation_passes = 1 ;
@@ -138,48 +137,26 @@ module Account = struct
   type bootstrap_accounts = { b1 : t ; b2 : t ; b3 : t ; b4 : t ;  b5 : t  ; }
 
   let bootstrap_accounts =
-    let bootstrap1_pk =
-      Ed25519.Public_key.of_b58check_exn
-        "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" in
-    let bootstrap2_pk =
-      Ed25519.Public_key.of_b58check_exn
-        "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9" in
-    let bootstrap3_pk =
-      Ed25519.Public_key.of_b58check_exn
-        "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV" in
-    let bootstrap4_pk =
-      Ed25519.Public_key.of_b58check_exn
-        "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU" in
-    let bootstrap5_pk =
-      Ed25519.Public_key.of_b58check_exn
-        "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n" in
     let bootstrap1_sk =
-      Ed25519.Secret_key.of_b58check_exn
-        "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh" in
+      "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh" in
     let bootstrap2_sk =
-      Ed25519.Secret_key.of_b58check_exn
-        "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo" in
+      "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo" in
     let bootstrap3_sk =
-      Ed25519.Secret_key.of_b58check_exn
-        "edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ" in
+      "edsk4ArLQgBTLWG5FJmnGnT689VKoqhXwmDPBuGx3z4cvwU9MmrPZZ" in
     let bootstrap4_sk =
-      Ed25519.Secret_key.of_b58check_exn
-        "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3" in
+      "edsk2uqQB9AY4FvioK2YMdfmyMrer5R8mGFyuaLLFfSRo8EoyNdht3" in
     let bootstrap5_sk =
-      Ed25519.Secret_key.of_b58check_exn
-        "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm" in
+      "edsk4QLrcijEffxV31gGdN2HU7UpyJjA8drFoNcmnB28n89YjPNRFm" in
     let cpt = ref 0 in
-    match List.map begin fun (pk, sk) ->
+    match List.map begin fun sk ->
         incr cpt ;
+        let sk = Ed25519.Secret_key.of_b58check_exn sk in
         let alias = Printf.sprintf "bootstrap%d" !cpt in
+        let pk = Ed25519.Secret_key.to_public_key sk in
         let pkh = Ed25519.Public_key.hash pk in
         { alias ; contract = Contract.default_contract pkh; pkh ; pk ; sk }
-      end [
-        bootstrap1_pk, bootstrap1_sk;
-        bootstrap2_pk, bootstrap2_sk;
-        bootstrap3_pk, bootstrap3_sk;
-        bootstrap4_pk, bootstrap4_sk;
-        bootstrap5_pk, bootstrap5_sk; ]
+      end [ bootstrap1_sk; bootstrap2_sk; bootstrap3_sk;
+            bootstrap4_sk; bootstrap5_sk; ]
     with
     | [ b1 ; b2 ; b3 ; b4 ; b5 ] -> { b1 ; b2 ; b3 ; b4 ; b5 }
     | _ -> assert false
@@ -190,11 +167,14 @@ module Account = struct
       ~(account:t)
       ~destination
       ~amount () =
+    let src_sk = Client_keys.Secret_key_locator.create
+        ~scheme:"unencrypted"
+        ~location:(Ed25519.Secret_key.to_b58check account.sk) in
     Client_proto_context.transfer (new Client_rpcs.http_ctxt !rpc_config)
       block
       ~source:account.contract
       ~src_pk:account.pk
-      ~src_sk:account.sk
+      ~src_sk
       ~destination
       ~amount
       ~fee ()
@@ -210,10 +190,13 @@ module Account = struct
     let delegatable, delegate = match delegate with
       | None -> false, None
       | Some delegate -> true, Some delegate in
+    let src_sk = Client_keys.Secret_key_locator.create
+        ~scheme:"unencrypted"
+        ~location:(Ed25519.Secret_key.to_b58check src.sk) in
     Client_proto_context.originate_account
       ~source:src.contract
       ~src_pk:src.pk
-      ~src_sk:src.sk
+      ~src_sk
       ~manager_pkh
       ~balance
       ~delegatable
@@ -429,6 +412,9 @@ module Baking = struct
       | Error _ -> assert false
       | Ok nonce -> nonce in
     let seed_nonce_hash = Nonce.hash seed_nonce in
+    let src_sk = Client_keys.Secret_key_locator.create
+        ~scheme:"unencrypted"
+        ~location:(Ed25519.Secret_key.to_b58check contract.sk) in
     Client_baking_forge.forge_block
       (new Client_rpcs.http_ctxt !rpc_config)
       block
@@ -438,7 +424,7 @@ module Baking = struct
       ~sort:false
       ~priority:(`Auto (contract.pkh, Some 1024, false))
       ~seed_nonce_hash
-      ~src_sk:contract.sk
+      ~src_sk
       ()
 
   let endorsement_reward block =

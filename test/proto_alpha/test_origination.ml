@@ -64,10 +64,14 @@ let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
     ~balance:(cents 1000L) () >>=? fun (_oph, d_contract) ->
 
   (* Change delegate of a non-delegatable contract *)
+  let manager_sk = Client_keys.Secret_key_locator.create
+      ~scheme:"unencrypted"
+      ~location:(Ed25519.Secret_key.to_b58check b1.sk) in
+
   Helpers.Account.set_delegate
     ~fee:(cents 5L)
     ~contract:nd_contract
-    ~manager_sk:b1.sk
+    ~manager_sk
     ~src_pk:b1.pk
     (Some b2.pkh) >>= fun result ->
   Assert.non_delegatable ~msg:__LOC__ result ;
@@ -75,7 +79,7 @@ let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
   (* Change delegate of a delegatable contract *)
   Helpers.Account.set_delegate
     ~contract:d_contract
-    ~manager_sk:b1.sk
+    ~manager_sk
     ~src_pk:b1.pk
     (Some b2.pkh) >>=? fun _result ->
   Assert.delegate_equal ~msg:__LOC__ d_contract (Some b2.pkh) >>=? fun () ->

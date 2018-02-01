@@ -23,7 +23,7 @@ let call_error_service1 rpc_config s block a1 =
   | Ok (Ok v) -> return v
   | Error _ as err -> Lwt.return err
 
-let bake rpc_config ?(timestamp = Time.now ()) block command seckey =
+let bake rpc_config ?(timestamp = Time.now ()) block command sk =
   let block = Client_rpcs.last_baked_block block in
   let proto_header = Data_encoding.Binary.to_bytes Data.Command.encoding command in
   Client_node_rpcs.Blocks.preapply
@@ -31,7 +31,7 @@ let bake rpc_config ?(timestamp = Time.now ()) block command seckey =
   let blk =
     Data_encoding.Binary.to_bytes Block_header.encoding
       { shell = shell_header ; proto = proto_header } in
-  let signed_blk = Ed25519.Signature.append seckey blk in
+  Client_keys.append sk blk >>=? fun signed_blk ->
   Client_node_rpcs.inject_block rpc_config signed_blk []
 
 let int64_parameter =
@@ -74,12 +74,11 @@ let commands () =
        @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
-      begin fun timestamp hash fitness validation_passes seckey (cctxt : Client_commands.full_context) ->
+      begin fun timestamp hash fitness validation_passes sk (cctxt : Client_commands.full_context) ->
         let fitness =
           Tezos_client_alpha.Proto_alpha.Fitness_repr.from_int64 fitness in
         bake cctxt ?timestamp cctxt#block
-          (Activate { protocol = hash ; validation_passes ; fitness })
-          seckey >>=? fun hash ->
+          (Activate { protocol = hash ; validation_passes ; fitness }) sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return ()
       end ;
@@ -93,15 +92,15 @@ let commands () =
          ~desc:"Hardcoded number of validation passes (integer)"
          int_parameter
        @@ prefixes [ "and" ; "key" ]
-       @@ Ed25519.Secret_key.param
+       @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
-      begin fun timestamp hash validation_passes seckey cctxt ->
+      begin fun timestamp hash validation_passes sk cctxt ->
         bake cctxt ?timestamp cctxt#block
           (Activate_testnet { protocol = hash ;
                               validation_passes ;
                               delay = Int64.mul 24L 3600L })
-          seckey >>=? fun hash ->
+          sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return ()
       end ;

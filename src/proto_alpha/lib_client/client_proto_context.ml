@@ -62,8 +62,9 @@ let transfer rpc_config
     ~branch ~source ~sourcePubKey:src_pk ~counter ~amount
     ~destination ?parameters ~fee () >>=? fun bytes ->
   Client_node_rpcs.Blocks.predecessor rpc_config block >>=? fun predecessor ->
-  let signature = Ed25519.sign src_sk bytes in
-  let signed_bytes = Ed25519.Signature.concat bytes signature in
+  Client_keys.sign src_sk bytes >>=? fun signature ->
+  let signed_bytes =
+    MBytes.concat bytes (Ed25519.Signature.to_bytes signature) in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_proto_rpcs.Helpers.apply_operation rpc_config block
     predecessor oph bytes (Some signature) >>=? fun contracts ->
@@ -112,7 +113,7 @@ let originate_account ?branch
     ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ~spendable:true
     ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
-  let signature = Ed25519.sign src_sk bytes in
+  Client_keys.sign src_sk bytes >>=? fun signature ->
   originate rpc_config ~block ~net_id ~signature bytes
 
 let faucet ?branch ~manager_pkh block rpc_config () =
@@ -132,7 +133,7 @@ let delegate_contract rpc_config
   Client_proto_rpcs.Helpers.Forge.Manager.delegation rpc_config block
     ~branch ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
   >>=? fun bytes ->
-  let signature = Ed25519.sign manager_sk bytes in
+  Client_keys.sign manager_sk bytes >>=? fun signature ->
   let signed_bytes = Ed25519.Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_node_rpcs.inject_operation
@@ -229,5 +230,5 @@ let originate_contract
     ~counter ~balance ~spendable:spendable
     ~delegatable ?delegatePubKey:delegate
     ~script:{ code ; storage } ~fee () >>=? fun bytes ->
-  let signature = Ed25519.sign src_sk bytes in
+  Client_keys.sign src_sk bytes >>=? fun signature ->
   originate cctxt ~block ~signature bytes
