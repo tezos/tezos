@@ -45,6 +45,13 @@ module type SIGNER = sig
   (** [scheme] is the name of the scheme implemented by this signer
       module. *)
 
+  val title : string
+  (** [title] is a one-line human readable description of the signer. *)
+
+  val description : string
+  (** [description] is a multi-line human readable description of the
+      signer, that should include the format of key specifications. *)
+
   val sk_locator_of_human_input :
     Client_commands.logging_wallet ->
     string list -> sk_locator tzresult Lwt.t

@@ -12,6 +12,17 @@ open Client_keys
 module Unencrypted_signer : SIGNER = struct
   let scheme = "unencrypted"
 
+  let title =
+    "Built-in signer using raw unencrypted keys."
+
+  let description =
+    "Do not use this signer except for playing on the test network.\n\
+     The format for importing secret keys is either no argument (will \
+     generate a key) or the raw Base58-encoded key (starting with \
+     'edsk').\n\
+     The format for importing public keys is the raw Base58-encoded \
+     key (starting with 'edpk')."
+
   type secret_key = Ed25519.Secret_key.t
   type public_key = Ed25519.Public_key.t
 

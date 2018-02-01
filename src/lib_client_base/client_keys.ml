@@ -115,6 +115,8 @@ module type SIGNER = sig
   type secret_key
   type public_key
   val scheme : string
+  val title : string
+  val description : string
   val sk_locator_of_human_input :
     Client_commands.logging_wallet ->
     string list -> sk_locator tzresult Lwt.t
@@ -288,15 +290,30 @@ let commands () =
       ~parameter:"-show-secret"
       ~doc:"show the private key" in
   [
-    command ~group ~desc: "List supported signing schemes."
+    command ~group
+      ~desc: "List supported signing schemes.\n\
+              Signing schemes are identifiers for signer modules: the \
+              built-in signing routines, a hardware wallet, an \
+              external agent, etc.\n\
+              Each signer has its own format for describing secret \
+              keys, such a raw secret key for the default \
+              `unencrypted` scheme, the path on a hardware security \
+              module, an alias for an external agent, etc.\n\
+              This command gives the list of signer modules that this \
+              version of the tezos client supports."
       no_options
       (fixed [ "list" ; "signing" ; "schemes" ])
       (fun () (cctxt : Client_commands.full_context) ->
          let schemes = Hashtbl.fold (fun k _ a -> k :: a) signers_table [] in
          let schemes = List.sort String.compare schemes in
-         Lwt_list.iter_s (cctxt#message "%s") schemes >>= return) ;
+         Lwt_list.iter_s
+           (fun n ->
+              let (module S : SIGNER) = Hashtbl.find signers_table n in
+              cctxt#message "@[<v 2>Scheme `%s`: %s@,@[<hov 0>%a@]@]"
+                n S.title Format.pp_print_text S.description)
+           schemes >>= return) ;
 
-    command ~group ~desc: "Generate a pair of keys."
+    command ~group ~desc: "Generate a pair of (unencrypted) keys."
       (args1 Secret_key.force_switch)
       (prefixes [ "gen" ; "keys" ]
        @@ Secret_key.fresh_alias_param
@@ -305,7 +322,7 @@ let commands () =
          Secret_key.of_fresh cctxt force name >>=? fun name ->
          gen_keys ~force cctxt name) ;
 
-    command ~group ~desc: "Generate keys including the given string"
+    command ~group ~desc: "Generate (unencrypted) keys including the given string."
       (args2
          (switch ~doc:"the key must begin with tz1[word]" ~parameter:"-prefix")
          force_switch)
@@ -322,12 +339,18 @@ let commands () =
       (prefix "import"
        @@ string
          ~name:"scheme"
-         ~desc:"Scheme to use when adding a secret key"
+         ~desc:"signer to use for this secret key\n\
+                Use command `list signing schemes` for a list of \
+                supported signers."
        @@ prefixes [ "secret" ; "key" ]
        @@ Secret_key.fresh_alias_param
-       @@ seq_of_param (string
-                          ~name:"secret key specification"
-                          ~desc:"Specification of a secret key"))
+       @@ seq_of_param
+         (string
+            ~name:"spec"
+            ~desc:"secret key specification\n\
+                   Varies from one scheme to the other.\n\
+                   Use command `list signing schemes` for more \
+                   information."))
       (fun force scheme name spec cctxt ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
          Lwt.return (find_signer_for_key ~scheme) >>=? fun signer ->
@@ -350,17 +373,23 @@ let commands () =
                    please don't use -force" name) >>=? fun () ->
              Secret_key.add ~force cctxt name skloc) ;
 
-    command ~group ~desc: "add a public key to the wallet."
+    command ~group ~desc: "Add a public key to the wallet."
       (args1 Public_key.force_switch)
       (prefix "import"
        @@ string
          ~name:"scheme"
-         ~desc:"Scheme to use when adding a public key"
+         ~desc:"signer to use for this public key\n\
+                Use command `list signing schemes` for a list of \
+                supported signers."
        @@ prefixes [ "public" ; "key" ]
        @@ Public_key.fresh_alias_param
-       @@ seq_of_param (string
-                          ~name:"public key specification"
-                          ~desc:"Specification of a public key"))
+       @@ seq_of_param
+         (string
+            ~name:"spec"
+            ~desc:"public key specification\n\
+                   Varies from one scheme to the other.\n\
+                   Use command `list signing schemes` for more \
+                   information."))
       (fun force scheme name location cctxt ->
          Public_key.of_fresh cctxt force name >>=? fun name ->
          Lwt.return (find_signer_for_key ~scheme) >>=? fun signer ->
