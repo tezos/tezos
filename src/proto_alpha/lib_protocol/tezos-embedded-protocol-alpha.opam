@@ -9,11 +9,11 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
+  "tezos-test-helpers" { test }
+  "tezos-embedded-protocol-genesis" { test }
   "tezos-protocol-compiler"
   "tezos-protocol-updater"
   "tezos-shell"
-  "tezos-test-helpers" { test }
-  "tezos-embedded-protocol-genesis" { test }
 ]
 build: [
   [ "rm" "jbuild" "src/jbuild" ]

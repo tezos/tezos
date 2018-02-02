@@ -89,7 +89,7 @@ build:
   dependencies:
     - build
 
-test:opam:
+test:opam_packaging:
   <<: *test_definition
   script:
     - ./scripts/check_opam_test.sh "$CI_PROJECT_DIR/$CI_CONFIG_PATH"
@@ -99,70 +99,90 @@ test:ocp-indent:
   script:
     - jbuilder build @runtest_indent
 
-test:utils:
+test:stdlib:
   <<: *test_definition
   script:
-    - jbuilder build @test/utils/runtest
+    - jbuilder build @src/lib_stdlib/runtest
+
+test:stdlib_lwt:
+  <<: *test_definition
+  script:
+    - jbuilder build @src/lib_stdlib_lwt/runtest
+
+test:data_encoding:
+  <<: *test_definition
+  script:
+    - jbuilder build @src/lib_data_encoding/runtest
+
+test:storage:
+  <<: *test_definition
+  script:
+    - jbuilder build @src/lib_storage/runtest
+
+test:crypto:
+  <<: *test_definition
+  script:
+    - jbuilder build @src/lib_crypto/runtest
 
 test:shell:
   <<: *test_definition
   script:
-    - jbuilder build @test/shell/runtest
+    - jbuilder build @src/lib_shell/runtest
 
 test:p2p:io-scheduler:
   <<: *test_definition
   script:
-    - jbuilder build @test/p2p/runtest_p2p_io_scheduler
+    - jbuilder build @src/lib_p2p/runtest_p2p_io_scheduler
 
 test:p2p:socket:
   <<: *test_definition
   script:
-    - jbuilder build @test/p2p/runtest_p2p_socket
+    - jbuilder build @src/lib_p2p/runtest_p2p_socket
 
 test:p2p:pool:
   <<: *test_definition
   script:
-    - jbuilder build @test/p2p/runtest_p2p_pool
+    - jbuilder build @src/lib_p2p/runtest_p2p_pool
 
-test:proto_alpha_isolate:
+test:proto_alpha:
   <<: *test_definition
   script:
-    - jbuilder build @test/proto_alpha_isolate/runtest_isolate_main
+    - jbuilder build @src/proto_alpha/runtest
 
-test:proto_alpha:transaction:
+test:client_alpha:transaction:
   <<: *test_definition
   script:
-    - jbuilder build @test/proto_alpha/runtest_transaction
+    - jbuilder build @src/proto_alpha/lib_client/runtest_transaction
 
-test:proto_alpha:origination:
+test:client_alpha:origination:
   <<: *test_definition
   script:
-    - jbuilder build @test/proto_alpha/runtest_origination
+    - jbuilder build @src/proto_alpha/lib_client/runtest_origination
 
-test:proto_alpha:endorsement:
+test:client_alpha:endorsement:
   <<: *test_definition
   script:
-    - jbuilder build @test/proto_alpha/runtest_endorsement
+    - jbuilder build @src/proto_alpha/lib_client/runtest_endorsement
 
-test:proto_alpha:vote:
+test:client_alpha:vote:
   <<: *test_definition
   script:
-    - jbuilder build @test/proto_alpha/runtest_vote
+    - jbuilder build @src/proto_alpha/lib_client/runtest_vote
 
 test:basic.sh:
   <<: *test_definition
   script:
-    - jbuilder build @test/runtest_basic.sh
+    - jbuilder build @src/bin_client/runtest_basic.sh
 
 test:contracts.sh:
   <<: *test_definition
   script:
-    - jbuilder build @test/runtest_contracts.sh
+    - jbuilder build @src/bin_client/runtest_contracts.sh
 
 test:multinode.sh:
   <<: *test_definition
   script:
-    - jbuilder build @test/runtest_multinode.sh
+    - jbuilder build @src/bin_client/runtest_multinode.sh
 
 test:proto:sandbox:
   <<: *test_definition
@@ -362,12 +382,7 @@ opam:34:ocplib-ezresto-directory:
   variables:
     package: ocplib-ezresto-directory
 
-opam:35:tezos-test:
-  <<: *opam_definition
-  variables:
-    package: tezos-test
-
-opam:36:tezos-protocol-demo:
+opam:35:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo

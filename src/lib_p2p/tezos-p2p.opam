@@ -9,6 +9,7 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta15" }
+  "tezos-test-helpers" { test }
   "tezos-base"
 ]
 build: [
