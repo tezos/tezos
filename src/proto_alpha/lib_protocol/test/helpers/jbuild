@@ -4,7 +4,6 @@
  ((name tezos_proto_alpha_isolate_helpers)
   (libraries (tezos-test-helpers
               tezos-base
-              tezos-shell
               tezos-embedded-protocol-genesis
               tezos-embedded-protocol-alpha))
   (wrapped false)

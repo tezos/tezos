@@ -1,0 +1,6 @@
+parameter unit;
+code
+  { # This contract will never accept a incoming transaction
+    FAIL};
+return unit;
+storage unit;

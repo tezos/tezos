@@ -1,0 +1,4 @@
+parameter unit;
+storage timestamp;
+return unit;
+code {DROP; NOW; UNIT; PAIR};

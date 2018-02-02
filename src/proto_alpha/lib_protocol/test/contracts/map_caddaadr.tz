@@ -1,0 +1,4 @@
+parameter unit;
+storage (pair (pair nat (pair nat (pair (pair (pair nat tez) nat) nat))) nat);
+return unit;
+code { MAP_CDADDAADR { PUSH tez "1.00" ; ADD } };

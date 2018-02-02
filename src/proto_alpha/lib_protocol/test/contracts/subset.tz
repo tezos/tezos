@@ -1,0 +1,18 @@
+parameter (pair (set string) (set string));
+return bool;
+storage unit;
+code { CAR; DUP; CDR; DIP{CAR}; # Unpack lists
+       PUSH bool True;
+       PAIR; SWAP;              # Setup accumulator
+       LAMBDA (pair string (pair bool (set string)))
+              (pair bool (set string))
+              { DUP;            # Unpack accumulator and input
+                CAR;
+                DIP{ CDR; DUP; DUP; CDR;
+                     DIP{CAR; DIP{CDR}}};
+                MEM;            # Check membership
+                AND;            # Combine accumulator and input
+                PAIR};
+       REDUCE;                  # Reduce
+       CAR;                     # Get the accumulator value
+       UNIT; SWAP; PAIR}        # Calling convention

@@ -1,0 +1,10 @@
+
+parameter int;
+storage unit;
+return int;
+code {CAR;                      # Get the parameter
+      PUSH int 1;               # We're adding 1, so we need to put 1 on the stack
+      ADD;                      # Add the two numbers
+      UNIT;                     # We need to put the storage value on the stack
+      SWAP;                     # The values must be rearranged to match the return calling convention
+      PAIR}                     # Create the end value

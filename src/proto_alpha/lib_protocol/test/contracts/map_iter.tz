@@ -1,0 +1,7 @@
+parameter (map int int);
+return (pair int int);
+storage unit;
+code { CAR; PUSH int 0; DUP; PAIR; SWAP;
+       ITER { DIP {DUP; CAR; DIP{CDR}}; DUP; # Last instr
+              DIP{CAR; ADD}; SWAP; DIP{CDR; ADD}; PAIR };
+       UNIT; SWAP; PAIR}

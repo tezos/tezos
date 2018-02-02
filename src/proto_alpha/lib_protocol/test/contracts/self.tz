@@ -1,0 +1,4 @@
+parameter unit ;
+storage (contract unit unit) ;
+return unit ;
+code { MAP_CDR { DROP ; SELF } }

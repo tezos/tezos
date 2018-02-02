@@ -1,0 +1,4 @@
+parameter nat;
+storage timestamp;
+return (pair nat bool);
+code {DUP; CAR; DIP{CDR; DUP; NOW; CMPGT}; PAIR; PAIR};

@@ -1,0 +1,8 @@
+
+parameter string;
+storage string;
+return string;
+code { DUP;                     # Duplicate the (pair parameter storage)
+       CDR;                     # Access the storage
+       DIP{CAR};                # Access the parameter, but leave the storage unchanged on top of the stack
+       PAIR}                    # Pair the elements, fulfilling the calling convention

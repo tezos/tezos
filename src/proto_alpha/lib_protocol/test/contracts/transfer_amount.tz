@@ -1,0 +1,4 @@
+parameter unit;
+storage tez;
+return unit;
+code { DROP; AMOUNT; UNIT; PAIR };

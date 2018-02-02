@@ -1,0 +1,42 @@
+# This is a very simple accounts system.
+# (Left key) initializes or deposits into an account
+# (Right key (pair tez (signed tez))) withdraws tez amount to a
+# DEFAULT_ACCOUNT created from the key if the balance is available
+# and the key is correctly signed
+parameter (or key_hash (pair key (pair tez signature)));
+# Maps the key to the balance they have stored
+storage (map key_hash tez);
+return unit;
+code { DUP; CAR;
+       # Deposit into account
+       IF_LEFT { DUP; DIIP{ CDR; DUP };
+                 DIP{ SWAP }; GET;
+                 # Create the account
+                 IF_NONE { DIP{ AMOUNT; SOME }; UPDATE; UNIT; PAIR }
+                         # Add to an existing account
+                         { AMOUNT; ADD; SOME; SWAP; UPDATE; UNIT; PAIR }}
+               # Withdrawl
+               { DUP; DUP; DUP; DUP;
+                 # Check signature on data
+                 CAR; DIIP{ CDAR; H }; DIP{ CDDR; PAIR }; CHECK_SIGNATURE;
+                 IF {} { FAIL };
+                 # Get user account information
+                 DIIP{ CDR; DUP }; CAR; HASH_KEY; DIP{ SWAP }; GET;
+                 # Account does not exist
+                 IF_NONE { FAIL }
+                         # Account exists
+                         { DUP; DIIP{ DUP; CDAR; DUP };
+                           # Ensure funds are available
+                           DIP{ CMPLT }; SWAP;
+                           IF { FAIL }
+                              { SUB; DIP{ DUP; DIP{ SWAP }}; DUP;
+                                # Delete account if balance is 0
+                                PUSH tez "0.00"; CMPEQ;
+                                IF { DROP; NONE tez }
+                                   # Otherwise update storage with new balance
+                                   { SOME };
+                                SWAP; CAR; HASH_KEY; UPDATE;
+                                SWAP; DUP; CDAR;
+                                # Execute the transfer
+                                DIP{ CAR; HASH_KEY; DEFAULT_ACCOUNT }; UNIT; TRANSFER_TOKENS;
+                                PAIR }}}}

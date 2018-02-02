@@ -1,0 +1,27 @@
+parameter nat;
+return unit;
+storage (list (contract string string));
+code { DUP;
+       CAR;                     # Get the number
+       DIP{CDR};                # Put the accumulator on the stack
+       PUSH bool True;          # Push true so we have a do while loop
+       LOOP { DUP; PUSH nat 0; CMPEQ; # Check if the number is 0
+              IF { PUSH bool False}   # End the loop
+                 { PUSH nat 1; SWAP; SUB; ABS; # Subtract 1. The ABS is to make it back into a nat
+                   UNIT;                       # Storage type
+                   LAMBDA (pair string unit)   # Identity contract
+                          (pair string unit)
+                          {};
+                   PUSH tez "5.00"; # Strating balance
+                   PUSH bool False; DUP; # Not spendable or delegatable
+                   NONE key_hash;
+                   # This is once again my key from the alphanet.
+                   # I highly encourage you to send funds to it
+                   # Will it help you? Will it help me? The answer is no,
+                   # However, do it anyway
+                   PUSH key_hash "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5";
+                   CREATE_CONTRACT; # Make the contract
+                   SWAP;            # Add to the list
+                   DIP{CONS};
+                   PUSH bool True}}; # Continue the loop
+       DROP; UNIT; PAIR}             # Calling convention

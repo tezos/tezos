@@ -1,0 +1,4 @@
+parameter string;
+return string;
+storage unit;
+code {};

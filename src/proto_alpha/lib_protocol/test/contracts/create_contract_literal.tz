@@ -1,0 +1,14 @@
+parameter key_hash;
+storage string;
+return unit;
+code { CAR;
+       DIP { UNIT;
+             PUSH tez "100.00"; PUSH bool False;
+             PUSH bool False; NONE key_hash };
+       CREATE_CONTRACT { parameter string ;
+                         storage unit ;
+                         return string ;
+                         code {CAR; UNIT; SWAP; PAIR } } ;
+       DIP{PUSH string ""}; PUSH tez "0.00";
+       PUSH string "abcdefg"; TRANSFER_TOKENS;
+       DIP{DROP}; UNIT; PAIR};

@@ -1,0 +1,4 @@
+parameter (pair bool bool);
+return (pair bool bool);
+storage unit;
+code {}

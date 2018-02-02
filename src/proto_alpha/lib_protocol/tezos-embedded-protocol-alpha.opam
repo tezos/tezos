@@ -12,6 +12,8 @@ depends: [
   "tezos-protocol-compiler"
   "tezos-protocol-updater"
   "tezos-shell"
+  "tezos-test-helpers" { test }
+  "tezos-embedded-protocol-genesis" { test }
 ]
 build: [
   [ "rm" "jbuild" "src/jbuild" ]
