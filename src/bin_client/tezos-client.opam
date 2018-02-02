@@ -13,6 +13,7 @@ depends: [
   "tezos-client-base"
   "tezos-client-genesis"
   "tezos-client-alpha"
+  "tezos-node" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

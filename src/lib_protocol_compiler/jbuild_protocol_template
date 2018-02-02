@@ -49,8 +49,6 @@ let sources =
         loop acc in
   loop []
 
-module M = Unix
-
 let () = Format.kasprintf Jbuild_plugin.V1.send {|
 
 (jbuild_version 1)

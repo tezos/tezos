@@ -34,7 +34,7 @@
  ((name runtest_multinode.sh)
   (deps (sandbox.json
          test_lib.inc.sh
-         (glob_files contracts/*)
+         (glob_files contracts/*.tz)
          ))
   (locks  (/tcp-port/18731 /tcp-port/18732 /tcp-port/18733 /tcp-port/18734
            /tcp-port/18735 /tcp-port/18736 /tcp-port/18737 /tcp-port/18738

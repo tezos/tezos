@@ -1,7 +1,6 @@
 #! /usr/bin/env bash
 
-test_lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && echo "$(pwd -P)")"
-test_dir="$(dirname "$test_lib_dir")"
+test_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && echo "$(pwd -P)")"
 src_dir="$(dirname "$test_dir")"
 cd "$test_dir"
 
@@ -11,6 +10,8 @@ tezos_sandboxed_node="${1:-$test_dir/../src/bin_node/tezos-sandboxed-node.sh}"
 local_node="${2:-$test_dir/../_build/default/src/bin_node/main.exe}"
 tezos_init_sandboxed_client="${3:-$test_dir/../src/bin_client/tezos-init-sandboxed-client.sh}"
 local_client="${4:-$test_dir/../_build/default/src/bin_client/main.exe}"
+
+contract_dir="contracts"
 
 source $tezos_sandboxed_node
 source $tezos_init_sandboxed_client
