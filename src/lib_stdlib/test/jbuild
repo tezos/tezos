@@ -1,0 +1,33 @@
+(jbuild_version 1)
+
+(executables
+ ((names (test_tzList
+          test_mbytes_buffer))
+  (libraries (tezos-stdlib tezos-test-helpers))
+  (flags (:standard -w -9-32
+                    -safe-string
+                    -open Tezos_test_helpers
+                    -open Tezos_stdlib))))
+
+(alias
+  ((name buildtest)
+   (deps (test_tzList.exe
+          test_mbytes_buffer.exe))))
+
+(alias
+ ((name runtest_tzList)
+  (action (run ${exe:test_tzList.exe}))))
+
+(alias
+ ((name runtest_mbytes_buffer)
+  (action (run ${exe:test_mbytes_buffer.exe}))))
+
+(alias
+ ((name runtest)
+  (deps ((alias runtest_tzList)
+         (alias runtest_mbytes_buffer)))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

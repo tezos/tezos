@@ -7,6 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Error = struct
+  type error = ..
+  let pp_print_error _ _ = ()
+end
+module Test = Tezos_test_helpers.Test.Make(Error)
+
 let rec permut = function
   | [] -> [[]]
   | x :: xs ->
@@ -23,32 +29,31 @@ let rec permut = function
 
 let test_take_n _ =
   ListLabels.iter (permut [1;2;3;4;5;6;7;8;9]) ~f:begin fun xs ->
-    Assert.equal ~msg:__LOC__ (List.take_n ~compare 1 xs) [9]
+    Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 1 xs) [9]
   end ;
   ListLabels.iter (permut [1;2;3;4;5;6;7;8;9]) ~f:begin fun xs ->
-    Assert.equal ~msg:__LOC__ (List.take_n ~compare 3 xs) [7;8;9]
+    Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 3 xs) [7;8;9]
   end ;
   let inv_compare x y = compare y x in
   ListLabels.iter (permut [1;2;3;4;5;6;7;8;9]) ~f:begin fun xs ->
-    Assert.equal ~msg:__LOC__ (List.take_n ~compare:inv_compare 3 xs) [3;2;1]
+    Assert.equal ~msg:__LOC__ (TzList.take_n ~compare:inv_compare 3 xs) [3;2;1]
   end ;
   (* less elements than the bound. *)
   ListLabels.iter (permut [1;2;3;4;5;6;7;8;9]) ~f:begin fun xs ->
-    Assert.equal ~msg:__LOC__ (List.take_n ~compare 12 xs) [1;2;3;4;5;6;7;8;9]
+    Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 12 xs) [1;2;3;4;5;6;7;8;9]
   end ;
   (* with duplicates. *)
   ListLabels.iter (permut [1;2;3;3;4;5;5;5;6]) ~f:begin fun xs ->
-    Assert.equal ~msg:__LOC__ (List.take_n ~compare 3 xs) [5;5;6]
+    Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 3 xs) [5;5;6]
   end ;
   ListLabels.iter (permut [1;2;3;3;4;5;5;5;6]) ~f:begin fun xs ->
-    Assert.equal ~msg:__LOC__ (List.take_n ~compare 5 xs) [4;5;5;5;6]
+    Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 5 xs) [4;5;5;5;6]
   end ;
-  return ()
+  Lwt.return_ok ()
 
-let tests : (string * (string -> unit tzresult Lwt.t)) list = [
+let tests : (string * (string -> (unit, Error.error list) result Lwt.t)) list = [
   "take_n", test_take_n ;
 ]
 
 let () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
-  Test.run "utils." tests
+  Test.run "tzList." tests

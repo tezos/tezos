@@ -7,9 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let rec (--) i j =
-  if j < i then []
-  else i :: (i+1) -- j
+open Error_monad
+open Utils.Infix
 
 type tree =
   | Empty

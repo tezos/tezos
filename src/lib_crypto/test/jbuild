@@ -1,0 +1,33 @@
+(jbuild_version 1)
+
+(executables
+ ((names (test_merkle))
+  (libraries (tezos-stdlib
+              tezos-error-monad
+              tezos-data-encoding
+              tezos-crypto
+              tezos-test-helpers))
+  (flags (:standard -w -9-32
+                    -safe-string
+                    -open Tezos_test_helpers
+                    -open Tezos_stdlib
+                    -open Tezos_error_monad
+                    -open Tezos_data_encoding
+                    -open Tezos_crypto))))
+
+(alias
+  ((name buildtest)
+   (deps (test_merkle.exe))))
+
+(alias
+ ((name runtest_merkle)
+  (action (run ${exe:test_merkle.exe}))))
+
+(alias
+ ((name runtest)
+  (deps ((alias runtest_merkle)))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
