@@ -541,6 +541,11 @@ module Block = struct
       read_exn net_state header.shell.predecessor >>= fun block ->
       Lwt.return (Some block)
 
+  let predecessor_n (net: Net.t) (b: Block_hash.t) (distance: int) : Block_hash.t option Lwt.t =
+    Shared.use net.block_store (fun store ->
+        predecessor_n store b distance)
+
+
   type error += Inconsistent_hash of Context_hash.t * Context_hash.t
 
   let () =

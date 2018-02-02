@@ -138,6 +138,7 @@ module Block : sig
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t
+  val predecessor_n: Net.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
