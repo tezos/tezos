@@ -10,10 +10,11 @@
               tezos-embedded-protocol-demo
               tezos-embedded-protocol-alpha
               tezos-embedded-protocol-genesis
-              test_lib))
+              tezos-test-helpers))
   (flags (:standard -w -9-32
                     -safe-string
                     -open Tezos_base__TzPervasives
+                    -open Tezos_test_helpers
                     -open Tezos_storage
                     -open Tezos_shell))))
 

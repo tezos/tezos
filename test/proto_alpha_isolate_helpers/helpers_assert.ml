@@ -106,18 +106,23 @@ let equal_cents_balance ~tc ?msg (contract, cents_balance) =
     ~msg: (Option.unopt ~default:"equal_cents_balance" msg)
     (contract, Helpers_cast.cents_of_int cents_balance)
 
-
 let ecoproto_error f = function
   | Proto_alpha.Environment.Ecoproto_error errors ->
       List.exists f errors
   | _ -> false
 
+let contain_error ?(msg="") ~f = function
+  | Ok _ -> Kaputt.Abbreviations.Assert.fail "Error _" "Ok _" msg
+  | Error error when not (List.exists f error) ->
+      let error_str = Format.asprintf "%a" Error_monad.pp_print_error error in
+      Kaputt.Abbreviations.Assert.fail "" error_str msg
+  | _ -> ()
 
 let generic_economic_error ~msg =
-  Assert.contain_error ~msg ~f: (ecoproto_error (fun _ -> true))
+  contain_error ~msg ~f: (ecoproto_error (fun _ -> true))
 
 let economic_error ~msg f =
-  Assert.contain_error ~msg ~f: (ecoproto_error f)
+  contain_error ~msg ~f: (ecoproto_error f)
 
 let ill_typed_data_error ~msg =
   let aux = function
@@ -167,7 +172,7 @@ let balance_too_low ~msg =
 
 
 let non_spendable ~msg =
-  Assert.contain_error ~msg ~f: begin ecoproto_error (function
+  contain_error ~msg ~f: begin ecoproto_error (function
       | Proto_alpha.Contract_storage.Unspendable_contract _ -> true
       | error ->
           Helpers_logger.debug "Actual error: %a" pp error ;
@@ -175,25 +180,25 @@ let non_spendable ~msg =
   end
 
 let inconsistent_pkh ~msg =
-  Assert.contain_error ~msg ~f: begin ecoproto_error (function
+  contain_error ~msg ~f: begin ecoproto_error (function
       | Proto_alpha.Contract_storage.Inconsistent_hash _ -> true
       | _ -> false)
   end
 
 let initial_amount_too_low ~msg =
-  Assert.contain_error ~msg ~f: begin ecoproto_error (function
+  contain_error ~msg ~f: begin ecoproto_error (function
       | Contract.Initial_amount_too_low _ -> true
       | _ -> false)
   end
 
 let non_delegatable ~msg =
-  Assert.contain_error ~msg ~f: begin ecoproto_error (function
+  contain_error ~msg ~f: begin ecoproto_error (function
       | Proto_alpha.Contract_storage.Non_delegatable_contract _ -> true
       | _ -> false)
   end
 
 let wrong_delegate ~msg =
-  Assert.contain_error ~msg ~f: begin ecoproto_error (function
+  contain_error ~msg ~f: begin ecoproto_error (function
       | Proto_alpha.Baking.Wrong_delegate _ -> true
       | _ -> false)
   end

@@ -12,9 +12,10 @@
               tezos-client-genesis
               tezos-client-alpha
               tezos-shell
-              test_lib))
+              tezos-test-helpers))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
+                    -open Tezos_test_helpers
                     -open Tezos_rpc_http
                     -open Tezos_client_base
                     -open Tezos_client_genesis

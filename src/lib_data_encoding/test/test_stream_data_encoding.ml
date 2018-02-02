@@ -1,13 +1,26 @@
+(**************************************************************************)
+(*                                                                        *)
+(*    Copyright (c) 2014 - 2017.                                          *)
+(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
+(*                                                                        *)
+(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
+(*                                                                        *)
+(**************************************************************************)
+
+open Lwt.Infix
 open Data_encoding
 
-let (>>=) = Lwt.bind
-let (>|=) = Lwt.(>|=)
+module Error = struct
+  type error = ..
+  let pp_print_error _ _ = ()
+end
+module Test = Test.Make(Error)
+
 let (//) = Filename.concat
 
 let is_invalid_arg = function
   | Invalid_argument _ -> true
   | _ -> false
-
 
 let is_await = function Binary.Await _ -> true | _ -> false
 let is_success = function Binary.Success _ -> true | _ -> false
@@ -435,7 +448,7 @@ let test_splitted _ =
 
 let wrap_test f base_dir =
   f base_dir >>= fun result ->
-  return result
+  Lwt.return_ok result
 
 let tests = [
   "simple", test_simple_values ;

@@ -498,4 +498,5 @@ let tests = [
 ]
 
 let main () =
+  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
   Test.run "michelson." tests

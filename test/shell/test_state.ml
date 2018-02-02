@@ -446,4 +446,5 @@ let tests : (string * (state -> unit tzresult Lwt.t)) list = [
 ]
 
 let () =
+  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
   Test.run "state." (List.map (fun (s, f) -> s, wrap_state_init f) tests)

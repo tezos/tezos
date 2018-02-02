@@ -1,11 +1,11 @@
 (jbuild_version 1)
 
 (library
- ((name test_lib)
-  (libraries (kaputt tezos-base))
-  (wrapped false)
-  (flags (:standard -w -9-32 -safe-string
-                    -open Tezos_base__TzPervasives))))
+ ((name tezos_test_helpers)
+  (public_name tezos-test-helpers)
+  (libraries (lwt.unix kaputt))
+  (modules (:standard))
+  (flags (:standard -w -9-32 -safe-string))))
 
 (alias
  ((name runtest_indent)

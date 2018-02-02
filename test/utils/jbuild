@@ -1,30 +1,22 @@
 (jbuild_version 1)
 
 (executables
- ((names (test_data_encoding
-          test_lwt_pipe
+ ((names (test_lwt_pipe
           test_merkle
-          test_stream_data_encoding
           test_utils
-          bench_data_encoding
           test_mbytes_buffer))
-  (libraries (tezos-base test_lib))
+  (libraries (tezos-base tezos-test-helpers))
   (flags (:standard -w -9-32
                     -safe-string
-                    -open Tezos_base__TzPervasives))))
+                    -open Tezos_base__TzPervasives
+                    -open Tezos_test_helpers))))
 
 (alias
   ((name buildtest)
-   (deps (test_data_encoding.exe
-          test_lwt_pipe.exe
+   (deps (test_lwt_pipe.exe
           test_merkle.exe
-          test_stream_data_encoding.exe
           test_utils.exe
           test_mbytes_buffer.exe))))
-
-(alias
- ((name runtest_data_encoding)
-  (action (run ${exe:test_data_encoding.exe}))))
 
 (alias
  ((name runtest_lwt_pipe)
@@ -33,10 +25,6 @@
 (alias
  ((name runtest_merkle)
   (action (run ${exe:test_merkle.exe}))))
-
-(alias
- ((name runtest_stream_data_encoding)
-  (action (run ${exe:test_stream_data_encoding.exe}))))
 
 (alias
  ((name runtest_utils)
@@ -48,10 +36,8 @@
 
 (alias
  ((name runtest)
-  (deps ((alias runtest_data_encoding)
-         (alias runtest_lwt_pipe)
+  (deps ((alias runtest_lwt_pipe)
          (alias runtest_merkle)
-         (alias runtest_stream_data_encoding)
          (alias runtest_utils)
          (alias runtest_mbytes_buffer)))))
 

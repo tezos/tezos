@@ -1,7 +1,22 @@
+(**************************************************************************)
+(*                                                                        *)
+(*    Copyright (c) 2014 - 2017.                                          *)
+(*    Dynamic Ledger Solutions, Inc. <contact@tezos.com>                  *)
+(*                                                                        *)
+(*    All rights reserved. No warranty, explicit or implicit, provided.   *)
+(*                                                                        *)
+(**************************************************************************)
+
+open Utils.Infix
+open Lwt.Infix
 open Data_encoding
 
-let (>>=) = Lwt.bind
-let (>|=) = Lwt.(>|=)
+module Error = struct
+  type error = ..
+  let pp_print_error _ _ = ()
+end
+module Test = Test.Make(Error)
+
 let (//) = Filename.concat
 
 let write_file dir ~name content =
@@ -117,6 +132,7 @@ let test_simple_values _ =
 
   Lwt.return_unit
 
+(*
 let test_json testdir =
   let open Data_encoding_ezjsonm in
   let file = testdir // "testing_data_encoding.tezos" in
@@ -130,7 +146,7 @@ let test_json testdir =
   read_file file >>= fun opt ->
   Assert.is_ok ~msg:__LOC__ opt ;
   Lwt.return ()
-
+*)
 type t = A of int | B of string | C of int | D of string | E
 
 let prn_t = function
@@ -256,6 +272,7 @@ let test_splitted _ =
   Assert.equal ~msg:__LOC__ "44" (get_result ~msg:__LOC__ binB);
   Lwt.return_unit
 
+(*
 let test_json_input testdir =
   let enc =
     obj1
@@ -318,10 +335,11 @@ let test_json_input testdir =
             | _ -> false) ;
         Lwt.return_unit
   end
+*)
 
 let wrap_test f base_dir =
   f base_dir >>= fun result ->
-  return result
+  Lwt.return_ok result
 
 let test_wrapped_binary _ =
   let open Data_encoding in
@@ -413,10 +431,10 @@ let test_randomized_variant_list _ =
 
 let tests = [
   "simple", test_simple_values ;
-  "json", test_json ;
+  (* "json", test_json ; *)
   "union", test_union ;
   "splitted", test_splitted ;
-  "json.input", test_json_input ;
+  (* "json.input", test_json_input ; *)
   "tags", test_tag_errors ;
   "wrapped_binary", test_wrapped_binary ;
   "out_of_range", test_out_of_range ;

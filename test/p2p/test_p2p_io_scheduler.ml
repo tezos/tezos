@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Process = Tezos_test_helpers.Process.Make(Error_monad)
+
 include Logging.Make (struct let name = "test-p2p-io-scheduler" end)
 
 exception Error of error list
@@ -215,6 +217,7 @@ let () =
 
 let () =
   Sys.catch_break true ;
+  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
   Test.run "p2p.io-scheduler." [
     "trivial-quota", (fun _dir ->
         run

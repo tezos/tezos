@@ -310,8 +310,15 @@ module Assert = struct
 
   let hash op = Tezos_base.Operation.hash op
 
+  let contain_error ?(msg="") ~f = function
+    | Ok _ -> Kaputt.Abbreviations.Assert.fail "Error _" "Ok _" msg
+    | Error error when not (List.exists f error) ->
+        let error_str = Format.asprintf "%a" Error_monad.pp_print_error error in
+        Kaputt.Abbreviations.Assert.fail "" error_str msg
+    | _ -> ()
+
   let failed_to_preapply ~msg ?op f =
-    Assert.contain_error ~msg ~f:begin function
+    contain_error ~msg ~f:begin function
       | Client_baking_forge.Failed_to_preapply (op', err) ->
           begin
             match op with
@@ -324,64 +331,64 @@ module Assert = struct
     end
 
   let generic_economic_error ~msg =
-    Assert.contain_error ~msg ~f:(ecoproto_error (fun _ -> true))
+    contain_error ~msg ~f:(ecoproto_error (fun _ -> true))
 
   let unknown_contract ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+    contain_error ~msg ~f:begin ecoproto_error (function
         | Raw_context.Storage_error _ -> true
         | _ -> false)
     end
 
   let non_existing_contract ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+    contain_error ~msg ~f:begin ecoproto_error (function
         | Contract_storage.Non_existing_contract _ -> true
         | _ -> false)
     end
 
   let balance_too_low ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+    contain_error ~msg ~f:begin ecoproto_error (function
         | Contract.Balance_too_low _ -> true
         | _ -> false)
     end
 
   let non_spendable ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+    contain_error ~msg ~f:begin ecoproto_error (function
         | Contract_storage.Unspendable_contract _ -> true
         | _ -> false)
     end
 
   let inconsistent_pkh ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+    contain_error ~msg ~f:begin ecoproto_error (function
         | Contract_storage.Inconsistent_hash _ -> true
         | _ -> false)
     end
 
   let inconsistent_public_key ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+    contain_error ~msg ~f:begin ecoproto_error (function
         | Contract_storage.Inconsistent_public_key _ -> true
         | _ -> false)
     end
 
   let missing_public_key ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+    contain_error ~msg ~f:begin ecoproto_error (function
         | Contract_storage.Missing_public_key _ -> true
         | _ -> false)
     end
 
   let initial_amount_too_low ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+    contain_error ~msg ~f:begin ecoproto_error (function
         | Contract.Initial_amount_too_low _ -> true
         | _ -> false)
     end
 
   let non_delegatable ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+    contain_error ~msg ~f:begin ecoproto_error (function
         | Contract_storage.Non_delegatable_contract _ -> true
         | _ -> false)
     end
 
   let wrong_delegate ~msg =
-    Assert.contain_error ~msg ~f:begin ecoproto_error (function
+    contain_error ~msg ~f:begin ecoproto_error (function
         | Baking.Wrong_delegate _ -> true
         | _ -> false)
     end

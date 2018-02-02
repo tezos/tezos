@@ -96,4 +96,5 @@ let tests = [
 ]
 
 let () =
+  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
   Test.run "origination." tests

@@ -7,11 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Process = Tezos_test_helpers.Process.Make(Error_monad)
+
 include Logging.Make (struct let name = "test.p2p.connection-pool" end)
 
 type message =
   | Ping
-
 
 let msg_config : message P2p_pool.message_config = {
   encoding = [
@@ -279,6 +280,7 @@ let spec = Arg.[
   ]
 
 let main () =
+  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;

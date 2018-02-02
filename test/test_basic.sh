@@ -3,7 +3,7 @@
 set -e
 
 test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
-source $test_dir/lib/test_lib.inc.sh "$@"
+source $test_dir/test_lib.inc.sh "$@"
 
 start_node 1
 activate_alpha

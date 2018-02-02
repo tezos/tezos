@@ -2,8 +2,7 @@
 
 (library
  ((name tezos_proto_alpha_isolate_helpers)
-  (libraries (kaputt
-              test_lib
+  (libraries (tezos-test-helpers
               tezos-base
               tezos-shell
               tezos-embedded-protocol-genesis
@@ -11,6 +10,7 @@
   (wrapped false)
   (flags (:standard -w -9-32 -safe-string
           -open Tezos_base__TzPervasives
+          -open Tezos_test_helpers
           -open Tezos_embedded_raw_protocol_alpha))))
 
 (alias

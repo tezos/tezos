@@ -216,4 +216,5 @@ let tests : (string * (t -> unit Lwt.t)) list = [
 ]
 
 let () =
+  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
   Test.run "context." (List.map (fun (s, f) -> s, wrap_context_init f) tests)

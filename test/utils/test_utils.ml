@@ -50,4 +50,5 @@ let tests : (string * (string -> unit tzresult Lwt.t)) list = [
 ]
 
 let () =
+  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
   Test.run "utils." tests

@@ -3,7 +3,7 @@
 (alias
  ((name runtest_basic.sh)
   (deps (sandbox.json
-         lib/test_lib.inc.sh
+         test_lib.inc.sh
          (glob_files contracts/*)
          ))
   (locks  (/tcp-port/18731
@@ -18,7 +18,7 @@
 (alias
  ((name runtest_contracts.sh)
   (deps (sandbox.json
-         lib/test_lib.inc.sh
+         test_lib.inc.sh
          (glob_files contracts/*)
          ))
   (locks  (/tcp-port/18731
@@ -33,7 +33,7 @@
 (alias
  ((name runtest_multinode.sh)
   (deps (sandbox.json
-         lib/test_lib.inc.sh
+         test_lib.inc.sh
          (glob_files contracts/*)
          ))
   (locks  (/tcp-port/18731 /tcp-port/18732 /tcp-port/18733 /tcp-port/18734
