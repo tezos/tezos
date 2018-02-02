@@ -45,23 +45,17 @@ let activate_alpha () =
                  fitness })
     dictator_sk
 
-let init ?(sandbox = "sandbox.json") ?rpc_port () =
+let init ?exe ?(sandbox = "sandbox.json") ?rpc_port () =
   begin
     match rpc_port with
     | None -> ()
     | Some port -> rpc_config := { !rpc_config with port }
   end ;
-  (* Handles relative path on OSX *)
-  let executable_path =
-    if Filename.is_relative Sys.argv.(0)
-    then Filename.concat (Sys.getcwd ()) Sys.argv.(0)
-    else Sys.argv.(0) in
-  Unix.chdir (Filename.dirname executable_path) ;
-  Unix.chdir ".." ;
   let pid =
     Node_helpers.fork_node
+      ?exe
       ~port:!rpc_config.port
-      ~sandbox:(Filename.dirname executable_path // sandbox)
+      ~sandbox
       () in
   activate_alpha () >>=? fun hash ->
   return (pid, hash)

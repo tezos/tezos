@@ -26,7 +26,7 @@ let handle_error res log_file_name =
       ignore (Sys.command (Printf.sprintf "cat %s" log_file_name) : int) ;
       raise Node_exited_prematurely
 
-let fork_node ?(timeout = 4) ?(port = 18732) ?sandbox () =
+let fork_node ?exe ?(timeout = 4) ?(port = 18732) ?sandbox () =
   let data_dir =
     Printf.sprintf
       "%s/tezos_node_%6X"
@@ -37,14 +37,17 @@ let fork_node ?(timeout = 4) ?(port = 18732) ?sandbox () =
   let log_fd = Unix.descr_of_out_channel log_file in
   let null_fd = Unix.(openfile "/dev/null" [O_RDONLY] 0o644) in
   let exe =
-    let (//) = Filename.concat in
-    try
-      let path = Sys.argv.(1) in
-      if Filename.is_relative path then
-        Sys.getcwd () // ".." // path
-      else
-        path
-    with _ -> Sys.getcwd () // ".." // "bin_node" // "main.exe" in
+    match exe with
+    | Some exe -> exe
+    | None ->
+        let (//) = Filename.concat in
+        try
+          let path = Sys.argv.(1) in
+          if Filename.is_relative path then
+            Sys.getcwd () // ".." // path
+          else
+            path
+        with _ -> Sys.getcwd () // ".." // "bin_node" // "main.exe" in
   Format.eprintf "EXE %s@." exe ;
   let pid =
     Unix.create_process exe

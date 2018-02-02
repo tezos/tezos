@@ -85,8 +85,12 @@ let run_change_to_demo_proto block
 
   return (`Hash head)
 
+let exe = try Sys.argv.(1) with _ -> "tezos-node"
+let sandbox = try Sys.argv.(2) with _ -> "sandbox-vote.json"
+let rpc_port = try int_of_string Sys.argv.(3) with _ -> 18400
+
 let change_to_demo_proto () =
-  init ~sandbox:"sandbox-vote.json" ~rpc_port:18400 () >>=? fun (_node_pid, hash) ->
+  init ~exe ~sandbox ~rpc_port () >>=? fun (_node_pid, hash) ->
   run_change_to_demo_proto (`Hash hash) Account.bootstrap_accounts >>=? fun _blkh ->
   return ()
 

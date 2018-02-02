@@ -71,8 +71,7 @@ let commands () =
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
       begin fun timestamp hash fitness sk (cctxt : Client_commands.full_context) ->
-        let fitness =
-          Tezos_client_alpha.Proto_alpha.Fitness_repr.from_int64 fitness in
+        let fitness = Proto_alpha.Fitness_repr.from_int64 fitness in
         bake cctxt ?timestamp cctxt#block
           (Activate { protocol = hash ; fitness })
           sk >>=? fun hash ->

@@ -11,6 +11,7 @@ open Proto_alpha
 open Tezos_context
 
 val init :
+  ?exe:string ->
   ?sandbox:string ->
   ?rpc_port:int ->
   unit -> (int * Block_hash.t) tzresult Lwt.t

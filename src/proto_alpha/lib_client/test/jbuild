@@ -31,9 +31,8 @@
 
 (alias
  ((name runtest_endorsement)
-  (deps (sandbox.json))
   (locks  (/tcp-port/18100))
-  (action (chdir ${ROOT} (run ${exe:test_endorsement.exe} ${bin:tezos-node})))))
+  (action (chdir ${ROOT} (run ${exe:test_endorsement.exe} ${bin:tezos-node} ${path:sandbox.json} 18100)))))
 
 (alias
  ((name runtest_michelson_parser)
@@ -41,21 +40,18 @@
 
 (alias
  ((name runtest_origination)
-  (deps (sandbox.json))
   (locks  (/tcp-port/18200))
-  (action (chdir ${ROOT} (run ${exe:test_origination.exe} ${bin:tezos-node})))))
+  (action (chdir ${ROOT} (run ${exe:test_origination.exe} ${bin:tezos-node} ${path:sandbox.json} 18200)))))
 
 (alias
  ((name runtest_transaction)
-  (deps (sandbox.json))
   (locks  (/tcp-port/18300))
-  (action (chdir ${ROOT} (run ${exe:test_transaction.exe} ${bin:tezos-node})))))
+  (action (chdir ${ROOT} (run ${exe:test_transaction.exe} ${bin:tezos-node} ${path:sandbox.json} 18300)))))
 
 (alias
  ((name runtest_vote)
-  (deps (sandbox-vote.json))
   (locks  (/tcp-port/18400))
-  (action (chdir ${ROOT} (run ${exe:test_vote.exe} ${bin:tezos-node})))))
+  (action (chdir ${ROOT} (run ${exe:test_vote.exe} ${bin:tezos-node} ${path:sandbox-vote.json} 18400)))))
 
 (alias
  ((name runtest)

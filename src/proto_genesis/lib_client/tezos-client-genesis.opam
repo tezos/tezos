@@ -13,8 +13,8 @@ depends: [
   "tezos-shell-services"
   "tezos-client-base"
   "tezos-protocol-environment-client"
-  "tezos-client-alpha"
   "tezos-protocol-genesis"
+  "tezos-protocol-alpha"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

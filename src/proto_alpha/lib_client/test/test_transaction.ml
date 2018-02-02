@@ -97,9 +97,13 @@ let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
 
   return blkh
 
+let exe = try Sys.argv.(1) with _ -> "tezos-node"
+let sandbox = try Sys.argv.(2) with _ -> "sandbox.json"
+let rpc_port = try int_of_string Sys.argv.(3) with _ -> 18300
+
 let main () =
-  Helpers.init ~rpc_port:18300 () >>=? fun (_node_pid, hash) ->
-  run (`Hash hash) Helpers.Account.bootstrap_accounts >>=? fun _blkh ->
+  Helpers.init ~exe ~sandbox ~rpc_port () >>=? fun (_node_pid, genesis) ->
+  run (`Hash genesis) Helpers.Account.bootstrap_accounts >>=? fun _blkh ->
   return ()
 
 let tests = [
