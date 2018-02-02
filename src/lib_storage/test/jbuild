@@ -1,0 +1,36 @@
+(jbuild_version 1)
+
+(executables
+ ((names (test_context
+          test_store))
+  (libraries (tezos-base
+              tezos-storage
+              tezos-test-helpers))
+  (flags (:standard -w -9-32
+                    -safe-string
+                    -open Tezos_base__TzPervasives
+                    -open Tezos_test_helpers
+                    -open Tezos_storage))))
+
+(alias
+ ((name buildtest)
+  (deps (test_context.exe
+         test_store.exe))))
+
+(alias
+ ((name runtest_context)
+  (action (run ${exe:test_context.exe}))))
+
+(alias
+ ((name runtest_store)
+  (action (run ${exe:test_store.exe}))))
+
+(alias
+ ((name runtest)
+  (deps ((alias runtest_context)
+         (alias runtest_store)))))
+
+(alias
+ ((name runtest_indent)
+  (deps ((glob_files *.ml) (glob_files *.mli)))
+  (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))

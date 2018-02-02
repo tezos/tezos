@@ -1,15 +1,11 @@
 (jbuild_version 1)
 
 (executables
- ((names (test_context
-          test_state
-          test_store))
+ ((names (test_state))
   (libraries (tezos-base
               tezos-storage
               tezos-shell
               tezos-embedded-protocol-demo
-              tezos-embedded-protocol-alpha
-              tezos-embedded-protocol-genesis
               tezos-test-helpers))
   (flags (:standard -w -9-32
                     -safe-string
@@ -20,27 +16,15 @@
 
 (alias
  ((name buildtest)
-  (deps (test_context.exe
-         test_state.exe
-         test_store.exe))))
-
-(alias
- ((name runtest_context)
-  (action (run ${exe:test_context.exe}))))
+  (deps (test_state.exe))))
 
 (alias
  ((name runtest_state)
   (action (run ${exe:test_state.exe}))))
 
 (alias
- ((name runtest_store)
-  (action (run ${exe:test_store.exe}))))
-
-(alias
  ((name runtest)
-  (deps ((alias runtest_context)
-         (alias runtest_state)
-         (alias runtest_store)))))
+  (deps ((alias runtest_state)))))
 
 (alias
  ((name runtest_indent)

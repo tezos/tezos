@@ -26,12 +26,6 @@ let genesis_protocol =
 let genesis_time =
   Time.of_seconds 0L
 
-let genesis = {
-  State.Net.time = genesis_time ;
-  block = genesis_block ;
-  protocol = genesis_protocol ;
-}
-
 (** *)
 
 let wrap_store_init f base_dir =
