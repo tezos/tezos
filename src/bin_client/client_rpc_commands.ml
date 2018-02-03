@@ -301,12 +301,12 @@ let schema meth url (cctxt : #Client_context.full) =
             "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
           return ()
       | { input = Some input ; output } ->
-          let json = `O [ "input", Json_schema.to_json input ;
-                          "output", Json_schema.to_json output ] in
+          let json = `O [ "input", Json_schema.to_json (fst input) ;
+                          "output", Json_schema.to_json (fst output) ] in
           cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
           return ()
       | { input = None ; output } ->
-          let json = `O [ "output", Json_schema.to_json output ] in
+          let json = `O [ "output", Json_schema.to_json (fst output) ] in
           cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
           return ()
     end
@@ -315,9 +315,14 @@ let schema meth url (cctxt : #Client_context.full) =
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
       return ()
 
-let format meth url (cctxt : #Client_context.io_rpcs) =
+let format binary meth url (cctxt : #Client_context.io_rpcs) =
   let args = String.split '/' url in
   let open RPC_description in
+  let pp =
+    if binary then
+      (fun ppf (_, schema) -> Data_encoding.Binary_schema.pp ppf schema)
+    else
+      (fun ppf (schema, _) -> Json_schema.pp ppf schema) in
   RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
       match RPC_service.MethMap.find meth services with
@@ -331,15 +336,15 @@ let format meth url (cctxt : #Client_context.io_rpcs) =
              @[<v 2>Input format:@,%a@]@,\
              @[<v 2>Output format:@,%a@]@,\
              @]"
-            Json_schema.pp input
-            Json_schema.pp output >>= fun () ->
+            pp input
+            pp output >>= fun () ->
           return ()
       | { input = None ; output } ->
           cctxt#message
             "@[<v 0>\
              @[<v 2>Output format:@,%a@]@,\
              @]"
-            Json_schema.pp output >>= fun () ->
+            pp output >>= fun () ->
           return ()
     end
   | _ ->
@@ -381,7 +386,7 @@ let call meth raw_url (cctxt : #Client_context.full) =
           cctxt#generic_json_call meth uri >>=?
           display_answer cctxt
       | { input = Some input } ->
-          fill_in ~show_optionals:false input >>= function
+          fill_in ~show_optionals:false (fst input) >>= function
           | Error msg ->
               cctxt#error "%s" msg >>= fun () ->
               return ()
@@ -470,12 +475,16 @@ let commands = [
 
   command ~group
     ~desc: "Get the humanoid readable input and output formats of an RPC."
-    no_options
+    (args1
+       (switch
+          ~doc:"Binary format"
+          ~short:'b'
+          ~long:"binary" ()))
     (prefixes [ "rpc" ; "format"] @@
      meth_params @@
      string ~name: "url" ~desc: "the RPC URL" @@
      stop)
-    (fun () -> format) ;
+    format ;
 
   command ~group
     ~desc: "Call an RPC with the GET method."

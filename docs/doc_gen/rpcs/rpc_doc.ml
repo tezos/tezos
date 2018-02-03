@@ -200,7 +200,7 @@ module Description = struct
           pp_button ppf
             ~default:true ~shortlabel:"descr" ~content:"Description"
             target_ref ;
-          Option.iter service.input ~f: begin fun __ ->
+          Option.iter service.input ~f: begin fun _ ->
             pp_button ppf
               ~default:false ~shortlabel:"input" ~content:"Input format"
               target_ref
@@ -212,14 +212,14 @@ module Description = struct
         pp_content ppf
           ~tag:"p" ~shortlabel:"descr" target_ref
           pp_description service ;
-        Option.iter service.input ~f: begin fun schema ->
+        Option.iter service.input ~f: begin fun (schema, _) ->
           pp_content ppf
             ~tag:"pre" ~shortlabel:"input" target_ref
             Json_schema.pp schema ;
         end ;
         pp_content ppf
           ~tag:"pre" ~shortlabel:"output" target_ref
-          Json_schema.pp service.output ;
+          Json_schema.pp (fst service.output) ;
       end
 
   end

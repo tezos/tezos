@@ -76,7 +76,7 @@ val put_service:
 
 val description_service:
   ([ `GET ], unit, unit * string list, Resto.Description.request,
-   unit, Json_schema.schema Resto.Description.directory) service
+   unit, RPC_encoding.schema Resto.Description.directory) service
 
 val error_service:
   ([ `GET ], unit, unit, unit, unit, Json_schema.schema) service

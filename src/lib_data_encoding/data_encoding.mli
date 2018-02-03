@@ -591,6 +591,12 @@ module Bson: sig
 
 end
 
+module Binary_schema : sig
+  type t
+  val pp: Format.formatter -> t -> unit
+  val encoding: t Encoding.t
+end
+
 module Binary: sig
 
   (** All the errors that might be returned while reading a binary value *)
@@ -671,6 +677,8 @@ module Binary: sig
   (** [to_bytes_exn enc v] is equivalent to [to_bytes enc v], except
       it raises [Write_error] instead of return [None] in case of error. *)
   val to_bytes_exn : 'a Encoding.t -> 'a -> MBytes.t
+
+  val describe : ?toplevel_name:string -> 'a Encoding.t -> Binary_schema.t
 
 end
 

@@ -8,11 +8,19 @@
 (**************************************************************************)
 
 type 'a t = 'a Data_encoding.t
-type schema = Data_encoding.json_schema
+type schema = Data_encoding.json_schema * Data_encoding.Binary_schema.t
 let unit = Data_encoding.empty
 let untyped = Data_encoding.(obj1 (req "untyped" string))
 let conv f g t = Data_encoding.conv ~schema:(Data_encoding.Json.schema t) f g t
-let schema = Data_encoding.Json.schema
+let schema t =
+  (Data_encoding.Json.schema t,
+   Data_encoding.Binary.describe t)
+
+let schema_encoding =
+  let open Data_encoding in
+  obj2
+    (req "json_schema" json_schema)
+    (req "binary_schema" Data_encoding.Binary_schema.encoding)
 
 module StringMap = Resto.StringMap
 
@@ -97,9 +105,9 @@ let service_descr_encoding =
        (req "path" (list path_item_encoding))
        (opt "description" string)
        (req "query" (list query_item_encoding))
-       (opt "input" json_schema)
-       (req "output" json_schema)
-       (req "erro" json_schema))
+       (opt "input" schema_encoding)
+       (req "output" schema_encoding)
+       (req "error" schema_encoding))
 
 let directory_descr_encoding =
   let open Data_encoding in
