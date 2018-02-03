@@ -102,15 +102,21 @@ let commands () =
        @@ Program.source_param
        @@ stop)
       (fun (show_types, emacs_mode, no_print_source) program cctxt ->
-         Lwt.return @@ Micheline_parser.no_parsing_error program >>=? fun program ->
-         typecheck_program program cctxt#block cctxt >>= fun res ->
-         print_typecheck_result
-           ~emacs:emacs_mode
-           ~show_types
-           ~print_source_on_error:(not no_print_source)
-           program
-           res
-           cctxt) ;
+         match program with
+         | program, [] ->
+             typecheck_program program cctxt#block cctxt >>= fun res ->
+             print_typecheck_result
+               ~emacs:emacs_mode
+               ~show_types
+               ~print_source_on_error:(not no_print_source)
+               program
+               res
+               cctxt
+         | res_with_errors ->
+             cctxt#message
+               "(@[<v 0>(types . ())@ (errors . %a)@])"
+               Michelson_v1_emacs.report_errors res_with_errors >>= fun () ->
+             return ()) ;
 
     command ~group ~desc: "Ask the node to typecheck a data expression."
       (args1 no_print_source_flag)
