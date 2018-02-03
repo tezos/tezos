@@ -133,17 +133,6 @@ let update_chain_store { net_id ; context_index ; chain_state } f =
     Lwt.return res
   end
 
-let rec predecessor (store : Store.Block.store) (b: Block_hash.t) n =
-  (* TODO optimize *)
-  if n = 0 then Lwt.return_some b else begin
-    Store.Block.Contents.read_exn (store, b) >>= fun contents ->
-    let pred = contents.header.shell.predecessor in
-    if Block_hash.equal b pred then
-      Lwt.return_none
-    else
-      predecessor store pred (n-1)
-  end
-
 (** The number of predecessors stored per block.
     This value chosen to compute efficiently block locators that
     can cover a chain of 2 months, at 1 block/min, which is ~86K
