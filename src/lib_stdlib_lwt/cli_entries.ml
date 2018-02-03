@@ -1197,11 +1197,11 @@ let handle_cli_errors ~stdout ~stderr ~global_options = function
             Format.fprintf stdout "@." ;
             return 0
         | Autocomplete_command (completions) ->
-            Format.pp_print_list
-              ~pp_sep:Format.pp_print_newline
-              Format.pp_print_string
-              Format.std_formatter
-              completions;
+            Format.fprintf stdout "%a@."
+              (Format.pp_print_list
+                 ~pp_sep:Format.pp_print_newline
+                 Format.pp_print_string)
+              completions ;
             return 0
         | Help_flag commands ->
             let format = if Unix.isatty Unix.stdout then `Ansi else `Plain in

@@ -387,8 +387,8 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   (lexical-let ((tmp-file (make-temp-file buffer-name)))
     (write-region (point-min) (point-max) tmp-file nil 'no-message)
     (let ((command
-           (append (split-string (expand-file-name michelson-client-command) " ")
-                   (list 
+           (append (split-string michelson-client-command " ")
+                   (list
                     "typecheck"
                     "program"
                     (if michelson-alphanet

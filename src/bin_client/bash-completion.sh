@@ -7,12 +7,6 @@ _tezos-client_complete()
 
     # Tezos script
     script=${COMP_WORDS[0]}
-    if [ -z "$(type -P $script)" ]; then
-        local tmp="$(alias $script)"
-        tmp="${tmp#*=}"
-        tmp="${tmp%\'}"
-        script="${tmp#\'}"
-    fi
 
     reply=$($script bash_autocomplete "$prev_word" "$cur_word" ${COMP_WORDS[@]})
 
@@ -53,4 +47,5 @@ _tezos-alphanet_complete()
 
 # Register _pss_complete to provide completion for the following commands
 complete -F _tezos-client_complete tezos-client
+complete -F _tezos-client_complete tezos-admin-client
 complete -F _tezos-alphanet_complete alphanet.sh

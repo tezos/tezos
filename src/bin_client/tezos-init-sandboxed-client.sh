@@ -13,7 +13,7 @@ init_sandboxed_client() {
     shift 1
 
     rpc=$((18730 + id))
-    client_dir="$(mktemp -d -t tezos-client.XXXXXXXX)"
+    client_dir="$(mktemp -d -t tezos-tmp-client.XXXXXXXX)"
     client_dirs+=("$client_dir")
     client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
 
@@ -228,12 +228,20 @@ main () {
 
     add_sandboxed_bootstrap_identities | sed -e 's/^/## /' 1>&2
 
+    mkdir -p $client_dir/bin
+    echo '#!/bin/sh' > $client_dir/bin/tezos-client
+    echo "exec $client \"\$@\"" >> $client_dir/bin/tezos-client
+    chmod +x $client_dir/bin/tezos-client
+    echo '#!/bin/sh' > $client_dir/bin/tezos-admin-client
+    echo "exec $client \"\$@\"" | sed s/tezos-client/tezos-adming-client/g  >> $client_dir/bin/tezos-admin-client
+    chmod +x $client_dir/bin/tezos-admin-client
+
     cat <<EOF
 if type tezos-client-reset >/dev/null 2>&1 ; then tezos-client-reset; fi ;
-alias tezos-client="$client" ;
+PATH="$client_dir/bin:\$PATH" ; export PATH ;
 alias tezos-activate-alpha="$client -block genesis activate protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK with fitness 1 and key dictator" ;
-alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-client tezos-activate-alpha tezos-client-reset" ;
-alias tezos-autocomplete="source \"$bin_dir/bash-completion.sh\"" ;
+alias tezos-client-reset="rm -rf \"$client_dir\"; unalias tezos-activate-alpha tezos-client-reset" ;
+alias tezos-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 trap tezos-client-reset EXIT ;
 EOF
 
