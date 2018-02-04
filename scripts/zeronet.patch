@@ -22,9 +22,9 @@ diff --git a/scripts/alphanet.sh b/scripts/alphanet.sh
  
  if [ $ALPHANET_EMACS ]; then
      interactive_flags="-t"
-diff --git a/src/node/main/node_config_file.ml b/src/node/main/node_config_file.ml
---- a/src/node/main/node_config_file.ml
-+++ b/src/node/main/node_config_file.ml
+diff --git a/src/bin_node/node_config_file.ml b/src/bin_node/node_config_file.ml
+--- a/src/bin_node/node_config_file.ml
++++ b/src/bin_node/node_config_file.ml
 @@ -16,7 +16,7 @@ let home =
    with Not_found -> "/root"
  
