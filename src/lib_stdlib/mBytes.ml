@@ -21,6 +21,12 @@ let copy ba =
   let ba' = create (Array1.dim ba) in
   Array1.blit ba ba';
   ba'
+let fill = Array1.fill
+
+let init sz v =
+  let b = create sz in
+  fill b v ;
+  b
 
 (** Adapted from ocaml-cstruct. *)
 

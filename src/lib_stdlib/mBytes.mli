@@ -20,9 +20,14 @@ type t = (char, int8_unsigned_elt, c_layout) Array1.t
 val create: int -> t
 (** [create n] allocates and returns an array of size [n] **)
 
+val init: int -> char -> t
+(** [init n c] allocates and returns an array of size [n] initialized
+    with [c]. *)
+
 val length: t -> int
 
 val copy: t -> t
+val fill: t -> char -> unit
 
 val sub: t -> int -> int -> t
 (** [sub src ofs len] extract a sub-array of [src] starting at [ofs]

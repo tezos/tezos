@@ -9,10 +9,12 @@
 
 (** Tezos - X25519/XSalsa20-Poly1305 cryptography *)
 
-type secret_key = Sodium.Box.secret_key
-type public_key = Sodium.Box.public_key
-type channel_key = Sodium.Box.channel_key
-type nonce = Sodium.Box.nonce
+open Tweetnacl
+
+type secret_key = Box.secret Box.key
+type public_key = Box.public Box.key
+type channel_key = Box.combined Box.key
+type nonce = Nonce.t
 type target = Z.t
 
 module Public_key_hash = Blake2B.Make (Base58) (struct
@@ -26,23 +28,50 @@ let () =
   Base58.check_encoded_prefix Public_key_hash.b58check_encoding "id" 30
 
 let hash pk =
-  Public_key_hash.hash_bytes [Sodium.Box.Bigbytes.of_public_key pk]
+  Public_key_hash.hash_bytes [Cstruct.to_bigarray (Box.to_cstruct pk)]
+
+let zerobytes = Box.zerobytes
+let boxzerobytes = Box.boxzerobytes
 
 let random_keypair () =
-  let sk, pk = Sodium.Box.random_keypair () in
+  let pk, sk = Box.keypair () in
   sk, pk, hash pk
-let random_nonce = Sodium.Box.random_nonce
-let increment_nonce = Sodium.Box.increment_nonce
-let box = Sodium.Box.Bigbytes.box
-let box_open sk pk msg nonce =
-  try Some (Sodium.Box.Bigbytes.box_open sk pk msg nonce) with
-  | Sodium.Verification_failure -> None
+let random_nonce = Nonce.gen
+let increment_nonce = Nonce.increment
 
-let precompute = Sodium.Box.precompute
-let fast_box = Sodium.Box.Bigbytes.fast_box
-let fast_box_open ck msg nonce =
-  try Some (Sodium.Box.Bigbytes.fast_box_open ck msg nonce) with
-  | Sodium.Verification_failure -> None
+let box sk pk msg nonce =
+  let msg = Cstruct.of_bigarray msg in
+  Cstruct.to_bigarray (Box.box ~sk ~pk ~msg ~nonce)
+
+let box_open sk pk cmsg nonce =
+  let cmsg = Cstruct.of_bigarray cmsg in
+  Option.map ~f:Cstruct.to_bigarray (Box.box_open ~sk ~pk ~cmsg ~nonce)
+
+let box_noalloc sk pk nonce msg =
+  let msg = Cstruct.of_bigarray msg in
+  Box.box_noalloc ~sk ~pk ~nonce ~msg
+
+let box_open_noalloc sk pk nonce cmsg =
+  let cmsg = Cstruct.of_bigarray cmsg in
+  Box.box_open_noalloc ~sk ~pk ~nonce ~cmsg
+
+let precompute sk pk = Box.combine pk sk
+
+let fast_box k msg nonce =
+  let msg = Cstruct.of_bigarray msg in
+  Cstruct.to_bigarray (Box.box_combined ~k ~msg ~nonce)
+
+let fast_box_open k cmsg nonce =
+  let cmsg = Cstruct.of_bigarray cmsg in
+  Option.map ~f:Cstruct.to_bigarray (Box.box_open_combined ~k ~cmsg ~nonce)
+
+let fast_box_noalloc k nonce msg =
+  let msg = Cstruct.of_bigarray msg in
+  Box.box_combined_noalloc ~k ~nonce ~msg
+
+let fast_box_open_noalloc k nonce cmsg =
+  let cmsg = Cstruct.of_bigarray cmsg in
+  Box.box_open_combined_noalloc ~k ~nonce ~cmsg
 
 let compare_target hash target =
   let hash = Z.of_bits (Blake2B.to_string hash) in
@@ -71,8 +100,8 @@ let default_target = make_target 24.
 let check_proof_of_work pk nonce target =
   let hash =
     Blake2B.hash_bytes [
-      Sodium.Box.Bigbytes.of_public_key pk ;
-      Sodium.Box.Bigbytes.of_nonce nonce ;
+      Cstruct.to_bigarray (Box.to_cstruct pk) ;
+      Cstruct.to_bigarray (Nonce.to_cstruct nonce) ;
     ] in
   compare_target hash target
 
@@ -86,26 +115,31 @@ let generate_proof_of_work ?max pk target =
     if check_proof_of_work pk nonce target then
       nonce
     else
-      loop (increment_nonce nonce) (cpt + 1) in
+      loop (Nonce.increment nonce) (cpt + 1) in
   loop (random_nonce ()) 0
+
+let to_bigarray : type a. a Box.key -> MBytes.t = fun k ->
+  Cstruct.to_bigarray (Box.to_cstruct k)
+
+let of_bigarray f s = f (Cstruct.of_bigarray s)
 
 let public_key_encoding =
   let open Data_encoding in
   conv
-    Sodium.Box.Bigbytes.of_public_key
-    Sodium.Box.Bigbytes.to_public_key
-    (Fixed.bytes Sodium.Box.public_key_size)
+    to_bigarray
+    (of_bigarray Box.pk_of_cstruct_exn)
+    (Fixed.bytes Box.pkbytes)
 
 let secret_key_encoding =
   let open Data_encoding in
   conv
-    Sodium.Box.Bigbytes.of_secret_key
-    Sodium.Box.Bigbytes.to_secret_key
-    (Fixed.bytes Sodium.Box.secret_key_size)
+    to_bigarray
+    (of_bigarray Box.sk_of_cstruct_exn)
+    (Fixed.bytes Box.skbytes)
 
 let nonce_encoding =
   let open Data_encoding in
   conv
-    Sodium.Box.Bigbytes.of_nonce
-    Sodium.Box.Bigbytes.to_nonce
-    (Fixed.bytes Sodium.Box.nonce_size)
+    (fun nonce -> Cstruct.to_bigarray (Nonce.to_cstruct nonce))
+    (of_bigarray Nonce.of_cstruct_exn)
+    (Fixed.bytes Nonce.bytes)

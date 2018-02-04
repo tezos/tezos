@@ -39,11 +39,11 @@ let block_forged ?prev ops =
                                        operations = ops } in
   let open Proto in
   let generate_proof_of_work_nonce () =
-    Sodium.Random.Bigbytes.generate
+    Rand.generate
       Proto.Tezos_context.Constants.proof_of_work_nonce_size in
   let generate_seed_nonce () =
     match Proto.Nonce_storage.of_bytes @@
-      Sodium.Random.Bigbytes.generate
+      Rand.generate
         Proto.Tezos_context.Constants.nonce_length with
     | Error _ -> assert false
     | Ok nonce -> nonce in

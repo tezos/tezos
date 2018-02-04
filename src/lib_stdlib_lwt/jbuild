@@ -12,7 +12,8 @@
               tezos-data-encoding
               tezos-error-monad
               lwt.unix
-              ipaddr.unix))))
+              ipaddr.unix
+              str))))
 
 (alias
  ((name runtest_indent)

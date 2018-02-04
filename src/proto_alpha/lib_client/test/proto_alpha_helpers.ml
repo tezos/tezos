@@ -409,7 +409,7 @@ module Baking = struct
   let bake block (contract: Account.t) operations =
     let seed_nonce =
       match Nonce.of_bytes @@
-        Sodium.Random.Bigbytes.generate Constants.nonce_length with
+        Rand.generate Constants.nonce_length with
       | Error _ -> assert false
       | Ok nonce -> nonce in
     let seed_nonce_hash = Nonce.hash seed_nonce in

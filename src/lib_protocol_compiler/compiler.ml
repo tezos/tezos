@@ -117,21 +117,23 @@ let debug fmt =
   else Format.ifprintf Format.err_formatter fmt
 
 let hash_file file =
-  let open Sodium.Generichash in
+  let open Blake2 in
   let buflen = 8092 in
   let buf = BytesLabels.create buflen in
   let fd = Unix.openfile file [Unix.O_RDONLY] 0o600 in
-  let state = init ~size:32 () in
+  let state = Blake2b.init 32 in
   let loop () =
     match Unix.read fd buf 0 buflen with
     | 0 -> ()
     | nb_read ->
-        Bytes.update state @@
-        if nb_read = buflen then buf else BytesLabels.sub buf ~pos:0 ~len:nb_read
+        Blake2b.update state
+          (Cstruct.of_bytes
+             (if nb_read = buflen then buf else BytesLabels.sub buf ~pos:0 ~len:nb_read))
   in
   loop () ;
   Unix.close fd ;
-  BytesLabels.unsafe_to_string (Bytes.of_hash (final state))
+  let Blake2b.Hash h = Blake2b.final state in
+  Cstruct.to_string h
 
 let mktemp_dir () =
   Filename.get_temp_dir_name () //

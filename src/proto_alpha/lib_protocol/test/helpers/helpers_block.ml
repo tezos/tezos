@@ -42,8 +42,8 @@ let get_op_header_res (res : result) : operation_header = {
 
 let get_proto_header priority : protocol_header = {
   priority ;
-  proof_of_work_nonce = Helpers_sodium.generate_proof_of_work_nonce ();
-  seed_nonce_hash = Proto_alpha.Tezos_context.Nonce.hash @@ Helpers_sodium.generate_seed_nonce ()
+  proof_of_work_nonce = Helpers_crypto.generate_proof_of_work_nonce ();
+  seed_nonce_hash = Proto_alpha.Tezos_context.Nonce.hash @@ Helpers_crypto.generate_seed_nonce ()
 }
 
 let get_op_header pbh : operation_header = {

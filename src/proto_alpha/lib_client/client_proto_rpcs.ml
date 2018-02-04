@@ -263,7 +263,7 @@ module Helpers = struct
         operations cctxt block ~branch [Seed_nonce_revelation { level ; nonce }]
       let faucet cctxt
           block ~branch ~id () =
-        let nonce = Sodium.Random.Bigbytes.generate 16 in
+        let nonce = Rand.generate 16 in
         operations cctxt block ~branch [Faucet { id ; nonce }]
     end
     let empty_proof_of_work_nonce =

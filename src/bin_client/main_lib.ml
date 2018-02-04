@@ -44,7 +44,6 @@ let get_commands_for_version ctxt block protocol =
 (* Main (lwt) entry *)
 let main ?only_commands () =
   Random.self_init () ;
-  Sodium.Random.stir () ;
   Lwt.catch begin fun () ->
     let original_args = List.tl (Array.to_list Sys.argv) in
     begin

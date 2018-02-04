@@ -7,17 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let () =
-  let expected_primitive = "blake2b"
-  and primitive = Sodium.Generichash.primitive in
-  if primitive <> expected_primitive then begin
-    Printf.eprintf
-      "FATAL ERROR: \
-       invalid value for Sodium.Generichash.primitive: %S (expected %S)@."
-      primitive expected_primitive ;
-    exit 1
-  end
-
 (*-- Type specific Hash builder ---------------------------------------------*)
 
 module type Name = sig
@@ -32,8 +21,8 @@ module type PrefixedName = sig
 end
 
 module Make_minimal (K : Name) = struct
-
-  type t = Sodium.Generichash.hash
+  open Blake2
+  type t = Blake2b.hash
 
   include K
 
@@ -46,7 +35,7 @@ module Make_minimal (K : Name) = struct
     if String.length s <> size then
       None
     else
-      Some (Sodium.Generichash.Bytes.to_hash (Bytes.of_string s))
+      Some (Blake2b.Hash (Cstruct.of_string s))
   let of_string_exn s =
     match of_string s with
     | None ->
@@ -55,7 +44,7 @@ module Make_minimal (K : Name) = struct
             K.name (String.length s) in
         raise (Invalid_argument msg)
     | Some h -> h
-  let to_string s = Bytes.to_string (Sodium.Generichash.Bytes.of_hash s)
+  let to_string (Blake2b.Hash h) = Cstruct.to_string h
 
   let of_hex s = of_string (Hex.to_string (`Hex s))
   let of_hex_exn s = of_string_exn (Hex.to_string (`Hex s))
@@ -63,14 +52,14 @@ module Make_minimal (K : Name) = struct
     let `Hex s = Hex.of_string (to_string s) in
     s
 
-  let compare = Sodium.Generichash.compare
+  let compare (Blake2b.Hash h1) (Blake2b.Hash h2) = Cstruct.compare h1 h2
   let equal x y = compare x y = 0
 
   let of_bytes b =
     if MBytes.length b <> size then
       None
     else
-      Some (Sodium.Generichash.Bigbytes.to_hash b)
+      Some (Blake2b.Hash (Cstruct.of_bigarray b))
   let of_bytes_exn b =
     match of_bytes b with
     | None ->
@@ -79,24 +68,20 @@ module Make_minimal (K : Name) = struct
             K.name (MBytes.length b) in
         raise (Invalid_argument msg)
     | Some h -> h
-  let to_bytes = Sodium.Generichash.Bigbytes.of_hash
+  let to_bytes (Blake2b.Hash h) = Cstruct.to_bigarray h
 
   let read src off = of_bytes_exn @@ MBytes.sub src off size
   let write dst off h = MBytes.blit (to_bytes h) 0 dst off size
 
   let hash_bytes l =
-    let open Sodium.Generichash in
-    let state = init ~size () in
-    List.iter (Bigbytes.update state) l ;
-    final state
+    let state = Blake2b.init size in
+    List.iter (fun b -> Blake2b.update state (Cstruct.of_bigarray b)) l ;
+    Blake2b.final state
 
   let hash_string l =
-    let open Sodium.Generichash in
-    let state = init ~size () in
-    List.iter
-      (fun s -> Bytes.update state (BytesLabels.unsafe_of_string s))
-      l ;
-    final state
+    let state = Blake2b.init size in
+    List.iter (fun s -> Blake2b.update state (Cstruct.of_string s)) l ;
+    Blake2b.final state
 
   let path_length = 6
   let to_path key l =
@@ -125,11 +110,7 @@ module Make_minimal (K : Name) = struct
   module Table = struct
     include Hashtbl.Make(struct
         type nonrec t = t
-        let hash s =
-          Int64.to_int
-            (EndianString.BigEndian.get_int64
-               (Bytes.unsafe_to_string (Sodium.Generichash.Bytes.of_hash s))
-               0)
+        let hash (Blake2b.Hash h) = Int64.to_int (Cstruct.BE.get_uint64 h 0)
         let equal = equal
       end)
   end

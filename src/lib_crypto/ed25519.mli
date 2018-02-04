@@ -102,7 +102,7 @@ module Signature : sig
   val of_bytes_opt: MBytes.t -> t option
   val to_bytes: t -> MBytes.t
 
-  (** Checks a signature *)
+  (** Check a signature *)
   val check: Public_key.t -> t -> MBytes.t -> bool
 
   (** Append a signature *)
@@ -113,8 +113,6 @@ end
 
 module Seed : sig
   type t
-  val to_hex : t -> string
-  val of_hex : string -> t
   val generate : unit -> t
   val extract : Secret_key.t -> t
 end

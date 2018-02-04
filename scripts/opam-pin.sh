@@ -10,12 +10,12 @@ export OPAMYES=yes
 ### Temporary HACK
 
 ## Should be in sync with `opam-unpin.sh`
-opam pin add --no-action --dev-repo sodium
 opam pin add --no-action --dev-repo ocplib-json-typed
 
 ## Unpin package we used to pin...
 opam pin remove --no-action ocp-ocamlres
 opam pin remove --no-action ocplib-resto
+opam pin remove --no-action sodium
 
 ### End of temporary HACK
 

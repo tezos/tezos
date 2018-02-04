@@ -17,10 +17,18 @@ module Public_key_hash = Blake2B.Make(Base58)(struct
 let () =
   Base58.check_encoded_prefix Public_key_hash.b58check_encoding "tz1" 36
 
+open Tweetnacl
+
+let of_bigarray1 f x =
+  f (Cstruct.of_bigarray x)
+
+let to_bigarray1 f x =
+  Cstruct.to_bigarray (f x)
+
 module Public_key = struct
 
-  type t = Sodium.Sign.public_key
-  let compare = Sodium.Sign.compare_public_keys
+  type t = Sign.public Sign.key
+  let compare a b = Cstruct.compare (Sign.to_cstruct a) (Sign.to_cstruct b)
   let (=) xs ys = compare xs ys = 0
   let (<>) xs ys = compare xs ys <> 0
   let (<) xs ys = compare xs ys < 0
@@ -33,16 +41,13 @@ module Public_key = struct
   type Base58.data +=
     | Public_key of t
 
-  let to_string s = Bytes.to_string (Sodium.Sign.Bytes.of_public_key s)
-  let of_string_exn x = Sodium.Sign.Bytes.to_public_key (Bytes.of_string x)
-  let of_string x =
-    try Some (of_string_exn x)
-    with _ -> None
+  let to_string s = Cstruct.to_string (Sign.to_cstruct s)
+  let of_string s = Sign.pk_of_cstruct (Cstruct.of_string s)
 
   let b58check_encoding =
     Base58.register_encoding
       ~prefix: Base58.Prefix.ed25519_public_key
-      ~length:Sodium.Sign.public_key_size
+      ~length:Sign.pkbytes
       ~to_raw:to_string
       ~of_raw:of_string
       ~wrap:(fun x -> Public_key x)
@@ -61,13 +66,14 @@ module Public_key = struct
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
   let of_hex s = of_string (Hex.to_string s)
-  let of_hex_exn s = of_string_exn (Hex.to_string s)
+  let of_hex_exn s =
+    match of_string (Hex.to_string s) with
+    | Some x -> x
+    | None -> invalid_arg "Public_key.of_hex_exn"
   let to_hex s = Hex.of_string (to_string s)
 
   let of_bytes_opt s =
-    match Sodium.Sign.Bigbytes.to_public_key s with
-    | exception _ -> None
-    | pk -> Some pk
+    Sign.pk_of_cstruct (Cstruct.of_bigarray s)
 
   let of_bytes s =
     match of_bytes_opt s with
@@ -81,7 +87,7 @@ module Public_key = struct
         Pervasives.invalid_arg "Ed25519.Public_key.of_bytes_exn: argument is not a serialized public key"
     | Some pk -> pk
 
-  let to_bytes = Sodium.Sign.Bigbytes.of_public_key
+  let to_bytes pk = Cstruct.to_bigarray (Sign.to_cstruct pk)
 
   let param ?(name="ed25519-public") ?(desc="Ed25519 public key (b58check-encoded)") t =
     Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
@@ -105,21 +111,21 @@ module Public_key = struct
            string)
       ~binary:
         (conv
-           Sodium.Sign.Bigbytes.of_public_key
-           Sodium.Sign.Bigbytes.to_public_key
-           (Fixed.bytes Sodium.Sign.public_key_size))
+           (to_bigarray1 Sign.to_cstruct)
+           (of_bigarray1 Sign.pk_of_cstruct_exn)
+           (Fixed.bytes Sign.pkbytes))
 
   let hash v =
     Public_key_hash.hash_bytes
-      [ Sodium.Sign.Bigbytes.of_public_key v ]
+      [ to_bigarray1 Sign.to_cstruct v ]
 
 end
 
 module Secret_key = struct
 
-  type t = Sodium.Sign.secret_key
+  type t = Sign.secret Sign.key
 
-  let to_public_key = Sodium.Sign.secret_key_to_public_key
+  let to_public_key = Sign.public
 
   type Base58.data +=
     | Secret_key of t
@@ -127,28 +133,21 @@ module Secret_key = struct
   let seed_encoding =
     Base58.register_encoding
       ~prefix: Base58.Prefix.ed25519_seed
-      ~length:Sodium.Sign.seed_size
-      ~to_raw:(fun x -> Sodium.Sign.secret_key_to_seed x |>
-                        Sodium.Sign.Bytes.of_seed |>
-                        Bytes.unsafe_to_string)
-      ~of_raw:(fun x ->
-          try Some (Bytes.unsafe_of_string x |>
-                    Sodium.Sign.Bytes.to_seed |>
-                    Sodium.Sign.seed_keypair |>
-                    fst)
-          with _ -> None)
-      ~wrap:(fun x -> Secret_key x)
+      ~length:Sign.seedbytes
+      ~to_raw:(fun sk -> Cstruct.to_string (Sign.seed sk))
+      ~of_raw:(fun buf ->
+          let seed = Cstruct.of_string buf in
+          match Sign.keypair ~seed () with
+          | exception _ -> None
+          | _pk, sk -> Some sk)
+      ~wrap:(fun sk -> Secret_key sk)
 
   let secret_key_encoding =
     Base58.register_encoding
       ~prefix: Base58.Prefix.ed25519_secret_key
-      ~length:Sodium.Sign.secret_key_size
-      ~to_raw:(fun x -> Sodium.Sign.Bytes.of_secret_key x |>
-                        Bytes.unsafe_to_string)
-      ~of_raw:(fun x ->
-          try Some (Bytes.unsafe_of_string x |>
-                    Sodium.Sign.Bytes.to_secret_key)
-          with _ -> None)
+      ~length:Sign.skbytes
+      ~to_raw:(fun sk -> Cstruct.to_string (Sign.to_cstruct sk))
+      ~of_raw:(fun buf -> Sign.sk_of_cstruct (Cstruct.of_string buf))
       ~wrap:(fun x -> Secret_key x)
 
   let of_b58check_opt s =
@@ -169,12 +168,11 @@ module Secret_key = struct
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
   let of_bytes_opt s =
-    match Sodium.Sign.Bigbytes.to_seed s with
-    | seed -> Some (seed |> Sodium.Sign.seed_keypair |> fst)
-    | exception _ ->
-        match Sodium.Sign.Bigbytes.to_secret_key s with
-        | exception _ -> None
-        | sk -> Some sk
+    let s = Cstruct.of_bigarray s in
+    match Cstruct.len s with
+    | 32 -> let _pk, sk = Sign.keypair ~seed:s () in Some sk
+    | 64 -> Sign.sk_of_cstruct s
+    | _ -> None
 
   let of_bytes s =
     match of_bytes_opt s with
@@ -188,8 +186,7 @@ module Secret_key = struct
         Pervasives.invalid_arg "Ed25519.Secret_key.of_bytes_exn: argument is not a serialized seed"
     | Some sk -> sk
 
-  let to_bytes sk =
-    Sodium.Sign.(sk |> secret_key_to_seed |> Bigbytes.of_seed)
+  let to_bytes = to_bigarray1 Sign.seed
 
   let param ?(name="ed25519-secret") ?(desc="Ed25519 secret key (b58check-encoded)") t =
     Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
@@ -213,20 +210,13 @@ module Secret_key = struct
                           "Ed25519 secret key: unexpected prefix.")
            string)
       ~binary:
-        (conv
-           (fun sk -> Sodium.Sign.secret_key_to_seed sk |>
-                      Sodium.Sign.Bigbytes.of_seed)
-           (fun bytes ->
-              if MBytes.length bytes = Sodium.Sign.seed_size
-              then Sodium.Sign.Bigbytes.to_seed bytes |>
-                   Sodium.Sign.seed_keypair |> fst
-              else Sodium.Sign.Bigbytes.to_secret_key bytes)
+        (conv to_bytes (fun buf -> of_bytes_exn buf)
            (dynamic_size (Variable.bytes)))
 
 end
 
 let sign key msg =
-  Sodium.Sign.Bigbytes.(of_signature @@ sign_detached key msg)
+  Cstruct.(to_bigarray (Sign.detached ~key (of_bigarray msg)))
 
 module Signature = struct
 
@@ -238,7 +228,7 @@ module Signature = struct
   let b58check_encoding =
     Base58.register_encoding
       ~prefix: Base58.Prefix.ed25519_signature
-      ~length:Sodium.Sign.signature_size
+      ~length:Sign.bytes
       ~to_raw:MBytes.to_string
       ~of_raw:(fun s -> Some (MBytes.of_string s))
       ~wrap:(fun x -> Signature x)
@@ -257,9 +247,7 @@ module Signature = struct
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
   let of_bytes_opt s =
-    match Sodium.Sign.Bigbytes.to_signature s with
-    | exception _ -> None
-    | _signature -> Some s
+    if MBytes.length s = Sign.bytes then Some s else None
 
   let of_bytes s =
     match of_bytes_opt s with
@@ -295,13 +283,12 @@ module Signature = struct
               | None -> Data_encoding.Json.cannot_destruct
                           "Ed25519 signature: unexpected prefix.")
            string)
-      ~binary: (Fixed.bytes Sodium.Sign.signature_size)
+      ~binary: (Fixed.bytes Sign.bytes)
 
   let check public_key signature msg =
-    try
-      Sodium.Sign.Bigbytes.(verify public_key (to_signature signature) msg) ;
-      true
-    with _ -> false
+    Sign.verify_detached ~key:public_key
+      ~signature:(Cstruct.of_bigarray signature)
+      (Cstruct.of_bigarray msg)
 
   let append key msg =
     MBytes.concat msg (sign key msg)
@@ -313,32 +300,16 @@ end
 
 module Seed = struct
 
-  type t = Sodium.Sign.seed
+  type t = Cstruct.t
 
-  let to_hex s =
-    Sodium.Sign.Bytes.of_seed s
-    |> Bytes.to_string
-    |> Hex.of_string
-    |> (fun (`Hex s) -> s)
-
-  let of_hex s =
-    Hex.to_string (`Hex s)
-    |> Bytes.of_string
-    |> Sodium.Sign.Bytes.to_seed
-
-  let generate () =
-    (* Seed is 32 bytes long *)
-    Sodium.Random.Bytes.generate Sodium.Sign.seed_size
-    |> Sodium.Sign.Bytes.to_seed
-
-  let extract =
-    Sodium.Sign.secret_key_to_seed
+  let generate () = Rand.gen 32
+  let extract = Sign.seed
 end
 
 let generate_key () =
-  let secret, pub = Sodium.Sign.random_keypair () in
-  (Public_key.hash pub, pub, secret)
+  let pk, sk = Sign.keypair () in
+  (Public_key.hash pk, pk, sk)
 
 let generate_seeded_key seed =
-  let secret, pub = Sodium.Sign.seed_keypair seed in
-  (Public_key.hash pub, pub, secret)
+  let pk, sk = Sign.keypair ~seed () in
+  (Public_key.hash pk, pk, sk)

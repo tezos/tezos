@@ -1,0 +1,14 @@
+(jbuild_version 1)
+
+(executable
+ ((name test)
+  (libraries (hex tweetnacl alcotest))))
+
+(alias
+ ((name    runtest-tweetnacl)
+  (deps    (test.exe))
+  (action  (run ${<}))))
+
+(alias
+ ((name    runtest)
+  (deps    ((alias runtest-tweetnacl)))))

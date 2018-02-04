@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* TODO encode/encrypt before to push into the writer pipe. *)
-(* TODO patch Sodium.Box to avoid allocation of the encrypted buffer.*)
 (* TODO patch Data_encoding for continuation-based binary writer/reader. *)
 (* TODO test `close ~wait:true`. *)
 (* TODO nothing in welcoming message proves that the incoming peer is
@@ -33,10 +31,9 @@ type error += Invalid_chunks_size of { value: int ; min: int ; max: int }
 
 module Crypto = struct
 
+  let bufsize = 1 lsl 16 - 1
   let header_length = 2
-  let crypto_overhead = 18 (* FIXME import from Sodium.Box. *)
-  let max_content_length =
-    1 lsl (header_length * 8) - crypto_overhead
+  let max_content_length = bufsize - header_length - Crypto_box.boxzerobytes
 
   type data = {
     channel_key : Crypto_box.channel_key ;
@@ -44,48 +41,53 @@ module Crypto = struct
     mutable remote_nonce : Crypto_box.nonce ;
   }
 
-  let write_chunk fd cryptobox_data buf =
-    let header_buf = MBytes.create header_length in
+  let write_chunk fd cryptobox_data msg =
+    let msglen = MBytes.length msg in
+    fail_unless
+      (msglen <= max_content_length) Invalid_message_size >>=? fun () ->
+    let buf = MBytes.init (msglen + Crypto_box.zerobytes) '\x00' in
+    MBytes.blit msg 0 buf Crypto_box.zerobytes msglen ;
     let local_nonce = cryptobox_data.local_nonce in
     cryptobox_data.local_nonce <- Crypto_box.increment_nonce local_nonce ;
-    let encrypted_message =
-      Crypto_box.fast_box cryptobox_data.channel_key buf local_nonce in
-    let encrypted_len = MBytes.length encrypted_message in
-    fail_unless
-      (encrypted_len < 1 lsl (header_length * 8))
-      Invalid_message_size >>=? fun () ->
-    MBytes.set_int16 header_buf 0 encrypted_len ;
-    P2p_io_scheduler.write fd header_buf >>=? fun () ->
-    P2p_io_scheduler.write fd encrypted_message >>=? fun () ->
-    return ()
+    Crypto_box.fast_box_noalloc
+      cryptobox_data.channel_key local_nonce buf ;
+    let encrypted_length = msglen + Crypto_box.boxzerobytes in
+    MBytes.set_int16 buf
+      (Crypto_box.boxzerobytes - header_length) encrypted_length ;
+    let payload = MBytes.sub buf (Crypto_box.boxzerobytes - header_length)
+        (header_length + encrypted_length) in
+    P2p_io_scheduler.write fd payload
 
   let read_chunk fd cryptobox_data =
     let header_buf = MBytes.create header_length in
     P2p_io_scheduler.read_full ~len:header_length fd header_buf >>=? fun () ->
-    let len = MBytes.get_uint16 header_buf 0 in
-    let buf = MBytes.create len in
-    P2p_io_scheduler.read_full ~len fd buf >>=? fun () ->
+    let encrypted_length = MBytes.get_uint16 header_buf 0 in
+    let buf = MBytes.init (encrypted_length + Crypto_box.boxzerobytes) '\x00' in
+    P2p_io_scheduler.read_full
+      ~pos:Crypto_box.boxzerobytes ~len:encrypted_length fd buf >>=? fun () ->
     let remote_nonce = cryptobox_data.remote_nonce in
     cryptobox_data.remote_nonce <- Crypto_box.increment_nonce remote_nonce ;
     match
-      Crypto_box.fast_box_open cryptobox_data.channel_key buf remote_nonce
+      Crypto_box.fast_box_open_noalloc
+        cryptobox_data.channel_key remote_nonce buf
     with
-    | None ->
+    | false ->
         fail Decipher_error
-    | Some buf ->
-        return buf
+    | true ->
+        return (MBytes.sub buf Crypto_box.zerobytes
+                  (encrypted_length - Crypto_box.boxzerobytes))
 
 end
 
 let check_binary_chunks_size  size =
-  let value = size - Crypto.crypto_overhead - Crypto.header_length in
+  let value = size - Crypto_box.boxzerobytes - Crypto.header_length in
   fail_unless
     (value > 0 &&
      value <= Crypto.max_content_length)
     (Invalid_chunks_size
        { value = size ;
-         min = Crypto.(header_length + crypto_overhead + 1) ;
-         max = Crypto.(max_content_length + crypto_overhead + header_length)
+         min = Crypto.(header_length + Crypto_box.boxzerobytes + 1) ;
+         max = Crypto.bufsize ;
        })
 
 module Connection_message = struct
@@ -392,7 +394,7 @@ module Writer = struct
       match binary_chunks_size with
       | None -> Crypto.max_content_length
       | Some size ->
-          let size = size - Crypto.crypto_overhead - Crypto.header_length in
+          let size = size - Crypto_box.boxzerobytes - Crypto.header_length in
           assert (size > 0) ;
           assert (size <= Crypto.max_content_length) ;
           size

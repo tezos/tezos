@@ -26,13 +26,6 @@ let id0 =
 
 let versions = P2p_version.[{ name = "TEST" ; minor = 0 ; major = 0 }]
 
-let random_bytes len =
-  let msg = MBytes.create len in
-  for i = 0 to len / 8 - 1 do
-    MBytes.set_int64 msg (i*8) (Random.int64 Int64.max_int)
-  done ;
-  msg
-
 let rec listen ?port addr =
   let tentative_port =
     match port with
@@ -143,7 +136,7 @@ let is_decoding_error = function
 
 module Low_level = struct
 
-  let simple_msg = random_bytes (1 lsl 4)
+  let simple_msg = Rand.generate (1 lsl 4)
 
   let client _ch sched addr port =
     let msg = MBytes.create (MBytes.length simple_msg) in
@@ -215,8 +208,8 @@ module Simple_message = struct
 
   let encoding = Data_encoding.bytes
 
-  let simple_msg = random_bytes (1 lsl 4)
-  let simple_msg2 = random_bytes (1 lsl 4)
+  let simple_msg = Rand.generate (1 lsl 4)
+  let simple_msg2 = Rand.generate (1 lsl 4)
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
@@ -246,8 +239,8 @@ module Chunked_message = struct
 
   let encoding = Data_encoding.bytes
 
-  let simple_msg = random_bytes (1 lsl 8)
-  let simple_msg2 = random_bytes (1 lsl 8)
+  let simple_msg = Rand.generate (1 lsl 8)
+  let simple_msg2 = Rand.generate (1 lsl 8)
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
@@ -279,8 +272,8 @@ module Oversized_message = struct
 
   let encoding = Data_encoding.bytes
 
-  let simple_msg = random_bytes (1 lsl 17)
-  let simple_msg2 = random_bytes (1 lsl 17)
+  let simple_msg = Rand.generate (1 lsl 17)
+  let simple_msg2 = Rand.generate (1 lsl 17)
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
@@ -310,7 +303,7 @@ module Close_on_read = struct
 
   let encoding = Data_encoding.bytes
 
-  let simple_msg = random_bytes (1 lsl 4)
+  let simple_msg = Rand.generate (1 lsl 4)
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->
@@ -336,7 +329,7 @@ module Close_on_write = struct
 
   let encoding = Data_encoding.bytes
 
-  let simple_msg = random_bytes (1 lsl 4)
+  let simple_msg = Rand.generate (1 lsl 4)
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->

@@ -1,0 +1,14 @@
+(jbuild_version 1)
+
+(executable
+ ((name test)
+  (libraries (blake2 alcotest))))
+
+(alias
+ ((name    runtest-blake2)
+  (deps    (test.exe))
+  (action  (run ${<}))))
+
+(alias
+ ((name    runtest)
+  (deps    ((alias runtest-blake2)))))

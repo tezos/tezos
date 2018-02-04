@@ -1,0 +1,21 @@
+opam-version: "1.2"
+name: "blake2"
+version: "dev"
+authors: "Vincent Bernardoff <vb@luminar.eu.org>"
+maintainer: "Vincent Bernardoff <vb@luminar.eu.org>"
+license: "ISC"
+homepage: "https://github.com/vbmithr/ocaml-blake2"
+bug-reports: "https://github.com/vbmithr/ocaml-blake2/issues"
+dev-repo: "git://github.com/vbmithr/ocaml-blake2"
+
+available: [
+  ocaml-version >= "4.02.0"
+]
+
+build: [ "jbuilder" "build" "-j" jobs "-p" name "@install" ]
+build-test: [ "jbuilder" "runtest" "-p" name "-j" jobs ]
+depends: [
+  "jbuilder" {build & >= "1.0+beta16"}
+  "cstruct" {>= "3.2.1"}
+  "alcotest" { test }
+]

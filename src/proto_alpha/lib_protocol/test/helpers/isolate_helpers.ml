@@ -9,7 +9,7 @@
 
 open Proto_alpha
 
-module Sodium = Helpers_sodium
+module Crypto = Helpers_crypto
 module Cast = Helpers_cast
 module Assert = Helpers_assert
 module Services = Helpers_services

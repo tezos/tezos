@@ -1,0 +1,7 @@
+(jbuild_version 1)
+
+(library
+ ((name            tweetnacl)
+  (public_name     tweetnacl)
+  (libraries       (hex cstruct zarith))
+  (c_names         (tweetnacl_stubs))))

@@ -16,7 +16,8 @@ depends: [
   "tezos-error-monad"
   "tezos-rpc"
   "nocrypto"
-  "sodium"
+  "blake2"
+  "tweetnacl"
   "zarith"
 ]
 build: [

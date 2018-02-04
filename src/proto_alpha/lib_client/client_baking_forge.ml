@@ -13,11 +13,11 @@ open Tezos_context
 open Logging.Client.Baking
 
 let generate_proof_of_work_nonce () =
-  Sodium.Random.Bigbytes.generate Constants.proof_of_work_nonce_size
+  Rand.generate Constants.proof_of_work_nonce_size
 
 let generate_seed_nonce () =
   match Nonce.of_bytes @@
-    Sodium.Random.Bigbytes.generate Constants.nonce_length with
+    Rand.generate Constants.nonce_length with
   | Error _ -> assert false
   | Ok nonce -> nonce
 
