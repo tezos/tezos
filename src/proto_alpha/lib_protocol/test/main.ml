@@ -14,4 +14,5 @@ let () =
       Test_transaction.tests @
       Test_endorsement.tests @
       Test_origination.tests @
+      Test_big_maps.tests @
       Test_michelson.tests )

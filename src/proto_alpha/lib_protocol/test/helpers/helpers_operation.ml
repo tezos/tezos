@@ -31,7 +31,7 @@ let manager_full src ?(fee = Tez.zero) ops context =
   manager src ~fee ops context >>=? fun ops -> return @@ sourced ops
 
 
-let transaction ?(parameters = None) amount destination =
+let transaction ?parameters amount destination =
   Transaction {
     amount ;
     parameters ;
@@ -70,8 +70,8 @@ let origination_full ?(spendable = true) ?(delegatable = true) ?(fee = Tez.zero)
   manager_full src ~fee [origination ~spendable ~delegatable src credit] context
 
 
-let transaction_full ?(fee = Tez.zero) src dst amount context =
-  manager src ~fee [transaction amount dst] context
+let transaction_full ?(fee = Tez.zero) ?parameters src dst amount context =
+  manager src ~fee [transaction ?parameters amount dst] context
   >>=? fun manager_op ->
   return @@ sourced manager_op
 
