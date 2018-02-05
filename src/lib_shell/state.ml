@@ -706,7 +706,7 @@ module Registred_protocol = struct
     let module Name = struct
       let name = Protocol_hash.to_b58check hash
     end in
-    let module Env = Tezos_protocol_environment.Make(Name)() in
+    let module Env = Updater.MakeV1(Name)() in
     (module struct
       let hash = hash
       module P = F(Env)

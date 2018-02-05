@@ -37,9 +37,52 @@ type rpc_context = {
   context: Context.t ;
 }
 
-module type RAW_PROTOCOL = sig
-  type error = ..
-  type 'a tzresult = ('a, error list) result
+(* The end of this file is not exported to the protocol... *)
+
+val compiler_name: string
+
+module Node_protocol_environment_sigs : sig
+
+  module type V1 = sig
+
+    include Tezos_protocol_environment_sigs.V1.T
+      with type Format.formatter = Format.formatter
+       and type 'a Data_encoding.t = 'a Data_encoding.t
+       and type 'a Lwt.t = 'a Lwt.t
+       and type ('a, 'b) Pervasives.result = ('a, 'b) result
+       and type Block_hash.t = Block_hash.t
+       and type Operation_hash.t = Operation_hash.t
+       and type Operation_list_hash.t = Operation_list_hash.t
+       and type Operation_list_list_hash.t = Operation_list_list_hash.t
+       and type Context_hash.t = Context_hash.t
+       and type Protocol_hash.t = Protocol_hash.t
+       and type Context.t = Context.t
+       and type Time.t = Time.t
+       and type MBytes.t = MBytes.t
+       and type Operation.shell_header = Operation.shell_header
+       and type Operation.t = Operation.t
+       and type Block_header.shell_header = Block_header.shell_header
+       and type Block_header.t = Block_header.t
+       and type 'a RPC_directory.t = 'a RPC_directory.t
+       and type Updater.validation_result = validation_result
+       and type Updater.quota = quota
+       and type Updater.rpc_context = rpc_context
+       and type Ed25519.Public_key_hash.t = Ed25519.Public_key_hash.t
+       and type Ed25519.Public_key.t = Ed25519.Public_key.t
+       and type Ed25519.Signature.t = Ed25519.Signature.t
+       and type 'a Micheline.canonical = 'a Micheline.canonical
+
+    type error += Ecoproto_error of Error_monad.error list
+    val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
+
+  end
+
+end
+
+module MakeV1(Name : sig val name: string end)() :
+  Node_protocol_environment_sigs.V1
+
+module type NODE_PROTOCOL = sig
   val max_block_length: int
   val validation_passes: quota list
   type operation
@@ -77,50 +120,6 @@ module type RAW_PROTOCOL = sig
   val configure_sandbox:
     Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 end
-
-(**/**)
-
-(* The end of this file is not exported to the protocol... *)
-
-val compiler_name: string
-
-module Node_protocol_environment_sigs : sig
-
-  module type V1 = sig
-
-    include Tezos_protocol_environment_sigs.V1.T
-      with type Format.formatter = Format.formatter
-       and type 'a Data_encoding.t = 'a Data_encoding.t
-       and type 'a Lwt.t = 'a Lwt.t
-       and type ('a, 'b) Pervasives.result = ('a, 'b) result
-       and type Block_hash.t = Block_hash.t
-       and type Operation_hash.t = Operation_hash.t
-       and type Operation_list_hash.t = Operation_list_hash.t
-       and type Operation_list_list_hash.t = Operation_list_list_hash.t
-       and type Context_hash.t = Context_hash.t
-       and type Protocol_hash.t = Protocol_hash.t
-       and type Context.t = Context.t
-       and type Time.t = Time.t
-       and type MBytes.t = MBytes.t
-       and type Operation.shell_header = Operation.shell_header
-       and type Operation.t = Operation.t
-       and type Block_header.shell_header = Block_header.shell_header
-       and type Block_header.t = Block_header.t
-       and type 'a RPC_directory.t = 'a RPC_directory.t
-       and type Updater.validation_result = validation_result
-       and type Updater.quota = quota
-       and type Updater.rpc_context = rpc_context
-
-    type error += Ecoproto_error of Error_monad.error list
-    val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
-
-  end
-
-end
-
-module type NODE_PROTOCOL =
-  RAW_PROTOCOL with type error := error
-                and type 'a tzresult := 'a tzresult
 
 module LiftProtocol(Name : sig val name: string end)
     (Env : Node_protocol_environment_sigs.V1)

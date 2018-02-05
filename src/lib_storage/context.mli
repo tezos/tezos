@@ -50,10 +50,6 @@ val fold:
   f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->
   'a Lwt.t
 
-val keys: context -> key -> key list Lwt.t
-val fold_keys:
-  context -> key -> init:'a -> f:(key -> 'a -> 'a Lwt.t) -> 'a Lwt.t
-
 (** {2 Accessing and Updating Versions} **************************************)
 
 val exists: index -> Context_hash.t -> bool Lwt.t

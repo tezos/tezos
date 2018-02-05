@@ -169,17 +169,6 @@ let fold ctxt key ~init ~f =
     end
     init keys
 
-let fold_keys s k ~init ~f =
-  let rec loop k acc =
-    fold s k ~init:acc
-      ~f:(fun file acc ->
-          match file with
-          | `Key k -> f k acc
-          | `Dir k -> loop k acc) in
-  loop k init
-
-let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
-
 (*-- Predefined Fields -------------------------------------------------------*)
 
 let get_protocol v =

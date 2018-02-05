@@ -7,6 +7,5 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Make(Param : sig val name: string end)() =
-  Tezos_base.Protocol_environment.MakeV1
-    (Param)(Fake_context)(Fake_updater.Make(Fake_context))()
+module Make(Context : Protocol_environment.CONTEXT) :
+  Protocol_environment.UPDATER with module Context := Context

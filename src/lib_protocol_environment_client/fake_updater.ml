@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Make(Context : sig type t end) = struct
+module Make(Context : Protocol_environment.CONTEXT) = struct
 
   type validation_result = {
     context: Context.t ;

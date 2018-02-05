@@ -53,5 +53,7 @@ module P2p_connection = P2p_connection
 module P2p_stat = P2p_stat
 module P2p_version = P2p_version
 
+module Protocol_environment = Protocol_environment
+
 include Utils.Infix
 include Error_monad

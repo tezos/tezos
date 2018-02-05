@@ -169,7 +169,17 @@ let test_replay { idx ; genesis }  =
       Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
       Lwt.return ()
 
-let test_keys { idx ; genesis } =
+let fold_keys s k ~init ~f =
+  let rec loop k acc =
+    fold s k ~init:acc
+      ~f:(fun file acc ->
+          match file with
+          | `Key k -> f k acc
+          | `Dir k -> loop k acc) in
+  loop k init
+let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+
+let test_fold { idx ; genesis } =
   checkout idx genesis >>= function
   | None ->
       Assert.fail_msg "checkout genesis_block"
@@ -198,7 +208,6 @@ let test_keys { idx ; genesis } =
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       Lwt.return ()
 
-
 (******************************************************************************)
 
 let tests : (string * (t -> unit Lwt.t)) list = [
@@ -206,7 +215,7 @@ let tests : (string * (t -> unit Lwt.t)) list = [
   "continuation", test_continuation ;
   "fork", test_fork ;
   "replay", test_replay ;
-  "keys", test_keys ;
+  "fold", test_fold ;
 ]
 
 let () =

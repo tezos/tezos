@@ -20,5 +20,3 @@ let remove_rec _ _ = assert false
 let fold _ _ ~init:_ ~f:_ = assert false
 let keys _ _ = assert false
 let fold_keys _ _ ~init:_ ~f:_ = assert false
-let register_resolver _ _ = ()
-let complete _ _ = assert false
