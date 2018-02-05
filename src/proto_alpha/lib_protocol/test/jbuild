@@ -1,7 +1,7 @@
 (jbuild_version 1)
 
-(executables
- ((names (test_isolate_main))
+(executable
+ ((name main)
   (libraries (tezos-base
               tezos-test-helpers
               tezos_proto_alpha_isolate_helpers
@@ -14,18 +14,18 @@
 (alias
  ((name buildtest)
   (package tezos-protocol-alpha)
-  (deps (test_isolate_main.exe))))
+  (deps (main.exe))))
 
 (alias
- ((name runtest_isolate_main)
+ ((name runtest_proto_alpha)
   (package tezos-protocol-alpha)
   (deps (sandbox.json (glob_files contracts/*.tz)))
-  (action (chdir ${ROOT} (run ${exe:test_isolate_main.exe} ${path-no-dep:contracts})))))
+  (action (chdir ${ROOT} (run ${exe:main.exe} ${path-no-dep:contracts})))))
 
 (alias
  ((name runtest)
   (package tezos-protocol-alpha)
-  (deps ((alias runtest_isolate_main)))))
+  (deps ((alias runtest_proto_alpha)))))
 
 (alias
  ((name runtest_indent)

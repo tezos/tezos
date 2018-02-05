@@ -10,8 +10,8 @@
 let () =
   let module Test = Test.Make(Error_monad) in
   Test.run "proto_alpha."
-    ( Test_isolate_dsl.tests @
-      Test_isolate_transaction.tests @
-      Test_isolate_endorsement.tests @
-      Test_isolate_origination.tests @
-      Test_isolate_michelson.tests )
+    ( Test_dsl.tests @
+      Test_transaction.tests @
+      Test_endorsement.tests @
+      Test_origination.tests @
+      Test_michelson.tests )
