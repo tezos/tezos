@@ -49,6 +49,7 @@
         "Gas",
 	"Script_tc_errors",
         "Script_ir_translator",
+	"Script_tc_errors_registration",
         "Script_interpreter",
 
         "Baking",

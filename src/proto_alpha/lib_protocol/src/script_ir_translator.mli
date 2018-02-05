@@ -54,9 +54,6 @@ val parse_ty :
 val unparse_ty :
   string option -> 'a Script_typed_ir.ty -> Script.node
 
-val type_map_enc : type_map Data_encoding.encoding
-val ex_ty_enc : ex_ty Data_encoding.encoding
-
 val parse_toplevel
   : Script.expr -> (Script.node * Script.node * Script.node * Script.node) tzresult
 

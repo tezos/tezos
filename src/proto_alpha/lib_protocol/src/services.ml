@@ -489,7 +489,7 @@ module Helpers = struct
       ~description: "Typecheck a piece of code in the current context"
       ~query: RPC_query.empty
       ~input: Script.expr_encoding
-      ~output: (wrap_tzerror Script_ir_translator.type_map_enc)
+      ~output: (wrap_tzerror Script_tc_errors_registration.type_map_enc)
       ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "typecheck_code")
 
