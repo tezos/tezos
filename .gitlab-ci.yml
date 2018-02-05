@@ -147,7 +147,7 @@ test:p2p:pool:
 test:proto_alpha:
   <<: *test_definition
   script:
-    - jbuilder build @src/proto_alpha/runtest
+    - jbuilder build @src/proto_alpha/lib_protocol/runtest
 
 test:client_alpha:transaction:
   <<: *test_definition

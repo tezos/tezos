@@ -7,11 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+
 module Sodium = Helpers_sodium
 module Cast = Helpers_cast
 module Assert = Helpers_assert
 module Services = Helpers_services
-module Constants = Helpers_constants
 module Account = Helpers_account
 module Misc = Helpers_misc
 module Operation = Helpers_operation
@@ -22,17 +23,12 @@ module Script = Helpers_script
 
 module Shorthands = struct
 
-  let to_tc ctxt = Misc.get_dummy_tezos_context ctxt
-
   let to_tc_full ctxt level fitness =
     Tezos_context.init
       ctxt
       ~level
       ~fitness
       ~timestamp:(Time.now())
-
-  let get_tc (res:Block.result) =
-    to_tc res.validation.context
 
   let get_tc_full (res:Block.result) =
     Tezos_context.init
@@ -42,9 +38,9 @@ module Shorthands = struct
       ~fitness:res.validation.fitness
 
   let get_balance_res (account:Account.t) (result:Block.result) =
-    let open Proto_alpha.Error_monad in
+    let open Proto_alpha.Environment.Error_monad in
     get_tc_full result >>=? fun tc ->
-    Proto_alpha.Tezos_context.Contract.get_balance tc account.contract
+    Tezos_context.Contract.get_balance tc account.contract
 
   let chain_empty_block (result:Block.result) =
     Block.empty

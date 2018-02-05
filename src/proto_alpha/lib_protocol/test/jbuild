@@ -3,28 +3,28 @@
 (executables
  ((names (test_isolate_main))
   (libraries (tezos-base
-              tezos-rpc-http
               tezos-test-helpers
-              tezos_proto_alpha_isolate_helpers))
+              tezos_proto_alpha_isolate_helpers
+              tezos_proto_alpha_isolate_michelson_parser))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_test_helpers
-                    -open Tezos_rpc_http))))
+                    -open Tezos_proto_alpha_isolate_michelson_parser))))
 
 (alias
  ((name buildtest)
-  (package tezos-embedded-protocol-alpha)
+  (package tezos-protocol-alpha)
   (deps (test_isolate_main.exe))))
 
 (alias
  ((name runtest_isolate_main)
-  (package tezos-embedded-protocol-alpha)
+  (package tezos-protocol-alpha)
   (deps (sandbox.json (glob_files contracts/*.tz)))
-  (action (chdir ${ROOT} (run ${exe:test_isolate_main.exe})))))
+  (action (chdir ${ROOT} (run ${exe:test_isolate_main.exe} ${path-no-dep:contracts})))))
 
 (alias
  ((name runtest)
-  (package tezos-embedded-protocol-alpha)
+  (package tezos-protocol-alpha)
   (deps ((alias runtest_isolate_main)))))
 
 (alias

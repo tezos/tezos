@@ -7,7 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_alpha.Error_monad
+open Proto_alpha
+open Error_monad
 
 type shell_header = Block_header.shell_header
 type tezos_header = Block_header.t
@@ -24,14 +25,14 @@ type init_block = {
   proto_header_bytes : MBytes.t ;
   timestamp : Time.t ;
   level : Int32.t ;
-  context : Tezos_storage.Context.t
+  context : Context.t
 }
 
 type result = {
   tezos_header : tezos_header ;
   hash : Block_hash.t ;
   level : Int32.t ;
-  validation : Tezos_protocol_updater.Updater.validation_result ;
+  validation : Updater.validation_result ;
   tezos_context : Proto_alpha.Tezos_context.t
 }
 
@@ -106,7 +107,7 @@ let get_level opt_msg =
 
 let get_header_hash
     (init_block : init_block)
-    (validation_result : Tezos_protocol_updater.Updater.validation_result)
+    (validation_result : Updater.validation_result)
   : result tzresult Lwt.t
   =
   let op_hashs = init_block.operation_hashs in

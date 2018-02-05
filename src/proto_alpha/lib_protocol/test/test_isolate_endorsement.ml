@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
 
 let name = "Isolate Endorsement"
 module Logger = Logging.Make(struct let name = name end)
@@ -19,7 +20,8 @@ exception No_error
 
 open Isolate_helpers
 open Shorthands
-open Proto_alpha.Environment.Error_monad
+open Error_monad
+
 let (>>?=) = Assert.(>>?=)
 
 let test_wrong_slot endorse_a starting_block =
@@ -27,9 +29,9 @@ let test_wrong_slot endorse_a starting_block =
     | Proto_alpha.Baking.Invalid_endorsement_slot _ -> true
     | _ -> false
   in
-  starting_block >>=? endorse_a (-1) >>?= fun result ->
+  endorse_a (-1) starting_block >>?= fun result ->
   Assert.economic_error ~msg: __LOC__ wrong_slot result ;
-  starting_block >>=? endorse_a 16 >>?= fun result ->
+  endorse_a 16 starting_block >>?= fun result ->
   Assert.economic_error ~msg: __LOC__ wrong_slot result ;
   return ()
 
@@ -39,16 +41,14 @@ let test_wrong_delegate endorse_a starting_block =
     | Proto_alpha.Baking.Wrong_delegate _ -> true
     | _ -> false
   in
-  starting_block >>=?
-  endorse_a 0 >>=? endorse_a 1 >>=? endorse_a 2 >>= Assert.wrap >>= fun result ->
+  endorse_a 0 starting_block >>=? endorse_a 1 >>=? endorse_a 2 >>= Assert.wrap >>= fun result ->
   Assert.economic_error ~msg: __LOC__ wrong_delegate result ;
   return ()
 
 
-let test_endorsement_payment starting_block =
+let test_endorsement_payment root =
   let bootstrap_accounts = Account.bootstrap_accounts in
   let open Proto_alpha.Tezos_context in
-  starting_block >>=? fun root ->
   get_tc_full root >>=? fun tc ->
   let level = Level.succ tc @@ Level.current tc in
   Proto_alpha.Services_registration.endorsement_rights tc level None >>=? fun (_, endorsers) ->
@@ -99,7 +99,7 @@ let test_endorsement_payment starting_block =
 let test_multiple_endorsement (pred: Block.result) =
   let open Proto_alpha.Tezos_context in
   let tc = pred.tezos_context in
-  let level = Level.succ tc @@ Level.current tc in
+  let level = Level.current tc in
   Proto_alpha.Services_registration.endorsement_rights tc level None >>=? fun (_, endorsers) ->
   let endorser =
     Misc.find_account Account.bootstrap_accounts
@@ -133,16 +133,14 @@ let test_fitness (res: Block.result) =
 
 let (>>=??) = Assert.(>>=??)
 
-let main (): unit Error_monad.tzresult Lwt.t =
+let main (): unit proto_tzresult Lwt.t =
   let open Error_monad in
 
-  Init.main () >>=? fun sb ->
-  let starting_block = Proto_alpha.Error_monad.return sb in
-
-  test_endorsement_payment starting_block >>=?? fun () ->
-  test_wrong_endorsement starting_block >>=?? fun () ->
-  test_multiple_endorsement sb >>=?? fun () ->
-  test_fitness sb >>=?? fun () ->
+  Init.main () >>=? fun starting_block ->
+  test_endorsement_payment starting_block >>=? fun () ->
+  test_wrong_endorsement starting_block >>=? fun () ->
+  test_multiple_endorsement starting_block >>=? fun () ->
+  test_fitness starting_block >>=? fun () ->
   return ()
 
 let tests = [
@@ -150,5 +148,5 @@ let tests = [
 ]
 
 let main () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
+  let module Test = Test.Make(Error_monad) in
   Test.run "endorsement." tests

@@ -151,15 +151,14 @@ let run (starting_block: Helpers.Block.result): unit tzresult Lwt.t =
 
 
 let main () =
-  let open Error_monad in
   Helpers.Init.main () >>=? fun starting_block ->
-  run starting_block >>= Assert.wrap
+  run starting_block
 
 
 let tests = [
-  "main", (fun _ -> main ()) ;
+  "main", (fun _ -> main () >>= Assert.wrap) ;
 ]
 
 let main () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
+  let module Test = Test.Make(Error_monad) in
   Test.run "transactions." tests

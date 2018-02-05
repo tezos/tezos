@@ -23,5 +23,5 @@ val tez_add_int : Tez.tez -> int -> Tez.tez
 (** Tez.(-?) with a top - level error instead *)
 val tez_sub : Tez.tez -> Tez.tez -> Tez.tez
 val tez_sub_int : Tez.tez -> int -> Tez.tez
-val ctxt_of_tc : context -> Tezos_storage.Context.t
+val ctxt_of_tc : context -> Mem_context.t
 

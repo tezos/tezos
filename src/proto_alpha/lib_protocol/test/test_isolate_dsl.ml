@@ -7,16 +7,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
+open Proto_alpha
 open Helpers_logger.Logger
 
 exception No_error
 
 open Isolate_helpers
 
-let run (starting_block : Block.result): unit Proto_alpha.tzresult Lwt.t =
+let run (starting_block : Block.result): unit proto_tzresult Lwt.t =
 
-  let open Proto_alpha.Error_monad in
+  let open Proto_alpha.Environment.Error_monad in
 
   let init_tc = starting_block.tezos_context in
 
@@ -151,8 +151,9 @@ let run (starting_block : Block.result): unit Proto_alpha.tzresult Lwt.t =
 
 
 let main () =
+  let open Proto_alpha.Error_monad in
   Init.main () >>=? fun starting_block ->
-  run starting_block >>= Assert.wrap
+  run starting_block
 
 
 let tests = [
@@ -160,5 +161,5 @@ let tests = [
 ]
 
 let main () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
+  let module Test = Test.Make(Error_monad) in
   Test.run "dsl." tests

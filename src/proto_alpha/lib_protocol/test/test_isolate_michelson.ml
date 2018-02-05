@@ -7,12 +7,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Tezos_context
 
 let name = "Isolate Michelson"
 module Logger = Logging.Make(struct let name = name end)
 let section = Lwt_log.Section.make name
 let () =
   Lwt_log.Section.set_level section Lwt_log.Debug(*.Warning*)
+
+let (//) = Filename.concat
+let contract_path =
+  try Sys.argv.(1) with _ -> Filename.dirname Sys.executable_name // "contracts"
 
 open Logger
 
@@ -45,9 +51,8 @@ let program param ret st code =
 let quote s = "\"" ^ s ^ "\""
 
 let test parse_execute =
-  let dir_path = "test/contracts/" in
   let test ?tc (file_name: string) (storage: string) (input: string) =
-    let full_path = dir_path ^ file_name ^ ".tz" in
+    let full_path = contract_path // file_name ^ ".tz" in
     let file = Helpers_misc.read_file full_path in
     let spaced_file = Str.global_replace (Str.regexp_string "\n") "\n " file in
     let program = "{" ^ spaced_file ^ "}" in
@@ -447,7 +452,6 @@ let test_example parse_execute sb =
 
 
 let test_program parse_execute =
-  let open Error_monad in
   let id_code = "code
      { DUP ;
        PAIR ;
@@ -476,14 +480,14 @@ let test_program parse_execute =
   return ()
 
 
-let main (): unit Error_monad.tzresult Lwt.t =
-  Init.main () >>=? fun sb ->
+let main (): unit tzresult Lwt.t =
+  Init.main () >>=?? fun sb ->
   let execute_code ?tc = Script.execute_code_pred ?tc sb in
   let parse_execute ?tc code_str param_str storage_str =
     let param = parse_param param_str in
     let script = parse_script code_str storage_str in
     execute_code ?tc script param >>=?? fun (ret, st, _, tc, nonce) ->
-    let contracts = Proto_alpha.Tezos_context.Contract.originated_contracts nonce in
+    let contracts = Contract.originated_contracts nonce in
     return (ret, st, tc, contracts)
   in
   test_program parse_execute >>=? fun _x ->
@@ -491,12 +495,10 @@ let main (): unit Error_monad.tzresult Lwt.t =
   return ()
 
 
-
-
 let tests = [
   "main", (fun _ -> main ()) ;
 ]
 
 let main () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
+  let module Test = Test.Make(Tezos_error_monad.Error_monad) in
   Test.run "michelson." tests

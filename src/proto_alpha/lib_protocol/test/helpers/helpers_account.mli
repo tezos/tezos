@@ -7,7 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_alpha.Tezos_context
+open Proto_alpha
+open Tezos_context
 
 (** Facilities to deal with accounts , bootstrap accounts and make new
     accounts *)
@@ -34,27 +35,27 @@ val init_amount : int
 (** Credits a new account *)
 val init_account :
   tc:context -> account ->
-  (account * context) Proto_alpha.tzresult Lwt.t
+  (account * context) proto_tzresult Lwt.t
 
 (** Generates a new account and credits it *)
 val make_account :
   tc:context ->
-  (account * context) Proto_alpha.tzresult Lwt.t
+  (account * context) proto_tzresult Lwt.t
 
 (** Generates a list of new accounts and credits them *)
 val make_accounts :
   tc:context -> int ->
-  (account list * context) Proto_alpha.tzresult Lwt.t
+  (account list * context) proto_tzresult Lwt.t
 
 (** Better typed "make_accounts tc 2" *)
 val make_2_accounts :
   tc:context ->
-  ((account * account) * context) Proto_alpha.tzresult Lwt.t
+  ((account * account) * context) proto_tzresult Lwt.t
 
 (** Better typed "make_accounts tc 4" *)
 val make_4_accounts :
   tc:context ->
-  ((t * t * t * t) * context) Proto_alpha.tzresult Lwt.t
+  ((t * t * t * t) * context) proto_tzresult Lwt.t
 
 (** Debug : Displays an account and its balance *)
 val display_account : tc:context -> account -> unit Lwt.t

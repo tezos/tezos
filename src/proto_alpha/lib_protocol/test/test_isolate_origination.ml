@@ -69,7 +69,7 @@ let test_delegation
 
 let main (): unit Error_monad.tzresult Lwt.t =
 
-  Init.main () >>=? fun root ->
+  Init.main () >>=?? fun root ->
 
   let originate ?(tc=root.tezos_context) ?baker ?spendable ?fee ?delegatable src amount =
     let delegatable = Option.unopt ~default:true delegatable in
@@ -103,5 +103,5 @@ let tests = [
 ]
 
 let main () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
+  let module Test = Test.Make(Error_monad) in
   Test.run "origination." tests

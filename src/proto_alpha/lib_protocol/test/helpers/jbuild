@@ -4,16 +4,13 @@
  ((name tezos_proto_alpha_isolate_helpers)
   (libraries (tezos-test-helpers
               tezos-base
-              tezos-embedded-protocol-genesis
-              tezos-embedded-protocol-alpha
-              tezos-protocol-updater
-              tezos-shell))
+              tezos-protocol-environment-client
+              tezos-protocol-alpha))
   (wrapped false)
   (flags (:standard -w -9-32 -safe-string
           -open Tezos_base__TzPervasives
           -open Tezos_test_helpers
-          -open Tezos_protocol_updater
-          -open Tezos_embedded_raw_protocol_alpha))))
+          -open Tezos_protocol_environment_client))))
 
 (alias
  ((name runtest_indent)

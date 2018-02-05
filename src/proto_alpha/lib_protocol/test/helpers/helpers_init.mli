@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+
 (** Functions used to build the first tezos_context and first block *)
 
-val main : unit -> Helpers_block.result tzresult Lwt.t
+val main : unit -> Helpers_block.result proto_tzresult Lwt.t

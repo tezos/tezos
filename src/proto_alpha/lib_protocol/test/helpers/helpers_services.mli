@@ -7,12 +7,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+
 (** Wrappers around Services_registration calls *)
 
 val endorsement_rights :
-  tc:Proto_alpha.Tezos_context.context -> unit ->
+  tc:Tezos_context.context -> unit ->
   (int * Tezos_context.public_key_hash) list tzresult Lwt.t
 
 val baking_rights :
-  tc:Proto_alpha.Tezos_context.context -> unit ->
+  tc:Tezos_context.context -> unit ->
   (int * Tezos_context.public_key_hash) list tzresult Lwt.t
