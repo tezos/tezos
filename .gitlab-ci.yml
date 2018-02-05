@@ -436,7 +436,7 @@ publish:github:
 
 ## Publish docs to gitlab...
 
-publish:pages:
+pages:
   image: ${build_deps_image}:${CI_COMMIT_SHA}
   stage: publish
   only:
