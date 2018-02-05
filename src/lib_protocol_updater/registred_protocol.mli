@@ -7,29 +7,24 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let srcdir = Sys.argv.(1)
-let version = Sys.argv.(2)
-
-let hash, sources = Protocol.read_dir srcdir
-
-let () =
-  Format.printf {|
-module Source = struct
-  let hash =
-    Some (Tezos_base.Protocol_hash.of_b58check_exn %S)
-  let sources = Tezos_base.Protocol.%a
+module type T = sig
+  val hash: Protocol_hash.t
+  include Updater.NODE_PROTOCOL
+  val complete_b58prefix : Context.t -> string -> string list Lwt.t
 end
-@.|}
-    (Protocol_hash.to_b58check hash)
-    Protocol.pp_ocaml sources
 
-let () =
-  Format.printf {|
-let () =
-  let module Ignored = Tezos_protocol_updater.Registred_protocol.Register
-    (Tezos_embedded_protocol_environment_%s.Environment)
-    (Tezos_embedded_raw_protocol_%s.Main)
-    (Source) in
-    ()
-@.|}
-    version version
+type t = (module T)
+
+val mem: Protocol_hash.t -> bool
+
+val get: Protocol_hash.t -> t option
+val get_exn: Protocol_hash.t -> t
+
+
+module Register
+    (Env : Updater.Node_protocol_environment_sigs.V1)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : sig
+       val hash: Protocol_hash.t option
+       val sources: Protocol.t
+     end) : sig end

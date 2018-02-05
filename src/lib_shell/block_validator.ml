@@ -114,7 +114,7 @@ let check_liveness net_state pred hash operations_hashes operations =
 
 let apply_block
     net_state
-    pred (module Proto : State.Registred_protocol.T)
+    pred (module Proto : Registred_protocol.T)
     hash (header: Block_header.t)
     operations =
   let pred_header = State.Block.header pred
@@ -207,7 +207,7 @@ let check_net_liveness net_db hash (header: Block_header.t) =
 let get_proto pred hash =
   State.Block.context pred >>= fun pred_context ->
   Context.get_protocol pred_context >>= fun pred_protocol_hash ->
-  match State.Registred_protocol.get pred_protocol_hash with
+  match Registred_protocol.get pred_protocol_hash with
   | None ->
       fail (Unavailable_protocol { block = hash ;
                                    protocol = pred_protocol_hash })

@@ -53,7 +53,7 @@ type prevalidation_state =
     -> prevalidation_state
 
 and 'a proto =
-  (module State.Registred_protocol.T with type validation_state = 'a)
+  (module Registred_protocol.T with type validation_state = 'a)
 
 let start_prevalidation
     ?proto_header
@@ -69,7 +69,7 @@ let start_prevalidation
   Context.get_protocol predecessor_context >>= fun protocol ->
   let predecessor = State.Block.hash predecessor in
   begin
-    match State.Registred_protocol.get protocol with
+    match Registred_protocol.get protocol with
     | None ->
         (* FIXME. *)
         (* This should not happen: it should be handled in the validator. *)

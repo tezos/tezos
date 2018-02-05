@@ -16,11 +16,11 @@ let no_ops_hash =
     [Operation_list_hash.empty]
 
 
-let get_protocol hash : (module State.Registred_protocol.T) =
-  let (module Protocol): (module State.Registred_protocol.T) =
+let get_protocol hash : (module Registred_protocol.T) =
+  let (module Protocol): (module Registred_protocol.T) =
     Option.unopt_exn
       Unknown_protocol
-    @@ State.Registred_protocol.get hash
+    @@ Registred_protocol.get hash
   in
   (module Protocol)
 

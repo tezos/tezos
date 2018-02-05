@@ -22,7 +22,7 @@ let genesis_protocol =
 let genesis_time =
   Time.of_seconds 0L
 
-module Proto = (val State.Registred_protocol.get_exn genesis_protocol)
+module Proto = (val Registred_protocol.get_exn genesis_protocol)
 
 let genesis : State.Net.genesis = {
   time = genesis_time ;

@@ -15,7 +15,7 @@ exception Unknown_protocol
 (** Miscellaneous self-descriptive functions *)
 
 val no_ops_hash : Operation_list_list_hash.t
-val get_protocol : Protocol_hash.t -> (module State.Registred_protocol.T)
+val get_protocol : Protocol_hash.t -> (module Tezos_protocol_updater.Registred_protocol.T)
 val get_shell_header :
   State.Block.t -> Tezos_base.Operation.shell_header
 val get_block_header :

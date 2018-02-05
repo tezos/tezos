@@ -4,6 +4,7 @@
  ((names (test_state))
   (libraries (tezos-base
               tezos-storage
+              tezos-protocol-updater
               tezos-shell
               tezos-embedded-protocol-demo
               tezos-test-helpers))
@@ -12,6 +13,7 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_test_helpers
                     -open Tezos_storage
+                    -open Tezos_protocol_updater
                     -open Tezos_shell))))
 
 (alias
