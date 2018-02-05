@@ -77,6 +77,7 @@ let () =
       | [] -> Ex_stack_ty Empty_t in
     conv unfold fold (list (tup2 ex_ty_enc (option string))) in
   (* -- Structure errors ---------------------- *)
+  (* Invalid arity *)
   register_error_kind
     `Permanent
     ~id:"invalidArityTypeError"
@@ -94,6 +95,7 @@ let () =
       | _ -> None)
     (fun (loc, (name, exp, got)) ->
        Invalid_arity (loc, name, exp, got)) ;
+  (* Missing field *)
   register_error_kind
     `Permanent
     ~id:"missingScriptField"
@@ -103,6 +105,7 @@ let () =
     (obj1 (req "prim" prim_encoding))
     (function Missing_field prim -> Some prim | _ -> None)
     (fun prim -> Missing_field prim) ;
+  (* Invalid primitive *)
   register_error_kind
     `Permanent
     ~id:"invalidPrimitiveTypeError"
@@ -117,6 +120,7 @@ let () =
       | _ -> None)
     (fun (loc, (exp, got)) ->
        Invalid_primitive (loc, exp, got)) ;
+  (* Invalid kind *)
   register_error_kind
     `Permanent
     ~id:"invalidExpressionKindTypeError"
@@ -132,6 +136,7 @@ let () =
       | _ -> None)
     (fun (loc, (exp, got)) ->
        Invalid_kind (loc, exp, got)) ;
+  (* Invalid namespace *)
   register_error_kind
     `Permanent
     ~id:"invalidPrimitiveNamespaceTypeError"
@@ -147,10 +152,11 @@ let () =
       | _ -> None)
     (fun (loc, (name, exp, got)) ->
        Invalid_namespace (loc, name, exp, got)) ;
+  (* Duplicate field *)
   register_error_kind
     `Permanent
     ~id:"duplicateScriptField"
-    ~title:"Script has a duplicated field (parse error)"
+    ~title: "Script has a duplicated field (parse error)"
     ~description:
       "When parsing script, a field was found more than once"
     (obj2
@@ -158,6 +164,8 @@ let () =
        (req "prim" prim_encoding))
     (function Duplicate_field (loc, prim) -> Some (loc, prim) | _ -> None)
     (fun (loc, prim) -> Duplicate_field (loc, prim)) ;
+  (* -- Value typing errors ---------------------- *)
+  (* Unordered map keys *)
   register_error_kind
     `Permanent
     ~id:"unorderedMapLiteral"
@@ -170,6 +178,7 @@ let () =
       | Unordered_map_keys (loc, expr) -> Some (loc, expr)
       | _ -> None)
     (fun (loc, expr) -> Unordered_map_keys (loc, expr));
+  (* Duplicate map keys *)
   register_error_kind
     `Permanent
     ~id:"duplicateMapKeys"
@@ -182,6 +191,7 @@ let () =
       | Duplicate_map_keys (loc, expr) -> Some (loc, expr)
       | _ -> None)
     (fun (loc, expr) -> Duplicate_map_keys (loc, expr));
+  (* Unordered set values *)
   register_error_kind
     `Permanent
     ~id:"unorderedSetLiteral"
@@ -194,6 +204,7 @@ let () =
       | Unordered_set_values (loc, expr) -> Some (loc, expr)
       | _ -> None)
     (fun (loc, expr) -> Unordered_set_values (loc, expr));
+  (* Duplicate set values *)
   register_error_kind
     `Permanent
     ~id:"duplicateSetValuesInLiteral"
@@ -208,6 +219,7 @@ let () =
       | _ -> None)
     (fun (loc, expr) -> Duplicate_set_values (loc, expr));
   (* -- Instruction typing errors ------------- *)
+  (* Fail not in tail position *)
   register_error_kind
     `Permanent
     ~id:"failNotInTailPositionTypeError"
@@ -220,6 +232,7 @@ let () =
       | _ -> None)
     (fun (loc, ()) ->
        Fail_not_in_tail_position loc) ;
+  (* Undefined binary operation *)
   register_error_kind
     `Permanent
     ~id:"undefinedBinopTypeError"
@@ -237,6 +250,7 @@ let () =
       | _ -> None)
     (fun (loc, (n, Ex_ty tyl, Ex_ty tyr)) ->
        Undefined_binop (loc, n, tyl, tyr)) ;
+  (* Undefined unary operation *)
   register_error_kind
     `Permanent
     ~id:"undefinedUnopTypeError"
@@ -253,6 +267,7 @@ let () =
       | _ -> None)
     (fun (loc, (n, Ex_ty ty)) ->
        Undefined_unop (loc, n, ty)) ;
+  (* Bad return *)
   register_error_kind
     `Permanent
     ~id:"badReturnTypeError"
@@ -267,6 +282,7 @@ let () =
       | _ -> None)
     (fun (loc, (Ex_ty ty, Ex_stack_ty sty)) ->
        Bad_return (loc, sty, ty)) ;
+  (* Bad stack *)
   register_error_kind
     `Permanent
     ~id:"badStackTypeError"
@@ -282,6 +298,7 @@ let () =
       | _ -> None)
     (fun (loc, (name, s, Ex_stack_ty sty)) ->
        Bad_stack (loc, name, s, sty)) ;
+  (* Inconsistent annotations *)
   register_error_kind
     `Permanent
     ~id:"inconsistentAnnotations"
@@ -293,6 +310,7 @@ let () =
     (function Inconsistent_annotations (annot1, annot2) -> Some (annot1, annot2)
             | _ -> None)
     (fun (annot1, annot2) -> Inconsistent_annotations (annot1, annot2)) ;
+  (* Inconsistent type annotations *)
   register_error_kind
     `Permanent
     ~id:"inconsistentTypeAnnotations"
@@ -305,6 +323,7 @@ let () =
       | Inconsistent_type_annotations (loc, ty1, ty2) -> Some (loc, (Ex_ty ty1, Ex_ty ty2))
       | _ -> None)
     (fun (loc, (Ex_ty ty1, Ex_ty ty2)) -> Inconsistent_type_annotations (loc, ty1, ty2)) ;
+  (* Unexpected annotation *)
   register_error_kind
     `Permanent
     ~id:"unexpectedAnnotation"
@@ -314,6 +333,7 @@ let () =
     (function Unexpected_annotation loc -> Some (loc, ())
             | _ -> None)
     (fun (loc, ()) -> Unexpected_annotation loc);
+  (* Unmatched branches *)
   register_error_kind
     `Permanent
     ~id:"unmatchedBranchesTypeError"
@@ -330,6 +350,7 @@ let () =
       | _ -> None)
     (fun (loc, (Ex_stack_ty stya, Ex_stack_ty styb)) ->
        Unmatched_branches (loc, stya, styb)) ;
+  (* Bad stack item *)
   register_error_kind
     `Permanent
     ~id:"badStackItemTypeError"
@@ -343,6 +364,7 @@ let () =
       | _ -> None)
     (fun n ->
        Bad_stack_item n) ;
+  (* TRANSFER_TOKENS in lambda *)
   register_error_kind
     `Permanent
     ~id:"TransferInLambdaTypeError"
@@ -355,6 +377,20 @@ let () =
       | _ -> None)
     (fun (loc, ()) ->
        Transfer_in_lambda loc) ;
+  (* TRANSFER_TOKENS in DIP *)
+  register_error_kind
+    `Permanent
+    ~id:"TransferInDipTypeError"
+    ~title: "Transfer in DIP (typechecking error)"
+    ~description:
+      "A TRANSFER_TOKENS instruction was encountered in a DIP instruction."
+    (located empty)
+    (function
+      | Transfer_in_dip loc -> Some (loc, ())
+      | _ -> None)
+    (fun (loc, ()) ->
+       Transfer_in_dip loc) ;
+  (* SELF in lambda *)
   register_error_kind
     `Permanent
     ~id:"selfInLambda"
@@ -382,6 +418,7 @@ let () =
     (fun () ->
        Bad_stack_length) ;
   (* -- Value typing errors ------------------- *)
+  (* Invalid constant *)
   register_error_kind
     `Permanent
     ~id:"invalidConstantTypeError"
@@ -397,6 +434,7 @@ let () =
       | _ -> None)
     (fun (loc, (Ex_ty ty, expr)) ->
        Invalid_constant (loc, expr, ty)) ;
+  (* Invalid contract *)
   register_error_kind
     `Permanent
     ~id:"invalidContractTypeError"
@@ -411,6 +449,7 @@ let () =
       | _ -> None)
     (fun (loc, c) ->
        Invalid_contract (loc, c)) ;
+  (* Comparable type expected *)
   register_error_kind
     `Permanent
     ~id:"comparableTypeExpectedTypeError"
@@ -424,6 +463,7 @@ let () =
       | _ -> None)
     (fun (loc, Ex_ty ty) ->
        Comparable_type_expected (loc, ty)) ;
+  (* Inconsistent types *)
   register_error_kind
     `Permanent
     ~id:"InconsistentTypesTypeError"
@@ -442,6 +482,8 @@ let () =
       | _ -> None)
     (fun (Ex_ty tya, Ex_ty tyb) ->
        Inconsistent_types (tya, tyb)) ;
+  (* -- Instruction typing errors ------------------- *)
+  (* Invalid map body *)
   register_error_kind
     `Permanent
     ~id:"invalidMapBody"
@@ -457,6 +499,7 @@ let () =
       | _ -> None)
     (fun (loc, Ex_stack_ty stack) ->
        Invalid_map_body (loc, stack)) ;
+  (* Invalid map block FAIL *)
   register_error_kind
     `Permanent
     ~id:"invalidMapBlockFail"
@@ -468,6 +511,7 @@ let () =
       | Invalid_map_block_fail loc -> Some loc
       | _ -> None)
     (fun loc -> Invalid_map_block_fail loc) ;
+  (* Invalid ITER body *)
   register_error_kind
     `Permanent
     ~id:"invalidIterBody"
@@ -483,6 +527,7 @@ let () =
       | Invalid_iter_body (loc, bef, aft) -> Some (loc, Ex_stack_ty bef, Ex_stack_ty aft)
       | _ -> None)
     (fun (loc, Ex_stack_ty bef, Ex_stack_ty aft) -> Invalid_iter_body (loc, bef, aft)) ;
+  (* Type too large *)
   register_error_kind
     `Permanent
     ~id:"typeTooLarge"
@@ -496,7 +541,8 @@ let () =
       | Type_too_large (loc, ts, maxts) -> Some (loc, ts, maxts)
       | _ -> None)
     (fun (loc, ts, maxts) -> Type_too_large (loc, ts, maxts)) ;
-  (* Toplevel errors *)
+  (* -- Toplevel errors ------------------- *)
+  (* Ill typed data *)
   register_error_kind
     `Permanent
     ~id:"illTypedDataTypeError"
@@ -514,6 +560,7 @@ let () =
       | _ -> None)
     (fun (name, Ex_ty ty,  expr) ->
        Ill_typed_data (name, expr, ty)) ;
+  (* Ill formed type *)
   register_error_kind
     `Permanent
     ~id:"illFormedTypeTypeError"
@@ -530,6 +577,7 @@ let () =
       | _ -> None)
     (fun (name, expr, loc) ->
        Ill_formed_type (name, expr, loc)) ;
+  (* Ill typed contract *)
   register_error_kind
     `Permanent
     ~id:"illTypedContractTypeError"
