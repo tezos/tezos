@@ -24,6 +24,7 @@ type error += Runtime_contract_error : Contract.t * Script.expr -> error
 
 let () =
   let open Data_encoding in
+  (* Reject *)
   register_error_kind
     `Temporary
     ~id:"scriptRejectedRuntimeError"
@@ -32,6 +33,16 @@ let () =
     (obj1 (req "location" Script.location_encoding))
     (function Reject loc -> Some loc | _ -> None)
     (fun loc -> Reject loc);
+  (* Overflow *)
+  register_error_kind
+    `Temporary
+    ~id:"scriptOverflowRuntimeError"
+    ~title: "Script failed (overflow error)"
+    ~description: "A FAIL instruction was reached due to the detection of an overflow"
+    (obj1 (req "location" Script.location_encoding))
+    (function Overflow loc -> Some loc | _ -> None)
+    (fun loc -> Overflow loc);
+  (* Runtime contract error *)
   register_error_kind
     `Temporary
     ~id:"scriptRuntimeError"
