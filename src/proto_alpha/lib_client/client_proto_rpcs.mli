@@ -169,7 +169,7 @@ module Helpers : sig
      (Script.location * Gas.t * Script.expr list) list) tzresult Lwt.t
   val typecheck_code:
     #Client_rpcs.ctxt ->
-    block -> Script.expr -> Script_ir_translator.type_map tzresult Lwt.t
+    block -> Script.expr -> Script_tc_errors.type_map tzresult Lwt.t
   val typecheck_data:
     #Client_rpcs.ctxt ->
     block -> Script.expr * Script.expr -> unit tzresult Lwt.t

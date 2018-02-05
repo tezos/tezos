@@ -35,7 +35,7 @@ let print_expr ppf expr =
   Format.fprintf ppf "@[<h>%a@]" print_expr root
 
 open Micheline_parser
-open Script_ir_translator
+open Script_tc_errors
 
 let print_type_map ppf (parsed, type_map) =
   let rec print_expr_types ppf = function

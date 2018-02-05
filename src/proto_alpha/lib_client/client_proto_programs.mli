@@ -66,13 +66,13 @@ val typecheck_program :
   Michelson_v1_parser.parsed ->
   Client_proto_rpcs.block ->
   #Client_rpcs.ctxt ->
-  Script_ir_translator.type_map tzresult Lwt.t
+  Script_tc_errors.type_map tzresult Lwt.t
 
 val print_typecheck_result :
   emacs:bool ->
   show_types:bool ->
   print_source_on_error:bool ->
   Michelson_v1_parser.parsed ->
-  (Script_ir_translator.type_map, error list) result ->
+  (Script_tc_errors.type_map, error list) result ->
   #Client_commands.logger ->
   unit tzresult Lwt.t

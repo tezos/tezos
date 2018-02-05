@@ -47,6 +47,7 @@
 
         "Script_typed_ir",
         "Gas",
+	"Script_tc_errors",
         "Script_ir_translator",
         "Script_interpreter",
 

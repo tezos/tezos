@@ -16,7 +16,7 @@ val print_expr :
   unit
 val print_type_map :
   Format.formatter ->
-  Michelson_v1_parser.parsed * Script_ir_translator.type_map ->
+  Michelson_v1_parser.parsed * Script_tc_errors.type_map ->
   unit
 val report_errors :
   Format.formatter ->

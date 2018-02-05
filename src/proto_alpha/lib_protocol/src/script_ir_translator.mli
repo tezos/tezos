@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 open Tezos_context
+open Script_tc_errors
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
@@ -16,58 +17,6 @@ type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 type ex_stack_ty = Ex_stack_ty : 'a Script_typed_ir.stack_ty -> ex_stack_ty
 type ex_script = Ex_script : ('a, 'b, 'c) Script_typed_ir.script -> ex_script
 
-(* ---- Error definitions ---------------------------------------------------*)
-
-(* Auxiliary types for error documentation *)
-type namespace = Type_namespace | Constant_namespace | Instr_namespace | Keyword_namespace
-type kind = Int_kind | String_kind | Prim_kind | Seq_kind
-type type_map = (int * (Script.expr list * Script.expr list)) list
-
-(* Structure errors *)
-type error += Invalid_arity of Script.location * Script.prim * int * int
-type error += Invalid_namespace of Script.location * Script.prim * namespace * namespace
-type error += Invalid_primitive of Script.location * Script.prim list * Script.prim
-type error += Invalid_kind of Script.location * kind list * kind
-type error += Missing_field of Script.prim
-type error += Type_too_large : Script.location * int * int -> error
-type error += Duplicate_field of Script.location * Script.prim
-
-(* Instruction typing errors *)
-type error += Fail_not_in_tail_position of Script.location
-type error += Undefined_binop : Script.location * Script.prim * _ Script_typed_ir.ty * _ Script_typed_ir.ty -> error
-type error += Undefined_unop : Script.location * Script.prim * _ Script_typed_ir.ty -> error
-type error += Bad_return : Script.location * _ Script_typed_ir.stack_ty * _ Script_typed_ir.ty -> error
-type error += Bad_stack : Script.location * Script.prim * int * _ Script_typed_ir.stack_ty -> error
-type error += Unmatched_branches : Script.location * _ Script_typed_ir.stack_ty * _ Script_typed_ir.stack_ty -> error
-
-type error += Inconsistent_annotations of string * string
-type error += Inconsistent_type_annotations :
-                Script.location * _ Script_typed_ir.ty * _ Script_typed_ir.ty -> error
-type error += Unexpected_annotation of Script.location
-
-type error += Transfer_in_lambda of Script.location
-type error += Transfer_in_dip of Script.location
-type error += Self_in_lambda of Script.location
-type error += Bad_stack_length
-type error += Bad_stack_item of int
-type error += Invalid_map_body : Script.location * _ Script_typed_ir.stack_ty -> error
-type error += Invalid_map_block_fail of Script.location
-type error += Invalid_iter_body : Script.location * _ Script_typed_ir.stack_ty * _ Script_typed_ir.stack_ty -> error
-
-(* Value typing errors *)
-type error += Invalid_constant : Script.location * Script.expr * _ Script_typed_ir.ty -> error
-type error += Invalid_contract of Script.location * Contract.t
-type error += Comparable_type_expected : Script.location * _ Script_typed_ir.ty -> error
-type error += Inconsistent_types : _ Script_typed_ir.ty * _ Script_typed_ir.ty -> error
-type error += Unordered_map_keys of Script.location * Script.expr
-type error += Unordered_set_values of Script.location * Script.expr
-type error += Duplicate_map_keys of Script.location * Script.expr
-type error += Duplicate_set_values of Script.location * Script.expr
-
-(* Toplevel errors *)
-type error += Ill_typed_data : string option * Script.expr * _ Script_typed_ir.ty -> error
-type error += Ill_formed_type of string option * Script.expr * Script.location
-type error += Ill_typed_contract : Script.expr * type_map -> error
 
 (* ---- Sets and Maps -------------------------------------------------------*)
 

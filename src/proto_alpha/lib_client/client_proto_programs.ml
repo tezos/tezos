@@ -110,7 +110,7 @@ let print_typecheck_result
     let type_map, errs = match res with
       | Ok type_map -> type_map, []
       | Error (Environment.Ecoproto_error
-                 (Script_ir_translator.Ill_typed_contract (_, type_map ) :: _)
+                 (Script_tc_errors.Ill_typed_contract (_, type_map ) :: _)
                :: _ as errs) ->
           type_map, errs
       | Error errs ->

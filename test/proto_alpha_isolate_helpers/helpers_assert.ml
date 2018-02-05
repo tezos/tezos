@@ -121,13 +121,13 @@ let economic_error ~msg f =
 
 let ill_typed_data_error ~msg =
   let aux = function
-    | Proto_alpha.Script_ir_translator.Ill_typed_data _ -> true
+    | Proto_alpha.Script_tc_errors.Ill_typed_data _ -> true
     | _ -> false in
   economic_error ~msg aux
 
 let ill_typed_return_error ~msg =
   let aux = function
-    | Proto_alpha.Script_ir_translator.Bad_return _ -> true
+    | Proto_alpha.Script_tc_errors.Bad_return _ -> true
     | _ -> false in
   economic_error ~msg aux
 

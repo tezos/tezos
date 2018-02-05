@@ -10,6 +10,7 @@
 open Tezos_context
 open Script
 open Script_typed_ir
+open Script_tc_errors
 open Script_ir_translator
 
 let dummy_code_fee = Tez.fifty_cents
