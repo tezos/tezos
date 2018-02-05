@@ -59,6 +59,7 @@ build_deps:
     - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
         ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
       fi
+    - opam list
   tags:
     - gitlab-org
 
@@ -84,8 +85,6 @@ build:
   stage: test
   except:
     - master@tezos/tezos
-  before_script:
-    - find _build -type f -exec touch {} \;
   dependencies:
     - build
 
@@ -201,8 +200,8 @@ test:proto:sandbox:
   script:
     - ./scripts/opam-pin.sh
     - opam depext --yes ${package}
-    - opam install --yes --deps-only ${package}
-    - opam install --yes --with-test ${package}
+    - opam install --yes ${package}
+    - opam reinstall --yes --with-test ${package}
   tags:
     - gitlab-org
 

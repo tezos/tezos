@@ -1,5 +1,6 @@
 
 DEV ?= --dev
+PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find -name *.opam)))
 
 all:
 	@jbuilder build ${DEV} \
@@ -12,9 +13,17 @@ all:
 	@cp _build/default/src/bin_client/admin_main.exe tezos-admin-client
 	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
 
-tezos-%.pkg:
-	@jbuilder build --dev $(patsubst %.opam,%.install, \
-				   $(shell find -name tezos-$*.opam))
+all.pkg:
+	@jbuilder build ${DEV} \
+	    $(patsubst %.opam,%.install, $(shell find -name \*.opam))
+
+$(addsuffix .pkg,${PACKAGES}): %.pkg:
+	@jbuilder build ${DEV} \
+	    $(patsubst %.opam,%.install, $(shell find -name $*.opam))
+
+$(addsuffix .test,${PACKAGES}): %.test:
+	@jbuilder build ${DEV} \
+	    @$(patsubst %/$*.opam,%,$(shell find -name $*.opam))/runtest
 
 doc-html: all
 	@jbuilder build @doc ${DEV}
