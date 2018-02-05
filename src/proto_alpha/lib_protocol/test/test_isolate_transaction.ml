@@ -7,40 +7,18 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+open Error_monad
+
 let name = "Isolate Transactions"
 module Logger = Logging.Make(struct let name = name end)
-let section = Lwt_log.Section.make name
-let () =
-  Lwt_log.Section.set_level section Lwt_log.Warning(*.Debug*)
 open Logger
 
 module Helpers = Isolate_helpers
-open Helpers
-open Proto_alpha.Error_monad
+module Assert = Helpers.Assert
 
-let test_cycle_transfer (pred: Helpers.Block.result) =
-  let transfer = Helpers.Apply.transaction_pred ~pred in
-  let tc = pred.tezos_context in
-  let cycle n =
-    Helpers.Account.make_accounts ~tc n >>=? fun (accounts, tc) ->
-    let pairs = List.combine accounts @@ List.shift accounts in
-    let aux tc (src, dst) =
-      transfer ~tc (src, dst, 10000, Some(10)) >>=? fun (_, tc) -> return tc
-    in
-    fold_left_s aux tc pairs >>=? fun tc ->
-    let aux (account: Helpers.Account.t) =
-      Helpers.Assert.equal_cents_balance ~tc ~msg: __LOC__ (account.contract, Helpers.Account.init_amount * 100 - 10)
-    in
-    iter_s aux accounts
-  in
-  cycle 2 >>=? fun _ ->
-  cycle 13 >>=? fun _ ->
-  cycle 50 >>=? fun _ ->
-  return ()
-
-
-
-let run (starting_block: Helpers.Block.result): unit tzresult Lwt.t =
+let test_basic (): unit tzresult Lwt.t =
+  Helpers.Init.main () >>=? fun starting_block ->
   let init_tc = starting_block.tezos_context in
 
   Helpers.Account.make_2_accounts ~tc: init_tc >>=? fun ((account_a, account_b), init_tc) ->
@@ -144,21 +122,32 @@ let run (starting_block: Helpers.Block.result): unit tzresult Lwt.t =
   >>= Assert.wrap >>= fun result ->
   Assert.inconsistent_pkh ~msg: __LOC__ result ;
   debug "No manager key" ;
-
-  test_cycle_transfer starting_block >>=? fun _ ->
-
   return ()
 
+let test_cycle_transfer () =
+  Helpers.Init.main () >>=? fun pred ->
+  let transfer = Helpers.Apply.transaction_pred ~pred in
+  let tc = pred.tezos_context in
+  let cycle n =
+    Helpers.Account.make_accounts ~tc n >>=? fun (accounts, tc) ->
+    let pairs = List.combine accounts @@ List.shift accounts in
+    let aux tc (src, dst) =
+      transfer ~tc (src, dst, 10000, Some(10)) >>=? fun (_, tc) -> return tc
+    in
+    fold_left_s aux tc pairs >>=? fun tc ->
+    let aux (account: Helpers.Account.t) =
+      Helpers.Assert.equal_cents_balance ~tc ~msg: __LOC__ (account.contract, Helpers.Account.init_amount * 100 - 10)
+    in
+    iter_s aux accounts
+  in
+  cycle 2 >>=? fun _ ->
+  cycle 13 >>=? fun _ ->
+  cycle 50 >>=? fun _ ->
+  return ()
 
-let main () =
-  Helpers.Init.main () >>=? fun starting_block ->
-  run starting_block
-
-
-let tests = [
-  "main", (fun _ -> main () >>= Assert.wrap) ;
-]
-
-let main () =
-  let module Test = Test.Make(Error_monad) in
-  Test.run "transactions." tests
+let tests =
+  List.map
+    (fun (n, f) -> (n, (fun (_: string) -> f () >>= Assert.wrap)))
+    [ "transaction.basic", test_basic ;
+      "transaction.cycle_transfer", test_cycle_transfer
+    ]

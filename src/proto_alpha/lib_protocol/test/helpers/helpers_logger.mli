@@ -8,5 +8,5 @@
 (**************************************************************************)
 
 val name : string
-module Logger : Logging.LOG
 include Logging.LOG
+

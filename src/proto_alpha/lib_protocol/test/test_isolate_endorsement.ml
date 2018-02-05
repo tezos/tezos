@@ -8,19 +8,16 @@
 (**************************************************************************)
 
 open Proto_alpha
+open Tezos_context
+open Error_monad
 
 let name = "Isolate Endorsement"
 module Logger = Logging.Make(struct let name = name end)
-let section = Lwt_log.Section.make name
-let () =
-  Lwt_log.Section.set_level section Lwt_log(*.Debug*).Warning
-
 
 exception No_error
 
 open Isolate_helpers
 open Shorthands
-open Error_monad
 
 let (>>?=) = Assert.(>>?=)
 
@@ -46,7 +43,8 @@ let test_wrong_delegate endorse_a starting_block =
   return ()
 
 
-let test_endorsement_payment root =
+let test_endorsement_payment () =
+  Init.main () >>=? fun root ->
   let bootstrap_accounts = Account.bootstrap_accounts in
   let open Proto_alpha.Tezos_context in
   get_tc_full root >>=? fun tc ->
@@ -96,8 +94,8 @@ let test_endorsement_payment root =
   iter_s aux @@ List.product slots prios
 
 
-let test_multiple_endorsement (pred: Block.result) =
-  let open Proto_alpha.Tezos_context in
+let test_multiple_endorsement () =
+  Init.main () >>=? fun pred ->
   let tc = pred.tezos_context in
   let level = Level.current tc in
   Proto_alpha.Services_registration.endorsement_rights tc level None >>=? fun (_, endorsers) ->
@@ -110,7 +108,8 @@ let test_multiple_endorsement (pred: Block.result) =
   return ()
 
 
-let test_wrong_endorsement starting_block =
+let test_wrong_endorsement () =
+  Init.main () >>=? fun starting_block ->
   let account = Account.new_account () in
   let endorse slot (res: Block.result) =
     Block.endorsement
@@ -121,7 +120,8 @@ let test_wrong_endorsement starting_block =
   test_wrong_slot endorse starting_block
 
 
-let test_fitness (res: Block.result) =
+let test_fitness () =
+  Init.main () >>=? fun res ->
   Block.of_res ~priority: 0 ~res () >>=? fun block_0 ->
   let fitness_0 = block_0.validation.fitness in
   Block.of_res ~priority: 1 ~res () >>=? fun block_1 ->
@@ -130,23 +130,11 @@ let test_fitness (res: Block.result) =
   Assert.equal_int ~msg: "Fitness test" diff 0 ;
   return ()
 
-
-let (>>=??) = Assert.(>>=??)
-
-let main (): unit proto_tzresult Lwt.t =
-  let open Error_monad in
-
-  Init.main () >>=? fun starting_block ->
-  test_endorsement_payment starting_block >>=? fun () ->
-  test_wrong_endorsement starting_block >>=? fun () ->
-  test_multiple_endorsement starting_block >>=? fun () ->
-  test_fitness starting_block >>=? fun () ->
-  return ()
-
-let tests = [
-  "main", (fun _ -> main ()) ;
-]
-
-let main () =
-  let module Test = Test.Make(Error_monad) in
-  Test.run "endorsement." tests
+let tests =
+  List.map
+    (fun (n, f) -> (n, (fun (_ : string) -> f () >>= Assert.wrap)))
+    [ "endorsement.payment", test_endorsement_payment ;
+      "endorsement.wrong", test_wrong_endorsement ;
+      "endorsement.multiple", test_multiple_endorsement ;
+      "endorsement.fitness", test_fitness ;
+    ]

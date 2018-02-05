@@ -8,16 +8,15 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Helpers_logger.Logger
+open Error_monad
+open Helpers_logger
+open Isolate_helpers
 
 exception No_error
 
-open Isolate_helpers
+let test_dsl () : unit proto_tzresult Lwt.t =
 
-let run (starting_block : Block.result): unit proto_tzresult Lwt.t =
-
-  let open Proto_alpha.Environment.Error_monad in
-
+  Init.main () >>=? fun starting_block ->
   let init_tc = starting_block.tezos_context in
 
   Account.make_2_accounts ~tc: init_tc >>=? fun ((account_a, account_b), init_tc) ->
@@ -150,16 +149,8 @@ let run (starting_block : Block.result): unit proto_tzresult Lwt.t =
   return ()
 
 
-let main () =
-  let open Proto_alpha.Error_monad in
-  Init.main () >>=? fun starting_block ->
-  run starting_block
-
-
-let tests = [
-  "main", (fun _ -> main ()) ;
-]
-
-let main () =
-  let module Test = Test.Make(Error_monad) in
-  Test.run "dsl." tests
+let tests =
+  List.map
+    (fun (n, f) -> (n, (fun (_ : string) -> f () >>= Assert.wrap)))
+    [ "dsl", test_dsl
+    ]

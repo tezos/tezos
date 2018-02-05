@@ -8,9 +8,10 @@
 (**************************************************************************)
 
 let () =
-  Test_isolate_dsl.main ();
-  Test_isolate_transaction.main ();
-  Test_isolate_endorsement.main ();
-  Test_isolate_origination.main ();
-  Test_isolate_michelson.main ()
-
+  let module Test = Test.Make(Error_monad) in
+  Test.run "proto_alpha."
+    ( Test_isolate_dsl.tests @
+      Test_isolate_transaction.tests @
+      Test_isolate_endorsement.tests @
+      Test_isolate_origination.tests @
+      Test_isolate_michelson.tests )

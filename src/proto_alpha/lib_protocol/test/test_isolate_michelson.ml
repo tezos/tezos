@@ -12,9 +12,6 @@ open Tezos_context
 
 let name = "Isolate Michelson"
 module Logger = Logging.Make(struct let name = name end)
-let section = Lwt_log.Section.make name
-let () =
-  Lwt_log.Section.set_level section Lwt_log.Debug(*.Warning*)
 
 let (//) = Filename.concat
 let contract_path =
@@ -50,23 +47,25 @@ let program param ret st code =
 
 let quote s = "\"" ^ s ^ "\""
 
-let test parse_execute =
-  let test ?tc (file_name: string) (storage: string) (input: string) =
-    let full_path = contract_path // file_name ^ ".tz" in
-    let file = Helpers_misc.read_file full_path in
-    let spaced_file = Str.global_replace (Str.regexp_string "\n") "\n " file in
-    let program = "{" ^ spaced_file ^ "}" in
-    parse_execute ?tc program input storage
-  in
-  test
+let parse_execute sb ?tc code_str param_str storage_str =
+  let param = parse_param param_str in
+  let script = parse_script code_str storage_str in
+  Script.execute_code_pred ?tc sb script param >>=?? fun (ret, st, _, tc, nonce) ->
+  let contracts = Contract.originated_contracts nonce in
+  return (ret, st, tc, contracts)
 
+let test ctxt ?tc (file_name: string) (storage: string) (input: string) =
+  let full_path = contract_path // file_name ^ ".tz" in
+  let file = Helpers_misc.read_file full_path in
+  let spaced_file = Str.global_replace (Str.regexp_string "\n") "\n " file in
+  let program = "{" ^ spaced_file ^ "}" in
+  parse_execute ctxt ?tc program input storage
 
-let test_fails ?location parse_execute f s i =
-  test parse_execute f s i >>= fun x ->
+let test_fails ctxt ?location f s i =
+  test ctxt f s i >>= fun x ->
   let msg = Option.unopt ~default:"Not failing" location in
   Assert.generic_economic_error ~msg x ;
   return ()
-
 
 let string_of_canon output_prim =
   let output_can = Proto_alpha.Michelson_v1_primitives.strings_of_prims output_prim in
@@ -79,9 +78,8 @@ let string_of_canon output_prim =
   let output = Format.flush_str_formatter () in
   output
 
-
-let test_print parse_execute fn s i =
-  test parse_execute fn s i >>=? fun (sp, op, _) ->
+let test_print ctxt fn s i =
+  test ctxt fn s i >>=? fun (sp, op, _, _) ->
   let ss = string_of_canon sp in
   let os = string_of_canon op in
   debug "Storage : %s" ss ;
@@ -89,36 +87,37 @@ let test_print parse_execute fn s i =
   return ()
 
 
-let test_output parse_execute ?location (file_name: string) (storage: string) (input: string) (expected_output: string) =
-  test parse_execute file_name storage input >>=? fun (_storage_prim, output_prim, _tc, _contracts) ->
+let test_output ctxt ?location (file_name: string) (storage: string) (input: string) (expected_output: string) =
+  test ctxt file_name storage input >>=? fun (_storage_prim, output_prim, _tc, _contracts) ->
   let output = string_of_canon output_prim in
   let msg = Option.unopt ~default:"strings aren't equal" location in
   Assert.equal_string ~msg expected_output output ;
   return ()
 
 
-let test_tc ?tc parse_execute (file_name: string) (storage: string) (input: string) =
-  test parse_execute ?tc file_name storage input >>=? fun (_storage_prim, _output_prim, tc, _contracts) ->
+let test_tc ctxt ?tc (file_name: string) (storage: string) (input: string) =
+  test ctxt ?tc file_name storage input >>=? fun (_storage_prim, _output_prim, tc, _contracts) ->
   return (tc)
 
 
-let test_contract ?tc parse_execute (file_name: string) (storage: string) (input: string) =
-  test parse_execute ?tc file_name storage input >>=? fun (_storage_prim, _output_prim, tc, contracts) ->
+let test_contract ctxt ?tc (file_name: string) (storage: string) (input: string) =
+  test ctxt ?tc file_name storage input >>=? fun (_storage_prim, _output_prim, tc, contracts) ->
   return (contracts, tc)
 
 
 
-let test_storage parse_execute ?location (file_name: string) (storage: string) (input: string) (expected_storage: string) =
-  test parse_execute file_name storage input >>=? fun (storage_prim, _output_prim, _tc, _contracts) ->
+let test_storage ctxt ?location (file_name: string) (storage: string) (input: string) (expected_storage: string) =
+  test ctxt file_name storage input >>=? fun (storage_prim, _output_prim, _tc, _contracts) ->
   let storage = string_of_canon storage_prim in
   let msg = Option.unopt ~default:"strings aren't equal" location in
   Assert.equal_string ~msg expected_storage storage ;
   return ()
 
 
-let test_example parse_execute sb =
+let test_example () =
+  Init.main () >>=?? fun sb ->
   let test_output ?location a b c d =
-    test_output ?location parse_execute a b c d >>= function
+    test_output sb ?location a b c d >>= function
     | Ok(x) -> return x
     | Error(errs) -> (
         match location with
@@ -126,11 +125,11 @@ let test_example parse_execute sb =
         | Some(loc) -> debug "loc : %s" loc
       ) ; Lwt.return (Error(errs))
   in
-  let test_fails ?location = test_fails ?location parse_execute in
-  let test_tc ?tc = test_tc ?tc parse_execute in
-  let test_contract ?tc = test_contract ?tc parse_execute in
-  (*  let test_print ?location = test_print ?location parse_execute in*)
-  let test_storage ?location = test_storage ?location parse_execute in
+  let test_fails ?location = test_fails ?location sb in
+  let test_tc ?tc = test_tc ?tc sb in
+  let test_contract ?tc = test_contract ?tc sb in
+  (*  let test_print ?location = test_print ?location sb in*)
+  let test_storage ?location = test_storage ?location sb in
 
   (*  FORMAT: assert_output contract_file storage input expected_result *)
   test_output ~location: __LOC__ "ret_int" "Unit" "Unit" "300" >>=? fun _ ->
@@ -451,7 +450,8 @@ let test_example parse_execute sb =
   return ()
 
 
-let test_program parse_execute =
+let test_program () =
+  Init.main () >>=?? fun sb ->
   let id_code = "code
      { DUP ;
        PAIR ;
@@ -470,35 +470,16 @@ let test_program parse_execute =
        PAIR }" in
   let push_300 =
     program "unit" "nat" "unit" push_300_code in
-  parse_execute id_int_program "2" "3" >>=? fun _ ->
-  parse_execute id_ill_param_program "2" "3" >>= fun x ->
+  parse_execute sb id_int_program "2" "3" >>=? fun _ ->
+  parse_execute sb id_ill_param_program "2" "3" >>= fun x ->
   Assert.ill_typed_data_error ~msg: "Good data type" x ;
-  parse_execute id_ill_return_program "2" "3" >>= fun x ->
+  parse_execute sb id_ill_return_program "2" "3" >>= fun x ->
   Assert.ill_typed_return_error ~msg: "Good return type" x ;
-  parse_execute push_300 "Unit" "Unit" >>=? fun _ ->
-  parse_execute id_pbool_program "(Pair True True)" "Unit" >>=? fun _ ->
+  parse_execute sb push_300 "Unit" "Unit" >>=? fun _ ->
+  parse_execute sb id_pbool_program "(Pair True True)" "Unit" >>=? fun _ ->
   return ()
-
-
-let main (): unit tzresult Lwt.t =
-  Init.main () >>=?? fun sb ->
-  let execute_code ?tc = Script.execute_code_pred ?tc sb in
-  let parse_execute ?tc code_str param_str storage_str =
-    let param = parse_param param_str in
-    let script = parse_script code_str storage_str in
-    execute_code ?tc script param >>=?? fun (ret, st, _, tc, nonce) ->
-    let contracts = Contract.originated_contracts nonce in
-    return (ret, st, tc, contracts)
-  in
-  test_program parse_execute >>=? fun _x ->
-  test_example parse_execute sb >>=? fun _x ->
-  return ()
-
 
 let tests = [
-  "main", (fun _ -> main ()) ;
+  "michelson.example", (fun _ -> test_example ()) ;
+  "michelson.program", (fun _ -> test_program ()) ;
 ]
-
-let main () =
-  let module Test = Test.Make(Tezos_error_monad.Error_monad) in
-  Test.run "michelson." tests
