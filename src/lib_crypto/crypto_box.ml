@@ -17,6 +17,32 @@ type channel_key = Box.combined Box.key
 type nonce = Nonce.t
 type target = Z.t
 
+module Secretbox = struct
+  include Secretbox
+
+  let of_bytes bytes =
+    of_cstruct (Cstruct.of_bigarray bytes)
+
+  let of_bytes_exn bytes =
+    of_cstruct_exn (Cstruct.of_bigarray bytes)
+
+  let box key msg nonce =
+    let msg = Cstruct.of_bigarray msg in
+    Cstruct.to_bigarray (box ~key ~msg ~nonce)
+
+  let box_open key cmsg nonce =
+    let cmsg = Cstruct.of_bigarray cmsg in
+    Option.map ~f:Cstruct.to_bigarray (box_open ~key ~cmsg ~nonce)
+
+  let box_noalloc key nonce msg =
+    let msg = Cstruct.of_bigarray msg in
+    box_noalloc ~key ~nonce ~msg
+
+  let box_open_noalloc key nonce cmsg =
+    let cmsg = Cstruct.of_bigarray cmsg in
+    box_open_noalloc ~key ~nonce ~cmsg
+end
+
 module Public_key_hash = Blake2B.Make (Base58) (struct
     let name = "Crypto_box.Public_key_hash"
     let title = "A Cryptobox public key ID"
@@ -36,6 +62,8 @@ let boxzerobytes = Box.boxzerobytes
 let random_keypair () =
   let pk, sk = Box.keypair () in
   sk, pk, hash pk
+
+let zero_nonce = Tweetnacl.Nonce.(of_cstruct_exn (Cstruct.create bytes))
 let random_nonce = Nonce.gen
 let increment_nonce = Nonce.increment
 

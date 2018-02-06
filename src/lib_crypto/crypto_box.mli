@@ -11,8 +11,25 @@
 
 type nonce
 
+val zero_nonce : nonce
 val random_nonce : unit -> nonce
 val increment_nonce : ?step:int -> nonce -> nonce
+
+module Secretbox : sig
+  type key
+
+  val zerobytes : int
+  val boxzerobytes : int
+
+  val of_bytes : MBytes.t -> key option
+  val of_bytes_exn : MBytes.t -> key
+
+  val box : key -> MBytes.t -> nonce -> MBytes.t
+  val box_open : key -> MBytes.t -> nonce -> MBytes.t option
+
+  val box_noalloc : key -> nonce -> MBytes.t -> unit
+  val box_open_noalloc : key -> nonce -> MBytes.t -> bool
+end
 
 type target
 val default_target : target
