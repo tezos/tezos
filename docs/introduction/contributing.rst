@@ -42,7 +42,7 @@ documentations for the various parts.
 Our git workflow
 ----------------
 
-First, the repository is http://gitlab.com/tezos/tezos, the github one
+First, the repository is https://gitlab.com/tezos/tezos, the github one
 is just a clone that exists for historical reasons. So if you want to
 contribute, simply create an account there.
 

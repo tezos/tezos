@@ -31,13 +31,14 @@ Welcome to Tezos's documentation!
 
 .. toctree::
    :maxdepth: 2
-   :caption: Tutorials:
+   :caption: Developer Tutorials:
 
    tutorials/data_encoding
    tutorials/error_monad
    tutorials/michelson_anti_patterns
    tutorials/entering_alpha
    tutorials/protocol_environment
+   tutorials/profiling
 
 .. toctree::
    :maxdepth: 2
