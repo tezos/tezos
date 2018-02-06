@@ -70,9 +70,10 @@ The rules have the main following form.
 
 ::
 
-    > (syntax pattern) / (initial stack pattern) => (result stack pattern)
-      iff (conditions)
-      where (recursions)
+    > (syntax pattern) / (initial stack pattern)  =>  (result stack pattern)
+        iff (conditions)
+        where (recursions)
+	and (more recursions)
 
 The left hand side of the ``=>`` sign is used for selecting the rule.
 Given a program and an initial stack, one (and only one) rule can be
@@ -104,7 +105,7 @@ form.
 
 ::
 
-    where (intermediate program) / (intermediate stack) => (partial result)
+    where (intermediate program) / (intermediate stack)  =>  (partial result)
 
 This means that this rules applies in case interpreting the intermediate
 state on the left gives the pattern on the right.
@@ -175,14 +176,14 @@ case, and when both are equivalents, we write rules of the form:
 
 ::
 
-    p / S   =>   S''
-    where   p' / S'   =>   S''
+    p / S  =>  S''
+    where   p' / S'  =>  S''
 
 using the following shortcut:
 
 ::
 
-    p / S   =>   p' / S'
+    p / S  =>  p' / S'
 
 The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
@@ -323,7 +324,7 @@ consistent with the expected result, also provided by the programmer.
 Annotations
 ~~~~~~~~~~~
 
-Most Instructions in the language can optionally take an annotation.
+Most instructions in the language can optionally take an annotation.
 Annotations allow you to better track data, on the stack and within
 pairs and unions.
 
@@ -410,8 +411,8 @@ Control structures
 
 ::
 
-    > FAIL / _   =>  [FAIL]
-    > _ / [FAIL]    =>   [FAIL]
+    > FAIL / _  =>  [FAIL]
+    > _ / [FAIL]  =>  [FAIL]
 
 -  ``{ I ; C }``: Sequence.
 
@@ -421,9 +422,9 @@ Control structures
        iff   I :: [ 'A -> 'B ]
              C :: [ 'B -> 'C ]
 
-    > I ; C / SA    =>   SC
-      where   I / SA   =>   SB
-        and   C / SB   =>   SC
+    > I ; C / SA  =>  SC
+        where   I / SA  =>  SB
+        and   C / SB  =>  SC
 
 -  ``IF bt bf``: Conditional branching.
 
@@ -433,8 +434,8 @@ Control structures
        iff   bt :: [ 'A -> 'B ]
              bf :: [ 'A -> 'B ]
 
-    > IF bt bf / True : S    =>    bt / S
-    > IF bt bf / False : S   =>    bf / S
+    > IF bt bf / True : S  =>  bt / S
+    > IF bt bf / False : S  =>  bf / S
 
 -  ``LOOP body``: A generic loop.
 
@@ -443,8 +444,8 @@ Control structures
     :: bool : 'A   ->   'A
        iff   body :: [ 'A -> bool : 'A ]
 
-    > LOOP body / True : S    =>    body ; LOOP body / S
-    > LOOP body / False : S   =>    S
+    > LOOP body / True : S  =>  body ; LOOP body / S
+    > LOOP body / False : S  =>  S
 
 -  ``LOOP_LEFT body``: A loop with an accumulator
 
@@ -453,8 +454,8 @@ Control structures
     :: (or 'a 'b) : 'A   ->   'A
        iff   body :: [ 'a : 'A -> (or 'a 'b) : 'A ]
 
-    > LOOP body / (Left a)  : S    =>    body ; LOOP body / (or 'a 'b) : S
-    > LOOP body / (Right b) : S   =>    b : S
+    > LOOP_LEFT body / (Left a)  : S  =>  body ; LOOP_LEFT body / (or 'a 'b) : S
+    > LOOP_LEFT body / (Right b) : S  =>  b : S
 
 -  ``DIP code``: Runs code protecting the top of the stack.
 
@@ -463,8 +464,8 @@ Control structures
     :: 'b : 'A   ->   'b : 'C
        iff   code :: [ 'A -> 'C ]
 
-    > DIP code / x : S   =>   x : S'
-      where    code / S   =>   S'
+    > DIP code / x : S  =>  x : S'
+        where    code / S  =>  S'
 
 -  ``EXEC``: Execute a function from the stack.
 
@@ -472,8 +473,8 @@ Control structures
 
     :: 'a : lambda 'a 'b : 'C   ->   'b : 'C
 
-    > EXEC / a : f : S   =>   r : S
-      where f / a : []   =>   r : []
+    > EXEC / a : f : S  =>  r : S
+        where f / a : []  =>  r : []
 
 Stack operations
 ~~~~~~~~~~~~~~~~
@@ -484,7 +485,7 @@ Stack operations
 
     :: _ : 'A   ->   'A
 
-    > DROP / _ : S   =>   S
+    > DROP / _ : S  =>  S
 
 -  ``DUP``: Duplicate the top of the stack.
 
@@ -492,7 +493,7 @@ Stack operations
 
     :: 'a : 'A   ->   'a : 'a : 'A
 
-    > DUP / x : S   =>   x : x : S
+    > DUP / x : S  =>  x : x : S
 
 -  ``SWAP``: Exchange the top two elements of the stack.
 
@@ -500,7 +501,7 @@ Stack operations
 
     :: 'a : 'b : 'A   ->   'b : 'a : 'A
 
-    > SWAP / x : y : S   =>   y : x : S
+    > SWAP / x : y : S  =>  y : x : S
 
 -  ``PUSH 'a x``: Push a constant value of a given type onto the stack.
 
@@ -509,7 +510,7 @@ Stack operations
     :: 'A   ->   'a : 'A
        iff   x :: 'a
 
-    > PUSH 'a x / S   =>   x : S
+    > PUSH 'a x / S  =>  x : S
 
 -  ``UNIT``: Push a unit value onto the stack.
 
@@ -517,7 +518,7 @@ Stack operations
 
     :: 'A   ->   unit : 'A
 
-    > UNIT / S   =>   Unit : S
+    > UNIT / S  =>  Unit : S
 
 -  ``LAMBDA 'a 'b code``: Push a lambda with given parameter and return
    types onto the stack.
@@ -526,7 +527,7 @@ Stack operations
 
     :: 'A ->  (lambda 'a 'b) : 'A
 
-    > LAMBDA _ _ code / S => code : S
+    > LAMBDA _ _ code / S  =>  code : S
 
 Generic comparison
 ~~~~~~~~~~~~~~~~~~
@@ -545,8 +546,9 @@ second, and positive otherwise.
 
     :: int : 'S   ->   bool : 'S
 
-    > EQ ; C / 0 : S     =>   C / True : S
-    > EQ ; C / _ : S     =>   C / False : S
+    > EQ / 0 : S  =>  True : S
+    > EQ / v : S  =>  False : S
+        iff v <> 0
 
 -  ``NEQ``: Checks that the top of the stack does Not EQual zero.
 
@@ -554,8 +556,9 @@ second, and positive otherwise.
 
     :: int : 'S   ->   bool : 'S
 
-    > NEQ ; C / 0 : S     =>   C / False : S
-    > NEQ ; C / _ : S     =>   C / True : S
+    > NEQ / 0 : S  =>  False : S
+    > NEQ / v : S  =>  True : S
+        iff v <> 0
 
 -  ``LT``: Checks that the top of the stack is Less Than zero.
 
@@ -563,8 +566,10 @@ second, and positive otherwise.
 
     :: int : 'S   ->   bool : 'S
 
-    > LT ; C / v : S     =>   C / True : S   iff  v < 0
-    > LT ; C / _ : S     =>   C / False : S
+    > LT / v : S  =>  True : S
+        iff  v < 0
+    > LT / v : S  =>  False : S
+        iff v >= 0
 
 -  ``GT``: Checks that the top of the stack is Greater Than zero.
 
@@ -572,8 +577,10 @@ second, and positive otherwise.
 
     :: int : 'S   ->   bool : 'S
 
-    > GT ; C / v : S     =>   C / True : S   iff  v > 0
-    > GT ; C / _ : S     =>   C / False : S
+    > GT / v : S  =>  C / True : S
+        iff  v > 0
+    > GT / v : S  =>  C / False : S
+        iff v <= 0
 
 -  ``LE``: Checks that the top of the stack is Less Than of Equal to
    zero.
@@ -582,8 +589,10 @@ second, and positive otherwise.
 
     :: int : 'S   ->   bool : 'S
 
-    > LE ; C / v : S     =>   C / True : S   iff  v <= 0
-    > LE ; C / _ : S     =>   C / False : S
+    > LE / v : S  =>  True : S
+        iff  v <= 0
+    > LE / v : S  =>  False : S
+        iff v > 0
 
 -  ``GE``: Checks that the top of the stack is Greater Than of Equal to
    zero.
@@ -592,8 +601,10 @@ second, and positive otherwise.
 
     :: int : 'S   ->   bool : 'S
 
-    > GE ; C / v : S     =>   C / True : S   iff  v >= 0
-    > GE ; C / _ : S     =>   C / False : S
+    > GE / v : S  =>  True : S
+        iff  v >= 0
+    > GE / v : S  =>  False : S
+        iff v < 0
 
 V - Operations
 --------------
@@ -607,7 +618,7 @@ Operations on booleans
 
     :: bool : bool : 'S   ->   bool : 'S
 
-    > OR ; C / x : y : S   =>   C / (x | y) : S
+    > OR / x : y : S  =>  (x | y) : S
 
 -  ``AND``
 
@@ -615,7 +626,7 @@ Operations on booleans
 
     :: bool : bool : 'S   ->   bool : 'S
 
-    > AND ; C / x : y : S   =>   C / (x & y) : S
+    > AND / x : y : S  =>  (x & y) : S
 
 -  ``XOR``
 
@@ -623,7 +634,7 @@ Operations on booleans
 
     :: bool : bool : 'S   ->   bool : 'S
 
-    > XOR ; C / x : y : S   =>   C / (x ^ y) : S
+    > XOR / x : y : S  =>  (x ^ y) : S
 
 -  ``NOT``
 
@@ -631,7 +642,7 @@ Operations on booleans
 
     :: bool : 'S   ->   bool : 'S
 
-    > NOT ; C / x : S   =>   C / ~x : S
+    > NOT / x : S  =>  ~x : S
 
 Operations on integers and natural numbers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -646,7 +657,7 @@ limit is fuel.
     :: int : 'S   ->   int : 'S
     :: nat : 'S   ->   int : 'S
 
-    > NEG ; C / x : S   =>   C / -x : S
+    > NEG / x : S  =>  -x : S
 
 -  ``ABS``
 
@@ -654,7 +665,7 @@ limit is fuel.
 
     :: int : 'S   ->   nat : 'S
 
-    > ABS ; C / x : S   =>   C / abs (x) : S
+    > ABS / x : S  =>  abs (x) : S
 
 -  ``ADD``
 
@@ -665,7 +676,7 @@ limit is fuel.
     :: nat : int : 'S   ->   int : 'S
     :: nat : nat : 'S   ->   nat : 'S
 
-    > ADD ; C / x : y : S   =>   C / (x + y) : S
+    > ADD / x : y : S  =>  (x + y) : S
 
 -  ``SUB``
 
@@ -676,7 +687,7 @@ limit is fuel.
     :: nat : int : 'S   ->   int : 'S
     :: nat : nat : 'S   ->   int : 'S
 
-    > SUB ; C / x : y : S   =>   C / (x - y) : S
+    > SUB / x : y : S  =>  (x - y) : S
 
 -  ``MUL``
 
@@ -687,7 +698,7 @@ limit is fuel.
     :: nat : int : 'S   ->   int : 'S
     :: nat : nat : 'S   ->   nat : 'S
 
-    > MUL ; C / x : y : S   =>   C / (x * y) : S
+    > MUL / x : y : S  =>  (x * y) : S
 
 -  ``EDIV`` Perform Euclidian division
 
@@ -698,8 +709,9 @@ limit is fuel.
     :: nat : int : 'S   ->   option (pair int nat) : 'S
     :: nat : nat : 'S   ->   option (pair nat nat) : 'S
 
-    > EDIV ; C / x : 0 : S   =>   C / None
-    > EDIV ; C / x : y : S   =>   C / Some (Pair (x / y) (x % y)) : S
+    > EDIV / x : 0 : S  =>  None : S
+    > EDIV / x : y : S  =>  Some (Pair (x / y) (x % y)) : S
+        iff y <> 0
 
 Bitwise logical operators are also available on unsigned integers.
 
@@ -709,7 +721,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     :: nat : nat : 'S   ->   nat : 'S
 
-    > OR ; C / x : y : S   =>   C / (x | y) : S
+    > OR / x : y : S  =>  (x | y) : S
 
 -  ``AND``
 
@@ -717,7 +729,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     :: nat : nat : 'S   ->   nat : 'S
 
-    > AND ; C / x : y : S   =>   C / (x & y) : S
+    > AND / x : y : S  =>  (x & y) : S
 
 -  ``XOR``
 
@@ -725,7 +737,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     :: nat : nat : 'S   ->   nat : 'S
 
-    > XOR ; C / x : y : S   =>   C / (x ^ y) : S
+    > XOR / x : y : S  =>  (x ^ y) : S
 
 -  ``NOT`` The return type of ``NOT`` is an ``int`` and not a ``nat``.
    This is because the sign is also negated. The resulting integer is
@@ -737,7 +749,7 @@ Bitwise logical operators are also available on unsigned integers.
     :: nat : 'S   ->   int : 'S
     :: int : 'S   ->   int : 'S
 
-    > NOT ; C / x : S   =>   C / ~x : S
+    > NOT / x : S  =>  ~x : S
 
 -  ``LSL``
 
@@ -745,9 +757,10 @@ Bitwise logical operators are also available on unsigned integers.
 
     :: nat : nat : 'S   ->   nat : 'S
 
-    > LSL ; C / x : s : S   =>   C / (x << s) : S
-      iff   s <= 256
-    > LSL ; C / x : s : S   =>   [FAIL]
+    > LSL / x : s : S  =>  (x << s) : S
+        iff   s <= 256
+    > LSL / x : s : S  =>  [FAIL]
+        iff   s > 256
 
 -  ``LSR``
 
@@ -755,7 +768,7 @@ Bitwise logical operators are also available on unsigned integers.
 
     :: nat : nat : 'S   ->   nat : 'S
 
-    > LSR ; C / x : s : S   =>   C / (x >>> s) : S
+    > LSR / x : s : S  =>  (x >>> s) : S
 
 -  ``COMPARE``: Integer/natural comparison
 
@@ -764,9 +777,12 @@ Bitwise logical operators are also available on unsigned integers.
     :: int : int : 'S   ->   int : 'S
     :: nat : nat : 'S   ->   int : 'S
 
-    > COMPARE ; C / x : y : S   =>   C / -1 : S  iff x < y
-    > COMPARE ; C / x : y : S   =>   C / 0 : S   iff x = y
-    > COMPARE ; C / x : y : S   =>   C / 1 : S   iff x > y
+    > COMPARE / x : y : S  =>  -1 : S
+        iff x < y
+    > COMPARE / x : y : S  =>  0 : S
+        iff x = y
+    > COMPARE / x : y : S  =>  1 : S
+        iff x > y
 
 Operations on strings
 ~~~~~~~~~~~~~~~~~~~~~
@@ -781,7 +797,7 @@ constants as is, concatenate them and use them as keys.
 
     :: string : string : 'S   -> string : 'S
 
-    > CONCAT / s : t : S => (s ^ t) : S
+    > CONCAT / s : t : S  =>  (s ^ t) : S
 
 -  ``COMPARE``: Lexicographic comparison.
 
@@ -789,11 +805,11 @@ constants as is, concatenate them and use them as keys.
 
     :: string : string : 'S   ->   int : 'S
 
-    > COMPARE / s : t : S => -1 : S
+    > COMPARE / s : t : S  =>  -1 : S
         iff s < t
-    > COMPARE / s : t : S => 0 : S
+    > COMPARE / s : t : S  =>  0 : S
         iff s = t
-    > COMPARE / s : t : S => 1 : S
+    > COMPARE / s : t : S  =>  1 : S
         iff s > t
 
 Operations on pairs
@@ -805,7 +821,7 @@ Operations on pairs
 
     :: 'a : 'b : 'S   ->   pair 'a 'b : 'S
 
-    > PAIR ; C / a : b : S   =>   C / (Pair a b) : S
+    > PAIR / a : b : S  =>  (Pair a b) : S
 
 -  ``CAR``: Access the left part of a pair.
 
@@ -813,7 +829,7 @@ Operations on pairs
 
     :: pair 'a _ : 'S   ->   'a : 'S
 
-    > Car ; C / (Pair a _) : S   =>   C / a : S
+    > CAR / (Pair a _) : S  =>  a : S
 
 -  ``CDR``: Access the right part of a pair.
 
@@ -821,7 +837,7 @@ Operations on pairs
 
     :: pair _ 'b : 'S   ->   'b : 'S
 
-    > Car ; C / (Pair _ b) : S   =>   C / b : S
+    > CDR / (Pair _ b) : S  =>  b : S
 
 Operations on sets
 ~~~~~~~~~~~~~~~~~~
@@ -829,12 +845,14 @@ Operations on sets
 -  ``EMPTY_SET 'elt``: Build a new, empty set for elements of a given
    type.
 
+   The ``'elt`` type must be comparable (the ``COMPARE``
+   primitive must be defined over it).
+
 ::
 
     :: 'S   ->   set 'elt : 'S
 
-     The `'elt` type must be comparable (the `COMPARE` primitive must
-     be defined over it).
+    > EMPTY_SET _ / S  =>  {} : S
 
 -  ``MEM``: Check for the presence of an element in a set.
 
@@ -842,14 +860,14 @@ Operations on sets
 
     :: 'elt : set 'elt : 'S   ->  bool : 'S
 
-    > MEM / x : {} : S    =>   false : S
-    > MEM / x : { hd ; <tl> } : S    =>   r : S
-        iff COMPARE / x : hd : []   =>   1 : []
-        where MEM / x : v : { <tl> } : S    =>   r : S
-    > MEM / x : { hd ; <tl> } : S    =>   true : S
-        iff COMPARE / x : hd : []   =>   0 : []
-    > MEM / x : { hd ; <tl> } : S    =>   false : S
-        iff COMPARE / x : hd : []   =>   -1 : []
+    > MEM / x : {} : S  =>  false : S
+    > MEM / x : { hd ; <tl> } : S  =>  r : S
+        iff COMPARE / x : hd : []  =>  1 : []
+        where MEM / x : v : { <tl> } : S  =>  r : S
+    > MEM / x : { hd ; <tl> } : S  =>  true : S
+        iff COMPARE / x : hd : []  =>  0 : []
+    > MEM / x : { hd ; <tl> } : S  =>  false : S
+        iff COMPARE / x : hd : []  =>  -1 : []
 
 -  ``UPDATE``: Inserts or removes an element in a set, replacing a
    previous value.
@@ -858,19 +876,19 @@ Operations on sets
 
     :: 'elt : bool : set 'elt : 'S   ->   set 'elt : 'S
 
-    > UPDATE / x : false : {} : S    =>   {} : S
-    > UPDATE / x : true : {} : S    =>   { x } : S
-    > UPDATE / x : v : { hd ; <tl> } : S    =>   { hd ; <tl'> } : S
-        iff COMPARE / x : hd : []   =>   1 : []
-        where UPDATE / x : v : { <tl> } : S    =>   { <tl'> } : S
-    > UPDATE / x : false : { hd ; <tl> } : S    =>   { <tl> } : S
-        iff COMPARE / x : hd : []   =>   0 : []
-    > UPDATE / x : true : { hd ; <tl> } : S    =>   { hd ; <tl> } : S
-        iff COMPARE / x : hd : []   =>   0 : []
-    > UPDATE / x : false : { hd ; <tl> } : S    =>   { hd ; <tl> } : S
-        iff COMPARE / x : hd : []   =>   -1 : []
-    > UPDATE / x : true : { hd ; <tl> } : S    =>   { x ; hd ; <tl> } : S
-        iff COMPARE / x : hd : []   =>   -1 : []
+    > UPDATE / x : false : {} : S  =>  {} : S
+    > UPDATE / x : true : {} : S  =>  { x } : S
+    > UPDATE / x : v : { hd ; <tl> } : S  =>  { hd ; <tl'> } : S
+        iff COMPARE / x : hd : []  =>  1 : []
+        where UPDATE / x : v : { <tl> } : S  =>  { <tl'> } : S
+    > UPDATE / x : false : { hd ; <tl> } : S  =>  { <tl> } : S
+        iff COMPARE / x : hd : []  =>  0 : []
+    > UPDATE / x : true : { hd ; <tl> } : S  =>  { hd ; <tl> } : S
+        iff COMPARE / x : hd : []  =>  0 : []
+    > UPDATE / x : false : { hd ; <tl> } : S  =>  { hd ; <tl> } : S
+        iff COMPARE / x : hd : []  =>  -1 : []
+    > UPDATE / x : true : { hd ; <tl> } : S  =>  { x ; hd ; <tl> } : S
+        iff COMPARE / x : hd : []  =>  -1 : []
 
 -  ``REDUCE``: Apply a function on a set passing the result of each
    application to the next one and return the last.
@@ -879,9 +897,9 @@ Operations on sets
 
     :: lambda (pair 'elt * 'b) 'b : set 'elt : 'b : 'S   ->   'b : 'S
 
-    > REDUCE / f : {} : b : S => b : S
-    > REDUCE / f : { hd : <tl> } : b : S => REDUCE / f : { <tl> } : c : S
-        where f / Pair hd b : [] => c : []
+    > REDUCE / f : {} : b : S  =>  b : S
+    > REDUCE / f : { hd : <tl> } : b : S  =>  REDUCE / f : { <tl> } : c : S
+        where f / Pair hd b : []  =>  c : []
 
 -  ``ITER body``: Apply the body expression to each element of a set.
    The body sequence has access to the stack.
@@ -891,8 +909,8 @@ Operations on sets
     :: (set 'elt) : 'A   ->  'A
        iff body :: [ 'elt : 'A -> 'A ]
 
-    > ITER body / {} : S    =>    S
-    > ITER body / { hd ; <tl> } : S => body; ITER body / hd : { <tl> } : S
+    > ITER body / {} : S  =>  S
+    > ITER body / { hd ; <tl> } : S  =>  body; ITER body / hd : { <tl> } : S
 
 -  ``SIZE``: Get the cardinality of the set.
 
@@ -900,14 +918,15 @@ Operations on sets
 
     :: set 'elt : 'S -> nat : 'S
 
-    > SIZE / {} : S    =>    0 : S
-    > SIZE / { _ ; <tl> } : S   =>   1 + s : S
-        where SIZE / { <tl> } : S   =>   s : S
+    > SIZE / {} : S  =>  0 : S
+    > SIZE / { _ ; <tl> } : S  =>  1 + s : S
+        where SIZE / { <tl> } : S  =>  s : S
 
 Operations on maps
 ~~~~~~~~~~~~~~~~~~
 
--  ``EMPTY_MAP 'key 'val``: Build a new, empty map.
+-  ``EMPTY_MAP 'key 'val``: Build a new, empty map from keys of a
+   given type to values of another given type.
 
    The ``'key`` type must be comparable (the ``COMPARE`` primitive must
    be defined over it).
@@ -916,7 +935,7 @@ Operations on maps
 
     :: 'S -> map 'key 'val : 'S
 
-    > EMPTY_MAP _ _ / S => {} : S
+    > EMPTY_MAP _ _ / S  =>  {} : S
 
 
 -  ``GET``: Access an element in a map, returns an optional value to be
@@ -926,14 +945,14 @@ Operations on maps
 
     :: 'key : map 'key 'val : 'S   ->   option 'val : 'S
 
-    > GET / x : {} : S => None : S
-    > GET / x : { Elt k v ; <tl> } : S => opt_y : S
-        iff COMPARE / x : k : [] => 1 : []
-	where GET / x : { <tl> } : S => opt_y : S
-    > GET / x : { Elt k v ; <tl> } : S => Some v : S
-        iff COMPARE / x : k : [] => 0 : []
-    > GET / x : { Elt k v ; <tl> } : S => None : S
-        iff COMPARE / x : k : [] => -1 : []
+    > GET / x : {} : S  =>  None : S
+    > GET / x : { Elt k v ; <tl> } : S  =>  opt_y : S
+        iff COMPARE / x : k : []  =>  1 : []
+	where GET / x : { <tl> } : S  =>  opt_y : S
+    > GET / x : { Elt k v ; <tl> } : S  =>  Some v : S
+        iff COMPARE / x : k : []  =>  0 : []
+    > GET / x : { Elt k v ; <tl> } : S  =>  None : S
+        iff COMPARE / x : k : []  =>  -1 : []
 
 -  ``MEM``: Check for the presence of a binding for a key in a map.
 
@@ -941,14 +960,14 @@ Operations on maps
 
     :: 'key : map 'key 'val : 'S   ->  bool : 'S
 
-    > MEM / x : {} : S => false : S
-    > MEM / x : { Elt k v ; <tl> } : S => r : S
-        iff COMPARE / x : k : [] => 1 : []
-        where MEM / x : { <tl> } : S => r : S
-    > MEM / x : { Elt k v ; <tl> } : S => true : S
-        iff COMPARE / x : k : [] => 0 : []
-    > MEM / x : { Elt k v ; <tl> } : S => false : S
-        iff COMPARE / x : k : [] => -1 : []
+    > MEM / x : {} : S  =>  false : S
+    > MEM / x : { Elt k v ; <tl> } : S  =>  r : S
+        iff COMPARE / x : k : []  =>  1 : []
+        where MEM / x : { <tl> } : S  =>  r : S
+    > MEM / x : { Elt k v ; <tl> } : S  =>  true : S
+        iff COMPARE / x : k : []  =>  0 : []
+    > MEM / x : { Elt k v ; <tl> } : S  =>  false : S
+        iff COMPARE / x : k : []  =>  -1 : []
 
 -  ``UPDATE``: Assign or remove an element in a map.
 
@@ -956,19 +975,19 @@ Operations on maps
 
     :: 'key : option 'val : map 'key 'val : 'S   ->   map 'key 'val : 'S
 
-    > UPDATE / x : None : {} : S => {} : S
-    > UPDATE / x : Some y : {} : S => { Elt x y } : S
-    > UPDATE / x : opt_y : { Elt k v ; <tl> } : S => { Elt k v ; <tl'> } : S
-        iff COMPARE / x : k : [] => 1 : []
-	where UPDATE / x : opt_y : { <tl> } : S => { <tl'> } : S
-    > UPDATE / x : None : { Elt k v ; <tl> } : S => { <tl> } : S
-        iff COMPARE / x : k : [] => 0 : []
-    > UPDATE / x : Some y : { Elt k v ; <tl> } : S => { Elt k y ; <tl> } : S
-        iff COMPARE / x : k : [] => 0 : []
-    > UPDATE / x : None : { Elt k v ; <tl> } : S => { Elt k v ; <tl> } : S
-        iff COMPARE / x : k : [] => -1 : []
-    > UPDATE / x : Some y : { Elt k v ; <tl> } : S => { Elt x y ; Elt k v ; <tl> } : S
-        iff COMPARE / x : k : [] => -1 : []
+    > UPDATE / x : None : {} : S  =>  {} : S
+    > UPDATE / x : Some y : {} : S  =>  { Elt x y } : S
+    > UPDATE / x : opt_y : { Elt k v ; <tl> } : S  =>  { Elt k v ; <tl'> } : S
+        iff COMPARE / x : k : []  =>  1 : []
+	where UPDATE / x : opt_y : { <tl> } : S  =>  { <tl'> } : S
+    > UPDATE / x : None : { Elt k v ; <tl> } : S  =>  { <tl> } : S
+        iff COMPARE / x : k : []  =>  0 : []
+    > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt k y ; <tl> } : S
+        iff COMPARE / x : k : []  =>  0 : []
+    > UPDATE / x : None : { Elt k v ; <tl> } : S  =>  { Elt k v ; <tl> } : S
+        iff COMPARE / x : k : []  =>  -1 : []
+    > UPDATE / x : Some y : { Elt k v ; <tl> } : S  =>  { Elt x y ; Elt k v ; <tl> } : S
+        iff COMPARE / x : k : []  =>  -1 : []
 
 
 -  ``MAP``: Apply a function on a map and return the map of results
@@ -978,9 +997,9 @@ Operations on maps
 
     :: lambda (pair 'key 'val) 'b : map 'key 'val : 'S   ->   map 'key 'b : 'S
 
-    > MAP / f : {} : S => {} : S
-    > MAP / f : { Elt k v ; <tl> } : S => { Elt k (f (Pair k v)) ; <tl'> } : S
-        where MAP / f : { <tl> } : S => { <tl'> } : S
+    > MAP / f : {} : S  =>  {} : S
+    > MAP / f : { Elt k v ; <tl> } : S  =>  { Elt k (f (Pair k v)) ; <tl'> } : S
+        where MAP / f : { <tl> } : S  =>  { <tl'> } : S
 
 
 -  ``MAP body``: Apply the body expression to each element of a map. The
@@ -991,9 +1010,9 @@ Operations on maps
     :: (map 'key 'val) : 'A   ->  (map 'key 'b) : 'A
        iff   body :: [ (pair 'key 'val) : 'A -> 'b : 'A ]
 
-    > MAP body / {} : S => {} : S
-    > MAP body / { Elt k v ; <tl> } : S => { Elt k (body (Pair k v)) ; <tl'> } : S
-        where MAP body / { <tl> } : S => { <tl'> } : S
+    > MAP body / {} : S  =>  {} : S
+    > MAP body / { Elt k v ; <tl> } : S  =>  { Elt k (body (Pair k v)) ; <tl'> } : S
+        where MAP body / { <tl> } : S  =>  { <tl'> } : S
 
 
 -  ``REDUCE``: Apply a function on a map passing the result of each
@@ -1003,9 +1022,9 @@ Operations on maps
 
     :: lambda (pair (pair 'key 'val) 'b) 'b : map 'key 'val : 'b : 'S   ->   'b : 'S
 
-    > REDUCE / f : {} : b : S => b : S
-    > REDUCE / f : { Elt k v ; <tl> } : b : S => REDUCE / f : { <tl> } : c : S
-        where f / Pair (Pair k v) b : [] => c
+    > REDUCE / f : {} : b : S  =>  b : S
+    > REDUCE / f : { Elt k v ; <tl> } : b : S  =>  REDUCE / f : { <tl> } : c : S
+        where f / Pair (Pair k v) b : []  =>  c
 
 -  ``ITER body``: Apply the body expression to each element of a map.
    The body sequence has access to the stack.
@@ -1015,8 +1034,8 @@ Operations on maps
     :: (map 'elt 'val) : 'A   ->  'A
        iff   body :: [ (pair 'elt 'val) : 'A -> 'A ]
 
-    > ITER body / {} : S    =>    S
-    > ITER body / { Elt k v ; <tl> } : S => body ; ITER body / (Pair k v) : { <tl> } : S
+    > ITER body / {} : S  =>  S
+    > ITER body / { Elt k v ; <tl> } : S  =>  body ; ITER body / (Pair k v) : { <tl> } : S
 
 -  ``SIZE``: Get the cardinality of the map.
 
@@ -1024,9 +1043,9 @@ Operations on maps
 
     :: map 'key 'val : 'S -> nat : 'S
 
-    > SIZE / {} : S    =>    0 : S
-    > SIZE / { _ ; <tl> } : S   =>   1 + s : S
-        where  SIZE / { <tl> } : S   =>   s : S
+    > SIZE / {} : S  =>  0 : S
+    > SIZE / { _ ; <tl> } : S  =>  1 + s : S
+        where  SIZE / { <tl> } : S  =>  s : S
 
 Operations on optional values
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1035,28 +1054,28 @@ Operations on optional values
 
 ::
 
-    :: 'a : 'S   ->   'a? : 'S
+    :: 'a : 'S   ->   option 'a : 'S
 
-    > SOME ; C / v :: S   =>   C / (Some v) :: S
+    > SOME / v : S  =>  (Some v) : S
 
 -  ``NONE 'a``: The absent optional value.
 
 ::
 
-    :: 'S   ->   'a? : 'S
+    :: 'S   ->   option 'a : 'S
 
-    > NONE ; C / v :: S   =>   C / None :: S
+    > NONE / v : S  =>  None : S
 
 -  ``IF_NONE bt bf``: Inspect an optional value.
 
 ::
 
-    :: 'a? : 'S   ->   'b : 'S
+    :: option 'a : 'S   ->   'b : 'S
        iff   bt :: [ 'S -> 'b : 'S]
              bf :: [ 'a : 'S -> 'b : 'S]
 
-    > IF_NONE ; C / (None) : S   =>    bt ; C / S
-    > IF_NONE ; C / (Some a) : S    =>    bf ; C / a : S
+    > IF_NONE bt bf / (None) : S  =>  bt / S
+    > IF_NONE bt bf / (Some a) : S  =>  bf / a : S
 
 Operations on unions
 ~~~~~~~~~~~~~~~~~~~~
@@ -1067,7 +1086,7 @@ Operations on unions
 
     :: 'a : 'S   ->   or 'a 'b : 'S
 
-    > LEFT ; C / v :: S   =>   C / (Left v) :: S
+    > LEFT / v : S  =>  (Left v) : S
 
 -  ``RIGHT 'a``: Pack a value in a union (right case).
 
@@ -1075,7 +1094,7 @@ Operations on unions
 
     :: 'b : 'S   ->   or 'a 'b : 'S
 
-    > RIGHT ; C / v :: S   =>   C / (Right v) :: S
+    > RIGHT / v : S  =>  (Right v) : S
 
 -  ``IF_LEFT bt bf``: Inspect a value of a variant type.
 
@@ -1085,8 +1104,8 @@ Operations on unions
        iff   bt :: [ 'a : 'S -> 'c : 'S]
              bf :: [ 'b : 'S -> 'c : 'S]
 
-    > IF_LEFT ; C / (Left a) : S    =>    bt ; C / a : S
-    > IF_LEFT ; C / (Right b) : S   =>    bf ; C / b : S
+    > IF_LEFT bt bf / (Left a) : S  =>  bt / a : S
+    > IF_LEFT bt bf / (Right b) : S  =>  bf / b : S
 
 -  ``IF_RIGHT bt bf``: Inspect a value of a variant type.
 
@@ -1096,8 +1115,8 @@ Operations on unions
        iff   bt :: [ 'b : 'S -> 'c : 'S]
              bf :: [ 'a : 'S -> 'c : 'S]
 
-    > IF_LEFT ; C / (Right b) : S   =>    bt ; C / b : S
-    > IF_RIGHT ; C / (Left a) : S    =>    bf ; C / a : S
+    > IF_RIGHT bt bf / (Right b) : S  =>  bt / b : S
+    > IF_RIGHT bt bf / (Left a) : S  =>  bf / a : S
 
 Operations on lists
 ~~~~~~~~~~~~~~~~~~~
@@ -1108,7 +1127,7 @@ Operations on lists
 
     :: 'a : list 'a : 'S   ->   list 'a : 'S
 
-    > CONS ; C / a : { <l> } : S   =>   C / { a ; <l> } : S
+    > CONS / a : { <l> } : S  =>  { a ; <l> } : S
 
 -  ``NIL 'a``: The empty list.
 
@@ -1116,7 +1135,7 @@ Operations on lists
 
     :: 'S   ->   list 'a : 'S
 
-    > NIL ; C / S   =>   C / {} : S
+    > NIL / S  =>  {} : S
 
 -  ``IF_CONS bt bf``: Inspect an optional value.
 
@@ -1126,8 +1145,8 @@ Operations on lists
        iff   bt :: [ 'a : list 'a : 'S -> 'b : 'S]
              bf :: [ 'S -> 'b : 'S]
 
-    > IF_CONS ; C / { a ; <rest> } : S   =>    bt ; C / a : { <rest> } : S
-    > IF_CONS ; C / {} : S   =>    bf ; C / S
+    > IF_CONS bt bf / { a ; <rest> } : S  =>  bt / a : { <rest> } : S
+    > IF_CONS bt bf / {} : S  =>  bf / S
 
 -  ``MAP``: Apply a function on a list from left to right and return the
    list of results in the same order.
@@ -1136,9 +1155,9 @@ Operations on lists
 
     :: lambda 'a 'b : list 'a : 'S -> list 'b : 'S
 
-    > MAP / f : { a ; <rest> } : S => { f a ; <rest'> } : S
-        where MAP / f : { <rest> } : S => { <rest'> } : S
-    > MAP / f : {} : S => {} : S
+    > MAP / f : { a ; <rest> } : S  =>  { f a ; <rest'> } : S
+        where MAP / f : { <rest> } : S  =>  { <rest'> } : S
+    > MAP / f : {} : S  =>  {} : S
 
 
 -  ``MAP body``: Apply the body expression to each element of the list.
@@ -1149,9 +1168,9 @@ Operations on lists
     :: (list 'elt) : 'A   ->  (list 'b) : 'A
        iff   body :: [ 'elt : 'A -> 'b : 'A ]
 
-    > MAP body / { a ; <rest> } : S => { body a ; <rest'> } : S
-        where MAP body / { <rest> } : S => { <rest'> } : S
-    > MAP body / {} : S => {} : S
+    > MAP body / { a ; <rest> } : S  =>  { body a ; <rest'> } : S
+        where MAP body / { <rest> } : S  =>  { <rest'> } : S
+    > MAP body / {} : S  =>  {} : S
 
 
 -  ``REDUCE``: Apply a function on a list from left to right passing the
@@ -1161,9 +1180,9 @@ Operations on lists
 
     :: lambda (pair 'a 'b) 'b : list 'a : 'b : 'S -> 'b : 'S
 
-    > REDUCE / f : { a : <rest> } : b : S  => REDUCE / f : { <rest> } : c : S
-        where f / Pair a b : [] => c
-    > REDUCE / f : {} : b : S => b : S
+    > REDUCE / f : { a : <rest> } : b : S  =>  REDUCE / f : { <rest> } : c : S
+        where f / Pair a b : []  =>  c
+    > REDUCE / f : {} : b : S  =>  b : S
 
 
 -  ``SIZE``: Get the number of elements in the list.
@@ -1172,9 +1191,9 @@ Operations on lists
 
     :: list 'elt : 'S -> nat : 'S
 
-    > SIZE / { _ ; <rest> } : S   =>   1 + s : S
-        where  SIZE / { <rest> } : S   =>   s : S
-    > SIZE / {} : S    =>    0 : S
+    > SIZE / { _ ; <rest> } : S  =>  1 + s : S
+        where  SIZE / { <rest> } : S  =>  s : S
+    > SIZE / {} : S  =>  0 : S
 
 
 -  ``ITER body``: Apply the body expression to each element of a list.
@@ -1184,8 +1203,8 @@ Operations on lists
 
     :: (list 'elt) : 'A   ->  'A
          iff body :: [ 'elt : 'A -> 'A ]
-    > ITER body / { a ; <rest> } : S => body ; ITER body / a : { <rest> } : S
-    > ITER body / {} : S => S
+    > ITER body / { a ; <rest> } : S  =>  body ; ITER body / a : { <rest> } : S
+    > ITER body / {} : S  =>  S
 
 
 VI - Domain specific data types
@@ -1220,8 +1239,8 @@ retrieved from script parameters or globals.
     :: timestamp : int : 'S -> timestamp : 'S
     :: int : timestamp : 'S -> timestamp : 'S
 
-    > ADD ; C / seconds : nat (t) : S   =>   C / (seconds + t) : S
-    > ADD ; C / nat (t) : seconds : S   =>   C / (t + seconds) : S
+    > ADD / seconds : nat (t) : S  =>  (seconds + t) : S
+    > ADD / nat (t) : seconds : S  =>  (t + seconds) : S
 
 -  ``SUB`` Subtract a number of seconds from a timestamp.
 
@@ -1229,7 +1248,7 @@ retrieved from script parameters or globals.
 
     :: timestamp : int : 'S -> timestamp : 'S
 
-    > SUB ; C / seconds : nat (t) : S   =>   C / (seconds - t) : S
+    > SUB / seconds : nat (t) : S  =>  (seconds - t) : S
 
 -  ``SUB`` Subtract two timestamps.
 
@@ -1237,7 +1256,7 @@ retrieved from script parameters or globals.
 
     :: timestamp : timestamp : 'S -> int : 'S
 
-    > SUB ; C / seconds(t1) : seconds(t2) : S   =>   C / (t1 - t2) : S
+    > SUB / seconds(t1) : seconds(t2) : S  =>  (t1 - t2) : S
 
 -  ``COMPARE``: Timestamp comparison.
 
@@ -1245,11 +1264,11 @@ retrieved from script parameters or globals.
 
     :: timestamp : timestamp : 'S   ->   int : 'S
 
-    > COMPARE / seconds(t1) : seconds(t2) : S => -1 : S
+    > COMPARE / seconds(t1) : seconds(t2) : S  =>  -1 : S
         iff t1 < t2
-    > COMPARE / seconds(t1) : seconds(t2) : S => 0 : S
+    > COMPARE / seconds(t1) : seconds(t2) : S  =>  0 : S
         iff t1 = t2
-    > COMPARE / seconds(t1) : seconds(t2) : S => 1 : S
+    > COMPARE / seconds(t1) : seconds(t2) : S  =>  1 : S
         iff t1 > t2
 
 
@@ -1267,8 +1286,8 @@ types by mistake. They are also mandatory checked for under/overflows.
 
     :: tez : tez : 'S   ->   tez : 'S
 
-    > ADD ; C / x : y : S   =>   [FAIL]   on overflow
-    > ADD ; C / x : y : S   =>   C / (x + y) : S
+    > ADD / x : y : S  =>  [FAIL]   on overflow
+    > ADD / x : y : S  =>  (x + y) : S
 
 -  ``SUB``:
 
@@ -1276,8 +1295,9 @@ types by mistake. They are also mandatory checked for under/overflows.
 
     :: tez : tez : 'S   ->   tez : 'S
 
-    > SUB ; C / x : y : S   =>   [FAIL]   iff   x < y
-    > SUB ; C / x : y : S   =>   C / (x - y) : S
+    > SUB / x : y : S  =>  [FAIL]
+        iff   x < y
+    > SUB / x : y : S  =>  (x - y) : S
 
 -  ``MUL``
 
@@ -1286,8 +1306,8 @@ types by mistake. They are also mandatory checked for under/overflows.
     :: tez : nat : 'S   ->   tez : 'S
     :: nat : tez : 'S   ->   tez : 'S
 
-    > MUL ; C / x : y : S   =>   [FAIL]   on overflow
-    > MUL ; C / x : y : S   =>   C / (x * y) : S
+    > MUL / x : y : S  =>  [FAIL]   on overflow
+    > MUL / x : y : S  =>  (x * y) : S
 
 -  ``EDIV``
 
@@ -1296,19 +1316,21 @@ types by mistake. They are also mandatory checked for under/overflows.
     :: tez : nat : 'S   ->   option (pair tez tez) : 'S
     :: tez : tez : 'S   ->   option (pair nat tez) : 'S
 
-    > EDIV ; C / x : 0 : S   =>   C / None
-    > EDIV ; C / x : y : S   =>   C / Some (Pair (x / y) (x % y)) : S
+    > EDIV / x : 0 : S  =>  None
+    > EDIV / x : y : S  =>  Some (Pair (x / y) (x % y)) : S
+        iff y <> 0
 
--  ``COMPARE``:
+-  ``COMPARE``
+
 ::
 
    :: tez : tez : ’S -> int : ’S
 
-   > COMPARE / x : y : S   =>   -1 : S
+   > COMPARE / x : y : S  =>  -1 : S
        iff x < y
-   > COMPARE / x : y : S   =>   0 : S
+   > COMPARE / x : y : S  =>  0 : S
        iff x = y
-   > COMPARE / x : y : S   =>   1 : S
+   > COMPARE / x : y : S  =>  1 : S
        iff x > y
 
 Operations on contracts
@@ -1324,7 +1346,7 @@ Operations on contracts
 
 ::
 
-    :: key_hash : key_hash? : bool : bool : tez : lambda (pair 'p 'g) (pair 'r 'g) : 'g : 'S
+    :: key_hash : option key_hash : bool : bool : tez : lambda (pair 'p 'g) (pair 'r 'g) : 'g : 'S
        -> contract 'p 'r : 'S
 
 As with non code-emitted originations the contract code takes as
@@ -1343,7 +1365,7 @@ returned as a first class value to be called immediately or stored.
 
 ::
 
-    :: key_hash : key_hash? : bool : bool : tez : 'g : 'S
+    :: key_hash : option key_hash : bool : bool : tez : 'g : 'S
        -> contract 'p 'r : 'S
 
 Originate a contract based on a literal. This is currently the only way
@@ -1357,7 +1379,7 @@ value to be called immediately or stored.
 
 ::
 
-    :: key_hash : key_hash? : bool : tez : 'S   ->   contract unit unit : 'S
+    :: key_hash : option key_hash : bool : tez : 'S   ->   contract unit unit : 'S
 
 Take as argument the manager, optional delegate, the delegatable flag
 and finally the initial amount taken from the currently executed
@@ -1388,27 +1410,27 @@ recursive call (the contract just fails if the boolean is true).
 
 ::
 
-    :: 'S   ->   tez :: 'S
+    :: 'S   ->   tez : 'S
 
 -  ``SOURCE 'p 'r``: Push the source contract of the current
    transaction.
 
 ::
 
-    :: 'S   ->   contract 'p 'r :: 'S
+    :: 'S   ->   contract 'p 'r : 'S
 
 -  ``SELF``: Push the current contract.
 
 ::
 
-    :: 'S   ->   contract 'p 'r :: 'S
+    :: 'S   ->   contract 'p 'r : 'S
        where   contract 'p 'r is the type of the current contract
 
 -  ``AMOUNT``: Push the amount of the current transaction.
 
 ::
 
-    :: 'S   ->   tez :: 'S
+    :: 'S   ->   tez : 'S
 
 -  ``DEFAULT_ACCOUNT``: Return a default contract with the given
    public/private key pair. Any funds deposited in this contract can
@@ -1418,7 +1440,7 @@ recursive call (the contract just fails if the boolean is true).
 
 ::
 
-    :: key_hash : 'S   ->   contract unit unit :: 'S
+    :: key_hash : 'S   ->   contract unit unit : 'S
 
 Special operations
 ~~~~~~~~~~~~~~~~~~
@@ -1428,7 +1450,7 @@ Special operations
 
 ::
 
-    :: 'S   ->   nat :: 'S
+    :: 'S   ->   nat : 'S
 
 -  ``NOW``: Push the timestamp of the block whose validation triggered
    this execution (does not change during the execution of the
@@ -1436,7 +1458,7 @@ Special operations
 
 ::
 
-    :: 'S   ->   timestamp :: 'S
+    :: 'S   ->   timestamp : 'S
 
 Cryptographic primitives
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1467,11 +1489,11 @@ Cryptographic primitives
 
     :: key_hash : key_hash : 'S   ->   int : 'S
 
-    > COMPARE / x : y : S   =>   -1 : S
+    > COMPARE / x : y : S  =>  -1 : S
         iff x < y
-    > COMPARE / x : y : S   =>   0 : S
+    > COMPARE / x : y : S  =>  0 : S
         iff x = y
-    > COMPARE / x : y : S   =>   1 : S
+    > COMPARE / x : y : S  =>  1 : S
         iff x > y
 
 VIII - Macros
@@ -1497,19 +1519,19 @@ combinators, and also for branching.
 
 ::
 
-    > CMP(\op) ; C / S   =>   COMPARE ; (\op) ; C / S
+    > CMP(\op) / S  =>  COMPARE ; (\op) / S
 
 -  ``IF{EQ|NEQ|LT|GT|LE|GE} bt bf``
 
 ::
 
-    > IF(\op) ; C / S   =>   (\op) ; IF bt bf ; C / S
+    > IF(\op) bt bf / S  =>  (\op) ; IF bt bf / S
 
 -  ``IFCMP{EQ|NEQ|LT|GT|LE|GE} bt bf``
 
 ::
 
-    > IFCMP(\op) ; C / S   =>   COMPARE ; (\op) ; IF bt bf ; C / S
+    > IFCMP(\op) / S  =>  COMPARE ; (\op) ; IF bt bf / S
 
 Assertion Macros
 ~~~~~~~~~~~~~~~~
@@ -1522,43 +1544,43 @@ to increase clarity about illegal states.
 
 ::
 
-    > IF {} {FAIL}
+    > ASSERT  =>  IF {} {FAIL}
 
 -  ``ASSERT_{EQ|NEQ|LT|LE|GT|GE}``:
 
 ::
 
-    > ASSERT_(\op) => IF(\op) {} {FAIL}
+    > ASSERT_(\op)  =>  IF(\op) {} {FAIL}
 
 -  ``ASSERT_CMP{EQ|NEQ|LT|LE|GT|GE}``:
 
 ::
 
-    > ASSERT_CMP(\op) => IFCMP(\op) {} {FAIL}
+    > ASSERT_CMP(\op)  =>  IFCMP(\op) {} {FAIL}
 
--  ``ASSERT_NONE``: Equivalent to \``.
-
-::
-
-    > ASSERT_NONE => IF_NONE {} {FAIL}
-
--  ``ASSERT_SOME``: Equivalent to ``IF_NONE {FAIL} {}``.
+-  ``ASSERT_NONE``
 
 ::
 
-    > ASSERT_NONE => IF_NONE {FAIL} {}
+    > ASSERT_NONE  =>  IF_NONE {} {FAIL}
+
+-  ``ASSERT_SOME``
+
+::
+
+    > ASSERT_SOME  =>  IF_SOME {FAIL} {}
 
 -  ``ASSERT_LEFT``:
 
 ::
 
-    > ASSERT_LEFT => IF_LEFT {} {FAIL}
+    > ASSERT_LEFT  =>  IF_LEFT {} {FAIL}
 
 -  ``ASSERT_RIGHT``:
 
 ::
 
-    > ASSERT_RIGHT => IF_LEFT {FAIL} {}
+    > ASSERT_RIGHT  =>  IF_LEFT {FAIL} {}
 
 Syntactic Conveniences
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1570,83 +1592,83 @@ operations.
 
 ::
 
-    > DII(\rest=I*)P code / S   =>   DIP (DI(\rest)P code) / S
+    > DII(\rest=I*)P code / S  =>  DIP (DI(\rest)P code) / S
 
 -  ``DUU+P``: A syntactic sugar for duplicating the ``n``\ th element of
    the stack.
 
 ::
 
-    > DUU(\rest=U*)P / S   =>   DIP (DU(\rest)P) ; SWAP / S
+    > DUU(\rest=U*)P / S  =>  DIP (DU(\rest)P) ; SWAP / S
 
 -  ``P(A*AI)+R``: A syntactic sugar for building nested pairs in bulk.
 
 ::
 
-    > P(\fst=A*)AI(\rest=(A*AI)+)R ; C / S  =>  P(\fst)AIR ; P(\rest)R ; C / S
-    > PA(\rest=A*)AIR ; C / S  =>   DIP (P(\rest)AIR) ; C / S
+    > P(\fst=A*)AI(\rest=(A*AI)+)R / S  =>  P(\fst)AIR ; P(\rest)R / S
+    > PA(\rest=A*)AIR / S  =>  DIP (P(\rest)AIR) / S
 
 -  ``C[AD]+R``: A syntactic sugar for accessing fields in nested pairs.
 
 ::
 
-    > CA(\rest=[AD]+)R ; C / S   =>   CAR ; C(\rest)R ; C / S
-    > CD(\rest=[AD]+)R ; C / S   =>   CDR ; C(\rest)R ; C / S
+    > CA(\rest=[AD]+)R / S  =>  CAR ; C(\rest)R / S
+    > CD(\rest=[AD]+)R / S  =>  CDR ; C(\rest)R / S
 
 -  ``IF_SOME bt bf``: Inspect an optional value.
 
 ::
 
-    :: 'a? : 'S   ->   'b : 'S
+    :: option 'a : 'S   ->   'b : 'S
        iff   bt :: [ 'a : 'S -> 'b : 'S]
              bf :: [ 'S -> 'b : 'S]
 
-    > IF_SOME ; C / (Some a) : S    =>    bt ; C / a : S
-    > IF_SOME ; C / (None) : S   =>    bf ; C / S
+    > IF_SOME / (Some a) : S  =>  bt / a : S
+    > IF_SOME / (None) : S  =>  bf / S
 
 -  ``SET_CAR``: Set the first value of a pair.
 
 ::
 
-    > SET_CAR => CDR ; SWAP ; PAIR
+    > SET_CAR  =>  CDR ; SWAP ; PAIR
 
 -  ``SET_CDR``: Set the first value of a pair.
 
 ::
 
-    > SET_CDR => CAR ; PAIR
+    > SET_CDR  =>  CAR ; PAIR
 
 -  ``SET_C[AD]+R``: A syntactic sugar for setting fields in nested
    pairs.
 
 ::
 
-    > SET_CA(\rest=[AD]+)R ; C / S   =>
-        { DUP ; DIP { CAR ; SET_C(\rest)R } ; CDR ; SWAP ; PAIR } ; C / S
-    > SET_CD(\rest=[AD]+)R ; C / S   =>
-        { DUP ; DIP { CDR ; SET_C(\rest)R } ; CAR ; PAIR } ; C / S
+    > SET_CA(\rest=[AD]+)R / S   =>
+        { DUP ; DIP { CAR ; SET_C(\rest)R } ; CDR ; SWAP ; PAIR } / S
+    > SET_CD(\rest=[AD]+)R / S   =>
+        { DUP ; DIP { CDR ; SET_C(\rest)R } ; CAR ; PAIR } / S
 
 -  ``MAP_CAR`` code: Transform the first value of a pair.
 
 ::
 
-    > SET_CAR => DUP ; CDR ; SWAP ; code ; CAR ; PAIR
+    > MAP_CAR code  =>  DUP ; CDR ; SWAP ; code ; CAR ; PAIR
 
 -  ``MAP_CDR`` code: Transform the first value of a pair.
 
 ::
 
-    > SET_CDR => DUP ; CDR ; code ; SWAP ; CAR ; PAIR
+    > MAP_CDR code  =>  DUP ; CDR ; code ; SWAP ; CAR ; PAIR
 
 -  ``MAP_C[AD]+R`` code: A syntactic sugar for transforming fields in
    nested pairs.
 
 ::
 
-    > MAP_CA(\rest=[AD]+)R ; C / S   =>
-        { DUP ; DIP { CAR ; MAP_C(\rest)R code } ; CDR ; SWAP ; PAIR } ; C / S
-    > MAP_CD(\rest=[AD]+)R ; C / S   =>
-        { DUP ; DIP { CDR ; MAP_C(\rest)R code } ; CAR ; PAIR } ; C / S
+    > MAP_CA(\rest=[AD]+)R / S   =>
+        { DUP ; DIP { CAR ; MAP_C(\rest)R code } ; CDR ; SWAP ; PAIR } / S
+    > MAP_CD(\rest=[AD]+)R / S   =>
+        { DUP ; DIP { CDR ; MAP_C(\rest)R code } ; CAR ; PAIR } / S
 
 IX - Concrete syntax
 --------------------
@@ -1863,8 +1885,8 @@ Contracts in the system are stored as a piece of code and a global data
 storage. The type of the global data of the storage is fixed for each
 contract at origination time. This is ensured statically by checking on
 origination that the code preserves the type of the global data. For
-this, the code of the contract is checked to be of the following type
-lambda (pair ’arg ’global) -> (pair ’ret ’global) where ’global is the
+this, the code of the contract is checked to be of  type
+``lambda (pair ’arg ’global) -> (pair ’ret ’global)`` where ``’global`` is the
 type of the original global store given on origination. The contract
 also takes a parameter and returns a value, hence the complete calling
 convention above.
