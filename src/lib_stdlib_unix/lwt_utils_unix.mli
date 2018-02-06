@@ -34,6 +34,10 @@ val getaddrinfo:
   node:string -> service:string ->
   (Ipaddr.V6.t * int) list Lwt.t
 
+(** [getpass ()] reads a password from stdio while setting-up the
+    terminal to not display the password being typed. *)
+val getpass : unit -> string
+
 module Json : sig
 
   (** Loads a JSON file in memory *)

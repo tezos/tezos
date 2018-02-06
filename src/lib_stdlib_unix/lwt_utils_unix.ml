@@ -136,6 +136,22 @@ let getaddrinfo ~passive ~node ~service =
       addr in
   Lwt.return points
 
+let getpass () =
+  let open Unix in
+  (* Turn echoing off and fail if we can't. *)
+  let tio = tcgetattr stdin in
+  let old_echo = tio.c_echo in
+  let old_echonl = tio.c_echonl in
+  tio.c_echo <- false ;
+  tio.c_echonl <- true ;
+  tcsetattr stdin TCSAFLUSH tio ;
+  (* Read the passwd. *)
+  let passwd = read_line () in
+  (* Restore terminal. *)
+  tio.c_echo <- old_echo ;
+  tio.c_echonl <- old_echonl ;
+  tcsetattr stdin TCSAFLUSH tio ;
+  passwd
 
 module Json = struct
 
