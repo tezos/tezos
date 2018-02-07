@@ -45,6 +45,11 @@ for opam in $opams; do
     packages="$packages $package"
 done
 
+# Hack: it loks like there is too many cycle in the opam-repository,
+# when using `opam-bundle --with-test --with-doc`, so we manually
+# inline some of the test and doc dependencies.
+extra_packages="depext kaputt alcotest ocp-indent odoc"
+
 if ! [ -f "$build_dir"/opam-repository-master.tgz ]; then
     echo
     echo "### Fetching opam-repository-master.tar.gz ..."
@@ -80,8 +85,7 @@ RUN opam bundle --yes --output="tezos_bundle-$ocaml_version" \
                 --repository=opam-repository-tezos \
                 --repository=opam-repository-master \
                 --ocaml=$ocaml_version \
-                --with-doc --with-test \
-                $packages depext ocp-indent odoc
+                $packages $extra_packages
 EOF
 
 docker build --pull -t $tmp_image "$tmp_dir"
