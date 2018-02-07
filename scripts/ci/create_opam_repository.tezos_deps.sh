@@ -80,6 +80,7 @@ RUN opam bundle --yes --output="tezos_bundle-$ocaml_version" \
                 --repository=opam-repository-tezos \
                 --repository=opam-repository-master \
                 --ocaml=$ocaml_version \
+                --with-doc --with-test \
                 $packages depext ocp-indent odoc
 EOF
 
