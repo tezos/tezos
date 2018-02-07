@@ -393,7 +393,7 @@ III - Core data types and notations
    of type ``(t)`` that we note ``{ Elt key value ; ... }``, with keys
    sorted.
 -  ``big_map (k) (t)``: Lazily deserialized maps from keys of type
-   ``(k)`` of values of type ``(t)`` that we note ``{ Elt key value ... }``,
+   ``(k)`` of values of type ``(t)`` that we note ``{ Elt key value ; ... }``,
    with keys sorted.  These maps should be used if you intend to store
    large amounts of data in a map. They have higher gas costs than
    standard maps as data is lazily deserialized.  You are limited to a
@@ -1055,28 +1055,28 @@ Operations on maps
         where  SIZE / { <tl> } : S  =>  s : S
 
 
-Operations on big_maps
-~~~~~~~~~~~~~~~~~~~~~~
+Operations on ``big_maps``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The behaviour of these operations is the same as if they were normal
 maps, except that under the hood, the elements are loaded and
 deserialized on demand.
 
 
--  ``GET``: Access an element in a big_map, returns an optional value to be
+-  ``GET``: Access an element in a ``big_map``, returns an optional value to be
    checked with ``IF_SOME``.
 
 ::
 
     :: 'key : big_map 'key 'val : 'S   ->   option 'val : 'S
 
--  ``MEM``: Check for the presence of an element in a big_map.
+-  ``MEM``: Check for the presence of an element in a ``big_map``.
 
 ::
 
     :: 'key : big_map 'key 'val : 'S   ->  bool : 'S
 
--  ``UPDATE``: Assign or remove an element in a map.
+-  ``UPDATE``: Assign or remove an element in a ``big_map``.
 
 ::
 
