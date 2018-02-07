@@ -962,18 +962,6 @@ and parse_ty : bool -> Script.node -> (ex_ty * annot) tzresult = fun big_map_pos
           T_string ; T_tez ; T_bool ;
           T_key ; T_key_hash ; T_timestamp ]
 
-let comparable_ty_of_ty
-  : type a. int -> a ty -> a comparable_ty tzresult
-  = fun loc ty -> match ty with
-    | Int_t -> ok Int_key
-    | Nat_t -> ok Nat_key
-    | String_t -> ok String_key
-    | Tez_t -> ok Tez_key
-    | Bool_t -> ok Bool_key
-    | Key_hash_t -> ok Key_hash_key
-    | Timestamp_t -> ok Timestamp_key
-    | ty -> error (Comparable_type_expected (loc, ty))
-
 let rec unparse_stack
   : type a. a stack_ty -> Script.expr list
   = function
