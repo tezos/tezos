@@ -24,4 +24,26 @@ let meth_encoding =
 
 module MethMap = Resto.MethMap
 
-include Resto.MakeService(RPC_encoding)
+type (+'m,'pr,'p,'q,'i,'o, 'e) raw =
+  ('m,'pr,'p,'q,'i,'o, 'e) Resto.MakeService(RPC_encoding).t
+  constraint 'meth = [< meth ]
+
+type (+'meth, 'prefix, 'params, 'query, 'input, 'output) t =
+  ('meth, 'prefix, 'params, 'query, 'input, 'output, unit) raw
+  constraint 'meth = [< meth ]
+
+type (+'meth, 'prefix, 'params, 'query, 'input, 'output) service =
+  ('meth, 'prefix, 'params, 'query, 'input, 'output, unit) raw
+  constraint 'meth = [< meth ]
+
+include (Resto.MakeService(RPC_encoding)
+         : (module type of struct include Resto.MakeService(RPC_encoding) end
+             with type (+'m,'pr,'p,'q,'i,'o, 'e) t := ('m,'pr,'p,'q,'i,'o, 'e) raw
+              and type (+'m,'pr,'p,'q,'i,'o, 'e) service := ('m,'pr,'p,'q,'i,'o, 'e) raw)
+        )
+
+let get_service = get_service ~error:Data_encoding.empty
+let post_service = post_service ~error:Data_encoding.empty
+let delete_service = delete_service ~error:Data_encoding.empty
+let patch_service = patch_service ~error:Data_encoding.empty
+let put_service = put_service ~error:Data_encoding.empty

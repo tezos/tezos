@@ -138,8 +138,8 @@ module Make (Encoding : ENCODING) : sig
 
   val register5:
     'prefix directory ->
-    ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q , 'i, 'o, 'e) Service.t ->
-    ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> [< ('o, 'e) Answer.t ] Lwt.t) ->
+    ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'f, 'q , 'i, 'o, 'e) Service.t ->
+    ('a -> 'b -> 'c -> 'd -> 'f -> 'q -> 'i -> [< ('o, 'e) Answer.t ] Lwt.t) ->
     'prefix directory
 
   (** Registring dynamic subtree. *)

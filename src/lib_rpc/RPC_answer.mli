@@ -7,4 +7,23 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include module type of (struct include Resto_directory.Answer end)
+(** Return type for service handler *)
+type 'o t =
+  [ `Ok of 'o (* 200 *)
+  | `OkStream of 'o stream (* 200 *)
+  | `Created of string option (* 201 *)
+  | `No_content (* 204 *)
+  | `Unauthorized of unit option (* 401 *)
+  | `Forbidden of unit option (* 403 *)
+  | `Not_found of unit option (* 404 *)
+  | `Conflict of unit option (* 409 *)
+  | `Error of unit option (* 500 *)
+  ]
+
+and 'a stream = 'a Resto_directory.Answer.stream = {
+  next: unit -> 'a option Lwt.t ;
+  shutdown: unit -> unit ;
+}
+
+val return: 'o -> 'o t Lwt.t
+val return_stream: 'o stream -> 'o t Lwt.t

@@ -79,14 +79,14 @@ val call_service :
   Media_type.t list ->
   ?logger:logger ->
   base:Uri.t ->
-  ([< Resto.meth ], unit, 'p, 'q, 'i, 'o, 'e) RPC_service.t ->
+  ([< Resto.meth ], unit, 'p, 'q, 'i, 'o) RPC_service.t ->
   'p -> 'q -> 'i -> 'o tzresult Lwt.t
 
 val call_streamed_service :
   Media_type.t list ->
   ?logger:logger ->
   base:Uri.t ->
-  ([< Resto.meth ], unit, 'p, 'q, 'i, 'o, 'e) RPC_service.t ->
+  ([< Resto.meth ], unit, 'p, 'q, 'i, 'o) RPC_service.t ->
   on_chunk: ('o -> unit) ->
   on_close: (unit -> unit) ->
   'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t

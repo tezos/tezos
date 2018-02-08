@@ -381,7 +381,7 @@ let handle accept (meth, uri, ans) =
 
 let call_streamed_service
     (type p q i o )
-    accept ?logger ~base (service : (_,_,p,q,i,o,_) RPC_service.t)
+    accept ?logger ~base (service : (_,_,p,q,i,o) RPC_service.t)
     ~on_chunk ~on_close
     (params : p) (query : q) (body : i) : (unit -> unit) tzresult Lwt.t =
   Client.call_streamed_service
@@ -391,7 +391,7 @@ let call_streamed_service
 
 let call_service
     (type p q i o )
-    accept ?logger ~base (service : (_,_,p,q,i,o,_) RPC_service.t)
+    accept ?logger ~base (service : (_,_,p,q,i,o) RPC_service.t)
     (params : p)
     (query : q) (body : i) : o tzresult Lwt.t =
   Client.call_service

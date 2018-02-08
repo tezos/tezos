@@ -15,7 +15,6 @@ let forge_block_header =
     ~query: RPC_query.empty
     ~input: Block_header.encoding
     ~output: (obj1 (req "block" bytes))
-    ~error: Data_encoding.empty
     RPC_path.(root / "forge_block_header")
 
 type inject_block_param = {
@@ -68,7 +67,6 @@ let inject_block =
     ~output:
       (RPC_error.wrap @@
        (obj1 (req "block_hash" Block_hash.encoding)))
-    ~error: Data_encoding.empty
     RPC_path.(root / "inject_block")
 
 let inject_operation =
@@ -100,7 +98,6 @@ let inject_operation =
        describe
          ~title: "Hash of the injected operation" @@
        (obj1 (req "injectedOperation" Operation_hash.encoding)))
-    ~error: Data_encoding.empty
     RPC_path.(root / "inject_operation")
 
 let inject_protocol =
@@ -129,7 +126,6 @@ let inject_protocol =
        describe
          ~title: "Hash of the injected protocol" @@
        (obj1 (req "injectedProtocol" Protocol_hash.encoding)))
-    ~error: Data_encoding.empty
     RPC_path.(root / "inject_protocol")
 
 let bootstrapped =
@@ -140,7 +136,6 @@ let bootstrapped =
     ~output: (obj2
                 (req "block" Block_hash.encoding)
                 (req "timestamp" Time.encoding))
-    ~error: Data_encoding.empty
     RPC_path.(root / "bootstrapped")
 
 let complete =
@@ -155,7 +150,6 @@ let complete =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (list string)
-    ~error: Data_encoding.empty
     RPC_path.(root / "complete" /: prefix_arg )
 
 let describe =

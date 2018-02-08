@@ -116,7 +116,6 @@ let info =
     ~query: RPC_query.empty
     ~input: (obj1 (dft "operations" bool true))
     ~output: block_info_encoding
-    ~error: Data_encoding.empty
     block_path
 
 let net_id =
@@ -125,7 +124,6 @@ let net_id =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (obj1 (req "net_id" Net_id.encoding))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "net_id")
 
 let level =
@@ -134,7 +132,6 @@ let level =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (obj1 (req "level" int32))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "level")
 
 let predecessor =
@@ -143,7 +140,6 @@ let predecessor =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (obj1 (req "predecessor" Block_hash.encoding))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "predecessor")
 
 let predecessors =
@@ -154,7 +150,6 @@ let predecessors =
     ~input: (obj1 (req "length" Data_encoding.uint16))
     ~output: (obj1
                 (req "blocks" (Data_encoding.list Block_hash.encoding)))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "predecessors")
 
 let hash =
@@ -163,7 +158,6 @@ let hash =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (obj1 (req "hash" Block_hash.encoding))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "hash")
 
 let fitness =
@@ -172,7 +166,6 @@ let fitness =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (obj1 (req "fitness" Fitness.encoding))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "fitness")
 
 let context =
@@ -181,7 +174,6 @@ let context =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (obj1 (req "context" Context_hash.encoding))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "context")
 
 let timestamp =
@@ -190,7 +182,6 @@ let timestamp =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (obj1 (req "timestamp" Time.encoding))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "timestamp")
 
 type operations_param = {
@@ -219,7 +210,6 @@ let operations =
                                (req "hash" Operation_hash.encoding)
                                (opt "contents"
                                   (dynamic_size Operation.encoding)))))))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "operations")
 
 let protocol =
@@ -228,7 +218,6 @@ let protocol =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (obj1 (req "protocol" Protocol_hash.encoding))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "protocol")
 
 let test_network =
@@ -237,7 +226,6 @@ let test_network =
     ~query: RPC_query.empty
     ~input: empty
     ~output: Test_network_status.encoding
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "test_network")
 
 let pending_operations =
@@ -266,7 +254,6 @@ let pending_operations =
             (dynamic_size
                (Preapply_result.encoding RPC_error.encoding))
             (obj1 (req "unprocessed" (list (dynamic_size operation_encoding))))))
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "pending_operations")
 
 let proto_path =
@@ -315,7 +302,6 @@ let preapply =
     ~query: RPC_query.empty
     ~input: preapply_param_encoding
     ~output: (RPC_error.wrap preapply_result_encoding)
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "preapply")
 
 let complete =
@@ -330,7 +316,6 @@ let complete =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (list string)
-    ~error: Data_encoding.empty
     RPC_path.(block_path / "complete" /: prefix_arg )
 
 type list_param = {
@@ -407,7 +392,6 @@ let list =
     ~query: RPC_query.empty
     ~input: list_param_encoding
     ~output: (obj1 (req "blocks" (list (list block_info_encoding))))
-    ~error: Data_encoding.empty
     RPC_path.(root / "blocks")
 
 let list_invalid =
@@ -422,7 +406,6 @@ let list_invalid =
                   (req "block" Block_hash.encoding)
                   (req "level" int32)
                   (req "errors" RPC_error.encoding)))
-    ~error: Data_encoding.empty
     RPC_path.(root / "invalid_blocks")
 
 let unmark_invalid =
@@ -432,5 +415,4 @@ let unmark_invalid =
     ~query: RPC_query.empty
     ~input:Data_encoding.(obj1 (req "block" Block_hash.encoding))
     ~output:(RPC_error.wrap Data_encoding.empty)
-    ~error: Data_encoding.empty
     RPC_path.(root / "unmark_invalid")

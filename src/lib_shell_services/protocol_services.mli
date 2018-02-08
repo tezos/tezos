@@ -10,7 +10,7 @@
 val contents:
   ([ `POST ], unit,
    unit * Protocol_hash.t, unit, unit,
-   Protocol.t, unit) RPC_service.t
+   Protocol.t) RPC_service.t
 
 type list_param = {
   contents: bool option ;
@@ -20,4 +20,4 @@ type list_param = {
 val list:
   ([ `POST ], unit,
    unit, unit, list_param,
-   (Protocol_hash.t * Protocol.t option) list, unit) RPC_service.t
+   (Protocol_hash.t * Protocol.t option) list) RPC_service.t

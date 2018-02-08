@@ -38,39 +38,39 @@ type block_info = {
 val info:
   ([ `POST ], unit,
    unit * block, unit, bool,
-   block_info, unit) RPC_service.t
+   block_info) RPC_service.t
 val net_id:
   ([ `POST ], unit,
    unit * block, unit, unit,
-   Net_id.t, unit) RPC_service.t
+   Net_id.t) RPC_service.t
 val level:
   ([ `POST ], unit,
    unit * block, unit, unit,
-   Int32.t, unit) RPC_service.t
+   Int32.t) RPC_service.t
 val predecessor:
   ([ `POST ], unit,
    unit * block, unit, unit,
-   Block_hash.t, unit) RPC_service.t
+   Block_hash.t) RPC_service.t
 val predecessors:
   ([ `POST ], unit,
    unit * block , unit, int,
-   Block_hash.t list, unit) RPC_service.t
+   Block_hash.t list) RPC_service.t
 val hash:
   ([ `POST ], unit,
    unit * block, unit, unit,
-   Block_hash.t, unit) RPC_service.t
+   Block_hash.t) RPC_service.t
 val timestamp:
   ([ `POST ], unit,
    unit * block, unit, unit,
-   Time.t, unit) RPC_service.t
+   Time.t) RPC_service.t
 val fitness:
   ([ `POST ], unit,
    unit * block, unit, unit,
-   MBytes.t list, unit) RPC_service.t
+   MBytes.t list) RPC_service.t
 val context:
   ([ `POST ], unit,
    unit * block, unit, unit,
-   Context_hash.t, unit) RPC_service.t
+   Context_hash.t) RPC_service.t
 
 type operations_param = {
   contents: bool ;
@@ -79,20 +79,20 @@ type operations_param = {
 val operations:
   ([ `POST ], unit,
    unit * block, unit, operations_param,
-   (Operation_hash.t * Operation.t option) list list, unit) RPC_service.t
+   (Operation_hash.t * Operation.t option) list list) RPC_service.t
 
 val protocol:
   ([ `POST ], unit,
    unit * block, unit, unit,
-   Protocol_hash.t, unit) RPC_service.t
+   Protocol_hash.t) RPC_service.t
 val test_network:
   ([ `POST ], unit,
    unit * block, unit, unit,
-   Test_network_status.t, unit) RPC_service.t
+   Test_network_status.t) RPC_service.t
 val pending_operations:
   ([ `POST ], unit,
    unit * block, unit, unit,
-   error Preapply_result.t * Operation.t Operation_hash.Map.t, unit) RPC_service.t
+   error Preapply_result.t * Operation.t Operation_hash.Map.t) RPC_service.t
 
 type list_param = {
   include_ops: bool ;
@@ -106,15 +106,15 @@ type list_param = {
 val list:
   ([ `POST ], unit,
    unit, unit, list_param,
-   block_info list list, unit) RPC_service.t
+   block_info list list) RPC_service.t
 
 val list_invalid:
   ([ `POST ], unit,
    unit, unit, unit,
-   (Block_hash.t * int32 * error list) list, unit) RPC_service.t
+   (Block_hash.t * int32 * error list) list) RPC_service.t
 
 val unmark_invalid:
-  ([ `POST ], unit, unit, unit, Block_hash.t, unit tzresult, unit) RPC_service.t
+  ([ `POST ], unit, unit, unit, Block_hash.t, unit tzresult) RPC_service.t
 
 type preapply_param = {
   timestamp: Time.t ;
@@ -130,11 +130,11 @@ type preapply_result = {
 val preapply:
   ([ `POST ], unit,
    unit * block, unit, preapply_param,
-   preapply_result tzresult, unit) RPC_service.t
+   preapply_result tzresult) RPC_service.t
 
 val complete:
   ([ `POST ], unit,
    (unit * block) * string, unit, unit,
-   string list, unit) RPC_service.t
+   string list) RPC_service.t
 
 val proto_path: (unit, unit * block) RPC_path.path

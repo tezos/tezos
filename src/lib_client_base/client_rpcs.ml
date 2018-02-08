@@ -44,11 +44,11 @@ end
 class type service_ctxt = object
   method call_service :
     'm 'p 'q 'i 'o 'e.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o, 'e) RPC_service.t ->
+    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
     'p -> 'q -> 'i -> 'o tzresult Lwt.t
   method call_streamed_service :
     'm 'p 'q 'i 'o 'e.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o, 'e) RPC_service.t ->
+    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
     on_chunk: ('o -> unit) ->
     on_close: (unit -> unit) ->
     'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t
@@ -74,13 +74,13 @@ class http_ctxt config : ctxt =
       RPC_client.generic_json_call ~logger meth ?body uri
     method call_service
       : 'm 'p 'q 'i 'o 'e.
-        ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o, 'e) RPC_service.t ->
+        ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
         'p -> 'q -> 'i -> 'o tzresult Lwt.t =
       fun service params query body ->
         RPC_client.call_service Media_type.all_media_types ~logger ~base service params query body
     method call_streamed_service
       : 'm 'p 'q 'i 'o 'e.
-        ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o, 'e) RPC_service.t ->
+        ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
         on_chunk: ('o -> unit) ->
       on_close: (unit -> unit) ->
       'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t =

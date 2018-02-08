@@ -19,7 +19,6 @@ let contents =
       (obj1 (req "data"
                (describe ~title: "Tezos protocol"
                   (Protocol.encoding))))
-    ~error: Data_encoding.empty
     RPC_path.(root / "protocols" /: protocols_arg)
 
 type list_param = {
@@ -48,5 +47,4 @@ let list =
                   (opt "contents"
                      (dynamic_size Protocol.encoding)))
             )))
-    ~error: Data_encoding.empty
     RPC_path.(root / "protocols")

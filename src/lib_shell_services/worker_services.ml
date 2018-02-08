@@ -25,7 +25,6 @@ module Prevalidators = struct
     RPC_service.post_service
       ~description:"Lists the Prevalidator workers and their status."
       ~query: RPC_query.empty
-      ~error: Data_encoding.empty
       ~input: empty
       ~output:
         (list
@@ -39,7 +38,6 @@ module Prevalidators = struct
     RPC_service.post_service
       ~description:"Introspect the state of a prevalidator worker."
       ~query: RPC_query.empty
-      ~error: Data_encoding.empty
       ~input: empty
       ~output:
         (Worker_types.full_status_encoding
@@ -57,7 +55,6 @@ module Block_validator = struct
     RPC_service.post_service
       ~description:"Introspect the state of the block_validator worker."
       ~query: RPC_query.empty
-      ~error: Data_encoding.empty
       ~input: empty
       ~output:
         (Worker_types.full_status_encoding
@@ -94,7 +91,6 @@ module Peer_validators = struct
     RPC_service.post_service
       ~description:"Lists the peer validator workers and their status."
       ~query: RPC_query.empty
-      ~error: Data_encoding.empty
       ~input: empty
       ~output:
         (list
@@ -108,7 +104,6 @@ module Peer_validators = struct
     RPC_service.post_service
       ~description:"Introspect the state of a peer validator worker."
       ~query: RPC_query.empty
-      ~error: Data_encoding.empty
       ~input: empty
       ~output:
         (Worker_types.full_status_encoding
@@ -135,7 +130,6 @@ module Net_validators = struct
     RPC_service.post_service
       ~description:"Lists the net validator workers and their status."
       ~query: RPC_query.empty
-      ~error: Data_encoding.empty
       ~input: empty
       ~output:
         (list
@@ -149,7 +143,6 @@ module Net_validators = struct
     RPC_service.post_service
       ~description:"Introspect the state of a net validator worker."
       ~query: RPC_query.empty
-      ~error: Data_encoding.empty
       ~input: empty
       ~output:
         (Worker_types.full_status_encoding

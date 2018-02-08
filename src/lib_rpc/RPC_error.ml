@@ -13,7 +13,6 @@ let service =
     ~query: RPC_query.empty
     ~input: Data_encoding.empty
     ~output: Data_encoding.json_schema
-    ~error: Data_encoding.empty
     RPC_path.(root / "errors")
 
 let encoding =

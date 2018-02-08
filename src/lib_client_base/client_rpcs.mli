@@ -25,11 +25,11 @@ end
 class type service_ctxt = object
   method call_service :
     'm 'p 'q 'i 'o 'e.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o, 'e) RPC_service.t ->
+    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
     'p -> 'q -> 'i -> 'o tzresult Lwt.t
   method call_streamed_service :
     'm 'p 'q 'i 'o 'e.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o, 'e) RPC_service.t ->
+    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
     on_chunk: ('o -> unit) ->
     on_close: (unit -> unit) ->
     'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t
@@ -47,63 +47,63 @@ val call_service:
   #service_ctxt ->
   ('m, unit,
    'p, 'q, 'i,
-   'o, 'e) RPC_service.t ->
+   'o) RPC_service.t ->
   'p -> 'q -> 'i -> 'o tzresult Lwt.t
 
 val call_service0:
   #service_ctxt ->
   ('m, unit,
    unit, unit, 'i,
-   'o, 'e) RPC_service.t ->
+   'o) RPC_service.t ->
   'i -> 'o tzresult Lwt.t
 
 val call_service1:
   #service_ctxt ->
   ('m, unit,
    unit * 'a, unit, 'i,
-   'o, 'e) RPC_service.t ->
+   'o) RPC_service.t ->
   'a -> 'i -> 'o tzresult Lwt.t
 
 val call_service2:
   #service_ctxt ->
   ('m, unit,
    (unit * 'a) * 'b, unit, 'i,
-   'o, 'e) RPC_service.t ->
+   'o) RPC_service.t ->
   'a -> 'b -> 'i -> 'o tzresult Lwt.t
 
 val call_streamed_service0:
   #service_ctxt ->
   ('m, unit,
    unit, unit, 'a,
-   'b, unit) RPC_service.t ->
+   'b) RPC_service.t ->
   'a -> 'b Lwt_stream.t tzresult Lwt.t
 
 val call_streamed_service1:
   #service_ctxt ->
   ('m, unit,
    unit * 'a, unit, 'b,
-   'c, unit) RPC_service.t ->
+   'c) RPC_service.t ->
   'a -> 'b -> 'c Lwt_stream.t tzresult Lwt.t
 
 val call_err_service0:
   #service_ctxt ->
   ('m, unit,
    unit, unit, 'i,
-   'o tzresult, 'e) RPC_service.t ->
+   'o tzresult) RPC_service.t ->
   'i -> 'o tzresult Lwt.t
 
 val call_err_service1:
   #service_ctxt ->
   ('m, unit,
    unit * 'a, unit, 'i,
-   'o tzresult, 'e) RPC_service.t ->
+   'o tzresult) RPC_service.t ->
   'a -> 'i -> 'o tzresult Lwt.t
 
 val call_err_service2:
   #service_ctxt ->
   ('m, unit,
    (unit * 'a) * 'b, unit, 'i,
-   'o tzresult, 'e) RPC_service.t ->
+   'o tzresult) RPC_service.t ->
   'a -> 'b -> 'i -> 'o tzresult Lwt.t
 
 type block = Block_services.block

@@ -48,7 +48,6 @@ module Forge = struct
               (req "context" Context_hash.encoding))
            Data.Command.encoding)
       ~output: (obj1 (req "payload" bytes))
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "forge" / "block")
 end
 

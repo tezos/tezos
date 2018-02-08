@@ -42,7 +42,6 @@ let operations custom_root =
     ~input: empty
     ~output: (wrap_tzerror @@
               (list (list (dynamic_size Operation.encoding))))
-    ~error: Data_encoding.empty
     RPC_path.(custom_root / "operations")
 
 let header custom_root =
@@ -51,7 +50,6 @@ let header custom_root =
     ~query: RPC_query.empty
     ~input: empty
     ~output: (wrap_tzerror Block_header.encoding)
-    ~error: Data_encoding.empty
     RPC_path.(custom_root / "header")
 
 module Header = struct
@@ -62,7 +60,6 @@ module Header = struct
       ~query: RPC_query.empty
       ~input: empty
       ~output: (wrap_tzerror uint16)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "header" / "priority")
 
   let seed_nonce_hash custom_root =
@@ -71,7 +68,6 @@ module Header = struct
       ~query: RPC_query.empty
       ~input: empty
       ~output: (wrap_tzerror Nonce_hash.encoding)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "header" / "seed_nonce_hash")
 
 end
@@ -85,7 +81,6 @@ module Constants = struct
       ~input: empty
       ~output: (wrap_tzerror @@
                 describe ~title: "cycle length" int32)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "constants" / "cycle_length")
 
   let voting_period_length custom_root =
@@ -95,7 +90,6 @@ module Constants = struct
       ~input: empty
       ~output: (wrap_tzerror @@
                 describe ~title: "voting period length" int32)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "constants" / "voting_period_length")
 
   let time_before_reward custom_root =
@@ -105,7 +99,6 @@ module Constants = struct
       ~input: empty
       ~output: (wrap_tzerror @@
                 describe ~title: "time before reward" Period.encoding)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "constants" / "time_before_reward")
 
   let slot_durations custom_root =
@@ -115,7 +108,6 @@ module Constants = struct
       ~input: empty
       ~output: (wrap_tzerror @@
                 describe ~title: "time between slots" (list Period.encoding))
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "constants" / "time_between_slots")
 
   let first_free_baking_slot custom_root =
@@ -125,7 +117,6 @@ module Constants = struct
       ~input: empty
       ~output: (wrap_tzerror @@
                 describe ~title: "first free baking slot" uint16)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "constants" / "first_free_baking_slot")
 
   let max_signing_slot custom_root =
@@ -135,7 +126,6 @@ module Constants = struct
       ~input: empty
       ~output: (wrap_tzerror @@
                 describe ~title: "max signing slot" uint16)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "constants" / "max_signing_slot")
 
   let max_gas custom_root =
@@ -145,7 +135,6 @@ module Constants = struct
       ~input: empty
       ~output: (wrap_tzerror @@
                 describe ~title: "instructions per transaction" int31)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "constants" / "max_gas")
 
   let proof_of_work_threshold custom_root =
@@ -155,7 +144,6 @@ module Constants = struct
       ~input: empty
       ~output: (wrap_tzerror @@
                 describe ~title: "proof_of_work threshold" int64)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "constants" / "proof_of_work_threshold")
 
   let errors custom_root =
@@ -164,7 +152,6 @@ module Constants = struct
       ~query: RPC_query.empty
       ~input: empty
       ~output: json_schema
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "constants" / "errors")
 
 end
@@ -178,7 +165,6 @@ module Context = struct
       ~input: empty
       ~output: (wrap_tzerror @@
                 describe ~title: "detailled level info" Level.encoding)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "context" / "level")
 
   let next_level custom_root =
@@ -188,7 +174,6 @@ module Context = struct
       ~input: empty
       ~output: (wrap_tzerror @@
                 describe ~title: "detailled level info" Level.encoding)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "context" / "next_level")
 
   let roll_value custom_root =
@@ -196,7 +181,6 @@ module Context = struct
       ~query: RPC_query.empty
       ~input: empty
       ~output: (wrap_tzerror Tez.encoding)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "context" / "roll_value")
 
   let next_roll custom_root =
@@ -204,7 +188,6 @@ module Context = struct
       ~query: RPC_query.empty
       ~input: empty
       ~output: (wrap_tzerror int32)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "context" / "next_roll")
 
   let voting_period_kind custom_root =
@@ -216,7 +199,6 @@ module Context = struct
         (wrap_tzerror @@
          (obj1
             (req "voting_period_kind" Voting_period.kind_encoding)))
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "context" / "voting_period_kind")
 
 
@@ -249,7 +231,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror nonce_encoding)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "nonce" /: Raw_level.arg)
 
     let hash custom_root =
@@ -259,7 +240,6 @@ module Context = struct
         ~input: empty
         ~output: (wrap_tzerror @@
                   describe ~title: "nonce hash" Nonce_hash.encoding)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "nonce")
 
   end
@@ -279,7 +259,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror @@ list pk_encoding)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "keys")
 
     let get custom_root =
@@ -288,7 +267,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror @@ pk_encoding)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "keys" /: public_key_hash_arg )
 
   end
@@ -303,7 +281,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror Tez.encoding)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "contracts" /: Contract.arg / "balance")
 
     let manager custom_root =
@@ -312,7 +289,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror Ed25519.Public_key_hash.encoding)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "contracts" /: Contract.arg / "manager")
 
     let delegate custom_root =
@@ -321,7 +297,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror (option Ed25519.Public_key_hash.encoding))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "contracts" /: Contract.arg / "delegate")
 
     let counter custom_root =
@@ -330,7 +305,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror int32)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "contracts" /: Contract.arg / "counter")
 
     let spendable custom_root =
@@ -339,7 +313,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror bool)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "contracts" /: Contract.arg / "spendable")
 
     let delegatable custom_root =
@@ -348,7 +321,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror bool)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "contracts" /: Contract.arg / "delegatable")
 
     let script custom_root =
@@ -357,7 +329,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror (option Script.encoding))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "contracts" /: Contract.arg / "script")
 
     let storage custom_root =
@@ -366,7 +337,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror (option Script.expr_encoding))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "contracts" /: Contract.arg / "storage")
 
     type info = {
@@ -399,7 +369,6 @@ module Context = struct
                 (opt "value" Ed25519.Public_key_hash.encoding))
              (opt "script" Script.encoding)
              (req "counter" int32))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "contracts" /: Contract.arg)
 
     let list custom_root =
@@ -409,7 +378,6 @@ module Context = struct
         ~query: RPC_query.empty
         ~input: empty
         ~output: (wrap_tzerror @@ list Contract.encoding)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "context" / "contracts")
 
   end
@@ -427,7 +395,6 @@ module Helpers = struct
       ~input: (obj1 (opt "priority" int31))
       ~output: (wrap_tzerror @@
                 obj1 (req "timestamp" Timestamp.encoding))
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "minimal_timestamp")
 
   let run_code_input_encoding =
@@ -449,7 +416,6 @@ module Helpers = struct
                      (req "storage" Script.expr_encoding)
                      (req "output" Script.expr_encoding)
                      (opt "big_map_diff" (list (tup2 Script.expr_encoding (option Script.expr_encoding))))))
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "run_code")
 
   let apply_operation custom_root =
@@ -463,7 +429,6 @@ module Helpers = struct
                  (opt "signature" Ed25519.Signature.encoding))
       ~output: (wrap_tzerror
                   (obj1 (req "contracts" (list Contract.encoding))))
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "apply_operation")
 
 
@@ -483,7 +448,6 @@ module Helpers = struct
                            (req "gas" Gas.encoding)
                            (req "stack" (list (Script.expr_encoding)))))
                      (opt "big_map_diff" (list (tup2 Script.expr_encoding (option Script.expr_encoding))))))
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "trace_code")
 
   let typecheck_code custom_root =
@@ -492,7 +456,6 @@ module Helpers = struct
       ~query: RPC_query.empty
       ~input: Script.expr_encoding
       ~output: (wrap_tzerror Script_tc_errors_registration.type_map_enc)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "typecheck_code")
 
   let typecheck_data custom_root =
@@ -504,7 +467,6 @@ module Helpers = struct
                  (req "data" Script.expr_encoding)
                  (req "type" Script.expr_encoding))
       ~output: (wrap_tzerror empty)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "typecheck_data")
 
   let hash_data custom_root =
@@ -515,7 +477,6 @@ module Helpers = struct
                  (req "type" Script.expr_encoding))
       ~output: (wrap_tzerror @@
                 obj1 (req "hash" string))
-      ~error: Data_encoding.empty
       ~query: RPC_query.empty
       RPC_path.(custom_root / "helpers" / "hash_data")
 
@@ -527,7 +488,6 @@ module Helpers = struct
                  (opt "offset" int32))
       ~output: (wrap_tzerror @@
                 describe ~title: "block level and cycle information" Level.encoding)
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "level" /: Raw_level.arg)
 
   let levels custom_root =
@@ -540,7 +500,6 @@ module Helpers = struct
                   (obj2
                      (req "first" Raw_level.encoding)
                      (req "last" Raw_level.encoding)))
-      ~error: Data_encoding.empty
       RPC_path.(custom_root / "helpers" / "levels" /: Cycle.arg)
 
   module Rights = struct
@@ -577,7 +536,6 @@ module Helpers = struct
                           (obj2
                              (req "delegate" Ed25519.Public_key_hash.encoding)
                              (req "timestamp" Timestamp.encoding)))))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "rights" / "baking")
 
     let baking_rights_for_level custom_root =
@@ -592,7 +550,6 @@ module Helpers = struct
                     (req "level" Raw_level.encoding)
                     (req "delegates"
                        (list Ed25519.Public_key_hash.encoding)))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "rights"
                   / "baking" / "level" /: Raw_level.arg )
 
@@ -604,7 +561,6 @@ module Helpers = struct
         ~input: empty
         ~output: (wrap_tzerror @@
                   obj1 (req "levels" (list Raw_level.encoding)))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "rights"
                   / "baking" / "level"  )
 
@@ -614,7 +570,6 @@ module Helpers = struct
         ~query: RPC_query.empty
         ~input: slots_range_encoding
         ~output: (wrap_tzerror (Data_encoding.list baking_slot_encoding))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "rights"
                   / "baking" / "delegate" /: Context.Key.public_key_hash_arg )
 
@@ -627,7 +582,6 @@ module Helpers = struct
         ~output: (wrap_tzerror @@
                   obj1 (req "delegates"
                           (list Ed25519.Public_key_hash.encoding)))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "rights"
                   / "baking" / "delegate"  )
 
@@ -642,7 +596,6 @@ module Helpers = struct
                     (req "level" Raw_level.encoding)
                     (req "delegates"
                        (list Ed25519.Public_key_hash.encoding)))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "rights" / "endorsement")
 
     let endorsement_rights_for_level custom_root =
@@ -656,7 +609,6 @@ module Helpers = struct
                     (req "level" Raw_level.encoding)
                     (req "delegates"
                        (list Ed25519.Public_key_hash.encoding)))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "rights"
                   / "endorsement" / "level" /: Raw_level.arg )
 
@@ -668,7 +620,6 @@ module Helpers = struct
         ~input: empty
         ~output: (wrap_tzerror @@
                   obj1 (req "levels" (list Raw_level.encoding)))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "rights"
                   / "endorsement" / "level"  )
 
@@ -678,7 +629,6 @@ module Helpers = struct
         ~query: RPC_query.empty
         ~input: slots_range_encoding
         ~output: (wrap_tzerror @@ Data_encoding.list endorsement_slot_encoding)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "rights"
                   / "endorsement" / "delegate" /: Context.Key.public_key_hash_arg )
 
@@ -691,7 +641,6 @@ module Helpers = struct
         ~output: (wrap_tzerror @@
                   obj1 (req "delegates"
                           (list Ed25519.Public_key_hash.encoding)))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "rights"
                   / "endorsement" / "delegate"  )
 
@@ -709,7 +658,6 @@ module Helpers = struct
            (obj1
               (req "operation" @@
                describe ~title: "hex encoded operation" bytes)))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "forge" / "operations" )
 
     let empty_proof_of_work_nonce =
@@ -729,7 +677,6 @@ module Helpers = struct
                    Tezos_context.Constants.proof_of_work_nonce_size)
                 empty_proof_of_work_nonce))
         ~output: (wrap_tzerror bytes)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "forge" / "block_proto_header")
 
   end
@@ -746,7 +693,6 @@ module Helpers = struct
              (opt "check_signature" bool))
         ~output:
           (wrap_tzerror (list (dynamic_size Operation.encoding)))
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "parse" / "operations" )
 
     let block custom_root =
@@ -755,7 +701,6 @@ module Helpers = struct
         ~query: RPC_query.empty
         ~input: Block_header.raw_encoding
         ~output: (wrap_tzerror Block_header.proto_header_encoding)
-        ~error: Data_encoding.empty
         RPC_path.(custom_root / "helpers" / "parse" / "block" )
 
   end

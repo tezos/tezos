@@ -37,7 +37,6 @@ let echo_service custom_root =
     ~query: RPC_query.empty
     ~input: Data_encoding.(obj1 (req "msg" string))
     ~output: Data_encoding.(obj1 (req "msg" string))
-    ~error: Data_encoding.empty
     RPC_path.(custom_root / "echo")
 
 let failing_service custom_root =
@@ -46,7 +45,6 @@ let failing_service custom_root =
     ~query: RPC_query.empty
     ~input: Data_encoding.(obj1 (req "arg" int31))
     ~output: (wrap_tzerror Data_encoding.empty)
-    ~error: Data_encoding.empty
     RPC_path.(custom_root / "failing")
 
 let rpc_services : Updater.rpc_context RPC_directory.t = let dir = RPC_directory.empty in
