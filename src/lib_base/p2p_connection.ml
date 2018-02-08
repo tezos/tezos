@@ -7,10 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type peer_id = Crypto_box.Public_key_hash.t
-let peer_id_encoding = Crypto_box.Public_key_hash.encoding
-let peer_id_pp = Crypto_box.Public_key_hash.pp
-
 module Id = struct
 
   (* A net point (address x port). *)
@@ -58,10 +54,10 @@ module Table = Hashtbl.Make (Id)
 module Info = struct
 
   type t = {
-    incoming : bool;
-    peer_id : peer_id;
-    id_point : Id.t;
-    remote_socket_port : P2p_addr.port;
+    incoming : bool ;
+    peer_id : P2p_peer_id.t ;
+    id_point : Id.t ;
+    remote_socket_port : P2p_addr.port ;
     versions : P2p_version.t list ;
   }
 
@@ -74,7 +70,7 @@ module Info = struct
          { incoming ; peer_id ; id_point ; remote_socket_port ; versions })
       (obj5
          (req "incoming" bool)
-         (req "peer_id" peer_id_encoding)
+         (req "peer_id" P2p_peer_id.encoding)
          (req "id_point" Id.encoding)
          (req "remote_socket_port" uint16)
          (req "versions" (list P2p_version.encoding)))
@@ -88,7 +84,7 @@ module Info = struct
       | Some port -> remote_addr, port in
     Format.fprintf ppf "%s %a %a (%a)"
       (if incoming then "↘" else "↗")
-      peer_id_pp peer_id
+      P2p_peer_id.pp peer_id
       P2p_point.Id.pp point
       P2p_version.pp version
 
@@ -104,7 +100,7 @@ module Pool_event = struct
     | Too_many_connections
 
     | New_point of P2p_point.Id.t
-    | New_peer of peer_id
+    | New_peer of P2p_peer_id.t
 
     | Gc_points
     | Gc_peer_ids
@@ -112,21 +108,21 @@ module Pool_event = struct
     | Incoming_connection of P2p_point.Id.t
     | Outgoing_connection of P2p_point.Id.t
     | Authentication_failed of P2p_point.Id.t
-    | Accepting_request of P2p_point.Id.t * Id.t * peer_id
-    | Rejecting_request of P2p_point.Id.t * Id.t * peer_id
-    | Request_rejected of P2p_point.Id.t * (Id.t * peer_id) option
-    | Connection_established of Id.t * peer_id
+    | Accepting_request of P2p_point.Id.t * Id.t * P2p_peer_id.t
+    | Rejecting_request of P2p_point.Id.t * Id.t * P2p_peer_id.t
+    | Request_rejected of P2p_point.Id.t * (Id.t * P2p_peer_id.t) option
+    | Connection_established of Id.t * P2p_peer_id.t
 
-    | Swap_request_received of { source : peer_id }
-    | Swap_ack_received of { source : peer_id }
-    | Swap_request_sent of { source : peer_id }
-    | Swap_ack_sent of { source : peer_id }
-    | Swap_request_ignored of { source : peer_id }
-    | Swap_success of { source : peer_id }
-    | Swap_failure of { source : peer_id }
+    | Swap_request_received of { source : P2p_peer_id.t }
+    | Swap_ack_received of { source : P2p_peer_id.t }
+    | Swap_request_sent of { source : P2p_peer_id.t }
+    | Swap_ack_sent of { source : P2p_peer_id.t }
+    | Swap_request_ignored of { source : P2p_peer_id.t }
+    | Swap_success of { source : P2p_peer_id.t }
+    | Swap_failure of { source : P2p_peer_id.t }
 
-    | Disconnection of peer_id
-    | External_disconnection of peer_id
+    | Disconnection of P2p_peer_id.t
+    | External_disconnection of P2p_peer_id.t
 
   let encoding =
     let open Data_encoding in
@@ -146,7 +142,7 @@ module Pool_event = struct
         (function New_point p -> Some p | _ -> None)
         (fun p -> New_point p) ;
       case (Tag 3) (branch_encoding "new_peer"
-                      (obj1 (req "peer_id" peer_id_encoding)))
+                      (obj1 (req "peer_id" P2p_peer_id.encoding)))
         (function New_peer p -> Some p | _ -> None)
         (fun p -> New_peer p) ;
       case (Tag 4) (branch_encoding "incoming_connection"
@@ -165,7 +161,7 @@ module Pool_event = struct
                       (obj3
                          (req "point" P2p_point.Id.encoding)
                          (req "id_point" Id.encoding)
-                         (req "peer_id" peer_id_encoding)))
+                         (req "peer_id" P2p_peer_id.encoding)))
         (function Accepting_request (p, id_p, g) ->
            Some (p, id_p, g) | _ -> None)
         (fun (p, id_p, g) -> Accepting_request (p, id_p, g)) ;
@@ -173,7 +169,7 @@ module Pool_event = struct
                       (obj3
                          (req "point" P2p_point.Id.encoding)
                          (req "id_point" Id.encoding)
-                         (req "peer_id" peer_id_encoding)))
+                         (req "peer_id" P2p_peer_id.encoding)))
         (function Rejecting_request (p, id_p, g) ->
            Some (p, id_p, g) | _ -> None)
         (fun (p, id_p, g) -> Rejecting_request (p, id_p, g)) ;
@@ -181,22 +177,22 @@ module Pool_event = struct
                       (obj2
                          (req "point" P2p_point.Id.encoding)
                          (opt "identity"
-                            (tup2 Id.encoding peer_id_encoding))))
+                            (tup2 Id.encoding P2p_peer_id.encoding))))
         (function Request_rejected (p, id) -> Some (p, id) | _ -> None)
         (fun (p, id) -> Request_rejected (p, id)) ;
       case (Tag 10) (branch_encoding "connection_established"
                        (obj2
                           (req "id_point" Id.encoding)
-                          (req "peer_id" peer_id_encoding)))
+                          (req "peer_id" P2p_peer_id.encoding)))
         (function Connection_established (id_p, g) ->
            Some (id_p, g) | _ -> None)
         (fun (id_p, g) -> Connection_established (id_p, g)) ;
       case (Tag 11) (branch_encoding "disconnection"
-                       (obj1 (req "peer_id" peer_id_encoding)))
+                       (obj1 (req "peer_id" P2p_peer_id.encoding)))
         (function Disconnection g -> Some g | _ -> None)
         (fun g -> Disconnection g) ;
       case (Tag 12) (branch_encoding "external_disconnection"
-                       (obj1 (req "peer_id" peer_id_encoding)))
+                       (obj1 (req "peer_id" P2p_peer_id.encoding)))
         (function External_disconnection g -> Some g | _ -> None)
         (fun g -> External_disconnection g) ;
       case (Tag 13) (branch_encoding "gc_points" empty)
@@ -206,43 +202,43 @@ module Pool_event = struct
         (function Gc_peer_ids -> Some () | _ -> None)
         (fun () -> Gc_peer_ids) ;
       case (Tag 15) (branch_encoding "swap_request_received"
-                       (obj1 (req "source" peer_id_encoding)))
+                       (obj1 (req "source" P2p_peer_id.encoding)))
         (function
           | Swap_request_received { source } -> Some source
           | _ -> None)
         (fun source -> Swap_request_received { source }) ;
       case (Tag 16) (branch_encoding "swap_ack_received"
-                       (obj1 (req "source" peer_id_encoding)))
+                       (obj1 (req "source" P2p_peer_id.encoding)))
         (function
           | Swap_ack_received { source } -> Some source
           | _ -> None)
         (fun source -> Swap_ack_received { source }) ;
       case (Tag 17) (branch_encoding "swap_request_sent"
-                       (obj1 (req "source" peer_id_encoding)))
+                       (obj1 (req "source" P2p_peer_id.encoding)))
         (function
           | Swap_request_sent { source } -> Some source
           | _ -> None)
         (fun source -> Swap_request_sent { source }) ;
       case (Tag 18) (branch_encoding "swap_ack_sent"
-                       (obj1 (req "source" peer_id_encoding)))
+                       (obj1 (req "source" P2p_peer_id.encoding)))
         (function
           | Swap_ack_sent { source } -> Some source
           | _ -> None)
         (fun source -> Swap_ack_sent { source }) ;
       case (Tag 19) (branch_encoding "swap_request_ignored"
-                       (obj1 (req "source" peer_id_encoding)))
+                       (obj1 (req "source" P2p_peer_id.encoding)))
         (function
           | Swap_request_ignored { source } -> Some source
           | _ -> None)
         (fun source -> Swap_request_ignored { source }) ;
       case (Tag 20) (branch_encoding "swap_success"
-                       (obj1 (req "source" peer_id_encoding)))
+                       (obj1 (req "source" P2p_peer_id.encoding)))
         (function
           | Swap_success { source } -> Some source
           | _ -> None)
         (fun source -> Swap_success { source }) ;
       case (Tag 21) (branch_encoding "swap_failure"
-                       (obj1 (req "source" peer_id_encoding)))
+                       (obj1 (req "source" P2p_peer_id.encoding)))
         (function
           | Swap_failure { source } -> Some source
           | _ -> None)

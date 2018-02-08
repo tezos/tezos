@@ -8,18 +8,19 @@
 (**************************************************************************)
 
 open Lwt.Infix
-include Logging.Make (struct let name = "test-pipe" end)
 
 let rec producer queue = function
   | 0 ->
-      lwt_log_notice "Done producing."
+      Format.eprintf "Done producing." ;
+      Lwt.return_unit
   | n ->
       Lwt_pipe.push queue () >>= fun () ->
       producer queue (pred n)
 
 let rec consumer queue = function
   | 0 ->
-      lwt_log_notice "Done consuming."
+      Format.eprintf "Done consuming." ;
+      Lwt.return_unit
   | n ->
       Lwt_pipe.pop queue >>= fun _ ->
       consumer queue (pred n)

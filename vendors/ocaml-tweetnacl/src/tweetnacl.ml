@@ -341,12 +341,12 @@ module Sign = struct
     let sk = Cstruct.create_unsafe skbytes in
     begin match seed with
       | None ->
-        Cstruct.(keypair (to_bigarray pk) (to_bigarray sk))
+          Cstruct.(keypair (to_bigarray pk) (to_bigarray sk))
       | Some cs ->
-        if Cstruct.len cs < seedbytes then
-          invalid_arg "Sign.keypair: seed must be at least 32 bytes long" ;
-        Cstruct.blit cs 0 sk 0 pkbytes ;
-        Cstruct.(keypair_seed (to_bigarray pk) (to_bigarray sk))
+          if Cstruct.len cs < seedbytes then
+            invalid_arg "Sign.keypair: seed must be at least 32 bytes long" ;
+          Cstruct.blit cs 0 sk 0 pkbytes ;
+          Cstruct.(keypair_seed (to_bigarray pk) (to_bigarray sk))
     end ;
     Pk pk, Sk sk
 
@@ -393,12 +393,12 @@ module Sign = struct
     let mlen = Cstruct.create_unsafe 8 in
     let msg = Cstruct.(create (len smsg)) in
     let ret = Cstruct.(verify
-               (to_bigarray msg) (to_bigarray mlen)
-               (to_bigarray smsg) (to_bigarray pk)) in
+                         (to_bigarray msg) (to_bigarray mlen)
+                         (to_bigarray smsg) (to_bigarray pk)) in
     match ret with
     | 0 ->
-      let len = Cstruct.LE.get_uint64 mlen 0 |> Int64.to_int in
-      Some (Cstruct.sub msg 0 len)
+        let len = Cstruct.LE.get_uint64 mlen 0 |> Int64.to_int in
+        Some (Cstruct.sub msg 0 len)
     | _ -> None
 
   let verify_detached ~key ~signature msg =

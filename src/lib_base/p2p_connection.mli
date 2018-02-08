@@ -7,9 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type peer_id = Crypto_box.Public_key_hash.t
-(* = P2p_peer.Id.t, but we should break cycles *)
-
 module Id : sig
 
   type t = P2p_addr.t * P2p_addr.port option
@@ -36,7 +33,7 @@ module Info : sig
 
   type t = {
     incoming : bool;
-    peer_id : peer_id;
+    peer_id : P2p_peer_id.t;
     id_point : Id.t;
     remote_socket_port : P2p_addr.port;
     versions : P2p_version.t list ;
@@ -55,7 +52,7 @@ module Pool_event : sig
     | Too_many_connections
 
     | New_point of P2p_point.Id.t
-    | New_peer of peer_id
+    | New_peer of P2p_peer_id.t
 
     | Gc_points
     (** Garbage collection of known point table has been triggered. *)
@@ -72,34 +69,34 @@ module Pool_event : sig
     | Authentication_failed of P2p_point.Id.t
     (** Remote point failed authentication *)
 
-    | Accepting_request of P2p_point.Id.t * Id.t * peer_id
+    | Accepting_request of P2p_point.Id.t * Id.t * P2p_peer_id.t
     (** We accepted a connection after authentifying the remote peer. *)
-    | Rejecting_request of P2p_point.Id.t * Id.t * peer_id
+    | Rejecting_request of P2p_point.Id.t * Id.t * P2p_peer_id.t
     (** We rejected a connection after authentifying the remote peer. *)
-    | Request_rejected of P2p_point.Id.t * (Id.t * peer_id) option
+    | Request_rejected of P2p_point.Id.t * (Id.t * P2p_peer_id.t) option
     (** The remote peer rejected our connection. *)
 
-    | Connection_established of Id.t * peer_id
+    | Connection_established of Id.t * P2p_peer_id.t
     (** We succesfully established a authentified connection. *)
 
-    | Swap_request_received of { source : peer_id }
+    | Swap_request_received of { source : P2p_peer_id.t }
     (** A swap request has been received. *)
-    | Swap_ack_received of { source : peer_id }
+    | Swap_ack_received of { source : P2p_peer_id.t }
     (** A swap ack has been received *)
-    | Swap_request_sent of { source : peer_id }
+    | Swap_request_sent of { source : P2p_peer_id.t }
     (** A swap request has been sent *)
-    | Swap_ack_sent of { source : peer_id }
+    | Swap_ack_sent of { source : P2p_peer_id.t }
     (** A swap ack has been sent *)
-    | Swap_request_ignored of { source : peer_id }
+    | Swap_request_ignored of { source : P2p_peer_id.t }
     (** A swap request has been ignored *)
-    | Swap_success of { source : peer_id }
+    | Swap_success of { source : P2p_peer_id.t }
     (** A swap operation has succeeded *)
-    | Swap_failure of { source : peer_id }
+    | Swap_failure of { source : P2p_peer_id.t }
     (** A swap operation has failed *)
 
-    | Disconnection of peer_id
+    | Disconnection of P2p_peer_id.t
     (** We decided to close the connection. *)
-    | External_disconnection of peer_id
+    | External_disconnection of P2p_peer_id.t
     (** The connection was closed for external reason. *)
 
   val encoding : t Data_encoding.t

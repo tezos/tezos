@@ -276,7 +276,7 @@ val broadcast_bootstrap_msg:  ('msg, 'meta) pool -> unit
 
 module Peers : sig
 
-  type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) P2p_peer.Pool_info.t
+  type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) P2p_peer_state.Info.t
 
   val info:
     ('msg, 'meta) pool -> P2p_peer.Id.t -> ('msg, 'meta) info option
@@ -307,7 +307,7 @@ end
 
 module Points : sig
 
-  type ('msg, 'meta) info = ('msg, 'meta) connection P2p_point.Pool_info.t
+  type ('msg, 'meta) info = ('msg, 'meta) connection P2p_point_state.Info.t
 
   val info:
     ('msg, 'meta) pool -> P2p_point.Id.t -> ('msg, 'meta) info option
@@ -349,3 +349,4 @@ module Message : sig
   val encoding: 'msg encoding list -> 'msg t Data_encoding.t
 
 end
+

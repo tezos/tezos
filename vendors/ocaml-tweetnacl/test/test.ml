@@ -21,8 +21,8 @@ let sign () =
   match Sign.verify ~key:pk signed_msg with
   | None -> failwith "Impossible to verify"
   | Some verified_msg ->
-    assert (Hex.of_cstruct msg =
-            Hex.of_cstruct (Cstruct.sub verified_msg Sign.bytes msglen))
+      assert (Hex.of_cstruct msg =
+              Hex.of_cstruct (Cstruct.sub verified_msg Sign.bytes msglen))
 
 let sign_detached () =
   let pk, sk = Sign.keypair () in
@@ -38,8 +38,8 @@ let sign_extended () =
   match Sign.verify ~key:pk signed_msg with
   | None -> failwith "Impossible to verify"
   | Some verified_msg ->
-    assert (Hex.of_cstruct msg =
-            Hex.of_cstruct (Cstruct.sub verified_msg Sign.bytes msglen))
+      assert (Hex.of_cstruct msg =
+              Hex.of_cstruct (Cstruct.sub verified_msg Sign.bytes msglen))
 
 let sign_extended_detached () =
   let pk, sk = Sign.keypair () in

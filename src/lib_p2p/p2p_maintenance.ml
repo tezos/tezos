@@ -49,11 +49,11 @@ let connectable st start_time expected =
   let acc = Bounded_point_info.create expected in
   P2p_pool.Points.fold_known pool ~init:()
     ~f:begin fun point pi () ->
-      match P2p_point.Pool_state.get pi with
+      match P2p_point_state.get pi with
       | Disconnected -> begin
-          match P2p_point.Pool_info.last_miss pi with
+          match P2p_point_state.Info.last_miss pi with
           | Some last when Time.(start_time < last)
-                        || P2p_point.Pool_info.greylisted ~now pi -> ()
+                        || P2p_point_state.Info.greylisted ~now pi -> ()
           | last ->
               Bounded_point_info.insert (last, point) acc
         end

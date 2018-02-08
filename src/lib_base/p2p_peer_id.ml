@@ -7,5 +7,5 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** P2p_point representing a reachable socket address *)
+include Crypto_box.Public_key_hash
 

@@ -516,12 +516,12 @@ module RPC = struct
     open P2p_point.State
 
     let info_of_point_info i =
-      let state = match P2p_point.Pool_state.get i with
+      let state = match P2p_point_state.get i with
         | Requested _ -> Requested
         | Accepted { current_peer_id ; _ } -> Accepted current_peer_id
         | Running { current_peer_id ; _ } -> Running current_peer_id
         | Disconnected -> Disconnected in
-      P2p_point.Pool_info.{
+      P2p_point_state.Info.{
         trusted = trusted i ;
         state ;
         greylisted_until = greylisted_until i ;
@@ -550,7 +550,7 @@ module RPC = struct
             ~default:[]
             ~f:begin fun pi ->
               let evts =
-                P2p_point.Pool_event.fold
+                P2p_point_state.Info.fold
                   pi ~init:[] ~f:(fun a e -> e :: a) in
               (if rev then List.rev_sub else List.sub) evts max
             end
@@ -561,7 +561,7 @@ module RPC = struct
       | Some pool ->
           match P2p_pool.Points.info pool point with
           | None -> raise Not_found
-          | Some pi -> P2p_point.Pool_event.watch pi
+          | Some pi -> P2p_point_state.Info.watch pi
 
     let list ?(restrict=[]) net =
       match net.pool with
@@ -585,18 +585,18 @@ module RPC = struct
     open P2p_peer.State
 
     let info_of_peer_info pool i =
-      let state, id_point = match P2p_peer.Pool_state.get i with
+      let state, id_point = match P2p_peer_state.get i with
         | Accepted { current_point } -> Accepted, Some current_point
         | Running { current_point } -> Running, Some current_point
         | Disconnected -> Disconnected, None
       in
-      let peer_id = P2p_peer.Pool_info.peer_id i in
+      let peer_id = P2p_peer_state.Info.peer_id i in
       let score = P2p_pool.Peers.get_score pool peer_id in
       let stat =
         match P2p_pool.Connection.find_by_peer_id pool peer_id with
         | None -> P2p_stat.empty
         | Some conn -> P2p_pool.Connection.stat conn
-      in P2p_peer.Pool_info.{
+      in P2p_peer_state.Info.{
           score ;
           trusted = trusted i ;
           state ;
@@ -627,7 +627,7 @@ module RPC = struct
             (P2p_pool.Peers.info pool peer_id)
             ~default:[]
             ~f:begin fun gi ->
-              let evts = P2p_peer.Pool_event.fold gi
+              let evts = P2p_peer_state.Info.fold gi
                   ~init:[] ~f:(fun a e -> e :: a) in
               (if rev then List.rev_sub else List.sub) evts max
             end
@@ -638,7 +638,7 @@ module RPC = struct
       | Some pool ->
           match P2p_pool.Peers.info pool peer_id with
           | None -> raise Not_found
-          | Some gi -> P2p_peer.Pool_event.watch gi
+          | Some gi -> P2p_peer_state.Info.watch gi
 
     let list ?(restrict=[]) net =
       match net.pool with

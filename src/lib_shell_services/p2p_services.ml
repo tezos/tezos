@@ -7,9 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let (peer_id_arg : P2p_peer.Id.t RPC_arg.arg) =
-  Crypto_box.Public_key_hash.rpc_arg
-
 let point_arg =
   RPC_arg.make
     ~name:"point"
@@ -74,7 +71,7 @@ module Connection = struct
       ~output: (Data_encoding.option P2p_connection.Info.encoding)
       ~error: Data_encoding.empty
       ~description:"Details about the current P2P connection to the given peer."
-      RPC_path.(root / "network" / "connection" /: peer_id_arg)
+      RPC_path.(root / "network" / "connection" /: P2p_peer.Id.rpc_arg)
 
   let kick =
     RPC_service.post_service
@@ -83,7 +80,7 @@ module Connection = struct
       ~output: Data_encoding.empty
       ~error: Data_encoding.empty
       ~description:"Forced close of the current P2P connection to the given peer."
-      RPC_path.(root / "network" / "connection" /: peer_id_arg / "kick")
+      RPC_path.(root / "network" / "connection" /: P2p_peer.Id.rpc_arg / "kick")
 
 end
 
@@ -135,7 +132,7 @@ module Peer_id = struct
       ~output: (Data_encoding.option P2p_peer.Info.encoding)
       ~error: Data_encoding.empty
       ~description:"Details about a given peer."
-      RPC_path.(root / "network" / "peer_id" /: peer_id_arg)
+      RPC_path.(root / "network" / "peer_id" /: P2p_peer.Id.rpc_arg)
 
   let events =
     RPC_service.post_service
@@ -145,7 +142,7 @@ module Peer_id = struct
                   P2p_peer.Pool_event.encoding)
       ~error: Data_encoding.empty
       ~description:"Monitor network events related to a given peer."
-      RPC_path.(root / "network" / "peer_id" /: peer_id_arg / "log")
+      RPC_path.(root / "network" / "peer_id" /: P2p_peer.Id.rpc_arg / "log")
 
   let list =
     let filter =

@@ -42,12 +42,12 @@ module Blake2b = struct
       invalid_arg "Blake2b.init: size must be between 1 and 64" ;
     let t = Cstruct.create_unsafe bytes in
     begin match key with
-    | Some key ->
-      or_fail ~msg:"Blake2b.init"
-        (fun () -> init_key t.buffer size key.Cstruct.buffer)
-    | None ->
-      or_fail ~msg:"Blake2b.init"
-        (fun () -> init t.buffer size)
+      | Some key ->
+          or_fail ~msg:"Blake2b.init"
+            (fun () -> init_key t.buffer size key.Cstruct.buffer)
+      | None ->
+          or_fail ~msg:"Blake2b.init"
+            (fun () -> init t.buffer size)
     end ;
     t
 
