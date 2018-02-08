@@ -440,7 +440,7 @@ let encoding =
 
 let read fp =
   if Sys.file_exists fp then begin
-    Data_encoding_ezjsonm.read_file fp >>=? fun json ->
+    Lwt_utils_unix.Json.read_file fp >>=? fun json ->
     try return (Data_encoding.Json.destruct encoding json)
     with exn -> fail (Exn exn)
   end else
@@ -448,7 +448,7 @@ let read fp =
 
 let write fp cfg =
   Node_data_version.ensure_data_dir (Filename.dirname fp) >>=? fun () ->
-  Data_encoding_ezjsonm.write_file fp
+  Lwt_utils_unix.Json.write_file fp
     (Data_encoding.Json.construct encoding cfg)
 
 let to_string cfg =

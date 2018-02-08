@@ -109,7 +109,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
         match sandbox_param with
         | None -> Lwt.return (Some (patch_context None))
         | Some file ->
-            Data_encoding_ezjsonm.read_file file >>= function
+            Lwt_utils_unix.Json.read_file file >>= function
             | Error err ->
                 lwt_warn
                   "Can't parse sandbox parameters: %s" file >>= fun () ->

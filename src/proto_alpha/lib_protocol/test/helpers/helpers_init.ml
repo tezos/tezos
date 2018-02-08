@@ -11,11 +11,11 @@ open Proto_alpha
 open Error_monad
 
 let get_sandbox () =
-  Data_encoding_ezjsonm.read_file
+  Lwt_utils_unix.Json.read_file
     "src/proto_alpha/lib_protocol/test/sandbox.json" >>= function
   | Ok x -> Lwt.return x
   | Error _ ->
-      Data_encoding_ezjsonm.read_file "test/sandbox.json" >>= fun x ->
+      Lwt_utils_unix.Json.read_file "test/sandbox.json" >>= fun x ->
       Lwt.return @@ Helpers_assert.no_error ~msg:__LOC__ x
 
 let main () =

@@ -133,14 +133,14 @@ module Info = struct
     let load path metadata_encoding =
       let enc = Data_encoding.list (encoding metadata_encoding) in
       if path <> "/dev/null" && Sys.file_exists path then
-        Data_encoding_ezjsonm.read_file path >>=? fun json ->
+        Lwt_utils_unix.Json.read_file path >>=? fun json ->
         return (Data_encoding.Json.destruct enc json)
       else
         return []
 
     let save path metadata_encoding peers =
       let open Data_encoding in
-      Data_encoding_ezjsonm.write_file path @@
+      Lwt_utils_unix.Json.write_file path @@
       Json.construct (list (encoding metadata_encoding)) peers
 
   end

@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
+
 val read_bytes:
   ?pos:int -> ?len:int -> Lwt_unix.file_descr -> bytes -> unit Lwt.t
 
@@ -28,3 +30,13 @@ val getaddrinfo:
   passive:bool ->
   node:string -> service:string ->
   (Ipaddr.V6.t * int) list Lwt.t
+
+module Json : sig
+
+  (** Loads a JSON file in memory *)
+  val read_file : string -> Data_encoding.json tzresult Lwt.t
+
+  (** (Over)write a JSON file from in memory data *)
+  val write_file : string -> Data_encoding.json -> unit tzresult Lwt.t
+
+end

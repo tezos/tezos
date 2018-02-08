@@ -91,7 +91,7 @@ let check_data_dir_version data_dir =
   let version_file = version_file data_dir in
   fail_unless (Sys.file_exists version_file)
     (No_data_dir_version_file version_file) >>=? fun () ->
-  Data_encoding_ezjsonm.read_file version_file
+  Lwt_utils_unix.Json.read_file version_file
   |> trace (Could_not_read_data_dir_version version_file) >>=? fun json ->
   begin
     try return (Data_encoding.Json.destruct version_encoding json)
@@ -104,7 +104,7 @@ let check_data_dir_version data_dir =
 
 let ensure_data_dir data_dir =
   let write_version () =
-    Data_encoding_ezjsonm.write_file
+    Lwt_utils_unix.Json.write_file
       (version_file data_dir)
       (Data_encoding.Json.construct version_encoding data_version) in
   try if Sys.file_exists data_dir then

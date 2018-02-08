@@ -27,7 +27,6 @@ module String : sig
 end
 
 module Time = Time
-module Data_encoding_ezjsonm = Data_encoding_ezjsonm
 module Fitness = Fitness
 module Block_header = Block_header
 module Operation = Operation

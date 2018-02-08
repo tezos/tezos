@@ -299,7 +299,7 @@ let test_json_input testdir =
 }
 |}
     in
-    Data_encoding_ezjsonm.read_file file >>= function
+    Lwt_utils_unix.Json.read_file file >>= function
     | Error _ -> Assert.fail_msg "Cannot parse \"good.json\"."
     | Ok json ->
         let (id, value, popup) = Json.destruct enc json in
@@ -325,7 +325,7 @@ let test_json_input testdir =
 }
 |}
     in
-    Data_encoding_ezjsonm.read_file file >>= function
+    Lwt_utils_unix.Json.read_file file >>= function
     | Error _ -> Assert.fail_msg "Cannot parse \"unknown.json\"."
     | Ok json ->
         Assert.test_fail ~msg:__LOC__

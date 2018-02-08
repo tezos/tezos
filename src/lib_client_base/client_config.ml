@@ -92,7 +92,7 @@ module Cfg_file = struct
     Data_encoding.Json.destruct encoding json
 
   let read fp =
-    Data_encoding_ezjsonm.read_file fp >>=? fun json ->
+    Lwt_utils_unix.Json.read_file fp >>=? fun json ->
     return (from_json json)
 
   let write out cfg =

@@ -77,7 +77,7 @@ class file_wallet dir : wallet = object (self)
       if not (Sys.file_exists filename) then
         return default
       else
-        Data_encoding_ezjsonm.read_file filename
+        Lwt_utils_unix.Json.read_file filename
         |> generic_trace
           "couldn't to read the %s file" alias_name >>=? fun json ->
         match Data_encoding.Json.destruct encoding json with
@@ -94,7 +94,7 @@ class file_wallet dir : wallet = object (self)
            Lwt_utils_unix.create_dir dir >>= fun () ->
            let filename = self#filename alias_name in
            let json = Data_encoding.Json.construct encoding list in
-           Data_encoding_ezjsonm.write_file filename json)
+           Lwt_utils_unix.Json.write_file filename json)
         (fun exn -> Lwt.return (error_exn exn))
       |> generic_trace "could not write the %s alias file." alias_name
 end
