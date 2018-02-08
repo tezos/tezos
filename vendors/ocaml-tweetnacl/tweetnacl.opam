@@ -18,6 +18,6 @@ depends: [
   "jbuilder" {build & >= "1.0+beta16"}
   "hex" {>= "1.2.0"}
   "cstruct" {>= "3.2.1"}
-  "zarith" {>= "1.7"}
-  "alcotest" { "test" }
+  "zarith" {>= "1.7" }
+  "alcotest" { test }
 ]
