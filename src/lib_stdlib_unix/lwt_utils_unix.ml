@@ -7,7 +7,19 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"unix_error"
+    ~title:"Unix error"
+    ~description:"An unhandled unix exception"
+    ~pp:Format.pp_print_string
+    Data_encoding.(obj1 (req "msg" string))
+    (function
+      | Exn (Unix.Unix_error (err, fn, _)) ->
+          Some ("Unix error in " ^ fn ^ ": " ^ Unix.error_message err)
+      | _ -> None)
+    (fun msg -> Exn (Failure msg))
 
 let read_bytes ?(pos = 0) ?len fd buf =
   let len = match len with None -> Bytes.length buf - pos | Some l -> l in

@@ -507,8 +507,6 @@ let () =
     Data_encoding.(obj1 (req "msg" string))
     (function
       | Exn (Failure msg) -> Some msg
-      | Exn (Unix.Unix_error (err, fn, _)) ->
-          Some ("Unix error in " ^ fn ^ ": " ^ Unix.error_message err)
       | Exn exn -> Some (Printexc.to_string exn)
       | _ -> None)
     (fun msg -> Exn (Failure msg))
