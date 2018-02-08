@@ -34,7 +34,7 @@ let blocking_create
     create_inner Unix.F_LOCK ~close_on_exec ~unlink_on_exit fn in
   match timeout with
   | None -> create ()
-  | Some duration -> Lwt_utils.with_timeout duration (fun _ -> create ())
+  | Some duration -> Lwt_utils_unix.with_timeout duration (fun _ -> create ())
 
 let is_locked fn =
   if not @@ Sys.file_exists fn then return false else
@@ -50,7 +50,7 @@ let is_locked fn =
 
 let get_pid fn =
   let open Lwt_io in
-  Lwt_utils.protect begin fun () ->
+  Lwt_utils_unix.protect begin fun () ->
     with_file ~mode:Input fn begin fun ic ->
       read ic >>= fun content ->
       return (int_of_string content)

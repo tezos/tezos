@@ -87,7 +87,7 @@ module Answerer = struct
 
   let rec worker_loop st =
     Lwt_unix.yield () >>= fun () ->
-    Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+    Lwt_utils_unix.protect ~canceler:st.canceler begin fun () ->
       P2p_socket.read st.conn
     end >>= function
     | Ok (_, Bootstrap) -> begin
@@ -122,7 +122,7 @@ module Answerer = struct
         (* TODO: Penalize peer... *)
         Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
-    | Error [Lwt_utils.Canceled] ->
+    | Error [Lwt_utils_unix.Canceled] ->
         Lwt.return_unit
     | Error err ->
         lwt_log_error "@[Answerer unexpected error:@ %a@]"
@@ -568,7 +568,7 @@ let rec connect ~timeout pool point =
     (active_connections pool <= pool.config.max_connections)
     Too_many_connections >>=? fun () ->
   let canceler = Lwt_canceler.create () in
-  Lwt_utils.with_timeout ~canceler timeout begin fun canceler ->
+  Lwt_utils_unix.with_timeout ~canceler timeout begin fun canceler ->
     let point_info =
       register_point pool pool.config.identity.peer_id point in
     let addr, port as point = P2p_point_state.Info.point point_info in
@@ -581,14 +581,14 @@ let rec connect ~timeout pool point =
     let uaddr =
       Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
     lwt_debug "connect: %a" P2p_point.Id.pp point >>= fun () ->
-    Lwt_utils.protect ~canceler begin fun () ->
+    Lwt_utils_unix.protect ~canceler begin fun () ->
       log pool (Outgoing_connection point) ;
       Lwt_unix.connect fd uaddr >>= fun () ->
       return ()
     end ~on_error: begin fun err ->
       lwt_debug "connect: %a -> disconnect" P2p_point.Id.pp point >>= fun () ->
       P2p_point_state.set_disconnected point_info ;
-      Lwt_utils.safe_close fd >>= fun () ->
+      Lwt_utils_unix.safe_close fd >>= fun () ->
       match err with
       | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
           fail Connection_refused
@@ -603,7 +603,7 @@ and authenticate pool ?point_info canceler fd point =
   lwt_debug "authenticate: %a%s"
     P2p_point.Id.pp point
     (if incoming then " incoming" else "") >>= fun () ->
-  Lwt_utils.protect ~canceler begin fun () ->
+  Lwt_utils_unix.protect ~canceler begin fun () ->
     P2p_socket.authenticate
       ~proof_of_work_target:pool.config.proof_of_work_target
       ~incoming (P2p_io_scheduler.register pool.io_sched fd) point
@@ -612,7 +612,7 @@ and authenticate pool ?point_info canceler fd point =
   end ~on_error: begin fun err ->
     (* TODO do something when the error is Not_enough_proof_of_work ?? *)
     begin match err with
-      | [ Lwt_utils.Canceled ] ->
+      | [ Lwt_utils_unix.Canceled ] ->
           (* Currently only on time out *)
           lwt_debug "authenticate: %a%s -> canceled"
             P2p_point.Id.pp point
@@ -682,7 +682,7 @@ and authenticate pool ?point_info canceler fd point =
       lwt_debug "authenticate: %a -> accept %a"
         P2p_point.Id.pp point
         P2p_connection.Info.pp info >>= fun () ->
-      Lwt_utils.protect ~canceler begin fun () ->
+      Lwt_utils_unix.protect ~canceler begin fun () ->
         P2p_socket.accept
           ?incoming_message_queue_size:pool.config.incoming_message_queue_size
           ?outgoing_message_queue_size:pool.config.outgoing_message_queue_size
@@ -881,7 +881,7 @@ and swap pool conn current_peer_id new_point =
       pool.latest_accepted_swap <- pool.latest_succesfull_swap ;
       log pool (Swap_failure { source = source_peer_id }) ;
       match err with
-      | [ Lwt_utils.Timeout ] ->
+      | [ Lwt_utils_unix.Timeout ] ->
           lwt_debug "Swap to %a was interupted: %a"
             P2p_point.Id.pp new_point pp_print_error err
       | _ ->
@@ -893,12 +893,12 @@ let accept pool fd point =
   log pool (Incoming_connection point) ;
   if pool.config.max_incoming_connections <= P2p_point.Table.length pool.incoming
   || pool.config.max_connections <= active_connections pool then
-    Lwt.async (fun () -> Lwt_utils.safe_close fd)
+    Lwt.async (fun () -> Lwt_utils_unix.safe_close fd)
   else
     let canceler = Lwt_canceler.create () in
     P2p_point.Table.add pool.incoming point canceler ;
     Lwt.async begin fun () ->
-      Lwt_utils.with_timeout
+      Lwt_utils_unix.with_timeout
         ~canceler pool.config.authentification_timeout
         (fun canceler -> authenticate pool canceler fd point)
     end

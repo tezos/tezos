@@ -168,18 +168,18 @@ let read_dir dir =
 open Lwt.Infix
 
 let create_files dir units =
-  Lwt_utils.remove_dir dir >>= fun () ->
-  Lwt_utils.create_dir dir >>= fun () ->
+  Lwt_utils_unix.remove_dir dir >>= fun () ->
+  Lwt_utils_unix.create_dir dir >>= fun () ->
   Lwt_list.map_s
     (fun { name ; interface ; implementation } ->
        let name = String.lowercase_ascii name in
        let ml = dir // (name ^ ".ml") in
        let mli = dir // (name ^ ".mli") in
-       Lwt_utils.create_file ml implementation >>= fun () ->
+       Lwt_utils_unix.create_file ml implementation >>= fun () ->
        match interface with
        | None -> Lwt.return [ml]
        | Some content ->
-           Lwt_utils.create_file mli content >>= fun () ->
+           Lwt_utils_unix.create_file mli content >>= fun () ->
            Lwt.return [ mli ; ml ])
     units >>= fun files ->
   let files = List.concat files in

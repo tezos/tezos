@@ -537,7 +537,7 @@ let resolve_addr ?default_port ?(passive = false) peer =
         invalid_arg ""
     | "", Some default_port -> string_of_int default_port
     | port, _ -> port in
-  Lwt_utils.getaddrinfo ~passive ~node ~service
+  Lwt_utils_unix.getaddrinfo ~passive ~node ~service
 
 let resolve_addrs ?default_port ?passive peers =
   Lwt_list.fold_left_s begin fun a peer ->

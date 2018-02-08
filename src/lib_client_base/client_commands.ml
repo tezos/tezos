@@ -91,7 +91,7 @@ class file_wallet dir : wallet = object (self)
     fun alias_name list encoding ->
       Lwt.catch
         (fun () ->
-           Lwt_utils.create_dir dir >>= fun () ->
+           Lwt_utils_unix.create_dir dir >>= fun () ->
            let filename = self#filename alias_name in
            let json = Data_encoding.Json.construct encoding list in
            Data_encoding_ezjsonm.write_file filename json)
@@ -127,7 +127,7 @@ let default_log ~base_dir channel msg =
       Lwt.return ()
   | log ->
       let (//) = Filename.concat in
-      Lwt_utils.create_dir (base_dir // "logs" // log) >>= fun () ->
+      Lwt_utils_unix.create_dir (base_dir // "logs" // log) >>= fun () ->
       Lwt_io.with_file
         ~flags: Unix.[ O_APPEND ; O_CREAT ; O_WRONLY ]
         ~mode: Lwt_io.Output

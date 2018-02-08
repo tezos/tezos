@@ -249,7 +249,7 @@ module Reader = struct
           lwt_debug "[read_message] incremental decoding error" >>= fun () ->
           return None
       | Await decode_next_buf ->
-          Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+          Lwt_utils_unix.protect ~canceler:st.canceler begin fun () ->
             Crypto.read_chunk st.conn.fd st.conn.cryptobox_data
           end >>=? fun buf ->
           lwt_debug
@@ -265,12 +265,12 @@ module Reader = struct
       read_message st init_mbytes >>=? fun msg ->
       match msg with
       | None ->
-          Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+          Lwt_utils_unix.protect ~canceler:st.canceler begin fun () ->
             Lwt_pipe.push st.messages (Error [Decoding_error]) >>= fun () ->
             return None
           end
       | Some (msg, size, rem_mbytes) ->
-          Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+          Lwt_utils_unix.protect ~canceler:st.canceler begin fun () ->
             Lwt_pipe.push st.messages (Ok (size, msg)) >>= fun () ->
             return (Some rem_mbytes)
           end
@@ -280,7 +280,7 @@ module Reader = struct
     | Ok None ->
         Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
-    | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
+    | Error [Lwt_utils_unix.Canceled | Exn Lwt_pipe.Closed] ->
         lwt_debug "connection closed to %a"
           P2p_connection.Info.pp st.conn.info >>= fun () ->
         Lwt.return_unit
@@ -331,7 +331,7 @@ module Writer = struct
     let rec loop = function
       | [] -> return ()
       | buf :: l ->
-          Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+          Lwt_utils_unix.protect ~canceler:st.canceler begin fun () ->
             Crypto.write_chunk st.conn.fd st.conn.cryptobox_data buf
           end >>=? fun () ->
           lwt_debug "writing %d bytes to %a"
@@ -345,10 +345,10 @@ module Writer = struct
 
   let rec worker_loop st =
     Lwt_unix.yield () >>= fun () ->
-    Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+    Lwt_utils_unix.protect ~canceler:st.canceler begin fun () ->
       Lwt_pipe.pop st.messages >>= return
     end >>= function
-    | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
+    | Error [Lwt_utils_unix.Canceled | Exn Lwt_pipe.Closed] ->
         lwt_debug "connection closed to %a"
           P2p_connection.Info.pp st.conn.info >>= fun () ->
         Lwt.return_unit
@@ -370,7 +370,7 @@ module Writer = struct
                   Lwt.wakeup_later u
                     (Error [P2p_io_scheduler.Connection_closed])) ;
             match err with
-            | [ Lwt_utils.Canceled | Exn Lwt_pipe.Closed ] ->
+            | [ Lwt_utils_unix.Canceled | Exn Lwt_pipe.Closed ] ->
                 lwt_debug "connection closed to %a"
                   P2p_connection.Info.pp st.conn.info >>= fun () ->
                 Lwt.return_unit
@@ -453,7 +453,7 @@ let info { conn } = conn.info
 let accept
     ?incoming_message_queue_size ?outgoing_message_queue_size
     ?binary_chunks_size (fd, info, cryptobox_data) encoding =
-  Lwt_utils.protect begin fun () ->
+  Lwt_utils_unix.protect begin fun () ->
     Ack.write fd cryptobox_data Ack >>=? fun () ->
     Ack.read fd cryptobox_data
   end ~on_error:begin fun err ->

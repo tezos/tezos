@@ -202,7 +202,7 @@ module Make
     Lwt.ignore_result (Lwt_canceler.cancel w.canceler)
 
   let protect { canceler } ?on_error f =
-    Lwt_utils.protect ?on_error ~canceler f
+    Lwt_utils_unix.protect ?on_error ~canceler f
 
   let canceler { canceler } = canceler
 
@@ -270,7 +270,7 @@ module Make
       Lwt.return_unit in
     let rec loop () =
       begin
-        Lwt_utils.protect ~canceler:w.canceler begin fun () ->
+        Lwt_utils_unix.protect ~canceler:w.canceler begin fun () ->
           pop w
         end >>=? function
         | None -> Handlers.on_no_request w
@@ -301,7 +301,7 @@ module Make
       end >>= function
       | Ok () ->
           loop ()
-      | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed | Exn Lwt_dropbox.Closed ] ->
+      | Error [Lwt_utils_unix.Canceled | Exn Lwt_pipe.Closed | Exn Lwt_dropbox.Closed ] ->
           Logger.lwt_log_info
             "[%a] worker terminated"
             Name.pp w.name >>= fun () ->

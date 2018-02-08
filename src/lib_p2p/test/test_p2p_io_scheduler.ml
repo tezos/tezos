@@ -151,7 +151,7 @@ let run
   let client n =
     let prefix = Printf.sprintf "client(%d): " n in
     Process.detach ~prefix begin fun _ ->
-      Lwt_utils.safe_close main_socket >>= fun () ->
+      Lwt_utils_unix.safe_close main_socket >>= fun () ->
       client ?max_upload_speed ?write_queue_size addr port time n
     end in
   Lwt_list.map_p client (1 -- n) >>= fun client_nodes ->

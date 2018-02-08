@@ -174,12 +174,12 @@ let main { compile_ml ; pack_objects ; link_shared } =
     match !build_dir with
     | None ->
         let dir = mktemp_dir () in
-        at_exit (fun () -> Lwt_main.run (Lwt_utils.remove_dir dir)) ;
+        at_exit (fun () -> Lwt_main.run (Lwt_utils_unix.remove_dir dir)) ;
         dir
     | Some dir -> dir in
-  Lwt_main.run (Lwt_utils.create_dir ~perm:0o755 build_dir) ;
-  Lwt_main.run (Lwt_utils.create_dir ~perm:0o755 (Filename.dirname output)) ;
   let hash, protocol = Protocol.read_dir source_dir in
+  Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 build_dir) ;
+  Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 (Filename.dirname output)) ;
   (* Generate the 'functor' *)
   let functor_file = build_dir // "functor.ml" in
   let oc = open_out functor_file in

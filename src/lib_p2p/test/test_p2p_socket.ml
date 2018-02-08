@@ -76,7 +76,7 @@ let run_nodes client server =
     return ()
   end >>= fun server_node ->
   Process.detach ~prefix:"client: " begin fun channel ->
-    Lwt_utils.safe_close main_socket >>= fun () ->
+    Lwt_utils_unix.safe_close main_socket >>= fun () ->
     let sched = P2p_io_scheduler.create ~read_buffer_size:(1 lsl 12) () in
     client channel sched default_addr port >>=? fun () ->
     P2p_io_scheduler.shutdown sched >>= fun () ->

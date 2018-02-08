@@ -120,7 +120,7 @@ module Scheduler(IO : IO) = struct
           false, (Queue.pop st.readys_low)
       in
       match msg with
-      | Error [Lwt_utils.Canceled] ->
+      | Error [ Lwt_utils_unix.Canceled ] ->
           worker_loop st
       | Error ([Connection_closed |
                 Exn ( Lwt_pipe.Closed |
@@ -140,7 +140,7 @@ module Scheduler(IO : IO) = struct
           conn.current_push <- begin
             IO.push conn.out_param msg >>= function
             | Ok ()
-            | Error [Lwt_utils.Canceled] ->
+            | Error [ Lwt_utils_unix.Canceled ] ->
                 return ()
             | Error ([Connection_closed |
                       Exn (Unix.Unix_error (EBADF, _, _) |
@@ -264,7 +264,7 @@ module WriteScheduler = Scheduler(struct
     let push fd buf =
       Lwt.catch
         (fun () ->
-           Lwt_utils.write_mbytes fd buf >>= return)
+           Lwt_utils_unix.write_mbytes fd buf >>= return)
         (function
           | Unix.Unix_error(Unix.ECONNRESET, _, _)
           | Unix.Unix_error(Unix.EPIPE, _, _)
@@ -357,7 +357,7 @@ let register =
   let cpt = ref 0 in
   fun st conn ->
     if st.closed then begin
-      Lwt.async (fun () -> Lwt_utils.safe_close conn) ;
+      Lwt.async (fun () -> Lwt_utils_unix.safe_close conn) ;
       raise Closed
     end else begin
       let id = incr cpt; !cpt in
@@ -380,7 +380,7 @@ let register =
         Moving_average.destroy write_conn.counter ;
         Lwt_pipe.close write_queue ;
         Lwt_pipe.close read_queue ;
-        Lwt_utils.safe_close conn
+        Lwt_utils_unix.safe_close conn
       end ;
       let conn = {
         sched = st ; id ; conn ; canceler ;
@@ -481,7 +481,7 @@ let close ?timeout conn =
     | None ->
         return (Lwt_canceler.cancelation conn.canceler)
     | Some timeout ->
-        Lwt_utils.with_timeout
+        Lwt_utils_unix.with_timeout
           ~canceler:conn.canceler timeout begin fun canceler ->
           return (Lwt_canceler.cancelation canceler)
         end

@@ -119,7 +119,7 @@ and too_few_connections st n_connected =
        discover the local network and then wait *)
     Option.iter ~f:P2p_discovery.restart st.disco ;
     P2p_pool.broadcast_bootstrap_msg pool ;
-    Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+    Lwt_utils_unix.protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
         P2p_pool.Pool_event.wait_new_peer pool ;
         Lwt_unix.sleep 5.0 (* TODO exponential back-off ??
@@ -146,7 +146,7 @@ and too_many_connections st n_connected =
 let rec worker_loop st =
   let Pool pool = st.pool in
   begin
-    Lwt_utils.protect ~canceler:st.canceler begin fun () ->
+    Lwt_utils_unix.protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
         Lwt_unix.sleep 120. ; (* every two minutes *)
         Lwt_condition.wait st.please_maintain ; (* when asked *)
@@ -165,7 +165,7 @@ let rec worker_loop st =
     end
   end >>= function
   | Ok () -> worker_loop st
-  | Error [Lwt_utils.Canceled] -> Lwt.return_unit
+  | Error [ Lwt_utils_unix.Canceled ] -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
 let run ~connection_timeout bounds pool disco =

@@ -78,7 +78,7 @@ let () =
 
 let rec worker_loop bv =
   begin
-    Lwt_utils.protect ~canceler:bv.canceler begin fun () ->
+    Lwt_utils_unix.protect ~canceler:bv.canceler begin fun () ->
       Lwt_pipe.pop bv.messages >>= return
     end >>=? function Message (request, wakener) ->
     match request with
@@ -115,7 +115,7 @@ let rec worker_loop bv =
   end >>= function
   | Ok () ->
       worker_loop bv
-  | Error [Lwt_utils.Canceled | Exn Lwt_pipe.Closed] ->
+  | Error [Lwt_utils_unix.Canceled | Exn Lwt_pipe.Closed] ->
       lwt_log_notice "terminating" >>= fun () ->
       Lwt.return_unit
   | Error err ->
