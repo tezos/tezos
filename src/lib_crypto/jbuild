@@ -3,17 +3,10 @@
 (library
  ((name tezos_crypto)
   (public_name tezos-crypto)
-  (flags (:standard -open Tezos_stdlib
-                    -open Tezos_data_encoding
-                    -open Tezos_stdlib_lwt
-                    -open Tezos_rpc
-                    -open Tezos_error_monad__Error_monad
-                    -safe-string))
+  (flags (:standard -safe-string
+                    -open Tezos_stdlib))
   (libraries (tezos-stdlib
-              tezos-stdlib-lwt
-              tezos-data-encoding
-              tezos-error-monad
-              tezos-rpc
+              lwt
               nocrypto
               blake2
               tweetnacl

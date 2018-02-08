@@ -493,7 +493,7 @@ end = struct
                  ( Table.remove state.pending key ; acc )
                else
                  let requested_peer =
-                   P2p_peer.Id.random_set_elt
+                   P2p_peer.Id.Set.random_elt
                      (if P2p_peer.Set.is_empty remaining_peers
                       then active_peers
                       else remaining_peers) in

@@ -7,12 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Blake2B.Make (Tezos_crypto.Base58) (struct
-    let name = "Block_hash"
-    let title = "A Tezos block ID"
-    let b58check_prefix = Tezos_crypto.Base58.Prefix.block_hash
-    let size = None
-  end)
+include (module type of Tezos_crypto.Crypto_box)
 
-let () =
-  Tezos_crypto.Base58.check_encoded_prefix b58check_encoding "B" 51
+val public_key_encoding : public_key Data_encoding.t
+val secret_key_encoding : secret_key Data_encoding.t
+val nonce_encoding : nonce Data_encoding.t

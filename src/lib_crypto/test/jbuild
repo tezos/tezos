@@ -4,7 +4,6 @@
  ((names (test_merkle))
   (libraries (tezos-stdlib
               tezos-error-monad
-              tezos-data-encoding
               tezos-crypto
               tezos-test-helpers))
   (flags (:standard -w -9-32
@@ -12,7 +11,6 @@
                     -open Tezos_test_helpers
                     -open Tezos_stdlib
                     -open Tezos_error_monad
-                    -open Tezos_data_encoding
                     -open Tezos_crypto))))
 
 (alias

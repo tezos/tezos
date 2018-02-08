@@ -7,5 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Tezos_crypto.S.INTERNAL_HASH
+include S.INTERNAL_HASH
+
 val of_block_hash: Block_hash.t -> t

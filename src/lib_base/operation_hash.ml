@@ -7,13 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Blake2B.Make (Base58) (struct
+include Blake2B.Make (Tezos_crypto.Base58) (struct
     let name = "Operation_hash"
     let title = "A Tezos operation ID"
-    let b58check_prefix = Base58.Prefix.operation_hash
+    let b58check_prefix = Tezos_crypto.Base58.Prefix.operation_hash
     let size = None
   end)
 
 let () =
-  Base58.check_encoded_prefix b58check_encoding "o" 51
+  Tezos_crypto.Base58.check_encoded_prefix b58check_encoding "o" 51
 

@@ -19,12 +19,6 @@ let () =
 
 open Tweetnacl
 
-let of_bigarray1 f x =
-  f (Cstruct.of_bigarray x)
-
-let to_bigarray1 f x =
-  Cstruct.to_bigarray (f x)
-
 module Public_key = struct
 
   type t = Sign.public Sign.key
@@ -58,10 +52,6 @@ module Public_key = struct
     | Some x -> x
     | None -> Pervasives.failwith
                 (Printf.sprintf "%s is not an ed25519 public key" s)
-  let of_b58check s =
-    match Base58.simple_decode b58check_encoding s with
-    | Some x -> Ok x
-    | None -> generic_error "%s is not an ed25519 public key" s
   let to_b58check s = Base58.simple_encode b58check_encoding s
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
@@ -75,49 +65,21 @@ module Public_key = struct
   let of_bytes_opt s =
     Sign.pk_of_cstruct (Cstruct.of_bigarray s)
 
-  let of_bytes s =
-    match of_bytes_opt s with
-    | None ->
-        generic_error "Could not deserialize Ed25519 public key (invalid format)"
-    | Some pk -> ok pk
-
   let of_bytes_exn s =
     match of_bytes_opt s with
     | None ->
         Pervasives.invalid_arg "Ed25519.Public_key.of_bytes_exn: argument is not a serialized public key"
     | Some pk -> pk
+  let size = Sign.pkbytes
 
   let to_bytes pk = Cstruct.to_bigarray (Sign.to_cstruct pk)
-
-  let param ?(name="ed25519-public") ?(desc="Ed25519 public key (b58check-encoded)") t =
-    Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
 
   let () =
     Base58.check_encoded_prefix b58check_encoding "edpk" 54
 
-  let encoding =
-    let open Data_encoding in
-    splitted
-      ~json:
-        (describe
-           ~title: "An Ed25519 public key (Base58Check encoded)" @@
-         conv
-           (fun s -> Base58.simple_encode b58check_encoding s)
-           (fun s ->
-              match Base58.simple_decode b58check_encoding s with
-              | Some x -> x
-              | None -> Data_encoding.Json.cannot_destruct
-                          "Ed25519 public key: unexpected prefix.")
-           string)
-      ~binary:
-        (conv
-           (to_bigarray1 Sign.to_cstruct)
-           (of_bigarray1 Sign.pk_of_cstruct_exn)
-           (Fixed.bytes Sign.pkbytes))
-
   let hash v =
     Public_key_hash.hash_bytes
-      [ to_bigarray1 Sign.to_cstruct v ]
+      [ Cstruct.to_bigarray (Sign.to_cstruct v) ]
 
 end
 
@@ -160,10 +122,6 @@ module Secret_key = struct
     | Some x -> x
     | None -> Pervasives.failwith
                 (Printf.sprintf "%s is not an ed25519 secret key" s)
-  let of_b58check s =
-    match of_b58check_opt s with
-    | Some x -> Ok x
-    | None -> generic_error "%s is not an ed25519 secret key" s
   let to_b58check s = Base58.simple_encode seed_encoding s
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
@@ -174,44 +132,18 @@ module Secret_key = struct
     | 64 -> Sign.sk_of_cstruct s
     | _ -> None
 
-  let of_bytes s =
-    match of_bytes_opt s with
-    | None ->
-        generic_error "Could not deserialize Ed25519 seed (invalid format)"
-    | Some sk -> ok sk
-
   let of_bytes_exn s =
     match of_bytes_opt s with
     | None ->
         Pervasives.invalid_arg "Ed25519.Secret_key.of_bytes_exn: argument is not a serialized seed"
     | Some sk -> sk
 
-  let to_bytes = to_bigarray1 Sign.seed
-
-  let param ?(name="ed25519-secret") ?(desc="Ed25519 secret key (b58check-encoded)") t =
-    Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
+  let to_bytes x = Cstruct.to_bigarray (Sign.seed x)
+  let size = Sign.seedbytes
 
   let () =
     Base58.check_encoded_prefix seed_encoding "edsk" 54 ;
     Base58.check_encoded_prefix secret_key_encoding "edsk" 98
-
-  let encoding =
-    let open Data_encoding in
-    splitted
-      ~json:
-        (describe
-           ~title: "An Ed25519 secret key (Base58Check encoded)" @@
-         conv
-           (fun s -> Base58.simple_encode seed_encoding s)
-           (fun s ->
-              match of_b58check_opt s with
-              | Some x -> x
-              | None -> Data_encoding.Json.cannot_destruct
-                          "Ed25519 secret key: unexpected prefix.")
-           string)
-      ~binary:
-        (conv to_bytes (fun buf -> of_bytes_exn buf)
-           (dynamic_size (Variable.bytes)))
 
 end
 
@@ -239,21 +171,11 @@ module Signature = struct
     | Some x -> x
     | None -> Pervasives.failwith
                 (Printf.sprintf "%s is not an ed25519 signature" s)
-  let of_b58check s =
-    match Base58.simple_decode b58check_encoding s with
-    | Some x -> Ok x
-    | None -> generic_error "%s is not an ed25519 signature" s
   let to_b58check s = Base58.simple_encode b58check_encoding s
   let pp ppf t = Format.fprintf ppf "%s" (to_b58check t)
 
   let of_bytes_opt s =
     if MBytes.length s = Sign.bytes then Some s else None
-
-  let of_bytes s =
-    match of_bytes_opt s with
-    | None ->
-        generic_error "Could not deserialize Ed25519 signature (invalid format)"
-    | Some signature -> ok signature
 
   let of_bytes_exn s =
     match of_bytes_opt s with
@@ -262,28 +184,10 @@ module Signature = struct
     | Some signature -> signature
 
   let to_bytes x = x
-
-  let param ?(name="signature") ?(desc="Signature (b58check-encoded)") t =
-    Cli_entries.(param ~name ~desc (parameter (fun _ str -> Lwt.return (of_b58check str))) t)
+  let size = Sign.bytes
 
   let () =
     Base58.check_encoded_prefix b58check_encoding "edsig" 99
-
-  let encoding =
-    let open Data_encoding in
-    splitted
-      ~json:
-        (describe
-           ~title: "An Ed25519 signature (Base58Check encoded)" @@
-         conv
-           (fun s -> Base58.simple_encode b58check_encoding s)
-           (fun s ->
-              match Base58.simple_decode b58check_encoding s with
-              | Some x -> x
-              | None -> Data_encoding.Json.cannot_destruct
-                          "Ed25519 signature: unexpected prefix.")
-           string)
-      ~binary: (Fixed.bytes Sign.bytes)
 
   let check public_key signature msg =
     Sign.verify_detached ~key:public_key

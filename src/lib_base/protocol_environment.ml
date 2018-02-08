@@ -96,7 +96,6 @@ module MakeV1
   module Time = Time
   module Ed25519 = Ed25519
   module S = struct
-    include Tezos_crypto.S
     include S
   end
   module Block_hash = Block_hash
@@ -191,7 +190,7 @@ module MakeV1
 
   end
   module Base58 = struct
-    include Base58
+    include Tezos_crypto.Base58
     let simple_encode enc s = simple_encode enc s
     let simple_decode enc s = simple_decode enc s
     include Make(struct type context = Context.t end)

@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Tezos_crypto.S.INTERNAL_HASH with type t = Crypto_box.Public_key_hash.t
+include S.INTERNAL_HASH with type t = Crypto_box.Public_key_hash.t

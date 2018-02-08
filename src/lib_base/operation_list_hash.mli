@@ -7,5 +7,5 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Tezos_crypto.S.INTERNAL_MERKLE_TREE with type elt = Operation_hash.t
+include S.INTERNAL_MERKLE_TREE with type elt = Operation_hash.t
 

@@ -13,7 +13,6 @@ type nonce
 
 val random_nonce : unit -> nonce
 val increment_nonce : ?step:int -> nonce -> nonce
-val nonce_encoding : nonce Data_encoding.t
 
 type target
 val default_target : target
@@ -21,11 +20,8 @@ val make_target : float -> target
 
 type secret_key
 type public_key
-module Public_key_hash : S.INTERNAL_HASH
+module Public_key_hash : S.HASH
 type channel_key
-
-val public_key_encoding : public_key Data_encoding.t
-val secret_key_encoding : secret_key Data_encoding.t
 
 val hash : public_key -> Public_key_hash.t
 
@@ -51,4 +47,14 @@ val fast_box_open_noalloc : channel_key -> nonce -> MBytes.t -> bool
 val check_proof_of_work : public_key -> nonce -> target -> bool
 val generate_proof_of_work : ?max:int -> public_key -> target -> nonce
 
+val public_key_to_bigarray : public_key -> Cstruct.buffer
+val public_key_of_bigarray : Cstruct.buffer -> public_key
+val public_key_size : int
 
+val secret_key_to_bigarray : secret_key -> Cstruct.buffer
+val secret_key_of_bigarray : Cstruct.buffer -> secret_key
+val secret_key_size : int
+
+val nonce_to_bigarray : nonce -> Cstruct.buffer
+val nonce_of_bigarray : Cstruct.buffer -> nonce
+val nonce_size : int

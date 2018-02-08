@@ -118,28 +118,14 @@ let generate_proof_of_work ?max pk target =
       loop (Nonce.increment nonce) (cpt + 1) in
   loop (random_nonce ()) 0
 
-let to_bigarray : type a. a Box.key -> MBytes.t = fun k ->
-  Cstruct.to_bigarray (Box.to_cstruct k)
+let public_key_to_bigarray x = Cstruct.to_bigarray (Box.to_cstruct x)
+let public_key_of_bigarray x = Box.pk_of_cstruct_exn (Cstruct.of_bigarray x)
+let public_key_size = Box.pkbytes
 
-let of_bigarray f s = f (Cstruct.of_bigarray s)
+let secret_key_to_bigarray x = Cstruct.to_bigarray (Box.to_cstruct x)
+let secret_key_of_bigarray x = Box.sk_of_cstruct_exn (Cstruct.of_bigarray x)
+let secret_key_size = Box.skbytes
 
-let public_key_encoding =
-  let open Data_encoding in
-  conv
-    to_bigarray
-    (of_bigarray Box.pk_of_cstruct_exn)
-    (Fixed.bytes Box.pkbytes)
-
-let secret_key_encoding =
-  let open Data_encoding in
-  conv
-    to_bigarray
-    (of_bigarray Box.sk_of_cstruct_exn)
-    (Fixed.bytes Box.skbytes)
-
-let nonce_encoding =
-  let open Data_encoding in
-  conv
-    (fun nonce -> Cstruct.to_bigarray (Nonce.to_cstruct nonce))
-    (of_bigarray Nonce.of_cstruct_exn)
-    (Fixed.bytes Nonce.bytes)
+let nonce_to_bigarray x = Cstruct.to_bigarray (Nonce.to_cstruct x)
+let nonce_of_bigarray x = Nonce.of_cstruct_exn (Cstruct.of_bigarray x)
+let nonce_size = Nonce.bytes

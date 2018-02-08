@@ -7,10 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val generate : int -> MBytes.t
+val generate : int -> Cstruct.buffer
 (** [generate len] is [len] random bytes. *)
 
-val generate_into : ?pos:int -> ?len:int -> MBytes.t -> unit
+val generate_into : ?pos:int -> ?len:int -> Cstruct.buffer -> unit
 (** [generate_into ?pos ?len buf] writes [len] (default:
     [MBytes.length buf]) bytes in [buf] starting at [pos] (default:
     [0]). *)

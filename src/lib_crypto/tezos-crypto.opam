@@ -11,14 +11,12 @@ depends: [
   "jbuilder" { build & >= "1.0+beta17" }
   "tezos-test-helpers" { test }
   "tezos-stdlib"
-  "tezos-stdlib-lwt"
-  "tezos-data-encoding"
-  "tezos-error-monad"
-  "tezos-rpc"
+  "lwt"
   "nocrypto"
   "blake2"
   "tweetnacl"
   "zarith"
+  "tezos-error-monad" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

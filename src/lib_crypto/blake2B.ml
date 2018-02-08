@@ -55,13 +55,13 @@ module Make_minimal (K : Name) = struct
   let compare (Blake2b.Hash h1) (Blake2b.Hash h2) = Cstruct.compare h1 h2
   let equal x y = compare x y = 0
 
-  let of_bytes b =
+  let of_bytes_opt b =
     if MBytes.length b <> size then
       None
     else
       Some (Blake2b.Hash (Cstruct.of_bigarray b))
   let of_bytes_exn b =
-    match of_bytes b with
+    match of_bytes_opt b with
     | None ->
         let msg =
           Printf.sprintf "%s.of_bytes: wrong string size (%d)"
@@ -107,14 +107,6 @@ module Make_minimal (K : Name) = struct
     and p6 = if len > 10 then String.sub p 10 (len - 10) else "" in
     [ p1 ; p2 ; p3 ; p4 ; p5 ; p6 ]
 
-  module Table = struct
-    include Hashtbl.Make(struct
-        type nonrec t = t
-        let hash (Blake2b.Hash h) = Int64.to_int (Cstruct.BE.get_uint64 h 0)
-        let equal = equal
-      end)
-  end
-
 end
 
 module Make (R : sig
@@ -128,6 +120,11 @@ module Make (R : sig
   end) (K : PrefixedName) = struct
 
   include Make_minimal(K)
+
+  let zero =
+    match of_hex (String.make (size * 2) '0') with
+    | Some c -> c
+    | None -> assert false
 
   (* Serializers *)
 
@@ -146,43 +143,10 @@ module Make (R : sig
     match Base58.simple_decode b58check_encoding s with
     | Some x -> x
     | None -> Format.kasprintf Pervasives.failwith "Unexpected hash (%s)" K.name
-  let of_b58check s =
-    match Base58.simple_decode b58check_encoding s with
-    | Some x -> Ok x
-    | None -> generic_error "Unexpected hash (%s)" K.name
   let to_b58check s = Base58.simple_encode b58check_encoding s
 
   let to_short_b58check s =
     String.sub (to_b58check s) 0 (10 + 2 * String.length K.b58check_prefix)
-
-  let rpc_arg =
-    RPC_arg.make
-      ~name:(Format.asprintf "hash.%s" K.name)
-      ~descr:(Format.asprintf "A b58check-encoded hash (%s)" K.name)
-      ~destruct:
-        (fun s ->
-           match of_b58check_opt s with
-           | None ->
-               Error (Format.asprintf
-                        "failed to decode b58check-encoded hash (%s): %S"
-                        K.name s)
-           | Some v -> Ok v)
-      ~construct:to_b58check
-      ()
-
-  let encoding =
-    let open Data_encoding in
-    splitted
-      ~binary:
-        (conv to_bytes of_bytes_exn (Fixed.bytes size))
-      ~json:
-        (describe ~title: (K.title ^ " (Base58Check-encoded Blake2B hash)") @@
-         conv to_b58check (Data_encoding.Json.wrap_error of_b58check_exn) string)
-
-  let param ?(name=K.name) ?(desc=K.title) t =
-    Cli_entries.param
-      ~name
-      ~desc (Cli_entries.parameter (fun _ str -> Lwt.return (of_b58check str))) t
 
   let pp ppf t =
     Format.pp_print_string ppf (to_b58check t)
@@ -190,45 +154,11 @@ module Make (R : sig
   let pp_short ppf t =
     Format.pp_print_string ppf (to_short_b58check t)
 
-  module Set = struct
-    include Set.Make(struct type nonrec t = t let compare = compare end)
-    exception Found of elt
-    let random_elt s =
-      let n = Random.int (cardinal s) in
-      try
-        ignore
-          (fold (fun x i -> if i = n then raise (Found x) ; i+1) s 0 : int) ;
-        assert false
-      with Found x -> x
-    let encoding =
-      Data_encoding.conv
-        elements
-        (fun l -> List.fold_left (fun m x -> add x m) empty l)
-        Data_encoding.(list encoding)
-  end
-
-  let random_set_elt = Set.random_elt
-
-  module Map = struct
-    include Map.Make(struct type nonrec t = t let compare = compare end)
-    let encoding arg_encoding =
-      Data_encoding.conv
-        bindings
-        (fun l -> List.fold_left (fun m (k,v) -> add k v m) empty l)
-        Data_encoding.(list (tup2 encoding arg_encoding))
-  end
-
-  let zero =
-    match of_hex (String.make (size * 2) '0') with
-    | Some c -> c
-    | None -> assert false
-
 end
 
 module Generic_Merkle_tree (H : sig
     type t
     type elt
-    val encoding : t Data_encoding.t
     val empty : t
     val leaf : elt -> t
     val node : t -> t -> t
@@ -310,29 +240,6 @@ module Generic_Merkle_tree (H : sig
     let h, _, pos = check_path p h in
     h, pos
 
-  let path_encoding =
-    let open Data_encoding in
-    mu "path"
-      (fun path_encoding ->
-         union [
-           case (Tag 240)
-             (obj2
-                (req "path" path_encoding)
-                (req "right" H.encoding))
-             (function Left (p, r) -> Some (p, r) | _ -> None)
-             (fun (p, r) -> Left (p, r)) ;
-           case (Tag 15)
-             (obj2
-                (req "left" H.encoding)
-                (req "path" path_encoding))
-             (function Right (r, p) -> Some (r, p) | _ -> None)
-             (fun (r, p) -> Right (r, p)) ;
-           case (Tag 0)
-             unit
-             (function Op -> Some () | _ -> None)
-             (fun () -> Op)
-         ])
-
 end
 
 module Make_merkle_tree
@@ -354,13 +261,13 @@ module Make_merkle_tree
   include Make (R) (K)
 
   type elt = Contents.t
+  let elt_bytes = Contents.to_bytes
 
   let empty = hash_bytes []
 
   include Generic_Merkle_tree(struct
       type nonrec t = t
       type nonrec elt = elt
-      let encoding = encoding
       let empty = empty
       let leaf x = hash_bytes [Contents.to_bytes x]
       let node x y = hash_bytes [to_bytes x; to_bytes y]

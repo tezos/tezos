@@ -12,8 +12,12 @@ include Tezos_stdlib_lwt
 include Tezos_data_encoding
 include Tezos_error_monad
 include Tezos_rpc
-include Tezos_crypto
 include Tezos_micheline
+
+module Ed25519 = Ed25519
+module Crypto_box = Crypto_box
+module Base58 = Tezos_crypto.Base58
+module Rand = Tezos_crypto.Rand
 
 module List = struct
   include List

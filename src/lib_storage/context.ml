@@ -37,7 +37,7 @@ module IrminBlake2B : Irmin.Hash.S with type t = Context_hash.t = struct
 
   let to_raw t = Cstruct.of_bigarray (Context_hash.to_bytes t)
   let of_raw t =
-    match Context_hash.of_bytes (Cstruct.to_bigarray t) with
+    match Context_hash.of_bytes_opt (Cstruct.to_bigarray t) with
     | Some t -> t
     | None ->
         let str = Cstruct.to_string t in

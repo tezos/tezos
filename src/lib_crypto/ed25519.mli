@@ -11,28 +11,20 @@
 
 (** {2 Hashed public keys for user ID} ***************************************)
 
-module Public_key_hash : S.INTERNAL_HASH
+module Public_key_hash : S.HASH
 
 (** {2 Signature} ************************************************************)
 
 module Public_key : sig
 
   include Compare.S
-  val encoding: t Data_encoding.t
   val pp : Format.formatter -> t -> unit
-
-  val param:
-    ?name:string ->
-    ?desc:string ->
-    ('a, 'b, 'c) Cli_entries.params ->
-    (t -> 'a, 'b, 'c) Cli_entries.params
 
   val hash: t -> Public_key_hash.t
 
   type Base58.data +=
     | Public_key of t
 
-  val of_b58check: string -> t tzresult
   val of_b58check_exn: string -> t
   val of_b58check_opt: string -> t option
   val to_b58check: t -> string
@@ -41,66 +33,53 @@ module Public_key : sig
   val of_hex: Hex.t -> t option
   val of_hex_exn: Hex.t -> t
 
-  val of_bytes: MBytes.t -> t tzresult
   val of_bytes_exn: MBytes.t -> t
   val of_bytes_opt: MBytes.t -> t option
   val to_bytes: t -> MBytes.t
+
+  val size: int
 
 end
 
 module Secret_key : sig
 
   type t
-  val encoding: t Data_encoding.t
   val pp : Format.formatter -> t -> unit
-
-  val param:
-    ?name:string ->
-    ?desc:string ->
-    ('a, 'b, 'c) Cli_entries.params ->
-    (t -> 'a, 'b, 'c) Cli_entries.params
 
   val to_public_key: t -> Public_key.t
 
   type Base58.data +=
     | Secret_key of t
 
-  val of_b58check: string -> t tzresult
   val of_b58check_exn: string -> t
   val of_b58check_opt: string -> t option
   val to_b58check: t -> string
 
-  val of_bytes: MBytes.t -> t tzresult
   val of_bytes_exn: MBytes.t -> t
   val of_bytes_opt: MBytes.t -> t option
   val to_bytes: t -> MBytes.t
+
+  val size: int
 
 end
 
 module Signature : sig
 
   type t
-  val encoding: t Data_encoding.t
   val pp : Format.formatter -> t -> unit
-
-  val param:
-    ?name:string ->
-    ?desc:string ->
-    ('a, 'b, 'c) Cli_entries.params ->
-    (t -> 'a, 'b, 'c) Cli_entries.params
 
   type Base58.data +=
     | Signature of t
 
-  val of_b58check: string -> t tzresult
   val of_b58check_exn: string -> t
   val of_b58check_opt: string -> t option
   val to_b58check: t -> string
 
-  val of_bytes: MBytes.t -> t tzresult
   val of_bytes_exn: MBytes.t -> t
   val of_bytes_opt: MBytes.t -> t option
   val to_bytes: t -> MBytes.t
+
+  val size: int
 
   (** Check a signature *)
   val check: Public_key.t -> t -> MBytes.t -> bool

@@ -7,13 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Tezos - Manipulation and creation of hashes *)
-
-(** {2 Predefined Hashes } ****************************************************)
-
-include S.MINIMAL_HASH
-
-(** {2 Building Hashes} *******************************************************)
+(** Builds a new Hash type using Blake2B. *)
 
 (** The parameters for creating a new Hash type using
     {!Make_Blake2B}. Both {!name} and {!title} are only informative,
@@ -30,7 +24,6 @@ module type PrefixedName = sig
   val b58check_prefix : string
 end
 
-(** Builds a new Hash type using Blake2B. *)
 module Make_minimal (Name : Name) : S.MINIMAL_HASH
 module Make
     (Register : sig
@@ -39,12 +32,10 @@ module Make
          length: int ->
          to_raw: ('a -> string) ->
          of_raw: (string -> 'a option) ->
-         wrap: ('a -> Base58.data) ->
-         'a Base58.encoding
+         wrap: ('a -> Tezos_crypto.Base58.data) ->
+         'a Tezos_crypto.Base58.encoding
      end)
-    (Name : PrefixedName) : S.HASH
-
-(**/**)
+    (Name : PrefixedName) : S.INTERNAL_HASH
 
 module Make_merkle_tree
     (R : sig
@@ -53,14 +44,14 @@ module Make_merkle_tree
          length:int ->
          to_raw: ('a -> string) ->
          of_raw: (string -> 'a option) ->
-         wrap: ('a -> Base58.data) ->
-         'a Base58.encoding
+         wrap: ('a -> Tezos_crypto.Base58.data) ->
+         'a Tezos_crypto.Base58.encoding
      end)
     (K : PrefixedName)
     (Contents: sig
        type t
        val to_bytes: t -> MBytes.t
-     end) : S.MERKLE_TREE with type elt = Contents.t
+     end) : S.INTERNAL_MERKLE_TREE with type elt = Contents.t
 
 module Generic_Merkle_tree (H : sig
     type t
@@ -77,3 +68,8 @@ module Generic_Merkle_tree (H : sig
   val compute_path: H.elt list -> int -> path
   val check_path: path -> H.elt -> H.t * int
 end
+
+module Extend (H: Tezos_crypto.S.HASH)
+  : S.INTERNAL_HASH with type t = H.t
+module Extend_merkle_tree (H: Tezos_crypto.S.MERKLE_TREE)
+  : S.INTERNAL_MERKLE_TREE with type t = H.t and type elt = H.elt

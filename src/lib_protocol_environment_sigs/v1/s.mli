@@ -75,7 +75,7 @@ module type MINIMAL_HASH = sig
   val of_string_exn: string -> t
 
   val to_bytes: t -> MBytes.t
-  val of_bytes: MBytes.t -> t option
+  val of_bytes_opt: MBytes.t -> t option
   val of_bytes_exn: MBytes.t -> t
 
   val read: MBytes.t -> int -> t
@@ -94,15 +94,18 @@ module type HASH = sig
 
   include MINIMAL_HASH
 
-  val of_b58check_exn: string -> t
-  val of_b58check_opt: string -> t option
+  val encoding: t Data_encoding.t
+
   val to_b58check: t -> string
   val to_short_b58check: t -> string
-  val encoding: t Data_encoding.t
-  val pp: Format.formatter -> t -> unit
-  val pp_short: Format.formatter -> t -> unit
   type Base58.data += Hash of t
   val b58check_encoding: t Base58.encoding
+
+  val of_b58check_exn: string -> t
+  val of_b58check_opt: string -> t option
+
+  val pp: Format.formatter -> t -> unit
+  val pp_short: Format.formatter -> t -> unit
 
   val rpc_arg: t RPC_arg.t
 

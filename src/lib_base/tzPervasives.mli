@@ -9,10 +9,13 @@
 
 include (module type of (struct include Tezos_stdlib end))
 include (module type of (struct include Tezos_data_encoding end))
-include (module type of (struct include Tezos_stdlib_lwt end))
 include (module type of (struct include Tezos_error_monad end))
 include (module type of (struct include Tezos_rpc end))
-include (module type of (struct include Tezos_crypto end))
+
+module Ed25519 = Ed25519
+module Crypto_box = Crypto_box
+module Base58 = Tezos_crypto.Base58
+module Rand = Tezos_crypto.Rand
 
 module List : sig
   include (module type of (struct include List end))

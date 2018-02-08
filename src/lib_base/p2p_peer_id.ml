@@ -7,5 +7,5 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Crypto_box.Public_key_hash
+include Blake2B.Extend(Crypto_box.Public_key_hash)
 

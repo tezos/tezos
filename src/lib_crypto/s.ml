@@ -23,7 +23,7 @@ module type MINIMAL_HASH = sig
   val name: string
   val title: string
 
-  val hash_bytes: MBytes.t list -> t
+  val hash_bytes: Cstruct.buffer list -> t
   val hash_string: string list -> t
   val size: int (* in bytes *)
   val compare: t -> t -> int
@@ -37,12 +37,12 @@ module type MINIMAL_HASH = sig
   val of_string: string -> t option
   val of_string_exn: string -> t
 
-  val to_bytes: t -> MBytes.t
-  val of_bytes: MBytes.t -> t option
-  val of_bytes_exn: MBytes.t -> t
+  val to_bytes: t -> Cstruct.buffer
+  val of_bytes_opt: Cstruct.buffer -> t option
+  val of_bytes_exn: Cstruct.buffer -> t
 
-  val read: MBytes.t -> int -> t
-  val write: MBytes.t -> int -> t -> unit
+  val read: Cstruct.buffer -> int -> t
+  val write: Cstruct.buffer -> int -> t -> unit
 
   val to_path: t -> string list -> string list
   val of_path: string list -> t option
@@ -53,76 +53,42 @@ module type MINIMAL_HASH = sig
 
 end
 
-module type INTERNAL_MINIMAL_HASH = sig
-  include MINIMAL_HASH
-  module Table : Hashtbl.S with type key = t
-end
-
 module type HASH = sig
 
   include MINIMAL_HASH
 
-  val of_b58check_exn: string -> t
-  val of_b58check_opt: string -> t option
+  val zero: t
+
   val to_b58check: t -> string
   val to_short_b58check: t -> string
-  val encoding: t Data_encoding.t
-  val pp: Format.formatter -> t -> unit
-  val pp_short: Format.formatter -> t -> unit
+
+  val of_b58check_exn: string -> t
+  val of_b58check_opt: string -> t option
+
   type Base58.data += Hash of t
   val b58check_encoding: t Base58.encoding
 
-  val rpc_arg: t RPC_arg.t
+  val pp: Format.formatter -> t -> unit
+  val pp_short: Format.formatter -> t -> unit
 
-  module Set : sig
-    include Set.S with type elt = t
-    val encoding: t Data_encoding.t
-  end
-
-  module Map : sig
-    include Map.S with type key = t
-    val encoding: 'a Data_encoding.t -> 'a t Data_encoding.t
-  end
-
-end
-
-module type INTERNAL_HASH = sig
-  include HASH
-  val of_b58check: string -> t tzresult
-  val param:
-    ?name:string ->
-    ?desc:string ->
-    ('a, 'arg, 'ret) Cli_entries.params ->
-    (t -> 'a, 'arg, 'ret) Cli_entries.params
-  val random_set_elt: Set.t -> t
-  module Table : Hashtbl.S with type key = t
-  val zero: t
-end
-
-module type INTERNAL_MERKLE_TREE = sig
-  type elt
-  include INTERNAL_HASH
-  val compute: elt list -> t
-  val empty: t
-  type path =
-    | Left of path * t
-    | Right of t * path
-    | Op
-  val compute_path: elt list -> int -> path
-  val check_path: path -> elt -> t * int
-  val path_encoding: path Data_encoding.t
 end
 
 module type MERKLE_TREE = sig
+
   type elt
+  val elt_bytes: elt -> Cstruct.buffer
+
   include HASH
+
   val compute: elt list -> t
   val empty: t
+
   type path =
     | Left of path * t
     | Right of t * path
     | Op
+
   val compute_path: elt list -> int -> path
   val check_path: path -> elt -> t * int
-  val path_encoding: path Data_encoding.t
+
 end

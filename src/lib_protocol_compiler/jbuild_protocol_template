@@ -56,8 +56,7 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
 (rule
  ((targets (tezos_protocol_%s.cmo
             tezos_protocol_%s_dummy_byte.ml))
-  (deps ((glob_files src/*.ml)
-         (glob_files src/*.mli)
+  (deps ((glob_files src/*.ml*)
          src/TEZOS_PROTOCOL))
   (action (with-stdout-to ${path-no-dep:tezos_protocol_%s_dummy_byte.ml}
            (chdir ${ROOT}

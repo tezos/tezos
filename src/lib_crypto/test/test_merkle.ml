@@ -30,9 +30,6 @@ module Merkle = Blake2B.Generic_Merkle_tree(struct
     let empty = Empty
     let leaf i = Leaf i
     let node x y = Node (x, y)
-    let encoding =
-      (* Fake... *)
-      Data_encoding.conv (fun _ -> 0) (fun _ -> Empty) Data_encoding.int31
   end)
 
 let rec compare_list xs ys =
