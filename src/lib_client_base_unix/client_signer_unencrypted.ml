@@ -26,6 +26,8 @@ module Unencrypted_signer : SIGNER = struct
   type secret_key = Ed25519.Secret_key.t
   type public_key = Ed25519.Public_key.t
 
+  let init _wallet = return ()
+
   let sk_locator_of_human_input _cctxt = function
     | sk :: _ ->
         return (Secret_key_locator.create ~scheme ~location:sk)

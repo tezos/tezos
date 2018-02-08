@@ -53,7 +53,7 @@ val hash_and_sign :
   Michelson_v1_parser.parsed ->
   Client_keys.sk_locator ->
   Block_services.block ->
-  #Proto_alpha.rpc_context ->
+  #Proto_alpha.full_context ->
   (string * string) tzresult Lwt.t
 
 val typecheck_data :

@@ -117,12 +117,9 @@ module type SIGNER = sig
   val scheme : string
   val title : string
   val description : string
-  val sk_locator_of_human_input :
-    Client_context.logging_wallet ->
-    string list -> sk_locator tzresult Lwt.t
-  val pk_locator_of_human_input :
-    Client_context.logging_wallet ->
-    string list -> pk_locator tzresult Lwt.t
+  val init : #Client_context.io_wallet -> unit tzresult Lwt.t
+  val sk_locator_of_human_input : #Client_context.io_wallet -> string list -> sk_locator tzresult Lwt.t
+  val pk_locator_of_human_input : #Client_context.io_wallet -> string list -> pk_locator tzresult Lwt.t
   val sk_of_locator : sk_locator -> secret_key tzresult Lwt.t
   val pk_of_locator : pk_locator -> public_key tzresult Lwt.t
   val sk_to_locator : secret_key -> sk_locator Lwt.t
@@ -133,30 +130,35 @@ module type SIGNER = sig
   val sign : secret_key -> MBytes.t -> Ed25519.Signature.t tzresult Lwt.t
 end
 
-let signers_table : (string, (module SIGNER)) Hashtbl.t = Hashtbl.create 13
+let signers_table : (string, (module SIGNER) * bool) Hashtbl.t = Hashtbl.create 13
+
 let register_signer signer =
   let module Signer = (val signer : SIGNER) in
-  Hashtbl.replace signers_table Signer.scheme signer
+  Hashtbl.replace signers_table Signer.scheme (signer, false)
 
-let find_signer_for_key ~scheme =
+let find_signer_for_key cctxt ~scheme =
   match Hashtbl.find signers_table scheme with
-  | exception Not_found -> error (Unregistered_key_scheme scheme)
-  | signer -> ok signer
+  | exception Not_found -> fail (Unregistered_key_scheme scheme)
+  | signer, false ->
+      let module Signer = (val signer : SIGNER) in
+      Signer.init cctxt >>=? fun () ->
+      return signer
+  | signer, true -> return signer
 
 let registered_signers () : (string * (module SIGNER)) list =
-  Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []
+  Hashtbl.fold (fun k (v, _) acc -> (k, v) :: acc) signers_table []
 
-let sign ((Sk_locator { scheme }) as skloc) buf =
-  Lwt.return (find_signer_for_key ~scheme) >>=? fun signer ->
+let sign cctxt ((Sk_locator { scheme }) as skloc) buf =
+  find_signer_for_key cctxt ~scheme >>=? fun signer ->
   let module Signer = (val signer : SIGNER) in
   Signer.sk_of_locator skloc >>=? fun t ->
   Signer.sign t buf
 
-let append loc buf =
-  sign loc buf >>|? fun signature ->
+let append cctxt loc buf =
+  sign cctxt loc buf >>|? fun signature ->
   MBytes.concat buf (Ed25519.Signature.to_bytes signature)
 
-let gen_keys ?(force=false) ?seed (cctxt : #Client_context.wallet) name =
+let gen_keys ?(force=false) ?seed (cctxt : #Client_context.io_wallet) name =
   let seed =
     match seed with
     | None -> Ed25519.Seed.generate ()
@@ -232,21 +234,20 @@ let get_key (cctxt : #Client_context.wallet) pkh =
       Public_key.find cctxt n >>=? fun pk ->
       Secret_key.find cctxt n >>=? fun sk ->
       let scheme = Secret_key_locator.scheme sk in
-      Lwt.return (find_signer_for_key ~scheme) >>=? fun signer ->
+      find_signer_for_key cctxt ~scheme >>=? fun signer ->
       let module Signer = (val signer : SIGNER) in
       Signer.pk_of_locator pk >>=? fun pk ->
       Signer.public_key pk >>= fun pk ->
       return (n, pk, sk)
 
-let get_keys (wallet : #Client_context.wallet) =
+let get_keys (wallet : #Client_context.io_wallet) =
   Secret_key.load wallet >>=? fun sks ->
   Lwt_list.filter_map_s begin fun (name, sk) ->
     begin
       Public_key.find wallet name >>=? fun pk ->
       Public_key_hash.find wallet name >>=? fun pkh ->
       let scheme = Public_key_locator.scheme pk in
-      Lwt.return
-        (find_signer_for_key ~scheme) >>=? fun signer ->
+      find_signer_for_key wallet ~scheme >>=? fun signer ->
       let module Signer = (val signer : SIGNER) in
       Signer.pk_of_locator pk >>=? fun pk ->
       Signer.public_key pk >>= fun pk ->

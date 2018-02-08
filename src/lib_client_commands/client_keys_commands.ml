@@ -89,10 +89,10 @@ let commands () =
                    information."))
       (fun force scheme name spec cctxt ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
-         Lwt.return (find_signer_for_key ~scheme) >>=? fun signer ->
+         find_signer_for_key ~scheme cctxt >>=? fun signer ->
          let module Signer = (val signer : SIGNER) in
          Signer.sk_locator_of_human_input
-           (cctxt :> Client_context.logging_wallet) spec >>=? fun skloc ->
+           (cctxt :> Client_context.io_wallet) spec >>=? fun skloc ->
          Signer.sk_of_locator skloc >>=? fun sk ->
          Signer.neuterize sk >>= fun pk ->
          Signer.pk_to_locator pk >>= fun pkloc ->
@@ -128,10 +128,10 @@ let commands () =
                    information."))
       (fun force scheme name location cctxt ->
          Public_key.of_fresh cctxt force name >>=? fun name ->
-         Lwt.return (find_signer_for_key ~scheme) >>=? fun signer ->
+         find_signer_for_key ~scheme cctxt >>=? fun signer ->
          let module Signer = (val signer : SIGNER) in
          Signer.pk_locator_of_human_input
-           (cctxt :> Client_context.logging_wallet) location >>=? fun pkloc ->
+           (cctxt :> Client_context.io_wallet) location >>=? fun pkloc ->
          Signer.pk_of_locator pkloc >>=? fun pk ->
          Signer.public_key_hash pk >>= fun pkh ->
          Public_key_hash.add ~force cctxt name pkh >>=? fun () ->
@@ -180,7 +180,7 @@ let commands () =
              match pk with
              | None -> return ()
              | Some (Pk_locator { scheme } as pkloc) ->
-                 Lwt.return (find_signer_for_key ~scheme) >>=? fun signer ->
+                 find_signer_for_key ~scheme cctxt >>=? fun signer ->
                  let module Signer = (val signer : SIGNER) in
                  Signer.pk_of_locator pkloc >>=? fun pk ->
                  Signer.public_key pk >>= fun pk ->

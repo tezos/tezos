@@ -52,16 +52,19 @@ module type SIGNER = sig
   (** [description] is a multi-line human readable description of the
       signer, that should include the format of key specifications. *)
 
+  val init :
+    #Client_context.io_wallet -> unit tzresult Lwt.t
+  (** [init wallet] initialized the signer module (plugin
+      dependent). *)
+
   val sk_locator_of_human_input :
-    Client_context.logging_wallet ->
-    string list -> sk_locator tzresult Lwt.t
+    #Client_context.io_wallet -> string list -> sk_locator tzresult Lwt.t
   (** [sk_locator_of_human_input wallet spec] is the [sk_locator]
       corresponding to the human readable specification [spec] (plugin
       dependent). *)
 
   val pk_locator_of_human_input :
-    Client_context.logging_wallet ->
-    string list -> pk_locator tzresult Lwt.t
+    #Client_context.io_wallet -> string list -> pk_locator tzresult Lwt.t
   (** [pk_locator_of_human_input wallet spec] is the [pk_locator]
       corresponding to the human readable specification [spec] (plugin
       dependent). *)
@@ -93,20 +96,24 @@ module type SIGNER = sig
 end
 
 val register_signer : (module SIGNER) -> unit
-(** [register_signer signer] sets first-class module [signer] as
+(** [register_signer signer] registers first-class module [signer] as
     signer for keys with scheme [(val signer : SIGNER).scheme]. *)
-
-val find_signer_for_key : scheme:string -> (module SIGNER) tzresult
 
 val registered_signers : unit -> (string * (module SIGNER)) list
 
-val sign : sk_locator -> MBytes.t -> Ed25519.Signature.t tzresult Lwt.t
-val append : sk_locator -> MBytes.t -> MBytes.t tzresult Lwt.t
+val find_signer_for_key :
+  #Client_context.io_wallet -> scheme:string -> (module SIGNER) tzresult Lwt.t
+val sign :
+  #Client_context.io_wallet ->
+  sk_locator -> MBytes.t -> Ed25519.Signature.t tzresult Lwt.t
+val append :
+  #Client_context.io_wallet ->
+  sk_locator -> MBytes.t -> MBytes.t tzresult Lwt.t
 
 val gen_keys :
   ?force:bool ->
   ?seed:Ed25519.Seed.t ->
-  #Client_context.wallet -> string -> unit tzresult Lwt.t
+  #Client_context.io_wallet -> string -> unit tzresult Lwt.t
 
 val gen_keys_containing :
   ?prefix:bool ->
@@ -124,12 +131,12 @@ val alias_keys :
   (Public_key_hash.t * pk_locator option * sk_locator option) option tzresult Lwt.t
 
 val get_key:
-  #Client_context.wallet ->
+  #Client_context.io_wallet ->
   Public_key_hash.t ->
   (string * Ed25519.Public_key.t * sk_locator) tzresult Lwt.t
 
 val get_keys:
-  #Client_context.wallet ->
+  #Client_context.io_wallet ->
   (string * Public_key_hash.t * Ed25519.Public_key.t * sk_locator) list tzresult Lwt.t
 
 val force_switch : unit -> (bool, #Client_context.full_context) Cli_entries.arg

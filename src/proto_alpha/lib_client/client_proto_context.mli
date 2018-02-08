@@ -35,7 +35,7 @@ val get_balance:
   Tez.t tzresult Lwt.t
 
 val set_delegate :
-  #Proto_alpha.rpc_context ->
+  #Proto_alpha.full_context ->
   Block_services.block ->
   fee:Tez.tez ->
   Contract.t ->
@@ -66,7 +66,7 @@ val originate_account :
   balance:Tez.tez ->
   fee:Tez.tez ->
   Block_services.block ->
-  #Proto_alpha.rpc_context ->
+  #Proto_alpha.full_context ->
   unit -> (Operation_list_hash.elt * Contract.t) tzresult Lwt.t
 
 val save_contract :
@@ -105,7 +105,7 @@ val faucet :
   unit -> (Operation_list_hash.elt * Contract.t) tzresult Lwt.t
 
 val transfer :
-  #Proto_alpha.rpc_context ->
+  #Proto_alpha.full_context ->
   Block_services.block ->
   ?branch:int ->
   source:Contract.t ->

@@ -4,8 +4,9 @@
  ((name tezos_client_base)
   (public_name tezos-client-base)
   (libraries (tezos-base
-              tezos-rpc
-              tezos-shell-services))
+              tezos-stdlib-unix
+              tezos-shell-services
+              tezos-rpc))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string

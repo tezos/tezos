@@ -13,16 +13,16 @@ let protocol =
   Protocol_hash.of_b58check_exn
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
-let bake rpc_config ?(timestamp = Time.now ()) block command sk =
+let bake cctxt ?(timestamp = Time.now ()) block command sk =
   let block = Block_services.last_baked_block block in
   let proto_header = Data_encoding.Binary.to_bytes Data.Command.encoding command in
   Block_services.preapply
-    rpc_config block ~timestamp ~proto_header [] >>=? fun { shell_header } ->
+    cctxt block ~timestamp ~proto_header [] >>=? fun { shell_header } ->
   let blk =
     Data_encoding.Binary.to_bytes Block_header.encoding
       { shell = shell_header ; proto = proto_header } in
-  Client_keys.append sk blk >>=? fun signed_blk ->
-  Shell_services.inject_block rpc_config signed_blk []
+  Client_keys.append cctxt sk blk >>=? fun signed_blk ->
+  Shell_services.inject_block cctxt signed_blk []
 
 let int64_parameter =
   (Cli_entries.parameter (fun _ p ->
