@@ -4,7 +4,7 @@
  ((name tezos_protocol_updater)
   (public_name tezos-protocol-updater)
   (libraries (tezos-base
-              tezos-stdlib-lwt
+              tezos-stdlib-unix
               tezos-micheline
               tezos-protocol-compiler.registerer
               tezos-protocol-compiler.native
@@ -13,7 +13,7 @@
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_stdlib_lwt
+                    -open Tezos_stdlib_unix
                     -open Tezos_micheline
                     -open Tezos_storage))))
 

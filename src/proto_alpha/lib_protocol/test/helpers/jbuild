@@ -4,13 +4,13 @@
  ((name tezos_proto_alpha_isolate_helpers)
   (libraries (tezos-test-helpers
               tezos-base
-              tezos-stdlib-lwt
+              tezos-stdlib-unix
               tezos-protocol-environment-client
               tezos-protocol-alpha))
   (wrapped false)
   (flags (:standard -w -9-32 -safe-string
           -open Tezos_base__TzPervasives
-          -open Tezos_stdlib_lwt
+          -open Tezos_stdlib_unix
           -open Tezos_test_helpers
           -open Tezos_protocol_environment_client))))
 

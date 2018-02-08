@@ -103,10 +103,10 @@ test:stdlib:
   script:
     - jbuilder build @src/lib_stdlib/runtest
 
-test:stdlib_lwt:
+test:stdlib_unix:
   <<: *test_definition
   script:
-    - jbuilder build @src/lib_stdlib_lwt/runtest
+    - jbuilder build @src/lib_stdlib_unix/runtest
 
 test:data_encoding:
   <<: *test_definition
@@ -211,75 +211,75 @@ opam:00:tezos-stdlib:
   variables:
     package: tezos-stdlib
 
-opam:01:ocplib-resto:
-  <<: *opam_definition
-  variables:
-    package: ocplib-resto
-
-opam:02:tezos-data-encoding:
+opam:01:tezos-data-encoding:
   <<: *opam_definition
   variables:
     package: tezos-data-encoding
 
-opam:03:ocplib-resto-directory:
+opam:02:ocplib-resto:
   <<: *opam_definition
   variables:
-    package: ocplib-resto-directory
+    package: ocplib-resto
 
-opam:04:tezos-error-monad:
-  <<: *opam_definition
-  variables:
-    package: tezos-error-monad
-
-opam:05:blake2:
+opam:03:blake2:
   <<: *opam_definition
   variables:
     package: blake2
 
-opam:06:tezos-rpc:
-  <<: *opam_definition
-  variables:
-    package: tezos-rpc
-
-opam:07:tezos-stdlib-lwt:
-  <<: *opam_definition
-  variables:
-    package: tezos-stdlib-lwt
-
-opam:08:tweetnacl:
+opam:04:tweetnacl:
   <<: *opam_definition
   variables:
     package: tweetnacl
 
-opam:09:tezos-crypto:
+opam:05:tezos-error-monad:
+  <<: *opam_definition
+  variables:
+    package: tezos-error-monad
+
+opam:06:ocplib-resto-directory:
+  <<: *opam_definition
+  variables:
+    package: ocplib-resto-directory
+
+opam:07:tezos-crypto:
   <<: *opam_definition
   variables:
     package: tezos-crypto
 
-opam:10:tezos-micheline:
+opam:08:tezos-micheline:
   <<: *opam_definition
   variables:
     package: tezos-micheline
+
+opam:09:tezos-rpc:
+  <<: *opam_definition
+  variables:
+    package: tezos-rpc
+
+opam:10:tezos-base:
+  <<: *opam_definition
+  variables:
+    package: tezos-base
 
 opam:11:ocplib-resto-cohttp:
   <<: *opam_definition
   variables:
     package: ocplib-resto-cohttp
 
-opam:12:tezos-base:
-  <<: *opam_definition
-  variables:
-    package: tezos-base
-
-opam:13:irmin-leveldb:
+opam:12:irmin-leveldb:
   <<: *opam_definition
   variables:
     package: irmin-leveldb
 
-opam:14:tezos-protocol-environment-sigs:
+opam:13:tezos-protocol-environment-sigs:
   <<: *opam_definition
   variables:
     package: tezos-protocol-environment-sigs
+
+opam:14:tezos-stdlib-unix:
+  <<: *opam_definition
+  variables:
+    package: tezos-stdlib-unix
 
 opam:15:tezos-rpc-http:
   <<: *opam_definition

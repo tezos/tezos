@@ -12,7 +12,7 @@ depends: [
   "base-unix"
   "tezos-base"
   "tezos-protocol-environment-sigs"
-  "lwt"
+  "tezos-stdlib-unix"
   "ocplib-endian"
   "ocp-ocamlres" { >= "0.4" }
 ]

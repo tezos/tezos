@@ -5,14 +5,14 @@
           test_p2p_pool
           test_p2p_io_scheduler))
   (libraries (tezos-base
-              tezos-stdlib-lwt
+              tezos-stdlib-unix
               tezos-p2p
               tezos-test-helpers))
   (flags (:standard -w -9-32
                     -linkall
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_stdlib_lwt
+                    -open Tezos_stdlib_unix
                     -open Tezos_test_helpers
                     -open Tezos_p2p))))
 

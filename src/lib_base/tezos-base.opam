@@ -10,7 +10,6 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta17" }
   "tezos-stdlib"
-  "tezos-stdlib-lwt"
   "tezos-crypto"
   "tezos-data-encoding"
   "tezos-error-monad"

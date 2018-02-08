@@ -11,6 +11,7 @@ depends: [
   "jbuilder" { build & >= "1.0+beta17" }
   "tezos-test-helpers" { test }
   "tezos-base"
+  "tezos-stdlib-unix"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]
