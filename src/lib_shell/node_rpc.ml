@@ -449,14 +449,14 @@ let build_rpc_directory node =
   (* Workers : Prevalidators *)
 
   let dir  =
-    RPC_directory.register0 dir Worker_services.Prevalidators.list
+    RPC_directory.register0 dir Worker_services.Prevalidators.S.list
       (fun () () ->
          RPC_answer.return
            (List.map
               (fun (id, w) -> (id, Prevalidator.status w))
               (Prevalidator.running_workers ()))) in
   let dir  =
-    RPC_directory.register1 dir Worker_services.Prevalidators.state
+    RPC_directory.register1 dir Worker_services.Prevalidators.S.state
       (fun net_id () () ->
          let w = List.assoc net_id (Prevalidator.running_workers ()) in
          RPC_answer.return
@@ -468,7 +468,7 @@ let build_rpc_directory node =
   (* Workers : Block_validator *)
 
   let dir  =
-    RPC_directory.register0 dir Worker_services.Block_validator.state
+    RPC_directory.register0 dir Worker_services.Block_validator.S.state
       (fun () () ->
          let w = Block_validator.running_worker () in
          RPC_answer.return
@@ -480,7 +480,7 @@ let build_rpc_directory node =
   (* Workers : Peer validators *)
 
   let dir  =
-    RPC_directory.register1 dir Worker_services.Peer_validators.list
+    RPC_directory.register1 dir Worker_services.Peer_validators.S.list
       (fun net_id () () ->
          RPC_answer.return
            (List.filter_map
@@ -490,7 +490,7 @@ let build_rpc_directory node =
                  else None)
               (Peer_validator.running_workers ()))) in
   let dir  =
-    RPC_directory.register2 dir Worker_services.Peer_validators.state
+    RPC_directory.register2 dir Worker_services.Peer_validators.S.state
       (fun net_id peer_id () () ->
          let w = List.assoc (net_id, peer_id) (Peer_validator.running_workers ()) in
          RPC_answer.return
@@ -502,14 +502,14 @@ let build_rpc_directory node =
   (* Workers : Net validators *)
 
   let dir  =
-    RPC_directory.register0 dir Worker_services.Net_validators.list
+    RPC_directory.register0 dir Worker_services.Net_validators.S.list
       (fun () () ->
          RPC_answer.return
            (List.map
               (fun (id, w) -> (id, Net_validator.status w))
               (Net_validator.running_workers ()))) in
   let dir  =
-    RPC_directory.register1 dir Worker_services.Net_validators.state
+    RPC_directory.register1 dir Worker_services.Net_validators.S.state
       (fun net_id () () ->
          let w = List.assoc net_id (Net_validator.running_workers ()) in
          RPC_answer.return
