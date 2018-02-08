@@ -43,3 +43,8 @@ let wrap param_encoding =
       (function Error x -> Some x | _ -> None)
       (fun x -> Error x) ;
   ]
+
+module F = struct
+  open RPC_context
+  let schema ctxt = make_call service ctxt () () ()
+end

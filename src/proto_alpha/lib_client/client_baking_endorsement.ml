@@ -104,7 +104,7 @@ let inject_endorsement (cctxt : Client_commands.full_context)
     ~slot:slot
     () >>=? fun bytes ->
   Client_keys.append src_sk bytes >>=? fun signed_bytes ->
-  Client_node_rpcs.inject_operation
+  Shell_services.inject_operation
     cctxt ?async ~net_id:bi.net_id signed_bytes >>=? fun oph ->
   State.record_endorsement cctxt level bi.hash slot oph >>=? fun () ->
   return oph

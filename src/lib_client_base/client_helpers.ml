@@ -24,7 +24,7 @@ let commands () = Cli_entries.[
          ~desc: "the prefix of the hash to complete" @@
        stop)
       (fun unique prefix (cctxt : Client_commands.full_context) ->
-         Client_node_rpcs.complete
+         Shell_services.complete
            cctxt ~block:cctxt#block prefix >>=? fun completions ->
          match completions with
          | [] -> Pervasives.exit 3
@@ -38,7 +38,7 @@ let commands () = Cli_entries.[
       (prefixes [ "bootstrapped" ] @@
        stop)
       (fun () (cctxt : Client_commands.full_context) ->
-         Client_node_rpcs.bootstrapped cctxt >>=? fun stream ->
+         Shell_services.bootstrapped cctxt >>=? fun (stream, _) ->
          Lwt_stream.iter_s
            (fun (hash, time) ->
               cctxt#message "Current head: %a (%a)"

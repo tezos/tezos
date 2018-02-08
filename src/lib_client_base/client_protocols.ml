@@ -39,7 +39,7 @@ let commands () =
          Lwt.catch
            (fun () ->
               Lwt_utils_unix.Protocol.read_dir dirname >>=? fun (_hash, proto) ->
-              Client_node_rpcs.inject_protocol cctxt proto >>= function
+              Shell_services.inject_protocol cctxt proto >>= function
               | Ok hash ->
                   cctxt#message "Injected protocol %a successfully" Protocol_hash.pp_short hash >>= fun () ->
                   return ()

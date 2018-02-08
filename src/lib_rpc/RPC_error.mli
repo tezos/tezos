@@ -13,3 +13,8 @@ val service:
   ([ `POST ], unit, unit, unit, unit, Json_schema.schema) RPC_service.t
 val encoding: error list Data_encoding.t
 val wrap: 'a Data_encoding.t -> 'a tzresult Data_encoding.encoding
+
+module F : sig
+  open RPC_context
+  val schema: #simple -> Json_schema.schema tzresult Lwt.t
+end

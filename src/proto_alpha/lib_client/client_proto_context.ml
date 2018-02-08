@@ -68,7 +68,7 @@ let transfer rpc_config
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_proto_rpcs.Helpers.apply_operation rpc_config block
     predecessor oph bytes (Some signature) >>=? fun contracts ->
-  Client_node_rpcs.inject_operation
+  Shell_services.inject_operation
     rpc_config ~net_id signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
   return (oph, contracts)
@@ -83,7 +83,7 @@ let originate rpc_config ?net_id ~block ?signature bytes =
   Client_proto_rpcs.Helpers.apply_operation rpc_config block
     predecessor oph bytes signature >>=? function
   | [ contract ] ->
-      Client_node_rpcs.inject_operation
+      Shell_services.inject_operation
         rpc_config ?net_id signed_bytes >>=? fun injected_oph ->
       assert (Operation_hash.equal oph injected_oph) ;
       return (oph, contract)
@@ -136,7 +136,7 @@ let delegate_contract rpc_config
   Client_keys.sign manager_sk bytes >>=? fun signature ->
   let signed_bytes = Ed25519.Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Client_node_rpcs.inject_operation
+  Shell_services.inject_operation
     rpc_config ~net_id signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
@@ -185,7 +185,7 @@ let dictate rpc_config block command seckey =
   let signature = Ed25519.sign seckey bytes in
   let signed_bytes = Ed25519.Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Client_node_rpcs.inject_operation
+  Shell_services.inject_operation
     rpc_config ~net_id signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
   return oph

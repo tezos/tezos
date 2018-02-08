@@ -67,7 +67,7 @@ let inject_block cctxt
   let block = `Hash shell_header.Tezos_base.Block_header.predecessor in
   forge_block_header cctxt block
     src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
-  Client_node_rpcs.inject_block cctxt
+  Shell_services.inject_block cctxt
     ?force ?net_id signed_header operations >>=? fun block_hash ->
   return block_hash
 

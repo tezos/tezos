@@ -401,18 +401,18 @@ let build_rpc_directory node =
       let res =
         Data_encoding.Binary.to_bytes Block_header.encoding header in
       RPC_answer.return res in
-    RPC_directory.register0 dir Shell_services.forge_block_header
+    RPC_directory.register0 dir Shell_services.S.forge_block_header
       implementation in
   let dir =
     let implementation ()
-        { Shell_services.raw ; blocking ; force ; operations } =
+        { Shell_services.S.raw ; blocking ; force ; operations } =
       begin
         Node.RPC.inject_block
           node ~force
           raw operations >>=? fun (hash, wait) ->
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end >>= RPC_answer.return in
-    RPC_directory.register0 dir Shell_services.inject_block implementation in
+    RPC_directory.register0 dir Shell_services.S.inject_block implementation in
   let dir =
     let implementation () (contents, blocking, net_id) =
       Node.RPC.inject_operation
@@ -420,25 +420,25 @@ let build_rpc_directory node =
       begin
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end >>= RPC_answer.return in
-    RPC_directory.register0 dir Shell_services.inject_operation implementation in
+    RPC_directory.register0 dir Shell_services.S.inject_operation implementation in
   let dir =
     let implementation () (proto, blocking, force) =
       Node.RPC.inject_protocol ?force node proto >>= fun (hash, wait) ->
       begin
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end >>= RPC_answer.return in
-    RPC_directory.register0 dir Shell_services.inject_protocol implementation in
+    RPC_directory.register0 dir Shell_services.S.inject_protocol implementation in
   let dir =
     let implementation () () =
       RPC_answer.return_stream (Node.RPC.bootstrapped node) in
-    RPC_directory.register0 dir Shell_services.bootstrapped implementation in
+    RPC_directory.register0 dir Shell_services.S.bootstrapped implementation in
   let dir =
     let implementation () () =
       RPC_answer.return
         Data_encoding.Json.(schema Error_monad.error_encoding) in
     RPC_directory.register0 dir RPC_error.service implementation in
   let dir =
-    RPC_directory.register1 dir Shell_services.complete
+    RPC_directory.register1 dir Shell_services.S.complete
       (fun s () () ->
          Node.RPC.complete node s >>= RPC_answer.return) in
   let dir =
@@ -616,5 +616,5 @@ let build_rpc_directory node =
         Node.RPC.Network.Point.events node point |> RPC_answer.return in
     RPC_directory.register1 dir P2p_services.Points.S.events implementation in
   let dir =
-    RPC_directory.register_describe_directory_service dir Shell_services.describe in
+    RPC_directory.register_describe_directory_service dir Shell_services.S.describe in
   dir

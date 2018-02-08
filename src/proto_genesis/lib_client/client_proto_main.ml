@@ -32,7 +32,7 @@ let bake rpc_config ?(timestamp = Time.now ()) block command sk =
     Data_encoding.Binary.to_bytes Block_header.encoding
       { shell = shell_header ; proto = proto_header } in
   Client_keys.append sk blk >>=? fun signed_blk ->
-  Client_node_rpcs.inject_block rpc_config signed_blk []
+  Shell_services.inject_block rpc_config signed_blk []
 
 let int64_parameter =
   (Cli_entries.parameter (fun _ p ->
