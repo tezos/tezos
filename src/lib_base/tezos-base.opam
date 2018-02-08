@@ -16,8 +16,9 @@ depends: [
   "tezos-error-monad"
   "tezos-micheline"
   "tezos-rpc"
-  "ezjsonm" { >= "0.5.0" }
   "calendar"
+  "ezjsonm" { >= "0.5.0" }
+  "ipaddr"
   "mtime" { >= "1.0.0" }
 ]
 build: [

@@ -25,6 +25,7 @@
   (public_name tezos-protocol-compiler)
   (libraries (tezos-base
               tezos-protocol-environment-sigs
+              tezos-stdlib-lwt
               compiler-libs
               lwt.unix
               ocplib-endian
@@ -32,7 +33,8 @@
               unix))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
-                    -open Tezos_base__TzPervasives))
+                    -open Tezos_base__TzPervasives
+                    -open Tezos_stdlib_lwt))
   (modules (Embedded_cmis Packer Compiler))))
 
 (library
@@ -79,9 +81,11 @@
  ((name main_embedded_packer)
   (public_name tezos-embedded-protocol-packer)
   (modes (native))
-  (libraries (tezos-base))
+  (libraries (tezos-base
+              tezos-stdlib-lwt))
   (flags (:standard -linkall
-                    -open Tezos_base__TzPervasives))
+                    -open Tezos_base__TzPervasives
+                    -open Tezos_stdlib_lwt))
   (modules (Main_embedded_packer))))
 
 (install

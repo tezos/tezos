@@ -4,13 +4,9 @@
  ((name tezos_stdlib_lwt)
   (public_name tezos-stdlib-lwt)
   (flags (:standard -w -9-30
-                    -open Tezos_stdlib
-                    -open Tezos_data_encoding
-                    -open Tezos_error_monad
+                    -open Tezos_base__TzPervasives
                     -safe-string))
-  (libraries (tezos-stdlib
-              tezos-data-encoding
-              tezos-error-monad
+  (libraries (tezos-base
               lwt.unix
               ipaddr.unix
               str))))

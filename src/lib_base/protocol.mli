@@ -40,6 +40,3 @@ module Meta: sig
   val encoding: t Data_encoding.t
 
 end
-
-val read_dir: string -> Protocol_hash.t * t
-val write_dir: string -> ?hash:Protocol_hash.t -> t -> unit Lwt.t

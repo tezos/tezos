@@ -60,23 +60,26 @@ module Raw = struct
     let plugin_file = datadir // Protocol_hash.to_short_b58check hash //
                       Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp hash
     in
-    Protocol.write_dir source_dir ~hash p >>= fun () ->
-    let compiler_command =
-      (Sys.executable_name,
-       Array.of_list [compiler_name; "-register"; plugin_file; source_dir]) in
-    let fd = Unix.(openfile log_file [O_WRONLY; O_CREAT; O_TRUNC] 0o644) in
-    let pi =
+    begin
+      Lwt_utils_unix.Protocol.write_dir source_dir ~hash p >>=? fun () ->
+      let compiler_command =
+        (Sys.executable_name,
+         Array.of_list [compiler_name; "-register"; plugin_file; source_dir]) in
+      let fd = Unix.(openfile log_file [O_WRONLY; O_CREAT; O_TRUNC] 0o644) in
       Lwt_process.exec
         ~stdin:`Close ~stdout:(`FD_copy fd) ~stderr:(`FD_move fd)
-        compiler_command in
-    pi >>= function
-    | Unix.WSIGNALED _ | Unix.WSTOPPED _ ->
+        compiler_command >>= return
+    end >>= function
+    | Error err ->
+        log_error "Error %a" pp_print_error err ;
+        Lwt.return false
+    | Ok (Unix.WSIGNALED _ | Unix.WSTOPPED _) ->
         log_error "INTERRUPTED COMPILATION (%s)" log_file;
         Lwt.return false
-    | Unix.WEXITED x when x <> 0 ->
+    | Ok (Unix.WEXITED x) when x <> 0 ->
         log_error "COMPILATION ERROR (%s)" log_file;
         Lwt.return false
-    | Unix.WEXITED _ ->
+    | Ok (Unix.WEXITED _) ->
         try Dynlink.loadfile_private plugin_file; Lwt.return true
         with Dynlink.Error err ->
           log_error "Can't load plugin: %s (%s)"

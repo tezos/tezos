@@ -5,7 +5,6 @@
   (public_name tezos-base)
   (flags (:standard -w -30
                     -open Tezos_stdlib
-                    -open Tezos_stdlib_lwt
                     -open Tezos_crypto
                     -open Tezos_data_encoding
                     -open Tezos_error_monad
@@ -13,7 +12,6 @@
                     -open Tezos_micheline
                     -safe-string))
   (libraries (tezos-stdlib
-              tezos-stdlib-lwt
               tezos-crypto
               tezos-data-encoding
               tezos-error-monad
@@ -21,7 +19,9 @@
               tezos-micheline
               calendar
               ezjsonm
-              mtime.clock.os))))
+              lwt.unix
+              mtime.clock.os
+              ipaddr.unix))))
 
 (alias
  ((name runtest_indent)

@@ -177,7 +177,12 @@ let main { compile_ml ; pack_objects ; link_shared } =
         at_exit (fun () -> Lwt_main.run (Lwt_utils_unix.remove_dir dir)) ;
         dir
     | Some dir -> dir in
-  let hash, protocol = Protocol.read_dir source_dir in
+  let hash, protocol =
+    match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir source_dir) with
+    | Ok v -> v
+    | Error err ->
+        Format.kasprintf Pervasives.failwith
+          "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err in
   Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 build_dir) ;
   Lwt_main.run (Lwt_utils_unix.create_dir ~perm:0o755 (Filename.dirname output)) ;
   (* Generate the 'functor' *)

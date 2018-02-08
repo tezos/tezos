@@ -8,7 +8,6 @@
 (**************************************************************************)
 
 include Tezos_stdlib
-include Tezos_stdlib_lwt
 include Tezos_data_encoding
 include Tezos_error_monad
 include Tezos_rpc

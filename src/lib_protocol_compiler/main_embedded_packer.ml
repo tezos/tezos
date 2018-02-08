@@ -10,7 +10,12 @@
 let srcdir = Sys.argv.(1)
 let version = Sys.argv.(2)
 
-let hash, sources = Protocol.read_dir srcdir
+let hash, sources =
+  match Lwt_main.run (Lwt_utils_unix.Protocol.read_dir srcdir) with
+  | Ok v -> v
+  | Error err ->
+      Format.kasprintf Pervasives.failwith
+        "Failed to read TEZOS_PROTOCOL: %a" pp_print_error err
 
 let () =
   Format.printf {|
