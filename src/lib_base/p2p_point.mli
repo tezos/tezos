@@ -23,6 +23,7 @@ module Id : sig
   val is_global : t -> bool
   val parse_addr_port : string -> string * string
 
+  val rpc_arg : t RPC_arg.t
 end
 
 module Map : Map.S with type key = Id.t

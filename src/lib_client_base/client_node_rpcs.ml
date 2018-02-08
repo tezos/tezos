@@ -57,19 +57,3 @@ module Protocols = struct
       { contents; monitor = Some false }
 
 end
-
-module Network = struct
-
-  let stat cctxt =
-    call_service0 cctxt P2p_services.stat ()
-
-  let connections cctxt =
-    call_service0 cctxt P2p_services.Connection.list ()
-
-  let peers cctxt =
-    call_service0 cctxt P2p_services.Peer_id.list []
-
-  let points cctxt =
-    call_service0 cctxt P2p_services.Point.list []
-
-end

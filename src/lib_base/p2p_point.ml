@@ -93,6 +93,14 @@ module Id = struct
   let encoding =
     Data_encoding.conv to_string of_string_exn Data_encoding.string
 
+  let rpc_arg =
+    RPC_arg.make
+      ~name:"point"
+      ~descr:"A network point (ipv4:port or [ipv6]:port)."
+      ~destruct:of_string
+      ~construct:to_string
+      ()
+
 end
 
 module Map = Map.Make (Id)

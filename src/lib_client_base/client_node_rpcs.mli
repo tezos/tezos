@@ -54,22 +54,6 @@ end
 val bootstrapped:
   #Client_rpcs.ctxt -> (Block_hash.t * Time.t) Lwt_stream.t tzresult Lwt.t
 
-module Network : sig
-
-  val stat:
-    #Client_rpcs.ctxt -> P2p_stat.t tzresult Lwt.t
-
-  val connections:
-    #Client_rpcs.ctxt -> P2p_connection.Info.t list tzresult Lwt.t
-
-  val peers:
-    #Client_rpcs.ctxt -> (P2p_peer.Id.t * P2p_peer.Info.t) list tzresult Lwt.t
-
-  val points:
-    #Client_rpcs.ctxt -> (P2p_point.Id.t * P2p_point.Info.t) list tzresult Lwt.t
-
-end
-
 val complete:
   #Client_rpcs.ctxt ->
   ?block:Block_services.block -> string -> string list tzresult Lwt.t

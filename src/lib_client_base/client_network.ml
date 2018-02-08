@@ -16,10 +16,10 @@ let commands () = [
   command ~group ~desc: "show global network status"
     no_options
     (prefixes ["network" ; "stat"] stop) begin fun () (cctxt : Client_commands.full_context) ->
-    Client_node_rpcs.Network.stat cctxt >>=? fun stat ->
-    Client_node_rpcs.Network.connections cctxt >>=? fun conns ->
-    Client_node_rpcs.Network.peers cctxt >>=? fun peers ->
-    Client_node_rpcs.Network.points cctxt >>=? fun points ->
+    P2p_services.stat cctxt >>=? fun stat ->
+    P2p_services.Connections.list cctxt >>=? fun conns ->
+    P2p_services.Peers.list cctxt >>=? fun peers ->
+    P2p_services.Points.list cctxt >>=? fun points ->
     cctxt#message "GLOBAL STATS" >>= fun () ->
     cctxt#message "  %a" P2p_stat.pp stat >>= fun () ->
     cctxt#message "CONNECTIONS" >>= fun () ->
