@@ -22,11 +22,3 @@ val display_paragraph: Format.formatter -> string -> unit
 
 (** [finalize f g ] ensures g() called after f(), even if exception raised **)
 val finalize: (unit -> 'a) -> (unit -> unit) -> 'a
-
-(** Return contents of file at given filename. **)
-val read_file: ?bin:bool -> string -> string
-
-(** [write_file p c] writes c to file at path p **)
-val write_file: ?bin:bool -> string -> string -> unit
-
-val mkdir: ?perm:Unix.file_perm -> string -> unit

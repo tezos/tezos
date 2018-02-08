@@ -22,6 +22,7 @@ val write_mbytes:
 
 val remove_dir: string -> unit Lwt.t
 val create_dir: ?perm:int -> string -> unit Lwt.t
+val read_file: string -> string Lwt.t
 val create_file: ?perm:int -> string -> string -> unit Lwt.t
 
 val safe_close: Lwt_unix.file_descr -> unit Lwt.t

@@ -113,7 +113,7 @@ let ensure_data_dir data_dir =
       | [| single |] when single = default_identity_file_name -> write_version ()
       | _ -> check_data_dir_version data_dir
     else begin
-      Utils.mkdir ~perm:0o700 data_dir ;
+      Lwt_utils_unix.create_dir ~perm:0o700 data_dir >>= fun () ->
       write_version ()
     end
   with Sys_error _ | Unix.Unix_error _ ->

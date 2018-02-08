@@ -92,6 +92,13 @@ let create_file ?(perm = 0o644) name content =
   Lwt_unix.write_string fd content 0 (String.length content) >>= fun _ ->
   Lwt_unix.close fd
 
+let read_file fn =
+  Lwt_io.with_file fn ~mode:Input begin fun ch ->
+    Lwt_io.read ch
+  end
+
+
+
 let safe_close fd =
   Lwt.catch
     (fun () -> Lwt_unix.close fd)
@@ -172,16 +179,16 @@ module Protocol = struct
     match Sys.file_exists implementation, Sys.file_exists interface with
     | false, _ -> Pervasives.failwith @@ "Not such file: " ^ implementation
     | true, false ->
-        let implementation = Utils.read_file ~bin:false implementation in
+        read_file implementation >|= fun implementation ->
         { name = module_name; interface = None; implementation }
     | _ ->
-        let interface = Utils.read_file ~bin:false interface in
-        let implementation = Utils.read_file ~bin:false implementation in
+        read_file interface >>= fun interface ->
+        read_file implementation >|= fun implementation ->
         { name = module_name; interface = Some interface; implementation }
 
   let read_dir dir =
     of_file ~dir >>=? fun meta ->
-    let components = List.map (find_component dir) meta.modules in
+    Lwt_list.map_p (find_component dir) meta.modules >>= fun components ->
     let expected_env =
       match meta.expected_env_version with
       | None -> V1

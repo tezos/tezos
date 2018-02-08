@@ -96,9 +96,8 @@ module Cfg_file = struct
     return (from_json json)
 
   let write out cfg =
-    Utils.write_file ~bin:false out
-      (Data_encoding.Json.construct encoding cfg |>
-       Data_encoding.Json.to_string)
+    Lwt_utils_unix.Json.write_file out
+      (Data_encoding.Json.construct encoding cfg)
 
 end
 
@@ -200,24 +199,13 @@ let tls_switch =
     ~parameter:"-tls"
     ~doc:"use TLS to connect to node."
 
-let read_config_file config_file = match
-    Utils.read_file ~bin:false config_file
-    |> Data_encoding.Json.from_string
-  with
-  | exception (Sys_error msg) ->
-      failwith
-        "Can't read the configuration file: %s@,%s"
-        config_file msg
-  | Error msg ->
-      failwith
-        "Can't parse the configuration file: %s@,%s"
-        config_file msg
-  | Ok cfg_json ->
-      try return @@ Cfg_file.from_json cfg_json
-      with exn ->
-        failwith
-          "Can't parse the configuration file: %s@,%a"
-          config_file (fun ppf exn -> Json_encoding.print_error ppf exn) exn
+let read_config_file config_file =
+  Lwt_utils_unix.Json.read_file config_file >>=? fun cfg_json ->
+  try return @@ Cfg_file.from_json cfg_json
+  with exn ->
+    failwith
+      "Can't parse the configuration file: %s@,%a"
+      config_file (fun ppf exn -> Json_encoding.print_error ppf exn) exn
 
 let default_config_file_name = "config"
 
@@ -244,7 +232,7 @@ let commands config_file cfg =
       no_options
       (fixed [ "config" ; "reset" ])
       (fun () _cctxt ->
-         return Cfg_file.(write config_file default)) ;
+         Cfg_file.(write config_file default)) ;
 
     command ~group
       ~desc:"Update the config based on the current cli values.\n\
@@ -255,7 +243,7 @@ let commands config_file cfg =
       no_options
       (fixed [ "config" ; "update" ])
       (fun () _cctxt ->
-         return Cfg_file.(write config_file cfg)) ;
+         Cfg_file.(write config_file cfg)) ;
 
     command ~group
       ~desc:"Create a config file based on the current CLI values.\n\
@@ -278,7 +266,7 @@ let commands config_file cfg =
       (fixed [ "config" ; "init" ])
       (fun config_file _cctxt ->
          if not (Sys.file_exists config_file)
-         then return Cfg_file.(write config_file cfg) (* Should be default or command would have failed *)
+         then Cfg_file.(write config_file cfg) (* Should be default or command would have failed *)
          else failwith "Config file already exists at location") ;
   ]
 
@@ -310,8 +298,9 @@ let parse_config_args (ctx : Client_commands.full_context) argv =
   begin match base_dir with
     | None ->
         let base_dir = Client_commands.default_base_dir in
-        if not (Sys.file_exists base_dir)
-        then Utils.mkdir base_dir ;
+        unless (Sys.file_exists base_dir) begin fun () ->
+          Lwt_utils_unix.create_dir base_dir >>= return
+        end >>=? fun () ->
         return base_dir
     | Some dir ->
         if not (Sys.file_exists dir)
@@ -338,7 +327,7 @@ let parse_config_args (ctx : Client_commands.full_context) argv =
       return { Cfg_file.default with base_dir = base_dir }
     else
       read_config_file config_file
-  end >>|? fun cfg ->
+  end >>=? fun cfg ->
   let tls = cfg.tls || tls in
   let node_addr = Option.unopt ~default:cfg.node_addr node_addr in
   let node_port = Option.unopt ~default:cfg.node_port node_port in
@@ -351,5 +340,8 @@ let parse_config_args (ctx : Client_commands.full_context) argv =
     Format.eprintf "%s is not a directory.@." config_dir ;
     exit 1 ;
   end ;
-  Utils.mkdir config_dir ;
-  (cfg, { block ; print_timings = timings ; log_requests ; protocol }, commands config_file cfg, remaining)
+  Lwt_utils_unix.create_dir config_dir >>= fun () ->
+  return
+    (cfg,
+     { block ; print_timings = timings ; log_requests ; protocol },
+     commands config_file cfg, remaining)
