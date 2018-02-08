@@ -36,7 +36,7 @@ and tls = {
 }
 
 and log = {
-  output : Logging.Output.t ;
+  output : Logging_unix.Output.t ;
   default_level : Logging.level ;
   rules : string option ;
   template : Logging.template ;
@@ -72,7 +72,7 @@ val update:
   ?cors_origins:string list ->
   ?cors_headers:string list ->
   ?rpc_tls:tls ->
-  ?log_output:Logging.Output.t ->
+  ?log_output:Logging_unix.Output.t ->
   ?bootstrap_threshold:int ->
   t -> t tzresult Lwt.t
 

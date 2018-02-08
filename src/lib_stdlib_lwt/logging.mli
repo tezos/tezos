@@ -67,25 +67,4 @@ type level = Lwt_log_core.level =
 type template = Lwt_log.template
 val default_template : template
 
-val level_encoding : level Data_encoding.t
-
-module Output : sig
-  type t =
-    | Null
-    | Stdout
-    | Stderr
-    | File of string
-    | Syslog of Lwt_log.syslog_facility
-
-  val encoding : t Data_encoding.t
-  val of_string : string -> t option
-  val to_string : t -> string
-  val pp : Format.formatter -> t -> unit
-end
-
-
-val init: ?template:template -> Output.t -> unit Lwt.t
-
-val close: unit -> unit Lwt.t
-
-val sections : string list ref
+val sections: string list ref

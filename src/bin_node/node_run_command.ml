@@ -88,7 +88,7 @@ let init_logger ?verbosity (log_config : Node_config_file.log) =
             exit 1
         end
   end ;
-  Logging.init ~template:log_config.template log_config.output
+  Logging_unix.init ~template:log_config.template log_config.output
 
 let init_node ?sandbox (config : Node_config_file.t) =
   let patch_context json ctxt =
@@ -243,7 +243,7 @@ let run ?verbosity ?sandbox (config : Node_config_file.t) =
   lwt_log_notice "Shutting down the RPC server..." >>= fun () ->
   Lwt_utils.may ~f:RPC_server.shutdown rpc >>= fun () ->
   lwt_log_notice "BYE (%d)" x >>= fun () ->
-  Logging.close () >>= fun () ->
+  Logging_unix.close () >>= fun () ->
   return ()
 
 let process sandbox verbosity args =

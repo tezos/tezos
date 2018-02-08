@@ -46,7 +46,7 @@ and tls = {
 }
 
 and log = {
-  output : Logging.Output.t ;
+  output : Logging_unix.Output.t ;
   default_level : Logging.level ;
   rules : string option ;
   template : Logging.template ;
@@ -274,6 +274,27 @@ let rpc : rpc Data_encoding.t =
        (opt "crt" string)
        (opt "key" string))
 
+let level_encoding =
+  let open Logging in
+  let open Data_encoding in
+  conv
+    (function
+      | Fatal -> "fatal"
+      | Error -> "error"
+      | Warning -> "warning"
+      | Notice -> "notice"
+      | Info -> "info"
+      | Debug -> "debug")
+    (function
+      | "error" -> Error
+      | "warn" -> Warning
+      | "notice" -> Notice
+      | "info" -> Info
+      | "debug" -> Debug
+      | "fatal" -> Fatal
+      | _ -> invalid_arg "Logging.level")
+    string
+
 let log =
   let open Data_encoding in
   conv
@@ -282,8 +303,8 @@ let log =
     (fun (output, default_level, rules, template) ->
        { output ; default_level ; rules ; template })
     (obj4
-       (dft "output" Logging.Output.encoding default_log.output)
-       (dft "level" Logging.level_encoding default_log.default_level)
+       (dft "output" Logging_unix.Output.encoding default_log.output)
+       (dft "level" level_encoding default_log.default_level)
        (opt "rules" string)
        (dft "template" string default_log.template))
 
@@ -301,7 +322,7 @@ let worker_limits_encoding
        { backlog_size ; backlog_level ; zombie_lifetime ; zombie_memory })
     (obj4
        (dft "worker_backlog_size" uint16 default_size)
-       (dft "worker_backlog_level" Logging.level_encoding default_level)
+       (dft "worker_backlog_level" level_encoding default_level)
        (dft "worker_zombie_lifetime" float default_zombie_lifetime)
        (dft "worker_zombie_memory" float default_zombie_memory))
 

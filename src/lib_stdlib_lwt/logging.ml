@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Lwt.Infix
-
 module type LOG = sig
 
   val debug: ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -28,21 +26,21 @@ module type LOG = sig
 end
 
 let log_f
-    ?exn ?(section = Lwt_log.Section.main) ?location ?logger ~level format =
-  if level < Lwt_log.Section.level section then
+    ?exn ?(section = Lwt_log_core.Section.main) ?location ?logger ~level format =
+  if level < Lwt_log_core.Section.level section then
     Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter format
   else
     Format.kasprintf
-      (fun msg -> Lwt_log.log ?exn ~section ?location ?logger ~level msg)
+      (fun msg -> Lwt_log_core.log ?exn ~section ?location ?logger ~level msg)
       format
 
 let ign_log_f
-    ?exn ?(section = Lwt_log.Section.main) ?location ?logger ~level format =
-  if level < Lwt_log.Section.level section then
+    ?exn ?(section = Lwt_log_core.Section.main) ?location ?logger ~level format =
+  if level < Lwt_log_core.Section.level section then
     Format.ikfprintf (fun _ -> ()) Format.std_formatter format
   else
     Format.kasprintf
-      (fun msg -> Lwt_log.ign_log ?exn ~section ?location ?logger ~level msg)
+      (fun msg -> Lwt_log_core.ign_log ?exn ~section ?location ?logger ~level msg)
       format
 
 let sections = ref []
@@ -50,21 +48,21 @@ let sections = ref []
 module Make(S : sig val name: string end) : LOG = struct
 
   let () = sections := S.name :: !sections
-  let section = Lwt_log.Section.make S.name
+  let section = Lwt_log_core.Section.make S.name
 
-  let debug fmt = ign_log_f ~section ~level:Lwt_log.Debug fmt
-  let log_info fmt = ign_log_f ~section ~level:Lwt_log.Info fmt
-  let log_notice fmt = ign_log_f ~section ~level:Lwt_log.Notice fmt
-  let warn fmt = ign_log_f ~section ~level:Lwt_log.Warning fmt
-  let log_error fmt = ign_log_f ~section ~level:Lwt_log.Error fmt
-  let fatal_error fmt = ign_log_f ~section ~level:Lwt_log.Fatal fmt
+  let debug fmt = ign_log_f ~section ~level:Lwt_log_core.Debug fmt
+  let log_info fmt = ign_log_f ~section ~level:Lwt_log_core.Info fmt
+  let log_notice fmt = ign_log_f ~section ~level:Lwt_log_core.Notice fmt
+  let warn fmt = ign_log_f ~section ~level:Lwt_log_core.Warning fmt
+  let log_error fmt = ign_log_f ~section ~level:Lwt_log_core.Error fmt
+  let fatal_error fmt = ign_log_f ~section ~level:Lwt_log_core.Fatal fmt
 
-  let lwt_debug fmt = log_f ~section ~level:Lwt_log.Debug fmt
-  let lwt_log_info fmt = log_f ~section ~level:Lwt_log.Info fmt
-  let lwt_log_notice fmt = log_f ~section ~level:Lwt_log.Notice fmt
-  let lwt_warn fmt = log_f ~section ~level:Lwt_log.Warning fmt
-  let lwt_log_error fmt = log_f ~section ~level:Lwt_log.Error fmt
-  let lwt_fatal_error fmt = log_f ~section ~level:Lwt_log.Fatal fmt
+  let lwt_debug fmt = log_f ~section ~level:Lwt_log_core.Debug fmt
+  let lwt_log_info fmt = log_f ~section ~level:Lwt_log_core.Info fmt
+  let lwt_log_notice fmt = log_f ~section ~level:Lwt_log_core.Notice fmt
+  let lwt_warn fmt = log_f ~section ~level:Lwt_log_core.Warning fmt
+  let lwt_log_error fmt = log_f ~section ~level:Lwt_log_core.Error fmt
+  let lwt_fatal_error fmt = log_f ~section ~level:Lwt_log_core.Fatal fmt
 
 end
 
@@ -89,122 +87,6 @@ module Client = struct
   module Denunciation = Make(struct let name = "client.denunciation" end)
 end
 
-type template = Lwt_log.template
-let default_template = "$(date) - $(section): $(message)"
-
-module Output = struct
-
-  type t =
-    | Null
-    | Stdout
-    | Stderr
-    | File of string
-    | Syslog of Lwt_log.syslog_facility
-
-  let to_string : t -> string = function
-    | Null -> "/dev/null"
-    | Stdout -> "stdout"
-    | Stderr -> "stderr"
-    | File fp -> fp
-    | Syslog `Auth -> "syslog:auth"
-    | Syslog `Authpriv -> "syslog:authpriv"
-    | Syslog `Cron -> "syslog:cron"
-    | Syslog `Daemon -> "syslog:daemon"
-    | Syslog `FTP -> "syslog:ftp"
-    | Syslog `Kernel -> "syslog:kernel"
-    | Syslog `Local0 -> "syslog:local0"
-    | Syslog `Local1 -> "syslog:local1"
-    | Syslog `Local2 -> "syslog:local2"
-    | Syslog `Local3 -> "syslog:local3"
-    | Syslog `Local4 -> "syslog:local4"
-    | Syslog `Local5 -> "syslog:local5"
-    | Syslog `Local6 -> "syslog:local6"
-    | Syslog `Local7 -> "syslog:local7"
-    | Syslog `LPR -> "syslog:lpr"
-    | Syslog `Mail -> "syslog:mail"
-    | Syslog `News -> "syslog:news"
-    | Syslog `Syslog -> "syslog:syslog"
-    | Syslog `User -> "syslog:user"
-    | Syslog `UUCP -> "syslog:uucp"
-    | Syslog `NTP -> "syslog:ntp"
-    | Syslog `Security -> "syslog:security"
-    | Syslog `Console -> "syslog:console"
-
-  let of_string : string -> t = function
-    | "/dev/null" | "null" -> Null
-    | "stdout" -> Stdout
-    | "stderr" -> Stderr
-    | "syslog:auth" -> Syslog `Auth
-    | "syslog:authpriv" -> Syslog `Authpriv
-    | "syslog:cron" -> Syslog `Cron
-    | "syslog:daemon" -> Syslog `Daemon
-    | "syslog:ftp" -> Syslog `FTP
-    | "syslog:kernel" -> Syslog `Kernel
-    | "syslog:local0" -> Syslog `Local0
-    | "syslog:local1" -> Syslog `Local1
-    | "syslog:local2" -> Syslog `Local2
-    | "syslog:local3" -> Syslog `Local3
-    | "syslog:local4" -> Syslog `Local4
-    | "syslog:local5" -> Syslog `Local5
-    | "syslog:local6" -> Syslog `Local6
-    | "syslog:local7" -> Syslog `Local7
-    | "syslog:lpr" -> Syslog `LPR
-    | "syslog:mail" -> Syslog `Mail
-    | "syslog:news" -> Syslog `News
-    | "syslog:syslog" -> Syslog `Syslog
-    | "syslog:user" -> Syslog `User
-    | "syslog:uucp" -> Syslog `UUCP
-    | "syslog:ntp" -> Syslog `NTP
-    | "syslog:security" -> Syslog `Security
-    | "syslog:console" -> Syslog `Console
-    (* | s when start_with "syslog:" FIXME error or warning. *)
-    | fp ->
-        (* TODO check absolute path *)
-        File fp
-
-  let encoding =
-    let open Data_encoding in
-    conv to_string of_string string
-
-  let of_string str =
-    try
-      Some (Data_encoding.Json.destruct encoding (`String str))
-    with _ -> None
-
-  let to_string output =
-    match Data_encoding.Json.construct encoding output with
-    | `String res -> res
-    | #Data_encoding.json -> assert false
-
-  let pp fmt output =
-    Format.fprintf fmt "%s" (to_string output)
-end
-
-let init ?(template = default_template) output =
-  let open Output in
-  begin
-    match output with
-    | Stderr ->
-        Lwt.return @@
-        Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stderr ()
-    | Stdout ->
-        Lwt.return @@
-        Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stdout ()
-    | File file_name ->
-        Lwt_log.file ~file_name ~template ()
-    | Null ->
-        Lwt.return @@
-        Lwt_log.null
-    | Syslog facility ->
-        Lwt.return @@
-        Lwt_log.syslog ~template ~facility ()
-  end >>= fun logger ->
-  Lwt_log.default := logger ;
-  Lwt.return_unit
-
-let close () =
-  Lwt_log.close !Lwt_log.default
-
 type level = Lwt_log_core.level =
   | Debug
   (** Debugging message. They can be automatically removed by the
@@ -221,22 +103,5 @@ type level = Lwt_log_core.level =
       program. *)
   | Fatal
 
-let level_encoding =
-  let open Data_encoding in
-  conv
-    (function
-      | Fatal -> "fatal"
-      | Error -> "error"
-      | Warning -> "warning"
-      | Notice -> "notice"
-      | Info -> "info"
-      | Debug -> "debug")
-    (function
-      | "error" -> Error
-      | "warn" -> Warning
-      | "notice" -> Notice
-      | "info" -> Info
-      | "debug" -> Debug
-      | "fatal" -> Fatal
-      | _ -> invalid_arg "Logging.level")
-    string
+type template = Lwt_log_core.template
+let default_template = "$(date) - $(section): $(message)"
