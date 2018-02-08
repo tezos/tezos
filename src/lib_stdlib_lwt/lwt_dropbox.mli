@@ -26,7 +26,7 @@ val take: 'a t -> 'a Lwt.t
     The elements is removed from the dropbox. The function might return
     [Closed] if the dropbox is empty and closed. *)
 
-val take_with_timeout: float -> 'a t -> 'a option Lwt.t
+val take_with_timeout: unit Lwt.t -> 'a t -> 'a option Lwt.t
 (** Like [take] except that it returns [None] after [timeout seconds]
     if the dropbox is still empty. *)
 

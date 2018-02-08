@@ -196,7 +196,8 @@ module Make
             Lwt_dropbox.take message_box >>= fun m ->
             return (Some m)
         | Some timeout ->
-            Lwt_dropbox.take_with_timeout timeout message_box >>= fun m ->
+            Lwt_dropbox.take_with_timeout
+              (Lwt_unix.sleep timeout) message_box >>= fun m ->
             return m
 
   let trigger_shutdown w =

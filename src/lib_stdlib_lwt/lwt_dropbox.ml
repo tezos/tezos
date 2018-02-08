@@ -88,6 +88,3 @@ let rec take_with_timeout timeout dropbox =
           take_with_timeout timeout dropbox
       else
         Lwt.return_none
-
-let take_with_timeout timeout dropbox =
-  take_with_timeout (Lwt_unix.sleep timeout) dropbox
