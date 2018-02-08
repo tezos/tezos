@@ -144,9 +144,6 @@ let rec pop_with_timeout timeout q =
   else
     Lwt.return_none
 
-let pop_with_timeout timeout q =
-  pop_with_timeout (Lwt_unix.sleep timeout) q
-
 let rec peek ({ closed ; queue ; _ } as q) =
   if not (Queue.is_empty queue) then
     let (_elt_size, elt) = Queue.peek queue in

@@ -184,7 +184,8 @@ module Make
           Lwt_pipe.pop message_queue >>= fun m ->
           return (Some m)
       | Some timeout ->
-          Lwt_pipe.pop_with_timeout timeout message_queue >>= fun m ->
+          Lwt_pipe.pop_with_timeout
+            (Lwt_unix.sleep timeout) message_queue >>= fun m ->
           return m in
     match w.buffer with
     | Queue_buffer message_queue -> pop_queue message_queue

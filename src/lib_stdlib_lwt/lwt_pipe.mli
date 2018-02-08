@@ -29,7 +29,7 @@ val pop : 'a t -> 'a Lwt.t
 (** [pop q] is a thread that blocks while [q] is empty, then
     removes and returns the first element in [q]. *)
 
-val pop_with_timeout : float -> 'a t -> 'a option Lwt.t
+val pop_with_timeout : unit Lwt.t -> 'a t -> 'a option Lwt.t
 (** [pop t q] is a thread that blocks while [q] is empty, then
     removes and returns the first element [v] in [q] and
     to return [Some v], unless no message could be popped
