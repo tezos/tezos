@@ -13,7 +13,7 @@ let cctxt ~base_dir ~block rpc_config =
   Client_commands.make_context ~base_dir ~block ~rpc_config (Client_commands.default_log ~base_dir)
 
 let get_commands_for_version ctxt block protocol =
-  Client_node_rpcs.Blocks.protocol ctxt block >>= function
+  Block_services.protocol ctxt block >>= function
   | Ok version -> begin
       match protocol with
       | None ->

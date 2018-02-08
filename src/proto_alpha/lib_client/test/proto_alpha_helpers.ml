@@ -235,7 +235,7 @@ module Protocol = struct
     Client_proto_rpcs.Context.voting_period_kind (new Client_rpcs.http_ctxt !rpc_config) block
 
   let proposals ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) proposals =
-    Client_node_rpcs.Blocks.info (new Client_rpcs.http_ctxt !rpc_config) block >>=? fun block_info ->
+    Block_services.info (new Client_rpcs.http_ctxt !rpc_config) block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level (new Client_rpcs.http_ctxt !rpc_config) block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.proposals (new Client_rpcs.http_ctxt !rpc_config) block
       ~branch:block_info.hash
@@ -248,7 +248,7 @@ module Protocol = struct
 
   let ballot ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
     let rpc = new Client_rpcs.http_ctxt !rpc_config in
-    Client_node_rpcs.Blocks.info rpc block >>=? fun block_info ->
+    Block_services.info rpc block >>=? fun block_info ->
     Client_proto_rpcs.Context.next_level rpc block >>=? fun next_level ->
     Client_proto_rpcs.Helpers.Forge.Delegate.ballot rpc block
       ~branch:block_info.hash
@@ -388,7 +388,7 @@ module Assert = struct
     end
 
   let check_protocol ?msg ~block h =
-    Client_node_rpcs.Blocks.protocol (new Client_rpcs.http_ctxt !rpc_config) block >>=? fun block_proto ->
+    Block_services.protocol (new Client_rpcs.http_ctxt !rpc_config) block >>=? fun block_proto ->
     return @@ Assert.equal
       ?msg:(Assert.format_msg msg)
       ~prn:Protocol_hash.to_b58check
@@ -445,7 +445,7 @@ module Endorse = struct
       slot =
     let block = Client_rpcs.last_baked_block block in
     let rpc = new Client_rpcs.http_ctxt !rpc_config in
-    Client_node_rpcs.Blocks.info rpc block >>=? fun { hash ; _ } ->
+    Block_services.info rpc block >>=? fun { hash ; _ } ->
     Client_proto_rpcs.Helpers.Forge.Delegate.endorsement rpc
       block
       ~branch:hash

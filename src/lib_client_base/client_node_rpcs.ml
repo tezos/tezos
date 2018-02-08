@@ -39,97 +39,12 @@ let complete cctxt ?block prefix =
   | None ->
       call_service1 cctxt Shell_services.complete prefix ()
   | Some block ->
-      call_service2 cctxt Block_services.complete block prefix ()
+      Block_services.complete cctxt block prefix
 
 let describe cctxt ?(recurse = true) path =
   Client_rpcs.call_service cctxt
     Shell_services.describe
     ((), path) { recurse } ()
-
-module Blocks = struct
-
-  type block = Block_services.block
-
-  type block_info = Block_services.block_info = {
-    hash: Block_hash.t ;
-    net_id: Net_id.t ;
-    level: Int32.t ;
-    proto_level: int ; (* uint8 *)
-    predecessor: Block_hash.t ;
-    timestamp: Time.t ;
-    validation_passes: int ; (* uint8 *)
-    operations_hash: Operation_list_list_hash.t ;
-    fitness: MBytes.t list ;
-    context: Context_hash.t ;
-    data: MBytes.t ;
-    operations: (Operation_hash.t * Operation.t) list list option ;
-    protocol: Protocol_hash.t ;
-    test_network: Test_network_status.t;
-  }
-  type preapply_param = Block_services.preapply_param = {
-    timestamp: Time.t ;
-    proto_header: MBytes.t ;
-    operations: Operation.t list list ;
-    sort_operations: bool ;
-  }
-  type preapply_result = Block_services.preapply_result = {
-    shell_header: Block_header.shell_header ;
-    operations: error Preapply_result.t list ;
-  }
-  let net_id cctxt h =
-    call_service1 cctxt Block_services.net_id h ()
-  let level cctxt h =
-    call_service1 cctxt Block_services.level h ()
-  let predecessor cctxt h =
-    call_service1 cctxt Block_services.predecessor h ()
-  let predecessors cctxt h l =
-    call_service1 cctxt Block_services.predecessors h l
-  let hash cctxt h =
-    call_service1 cctxt Block_services.hash h ()
-  let timestamp cctxt h =
-    call_service1 cctxt Block_services.timestamp h ()
-  let fitness cctxt h =
-    call_service1 cctxt Block_services.fitness h ()
-  let operations cctxt ?(contents = false) h =
-    call_service1 cctxt Block_services.operations h
-      { contents ; monitor = false }
-  let protocol cctxt h =
-    call_service1 cctxt Block_services.protocol h ()
-  let test_network cctxt h =
-    call_service1 cctxt Block_services.test_network h ()
-
-  let preapply cctxt h
-      ?(timestamp = Time.now ()) ?(sort = false) ~proto_header operations =
-    call_err_service1
-      cctxt Block_services.preapply h
-      { timestamp ; proto_header ; sort_operations = sort ; operations }
-  let pending_operations cctxt block =
-    call_service1 cctxt Block_services.pending_operations block ()
-  let info cctxt ?(include_ops = true) h =
-    call_service1 cctxt Block_services.info h include_ops
-  let complete cctxt block prefix =
-    call_service2 cctxt Block_services.complete block prefix ()
-  let list cctxt ?(include_ops = false)
-      ?length ?heads ?delay ?min_date ?min_heads () =
-    call_service0 cctxt Block_services.list
-      { include_ops ; length ; heads ; monitor = Some false ; delay ;
-        min_date ; min_heads }
-  let monitor cctxt ?(include_ops = false)
-      ?length ?heads ?delay ?min_date ?min_heads () =
-    call_streamed_service0 cctxt Block_services.list
-      { include_ops ; length ; heads ; monitor = Some true ; delay ;
-        min_date ; min_heads }
-
-end
-
-module Operations = struct
-
-  let monitor cctxt ?(contents = false) () =
-    call_streamed_service1 cctxt Block_services.operations
-      `Prevalidation
-      { contents ; monitor = true }
-
-end
 
 module Protocols = struct
 

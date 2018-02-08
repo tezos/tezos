@@ -22,18 +22,7 @@ class type json_ctxt = object
     (Data_encoding.json, Data_encoding.json option) RPC_client.rest_result Lwt.t
 end
 
-class type service_ctxt = object
-  method call_service :
-    'm 'p 'q 'i 'o 'e.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
-    'p -> 'q -> 'i -> 'o tzresult Lwt.t
-  method call_streamed_service :
-    'm 'p 'q 'i 'o 'e.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
-    on_chunk: ('o -> unit) ->
-    on_close: (unit -> unit) ->
-    'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t
-end
+class type service_ctxt = RPC_context.t
 
 class type ctxt = object
   inherit json_ctxt

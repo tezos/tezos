@@ -42,65 +42,65 @@ let register_bi_dir node dir =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return (filter_bi include_ops bi) in
     RPC_directory.register1 dir
-      Block_services.info implementation in
+      Block_services.S.info implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.hash in
     RPC_directory.register1 dir
-      Block_services.hash
+      Block_services.S.hash
       implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.net_id in
     RPC_directory.register1 dir
-      Block_services.net_id implementation in
+      Block_services.S.net_id implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.level in
     RPC_directory.register1 dir
-      Block_services.level implementation in
+      Block_services.S.level implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.predecessor in
     RPC_directory.register1 dir
-      Block_services.predecessor implementation in
+      Block_services.S.predecessor implementation in
   let dir =
     let implementation b () len =
       Node.RPC.block_info node b >>= fun bi ->
       Node.RPC.predecessors node len bi.hash >>= fun hashes ->
       RPC_answer.return hashes in
     RPC_directory.register1 dir
-      Block_services.predecessors implementation in
+      Block_services.S.predecessors implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.fitness in
     RPC_directory.register1 dir
-      Block_services.fitness implementation in
+      Block_services.S.fitness implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.timestamp in
     RPC_directory.register1 dir
-      Block_services.timestamp implementation in
+      Block_services.S.timestamp implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.protocol in
     RPC_directory.register1 dir
-      Block_services.protocol implementation in
+      Block_services.S.protocol implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
       RPC_answer.return bi.test_network in
     RPC_directory.register1 dir
-      Block_services.test_network implementation in
+      Block_services.S.test_network implementation in
   let dir =
-    let implementation b () { Block_services.contents ; monitor } =
+    let implementation b () { Block_services.S.contents ; monitor } =
       match b with
       | `Prevalidation when monitor ->
           monitor_operations node contents
@@ -115,18 +115,18 @@ let register_bi_dir node dir =
             List.map (List.map (fun h -> h, None)) hashes
     in
     RPC_directory.register1 dir
-      Block_services.operations implementation in
+      Block_services.S.operations implementation in
   let dir =
     let implementation b () () =
       Node.RPC.pending_operations node b >>= fun res ->
       RPC_answer.return res in
     RPC_directory.register1 dir
-      Block_services.pending_operations
+      Block_services.S.pending_operations
       implementation in
   let dir =
     let implementation
         b ()
-        { Block_services.operations ; sort_operations ;
+        { Block_services.S.operations ; sort_operations ;
           timestamp ; proto_header} =
       Node.RPC.preapply node b
         ~timestamp ~proto_header ~sort_operations operations >>= function
@@ -135,7 +135,7 @@ let register_bi_dir node dir =
             (Ok { Block_services.shell_header ; operations })
       | Error _ as err -> RPC_answer.return err in
     RPC_directory.register1 dir
-      Block_services.preapply implementation in
+      Block_services.S.preapply implementation in
   dir
 
 let rec insert_future_block (bi: Block_services.block_info) = function
@@ -236,7 +236,7 @@ let create_delayed_stream
 
 let list_blocks
     node ()
-    { Block_services.include_ops ; length ; heads ; monitor ; delay ;
+    { Block_services.S.include_ops ; length ; heads ; monitor ; delay ;
       min_date; min_heads} =
   let len = match length with None -> 1 | Some x -> x in
   let monitor = match monitor with None -> false | Some x -> x in
@@ -327,7 +327,7 @@ let list_invalid node () () =
   Node.RPC.list_invalid node >>= fun l ->
   RPC_answer.return l
 
-let unmark_invalid node () block =
+let unmark_invalid node block () () =
   Node.RPC.unmark_invalid node block >>= fun x ->
   RPC_answer.return x
 
@@ -370,13 +370,13 @@ let get_protocols node hash () () =
 let build_rpc_directory node =
   let dir = RPC_directory.empty in
   let dir =
-    RPC_directory.register0 dir Block_services.list
+    RPC_directory.register0 dir Block_services.S.list
       (list_blocks node) in
   let dir =
-    RPC_directory.register0 dir Block_services.list_invalid
+    RPC_directory.register0 dir Block_services.S.list_invalid
       (list_invalid node) in
   let dir =
-    RPC_directory.register0 dir Block_services.unmark_invalid
+    RPC_directory.register1 dir Block_services.S.unmark_invalid
       (unmark_invalid node) in
   let dir = register_bi_dir node dir in
   let dir =
@@ -389,7 +389,7 @@ let build_rpc_directory node =
     RPC_directory.register_dynamic_directory1
       ~descr:
         "All the RPCs which are specific to the protocol version."
-      dir Block_services.proto_path implementation in
+      dir Block_services.S.proto_path implementation in
   let dir =
     RPC_directory.register0 dir Protocol_services.list
       (list_protocols node) in
@@ -442,7 +442,7 @@ let build_rpc_directory node =
       (fun s () () ->
          Node.RPC.complete node s >>= RPC_answer.return) in
   let dir =
-    RPC_directory.register2 dir Block_services.complete
+    RPC_directory.register2 dir Block_services.S.complete
       (fun block s () () ->
          Node.RPC.complete node ~block s >>= RPC_answer.return) in
 

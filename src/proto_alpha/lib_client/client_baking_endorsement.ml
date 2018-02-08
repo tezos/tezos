@@ -95,7 +95,7 @@ let inject_endorsement (cctxt : Client_commands.full_context)
     block level ?async
     src_sk source slot =
   let block = Client_rpcs.last_baked_block block in
-  Client_node_rpcs.Blocks.info cctxt block >>=? fun bi ->
+  Block_services.info cctxt block >>=? fun bi ->
   Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt
     block
     ~branch:bi.hash

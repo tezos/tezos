@@ -16,7 +16,7 @@ let inject_seed_nonce_revelation rpc_config block ?async nonces =
       (fun (level, nonce) ->
          Seed_nonce_revelation { level ; nonce }) nonces in
   let block = Client_rpcs.last_baked_block block in
-  Client_node_rpcs.Blocks.info rpc_config block >>=? fun bi ->
+  Block_services.info rpc_config block >>=? fun bi ->
   Client_proto_rpcs.Helpers.Forge.Anonymous.operations rpc_config
     block ~branch:bi.hash operations >>=? fun bytes ->
   Client_node_rpcs.inject_operation
@@ -27,7 +27,7 @@ let inject_seed_nonce_revelation rpc_config block ?async nonces =
 let forge_seed_nonce_revelation
     (cctxt: Client_commands.full_context)
     block nonces =
-  Client_node_rpcs.Blocks.hash cctxt block >>=? fun hash ->
+  Block_services.hash cctxt block >>=? fun hash ->
   match nonces with
   | [] ->
       cctxt#message "No nonce to reveal for block %a"

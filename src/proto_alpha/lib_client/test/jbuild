@@ -8,6 +8,7 @@
           test_vote))
   (libraries (tezos-base
               tezos-rpc-http
+              tezos-shell-services
               tezos-client-base
               tezos-client-genesis
               tezos-client-alpha
@@ -16,6 +17,7 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_test_helpers
                     -open Tezos_rpc_http
+                    -open Tezos_shell_services
                     -open Tezos_client_base
                     -open Tezos_client_genesis
                     -open Tezos_client_alpha))))

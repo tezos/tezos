@@ -22,7 +22,7 @@ type block_info = {
 
 let convert_block_info cctxt
     ( { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol }
-      : Client_node_rpcs.Blocks.block_info ) =
+      : Block_services.block_info ) =
   Client_proto_rpcs.Context.level cctxt (`Hash hash) >>= function
   | Ok level ->
       Lwt.return
@@ -34,12 +34,12 @@ let convert_block_info cctxt
 
 let convert_block_info_err cctxt
     ( { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol }
-      : Client_node_rpcs.Blocks.block_info ) =
+      : Block_services.block_info ) =
   Client_proto_rpcs.Context.level cctxt (`Hash hash) >>=? fun level ->
   return { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol ; level }
 
 let info cctxt ?include_ops block =
-  Client_node_rpcs.Blocks.info cctxt ?include_ops block >>=? fun block ->
+  Block_services.info cctxt ?include_ops block >>=? fun block ->
   convert_block_info_err cctxt block
 
 let compare (bi1 : block_info) (bi2 : block_info) =
@@ -62,9 +62,9 @@ let sort_blocks cctxt ?(compare = compare) blocks =
 let monitor cctxt
     ?include_ops ?length ?heads ?delay
     ?min_date ?min_heads ?compare () =
-  Client_node_rpcs.Blocks.monitor cctxt
+  Block_services.monitor
     ?include_ops ?length ?heads ?delay ?min_date ?min_heads
-    () >>=? fun block_stream ->
+    cctxt >>=? fun (block_stream, _stop) ->
   let convert blocks =
     sort_blocks cctxt ?compare (List.flatten blocks) >>= return in
   return (Lwt_stream.map_s convert block_stream)
@@ -74,12 +74,12 @@ let blocks_from_cycle cctxt block cycle =
   Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
   Client_proto_rpcs.Helpers.levels cctxt block cycle >>=? fun (first, last) ->
   let length = Int32.to_int (Raw_level.diff level.level first) in
-  Client_node_rpcs.Blocks.predecessors cctxt block length >>=? fun blocks ->
+  Block_services.predecessors cctxt block length >>=? fun blocks ->
   let blocks =
     List.remove
       (length - (1 + Int32.to_int (Raw_level.diff last first))) blocks in
   if Raw_level.(level.level = last) then
-    Client_node_rpcs.Blocks.hash cctxt block >>=? fun last ->
+    Block_services.hash cctxt block >>=? fun last ->
     return (last :: blocks)
   else
     return blocks

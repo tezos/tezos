@@ -36,10 +36,9 @@ type content_type = (string * string)
 type raw_content = Cohttp_lwt.Body.t * content_type option
 type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
-type rest_error =
+type rpc_error =
   | Empty_answer
   | Connection_failed of string
-  | Not_found
   | Bad_request of string
   | Method_not_allowed of RPC_service.meth list
   | Unsupported_media_type of string option
@@ -54,12 +53,11 @@ type rest_error =
                             media_type: string ;
                             error: string }
   | OCaml_exception of string
-  | Generic_error (* temporary *)
 
 type error +=
   | Request_failed of { meth: RPC_service.meth ;
                         uri: Uri.t ;
-                        error: rest_error }
+                        error: rpc_error }
 
 val generic_call :
   ?logger:logger ->

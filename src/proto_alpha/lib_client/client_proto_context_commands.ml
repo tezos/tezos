@@ -48,7 +48,7 @@ let commands () =
       no_options
       (fixed [ "get" ; "timestamp" ])
       begin fun () (cctxt : Client_commands.full_context) ->
-        Client_node_rpcs.Blocks.timestamp
+        Block_services.timestamp
           cctxt cctxt#block >>=? fun v ->
         cctxt#message "%s" (Time.to_notation v) >>= fun () ->
         return ()

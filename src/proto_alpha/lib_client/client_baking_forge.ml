@@ -118,7 +118,7 @@ let forge_block cctxt block
   begin
     match operations with
     | None ->
-        Client_node_rpcs.Blocks.pending_operations
+        Block_services.pending_operations
           cctxt block >>=? fun (ops, pendings) ->
         let ops =
           List.map snd @@
@@ -175,7 +175,7 @@ let forge_block cctxt block
   let request = List.length operations in
   let proto_header = forge_faked_proto_header ~priority ~seed_nonce_hash in
   let operations = classify_operations operations in
-  Client_node_rpcs.Blocks.preapply
+  Block_services.preapply
     cctxt block ~timestamp ~sort ~proto_header operations >>=?
   fun { operations = result ; shell_header } ->
   let valid = List.fold_left (fun acc r -> acc + List.length r.Preapply_result.applied) 0 result in
@@ -194,7 +194,7 @@ let forge_block cctxt block
     let operations =
       if not best_effort then operations
       else List.map (fun l -> List.map snd l.Preapply_result.applied) result in
-    Client_node_rpcs.Blocks.info cctxt block >>=? fun {net_id} ->
+    Block_services.info cctxt block >>=? fun {net_id} ->
     inject_block cctxt
       ?force ~net_id ~shell_header ~priority ~seed_nonce_hash ~src_sk
       operations
@@ -477,7 +477,7 @@ let bake (cctxt : Client_commands.full_context) state =
        lwt_debug "Try baking after %a (slot %d) for %s (%a)"
          Block_hash.pp_short bi.hash
          priority name Time.pp_hum timestamp >>= fun () ->
-       Client_node_rpcs.Blocks.pending_operations cctxt
+       Block_services.pending_operations cctxt
          block >>=? fun (res, ops) ->
        let operations =
          List.map snd @@
@@ -487,7 +487,7 @@ let bake (cctxt : Client_commands.full_context) state =
        let request = List.length operations in
        let proto_header =
          forge_faked_proto_header ~priority ~seed_nonce_hash in
-       Client_node_rpcs.Blocks.preapply cctxt block
+       Block_services.preapply cctxt block
          ~timestamp ~sort:true ~proto_header [operations] >>= function
        | Error errs ->
            lwt_log_error "Error while prevalidating operations:\n%a"
@@ -559,7 +559,7 @@ let create
   | None | Some (Ok [] | Error _) ->
       cctxt#error "Can't fetch the current block head."
   | Some (Ok (bi :: _ as initial_heads)) ->
-      Client_node_rpcs.Blocks.hash cctxt `Genesis >>=? fun genesis_hash ->
+      Block_services.hash cctxt `Genesis >>=? fun genesis_hash ->
       let last_get_block = ref None in
       let get_block () =
         match !last_get_block with

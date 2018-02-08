@@ -23,7 +23,7 @@ let rec find_predecessor rpc_config h n =
   if n <= 0 then
     return (`Hash h)
   else
-    Client_node_rpcs.Blocks.predecessor rpc_config (`Hash h) >>=? fun h ->
+    Block_services.predecessor rpc_config (`Hash h) >>=? fun h ->
     find_predecessor rpc_config h (n-1)
 
 let get_branch rpc_config block branch =
@@ -36,7 +36,7 @@ let get_branch rpc_config block branch =
     | `Hash h -> find_predecessor rpc_config h branch
     | `Genesis -> return `Genesis
   end >>=? fun block ->
-  Client_node_rpcs.Blocks.info rpc_config block >>=? fun { net_id ; hash } ->
+  Block_services.info rpc_config block >>=? fun { net_id ; hash } ->
   return (net_id, hash)
 
 let parse_expression arg =
@@ -61,7 +61,7 @@ let transfer rpc_config
     rpc_config block
     ~branch ~source ~sourcePubKey:src_pk ~counter ~amount
     ~destination ?parameters ~fee () >>=? fun bytes ->
-  Client_node_rpcs.Blocks.predecessor rpc_config block >>=? fun predecessor ->
+  Block_services.predecessor rpc_config block >>=? fun predecessor ->
   Client_keys.sign src_sk bytes >>=? fun signature ->
   let signed_bytes =
     MBytes.concat bytes (Ed25519.Signature.to_bytes signature) in
@@ -78,7 +78,7 @@ let originate rpc_config ?net_id ~block ?signature bytes =
     match signature with
     | None -> bytes
     | Some signature -> Ed25519.Signature.concat bytes signature in
-  Client_node_rpcs.Blocks.predecessor rpc_config block >>=? fun predecessor ->
+  Block_services.predecessor rpc_config block >>=? fun predecessor ->
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Client_proto_rpcs.Helpers.apply_operation rpc_config block
     predecessor oph bytes signature >>=? function
@@ -178,7 +178,7 @@ let get_manager (cctxt : Client_commands.full_context) block source =
 
 let dictate rpc_config block command seckey =
   let block = Client_rpcs.last_baked_block block in
-  Client_node_rpcs.Blocks.info
+  Block_services.info
     rpc_config block >>=? fun { net_id ; hash = branch } ->
   Client_proto_rpcs.Helpers.Forge.Dictator.operation
     rpc_config block ~branch command >>=? fun bytes ->

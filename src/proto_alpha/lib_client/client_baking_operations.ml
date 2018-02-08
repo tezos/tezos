@@ -16,7 +16,8 @@ type operation = {
 }
 
 let monitor cctxt ?contents ?check () =
-  Client_node_rpcs.Operations.monitor cctxt ?contents () >>=? fun ops_stream ->
+  Block_services.monitor_prevalidated_operations
+    ?contents cctxt >>=? fun (ops_stream, _) ->
   let convert ops =
     map_s
       (fun (hash, op) ->

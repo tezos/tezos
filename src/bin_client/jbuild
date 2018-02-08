@@ -5,6 +5,7 @@
   (public_names (tezos-client tezos-admin))
   (libraries (tezos-base
               tezos-rpc-http
+              tezos-shell-services
               tezos-client-base
               tezos-client-genesis
               tezos-client-alpha))
@@ -12,6 +13,7 @@
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_rpc_http
+                    -open Tezos_shell_services
                     -open Tezos_client_base
                     -linkall))))
 

@@ -15,7 +15,7 @@ let protocol =
 
 let call_service1 rpc_config s block a1 =
   Client_rpcs.call_service1 rpc_config
-    (s Block_services.proto_path) block a1
+    (s Block_services.S.proto_path) block a1
 
 let call_error_service1 rpc_config s block a1 =
   call_service1 rpc_config s block a1 >>= function
@@ -26,7 +26,7 @@ let call_error_service1 rpc_config s block a1 =
 let bake rpc_config ?(timestamp = Time.now ()) block command sk =
   let block = Client_rpcs.last_baked_block block in
   let proto_header = Data_encoding.Binary.to_bytes Data.Command.encoding command in
-  Client_node_rpcs.Blocks.preapply
+  Block_services.preapply
     rpc_config block ~timestamp ~proto_header [] >>=? fun { shell_header } ->
   let blk =
     Data_encoding.Binary.to_bytes Block_header.encoding

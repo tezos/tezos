@@ -97,13 +97,13 @@ end
 module Baking : sig
 
   val bake:
-    Client_node_rpcs.Blocks.block ->
+    Block_services.block ->
     Account.t ->
     Operation.raw list ->
     Block_hash.t tzresult Lwt.t
 
   val endorsement_reward:
-    Client_node_rpcs.Blocks.block -> int64 tzresult Lwt.t
+    Block_services.block -> int64 tzresult Lwt.t
 
 end
 
@@ -130,13 +130,13 @@ end
 module Protocol : sig
 
   val proposals :
-    ?block:Client_node_rpcs.Blocks.block ->
+    ?block:Block_services.block ->
     src:Account.t ->
     Protocol_hash.t list ->
     Operation.raw tzresult Lwt.t
 
   val ballot :
-    ?block:Client_node_rpcs.Blocks.block ->
+    ?block:Block_services.block ->
     src:Account.t ->
     proposal:Protocol_hash.t ->
     Vote.ballot ->
@@ -149,10 +149,10 @@ module Assert : sig
   include module type of Assert
 
   val balance_equal:
-    ?block:Client_node_rpcs.Blocks.block ->
+    ?block:Block_services.block ->
     msg:string -> Account.t -> int64 -> unit tzresult Lwt.t
   val delegate_equal:
-    ?block:Client_node_rpcs.Blocks.block ->
+    ?block:Block_services.block ->
     msg:string -> Contract.t -> public_key_hash option -> unit tzresult Lwt.t
 
   val failed_to_preapply:
@@ -191,11 +191,11 @@ module Assert : sig
   val wrong_delegate : msg:string -> 'a tzresult -> unit
 
   val check_protocol :
-    ?msg:string -> block:Client_node_rpcs.Blocks.block ->
+    ?msg:string -> block:Block_services.block ->
     Protocol_hash.t -> unit tzresult Lwt.t
 
   val check_voting_period_kind :
-    ?msg:string -> block:Client_node_rpcs.Blocks.block ->
+    ?msg:string -> block:Block_services.block ->
     Voting_period.kind -> unit tzresult Lwt.t
 
 end

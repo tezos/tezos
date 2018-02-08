@@ -22,7 +22,7 @@ type block_info = {
 
 val info:
   #Client_rpcs.ctxt ->
-  ?include_ops:bool -> Client_node_rpcs.Blocks.block -> block_info tzresult Lwt.t
+  ?include_ops:bool -> Block_services.block -> block_info tzresult Lwt.t
 
 val compare:
   block_info -> block_info -> int
@@ -36,6 +36,6 @@ val monitor:
 
 val blocks_from_cycle:
   #Client_rpcs.ctxt ->
-  Client_node_rpcs.Blocks.block ->
+  Block_services.block ->
   Cycle.t ->
   Block_hash.t list tzresult Lwt.t

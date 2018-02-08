@@ -12,7 +12,7 @@ open Proto_genesis
 val bake:
   #Client_rpcs.ctxt ->
   ?timestamp: Time.t ->
-  Client_node_rpcs.Blocks.block ->
+  Block_services.block ->
   Data.Command.t ->
   Client_keys.sk_locator ->
   Block_hash.t tzresult Lwt.t

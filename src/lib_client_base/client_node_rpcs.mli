@@ -38,105 +38,6 @@ val inject_protocol:
   Protocol.t ->
   Protocol_hash.t tzresult Lwt.t
 
-module Blocks : sig
-
-  type block = Block_services.block
-
-  val net_id:
-    #Client_rpcs.ctxt ->
-    block -> Net_id.t tzresult Lwt.t
-  val level:
-    #Client_rpcs.ctxt ->
-    block -> Int32.t tzresult Lwt.t
-  val predecessor:
-    #Client_rpcs.ctxt ->
-    block -> Block_hash.t tzresult Lwt.t
-  val predecessors:
-    #Client_rpcs.ctxt ->
-    block -> int -> Block_hash.t list tzresult Lwt.t
-  val hash:
-    #Client_rpcs.ctxt ->
-    block -> Block_hash.t tzresult Lwt.t
-  val timestamp:
-    #Client_rpcs.ctxt ->
-    block -> Time.t tzresult Lwt.t
-  val fitness:
-    #Client_rpcs.ctxt ->
-    block -> MBytes.t list tzresult Lwt.t
-  val operations:
-    #Client_rpcs.ctxt ->
-    ?contents:bool ->
-    block -> (Operation_hash.t * Operation.t option) list list tzresult Lwt.t
-  val protocol:
-    #Client_rpcs.ctxt ->
-    block -> Protocol_hash.t tzresult Lwt.t
-  val test_network:
-    #Client_rpcs.ctxt ->
-    block -> Test_network_status.t tzresult Lwt.t
-
-  val pending_operations:
-    #Client_rpcs.ctxt ->
-    block ->
-    (error Preapply_result.t * Operation.t Operation_hash.Map.t) tzresult Lwt.t
-
-  type block_info = {
-    hash: Block_hash.t ;
-    net_id: Net_id.t ;
-    level: Int32.t ;
-    proto_level: int ; (* uint8 *)
-    predecessor: Block_hash.t ;
-    timestamp: Time.t ;
-    validation_passes: int ; (* uint8 *)
-    operations_hash: Operation_list_list_hash.t ;
-    fitness: MBytes.t list ;
-    context: Context_hash.t ;
-    data: MBytes.t ;
-    operations: (Operation_hash.t * Operation.t) list list option ;
-    protocol: Protocol_hash.t ;
-    test_network: Test_network_status.t ;
-  }
-
-  val info:
-    #Client_rpcs.ctxt ->
-    ?include_ops:bool -> block -> block_info tzresult Lwt.t
-
-  val list:
-    #Client_rpcs.ctxt ->
-    ?include_ops:bool -> ?length:int -> ?heads:Block_hash.t list ->
-    ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
-    unit -> block_info list list tzresult Lwt.t
-
-  val monitor:
-    #Client_rpcs.ctxt ->
-    ?include_ops:bool -> ?length:int -> ?heads:Block_hash.t list ->
-    ?delay:int -> ?min_date:Time.t -> ?min_heads:int ->
-    unit -> block_info list list Lwt_stream.t tzresult Lwt.t
-
-  type preapply_result = {
-    shell_header: Block_header.shell_header ;
-    operations: error Preapply_result.t list ;
-  }
-
-  val preapply:
-    #Client_rpcs.ctxt ->
-    block ->
-    ?timestamp:Time.t ->
-    ?sort:bool ->
-    proto_header:MBytes.t ->
-    Operation.t list list -> preapply_result tzresult Lwt.t
-
-end
-
-module Operations : sig
-
-  val monitor:
-    #Client_rpcs.ctxt ->
-    ?contents:bool ->
-    unit ->
-    (Operation_hash.t * Operation.t option) list list Lwt_stream.t tzresult Lwt.t
-
-end
-
 module Protocols : sig
 
   val contents:
@@ -171,7 +72,7 @@ end
 
 val complete:
   #Client_rpcs.ctxt ->
-  ?block:Blocks.block -> string -> string list tzresult Lwt.t
+  ?block:Block_services.block -> string -> string list tzresult Lwt.t
 
 val describe:
   #Client_rpcs.ctxt ->

@@ -21,10 +21,10 @@ let handle_error (cctxt : #Client_commands.logger) = function
 
 let call_service0 cctxt s block =
   Client_rpcs.call_service0 cctxt
-    (s Block_services.proto_path) block
+    (s Block_services.S.proto_path) block
 let call_service1 cctxt s block a1 =
   Client_rpcs.call_service1 cctxt
-    (s Block_services.proto_path) block a1
+    (s Block_services.S.proto_path) block a1
 let call_error_service1 cctxt s block a1 =
   call_service1 cctxt s block a1 >>= function
   | Ok (Error _ as err) -> Lwt.return (Environment.wrap_error err)
@@ -32,7 +32,7 @@ let call_error_service1 cctxt s block a1 =
   | Error _ as err -> Lwt.return err
 let call_service2 cctxt s block a1 a2 =
   Client_rpcs.call_service2 cctxt
-    (s Block_services.proto_path) block a1 a2
+    (s Block_services.S.proto_path) block a1 a2
 let call_error_service2 cctxt s block a1 a2 =
   call_service2 cctxt s block a1 a2 >>= function
   | Ok (Error _ as err) -> Lwt.return (Environment.wrap_error err)

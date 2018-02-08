@@ -27,10 +27,9 @@ type content_type = (string * string)
 type raw_content = Cohttp_lwt.Body.t * content_type option
 type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
-type rest_error =
+type rpc_error =
   | Empty_answer
   | Connection_failed of string
-  | Not_found
   | Bad_request of string
   | Method_not_allowed of RPC_service.meth list
   | Unsupported_media_type of string option
@@ -45,9 +44,8 @@ type rest_error =
                             media_type: string ;
                             error: string }
   | OCaml_exception of string
-  | Generic_error (* temporary *)
 
-let rest_error_encoding =
+let rpc_error_encoding =
   let open Data_encoding in
   union
     [ case (Tag  0)
@@ -135,7 +133,7 @@ let rest_error_encoding =
         (function ((), msg) -> OCaml_exception msg) ;
     ]
 
-let pp_rest_error ppf err =
+let pp_rpc_error ppf err =
   match err with
   | Empty_answer ->
       Format.fprintf ppf
@@ -143,9 +141,6 @@ let pp_rest_error ppf err =
   | Connection_failed msg ->
       Format.fprintf ppf
         "Unable to connect to the node: \"%s\"" msg
-  | Not_found ->
-      Format.fprintf ppf
-        "404 Not Found"
   | Bad_request msg ->
       Format.fprintf ppf
         "@[<v 2>Oups! It looks like we forged an invalid HTTP request.@,%s@]"
@@ -187,14 +182,11 @@ let pp_rest_error ppf err =
       Format.fprintf ppf
         "@[<v 2>The server failed with an unexpected exception:@ %s@]"
         msg
-  | Generic_error ->
-      Format.fprintf ppf
-        "Generic error"
 
 type error +=
   | Request_failed of { meth: RPC_service.meth ;
                         uri: Uri.t ;
-                        error: rest_error }
+                        error: rpc_error }
 
 let uri_encoding =
   let open Data_encoding in
@@ -216,11 +208,11 @@ let () =
           \ - error: %a@]"
           (RPC_service.string_of_meth meth)
           (Uri.to_string uri)
-          pp_rest_error error)
+          pp_rpc_error error)
     Data_encoding.(obj3
                      (req "meth" RPC_service.meth_encoding)
                      (req "uri" uri_encoding)
-                     (req "error" rest_error_encoding))
+                     (req "error" rpc_error_encoding))
     (function
       | Request_failed { uri ; error ; meth } -> Some (meth, uri, error)
       | _ -> None)
@@ -338,10 +330,10 @@ let handle accept (meth, uri, ans) =
   match ans with
   | `Ok (Some v) -> return v
   | `Ok None -> request_failed meth uri Empty_answer
-  | `Not_found None -> request_failed meth uri Not_found
+  | `Not_found None -> fail (RPC_context.Not_found { meth ; uri })
   | `Conflict _ | `Error _ | `Forbidden _ | `Unauthorized _
   | `Not_found (Some _) ->
-      request_failed meth uri Generic_error
+      fail (RPC_context.Generic_error { meth ; uri })
   | `Unexpected_status_code (code, (content, _, media_type)) ->
       let media_type = Option.map media_type ~f:Media_type.name in
       Cohttp_lwt.Body.to_string content >>= fun content ->

@@ -62,14 +62,10 @@ let registered_protocols ppf =
     (Client_commands.get_versions ())
 
 let print_heads ppf cctxt =
-  Client_rpcs.call_service0 cctxt Block_services.list
-    { include_ops = true ;
-      length = Some 1 ;
-      heads = None ;
-      monitor = None ;
-      delay = None ;
-      min_date = None ;
-      min_heads = None } >>=? fun heads ->
+  Block_services.list
+    ~include_ops:true
+    ~length:1
+    cctxt >>=? fun heads ->
   return @@
   Format.pp_print_list ~pp_sep:Format.pp_print_newline
     (fun ppf blocks ->
@@ -81,8 +77,7 @@ let print_heads ppf cctxt =
     ppf heads
 
 let print_rejected ppf cctxt =
-  Client_rpcs.call_service0 cctxt
-    Block_services.list_invalid () >>=? fun invalid ->
+  Block_services.list_invalid cctxt >>=? fun invalid ->
   return @@
   Format.pp_print_list
     (fun ppf (hash, level, errors) ->
