@@ -331,7 +331,7 @@ let unmark_invalid node block () () =
   Node.RPC.unmark_invalid node block >>= fun x ->
   RPC_answer.return x
 
-let list_protocols node () { Protocol_services.monitor ; contents } =
+let list_protocols node () { Protocol_services.S.monitor ; contents } =
   let monitor = match monitor with None -> false | Some x -> x in
   let include_contents = match contents with None -> false | Some x -> x in
   Node.RPC.protocols node >>= fun protocols ->
@@ -391,10 +391,10 @@ let build_rpc_directory node =
         "All the RPCs which are specific to the protocol version."
       dir Block_services.S.proto_path implementation in
   let dir =
-    RPC_directory.register0 dir Protocol_services.list
+    RPC_directory.register0 dir Protocol_services.S.list
       (list_protocols node) in
   let dir =
-    RPC_directory.register1 dir Protocol_services.contents
+    RPC_directory.register1 dir Protocol_services.S.contents
       (get_protocols node) in
   let dir =
     let implementation () header =

@@ -38,16 +38,6 @@ val inject_protocol:
   Protocol.t ->
   Protocol_hash.t tzresult Lwt.t
 
-module Protocols : sig
-
-  val contents:
-    #Client_rpcs.ctxt ->
-    Protocol_hash.t -> Protocol.t tzresult Lwt.t
-
-  val list:
-    #Client_rpcs.ctxt ->
-    ?contents:bool -> unit ->
-    (Protocol_hash.t * Protocol.t option) list tzresult Lwt.t
 
 end
 

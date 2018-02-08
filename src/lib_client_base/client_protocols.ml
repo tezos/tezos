@@ -25,7 +25,7 @@ let commands () =
       no_options
       (prefixes [ "list" ; "protocols" ] stop)
       (fun () (cctxt : Client_commands.full_context) ->
-         Client_node_rpcs.Protocols.list cctxt ~contents:false () >>=? fun protos ->
+         Protocol_services.list ~contents:false cctxt >>=? fun protos ->
          Lwt_list.iter_s (fun (ph, _p) -> cctxt#message "%a" Protocol_hash.pp ph) protos >>= fun () ->
          return ()
       );
@@ -59,7 +59,7 @@ let commands () =
        @@ Protocol_hash.param ~name:"protocol hash" ~desc:""
        @@ stop)
       (fun () ph (cctxt : Client_commands.full_context) ->
-         Client_node_rpcs.Protocols.contents cctxt ph >>=? fun proto ->
+         Protocol_services.contents cctxt ph >>=? fun proto ->
          Lwt_utils_unix.Protocol.write_dir (Protocol_hash.to_short_b58check ph) ~hash:ph proto >>=? fun () ->
          cctxt#message "Extracted protocol %a" Protocol_hash.pp_short ph >>= fun () ->
          return ()

@@ -9,42 +9,58 @@
 
 open Data_encoding
 
-let protocols_arg = Protocol_hash.rpc_arg
 
-let contents =
-  RPC_service.post_service
-    ~query: RPC_query.empty
-    ~input: empty
-    ~output:
-      (obj1 (req "data"
-               (describe ~title: "Tezos protocol"
-                  (Protocol.encoding))))
-    RPC_path.(root / "protocols" /: protocols_arg)
+module S = struct
 
-type list_param = {
-  contents: bool option ;
-  monitor: bool option ;
-}
+  let protocols_arg = Protocol_hash.rpc_arg
 
-let list_param_encoding =
-  conv
-    (fun {contents; monitor} -> (contents, monitor))
-    (fun (contents, monitor) -> {contents; monitor})
-    (obj2
-       (opt "contents" bool)
-       (opt "monitor" bool))
+  let contents =
+    RPC_service.post_service
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output:
+        (obj1 (req "data"
+                 (describe ~title: "Tezos protocol"
+                    (Protocol.encoding))))
+      RPC_path.(root / "protocols" /: protocols_arg)
 
-let list =
-  RPC_service.post_service
-    ~query: RPC_query.empty
-    ~input: list_param_encoding
-    ~output:
-      (obj1
-         (req "protocols"
-            (list
-               (obj2
-                  (req "hash" Protocol_hash.encoding)
-                  (opt "contents"
-                     (dynamic_size Protocol.encoding)))
-            )))
-    RPC_path.(root / "protocols")
+  type list_param = {
+    contents: bool option ;
+    monitor: bool option ;
+  }
+
+  let list_param_encoding =
+    conv
+      (fun {contents; monitor} -> (contents, monitor))
+      (fun (contents, monitor) -> {contents; monitor})
+      (obj2
+         (opt "contents" bool)
+         (opt "monitor" bool))
+
+  let list =
+    RPC_service.post_service
+      ~query: RPC_query.empty
+      ~input: list_param_encoding
+      ~output:
+        (obj1
+           (req "protocols"
+              (list
+                 (obj2
+                    (req "hash" Protocol_hash.encoding)
+                    (opt "contents"
+                       (dynamic_size Protocol.encoding)))
+              )))
+      RPC_path.(root / "protocols")
+
+end
+
+open RPC_context
+let contents ctxt h =
+  make_call1 S.contents ctxt h () ()
+let monitor ?(contents = false) ctxt =
+  make_streamed_call S.list ctxt () ()
+    { contents = Some contents ; monitor = Some true }
+let list ?(contents = false) ctxt =
+  make_call S.list ctxt () ()
+    { contents = Some contents ; monitor = Some false }
+

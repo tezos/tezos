@@ -46,14 +46,4 @@ let describe cctxt ?(recurse = true) path =
     Shell_services.describe
     ((), path) { recurse } ()
 
-module Protocols = struct
-
-  let contents cctxt hash =
-    call_service1 cctxt Protocol_services.contents hash ()
-
-  let list cctxt ?contents () =
-    call_service0
-      cctxt Protocol_services.list
-      { contents; monitor = Some false }
-
 end
