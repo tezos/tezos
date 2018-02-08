@@ -154,7 +154,7 @@ let rec peek ({ closed ; queue ; _ } as q) =
     wait_push q >>= fun () ->
     peek q
 
-let peek_all { queue ; closed } =
+let peek_all { queue ; closed ; _ } =
   if closed then
     []
   else

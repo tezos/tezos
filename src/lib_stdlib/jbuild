@@ -3,7 +3,12 @@
 (library
  ((name tezos_stdlib)
   (public_name tezos-stdlib)
-  (libraries (ocplib-endian.bigstring cstruct stringext hex))
+  (libraries (ocplib-endian.bigstring
+              cstruct
+              stringext
+              hex
+              lwt
+              lwt.log))
   (flags (:standard -safe-string))))
 
 (alias

@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
+open Lwt.Infix
 
 type t =
   { mutable pending_tasks : unit Lwt.u list ;
