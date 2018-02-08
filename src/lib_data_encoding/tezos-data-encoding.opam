@@ -11,9 +11,10 @@ depends: [
   "jbuilder" { build & >= "1.0+beta17" }
   "tezos-test-helpers" { test }
   "tezos-stdlib"
+  "ezjsonm"
+  "js_of_ocaml" # for ocplib-json-typed.bson
   "ocplib-json-typed"
   "ocplib-endian"
-  "js_of_ocaml"
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

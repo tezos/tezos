@@ -57,9 +57,9 @@ let encoding =
        shell_header_encoding
        (obj1 (req "data" Variable.bytes)))
 
-let pp fmt op =
-  Format.pp_print_string fmt @@
-  Data_encoding_ezjsonm.to_string (Data_encoding.Json.construct encoding op)
+let pp ppf op =
+  Data_encoding.Json.pp ppf
+    (Data_encoding.Json.construct encoding op)
 
 let compare b1 b2 =
   let (>>) x y = if x = 0 then y () else x in

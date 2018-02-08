@@ -490,9 +490,8 @@ let catch_closed_pipe f =
   | Error _ | Ok _ as v -> Lwt.return v
 
 let pp_json encoding ppf msg =
-  Format.pp_print_string ppf
-    (Data_encoding_ezjsonm.to_string
-       (Data_encoding.Json.construct encoding msg))
+  Data_encoding.Json.pp ppf
+    (Data_encoding.Json.construct encoding msg)
 
 let write { writer ; conn } msg =
   catch_closed_pipe begin fun () ->

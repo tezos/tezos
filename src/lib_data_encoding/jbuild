@@ -3,7 +3,10 @@
 (library
  ((name tezos_data_encoding)
   (public_name tezos-data-encoding)
-  (libraries (tezos-stdlib ocplib-json-typed ocplib-json-typed.bson))
+  (libraries (tezos-stdlib
+              ocplib-json-typed
+              ocplib-json-typed.bson
+              ezjsonm))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_stdlib))))

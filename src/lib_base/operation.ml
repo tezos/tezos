@@ -32,8 +32,8 @@ let encoding =
        (obj1 (req "data" Variable.bytes)))
 
 let pp fmt op =
-  Format.pp_print_string fmt @@
-  Data_encoding_ezjsonm.to_string (Data_encoding.Json.construct encoding op)
+  Data_encoding.Json.pp fmt
+    (Data_encoding.Json.construct encoding op)
 
 let compare o1 o2 =
   let (>>) x y = if x = 0 then y () else x in

@@ -13,7 +13,7 @@ let json  = {
   name = Cohttp.Accept.MediaType ("application", "json") ;
   q = Some 1000 ;
   pp = begin fun _enc ppf raw ->
-    match Data_encoding_ezjsonm.from_string raw with
+    match Data_encoding.Json.from_string raw with
     | Error err ->
         Format.fprintf ppf
           "@[Invalid JSON:@ \
@@ -21,14 +21,14 @@ let json  = {
           \ - @[<v 2>Raw data:@ %s@]@]"
           err raw
     | Ok json ->
-        Data_encoding_ezjsonm.pp ppf json
+        Data_encoding.Json.pp ppf json
   end ;
   construct = begin fun enc v ->
-    Data_encoding_ezjsonm.to_string ~minify:true @@
+    Data_encoding.Json.to_string ~minify:true @@
     Data_encoding.Json.construct enc v
   end ;
   destruct = begin fun enc body ->
-    match Data_encoding_ezjsonm.from_string body with
+    match Data_encoding.Json.from_string body with
     | Error _ as err -> err
     | Ok json ->
         try Ok (Data_encoding.Json.destruct enc json)
@@ -56,7 +56,7 @@ let bson  = {
             (module Json_repr_bson.Repr)
             (module Json_repr.Ezjsonm)
             bson in
-        Data_encoding_ezjsonm.pp ppf json
+        Data_encoding.Json.pp ppf json
   end ;
   construct = begin fun enc v ->
     Bytes.unsafe_to_string @@
@@ -86,7 +86,7 @@ let octet_stream = {
     | Some v ->
         Format.fprintf ppf
           ";; binary equivalent of the following json@.%a"
-          Data_encoding_ezjsonm.pp (Data_encoding.Json.construct enc v)
+          Data_encoding.Json.pp (Data_encoding.Json.construct enc v)
   end ;
   construct = begin fun enc v ->
     MBytes.to_string @@

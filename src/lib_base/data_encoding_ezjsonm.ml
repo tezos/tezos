@@ -15,32 +15,11 @@ let to_root = function
   | `Null -> `O []
   | oth -> `A [ oth ]
 
-let to_string ?minify j = Ezjsonm.to_string ?minify (to_root j)
-
-let pp = Json_repr.(pp (module Ezjsonm))
-
-let from_string s =
-  try Ok (Ezjsonm.from_string s :> Data_encoding.json)
-  with Ezjsonm.Parse_error (_, msg) -> Error msg
-
-let from_stream (stream: string Lwt_stream.t) =
-  let buffer = ref "" in
-  Lwt_stream.filter_map
-    (fun str ->
-       buffer := !buffer ^ str ;
-       try
-         let json = Ezjsonm.from_string !buffer in
-         buffer := "" ;
-         Some (Ok json)
-       with Ezjsonm.Parse_error _ ->
-         None)
-    stream
-
 let write_file file json =
   let json = to_root json in
   protect begin fun () ->
     Lwt_io.with_file ~mode:Output file begin fun chan ->
-      let str = to_string json in
+      let str = Data_encoding.Json.to_string ~minify:false json in
       Lwt_io.write chan str >>= fun _ ->
       return ()
     end
@@ -53,6 +32,3 @@ let read_file file =
       return (Ezjsonm.from_string str :> Data_encoding.json)
     end
   end
-
-let () =
-  Error_monad.json_to_string := to_string

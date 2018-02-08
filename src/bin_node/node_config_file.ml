@@ -452,7 +452,7 @@ let write fp cfg =
     (Data_encoding.Json.construct encoding cfg)
 
 let to_string cfg =
-  Data_encoding_ezjsonm.to_string
+  Data_encoding.Json.to_string
     (Data_encoding.Json.construct encoding cfg)
 
 let update

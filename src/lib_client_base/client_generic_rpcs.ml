@@ -135,7 +135,7 @@ let editor_fill_in ?(show_optionals=true) schema =
     | Error msg -> Lwt.return (Error msg)
     | Ok json ->
         Lwt_io.(with_file ~mode:Output tmp (fun fp ->
-            write_line fp (Data_encoding_ezjsonm.to_string json))) >>= fun () ->
+            write_line fp (Data_encoding.Json.to_string json))) >>= fun () ->
         edit ()
   and edit () =
     (* launch the user's editor on it *)
@@ -163,7 +163,7 @@ let editor_fill_in ?(show_optionals=true) schema =
   and reread () =
     (* finally reread the file *)
     Lwt_io.(with_file ~mode:Input tmp (fun fp -> read fp)) >>= fun text ->
-    match Data_encoding_ezjsonm.from_string text with
+    match Data_encoding.Json.from_string text with
     | Ok r -> Lwt.return (Ok r)
     | Error msg -> Lwt.return (Error (Printf.sprintf "bad input: %s" msg))
   and delete () =
@@ -394,7 +394,7 @@ let call raw_url (cctxt : #Client_commands.full_context) =
 
 let call_with_json raw_url json (cctxt: Client_commands.full_context) =
   let uri = Uri.of_string raw_url in
-  match Data_encoding_ezjsonm.from_string json with
+  match Data_encoding.Json.from_string json with
   | Error err ->
       cctxt#error
         "Failed to parse the provided json: %s\n%!"

@@ -90,7 +90,7 @@ module Account = struct
 
   let pp_account ppf account =
     let json = Data_encoding.Json.construct encoding account in
-    Format.fprintf ppf "%s" (Data_encoding_ezjsonm.to_string json)
+    Format.fprintf ppf "%s" (Data_encoding.Json.to_string json)
 
   let create ?keys alias =
     let sk, pk = match keys with
@@ -122,7 +122,7 @@ module Account = struct
 
   let pp_destination ppf destination =
     let json = Data_encoding.Json.construct destination_encoding destination in
-    Format.fprintf ppf "%s" (Data_encoding_ezjsonm.to_string json)
+    Format.fprintf ppf "%s" (Data_encoding.Json.to_string json)
 
   let create_destination ~alias ~contract ~pk =
     let pkh = Ed25519.Public_key.hash pk in

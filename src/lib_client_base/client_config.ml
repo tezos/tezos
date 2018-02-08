@@ -98,7 +98,7 @@ module Cfg_file = struct
   let write out cfg =
     Utils.write_file ~bin:false out
       (Data_encoding.Json.construct encoding cfg |>
-       Data_encoding_ezjsonm.to_string)
+       Data_encoding.Json.to_string)
 
 end
 
@@ -202,7 +202,7 @@ let tls_switch =
 
 let read_config_file config_file = match
     Utils.read_file ~bin:false config_file
-    |> Data_encoding_ezjsonm.from_string
+    |> Data_encoding.Json.from_string
   with
   | exception (Sys_error msg) ->
       failwith
@@ -229,7 +229,7 @@ let commands config_file cfg =
       no_options
       (fixed [ "config" ; "show" ])
       (fun () (cctxt : Client_commands.full_context) ->
-         let pp_cfg ppf cfg = Format.fprintf ppf "%a" Data_encoding_ezjsonm.pp (Data_encoding.Json.construct Cfg_file.encoding cfg) in
+         let pp_cfg ppf cfg = Format.fprintf ppf "%a" Data_encoding.Json.pp (Data_encoding.Json.construct Cfg_file.encoding cfg) in
          if not @@ Sys.file_exists config_file then
            cctxt#warning
              "@[<v 2>Warning: no config file at %s,@,\

@@ -181,6 +181,5 @@ let cfg : _ P2p.message_config = { encoding ; versions }
 let raw_encoding = P2p.Raw.encoding encoding
 
 let pp_json ppf msg =
-  Format.pp_print_string ppf
-    (Data_encoding_ezjsonm.to_string
-       (Data_encoding.Json.construct raw_encoding (Message msg)))
+  Data_encoding.Json.pp ppf
+    (Data_encoding.Json.construct raw_encoding (Message msg))

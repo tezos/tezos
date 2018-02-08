@@ -269,7 +269,7 @@ let handle_error meth uri (body, media, _) f =
     match media with
     | Some ("application", "json") | None -> begin
         Cohttp_lwt.Body.to_string body >>= fun body ->
-        match Data_encoding_ezjsonm.from_string body with
+        match Data_encoding.Json.from_string body with
         | Ok body -> return (f (Some body))
         | Error msg ->
             request_failed meth uri
@@ -287,13 +287,13 @@ let handle_error meth uri (body, media, _) f =
 let generic_json_call ?logger ?body meth uri : (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t =
   let body =
     Option.map body ~f:begin fun b ->
-      (Cohttp_lwt.Body.of_string (Data_encoding_ezjsonm.to_string b))
+      (Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
     end in
   let media = Media_type.json in
   generic_call meth ?logger ~accept:Media_type.[bson ; json] ?body ~media uri >>=? function
   | `Ok (body, (Some ("application", "json") | None), _) -> begin
       Cohttp_lwt.Body.to_string body >>= fun body ->
-      match Data_encoding_ezjsonm.from_string body with
+      match Data_encoding.Json.from_string body with
       | Ok json -> return (`Ok json)
       | Error msg ->
           request_failed meth uri

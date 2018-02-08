@@ -51,8 +51,8 @@ let encoding =
        (req "components" (list component_encoding)))
 
 let pp ppf op =
-  Format.pp_print_string ppf @@
-  Data_encoding_ezjsonm.to_string (Data_encoding.Json.construct encoding op)
+  Data_encoding.Json.pp ppf
+    (Data_encoding.Json.construct encoding op)
 
 let env_version_to_string = function
   | V1 -> "V1"
@@ -127,11 +127,11 @@ module Meta = struct
         encoding
         { hash ; expected_env_version = env_version ; modules } in
     Utils.write_file ~bin:false (dirname // name) @@
-    Data_encoding_ezjsonm.to_string config_file
+    Data_encoding.Json.to_string config_file
 
   let of_file ~dir:dirname =
     Utils.read_file ~bin:false (dirname // name) |>
-    Data_encoding_ezjsonm.from_string |> function
+    Data_encoding.Json.from_string |> function
     | Error err -> Pervasives.failwith err
     | Ok json -> Data_encoding.Json.destruct encoding json
 
