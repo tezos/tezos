@@ -3,7 +3,8 @@
 (library
  ((name tezos_base)
   (public_name tezos-base)
-  (flags (:standard -open Tezos_stdlib
+  (flags (:standard -w -30
+                    -open Tezos_stdlib
                     -open Tezos_stdlib_lwt
                     -open Tezos_crypto
                     -open Tezos_data_encoding

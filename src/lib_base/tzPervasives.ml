@@ -59,5 +59,7 @@ module P2p_version = P2p_version
 
 module Protocol_environment = Protocol_environment
 
+module Cli_entries = Cli_entries
+
 include Utils.Infix
 include Error_monad

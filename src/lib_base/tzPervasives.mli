@@ -55,5 +55,7 @@ module P2p_version = P2p_version
 
 module Protocol_environment = Protocol_environment
 
+module Cli_entries = Cli_entries
+
 include (module type of (struct include Utils.Infix end))
 include (module type of (struct include Error_monad end))
