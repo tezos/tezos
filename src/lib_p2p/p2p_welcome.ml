@@ -21,7 +21,7 @@ type t = {
 let rec worker_loop st =
   let Pool pool = st.pool in
   Lwt_unix.yield () >>= fun () ->
-  Lwt_utils_unix.protect ~canceler:st.canceler begin fun () ->
+  protect ~canceler:st.canceler begin fun () ->
     Lwt_unix.accept st.socket >>= return
   end >>= function
   | Ok (fd, addr) ->
@@ -32,7 +32,7 @@ let rec worker_loop st =
             (Ipaddr_unix.V6.of_inet_addr_exn addr, port) in
       P2p_pool.accept pool fd point ;
       worker_loop st
-  | Error [Lwt_utils_unix.Canceled] ->
+  | Error [ Canceled ] ->
       Lwt.return_unit
   | Error err ->
       lwt_log_error "@[<v 2>Unexpected error in the Welcome worker@ %a@]"

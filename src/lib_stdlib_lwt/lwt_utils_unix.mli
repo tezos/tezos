@@ -28,18 +28,3 @@ val getaddrinfo:
   passive:bool ->
   node:string -> service:string ->
   (Ipaddr.V6.t * int) list Lwt.t
-
-open Error_monad
-
-type error += Canceled
-
-val protect :
-  ?on_error:(error list -> 'a tzresult Lwt.t) ->
-  ?canceler:Lwt_canceler.t ->
-  (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
-
-type error += Timeout
-val with_timeout:
-  ?canceler:Lwt_canceler.t ->
-  float -> (Lwt_canceler.t -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
-

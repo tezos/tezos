@@ -122,8 +122,8 @@ module Simple = struct
     | Error ([ P2p_pool.Connection_refused
              | P2p_pool.Pending_connection
              | P2p_socket.Rejected
-             | Lwt_utils_unix.Canceled
-             | Lwt_utils_unix.Timeout
+             | Canceled
+             | Timeout
              | P2p_pool.Rejected _ as err ]) ->
         lwt_log_info "Connection to %a failed (%a)"
           P2p_point.Id.pp point
@@ -134,9 +134,9 @@ module Simple = struct
                  Format.fprintf ppf "pending connection"
              | P2p_socket.Rejected ->
                  Format.fprintf ppf "rejected"
-             | Lwt_utils_unix.Canceled ->
+             | Canceled ->
                  Format.fprintf ppf "canceled"
-             | Lwt_utils_unix.Timeout ->
+             | Timeout ->
                  Format.fprintf ppf "timeout"
              | P2p_pool.Rejected peer ->
                  Format.fprintf ppf "rejected (%a)" P2p_peer.Id.pp peer

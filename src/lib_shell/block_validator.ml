@@ -241,7 +241,7 @@ let on_request
                 net_state header.shell.predecessor >>=? fun pred ->
               get_proto pred hash >>=? fun proto ->
               (* TODO also protect with [Worker.canceler w]. *)
-              Lwt_utils_unix.protect ?canceler begin fun () ->
+              protect ?canceler begin fun () ->
                 apply_block
                   (Distributed_db.net_state net_db)
                   pred proto hash header operations
@@ -264,7 +264,7 @@ let on_request
               end
             (* TODO catch other temporary error (e.g. system errors)
                and do not 'commit' them on disk... *)
-            | Error [Lwt_utils_unix.Canceled | Unavailable_protocol _] as err ->
+            | Error [Canceled | Unavailable_protocol _] as err ->
                 return err
             | Error errors ->
                 Worker.protect w begin fun () ->

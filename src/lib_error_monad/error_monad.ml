@@ -474,12 +474,6 @@ module Make() = struct
     else
       Format.kasprintf (fun msg -> fail (Assert_error (loc, msg))) fmt
 
-
-  let protect ~on_error t =
-    t  >>= function
-    | Ok res -> return res
-    | Error err -> on_error err
-
 end
 
 include Make()
@@ -501,15 +495,6 @@ let record_trace_exn exn f = record_trace (Exn exn) f
 let failure fmt =
   Format.kasprintf (fun str -> Exn (Failure str)) fmt
 
-
-let protect ?on_error t =
-  Lwt.catch t (fun exn -> fail (Exn exn)) >>= function
-  | Ok res -> return res
-  | Error err ->
-      match on_error with
-      | Some f -> f err
-      | None -> Lwt.return (Error err)
-
 let pp_exn ppf exn = pp ppf (Exn exn)
 
 let () =
@@ -527,3 +512,49 @@ let () =
       | Exn exn -> Some (Printexc.to_string exn)
       | _ -> None)
     (fun msg -> Exn (Failure msg))
+
+type error += Canceled
+
+let protect ?on_error ?canceler t =
+  let cancelation =
+    match canceler with
+    | None -> Lwt_utils.never_ending
+    | Some canceler ->
+        (Lwt_canceler.cancelation canceler >>= fun () ->
+         fail Canceled ) in
+  let res =
+    Lwt.pick [ cancelation ;
+               Lwt.catch t (fun exn -> fail (Exn exn)) ] in
+  res >>= function
+  | Ok _ -> res
+  | Error err ->
+      let canceled =
+        Option.unopt_map canceler ~default:false ~f:Lwt_canceler.canceled in
+      let err = if canceled then [Canceled] else err in
+      match on_error with
+      | None -> Lwt.return (Error err)
+      | Some on_error ->
+          Lwt.catch (fun () -> on_error err) (fun exn -> fail (Exn exn))
+
+type error += Timeout
+
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"utils.Timeout"
+    ~title:"Timeout"
+    ~description:"Timeout"
+    Data_encoding.unit
+    (function Timeout -> Some () | _ -> None)
+    (fun () -> Timeout)
+
+let with_timeout ?(canceler = Lwt_canceler.create ()) timeout f =
+  let target = f canceler in
+  Lwt.choose [ timeout ; (target >|= fun _ -> ()) ] >>= fun () ->
+  if Lwt.state target <> Lwt.Sleep then begin
+    Lwt.cancel timeout ;
+    target
+  end else begin
+    Lwt_canceler.cancel canceler >>= fun () ->
+    fail Timeout
+  end

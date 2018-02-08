@@ -629,7 +629,7 @@ module P2p_reader = struct
       end
 
   let rec worker_loop global_db state =
-    Lwt_utils_unix.protect ~canceler:state.canceler begin fun () ->
+    protect ~canceler:state.canceler begin fun () ->
       P2p.recv global_db.p2p state.conn
     end >>= function
     | Ok msg ->

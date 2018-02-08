@@ -28,10 +28,6 @@ val failwith :
   ('a, Format.formatter, unit, 'b tzresult Lwt.t) format4 ->
   'a
 
-val protect :
-  ?on_error: (error list -> 'a tzresult Lwt.t) ->
-  (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
-
 val error_exn : exn -> 'a tzresult
 val record_trace_exn : exn -> 'a tzresult -> 'a tzresult
 val trace_exn : exn -> 'b tzresult Lwt.t -> 'b tzresult Lwt.t
@@ -44,6 +40,18 @@ val failure : ('a, Format.formatter, unit, error) format4 -> 'a
 
 type error += Exn of exn
 type error += Unclassified of string
+
+type error += Canceled
+
+val protect :
+  ?on_error:(error list -> 'a tzresult Lwt.t) ->
+  ?canceler:Lwt_canceler.t ->
+  (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
+
+type error += Timeout
+val with_timeout:
+  ?canceler:Lwt_canceler.t ->
+  unit Lwt.t -> (Lwt_canceler.t -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
 module Make() : Error_monad_sig.S
 

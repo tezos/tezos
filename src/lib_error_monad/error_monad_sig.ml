@@ -109,10 +109,6 @@ module type S = sig
     bool -> string ->
     ('a, Format.formatter, unit, unit tzresult Lwt.t) format4 -> 'a
 
-  val protect :
-    on_error: (error list -> 'a tzresult Lwt.t) ->
-    'a tzresult Lwt.t -> 'a tzresult Lwt.t
-
   (** {2 In-monad list iterators} ********************************************)
 
   (** A {!List.iter} in the monad *)

@@ -120,7 +120,7 @@ module Scheduler(IO : IO) = struct
           false, (Queue.pop st.readys_low)
       in
       match msg with
-      | Error [ Lwt_utils_unix.Canceled ] ->
+      | Error [ Canceled ] ->
           worker_loop st
       | Error ([Connection_closed |
                 Exn ( Lwt_pipe.Closed |
@@ -140,7 +140,7 @@ module Scheduler(IO : IO) = struct
           conn.current_push <- begin
             IO.push conn.out_param msg >>= function
             | Ok ()
-            | Error [ Lwt_utils_unix.Canceled ] ->
+            | Error [ Canceled ] ->
                 return ()
             | Error ([Connection_closed |
                       Exn (Unix.Unix_error (EBADF, _, _) |
@@ -481,10 +481,10 @@ let close ?timeout conn =
     | None ->
         return (Lwt_canceler.cancelation conn.canceler)
     | Some timeout ->
-        Lwt_utils_unix.with_timeout
-          ~canceler:conn.canceler timeout begin fun canceler ->
-          return (Lwt_canceler.cancelation canceler)
-        end
+        with_timeout
+          ~canceler:conn.canceler
+          (Lwt_unix.sleep timeout)
+          (fun canceler -> return (Lwt_canceler.cancelation canceler))
   end >>=? fun _ ->
   conn.write_conn.current_push >>= fun res ->
   lwt_log_info "<-- close (%d)" conn.id >>= fun () ->

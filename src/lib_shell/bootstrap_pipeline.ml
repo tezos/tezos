@@ -55,7 +55,7 @@ let fetch_step pipeline (step : Block_locator_iterator.step)  =
       lwt_debug "fetching block header %a from peer %a."
         Block_hash.pp_short hash
         P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
-      Lwt_utils_unix.protect ~canceler:pipeline.canceler begin fun () ->
+      protect ~canceler:pipeline.canceler begin fun () ->
         Distributed_db.Block_header.fetch
           ~timeout:pipeline.block_header_timeout
           pipeline.net_db ~peer:pipeline.peer_id
@@ -69,7 +69,7 @@ let fetch_step pipeline (step : Block_locator_iterator.step)  =
   fetch_loop [] step.block step.step >>=? fun headers ->
   iter_s
     begin fun header ->
-      Lwt_utils_unix.protect ~canceler:pipeline.canceler begin fun () ->
+      protect ~canceler:pipeline.canceler begin fun () ->
         Lwt_pipe.push pipeline.fetched_headers header >>= return
       end
     end
@@ -87,7 +87,7 @@ let headers_fetch_worker_loop pipeline =
         P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
       Lwt_pipe.close pipeline.fetched_headers ;
       Lwt.return_unit
-  | Error [Exn Lwt.Canceled | Lwt_utils_unix.Canceled | Exn Lwt_pipe.Closed] ->
+  | Error [Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed] ->
       Lwt.return_unit
   | Error [ Distributed_db.Block_header.Timeout bh ] ->
       lwt_log_info "request for header %a from peer %a timed out."
@@ -105,7 +105,7 @@ let headers_fetch_worker_loop pipeline =
 let rec operations_fetch_worker_loop pipeline =
   begin
     Lwt_unix.yield () >>= fun () ->
-    Lwt_utils_unix.protect ~canceler:pipeline.canceler begin fun () ->
+    protect ~canceler:pipeline.canceler begin fun () ->
       Lwt_pipe.pop pipeline.fetched_headers >>= return
     end >>=? fun (hash, header) ->
     lwt_log_info "fetching operations of block %a from peer %a."
@@ -113,7 +113,7 @@ let rec operations_fetch_worker_loop pipeline =
       P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
     map_p
       (fun i ->
-         Lwt_utils_unix.protect ~canceler:pipeline.canceler begin fun () ->
+         protect ~canceler:pipeline.canceler begin fun () ->
            Distributed_db.Operations.fetch
              ~timeout:pipeline.block_operations_timeout
              pipeline.net_db ~peer:pipeline.peer_id
@@ -123,14 +123,14 @@ let rec operations_fetch_worker_loop pipeline =
     lwt_log_info "fetched operations of block %a from peer %a."
       Block_hash.pp_short hash
       P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
-    Lwt_utils_unix.protect ~canceler:pipeline.canceler begin fun () ->
+    protect ~canceler:pipeline.canceler begin fun () ->
       Lwt_pipe.push pipeline.fetched_blocks
         (hash, header, operations) >>= return
     end
   end >>= function
   | Ok () ->
       operations_fetch_worker_loop pipeline
-  | Error [Exn Lwt.Canceled | Lwt_utils_unix.Canceled | Exn Lwt_pipe.Closed] ->
+  | Error [Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed] ->
       Lwt_pipe.close pipeline.fetched_blocks ;
       Lwt.return_unit
   | Error [ Distributed_db.Operations.Timeout (bh, n) ] ->
@@ -149,13 +149,13 @@ let rec operations_fetch_worker_loop pipeline =
 let rec validation_worker_loop pipeline =
   begin
     Lwt_unix.yield () >>= fun () ->
-    Lwt_utils_unix.protect ~canceler:pipeline.canceler begin fun () ->
+    protect ~canceler:pipeline.canceler begin fun () ->
       Lwt_pipe.pop pipeline.fetched_blocks >>= return
     end >>=? fun (hash, header, operations) ->
     lwt_log_info "requesting validation for block %a from peer %a."
       Block_hash.pp_short hash
       P2p_peer.Id.pp_short pipeline.peer_id >>= fun () ->
-    Lwt_utils_unix.protect ~canceler:pipeline.canceler begin fun () ->
+    protect ~canceler:pipeline.canceler begin fun () ->
       Block_validator.validate
         ~canceler:pipeline.canceler
         ~notify_new_block:pipeline.notify_new_block
@@ -168,7 +168,7 @@ let rec validation_worker_loop pipeline =
     return ()
   end >>= function
   | Ok () -> validation_worker_loop pipeline
-  | Error [Exn Lwt.Canceled | Lwt_utils_unix.Canceled | Exn Lwt_pipe.Closed] ->
+  | Error [Exn Lwt.Canceled | Canceled | Exn Lwt_pipe.Closed] ->
       Lwt.return_unit
   | Error ([ Block_validator_errors.Invalid_block _
            | Block_validator_errors.Unavailable_protocol _ ] as err ) ->
