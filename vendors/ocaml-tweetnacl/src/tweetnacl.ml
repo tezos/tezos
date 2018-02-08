@@ -30,6 +30,7 @@ module Hash = struct
 end
 
 let cs_of_z cs z =
+  Cstruct.memset cs 0 ;
   let bits = Z.to_bits z in
   Cstruct.blit_from_string bits 0 cs 0 (String.length bits)
 
