@@ -38,10 +38,15 @@ val map_get : 'key -> ('key, 'value) Script_typed_ir.map -> 'value option
 val map_key_ty : ('a, 'b) Script_typed_ir.map -> 'a Script_typed_ir.comparable_ty
 val map_size : ('a, 'b) Script_typed_ir.map -> Script_int.n Script_int.num
 
-val big_map_mem : context -> Alpha_context.Contract.t -> 'key -> ('key, 'value) Script_typed_ir.big_map -> bool Lwt.t
+val big_map_mem :
+  context -> Gas.t -> Contract.t -> 'key ->
+  ('key, 'value) Script_typed_ir.big_map ->
+  (bool * Gas.t) tzresult Lwt.t
 val big_map_get :
-  context -> Alpha_context.Contract.t -> 'key -> ('key, 'value) Script_typed_ir.big_map ->
-  'value option tzresult Lwt.t
+  context -> Gas.t ->
+  Contract.t -> 'key ->
+  ('key, 'value) Script_typed_ir.big_map ->
+  ('value option * Gas.t) tzresult Lwt.t
 val big_map_update :
   'key -> 'value option -> ('key, 'value) Script_typed_ir.big_map ->
   ('key, 'value) Script_typed_ir.big_map
@@ -52,36 +57,42 @@ val ty_eq :
 
 val parse_data :
   ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
-  context -> 'a Script_typed_ir.ty -> Script.node -> 'a tzresult Lwt.t
+  context -> Gas.t -> 'a Script_typed_ir.ty -> Script.node -> ('a * Gas.t) tzresult Lwt.t
 val unparse_data :
-  'a Script_typed_ir.ty -> 'a -> Script.node
+  Gas.t -> 'a Script_typed_ir.ty -> 'a -> (Script.node * Gas.t) tzresult
 
-val parse_ty : bool ->
-  Script.node -> (ex_ty * Script_typed_ir.annot) tzresult
+val parse_ty :
+  Gas.t -> bool -> Script.node ->
+  ((ex_ty * Script_typed_ir.annot) * Gas.t) tzresult
 val unparse_ty :
   string option -> 'a Script_typed_ir.ty -> Script.node
 
 val parse_toplevel
-  : Script.expr -> (Script.node * Script.node * Script.node * Script.node) tzresult
+  : Gas.t -> Script.expr -> ((Script.node * Script.node * Script.node * Script.node) * Gas.t) tzresult
 
 val typecheck_code :
-  context -> Script.expr -> type_map tzresult Lwt.t
+  context -> Gas.t -> Script.expr -> (type_map * Gas.t) tzresult Lwt.t
 
 val typecheck_data :
   ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
-  context -> Script.expr * Script.expr -> unit tzresult Lwt.t
+  context -> Gas.t -> Script.expr * Script.expr -> Gas.t tzresult Lwt.t
 
 val parse_script :
   ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
-  context -> Script.t -> ex_script tzresult Lwt.t
+  context -> Gas.t -> Script.t -> (ex_script * Gas.t) tzresult Lwt.t
 
-val hash_data : 'a Script_typed_ir.ty -> 'a -> string
+val hash_data : Gas.t -> 'a Script_typed_ir.ty -> 'a -> (string * Gas.t) tzresult
 
 val extract_big_map : 'a Script_typed_ir.ty -> 'a -> Script_typed_ir.ex_big_map option
 
-val to_serializable_big_map : Script_typed_ir.ex_big_map -> Contract_storage.big_map_diff
+val to_serializable_big_map :
+  Gas.t -> Script_typed_ir.ex_big_map ->
+  (Contract_storage.big_map_diff * Gas.t) tzresult Lwt.t
 
-val to_printable_big_map : Script_typed_ir.ex_big_map -> (Script.expr * Script.expr option) list
+val to_printable_big_map :
+  Script_typed_ir.ex_big_map ->
+  (Script.expr * Script.expr option) list
 
-val erase_big_map_initialization : context -> Script.t ->
-  (Script.t * Contract_storage.big_map_diff option) tzresult Lwt.t
+val erase_big_map_initialization :
+  context -> Gas.t -> Script.t ->
+  (Script.t * Contract_storage.big_map_diff option * Gas.t) tzresult Lwt.t

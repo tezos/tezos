@@ -206,6 +206,11 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_source (parsed, hilights) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
+    | Alpha_environment.Ecoproto_error Gas.Quota_exceeded :: rest ->
+        Format.fprintf ppf
+          "@[<v 0>Gas limit exceeded during typechecking or execution. Try again with a higher gas limit.@]" ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
     | Alpha_environment.Ecoproto_error err :: rest ->
         begin match err with
           | Apply.Bad_contract_parameter (c, None, _) ->

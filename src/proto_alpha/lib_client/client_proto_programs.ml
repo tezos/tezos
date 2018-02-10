@@ -117,33 +117,34 @@ let trace
   Alpha_services.Helpers.trace_code cctxt
     block program.expanded (storage.expanded, input.expanded, amount, contract)
 
-let hash_and_sign (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser.parsed) sk block cctxt =
-  Alpha_services.Helpers.hash_data cctxt block (data.expanded, typ.expanded) >>=? fun hash ->
+let hash_and_sign ?gas (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser.parsed) sk block cctxt =
+  Alpha_services.Helpers.hash_data cctxt block (data.expanded, typ.expanded, gas) >>=? fun (hash, gas) ->
   Client_keys.sign sk (MBytes.of_string hash) >>=? fun signature ->
   let `Hex signature = Signature.to_hex signature in
-  return (hash, signature)
+  return (hash, signature, gas)
 
 let typecheck_data
+    ?gas
     ~(data : Michelson_v1_parser.parsed)
     ~(ty : Michelson_v1_parser.parsed)
     block cctxt =
-  Alpha_services.Helpers.typecheck_data cctxt block (data.expanded, ty.expanded)
+  Alpha_services.Helpers.typecheck_data cctxt block (data.expanded, ty.expanded, gas)
 
-let typecheck_program (program : Michelson_v1_parser.parsed) block cctxt =
-  Alpha_services.Helpers.typecheck_code cctxt block program.expanded
+let typecheck_program ?gas (program : Michelson_v1_parser.parsed) block cctxt =
+  Alpha_services.Helpers.typecheck_code cctxt block (program.expanded, gas)
 
 let print_typecheck_result
-    ~emacs ~show_types ~print_source_on_error
+    ~emacs ~show_types ~print_source_on_error ~original_gas
     program res (cctxt : #Client_context.printer) =
   if emacs then
-    let type_map, errs = match res with
-      | Ok type_map -> type_map, []
+    let type_map, errs, _gas = match res with
+      | Ok (type_map, gas) -> (type_map, [], Some gas)
       | Error (Alpha_environment.Ecoproto_error
                  (Script_tc_errors.Ill_typed_contract (_, type_map ))
                :: _ as errs) ->
-          type_map, errs
+          (type_map, errs, None)
       | Error errs ->
-          [], errs in
+          ([], errs, None) in
     cctxt#message
       "(@[<v 0>(types . %a)@ (errors . %a)@])"
       Michelson_v1_emacs.print_type_map (program, type_map)
@@ -151,9 +152,11 @@ let print_typecheck_result
     return ()
   else
     match res with
-    | Ok type_map ->
+    | Ok (type_map, gas) ->
         let program = Michelson_v1_printer.inject_types type_map program in
-        cctxt#message "Well typed" >>= fun () ->
+        cctxt#message "@[<v 0>Well typed@,Gas used: %a@,Gas remaining: %a@]"
+          Gas.pp (Gas.used ~original:original_gas ~current:gas)
+          Gas.pp gas >>= fun () ->
         if show_types then
           cctxt#message "%a" Micheline_printer.print_expr program >>= fun () ->
           return ()

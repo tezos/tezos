@@ -37,15 +37,16 @@ val trace_code:
 
 val typecheck_code:
   'a #RPC_context.simple ->
-  'a -> Script.expr -> Script_tc_errors.type_map shell_tzresult Lwt.t
+  'a -> (Script.expr * Gas.t option) ->
+  (Script_tc_errors.type_map * Gas.t) shell_tzresult Lwt.t
 
 val typecheck_data:
   'a #RPC_context.simple ->
-  'a -> Script.expr * Script.expr -> unit shell_tzresult Lwt.t
+  'a -> Script.expr * Script.expr * (Gas.t option) -> Gas.t shell_tzresult Lwt.t
 
 val hash_data:
   'a #RPC_context.simple ->
-  'a -> Script.expr * Script.expr -> string shell_tzresult Lwt.t
+  'a -> Script.expr * Script.expr * (Gas.t option) -> (string * Gas.t) shell_tzresult Lwt.t
 
 val level:
   'a #RPC_context.simple ->

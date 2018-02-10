@@ -77,8 +77,12 @@ module S = struct
     RPC_service.post_service
       ~description: "Typecheck a piece of code in the current context"
       ~query: RPC_query.empty
-      ~input: Script.expr_encoding
-      ~output: Script_tc_errors_registration.type_map_enc
+      ~input: (obj2
+                 (req "program" Script.expr_encoding)
+                 (opt "gas" Gas.encoding))
+      ~output: (obj2
+                  (req "type_map" Script_tc_errors_registration.type_map_enc)
+                  (req "gas" Gas.encoding))
       RPC_path.(custom_root / "typecheck_code")
 
   let typecheck_data =
@@ -86,19 +90,25 @@ module S = struct
       ~description: "Check that some data expression is well formed \
                      and of a given type in the current context"
       ~query: RPC_query.empty
-      ~input: (obj2
+      ~input: (obj3
                  (req "data" Script.expr_encoding)
-                 (req "type" Script.expr_encoding))
-      ~output: empty
+                 (req "type" Script.expr_encoding)
+                 (opt "gas" Gas.encoding))
+      ~output: (obj1 (req "gas" Gas.encoding))
       RPC_path.(custom_root / "typecheck_data")
 
   let hash_data =
     RPC_service.post_service
       ~description: "Computes the hash of some data expression \
                      using the same algorithm as script instruction H"
-      ~input: (obj2 (req "data" Script.expr_encoding)
-                 (req "type" Script.expr_encoding))
-      ~output: (obj1 (req "hash" string))
+
+      ~input: (obj3
+                 (req "data" Script.expr_encoding)
+                 (req "type" Script.expr_encoding)
+                 (opt "gas" Gas.encoding))
+      ~output: (obj2
+                  (req "hash" string)
+                  (req "gas" Gas.encoding))
       ~query: RPC_query.empty
       RPC_path.(custom_root / "hash_data")
 
@@ -191,17 +201,30 @@ let () =
             Option.map maybe_big_map_diff
               ~f:Script_ir_translator.to_printable_big_map)
   end ;
-  register0 S.typecheck_code begin fun ctxt () ->
+  register0 S.typecheck_code begin fun ctxt () (expr, maybe_gas) ->
     Script_ir_translator.typecheck_code ctxt
+      (match maybe_gas with
+       | None -> Gas.of_int (Constants.max_gas ctxt)
+       | Some gas -> gas)
+      expr
   end ;
-  register0 S.typecheck_data begin fun ctxt () ->
+  register0 S.typecheck_data begin fun ctxt () (data, ty, maybe_gas) ->
     Script_ir_translator.typecheck_data ctxt
+      (match maybe_gas with
+       | None -> Gas.of_int (Constants.max_gas ctxt)
+       | Some gas -> gas)
+      (data, ty)
   end ;
-  register0 S.hash_data begin fun ctxt () (expr, typ) ->
+  register0 S.hash_data begin fun ctxt () (expr, typ, maybe_gas) ->
     let open Script_ir_translator in
-    Lwt.return @@ parse_ty false (Micheline.root typ) >>=? fun (Ex_ty typ, _) ->
-    parse_data ctxt typ (Micheline.root expr) >>=? fun data ->
-    return (Script_ir_translator.hash_data typ data)
+    Lwt.return @@
+    parse_ty
+      (match maybe_gas with
+       | None -> Gas.of_int (Constants.max_gas ctxt)
+       | Some gas -> gas)
+      false (Micheline.root typ) >>=? fun ((Ex_ty typ, _), gas) ->
+    parse_data ctxt gas typ (Micheline.root expr) >>=? fun (data, gas) ->
+    Lwt.return @@ Script_ir_translator.hash_data gas typ data
   end ;
   register1 S.level begin fun ctxt raw () offset ->
     return (Level.from_raw ctxt ?offset raw)

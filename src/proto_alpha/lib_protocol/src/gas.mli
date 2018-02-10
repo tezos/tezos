@@ -21,12 +21,20 @@ val encoding_cost : cost Data_encoding.encoding
 val pp_cost : Format.formatter -> cost -> unit
 
 val check : t -> unit tzresult Lwt.t
+val consume_check : t -> cost -> t tzresult Lwt.t
+val check_error : t -> unit tzresult
+val consume_check_error : t -> cost -> t tzresult
 type error += Quota_exceeded
 
 val of_int : int -> t
 
+val used : original:t -> current:t -> t
+
+val max_gas : t
+
 module Cost_of : sig
   val cycle : cost
+  val typechecking_cycle : cost
   val loop_cycle : cost
   val list_size : cost
   val nop : cost
@@ -52,7 +60,7 @@ module Cost_of : sig
   val big_map_get : 'key -> ('key, 'value) Script_typed_ir.big_map -> cost
   val big_map_update : 'key -> 'value option -> ('key, 'value) Script_typed_ir.big_map -> cost
   val set_to_list : 'a Script_typed_ir.set -> cost
-  val set_update : 'a -> 'b -> 'a Script_typed_ir.set -> cost
+  val set_update : 'a -> bool -> 'a Script_typed_ir.set -> cost
   val set_mem : 'a -> 'a Script_typed_ir.set -> cost
   val mul : 'a Script_int.num -> 'b Script_int.num -> cost
   val div : 'a Script_int.num -> 'b Script_int.num -> cost
@@ -103,5 +111,97 @@ module Cost_of : sig
   val compare_nat : 'a Script_int.num -> 'b Script_int.num -> cost
   val compare_key_hash : 'a -> 'b -> cost
   val compare_timestamp : Script_timestamp.t -> Script_timestamp.t -> cost
+
+  module Typechecking : sig
+    val cycle : cost
+    val unit : cost
+    val bool : cost
+    val tez : cost
+    val string : int -> cost
+    val int_of_string : string -> cost
+    val string_timestamp : cost
+    val key : cost
+    val key_hash : cost
+    val signature : cost
+
+    val contract : cost
+
+    (** Cost of getting the code for a contract *)
+    val get_script : cost
+
+    val contract_exists : cost
+
+    (** Additional cost of parsing a pair over the cost of parsing each type  *)
+    val pair : cost
+
+    val union : cost
+
+    val lambda : cost
+
+    val some : cost
+    val none : cost
+
+    val list_element : cost
+    val set_element : cost
+    val map_element : cost
+
+    val primitive_type : cost
+    val one_arg_type : cost
+    val two_arg_type : cost
+  end
+
+  module Unparse : sig
+    val cycle : cost
+    val unit : cost
+    val bool : cost
+    val int : 'a Script_int.num -> cost
+    val tez : cost
+    val string : string -> cost
+    val timestamp : Script_timestamp.t -> cost
+    val key : cost
+    val key_hash : cost
+    val signature : cost
+
+    val contract : cost
+
+    (** Additional cost of parsing a pair over the cost of parsing each type  *)
+    val pair : cost
+
+    val union : cost
+
+    val lambda : cost
+
+    val some : cost
+    val none : cost
+
+    val list_element : cost
+    val set_element : cost
+    val map_element : cost
+
+    val primitive_type : cost
+    val one_arg_type : cost
+    val two_arg_type : cost
+    val set_to_list : 'a Script_typed_ir.set -> cost
+    val map_to_list : ('a, 'b) Script_typed_ir.map -> cost
+  end
 end
 
+val fold_left : ?cycle_cost:cost ->
+  t ->
+  (t -> 'a -> 'b -> ('b * t) tzresult Lwt.t) ->
+  'b -> 'a list -> ('b * t) tzresult Lwt.t
+
+val fold_right : ?cycle_cost:cost ->
+  t ->
+  (t -> 'a -> 'b -> ('b * t) tzresult Lwt.t) ->
+  'b -> 'a list -> ('b * t) tzresult Lwt.t
+
+val fold_right_error : ?cycle_cost:cost ->
+  t ->
+  (t -> 'a -> 'b -> ('b * t) tzresult) ->
+  'b -> 'a list -> ('b * t) tzresult
+
+val fold_left_error : ?cycle_cost:cost ->
+  t ->
+  (t -> 'a -> 'b -> ('b * t) tzresult) ->
+  'b -> 'a list -> ('b * t) tzresult

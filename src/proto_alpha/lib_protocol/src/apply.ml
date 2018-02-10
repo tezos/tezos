@@ -386,35 +386,35 @@ let apply_manager_operation_content
               | _ -> fail (Bad_contract_parameter (destination, None, parameters))
         end
       | Some script ->
-          let call_contract argument =
+          let gas = Gas.of_int (Constants.max_gas ctxt) in
+          let call_contract argument gas =
             Script_interpreter.execute
               origination_nonce
               source destination ctxt script amount argument
-              (Gas.of_int (Constants.max_gas ctxt))
+              gas
             >>= function
-            | Ok (storage_res, _res, _steps, ctxt, origination_nonce, maybe_big_map_diff) ->
-                (* TODO: pay for the steps and the storage diff:
-                   update_script_storage checks the storage cost *)
+            | Ok (storage_res, _res, gas, ctxt, origination_nonce, maybe_big_map_diff) ->
+                begin match maybe_big_map_diff with
+                  | None -> return (None, gas)
+                  | Some map ->
+                      Script_ir_translator.to_serializable_big_map gas map >>=? fun (diff, gas) ->
+                      return (Some diff, gas) end >>=? fun (diff, _gas) ->
                 Contract.update_script_storage
                   ctxt destination
-                  storage_res
-                  (match maybe_big_map_diff with
-                   | None -> None
-                   | Some map ->
-                       Some (Script_ir_translator.to_serializable_big_map map)) >>=? fun ctxt ->
+                  storage_res diff >>=? fun ctxt ->
                 Fees.update_script_storage ctxt ~source
                   destination Script_interpreter.dummy_storage_fee >>=? fun ctxt ->
                 return (ctxt, origination_nonce, None)
             | Error err ->
                 return (ctxt, origination_nonce, Some err) in
-          Lwt.return (Script_ir_translator.parse_toplevel script.code) >>=? fun (arg_type, _, _, _) ->
+          Lwt.return @@ Script_ir_translator.parse_toplevel gas script.code >>=? fun ((arg_type, _, _, _), gas) ->
           let arg_type = Micheline.strip_locations arg_type in
           match parameters, Micheline.root arg_type with
           | None, Prim (_, T_unit, _, _) ->
-              call_contract (Micheline.strip_locations (Prim (0, Script.D_Unit, [], None)))
+              call_contract (Micheline.strip_locations (Prim (0, Script.D_Unit, [], None))) gas
           | Some parameters, _ -> begin
-              Script_ir_translator.typecheck_data ctxt (parameters, arg_type) >>= function
-              | Ok () -> call_contract parameters
+              Script_ir_translator.typecheck_data ctxt gas (parameters, arg_type) >>= function
+              | Ok gas -> call_contract parameters gas
               | Error errs ->
                   let err = Bad_contract_parameter (destination, Some arg_type, Some parameters) in
                   return (ctxt, origination_nonce, Some ((err :: errs)))
@@ -423,14 +423,15 @@ let apply_manager_operation_content
     end
   | Origination { manager ; delegate ; script ;
                   spendable ; delegatable ; credit } ->
+      let gas = Gas.of_int (Constants.max_gas ctxt) in
       begin match script with
-        | None -> return (None, None)
+        | None -> return (None, None, gas)
         | Some script ->
-            Script_ir_translator.parse_script ctxt script >>=? fun _ ->
-            Script_ir_translator.erase_big_map_initialization ctxt script >>=? fun (script, big_map_diff) ->
+            Script_ir_translator.parse_script ctxt gas script >>=? fun (_, gas) ->
+            Script_ir_translator.erase_big_map_initialization ctxt gas script >>=? fun (script, big_map_diff, gas) ->
             return (Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)),
-                    big_map_diff)
-      end >>=? fun (script, big_map) ->
+                    big_map_diff, gas)
+      end >>=? fun (script, big_map, _gas) ->
       Contract.spend ctxt source credit >>=? fun ctxt ->
       Contract.originate ctxt
         origination_nonce

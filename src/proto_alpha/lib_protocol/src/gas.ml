@@ -32,6 +32,9 @@ let pp ppf { remaining } =
 
 let of_int remaining = { remaining }
 
+(* Maximum gas representable on a 64 bit system *)
+let max_gas = of_int 4611686018427387903
+
 let encoding_cost =
   let open Data_encoding in
   conv
@@ -57,19 +60,35 @@ let bits_per_word = 8 * bytes_per_word
 let words_of_bits n =
   n / bits_per_word
 
-let check gas =
+let check_error gas =
   if Compare.Int.(gas.remaining <= 0)
-  then fail Quota_exceeded
-  else return ()
+  then error Quota_exceeded
+  else ok ()
+
+let check gas =
+  Lwt.return @@ check_error gas
 
 let word_cost = 2
 let step_cost = 1
+
+let used ~original ~current =
+  { remaining = original.remaining - current.remaining }
 
 let consume t cost =
   { remaining =
       t.remaining
       - word_cost * cost.allocations
       - step_cost * cost.steps }
+
+let consume_check gas cost =
+  let gas = consume gas cost in
+  check gas >>|? fun () ->
+  gas
+
+let consume_check_error gas cost =
+  let gas = consume gas cost in
+  check_error gas >|? fun () ->
+  gas
 
 (* Cost for heap allocating n words of data. *)
 let alloc_cost n =
@@ -97,6 +116,7 @@ let max = Compare.Int.max
 
 module Cost_of = struct
   let cycle = step_cost 1
+  let typechecking_cycle = cycle
   let nop = free
 
   let stack_op = step_cost 1
@@ -113,9 +133,12 @@ module Cost_of = struct
 
   let branch = step_cost 2
 
+  let string length =
+    alloc_cost (length / bytes_per_word)
+
   let concat s1 s2 =
     let (+) = Pervasives.(+) in
-    alloc_cost ((String.length s1 + String.length s2) / bytes_per_word)
+    string ((String.length s1 + String.length s2) / bytes_per_word)
 
   (* Cost per cycle of a loop, fold, etc *)
   let loop_cycle = step_cost 2
@@ -159,7 +182,7 @@ module Cost_of = struct
 
   let set_mem key set = step_cost (set_access key set)
 
-  let set_update key _value set =
+  let set_update key _presence set =
     set_access key set * alloc_cost 3
 
   (* for LEFT, RIGHT, SOME *)
@@ -247,7 +270,6 @@ module Cost_of = struct
      Z.numbits (Script_int.to_zint x) -
      unopt (Script_int.to_int y) ~default:max_int)
 
-
   let exec = step_cost 1
 
   let push = step_cost 1
@@ -281,7 +303,104 @@ module Cost_of = struct
   let compare_key_hash _ _ = alloc_cost (36 / bytes_per_word)
   let compare_timestamp t1 t2 = compare_zint (Script_timestamp.to_zint t1) (Script_timestamp.to_zint t2)
 
+  module Typechecking = struct
+    let cycle = step_cost 1
+    let bool = free
+    let unit = free
+    let string = string
+    let int_of_string str =
+      alloc_cost @@ (Pervasives.(/) (String.length str) 5)
+    let tez = step_cost 1 + alloc_cost 1
+    let string_timestamp = step_cost 3 + alloc_cost 3
+    let key = step_cost 3 + alloc_cost 3
+    let key_hash = step_cost 1 + alloc_cost 1
+    let signature = step_cost 1 + alloc_cost 1
+    let contract = step_cost 5
+    let get_script = step_cost 20 + alloc_cost 5
+    let contract_exists = step_cost 15 + alloc_cost 5
+    let pair = alloc_cost 2
+    let union = alloc_cost 1
+    let lambda = alloc_cost 5 + step_cost 3
+    let some = alloc_cost 1
+    let none = alloc_cost 0
+    let list_element = alloc_cost 2 + step_cost 1
+    let set_element = alloc_cost 3 + step_cost 2
+    let map_element = alloc_cost 4 + step_cost 2
+    let primitive_type = alloc_cost 1
+    let one_arg_type = alloc_cost 2
+    let two_arg_type = alloc_cost 3
+  end
+
+  module Unparse = struct
+    let prim_cost = alloc_cost 4 (* location, primitive name, list, annotation *)
+    let string_cost length =
+      alloc_cost 3 + alloc_cost (length / bytes_per_word)
+
+    let cycle = step_cost 1
+    let bool = prim_cost
+    let unit = prim_cost
+    let string s = string_cost (String.length s)
+    (* Approximates log10(x) *)
+    let int i =
+      let decimal_digits = (Z.numbits (Z.abs (Script_int.to_zint i))) / 4 in
+      prim_cost + (alloc_cost @@ decimal_digits / bytes_per_word)
+    let tez = string_cost 19 (* max length of 64 bit int *)
+    let timestamp x = Script_timestamp.to_zint x |> Script_int.of_zint |> int
+    let key = string_cost 54
+    let key_hash = string_cost 36
+    let signature = string_cost 128
+    let contract = string_cost 36
+    let pair = prim_cost + alloc_cost 4
+    let union = prim_cost + alloc_cost 2
+    let lambda = prim_cost + alloc_cost 3
+    let some = prim_cost + alloc_cost 2
+    let none = prim_cost
+    let list_element = prim_cost + alloc_cost 2
+    let set_element = alloc_cost 2
+    let map_element = alloc_cost 2
+    let primitive_type = prim_cost
+    let one_arg_type = prim_cost + alloc_cost 2
+    let two_arg_type = prim_cost + alloc_cost 4
+
+    let set_to_list = set_to_list
+    let map_to_list = map_to_list
+  end
+
 end
+
+(* f should fail if it does not receive sufficient gas *)
+let rec fold_left ?(cycle_cost = Cost_of.loop_cycle) gas f acc l =
+  consume_check gas cycle_cost >>=? fun gas ->
+  match l with
+  | [] -> return (acc, gas)
+  | hd :: tl -> f gas hd acc >>=? fun (acc, gas) ->
+      fold_left gas f acc tl
+
+(* f should fail if it does not receive sufficient gas *)
+let rec fold_right ?(cycle_cost = Cost_of.loop_cycle) gas f base l =
+  consume_check gas cycle_cost >>=? fun gas ->
+  match l with
+  | [] -> return (base, gas)
+  | hd :: tl ->
+      fold_right gas f base tl >>=? fun (acc, gas) ->
+      f gas hd acc
+
+(* f should fail if it does not receive sufficient gas *)
+let rec fold_right_error ?(cycle_cost = Cost_of.loop_cycle) gas f base l =
+  consume_check_error gas cycle_cost >>? fun gas ->
+  match l with
+  | [] -> ok (base, gas)
+  | hd :: tl ->
+      fold_right_error gas f base tl >>? fun (acc, gas) ->
+      f gas hd acc
+
+(* f should fail if it does not receive sufficient gas *)
+let rec fold_left_error ?(cycle_cost = Cost_of.loop_cycle) gas f acc l =
+  consume_check_error gas cycle_cost >>? fun gas ->
+  match l with
+  | [] -> ok (acc, gas)
+  | hd :: tl -> f gas hd acc >>? fun (acc, gas) ->
+      fold_left_error gas f acc tl
 
 let () =
   let open Data_encoding in
