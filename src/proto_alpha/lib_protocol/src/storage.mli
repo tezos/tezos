@@ -209,7 +209,7 @@ module Seed : sig
 
   type nonce_status =
     | Unrevealed of {
-        nonce_hash: Tezos_hash.Nonce_hash.t ;
+        nonce_hash: Nonce_hash.t ;
         delegate_to_reward: Ed25519.Public_key_hash.t ;
         reward_amount: Tez_repr.t ;
       }

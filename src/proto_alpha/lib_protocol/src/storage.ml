@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_hash
 open Storage_functors
 
 module Int32 = struct

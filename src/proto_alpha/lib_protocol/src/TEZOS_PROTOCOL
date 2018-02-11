@@ -2,7 +2,10 @@
     "hash": "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK",
     "modules": [
         "Misc",
-        "Tezos_hash",
+        "State_hash",
+        "Nonce_hash",
+        "Script_expr_hash",
+        "Contract_hash",
 
         "Qty_repr",
         "Tez_repr",

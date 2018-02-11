@@ -2130,7 +2130,7 @@ let typecheck_data
 let hash_data typ data =
   let unparsed = strip_annotations @@ unparse_data typ data in
   let bytes = Data_encoding.Binary.to_bytes expr_encoding (Micheline.strip_locations unparsed) in
-  Tezos_hash.Script_expr_hash.(hash_bytes [ bytes ] |> to_b58check)
+  Script_expr_hash.(hash_bytes [ bytes ] |> to_b58check)
 
 (* ---------------- Big map -------------------------------------------------*)
 

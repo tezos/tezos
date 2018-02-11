@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_hash
-
 (** Tezos Protocol Implementation - Random number generation
 
     This is not expected to be a good cryptographic random number

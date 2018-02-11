@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_hash
-
 (** Exported type *)
 type t = {
   shell: Block_header.shell_header ;

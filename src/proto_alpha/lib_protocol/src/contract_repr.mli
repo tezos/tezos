@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_hash
-
 type t = private
   | Default of Ed25519.Public_key_hash.t
   | Originated of Contract_hash.t

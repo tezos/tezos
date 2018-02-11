@@ -9,8 +9,6 @@
 
 (* Tezos Protocol Implementation - Random number generation *)
 
-open Tezos_hash
-
 type seed = B of State_hash.t
 type t = T of State_hash.t
 type sequence = S of State_hash.t

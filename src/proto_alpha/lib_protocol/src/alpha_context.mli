@@ -17,10 +17,6 @@ end
 type t
 type context = t
 
-module Contract_hash = Tezos_hash.Contract_hash
-
-module Nonce_hash = Tezos_hash.Nonce_hash
-
 type public_key = Ed25519.Public_key.t
 type public_key_hash = Ed25519.Public_key_hash.t
 type secret_key = Ed25519.Secret_key.t
