@@ -664,10 +664,10 @@ module MakeService(Encoding : ENCODING) = struct
   }
 
   let forge_request_args
-    : type p. (unit, p) path -> p -> string list
+    : type pr p. (pr, p) path -> p -> string list
     = fun path args ->
       let rec forge_request_args
-        : type k. (unit, k) rpath -> k -> string list -> string list
+        : type k. (pr, k) rpath -> k -> string list -> string list
         = fun path args acc ->
           match path, args with
           | Root, _ ->
@@ -711,9 +711,9 @@ module MakeService(Encoding : ENCODING) = struct
           end in
       loop fields
 
-  let forge_request
-    : type p i q o e.
-      (_, unit, p, q, i, o, e) service -> ?base:Uri.t -> p -> q -> i request
+  let forge_partial_request
+    : type pr p i q o e.
+      (_, pr, p, q, i, o, e) service -> ?base:Uri.t -> p -> q -> i request
     = fun s ?base:(uri = Uri.empty) args query ->
       let path = String.concat "/" (forge_request_args s.path args) in
       let prefix = Uri.path uri in
@@ -722,9 +722,14 @@ module MakeService(Encoding : ENCODING) = struct
       let uri = Uri.with_query' uri (forge_request_query s.types.query query) in
       { meth = s.meth ; uri ; input = s.types.input }
 
-  let forge_request =
-    (forge_request
+  let forge_partial_request =
+    (forge_partial_request
      : (meth, _, _, _, _, _, _) service -> _
      :> ([< meth], _, _, _, _, _, _) service -> _ )
+
+  let forge_request =
+    (forge_partial_request
+     : (meth, _, _, _, _, _, _) service -> _
+     :> ([< meth], unit, _, _, _, _, _) service -> _ )
 
 end

@@ -363,6 +363,10 @@ module MakeService(Encoding : ENCODING) : sig
     ('meth, unit, 'params, 'query, 'input, 'output, 'error) service ->
     ?base:Uri.t -> 'params -> 'query -> 'input request
 
+  val forge_partial_request:
+    ('meth, 'prefix, 'params, 'query, 'input, 'output, 'error) service ->
+    ?base:Uri.t -> 'params -> 'query -> 'input request
+
   module Internal : sig
 
     include (module type of (struct include Internal end))
