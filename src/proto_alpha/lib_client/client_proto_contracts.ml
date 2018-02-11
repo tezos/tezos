@@ -132,18 +132,18 @@ let list_contracts cctxt =
 let get_manager cctxt block source =
   match Contract.is_default source with
   | Some hash -> return hash
-  | None -> Client_proto_rpcs.Context.Contract.manager cctxt block source
+  | None -> Alpha_services.Contract.manager cctxt block source
 
 let get_delegate cctxt block source =
   match Contract.is_default source with
   | Some hash -> return hash
   | None ->
-      Client_proto_rpcs.Context.Contract.delegate cctxt
+      Alpha_services.Contract.delegate_opt cctxt
         block source >>=? function
       | Some delegate ->
           return delegate
       | None ->
-          Client_proto_rpcs.Context.Contract.manager cctxt block source
+          Alpha_services.Contract.manager cctxt block source
 
 let may_check_key sourcePubKey sourcePubKeyHash =
   match sourcePubKey with
@@ -156,7 +156,7 @@ let may_check_key sourcePubKey sourcePubKeyHash =
       return ()
 
 let check_public_key cctxt block ?src_pk src_pk_hash =
-  Client_proto_rpcs.Context.Key.get cctxt block src_pk_hash >>= function
+  Alpha_services.Delegate.Key.get cctxt block src_pk_hash >>= function
   | Error errors ->
       begin
         match src_pk with

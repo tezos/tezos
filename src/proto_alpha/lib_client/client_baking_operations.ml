@@ -24,7 +24,7 @@ let monitor cctxt ?contents ?check () =
          match op with
          | None -> return { hash; content = None }
          | Some (op : Operation.raw) ->
-             Client_proto_rpcs.Helpers.Parse.operations cctxt
+             Alpha_services.Parse.operations cctxt
                `Prevalidation ?check [op] >>=? function
              | [proto] ->
                  return { hash ; content = Some proto }

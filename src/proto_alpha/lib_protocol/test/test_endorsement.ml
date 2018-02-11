@@ -49,7 +49,7 @@ let test_endorsement_payment () =
   let open Proto_alpha.Alpha_context in
   get_tc_full root >>=? fun tc ->
   let level = Level.succ tc @@ Level.current tc in
-  Proto_alpha.Services_registration.endorsement_rights tc level None >>=? fun (_, endorsers) ->
+  Alpha_services.Delegate.endorsement_rights tc level None >>=? fun (_, endorsers) ->
 
   let aux (endorser_slot, block_priority) =
     let contract_p =
@@ -98,7 +98,7 @@ let test_multiple_endorsement () =
   Init.main () >>=? fun pred ->
   let tc = pred.tezos_context in
   let level = Level.current tc in
-  Proto_alpha.Services_registration.endorsement_rights tc level None >>=? fun (_, endorsers) ->
+  Alpha_services.Delegate.endorsement_rights tc level None >>=? fun (_, endorsers) ->
   let endorser =
     Misc.find_account Account.bootstrap_accounts
     @@ List.nth endorsers 0 in

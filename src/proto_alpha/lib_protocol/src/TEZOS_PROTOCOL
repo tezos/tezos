@@ -59,8 +59,12 @@
         "Amendment",
         "Apply",
 
-        "Services",
         "Services_registration",
+        "Constants_services",
+        "Contract_services",
+        "Delegate_services",
+        "Helpers_services",
+        "Alpha_services",
 
         "Main"
     ]

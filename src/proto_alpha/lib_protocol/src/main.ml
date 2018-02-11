@@ -21,7 +21,7 @@ let validation_passes =
   Updater.[ { max_size = 32 * 1024 ; max_op = None  } ; (* 32kB FIXME *)
             { max_size = 1024 * 1024 ; max_op = None  } ] (* 1MB *)
 
-let rpc_services = Services_registration.rpc_services
+let rpc_services = Services_registration.get_rpc_services ()
 
 type validation_mode =
   | Application of {

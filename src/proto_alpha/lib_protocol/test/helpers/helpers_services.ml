@@ -7,17 +7,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_alpha.Alpha_context
+open Proto_alpha
+open Alpha_context
 open Helpers_assert
 
 let endorsement_rights ~tc () =
   let level = Level.current tc in
-  Proto_alpha.Services_registration.endorsement_rights tc level None >>=?? fun (_, endorsers) ->
+  Alpha_services.Delegate.endorsement_rights tc level None >>=?? fun (_, endorsers) ->
   return @@ List.mapi (fun x i -> x, i) endorsers
 
 
 let baking_rights ~tc () =
-  let level = Level.succ tc @@ Level.current tc in
-  Proto_alpha.Services_registration.baking_rights tc level None >>=?? fun (_, bakers) ->
-  return @@ List.mapi (fun x i -> x, i) bakers
+  Alpha_services.Delegate.baking_rights tc () None >>=?? fun (_, bakers) ->
+  return @@ List.mapi (fun x (i,_) -> x, i) bakers
 

@@ -14,10 +14,10 @@ open Client_proto_contracts
 open Client_keys
 
 let get_balance (rpc : #Proto_alpha.rpc_context) block contract =
-  Client_proto_rpcs.Context.Contract.balance rpc block contract
+  Alpha_services.Contract.balance rpc block contract
 
 let get_storage (rpc : #Proto_alpha.rpc_context) block contract =
-  Client_proto_rpcs.Context.Contract.storage rpc block contract
+  Alpha_services.Contract.storage_opt rpc block contract
 
 let rec find_predecessor rpc_config h n =
   if n <= 0 then
@@ -54,10 +54,10 @@ let transfer rpc_config
         return (Some arg)
     | None -> return None
   end >>=? fun parameters ->
-  Client_proto_rpcs.Context.Contract.counter
+  Alpha_services.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
-  Client_proto_rpcs.Helpers.Forge.Manager.transaction
+  Alpha_services.Forge.Manager.transaction
     rpc_config block
     ~branch ~source ~sourcePubKey:src_pk ~counter ~amount
     ~destination ?parameters ~fee () >>=? fun bytes ->
@@ -66,7 +66,7 @@ let transfer rpc_config
   let signed_bytes =
     MBytes.concat bytes (Ed25519.Signature.to_bytes signature) in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Client_proto_rpcs.Helpers.apply_operation rpc_config block
+  Alpha_services.Helpers.apply_operation rpc_config block
     predecessor oph bytes (Some signature) >>=? fun contracts ->
   Shell_services.inject_operation
     rpc_config ~net_id signed_bytes >>=? fun injected_oph ->
@@ -80,7 +80,7 @@ let originate rpc_config ?net_id ~block ?signature bytes =
     | Some signature -> Ed25519.Signature.concat bytes signature in
   Block_services.predecessor rpc_config block >>=? fun predecessor ->
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
-  Client_proto_rpcs.Helpers.apply_operation rpc_config block
+  Alpha_services.Helpers.apply_operation rpc_config block
     predecessor oph bytes signature >>=? function
   | [ contract ] ->
       Shell_services.inject_operation
@@ -106,10 +106,10 @@ let originate_account ?branch
     ~source ~src_pk ~src_sk ~manager_pkh
     ?delegatable ?delegate ~balance ~fee block rpc_config () =
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
-  Client_proto_rpcs.Context.Contract.counter
+  Alpha_services.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
-  Client_proto_rpcs.Helpers.Forge.Manager.origination rpc_config block
+  Alpha_services.Forge.Manager.origination rpc_config block
     ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager_pkh
     ~counter ~balance ~spendable:true
     ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
@@ -118,8 +118,9 @@ let originate_account ?branch
 
 let faucet ?branch ~manager_pkh block rpc_config () =
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
-  Client_proto_rpcs.Helpers.Forge.Anonymous.faucet
-    rpc_config block ~branch ~id:manager_pkh () >>=? fun bytes ->
+  let nonce = Rand.generate Constants_repr.nonce_length in
+  Alpha_services.Forge.Anonymous.faucet
+    rpc_config block ~branch ~id:manager_pkh ~nonce () >>=? fun bytes ->
   originate rpc_config ~net_id ~block bytes
 
 let delegate_contract rpc_config
@@ -127,10 +128,10 @@ let delegate_contract rpc_config
     ~source ?src_pk ~manager_sk
     ~fee delegate_opt =
   get_branch rpc_config block branch >>=? fun (net_id, branch) ->
-  Client_proto_rpcs.Context.Contract.counter
+  Alpha_services.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
-  Client_proto_rpcs.Helpers.Forge.Manager.delegation rpc_config block
+  Alpha_services.Forge.Manager.delegation rpc_config block
     ~branch ~source ?sourcePubKey:src_pk ~counter ~fee delegate_opt
   >>=? fun bytes ->
   Client_keys.sign manager_sk bytes >>=? fun signature ->
@@ -141,8 +142,8 @@ let delegate_contract rpc_config
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
 
-let list_contract_labels (cctxt : #Client_commands.full_context) block =
-  Client_proto_rpcs.Context.Contract.list
+let list_contract_labels (cctxt : #Proto_alpha.full_context) block =
+  Alpha_services.Contract.list
     cctxt block >>=? fun contracts ->
   map_s (fun h ->
       begin match Contract.is_default h with
@@ -167,10 +168,10 @@ let list_contract_labels (cctxt : #Client_commands.full_context) block =
       return (nm, h_b58, kind))
     contracts
 
-let message_added_contract (cctxt : #Client_commands.full_context) name =
+let message_added_contract (cctxt : #Proto_alpha.full_context) name =
   cctxt#message "Contract memorized as %s." name
 
-let get_manager (cctxt : #Client_commands.full_context) block source =
+let get_manager (cctxt : #Proto_alpha.full_context) block source =
   Client_proto_contracts.get_manager
     cctxt block source >>=? fun src_pkh ->
   Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
@@ -180,7 +181,7 @@ let dictate rpc_config block command seckey =
   let block = Block_services.last_baked_block block in
   Block_services.info
     rpc_config block >>=? fun { net_id ; hash = branch } ->
-  Client_proto_rpcs.Helpers.Forge.Dictator.operation
+  Alpha_services.Forge.Dictator.operation
     rpc_config block ~branch command >>=? fun bytes ->
   let signature = Ed25519.sign seckey bytes in
   let signed_bytes = Ed25519.Signature.concat bytes signature in
@@ -221,11 +222,11 @@ let originate_contract
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
   fun { Michelson_v1_parser.expanded = storage } ->
   let block = cctxt#block in
-  Client_proto_rpcs.Context.Contract.counter
+  Alpha_services.Contract.counter
     cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
   get_branch cctxt block None >>=? fun (_net_id, branch) ->
-  Client_proto_rpcs.Helpers.Forge.Manager.origination cctxt block
+  Alpha_services.Forge.Manager.origination cctxt block
     ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager
     ~counter ~balance ~spendable:spendable
     ~delegatable ?delegatePubKey:delegate

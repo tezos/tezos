@@ -23,7 +23,7 @@ let generate_seed_nonce () =
 
 let forge_block_header
     cctxt block delegate_sk shell priority seed_nonce_hash =
-  Client_proto_rpcs.Constants.stamp_threshold
+  Alpha_services.Constants.proof_of_work_threshold
     cctxt block >>=? fun stamp_threshold ->
   let rec loop () =
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
@@ -133,22 +133,22 @@ let forge_block cctxt block
   end >>=? fun operations ->
   begin
     match priority with
-    | `Set prio -> begin
-        Client_proto_rpcs.Helpers.minimal_time
-          cctxt block ~prio () >>=? fun time ->
-        return (prio, time)
+    | `Set priority -> begin
+        Alpha_services.Helpers.minimal_time
+          cctxt block ~priority >>=? fun time ->
+        return (priority, time)
       end
     | `Auto (src_pkh, max_priority, free_baking) ->
-        Client_proto_rpcs.Context.next_level cctxt block >>=? fun { level } ->
-        Client_proto_rpcs.Helpers.Rights.baking_rights_for_delegate cctxt
+        Alpha_services.Context.next_level cctxt block >>=? fun { level } ->
+        Alpha_services.Delegate.Baker.rights_for_delegate cctxt
           ?max_priority
           ~first_level:level
           ~last_level:level
-          block src_pkh () >>=? fun possibilities ->
+          block src_pkh >>=? fun possibilities ->
         try
           begin
             if free_baking then
-              Client_proto_rpcs.Constants.first_free_baking_slot cctxt block
+              Alpha_services.Constants.first_free_baking_slot cctxt block
             else
               return 0
           end >>=? fun min_prio ->
@@ -304,11 +304,11 @@ let get_baking_slot cctxt
   let level = Raw_level.succ bi.level.level in
   Lwt_list.filter_map_p
     (fun delegate ->
-       Client_proto_rpcs.Helpers.Rights.baking_rights_for_delegate cctxt
+       Alpha_services.Delegate.Baker.rights_for_delegate cctxt
          ?max_priority
          ~first_level:level
          ~last_level:level
-         block delegate () >>= function
+         block delegate >>= function
        | Error errs ->
            log_error "Error while fetching baking possibilities:\n%a"
              pp_print_error errs ;
@@ -369,7 +369,7 @@ let compute_timeout { future_slots } =
         Lwt_unix.sleep (Int64.to_float delay)
 
 let get_unrevealed_nonces (cctxt : #Proto_alpha.full_context) ?(force = false) block =
-  Client_proto_rpcs.Context.next_level cctxt block >>=? fun level ->
+  Alpha_services.Context.next_level cctxt block >>=? fun level ->
   let cur_cycle = level.cycle in
   match Cycle.pred cur_cycle with
   | None -> return []
@@ -380,12 +380,12 @@ let get_unrevealed_nonces (cctxt : #Proto_alpha.full_context) ?(force = false) b
           Client_proto_nonces.find cctxt hash >>=? function
           | None -> return None
           | Some nonce ->
-              Client_proto_rpcs.Context.level
+              Alpha_services.Context.level
                 cctxt (`Hash hash) >>=? fun level ->
               if force then
                 return (Some (hash, (level.level, nonce)))
               else
-                Client_proto_rpcs.Context.Nonce.get
+                Alpha_services.Nonce.get
                   cctxt block level.level >>=? function
                 | Missing nonce_hash
                   when Nonce.check_hash nonce nonce_hash ->

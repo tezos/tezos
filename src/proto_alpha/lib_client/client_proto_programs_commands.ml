@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Proto_alpha
+
 let group =
   { Cli_entries.name = "programs" ;
     title = "Commands for managing the library of known programs" }
@@ -153,7 +155,7 @@ let commands () =
          data_parameter
        @@ stop)
       (fun () data typ cctxt ->
-         Client_proto_rpcs.Helpers.hash_data cctxt
+         Alpha_services.Helpers.hash_data cctxt
            cctxt#block (data.expanded, typ.expanded) >>= function
          | Ok hash ->
              cctxt#message "%S" hash >>= fun () ->

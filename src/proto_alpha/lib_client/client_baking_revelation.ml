@@ -17,7 +17,7 @@ let inject_seed_nonce_revelation rpc_config block ?async nonces =
          Seed_nonce_revelation { level ; nonce }) nonces in
   let block = Block_services.last_baked_block block in
   Block_services.info rpc_config block >>=? fun bi ->
-  Client_proto_rpcs.Helpers.Forge.Anonymous.operations rpc_config
+  Alpha_services.Forge.Anonymous.operations rpc_config
     block ~branch:bi.hash operations >>=? fun bytes ->
   Shell_services.inject_operation
     rpc_config ?async ~net_id:bi.net_id

@@ -19,7 +19,7 @@ let bake_block (cctxt : #Proto_alpha.full_context) block
         return src_sk
     | Some sk -> return sk
   end >>=? fun src_sk ->
-  Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
+  Alpha_services.Context.level cctxt block >>=? fun level ->
   let level = Raw_level.succ level.level in
   let seed_nonce = Client_baking_forge.generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in

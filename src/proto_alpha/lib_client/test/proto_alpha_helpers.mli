@@ -123,7 +123,7 @@ module Endorse : sig
     ?max_priority:int ->
     Account.t ->
     Block_services.block ->
-    Client_proto_rpcs.Helpers.Rights.endorsement_slot list tzresult Lwt.t
+    (Raw_level.t * int) list tzresult Lwt.t
 
 end
 

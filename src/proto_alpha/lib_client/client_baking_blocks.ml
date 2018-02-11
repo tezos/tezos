@@ -23,7 +23,7 @@ type block_info = {
 let convert_block_info cctxt
     ( { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol }
       : Block_services.block_info ) =
-  Client_proto_rpcs.Context.level cctxt (`Hash hash) >>= function
+  Alpha_services.Context.level cctxt (`Hash hash) >>= function
   | Ok level ->
       Lwt.return
         (Some { hash ; net_id ; predecessor ;
@@ -35,7 +35,7 @@ let convert_block_info cctxt
 let convert_block_info_err cctxt
     ( { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol }
       : Block_services.block_info ) =
-  Client_proto_rpcs.Context.level cctxt (`Hash hash) >>=? fun level ->
+  Alpha_services.Context.level cctxt (`Hash hash) >>=? fun level ->
   return { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol ; level }
 
 let info cctxt ?include_ops block =
@@ -71,8 +71,8 @@ let monitor cctxt
 
 let blocks_from_cycle cctxt block cycle =
   let block = Block_services.last_baked_block block in
-  Client_proto_rpcs.Context.level cctxt block >>=? fun level ->
-  Client_proto_rpcs.Helpers.levels cctxt block cycle >>=? fun (first, last) ->
+  Alpha_services.Context.level cctxt block >>=? fun level ->
+  Alpha_services.Helpers.levels cctxt block cycle >>=? fun (first, last) ->
   let length = Int32.to_int (Raw_level.diff level.level first) in
   Block_services.predecessors cctxt block length >>=? fun blocks ->
   let blocks =

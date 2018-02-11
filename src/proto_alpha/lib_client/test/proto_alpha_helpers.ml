@@ -28,7 +28,7 @@ let build_rpc_context config =
 let rpc_ctxt = ref (build_rpc_context !rpc_config)
 
 (* Context that does not write to alias files *)
-let no_write_context config block : Client_commands.full_context = object
+let no_write_context config block : #Client_commands.full_context = object
   inherit RPC_client.http_ctxt config Media_type.all_media_types
   inherit Client_commands.logger (fun _ _ -> Lwt.return_unit)
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a Error_monad.tzresult Lwt.t =
@@ -69,7 +69,7 @@ let init ?exe ?(sandbox = "sandbox.json") ?rpc_port () =
   return (pid, hash)
 
 let level block =
-  Client_proto_rpcs.Context.level !rpc_ctxt block
+  Alpha_services.Context.level !rpc_ctxt block
 
 module Account = struct
 
@@ -225,13 +225,12 @@ module Account = struct
       delegate_opt
 
   let balance ?(block = `Prevalidation) (account : t) =
-    Client_proto_rpcs.Context.Contract.balance !rpc_ctxt
+    Alpha_services.Contract.balance !rpc_ctxt
       block account.contract
 
   (* TODO: gather contract related functions in a Contract module? *)
   let delegate ?(block = `Prevalidation) (contract : Contract.t) =
-    Client_proto_rpcs.Context.Contract.delegate !rpc_ctxt
-      block contract
+    Alpha_services.Contract.delegate_opt !rpc_ctxt block contract
 
 end
 
@@ -240,12 +239,12 @@ module Protocol = struct
   open Account
 
   let voting_period_kind ?(block = `Prevalidation) () =
-    Client_proto_rpcs.Context.voting_period_kind !rpc_ctxt block
+    Alpha_services.Context.voting_period_kind !rpc_ctxt block
 
   let proposals ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) proposals =
     Block_services.info !rpc_ctxt block >>=? fun block_info ->
-    Client_proto_rpcs.Context.next_level !rpc_ctxt block >>=? fun next_level ->
-    Client_proto_rpcs.Helpers.Forge.Delegate.proposals !rpc_ctxt block
+    Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
+    Alpha_services.Forge.Delegate.proposals !rpc_ctxt block
       ~branch:block_info.hash
       ~source:pk
       ~period:next_level.voting_period
@@ -256,8 +255,8 @@ module Protocol = struct
 
   let ballot ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
     Block_services.info !rpc_ctxt block >>=? fun block_info ->
-    Client_proto_rpcs.Context.next_level !rpc_ctxt block >>=? fun next_level ->
-    Client_proto_rpcs.Helpers.Forge.Delegate.ballot !rpc_ctxt block
+    Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
+    Alpha_services.Forge.Delegate.ballot !rpc_ctxt block
       ~branch:block_info.hash
       ~source:pk
       ~period:next_level.voting_period
@@ -412,7 +411,7 @@ module Assert = struct
       block_proto h
 
   let check_voting_period_kind ?msg ~block kind =
-    Client_proto_rpcs.Context.voting_period_kind !rpc_ctxt block
+    Alpha_services.Context.voting_period_kind !rpc_ctxt block
     >>=? fun current_kind ->
     return @@ equal
       ?msg
@@ -450,7 +449,7 @@ module Baking = struct
       ()
 
   let endorsement_reward block =
-    Client_proto_rpcs.Header.priority !rpc_ctxt block >>=? fun prio ->
+    Alpha_services.priority !rpc_ctxt block >>=? fun prio ->
     Baking.endorsement_reward ~block_priority:prio >|=
     Alpha_environment.wrap_error >>|?
     Tez.to_mutez
@@ -466,7 +465,7 @@ module Endorse = struct
       slot =
     let block = Block_services.last_baked_block block in
     Block_services.info !rpc_ctxt block >>=? fun { hash ; _ } ->
-    Client_proto_rpcs.Helpers.Forge.Delegate.endorsement !rpc_ctxt
+    Alpha_services.Forge.Delegate.endorsement !rpc_ctxt
       block
       ~branch:hash
       ~source
@@ -481,9 +480,9 @@ module Endorse = struct
       block
       delegate
       level =
-    Client_proto_rpcs.Helpers.Rights.endorsement_rights_for_delegate
+    Alpha_services.Delegate.Endorser.rights_for_delegate
       !rpc_ctxt ~max_priority ~first_level:level ~last_level:level
-      block delegate () >>=? fun possibilities ->
+      block delegate >>=? fun possibilities ->
     let slots =
       List.map (fun (_,slot) -> slot)
       @@ List.filter (fun (l, _) -> l = level) possibilities in
@@ -493,7 +492,7 @@ module Endorse = struct
       ?slot
       (contract : Account.t)
       block =
-    Client_proto_rpcs.Context.next_level !rpc_ctxt block >>=? fun { level } ->
+    Alpha_services.Context.next_level !rpc_ctxt block >>=? fun { level } ->
     begin
       match slot with
       | Some slot -> return slot
@@ -511,16 +510,16 @@ module Endorse = struct
   (* FIXME @vb: I don't understand this function, copied from @cago. *)
   let endorsers_list block =
     let get_endorser_list result (account : Account.t) level block =
-      Client_proto_rpcs.Helpers.Rights.endorsement_rights_for_delegate
+      Alpha_services.Delegate.Endorser.rights_for_delegate
         !rpc_ctxt block account.pkh
         ~max_priority:16
         ~first_level:level
-        ~last_level:level () >>|? fun slots ->
+        ~last_level:level >>|? fun slots ->
       List.iter (fun (_,slot) -> result.(slot) <- account) slots
     in
     let { Account.b1 ; b2 ; b3 ; b4 ; b5 } = Account.bootstrap_accounts in
     let result = Array.make 16 b1 in
-    Client_proto_rpcs.Context.level !rpc_ctxt block >>=? fun level ->
+    Alpha_services.Context.level !rpc_ctxt block >>=? fun level ->
     let level = Raw_level.succ @@ level.level in
     get_endorser_list result b1 level block >>=? fun () ->
     get_endorser_list result b2 level block >>=? fun () ->
@@ -532,19 +531,19 @@ module Endorse = struct
   let endorsement_rights
       ?(max_priority = 1024)
       (contract : Account.t) block =
-    Client_proto_rpcs.Context.level !rpc_ctxt block >>=? fun level ->
+    Alpha_services.Context.level !rpc_ctxt block >>=? fun level ->
     let delegate = contract.pkh in
     let level = level.level in
-    Client_proto_rpcs.Helpers.Rights.endorsement_rights_for_delegate
+    Alpha_services.Delegate.Endorser.rights_for_delegate
       !rpc_ctxt
       ~max_priority
       ~first_level:level
       ~last_level:level
-      block delegate ()
+      block delegate
 
 end
 
 let display_level block =
-  Client_proto_rpcs.Context.level !rpc_ctxt block >>=? fun lvl ->
+  Alpha_services.Context.level !rpc_ctxt block >>=? fun lvl ->
   Format.eprintf "Level: %a@." Level.pp_full lvl ;
   return ()

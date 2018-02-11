@@ -93,7 +93,7 @@ let run
     ~(input : Michelson_v1_parser.parsed)
     block
     (cctxt : #RPC_context.simple) =
-  Client_proto_rpcs.Helpers.run_code cctxt
+  Alpha_services.Helpers.run_code cctxt
     block program.expanded (storage.expanded, input.expanded, amount)
 
 let trace
@@ -103,11 +103,11 @@ let trace
     ~(input : Michelson_v1_parser.parsed)
     block
     (cctxt : #RPC_context.simple) =
-  Client_proto_rpcs.Helpers.trace_code cctxt
+  Alpha_services.Helpers.trace_code cctxt
     block program.expanded (storage.expanded, input.expanded, amount)
 
 let hash_and_sign (data : Michelson_v1_parser.parsed) (typ : Michelson_v1_parser.parsed) sk block cctxt =
-  Client_proto_rpcs.Helpers.hash_data cctxt block (data.expanded, typ.expanded) >>=? fun hash ->
+  Alpha_services.Helpers.hash_data cctxt block (data.expanded, typ.expanded) >>=? fun hash ->
   Client_keys.sign sk (MBytes.of_string hash) >>=? fun signature ->
   return (hash,
           signature |>
@@ -119,10 +119,10 @@ let typecheck_data
     ~(data : Michelson_v1_parser.parsed)
     ~(ty : Michelson_v1_parser.parsed)
     block cctxt =
-  Client_proto_rpcs.Helpers.typecheck_data cctxt block (data.expanded, ty.expanded)
+  Alpha_services.Helpers.typecheck_data cctxt block (data.expanded, ty.expanded)
 
 let typecheck_program (program : Michelson_v1_parser.parsed) block cctxt =
-  Client_proto_rpcs.Helpers.typecheck_code cctxt block program.expanded
+  Alpha_services.Helpers.typecheck_code cctxt block program.expanded
 
 let print_typecheck_result
     ~emacs ~show_types ~print_source_on_error

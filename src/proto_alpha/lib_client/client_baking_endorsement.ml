@@ -83,9 +83,9 @@ end = struct
 end
 
 let get_signing_slots cctxt ?max_priority block delegate level =
-  Client_proto_rpcs.Helpers.Rights.endorsement_rights_for_delegate cctxt
+  Alpha_services.Delegate.Endorser.rights_for_delegate cctxt
     ?max_priority ~first_level:level ~last_level:level
-    block delegate () >>=? fun possibilities ->
+    block delegate >>=? fun possibilities ->
   let slots =
     List.map (fun (_,slot) -> slot)
     @@ List.filter (fun (l, _) -> l = level) possibilities in
@@ -96,7 +96,7 @@ let inject_endorsement (cctxt : #Proto_alpha.full_context)
     src_sk source slot =
   let block = Block_services.last_baked_block block in
   Block_services.info cctxt block >>=? fun bi ->
-  Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt
+  Alpha_services.Forge.Delegate.endorsement cctxt
     block
     ~branch:bi.hash
     ~source
@@ -128,7 +128,7 @@ let forge_endorsement (cctxt : #Proto_alpha.full_context)
     ~src_sk ?slot ?max_priority src_pk =
   let block = Block_services.last_baked_block block in
   let src_pkh = Ed25519.Public_key.hash src_pk in
-  Client_proto_rpcs.Context.next_level cctxt block >>=? fun { level } ->
+  Alpha_services.Context.next_level cctxt block >>=? fun { level } ->
   begin
     match slot with
     | Some slot -> return slot
