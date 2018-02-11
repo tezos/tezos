@@ -15,6 +15,7 @@ depends: [
   "tezos-error-monad"
   "tezos-micheline"
   "tezos-rpc"
+  "tezos-protocol-environment-sigs"
   "calendar"
   "ezjsonm" { >= "0.5.0" }
   "ipaddr"
