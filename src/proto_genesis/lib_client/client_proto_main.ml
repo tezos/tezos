@@ -14,7 +14,7 @@ let protocol =
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
 let bake rpc_config ?(timestamp = Time.now ()) block command sk =
-  let block = Client_rpcs.last_baked_block block in
+  let block = Block_services.last_baked_block block in
   let proto_header = Data_encoding.Binary.to_bytes Data.Command.encoding command in
   Block_services.preapply
     rpc_config block ~timestamp ~proto_header [] >>=? fun { shell_header } ->

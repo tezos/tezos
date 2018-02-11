@@ -92,7 +92,7 @@ let run
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
     block
-    (cctxt : #Client_rpcs.ctxt) =
+    (cctxt : #RPC_context.simple) =
   Client_proto_rpcs.Helpers.run_code cctxt
     block program.expanded (storage.expanded, input.expanded, amount)
 
@@ -102,7 +102,7 @@ let trace
     ~(storage : Michelson_v1_parser.parsed)
     ~(input : Michelson_v1_parser.parsed)
     block
-    (cctxt : #Client_rpcs.ctxt) =
+    (cctxt : #RPC_context.simple) =
   Client_proto_rpcs.Helpers.trace_code cctxt
     block program.expanded (storage.expanded, input.expanded, amount)
 

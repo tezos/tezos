@@ -391,3 +391,72 @@ let call_service
   Client.call_service
     ?logger ~base accept service params query body >>= fun ans ->
   handle accept ans
+
+type config = {
+  host : string ;
+  port : int ;
+  tls : bool ;
+  logger : logger ;
+}
+
+let config_encoding =
+  let open Data_encoding in
+  conv
+    (fun { host ; port ; tls } -> (host, port, tls))
+    (fun (host, port, tls) -> { host ; port ; tls ; logger = null_logger})
+    (obj3
+       (req "host" string)
+       (req "port" uint16)
+       (req "tls" bool))
+
+let default_config = {
+  host = "localhost" ;
+  port = 8732 ;
+  tls = false ;
+  logger = null_logger ;
+}
+
+class type json_ctxt = object
+  method generic_json_call :
+    RPC_service.meth ->
+    ?body:Data_encoding.json ->
+    Uri.t ->
+    (Data_encoding.json, Data_encoding.json option)
+      rest_result Lwt.t
+end
+
+class type ctxt = object
+  inherit RPC_context.t
+  inherit json_ctxt
+end
+
+class http_ctxt config media_types : ctxt =
+  let base =
+    Uri.make
+      ~scheme:(if config.tls then "https" else "http")
+      ~host:config.host
+      ~port:config.port
+      () in
+  let logger = config.logger in
+  object
+    method generic_json_call meth ?body uri =
+      let uri = Uri.with_path base (Uri.path uri) in
+      let uri = Uri.with_query uri (Uri.query uri) in
+      generic_json_call ~logger meth ?body uri
+    method call_service
+      : 'm 'p 'q 'i 'o.
+        ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+        'p -> 'q -> 'i -> 'o tzresult Lwt.t =
+      fun service params query body ->
+        call_service media_types
+          ~logger ~base service params query body
+    method call_streamed_service
+      : 'm 'p 'q 'i 'o.
+        ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+        on_chunk: ('o -> unit) ->
+      on_close: (unit -> unit) ->
+      'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t =
+      fun service ~on_chunk ~on_close params query body ->
+        call_streamed_service media_types service
+          ~logger ~base ~on_chunk ~on_close params query body
+  end

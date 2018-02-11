@@ -38,13 +38,13 @@ end
 
 class type logging_rpcs = object
   inherit logger_sig
-  inherit Client_rpcs.ctxt
+  inherit RPC_client.ctxt
 end
 
 class type full_context = object
   inherit logger_sig
   inherit wallet
-  inherit Client_rpcs.ctxt
+  inherit RPC_client.ctxt
   inherit block
 end
 (** The [full_context] allows the client {!command} handlers to work in
@@ -57,7 +57,7 @@ end
 val make_context :
   ?base_dir:string ->
   ?block:Block_services.block ->
-  ?rpc_config:Client_rpcs.config ->
+  ?rpc_config:RPC_client.config ->
   (string -> string -> unit Lwt.t) -> full_context
 (** [make_context ?config log_fun] builds a context whose logging
     callbacks call [log_fun section msg], and whose [error] function

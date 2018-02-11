@@ -86,7 +86,7 @@ let reveal_block_nonces (cctxt : Client_commands.full_context) block_hashes =
   do_reveal cctxt cctxt#block blocks
 
 let reveal_nonces cctxt () =
-  let block = Client_rpcs.last_baked_block cctxt#block in
+  let block = Block_services.last_baked_block cctxt#block in
   Client_baking_forge.get_unrevealed_nonces
     cctxt block >>=? fun nonces ->
   do_reveal cctxt cctxt#block nonces

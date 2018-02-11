@@ -50,16 +50,16 @@ let main ?only_commands () =
       Client_config.parse_config_args
         (cctxt ~base_dir:Client_commands.default_base_dir
            ~block:Client_commands.default_block
-           Client_rpcs.default_config)
+           RPC_client.default_config)
         original_args
       >>=? fun (parsed_config_file, parsed_args, config_commands, remaining) ->
-      let rpc_config : Client_rpcs.config = {
-        Client_rpcs.default_config with
+      let rpc_config : RPC_client.config = {
+        RPC_client.default_config with
         host = parsed_config_file.node_addr ;
         port = parsed_config_file.node_port ;
         tls = parsed_config_file.tls ;
       } in
-      let ctxt = new Client_rpcs.http_ctxt rpc_config in
+      let ctxt = new RPC_client.http_ctxt rpc_config Media_type.all_media_types in
       begin match only_commands with
         | None ->
             get_commands_for_version ctxt

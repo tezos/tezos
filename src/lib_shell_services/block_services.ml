@@ -16,6 +16,11 @@ type block = [
   | `Hash of Block_hash.t
 ]
 
+let last_baked_block = function
+  | `Prevalidation -> `Head 0
+  | `Test_prevalidation -> `Test_head 0
+  | `Genesis | `Head _ | `Test_head _ | `Hash _ as block -> block
+
 let parse_block s =
   try
     match String.split '~' s with

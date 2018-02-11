@@ -17,7 +17,7 @@ val generate_seed_nonce: unit -> Nonce.t
     reveal the aforementionned nonce during the next cycle. *)
 
 val inject_block:
-  #Client_rpcs.ctxt ->
+  #RPC_context.simple ->
   ?force:bool ->
   ?net_id:Net_id.t ->
   shell_header:Block_header.shell_header ->
@@ -36,7 +36,7 @@ type error +=
   | Failed_to_preapply of Tezos_base.Operation.t * error list
 
 val forge_block:
-  #Client_rpcs.ctxt ->
+  #RPC_context.simple ->
   Client_proto_rpcs.block ->
   ?force:bool ->
   ?operations:Operation.raw list ->

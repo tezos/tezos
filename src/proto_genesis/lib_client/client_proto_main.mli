@@ -10,7 +10,7 @@
 open Proto_genesis
 
 val bake:
-  #Client_rpcs.ctxt ->
+  #RPC_context.simple ->
   ?timestamp: Time.t ->
   Block_services.block ->
   Data.Command.t ->

@@ -24,6 +24,15 @@ val null_logger: logger
 val timings_logger: Format.formatter -> logger
 val full_logger: Format.formatter -> logger
 
+type config = {
+  host : string ;
+  port : int ;
+  tls : bool ;
+  logger : logger ;
+}
+val config_encoding: config Data_encoding.t
+val default_config: config
+
 type ('o, 'e) rest_result =
   [ `Ok of 'o
   | `Conflict of 'e
@@ -32,9 +41,21 @@ type ('o, 'e) rest_result =
   | `Not_found of 'e
   | `Unauthorized of 'e ] tzresult
 
-type content_type = (string * string)
-type raw_content = Cohttp_lwt.Body.t * content_type option
-type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
+class type json_ctxt = object
+  method generic_json_call :
+    RPC_service.meth ->
+    ?body:Data_encoding.json ->
+    Uri.t ->
+    (Data_encoding.json, Data_encoding.json option)
+      rest_result Lwt.t
+end
+
+class type ctxt = object
+  inherit RPC_context.t
+  inherit json_ctxt
+end
+
+class http_ctxt : config -> Media_type.t list -> ctxt
 
 type rpc_error =
   | Empty_answer
@@ -59,19 +80,11 @@ type error +=
                         uri: Uri.t ;
                         error: rpc_error }
 
-val generic_call :
-  ?logger:logger ->
-  ?accept:Media_type.t list ->
-  ?body:Cohttp_lwt.Body.t ->
-  ?media:Media_type.t ->
-  [< RPC_service.meth ] ->
-  Uri.t -> (content, content) rest_result Lwt.t
+(**/**)
 
-val generic_json_call :
-  ?logger:logger ->
-  ?body:Data_encoding.json ->
-  [< RPC_service.meth ] -> Uri.t ->
-  (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t
+type content_type = (string * string)
+type raw_content = Cohttp_lwt.Body.t * content_type option
+type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
 val call_service :
   Media_type.t list ->
@@ -88,3 +101,17 @@ val call_streamed_service :
   on_chunk: ('o -> unit) ->
   on_close: (unit -> unit) ->
   'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t
+
+val generic_call :
+  ?logger:logger ->
+  ?accept:Media_type.t list ->
+  ?body:Cohttp_lwt.Body.t ->
+  ?media:Media_type.t ->
+  [< RPC_service.meth ] ->
+  Uri.t -> (content, content) rest_result Lwt.t
+
+val generic_json_call :
+  ?logger:logger ->
+  ?body:Data_encoding.json ->
+  [< RPC_service.meth ] -> Uri.t ->
+  (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t

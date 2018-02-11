@@ -15,7 +15,7 @@ let inject_seed_nonce_revelation rpc_config block ?async nonces =
     List.map
       (fun (level, nonce) ->
          Seed_nonce_revelation { level ; nonce }) nonces in
-  let block = Client_rpcs.last_baked_block block in
+  let block = Block_services.last_baked_block block in
   Block_services.info rpc_config block >>=? fun bi ->
   Client_proto_rpcs.Helpers.Forge.Anonymous.operations rpc_config
     block ~branch:bi.hash operations >>=? fun bytes ->

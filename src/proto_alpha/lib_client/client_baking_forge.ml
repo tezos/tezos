@@ -114,7 +114,7 @@ let forge_block cctxt block
     ?timestamp
     ~priority
     ~seed_nonce_hash ~src_sk () =
-  let block = Client_rpcs.last_baked_block block in
+  let block = Block_services.last_baked_block block in
   begin
     match operations with
     | None ->

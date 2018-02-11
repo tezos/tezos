@@ -13,10 +13,10 @@ open Tezos_micheline
 open Client_proto_contracts
 open Client_keys
 
-let get_balance (rpc : #Client_rpcs.ctxt) block contract =
+let get_balance (rpc : #RPC_context.simple) block contract =
   Client_proto_rpcs.Context.Contract.balance rpc block contract
 
-let get_storage (rpc : #Client_rpcs.ctxt) block contract =
+let get_storage (rpc : #RPC_context.simple) block contract =
   Client_proto_rpcs.Context.Contract.storage rpc block contract
 
 let rec find_predecessor rpc_config h n =
@@ -28,7 +28,7 @@ let rec find_predecessor rpc_config h n =
 
 let get_branch rpc_config block branch =
   let branch = Option.unopt ~default:0 branch in (* TODO export parameter *)
-  let block = Client_rpcs.last_baked_block block in
+  let block = Block_services.last_baked_block block in
   begin
     match block with
     | `Head n -> return (`Head (n+branch))
@@ -177,7 +177,7 @@ let get_manager (cctxt : Client_commands.full_context) block source =
   return (src_name, src_pkh, src_pk, src_sk)
 
 let dictate rpc_config block command seckey =
-  let block = Client_rpcs.last_baked_block block in
+  let block = Block_services.last_baked_block block in
   Block_services.info
     rpc_config block >>=? fun { net_id ; hash = branch } ->
   Client_proto_rpcs.Helpers.Forge.Dictator.operation
@@ -190,7 +190,7 @@ let dictate rpc_config block command seckey =
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
 
-let set_delegate (cctxt : #Client_rpcs.ctxt) block ~fee contract ~src_pk ~manager_sk opt_delegate =
+let set_delegate (cctxt : #RPC_context.simple) block ~fee contract ~src_pk ~manager_sk opt_delegate =
   delegate_contract
     cctxt block ~source:contract
     ~src_pk ~manager_sk ~fee opt_delegate

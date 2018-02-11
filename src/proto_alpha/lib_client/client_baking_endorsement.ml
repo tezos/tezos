@@ -94,7 +94,7 @@ let get_signing_slots cctxt ?max_priority block delegate level =
 let inject_endorsement (cctxt : Client_commands.full_context)
     block level ?async
     src_sk source slot =
-  let block = Client_rpcs.last_baked_block block in
+  let block = Block_services.last_baked_block block in
   Block_services.info cctxt block >>=? fun bi ->
   Client_proto_rpcs.Helpers.Forge.Delegate.endorsement cctxt
     block
@@ -126,7 +126,7 @@ let check_endorsement cctxt level slot =
 let forge_endorsement (cctxt : Client_commands.full_context)
     block
     ~src_sk ?slot ?max_priority src_pk =
-  let block = Client_rpcs.last_baked_block block in
+  let block = Block_services.last_baked_block block in
   let src_pkh = Ed25519.Public_key.hash src_pk in
   Client_proto_rpcs.Context.next_level cctxt block >>=? fun { level } ->
   begin

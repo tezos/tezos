@@ -54,13 +54,13 @@ end
 
 class type logging_rpcs = object
   inherit logger
-  inherit Client_rpcs.ctxt
+  inherit RPC_client.ctxt
 end
 
 class type full_context = object
   inherit logger
   inherit wallet
-  inherit Client_rpcs.ctxt
+  inherit RPC_client.ctxt
   inherit block
 end
 
@@ -137,12 +137,12 @@ let default_log ~base_dir channel msg =
 let make_context
     ?(base_dir = default_base_dir)
     ?(block = default_block)
-    ?(rpc_config = Client_rpcs.default_config)
+    ?(rpc_config = RPC_client.default_config)
     log =
   object
     inherit logger log
     inherit file_wallet base_dir
-    inherit Client_rpcs.http_ctxt rpc_config
+    inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
     method block = block
   end
 

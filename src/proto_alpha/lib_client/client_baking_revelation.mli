@@ -11,7 +11,7 @@ open Proto_alpha
 open Tezos_context
 
 val inject_seed_nonce_revelation:
-  #Client_rpcs.ctxt ->
+  #RPC_context.simple ->
   Client_proto_rpcs.block ->
   ?async:bool ->
   (Raw_level.t * Nonce.t) list ->

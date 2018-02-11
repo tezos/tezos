@@ -34,7 +34,7 @@ let demo cctxt =
   return ()
 
 let bake cctxt =
-  let block = Client_rpcs.last_baked_block cctxt.Client_commands.config.block in
+  let block = Block_services.last_baked_block cctxt.Client_commands.config.block in
   Client_node_rpcs.Blocks.info cctxt.rpc_config block >>=? fun bi ->
   let fitness =
     match bi.fitness with

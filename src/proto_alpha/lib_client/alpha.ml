@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module RPCs = Client_rpcs
-
 module Contracts = Client_proto_contracts
 
 module Context = Client_proto_context
