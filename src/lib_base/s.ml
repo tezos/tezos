@@ -80,8 +80,6 @@ module type INTERNAL_HASH = sig
 
   include Tezos_crypto.S.HASH
 
-  val zero: t
-
   val of_b58check: string -> t tzresult
   val of_bytes: MBytes.t -> t tzresult
 

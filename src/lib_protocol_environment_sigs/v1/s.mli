@@ -88,6 +88,8 @@ module type MINIMAL_HASH = sig
   val prefix_path: string -> string list
   val path_length: int
 
+  val zero: t
+
 end
 
 module type HASH = sig

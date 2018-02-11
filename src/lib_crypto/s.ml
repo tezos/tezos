@@ -51,13 +51,13 @@ module type MINIMAL_HASH = sig
   val prefix_path: string -> string list
   val path_length: int
 
+  val zero: t
+
 end
 
 module type HASH = sig
 
   include MINIMAL_HASH
-
-  val zero: t
 
   val to_b58check: t -> string
   val to_short_b58check: t -> string

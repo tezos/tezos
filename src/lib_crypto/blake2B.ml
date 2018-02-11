@@ -107,6 +107,11 @@ module Make_minimal (K : Name) = struct
     and p6 = if len > 10 then String.sub p 10 (len - 10) else "" in
     [ p1 ; p2 ; p3 ; p4 ; p5 ; p6 ]
 
+  let zero =
+    match of_hex (String.make (size * 2) '0') with
+    | Some c -> c
+    | None -> assert false
+
 end
 
 module Make (R : sig
@@ -120,11 +125,6 @@ module Make (R : sig
   end) (K : PrefixedName) = struct
 
   include Make_minimal(K)
-
-  let zero =
-    match of_hex (String.make (size * 2) '0') with
-    | Some c -> c
-    | None -> assert false
 
   (* Serializers *)
 
