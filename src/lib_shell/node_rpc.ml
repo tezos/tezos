@@ -509,103 +509,11 @@ let build_rpc_directory node =
              backlog = Net_validator.last_events w ;
              current_request = Net_validator.current_request w }) in
 
-  (* Network : Global *)
+  (* Network  *)
+  let dir = RPC_directory.merge dir (Node.RPC.build_p2p_rpc_directory node) in
 
   let dir =
-    let implementation () () = Node.RPC.Network.stat node |> return in
-    RPC_directory.register0 dir P2p_services.S.stat implementation in
-  let dir =
-    let implementation () () =
-      return Distributed_db.Raw.supported_versions in
-    RPC_directory.register0 dir P2p_services.S.versions implementation in
-  let dir =
-    let implementation () () =
-      let stream, stopper = Node.RPC.Network.watch node in
-      let shutdown () = Lwt_watcher.shutdown stopper in
-      let next () = Lwt_stream.get stream in
-      RPC_answer.return_stream { next ; shutdown } in
-    RPC_directory.gen_register0 dir P2p_services.S.events implementation in
-  let dir =
-    let implementation point () timeout =
-      Node.RPC.Network.connect node point timeout in
-    RPC_directory.register1 dir P2p_services.S.connect implementation in
+    RPC_directory.register_describe_directory_service
+      dir RPC_service.description_service in
 
-  (* Network : Connection *)
-
-  let dir =
-    let implementation peer_id () () =
-      match Node.RPC.Network.Connection.info node peer_id with
-      | None -> raise Not_found
-      | Some v -> return v in
-    RPC_directory.register1 dir P2p_services.Connections.S.info implementation in
-  let dir =
-    let implementation peer_id () wait =
-      Node.RPC.Network.Connection.kick node peer_id wait >>= return in
-    RPC_directory.register1 dir P2p_services.Connections.S.kick implementation in
-  let dir =
-    let implementation () () =
-      Node.RPC.Network.Connection.list node |> return in
-    RPC_directory.register0 dir P2p_services.Connections.S.list implementation in
-
-  (* Network : Peer_id *)
-
-  let dir =
-    let implementation () state =
-      Node.RPC.Network.Peer_id.list node ~restrict:state |> return in
-    RPC_directory.register0 dir P2p_services.Peers.S.list implementation in
-  let dir =
-    let implementation peer_id () () =
-      match Node.RPC.Network.Peer_id.info node peer_id with
-      | None -> raise Not_found
-      | Some v -> return v in
-    RPC_directory.register1 dir P2p_services.Peers.S.info implementation in
-  let dir =
-    let implementation peer_id () monitor =
-      if monitor then
-        let stream, stopper = Node.RPC.Network.Peer_id.watch node peer_id in
-        let shutdown () = Lwt_watcher.shutdown stopper in
-        let first_request = ref true in
-        let next () =
-          if not !first_request then begin
-            Lwt_stream.get stream >|= Option.map ~f:(fun i -> [i])
-          end else begin
-            first_request := false ;
-            Lwt.return_some @@ Node.RPC.Network.Peer_id.events node peer_id
-          end in
-        RPC_answer.return_stream { next ; shutdown }
-      else
-        Node.RPC.Network.Peer_id.events node peer_id |> RPC_answer.return in
-    RPC_directory.gen_register1 dir P2p_services.Peers.S.events implementation in
-
-  (* Network : Point *)
-
-  let dir =
-    let implementation () state =
-      Node.RPC.Network.Point.list node ~restrict:state |> return in
-    RPC_directory.register0 dir P2p_services.Points.S.list implementation in
-  let dir =
-    let implementation point () () =
-      match Node.RPC.Network.Point.info node point with
-      | None -> raise Not_found
-      | Some v -> return v in
-    RPC_directory.register1 dir P2p_services.Points.S.info implementation in
-  let dir =
-    let implementation point () monitor =
-      if monitor then
-        let stream, stopper = Node.RPC.Network.Point.watch node point in
-        let shutdown () = Lwt_watcher.shutdown stopper in
-        let first_request = ref true in
-        let next () =
-          if not !first_request then begin
-            Lwt_stream.get stream >|= Option.map ~f:(fun i -> [i])
-          end else begin
-            first_request := false ;
-            Lwt.return_some @@ Node.RPC.Network.Point.events node point
-          end in
-        RPC_answer.return_stream { next ; shutdown }
-      else
-        Node.RPC.Network.Point.events node point |> RPC_answer.return in
-    RPC_directory.gen_register1 dir P2p_services.Points.S.events implementation in
-  let dir =
-    RPC_directory.register_describe_directory_service dir RPC_service.description_service in
   dir

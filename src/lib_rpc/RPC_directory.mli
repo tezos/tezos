@@ -18,6 +18,12 @@ val register:
   ('p -> 'q -> 'i -> 'o tzresult Lwt.t) ->
   'prefix directory
 
+val opt_register:
+  'prefix directory ->
+  ([< Resto.meth ], 'prefix, 'p, 'q, 'i, 'o) RPC_service.t ->
+  ('p -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
+  'prefix directory
+
 val gen_register:
   'prefix directory ->
   ('meth, 'prefix, 'params, 'query, 'input, 'output) RPC_service.t ->
@@ -66,6 +72,43 @@ val register5:
   'prefix directory ->
   ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q , 'i, 'o) RPC_service.t ->
   ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o tzresult Lwt.t) ->
+  'prefix directory
+
+
+val opt_register0:
+  unit directory ->
+  ('m, unit, unit, 'q, 'i, 'o) RPC_service.t ->
+  ('q -> 'i -> 'o option tzresult Lwt.t) ->
+  unit directory
+
+val opt_register1:
+  'prefix directory ->
+  ('m, 'prefix, unit * 'a, 'q , 'i, 'o) RPC_service.t ->
+  ('a -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
+  'prefix directory
+
+val opt_register2:
+  'prefix directory ->
+  ('m, 'prefix, (unit * 'a) * 'b, 'q , 'i, 'o) RPC_service.t ->
+  ('a -> 'b -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
+  'prefix directory
+
+val opt_register3:
+  'prefix directory ->
+  ('m, 'prefix, ((unit * 'a) * 'b) * 'c, 'q , 'i, 'o) RPC_service.t ->
+  ('a -> 'b -> 'c -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
+  'prefix directory
+
+val opt_register4:
+  'prefix directory ->
+  ('m, 'prefix, (((unit * 'a) * 'b) * 'c) * 'd, 'q , 'i, 'o) RPC_service.t ->
+  ('a -> 'b -> 'c -> 'd -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
+  'prefix directory
+
+val opt_register5:
+  'prefix directory ->
+  ('m, 'prefix, ((((unit * 'a) * 'b) * 'c) * 'd) * 'e, 'q , 'i, 'o) RPC_service.t ->
+  ('a -> 'b -> 'c -> 'd -> 'e -> 'q -> 'i -> 'o option tzresult Lwt.t) ->
   'prefix directory
 
 

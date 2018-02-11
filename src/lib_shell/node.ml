@@ -667,65 +667,7 @@ module RPC = struct
     let shutdown () = Lwt_watcher.shutdown stopper in
     RPC_answer.{ next ; shutdown }
 
-  module Network = struct
-
-    let stat (node : t) =
-      P2p.RPC.stat node.p2p
-
-    let watch (node : t) =
-      P2p.RPC.watch node.p2p
-
-    let connect (node : t) =
-      P2p.RPC.connect node.p2p
-
-    module Connection = struct
-
-      let info (node : t) =
-        P2p.RPC.Connection.info node.p2p
-
-      let kick (node : t) =
-        P2p.RPC.Connection.kick node.p2p
-
-      let list (node : t) =
-        P2p.RPC.Connection.list node.p2p
-
-      let count (node : t) =
-        P2p.RPC.Connection.count node.p2p
-
-    end
-
-    module Point = struct
-
-      let info (node : t) =
-        P2p.RPC.Point.info node.p2p
-
-      let list ?restrict (node : t) =
-        P2p.RPC.Point.list ?restrict node.p2p
-
-      let events ?max ?rev (node : t) =
-        P2p.RPC.Point.events node.p2p ?max ?rev
-
-      let watch (node : t) =
-        P2p.RPC.Point.watch node.p2p
-
-    end
-
-    module Peer_id = struct
-
-      let info (node : t) =
-        P2p.RPC.Peer_id.info node.p2p
-
-      let list ?restrict (node : t) =
-        P2p.RPC.Peer_id.list ?restrict node.p2p
-
-      let events ?max ?rev (node : t) =
-        P2p.RPC.Peer_id.events node.p2p ?max ?rev
-
-      let watch (node : t) =
-        P2p.RPC.Peer_id.watch node.p2p
-
-    end
-
-  end
+  let build_p2p_rpc_directory (t : t) =
+    P2p.build_rpc_directory t.p2p
 
 end

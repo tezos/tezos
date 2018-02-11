@@ -127,62 +127,8 @@ module RPC : sig
   val bootstrapped:
     t -> (Block_hash.t * Time.t) RPC_answer.stream
 
-  module Network : sig
 
-    val stat : t -> P2p_stat.t
-
-    val watch :
-      t ->
-      P2p_connection.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
-    val connect : t -> P2p_point.Id.t -> float -> unit tzresult Lwt.t
-
-    module Connection : sig
-      val info : t -> P2p_peer.Id.t -> P2p_connection.Info.t option
-      val kick : t -> P2p_peer.Id.t -> bool -> unit Lwt.t
-      val list : t -> P2p_connection.Info.t list
-      val count : t -> int
-    end
-
-    module Point : sig
-
-      val info :
-        t -> P2p_point.Id.t -> P2p_point.Info.t option
-
-      val list :
-        ?restrict: P2p_point.State.t list ->
-        t -> (P2p_point.Id.t * P2p_point.Info.t) list
-
-      val events :
-        ?max:int -> ?rev:bool -> t -> P2p_point.Id.t ->
-        P2p_point.Pool_event.t list
-
-      val watch :
-        t -> P2p_point.Id.t ->
-        P2p_point.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
-
-    end
-
-    module Peer_id : sig
-
-      val info :
-        t -> P2p_peer.Id.t -> P2p_peer.Info.t option
-
-      val list :
-        ?restrict: P2p_peer.State.t list ->
-        t -> (P2p_peer.Id.t * P2p_peer.Info.t) list
-
-      val events :
-        ?max: int -> ?rev: bool ->
-        t -> P2p_peer.Id.t ->
-        P2p_peer.Pool_event.t list
-
-      val watch :
-        t -> P2p_peer.Id.t ->
-        P2p_peer.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
-
-    end
-
-  end
+  val build_p2p_rpc_directory: t -> unit RPC_directory.t
 
 end
 

@@ -183,63 +183,6 @@ val try_send :
 (** Send a message to all peers *)
 val broadcast : ('msg, 'meta) net -> 'msg -> unit
 
-module RPC : sig
-
-  val stat : ('msg, 'meta) net -> P2p_stat.t
-
-  val watch :
-    ('msg, 'meta) net ->
-    P2p_connection.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
-  val connect : ('msg, 'meta) net -> P2p_point.Id.t -> float -> unit tzresult Lwt.t
-
-  module Connection : sig
-    val info : ('msg, 'meta) net -> P2p_peer.Id.t -> P2p_connection.Info.t option
-    val kick : ('msg, 'meta) net -> P2p_peer.Id.t -> bool -> unit Lwt.t
-    val list : ('msg, 'meta) net -> P2p_connection.Info.t list
-    val count : ('msg, 'meta) net -> int
-  end
-
-  module Point : sig
-
-    val info :
-      ('msg, 'meta) net -> P2p_point.Id.t -> P2p_point.Info.t option
-
-    val list :
-      ?restrict: P2p_point.State.t list ->
-      ('msg, 'meta) net -> (P2p_point.Id.t * P2p_point.Info.t) list
-
-    val events :
-      ?max:int -> ?rev:bool -> ('msg, 'meta) net -> P2p_point.Id.t ->
-      P2p_point.Pool_event.t list
-
-    val watch :
-      ('msg, 'meta) net -> P2p_point.Id.t ->
-      P2p_point.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
-
-  end
-
-  module Peer_id : sig
-
-    val info :
-      ('msg, 'meta) net -> P2p_peer.Id.t -> P2p_peer.Info.t option
-
-    val list :
-      ?restrict: P2p_peer.State.t list ->
-      ('msg, 'meta) net -> (P2p_peer.Id.t * P2p_peer.Info.t) list
-
-    val events :
-      ?max: int -> ?rev: bool ->
-      ('msg, 'meta) net -> P2p_peer.Id.t ->
-      P2p_peer.Pool_event.t list
-
-    val watch :
-      ('msg, 'meta) net -> P2p_peer.Id.t ->
-      P2p_peer.Pool_event.t Lwt_stream.t * Lwt_watcher.stopper
-
-  end
-
-end
-
 val fold_connections :
   ('msg, 'meta) net ->
   init:'a -> f:(P2p_peer.Id.t -> ('msg, 'meta) connection -> 'a -> 'a) -> 'a
@@ -251,6 +194,8 @@ val iter_connections :
 val on_new_connection :
   ('msg, 'meta) net ->
   (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit
+
+val build_rpc_directory : _ t -> unit RPC_directory.t
 
 (**/**)
 
