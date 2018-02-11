@@ -69,7 +69,7 @@ module Test(Request : sig
     assert (test add_service ((), 2) 3 5) ;
     assert (test alternate_add_service (((), 1), 2.5) () 3.5) ;
     assert (test real_minus_service1 (((), 2.5), 1) () 1.5) ;
-    assert (test alternate_add_service' (1, 2) () 3) ;
+    assert (test alternate_add_service' (((), 1), 2.) () 3) ;
     ()
 
 end

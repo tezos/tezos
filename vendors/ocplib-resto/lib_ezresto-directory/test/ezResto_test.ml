@@ -48,7 +48,7 @@ module Test(Request : sig
     assert (test repeat_service ((), 3) (`A []) (`A (repeat 3 (`A [])))) ;
     assert (test add_service ((), 2) 3 5) ;
     assert (test alternate_add_service (((), 1), 2.5) () 3.5) ;
-    assert (test alternate_add_service' (1, 2) () 3) ;
+    assert (test alternate_add_service' (((), 1), 2.) () 3) ;
     ()
 end
 

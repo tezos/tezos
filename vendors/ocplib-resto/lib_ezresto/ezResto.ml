@@ -23,7 +23,6 @@ module Path = struct
   let add_arg = Path.add_arg
   let (/) = add_suffix
   let (/:) = add_arg
-  let map = Path.map
 end
 module Query = Query
 type ('meth, 'params, 'query, 'input, 'output, 'error) service =

@@ -43,19 +43,6 @@ val error_encoding:
   ('meth, 'prefix, 'params, 'query, 'input, 'output) service ->
   unit Data_encoding.t
 
-val prefix:
-  ('prefix, 'inner_prefix) RPC_path.t ->
-  ('meth, 'inner_prefix, 'params, 'query,
-   'input, 'output) service ->
-  ('meth, 'prefix, 'params,
-   'query, 'input, 'output) service
-
-val map:
-  ('a -> 'b) ->
-  ('b -> 'a) ->
-  ('meth, 'pr, 'a, 'q, 'i, 'o) service ->
-  ('meth, 'pr, 'b, 'q, 'i, 'o) service
-
 val get_service:
   ?description: string ->
   query: 'query RPC_query.t ->

@@ -75,9 +75,6 @@ module Path : sig
   val prefix:
     ('prefix, 'a) path -> ('a, 'params) path -> ('prefix, 'params) path
 
-  val map:
-    ('a -> 'b) -> ('b -> 'a) -> ('prefix, 'a) path -> ('prefix, 'b) path
-
 end
 
 (** Service directory description *)
@@ -192,17 +189,11 @@ module Internal : sig
   val from_arg : 'a arg -> 'a Arg.t
   val to_arg : 'a Arg.t -> 'a arg
 
-  type (_, _) rpath =
-    | Root : ('rkey, 'rkey) rpath
-    | Static : ('rkey, 'key) rpath * string -> ('rkey, 'key) rpath
-    | Dynamic : ('rkey, 'key) rpath * 'a arg -> ('rkey, 'key * 'a) rpath
-    | DynamicTail : ('rkey, 'key) rpath * 'a arg -> ('rkey, 'key * 'a list) rpath
-
   type (_, _) path =
-    | Path: ('prefix, 'params) rpath -> ('prefix, 'params) path
-    | MappedPath:
-        ('prefix, 'key) rpath * ('key -> 'params) * ('params -> 'key) ->
-      ('prefix, 'params) path
+    | Root : ('rkey, 'rkey) path
+    | Static : ('rkey, 'key) path * string -> ('rkey, 'key) path
+    | Dynamic : ('rkey, 'key) path * 'a arg -> ('rkey, 'key * 'a) path
+    | DynamicTail : ('rkey, 'key) path * 'a arg -> ('rkey, 'key * 'a list) path
 
   val from_path : ('a, 'b) path -> ('a, 'b) Path.t
   val to_path : ('a, 'b) Path.t -> ('a, 'b) path
@@ -337,12 +328,6 @@ module MakeService(Encoding : ENCODING) : sig
      'input, 'output, 'error) service ->
     ('meth, 'prefix, 'params,
      'query, 'input, 'output, 'error) service
-
-  val map:
-    ('a -> 'b) ->
-    ('b -> 'a) ->
-    ('meth, 'pr, 'a, 'q, 'i, 'o, 'e) service ->
-    ('meth, 'pr, 'b, 'q, 'i, 'o, 'e) service
 
   val subst0:
     ([< meth ] as 'm, 'p, 'p, 'q, 'i, 'o, 'e) service ->

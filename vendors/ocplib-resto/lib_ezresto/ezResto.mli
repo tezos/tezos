@@ -49,8 +49,6 @@ module Path : sig
   val add_arg: 'params path -> 'a Arg.arg -> ('params * 'a) path
   val (/:): 'params path -> 'a Arg.arg -> ('params * 'a) path
 
-  val map: ('a -> 'b) -> ('b -> 'a) -> 'a path -> 'b path
-
 end
 
 module Query : sig

@@ -69,57 +69,35 @@ module Internal = struct
   let from_arg x = x
   let to_arg x = x
 
-  type (_,_) rpath =
-    | Root : ('rkey, 'rkey) rpath
-    | Static : ('rkey, 'key) rpath * string -> ('rkey, 'key) rpath
-    | Dynamic : ('rkey, 'key) rpath * 'a arg -> ('rkey, 'key * 'a) rpath
-    | DynamicTail : ('rkey, 'key) rpath * 'a arg -> ('rkey, 'key * 'a list) rpath
-
   type (_,_) path =
-    | Path: ('prefix, 'params) rpath -> ('prefix, 'params) path
-    | MappedPath:
-        ('prefix, 'key) rpath * ('key -> 'params) * ('params -> 'key) ->
-      ('prefix, 'params) path
+    | Root : ('rkey, 'rkey) path
+    | Static : ('rkey, 'key) path * string -> ('rkey, 'key) path
+    | Dynamic : ('rkey, 'key) path * 'a arg -> ('rkey, 'key * 'a) path
+    | DynamicTail : ('rkey, 'key) path * 'a arg -> ('rkey, 'key * 'a list) path
 
-  let rec rsubst0 : type a b. (a, a) rpath -> (b, b) rpath = function
+  let rec subst0 : type a b. (a, a) path -> (b, b) path = function
     | Root -> Root
-    | Static (rpath, name) -> Static (rsubst0 rpath, name)
-    | Dynamic (rpath, arg) -> assert false (* impossible *)
-    | DynamicTail (rpath, arg) -> assert false (* impossible *)
+    | Static (path, name) -> Static (subst0 path, name)
+    | Dynamic (path, arg) -> assert false (* impossible *)
+    | DynamicTail (path, arg) -> assert false (* impossible *)
 
-  let subst0 = function
-    | Path rpath -> Path (rsubst0 rpath)
-    | MappedPath _ -> invalid_arg "Resto.Path.subst0"
-
-  let rec rsubst1 : type a b c. (a, a * c) rpath -> (b, b * c) rpath = function
+  let rec subst1 : type a b c. (a, a * c) path -> (b, b * c) path = function
     | Root -> assert false (* impossible *)
-    | Static (rpath, name) -> Static (rsubst1 rpath, name)
-    | Dynamic (rpath, arg) -> Dynamic (rsubst0 rpath, arg)
-    | DynamicTail (rpath, arg) -> DynamicTail (rsubst0 rpath, arg)
+    | Static (path, name) -> Static (subst1 path, name)
+    | Dynamic (path, arg) -> Dynamic (subst0 path, arg)
+    | DynamicTail (path, arg) -> DynamicTail (subst0 path, arg)
 
-  let subst1 = function
-    | Path rpath -> Path (rsubst1 rpath)
-    | MappedPath _ -> invalid_arg "Resto.Path.subst1"
-
-  let rec rsubst2 : type a b c d. (a, (a * c) * d) rpath -> (b, (b * c) * d) rpath = function
+  let rec subst2 : type a b c d. (a, (a * c) * d) path -> (b, (b * c) * d) path = function
     | Root -> assert false (* impossible *)
-    | Static (rpath, name) -> Static (rsubst2 rpath, name)
-    | Dynamic (rpath, arg) -> Dynamic (rsubst1 rpath, arg)
-    | DynamicTail (rpath, arg) -> DynamicTail (rsubst1 rpath, arg)
+    | Static (path, name) -> Static (subst2 path, name)
+    | Dynamic (path, arg) -> Dynamic (subst1 path, arg)
+    | DynamicTail (path, arg) -> DynamicTail (subst1 path, arg)
 
-  let subst2 = function
-    | Path rpath -> Path (rsubst2 rpath)
-    | MappedPath _ -> invalid_arg "Resto.Path.subst2"
-
-  let rec rsubst3 : type a b c d e. (a, ((a * c) * d) * e) rpath -> (b, ((b * c) * d) * e) rpath = function
+  let rec subst3 : type a b c d e. (a, ((a * c) * d) * e) path -> (b, ((b * c) * d) * e) path = function
     | Root -> assert false (* impossible *)
-    | Static (rpath, name) -> Static (rsubst3 rpath, name)
-    | Dynamic (rpath, arg) -> Dynamic (rsubst2 rpath, arg)
-    | DynamicTail (rpath, arg) -> DynamicTail (rsubst2 rpath, arg)
-
-  let subst3 = function
-    | Path rpath -> Path (rsubst3 rpath)
-    | MappedPath _ -> invalid_arg "Resto.Path.subst3"
+    | Static (path, name) -> Static (subst3 path, name)
+    | Dynamic (path, arg) -> Dynamic (subst2 path, arg)
+    | DynamicTail (path, arg) -> DynamicTail (subst2 path, arg)
 
   let from_path x = x
   let to_path x = x
@@ -245,52 +223,33 @@ module Path = struct
 
   type ('a, 'b) t = ('a, 'b) Internal.path
   type ('a, 'b) path = ('a, 'b) Internal.path
-  type ('a, 'b) rpath = ('a, 'b) Internal.rpath
 
   type 'prefix context = ('prefix, 'prefix) path
 
-  let root = Path Root
-  let open_root = Path Root
+  let root = Root
+  let open_root = Root
 
   let add_suffix (type p pr) (path : (p, pr) path) name =
     match path with
-    | Path (DynamicTail _) -> invalid_arg "Resto.Path.add_suffix"
-    | MappedPath (DynamicTail _, _, _) -> invalid_arg "Resto.Path.add_suffix"
-    | Path path -> Path (Static (path, name))
-    | MappedPath (path, map, rmap) ->
-        MappedPath (Static (path, name), map, rmap)
+    | DynamicTail _ -> invalid_arg "Resto.Path.add_suffix"
+    | path -> Static (path, name)
 
   let add_arg (type p pr) (path : (p, pr) path)  arg =
     match path with
-    | Path (DynamicTail _) -> invalid_arg "Resto.Path.add_arg"
-    | MappedPath (DynamicTail _, _, _) -> invalid_arg "Resto.Path.add_arg"
-    | Path path -> Path (Dynamic (path, arg))
-    | MappedPath (path, map, rmap) ->
-        MappedPath (Dynamic (path, arg),
-                    (fun (x, y) -> (map x, y)),
-                    (fun (x, y) -> (rmap x, y)))
+    | DynamicTail _ -> invalid_arg "Resto.Path.add_arg"
+    | path -> Dynamic (path, arg)
 
   let add_final_args (type p pr) (path : (p, pr) path)  arg =
     match path with
-    | Path (DynamicTail _) -> invalid_arg "Resto.Path.add_final_arg"
-    | MappedPath (DynamicTail _, _, _) -> invalid_arg "Resto.Path.add_final_arg"
-    | Path path -> Path (DynamicTail (path, arg))
-    | MappedPath (path, map, rmap) ->
-        MappedPath (DynamicTail (path, arg),
-                    (fun (x, y) -> (map x, y)),
-                    (fun (x, y) -> (rmap x, y)))
-
-  let map map rmap = function
-    | Path p -> MappedPath (p, map, rmap)
-    | MappedPath (p, map', rmap') ->
-        MappedPath (p, (fun x -> map (map' x)), (fun x -> rmap' (rmap x)))
+    | DynamicTail _ -> invalid_arg "Resto.Path.add_final_arg"
+    | path -> DynamicTail (path, arg)
 
   let prefix
     : type p pr a. (pr, a) path -> (a, p) path -> (pr, p) path
     = fun p1 p2 ->
       let rec prefix
         : type pr a k.
-          (pr, a) path -> (a, k) rpath -> (pr, k) path
+          (pr, a) path -> (a, k) path -> (pr, k) path
         = fun p1 p2 ->
           match p2 with
           | Root -> p1
@@ -299,12 +258,8 @@ module Path = struct
           | DynamicTail (path, arg) -> add_final_args (prefix p1 path) arg
       in
       match p1 with
-      | Path (DynamicTail _) -> invalid_arg "Resto.Path.prefix"
-      | MappedPath (DynamicTail _, _, _) -> invalid_arg "Resto.Path.prefix"
-      | _ ->
-          match p2 with
-          | Path p2 -> prefix p1 p2
-          | MappedPath (p2, m, rm) -> map m rm (prefix p1 p2)
+      | DynamicTail _ -> invalid_arg "Resto.Path.prefix"
+      | _ -> prefix p1 p2
 
   let (/) = add_suffix
   let (/:) = add_arg
@@ -658,10 +613,6 @@ module MakeService(Encoding : ENCODING) = struct
   let subst2 s = { s with path = Internal.subst2 s.path }
   let subst3 s = { s with path = Internal.subst3 s.path }
 
-  let map f g (s : (_,_,_,_,_,_,_) service) =
-    { s with path = Path.map f g s.path }
-
-
   let meth = fun { meth } -> meth
 
   let query
@@ -711,7 +662,7 @@ module MakeService(Encoding : ENCODING) = struct
     : type pr p. (pr, p) path -> p -> string list
     = fun path args ->
       let rec forge_request_args
-        : type k. (pr, k) rpath -> k -> string list -> string list
+        : type k. (pr, k) path -> k -> string list -> string list
         = fun path args acc ->
           match path, args with
           | Root, _ ->
@@ -723,9 +674,7 @@ module MakeService(Encoding : ENCODING) = struct
           | DynamicTail (path, arg), (args, xs) ->
               forge_request_args path args
                 (List.fold_right (fun x acc -> arg.construct x :: acc) xs acc) in
-      match path with
-      | Path path -> forge_request_args path args []
-      | MappedPath (path, _, rmap) -> forge_request_args path (rmap args) []
+      forge_request_args path args []
 
   let forge_request_query
     : type q. q query -> q -> (string * string) list

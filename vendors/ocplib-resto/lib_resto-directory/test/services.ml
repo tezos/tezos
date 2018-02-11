@@ -43,10 +43,7 @@ let alternate_add_service' =
     ~input:Json_encoding.null
     ~output:Json_encoding.int
     ~error:Json_encoding.empty
-    Path.(map
-            (fun (((),i),f) -> (i,int_of_float f))
-            (fun (i,f) -> (((),i),float_of_int f))
-            (root / "bar" /: Arg.int /: Arg.float / "add"))
+    Path.(root / "bar" /: Arg.int /: Arg.float / "add")
 
 let minus_service =
   post_service

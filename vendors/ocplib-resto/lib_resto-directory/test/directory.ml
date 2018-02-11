@@ -28,7 +28,7 @@ let dir =
     (fun i j () () -> Lwt.return (`Ok (float_of_int i+.j)))
 let dir =
   register dir alternate_add_service'
-    (fun (i,j) () () -> Lwt.return (`Ok (i+j)))
+    (fun (((),i),j) () () -> Lwt.return (`Ok (i+ int_of_float j)))
 let dir =
   register dir dummy_service
     (fun ((((((((),_a), _b), _c), _d), _e), _f), _g) () () -> Lwt.return (`Ok ()))

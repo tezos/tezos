@@ -181,7 +181,7 @@ module Make (Encoding : ENCODING) = struct
     : type p pr. (pr, p) Path.path -> p directory -> pr directory
     = fun path dir ->
       let rec prefix
-        : type k pr. (pr, k) Resto.Internal.rpath -> k directory -> pr directory
+        : type k pr. (pr, k) Resto.Internal.path -> k directory -> pr directory
         = fun path dir ->
           match path with
           | Root -> dir
@@ -195,9 +195,7 @@ module Make (Encoding : ENCODING) = struct
                                     services = MethMap.empty })
           | DynamicTail _ ->
               invalid_arg "RestoDirectory.prefix" in
-      match Resto.Internal.to_path path with
-      | Path path -> prefix path dir
-      | MappedPath (path, map, _) -> prefix path (map_directory map dir)
+      prefix (Resto.Internal.to_path path) dir
 
   let conflict steps kind = raise (Conflict (steps, kind))
 
@@ -431,7 +429,7 @@ module Make (Encoding : ENCODING) = struct
 
   let rec transparent_resolve
     : type pr p.
-      pr directory -> (pr, p) rpath -> p -> p directory option Lwt.t
+      pr directory -> (pr, p) path -> p -> p directory option Lwt.t
     = fun dir path rargs ->
       match path with
       | Root -> Lwt.return_some dir
@@ -488,16 +486,7 @@ module Make (Encoding : ENCODING) = struct
     params -> query -> input -> (output, error) Answer.t Lwt.t =
     fun dir service params query body ->
       let service = Service.Internal.to_service service in
-      begin
-        match service.path with
-        | Service.Internal.Path p ->
-            transparent_resolve dir p params
-        | Service.Internal.MappedPath (p, _, f) -> begin
-            transparent_resolve dir p (f params) >>= function
-            | None -> Lwt.return_none
-            | Some dir -> Lwt.return_some (map f dir)
-          end
-      end >>= function
+      transparent_resolve dir service.path params >>= function
       | None -> Lwt.return (`Not_found None)
       | Some (Static { services ; _ }) -> begin
           try
@@ -522,7 +511,7 @@ module Make (Encoding : ENCODING) = struct
 
   let rec describe_rpath
     : type a b. Description.path_item list ->
-      (a, b) rpath -> Description.path_item list
+      (a, b) path -> Description.path_item list
     = fun acc path ->
       match path with
       | Root -> acc
@@ -538,7 +527,7 @@ module Make (Encoding : ENCODING) = struct
    ****************************************************************************)
 
   let rec step_of_path
-    : type p rk. (rk, p) rpath -> step list -> step list
+    : type p rk. (rk, p) path -> step list -> step list
     = fun path acc ->
       match path with
       | Root -> acc
@@ -551,7 +540,7 @@ module Make (Encoding : ENCODING) = struct
 
   let rec insert
     : type k rk.
-      (rk, k) rpath -> rk directory -> k directory * (k directory -> rk directory)
+      (rk, k) path -> rk directory -> k directory * (k directory -> rk directory)
     = fun path dir ->
       match path with
       | Root -> dir, (fun x -> x)
@@ -629,7 +618,7 @@ module Make (Encoding : ENCODING) = struct
     fun root s handler ->
       let s = Service.Internal.to_service s in
       let register
-        : type k. (pr, k) rpath -> (k -> q -> i -> (o, e) Answer.t Lwt.t) ->
+        : type k. (pr, k) path -> (k -> q -> i -> (o, e) Answer.t Lwt.t) ->
           pr directory =
         fun path handler ->
           let dir, insert = insert path root in
@@ -662,9 +651,7 @@ module Make (Encoding : ENCODING) = struct
           | Static _ -> conflict path (CService s.meth)
           | Dynamic _ -> conflict path CBuilder
           | DynamicTail _ -> conflict path CTail in
-      match s.path with
-      | Path p -> register p handler
-      | MappedPath (p, map, _) -> register p (fun p i -> handler (map p) i)
+      register s.path handler
 
   let register =
     (register
@@ -681,7 +668,7 @@ module Make (Encoding : ENCODING) = struct
     fun ?descr root path builder ->
       let path = Resto.Internal.to_path path in
       let register
-        : type k. (pr, k) rpath -> (k -> k directory Lwt.t) -> pr directory =
+        : type k. (pr, k) path -> (k -> k directory Lwt.t) -> pr directory =
         fun path builder ->
           let dir, insert = insert path root in
           match dir with
@@ -692,11 +679,7 @@ module Make (Encoding : ENCODING) = struct
           | Static ({ subdirs = Some _ ; _ }) -> conflict path CDir
           | Dynamic _ -> conflict path CBuilder
           | DynamicTail _ -> conflict path CTail in
-      match path with
-      | Path p -> register p builder
-      | MappedPath (p, map, _) ->
-          register p
-            (fun args -> builder (map args) >|= map_directory map)
+      register path builder
 
   let register_describe_directory_service
     : type pr.

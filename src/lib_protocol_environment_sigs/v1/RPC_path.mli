@@ -28,9 +28,3 @@ val add_final_args:
   ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
 val (/:*):
   ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
-
-val prefix:
-  ('prefix, 'a) path -> ('a, 'params) path -> ('prefix, 'params) path
-
-val map:
-  ('a -> 'b) -> ('b -> 'a) -> ('prefix, 'a) path -> ('prefix, 'b) path
