@@ -57,6 +57,93 @@ module type UPDATER = sig
 
 end
 
+module type T = sig
+  type context
+  type quota
+  type validation_result
+  type rpc_context
+  type 'a tzresult
+  val max_block_length: int
+  val validation_passes: quota list
+  type operation
+  val parse_operation:
+    Operation_hash.t -> Operation.t -> operation tzresult
+  val acceptable_passes: operation -> int list
+  val compare_operations: operation -> operation -> int
+  type validation_state
+  val current_context: validation_state -> context tzresult Lwt.t
+  val precheck_block:
+    ancestor_context: context ->
+    ancestor_timestamp: Time.t ->
+    Block_header.t ->
+    unit tzresult Lwt.t
+  val begin_application:
+    predecessor_context: context ->
+    predecessor_timestamp: Time.t ->
+    predecessor_fitness: Fitness.t ->
+    Block_header.t ->
+    validation_state tzresult Lwt.t
+  val begin_construction:
+    predecessor_context: context ->
+    predecessor_timestamp: Time.t ->
+    predecessor_level: Int32.t ->
+    predecessor_fitness: Fitness.t ->
+    predecessor: Block_hash.t ->
+    timestamp: Time.t ->
+    ?proto_header: MBytes.t ->
+    unit -> validation_state tzresult Lwt.t
+  val apply_operation:
+    validation_state -> operation -> validation_state tzresult Lwt.t
+  val finalize_block:
+    validation_state -> validation_result tzresult Lwt.t
+  val rpc_services: rpc_context RPC_directory.t
+  val configure_sandbox:
+    context -> Data_encoding.json option -> context tzresult Lwt.t
+end
+
+module type V1 = sig
+
+  include Tezos_protocol_environment_sigs.V1.T
+    with type Format.formatter = Format.formatter
+     and type 'a Data_encoding.t = 'a Data_encoding.t
+     and type 'a Lwt.t = 'a Lwt.t
+     and type ('a, 'b) Pervasives.result = ('a, 'b) result
+     and type Block_hash.t = Block_hash.t
+     and type Operation_hash.t = Operation_hash.t
+     and type Operation_list_hash.t = Operation_list_hash.t
+     and type Operation_list_list_hash.t = Operation_list_list_hash.t
+     and type Context_hash.t = Context_hash.t
+     and type Protocol_hash.t = Protocol_hash.t
+     and type Time.t = Time.t
+     and type MBytes.t = MBytes.t
+     and type Operation.shell_header = Operation.shell_header
+     and type Operation.t = Operation.t
+     and type Block_header.shell_header = Block_header.shell_header
+     and type Block_header.t = Block_header.t
+     and type 'a RPC_directory.t = 'a RPC_directory.t
+     and type Ed25519.Public_key_hash.t = Ed25519.Public_key_hash.t
+     and type Ed25519.Public_key.t = Ed25519.Public_key.t
+     and type Ed25519.Secret_key.t = Ed25519.Secret_key.t
+     and type Ed25519.Signature.t = Ed25519.Signature.t
+     and type 'a Micheline.canonical = 'a Micheline.canonical
+     and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
+     and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
+     and type Data_encoding.json_schema = Data_encoding.json_schema
+     and type RPC_service.meth = RPC_service.meth
+     and type (+'m,'pr,'p,'q,'i,'o) RPC_service.t = ('m,'pr,'p,'q,'i,'o) RPC_service.t
+
+  type error += Ecoproto_error of Error_monad.error list
+  val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
+
+  module Lift (P : Updater.PROTOCOL) :
+    T with type context := Context.t
+       and type quota := Updater.quota
+       and type validation_result := Updater.validation_result
+       and type rpc_context := Updater.rpc_context
+       and type 'a tzresult := 'a tzresult
+
+end
+
 module MakeV1
     (Param : sig val name: string end)
     (Context : CONTEXT)
@@ -148,45 +235,12 @@ module MakeV1
 
     include Updater
 
-    module type PROTOCOL = sig
-      open Error_monad
-      val max_block_length: int
-      val validation_passes: quota list
-      type operation
-      val parse_operation:
-        Operation_hash.t -> Operation.t -> operation tzresult
-      val acceptable_passes: operation -> int list
-      val compare_operations: operation -> operation -> int
-      type validation_state
-      val current_context: validation_state -> Context.t tzresult Lwt.t
-      val precheck_block:
-        ancestor_context: Context.t ->
-        ancestor_timestamp: Time.t ->
-        Block_header.t ->
-        unit tzresult Lwt.t
-      val begin_application:
-        predecessor_context: Context.t ->
-        predecessor_timestamp: Time.t ->
-        predecessor_fitness: Fitness.t ->
-        Block_header.t ->
-        validation_state tzresult Lwt.t
-      val begin_construction:
-        predecessor_context: Context.t ->
-        predecessor_timestamp: Time.t ->
-        predecessor_level: Int32.t ->
-        predecessor_fitness: Fitness.t ->
-        predecessor: Block_hash.t ->
-        timestamp: Time.t ->
-        ?proto_header: MBytes.t ->
-        unit -> validation_state tzresult Lwt.t
-      val apply_operation:
-        validation_state -> operation -> validation_state tzresult Lwt.t
-      val finalize_block:
-        validation_state -> validation_result tzresult Lwt.t
-      val rpc_services: rpc_context RPC_directory.t
-      val configure_sandbox:
-        Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
-    end
+    module type PROTOCOL =
+      T with type context := Context.t
+         and type quota := Updater.quota
+         and type validation_result := Updater.validation_result
+         and type rpc_context := Updater.rpc_context
+         and type 'a tzresult := 'a Error_monad.tzresult
 
   end
   module Base58 = struct
@@ -212,6 +266,40 @@ module MakeV1
 
     let register_resolver = Base58.register_resolver
     let complete ctxt s = Base58.complete ctxt s
+  end
+
+  module Lift(P : Updater.PROTOCOL) = struct
+    include P
+    let precheck_block
+        ~ancestor_context ~ancestor_timestamp
+        raw_block =
+      precheck_block
+        ~ancestor_context ~ancestor_timestamp
+        raw_block >|= wrap_error
+    let begin_application
+        ~predecessor_context ~predecessor_timestamp
+        ~predecessor_fitness
+        raw_block =
+      begin_application
+        ~predecessor_context ~predecessor_timestamp
+        ~predecessor_fitness
+        raw_block >|= wrap_error
+    let begin_construction
+        ~predecessor_context ~predecessor_timestamp
+        ~predecessor_level ~predecessor_fitness
+        ~predecessor ~timestamp ?proto_header () =
+      begin_construction
+        ~predecessor_context ~predecessor_timestamp
+        ~predecessor_level ~predecessor_fitness
+        ~predecessor ~timestamp ?proto_header () >|= wrap_error
+    let current_context c =
+      current_context c >|= wrap_error
+    let apply_operation c o =
+      apply_operation c o >|= wrap_error
+    let finalize_block c = finalize_block c >|= wrap_error
+    let parse_operation h b = parse_operation h b |> wrap_error
+    let configure_sandbox c j =
+      configure_sandbox c j >|= wrap_error
   end
 
 end

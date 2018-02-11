@@ -17,6 +17,7 @@
               tezos-error-monad
               tezos-rpc
               tezos-micheline
+              tezos-protocol-environment-sigs
               calendar
               ezjsonm
               lwt.unix

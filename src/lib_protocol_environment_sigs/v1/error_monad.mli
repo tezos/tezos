@@ -97,6 +97,7 @@ val fail_when : bool -> error -> unit tzresult Lwt.t
 
 (** A {!List.iter} in the monad *)
 val iter_s : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
+val iter_p : ('a -> unit tzresult Lwt.t) -> 'a list -> unit tzresult Lwt.t
 
 (** A {!List.map} in the monad *)
 val map_s : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult Lwt.t

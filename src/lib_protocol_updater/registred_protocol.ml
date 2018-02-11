@@ -24,8 +24,7 @@ let build_v1 hash =
   (module struct
     let hash = hash
     module P = F(Env)
-    include P
-    include Updater.LiftProtocol(Name)(Env)(P)
+    include Env.Lift(P)
     let complete_b58prefix = Env.Context.complete
   end : T)
 
@@ -70,8 +69,7 @@ module Register
       versions hash
       (module struct
         let hash = hash
-        include Proto
-        include Updater.LiftProtocol(Name)(Env)(Proto)
+        include Env.Lift(Proto)
         let complete_b58prefix = Env.Context.complete
       end : T)
 
