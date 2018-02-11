@@ -37,7 +37,7 @@ type error +=
 
 val forge_block:
   #RPC_context.simple ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   ?force:bool ->
   ?operations:Operation.raw list ->
   ?best_effort:bool ->
@@ -86,5 +86,5 @@ val create:
 val get_unrevealed_nonces:
   #Client_commands.full_context ->
   ?force:bool ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   (Block_hash.t * (Raw_level.t * Nonce.t)) list tzresult Lwt.t

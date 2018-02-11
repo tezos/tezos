@@ -12,7 +12,7 @@ open Tezos_context
 
 val forge_endorsement:
   #Client_commands.full_context ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   src_sk:Client_keys.sk_locator ->
   ?slot:int ->
   ?max_priority:int ->

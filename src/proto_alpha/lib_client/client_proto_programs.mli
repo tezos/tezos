@@ -52,20 +52,20 @@ val hash_and_sign :
   Michelson_v1_parser.parsed ->
   Michelson_v1_parser.parsed ->
   Client_keys.sk_locator ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   #RPC_context.simple ->
   (string * string) tzresult Lwt.t
 
 val typecheck_data :
   data:Michelson_v1_parser.parsed ->
   ty:Michelson_v1_parser.parsed ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   #RPC_context.simple ->
   unit tzresult Lwt.t
 
 val typecheck_program :
   Michelson_v1_parser.parsed ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   #RPC_context.simple ->
   Script_tc_errors.type_map tzresult Lwt.t
 

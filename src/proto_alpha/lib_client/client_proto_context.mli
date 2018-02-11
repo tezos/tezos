@@ -13,31 +13,31 @@ open Environment
 
 val list_contract_labels :
   #Client_commands.full_context ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   (string * string * string) list tzresult Lwt.t
 
 val get_storage :
   #RPC_context.simple ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
 val get_manager :
   #Client_commands.full_context ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   Contract.t ->
   (string * public_key_hash *
    public_key * Client_keys.sk_locator) tzresult Lwt.t
 
 val get_balance:
   #RPC_context.simple ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   Contract.t ->
   Tez.t tzresult Lwt.t
 
 val set_delegate :
   #RPC_context.simple ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   fee:Tez.tez ->
   Contract.t ->
   src_pk:public_key ->
@@ -52,7 +52,7 @@ val operation_submitted_message :
 
 val source_to_keys:
   #Client_commands.full_context ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   Contract.t ->
   (public_key * Client_keys.sk_locator) tzresult Lwt.t
 
@@ -107,7 +107,7 @@ val faucet :
 
 val transfer :
   #RPC_context.simple ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   ?branch:int ->
   source:Contract.t ->
   src_pk:public_key ->
@@ -121,7 +121,7 @@ val transfer :
 
 val dictate :
   #RPC_context.simple ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   dictator_operation ->
   secret_key ->
   Operation_hash.t tzresult Lwt.t

@@ -13,7 +13,7 @@ open Tezos_context
 (** Mine a block *)
 val bake_block:
   #Client_commands.full_context ->
-  Client_proto_rpcs.block ->
+  Block_services.block ->
   ?force:bool ->
   ?max_priority: int ->
   ?free_baking: bool ->

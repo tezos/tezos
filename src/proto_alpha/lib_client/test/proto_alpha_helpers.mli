@@ -19,7 +19,7 @@ val init :
     forked Tezos node and the block info of the block from where the
     tests will begin. *)
 
-val level : Client_proto_rpcs.block -> Tezos_context.Level.t tzresult Lwt.t
+val level : Block_services.block -> Tezos_context.Level.t tzresult Lwt.t
 
 module Account : sig
 
@@ -59,7 +59,7 @@ module Account : sig
   (** The hardcoded bootstrap accounts. *)
 
   val transfer :
-    ?block:Client_proto_rpcs.block ->
+    ?block:Block_services.block ->
     ?fee: Tez.t ->
     account:t ->
     destination:Contract.t ->
@@ -68,7 +68,7 @@ module Account : sig
     (Operation_hash.t * Contract.t list) tzresult Lwt.t
 
   val originate :
-    ?block:Client_proto_rpcs.block ->
+    ?block:Block_services.block ->
     ?delegate:public_key_hash ->
     ?fee: Tez.t ->
     src:t ->
@@ -77,7 +77,7 @@ module Account : sig
     unit -> (Operation_hash.t * Contract.t) tzresult Lwt.t
 
   val set_delegate :
-    ?block:Client_proto_rpcs.block ->
+    ?block:Block_services.block ->
     ?fee: Tez.t ->
     contract:Contract.t ->
     manager_sk:Client_keys.Secret_key_locator.t ->
@@ -85,10 +85,10 @@ module Account : sig
     public_key_hash option ->
     Operation_hash.t tzresult Lwt.t
 
-  val balance : ?block:Client_proto_rpcs.block -> t -> Tez.t tzresult Lwt.t
+  val balance : ?block:Block_services.block -> t -> Tez.t tzresult Lwt.t
 
   val delegate :
-    ?block:Client_proto_rpcs.block ->
+    ?block:Block_services.block ->
     Contract.t ->
     public_key_hash option tzresult Lwt.t
 
@@ -112,17 +112,17 @@ module Endorse : sig
   val endorse :
     ?slot:int ->
     Account.t ->
-    Client_proto_rpcs.block ->
+    Block_services.block ->
     Operation.raw tzresult Lwt.t
 
   val endorsers_list :
-    Client_proto_rpcs.block ->
+    Block_services.block ->
     Account.t array tzresult Lwt.t
 
   val endorsement_rights :
     ?max_priority:int ->
     Account.t ->
-    Client_proto_rpcs.block ->
+    Block_services.block ->
     Client_proto_rpcs.Helpers.Rights.endorsement_slot list tzresult Lwt.t
 
 end
@@ -208,4 +208,4 @@ module Assert : sig
 
 end
 
-val display_level: Client_proto_rpcs.block -> unit tzresult Lwt.t
+val display_level: Block_services.block -> unit tzresult Lwt.t
