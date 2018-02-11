@@ -184,6 +184,7 @@ let make_args_dict help_handler spec args =
 type (_, _) options =
     Argument : { spec : ('a, 'arg) args ;
                  converter : 'a -> 'b } -> ('b, 'arg) options
+
 let (>>) arg1 arg2 = AddArg (arg1, arg2)
 let args1 spec =
   Argument { spec = spec >> NoArgs;
@@ -246,12 +247,12 @@ type group =
 (* A command wraps a callback with its type and info *)
 type ('arg, 'ret) command =
   | Command
-    : { params : ('a, 'arg, 'ret) params ;
-        options : ('b, 'arg) options ;
+    : { params : ('a, 'iarg, 'ret) params ;
+        options : ('b, 'iarg) options ;
         handler : 'b -> 'a ;
         desc : string ;
-        group : group option }
-    -> ('arg, 'ret) command
+        group : group option ;
+        conv : 'arg -> 'iarg } -> ('arg, 'ret) command
 
 type format = [ `Plain | `Ansi | `Html ]
 
@@ -285,7 +286,7 @@ let rec prefixes p next =
 let stop = Stop
 let no_options = Argument { spec=NoArgs ; converter=fun () -> () }
 let command ?group ~desc options params handler =
-  Command { params ; options ; handler ; desc ; group }
+  Command { params ; options ; handler ; desc ; group ; conv = (fun x -> x) }
 
 (* Param combinators *)
 let string ~name ~desc next =
@@ -371,16 +372,18 @@ let rec help_commands commands =
          fail (Help_cmd (keywords, commands, format, verbosity))) ]
 
 (* Command execution *)
+
 let exec
-    (type ctx) (type ret)
+    (type ctx)
     (Command { options = (Argument { converter ; spec = options_spec }) ;
                params = spec ;
                handler ;
+               conv ;
                _ })
     (ctx : ctx) params args_dict =
   let rec exec
-    : type a. int -> (a, ctx, ret) params -> a -> string list -> ret tzresult Lwt.t
-    = fun i spec cb params ->
+    : type a ctx ret. int -> ctx -> (a, ctx, ret) params -> a -> string list -> ret tzresult Lwt.t
+    = fun i ctx spec cb params ->
       match spec, params with
       | Stop, _ -> cb ctx
       | Seq (_, _, { converter ; _ }), seq ->
@@ -397,7 +400,7 @@ let exec
           do_seq i [] seq >>=? fun parsed ->
           cb parsed ctx
       | Prefix (n, next), p :: rest when n = p ->
-          exec (succ i) next cb rest
+          exec (succ i) ctx next cb rest
       | Param (_, _, { converter ; _ }, next), p :: rest ->
           Lwt.catch
             (fun () -> converter ctx p)
@@ -405,11 +408,11 @@ let exec
               | Failure msg -> Error_monad.failwith "%s" msg
               | exn -> fail (Exn exn))
           |> trace (Bad_argument (i, p)) >>=? fun v ->
-          exec (succ i) next (cb v) rest
-      | _ -> raise (Failure ("cli_entries internal error: exec no case matched"))
-  in
+          exec (succ i) ctx next (cb v) rest
+      | _ -> raise (Failure ("cli_entries internal error: exec no case matched")) in
+  let ctx = conv ctx in
   parse_args options_spec args_dict ctx >>=? fun parsed_options ->
-  exec 1 spec (handler (converter parsed_options)) params
+  exec 1 ctx spec (handler (converter parsed_options)) params
 
 (* Command dispatch tree *)
 type ('arg, 'ret) level =
@@ -428,51 +431,60 @@ and ('ctx, 'ret) tree =
 
 let has_options : type ret ctx. (ctx, ret) command -> bool =
   fun (Command { options = Argument { spec ; _ } ; _ }) ->
-    let args_help : type a. (a, ctx) args -> bool = function
+    let args_help : type a. (a, _) args -> bool = function
       | NoArgs -> false
       | AddArg (_, _) -> true
     in args_help spec
 
-let insert_in_dispatch_tree
-    (type ctx) (type ret)
-    root (Command { params ; _ } as command) =
-  let access_autocomplete :
-    type p. (p, ctx) parameter -> (ctx -> string list tzresult Lwt.t) option =
-    fun { autocomplete ; _ } -> autocomplete in
-  let rec insert_tree
-    : type a. (ctx, ret) tree -> (a, ctx, ret) params -> (ctx, ret) tree
-    = fun t c -> match t, c with
-      | TEmpty, Stop -> TStop command
-      | TEmpty, Seq (_, _, { autocomplete ; _ }) -> TSeq (command, autocomplete)
-      | TEmpty, Param (_, _, param, next) ->
-          TParam { tree = insert_tree TEmpty next ; stop = None ; autocomplete=access_autocomplete param}
-      | TEmpty, Prefix (n, next) ->
-          TPrefix { stop = None ; prefix = [ (n, insert_tree TEmpty next) ] }
-      | TStop cmd, Param (_, _, param, next) ->
-          if not (has_options cmd)
-          then TParam { tree = insert_tree TEmpty next ;
-                        stop = Some cmd ;
-                        autocomplete=access_autocomplete param }
-          else raise (Failure "Command cannot have both prefix and options")
-      | TStop cmd, Prefix (n, next) ->
-          TPrefix { stop = Some cmd ;
-                    prefix = [ (n, insert_tree TEmpty next) ] }
-      | TParam t, Param (_, _, _, next) ->
-          TParam { t with tree = insert_tree t.tree next }
-      | TPrefix ({ prefix ; _ } as l), Prefix (n, next) ->
-          let rec insert_prefix = function
-            | [] -> [ (n, insert_tree TEmpty next) ]
-            | (n', t) :: rest when n = n' -> (n, insert_tree t next) :: rest
-            | item :: rest -> item :: insert_prefix rest in
-          TPrefix { l with prefix = insert_prefix prefix }
-      | TPrefix ({ stop = None ; _ } as l), Stop ->
-          TPrefix { l with stop = Some command }
-      | TParam ({ stop = None ; _ } as l), Stop ->
-          TParam { l with stop = Some command }
-      | _, _ ->
-          Pervasives.failwith
-            "Cli_entries.Command_tree.insert: conflicting commands" in
-  insert_tree root params
+let insert_in_dispatch_tree :
+  type ctx ret. (ctx, ret) tree -> (ctx, ret) command -> (ctx, ret) tree =
+  fun root (Command { params ; conv ; _ } as command) ->
+    let access_autocomplete :
+      type p ctx. (p, ctx) parameter -> (ctx -> string list tzresult Lwt.t) option =
+      fun { autocomplete ; _ } -> autocomplete in
+    let rec insert_tree
+      : type a ictx.
+        (ctx -> ictx) ->
+        (ctx, ret) tree -> (a, ictx, ret) params -> (ctx, ret) tree
+      = fun conv t c ->
+        let insert_tree t c = insert_tree conv t c in
+        match t, c with
+        | TEmpty, Stop -> TStop command
+        | TEmpty, Seq (_, _, { autocomplete ; _ }) -> TSeq (command,
+                                                            Option.map autocomplete ~f:(fun a c -> a (conv c)))
+        | TEmpty, Param (_, _, param, next) ->
+            let autocomplete = access_autocomplete param in
+            let autocomplete = Option.map autocomplete ~f:(fun a c -> a (conv c)) in
+            TParam { tree = insert_tree TEmpty next ; stop = None ; autocomplete}
+        | TEmpty, Prefix (n, next) ->
+            TPrefix { stop = None ; prefix = [ (n, insert_tree TEmpty next) ] }
+        | TStop cmd, Param (_, _, param, next) ->
+            let autocomplete = access_autocomplete param in
+            let autocomplete = Option.map autocomplete ~f:(fun a c -> a (conv c)) in
+            if not (has_options cmd)
+            then TParam { tree = insert_tree TEmpty next ;
+                          stop = Some cmd ;
+                          autocomplete }
+            else raise (Failure "Command cannot have both prefix and options")
+        | TStop cmd, Prefix (n, next) ->
+            TPrefix { stop = Some cmd ;
+                      prefix = [ (n, insert_tree TEmpty next) ] }
+        | TParam t, Param (_, _, _, next) ->
+            TParam { t with tree = insert_tree t.tree next }
+        | TPrefix ({ prefix ; _ } as l), Prefix (n, next) ->
+            let rec insert_prefix = function
+              | [] -> [ (n, insert_tree TEmpty next) ]
+              | (n', t) :: rest when n = n' -> (n, insert_tree t next) :: rest
+              | item :: rest -> item :: insert_prefix rest in
+            TPrefix { l with prefix = insert_prefix prefix }
+        | TPrefix ({ stop = None ; _ } as l), Stop ->
+            TPrefix { l with stop = Some command }
+        | TParam ({ stop = None ; _ } as l), Stop ->
+            TParam { l with stop = Some command }
+        | _, _ ->
+            Pervasives.failwith
+              "Cli_entries.Command_tree.insert: conflicting commands" in
+    insert_tree conv root params
 
 let make_dispatch_tree commands =
   List.fold_left insert_in_dispatch_tree TEmpty commands
@@ -1071,8 +1083,8 @@ let complete_tree cctxt tree index args =
           end
       | TParam { tree ; _ }, _ :: tl ->
           help tree tl (ind - 1)
-      | TStop Command { options = Argument { spec ; _ } ; _ }, args ->
-          complete_options (fun _ _ -> return []) args spec ind cctxt
+      | TStop Command { options = Argument { spec ; _ } ; conv ;_ }, args ->
+          complete_options (fun _ _ -> return []) args spec ind (conv cctxt)
       | (TParam _ | TPrefix _), []
       | TEmpty, _ -> return []
   in help tree args index
@@ -1250,3 +1262,6 @@ let () =
     Data_encoding.(obj1 (req "arg" string))
     (function Unknown_option arg -> Some arg | _ -> None)
     (fun arg -> Unknown_option arg)
+
+let map_command f (Command c) =
+  (Command { c with conv = (fun x -> c.conv (f x)) })

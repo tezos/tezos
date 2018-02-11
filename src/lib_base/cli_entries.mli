@@ -228,3 +228,5 @@ val parse_initial_options :
   'ctx ->
   string list ->
   ('a * string list) tzresult Lwt.t
+
+val map_command: ('a -> 'b) -> ('b, 'c) command -> ('a, 'c) command
