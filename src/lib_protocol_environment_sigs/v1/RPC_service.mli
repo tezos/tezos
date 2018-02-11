@@ -16,32 +16,10 @@ type meth = [
   | `PATCH
 ]
 
-module MethMap : Map.S with type key = meth
-
 type (+'meth, 'prefix, 'params, 'query, 'input, 'output) t
   constraint 'meth = [< meth ]
 type (+'meth, 'prefix, 'params, 'query, 'input, 'output) service =
   ('meth, 'prefix, 'params, 'query, 'input, 'output) t
-
-val query:
-  ('meth, 'prefix, 'params, 'query, 'input, 'output) service ->
-  'query RPC_query.t
-
-type _ input =
-  | No_input : unit input
-  | Input : 'input Data_encoding.t -> 'input input
-
-val input_encoding:
-  ('meth, 'prefix, 'params, 'query, 'input, 'output) service ->
-  'input input
-
-val output_encoding:
-  ('meth, 'prefix, 'params, 'query, 'input, 'output) service ->
-  'output Data_encoding.t
-
-val error_encoding:
-  ('meth, 'prefix, 'params, 'query, 'input, 'output) service ->
-  unit Data_encoding.t
 
 val get_service:
   ?description: string ->

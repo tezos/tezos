@@ -38,7 +38,7 @@ module S = struct
       ~description:"Connect to a peer"
       ~query: RPC_query.empty
       ~input: Data_encoding.(obj1 (dft "timeout" float 5.))
-      ~output: (RPC_error.wrap Data_encoding.empty)
+      ~output: Data_encoding.empty
       RPC_path.(root / "network" / "connect" /: P2p_point.Id.rpc_arg)
 
 end
@@ -48,7 +48,7 @@ let stat ctxt = make_call S.stat ctxt () () ()
 let versions ctxt = make_call S.versions ctxt () () ()
 let events ctxt = make_streamed_call S.events ctxt () () ()
 let connect ctxt ~timeout peer_id =
-  make_err_call1 S.connect ctxt peer_id () timeout
+  make_call1 S.connect ctxt peer_id () timeout
 
 let monitor_encoding = Data_encoding.(obj1 (dft "monitor" bool false))
 

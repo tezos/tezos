@@ -9,3 +9,6 @@
 
 include Resto.Description
 
+let describe ctxt ?(recurse = false) path =
+  RPC_context.make_call1
+    RPC_service.description_service ctxt path { recurse } ()

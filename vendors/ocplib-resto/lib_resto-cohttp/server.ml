@@ -327,13 +327,18 @@ module Make (Encoding : Resto.ENCODING)(Log : LOGGING) = struct
       and callback (io, con) req body =
         Lwt.catch
           begin fun () -> callback server (io, con) req body end
-          begin fun exn ->
-            let headers = Header.init () in
-            let headers =
-              Header.add headers "content-type" "text/ocaml.exception" in
-            let status = `Internal_server_error in
-            let body = Cohttp_lwt.Body.of_string (Printexc.to_string exn) in
-            Lwt.return (Response.make ~status ~headers (), body)
+          begin function
+            | Not_found ->
+                let status = `Not_found in
+                let body = Cohttp_lwt.Body.empty in
+                Lwt.return (Response.make ~status (), body)
+            | exn ->
+                let headers = Header.init () in
+                let headers =
+                  Header.add headers "content-type" "text/ocaml.exception" in
+                let status = `Internal_server_error in
+                let body = Cohttp_lwt.Body.of_string (Printexc.to_string exn) in
+                Lwt.return (Response.make ~status ~headers (), body)
           end
       in
       Cohttp_lwt_unix.Server.create ~stop ~ctx ~mode ~on_exn

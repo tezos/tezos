@@ -684,7 +684,7 @@ module Make (Encoding : ENCODING) = struct
   let register_describe_directory_service
     : type pr.
       pr directory ->
-      (pr, pr) Service.description_service ->
+      (pr, pr, _) Service.description_service ->
       pr directory
     = fun root service ->
       let dir = ref root in

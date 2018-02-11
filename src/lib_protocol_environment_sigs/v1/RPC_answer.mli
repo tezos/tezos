@@ -13,11 +13,11 @@ type 'o t =
   | `OkStream of 'o stream (* 200 *)
   | `Created of string option (* 201 *)
   | `No_content (* 204 *)
-  | `Unauthorized of unit option (* 401 *)
-  | `Forbidden of unit option (* 403 *)
-  | `Not_found of unit option (* 404 *)
-  | `Conflict of unit option (* 409 *)
-  | `Error of unit option (* 500 *)
+  | `Unauthorized of error list option (* 401 *)
+  | `Forbidden of error list option (* 403 *)
+  | `Not_found of error list option (* 404 *)
+  | `Conflict of error list option (* 409 *)
+  | `Error of error list option (* 500 *)
   ]
 
 and 'a stream = {
@@ -27,3 +27,5 @@ and 'a stream = {
 
 val return: 'o -> 'o t Lwt.t
 val return_stream: 'o stream -> 'o t Lwt.t
+val not_found: 'o t Lwt.t
+val fail: error list -> 'a t Lwt.t

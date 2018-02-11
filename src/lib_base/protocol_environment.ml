@@ -182,32 +182,11 @@ module MakeV1
   module Data_encoding = Data_encoding
   module Time = Time
   module Ed25519 = Ed25519
-  module S = struct
-    include S
-  end
-  module Block_hash = Block_hash
-  module Operation_hash = Operation_hash
-  module Operation_list_hash = Operation_list_hash
-  module Operation_list_list_hash = Operation_list_list_hash
-  module Context_hash = Context_hash
-  module Protocol_hash = Protocol_hash
-  module Blake2B = Blake2B
-  module Fitness = Fitness
-  module Operation = Operation
-  module Block_header = Block_header
-  module Protocol = Protocol
-  module RPC_arg = RPC_arg
-  module RPC_path = RPC_path
-  module RPC_query = RPC_query
-  module RPC_service = RPC_service
-  module RPC_answer = RPC_answer
-  module RPC_directory = RPC_directory
+  module S = S
   module Error_monad = struct
     type error_category = [ `Branch | `Temporary | `Permanent ]
     include Error_monad.Make()
   end
-  module Micheline = Micheline
-  module Logging = Logging.Make(Param)
 
   type error += Ecoproto_error of Error_monad.error list
 
@@ -230,6 +209,114 @@ module MakeV1
   let wrap_error = function
     | Ok _ as ok -> ok
     | Error errors -> Error [Ecoproto_error errors]
+
+  module Block_hash = Block_hash
+  module Operation_hash = Operation_hash
+  module Operation_list_hash = Operation_list_hash
+  module Operation_list_list_hash = Operation_list_list_hash
+  module Context_hash = Context_hash
+  module Protocol_hash = Protocol_hash
+  module Blake2B = Blake2B
+  module Fitness = Fitness
+  module Operation = Operation
+  module Block_header = Block_header
+  module Protocol = Protocol
+  module RPC_arg = RPC_arg
+  module RPC_path = RPC_path
+  module RPC_query = RPC_query
+  module RPC_service = RPC_service
+  module RPC_answer = struct
+
+    type 'o t =
+      [ `Ok of 'o (* 200 *)
+      | `OkStream of 'o stream (* 200 *)
+      | `Created of string option (* 201 *)
+      | `No_content (* 204 *)
+      | `Unauthorized of Error_monad.error list option (* 401 *)
+      | `Forbidden of Error_monad.error list option (* 403 *)
+      | `Not_found of Error_monad.error list option (* 404 *)
+      | `Conflict of Error_monad.error list option (* 409 *)
+      | `Error of Error_monad.error list option (* 500 *)
+      ]
+
+    and 'a stream = 'a Resto_directory.Answer.stream = {
+      next: unit -> 'a option Lwt.t ;
+      shutdown: unit -> unit ;
+    }
+
+    let return x = Lwt.return (`Ok x)
+    let return_stream x = Lwt.return (`OkStream x)
+    let not_found = Lwt.return (`Not_found None)
+
+    let fail err = Lwt.return (`Error (Some err))
+  end
+  module RPC_directory = struct
+    include RPC_directory
+    let register dir service handler =
+      gen_register dir service
+        (fun p q i ->
+           handler p q i >>= function
+           | `Ok o -> RPC_answer.return o
+           | `OkStream s -> RPC_answer.return_stream s
+           | `Created s -> Lwt.return (`Created s)
+           | `No_content -> Lwt.return (`No_content)
+           | `Unauthorized e ->
+               let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+               Lwt.return (`Unauthorized e)
+           | `Forbidden e ->
+               let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+               Lwt.return (`Forbidden e)
+           | `Not_found e ->
+               let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+               Lwt.return (`Not_found e)
+           | `Conflict e ->
+               let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+               Lwt.return (`Conflict e)
+           | `Error e ->
+               let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+               Lwt.return (`Error e))
+
+    (*
+    let tz_register dir service handler =
+      register dir service
+        (fun p q i ->
+           handler p q i >>= function
+           | Ok o -> RPC_answer.return o
+           | Error e -> RPC_answer.fail e)
+
+    let lwt_register dir service handler =
+      register dir service
+        (fun p q i ->
+           handler p q i >>= fun o ->
+           RPC_answer.return o)
+*)
+    open Curry
+
+    let register0 root s f = register root s (curry Z f)
+    let register1 root s f = register root s (curry (S Z) f)
+    let register2 root s f = register root s (curry (S (S Z)) f)
+    let register3 root s f = register root s (curry (S (S (S Z))) f)
+    let register4 root s f = register root s (curry (S (S (S (S Z)))) f)
+    let register5 root s f = register root s (curry (S (S (S (S (S Z))))) f)
+
+    (*
+    let tz_register0 root s f = tz_register root s (curry Z f)
+    let tz_register1 root s f = tz_register root s (curry (S Z) f)
+    let tz_register2 root s f = tz_register root s (curry (S (S Z)) f)
+    let tz_register3 root s f = tz_register root s (curry (S (S (S Z))) f)
+    let tz_register4 root s f = tz_register root s (curry (S (S (S (S Z)))) f)
+    let tz_register5 root s f = tz_register root s (curry (S (S (S (S (S Z))))) f)
+
+    let lwt_register0 root s f = lwt_register root s (curry Z f)
+    let lwt_register1 root s f = lwt_register root s (curry (S Z) f)
+    let lwt_register2 root s f = lwt_register root s (curry (S (S Z)) f)
+    let lwt_register3 root s f = lwt_register root s (curry (S (S (S Z))) f)
+    let lwt_register4 root s f = lwt_register root s (curry (S (S (S (S Z)))) f)
+    let lwt_register5 root s f = lwt_register root s (curry (S (S (S (S (S Z))))) f)
+*)
+  end
+  module Micheline = Micheline
+  module Logging = Logging.Make(Param)
 
   module Updater = struct
 

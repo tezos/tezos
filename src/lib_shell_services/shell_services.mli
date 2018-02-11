@@ -45,11 +45,6 @@ val complete:
   #simple ->
   ?block:Block_services.block -> string -> string list tzresult Lwt.t
 
-val describe:
-  #simple ->
-  ?recurse:bool -> string list ->
-  Data_encoding.json_schema RPC_description.directory tzresult Lwt.t
-
 module S : sig
 
   val forge_block_header:
@@ -68,17 +63,17 @@ module S : sig
   val inject_block:
     ([ `POST ], unit,
      unit, unit, inject_block_param,
-     Block_hash.t tzresult) RPC_service.t
+     Block_hash.t) RPC_service.t
 
   val inject_operation:
     ([ `POST ], unit,
      unit, unit, (MBytes.t * bool * Net_id.t option),
-     Operation_hash.t tzresult) RPC_service.t
+     Operation_hash.t) RPC_service.t
 
   val inject_protocol:
     ([ `POST ], unit,
      unit, unit, (Protocol.t * bool * bool option),
-     Protocol_hash.t tzresult) RPC_service.t
+     Protocol_hash.t) RPC_service.t
 
   val bootstrapped:
     ([ `POST ], unit,
@@ -89,7 +84,5 @@ module S : sig
     ([ `POST ], unit,
      unit * string, unit, unit,
      string list) RPC_service.t
-
-  val describe: (unit, unit) RPC_service.description_service
 
 end

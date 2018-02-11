@@ -331,8 +331,10 @@ let handle accept (meth, uri, ans) =
   | `Ok (Some v) -> return v
   | `Ok None -> request_failed meth uri Empty_answer
   | `Not_found None -> fail (RPC_context.Not_found { meth ; uri })
-  | `Conflict _ | `Error _ | `Forbidden _ | `Unauthorized _
-  | `Not_found (Some _) ->
+  | `Conflict (Some err) | `Error (Some err)
+  | `Forbidden (Some err) | `Unauthorized (Some err)
+  | `Not_found (Some err) -> Lwt.return_error err
+  | `Conflict None | `Error None | `Forbidden None | `Unauthorized None ->
       fail (RPC_context.Generic_error { meth ; uri })
   | `Unexpected_status_code (code, (content, _, media_type)) ->
       let media_type = Option.map media_type ~f:Media_type.name in

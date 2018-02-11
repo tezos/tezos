@@ -60,12 +60,16 @@ let of_directory (dir : unit RPC_directory.t) : t = object
           | None -> shutdown () ; not_found s p q
         end
       | `Not_found None -> not_found s p q
-      | `Unauthorized _
-      | `Error _
-      | `Not_found _
-      | `Forbidden _
+      | `Unauthorized (Some err)
+      | `Forbidden (Some err)
+      | `Not_found (Some err)
+      | `Conflict (Some err)
+      | `Error (Some err) -> Lwt.return_error err
+      | `Unauthorized None
+      | `Error None
+      | `Forbidden None
       | `Created _
-      | `Conflict _
+      | `Conflict None
       | `No_content -> generic_error s p q
   method call_streamed_service : 'm 'p 'q 'i 'o.
     ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
@@ -85,12 +89,16 @@ let of_directory (dir : unit RPC_directory.t) : t = object
           on_chunk v ; on_close () ;
           return (fun () -> ())
       | `Not_found None -> not_found s p q
-      | `Unauthorized _
-      | `Error _
-      | `Not_found (Some _)
-      | `Forbidden _
+      | `Unauthorized (Some err)
+      | `Forbidden (Some err)
+      | `Not_found (Some err)
+      | `Conflict (Some err)
+      | `Error (Some err) -> Lwt.return_error err
+      | `Unauthorized None
+      | `Error None
+      | `Forbidden None
       | `Created _
-      | `Conflict _
+      | `Conflict None
       | `No_content -> generic_error s p q
 end
 
@@ -98,11 +106,6 @@ let make_call s (ctxt : #simple) = ctxt#call_service s
 let make_call1 s ctxt x = make_call s ctxt ((), x)
 let make_call2 s ctxt x y = make_call s ctxt (((), x), y)
 let make_call3 s ctxt x y z = make_call s ctxt ((((), x), y), z)
-
-let make_err_call s ctxt p q i =
-  make_call s ctxt p q i >>=? Lwt.return
-let make_err_call1 s ctxt x = make_err_call s ctxt ((), x)
-let make_err_call2 s ctxt x y = make_err_call s ctxt (((), x), y)
 
 type stopper = unit -> unit
 

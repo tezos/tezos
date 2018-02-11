@@ -635,11 +635,11 @@ module MakeService(Encoding : ENCODING) = struct
       (_, pr, p, q, i, o, e) service -> e Encoding.t
     = fun { types } -> types.error
 
-  type ('prefix, 'params) description_service =
+  type ('prefix, 'params, 'error) description_service =
     ([ `GET ], 'prefix, 'params * string list, Description.request,
-     unit, Encoding.schema Description.directory, unit) service
+     unit, Encoding.schema Description.directory, 'error) service
 
-  let description_service ?description path =
+  let description_service ?description error path =
     let description =
       match description with
       | Some descr -> descr
@@ -649,7 +649,7 @@ module MakeService(Encoding : ENCODING) = struct
       ~description
       ~query:Description.request_query
       ~output:Encoding.description_answer_encoding
-      ~error:Encoding.unit
+      ~error
       Path.(path /:* Arg.string)
 
   type 'input request = {

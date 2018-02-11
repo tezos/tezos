@@ -66,9 +66,7 @@ module S = struct
          validated before answering."
       ~query: RPC_query.empty
       ~input: inject_block_param
-      ~output:
-        (RPC_error.wrap @@
-         (obj1 (req "block_hash" Block_hash.encoding)))
+      ~output: (obj1 (req "block_hash" Block_hash.encoding))
       RPC_path.(root / "inject_block")
 
   let inject_operation =
@@ -96,8 +94,7 @@ module S = struct
               true)
            (opt "net_id" Net_id.encoding))
       ~output:
-        (RPC_error.wrap @@
-         describe
+        (describe
            ~title: "Hash of the injected operation" @@
          (obj1 (req "injectedOperation" Operation_hash.encoding)))
       RPC_path.(root / "inject_operation")
@@ -124,8 +121,7 @@ module S = struct
                    "Should we inject protocol that is invalid. (default: false)"
                  bool)))
       ~output:
-        (RPC_error.wrap @@
-         describe
+        (describe
            ~title: "Hash of the injected protocol" @@
          (obj1 (req "injectedProtocol" Protocol_hash.encoding)))
       RPC_path.(root / "inject_protocol")
@@ -154,11 +150,6 @@ module S = struct
       ~output: (list string)
       RPC_path.(root / "complete" /: prefix_arg )
 
-  let describe =
-    RPC_service.description_service
-      ~description: "RPCs documentation and input/output schema"
-      RPC_path.(root / "describe")
-
 end
 
 open RPC_context
@@ -169,15 +160,15 @@ let forge_block_header ctxt header =
 let inject_block ctxt
     ?(async = false) ?(force = false) ?net_id
     raw operations =
-  make_err_call S.inject_block ctxt () ()
+  make_call S.inject_block ctxt () ()
     { raw ; blocking = not async ; force ; net_id ; operations }
 
 let inject_operation ctxt ?(async = false) ?net_id operation =
-  make_err_call S.inject_operation ctxt () ()
+  make_call S.inject_operation ctxt () ()
     (operation, not async, net_id)
 
 let inject_protocol ctxt ?(async = false) ?force protocol =
-  make_err_call S.inject_protocol ctxt () ()
+  make_call S.inject_protocol ctxt () ()
     (protocol, not async, force)
 
 let bootstrapped ctxt =
@@ -189,6 +180,3 @@ let complete ctxt ?block prefix =
       make_call1 S.complete ctxt prefix () ()
   | Some block ->
       Block_services.complete ctxt block prefix
-
-let describe ctxt ?(recurse = true) path =
-  make_call1 S.describe ctxt path { recurse } ()

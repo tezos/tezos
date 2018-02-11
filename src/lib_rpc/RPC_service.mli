@@ -19,12 +19,14 @@ type (+'m,'pr,'p,'q,'i,'o, 'e) raw =
   ('m,'pr,'p,'q,'i,'o, 'e) Resto.MakeService(RPC_encoding).t
   constraint 'meth = [< meth ]
 
+type error = Error_monad.error list
+
 type (+'meth, 'prefix, 'params, 'query, 'input, 'output) t =
-  ('meth, 'prefix, 'params, 'query, 'input, 'output, unit) raw
+  ('meth, 'prefix, 'params, 'query, 'input, 'output, error) raw
   constraint 'meth = [< meth ]
 
 type (+'meth, 'prefix, 'params, 'query, 'input, 'output) service =
-  ('meth, 'prefix, 'params, 'query, 'input, 'output, unit) raw
+  ('meth, 'prefix, 'params, 'query, 'input, 'output, error) raw
   constraint 'meth = [< meth ]
 
 include (module type of struct include Resto.MakeService(RPC_encoding) end
@@ -68,3 +70,15 @@ val put_service:
   output: 'output Data_encoding.t ->
   ('prefix, 'params) RPC_path.t ->
   ([ `PUT ], 'prefix, 'params, 'query, 'input, 'output) service
+
+
+(**/**)
+
+val description_service:
+  ([ `GET ], unit, unit * string list, Resto.Description.request,
+   unit, Json_schema.schema Resto.Description.directory) service
+
+val error_service:
+  ([ `POST ], unit, unit, unit, unit, Json_schema.schema) service
+
+val error_encoding: error Data_encoding.t

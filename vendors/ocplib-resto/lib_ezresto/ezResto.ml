@@ -49,4 +49,5 @@ module Description = Resto.Description
 type description_service =
   ([`GET], unit * string list, Description.request,
    unit, Json_schema.schema Description.directory, unit) service
-let description_service = description_service
+let description_service ?description path =
+  description_service ?description Json_encoding.empty path

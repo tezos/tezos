@@ -7,4 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Error_monad
+
 include (module type of struct include Resto.Description end)
+
+val describe:
+  #RPC_context.simple ->
+  ?recurse:bool ->
+  string list ->
+  Json_schema.schema directory tzresult Lwt.t
+

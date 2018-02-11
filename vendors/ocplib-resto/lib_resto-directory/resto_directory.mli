@@ -174,7 +174,7 @@ module Make (Encoding : ENCODING) : sig
   (** Registring a description service. *)
   val register_describe_directory_service:
     'prefix directory ->
-    ('prefix, 'prefix) Service.description_service ->
+    ('prefix, 'prefix, 'error) Service.description_service ->
     'prefix directory
 
   (**/**)

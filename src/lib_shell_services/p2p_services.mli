@@ -38,7 +38,7 @@ module S : sig
   val connect :
     ([ `POST ], unit,
      unit * P2p_point.Id.t, unit, float,
-     unit tzresult) RPC_service.t
+     unit) RPC_service.t
 
 end
 

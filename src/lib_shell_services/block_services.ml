@@ -303,7 +303,7 @@ module S = struct
          the given operations and return the resulting fitness."
       ~query: RPC_query.empty
       ~input: preapply_param_encoding
-      ~output: (RPC_error.wrap preapply_result_encoding)
+      ~output: preapply_result_encoding
       RPC_path.(block_path / "preapply")
 
   let complete =
@@ -416,7 +416,7 @@ module S = struct
         "Unmark an invalid block"
       ~query: RPC_query.empty
       ~input: Data_encoding.empty
-      ~output:(RPC_error.wrap Data_encoding.empty)
+      ~output: Data_encoding.empty
       RPC_path.(root / "invalid_blocks" /: Block_hash.rpc_arg / "unmark" )
 
 end
@@ -458,11 +458,11 @@ let complete ctxt b s =
   make_call2 S.complete ctxt b s () ()
 let preapply ctxt h
     ?(timestamp = Time.now ()) ?(sort = false) ~proto_header operations =
-  make_err_call1 S.preapply ctxt h ()
+  make_call1 S.preapply ctxt h ()
     { timestamp ; proto_header ; sort_operations = sort ; operations }
 
 let unmark_invalid ctxt h =
-  make_err_call1 S.unmark_invalid ctxt h () ()
+  make_call1 S.unmark_invalid ctxt h () ()
 
 let list_invalid ctxt =
   make_call S.list_invalid ctxt () () ()

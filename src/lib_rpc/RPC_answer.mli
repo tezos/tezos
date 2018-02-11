@@ -13,11 +13,11 @@ type 'o t =
   | `OkStream of 'o stream (* 200 *)
   | `Created of string option (* 201 *)
   | `No_content (* 204 *)
-  | `Unauthorized of unit option (* 401 *)
-  | `Forbidden of unit option (* 403 *)
-  | `Not_found of unit option (* 404 *)
-  | `Conflict of unit option (* 409 *)
-  | `Error of unit option (* 500 *)
+  | `Unauthorized of RPC_service.error option (* 401 *)
+  | `Forbidden of RPC_service.error option (* 403 *)
+  | `Not_found of RPC_service.error option (* 404 *)
+  | `Conflict of RPC_service.error option (* 409 *)
+  | `Error of RPC_service.error option (* 500 *)
   ]
 
 and 'a stream = 'a Resto_directory.Answer.stream = {
@@ -27,3 +27,6 @@ and 'a stream = 'a Resto_directory.Answer.stream = {
 
 val return: 'o -> 'o t Lwt.t
 val return_stream: 'o stream -> 'o t Lwt.t
+val not_found: 'o t Lwt.t
+
+val fail: Error_monad.error list -> 'a t Lwt.t

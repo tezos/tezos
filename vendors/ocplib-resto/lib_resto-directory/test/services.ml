@@ -54,7 +54,7 @@ let minus_service =
     Path.(open_root /: Arg.int / "minus")
 
 let describe_service =
-  description_service Path.(root / "describe")
+  description_service Json_encoding.empty Path.(root / "describe")
 
 let dummy_service =
   post_service

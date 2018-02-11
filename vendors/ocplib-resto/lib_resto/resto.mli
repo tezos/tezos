@@ -345,14 +345,15 @@ module MakeService(Encoding : ENCODING) : sig
     ([< meth ] as 'm, 'p, (('p * 'a) * 'b) * 'c, 'q, 'i, 'o, 'e) service ->
     ('m, 'p2, (('p2 * 'a) * 'b) * 'c, 'q, 'i, 'o, 'e) service
 
-  type ('prefix, 'params) description_service =
+  type ('prefix, 'params, 'error) description_service =
     ([ `GET ], 'prefix, 'params * string list, Description.request,
-     unit, Encoding.schema Description.directory, unit) service
+     unit, Encoding.schema Description.directory, 'error) service
 
   val description_service:
     ?description:string ->
+    'error Encoding.t ->
     ('prefix, 'params) Path.t ->
-    ('prefix, 'params) description_service
+    ('prefix, 'params, 'error) description_service
 
   type 'input request = {
     meth: meth ;

@@ -54,18 +54,6 @@ val make_call3 :
   ([< Resto.meth ], unit, ((unit * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
   #simple -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t
 
-val make_err_call :
-  ([< Resto.meth ], unit, 'p, 'q, 'i, 'o tzresult) RPC_service.t ->
-  #simple -> 'p -> 'q -> 'i -> 'o tzresult Lwt.t
-
-val make_err_call1 :
-  ([< Resto.meth ], unit, unit * 'a, 'q, 'i, 'o tzresult) RPC_service.t ->
-  #simple -> 'a -> 'q -> 'i -> 'o tzresult Lwt.t
-
-val make_err_call2 :
-  ([< Resto.meth ], unit, (unit * 'a) * 'b, 'q, 'i, 'o tzresult) RPC_service.t ->
-  #simple -> 'a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t
-
 type stopper = unit -> unit
 
 val make_streamed_call :

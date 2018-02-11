@@ -193,7 +193,7 @@ let rec count =
 
 let list url (cctxt : Client_commands.full_context) =
   let args = String.split '/' url in
-  Shell_services.describe cctxt
+  RPC_description.describe cctxt
     ~recurse:true args >>=? fun tree ->
   let open RPC_description in
   let collected_args = ref [] in
@@ -293,7 +293,7 @@ let list url (cctxt : Client_commands.full_context) =
 let schema url (cctxt : Client_commands.full_context) =
   let args = String.split '/' url in
   let open RPC_description in
-  Shell_services.describe cctxt ~recurse:false args >>=? function
+  RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
       match RPC_service.MethMap.find `POST services with
       | exception Not_found ->
@@ -318,7 +318,7 @@ let schema url (cctxt : Client_commands.full_context) =
 let format url (cctxt : #Client_commands.logging_rpcs) =
   let args = String.split '/' url in
   let open RPC_description in
-  Shell_services.describe cctxt ~recurse:false args >>=? function
+  RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
       match RPC_service.MethMap.find `POST services with
       | exception Not_found ->
@@ -369,7 +369,7 @@ let display_answer (cctxt : #Client_commands.full_context) = function
 let call raw_url (cctxt : #Client_commands.full_context) =
   let uri = Uri.of_string raw_url in
   let args = String.split_path (Uri.path uri) in
-  Shell_services.describe cctxt ~recurse:false args >>=? function
+  RPC_description.describe cctxt ~recurse:false args >>=? function
   | Static { services } -> begin
       match RPC_service.MethMap.find `POST services with
       | exception Not_found ->

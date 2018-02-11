@@ -189,7 +189,7 @@ module S : sig
   val unmark_invalid:
     ([ `POST ], unit,
      unit * Block_hash.t, unit, unit,
-     unit tzresult) RPC_service.t
+     unit) RPC_service.t
 
   type preapply_param = {
     timestamp: Time.t ;
@@ -201,7 +201,7 @@ module S : sig
   val preapply:
     ([ `POST ], unit,
      unit * block, unit, preapply_param,
-     preapply_result tzresult) RPC_service.t
+     preapply_result) RPC_service.t
 
   val complete:
     ([ `POST ], unit,
