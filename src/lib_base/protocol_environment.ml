@@ -96,7 +96,7 @@ module type T = sig
     validation_state -> operation -> validation_state tzresult Lwt.t
   val finalize_block:
     validation_state -> validation_result tzresult Lwt.t
-  val rpc_services: rpc_context RPC_directory.t
+  val rpc_services: rpc_context Lwt.t RPC_directory.t
   val configure_sandbox:
     context -> Data_encoding.json option -> context tzresult Lwt.t
 end

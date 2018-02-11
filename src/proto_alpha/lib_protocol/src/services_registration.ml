@@ -17,16 +17,16 @@ type rpc_context = {
   context: Tezos_context.t ;
 }
 
-let rpc_init
-    ({ block_hash ; block_header ;
-       operation_hashes ; operations ; context } : Updater.rpc_context) =
+let rpc_init (rpc_context : Updater.rpc_context Lwt.t) =
+  rpc_context >>= fun { block_hash ; block_header ;
+                        operation_hashes ; operations ; context } ->
   let level = Int32.succ block_header.shell.level in
   let timestamp = block_header.shell.timestamp in
   let fitness = block_header.shell.fitness in
   Tezos_context.init ~level ~timestamp ~fitness context >>=? fun context ->
   return { block_hash ; block_header ; operation_hashes ; operations ; context }
 
-let rpc_services = ref (RPC_directory.empty : Updater.rpc_context RPC_directory.t)
+let rpc_services = ref (RPC_directory.empty : Updater.rpc_context Lwt.t RPC_directory.t)
 
 let register0_fullctxt s f =
   rpc_services :=

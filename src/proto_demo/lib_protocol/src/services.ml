@@ -23,7 +23,7 @@ let failing_service custom_root =
     ~output: Data_encoding.empty
     RPC_path.(custom_root / "failing")
 
-let rpc_services : Updater.rpc_context RPC_directory.t =
+let rpc_services : Updater.rpc_context Lwt.t RPC_directory.t =
   let dir = RPC_directory.empty in
   let dir =
     RPC_directory.register
