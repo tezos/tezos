@@ -241,3 +241,9 @@ module Protocol = struct
       (List.map (fun { name ; _ } -> String.capitalize_ascii name) p.components)
 
 end
+
+let with_tempdir name f =
+  let base_dir = Filename.temp_file name "" in
+  Lwt_unix.unlink base_dir >>= fun () ->
+  Lwt_unix.mkdir base_dir 0o700 >>= fun () ->
+  Lwt.finalize (fun () -> f base_dir) (fun () -> remove_dir base_dir)

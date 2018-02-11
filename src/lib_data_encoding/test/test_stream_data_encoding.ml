@@ -7,16 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Lwt.Infix
 open Data_encoding
-
-module Error = struct
-  type error = ..
-  let pp_print_error _ _ = ()
-end
-module Test = Test.Make(Error)
-
-let (//) = Filename.concat
 
 let is_invalid_arg = function
   | Invalid_argument _ -> true
@@ -321,8 +312,6 @@ let test_simple_values _ =
     ["one", 1; "two", 2; "three", 3; "four", 4; "five", 6; "six", 6] in
   test_simple ~msg:__LOC__ (string_enum enum_enc) 4;
 
-  Lwt.return_unit
-
 
 type t = A of int | B of string | C of int | D of string | E
 
@@ -391,8 +380,7 @@ let test_union _ =
   Assert.equal ~prn:prn_t ~msg:__LOC__ (A 1) (get_result ~msg:__LOC__ binA) ;
   Assert.equal ~prn:prn_t ~msg:__LOC__ (B "2") (get_result ~msg:__LOC__ binB) ;
   Assert.equal ~prn:prn_t ~msg:__LOC__ (C 3) (get_result ~msg:__LOC__ binC) ;
-  Assert.equal ~prn:prn_t ~msg:__LOC__ (D "4") (get_result ~msg:__LOC__ binD) ;
-  Lwt.return_unit
+  Assert.equal ~prn:prn_t ~msg:__LOC__ (D "4") (get_result ~msg:__LOC__ binD)
 
 type s = { field : int }
 
@@ -442,20 +430,10 @@ let test_splitted _ =
   Assert.equal ~msg:__LOC__ "41" (Json.destruct enc jsonA);
   Assert.equal ~msg:__LOC__ "42" (Json.destruct enc jsonB);
   Assert.equal ~msg:__LOC__ "43" (get_result ~msg:__LOC__ binA);
-  Assert.equal ~msg:__LOC__ "44" (get_result ~msg:__LOC__ binB);
-  Lwt.return_unit
-
-
-let wrap_test f base_dir =
-  f base_dir >>= fun result ->
-  Lwt.return_ok result
+  Assert.equal ~msg:__LOC__ "44" (get_result ~msg:__LOC__ binB)
 
 let tests = [
-  "simple", test_simple_values ;
-  "union", test_union ;
-  "splitted", test_splitted ;
+  "simple", `Quick, test_simple_values ;
+  "union", `Quick, test_union ;
+  "splitted", `Quick, test_splitted ;
 ]
-
-let () =
-  Test.run "stream_data_encoding."
-    (List.map (fun (s, f) -> s, wrap_test f) tests)

@@ -3,14 +3,11 @@
 (executables
  ((names (test_merkle))
   (libraries (tezos-stdlib
-              tezos-error-monad
               tezos-crypto
-              tezos-test-helpers))
+              alcotest))
   (flags (:standard -w -9-32
                     -safe-string
-                    -open Tezos_test_helpers
                     -open Tezos_stdlib
-                    -open Tezos_error_monad
                     -open Tezos_crypto))))
 
 (alias

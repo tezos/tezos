@@ -58,30 +58,6 @@ let operation op =
   op,
   Data_encoding.Binary.to_bytes Operation.encoding op
 
-let equal_operation ?msg op1 op2 =
-  let msg = Assert.format_msg msg in
-  let eq op1 op2 =
-    match op1, op2 with
-    | None, None -> true
-    | Some op1, Some op2 ->
-        Operation.equal op1 op2
-    | _ -> false in
-  let prn = function
-    | None -> "none"
-    | Some op -> Operation_hash.to_hex (Operation.hash op) in
-  Assert.equal ?msg ~prn ~eq op1 op2
-
-let equal_block ?msg st1 st2 =
-  let msg = Assert.format_msg msg in
-  let eq st1 st2 =
-    match st1, st2 with
-    | None, None -> true
-    | Some st1, Some st2 -> Block_header.equal st1 st2
-    | _ -> false in
-  let prn = function
-    | None -> "none"
-    | Some st -> Block_hash.to_hex (Block_header.hash st) in
-  Assert.equal ?msg ~prn ~eq st1 st2
 
 let block _state ?(context = Context_hash.zero) ?(operations = []) (pred: State.Block.t) name
   : Block_header.t =
@@ -447,6 +423,17 @@ let tests : (string * (state -> unit tzresult Lwt.t)) list = [
   "find_new", test_find_new ;
 ]
 
+let wrap (n, f) =
+  Alcotest_lwt.test_case n `Quick begin fun _ () ->
+    Lwt_utils_unix.with_tempdir "tezos_test_" begin fun dir ->
+      wrap_state_init f dir >>= function
+      | Ok () -> Lwt.return_unit
+      | Error error ->
+          Format.kasprintf Pervasives.failwith "%a" pp_print_error error
+    end
+  end
+
 let () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
-  Test.run "state." (List.map (fun (s, f) -> s, wrap_state_init f) tests)
+  Alcotest.run ~argv:[|""|] "tezos-shell" [
+    "state", List.map wrap tests
+  ]

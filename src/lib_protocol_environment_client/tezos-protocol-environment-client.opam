@@ -12,7 +12,7 @@ depends: [
   "tezos-base"
   "tezos-micheline"
   "tezos-protocol-environment-sigs"
-  "tezos-test-helpers" { test }
+  "alcotest-lwt" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

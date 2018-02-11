@@ -1,37 +1,25 @@
 (jbuild_version 1)
 
 (executables
- ((names (test_data_encoding
-          test_stream_data_encoding
+ ((names (test
           ;; bench_data_encoding
           ))
   (libraries (tezos-stdlib
               tezos_data_encoding
-              tezos-test-helpers))
+              alcotest))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_stdlib
-                    -open Tezos_data_encoding
-                    -open Tezos_test_helpers))))
+                    -open Tezos_data_encoding))))
 
 (alias
   ((name buildtest)
-   (deps (test_data_encoding.exe
-          test_stream_data_encoding.exe
+   (deps (test.exe
           ;; bench_data_encoding.exe
           ))))
 
 (alias
- ((name runtest_stream_data_encoding)
-  (action (run ${exe:test_stream_data_encoding.exe}))))
-
-(alias
- ((name runtest_data_encoding)
-  (action (run ${exe:test_data_encoding.exe}))))
-
-(alias
  ((name runtest)
-  (deps ((alias runtest_data_encoding)
-         (alias runtest_stream_data_encoding)))))
+  (action (run ${exe:test.exe}))))
 
 (alias
  ((name runtest_indent)

@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Process = Tezos_test_helpers.Process.Make(Error_monad)
-
 include Logging.Make (struct let name = "test-p2p-io-scheduler" end)
 
 exception Error of error list
@@ -215,17 +213,25 @@ let () =
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg
 
+let wrap n f =
+  Alcotest_lwt.test_case n `Quick begin fun _ () ->
+    f () >>= function
+    | Ok () -> Lwt.return_unit
+    | Error error ->
+        Format.kasprintf Pervasives.failwith "%a" pp_print_error error
+  end
+
 let () =
-  Sys.catch_break true ;
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
-  Test.run "p2p.io-scheduler." [
-    "trivial-quota", (fun _dir ->
-        run
-          ?display_client_stat:!display_client_stat
-          ?max_download_speed:!max_download_speed
-          ?max_upload_speed:!max_upload_speed
-          ~read_buffer_size:!read_buffer_size
-          ?read_queue_size:!read_queue_size
-          ?write_queue_size:!write_queue_size
-          !addr !port !delay !clients)
+  Alcotest.run ~argv:[|""|] "tezos-p2p" [
+    "p2p.io-scheduler", [
+      wrap "trivial-quota" (fun () ->
+          run
+            ?display_client_stat:!display_client_stat
+            ?max_download_speed:!max_download_speed
+            ?max_upload_speed:!max_upload_speed
+            ~read_buffer_size:!read_buffer_size
+            ?read_queue_size:!read_queue_size
+            ?write_queue_size:!write_queue_size
+            !addr !port !delay !clients)
+    ]
   ]

@@ -7,11 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* TODO Use Kaputt on the client side and remove `assert` from the
-        server. *)
-
-module Process = Tezos_test_helpers.Process.Make(Error_monad)
-
 include Logging.Make (struct let name = "test.p2p.connection" end)
 
 let default_addr = Ipaddr.V6.localhost
@@ -403,22 +398,30 @@ let spec = Arg.[
 
   ]
 
+let wrap n f =
+  Alcotest_lwt.test_case n `Quick begin fun _ () ->
+    f () >>= function
+    | Ok () -> Lwt.return_unit
+    | Error error ->
+        Format.kasprintf Pervasives.failwith "%a" pp_print_error error
+  end
+
 let main () =
-  let module Test = Tezos_test_helpers.Process.Make(Error_monad) in
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
-  Test.run "p2p-connection." [
-    "low-level", Low_level.run ;
-    "kick", Kick.run ;
-    "kicked", Kicked.run ;
-    "simple-message", Simple_message.run ;
-    "chunked-message", Chunked_message.run ;
-    "oversized-message", Oversized_message.run ;
-    "close-on-read", Close_on_read.run ;
-    "close-on-write", Close_on_write.run ;
-    "garbled-data", Garbled_data.run ;
+  Alcotest.run ~argv:[|""|] "tezos-p2p" [
+    "p2p-connection.", [
+      wrap "low-level" Low_level.run ;
+      wrap "kick" Kick.run ;
+      wrap "kicked" Kicked.run ;
+      wrap "simple-message" Simple_message.run ;
+      wrap "chunked-message" Chunked_message.run ;
+      wrap "oversized-message" Oversized_message.run ;
+      wrap "close-on-read" Close_on_read.run ;
+      wrap "close-on-write" Close_on_write.run ;
+      wrap "garbled-data" Garbled_data.run ;
+    ]
   ]
 
 let () =

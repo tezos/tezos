@@ -34,13 +34,13 @@ type t = {
   block3b: Mem_context.t ;
 }
 
-let wrap_context_init f _base_dir =
+let wrap_context_init f _ () =
   let genesis = Mem_context.empty in
   create_block2 genesis >>= fun block2 ->
   create_block3a block2 >>= fun block3a ->
   create_block3b block2 >>= fun block3b ->
   f { genesis; block2 ; block3a; block3b } >>= fun result ->
-  return result
+  Lwt.return result
 
 (** Simple test *)
 
@@ -135,7 +135,7 @@ let test_fold { genesis = ctxt } =
 
 (******************************************************************************)
 
-let tests : (string * (t -> unit Lwt.t)) list = [
+let tests = [
   "simple", test_simple ;
   "continuation", test_continuation ;
   "fork", test_fork ;
@@ -143,6 +143,7 @@ let tests : (string * (t -> unit Lwt.t)) list = [
   "fold", test_fold ;
 ]
 
-let () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
-  Test.run "context." (List.map (fun (s, f) -> s, wrap_context_init f) tests)
+let tests =
+  List.map
+    (fun (n, f) -> Alcotest_lwt.test_case n `Quick (wrap_context_init f))
+    tests

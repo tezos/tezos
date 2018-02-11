@@ -8,23 +8,7 @@
 (**************************************************************************)
 
 open Utils.Infix
-open Lwt.Infix
 open Data_encoding
-
-module Error = struct
-  type error = ..
-  let pp_print_error _ _ = ()
-end
-module Test = Test.Make(Error)
-
-let (//) = Filename.concat
-
-let write_file dir ~name content =
-  let file = (dir // name) in
-  let oc = open_out file in
-  output_string oc content ;
-  close_out oc ;
-  file
 
 let is_invalid_arg = function
   | Invalid_argument _ -> true
@@ -125,28 +109,11 @@ let test_simple_values _ =
   test_bin_exn ~msg:__LOC__ (string_enum enum_enc) 7
     (function
       | No_case_matched -> true
-      | _ -> false) ;
-  (* Should fail *)
-  (* test_bin_exn ~msg:__LOC__ (string_enum ["a", 1; "a", 2]) 2 (...duplicatate...); *)
-  (* test_json_exn ~msg:__LOC__ (string_enum ["a", 1; "a", 2]) 1 (... duplicate...); *)
+      | _ -> false)
+(* Should fail *)
+(* test_bin_exn ~msg:__LOC__ (string_enum ["a", 1; "a", 2]) 2 (...duplicatate...); *)
+(* test_json_exn ~msg:__LOC__ (string_enum ["a", 1; "a", 2]) 1 (... duplicate...); *)
 
-  Lwt.return_unit
-
-(*
-let test_json testdir =
-  let open Data_encoding_ezjsonm in
-  let file = testdir // "testing_data_encoding.tezos" in
-  let v = `Float 42. in
-  let f_str = to_string ~minify:false v in
-  Assert.equal_string  ~msg:__LOC__ f_str "[\n  42\n]";
-  read_file (testdir // "NONEXISTINGFILE") >>= fun rf ->
-  Assert.is_error ~msg:__LOC__ rf ;
-  write_file file v >>= fun success ->
-  Assert.is_ok ~msg:__LOC__ success ;
-  read_file file >>= fun opt ->
-  Assert.is_ok ~msg:__LOC__ opt ;
-  Lwt.return ()
-*)
 type t = A of int | B of string | C of int | D of string | E
 
 let prn_t = function
@@ -178,8 +145,7 @@ let test_tag_errors _ =
         (fun i -> Some i)] in
   Assert.test_fail ~msg:__LOC__  invalid_tag
     (function (Invalid_tag (_, `Uint8)) -> true
-            | _ -> false) ;
-  Lwt.return_unit
+            | _ -> false)
 
 let test_union _ =
   let enc =
@@ -228,8 +194,7 @@ let test_union _ =
   Assert.equal ~prn:prn_t ~msg:__LOC__ (A 1) (get_result ~msg:__LOC__ binA) ;
   Assert.equal ~prn:prn_t ~msg:__LOC__ (B "2") (get_result ~msg:__LOC__ binB) ;
   Assert.equal ~prn:prn_t ~msg:__LOC__ (C 3) (get_result ~msg:__LOC__ binC) ;
-  Assert.equal ~prn:prn_t ~msg:__LOC__ (D "4") (get_result ~msg:__LOC__ binD) ;
-  Lwt.return_unit
+  Assert.equal ~prn:prn_t ~msg:__LOC__ (D "4") (get_result ~msg:__LOC__ binD)
 
 
 type s = { field : int }
@@ -269,77 +234,7 @@ let test_splitted _ =
   Assert.equal ~msg:__LOC__ "41" (Json.destruct enc jsonA);
   Assert.equal ~msg:__LOC__ "42" (Json.destruct enc jsonB);
   Assert.equal ~msg:__LOC__ "43" (get_result ~msg:__LOC__ binA);
-  Assert.equal ~msg:__LOC__ "44" (get_result ~msg:__LOC__ binB);
-  Lwt.return_unit
-
-(*
-let test_json_input testdir =
-  let enc =
-    obj1
-      (req "menu" (
-          obj3
-            (req "id" string)
-            (req "value" string)
-            (opt "popup" (
-                obj2
-                  (req "width" int64)
-                  (req "height" int64))))) in
-  begin
-    let file =
-      write_file testdir ~name:"good.json" {|
- {
-    "menu": {
-        "id": "file",
-        "value": "File",
-        "popup": {
-            "width" : 42,
-            "height" : 52
-        }
-    }
-}
-|}
-    in
-    Lwt_utils_unix.Json.read_file file >>= function
-    | Error _ -> Assert.fail_msg "Cannot parse \"good.json\"."
-    | Ok json ->
-        let (id, value, popup) = Json.destruct enc json in
-        Assert.equal_string ~msg:__LOC__ "file" id;
-        Assert.equal_string ~msg:__LOC__ "File" value;
-        Assert.is_some ~msg:__LOC__ popup;
-        let w,h = match popup with None -> assert false | Some (w,h) -> w,h in
-        Assert.equal_int64 ~msg:__LOC__ 42L w;
-        Assert.equal_int64 ~msg:__LOC__ 52L h;
-        Lwt.return_unit
-  end >>= fun () ->
-  let enc =
-    obj2
-      (req "kind" (string))
-      (req "data" (int64)) in
-  begin
-    let file =
-      write_file testdir ~name:"unknown.json" {|
-{
-  "kind" : "int64",
-  "data" : "42",
-  "unknown" : 2
-}
-|}
-    in
-    Lwt_utils_unix.Json.read_file file >>= function
-    | Error _ -> Assert.fail_msg "Cannot parse \"unknown.json\"."
-    | Ok json ->
-        Assert.test_fail ~msg:__LOC__
-          (fun () -> ignore (Json.destruct enc json))
-          (function
-            | Json.Unexpected_field "unknown" -> true
-            | _ -> false) ;
-        Lwt.return_unit
-  end
-*)
-
-let wrap_test f base_dir =
-  f base_dir >>= fun result ->
-  Lwt.return_ok result
+  Assert.equal ~msg:__LOC__ "44" (get_result ~msg:__LOC__ binB)
 
 let test_wrapped_binary _ =
   let open Data_encoding in
@@ -356,31 +251,27 @@ let test_wrapped_binary _ =
   let data = (Ok "") in
   let encoded = Data_encoding.Binary.to_bytes enc data in
   let decoded = Data_encoding.Binary.of_bytes_exn enc encoded in
-  Lwt.return @@ Assert.equal data decoded
+  Assert.equal data decoded
 
-let test_out_of_range _ =
-  let assert_exception enc x =
+let test_out_of_range () =
+  let assert_exception ~msg enc x =
     begin try
-        ignore (Data_encoding.Json.construct enc x) ;
-        assert false
-      with Invalid_argument _ ->
-        Assert.is_true true
+        ignore (Data_encoding.Json.construct enc x : Data_encoding.json) ;
+        Assert.fail_msg "%s: json" msg
+      with Invalid_argument _ -> ()
     end ;
     begin
       try
         ignore (Data_encoding.Binary.to_bytes enc x) ;
-        assert false
-      with Invalid_argument _ ->
-        Assert.is_true true
+        Assert.fail_msg "%s: binary" msg
+      with Invalid_argument _ -> ()
     end in
   let enc_int = Data_encoding.ranged_int ~-30 100 in
   let enc_float = Data_encoding.ranged_float ~-.30. 100. in
-  assert_exception enc_int 101 ;
-  assert_exception enc_int ~-32 ;
-  assert_exception enc_float ~-.31. ;
-  assert_exception enc_float 101. ;
-  assert_exception enc_float 100.1 ;
-  Lwt.return_unit
+  assert_exception ~msg: __LOC__ enc_int 101 ;
+  assert_exception ~msg: __LOC__ enc_int ~-32 ;
+  assert_exception ~msg: __LOC__ enc_float ~-.31. ;
+  assert_exception ~msg: __LOC__ enc_float 101.
 
 let test_string_enum_boundary _ =
   let open Data_encoding in
@@ -394,8 +285,7 @@ let test_string_enum_boundary _ =
   run_test entries ;
   let entries2 = (("255", 255) :: entries) in
   run_test entries2 ;
-  run_test (("256", 256) :: entries2) ;
-  Lwt.return_unit
+  run_test (("256", 256) :: entries2)
 
 (** Generate encodings of the encoding and the randomized generator *)
 let test_generator ?(iterations=50) encoding generator =
@@ -404,8 +294,7 @@ let test_generator ?(iterations=50) encoding generator =
     let bytes = Data_encoding.Binary.to_bytes encoding encode in
     let decode = Data_encoding.Binary.of_bytes_exn encoding bytes in
     Assert.equal encode decode
-  done ;
-  Lwt.return ()
+  done
 
 let rec make_int_list acc len () =
   if len = 0
@@ -430,20 +319,15 @@ let test_randomized_variant_list _ =
          (make_int_list [] 100 ()))
 
 let tests = [
-  "simple", test_simple_values ;
-  (* "json", test_json ; *)
-  "union", test_union ;
-  "splitted", test_splitted ;
-  (* "json.input", test_json_input ; *)
-  "tags", test_tag_errors ;
-  "wrapped_binary", test_wrapped_binary ;
-  "out_of_range", test_out_of_range ;
-  "string_enum_boundary", test_string_enum_boundary ;
-  "randomized_int_list", test_randomized_int_list ;
-  "randomized_string_list", test_randomized_string_list ;
-  "randomized_variant_list", test_randomized_variant_list ;
+  "simple", `Quick, test_simple_values ;
+  "union", `Quick, test_union ;
+  "splitted", `Quick, test_splitted ;
+  "tags", `Quick, test_tag_errors ;
+  "wrapped_binary", `Quick, test_wrapped_binary ;
+  "out_of_range", `Quick, test_out_of_range ;
+  "string_enum_boundary", `Quick, test_string_enum_boundary ;
+  "randomized_int_list", `Quick, test_randomized_int_list ;
+  "randomized_string_list", `Quick, test_randomized_string_list ;
+  "randomized_variant_list", `Quick, test_randomized_variant_list ;
 ]
 
-let () =
-  Random.init 100 ;
-  Test.run "data_encoding." (List.map (fun (s, f) -> s, wrap_test f) tests)

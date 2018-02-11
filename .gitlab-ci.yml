@@ -251,30 +251,30 @@ opam:08:tezos-micheline:
   variables:
     package: tezos-micheline
 
-opam:09:tezos-rpc:
+opam:09:tezos-protocol-environment-sigs:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-environment-sigs
+
+opam:10:tezos-rpc:
   <<: *opam_definition
   variables:
     package: tezos-rpc
 
-opam:10:tezos-base:
+opam:11:tezos-base:
   <<: *opam_definition
   variables:
     package: tezos-base
 
-opam:11:ocplib-resto-cohttp:
+opam:12:ocplib-resto-cohttp:
   <<: *opam_definition
   variables:
     package: ocplib-resto-cohttp
 
-opam:12:irmin-leveldb:
+opam:13:irmin-leveldb:
   <<: *opam_definition
   variables:
     package: irmin-leveldb
-
-opam:13:tezos-protocol-environment-sigs:
-  <<: *opam_definition
-  variables:
-    package: tezos-protocol-environment-sigs
 
 opam:14:tezos-stdlib-unix:
   <<: *opam_definition
@@ -381,17 +381,12 @@ opam:34:tezos-node:
   variables:
     package: tezos-node
 
-opam:35:tezos-test-helpers:
-  <<: *opam_definition
-  variables:
-    package: tezos-test-helpers
-
-opam:36:ocplib-ezresto-directory:
+opam:35:ocplib-ezresto-directory:
   <<: *opam_definition
   variables:
     package: ocplib-ezresto-directory
 
-opam:37:tezos-protocol-demo:
+opam:36:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo

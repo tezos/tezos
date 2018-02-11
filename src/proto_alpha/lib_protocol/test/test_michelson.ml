@@ -478,6 +478,6 @@ let test_program () =
   return ()
 
 let tests = [
-  "michelson.example", (fun _ -> test_example ()) ;
-  "michelson.program", (fun _ -> test_program ()) ;
+  "example", (fun _ -> test_example ()) ;
+  "program", (fun _ -> test_program ()) ;
 ]

@@ -1,34 +1,24 @@
 (jbuild_version 1)
 
 (executables
- ((names (test_context
-          test_store))
+ ((names (test))
   (libraries (tezos-base
               tezos-storage
-              tezos-test-helpers))
+              tezos-stdlib-unix
+              alcotest-lwt))
   (flags (:standard -w -9-32
                     -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_test_helpers
-                    -open Tezos_storage))))
+                    -open Tezos_storage
+                    -open Tezos_stdlib_unix))))
 
 (alias
  ((name buildtest)
-  (deps (test_context.exe
-         test_store.exe))))
-
-(alias
- ((name runtest_context)
-  (action (run ${exe:test_context.exe}))))
-
-(alias
- ((name runtest_store)
-  (action (run ${exe:test_store.exe}))))
+  (deps (test.exe))))
 
 (alias
  ((name runtest)
-  (deps ((alias runtest_context)
-         (alias runtest_store)))))
+  (action (chdir ${ROOT} (run ${exe:test.exe})))))
 
 (alias
  ((name runtest_indent)

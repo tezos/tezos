@@ -9,12 +9,12 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta17" }
-  "tezos-test-helpers" { test }
   "tezos-stdlib"
   "ezjsonm"
   "js_of_ocaml" # for ocplib-json-typed.bson
   "ocplib-json-typed"
   "ocplib-endian"
+  "alcotest" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

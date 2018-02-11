@@ -9,14 +9,13 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta17" }
-  "tezos-test-helpers" { test }
   "tezos-stdlib"
   "lwt"
   "nocrypto"
   "blake2"
   "tweetnacl"
   "zarith"
-  "tezos-error-monad" { test }
+  "alcotest" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

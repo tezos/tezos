@@ -10,7 +10,17 @@
 open Proto_alpha
 open Tezos_context
 
-include module type of Assert
+val fail : string -> string -> string -> 'a
+(** Raises [Failed] with the passed parameters
+    (expected value, actual value, and message). *)
+
+val fail_msg : ('a, Format.formatter, unit, 'b) format4 -> 'a
+(** [fail_msg m] is equivalent to [fail "" "" m]. *)
+
+val equal_string : ?msg:string -> string -> string -> unit
+(** Same as [equal], but specialized for [string] values. *)
+
+val equal : ?eq:('a -> 'a -> bool) -> ?prn:('a -> string) -> ?msg:string -> 'a -> 'a -> unit
 
 (** Functions capturing common assertion scenarios and error monads helpers *)
 

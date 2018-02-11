@@ -7,11 +7,24 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Make(Error : sig
-    type error
-    val pp_print_error: Format.formatter -> error list -> unit
-  end) : sig
+open Error_monad
 
-  val run : string -> (string * (string -> (unit, Error.error list) result Lwt.t)) list -> unit
+exception Exited of int
 
+module Channel : sig
+  type ('a, 'b) t
+  val push: ('a, 'b) t -> 'a -> unit tzresult Lwt.t
+  val pop: ('a, 'b) t -> 'b tzresult Lwt.t
 end
+
+type ('a, 'b) t = {
+  termination: unit tzresult Lwt.t ;
+  channel: ('b, 'a) Channel.t ;
+}
+
+val detach:
+  ?prefix:string ->
+  (('a, 'b) Channel.t -> unit tzresult Lwt.t) ->
+  ('a, 'b) t Lwt.t
+
+val wait_all: ('a, 'b) t list -> unit tzresult Lwt.t

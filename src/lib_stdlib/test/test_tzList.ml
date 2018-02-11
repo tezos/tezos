@@ -7,12 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Error = struct
-  type error = ..
-  let pp_print_error _ _ = ()
-end
-module Test = Tezos_test_helpers.Test.Make(Error)
-
 let rec permut = function
   | [] -> [[]]
   | x :: xs ->
@@ -48,12 +42,13 @@ let test_take_n _ =
   end ;
   ListLabels.iter (permut [1;2;3;3;4;5;5;5;6]) ~f:begin fun xs ->
     Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 5 xs) [4;5;5;5;6]
-  end ;
-  Lwt.return_ok ()
+  end
 
-let tests : (string * (string -> (unit, Error.error list) result Lwt.t)) list = [
-  "take_n", test_take_n ;
+let tests = [
+  "take_n", `Quick, test_take_n ;
 ]
 
 let () =
-  Test.run "tzList." tests
+  Alcotest.run "stdlib" [
+    "tzList", tests ;
+  ]

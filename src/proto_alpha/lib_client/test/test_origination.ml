@@ -99,6 +99,16 @@ let tests = [
   "main", (fun _ -> main ()) ;
 ]
 
+
+let wrap (n, f) =
+  Alcotest_lwt.test_case n `Quick begin fun _ () ->
+    f () >>= function
+    | Ok () -> Lwt.return_unit
+    | Error error ->
+        Format.kasprintf Pervasives.failwith "%a" pp_print_error error
+  end
+
 let () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
-  Test.run "origination." tests
+  Alcotest.run ~argv:[|""|] "tezos-client-alpha" [
+    "origination", List.map wrap tests
+  ]

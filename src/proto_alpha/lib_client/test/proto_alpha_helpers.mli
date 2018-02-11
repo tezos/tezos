@@ -146,7 +146,15 @@ end
 
 module Assert : sig
 
-  include module type of Assert
+  val fail : string -> string -> string -> 'a
+
+  val fail_msg : ('a, Format.formatter, unit, 'b) format4 -> 'a
+
+  val equal : ?eq:('a -> 'a -> bool) -> ?prn:('a -> string) -> ?msg:string -> 'a -> 'a -> unit
+  val is_none : ?msg:string -> 'a option -> unit
+  val is_some : ?msg:string -> 'a option -> unit
+  val equal_int : ?msg:string -> int -> int -> unit
+  val equal_bool : ?msg:string -> bool -> bool -> unit
 
   val balance_equal:
     ?block:Block_services.block ->

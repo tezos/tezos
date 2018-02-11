@@ -9,7 +9,6 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta17" }
-  "tezos-test-helpers" { test }
   "tezos-base"
   "lwt" { >= "3.0.0" }
   "ipaddr"

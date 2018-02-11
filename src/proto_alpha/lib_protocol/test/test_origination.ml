@@ -81,8 +81,8 @@ let test_delegation () =
 
 let tests =
   List.map
-    (fun (n, f) -> (n, (fun (_: string) -> f () >>= Assert.wrap)))
-    [ "origination.simple", test_simple_origination ;
-      "origination.delegate", test_delegation ;
+    (fun (n, f) -> (n, (fun () -> f () >>= Assert.wrap)))
+    [ "simple", test_simple_origination ;
+      "delegate", test_delegation ;
     ]
 

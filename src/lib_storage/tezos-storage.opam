@@ -9,10 +9,11 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta17" }
-  "tezos-test-helpers" { test }
   "tezos-base"
   "leveldb"
   "irmin-leveldb"
+  "tezos-stdlib-unix" { test }
+  "alcotest-lwt" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

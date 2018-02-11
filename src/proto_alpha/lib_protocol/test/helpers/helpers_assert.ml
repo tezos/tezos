@@ -7,9 +7,38 @@
 (*                                                                        *)
 (**************************************************************************)
 
-include Assert
+open Proto_alpha
+open Tezos_context
 
-open Proto_alpha.Tezos_context
+module Assert = struct
+  let fail expected given msg =
+    Format.kasprintf Pervasives.failwith
+      "@[%s@ expected: %s@ got: %s@]" msg expected given
+  let fail_msg fmt = Format.kasprintf (fail "" "") fmt
+
+  let default_printer _ = ""
+
+  let equal ?(eq=(=)) ?(prn=default_printer) ?(msg="") x y =
+    if not (eq x y) then fail (prn x) (prn y) msg
+
+  let is_true ?(msg="") x =
+    if not x then fail "true" "false" msg
+
+  let is_false ?(msg="") x =
+    if x then fail "false" "true" msg
+
+  let is_some ?(msg="") x =
+    if x = None then fail "Some _" "None" msg
+
+  let is_none ?(msg="") x =
+    if x <> None then fail "None" "Some _" msg
+
+  let make_equal e p = equal ~eq:e ~prn:p
+  let string_of_string s = Printf.sprintf "%S" s
+  let equal_string = make_equal (=) string_of_string
+
+
+end
 
 let wrap_result = Proto_alpha.Environment.wrap_error
 
@@ -58,7 +87,6 @@ let no_error ?msg = function
 
 
 let equal_pkh ?msg pkh1 pkh2 =
-  let msg = Assert.format_msg msg in
   let eq pkh1 pkh2 =
     match pkh1, pkh2 with
     | None, None -> true
@@ -112,10 +140,10 @@ let ecoproto_error f = function
   | _ -> false
 
 let contain_error ?(msg="") ~f = function
-  | Ok _ -> Kaputt.Abbreviations.Assert.fail "Error _" "Ok _" msg
+  | Ok _ -> Assert.fail "Error _" "Ok _" msg
   | Error error when not (List.exists f error) ->
-      let error_str = Format.asprintf "%a" Error_monad.pp_print_error error in
-      Kaputt.Abbreviations.Assert.fail "" error_str msg
+      let error_str = Format.asprintf "%a" Tezos_error_monad.Error_monad.pp_print_error error in
+      Assert.fail "" error_str msg
   | _ -> ()
 
 let generic_economic_error ~msg =
@@ -202,3 +230,5 @@ let wrong_delegate ~msg =
       | Proto_alpha.Baking.Wrong_delegate _ -> true
       | _ -> false)
   end
+
+include Assert

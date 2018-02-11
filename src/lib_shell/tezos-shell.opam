@@ -9,12 +9,12 @@ license: "unreleased"
 depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta17" }
-  "tezos-test-helpers" { test }
   "tezos-base"
   "tezos-rpc-http"
   "tezos-p2p"
   "tezos-shell-services"
   "tezos-protocol-updater"
+  "alcotest-lwt" { test }
   "tezos-embedded-protocol-demo" { test }
 ]
 build: [

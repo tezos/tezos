@@ -8,11 +8,8 @@
 (**************************************************************************)
 
 
-let name = "Isolate Big Maps"
+let name = "bigmap"
 module Logger = Logging.Make(struct let name = name end)
-let section = Lwt_log.Section.make name
-let () =
-  Lwt_log.Section.set_level section Lwt_log.Debug(*.Warning*)
 
 open Logger
 
@@ -128,5 +125,5 @@ let main () =
 
 
 let tests = [
-  "main", (fun _ -> main ()) ;
+  "bigmaps", (fun _ -> main ()) ;
 ]

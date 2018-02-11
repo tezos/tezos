@@ -28,25 +28,29 @@ let genesis_time =
 
 (** *)
 
-let wrap_store_init f base_dir =
-  let root = base_dir // "store" in
-  Store.init root >>= function
-  | Ok store ->
-      f store >>= fun () ->
-      return ()
-  | Error err ->
-      Format.kasprintf Pervasives.failwith
-        "@[Cannot initialize store:@ %a@]" pp_print_error err
+let wrap_store_init f _ () =
+  Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir ->
+    let root = base_dir // "store" in
+    Store.init root >>= function
+    | Ok store ->
+        f store >>= fun () ->
+        Lwt.return ()
+    | Error err ->
+        Format.kasprintf Pervasives.failwith
+          "@[Cannot initialize store:@ %a@]" pp_print_error err
+  end
 
-let wrap_raw_store_init f base_dir =
-  let root = base_dir // "store" in
-  Raw_store.init root >>= function
-  | Ok store ->
-      f store >>= fun () ->
-      return ()
-  | Error err ->
-      Format.kasprintf Pervasives.failwith
-        "@[Cannot initialize store:@ %a@]" pp_print_error err
+let wrap_raw_store_init f _ () =
+  Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir ->
+    let root = base_dir // "store" in
+    Raw_store.init root >>= function
+    | Ok store ->
+        f store >>= fun () ->
+        Lwt.return ()
+    | Error err ->
+        Format.kasprintf Pervasives.failwith
+          "@[Cannot initialize store:@ %a@]" pp_print_error err
+  end
 
 let test_init _ = Lwt.return_unit
 
@@ -202,15 +206,6 @@ let test_generic_list (type t)
 
 open Store_helpers
 
-let equal_block_set ?msg set1 set2 =
-  let msg = Assert.format_msg msg in
-  let b1 = Block_hash.Set.elements set1
-  and b2 = Block_hash.Set.elements set2 in
-  Assert.make_equal_list ?msg
-    (fun h1 h2 -> Block_hash.equal h1 h2)
-    Block_hash.to_string
-    b1 b2
-
 let test_hashset (type t)
     (module Store: Store_sigs.STORE with type t = t) (s: Store.t) =
   let module BlockSet = Block_hash.Set in
@@ -222,33 +217,24 @@ let test_hashset (type t)
   let bhset : BlockSet.t = BlockSet.add bh2 (BlockSet.add bh1 BlockSet.empty) in
   StoreSet.store_all s bhset >>= fun () ->
   StoreSet.read_all s >>= fun bhset' ->
-  equal_block_set ~msg:__LOC__ bhset bhset' ;
+  Assert.equal_block_set ~msg:__LOC__ bhset bhset' ;
   let bhset2 =
     Pervasives.(bhset |> BlockSet.add bh3 |> BlockSet.remove bh1) in
   StoreSet.store_all s bhset2 >>= fun () ->
   StoreSet.read_all s >>= fun bhset2' ->
-  equal_block_set ~msg:__LOC__ bhset2 bhset2' ;
+  Assert.equal_block_set ~msg:__LOC__ bhset2 bhset2' ;
   StoreSet.fold s ~init:BlockSet.empty
     ~f:(fun bh acc -> Lwt.return (BlockSet.add bh acc)) >>= fun bhset2'' ->
-  equal_block_set ~msg:__LOC__ bhset2 bhset2'' ;
+  Assert.equal_block_set ~msg:__LOC__ bhset2 bhset2'' ;
   Store.store s ["day";"current"] (MBytes.of_string "Mercredi") >>= fun () ->
   StoreSet.remove_all s >>= fun () ->
   StoreSet.read_all s >>= fun empty ->
-  equal_block_set ~msg:__LOC__ BlockSet.empty empty ;
+  Assert.equal_block_set ~msg:__LOC__ BlockSet.empty empty ;
   check (module Store) s ["day";"current"] (MBytes.of_string "Mercredi") >>= fun () ->
   Lwt.return_unit
 
 
 (** HashMap *)
-
-let equal_block_map ?msg ~eq map1 map2 =
-  let msg = Assert.format_msg msg in
-  let b1 = Block_hash.Map.bindings map1
-  and b2 = Block_hash.Map.bindings map2 in
-  Assert.make_equal_list ?msg
-    (fun (h1, b1) (h2, b2) -> Block_hash.equal h1 h2 && eq b1 b2)
-    (fun (h1, _) -> Block_hash.to_string h1)
-    b1 b2
 
 let test_hashmap (type t)
     (module Store: Store_sigs.STORE with type t = t) (s: Store.t) =
@@ -269,12 +255,12 @@ let test_hashmap (type t)
                 BlockMap.add bh1 (1, 'a') |> BlockMap.add bh2 (2, 'b')) in
   StoreMap.store_all s map >>= fun () ->
   StoreMap.read_all s >>= fun map' ->
-  equal_block_map ~msg:__LOC__ ~eq map map' ;
+  Assert.equal_block_map ~msg:__LOC__ ~eq map map' ;
   let map2 =
     Pervasives.(map |> BlockMap.add bh3 (3, 'c') |> BlockMap.remove bh1) in
   StoreMap.store_all s map2 >>= fun () ->
   StoreMap.read_all s >>= fun map2' ->
-  equal_block_map ~msg:__LOC__ ~eq map2 map2' ;
+  Assert.equal_block_map ~msg:__LOC__ ~eq map2 map2' ;
   Lwt.return_unit
 
 (** Functors *)
@@ -328,11 +314,6 @@ module SubBlocksMap =
      end))
     (Block_hash.Map)
 
-let equal_block_hash_list ?msg l1 l2 =
-  let msg = Assert.format_msg msg in
-  let pr_block_hash = Block_hash.to_short_b58check in
-  Assert.make_equal_list ?msg Block_hash.equal pr_block_hash l1 l2
-
 let test_subblock s =
   SubBlocksSet.known s bh1 >>= fun known ->
   Assert.is_false ~msg:__LOC__ known ;
@@ -345,7 +326,7 @@ let test_subblock s =
     Block_hash.Set.empty
     |> Block_hash.Set.add bh1
     |> Block_hash.Set.add bh2 in
-  equal_block_set ~msg:__LOC__ set set' ;
+  Assert.equal_block_set ~msg:__LOC__ set set' ;
   SubBlocksSet.remove s bh2 >>= fun () ->
   let set =
     Block_hash.Set.empty
@@ -353,13 +334,13 @@ let test_subblock s =
     |> Block_hash.Set.add bh3 in
   SubBlocksSet.store_all s set >>= fun () ->
   SubBlocksSet.elements s >>= fun elts ->
-  equal_block_hash_list ~msg:__LOC__
+  Assert.equal_block_hash_list ~msg:__LOC__
     (List.sort Block_hash.compare elts)
     (List.sort Block_hash.compare [bh3 ; bh3']) ;
   SubBlocksSet.store s bh2 >>= fun () ->
   SubBlocksSet.remove s bh3 >>= fun () ->
   SubBlocksSet.elements s >>= fun elts ->
-  equal_block_hash_list ~msg:__LOC__
+  Assert.equal_block_hash_list ~msg:__LOC__
     (List.sort Block_hash.compare elts)
     (List.sort Block_hash.compare [bh2 ; bh3']) ;
   SubBlocksMap.known s bh1 >>= fun known ->
@@ -377,19 +358,19 @@ let test_subblock s =
     |> Block_hash.Map.add bh1 v1
     |> Block_hash.Map.add bh2 v2 in
   SubBlocksMap.read_all s >>= fun map' ->
-  equal_block_map ~eq:(=) ~msg:__LOC__ map map' ;
+  Assert.equal_block_map ~eq:(=) ~msg:__LOC__ map map' ;
 
   SubBlocksSet.remove_all s >>= fun () ->
   SubBlocksSet.elements s >>= fun elts ->
-  equal_block_hash_list ~msg:__LOC__ elts [] ;
+  Assert.equal_block_hash_list ~msg:__LOC__ elts [] ;
 
   SubBlocksMap.read_all s >>= fun map' ->
-  equal_block_map ~eq:(=) ~msg:__LOC__ map map' ;
+  Assert.equal_block_map ~eq:(=) ~msg:__LOC__ map map' ;
 
   SubBlocksSet.store s bh3 >>= fun () ->
 
   SubBlocks.indexes s >>= fun keys ->
-  equal_block_hash_list ~msg:__LOC__
+  Assert.equal_block_hash_list ~msg:__LOC__
     (List.sort Block_hash.compare keys)
     (List.sort Block_hash.compare [bh1;bh2;bh3]) ;
 
@@ -450,8 +431,10 @@ let tests : (string * (Store.t -> unit Lwt.t)) list = [
   "block", test_block ;
 ]
 
-let () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
-  Test.run "store."
-    (List.map (fun (s, f) -> s, wrap_raw_store_init f) tests_raw @
-     List.map (fun (s, f) -> s, wrap_store_init f) tests)
+let tests =
+  List.map
+    (fun (s, f) -> Alcotest_lwt.test_case s `Quick (wrap_raw_store_init f))
+    tests_raw @
+  List.map
+    (fun (s, f) -> Alcotest_lwt.test_case s `Quick (wrap_store_init f))
+    tests

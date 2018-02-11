@@ -7,8 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Process = Tezos_test_helpers.Process.Make(Error_monad)
-
 include Logging.Make (struct let name = "test.p2p.connection-pool" end)
 
 type message =
@@ -279,19 +277,27 @@ let spec = Arg.[
 
   ]
 
+let wrap n f =
+  Alcotest_lwt.test_case n `Quick begin fun _ () ->
+    f () >>= function
+    | Ok () -> Lwt.return_unit
+    | Error error ->
+        Format.kasprintf Pervasives.failwith "%a" pp_print_error error
+  end
+
 let main () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
   let ports = !port -- (!port + !clients - 1) in
   let points = List.map (fun port -> !addr, port) ports in
-  Test.run "p2p-connection-pool." [
-    "simple", (fun _ -> Simple.run points) ;
-    "random", (fun _ -> Random_connections.run points !repeat_connections) ;
-    "garbled", (fun _ -> Garbled.run points) ;
+  Alcotest.run ~argv:[|""|] "tezos-p2p" [
+    "p2p-connection-pool", [
+      wrap "simple" (fun _ -> Simple.run points) ;
+      wrap "random" (fun _ -> Random_connections.run points !repeat_connections) ;
+      wrap "garbled" (fun _ -> Garbled.run points) ;
+    ]
   ]
-
 let () =
   Sys.catch_break true ;
   try main ()

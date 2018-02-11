@@ -103,3 +103,6 @@ let concat b1 b2 =
   blit b2 0 b l1 l2 ;
   b
 
+let pp_hex ppf t =
+  let `Hex s = to_hex t in
+  Format.pp_print_string ppf s

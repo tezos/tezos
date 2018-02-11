@@ -147,7 +147,7 @@ let test_cycle_transfer () =
 
 let tests =
   List.map
-    (fun (n, f) -> (n, (fun (_: string) -> f () >>= Assert.wrap)))
+    (fun (n, f) -> (n, (fun () -> f () >>= Assert.wrap)))
     [ "transaction.basic", test_basic ;
       "transaction.cycle_transfer", test_cycle_transfer
     ]

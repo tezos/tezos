@@ -5,10 +5,10 @@
           test_mbytes_buffer
           test_lwt_pipe))
   (libraries (tezos-stdlib
-              tezos-test-helpers))
+              alcotest
+              lwt.unix))
   (flags (:standard -w -9-32
                     -safe-string
-                    -open Tezos_test_helpers
                     -open Tezos_stdlib))))
 
 (alias

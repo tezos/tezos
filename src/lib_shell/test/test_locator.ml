@@ -311,10 +311,20 @@ let test_locator base_dir =
   loop 1
 
 
-let tests : (string * (string -> unit tzresult Lwt.t)) list =
-  [ "test pred", test_pred ]
+let wrap n f =
+  Alcotest_lwt.test_case n `Quick begin fun _ () ->
+    Lwt_utils_unix.with_tempdir "tezos_test_" begin fun dir ->
+      f dir >>= function
+      | Ok () -> Lwt.return_unit
+      | Error error ->
+          Format.kasprintf Pervasives.failwith "%a" pp_print_error error
+    end
+  end
 
-let bench = [ "test locator", test_locator ]
+let tests =
+  [ wrap "test pred" test_pred ]
+
+let bench = [ wrap "test locator" test_locator ]
 
 let tests =
   try
@@ -324,6 +334,8 @@ let tests =
       tests @ bench
   with _ -> tests @ bench
 
+
 let () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
-  Test.run "state." tests
+  Alcotest.run ~argv:[|""|] "tezos-shell" [
+    "locator", tests
+  ]

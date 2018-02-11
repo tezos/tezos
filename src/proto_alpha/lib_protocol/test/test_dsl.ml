@@ -151,6 +151,6 @@ let test_dsl () : unit proto_tzresult Lwt.t =
 
 let tests =
   List.map
-    (fun (n, f) -> (n, (fun (_ : string) -> f () >>= Assert.wrap)))
+    (fun (n, f) -> (n, (fun () -> f () >>= Assert.wrap)))
     [ "dsl", test_dsl
     ]

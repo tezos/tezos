@@ -3,13 +3,12 @@
 (executable
  ((name main)
   (libraries (tezos-base
-              tezos-test-helpers
               tezos-micheline
               tezos_proto_alpha_isolate_helpers
-              tezos_proto_alpha_isolate_michelson_parser))
+              tezos_proto_alpha_isolate_michelson_parser
+              alcotest-lwt))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
-                    -open Tezos_test_helpers
                     -open Tezos_micheline
                     -open Tezos_proto_alpha_isolate_michelson_parser))))
 
@@ -22,7 +21,7 @@
  ((name runtest_proto_alpha)
   (package tezos-protocol-alpha)
   (deps (sandbox.json (glob_files contracts/*.tz)))
-  (action (chdir ${ROOT} (run ${exe:main.exe} ${path-no-dep:contracts})))))
+  (action (chdir ${ROOT} (run ${exe:main.exe})))))
 
 (alias
  ((name runtest)

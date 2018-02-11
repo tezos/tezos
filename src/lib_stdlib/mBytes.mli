@@ -157,3 +157,5 @@ val concat: t -> t -> t
 
 val to_hex: t -> Hex.t
 val of_hex: Hex.t -> t
+
+val pp_hex: Format.formatter -> t -> unit

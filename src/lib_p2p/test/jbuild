@@ -7,13 +7,12 @@
   (libraries (tezos-base
               tezos-stdlib-unix
               tezos-p2p
-              tezos-test-helpers))
+              alcotest-lwt))
   (flags (:standard -w -9-32
                     -linkall
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_stdlib_unix
-                    -open Tezos_test_helpers
                     -open Tezos_p2p))))
 
 (alias

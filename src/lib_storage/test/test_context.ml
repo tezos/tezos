@@ -84,18 +84,20 @@ type t = {
   block3b: Context_hash.t ;
 }
 
-let wrap_context_init f base_dir =
-  let root = base_dir // "context" in
-  Context.init ~root ?patch_context:None >>= fun idx ->
-  Context.commit_genesis idx
-    ~net_id
-    ~time:genesis_time
-    ~protocol:genesis_protocol >>= fun genesis ->
-  create_block2 idx genesis >>= fun block2 ->
-  create_block3a idx block2 >>= fun block3a ->
-  create_block3b idx block2  >>= fun block3b ->
-  f { idx; genesis; block2 ; block3a; block3b } >>= fun result ->
-  Error_monad.return result
+let wrap_context_init f _ () =
+  Lwt_utils_unix.with_tempdir "tezos_test_" begin fun base_dir ->
+    let root = base_dir // "context" in
+    Context.init ~root ?patch_context:None >>= fun idx ->
+    Context.commit_genesis idx
+      ~net_id
+      ~time:genesis_time
+      ~protocol:genesis_protocol >>= fun genesis ->
+    create_block2 idx genesis >>= fun block2 ->
+    create_block3a idx block2 >>= fun block3a ->
+    create_block3b idx block2  >>= fun block3b ->
+    f { idx; genesis; block2 ; block3a; block3b } >>= fun result ->
+    Lwt.return result
+  end
 
 (** Simple test *)
 
@@ -218,6 +220,8 @@ let tests : (string * (t -> unit Lwt.t)) list = [
   "fold", test_fold ;
 ]
 
-let () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
-  Test.run "context." (List.map (fun (s, f) -> s, wrap_context_init f) tests)
+
+let tests =
+  List.map
+    (fun (s, f) -> Alcotest_lwt.test_case s `Quick (wrap_context_init f))
+    tests

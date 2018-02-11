@@ -132,7 +132,7 @@ let test_fitness () =
 
 let tests =
   List.map
-    (fun (n, f) -> (n, (fun (_ : string) -> f () >>= Assert.wrap)))
+    (fun (n, f) -> (n, (fun () -> f () >>= Assert.wrap)))
     [ "endorsement.payment", test_endorsement_payment ;
       "endorsement.wrong", test_wrong_endorsement ;
       "endorsement.multiple", test_multiple_endorsement ;

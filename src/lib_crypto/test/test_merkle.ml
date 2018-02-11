@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Error_monad
 open Utils.Infix
 
 type tree =
@@ -43,9 +42,10 @@ let check_size i =
   let l = 0 -- i in
   let l2, _ = list_of_tree (Merkle.compute l) in
   if compare_list l l2 then
-    return ()
+    ()
   else
-    failwith "Failed for %d: %a"
+    Format.kasprintf failwith
+      "Failed for %d: %a"
       i
       (Format.pp_print_list
          ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";")
@@ -53,28 +53,29 @@ let check_size i =
       l2
 
 let test_compute _ =
-  iter_s check_size (0--99)
+  List.iter check_size (0--99)
 
 let check_path i =
   let l = 0 -- i in
   let orig = Merkle.compute l in
-  iter_s (fun j ->
+  List.iter (fun j ->
       let path = Merkle.compute_path l j in
       let found, pos = Merkle.check_path path j in
       if found = orig && j = pos then
-        return ()
+        ()
       else
-        failwith "Failed for %d in %d." j i)
+        Format.kasprintf failwith "Failed for %d in %d." j i)
     l
 
 let test_path _ =
-  iter_s check_path (0--128)
+  List.iter check_path (0--128)
 
-let tests : (string * (string -> unit tzresult Lwt.t)) list = [
-  "compute", test_compute ;
-  "path", test_path ;
+let tests = [
+  "compute", `Quick, test_compute ;
+  "path", `Quick, test_path ;
 ]
 
 let () =
-  let module Test = Tezos_test_helpers.Test.Make(Error_monad) in
-  Test.run "merkel." tests
+  Alcotest.run "tezos-crypto" [
+    "merkel", tests
+  ]

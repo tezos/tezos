@@ -264,10 +264,20 @@ end
 
 module Assert = struct
 
-  include Assert
+  let fail expected given msg =
+    Format.kasprintf Pervasives.failwith
+      "@[%s@ expected: %s@ got: %s@]" msg expected given
+  let fail_msg fmt = Format.kasprintf (fail "" "") fmt
+
+  let default_printer _ = ""
+
+  let equal ?(eq=(=)) ?(prn=default_printer) ?(msg="") x y =
+    if not (eq x y) then fail (prn x) (prn y) msg
+  let make_equal e p = equal ~eq:e ~prn:p
+  let equal_bool = make_equal (=) string_of_bool
+  let equal_int = make_equal (=) string_of_int
 
   let equal_pkh ?msg pkh1 pkh2 =
-    let msg = Assert.format_msg msg in
     let eq pkh1 pkh2 =
       match pkh1, pkh2 with
       | None, None -> true
@@ -277,13 +287,12 @@ module Assert = struct
     let prn = function
       | None -> "none"
       | Some pkh -> Ed25519.Public_key_hash.to_hex pkh in
-    Assert.equal ?msg ~prn ~eq pkh1 pkh2
+    equal ?msg ~prn ~eq pkh1 pkh2
 
   let equal_tez ?msg tz1 tz2 =
-    let msg = Assert.format_msg msg in
     let eq tz1 tz2 = Int64.equal (Tez.to_mutez tz1) (Tez.to_mutez tz2) in
     let prn = Tez.to_string in
-    Assert.equal ?msg ~prn ~eq tz1 tz2
+    equal ?msg ~prn ~eq tz1 tz2
 
   let balance_equal ?block ~msg account expected_balance =
     Account.balance ?block account >>=? fun actual_balance ->
@@ -305,10 +314,10 @@ module Assert = struct
   let hash op = Tezos_base.Operation.hash op
 
   let contain_error ?(msg="") ~f = function
-    | Ok _ -> Kaputt.Abbreviations.Assert.fail "Error _" "Ok _" msg
+    | Ok _ -> fail "Error _" "Ok _" msg
     | Error error when not (List.exists f error) ->
         let error_str = Format.asprintf "%a" Error_monad.pp_print_error error in
-        Kaputt.Abbreviations.Assert.fail "" error_str msg
+        fail "" error_str msg
     | _ -> ()
 
   let failed_to_preapply ~msg ?op f =
@@ -389,8 +398,8 @@ module Assert = struct
 
   let check_protocol ?msg ~block h =
     Block_services.protocol (new Client_rpcs.http_ctxt !rpc_config) block >>=? fun block_proto ->
-    return @@ Assert.equal
-      ?msg:(Assert.format_msg msg)
+    return @@ equal
+      ?msg
       ~prn:Protocol_hash.to_b58check
       ~eq:Protocol_hash.equal
       block_proto h
@@ -398,9 +407,14 @@ module Assert = struct
   let check_voting_period_kind ?msg ~block kind =
     Client_proto_rpcs.Context.voting_period_kind (new Client_rpcs.http_ctxt !rpc_config) block
     >>=? fun current_kind ->
-    return @@ Assert.equal
-      ?msg:(Assert.format_msg msg)
+    return @@ equal
+      ?msg
       current_kind kind
+
+  let is_none ?(msg="") x =
+    if x <> None then fail "None" "Some _" msg
+  let is_some ?(msg="") x =
+    if x = None then fail "Some _" "None" msg
 
 end
 

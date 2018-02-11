@@ -11,7 +11,7 @@ depends: [
   "jbuilder" { build & >= "1.0+beta17" }
   "tezos-base"
   "tezos-protocol-compiler"
-  "tezos-test-helpers" { test }
+  "alcotest-lwt" { test }
   "tezos-protocol-environment-client" { test }
 ]
 build: [
