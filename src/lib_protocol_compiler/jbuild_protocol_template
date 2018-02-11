@@ -60,7 +60,7 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
          src/TEZOS_PROTOCOL))
   (action (with-stdout-to ${path-no-dep:tezos_protocol_%s_dummy_byte.ml}
            (chdir ${ROOT}
-                  (run ${bin:tezos-protocol-compiler-byte} -static ${path-no-dep:tezos_protocol_%s} ${path-no-dep:src}))))))
+                  (run ${bin:tezos-protocol-compiler-byte} -static -output-dep ${path-no-dep:tezos_protocol_%s} ${path-no-dep:src}))))))
 
 (rule
  ((targets (tezos_protocol_%s.o
@@ -72,7 +72,7 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
          src/TEZOS_PROTOCOL))
   (action (with-stdout-to ${path-no-dep:tezos_protocol_%s_dummy.ml}
            (chdir ${ROOT}
-                  (run ${bin:tezos-protocol-compiler} -static ${path-no-dep:tezos_protocol_%s} ${path-no-dep:src}))))))
+                  (run ${bin:tezos-protocol-compiler} -static -output-dep ${path-no-dep:tezos_protocol_%s} ${path-no-dep:src}))))))
 
 (library
  ((name tezos_protocol_%s)

@@ -152,12 +152,14 @@ let main { compile_ml ; pack_objects ; link_shared } =
   let anonymous = ref []
   and static = ref false
   and register = ref false
-  and build_dir = ref None in
+  and build_dir = ref None
+  and output_dep = ref false in
   let args_spec = [
     "-static", Arg.Set static, " Only build the static library (no .cmxs)";
     "-register", Arg.Set register, " Generete the `Registerer` module";
     "-bin-annot", Arg.Set Clflags.binary_annotations, " (see ocamlopt)" ;
     "-g", Arg.Set Clflags.debug, " (see ocamlopt)" ;
+    "-output-dep", Arg.Set output_dep, " ..." ;
     "-build-dir", Arg.String (fun s -> build_dir := Some s),
     "use custom build directory and preserve build artifacts"
   ] in
@@ -239,4 +241,15 @@ let main { compile_ml ; pack_objects ; link_shared } =
   if not !static then begin
     Clflags.link_everything := true ;
     link_shared (output ^ ".cmxs") [resulting_object] ;
+  end ;
+
+  if !output_dep then begin
+    let dsrc = Digest.file functor_file in
+    let dimpl = Digest.file resulting_object in
+    let dintf = Digest.file (Filename.chop_extension resulting_object ^ ".cmi") in
+    Format.printf "module Toto = struct include %s end ;; \n" for_pack ;
+    Format.printf "let src_digest = %S ;;\n" (Digest.to_hex dsrc) ;
+    Format.printf "let impl_digest = %S ;;\n" (Digest.to_hex dimpl) ;
+    Format.printf "let intf_digest = %S ;;\n" (Digest.to_hex dintf)
   end
+
