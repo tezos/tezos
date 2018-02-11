@@ -120,3 +120,9 @@ val fold_left_s : ('a -> 'b -> 'a tzresult Lwt.t) -> 'a -> 'b list -> 'a tzresul
 
 (** A {!List.fold_right} in the monad *)
 val fold_right_s : ('a -> 'b -> 'b tzresult Lwt.t) -> 'a list -> 'b -> 'b tzresult Lwt.t
+
+
+(**/**)
+
+type shell_error
+type 'a shell_tzresult = ('a, shell_error list) result

@@ -58,6 +58,7 @@
     v1/protocol.mli
     v1/context.mli
     v1/updater.mli
+    v1/RPC_context.mli
 
   ))
   (action

@@ -124,6 +124,7 @@ module type V1 = sig
      and type ('a, 'b) RPC_path.t = ('a, 'b) RPC_path.t
      and type RPC_service.meth = RPC_service.meth
      and type (+'m,'pr,'p,'q,'i,'o) RPC_service.t = ('m,'pr,'p,'q,'i,'o) RPC_service.t
+     and type Error_monad.shell_error = Error_monad.error
 
   type error += Ecoproto_error of Error_monad.error list
   val wrap_error : 'a Error_monad.tzresult -> 'a tzresult

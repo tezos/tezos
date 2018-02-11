@@ -131,6 +131,7 @@ module type V1 = sig
      and type Data_encoding.json_schema = Data_encoding.json_schema
      and type RPC_service.meth = RPC_service.meth
      and type (+'m,'pr,'p,'q,'i,'o) RPC_service.t = ('m,'pr,'p,'q,'i,'o) RPC_service.t
+     and type Error_monad.shell_error = Error_monad.error
 
   type error += Ecoproto_error of Error_monad.error list
   val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
@@ -184,6 +185,8 @@ module MakeV1
   module Ed25519 = Ed25519
   module S = S
   module Error_monad = struct
+    type 'a shell_tzresult = 'a Error_monad.tzresult
+    type shell_error = Error_monad.error = ..
     type error_category = [ `Branch | `Temporary | `Permanent ]
     include Error_monad.Make()
   end
@@ -311,6 +314,70 @@ module MakeV1
     let lwt_register3 root s f = lwt_register root s (curry (S (S (S Z))) f)
     let lwt_register4 root s f = lwt_register root s (curry (S (S (S (S Z)))) f)
     let lwt_register5 root s f = lwt_register root s (curry (S (S (S (S (S Z))))) f)
+
+  end
+  module RPC_context = struct
+
+    type t = Updater.rpc_context Lwt.t
+
+    class type ['pr] simple = object
+      method call_proto_service0 :
+        'm 'q 'i 'o.
+        ([< RPC_service.meth ] as 'm, t, t, 'q, 'i, 'o) RPC_service.t ->
+        'pr -> 'q -> 'i -> 'o Error_monad.shell_tzresult Lwt.t
+      method call_proto_service1 :
+        'm 'a 'q 'i 'o.
+        ([< RPC_service.meth ] as 'm, t, t * 'a, 'q, 'i, 'o) RPC_service.t ->
+        'pr -> 'a -> 'q -> 'i -> 'o Error_monad.shell_tzresult Lwt.t
+      method call_proto_service2 :
+        'm 'a 'b 'q 'i 'o.
+        ([< RPC_service.meth ] as 'm, t, (t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
+        'pr -> 'a -> 'b -> 'q -> 'i -> 'o Error_monad.shell_tzresult Lwt.t
+      method call_proto_service3 :
+        'm 'a 'b 'c 'q 'i 'o.
+        ([< RPC_service.meth ] as 'm, t, ((t * 'a) * 'b) * 'c, 'q, 'i, 'o) RPC_service.t ->
+        'pr -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o Error_monad.shell_tzresult Lwt.t
+    end
+
+    let make_call0 s (ctxt : _ simple) =
+      ctxt#call_proto_service0 s
+    let make_call0 = (make_call0 : _ -> _ simple -> _ :> _ -> _ #simple -> _)
+
+    let make_call1 s (ctxt: _ simple) =
+      ctxt#call_proto_service1 s
+    let make_call1 = (make_call1 : _ -> _ simple -> _ :> _ -> _ #simple -> _)
+
+    let make_call2 s (ctxt: _ simple) =
+      ctxt#call_proto_service2 s
+    let make_call2 = (make_call2 : _ -> _ simple -> _ :> _ -> _ #simple -> _)
+
+    let make_call3 s (ctxt: _ simple) =
+      ctxt#call_proto_service3 s
+    let make_call3 = (make_call3 : _ -> _ simple -> _ :> _ -> _ #simple -> _)
+
+    let make_opt_call0 s ctxt block q i =
+      make_call0 s ctxt block q i >>= function
+      | Error [RPC_context.Not_found _] -> Lwt.return (Ok None)
+      | Error _ as v -> Lwt.return v
+      | Ok v -> Lwt.return (Ok (Some v))
+
+    let make_opt_call1 s ctxt block a1 q i =
+      make_call1 s ctxt block a1 q i >>= function
+      | Error [RPC_context.Not_found _] -> Lwt.return (Ok None)
+      | Error _ as v -> Lwt.return v
+      | Ok v -> Lwt.return (Ok (Some v))
+
+    let make_opt_call2 s ctxt block a1 a2 q i =
+      make_call2 s ctxt block a1 a2 q i >>= function
+      | Error [RPC_context.Not_found _] -> Lwt.return (Ok None)
+      | Error _ as v -> Lwt.return v
+      | Ok v -> Lwt.return (Ok (Some v))
+
+    let make_opt_call3 s ctxt block a1 a2 a3 q i =
+      make_call3 s ctxt block a1 a2 a3 q i >>= function
+      | Error [RPC_context.Not_found _] -> Lwt.return (Ok None)
+      | Error _ as v -> Lwt.return v
+      | Ok v -> Lwt.return (Ok (Some v))
 
   end
   module Micheline = Micheline
