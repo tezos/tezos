@@ -131,7 +131,9 @@ module S = struct
     RPC_arg.make ~name ~descr ~construct ~destruct ()
 
   let block_path : (unit, unit * block) RPC_path.path =
-    RPC_path.(root / "blocks" /: blocks_arg )
+    RPC_path.(root / "blocks" /: blocks_arg)
+  let proto_path () =
+    RPC_path.(open_root / "blocks" /: blocks_arg / "proto")
 
   let info =
     RPC_service.post_service
@@ -278,9 +280,6 @@ module S = struct
                  (Preapply_result.encoding RPC_error.encoding))
               (obj1 (req "unprocessed" (list (dynamic_size operation_encoding))))))
       RPC_path.(block_path / "pending_operations")
-
-  let proto_path =
-    RPC_path.(block_path / "proto")
 
   type preapply_param = {
     timestamp: Time.t ;

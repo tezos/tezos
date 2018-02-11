@@ -91,7 +91,7 @@ let get_signing_slots cctxt ?max_priority block delegate level =
     @@ List.filter (fun (l, _) -> l = level) possibilities in
   return slots
 
-let inject_endorsement (cctxt : #Client_commands.full_context)
+let inject_endorsement (cctxt : #Proto_alpha.full_context)
     block level ?async
     src_sk source slot =
   let block = Block_services.last_baked_block block in
@@ -123,7 +123,7 @@ let check_endorsement cctxt level slot =
         Block_hash.pp_short block Raw_level.pp level slot
 
 
-let forge_endorsement (cctxt : #Client_commands.full_context)
+let forge_endorsement (cctxt : #Proto_alpha.full_context)
     block
     ~src_sk ?slot ?max_priority src_pk =
   let block = Block_services.last_baked_block block in
@@ -186,7 +186,7 @@ let drop_old_endorsement ~before state =
       (fun { block } -> Fitness.compare before block.fitness <= 0)
       state.to_endorse
 
-let schedule_endorsements (cctxt : #Client_commands.full_context) state bis =
+let schedule_endorsements (cctxt : #Proto_alpha.full_context) state bis =
   let may_endorse (block: Client_baking_blocks.block_info) delegate time =
     Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
     lwt_log_info "May endorse block %a for %s"
@@ -256,7 +256,7 @@ let schedule_endorsements (cctxt : #Client_commands.full_context) state bis =
          bis)
     delegates
 
-let schedule_endorsements (cctxt : #Client_commands.full_context) state bis =
+let schedule_endorsements (cctxt : #Proto_alpha.full_context) state bis =
   schedule_endorsements cctxt state bis >>= function
   | Error exns ->
       lwt_log_error
@@ -311,7 +311,7 @@ let compute_timeout state =
       else
         Lwt_unix.sleep (Int64.to_float delay)
 
-let create (cctxt : #Client_commands.full_context) ~delay contracts block_stream =
+let create (cctxt : #Proto_alpha.full_context) ~delay contracts block_stream =
   lwt_log_info "Starting endorsement daemon" >>= fun () ->
   Lwt_stream.get block_stream >>= function
   | None | Some (Ok []) | Some (Error _) ->

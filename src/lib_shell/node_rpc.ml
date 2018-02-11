@@ -383,7 +383,7 @@ let build_rpc_directory node =
     RPC_directory.register_dynamic_directory1
       ~descr:
         "All the RPCs which are specific to the protocol version."
-      dir Block_services.S.proto_path implementation in
+      dir (Block_services.S.proto_path ()) implementation in
   let dir =
     RPC_directory.gen_register0 dir Protocol_services.S.list
       (list_protocols node) in

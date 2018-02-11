@@ -13,6 +13,7 @@ let protocol =
 
 let () =
   Client_commands.register protocol @@
+  List.map (Cli_entries.map_command (new Proto_alpha.wrap_full_context)) @@
   Client_proto_programs_commands.commands () @
   Client_proto_contracts_commands.commands () @
   Client_proto_context_commands.commands () @

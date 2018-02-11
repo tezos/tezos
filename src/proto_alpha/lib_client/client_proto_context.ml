@@ -13,10 +13,10 @@ open Tezos_micheline
 open Client_proto_contracts
 open Client_keys
 
-let get_balance (rpc : #RPC_context.simple) block contract =
+let get_balance (rpc : #Proto_alpha.rpc_context) block contract =
   Client_proto_rpcs.Context.Contract.balance rpc block contract
 
-let get_storage (rpc : #RPC_context.simple) block contract =
+let get_storage (rpc : #Proto_alpha.rpc_context) block contract =
   Client_proto_rpcs.Context.Contract.storage rpc block contract
 
 let rec find_predecessor rpc_config h n =
@@ -195,7 +195,7 @@ let set_delegate (cctxt : #RPC_context.simple) block ~fee contract ~src_pk ~mana
     cctxt block ~source:contract
     ~src_pk ~manager_sk ~fee opt_delegate
 
-let source_to_keys (wallet : #Client_commands.full_context) block source =
+let source_to_keys (wallet : #Proto_alpha.full_context) block source =
   get_manager wallet block source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
   return (src_pk, src_sk)
 
@@ -216,7 +216,7 @@ let originate_contract
     ~src_pk
     ~src_sk
     ~code
-    (cctxt : #Client_commands.full_context) =
+    (cctxt : #Proto_alpha.full_context) =
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage) >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
   fun { Michelson_v1_parser.expanded = storage } ->

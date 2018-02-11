@@ -7,4 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val commands: unit -> Client_commands.command list
+val commands: unit -> (Proto_alpha.full_context, unit) Cli_entries.command list

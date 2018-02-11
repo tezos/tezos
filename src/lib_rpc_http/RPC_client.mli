@@ -82,10 +82,6 @@ type error +=
 
 (**/**)
 
-type content_type = (string * string)
-type raw_content = Cohttp_lwt.Body.t * content_type option
-type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
-
 val call_service :
   Media_type.t list ->
   ?logger:logger ->
@@ -102,6 +98,15 @@ val call_streamed_service :
   on_close: (unit -> unit) ->
   'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t
 
+val generic_json_call :
+  ?logger:logger ->
+  ?body:Data_encoding.json ->
+  [< RPC_service.meth ] -> Uri.t ->
+  (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t
+
+type content_type = (string * string)
+type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
+
 val generic_call :
   ?logger:logger ->
   ?accept:Media_type.t list ->
@@ -110,8 +115,3 @@ val generic_call :
   [< RPC_service.meth ] ->
   Uri.t -> (content, content) rest_result Lwt.t
 
-val generic_json_call :
-  ?logger:logger ->
-  ?body:Data_encoding.json ->
-  [< RPC_service.meth ] -> Uri.t ->
-  (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t

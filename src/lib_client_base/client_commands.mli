@@ -54,6 +54,8 @@ end
      handler when running a command, and must be transmitted to all
      basic operations, also making client commands reantrant. *)
 
+class proxy_context : full_context -> full_context
+
 val make_context :
   ?base_dir:string ->
   ?block:Block_services.block ->

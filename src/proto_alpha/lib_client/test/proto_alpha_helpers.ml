@@ -22,6 +22,7 @@ let rpc_config = ref {
   }
 
 let build_rpc_context config =
+  new Proto_alpha.wrap_proto_context @@
   new RPC_client.http_ctxt config Media_type.all_media_types
 
 let rpc_ctxt = ref (build_rpc_context !rpc_config)

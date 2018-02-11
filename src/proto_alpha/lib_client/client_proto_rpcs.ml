@@ -11,11 +11,11 @@ open Proto_alpha
 open Alpha_context
 
 let make_call1 cctxt s=
-  RPC_context.make_call1 (s Block_services.S.proto_path) cctxt
+  RPC_context.make_call1 (s (Block_services.S.proto_path ())) cctxt
 let make_call2 cctxt s =
-  RPC_context.make_call2 (s Block_services.S.proto_path) cctxt
+  RPC_context.make_call2 (s (Block_services.S.proto_path ())) cctxt
 let make_call3 cctxt s =
-  RPC_context.make_call3 (s Block_services.S.proto_path) cctxt
+  RPC_context.make_call3 (s (Block_services.S.proto_path ())) cctxt
 
 let make_opt_call2 cctxt s block a1 q i =
   make_call2 cctxt s block a1 q i >>= function

@@ -23,10 +23,6 @@ type ('o, 'e) rest_result =
   | `Not_found of 'e
   | `Unauthorized of 'e ] tzresult
 
-type content_type = (string * string)
-type raw_content = Cohttp_lwt.Body.t * content_type option
-type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
-
 type rpc_error =
   | Empty_answer
   | Connection_failed of string
@@ -221,6 +217,9 @@ let () =
 let request_failed meth uri error =
   let meth = ( meth : [< RPC_service.meth ] :> RPC_service.meth) in
   fail (Request_failed { meth ; uri ; error })
+
+type content_type = (string * string)
+type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
 let generic_call ?logger ?accept ?body ?media meth uri : (content, content) rest_result Lwt.t =
   Client.generic_call meth ?logger ?accept ?body ?media uri >>= function

@@ -10,7 +10,7 @@
 open Proto_alpha
 open Alpha_context
 
-let bake_block (cctxt : #Client_commands.full_context) block
+let bake_block (cctxt : #Proto_alpha.full_context) block
     ?force ?max_priority ?(free_baking=false) ?src_sk delegate =
   begin
     match src_sk with
@@ -59,7 +59,7 @@ let do_reveal cctxt block blocks =
   Client_proto_nonces.dels cctxt (List.map fst blocks) >>=? fun () ->
   return ()
 
-let reveal_block_nonces (cctxt : #Client_commands.full_context) block_hashes =
+let reveal_block_nonces (cctxt : #Proto_alpha.full_context) block_hashes =
   Lwt_list.filter_map_p
     (fun hash ->
        Lwt.catch

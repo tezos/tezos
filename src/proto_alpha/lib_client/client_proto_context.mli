@@ -11,31 +11,31 @@ open Proto_alpha
 open Alpha_context
 
 val list_contract_labels :
-  #Client_commands.full_context ->
+  #Proto_alpha.full_context ->
   Block_services.block ->
   (string * string * string) list tzresult Lwt.t
 
 val get_storage :
-  #RPC_context.simple ->
+  #Proto_alpha.rpc_context ->
   Block_services.block ->
   Contract.t ->
   Script.expr option tzresult Lwt.t
 
 val get_manager :
-  #Client_commands.full_context ->
+  #Proto_alpha.full_context ->
   Block_services.block ->
   Contract.t ->
   (string * public_key_hash *
    public_key * Client_keys.sk_locator) tzresult Lwt.t
 
 val get_balance:
-  #RPC_context.simple ->
+  #Proto_alpha.rpc_context ->
   Block_services.block ->
   Contract.t ->
   Tez.t tzresult Lwt.t
 
 val set_delegate :
-  #RPC_context.simple ->
+  #Proto_alpha.rpc_context ->
   Block_services.block ->
   fee:Tez.tez ->
   Contract.t ->
@@ -50,7 +50,7 @@ val operation_submitted_message :
   unit tzresult Lwt.t
 
 val source_to_keys:
-  #Client_commands.full_context ->
+  #Proto_alpha.full_context ->
   Block_services.block ->
   Contract.t ->
   (public_key * Client_keys.sk_locator) tzresult Lwt.t
@@ -66,12 +66,12 @@ val originate_account :
   balance:Tez.tez ->
   fee:Tez.tez ->
   Block_services.block ->
-  #RPC_context.simple ->
+  #Proto_alpha.rpc_context ->
   unit -> (Operation_list_hash.elt * Contract.t) tzresult Lwt.t
 
 val save_contract :
   force:bool ->
-  #Client_commands.full_context ->
+  #Proto_alpha.full_context ->
   string ->
   Contract.t ->
   unit tzresult Lwt.t
@@ -94,18 +94,18 @@ val originate_contract:
   src_pk:public_key ->
   src_sk:Client_keys.sk_locator ->
   code:Script.expr ->
-  #Client_commands.full_context ->
+  #Proto_alpha.full_context ->
   (Operation_hash.t * Contract.t) tzresult Lwt.t
 
 val faucet :
   ?branch:int ->
   manager_pkh:public_key_hash ->
   Block_services.block ->
-  #RPC_context.simple ->
+  #Proto_alpha.rpc_context ->
   unit -> (Operation_list_hash.elt * Contract.t) tzresult Lwt.t
 
 val transfer :
-  #RPC_context.simple ->
+  #Proto_alpha.rpc_context ->
   Block_services.block ->
   ?branch:int ->
   source:Contract.t ->
@@ -119,7 +119,7 @@ val transfer :
   (Operation_hash.t * Contract.t list) tzresult Lwt.t
 
 val dictate :
-  #RPC_context.simple ->
+  #Proto_alpha.rpc_context ->
   Block_services.block ->
   dictator_operation ->
   secret_key ->

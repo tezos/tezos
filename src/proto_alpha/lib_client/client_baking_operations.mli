@@ -16,7 +16,7 @@ type operation = {
 }
 
 val monitor:
-  #RPC_context.t ->
+  #Proto_alpha.rpc_context ->
   ?contents:bool -> ?check:bool -> unit ->
   operation list tzresult Lwt_stream.t tzresult Lwt.t
 
@@ -28,6 +28,6 @@ type valid_endorsement = {
 }
 
 val monitor_endorsement:
-  #RPC_context.t ->
+  #Proto_alpha.rpc_context ->
   valid_endorsement tzresult Lwt_stream.t tzresult Lwt.t
 

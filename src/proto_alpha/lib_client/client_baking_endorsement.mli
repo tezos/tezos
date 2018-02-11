@@ -11,7 +11,7 @@ open Proto_alpha
 open Alpha_context
 
 val forge_endorsement:
-  #Client_commands.full_context ->
+  #Proto_alpha.full_context ->
   Block_services.block ->
   src_sk:Client_keys.sk_locator ->
   ?slot:int ->
@@ -20,7 +20,7 @@ val forge_endorsement:
   Operation_hash.t tzresult Lwt.t
 
 val create :
-  #Client_commands.full_context ->
+  #Proto_alpha.full_context ->
   delay:int ->
   public_key_hash list ->
   Client_baking_blocks.block_info list tzresult Lwt_stream.t -> unit Lwt.t

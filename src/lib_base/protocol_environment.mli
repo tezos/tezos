@@ -136,6 +136,14 @@ module type V1 = sig
        and type rpc_context := Updater.rpc_context
        and type 'a tzresult := 'a tzresult
 
+  class ['block] proto_rpc_context :
+    Tezos_rpc.RPC_context.t -> (unit, unit * 'block) RPC_path.t ->
+    ['block] RPC_context.simple
+
+  class ['block] proto_rpc_context_of_directory :
+    ('block -> RPC_context.t) -> RPC_context.t RPC_directory.t ->
+    ['block] RPC_context.simple
+
 end
 
 module MakeV1

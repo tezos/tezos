@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let run (cctxt : #Client_commands.full_context) ?max_priority ~delay ?min_date delegates ~endorsement ~denunciation ~baking =
+let run (cctxt : #Proto_alpha.full_context) ?max_priority ~delay ?min_date delegates ~endorsement ~denunciation ~baking =
   (* TODO really detach... *)
   let endorsement =
     if endorsement then

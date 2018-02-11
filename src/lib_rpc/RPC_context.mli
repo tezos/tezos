@@ -9,20 +9,33 @@
 
 open Error_monad
 
-class type simple = object
+class type ['pr] gen_simple = object
   method call_service :
     'm 'p 'q 'i 'o.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    ([< Resto.meth ] as 'm, 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
     'p -> 'q -> 'i -> 'o tzresult Lwt.t
 end
 
-class type streamed = object
+class type ['pr] gen_streamed = object
   method call_streamed_service :
     'm 'p 'q 'i 'o.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    ([< Resto.meth ] as 'm, 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
     on_chunk: ('o -> unit) ->
     on_close: (unit -> unit) ->
     'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t
+end
+
+class type ['pr] gen = object
+  inherit ['pr] gen_simple
+  inherit ['pr] gen_streamed
+end
+
+class type simple = object
+  inherit [unit] gen_simple
+end
+
+class type streamed = object
+  inherit [unit] gen_streamed
 end
 
 class type t = object
@@ -30,7 +43,7 @@ class type t = object
   inherit streamed
 end
 
-val of_directory : unit RPC_directory.t -> t
+class ['pr] of_directory : 'pr RPC_directory.t -> ['pr] gen
 
 type error +=
   | Not_found of { meth: RPC_service.meth ;
@@ -60,3 +73,4 @@ val make_streamed_call :
   ([< Resto.meth ], unit, 'p, 'q, 'i, 'o) RPC_service.t ->
   #streamed -> 'p -> 'q ->  'i ->
   ('o Lwt_stream.t * stopper) tzresult Lwt.t
+

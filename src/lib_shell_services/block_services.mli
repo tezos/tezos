@@ -215,6 +215,6 @@ module S : sig
      (unit * block) * string, unit, unit,
      string list) RPC_service.t
 
-  val proto_path: (unit, unit * block) RPC_path.path
+  val proto_path: unit -> ('a, 'a * block) RPC_path.path
 
 end

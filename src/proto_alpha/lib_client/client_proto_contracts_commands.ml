@@ -40,7 +40,7 @@ let commands  () =
     command ~group ~desc: "Lists all known contracts in the wallet."
       no_options
       (fixed [ "list" ; "known" ; "contracts" ])
-      (fun () (cctxt : Client_commands.full_context) ->
+      (fun () (cctxt : Proto_alpha.full_context) ->
          list_contracts cctxt >>=? fun contracts ->
          iter_s
            (fun (prefix, alias, contract) ->
@@ -62,7 +62,7 @@ let commands  () =
       (prefixes [ "show" ; "known" ; "contract" ]
        @@ RawContractAlias.alias_param
        @@ stop)
-      (fun () (_, contract) (cctxt : Client_commands.full_context) ->
+      (fun () (_, contract) (cctxt : Proto_alpha.full_context) ->
          cctxt#message "%a\n%!" Contract.pp contract >>= fun () ->
          return ()) ;
 

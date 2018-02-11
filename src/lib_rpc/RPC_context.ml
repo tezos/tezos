@@ -9,26 +9,40 @@
 
 open Error_monad
 
-class type simple = object
+class type ['pr] gen_simple = object
   method call_service :
     'm 'p 'q 'i 'o.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    ([< Resto.meth ] as 'm, 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
     'p -> 'q -> 'i -> 'o tzresult Lwt.t
 end
 
-class type streamed = object
+class type ['pr] gen_streamed = object
   method call_streamed_service :
     'm 'p 'q 'i 'o.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    ([< Resto.meth ] as 'm, 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
     on_chunk: ('o -> unit) ->
     on_close: (unit -> unit) ->
     'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t
+end
+
+class type ['pr] gen = object
+  inherit ['pr] gen_simple
+  inherit ['pr] gen_streamed
+end
+
+class type simple = object
+  inherit [unit] gen_simple
+end
+
+class type streamed = object
+  inherit [unit] gen_streamed
 end
 
 class type t = object
   inherit simple
   inherit streamed
 end
+
 
 type error +=
   | Not_found of { meth: RPC_service.meth ;
@@ -39,17 +53,17 @@ type error +=
 let base = Uri.make ~scheme:"ocaml" ()
 let not_found s p q =
   let { RPC_service.meth ; uri ; _ } =
-    RPC_service.forge_request s ~base p q in
+    RPC_service.forge_partial_request s ~base p q in
   fail (Not_found { meth ; uri })
 
 let generic_error s p q =
   let { RPC_service.meth ; uri ; _ } =
-    RPC_service.forge_request s ~base p q in
+    RPC_service.forge_partial_request s ~base p q in
   fail (Generic_error { meth ; uri })
 
-let of_directory (dir : unit RPC_directory.t) : t = object
+class ['pr] of_directory (dir : 'pr RPC_directory.t) = object
   method call_service : 'm 'p 'q 'i 'o.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    ([< Resto.meth ] as 'm, 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
     'p -> 'q -> 'i -> 'o tzresult Lwt.t =
     fun s p q i ->
       RPC_directory.transparent_lookup dir s p q i >>= function
@@ -72,7 +86,7 @@ let of_directory (dir : unit RPC_directory.t) : t = object
       | `Conflict None
       | `No_content -> generic_error s p q
   method call_streamed_service : 'm 'p 'q 'i 'o.
-    ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->
+    ([< Resto.meth ] as 'm, 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
     on_chunk: ('o -> unit) ->
     on_close: (unit -> unit) ->
     'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t =

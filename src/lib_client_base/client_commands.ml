@@ -64,6 +64,28 @@ class type full_context = object
   inherit block
 end
 
+class proxy_context (obj : full_context) = object
+  method block = obj#block
+  method answer : type a. (a, unit) lwt_format -> a = obj#answer
+  method call_service :
+    'm 'p 'q 'i 'o.
+    ([< Resto.meth ] as 'm, 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+    'p -> 'q -> 'i -> 'o tzresult Lwt.t = obj#call_service
+  method call_streamed_service :
+    'm 'p 'q 'i 'o.
+    ([< Resto.meth ] as 'm, 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+    on_chunk: ('o -> unit) ->
+    on_close: (unit -> unit) ->
+    'p -> 'q -> 'i -> (unit -> unit) tzresult Lwt.t = obj#call_streamed_service
+  method error : type a b. (a, b) lwt_format -> a = obj#error
+  method generic_json_call = obj#generic_json_call
+  method load : type a. string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t = obj#load
+  method log : type a. string -> (a, unit) lwt_format -> a = obj#log
+  method message : type a. (a, unit) lwt_format -> a = obj#message
+  method warning : type a. (a, unit) lwt_format -> a  = obj#warning
+  method write : type a. string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t = obj#write
+end
+
 
 class file_wallet dir : wallet = object (self)
   method private filename alias_name =

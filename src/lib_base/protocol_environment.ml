@@ -143,6 +143,14 @@ module type V1 = sig
        and type rpc_context := Updater.rpc_context
        and type 'a tzresult := 'a tzresult
 
+  class ['block] proto_rpc_context :
+    Tezos_rpc.RPC_context.t -> (unit, unit * 'block) RPC_path.t ->
+    ['block] RPC_context.simple
+
+  class ['block] proto_rpc_context_of_directory :
+    ('block -> RPC_context.t) -> RPC_context.t RPC_directory.t ->
+    ['block] RPC_context.simple
+
 end
 
 module MakeV1
@@ -453,6 +461,87 @@ module MakeV1
     let configure_sandbox c j =
       configure_sandbox c j >|= wrap_error
   end
+
+  class ['block] proto_rpc_context
+      (t : Tezos_rpc.RPC_context.t)
+      (prefix : (unit, unit * 'block) RPC_path.t) =
+    object
+      method call_proto_service0
+        : 'm 'q 'i 'o.
+          ([< RPC_service.meth ] as 'm, RPC_context.t,
+           RPC_context.t, 'q, 'i, 'o) RPC_service.t ->
+          'block -> 'q -> 'i -> 'o tzresult Lwt.t
+        = fun s block q i ->
+          let s = RPC_service.subst0 s in
+          let s = RPC_service.prefix prefix s in
+          t#call_service s ((), block) q i
+      method call_proto_service1
+        : 'm 'a 'q 'i 'o.
+          ([< RPC_service.meth ] as 'm, RPC_context.t,
+           RPC_context.t * 'a, 'q, 'i, 'o) RPC_service.t ->
+          'block -> 'a -> 'q -> 'i -> 'o tzresult Lwt.t
+        = fun s block a1 q i ->
+          let s = RPC_service.subst1 s in
+          let s = RPC_service.prefix prefix s in
+          t#call_service s (((), block), a1) q i
+      method call_proto_service2
+        : 'm 'a 'b 'q 'i 'o.
+          ([< RPC_service.meth ] as 'm, RPC_context.t,
+           (RPC_context.t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
+          'block -> 'a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t
+        = fun s block a1 a2 q i ->
+          let s = RPC_service.subst2 s in
+          let s = RPC_service.prefix prefix s in
+          t#call_service s ((((), block), a1), a2) q i
+      method call_proto_service3
+        : 'm 'a 'b 'c 'q 'i 'o.
+          ([< RPC_service.meth ] as 'm, RPC_context.t,
+           ((RPC_context.t * 'a) * 'b) * 'c,
+           'q, 'i, 'o) RPC_service.t ->
+          'block -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t
+        = fun s block a1 a2 a3 q i ->
+          let s = RPC_service.subst3 s in
+          let s = RPC_service.prefix prefix s in
+          t#call_service s (((((), block), a1), a2), a3) q i
+    end
+
+  class ['block] proto_rpc_context_of_directory conv dir : ['block] RPC_context.simple =
+    let lookup = new Tezos_rpc.RPC_context.of_directory dir in
+    object
+      method call_proto_service0
+        : 'm 'q 'i 'o.
+          ([< RPC_service.meth ] as 'm, RPC_context.t,
+           RPC_context.t, 'q, 'i, 'o) RPC_service.t ->
+          'block -> 'q -> 'i -> 'o tzresult Lwt.t
+        = fun s block q i ->
+          let rpc_context = conv block in
+          lookup#call_service s rpc_context q i
+      method call_proto_service1
+        : 'm 'a 'q 'i 'o.
+          ([< RPC_service.meth ] as 'm, RPC_context.t,
+           RPC_context.t * 'a, 'q, 'i, 'o) RPC_service.t ->
+          'block -> 'a -> 'q -> 'i -> 'o tzresult Lwt.t
+        = fun s block a1 q i ->
+          let rpc_context = conv block in
+          lookup#call_service s (rpc_context, a1) q i
+      method call_proto_service2
+        : 'm 'a 'b 'q 'i 'o.
+          ([< RPC_service.meth ] as 'm, RPC_context.t,
+           (RPC_context.t * 'a) * 'b, 'q, 'i, 'o) RPC_service.t ->
+          'block -> 'a -> 'b -> 'q -> 'i -> 'o tzresult Lwt.t
+        = fun s block a1 a2 q i ->
+          let rpc_context = conv block in
+          lookup#call_service s ((rpc_context, a1), a2) q i
+      method call_proto_service3
+        : 'm 'a 'b 'c 'q 'i 'o.
+          ([< RPC_service.meth ] as 'm, RPC_context.t,
+           ((RPC_context.t * 'a) * 'b) * 'c,
+           'q, 'i, 'o) RPC_service.t ->
+          'block -> 'a -> 'b -> 'c -> 'q -> 'i -> 'o tzresult Lwt.t
+        = fun s block a1 a2 a3 q i ->
+          let rpc_context = conv block in
+          lookup#call_service s (((rpc_context, a1), a2), a3) q i
+    end
 
 end
 
