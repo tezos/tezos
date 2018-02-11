@@ -141,7 +141,7 @@ let delegate_contract rpc_config
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
 
-let list_contract_labels (cctxt : Client_commands.full_context) block =
+let list_contract_labels (cctxt : #Client_commands.full_context) block =
   Client_proto_rpcs.Context.Contract.list
     cctxt block >>=? fun contracts ->
   map_s (fun h ->
@@ -167,10 +167,10 @@ let list_contract_labels (cctxt : Client_commands.full_context) block =
       return (nm, h_b58, kind))
     contracts
 
-let message_added_contract (cctxt : Client_commands.full_context) name =
+let message_added_contract (cctxt : #Client_commands.full_context) name =
   cctxt#message "Contract memorized as %s." name
 
-let get_manager (cctxt : Client_commands.full_context) block source =
+let get_manager (cctxt : #Client_commands.full_context) block source =
   Client_proto_contracts.get_manager
     cctxt block source >>=? fun src_pkh ->
   Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
@@ -216,7 +216,7 @@ let originate_contract
     ~src_pk
     ~src_sk
     ~code
-    (cctxt : Client_commands.full_context) =
+    (cctxt : #Client_commands.full_context) =
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage) >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
   fun { Michelson_v1_parser.expanded = storage } ->

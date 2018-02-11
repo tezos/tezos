@@ -118,16 +118,16 @@ let default_cli_args = {
 
 open Cli_entries
 
-let string_parameter : (string, Client_commands.full_context) parameter =
+let string_parameter () : (string, #Client_commands.full_context) parameter =
   parameter (fun _ x -> return x)
 
-let block_parameter =
+let block_parameter () =
   parameter
     (fun _ block -> match Block_services.parse_block block with
        | Error _ -> fail (Invalid_block_argument block)
        | Ok block -> return block)
 
-let protocol_parameter =
+let protocol_parameter () =
   parameter
     (fun _ arg ->
        try
@@ -141,50 +141,50 @@ let protocol_parameter =
     )
 
 (* Command-line only args (not in config file) *)
-let base_dir_arg =
+let base_dir_arg () =
   arg
     ~parameter:"-base-dir"
     ~placeholder:"path"
     ~doc:("client data directory\n\
            The directory where the Tezos client will store all its data.\n\
            By default " ^ Client_commands.default_base_dir)
-    string_parameter
-let config_file_arg =
+    (string_parameter ())
+let config_file_arg () =
   arg
     ~parameter:"-config-file"
     ~placeholder:"path"
     ~doc:"configuration file"
-    string_parameter
-let timings_switch =
+    (string_parameter ())
+let timings_switch () =
   switch
     ~parameter:"-timings"
     ~doc:"show RPC request times"
-let block_arg =
+let block_arg () =
   default_arg
     ~parameter:"-block"
     ~placeholder:"hash|tag"
     ~doc:"block on which to apply contextual commands"
     ~default:(Block_services.to_string default_cli_args.block)
-    block_parameter
-let protocol_arg =
+    (block_parameter ())
+let protocol_arg () =
   arg
     ~parameter:"-protocol"
     ~placeholder:"hash"
     ~doc:"use commands of a specific protocol"
-    protocol_parameter
-let log_requests_switch =
+    (protocol_parameter ())
+let log_requests_switch () =
   switch
     ~parameter:"-log-requests"
     ~doc:"log all requests to the node"
 
 (* Command-line args which can be set in config file as well *)
-let addr_arg =
+let addr_arg () =
   arg
     ~parameter:"-addr"
     ~placeholder:"IP addr|host"
     ~doc:"IP address of the node"
-    string_parameter
-let port_arg =
+    (string_parameter ())
+let port_arg () =
   arg
     ~parameter:"-port"
     ~placeholder:"number"
@@ -194,7 +194,7 @@ let port_arg =
            return (int_of_string x)
          with Failure _ ->
            fail (Invalid_port_arg x)))
-let tls_switch =
+let tls_switch () =
   switch
     ~parameter:"-tls"
     ~doc:"use TLS to connect to node."
@@ -216,7 +216,7 @@ let commands config_file cfg =
   [ command ~group ~desc:"Show the config file."
       no_options
       (fixed [ "config" ; "show" ])
-      (fun () (cctxt : Client_commands.full_context) ->
+      (fun () (cctxt : #Client_commands.full_context) ->
          let pp_cfg ppf cfg = Format.fprintf ppf "%a" Data_encoding.Json.pp (Data_encoding.Json.construct Cfg_file.encoding cfg) in
          if not @@ Sys.file_exists config_file then
            cctxt#warning
@@ -270,20 +270,20 @@ let commands config_file cfg =
          else failwith "Config file already exists at location") ;
   ]
 
-let global_options =
-  args9 base_dir_arg
-    config_file_arg
-    timings_switch
-    block_arg
-    protocol_arg
-    log_requests_switch
-    addr_arg
-    port_arg
-    tls_switch
+let global_options () =
+  args9 (base_dir_arg ())
+    (config_file_arg ())
+    (timings_switch ())
+    (block_arg ())
+    (protocol_arg ())
+    (log_requests_switch ())
+    (addr_arg ())
+    (port_arg ())
+    (tls_switch ())
 
-let parse_config_args (ctx : Client_commands.full_context) argv =
+let parse_config_args (ctx : #Client_commands.full_context) argv =
   parse_initial_options
-    global_options
+    (global_options ())
     ctx
     argv >>=?
   fun ((base_dir,

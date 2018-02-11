@@ -167,7 +167,7 @@ let gen_keys ?(force=false) ?seed (cctxt : #Client_commands.wallet) name =
     cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
   return ()
 
-let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : Client_commands.full_context) =
+let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : #Client_commands.full_context) =
   let unrepresentable =
     List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
   match unrepresentable with
@@ -276,7 +276,7 @@ let alias_keys cctxt name =
         else find_key tl
   in find_key l
 
-let force_switch =
+let force_switch () =
   Client_commands.force_switch ~doc:"overwrite existing keys" ()
 
 let group =
@@ -303,7 +303,7 @@ let commands () =
               version of the tezos client supports."
       no_options
       (fixed [ "list" ; "signing" ; "schemes" ])
-      (fun () (cctxt : Client_commands.full_context) ->
+      (fun () (cctxt : #Client_commands.full_context) ->
          let schemes = Hashtbl.fold (fun k _ a -> k :: a) signers_table [] in
          let schemes = List.sort String.compare schemes in
          Lwt_list.iter_s
@@ -314,18 +314,18 @@ let commands () =
            schemes >>= return) ;
 
     command ~group ~desc: "Generate a pair of (unencrypted) keys."
-      (args1 Secret_key.force_switch)
+      (args1 (Secret_key.force_switch ()))
       (prefixes [ "gen" ; "keys" ]
        @@ Secret_key.fresh_alias_param
        @@ stop)
-      (fun force name (cctxt : Client_commands.full_context) ->
+      (fun force name (cctxt : #Client_commands.full_context) ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
          gen_keys ~force cctxt name) ;
 
     command ~group ~desc: "Generate (unencrypted) keys including the given string."
       (args2
          (switch ~doc:"the key must begin with tz1[word]" ~parameter:"-prefix")
-         force_switch)
+         (force_switch ()))
       (prefixes [ "gen" ; "vanity" ; "keys" ]
        @@ Public_key_hash.fresh_alias_param
        @@ prefix "matching"
@@ -335,7 +335,7 @@ let commands () =
          gen_keys_containing ~force ~prefix ~containing ~name cctxt) ;
 
     command ~group ~desc: "Add a secret key to the wallet."
-      (args1 Secret_key.force_switch)
+      (args1 (Secret_key.force_switch ()))
       (prefix "import"
        @@ string
          ~name:"scheme"
@@ -374,7 +374,7 @@ let commands () =
              Secret_key.add ~force cctxt name skloc) ;
 
     command ~group ~desc: "Add a public key to the wallet."
-      (args1 Public_key.force_switch)
+      (args1 (Public_key.force_switch ()))
       (prefix "import"
        @@ string
          ~name:"scheme"
@@ -402,7 +402,7 @@ let commands () =
          Public_key.add ~force cctxt name pkloc) ;
 
     command ~group ~desc: "Add an identity to the wallet."
-      (args1 Public_key.force_switch)
+      (args1 (Public_key.force_switch ()))
       (prefixes [ "add" ; "identity" ]
        @@ Public_key_hash.fresh_alias_param
        @@ Public_key_hash.source_param
@@ -414,7 +414,7 @@ let commands () =
     command ~group ~desc: "List all identities and associated keys."
       no_options
       (fixed [ "list" ; "known" ; "identities" ])
-      (fun () (cctxt : Client_commands.full_context) ->
+      (fun () (cctxt : #Client_commands.full_context) ->
          list_keys cctxt >>=? fun l ->
          iter_s begin fun (name, pkh, pk, sk) ->
            Public_key_hash.to_source pkh >>=? fun v ->
@@ -433,7 +433,7 @@ let commands () =
       (prefixes [ "show" ; "identity"]
        @@ Public_key_hash.alias_param
        @@ stop)
-      (fun show_private (name, _) (cctxt : Client_commands.full_context) ->
+      (fun show_private (name, _) (cctxt : #Client_commands.full_context) ->
          let ok_lwt x = x >>= (fun x -> return x) in
          alias_keys cctxt name >>=? fun key_info ->
          match key_info with

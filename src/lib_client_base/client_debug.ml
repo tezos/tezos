@@ -112,7 +112,7 @@ let commands () =
     command ~group ~desc: "list protocols"
       (args1 output_arg)
       (fixed [ "list" ; "registered" ; "protocols" ])
-      (fun output (_cctxt : Client_commands.full_context) ->
+      (fun output (_cctxt : #Client_commands.full_context) ->
          let ppf = output_to_ppf output in
          registered_protocols ppf ;
          Format.fprintf ppf "@." ;

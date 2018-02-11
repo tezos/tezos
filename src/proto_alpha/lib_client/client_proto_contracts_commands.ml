@@ -20,7 +20,7 @@ let commands  () =
   [
 
     command ~group ~desc: "Add a contract to the wallet."
-      (args1 RawContractAlias.force_switch)
+      (args1 (RawContractAlias.force_switch ()))
       (prefixes [ "remember" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param
        @@ RawContractAlias.source_param
@@ -49,7 +49,7 @@ let commands  () =
            contracts) ;
 
     command ~group ~desc: "Forget the entire wallet of known contracts."
-      (args1 RawContractAlias.force_switch)
+      (args1 (RawContractAlias.force_switch ()))
       (fixed [ "forget" ; "all" ; "contracts" ])
       (fun force cctxt ->
          fail_unless

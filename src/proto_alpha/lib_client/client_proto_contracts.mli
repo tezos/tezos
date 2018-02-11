@@ -9,6 +9,7 @@
 
 open Proto_alpha
 open Tezos_context
+open Cli_entries
 
 module RawContractAlias :
   Client_aliases.Alias with type t = Contract.t
@@ -20,13 +21,13 @@ module ContractAlias : sig
   val alias_param:
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_commands.wallet as 'wallet), 'ret) Cli_entries.params ->
-    (Lwt_io.file_name * Contract.t -> 'a, 'wallet, 'ret) Cli_entries.params
+    ('a, (#Client_commands.wallet as 'wallet), 'ret) params ->
+    (Lwt_io.file_name * Contract.t -> 'a, 'wallet, 'ret) params
   val destination_param:
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_commands.wallet as 'wallet), 'ret) Cli_entries.params ->
-    (Lwt_io.file_name * Contract.t -> 'a, 'wallet, 'ret) Cli_entries.params
+    ('a, (#Client_commands.wallet as 'wallet), 'ret) params ->
+    (Lwt_io.file_name * Contract.t -> 'a, 'wallet, 'ret) params
   val rev_find:
     #Client_commands.wallet ->
     Contract.t -> string option tzresult Lwt.t

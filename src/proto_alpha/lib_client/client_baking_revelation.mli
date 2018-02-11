@@ -18,7 +18,7 @@ val inject_seed_nonce_revelation:
   Operation_hash.t tzresult Lwt.t
 
 val forge_seed_nonce_revelation:
-  Client_commands.full_context ->
+  #Client_commands.full_context ->
   Client_proto_rpcs.block ->
   (Raw_level.t * Nonce.t) list ->
   unit tzresult Lwt.t

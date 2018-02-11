@@ -49,7 +49,7 @@ let commands () =
          return ()) ;
 
     command ~group ~desc: "Add a program to the library."
-      (args1 Program.force_switch)
+      (args1 (Program.force_switch ()))
       (prefixes [ "remember" ; "program" ]
        @@ Program.fresh_alias_param
        @@ Program.source_param

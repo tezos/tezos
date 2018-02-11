@@ -12,7 +12,7 @@ open Tezos_context
 open Environment
 
 val list_contract_labels :
-  Client_commands.full_context ->
+  #Client_commands.full_context ->
   Client_proto_rpcs.block ->
   (string * string * string) list tzresult Lwt.t
 
@@ -23,7 +23,7 @@ val get_storage :
   Script.expr option tzresult Lwt.t
 
 val get_manager :
-  Client_commands.full_context ->
+  #Client_commands.full_context ->
   Client_proto_rpcs.block ->
   Contract.t ->
   (string * public_key_hash *
@@ -51,7 +51,7 @@ val operation_submitted_message :
   unit tzresult Lwt.t
 
 val source_to_keys:
-  Client_commands.full_context ->
+  #Client_commands.full_context ->
   Client_proto_rpcs.block ->
   Contract.t ->
   (public_key * Client_keys.sk_locator) tzresult Lwt.t
@@ -72,7 +72,7 @@ val originate_account :
 
 val save_contract :
   force:bool ->
-  Client_commands.full_context ->
+  #Client_commands.full_context ->
   string ->
   Contract.t ->
   unit tzresult Lwt.t
@@ -95,7 +95,7 @@ val originate_contract:
   src_pk:public_key ->
   src_sk:Client_keys.sk_locator ->
   code:Script.expr ->
-  Client_commands.full_context ->
+  #Client_commands.full_context ->
   (Operation_hash.t * Contract.t) tzresult Lwt.t
 
 val faucet :

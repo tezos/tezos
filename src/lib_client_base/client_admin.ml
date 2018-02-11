@@ -17,7 +17,7 @@ let commands () =
       (prefixes [ "unmark" ; "invalid" ]
        @@ Block_hash.param ~name:"block" ~desc:"block to remove from invalid list"
        @@ stop)
-      (fun () block (cctxt : Client_commands.full_context) ->
+      (fun () block (cctxt : #Client_commands.full_context) ->
          Block_services.unmark_invalid cctxt block >>=? fun () ->
          cctxt#message "Block %a no longer marked invalid" Block_hash.pp block >>= return) ;
   ]

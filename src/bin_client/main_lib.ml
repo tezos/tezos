@@ -86,14 +86,14 @@ let main ?only_commands () =
       let client_config =
         cctxt ~block:parsed_args.block ~base_dir:parsed_config_file.base_dir rpc_config in
       (Cli_entries.dispatch
-         ~global_options:Client_config.global_options
+         ~global_options:(Client_config.global_options ())
          commands
          client_config
          remaining) end >>=
     Cli_entries.handle_cli_errors
       ~stdout:Format.std_formatter
       ~stderr:Format.err_formatter
-      ~global_options:Client_config.global_options
+      ~global_options:(Client_config.global_options ())
     >>= function
     | Ok i ->
         Lwt.return i

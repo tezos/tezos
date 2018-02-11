@@ -135,7 +135,7 @@ let commands () =
       end ;
 
     command ~group ~desc:"Open a new account."
-      (args4 fee_arg delegate_arg delegatable_switch Client_keys.force_switch)
+      (args4 fee_arg delegate_arg delegatable_switch (Client_keys.force_switch ()))
       (prefixes [ "originate" ; "account" ]
        @@ RawContractAlias.fresh_alias_param
          ~name: "new" ~desc: "name of the new contract"
@@ -172,7 +172,7 @@ let commands () =
 
     command ~group ~desc: "Launch a smart contract on the blockchain."
       (args7
-         fee_arg delegate_arg Client_keys.force_switch
+         fee_arg delegate_arg (Client_keys.force_switch ())
          delegatable_switch spendable_switch init_arg no_print_source_flag)
       (prefixes [ "originate" ; "contract" ]
        @@ RawContractAlias.fresh_alias_param

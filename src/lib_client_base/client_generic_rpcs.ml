@@ -191,7 +191,7 @@ let rec count =
 
 (*-- Commands ---------------------------------------------------------------*)
 
-let list url (cctxt : Client_commands.full_context) =
+let list url (cctxt : #Client_commands.full_context) =
   let args = String.split '/' url in
   RPC_description.describe cctxt
     ~recurse:true args >>=? fun tree ->
@@ -290,7 +290,7 @@ let list url (cctxt : Client_commands.full_context) =
   end else return ()
 
 
-let schema url (cctxt : Client_commands.full_context) =
+let schema url (cctxt : #Client_commands.full_context) =
   let args = String.split '/' url in
   let open RPC_description in
   RPC_description.describe cctxt ~recurse:false args >>=? function
@@ -392,7 +392,7 @@ let call raw_url (cctxt : #Client_commands.full_context) =
       cctxt#message "No service found at this URL\n%!" >>= fun () ->
       return ()
 
-let call_with_json raw_url json (cctxt: Client_commands.full_context) =
+let call_with_json raw_url json (cctxt: #Client_commands.full_context) =
   let uri = Uri.of_string raw_url in
   match Data_encoding.Json.from_string json with
   | Error err ->
@@ -403,7 +403,7 @@ let call_with_json raw_url json (cctxt: Client_commands.full_context) =
       cctxt#generic_json_call `POST ~body uri >>=?
       display_answer cctxt
 
-let call_with_file_or_json url maybe_file (cctxt: Client_commands.full_context) =
+let call_with_file_or_json url maybe_file (cctxt: #Client_commands.full_context) =
   begin
     match TzString.split ':' ~limit:1 maybe_file with
     | [ "file" ; filename] ->
@@ -429,7 +429,7 @@ let commands = [
     ~desc: "List the protocol versions that this client understands."
     no_options
     (fixed [ "list" ; "versions" ])
-    (fun () (cctxt : Client_commands.full_context) ->
+    (fun () (cctxt : #Client_commands.full_context) ->
        Lwt_list.iter_s
          (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
          (Client_commands.get_versions ()) >>= fun () ->

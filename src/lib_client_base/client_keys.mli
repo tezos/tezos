@@ -101,7 +101,7 @@ val sign : sk_locator -> MBytes.t -> Ed25519.Signature.t tzresult Lwt.t
 val append : sk_locator -> MBytes.t -> MBytes.t tzresult Lwt.t
 
 val get_key:
-  Client_commands.full_context ->
+  #Client_commands.full_context ->
   Public_key_hash.t ->
   (string * Ed25519.Public_key.t * sk_locator) tzresult Lwt.t
 
@@ -109,6 +109,6 @@ val get_keys:
   #Client_commands.wallet ->
   (string * Public_key_hash.t * Ed25519.Public_key.t * sk_locator) list tzresult Lwt.t
 
-val force_switch : (bool, Client_commands.full_context) Cli_entries.arg
+val force_switch : unit -> (bool, #Client_commands.full_context) Cli_entries.arg
 
 val commands: unit -> Client_commands.command list

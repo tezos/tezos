@@ -68,7 +68,7 @@ module type Alias = sig
     ('a, (< .. > as 'obj), 'ret) Cli_entries.params ->
     (fresh_param -> 'a, 'obj, 'ret) Cli_entries.params
   val force_switch :
-    (bool, Client_commands.full_context) arg
+    unit -> (bool, #Client_commands.full_context) arg
   val of_fresh :
     #Client_commands.wallet ->
     bool ->
@@ -263,7 +263,7 @@ module Alias = functor (Entity : Entity) -> struct
            end))
       next
 
-  let force_switch =
+  let force_switch () =
     Client_commands.force_switch
       ~doc:("overwrite existing " ^ Entity.name) ()
 

@@ -56,7 +56,7 @@ let tez_sym =
   "\xEA\x9C\xA9"
 
 let string_parameter =
-  parameter (fun (_ : Client_commands.full_context) x -> return x)
+  parameter (fun _ x -> return x)
 
 let init_arg =
   default_arg
