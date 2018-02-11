@@ -81,6 +81,46 @@ module Internal = struct
         ('prefix, 'key) rpath * ('key -> 'params) * ('params -> 'key) ->
       ('prefix, 'params) path
 
+  let rec rsubst0 : type a b. (a, a) rpath -> (b, b) rpath = function
+    | Root -> Root
+    | Static (rpath, name) -> Static (rsubst0 rpath, name)
+    | Dynamic (rpath, arg) -> assert false (* impossible *)
+    | DynamicTail (rpath, arg) -> assert false (* impossible *)
+
+  let subst0 = function
+    | Path rpath -> Path (rsubst0 rpath)
+    | MappedPath _ -> invalid_arg "Resto.Path.subst0"
+
+  let rec rsubst1 : type a b c. (a, a * c) rpath -> (b, b * c) rpath = function
+    | Root -> assert false (* impossible *)
+    | Static (rpath, name) -> Static (rsubst1 rpath, name)
+    | Dynamic (rpath, arg) -> Dynamic (rsubst0 rpath, arg)
+    | DynamicTail (rpath, arg) -> DynamicTail (rsubst0 rpath, arg)
+
+  let subst1 = function
+    | Path rpath -> Path (rsubst1 rpath)
+    | MappedPath _ -> invalid_arg "Resto.Path.subst1"
+
+  let rec rsubst2 : type a b c d. (a, (a * c) * d) rpath -> (b, (b * c) * d) rpath = function
+    | Root -> assert false (* impossible *)
+    | Static (rpath, name) -> Static (rsubst2 rpath, name)
+    | Dynamic (rpath, arg) -> Dynamic (rsubst1 rpath, arg)
+    | DynamicTail (rpath, arg) -> DynamicTail (rsubst1 rpath, arg)
+
+  let subst2 = function
+    | Path rpath -> Path (rsubst2 rpath)
+    | MappedPath _ -> invalid_arg "Resto.Path.subst2"
+
+  let rec rsubst3 : type a b c d e. (a, ((a * c) * d) * e) rpath -> (b, ((b * c) * d) * e) rpath = function
+    | Root -> assert false (* impossible *)
+    | Static (rpath, name) -> Static (rsubst3 rpath, name)
+    | Dynamic (rpath, arg) -> Dynamic (rsubst2 rpath, arg)
+    | DynamicTail (rpath, arg) -> DynamicTail (rsubst2 rpath, arg)
+
+  let subst3 = function
+    | Path rpath -> Path (rsubst3 rpath)
+    | MappedPath _ -> invalid_arg "Resto.Path.subst3"
+
   let from_path x = x
   let to_path x = x
 
@@ -613,6 +653,10 @@ module MakeService(Encoding : ENCODING) = struct
       types = { query ; input ; output ; error } }
 
   let prefix path s = { s with path = Path.prefix path s.path }
+  let subst0 s = { s with path = Internal.subst0 s.path }
+  let subst1 s = { s with path = Internal.subst1 s.path }
+  let subst2 s = { s with path = Internal.subst2 s.path }
+  let subst3 s = { s with path = Internal.subst3 s.path }
 
   let map f g (s : (_,_,_,_,_,_,_) service) =
     { s with path = Path.map f g s.path }

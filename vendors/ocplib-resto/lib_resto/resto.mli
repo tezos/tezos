@@ -344,6 +344,22 @@ module MakeService(Encoding : ENCODING) : sig
     ('meth, 'pr, 'a, 'q, 'i, 'o, 'e) service ->
     ('meth, 'pr, 'b, 'q, 'i, 'o, 'e) service
 
+  val subst0:
+    ([< meth ] as 'm, 'p, 'p, 'q, 'i, 'o, 'e) service ->
+    ('m, 'p2, 'p2, 'q, 'i, 'o, 'e) service
+
+  val subst1:
+    ([< meth ] as 'm, 'p, 'p * 'a, 'q, 'i, 'o, 'e) service ->
+    ('m, 'p2, 'p2 * 'a, 'q, 'i, 'o, 'e) service
+
+  val subst2:
+    ([< meth ] as 'm, 'p, ('p * 'a) * 'b, 'q, 'i, 'o, 'e) service ->
+    ('m, 'p2, ('p2 * 'a) * 'b, 'q, 'i, 'o, 'e) service
+
+  val subst3:
+    ([< meth ] as 'm, 'p, (('p * 'a) * 'b) * 'c, 'q, 'i, 'o, 'e) service ->
+    ('m, 'p2, (('p2 * 'a) * 'b) * 'c, 'q, 'i, 'o, 'e) service
+
   type ('prefix, 'params) description_service =
     ([ `GET ], 'prefix, 'params * string list, Description.request,
      unit, Encoding.schema Description.directory, unit) service
