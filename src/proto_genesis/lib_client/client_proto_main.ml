@@ -13,16 +13,6 @@ let protocol =
   Protocol_hash.of_b58check_exn
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
-let call_service1 rpc_config s block a1 =
-  Client_rpcs.call_service1 rpc_config
-    (s Block_services.S.proto_path) block a1
-
-let call_error_service1 rpc_config s block a1 =
-  call_service1 rpc_config s block a1 >>= function
-  | Ok (Error _ as err) -> Lwt.return (Environment.wrap_error err)
-  | Ok (Ok v) -> return v
-  | Error _ as err -> Lwt.return err
-
 let bake rpc_config ?(timestamp = Time.now ()) block command sk =
   let block = Client_rpcs.last_baked_block block in
   let proto_header = Data_encoding.Binary.to_bytes Data.Command.encoding command in

@@ -10,78 +10,66 @@
 open Proto_alpha
 open Tezos_context
 
-let string_of_errors exns =
-  Format.asprintf "  @[<v>%a@]" pp_print_error exns
-
-let handle_error (cctxt : #Client_commands.logger) = function
-  | Ok res -> Lwt.return res
-  | Error exns ->
-      pp_print_error Format.err_formatter exns ;
-      cctxt#error "%s" "cannot continue"
-
 let call_service0 cctxt s block =
   Client_rpcs.call_service0 cctxt
     (s Block_services.S.proto_path) block
 let call_service1 cctxt s block a1 =
   Client_rpcs.call_service1 cctxt
     (s Block_services.S.proto_path) block a1
-let call_error_service1 cctxt s block a1 =
-  call_service1 cctxt s block a1 >>= function
-  | Ok (Error _ as err) -> Lwt.return (Environment.wrap_error err)
-  | Ok (Ok v) -> return v
-  | Error _ as err -> Lwt.return err
 let call_service2 cctxt s block a1 a2 =
   Client_rpcs.call_service2 cctxt
     (s Block_services.S.proto_path) block a1 a2
-let call_error_service2 cctxt s block a1 a2 =
-  call_service2 cctxt s block a1 a2 >>= function
-  | Ok (Error _ as err) -> Lwt.return (Environment.wrap_error err)
-  | Ok (Ok v) -> return v
+
+let call_opt_service2 cctxt s block a1 a2 =
+  Client_rpcs.call_service2 cctxt
+    (s Block_services.S.proto_path) block a1 a2 >>= function
+  | Ok v -> return (Some v)
+  | Error [RPC_context.Not_found _] -> return None
   | Error _ as err -> Lwt.return err
 
 type block = Block_services.block
 
 let header cctxt block =
-  call_error_service1 cctxt Services.header block ()
+  call_service1 cctxt Services.header block ()
 
 module Header = struct
   let priority cctxt block =
-    call_error_service1 cctxt Services.Header.priority block ()
+    call_service1 cctxt Services.Header.priority block ()
   let seed_nonce_hash cctxt block =
-    call_error_service1 cctxt Services.Header.seed_nonce_hash block ()
+    call_service1 cctxt Services.Header.seed_nonce_hash block ()
 end
 
 module Constants = struct
   let errors cctxt block =
     call_service1 cctxt Services.Constants.errors block ()
   let cycle_length cctxt block =
-    call_error_service1 cctxt Services.Constants.cycle_length block ()
+    call_service1 cctxt Services.Constants.cycle_length block ()
   let voting_period_length cctxt block =
-    call_error_service1 cctxt Services.Constants.voting_period_length block ()
+    call_service1 cctxt Services.Constants.voting_period_length block ()
   let time_before_reward cctxt block =
-    call_error_service1 cctxt Services.Constants.time_before_reward block ()
+    call_service1 cctxt Services.Constants.time_before_reward block ()
   let slot_durations cctxt block =
-    call_error_service1 cctxt Services.Constants.slot_durations block ()
+    call_service1 cctxt Services.Constants.slot_durations block ()
   let first_free_baking_slot cctxt block =
-    call_error_service1 cctxt Services.Constants.first_free_baking_slot block ()
+    call_service1 cctxt Services.Constants.first_free_baking_slot block ()
   let max_signing_slot cctxt block =
-    call_error_service1 cctxt Services.Constants.max_signing_slot block ()
+    call_service1 cctxt Services.Constants.max_signing_slot block ()
   let instructions_per_transaction cctxt block =
-    call_error_service1 cctxt Services.Constants.max_gas block ()
+    call_service1 cctxt Services.Constants.max_gas block ()
   let stamp_threshold cctxt block =
-    call_error_service1 cctxt Services.Constants.proof_of_work_threshold block ()
+    call_service1 cctxt Services.Constants.proof_of_work_threshold block ()
 end
 
 module Context = struct
 
   let level cctxt block =
-    call_error_service1 cctxt Services.Context.level block ()
+    call_service1 cctxt Services.Context.level block ()
 
   let next_level cctxt block =
-    call_error_service1 cctxt Services.Context.next_level block ()
+    call_service1 cctxt Services.Context.next_level block ()
 
   let voting_period_kind cctxt block =
-    call_error_service1 cctxt Services.Context.voting_period_kind block ()
+    call_service1 cctxt Services.Context.voting_period_kind block ()
 
   module Nonce = struct
 
@@ -91,26 +79,26 @@ module Context = struct
       | Forgotten
 
     let get cctxt block level =
-      call_error_service2 cctxt Services.Context.Nonce.get block level ()
+      call_service2 cctxt Services.Context.Nonce.get block level ()
 
     let hash cctxt block =
-      call_error_service1 cctxt Services.Context.Nonce.hash block ()
+      call_service1 cctxt Services.Context.Nonce.hash block ()
 
   end
 
   module Key = struct
 
     let get cctxt block pk_h =
-      call_error_service2 cctxt Services.Context.Key.get block pk_h ()
+      call_service2 cctxt Services.Context.Key.get block pk_h ()
 
     let list cctxt block =
-      call_error_service1 cctxt Services.Context.Key.list block ()
+      call_service1 cctxt Services.Context.Key.list block ()
 
   end
 
   module Contract = struct
     let list cctxt b =
-      call_error_service1 cctxt Services.Context.Contract.list b ()
+      call_service1 cctxt Services.Context.Contract.list b ()
     type info = Services.Context.Contract.info = {
       manager: public_key_hash ;
       balance: Tez.t ;
@@ -120,23 +108,23 @@ module Context = struct
       counter: int32 ;
     }
     let get cctxt b c =
-      call_error_service2 cctxt Services.Context.Contract.get b c ()
+      call_service2 cctxt Services.Context.Contract.get b c ()
     let balance cctxt b c =
-      call_error_service2 cctxt Services.Context.Contract.balance b c ()
+      call_service2 cctxt Services.Context.Contract.balance b c ()
     let manager cctxt b c =
-      call_error_service2 cctxt Services.Context.Contract.manager b c ()
+      call_service2 cctxt Services.Context.Contract.manager b c ()
     let delegate cctxt b c =
-      call_error_service2 cctxt Services.Context.Contract.delegate b c ()
+      call_opt_service2 cctxt Services.Context.Contract.delegate b c ()
     let counter cctxt b c =
-      call_error_service2 cctxt Services.Context.Contract.counter b c ()
+      call_service2 cctxt Services.Context.Contract.counter b c ()
     let spendable cctxt b c =
-      call_error_service2 cctxt Services.Context.Contract.spendable b c ()
+      call_service2 cctxt Services.Context.Contract.spendable b c ()
     let delegatable cctxt b c =
-      call_error_service2 cctxt Services.Context.Contract.delegatable b c ()
+      call_service2 cctxt Services.Context.Contract.delegatable b c ()
     let script cctxt b c =
-      call_error_service2 cctxt Services.Context.Contract.script b c ()
+      call_opt_service2 cctxt Services.Context.Contract.script b c ()
     let storage cctxt b c =
-      call_error_service2 cctxt Services.Context.Contract.storage b c ()
+      call_opt_service2 cctxt Services.Context.Contract.storage b c ()
   end
 
 end
@@ -144,45 +132,45 @@ end
 module Helpers = struct
 
   let minimal_time cctxt block ?prio () =
-    call_error_service1 cctxt Services.Helpers.minimal_timestamp block prio
+    call_service1 cctxt Services.Helpers.minimal_timestamp block prio
 
   let typecheck_code cctxt =
-    call_error_service1 cctxt Services.Helpers.typecheck_code
+    call_service1 cctxt Services.Helpers.typecheck_code
 
   let apply_operation cctxt block pred_block hash forged_operation signature =
-    call_error_service1 cctxt Services.Helpers.apply_operation
+    call_service1 cctxt Services.Helpers.apply_operation
       block (pred_block, hash, forged_operation, signature)
 
   let run_code cctxt block code (storage, input, amount) =
-    call_error_service1 cctxt Services.Helpers.run_code
+    call_service1 cctxt Services.Helpers.run_code
       block (code, storage, input, amount, None, None)
 
   let trace_code cctxt block code (storage, input, amount) =
-    call_error_service1 cctxt Services.Helpers.trace_code
+    call_service1 cctxt Services.Helpers.trace_code
       block (code, storage, input, amount, None, None)
 
   let typecheck_data cctxt =
-    call_error_service1 cctxt Services.Helpers.typecheck_data
+    call_service1 cctxt Services.Helpers.typecheck_data
 
   let hash_data cctxt =
-    call_error_service1 cctxt Services.Helpers.hash_data
+    call_service1 cctxt Services.Helpers.hash_data
 
   let level cctxt block ?offset lvl =
-    call_error_service2 cctxt Services.Helpers.level block lvl offset
+    call_service2 cctxt Services.Helpers.level block lvl offset
 
   let levels cctxt block cycle =
-    call_error_service2 cctxt Services.Helpers.levels block cycle ()
+    call_service2 cctxt Services.Helpers.levels block cycle ()
 
   module Rights = struct
     type baking_slot = Raw_level.t * int * Time.t
     type endorsement_slot = Raw_level.t * int
     let baking_rights_for_delegate cctxt
         b c ?max_priority ?first_level ?last_level () =
-      call_error_service2 cctxt Services.Helpers.Rights.baking_rights_for_delegate
+      call_service2 cctxt Services.Helpers.Rights.baking_rights_for_delegate
         b c (max_priority, first_level, last_level)
     let endorsement_rights_for_delegate cctxt
         b c ?max_priority ?first_level ?last_level () =
-      call_error_service2 cctxt Services.Helpers.Rights.endorsement_rights_for_delegate
+      call_service2 cctxt Services.Helpers.Rights.endorsement_rights_for_delegate
         b c (max_priority, first_level, last_level)
   end
 
@@ -194,7 +182,7 @@ module Helpers = struct
         let ops =
           Manager_operations { source ; public_key = sourcePubKey ;
                                counter ; operations ; fee } in
-        (call_error_service1 cctxt Services.Helpers.Forge.operations block
+        (call_service1 cctxt Services.Helpers.Forge.operations block
            ({ branch }, Sourced_operations ops))
       let transaction cctxt
           block ~branch ~source ?sourcePubKey ~counter
@@ -226,7 +214,7 @@ module Helpers = struct
       let operations cctxt
           block ~branch ~source operations =
         let ops = Delegate_operations { source ; operations } in
-        (call_error_service1 cctxt Services.Helpers.Forge.operations block
+        (call_service1 cctxt Services.Helpers.Forge.operations block
            ({ branch }, Sourced_operations ops))
       let endorsement cctxt
           b ~branch ~source ~block ~slot () =
@@ -245,7 +233,7 @@ module Helpers = struct
       let operation cctxt
           block ~branch operation =
         let op = Dictator_operation operation in
-        (call_error_service1 cctxt Services.Helpers.Forge.operations block
+        (call_service1 cctxt Services.Helpers.Forge.operations block
            ({ branch }, Sourced_operations op))
       let activate cctxt
           b ~branch hash =
@@ -256,7 +244,7 @@ module Helpers = struct
     end
     module Anonymous = struct
       let operations cctxt block ~branch operations =
-        (call_error_service1 cctxt Services.Helpers.Forge.operations block
+        (call_service1 cctxt Services.Helpers.Forge.operations block
            ({ branch }, Anonymous_operations operations))
       let seed_nonce_revelation cctxt
           block ~branch ~level ~nonce () =
@@ -273,16 +261,16 @@ module Helpers = struct
         block
         ~priority ~seed_nonce_hash
         ?(proof_of_work_nonce = empty_proof_of_work_nonce) () =
-      call_error_service1 cctxt Services.Helpers.Forge.block_proto_header
+      call_service1 cctxt Services.Helpers.Forge.block_proto_header
         block (priority, seed_nonce_hash, proof_of_work_nonce)
   end
 
   module Parse = struct
     let operations cctxt block ?check operations =
-      call_error_service1 cctxt
+      call_service1 cctxt
         Services.Helpers.Parse.operations block (operations, check)
     let block cctxt block shell proto =
-      call_error_service1 cctxt
+      call_service1 cctxt
         Services.Helpers.Parse.block block
         ({ shell ; proto } : Block_header.raw)
   end
@@ -292,8 +280,8 @@ end
 (* raw_level * int * timestamp option *)
 (* let baking_possibilities *)
 (* b c ?max_priority ?first_level ?last_level () = *)
-(* call_error_service2 Services.Helpers.Context.Contract.baking_possibilities *)
+(* call_service2 Services.Helpers.Context.Contract.baking_possibilities *)
 (* b c (max_priority, first_level, last_level) *)
 (* (\* let endorsement_possibilities b c ?max_priority ?first_level ?last_level () = *\) *)
-(* call_error_service2 Services.Helpers.Context.Contract.endorsement_possibilities *)
+(* call_service2 Services.Helpers.Context.Contract.endorsement_possibilities *)
 (* b c (max_priority, first_level, last_level) *)

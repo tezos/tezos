@@ -161,10 +161,10 @@ let check_public_key cctxt block ?src_pk src_pk_hash =
       begin
         match src_pk with
         | None ->
-            let exn = Client_proto_rpcs.string_of_errors errors in
-            failwith "Unknown public key\n%s" exn
+            failwith "Unknown public key@ %a" pp_print_error errors
         | Some key ->
             may_check_key src_pk src_pk_hash >>=? fun () ->
             return (Some key)
       end
   | Ok _ -> return None
+

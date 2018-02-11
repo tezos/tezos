@@ -7,30 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let error_encoding =
-  let open Data_encoding in
-  describe
-    ~description:
-      "The full list of error is available with \
-       the global RPC `/errors`"
-    (conv
-       (fun exn -> `A (List.map json_of_error exn))
-       (function `A exns -> List.map error_of_json exns | _ -> [])
-       json)
-
-let wrap_tzerror encoding =
-  let open Data_encoding in
-  union [
-    case (Tag 0)
-      (obj1 (req "ok" encoding))
-      (function Ok x -> Some x | _ -> None)
-      (fun x -> Ok x) ;
-    case (Tag 1)
-      (obj1 (req "error" error_encoding))
-      (function Error x -> Some x | _ -> None)
-      (fun x -> Error x) ;
-  ]
-
 module Forge = struct
   let block custom_root =
     let open Data_encoding in
@@ -71,5 +47,5 @@ let rpc_services : Updater.rpc_context RPC_directory.t =
                       timestamp ; fitness ; validation_passes = 0 ;
                       operations_hash ; context } in
         let bytes = Data.Command.forge shell command in
-        RPC_answer.return bytes) in
+        return bytes) in
   dir

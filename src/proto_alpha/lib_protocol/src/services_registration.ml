@@ -32,29 +32,30 @@ let register0_fullctxt s f =
   rpc_services :=
     RPC_directory.register !rpc_services (s RPC_path.open_root)
       (fun ctxt q () ->
-         ( rpc_init ctxt >>=? fun ctxt ->
-           f ctxt q) >>= RPC_answer.return)
+         rpc_init ctxt >>=? fun ctxt ->
+         f ctxt q)
 let register0 s f = register0_fullctxt s (fun { context ; _ } -> f context)
 
 let register1_fullctxt s f =
   rpc_services :=
     RPC_directory.register !rpc_services (s RPC_path.open_root)
       (fun ctxt q arg ->
-         ( rpc_init ctxt >>=? fun ctxt ->
-           f ctxt q arg ) >>= RPC_answer.return)
+         rpc_init ctxt >>=? fun ctxt ->
+         f ctxt q arg )
 let register1 s f = register1_fullctxt s (fun { context ; _ } x -> f context x)
 let register1_noctxt s f =
   rpc_services :=
     RPC_directory.register !rpc_services (s RPC_path.open_root)
-      (fun _ q arg -> f q arg >>= RPC_answer.return)
+      (fun _ q arg -> f q arg)
 
 let register2_fullctxt s f =
   rpc_services :=
     RPC_directory.register !rpc_services (s RPC_path.open_root)
       (fun (ctxt, arg1) q arg2 ->
-         ( rpc_init ctxt >>=? fun ctxt ->
-           f ctxt q arg1 arg2 ) >>= RPC_answer.return)
-let register2 s f = register2_fullctxt s (fun { context ; _ } q x y -> f context q x y)
+         rpc_init ctxt >>=? fun ctxt ->
+         f ctxt q arg1 arg2)
+let register2 s f =
+  register2_fullctxt s (fun { context ; _ } q x y -> f context q x y)
 
 
 (*-- Operations --------------------------------------------------------------*)
@@ -140,7 +141,7 @@ let () =
 let () =
   register1_noctxt Services.Constants.errors
     (fun () () ->
-       Lwt.return (Data_encoding.Json.(schema error_encoding)))
+       return (Data_encoding.Json.(schema error_encoding)))
 
 (*-- Context -----------------------------------------------------------------*)
 
@@ -215,19 +216,23 @@ let () =
     rpc_services :=
       RPC_directory.register !rpc_services (s RPC_path.open_root)
         (fun (ctxt, contract) () arg ->
-           ( rpc_init ctxt >>=? fun { context = ctxt ; _ } ->
-             Contract.exists ctxt contract >>=? function
-             | true -> f ctxt contract arg
-             | false -> raise Not_found ) >>= RPC_answer.return) in
+           rpc_init ctxt >>=? fun { context = ctxt ; _ } ->
+           Contract.exists ctxt contract >>=? function
+           | true -> f ctxt contract arg
+           | false -> raise Not_found) in
   let register2' s f = register2 s (fun ctxt a1 () -> f ctxt a1) in
+  let register2'' s f =
+    register2 s (fun ctxt a1 () -> f ctxt a1 >>=? function
+      | None -> raise Not_found
+      | Some v -> return v) in
   register2' Services.Context.Contract.balance Contract.get_balance ;
   register2' Services.Context.Contract.manager Contract.get_manager ;
-  register2' Services.Context.Contract.delegate Contract.get_delegate_opt ;
+  register2'' Services.Context.Contract.delegate Contract.get_delegate_opt ;
   register2' Services.Context.Contract.counter Contract.get_counter ;
   register2' Services.Context.Contract.spendable Contract.is_spendable ;
   register2' Services.Context.Contract.delegatable Contract.is_delegatable ;
-  register2' Services.Context.Contract.script Contract.get_script ;
-  register2' Services.Context.Contract.storage Contract.get_storage ;
+  register2'' Services.Context.Contract.script Contract.get_script ;
+  register2'' Services.Context.Contract.storage Contract.get_storage ;
   register2' Services.Context.Contract.get (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Contract.get_manager ctxt contract >>=? fun manager ->
