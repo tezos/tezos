@@ -38,7 +38,7 @@ module Shorthands = struct
       ~fitness:res.validation.fitness
 
   let get_balance_res (account:Account.t) (result:Block.result) =
-    let open Proto_alpha.Environment.Error_monad in
+    let open Alpha_environment.Error_monad in
     get_tc_full result >>=? fun tc ->
     Tezos_context.Contract.get_balance tc account.contract
 

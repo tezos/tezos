@@ -368,13 +368,14 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                 print_ty (None, tyb)
           | Reject _ -> Format.fprintf ppf "Script reached FAIL instruction"
           | Overflow _ -> Format.fprintf ppf "Unexpected arithmetic overflow"
-          | err -> Format.fprintf ppf "%a" Environment.Error_monad.pp err
+          | err -> Format.fprintf ppf "%a" Alpha_environment.Error_monad.pp err
         end ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest in
   Format.fprintf ppf "@[<v 0>%a@]"
     (Format.pp_print_list
        (fun ppf -> function
-          | Environment.Ecoproto_error errs -> print_trace (fun _ -> None) errs
+          | Alpha_environment.Ecoproto_error errs ->
+              print_trace (fun _ -> None) errs
           | err -> pp ppf err))
     errs

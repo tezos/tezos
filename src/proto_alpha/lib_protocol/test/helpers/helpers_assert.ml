@@ -40,7 +40,7 @@ module Assert = struct
 
 end
 
-let wrap_result = Proto_alpha.Environment.wrap_error
+let wrap_result = Alpha_environment.wrap_error
 
 let wrap = fun x -> Lwt.return @@ wrap_result x
 
@@ -135,7 +135,7 @@ let equal_cents_balance ~tc ?msg (contract, cents_balance) =
     (contract, Helpers_cast.cents_of_int cents_balance)
 
 let ecoproto_error f = function
-  | Proto_alpha.Environment.Ecoproto_error errors ->
+  | Alpha_environment.Ecoproto_error errors ->
       List.exists f errors
   | _ -> false
 

@@ -99,8 +99,8 @@ let report_errors ppf (parsed, errs) =
             fst (List.assoc oloc parsed.expansion_table) in
           let errs, loc =
             match err with
-            | Environment.Ecoproto_error (top :: errs) ->
-                [ Environment.Ecoproto_error (top :: errs) ],
+            | Alpha_environment.Ecoproto_error (top :: errs) ->
+                [ Alpha_environment.Ecoproto_error (top :: errs) ],
                 begin match top with
                   | Ill_typed_contract (expr, _)
                   | Ill_typed_data (_, expr, _) ->

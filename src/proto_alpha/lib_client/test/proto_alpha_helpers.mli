@@ -166,12 +166,12 @@ module Assert : sig
   val failed_to_preapply:
     msg:string ->
     ?op:Tezos_base.Operation.t ->
-    (Environment.Error_monad.error ->
+    (Alpha_environment.Error_monad.error ->
      bool) ->
     'a tzresult -> unit
 
   val ecoproto_error:
-    (Environment.Error_monad.error -> bool) ->
+    (Alpha_environment.Error_monad.error -> bool) ->
     error -> bool
 
   val generic_economic_error : msg:string -> 'a tzresult -> unit

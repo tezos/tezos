@@ -12,11 +12,11 @@ module Context =
   Tezos_protocol_environment_client.Mem_context
 module Updater =
   Tezos_protocol_environment_client.Fake_updater.Make(Context)
-module Environment =
+module Alpha_environment =
   Tezos_base.Protocol_environment.MakeV1(Name)(Context)(Updater)()
-include Tezos_protocol_alpha.Functor.Make(Environment)
+include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
 
-module Error_monad = Environment.Error_monad
+module Error_monad = Alpha_environment.Error_monad
 type proto_error = Error_monad.error
 type 'a proto_tzresult = 'a Error_monad.tzresult
 

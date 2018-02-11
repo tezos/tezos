@@ -313,7 +313,7 @@ module Assert = struct
     equal_pkh ~msg expected_delegate actual_delegate
 
   let ecoproto_error f = function
-    | Environment.Ecoproto_error errors ->
+    | Alpha_environment.Ecoproto_error errors ->
         List.exists f errors
     | _ -> false
 
@@ -451,7 +451,7 @@ module Baking = struct
   let endorsement_reward block =
     Client_proto_rpcs.Header.priority !rpc_ctxt block >>=? fun prio ->
     Baking.endorsement_reward ~block_priority:prio >|=
-    Environment.wrap_error >>|?
+    Alpha_environment.wrap_error >>|?
     Tez.to_mutez
 
 end

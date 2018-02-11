@@ -8,5 +8,5 @@
 (**************************************************************************)
 
 module Name = struct let name = "genesis" end
-module Environment = Tezos_protocol_environment_client.Fake.Make(Name)()
-include Tezos_protocol_genesis.Functor.Make(Environment)
+module Genesis_environment = Tezos_protocol_environment_client.Fake.Make(Name)()
+include Tezos_protocol_genesis.Functor.Make(Genesis_environment)
