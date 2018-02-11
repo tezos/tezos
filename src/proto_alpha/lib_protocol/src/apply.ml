@@ -9,7 +9,7 @@
 
 (** Tezos Protocol Implementation - Main Entry Points *)
 
-open Tezos_context
+open Alpha_context
 
 type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Temporary *)
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)

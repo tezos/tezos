@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 (** Facilities to deal with accounts , bootstrap accounts and make new
     accounts *)

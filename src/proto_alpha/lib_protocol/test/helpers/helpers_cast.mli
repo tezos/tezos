@@ -7,11 +7,11 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_alpha.Tezos_context
+open Proto_alpha.Alpha_context
 
 exception Tez_error
 
-(** Common casts between Tezos_context types *)
+(** Common casts between Alpha_context types *)
 
 val tez_of_int : int -> Tez.tez
 val cents_of_int : int -> Tez.tez

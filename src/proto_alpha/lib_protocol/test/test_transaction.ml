@@ -65,7 +65,7 @@ let test_basic (): unit tzresult Lwt.t =
   (* Check sender/receiver balance post transaction *)
   transfer (account_a, account_b, 1000) >>=
   Assert.ok_contract ~msg: __LOC__ >>=? fun (_,tc) ->
-  Proto_alpha.Tezos_context.Contract.get_balance tc account_a.contract >>=? fun _balance ->
+  Proto_alpha.Alpha_context.Contract.get_balance tc account_a.contract >>=? fun _balance ->
   Assert.equal_cents_balance ~msg: __LOC__ ~tc (account_a.contract, init_amount * 100 - 1000 - 10) >>=? fun () ->
   Assert.equal_cents_balance ~msg: __LOC__ ~tc (account_b.contract, 1001000) >>=? fun () ->
   debug "Transfer balances" ;

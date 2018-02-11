@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 type operation = {
   hash: Operation_hash.t ;

@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 open Proto_alpha_helpers
 
 let demo_protocol =

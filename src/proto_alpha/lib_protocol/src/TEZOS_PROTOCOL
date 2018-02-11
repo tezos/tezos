@@ -43,7 +43,7 @@
         "Init_storage",
         "Public_key_storage",
 
-        "Tezos_context",
+        "Alpha_context",
 
         "Script_typed_ir",
         "Gas",

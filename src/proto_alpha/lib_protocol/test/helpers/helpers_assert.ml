@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 module Assert = struct
   let fail expected given msg =

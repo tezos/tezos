@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 let inject_seed_nonce_revelation rpc_config block ?async nonces =
   let operations =

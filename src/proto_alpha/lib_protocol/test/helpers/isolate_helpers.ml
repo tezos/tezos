@@ -24,14 +24,14 @@ module Script = Helpers_script
 module Shorthands = struct
 
   let to_tc_full ctxt level fitness =
-    Tezos_context.init
+    Alpha_context.init
       ctxt
       ~level
       ~fitness
       ~timestamp:(Time.now())
 
   let get_tc_full (res:Block.result) =
-    Tezos_context.init
+    Alpha_context.init
       res.validation.context
       ~level:res.level
       ~timestamp:res.tezos_header.shell.timestamp
@@ -40,7 +40,7 @@ module Shorthands = struct
   let get_balance_res (account:Account.t) (result:Block.result) =
     let open Alpha_environment.Error_monad in
     get_tc_full result >>=? fun tc ->
-    Tezos_context.Contract.get_balance tc account.contract
+    Alpha_context.Contract.get_balance tc account.contract
 
   let chain_empty_block (result:Block.result) =
     Block.empty

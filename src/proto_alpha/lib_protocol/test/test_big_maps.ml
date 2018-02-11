@@ -19,14 +19,14 @@ module Assert = Helpers.Assert
 let (>>??) = Helpers.Assert.(>>??)
 let (>>=??) = Helpers.Assert.(>>=??)
 
-let parse_expr s : Proto_alpha.Tezos_context.Script.expr tzresult =
+let parse_expr s : Proto_alpha.Alpha_context.Script.expr tzresult =
   Micheline_parser.no_parsing_error (Michelson_v1_parser.parse_expression s) >>? fun parsed ->
   ok parsed.expanded
 
-let parse_script code_str storage_str : Proto_alpha.Tezos_context.Script.t tzresult =
+let parse_script code_str storage_str : Proto_alpha.Alpha_context.Script.t tzresult =
   parse_expr code_str >>? fun code ->
   parse_expr storage_str >>? fun storage ->
-  ok { Proto_alpha.Tezos_context.Script.code ; storage }
+  ok { Proto_alpha.Alpha_context.Script.code ; storage }
 
 let code = {|
 { parameter (list (pair string int)) ;
@@ -47,7 +47,7 @@ let expect_big_map tc contract print_key key_type print_data data_type contents 
   iter_p
     (fun (n, exp) ->
        let key = Proto_alpha.Script_ir_translator.hash_data key_type n in
-       Proto_alpha.Tezos_context.Contract.Big_map_storage.get_opt tc contract key >>=? fun data ->
+       Proto_alpha.Alpha_context.Contract.Big_map_storage.get_opt tc contract key >>=? fun data ->
        match data, exp with
        | None, None ->
            debug " - big_map[%a] is not defined (ok)" print_key n ;
@@ -86,9 +86,9 @@ let main () =
     expect_big_map tc contract
       (fun ppf k -> Format.fprintf ppf "%s" k)
       Proto_alpha.Script_typed_ir.String_t
-      (fun ppf n -> Format.fprintf ppf "%s" (Proto_alpha.Tezos_context.Script_int.to_string n))
+      (fun ppf n -> Format.fprintf ppf "%s" (Proto_alpha.Alpha_context.Script_int.to_string n))
       Proto_alpha.Script_typed_ir.Int_t
-      (List.map (fun (n, v) -> (n, Option.map ~f:Proto_alpha.Tezos_context.Script_int.of_int v)) exp) in
+      (List.map (fun (n, v) -> (n, Option.map ~f:Proto_alpha.Alpha_context.Script_int.of_int v)) exp) in
   expect_big_map tc
     [ "A", Some 1 ; "B", Some 2 ; "C", None ; "D", None ] >>=?? fun () ->
   debug "initial big map is ok" ;

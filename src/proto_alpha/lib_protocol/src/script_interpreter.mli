@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_context
+open Alpha_context
 
 type error += Overflow of Script.location
 type error += Reject of Script.location
@@ -18,7 +18,7 @@ val dummy_storage_fee : Tez.t
 
 val execute:
   Contract.origination_nonce ->
-  Contract.t -> Contract.t -> Tezos_context.t ->
+  Contract.t -> Contract.t -> Alpha_context.t ->
   Script.t -> Tez.t ->
   Script.expr -> Gas.t ->
   (Script.expr * Script.expr * Gas.t * context * Contract.origination_nonce *
@@ -26,7 +26,7 @@ val execute:
 
 val trace:
   Contract.origination_nonce ->
-  Contract.t -> Contract.t -> Tezos_context.t ->
+  Contract.t -> Contract.t -> Alpha_context.t ->
   Script.t -> Tez.t ->
   Script.expr -> Gas.t ->
   ((Script.expr * Script.expr * Gas.t * context * Contract.origination_nonce * Script_typed_ir.ex_big_map option) *

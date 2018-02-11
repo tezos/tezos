@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 val init :
   ?exe:string ->
@@ -19,7 +19,7 @@ val init :
     forked Tezos node and the block info of the block from where the
     tests will begin. *)
 
-val level : Block_services.block -> Tezos_context.Level.t tzresult Lwt.t
+val level : Block_services.block -> Alpha_context.Level.t tzresult Lwt.t
 
 module Account : sig
 

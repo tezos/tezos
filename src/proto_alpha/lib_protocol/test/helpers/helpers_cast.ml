@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_alpha.Tezos_context
+open Proto_alpha.Alpha_context
 
 exception Tez_error
 

@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 (** Functions building operations *)
 
@@ -46,7 +46,7 @@ val origination_full :
   proto_operation proto_tzresult Lwt.t
 
 val transaction_full :
-  ?fee:Tez.tez -> ?parameters:Proto_alpha.Tezos_context.Script.expr -> Helpers_account.t -> Contract.contract -> Tez.t ->
+  ?fee:Tez.tez -> ?parameters:Proto_alpha.Alpha_context.Script.expr -> Helpers_account.t -> Contract.contract -> Tez.t ->
   Alpha_environment.Context.t -> proto_operation proto_tzresult Lwt.t
 
 val delegate :

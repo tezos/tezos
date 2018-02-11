@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_alpha.Tezos_context
+open Proto_alpha.Alpha_context
 open Helpers_assert
 
 let endorsement_rights ~tc () =

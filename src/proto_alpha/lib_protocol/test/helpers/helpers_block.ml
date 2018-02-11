@@ -12,7 +12,7 @@ open Error_monad
 
 type shell_header = Block_header.shell_header
 type tezos_header = Block_header.t
-type protocol_header = Proto_alpha.Tezos_context.Block_header.proto_header
+type protocol_header = Proto_alpha.Alpha_context.Block_header.proto_header
 type operation_header = Operation.shell_header
 
 type init_block = {
@@ -33,7 +33,7 @@ type result = {
   hash : Block_hash.t ;
   level : Int32.t ;
   validation : Updater.validation_result ;
-  tezos_context : Proto_alpha.Tezos_context.t
+  tezos_context : Proto_alpha.Alpha_context.t
 }
 
 let get_op_header_res (res : result) : operation_header = {
@@ -43,7 +43,7 @@ let get_op_header_res (res : result) : operation_header = {
 let get_proto_header priority : protocol_header = {
   priority ;
   proof_of_work_nonce = Helpers_crypto.generate_proof_of_work_nonce ();
-  seed_nonce_hash = Proto_alpha.Tezos_context.Nonce.hash @@ Helpers_crypto.generate_seed_nonce ()
+  seed_nonce_hash = Proto_alpha.Alpha_context.Nonce.hash @@ Helpers_crypto.generate_seed_nonce ()
 }
 
 let get_op_header pbh : operation_header = {
@@ -64,7 +64,7 @@ let init (pred_shell_header : shell_header) pred_block_hash
   let (sourced_operations, operation_hashs) = List.split src_ops_hashs in
   let proto_header = get_proto_header priority in
   let proto_header_bytes =
-    Proto_alpha.Tezos_context.Block_header.forge_unsigned_proto_header
+    Proto_alpha.Alpha_context.Block_header.forge_unsigned_proto_header
       proto_header
   in
   let timestamp =
@@ -127,7 +127,7 @@ let get_header_hash
     shell = shell_header ;
     proto = init_block.proto_header_bytes
   } in
-  Proto_alpha.Tezos_context.init
+  Proto_alpha.Alpha_context.init
     validation_result.context
     ~level
     ~timestamp

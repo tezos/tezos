@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 let bake_block (cctxt : #Client_commands.full_context) block
     ?force ?max_priority ?(free_baking=false) ?src_sk delegate =

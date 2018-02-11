@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 val fail : string -> string -> string -> 'a
 (** Raises [Failed] with the passed parameters

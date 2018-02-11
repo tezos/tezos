@@ -10,7 +10,7 @@
 (** Functions to build and apply operations *)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 val operation :
   tc:context -> ?baker:Helpers_account.t -> ?src:Helpers_account.t ->

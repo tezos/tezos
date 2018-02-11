@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 val inject_seed_nonce_revelation:
   #RPC_context.simple ->

@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 type operation = {
   hash: Operation_hash.t ;
@@ -43,7 +43,7 @@ type valid_endorsement = {
 
 (*
 let filter_valid_endorsement cctxt ({ hash ; content } : operation) =
-  let open Tezos_context in
+  let open Alpha_context in
   match content with
   | None
   | Some { contents = Anonymous_operations _ }

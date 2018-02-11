@@ -37,7 +37,7 @@ let main () =
   } in
   let proto_header =
     Data_encoding.Binary.to_bytes
-      Tezos_context.Block_header.proto_header_encoding
+      Alpha_context.Block_header.proto_header_encoding
       (Helpers_block.get_proto_header 0) in
   let tezos_header = { Block_header.shell = header ; proto = proto_header } in
   Proto_alpha.Main.begin_construction
@@ -51,7 +51,7 @@ let main () =
     () >>=? fun vstate ->
   let hash = Block_header.hash tezos_header in
   Proto_alpha.Main.finalize_block vstate >>=? fun validation ->
-  Tezos_context.init
+  Alpha_context.init
     ~level: (Int32.succ header.level)
     ~timestamp: header.timestamp
     ~fitness: header.fitness

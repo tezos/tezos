@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Data_encoding
-open Tezos_context
+open Alpha_context
 
 let operations custom_root =
   RPC_service.post_service
@@ -617,7 +617,7 @@ module Helpers = struct
              (req "nonce_hash" Nonce_hash.encoding)
              (dft "proof_of_work_nonce"
                 (Fixed.bytes
-                   Tezos_context.Constants.proof_of_work_nonce_size)
+                   Alpha_context.Constants.proof_of_work_nonce_size)
                 empty_proof_of_work_nonce))
         ~output: (obj1 (req "proto_header" bytes))
         RPC_path.(custom_root / "helpers" / "forge" / "block_proto_header")

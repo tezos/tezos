@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_context
+open Alpha_context
 open Script
 open Script_typed_ir
 

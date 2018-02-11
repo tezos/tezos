@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 open Error_monad
 
 let name = "Isolate Endorsement"
@@ -46,7 +46,7 @@ let test_wrong_delegate endorse_a starting_block =
 let test_endorsement_payment () =
   Init.main () >>=? fun root ->
   let bootstrap_accounts = Account.bootstrap_accounts in
-  let open Proto_alpha.Tezos_context in
+  let open Proto_alpha.Alpha_context in
   get_tc_full root >>=? fun tc ->
   let level = Level.succ tc @@ Level.current tc in
   Proto_alpha.Services_registration.endorsement_rights tc level None >>=? fun (_, endorsers) ->

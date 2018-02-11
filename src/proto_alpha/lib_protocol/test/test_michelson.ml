@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 let name = "Isolate Michelson"
 module Logger = Logging.Make(struct let name = name end)
@@ -25,15 +25,15 @@ open Shorthands
 let (>>??) = Assert.(>>??)
 let (>>=??) = Assert.(>>=??)
 
-let parse_param s : Proto_alpha.Tezos_context.Script.expr =
+let parse_param s : Proto_alpha.Alpha_context.Script.expr =
   let (parsed, _) = Michelson_v1_parser.parse_expression s in
   parsed.expanded
 
 
-let parse_script code_str storage_str : Proto_alpha.Tezos_context.Script.t =
+let parse_script code_str storage_str : Proto_alpha.Alpha_context.Script.t =
   let code = parse_param code_str in
   let storage = parse_param storage_str in
-  let return: Proto_alpha.Tezos_context.Script.t = {code ; storage} in
+  let return: Proto_alpha.Alpha_context.Script.t = {code ; storage} in
   return
 
 
@@ -291,7 +291,7 @@ let test_example () =
 
   let bootstrap_0 = List.nth Account.bootstrap_accounts 0 in
   get_balance_res bootstrap_0 sb >>=?? fun _balance ->
-  let amount = Proto_alpha.Tezos_context.Tez.to_string @@ Cast.cents_of_int Script.init_amount in
+  let amount = Proto_alpha.Alpha_context.Tez.to_string @@ Cast.cents_of_int Script.init_amount in
   (*  Get the current balance of the contract *)
   test_output ~location: __LOC__ "balance" "Unit" "Unit" ("\"" ^ amount ^ "\"") >>=? fun _ ->
 
@@ -435,7 +435,7 @@ let test_example () =
   test_contract ~tc "create_contract" account_str account_str >>=? fun (cs, tc) ->
   Assert.equal_int 1 @@ List.length cs ;
   let contract = List.hd cs in
-  Proto_alpha.Tezos_context.Contract.get_script tc contract >>=?? fun res ->
+  Proto_alpha.Alpha_context.Contract.get_script tc contract >>=?? fun res ->
   let script = Option.unopt_exn (Failure "get_script") res in
   Script.execute_code_pred ~tc sb script (parse_param "\"abc\"") >>=?? fun (_, ret, _, _, _, _) ->
   Assert.equal_string ~msg: __LOC__ "\"abc\"" @@ string_of_canon ret ;

@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 open Logging.Client.Baking
 
@@ -28,7 +28,7 @@ let forge_block_header
   let rec loop () =
     let proof_of_work_nonce = generate_proof_of_work_nonce () in
     let unsigned_header =
-      Tezos_context.Block_header.forge_unsigned
+      Alpha_context.Block_header.forge_unsigned
         shell { priority ; seed_nonce_hash ; proof_of_work_nonce } in
     Client_keys.append delegate_sk unsigned_header >>=? fun signed_header ->
     let block_hash = Block_hash.hash_bytes [signed_header] in
@@ -43,7 +43,7 @@ let empty_proof_of_work_nonce =
     (String.make Constants_repr.proof_of_work_nonce_size  '\000')
 
 let forge_faked_proto_header ~priority ~seed_nonce_hash =
-  Tezos_context.Block_header.forge_unsigned_proto_header
+  Alpha_context.Block_header.forge_unsigned_proto_header
     { priority ; seed_nonce_hash ;
       proof_of_work_nonce = empty_proof_of_work_nonce }
 

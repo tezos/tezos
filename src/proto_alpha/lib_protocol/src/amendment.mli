@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_context
+open Alpha_context
 
 val may_start_new_voting_cycle:
   context -> context tzresult Lwt.t

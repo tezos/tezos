@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_context
+open Alpha_context
 
 (* FIXME: this really is a preliminary estimation of costs,
    everything in this file needs to be tweaked and proofread. *)

@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 val generate_seed_nonce: unit -> Nonce.t
 (** [generate_seed_nonce ()] is a random nonce that is typically used

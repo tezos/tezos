@@ -30,7 +30,7 @@ These layers follow the linking order: the first modules are the tower’s
 foundation that talk to the raw key-value store, and going forward in
 the module list means climbing up the abstraction tower.
 
-The big abstraction barrier: ``Tezos_context``
+The big abstraction barrier: ``Alpha_context``
 ----------------------------------------------
 
 the proof-of-stake algorithm, as described in the white paper, relies on
@@ -43,31 +43,31 @@ The proof-of-stake is thus implemented over a generic key-value store
 whose keys and associated binary data must implement the abstract
 structure.
 
-The ``Tezos_context`` module enforces the separation of concerns
+The ``Alpha_context`` module enforces the separation of concerns
 between, on one hand, mapping the abstract state of the ledger to the
 concrete structure of the key-value store, and, on the other hand,
 implementing the proof-of-stake algorithm over this state.
 
-In more practical terms, ``Tezos_context`` defines a type ``t`` that
+In more practical terms, ``Alpha_context`` defines a type ``t`` that
 represents a state of the ledger. This state is an abstracted out
 version of the key-value store that can only be manipulated through the
-use of the few selected manipulations reexported by ``Tezos_context``,
+use of the few selected manipulations reexported by ``Alpha_context``,
 that always preserve the well-typed aspect and internal consistency
 invariants of the state.
 
 When validating a block, the low-level state that result from the
 predecessor block is read from the disk, then abstracted out to a
-``Tezos_context.t``, which is then only updated by high level operations
+``Alpha_context.t``, which is then only updated by high level operations
 that preserve consistency, and finally, the low level state is extracted
 to be committed on disk.
 
 This way, we have two well separated parts in the code. The code below
-``Tezos_context`` implements the ledger’s state storage, while the code
+``Alpha_context`` implements the ledger’s state storage, while the code
 on top of it is the proof-of-stake algorithm. Thanks to this barrier,
 the latter can remain nice, readable OCaml that only manipulates plain
 OCaml values.
 
-Below the ``Tezos_context``
+Below the ``Alpha_context``
 ---------------------------
 
 For this part, in a first discovery of the source code, you can start by
@@ -137,7 +137,7 @@ These transaction do not go as far as checking that, for instance, when
 the destination of a transaction is credited, the source is also
 debitted, as in some cases, it might not be the case.
 
-Above the ``Tezos_context``
+Above the ``Alpha_context``
 ---------------------------
 
 The three next sections describe the main entrypoints to the protocol:
@@ -158,7 +158,7 @@ understood with minimum OCaml knowledge.
 
 You want to start from the shell entry points (validation of the block
 header, validation of an operation, finalization of a block validation),
-and follow the control flow until you hit the ``Tezos_context``
+and follow the control flow until you hit the ``Alpha_context``
 abstraction barrier. This will lead you to reading modules ``Baking``
 and ``Amendment``.
 
@@ -175,7 +175,7 @@ Protocol RPC API
 ~~~~~~~~~~~~~~~~
 
 Finally, the RPCs specific to Alpha are also defined above the
-``Tezos_context`` barrier. The definition is split into two parts.
+``Alpha_context`` barrier. The definition is split into two parts.
 
 The first part, ``Services``, defines the RPC API: URL schemes with the
 types of parameters, and input and output JSON schemas. This interface

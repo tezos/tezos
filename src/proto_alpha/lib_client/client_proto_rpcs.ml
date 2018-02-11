@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 
 let make_call1 cctxt s=
   RPC_context.make_call1 (s Block_services.S.proto_path) cctxt
@@ -184,7 +184,7 @@ module Helpers = struct
           block ~branch ~source ?sourcePubKey ~counter
           ~amount ~destination ?parameters ~fee ()=
         operations cctxt block ~branch ~source ?sourcePubKey ~counter ~fee
-          Tezos_context.[Transaction { amount ; parameters ; destination }]
+          Alpha_context.[Transaction { amount ; parameters ; destination }]
       let origination cctxt
           block ~branch
           ~source ?sourcePubKey ~counter
@@ -193,7 +193,7 @@ module Helpers = struct
           ?(delegatable = true)
           ?delegatePubKey ?script ~fee () =
         operations cctxt block ~branch ~source ?sourcePubKey ~counter ~fee
-          Tezos_context.[
+          Alpha_context.[
             Origination { manager = managerPubKey ;
                           delegate = delegatePubKey ;
                           script ;
@@ -204,7 +204,7 @@ module Helpers = struct
       let delegation cctxt
           block ~branch ~source ?sourcePubKey ~counter ~fee delegate =
         operations cctxt block ~branch ~source ?sourcePubKey ~counter ~fee
-          Tezos_context.[Delegation delegate]
+          Alpha_context.[Delegation delegate]
     end
     module Delegate = struct
       let operations cctxt
@@ -215,15 +215,15 @@ module Helpers = struct
       let endorsement cctxt
           b ~branch ~source ~block ~slot () =
         operations cctxt b ~branch ~source
-          Tezos_context.[Endorsement { block ; slot }]
+          Alpha_context.[Endorsement { block ; slot }]
       let proposals cctxt
           b ~branch ~source ~period ~proposals () =
         operations cctxt b ~branch ~source
-          Tezos_context.[Proposals { period ; proposals }]
+          Alpha_context.[Proposals { period ; proposals }]
       let ballot cctxt
           b ~branch ~source ~period ~proposal ~ballot () =
         operations cctxt b ~branch ~source
-          Tezos_context.[Ballot { period ; proposal ; ballot }]
+          Alpha_context.[Ballot { period ; proposal ; ballot }]
     end
     module Dictator = struct
       let operation cctxt

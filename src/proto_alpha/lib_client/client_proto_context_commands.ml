@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 open Proto_alpha
-open Tezos_context
+open Alpha_context
 open Tezos_micheline
 open Client_proto_context
 open Client_proto_contracts

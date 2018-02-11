@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_context
+open Alpha_context
 
 type t
 type cost

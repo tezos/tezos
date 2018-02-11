@@ -9,7 +9,7 @@
 
 
 open Proto_alpha.Error_monad
-open Proto_alpha.Tezos_context
+open Proto_alpha.Alpha_context
 
 type account = {
   hpub : Ed25519.Public_key_hash.t ;

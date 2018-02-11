@@ -9,13 +9,13 @@
 
 (* Tezos Protocol Implementation - Protocol Signature Instance *)
 
-type operation = Tezos_context.operation
+type operation = Alpha_context.operation
 
-let parse_operation = Tezos_context.Operation.parse
-let acceptable_passes = Tezos_context.Operation.acceptable_passes
+let parse_operation = Alpha_context.Operation.parse
+let acceptable_passes = Alpha_context.Operation.acceptable_passes
 
 let max_block_length =
-  Tezos_context.Block_header.max_header_length
+  Alpha_context.Block_header.max_header_length
 
 let validation_passes =
   Updater.[ { max_size = 32 * 1024 ; max_op = None  } ; (* 32kB FIXME *)
@@ -25,31 +25,31 @@ let rpc_services = Services_registration.rpc_services
 
 type validation_mode =
   | Application of {
-      block_header : Tezos_context.Block_header.t ;
-      baker : Tezos_context.public_key_hash ;
+      block_header : Alpha_context.Block_header.t ;
+      baker : Alpha_context.public_key_hash ;
     }
   | Partial_construction of {
       predecessor : Block_hash.t ;
     }
   | Full_construction of {
       predecessor : Block_hash.t ;
-      block_proto_header : Tezos_context.Block_header.proto_header ;
-      baker : Tezos_context.public_key_hash ;
+      block_proto_header : Alpha_context.Block_header.proto_header ;
+      baker : Alpha_context.public_key_hash ;
     }
 
 type validation_state =
   { mode : validation_mode ;
-    ctxt : Tezos_context.t ;
+    ctxt : Alpha_context.t ;
     op_count : int }
 
 let current_context { ctxt } =
-  return (Tezos_context.finalize ctxt).context
+  return (Alpha_context.finalize ctxt).context
 
 let precheck_block
     ~ancestor_context:_
     ~ancestor_timestamp:_
     raw_block =
-  Lwt.return (Tezos_context.Block_header.parse raw_block) >>=? fun _ ->
+  Lwt.return (Alpha_context.Block_header.parse raw_block) >>=? fun _ ->
   (* TODO: decide what other properties should be checked *)
   return ()
 
@@ -58,11 +58,11 @@ let begin_application
     ~predecessor_timestamp:pred_timestamp
     ~predecessor_fitness:pred_fitness
     raw_block =
-  Lwt.return (Tezos_context.Block_header.parse raw_block) >>=? fun block_header ->
+  Lwt.return (Alpha_context.Block_header.parse raw_block) >>=? fun block_header ->
   let level = block_header.shell.level in
   let fitness = pred_fitness in
   let timestamp = block_header.shell.timestamp in
-  Tezos_context.init ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
+  Alpha_context.init ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
     ctxt block_header pred_timestamp >>=? fun (ctxt, baker) ->
   let mode = Application { block_header ; baker } in
@@ -79,7 +79,7 @@ let begin_construction
     () =
   let level = Int32.succ pred_level in
   let fitness = pred_fitness in
-  Tezos_context.init ~timestamp ~level ~fitness ctxt >>=? fun ctxt ->
+  Alpha_context.init ~timestamp ~level ~fitness ctxt >>=? fun ctxt ->
   begin
     match proto_header with
     | None ->
@@ -107,7 +107,7 @@ let apply_operation ({ mode ; ctxt ; op_count } as data) operation =
     | Full_construction { predecessor ; block_proto_header ; baker } ->
         predecessor,
         block_proto_header.priority,
-        Some (Tezos_context.Contract.default_contract baker) in
+        Some (Alpha_context.Contract.default_contract baker) in
   Apply.apply_operation
     ctxt baker_contract pred_block block_prio operation
   >>=? fun (ctxt, _contracts, _ignored_script_error) ->
@@ -116,25 +116,25 @@ let apply_operation ({ mode ; ctxt ; op_count } as data) operation =
 
 let finalize_block { mode ; ctxt ; op_count } = match mode with
   | Partial_construction _ ->
-      let ctxt = Tezos_context.finalize ctxt in
+      let ctxt = Alpha_context.finalize ctxt in
       return ctxt
   | Application
       { baker ;  block_header = { proto = block_proto_header } }
   | Full_construction { block_proto_header ; baker } ->
       Apply.finalize_application ctxt block_proto_header baker >>=? fun ctxt ->
-      let { level } : Tezos_context.Level.t =
-        Tezos_context. Level.current ctxt in
+      let { level } : Alpha_context.Level.t =
+        Alpha_context. Level.current ctxt in
       let priority = block_proto_header.priority in
-      let level = Tezos_context.Raw_level.to_int32 level in
-      let fitness = Tezos_context.Fitness.current ctxt in
+      let level = Alpha_context.Raw_level.to_int32 level in
+      let fitness = Alpha_context.Fitness.current ctxt in
       let commit_message =
         Format.asprintf
           "lvl %ld, fit %Ld, prio %d, %d ops"
           level fitness priority op_count in
-      let ctxt = Tezos_context.finalize ~commit_message ctxt in
+      let ctxt = Alpha_context.finalize ~commit_message ctxt in
       return ctxt
 
 let compare_operations op1 op2 =
   Apply.compare_operations op1 op2
 
-let configure_sandbox = Tezos_context.configure_sandbox
+let configure_sandbox = Alpha_context.configure_sandbox

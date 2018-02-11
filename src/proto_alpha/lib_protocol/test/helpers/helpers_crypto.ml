@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_alpha.Tezos_context
+open Proto_alpha.Alpha_context
 
 let generate_proof_of_work_nonce () =
   Rand.generate Constants.proof_of_work_nonce_size

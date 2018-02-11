@@ -7,14 +7,14 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Tezos_context
+open Alpha_context
 
 type rpc_context = {
   block_hash: Block_hash.t ;
   block_header: Block_header.raw ;
   operation_hashes: unit -> Operation_hash.t list list Lwt.t ;
   operations: unit -> Operation.raw list list Lwt.t ;
-  context: Tezos_context.t ;
+  context: Alpha_context.t ;
 }
 
 let rpc_init (rpc_context : Updater.rpc_context Lwt.t) =
@@ -23,7 +23,7 @@ let rpc_init (rpc_context : Updater.rpc_context Lwt.t) =
   let level = Int32.succ block_header.shell.level in
   let timestamp = block_header.shell.timestamp in
   let fitness = block_header.shell.fitness in
-  Tezos_context.init ~level ~timestamp ~fitness context >>=? fun context ->
+  Alpha_context.init ~level ~timestamp ~fitness context >>=? fun context ->
   return { block_hash ; block_header ; operation_hashes ; operations ; context }
 
 let rpc_services = ref (RPC_directory.empty : Updater.rpc_context Lwt.t RPC_directory.t)
@@ -255,7 +255,7 @@ let minimal_timestamp ctxt prio =
 let () = register1
     Services.Helpers.minimal_timestamp
     (fun ctxt () slot ->
-       let timestamp = Tezos_context.Timestamp.current ctxt in
+       let timestamp = Alpha_context.Timestamp.current ctxt in
        minimal_timestamp ctxt slot timestamp)
 
 let () =
@@ -268,7 +268,7 @@ let () =
        | None -> Error_monad.fail Operation.Cannot_parse_operation
        | Some (shell, contents) ->
            let operation = { hash ; shell ; contents ; signature } in
-           let level = Tezos_context.Level.current ctxt in
+           let level = Alpha_context.Level.current ctxt in
            Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (baker_pkh, _)) ->
            let baker_contract = Contract.default_contract baker_pkh in
            let block_prio = 0 in

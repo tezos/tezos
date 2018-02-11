@@ -40,11 +40,11 @@ let block_forged ?prev ops =
   let open Proto in
   let generate_proof_of_work_nonce () =
     Rand.generate
-      Proto.Tezos_context.Constants.proof_of_work_nonce_size in
+      Proto.Alpha_context.Constants.proof_of_work_nonce_size in
   let generate_seed_nonce () =
     match Proto.Nonce_storage.of_bytes @@
       Rand.generate
-        Proto.Tezos_context.Constants.nonce_length with
+        Proto.Alpha_context.Constants.nonce_length with
     | Error _ -> assert false
     | Ok nonce -> nonce in
   Block_repr.forge_header (block ops)

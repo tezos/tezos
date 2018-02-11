@@ -9,7 +9,7 @@
 
 open Proto_alpha
 open Error_monad
-open Tezos_context
+open Alpha_context
 
 let init_amount = 20000
 
@@ -28,7 +28,7 @@ let execute_code_pred
       (Some op) op_header dummy_protop in
   let dummy_nonce = Contract.initial_origination_nonce apply_op.hash in
   let amount = Tez.zero in
-  let gaz = Gas.of_int (Tezos_context.Constants.max_gas tc) in
+  let gaz = Gas.of_int (Alpha_context.Constants.max_gas tc) in
   let return = Script_interpreter.execute
       dummy_nonce op.contract dst
       tc script amount argument gaz in

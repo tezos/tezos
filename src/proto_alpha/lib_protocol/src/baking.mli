@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 
-open Tezos_context
+open Alpha_context
 open Misc
 
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
