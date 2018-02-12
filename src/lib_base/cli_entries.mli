@@ -252,7 +252,7 @@ val dispatch:
 
 (** Parse the global options, and return their value, with the rest of
    the command to be parsed. *)
-val parse_global_options :
+val parse_initial_options :
   ('a, 'ctx) options ->
   'ctx ->
   string list ->
@@ -262,4 +262,41 @@ val map_command: ('a -> 'b) -> ('b, 'c) command -> ('a, 'c) command
 
 (** {2 Output formatting} *)
 
-val setup_ppf : Format.formatter -> [< `Plain ] -> [< `LOL ] -> unit
+(** Used to restore the formatter state after [setup_formatter]. *)
+type formatter_state
+
+(** Updates the formatter's functions to interprete some semantic tags
+    used in manual production. Returns the previous state of the
+    formatter to restore it afterwards if needed.
+
+    Toplevel structure tags:
+
+      * [<document>]: a toplevel group
+      * [<title>]: a section title (just below a [<document])
+      * [<list>]: a list section (just below a [<document])
+
+   Structure tags used internally for generating the manual:
+
+    * [<command>]: wraps the full documentation bloc for a command
+    * [<commandline>]: wraps the command line in a [<command>]
+    * [<commanddoc>]: wraps everything but the command line in a [<command>]
+
+   Cosmetic tags for hilighting text:
+
+    * [<opt>]: optional arguments * [<arg>]: positional arguments
+    * [<kwd>]: positional keywords * [<hilight>]: search results
+
+   Verbosity levels, in order, and how they are used in the manual:
+
+    * [<terse>]: always displayed (titles commands lines)
+    * [<args>]: displayed if [verbosity >= `Args] (lists of arguments)
+    * [<short>]: displayed if [verbosity >= `Short] (single line descriptions)
+    * [<full>]: only displayed if [verbosity = `Full] (long descriptions) *)
+val setup_formatter :
+  Format.formatter ->
+  format: [< `Ansi | `Html | `Plain ] ->
+  verbosity: [> `Terse | `Short | `Args | `Full ] ->
+  formatter_state
+
+(** Restore the formatter state after [setup_formatter]. *)
+val restore_formatter : Format.formatter -> formatter_state -> unit

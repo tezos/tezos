@@ -731,201 +731,217 @@ let group_commands commands =
                ref l ]))
 
 let print_group print_command ppf ({ title ; _ }, commands) =
-  Format.fprintf ppf "@{<title>%s@}@,@{<section>%a@}"
+  Format.fprintf ppf "@{<title>%s@}@,@{<list>%a@}"
     title
     (Format.pp_print_list print_command) commands
 
-let setup_ppf ppf format verbosity =
+type formatter_state =
+  Format.formatter_out_functions *
+  Format.formatter_tag_functions *
+  bool
+
+let setup_formatter ppf ~format ~verbosity =
   let skip = ref false in
-  let orig_out_functions =
-    Format.pp_get_formatter_out_functions ppf () in
-  Format.pp_set_formatter_out_functions ppf
-    { out_string =
-        (fun s b a ->
-           if s = "\000\000\000" then skip := true
-           else if s = "\255\255\255" then skip := false
-           else if not !skip then orig_out_functions.out_string s b a) ;
-      out_spaces = (fun n -> if not !skip then orig_out_functions.out_spaces n) ;
-      out_newline = (fun () -> if not !skip then orig_out_functions.out_newline ()) ;
-      out_flush = (fun () -> if not !skip then orig_out_functions.out_flush ()) } ;
-  let levels = ref [] in
-  let setup_level level =
-    match verbosity, level with
-    | (`Full, (`Terse | `Short | `Args | `Full))
-    | (`Args, (`Terse | `Short | `Args))
-    | (`Short, (`Terse | `Short))
-    | `Terse, `Terse -> Format.fprintf ppf "@<0>%s" "\255\255\255"
-    | _ -> Format.fprintf ppf "@<0>%s" "\000\000\000" in
-  let push_level level =
-    levels := level :: !levels ;
-    setup_level level in
-  let pop_level _ =
-    match !levels with
-    | _ :: level :: rest -> levels := level :: rest ; setup_level level
-    | [ _ ] | [] -> Pervasives.failwith "Cli_entries: unclosed verbosity tag" in
-  push_level `Terse ;
-  match format with
-  | `Ansi ->
-      let color_num = function
-        | `Black -> None
-        | `Red -> Some 1
-        | `Green -> Some 2
-        | `Yellow -> Some 3
-        | `Blue -> Some 4
-        | `Magenta -> Some 5
-        | `Cyan -> Some 6
-        | `White -> Some 7 in
-      let ansi_format ppf (fg, bg, b, u) =
-        Format.fprintf ppf "@<0>%s" "\027[0m" ;
-        match
-          (match color_num fg with Some n -> [ string_of_int (30 + n) ] | None -> []) @
-          (match color_num bg with Some n -> [ string_of_int (40 + n) ] | None -> []) @
-          (if b then [ "1" ] else []) @
-          (if u then [ "4" ] else [])
-        with
-        | [] -> ()
-        | l -> Format.fprintf ppf "@<0>%s" ("\027[" ^ String.concat ";" l ^ "m") in
-      Format.pp_set_formatter_tag_functions ppf
-        { mark_open_tag = (fun _ -> "") ;
-          mark_close_tag = (fun _ -> "") ;
-          print_open_tag = begin function
-            | "title" -> Format.fprintf ppf "@<0>%a" ansi_format (`White, `Black, true, true)
-            | "commandline" -> Format.fprintf ppf "@[<hov 4>"
-            | "commanddoc" -> Format.fprintf ppf "  @[<v 0>"
-            | "opt" -> Format.fprintf ppf "@<0>%a" ansi_format (`Green, `Black, false, false)
-            | "arg" -> Format.fprintf ppf "@<0>%a<" ansi_format (`Yellow, `Black, false, false)
-            | "kwd" -> Format.fprintf ppf "@<0>%a" ansi_format (`White, `Black, false, true)
-            | "hilight" -> Format.fprintf ppf "@<0>%a" ansi_format (`Black, `Yellow, false, true)
-            | "section" -> Format.fprintf ppf "  @[<v 0>"
-            | "command" -> Format.fprintf ppf "@[<v 0>"
-            | "full" -> push_level `Full
-            | "args" -> push_level `Args
-            | "short" -> push_level `Short
-            | "terse" -> push_level `Terse
-            | "document" -> Format.fprintf ppf "@[<v 0>"
-            | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
-          end ;
-          print_close_tag = begin function
-            | "title" -> Format.fprintf ppf ":@<0>%s" "\027[0m"
-            | "commandline" -> Format.fprintf ppf "@]"
-            | "commanddoc" -> Format.fprintf ppf "@]"
-            | "opt" -> Format.fprintf ppf "@<0>%s" "\027[0m"
-            | "arg" -> Format.fprintf ppf ">@<0>%s" "\027[0m"
-            | "kwd" -> Format.fprintf ppf "@<0>%s" "\027[0m"
-            | "hilight" -> Format.fprintf ppf "@<0>%s" "\027[0m"
-            | "command" | "section" -> Format.fprintf ppf "@]"
-            | "full" -> pop_level `Full
-            | "args" -> pop_level `Args
-            | "short" -> pop_level `Short
-            | "terse" -> pop_level `Terse
-            | "document" -> Format.fprintf ppf "@]"
-            | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
-          end } ;
-      Format.pp_set_print_tags ppf true
-  | `Plain ->
-      Format.pp_set_formatter_tag_functions ppf
-        { mark_open_tag = (fun _ -> "") ;
-          mark_close_tag = (fun _ -> "") ;
-          print_open_tag = begin function
-            | "title" -> ()
-            | "commandline" -> Format.fprintf ppf "@[<hov 4>"
-            | "commanddoc" -> Format.fprintf ppf "  @[<v 0>"
-            | "opt" -> ()
-            | "arg" -> Format.fprintf ppf "<"
-            | "kwd" -> ()
-            | "hilight" -> ()
-            | "section" -> Format.fprintf ppf "  @[<v 0>"
-            | "command" -> Format.fprintf ppf "@[<v 0>"
-            | "full" -> push_level `Full
-            | "args" -> push_level `Args
-            | "short" -> push_level `Short
-            | "terse" -> push_level `Terse
-            | "document" -> Format.fprintf ppf "@[<v 0>"
-            | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
-          end ;
-          print_close_tag = begin function
-            | "title" -> Format.fprintf ppf ":"
-            | "commandline" -> Format.fprintf ppf "@]"
-            | "commanddoc" -> Format.fprintf ppf "@]"
-            | "opt" -> ()
-            | "arg" -> Format.fprintf ppf ">"
-            | "kwd" -> ()
-            | "hilight" -> ()
-            | "command" | "section" -> Format.fprintf ppf "@]"
-            | "full" -> pop_level `Full
-            | "args" -> pop_level `Args
-            | "short" -> pop_level `Short
-            | "terse" -> pop_level `Terse
-            | "document" -> Format.fprintf ppf "@]"
-            | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
-          end } ;
-      Format.pp_set_print_tags ppf true
-  | `Html ->
-      Format.pp_set_formatter_tag_functions ppf
-        { mark_open_tag = (fun _ -> "") ;
-          mark_close_tag = (fun _ -> "") ;
-          print_open_tag = begin function
-            | "title" -> Format.fprintf ppf "\003h3\004"
-            | "commandline" -> Format.fprintf ppf "\003div class='cmdline'\004@[<h>"
-            | "commanddoc" -> Format.fprintf ppf "\003div class='cmddoc'\004"
-            | "opt" -> Format.fprintf ppf "\003span class='opt'\004"
-            | "arg" -> Format.fprintf ppf "\003span class='arg'\004"
-            | "kwd" -> Format.fprintf ppf "\003span class='kwd'\004"
-            | "hilight" -> ()
-            | "section" -> Format.fprintf ppf "\003ul\004@\n"
-            | "command" -> Format.fprintf ppf "\003li\004@\n"
-            | "full" -> push_level `Full
-            | "args" -> push_level `Args
-            | "short" -> push_level `Short
-            | "terse" -> push_level `Terse
-            | "document" ->
-                Format.fprintf ppf
-                  "@[<v 0>\003style\004\
-                   .cmdline { font-family: monospace }\
-                   .cmddoc { white-space: pre-wrap ; font-family: monospace; line-height: 170%%; margin: 0 0 20px 0 }\
-                   .cmdline { background: #343131; padding: 2px 8px;	border-radius:10px; color: white; margin: 5px; }\
-                   .cmdline+.cmddoc { margin: -5px 5px 0 20px; padding: 5px }\
-                   .opt,.arg { background: #343131; font-weight: bold;  padding: 2px 4px; border-radius:5px; }\
-                   .kwd { font-weight: bold; } .opt { color:#CF0; background: #460; } .arg { color: #CEF; background: #369; }\
-                   \003/style\004@\n" ;
-            | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
-          end ;
-          print_close_tag = begin function
-            | "title" -> Format.fprintf ppf "\003/h3\004@\n"
-            | "commandline" -> Format.fprintf ppf "@]\003/div\004@\n"
-            | "commanddoc" -> Format.fprintf ppf "\003/div\004@\n"
-            | "opt" -> Format.fprintf ppf "\003/span\004"
-            | "arg" -> Format.fprintf ppf "\003/span\004"
-            | "kwd" -> Format.fprintf ppf "\003/span\004"
-            | "hilight" -> ()
-            | "section" -> Format.fprintf ppf "\003/ul\004@\n"
-            | "command" -> Format.fprintf ppf "\003/li\004@\n"
-            | "full" -> pop_level `Full
-            | "args" -> pop_level `Args
-            | "short" -> pop_level `Short
-            | "terse" -> pop_level `Terse
-            | "document" -> Format.fprintf ppf "@]"
-            | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
-          end } ;
-      let orig_out_functions =
-        Format.pp_get_formatter_out_functions ppf () in
-      Format.pp_set_formatter_out_functions ppf
-        { orig_out_functions with
-          out_string = (fun s i j ->
-              let buf = Buffer.create (j - i) in
-              for n = i to j - 1 do match String.get s n with
-                | '\003' -> Buffer.add_char buf '<'
-                | '\004' -> Buffer.add_char buf '>'
-                | '>' -> Buffer.add_string buf "&gt;"
-                | '<' -> Buffer.add_string buf "&lt;"
-                | c -> Buffer.add_char buf c
-              done ;
-              let s' = Buffer.contents buf in
-              orig_out_functions.out_string s' 0 (String.length s'))} ;
-      Format.pp_set_print_tags ppf true
+  let orig_out_functions, _, _ as orig_state =
+    Format.pp_get_formatter_out_functions ppf (),
+    Format.pp_get_formatter_tag_functions ppf (),
+    Format.pp_get_print_tags ppf () in
+  begin
+    Format.pp_set_formatter_out_functions ppf
+      { out_string =
+          (fun s b a ->
+             if s = "\000\000\000" then skip := true
+             else if s = "\255\255\255" then skip := false
+             else if not !skip then orig_out_functions.out_string s b a) ;
+        out_spaces = (fun n -> if not !skip then orig_out_functions.out_spaces n) ;
+        out_newline = (fun () -> if not !skip then orig_out_functions.out_newline ()) ;
+        out_flush = (fun () -> if not !skip then orig_out_functions.out_flush ()) } ;
+    let levels = ref [] in
+    let setup_level level =
+      match verbosity, level with
+      | (`Full, (`Terse | `Short | `Args | `Full))
+      | (`Args, (`Terse | `Short | `Args))
+      | (`Short, (`Terse | `Short))
+      | `Terse, `Terse -> Format.fprintf ppf "@<0>%s" "\255\255\255"
+      | _ -> Format.fprintf ppf "@<0>%s" "\000\000\000" in
+    let push_level level =
+      levels := level :: !levels ;
+      setup_level level in
+    let pop_level _ =
+      match !levels with
+      | _ :: level :: rest -> levels := level :: rest ; setup_level level
+      | [ _ ] | [] -> Pervasives.failwith "Cli_entries: unclosed verbosity tag" in
+    push_level `Terse ;
+    match format with
+    | `Ansi ->
+        let color_num = function
+          | `Black -> None
+          | `Red -> Some 1
+          | `Green -> Some 2
+          | `Yellow -> Some 3
+          | `Blue -> Some 4
+          | `Magenta -> Some 5
+          | `Cyan -> Some 6
+          | `White -> Some 7 in
+        let ansi_format ppf (fg, bg, b, u) =
+          Format.fprintf ppf "@<0>%s" "\027[0m" ;
+          match
+            (match color_num fg with Some n -> [ string_of_int (30 + n) ] | None -> []) @
+            (match color_num bg with Some n -> [ string_of_int (40 + n) ] | None -> []) @
+            (if b then [ "1" ] else []) @
+            (if u then [ "4" ] else [])
+          with
+          | [] -> ()
+          | l -> Format.fprintf ppf "@<0>%s" ("\027[" ^ String.concat ";" l ^ "m") in
+        Format.pp_set_formatter_tag_functions ppf
+          { mark_open_tag = (fun _ -> "") ;
+            mark_close_tag = (fun _ -> "") ;
+            print_open_tag = begin function
+              | "title" -> Format.fprintf ppf "@<0>%a" ansi_format (`White, `Black, true, true)
+              | "commandline" -> Format.fprintf ppf "@[<hov 4>"
+              | "commanddoc" -> Format.fprintf ppf "  @[<v 0>"
+              | "opt" -> Format.fprintf ppf "@<0>%a" ansi_format (`Green, `Black, false, false)
+              | "arg" -> Format.fprintf ppf "@<0>%a<" ansi_format (`Yellow, `Black, false, false)
+              | "kwd" -> Format.fprintf ppf "@<0>%a" ansi_format (`White, `Black, false, true)
+              | "hilight" -> Format.fprintf ppf "@<0>%a" ansi_format (`Black, `Yellow, false, true)
+              | "list" -> Format.fprintf ppf "  @[<v 0>"
+              | "command" -> Format.fprintf ppf "@[<v 0>"
+              | "full" -> push_level `Full
+              | "args" -> push_level `Args
+              | "short" -> push_level `Short
+              | "terse" -> push_level `Terse
+              | "document" -> Format.fprintf ppf "@[<v 0>"
+              | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
+            end ;
+            print_close_tag = begin function
+              | "title" -> Format.fprintf ppf ":@<0>%s" "\027[0m"
+              | "commandline" -> Format.fprintf ppf "@]"
+              | "commanddoc" -> Format.fprintf ppf "@]"
+              | "opt" -> Format.fprintf ppf "@<0>%s" "\027[0m"
+              | "arg" -> Format.fprintf ppf ">@<0>%s" "\027[0m"
+              | "kwd" -> Format.fprintf ppf "@<0>%s" "\027[0m"
+              | "hilight" -> Format.fprintf ppf "@<0>%s" "\027[0m"
+              | "command" | "list" -> Format.fprintf ppf "@]"
+              | "full" -> pop_level `Full
+              | "args" -> pop_level `Args
+              | "short" -> pop_level `Short
+              | "terse" -> pop_level `Terse
+              | "document" -> Format.fprintf ppf "@]"
+              | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
+            end } ;
+        Format.pp_set_print_tags ppf true
+    | `Plain ->
+        Format.pp_set_formatter_tag_functions ppf
+          { mark_open_tag = (fun _ -> "") ;
+            mark_close_tag = (fun _ -> "") ;
+            print_open_tag = begin function
+              | "title" -> ()
+              | "commandline" -> Format.fprintf ppf "@[<hov 4>"
+              | "commanddoc" -> Format.fprintf ppf "  @[<v 0>"
+              | "opt" -> ()
+              | "arg" -> Format.fprintf ppf "<"
+              | "kwd" -> ()
+              | "hilight" -> ()
+              | "list" -> Format.fprintf ppf "  @[<v 0>"
+              | "command" -> Format.fprintf ppf "@[<v 0>"
+              | "full" -> push_level `Full
+              | "args" -> push_level `Args
+              | "short" -> push_level `Short
+              | "terse" -> push_level `Terse
+              | "document" -> Format.fprintf ppf "@[<v 0>"
+              | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
+            end ;
+            print_close_tag = begin function
+              | "title" -> Format.fprintf ppf ":"
+              | "commandline" -> Format.fprintf ppf "@]"
+              | "commanddoc" -> Format.fprintf ppf "@]"
+              | "opt" -> ()
+              | "arg" -> Format.fprintf ppf ">"
+              | "kwd" -> ()
+              | "hilight" -> ()
+              | "command" | "list" -> Format.fprintf ppf "@]"
+              | "full" -> pop_level `Full
+              | "args" -> pop_level `Args
+              | "short" -> pop_level `Short
+              | "terse" -> pop_level `Terse
+              | "document" -> Format.fprintf ppf "@]"
+              | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
+            end } ;
+        Format.pp_set_print_tags ppf true
+    | `Html ->
+        Format.pp_set_formatter_tag_functions ppf
+          { mark_open_tag = (fun _ -> "") ;
+            mark_close_tag = (fun _ -> "") ;
+            print_open_tag = begin function
+              | "title" -> Format.fprintf ppf "\003h3\004"
+              | "commandline" -> Format.fprintf ppf "\003div class='cmdline'\004@[<h>"
+              | "commanddoc" -> Format.fprintf ppf "\003div class='cmddoc'\004"
+              | "opt" -> Format.fprintf ppf "\003span class='opt'\004"
+              | "arg" -> Format.fprintf ppf "\003span class='arg'\004"
+              | "kwd" -> Format.fprintf ppf "\003span class='kwd'\004"
+              | "hilight" -> ()
+              | "list" -> Format.fprintf ppf "\003ul\004@\n"
+              | "command" -> Format.fprintf ppf "\003li\004@\n"
+              | "full" -> push_level `Full
+              | "args" -> push_level `Args
+              | "short" -> push_level `Short
+              | "terse" -> push_level `Terse
+              | "document" ->
+                  Format.fprintf ppf
+                    "@[<v 0>\003style\004\
+                     .cmdline { font-family: monospace }\
+                     .cmddoc { white-space: pre-wrap ; font-family: monospace; line-height: 170%%; margin: 0 0 20px 0 }\
+                     .cmdline { background: #343131; padding: 2px 8px;	border-radius:10px; color: white; margin: 5px; }\
+                     .cmdline+.cmddoc { margin: -5px 5px 0 20px; padding: 5px }\
+                     .opt,.arg { background: #343131; font-weight: bold;  padding: 2px 4px; border-radius:5px; }\
+                     .kwd { font-weight: bold; } .opt { color:#CF0; background: #460; } .arg { color: #CEF; background: #369; }\
+                     \003/style\004@\n" ;
+              | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
+            end ;
+            print_close_tag = begin function
+              | "title" -> Format.fprintf ppf "\003/h3\004@\n"
+              | "commandline" -> Format.fprintf ppf "@]\003/div\004@\n"
+              | "commanddoc" -> Format.fprintf ppf "\003/div\004@\n"
+              | "opt" -> Format.fprintf ppf "\003/span\004"
+              | "arg" -> Format.fprintf ppf "\003/span\004"
+              | "kwd" -> Format.fprintf ppf "\003/span\004"
+              | "hilight" -> ()
+              | "list" -> Format.fprintf ppf "\003/ul\004@\n"
+              | "command" -> Format.fprintf ppf "\003/li\004@\n"
+              | "full" -> pop_level `Full
+              | "args" -> pop_level `Args
+              | "short" -> pop_level `Short
+              | "terse" -> pop_level `Terse
+              | "document" -> Format.fprintf ppf "@]"
+              | _ -> Pervasives.failwith "Cli_entries: invalid semantic tag"
+            end } ;
+        let orig_out_functions =
+          Format.pp_get_formatter_out_functions ppf () in
+        Format.pp_set_formatter_out_functions ppf
+          { orig_out_functions with
+            out_string = (fun s i j ->
+                let buf = Buffer.create (j - i) in
+                for n = i to j - 1 do match String.get s n with
+                  | '\003' -> Buffer.add_char buf '<'
+                  | '\004' -> Buffer.add_char buf '>'
+                  | '>' -> Buffer.add_string buf "&gt;"
+                  | '<' -> Buffer.add_string buf "&lt;"
+                  | c -> Buffer.add_char buf c
+                done ;
+                let s' = Buffer.contents buf in
+                orig_out_functions.out_string s' 0 (String.length s'))} ;
+        Format.pp_set_print_tags ppf true
+  end ;
+  orig_state
+
+let restore_formatter ppf (out_functions, tag_functions, tags) =
+  Format.pp_set_formatter_out_functions ppf out_functions ;
+  Format.pp_set_formatter_tag_functions ppf tag_functions ;
+  Format.pp_set_print_tags ppf tags
+
 
 let usage ppf ?global_options ?(highlights=[]) commands format verbosity =
-  setup_ppf ppf format verbosity ;
+  ignore (setup_formatter ppf ~format ~verbosity) ;
   let usage ppf (by_group, options) =
     let exe = Filename.basename Sys.executable_name in
     let print_groups =
@@ -940,7 +956,7 @@ let usage ppf ?global_options ?(highlights=[]) commands format verbosity =
     | Some (Argument { spec ; _ })->
         Format.fprintf ppf
           "@[<v>@{<title>Usage@}@,\
-           @{<section>\
+           @{<list>\
            @{<command>@{<commandline>\
            %s [@{<opt>global options@}] command @{<opt>[command options]@}@}@}@,\
            @{<command>@{<commandline>\
@@ -949,7 +965,7 @@ let usage ppf ?global_options ?(highlights=[]) commands format verbosity =
            %s [@{<opt>global options@}] command @{<opt>-help@} (for command options)@}@}\
            @}@,@,\
            @{<title>To browse the documentation@}@,\
-           @{<section>\
+           @{<list>\
            @{<command>@{<commandline>\
            %s [@{<opt>global options@}] man (for a list of commands)@}@}@,\
            @{<command>@{<commandline>\
@@ -968,7 +984,7 @@ let usage ppf ?global_options ?(highlights=[]) commands format verbosity =
   Format.fprintf ppf "@}"
 
 let command_usage ppf commands format verbosity =
-  setup_ppf ppf format verbosity ;
+  ignore (setup_formatter ppf ~format ~verbosity) ;
   let exe = Filename.basename Sys.executable_name in
   let prefix ppf () =
     Format.fprintf ppf "@{<kwd>%s@} @{<opt>[global options]@} " exe in
@@ -1147,13 +1163,13 @@ let handle_cli_errors ~stdout ~stderr ~global_options = function
   | Error [ e ] ->              (* Should only be one error here *)
       begin match e with
         | Extra_arguments (_, cmd) ->
-            setup_ppf stderr (if Unix.isatty Unix.stderr then `Ansi else `Plain) `Terse ;
+            ignore (setup_formatter stderr ~format:(if Unix.isatty Unix.stderr then `Ansi else `Plain) ~verbosity:`Terse) ;
             Format.fprintf stderr
               "Extra arguments provided for command:@;<1 2>@[%a@]@."
               (print_command ?prefix:None ~highlights:[]) cmd;
             return 1
         | Not_enough_args (_, cmds) ->
-            setup_ppf stderr (if Unix.isatty Unix.stderr then `Ansi else `Plain) `Terse ;
+            ignore (setup_formatter stderr ~format:(if Unix.isatty Unix.stderr then `Ansi else `Plain) ~verbosity:`Terse) ;
             Format.fprintf stderr
               "@[<v 2>Unterminated command, here are possible completions:@,%a@]@."
               (Format.pp_print_list
