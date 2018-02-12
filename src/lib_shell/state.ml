@@ -556,6 +556,11 @@ module Block = struct
       ~description:
         "When commiting the context of a block, the announced context \
          hash was not the one computed at commit time."
+      ~pp: (fun ppf (got, exp) ->
+          Format.fprintf ppf
+            "@[<v 2>Inconsistant hash:@ got: %a@ expected: %a"
+            Context_hash.pp got
+            Context_hash.pp exp)
       Data_encoding.(obj2
                        (req "wrong_context_hash" Context_hash.encoding)
                        (req "expected_context_hash" Context_hash.encoding))
@@ -563,6 +568,7 @@ module Block = struct
       (fun (got, exp) -> Inconsistent_hash (got, exp))
 
   let store
+      ?(dont_enforce_context_hash = false)
       net_state block_header operations
       { Updater.context ; message ; max_operations_ttl ;
         max_operation_data_length } =
@@ -579,10 +585,16 @@ module Block = struct
         Context.commit
           ~time:block_header.shell.timestamp ?message context >>= fun commit ->
         fail_unless
-          (Context_hash.equal block_header.shell.context commit)
+          (dont_enforce_context_hash
+           || Context_hash.equal block_header.shell.context commit)
           (Inconsistent_hash (commit, block_header.shell.context)) >>=? fun () ->
         let contents = {
-          Store.Block.header = block_header ;
+          Store.Block.header =
+            if dont_enforce_context_hash then
+              { block_header
+                with shell = { block_header.shell with context = commit } }
+            else
+              block_header ;
           message ;
           max_operations_ttl ;
           max_operation_data_length ;

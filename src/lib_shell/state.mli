@@ -108,6 +108,7 @@ module Block : sig
   type error += Inconsistent_hash of Context_hash.t * Context_hash.t
 
   val store:
+    ?dont_enforce_context_hash:bool ->
     Net.t ->
     Block_header.t ->
     Operation.t list list ->
