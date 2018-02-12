@@ -142,8 +142,8 @@ Running the node in a sandbox
 To run a ‘localhost-only’ instance of a Tezos network, we provide two
 helper scripts:
 
--  ``./bin_node/tezos-sandboxed-node.sh``
--  ``./bin_client/tezos-init-sandboxed-client.sh``
+-  ``./src/bin_node/tezos-sandboxed-node.sh``
+-  ``./src/bin_client/tezos-init-sandboxed-client.sh``
 
 For instance, if you want to run local network with two nodes, in a
 first terminal, the following command will initialize a node listening
@@ -151,7 +151,7 @@ for peers on port ``19731`` and listening for RPC on port ``18731``.
 
 ::
 
-    ./bin_node/tezos-sandboxed-node.sh 1
+    ./src/bin_node/tezos-sandboxed-node.sh 1
 
 This node will store its data in a temporary directory which will be
 removed when the node is killed.
@@ -161,7 +161,7 @@ listen on port ``19739`` and ``18739``:
 
 ::
 
-    ./bin_node/tezos-sandboxed-node.sh 9
+    ./src/bin_node/tezos-sandboxed-node.sh 9
 
 You might replace ``1`` or ``9`` by any number in between if you want to
 run more than two nodes. But, if you intend to run a single node
@@ -171,14 +171,14 @@ command instead:
 
 ::
 
-    ./bin_node/tezos-sandboxed-node.sh 1 --connections 0
+    ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 0
 
 Once your node(s) is/are running, open a new terminal and initialize the
 “sandboxed” client data:
 
 ::
 
-    eval `./bin_client/tezos-init-sandboxed-client.sh 1`
+    eval `./src/bin_client/tezos-init-sandboxed-client.sh 1`
 
 It will initialize the client data in a temporary directory. It will
 also defines in the current shell session an alias ``tezos-client``
