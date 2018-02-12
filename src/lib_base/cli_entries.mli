@@ -9,31 +9,59 @@
 
 open Error_monad
 
-(* Tezos: a small Command Line Parsing library *)
-(* Only used in the client. *)
+(** Command Line Interpretation Combinators.
 
-(** The type for positional parameters and flags *)
-type ('p, 'ctx) parameter
-val parameter : ?autocomplete:('ctx -> string list tzresult Lwt.t) ->
-  ('ctx -> string -> 'p tzresult Lwt.t) ->
-  ('p, 'ctx) parameter
+    Supports command lines of the following form:
+
+    [executable [global options] command [command options]]
+
+    Global options must be passed before the command, and may define
+    the set of supported commands.
+
+    Commands are series of fixed keywords and positional arguments, in
+    order to support command lines close to a natural language. *)
+
+(** {2 Argument parsers. *)
+
+(** The type for argument parsers, used for both positional and
+    optional arguments.
+
+    The first type parameter is the OCaml type of the argument once
+    parsed from its string notation. The second parameter is a context
+    that is passed througout the parsing of the command line. Some
+    parameters (for instance a simple [int]) can remain polymorphic,
+    while others need a context to be parsed. Of course, a command line
+    can only contain parameters that bear the same context type. *)
+type ('a, 'ctx) parameter
+
+(** Build an argument parser, combining a parsing function and an
+    autocompletion function. The autocompletion must simply return the
+    list of all valid values for the parameter. *)
+val parameter :
+  ?autocomplete:('ctx -> string list tzresult Lwt.t) ->
+  ('ctx -> string -> 'a tzresult Lwt.t) ->
+  ('a, 'ctx) parameter
 
 (** {2 Flags and Options } *)
 
-(** {3 Options and Switches } *)
+(** The type for optional arguments (and switches).
 
-(** Type for option or switch *)
+    Extends a parser with a parameter name and a placeholder to
+    display in help screens.
+
+    Also adds a documentation for the switch, that must be of the form
+    ["lowercase short description\nOptional longer description."]. *)
 type ('a, 'ctx) arg
 
 (** [arg ~doc ~parameter converter] creates an argument to a command.
     The [~parameter] argument should begin with a [-].
-    If the argument is not provided, [None] is returned *)
+    If the argument is not provided, [None] is returned. *)
 val arg :
   doc:string ->
   parameter:string ->
   placeholder:string ->
-  ('p, 'ctx) parameter ->
-  ('p option, 'ctx) arg
+  ('a, 'ctx) parameter ->
+  ('a option, 'ctx) arg
 
 (** Create an argument that will contain the [~default] value if it is not provided.
     see arg *)
@@ -42,19 +70,18 @@ val default_arg :
   parameter:string ->
   placeholder:string ->
   default:string ->
-  ('p, 'ctx) parameter ->
-  ('p, 'ctx) arg
+  ('a, 'ctx) parameter ->
+  ('a, 'ctx) arg
 
 (** Create a boolean switch.
     The value will be set to [true] if the switch is provided and [false] if it is not. *)
 val switch : doc:string -> parameter:string ->
   (bool, 'ctx) arg
 
-(** {3 Optional Argument Combinators} *)
-(** To specify default arguments ([options]) for a command,
-    You need to use the following functions,
-    which allow you to specify how many arguments you have.
-    If you are not including any arguments, use [no_args]. *)
+(** {2 Groups of Optional Arguments} *)
+
+(** Defines a group of options, either the global options or the
+   command options. *)
 
 (** The type of a series of labeled arguments to a command *)
 type ('a, 'ctx) options
@@ -133,7 +160,7 @@ val args10 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) ar
   ('i, 'ctx) arg -> ('j, 'ctx) arg ->
   ('a * 'b * 'c * 'd * 'e * 'f * 'g * 'h * 'i * 'j, 'ctx) options
 
-(** {2 Parameter based command lines } *)
+(** {2 Parameter based command lines} *)
 
 (** Type of parameters for a command *)
 type ('a, 'ctx, 'ret) params
@@ -194,7 +221,8 @@ type group =
   { name : string ;
     title : string }
 
-(** A complete command, with documentation, a specification of its options, parameters, and handler function *)
+(** A complete command, with documentation, a specification of its
+   options, parameters, and handler function. *)
 val command:
   ?group: group ->
   desc: string ->
@@ -222,11 +250,16 @@ val dispatch:
   string list ->
   'ret tzresult Lwt.t
 
-(** Parse the sequence of optional arguments that proceed a command *)
-val parse_initial_options :
+(** Parse the global options, and return their value, with the rest of
+   the command to be parsed. *)
+val parse_global_options :
   ('a, 'ctx) options ->
   'ctx ->
   string list ->
   ('a * string list) tzresult Lwt.t
 
 val map_command: ('a -> 'b) -> ('b, 'c) command -> ('a, 'c) command
+
+(** {2 Output formatting} *)
+
+val setup_ppf : Format.formatter -> [< `Plain ] -> [< `LOL ] -> unit
