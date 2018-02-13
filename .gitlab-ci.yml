@@ -396,6 +396,11 @@ opam:36:tezos-protocol-demo:
   variables:
     package: tezos-protocol-demo
 
+opam:37:tezos-unix-signers:
+  <<: *opam_definition
+  variables:
+    package: tezos-unix-signers
+
 
 ##END_OPAM##
 

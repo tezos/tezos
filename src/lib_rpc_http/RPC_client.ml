@@ -15,14 +15,6 @@ let null_logger = Client.null_logger
 let timings_logger = Client.timings_logger
 let full_logger = Client.full_logger
 
-type ('o, 'e) rest_result =
-  [ `Ok of 'o
-  | `Conflict of 'e
-  | `Error of 'e
-  | `Forbidden of 'e
-  | `Not_found of 'e
-  | `Unauthorized of 'e ] tzresult
-
 type rpc_error =
   | Empty_answer
   | Connection_failed of string
@@ -221,7 +213,7 @@ let request_failed meth uri error =
 type content_type = (string * string)
 type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
-let generic_call ?logger ?accept ?body ?media meth uri : (content, content) rest_result Lwt.t =
+let generic_call ?logger ?accept ?body ?media meth uri : (content, content) RPC_context.rest_result Lwt.t =
   Client.generic_call meth ?logger ?accept ?body ?media uri >>= function
   | `Ok (Some v) -> return (`Ok v)
   | `Ok None -> request_failed meth uri Empty_answer
@@ -275,7 +267,7 @@ let handle_error meth uri (body, media, _) f =
                                      acceptable = [Media_type.(name json)] ;
                                      body })
 
-let generic_json_call ?logger ?body meth uri : (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t =
+let generic_json_call ?logger ?body meth uri : (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result Lwt.t =
   let body =
     Option.map body ~f:begin fun b ->
       (Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
@@ -415,21 +407,7 @@ let default_config = {
   logger = null_logger ;
 }
 
-class type json_ctxt = object
-  method generic_json_call :
-    RPC_service.meth ->
-    ?body:Data_encoding.json ->
-    Uri.t ->
-    (Data_encoding.json, Data_encoding.json option)
-      rest_result Lwt.t
-end
-
-class type ctxt = object
-  inherit RPC_context.t
-  inherit json_ctxt
-end
-
-class http_ctxt config media_types : ctxt =
+class http_ctxt config media_types : RPC_context.json =
   let base =
     Uri.make
       ~scheme:(if config.tls then "https" else "http")

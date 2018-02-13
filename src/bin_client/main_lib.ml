@@ -10,7 +10,7 @@
 (* Tezos Command line interface - Main Program *)
 
 let cctxt ~base_dir ~block rpc_config =
-  Client_commands.make_context ~base_dir ~block ~rpc_config (Client_commands.default_log ~base_dir)
+  Client_context_unix.make_context ~base_dir ~block ~rpc_config (Client_context_unix.default_log ~base_dir)
 
 let get_commands_for_version ctxt block protocol =
   Block_services.protocol ctxt block >>= function
@@ -64,8 +64,8 @@ let main ?only_commands () =
                         (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
-        (cctxt ~base_dir:Client_commands.default_base_dir
-           ~block:Client_commands.default_block
+        (cctxt ~base_dir:Client_context_unix.default_base_dir
+           ~block:Client_context_unix.default_block
            RPC_client.default_config)
         original_args
       >>=? fun (parsed_config_file, parsed_args, config_commands, remaining) ->

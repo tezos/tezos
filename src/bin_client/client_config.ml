@@ -61,7 +61,7 @@ module Cfg_file = struct
   }
 
   let default = {
-    base_dir = Client_commands.default_base_dir ;
+    base_dir = Client_context_unix.default_base_dir ;
     node_addr = "localhost" ;
     node_port = 8732 ;
     tls = false ;
@@ -109,7 +109,7 @@ type cli_args = {
 }
 
 let default_cli_args = {
-  block = Client_commands.default_block ;
+  block = Client_context_unix.default_block ;
   protocol = None ;
   print_timings = false ;
   log_requests = false ;
@@ -148,7 +148,7 @@ let base_dir_arg () =
     ~placeholder:"path"
     ~doc:("client data directory\n\
            The directory where the Tezos client will store all its data.\n\
-           By default " ^ Client_commands.default_base_dir)
+           By default " ^ Client_context_unix.default_base_dir)
     (string_parameter ())
 let config_file_arg () =
   arg
@@ -310,7 +310,7 @@ let parse_config_args (ctx : #Client_commands.full_context) argv =
         tls), remaining) ->
   begin match base_dir with
     | None ->
-        let base_dir = Client_commands.default_base_dir in
+        let base_dir = Client_context_unix.default_base_dir in
         unless (Sys.file_exists base_dir) begin fun () ->
           Lwt_utils_unix.create_dir base_dir >>= return
         end >>=? fun () ->

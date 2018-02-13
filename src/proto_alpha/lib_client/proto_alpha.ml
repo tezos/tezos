@@ -12,11 +12,11 @@ module Alpha_environment = Tezos_protocol_environment_client.Fake.Make(Name)()
 include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
 
 class type rpc_context = object
-  inherit RPC_client.ctxt
+  inherit RPC_context.json
   inherit [Block_services.block] Alpha_environment.RPC_context.simple
 end
 
-class wrap_proto_context (t : RPC_client.ctxt) : rpc_context = object
+class wrap_proto_context (t : RPC_context.json) : rpc_context = object
   method generic_json_call = t#generic_json_call
   method call_service : 'm 'p 'q 'i 'o.
     ([< Resto.meth ] as 'm, unit, 'p, 'q, 'i, 'o) RPC_service.t ->

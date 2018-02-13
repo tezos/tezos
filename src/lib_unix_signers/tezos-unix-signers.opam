@@ -11,10 +11,6 @@ depends: [
   "jbuilder" { build & >= "1.0+beta17" }
   "tezos-base"
   "tezos-client-base"
-  "tezos-client-genesis"
-  "tezos-client-alpha"
-  "tezos-unix-signers"
-  "tezos-node" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

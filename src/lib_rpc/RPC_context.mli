@@ -43,6 +43,24 @@ class type t = object
   inherit streamed
 end
 
+type ('o, 'e) rest_result =
+  [ `Ok of 'o
+  | `Conflict of 'e
+  | `Error of 'e
+  | `Forbidden of 'e
+  | `Not_found of 'e
+  | `Unauthorized of 'e ] tzresult
+
+class type json = object
+  inherit t
+  method generic_json_call :
+    RPC_service.meth ->
+    ?body:Data_encoding.json ->
+    Uri.t ->
+    (Data_encoding.json, Data_encoding.json option)
+      rest_result Lwt.t
+end
+
 class ['pr] of_directory : 'pr RPC_directory.t -> ['pr] gen
 
 type error +=
