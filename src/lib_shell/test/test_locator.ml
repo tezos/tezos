@@ -222,7 +222,7 @@ let test_pred (base_dir:string) : unit tzresult Lwt.t =
   let _ = Random.self_init () in
   let range = size_chain+(size_chain/10) in
   let repeats = 100 in
-  return (repeat (fun () -> test_once (Random.int range)) repeats)
+  return (repeat (fun () -> test_once (1 + Random.int range)) repeats)
 
 
 (* compute locator using the linear predecessor *)
