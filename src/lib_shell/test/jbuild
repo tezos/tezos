@@ -7,6 +7,7 @@
               tezos-storage
               tezos-protocol-updater
               tezos-shell
+              tezos-shell-services
               tezos-embedded-protocol-demo
               tezos-stdlib-unix
               alcotest-lwt))
@@ -16,6 +17,7 @@
                     -open Tezos_storage
                     -open Tezos_protocol_updater
                     -open Tezos_shell
+                    -open Tezos_shell_services
                     -open Tezos_stdlib_unix))))
 
 (alias

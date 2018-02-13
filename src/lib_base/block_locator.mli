@@ -15,6 +15,8 @@ and raw = Block_header.t * Block_hash.t list
 
 val raw: t -> raw
 
+val pp : Format.formatter -> t -> unit
+
 val encoding: t Data_encoding.t
 
 val compute: predecessor: (Block_hash.t -> int -> Block_hash.t option Lwt.t) ->

@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Validation_errors
+
 include Logging.Make(struct let name = "node.validator.block" end)
 
 type 'a request =
@@ -25,56 +27,6 @@ type t = {
 }
 
 (** Block validation *)
-
-type protocol_error =
-  | Compilation_failed
-  | Dynlinking_failed
-
-let protocol_error_encoding =
-  let open Data_encoding in
-  union
-    [
-      case (Tag 0)
-        (obj1
-           (req "error" (constant "compilation_failed")))
-        (function Compilation_failed -> Some ()
-                | _ -> None)
-        (fun () -> Compilation_failed) ;
-      case (Tag 1)
-        (obj1
-           (req "error" (constant "dynlinking_failed")))
-        (function Dynlinking_failed -> Some ()
-                | _ -> None)
-        (fun () -> Dynlinking_failed) ;
-    ]
-
-let pp_protocol_error ppf = function
-  | Compilation_failed ->
-      Format.fprintf ppf "compilation error"
-  | Dynlinking_failed ->
-      Format.fprintf ppf "dynlinking error"
-
-type error +=
-  | Invalid_protocol of { hash: Protocol_hash.t ; error: protocol_error }
-
-let () =
-  Error_monad.register_error_kind
-    `Permanent
-    ~id:"validator.invalid_protocol"
-    ~title:"Invalid protocol"
-    ~description:"Invalid protocol."
-    ~pp:begin fun ppf (protocol, error) ->
-      Format.fprintf ppf
-        "@[<v 2>Invalid protocol %a@ %a@]"
-        Protocol_hash.pp_short protocol pp_protocol_error error
-    end
-    Data_encoding.(merge_objs
-                     (obj1 (req "invalid_protocol" Protocol_hash.encoding))
-                     protocol_error_encoding)
-    (function Invalid_protocol { hash ; error } ->
-       Some (hash, error) | _ -> None)
-    (fun (hash, error) ->
-       Invalid_protocol { hash ; error })
 
 let rec worker_loop bv =
   begin

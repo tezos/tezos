@@ -101,7 +101,7 @@ let build_valid_chain state vtbl pred names =
            return vblock
          end >>= function
          | Ok v -> Lwt.return v
-         | Error [ State.Block.Inconsistent_hash (got, _) ] ->
+         | Error [ Validation_errors.Inconsistent_hash (got, _) ] ->
              (* Kind of a hack, but at least it tests idempotence to some extent. *)
              attempt (Some got)
          | Error err ->

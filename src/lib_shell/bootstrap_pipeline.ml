@@ -9,7 +9,7 @@
 
 include Logging.Make(struct let name = "node.validator.bootstrap_pipeline" end)
 
-type error += Invalid_locator of P2p_peer.Id.t * Block_locator.t
+open Validation_errors
 
 type t = {
   canceler: Lwt_canceler.t ;

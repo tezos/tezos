@@ -16,6 +16,8 @@ and raw = Block_header.t * Block_hash.t list
 
 let raw x = x
 
+let pp ppf loc = Block_header.pp ppf (fst loc)
+
 let encoding =
   let open Data_encoding in
   (* TODO add a [description] *)

@@ -81,10 +81,6 @@ type t = Worker.dropbox Worker.t
 let debug w =
   Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
 
-type error +=
-  | Unknown_ancestor
-  | Known_invalid
-
 let set_bootstrapped pv =
   if not pv.bootstrapped then begin
     pv.bootstrapped <- true ;
@@ -194,7 +190,7 @@ let may_validate_new_head w hash header =
             "ignoring known invalid block %a from peer %a"
             Block_hash.pp_short hash
             P2p_peer.Id.pp_short pv.peer_id ;
-          fail Known_invalid
+          fail Validation_errors.Known_invalid
     end
   | false ->
       only_if_fitness_increases w header @@ fun () ->
@@ -211,7 +207,7 @@ let may_validate_new_branch w distant_hash locator =
         "ignoring branch %a without common ancestor from peer: %a."
         Block_hash.pp_short distant_hash
         P2p_peer.Id.pp_short pv.peer_id ;
-      fail Unknown_ancestor
+      fail Validation_errors.Unknown_ancestor
   | Some (ancestor, unknown_prefix) ->
       bootstrap_new_branch w ancestor distant_header unknown_prefix
 
@@ -246,8 +242,8 @@ let on_completion w r _ st =
 let on_error w r st errs =
   let pv = Worker.state w in
   match errs with
-    ((( Unknown_ancestor
-      | Bootstrap_pipeline.Invalid_locator _
+    ((( Validation_errors.Unknown_ancestor
+      | Validation_errors.Invalid_locator _
       | Block_validator_errors.Invalid_block _ ) :: _) as errors ) ->
       (* TODO ban the peer_id... *)
       debug w

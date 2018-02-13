@@ -55,26 +55,9 @@ let activate v ?max_child_ttl chain_state =
 let get_exn { active_chains } chain_id =
   Chain_id.Table.find active_chains chain_id
 
-type error +=
-  | Inactive_chain of Chain_id.t
-
-let () =
-  register_error_kind `Branch
-    ~id: "node.validator.inactive_chain"
-    ~title: "Inactive chain"
-    ~description: "Attempted validation of a block from an inactive chain."
-    ~pp: (fun ppf chain ->
-        Format.fprintf ppf
-          "Tried to validate a block from chain %a, \
-           that is not currently considered active."
-          Chain_id.pp chain)
-    Data_encoding.(obj1 (req "inactive_chain" Chain_id.encoding))
-    (function Inactive_chain chain -> Some chain | _ -> None)
-    (fun chain -> Inactive_chain chain)
-
 let get v chain_id =
   try get_exn v chain_id >>= fun nv -> return nv
-  with Not_found -> fail (Inactive_chain chain_id)
+  with Not_found -> fail (Validation_errors.Inactive_chain chain_id)
 
 let validate_block v ?(force = false) ?chain_id bytes operations =
   let hash = Block_hash.hash_bytes [bytes] in

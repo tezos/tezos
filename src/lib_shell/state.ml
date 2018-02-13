@@ -8,51 +8,7 @@
 (**************************************************************************)
 
 open Logging.Node.State
-
-type error +=
-  | Unknown_chain of Chain_id.t
-
-type error += Bad_data_dir
-
-type error += Block_not_invalid of Block_hash.t
-
-let () =
-  let open Error_monad in
-  register_error_kind
-    `Temporary
-    ~id:"state.unknown_chain"
-    ~title:"Unknown chain"
-    ~description:"TODO"
-    ~pp:(fun ppf id ->
-        Format.fprintf ppf "Unknown chain %a" Chain_id.pp id)
-    Data_encoding.(obj1 (req "chain" Chain_id.encoding))
-    (function Unknown_chain x -> Some x | _ -> None)
-    (fun x -> Unknown_chain x) ;
-  register_error_kind
-    `Permanent
-    ~id:"badDataDir"
-    ~title:"Bad data directory"
-    ~description:"The data directory could not be read. \
-                  This could be because it was generated with an \
-                  old version of the tezos-node program. \
-                  Deleting and regenerating this directory \
-                  may fix the problem."
-    Data_encoding.empty
-    (function Bad_data_dir -> Some () | _ -> None)
-    (fun () -> Bad_data_dir) ;
-  register_error_kind
-    `Permanent
-    ~id:"blockNotInvalid"
-    ~title:"Block not invalid"
-    ~description:"The invalid block to be unmarked was not actually invalid."
-    ~pp:(fun ppf block ->
-        Format.fprintf ppf "Block %a was expected to be invalid, but was not actually invalid."
-          Block_hash.pp block)
-    Data_encoding.(obj1 (req "block" Block_hash.encoding))
-    (function Block_not_invalid block -> Some block | _ -> None)
-    (fun block -> Block_not_invalid block) ;
-
-  (** *)
+open Validation_errors
 
 module Shared = struct
   type 'a t = {
@@ -544,28 +500,6 @@ module Block = struct
   let predecessor_n (chain: Chain.t) (b: Block_hash.t) (distance: int) : Block_hash.t option Lwt.t =
     Shared.use chain.block_store (fun store ->
         predecessor_n store b distance)
-
-
-  type error += Inconsistent_hash of Context_hash.t * Context_hash.t
-
-  let () =
-    Error_monad.register_error_kind
-      `Permanent
-      ~id:"inconsistentContextHash"
-      ~title:"Inconsistent commit hash"
-      ~description:
-        "When commiting the context of a block, the announced context \
-         hash was not the one computed at commit time."
-      ~pp: (fun ppf (got, exp) ->
-          Format.fprintf ppf
-            "@[<v 2>Inconsistant hash:@ got: %a@ expected: %a"
-            Context_hash.pp got
-            Context_hash.pp exp)
-      Data_encoding.(obj2
-                       (req "wrong_context_hash" Context_hash.encoding)
-                       (req "expected_context_hash" Context_hash.encoding))
-      (function Inconsistent_hash (got, exp) -> Some (got, exp) | _ -> None)
-      (fun (got, exp) -> Inconsistent_hash (got, exp))
 
   let store
       ?(dont_enforce_context_hash = false)

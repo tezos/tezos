@@ -149,7 +149,9 @@ end = struct
   type error += Timeout of key
 
   let () =
-    Error_monad.register_error_kind `Permanent
+    (* Missing data key *)
+    register_error_kind
+      `Permanent
       ~id: ("distributed_db." ^ Hash.name ^ ".missing")
       ~title: ("Missing " ^ Hash.name)
       ~description: ("Some " ^ Hash.name ^ " is missing from the distributed db")
@@ -158,6 +160,7 @@ end = struct
       (Data_encoding.obj1 (Data_encoding.req "key" Hash.encoding))
       (function Missing_data key -> Some key | _ -> None)
       (fun key -> Missing_data key) ;
+    (* Canceled key *)
     register_error_kind
       `Permanent
       ~title: ("Canceled fetch of a " ^ Hash.name)
@@ -168,6 +171,7 @@ end = struct
       Data_encoding.(obj1 (req "key" Hash.encoding))
       (function (Canceled key) -> Some key | _ -> None)
       (fun key -> Canceled key) ;
+    (* Timeout key *)
     register_error_kind
       `Permanent
       ~title: ("Timed out fetch of a " ^ Hash.name)

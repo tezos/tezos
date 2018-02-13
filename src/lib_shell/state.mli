@@ -31,12 +31,6 @@ val read:
 val close:
   global_state -> unit Lwt.t
 
-(** {2 Errors} **************************************************************)
-
-type error +=
-  | Unknown_chain of Chain_id.t
-
-
 (** {2 Network} ************************************************************)
 
 (** Data specific to a given chain (e.g the main chain or the current
@@ -104,8 +98,6 @@ module Block : sig
   val read: Chain.t -> Block_hash.t -> block tzresult Lwt.t
   val read_opt: Chain.t -> Block_hash.t -> block option Lwt.t
   val read_exn: Chain.t -> Block_hash.t -> block Lwt.t
-
-  type error += Inconsistent_hash of Context_hash.t * Context_hash.t
 
   val store:
     ?dont_enforce_context_hash:bool ->

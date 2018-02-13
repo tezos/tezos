@@ -27,8 +27,6 @@ val activate:
   ?max_child_ttl:int ->
   State.Chain.t -> Chain_validator.t Lwt.t
 
-type error +=
-  | Inactive_chain of Chain_id.t
 val get: t -> Chain_id.t -> Chain_validator.t tzresult Lwt.t
 val get_exn: t -> Chain_id.t -> Chain_validator.t Lwt.t
 

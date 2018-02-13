@@ -9,14 +9,6 @@
 
 type t
 
-type protocol_error =
-  | Compilation_failed
-  | Dynlinking_failed
-
-type error +=
-  | Invalid_protocol of
-      { hash: Protocol_hash.t ; error: protocol_error }
-
 val create: Distributed_db.t -> t
 
 val validate:

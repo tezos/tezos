@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 open Preapply_result
+open Validation_errors
 
 let rec apply_operations apply_operation state r max_ops ~sort ops =
   Lwt_list.fold_left_s
@@ -96,32 +97,6 @@ let start_prevalidation
   return (State { proto = (module Proto) ; state ;
                   max_number_of_operations ; max_operation_data_length })
 
-type error += Parse_error
-type error += Too_many_operations
-type error += Oversized_operation of { size: int ; max: int }
-
-let () =
-  register_error_kind `Temporary
-    ~id:"prevalidation.too_many_operations"
-    ~title:"Too many pending operations in prevalidation"
-    ~description:"The prevalidation context is full."
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "Too many operation in prevalidation context.")
-    Data_encoding.empty
-    (function Too_many_operations -> Some () | _ -> None)
-    (fun () -> Too_many_operations) ;
-  register_error_kind `Permanent
-    ~id:"prevalidation.oversized_operation"
-    ~title:"Oversized operation"
-    ~description:"The operation size is bigger than allowed."
-    ~pp:(fun ppf (size, max) ->
-        Format.fprintf ppf "Oversized operation (size: %d, max: %d)"
-          size max)
-    Data_encoding.(obj2
-                     (req "size" int31)
-                     (req "max_size" int31))
-    (function Oversized_operation { size ; max } -> Some (size, max) | _ -> None)
-    (fun (size, max) -> Oversized_operation { size ; max })
 
 let prevalidate
     (State { proto = (module Proto) ; state ;
