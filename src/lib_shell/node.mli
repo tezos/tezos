@@ -112,6 +112,14 @@ module RPC : sig
   val context_dir:
     t -> block -> 'a RPC_directory.t option Lwt.t
 
+  (** Returns the content of the context at the given [path] descending
+      recursively into directories as far as [depth] allows.
+      Returns [None] if a path in not in the context or if [depth] is
+      negative. *)
+  val context_raw_get:
+    t -> block -> path:string list -> depth:int ->
+    Block_services.raw_context_result option Lwt.t
+
   val preapply:
     t -> block ->
     timestamp:Time.t -> protocol_data:MBytes.t ->

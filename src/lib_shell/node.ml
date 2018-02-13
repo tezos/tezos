@@ -561,6 +561,34 @@ module RPC = struct
         let dir = RPC_directory.map (fun () -> Lwt.return rpc_context) Proto.rpc_services in
         Lwt.return (Some (RPC_directory.map (fun _ -> ()) dir))
 
+  let context_raw_get node block ~path ~depth =
+    let open Block_services in
+    (* negative depth could be handled by a more informative error *)
+    if depth < 0 then Lwt.return_none else
+      get_rpc_context node block >>= function
+      | None -> Lwt.return_none
+      | Some rpc_context ->
+          let rec loop path depth = (* non tail-recursive *)
+            if depth = 0 then Lwt.return Cut else
+              (* try to read as file *)
+              Context.get rpc_context.context path >>= function
+              | Some v -> Lwt.return (Key v)
+              | None -> (* try to read as directory *)
+                  Context.fold rpc_context.context path ~init:[]
+                    ~f:(fun k acc ->
+                        match k with
+                        | `Key k | `Dir k ->
+                            loop k (depth-1) >>= fun v ->
+                            let k = List.nth k ((List.length k)-1) in
+                            Lwt.return ((k,v)::acc)) >>= fun l ->
+                  Lwt.return (Dir (List.rev l))
+          in
+          Context.mem rpc_context.context path >>= fun mem ->
+          Context.dir_mem rpc_context.context path >>= fun dir_mem ->
+          if mem || dir_mem then
+            loop path depth >>= Lwt.return_some
+          else Lwt.return_none
+
   let heads node =
     let chain_state = Chain_validator.chain_state node.mainchain_validator in
     Chain.known_heads chain_state >>= fun heads ->

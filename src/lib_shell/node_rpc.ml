@@ -436,6 +436,13 @@ let build_rpc_directory node =
   let dir =
     RPC_directory.register2 dir Block_services.S.complete
       (fun block s () () -> Node.RPC.complete node ~block s >>= return) in
+  let dir =
+    RPC_directory.register2 dir Block_services.S.raw_context
+      (fun block path q () ->
+         Node.RPC.context_raw_get node block ~path ~depth:q#depth >>= function
+         | None -> raise Not_found
+         | Some v -> return v)
+  in
 
   (* Workers : Prevalidators *)
 

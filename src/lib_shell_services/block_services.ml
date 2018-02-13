@@ -153,6 +153,23 @@ let preapply_result_encoding =
         (req "operations"
            (list (Preapply_result.encoding RPC_error.encoding)))))
 
+type raw_context_result =
+  | Key of MBytes.t
+  | Dir of (string * raw_context_result) list
+  | Cut
+
+let raw_context_result_pp t =
+  let open Format in
+  let rec loop ppf = function
+    | Cut -> fprintf ppf "..."
+    | Key v -> let `Hex s = MBytes.to_hex v in fprintf ppf "%S" s
+    | Dir l ->
+        fprintf ppf "{@[<v 1>@,%a@]@,}"
+          (pp_print_list ~pp_sep:Format.pp_print_cut
+             (fun ppf (s,t) -> fprintf ppf "%s : %a" s loop t)) l
+  in
+  asprintf "%a" loop t
+
 module S = struct
 
   let blocks_arg =
@@ -238,6 +255,47 @@ module S = struct
       ~input: empty
       ~output: (obj1 (req "context" Context_hash.encoding))
       RPC_path.(block_path / "context")
+
+  let raw_context_args : string RPC_arg.t =
+    let name = "context_path" in
+    let descr = "A path inside the context" in
+    let construct = fun s -> s in
+    let destruct = fun s -> Ok s in
+    RPC_arg.make ~name ~descr ~construct ~destruct ()
+
+  let raw_context_result_encoding : raw_context_result Data_encoding.t =
+    let open Data_encoding in
+    obj1 (req "content"
+            (mu "context_tree" (fun raw_context_result_encoding ->
+                 union [
+                   case (Tag 0) bytes
+                     (function Key k -> Some k | _ -> None)
+                     (fun k -> Key k) ;
+                   case (Tag 1) (assoc raw_context_result_encoding)
+                     (function Dir k -> Some k | _ -> None)
+                     (fun k -> Dir k) ;
+                   case (Tag 2) null
+                     (function Cut -> Some () | _ -> None)
+                     (fun () -> Cut) ;
+                 ])))
+
+  (* The depth query argument for the [raw_context] service,
+     default value is 1. *)
+  let depth_query : < depth: int > RPC_query.t =
+    let open RPC_query in
+    query (fun depth -> object
+            method depth = depth
+          end)
+    |+ field "depth" RPC_arg.int 1 (fun t -> t#depth)
+    |> seal
+
+  let raw_context =
+    RPC_service.post_service
+      ~description:"Returns the raw context."
+      ~query: depth_query
+      ~input: empty
+      ~output: raw_context_result_encoding
+      RPC_path.(block_path / "raw_context" /:* raw_context_args)
 
   let timestamp =
     RPC_service.post_service
@@ -508,3 +566,10 @@ let unmark_invalid ctxt h =
 
 let list_invalid ctxt =
   make_call S.list_invalid ctxt () () ()
+
+let raw_context ctxt b key depth =
+  let depth = object
+    method depth = depth
+  end
+  in
+  make_call2 S.raw_context ctxt b key depth ()

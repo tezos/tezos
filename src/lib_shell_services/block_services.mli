@@ -102,6 +102,21 @@ val preapply:
 val complete:
   #simple -> block -> string -> string list tzresult Lwt.t
 
+(** Encodes a directory structure returned from a context
+    query as a tree plus a special case [Cut] used when
+    the query is limited by a [depth] value.
+    [Cut] is encoded as [null] in json. *)
+type raw_context_result =
+  | Key of MBytes.t
+  | Dir of (string * raw_context_result) list
+  | Cut
+
+(** Pretty-printer for raw_context_result *)
+val raw_context_result_pp : raw_context_result -> string
+
+val raw_context:
+  #simple -> block -> string list -> int -> raw_context_result tzresult Lwt.t
+
 val monitor_prevalidated_operations:
   ?contents:bool ->
   #streamed ->
@@ -112,7 +127,8 @@ val unmark_invalid:
 val list_invalid:
   #simple -> (Block_hash.t * int32 * error list) list tzresult Lwt.t
 
-
+(** Signatures of all RPCs.
+    This module is shared between the Client and the Node. *)
 module S : sig
 
   val blocks_arg : block RPC_arg.arg
@@ -153,6 +169,19 @@ module S : sig
     ([ `POST ], unit,
      unit * block, unit, unit,
      Context_hash.t) RPC_service.t
+
+  (** Accepts queries of the form
+      /blocks/<id>/raw_context/<path>?depth=<n>
+      returning the sub-tree corresponding to <path> inside the context of
+      block <id>. The optional parameter <depth> controls the size of the
+      tree, default is 1.
+      Example:
+      tezos-client rpc call /blocks/head/raw_context/v1?depth=2
+  *)
+  val raw_context:
+    ([ `POST ], unit,
+     (unit * block) * string list, <depth:int>, unit,
+     raw_context_result) RPC_service.t
 
   type operations_param = {
     contents: bool ;
