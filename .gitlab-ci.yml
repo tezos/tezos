@@ -183,6 +183,11 @@ test:multinode.sh:
   script:
     - jbuilder build @src/bin_client/runtest_multinode.sh
 
+test:inject.sh:
+  <<: *test_definition
+  script:
+    - jbuilder build @src/bin_client/runtest_injection.sh
+
 test:proto:sandbox:
   <<: *test_definition
   script:
