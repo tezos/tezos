@@ -58,7 +58,7 @@ module Raw = struct
     let source_dir = datadir // Protocol_hash.to_short_b58check hash // "src" in
     let log_file = datadir // Protocol_hash.to_short_b58check hash // "LOG" in
     let plugin_file = datadir // Protocol_hash.to_short_b58check hash //
-                      Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp hash
+                      Format.asprintf "protocol_%a" Protocol_hash.pp hash
     in
     begin
       Lwt_utils_unix.Protocol.write_dir source_dir ~hash p >>=? fun () ->
@@ -80,7 +80,7 @@ module Raw = struct
         log_error "COMPILATION ERROR (%s)" log_file;
         Lwt.return false
     | Ok (Unix.WEXITED _) ->
-        try Dynlink.loadfile_private plugin_file; Lwt.return true
+        try Dynlink.loadfile_private (plugin_file ^ ".cmxs"); Lwt.return true
         with Dynlink.Error err ->
           log_error "Can't load plugin: %s (%s)"
             (Dynlink.error_message err) plugin_file;

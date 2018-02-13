@@ -226,7 +226,7 @@ let main { compile_ml ; pack_objects ; link_shared } =
       create_file register_file
         (Printf.sprintf
            "module Name = struct let name = %S end\n\
-           \ let () = Tezos_protocol_compiler_native__Registerer.register Name.name (module %s.Make)"
+           \ let () = Tezos_protocol_registerer__Registerer.register Name.name (module %s.Make)"
            (Protocol_hash.to_b58check hash)
            functor_unit) ;
       let register_object = compile_ml ~for_pack register_file in
