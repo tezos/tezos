@@ -182,9 +182,11 @@ module Alias = functor (Entity : Entity) -> struct
   let alias_param
       ?(name = "name") ?(desc = "existing " ^ Entity.name ^ " alias") next =
     param ~name ~desc
-      (parameter (fun (cctxt : #Client_commands.wallet) s ->
-           find cctxt s >>=? fun v ->
-           return (s, v)))
+      (parameter
+         ~autocomplete
+         (fun (cctxt : #Client_commands.wallet) s ->
+            find cctxt s >>=? fun v ->
+            return (s, v)))
       next
 
   type fresh_param = Fresh of string
