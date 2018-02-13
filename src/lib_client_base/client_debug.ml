@@ -102,7 +102,8 @@ let commands () =
   let output_arg =
     arg
       ~doc:"Write output of debug command to file"
-      ~parameter:"-file"
+      ~long:"output"
+      ~short:'o'
       ~placeholder:"path"
     @@ parameter (fun _ str -> return str) in
   let output_to_ppf = function

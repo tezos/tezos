@@ -18,17 +18,17 @@ let parameter ?autocomplete converter =
 
 type ('a, 'ctx) arg =
   | Arg : { doc : string ;
-            parameter : string ;
+            parameter : string * char option ;
             placeholder : string ;
             kind : ('p, 'ctx) parameter } ->
     ('p option, 'ctx) arg
   | DefArg : { doc : string ;
-               parameter : string ;
+               parameter : string * char option ;
                placeholder : string ;
                kind : ('p, 'ctx) parameter ;
                default : string } -> ('p, 'ctx) arg
   | Switch : { doc : string ;
-               parameter : string } ->
+               parameter : string * char option } ->
     (bool, 'ctx) arg
 
 type ('a, 'arg) args =
@@ -77,6 +77,7 @@ type error += Command_not_found : string list * 'ctx command list -> error
 type error += Unknown_option : string * 'ctx command -> error
 type error += Option_expected_argument : string * 'ctx command option -> error
 type error += Bad_option_argument : string * 'ctx command option -> error
+type error += Multiple_occurences : string * 'ctx command option -> error
 type error += Extra_arguments : string list * 'ctx command -> error
 
 let trim s = (* config-file wokaround *)
@@ -96,18 +97,25 @@ let print_desc ppf doc =
   | Some doc ->
       Format.fprintf ppf "%s@{<full>@\n  @[<hov 0>%a@]@}" short Format.pp_print_text doc
 
+let print_parameter ppf = function
+  | long, None -> Format.fprintf ppf "--%s" long
+  | long, Some short -> Format.fprintf ppf "-%c --%s" short long
+
 let print_options_detailed (type ctx) =
   let help_option : type a.Format.formatter -> (a, ctx) arg -> unit =
     fun ppf -> function
       | Arg { parameter ; placeholder ; doc ; _ } ->
-          Format.fprintf ppf "@{<opt>%s <%s>@}: %a"
-            parameter placeholder print_desc doc ;
+          Format.fprintf ppf "@{<opt>%a <%s>@}: %a"
+            print_parameter parameter placeholder
+            print_desc doc ;
       | DefArg { parameter ; placeholder ; doc ; default ; _ } ->
-          Format.fprintf ppf "@{<opt>%s <%s>@}: %a"
-            parameter placeholder print_desc (doc ^ "\nDefaults to `" ^ default ^ "`.")
+          Format.fprintf ppf "@{<opt>%a <%s>@}: %a"
+            print_parameter parameter placeholder
+            print_desc (doc ^ "\nDefaults to `" ^ default ^ "`.")
       | Switch { parameter ; doc } ->
-          Format.fprintf ppf "@{<opt>%s@}: %a"
-            parameter print_desc doc in
+          Format.fprintf ppf "@{<opt>%a@}: %a"
+            print_parameter parameter
+            print_desc doc in
   let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
     fun ppf -> function
       | NoArgs -> ()
@@ -128,11 +136,14 @@ let print_options_brief (type ctx) =
     type a. Format.formatter -> (a, ctx) arg -> unit =
     fun ppf -> function
       | DefArg { parameter ; placeholder ; _ } ->
-          Format.fprintf ppf "[@{<opt>%s <%s>@}]" parameter placeholder
+          Format.fprintf ppf "[@{<opt>%a <%s>@}]"
+            print_parameter parameter placeholder
       | Arg { parameter ; placeholder ; _ } ->
-          Format.fprintf ppf "[@{<opt>%s <%s>@}]" parameter placeholder
+          Format.fprintf ppf "[@{<opt>%a <%s>@}]"
+            print_parameter  parameter placeholder
       | Switch { parameter ; _ } ->
-          Format.fprintf ppf "[@{<opt>%s@}]" parameter
+          Format.fprintf ppf "[@{<opt>%a@}]"
+            print_parameter parameter
   in let rec help : type b. Format.formatter -> (b, ctx) args -> unit =
        fun ppf -> function
          | NoArgs -> ()
@@ -503,9 +514,9 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights=[]) command
      @{<command>@{<commandline>\
      %s [@{<opt>global options@}] command @{<opt>[command options]@}@}@}@,\
      @{<command>@{<commandline>\
-     %s @{<opt>-help@} (for global options)@}@}@,\
+     %s @{<opt>--help@} (for global options)@}@}@,\
      @{<command>@{<commandline>\
-     %s [@{<opt>global options@}] command @{<opt>-help@} (for command options)@}@}\
+     %s [@{<opt>global options@}] command @{<opt>--help@} (for command options)@}@}\
      @}@,@,\
      @{<title>To browse the documentation@}@,\
      @{<list>\
@@ -522,42 +533,39 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights=[]) command
     (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,") ()
     print_groups by_group
 
-let arg ~doc ~parameter ~placeholder kind =
+let arg ~doc ?short ~long ~placeholder kind =
   Arg { doc ;
-        parameter ;
+        parameter = (long, short) ;
         placeholder ;
         kind }
 
-let default_arg ~doc ~parameter ~placeholder ~default kind =
+let default_arg ~doc ?short ~long ~placeholder ~default kind =
   DefArg { doc ;
            placeholder ;
-           parameter ;
+           parameter = (long, short) ;
            kind ;
            default }
 
-let switch ~doc ~parameter =
-  Switch { doc ; parameter }
+let switch ~doc ?short ~long () =
+  Switch { doc ; parameter = (long, short) }
 
 let parse_arg :
-  type a ctx. ?command:_ command -> (a, ctx) arg -> string option TzString.Map.t -> ctx -> a tzresult Lwt.t =
+  type a ctx. ?command:_ command -> (a, ctx) arg -> string list TzString.Map.t -> ctx -> a tzresult Lwt.t =
   fun ?command spec args_dict ctx ->
     match spec with
-    | Arg { parameter ; kind = { converter ; _  } ; _ } ->
-        begin
-          try
-            begin
-              match TzString.Map.find parameter args_dict with
-              | None -> return None
-              | Some s ->
-                  (trace
-                     (Bad_option_argument (parameter, command))
-                     (converter ctx s)) >>|? fun x ->
-                  Some x
-            end
-          with Not_found ->
-            return None
+    | Arg { parameter = (long, _) ; kind = { converter ; _  } ; _ } ->
+        begin match TzString.Map.find long args_dict with
+          | exception Not_found -> return None
+          | [] -> return None
+          | [ s ] ->
+              (trace
+                 (Bad_option_argument ("--" ^ long, command))
+                 (converter ctx s)) >>|? fun x ->
+              Some x
+          | _ :: _ ->
+              fail (Multiple_occurences ("--" ^ long, command))
         end
-    | DefArg { parameter ; kind = { converter ; _ } ; default ; _ } ->
+    | DefArg { parameter = (long, _) ; kind = { converter ; _ } ; default ; _ } ->
         converter ctx default >>= fun default ->
         begin match default with
           | Ok x -> return x
@@ -565,22 +573,28 @@ let parse_arg :
               invalid_arg
                 (Format.sprintf
                    "Value provided as default for '%s' could not be parsed by converter function."
-                   parameter) end >>=? fun default ->
-        begin try
-            match TzString.Map.find parameter args_dict with
-            | None -> return default
-            | Some s ->
-                trace
-                  (Bad_option_argument (parameter, command))
-                  (converter ctx s)
-          with Not_found -> return default
+                   long) end >>=? fun default ->
+        begin match TzString.Map.find long args_dict with
+          | exception Not_found -> return default
+          | [] -> return default
+          | [ s ] ->
+              (trace
+                 (Bad_option_argument (long, command))
+                 (converter ctx s))
+          | _ :: _ ->
+              fail (Multiple_occurences (long, command))
         end
-    | Switch { parameter ; _ } ->
-        return (TzString.Map.mem parameter args_dict)
+    | Switch { parameter = (long, _) ; _ } ->
+        begin match TzString.Map.find long args_dict with
+          | exception Not_found -> return false
+          | [] -> return false
+          | [ _ ] -> return true
+          | _ :: _ -> fail (Multiple_occurences (long, command))
+        end
 
 (* Argument parsing *)
 let rec parse_args :
-  type a ctx. ?command:_ command -> (a, ctx) args -> string option TzString.Map.t -> ctx -> a tzresult Lwt.t =
+  type a ctx. ?command:_ command -> (a, ctx) args -> string list TzString.Map.t -> ctx -> a tzresult Lwt.t =
   fun ?command spec args_dict ctx ->
     match spec with
     | NoArgs -> return ()
@@ -592,18 +606,21 @@ let rec parse_args :
 let empty_args_dict = TzString.Map.empty
 
 let rec make_arities_dict :
-  type a b. int TzString.Map.t -> (a, b) args -> int TzString.Map.t =
-  fun acc -> function
+  type a b. (a, b) args -> (int * string) TzString.Map.t -> (int * string) TzString.Map.t =
+  fun args acc -> match args with
     | NoArgs -> acc
     | AddArg (arg, rest) ->
-        let recur parameter num =
-          make_arities_dict (TzString.Map.add parameter num acc) rest in
-        begin
-          match arg with
-          | Arg { parameter ; _ } -> recur parameter 1
-          | DefArg { parameter ; _ } -> recur parameter 1
-          | Switch { parameter ; _ } -> recur parameter 0
-        end
+        let recur (long, short) num =
+          (match short with
+           | None -> acc
+           | Some c -> TzString.Map.add ("-" ^ String.make 1 c) (num, long) acc) |>
+          TzString.Map.add ("-" ^ long) (num, long) |>
+          TzString.Map.add ("--" ^ long) (num, long) |>
+          make_arities_dict rest in
+        match arg with
+        | Arg { parameter ; _ } -> recur parameter 1
+        | DefArg { parameter ; _ } -> recur parameter 1
+        | Switch { parameter ; _ } -> recur parameter 0
 
 type error += Help : 'a command option -> error
 
@@ -611,8 +628,10 @@ let check_help_flag ?command = function
   | ("-help" | "--help") :: _ -> fail (Help command)
   | _ -> return ()
 
-(* ignore_autocomplete is a hack to have the initial arguments get parsed
-   even if autocomplete command is running *)
+let add_occurrence long value acc =
+  try TzString.Map.add long (TzString.Map.find long acc) acc
+  with Not_found -> TzString.Map.add long [ value ] acc
+
 let make_args_dict_consume ?command spec args =
   let rec make_args_dict completing arities acc args =
     check_help_flag ?command args >>=? fun () ->
@@ -620,12 +639,14 @@ let make_args_dict_consume ?command spec args =
     | [] -> return (acc, [])
     | arg :: tl ->
         if TzString.Map.mem arg arities
-        then let arity = TzString.Map.find arg arities in
+        then
+          let arity, long = TzString.Map.find arg arities in
           check_help_flag ?command tl >>=? fun () ->
           match arity, tl with
-          | 0, tl' -> make_args_dict completing arities (TzString.Map.add arg None acc) tl'
+          | 0, tl' ->
+              make_args_dict completing arities (add_occurrence long "" acc) tl'
           | 1, value :: tl' ->
-              make_args_dict completing arities (TzString.Map.add arg (Some value) acc) tl'
+              make_args_dict completing arities (add_occurrence long value acc) tl'
           | 1, [] when completing ->
               return (acc, [])
           | 1, [] ->
@@ -633,7 +654,7 @@ let make_args_dict_consume ?command spec args =
           | _, _ ->
               raise (Failure "cli_entries: Arguments with arity not equal to 1 or 0 not supported")
         else return (acc, args)
-  in make_args_dict false (make_arities_dict TzString.Map.empty spec) TzString.Map.empty args
+  in make_args_dict false (make_arities_dict spec TzString.Map.empty) TzString.Map.empty args
 
 let make_args_dict_filter ?command spec args =
   let rec make_args_dict arities (dict, other_args) args =
@@ -642,17 +663,17 @@ let make_args_dict_filter ?command spec args =
     | [] -> return (dict, other_args)
     | arg :: tl ->
         if TzString.Map.mem arg arities
-        then let arity = TzString.Map.find arg arities in
+        then let arity, long = TzString.Map.find arg arities in
           check_help_flag ?command tl >>=? fun () ->
           match arity, tl with
-          | 0, tl -> make_args_dict arities (TzString.Map.add arg None dict, other_args) tl
-          | 1, value :: tl' -> make_args_dict arities (TzString.Map.add arg (Some value) dict, other_args) tl'
+          | 0, tl -> make_args_dict arities (add_occurrence long "" dict, other_args) tl
+          | 1, value :: tl' -> make_args_dict arities (add_occurrence long value dict, other_args) tl'
           | 1, [] -> fail (Option_expected_argument (arg, command))
           | _, _ ->
               raise (Failure "cli_entries: Arguments with arity not equal to 1 or 0 not supported")
         else make_args_dict arities (dict, arg :: other_args) tl
   in make_args_dict
-    (make_arities_dict TzString.Map.empty spec)
+    (make_arities_dict spec TzString.Map.empty)
     (TzString.Map.empty, [])
     args >>|? fun (dict, remaining) ->
   (dict, List.rev remaining)
@@ -924,14 +945,19 @@ let find_command tree initial_arguments =
         fail (Command_not_found (List.rev acc, []))
   in traverse tree initial_arguments []
 
-let get_arg : type a ctx. (a, ctx) arg -> string = function
-  | Arg { parameter ; _ } -> parameter
-  | DefArg { parameter ; _ } -> parameter
-  | Switch { parameter ; _ } -> parameter
+let get_arg
+  : type a ctx. (a, ctx) arg -> string list
+  = fun arg ->
+    let long, short =
+      match arg with
+      | Arg { parameter ; _ } -> parameter
+      | DefArg { parameter ; _ } -> parameter
+      | Switch { parameter ; _ } -> parameter in
+    ("--" ^ long) :: match short with None -> [] | Some c -> [ "-" ^ String.make 1 c ]
 
 let rec list_args : type arg ctx. (arg, ctx) args -> string list = function
   | NoArgs -> []
-  | AddArg (arg, args) -> (get_arg arg) :: (list_args args)
+  | AddArg (arg, args) -> get_arg arg @ list_args args
 
 let complete_func autocomplete cctxt =
   match autocomplete with
@@ -960,18 +986,18 @@ let rec remaining_spec :
   fun seen -> function
     | NoArgs -> []
     | AddArg (arg, rest) ->
-        let parameter = get_arg_parameter arg in
-        if StringSet.mem parameter seen
-        then (remaining_spec seen rest)
-        else parameter :: (remaining_spec seen rest)
+        let (long, _) = get_arg_parameter arg in
+        if StringSet.mem long seen
+        then remaining_spec seen rest
+        else get_arg arg @ remaining_spec seen rest
 
 let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
-  let arities = make_arities_dict TzString.Map.empty args_spec in
+  let arities = make_arities_dict args_spec TzString.Map.empty in
   let rec complete_spec : type a. string -> (a, ctx) args -> string list tzresult Lwt.t =
     fun name -> function
       | NoArgs -> return []
       | AddArg (arg, rest) ->
-          if (get_arg_parameter arg) = name
+          if fst (get_arg_parameter arg) = name
           then complete_arg ctx arg
           else complete_spec name rest in
   let rec help args ind seen =
@@ -985,17 +1011,16 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
     | arg :: tl ->
         if TzString.Map.mem arg arities
         then
-          let seen = StringSet.add arg seen in
-          begin
-            match TzString.Map.find arg arities, tl with
-            | 0, args when ind = 0 ->
-                continuation args 0 >>|? fun cont_args ->
-                remaining_spec seen args_spec @ cont_args
-            | 0, args -> help args (ind - 1) seen
-            | 1, _ when ind = 1 -> complete_spec arg args_spec
-            | 1, _ :: tl -> help tl (ind - 2) seen
-            | _ -> Pervasives.failwith "cli_entries internal error, invalid arity"
-          end
+          let arity, long = TzString.Map.find arg arities in
+          let seen = StringSet.add long seen in
+          match arity, tl with
+          | 0, args when ind = 0 ->
+              continuation args 0 >>|? fun cont_args ->
+              remaining_spec seen args_spec @ cont_args
+          | 0, args -> help args (ind - 1) seen
+          | 1, _ when ind = 1 -> complete_spec arg args_spec
+          | 1, _ :: tl -> help tl (ind - 2) seen
+          | _ -> Pervasives.failwith "cli_entries internal error, invalid arity"
         else continuation args ind
   in help args ind StringSet.empty
 
@@ -1047,7 +1072,7 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands cct
     then complete_next_tree cctxt tree >>|? fun command_completions ->
       begin
         let (Argument { spec ; _ }) = global_options in
-        remaining_spec StringSet.empty spec @ command_completions
+        list_args spec @ command_completions
       end
     else
       match ind 0 args with
@@ -1103,7 +1128,8 @@ let add_manual ~executable_name ~global_options format ppf commands =
                      1. Shows command mnemonics with short descriptions.\n\
                      2. Show commands and arguments with short descriptions\n\
                      3. Show everything"
-               ~parameter:"-verbosity"
+               ~long:"verbosity"
+               ~short:'v'
                ~placeholder:"0|1|2|3"
                (parameter
                   ~autocomplete: (fun _ -> return [ "0" ; "1" ; "2" ; "3" ])
@@ -1116,7 +1142,7 @@ let add_manual ~executable_name ~global_options format ppf commands =
             (default_arg
                ~doc:"the manual's output format"
                ~placeholder: "plain|colors|html"
-               ~parameter: "-format"
+               ~long: "format"
                ~default:
                  (match format with
                   | Ansi -> "colors"
@@ -1166,6 +1192,10 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
     | Bad_option_argument (arg, command) ->
         Format.fprintf ppf
           "Wrong value for command line option @{<opt>%s@}." arg ;
+        Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command
+    | Multiple_occurences (arg, command) ->
+        Format.fprintf ppf
+          "Command line option @{<opt>%s@} appears multiple times." arg ;
         Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command
     | No_manual_entry [ keyword ] ->
         Format.fprintf ppf

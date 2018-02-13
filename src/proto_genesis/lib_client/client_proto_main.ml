@@ -39,7 +39,7 @@ let commands () =
   let args =
     args1
       (arg
-         ~parameter:"-timestamp"
+         ~long:"timestamp"
          ~placeholder:"date"
          ~doc:"Set the timestamp of the block (and initial time of the chain)"
          (parameter (fun _ t ->

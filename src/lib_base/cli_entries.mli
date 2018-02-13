@@ -53,21 +53,23 @@ val parameter :
     ["lowercase short description\nOptional longer description."]. *)
 type ('a, 'ctx) arg
 
-(** [arg ~doc ~parameter converter] creates an argument to a command.
-    The [~parameter] argument should begin with a [-].
+(** [arg ~doc ~long ?short converter] creates an argument to a command.
+    The [~long] argument is the long format, without the double dashes.
+    The [?short] argument is the optional one letter shortcut.
     If the argument is not provided, [None] is returned. *)
 val arg :
   doc:string ->
-  parameter:string ->
+  ?short:char ->
+  long:string ->
   placeholder:string ->
   ('a, 'ctx) parameter ->
   ('a option, 'ctx) arg
 
-(** Create an argument that will contain the [~default] value if it is not provided.
-    see arg *)
+(** Create an argument that will contain the [~default] value if it is not provided. *)
 val default_arg :
   doc:string ->
-  parameter:string ->
+  ?short:char ->
+  long:string ->
   placeholder:string ->
   default:string ->
   ('a, 'ctx) parameter ->
@@ -75,7 +77,11 @@ val default_arg :
 
 (** Create a boolean switch.
     The value will be set to [true] if the switch is provided and [false] if it is not. *)
-val switch : doc:string -> parameter:string ->
+val switch :
+  doc:string ->
+  ?short:char ->
+  long:string ->
+  unit ->
   (bool, 'ctx) arg
 
 (** {2 Groups of Optional Arguments} *)

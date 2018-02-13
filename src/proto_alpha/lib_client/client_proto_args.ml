@@ -60,7 +60,7 @@ let string_parameter =
 
 let init_arg =
   default_arg
-    ~parameter:"-init"
+    ~long:"init"
     ~placeholder:"data"
     ~doc:"initial value of the contract's storage"
     ~default:"Unit"
@@ -68,7 +68,7 @@ let init_arg =
 
 let arg_arg =
   default_arg
-    ~parameter:"-arg"
+    ~long:"arg"
     ~placeholder:"data"
     ~doc:"argument passed to the contract's script, if needed"
     ~default:"Unit"
@@ -76,7 +76,7 @@ let arg_arg =
 
 let delegate_arg =
   arg
-    ~parameter:"-delegate"
+    ~long:"delegate"
     ~placeholder:"identity"
     ~doc:"delegate of the contract\n\
           Must be a known identity."
@@ -84,7 +84,7 @@ let delegate_arg =
 
 let source_arg =
   arg
-    ~parameter:"-source"
+    ~long:"source"
     ~placeholder:"identity"
     ~doc:"source of the bonds to be paid\n\
           Must be a known identity."
@@ -92,21 +92,25 @@ let source_arg =
 
 let spendable_switch =
   switch
-    ~parameter:"-spendable"
+    ~long:"spendable"
     ~doc:"allow the manager to spend the contract's tokens"
+    ()
 
 let force_switch =
   switch
-    ~parameter:"-force"
+    ~long:"force"
+    ~short:'f'
     ~doc:"disables the node's injection checks\n\
           Force the injection of branch-invalid operation or force \
          \ the injection of block without a fitness greater than the \
          \ current head."
+    ()
 
 let delegatable_switch =
   switch
-    ~parameter:"-delegatable"
+    ~long:"delegatable"
     ~doc:"allow future delegate change"
+    ()
 
 let tez_format =
   "Text format: `D,DDD,DDD.DDD,DDD`.\n\
@@ -122,7 +126,8 @@ let tez_parameter param =
        | None -> fail (Bad_tez_arg (param, s)))
 
 let tez_arg ~default ~parameter ~doc =
-  default_arg ~parameter ~placeholder:"amount" ~doc ~default (tez_parameter parameter)
+  default_arg ~long:parameter ~placeholder:"amount" ~doc ~default
+    (tez_parameter ("--" ^ parameter))
 
 let tez_param ~name ~desc next =
   Cli_entries.param
@@ -134,12 +139,12 @@ let tez_param ~name ~desc next =
 let fee_arg =
   tez_arg
     ~default:"0.05"
-    ~parameter:"-fee"
+    ~parameter:"fee"
     ~doc:"fee in \xEA\x9C\xA9 to pay to the baker"
 
 let max_priority_arg =
   arg
-    ~parameter:"-max-priority"
+    ~long:"max-priority"
     ~placeholder:"slot"
     ~doc:"maximum allowed baking slot"
     (parameter (fun _ s ->
@@ -148,12 +153,14 @@ let max_priority_arg =
 
 let free_baking_switch =
   switch
-    ~parameter:"-free-baking"
+    ~long:"free-baking"
+    ?short:None
     ~doc:"only consider free baking slots"
+    ()
 
 let endorsement_delay_arg =
   default_arg
-    ~parameter:"-endorsement-delay"
+    ~long:"endorsement-delay"
     ~placeholder:"seconds"
     ~doc:"delay before endorsing blocks\n\
           Delay between notifications of new blocks from the node and \
@@ -165,23 +172,28 @@ let endorsement_delay_arg =
 
 let no_print_source_flag =
   switch
-    ~parameter:"-no-print-source"
+    ~long:"no-print-source"
+    ~short:'q'
     ~doc:"don't print the source code\n\
           If an error is encountered, the client will print the \
           contract's source code by default.\n\
           This option disables this behaviour."
+    ()
 
 module Daemon = struct
   let baking_switch =
     switch
-      ~parameter:"-baking"
-      ~doc:"run the baking daemon"
+      ~long:"baking"
+      ~short:'B'
+      ~doc:"run the baking daemon" ()
   let endorsement_switch =
     switch
-      ~parameter:"-endorsement"
-      ~doc:"run the endorsement daemon"
+      ~long:"endorsement"
+      ~short:'E'
+      ~doc:"run the endorsement daemon" ()
   let denunciation_switch =
     switch
-      ~parameter:"-denunciation"
-      ~doc:"run the denunciation daemon"
+      ~long:"denunciation"
+      ~short:'D'
+      ~doc:"run the denunciation daemon" ()
 end

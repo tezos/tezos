@@ -192,4 +192,4 @@ let commands_for_version version =
   with Not_found -> raise Version_not_found
 
 let force_switch ?(doc = "Silence any warnings and some checks.") () =
-  Cli_entries.switch ~parameter:"-force" ~doc
+  Cli_entries.switch ~long:"force" ~short:'f' ~doc ()

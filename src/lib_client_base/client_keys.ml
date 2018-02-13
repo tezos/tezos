@@ -287,8 +287,9 @@ let commands () =
   let open Cli_entries in
   let show_private_switch =
     switch
-      ~parameter:"-show-secret"
-      ~doc:"show the private key" in
+      ~long:"show-secret"
+      ~short:'S'
+      ~doc:"show the private key" () in
   [
     command ~group
       ~desc: "List supported signing schemes.\n\
@@ -324,7 +325,11 @@ let commands () =
 
     command ~group ~desc: "Generate (unencrypted) keys including the given string."
       (args2
-         (switch ~doc:"the key must begin with tz1[word]" ~parameter:"-prefix")
+         (switch
+            ~long:"prefix"
+            ~short:'P'
+            ~doc:"the key must begin with tz1[word]"
+            ())
          (force_switch ()))
       (prefixes [ "gen" ; "vanity" ; "keys" ]
        @@ Public_key_hash.fresh_alias_param

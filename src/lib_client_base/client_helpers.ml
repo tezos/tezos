@@ -9,8 +9,10 @@
 
 let unique_switch =
   Cli_entries.switch
-    ~parameter:"-unique"
+    ~long:"unique"
+    ~short:'u'
     ~doc:"Fail when there is more than one possible completion."
+    ()
 
 let commands () = Cli_entries.[
     command

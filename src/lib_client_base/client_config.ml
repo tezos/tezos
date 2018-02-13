@@ -143,7 +143,8 @@ let protocol_parameter () =
 (* Command-line only args (not in config file) *)
 let base_dir_arg () =
   arg
-    ~parameter:"-base-dir"
+    ~long:"base-dir"
+    ~short:'d'
     ~placeholder:"path"
     ~doc:("client data directory\n\
            The directory where the Tezos client will store all its data.\n\
@@ -151,42 +152,51 @@ let base_dir_arg () =
     (string_parameter ())
 let config_file_arg () =
   arg
-    ~parameter:"-config-file"
+    ~long:"config-file"
+    ~short:'c'
     ~placeholder:"path"
     ~doc:"configuration file"
     (string_parameter ())
 let timings_switch () =
   switch
-    ~parameter:"-timings"
+    ~long:"timings"
+    ~short:'t'
     ~doc:"show RPC request times"
+    ()
 let block_arg () =
   default_arg
-    ~parameter:"-block"
+    ~long:"block"
+    ~short:'b'
     ~placeholder:"hash|tag"
     ~doc:"block on which to apply contextual commands"
     ~default:(Block_services.to_string default_cli_args.block)
     (block_parameter ())
 let protocol_arg () =
   arg
-    ~parameter:"-protocol"
+    ~long:"protocol"
+    ~short:'p'
     ~placeholder:"hash"
     ~doc:"use commands of a specific protocol"
     (protocol_parameter ())
 let log_requests_switch () =
   switch
-    ~parameter:"-log-requests"
+    ~long:"log-requests"
+    ~short:'l'
     ~doc:"log all requests to the node"
+    ()
 
 (* Command-line args which can be set in config file as well *)
 let addr_arg () =
   arg
-    ~parameter:"-addr"
+    ~long:"addr"
+    ~short:'A'
     ~placeholder:"IP addr|host"
     ~doc:"IP address of the node"
     (string_parameter ())
 let port_arg () =
   arg
-    ~parameter:"-port"
+    ~long:"port"
+    ~short:'P'
     ~placeholder:"number"
     ~doc:"RPC port of the node"
     (parameter
@@ -196,8 +206,10 @@ let port_arg () =
            fail (Invalid_port_arg x)))
 let tls_switch () =
   switch
-    ~parameter:"-tls"
+    ~long:"tls"
+    ~short:'S'
     ~doc:"use TLS to connect to node."
+    ()
 
 let read_config_file config_file =
   Lwt_utils_unix.Json.read_file config_file >>=? fun cfg_json ->
@@ -258,7 +270,8 @@ let commands config_file cfg =
              The command will always fail if the file already exists."
       (args1
          (default_arg
-            ~parameter:"-file"
+            ~long:"output"
+            ~short:'o'
             ~placeholder:"path"
             ~doc:"path at which to create the file"
             ~default:(cfg.base_dir // default_config_file_name)

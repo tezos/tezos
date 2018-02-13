@@ -21,19 +21,24 @@ let commands () =
   let open Cli_entries in
   let show_types_switch =
     switch
-      ~parameter:"-details"
-      ~doc:"show the types of each instruction" in
+      ~long:"-details"
+      ~short:'v'
+      ~doc:"show the types of each instruction"
+      () in
   let emacs_mode_switch =
     switch
-      ~parameter:"-emacs"
-      ~doc:"output in `michelson-mode.el` compatible format" in
+      ~long:"-emacs"
+      ?short:None
+      ~doc:"output in `michelson-mode.el` compatible format"
+      () in
   let trace_stack_switch =
     switch
-      ~parameter:"-trace-stack"
-      ~doc:"show the stack after each step" in
+      ~long:"trace-stack"
+      ~doc:"show the stack after each step"
+      () in
   let amount_arg =
     Client_proto_args.tez_arg
-      ~parameter:"-amount"
+      ~parameter:"amount"
       ~doc:"amount of the transfer in \xEA\x9C\xA9"
       ~default:"0.05" in
   let data_parameter =
