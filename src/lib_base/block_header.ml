@@ -48,6 +48,25 @@ type t = {
   proto: MBytes.t ;
 }
 
+include Compare.Make (struct
+    type nonrec t = t
+    let compare b1 b2 =
+      let (>>) x y = if x = 0 then y () else x in
+      let rec list compare xs ys =
+        match xs, ys with
+        | [], [] -> 0
+        | _ :: _, [] -> -1
+        | [], _ :: _ -> 1
+        | x :: xs, y :: ys ->
+            compare x y >> fun () -> list compare xs ys in
+      Block_hash.compare b1.shell.predecessor b2.shell.predecessor >> fun () ->
+      compare b1.proto b2.proto >> fun () ->
+      Operation_list_list_hash.compare
+        b1.shell.operations_hash b2.shell.operations_hash >> fun () ->
+      Time.compare b1.shell.timestamp b2.shell.timestamp >> fun () ->
+      list compare b1.shell.fitness b2.shell.fitness
+  end)
+
 let encoding =
   let open Data_encoding in
   conv
@@ -60,33 +79,6 @@ let encoding =
 let pp ppf op =
   Data_encoding.Json.pp ppf
     (Data_encoding.Json.construct encoding op)
-
-let compare b1 b2 =
-  let (>>) x y = if x = 0 then y () else x in
-  let rec list compare xs ys =
-    match xs, ys with
-    | [], [] -> 0
-    | _ :: _, [] -> -1
-    | [], _ :: _ -> 1
-    | x :: xs, y :: ys ->
-        compare x y >> fun () -> list compare xs ys in
-  Block_hash.compare b1.shell.predecessor b2.shell.predecessor >> fun () ->
-  compare b1.proto b2.proto >> fun () ->
-  Operation_list_list_hash.compare
-    b1.shell.operations_hash b2.shell.operations_hash >> fun () ->
-  Time.compare b1.shell.timestamp b2.shell.timestamp >> fun () ->
-  list compare b1.shell.fitness b2.shell.fitness
-
-let equal b1 b2 = compare b1 b2 = 0
-
-let (=) = equal
-let (<>) x y = compare x y <> 0
-let (<) x y = compare x y < 0
-let (<=) x y = compare x y <= 0
-let (>=) x y = compare x y >= 0
-let (>) x y = compare x y > 0
-let min x y = if x <= y then x else y
-let max x y = if x <= y then y else x
 
 let to_bytes v = Data_encoding.Binary.to_bytes encoding v
 let of_bytes b = Data_encoding.Binary.of_bytes encoding b

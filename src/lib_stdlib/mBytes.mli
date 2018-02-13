@@ -16,6 +16,7 @@ open Bigarray
 
 (** Arrays are of characters, represented as uint8's, in row-major layout. *)
 type t = (char, int8_unsigned_elt, c_layout) Array1.t
+include Compare.S with type t := t
 
 val create: int -> t
 (** [create n] allocates and returns an array of size [n] **)
@@ -143,14 +144,6 @@ module LE: sig
   (** [set_int64 buff i v] writes [v] to [buff] at offset [i] *)
 
 end
-
-val (=) : t -> t -> bool
-val (<>) : t -> t -> bool
-val (<) : t -> t -> bool
-val (<=) : t -> t -> bool
-val (>=) : t -> t -> bool
-val (>) : t -> t -> bool
-val compare : t -> t -> int
 
 val concat: t -> t -> t
 (** Returns a new array with adjacent copies of the two input arrays **)

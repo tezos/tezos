@@ -12,18 +12,7 @@ open Error_monad
 module type T = sig
 
   type t
-
-  val compare: t -> t -> int
-  val equal: t -> t -> bool
-
-  val (=): t -> t -> bool
-  val (<>): t -> t -> bool
-  val (<): t -> t -> bool
-  val (<=): t -> t -> bool
-  val (>=): t -> t -> bool
-  val (>): t -> t -> bool
-  val min: t -> t -> t
-  val max: t -> t -> t
+  include Compare.S with type t := t
 
   val pp: Format.formatter -> t -> unit
 

@@ -8,6 +8,7 @@
 (**************************************************************************)
 
 type t
+include Compare.S with type t := t
 
 val min_value : t
 val epoch : t
@@ -15,18 +16,6 @@ val max_value : t
 
 val add : t -> int64 -> t
 val diff : t -> t -> int64
-
-val equal : t -> t -> bool
-val compare : t -> t -> int
-
-val (=) : t -> t -> bool
-val (<>) : t -> t -> bool
-val (<) : t -> t -> bool
-val (<=) : t -> t -> bool
-val (>=) : t -> t -> bool
-val (>) : t -> t -> bool
-val min : t -> t -> t
-val max : t -> t -> t
 
 val of_seconds : int64 -> t
 val to_seconds : t -> int64

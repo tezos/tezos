@@ -7,7 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
 type t = {
   level: Raw_level_repr.t ;
   level_position: int32 ;
@@ -16,6 +15,11 @@ type t = {
   voting_period: Voting_period_repr.t ;
   voting_period_position: int32 ;
 }
+
+include Compare.Make(struct
+    type nonrec t = t
+    let compare { level = l1 } { level = l2 } = Raw_level_repr.compare l1 l2
+  end)
 
 type level = t
 
@@ -79,14 +83,4 @@ let from_raw ~first_level ~cycle_length ~voting_period_length level =
 
 let diff { level = l1 } { level = l2 } =
   Int32.sub (Raw_level_repr.to_int32 l1) (Raw_level_repr.to_int32 l2)
-
-let compare { level = l1 } { level = l2 } = Raw_level_repr.compare l1 l2
-let (=) { level = l1 } { level = l2 } = Raw_level_repr.(=) l1 l2
-let (<>) { level = l1 } { level = l2 } = Raw_level_repr.(<>) l1 l2
-let (>) { level = l1 } { level = l2 } = Raw_level_repr.(>) l1 l2
-let (>=) { level = l1 } { level = l2 } = Raw_level_repr.(>=) l1 l2
-let (<=) { level = l1 } { level = l2 } = Raw_level_repr.(<=) l1 l2
-let (<) { level = l1 } { level = l2 } = Raw_level_repr.(<) l1 l2
-let min l1 l2 = if l1 <= l2 then l1 else l2
-let max l1 l2 = if l1 >= l2 then l1 else l2
 

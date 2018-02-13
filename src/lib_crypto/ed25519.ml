@@ -22,15 +22,12 @@ open Tweetnacl
 module Public_key = struct
 
   type t = Sign.public Sign.key
-  let compare a b = Cstruct.compare (Sign.to_cstruct a) (Sign.to_cstruct b)
-  let (=) xs ys = compare xs ys = 0
-  let (<>) xs ys = compare xs ys <> 0
-  let (<) xs ys = compare xs ys < 0
-  let (<=) xs ys = compare xs ys <= 0
-  let (>=) xs ys = compare xs ys >= 0
-  let (>) xs ys = compare xs ys > 0
-  let max x y = if x >= y then x else y
-  let min x y = if x <= y then x else y
+
+  include Compare.Make(struct
+      type nonrec t = t
+      let compare a b =
+        Cstruct.compare (Sign.to_cstruct a) (Sign.to_cstruct b)
+    end)
 
   type Base58.data +=
     | Public_key of t

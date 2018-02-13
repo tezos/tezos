@@ -100,7 +100,7 @@ let map_option f = function
   | None -> None
   | Some x -> Some (f x)
 
-module CompareListInt = Compare.List(Compare.Int)
+module CompareListInt = Compare.List (Compare.Int)
 
 let constants_encoding =
   (* let open Data_encoding in *)

@@ -10,6 +10,19 @@
 type t =
   | Default of Ed25519.Public_key_hash.t
   | Originated of Contract_hash.t
+
+include Compare.Make(struct
+    type nonrec t = t
+    let compare l1 l2 =
+      match l1, l2 with
+      | Default pkh1, Default pkh2 ->
+          Ed25519.Public_key_hash.compare pkh1 pkh2
+      | Originated h1, Originated h2 ->
+          Contract_hash.compare h1 h2
+      | Default _, Originated _ -> -1
+      | Originated _, Default _ -> 1
+  end)
+
 type contract = t
 
 type error += Invalid_contract_notation of string (* `Permanent *)
@@ -129,23 +142,6 @@ let arg =
     ~construct
     ~destruct
     ()
-
-let compare l1 l2 =
-  match l1, l2 with
-  | Default pkh1, Default pkh2 ->
-      Ed25519.Public_key_hash.compare pkh1 pkh2
-  | Originated h1, Originated h2 ->
-      Contract_hash.compare h1 h2
-  | Default _, Originated _ -> -1
-  | Originated _, Default _ -> 1
-let (=) l1 l2 = Compare.Int.(=) (compare l1 l2) 0
-let (<>) l1 l2 = Compare.Int.(<>) (compare l1 l2) 0
-let (>) l1 l2 = Compare.Int.(>) (compare l1 l2) 0
-let (>=) l1 l2 = Compare.Int.(>=) (compare l1 l2) 0
-let (<=) l1 l2 = Compare.Int.(<=) (compare l1 l2) 0
-let (<) l1 l2 = Compare.Int.(<) (compare l1 l2) 0
-let min l1 l2 = if l1 <= l2 then l1 else l2
-let max l1 l2 = if l1 >= l2 then l1 else l2
 
 module Index = struct
   type t = contract

@@ -20,6 +20,11 @@ and component = {
 
 and env_version = V1
 
+include Compare.Make(struct
+    type nonrec t = t
+    let compare = Pervasives.compare
+  end)
+
 let component_encoding =
   let open Data_encoding in
   conv
@@ -73,18 +78,6 @@ let pp_ocaml ppf { expected_env ; components } =
        ~pp_sep:(fun ppf () -> Format.fprintf ppf " ;@ ")
        pp_ocaml_component)
     components
-
-let compare = Pervasives.compare
-let equal = (=)
-
-let (=) = equal
-let (<>) x y = compare x y <> 0
-let (<) x y = compare x y < 0
-let (<=) x y = compare x y <= 0
-let (>=) x y = compare x y >= 0
-let (>) x y = compare x y > 0
-let min x y = if x <= y then x else y
-let max x y = if x <= y then y else x
 
 let to_bytes v = Data_encoding.Binary.to_bytes encoding v
 let of_bytes b = Data_encoding.Binary.of_bytes encoding b

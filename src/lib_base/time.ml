@@ -33,15 +33,6 @@ module T = struct
         if compare t1 t2 < 0 then a2 else a1
 
   let hash = to_int
-  let (=) = equal
-  let (<>) x y = compare x y <> 0
-  let (<) x y = compare x y < 0
-  let (<=) x y = compare x y <= 0
-  let (>=) x y = compare x y >= 0
-  let (>) x y = compare x y > 0
-  let min x y = if x <= y then x else y
-  let max x y = if x <= y then y else x
-
   let min_value = min_int
   let epoch = 0L
   let max_value = max_int
@@ -149,6 +140,7 @@ module T = struct
 end
 
 include T
-module Set = Set.Make(T)
-module Map = Map.Make(T)
-module Table = Hashtbl.Make(T)
+include Compare.Make (T)
+module Set = Set.Make (T)
+module Map = Map.Make (T)
+module Table = Hashtbl.Make (T)

@@ -81,19 +81,14 @@ let substring src srcoff len =
   Bytes.unsafe_to_string s
 
 include EndianBigstring.BigEndian
+include Compare.Make(struct
+    type nonrec t = t
+    let compare = Pervasives.compare
+  end)
 
 module LE = struct
   include EndianBigstring.LittleEndian
 end
-
-
-let (=) = ((=) : t -> t -> bool)
-let (<>) = ((<>) : t -> t -> bool)
-let (<) = ((<) : t -> t -> bool)
-let (<=) = ((<=) : t -> t -> bool)
-let (>=) = ((>=) : t -> t -> bool)
-let (>) = ((>) : t -> t -> bool)
-let compare = Pervasives.compare
 
 let concat b1 b2 =
   let l1 = length b1 in
