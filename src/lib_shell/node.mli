@@ -118,9 +118,6 @@ module RPC : sig
     sort_operations:bool -> Operation.t list list ->
     (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 
-  val context_dir:
-    t -> block -> 'a RPC_directory.t option Lwt.t
-
   val complete:
     t -> ?block:block -> string -> string list Lwt.t
 
