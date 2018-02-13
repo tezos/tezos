@@ -70,7 +70,7 @@ val ignore_context : full_context
 (** [ignore_context] is a context whose logging callbacks do nothing,
     and whose [error] function calls [Lwt.fail_with]. *)
 
-type command = (full_context, unit) Cli_entries.command
+type command = full_context Cli_entries.command
 
 exception Version_not_found
 

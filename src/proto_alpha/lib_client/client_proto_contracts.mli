@@ -21,13 +21,13 @@ module ContractAlias : sig
   val alias_param:
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_commands.wallet as 'wallet), 'ret) params ->
-    (Lwt_io.file_name * Contract.t -> 'a, 'wallet, 'ret) params
+    ('a, (#Client_commands.wallet as 'wallet)) params ->
+    (Lwt_io.file_name * Contract.t -> 'a, 'wallet) params
   val destination_param:
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_commands.wallet as 'wallet), 'ret) params ->
-    (Lwt_io.file_name * Contract.t -> 'a, 'wallet, 'ret) params
+    ('a, (#Client_commands.wallet as 'wallet)) params ->
+    (Lwt_io.file_name * Contract.t -> 'a, 'wallet) params
   val rev_find:
     #Client_commands.wallet ->
     Contract.t -> string option tzresult Lwt.t

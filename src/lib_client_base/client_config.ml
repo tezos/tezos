@@ -20,7 +20,7 @@ let () =
     ~description: "Block argument could not be parsed"
     ~pp:
       (fun ppf s ->
-         Format.fprintf ppf "Value provided for -block flag (%s) could not be parsed" s)
+         Format.fprintf ppf "Value %s is not a value block reference." s)
     Data_encoding.(obj1 (req "value" string))
     (function Invalid_block_argument s -> Some s | _ -> None)
     (fun s -> Invalid_block_argument s) ;
@@ -31,7 +31,7 @@ let () =
     ~description: "Protocol argument could not be parsed"
     ~pp:
       (fun ppf s ->
-         Format.fprintf ppf "Value provided for -protocol flag (%s) does not correspond to any known protocol" s)
+         Format.fprintf ppf "Value %s does not correspond to any known protocol." s)
     Data_encoding.(obj1 (req "value" string))
     (function Invalid_protocol_argument s -> Some s | _ -> None)
     (fun s -> Invalid_protocol_argument s) ;
@@ -42,7 +42,7 @@ let () =
     ~description: "Port argument could not be parsed"
     ~pp:
       (fun ppf s ->
-         Format.fprintf ppf "Value provided for -port flag (%s) could not be parsed" s)
+         Format.fprintf ppf "Value %s is not a valid TCP port." s)
     Data_encoding.(obj1 (req "value" string))
     (function Invalid_port_arg s -> Some s | _ -> None)
     (fun s -> Invalid_port_arg s)
@@ -282,7 +282,7 @@ let global_options () =
     (tls_switch ())
 
 let parse_config_args (ctx : #Client_commands.full_context) argv =
-  parse_initial_options
+  parse_global_options
     (global_options ())
     ctx
     argv >>=?

@@ -121,7 +121,7 @@ class file_wallet dir : wallet = object (self)
       |> generic_trace "could not write the %s alias file." alias_name
 end
 
-type command = (full_context, unit) Cli_entries.command
+type command = full_context Cli_entries.command
 
 (* Default config *)
 

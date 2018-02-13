@@ -8,7 +8,7 @@ _tezos-client_complete()
     # Tezos script
     script=${COMP_WORDS[0]}
 
-    reply=$($script bash_autocomplete "$prev_word" "$cur_word" ${COMP_WORDS[@]})
+    reply=$($script bash_autocomplete "$prev_word" "$cur_word" ${COMP_WORDS[@]} 2>/dev/null)
 
     COMPREPLY=($(compgen -W "$reply" -- $cur_word))
 

@@ -35,8 +35,8 @@ val tez_arg :
 val tez_param :
   name:string ->
   desc:string ->
-  ('a, full_context, 'ret) Cli_entries.params ->
-  (Tez.t -> 'a, full_context, 'ret) Cli_entries.params
+  ('a, full_context) Cli_entries.params ->
+  (Tez.t -> 'a, full_context) Cli_entries.params
 
 module Daemon : sig
   val baking_switch: (bool, Proto_alpha.full_context) Cli_entries.arg

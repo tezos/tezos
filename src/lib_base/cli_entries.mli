@@ -81,7 +81,7 @@ val switch : doc:string -> parameter:string ->
 (** {2 Groups of Optional Arguments} *)
 
 (** Defines a group of options, either the global options or the
-   command options. *)
+    command options. *)
 
 (** The type of a series of labeled arguments to a command *)
 type ('a, 'ctx) options
@@ -163,56 +163,56 @@ val args10 : ('a, 'ctx) arg -> ('b, 'ctx) arg -> ('c, 'ctx) arg -> ('d, 'ctx) ar
 (** {2 Parameter based command lines} *)
 
 (** Type of parameters for a command *)
-type ('a, 'ctx, 'ret) params
+type ('a, 'ctx) params
 
 (** A piece of data inside a command line *)
 val param:
   name: string ->
   desc: string ->
   ('a, 'ctx) parameter ->
-  ('b, 'ctx, 'ret) params ->
-  ('a -> 'b, 'ctx, 'ret) params
+  ('b, 'ctx) params ->
+  ('a -> 'b, 'ctx) params
 
 (** A word in a command line.
     Should be descriptive. *)
 val prefix:
   string ->
-  ('a, 'ctx, 'ret) params ->
-  ('a, 'ctx, 'ret) params
+  ('a, 'ctx) params ->
+  ('a, 'ctx) params
 
 (** Multiple words given in sequence for a command line *)
 val prefixes:
   string list ->
-  ('a, 'ctx, 'ret) params ->
-  ('a, 'ctx, 'ret) params
+  ('a, 'ctx) params ->
+  ('a, 'ctx) params
 
 (** A fixed series of words that trigger a command. *)
 val fixed:
   string list ->
-  ('ctx -> 'ret tzresult Lwt.t, 'ctx, 'ret) params
+  ('ctx -> unit tzresult Lwt.t, 'ctx) params
 
 (** End the description of the command line *)
 val stop:
-  ('ctx -> 'ret tzresult Lwt.t, 'ctx, 'ret) params
+  ('ctx -> unit tzresult Lwt.t, 'ctx) params
 
 (** Take a sequence of parameters instead of only a single one.
     Must be the last thing in the command line. *)
 val seq_of_param:
-  (('ctx -> 'ret tzresult Lwt.t, 'ctx, 'ret) params ->
-   ('a -> 'ctx -> 'ret tzresult Lwt.t, 'ctx, 'ret) params) ->
-  ('a list -> 'ctx -> 'ret tzresult Lwt.t, 'ctx, 'ret) params
+  (('ctx -> unit tzresult Lwt.t, 'ctx) params ->
+   ('a -> 'ctx -> unit tzresult Lwt.t, 'ctx) params) ->
+  ('a list -> 'ctx -> unit tzresult Lwt.t, 'ctx) params
 
 (** Parameter that expects a string *)
 val string:
   name: string ->
   desc: string ->
-  ('a, 'ctx, 'ret) params ->
-  (string -> 'a, 'ctx, 'ret) params
+  ('a, 'ctx) params ->
+  (string -> 'a, 'ctx) params
 
 (** {2 Commands }  *)
 
 (** Command, including a parameter specification, optional arguments, and handlers  *)
-type ('ctx, 'ret) command
+type 'ctx command
 
 (** Type of a group of commands.
     Groups have their documentation printed together
@@ -222,48 +222,29 @@ type group =
     title : string }
 
 (** A complete command, with documentation, a specification of its
-   options, parameters, and handler function. *)
+    options, parameters, and handler function. *)
 val command:
   ?group: group ->
   desc: string ->
   ('b, 'ctx) options ->
-  ('a, 'ctx, 'ret) params ->
+  ('a, 'ctx) params ->
   ('b -> 'a) ->
-  ('ctx, 'ret) command
+  'ctx command
 
-(** {2 Parsing and error reporting} *)
-
-(** Print readable descriptions for CLI parsing errors.
-    This function must be used for help printing to work. *)
-val handle_cli_errors:
-  stdout: Format.formatter ->
-  stderr: Format.formatter ->
-  global_options:(_, _) options ->
-  'a tzresult -> int tzresult Lwt.t
-
-(** Find and call the applicable command on the series of arguments.
-    @raises [Failure] if the command list would be ambiguous. *)
-val dispatch:
-  ?global_options:('a, 'ctx) options ->
-  ('ctx, 'ret) command list ->
-  'ctx ->
-  string list ->
-  'ret tzresult Lwt.t
-
-(** Parse the global options, and return their value, with the rest of
-   the command to be parsed. *)
-val parse_initial_options :
-  ('a, 'ctx) options ->
-  'ctx ->
-  string list ->
-  ('a * string list) tzresult Lwt.t
-
-val map_command: ('a -> 'b) -> ('b, 'c) command -> ('a, 'c) command
+(** Combinator to use a command in an adaptated context. *)
+val map_command: ('a -> 'b) -> 'b command -> 'a command
 
 (** {2 Output formatting} *)
 
 (** Used to restore the formatter state after [setup_formatter]. *)
 type formatter_state
+
+(** Supported output formats.
+    Currently: black and white, colors using ANSI escapes, and HTML.*)
+type format = Plain | Ansi | Html
+
+(** Verbosity level, from terse to verbose. *)
+type verbosity = Terse | Short | Details | Full
 
 (** Updates the formatter's functions to interprete some semantic tags
     used in manual production. Returns the previous state of the
@@ -275,28 +256,86 @@ type formatter_state
       * [<title>]: a section title (just below a [<document])
       * [<list>]: a list section (just below a [<document])
 
-   Structure tags used internally for generating the manual:
+    Structure tags used internally for generating the manual:
 
     * [<command>]: wraps the full documentation bloc for a command
     * [<commandline>]: wraps the command line in a [<command>]
     * [<commanddoc>]: wraps everything but the command line in a [<command>]
 
-   Cosmetic tags for hilighting text:
+    Cosmetic tags for hilighting text:
 
     * [<opt>]: optional arguments * [<arg>]: positional arguments
     * [<kwd>]: positional keywords * [<hilight>]: search results
 
-   Verbosity levels, in order, and how they are used in the manual:
+    Verbosity levels, in order, and how they are used in the manual:
 
-    * [<terse>]: always displayed (titles commands lines)
-    * [<args>]: displayed if [verbosity >= `Args] (lists of arguments)
-    * [<short>]: displayed if [verbosity >= `Short] (single line descriptions)
-    * [<full>]: only displayed if [verbosity = `Full] (long descriptions) *)
+    * [<terse>]: titles, commands lines
+    * [<short>]: lists of arguments
+    * [<details>]: single line descriptions
+    * [<full>]: with long descriptions
+
+    Wrapping a piece of text with a debug level means that the
+    contents are only printed if the verbosity is equal to or
+    above that level. Use prefix [=] for an exact match, or [-]
+    for the inverse interpretation. *)
 val setup_formatter :
   Format.formatter ->
-  format: [< `Ansi | `Html | `Plain ] ->
-  verbosity: [> `Terse | `Short | `Args | `Full ] ->
+  format ->
+  verbosity ->
   formatter_state
 
 (** Restore the formatter state after [setup_formatter]. *)
 val restore_formatter : Format.formatter -> formatter_state -> unit
+
+(** {2 Parsing and error reporting} *)
+
+(** Help error (not really an error), thrown by {!dispatch} and {!parse_initial_options}. *)
+type error += Help : _ command option -> error
+
+(** Find and call the applicable command on the series of arguments.
+    @raises [Failure] if the command list would be ambiguous. *)
+val dispatch: 'ctx command list -> 'ctx -> string list -> unit tzresult Lwt.t
+
+(** Parse the global options, and return their value, with the rest of
+    the command to be parsed. *)
+val parse_global_options : ('a, 'ctx) options -> 'ctx -> string list -> ('a * string list) tzresult Lwt.t
+
+(** Pretty printfs the error messages to the given formatter.
+    [executable_name] and [global_options] are for help screens.
+    [default] is used to print non-cli errors. *)
+val pp_cli_errors :
+  Format.formatter ->
+  executable_name: string ->
+  global_options: (_, _) options ->
+  default: (Format.formatter -> error -> unit) ->
+  error list ->
+  unit
+
+(** Acts as {!dispatch}, but stops if the given command up to
+    [prev_arg] is a valid prefix command, returning the list of valid
+    next words, filtered with [cur_arg]. *)
+val autocompletion :
+  script:string -> cur_arg:string -> prev_arg:string -> args:string list ->
+  global_options:('a, 'ctx) options -> 'ctx command list -> 'ctx ->
+  string list Error_monad.tzresult Lwt.t
+
+(** Displays a help page for the given commands. *)
+val usage :
+  Format.formatter ->
+  executable_name:string ->
+  global_options:(_, _) options ->
+  _ command list ->
+  unit
+
+(** {2 Manual} *)
+
+(** Add manual commands to a list of commands.
+    For this to work, the command list must be complete.
+    Commands added later will not appear in the manual. *)
+val add_manual :
+  executable_name: string ->
+  global_options: ('a, 'ctx) options ->
+  format ->
+  Format.formatter ->
+  'ctx command list ->
+  'ctx command list

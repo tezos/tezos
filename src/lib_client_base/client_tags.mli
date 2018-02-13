@@ -28,8 +28,8 @@ module Tags (Entity : Entity) : sig
   val tag_param:
     ?name:string ->
     ?desc:string ->
-    ('a, 'ctx, 'ret) Cli_entries.params ->
-    (Tag.t -> 'a, 'ctx, 'ret) Cli_entries.params
+    ('a, 'ctx) Cli_entries.params ->
+    (Tag.t -> 'a, 'ctx) Cli_entries.params
 
   val rev_find_by_tag:
     #Client_commands.full_context ->

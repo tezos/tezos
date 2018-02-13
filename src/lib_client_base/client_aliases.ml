@@ -60,13 +60,13 @@ module type Alias = sig
   val alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_commands.wallet as 'b), 'ret) Cli_entries.params ->
-    (string * t -> 'a, 'b, 'ret) Cli_entries.params
+    ('a, (#Client_commands.wallet as 'b)) Cli_entries.params ->
+    (string * t -> 'a, 'b) Cli_entries.params
   val fresh_alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (< .. > as 'obj), 'ret) Cli_entries.params ->
-    (fresh_param -> 'a, 'obj, 'ret) Cli_entries.params
+    ('a, (< .. > as 'obj)) Cli_entries.params ->
+    (fresh_param -> 'a, 'obj) Cli_entries.params
   val force_switch :
     unit -> (bool, #Client_commands.full_context) arg
   val of_fresh :
@@ -77,8 +77,8 @@ module type Alias = sig
   val source_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_commands.wallet as 'obj), 'ret) Cli_entries.params ->
-    (t -> 'a, 'obj, 'ret) Cli_entries.params
+    ('a, (#Client_commands.wallet as 'obj)) Cli_entries.params ->
+    (t -> 'a, 'obj) Cli_entries.params
   val autocomplete:
     #Client_commands.wallet -> string list tzresult Lwt.t
 end
