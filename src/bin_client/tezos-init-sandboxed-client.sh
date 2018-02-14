@@ -4,6 +4,7 @@ set -e
 
 client_dir="${client_dir:=$HOME/.tezos-client}"
 client="${client:=tezos-client -base-dir $client_dir}"
+admin_client="${client:=tezos-admin-client -base-dir $client_dir}"
 
 client_dirs=()
 
@@ -16,6 +17,7 @@ init_sandboxed_client() {
     client_dir="$(mktemp -d -t tezos-tmp-client.XXXXXXXX)"
     client_dirs+=("$client_dir")
     client="$local_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
+    admin_client="$local_admin_client -base-dir $client_dir -addr 127.0.0.1 -port $rpc"
 
 }
 
@@ -215,8 +217,10 @@ main () {
     local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
     if [ $(basename "$bin_dir") = "bin_client" ]; then
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
+        local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
     else
         local_client="${local_client:-tezos-client}"
+        local_admin_client="${local_admin_client:-tezos-admin-client}"
     fi
 
     if [ $# -lt 1 ] || [ "$1" -le 0 ] || [ 10 -le "$1" ]; then
@@ -233,7 +237,7 @@ main () {
     echo "exec $client \"\$@\"" >> $client_dir/bin/tezos-client
     chmod +x $client_dir/bin/tezos-client
     echo '#!/bin/sh' > $client_dir/bin/tezos-admin-client
-    echo "exec $client \"\$@\"" | sed s/main_client/main_admin/g  >> $client_dir/bin/tezos-admin-client
+    echo "exec $admin_client \"\$@\""  >> $client_dir/bin/tezos-admin-client
     chmod +x $client_dir/bin/tezos-admin-client
 
     cat <<EOF

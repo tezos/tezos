@@ -9,7 +9,8 @@ sandbox_file="$test_dir/sandbox.json"
 tezos_sandboxed_node="${1:-$test_dir/../../bin_node/tezos-sandboxed-node.sh}"
 local_node="${2:-$test_dir/../../../_build/default/src/bin_node/main.exe}"
 tezos_init_sandboxed_client="${3:-$test_dir/../../bin_client/tezos-init-sandboxed-client.sh}"
-local_client="${4:-$test_dir/../../../_build/default/src/bin_client/main.exe}"
+local_client="${4:-$test_dir/../../../_build/default/src/bin_client/main_client.exe}"
+local_admin_client="${5:-$test_dir/../../../_build/default/src/bin_client/main_admin.exe}"
 
 contract_dir="contracts"
 

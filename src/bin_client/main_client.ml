@@ -44,7 +44,6 @@ let select_commands ctxt { block ; protocol } =
   Client_rpc_commands.commands @
   Client_network_commands.commands () @
   Client_keys_commands.commands () @
-  Client_protocols.commands () @
   Client_helpers_commands.commands () @
   commands_for_version
 

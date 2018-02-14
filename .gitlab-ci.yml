@@ -401,6 +401,11 @@ opam:37:tezos-unix-signers:
   variables:
     package: tezos-unix-signers
 
+opam:38:tezos-client-commands:
+  <<: *opam_definition
+  variables:
+    package: tezos-client-commands
+
 
 ##END_OPAM##
 
