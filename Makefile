@@ -56,7 +56,7 @@ install:
 
 clean:
 	@-jbuilder clean
-	@-rm -f tezos-node tezos-client tezos-protocol-compiler
+	@-rm -f tezos-node tezos-client tezos-admin-client tezos-protocol-compiler
 	@-make -C docs clean
 
 .PHONY: all test build-deps docker-image clean
