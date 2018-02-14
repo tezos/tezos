@@ -19,9 +19,16 @@ module StringMap = Resto.StringMap
 let arg_encoding =
   let open Data_encoding in
   conv
-    (fun {Resto.Arg.name; descr} -> (name, descr))
-    (fun (name, descr) -> {name; descr})
-    (obj2 (req "name" string) (opt "descr" string))
+    (fun {Resto.Arg.name; descr} -> ((),name, descr))
+    (fun ((),name, descr) -> {name; descr})
+    (obj3 (req "id" (constant "single")) (req "name" string) (opt "descr" string))
+
+let multi_arg_encoding =
+  let open Data_encoding in
+  conv
+    (fun {Resto.Arg.name; descr} -> ((),name, descr))
+    (fun ((),name, descr) -> {name; descr})
+    (obj3 (req "id" (constant "multiple")) (req "name" string) (opt "descr" string))
 
 open Resto.Description
 
@@ -42,6 +49,9 @@ let path_item_encoding =
     case (Tag 1) arg_encoding
       (function PDynamic s -> Some s | _ -> None)
       (fun s -> PDynamic s) ;
+    case (Tag 2) multi_arg_encoding
+      (function PDynamicTail s -> Some s | _ -> None)
+      (fun s -> PDynamicTail s) ;
   ]
 
 let query_kind_encoding =
