@@ -280,4 +280,6 @@ let alias_keys cctxt name =
   in find_key l
 
 let force_switch () =
-  Client_commands.force_switch ~doc:"overwrite existing keys" ()
+  Cli_entries.switch
+    ~long:"force" ~short:'f'
+    ~doc:"overwrite existing keys" ()

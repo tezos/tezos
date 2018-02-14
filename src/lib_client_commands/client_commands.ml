@@ -30,6 +30,3 @@ let register name commands =
 let commands_for_version version =
   try Protocol_hash.Table.find versions version
   with Not_found -> raise Version_not_found
-
-let force_switch ?(doc = "Silence any warnings and some checks.") () =
-  Cli_entries.switch ~long:"force" ~short:'f' ~doc ()

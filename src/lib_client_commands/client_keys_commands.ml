@@ -195,7 +195,9 @@ let commands () =
                  else return ()) ;
 
     command ~group ~desc: "Forget the entire wallet of keys."
-      (args1 (Client_commands.force_switch ~doc:"you got to use the force for that" ()))
+      (args1 (Cli_entries.switch
+                ~long:"force" ~short:'f'
+                ~doc:"you got to use the force for that" ()))
       (fixed [ "forget" ; "all" ; "keys" ])
       (fun force cctxt ->
          fail_unless force

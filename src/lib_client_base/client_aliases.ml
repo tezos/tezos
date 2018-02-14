@@ -266,7 +266,8 @@ module Alias = functor (Entity : Entity) -> struct
       next
 
   let force_switch () =
-    Client_commands.force_switch
+    Cli_entries.switch
+      ~long:"force" ~short:'f'
       ~doc:("overwrite existing " ^ Entity.name) ()
 
   let name (wallet : #wallet) d =

@@ -6,6 +6,7 @@
   (libraries (tezos-base
               tezos-shell-services
               tezos-client-base
+              tezos-client-commands
               tezos-protocol-environment-client
               tezos-protocol-genesis
               tezos-protocol-alpha))
@@ -14,7 +15,8 @@
                     -safe-string
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell_services
-                    -open Tezos_client_base))))
+                    -open Tezos_client_base
+                    -open Tezos_client_commands))))
 
 (alias
  ((name runtest_indent)

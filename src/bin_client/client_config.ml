@@ -230,7 +230,7 @@ let default_config_file_name = "config"
 let commands config_file cfg =
   let open Cli_entries in
   let group = { Cli_entries.name = "config" ;
-                title = "Commands for editing and viewing the client's config file." } in
+                title = "Commands for editing and viewing the client's config file" } in
   [ command ~group ~desc:"Show the config file."
       no_options
       (fixed [ "config" ; "show" ])
