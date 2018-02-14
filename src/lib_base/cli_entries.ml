@@ -74,7 +74,7 @@ type 'arg command =
 type error += Bad_argument of int * string
 type error += Unterminated_command : string list * 'ctx command list -> error
 type error += Command_not_found : string list * 'ctx command list -> error
-type error += Unknown_option : string * 'ctx command -> error
+type error += Unknown_option : string * 'ctx command option -> error
 type error += Option_expected_argument : string * 'ctx command option -> error
 type error += Bad_option_argument : string * 'ctx command option -> error
 type error += Multiple_occurences : string * 'ctx command option -> error
@@ -641,21 +641,23 @@ let make_args_dict_consume ?command spec args =
     match args with
     | [] -> return (acc, [])
     | arg :: tl ->
-        if TzString.Map.mem arg arities
-        then
-          let arity, long = TzString.Map.find arg arities in
-          check_help_flag ?command tl >>=? fun () ->
-          match arity, tl with
-          | 0, tl' ->
-              make_args_dict completing arities (add_occurrence long "" acc) tl'
-          | 1, value :: tl' ->
-              make_args_dict completing arities (add_occurrence long value acc) tl'
-          | 1, [] when completing ->
-              return (acc, [])
-          | 1, [] ->
-              fail (Option_expected_argument (arg, None))
-          | _, _ ->
-              raise (Failure "cli_entries: Arguments with arity not equal to 1 or 0 not supported")
+        if String.length arg > 0 && String.get arg 0 = '-' then
+          if TzString.Map.mem arg arities then
+            let arity, long = TzString.Map.find arg arities in
+            check_help_flag ?command tl >>=? fun () ->
+            match arity, tl with
+            | 0, tl' ->
+                make_args_dict completing arities (add_occurrence long "" acc) tl'
+            | 1, value :: tl' ->
+                make_args_dict completing arities (add_occurrence long value acc) tl'
+            | 1, [] when completing ->
+                return (acc, [])
+            | 1, [] ->
+                fail (Option_expected_argument (arg, None))
+            | _, _ ->
+                raise (Failure "cli_entries: Arguments with arity not equal to 1 or 0 not supported")
+          else
+            fail (Unknown_option (arg, None))
         else return (acc, args)
   in make_args_dict false (make_arities_dict spec TzString.Map.empty) TzString.Map.empty args
 
@@ -917,7 +919,7 @@ let find_command tree initial_arguments =
           | [] -> return (command, args_dict, initial_arguments)
           | hd :: _ ->
               if String.length hd > 0 && String.get hd 0 = '-' then
-                fail (Unknown_option (hd, command))
+                fail (Unknown_option (hd, Some command))
               else
                 fail (Extra_arguments (unparsed, command))
         end
@@ -1218,7 +1220,7 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
         Format.fprintf ppf
           "Unexpected command line option @{<opt>%s@}."
           option ;
-        [ Ex command ]
+        Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command
     | Extra_arguments (extra, command) ->
         Format.fprintf ppf
           "Extra command line arguments:@, @[<h>%a@]."
