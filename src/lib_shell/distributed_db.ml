@@ -816,32 +816,6 @@ module Raw = struct
   let supported_versions = Message.cfg.versions
 end
 
-module type DISTRIBUTED_DB = sig
-  type t
-  type key
-  type value
-  val known: t -> key -> bool Lwt.t
-  type error += Missing_data of key
-  val read: t -> key -> value tzresult Lwt.t
-  val read_opt: t -> key -> value option Lwt.t
-  val read_exn: t -> key -> value Lwt.t
-  type param
-  type error += Timeout of key
-  val fetch:
-    t ->
-    ?peer:P2p_peer.Id.t ->
-    ?timeout:float ->
-    key -> param -> value tzresult Lwt.t
-  val prefetch:
-    t ->
-    ?peer:P2p_peer.Id.t ->
-    ?timeout:float ->
-    key -> param -> unit
-  type error += Canceled of key
-  val clear_or_cancel: t -> key -> unit
-  val watch: t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
-end
-
 module Make
     (Table : Distributed_db_functors.DISTRIBUTED_DB)
     (Kind : sig
@@ -863,6 +837,7 @@ module Make
     Table.fetch (Kind.proj t) ?peer ?timeout k p
   let clear_or_cancel t k = Table.clear_or_cancel (Kind.proj t) k
   let inject t k v = Table.inject (Kind.proj t) k v
+  let pending t k = Table.pending (Kind.proj t) k
   let watch t = Table.watch (Kind.proj t)
 end
 
@@ -871,10 +846,10 @@ module Block_header = struct
   include (Make (Raw_block_header.Table) (struct
              type t = net_db
              let proj net = net.block_header_db.table
-           end) : DISTRIBUTED_DB with type t := net_db
-                                  and type key := Block_hash.t
-                                  and type value := Block_header.t
-                                  and type param := unit)
+           end) : Distributed_db_functors.DISTRIBUTED_DB with type t := net_db
+                                                          and type key := Block_hash.t
+                                                          and type value := Block_header.t
+                                                          and type param := unit)
 end
 
 module Operation_hashes =
@@ -894,10 +869,10 @@ module Operation = struct
   include (Make (Raw_operation.Table) (struct
              type t = net_db
              let proj net = net.operation_db.table
-           end) : DISTRIBUTED_DB with type t := net_db
-                                  and type key := Operation_hash.t
-                                  and type value := Operation.t
-                                  and type param := unit)
+           end) : Distributed_db_functors.DISTRIBUTED_DB with type t := net_db
+                                                          and type key := Operation_hash.t
+                                                          and type value := Operation.t
+                                                          and type param := unit)
 end
 
 module Protocol = struct
@@ -905,10 +880,10 @@ module Protocol = struct
   include (Make (Raw_protocol.Table) (struct
              type t = db
              let proj db = db.protocol_db.table
-           end) : DISTRIBUTED_DB with type t := db
-                                  and type key := Protocol_hash.t
-                                  and type value := Protocol.t
-                                  and type param := unit)
+           end) : Distributed_db_functors.DISTRIBUTED_DB with type t := db
+                                                          and type key := Protocol_hash.t
+                                                          and type value := Protocol.t
+                                                          and type param := unit)
 end
 
 
