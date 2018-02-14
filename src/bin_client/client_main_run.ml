@@ -184,8 +184,8 @@ let main select_commands =
         Format.printf "@{<error>@{<title>Fatal error@}@} %s." (Printexc.to_string exn) ;
         Lwt.return 1
   end >>= fun retcode ->
-  Format.fprintf Format.std_formatter "@." ;
-  Format.fprintf Format.err_formatter "@." ;
+  Format.pp_flush_formatter Format.std_formatter ;
+  Format.pp_flush_formatter Format.err_formatter ;
   Lwt.return retcode
 
 (* Where all the user friendliness starts *)

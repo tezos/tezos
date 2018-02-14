@@ -293,6 +293,7 @@ let setup_formatter ppf format verbosity =
     Format.pp_get_formatter_tag_functions ppf (),
     Format.pp_get_print_tags ppf () in
   begin
+    Format.pp_flush_formatter ppf ;
     Format.pp_set_formatter_out_functions ppf
       { out_string =
           (fun s b a ->
@@ -335,7 +336,8 @@ let setup_formatter ppf format verbosity =
     match format with
     | Ansi ->
         let color_num = function
-          | `Black -> None
+          | `Auto -> None
+          | `Black -> Some 0
           | `Red -> Some 1
           | `Green -> Some 2
           | `Yellow -> Some 3
@@ -353,7 +355,7 @@ let setup_formatter ppf format verbosity =
           with
           | [] -> ()
           | l -> Format.fprintf ppf "@<0>%s" ("\027[" ^ String.concat ";" l ^ "m") in
-        let ansi_stack = ref [ (`White, `Black, false, false) ] in
+        let ansi_stack = ref [ (`Auto, `Auto, false, false) ] in
         let push_ansi_format (fg, bg, b, u) =
           let format = match !ansi_stack with
             | (pfg, pbg, pb, pu) :: _ ->
@@ -378,12 +380,12 @@ let setup_formatter ppf format verbosity =
               | "title" -> push_ansi_format (None, None, true, true)
               | "commandline" -> Format.fprintf ppf "@[<hov 4>"
               | "commanddoc" -> Format.fprintf ppf "  @[<v 0>"
-              | "opt" -> push_ansi_format (Some `Green, Some `Black, false, false)
-              | "arg" -> push_ansi_format (Some `Yellow, Some `Black, false, false) ; Format.fprintf ppf "<"
-              | "kwd" -> push_ansi_format (Some `White, Some `Black, false, true)
-              | "error" -> push_ansi_format (Some `Red, Some `Black, true, true)
-              | "warning" -> push_ansi_format (Some `Yellow, Some `Black, true, true)
-              | "hilight" -> push_ansi_format (Some `Black, Some `Yellow, false, true)
+              | "opt" -> push_ansi_format (Some `Green, None, false, false)
+              | "arg" -> push_ansi_format (Some `Yellow, None, false, false) ; Format.fprintf ppf "<"
+              | "kwd" -> push_ansi_format (Some `White, None, false, true)
+              | "error" -> push_ansi_format (Some `Red, None, true, true)
+              | "warning" -> push_ansi_format (Some `Yellow, None, true, true)
+              | "hilight" -> push_ansi_format (Some `White, Some `Yellow, true, true)
               | "list" -> Format.fprintf ppf "  @[<v 0>"
               | "command" -> Format.fprintf ppf "@[<v 0>"
               | "document" -> Format.fprintf ppf "@[<v 0>"
@@ -497,6 +499,7 @@ let setup_formatter ppf format verbosity =
   orig_state
 
 let restore_formatter ppf (out_functions, tag_functions, tags) =
+  Format.pp_flush_formatter ppf ;
   Format.pp_set_formatter_out_functions ppf out_functions ;
   Format.pp_set_formatter_tag_functions ppf tag_functions ;
   Format.pp_set_print_tags ppf tags
@@ -512,22 +515,22 @@ let usage_internal ppf ~executable_name ~global_options ?(highlights=[]) command
     "@{<document>@{<title>Usage@}@,\
      @{<list>\
      @{<command>@{<commandline>\
-     %s [@{<opt>global options@}] command @{<opt>[command options]@}@}@}@,\
+     %s [@{<opt>global options@}] @{<kwd>command@} [@{<opt>command options@}]@}@}@,\
      @{<command>@{<commandline>\
      %s @{<opt>--help@} (for global options)@}@}@,\
      @{<command>@{<commandline>\
-     %s [@{<opt>global options@}] command @{<opt>--help@} (for command options)@}@}\
+     %s [@{<opt>global options@}] @{<kwd>command@} @{<opt>--help@} (for command options)@}@}\
      @}@,@,\
      @{<title>To browse the documentation@}@,\
      @{<list>\
      @{<command>@{<commandline>\
-     %s [@{<opt>global options@}] man (for a list of commands)@}@}@,\
+     %s [@{<opt>global options@}] @{<kwd>man@} (for a list of commands)@}@}@,\
      @{<command>@{<commandline>\
-     %s [@{<opt>global options@}] man @{<opt>-verbosity 3@} (for the full manual)@}@}\
+     %s [@{<opt>global options@}] @{<kwd>man@} @{<opt>-v 3@} (for the full manual)@}@}\
      @}@,@,\
      @{<title>Global options (must come before the command)@}@,\
      @{<commanddoc>%a@}%a\
-     %a@}"
+     %a@}@."
     executable_name executable_name executable_name executable_name executable_name
     print_options_detailed spec
     (fun ppf () -> if by_group <> [] then Format.fprintf ppf "@,@,") ()
@@ -1251,7 +1254,7 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
         pp acc errs in
   Format.fprintf ppf "@[<v 2>@{<error>@{<title>Error@}@}@," ;
   let commands = pp [] errs in
-  Format.fprintf ppf "@]@.@[<v 0>%a@]"
+  Format.fprintf ppf "@]@\n@\n@[<v 0>%a@]"
     (fun ppf commands -> usage_internal ppf ~executable_name ~global_options commands)
     commands
 

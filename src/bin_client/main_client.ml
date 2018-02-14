@@ -18,7 +18,7 @@ let get_commands_for_version ctxt block protocol =
       | Some given_version -> begin
           if not (Protocol_hash.equal version given_version) then
             Format.eprintf
-              "@[<v 2>Warning:@,\
+              "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
                The protocol provided via `-protocol` (%a)@,\
                is not the one retrieved from the node (%a).@]@\n@."
               Protocol_hash.pp_short given_version
