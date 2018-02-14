@@ -1,7 +1,7 @@
 (jbuild_version 1)
 
 (executables
- ((names (main admin_main))
+ ((names (main_client main_admin))
   (public_names (tezos-client tezos-admin))
   (libraries (tezos-base
               tezos-rpc-http

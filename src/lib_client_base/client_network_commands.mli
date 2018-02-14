@@ -7,5 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Where all the user friendliness starts *)
-let () = Pervasives.exit (Lwt_main.run (Main_lib.main ()))
+val commands: unit -> Client_commands.command list

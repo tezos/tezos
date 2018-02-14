@@ -97,11 +97,34 @@ val register_signer : (module SIGNER) -> unit
     signer for keys with scheme [(val signer : SIGNER).scheme]. *)
 
 val find_signer_for_key : scheme:string -> (module SIGNER) tzresult
+
+val registered_signers : unit -> (string * (module SIGNER)) list
+
 val sign : sk_locator -> MBytes.t -> Ed25519.Signature.t tzresult Lwt.t
 val append : sk_locator -> MBytes.t -> MBytes.t tzresult Lwt.t
 
+val gen_keys :
+  ?force:bool ->
+  ?seed:Ed25519.Seed.t ->
+  #Client_commands.wallet -> string -> unit tzresult Lwt.t
+
+val gen_keys_containing :
+  ?prefix:bool ->
+  ?force:bool ->
+  containing:string list ->
+  name:string ->
+  #Client_commands.full_context -> unit tzresult Lwt.t
+
+val list_keys :
+  #Client_commands.wallet ->
+  (string * Public_key_hash.t * pk_locator option * sk_locator option) list tzresult Lwt.t
+
+val alias_keys :
+  #Client_commands.wallet -> string ->
+  (Public_key_hash.t * pk_locator option * sk_locator option) option tzresult Lwt.t
+
 val get_key:
-  #Client_commands.full_context ->
+  #Client_commands.wallet ->
   Public_key_hash.t ->
   (string * Ed25519.Public_key.t * sk_locator) tzresult Lwt.t
 
@@ -110,5 +133,3 @@ val get_keys:
   (string * Public_key_hash.t * Ed25519.Public_key.t * sk_locator) list tzresult Lwt.t
 
 val force_switch : unit -> (bool, #Client_commands.full_context) Cli_entries.arg
-
-val commands: unit -> Client_commands.command list

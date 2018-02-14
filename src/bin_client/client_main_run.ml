@@ -9,41 +9,12 @@
 
 (* Tezos Command line interface - Main Program *)
 
-let cctxt ~base_dir ~block rpc_config =
-  Client_context_unix.make_context ~base_dir ~block ~rpc_config (Client_context_unix.default_log ~base_dir)
-
-let get_commands_for_version ctxt block protocol =
-  Block_services.protocol ctxt block >>= function
-  | Ok version -> begin
-      match protocol with
-      | None ->
-          return (Some version, Client_commands.commands_for_version version)
-      | Some given_version -> begin
-          if not (Protocol_hash.equal version given_version) then
-            Format.eprintf
-              "@[<v 2>Warning:@,\
-               The protocol provided via `-protocol` (%a)@,\
-               is not the one retrieved from the node (%a).@]@\n@."
-              Protocol_hash.pp_short given_version
-              Protocol_hash.pp_short version ;
-          return (Some version, Client_commands.commands_for_version given_version)
-        end
-    end
-  | Error errs -> begin
-      match protocol with
-      | None -> begin
-          Format.eprintf
-            "@[<v 2>@{<warning>@{<title>Warning@}@}@,\
-             Failed to acquire the protocol version from the node@,%a@]@\n@."
-            (Format.pp_print_list pp) errs ;
-          return (None, [])
-        end
-      | Some version ->
-          return (Some version, Client_commands.commands_for_version version)
-    end
-
 (* Main (lwt) entry *)
-let main ?only_commands () =
+let main select_commands =
+  let cctxt ~base_dir ~block rpc_config =
+    Client_context.make_context
+      ~base_dir ~block ~rpc_config
+      (Client_context.default_log ~base_dir) in
   let executable_name = Filename.basename Sys.executable_name in
   let global_options = Client_config.global_options () in
   let original_args, autocomplete =
@@ -64,8 +35,8 @@ let main ?only_commands () =
                         (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
-        (cctxt ~base_dir:Client_context_unix.default_base_dir
-           ~block:Client_context_unix.default_block
+        (cctxt ~base_dir:Client_context.default_base_dir
+           ~block:Client_context.default_block
            RPC_client.default_config)
         original_args
       >>=? fun (parsed_config_file, parsed_args, config_commands, remaining) ->
@@ -76,28 +47,14 @@ let main ?only_commands () =
         tls = parsed_config_file.tls ;
       } in
       let ctxt = new RPC_client.http_ctxt rpc_config Media_type.all_media_types in
-      begin match only_commands with
-        | None ->
-            get_commands_for_version ctxt
-              parsed_args.block
-              parsed_args.protocol >>|? fun (_version, commands_for_version)  ->
-            Client_generic_rpcs.commands @
-            Client_network.commands () @
-            Client_keys.commands () @
-            Client_protocols.commands () @
-            Client_helpers.commands () @
-            config_commands @
-            commands_for_version
-        | Some commands ->
-            return (config_commands @ commands)
-      end >>=? fun commands ->
+      select_commands ctxt parsed_args >>=? fun commands ->
       let commands =
         Cli_entries.add_manual
           ~executable_name
           ~global_options
           (if Unix.isatty Unix.stdout then Cli_entries.Ansi else Cli_entries.Plain)
           Format.std_formatter
-          commands in
+          (config_commands @ commands) in
       let rpc_config =
         if parsed_args.print_timings then
           { rpc_config with
@@ -150,3 +107,7 @@ let main ?only_commands () =
   Format.fprintf Format.std_formatter "@." ;
   Format.fprintf Format.err_formatter "@." ;
   Lwt.return retcode
+
+(* Where all the user friendliness starts *)
+let run select_commands =
+  Pervasives.exit (Lwt_main.run (main select_commands))

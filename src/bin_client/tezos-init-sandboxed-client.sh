@@ -214,7 +214,7 @@ main () {
 
     local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
     if [ $(basename "$bin_dir") = "bin_client" ]; then
-        local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main.exe}"
+        local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
     else
         local_client="${local_client:-tezos-client}"
     fi
@@ -233,7 +233,7 @@ main () {
     echo "exec $client \"\$@\"" >> $client_dir/bin/tezos-client
     chmod +x $client_dir/bin/tezos-client
     echo '#!/bin/sh' > $client_dir/bin/tezos-admin-client
-    echo "exec $client \"\$@\"" | sed s/tezos-client/tezos-adming-client/g  >> $client_dir/bin/tezos-admin-client
+    echo "exec $client \"\$@\"" | sed s/main_client/main_admin/g  >> $client_dir/bin/tezos-admin-client
     chmod +x $client_dir/bin/tezos-admin-client
 
     cat <<EOF
