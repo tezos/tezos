@@ -41,7 +41,7 @@ let get_commands_for_version ctxt block protocol =
 
 let select_commands ctxt { block ; protocol } =
   get_commands_for_version ctxt block protocol >>|? fun (_, commands_for_version)  ->
-  Client_generic_rpcs.commands @
+  Client_rpc_commands.commands @
   Client_network_commands.commands () @
   Client_keys_commands.commands () @
   Client_protocols.commands () @

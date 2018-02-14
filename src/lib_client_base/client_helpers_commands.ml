@@ -25,7 +25,7 @@ let commands () = Cli_entries.[
          ~name: "prefix"
          ~desc: "the prefix of the hash to complete" @@
        stop)
-      (fun unique prefix (cctxt : #Client_commands.full_context) ->
+      (fun unique prefix (cctxt : #Client_context.full_context) ->
          Shell_services.complete
            cctxt ~block:cctxt#block prefix >>=? fun completions ->
          match completions with
@@ -39,7 +39,7 @@ let commands () = Cli_entries.[
       no_options
       (prefixes [ "bootstrapped" ] @@
        stop)
-      (fun () (cctxt : #Client_commands.full_context) ->
+      (fun () (cctxt : #Client_context.full_context) ->
          Shell_services.bootstrapped cctxt >>=? fun (stream, _) ->
          Lwt_stream.iter_s
            (fun (hash, time) ->

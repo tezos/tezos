@@ -41,7 +41,7 @@ let endorse_block cctxt ?max_priority delegate =
   cctxt#answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return ()
 
-let get_predecessor_cycle (cctxt : #Client_commands.logger) cycle =
+let get_predecessor_cycle (cctxt : #Client_context.logger) cycle =
   match Cycle.pred cycle with
   | None ->
       if Cycle.(cycle = root) then

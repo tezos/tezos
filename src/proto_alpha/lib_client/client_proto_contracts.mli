@@ -16,29 +16,29 @@ module RawContractAlias :
 
 module ContractAlias : sig
   val get_contract:
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     string -> (string * Contract.t) tzresult Lwt.t
   val alias_param:
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_commands.wallet as 'wallet)) params ->
+    ('a, (#Client_context.wallet as 'wallet)) params ->
     (Lwt_io.file_name * Contract.t -> 'a, 'wallet) params
   val destination_param:
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_commands.wallet as 'wallet)) params ->
+    ('a, (#Client_context.wallet as 'wallet)) params ->
     (Lwt_io.file_name * Contract.t -> 'a, 'wallet) params
   val rev_find:
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     Contract.t -> string option tzresult Lwt.t
   val name:
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     Contract.t -> string tzresult Lwt.t
-  val autocomplete: #Client_commands.wallet -> string list tzresult Lwt.t
+  val autocomplete: #Client_context.wallet -> string list tzresult Lwt.t
 end
 
 val list_contracts:
-  #Client_commands.wallet ->
+  #Client_context.wallet ->
   (string * string * RawContractAlias.t) list tzresult Lwt.t
 
 val get_manager:

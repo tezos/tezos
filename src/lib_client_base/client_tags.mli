@@ -32,17 +32,17 @@ module Tags (Entity : Entity) : sig
     (Tag.t -> 'a, 'ctx) Cli_entries.params
 
   val rev_find_by_tag:
-    #Client_commands.full_context ->
+    #Client_context.full_context ->
     string ->
     string option tzresult Lwt.t
 
   val filter:
-    #Client_commands.full_context ->
+    #Client_context.full_context ->
     (string * t -> bool) ->
     (string * t) list tzresult Lwt.t
 
   val filter_by_tag:
-    #Client_commands.full_context ->
+    #Client_context.full_context ->
     string ->
     (string * t) list tzresult Lwt.t
 

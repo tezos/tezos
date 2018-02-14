@@ -118,10 +118,10 @@ module type SIGNER = sig
   val title : string
   val description : string
   val sk_locator_of_human_input :
-    Client_commands.logging_wallet ->
+    Client_context.logging_wallet ->
     string list -> sk_locator tzresult Lwt.t
   val pk_locator_of_human_input :
-    Client_commands.logging_wallet ->
+    Client_context.logging_wallet ->
     string list -> pk_locator tzresult Lwt.t
   val sk_of_locator : sk_locator -> secret_key tzresult Lwt.t
   val pk_of_locator : pk_locator -> public_key tzresult Lwt.t
@@ -156,7 +156,7 @@ let append loc buf =
   sign loc buf >>|? fun signature ->
   MBytes.concat buf (Ed25519.Signature.to_bytes signature)
 
-let gen_keys ?(force=false) ?seed (cctxt : #Client_commands.wallet) name =
+let gen_keys ?(force=false) ?seed (cctxt : #Client_context.wallet) name =
   let seed =
     match seed with
     | None -> Ed25519.Seed.generate ()
@@ -170,7 +170,7 @@ let gen_keys ?(force=false) ?seed (cctxt : #Client_commands.wallet) name =
     cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
   return ()
 
-let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : #Client_commands.full_context) =
+let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : #Client_context.full_context) =
   let unrepresentable =
     List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
   match unrepresentable with
@@ -225,7 +225,7 @@ let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt 
           return ()
         end
 
-let get_key (cctxt : #Client_commands.wallet) pkh =
+let get_key (cctxt : #Client_context.wallet) pkh =
   Public_key_hash.rev_find cctxt pkh >>=? function
   | None -> failwith "no keys for the source contract manager"
   | Some n ->
@@ -238,7 +238,7 @@ let get_key (cctxt : #Client_commands.wallet) pkh =
       Signer.public_key pk >>= fun pk ->
       return (n, pk, sk)
 
-let get_keys (wallet : #Client_commands.wallet) =
+let get_keys (wallet : #Client_context.wallet) =
   Secret_key.load wallet >>=? fun sks ->
   Lwt_list.filter_map_s begin fun (name, sk) ->
     begin

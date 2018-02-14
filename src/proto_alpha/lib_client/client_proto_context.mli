@@ -45,7 +45,7 @@ val set_delegate :
   Operation_list_hash.elt tzresult Lwt.t
 
 val operation_submitted_message :
-  #Client_commands.logger ->
+  #Client_context.logger ->
   Operation_hash.t ->
   unit tzresult Lwt.t
 
@@ -77,7 +77,7 @@ val save_contract :
   unit tzresult Lwt.t
 
 val operation_submitted_message :
-  #Client_commands.logger ->
+  #Client_context.logger ->
   ?contracts:Contract.t list ->
   Operation_hash.t ->
   unit tzresult Lwt.t

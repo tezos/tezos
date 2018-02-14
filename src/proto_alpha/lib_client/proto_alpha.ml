@@ -31,12 +31,12 @@ class wrap_proto_context (t : RPC_context.json) : rpc_context = object
 end
 
 class type full_context = object
-  inherit Client_commands.full_context
+  inherit Client_context.full_context
   inherit [Block_services.block] Alpha_environment.RPC_context.simple
 end
 
-class wrap_full_context (t : Client_commands.full_context) : full_context = object
-  inherit Client_commands.proxy_context t
+class wrap_full_context (t : Client_context.full_context) : full_context = object
+  inherit Client_context.proxy_context t
   inherit [Block_services.block] Alpha_environment.proto_rpc_context
       (t :> RPC_context.t) (Block_services.S.proto_path ())
 end

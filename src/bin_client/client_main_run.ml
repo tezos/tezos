@@ -9,12 +9,74 @@
 
 (* Tezos Command line interface - Main Program *)
 
+open Client_context
+
+class file_wallet dir : wallet = object (self)
+  method private filename alias_name =
+    Filename.concat
+      dir
+      (Str.(global_replace (regexp_string " ") "_" alias_name) ^ "s")
+
+  method load : type a. string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t =
+    fun alias_name ~default encoding ->
+      let filename = self#filename alias_name in
+      if not (Sys.file_exists filename) then
+        return default
+      else
+        Lwt_utils_unix.Json.read_file filename
+        |> generic_trace
+          "couldn't to read the %s file" alias_name >>=? fun json ->
+        match Data_encoding.Json.destruct encoding json with
+        | exception _ -> (* TODO print_error *)
+            failwith "didn't understand the %s file" alias_name
+        | data ->
+            return data
+
+  method write :
+    type a. string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t =
+    fun alias_name list encoding ->
+      Lwt.catch
+        (fun () ->
+           Lwt_utils_unix.create_dir dir >>= fun () ->
+           let filename = self#filename alias_name in
+           let json = Data_encoding.Json.construct encoding list in
+           Lwt_utils_unix.Json.write_file filename json)
+        (fun exn -> Lwt.return (error_exn exn))
+      |> generic_trace "could not write the %s alias file." alias_name
+end
+
+let default_log ~base_dir channel msg =
+  let startup =
+    CalendarLib.Printer.Precise_Calendar.sprint
+      "%Y-%m-%dT%H:%M:%SZ"
+      (CalendarLib.Calendar.Precise.now ()) in
+  match channel with
+  | "stdout" ->
+      print_endline msg ;
+      Lwt.return ()
+  | "stderr" ->
+      prerr_endline msg ;
+      Lwt.return ()
+  | log ->
+      let (//) = Filename.concat in
+      Lwt_utils_unix.create_dir (base_dir // "logs" // log) >>= fun () ->
+      Lwt_io.with_file
+        ~flags: Unix.[ O_APPEND ; O_CREAT ; O_WRONLY ]
+        ~mode: Lwt_io.Output
+        (base_dir // "logs" // log // startup)
+        (fun chan -> Lwt_io.write chan msg)
+
+
+let make_context block base_dir rpc_config =
+  object
+    inherit Client_context.logger (default_log ~base_dir)
+    inherit file_wallet base_dir
+    inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
+    method block = block
+  end
+
 (* Main (lwt) entry *)
 let main select_commands =
-  let cctxt ~base_dir ~block rpc_config =
-    Client_context.make_context
-      ~base_dir ~block ~rpc_config
-      (Client_context.default_log ~base_dir) in
   let executable_name = Filename.basename Sys.executable_name in
   let global_options = Client_config.global_options () in
   let original_args, autocomplete =
@@ -35,8 +97,9 @@ let main select_commands =
                         (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
-        (cctxt ~base_dir:Client_context.default_base_dir
-           ~block:Client_context.default_block
+        (make_context
+           Client_config.default_block
+           Client_config.default_base_dir
            RPC_client.default_config)
         original_args
       >>=? fun (parsed_config_file, parsed_args, config_commands, remaining) ->
@@ -64,7 +127,10 @@ let main select_commands =
         else rpc_config
       in
       let client_config =
-        cctxt ~block:parsed_args.block ~base_dir:parsed_config_file.base_dir rpc_config in
+        make_context
+          parsed_args.block
+          parsed_config_file.base_dir
+          rpc_config in
       begin match autocomplete with
         | Some (prev_arg, cur_arg, script) ->
             Cli_entries.autocompletion

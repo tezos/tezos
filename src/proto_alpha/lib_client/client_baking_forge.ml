@@ -241,11 +241,11 @@ let forge_block cctxt block
 module State : sig
 
   val get_block:
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     Raw_level.t -> Block_hash.t list tzresult Lwt.t
 
   val record_block:
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     Raw_level.t -> Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
 
 end = struct
@@ -268,15 +268,15 @@ end = struct
   let name =
     "blocks"
 
-  let load (wallet : #Client_commands.wallet) =
+  let load (wallet : #Client_context.wallet) =
     wallet#load name ~default:LevelMap.empty encoding
 
-  let save (wallet : #Client_commands.wallet) map =
+  let save (wallet : #Client_context.wallet) map =
     wallet#write name map encoding
 
   let lock = Lwt_mutex.create ()
 
-  let get_block (cctxt : #Client_commands.wallet) level =
+  let get_block (cctxt : #Client_context.wallet) level =
     Lwt_mutex.with_lock lock
       (fun () ->
          load cctxt >>=? fun map ->

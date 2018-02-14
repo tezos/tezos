@@ -48,6 +48,12 @@ let () =
     (fun s -> Invalid_port_arg s)
 
 
+let default_base_dir =
+  let home = try Sys.getenv "HOME" with Not_found -> "/root" in
+  Filename.concat home ".tezos-client"
+
+let default_block = `Prevalidation
+
 let (//) = Filename.concat
 
 module Cfg_file = struct
@@ -61,7 +67,7 @@ module Cfg_file = struct
   }
 
   let default = {
-    base_dir = Client_context.default_base_dir ;
+    base_dir = default_base_dir ;
     node_addr = "localhost" ;
     node_port = 8732 ;
     tls = false ;
@@ -109,7 +115,7 @@ type cli_args = {
 }
 
 let default_cli_args = {
-  block = Client_context.default_block ;
+  block = default_block ;
   protocol = None ;
   print_timings = false ;
   log_requests = false ;
@@ -118,7 +124,7 @@ let default_cli_args = {
 
 open Cli_entries
 
-let string_parameter () : (string, #Client_commands.full_context) parameter =
+let string_parameter () : (string, #Client_context.full_context) parameter =
   parameter (fun _ x -> return x)
 
 let block_parameter () =
@@ -148,7 +154,7 @@ let base_dir_arg () =
     ~placeholder:"path"
     ~doc:("client data directory\n\
            The directory where the Tezos client will store all its data.\n\
-           By default " ^ Client_context.default_base_dir)
+           By default: '" ^ default_base_dir ^"'.")
     (string_parameter ())
 let config_file_arg () =
   arg
@@ -228,7 +234,7 @@ let commands config_file cfg =
   [ command ~group ~desc:"Show the config file."
       no_options
       (fixed [ "config" ; "show" ])
-      (fun () (cctxt : #Client_commands.full_context) ->
+      (fun () (cctxt : #Client_context.full_context) ->
          let pp_cfg ppf cfg = Format.fprintf ppf "%a" Data_encoding.Json.pp (Data_encoding.Json.construct Cfg_file.encoding cfg) in
          if not @@ Sys.file_exists config_file then
            cctxt#warning
@@ -294,7 +300,7 @@ let global_options () =
     (port_arg ())
     (tls_switch ())
 
-let parse_config_args (ctx : #Client_commands.full_context) argv =
+let parse_config_args (ctx : #Client_context.full_context) argv =
   parse_global_options
     (global_options ())
     ctx
@@ -310,7 +316,7 @@ let parse_config_args (ctx : #Client_commands.full_context) argv =
         tls), remaining) ->
   begin match base_dir with
     | None ->
-        let base_dir = Client_context.default_base_dir in
+        let base_dir = default_base_dir in
         unless (Sys.file_exists base_dir) begin fun () ->
           Lwt_utils_unix.create_dir base_dir >>= return
         end >>=? fun () ->

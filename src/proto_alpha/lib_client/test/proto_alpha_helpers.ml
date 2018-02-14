@@ -28,9 +28,9 @@ let build_rpc_context config =
 let rpc_ctxt = ref (build_rpc_context !rpc_config)
 
 (* Context that does not write to alias files *)
-let no_write_context config block : #Client_commands.full_context = object
+let no_write_context config block : #Client_context.full_context = object
   inherit RPC_client.http_ctxt config Media_type.all_media_types
-  inherit Client_commands.logger (fun _ _ -> Lwt.return_unit)
+  inherit Client_context.logger (fun _ _ -> Lwt.return_unit)
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a Error_monad.tzresult Lwt.t =
     fun _ ~default _ -> return default
   method write : type a. string ->

@@ -8,4 +8,4 @@
 (**************************************************************************)
 
 
-val commands : unit -> #Client_commands.full_context Cli_entries.command list
+val commands : unit -> #Client_context.full_context Cli_entries.command list

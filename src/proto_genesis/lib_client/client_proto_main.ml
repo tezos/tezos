@@ -60,7 +60,7 @@ let commands () =
        @@ Client_keys.Secret_key.source_param
          ~name:"password" ~desc:"Dictator's key"
        @@ stop)
-      begin fun timestamp hash fitness sk (cctxt : Client_commands.full_context) ->
+      begin fun timestamp hash fitness sk (cctxt : Client_context.full_context) ->
         let fitness = Proto_alpha.Fitness_repr.from_int64 fitness in
         bake cctxt ?timestamp cctxt#block
           (Activate { protocol = hash ; fitness })

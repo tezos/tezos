@@ -24,7 +24,7 @@ let commands () =
     command ~group ~desc: "List protocols known by the node."
       no_options
       (prefixes [ "list" ; "protocols" ] stop)
-      (fun () (cctxt : #Client_commands.full_context) ->
+      (fun () (cctxt : #Client_context.full_context) ->
          Protocol_services.list ~contents:false cctxt >>=? fun protos ->
          Lwt_list.iter_s (fun (ph, _p) -> cctxt#message "%a" Protocol_hash.pp ph) protos >>= fun () ->
          return ()
@@ -35,7 +35,7 @@ let commands () =
       (prefixes [ "inject" ; "protocol" ]
        @@ param ~name:"dir" ~desc:"directory containing a protocol" check_dir_parameter
        @@ stop)
-      (fun () dirname (cctxt : #Client_commands.full_context) ->
+      (fun () dirname (cctxt : #Client_context.full_context) ->
          Lwt.catch
            (fun () ->
               Lwt_utils_unix.Protocol.read_dir dirname >>=? fun (_hash, proto) ->
@@ -58,7 +58,7 @@ let commands () =
       (prefixes [ "dump" ; "protocol" ]
        @@ Protocol_hash.param ~name:"protocol hash" ~desc:""
        @@ stop)
-      (fun () ph (cctxt : #Client_commands.full_context) ->
+      (fun () ph (cctxt : #Client_context.full_context) ->
          Protocol_services.contents cctxt ph >>=? fun proto ->
          Lwt_utils_unix.Protocol.write_dir (Protocol_hash.to_short_b58check ph) ~hash:ph proto >>=? fun () ->
          cctxt#message "Extracted protocol %a" Protocol_hash.pp_short ph >>= fun () ->

@@ -23,13 +23,13 @@ let encoding : t Data_encoding.t =
 
 let name = "nonces"
 
-let load (wallet : #Client_commands.wallet) =
+let load (wallet : #Client_context.wallet) =
   wallet#load ~default:[] name encoding
 
-let save (wallet : #Client_commands.wallet) list =
+let save (wallet : #Client_context.wallet) list =
   wallet#write name list encoding
 
-let mem (wallet : #Client_commands.wallet) block_hash =
+let mem (wallet : #Client_context.wallet) block_hash =
   load wallet >>|? fun data ->
   List.mem_assoc block_hash data
 

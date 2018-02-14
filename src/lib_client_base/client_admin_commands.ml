@@ -17,7 +17,7 @@ let commands () =
       no_options
       (prefixes [ "unmark" ; "invalid" ]
        @@ seq_of_param (Block_hash.param ~name:"block" ~desc:"block to remove from invalid list"))
-      (fun () blocks (cctxt : #Client_commands.full_context) ->
+      (fun () blocks (cctxt : #Client_context.full_context) ->
          iter_s
            (fun block ->
               Block_services.unmark_invalid cctxt block >>=? fun () ->

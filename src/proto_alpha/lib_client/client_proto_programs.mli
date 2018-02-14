@@ -33,14 +33,14 @@ val trace :
   (Script.expr * Script.expr * (int * Gas.t * Script.expr list) list * (Script.expr * Script.expr option) list option) tzresult Lwt.t
 
 val print_run_result :
-  #Client_commands.logger ->
+  #Client_context.logger ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr * Script_repr.expr *
    (Script_repr.expr * Script_repr.expr option) list option) tzresult -> unit tzresult Lwt.t
 
 val print_trace_result :
-  #Client_commands.logger ->
+  #Client_context.logger ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr * Script_repr.expr *
@@ -75,5 +75,5 @@ val print_typecheck_result :
   print_source_on_error:bool ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map, error list) result ->
-  #Client_commands.logger ->
+  #Client_context.logger ->
   unit tzresult Lwt.t

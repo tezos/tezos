@@ -53,14 +53,14 @@ module type SIGNER = sig
       signer, that should include the format of key specifications. *)
 
   val sk_locator_of_human_input :
-    Client_commands.logging_wallet ->
+    Client_context.logging_wallet ->
     string list -> sk_locator tzresult Lwt.t
   (** [sk_locator_of_human_input wallet spec] is the [sk_locator]
       corresponding to the human readable specification [spec] (plugin
       dependent). *)
 
   val pk_locator_of_human_input :
-    Client_commands.logging_wallet ->
+    Client_context.logging_wallet ->
     string list -> pk_locator tzresult Lwt.t
   (** [pk_locator_of_human_input wallet spec] is the [pk_locator]
       corresponding to the human readable specification [spec] (plugin
@@ -106,30 +106,30 @@ val append : sk_locator -> MBytes.t -> MBytes.t tzresult Lwt.t
 val gen_keys :
   ?force:bool ->
   ?seed:Ed25519.Seed.t ->
-  #Client_commands.wallet -> string -> unit tzresult Lwt.t
+  #Client_context.wallet -> string -> unit tzresult Lwt.t
 
 val gen_keys_containing :
   ?prefix:bool ->
   ?force:bool ->
   containing:string list ->
   name:string ->
-  #Client_commands.full_context -> unit tzresult Lwt.t
+  #Client_context.full_context -> unit tzresult Lwt.t
 
 val list_keys :
-  #Client_commands.wallet ->
+  #Client_context.wallet ->
   (string * Public_key_hash.t * pk_locator option * sk_locator option) list tzresult Lwt.t
 
 val alias_keys :
-  #Client_commands.wallet -> string ->
+  #Client_context.wallet -> string ->
   (Public_key_hash.t * pk_locator option * sk_locator option) option tzresult Lwt.t
 
 val get_key:
-  #Client_commands.wallet ->
+  #Client_context.wallet ->
   Public_key_hash.t ->
   (string * Ed25519.Public_key.t * sk_locator) tzresult Lwt.t
 
 val get_keys:
-  #Client_commands.wallet ->
+  #Client_context.wallet ->
   (string * Public_key_hash.t * Ed25519.Public_key.t * sk_locator) list tzresult Lwt.t
 
-val force_switch : unit -> (bool, #Client_commands.full_context) Cli_entries.arg
+val force_switch : unit -> (bool, #Client_context.full_context) Cli_entries.arg

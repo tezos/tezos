@@ -92,7 +92,7 @@ let originate rpc_config ?net_id ~block ?signature bytes =
         "The origination introduced %d contracts instead of one."
         (List.length contracts)
 
-let operation_submitted_message (cctxt : #Client_commands.logger) ?(contracts = []) oph =
+let operation_submitted_message (cctxt : #Client_context.logger) ?(contracts = []) oph =
   cctxt#message "Operation successfully injected in the node." >>= fun () ->
   cctxt#message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   Lwt_list.iter_s

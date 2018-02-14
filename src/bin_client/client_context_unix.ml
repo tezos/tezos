@@ -82,7 +82,7 @@ let make_context
     ?(rpc_config = RPC_client.default_config)
     log =
   object
-    inherit Client_commands.logger log
+    inherit Client_context.logger log
     inherit file_wallet base_dir
     inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
     method block = block

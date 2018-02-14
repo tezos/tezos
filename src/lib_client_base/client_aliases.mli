@@ -20,43 +20,43 @@ module type Alias = sig
   type t
   type fresh_param
   val load :
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     (string * t) list tzresult Lwt.t
   val set :
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     (string * t) list ->
     unit tzresult Lwt.t
   val find :
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     string -> t tzresult Lwt.t
   val find_opt :
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     string -> t option tzresult Lwt.t
   val rev_find :
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     t -> string option tzresult Lwt.t
   val name :
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     t -> string tzresult Lwt.t
   val mem :
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     string -> bool tzresult Lwt.t
   val add :
     force:bool ->
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     string -> t -> unit tzresult Lwt.t
   val del :
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     string -> unit tzresult Lwt.t
   val update :
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     string -> t -> unit tzresult Lwt.t
   val of_source  : string -> t tzresult Lwt.t
   val to_source  : t -> string tzresult Lwt.t
   val alias_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_commands.wallet as 'b)) Cli_entries.params ->
+    ('a, (#Client_context.wallet as 'b)) Cli_entries.params ->
     (string * t -> 'a, 'b) Cli_entries.params
   val fresh_alias_param :
     ?name:string ->
@@ -64,18 +64,18 @@ module type Alias = sig
     ('a, (< .. > as 'obj)) Cli_entries.params ->
     (fresh_param -> 'a, 'obj) Cli_entries.params
   val force_switch :
-    unit -> (bool, #Client_commands.full_context) Cli_entries.arg
+    unit -> (bool, #Client_context.full_context) Cli_entries.arg
   val of_fresh :
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     bool ->
     fresh_param ->
     string tzresult Lwt.t
   val source_param :
     ?name:string ->
     ?desc:string ->
-    ('a, (#Client_commands.wallet as 'obj)) Cli_entries.params ->
+    ('a, (#Client_context.wallet as 'obj)) Cli_entries.params ->
     (t -> 'a, 'obj) Cli_entries.params
   val autocomplete:
-    #Client_commands.wallet -> string list tzresult Lwt.t
+    #Client_context.wallet -> string list tzresult Lwt.t
 end
 module Alias (Entity : Entity) : Alias with type t = Entity.t

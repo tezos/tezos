@@ -20,7 +20,7 @@ let get_pkh cctxt = function
   | None -> return None
   | Some x -> Public_key_hash.find_opt cctxt x
 
-let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_commands.logger) = function
+let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_context.logger) = function
   | Error errs ->
       cctxt#warning "%a"
         (Michelson_v1_error_reporter.report_errors

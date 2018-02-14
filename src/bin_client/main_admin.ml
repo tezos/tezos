@@ -13,6 +13,7 @@ let select_commands _ _ =
        [ Client_report_commands.commands () ;
          Client_admin_commands.commands () ;
          Client_network_commands.commands () ;
-         Client_generic_rpcs.commands ])
+         Client_protocols_commands.commands () ;
+         Client_rpc_commands.commands ])
 
 let () = Client_main_run.run select_commands

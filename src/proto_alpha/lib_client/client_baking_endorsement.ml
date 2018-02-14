@@ -15,13 +15,13 @@ open Logging.Client.Endorsement
 module State : sig
 
   val get_endorsement:
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     Raw_level.t ->
     int ->
     (Block_hash.t * Operation_hash.t) option tzresult Lwt.t
 
   val record_endorsement:
-    #Client_commands.wallet ->
+    #Client_context.wallet ->
     Raw_level.t ->
     Block_hash.t ->
     int -> Operation_hash.t -> unit tzresult Lwt.t
@@ -50,15 +50,15 @@ end = struct
   let name =
     "endorsements"
 
-  let load (wallet : #Client_commands.wallet) =
+  let load (wallet : #Client_context.wallet) =
     wallet#load name encoding ~default:LevelMap.empty
 
-  let save (wallet : #Client_commands.wallet) map =
+  let save (wallet : #Client_context.wallet) map =
     wallet#write name encoding map
 
   let lock = Lwt_mutex.create ()
 
-  let get_endorsement (wallet : #Client_commands.wallet) level slot =
+  let get_endorsement (wallet : #Client_context.wallet) level slot =
     Lwt_mutex.with_lock lock
       (fun () ->
          load wallet >>=? fun map ->
@@ -69,7 +69,7 @@ end = struct
            return (Some (block, op))
          with Not_found -> return None)
 
-  let record_endorsement (wallet : #Client_commands.wallet) level hash slot oph =
+  let record_endorsement (wallet : #Client_context.wallet) level hash slot oph =
     Lwt_mutex.with_lock lock
       (fun () ->
          load wallet >>=? fun map ->
