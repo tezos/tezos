@@ -10,8 +10,8 @@
 let select_commands _ _ =
   return
     (List.flatten
-       [ Client_debug.commands () ;
-         Client_admin.commands () ;
+       [ Client_report_commands.commands () ;
+         Client_admin_commands.commands () ;
          Client_network_commands.commands () ;
          Client_generic_rpcs.commands ])
 

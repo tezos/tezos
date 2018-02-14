@@ -10,14 +10,20 @@
 let commands () =
   let open Cli_entries in
   let group = { name = "admin" ;
-                title = "commands to perform privileged operations on the node" } in
+                title = "Commands to perform privileged operations on the node" } in
   [
-    command ~group ~desc: "unmark invalid"
+    command ~group
+      ~desc: "Make the node forget its decision of rejecting a block."
       no_options
       (prefixes [ "unmark" ; "invalid" ]
-       @@ Block_hash.param ~name:"block" ~desc:"block to remove from invalid list"
-       @@ stop)
-      (fun () block (cctxt : #Client_commands.full_context) ->
-         Block_services.unmark_invalid cctxt block >>=? fun () ->
-         cctxt#message "Block %a no longer marked invalid" Block_hash.pp block >>= return) ;
+       @@ seq_of_param (Block_hash.param ~name:"block" ~desc:"block to remove from invalid list"))
+      (fun () blocks (cctxt : #Client_commands.full_context) ->
+         iter_s
+           (fun block ->
+              Block_services.unmark_invalid cctxt block >>=? fun () ->
+              cctxt#message
+                "Block %a no longer marked invalid."
+                Block_hash.pp block >>= fun () ->
+              return ())
+           blocks) ;
   ]
