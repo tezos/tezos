@@ -425,16 +425,6 @@ let group =
 
 let commands = [
 
-  command
-    ~desc: "List the protocol versions that this client understands."
-    no_options
-    (fixed [ "list" ; "versions" ])
-    (fun () (cctxt : #Client_context.full_context) ->
-       Lwt_list.iter_s
-         (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
-         (Client_commands.get_versions ()) >>= fun () ->
-       return ()) ;
-
   command ~group
     ~desc: "List RPCs under a given URL prefix.\n\
             Some parts of the RPC service hierarchy depend on parameters,\n\

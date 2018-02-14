@@ -75,6 +75,20 @@ let make_context block base_dir rpc_config =
     method block = block
   end
 
+let builtin_commands =
+  let open Cli_entries in
+  [
+    command
+      ~desc: "List the protocol versions that this client understands."
+      no_options
+      (fixed [ "list" ; "understood" ; "protocols" ])
+      (fun () (cctxt : #Client_context.full_context) ->
+         Lwt_list.iter_s
+           (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
+           (Client_commands.get_versions ()) >>= fun () ->
+         return ()) ;
+  ]
+
 (* Main (lwt) entry *)
 let main select_commands =
   let executable_name = Filename.basename Sys.executable_name in
@@ -117,7 +131,7 @@ let main select_commands =
           ~global_options
           (if Unix.isatty Unix.stdout then Cli_entries.Ansi else Cli_entries.Plain)
           Format.std_formatter
-          (config_commands @ commands) in
+          (config_commands @ builtin_commands @ commands) in
       let rpc_config =
         if parsed_args.print_timings then
           { rpc_config with
