@@ -21,7 +21,7 @@ let genesis : State.Chain.genesis = {
 }
 
 type error += Non_private_sandbox of P2p_addr.t
-type error += RPC_Port_already_in_use of P2p_addr.t
+type error += RPC_Port_already_in_use of P2p_point.Id.t list
 
 let () =
   register_error_kind
@@ -44,15 +44,15 @@ let () =
     ~id:"main.run.port_already_in_use"
     ~title:"Cannot start sode: RPC port already in use"
     ~description:"An other tezos node is probably running on the same RPC port."
-    ~pp:begin fun ppf addr ->
+    ~pp:begin fun ppf addrlist ->
       Format.fprintf ppf
-        "An other tezos node is probably running on port (%a). \
+        "An other tezos node is probably running on one of these addresses (%a). \
          Please choose another RPC port."
-        Ipaddr.V6.pp_hum addr
+        (Format.pp_print_list P2p_point.Id.pp) addrlist
     end
-    Data_encoding.(obj1 (req "addr" P2p_addr.encoding))
-    (function RPC_Port_already_in_use addr -> Some addr | _ -> None)
-    (fun addr -> RPC_Port_already_in_use addr)
+    Data_encoding.(obj1 (req "addrlist" (list P2p_point.Id.encoding)))
+    (function | RPC_Port_already_in_use addrlist -> Some addrlist | _ -> None)
+    (fun addrlist -> RPC_Port_already_in_use addrlist)
 
 let (//) = Filename.concat
 
@@ -214,7 +214,7 @@ let init_rpc (rpc_config: Node_config_file.rpc) node =
                return (Some server))
             (function
               |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
-                  fail (RPC_Port_already_in_use addr)
+                  fail (RPC_Port_already_in_use [(addr,port)])
               | exn -> Lwt.return (error_exn exn)
             )
 
@@ -268,7 +268,18 @@ let process sandbox verbosity args =
     Lwt_lock_file.is_locked
       (lock_file config.data_dir) >>=? function
     | false ->
-        run ?sandbox ?verbosity config
+        Lwt.catch
+          (fun () -> run ?sandbox ?verbosity config)
+          (function
+            |Unix.Unix_error(Unix.EADDRINUSE, "bind","") ->
+                begin match config.rpc.listen_addr with
+                  | None -> assert false
+                  | Some addr ->
+                      Node_config_file.resolve_rpc_listening_addrs addr >>= fun addrlist ->
+                      fail (RPC_Port_already_in_use addrlist)
+                end
+            | exn -> Lwt.return (error_exn exn)
+          )
     | true -> failwith "Data directory is locked by another process" in
   match Lwt_main.run run with
   | Ok () -> `Ok ()
