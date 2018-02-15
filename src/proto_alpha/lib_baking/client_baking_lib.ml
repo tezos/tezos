@@ -56,7 +56,7 @@ let do_reveal cctxt block blocks =
   let nonces = List.map snd blocks in
   Client_baking_revelation.forge_seed_nonce_revelation cctxt
     block nonces >>=? fun () ->
-  Client_proto_nonces.dels cctxt (List.map fst blocks) >>=? fun () ->
+  Client_baking_nonces.dels cctxt (List.map fst blocks) >>=? fun () ->
   return ()
 
 let reveal_block_nonces (cctxt : #Proto_alpha.full_context) block_hashes =
@@ -75,7 +75,7 @@ let reveal_block_nonces (cctxt : #Proto_alpha.full_context) block_hashes =
             Lwt.return_none))
     block_hashes >>= fun block_infos ->
   filter_map_s (fun (bi : Client_baking_blocks.block_info) ->
-      Client_proto_nonces.find cctxt bi.hash >>=? function
+      Client_baking_nonces.find cctxt bi.hash >>=? function
       | None ->
           cctxt#warning "Cannot find nonces for block %a (ignoring)@."
             Block_hash.pp_short bi.hash >>= fun () ->

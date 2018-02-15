@@ -7,7 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Client_commands
+open Client_context
 
 class file_wallet dir : wallet = object (self)
   method private filename alias_name =

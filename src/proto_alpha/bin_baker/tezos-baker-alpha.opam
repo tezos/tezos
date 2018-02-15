@@ -13,15 +13,11 @@ depends: [
   "tezos-client-base"
   "tezos-client-genesis"
   "tezos-client-alpha"
-  "tezos-client-alpha-commands"
+  "tezos-client-commands"
+  "tezos-client-base-unix"
   "tezos-baking-alpha"
   "tezos-baking-alpha-commands"
-  "tezos-client-base-unix"
-  "tezos-node" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]
-]
-build-test: [
-  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
 ]

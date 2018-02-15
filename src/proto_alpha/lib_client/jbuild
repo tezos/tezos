@@ -8,7 +8,6 @@
               tezos-protocol-environment-client
               tezos-shell-services
               tezos-client-base
-              tezos-client-commands
               tezos-rpc))
   (library_flags (:standard -linkall))
   (flags (:standard -w -9+27-30-32-40@8
@@ -16,7 +15,6 @@
                     -open Tezos_base__TzPervasives
                     -open Tezos_shell_services
                     -open Tezos_client_base
-                    -open Tezos_client_commands
                     -open Tezos_rpc))))
 
 (alias

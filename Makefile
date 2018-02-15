@@ -7,11 +7,13 @@ all:
 		src/bin_node/main.exe \
 		src/bin_client/main_client.exe \
 		src/bin_client/main_admin.exe \
-		src/lib_protocol_compiler/main_native.exe
+		src/lib_protocol_compiler/main_native.exe \
+		src/proto_alpha/bin_baker/main_baker_alpha.exe
 	@cp _build/default/src/bin_node/main.exe tezos-node
 	@cp _build/default/src/bin_client/main_client.exe tezos-client
 	@cp _build/default/src/bin_client/main_admin.exe tezos-admin-client
 	@cp _build/default/src/lib_protocol_compiler/main_native.exe tezos-protocol-compiler
+	@cp _build/default/src/proto_alpha/bin_baker/main_baker_alpha.exe tezos-alpha-baker
 
 all.pkg:
 	@jbuilder build ${DEV} \
@@ -56,7 +58,12 @@ install:
 
 clean:
 	@-jbuilder clean
-	@-rm -f tezos-node tezos-client tezos-admin-client tezos-protocol-compiler
+	@-rm -f \
+		tezos-node \
+		tezos-client \
+		tezos-admin-client \
+		tezos-protocol-compiler \
+		tezos-alpha-baker
 	@-make -C docs clean
 
 .PHONY: all test build-deps docker-image clean

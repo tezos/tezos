@@ -7,14 +7,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let protocol =
-  Protocol_hash.of_b58check_exn
-    "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
+let select_commands _ _ =
+  return
+    (List.map
+       (Cli_entries.map_command (new Proto_alpha.wrap_full_context))
+       (Client_baking_commands.commands ()))
 
-let () =
-  Client_commands.register protocol @@
-  List.map (Cli_entries.map_command (new Proto_alpha.wrap_full_context)) @@
-  Client_proto_programs_commands.commands () @
-  Client_proto_contracts_commands.commands () @
-  Client_proto_context_commands.commands () @
-  Client_baking_main.commands ()
+let () = Client_main_run.run select_commands

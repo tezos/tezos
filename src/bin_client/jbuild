@@ -9,9 +9,11 @@
               tezos-client-base
               tezos-client-commands
               tezos-client-genesis
+              tezos-client-alpha
               tezos-stdlib-unix
-              tezos-unix-signers
-              tezos-client-alpha))
+              tezos-client-base-unix
+              tezos-client-alpha-commands.registration
+              tezos-baking-alpha-commands.registration))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives
@@ -20,7 +22,7 @@
                     -open Tezos_shell_services
                     -open Tezos_client_base
                     -open Tezos_client_commands
-                    -open Tezos_unix_signers))))
+                    -open Tezos_client_base_unix))))
 
 (install
  ((section bin)

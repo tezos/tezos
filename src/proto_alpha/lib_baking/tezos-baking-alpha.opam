@@ -10,14 +10,16 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta17" }
   "tezos-base"
+  "tezos-protocol-environment-client"
+  "tezos-protocol-alpha"
+  "tezos-shell-services"
   "tezos-client-base"
-  "tezos-client-genesis"
+  "tezos-client-commands"
   "tezos-client-alpha"
-  "tezos-client-alpha-commands"
-  "tezos-baking-alpha"
-  "tezos-baking-alpha-commands"
-  "tezos-client-base-unix"
   "tezos-node" { test }
+  "tezos-client-genesis" { test }
+  "tezos-client-base-unix" { test }
+  "alcotest-lwt" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

@@ -32,7 +32,7 @@ let expand_all source ast errors =
           f tl in
   let error_map = error_map ([], []) in
   let rec expand expr =
-    match Michelson_macros.expand expr with
+    match Michelson_v1_macros.expand expr with
     | Ok expanded ->
         begin
           match expanded with

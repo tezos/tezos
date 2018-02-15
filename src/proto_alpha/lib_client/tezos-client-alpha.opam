@@ -14,13 +14,7 @@ depends: [
   "tezos-protocol-alpha"
   "tezos-shell-services"
   "tezos-client-base"
-  "tezos-node" { test }
-  "tezos-client-genesis" { test }
-  "alcotest-lwt" { test }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]
-]
-build-test: [
-  [ "jbuilder" "runtest" "-p" name "-j" jobs ]
 ]

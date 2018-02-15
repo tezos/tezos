@@ -62,7 +62,7 @@ let inject_types type_map parsed =
 
 let unparse ?type_map parse expanded =
   let rec unexpand expr =
-    match Michelson_macros.unexpand expr with
+    match Michelson_v1_macros.unexpand expr with
     | Seq (loc, items, annot) ->
         Seq (loc, List.map unexpand items, annot)
     | Prim (loc, name, args, annot) ->

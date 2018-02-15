@@ -294,7 +294,7 @@ end = struct
            with Not_found -> [] in
          save cctxt
            (LevelMap.add level (hash :: previous) map)) >>=? fun () ->
-    Client_proto_nonces.add cctxt hash nonce
+    Client_baking_nonces.add cctxt hash nonce
 
 end
 
@@ -377,7 +377,7 @@ let get_unrevealed_nonces (cctxt : #Proto_alpha.full_context) ?(force = false) b
       Client_baking_blocks.blocks_from_cycle
         cctxt block cycle >>=? fun blocks ->
       filter_map_s (fun hash ->
-          Client_proto_nonces.find cctxt hash >>=? function
+          Client_baking_nonces.find cctxt hash >>=? function
           | None -> return None
           | Some nonce ->
               Alpha_services.Context.level

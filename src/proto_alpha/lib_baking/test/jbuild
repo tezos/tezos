@@ -12,7 +12,8 @@
               tezos-client-base
               tezos-client-genesis
               tezos-client-alpha
-              tezos-unix-signers
+              tezos-baking-alpha
+              tezos-client-base-unix
               alcotest-lwt))
   (flags (:standard -w -9-32 -safe-string
                     -open Tezos_base__TzPervasives
@@ -21,7 +22,8 @@
                     -open Tezos_client_base
                     -open Tezos_client_genesis
                     -open Tezos_client_alpha
-                    -open Tezos_unix_signers))))
+                    -open Tezos_baking_alpha
+                    -open Tezos_client_base_unix))))
 
 (alias
  ((name buildtest)

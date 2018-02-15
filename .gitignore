@@ -15,6 +15,7 @@ __pycache__
 /tezos-protocol-compiler
 /tezos-client
 /tezos-admin-client
+/tezos-alpha-baker
 
 /scripts/opam-test-all.sh.DONE
 
