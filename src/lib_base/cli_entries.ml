@@ -299,7 +299,7 @@ let help_group =
 
 let string_contains ~needle ~haystack =
   try
-    Some (Str.search_forward (Str.regexp_string needle) haystack 0)
+    Some Re_str.(search_forward (regexp_string needle) haystack 0)
   with Not_found ->
     None
 
@@ -615,18 +615,18 @@ let print_highlight highlight_strings formatter str =
   let rec print_string = function
     | [] -> Format.fprintf formatter "%s" str
     | regex :: tl ->
-        begin match Str.full_split regex str with
+        begin match Re_str.full_split regex str with
           | []
-          | [ Str.Text _ ] -> print_string tl
+          | [ Re_str.Text _ ] -> print_string tl
           | list ->
               List.iter
                 (function
-                  | Str.Text text -> Format.fprintf formatter "%s" text
-                  | Str.Delim delimiter ->
+                  | Re_str.Text text -> Format.fprintf formatter "%s" text
+                  | Re_str.Delim delimiter ->
                       Format.fprintf formatter "@{<hilight>%s@}" delimiter)
                 list
         end
-  in print_string (List.map Str.regexp_string highlight_strings)
+  in print_string (List.map Re_str.regexp_string highlight_strings)
 
 let print_commandline ppf (highlights, options, args) =
   let rec print
@@ -1121,7 +1121,7 @@ let autocomplete ~script ~cur_arg ~prev_arg ~args ~tree ~global_options cctxt =
           end
   end >>|? fun completions ->
   List.filter
-    (fun completion -> Str.string_match (Str.regexp_string cur_arg) completion 0)
+    (fun completion -> Re_str.(string_match (regexp_string cur_arg) completion 0))
     completions
 
 (* Try a list of commands on a list of arguments *)

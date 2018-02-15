@@ -18,6 +18,7 @@
               tezos-rpc
               tezos-micheline
               tezos-protocol-environment-sigs
+              re.str
               calendar
               ezjsonm
               lwt.unix

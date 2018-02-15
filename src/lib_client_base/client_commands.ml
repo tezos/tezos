@@ -91,7 +91,7 @@ class file_wallet dir : wallet = object (self)
   method private filename alias_name =
     Filename.concat
       dir
-      (Str.(global_replace (regexp_string " ") "_" alias_name) ^ "s")
+      (Re_str.(global_replace (regexp_string " ") "_" alias_name) ^ "s")
 
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t =
     fun alias_name ~default encoding ->
