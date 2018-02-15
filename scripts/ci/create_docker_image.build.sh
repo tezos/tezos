@@ -9,7 +9,6 @@ cd "$src_dir"
 
 . "$script_dir"/version.sh
 
-export build_dir=${build_dir:-_docker_build}
 tmp_dir=$(mktemp -dt tezos.opam.tezos.XXXXXXXX)
 
 cleanup () {
@@ -25,7 +24,9 @@ base_image_name="${3-${image_name}_deps:${image_version}}"
 
 cat <<EOF > "$src_dir"/Dockerfile
 FROM $base_image_name
-COPY . tezos
+COPY Makefile tezos/
+COPY src tezos/src/
+COPY vendors tezos/vendors/
 RUN sudo chown -R opam tezos && \
     opam exec -- make -C tezos all build-test
 EOF
