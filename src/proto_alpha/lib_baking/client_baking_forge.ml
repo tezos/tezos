@@ -368,7 +368,7 @@ let compute_timeout { future_slots } =
       else
         Lwt_unix.sleep (Int64.to_float delay)
 
-let get_unrevealed_nonces (cctxt : #Proto_alpha.full_context) ?(force = false) block =
+let get_unrevealed_nonces (cctxt : #Proto_alpha.full) ?(force = false) block =
   Alpha_services.Context.next_level cctxt block >>=? fun level ->
   let cur_cycle = level.cycle in
   match Cycle.pred cur_cycle with
@@ -416,7 +416,7 @@ let get_delegates cctxt state =
   | _ :: _ as delegates -> return delegates
 
 let insert_block
-    (cctxt : #Proto_alpha.full_context) ?max_priority state (bi: Client_baking_blocks.block_info) =
+    (cctxt : #Proto_alpha.full) ?max_priority state (bi: Client_baking_blocks.block_info) =
   begin
     safe_get_unrevealed_nonces cctxt (`Hash bi.hash) >>= fun nonces ->
     Client_baking_revelation.forge_seed_nonce_revelation
@@ -461,7 +461,7 @@ let insert_blocks cctxt ?max_priority state bis =
       Format.eprintf "Error: %a" pp_print_error err  ;
       Lwt.return_unit
 
-let bake (cctxt : #Proto_alpha.full_context) state =
+let bake (cctxt : #Proto_alpha.full) state =
   let slots = pop_baking_slots state in
   let seed_nonce = generate_seed_nonce () in
   let seed_nonce_hash = Nonce.hash seed_nonce in
@@ -550,7 +550,7 @@ let bake (cctxt : #Proto_alpha.full_context) state =
       return ()
 
 let create
-    (cctxt : #Proto_alpha.full_context) ?max_priority delegates
+    (cctxt : #Proto_alpha.full) ?max_priority delegates
     (block_stream:
        Client_baking_blocks.block_info list tzresult Lwt_stream.t)
     (endorsement_stream:

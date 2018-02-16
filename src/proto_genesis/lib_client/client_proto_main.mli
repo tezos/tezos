@@ -10,7 +10,7 @@
 open Proto_genesis
 
 val bake:
-  #Client_context.full_context ->
+  #Client_context.full ->
   ?timestamp: Time.t ->
   Block_services.block ->
   Data.Command.t ->

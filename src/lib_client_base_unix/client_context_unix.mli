@@ -11,12 +11,12 @@ class unix_wallet :
   base_dir:string ->
   Client_context.wallet
 class unix_prompter :
-  Client_context.prompter_sig
+  Client_context.prompter
 class unix_logger :
   base_dir:string ->
-  Client_context.logger_sig
-class unix_full_context :
+  Client_context.printer
+class unix_full :
   base_dir:string ->
   block:Block_services.block ->
   rpc_config:RPC_client.config ->
-  Client_context.full_context
+  Client_context.full

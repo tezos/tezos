@@ -26,7 +26,7 @@ module Program = Client_aliases.Alias (struct
     let name = "program"
   end)
 
-let print_errors (cctxt : #Client_context.logger) errs ~show_source ~parsed =
+let print_errors (cctxt : #Client_context.printer) errs ~show_source ~parsed =
   cctxt#warning "%a"
     (Michelson_v1_error_reporter.report_errors
        ~details:false
@@ -54,7 +54,7 @@ let print_big_map_diff ppf = function
                 value))
         diff
 
-let print_run_result (cctxt : #Client_context.logger) ~show_source ~parsed = function
+let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed = function
   | Ok (storage, output, maybe_diff) ->
       cctxt#message "@[<v 0>@[<v 2>storage@,%a@]@,@[<v 2>output@,%a@]@,@[%a@]@]@."
         print_expr storage
@@ -64,7 +64,7 @@ let print_run_result (cctxt : #Client_context.logger) ~show_source ~parsed = fun
   | Error errs ->
       print_errors cctxt errs ~show_source ~parsed
 
-let print_trace_result (cctxt : #Client_context.logger) ~show_source ~parsed =
+let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
   function
   | Ok (storage, output, trace, maybe_big_map_diff) ->
       cctxt#message
@@ -126,7 +126,7 @@ let typecheck_program (program : Michelson_v1_parser.parsed) block cctxt =
 
 let print_typecheck_result
     ~emacs ~show_types ~print_source_on_error
-    program res (cctxt : #Client_context.logger) =
+    program res (cctxt : #Client_context.printer) =
   if emacs then
     let type_map, errs = match res with
       | Ok type_map -> type_map, []

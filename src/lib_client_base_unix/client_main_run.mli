@@ -10,5 +10,5 @@
 val run :
   (RPC_client.http_ctxt ->
    Client_config.cli_args ->
-   Client_context.full_context Cli_entries.command list tzresult Lwt.t) ->
+   Client_context.full Cli_entries.command list tzresult Lwt.t) ->
   unit

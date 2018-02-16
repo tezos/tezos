@@ -80,10 +80,10 @@ class unix_logger ~base_dir =
           (base_dir // "logs" // log // startup)
           (fun chan -> Lwt_io.write chan msg) in
   object
-    inherit Client_context.logger log
+    inherit Client_context.simple_printer log
   end
 
-class unix_full_context ~base_dir ~block ~rpc_config : Client_context.full_context =
+class unix_full ~base_dir ~block ~rpc_config : Client_context.full =
   object
     inherit unix_logger ~base_dir
     inherit unix_prompter

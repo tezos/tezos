@@ -92,7 +92,7 @@ let originate rpc_config ?chain_id ~block ?signature bytes =
         "The origination introduced %d contracts instead of one."
         (List.length contracts)
 
-let operation_submitted_message (cctxt : #Client_context.logger) ?(contracts = []) oph =
+let operation_submitted_message (cctxt : #Client_context.printer) ?(contracts = []) oph =
   cctxt#message "Operation successfully injected in the node." >>= fun () ->
   cctxt#message "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   Lwt_list.iter_s
@@ -142,7 +142,7 @@ let delegate_contract cctxt
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
 
-let list_contract_labels (cctxt : #Proto_alpha.full_context) block =
+let list_contract_labels (cctxt : #Proto_alpha.full) block =
   Alpha_services.Contract.list
     cctxt block >>=? fun contracts ->
   map_s (fun h ->
@@ -168,10 +168,10 @@ let list_contract_labels (cctxt : #Proto_alpha.full_context) block =
       return (nm, h_b58, kind))
     contracts
 
-let message_added_contract (cctxt : #Proto_alpha.full_context) name =
+let message_added_contract (cctxt : #Proto_alpha.full) name =
   cctxt#message "Contract memorized as %s." name
 
-let get_manager (cctxt : #Proto_alpha.full_context) block source =
+let get_manager (cctxt : #Proto_alpha.full) block source =
   Client_proto_contracts.get_manager
     cctxt block source >>=? fun src_pkh ->
   Client_keys.get_key cctxt src_pkh >>=? fun (src_name, src_pk, src_sk) ->
@@ -195,7 +195,7 @@ let set_delegate cctxt block ~fee contract ~src_pk ~manager_sk opt_delegate =
   delegate_contract
     cctxt block ~source:contract ~src_pk ~manager_sk ~fee opt_delegate
 
-let source_to_keys (wallet : #Proto_alpha.full_context) block source =
+let source_to_keys (wallet : #Proto_alpha.full) block source =
   get_manager wallet block source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
   return (src_pk, src_sk)
 
@@ -216,7 +216,7 @@ let originate_contract
     ~src_pk
     ~src_sk
     ~code
-    (cctxt : #Proto_alpha.full_context) =
+    (cctxt : #Proto_alpha.full) =
   Lwt.return (Michelson_v1_parser.parse_expression initial_storage) >>= fun result ->
   Lwt.return (Micheline_parser.no_parsing_error result) >>=?
   fun { Michelson_v1_parser.expanded = storage } ->

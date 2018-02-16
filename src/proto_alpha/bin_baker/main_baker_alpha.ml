@@ -10,7 +10,7 @@
 let select_commands _ _ =
   return
     (List.map
-       (Cli_entries.map_command (new Proto_alpha.wrap_full_context))
+       (Cli_entries.map_command (new Proto_alpha.wrap_full))
        (Client_baking_commands.commands ()))
 
 let () = Client_main_run.run select_commands

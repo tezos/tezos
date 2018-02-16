@@ -172,7 +172,7 @@ let gen_keys ?(force=false) ?seed (cctxt : #Client_context.io_wallet) name =
     cctxt name (Ed25519.Public_key.hash public_key) >>=? fun () ->
   return ()
 
-let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : #Client_context.full_context) =
+let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt : #Client_context.full) =
   let unrepresentable =
     List.filter (fun s -> not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s) containing in
   match unrepresentable with

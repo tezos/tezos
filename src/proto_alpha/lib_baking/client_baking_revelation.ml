@@ -25,7 +25,7 @@ let inject_seed_nonce_revelation rpc_config block ?async nonces =
   return oph
 
 let forge_seed_nonce_revelation
-    (cctxt: #Proto_alpha.full_context)
+    (cctxt: #Proto_alpha.full)
     block nonces =
   Block_services.hash cctxt block >>=? fun hash ->
   match nonces with

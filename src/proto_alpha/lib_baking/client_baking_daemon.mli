@@ -11,7 +11,7 @@ open Proto_alpha
 open Alpha_context
 
 val run:
-  #Proto_alpha.full_context ->
+  #Proto_alpha.full ->
   ?max_priority: int ->
   delay: int ->
   ?min_date: Time.t ->

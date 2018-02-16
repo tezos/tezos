@@ -120,7 +120,7 @@ val gen_keys_containing :
   ?force:bool ->
   containing:string list ->
   name:string ->
-  #Client_context.full_context -> unit tzresult Lwt.t
+  #Client_context.full -> unit tzresult Lwt.t
 
 val list_keys :
   #Client_context.wallet ->
@@ -139,4 +139,4 @@ val get_keys:
   #Client_context.io_wallet ->
   (string * Public_key_hash.t * Ed25519.Public_key.t * sk_locator) list tzresult Lwt.t
 
-val force_switch : unit -> (bool, #Client_context.full_context) Cli_entries.arg
+val force_switch : unit -> (bool, #Client_context.full) Cli_entries.arg

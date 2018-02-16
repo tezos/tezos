@@ -191,7 +191,7 @@ let rec count =
 
 (*-- Commands ---------------------------------------------------------------*)
 
-let list url (cctxt : #Client_context.full_context) =
+let list url (cctxt : #Client_context.full) =
   let args = String.split '/' url in
   RPC_description.describe cctxt
     ~recurse:true args >>=? fun tree ->
@@ -290,7 +290,7 @@ let list url (cctxt : #Client_context.full_context) =
   end else return ()
 
 
-let schema url (cctxt : #Client_context.full_context) =
+let schema url (cctxt : #Client_context.full) =
   let args = String.split '/' url in
   let open RPC_description in
   RPC_description.describe cctxt ~recurse:false args >>=? function
@@ -315,7 +315,7 @@ let schema url (cctxt : #Client_context.full_context) =
         "No service found at this URL (but this is a valid prefix)\n%!" >>= fun () ->
       return ()
 
-let format url (cctxt : #Client_context.logging_rpcs) =
+let format url (cctxt : #Client_context.io_rpcs) =
   let args = String.split '/' url in
   let open RPC_description in
   RPC_description.describe cctxt ~recurse:false args >>=? function
@@ -354,7 +354,7 @@ let fill_in ?(show_optionals=true) schema =
   | Any | Object { properties = [] } -> Lwt.return (Ok (`O []))
   | _ -> editor_fill_in ~show_optionals schema
 
-let display_answer (cctxt : #Client_context.full_context) = function
+let display_answer (cctxt : #Client_context.full) = function
   | `Ok json ->
       cctxt#message "%a"
         Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
@@ -366,7 +366,7 @@ let display_answer (cctxt : #Client_context.full_context) = function
       cctxt#message "Unexpected server answer\n%!" >>= fun () ->
       return ()
 
-let call raw_url (cctxt : #Client_context.full_context) =
+let call raw_url (cctxt : #Client_context.full) =
   let uri = Uri.of_string raw_url in
   let args = String.split_path (Uri.path uri) in
   RPC_description.describe cctxt ~recurse:false args >>=? function
@@ -392,7 +392,7 @@ let call raw_url (cctxt : #Client_context.full_context) =
       cctxt#message "No service found at this URL\n%!" >>= fun () ->
       return ()
 
-let call_with_json raw_url json (cctxt: #Client_context.full_context) =
+let call_with_json raw_url json (cctxt: #Client_context.full) =
   let uri = Uri.of_string raw_url in
   match Data_encoding.Json.from_string json with
   | Error err ->
@@ -403,7 +403,7 @@ let call_with_json raw_url json (cctxt: #Client_context.full_context) =
       cctxt#generic_json_call `POST ~body uri >>=?
       display_answer cctxt
 
-let call_with_file_or_json url maybe_file (cctxt: #Client_context.full_context) =
+let call_with_file_or_json url maybe_file (cctxt: #Client_context.full) =
   begin
     match TzString.split ':' ~limit:1 maybe_file with
     | [ "file" ; filename] ->

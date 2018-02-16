@@ -8,6 +8,6 @@
 (**************************************************************************)
 
 val create:
-  #Proto_alpha.full_context ->
+  #Proto_alpha.full ->
   Client_baking_operations.valid_endorsement tzresult Lwt_stream.t ->
   unit Lwt.t

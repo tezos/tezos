@@ -18,7 +18,7 @@ let builtin_commands =
       ~desc: "List the protocol versions that this client understands."
       no_options
       (fixed [ "list" ; "understood" ; "protocols" ])
-      (fun () (cctxt : #Client_context.full_context) ->
+      (fun () (cctxt : #Client_context.full) ->
          Lwt_list.iter_s
            (fun (ver, _) -> cctxt#message "%a" Protocol_hash.pp_short ver)
            (Client_commands.get_versions ()) >>= fun () ->
@@ -47,7 +47,7 @@ let main select_commands =
                         (if Unix.isatty Unix.stderr then Ansi else Plain) Short) ;
   Lwt.catch begin fun () -> begin
       Client_config.parse_config_args
-        (new unix_full_context
+        (new unix_full
           ~block:Client_config.default_block
           ~base_dir:Client_config.default_base_dir
           ~rpc_config:RPC_client.default_config)
@@ -77,7 +77,7 @@ let main select_commands =
         else rpc_config
       in
       let client_config =
-        new unix_full_context
+        new unix_full
           ~block:parsed_args.block
           ~base_dir:parsed_config_file.base_dir
           ~rpc_config:rpc_config in

@@ -20,7 +20,7 @@ let get_pkh cctxt = function
   | None -> return None
   | Some x -> Public_key_hash.find_opt cctxt x
 
-let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_context.logger) = function
+let report_michelson_errors ?(no_print_source=false) ~msg (cctxt : #Client_context.printer) = function
   | Error errs ->
       cctxt#warning "%a"
         (Michelson_v1_error_reporter.report_errors
@@ -47,7 +47,7 @@ let commands () =
     command ~group ~desc: "Access the timestamp of the block."
       no_options
       (fixed [ "get" ; "timestamp" ])
-      begin fun () (cctxt : Proto_alpha.full_context) ->
+      begin fun () (cctxt : Proto_alpha.full) ->
         Block_services.timestamp
           cctxt cctxt#block >>=? fun v ->
         cctxt#message "%s" (Time.to_notation v) >>= fun () ->
@@ -57,7 +57,7 @@ let commands () =
     command ~group ~desc: "Lists all non empty contracts of the block."
       no_options
       (fixed [ "list" ; "contracts" ])
-      begin fun () (cctxt : Proto_alpha.full_context) ->
+      begin fun () (cctxt : Proto_alpha.full) ->
         list_contract_labels cctxt cctxt#block >>=? fun contracts ->
         Lwt_list.iter_s
           (fun (alias, hash, kind) -> cctxt#message "%s%s%s" hash kind alias)
@@ -70,7 +70,7 @@ let commands () =
       (prefixes [ "get" ; "balance" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full_context) ->
+      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
         get_balance cctxt cctxt#block contract >>=? fun amount ->
         cctxt#answer "%a %s" Tez.pp amount Client_proto_args.tez_sym >>= fun () ->
         return ()
@@ -81,7 +81,7 @@ let commands () =
       (prefixes [ "get" ; "storage" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full_context) ->
+      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
         get_storage cctxt cctxt#block contract >>=? function
         | None ->
             cctxt#error "This is not a smart contract."
@@ -95,7 +95,7 @@ let commands () =
       (prefixes [ "get" ; "manager" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full_context) ->
+      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
         Client_proto_contracts.get_manager
           cctxt cctxt#block contract >>=? fun manager ->
         Public_key_hash.rev_find cctxt manager >>=? fun mn ->
@@ -110,7 +110,7 @@ let commands () =
       (prefixes [ "get" ; "delegate" ; "for" ]
        @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
        @@ stop)
-      begin fun () (_, contract) (cctxt : Proto_alpha.full_context) ->
+      begin fun () (_, contract) (cctxt : Proto_alpha.full) ->
         Client_proto_contracts.get_delegate
           cctxt cctxt#block contract >>=? fun delegate ->
         Public_key_hash.rev_find cctxt delegate >>=? fun mn ->
@@ -128,7 +128,7 @@ let commands () =
        @@ Public_key_hash.alias_param
          ~name: "mgr" ~desc: "new delegate of the contract"
        @@ stop)
-      begin fun fee (_, contract) (_, delegate) (cctxt : Proto_alpha.full_context) ->
+      begin fun fee (_, contract) (_, delegate) (cctxt : Proto_alpha.full) ->
         source_to_keys cctxt cctxt#block contract >>=? fun (src_pk, manager_sk) ->
         set_delegate ~fee cctxt cctxt#block contract (Some delegate) ~src_pk ~manager_sk >>=? fun oph ->
         operation_submitted_message cctxt oph
@@ -150,7 +150,7 @@ let commands () =
          ~name:"src" ~desc: "name of the source contract"
        @@ stop)
       begin fun (fee, delegate, delegatable, force)
-        new_contract (_, manager_pkh) balance (_, source) (cctxt : Proto_alpha.full_context) ->
+        new_contract (_, manager_pkh) balance (_, source) (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force new_contract >>=? fun alias_name ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
         get_pkh cctxt delegate >>=? fun delegate ->
@@ -192,7 +192,7 @@ let commands () =
                              Combine with -init if the storage type is not unit."
        @@ stop)
       begin fun (fee, delegate, force, delegatable, spendable, initial_storage, no_print_source)
-        alias_name (_, manager) balance (_, source) program (cctxt : Proto_alpha.full_context) ->
+        alias_name (_, manager) balance (_, source) program (cctxt : Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program) >>=? fun { expanded = code } ->
         source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
@@ -238,7 +238,7 @@ let commands () =
        @@ Public_key_hash.alias_param
          ~name: "mgr" ~desc: "manager of the new contract"
        @@ stop)
-      begin fun force alias_name (_, manager_pkh) (cctxt: Proto_alpha.full_context) ->
+      begin fun force alias_name (_, manager_pkh) (cctxt: Proto_alpha.full) ->
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         faucet ~manager_pkh cctxt#block cctxt () >>=? fun (oph, contract) ->
         operation_submitted_message cctxt

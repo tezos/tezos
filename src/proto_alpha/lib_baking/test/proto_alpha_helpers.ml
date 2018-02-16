@@ -28,9 +28,9 @@ let build_rpc_context config =
 let rpc_ctxt = ref (build_rpc_context !rpc_config)
 
 (* Context that does not write to alias files *)
-let no_write_context ?(block = `Prevalidation) config : #Client_context.full_context = object
+let no_write_context ?(block = `Prevalidation) config : #Client_context.full = object
   inherit RPC_client.http_ctxt config Media_type.all_media_types
-  inherit Client_context.logger (fun _ _ -> Lwt.return_unit)
+  inherit Client_context.simple_printer (fun _ _ -> Lwt.return_unit)
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a Error_monad.tzresult Lwt.t =
     fun _ ~default _ -> return default
   method write : type a. string ->
@@ -177,7 +177,7 @@ module Account = struct
         ~scheme:"unencrypted"
         ~location:(Ed25519.Secret_key.to_b58check account.sk) in
     Client_proto_context.transfer
-      (new wrap_full_context (no_write_context !rpc_config ~block))
+      (new wrap_full (no_write_context !rpc_config ~block))
       block
       ~source:account.contract
       ~src_pk:account.pk
@@ -210,7 +210,7 @@ module Account = struct
       ?delegate
       ~fee
       block
-      (new wrap_full_context (no_write_context !rpc_config))
+      (new wrap_full (no_write_context !rpc_config))
       ()
 
   let set_delegate
@@ -221,7 +221,7 @@ module Account = struct
       ~src_pk
       delegate_opt =
     Client_proto_context.set_delegate
-      (new wrap_full_context (no_write_context ~block !rpc_config))
+      (new wrap_full (no_write_context ~block !rpc_config))
       block
       ~fee
       contract
@@ -442,7 +442,7 @@ module Baking = struct
         ~scheme:"unencrypted"
         ~location:(Ed25519.Secret_key.to_b58check contract.sk) in
     Client_baking_forge.forge_block
-      (new wrap_full_context (no_write_context ~block !rpc_config))
+      (new wrap_full (no_write_context ~block !rpc_config))
       block
       ~operations
       ~force:true

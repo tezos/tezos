@@ -17,7 +17,7 @@ val generate_seed_nonce: unit -> Nonce.t
     reveal the aforementionned nonce during the next cycle. *)
 
 val inject_block:
-  #Proto_alpha.full_context ->
+  #Proto_alpha.full ->
   ?force:bool ->
   ?chain_id:Chain_id.t ->
   shell_header:Block_header.shell_header ->
@@ -36,7 +36,7 @@ type error +=
   | Failed_to_preapply of Tezos_base.Operation.t * error list
 
 val forge_block:
-  #Proto_alpha.full_context ->
+  #Proto_alpha.full ->
   Block_services.block ->
   ?force:bool ->
   ?operations:Operation.raw list ->
@@ -68,15 +68,15 @@ val forge_block:
 
 module State : sig
   val get_block:
-    #Proto_alpha.full_context ->
+    #Proto_alpha.full ->
     Raw_level.t -> Block_hash.t list tzresult Lwt.t
   val record_block:
-    #Proto_alpha.full_context ->
+    #Proto_alpha.full ->
     Raw_level.t -> Block_hash.t -> Nonce.t -> unit tzresult Lwt.t
 end
 
 val create:
-  #Proto_alpha.full_context ->
+  #Proto_alpha.full ->
   ?max_priority: int ->
   public_key_hash list ->
   Client_baking_blocks.block_info list tzresult Lwt_stream.t ->
@@ -84,7 +84,7 @@ val create:
   unit tzresult Lwt.t
 
 val get_unrevealed_nonces:
-  #Proto_alpha.full_context ->
+  #Proto_alpha.full ->
   ?force:bool ->
   Block_services.block ->
   (Block_hash.t * (Raw_level.t * Nonce.t)) list tzresult Lwt.t

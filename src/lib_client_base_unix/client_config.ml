@@ -124,7 +124,7 @@ let default_cli_args = {
 
 open Cli_entries
 
-let string_parameter () : (string, #Client_context.full_context) parameter =
+let string_parameter () : (string, #Client_context.full) parameter =
   parameter (fun _ x -> return x)
 
 let block_parameter () =
@@ -234,7 +234,7 @@ let commands config_file cfg =
   [ command ~group ~desc:"Show the config file."
       no_options
       (fixed [ "config" ; "show" ])
-      (fun () (cctxt : #Client_context.full_context) ->
+      (fun () (cctxt : #Client_context.full) ->
          let pp_cfg ppf cfg = Format.fprintf ppf "%a" Data_encoding.Json.pp (Data_encoding.Json.construct Cfg_file.encoding cfg) in
          if not @@ Sys.file_exists config_file then
            cctxt#warning
@@ -300,7 +300,7 @@ let global_options () =
     (port_arg ())
     (tls_switch ())
 
-let parse_config_args (ctx : #Client_context.full_context) argv =
+let parse_config_args (ctx : #Client_context.full) argv =
   parse_global_options
     (global_options ())
     ctx

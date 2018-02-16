@@ -15,7 +15,7 @@ let commands () = [
   let open Cli_entries in
   command ~group ~desc: "show global network status"
     no_options
-    (prefixes ["p2p" ; "stat"] stop) begin fun () (cctxt : #Client_context.full_context) ->
+    (prefixes ["p2p" ; "stat"] stop) begin fun () (cctxt : #Client_context.full) ->
     P2p_services.stat cctxt >>=? fun stat ->
     P2p_services.Connections.list cctxt >>=? fun conns ->
     P2p_services.Peers.list cctxt >>=? fun peers ->

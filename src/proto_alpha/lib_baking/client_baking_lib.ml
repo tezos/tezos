@@ -10,7 +10,7 @@
 open Proto_alpha
 open Alpha_context
 
-let bake_block (cctxt : #Proto_alpha.full_context) block
+let bake_block (cctxt : #Proto_alpha.full) block
     ?force ?max_priority ?(free_baking=false) ?src_sk delegate =
   begin
     match src_sk with
@@ -41,7 +41,7 @@ let endorse_block cctxt ?max_priority delegate =
   cctxt#answer "Operation hash is '%a'." Operation_hash.pp oph >>= fun () ->
   return ()
 
-let get_predecessor_cycle (cctxt : #Client_context.logger) cycle =
+let get_predecessor_cycle (cctxt : #Client_context.printer) cycle =
   match Cycle.pred cycle with
   | None ->
       if Cycle.(cycle = root) then
@@ -59,7 +59,7 @@ let do_reveal cctxt block blocks =
   Client_baking_nonces.dels cctxt (List.map fst blocks) >>=? fun () ->
   return ()
 
-let reveal_block_nonces (cctxt : #Proto_alpha.full_context) block_hashes =
+let reveal_block_nonces (cctxt : #Proto_alpha.full) block_hashes =
   Lwt_list.filter_map_p
     (fun hash ->
        Lwt.catch

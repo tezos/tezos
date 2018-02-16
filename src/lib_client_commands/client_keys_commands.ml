@@ -34,7 +34,7 @@ let commands () =
               version of the tezos client supports."
       no_options
       (fixed [ "list" ; "signing" ; "schemes" ])
-      (fun () (cctxt : #Client_context.full_context) ->
+      (fun () (cctxt : #Client_context.full) ->
          let signers =
            List.sort
              (fun (ka, _) (kb, _) -> String.compare ka kb)
@@ -50,7 +50,7 @@ let commands () =
       (prefixes [ "gen" ; "keys" ]
        @@ Secret_key.fresh_alias_param
        @@ stop)
-      (fun force name (cctxt : #Client_context.full_context) ->
+      (fun force name (cctxt : #Client_context.full) ->
          Secret_key.of_fresh cctxt force name >>=? fun name ->
          gen_keys ~force cctxt name) ;
 
@@ -150,7 +150,7 @@ let commands () =
     command ~group ~desc: "List all identities and associated keys."
       no_options
       (fixed [ "list" ; "known" ; "identities" ])
-      (fun () (cctxt : #Client_context.full_context) ->
+      (fun () (cctxt : #Client_context.full) ->
          list_keys cctxt >>=? fun l ->
          iter_s begin fun (name, pkh, pk, sk) ->
            Public_key_hash.to_source pkh >>=? fun v ->
@@ -169,7 +169,7 @@ let commands () =
       (prefixes [ "show" ; "identity"]
        @@ Public_key_hash.alias_param
        @@ stop)
-      (fun show_private (name, _) (cctxt : #Client_context.full_context) ->
+      (fun show_private (name, _) (cctxt : #Client_context.full) ->
          let ok_lwt x = x >>= (fun x -> return x) in
          alias_keys cctxt name >>=? fun key_info ->
          match key_info with

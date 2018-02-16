@@ -33,14 +33,14 @@ val trace :
   (Script.expr * Script.expr * (int * Gas.t * Script.expr list) list * (Script.expr * Script.expr option) list option) tzresult Lwt.t
 
 val print_run_result :
-  #Client_context.logger ->
+  #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr * Script_repr.expr *
    (Script_repr.expr * Script_repr.expr option) list option) tzresult -> unit tzresult Lwt.t
 
 val print_trace_result :
-  #Client_context.logger ->
+  #Client_context.printer ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr * Script_repr.expr *
@@ -53,7 +53,7 @@ val hash_and_sign :
   Michelson_v1_parser.parsed ->
   Client_keys.sk_locator ->
   Block_services.block ->
-  #Proto_alpha.full_context ->
+  #Proto_alpha.full ->
   (string * string) tzresult Lwt.t
 
 val typecheck_data :
@@ -75,5 +75,5 @@ val print_typecheck_result :
   print_source_on_error:bool ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map, error list) result ->
-  #Client_context.logger ->
+  #Client_context.printer ->
   unit tzresult Lwt.t

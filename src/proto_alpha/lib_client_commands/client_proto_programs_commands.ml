@@ -50,7 +50,7 @@ let commands () =
     command ~group ~desc: "Lists all programs in the library."
       no_options
       (fixed [ "list" ; "known" ; "programs" ])
-      (fun () (cctxt : Proto_alpha.full_context) ->
+      (fun () (cctxt : Proto_alpha.full) ->
          Program.load cctxt >>=? fun list ->
          Lwt_list.iter_s (fun (n, _) -> cctxt#message "%s" n) list >>= fun () ->
          return ()) ;
@@ -77,7 +77,7 @@ let commands () =
       (prefixes [ "show" ; "known" ; "program" ]
        @@ Program.alias_param
        @@ stop)
-      (fun () (_, program) (cctxt : Proto_alpha.full_context) ->
+      (fun () (_, program) (cctxt : Proto_alpha.full) ->
          Program.to_source program >>=? fun source ->
          cctxt#message "%s\n" source >>= fun () ->
          return ()) ;

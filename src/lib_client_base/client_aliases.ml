@@ -68,7 +68,7 @@ module type Alias = sig
     ('a, (< .. > as 'obj)) Cli_entries.params ->
     (fresh_param -> 'a, 'obj) Cli_entries.params
   val force_switch :
-    unit -> (bool, #Client_context.full_context) arg
+    unit -> (bool, #Client_context.full) arg
   val of_fresh :
     #Client_context.wallet ->
     bool ->
