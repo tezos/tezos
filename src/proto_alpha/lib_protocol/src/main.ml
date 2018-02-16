@@ -33,7 +33,7 @@ type validation_mode =
     }
   | Full_construction of {
       predecessor : Block_hash.t ;
-      block_proto_header : Alpha_context.Block_header.proto_header ;
+      protocol_data : Alpha_context.Block_header.protocol_data ;
       baker : Alpha_context.public_key_hash ;
     }
 
@@ -42,7 +42,7 @@ type validation_state =
     ctxt : Alpha_context.t ;
     op_count : int }
 
-let current_context { ctxt } =
+let current_context { ctxt ; _ } =
   return (Alpha_context.finalize ctxt).context
 
 let precheck_block
@@ -75,13 +75,13 @@ let begin_construction
     ~predecessor_fitness:pred_fitness
     ~predecessor
     ~timestamp
-    ?proto_header
+    ?protocol_data
     () =
   let level = Int32.succ pred_level in
   let fitness = pred_fitness in
   Alpha_context.init ~timestamp ~level ~fitness ctxt >>=? fun ctxt ->
   begin
-    match proto_header with
+    match protocol_data with
     | None ->
         Apply.begin_partial_construction ctxt >>=? fun ctxt ->
         let mode = Partial_construction { predecessor } in
@@ -89,9 +89,9 @@ let begin_construction
     | Some proto_header ->
         Apply.begin_full_construction
           ctxt pred_timestamp
-          proto_header >>=? fun (ctxt, block_proto_header, baker) ->
+          proto_header >>=? fun (ctxt, protocol_data, baker) ->
         let mode =
-          Full_construction { predecessor ; baker ; block_proto_header } in
+          Full_construction { predecessor ; baker ; protocol_data } in
         return (mode, ctxt)
   end >>=? fun (mode, ctxt) ->
   return { mode ; ctxt ; op_count = 0 }
@@ -102,11 +102,11 @@ let apply_operation ({ mode ; ctxt ; op_count } as data) operation =
     | Partial_construction { predecessor } ->
         predecessor, 0, None
     | Application
-        { baker ;  block_header = { shell = { predecessor } ;
-                                    proto = block_proto_header } }
-    | Full_construction { predecessor ; block_proto_header ; baker } ->
+        { baker ;  block_header = { shell = { predecessor ; _ } ;
+                                    protocol_data ; _ } }
+    | Full_construction { predecessor ; protocol_data ; baker } ->
         predecessor,
-        block_proto_header.priority,
+        protocol_data.priority,
         Some (Alpha_context.Contract.default_contract baker) in
   Apply.apply_operation
     ctxt baker_contract pred_block block_prio operation
@@ -119,12 +119,12 @@ let finalize_block { mode ; ctxt ; op_count } = match mode with
       let ctxt = Alpha_context.finalize ctxt in
       return ctxt
   | Application
-      { baker ;  block_header = { proto = block_proto_header } }
-  | Full_construction { block_proto_header ; baker } ->
-      Apply.finalize_application ctxt block_proto_header baker >>=? fun ctxt ->
-      let { level } : Alpha_context.Level.t =
+      { baker ;  block_header = { protocol_data ; _ } }
+  | Full_construction { protocol_data ; baker ; _ } ->
+      Apply.finalize_application ctxt protocol_data baker >>=? fun ctxt ->
+      let { level ; _ } : Alpha_context.Level.t =
         Alpha_context. Level.current ctxt in
-      let priority = block_proto_header.priority in
+      let priority = protocol_data.priority in
       let level = Alpha_context.Raw_level.to_int32 level in
       let fitness = Alpha_context.Fitness.current ctxt in
       let commit_message =

@@ -42,8 +42,8 @@ let empty_proof_of_work_nonce =
   MBytes.of_string
     (String.make Constants_repr.proof_of_work_nonce_size  '\000')
 
-let forge_faked_proto_header ~priority ~seed_nonce_hash =
-  Alpha_context.Block_header.forge_unsigned_proto_header
+let forge_faked_protocol_data ~priority ~seed_nonce_hash =
+  Alpha_context.Block_header.forge_unsigned_protocol_data
     { priority ; seed_nonce_hash ;
       proof_of_work_nonce = empty_proof_of_work_nonce }
 
@@ -173,10 +173,10 @@ let forge_block cctxt block
           return timestamp
   end >>=? fun timestamp ->
   let request = List.length operations in
-  let proto_header = forge_faked_proto_header ~priority ~seed_nonce_hash in
+  let protocol_data = forge_faked_protocol_data ~priority ~seed_nonce_hash in
   let operations = classify_operations operations in
   Block_services.preapply
-    cctxt block ~timestamp ~sort ~proto_header operations >>=?
+    cctxt block ~timestamp ~sort ~protocol_data operations >>=?
   fun { operations = result ; shell_header } ->
   let valid = List.fold_left (fun acc r -> acc + List.length r.Preapply_result.applied) 0 result in
   lwt_log_info "Found %d valid operations (%d refused) for timestamp %a"
@@ -485,10 +485,10 @@ let bake (cctxt : #Proto_alpha.full) state =
          Operation_hash.Map.(fold add)
            ops (Preapply_result.operations res) in
        let request = List.length operations in
-       let proto_header =
-         forge_faked_proto_header ~priority ~seed_nonce_hash in
+       let protocol_data =
+         forge_faked_protocol_data ~priority ~seed_nonce_hash in
        Block_services.preapply cctxt block
-         ~timestamp ~sort:true ~proto_header [operations] >>= function
+         ~timestamp ~sort:true ~protocol_data [operations] >>= function
        | Error errs ->
            lwt_log_error "Error while prevalidating operations:\n%a"
              pp_print_error

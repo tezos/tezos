@@ -64,11 +64,11 @@ let () =
   end ;
   register0_fullctxt S.priority begin fun { block_header ; _ } () () ->
     Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
-    return block_header.proto.priority
+    return block_header.protocol_data.priority
   end ;
   register0_fullctxt S.seed_nonce_hash begin fun { block_header ; _ } () ( )->
     Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
-    return block_header.proto.seed_nonce_hash
+    return block_header.protocol_data.seed_nonce_hash
   end
 
 let operations ctxt block =

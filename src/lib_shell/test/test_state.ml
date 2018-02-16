@@ -73,7 +73,7 @@ let block _state ?(context = Context_hash.zero) ?(operations = []) (pred: State.
               validation_passes = 1 ;
               timestamp ; operations_hash ; fitness ;
               context } ;
-    proto = MBytes.of_string name ;
+    protocol_data = MBytes.of_string name ;
   }
 
 let build_valid_chain state vtbl pred names =

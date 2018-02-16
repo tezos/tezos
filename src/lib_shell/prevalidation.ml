@@ -56,7 +56,7 @@ and 'a proto =
   (module Registred_protocol.T with type validation_state = 'a)
 
 let start_prevalidation
-    ?proto_header
+    ?protocol_data
     ~predecessor ~timestamp () =
   let { Block_header.shell =
           { fitness = predecessor_fitness ;
@@ -88,7 +88,7 @@ let start_prevalidation
     ~predecessor_level
     ~predecessor
     ~timestamp
-    ?proto_header
+    ?protocol_data
     ()
   >>=? fun state ->
   (* FIXME arbitrary value, to be customisable *)

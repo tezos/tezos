@@ -83,7 +83,7 @@ let lolblock ?(operations = []) header =
             fitness = [MBytes.of_string @@ string_of_int @@ String.length header;
                        MBytes.of_string @@ string_of_int @@ 12] ;
             context = Context_hash.zero } ;
-        proto = MBytes.of_string header ;
+        protocol_data = MBytes.of_string header ;
       } ;
     max_operations_ttl = 0 ;
     message = None ;

@@ -37,7 +37,7 @@ val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
     funds to claim baking rights. *)
 val pay_baking_bond:
   context ->
-  Block_header.proto_header ->
+  Block_header.protocol_data ->
   public_key_hash ->
   context tzresult Lwt.t
 
@@ -54,7 +54,7 @@ val pay_endorsement_bond:
     * the bond have been payed if the slot is below [Constants.first_free_baking_slot].
 *)
 val check_baking_rights:
-  context -> Block_header.proto_header -> Time.t ->
+  context -> Block_header.protocol_data -> Time.t ->
   public_key_hash tzresult Lwt.t
 
 (** [check_signing_rights c slot contract] verifies that:

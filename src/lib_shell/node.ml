@@ -171,7 +171,7 @@ module RPC = struct
     operations_hash: Operation_list_list_hash.t ;
     fitness: MBytes.t list ;
     context: Context_hash.t ;
-    data: MBytes.t ;
+    protocol_data: MBytes.t ;
     operations: (Operation_hash.t * Operation.t) list list option ;
     protocol: Protocol_hash.t ;
     test_chain: Test_chain_status.t ;
@@ -197,7 +197,7 @@ module RPC = struct
       operations_hash = header.shell.operations_hash ;
       fitness = header.shell.fitness ;
       context = header.shell.context ;
-      data = header.proto ;
+      protocol_data = header.protocol_data ;
       operations = Some operations ;
       protocol ;
       test_chain ;
@@ -305,7 +305,7 @@ module RPC = struct
                        operations) ;
                 operations = Some operations ;
                 context = Context_hash.zero ;
-                data = MBytes.of_string "" ;
+                protocol_data = MBytes.of_string "" ;
                 chain_id = head_chain_id ;
                 test_chain ;
               }
@@ -382,7 +382,7 @@ module RPC = struct
                     fitness ;
                     context = Context_hash.zero ;
                   } ;
-                  proto = MBytes.create 0 ;
+                  protocol_data = MBytes.create 0 ;
                 } ;
                 operation_hashes = (fun () -> Lwt.return operation_hashes) ;
                 operations = (fun () -> Lwt.return operations) ;
@@ -475,7 +475,7 @@ module RPC = struct
 
   let preapply
       node block
-      ~timestamp ~proto_header ~sort_operations:sort ops =
+      ~timestamp ~protocol_data ~sort_operations:sort ops =
     begin
       match block with
       | `Genesis ->
@@ -499,7 +499,7 @@ module RPC = struct
           | Some data -> return data
     end >>=? fun predecessor ->
     Prevalidation.start_prevalidation
-      ~proto_header ~predecessor ~timestamp () >>=? fun validation_state ->
+      ~protocol_data ~predecessor ~timestamp () >>=? fun validation_state ->
     let ops = List.map (List.map (fun x -> Operation.hash x, x)) ops in
     Lwt_list.fold_left_s
       (fun (validation_state, rs) ops ->

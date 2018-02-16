@@ -56,8 +56,10 @@ let max_block_length =
     | Some len -> len
   end
 
-let parse_block { Block_header.shell ; proto } : block tzresult =
-  match Data_encoding.Binary.of_bytes Data.Command.signed_encoding proto with
+let parse_block { Block_header.shell ; protocol_data } : block tzresult =
+  match
+    Data_encoding.Binary.of_bytes Data.Command.signed_encoding protocol_data
+  with
   | None -> Error [Parsing_error]
   | Some (command, signature) -> Ok { shell ; command ; signature }
 
@@ -70,7 +72,7 @@ let check_signature ctxt { shell ; command ; signature } =
 
 type validation_state = Updater.validation_result
 
-let current_context ({ context } : validation_state) =
+let current_context ({ context ; _ } : validation_state) =
   return context
 
 let precheck_block
@@ -116,9 +118,9 @@ let begin_construction
     ~predecessor_fitness:fitness
     ~predecessor:_
     ~timestamp
-    ?proto_header
+    ?protocol_data
     () =
-  match proto_header with
+  match protocol_data with
   | None ->
       (* Dummy result. *)
       return { Updater.message = None ; context = ctxt ;

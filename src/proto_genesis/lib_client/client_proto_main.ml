@@ -15,12 +15,13 @@ let protocol =
 
 let bake cctxt ?(timestamp = Time.now ()) block command sk =
   let block = Block_services.last_baked_block block in
-  let proto_header = Data_encoding.Binary.to_bytes Data.Command.encoding command in
+  let protocol_data = Data_encoding.Binary.to_bytes Data.Command.encoding command in
   Block_services.preapply
-    cctxt block ~timestamp ~proto_header [] >>=? fun { shell_header } ->
+    cctxt block ~timestamp ~protocol_data
+    [] >>=? fun { shell_header } ->
   let blk =
     Data_encoding.Binary.to_bytes Block_header.encoding
-      { shell = shell_header ; proto = proto_header } in
+      { shell = shell_header ; protocol_data } in
   Client_keys.append cctxt sk blk >>=? fun signed_blk ->
   Shell_services.inject_block cctxt signed_blk []
 

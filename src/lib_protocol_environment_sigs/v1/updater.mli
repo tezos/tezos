@@ -119,12 +119,13 @@ module type PROTOCOL = sig
 
   (** Initializes a validation context for constructing a new block
       (as opposed to validating an existing block). When the
-      [proto_header] argument is not specified, the function should
-      produce the exact same effect on the context than would produce
-      the validation of a block containing an "equivalent" (but
-      complete) header. For instance, if the block header usually
-      includes a signature, the header provided to
-      {!begin_construction} could includes a faked signature. *)
+      [protocol_data] argument is specified, it should contains a
+      'prototype' of a the protocol specific part of a block header,
+      and the function should produce the exact same effect on the
+      context than would produce the validation of a block containing
+      an "equivalent" (but complete) header. For instance, if the
+      block header usually includes a signature, the header provided
+      to {!begin_construction} should includes a faked signature. *)
   val begin_construction:
     predecessor_context: Context.t ->
     predecessor_timestamp: Time.t ->
@@ -132,7 +133,7 @@ module type PROTOCOL = sig
     predecessor_fitness: Fitness.t ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
-    ?proto_header: MBytes.t ->
+    ?protocol_data: MBytes.t ->
     unit -> validation_state tzresult Lwt.t
 
   (** Called after {!begin_application} (or {!begin_construction}) and

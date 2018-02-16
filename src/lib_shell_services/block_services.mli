@@ -35,11 +35,13 @@ type block_info = {
   operations_hash: Operation_list_list_hash.t ;
   fitness: MBytes.t list ;
   context: Context_hash.t ;
-  data: MBytes.t ;
+  protocol_data: MBytes.t ;
   operations: (Operation_hash.t * Operation.t) list list option ;
   protocol: Protocol_hash.t ;
   test_chain: Test_chain_status.t ;
 }
+
+val pp_block_info: Format.formatter -> block_info -> unit
 
 type preapply_result = {
   shell_header: Block_header.shell_header ;
@@ -94,7 +96,7 @@ val preapply:
   #simple -> block ->
   ?timestamp:Time.t ->
   ?sort:bool ->
-  proto_header:MBytes.t ->
+  protocol_data:MBytes.t ->
   Operation.t list list -> preapply_result tzresult Lwt.t
 
 val complete:
@@ -200,7 +202,7 @@ module S : sig
 
   type preapply_param = {
     timestamp: Time.t ;
-    proto_header: MBytes.t ;
+    protocol_data: MBytes.t ;
     operations: Operation.t list list ;
     sort_operations: bool ;
   }

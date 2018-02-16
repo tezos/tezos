@@ -257,7 +257,7 @@ module Locked_block = struct
       operations_hash = Operation_list_list_hash.empty ;
       context ;
     } in
-    let header : Block_header.t = { shell ; proto = MBytes.create 0 } in
+    let header : Block_header.t = { shell ; protocol_data = MBytes.create 0 } in
     Store.Block.Contents.store (store, genesis.block)
       { Store.Block.header ; message = Some "Genesis" ;
         max_operations_ttl = 0 ; context ;

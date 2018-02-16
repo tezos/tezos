@@ -23,7 +23,7 @@ type validation_state = {
   fitness : Int64.t ;
 }
 
-let current_context { context } =
+let current_context { context ; _ } =
   return context
 
 module Fitness = struct
@@ -50,7 +50,7 @@ module Fitness = struct
     | [] -> return 0L
     | _ -> fail Invalid_fitness
 
-  let get { fitness } = fitness
+  let get { fitness ; _ } = fitness
 
 end
 
@@ -76,7 +76,7 @@ let begin_construction
     ~predecessor_fitness:pred_fitness
     ~predecessor:_
     ~timestamp:_
-    ?proto_header:_ () =
+    ?protocol_data:_ () =
   Fitness.to_int64 pred_fitness >>=? fun pred_fitness ->
   let fitness = Int64.succ pred_fitness in
   return { context ; fitness }

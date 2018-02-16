@@ -56,11 +56,49 @@ type block_info = {
   operations_hash: Operation_list_list_hash.t ;
   fitness: MBytes.t list ;
   context: Context_hash.t ;
-  data: MBytes.t ;
+  protocol_data: MBytes.t ;
   operations: (Operation_hash.t * Operation.t) list list option ;
   protocol: Protocol_hash.t ;
   test_chain: Test_chain_status.t ;
 }
+
+let pp_block_info ppf
+    { hash ; chain_id ; level ;
+      proto_level ; predecessor ; timestamp ;
+      operations_hash ; fitness ; protocol_data ;
+      operations ; protocol ; test_chain } =
+  Format.fprintf ppf
+    "@[<v 2>Hash: %a\
+     @ Test chain: %a\
+     @ Level: %ld\
+     @ Proto_level: %d\
+     @ Predecessor: %a\
+     @ Protocol: %a\
+     @ Net id: %a\
+     @ Timestamp: %a\
+     @ @[<hov 2>Fitness: %a@]\
+     @ Operations hash: %a\
+     @ @[<hov 2>Operations:@ %a@]\
+     @ @[<hov 2>Protocol data:@ %a@]@]"
+    Block_hash.pp hash
+    Test_chain_status.pp test_chain
+    level
+    proto_level
+    Block_hash.pp predecessor
+    Protocol_hash.pp protocol
+    Chain_id.pp chain_id
+    Time.pp_hum timestamp
+    Fitness.pp fitness
+    Operation_list_list_hash.pp operations_hash
+    (fun ppf -> function
+       | None -> Format.fprintf ppf "None"
+       | Some operations ->
+           Format.pp_print_list ~pp_sep:Format.pp_print_newline
+             (Format.pp_print_list ~pp_sep:Format.pp_print_space
+                (fun ppf (oph, _) -> Operation_hash.pp ppf oph))
+             ppf operations)
+    operations
+    Hex.pp (MBytes.to_hex protocol_data)
 
 let block_info_encoding =
   let operation_encoding =
@@ -70,23 +108,23 @@ let block_info_encoding =
   conv
     (fun { hash ; chain_id ; level ; proto_level ; predecessor ;
            fitness ; timestamp ; protocol ;
-           validation_passes ; operations_hash ; context ; data ;
+           validation_passes ; operations_hash ; context ; protocol_data ;
            operations ; test_chain } ->
       ((hash, chain_id, operations, protocol, test_chain),
        { Block_header.shell =
            { level ; proto_level ; predecessor ;
              timestamp ; validation_passes ; operations_hash ; fitness ;
              context } ;
-         proto = data }))
+         protocol_data }))
     (fun ((hash, chain_id, operations, protocol, test_chain),
           { Block_header.shell =
               { level ; proto_level ; predecessor ;
                 timestamp ; validation_passes ; operations_hash ; fitness ;
                 context } ;
-            proto = data }) ->
+            protocol_data }) ->
       { hash ; chain_id ; level ; proto_level ; predecessor ;
         fitness ; timestamp ; protocol ;
-        validation_passes ; operations_hash ; context ; data ;
+        validation_passes ; operations_hash ; context ; protocol_data ;
         operations ; test_chain })
     (dynamic_size
        (merge_objs
@@ -283,20 +321,20 @@ module S = struct
 
   type preapply_param = {
     timestamp: Time.t ;
-    proto_header: MBytes.t ;
+    protocol_data: MBytes.t ;
     operations: Operation.t list list ;
     sort_operations: bool ;
   }
 
   let preapply_param_encoding =
     (conv
-       (fun { timestamp ; proto_header ; operations ; sort_operations } ->
-          (timestamp, proto_header, operations, sort_operations))
-       (fun (timestamp, proto_header, operations, sort_operations) ->
-          { timestamp ; proto_header ; operations ; sort_operations })
+       (fun { timestamp ; protocol_data ; operations ; sort_operations } ->
+          (timestamp, protocol_data, operations, sort_operations))
+       (fun (timestamp, protocol_data, operations, sort_operations) ->
+          { timestamp ; protocol_data ; operations ; sort_operations })
        (obj4
           (req "timestamp" Time.encoding)
-          (req "proto_header" bytes)
+          (req "protocol_data" bytes)
           (req "operations" (list (dynamic_size (list (dynamic_size Operation.encoding)))))
           (dft "sort_operations" bool false)))
 
@@ -461,9 +499,9 @@ let list ?(include_ops = false)
 let complete ctxt b s =
   make_call2 S.complete ctxt b s () ()
 let preapply ctxt h
-    ?(timestamp = Time.now ()) ?(sort = false) ~proto_header operations =
+    ?(timestamp = Time.now ()) ?(sort = false) ~protocol_data operations =
   make_call1 S.preapply ctxt h ()
-    { timestamp ; proto_header ; sort_operations = sort ; operations }
+    { timestamp ; protocol_data ; sort_operations = sort ; operations }
 
 let unmark_invalid ctxt h =
   make_call1 S.unmark_invalid ctxt h () ()

@@ -10,7 +10,7 @@
 type prevalidation_state
 
 val start_prevalidation :
-  ?proto_header: MBytes.t ->
+  ?protocol_data: MBytes.t ->
   predecessor: State.Block.t ->
   timestamp: Time.t ->
   unit -> prevalidation_state tzresult Lwt.t

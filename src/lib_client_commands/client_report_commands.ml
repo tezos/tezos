@@ -9,44 +9,6 @@
 
 (* Commands used to introspect the node's state *)
 
-let pp_block ppf
-    { Block_services.hash ; chain_id ; level ;
-      proto_level ; predecessor ; timestamp ;
-      operations_hash ; fitness ; data ;
-      operations ; protocol ; test_chain } =
-  Format.fprintf ppf
-    "@[<v 2>Hash: %a\
-     @ Test chain: %a\
-     @ Level: %ld\
-     @ Proto_level: %d\
-     @ Predecessor: %a\
-     @ Protocol: %a\
-     @ Net id: %a\
-     @ Timestamp: %a\
-     @ Fitness: @[<v>%a@]\
-     @ Operations hash: %a\
-     @ Operations: @[<v>%a@]\
-     @ Data (hex encoded): \"%a\"@]"
-    Block_hash.pp hash
-    Test_chain_status.pp test_chain
-    level
-    proto_level
-    Block_hash.pp predecessor
-    Protocol_hash.pp protocol
-    Chain_id.pp chain_id
-    Time.pp_hum timestamp
-    Fitness.pp fitness
-    Operation_list_list_hash.pp operations_hash
-    (fun ppf -> function
-       | None -> Format.fprintf ppf "None"
-       | Some operations ->
-           Format.pp_print_list ~pp_sep:Format.pp_print_newline
-             (Format.pp_print_list ~pp_sep:Format.pp_print_space
-                (fun ppf (oph, _) -> Operation_hash.pp ppf oph))
-             ppf operations)
-    operations
-    Hex.pp (MBytes.to_hex data)
-
 let skip_line ppf =
   Format.pp_print_newline ppf ();
   return @@ Format.pp_print_newline ppf ()
@@ -56,7 +18,7 @@ let print_heads ppf heads =
     (fun ppf blocks ->
        Format.pp_print_list
          ~pp_sep:Format.pp_print_newline
-         pp_block
+         Block_services.pp_block_info
          ppf
          blocks)
     ppf heads

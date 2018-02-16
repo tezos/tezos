@@ -98,7 +98,7 @@ let apply_delegate_operation_content
       let ctxt = Fitness.increase ctxt in
       Baking.pay_endorsement_bond ctxt delegate >>=? fun (ctxt, bond) ->
       Baking.endorsement_reward ~block_priority >>=? fun reward ->
-      let { cycle = current_cycle } : Level.t = Level.current ctxt in
+      let { cycle = current_cycle ; _ } : Level.t = Level.current ctxt in
       Lwt.return Tez.(reward +? bond) >>=? fun full_reward ->
       Reward.record ctxt delegate current_cycle full_reward
   | Proposals { period ; proposals } ->
@@ -258,7 +258,7 @@ let apply_anonymous_operation ctxt baker_contract origination_nonce kind =
               ctxt contract Constants.seed_nonce_revelation_tip >>=? fun ctxt ->
             return (ctxt, origination_nonce)
       end
-  | Faucet { id = manager } ->
+  | Faucet { id = manager ; _ } ->
       (* Free tez for all! *)
       begin
         match baker_contract with
@@ -309,15 +309,15 @@ let may_start_new_cycle ctxt =
         ctxt last_cycle reward_date >>=? fun ctxt ->
       return ctxt
 
-let begin_full_construction ctxt pred_timestamp proto_header =
+let begin_full_construction ctxt pred_timestamp protocol_data =
   Lwt.return
-    (Block_header.parse_unsigned_proto_header
-       proto_header) >>=? fun proto_header ->
+    (Block_header.parse_unsigned_protocol_data
+       protocol_data) >>=? fun protocol_data ->
   Baking.check_baking_rights
-    ctxt proto_header pred_timestamp >>=? fun baker ->
-  Baking.pay_baking_bond ctxt proto_header baker >>=? fun ctxt ->
+    ctxt protocol_data pred_timestamp >>=? fun baker ->
+  Baking.pay_baking_bond ctxt protocol_data baker >>=? fun ctxt ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, proto_header, baker)
+  return (ctxt, protocol_data, baker)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
@@ -327,18 +327,18 @@ let begin_application ctxt block_header pred_timestamp =
   Baking.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
   Baking.check_baking_rights
-    ctxt block_header.proto pred_timestamp >>=? fun baker ->
+    ctxt block_header.protocol_data pred_timestamp >>=? fun baker ->
   Baking.check_signature ctxt block_header baker >>=? fun () ->
-  Baking.pay_baking_bond ctxt block_header.proto baker >>=? fun ctxt ->
+  Baking.pay_baking_bond ctxt block_header.protocol_data baker >>=? fun ctxt ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, baker)
 
-let finalize_application ctxt block_proto_header baker =
+let finalize_application ctxt block_protocol_data baker =
   (* end of level (from this point nothing should fail) *)
-  let priority = block_proto_header.Block_header.priority in
+  let priority = block_protocol_data.Block_header.priority in
   let reward = Baking.base_baking_reward ctxt ~priority in
   Nonce.record_hash ctxt
-    baker reward block_proto_header.seed_nonce_hash >>=? fun ctxt ->
+    baker reward block_protocol_data.seed_nonce_hash >>=? fun ctxt ->
   Reward.pay_due_rewards ctxt >>=? fun ctxt ->
   (* end of cycle *)
   may_start_new_cycle ctxt >>=? fun ctxt ->

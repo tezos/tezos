@@ -60,7 +60,7 @@ module Make(Context : Protocol_environment.CONTEXT) = struct
       predecessor_fitness: Fitness.t ->
       predecessor: Block_hash.t ->
       timestamp: Time.t ->
-      ?proto_header: MBytes.t ->
+      ?protocol_data: MBytes.t ->
       unit -> validation_state tzresult Lwt.t
     val apply_operation:
       validation_state -> operation -> validation_state tzresult Lwt.t

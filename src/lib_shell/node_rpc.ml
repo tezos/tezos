@@ -127,9 +127,9 @@ let register_bi_dir node dir =
     let implementation
         b ()
         { Block_services.S.operations ; sort_operations ;
-          timestamp ; proto_header} =
+          timestamp ; protocol_data } =
       Node.RPC.preapply node b
-        ~timestamp ~proto_header ~sort_operations operations
+        ~timestamp ~protocol_data ~sort_operations operations
       >>=? fun (shell_header, operations) ->
       return { Block_services.shell_header ; operations } in
     RPC_directory.register1 dir

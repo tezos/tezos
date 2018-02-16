@@ -13,19 +13,19 @@ open Proto_alpha
 
 type shell_header = Block_header.shell_header
 type tezos_header = Block_header.t
-type protocol_header = Alpha_context.Block_header.proto_header
+type protocol_data = Alpha_context.Block_header.protocol_data
 type operation_header = Operation.shell_header
 
 (** Block before application *)
 type init_block = {
   pred_block_hash : Block_hash.t;
   pred_shell_header : shell_header;
-  proto_header : protocol_header;
+  protocol_data : protocol_data;
   op_header : operation_header;
   sourced_operations :
     (Main.operation * Helpers_account.t) list;
   operation_hashs : Operation_hash.t list;
-  proto_header_bytes : MBytes.t;
+  protocol_data_bytes : MBytes.t;
   timestamp : Time.t;
   level : Int32.t;
   context : Context.t;
@@ -40,7 +40,7 @@ type result = {
   tezos_context : Alpha_context.t;
 }
 val get_op_header_res : result -> operation_header
-val get_proto_header : int -> protocol_header
+val get_protocol_data : int -> protocol_data
 val get_op_header : Block_hash.t -> operation_header
 val make_sourced_operation :
   Operation.shell_header ->

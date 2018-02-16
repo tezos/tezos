@@ -22,7 +22,7 @@ val shell_header_encoding: shell_header Data_encoding.t
 
 type t = {
   shell: shell_header ;
-  proto: MBytes.t ;
+  protocol_data: MBytes.t ;
 }
 
 include S.HASHABLE with type t := t

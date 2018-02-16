@@ -185,7 +185,7 @@ module Forge : sig
 
   end
 
-  val block_proto_header:
+  val protocol_data:
     'a #RPC_context.simple -> 'a ->
     priority: int ->
     seed_nonce_hash: Nonce_hash.t ->
@@ -204,6 +204,6 @@ module Parse : sig
   val block:
     'a #RPC_context.simple -> 'a ->
     Block_header.shell_header -> MBytes.t ->
-    Block_header.proto_header shell_tzresult Lwt.t
+    Block_header.protocol_data shell_tzresult Lwt.t
 
 end

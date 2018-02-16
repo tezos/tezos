@@ -45,7 +45,7 @@ let shell_header_encoding =
 
 type t = {
   shell: shell_header ;
-  proto: MBytes.t ;
+  protocol_data: MBytes.t ;
 }
 
 include Compare.Make (struct
@@ -60,7 +60,7 @@ include Compare.Make (struct
         | x :: xs, y :: ys ->
             compare x y >> fun () -> list compare xs ys in
       Block_hash.compare b1.shell.predecessor b2.shell.predecessor >> fun () ->
-      compare b1.proto b2.proto >> fun () ->
+      compare b1.protocol_data b2.protocol_data >> fun () ->
       Operation_list_list_hash.compare
         b1.shell.operations_hash b2.shell.operations_hash >> fun () ->
       Time.compare b1.shell.timestamp b2.shell.timestamp >> fun () ->
@@ -70,11 +70,11 @@ include Compare.Make (struct
 let encoding =
   let open Data_encoding in
   conv
-    (fun { shell ; proto } -> (shell, proto))
-    (fun (shell, proto) -> { shell ; proto })
+    (fun { shell ; protocol_data } -> (shell, protocol_data))
+    (fun (shell, protocol_data) -> { shell ; protocol_data })
     (merge_objs
        shell_header_encoding
-       (obj1 (req "data" Variable.bytes)))
+       (obj1 (req "protocol_data" Variable.bytes)))
 
 let pp ppf op =
   Data_encoding.Json.pp ppf

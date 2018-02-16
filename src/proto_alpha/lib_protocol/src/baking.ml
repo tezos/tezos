@@ -118,14 +118,14 @@ let check_timestamp c priority pred_timestamp =
   fail_unless Timestamp.(minimal_time <= timestamp)
     (Timestamp_too_early (minimal_time, timestamp))
 
-let check_baking_rights c { Block_header.priority }
+let check_baking_rights c { Block_header.priority ; _ }
     pred_timestamp =
   let level = Level.current c in
   Roll.baking_rights_owner c level ~priority >>=? fun delegate ->
   check_timestamp c priority pred_timestamp >>=? fun () ->
   return delegate
 
-let pay_baking_bond c { Block_header.priority } id =
+let pay_baking_bond c { Block_header.priority ; _ } id =
   if Compare.Int.(priority >= Constants.first_free_baking_slot c)
   then return c
   else
@@ -233,8 +233,8 @@ let check_proof_of_work_stamp ctxt block =
 
 let check_signature ctxt block id =
   Delegates_pubkey.get ctxt id >>=? fun key ->
-  let check_signature key { Block_header.proto ; shell ; signature } =
-    let unsigned_header = Block_header.forge_unsigned shell proto in
+  let check_signature key { Block_header.protocol_data ; shell ; signature } =
+    let unsigned_header = Block_header.forge_unsigned shell protocol_data in
     Ed25519.Signature.check key signature unsigned_header in
   if check_signature key block then
     return ()

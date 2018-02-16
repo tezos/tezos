@@ -272,7 +272,7 @@ module Forge = struct
       MBytes.of_string
         (String.make Constants_repr.proof_of_work_nonce_size  '\000')
 
-    let block_proto_header =
+    let protocol_data =
       RPC_service.post_service
         ~description: "Forge the protocol-specific part of a block header"
         ~query: RPC_query.empty
@@ -284,8 +284,8 @@ module Forge = struct
                 (Fixed.bytes
                    Alpha_context.Constants.proof_of_work_nonce_size)
                 empty_proof_of_work_nonce))
-        ~output: (obj1 (req "proto_header" bytes))
-        RPC_path.(custom_root / "forge" / "block_proto_header")
+        ~output: (obj1 (req "protocol_data" bytes))
+        RPC_path.(custom_root / "forge" / "protocol_data")
 
   end
 
@@ -294,9 +294,9 @@ module Forge = struct
     register0_noctxt S.operations begin fun () (shell, proto) ->
       return (Operation.forge shell proto)
     end ;
-    register0_noctxt S.block_proto_header begin fun ()
+    register0_noctxt S.protocol_data begin fun ()
       (priority, seed_nonce_hash, proof_of_work_nonce) ->
-      return (Block_header.forge_unsigned_proto_header
+      return (Block_header.forge_unsigned_protocol_data
                 { priority ; seed_nonce_hash ; proof_of_work_nonce })
     end
 
@@ -403,11 +403,11 @@ module Forge = struct
     MBytes.of_string
       (String.make Constants_repr.proof_of_work_nonce_size  '\000')
 
-  let block_proto_header ctxt
+  let protocol_data ctxt
       block
       ~priority ~seed_nonce_hash
       ?(proof_of_work_nonce = empty_proof_of_work_nonce) () =
-    RPC_context.make_call0 S.block_proto_header
+    RPC_context.make_call0 S.protocol_data
       ctxt block () (priority, seed_nonce_hash, proof_of_work_nonce)
 
 end
@@ -436,7 +436,7 @@ module Parse = struct
         ~description:"Parse a block"
         ~query: RPC_query.empty
         ~input: Block_header.raw_encoding
-        ~output: Block_header.proto_header_encoding
+        ~output: Block_header.protocol_data_encoding
         RPC_path.(custom_root / "parse" / "block" )
 
   end
@@ -478,16 +478,16 @@ module Parse = struct
       end operations
     end ;
     register0_noctxt S.block begin fun () raw_block ->
-      Lwt.return (Block_header.parse raw_block) >>=? fun { proto ; _ } ->
-      return proto
+      Lwt.return (Block_header.parse raw_block) >>=? fun { protocol_data ; _ } ->
+      return protocol_data
     end
 
   let operations ctxt block ?check operations =
     RPC_context.make_call0
       S.operations ctxt block () (operations, check)
-  let block ctxt block shell proto =
+  let block ctxt block shell protocol_data =
     RPC_context.make_call0
-      S.block ctxt block () ({ shell ; proto } : Block_header.raw)
+      S.block ctxt block () ({ shell ; protocol_data } : Block_header.raw)
 
 end
 

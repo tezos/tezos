@@ -35,19 +35,19 @@ let main () =
     fitness = [] ; (* don't care *)
     context = Context_hash.zero ; (* don't care *)
   } in
-  let proto_header =
+  let protocol_data =
     Data_encoding.Binary.to_bytes
-      Alpha_context.Block_header.proto_header_encoding
-      (Helpers_block.get_proto_header 0) in
-  let tezos_header = { Block_header.shell = header ; proto = proto_header } in
+      Alpha_context.Block_header.protocol_data_encoding
+      (Helpers_block.get_protocol_data 0) in
+  let tezos_header = { Block_header.shell = header ; protocol_data } in
   Proto_alpha.Main.begin_construction
     ~predecessor_context: context
     ~predecessor_fitness:[]
-    ~predecessor_timestamp:(Time.epoch)
+    ~predecessor_timestamp:Time.epoch
     ~predecessor_level: 0l
     ~predecessor: genesis_hash
     ~timestamp: header.timestamp
-    ~proto_header
+    ~protocol_data
     () >>=? fun vstate ->
   let hash = Block_header.hash tezos_header in
   Proto_alpha.Main.finalize_block vstate >>=? fun validation ->

@@ -78,7 +78,7 @@ let block_header
         fitness = fitness ;
         context ;
       } ;
-    Block_header.proto = MBytes.of_string "" ;
+    Block_header.protocol_data = MBytes.of_string "" ;
   }
 
 (* adds n blocks on top of an initialized chain *)

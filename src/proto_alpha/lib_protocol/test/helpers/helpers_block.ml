@@ -12,17 +12,17 @@ open Error_monad
 
 type shell_header = Block_header.shell_header
 type tezos_header = Block_header.t
-type protocol_header = Proto_alpha.Alpha_context.Block_header.proto_header
+type protocol_data = Proto_alpha.Alpha_context.Block_header.protocol_data
 type operation_header = Operation.shell_header
 
 type init_block = {
   pred_block_hash : Block_hash.t ;
   pred_shell_header : shell_header ;
-  proto_header : protocol_header ;
+  protocol_data : protocol_data ;
   op_header : operation_header ;
   sourced_operations : (Proto_alpha.Main.operation * Helpers_account.t) list ;
   operation_hashs : Operation_hash.t list ;
-  proto_header_bytes : MBytes.t ;
+  protocol_data_bytes : MBytes.t ;
   timestamp : Time.t ;
   level : Int32.t ;
   context : Context.t
@@ -40,7 +40,7 @@ let get_op_header_res (res : result) : operation_header = {
   branch = res.hash
 }
 
-let get_proto_header priority : protocol_header = {
+let get_protocol_data priority : protocol_data = {
   priority ;
   proof_of_work_nonce = Helpers_crypto.generate_proof_of_work_nonce ();
   seed_nonce_hash = Proto_alpha.Alpha_context.Nonce.hash @@ Helpers_crypto.generate_seed_nonce ()
@@ -62,10 +62,10 @@ let init (pred_shell_header : shell_header) pred_block_hash
     get_op_header pred_block_hash in
   Helpers_assert.tmp_map (make_sourced_operation op_header) src_protops >>? fun src_ops_hashs ->
   let (sourced_operations, operation_hashs) = List.split src_ops_hashs in
-  let proto_header = get_proto_header priority in
-  let proto_header_bytes =
-    Proto_alpha.Alpha_context.Block_header.forge_unsigned_proto_header
-      proto_header
+  let protocol_data = get_protocol_data priority in
+  let protocol_data_bytes =
+    Proto_alpha.Alpha_context.Block_header.forge_unsigned_protocol_data
+      protocol_data
   in
   let timestamp =
     Time.add
@@ -75,9 +75,9 @@ let init (pred_shell_header : shell_header) pred_block_hash
   ok {
     pred_block_hash ;
     pred_shell_header ;
-    proto_header ;
+    protocol_data ;
     op_header ;
-    proto_header_bytes ;
+    protocol_data_bytes ;
     sourced_operations ;
     operation_hashs ;
     timestamp ;
@@ -125,7 +125,7 @@ let get_header_hash
   } in
   let tezos_header : tezos_header = {
     shell = shell_header ;
-    proto = init_block.proto_header_bytes
+    protocol_data = init_block.protocol_data_bytes
   } in
   Proto_alpha.Alpha_context.init
     validation_result.context
@@ -151,7 +151,7 @@ let begin_construction_pre (init_block: init_block) =
     ~predecessor_fitness: init_block.pred_shell_header.fitness
     ~predecessor: init_block.pred_block_hash
     ~timestamp: init_block.timestamp
-    ~proto_header: init_block.proto_header_bytes
+    ~protocol_data: init_block.protocol_data_bytes
     ()
 
 

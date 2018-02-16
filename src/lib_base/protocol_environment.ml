@@ -90,7 +90,7 @@ module type T = sig
     predecessor_fitness: Fitness.t ->
     predecessor: Block_hash.t ->
     timestamp: Time.t ->
-    ?proto_header: MBytes.t ->
+    ?protocol_data: MBytes.t ->
     unit -> validation_state tzresult Lwt.t
   val apply_operation:
     validation_state -> operation -> validation_state tzresult Lwt.t
@@ -447,11 +447,11 @@ module MakeV1
     let begin_construction
         ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness
-        ~predecessor ~timestamp ?proto_header () =
+        ~predecessor ~timestamp ?protocol_data () =
       begin_construction
         ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness
-        ~predecessor ~timestamp ?proto_header () >|= wrap_error
+        ~predecessor ~timestamp ?protocol_data () >|= wrap_error
     let current_context c =
       current_context c >|= wrap_error
     let apply_operation c o =

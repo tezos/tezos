@@ -114,7 +114,7 @@ module RPC : sig
 
   val preapply:
     t -> block ->
-    timestamp:Time.t -> proto_header:MBytes.t ->
+    timestamp:Time.t -> protocol_data:MBytes.t ->
     sort_operations:bool -> Operation.t list list ->
     (Block_header.shell_header * error Preapply_result.t list) tzresult Lwt.t
 

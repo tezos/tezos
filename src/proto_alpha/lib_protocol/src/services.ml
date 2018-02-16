@@ -642,7 +642,7 @@ module Helpers = struct
         ~description:"Parse a block"
         ~query: RPC_query.empty
         ~input: Block_header.raw_encoding
-        ~output: Block_header.proto_header_encoding
+        ~output: Block_header.protocol_data_encoding
         RPC_path.(custom_root / "helpers" / "parse" / "block" )
 
   end

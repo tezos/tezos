@@ -64,9 +64,9 @@ let test_endorsement_payment () =
       root.validation.context endorser_slot
     >>=? fun result ->
     get_balance_res contract_p result >>=? fun bond_balance ->
-    let proto_header = Block.get_proto_header block_priority in
+    let protocol_data = Block.get_protocol_data block_priority in
     Proto_alpha.Baking.check_baking_rights
-      result.tezos_context proto_header root.tezos_header.shell.timestamp
+      result.tezos_context protocol_data root.tezos_header.shell.timestamp
     >>=? fun baker_hpub ->
     let endorsement_bond_cost =
       Constants.endorsement_bond_cost in
