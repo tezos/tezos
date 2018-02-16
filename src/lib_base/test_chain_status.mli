@@ -14,7 +14,7 @@ type t =
       expiration: Time.t ;
     }
   | Running of {
-      net_id: Net_id.t ;
+      chain_id: Chain_id.t ;
       genesis: Block_hash.t ;
       protocol: Protocol_hash.t ;
       expiration: Time.t ;

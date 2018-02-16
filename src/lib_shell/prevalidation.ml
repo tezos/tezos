@@ -78,7 +78,7 @@ let start_prevalidation
     | Some protocol ->
         return protocol
   end >>=? fun (module Proto) ->
-  Context.reset_test_network
+  Context.reset_test_chain
     predecessor_context predecessor
     timestamp >>= fun predecessor_context ->
   Proto.begin_construction

@@ -84,7 +84,7 @@ and delegate_operation =
 
 and dictator_operation =
   | Activate of Protocol_hash.t
-  | Activate_testnet of Protocol_hash.t
+  | Activate_testchain of Protocol_hash.t
 
 and counter = Int32.t
 

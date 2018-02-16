@@ -37,7 +37,7 @@ module Request = struct
   include Request
   type 'a t =
     | Request_validation : {
-        net_db: Distributed_db.net_db ;
+        chain_db: Distributed_db.chain_db ;
         notify_new_block: State.Block.t -> unit ;
         canceler: Lwt_canceler.t option ;
         peer: P2p_peer.Id.t option ;
@@ -47,9 +47,9 @@ module Request = struct
       } -> State.Block.t tzresult t
   let view
     : type a. a t -> view
-    = fun (Request_validation { net_db ; peer ; hash }) ->
-      let net_id = net_db |> Distributed_db.net_state |> State.Net.id in
-      { net_id ; block = hash ; peer = peer }
+    = fun (Request_validation { chain_db ; peer ; hash }) ->
+      let chain_id = chain_db |> Distributed_db.chain_state |> State.Chain.id in
+      { chain_id ; block = hash ; peer = peer }
 end
 
 module Worker = Worker.Make (Name) (Event) (Request) (Types)
@@ -98,9 +98,9 @@ let assert_operation_liveness block live_blocks operations =
                               originating_block = op.shell.branch })))
     operations
 
-let check_liveness net_state pred hash operations_hashes operations =
+let check_liveness chain_state pred hash operations_hashes operations =
   begin
-    Chain.data net_state >>= fun chain_data ->
+    Chain.data chain_state >>= fun chain_data ->
     if State.Block.equal chain_data.current_head pred then
       Lwt.return (chain_data.live_blocks, chain_data.live_operations)
     else
@@ -113,7 +113,7 @@ let check_liveness net_state pred hash operations_hashes operations =
   return ()
 
 let apply_block
-    net_state
+    chain_state
     pred (module Proto : Registred_protocol.T)
     hash (header: Block_header.t)
     operations =
@@ -141,7 +141,7 @@ let apply_block
        return ())
     operations Proto.validation_passes >>=? fun () ->
   let operation_hashes = List.map (List.map Operation.hash) operations in
-  check_liveness net_state pred hash operation_hashes operations >>=? fun () ->
+  check_liveness chain_state pred hash operation_hashes operations >>=? fun () ->
   mapi2_s (fun pass -> map2_s begin fun op_hash raw ->
       Lwt.return (Proto.parse_operation op_hash raw)
       |> trace (invalid_block hash (Cannot_parse_operation op_hash)) >>=? fun op ->
@@ -155,7 +155,7 @@ let apply_block
     operation_hashes
     operations >>=? fun parsed_operations ->
   State.Block.context pred >>= fun pred_context ->
-  Context.reset_test_network
+  Context.reset_test_chain
     pred_context pred_hash header.shell.timestamp >>= fun context ->
   (* TODO wrap 'proto_error' into 'block_error' *)
   Proto.begin_application
@@ -194,14 +194,14 @@ let apply_block
     { new_context with max_operations_ttl } in
   return new_context
 
-let check_net_liveness net_db hash (header: Block_header.t) =
-  let net_state = Distributed_db.net_state net_db in
-  match State.Net.expiration net_state with
+let check_chain_liveness chain_db hash (header: Block_header.t) =
+  let chain_state = Distributed_db.chain_state chain_db in
+  match State.Chain.expiration chain_state with
   | Some eol when Time.(eol <= header.shell.timestamp) ->
       fail @@ invalid_block hash @@
-      Expired_network { net_id = State.Net.id net_state ;
-                        expiration = eol ;
-                        timestamp = header.shell.timestamp }
+      Expired_chain { chain_id = State.Chain.id chain_state ;
+                      expiration = eol ;
+                      timestamp = header.shell.timestamp }
   | None | Some _ -> return ()
 
 let get_proto pred hash =
@@ -217,11 +217,11 @@ let on_request
   : type r. t -> r Request.t -> r tzresult Lwt.t
   = fun w
     (Request.Request_validation
-       { net_db ; notify_new_block ; canceler ;
+       { chain_db ; notify_new_block ; canceler ;
          peer ; hash ; header ; operations }) ->
     let bv = Worker.state w in
-    let net_state = Distributed_db.net_state net_db in
-    State.Block.read_opt net_state hash >>= function
+    let chain_state = Distributed_db.chain_state chain_db in
+    State.Block.read_opt chain_state hash >>= function
     | Some block ->
         debug w "previously validated block %a (after pipe)"
           Block_hash.pp_short hash ;
@@ -231,26 +231,26 @@ let on_request
           block ;
         return (Ok block)
     | None ->
-        State.Block.read_invalid net_state hash >>= function
+        State.Block.read_invalid chain_state hash >>= function
         | Some { errors } ->
             return (Error errors)
         | None ->
             begin
               debug w "validating block %a" Block_hash.pp_short hash ;
               State.Block.read
-                net_state header.shell.predecessor >>=? fun pred ->
+                chain_state header.shell.predecessor >>=? fun pred ->
               get_proto pred hash >>=? fun proto ->
               (* TODO also protect with [Worker.canceler w]. *)
               protect ?canceler begin fun () ->
                 apply_block
-                  (Distributed_db.net_state net_db)
+                  (Distributed_db.chain_state chain_db)
                   pred proto hash header operations
               end
             end >>= function
             | Ok result -> begin
                 Worker.protect w begin fun () ->
                   Distributed_db.commit_block
-                    net_db hash header operations result
+                    chain_db hash header operations result
                 end >>=? function
                 | None ->
                     assert false (* should not happen *)
@@ -269,7 +269,7 @@ let on_request
             | Error errors ->
                 Worker.protect w begin fun () ->
                   Distributed_db.commit_invalid_block
-                    net_db hash header errors
+                    chain_db hash header errors
                 end >>=? fun commited ->
                 assert commited ;
                 return (Error errors)
@@ -318,10 +318,10 @@ let shutdown = Worker.shutdown
 
 let validate w
     ?canceler ?peer ?(notify_new_block = fun _ -> ())
-    net_db hash (header : Block_header.t) operations =
+    chain_db hash (header : Block_header.t) operations =
   let bv = Worker.state w in
-  let net_state = Distributed_db.net_state net_db in
-  State.Block.read_opt net_state hash >>= function
+  let chain_state = Distributed_db.chain_state chain_db in
+  State.Block.read_opt chain_state hash >>= function
   | Some block ->
       debug w "previously validated block %a (before pipe)"
         Block_hash.pp_short hash ;
@@ -346,10 +346,10 @@ let validate w
             expected = header.shell.operations_hash ;
             found = computed_hash ;
           }) >>=? fun () ->
-      check_net_liveness net_db hash header >>=? fun () ->
+      check_chain_liveness chain_db hash header >>=? fun () ->
       Worker.push_request_and_wait w
         (Request_validation
-           { net_db ; notify_new_block ; canceler ;
+           { chain_db ; notify_new_block ; canceler ;
              peer ; hash ; header ; operations }) >>=? fun result ->
       Lwt.return result
 

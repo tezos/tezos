@@ -9,12 +9,12 @@
 
 type t =
 
-  | Get_current_branch of Net_id.t
-  | Current_branch of Net_id.t * Block_locator.t
-  | Deactivate of Net_id.t
+  | Get_current_branch of Chain_id.t
+  | Current_branch of Chain_id.t * Block_locator.t
+  | Deactivate of Chain_id.t
 
-  | Get_current_head of Net_id.t
-  | Current_head of Net_id.t * Block_header.t * Mempool.t
+  | Get_current_head of Chain_id.t
+  | Current_head of Chain_id.t * Block_header.t * Mempool.t
 
   | Get_block_headers of Block_hash.t list
   | Block_header of Block_header.t
@@ -42,46 +42,46 @@ let encoding =
   [
     case ~tag:0x10
       (obj1
-         (req "get_current_branch" Net_id.encoding))
+         (req "get_current_branch" Chain_id.encoding))
       (function
-        | Get_current_branch net_id -> Some net_id
+        | Get_current_branch chain_id -> Some chain_id
         | _ -> None)
-      (fun net_id -> Get_current_branch net_id) ;
+      (fun chain_id -> Get_current_branch chain_id) ;
 
     case ~tag:0x11
       (obj2
-         (req "net_id" Net_id.encoding)
+         (req "chain_id" Chain_id.encoding)
          (req "current_branch" Block_locator.encoding))
       (function
-        | Current_branch (net_id, locator) -> Some (net_id, locator)
+        | Current_branch (chain_id, locator) -> Some (chain_id, locator)
         | _ -> None)
-      (fun (net_id, locator) -> Current_branch (net_id, locator)) ;
+      (fun (chain_id, locator) -> Current_branch (chain_id, locator)) ;
 
     case ~tag:0x12
       (obj1
-         (req "deactivate" Net_id.encoding))
+         (req "deactivate" Chain_id.encoding))
       (function
-        | Deactivate net_id -> Some net_id
+        | Deactivate chain_id -> Some chain_id
         | _ -> None)
-      (fun net_id -> Deactivate net_id) ;
+      (fun chain_id -> Deactivate chain_id) ;
 
     case ~tag:0x13
       (obj1
-         (req "get_current_head" Net_id.encoding))
+         (req "get_current_head" Chain_id.encoding))
       (function
-        | Get_current_head net_id -> Some net_id
+        | Get_current_head chain_id -> Some chain_id
         | _ -> None)
-      (fun net_id -> Get_current_branch net_id) ;
+      (fun chain_id -> Get_current_branch chain_id) ;
 
     case ~tag:0x14
       (obj3
-         (req "net_id" Net_id.encoding)
+         (req "chain_id" Chain_id.encoding)
          (req "current_block_header" (dynamic_size Block_header.encoding))
          (req "current_mempool" Mempool.encoding))
       (function
-        | Current_head (net_id, bh, mempool) -> Some (net_id, bh, mempool)
+        | Current_head (chain_id, bh, mempool) -> Some (chain_id, bh, mempool)
         | _ -> None)
-      (fun (net_id, bh, mempool) -> Current_head (net_id, bh, mempool)) ;
+      (fun (chain_id, bh, mempool) -> Current_head (chain_id, bh, mempool)) ;
 
     case ~tag:0x20
       (obj1 (req "get_block_headers" (list Block_hash.encoding)))

@@ -23,7 +23,7 @@ module Prefix : sig
   val ed25519_public_key: string
   val ed25519_secret_key: string
   val ed25519_signature: string
-  val net_id: string
+  val chain_id: string
 
 end
 

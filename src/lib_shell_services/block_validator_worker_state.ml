@@ -9,24 +9,24 @@
 
 module Request = struct
   type view = {
-    net_id : Net_id.t ;
+    chain_id : Chain_id.t ;
     block : Block_hash.t ;
     peer : P2p_peer.Id.t option ;
   }
   let encoding =
     let open Data_encoding in
     conv
-      (fun { net_id ; block ; peer } -> (block, net_id, peer))
-      (fun (block, net_id, peer) -> { net_id ; block ; peer })
+      (fun { chain_id ; block ; peer } -> (block, chain_id, peer))
+      (fun (block, chain_id, peer) -> { chain_id ; block ; peer })
       (obj3
          (req "block" Block_hash.encoding)
-         (req "net_id" Net_id.encoding)
+         (req "chain_id" Chain_id.encoding)
          (opt "peer" P2p_peer.Id.encoding))
 
-  let pp ppf { net_id ; block ; peer } =
-    Format.fprintf ppf "Validation of %a (net: %a)"
+  let pp ppf { chain_id ; block ; peer } =
+    Format.fprintf ppf "Validation of %a (chain: %a)"
       Block_hash.pp block
-      Net_id.pp_short net_id ;
+      Chain_id.pp_short chain_id ;
     match peer with
     | None -> ()
     | Some peer ->

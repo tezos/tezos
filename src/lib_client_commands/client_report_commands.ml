@@ -10,13 +10,13 @@
 (* Commands used to introspect the node's state *)
 
 let pp_block ppf
-    { Block_services.hash ; net_id ; level ;
+    { Block_services.hash ; chain_id ; level ;
       proto_level ; predecessor ; timestamp ;
       operations_hash ; fitness ; data ;
-      operations ; protocol ; test_network } =
+      operations ; protocol ; test_chain } =
   Format.fprintf ppf
     "@[<v 2>Hash: %a\
-     @ Test network: %a\
+     @ Test chain: %a\
      @ Level: %ld\
      @ Proto_level: %d\
      @ Predecessor: %a\
@@ -28,12 +28,12 @@ let pp_block ppf
      @ Operations: @[<v>%a@]\
      @ Data (hex encoded): \"%a\"@]"
     Block_hash.pp hash
-    Test_network_status.pp test_network
+    Test_chain_status.pp test_chain
     level
     proto_level
     Block_hash.pp predecessor
     Protocol_hash.pp protocol
-    Net_id.pp net_id
+    Chain_id.pp chain_id
     Time.pp_hum timestamp
     Fitness.pp fitness
     Operation_list_list_hash.pp operations_hash

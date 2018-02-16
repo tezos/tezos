@@ -95,7 +95,7 @@ module type PROTOCOL = sig
 
   (** Checks that a block is well formed in a given context. This
       function should run quickly, as its main use is to reject bad
-      blocks from the network as early as possible. The input context
+      blocks from the chain as early as possible. The input context
       is the one resulting of an ancestor block of same protocol
       version, not necessarily the one of its predecessor. *)
   val precheck_block:
@@ -169,10 +169,10 @@ val compile: Protocol_hash.t -> Protocol.t -> bool Lwt.t
     been previously compiled successfully. *)
 val activate: Context.t -> Protocol_hash.t -> Context.t Lwt.t
 
-(** Fork a test network. The forkerd network will use the current block
-    as genesis, and [protocol] as economic protocol. The network will
+(** Fork a test chain. The forkerd chain will use the current block
+    as genesis, and [protocol] as economic protocol. The chain will
     be destroyed when a (successor) block will have a timestamp greater
     than [expiration]. The protocol must have been previously compiled
     successfully. *)
-val fork_test_network:
+val fork_test_chain:
   Context.t -> protocol:Protocol_hash.t -> expiration:Time.t -> Context.t Lwt.t

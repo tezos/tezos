@@ -89,7 +89,7 @@ type t = context
 (*-- Version Access and Update -----------------------------------------------*)
 
 let current_protocol_key = ["protocol"]
-let current_test_network_key = ["test_network"]
+let current_test_chain_key = ["test_chain"]
 
 let exists index key =
   GitStore.Commit.of_hash index.repo key >>= function
@@ -178,21 +178,21 @@ let get_protocol v =
 let set_protocol v key =
   raw_set v current_protocol_key (Protocol_hash.to_bytes key)
 
-let get_test_network v =
-  raw_get v current_test_network_key >>= function
-  | None -> Lwt.fail (Failure "Unexpected error (Context.get_test_network)")
+let get_test_chain v =
+  raw_get v current_test_chain_key >>= function
+  | None -> Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
   | Some data ->
-      match Data_encoding.Binary.of_bytes Test_network_status.encoding data with
-      | None -> Lwt.fail (Failure "Unexpected error (Context.get_test_network)")
+      match Data_encoding.Binary.of_bytes Test_chain_status.encoding data with
+      | None -> Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
       | Some r -> Lwt.return r
 
-let set_test_network v id =
-  raw_set v current_test_network_key
-    (Data_encoding.Binary.to_bytes Test_network_status.encoding id)
-let del_test_network v  = raw_del v current_test_network_key
+let set_test_chain v id =
+  raw_set v current_test_chain_key
+    (Data_encoding.Binary.to_bytes Test_chain_status.encoding id)
+let del_test_chain v  = raw_del v current_test_chain_key
 
-let fork_test_network v ~protocol ~expiration =
-  set_test_network v (Forking { protocol ; expiration })
+let fork_test_chain v ~protocol ~expiration =
+  set_test_chain v (Forking { protocol ; expiration })
 
 (*-- Initialisation ----------------------------------------------------------*)
 
@@ -208,53 +208,53 @@ let init ?patch_context ~root =
       | Some patch_context -> patch_context
   }
 
-let get_branch net_id = Format.asprintf "%a" Net_id.pp net_id
+let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
 
-let commit_genesis index ~net_id ~time ~protocol =
+let commit_genesis index ~chain_id ~time ~protocol =
   let tree = GitStore.Tree.empty in
   let ctxt = { index ; tree ; parents = [] } in
   index.patch_context ctxt >>= fun ctxt ->
   set_protocol ctxt protocol >>= fun ctxt ->
-  set_test_network ctxt Not_running >>= fun ctxt ->
+  set_test_chain ctxt Not_running >>= fun ctxt ->
   raw_commit ~time ~message:"Genesis" ctxt >>= fun commit ->
-  GitStore.Branch.set index.repo (get_branch net_id) commit >>= fun () ->
+  GitStore.Branch.set index.repo (get_branch chain_id) commit >>= fun () ->
   Lwt.return (GitStore.Commit.hash commit)
 
-let compute_testnet_genesis forked_block =
+let compute_testchain_genesis forked_block =
   let genesis = Block_hash.hash_bytes [Block_hash.to_bytes forked_block] in
-  let net_id = Net_id.of_block_hash genesis in
-  net_id, genesis
+  let chain_id = Chain_id.of_block_hash genesis in
+  chain_id, genesis
 
-let commit_test_network_genesis index forked_block time ctxt =
-  let net_id, genesis = compute_testnet_genesis forked_block in
-  let branch = get_branch net_id in
-  let message = Format.asprintf "Forking testnet: %s." branch in
+let commit_test_chain_genesis index forked_block time ctxt =
+  let chain_id, genesis = compute_testchain_genesis forked_block in
+  let branch = get_branch chain_id in
+  let message = Format.asprintf "Forking testchain: %s." branch in
   raw_commit ~time ~message ctxt >>= fun commit ->
   GitStore.Branch.set index.repo branch commit >>= fun () ->
-  return (net_id, genesis, GitStore.Commit.hash commit)
+  return (chain_id, genesis, GitStore.Commit.hash commit)
 
-let reset_test_network ctxt forked_block timestamp =
-  get_test_network ctxt >>= function
+let reset_test_chain ctxt forked_block timestamp =
+  get_test_chain ctxt >>= function
   | Not_running -> Lwt.return ctxt
   | Running { expiration } ->
       if Time.(expiration <= timestamp) then
-        set_test_network ctxt Not_running
+        set_test_chain ctxt Not_running
       else
         Lwt.return ctxt
   | Forking { protocol ; expiration } ->
-      let net_id, genesis = compute_testnet_genesis forked_block in
-      set_test_network ctxt
-        (Running { net_id ; genesis ;
+      let chain_id, genesis = compute_testchain_genesis forked_block in
+      set_test_chain ctxt
+        (Running { chain_id ; genesis ;
                    protocol ; expiration })
 
-let clear_test_network index net_id =
+let clear_test_chain index chain_id =
   (* TODO remove commits... ??? *)
-  let branch = get_branch net_id in
+  let branch = get_branch chain_id in
   GitStore.Branch.remove index.repo branch
 
-let set_head index net_id commit =
-  let branch = get_branch net_id in
+let set_head index chain_id commit =
+  let branch = get_branch chain_id in
   GitStore.Commit.of_hash index.repo commit >>= function
   | None -> assert false
   | Some commit ->

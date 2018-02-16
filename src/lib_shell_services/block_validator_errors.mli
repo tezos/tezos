@@ -18,8 +18,8 @@ type block_error =
   | Outdated_operation of
       { operation: Operation_hash.t;
         originating_block: Block_hash.t }
-  | Expired_network of
-      { net_id: Net_id.t ;
+  | Expired_chain of
+      { chain_id: Chain_id.t ;
         expiration: Time.t ;
         timestamp: Time.t ;
       }

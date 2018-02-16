@@ -19,10 +19,10 @@ done
 
 for client in "${client_instances[@]}"; do
     echo
-    echo "### $client network stat"
+    echo "### $client p2p stat"
     echo
     $client bootstrapped
-    $client network stat
+    $client p2p stat
     echo
 done
 

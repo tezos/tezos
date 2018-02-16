@@ -234,12 +234,12 @@ let apply_sourced_operation
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       activate ctxt hash >>= fun ctxt ->
       return (ctxt, origination_nonce, None)
-  | Dictator_operation (Activate_testnet hash) ->
+  | Dictator_operation (Activate_testchain hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
       Operation.check_signature dictator_pubkey operation >>=? fun () ->
       let expiration = (* in two days maximum... *)
         Time.add (Timestamp.current ctxt) (Int64.mul 48L 3600L) in
-      fork_test_network ctxt hash expiration >>= fun ctxt ->
+      fork_test_chain ctxt hash expiration >>= fun ctxt ->
       return (ctxt, origination_nonce, None)
 
 let apply_anonymous_operation ctxt baker_contract origination_nonce kind =

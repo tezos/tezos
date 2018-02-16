@@ -31,12 +31,12 @@ module Fitness = Fitness
 module Block_header = Block_header
 module Operation = Operation
 module Protocol = Protocol
-module Test_network_status = Test_network_status
+module Test_chain_status = Test_chain_status
 module Preapply_result = Preapply_result
 module Block_locator = Block_locator
 module Mempool = Mempool
 
-module Net_id = Net_id
+module Chain_id = Chain_id
 module Block_hash = Block_hash
 module Operation_hash = Operation_hash
 module Operation_list_hash = Operation_list_hash

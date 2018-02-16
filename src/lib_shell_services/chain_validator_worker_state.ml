@@ -25,7 +25,7 @@ module Event = struct
           request_status : Worker_types.request_status ;
           update : update ;
           fitness : Fitness.t }
-    | Could_not_switch_testnet of error list
+    | Could_not_switch_testchain of error list
 
   let level = function
     | Processed_block req ->
@@ -33,7 +33,7 @@ module Event = struct
           | Ignored_head -> Logging.Info
           | Branch_switch | Head_incrememt -> Logging.Notice
         end
-    | Could_not_switch_testnet _ -> Logging.Error
+    | Could_not_switch_testchain _ -> Logging.Error
 
   let encoding =
     let open Data_encoding in
@@ -56,9 +56,9 @@ module Event = struct
         case (Tag 1)
           RPC_error.encoding
           (function
-            | Could_not_switch_testnet err -> Some err
+            | Could_not_switch_testchain err -> Some err
             | _ -> None)
-          (fun err -> Could_not_switch_testnet err) ]
+          (fun err -> Could_not_switch_testchain err) ]
 
   let pp ppf = function
     | Processed_block req ->
@@ -81,8 +81,8 @@ module Event = struct
           Time.pp_hum req.request_status.pushed
           Time.pp_hum req.request_status.treated
           Time.pp_hum req.request_status.completed
-    | Could_not_switch_testnet err ->
-        Format.fprintf ppf "@[<v 2>Error while switch test network:@ %a@]"
+    | Could_not_switch_testchain err ->
+        Format.fprintf ppf "@[<v 2>Error while switching test chain:@ %a@]"
           Error_monad.pp_print_error err
 
 end

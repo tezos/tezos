@@ -11,7 +11,7 @@ module Raw = struct
 
   type t = string
 
-  let name = "Net_id"
+  let name = "Chain_id"
   let title = "Network identifier"
 
   let extract bh =
@@ -83,7 +83,7 @@ module Raw = struct
 
   let b58check_encoding =
     Tezos_crypto.Base58.register_encoding
-      ~prefix: Tezos_crypto.Base58.Prefix.net_id
+      ~prefix: Tezos_crypto.Base58.Prefix.chain_id
       ~length: size
       ~wrap: (fun s -> Hash s)
       ~of_raw:of_string ~to_raw: (fun h -> h)

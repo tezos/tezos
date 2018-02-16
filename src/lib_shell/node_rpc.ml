@@ -53,9 +53,9 @@ let register_bi_dir node dir =
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
-      return bi.net_id in
+      return bi.chain_id in
     RPC_directory.register1 dir
-      Block_services.S.net_id implementation in
+      Block_services.S.chain_id implementation in
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
@@ -96,9 +96,9 @@ let register_bi_dir node dir =
   let dir =
     let implementation b () () =
       Node.RPC.block_info node b >>= fun bi ->
-      return bi.test_network in
+      return bi.test_chain in
     RPC_directory.register1 dir
-      Block_services.S.test_network implementation in
+      Block_services.S.test_chain implementation in
   let dir =
     let implementation b () { Block_services.S.contents ; monitor } =
       match b with
@@ -408,9 +408,9 @@ let build_rpc_directory node =
       end in
     RPC_directory.register0 dir Shell_services.S.inject_block implementation in
   let dir =
-    let implementation () (contents, blocking, net_id) =
+    let implementation () (contents, blocking, chain_id) =
       Node.RPC.inject_operation
-        node ?net_id contents >>= fun (hash, wait) ->
+        node ?chain_id contents >>= fun (hash, wait) ->
       begin
         (if blocking then wait else return ()) >>=? fun () -> return hash
       end in
@@ -448,8 +448,8 @@ let build_rpc_directory node =
               (Prevalidator.running_workers ()))) in
   let dir  =
     RPC_directory.register1 dir Worker_services.Prevalidators.S.state
-      (fun net_id () () ->
-         let w = List.assoc net_id (Prevalidator.running_workers ()) in
+      (fun chain_id () () ->
+         let w = List.assoc chain_id (Prevalidator.running_workers ()) in
          return
            { Worker_types.status = Prevalidator.status w ;
              pending_requests = Prevalidator.pending_requests w ;
@@ -472,18 +472,18 @@ let build_rpc_directory node =
 
   let dir  =
     RPC_directory.register1 dir Worker_services.Peer_validators.S.list
-      (fun net_id () () ->
+      (fun chain_id () () ->
          return
            (List.filter_map
               (fun ((id, peer_id), w) ->
-                 if Net_id.equal id net_id then
+                 if Chain_id.equal id chain_id then
                    Some (peer_id, Peer_validator.status w)
                  else None)
               (Peer_validator.running_workers ()))) in
   let dir  =
     RPC_directory.register2 dir Worker_services.Peer_validators.S.state
-      (fun net_id peer_id () () ->
-         let w = List.assoc (net_id, peer_id) (Peer_validator.running_workers ()) in
+      (fun chain_id peer_id () () ->
+         let w = List.assoc (chain_id, peer_id) (Peer_validator.running_workers ()) in
          return
            { Worker_types.status = Peer_validator.status w ;
              pending_requests = [] ;
@@ -493,21 +493,21 @@ let build_rpc_directory node =
   (* Workers : Net validators *)
 
   let dir  =
-    RPC_directory.register0 dir Worker_services.Net_validators.S.list
+    RPC_directory.register0 dir Worker_services.Chain_validators.S.list
       (fun () () ->
          return
            (List.map
-              (fun (id, w) -> (id, Net_validator.status w))
-              (Net_validator.running_workers ()))) in
+              (fun (id, w) -> (id, Chain_validator.status w))
+              (Chain_validator.running_workers ()))) in
   let dir  =
-    RPC_directory.register1 dir Worker_services.Net_validators.S.state
-      (fun net_id () () ->
-         let w = List.assoc net_id (Net_validator.running_workers ()) in
+    RPC_directory.register1 dir Worker_services.Chain_validators.S.state
+      (fun chain_id () () ->
+         let w = List.assoc chain_id (Chain_validator.running_workers ()) in
          return
-           { Worker_types.status = Net_validator.status w ;
-             pending_requests = Net_validator.pending_requests w ;
-             backlog = Net_validator.last_events w ;
-             current_request = Net_validator.current_request w }) in
+           { Worker_types.status = Chain_validator.status w ;
+             pending_requests = Chain_validator.pending_requests w ;
+             backlog = Chain_validator.last_events w ;
+             current_request = Chain_validator.current_request w }) in
 
   (* Network  *)
   let dir = RPC_directory.merge dir (Node.RPC.build_p2p_rpc_directory node) in

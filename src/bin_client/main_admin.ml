@@ -12,7 +12,7 @@ let select_commands _ _ =
     (List.flatten
        [ Client_report_commands.commands () ;
          Client_admin_commands.commands () ;
-         Client_network_commands.commands () ;
+         Client_p2p_commands.commands () ;
          Client_protocols_commands.commands () ;
          Client_rpc_commands.commands ])
 

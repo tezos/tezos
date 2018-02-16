@@ -84,7 +84,7 @@ and delegate_operation =
 
 and dictator_operation =
   | Activate of Protocol_hash.t
-  | Activate_testnet of Protocol_hash.t
+  | Activate_testchain of Protocol_hash.t
 
 and counter = Int32.t
 
@@ -237,7 +237,7 @@ module Encoding = struct
         (fun o -> ((), o))
         (fun ((), o) -> o)
         (merge_objs
-           (obj1 (req "network" (constant name)))
+           (obj1 (req "chain" (constant name)))
            args) in
     let open Data_encoding in
     union ~tag_size:`Uint8 [
@@ -247,10 +247,10 @@ module Encoding = struct
         (function (Activate hash) -> Some hash | _ -> None)
         (fun hash -> Activate hash) ;
       case (Tag 1)
-        (mk_case "activate_testnet"
+        (mk_case "activate_testchain"
            (obj1 (req "hash" Protocol_hash.encoding)))
-        (function (Activate_testnet hash) -> Some hash | _ -> None)
-        (fun hash -> Activate_testnet hash) ;
+        (function (Activate_testchain hash) -> Some hash | _ -> None)
+        (fun hash -> Activate_testchain hash) ;
     ]
 
   let dictator_kind_case tag =

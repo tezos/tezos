@@ -25,21 +25,21 @@ val shutdown: t -> unit Lwt.t
 
 (** {1 Network database} *)
 
-(** An instance of the distributed DB for a given network (mainnet,
-    current testnet, ...) *)
-type net_db
+(** An instance of the distributed DB for a given chain (mainchain,
+    current testchain, ...) *)
+type chain_db
 
-(** Activate a given network. The node will notify its neighbours that
-    it now handles the given network and that it expects notification
+(** Activate a given chain. The node will notify its neighbours that
+    it now handles the given chain and that it expects notification
     for new head or new operations. *)
-val activate: t -> State.Net.t -> net_db
+val activate: t -> State.Chain.t -> chain_db
 
-(** Look for the database of an active network. *)
-val get_net: t -> Net_id.t -> net_db option
+(** Look for the database of an active chain. *)
+val get_chain: t -> Chain_id.t -> chain_db option
 
-(** Deactivate a given network. The node will notify its neighbours
-    that it does not care anymore about this network. *)
-val deactivate: net_db -> unit Lwt.t
+(** Deactivate a given chain. The node will notify its neighbours
+    that it does not care anymore about this chain. *)
+val deactivate: chain_db -> unit Lwt.t
 
 type callback = {
   notify_branch: P2p_peer.Id.t -> Block_locator.t -> unit ;
@@ -49,43 +49,43 @@ type callback = {
 
 (** Register all the possible callback from the distributed DB to the
     validator. *)
-val set_callback: net_db -> callback -> unit
+val set_callback: chain_db -> callback -> unit
 
 (** Kick a given peer. *)
-val disconnect: net_db -> P2p_peer.Id.t -> unit Lwt.t
+val disconnect: chain_db -> P2p_peer.Id.t -> unit Lwt.t
 
 (** Various accessors. *)
-val net_state: net_db -> State.Net.t
-val db: net_db -> db
+val chain_state: chain_db -> State.Chain.t
+val db: chain_db -> db
 
 (** {1 Sending messages} *)
 
 module Request : sig
 
   (** Send to a given peer, or to all known active peers for the
-      network, a friendly request "Hey, what's your current branch
+      chain, a friendly request "Hey, what's your current branch
       ?". The expected answer is a `Block_locator.t.`. *)
-  val current_branch: net_db -> ?peer:P2p_peer.Id.t -> unit -> unit
+  val current_branch: chain_db -> ?peer:P2p_peer.Id.t -> unit -> unit
 
   (** Send to a given peer, or to all known active peers for the
-      given network, a friendly request "Hey, what's your current
+      given chain, a friendly request "Hey, what's your current
       branch ?". The expected answer is a `Block_locator.t.`. *)
-  val current_head: net_db -> ?peer:P2p_peer.Id.t -> unit -> unit
+  val current_head: chain_db -> ?peer:P2p_peer.Id.t -> unit -> unit
 
 end
 
 module Advertise : sig
 
   (** Notify a given peer, or all known active peers for the
-      network, of a new head and possibly of new operations. *)
+      chain, of a new head and possibly of new operations. *)
   val current_head:
-    net_db -> ?peer:P2p_peer.Id.t ->
+    chain_db -> ?peer:P2p_peer.Id.t ->
     ?mempool:Mempool.t -> State.Block.t -> unit
 
   (** Notify a given peer, or all known active peers for the
-      network, of a new head and its sparse history. *)
+      chain, of a new head and its sparse history. *)
   val current_branch:
-    net_db -> ?peer:P2p_peer.Id.t ->
+    chain_db -> ?peer:P2p_peer.Id.t ->
     Block_locator.t -> unit Lwt.t
 
 end
@@ -95,19 +95,19 @@ end
 (** Index of block headers. *)
 module Block_header : sig
   type t = Block_header.t (* avoid shadowing. *)
-  include DISTRIBUTED_DB with type t := net_db
+  include DISTRIBUTED_DB with type t := chain_db
                           and type key := Block_hash.t
                           and type value := Block_header.t
                           and type param := unit
 end
 
-(** Lookup for block header in any active networks *)
+(** Lookup for block header in any active chains *)
 val read_block_header:
-  db -> Block_hash.t -> (Net_id.t * Block_header.t) option Lwt.t
+  db -> Block_hash.t -> (Chain_id.t * Block_header.t) option Lwt.t
 
 (** Index of all the operations of a given block (per validation pass). *)
 module Operations :
-  DISTRIBUTED_DB with type t := net_db
+  DISTRIBUTED_DB with type t := chain_db
                   and type key = Block_hash.t * int
                   and type value = Operation.t list
                   and type param := Operation_list_list_hash.t
@@ -115,14 +115,14 @@ module Operations :
 (** Index of all the hashes of operations of a given block (per
     validation pass). *)
 module Operation_hashes :
-  DISTRIBUTED_DB with type t := net_db
+  DISTRIBUTED_DB with type t := chain_db
                   and type key = Block_hash.t * int
                   and type value = Operation_hash.t list
                   and type param := Operation_list_list_hash.t
 
 (** Store on disk all the data associated to a valid block. *)
 val commit_block:
-  net_db ->
+  chain_db ->
   Block_hash.t ->
   Block_header.t -> Operation.t list list ->
   Updater.validation_result ->
@@ -130,11 +130,11 @@ val commit_block:
 
 (** Store on disk all the data associated to an invalid block. *)
 val commit_invalid_block:
-  net_db ->
+  chain_db ->
   Block_hash.t -> Block_header.t -> Error_monad.error list ->
   bool tzresult Lwt.t
 
-(** Monitor all the fetched block headers (for all activate networks). *)
+(** Monitor all the fetched block headers (for all activate chains). *)
 val watch_block_header:
   t -> (Block_hash.t * Block_header.t) Lwt_stream.t * Lwt_watcher.stopper
 
@@ -144,7 +144,7 @@ val watch_block_header:
 (** Index of operations (for the mempool). *)
 module Operation : sig
   type t = Operation.t (* avoid shadowing. *)
-  include DISTRIBUTED_DB with type t := net_db
+  include DISTRIBUTED_DB with type t := chain_db
                           and type key := Operation_hash.t
                           and type value := Operation.t
                           and type param := unit
@@ -152,9 +152,9 @@ end
 
 (** Inject a new operation in the local index (memory only). *)
 val inject_operation:
-  net_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
+  chain_db -> Operation_hash.t -> Operation.t -> bool Lwt.t
 
-(** Monitor all the fetched operations (for all activate networks). *)
+(** Monitor all the fetched operations (for all activate chains). *)
 val watch_operation:
   t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Lwt_watcher.stopper
 

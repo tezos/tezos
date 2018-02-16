@@ -14,7 +14,7 @@ type t =
       expiration: Time.t ;
     }
   | Running of {
-      net_id: Net_id.t ;
+      chain_id: Chain_id.t ;
       genesis: Block_hash.t ;
       protocol: Protocol_hash.t ;
       expiration: Time.t ;
@@ -41,16 +41,16 @@ let encoding =
     case (Tag 2)
       (obj5
          (req "status" (constant "running"))
-         (req "net_id" Net_id.encoding)
+         (req "chain_id" Chain_id.encoding)
          (req "genesis" Block_hash.encoding)
          (req "protocol" Protocol_hash.encoding)
          (req "expiration" Time.encoding))
       (function
-        | Running { net_id ; genesis ; protocol ; expiration } ->
-            Some ((), net_id, genesis, protocol, expiration)
+        | Running { chain_id ; genesis ; protocol ; expiration } ->
+            Some ((), chain_id, genesis, protocol, expiration)
         | _ -> None)
-      (fun ((), net_id, genesis, protocol, expiration) ->
-         Running { net_id ; genesis ; protocol ; expiration }) ;
+      (fun ((), chain_id, genesis, protocol, expiration) ->
+         Running { chain_id ; genesis ; protocol ; expiration }) ;
   ]
 
 let pp ppf = function
@@ -62,7 +62,7 @@ let pp ppf = function
         protocol
         Time.pp_hum
         expiration
-  | Running { net_id ; genesis ; protocol ; expiration } ->
+  | Running { chain_id ; genesis ; protocol ; expiration } ->
       Format.fprintf ppf
         "@[<v 2>Running %a\
          @ Genesis: %a\
@@ -70,5 +70,5 @@ let pp ppf = function
          @ Expiration: %a@]"
         Protocol_hash.pp protocol
         Block_hash.pp genesis
-        Net_id.pp net_id
+        Chain_id.pp chain_id
         Time.pp_hum expiration

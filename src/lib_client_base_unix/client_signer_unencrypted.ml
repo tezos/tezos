@@ -16,7 +16,7 @@ module Unencrypted_signer : SIGNER = struct
     "Built-in signer using raw unencrypted keys."
 
   let description =
-    "Do not use this signer except for playing on the test network.\n\
+    "Do not use this signer except for playing on the test chain.\n\
      The format for importing secret keys is either no argument (will \
      generate a key) or the raw Base58-encoded key (starting with \
      'edsk').\n\

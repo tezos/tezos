@@ -599,7 +599,7 @@ and delegate_operation =
 
 and dictator_operation =
   | Activate of Protocol_hash.t
-  | Activate_testnet of Protocol_hash.t
+  | Activate_testchain of Protocol_hash.t
 
 and counter = Int32.t
 
@@ -730,7 +730,7 @@ val configure_sandbox:
   Context.t -> Data_encoding.json option -> Context.t tzresult Lwt.t
 
 val activate: context -> Protocol_hash.t -> context Lwt.t
-val fork_test_network: context -> Protocol_hash.t -> Time.t -> context Lwt.t
+val fork_test_chain: context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
 val endorsement_already_recorded: context -> int -> bool
 val record_endorsement: context -> int -> context

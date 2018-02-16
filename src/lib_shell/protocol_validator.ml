@@ -181,7 +181,7 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block: State.Block.t) =
     fetch_and_compile_protocol pv ?peer ?timeout protocol_hash >>=? fun _ ->
     return ()
   and test_protocol =
-    Context.get_test_network context >>= function
+    Context.get_test_chain context >>= function
     | Not_running -> return ()
     | Forking { protocol }
     | Running { protocol } ->

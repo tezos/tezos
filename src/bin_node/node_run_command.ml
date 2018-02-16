@@ -9,7 +9,7 @@
 
 open Logging.Node.Main
 
-let genesis : State.Net.genesis = {
+let genesis : State.Chain.genesis = {
   time =
     Time.of_notation_exn "2017-10-19T00:00:00Z" ;
   block =
@@ -120,7 +120,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
   end >>= fun patch_context ->
   (* TODO "WARN" when pow is below our expectation. *)
   begin
-    match config.net.listen_addr with
+    match config.p2p.listen_addr with
     | None ->
         lwt_log_notice "Not listening to P2P calls." >>= fun () ->
         return (None, None)
@@ -140,7 +140,7 @@ let init_node ?sandbox (config : Node_config_file.t) =
     | None, Some _ -> return None
     | _ ->
         (Node_config_file.resolve_bootstrap_addrs
-           config.net.bootstrap_peers) >>= fun trusted_points ->
+           config.p2p.bootstrap_peers) >>= fun trusted_points ->
         Node_identity_file.read
           (config.data_dir //
            Node_data_version.default_identity_file_name) >>=? fun identity ->
@@ -153,13 +153,13 @@ let init_node ?sandbox (config : Node_config_file.t) =
             trusted_points ;
             peers_file =
               (config.data_dir // "peers.json") ;
-            closed_network = config.net.closed ;
+            closed_network = config.p2p.closed ;
             identity ;
             proof_of_work_target =
-              Crypto_box.make_target config.net.expected_pow ;
+              Crypto_box.make_target config.p2p.expected_pow ;
           }
         in
-        return (Some (p2p_config, config.net.limits))
+        return (Some (p2p_config, config.p2p.limits))
   end >>=? fun p2p_config ->
   let node_config : Node.config = {
     genesis ;
@@ -167,14 +167,14 @@ let init_node ?sandbox (config : Node_config_file.t) =
     store_root = store_dir config.data_dir ;
     context_root = context_dir config.data_dir ;
     p2p = p2p_config ;
-    test_network_max_tll = Some (48 * 3600) ; (* 2 days *)
+    test_chain_max_tll = Some (48 * 3600) ; (* 2 days *)
   } in
   Node.create
     node_config
     config.shell.peer_validator_limits
     config.shell.block_validator_limits
     config.shell.prevalidator_limits
-    config.shell.net_validator_limits
+    config.shell.chain_validator_limits
 
 let () =
   let old_hook = !Lwt.async_exception_hook in

@@ -1,7 +1,7 @@
 (jbuild_version 1)
 
 (executables
- ((names (test_state
+ ((names (test
           test_locator))
   (libraries (tezos-base
               tezos-storage
@@ -20,12 +20,12 @@
 
 (alias
  ((name buildtest)
-  (deps (test_state.exe
+  (deps (test.exe
          test_locator.exe))))
 
 (alias
- ((name runtest_state)
-  (action (run ${exe:test_state.exe}))))
+ ((name runtest_shell)
+  (action (run ${exe:test.exe}))))
 
 (alias
  ((name runtest_locator)
@@ -37,7 +37,7 @@
 
 (alias
  ((name runtest)
-  (deps ((alias runtest_state)
+  (deps ((alias runtest_shell)
          (alias runtest_locator)))))
 
 (alias

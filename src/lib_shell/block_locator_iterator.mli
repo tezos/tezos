@@ -40,16 +40,16 @@ val estimated_length: Block_locator.t -> int
     represented by [locator]. *)
 
 val known_ancestor:
-  State.Net.t -> Block_locator.t -> (State.Block.t * Block_locator.t) option Lwt.t
-(** [known_ancestor net_state locator] computes the first block of
+  State.Chain.t -> Block_locator.t -> (State.Block.t * Block_locator.t) option Lwt.t
+(** [known_ancestor chain_state locator] computes the first block of
     [locator] that is known to be a valid block. It also computes the
     'prefix' of [locator] with end at the first valid block.  The
     function returns [None] when no block in the locator are known or
     if the first known block is invalid. *)
 
 val find_new:
-  State.Net.t -> Block_locator.t -> int -> Block_hash.t list Lwt.t
-(** [find_new net locator max_length] returns the blocks from our
+  State.Chain.t -> Block_locator.t -> int -> Block_hash.t list Lwt.t
+(** [find_new chain locator max_length] returns the blocks from our
     current branch that would be unknown to a peer that sends us the
     [locator]. *)
 

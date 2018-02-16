@@ -55,7 +55,7 @@ let bake cctxt =
                 validation_passes = 0 ;
                 operations_hash = Operation_list_list_hash.empty } ;
       proto = MBytes.create 0 } >>=? fun bytes ->
-  Client_node_rpcs.inject_block cctxt.rpc_config ~net_id:bi.net_id bytes [] >>=? fun hash ->
+  Client_node_rpcs.inject_block cctxt.rpc_config ~chain_id:bi.chain_id bytes [] >>=? fun hash ->
   cctxt.answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
   return ()
 

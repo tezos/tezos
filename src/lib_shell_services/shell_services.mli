@@ -17,7 +17,7 @@ val forge_block_header:
 
 val inject_block:
   #simple ->
-  ?async:bool -> ?force:bool -> ?net_id:Net_id.t ->
+  ?async:bool -> ?force:bool -> ?chain_id:Chain_id.t ->
   MBytes.t -> Operation.t list list ->
   Block_hash.t tzresult Lwt.t
 (** [inject_block cctxt ?async ?force raw_block] tries to inject
@@ -28,7 +28,7 @@ val inject_block:
 
 val inject_operation:
   #simple ->
-  ?async:bool -> ?net_id:Net_id.t ->
+  ?async:bool -> ?chain_id:Chain_id.t ->
   MBytes.t ->
   Operation_hash.t tzresult Lwt.t
 
@@ -56,7 +56,7 @@ module S : sig
     raw: MBytes.t ;
     blocking: bool ;
     force: bool ;
-    net_id: Net_id.t option ;
+    chain_id: Chain_id.t option ;
     operations: Operation.t list list ;
   }
 
@@ -67,7 +67,7 @@ module S : sig
 
   val inject_operation:
     ([ `POST ], unit,
-     unit, unit, (MBytes.t * bool * Net_id.t option),
+     unit, unit, (MBytes.t * bool * Chain_id.t option),
      Operation_hash.t) RPC_service.t
 
   val inject_protocol:

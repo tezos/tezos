@@ -36,9 +36,9 @@ type limits = {
   worker_limits : Worker_types.limits ;
 }
 
-type error += Closed of Net_id.t
+type error += Closed of Chain_id.t
 
-val create: limits -> Distributed_db.net_db -> t Lwt.t
+val create: limits -> Distributed_db.chain_db -> t Lwt.t
 val shutdown: t -> unit Lwt.t
 val notify_operations: t -> P2p_peer.Id.t -> Mempool.t -> unit
 val inject_operation: t -> Operation.t -> unit tzresult Lwt.t
@@ -48,7 +48,7 @@ val operations: t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
 val context: t -> Updater.validation_result tzresult Lwt.t
 val pending: ?block:State.Block.t -> t -> Operation.t Operation_hash.Map.t Lwt.t
 
-val running_workers: unit -> (Net_id.t * t) list
+val running_workers: unit -> (Chain_id.t * t) list
 val status: t -> Worker_types.worker_status
 
 val pending_requests : t -> (Time.t * Prevalidator_worker_state.Request.view) list

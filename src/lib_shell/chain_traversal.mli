@@ -43,7 +43,7 @@ val new_blocks:
     and [to_block] and where [path] is the chain from [ancestor]
     (excluded) to [to_block] (included).  The function raises an
     exception when the two provided blocks do not belong the the same
-    [net].  *)
+    [chain].  *)
 
 val live_blocks:
   Block.t -> int -> (Block_hash.Set.t * Operation_hash.Set.t) Lwt.t

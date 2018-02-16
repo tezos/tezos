@@ -15,7 +15,7 @@ module S = struct
       ~query: RPC_query.empty
       ~input: Data_encoding.empty
       ~output: (Data_encoding.list P2p_version.encoding)
-      RPC_path.(root / "network" / "versions")
+      RPC_path.(root / "p2p" / "versions")
 
   let stat =
     RPC_service.post_service
@@ -23,7 +23,7 @@ module S = struct
       ~query: RPC_query.empty
       ~input: Data_encoding.empty
       ~output: P2p_stat.encoding
-      RPC_path.(root / "network" / "stat")
+      RPC_path.(root / "p2p" / "stat")
 
   let events =
     RPC_service.post_service
@@ -31,7 +31,7 @@ module S = struct
       ~query: RPC_query.empty
       ~input: Data_encoding.empty
       ~output: P2p_connection.Pool_event.encoding
-      RPC_path.(root / "network" / "log")
+      RPC_path.(root / "p2p" / "log")
 
   let connect =
     RPC_service.post_service
@@ -39,7 +39,7 @@ module S = struct
       ~query: RPC_query.empty
       ~input: Data_encoding.(obj1 (dft "timeout" float 5.))
       ~output: Data_encoding.empty
-      RPC_path.(root / "network" / "connect" /: P2p_point.Id.rpc_arg)
+      RPC_path.(root / "p2p" / "connect" /: P2p_point.Id.rpc_arg)
 
 end
 
@@ -62,7 +62,7 @@ module Connections = struct
         ~query: RPC_query.empty
         ~input: Data_encoding.empty
         ~output: (Data_encoding.list P2p_connection.Info.encoding)
-        RPC_path.(root / "network" / "connections")
+        RPC_path.(root / "p2p" / "connections")
 
     let info =
       RPC_service.post_service
@@ -70,7 +70,7 @@ module Connections = struct
         ~input: Data_encoding.empty
         ~output: P2p_connection.Info.encoding
         ~description:"Details about the current P2P connection to the given peer."
-        RPC_path.(root / "network" / "connections" /: P2p_peer.Id.rpc_arg)
+        RPC_path.(root / "p2p" / "connections" /: P2p_peer.Id.rpc_arg)
 
     let kick =
       RPC_service.post_service
@@ -78,7 +78,7 @@ module Connections = struct
         ~input: Data_encoding.(obj1 (req "wait" bool))
         ~output: Data_encoding.empty
         ~description:"Forced close of the current P2P connection to the given peer."
-        RPC_path.(root / "network" / "connections" /: P2p_peer.Id.rpc_arg / "kick")
+        RPC_path.(root / "p2p" / "connections" /: P2p_peer.Id.rpc_arg / "kick")
 
   end
 
@@ -98,7 +98,7 @@ module Points = struct
         ~input: Data_encoding.empty
         ~output: P2p_point.Info.encoding
         ~description: "Details about a given `IP:addr`."
-        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg)
+        RPC_path.(root / "p2p" / "points" /: P2p_point.Id.rpc_arg)
 
     let events =
       RPC_service.post_service
@@ -107,7 +107,7 @@ module Points = struct
         ~output: (Data_encoding.list
                     P2p_point.Pool_event.encoding)
         ~description: "Monitor network events related to an `IP:addr`."
-        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "log")
+        RPC_path.(root / "p2p" / "points" /: P2p_point.Id.rpc_arg / "log")
 
     let list =
       let filter =
@@ -144,7 +144,7 @@ module Peers = struct
         ~input: Data_encoding.empty
         ~output: P2p_peer.Info.encoding
         ~description:"Details about a given peer."
-        RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg)
+        RPC_path.(root / "p2p" / "peers" /: P2p_peer.Id.rpc_arg)
 
     let events =
       RPC_service.post_service
@@ -153,7 +153,7 @@ module Peers = struct
         ~output: (Data_encoding.list
                     P2p_peer.Pool_event.encoding)
         ~description:"Monitor network events related to a given peer."
-        RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "log")
+        RPC_path.(root / "p2p" / "peers" /: P2p_peer.Id.rpc_arg / "log")
 
     let list =
       let filter =
@@ -167,7 +167,7 @@ module Peers = struct
                                  P2p_peer.Id.encoding
                                  P2p_peer.Info.encoding))
         ~description:"List the peers the node ever met."
-        RPC_path.(root / "network" / "peers")
+        RPC_path.(root / "p2p" / "peers")
 
   end
 

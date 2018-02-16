@@ -50,7 +50,7 @@ let filter_valid_endorsement cctxt ({ hash ; content } : operation) =
   | Some { contents = Sourced_operations (Dictator_operation _ ) }
   | Some { contents = Sourced_operations (Manager_operations _ ) } ->
       Lwt.return_none
-  | Some { shell = {net_id} ;
+  | Some { shell = {chain_id} ;
            contents =
              Sourced_operations (Delegate_operations { source ; operations }) } ->
       let source = Ed25519.Public_key.hash source in
@@ -72,7 +72,7 @@ let filter_valid_endorsement cctxt ({ hash ; content } : operation) =
                 slots in
             (* Ensure thath the block has been previously validated by
                the node. This might took some times... *)
-            Client_node_rpcs.validate_block cctxt net_id block >>= function
+            Client_node_rpcs.validate_block cctxt chain_id block >>= function
             | Error error ->
                 lwt_log_info
                   "@[<v 2>Found endorsement for an invalid block@,%a@["

@@ -109,8 +109,8 @@ module Make
             "Worker %s[%a] has been shut down."
             base_name Name.pp name)
       Data_encoding.(obj1 (req "worker_id" Name.encoding))
-      (function Closed net_id -> Some net_id | _ -> None)
-      (fun net_id -> Closed net_id)
+      (function Closed chain_id -> Some chain_id | _ -> None)
+      (fun chain_id -> Closed chain_id)
 
   let queue_item ?u r =
     Time.now (),

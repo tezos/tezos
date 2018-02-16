@@ -72,7 +72,7 @@ let start_new_voting_cycle ctxt =
         let expiration = (* in two days maximum... *)
           Time.add (Timestamp.current ctxt) (Int64.mul 48L 3600L) in
         Vote.get_current_proposal ctxt >>=? fun proposal ->
-        fork_test_network ctxt proposal expiration >>= fun ctxt ->
+        fork_test_chain ctxt proposal expiration >>= fun ctxt ->
         Vote.set_current_period_kind ctxt Testing >>=? fun ctxt ->
         return ctxt
       else

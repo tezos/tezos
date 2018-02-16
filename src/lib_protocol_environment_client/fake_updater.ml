@@ -73,6 +73,6 @@ module Make(Context : Protocol_environment.CONTEXT) = struct
 
   let compile _ _ = assert false
   let activate _ _ = assert false
-  let fork_test_network _ ~protocol:_ ~expiration:_ = assert false
+  let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
 
 end

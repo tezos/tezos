@@ -26,7 +26,7 @@ val to_string: block -> string
 
 type block_info = {
   hash: Block_hash.t ;
-  net_id: Net_id.t ;
+  chain_id: Chain_id.t ;
   level: Int32.t ;
   proto_level: int ; (* uint8 *)
   predecessor: Block_hash.t ;
@@ -38,7 +38,7 @@ type block_info = {
   data: MBytes.t ;
   operations: (Operation_hash.t * Operation.t) list list option ;
   protocol: Protocol_hash.t ;
-  test_network: Test_network_status.t ;
+  test_chain: Test_chain_status.t ;
 }
 
 type preapply_result = {
@@ -48,8 +48,8 @@ type preapply_result = {
 
 open RPC_context
 
-val net_id:
-  #simple -> block -> Net_id.t tzresult Lwt.t
+val chain_id:
+  #simple -> block -> Chain_id.t tzresult Lwt.t
 val level:
   #simple -> block -> Int32.t tzresult Lwt.t
 val predecessor:
@@ -67,8 +67,8 @@ val operations:
   block -> (Operation_hash.t * Operation.t option) list list tzresult Lwt.t
 val protocol:
   #simple -> block -> Protocol_hash.t tzresult Lwt.t
-val test_network:
-  #simple -> block -> Test_network_status.t tzresult Lwt.t
+val test_chain:
+  #simple -> block -> Test_chain_status.t tzresult Lwt.t
 
 val pending_operations:
   #simple -> block ->
@@ -119,10 +119,10 @@ module S : sig
     ([ `POST ], unit,
      unit * block, unit, bool,
      block_info) RPC_service.t
-  val net_id:
+  val chain_id:
     ([ `POST ], unit,
      unit * block, unit, unit,
-     Net_id.t) RPC_service.t
+     Chain_id.t) RPC_service.t
   val level:
     ([ `POST ], unit,
      unit * block, unit, unit,
@@ -165,10 +165,10 @@ module S : sig
     ([ `POST ], unit,
      unit * block, unit, unit,
      Protocol_hash.t) RPC_service.t
-  val test_network:
+  val test_chain:
     ([ `POST ], unit,
      unit * block, unit, unit,
-     Test_network_status.t) RPC_service.t
+     Test_chain_status.t) RPC_service.t
   val pending_operations:
     ([ `POST ], unit,
      unit * block, unit, unit,

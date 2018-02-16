@@ -8,14 +8,14 @@
 (**************************************************************************)
 
 let group =
-  { Cli_entries.name = "network" ;
-    title = "Commands for monitoring and controlling network state" }
+  { Cli_entries.name = "p2p" ;
+    title = "Commands for monitoring and controlling p2p-layer state" }
 
 let commands () = [
   let open Cli_entries in
   command ~group ~desc: "show global network status"
     no_options
-    (prefixes ["network" ; "stat"] stop) begin fun () (cctxt : #Client_context.full_context) ->
+    (prefixes ["p2p" ; "stat"] stop) begin fun () (cctxt : #Client_context.full_context) ->
     P2p_services.stat cctxt >>=? fun stat ->
     P2p_services.Connections.list cctxt >>=? fun conns ->
     P2p_services.Peers.list cctxt >>=? fun peers ->

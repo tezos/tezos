@@ -19,7 +19,7 @@ type t = {
   mutable operations_fetch_worker: unit Lwt.t ;
   mutable validation_worker: unit Lwt.t ;
   peer_id: P2p_peer.Id.t ;
-  net_db: Distributed_db.net_db ;
+  chain_db: Distributed_db.chain_db ;
   locator: Block_locator.t ;
   block_validator: Block_validator.t ;
   notify_new_block: State.Block.t -> unit ;
@@ -58,7 +58,7 @@ let fetch_step pipeline (step : Block_locator_iterator.step)  =
       protect ~canceler:pipeline.canceler begin fun () ->
         Distributed_db.Block_header.fetch
           ~timeout:pipeline.block_header_timeout
-          pipeline.net_db ~peer:pipeline.peer_id
+          pipeline.chain_db ~peer:pipeline.peer_id
           hash ()
       end >>=? fun header ->
       lwt_debug "fetched block header %a from peer %a."
@@ -116,7 +116,7 @@ let rec operations_fetch_worker_loop pipeline =
          protect ~canceler:pipeline.canceler begin fun () ->
            Distributed_db.Operations.fetch
              ~timeout:pipeline.block_operations_timeout
-             pipeline.net_db ~peer:pipeline.peer_id
+             pipeline.chain_db ~peer:pipeline.peer_id
              (hash, i) header.shell.operations_hash
          end)
       (0 -- (header.shell.validation_passes - 1)) >>=? fun operations ->
@@ -160,7 +160,7 @@ let rec validation_worker_loop pipeline =
         ~canceler:pipeline.canceler
         ~notify_new_block:pipeline.notify_new_block
         pipeline.block_validator
-        pipeline.net_db hash header operations
+        pipeline.chain_db hash header operations
     end >>=? fun _block ->
     lwt_log_info "validated block %a from peer %a."
       Block_hash.pp_short hash
@@ -186,7 +186,7 @@ let rec validation_worker_loop pipeline =
 let create
     ?(notify_new_block = fun _ -> ())
     ~block_header_timeout ~block_operations_timeout
-    block_validator peer_id net_db locator =
+    block_validator peer_id chain_db locator =
   let canceler = Lwt_canceler.create () in
   let fetched_headers =
     Lwt_pipe.create ~size:(50, fun _ -> 1) () in
@@ -199,7 +199,7 @@ let create
     operations_fetch_worker = Lwt.return_unit ;
     validation_worker = Lwt.return_unit ;
     notify_new_block ;
-    peer_id ; net_db ; locator ;
+    peer_id ; chain_db ; locator ;
     block_validator ;
     fetched_headers ; fetched_blocks ;
     errors = [] ;

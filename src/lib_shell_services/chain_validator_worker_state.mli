@@ -24,7 +24,7 @@ module Event : sig
           request_status : Worker_types.request_status ;
           update : update ;
           fitness : Fitness.t }
-    | Could_not_switch_testnet of error list
+    | Could_not_switch_testchain of error list
   val level : t -> Logging.level
   val encoding : t Data_encoding.encoding
   val pp : Format.formatter -> t -> unit

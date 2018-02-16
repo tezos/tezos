@@ -11,12 +11,12 @@
 
 type t =
 
-  | Get_current_branch of Net_id.t
-  | Current_branch of Net_id.t * Block_locator.t
-  | Deactivate of Net_id.t
+  | Get_current_branch of Chain_id.t
+  | Current_branch of Chain_id.t * Block_locator.t
+  | Deactivate of Chain_id.t
 
-  | Get_current_head of Net_id.t
-  | Current_head of Net_id.t * Block_header.t * Mempool.t
+  | Get_current_head of Chain_id.t
+  | Current_head of Chain_id.t * Block_header.t * Mempool.t
 
   | Get_block_headers of Block_hash.t list
   | Block_header of Block_header.t

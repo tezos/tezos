@@ -87,11 +87,11 @@ let wrap
 module Manpage = struct
 
   let misc_section = "MISC OPTIONS"
-  let network_section = "NETWORK OPTIONS"
+  let p2p_section = "P2P OPTIONS"
   let rpc_section = "RPC OPTIONS"
 
   let args = [
-    `S network_section ;
+    `S p2p_section ;
     `S rpc_section ;
     `S misc_section ;
   ]
@@ -133,9 +133,9 @@ module Term = struct
     Arg.(value & opt (some string) None &
          info ~docs ~doc ~docv:"FILE" ["config-file"])
 
-  (* net args *)
+  (* P2p args *)
 
-  let docs = Manpage.network_section
+  let docs = Manpage.p2p_section
 
   let connections =
     let doc =
@@ -270,7 +270,7 @@ let read_and_patch_config_file ?(ignore_bootstrap_peers=false) args =
       log_info "Ignoring bootstrap peers" ;
       peers
     end else
-      cfg.net.bootstrap_peers @ peers in
+      cfg.p2p.bootstrap_peers @ peers in
   Node_config_file.update
     ?data_dir ?min_connections ?expected_connections ?max_connections
     ?max_download_speed ?max_upload_speed ?binary_chunks_size

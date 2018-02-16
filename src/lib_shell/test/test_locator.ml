@@ -23,12 +23,12 @@ let genesis_time = Time.of_seconds 0L
 
 let state_genesis_block =
   {
-    State.Net.time = genesis_time;
-    State.Net.block= genesis_hash;
-    State.Net.protocol = genesis_protocol
+    State.Chain.time = genesis_time;
+    State.Chain.block= genesis_hash;
+    State.Chain.protocol = genesis_protocol
   }
 
-let net_id = Net_id.of_block_hash genesis_hash
+let chain_id = Chain_id.of_block_hash genesis_hash
 
 module Proto = (val Registred_protocol.get_exn genesis_protocol)
 
@@ -51,13 +51,13 @@ let incr_fitness fitness =
 
 
 (* returns a new state with a single block, genesis *)
-let init_net base_dir : State.Net.t Lwt.t =
+let init_chain base_dir : State.Chain.t Lwt.t =
   let store_root = base_dir // "store" in
   let context_root = base_dir // "context" in
   State.read ~store_root ~context_root () >>= function
   | Error _ -> Pervasives.failwith "read err"
   | Ok (state:State.global_state) ->
-      State.Net.create state state_genesis_block
+      State.Chain.create state state_genesis_block
 
 
 let block_header
@@ -81,9 +81,9 @@ let block_header
     Block_header.proto = MBytes.of_string "" ;
   }
 
-(* adds n blocks on top of an initialized net *)
-let make_empty_chain (net:State.Net.t) n : Block_hash.t Lwt.t =
-  State.Block.read_exn net genesis_hash >>= fun genesis ->
+(* adds n blocks on top of an initialized chain *)
+let make_empty_chain (chain:State.Chain.t) n : Block_hash.t Lwt.t =
+  State.Block.read_exn chain genesis_hash >>= fun genesis ->
   State.Block.context genesis >>= fun empty_context ->
   let header = State.Block.header genesis in
   Context.commit
@@ -104,7 +104,7 @@ let make_empty_chain (net:State.Net.t) n : Block_hash.t Lwt.t =
         { header with
           shell = { header.shell with predecessor = pred ;
                                       level = Int32.of_int lvl } } in
-      State.Block.store net header [] empty_result >>=? fun _ ->
+      State.Block.store chain header [] empty_result >>=? fun _ ->
       loop (lvl+1) (Block_header.hash header)
   in
   loop 1 genesis_hash >>= function
@@ -151,22 +151,22 @@ let print_block b =
     (Int32.to_int (State.Block.level b))
     (Block_hash.to_b58check (State.Block.hash b))
 
-let print_block_h net bh =
-  State.Block.read_exn net bh >|= fun b ->
+let print_block_h chain bh =
+  State.Block.read_exn chain bh >|= fun b ->
   print_block b
 
 
 (* returns the predecessor at distance one, reading the header *)
-let linear_predecessor net (bh: Block_hash.t) : Block_hash.t option Lwt.t =
-  State.Block.read_exn net bh >>= fun b ->
+let linear_predecessor chain (bh: Block_hash.t) : Block_hash.t option Lwt.t =
+  State.Block.read_exn chain bh >>= fun b ->
   State.Block.predecessor b >|= function
   | None -> None
   | Some pred -> Some (State.Block.hash pred)
 
-let print_chain net bh =
+let print_chain chain bh =
   let rec loop bh cnt =
-    let _ = print_block_h net bh in
-    linear_predecessor net bh >>= function
+    let _ = print_block_h chain bh in
+    linear_predecessor chain bh >>= function
     | Some pred -> loop pred (cnt+1)
     | None -> Lwt.return_unit
   in
@@ -174,15 +174,15 @@ let print_chain net bh =
 
 
 (* returns the predecessors at ditance n, traversing all n intermediate blocks *)
-let linear_predecessor_n (net:State.Net.t) (bh:Block_hash.t) (distance:int)
+let linear_predecessor_n (chain:State.Chain.t) (bh:Block_hash.t) (distance:int)
   : Block_hash.t option Lwt.t =
-  (* let _ = Printf.printf "LP: %4i " distance; print_block_h net bh in *)
+  (* let _ = Printf.printf "LP: %4i " distance; print_block_h chain bh in *)
   if distance < 1 then invalid_arg "distance<1" else
     let rec loop bh distance =
       if distance = 0
       then Lwt.return_some bh   (* reached distance *)
       else
-        linear_predecessor net bh >>= function
+        linear_predecessor chain bh >>= function
         | None -> Lwt.return_none
         | Some pred ->
             loop pred (distance-1)
@@ -197,12 +197,12 @@ let linear_predecessor_n (net:State.Net.t) (bh:Block_hash.t) (distance:int)
    requested *)
 let test_pred (base_dir:string) : unit tzresult Lwt.t =
   let size_chain = 1000 in
-  init_net base_dir >>= fun net ->
-  make_empty_chain net size_chain >>= fun head ->
+  init_chain base_dir >>= fun chain ->
+  make_empty_chain chain size_chain >>= fun head ->
 
   let test_once distance =
-    linear_predecessor_n net head distance >>= fun lin_res ->
-    State.Block.predecessor_n net head distance >>= fun exp_res ->
+    linear_predecessor_n chain head distance >>= fun lin_res ->
+    State.Block.predecessor_n chain head distance >>= fun exp_res ->
     match lin_res,exp_res with
     | None, None ->
         Lwt.return_unit
@@ -211,9 +211,9 @@ let test_pred (base_dir:string) : unit tzresult Lwt.t =
     | Some lin_res, Some exp_res ->
         (* check that the two results are the same *)
         (assert (lin_res = exp_res));
-        State.Block.read_exn net lin_res >>= fun pred ->
+        State.Block.read_exn chain lin_res >>= fun pred ->
         let level_pred = Int32.to_int (State.Block.level pred) in
-        State.Block.read_exn net head >>= fun head ->
+        State.Block.read_exn chain head >>= fun head ->
         let level_start = Int32.to_int (State.Block.level head) in
         (* check distance using the level *)
         assert (level_start - distance = level_pred);
@@ -226,11 +226,11 @@ let test_pred (base_dir:string) : unit tzresult Lwt.t =
 
 
 (* compute locator using the linear predecessor *)
-let compute_linear_locator (net:State.Net.t) ~size block =
-  let genesis = State.Net.genesis net in
+let compute_linear_locator (chain:State.Chain.t) ~size block =
+  let genesis = State.Chain.genesis chain in
   let block_hash = State.Block.hash block in
   let header = State.Block.header block in
-  Block_locator.compute ~predecessor:(linear_predecessor_n net)
+  Block_locator.compute ~predecessor:(linear_predecessor_n chain)
     ~genesis:genesis.block block_hash header size
 
 
@@ -270,9 +270,9 @@ let test_locator base_dir =
   let locator_limit = compute_size_locator size_chain in
   let _ = Printf.printf "#locator_limit %i\n" locator_limit in
 
-  init_net base_dir >>= fun net ->
+  init_chain base_dir >>= fun chain ->
   time1 (fun () ->
-      make_empty_chain net size_chain) |>
+      make_empty_chain chain size_chain) |>
   fun (res, t_chain) ->
   let _ = Printf.printf
       "#size_chain %i built in %f sec\n#      size      exp       lins\n"
@@ -280,12 +280,12 @@ let test_locator base_dir =
   res >>= fun head ->
 
   let check_locator size : unit tzresult Lwt.t =
-    State.Block.read net head >>=? fun block ->
+    State.Block.read chain head >>=? fun block ->
     time ~runs:runs (fun () ->
-        State.compute_locator net ~size:size block) |>
+        State.compute_locator chain ~size:size block) |>
     fun (l_exp,t_exp) ->
     time ~runs:runs (fun () ->
-        compute_linear_locator net ~size:size block) |>
+        compute_linear_locator chain ~size:size block) |>
     fun (l_lin,t_lin) ->
     l_exp >>= fun l_exp ->
     l_lin >>= fun l_lin ->

@@ -272,7 +272,7 @@ let commands () =
        @@ stop)
       begin fun () hash seckey cctxt ->
         dictate cctxt cctxt#block
-          (Activate_testnet hash) seckey >>=? fun oph ->
+          (Activate_testchain hash) seckey >>=? fun oph ->
         operation_submitted_message cctxt oph
       end ;
 

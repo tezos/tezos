@@ -36,8 +36,8 @@ let get_branch rpc_config block branch =
     | `Hash h -> find_predecessor rpc_config h branch
     | `Genesis -> return `Genesis
   end >>=? fun block ->
-  Block_services.info rpc_config block >>=? fun { net_id ; hash } ->
-  return (net_id, hash)
+  Block_services.info rpc_config block >>=? fun { chain_id ; hash } ->
+  return (chain_id, hash)
 
 let parse_expression arg =
   Lwt.return
@@ -47,7 +47,7 @@ let parse_expression arg =
 let transfer rpc_config
     block ?branch
     ~source ~src_pk ~src_sk ~destination ?arg ~amount ~fee () =
-  get_branch rpc_config block branch >>=? fun (net_id, branch) ->
+  get_branch rpc_config block branch >>=? fun (chain_id, branch) ->
   begin match arg with
     | Some arg ->
         parse_expression arg >>=? fun { expanded = arg } ->
@@ -69,11 +69,11 @@ let transfer rpc_config
   Alpha_services.Helpers.apply_operation rpc_config block
     predecessor oph bytes (Some signature) >>=? fun contracts ->
   Shell_services.inject_operation
-    rpc_config ~net_id signed_bytes >>=? fun injected_oph ->
+    rpc_config ~chain_id signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
   return (oph, contracts)
 
-let originate rpc_config ?net_id ~block ?signature bytes =
+let originate rpc_config ?chain_id ~block ?signature bytes =
   let signed_bytes =
     match signature with
     | None -> bytes
@@ -84,7 +84,7 @@ let originate rpc_config ?net_id ~block ?signature bytes =
     predecessor oph bytes signature >>=? function
   | [ contract ] ->
       Shell_services.inject_operation
-        rpc_config ?net_id signed_bytes >>=? fun injected_oph ->
+        rpc_config ?chain_id signed_bytes >>=? fun injected_oph ->
       assert (Operation_hash.equal oph injected_oph) ;
       return (oph, contract)
   | contracts ->
@@ -105,7 +105,7 @@ let operation_submitted_message (cctxt : #Client_context.logger) ?(contracts = [
 let originate_account ?branch
     ~source ~src_pk ~src_sk ~manager_pkh
     ?delegatable ?delegate ~balance ~fee block rpc_config () =
-  get_branch rpc_config block branch >>=? fun (net_id, branch) ->
+  get_branch rpc_config block branch >>=? fun (chain_id, branch) ->
   Alpha_services.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
@@ -114,20 +114,20 @@ let originate_account ?branch
     ~counter ~balance ~spendable:true
     ?delegatable ?delegatePubKey:delegate ~fee () >>=? fun bytes ->
   Client_keys.sign src_sk bytes >>=? fun signature ->
-  originate rpc_config ~block ~net_id ~signature bytes
+  originate rpc_config ~block ~chain_id ~signature bytes
 
 let faucet ?branch ~manager_pkh block rpc_config () =
-  get_branch rpc_config block branch >>=? fun (net_id, branch) ->
+  get_branch rpc_config block branch >>=? fun (chain_id, branch) ->
   let nonce = Rand.generate Constants_repr.nonce_length in
   Alpha_services.Forge.Anonymous.faucet
     rpc_config block ~branch ~id:manager_pkh ~nonce () >>=? fun bytes ->
-  originate rpc_config ~net_id ~block bytes
+  originate rpc_config ~chain_id ~block bytes
 
 let delegate_contract rpc_config
     block ?branch
     ~source ?src_pk ~manager_sk
     ~fee delegate_opt =
-  get_branch rpc_config block branch >>=? fun (net_id, branch) ->
+  get_branch rpc_config block branch >>=? fun (chain_id, branch) ->
   Alpha_services.Contract.counter
     rpc_config block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
@@ -138,7 +138,7 @@ let delegate_contract rpc_config
   let signed_bytes = Ed25519.Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Shell_services.inject_operation
-    rpc_config ~net_id signed_bytes >>=? fun injected_oph ->
+    rpc_config ~chain_id signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
 
@@ -180,14 +180,14 @@ let get_manager (cctxt : #Proto_alpha.full_context) block source =
 let dictate rpc_config block command seckey =
   let block = Block_services.last_baked_block block in
   Block_services.info
-    rpc_config block >>=? fun { net_id ; hash = branch } ->
+    rpc_config block >>=? fun { chain_id ; hash = branch } ->
   Alpha_services.Forge.Dictator.operation
     rpc_config block ~branch command >>=? fun bytes ->
   let signature = Ed25519.sign seckey bytes in
   let signed_bytes = Ed25519.Signature.concat bytes signature in
   let oph = Operation_hash.hash_bytes [ signed_bytes ] in
   Shell_services.inject_operation
-    rpc_config ~net_id signed_bytes >>=? fun injected_oph ->
+    rpc_config ~chain_id signed_bytes >>=? fun injected_oph ->
   assert (Operation_hash.equal oph injected_oph) ;
   return oph
 
@@ -225,7 +225,7 @@ let originate_contract
   Alpha_services.Contract.counter
     cctxt block source >>=? fun pcounter ->
   let counter = Int32.succ pcounter in
-  get_branch cctxt block None >>=? fun (_net_id, branch) ->
+  get_branch cctxt block None >>=? fun (_chain_id, branch) ->
   Alpha_services.Forge.Manager.origination cctxt block
     ~branch ~source ~sourcePubKey:src_pk ~managerPubKey:manager
     ~counter ~balance ~spendable:spendable

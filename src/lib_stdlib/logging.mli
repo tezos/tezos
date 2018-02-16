@@ -26,7 +26,7 @@ module type LOG = sig
 end
 
 module Core : LOG
-module Net : LOG
+module P2p : LOG
 module RPC : LOG
 module Db : LOG
 module Updater : LOG

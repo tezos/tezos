@@ -58,7 +58,7 @@ val is_empty : 'a t -> bool
 (** Returns [true] iff the given sequence is empty *)
 
 val length : 'a t -> int
-(** Returns the number of elemenets in the given sequence. This is a
+(** Returns the number of elements in the given sequence. This is a
     O(n) operation where [n] is the number of elements in the
     sequence. *)
 

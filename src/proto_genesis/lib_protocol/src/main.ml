@@ -47,8 +47,8 @@ type block = {
 let max_block_length =
   Data_encoding.Binary.length
     Data.Command.encoding
-    (Activate_testnet { protocol = Protocol_hash.hash_bytes [] ;
-                        delay = 0L })
+    (Activate_testchain { protocol = Protocol_hash.hash_bytes [] ;
+                          delay = 0L })
   +
   begin
     match Data_encoding.Binary.fixed_length Ed25519.Signature.encoding with
@@ -89,11 +89,11 @@ let prepare_application ctxt command timestamp fitness =
       return { Updater.message ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
                max_operation_data_length = 0 }
-  | Activate_testnet { protocol = hash ; delay } ->
+  | Activate_testchain { protocol = hash ; delay } ->
       let message =
-        Some (Format.asprintf "activate testnet %a" Protocol_hash.pp_short hash) in
+        Some (Format.asprintf "activate testchain %a" Protocol_hash.pp_short hash) in
       let expiration = Time.add timestamp delay in
-      Updater.fork_test_network ctxt ~protocol:hash ~expiration >>= fun ctxt ->
+      Updater.fork_test_chain ctxt ~protocol:hash ~expiration >>= fun ctxt ->
       return { Updater.message ; context = ctxt ; fitness ;
                max_operations_ttl = 0 ;
                max_operation_data_length = 0 }

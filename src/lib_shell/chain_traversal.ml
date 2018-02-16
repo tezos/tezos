@@ -10,7 +10,7 @@
 open State
 
 let path (b1: Block.t) (b2: Block.t) =
-  if not (Net_id.equal (Block.net_id b1) (Block.net_id b2)) then
+  if not (Chain_id.equal (Block.chain_id b1) (Block.chain_id b2)) then
     invalid_arg "Chain_traversal.path" ;
   let rec loop acc current =
     if Block.equal b1 current then
@@ -22,7 +22,7 @@ let path (b1: Block.t) (b2: Block.t) =
   loop [] b2
 
 let common_ancestor (b1: Block.t) (b2: Block.t) =
-  if not ( Net_id.equal (Block.net_id b1) (Block.net_id b2)) then
+  if not ( Chain_id.equal (Block.chain_id b1) (Block.chain_id b2)) then
     invalid_arg "Chain_traversal.path" ;
   let rec loop (b1: Block.t) (b2: Block.t) =
     if Block.equal b1 b2 then
@@ -103,8 +103,8 @@ let iter_predecessors ?max ?min_fitness ?min_date heads ~f =
   match heads with
   | [] -> Lwt.return_unit
   | b :: _ ->
-      let net_id = Block.net_id b in
-      if not (List.for_all (fun b -> Net_id.equal net_id (Block.net_id b)) heads) then
+      let chain_id = Block.chain_id b in
+      if not (List.for_all (fun b -> Chain_id.equal chain_id (Block.chain_id b)) heads) then
         invalid_arg "State.Helpers.iter_predecessors" ;
       iter_predecessors ?max ?min_fitness ?min_date heads ~f
 

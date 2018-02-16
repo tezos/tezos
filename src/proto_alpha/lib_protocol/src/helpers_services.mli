@@ -120,7 +120,7 @@ module Forge : sig
       branch:Block_hash.t ->
       Protocol_hash.t -> MBytes.t shell_tzresult Lwt.t
 
-    val activate_testnet:
+    val activate_testchain:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
       Protocol_hash.t -> MBytes.t shell_tzresult Lwt.t

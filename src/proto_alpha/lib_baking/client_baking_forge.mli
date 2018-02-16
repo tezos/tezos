@@ -19,7 +19,7 @@ val generate_seed_nonce: unit -> Nonce.t
 val inject_block:
   #Proto_alpha.rpc_context ->
   ?force:bool ->
-  ?net_id:Net_id.t ->
+  ?chain_id:Chain_id.t ->
   shell_header:Block_header.shell_header ->
   priority:int ->
   seed_nonce_hash:Nonce_hash.t ->

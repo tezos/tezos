@@ -13,8 +13,8 @@
 
     - the index of validation contexts; and
     - the persistent state of the node:
-      - the blockchain and its alternate heads of a "network";
-      - the pool of pending operations of a "network". *)
+      - the blockchain and its alternate heads ;
+      - the pool of pending operations of a chain. *)
 
 type t
 type global_state = t
@@ -34,17 +34,17 @@ val close:
 (** {2 Errors} **************************************************************)
 
 type error +=
-  | Unknown_network of Net_id.t
+  | Unknown_chain of Chain_id.t
 
 
 (** {2 Network} ************************************************************)
 
-(** Data specific to a given network (e.g the mainnet or the current
-    test network).  *)
-module Net : sig
+(** Data specific to a given chain (e.g the main chain or the current
+    test chain).  *)
+module Chain : sig
 
   type t
-  type net_state = t
+  type chain_state = t
 
   (** The chain starts from a genesis block associated to a seed protocol *)
   type genesis = {
@@ -54,36 +54,36 @@ module Net : sig
   }
   val genesis_encoding: genesis Data_encoding.t
 
-  (** Initialize a network for a given [genesis]. By default,
-      the network does accept forking test network. When
-      [~allow_forked_network:true] is provided, test network are allowed. *)
+  (** Initialize a chain for a given [genesis]. By default,
+      the chain does accept forking test chain. When
+      [~allow_forked_chain:true] is provided, test chain are allowed. *)
   val create:
     global_state ->
-    ?allow_forked_network:bool ->
-    genesis -> net_state Lwt.t
+    ?allow_forked_chain:bool ->
+    genesis -> chain_state Lwt.t
 
-  (** Look up for a network by the hash of its genesis block. *)
-  val get: global_state -> Net_id.t -> net_state tzresult Lwt.t
+  (** Look up for a chain by the hash of its genesis block. *)
+  val get: global_state -> Chain_id.t -> chain_state tzresult Lwt.t
 
-  (** Returns all the known networks. *)
-  val all: global_state -> net_state list Lwt.t
+  (** Returns all the known chains. *)
+  val all: global_state -> chain_state list Lwt.t
 
-  (** Destroy a network: this completly removes from the local storage all
-      the data associated to the network (this includes blocks and
+  (** Destroy a chain: this completly removes from the local storage all
+      the data associated to the chain (this includes blocks and
       operations). *)
-  val destroy: global_state -> net_state -> unit Lwt.t
+  val destroy: global_state -> chain_state -> unit Lwt.t
 
   (** Various accessors. *)
-  val id: net_state -> Net_id.t
-  val genesis: net_state -> genesis
-  val global_state: net_state -> global_state
+  val id: chain_state -> Chain_id.t
+  val genesis: chain_state -> genesis
+  val global_state: chain_state -> global_state
 
   (** Hash of the faked block header of the genesis block. *)
-  val faked_genesis_hash: net_state -> Block_hash.t
+  val faked_genesis_hash: chain_state -> Block_hash.t
 
-  (** Return the expiration timestamp of a test netwowk. *)
-  val expiration: net_state -> Time.t option
-  val allow_forked_network: net_state -> bool
+  (** Return the expiration timestamp of a test chain. *)
+  val expiration: chain_state -> Time.t option
+  val allow_forked_chain: chain_state -> bool
 
 end
 
@@ -94,29 +94,29 @@ module Block : sig
   type t
   type block = t
 
-  val known: Net.t -> Block_hash.t -> bool Lwt.t
-  val known_valid: Net.t -> Block_hash.t -> bool Lwt.t
-  val known_invalid: Net.t -> Block_hash.t -> bool Lwt.t
-  val read_invalid: Net.t -> Block_hash.t -> Store.Block.invalid_block option Lwt.t
-  val list_invalid: Net.t -> (Block_hash.t * int32 * error list) list Lwt.t
-  val unmark_invalid: Net.t -> Block_hash.t -> unit tzresult Lwt.t
+  val known: Chain.t -> Block_hash.t -> bool Lwt.t
+  val known_valid: Chain.t -> Block_hash.t -> bool Lwt.t
+  val known_invalid: Chain.t -> Block_hash.t -> bool Lwt.t
+  val read_invalid: Chain.t -> Block_hash.t -> Store.Block.invalid_block option Lwt.t
+  val list_invalid: Chain.t -> (Block_hash.t * int32 * error list) list Lwt.t
+  val unmark_invalid: Chain.t -> Block_hash.t -> unit tzresult Lwt.t
 
-  val read: Net.t -> Block_hash.t -> block tzresult Lwt.t
-  val read_opt: Net.t -> Block_hash.t -> block option Lwt.t
-  val read_exn: Net.t -> Block_hash.t -> block Lwt.t
+  val read: Chain.t -> Block_hash.t -> block tzresult Lwt.t
+  val read_opt: Chain.t -> Block_hash.t -> block option Lwt.t
+  val read_exn: Chain.t -> Block_hash.t -> block Lwt.t
 
   type error += Inconsistent_hash of Context_hash.t * Context_hash.t
 
   val store:
     ?dont_enforce_context_hash:bool ->
-    Net.t ->
+    Chain.t ->
     Block_header.t ->
     Operation.t list list ->
     Updater.validation_result ->
     block option tzresult Lwt.t
 
   val store_invalid:
-    Net.t ->
+    Chain.t ->
     Block_header.t ->
     error list ->
     bool tzresult Lwt.t
@@ -130,8 +130,8 @@ module Block : sig
   val timestamp: t -> Time.t
   val fitness: t -> Fitness.t
   val validation_passes: t -> int
-  val net_id: t -> Net_id.t
-  val net_state: t -> Net.t
+  val chain_id: t -> Chain_id.t
+  val chain_state: t -> Chain.t
   val level: t -> Int32.t
   val message: t -> string option
   val max_operations_ttl: t -> int
@@ -139,11 +139,11 @@ module Block : sig
 
   val is_genesis: t -> bool
   val predecessor: t -> block option Lwt.t
-  val predecessor_n: Net.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
+  val predecessor_n: Chain.t -> Block_hash.t -> int -> Block_hash.t option Lwt.t
 
   val context: t -> Context.t Lwt.t
   val protocol_hash: t -> Protocol_hash.t Lwt.t
-  val test_network: t -> Test_network_status.t Lwt.t
+  val test_chain: t -> Test_chain_status.t Lwt.t
 
   val operation_hashes:
     t -> int ->
@@ -154,7 +154,7 @@ module Block : sig
     t -> int -> (Operation.t list * Operation_list_list_hash.path) Lwt.t
   val all_operations: t -> Operation.t list list Lwt.t
 
-  val watcher: Net.t -> block Lwt_stream.t * Lwt_watcher.stopper
+  val watcher: Chain.t -> block Lwt_stream.t * Lwt_watcher.stopper
 
 end
 
@@ -164,10 +164,10 @@ val read_block:
 val read_block_exn:
   global_state -> Block_hash.t -> Block.t Lwt.t
 
-val compute_locator: Net.t -> ?size:int -> Block.t -> Block_locator.t Lwt.t
+val compute_locator: Chain.t -> ?size:int -> Block.t -> Block_locator.t Lwt.t
 
-val fork_testnet:
-  Block.t -> Protocol_hash.t -> Time.t -> Net.t tzresult Lwt.t
+val fork_testchain:
+  Block.t -> Protocol_hash.t -> Time.t -> Chain.t tzresult Lwt.t
 
 type chain_data = {
   current_head: Block.t ;
@@ -177,14 +177,14 @@ type chain_data = {
   locator: Block_locator.t Lwt.t lazy_t ;
 }
 
-val read_chain_store:
-  Net.t ->
-  (Store.Chain.store -> chain_data -> 'a Lwt.t) ->
+val read_chain_data:
+  Chain.t ->
+  (Store.Chain_data.store -> chain_data -> 'a Lwt.t) ->
   'a Lwt.t
 
-val update_chain_store:
-  Net.t ->
-  (Store.Chain.store -> chain_data -> (chain_data option * 'a) Lwt.t) ->
+val update_chain_data:
+  Chain.t ->
+  (Store.Chain_data.store -> chain_data -> (chain_data option * 'a) Lwt.t) ->
   'a Lwt.t
 
 (** {2 Protocol database} ***************************************************)
@@ -217,10 +217,10 @@ end
 
 module Current_mempool : sig
 
-  val get: Net.t -> (Block_header.t * Mempool.t) Lwt.t
+  val get: Chain.t -> (Block_header.t * Mempool.t) Lwt.t
   (** The current mempool. *)
 
-  val set: Net.t -> head:Block_hash.t -> Mempool.t -> unit Lwt.t
+  val set: Chain.t -> head:Block_hash.t -> Mempool.t -> unit Lwt.t
   (** Set the current mempool. It is ignored if the current head is
       not the provided one. *)
 

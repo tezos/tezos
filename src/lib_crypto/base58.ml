@@ -319,6 +319,6 @@ module Prefix = struct
   let ed25519_signature = "\009\245\205\134\018" (* edsig(99) *)
 
   (* 4 *)
-  let net_id = "\087\082\000" (* Net(15) *)
+  let chain_id = "\087\082\000" (* Net(15) *)
 
 end

@@ -54,7 +54,7 @@ let wrap_raw_store_init f _ () =
 
 let test_init _ = Lwt.return_unit
 
-let net_id = Net_id.of_block_hash genesis_block
+let chain_id = Chain_id.of_block_hash genesis_block
 
 (** Operation store *)
 
@@ -120,7 +120,7 @@ let check_block s h b =
       exit 1
 
 let test_block s =
-  let s = Store.Net.get s net_id in
+  let s = Store.Chain.get s chain_id in
   let s = Store.Block.get s in
   Block.Contents.store (s, bh1) b1 >>= fun () ->
   Block.Contents.store (s, bh2) b2 >>= fun () ->
@@ -130,7 +130,7 @@ let test_block s =
   check_block s bh3 b3
 
 let test_expand s =
-  let s = Store.Net.get s net_id in
+  let s = Store.Chain.get s chain_id in
   let s = Store.Block.get s in
   Block.Contents.store (s, bh1) b1 >>= fun () ->
   Block.Contents.store (s, bh2) b2 >>= fun () ->

@@ -9,7 +9,7 @@
 
 module Request : sig
   type view = {
-    net_id : Net_id.t ;
+    chain_id : Chain_id.t ;
     block : Block_hash.t ;
     peer: P2p_peer.Id.t option ;
   }

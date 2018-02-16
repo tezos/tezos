@@ -17,15 +17,15 @@ val init: string -> t tzresult Lwt.t
 val close : t -> unit
 
 
-(** {2 Net store} ************************************************************)
+(** {2 Chain store} **********************************************************)
 
-module Net : sig
+module Chain : sig
 
-  val list: global_store -> Net_id.t list Lwt.t
-  val destroy: global_store -> Net_id.t -> unit Lwt.t
+  val list: global_store -> Chain_id.t list Lwt.t
+  val destroy: global_store -> Chain_id.t -> unit Lwt.t
 
   type store
-  val get: global_store -> Net_id.t -> store
+  val get: global_store -> Chain_id.t -> store
 
   module Genesis_hash : SINGLE_STORE
     with type t := store
@@ -47,19 +47,19 @@ module Net : sig
     with type t := store
      and type value := Time.t
 
-  module Allow_forked_network : SET_STORE
+  module Allow_forked_chain : SET_STORE
     with type t := t
-     and type elt := Net_id.t
+     and type elt := Chain_id.t
 
 end
 
 
-(** {2 Chain data} ***********************************************************)
+(** {2 Mutable chain data} *******************************************************)
 
-module Chain : sig
+module Chain_data : sig
 
   type store
-  val get: Net.store -> store
+  val get: Chain.store -> store
 
   module Current_head : SINGLE_STORE
     with type t := store
@@ -70,7 +70,7 @@ module Chain : sig
      and type elt := Block_hash.t
      and module Set := Block_hash.Set
 
-  module In_chain : SINGLE_STORE
+  module In_main_branch : SINGLE_STORE
     with type t = store * Block_hash.t
      and type value := Block_hash.t (* successor *)
 
@@ -82,7 +82,7 @@ end
 module Block : sig
 
   type store
-  val get: Net.store -> store
+  val get: Chain.store -> store
 
   type contents = {
     header: Block_header.t ;

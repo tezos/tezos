@@ -16,10 +16,10 @@ type limits = {
 }
 
 module Name = struct
-  type t = Net_id.t
-  let encoding = Net_id.encoding
+  type t = Chain_id.t
+  let encoding = Chain_id.encoding
   let base = [ "prevalidator" ]
-  let pp = Net_id.pp_short
+  let pp = Chain_id.pp_short
 end
 
 module Types = struct
@@ -30,7 +30,7 @@ module Types = struct
      - pv.prevalidation_result.refused = Ø, refused ops are in pv.refused
      - the 'applied' operations in pv.validation_result are in reverse order. *)
   type state = {
-    net_db : Distributed_db.net_db ;
+    chain_db : Distributed_db.chain_db ;
     limits : limits ;
     mutable predecessor : State.Block.t ;
     mutable timestamp : Time.t ;
@@ -46,7 +46,7 @@ module Types = struct
     mutable validation_state : Prevalidation.prevalidation_state tzresult ;
     mutable advertisement : [ `Pending of Mempool.t | `None ] ;
   }
-  type parameters = limits * Distributed_db.net_db
+  type parameters = limits * Distributed_db.chain_db
 
   include Worker_state
 
@@ -80,7 +80,7 @@ type error += Closed = Worker.Closed
 let debug w =
   Format.kasprintf (fun msg -> Worker.record_event w (Debug msg))
 
-let list_pendings ?maintain_net_db  ~from_block ~to_block old_mempool =
+let list_pendings ?maintain_chain_db  ~from_block ~to_block old_mempool =
   let rec pop_blocks ancestor block mempool =
     let hash = State.Block.hash block in
     if Block_hash.equal hash ancestor then
@@ -90,9 +90,9 @@ let list_pendings ?maintain_net_db  ~from_block ~to_block old_mempool =
       Lwt_list.fold_left_s
         (Lwt_list.fold_left_s (fun mempool op ->
              let h = Operation.hash op in
-             Lwt_utils.may maintain_net_db
-               ~f:begin fun net_db ->
-                 Distributed_db.inject_operation net_db h op >>= fun _ ->
+             Lwt_utils.may maintain_chain_db
+               ~f:begin fun chain_db ->
+                 Distributed_db.inject_operation chain_db h op >>= fun _ ->
                  Lwt.return_unit
                end >>= fun () ->
              Lwt.return (Operation_hash.Map.add h op mempool)))
@@ -103,10 +103,10 @@ let list_pendings ?maintain_net_db  ~from_block ~to_block old_mempool =
   in
   let push_block mempool block =
     State.Block.all_operation_hashes block >|= fun operations ->
-    Option.iter maintain_net_db
-      ~f:(fun net_db ->
+    Option.iter maintain_chain_db
+      ~f:(fun chain_db ->
           List.iter
-            (List.iter (Distributed_db.Operation.clear_or_cancel net_db))
+            (List.iter (Distributed_db.Operation.clear_or_cancel chain_db))
             operations) ;
     List.fold_left
       (List.fold_left (fun mempool h -> Operation_hash.Map.remove h mempool))
@@ -209,7 +209,7 @@ let handle_unprocessed w pv =
                    Operation_hash.Map.add h errs pv.refusals)
               pv.validation_result.refused ;
             Operation_hash.Map.iter
-              (fun oph _ -> Distributed_db.Operation.clear_or_cancel pv.net_db oph)
+              (fun oph _ -> Distributed_db.Operation.clear_or_cancel pv.chain_db oph)
               pv.validation_result.refused ;
             pv.validation_result <-
               merge_validation_results
@@ -232,7 +232,7 @@ let handle_unprocessed w pv =
           (fun k _ s -> Operation_hash.Set.add k s)
           pv.validation_result.branch_refused @@
         Operation_hash.Set.empty } ;
-  State.Current_mempool.set (Distributed_db.net_state pv.net_db)
+  State.Current_mempool.set (Distributed_db.chain_state pv.chain_db)
     ~head:(State.Block.hash pv.predecessor) pv.mempool >>= fun () ->
   Lwt.return ()
 
@@ -242,7 +242,7 @@ let fetch_operation w pv ?peer oph =
     Operation_hash.pp_short oph ;
   Distributed_db.Operation.fetch
     ~timeout:pv.limits.operation_timeout
-    pv.net_db ?peer oph () >>= function
+    pv.chain_db ?peer oph () >>= function
   | Ok op ->
       Worker.push_request_now w (Arrived (oph, op)) ;
       Lwt.return_unit
@@ -257,7 +257,7 @@ let fetch_operation w pv ?peer oph =
 let on_operation_arrived (pv : state) oph op =
   pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
   if not (Block_hash.Set.mem op.Operation.shell.branch pv.live_blocks) then begin
-    Distributed_db.Operation.clear_or_cancel pv.net_db oph
+    Distributed_db.Operation.clear_or_cancel pv.chain_db oph
     (* TODO: put in a specific delayed map ? *)
   end else if not (already_handled pv oph) (* prevent double inclusion on flush *) then begin
     pv.pending <- Operation_hash.Map.add oph op pv.pending
@@ -274,7 +274,7 @@ let on_inject pv op =
         validation_state ~sort:false [ (oph, op) ] >>= fun (_, result) ->
       match result.applied with
       | [ app_oph, _ ] when Operation_hash.equal app_oph oph ->
-          Distributed_db.inject_operation pv.net_db oph op >>= fun (_ : bool) ->
+          Distributed_db.inject_operation pv.chain_db oph op >>= fun (_ : bool) ->
           pv.pending <- Operation_hash.Map.add oph op pv.pending ;
           return result
       | _ ->
@@ -317,7 +317,7 @@ let on_notify w pv peer mempool =
 
 let on_flush w pv predecessor =
   list_pendings
-    ~maintain_net_db:pv.net_db
+    ~maintain_chain_db:pv.chain_db
     ~from_block:pv.predecessor ~to_block:predecessor
     (Preapply_result.operations pv.validation_result) >>= fun pending ->
   let timestamp = Time.now () in
@@ -352,7 +352,7 @@ let on_advertise pv =
   | `None -> () (* should not happen *)
   | `Pending mempool ->
       pv.advertisement <- `None ;
-      Distributed_db.Advertise.current_head pv.net_db ~mempool pv.predecessor
+      Distributed_db.Advertise.current_head pv.chain_db ~mempool pv.predecessor
 
 let on_request
   : type r. t -> r Request.t -> r tzresult Lwt.t
@@ -362,8 +362,8 @@ let on_request
       | Request.Flush hash ->
           on_advertise pv ;
           (* TODO: rebase the advertisement instead *)
-          let net_state = Distributed_db.net_state pv.net_db in
-          State.Block.read net_state hash >>=? fun block ->
+          let chain_state = Distributed_db.chain_state pv.chain_db in
+          State.Block.read chain_state hash >>=? fun block ->
           on_flush w pv block >>=? fun () ->
           return (() : r)
       | Request.Notify (peer, mempool) ->
@@ -385,16 +385,15 @@ let on_request
 let on_close w =
   let pv = Worker.state w in
   Operation_hash.Set.iter
-    (Distributed_db.Operation.clear_or_cancel pv.net_db)
+    (Distributed_db.Operation.clear_or_cancel pv.chain_db)
     pv.fetching ;
   Lwt.return_unit
 
-let on_launch w _ (limits, net_db) =
-  let net_state = Distributed_db.net_state net_db in
-  State.read_chain_store net_state
-    (fun _ { current_head ; current_mempool ; live_blocks ; live_operations } ->
-       Lwt.return (current_head, current_mempool, live_blocks, live_operations))
-  >>= fun (predecessor, mempool, live_blocks, live_operations) ->
+let on_launch w _ (limits, chain_db) =
+  let chain_state = Distributed_db.chain_state chain_db in
+  Chain.data chain_state >>= fun
+    { current_head = predecessor ; current_mempool = mempool ;
+      live_blocks ; live_operations } ->
   let timestamp = Time.now () in
   Prevalidation.start_prevalidation
     ~predecessor ~timestamp () >>= fun validation_state ->
@@ -411,7 +410,7 @@ let on_launch w _ (limits, net_db) =
       (fun s h -> Operation_hash.Set.add h s)
       Operation_hash.Set.empty mempool.known_valid in
   let pv =
-    { limits ; net_db ;
+    { limits ; chain_db ;
       predecessor ; timestamp ; live_blocks ; live_operations ;
       mempool = { known_valid = [] ; pending = Operation_hash.Set.empty };
       refused = Ring.create limits.max_refused_operations ;
@@ -436,8 +435,8 @@ let on_completion w r _ st =
 
 let table = Worker.create_table Queue
 
-let create limits net_db =
-  let net_state = Distributed_db.net_state net_db in
+let create limits chain_db =
+  let chain_state = Distributed_db.chain_state chain_db in
   let module Handlers = struct
     type self = t
     let on_launch = on_launch
@@ -448,8 +447,8 @@ let create limits net_db =
     let on_no_request _ = return ()
   end in
   Worker.launch table limits.worker_limits
-    (State.Net.id net_state)
-    (limits, net_db)
+    (State.Chain.id chain_state)
+    (limits, chain_db)
     (module Handlers)
 
 let shutdown = Worker.shutdown
@@ -472,7 +471,7 @@ let pending ?block w =
   match block with
   | Some to_block ->
       list_pendings
-        ~maintain_net_db:pv.net_db
+        ~maintain_chain_db:pv.chain_db
         ~from_block:pv.predecessor ~to_block ops
   | None -> Lwt.return ops
 

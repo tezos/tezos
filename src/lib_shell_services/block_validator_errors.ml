@@ -18,8 +18,8 @@ type block_error =
   | Outdated_operation of
       { operation: Operation_hash.t;
         originating_block: Block_hash.t }
-  | Expired_network of
-      { net_id: Net_id.t ;
+  | Expired_chain of
+      { chain_id: Chain_id.t ;
         expiration: Time.t ;
         timestamp: Time.t ;
       }
@@ -188,13 +188,13 @@ let pp_block_error ppf = function
         "The operation %a is outdated (originated in block: %a)"
         Operation_hash.pp_short operation
         Block_hash.pp_short originating_block
-  | Expired_network { net_id ; expiration ; timestamp } ->
+  | Expired_chain { chain_id ; expiration ; timestamp } ->
       Format.fprintf ppf
         "The block timestamp (%a) is later than \
-         its network expiration date: %a (net: %a)."
+         its chain expiration date: %a (chain: %a)."
         Time.pp_hum timestamp
         Time.pp_hum expiration
-        Net_id.pp_short net_id
+        Chain_id.pp_short chain_id
   | Unexpected_number_of_validation_passes n ->
       Format.fprintf ppf
         "Invalid number of validation passes (found: %d)"

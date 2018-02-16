@@ -26,20 +26,18 @@ considers to be the current head of the blockchain.
 The validator is written as a collection of workers: local event loops
 communicating with each other via message passing. Workers are spawned
 and killed dynamically, according to connected peers, incoming blocks
-to validate, and active (test)nets.
+to validate, and active (test)chains.
 
-A *net validator* worker is launched by the validator for each *net*
-that it considers alive. A *net* is how we call subset of block chains
-that go through a given root block. This should not be mixed up with
-the *net* in *peer-to-peer network*. Each net validator is responsible
-for handling blocks that belong to this net, and select the best head
-for this net. A main net validator is spawned for the main chain that
+A *chain validator* worker is launched by the validator for each
+*chain* that it considers alive. Each chain validator is responsible for
+handling blocks that belong to this chain, and select the best head for
+this chain. A main chain validator is spawned for the main chain that
 starts at the genesis, a second one when there is an active test
-chain. Forking a net is decided from within the economic protocol.
-In version Alpha, this is only used to try new protocols before self
-amending the main net.
+chain. Forking a chain is decided from within the economic protocol.  In
+version Alpha, this is only used to try new protocols before self
+amending the main chain.
 
-The net validator spawns one *peer validator* worker per connected
+The chain validator spawns one *peer validator* worker per connected
 peer. This set updated, grown or shrinked on the fly, according to the
 connections and deconnection signals from the peer-to-peer component.
 Each peer validator will treat new head proposals from the associated
@@ -78,8 +76,8 @@ everything needed for a block, they will call the *block validator*.
 The *block validator* validates blocks (currently in sequence),
 assuming that all the necessary data have already been retrieved from
 the peer-to-peer network. When a block is valid, it will notify the
-correspondig net validator, that may update its head. In this case,
-the net validator will propagate this information to its associated
+correspondig chain validator, that may update its head. In this case,
+the chain validator will propagate this information to its associated
 *prevalidator*, and may decide to kill or spawn the test network
 according to the protocol's decision.
 
@@ -87,10 +85,10 @@ Prevalidator
 ------------
 .. _prevalidator_component:
 
-To each net validator is associated a *prevalidator* (this may become
+To each chain validator is associated a *prevalidator* (this may become
 an option in the future, to allow running nodes on machines with less
 RAM), that is responsible for the transmission of operations for this
-net over the peer-to-peer network.
+chain over the peer-to-peer network.
 
 To prevent spam, this prevalidator must select the set of operations
 that it considers valid, and the ones that it chooses to broadcast.

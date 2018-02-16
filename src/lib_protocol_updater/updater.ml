@@ -35,7 +35,7 @@ module Raw = struct
   }
 
   let activate = Context.set_protocol
-  let fork_test_network = Context.fork_test_network
+  let fork_test_chain = Context.fork_test_chain
 
   (** Compiler *)
 

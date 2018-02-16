@@ -12,13 +12,13 @@
 open Peer_validator_worker_state
 
 module Name = struct
-  type t = Net_id.t * P2p_peer.Id.t
+  type t = Chain_id.t * P2p_peer.Id.t
   let encoding =
-    Data_encoding.tup2 Net_id.encoding P2p_peer.Id.encoding
+    Data_encoding.tup2 Chain_id.encoding P2p_peer.Id.encoding
   let base = [ "peer_validator" ]
-  let pp ppf (net, peer) =
+  let pp ppf (chain, peer) =
     Format.fprintf ppf "%a:%a"
-      Net_id.pp_short net P2p_peer.Id.pp_short peer
+      Chain_id.pp_short chain P2p_peer.Id.pp_short peer
 end
 
 module Request = struct
@@ -47,9 +47,9 @@ module Types = struct
   include Worker_state
 
   type parameters = {
-    net_db: Distributed_db.net_db ;
+    chain_db: Distributed_db.chain_db ;
     block_validator: Block_validator.t ;
-    (* callback to net_validator *)
+    (* callback to chain_validator *)
     notify_new_block: State.Block.t -> unit ;
     notify_bootstrapped: unit -> unit ;
     notify_termination: unit -> unit ;
@@ -103,7 +103,7 @@ let bootstrap_new_branch w _ancestor _head unknown_prefix =
       ~block_header_timeout:pv.parameters.limits.block_header_timeout
       ~block_operations_timeout:pv.parameters.limits.block_operations_timeout
       pv.parameters.block_validator
-      pv.peer_id pv.parameters.net_db unknown_prefix in
+      pv.peer_id pv.parameters.chain_db unknown_prefix in
   Worker.protect w
     ~on_error:begin fun error ->
       (* if the peer_validator is killed, let's cancel the pipeline *)
@@ -121,14 +121,14 @@ let bootstrap_new_branch w _ancestor _head unknown_prefix =
 
 let validate_new_head w hash (header : Block_header.t) =
   let pv = Worker.state w in
-  let net_state = Distributed_db.net_state pv.parameters.net_db in
-  State.Block.known net_state header.shell.predecessor >>= function
+  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  State.Block.known chain_state header.shell.predecessor >>= function
   | false ->
       debug w
         "missing predecessor for new head %a from peer %a"
         Block_hash.pp_short hash
         P2p_peer.Id.pp_short pv.peer_id ;
-      Distributed_db.Request.current_branch pv.parameters.net_db ~peer:pv.peer_id () ;
+      Distributed_db.Request.current_branch pv.parameters.chain_db ~peer:pv.peer_id () ;
       return ()
   | true ->
       debug w
@@ -140,7 +140,7 @@ let validate_new_head w hash (header : Block_header.t) =
            Worker.protect w begin fun () ->
              Distributed_db.Operations.fetch
                ~timeout:pv.parameters.limits.block_operations_timeout
-               pv.parameters.net_db ~peer:pv.peer_id
+               pv.parameters.chain_db ~peer:pv.peer_id
                (hash, i) header.shell.operations_hash
            end)
         (0 -- (header.shell.validation_passes - 1)) >>=? fun operations ->
@@ -150,7 +150,7 @@ let validate_new_head w hash (header : Block_header.t) =
         P2p_peer.Id.pp_short pv.peer_id ;
       Block_validator.validate
         ~notify_new_block:pv.parameters.notify_new_block
-        pv.parameters.block_validator pv.parameters.net_db
+        pv.parameters.block_validator pv.parameters.chain_db
         hash header operations >>=? fun _block ->
       debug w
         "end of validation for new head %a from peer %a"
@@ -161,8 +161,8 @@ let validate_new_head w hash (header : Block_header.t) =
 
 let only_if_fitness_increases w distant_header cont =
   let pv = Worker.state w in
-  let net_state = Distributed_db.net_state pv.parameters.net_db in
-  Chain.head net_state >>= fun local_header ->
+  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  Chain.head chain_state >>= fun local_header ->
   if Fitness.compare
       distant_header.Block_header.shell.fitness
       (State.Block.fitness local_header) <= 0 then begin
@@ -177,10 +177,10 @@ let only_if_fitness_increases w distant_header cont =
 
 let may_validate_new_head w hash header =
   let pv = Worker.state w in
-  let net_state = Distributed_db.net_state pv.parameters.net_db in
-  State.Block.known net_state hash >>= function
+  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  State.Block.known chain_state hash >>= function
   | true -> begin
-      State.Block.known_valid net_state hash >>= function
+      State.Block.known_valid chain_state hash >>= function
       | true ->
           debug w
             "ignoring previously validated block %a from peer %a"
@@ -204,8 +204,8 @@ let may_validate_new_branch w distant_hash locator =
   let pv = Worker.state w in
   let distant_header, _ = (locator : Block_locator.t :> Block_header.t * _) in
   only_if_fitness_increases w distant_header @@ fun () ->
-  let net_state = Distributed_db.net_state pv.parameters.net_db in
-  Block_locator_iterator.known_ancestor net_state locator >>= function
+  let chain_state = Distributed_db.chain_state pv.parameters.chain_db in
+  Block_locator_iterator.known_ancestor chain_state locator >>= function
   | None ->
       debug w
         "ignoring branch %a without common ancestor from peer: %a."
@@ -220,7 +220,7 @@ let on_no_request w =
   debug w "no new head from peer %a for %g seconds."
     P2p_peer.Id.pp_short pv.peer_id
     pv.parameters.limits.new_head_request_timeout ;
-  Distributed_db.Request.current_head pv.parameters.net_db ~peer:pv.peer_id () ;
+  Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
   return ()
 
 let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
@@ -281,13 +281,13 @@ let on_error w r st errs =
 let on_close w =
   let pv = Worker.state w in
   pv.parameters.notify_termination () ;
-  Distributed_db.disconnect pv.parameters.net_db pv.peer_id >>= fun () ->
+  Distributed_db.disconnect pv.parameters.chain_db pv.peer_id >>= fun () ->
   Lwt.return ()
 
 let on_launch _ name parameters =
-  let net_state = Distributed_db.net_state parameters.net_db in
-  State.Block.read_exn net_state
-    (State.Net.genesis net_state).block >>= fun genesis ->
+  let chain_state = Distributed_db.chain_state parameters.chain_db in
+  State.Block.read_exn chain_state
+    (State.Chain.genesis chain_state).block >>= fun genesis ->
   let rec pv = {
     peer_id = snd name ;
     parameters = { parameters with notify_new_block } ;
@@ -324,10 +324,10 @@ let create
     ?(notify_new_block = fun _ -> ())
     ?(notify_bootstrapped = fun () -> ())
     ?(notify_termination = fun _ -> ())
-    limits block_validator net_db peer_id =
-  let name = (State.Net.id (Distributed_db.net_state net_db), peer_id) in
+    limits block_validator chain_db peer_id =
+  let name = (State.Chain.id (Distributed_db.chain_state chain_db), peer_id) in
   let parameters = {
-    net_db ;
+    chain_db ;
     notify_termination ;
     block_validator ;
     notify_new_block ;

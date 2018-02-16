@@ -11,7 +11,7 @@
 
 val compile: Protocol_hash.t -> Protocol.t -> bool Lwt.t
 val activate: Context.t -> Protocol_hash.t -> Context.t Lwt.t
-val fork_test_network:
+val fork_test_chain:
   Context.t -> protocol:Protocol_hash.t -> expiration:Time.t -> Context.t Lwt.t
 
 val init: string -> unit

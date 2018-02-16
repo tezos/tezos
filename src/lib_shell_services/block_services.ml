@@ -47,7 +47,7 @@ let to_string = function
 
 type block_info = {
   hash: Block_hash.t ;
-  net_id: Net_id.t ;
+  chain_id: Chain_id.t ;
   level: Int32.t ;
   proto_level: int ; (* uint8 *)
   predecessor: Block_hash.t ;
@@ -59,7 +59,7 @@ type block_info = {
   data: MBytes.t ;
   operations: (Operation_hash.t * Operation.t) list list option ;
   protocol: Protocol_hash.t ;
-  test_network: Test_network_status.t ;
+  test_chain: Test_chain_status.t ;
 }
 
 let block_info_encoding =
@@ -68,35 +68,35 @@ let block_info_encoding =
       (obj1 (req "hash" Operation_hash.encoding))
       Operation.encoding in
   conv
-    (fun { hash ; net_id ; level ; proto_level ; predecessor ;
+    (fun { hash ; chain_id ; level ; proto_level ; predecessor ;
            fitness ; timestamp ; protocol ;
            validation_passes ; operations_hash ; context ; data ;
-           operations ; test_network } ->
-      ((hash, net_id, operations, protocol, test_network),
+           operations ; test_chain } ->
+      ((hash, chain_id, operations, protocol, test_chain),
        { Block_header.shell =
            { level ; proto_level ; predecessor ;
              timestamp ; validation_passes ; operations_hash ; fitness ;
              context } ;
          proto = data }))
-    (fun ((hash, net_id, operations, protocol, test_network),
+    (fun ((hash, chain_id, operations, protocol, test_chain),
           { Block_header.shell =
               { level ; proto_level ; predecessor ;
                 timestamp ; validation_passes ; operations_hash ; fitness ;
                 context } ;
             proto = data }) ->
-      { hash ; net_id ; level ; proto_level ; predecessor ;
+      { hash ; chain_id ; level ; proto_level ; predecessor ;
         fitness ; timestamp ; protocol ;
         validation_passes ; operations_hash ; context ; data ;
-        operations ; test_network })
+        operations ; test_chain })
     (dynamic_size
        (merge_objs
           (obj5
              (req "hash" Block_hash.encoding)
-             (req "net_id" Net_id.encoding)
+             (req "chain_id" Chain_id.encoding)
              (opt "operations" (dynamic_size (list (dynamic_size (list (dynamic_size operation_encoding))))))
              (req "protocol" Protocol_hash.encoding)
-             (dft "test_network"
-                Test_network_status.encoding Not_running))
+             (dft "test_chain"
+                Test_chain_status.encoding Not_running))
           Block_header.encoding))
 
 type preapply_result = {
@@ -143,13 +143,13 @@ module S = struct
       ~output: block_info_encoding
       block_path
 
-  let net_id =
+  let chain_id =
     RPC_service.post_service
-      ~description:"Returns the net of the chain in which the block belongs."
+      ~description:"Returns the chain in which the block belongs."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "net_id" Net_id.encoding))
-      RPC_path.(block_path / "net_id")
+      ~output: (obj1 (req "chain_id" Chain_id.encoding))
+      RPC_path.(block_path / "chain_id")
 
   let level =
     RPC_service.post_service
@@ -245,13 +245,13 @@ module S = struct
       ~output: (obj1 (req "protocol" Protocol_hash.encoding))
       RPC_path.(block_path / "protocol")
 
-  let test_network =
+  let test_chain =
     RPC_service.post_service
-      ~description:"Returns the status of the associated test network."
+      ~description:"Returns the status of the associated test chain."
       ~query: RPC_query.empty
       ~input: empty
-      ~output: Test_network_status.encoding
-      RPC_path.(block_path / "test_network")
+      ~output: Test_chain_status.encoding
+      RPC_path.(block_path / "test_chain")
 
   let pending_operations =
     let operation_encoding =
@@ -432,7 +432,7 @@ let monitor_prevalidated_operations ?(contents = false) ctxt =
     ((), `Prevalidation) ()
     { contents ; monitor = true }
 
-let net_id ctxt b = make_call1 S.net_id ctxt b () ()
+let chain_id ctxt b = make_call1 S.chain_id ctxt b () ()
 let level ctxt b = make_call1 S.level ctxt b () ()
 let predecessor ctxt b = make_call1 S.predecessor ctxt b () ()
 let predecessors ctxt b n = make_call1 S.predecessors ctxt b () n
@@ -442,7 +442,7 @@ let fitness ctxt b = make_call1 S.fitness ctxt b () ()
 let operations ctxt ?(contents = false) h =
   make_call1 S.operations ctxt h () { contents ; monitor = false }
 let protocol ctxt b = make_call1 S.protocol ctxt b () ()
-let test_network ctxt b = make_call1 S.test_network ctxt b () ()
+let test_chain ctxt b = make_call1 S.test_chain ctxt b () ()
 let pending_operations ctxt b = make_call1 S.pending_operations ctxt b () ()
 let info ctxt ?(include_ops = true) h =
   make_call1 S.info ctxt h () include_ops

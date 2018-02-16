@@ -249,8 +249,8 @@ let rec double_roll_value ctxt i =
 
 let activate ({ context = c } as s) h =
   Updater.activate c h >>= fun c -> Lwt.return { s with context = c }
-let fork_test_network ({ context = c } as s) protocol expiration =
-  Updater.fork_test_network c ~protocol ~expiration >>= fun c ->
+let fork_test_chain ({ context = c } as s) protocol expiration =
+  Updater.fork_test_chain c ~protocol ~expiration >>= fun c ->
   Lwt.return { s with context = c }
 
 let register_resolvers enc resolve =

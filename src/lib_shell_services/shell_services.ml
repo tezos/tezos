@@ -23,16 +23,16 @@ module S = struct
     raw: MBytes.t ;
     blocking: bool ;
     force: bool ;
-    net_id: Net_id.t option ;
+    chain_id: Chain_id.t option ;
     operations: Operation.t list list ;
   }
 
   let inject_block_param =
     conv
-      (fun { raw ; blocking ; force ; net_id ; operations } ->
-         (raw, blocking, force, net_id, operations))
-      (fun (raw, blocking, force, net_id, operations) ->
-         { raw ; blocking ; force ; net_id ; operations })
+      (fun { raw ; blocking ; force ; chain_id ; operations } ->
+         (raw, blocking, force, chain_id, operations))
+      (fun (raw, blocking, force, chain_id, operations) ->
+         { raw ; blocking ; force ; chain_id ; operations })
       (obj5
          (req "data" bytes)
          (dft "blocking"
@@ -49,7 +49,7 @@ module S = struct
                   the current head. (default: false)"
                bool)
             false)
-         (opt "net_id" Net_id.encoding)
+         (opt "chain_id" Chain_id.encoding)
          (req "operations"
             (describe
                ~description:"..."
@@ -92,7 +92,7 @@ module S = struct
                     (pre-)validated before answering. (default: true)"
                  bool)
               true)
-           (opt "net_id" Net_id.encoding))
+           (opt "chain_id" Chain_id.encoding))
       ~output:
         (describe
            ~title: "Hash of the injected operation" @@
@@ -158,14 +158,14 @@ let forge_block_header ctxt header =
   make_call S.forge_block_header ctxt () () header
 
 let inject_block ctxt
-    ?(async = false) ?(force = false) ?net_id
+    ?(async = false) ?(force = false) ?chain_id
     raw operations =
   make_call S.inject_block ctxt () ()
-    { raw ; blocking = not async ; force ; net_id ; operations }
+    { raw ; blocking = not async ; force ; chain_id ; operations }
 
-let inject_operation ctxt ?(async = false) ?net_id operation =
+let inject_operation ctxt ?(async = false) ?chain_id operation =
   make_call S.inject_operation ctxt () ()
-    (operation, not async, net_id)
+    (operation, not async, chain_id)
 
 let inject_protocol ctxt ?(async = false) ?force protocol =
   make_call S.inject_protocol ctxt () ()

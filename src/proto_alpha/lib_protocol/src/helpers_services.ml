@@ -377,9 +377,9 @@ module Forge = struct
         b ~branch hash =
       operation ctxt b ~branch (Activate hash)
 
-    let activate_testnet ctxt
+    let activate_testchain ctxt
         b ~branch hash =
-      operation ctxt b ~branch (Activate_testnet hash)
+      operation ctxt b ~branch (Activate_testchain hash)
 
   end
 

@@ -26,7 +26,7 @@ let genesis_protocol =
 let genesis_time =
   Time.of_seconds 0L
 
-let net_id = Net_id.of_block_hash genesis_block
+let chain_id = Chain_id.of_block_hash genesis_block
 
 (** Context creation *)
 
@@ -89,7 +89,7 @@ let wrap_context_init f _ () =
     let root = base_dir // "context" in
     Context.init ~root ?patch_context:None >>= fun idx ->
     Context.commit_genesis idx
-      ~net_id
+      ~chain_id
       ~time:genesis_time
       ~protocol:genesis_protocol >>= fun genesis ->
     create_block2 idx genesis >>= fun block2 ->

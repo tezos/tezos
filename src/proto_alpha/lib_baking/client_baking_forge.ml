@@ -61,14 +61,14 @@ let assert_valid_operations_hash shell_header operations =
         inconsistent header.")
 
 let inject_block cctxt
-    ?force ?net_id
+    ?force ?chain_id
     ~shell_header ~priority ~seed_nonce_hash ~src_sk operations =
   assert_valid_operations_hash shell_header operations >>=? fun () ->
   let block = `Hash shell_header.Tezos_base.Block_header.predecessor in
   forge_block_header cctxt block
     src_sk shell_header priority seed_nonce_hash >>=? fun signed_header ->
   Shell_services.inject_block cctxt
-    ?force ?net_id signed_header operations >>=? fun block_hash ->
+    ?force ?chain_id signed_header operations >>=? fun block_hash ->
   return block_hash
 
 type error +=
@@ -194,9 +194,9 @@ let forge_block cctxt block
     let operations =
       if not best_effort then operations
       else List.map (fun l -> List.map snd l.Preapply_result.applied) result in
-    Block_services.info cctxt block >>=? fun {net_id} ->
+    Block_services.info cctxt block >>=? fun {chain_id} ->
     inject_block cctxt
-      ?force ~net_id ~shell_header ~priority ~seed_nonce_hash ~src_sk
+      ?force ~chain_id ~shell_header ~priority ~seed_nonce_hash ~src_sk
       operations
   else
     let result =
@@ -527,7 +527,7 @@ let bake (cctxt : #Proto_alpha.full_context) state =
         Fitness.pp shell_header.fitness >>= fun () ->
       Client_keys.get_key cctxt delegate >>=? fun (_,_,src_sk) ->
       inject_block cctxt
-        ~force:true ~net_id:bi.net_id
+        ~force:true ~chain_id:bi.chain_id
         ~shell_header ~priority ~seed_nonce_hash ~src_sk
         [List.map snd operations.applied]
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->

@@ -68,7 +68,7 @@ module Make_raw
 end
 
 module Fake_operation_storage = struct
-  type store = State.Net.t
+  type store = State.Chain.t
   type value = Operation.t
   let known _ _ = Lwt.return_false
   let read _ _ = Lwt.return (Error_monad.error_exn Not_found)
@@ -92,17 +92,17 @@ module Raw_operation =
     end)
 
 module Block_header_storage = struct
-  type store = State.Net.t
+  type store = State.Chain.t
   type value = Block_header.t
   let known = State.Block.known_valid
-  let read net_state h =
-    State.Block.read net_state h >>=? fun b ->
+  let read chain_state h =
+    State.Block.read chain_state h >>=? fun b ->
     return (State.Block.header b)
-  let read_opt net_state h =
-    State.Block.read_opt net_state h >>= fun b ->
+  let read_opt chain_state h =
+    State.Block.read_opt chain_state h >>= fun b ->
     Lwt.return (Option.map ~f:State.Block.header b)
-  let read_exn net_state h =
-    State.Block.read_exn net_state h >>= fun b ->
+  let read_exn chain_state h =
+    State.Block.read_exn chain_state h >>= fun b ->
     Lwt.return (State.Block.header b)
 end
 
@@ -122,21 +122,21 @@ module Raw_block_header =
     end)
 
 module Operation_hashes_storage = struct
-  type store = State.Net.t
+  type store = State.Chain.t
   type value = Operation_hash.t list
-  let known net_state (h, _) = State.Block.known_valid net_state h
-  let read net_state (h, i) =
-    State.Block.read net_state h >>=? fun b ->
+  let known chain_state (h, _) = State.Block.known_valid chain_state h
+  let read chain_state (h, i) =
+    State.Block.read chain_state h >>=? fun b ->
     State.Block.operation_hashes b i >>= fun (ops, _) ->
     return ops
-  let read_opt net_state (h, i) =
-    State.Block.read_opt net_state h >>= function
+  let read_opt chain_state (h, i) =
+    State.Block.read_opt chain_state h >>= function
     | None -> Lwt.return_none
     | Some b ->
         State.Block.operation_hashes b i >>= fun (ops, _) ->
         Lwt.return (Some ops)
-  let read_exn net_state (h, i) =
-    State.Block.read_exn net_state h >>= fun b ->
+  let read_exn chain_state (h, i) =
+    State.Block.read_exn chain_state h >>= fun b ->
     State.Block.operation_hashes b i >>= fun (ops, _) ->
     Lwt.return ops
 end
@@ -199,21 +199,21 @@ module Raw_operation_hashes = struct
 end
 
 module Operations_storage = struct
-  type store = State.Net.t
+  type store = State.Chain.t
   type value = Operation.t list
-  let known net_state (h, _) = State.Block.known_valid net_state h
-  let read net_state (h, i) =
-    State.Block.read net_state h >>=? fun b ->
+  let known chain_state (h, _) = State.Block.known_valid chain_state h
+  let read chain_state (h, i) =
+    State.Block.read chain_state h >>=? fun b ->
     State.Block.operations b i >>= fun (ops, _) ->
     return ops
-  let read_opt net_state (h, i) =
-    State.Block.read_opt net_state h >>= function
+  let read_opt chain_state (h, i) =
+    State.Block.read_opt chain_state h >>= function
     | None -> Lwt.return_none
     | Some b ->
         State.Block.operations b i >>= fun (ops, _) ->
         Lwt.return (Some ops)
-  let read_exn net_state (h, i) =
-    State.Block.read_exn net_state h >>= fun b ->
+  let read_exn chain_state (h, i) =
+    State.Block.read_exn chain_state h >>= fun b ->
     State.Block.operations b i >>= fun (ops, _) ->
     Lwt.return ops
 end
@@ -302,14 +302,14 @@ type db = {
   p2p: p2p ;
   p2p_readers: p2p_reader P2p_peer.Table.t ;
   disk: State.t ;
-  active_nets: net_db Net_id.Table.t ;
+  active_chains: chain_db Chain_id.Table.t ;
   protocol_db: Raw_protocol.t ;
   block_input: (Block_hash.t * Block_header.t) Lwt_watcher.input ;
   operation_input: (Operation_hash.t * Operation.t) Lwt_watcher.input ;
 }
 
-and net_db = {
-  net_state: State.Net.t ;
+and chain_db = {
+  chain_state: State.Chain.t ;
   global_db: db ;
   operation_db: Raw_operation.t ;
   block_header_db: Raw_block_header.t ;
@@ -323,7 +323,7 @@ and net_db = {
 and p2p_reader = {
   gid: P2p_peer.Id.t ;
   conn: connection ;
-  peer_active_nets: net_db Net_id.Table.t ;
+  peer_active_chains: chain_db Chain_id.Table.t ;
   canceler: Lwt_canceler.t ;
   mutable worker: unit Lwt.t ;
 }
@@ -337,116 +337,116 @@ let noop_callback = {
 type t = db
 
 let state { disk } = disk
-let net_state { net_state } = net_state
+let chain_state { chain_state } = chain_state
 let db { global_db } = global_db
 
 let read_block_header { disk } h =
   State.read_block disk h >>= function
   | Some b ->
-      Lwt.return_some (State.Block.net_id b, State.Block.header b)
+      Lwt.return_some (State.Block.chain_id b, State.Block.header b)
   | None ->
       Lwt.return_none
 
-let find_pending_block_header { peer_active_nets } h  =
-  Net_id.Table.fold
-    (fun _net_id net_db acc ->
+let find_pending_block_header { peer_active_chains } h  =
+  Chain_id.Table.fold
+    (fun _chain_id chain_db acc ->
        match acc with
        | Some _ -> acc
        | None when Raw_block_header.Table.pending
-             net_db.block_header_db.table h ->
-           Some net_db
+             chain_db.block_header_db.table h ->
+           Some chain_db
        | None -> None)
-    peer_active_nets
+    peer_active_chains
     None
 
-let find_pending_operations { peer_active_nets } h i =
-  Net_id.Table.fold
-    (fun _net_id net_db acc ->
+let find_pending_operations { peer_active_chains } h i =
+  Chain_id.Table.fold
+    (fun _chain_id chain_db acc ->
        match acc with
        | Some _ -> acc
        | None when Raw_operations.Table.pending
-             net_db.operations_db.table (h, i) ->
-           Some net_db
+             chain_db.operations_db.table (h, i) ->
+           Some chain_db
        | None -> None)
-    peer_active_nets
+    peer_active_chains
     None
 
-let find_pending_operation_hashes { peer_active_nets } h i =
-  Net_id.Table.fold
-    (fun _net_id net_db acc ->
+let find_pending_operation_hashes { peer_active_chains } h i =
+  Chain_id.Table.fold
+    (fun _chain_id chain_db acc ->
        match acc with
        | Some _ -> acc
        | None when Raw_operation_hashes.Table.pending
-             net_db.operation_hashes_db.table (h, i) ->
-           Some net_db
+             chain_db.operation_hashes_db.table (h, i) ->
+           Some chain_db
        | None -> None)
-    peer_active_nets
+    peer_active_chains
     None
 
-let find_pending_operation { peer_active_nets } h =
-  Net_id.Table.fold
-    (fun _net_id net_db acc ->
+let find_pending_operation { peer_active_chains } h =
+  Chain_id.Table.fold
+    (fun _chain_id chain_db acc ->
        match acc with
        | Some _ -> acc
        | None when Raw_operation.Table.pending
-             net_db.operation_db.table h ->
-           Some net_db
+             chain_db.operation_db.table h ->
+           Some chain_db
        | None -> None)
-    peer_active_nets
+    peer_active_chains
     None
 
-let read_operation { active_nets } h =
-  Net_id.Table.fold
-    (fun net_id net_db acc ->
+let read_operation { active_chains } h =
+  Chain_id.Table.fold
+    (fun chain_id chain_db acc ->
        acc >>= function
        | Some _ -> acc
        | None ->
            Raw_operation.Table.read_opt
-             net_db.operation_db.table h >>= function
+             chain_db.operation_db.table h >>= function
            | None -> Lwt.return_none
-           | Some bh -> Lwt.return_some (net_id, bh))
-    active_nets
+           | Some bh -> Lwt.return_some (chain_id, bh))
+    active_chains
     Lwt.return_none
 
 module P2p_reader = struct
 
-  let may_activate global_db state net_id f =
-    match Net_id.Table.find state.peer_active_nets net_id with
-    | net_db ->
-        f net_db
+  let may_activate global_db state chain_id f =
+    match Chain_id.Table.find state.peer_active_chains chain_id with
+    | chain_db ->
+        f chain_db
     | exception Not_found ->
-        match Net_id.Table.find global_db.active_nets net_id with
-        | net_db ->
-            net_db.active_peers :=
-              P2p_peer.Set.add state.gid !(net_db.active_peers) ;
-            P2p_peer.Table.add net_db.active_connections
+        match Chain_id.Table.find global_db.active_chains chain_id with
+        | chain_db ->
+            chain_db.active_peers :=
+              P2p_peer.Set.add state.gid !(chain_db.active_peers) ;
+            P2p_peer.Table.add chain_db.active_connections
               state.gid state ;
-            Net_id.Table.add state.peer_active_nets net_id net_db ;
-            f net_db
+            Chain_id.Table.add state.peer_active_chains chain_id chain_db ;
+            f chain_db
         | exception Not_found ->
             (* TODO  decrease peer score. *)
             Lwt.return_unit
 
-  let deactivate state net_db =
-    net_db.callback.disconnection state.gid ;
-    net_db.active_peers :=
-      P2p_peer.Set.remove state.gid !(net_db.active_peers) ;
-    P2p_peer.Table.remove net_db.active_connections state.gid
+  let deactivate state chain_db =
+    chain_db.callback.disconnection state.gid ;
+    chain_db.active_peers :=
+      P2p_peer.Set.remove state.gid !(chain_db.active_peers) ;
+    P2p_peer.Table.remove chain_db.active_connections state.gid
 
-  let may_handle state net_id f =
-    match Net_id.Table.find state.peer_active_nets net_id with
+  let may_handle state chain_id f =
+    match Chain_id.Table.find state.peer_active_chains chain_id with
     | exception Not_found ->
         (* TODO decrease peer score *)
         Lwt.return_unit
-    | net_db ->
-        f net_db
+    | chain_db ->
+        f chain_db
 
-  let may_handle_global global_db net_id f =
-    match Net_id.Table.find global_db.active_nets net_id with
+  let may_handle_global global_db chain_id f =
+    match Chain_id.Table.find global_db.active_chains chain_id with
     | exception Not_found ->
         Lwt.return_unit
-    | net_db ->
-        f net_db
+    | chain_db ->
+        f chain_db
 
   let handle_msg global_db state msg =
 
@@ -460,50 +460,50 @@ module P2p_reader = struct
 
     match msg with
 
-    | Get_current_branch net_id ->
-        may_handle_global global_db net_id @@ fun net_db ->
-        if not (Net_id.Table.mem state.peer_active_nets net_id) then
+    | Get_current_branch chain_id ->
+        may_handle_global global_db chain_id @@ fun chain_db ->
+        if not (Chain_id.Table.mem state.peer_active_chains chain_id) then
           ignore
           @@ P2p.try_send global_db.p2p state.conn
-          @@ Get_current_branch net_id ;
-        Chain.locator net_db.net_state >>= fun locator ->
+          @@ Get_current_branch chain_id ;
+        Chain.locator chain_db.chain_state >>= fun locator ->
         ignore
         @@ P2p.try_send global_db.p2p state.conn
-        @@ Current_branch (net_id, locator) ;
+        @@ Current_branch (chain_id, locator) ;
         Lwt.return_unit
 
-    | Current_branch (net_id, locator) ->
-        may_activate global_db state net_id @@ fun net_db ->
+    | Current_branch (chain_id, locator) ->
+        may_activate global_db state chain_id @@ fun chain_db ->
         let head, hist = (locator :> Block_header.t * Block_hash.t list) in
         Lwt_list.exists_p
-          (State.Block.known_invalid net_db.net_state)
+          (State.Block.known_invalid chain_db.chain_state)
           (Block_header.hash head :: hist) >>= fun known_invalid ->
         if not known_invalid then
-          net_db.callback.notify_branch state.gid locator ;
+          chain_db.callback.notify_branch state.gid locator ;
         (* TODO Kickban *)
         Lwt.return_unit
 
-    | Deactivate net_id ->
-        may_handle state net_id @@ fun net_db ->
-        deactivate state net_db ;
-        Net_id.Table.remove state.peer_active_nets net_id ;
+    | Deactivate chain_id ->
+        may_handle state chain_id @@ fun chain_db ->
+        deactivate state chain_db ;
+        Chain_id.Table.remove state.peer_active_chains chain_id ;
         Lwt.return_unit
 
-    | Get_current_head net_id ->
-        may_handle state net_id @@ fun net_db ->
-        State.Current_mempool.get net_db.net_state >>= fun (head, mempool) ->
+    | Get_current_head chain_id ->
+        may_handle state chain_id @@ fun chain_db ->
+        State.Current_mempool.get chain_db.chain_state >>= fun (head, mempool) ->
         (* TODO bound the sent mempool size *)
         ignore
         @@ P2p.try_send global_db.p2p state.conn
-        @@ Current_head (net_id, head, mempool) ;
+        @@ Current_head (chain_id, head, mempool) ;
         Lwt.return_unit
 
-    | Current_head (net_id, header, mempool) ->
-        may_handle state net_id @@ fun net_db ->
+    | Current_head (chain_id, header, mempool) ->
+        may_handle state chain_id @@ fun chain_db ->
         let head = Block_header.hash header in
-        State.Block.known_invalid net_db.net_state head >>= fun known_invalid ->
+        State.Block.known_invalid chain_db.chain_state head >>= fun known_invalid ->
         if not known_invalid then
-          net_db.callback.notify_head state.gid header mempool ;
+          chain_db.callback.notify_head state.gid header mempool ;
         (* TODO Kickban *)
         Lwt.return_unit
 
@@ -514,7 +514,7 @@ module P2p_reader = struct
              | None ->
                  (* TODO: Blame request of unadvertised blocks ? *)
                  Lwt.return_unit
-             | Some (_net_id, header) ->
+             | Some (_chain_id, header) ->
                  ignore @@
                  P2p.try_send global_db.p2p state.conn (Block_header header) ;
                  Lwt.return_unit)
@@ -526,9 +526,9 @@ module P2p_reader = struct
         | None ->
             (* TODO some penalty. *)
             Lwt.return_unit
-        | Some net_db ->
+        | Some chain_db ->
             Raw_block_header.Table.notify
-              net_db.block_header_db.table state.gid hash block >>= fun () ->
+              chain_db.block_header_db.table state.gid hash block >>= fun () ->
             Lwt.return_unit
       end
 
@@ -539,7 +539,7 @@ module P2p_reader = struct
              | None ->
                  (* TODO: Blame request of unadvertised operations ? *)
                  Lwt.return_unit
-             | Some (_net_id, op) ->
+             | Some (_chain_id, op) ->
                  ignore @@
                  P2p.try_send global_db.p2p state.conn (Operation op) ;
                  Lwt.return_unit)
@@ -551,9 +551,9 @@ module P2p_reader = struct
         | None ->
             (* TODO some penalty. *)
             Lwt.return_unit
-        | Some net_db ->
+        | Some chain_db ->
             Raw_operation.Table.notify
-              net_db.operation_db.table state.gid hash operation >>= fun () ->
+              chain_db.operation_db.table state.gid hash operation >>= fun () ->
             Lwt.return_unit
       end
 
@@ -595,9 +595,9 @@ module P2p_reader = struct
         | None ->
             (* TODO some penalty. *)
             Lwt.return_unit
-        | Some net_db ->
+        | Some chain_db ->
             Raw_operation_hashes.Table.notify
-              net_db.operation_hashes_db.table state.gid
+              chain_db.operation_hashes_db.table state.gid
               (block, ofs) (ops, path) >>= fun () ->
             Lwt.return_unit
       end
@@ -621,9 +621,9 @@ module P2p_reader = struct
         | None ->
             (* TODO some penalty. *)
             Lwt.return_unit
-        | Some net_db ->
+        | Some chain_db ->
             Raw_operations.Table.notify
-              net_db.operations_db.table state.gid
+              chain_db.operations_db.table state.gid
               (block, ofs) (ops, path) >>= fun () ->
             Lwt.return_unit
       end
@@ -636,9 +636,9 @@ module P2p_reader = struct
         handle_msg global_db state msg >>= fun () ->
         worker_loop global_db state
     | Error _ ->
-        Net_id.Table.iter
+        Chain_id.Table.iter
           (fun _ -> deactivate state)
-          state.peer_active_nets ;
+          state.peer_active_chains ;
         P2p_peer.Table.remove global_db.p2p_readers state.gid ;
         Lwt.return_unit
 
@@ -646,14 +646,14 @@ module P2p_reader = struct
     let canceler = Lwt_canceler.create () in
     let state = {
       conn ; gid ; canceler ;
-      peer_active_nets = Net_id.Table.create 17 ;
+      peer_active_chains = Chain_id.Table.create 17 ;
       worker = Lwt.return_unit ;
     } in
-    Net_id.Table.iter (fun net_id _net_db ->
+    Chain_id.Table.iter (fun chain_id _chain_db ->
         Lwt.async begin fun () ->
-          P2p.send db.p2p conn (Get_current_branch net_id)
+          P2p.send db.p2p conn (Get_current_branch chain_id)
         end)
-      db.active_nets ;
+      db.active_chains ;
     state.worker <-
       Lwt_utils.worker
         (Format.asprintf "db_network_reader.%a"
@@ -688,21 +688,21 @@ let create disk p2p =
       send = raw_try_send p2p ;
     } in
   let protocol_db = Raw_protocol.create global_request disk in
-  let active_nets = Net_id.Table.create 17 in
+  let active_chains = Chain_id.Table.create 17 in
   let p2p_readers = P2p_peer.Table.create 17 in
   let block_input = Lwt_watcher.create_input () in
   let operation_input = Lwt_watcher.create_input () in
   let db =
     { p2p ; p2p_readers ; disk ;
-      active_nets ; protocol_db ;
+      active_chains ; protocol_db ;
       block_input ; operation_input } in
   P2p.on_new_connection p2p (P2p_reader.run db) ;
   P2p.iter_connections p2p (P2p_reader.run db) ;
   db
 
-let activate ({ p2p ; active_nets } as global_db) net_state =
-  let net_id = State.Net.id net_state in
-  match Net_id.Table.find active_nets net_id with
+let activate ({ p2p ; active_chains } as global_db) chain_state =
+  let chain_id = State.Chain.id chain_state in
+  match Chain_id.Table.find active_chains chain_id with
   | exception Not_found ->
       let active_peers = ref P2p_peer.Set.empty in
       let p2p_request =
@@ -712,50 +712,50 @@ let activate ({ p2p ; active_nets } as global_db) net_state =
         } in
       let operation_db =
         Raw_operation.create
-          ~global_input:global_db.operation_input p2p_request net_state in
+          ~global_input:global_db.operation_input p2p_request chain_state in
       let block_header_db =
         Raw_block_header.create
-          ~global_input:global_db.block_input p2p_request net_state in
+          ~global_input:global_db.block_input p2p_request chain_state in
       let operation_hashes_db =
-        Raw_operation_hashes.create p2p_request net_state in
+        Raw_operation_hashes.create p2p_request chain_state in
       let operations_db =
-        Raw_operations.create p2p_request net_state in
-      let net = {
+        Raw_operations.create p2p_request chain_state in
+      let chain = {
         global_db ; operation_db ; block_header_db ;
         operation_hashes_db ; operations_db ;
-        net_state ; callback = noop_callback ; active_peers ;
+        chain_state ; callback = noop_callback ; active_peers ;
         active_connections = P2p_peer.Table.create 53 ;
       } in
       P2p.iter_connections p2p (fun _peer_id conn ->
           Lwt.async begin fun () ->
-            P2p.send p2p conn (Get_current_branch net_id)
+            P2p.send p2p conn (Get_current_branch chain_id)
           end) ;
-      Net_id.Table.add active_nets net_id net ;
-      net
-  | net ->
-      net
+      Chain_id.Table.add active_chains chain_id chain ;
+      chain
+  | chain ->
+      chain
 
-let set_callback net_db callback =
-  net_db.callback <- callback
+let set_callback chain_db callback =
+  chain_db.callback <- callback
 
-let deactivate net_db =
-  let { active_nets ; p2p } = net_db.global_db in
-  let net_id = State.Net.id net_db.net_state in
-  Net_id.Table.remove active_nets net_id ;
+let deactivate chain_db =
+  let { active_chains ; p2p } = chain_db.global_db in
+  let chain_id = State.Chain.id chain_db.chain_state in
+  Chain_id.Table.remove active_chains chain_id ;
   P2p_peer.Table.iter
     (fun _peer_id reader ->
-       P2p_reader.deactivate reader net_db  ;
+       P2p_reader.deactivate reader chain_db  ;
        Lwt.async begin fun () ->
-         P2p.send p2p reader.conn (Deactivate net_id)
+         P2p.send p2p reader.conn (Deactivate chain_id)
        end)
-    net_db.active_connections ;
-  Raw_operation.shutdown net_db.operation_db >>= fun () ->
-  Raw_block_header.shutdown net_db.block_header_db >>= fun () ->
+    chain_db.active_connections ;
+  Raw_operation.shutdown chain_db.operation_db >>= fun () ->
+  Raw_block_header.shutdown chain_db.block_header_db >>= fun () ->
   Lwt.return_unit >>= fun () ->
   Lwt.return_unit
 
-let get_net { active_nets } net_id =
-  try Some (Net_id.Table.find active_nets net_id)
+let get_chain { active_chains } chain_id =
+  try Some (Chain_id.Table.find active_chains chain_id)
   with Not_found -> None
 
 let disconnect { global_db = { p2p } } peer_id =
@@ -763,43 +763,43 @@ let disconnect { global_db = { p2p } } peer_id =
   | None -> Lwt.return_unit
   | Some conn -> P2p.disconnect p2p conn
 
-let shutdown { p2p ; p2p_readers ; active_nets } =
+let shutdown { p2p ; p2p_readers ; active_chains } =
   P2p_peer.Table.fold
     (fun _peer_id reader acc ->
        P2p_reader.shutdown reader >>= fun () -> acc)
     p2p_readers
     Lwt.return_unit >>= fun () ->
-  Net_id.Table.fold
-    (fun _ net_db acc ->
-       Raw_operation.shutdown net_db.operation_db >>= fun () ->
-       Raw_block_header.shutdown net_db.block_header_db >>= fun () ->
+  Chain_id.Table.fold
+    (fun _ chain_db acc ->
+       Raw_operation.shutdown chain_db.operation_db >>= fun () ->
+       Raw_block_header.shutdown chain_db.block_header_db >>= fun () ->
        acc)
-    active_nets
+    active_chains
     Lwt.return_unit >>= fun () ->
   P2p.shutdown p2p >>= fun () ->
   Lwt.return_unit
 
-let clear_block net_db hash n =
-  Raw_operations.clear_all net_db.operations_db.table hash n ;
-  Raw_operation_hashes.clear_all net_db.operation_hashes_db.table hash n ;
-  Raw_block_header.Table.clear_or_cancel net_db.block_header_db.table hash
+let clear_block chain_db hash n =
+  Raw_operations.clear_all chain_db.operations_db.table hash n ;
+  Raw_operation_hashes.clear_all chain_db.operation_hashes_db.table hash n ;
+  Raw_block_header.Table.clear_or_cancel chain_db.block_header_db.table hash
 
-let commit_block net_db hash header operations result =
+let commit_block chain_db hash header operations result =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
   assert (List.length operations = header.shell.validation_passes) ;
-  State.Block.store net_db.net_state header operations result >>=? fun res ->
-  clear_block net_db hash header.shell.validation_passes ;
+  State.Block.store chain_db.chain_state header operations result >>=? fun res ->
+  clear_block chain_db hash header.shell.validation_passes ;
   return res
 
-let commit_invalid_block net_db hash header errors =
+let commit_invalid_block chain_db hash header errors =
   assert (Block_hash.equal hash (Block_header.hash header)) ;
-  State.Block.store_invalid net_db.net_state header errors >>=? fun res ->
-  clear_block net_db hash header.shell.validation_passes ;
+  State.Block.store_invalid chain_db.chain_state header errors >>=? fun res ->
+  clear_block chain_db hash header.shell.validation_passes ;
   return res
 
-let inject_operation net_db h op =
+let inject_operation chain_db h op =
   assert (Operation_hash.equal h (Operation.hash op)) ;
-  Raw_operation.Table.inject net_db.operation_db.table h op
+  Raw_operation.Table.inject chain_db.operation_db.table h op
 
 let commit_protocol db h p =
   State.Protocol.store db.disk p >>= fun res ->
@@ -844,9 +844,9 @@ end
 module Block_header = struct
   type t = Block_header.t
   include (Make (Raw_block_header.Table) (struct
-             type t = net_db
-             let proj net = net.block_header_db.table
-           end) : Distributed_db_functors.DISTRIBUTED_DB with type t := net_db
+             type t = chain_db
+             let proj chain = chain.block_header_db.table
+           end) : Distributed_db_functors.DISTRIBUTED_DB with type t := chain_db
                                                           and type key := Block_hash.t
                                                           and type value := Block_header.t
                                                           and type param := unit)
@@ -854,22 +854,22 @@ end
 
 module Operation_hashes =
   Make (Raw_operation_hashes.Table) (struct
-    type t = net_db
-    let proj net = net.operation_hashes_db.table
+    type t = chain_db
+    let proj chain = chain.operation_hashes_db.table
   end)
 
 module Operations =
   Make (Raw_operations.Table) (struct
-    type t = net_db
-    let proj net = net.operations_db.table
+    type t = chain_db
+    let proj chain = chain.operations_db.table
   end)
 
 module Operation = struct
   include Operation
   include (Make (Raw_operation.Table) (struct
-             type t = net_db
-             let proj net = net.operation_db.table
-           end) : Distributed_db_functors.DISTRIBUTED_DB with type t := net_db
+             type t = chain_db
+             let proj chain = chain.operation_db.table
+           end) : Distributed_db_functors.DISTRIBUTED_DB with type t := chain_db
                                                           and type key := Operation_hash.t
                                                           and type value := Operation.t
                                                           and type param := unit)
@@ -887,46 +887,46 @@ module Protocol = struct
 end
 
 
-let broadcast net_db msg =
+let broadcast chain_db msg =
   P2p_peer.Table.iter
     (fun _peer_id state ->
-       ignore (P2p.try_send net_db.global_db.p2p state.conn msg))
-    net_db.active_connections
+       ignore (P2p.try_send chain_db.global_db.p2p state.conn msg))
+    chain_db.active_connections
 
-let try_send net_db peer_id msg =
+let try_send chain_db peer_id msg =
   try
-    let conn = P2p_peer.Table.find net_db.active_connections peer_id in
-    ignore (P2p.try_send net_db.global_db.p2p conn.conn msg : bool)
+    let conn = P2p_peer.Table.find chain_db.active_connections peer_id in
+    ignore (P2p.try_send chain_db.global_db.p2p conn.conn msg : bool)
   with Not_found -> ()
 
-let send net_db ?peer msg =
+let send chain_db ?peer msg =
   match peer with
-  | Some peer -> try_send net_db peer msg
-  | None -> broadcast net_db msg
+  | Some peer -> try_send chain_db peer msg
+  | None -> broadcast chain_db msg
 
 module Request = struct
 
-  let current_head net_db ?peer () =
-    let net_id = State.Net.id net_db.net_state in
-    send net_db ?peer @@ Get_current_head net_id
+  let current_head chain_db ?peer () =
+    let chain_id = State.Chain.id chain_db.chain_state in
+    send chain_db ?peer @@ Get_current_head chain_id
 
-  let current_branch net_db ?peer () =
-    let net_id = State.Net.id net_db.net_state in
-    send net_db ?peer @@ Get_current_branch net_id
+  let current_branch chain_db ?peer () =
+    let chain_id = State.Chain.id chain_db.chain_state in
+    send chain_db ?peer @@ Get_current_branch chain_id
 
 end
 
 module Advertise = struct
 
-  let current_head net_db ?peer ?(mempool = Mempool.empty) head =
-    let net_id = State.Net.id net_db.net_state in
-    assert (Net_id.equal net_id (State.Block.net_id head)) ;
-    send net_db ?peer @@
-    Current_head (net_id, State.Block.header head, mempool)
+  let current_head chain_db ?peer ?(mempool = Mempool.empty) head =
+    let chain_id = State.Chain.id chain_db.chain_state in
+    assert (Chain_id.equal chain_id (State.Block.chain_id head)) ;
+    send chain_db ?peer @@
+    Current_head (chain_id, State.Block.header head, mempool)
 
-  let current_branch net_db ?peer locator =
-    let net_id = State.Net.id net_db.net_state in
-    send net_db ?peer @@ Current_branch (net_id, locator) ;
+  let current_branch chain_db ?peer locator =
+    let chain_id = State.Chain.id chain_db.chain_state in
+    send chain_db ?peer @@ Current_branch (chain_id, locator) ;
     Lwt.return_unit
 
 end

@@ -16,7 +16,7 @@ module Proto = Client_embedded_proto_alpha
 let genesis_block_hashed = Block_hash.of_b58check
     "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
 let network = Store.Net genesis_block_hashed
-let network = Store.Net_id.Id genesis_block_hashed
+let network = Store.Chain_id.Id genesis_block_hashed
 
 (* the bootstrap accounts and actions like signing to do with them *)
 let source_account = List.nth Proto.Bootstrap_storage.accounts 4
@@ -32,7 +32,7 @@ let block_forged ?prev ops =
     [ MBytes.of_string Proto.Constants_repr.version_number ;
       Proto.Fitness_repr.int64_to_bytes x ] in
   let pred = match prev with None -> genesis_block_hashed | Some x -> x in
-  let block ops = Store.Block_header.{ net_id = network ;
+  let block ops = Store.Block_header.{ chain_id = network ;
                                        predecessor = pred ;
                                        timestamp = Time.now () ;
                                        fitness = from_int64 1L;
@@ -75,7 +75,7 @@ let tx_forged ?dest amount fee =
             fee = of_cents_exn fee ;
             counter = 1l ;
             operations = [tx] ; }) in
-  forge { net_id = network } op
+  forge { chain_id = network } op
 
 (* forge a list of proposals, california eat your heart out *)
 let props_forged period props =
@@ -87,7 +87,7 @@ let props_forged period props =
   let op = Sourced_operations (Delegate_operations {
       source = src.public_key ;
       operations = [props] }) in
-  forge { net_id = network } op
+  forge { chain_id = network } op
 
 (* "forge" a ballot *)
 let ballot_forged period prop vote =
@@ -101,7 +101,7 @@ let ballot_forged period prop vote =
   let op = Sourced_operations (Delegate_operations {
       source = src.public_key ;
       operations = [ballot] }) in
-  forge { net_id = network } op
+  forge { chain_id = network } op
 
 let identity = P2p_identity.generate Crypto_box.default_target
 

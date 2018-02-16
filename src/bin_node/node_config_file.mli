@@ -9,13 +9,13 @@
 
 type t = {
   data_dir : string ;
-  net : net ;
+  p2p : p2p ;
   rpc : rpc ;
   log : log ;
   shell : shell ;
 }
 
-and net = {
+and p2p = {
   expected_pow : float ;
   bootstrap_peers : string list ;
   listen_addr : string option ;
@@ -46,13 +46,13 @@ and shell = {
   block_validator_limits : Node.block_validator_limits ;
   prevalidator_limits : Node.prevalidator_limits ;
   peer_validator_limits : Node.peer_validator_limits ;
-  net_validator_limits : Node.net_validator_limits ;
+  chain_validator_limits : Node.chain_validator_limits ;
 }
 
 val default_data_dir: string
-val default_net_port: int
+val default_p2p_port: int
 val default_rpc_port: int
-val default_net: net
+val default_p2p: p2p
 val default_config: t
 
 val update:

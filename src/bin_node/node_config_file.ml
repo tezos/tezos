@@ -14,18 +14,18 @@ let home =
   with Not_found -> "/root"
 
 let default_data_dir = home // ".tezos-node"
-let default_net_port = 9732
+let default_p2p_port = 9732
 let default_rpc_port = 8732
 
 type t = {
   data_dir : string ;
-  net : net ;
+  p2p : p2p ;
   rpc : rpc ;
   log : log ;
   shell : shell ;
 }
 
-and net = {
+and p2p = {
   expected_pow : float ;
   bootstrap_peers : string list ;
   listen_addr : string option ;
@@ -56,10 +56,10 @@ and shell = {
   block_validator_limits : Node.block_validator_limits ;
   prevalidator_limits : Node.prevalidator_limits ;
   peer_validator_limits : Node.peer_validator_limits ;
-  net_validator_limits : Node.net_validator_limits ;
+  chain_validator_limits : Node.chain_validator_limits ;
 }
 
-let default_net_limits : P2p.limits = {
+let default_p2p_limits : P2p.limits = {
   authentification_timeout = 5. ;
   min_connections = 10 ;
   expected_connections = 50 ;
@@ -82,12 +82,12 @@ let default_net_limits : P2p.limits = {
   binary_chunks_size = None ;
 }
 
-let default_net = {
+let default_p2p = {
   expected_pow = 24. ;
   bootstrap_peers  = ["bootstrap.tezos.com"] ;
-  listen_addr  = Some ("[::]:" ^ string_of_int default_net_port) ;
+  listen_addr  = Some ("[::]:" ^ string_of_int default_p2p_port) ;
   closed  = false ;
-  limits = default_net_limits ;
+  limits = default_p2p_limits ;
 }
 
 let default_rpc = {
@@ -136,7 +136,7 @@ let default_shell = {
       zombie_memory = 120. ;
     }
   } ;
-  net_validator_limits = {
+  chain_validator_limits = {
     bootstrap_threshold = 4 ;
     worker_limits = {
       backlog_size = 1000 ;
@@ -149,7 +149,7 @@ let default_shell = {
 
 let default_config = {
   data_dir = default_data_dir ;
-  net = default_net ;
+  p2p = default_p2p ;
   rpc = default_rpc ;
   log = default_log ;
   shell = default_shell ;
@@ -202,38 +202,38 @@ let limit : P2p.limits Data_encoding.t =
     (merge_objs
        (obj10
           (dft "authentification-timeout"
-             float default_net_limits.authentification_timeout)
+             float default_p2p_limits.authentification_timeout)
           (dft "min-connections" uint16
-             default_net_limits.min_connections)
+             default_p2p_limits.min_connections)
           (dft "expected-connections" uint16
-             default_net_limits.expected_connections)
+             default_p2p_limits.expected_connections)
           (dft "max-connections" uint16
-             default_net_limits.max_connections)
+             default_p2p_limits.max_connections)
           (dft "backlog" uint8
-             default_net_limits.backlog)
+             default_p2p_limits.backlog)
           (dft "max-incoming-connections" uint8
-             default_net_limits.max_incoming_connections)
+             default_p2p_limits.max_incoming_connections)
           (opt "max-download-speed" int31)
           (opt "max-upload-speed" int31)
-          (dft "swap-linger" float default_net_limits.swap_linger)
+          (dft "swap-linger" float default_p2p_limits.swap_linger)
           (opt "binary-chunks-size" uint8))
        (obj10
           (dft "read-buffer-size" int31
-             default_net_limits.read_buffer_size)
+             default_p2p_limits.read_buffer_size)
           (opt "read-queue-size" int31)
           (opt "write-queue-size" int31)
           (opt "incoming-app-message-queue-size" int31)
           (opt "incoming-message-queue-size" int31)
           (opt "outgoing-message-queue-size" int31)
           (dft "known_points_history_size" uint16
-             default_net_limits.known_points_history_size)
+             default_p2p_limits.known_points_history_size)
           (dft "known_peer_ids_history_size" uint16
-             default_net_limits.known_points_history_size)
+             default_p2p_limits.known_points_history_size)
           (opt "max_known_points" (tup2 uint16 uint16))
           (opt "max_known_peer_ids" (tup2 uint16 uint16))
        ))
 
-let net =
+let p2p =
   let open Data_encoding in
   conv
     (fun { expected_pow ; bootstrap_peers ;
@@ -245,12 +245,12 @@ let net =
       { expected_pow ; bootstrap_peers ;
         listen_addr ; closed ; limits })
     (obj5
-       (dft "expected-proof-of-work" float default_net.expected_pow)
+       (dft "expected-proof-of-work" float default_p2p.expected_pow)
        (dft "bootstrap-peers"
-          (list string) default_net.bootstrap_peers)
+          (list string) default_p2p.bootstrap_peers)
        (opt "listen-addr" string)
        (dft "closed" bool false)
-       (dft "limits" limit default_net_limits))
+       (dft "limits" limit default_p2p_limits))
 
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
@@ -389,7 +389,7 @@ let peer_validator_limits_encoding =
           default_limits.worker_limits.zombie_lifetime
           default_limits.worker_limits.zombie_memory))
 
-let net_validator_limits_encoding =
+let chain_validator_limits_encoding =
   let open Data_encoding in
   conv
     (fun { Node.bootstrap_threshold ; worker_limits } ->
@@ -399,42 +399,42 @@ let net_validator_limits_encoding =
     (merge_objs
        (obj1
           (dft "bootstrap_threshold" uint8
-             default_shell.net_validator_limits.bootstrap_threshold))
+             default_shell.chain_validator_limits.bootstrap_threshold))
        (worker_limits_encoding
-          default_shell.net_validator_limits.worker_limits.backlog_size
-          default_shell.net_validator_limits.worker_limits.backlog_level
-          default_shell.net_validator_limits.worker_limits.zombie_lifetime
-          default_shell.net_validator_limits.worker_limits.zombie_memory))
+          default_shell.chain_validator_limits.worker_limits.backlog_size
+          default_shell.chain_validator_limits.worker_limits.backlog_level
+          default_shell.chain_validator_limits.worker_limits.zombie_lifetime
+          default_shell.chain_validator_limits.worker_limits.zombie_memory))
 
 let shell =
   let open Data_encoding in
   conv
     (fun { peer_validator_limits ; block_validator_limits ;
-           prevalidator_limits ; net_validator_limits } ->
+           prevalidator_limits ; chain_validator_limits } ->
       (peer_validator_limits, block_validator_limits,
-       prevalidator_limits, net_validator_limits))
+       prevalidator_limits, chain_validator_limits))
     (fun (peer_validator_limits, block_validator_limits,
-          prevalidator_limits, net_validator_limits) ->
+          prevalidator_limits, chain_validator_limits) ->
       { peer_validator_limits ; block_validator_limits ;
-        prevalidator_limits ; net_validator_limits })
+        prevalidator_limits ; chain_validator_limits })
     (obj4
        (dft "peer_validator" peer_validator_limits_encoding default_shell.peer_validator_limits)
        (dft "block_validator" block_validator_limits_encoding default_shell.block_validator_limits)
        (dft "prevalidator" prevalidator_limits_encoding default_shell.prevalidator_limits)
-       (dft "net_validator" net_validator_limits_encoding default_shell.net_validator_limits)
+       (dft "chain_validator" chain_validator_limits_encoding default_shell.chain_validator_limits)
     )
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun { data_dir ; rpc ; net ; log ; shell } ->
-       (data_dir, rpc, net, log, shell))
-    (fun (data_dir, rpc, net, log, shell) ->
-       { data_dir ; rpc ; net ; log ; shell })
+    (fun { data_dir ; rpc ; p2p ; log ; shell } ->
+       (data_dir, rpc, p2p, log, shell))
+    (fun (data_dir, rpc, p2p, log, shell) ->
+       { data_dir ; rpc ; p2p ; log ; shell })
     (obj5
        (dft "data-dir" string default_data_dir)
        (dft "rpc" rpc default_rpc)
-       (req "net" net)
+       (req "p2p" p2p)
        (dft "log" log default_log)
        (dft "shell" shell default_shell))
 
@@ -482,42 +482,42 @@ let update
     | [] -> default
     | l -> l in
   let limits : P2p.limits = {
-    cfg.net.limits with
+    cfg.p2p.limits with
     min_connections =
       Option.unopt
-        ~default:cfg.net.limits.min_connections
+        ~default:cfg.p2p.limits.min_connections
         min_connections ;
     expected_connections =
       Option.unopt
-        ~default:cfg.net.limits.expected_connections
+        ~default:cfg.p2p.limits.expected_connections
         expected_connections ;
     max_connections =
       Option.unopt
-        ~default:cfg.net.limits.max_connections
+        ~default:cfg.p2p.limits.max_connections
         max_connections ;
     max_download_speed =
       Option.first_some
-        max_download_speed cfg.net.limits.max_download_speed ;
+        max_download_speed cfg.p2p.limits.max_download_speed ;
     max_upload_speed =
       Option.first_some
-        max_upload_speed cfg.net.limits.max_upload_speed ;
+        max_upload_speed cfg.p2p.limits.max_upload_speed ;
     max_known_points =
       Option.first_some
-        peer_table_size cfg.net.limits.max_known_points ;
+        peer_table_size cfg.p2p.limits.max_known_points ;
     max_known_peer_ids =
       Option.first_some
-        peer_table_size cfg.net.limits.max_known_peer_ids ;
+        peer_table_size cfg.p2p.limits.max_known_peer_ids ;
     binary_chunks_size =
       Option.map ~f:(fun x -> x lsl 10) binary_chunks_size ;
   } in
-  let net : net = {
+  let p2p : p2p = {
     expected_pow =
-      Option.unopt ~default:cfg.net.expected_pow expected_pow ;
+      Option.unopt ~default:cfg.p2p.expected_pow expected_pow ;
     bootstrap_peers =
-      Option.unopt ~default:cfg.net.bootstrap_peers bootstrap_peers ;
+      Option.unopt ~default:cfg.p2p.bootstrap_peers bootstrap_peers ;
     listen_addr =
-      Option.first_some listen_addr cfg.net.listen_addr ;
-    closed = cfg.net.closed || closed ;
+      Option.first_some listen_addr cfg.p2p.listen_addr ;
+    closed = cfg.p2p.closed || closed ;
     limits ;
   }
   and rpc : rpc = {
@@ -538,16 +538,16 @@ let update
     peer_validator_limits = cfg.shell.peer_validator_limits ;
     block_validator_limits = cfg.shell.block_validator_limits ;
     prevalidator_limits = cfg.shell.prevalidator_limits ;
-    net_validator_limits =
+    chain_validator_limits =
       Option.unopt_map
-        ~default:cfg.shell.net_validator_limits
+        ~default:cfg.shell.chain_validator_limits
         ~f:(fun bootstrap_threshold ->
-            { cfg.shell.net_validator_limits
+            { cfg.shell.chain_validator_limits
               with bootstrap_threshold })
         bootstrap_threshold
   }
   in
-  return { data_dir ; net ; rpc ; log ; shell }
+  return { data_dir ; p2p ; rpc ; log ; shell }
 
 let resolve_addr ?default_port ?(passive = false) peer =
   let addr, port = P2p_point.Id.parse_addr_port peer in
@@ -568,7 +568,7 @@ let resolve_addrs ?default_port ?passive peers =
 
 let resolve_listening_addrs listen_addr =
   resolve_addr
-    ~default_port:default_net_port
+    ~default_port:default_p2p_port
     ~passive:true
     listen_addr
 
@@ -580,10 +580,10 @@ let resolve_rpc_listening_addrs listen_addr =
 
 let resolve_bootstrap_addrs peers =
   resolve_addrs
-    ~default_port:default_net_port
+    ~default_port:default_p2p_port
     peers
 let check_listening_addr config =
-  match config.net.listen_addr with
+  match config.p2p.listen_addr with
   | None -> Lwt.return_unit
   | Some addr ->
       Lwt.catch begin fun () ->
@@ -635,7 +635,7 @@ let check_bootstrap_peer addr =
 
 
 let check_bootstrap_peers config =
-  Lwt_list.iter_p check_bootstrap_peer config.net.bootstrap_peers
+  Lwt_list.iter_p check_bootstrap_peer config.p2p.bootstrap_peers
 
 let check config =
   check_listening_addr config >>= fun () ->

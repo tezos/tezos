@@ -7,13 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Net_validator_worker_state
+open Chain_validator_worker_state
 
 module Name = struct
-  type t = Net_id.t
-  let encoding = Net_id.encoding
-  let base = [ "net_validator" ]
-  let pp = Net_id.pp_short
+  type t = Chain_id.t
+  let encoding = Chain_id.encoding
+  let base = [ "chain_validator" ]
+  let pp = Chain_id.pp_short
 end
 
 module Request = struct
@@ -34,8 +34,8 @@ module Types = struct
   type parameters = {
     parent: Name.t option ;
     db: Distributed_db.t ;
-    net_state: State.Net.t ;
-    net_db: Distributed_db.net_db ;
+    chain_state: State.Chain.t ;
+    chain_db: Distributed_db.chain_db ;
     block_validator: Block_validator.t ;
     global_valid_block_input: State.Block.t Lwt_watcher.input ;
 
@@ -96,7 +96,7 @@ let notify_new_block w block =
   Lwt_watcher.notify nv.parameters.global_valid_block_input block ;
   Worker.push_request_now w (Validated block)
 
-let may_toggle_bootstrapped_network w =
+let may_toggle_bootstrapped_chain w =
   let nv = Worker.state w in
   if not nv.bootstrapped &&
      P2p_peer.Table.length nv.bootstrapped_peers >= nv.parameters.limits.bootstrap_threshold
@@ -114,7 +114,7 @@ let may_activate_peer_validator w peer_id =
         ~notify_new_block:(notify_new_block w)
         ~notify_bootstrapped: begin fun () ->
           P2p_peer.Table.add nv.bootstrapped_peers peer_id () ;
-          may_toggle_bootstrapped_network w
+          may_toggle_bootstrapped_chain w
         end
         ~notify_termination: begin fun _pv ->
           P2p_peer.Table.remove nv.active_peers peer_id ;
@@ -122,36 +122,36 @@ let may_activate_peer_validator w peer_id =
         end
         nv.parameters.peer_validator_limits
         nv.parameters.block_validator
-        nv.parameters.net_db
+        nv.parameters.chain_db
         peer_id in
     P2p_peer.Table.add nv.active_peers peer_id pv ;
     pv
 
-let may_switch_test_network w spawn_child block =
+let may_switch_test_chain w spawn_child block =
   let nv = Worker.state w in
   let create_child genesis protocol expiration =
-    if State.Net.allow_forked_network nv.parameters.net_state then begin
+    if State.Chain.allow_forked_chain nv.parameters.chain_state then begin
       shutdown_child nv >>= fun () ->
       begin
-        let net_id = Net_id.of_block_hash (State.Block.hash genesis) in
-        State.Net.get
-          (State.Net.global_state nv.parameters.net_state) net_id >>= function
-        | Ok net_state -> return net_state
+        let chain_id = Chain_id.of_block_hash (State.Block.hash genesis) in
+        State.Chain.get
+          (State.Chain.global_state nv.parameters.chain_state) chain_id >>= function
+        | Ok chain_state -> return chain_state
         | Error _ ->
-            State.fork_testnet
-              genesis protocol expiration >>=? fun net_state ->
-            Chain.head net_state >>= fun new_genesis_block ->
+            State.fork_testchain
+              genesis protocol expiration >>=? fun chain_state ->
+            Chain.head chain_state >>= fun new_genesis_block ->
             Lwt_watcher.notify nv.parameters.global_valid_block_input new_genesis_block ;
             Lwt_watcher.notify nv.valid_block_input new_genesis_block ;
-            return net_state
-      end >>=? fun net_state ->
+            return chain_state
+      end >>=? fun chain_state ->
       spawn_child
-        ~parent:(State.Net.id net_state)
+        ~parent:(State.Chain.id chain_state)
         nv.parameters.peer_validator_limits
         nv.parameters.prevalidator_limits
         nv.parameters.block_validator
         nv.parameters.global_valid_block_input
-        nv.parameters.db net_state
+        nv.parameters.db chain_state
         nv.parameters.limits (* TODO: different limits main/test ? *) >>= fun child ->
       nv.child <- Some child ;
       return ()
@@ -166,9 +166,9 @@ let may_switch_test_network w spawn_child block =
       | None -> false
       | Some (child , _) ->
           Block_hash.equal
-            (State.Net.genesis child.parameters.net_state).block
+            (State.Chain.genesis child.parameters.chain_state).block
             genesis in
-    State.Block.read nv.parameters.net_state genesis >>=? fun genesis ->
+    State.Block.read nv.parameters.chain_state genesis >>=? fun genesis ->
     begin
       match nv.parameters.max_child_ttl with
       | None -> Lwt.return expiration
@@ -187,7 +187,7 @@ let may_switch_test_network w spawn_child block =
 
   begin
     let block_header = State.Block.header block in
-    State.Block.test_network block >>= function
+    State.Block.test_chain block >>= function
     | Not_running -> shutdown_child nv >>= return
     | Running { genesis ; protocol ; expiration } ->
         check_child genesis protocol expiration
@@ -197,7 +197,7 @@ let may_switch_test_network w spawn_child block =
   end >>= function
   | Ok () -> Lwt.return_unit
   | Error err ->
-      Worker.record_event w (Could_not_switch_testnet err) ;
+      Worker.record_event w (Could_not_switch_testchain err) ;
       Lwt.return_unit
 
 let broadcast_head w ~previous block =
@@ -213,20 +213,20 @@ let broadcast_head w ~previous block =
     end >>= fun successor ->
     if successor then begin
       Distributed_db.Advertise.current_head
-        nv.parameters.net_db block ;
+        nv.parameters.chain_db block ;
       Lwt.return_unit
     end else begin
-      let net_state = Distributed_db.net_state nv.parameters.net_db in
-      Chain.locator net_state >>= fun locator ->
+      let chain_state = Distributed_db.chain_state nv.parameters.chain_db in
+      Chain.locator chain_state >>= fun locator ->
       Distributed_db.Advertise.current_branch
-        nv.parameters.net_db locator
+        nv.parameters.chain_db locator
     end
   end
 
 let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
   let Request.Validated block = req in
   let nv = Worker.state w in
-  Chain.head nv.parameters.net_state >>= fun head ->
+  Chain.head nv.parameters.chain_state >>= fun head ->
   let head_header = State.Block.header head
   and head_hash = State.Block.hash head
   and block_header = State.Block.header block
@@ -236,10 +236,10 @@ let on_request (type a) w spawn_child (req : a Request.t) : a tzresult Lwt.t =
   then
     return Event.Ignored_head
   else begin
-    Chain.set_head nv.parameters.net_state block >>= fun previous ->
+    Chain.set_head nv.parameters.chain_state block >>= fun previous ->
     broadcast_head w ~previous block >>= fun () ->
     Prevalidator.flush nv.prevalidator block_hash >>=? fun () ->
-    may_switch_test_network w spawn_child block >>= fun () ->
+    may_switch_test_chain w spawn_child block >>= fun () ->
     Lwt_watcher.notify nv.new_head_input block ;
     if Block_hash.equal head_hash block_header.shell.predecessor then
       return Event.Head_incrememt
@@ -256,7 +256,7 @@ let on_completion (type a) w  (req : a Request.t) (update : a) request_status =
 
 let on_close w =
   let nv = Worker.state w in
-  Distributed_db.deactivate nv.parameters.net_db >>= fun () ->
+  Distributed_db.deactivate nv.parameters.chain_db >>= fun () ->
   Lwt.join
     (Prevalidator.shutdown nv.prevalidator ::
      Lwt_utils.may ~f:(fun (_, shutdown) -> shutdown ()) nv.child ::
@@ -266,9 +266,9 @@ let on_close w =
   Lwt.return_unit
 
 let on_launch w _ parameters =
-  Chain.init_head parameters.net_state >>= fun () ->
+  Chain.init_head parameters.chain_state >>= fun () ->
   Prevalidator.create
-    parameters.prevalidator_limits parameters.net_db >>= fun prevalidator ->
+    parameters.prevalidator_limits parameters.chain_db >>= fun prevalidator ->
   let valid_block_input = Lwt_watcher.create_input () in
   let new_head_input = Lwt_watcher.create_input () in
   let bootstrapped_waiter, bootstrapped_wakener = Lwt.wait () in
@@ -286,7 +286,7 @@ let on_launch w _ parameters =
       child = None ;
       prevalidator } in
   if nv.bootstrapped then Lwt.wakeup_later bootstrapped_wakener () ;
-  Distributed_db.set_callback parameters.net_db {
+  Distributed_db.set_callback parameters.chain_db {
     notify_branch = begin fun peer_id locator ->
       Lwt.async begin fun () ->
         may_activate_peer_validator w peer_id >>= fun pv ->
@@ -316,7 +316,7 @@ let on_launch w _ parameters =
 let rec create
     ?max_child_ttl ?parent
     peer_validator_limits prevalidator_limits block_validator
-    global_valid_block_input db net_state limits =
+    global_valid_block_input db chain_state limits =
   let spawn_child ~parent pvl pl bl gvbi db n l =
     create ~parent pvl pl bl gvbi db n l >>= fun w ->
     Lwt.return (Worker.state w, (fun () -> Worker.shutdown w)) in
@@ -337,12 +337,12 @@ let rec create
       block_validator ;
       global_valid_block_input ;
       db ;
-      net_db = Distributed_db.activate db net_state ;
-      net_state ;
+      chain_db = Distributed_db.activate db chain_state ;
+      chain_state ;
       limits } in
   Worker.launch table
     prevalidator_limits.worker_limits
-    (State.Net.id net_state)
+    (State.Chain.id chain_state)
     parameters
     (module Handlers)
 
@@ -358,33 +358,33 @@ let create
     peer_validator_limits prevalidator_limits
     block_validator global_valid_block_input global_db state limits
 
-let net_id w =
-  let { parameters = { net_state } } = Worker.state w in
-  State.Net.id net_state
+let chain_id w =
+  let { parameters = { chain_state } } = Worker.state w in
+  State.Chain.id chain_state
 
-let net_state w =
-  let { parameters = { net_state } } = Worker.state w in
-  net_state
+let chain_state w =
+  let { parameters = { chain_state } } = Worker.state w in
+  chain_state
 
 let prevalidator w =
   let { prevalidator } = Worker.state w in
   prevalidator
 
-let net_db w =
-  let { parameters = { net_db } } = Worker.state w in
-  net_db
+let chain_db w =
+  let { parameters = { chain_db } } = Worker.state w in
+  chain_db
 
 let child w =
   match (Worker.state w).child with
   | None -> None
-  | Some ({ parameters = { net_state } }, _) ->
-      try Some (List.assoc (State.Net.id net_state) (Worker.list table))
+  | Some ({ parameters = { chain_state } }, _) ->
+      try Some (List.assoc (State.Chain.id chain_state) (Worker.list table))
       with Not_found -> None
 
 let validate_block w ?(force = false) hash block operations =
   let nv = Worker.state w in
   assert (Block_hash.equal hash (Block_header.hash block)) ;
-  Chain.head nv.parameters.net_state >>= fun head ->
+  Chain.head nv.parameters.chain_state >>= fun head ->
   let head = State.Block.header head in
   if
     force || Fitness.(head.shell.fitness <= block.shell.fitness)
@@ -393,7 +393,7 @@ let validate_block w ?(force = false) hash block operations =
       ~canceler:(Worker.canceler w)
       ~notify_new_block:(notify_new_block w)
       nv.parameters.block_validator
-      nv.parameters.net_db
+      nv.parameters.chain_db
       hash block operations
   else
     failwith "Fitness too low"

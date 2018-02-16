@@ -18,13 +18,13 @@ let show { Node_config_file.data_dir } =
   Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
   return ()
 
-let generate { Node_config_file.data_dir ; net } =
+let generate { Node_config_file.data_dir ; p2p } =
   let identity_file = identity_file data_dir in
   if Sys.file_exists identity_file then
     fail (Node_identity_file.Existent_identity_file identity_file)
   else
-    let target = Crypto_box.make_target net.expected_pow in
-    Format.eprintf "Generating a new identity... (level: %.2f) " net.expected_pow ;
+    let target = Crypto_box.make_target p2p.expected_pow in
+    Format.eprintf "Generating a new identity... (level: %.2f) " p2p.expected_pow ;
     let id =
       P2p_identity.generate_with_animation Format.err_formatter target in
     Node_identity_file.write identity_file id >>=? fun () ->
@@ -33,7 +33,7 @@ let generate { Node_config_file.data_dir ; net } =
       P2p_peer.Id.pp id.peer_id identity_file ;
     return ()
 
-let check { Node_config_file.data_dir ; net = { expected_pow } } =
+let check { Node_config_file.data_dir ; p2p = { expected_pow } } =
   Node_identity_file.read
     ~expected_pow (identity_file data_dir) >>=? fun id ->
   Format.printf

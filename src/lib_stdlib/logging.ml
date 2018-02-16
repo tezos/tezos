@@ -67,7 +67,7 @@ module Make(S : sig val name: string end) : LOG = struct
 end
 
 module Core = Make(struct let name = "core" end)
-module Net = Make(struct let name = "net" end)
+module P2p = Make(struct let name = "p2p" end)
 module RPC = Make(struct let name = "rpc" end)
 module Db = Make(struct let name = "db" end)
 module Updater = Make(struct let name = "updater" end)

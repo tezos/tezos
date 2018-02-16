@@ -105,7 +105,7 @@ let inject_endorsement (cctxt : #Proto_alpha.full_context)
     () >>=? fun bytes ->
   Client_keys.append src_sk bytes >>=? fun signed_bytes ->
   Shell_services.inject_operation
-    cctxt ?async ~net_id:bi.net_id signed_bytes >>=? fun oph ->
+    cctxt ?async ~chain_id:bi.chain_id signed_bytes >>=? fun oph ->
   State.record_endorsement cctxt level bi.hash slot oph >>=? fun () ->
   return oph
 

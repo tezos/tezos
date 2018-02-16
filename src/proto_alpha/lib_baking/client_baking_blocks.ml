@@ -12,7 +12,7 @@ open Alpha_context
 
 type block_info = {
   hash: Block_hash.t ;
-  net_id: Net_id.t ;
+  chain_id: Chain_id.t ;
   predecessor: Block_hash.t ;
   fitness: MBytes.t list ;
   timestamp: Time.t ;
@@ -21,22 +21,22 @@ type block_info = {
 }
 
 let convert_block_info cctxt
-    ( { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol }
+    ( { hash ; chain_id ; predecessor ; fitness ; timestamp ; protocol }
       : Block_services.block_info ) =
   Alpha_services.Context.level cctxt (`Hash hash) >>= function
   | Ok level ->
       Lwt.return
-        (Some { hash ; net_id ; predecessor ;
+        (Some { hash ; chain_id ; predecessor ;
                 fitness ; timestamp ; protocol ; level })
   | Error _ ->
       (* TODO log error *)
       Lwt.return_none
 
 let convert_block_info_err cctxt
-    ( { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol }
+    ( { hash ; chain_id ; predecessor ; fitness ; timestamp ; protocol }
       : Block_services.block_info ) =
   Alpha_services.Context.level cctxt (`Hash hash) >>=? fun level ->
-  return { hash ; net_id ; predecessor ; fitness ; timestamp ; protocol ; level }
+  return { hash ; chain_id ; predecessor ; fitness ; timestamp ; protocol ; level }
 
 let info cctxt ?include_ops block =
   Block_services.info cctxt ?include_ops block >>=? fun block ->

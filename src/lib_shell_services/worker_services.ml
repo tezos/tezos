@@ -13,11 +13,11 @@ module Prevalidators = struct
 
   module S = struct
 
-    let (net_id_arg : Net_id.t RPC_arg.t) =
+    let (chain_id_arg : Chain_id.t RPC_arg.t) =
       RPC_arg.like
-        Net_id.rpc_arg
-        ~descr:"The network identifier of whom the prevalidator is responsible."
-        "net_id"
+        Chain_id.rpc_arg
+        ~descr:"The chain identifier of whom the prevalidator is responsible."
+        "chain_id"
 
     let list =
       RPC_service.post_service
@@ -27,7 +27,7 @@ module Prevalidators = struct
         ~output:
           (list
              (obj2
-                (req "net_id" Net_id.encoding)
+                (req "chain_id" Chain_id.encoding)
                 (req "status" (Worker_types.worker_status_encoding  RPC_error.encoding))))
         RPC_path.(root / "workers" / "prevalidators")
 
@@ -42,7 +42,7 @@ module Prevalidators = struct
              Prevalidator_worker_state.Request.encoding
              Prevalidator_worker_state.Event.encoding
              RPC_error.encoding)
-        RPC_path.(root / "workers" / "prevalidators" /: Net_id.rpc_arg )
+        RPC_path.(root / "workers" / "prevalidators" /: Chain_id.rpc_arg )
 
   end
 
@@ -80,11 +80,11 @@ module Peer_validators = struct
 
   module S = struct
 
-    let (net_id_arg : Net_id.t RPC_arg.t) =
+    let (chain_id_arg : Chain_id.t RPC_arg.t) =
       RPC_arg.like
-        Net_id.rpc_arg
-        ~descr:"The network identifier the peer validator is associated to."
-        "net_id"
+        Chain_id.rpc_arg
+        ~descr:"The chain identifier the peer validator is associated to."
+        "chain_id"
 
     let (peer_id_arg : P2p_peer.Id.t RPC_arg.t) =
       RPC_arg.make
@@ -106,7 +106,7 @@ module Peer_validators = struct
              (obj2
                 (req "peer_id" P2p_peer.Id.encoding)
                 (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))))
-        RPC_path.(root / "workers" / "peer_validators" /: net_id_arg)
+        RPC_path.(root / "workers" / "peer_validators" /: chain_id_arg)
 
     let state =
       let open Data_encoding in
@@ -119,7 +119,7 @@ module Peer_validators = struct
              Peer_validator_worker_state.Request.encoding
              Peer_validator_worker_state.Event.encoding
              RPC_error.encoding)
-        RPC_path.(root / "workers" / "peer_validators" /: net_id_arg /: peer_id_arg)
+        RPC_path.(root / "workers" / "peer_validators" /: chain_id_arg /: peer_id_arg)
 
   end
 
@@ -129,39 +129,39 @@ module Peer_validators = struct
 
 end
 
-module Net_validators = struct
+module Chain_validators = struct
 
   module S = struct
-    let (net_id_arg : Net_id.t RPC_arg.t) =
+    let (chain_id_arg : Chain_id.t RPC_arg.t) =
       RPC_arg.like
-        Net_id.rpc_arg
-        ~descr:"The network identifier of whom the net validator is responsible."
-        "net_id"
+        Chain_id.rpc_arg
+        ~descr:"The chain identifier of whom the chain validator is responsible."
+        "chain_id"
 
     let list =
       RPC_service.post_service
-        ~description:"Lists the net validator workers and their status."
+        ~description:"Lists the chain validator workers and their status."
         ~query: RPC_query.empty
         ~input: empty
         ~output:
           (list
              (obj2
-                (req "net_id" Net_id.encoding)
+                (req "chain_id" Chain_id.encoding)
                 (req "status" (Worker_types.worker_status_encoding RPC_error.encoding))))
-        RPC_path.(root / "workers" / "net_validators")
+        RPC_path.(root / "workers" / "chain_validators")
 
     let state =
       let open Data_encoding in
       RPC_service.post_service
-        ~description:"Introspect the state of a net validator worker."
+        ~description:"Introspect the state of a chain validator worker."
         ~query: RPC_query.empty
         ~input: empty
         ~output:
           (Worker_types.full_status_encoding
-             Net_validator_worker_state.Request.encoding
-             Net_validator_worker_state.Event.encoding
+             Chain_validator_worker_state.Request.encoding
+             Chain_validator_worker_state.Event.encoding
              RPC_error.encoding)
-        RPC_path.(root / "workers" / "net_validators" /: net_id_arg )
+        RPC_path.(root / "workers" / "chain_validators" /: chain_id_arg )
 
   end
 

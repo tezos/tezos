@@ -10,12 +10,12 @@
 type t
 
 type config = {
-  genesis: State.Net.genesis ;
+  genesis: State.Chain.genesis ;
   store_root: string ;
   context_root: string ;
   patch_context: (Context.t -> Context.t Lwt.t) option ;
   p2p: (P2p.config * P2p.limits) option ;
-  test_network_max_tll: int option ;
+  test_chain_max_tll: int option ;
 }
 
 and peer_validator_limits = {
@@ -34,7 +34,7 @@ and block_validator_limits = {
   protocol_timeout: float ;
   worker_limits : Worker_types.limits ;
 }
-and net_validator_limits = {
+and chain_validator_limits = {
   bootstrap_threshold: int ;
   worker_limits : Worker_types.limits ;
 }
@@ -44,7 +44,7 @@ val create:
   peer_validator_limits ->
   block_validator_limits ->
   prevalidator_limits ->
-  net_validator_limits ->
+  chain_validator_limits ->
   t tzresult Lwt.t
 
 module RPC : sig
@@ -53,7 +53,7 @@ module RPC : sig
   type block_info = Block_services.block_info
 
   val inject_block:
-    t -> ?force:bool -> ?net_id:Net_id.t ->
+    t -> ?force:bool -> ?chain_id:Chain_id.t ->
     MBytes.t -> Operation.t list list ->
     (Block_hash.t * unit tzresult Lwt.t) tzresult Lwt.t
   (** [inject_block node ?force bytes] tries to insert [bytes]
@@ -62,7 +62,7 @@ module RPC : sig
       non strictly increasing fitness. *)
 
   val inject_operation:
-    t -> ?net_id:Net_id.t -> MBytes.t ->
+    t -> ?chain_id:Chain_id.t -> MBytes.t ->
     (Operation_hash.t * unit tzresult Lwt.t) Lwt.t
   val inject_protocol:
     t -> ?force:bool -> Protocol.t ->

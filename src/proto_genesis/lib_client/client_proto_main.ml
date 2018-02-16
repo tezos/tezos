@@ -79,8 +79,8 @@ let commands () =
        @@ stop)
       begin fun timestamp hash sk cctxt ->
         bake cctxt ?timestamp cctxt#block
-          (Activate_testnet { protocol = hash ;
-                              delay = Int64.mul 24L 3600L })
+          (Activate_testchain { protocol = hash ;
+                                delay = Int64.mul 24L 3600L })
           sk >>=? fun hash ->
         cctxt#answer "Injected %a" Block_hash.pp_short hash >>= fun () ->
         return ()

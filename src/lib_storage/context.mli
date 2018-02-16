@@ -24,14 +24,14 @@ val init:
 
 val commit_genesis:
   index ->
-  net_id:Net_id.t ->
+  chain_id:Chain_id.t ->
   time:Time.t ->
   protocol:Protocol_hash.t ->
   Context_hash.t Lwt.t
 
-val commit_test_network_genesis:
+val commit_test_chain_genesis:
   index -> Block_hash.t -> Time.t -> context ->
-  (Net_id.t * Block_hash.t * Context_hash.t) tzresult Lwt.t
+  (Chain_id.t * Block_hash.t * Context_hash.t) tzresult Lwt.t
 
 (** {2 Generic interface} ****************************************************)
 
@@ -60,7 +60,7 @@ val commit:
   ?message:string ->
   context ->
   Context_hash.t Lwt.t
-val set_head: index -> Net_id.t -> Context_hash.t -> unit Lwt.t
+val set_head: index -> Chain_id.t -> Context_hash.t -> unit Lwt.t
 val set_master: index -> Context_hash.t -> unit Lwt.t
 
 (** {2 Predefined Fields} ****************************************************)
@@ -68,13 +68,13 @@ val set_master: index -> Context_hash.t -> unit Lwt.t
 val get_protocol: context -> Protocol_hash.t Lwt.t
 val set_protocol: context -> Protocol_hash.t -> context Lwt.t
 
-val get_test_network: context -> Test_network_status.t Lwt.t
-val set_test_network: context -> Test_network_status.t -> context Lwt.t
+val get_test_chain: context -> Test_chain_status.t Lwt.t
+val set_test_chain: context -> Test_chain_status.t -> context Lwt.t
 
-val del_test_network: context -> context Lwt.t
+val del_test_chain: context -> context Lwt.t
 
-val reset_test_network: context -> Block_hash.t -> Time.t -> context Lwt.t
+val reset_test_chain: context -> Block_hash.t -> Time.t -> context Lwt.t
 
-val fork_test_network:
+val fork_test_chain:
   context -> protocol:Protocol_hash.t -> expiration:Time.t -> context Lwt.t
-val clear_test_network: index -> Net_id.t -> unit Lwt.t
+val clear_test_chain: index -> Chain_id.t -> unit Lwt.t

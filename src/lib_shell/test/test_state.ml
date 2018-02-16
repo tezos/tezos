@@ -24,13 +24,13 @@ let genesis_time =
 
 module Proto = (val Registred_protocol.get_exn genesis_protocol)
 
-let genesis : State.Net.genesis = {
+let genesis : State.Chain.genesis = {
   time = genesis_time ;
   block = genesis_block ;
   protocol = genesis_protocol ;
 }
 
-let net_id = Net_id.of_block_hash genesis_block
+let chain_id = Chain_id.of_block_hash genesis_block
 
 let incr_fitness fitness =
   let new_fitness =
@@ -112,21 +112,21 @@ let build_valid_chain state vtbl pred names =
     names >>= fun _ ->
   Lwt.return ()
 
-let build_example_tree net =
+let build_example_tree chain =
   let vtbl = Hashtbl.create 23 in
-  Chain.genesis net >>= fun genesis ->
+  Chain.genesis chain >>= fun genesis ->
   Hashtbl.add vtbl "Genesis" genesis ;
-  let chain = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ; "A6" ; "A7" ; "A8" ] in
-  build_valid_chain net vtbl genesis chain >>= fun () ->
+  let c = [ "A1" ; "A2" ; "A3" ; "A4" ; "A5" ; "A6" ; "A7" ; "A8" ] in
+  build_valid_chain chain vtbl genesis c >>= fun () ->
   let a3 = Hashtbl.find vtbl "A3" in
-  let chain = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ; "B6" ; "B7" ; "B8" ] in
-  build_valid_chain net vtbl a3 chain >>= fun () ->
+  let c = [ "B1" ; "B2" ; "B3" ; "B4" ; "B5" ; "B6" ; "B7" ; "B8" ] in
+  build_valid_chain chain vtbl a3 c >>= fun () ->
   Lwt.return vtbl
 
 type state = {
   vblock: (string, State.Block.t) Hashtbl.t ;
   state: State.t ;
-  net: State.Net.t ;
+  chain: State.Chain.t ;
   init: unit -> State.t tzresult Lwt.t;
 }
 
@@ -148,9 +148,9 @@ let wrap_state_init f base_dir =
         ~context_root
         () in
     init () >>=? fun state ->
-    State.Net.create state genesis >>= fun net ->
-    build_example_tree net >>= fun vblock ->
-    f { state ; net ; vblock ; init } >>=? fun () ->
+    State.Chain.create state genesis >>= fun chain ->
+    build_example_tree chain >>= fun vblock ->
+    f { state ; chain ; vblock ; init } >>=? fun () ->
     return ()
   end
 
@@ -166,7 +166,7 @@ let test_init (_ : state) =
 let test_read_block (s: state) =
   Lwt_list.iter_s (fun (name, vblock) ->
       let hash = State.Block.hash vblock in
-      State.Block.read s.net hash >>= function
+      State.Block.read s.chain hash >>= function
       | Error _ ->
           Assert.fail_msg "Error while reading valid block %s" name
       | Ok _vblock' ->
@@ -238,7 +238,7 @@ let test_ancestor s =
 
 let test_locator s =
   let check_locator length h1 expected =
-    State.compute_locator s.net
+    State.compute_locator s.chain
       ~size:length (vblock s h1) >>= fun l ->
     let _, l = (l : Block_locator.t :> _ * _) in
     if List.length l <> List.length expected then
@@ -276,7 +276,7 @@ let compare s name heads l =
     l
 
 let test_known_heads s =
-  Chain.known_heads s.net >>= fun heads ->
+  Chain.known_heads s.chain >>= fun heads ->
   compare s "initial" heads ["A8";"B8"] ;
   return ()
 
@@ -286,11 +286,11 @@ let test_known_heads s =
 (** Chain.head/set_head *)
 
 let test_head s =
-  Chain.head s.net >>= fun head ->
+  Chain.head s.chain >>= fun head ->
   if not (Block_hash.equal (State.Block.hash head) genesis_block) then
     Assert.fail_msg "unexpected head" ;
-  Chain.set_head s.net (vblock s "A6") >>= fun _ ->
-  Chain.head s.net >>= fun head ->
+  Chain.set_head s.chain (vblock s "A6") >>= fun _ ->
+  Chain.head s.chain >>= fun head ->
   if not (Block_hash.equal (State.Block.hash head) (State.Block.hash @@ vblock s "A6")) then
     Assert.fail_msg "unexpected head" ;
   return ()
@@ -302,7 +302,7 @@ let test_head s =
 
 let test_mem s =
   let mem s x =
-    Chain.mem s.net (State.Block.hash @@ vblock s x) in
+    Chain.mem s.chain (State.Block.hash @@ vblock s x) in
   let test_mem s x =
     mem s x >>= function
     | true -> Lwt.return_unit
@@ -317,21 +317,21 @@ let test_mem s =
   test_not_mem s "B1" >>= fun () ->
   test_not_mem s "B6" >>= fun () ->
   test_not_mem s "B8" >>= fun () ->
-  Chain.set_head s.net (vblock s "A8") >>= fun _ ->
+  Chain.set_head s.chain (vblock s "A8") >>= fun _ ->
   test_mem s "A3" >>= fun () ->
   test_mem s "A6" >>= fun () ->
   test_mem s "A8" >>= fun () ->
   test_not_mem s "B1" >>= fun () ->
   test_not_mem s "B6" >>= fun () ->
   test_not_mem s "B8" >>= fun () ->
-  Chain.set_head s.net (vblock s "A6") >>= fun _ ->
+  Chain.set_head s.chain (vblock s "A6") >>= fun _ ->
   test_mem s "A3" >>= fun () ->
   test_mem s "A6" >>= fun () ->
   test_not_mem s "A8" >>= fun () ->
   test_not_mem s "B1" >>= fun () ->
   test_not_mem s "B6" >>= fun () ->
   test_not_mem s "B8" >>= fun () ->
-  Chain.set_head s.net (vblock s "B6") >>= fun _ ->
+  Chain.set_head s.chain (vblock s "B6") >>= fun _ ->
   test_mem s "A3" >>= fun () ->
   test_not_mem s "A4" >>= fun () ->
   test_not_mem s "A6" >>= fun () ->
@@ -339,7 +339,7 @@ let test_mem s =
   test_mem s "B1" >>= fun () ->
   test_mem s "B6" >>= fun () ->
   test_not_mem s "B8" >>= fun () ->
-  Chain.set_head s.net (vblock s "B8") >>= fun _ ->
+  Chain.set_head s.chain (vblock s "B8") >>= fun _ ->
   test_mem s "A3" >>= fun () ->
   test_not_mem s "A4" >>= fun () ->
   test_not_mem s "A6" >>= fun () ->
@@ -384,9 +384,9 @@ let test_new_blocks s =
 
 let test_find_new s =
   let test s h expected =
-    State.compute_locator s.net ~size:50 (vblock s h) >>= fun loc ->
+    State.compute_locator s.chain ~size:50 (vblock s h) >>= fun loc ->
     Block_locator_iterator.find_new
-      s.net loc (List.length expected) >>= fun blocks ->
+      s.chain loc (List.length expected) >>= fun blocks ->
     if List.length blocks <> List.length expected then
       Assert.fail_msg
         "Invalid find new length %s (found: %d, expected: %d)"
@@ -398,7 +398,7 @@ let test_find_new s =
       blocks expected ;
     Lwt.return_unit
   in
-  Chain.set_head s.net (vblock s "A8") >>= fun _ ->
+  Chain.set_head s.chain (vblock s "A8") >>= fun _ ->
   test s "A6" [] >>= fun () ->
   test s "A6" ["A7";"A8"] >>= fun () ->
   test s "A6" ["A7"] >>= fun () ->
@@ -433,7 +433,5 @@ let wrap (n, f) =
     end
   end
 
-let () =
-  Alcotest.run ~argv:[|""|] "tezos-shell" [
-    "state", List.map wrap tests
-  ]
+let tests =List.map wrap tests
+

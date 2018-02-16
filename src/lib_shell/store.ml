@@ -11,18 +11,18 @@ type t = Raw_store.t
 type global_store = t
 
 (**************************************************************************
- * Net store under "net/"
+ * Net store under "chain/"
  **************************************************************************)
 
-module Net = struct
+module Chain = struct
 
-  type store = global_store * Net_id.t
+  type store = global_store * Chain_id.t
   let get s id = (s, id)
 
   module Indexed_store =
     Store_helpers.Make_indexed_substore
-      (Store_helpers.Make_substore(Raw_store)(struct let name = ["net"] end))
-      (Net_id)
+      (Store_helpers.Make_substore(Raw_store)(struct let name = ["chain"] end))
+      (Chain_id)
 
   let destroy = Indexed_store.remove_all
   let list t =
@@ -59,24 +59,24 @@ module Net = struct
       (struct let name = ["expiration"] end)
       (Store_helpers.Make_value(Time))
 
-  module Allow_forked_network =
-    Indexed_store.Make_set (struct let name = ["allow_forked_network"] end)
+  module Allow_forked_chain =
+    Indexed_store.Make_set (struct let name = ["allow_forked_chain"] end)
 
 end
 
 (**************************************************************************
- * Block_header store under "net/<id>/blocks/"
+ * Block_header store under "chain/<id>/blocks/"
  **************************************************************************)
 
 module Block = struct
 
-  type store = Net.store
+  type store = Chain.store
   let get x = x
 
   module Indexed_store =
     Store_helpers.Make_indexed_substore
       (Store_helpers.Make_substore
-         (Net.Indexed_store.Store)
+         (Chain.Indexed_store.Store)
          (struct let name = ["blocks"] end))
       (Block_hash)
 
@@ -153,7 +153,7 @@ module Block = struct
   module Invalid_block =
     Store_helpers.Make_map
       (Store_helpers.Make_substore
-         (Net.Indexed_store.Store)
+         (Chain.Indexed_store.Store)
          (struct let name = ["invalid_blocks"] end))
       (Block_hash)
       (Store_helpers.Make_value(struct
@@ -169,9 +169,9 @@ module Block = struct
   let register s =
     Base58.register_resolver Block_hash.b58check_encoding begin fun str ->
       let pstr = Block_hash.prefix_path str in
-      Net.Indexed_store.fold_indexes s ~init:[]
-        ~f:begin fun net acc ->
-          Indexed_store.resolve_index (s, net) pstr >>= fun l ->
+      Chain.Indexed_store.fold_indexes s ~init:[]
+        ~f:begin fun chain acc ->
+          Indexed_store.resolve_index (s, chain) pstr >>= fun l ->
           Lwt.return (List.rev_append l acc)
         end
     end
@@ -191,26 +191,26 @@ end
  * Blockchain data
  **************************************************************************)
 
-module Chain = struct
+module Chain_data = struct
 
-  type store = Net.store
+  type store = Chain.store
   let get s = s
 
   module Known_heads =
     Store_helpers.Make_buffered_set
       (Store_helpers.Make_substore
-         (Net.Indexed_store.Store)
+         (Chain.Indexed_store.Store)
          (struct let name = ["known_heads"] end))
       (Block_hash)
       (Block_hash.Set)
 
   module Current_head =
     Store_helpers.Make_single_store
-      (Net.Indexed_store.Store)
+      (Chain.Indexed_store.Store)
       (struct let name = ["current_head"] end)
       (Store_helpers.Make_value(Block_hash))
 
-  module In_chain =
+  module In_main_branch =
     Store_helpers.Make_single_store
       (Block.Indexed_store.Store)
       (struct let name = ["in_chain"] end)
