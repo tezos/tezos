@@ -17,6 +17,6 @@ depends: [
   "stdio" {build & >= "v0.10.0"}
   "nocrypto" {>= "0.5.4"}
   "pbkdf" {>= "0.2.0"}
-  "hex" { "test" }
-  "alcotest" { "test" }
+  "hex" {test & >= "1.2.0"}
+  "alcotest" {test & >= "0.8.1"}
 ]
