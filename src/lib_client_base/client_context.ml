@@ -18,6 +18,11 @@ class type logger_sig = object
   method log : string -> ('a, unit) lwt_format -> 'a
 end
 
+class type prompter_sig = object
+  method prompt : ('a, string) lwt_format -> 'a
+  method prompt_password : ('a, string) lwt_format -> 'a
+end
+
 class logger log =
   let message =
     (fun x ->
@@ -48,17 +53,24 @@ class type block = object
 end
 
 class type logging_wallet = object
-  inherit logger
+  inherit logger_sig
+  inherit wallet
+end
+
+class type io_wallet = object
+  inherit logger_sig
+  inherit prompter_sig
   inherit wallet
 end
 
 class type logging_rpcs = object
-  inherit logger
+  inherit logger_sig
   inherit RPC_context.json
 end
 
 class type full_context = object
-  inherit logger
+  inherit logger_sig
+  inherit prompter_sig
   inherit wallet
   inherit RPC_context.json
   inherit block
@@ -84,4 +96,6 @@ class proxy_context (obj : full_context) = object
   method message : type a. (a, unit) lwt_format -> a = obj#message
   method warning : type a. (a, unit) lwt_format -> a  = obj#warning
   method write : type a. string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t = obj#write
+  method prompt : type a. (a, string) lwt_format -> a = obj#prompt
+  method prompt_password : type a. (a, string) lwt_format -> a = obj#prompt_password
 end

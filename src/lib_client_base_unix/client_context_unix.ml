@@ -9,10 +9,10 @@
 
 open Client_context
 
-class file_wallet dir : wallet = object (self)
+class unix_wallet ~base_dir : wallet = object (self)
   method private filename alias_name =
     Filename.concat
-      dir
+      base_dir
       (Str.(global_replace (regexp_string " ") "_" alias_name) ^ "s")
 
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t =
@@ -35,7 +35,7 @@ class file_wallet dir : wallet = object (self)
     fun alias_name list encoding ->
       Lwt.catch
         (fun () ->
-           Lwt_utils_unix.create_dir dir >>= fun () ->
+           Lwt_utils_unix.create_dir base_dir >>= fun () ->
            let filename = self#filename alias_name in
            let json = Data_encoding.Json.construct encoding list in
            Lwt_utils_unix.Json.write_file filename json)
@@ -43,50 +43,51 @@ class file_wallet dir : wallet = object (self)
       |> generic_trace "could not write the %s alias file." alias_name
 end
 
-(* Default config *)
+class unix_prompter = object
+  method prompt : type a. (a, string) lwt_format -> a =
+    Format.kasprintf begin fun msg ->
+      print_string msg ;
+      let line = read_line () in
+      Lwt.return line
+    end
 
-let (//) = Filename.concat
+  method prompt_password : type a. (a, string) lwt_format -> a =
+    Format.kasprintf begin fun msg ->
+      print_string msg ;
+      let line = Lwt_utils_unix.getpass () in
+      Lwt.return line
+    end
+end
 
-let home =
-  try Sys.getenv "HOME"
-  with Not_found -> "/root"
-
-let default_base_dir = home // ".tezos-client"
-
-let default_block = `Prevalidation
-
-let default_log ~base_dir channel msg =
+class unix_logger ~base_dir =
   let startup =
     CalendarLib.Printer.Precise_Calendar.sprint
       "%Y-%m-%dT%H:%M:%SZ"
       (CalendarLib.Calendar.Precise.now ()) in
-  match channel with
-  | "stdout" ->
-      print_endline msg ;
-      Lwt.return ()
-  | "stderr" ->
-      prerr_endline msg ;
-      Lwt.return ()
-  | log ->
-      let (//) = Filename.concat in
-      Lwt_utils_unix.create_dir (base_dir // "logs" // log) >>= fun () ->
-      Lwt_io.with_file
-        ~flags: Unix.[ O_APPEND ; O_CREAT ; O_WRONLY ]
-        ~mode: Lwt_io.Output
-        (base_dir // "logs" // log // startup)
-        (fun chan -> Lwt_io.write chan msg)
-
-let make_context
-    ?(base_dir = default_base_dir)
-    ?(block = default_block)
-    ?(rpc_config = RPC_client.default_config)
-    log =
+  let log channel msg = match channel with
+    | "stdout" ->
+        print_endline msg ;
+        Lwt.return ()
+    | "stderr" ->
+        prerr_endline msg ;
+        Lwt.return ()
+    | log ->
+        let (//) = Filename.concat in
+        Lwt_utils_unix.create_dir (base_dir // "logs" // log) >>= fun () ->
+        Lwt_io.with_file
+          ~flags: Unix.[ O_APPEND ; O_CREAT ; O_WRONLY ]
+          ~mode: Lwt_io.Output
+          (base_dir // "logs" // log // startup)
+          (fun chan -> Lwt_io.write chan msg) in
   object
     inherit Client_context.logger log
-    inherit file_wallet base_dir
+  end
+
+class unix_full_context ~base_dir ~block ~rpc_config : Client_context.full_context =
+  object
+    inherit unix_logger ~base_dir
+    inherit unix_prompter
+    inherit unix_wallet ~base_dir
     inherit RPC_client.http_ctxt rpc_config Media_type.all_media_types
     method block = block
   end
-
-let ignore_context =
-  make_context (fun _ _ -> Lwt.return ())

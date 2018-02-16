@@ -28,7 +28,7 @@ let build_rpc_context config =
 let rpc_ctxt = ref (build_rpc_context !rpc_config)
 
 (* Context that does not write to alias files *)
-let no_write_context config block : #Client_context.full_context = object
+let no_write_context ?(block = `Prevalidation) config : #Client_context.full_context = object
   inherit RPC_client.http_ctxt config Media_type.all_media_types
   inherit Client_context.logger (fun _ _ -> Lwt.return_unit)
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a Error_monad.tzresult Lwt.t =
@@ -38,6 +38,10 @@ let no_write_context config block : #Client_context.full_context = object
     a Data_encoding.encoding -> unit Error_monad.tzresult Lwt.t =
     fun _ _ _ -> return ()
   method block = block
+  method prompt : type a. (a, string) Client_context.lwt_format -> a =
+    Format.kasprintf (fun _ -> Lwt.return "")
+  method prompt_password : type a. (a, string) Client_context.lwt_format -> a =
+    Format.kasprintf (fun _ -> Lwt.return "")
 end
 
 let activate_alpha () =
@@ -46,7 +50,7 @@ let activate_alpha () =
       ~scheme:"unencrypted"
       ~location:"edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6" in
   Tezos_client_genesis.Client_proto_main.bake
-    !rpc_ctxt (`Head 0)
+    (no_write_context ~block:(`Head 0) !rpc_config) (`Head 0)
     (Activate  { protocol = Proto_alpha.hash ;
                  fitness })
     dictator_sk
@@ -172,7 +176,8 @@ module Account = struct
     let src_sk = Client_keys.Secret_key_locator.create
         ~scheme:"unencrypted"
         ~location:(Ed25519.Secret_key.to_b58check account.sk) in
-    Client_proto_context.transfer !rpc_ctxt
+    Client_proto_context.transfer
+      (new wrap_full_context (no_write_context !rpc_config ~block))
       block
       ~source:account.contract
       ~src_pk:account.pk
@@ -205,7 +210,7 @@ module Account = struct
       ?delegate
       ~fee
       block
-      !rpc_ctxt
+      (new wrap_full_context (no_write_context !rpc_config))
       ()
 
   let set_delegate
@@ -216,7 +221,7 @@ module Account = struct
       ~src_pk
       delegate_opt =
     Client_proto_context.set_delegate
-      !rpc_ctxt
+      (new wrap_full_context (no_write_context ~block !rpc_config))
       block
       ~fee
       contract
@@ -437,7 +442,7 @@ module Baking = struct
         ~scheme:"unencrypted"
         ~location:(Ed25519.Secret_key.to_b58check contract.sk) in
     Client_baking_forge.forge_block
-      !rpc_ctxt
+      (new wrap_full_context (no_write_context ~block !rpc_config))
       block
       ~operations
       ~force:true

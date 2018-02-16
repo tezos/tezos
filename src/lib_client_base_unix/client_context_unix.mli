@@ -7,20 +7,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
-val make_context :
-  ?base_dir:string ->
-  ?block:Block_services.block ->
-  ?rpc_config:RPC_client.config ->
-  (string -> string -> unit Lwt.t) -> Client_context.full_context
-(** [make_context ?config log_fun] builds a context whose logging
-    callbacks call [log_fun section msg], and whose [error] function
-    fails with [Failure] and the given message. If not passed,
-    [config] is {!default_cfg}. *)
-
-val ignore_context : Client_context.full_context
-(** [ignore_context] is a context whose logging callbacks do nothing,
-    and whose [error] function calls [Lwt.fail_with]. *)
-
-val default_log : base_dir:string -> string -> string -> unit Lwt.t
-val default_base_dir : string
-val default_block : Block_services.block
+class unix_wallet :
+  base_dir:string ->
+  Client_context.wallet
+class unix_prompter :
+  Client_context.prompter_sig
+class unix_logger :
+  base_dir:string ->
+  Client_context.logger_sig
+class unix_full_context :
+  base_dir:string ->
+  block:Block_services.block ->
+  rpc_config:RPC_client.config ->
+  Client_context.full_context

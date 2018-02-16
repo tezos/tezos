@@ -18,6 +18,11 @@ class type logger_sig = object
   method log : string -> ('a, unit) lwt_format -> 'a
 end
 
+class type prompter_sig = object
+  method prompt : ('a, string) lwt_format -> 'a
+  method prompt_password : ('a, string) lwt_format -> 'a
+end
+
 class logger : (string -> string -> unit Lwt.t) -> logger_sig
 
 class type wallet = object
@@ -34,6 +39,12 @@ class type logging_wallet = object
   inherit wallet
 end
 
+class type io_wallet = object
+  inherit logger_sig
+  inherit prompter_sig
+  inherit wallet
+end
+
 class type logging_rpcs = object
   inherit logger_sig
   inherit RPC_context.json
@@ -41,6 +52,7 @@ end
 
 class type full_context = object
   inherit logger_sig
+  inherit prompter_sig
   inherit wallet
   inherit RPC_context.json
   inherit block
