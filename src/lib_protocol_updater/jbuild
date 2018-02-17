@@ -6,6 +6,7 @@
   (libraries (tezos-base
               tezos-stdlib-unix
               tezos-micheline
+              tezos-protocol-environment-shell
               tezos-protocol-compiler.registerer
               tezos-protocol-compiler.native
               tezos-storage

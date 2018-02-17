@@ -112,7 +112,7 @@ module Block : sig
     Chain.t ->
     Block_header.t ->
     Operation.t list list ->
-    Updater.validation_result ->
+    Tezos_protocol_environment_shell.validation_result ->
     block option tzresult Lwt.t
 
   val store_invalid:

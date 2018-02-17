@@ -10,7 +10,6 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta17" }
   "tezos-base"
-  "tezos-micheline"
   "tezos-protocol-environment-sigs"
   "alcotest-lwt" { test }
 ]

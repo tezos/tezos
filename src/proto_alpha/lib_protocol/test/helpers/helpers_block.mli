@@ -28,7 +28,7 @@ type init_block = {
   protocol_data_bytes : MBytes.t;
   timestamp : Time.t;
   level : Int32.t;
-  context : Context.t;
+  context : Tezos_protocol_environment_memory.Context.t
 }
 
 (** Result of the application of a block *)
@@ -36,7 +36,7 @@ type result = {
   tezos_header : tezos_header;
   hash : Block_hash.t;
   level : Int32.t;
-  validation : Updater.validation_result;
+  validation : Tezos_protocol_environment_memory.validation_result;
   tezos_context : Alpha_context.t;
 }
 val get_op_header_res : result -> operation_header
@@ -57,7 +57,7 @@ val init_of_result :
   init_block proto_tzresult
 val get_level : string option -> int32
 val get_header_hash :
-  init_block -> Updater.validation_result ->
+  init_block -> Tezos_protocol_environment_memory.validation_result ->
   result proto_tzresult Lwt.t
 val begin_construction_pre :
   init_block -> Main.validation_state proto_tzresult Lwt.t

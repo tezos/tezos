@@ -19,7 +19,7 @@ let get_sandbox () =
       Lwt.return @@ Helpers_assert.no_error ~msg:__LOC__ x
 
 let main () =
-  let context = Tezos_protocol_environment_client.Mem_context.empty in
+  let context = Tezos_protocol_environment_memory.Context.empty in
   get_sandbox () >>= fun json ->
   Main.configure_sandbox context @@ Some json >>=? fun context ->
   let genesis_hash =

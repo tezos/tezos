@@ -310,11 +310,11 @@ module RPC = struct
                 test_chain ;
               }
 
-  let rpc_context block : Updater.rpc_context Lwt.t =
+  let rpc_context block : Tezos_protocol_environment_shell.rpc_context Lwt.t =
     let block_hash = State.Block.hash block in
     let block_header = State.Block.header block in
     State.Block.context block >|= fun context ->
-    { Updater.block_hash ;
+    { Tezos_protocol_environment_shell.block_hash ;
       block_header ;
       operation_hashes = (fun () -> State.Block.all_operation_hashes block) ;
       operations = (fun () -> State.Block.all_operations block) ;
@@ -370,7 +370,8 @@ module RPC = struct
               Operation_list_list_hash.compute
                 (List.map Operation_list_hash.compute operation_hashes) in
             Lwt.return (Some {
-                Updater.block_hash = prevalidation_hash ;
+                Tezos_protocol_environment_shell.
+                block_hash = prevalidation_hash ;
                 block_header = {
                   shell = {
                     level = Int32.succ head_header.shell.level ;

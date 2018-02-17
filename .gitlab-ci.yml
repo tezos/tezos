@@ -326,10 +326,10 @@ opam:22:tezos-protocol-alpha:
   variables:
     package: tezos-protocol-alpha
 
-opam:23:tezos-protocol-environment-client:
+opam:23:tezos-protocol-environment:
   <<: *opam_definition
   variables:
-    package: tezos-protocol-environment-client
+    package: tezos-protocol-environment
 
 opam:24:tezos-client-alpha:
   <<: *opam_definition
@@ -435,6 +435,11 @@ opam:44:tezos-protocol-demo:
   <<: *opam_definition
   variables:
     package: tezos-protocol-demo
+
+opam:45:tezos-protocol-environment-shell:
+  <<: *opam_definition
+  variables:
+    package: tezos-protocol-environment-shell
 
 
 ##END_OPAM##

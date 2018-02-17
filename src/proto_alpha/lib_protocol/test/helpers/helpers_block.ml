@@ -25,14 +25,14 @@ type init_block = {
   protocol_data_bytes : MBytes.t ;
   timestamp : Time.t ;
   level : Int32.t ;
-  context : Context.t
+  context : Tezos_protocol_environment_memory.Context.t
 }
 
 type result = {
   tezos_header : tezos_header ;
   hash : Block_hash.t ;
   level : Int32.t ;
-  validation : Updater.validation_result ;
+  validation : Tezos_protocol_environment_memory.validation_result ;
   tezos_context : Proto_alpha.Alpha_context.t
 }
 
@@ -107,7 +107,7 @@ let get_level opt_msg =
 
 let get_header_hash
     (init_block : init_block)
-    (validation_result : Updater.validation_result)
+    (validation_result : Tezos_protocol_environment_memory.validation_result)
   : result tzresult Lwt.t
   =
   let op_hashs = init_block.operation_hashs in

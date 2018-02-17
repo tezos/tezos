@@ -45,7 +45,7 @@ val inject_operation: t -> Operation.t -> unit tzresult Lwt.t
 val flush: t -> Block_hash.t -> unit tzresult Lwt.t
 val timestamp: t -> Time.t
 val operations: t -> error Preapply_result.t * Operation.t Operation_hash.Map.t
-val context: t -> Updater.validation_result tzresult Lwt.t
+val context: t -> Tezos_protocol_environment_shell.validation_result tzresult Lwt.t
 val pending: ?block:State.Block.t -> t -> Operation.t Operation_hash.Map.t Lwt.t
 
 val running_workers: unit -> (Chain_id.t * t) list

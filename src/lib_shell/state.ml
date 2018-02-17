@@ -570,8 +570,8 @@ module Block = struct
   let store
       ?(dont_enforce_context_hash = false)
       chain_state block_header operations
-      { Updater.context ; message ; max_operations_ttl ;
-        max_operation_data_length } =
+      { Tezos_protocol_environment_shell.context ; message ;
+        max_operations_ttl ; max_operation_data_length } =
     let bytes = Block_header.to_bytes block_header in
     let hash = Block_header.hash_raw bytes in
     (* let's the validator check the consistency... of fitness, level, ... *)

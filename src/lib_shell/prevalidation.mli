@@ -21,4 +21,5 @@ val prevalidate :
   (prevalidation_state * error Preapply_result.t) Lwt.t
 
 val end_prevalidation :
-  prevalidation_state -> Updater.validation_result tzresult Lwt.t
+  prevalidation_state ->
+  Tezos_protocol_environment_shell.validation_result tzresult Lwt.t

@@ -8,7 +8,7 @@
 (**************************************************************************)
 
 module Name = struct let name = "alpha" end
-module Alpha_environment = Tezos_protocol_environment_client.Fake.Make(Name)()
+module Alpha_environment = Tezos_protocol_environment_faked.MakeV1(Name)()
 include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
 
 let hash =

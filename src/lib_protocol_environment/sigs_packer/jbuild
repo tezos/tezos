@@ -2,7 +2,8 @@
 
 (executable
   ((name sigs_packer)
-   (public_name tezos-protocol-environment-sigs.packer)))
+   (public_name tezos-protocol-environment-sigs.packer)
+   (package tezos-protocol-environment-sigs)))
 
 (alias
  ((name runtest_indent)

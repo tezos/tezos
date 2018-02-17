@@ -12,6 +12,7 @@ depends: [
   "tezos-base"
   "tezos-micheline"
   "tezos-protocol-compiler"
+  "tezos-protocol-environment-shell"
   "tezos-stdlib-unix"
   "tezos-storage"
 ]

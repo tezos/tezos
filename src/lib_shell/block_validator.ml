@@ -124,8 +124,8 @@ let apply_block
     (fun i ops quota ->
        fail_unless
          (Option.unopt_map ~default:true
-            ~f:(fun max -> List.length ops <= max) quota.Updater.max_op)
-         (let max = Option.unopt ~default:~-1 quota.Updater.max_op in
+            ~f:(fun max -> List.length ops <= max) quota.Tezos_protocol_environment_shell.max_op)
+         (let max = Option.unopt ~default:~-1 quota.max_op in
           invalid_block hash @@
           Too_many_operations
             { pass = i + 1 ; found = List.length ops ; max }) >>=? fun () ->

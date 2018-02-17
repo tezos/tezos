@@ -9,7 +9,7 @@
 
 module type T = sig
   val hash: Protocol_hash.t
-  include Updater.NODE_PROTOCOL
+  include Tezos_protocol_environment_shell.PROTOCOL
   val complete_b58prefix : Context.t -> string -> string list Lwt.t
 end
 
@@ -20,7 +20,7 @@ let build_v1 hash =
   let module Name = struct
     let name = Protocol_hash.to_b58check hash
   end in
-  let module Env = Protocol_environment.MakeV1(Name)(Context)(Updater)() in
+  let module Env = Tezos_protocol_environment_shell.MakeV1(Name)() in
   (module struct
     let hash = hash
     module P = F(Env)
@@ -49,7 +49,7 @@ let get hash =
   with Not_found -> None
 
 module Register
-    (Env : Updater.Node_protocol_environment_sigs.V1)
+    (Env : Tezos_protocol_environment_shell.V1)
     (Proto : Env.Updater.PROTOCOL)
     (Source : sig
        val hash: Protocol_hash.t option

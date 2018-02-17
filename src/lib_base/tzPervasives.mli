@@ -52,8 +52,6 @@ module P2p_connection = P2p_connection
 module P2p_stat = P2p_stat
 module P2p_version = P2p_version
 
-module Protocol_environment = Protocol_environment
-
 module Cli_entries = Cli_entries
 module Lwt_exit = Lwt_exit
 

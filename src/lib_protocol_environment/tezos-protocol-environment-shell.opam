@@ -10,14 +10,10 @@ depends: [
   "ocamlfind" { build }
   "jbuilder" { build & >= "1.0+beta17" }
   "tezos-base"
-  "tezos-protocol-compiler"
-  "alcotest-lwt" { test }
-  "tezos-protocol-environment" { test }
+  "tezos-protocol-environment"
+  "tezos-storage"
 ]
 build: [
-  [ "rm" "jbuild" "src/jbuild" ]
-  [ "cp" "%{tezos-protocol-compiler:share}%/jbuild_protocol_template" "jbuild" ]
-  [ "sed" "-i" "s/let predefined_version = None/let predefined_version = Some \"alpha\"/" "jbuild" ]
   [ "jbuilder" "build" "-p" name "-j" jobs ]
 ]
 build-test: [

@@ -63,7 +63,7 @@
   ))
   (action
     (with-stdout-to ${@}
-      (chdir ${ROOT} (run ${exe:sigs_packer/sigs_packer.exe} ${^}))))))
+      (chdir ${ROOT} (run ${exe:../sigs_packer/sigs_packer.exe} ${^}))))))
 
 (library
  ((name tezos_protocol_environment_sigs)

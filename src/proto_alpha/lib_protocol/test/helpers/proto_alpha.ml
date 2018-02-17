@@ -8,12 +8,8 @@
 (**************************************************************************)
 
 module Name = struct let name = "alpha" end
-module Context =
-  Tezos_protocol_environment_client.Mem_context
-module Updater =
-  Tezos_protocol_environment_client.Fake_updater.Make(Context)
-module Alpha_environment =
-  Tezos_base.Protocol_environment.MakeV1(Name)(Context)(Updater)()
+module Context = Tezos_protocol_environment_memory.Context
+module Alpha_environment = Tezos_protocol_environment_memory.MakeV1(Name)()
 include Tezos_protocol_alpha.Functor.Make(Alpha_environment)
 
 module Error_monad = Alpha_environment.Error_monad

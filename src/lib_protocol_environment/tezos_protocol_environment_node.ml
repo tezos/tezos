@@ -7,16 +7,4 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type t
-
-type key = string list
-type value = MBytes.t
-let mem _ _ = assert false
-let dir_mem _ _ = assert false
-let get _ _ = assert false
-let set _ _ _ = assert false
-let del _ _ = assert false
-let remove_rec _ _ = assert false
-let fold _ _ ~init:_ ~f:_ = assert false
-let keys _ _ = assert false
-let fold_keys _ _ ~init:_ ~f:_ = assert false
+include Tezos_protocol_environment.Make(Context)

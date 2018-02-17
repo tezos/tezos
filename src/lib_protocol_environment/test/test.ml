@@ -7,6 +7,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-module Make(Param : sig val name: string end)() =
-  Tezos_base.Protocol_environment.MakeV1
-    (Param)(Fake_context)(Fake_updater.Make(Fake_context))()
+let () =
+  Alcotest.run "tezos-protocol-environment-shell" [
+    "mem_context", Test_mem_context.tests ;
+  ]

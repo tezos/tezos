@@ -89,7 +89,7 @@ let make_empty_chain (chain:State.Chain.t) n : Block_hash.t Lwt.t =
   Context.commit
     ~time:header.shell.timestamp empty_context >>= fun context ->
   let header = { header with shell = { header.shell with context } } in
-  let empty_result : Updater.validation_result = {
+  let empty_result : Tezos_protocol_environment_shell.validation_result = {
     context = empty_context ;
     fitness = [] ;
     message = None ;

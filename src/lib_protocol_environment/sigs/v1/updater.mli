@@ -158,12 +158,6 @@ module type PROTOCOL = sig
 
 end
 
-(** Takes a version hash, a list of OCaml components in compilation
-    order. The last element must be named [protocol] and respect the
-    [protocol.ml] interface. Tries to compile it and returns true
-    if the operation was successful. *)
-val compile: Protocol_hash.t -> Protocol.t -> bool Lwt.t
-
 (** Activates a given protocol version from a given context. This
     means that the context used for the next block will use this
     version (this is not an immediate change). The version must have
