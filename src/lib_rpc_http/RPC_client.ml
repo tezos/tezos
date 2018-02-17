@@ -417,8 +417,9 @@ class http_ctxt config media_types : RPC_context.json =
   let logger = config.logger in
   object
     method generic_json_call meth ?body uri =
-      let uri = Uri.with_path base (Uri.path uri) in
-      let uri = Uri.with_query uri (Uri.query uri) in
+      let path = Uri.path uri and query = Uri.query uri in
+      let uri = Uri.with_path base path in
+      let uri = Uri.with_query uri query in
       generic_json_call ~logger meth ?body uri
     method call_service
       : 'm 'p 'q 'i 'o.
