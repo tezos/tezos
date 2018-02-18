@@ -79,4 +79,11 @@ As per the hygiene of MRs themselves:
 -  Give appropriate titles to the MRs, and when non trivial add a
    detailed motivated explanation.
 -  Give meaningful and consistent names to branches.
--  Don’t forget to put a ``WIP:`` flag when it is a work in progress.
+-  Don’t forget to put a ``WIP:`` flag when it is a work in progress
+
+Some extra CI tests are only done on demand for branches other that
+master. You can (should) activate these tests by including keywords in
+the branch name.
+
+-  If your MR impacts OPAM packaging, use ``opam`` in the branch name.
+-  If your MR updates documentation, use ``doc`` in the branch name.

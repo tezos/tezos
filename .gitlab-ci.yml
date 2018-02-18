@@ -507,6 +507,20 @@ pages:
   tags:
     - gitlab-org
 
+documentation:
+  image: ${build_deps_image}:${CI_COMMIT_SHA}
+  stage: test
+  only:
+    - /^.*doc.*$/
+  script:
+    - sudo apk add --no-cache py3-sphinx py3-sphinx_rtd_theme
+    - sudo ln -s /usr/bin/sphinx-build-3 /usr/bin/sphinx-build
+    - opam install --yes odoc
+    - make doc-html
+  tags:
+    - gitlab-org
+
+
 ## Relaunching the bootstrap servers of the alphanet.zeronet
 
 .bootstrap_template: &bootstrap_definition
