@@ -1,3 +1,5 @@
+.. _entering_alpha:
+
 How to start reading protocol Alpha
 ===================================
 

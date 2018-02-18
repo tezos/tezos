@@ -35,7 +35,7 @@ Where to start
 
 While you familiarize yourself with the basics as suggested above, you
 can have a look at the :ref:`software architecture
-<the_big_picture>` of Tezos. It will
+<software_architecture>` of Tezos. It will
 give you the main components and their interactions, and links to the
 documentations for the various parts.
 
