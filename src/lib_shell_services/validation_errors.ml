@@ -17,7 +17,7 @@ let () =
   (* Parse error *)
   register_error_kind
     `Permanent
-    ~id:"prevalidation.parse_error"
+    ~id:"node.prevalidation.parse_error"
     ~title:"Parsing error in prevalidation"
     ~description:"Raised when an operation has not been parsed correctly during prevalidation."
     ~pp:(fun ppf () ->
@@ -28,7 +28,7 @@ let () =
   (* Too many operations *)
   register_error_kind
     `Temporary
-    ~id:"prevalidation.too_many_operations"
+    ~id:"node.prevalidation.too_many_operations"
     ~title:"Too many pending operations in prevalidation"
     ~description:"The prevalidation context is full."
     ~pp:(fun ppf () ->
@@ -39,7 +39,7 @@ let () =
   (* Oversized operation *)
   register_error_kind
     `Permanent
-    ~id:"prevalidation.oversized_operation"
+    ~id:"node.prevalidation.oversized_operation"
     ~title:"Oversized operation"
     ~description:"The operation size is bigger than allowed."
     ~pp:(fun ppf (size, max) ->
@@ -64,7 +64,7 @@ let () =
   (* Unknown network *)
   register_error_kind
     `Permanent
-    ~id:"state.unknown_chain"
+    ~id:"node.state.unknown_chain"
     ~title:"Unknown chain"
     ~description:"The chain identifier could not be found in \
                   the chain identifiers table."
@@ -75,7 +75,7 @@ let () =
     (fun x -> Unknown_chain x) ;
   register_error_kind
     `Permanent
-    ~id:"badDataDir"
+    ~id:"node.state.bad_data_dir"
     ~title:"Bad data directory"
     ~description:"The data directory could not be read. \
                   This could be because it was generated with an \
@@ -89,7 +89,7 @@ let () =
   (* Block not invalid *)
   register_error_kind
     `Permanent
-    ~id:"blockNotInvalid"
+    ~id:"node.state.block_not_invalid"
     ~title:"Block not invalid"
     ~description:"The invalid block to be unmarked was not actually invalid."
     ~pp:(fun ppf block ->
@@ -107,7 +107,7 @@ let () =
   (* Inconsistent hash *)
   register_error_kind
     `Permanent
-    ~id:"inconsistentContextHash"
+    ~id:"node.state.block.inconsistent_context_hash"
     ~title:"Inconsistent commit hash"
     ~description:
       "When commiting the context of a block, the announced context \
@@ -131,7 +131,7 @@ let () =
   (* Invalid locator *)
   register_error_kind
     `Permanent
-    ~id:"invalidLocator"
+    ~id:"node.bootstrap_pipeline.invalid_locator"
     ~title:"Invalid block locator"
     ~description:"Block locator is invalid."
     ~pp: (fun ppf (id, locator) ->
@@ -181,7 +181,7 @@ let () =
   (* Invalid protocol *)
   register_error_kind
     `Permanent
-    ~id:"validator.invalid_protocol"
+    ~id:"node.protocol_validator.invalid_protocol"
     ~title:"Invalid protocol"
     ~description:"Invalid protocol."
     ~pp:begin fun ppf (protocol, error) ->
