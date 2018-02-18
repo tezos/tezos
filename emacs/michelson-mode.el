@@ -395,7 +395,7 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
                         (concat "container:" tmp-file)
                       tmp-file)
                     "-details"
-                    "-emacs"))))
+                    "--emacs"))))
           (michelson-async-command-to-string
            command
            (lambda (output)

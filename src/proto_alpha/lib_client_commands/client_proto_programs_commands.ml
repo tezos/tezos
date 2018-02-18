@@ -21,13 +21,13 @@ let commands () =
   let open Cli_entries in
   let show_types_switch =
     switch
-      ~long:"-details"
+      ~long:"details"
       ~short:'v'
       ~doc:"show the types of each instruction"
       () in
   let emacs_mode_switch =
     switch
-      ~long:"-emacs"
+      ~long:"emacs"
       ?short:None
       ~doc:"output in `michelson-mode.el` compatible format"
       () in
