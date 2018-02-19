@@ -28,9 +28,9 @@ module Tez : sig
   type tez = t
 
   val zero: tez
-  val one_cent : tez
-  val fifty_cents : tez
-  val one : tez
+  val one_cent: tez
+  val fifty_cents: tez
+  val one: tez
 
   val ( -? ) : tez -> tez -> tez tzresult
   val ( +? ) : tez -> tez -> tez tzresult
@@ -53,9 +53,9 @@ module Period : sig
   val of_seconds: int64 -> period tzresult
   val mult: int32 -> period -> period tzresult
 
-  val one_second : period
-  val one_minute : period
-  val one_hour : period
+  val one_second: period
+  val one_minute: period
+  val one_hour: period
 
 end
 
@@ -71,7 +71,7 @@ module Timestamp : sig
   val of_seconds: string -> time option
   val to_seconds_string: time -> string
 
-  val current : context -> time
+  val current: context -> time
 
 end
 
@@ -108,16 +108,16 @@ module Script_int : module type of Script_int_repr
 module Script_timestamp : sig
   open Script_int
   type t
-  val compare : t -> t -> int
-  val to_string : t -> string
-  val to_notation : t -> string option
-  val to_num_str : t -> string
-  val of_string : string -> t option
-  val diff : t -> t -> z num
-  val add_delta : t -> z num -> t
-  val sub_delta : t -> z num -> t
-  val now : context -> t
-  val to_zint : t -> Z.t
+  val compare: t -> t -> int
+  val to_string: t -> string
+  val to_notation: t -> string option
+  val to_num_str: t -> string
+  val of_string: string -> t option
+  val diff: t -> t -> z num
+  val add_delta: t -> z num -> t
+  val sub_delta: t -> z num -> t
+  val now: context -> t
+  val to_zint: t -> Z.t
 end
 
 module Script : sig
@@ -231,8 +231,8 @@ module Script : sig
   type node = (location, prim) Micheline.node
 
   type t =
-    { code : expr ;
-      storage : expr }
+    { code: expr ;
+      storage: expr }
 
   val location_encoding: location Data_encoding.t
   val expr_encoding: expr Data_encoding.t
@@ -411,11 +411,11 @@ module Contract : sig
 
   type origination_nonce
 
-  val origination_nonce_encoding : origination_nonce Data_encoding.t
-  val originated_contract : origination_nonce -> contract
-  val originated_contracts : origination_nonce -> contract list
+  val origination_nonce_encoding: origination_nonce Data_encoding.t
+  val originated_contract: origination_nonce -> contract
+  val originated_contracts: origination_nonce -> contract list
 
-  val initial_origination_nonce : Operation_hash.t -> origination_nonce
+  val initial_origination_nonce: Operation_hash.t -> origination_nonce
 
   val get_manager:
     context -> contract -> public_key_hash tzresult Lwt.t
@@ -473,13 +473,13 @@ module Contract : sig
     context -> contract -> int32 -> unit tzresult Lwt.t
 
   module Big_map_storage : sig
-    val set :
+    val set:
       context -> contract ->
       string -> Script.expr -> context tzresult Lwt.t
-    val remove :
+    val remove:
       context -> contract -> string -> context tzresult Lwt.t
-    val mem : context -> contract -> string -> bool Lwt.t
-    val get_opt :
+    val mem: context -> contract -> string -> bool Lwt.t
+    val get_opt:
       context -> contract -> string -> Script_repr.expr option tzresult Lwt.t
   end
 

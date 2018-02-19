@@ -15,27 +15,34 @@ let nonce_length = 32
 (* 10 tez *)
 let seed_nonce_revelation_tip =
   Tez_repr.(mul_exn one 10)
+
 (* 1 tez *)
 let origination_burn =
   Tez_repr.one
 (* 1 tez *)
 let minimal_contract_balance =
   Tez_repr.one
+
 (* 1000 tez *)
 let baking_bond_cost =
   Tez_repr.(mul_exn one 1000)
+
 (* 1000 tez *)
 let endorsement_bond_cost =
   Tez_repr.(mul_exn one 1000)
+
 (* 150 tez *)
 let baking_reward =
   Tez_repr.(mul_exn one 150)
+
 (* 150 tez *)
 let endorsement_reward =
   Tez_repr.(mul_exn one 150)
+
 (* 100,000 tez *)
 let faucet_credit =
   Tez_repr.(mul_exn one 100_000)
+
 (* 4,000,000 tez *)
 let bootstrap_wealth =
   Tez_repr.(mul_exn one 4_000_000)

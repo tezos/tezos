@@ -185,7 +185,8 @@ let () =
 
 let failwith msg = fail (Failure msg)
 
-let create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable =
+let create_base c contract
+    ~balance ~manager ~delegate ?script ~spendable ~delegatable =
   (match Contract_repr.is_default contract with
    | None -> return 0l
    | Some _ -> Storage.Contract.Global_counter.get c) >>=? fun counter ->
@@ -303,10 +304,10 @@ let get_manager c contract =
 let update_manager_key c contract = function
   | Some public_key ->
       begin Storage.Contract.Manager.get c contract >>=? function
-        | (Manager_repr.Public_key v) -> (* key revealed for the second time *)
+        | Public_key v -> (* key revealed for the second time *)
             if Ed25519.Public_key.(v = public_key) then return (c,v)
             else fail (Inconsistent_public_key (v,public_key))
-        | (Manager_repr.Hash v) ->
+        | Hash v ->
             let actual_hash = Ed25519.Public_key.hash public_key in
             if (Ed25519.Public_key_hash.equal actual_hash v) then
               let v = (Manager_repr.Public_key public_key) in
@@ -314,10 +315,10 @@ let update_manager_key c contract = function
               return (c,public_key) (* reveal and update key *)
             else fail (Inconsistent_hash (public_key,v,actual_hash))
       end
-  | None -> 
+  | None ->
       begin Storage.Contract.Manager.get c contract >>=? function
-        | (Manager_repr.Public_key v) -> return (c,v) (* already revealed *)
-        | (Manager_repr.Hash v) -> fail (Missing_public_key (v))
+        | Public_key v -> return (c,v) (* already revealed *)
+        | Hash v -> fail (Missing_public_key (v))
       end
 
 let get_delegate_opt = Roll_storage.get_contract_delegate
@@ -447,7 +448,8 @@ let init c =
   Storage.Contract.Global_counter.init c 0l
 
 module Big_map = struct
-  let set handle key value = Storage.Contract.Big_map.init_set handle key value >>= return
+  let set handle key value =
+    Storage.Contract.Big_map.init_set handle key value >>= return
   let remove = Storage.Contract.Big_map.delete
   let mem = Storage.Contract.Big_map.mem
   let get_opt = Storage.Contract.Big_map.get_option
