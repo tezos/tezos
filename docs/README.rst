@@ -22,6 +22,27 @@ On a debian system, you can install the needed dependencies with:
       python3-sphinx \
       python3-sphinx-rtd-theme
 
+Sphinx extensions
+-----------------
+
+Some ad-hoc reference kinds are supported.
+
+- ``:package-src:`name``` or ``:package-src:`text<name>``` points
+  to the gitlab source tree viewer where the `.opam` for the package
+  is located
+- ``:package:`name``` or ``:package:`text<name>``` now points
+  either to the `odoc` page, or if it doesn't exist, to the gitlab
+  source tree viewer
+- ``:package-name:`name``` or ``:package-name:`text<name>``` just
+  displays the package name (no link), checking that the package
+  exists
+- ``:src:`/path/to/file/or/dir``` or
+  ``:src:`text</path/to/file/or/dir>``` points to the gitlab source
+  tree viewer
+- ``:opam:`package``` or ``:opam:`text<package>``` points to the
+  package page on ``opam.ocaml.org``, version number is supported
+  (``package.version``)
+
 OCaml documentation
 -------------------
 
