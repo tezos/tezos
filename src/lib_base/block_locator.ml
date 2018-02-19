@@ -16,7 +16,26 @@ and raw = Block_header.t * Block_hash.t list
 
 let raw x = x
 
-let pp ppf loc = Block_header.pp ppf (fst loc)
+let pp ppf (hd, h_lst) =
+  let repeats = 10 in
+  let coef = 2 in
+  (* list of hashes *)
+  let rec pp_hash_list ppf (h_lst , acc , d , r) =
+    match h_lst with
+    | [] ->
+        Format.fprintf ppf ""
+    | hd :: tl ->
+        let new_d = if r > 1 then d else d * coef in
+        let new_r = if r > 1 then r - 1 else repeats in
+        Format.fprintf ppf "%a (%i)\n%a" Block_hash.pp hd acc pp_hash_list (tl , acc - d , new_d , new_r) in
+  Format.fprintf ppf "%a (head)\n%a"
+    Block_hash.pp (Block_header.hash hd)
+    pp_hash_list (h_lst , -1, 1, repeats - 1)
+
+let pp_short ppf (hd, h_lst) =
+  Format.fprintf ppf "head: %a, %d predecessors"
+    Block_hash.pp (Block_header.hash hd)
+    (List.length h_lst)
 
 let encoding =
   let open Data_encoding in

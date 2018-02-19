@@ -17,6 +17,8 @@ val raw: t -> raw
 
 val pp : Format.formatter -> t -> unit
 
+val pp_short : Format.formatter -> t -> unit
+
 val encoding: t Data_encoding.t
 
 val compute: predecessor: (Block_hash.t -> int -> Block_hash.t option Lwt.t) ->

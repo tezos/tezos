@@ -136,9 +136,9 @@ let () =
     ~description:"Block locator is invalid."
     ~pp: (fun ppf (id, locator) ->
         Format.fprintf ppf
-          "Invalid block locator %a on peer %a"
-          Block_locator.pp locator
-          P2p_peer.Id.pp id)
+          "Invalid block locator on peer %a:\n%a"
+          P2p_peer.Id.pp id
+          Block_locator.pp locator)
     Data_encoding.(obj2
                      (req "id" P2p_peer.Id.encoding)
                      (req "locator" Block_locator.encoding))
