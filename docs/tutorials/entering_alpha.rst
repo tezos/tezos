@@ -175,22 +175,23 @@ Protocol RPC API
 ~~~~~~~~~~~~~~~~
 
 Finally, the RPCs specific to Alpha are also defined above the
-``Alpha_context`` barrier. The definition is split into two parts.
+``Alpha_context`` barrier.
 
-The first part, ``Services``, defines the RPC API: URL schemes with the
-types of parameters, and input and output JSON schemas. This interface
-serves three purposes. As it is thourouhgly tyoed, it makes sure that
-the handlers have the right input and output types. It is also used by
-the client to perform RPC calls, to make sure that the URL schemes and
-JSON formats and consistent between the two parties. These two features
-are extremely useful when refactoring, as the OCaml typechecker will
-help us track the effects of an RPC API change on the whole codebase.
-The third purpose is of course, to make automatic documentation
-generation possible (as in ``tezos client rpc list/format``).
+Services are defined in a few modules, divided by theme. Each module
+defines the RPC API: URL schemes with the types of parameters, and
+input and output JSON schemas. This interface serves three
+purposes. As it is thourouhgly typed, it makes sure that the handlers
+(that are registered in the same file) have the right input and output
+types. It is also used by the client to perform RPC calls, to make
+sure that the URL schemes and JSON formats and consistent between the
+two parties. These two features are extremely useful when refactoring,
+as the OCaml typechecker will help us track the effects of an RPC API
+change on the whole codebase. The third purpose is of course, to make
+automatic documentation generation possible (as in ``tezos client rpc
+list/format``). Each service is also accompanied by a caller function,
+that can be used from the client to perform the calls, and by the
+tests to simulate calls in a fake in-memory context.
 
 It can be useful if you are a third party developer who wants to read
 the OCaml definition of the service hierarchy directly, instead of the
 automatically generated JSON hierarchy.
-
-The second part, ``Services_registration``, is responsible for plugging
-the OCaml handler functions that implement the RPC API.
