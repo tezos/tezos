@@ -39,7 +39,7 @@ let wrap
     data_dir config_file
     connections max_download_speed max_upload_speed binary_chunks_size
     peer_table_size
-    listen_addr peers no_bootstrap_peers closed expected_pow
+    listen_addr peers no_bootstrap_peers bootstrap_threshold closed expected_pow
     rpc_listen_addr rpc_tls
     cors_origins cors_headers log_output =
 
@@ -59,9 +59,13 @@ let wrap
   let bootstrap_threshold,
       min_connections, expected_connections, max_connections =
     match connections with
-    | None -> None, None, None, None
-    | Some x ->  Some (min (x/4) 2), Some (x/2), Some x, Some (3*x/2) in
-
+    | None -> bootstrap_threshold, None, None, None
+    | Some x ->
+        begin match bootstrap_threshold with
+          | None -> Some (min (x/4) 2), Some (x/2), Some x, Some (3*x/2)
+          | Some bs -> Some bs, Some (x/2), Some x, Some (3*x/2)
+        end
+  in
   { data_dir ;
     config_file ;
     min_connections ;
@@ -183,6 +187,13 @@ module Term = struct
     Arg.(value & flag &
          info ~docs ~doc ["no-bootstrap-peers"])
 
+  let bootstrap_threshold =
+    let doc =
+      "Set the number of peers with whom a chain synchronization must \
+       be completed to bootstrap the node" in
+    Arg.(value & opt (some int) None &
+         info ~docs ~doc ~docv:"NUM" ["bootstrap-threshold"])
+
   let peers =
     let doc =
       "A peer to bootstrap the network from. \
@@ -238,7 +249,7 @@ module Term = struct
     $ connections
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
     $ peer_table_size
-    $ listen_addr $ peers $ no_bootstrap_peers $ closed $ expected_pow
+    $ listen_addr $ peers $ no_bootstrap_peers $ bootstrap_threshold $ closed $ expected_pow
     $ rpc_listen_addr $ rpc_tls
     $ cors_origins $ cors_headers
     $ log_output
