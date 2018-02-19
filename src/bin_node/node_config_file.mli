@@ -84,4 +84,6 @@ val resolve_listening_addrs: string -> (P2p_addr.t * int) list Lwt.t
 val resolve_rpc_listening_addrs: string -> (P2p_addr.t * int) list Lwt.t
 val resolve_bootstrap_addrs: string list -> (P2p_addr.t * int) list Lwt.t
 
+val encoding: t Data_encoding.t
+
 val check: t -> unit Lwt.t

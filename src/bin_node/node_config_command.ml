@@ -123,9 +123,17 @@ module Manpage = struct
         entries in the Tezos configuration file."
   ]
 
+  let schema = Data_encoding.Json.schema (Node_config_file.encoding)
+  let options = [
+    `S "OPTIONS" ;
+    `P "All options available in the config file";
+    `Pre (Format.asprintf "@[%a@]" Json_schema.pp schema)
+  ]
+
   let man =
     description @
     Node_shared_arg.Manpage.args @
+    options @
     Node_shared_arg.Manpage.bugs
 
   let info =
