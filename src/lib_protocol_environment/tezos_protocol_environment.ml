@@ -139,6 +139,8 @@ module Make (Context : CONTEXT) = struct
     val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
 
     module Lift (P : Updater.PROTOCOL) : PROTOCOL
+      with type operation = P.operation
+       and type validation_state = P.validation_state
 
     class ['block] proto_rpc_context :
       Tezos_rpc.RPC_context.t -> (unit, unit * 'block) RPC_path.t ->
