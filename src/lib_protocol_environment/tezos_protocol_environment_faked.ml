@@ -16,6 +16,7 @@ module Context = struct
   let dir_mem _ _ = assert false
   let get _ _ = assert false
   let set _ _ _ = assert false
+  let copy _ ~from:_ ~to_:_ = assert false
   let del _ _ = assert false
   let remove_rec _ _ = assert false
   let fold _ _ ~init:_ ~f:_ = assert false

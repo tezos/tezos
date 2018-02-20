@@ -45,6 +45,9 @@ val set: context -> key -> value -> t Lwt.t
 val del: context -> key -> t Lwt.t
 val remove_rec: context -> key -> t Lwt.t
 
+(** [copy] returns None if the [from] key is not bound *)
+val copy: context -> from:key -> to_:key -> context option Lwt.t
+
 val fold:
   context -> key -> init:'a ->
   f:([ `Key of key | `Dir of key ] -> 'a -> 'a Lwt.t) ->

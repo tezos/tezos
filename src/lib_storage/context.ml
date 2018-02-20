@@ -157,6 +157,13 @@ let remove_rec ctxt key =
   GitStore.Tree.remove ctxt.tree (data_key key) >>= fun tree ->
   Lwt.return { ctxt with tree }
 
+let copy ctxt ~from ~to_ =
+  GitStore.Tree.find_tree ctxt.tree (data_key from) >>= function
+  | None -> Lwt.return_none
+  | Some sub_tree ->
+      GitStore.Tree.add_tree ctxt.tree (data_key to_) sub_tree >>= fun tree ->
+      Lwt.return_some { ctxt with tree }
+
 let fold ctxt key ~init ~f =
   GitStore.Tree.list ctxt.tree (data_key key) >>= fun keys ->
   Lwt_list.fold_left_s

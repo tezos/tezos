@@ -86,6 +86,10 @@ module Context = struct
     match raw_set m k None with
     | None -> Lwt.return m
     | Some m -> Lwt.return m
+  let copy m ~from ~to_ =
+    match raw_get m from with
+    | None -> Lwt.return_none
+    | Some v -> Lwt.return (raw_set m to_ (Some v))
 
   let fold m k ~init ~f =
     match raw_get m k with

@@ -25,6 +25,9 @@ val get: t -> key -> value option Lwt.t
 
 val set: t -> key -> value -> t Lwt.t
 
+(** [copy] returns None if the [from] key is not bound *)
+val copy: t -> from:key -> to_:key -> t option Lwt.t
+
 val del: t -> key -> t Lwt.t
 val remove_rec: t -> key -> t Lwt.t
 
