@@ -8,9 +8,7 @@
 (**************************************************************************)
 
 type error +=
-  | Initial_amount_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t (* `Permanent *)
   | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t (* `Temporary *)
-  | Cannot_pay_storage_fee of Contract_repr.contract * Tez_repr.t * Tez_repr.t (* `Temporary *)
   | Counter_in_the_past of Contract_repr.contract * int32 * int32 (* `Branch *)
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
@@ -22,21 +20,6 @@ type error +=
   | Failure of string (* `Permanent *)
 
 let () =
-  register_error_kind
-    `Permanent
-    ~id:"contract.initial_amount_too_low"
-    ~title:"Initial amount too low"
-    ~description:"Not enough tokens provided for an origination"
-    ~pp:(fun ppf (c, r, p) ->
-        Format.fprintf ppf "Initial amount of contract %a too low (required %a but provided %a)"
-          Contract_repr.pp c
-          Tez_repr.pp p Tez_repr.pp r)
-    Data_encoding.(obj3
-                     (req "contract" Contract_repr.encoding)
-                     (req "required" Tez_repr.encoding)
-                     (req "provided" Tez_repr.encoding))
-    (function Initial_amount_too_low (c, r, p)   -> Some (c, r, p) | _ -> None)
-    (fun (c, r, p) -> Initial_amount_too_low (c, r, p)) ;
   register_error_kind
     `Permanent
     ~id:"contract.unspendable_contract"
@@ -62,20 +45,6 @@ let () =
                      (req "amount" Tez_repr.encoding))
     (function Balance_too_low (c, b, a)   -> Some (c, b, a) | _ -> None)
     (fun (c, b, a) -> Balance_too_low (c, b, a)) ;
-  register_error_kind
-    `Temporary
-    ~id:"contract.cannot_pay_storage_fee"
-    ~title:"Cannot pay storage fee"
-    ~description:"The storage fee is higher than the contract balance"
-    ~pp:(fun ppf (c, b, a) ->
-        Format.fprintf ppf "Balance of contract %a too low (%a) to pay storage fee %a"
-          Contract_repr.pp c Tez_repr.pp b Tez_repr.pp a)
-    Data_encoding.(obj3
-                     (req "contract" Contract_repr.encoding)
-                     (req "balance" Tez_repr.encoding)
-                     (req "storage_fee" Tez_repr.encoding))
-    (function Cannot_pay_storage_fee (c, b, a)   -> Some (c, b, a) | _ -> None)
-    (fun (c, b, a) -> Cannot_pay_storage_fee (c, b, a)) ;
   register_error_kind
     `Temporary
     ~id:"contract.counter_in_the_future"
@@ -213,7 +182,7 @@ let create_base c contract
   Roll_storage.Contract.add_amount c contract balance >>=? fun c ->
   return (c, contract)
 
-let create c nonce ~balance ~manager ~delegate ?script ~spendable ~delegatable =
+let originate c nonce ~balance ~manager ?script ~delegate ~spendable ~delegatable =
   let contract = Contract_repr.originated_contract nonce in
   create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable >>=? fun (ctxt, contract) ->
   return (ctxt, contract, Contract_repr.incr_origination_nonce nonce)
@@ -363,52 +332,51 @@ let set_delegate c contract delegate =
           Storage.Contract.Delegate.init_set c contract delegate >>= fun c ->
           return c
 
-let contract_fee c contract =
+let code_and_storage_fee c contract =
   Storage.Contract.Code_fees.get_option c contract >>=? fun code_fees ->
   Storage.Contract.Storage_fees.get_option c contract >>=? fun storage_fees ->
   match code_fees, storage_fees with
-  | (None, Some _) | (Some _, None) -> failwith "contract_fee"
+  | (None, Some _) | (Some _, None) ->
+      failwith "contract_fee" (* Internal error *)
   | None, None ->
-      return Constants_repr.minimal_contract_balance
+      return Tez_repr.zero
   | Some code_fees, Some storage_fees ->
-      Lwt.return Tez_repr.(code_fees +? storage_fees) >>=? fun script_fees ->
-      Lwt.return Tez_repr.(Constants_repr.minimal_contract_balance +? script_fees)
+      Lwt.return Tez_repr.(code_fees +? storage_fees)
+
+let update_storage_fee c contract storage_fees =
+  Storage.Contract.Storage_fees.set c contract storage_fees
 
 type big_map_diff = (string * Script_repr.expr option) list
 
-let update_script_storage_and_fees c contract storage_fees storage big_map  =
-  Storage.Contract.Balance.get_option c contract >>=? function
-  | None ->
-      (* The contract was destroyed *)
-      return c
-  | Some balance ->
-      Storage.Contract.Storage_fees.set c contract storage_fees >>=? fun c ->
-      contract_fee c contract >>=? fun fee ->
-      fail_unless Tez_repr.(balance > fee)
-        (Cannot_pay_storage_fee (contract, balance, fee)) >>=? fun () ->
-      begin match big_map with
-        | None -> return c
-        | Some diff ->
-            fold_left_s (fun c (key, value) ->
-                match value with
-                | None -> Storage.Contract.Big_map.remove (c, contract) key >>= return
-                | Some v ->
-                    Storage.Contract.Big_map.init_set (c, contract) key v >>= return)
-              c diff
-      end >>=? fun c ->
-      Storage.Contract.Storage.set c contract storage
+let update_script_storage c contract storage big_map  =
+  begin match big_map with
+    | None -> return c
+    | Some diff ->
+        fold_left_s (fun c (key, value) ->
+            match value with
+            | None ->
+                Storage.Contract.Big_map.remove (c, contract) key >>=
+                return
+            | Some v ->
+                Storage.Contract.Big_map.init_set (c, contract) key v >>=
+                return)
+          c diff
+  end >>=? fun c ->
+  Storage.Contract.Storage.set c contract storage
 
 let spend_from_script c contract amount =
   Storage.Contract.Balance.get c contract >>=? fun balance ->
-  Lwt.return Tez_repr.(balance -? amount) |>
-  trace (Balance_too_low (contract, balance, amount)) >>=? fun new_balance ->
-  contract_fee c contract >>=? fun fee ->
-  if Tez_repr.(new_balance > fee) then
-    Storage.Contract.Balance.set c contract new_balance >>=? fun c ->
-    Roll_storage.Contract.remove_amount c contract amount
-  else
-    (* TODO: do we really want to allow overspending ? *)
-    delete c contract
+  match Tez_repr.(balance -? amount) with
+  | Error _ ->
+      fail (Balance_too_low (contract, balance, amount))
+  | Ok new_balance ->
+      if Tez_repr.(new_balance > Tez_repr.zero) then
+        Storage.Contract.Balance.set c contract new_balance >>=? fun c ->
+        Roll_storage.Contract.remove_amount c contract amount
+      else
+        match Contract_repr.is_default contract with
+        | Some _ -> delete c contract
+        | None -> return c
 
 let credit c contract amount =
   Storage.Contract.Balance.get_option c contract >>=? function
@@ -416,14 +384,8 @@ let credit c contract amount =
       match Contract_repr.is_default contract with
       | None -> fail (Non_existing_contract contract)
       | Some manager ->
-          if Tez_repr.(amount < Constants_repr.minimal_contract_balance)
-          then
-            (* Not enough to keep a default contract alive: burn the tokens *)
-            return c
-          else
-            (* Otherwise, create the default contract. *)
-            create_default c manager ~balance:amount >>=? fun (c, _) ->
-            return c
+          create_default c manager ~balance:amount >>=? fun (c, _) ->
+          return c
     end
   | Some balance ->
       Lwt.return Tez_repr.(amount +? balance) >>=? fun balance ->
@@ -435,14 +397,6 @@ let spend c contract amount =
   if not spendable
   then fail (Unspendable_contract contract)
   else spend_from_script c contract amount
-
-let originate c nonce ~balance ~manager ?script ~delegate ~spendable ~delegatable  =
-  create c nonce ~balance ~manager ~delegate ?script ~spendable ~delegatable >>=? fun (c, contract, nonce) ->
-  (* check contract fee *)
-  contract_fee c contract >>=? fun fee ->
-  fail_unless Tez_repr.(balance >= fee)
-    (Initial_amount_too_low (contract, balance, fee)) >>=? fun () ->
-  return (c, contract, nonce)
 
 let init c =
   Storage.Contract.Global_counter.init c 0l

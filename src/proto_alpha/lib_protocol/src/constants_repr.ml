@@ -19,9 +19,6 @@ let seed_nonce_revelation_tip =
 (* 1 tez *)
 let origination_burn =
   Tez_repr.one
-(* 1 tez *)
-let minimal_contract_balance =
-  Tez_repr.one
 
 (* 1000 tez *)
 let baking_bond_cost =

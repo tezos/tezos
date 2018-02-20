@@ -29,20 +29,6 @@ let run blkid ({ b1 ; b2 ; _ } : Helpers.Account.bootstrap_accounts) =
     ~balance:Tez.zero () >>= fun result ->
   Assert.unknown_contract ~msg:__LOC__ result ;
 
-  (* Origination with amount = .5 tez *)
-  Helpers.Account.originate
-    ~src:b1
-    ~manager_pkh:foo.pkh
-    ~balance:Tez.fifty_cents () >>= fun result ->
-  Assert.initial_amount_too_low ~msg:__LOC__ result ;
-
-  (* Origination with amount = 1 tez *)
-  Helpers.Account.originate
-    ~src:b1
-    ~manager_pkh:foo.pkh
-    ~balance:(cents 99L) () >>= fun result ->
-  Assert.initial_amount_too_low ~msg:__LOC__ result ;
-
   (* Origination with amount > 1 tez *)
   Helpers.Account.originate
     ~src:b1

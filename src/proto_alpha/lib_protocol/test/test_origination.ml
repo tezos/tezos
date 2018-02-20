@@ -35,14 +35,6 @@ let test_simple_origination () =
   Init.main () >>=? fun root ->
   let src = List.hd Account.bootstrap_accounts in
 
-  (* 0 balance should fail *)
-  originate root src 0 >>= Assert.wrap >>= fun result ->
-  Assert.initial_amount_too_low ~msg: __LOC__ result ;
-
-  (* .5 Balance should fail *)
-  originate root src 50 >>= Assert.wrap >>= fun result ->
-  Assert.initial_amount_too_low ~msg: __LOC__ result ;
-
   (* 2. Balance should work *)
   originate root src 200 >>= Assert.ok >>= fun _ ->
   return ()

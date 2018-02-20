@@ -196,6 +196,7 @@ let rec interp
               ~script:({ code ; storage }, (dummy_code_fee, dummy_storage_fee))
               ~spendable ~delegatable
             >>=? fun (ctxt, contract, origination) ->
+            Fees.origination_burn ctxt ~source:orig contract >>=? fun ctxt ->
             logged_return descr ~origination (Item ((param_type, return_type, contract), rest), gas, ctxt) in
         let logged_return : ?origination:Contract.origination_nonce ->
           a stack * Gas.t * context ->
@@ -655,9 +656,10 @@ let rec interp
             Contract.credit ctxt destination amount >>=? fun ctxt ->
             Contract.get_script ctxt destination >>=? fun destination_script ->
             let sto = Micheline.strip_locations (unparse_data storage_type storage) in
-            Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto
+            Contract.update_script_storage ctxt source sto
               (Option.map ~f:Script_ir_translator.to_serializable_big_map
                  (Script_ir_translator.extract_big_map storage_type storage)) >>=? fun ctxt ->
+            Fees.update_script_storage ctxt ~source:orig source dummy_storage_fee >>=? fun ctxt ->
             begin match destination_script with
               | None ->
                   (* we see non scripted contracts as (unit, unit) contract *)
@@ -668,11 +670,13 @@ let rec interp
                   let p = unparse_data tp p in
                   execute origination source destination ctxt script amount p gas
                   >>=? fun (csto, ret, gas, ctxt, origination, maybe_diff) ->
-                  Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee csto
+                  Contract.update_script_storage ctxt destination csto
                     (Option.map ~f:Script_ir_translator.to_serializable_big_map maybe_diff) >>=? fun ctxt ->
                   trace
                     (Invalid_contract (loc, destination))
                     (parse_data ctxt Unit_t ret) >>=? fun () ->
+                  Fees.update_script_storage ctxt ~source:orig
+                    destination dummy_storage_fee >>=? fun ctxt ->
                   return (ctxt, gas, origination)
             end >>=? fun (ctxt, gas, origination) ->
             Contract.get_script ctxt source >>=? (function
@@ -694,12 +698,16 @@ let rec interp
                     Option.map ~f:to_serializable_big_map
                     @@ extract_big_map storage_type sto) in
                 let sto = Micheline.strip_locations (unparse_data storage_type sto) in
-                Contract.update_script_storage_and_fees ctxt source dummy_storage_fee sto maybe_diff >>=? fun ctxt ->
+                Contract.update_script_storage ctxt source sto maybe_diff >>=? fun ctxt ->
+                Fees.update_script_storage ctxt ~source:orig
+                  source dummy_storage_fee >>=? fun ctxt ->
                 let p = unparse_data tp p in
                 execute origination source destination ctxt script amount p gas
                 >>=? fun (sto, ret, gas, ctxt, origination, maybe_diff) ->
-                Contract.update_script_storage_and_fees ctxt destination dummy_storage_fee sto
+                Contract.update_script_storage ctxt destination sto
                   (Option.map ~f:Script_ir_translator.to_serializable_big_map maybe_diff) >>=? fun ctxt ->
+                Fees.update_script_storage ctxt ~source:orig
+                  destination dummy_storage_fee >>=? fun ctxt ->
                 trace
                   (Invalid_contract (loc, destination))
                   (parse_data ctxt tr ret) >>=? fun v ->
@@ -719,6 +727,7 @@ let rec interp
               origination
               ~manager ~delegate ~balance
               ?script:None ~spendable:true ~delegatable >>=? fun (ctxt, contract, origination) ->
+            Fees.origination_burn ctxt ~source contract >>=? fun ctxt ->
             logged_return ~origination (Item ((Unit_t, Unit_t, contract), rest), gas, ctxt)
         | Default_account, Item (key, rest) ->
             let gas = Gas.consume gas Gas.Cost_of.default_account in

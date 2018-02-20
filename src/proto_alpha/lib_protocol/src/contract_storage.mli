@@ -8,9 +8,7 @@
 (**************************************************************************)
 
 type error +=
-  | Initial_amount_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t (* `Permanent *)
   | Balance_too_low of Contract_repr.contract * Tez_repr.t * Tez_repr.t (* `Temporary *)
-  | Cannot_pay_storage_fee of Contract_repr.contract * Tez_repr.t * Tez_repr.t (* `Temporary *)
   | Counter_in_the_past of Contract_repr.contract * int32 * int32 (* `Branch *)
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
@@ -60,9 +58,9 @@ val get_storage:
 
 type big_map_diff = (string * Script_repr.expr option) list
 
-val update_script_storage_and_fees:
-  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Script_repr.expr ->
-  big_map_diff option ->
+val update_script_storage:
+  Raw_context.t -> Contract_repr.t ->
+  Script_repr.expr -> big_map_diff option ->
   Raw_context.t tzresult Lwt.t
 
 (** fails if the contract is not delegatable *)
@@ -83,6 +81,12 @@ val spend:
 val spend_from_script:
   Raw_context.t -> Contract_repr.t -> Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
+
+val code_and_storage_fee:
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
+
+val update_storage_fee:
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
 
 val originate:
   Raw_context.t ->

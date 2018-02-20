@@ -440,8 +440,6 @@ module Contract : sig
   val set_delegate:
     context -> contract -> public_key_hash option -> context tzresult Lwt.t
 
-  type error += Initial_amount_too_low of contract * Tez.t * Tez.t
-
   val originate:
     context ->
     origination_nonce ->
@@ -462,9 +460,13 @@ module Contract : sig
   val credit:
     context -> contract -> Tez.t -> context tzresult Lwt.t
 
-  val update_script_storage_and_fees:
-    context -> contract -> Tez.t -> Script.expr ->
-    (string * Script.expr option) list option -> context tzresult Lwt.t
+  val update_script_storage:
+    context -> contract ->
+    Script.expr -> (string * Script.expr option) list option ->
+    context tzresult Lwt.t
+
+  val code_and_storage_fee: context -> contract -> Tez.t tzresult Lwt.t
+  val update_storage_fee: context -> contract -> Tez.t -> context tzresult Lwt.t
 
   val increment_counter:
     context -> contract -> context tzresult Lwt.t

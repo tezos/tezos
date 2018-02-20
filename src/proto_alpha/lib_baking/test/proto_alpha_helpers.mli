@@ -195,7 +195,6 @@ module Assert : sig
 
   (** Origination assertions *)
 
-  val initial_amount_too_low : msg:string -> 'a tzresult -> unit
   val non_delegatable : msg:string -> 'a tzresult -> unit
 
   (** Endorsement / baking assertions *)

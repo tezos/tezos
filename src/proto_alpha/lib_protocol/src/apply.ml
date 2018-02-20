@@ -138,14 +138,15 @@ let apply_manager_operation_content
             | Ok (storage_res, _res, _steps, ctxt, origination_nonce, maybe_big_map_diff) ->
                 (* TODO: pay for the steps and the storage diff:
                    update_script_storage checks the storage cost *)
-                Contract.update_script_storage_and_fees
+                Contract.update_script_storage
                   ctxt destination
-                  Script_interpreter.dummy_storage_fee
                   storage_res
                   (match maybe_big_map_diff with
                    | None -> None
                    | Some map ->
                        Some (Script_ir_translator.to_serializable_big_map map)) >>=? fun ctxt ->
+                Fees.update_script_storage ctxt ~source
+                  destination Script_interpreter.dummy_storage_fee >>=? fun ctxt ->
                 return (ctxt, origination_nonce, None)
             | Error err ->
                 return (ctxt, origination_nonce, Some err) in
@@ -173,13 +174,13 @@ let apply_manager_operation_content
             return (Some (script, (Script_interpreter.dummy_code_fee, Script_interpreter.dummy_storage_fee)),
                     big_map_diff)
       end >>=? fun (script, big_map) ->
-      Contract.spend ctxt source Constants.origination_burn >>=? fun ctxt ->
       Contract.spend ctxt source credit >>=? fun ctxt ->
       Contract.originate ctxt
         origination_nonce
         ~manager ~delegate ~balance:credit
         ?script
         ~spendable ~delegatable >>=? fun (ctxt, contract, origination_nonce) ->
+      Fees.origination_burn ctxt ~source contract >>=? fun ctxt ->
       begin match big_map with
         | None -> return ctxt
         | Some diff ->

@@ -213,12 +213,6 @@ let inconsistent_pkh ~msg =
       | _ -> false)
   end
 
-let initial_amount_too_low ~msg =
-  contain_error ~msg ~f: begin ecoproto_error (function
-      | Contract.Initial_amount_too_low _ -> true
-      | _ -> false)
-  end
-
 let non_delegatable ~msg =
   contain_error ~msg ~f: begin ecoproto_error (function
       | Proto_alpha.Contract_storage.Non_delegatable_contract _ -> true
