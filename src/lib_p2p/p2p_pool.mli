@@ -8,19 +8,19 @@
 (**************************************************************************)
 
 (** Pool of connections. This module manages the connection pool that
-    the shell needs to maintain in order to function correctly.
+    the peer-to-peer layer needs to maintain in order to function
+    correctly.
 
     A pool and its connections are parametrized by the type of
     messages exchanged over the connection and the type of
     meta-information associated with a peer. The type [('msg, 'meta)
-    connection] is a wrapper on top of [P2p_connection.t] that adds
-    meta-information, a data-structure describing a fine-grained state
-    of the connection, as well as a new message queue (referred to
-    "app message queue") that will only contain the messages from the
-    internal [P2p_connection.t] that needs to be examined by the
-    higher layers. Some messages are directly processed by an internal
-    worker and thus never propagated above.
-*)
+    connection] is a wrapper on top of [P2p_socket.t] that adds
+    meta-information, a data-structure describing the detailed state of
+    the connection, as well as a new message queue (referred to "app
+    message queue") that will only contain the messages from the
+    internal [P2p_socket.t] that needs to be examined by the higher
+    layers. Some messages are directly processed by an internal worker
+    and thus never propagated above. *)
 
 type 'msg encoding = Encoding : {
     tag: int ;
@@ -75,7 +75,10 @@ type config = {
       Above this number, [accept] will start dropping incoming
       connections. *)
 
-  authentification_timeout : float ;
+  connection_timeout : float ;
+  (** Maximum time allowed to the establishment of a connection. *)
+
+  authentication_timeout : float ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
   incoming_app_message_queue_size : int option ;
@@ -181,11 +184,11 @@ type ('msg, 'meta) connection
     fine-grained logical state of the connection. *)
 
 val connect:
-  timeout:float ->
+  ?timeout:float ->
   ('msg, 'meta) pool -> P2p_point.Id.t ->
   ('msg, 'meta) connection tzresult Lwt.t
-(** [connect ~timeout pool point] tries to add a
-    connection to [point] in [pool] in less than [timeout] seconds. *)
+(** [connect ?timeout pool point] tries to add a connection to [point]
+    in [pool] in less than [timeout] seconds. *)
 
 val accept:
   ('msg, 'meta) pool -> Lwt_unix.file_descr -> P2p_point.Id.t -> unit

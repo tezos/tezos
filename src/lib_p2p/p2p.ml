@@ -41,7 +41,8 @@ type config = {
 
 type limits = {
 
-  authentification_timeout : float ;
+  connection_timeout : float ;
+  authentication_timeout : float ;
 
   min_connections : int ;
   expected_connections : int ;
@@ -94,7 +95,8 @@ let create_connection_pool config limits meta_cfg msg_cfg io_sched =
     min_connections = limits.min_connections ;
     max_connections = limits.max_connections ;
     max_incoming_connections = limits.max_incoming_connections ;
-    authentification_timeout = limits.authentification_timeout ;
+    connection_timeout = limits.connection_timeout ;
+    authentication_timeout = limits.authentication_timeout ;
     incoming_app_message_queue_size = limits.incoming_app_message_queue_size ;
     incoming_message_queue_size = limits.incoming_message_queue_size ;
     outgoing_message_queue_size = limits.outgoing_message_queue_size ;
@@ -123,19 +125,14 @@ let bounds ~min ~expected ~max =
     max_threshold = max - step_max ;
   }
 
-let may_create_discovery_worker _config pool =
-  Some (P2p_discovery.create pool)
-
-let create_maintenance_worker limits pool disco =
+let create_maintenance_worker limits pool =
   let bounds =
     bounds
       ~min:limits.min_connections
       ~expected:limits.expected_connections
       ~max:limits.max_connections
   in
-  P2p_maintenance.run
-    ~connection_timeout:limits.authentification_timeout
-    bounds pool disco
+  P2p_maintenance.run bounds pool
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
@@ -156,7 +153,6 @@ module Real = struct
     limits: limits ;
     io_sched: P2p_io_scheduler.t ;
     pool: ('msg, 'meta) P2p_pool.t ;
-    discoverer: P2p_discovery.t option ;
     maintenance: 'meta P2p_maintenance.t ;
     welcome: P2p_welcome.t option ;
   }
@@ -165,15 +161,13 @@ module Real = struct
     let io_sched = create_scheduler limits in
     create_connection_pool
       config limits meta_cfg msg_cfg io_sched >>= fun pool ->
-    let discoverer = may_create_discovery_worker config pool in
-    let maintenance = create_maintenance_worker limits pool discoverer in
+    let maintenance = create_maintenance_worker limits pool in
     may_create_welcome_worker config limits pool >>= fun welcome ->
     return {
       config ;
       limits ;
       io_sched ;
       pool ;
-      discoverer ;
       maintenance ;
       welcome ;
     }
@@ -190,7 +184,6 @@ module Real = struct
   let shutdown net () =
     Lwt_utils.may ~f:P2p_welcome.shutdown net.welcome >>= fun () ->
     P2p_maintenance.shutdown net.maintenance >>= fun () ->
-    Lwt_utils.may ~f:P2p_discovery.shutdown net.discoverer >>= fun () ->
     P2p_pool.destroy net.pool >>= fun () ->
     P2p_io_scheduler.shutdown ~timeout:3.0 net.io_sched
 
@@ -352,8 +345,8 @@ let check_limits =
       Error_monad.failwith "value of option %S cannot be negative@." orig
   in
   fun c ->
-    fail_1 c.authentification_timeout
-      "authentification-timeout" >>=? fun () ->
+    fail_1 c.authentication_timeout
+      "authentication-timeout" >>=? fun () ->
     fail_2 c.min_connections
       "min-connections" >>=? fun () ->
     fail_2 c.expected_connections

@@ -7,12 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** IO Scheduling. This module implements generic IO scheduling
-    between file descriptors. In order to use IO scheduling, the
-    [register] function must be used to make a file descriptor managed
-    by a [scheduler].. It will return a value of type [connection]
-    that must be used to perform IO on the managed file descriptor
-    using this module's dedicated IO functions (read, write, etc.).
+(** Generic IO scheduling between file descriptors.
+
+    In order to use IO scheduling, the [register] function must be
+    used to make a file descriptor managed by a [scheduler].. It will
+    return a value of type [connection] that must be used to perform IO
+    on the managed file descriptor using this module's dedicated IO
+    functions (read, write, etc.).
 
     Each connection is allowed a read (resp. write) quota, which is
     for now fairly distributed among connections.

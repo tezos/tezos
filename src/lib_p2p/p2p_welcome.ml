@@ -47,7 +47,7 @@ let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
   Lwt_unix.listen main_socket backlog ;
   Lwt.return main_socket
 
-let run ~backlog pool ?addr port  =
+let run ?addr ~backlog pool port =
   Lwt.catch begin fun () ->
     create_listening_socket
       ~backlog ?addr port >>= fun socket ->

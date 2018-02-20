@@ -7,7 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Tezos Shell Net - Low level API for the Gossip network *)
+(** Tezos Shell Net - Low level API for the Gossip network
+
+    This is the entry point of the peer-to-peer layer.
+
+    It is used by the Shell as the API to communicate with other
+    nodes.
+*)
 
 type 'meta meta_config = {
   encoding : 'meta Data_encoding.t;
@@ -61,7 +67,10 @@ type config = {
 (** Network capacities *)
 type limits = {
 
-  authentification_timeout : float ;
+  connection_timeout : float ;
+  (** Maximum time allowed to the establishment of a connection. *)
+
+  authentication_timeout : float ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
   min_connections : int ;
@@ -113,6 +122,10 @@ type limits = {
 
 }
 
+(** Type of a P2P layer instance, parametrized by:
+    ['msg]: type of messages exchanged between peers
+    ['meta]: type of the metadata associated with peers (score, etc.)
+*)
 type ('msg, 'meta) t
 type ('msg, 'meta) net = ('msg, 'meta) t
 

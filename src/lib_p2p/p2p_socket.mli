@@ -7,7 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** This modules adds message encoding and encryption to
+(** Typed and encrypted connections to peers.
+
+    This modules adds message encoding and encryption to
     [P2p_io_scheduler]'s generic throttled connections.
 
     Each connection have an associated internal read (resp. write)

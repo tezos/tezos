@@ -60,6 +60,7 @@ license when the main network lunches.
    :caption: White doc:
 
    whitedoc/the_big_picture
+   whitedoc/p2p
    whitedoc/validation
    whitedoc/michelson
    whitedoc/proof_of_stake

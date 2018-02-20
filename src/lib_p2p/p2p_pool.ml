@@ -160,7 +160,8 @@ type config = {
   min_connections : int ;
   max_connections : int ;
   max_incoming_connections : int ;
-  authentification_timeout : float ;
+  connection_timeout : float ;
+  authentication_timeout : float ;
 
   incoming_app_message_queue_size : int option ;
   incoming_message_queue_size : int option ;
@@ -555,7 +556,9 @@ let compare_known_point_info p1 p2 =
   | true, false -> 1
   | true, true -> compare_last_seen p2 p1
 
-let rec connect ~timeout pool point =
+let rec connect ?timeout pool point =
+  let timeout =
+    Option.unopt ~default:pool.config.connection_timeout timeout in
   fail_unless
     (active_connections pool <= pool.config.max_connections)
     P2p_errors.Too_many_connections >>=? fun () ->
@@ -858,7 +861,7 @@ and swap_ack pool conn new_point _new_peer_id =
 and swap pool conn current_peer_id new_point =
   let source_peer_id = P2p_peer_state.Info.peer_id conn.peer_info in
   pool.latest_accepted_swap <- Time.now () ;
-  connect ~timeout:10. pool new_point >>= function
+  connect pool new_point >>= function
   | Ok _new_conn -> begin
       pool.latest_succesfull_swap <- Time.now () ;
       log pool (Swap_success { source = source_peer_id }) ;
@@ -891,7 +894,7 @@ let accept pool fd point =
     P2p_point.Table.add pool.incoming point canceler ;
     Lwt.async begin fun () ->
       with_timeout
-        ~canceler (Lwt_unix.sleep pool.config.authentification_timeout)
+        ~canceler (Lwt_unix.sleep pool.config.authentication_timeout)
         (fun canceler -> authenticate pool canceler fd point)
     end
 

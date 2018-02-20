@@ -20,10 +20,8 @@ type 'meta pool = Pool : ('msg, 'meta) P2p_pool.t -> 'meta pool
 
 type 'meta t = {
   canceler: Lwt_canceler.t ;
-  connection_timeout: float ;
   bounds: bounds ;
   pool: 'meta pool ;
-  disco: P2p_discovery.t option ;
   just_maintained: unit Lwt_condition.t ;
   please_maintain: unit Lwt_condition.t ;
   mutable maintain_worker : unit Lwt.t ;
@@ -80,8 +78,7 @@ let rec try_to_contact
     else
       List.fold_left
         (fun acc point ->
-           P2p_pool.connect
-             ~timeout:st.connection_timeout pool point >>= function
+           P2p_pool.connect pool point >>= function
            | Ok _ -> acc >|= succ
            | Error _ -> acc)
         (Lwt.return 0)
@@ -115,9 +112,7 @@ and too_few_connections st n_connected =
   if success then begin
     maintain st
   end else begin
-    (* not enough contacts, ask the pals of our pals,
-       discover the local network and then wait *)
-    Option.iter ~f:P2p_discovery.restart st.disco ;
+    (* not enough contacts, ask the pals of our pals, and then wait *)
     P2p_pool.broadcast_bootstrap_msg pool ;
     protect ~canceler:st.canceler begin fun () ->
       Lwt.pick [
@@ -168,14 +163,12 @@ let rec worker_loop st =
   | Error [ Canceled ] -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
-let run ~connection_timeout bounds pool disco =
+let run bounds pool =
   let canceler = Lwt_canceler.create () in
   let st = {
     canceler ;
-    connection_timeout ;
     bounds ;
     pool = Pool pool ;
-    disco ;
     just_maintained = Lwt_condition.create () ;
     please_maintain = Lwt_condition.create () ;
     maintain_worker = Lwt.return_unit ;

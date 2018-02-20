@@ -60,7 +60,8 @@ and shell = {
 }
 
 let default_p2p_limits : P2p.limits = {
-  authentification_timeout = 5. ;
+  connection_timeout = 10. ;
+  authentication_timeout = 5. ;
   min_connections = 10 ;
   expected_connections = 50 ;
   max_connections = 100 ;
@@ -158,7 +159,7 @@ let default_config = {
 let limit : P2p.limits Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun { P2p.authentification_timeout ;
+    (fun { P2p.connection_timeout ; authentication_timeout ;
            min_connections ; expected_connections ; max_connections ;
            backlog ; max_incoming_connections ;
            max_download_speed ; max_upload_speed ;
@@ -169,27 +170,27 @@ let limit : P2p.limits Data_encoding.t =
            max_known_points ; max_known_peer_ids ;
            swap_linger ; binary_chunks_size
          } ->
-      ( ( authentification_timeout, min_connections, expected_connections,
-          max_connections, backlog, max_incoming_connections,
-          max_download_speed, max_upload_speed, swap_linger,
-          binary_chunks_size) ,
-        ( read_buffer_size, read_queue_size, write_queue_size,
-          incoming_app_message_queue_size,
-          incoming_message_queue_size, outgoing_message_queue_size,
-          known_points_history_size, known_peer_ids_history_size,
-          max_known_points, max_known_peer_ids
-        )))
-    (fun ( ( authentification_timeout, min_connections, expected_connections,
-             max_connections, backlog, max_incoming_connections,
-             max_download_speed, max_upload_speed, swap_linger,
-             binary_chunks_size) ,
-           ( read_buffer_size, read_queue_size, write_queue_size,
-             incoming_app_message_queue_size,
-             incoming_message_queue_size, outgoing_message_queue_size,
-             known_points_history_size, known_peer_ids_history_size,
-             max_known_points, max_known_peer_ids
-           ) ) ->
-      { authentification_timeout ; min_connections ; expected_connections ;
+      (((( connection_timeout,
+           authentication_timeout, min_connections, expected_connections,
+           max_connections, backlog, max_incoming_connections,
+           max_download_speed, max_upload_speed, swap_linger),
+         ( binary_chunks_size, read_buffer_size, read_queue_size, write_queue_size,
+           incoming_app_message_queue_size,
+           incoming_message_queue_size, outgoing_message_queue_size,
+           known_points_history_size, known_peer_ids_history_size,
+           max_known_points)),
+        max_known_peer_ids)))
+    (fun (((( connection_timeout,
+              authentication_timeout, min_connections, expected_connections,
+              max_connections, backlog, max_incoming_connections,
+              max_download_speed, max_upload_speed, swap_linger),
+            ( binary_chunks_size, read_buffer_size, read_queue_size, write_queue_size,
+              incoming_app_message_queue_size,
+              incoming_message_queue_size, outgoing_message_queue_size,
+              known_points_history_size, known_peer_ids_history_size,
+              max_known_points)),
+           max_known_peer_ids)) ->
+      { connection_timeout ; authentication_timeout ; min_connections ; expected_connections ;
         max_connections ; backlog ; max_incoming_connections ;
         max_download_speed ; max_upload_speed ;
         read_buffer_size ; read_queue_size ; write_queue_size ;
@@ -200,71 +201,78 @@ let limit : P2p.limits Data_encoding.t =
         binary_chunks_size
       })
     (merge_objs
-       (obj10
-          (dft "authentification-timeout"
-             (Data_encoding.describe
-                ~description: "Delay granted to a peer to perform authentication, \
-                               in seconds."
-                float) default_p2p_limits.authentification_timeout)
-          (dft "min-connections"
-             (Data_encoding.describe
-                ~description: "Strict minimum number of connections (triggers an \
-                               urgent maintenance)."
-                uint16)
-             default_p2p_limits.min_connections)
-          (dft "expected-connections"
-             (Data_encoding.describe
-                ~description: "Targeted number of connections to reach when \
-                               bootstraping / maintaining."
-                uint16)
-             default_p2p_limits.expected_connections)
-          (dft "max-connections"
-             (Data_encoding.describe
-                ~description: "Maximum number of connections (exceeding peers are \
-                               disconnected)."
-                uint16)
-             default_p2p_limits.max_connections)
-          (dft "backlog"
-             (Data_encoding.describe
-                ~description: "Number above which pending incoming connections are \
-                               immediately rejected."
-                uint8)
-             default_p2p_limits.backlog)
-          (dft "max-incoming-connections"
-             (Data_encoding.describe
-                ~description: "Number above which pending incoming connections are \
-                               immediately rejected."
-                uint8)
-             default_p2p_limits.max_incoming_connections)
-          (opt "max-download-speed"
-             (Data_encoding.describe
-                ~description: "Max download speeds in KiB/s."
-                int31))
-          (opt "max-upload-speed"
-             (Data_encoding.describe
-                ~description: "Max upload speeds in KiB/s."
+       (merge_objs
+          (obj10
+             (dft "connection-timeout"
+                (Data_encoding.describe
+                   ~description: "Delay acceptable when initiating a \
+                                  connection to a new peer, in seconds."
+                   float) default_p2p_limits.authentication_timeout)
+             (dft "authentication-timeout"
+                (Data_encoding.describe
+                   ~description: "Delay granted to a peer to perform authentication, \
+                                  in seconds."
+                   float) default_p2p_limits.authentication_timeout)
+             (dft "min-connections"
+                (Data_encoding.describe
+                   ~description: "Strict minimum number of connections (triggers an \
+                                  urgent maintenance)."
+                   uint16)
+                default_p2p_limits.min_connections)
+             (dft "expected-connections"
+                (Data_encoding.describe
+                   ~description: "Targeted number of connections to reach when \
+                                  bootstraping / maintaining."
+                   uint16)
+                default_p2p_limits.expected_connections)
+             (dft "max-connections"
+                (Data_encoding.describe
+                   ~description: "Maximum number of connections (exceeding peers are \
+                                  disconnected)."
+                   uint16)
+                default_p2p_limits.max_connections)
+             (dft "backlog"
+                (Data_encoding.describe
+                   ~description: "Number above which pending incoming connections are \
+                                  immediately rejected."
+                   uint8)
+                default_p2p_limits.backlog)
+             (dft "max-incoming-connections"
+                (Data_encoding.describe
+                   ~description: "Number above which pending incoming connections are \
+                                  immediately rejected."
+                   uint8)
+                default_p2p_limits.max_incoming_connections)
+             (opt "max-download-speed"
+                (Data_encoding.describe
+                   ~description: "Max download speeds in KiB/s."
+                   int31))
+             (opt "max-upload-speed"
+                (Data_encoding.describe
+                   ~description: "Max upload speeds in KiB/s."
 
-                int31))
-          (dft "swap-linger" float default_p2p_limits.swap_linger)
-          (opt "binary-chunks-size" uint8))
-       (obj10
-          (dft "read-buffer-size"
-             (Data_encoding.describe
-                ~description: "Size of the buffer passed to read(2)."
-                int31)
-             default_p2p_limits.read_buffer_size)
-          (opt "read-queue-size" int31)
-          (opt "write-queue-size" int31)
-          (opt "incoming-app-message-queue-size" int31)
-          (opt "incoming-message-queue-size" int31)
-          (opt "outgoing-message-queue-size" int31)
-          (dft "known_points_history_size" uint16
-             default_p2p_limits.known_points_history_size)
-          (dft "known_peer_ids_history_size" uint16
-             default_p2p_limits.known_points_history_size)
-          (opt "max_known_points" (tup2 uint16 uint16))
-          (opt "max_known_peer_ids" (tup2 uint16 uint16))
-       ))
+                   int31))
+             (dft "swap-linger" float default_p2p_limits.swap_linger))
+          (obj10
+             (opt "binary-chunks-size" uint8)
+             (dft "read-buffer-size"
+                (Data_encoding.describe
+                   ~description: "Size of the buffer passed to read(2)."
+                   int31)
+                default_p2p_limits.read_buffer_size)
+             (opt "read-queue-size" int31)
+             (opt "write-queue-size" int31)
+             (opt "incoming-app-message-queue-size" int31)
+             (opt "incoming-message-queue-size" int31)
+             (opt "outgoing-message-queue-size" int31)
+             (dft "known_points_history_size" uint16
+                default_p2p_limits.known_points_history_size)
+             (dft "known_peer_ids_history_size" uint16
+                default_p2p_limits.known_points_history_size)
+             (opt "max_known_points" (tup2 uint16 uint16))
+          ))
+       (obj1
+          (opt "max_known_peer_ids" (tup2 uint16 uint16))))
 
 let p2p =
   let open Data_encoding in

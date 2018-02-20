@@ -7,19 +7,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Welcome worker. Accept incoming connections and add them to its
-    connection pool. *)
+(** Welcome worker.
+
+    Accept incoming connections and add them to the pool.
+*)
 
 type t
-(** Type of a welcome worker, parametrized like a
-    [P2p_connection_pool.pool]. *)
+(** Type of a welcome worker. *)
 
 val run:
-  backlog:int ->
-  ('msg, 'meta) P2p_pool.t ->
-  ?addr:P2p_addr.t -> P2p_addr.port -> t Lwt.t
-(** [run ~backlog ~addr pool port] returns a running welcome worker
-    feeding [pool] listening at [(addr, port)]. [backlog] is the
-    argument passed to [Lwt_unix.accept]. *)
+  ?addr:P2p_addr.t -> backlog:int ->
+  ('msg, 'meta) P2p_pool.t -> P2p_addr.port -> t Lwt.t
+(** [run ?addr ~backlog pool port] returns a running welcome worker
+    adding connections into [pool] listening on [addr:port]. [backlog]
+    is passed to [Lwt_unix.listen]. *)
 
 val shutdown: t -> unit Lwt.t
+(** [shutdown t] returns when [t] has completed shutdown. *)
