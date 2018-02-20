@@ -31,7 +31,7 @@ module Make (H: Hash.S) : S = struct
         let rec f u xor = function
             0 -> xor
           | j -> let u = H.hmac ~key:password u in
-            f u (Cs.xor xor u) (j - 1)
+              f u (Cs.xor xor u) (j - 1)
         in
         let int_i = Cstruct.create 4 in
         Cstruct.BE.set_uint32 int_i 0 (Int32.of_int i);

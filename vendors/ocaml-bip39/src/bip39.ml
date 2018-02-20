@@ -102,9 +102,9 @@ let pack l pack_len =
   let rec inner (sub_acc_len, sub_acc, acc) = function
     | [] -> if sub_acc <> [] then List.rev sub_acc :: acc else acc
     | h :: tl ->
-      if sub_acc_len = pack_len then
-        inner (1, [h], List.rev sub_acc :: acc) tl
-      else inner (succ sub_acc_len, h :: sub_acc, acc) tl
+        if sub_acc_len = pack_len then
+          inner (1, [h], List.rev sub_acc :: acc) tl
+        else inner (succ sub_acc_len, h :: sub_acc, acc) tl
   in
   List.rev (inner (0, [], []) l)
 

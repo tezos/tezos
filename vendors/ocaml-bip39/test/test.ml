@@ -108,15 +108,15 @@ let vectors = [
 let pp_diff ppf (l1, l2) =
   match List.length l1, List.length l2 with
   | n, m when n <> m ->
-    Format.fprintf ppf "Mnemonic size differs: %d vs %d" n m ;
+      Format.fprintf ppf "Mnemonic size differs: %d vs %d" n m ;
   | _ ->
-    ignore @@ ListLabels.fold_left2 l1 l2 ~init:0 ~f:begin fun i w1 w2 ->
-      if w1 <> w2 then begin
-        Format.fprintf ppf "At position %d, words differ: %s <> %s"
-          i w1 w2
-      end ;
-      succ i
-    end
+      ignore @@ ListLabels.fold_left2 l1 l2 ~init:0 ~f:begin fun i w1 w2 ->
+        if w1 <> w2 then begin
+          Format.fprintf ppf "At position %d, words differ: %s <> %s"
+            i w1 w2
+        end ;
+        succ i
+      end
 
 let vectors () =
   ListLabels.iteri vectors ~f:begin fun i { entropy ; words ; seed } ->
