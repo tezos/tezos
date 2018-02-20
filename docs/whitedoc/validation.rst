@@ -38,8 +38,8 @@ version Alpha, this is only used to try new protocols before self
 amending the main chain.
 
 The chain validator spawns one *peer validator* worker per connected
-peer. This set updated, grown or shrinked on the fly, according to the
-connections and deconnection signals from the peer-to-peer component.
+peer. This set is updated, grown or shrunk on the fly, according to the
+connections and disconnections signals from the peer-to-peer component.
 Each peer validator will treat new head proposals from the associated
 peer, one at a time, in a loop. In the simple case, when a peer
 receives a new head proposal that is a direct successor of the current
@@ -76,7 +76,7 @@ everything needed for a block, they will call the *block validator*.
 The *block validator* validates blocks (currently in sequence),
 assuming that all the necessary data have already been retrieved from
 the peer-to-peer network. When a block is valid, it will notify the
-correspondig chain validator, that may update its head. In this case,
+corresponding chain validator, that may update its head. In this case,
 the chain validator will propagate this information to its associated
 *prevalidator*, and may decide to kill or spawn the test network
 according to the protocol's decision.
