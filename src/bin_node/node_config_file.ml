@@ -202,23 +202,56 @@ let limit : P2p.limits Data_encoding.t =
     (merge_objs
        (obj10
           (dft "authentification-timeout"
-             float default_p2p_limits.authentification_timeout)
-          (dft "min-connections" uint16
+             (Data_encoding.describe
+                ~description: "Delay granted to a peer to perform authentication, \
+                               in seconds."
+                float) default_p2p_limits.authentification_timeout)
+          (dft "min-connections"
+             (Data_encoding.describe
+                ~description: "Strict minimum number of connections (triggers an \
+                               urgent maintenance)."
+                uint16)
              default_p2p_limits.min_connections)
-          (dft "expected-connections" uint16
+          (dft "expected-connections"
+             (Data_encoding.describe
+                ~description: "Targeted number of connections to reach when \
+                               bootstraping / maintaining."
+                uint16)
              default_p2p_limits.expected_connections)
-          (dft "max-connections" uint16
+          (dft "max-connections"
+             (Data_encoding.describe
+                ~description: "Maximum number of connections (exceeding peers are \
+                               disconnected)."
+                uint16)
              default_p2p_limits.max_connections)
-          (dft "backlog" uint8
+          (dft "backlog"
+             (Data_encoding.describe
+                ~description: "Number above which pending incoming connections are \
+                               immediately rejected."
+                uint8)
              default_p2p_limits.backlog)
-          (dft "max-incoming-connections" uint8
+          (dft "max-incoming-connections"
+             (Data_encoding.describe
+                ~description: "Number above which pending incoming connections are \
+                               immediately rejected."
+                uint8)
              default_p2p_limits.max_incoming_connections)
-          (opt "max-download-speed" int31)
-          (opt "max-upload-speed" int31)
+          (opt "max-download-speed"
+             (Data_encoding.describe
+                ~description: "Max download speeds in KiB/s."
+                int31))
+          (opt "max-upload-speed"
+             (Data_encoding.describe
+                ~description: "Max upload speeds in KiB/s."
+
+                int31))
           (dft "swap-linger" float default_p2p_limits.swap_linger)
           (opt "binary-chunks-size" uint8))
        (obj10
-          (dft "read-buffer-size" int31
+          (dft "read-buffer-size"
+             (Data_encoding.describe
+                ~description: "Size of the buffer passed to read(2)."
+                int31)
              default_p2p_limits.read_buffer_size)
           (opt "read-queue-size" int31)
           (opt "write-queue-size" int31)
@@ -245,12 +278,32 @@ let p2p =
       { expected_pow ; bootstrap_peers ;
         listen_addr ; closed ; limits })
     (obj5
-       (dft "expected-proof-of-work" float default_p2p.expected_pow)
+       (dft "expected-proof-of-work"
+          (Data_encoding.describe
+             ~description: "Floating point number between 0 and 256 that represents a \
+                            difficulty, 24 signifies for example that at least 24 leading \
+                            zeroes are expected in the hash."
+             float) default_p2p.expected_pow)
        (dft "bootstrap-peers"
-          (list string) default_p2p.bootstrap_peers)
-       (opt "listen-addr" string)
-       (dft "closed" bool false)
-       (dft "limits" limit default_p2p_limits))
+          (Data_encoding.describe
+             ~description: "List of hosts. Tezos can connect to both IPv6 and IPv4 hosts. \
+                            If the port is not specified, default port 9732 will be assumed."
+             (list string)) default_p2p.bootstrap_peers)
+       (opt "listen-addr"
+          (Data_encoding.describe ~description: "Host to listen to. If the port is not \
+                                                 specified, the default port 8732 will be \
+                                                 assumed."
+             string))
+       (dft "closed"
+          (Data_encoding.describe
+             ~description: "Specify if the network is closed or not. A closed network allows \
+                            only peers listed in 'bootstrap-peers'."
+             bool) false)
+       (dft "limits"
+          (Data_encoding.describe
+             ~description: "Network limits"
+             limit) default_p2p_limits)
+    )
 
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
@@ -268,11 +321,30 @@ let rpc : rpc Data_encoding.t =
          | Some cert, Some key -> Some { cert ; key } in
        { listen_addr ; cors_origins ; cors_headers ; tls })
     (obj5
-       (opt "listen-addr" string)
-       (dft "cors-origin" (list string) default_rpc.cors_origins)
-       (dft "cors-headers" (list string) default_rpc.cors_headers)
-       (opt "crt" string)
-       (opt "key" string))
+       (opt "listen-addr"
+          (Data_encoding.describe
+             ~description: "Host to listen to. If the port is not specified, \
+                            the default port 8732 will be assumed."
+             string))
+       (dft "cors-origin"
+          (Data_encoding.describe
+             ~description: "Cross Origin Resource Sharing parameters, see \
+                            https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
+             (list string)) default_rpc.cors_origins)
+       (dft "cors-headers"
+          (Data_encoding.describe
+             ~description: "Cross Origin Resource Sharing parameters, see \
+                            https://en.wikipedia.org/wiki/Cross-origin_resource_sharing."
+             (list string)) default_rpc.cors_headers)
+       (opt "crt"
+          (Data_encoding.describe
+             ~description: "Certificate file (necessary when TLS is used)."
+             string))
+       (opt "key"
+          (Data_encoding.describe
+             ~description: "Key file (necessary when TLS is used)."
+             string))
+    )
 
 let level_encoding =
   let open Logging in
@@ -303,10 +375,31 @@ let log =
     (fun (output, default_level, rules, template) ->
        { output ; default_level ; rules ; template })
     (obj4
-       (dft "output" Logging_unix.Output.encoding default_log.output)
-       (dft "level" level_encoding default_log.default_level)
-       (opt "rules" string)
-       (dft "template" string default_log.template))
+       (dft "output"
+          (Data_encoding.describe
+             ~description: "Output for the logging function. Either 'stdout', \
+                            'stderr' or the name of a log file ."
+             Logging_unix.Output.encoding) default_log.output)
+       (dft "level"
+          (Data_encoding.describe
+             ~description: "Verbosity level: one of 'fatal', 'error', 'warn',\
+                            'notice', 'info', 'debug'."
+             level_encoding) default_log.default_level)
+       (opt "rules"
+          (Data_encoding.describe
+             ~description: "Fine-grained logging instructions. Same format as \
+                            described in `tezos-node run --help`, DEBUG section. \
+                            In the example below, sections 'p2p' and all sections \
+                            starting by 'client' will have their messages logged \
+                            up to the debug level, whereas the rest of log sections \
+                            will be logged up to the notice level."
+             string))
+       (dft "template"
+          (Data_encoding.describe
+             ~description: "Format for the log file, see \
+                            http://ocsigen.org/lwt/dev/api/Lwt_log_core#2_Logtemplates."
+             string) default_log.template)
+    )
 
 
 let worker_limits_encoding
@@ -398,7 +491,12 @@ let chain_validator_limits_encoding =
        { bootstrap_threshold ; worker_limits})
     (merge_objs
        (obj1
-          (dft "bootstrap_threshold" uint8
+          (dft "bootstrap_threshold"
+             (Data_encoding.describe
+                ~description:
+                  "Set the number of peers with whom a chain synchronization must \
+                   be completed to bootstrap the node."
+                uint8)
              default_shell.chain_validator_limits.bootstrap_threshold))
        (worker_limits_encoding
           default_shell.chain_validator_limits.worker_limits.backlog_size
@@ -432,11 +530,25 @@ let encoding =
     (fun (data_dir, rpc, p2p, log, shell) ->
        { data_dir ; rpc ; p2p ; log ; shell })
     (obj5
-       (dft "data-dir" string default_data_dir)
-       (dft "rpc" rpc default_rpc)
-       (req "p2p" p2p)
-       (dft "log" log default_log)
-       (dft "shell" shell default_shell))
+       (dft "data-dir"
+          (Data_encoding.describe
+             ~description: "Location of the data dir on disk."
+             string) default_data_dir)
+       (dft "rpc"
+          (Data_encoding.describe
+             ~description: "Configuration of rpc parameters"
+             rpc) default_rpc)
+       (req "p2p"
+          (Data_encoding.describe
+             ~description: "Configuration of network parameters" p2p))
+       (dft "log"
+          (Data_encoding.describe
+             ~description: "Configuration of network parameters"
+             log) default_log)
+       (dft "shell"
+          (Data_encoding.describe
+             ~description: "Configuration of network parameters"
+             shell) default_shell))
 
 let read fp =
   if Sys.file_exists fp then begin
