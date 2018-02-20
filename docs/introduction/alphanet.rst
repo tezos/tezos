@@ -1,3 +1,5 @@
+.. _alphanet:
+
 Participating in the Alphanet
 =============================
 

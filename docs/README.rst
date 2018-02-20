@@ -2,10 +2,13 @@
 Building documentation locally
 ******************************
 
+The documenation is available online at `doc.tzalpha.net <http://doc.tzalpha.net/>`_,
+always up to date with master on `Gitlab <https://gitlab.com/tezos/tezos>`_.
+
 Building instructions
 ---------------------
 
-To build the documentaion, you can use the main Makefile target ``doc-html``
+To build the documentation, you can use the main Makefile target ``doc-html``
 
 .. code:: bash
 

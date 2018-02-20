@@ -173,3 +173,7 @@ texinfo_documents = [
      author, 'Tezos', 'One line description of project.',
      'Miscellaneous'),
 ]
+
+# -- Ignore fragments in linkcheck
+
+linkcheck_anchors = False

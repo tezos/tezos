@@ -1,12 +1,5 @@
-TEZOS
-=====
-
-Tezos is a distributed consensus platform with meta-consensus
-capability. Tezos not only comes to consensus about state, like BTC or
-ETH. It also comes to consensus about how the protocol and the nodes
-should adapt and upgrade.
-
-See https://www.tezos.com/ for more information about the project.
+How to build and run
+====================
 
 Build instructions
 ------------------
@@ -48,8 +41,7 @@ While building the dependencies, ``opam`` is able to handle correctly
 the OCaml libraries but it is not always able to handle all external C
 libraries we depend on. On most system, it is able to suggest a call to
 the system package manager but it currently does not handle version
-check. In particular, the ``libsodium-dev`` packages on Ubuntu is too
-old for building Tezos, we rely on version ``1.0.11`` at least.
+check.
 
 At last, compile the project:
 
