@@ -73,6 +73,23 @@ let transfer cctxt
   assert (Operation_hash.equal oph injected_oph) ;
   return (oph, contracts)
 
+let reveal cctxt
+    block ?branch ~source ~src_pk ~src_sk ~fee () =
+  get_branch cctxt block branch >>=? fun (chain_id, branch) ->
+  Alpha_services.Contract.counter cctxt block source >>=? fun pcounter ->
+  let counter = Int32.succ pcounter in
+  Alpha_services.Forge.Manager.reveal
+    cctxt block
+    ~branch ~source ~sourcePubKey:src_pk ~counter ~fee () >>=? fun bytes ->
+  Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
+  let signed_bytes =
+    MBytes.concat bytes (Ed25519.Signature.to_bytes signature) in
+  let oph = Operation_hash.hash_bytes [ signed_bytes ] in
+  Shell_services.inject_operation
+    cctxt ~chain_id signed_bytes >>=? fun injected_oph ->
+  assert (Operation_hash.equal oph injected_oph) ;
+  return oph
+
 let originate rpc_config ?chain_id ~block ?signature bytes =
   let signed_bytes =
     match signature with

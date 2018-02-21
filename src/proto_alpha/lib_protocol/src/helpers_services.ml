@@ -315,6 +315,10 @@ module Forge = struct
       (RPC_context.make_call0 S.operations ctxt block
          () ({ branch }, Sourced_operations ops))
 
+    let reveal ctxt
+        block ~branch ~source ~sourcePubKey ~counter ~fee ()=
+      operations ctxt block ~branch ~source ~sourcePubKey ~counter ~fee []
+
     let transaction ctxt
         block ~branch ~source ?sourcePubKey ~counter
         ~amount ~destination ?parameters ~fee ()=

@@ -69,6 +69,15 @@ module Forge : sig
       fee:Tez.t ->
       manager_operation list -> MBytes.t shell_tzresult Lwt.t
 
+    val reveal:
+      'a #RPC_context.simple -> 'a ->
+      branch:Block_hash.t ->
+      source:Contract.t ->
+      sourcePubKey:public_key ->
+      counter:int32 ->
+      fee:Tez.t ->
+      unit -> MBytes.t shell_tzresult Lwt.t
+
     val transaction:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->

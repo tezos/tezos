@@ -229,6 +229,19 @@ let commands () =
             operation_submitted_message cctxt ~contracts oph
       end;
 
+    command ~group ~desc: "Reveal the public key of the contract manager."
+      (args1 fee_arg)
+      (prefixes [ "reveal" ; "key" ; "for" ]
+       @@ ContractAlias.alias_param
+         ~name: "src" ~desc: "name of the source contract"
+       @@ stop)
+      begin fun fee (_, source) cctxt ->
+        source_to_keys cctxt cctxt#block source >>=? fun (src_pk, src_sk) ->
+        reveal cctxt ~fee cctxt#block
+          ~source ~src_pk ~src_sk () >>=? fun oph ->
+        operation_submitted_message cctxt oph
+      end;
+
     command ~group:alphanet ~desc: "Open a new FREE account (Alphanet only)."
       (args1 force_switch)
       (prefixes [ "originate" ; "free" ; "account" ]

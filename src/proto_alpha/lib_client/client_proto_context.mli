@@ -118,6 +118,16 @@ val transfer :
   unit ->
   (Operation_hash.t * Contract.t list) tzresult Lwt.t
 
+val reveal :
+  #Proto_alpha.full ->
+  Block_services.block ->
+  ?branch:int ->
+  source:Contract.t ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_locator ->
+  fee:Tez.t ->
+  unit -> Operation_hash.t tzresult Lwt.t
+
 val dictate :
   #Proto_alpha.rpc_context ->
   Block_services.block ->
