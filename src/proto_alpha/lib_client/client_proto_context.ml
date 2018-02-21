@@ -212,6 +212,13 @@ let set_delegate cctxt block ~fee contract ~src_pk ~manager_sk opt_delegate =
   delegate_contract
     cctxt block ~source:contract ~src_pk ~manager_sk ~fee opt_delegate
 
+let register_as_delegate cctxt block ~fee ~manager_sk src_pk =
+  let source = Ed25519.Public_key.hash src_pk in
+  delegate_contract
+    cctxt block
+    ~source:(Contract.implicit_contract source) ~src_pk ~manager_sk ~fee
+    (Some source)
+
 let source_to_keys (wallet : #Proto_alpha.full) block source =
   get_manager wallet block source >>=? fun (_src_name, _src_pkh, src_pk, src_sk) ->
   return (src_pk, src_sk)

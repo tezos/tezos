@@ -67,6 +67,7 @@ $client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
 
 $client originate free account free_account for $key1
 $client get delegate for free_account
+$client register key $key2 as delegate
 $client set delegate for free_account to $key2
 $client get delegate for free_account
 

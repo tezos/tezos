@@ -44,6 +44,13 @@ val set_delegate :
   public_key_hash option ->
   Operation_list_hash.elt tzresult Lwt.t
 
+val register_as_delegate:
+  #Proto_alpha.full ->
+  Block_services.block ->
+  fee:Tez.tez ->
+  manager_sk:Client_keys.sk_locator ->
+  public_key -> Operation_list_hash.elt tzresult Lwt.t
+
 val operation_submitted_message :
   #Client_context.printer ->
   Operation_hash.t ->

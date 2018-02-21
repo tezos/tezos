@@ -242,6 +242,20 @@ let commands () =
         operation_submitted_message cctxt oph
       end;
 
+    command ~group ~desc: "Register the public key hash as a delegate."
+      (args1 fee_arg)
+      (prefixes [ "register" ; "key" ]
+       @@ Public_key_hash.alias_param
+         ~name: "mgr" ~desc: "the delegate key"
+       @@ prefixes [ "as" ; "delegate" ]
+       @@ stop)
+      begin fun fee (_, src_pkh) cctxt ->
+        Client_keys.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
+        register_as_delegate cctxt
+          ~fee cctxt#block ~manager_sk:src_sk src_pk >>=? fun oph ->
+        operation_submitted_message cctxt oph
+      end;
+
     command ~group:alphanet ~desc: "Open a new FREE account (Alphanet only)."
       (args1 force_switch)
       (prefixes [ "originate" ; "free" ; "account" ]
