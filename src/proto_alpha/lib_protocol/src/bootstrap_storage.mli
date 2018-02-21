@@ -17,5 +17,3 @@ val account_encoding: account Data_encoding.t
 val accounts: Raw_context.t -> account list
 
 val init: Raw_context.t -> Raw_context.t tzresult Lwt.t
-
-val refill: Raw_context.t -> Raw_context.t tzresult Lwt.t

@@ -299,7 +299,6 @@ let may_start_new_cycle ctxt =
   | Some last_cycle ->
       let new_cycle = Cycle.succ last_cycle in
       let succ_new_cycle = Cycle.succ new_cycle in
-      Bootstrap.refill ctxt >>=? fun ctxt ->
       Seed.clear_cycle ctxt last_cycle >>=? fun ctxt ->
       Seed.compute_for_cycle ctxt succ_new_cycle >>=? fun ctxt ->
       Roll.clear_cycle ctxt last_cycle >>=? fun ctxt ->

@@ -30,12 +30,6 @@ module Context : sig
   (** [next_level cctxt blk] returns the (protocol view of the) level
       of the successor of [blk]. *)
 
-  val next_roll:
-    'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
-
-  val roll_value:
-    'a #RPC_context.simple -> 'a -> Tez.t shell_tzresult Lwt.t
-
   val voting_period_kind:
     'a #RPC_context.simple -> 'a -> Voting_period.kind shell_tzresult Lwt.t
     (** [voting_period_kind cctxt blk] returns the voting period kind

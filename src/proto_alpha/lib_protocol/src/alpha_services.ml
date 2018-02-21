@@ -102,20 +102,6 @@ module Context = struct
         ~output: Level.encoding
         RPC_path.(custom_root / "context" / "next_level")
 
-    let roll_value =
-      RPC_service.post_service
-        ~query: RPC_query.empty
-        ~input: empty
-        ~output: (obj1 (req "roll_value" Tez.encoding))
-        RPC_path.(custom_root / "context" / "roll_value")
-
-    let next_roll =
-      RPC_service.post_service
-        ~query: RPC_query.empty
-        ~input: empty
-        ~output: (obj1 (req "next_roll" int32))
-        RPC_path.(custom_root / "context" / "next_roll")
-
     let voting_period_kind =
       RPC_service.post_service
         ~description: "Voting period kind for the current block"
@@ -140,12 +126,6 @@ module Context = struct
     register0 S.next_level begin fun ctxt () () ->
       return (Level.current ctxt)
     end ;
-    register0 S.roll_value begin fun ctxt () () ->
-      return (Roll.value ctxt)
-    end;
-    register0 S.next_roll begin fun ctxt () () ->
-      Roll.next ctxt
-    end ;
     register0 S.voting_period_kind begin fun ctxt () () ->
       Vote.get_current_period_kind ctxt
     end
@@ -155,12 +135,6 @@ module Context = struct
 
   let next_level ctxt block =
     RPC_context.make_call0 S.next_level ctxt block () ()
-
-  let roll_value ctxt block =
-    RPC_context.make_call0 S.roll_value ctxt block () ()
-
-  let next_roll ctxt block =
-    RPC_context.make_call0 S.next_roll ctxt block () ()
 
   let voting_period_kind ctxt block =
     RPC_context.make_call0 S.voting_period_kind ctxt block () ()

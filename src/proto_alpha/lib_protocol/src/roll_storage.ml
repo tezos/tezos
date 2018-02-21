@@ -215,30 +215,5 @@ end
 
 let value = Raw_context.roll_value
 
-(* HACK for the alphanet: let's increase the roll value when
-   the total amount of roll is greater than 100,000. *)
-let may_recompute_rolls c =
-  Storage.Roll.Next.get c >>=? fun next ->
-  let double = Roll_repr.too_many_roll next in
-  if Compare.Int.(double <= 0) then
-    return c
-  else
-    Raw_context.double_roll_value c double >>=? fun c ->
-    Storage.Roll.clear c >>= fun c ->
-    Storage.Roll.Limbo.remove c >>= fun c ->
-    Storage.Roll.Next.init_set c Roll_repr.first >>= fun c ->
-    Storage.Contract.fold c ~init:(ok c) ~f:begin fun k c ->
-      Lwt.return c >>=? fun c ->
-      Storage.Roll.Contract_roll_list.remove c k >>= fun c ->
-      Storage.Roll.Contract_change.init_set c k Tez_repr.zero >>= fun c ->
-      Storage.Contract.Balance.get c k >>=? fun balance ->
-      Contract.add_amount c k balance >>=? fun c ->
-      return c
-    end
-
-let next c =
-  Storage.Roll.Next.get c >>=? fun next ->
-  return (Roll_repr.to_int32 next)
-
 let init c =
   Storage.Roll.Next.init c Roll_repr.first

@@ -247,7 +247,6 @@ module Bootstrap : sig
   }
   val accounts: context -> account list
   val account_encoding: account Data_encoding.t
-  val refill: context -> context tzresult Lwt.t
 end
 
 module Constants : sig
@@ -692,7 +691,6 @@ end
 module Roll : sig
 
   val value: context -> Tez.t
-  val next: context -> Int32.t tzresult Lwt.t
 
   val freeze_rolls_for_cycle: context -> Cycle.t -> context tzresult Lwt.t
   val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t

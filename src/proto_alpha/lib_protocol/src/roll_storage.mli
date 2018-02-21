@@ -63,7 +63,3 @@ val get_contract_delegate:
   Raw_context.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option tzresult Lwt.t
 
 val value: Raw_context.t -> Tez_repr.t
-
-(** HACK for the alphanet. *)
-val may_recompute_rolls: Raw_context.t -> Raw_context.t tzresult Lwt.t
-val next: Raw_context.t -> Int32.t tzresult Lwt.t
