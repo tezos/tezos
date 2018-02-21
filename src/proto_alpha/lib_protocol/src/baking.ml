@@ -20,7 +20,6 @@ type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Empty_endorsement
 type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
 
-
 let () =
   register_error_kind
     `Permanent
@@ -110,6 +109,24 @@ let () =
                      (req "expected" Ed25519.Public_key_hash.encoding))
     (function Invalid_block_signature (block, pkh) -> Some (block, pkh) | _ -> None)
     (fun (block, pkh) -> Invalid_block_signature (block, pkh))
+    ~id:"baking.invalid_signature"
+    ~title:"Invalid block signature"
+    ~description:"The block's signature is invalid"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Invalid block signature")
+    Data_encoding.empty
+    (function Invalid_signature -> Some () | _ -> None)
+    (fun () -> Invalid_signature) ;
+  register_error_kind
+    `Permanent
+    ~id:"baking.insufficient_proof_of_work"
+    ~title:"Insufficient block proof-of-work stamp"
+    ~description:"The block's proof-of-work stamp is insufficient"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Insufficient proof-of-work stamp")
+    Data_encoding.empty
+    (function Invalid_stamp -> Some () | _ -> None)
+    (fun () -> Invalid_stamp)
 
 
 let minimal_time c priority pred_timestamp =
@@ -277,4 +294,3 @@ let dawn_of_a_new_cycle ctxt =
     return (Some level.cycle)
   else
     return None
-
