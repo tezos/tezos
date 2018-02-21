@@ -14,9 +14,10 @@ open Misc
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
-type error += Wrong_delegate of public_key_hash * public_key_hash (* `Permanent *)
+type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Cannot_pay_baking_bond (* `Permanent *)
 type error += Cannot_pay_endorsement_bond (* `Permanent *)
+type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
 
 val paying_priorities: context -> int list
 
@@ -55,15 +56,14 @@ val pay_endorsement_bond:
 *)
 val check_baking_rights:
   context -> Block_header.protocol_data -> Time.t ->
-  public_key_hash tzresult Lwt.t
+  public_key tzresult Lwt.t
 
-(** [check_signing_rights c slot contract] verifies that:
-    * the slot is valid;
-    * [contract] owned, at cycle start, the roll that has the right to sign
-      for the slot and the current level.
+(** [check_endorsements_rights c slots]:
+    * verifies that the endorsement slots are valid ;
+    * verifies that the endorsement slots correspond to the same delegate at the current level;
 *)
-val check_signing_rights:
-  context -> int -> public_key_hash -> unit tzresult Lwt.t
+val check_endorsements_rights:
+  context -> Level.t -> int list -> public_key tzresult Lwt.t
 
 (** If this priority should have payed the bond it is the base baking
     reward and the bond, or just the base reward otherwise *)
@@ -102,8 +102,7 @@ val first_endorsement_slots:
 
 (** [check_signature ctxt block id] check if the block is signed with
     the given key *)
-val check_signature:
-  context -> Block_header.t -> public_key_hash -> unit tzresult Lwt.t
+val check_signature: Block_header.t -> public_key -> unit tzresult Lwt.t
 
 val check_hash: Block_hash.t -> int64 -> bool
 

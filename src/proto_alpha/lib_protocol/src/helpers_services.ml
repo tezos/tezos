@@ -341,28 +341,39 @@ module Forge = struct
 
   end
 
-  module Delegate = struct
+  module Consensus = struct
 
     let operations ctxt
-        block ~branch ~source operations =
-      let ops = Delegate_operations { source ; operations } in
+        block ~branch operation =
+      let ops = Consensus_operation operation in
       (RPC_context.make_call0 S.operations ctxt block
          () ({ branch }, Sourced_operations ops))
 
     let endorsement ctxt
-        b ~branch ~source ~block ~slot () =
-      operations ctxt b ~branch ~source
-        Alpha_context.[Endorsement { block ; slot }]
+        b ~branch ~block ~level ~slots () =
+      operations ctxt b ~branch
+        Alpha_context.(Endorsements { block ; level ; slots })
+
+
+  end
+
+  module Amendment = struct
+
+    let operation ctxt
+        block ~branch ~source operation =
+      let ops = Amendment_operation { source ; operation } in
+      (RPC_context.make_call0 S.operations ctxt block
+         () ({ branch }, Sourced_operations ops))
 
     let proposals ctxt
         b ~branch ~source ~period ~proposals () =
-      operations ctxt b ~branch ~source
-        Alpha_context.[Proposals { period ; proposals }]
+      operation ctxt b ~branch ~source
+        Alpha_context.(Proposals { period ; proposals })
 
     let ballot ctxt
         b ~branch ~source ~period ~proposal ~ballot () =
-      operations ctxt b ~branch ~source
-        Alpha_context.[Ballot { period ; proposal ; ballot }]
+      operation ctxt b ~branch ~source
+        Alpha_context.(Ballot { period ; proposal ; ballot })
 
   end
 
@@ -457,7 +468,13 @@ module Parse = struct
           end >>=? fun public_key ->
           Operation.check_signature public_key
             { signature ; shell ; contents ; hash = Operation_hash.zero }
-      | Sourced_operations (Delegate_operations { source ; _ }) ->
+      | Sourced_operations (Consensus_operation (Endorsements { level ; slots ; _ })) ->
+          let level = Level.from_raw ctxt level in
+          Baking.check_endorsements_rights ctxt level slots >>=? fun public_key ->
+          Operation.check_signature public_key
+            { signature ; shell ; contents ; hash = Operation_hash.zero }
+      | Sourced_operations (Amendment_operation { source ; _ }) ->
+          Delegates_pubkey.get ctxt source >>=? fun source ->
           Operation.check_signature source
             { signature ; shell ; contents ; hash = Operation_hash.zero }
       | Sourced_operations (Dictator_operation _) ->

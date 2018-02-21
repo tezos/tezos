@@ -19,6 +19,7 @@ let max_block_length =
 
 let validation_passes =
   Updater.[ { max_size = 32 * 1024 ; max_op = None  } ; (* 32kB FIXME *)
+            { max_size = 32 * 1024 ; max_op = None  } ; (* 32kB FIXME *)
             { max_size = 1024 * 1024 ; max_op = None  } ] (* 1MB *)
 
 let rpc_services = Services_registration.get_rpc_services ()
@@ -65,7 +66,7 @@ let begin_application
   Alpha_context.init ~level ~timestamp ~fitness ctxt >>=? fun ctxt ->
   Apply.begin_application
     ctxt block_header pred_timestamp >>=? fun (ctxt, baker) ->
-  let mode = Application { block_header ; baker } in
+  let mode = Application { block_header ; baker = Ed25519.Public_key.hash baker } in
   return { mode ; ctxt ; op_count = 0 }
 
 let begin_construction
@@ -91,6 +92,7 @@ let begin_construction
           ctxt pred_timestamp
           proto_header >>=? fun (ctxt, protocol_data, baker) ->
         let mode =
+          let baker = Ed25519.Public_key.hash baker in
           Full_construction { predecessor ; baker ; protocol_data } in
         return (mode, ctxt)
   end >>=? fun (mode, ctxt) ->

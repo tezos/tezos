@@ -47,12 +47,13 @@ let compute_for_cycle c cycle =
   | c -> Lwt.return c
 
 let for_cycle c cycle =
-  let current_level = Level_storage.current c in
-  let current_cycle = current_level.cycle in
-  let next_cycle = (Level_storage.succ c current_level).cycle in
-  fail_unless
-    Cycle_repr.(cycle = current_cycle || cycle = next_cycle)
-    Invalid_cycle >>=? fun () ->
+  (* let current_level = Level_storage.current c in *)
+  (* let current_cycle = current_level.cycle in *)
+  (* let next_cycle = (Level_storage.succ c current_level).cycle in *)
+  (* Temporary, we need to preserve the seed for 5 more cycle. *)
+  (* fail_unless *)
+  (* Cycle_repr.(cycle = current_cycle || cycle = next_cycle) *)
+  (* Invalid_cycle >>=? fun () -> *)
   Storage.Seed.For_cycle.get c cycle
 
 let clear_cycle c cycle =

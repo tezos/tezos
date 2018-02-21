@@ -76,25 +76,23 @@ let transaction_full ?(fee = Tez.zero) ?parameters src dst amount context =
   return @@ sourced manager_op
 
 
-let delegate (src: Helpers_account.t) operations =
-  Delegate_operations {
-    source = src.pub ;
-    operations
+let amendment_operation (src: Helpers_account.t) operation =
+  Amendment_operation {
+    source = src.hpub ;
+    operation
   }
 
-
-let endorsement ?(slot = 0) block =
-  Endorsement {
+let endorsements ?(slot = 0) block level =
+  Endorsements {
     block ;
-    slot
+    level ;
+    slots = [slot] ;
   }
 
 
-let endorsement_full ?(slot = 0) src block =
+let endorsement_full ?(slot = 0) block level =
   sourced
-  @@ delegate
-    src
-    [endorsement block ~slot]
+  @@ Consensus_operation (endorsements block level ~slot)
 
 
 let sign src oph protop =

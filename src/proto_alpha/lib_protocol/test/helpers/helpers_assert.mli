@@ -87,5 +87,4 @@ val balance_too_low : msg:string -> 'a proto_tzresult -> unit
 val non_spendable : msg:string -> 'a tzresult -> unit
 val inconsistent_pkh : msg:string -> 'a tzresult -> unit
 val non_delegatable : msg:string -> 'a tzresult -> unit
-val wrong_delegate : msg:string -> 'a tzresult -> unit
 

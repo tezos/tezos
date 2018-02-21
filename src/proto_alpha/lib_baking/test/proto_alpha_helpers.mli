@@ -199,8 +199,6 @@ module Assert : sig
 
   (** Endorsement / baking assertions *)
 
-  val wrong_delegate : msg:string -> 'a tzresult -> unit
-
   val check_protocol :
     ?msg:string -> block:Block_services.block ->
     Protocol_hash.t -> unit tzresult Lwt.t

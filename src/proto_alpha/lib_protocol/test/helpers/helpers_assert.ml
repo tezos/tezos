@@ -219,10 +219,4 @@ let non_delegatable ~msg =
       | _ -> false)
   end
 
-let wrong_delegate ~msg =
-  contain_error ~msg ~f: begin ecoproto_error (function
-      | Proto_alpha.Baking.Wrong_delegate _ -> true
-      | _ -> false)
-  end
-
 include Assert

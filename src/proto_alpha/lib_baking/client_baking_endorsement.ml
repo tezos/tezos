@@ -93,20 +93,23 @@ let get_signing_slots cctxt ?max_priority block delegate level =
 
 let inject_endorsement (cctxt : #Proto_alpha.full)
     block level ?async
-    src_sk source slot =
+    src_sk slots =
   let block = Block_services.last_baked_block block in
   Block_services.info cctxt block >>=? fun bi ->
-  Alpha_services.Forge.Delegate.endorsement cctxt
+  Alpha_services.Forge.Consensus.endorsement cctxt
     block
     ~branch:bi.hash
-    ~source
     ~block:bi.hash
-    ~slot:slot
+    ~level:level
+    ~slots
     () >>=? fun bytes ->
   Client_keys.append cctxt src_sk bytes >>=? fun signed_bytes ->
   Shell_services.inject_operation
     cctxt ?async ~chain_id:bi.chain_id signed_bytes >>=? fun oph ->
-  State.record_endorsement cctxt level bi.hash slot oph >>=? fun () ->
+  iter_s
+    (fun slot ->
+       State.record_endorsement cctxt level bi.hash slot oph)
+    slots >>=? fun () ->
   return oph
 
 let previously_endorsed_slot cctxt level slot =
@@ -125,23 +128,23 @@ let check_endorsement cctxt level slot =
 
 let forge_endorsement (cctxt : #Proto_alpha.full)
     block
-    ~src_sk ?slot ?max_priority src_pk =
+    ~src_sk ?slots ?max_priority src_pk =
   let block = Block_services.last_baked_block block in
   let src_pkh = Ed25519.Public_key.hash src_pk in
-  Alpha_services.Context.next_level cctxt block >>=? fun { level } ->
+  Alpha_services.Context.level cctxt block >>=? fun { level } ->
   begin
-    match slot with
-    | Some slot -> return slot
+    match slots with
+    | Some slots -> return slots
     | None ->
         get_signing_slots
           cctxt ?max_priority block src_pkh level >>=? function
-        | slot::_ -> return slot
         | [] -> cctxt#error "No slot found at level %a" Raw_level.pp level
-  end >>=? fun slot ->
-  check_endorsement cctxt level slot >>=? fun () ->
+        | slots -> return slots
+  end >>=? fun slots ->
+  iter_s (check_endorsement cctxt level) slots >>=? fun () ->
   inject_endorsement cctxt
     block level
-    src_sk src_pk slot
+    src_sk slots
 
 
 (** Worker *)
@@ -285,12 +288,12 @@ let endorse cctxt state =
        previously_endorsed_slot cctxt level slot >>=? function
        | true -> return ()
        | false ->
-           Client_keys.get_key cctxt delegate >>=? fun (name, pk, sk) ->
+           Client_keys.get_key cctxt delegate >>=? fun (name, _pk, sk) ->
            lwt_debug "Endorsing %a for %s (slot %d)!"
              Block_hash.pp_short hash name slot >>= fun () ->
            inject_endorsement cctxt
              b level ~async:true
-             sk pk slot >>=? fun oph ->
+             sk [slot] >>=? fun oph ->
            cctxt#message
              "Injected endorsement for block '%a' \
              \ (level %a, slot %d, contract %s) '%a'"

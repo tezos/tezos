@@ -72,12 +72,9 @@ val of_res :
   res:result ->
   unit -> result proto_tzresult Lwt.t
 val endorsement :
-  shell_header -> Block_hash.t -> Int32.t -> int ->
+  shell_header -> Block_hash.t -> Alpha_context.Raw_level.t -> int ->
   Helpers_account.t -> Context.t -> int ->
   result proto_tzresult Lwt.t
-val endorsement_of_res :
-  result -> Helpers_account.t -> int -> ?priority:int -> res:result ->
-  unit -> result proto_tzresult Lwt.t
 val empty :
   shell_header -> Block_hash.t -> Int32.t -> int ->
   Context.t -> result proto_tzresult Lwt.t

@@ -249,24 +249,24 @@ module Protocol = struct
   let voting_period_kind ?(block = `Prevalidation) () =
     Alpha_services.Context.voting_period_kind !rpc_ctxt block
 
-  let proposals ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) proposals =
+  let proposals ?(block = `Prevalidation) ~src:({ pkh; sk } : Account.t) proposals =
     Block_services.info !rpc_ctxt block >>=? fun block_info ->
     Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
-    Alpha_services.Forge.Delegate.proposals !rpc_ctxt block
+    Alpha_services.Forge.Amendment.proposals !rpc_ctxt block
       ~branch:block_info.hash
-      ~source:pk
+      ~source:pkh
       ~period:next_level.voting_period
       ~proposals
       () >>=? fun bytes ->
     let signed_bytes = Ed25519.Signature.append sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
-  let ballot ?(block = `Prevalidation) ~src:({ pk; sk } : Account.t) ~proposal ballot =
+  let ballot ?(block = `Prevalidation) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
     Block_services.info !rpc_ctxt block >>=? fun block_info ->
     Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
-    Alpha_services.Forge.Delegate.ballot !rpc_ctxt block
+    Alpha_services.Forge.Amendment.ballot !rpc_ctxt block
       ~branch:block_info.hash
-      ~source:pk
+      ~source:pkh
       ~period:next_level.voting_period
       ~proposal
       ~ballot
@@ -398,12 +398,6 @@ module Assert = struct
         | _ -> false)
     end
 
-  let wrong_delegate ~msg =
-    contain_error ~msg ~f:begin ecoproto_error (function
-        | Baking.Wrong_delegate _ -> true
-        | _ -> false)
-    end
-
   let check_protocol ?msg ~block h =
     Block_services.protocol !rpc_ctxt block >>=? fun block_proto ->
     return @@ equal
@@ -463,16 +457,16 @@ module Endorse = struct
   let forge_endorsement
       block
       src_sk
-      source
       slot =
     let block = Block_services.last_baked_block block in
     Block_services.info !rpc_ctxt block >>=? fun { hash ; _ } ->
-    Alpha_services.Forge.Delegate.endorsement !rpc_ctxt
+    Alpha_services.Context.level !rpc_ctxt (`Hash hash) >>=? fun level ->
+    Alpha_services.Forge.Consensus.endorsement !rpc_ctxt
       block
       ~branch:hash
-      ~source
       ~block:hash
-      ~slot:slot
+      ~level:level.level
+      ~slots:[slot]
       () >>=? fun bytes ->
     let signed_bytes = Ed25519.Signature.append src_sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
@@ -494,7 +488,7 @@ module Endorse = struct
       ?slot
       (contract : Account.t)
       block =
-    Alpha_services.Context.next_level !rpc_ctxt block >>=? fun { level } ->
+    Alpha_services.Context.level !rpc_ctxt block >>=? fun { level } ->
     begin
       match slot with
       | Some slot -> return slot
@@ -507,7 +501,7 @@ module Endorse = struct
               failwith "No slot found at level %a" Raw_level.pp level
         end
     end >>=? fun slot ->
-    forge_endorsement block contract.sk contract.pk slot
+    forge_endorsement block contract.sk slot
 
   (* FIXME @vb: I don't understand this function, copied from @cago. *)
   let endorsers_list block =
@@ -522,7 +516,7 @@ module Endorse = struct
     let { Account.b1 ; b2 ; b3 ; b4 ; b5 } = Account.bootstrap_accounts in
     let result = Array.make 16 b1 in
     Alpha_services.Context.level !rpc_ctxt block >>=? fun level ->
-    let level = Raw_level.succ @@ level.level in
+    let level = level.level in
     get_endorser_list result b1 level block >>=? fun () ->
     get_endorser_list result b2 level block >>=? fun () ->
     get_endorser_list result b3 level block >>=? fun () ->

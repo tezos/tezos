@@ -14,7 +14,7 @@ val forge_endorsement:
   #Proto_alpha.full ->
   Block_services.block ->
   src_sk:Client_keys.sk_locator ->
-  ?slot:int ->
+  ?slots:int list ->
   ?max_priority:int ->
   public_key ->
   Operation_hash.t tzresult Lwt.t

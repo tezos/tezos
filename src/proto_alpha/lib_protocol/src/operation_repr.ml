@@ -38,6 +38,11 @@ and anonymous_operation =
     }
 
 and sourced_operations =
+  | Consensus_operation of consensus_operation
+  | Amendment_operation of {
+      source: Ed25519.Public_key_hash.t ;
+      operation: amendment_operation ;
+    }
   | Manager_operations of {
       source: Contract_repr.contract ;
       public_key: Ed25519.Public_key.t option ;
@@ -45,11 +50,25 @@ and sourced_operations =
       counter: counter ;
       operations: manager_operation list ;
     }
-  | Delegate_operations of {
-      source: Ed25519.Public_key.t ;
-      operations: delegate_operation list ;
-    }
   | Dictator_operation of dictator_operation
+
+and consensus_operation =
+  | Endorsements of {
+      block: Block_hash.t ;
+      level: Raw_level_repr.t ;
+      slots: int list ;
+    }
+
+and amendment_operation =
+  | Proposals of {
+      period: Voting_period_repr.t ;
+      proposals: Protocol_hash.t list ;
+    }
+  | Ballot of {
+      period: Voting_period_repr.t ;
+      proposal: Protocol_hash.t ;
+      ballot: Vote_repr.ballot ;
+    }
 
 and manager_operation =
   | Transaction of {
@@ -66,21 +85,6 @@ and manager_operation =
       credit: Tez_repr.tez ;
     }
   | Delegation of Ed25519.Public_key_hash.t option
-
-and delegate_operation =
-  | Endorsement of {
-      block: Block_hash.t ;
-      slot: int ;
-    }
-  | Proposals of {
-      period: Voting_period_repr.t ;
-      proposals: Protocol_hash.t list ;
-    }
-  | Ballot of {
-      period: Voting_period_repr.t ;
-      proposal: Protocol_hash.t ;
-      ballot: Vote_repr.ballot ;
-    }
 
 and dictator_operation =
   | Activate of Protocol_hash.t
@@ -145,7 +149,8 @@ module Encoding = struct
       (fun ((), key) -> Delegation key)
 
   let manager_kind_encoding =
-    (obj5
+    (obj6
+       (req "kind" (constant "manager"))
        (req "source" Contract_repr.encoding)
        (opt "public_key" Ed25519.Public_key.encoding)
        (req "fee" Tez_repr.encoding)
@@ -161,25 +166,34 @@ module Encoding = struct
     case tag manager_kind_encoding
       (function
         | Manager_operations { source; public_key ; fee ; counter ;operations } ->
-            Some (source, public_key, fee, counter, operations)
+            Some ((), source, public_key, fee, counter, operations)
         | _ -> None)
-      (fun (source, public_key, fee, counter, operations) ->
+      (fun ((), source, public_key, fee, counter, operations) ->
          Manager_operations { source; public_key ; fee ; counter ; operations })
 
   let endorsement_encoding =
-    (obj3
+    (obj4
        (req "kind" (constant "endorsement"))
        (req "block" Block_hash.encoding)
-       (req "slot" int31))
+       (req "level" Raw_level_repr.encoding)
+       (req "slots" (list int31)))
 
-  let endorsement_case tag =
-    case tag endorsement_encoding
+  let consensus_kind_encoding =
+    conv
       (function
-        | Endorsement { block ; slot } ->
-            Some ((), block, slot)
+        | Endorsements { block ; level ; slots } ->
+            ((), block, level, slots))
+      (fun ((), block, level, slots) ->
+         Endorsements { block ; level ; slots })
+      endorsement_encoding
+
+  let consensus_kind_case tag =
+    case tag consensus_kind_encoding
+      (function
+        | Consensus_operation op ->
+            Some op
         | _ -> None)
-      (fun ((), block, slot) ->
-         Endorsement { block ; slot })
+      (fun op -> Consensus_operation op)
 
   let proposal_encoding =
     (obj3
@@ -212,23 +226,21 @@ module Encoding = struct
       (fun ((), period, proposal, ballot) ->
          Ballot { period ; proposal ; ballot })
 
-  let delegate_kind_encoding =
-    (obj2
-       (req "source" Ed25519.Public_key.encoding)
-       (req "operations"
-          (list (union [
-               endorsement_case (Tag 0) ;
-               proposal_case (Tag 1) ;
-               ballot_case (Tag 2) ;
-             ]))))
+  let amendment_kind_encoding =
+    merge_objs
+      (obj1 (req "source" Ed25519.Public_key_hash.encoding))
+      (union [
+          proposal_case (Tag 0) ;
+          ballot_case (Tag 1) ;
+        ])
 
-  let delegate_kind_case tag =
-    case tag delegate_kind_encoding
+  let amendment_kind_case tag =
+    case tag amendment_kind_encoding
       (function
-        | Delegate_operations { source ; operations } ->
-            Some (source, operations)
+        | Amendment_operation { source ; operation } ->
+            Some (source, operation)
         | _ -> None)
-      (fun (source, operations) -> Delegate_operations { source ; operations })
+      (fun (source, operation) -> Amendment_operation { source ; operation })
 
   let dictator_kind_encoding =
     let mk_case name args =
@@ -261,9 +273,10 @@ module Encoding = struct
   let signed_operations_case tag =
     case tag
       (union [
-          manager_kind_case (Tag 0) ;
-          delegate_kind_case (Tag 1) ;
-          dictator_kind_case (Tag 2) ;
+          consensus_kind_case (Tag 0) ;
+          amendment_kind_case (Tag 1) ;
+          manager_kind_case (Tag 2) ;
+          dictator_kind_case (Tag 3) ;
         ])
       (function Sourced_operations ops -> Some ops | _ -> None)
       (fun ops -> Sourced_operations ops)
@@ -365,17 +378,9 @@ let parse hash (op: Operation.t) =
 let acceptable_passes op =
   match op.contents with
   | Anonymous_operations _
-  | Sourced_operations (Manager_operations _) -> [1]
-  | Sourced_operations (Delegate_operations { operations ; _ }) ->
-      let is_endorsement = function Endorsement _ -> true | _ -> false in
-      if List.exists is_endorsement operations then
-        if List.for_all is_endorsement operations then
-          [0]
-        else
-          []
-      else
-        [1]
-  | Sourced_operations (Dictator_operation _) -> [0]
+  | Sourced_operations (Consensus_operation _) -> [0]
+  | Sourced_operations (Amendment_operation _ | Dictator_operation _) -> [1]
+  | Sourced_operations (Manager_operations _) -> [2]
 
 type error += Invalid_signature (* `Permanent *)
 type error += Missing_signature (* `Permanent *)

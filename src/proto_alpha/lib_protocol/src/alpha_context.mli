@@ -346,7 +346,7 @@ module Fitness : sig
   include (module type of Fitness)
   type fitness = t
 
-  val increase: context -> context
+  val increase: ?gap:int -> context -> context
 
   val current: context -> int64
 
@@ -554,18 +554,37 @@ and anonymous_operation =
     }
 
 and sourced_operations =
+  | Consensus_operation of consensus_operation
+  | Amendment_operation of {
+      source: Ed25519.Public_key_hash.t ;
+      operation: amendment_operation ;
+    }
   | Manager_operations of {
-      source: Contract.t ;
-      public_key: public_key option ;
+      source: Contract.contract ;
+      public_key: Ed25519.Public_key.t option ;
       fee: Tez.t ;
       counter: counter ;
       operations: manager_operation list ;
     }
-  | Delegate_operations of {
-      source: public_key ;
-      operations: delegate_operation list ;
-    }
   | Dictator_operation of dictator_operation
+
+and consensus_operation =
+  | Endorsements of {
+      block: Block_hash.t ;
+      level: Raw_level.t ;
+      slots: int list ;
+    }
+
+and amendment_operation =
+  | Proposals of {
+      period: Voting_period.t ;
+      proposals: Protocol_hash.t list ;
+    }
+  | Ballot of {
+      period: Voting_period.t ;
+      proposal: Protocol_hash.t ;
+      ballot: Vote.ballot ;
+    }
 
 and manager_operation =
   | Transaction of {
@@ -582,21 +601,6 @@ and manager_operation =
       credit: Tez.t ;
     }
   | Delegation of public_key_hash option
-
-and delegate_operation =
-  | Endorsement of {
-      block: Block_hash.t ;
-      slot: int ;
-    }
-  | Proposals of {
-      period: Voting_period.t ;
-      proposals: Protocol_hash.t list ;
-    }
-  | Ballot of {
-      period: Voting_period.t ;
-      proposal: Protocol_hash.t ;
-      ballot: Vote.ballot ;
-    }
 
 and dictator_operation =
   | Activate of Protocol_hash.t

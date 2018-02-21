@@ -38,6 +38,11 @@ and anonymous_operation =
     }
 
 and sourced_operations =
+  | Consensus_operation of consensus_operation
+  | Amendment_operation of {
+      source: Ed25519.Public_key_hash.t ;
+      operation: amendment_operation ;
+    }
   | Manager_operations of {
       source: Contract_repr.contract ;
       public_key: Ed25519.Public_key.t option ;
@@ -45,11 +50,25 @@ and sourced_operations =
       counter: counter ;
       operations: manager_operation list ;
     }
-  | Delegate_operations of {
-      source: Ed25519.Public_key.t ;
-      operations: delegate_operation list ;
-    }
   | Dictator_operation of dictator_operation
+
+and consensus_operation =
+  | Endorsements of {
+      block: Block_hash.t ;
+      level: Raw_level_repr.t ;
+      slots: int list ;
+    }
+
+and amendment_operation =
+  | Proposals of {
+      period: Voting_period_repr.t ;
+      proposals: Protocol_hash.t list ;
+    }
+  | Ballot of {
+      period: Voting_period_repr.t ;
+      proposal: Protocol_hash.t ;
+      ballot: Vote_repr.ballot ;
+    }
 
 and manager_operation =
   | Transaction of {
@@ -66,21 +85,6 @@ and manager_operation =
       credit: Tez_repr.tez ;
     }
   | Delegation of Ed25519.Public_key_hash.t option
-
-and delegate_operation =
-  | Endorsement of {
-      block: Block_hash.t ;
-      slot: int ;
-    }
-  | Proposals of {
-      period: Voting_period_repr.t ;
-      proposals: Protocol_hash.t list ;
-    }
-  | Ballot of {
-      period: Voting_period_repr.t ;
-      proposal: Protocol_hash.t ;
-      ballot: Vote_repr.ballot ;
-    }
 
 and dictator_operation =
   | Activate of Protocol_hash.t

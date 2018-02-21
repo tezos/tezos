@@ -77,7 +77,7 @@ let test_wrong_delegate ~baker contract block =
     return ()
   end >>= fun res ->
   Assert.failed_to_preapply ~msg:__LOC__ begin function
-    | Baking.Wrong_delegate _ -> true
+    | Alpha_context.Operation.Invalid_signature -> true
     | _ -> false
   end res ;
   Lwt.return_unit

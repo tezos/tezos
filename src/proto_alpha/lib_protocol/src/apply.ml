@@ -16,6 +16,7 @@ type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `T
 type error += Duplicate_endorsement of int (* `Branch *)
 type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.expr option (* `Permanent *)
 type error += Too_many_faucet
+type error += Invalid_endorsement_level
 
 
 let () =
@@ -81,26 +82,49 @@ let () =
         Format.fprintf ppf "Too many faucet operation.")
     Data_encoding.unit
     (function Too_many_faucet -> Some () | _ -> None)
-    (fun () -> Too_many_faucet)
+    (fun () -> Too_many_faucet) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.invalid_endorsement_level"
+    ~title:"Unpexpected level in endorsement"
+    ~description:"The level of an endorsement is inconsistent with the \
+                 \ provided block hash."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Unpexpected level in endorsement.")
+    Data_encoding.unit
+    (function Invalid_endorsement_level -> Some () | _ -> None)
+    (fun () -> Invalid_endorsement_level)
 
-
-let apply_delegate_operation_content
-    ctxt delegate pred_block block_priority = function
-  | Endorsement { block ; slot } ->
+let apply_consensus_operation_content ctxt
+    pred_block block_priority operation = function
+  | Endorsements { block ; level ; slots } ->
+      begin
+        match Level.pred ctxt (Level.current ctxt) with
+        | None -> failwith ""
+        | Some lvl -> return lvl
+      end >>=? fun ({ cycle = current_cycle ; level = current_level ;_ } as lvl) ->
       fail_unless
         (Block_hash.equal block pred_block)
         (Wrong_endorsement_predecessor (pred_block, block)) >>=? fun () ->
-      fail_when
-        (endorsement_already_recorded ctxt slot)
-        (Duplicate_endorsement (slot)) >>=? fun () ->
-      Baking.check_signing_rights ctxt slot delegate >>=? fun () ->
-      let ctxt = record_endorsement ctxt slot in
-      let ctxt = Fitness.increase ctxt in
+      fail_unless
+        Raw_level.(level = current_level)
+        Invalid_endorsement_level >>=? fun () ->
+      fold_left_s (fun ctxt slot ->
+          fail_when
+            (endorsement_already_recorded ctxt slot)
+            (Duplicate_endorsement slot) >>=? fun () ->
+          return (record_endorsement ctxt slot))
+        ctxt slots >>=? fun ctxt ->
+      Baking.check_endorsements_rights ctxt lvl slots >>=? fun delegate ->
+      Operation.check_signature delegate operation >>=? fun () ->
+      let delegate = Ed25519.Public_key.hash delegate in
+      let ctxt = Fitness.increase ~gap:(List.length slots) ctxt in
       Baking.pay_endorsement_bond ctxt delegate >>=? fun (ctxt, bond) ->
       Baking.endorsement_reward ~block_priority >>=? fun reward ->
-      let { cycle = current_cycle ; _ } : Level.t = Level.current ctxt in
       Lwt.return Tez.(reward +? bond) >>=? fun full_reward ->
       Reward.record ctxt delegate current_cycle full_reward
+
+let apply_amendment_operation_content ctxt delegate = function
   | Proposals { period ; proposals } ->
       let level = Level.current ctxt in
       fail_unless Voting_period.(level.voting_period = period)
@@ -219,16 +243,16 @@ let apply_sourced_operation
               apply_manager_operation_content
                 ctxt origination_nonce source content)
         (ctxt, origination_nonce, None) contents
-  | Delegate_operations { source ; operations = contents } ->
-      let delegate = Ed25519.Public_key.hash source in
-      Delegates_pubkey.reveal ctxt delegate source >>=? fun ctxt ->
-      Operation.check_signature source operation >>=? fun () ->
+  | Consensus_operation content ->
+      apply_consensus_operation_content ctxt
+        pred_block block_prio operation content >>=? fun ctxt ->
+      return (ctxt, origination_nonce, None)
+  | Amendment_operation { source ; operation = content } ->
+      Delegates_pubkey.get ctxt source >>=? fun delegate ->
+      Operation.check_signature delegate operation >>=? fun () ->
       (* TODO, see how to extract the public key hash after this operation to
          pass it to apply_delegate_operation_content *)
-      fold_left_s (fun ctxt content ->
-          apply_delegate_operation_content
-            ctxt delegate pred_block block_prio content)
-        ctxt contents >>=? fun ctxt ->
+      apply_amendment_operation_content ctxt source content >>=? fun ctxt ->
       return (ctxt, origination_nonce, None)
   | Dictator_operation (Activate hash) ->
       let dictator_pubkey = Constants.dictator_pubkey ctxt in
@@ -299,9 +323,16 @@ let may_start_new_cycle ctxt =
   | Some last_cycle ->
       let new_cycle = Cycle.succ last_cycle in
       let succ_new_cycle = Cycle.succ new_cycle in
-      Seed.clear_cycle ctxt last_cycle >>=? fun ctxt ->
+      begin
+        (* Temporary, the seed needs to be preserve until
+           no denunciation are allowed *)
+        match Cycle.pred last_cycle with
+        | None -> return ctxt
+        | Some pred_last_cycle ->
+            Seed.clear_cycle ctxt pred_last_cycle >>=? fun ctxt ->
+            Roll.clear_cycle ctxt pred_last_cycle
+      end >>=? fun ctxt ->
       Seed.compute_for_cycle ctxt succ_new_cycle >>=? fun ctxt ->
-      Roll.clear_cycle ctxt last_cycle >>=? fun ctxt ->
       Roll.freeze_rolls_for_cycle ctxt succ_new_cycle >>=? fun ctxt ->
       let timestamp = Timestamp.current ctxt in
       Lwt.return (Timestamp.(timestamp +? (Constants.time_before_reward ctxt)))
@@ -316,7 +347,8 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
        protocol_data) >>=? fun protocol_data ->
   Baking.check_baking_rights
     ctxt protocol_data pred_timestamp >>=? fun baker ->
-  Baking.pay_baking_bond ctxt protocol_data baker >>=? fun ctxt ->
+  Baking.pay_baking_bond ctxt protocol_data
+    (Ed25519.Public_key.hash baker) >>=? fun ctxt ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, protocol_data, baker)
 
@@ -329,8 +361,9 @@ let begin_application ctxt block_header pred_timestamp =
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
   Baking.check_baking_rights
     ctxt block_header.protocol_data pred_timestamp >>=? fun baker ->
-  Baking.check_signature ctxt block_header baker >>=? fun () ->
-  Baking.pay_baking_bond ctxt block_header.protocol_data baker >>=? fun ctxt ->
+  Baking.check_signature block_header baker >>=? fun () ->
+  Baking.pay_baking_bond ctxt block_header.protocol_data
+    (Ed25519.Public_key.hash baker) >>=? fun ctxt ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, baker)
 
@@ -353,13 +386,15 @@ let compare_operations op1 op2 =
   | Sourced_operations _, Anonymous_operations _ -> 1
   | Sourced_operations op1, Sourced_operations op2 ->
       match op1, op2 with
-      | Delegate_operations _, (Manager_operations _ | Dictator_operation _) -> -1
+      | Consensus_operation _, (Amendment_operation _ | Manager_operations _ | Dictator_operation _) -> -1
+      | (Amendment_operation _ | Manager_operations _ | Dictator_operation _), Consensus_operation _ -> 1
+      | Amendment_operation _, (Manager_operations _ | Dictator_operation _) -> -1
+      | (Manager_operations _ | Dictator_operation _), Amendment_operation _ -> 1
       | Manager_operations _, Dictator_operation _ -> -1
       | Dictator_operation _, Manager_operations _ -> 1
-      | (Manager_operations _ | Dictator_operation _), Delegate_operations _ -> 1
-      | Delegate_operations _, Delegate_operations _ -> 0
-      | Dictator_operation _, Dictator_operation _ -> 0
-      | Manager_operations op1, Manager_operations op2 -> begin
+      | Consensus_operation _, Consensus_operation _ -> 0
+      | Amendment_operation _, Amendment_operation _ -> 0
+      | Manager_operations op1, Manager_operations op2 ->
           (* Manager operations with smaller counter are pre-validated first. *)
           Int32.compare op1.counter op2.counter
-        end
+      | Dictator_operation _, Dictator_operation _ -> 0

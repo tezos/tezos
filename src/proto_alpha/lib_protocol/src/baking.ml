@@ -14,9 +14,12 @@ open Misc
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
-type error += Wrong_delegate of public_key_hash * public_key_hash (* `Permanent *)
+type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
+type error += Empty_endorsement
 type error += Cannot_pay_baking_bond (* `Permanent *)
 type error += Cannot_pay_endorsement_bond (* `Permanent *)
+type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
+
 
 let () =
   register_error_kind
@@ -61,18 +64,17 @@ let () =
     (fun (m, g) -> Invalid_endorsement_slot (m, g)) ;
   register_error_kind
     `Permanent
-    ~id:"baking.wrong_delegate"
-    ~title:"Wrong delegate"
-    ~description:"The block delegate is not the expected one"
-    ~pp:(fun ppf (e, g) ->
+    ~id:"baking.inconsisten_endorsement"
+    ~title:"Multiple delegates for a single endorsement"
+    ~description:"The operation tries to endorse slots with distinct delegates"
+    ~pp:(fun ppf l ->
         Format.fprintf ppf
-          "The declared delegate %a is not %a"
-          Ed25519.Public_key_hash.pp g Ed25519.Public_key_hash.pp e)
-    Data_encoding.(obj2
-                     (req "expected" Ed25519.Public_key_hash.encoding)
-                     (req "provided" Ed25519.Public_key_hash.encoding))
-    (function Wrong_delegate (e, g)   -> Some (e, g) | _ -> None)
-    (fun (e, g) -> Wrong_delegate (e, g)) ;
+          "@[<v 2>The endorsement is inconsistent. Delegates:@ %a@]"
+          (Format.pp_print_list Ed25519.Public_key_hash.pp) l)
+    Data_encoding.(obj1
+                     (req "delegates" (list Ed25519.Public_key_hash.encoding)))
+    (function Inconsistent_endorsement l -> Some l | _ -> None)
+    (fun l -> Inconsistent_endorsement l) ;
   register_error_kind
     `Permanent
     ~id:"baking.cannot_pay_baking_bond"
@@ -92,7 +94,22 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay the endorsement bond")
     Data_encoding.unit
     (function Cannot_pay_endorsement_bond -> Some () | _ -> None)
-    (fun () -> Cannot_pay_endorsement_bond)
+    (fun () -> Cannot_pay_endorsement_bond) ;
+  register_error_kind
+    `Permanent
+    ~id:"baking.invalid_block_signature"
+    ~title:"Invalid block signature"
+    ~description:
+      "A block was not signed with the expected private key."
+    ~pp:(fun ppf (block, pkh) ->
+        Format.fprintf ppf "Invalid signature for block %a. Expected: %a."
+          Block_hash.pp_short block
+          Ed25519.Public_key_hash.pp_short pkh)
+    Data_encoding.(obj2
+                     (req "block" Block_hash.encoding)
+                     (req "expected" Ed25519.Public_key_hash.encoding))
+    (function Invalid_block_signature (block, pkh) -> Some (block, pkh) | _ -> None)
+    (fun (block, pkh) -> Invalid_block_signature (block, pkh))
 
 let minimal_time c priority pred_timestamp =
   let priority = Int32.of_int priority in
@@ -123,7 +140,7 @@ let check_baking_rights c { Block_header.priority ; _ }
   let level = Level.current c in
   Roll.baking_rights_owner c level ~priority >>=? fun delegate ->
   check_timestamp c priority pred_timestamp >>=? fun () ->
-  return (Ed25519.Public_key.hash delegate)
+  return delegate
 
 let pay_baking_bond c { Block_header.priority ; _ } id =
   if Compare.Int.(priority >= Constants.first_free_baking_slot c)
@@ -138,14 +155,18 @@ let pay_endorsement_bond c id =
   |> trace Cannot_pay_endorsement_bond >>=? fun c ->
   return (c, bond)
 
-let check_signing_rights c slot delegate =
-  fail_unless Compare.Int.(0 <= slot && slot <= Constants.max_signing_slot c)
-    (Invalid_endorsement_slot (Constants.max_signing_slot c, slot)) >>=? fun () ->
-  let level = Level.current c in
-  Roll.endorsement_rights_owner c level ~slot >>=? fun owning_delegate ->
-  let owning_delegate = Ed25519.Public_key.hash owning_delegate in
-  fail_unless (Ed25519.Public_key_hash.equal owning_delegate delegate)
-    (Wrong_delegate (owning_delegate, delegate))
+let check_endorsements_rights c level slots =
+  map_p (fun slot ->
+      fail_unless Compare.Int.(0 <= slot && slot <= Constants.max_signing_slot c)
+        (Invalid_endorsement_slot (Constants.max_signing_slot c, slot)) >>=? fun () ->
+      Roll.endorsement_rights_owner c level ~slot)
+    slots >>=? function
+  | [] -> fail Empty_endorsement
+  | delegate :: delegates as all_delegates ->
+      fail_unless
+        (List.for_all (fun d -> Ed25519.Public_key.equal d delegate) delegates)
+        (Inconsistent_endorsement (List.map Ed25519.Public_key.hash all_delegates)) >>=? fun () ->
+      return delegate
 
 let paying_priorities c =
   0 --> Constants.first_free_baking_slot c
@@ -222,7 +243,6 @@ let check_header_hash header stamp_threshold =
   check_hash hash stamp_threshold
 
 type error +=
-  | Invalid_signature
   | Invalid_stamp
 
 let check_proof_of_work_stamp ctxt block =
@@ -232,15 +252,15 @@ let check_proof_of_work_stamp ctxt block =
   else
     fail Invalid_stamp
 
-let check_signature ctxt block id =
-  Delegates_pubkey.get ctxt id >>=? fun key ->
+let check_signature block key =
   let check_signature key { Block_header.protocol_data ; shell ; signature } =
     let unsigned_header = Block_header.forge_unsigned shell protocol_data in
     Ed25519.Signature.check key signature unsigned_header in
   if check_signature key block then
     return ()
   else
-    fail Invalid_signature
+    fail (Invalid_block_signature (Block_header.hash block,
+                                   Ed25519.Public_key.hash key))
 
 let max_fitness_gap ctxt =
   let slots = Int64.of_int (Constants.max_signing_slot ctxt + 1) in

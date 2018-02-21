@@ -49,14 +49,14 @@ val transaction_full :
   ?fee:Tez.tez -> ?parameters:Proto_alpha.Alpha_context.Script.expr -> Helpers_account.t -> Contract.contract -> Tez.t ->
   Alpha_environment.Context.t -> proto_operation proto_tzresult Lwt.t
 
-val delegate :
-  Helpers_account.t -> delegate_operation list -> sourced_operations
+val amendment_operation :
+  Helpers_account.t -> amendment_operation -> sourced_operations
 
-val endorsement :
-  ?slot:int -> Block_hash.t -> delegate_operation
+val endorsements :
+  ?slot:int -> Block_hash.t -> Raw_level.t -> consensus_operation
 
 val endorsement_full :
-  ?slot:int -> Helpers_account.t -> Block_hash.t -> proto_operation
+  ?slot:int -> Block_hash.t -> Raw_level.t -> proto_operation
 
 val sign :
   Helpers_account.t option -> Tezos_base.Operation.shell_header ->

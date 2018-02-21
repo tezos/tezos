@@ -127,26 +127,24 @@ module Forge : sig
 
   end
 
-  module Delegate : sig
-
-    val operations:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      source:public_key ->
-      delegate_operation list -> MBytes.t shell_tzresult Lwt.t
+  module Consensus : sig
 
     val endorsement:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:public_key ->
       block:Block_hash.t ->
-      slot:int ->
+      level:Raw_level.t ->
+      slots:int list ->
       unit -> MBytes.t shell_tzresult Lwt.t
+
+  end
+
+  module Amendment : sig
 
     val proposals:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:public_key ->
+      source:public_key_hash ->
       period:Voting_period.t ->
       proposals:Protocol_hash.t list ->
       unit -> MBytes.t shell_tzresult Lwt.t
@@ -154,7 +152,7 @@ module Forge : sig
     val ballot:
       'a #RPC_context.simple -> 'a ->
       branch:Block_hash.t ->
-      source:public_key ->
+      source:public_key_hash ->
       period:Voting_period.t ->
       proposal:Protocol_hash.t ->
       ballot:Vote.ballot ->

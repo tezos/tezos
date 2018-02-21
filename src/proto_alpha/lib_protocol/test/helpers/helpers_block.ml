@@ -176,13 +176,9 @@ let of_res ?priority ?(ops =[]) ~(res: result) () =
 let endorsement
     psh pbh level priority src ctxt slot =
   make_init
-    psh pbh level priority
-    [Helpers_operation.endorsement_full src pbh ~slot, src]
+    psh pbh (Alpha_context.Raw_level.to_int32 level) priority
+    [Helpers_operation.endorsement_full pbh ~slot level, src]
     ctxt
-
-
-let endorsement_of_res (pred: result) (src: Helpers_account.t) slot =
-  of_res ~ops: [Helpers_operation.endorsement_full src pred.hash ~slot, src]
 
 
 let empty psh pbh level prio ctxt =
