@@ -48,18 +48,17 @@ let clear_ballots = Storage.Vote.Ballots.clear
 
 let freeze_listings ctxt =
   Roll_storage.fold ctxt (ctxt, 0l)
-    ~f:(fun _roll contract (ctxt, total as acc) ->
-        Contract_storage.get_delegate_opt ctxt contract >>=? function
-        | None -> return acc
-        | Some delegate ->
-            begin
-              Storage.Vote.Listings.get_option ctxt delegate >>=? function
-              | None -> return 0l
-              | Some count -> return count
-            end >>=? fun count ->
-            Storage.Vote.Listings.init_set
-              ctxt delegate (Int32.succ count) >>= fun ctxt ->
-            return (ctxt, Int32.succ total)) >>=? fun (ctxt, total) ->
+    ~f:(fun _roll delegate (ctxt, total) ->
+        (* TODO use snapshots *)
+        let delegate = Ed25519.Public_key.hash delegate in
+        begin
+          Storage.Vote.Listings.get_option ctxt delegate >>=? function
+          | None -> return 0l
+          | Some count -> return count
+        end >>=? fun count ->
+        Storage.Vote.Listings.init_set
+          ctxt delegate (Int32.succ count) >>= fun ctxt ->
+        return (ctxt, Int32.succ total)) >>=? fun (ctxt, total) ->
   Storage.Vote.Listings_size.init ctxt total >>=? fun ctxt ->
   return ctxt
 

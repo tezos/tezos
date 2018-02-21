@@ -69,11 +69,16 @@ module Contract = struct
       (struct let name = ["delegatable"] end)
 
   module Delegate =
-    Make_indexed_data_snapshotable_storage
-      (Make_subcontext(Raw_context)(struct let name = ["delegate"] end))
-      (Cycle_repr.Index)
-      (Contract_repr.Index)
+    Indexed_context.Make_map
+      (struct let name = ["delegate"] end)
       (Make_value(Ed25519.Public_key_hash))
+
+  module Delegated =
+    Make_data_set_storage
+      (Make_subcontext
+         (Indexed_context.Raw_context)
+         (struct let name = ["delegated"] end))
+      (Contract_hash)
 
   module Counter =
     Indexed_context.Make_map
@@ -230,21 +235,31 @@ module Roll = struct
       (struct let name = ["limbo"] end)
       (Make_value(Roll_repr))
 
-  module Contract_roll_list = Contract.Roll_list
+  module Delegate_roll_list =
+    Wrap_indexed_data_storage(Contract.Roll_list)(struct
+      type t = Ed25519.Public_key_hash.t
+      let wrap = Contract_repr.implicit_contract
+      let unwrap = Contract_repr.is_implicit
+    end)
 
   module Successor =
     Indexed_context.Make_map
       (struct let name = ["successor"] end)
       (Make_value(Roll_repr))
 
-  module Contract_change = Contract.Change
+  module Delegate_change =
+    Wrap_indexed_data_storage(Contract.Change)(struct
+      type t = Ed25519.Public_key_hash.t
+      let wrap = Contract_repr.implicit_contract
+      let unwrap = Contract_repr.is_implicit
+    end)
 
   module Owner =
     Make_indexed_data_snapshotable_storage
       (Make_subcontext(Raw_context)(struct let name = ["owner"] end))
       (Cycle_repr.Index)
       (Roll_repr.Index)
-      (Make_value(Contract_repr))
+      (Make_value(Ed25519.Public_key))
 
   module Last_for_cycle = Cycle.Last_roll
 

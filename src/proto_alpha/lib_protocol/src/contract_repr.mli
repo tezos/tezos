@@ -37,6 +37,8 @@ val initial_origination_nonce : Operation_hash.t -> origination_nonce
 
 val incr_origination_nonce : origination_nonce -> origination_nonce
 
+val is_originated : contract -> Contract_hash.t option
+
 
 (** {2 Human readable notation} ***********************************************)
 

@@ -479,3 +479,42 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
   end
 
 end
+
+module Wrap_indexed_data_storage
+    (C : Indexed_data_storage)
+    (K : sig
+       type t
+       val wrap: t -> C.key
+       val unwrap: C.key -> t option
+     end) = struct
+  type t = C.t
+  type context = C.t
+  type key = K.t
+  type value = C.value
+  let mem ctxt k = C.mem ctxt (K.wrap k)
+  let get ctxt k = C.get ctxt (K.wrap k)
+  let get_option ctxt k = C.get_option ctxt (K.wrap k)
+  let set ctxt k v = C.set ctxt (K.wrap k) v
+  let init ctxt k v = C.init ctxt (K.wrap k) v
+  let init_set ctxt k v = C.init_set ctxt (K.wrap k) v
+  let set_option ctxt k v = C.set_option ctxt (K.wrap k) v
+  let delete ctxt k = C.delete ctxt (K.wrap k)
+  let remove ctxt k = C.remove ctxt (K.wrap k)
+  let clear ctxt = C.clear ctxt
+  let fold ctxt ~init ~f =
+    C.fold ctxt ~init ~f:(fun k v acc ->
+        match K.unwrap k with
+        | None -> Lwt.return acc
+        | Some k -> f k v acc)
+  let bindings s =
+    fold s ~init:[] ~f:(fun p v acc -> Lwt.return ((p,v) :: acc))
+  let fold_keys s ~init ~f =
+    C.fold_keys s ~init
+      ~f:(fun k acc ->
+          match K.unwrap k with
+          | None -> Lwt.return acc
+          | Some k -> f k acc)
+  let keys s =
+    fold_keys s ~init:[] ~f:(fun p acc -> Lwt.return (p :: acc))
+
+end

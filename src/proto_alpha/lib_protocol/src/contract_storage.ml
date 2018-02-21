@@ -154,6 +154,30 @@ let () =
 
 let failwith msg = fail (Failure msg)
 
+let get_delegate_opt = Roll_storage.get_contract_delegate
+
+let link_delegate c contract delegate balance =
+  Roll_storage.Delegate.add_amount c delegate balance >>=? fun c ->
+  match Contract_repr.is_originated contract with
+  | None -> return c
+  | Some h ->
+      Storage.Contract.Delegated.add
+        (c, Contract_repr.implicit_contract delegate) h >>= fun c ->
+      return c
+
+let unlink_delegate c contract =
+  Storage.Contract.Balance.get c contract >>=? fun balance ->
+  Storage.Contract.Delegate.get_option c contract >>=? function
+  | None -> return c
+  | Some delegate ->
+      Roll_storage.Delegate.remove_amount c delegate balance >>=? fun c ->
+      match Contract_repr.is_originated contract with
+      | None -> return c
+      | Some h ->
+          Storage.Contract.Delegated.del
+            (c, Contract_repr.implicit_contract delegate) h >>= fun c ->
+          return c
+
 let create_base c contract
     ~balance ~manager ~delegate ?script ~spendable ~delegatable =
   (match Contract_repr.is_implicit contract with
@@ -165,7 +189,8 @@ let create_base c contract
     match delegate with
     | None -> return c
     | Some delegate ->
-        Storage.Contract.Delegate.init c contract delegate
+        Storage.Contract.Delegate.init c contract delegate >>=? fun c ->
+        link_delegate c contract delegate balance
   end >>=? fun c ->
   Storage.Contract.Spendable.init c contract spendable >>=? fun c ->
   begin
@@ -183,8 +208,6 @@ let create_base c contract
        Storage.Contract.Storage_fees.init c contract storage_fees
    | None ->
        return c) >>=? fun c ->
-  Roll_storage.Contract.init c contract >>=? fun c ->
-  Roll_storage.Contract.add_amount c contract balance >>=? fun c ->
   return (c, contract)
 
 let originate c nonce ~balance ~manager ?script ~delegate ~spendable ~delegatable =
@@ -198,9 +221,7 @@ let create_implicit c manager ~balance =
     ~spendable:true ~delegatable:false
 
 let delete c contract =
-  Storage.Contract.Balance.get c contract >>=? fun balance ->
-  Roll_storage.Contract.remove_amount c contract balance >>=? fun c ->
-  Roll_storage.Contract.assert_empty c contract >>=? fun () ->
+  unlink_delegate c contract >>=? fun c ->
   Storage.Contract.Balance.delete c contract >>=? fun c ->
   Storage.Contract.Manager.delete c contract >>=? fun c ->
   Storage.Contract.Delegate.remove c contract >>= fun c ->
@@ -294,8 +315,6 @@ let update_manager_key c contract = function
         | Hash v -> fail (Missing_public_key (v))
       end
 
-let get_delegate_opt = Roll_storage.get_contract_delegate
-
 let get_balance c contract =
   Storage.Contract.Balance.get_option c contract >>=? function
   | None -> begin
@@ -324,6 +343,7 @@ let is_spendable c contract =
 let set_delegate c contract delegate =
   match delegate with
   | None ->
+      unlink_delegate c contract >>=? fun c ->
       Storage.Contract.Delegate.remove c contract >>= fun c ->
       return c
   | Some delegate ->
@@ -346,7 +366,10 @@ let set_delegate c contract delegate =
       else if not (delegatable || self_delegation) then
         fail (Non_delegatable_contract contract)
       else
+        unlink_delegate c contract >>=? fun c ->
         Storage.Contract.Delegate.init_set c contract delegate >>= fun c ->
+        Storage.Contract.Balance.get c contract >>=? fun balance ->
+        link_delegate c contract delegate balance >>=? fun c ->
         return c
 
 

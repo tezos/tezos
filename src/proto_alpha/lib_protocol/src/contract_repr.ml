@@ -92,6 +92,10 @@ let is_implicit = function
   | Implicit m -> Some m
   | Originated _ -> None
 
+let is_originated = function
+  | Implicit _ -> None
+  | Originated h -> Some h
+
 type origination_nonce =
   { operation_hash: Operation_hash.t ;
     origination_index: int32 }

@@ -28,7 +28,7 @@ module Roll : sig
   module Owner : Indexed_data_snapshotable_storage
     with type key = Roll_repr.t
      and type snapshot = Cycle_repr.t
-     and type value = Contract_repr.t
+     and type value = Ed25519.Public_key.t
      and type t := Raw_context.t
 
   val clear: Raw_context.t -> Raw_context.t Lwt.t
@@ -47,8 +47,8 @@ module Roll : sig
      and type t := Raw_context.t
 
   (** Rolls associated to contracts, a linked list per contract *)
-  module Contract_roll_list : Indexed_data_storage
-    with type key = Contract_repr.t
+  module Delegate_roll_list : Indexed_data_storage
+    with type key = Ed25519.Public_key_hash.t
      and type value = Roll_repr.t
      and type t := Raw_context.t
 
@@ -59,8 +59,8 @@ module Roll : sig
      and type t := Raw_context.t
 
   (** The tez of a contract that are not assigned to rolls *)
-  module Contract_change : Indexed_data_storage
-    with type key = Contract_repr.t
+  module Delegate_change : Indexed_data_storage
+    with type key = Ed25519.Public_key_hash.t
      and type value = Tez_repr.t
      and type t := Raw_context.t
 
@@ -103,11 +103,14 @@ module Contract : sig
      and type t := Raw_context.t
 
   (** The delegate of a contract, if any. *)
-  module Delegate : Indexed_data_snapshotable_storage
+  module Delegate : Indexed_data_storage
     with type key = Contract_repr.t
-     and type snapshot = Cycle_repr.t
      and type value = Ed25519.Public_key_hash.t
      and type t := Raw_context.t
+
+  module Delegated : Data_set_storage
+    with type elt = Contract_hash.t
+     and type t = Raw_context.t * Contract_repr.t
 
   module Spendable : Indexed_data_storage
     with type key = Contract_repr.t

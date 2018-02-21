@@ -54,3 +54,14 @@ module Make_indexed_data_snapshotable_storage (C : Raw_context.T)
 module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
   : Indexed_raw_context with type t = C.t
                          and type key = I.t
+
+module Wrap_indexed_data_storage
+    (C : Indexed_data_storage)
+    (K : sig
+       type t
+       val wrap: t -> C.key
+       val unwrap: C.key -> t option
+     end)
+  : Indexed_data_storage with type t = C.t
+                          and type key = K.t
+                          and type value = C.value
