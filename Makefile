@@ -56,6 +56,9 @@ install:
 	@jbuilder build @install
 	@jbuilder install
 
+uninstall:
+	@jbuilder uninstall
+
 clean:
 	@-jbuilder clean
 	@-rm -f \
@@ -67,4 +70,3 @@ clean:
 	@-make -C docs clean
 
 .PHONY: all test build-deps docker-image clean
-
