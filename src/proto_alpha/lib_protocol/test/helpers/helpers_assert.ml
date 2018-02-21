@@ -135,8 +135,7 @@ let equal_cents_balance ~tc ?msg (contract, cents_balance) =
     (contract, Helpers_cast.cents_of_int cents_balance)
 
 let ecoproto_error f = function
-  | Alpha_environment.Ecoproto_error errors ->
-      List.exists f errors
+  | Alpha_environment.Ecoproto_error error -> f error
   | _ -> false
 
 let contain_error ?(msg="") ~f = function

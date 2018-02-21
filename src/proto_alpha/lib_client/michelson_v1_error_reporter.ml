@@ -54,34 +54,37 @@ let rec print_enumeration ppf = function
 
 let collect_error_locations errs =
   let rec collect acc = function
-    | Ill_formed_type (_, _, loc) :: _ -> loc :: acc
-    | (Ill_typed_data (_, _, _)
-      | Ill_typed_contract (_, _)) :: _
+    | Alpha_environment.Ecoproto_error
+        (Ill_formed_type (_, _, _)
+        | Runtime_contract_error (_, _)
+        | Michelson_v1_primitives.Invalid_primitive_name (_, _)
+        | Ill_typed_data (_, _, _)
+        | Ill_typed_contract (_, _)) :: _
     | [] -> acc
-    | (Invalid_arity (loc, _, _, _)
-      | Inconsistent_type_annotations (loc, _, _)
-      | Unexpected_annotation loc
-      | Type_too_large (loc, _, _)
-      | Invalid_namespace (loc, _, _, _)
-      | Invalid_primitive (loc, _, _)
-      | Invalid_kind (loc, _, _)
-      | Duplicate_field (loc, _)
-      | Unexpected_big_map loc
-      | Fail_not_in_tail_position loc
-      | Undefined_binop (loc, _, _, _)
-      | Undefined_unop (loc, _, _)
-      | Bad_return (loc, _, _)
-      | Bad_stack (loc, _, _, _)
-      | Unmatched_branches (loc, _, _)
-      | Transfer_in_lambda loc
-      | Self_in_lambda loc
-      | Transfer_in_dip loc
-      | Invalid_constant (loc, _, _)
-      | Invalid_contract (loc, _)
-      | Comparable_type_expected (loc, _)
-      | Overflow loc
-      | Reject loc
-      | Michelson_v1_primitives.Invalid_primitive_name loc) :: rest ->
+    | Alpha_environment.Ecoproto_error
+        (Invalid_arity (loc, _, _, _)
+        | Inconsistent_type_annotations (loc, _, _)
+        | Unexpected_annotation loc
+        | Type_too_large (loc, _, _)
+        | Invalid_namespace (loc, _, _, _)
+        | Invalid_primitive (loc, _, _)
+        | Invalid_kind (loc, _, _)
+        | Duplicate_field (loc, _)
+        | Unexpected_big_map loc
+        | Fail_not_in_tail_position loc
+        | Undefined_binop (loc, _, _, _)
+        | Undefined_unop (loc, _, _)
+        | Bad_return (loc, _, _)
+        | Bad_stack (loc, _, _, _)
+        | Unmatched_branches (loc, _, _)
+        | Transfer_in_lambda loc
+        | Self_in_lambda loc
+        | Transfer_in_dip loc
+        | Invalid_constant (loc, _, _)
+        | Invalid_contract (loc, _)
+        | Comparable_type_expected (loc, _)
+        | Overflow loc
+        | Reject loc) :: rest ->
         collect (loc :: acc) rest
     | _ :: rest -> collect acc rest in
   collect [] errs
@@ -113,7 +116,26 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         (List.mapi (fun i l -> (i + 1, l)) lines) in
     match errs with
     | [] -> ()
-    | Ill_typed_data (name, expr, ty) :: rest ->
+    | Alpha_environment.Ecoproto_error (Michelson_v1_primitives.Invalid_primitive_name (expr, loc)) :: rest ->
+        let parsed =
+          match parsed with
+          | Some parsed ->
+              if Micheline.strip_locations (Michelson_v1_macros.unexpand_rec (Micheline.root expr)) =
+                 parsed.Michelson_v1_parser.unexpanded then
+                parsed
+              else
+                Michelson_v1_printer.unparse_invalid expr
+          | None -> Michelson_v1_printer.unparse_invalid expr in
+        let hilights = loc :: collect_error_locations rest in
+        if show_source then
+          Format.fprintf ppf
+            "@[<hov 0>@[<hov 2>Invalid primitive:@ %a@]@]"
+            print_source (parsed, hilights)
+        else
+          Format.fprintf ppf "Invalid primitive." ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace (parsed_locations parsed) rest
+    | Alpha_environment.Ecoproto_error (Ill_typed_data (name, expr, ty)) :: rest ->
         let parsed =
           match parsed with
           | Some parsed when expr = parsed.Michelson_v1_parser.expanded -> parsed
@@ -130,12 +152,12 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_ty (None, ty) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | Ill_formed_type (_, expr, loc) :: rest ->
+    | Alpha_environment.Ecoproto_error (Ill_formed_type (_, expr, loc)) :: rest ->
         let parsed =
           match parsed with
           | Some parsed when expr = parsed.Michelson_v1_parser.expanded -> parsed
           | Some _ | None -> Michelson_v1_printer.unparse_expression expr in
-        let hilights = collect_error_locations errs in
+        let hilights = loc :: collect_error_locations errs in
         if show_source then
           Format.fprintf ppf
             "@[<v 2>%aill formed type:@ %a@]"
@@ -145,7 +167,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
             "Ill formed type." ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | Ill_typed_contract (expr, type_map) :: rest ->
+    | Alpha_environment.Ecoproto_error (Ill_typed_contract (expr, type_map)) :: rest ->
         let parsed =
           match parsed with
           | Some parsed when not details && expr = parsed.Michelson_v1_parser.expanded -> parsed
@@ -159,20 +181,20 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           Format.fprintf ppf "Ill typed contract.";
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | Missing_field prim :: rest ->
+    | Alpha_environment.Ecoproto_error (Missing_field prim) :: rest ->
         Format.fprintf ppf "@[<v 0>Missing contract field: %s@]"
           (Michelson_v1_primitives.string_of_prim prim) ;
         print_trace locations rest
-    | Duplicate_field (loc, prim) :: rest ->
+    | Alpha_environment.Ecoproto_error (Duplicate_field (loc, prim)) :: rest ->
         Format.fprintf ppf "@[<v 0>%aduplicate contract field: %s@]"
           print_loc loc
           (Michelson_v1_primitives.string_of_prim prim) ;
         print_trace locations rest
-    | Unexpected_big_map loc :: rest ->
+    | Alpha_environment.Ecoproto_error (Unexpected_big_map loc) :: rest ->
         Format.fprintf ppf "%abig_map type only allowed on the left of the toplevel storage pair"
           print_loc loc ;
         print_trace locations rest
-    | Runtime_contract_error (contract, expr) :: rest ->
+    | Alpha_environment.Ecoproto_error (Runtime_contract_error (contract, expr)) :: rest ->
         let parsed =
           match parsed with
           | Some parsed when expr = parsed.Michelson_v1_parser.expanded -> parsed
@@ -184,7 +206,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           print_source (parsed, hilights) ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
-    | err :: rest ->
+    | Alpha_environment.Ecoproto_error err :: rest ->
         begin match err with
           | Apply.Bad_contract_parameter (c, None, _) ->
               Format.fprintf ppf
@@ -366,16 +388,20 @@ let report_errors ~details ~show_source ?parsed ppf errs =
                  @[<hov 2>is not compatible with type@ %a.@]@]"
                 print_ty (None, tya)
                 print_ty (None, tyb)
-          | Reject _ -> Format.fprintf ppf "Script reached FAIL instruction"
-          | Overflow _ -> Format.fprintf ppf "Unexpected arithmetic overflow"
+          | Reject loc ->
+              Format.fprintf ppf "%ascript reached FAIL instruction"
+                print_loc loc
+          | Overflow loc ->
+              Format.fprintf ppf "%aunexpected arithmetic overflow"
+                print_loc loc
           | err -> Format.fprintf ppf "%a" Alpha_environment.Error_monad.pp err
         end ;
         if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | err :: rest ->
+        Format.fprintf ppf "%a" Error_monad.pp err ;
+        if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest in
-  Format.fprintf ppf "@[<v 0>%a@]"
-    (Format.pp_print_list
-       (fun ppf -> function
-          | Alpha_environment.Ecoproto_error errs ->
-              print_trace (fun _ -> None) errs
-          | err -> pp ppf err))
-    errs
+  Format.fprintf ppf "@[<v 0>" ;
+  print_trace (fun _ -> None) errs ;
+  Format.fprintf ppf "@]"

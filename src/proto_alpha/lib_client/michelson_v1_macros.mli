@@ -16,6 +16,7 @@ type error += Sequence_expected of string
 type error += Invalid_arity of string * int * int
 
 val expand : 'l node -> 'l node tzresult
+val expand_rec : 'l node -> 'l node * error list
 
 val expand_caddadr : 'l node -> 'l node option tzresult
 val expand_set_caddadr : 'l node -> 'l node option tzresult
@@ -30,6 +31,7 @@ val expand_if_some : 'l node -> 'l node option tzresult
 val expand_if_right : 'l node -> 'l node option tzresult
 
 val unexpand : 'l node -> 'l node
+val unexpand_rec : 'l node -> 'l node
 
 val unexpand_caddadr : 'l node -> 'l node option
 val unexpand_set_caddadr : 'l node -> 'l node option

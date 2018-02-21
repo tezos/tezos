@@ -137,7 +137,7 @@ module Make (Context : CONTEXT) = struct
        and type (+'m,'pr,'p,'q,'i,'o) RPC_service.t = ('m,'pr,'p,'q,'i,'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
 
-    type error += Ecoproto_error of Error_monad.error list
+    type error += Ecoproto_error of Error_monad.error
     val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
 
     module Lift (P : Updater.PROTOCOL) : PROTOCOL
@@ -193,30 +193,31 @@ module Make (Context : CONTEXT) = struct
       type 'a shell_tzresult = 'a Error_monad.tzresult
       type shell_error = Error_monad.error = ..
       type error_category = [ `Branch | `Temporary | `Permanent ]
-      include Error_monad.Make()
+      include Error_monad.Make(struct let id = Format.asprintf "proto.%s." Param.name end)
     end
 
-    type error += Ecoproto_error of Error_monad.error list
+    type error += Ecoproto_error of Error_monad.error
+
+    module Wrapped_error_monad = struct
+      type unwrapped = Error_monad.error = ..
+      include (Error_monad : Error_monad_sig.S with type error := unwrapped)
+      let unwrap = function
+        | Ecoproto_error ecoerror -> Some ecoerror
+        | _ -> None
+      let wrap ecoerror =
+        Ecoproto_error ecoerror
+    end
 
     let () =
-      let id = Format.asprintf "Ecoproto.%s" Param.name in
+      let id = Format.asprintf "proto.%s.wrapper" Param.name in
       register_wrapped_error_kind
-        (fun ecoerrors -> Error_monad.classify_errors ecoerrors)
-        ~id ~title:"Error returned by the protocol"
-        ~description:"Wrapped error for the economic protocol."
-        ~pp:(fun ppf ->
-            Format.fprintf ppf
-              "@[<v 2>Economic error:@ %a@]"
-              (Format.pp_print_list Error_monad.pp))
-        Data_encoding.(obj1 (req "ecoproto"
-                               (list Error_monad.error_encoding)))
-        (function Ecoproto_error ecoerrors -> Some ecoerrors
-                | _ -> None )
-        (function ecoerrors -> Ecoproto_error ecoerrors)
+        (module Wrapped_error_monad)
+        ~id ~title: ("Error returned by protocol " ^ Param.name)
+        ~description: ("Wrapped error for economic protocol " ^ Param.name ^ ".")
 
     let wrap_error = function
       | Ok _ as ok -> ok
-      | Error errors -> Error [Ecoproto_error errors]
+      | Error errors -> Error (List.map (fun error -> Ecoproto_error error) errors)
 
     module Block_hash = Block_hash
     module Operation_hash = Operation_hash
@@ -269,19 +270,19 @@ module Make (Context : CONTEXT) = struct
              | `Created s -> Lwt.return (`Created s)
              | `No_content -> Lwt.return (`No_content)
              | `Unauthorized e ->
-                 let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+                 let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
                  Lwt.return (`Unauthorized e)
              | `Forbidden e ->
-                 let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+                 let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
                  Lwt.return (`Forbidden e)
              | `Not_found e ->
-                 let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+                 let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
                  Lwt.return (`Not_found e)
              | `Conflict e ->
-                 let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+                 let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
                  Lwt.return (`Conflict e)
              | `Error e ->
-                 let e = Option.map e ~f:(fun e -> [Ecoproto_error e]) in
+                 let e = Option.map e ~f:(List.map (fun e -> Ecoproto_error e)) in
                  Lwt.return (`Error e))
 
       let register dir service handler =

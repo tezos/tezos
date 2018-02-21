@@ -130,7 +130,7 @@ module Make (Context : CONTEXT) : sig
        and type (+'m,'pr,'p,'q,'i,'o) RPC_service.t = ('m,'pr,'p,'q,'i,'o) RPC_service.t
        and type Error_monad.shell_error = Error_monad.error
 
-    type error += Ecoproto_error of Error_monad.error list
+    type error += Ecoproto_error of Error_monad.error
     val wrap_error : 'a Error_monad.tzresult -> 'a tzresult
 
     module Lift (P : Updater.PROTOCOL) : PROTOCOL

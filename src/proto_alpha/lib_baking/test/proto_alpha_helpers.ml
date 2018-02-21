@@ -321,8 +321,7 @@ module Assert = struct
     equal_pkh ~msg expected_delegate actual_delegate
 
   let ecoproto_error f = function
-    | Alpha_environment.Ecoproto_error errors ->
-        List.exists f errors
+    | Alpha_environment.Ecoproto_error error -> f error
     | _ -> false
 
   let hash op = Tezos_base.Operation.hash op

@@ -119,11 +119,20 @@ let commands () =
                program
                res
                cctxt
-         | res_with_errors ->
+         | res_with_errors when emacs_mode ->
              cctxt#message
                "(@[<v 0>(types . ())@ (errors . %a)@])"
                Michelson_v1_emacs.report_errors res_with_errors >>= fun () ->
-             return ()) ;
+             return ()
+         | (parsed, errors) ->
+             cctxt#message "%a"
+               (fun ppf () ->
+                  Michelson_v1_error_reporter.report_errors
+                    ~details:(not no_print_source) ~parsed
+                    ~show_source:(not no_print_source)
+                    ppf errors) () >>= fun () ->
+             return ()
+      ) ;
 
     command ~group ~desc: "Ask the node to typecheck a data expression."
       (args1 no_print_source_flag)
