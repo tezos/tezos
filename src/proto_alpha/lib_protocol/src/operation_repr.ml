@@ -45,7 +45,6 @@ and sourced_operations =
     }
   | Manager_operations of {
       source: Contract_repr.contract ;
-      public_key: Ed25519.Public_key.t option ;
       fee: Tez_repr.tez ;
       counter: counter ;
       operations: manager_operation list ;
@@ -71,6 +70,7 @@ and amendment_operation =
     }
 
 and manager_operation =
+  | Reveal of Ed25519.Public_key.t
   | Transaction of {
       amount: Tez_repr.tez ;
       parameters: Script_repr.expr option ;
@@ -95,6 +95,18 @@ and counter = Int32.t
 module Encoding = struct
 
   open Data_encoding
+
+  let reveal_encoding =
+    (obj2
+       (req "kind" (constant "reveal"))
+       (req "public_key" Ed25519.Public_key.encoding))
+
+  let reveal_case tag =
+    case tag reveal_encoding
+      (function
+        | Reveal pkh -> Some ((), pkh)
+        | _ -> None)
+      (fun ((), pkh) -> Reveal pkh)
 
   let transaction_encoding =
     (obj4
@@ -149,27 +161,27 @@ module Encoding = struct
       (fun ((), key) -> Delegation key)
 
   let manager_kind_encoding =
-    (obj6
+    (obj5
        (req "kind" (constant "manager"))
        (req "source" Contract_repr.encoding)
-       (opt "public_key" Ed25519.Public_key.encoding)
        (req "fee" Tez_repr.encoding)
        (req "counter" int32)
        (req "operations"
           (list (union ~tag_size:`Uint8 [
-               transaction_case (Tag 0) ;
-               origination_case (Tag 1) ;
-               delegation_case (Tag 2) ;
+               reveal_case (Tag 0) ;
+               transaction_case (Tag 1) ;
+               origination_case (Tag 2) ;
+               delegation_case (Tag 3) ;
              ]))))
 
   let manager_kind_case tag =
     case tag manager_kind_encoding
       (function
-        | Manager_operations { source; public_key ; fee ; counter ;operations } ->
-            Some ((), source, public_key, fee, counter, operations)
+        | Manager_operations { source; fee ; counter ;operations } ->
+            Some ((), source, fee, counter, operations)
         | _ -> None)
-      (fun ((), source, public_key, fee, counter, operations) ->
-         Manager_operations { source; public_key ; fee ; counter ; operations })
+      (fun ((), source, fee, counter, operations) ->
+         Manager_operations { source; fee ; counter ; operations })
 
   let endorsement_encoding =
     (obj4

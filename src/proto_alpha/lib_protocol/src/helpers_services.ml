@@ -305,8 +305,12 @@ module Forge = struct
 
     let operations ctxt
         block ~branch ~source ?sourcePubKey ~counter ~fee operations =
+      let operations =
+        match sourcePubKey with
+        | None -> operations
+        | Some pk -> Reveal pk :: operations in
       let ops =
-        Manager_operations { source ; public_key = sourcePubKey ;
+        Manager_operations { source ;
                              counter ; operations ; fee } in
       (RPC_context.make_call0 S.operations ctxt block
          () ({ branch }, Sourced_operations ops))
@@ -459,8 +463,13 @@ module Parse = struct
       match contents with
       | Anonymous_operations _ -> return ()
       | Sourced_operations (Manager_operations op) ->
+          let public_key =
+            List.fold_left (fun acc op ->
+                match op with
+                | Reveal pk -> Some pk
+                | _ -> acc) None op.operations in
           begin
-            match op.public_key with
+            match public_key with
             | Some key -> return key
             | None ->
                 Contract.get_manager ctxt op.source >>=? fun manager ->

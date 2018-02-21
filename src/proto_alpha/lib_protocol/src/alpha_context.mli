@@ -561,7 +561,6 @@ and sourced_operations =
     }
   | Manager_operations of {
       source: Contract.contract ;
-      public_key: Ed25519.Public_key.t option ;
       fee: Tez.t ;
       counter: counter ;
       operations: manager_operation list ;
@@ -587,6 +586,7 @@ and amendment_operation =
     }
 
 and manager_operation =
+  | Reveal of Ed25519.Public_key.t
   | Transaction of {
       amount: Tez.t ;
       parameters: Script.expr option ;

@@ -138,6 +138,7 @@ let apply_amendment_operation_content ctxt delegate = function
 
 let apply_manager_operation_content
     ctxt origination_nonce source = function
+  | Reveal _ -> return (ctxt, origination_nonce, None)
   | Transaction { amount ; parameters ; destination } -> begin
       Contract.spend ctxt source amount >>=? fun ctxt ->
       Contract.credit ctxt destination amount >>=? fun ctxt ->
@@ -224,7 +225,12 @@ let apply_sourced_operation
     ctxt baker_contract pred_block block_prio
     operation origination_nonce ops =
   match ops with
-  | Manager_operations { source ; public_key ; fee ; counter ; operations = contents } ->
+  | Manager_operations { source ; fee ; counter ; operations = contents } ->
+      let public_key =
+        List.fold_left (fun acc op ->
+            match op with
+            | Reveal pk -> Some pk
+            | _ -> acc) None contents in
       Contract.must_exist ctxt source >>=? fun () ->
       Contract.update_manager_key ctxt source public_key >>=? fun (ctxt,public_key) ->
       Operation.check_signature public_key operation >>=? fun () ->

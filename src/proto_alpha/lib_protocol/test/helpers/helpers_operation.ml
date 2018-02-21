@@ -20,10 +20,9 @@ let manager (src : Helpers_account.t) ?(fee = Tez.zero) operations context =
   return @@
   Manager_operations {
     source = src.contract ;
-    public_key = Some src.pub ;
     fee ;
     counter ;
-    operations
+    operations = Reveal src.pub :: operations ;
   }
 
 
