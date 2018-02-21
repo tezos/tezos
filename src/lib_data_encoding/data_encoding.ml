@@ -162,7 +162,8 @@ type 'a desc =
             encoding : 'a t } -> 'a desc
   | Splitted :
       { encoding : 'a t ;
-        json_encoding : 'a Json_encoding.encoding } -> 'a desc
+        json_encoding : 'a Json_encoding.encoding ;
+        is_obj : bool ; is_tup : bool } -> 'a desc
   | Dynamic_size : 'a t -> 'a desc
   | Delayed : (unit -> 'a t) -> 'a desc
 
@@ -595,11 +596,48 @@ module Encoding = struct
     Dft (n, describe ?title ?description t, d)
 
   let raw_splitted ~json ~binary =
-    make @@ Splitted { encoding = binary ; json_encoding = json }
+    make @@ Splitted { encoding = binary ;
+                       json_encoding = json ;
+                       is_obj = false ;
+                       is_tup = false }
+
+  let rec is_obj : type a. a t -> bool = fun e ->
+    match e.encoding with
+    | Obj _ -> true
+    | Objs _ (* by construction *) -> true
+    | Conv { encoding = e } -> is_obj e
+    | Dynamic_size e  -> is_obj e
+    | Union (_,_,cases) ->
+        List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
+    | Empty -> true
+    | Ignore -> true
+    | Mu (_,_,self) -> is_obj (self e)
+    | Splitted { is_obj } -> is_obj
+    | Delayed f -> is_obj (f ())
+    | Describe { encoding } -> is_obj encoding
+    | Def { encoding } -> is_obj encoding
+    | _ -> false
+
+  let rec is_tup : type a. a t -> bool = fun e ->
+    match e.encoding with
+    | Tup _ -> true
+    | Tups _ (* by construction *) -> true
+    | Conv { encoding = e } -> is_tup e
+    | Dynamic_size e  -> is_tup e
+    | Union (_,_,cases) ->
+        List.for_all (function Case { encoding = e} -> is_tup e) cases
+    | Mu (_,_,self) -> is_tup (self e)
+    | Splitted { is_tup } -> is_tup
+    | Delayed f -> is_tup (f ())
+    | Describe { encoding } -> is_tup encoding
+    | Def { encoding } -> is_tup encoding
+    | _ -> false
 
   let splitted ~json ~binary =
-    let json = Json.convert json in
-    raw_splitted ~binary ~json
+    make @@ Splitted { encoding = binary ;
+                       json_encoding = Json.convert json ;
+                       is_obj = is_obj json ;
+                       is_tup = is_tup json }
 
   let json =
     let binary =
@@ -654,30 +692,6 @@ module Encoding = struct
     raw_merge_objs (obj1 f9) (obj8 f8 f7 f6 f5 f4 f3 f2 f1)
   let obj10 f10 f9 f8 f7 f6 f5 f4 f3 f2 f1 =
     raw_merge_objs (obj2 f10 f9) (obj8 f8 f7 f6 f5 f4 f3 f2 f1)
-
-  let rec is_obj : type a. a t -> bool = fun e ->
-    match e.encoding with
-    | Obj _ -> true
-    | Objs _ (* by construction *) -> true
-    | Conv { encoding = e } -> is_obj e
-    | Dynamic_size e  -> is_obj e
-    | Union (_,_,cases) ->
-        List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
-    | Empty -> true
-    | Ignore -> true
-    | Mu (_,_,self) -> is_obj (self e)
-    | _ -> false
-
-  let rec is_tup : type a. a t -> bool = fun e ->
-    match e.encoding with
-    | Tup _ -> true
-    | Tups _ (* by construction *) -> true
-    | Conv { encoding = e } -> is_tup e
-    | Dynamic_size e  -> is_tup e
-    | Union (_,_,cases) ->
-        List.for_all (function Case { encoding = e} -> is_tup e) cases
-    | Mu (_,_,self) -> is_tup (self e)
-    | _ -> false
 
   let merge_objs o1 o2 =
     if is_obj o1 && is_obj o2 then
