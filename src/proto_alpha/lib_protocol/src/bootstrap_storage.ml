@@ -16,7 +16,7 @@ let init_account ctxt account =
   Storage.Public_key.init ctxt account.public_key_hash account.public_key >>=? fun ctxt ->
   Contract_storage.credit
     ctxt
-    (Contract_repr.default_contract account.public_key_hash)
+    (Contract_repr.implicit_contract account.public_key_hash)
     Constants_repr.bootstrap_wealth >>=? fun ctxt ->
   return ctxt
 

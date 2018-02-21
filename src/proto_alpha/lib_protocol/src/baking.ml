@@ -129,12 +129,12 @@ let pay_baking_bond c { Block_header.priority ; _ } id =
   if Compare.Int.(priority >= Constants.first_free_baking_slot c)
   then return c
   else
-    Contract.spend c (Contract.default_contract id) Constants.baking_bond_cost
+    Contract.spend c (Contract.implicit_contract id) Constants.baking_bond_cost
     |> trace Cannot_pay_baking_bond
 
 let pay_endorsement_bond c id =
   let bond = Constants.endorsement_bond_cost in
-  Contract.spend c (Contract.default_contract id) bond
+  Contract.spend c (Contract.implicit_contract id) bond
   |> trace Cannot_pay_endorsement_bond >>=? fun c ->
   return (c, bond)
 

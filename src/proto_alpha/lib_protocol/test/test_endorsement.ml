@@ -55,7 +55,7 @@ let test_endorsement_payment () =
     let contract_p =
       Misc.find_account bootstrap_accounts
       @@ List.nth endorsers endorser_slot in
-    Contract.get_balance tc (Contract.default_contract contract_p.hpub) >>=? fun init_balance ->
+    Contract.get_balance tc (Contract.implicit_contract contract_p.hpub) >>=? fun init_balance ->
 
     (* After one block, endorsement bond cost should be paid *)
     Block.endorsement

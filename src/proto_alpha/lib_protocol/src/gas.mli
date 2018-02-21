@@ -84,7 +84,7 @@ module Cost_of : sig
   val transfer : cost
   val create_account : cost
   val create_contract : cost
-  val default_account : cost
+  val implicit_account : cost
   val balance : cost
   val now : cost
   val check_signature : cost

@@ -8,17 +8,17 @@
 (**************************************************************************)
 
 type t = private
-  | Default of Ed25519.Public_key_hash.t
+  | Implicit of Ed25519.Public_key_hash.t
   | Originated of Contract_hash.t
 type contract = t
 
 include Compare.S with type t := contract
 
-(** {2 Default contracts} *****************************************************)
+(** {2 Implicit contracts} *****************************************************)
 
-val default_contract : Ed25519.Public_key_hash.t -> contract
+val implicit_contract : Ed25519.Public_key_hash.t -> contract
 
-val is_default : contract -> Ed25519.Public_key_hash.t option
+val is_implicit : contract -> Ed25519.Public_key_hash.t option
 
 (** {2 Originated contracts} **************************************************)
 

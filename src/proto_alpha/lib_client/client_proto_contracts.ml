@@ -33,16 +33,16 @@ module ContractAlias = struct
     | None ->
         Client_keys.Public_key_hash.find_opt cctxt s >>=? function
         | Some v ->
-            return (s, Contract.default_contract v)
+            return (s, Contract.implicit_contract v)
         | None ->
             failwith "no contract or key named %s" s
 
   let find_key cctxt name =
     Client_keys.Public_key_hash.find cctxt name >>=? fun v ->
-    return (name, Contract.default_contract v)
+    return (name, Contract.implicit_contract v)
 
   let rev_find cctxt c =
-    match Contract.is_default c with
+    match Contract.is_implicit c with
     | Some hash -> begin
         Client_keys.Public_key_hash.rev_find cctxt hash >>=? function
         | Some name -> return (Some ("key:" ^ name))
@@ -91,7 +91,7 @@ module ContractAlias = struct
                     find cctxt alias
                 | [ "key" ; text ] ->
                     Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
-                    return (s, Contract.default_contract v)
+                    return (s, Contract.implicit_contract v)
                 | _ ->
                     find cctxt s >>= function
                     | Ok v -> return v
@@ -120,22 +120,22 @@ let list_contracts cctxt =
     (fun (n, v) -> Lwt.return ("", n, v))
     raw_contracts >>= fun contracts ->
   Client_keys.Public_key_hash.load cctxt >>=? fun keys ->
-  (* List accounts (default contracts of identities) *)
+  (* List accounts (implicit contracts of identities) *)
   map_s (fun (n, v) ->
       RawContractAlias.mem cctxt n >>=? fun mem ->
       let p = if mem then "key:" else "" in
-      let v' = Contract.default_contract v in
+      let v' = Contract.implicit_contract v in
       return (p, n, v'))
     keys >>=? fun accounts ->
   return (contracts @ accounts)
 
 let get_manager cctxt block source =
-  match Contract.is_default source with
+  match Contract.is_implicit source with
   | Some hash -> return hash
   | None -> Alpha_services.Contract.manager cctxt block source
 
 let get_delegate cctxt block source =
-  match Contract.is_default source with
+  match Contract.is_implicit source with
   | Some hash -> return hash
   | None ->
       Alpha_services.Contract.delegate_opt cctxt

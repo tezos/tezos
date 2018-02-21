@@ -81,7 +81,7 @@ let () =
     `Temporary
     ~id:"contract.non_existing_contract"
     ~title:"Non existing contract"
-    ~description:"A non default contract handle is not present in the context \
+    ~description:"A contract handle is not present in the context \
                   (either it never was or it has been destroyed)"
     ~pp:(fun ppf contract ->
         Format.fprintf ppf "Contract %a does not exist"
@@ -93,7 +93,7 @@ let () =
     `Permanent
     ~id:"contract.undelagatable_contract"
     ~title:"Non delegatable contract"
-    ~description:"Tried to delegate a default contract \
+    ~description:"Tried to delegate a implicit contract \
                   or a non delegatable originated contract"
     ~pp:(fun ppf contract ->
         Format.fprintf ppf "Contract %a is not delegatable"
@@ -156,7 +156,7 @@ let failwith msg = fail (Failure msg)
 
 let create_base c contract
     ~balance ~manager ~delegate ?script ~spendable ~delegatable =
-  (match Contract_repr.is_default contract with
+  (match Contract_repr.is_implicit contract with
    | None -> return 0l
    | Some _ -> Storage.Contract.Global_counter.get c) >>=? fun counter ->
   Storage.Contract.Balance.init c contract balance >>=? fun c ->
@@ -187,8 +187,8 @@ let originate c nonce ~balance ~manager ?script ~delegate ~spendable ~delegatabl
   create_base c contract ~balance ~manager ~delegate ?script ~spendable ~delegatable >>=? fun (ctxt, contract) ->
   return (ctxt, contract, Contract_repr.incr_origination_nonce nonce)
 
-let create_default c manager ~balance =
-  create_base c (Contract_repr.default_contract manager)
+let create_implicit c manager ~balance =
+  create_base c (Contract_repr.implicit_contract manager)
     ~balance ~manager ~delegate:(Some manager)
     ?script:None
     ~spendable:true ~delegatable:false
@@ -211,7 +211,7 @@ let delete c contract =
   return c
 
 let exists c contract =
-  match Contract_repr.is_default contract with
+  match Contract_repr.is_implicit contract with
   | Some _ -> return true
   | None ->
       Storage.Contract.Counter.get_option c contract >>=? function
@@ -254,7 +254,7 @@ let get_storage = Storage.Contract.Storage.get_option
 let get_counter c contract =
   Storage.Contract.Counter.get_option c contract >>=? function
   | None -> begin
-      match Contract_repr.is_default contract with
+      match Contract_repr.is_implicit contract with
       | Some _ -> Storage.Contract.Global_counter.get c
       | None -> failwith "get_counter"
     end
@@ -263,7 +263,7 @@ let get_counter c contract =
 let get_manager c contract =
   Storage.Contract.Manager.get_option c contract >>=? function
   | None -> begin
-      match Contract_repr.is_default contract with
+      match Contract_repr.is_implicit contract with
       | Some manager -> return manager
       | None -> failwith "get_manager"
     end
@@ -295,7 +295,7 @@ let get_delegate_opt = Roll_storage.get_contract_delegate
 let get_balance c contract =
   Storage.Contract.Balance.get_option c contract >>=? function
   | None -> begin
-      match Contract_repr.is_default contract with
+      match Contract_repr.is_implicit contract with
       | Some _ -> return Tez_repr.zero
       | None -> failwith "get_balance"
     end
@@ -304,7 +304,7 @@ let get_balance c contract =
 let is_delegatable c contract =
   Storage.Contract.Delegatable.get_option c contract >>=? function
   | None -> begin
-      match Contract_repr.is_default contract with
+      match Contract_repr.is_implicit contract with
       | Some _ -> return false
       | None -> failwith "is_delegatable"
     end
@@ -313,7 +313,7 @@ let is_delegatable c contract =
 let is_spendable c contract =
   Storage.Contract.Spendable.get_option c contract >>=? function
   | None -> begin
-      match Contract_repr.is_default contract with
+      match Contract_repr.is_implicit contract with
       | Some _ -> return true
       | None -> failwith "is_spendable"
     end
@@ -374,17 +374,17 @@ let spend_from_script c contract amount =
         Storage.Contract.Balance.set c contract new_balance >>=? fun c ->
         Roll_storage.Contract.remove_amount c contract amount
       else
-        match Contract_repr.is_default contract with
+        match Contract_repr.is_implicit contract with
         | Some _ -> delete c contract
         | None -> return c
 
 let credit c contract amount =
   Storage.Contract.Balance.get_option c contract >>=? function
   | None -> begin
-      match Contract_repr.is_default contract with
+      match Contract_repr.is_implicit contract with
       | None -> fail (Non_existing_contract contract)
       | Some manager ->
-          create_default c manager ~balance:amount >>=? fun (c, _) ->
+          create_implicit c manager ~balance:amount >>=? fun (c, _) ->
           return c
     end
   | Some balance ->

@@ -146,7 +146,7 @@ let list_contract_labels (cctxt : #Proto_alpha.full) block =
   Alpha_services.Contract.list
     cctxt block >>=? fun contracts ->
   map_s (fun h ->
-      begin match Contract.is_default h with
+      begin match Contract.is_implicit h with
         | Some m -> begin
             Public_key_hash.rev_find cctxt m >>=? function
             | None -> return ""
@@ -161,8 +161,8 @@ let list_contract_labels (cctxt : #Proto_alpha.full) block =
             | Some nm ->  return (" (known as " ^ nm ^ ")")
           end
       end >>=? fun nm ->
-      let kind = match Contract.is_default h with
-        | Some _ -> " (default)"
+      let kind = match Contract.is_implicit h with
+        | Some _ -> " (implicit)"
         | None -> "" in
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))

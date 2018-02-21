@@ -135,7 +135,7 @@ module I = struct
         let operation = { hash ; shell ; contents ; signature } in
         let level = Alpha_context.Level.current ctxt in
         Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (baker_pkh, _)) ->
-        let baker_contract = Contract.default_contract baker_pkh in
+        let baker_contract = Contract.implicit_contract baker_pkh in
         let block_prio = 0 in
         Apply.apply_operation
           ctxt (Some baker_contract) pred_block block_prio operation
@@ -149,7 +149,7 @@ module I = struct
       match contract with
       | Some contract -> contract
       | None ->
-          Contract.default_contract
+          Contract.implicit_contract
             (List.hd (Bootstrap.accounts ctxt)).Bootstrap.public_key_hash in
     let max_gas =
       Constants.max_gas ctxt in

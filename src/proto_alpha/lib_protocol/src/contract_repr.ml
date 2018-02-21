@@ -8,19 +8,19 @@
 (**************************************************************************)
 
 type t =
-  | Default of Ed25519.Public_key_hash.t
+  | Implicit of Ed25519.Public_key_hash.t
   | Originated of Contract_hash.t
 
 include Compare.Make(struct
     type nonrec t = t
     let compare l1 l2 =
       match l1, l2 with
-      | Default pkh1, Default pkh2 ->
+      | Implicit pkh1, Implicit pkh2 ->
           Ed25519.Public_key_hash.compare pkh1 pkh2
       | Originated h1, Originated h2 ->
           Contract_hash.compare h1 h2
-      | Default _, Originated _ -> -1
-      | Originated _, Default _ -> 1
+      | Implicit _, Originated _ -> -1
+      | Originated _, Implicit _ -> 1
   end)
 
 type contract = t
@@ -28,21 +28,21 @@ type contract = t
 type error += Invalid_contract_notation of string (* `Permanent *)
 
 let to_b58check = function
-  | Default pbk -> Ed25519.Public_key_hash.to_b58check pbk
+  | Implicit pbk -> Ed25519.Public_key_hash.to_b58check pbk
   | Originated h -> Contract_hash.to_b58check h
 
 let of_b58check s =
   match Base58.decode s with
-  | Some (Ed25519.Public_key_hash.Hash h) -> ok (Default h)
+  | Some (Ed25519.Public_key_hash.Hash h) -> ok (Implicit h)
   | Some (Contract_hash.Hash h) -> ok (Originated h)
   | _ -> error (Invalid_contract_notation s)
 
 let pp ppf = function
-  | Default pbk -> Ed25519.Public_key_hash.pp ppf pbk
+  | Implicit pbk -> Ed25519.Public_key_hash.pp ppf pbk
   | Originated h -> Contract_hash.pp ppf h
 
 let pp_short ppf = function
-  | Default pbk -> Ed25519.Public_key_hash.pp_short ppf pbk
+  | Implicit pbk -> Ed25519.Public_key_hash.pp_short ppf pbk
   | Originated h -> Contract_hash.pp_short ppf h
 
 let encoding =
@@ -52,14 +52,14 @@ let encoding =
       "A contract handle"
     ~description:
       "A contract notation as given to an RPC or inside scripts. \
-       Can be a base58 public key hash, representing the default contract \
+       Can be a base58 public key hash, representing the implicit contract \
        of this identity, or a base58 originated contract hash." @@
   splitted
     ~binary:
       (union ~tag_size:`Uint8 [
           case (Tag 0) Ed25519.Public_key_hash.encoding
-            (function Default k -> Some k | _ -> None)
-            (fun k -> Default k) ;
+            (function Implicit k -> Some k | _ -> None)
+            (fun k -> Implicit k) ;
           case (Tag 1) Contract_hash.encoding
             (function Originated k -> Some k | _ -> None)
             (fun k -> Originated k) ;
@@ -86,10 +86,10 @@ let () =
     (function Invalid_contract_notation loc -> Some loc | _ -> None)
     (fun loc -> Invalid_contract_notation loc)
 
-let default_contract id = Default id
+let implicit_contract id = Implicit id
 
-let is_default = function
-  | Default m -> Some m
+let is_implicit = function
+  | Implicit m -> Some m
   | Originated _ -> None
 
 type origination_nonce =
@@ -151,15 +151,15 @@ module Index = struct
     Ed25519.Public_key_hash.path_length + 1
   let to_path c l =
     match c with
-    | Default k ->
-        "pubkey" :: Ed25519.Public_key_hash.to_path k l
+    | Implicit k ->
+        "implicit" :: Ed25519.Public_key_hash.to_path k l
     | Originated h ->
         "originated" :: Contract_hash.to_path h l
   let of_path = function
-    | "pubkey" :: key -> begin
+    | "implicit" :: key -> begin
         match Ed25519.Public_key_hash.of_path key with
         | None -> None
-        | Some h -> Some (Default h)
+        | Some h -> Some (Implicit h)
       end
     | "originated" :: key -> begin
         match Contract_hash.of_path key with

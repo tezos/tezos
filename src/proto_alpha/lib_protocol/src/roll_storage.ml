@@ -14,12 +14,12 @@ type error +=
   | No_roll_snapshot_for_cycle of Cycle_repr.t
 
 let get_contract_delegate c contract =
-  match Contract_repr.is_default contract with
+  match Contract_repr.is_implicit contract with
   | Some manager -> return (Some manager)
   | None -> Storage.Contract.Delegate.get_option c contract
 
 let get_contract_delegate_at_cycle c cycle contract =
-  match Contract_repr.is_default contract with
+  match Contract_repr.is_implicit contract with
   | Some manager -> return (Some manager)
   | None -> Storage.Contract.Delegate.Snapshot.get_option c (cycle, contract)
 

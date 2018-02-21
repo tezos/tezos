@@ -373,7 +373,7 @@ let () =
        Contract.Indexed_context.resolve ctxt p >|= fun l ->
        List.map
          (function
-           | Contract_repr.Default _ -> assert false
+           | Contract_repr.Implicit _ -> assert false
            | Contract_repr.Originated s -> s)
          l) ;
   Raw_context.register_resolvers
@@ -383,6 +383,6 @@ let () =
        Contract.Indexed_context.resolve ctxt p >|= fun l ->
        List.map
          (function
-           | Contract_repr.Default s -> s
+           | Contract_repr.Implicit s -> s
            | Contract_repr.Originated _ -> assert false)
          l)

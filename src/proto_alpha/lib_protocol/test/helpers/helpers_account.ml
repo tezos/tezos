@@ -47,13 +47,13 @@ let bootstrap_accounts =
       pub ;
       ppk ;
       hpub ;
-      contract = Contract.default_contract hpub
+      contract = Contract.implicit_contract hpub
     }
   in List.map aux keys
 
 let new_account () : account =
   let (hpub, pub, ppk) = Ed25519.generate_key () in
-  let contract = Contract.default_contract hpub in
+  let contract = Contract.implicit_contract hpub in
   {hpub ; pub ; ppk ; contract}
 
 let init_amount = 10000

@@ -107,7 +107,7 @@ let apply_operation ({ mode ; ctxt ; op_count } as data) operation =
     | Full_construction { predecessor ; protocol_data ; baker } ->
         predecessor,
         protocol_data.priority,
-        Some (Alpha_context.Contract.default_contract baker) in
+        Some (Alpha_context.Contract.implicit_contract baker) in
   Apply.apply_operation
     ctxt baker_contract pred_block block_prio operation
   >>=? fun (ctxt, _contracts, _ignored_script_error) ->

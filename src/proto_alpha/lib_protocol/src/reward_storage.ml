@@ -48,7 +48,7 @@ let pay_rewards_for_cycle c cycle =
         | Error _ -> Lwt.return c
         | Ok c ->
             Contract_storage.credit c
-              (Contract_repr.default_contract delegate)
+              (Contract_repr.implicit_contract delegate)
               amount) >>=? fun c ->
   Storage.Rewards.Amount.clear (c, cycle) >>= fun c ->
   return c

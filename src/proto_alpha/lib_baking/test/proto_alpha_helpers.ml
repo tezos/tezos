@@ -112,7 +112,7 @@ module Account = struct
       | Some keys -> keys
       | None -> let _, pk, sk = Ed25519.generate_key () in sk, pk in
     let pkh = Ed25519.Public_key.hash pk in
-    let contract = Contract.default_contract pkh in
+    let contract = Contract.implicit_contract pkh in
     { alias ; contract ; pkh ; pk ; sk }
 
   type destination = {
@@ -163,7 +163,7 @@ module Account = struct
         let alias = Printf.sprintf "bootstrap%d" !cpt in
         let pk = Ed25519.Secret_key.to_public_key sk in
         let pkh = Ed25519.Public_key.hash pk in
-        { alias ; contract = Contract.default_contract pkh; pkh ; pk ; sk }
+        { alias ; contract = Contract.implicit_contract pkh; pkh ; pk ; sk }
       end [ bootstrap1_sk; bootstrap2_sk; bootstrap3_sk;
             bootstrap4_sk; bootstrap5_sk; ]
     with

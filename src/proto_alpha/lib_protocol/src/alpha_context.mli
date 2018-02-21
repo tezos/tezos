@@ -400,8 +400,8 @@ module Contract : sig
   val to_b58check: contract -> string
   val of_b58check: string -> contract tzresult
 
-  val default_contract: public_key_hash -> contract
-  val is_default: contract -> public_key_hash option
+  val implicit_contract: public_key_hash -> contract
+  val is_implicit: contract -> public_key_hash option
 
   val exists: context -> contract -> bool tzresult Lwt.t
   val must_exist: context -> contract -> unit tzresult Lwt.t

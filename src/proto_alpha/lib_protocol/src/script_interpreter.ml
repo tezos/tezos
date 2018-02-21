@@ -730,9 +730,9 @@ let rec interp
             Fees.origination_burn ctxt ~source contract >>=? fun ctxt ->
             logged_return ~origination (Item ((Unit_t, Unit_t, contract), rest), gas, ctxt)
         | Default_account, Item (key, rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.default_account in
+            let gas = Gas.consume gas Gas.Cost_of.implicit_account in
             Gas.check gas >>=? fun () ->
-            let contract = Contract.default_contract key in
+            let contract = Contract.implicit_contract key in
             logged_return (Item ((Unit_t, Unit_t, contract), rest), gas, ctxt)
         | Create_contract (storage_type, param_type, return_type),
           Item (manager, Item
