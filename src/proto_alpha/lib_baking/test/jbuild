@@ -5,6 +5,7 @@
           test_michelson_parser
           test_origination
           test_transaction
+          test_rpc
           test_vote))
   (libraries (tezos-base
               tezos-rpc-http
@@ -31,6 +32,7 @@
          test_michelson_parser.exe
          test_origination.exe
          test_transaction.exe
+         test_rpc.exe
          test_vote.exe))))
 
 (alias
@@ -58,11 +60,17 @@
   (action (chdir ${ROOT} (run ${exe:test_vote.exe} ${bin:tezos-node} ${path:sandbox-vote.json} 18400)))))
 
 (alias
+ ((name runtest_rpc)
+  (locks  (/tcp-port/18500))
+  (action (chdir ${ROOT} (run ${exe:test_rpc.exe} ${bin:tezos-node} ${path:sandbox.json} 18500)))))
+
+(alias
  ((name runtest)
   (deps ((alias runtest_endorsement)
          (alias runtest_michelson_parser)
          (alias runtest_origination)
          (alias runtest_transaction)
+         (alias runtest_rpc)
          (alias runtest_vote)))))
 
 (alias

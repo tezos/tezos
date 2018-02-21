@@ -21,6 +21,10 @@ val init :
 
 val level : Block_services.block -> Alpha_context.Level.t tzresult Lwt.t
 
+(** Calls the rpc service raw_context using the right rpc context *)
+val rpc_raw_context : Block_services.block -> string list -> int ->
+  Block_services.raw_context_result tzresult Lwt.t
+
 module Account : sig
 
   type t = {

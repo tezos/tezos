@@ -75,6 +75,9 @@ let init ?exe ?(sandbox = "sandbox.json") ?rpc_port () =
 let level block =
   Alpha_services.Context.level !rpc_ctxt block
 
+let rpc_raw_context block path depth =
+  Block_services.raw_context !rpc_ctxt block path depth
+
 module Account = struct
 
   type t = {
