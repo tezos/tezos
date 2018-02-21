@@ -85,7 +85,7 @@ let run blkid ({ b1 ; b2 ; b3 ; _ } : Helpers.Account.bootstrap_accounts) =
     ~account
     ~destination:b3.contract
     ~amount:(tez 10L) () >>= fun result ->
-  Assert.inconsistent_pkh ~msg:__LOC__ result ;
+  Assert.inconsistent_public_key ~msg:__LOC__ result ;
 
   (* Try spending an originated contract without the manager's key. *)
   let account = { b1 with contract = spendable } in

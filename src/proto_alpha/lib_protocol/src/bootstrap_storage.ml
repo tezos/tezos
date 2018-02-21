@@ -14,10 +14,13 @@ type account = {
 
 let init_account ctxt account =
   Storage.Public_key.init ctxt account.public_key_hash account.public_key >>=? fun ctxt ->
-  Contract_storage.credit
-    ctxt
-    (Contract_repr.implicit_contract account.public_key_hash)
+  let contract = Contract_repr.implicit_contract account.public_key_hash in
+  Contract_storage.credit ctxt contract
     Constants_repr.bootstrap_wealth >>=? fun ctxt ->
+  Contract_storage.update_manager_key ctxt contract
+    (Some account.public_key) >>=? fun (ctxt, _) ->
+  Contract_storage.set_delegate ctxt contract
+    (Some account.public_key_hash) >>=? fun ctxt ->
   return ctxt
 
 

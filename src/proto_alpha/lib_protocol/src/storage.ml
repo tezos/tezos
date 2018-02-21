@@ -65,9 +65,8 @@ module Contract = struct
       (Make_value(Bool))
 
   module Delegatable =
-    Indexed_context.Make_map
+    Indexed_context.Make_set
       (struct let name = ["delegatable"] end)
-      (Make_value(Bool))
 
   module Delegate =
     Make_indexed_data_snapshotable_storage

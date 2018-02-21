@@ -114,9 +114,8 @@ module Contract : sig
      and type value = bool
      and type t := Raw_context.t
 
-  module Delegatable : Indexed_data_storage
-    with type key = Contract_repr.t
-     and type value = bool
+  module Delegatable : Data_set_storage
+    with type elt = Contract_repr.t
      and type t := Raw_context.t
 
   module Counter : Indexed_data_storage
