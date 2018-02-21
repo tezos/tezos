@@ -188,14 +188,6 @@ module Vote : sig
 
 end
 
-
-(** Keys *)
-
-module Public_key : Indexed_data_storage
-  with type key = Ed25519.Public_key_hash.t
-   and type value = Ed25519.Public_key.t
-   and type t := Raw_context.t
-
 (** Seed *)
 
 module Seed : sig

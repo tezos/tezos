@@ -254,7 +254,7 @@ let apply_sourced_operation
         pred_block block_prio operation content >>=? fun ctxt ->
       return (ctxt, origination_nonce, None)
   | Amendment_operation { source ; operation = content } ->
-      Delegates_pubkey.get ctxt source >>=? fun delegate ->
+      Roll.delegate_pubkey ctxt source >>=? fun delegate ->
       Operation.check_signature delegate operation >>=? fun () ->
       (* TODO, see how to extract the public key hash after this operation to
          pass it to apply_delegate_operation_content *)

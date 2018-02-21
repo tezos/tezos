@@ -154,17 +154,3 @@ let may_check_key sourcePubKey sourcePubKeyHash =
         (failure "Invalid public key in `client_proto_endorsement`")
   | None ->
       return ()
-
-let check_public_key cctxt block ?src_pk src_pk_hash =
-  Alpha_services.Delegate.Key.get cctxt block src_pk_hash >>= function
-  | Error errors ->
-      begin
-        match src_pk with
-        | None ->
-            failwith "Unknown public key@ %a" pp_print_error errors
-        | Some key ->
-            may_check_key src_pk src_pk_hash >>=? fun () ->
-            return (Some key)
-      end
-  | Ok _ -> return None
-

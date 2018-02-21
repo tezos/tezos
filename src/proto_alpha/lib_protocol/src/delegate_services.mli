@@ -45,19 +45,6 @@ module Endorser : sig
 
 end
 
-module Key : sig
-
-  val list:
-    'a #RPC_context.simple -> 'a ->
-    (Ed25519.Public_key_hash.t * Ed25519.Public_key.t) list shell_tzresult Lwt.t
-
-  val get:
-    'a #RPC_context.simple -> 'a ->
-    Ed25519.Public_key_hash.t ->
-    (Ed25519.Public_key_hash.t * Ed25519.Public_key.t) shell_tzresult Lwt.t
-
-end
-
 (* temporary export *)
 val endorsement_rights:
   Alpha_context.t ->

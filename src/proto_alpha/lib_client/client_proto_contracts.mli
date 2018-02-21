@@ -53,13 +53,6 @@ val get_delegate:
   Contract.t ->
   public_key_hash tzresult Lwt.t
 
-val check_public_key :
-  #Proto_alpha.rpc_context ->
-  Block_services.block ->
-  ?src_pk:public_key ->
-  public_key_hash ->
-  public_key option tzresult Lwt.t
-
 module Contract_tags : module type of Client_tags.Tags (struct
     let name = "contract"
   end)

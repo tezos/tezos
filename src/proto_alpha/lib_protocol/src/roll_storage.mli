@@ -20,6 +20,7 @@
 type error +=
   | Consume_roll_change
   | No_roll_in_contract
+  | Unregistred_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
 
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
@@ -56,6 +57,10 @@ module Contract : sig
   val assert_empty : Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 
 end
+
+val delegate_pubkey:
+  Raw_context.t -> Ed25519.Public_key_hash.t ->
+  Ed25519.Public_key.t tzresult Lwt.t
 
 (**/**)
 

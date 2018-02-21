@@ -275,23 +275,6 @@ module Constants : sig
   val michelson_maximum_type_size: context -> int
 end
 
-(** Global storage for all delegates public keys *)
-module Delegates_pubkey : sig
-
-  val get:
-    context -> public_key_hash -> public_key tzresult Lwt.t
-  val get_option:
-    context -> public_key_hash -> public_key option tzresult Lwt.t
-  val reveal:
-    context -> public_key_hash -> public_key -> context tzresult Lwt.t
-  val remove:
-    context -> public_key_hash -> context Lwt.t
-
-  val list:
-    context -> (public_key_hash * public_key) list Lwt.t
-
-end
-
 module Voting_period : sig
 
   include BASIC_DATA
@@ -423,6 +406,7 @@ module Contract : sig
 
   val get_delegate_opt:
     context -> contract -> public_key_hash option tzresult Lwt.t
+
   val is_delegatable:
     context -> contract -> bool tzresult Lwt.t
   val is_spendable:
@@ -704,6 +688,9 @@ module Roll : sig
 
   val endorsement_rights_owner:
     context -> Level.t -> slot:int -> public_key tzresult Lwt.t
+
+  val delegate_pubkey:
+    context -> public_key_hash -> public_key tzresult Lwt.t
 
 end
 

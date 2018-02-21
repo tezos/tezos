@@ -94,8 +94,6 @@ module Constants = struct
     constants.michelson_maximum_type_size
 end
 
-module Delegates_pubkey = Public_key_storage
-
 module Voting_period = Voting_period_repr
 
 module Level = struct

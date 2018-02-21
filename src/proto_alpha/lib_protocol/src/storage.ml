@@ -308,16 +308,6 @@ module Vote = struct
 
 end
 
-(** Keys *)
-
-module Public_key =
-  Make_indexed_data_storage
-    (Make_subcontext
-       (Raw_context)
-       (struct let name = ["public_keys"; "ed25519"] end))
-    (Ed25519.Public_key_hash)
-    (Make_value(Ed25519.Public_key))
-
 (** Seed *)
 
 module Seed = struct

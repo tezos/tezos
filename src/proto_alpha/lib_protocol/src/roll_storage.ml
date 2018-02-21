@@ -12,14 +12,35 @@ type error +=
   | No_roll_in_contract
   | Deleted_contract_owning_rolls
   | No_roll_snapshot_for_cycle of Cycle_repr.t
+  | Unregistred_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"contract.manager.unregistred_delegate"
+    ~title:"Unregistred delegate"
+    ~description:"A contract cannot be delegated to an unregistred delegate"
+    ~pp:(fun ppf (k) ->
+        Format.fprintf ppf "The provided public key (with hash %a) is \
+                           \ not registred as valid delegate key."
+          Ed25519.Public_key_hash.pp k)
+    Data_encoding.(obj1 (req "hash" Ed25519.Public_key_hash.encoding))
+    (function Unregistred_delegate (k) -> Some (k) | _ -> None)
+    (fun (k) -> Unregistred_delegate (k))
 
 let get_contract_delegate c contract =
   Storage.Contract.Delegate.get_option c contract
 
 let get_contract_delegate_at_cycle c cycle contract =
-  match Contract_repr.is_implicit contract with
-  | Some manager -> return (Some manager)
-  | None -> Storage.Contract.Delegate.Snapshot.get_option c (cycle, contract)
+  Storage.Contract.Delegate.Snapshot.get_option c (cycle, contract)
+
+let delegate_pubkey ctxt delegate =
+  Storage.Contract.Manager.get_option ctxt
+    (Contract_repr.implicit_contract delegate) >>=? function
+  | None | Some (Manager_repr.Hash _) ->
+      fail (Unregistred_delegate delegate)
+  | Some (Manager_repr.Public_key pk) ->
+      return pk
 
 let clear_cycle c cycle =
   Storage.Roll.Last_for_cycle.delete c cycle >>=? fun c ->
@@ -78,10 +99,7 @@ module Random = struct
           | None ->
               loop sequence
           | Some delegate ->
-              Public_key_storage.get_option c delegate >>=? function
-              | None -> loop sequence
-              | Some delegate -> return delegate
-    in
+              delegate_pubkey c delegate in
     Storage.Roll.Owner.snapshot_exists c cycle >>= fun snapshot_exists ->
     fail_unless snapshot_exists (No_roll_snapshot_for_cycle cycle) >>=? fun () ->
     loop sequence

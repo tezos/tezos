@@ -37,7 +37,6 @@
         "Level_storage",
         "Nonce_storage",
         "Seed_storage",
-        "Public_key_storage",
         "Roll_storage",
         "Contract_storage",
         "Reward_storage",

@@ -477,7 +477,7 @@ module Parse = struct
             | Some key -> return key
             | None ->
                 Contract.get_manager ctxt op.source >>=? fun manager ->
-                Delegates_pubkey.get ctxt manager
+                Roll.delegate_pubkey ctxt manager
           end >>=? fun public_key ->
           Operation.check_signature public_key
             { signature ; shell ; contents ; hash = Operation_hash.zero }
@@ -487,7 +487,7 @@ module Parse = struct
           Operation.check_signature public_key
             { signature ; shell ; contents ; hash = Operation_hash.zero }
       | Sourced_operations (Amendment_operation { source ; _ }) ->
-          Delegates_pubkey.get ctxt source >>=? fun source ->
+          Roll.delegate_pubkey ctxt source >>=? fun source ->
           Operation.check_signature source
             { signature ; shell ; contents ; hash = Operation_hash.zero }
       | Sourced_operations (Dictator_operation _) ->

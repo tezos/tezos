@@ -18,7 +18,6 @@ type error +=
   | Inconsistent_public_key of Ed25519.Public_key.t * Ed25519.Public_key.t (* `Permanent *)
   | Missing_public_key of Ed25519.Public_key_hash.t (* `Permanent *)
   | Failure of string (* `Permanent *)
-  | Unregistred_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
 
 let () =
   register_error_kind
@@ -151,18 +150,7 @@ let () =
     ~pp:(fun ppf s -> Format.fprintf ppf "Contract_storage.Failure %S" s)
     Data_encoding.(obj1 (req "message" string))
     (function Failure s -> Some s | _ -> None)
-    (fun s -> Failure s) ;
-  register_error_kind
-    `Permanent
-    ~id:"contract.manager.unregistred_delegate"
-    ~title:"Unregistred delegate"
-    ~description:"A contract cannot be delegated to an unregistred delegate"
-    ~pp:(fun ppf (k) ->
-        Format.fprintf ppf "The delegate public key (with hash %a) is missing"
-          Ed25519.Public_key_hash.pp k)
-    Data_encoding.(obj1 (req "hash" Ed25519.Public_key_hash.encoding))
-    (function Unregistred_delegate (k) -> Some (k) | _ -> None)
-    (fun (k) -> Unregistred_delegate (k))
+    (fun s -> Failure s)
 
 let failwith msg = fail (Failure msg)
 
@@ -354,7 +342,7 @@ let set_delegate c contract delegate =
         | Some pkh -> Ed25519.Public_key_hash.equal pkh delegate
         | None -> false in
       if not known_delegate || not (registred_delegate || self_delegation) then
-        fail (Unregistred_delegate delegate)
+        fail (Roll_storage.Unregistred_delegate delegate)
       else if not (delegatable || self_delegation) then
         fail (Non_delegatable_contract contract)
       else

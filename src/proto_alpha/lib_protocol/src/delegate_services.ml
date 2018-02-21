@@ -321,55 +321,5 @@ module Endorser = struct
 
 end
 
-module Key = struct
-
-  module S = struct
-
-    open Data_encoding
-
-    let custom_root =
-      RPC_path.(open_root / "context" / "key")
-
-    let pk_encoding =
-      (obj2
-         (req "hash" Ed25519.Public_key_hash.encoding)
-         (req "public_key" Ed25519.Public_key.encoding))
-
-    let list =
-      RPC_service.post_service
-        ~description: "List the known public keys"
-        ~query: RPC_query.empty
-        ~input: empty
-        ~output: (list pk_encoding)
-        custom_root
-
-    let get =
-      RPC_service.post_service
-        ~description: "Fetch the stored public key"
-        ~query: RPC_query.empty
-        ~input: empty
-        ~output: pk_encoding
-        RPC_path.(custom_root /: Ed25519.Public_key_hash.rpc_arg )
-
-  end
-
-  let () =
-    let open Services_registration in
-    register1 S.get begin fun ctxt hash () () ->
-      Delegates_pubkey.get ctxt hash >>=? fun pk ->
-      return (hash, pk)
-    end ;
-    register0 S.list begin fun ctxt () () ->
-      Delegates_pubkey.list ctxt >>= return
-    end
-
-  let list ctxt block =
-    RPC_context.make_call0 S.list ctxt block () ()
-
-  let get ctxt block pkh =
-    RPC_context.make_call1 S.get ctxt block pkh () ()
-
-end
-
 let baking_rights = Baker.I.baking_rights
 let endorsement_rights = Endorser.I.endorsement_rights
