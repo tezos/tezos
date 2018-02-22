@@ -55,9 +55,11 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
 
 (rule
  ((targets (tezos_protocol_%s.cmo
+            tezos_protocol_%s.cmi
             tezos_protocol_%s_dummy_byte.ml))
   (deps ((glob_files src/*.ml*)
          src/TEZOS_PROTOCOL))
+  (locks (tezos_protocol_%s.cmi))
   (action (with-stdout-to ${path-no-dep:tezos_protocol_%s_dummy_byte.ml}
            (chdir ${ROOT}
                   (run ${bin:tezos-protocol-compiler-byte} -static -output-dep ${path-no-dep:tezos_protocol_%s} ${path-no-dep:src}))))))
@@ -65,11 +67,11 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
 (rule
  ((targets (tezos_protocol_%s.o
             tezos_protocol_%s.cmx
-            tezos_protocol_%s.cmi
             tezos_protocol_%s_dummy.ml))
   (deps ((glob_files src/*.ml)
          (glob_files src/*.mli)
          src/TEZOS_PROTOCOL))
+  (locks (tezos_protocol_%s.cmi))
   (action (with-stdout-to ${path-no-dep:tezos_protocol_%s_dummy.ml}
            (chdir ${ROOT}
                   (run ${bin:tezos-protocol-compiler} -static -output-dep ${path-no-dep:tezos_protocol_%s} ${path-no-dep:src}))))))
@@ -110,6 +112,7 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
     version version version version
     version version version version
     version version version version
+    version version
     path version
     version version version
     path version
