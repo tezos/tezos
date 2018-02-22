@@ -17,9 +17,15 @@ let get_contract_delegate c contract =
   | Some manager -> return (Some manager)
   | None -> Storage.Contract.Delegate.get_option c contract
 
+let get_contract_delegate_at_cycle c cycle contract =
+  match Contract_repr.is_default contract with
+  | Some manager -> return (Some manager)
+  | None -> Storage.Contract.Delegate.Snapshot.get_option c (cycle, contract)
+
 let clear_cycle c cycle =
   Storage.Roll.Last_for_cycle.delete c cycle >>=? fun c ->
-  Storage.Roll.Owner_for_cycle.clear (c, cycle) >>= fun c ->
+  Storage.Contract.Delegate.delete_snapshot c cycle >>= fun c ->
+  Storage.Roll.Owner.delete_snapshot c cycle >>= fun c ->
   return c
 
 let fold ctxt ~f init =
@@ -37,16 +43,10 @@ let fold ctxt ~f init =
   loop ctxt Roll_repr.first (return init)
 
 let freeze_rolls_for_cycle ctxt cycle =
-  fold ctxt (ctxt, Roll_repr.first)
-    ~f:(fun _roll contract (ctxt, promoted_roll as acc) ->
-        get_contract_delegate ctxt contract >>=? function
-        | None -> return acc
-        | Some delegate ->
-            Storage.Roll.Owner_for_cycle.init
-              (ctxt, cycle) promoted_roll delegate >>=? fun ctxt ->
-            return (ctxt, Roll_repr.succ promoted_roll))
-  >>=? fun (ctxt, last_promoted_roll) ->
-  Storage.Roll.Last_for_cycle.init ctxt cycle last_promoted_roll
+  Storage.Contract.Delegate.snapshot ctxt cycle >>=? fun ctxt ->
+  Storage.Roll.Owner.snapshot ctxt cycle >>=? fun ctxt ->
+  Storage.Roll.Next.get ctxt >>=? fun last ->
+  Storage.Roll.Last_for_cycle.init ctxt cycle last
 
 (* Roll selection *)
 
@@ -69,8 +69,19 @@ module Random = struct
     let rd = level_random random_seed kind level in
     let sequence = Seed_repr.sequence rd (Int32.of_int offset) in
     Storage.Roll.Last_for_cycle.get c cycle >>=? fun bound ->
-    let roll, _ = Roll_repr.random sequence ~bound in
-    Storage.Roll.Owner_for_cycle.get (c, cycle) roll
+    let rec loop sequence =
+      let roll, sequence = Roll_repr.random sequence ~bound in
+      Storage.Roll.Owner.Snapshot.get_option c (cycle, roll) >>=? function
+      | None ->
+          loop sequence
+      | Some contract ->
+          get_contract_delegate_at_cycle c cycle contract >>=? function
+          | None ->
+              loop sequence
+          | Some delegate ->
+              return delegate
+    in
+    loop sequence
 
 end
 

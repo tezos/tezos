@@ -25,8 +25,9 @@ module Roll : sig
   (** Storage from this submodule must only be accessed through the
       module `Roll`. *)
 
-  module Owner : Indexed_data_storage
+  module Owner : Indexed_data_snapshotable_storage
     with type key = Roll_repr.t
+     and type snapshot = Cycle_repr.t
      and type value = Contract_repr.t
      and type t := Raw_context.t
 
@@ -70,11 +71,6 @@ module Roll : sig
      and type value = Roll_repr.t
      and type t := Raw_context.t
 
-  module Owner_for_cycle : Indexed_data_storage
-    with type key = Roll_repr.t
-     and type value = Ed25519.Public_key_hash.t
-     and type t = Raw_context.t * Cycle_repr.t
-
 end
 
 module Contract : sig
@@ -107,8 +103,9 @@ module Contract : sig
      and type t := Raw_context.t
 
   (** The delegate of a contract, if any. *)
-  module Delegate : Indexed_data_storage
+  module Delegate : Indexed_data_snapshotable_storage
     with type key = Contract_repr.t
+     and type snapshot = Cycle_repr.t
      and type value = Ed25519.Public_key_hash.t
      and type t := Raw_context.t
 

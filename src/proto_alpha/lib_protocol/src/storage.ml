@@ -70,8 +70,10 @@ module Contract = struct
       (Make_value(Bool))
 
   module Delegate =
-    Indexed_context.Make_map
-      (struct let name = ["delegate"] end)
+    Make_indexed_data_snapshotable_storage
+      (Make_subcontext(Raw_context)(struct let name = ["delegate"] end))
+      (Cycle_repr.Index)
+      (Contract_repr.Index)
       (Make_value(Ed25519.Public_key_hash))
 
   module Counter =
@@ -142,14 +144,6 @@ module Cycle = struct
     Indexed_context.Make_map
       (struct let name = ["last_roll"] end)
       (Make_value(Roll_repr))
-
-  module Roll_owner =
-    Make_indexed_data_storage
-      (Make_subcontext
-         (Indexed_context.Raw_context)
-         (struct let name = ["roll_owners"] end))
-      (Roll_repr.Index)
-      (Make_value(Ed25519.Public_key_hash))
 
   type nonce_status =
     | Unrevealed of {
@@ -247,12 +241,13 @@ module Roll = struct
   module Contract_change = Contract.Change
 
   module Owner =
-    Indexed_context.Make_map
-      (struct let name = ["owner"] end)
+    Make_indexed_data_snapshotable_storage
+      (Make_subcontext(Raw_context)(struct let name = ["owner"] end))
+      (Cycle_repr.Index)
+      (Roll_repr.Index)
       (Make_value(Contract_repr))
 
   module Last_for_cycle = Cycle.Last_roll
-  module Owner_for_cycle = Cycle.Roll_owner
 
   let clear = Indexed_context.clear
 
