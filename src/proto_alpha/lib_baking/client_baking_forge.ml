@@ -487,8 +487,9 @@ let bake (cctxt : #Proto_alpha.full) state =
        let request = List.length operations in
        let protocol_data =
          forge_faked_protocol_data ~priority ~seed_nonce_hash in
+       let operations = classify_operations operations in
        Block_services.preapply cctxt block
-         ~timestamp ~sort:true ~protocol_data [operations] >>= function
+         ~timestamp ~sort:true ~protocol_data operations >>= function
        | Error errs ->
            lwt_log_error "Error while prevalidating operations:\n%a"
              pp_print_error
