@@ -123,7 +123,7 @@ let check_baking_rights c { Block_header.priority ; _ }
   let level = Level.current c in
   Roll.baking_rights_owner c level ~priority >>=? fun delegate ->
   check_timestamp c priority pred_timestamp >>=? fun () ->
-  return delegate
+  return (Ed25519.Public_key.hash delegate)
 
 let pay_baking_bond c { Block_header.priority ; _ } id =
   if Compare.Int.(priority >= Constants.first_free_baking_slot c)
@@ -143,6 +143,7 @@ let check_signing_rights c slot delegate =
     (Invalid_endorsement_slot (Constants.max_signing_slot c, slot)) >>=? fun () ->
   let level = Level.current c in
   Roll.endorsement_rights_owner c level ~slot >>=? fun owning_delegate ->
+  let owning_delegate = Ed25519.Public_key.hash owning_delegate in
   fail_unless (Ed25519.Public_key_hash.equal owning_delegate delegate)
     (Wrong_delegate (owning_delegate, delegate))
 
@@ -187,9 +188,9 @@ let select_delegate delegate delegate_list max_priority =
     if Compare.Int.(n >= max_priority)
     then return (List.rev acc)
     else
-      let LCons (pkh, t) = l in
+      let LCons (pk, t) = l in
       let acc =
-        if Ed25519.Public_key_hash.equal delegate pkh
+        if Ed25519.Public_key_hash.equal delegate (Ed25519.Public_key.hash pk)
         then n :: acc
         else acc in
       t () >>=? fun t ->

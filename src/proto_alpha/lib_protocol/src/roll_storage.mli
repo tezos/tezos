@@ -36,11 +36,11 @@ val clear_cycle :
 
 val baking_rights_owner :
   Raw_context.t -> Level_repr.t -> priority:int ->
-  Ed25519.Public_key_hash.t tzresult Lwt.t
+  Ed25519.Public_key.t tzresult Lwt.t
 
 val endorsement_rights_owner :
   Raw_context.t -> Level_repr.t -> slot:int ->
-  Ed25519.Public_key_hash.t tzresult Lwt.t
+  Ed25519.Public_key.t tzresult Lwt.t
 
 module Contract : sig
 

@@ -696,10 +696,10 @@ module Roll : sig
   val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t
 
   val baking_rights_owner:
-    context -> Level.t -> priority:int -> public_key_hash tzresult Lwt.t
+    context -> Level.t -> priority:int -> public_key tzresult Lwt.t
 
   val endorsement_rights_owner:
-    context -> Level.t -> slot:int -> public_key_hash tzresult Lwt.t
+    context -> Level.t -> slot:int -> public_key tzresult Lwt.t
 
 end
 

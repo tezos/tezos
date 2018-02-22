@@ -37,6 +37,7 @@
         "Level_storage",
         "Nonce_storage",
         "Seed_storage",
+        "Public_key_storage",
         "Roll_storage",
         "Contract_storage",
         "Reward_storage",
@@ -44,7 +45,6 @@
         "Fitness_storage",
         "Vote_storage",
         "Init_storage",
-        "Public_key_storage",
 
         "Alpha_context",
 

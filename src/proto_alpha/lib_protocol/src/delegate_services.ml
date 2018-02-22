@@ -107,7 +107,7 @@ module Baker = struct
             let Misc.LCons (h, t) = l in
             t () >>=? fun t ->
             loop t (pred n) >>=? fun t ->
-            return (h :: t)
+            return (Ed25519.Public_key.hash h :: t)
       in
       loop contract_list max >>=? fun prio ->
       return (level.level, prio)
@@ -266,7 +266,7 @@ module Endorser = struct
             let Misc.LCons (h, t) = l in
             t () >>=? fun t ->
             loop t (pred n) >>=? fun t ->
-            return (h :: t)
+            return (Ed25519.Public_key.hash h :: t)
       in
       loop contract_list max >>=? fun prio ->
       return (level.level, prio)

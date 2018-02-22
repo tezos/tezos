@@ -134,7 +134,8 @@ module I = struct
     | Some (shell, contents) ->
         let operation = { hash ; shell ; contents ; signature } in
         let level = Alpha_context.Level.current ctxt in
-        Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (baker_pkh, _)) ->
+        Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (baker_pk, _)) ->
+        let baker_pkh = Ed25519.Public_key.hash baker_pk in
         let baker_contract = Contract.implicit_contract baker_pkh in
         let block_prio = 0 in
         Apply.apply_operation

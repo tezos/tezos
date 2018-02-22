@@ -75,12 +75,12 @@ val endorsement_reward: block_priority:int -> Tez.t tzresult Lwt.t
 (** [baking_priorities ctxt level] is the lazy list of contract's
     public key hashes that are allowed to bake for [level]. *)
 val baking_priorities:
-  context -> Level.t -> public_key_hash lazy_list
+  context -> Level.t -> public_key lazy_list
 
 (** [endorsement_priorities ctxt level] is the lazy list of contract's
     public key hashes that are allowed to endorse for [level]. *)
 val endorsement_priorities:
-  context -> Level.t -> public_key_hash lazy_list
+  context -> Level.t -> public_key lazy_list
 
 (** [first_baking_priorities ctxt ?max_priority contract_hash level]
     is a list of priorities of max [?max_priority] elements, where the
