@@ -141,6 +141,22 @@ module type Indexed_data_storage = sig
 
 end
 
+module type Indexed_data_snapshotable_storage = sig
+  type snapshot
+  type key
+
+  include Indexed_data_storage with type key := key
+
+  module Snapshot : Indexed_data_storage
+    with type key = (snapshot * key)
+     and type value = value
+     and type t = t
+
+  val snapshot : context -> snapshot -> Raw_context.t tzresult Lwt.t
+  val delete_snapshot : context -> snapshot -> Raw_context.t Lwt.t
+
+end
+
 (** The generic signature of a data set accessor (a set of values
     bound to a specific key prefix in the hierarchical (key x value)
     database). *)

@@ -44,6 +44,13 @@ module Make_indexed_data_storage (C : Raw_context.T) (I : INDEX) (V : VALUE)
                           and type key = I.t
                           and type value = V.t
 
+module Make_indexed_data_snapshotable_storage (C : Raw_context.T)
+    (Snapshot : INDEX) (I : INDEX) (V : VALUE)
+  : Indexed_data_snapshotable_storage with type t = C.t
+                                       and type snapshot = Snapshot.t
+                                       and type key = I.t
+                                       and type value = V.t
+
 module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
   : Indexed_raw_context with type t = C.t
                          and type key = I.t

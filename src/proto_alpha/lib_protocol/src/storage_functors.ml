@@ -254,6 +254,37 @@ module Make_indexed_data_storage
 
 end
 
+module Make_indexed_data_snapshotable_storage (C : Raw_context.T)
+    (Snapshot_index : INDEX) (I : INDEX) (V : VALUE)
+  : Indexed_data_snapshotable_storage with type t = C.t
+                                       and type snapshot = Snapshot_index.t
+                                       and type key = I.t
+                                       and type value = V.t = struct
+  type snapshot = Snapshot_index.t
+
+  let data_name = ["current"]
+  let snapshot_name = ["snapshot"]
+  let snapshot_name_length = List.length snapshot_name
+
+  module C_data = Make_subcontext(C)(struct let name = data_name end)
+  module C_snapshot = Make_subcontext(C)(struct let name = snapshot_name end)
+
+  include Make_indexed_data_storage(C_data)(I) (V)
+  module Snapshot = Make_indexed_data_storage(C_snapshot)(Pair(Snapshot_index)(I))(V)
+
+  let snapshot_path id = snapshot_name @ Snapshot_index.to_path id []
+
+  let snapshot s id =
+    C.copy s ~from:data_name ~to_:(snapshot_path id) >>=? fun t ->
+    return (C.project t)
+
+  let delete_snapshot s id =
+    C.remove_rec s (Snapshot_index.to_path id snapshot_name) >>= fun t ->
+    Lwt.return (C.project t)
+
+end
+
+
 module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
   : Indexed_raw_context with type t = C.t
                          and type key = I.t = struct
