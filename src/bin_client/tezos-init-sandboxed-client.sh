@@ -2,12 +2,6 @@
 
 set -e
 
-if [ "$is_tezos_sandboxed_init" = "1" ]; then
-    echo 'The client has already been initialized in this session.' >&2
-    echo 'Start a new shell session if you wish to reinitialize a client.' >&2
-    exit
-fi
-
 client_dirs=()
 
 init_sandboxed_client() {
@@ -215,6 +209,12 @@ usage() {
 }
 
 main () {
+
+    if [ "$is_tezos_sandboxed_init" = "1" ]; then
+        echo 'The client has already been initialized in this session.' >&2
+        echo 'Start a new shell session if you wish to reinitialize a client.' >&2
+        exit
+    fi
 
     local bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
     if [ $(basename "$bin_dir") = "bin_client" ]; then
