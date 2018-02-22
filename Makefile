@@ -53,6 +53,9 @@ test:
 test-indent:
 	@jbuilder build @runtest_indent ${DEV}
 
+fix-indent:
+	@src/lib_stdlib/test-ocp-indent.sh fix
+
 build-deps:
 	@./scripts/install_build_deps.sh
 
