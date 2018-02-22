@@ -152,6 +152,7 @@ module type Indexed_data_snapshotable_storage = sig
      and type value = value
      and type t = t
 
+  val snapshot_exists : context -> snapshot -> bool Lwt.t
   val snapshot : context -> snapshot -> Raw_context.t tzresult Lwt.t
   val delete_snapshot : context -> snapshot -> Raw_context.t Lwt.t
 

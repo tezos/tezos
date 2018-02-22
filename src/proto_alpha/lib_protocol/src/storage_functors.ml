@@ -274,6 +274,9 @@ module Make_indexed_data_snapshotable_storage (C : Raw_context.T)
 
   let snapshot_path id = snapshot_name @ Snapshot_index.to_path id []
 
+  let snapshot_exists s id =
+    C.dir_mem s (snapshot_path id)
+
   let snapshot s id =
     C.copy s ~from:data_name ~to_:(snapshot_path id) >>=? fun t ->
     return (C.project t)

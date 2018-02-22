@@ -11,6 +11,7 @@ type error +=
   | Consume_roll_change
   | No_roll_in_contract
   | Deleted_contract_owning_rolls
+  | No_roll_snapshot_for_cycle of Cycle_repr.t
 
 let get_contract_delegate c contract =
   match Contract_repr.is_default contract with
@@ -81,6 +82,8 @@ module Random = struct
           | Some delegate ->
               return delegate
     in
+    Storage.Roll.Owner.snapshot_exists c cycle >>= fun snapshot_exists ->
+    fail_unless snapshot_exists (No_roll_snapshot_for_cycle cycle) >>=? fun () ->
     loop sequence
 
 end
