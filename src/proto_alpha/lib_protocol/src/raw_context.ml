@@ -41,7 +41,7 @@ let set_current_fitness ctxt fitness = { ctxt with fitness }
 
 type storage_error =
   | Incompatible_protocol_version of string
-  | Missing_key of string list * [`Get | `Set | `Del]
+  | Missing_key of string list * [`Get | `Set | `Del | `Copy]
   | Existing_key of string list
   | Corrupted_data of string list
 
@@ -84,6 +84,10 @@ let pp_storage_error ppf = function
   | Missing_key (key, `Del) ->
       Format.fprintf ppf
         "Cannot delete undefined key '%s'."
+        (String.concat "/" key)
+  | Missing_key (key, `Copy) ->
+      Format.fprintf ppf
+        "Cannot copy undefined key '%s'."
         (String.concat "/" key)
   | Existing_key key ->
       Format.fprintf ppf
@@ -330,6 +334,7 @@ module type T = sig
   val delete: context -> key -> context tzresult Lwt.t
   val remove: context -> key -> context Lwt.t
   val remove_rec: context -> key -> context Lwt.t
+  val copy: context -> from:key -> to_:key -> context tzresult Lwt.t
 
   val fold:
     context -> key -> init:'a ->
@@ -396,6 +401,12 @@ let set_option ctxt k = function
 let remove_rec ctxt k =
   Context.remove_rec ctxt.context k >>= fun context ->
   Lwt.return { ctxt with context }
+
+let copy ctxt ~from ~to_ =
+  Context.copy ctxt.context ~from ~to_ >>= function
+  | None -> storage_error (Missing_key (from, `Copy))
+  | Some context ->
+      return { ctxt with context }
 
 let fold ctxt k ~init ~f =
   Context.fold ctxt.context k ~init ~f

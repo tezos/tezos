@@ -53,6 +53,7 @@ module Make_subcontext (C : Raw_context.T) (N : NAME)
   let delete t k = C.delete t (to_key k)
   let remove t k = C.remove t (to_key k)
   let remove_rec t k = C.remove_rec t (to_key k)
+  let copy t ~from ~to_ = C.copy t ~from:(to_key from) ~to_:(to_key to_)
   let fold t k ~init ~f =
     C.fold t (to_key k) ~init
       ~f:(fun k acc -> f (map_key of_key k) acc)
@@ -288,6 +289,9 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
       C.remove t (to_key i k) >>= fun t -> Lwt.return (t, i)
     let remove_rec (t, i) k =
       C.remove_rec t (to_key i k) >>= fun t -> Lwt.return (t, i)
+    let copy (t, i) ~from ~to_ =
+      C.copy t ~from:(to_key i from) ~to_:(to_key i to_) >>=? fun t ->
+      return (t, i)
     let fold (t, i) k ~init ~f =
       C.fold t (to_key i k) ~init
         ~f:(fun k acc -> f (map_key of_key k) acc)

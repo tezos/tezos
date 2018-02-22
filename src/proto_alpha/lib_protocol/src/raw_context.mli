@@ -12,7 +12,7 @@
 (** An internal storage error that should not happen *)
 type storage_error =
   | Incompatible_protocol_version of string
-  | Missing_key of string list * [`Get | `Set | `Del]
+  | Missing_key of string list * [`Get | `Set | `Del | `Copy]
   | Existing_key of string list
   | Corrupted_data of string list
 
@@ -114,6 +114,8 @@ module type T = sig
   (** Recursively removes all the storage buckets and contents ; does
       nothing if no bucket exists. *)
   val remove_rec: context -> key -> context Lwt.t
+
+  val copy: context -> from:key -> to_:key -> context tzresult Lwt.t
 
   (** Iterator on all the items of a given directory. *)
   val fold:
