@@ -264,7 +264,6 @@ module Make_indexed_data_snapshotable_storage (C : Raw_context.T)
 
   let data_name = ["current"]
   let snapshot_name = ["snapshot"]
-  let snapshot_name_length = List.length snapshot_name
 
   module C_data = Make_subcontext(C)(struct let name = data_name end)
   module C_snapshot = Make_subcontext(C)(struct let name = snapshot_name end)
