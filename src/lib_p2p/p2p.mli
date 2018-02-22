@@ -73,6 +73,9 @@ type limits = {
   authentication_timeout : float ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
+  greylist_timeout : float ;
+  (** GC delay for the grelists tables, in seconds. *)
+
   min_connections : int ;
   (** Strict minimum number of connections (triggers an urgent maintenance) *)
 
@@ -209,6 +212,9 @@ val on_new_connection :
   (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit
 
 val build_rpc_directory : _ t -> unit RPC_directory.t
+
+val temp_ban_addr : ('msg, 'meta) net -> P2p_addr.t -> unit
+val temp_ban_peer : ('msg, 'meta) net -> P2p_peer.Id.t -> unit
 
 (**/**)
 

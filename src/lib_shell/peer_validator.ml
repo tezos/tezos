@@ -251,7 +251,7 @@ let on_error w r st errs =
     ((( Validation_errors.Unknown_ancestor
       | Validation_errors.Invalid_locator _
       | Block_validator_errors.Invalid_block _ ) :: _) as errors ) ->
-      (* TODO ban the peer_id... *)
+      Distributed_db.temp_ban pv.parameters.chain_db pv.peer_id >>= fun () ->
       debug w
         "Terminating the validation worker for peer %a (kickban)."
         P2p_peer.Id.pp_short pv.peer_id ;
@@ -267,7 +267,7 @@ let on_error w r st errs =
         protocol >>= function
       | Ok _ -> return ()
       | Error _ ->
-          (* TODO penality... *)
+          (* TODO: punish *)
           debug w
             "Terminating the validation worker for peer %a \
              (missing protocol %a)."

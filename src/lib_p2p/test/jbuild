@@ -3,7 +3,11 @@
 (executables
  ((names (test_p2p_socket
           test_p2p_pool
-          test_p2p_io_scheduler))
+          test_p2p_io_scheduler
+          test_p2p_peerset
+          test_p2p_ipv6set
+          test_p2p_banned_peers
+          ))
   (libraries (tezos-base
               tezos-stdlib-unix
               tezos-shell-services
@@ -21,7 +25,11 @@
  ((name buildtest)
   (deps (test_p2p_socket.exe
          test_p2p_pool.exe
-         test_p2p_io_scheduler.exe))))
+         test_p2p_io_scheduler.exe
+         test_p2p_peerset.exe
+         test_p2p_ipv6set.exe
+         test_p2p_banned_peers.exe
+         ))))
 
 (alias
  ((name runtest_p2p_socket)
@@ -40,10 +48,26 @@
                    ))))
 
 (alias
+ ((name runtest_p2p_ipv6set)
+  (action (run ${exe:test_p2p_ipv6set.exe} -v))))
+
+(alias
+ ((name runtest_p2p_peerset)
+  (action (run ${exe:test_p2p_peerset.exe} -v))))
+
+(alias
+ ((name runtest_p2p_banned_peers)
+  (action (run ${exe:test_p2p_banned_peers.exe} -v))))
+
+(alias
  ((name runtest)
   (deps ((alias runtest_p2p_socket)
          (alias runtest_p2p_pool)
-         (alias runtest_p2p_io_scheduler)))))
+         (alias runtest_p2p_io_scheduler)
+         (alias runtest_p2p_peerset)
+         (alias runtest_p2p_ipv6set)
+         (alias runtest_p2p_banned_peers)
+         ))))
 
 (alias
  ((name runtest_indent)

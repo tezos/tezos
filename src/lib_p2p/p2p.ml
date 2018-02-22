@@ -43,6 +43,7 @@ type limits = {
 
   connection_timeout : float ;
   authentication_timeout : float ;
+  greylist_timeout : float ;
 
   min_connections : int ;
   expected_connections : int ;
@@ -97,6 +98,7 @@ let create_connection_pool config limits meta_cfg msg_cfg io_sched =
     max_incoming_connections = limits.max_incoming_connections ;
     connection_timeout = limits.connection_timeout ;
     authentication_timeout = limits.authentication_timeout ;
+    greylist_timeout = limits.greylist_timeout ;
     incoming_app_message_queue_size = limits.incoming_app_message_queue_size ;
     incoming_message_queue_size = limits.incoming_message_queue_size ;
     outgoing_message_queue_size = limits.outgoing_message_queue_size ;
@@ -132,7 +134,7 @@ let create_maintenance_worker limits pool =
       ~expected:limits.expected_connections
       ~max:limits.max_connections
   in
-  P2p_maintenance.run bounds pool
+  P2p_maintenance.run bounds ~greylist_timeout:limits.greylist_timeout pool
 
 let may_create_welcome_worker config limits pool =
   match config.listening_port with
@@ -444,6 +446,16 @@ let fold_connections net = net.fold_connections
 let iter_connections net = net.iter_connections
 let on_new_connection net = net.on_new_connection
 
+let temp_ban_peer net peer_id =
+  match net.pool with
+  |None -> ()
+  |Some pool -> P2p_pool.temp_ban_peer pool peer_id
+
+let temp_ban_addr net addr =
+  match net.pool with
+  |None -> ()
+  |Some pool -> P2p_pool.temp_ban_addr pool addr
+
 module Raw = struct
   type 'a t = 'a P2p_pool.Message.t =
     | Bootstrap
@@ -536,6 +548,9 @@ let build_rpc_directory net =
       match net.pool with
       | None -> failwith "The node has disable the P2P layer."
       | Some pool ->
+          fail_unless
+            (not(P2p_pool.Points.is_banned pool point))
+            (P2p_errors.Point_banned point) >>=? fun () ->
           ignore (P2p_pool.connect ~timeout pool point : _ tzresult Lwt.t) ;
           return ()
     end in
@@ -638,6 +653,37 @@ let build_rpc_directory net =
                   RPC_answer.return_stream { next ; shutdown }
       end in
 
+  let dir =
+    RPC_directory.gen_register1 dir P2p_services.Peers.S.ban
+      begin fun peer_id () () ->
+        match net.pool with
+        | None -> RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.Peers.unset_trusted pool peer_id;
+            P2p_pool.Peers.ban pool peer_id ;
+            RPC_answer.return ()
+      end in
+
+  let dir =
+    RPC_directory.gen_register1 dir P2p_services.Peers.S.trust
+      begin fun peer_id () () ->
+        match net.pool with
+        | None -> RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.Peers.set_trusted pool peer_id ;
+            RPC_answer.return ()
+      end in
+
+  let dir =
+    RPC_directory.register1 dir P2p_services.Peers.S.is_banned
+      begin fun peer_id () () ->
+        match net.pool with
+        | None -> return false
+        | Some pool ->
+            if P2p_pool.Peers.get_trusted pool peer_id then return false
+            else return (P2p_pool.Peers.is_banned pool peer_id)
+      end in
+
   (* Network : Point *)
 
   let dir =
@@ -698,6 +744,51 @@ let build_rpc_directory net =
                       Lwt.return_some evts
                     end in
                   RPC_answer.return_stream { next ; shutdown }
+      end in
+
+  let dir =
+    RPC_directory.gen_register1 dir P2p_services.Points.S.ban
+      begin fun point () () ->
+        match net.pool with
+        | None -> RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.Points.unset_trusted pool point;
+            P2p_pool.Points.ban pool point;
+            RPC_answer.return ()
+      end in
+
+  let dir =
+    RPC_directory.gen_register1 dir P2p_services.Points.S.trust
+      begin fun point () () ->
+        match net.pool with
+        | None -> RPC_answer.not_found
+        | Some pool ->
+            P2p_pool.Points.set_trusted pool point ;
+            RPC_answer.return ()
+      end in
+
+  let dir =
+    RPC_directory.gen_register1 dir P2p_services.Points.S.is_banned
+      begin fun point () () ->
+        match net.pool with
+        | None -> RPC_answer.return false
+        | Some pool ->
+            if P2p_pool.Points.get_trusted pool point then
+              RPC_answer.return false
+            else
+              RPC_answer.return (P2p_pool.Points.is_banned pool point)
+      end in
+
+  (* Network : Greylist *)
+
+  let dir =
+    RPC_directory.register dir P2p_services.Greylist.S.clear
+      begin fun () () () ->
+        match net.pool with
+        | None -> return ()
+        | Some pool ->
+            P2p_pool.greylist_clear pool ;
+            return ()
       end in
 
   dir

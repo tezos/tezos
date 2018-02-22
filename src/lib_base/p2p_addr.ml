@@ -26,3 +26,23 @@ let encoding =
     end
 
 type port = int
+
+let pp ppf addr =
+  match Ipaddr.v4_of_v6 addr with
+  | Some addr ->
+      Format.fprintf ppf "%a" Ipaddr.V4.pp_hum addr
+  | None ->
+      Format.fprintf ppf "[%a]" Ipaddr.V6.pp_hum addr
+
+let of_string_exn str =
+  match Ipaddr.of_string_exn str with
+  | V4 addr -> Ipaddr.v6_of_v4 addr
+  | V6 addr -> addr
+
+let of_string str =
+  try Ok (of_string_exn str) with
+  | Invalid_argument s -> Error s
+  | Failure s -> Error s
+  | _ -> Error "P2p_addr.of_string"
+
+let to_string saddr = Format.asprintf "%a" pp saddr

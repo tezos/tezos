@@ -20,6 +20,7 @@ type 'meta pool = Pool : ('msg, 'meta) P2p_pool.t -> 'meta pool
 
 type 'meta t = {
   canceler: Lwt_canceler.t ;
+  greylist_timeout: float;
   bounds: bounds ;
   pool: 'meta pool ;
   just_maintained: unit Lwt_condition.t ;
@@ -29,8 +30,8 @@ type 'meta t = {
 
 (** Select [expected] points amongst the disconnected known points.
     It ignores points which are greylisted, or for which a connection
-    failed after [start_time]. It first selects points with the oldest
-    last tentative. *)
+    failed after [start_time] and the pointes that are banned. It
+    first selects points with the oldest last tentative. *)
 let connectable st start_time expected =
   let Pool pool = st.pool in
   let now = Time.now () in
@@ -52,6 +53,7 @@ let connectable st start_time expected =
           match P2p_point_state.Info.last_miss pi with
           | Some last when Time.(start_time < last)
                         || P2p_point_state.Info.greylisted ~now pi -> ()
+          | _ when (P2p_pool.Points.is_banned pool point) -> ()
           | last ->
               Bounded_point_info.insert (last, point) acc
         end
@@ -87,10 +89,13 @@ let rec try_to_contact
         (min_to_contact - established) (max_to_contact - established)
 
 (** Do a maintenance step. It will terminate only when the number
-    of connections is between `min_threshold` and `max_threshold`. *)
+    of connections is between `min_threshold` and `max_threshold`.
+    Do a pass in the list of banned peers and remove all peers that
+    have been banned for more then xxx seconds *)
 let rec maintain st =
   let Pool pool = st.pool in
   let n_connected = P2p_pool.active_connections pool in
+  P2p_pool.gc_greylist pool ~delay:st.greylist_timeout;
   if n_connected < st.bounds.min_threshold then
     too_few_connections st n_connected
   else if st.bounds.max_threshold < n_connected then
@@ -163,10 +168,11 @@ let rec worker_loop st =
   | Error [ Canceled ] -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
-let run bounds pool =
+let run ~greylist_timeout bounds pool =
   let canceler = Lwt_canceler.create () in
   let st = {
     canceler ;
+    greylist_timeout ;
     bounds ;
     pool = Pool pool ;
     just_maintained = Lwt_condition.create () ;

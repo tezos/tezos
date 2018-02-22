@@ -81,6 +81,9 @@ type config = {
   authentication_timeout : float ;
   (** Delay granted to a peer to perform authentication, in seconds. *)
 
+  greylist_timeout : float ;
+  (** GC delay for the grelists tables, in seconds. *)
+
   incoming_app_message_queue_size : int option ;
   (** Size of the message queue for user messages (messages returned
       by this module's [read] function. *)
@@ -174,6 +177,7 @@ module Pool_event : sig
 
 end
 
+
 (** {1 Connections management} *)
 
 type ('msg, 'meta) connection
@@ -266,6 +270,11 @@ val broadcast_bootstrap_msg:  ('msg, 'meta) pool -> unit
 (** [write_all pool msg] is [P2P_connection.write_now conn Bootstrap]
     for all member connections to [pool] in [Running] state. *)
 
+val temp_ban_peer : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
+val temp_ban_addr : ('msg, 'meta) pool -> P2p_addr.t -> unit
+val gc_greylist: delay:float -> ('msg, 'meta) pool -> unit
+val greylist_clear : ('msg, 'meta) pool -> unit
+
 (** {1 Functions on [Peer_id]} *)
 
 module Peers : sig
@@ -295,6 +304,11 @@ module Peers : sig
     f:(P2p_peer.Id.t ->  ('msg, 'meta) info -> 'a -> 'a) ->
     'a
 
+  val forget : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
+  val ban : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
+  val trust : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
+  val is_banned : ('msg, 'meta) pool -> P2p_peer.Id.t -> bool
+
 end
 
 (** {1 Functions on [Points]} *)
@@ -321,6 +335,11 @@ module Points : sig
     init:'a ->
     f:(P2p_point.Id.t -> ('msg, 'meta) info  -> 'a -> 'a) ->
     'a
+
+  val forget : ('msg, 'meta) pool -> P2p_point.Id.t -> unit
+  val ban : ('msg, 'meta) pool -> P2p_point.Id.t -> unit
+  val trust : ('msg, 'meta) pool -> P2p_point.Id.t -> unit
+  val is_banned : ('msg, 'meta) pool -> P2p_point.Id.t -> bool
 
 end
 

@@ -176,6 +176,7 @@ type config = {
   max_incoming_connections : int ;
   connection_timeout : float ;
   authentication_timeout : float ;
+  greylist_timeout : float ;
 
   incoming_app_message_queue_size : int option ;
   incoming_message_queue_size : int option ;
@@ -218,6 +219,7 @@ type ('msg, 'meta) t = {
   encoding : 'msg Message.t Data_encoding.t ;
   events : events ;
   watcher : P2p_connection.Pool_event.t Lwt_watcher.input ;
+  acl : P2p_acl.t;
   mutable new_connection_hook :
     (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) list ;
   mutable latest_accepted_swap : Time.t ;
@@ -396,12 +398,76 @@ let broadcast_bootstrap_msg pool =
 
 (***************************************************************************)
 
+(* this function duplicates bit of code from the modules below to avoid
+   creating mutually recurvive modules *)
+let get_addr pool peer_id =
+  let info peer_id =
+    try Some (P2p_peer.Table.find pool.known_peer_ids peer_id)
+    with Not_found -> None
+  in
+  let find_by_peer_id peer_id =
+    Option.apply
+      (info peer_id)
+      ~f:(fun p ->
+          match P2p_peer_state.get p with
+          | Running { data } -> Some data
+          | _ -> None)
+  in
+  match find_by_peer_id peer_id with
+  |None -> None
+  |Some ci ->
+      let info = P2p_socket.info ci.conn in
+      Some(info.id_point)
+
+module Points = struct
+
+  type ('msg, 'meta) info = ('msg, 'meta) connection P2p_point_state.Info.t
+
+  let info { known_points } point =
+    try Some (P2p_point.Table.find known_points point)
+    with Not_found -> None
+
+  let get_trusted pool point =
+    try P2p_point_state.Info.trusted (P2p_point.Table.find pool.known_points point)
+    with Not_found -> false
+
+  let set_trusted pool point =
+    try
+      P2p_point_state.Info.set_trusted
+        (register_point pool pool.config.identity.peer_id point)
+    with Not_found -> ()
+
+  let unset_trusted pool point =
+    try P2p_point_state.Info.unset_trusted (P2p_point.Table.find pool.known_points point)
+    with Not_found -> ()
+
+  let fold_known pool ~init ~f =
+    P2p_point.Table.fold f pool.known_points init
+
+  let fold_connected  pool ~init ~f =
+    P2p_point.Table.fold f pool.connected_points init
+
+  let is_banned pool point =
+    P2p_acl.is_banned_addr pool.acl (fst point)
+
+  let ban pool point =
+    P2p_acl.IPBlacklist.add pool.acl (fst point)
+
+  let trust pool point =
+    P2p_acl.IPBlacklist.remove pool.acl (fst point)
+
+  let forget pool point =
+    unset_trusted pool point; (* remove from whitelist *)
+    P2p_acl.IPBlacklist.remove pool.acl (fst point)
+
+end
+
 module Peers = struct
 
   type ('msg, 'meta) info = (('msg, 'meta) connection, 'meta) P2p_peer_state.Info.t
 
-  let info { known_peer_ids } point =
-    try Some (P2p_peer.Table.find known_peer_ids point)
+  let info { known_peer_ids } peer_id =
+    try Some (P2p_peer.Table.find known_peer_ids peer_id)
     with Not_found -> None
 
   let get_metadata pool peer_id =
@@ -432,35 +498,29 @@ module Peers = struct
   let fold_connected pool ~init ~f =
     P2p_peer.Table.fold f pool.connected_peer_ids init
 
-end
+  let forget pool peer =
+    match get_addr pool peer with
+    |None -> ()
+    |Some point ->
+        unset_trusted pool peer; (* remove from whitelist *)
+        P2p_acl.PeerBlacklist.remove pool.acl peer;
+        P2p_acl.IPBlacklist.remove pool.acl (fst point)
 
-module Points = struct
+  let ban pool peer =
+    match get_addr pool peer with
+    |None -> ()
+    |Some point ->
+        Points.ban pool point;
+        P2p_acl.PeerBlacklist.add pool.acl peer
 
-  type ('msg, 'meta) info = ('msg, 'meta) connection P2p_point_state.Info.t
+  let trust pool peer =
+    match get_addr pool peer with
+    |None -> ()
+    |Some point ->
+        Points.trust pool point
 
-  let info { known_points } point =
-    try Some (P2p_point.Table.find known_points point)
-    with Not_found -> None
-
-  let get_trusted pool point =
-    try P2p_point_state.Info.trusted (P2p_point.Table.find pool.known_points point)
-    with Not_found -> false
-
-  let set_trusted pool point =
-    try
-      P2p_point_state.Info.set_trusted
-        (register_point pool pool.config.identity.peer_id point)
-    with Not_found -> ()
-
-  let unset_trusted pool peer_id =
-    try P2p_point_state.Info.unset_trusted (P2p_point.Table.find pool.known_points peer_id)
-    with Not_found -> ()
-
-  let fold_known pool ~init ~f =
-    P2p_point.Table.fold f pool.known_points init
-
-  let fold_connected  pool ~init ~f =
-    P2p_point.Table.fold f pool.connected_points init
+  let is_banned pool peer =
+    P2p_acl.is_banned_peer pool.acl peer
 
 end
 
@@ -532,9 +592,23 @@ module Connection = struct
 
 end
 
+let temp_ban_addr pool addr =
+  P2p_acl.IPGreylist.add pool.acl addr
+
+let temp_ban_peer pool peer =
+  match get_addr pool peer with
+  |None -> ()
+  |Some point ->
+      temp_ban_addr pool (fst point);
+      P2p_acl.PeerGreylist.add pool.acl peer
+
+let greylist_clear pool =
+  P2p_acl.greylist_clear pool.acl
+
+let gc_greylist ~delay pool = P2p_acl.IPGreylist.gc ~delay pool.acl
+
 let pool_stat { io_sched } =
   P2p_io_scheduler.global_stat io_sched
-
 
 (***************************************************************************)
 
@@ -571,6 +645,9 @@ let compare_known_point_info p1 p2 =
   | true, true -> compare_last_seen p2 p1
 
 let rec connect ?timeout pool point =
+  fail_unless
+    (not(Points.is_banned pool point))
+    (P2p_errors.Point_banned point) >>=? fun () ->
   let timeout =
     Option.unopt ~default:pool.config.connection_timeout timeout in
   fail_unless
@@ -645,6 +722,9 @@ and authenticate pool ?point_info canceler fd point =
   lwt_debug "authenticate: %a -> auth %a"
     P2p_point.Id.pp point
     P2p_connection.Info.pp info >>= fun () ->
+  fail_unless
+    (not(Peers.is_banned pool info.peer_id))
+    (P2p_errors.Peer_banned info.peer_id) >>=? fun () ->
   let remote_point_info =
     match info.id_point with
     | addr, Some port
@@ -901,7 +981,9 @@ and swap pool conn current_peer_id new_point =
 let accept pool fd point =
   log pool (Incoming_connection point) ;
   if pool.config.max_incoming_connections <= P2p_point.Table.length pool.incoming
-  || pool.config.max_connections <= active_connections pool then
+  || pool.config.max_connections <= active_connections pool
+  (* silently ignore banned points *)
+  || (P2p_acl.is_banned_addr pool.acl (fst point)) then
     Lwt.async (fun () -> Lwt_utils_unix.safe_close fd)
   else
     let canceler = Lwt_canceler.create () in
@@ -947,6 +1029,7 @@ let create config meta_config message_config io_sched =
     encoding = Message.encoding message_config.encoding ;
     events ;
     watcher = Lwt_watcher.create_input () ;
+    acl = P2p_acl.create 1023;
     new_connection_hook = [] ;
     latest_accepted_swap = Time.epoch ;
     latest_succesfull_swap = Time.epoch ;

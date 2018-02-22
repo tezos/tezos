@@ -484,8 +484,10 @@ module P2p_reader = struct
           (State.Block.known_invalid chain_db.chain_state)
           (Block_header.hash head :: hist) >>= fun known_invalid ->
         if not known_invalid then
-          chain_db.callback.notify_branch state.gid locator ;
-        (* TODO Kickban *)
+          chain_db.callback.notify_branch state.gid locator
+        else
+          (* Kickban *)
+          P2p.temp_ban_peer global_db.p2p state.gid;
         Lwt.return_unit
 
     | Deactivate chain_id ->
@@ -508,8 +510,10 @@ module P2p_reader = struct
         let head = Block_header.hash header in
         State.Block.known_invalid chain_db.chain_state head >>= fun known_invalid ->
         if not known_invalid then
-          chain_db.callback.notify_head state.gid header mempool ;
-        (* TODO Kickban *)
+          chain_db.callback.notify_head state.gid header mempool
+        else
+          (* Kickban *)
+          P2p.temp_ban_peer global_db.p2p state.gid ;
         Lwt.return_unit
 
     | Get_block_headers hashes ->
@@ -763,6 +767,9 @@ let deactivate chain_db =
 let get_chain { active_chains } chain_id =
   try Some (Chain_id.Table.find active_chains chain_id)
   with Not_found -> None
+
+let temp_ban { global_db = { p2p } } peer_id =
+  Lwt.return (P2p.temp_ban_peer p2p peer_id)
 
 let disconnect { global_db = { p2p } } peer_id =
   match P2p.find_connection p2p peer_id with

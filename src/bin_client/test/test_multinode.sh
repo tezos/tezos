@@ -22,7 +22,7 @@ for client in "${client_instances[@]}"; do
     echo "### $client p2p stat"
     echo
     $client bootstrapped
-    $client p2p stat
+    $admin_client network stat
     echo
 done
 

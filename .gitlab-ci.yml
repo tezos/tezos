@@ -161,6 +161,21 @@ test:proto_alpha:
   script:
     - jbuilder build @src/proto_alpha/lib_protocol/runtest
 
+test:p2p:peerset:
+  <<: *test_definition
+  script:
+    - jbuilder build @src/lib_p2p/runtest_p2p_peerset
+
+test:p2p:ipv6set:
+  <<: *test_definition
+  script:
+    - jbuilder build @src/lib_p2p/runtest_p2p_ipv6set
+
+test:p2p:banned_peers:
+  <<: *test_definition
+  script:
+    - jbuilder build @src/lib_p2p/runtest_p2p_banned_peers
+
 # test:client_alpha:transaction:
   # <<: *test_definition
   # script:
