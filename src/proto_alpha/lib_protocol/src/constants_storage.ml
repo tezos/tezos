@@ -13,6 +13,9 @@ let preserved_cycles c =
 let cycle_length c =
   let constants = Raw_context.constants c in
   constants.cycle_length
+let blocks_per_commitment c =
+  let constants = Raw_context.constants c in
+  constants.blocks_per_commitment
 let voting_period_length c =
   let constants = Raw_context.constants c in
   constants.voting_period_length

@@ -40,6 +40,14 @@ module S = struct
       ~output: (obj1 (req "voting_period_length" int32))
       RPC_path.(custom_root / "voting_period_length")
 
+  let blocks_per_commitment =
+    RPC_service.post_service
+      ~description: "How many blocks beetween random seed's nonce commitment"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req "blocks_per_commitment" int32))
+      RPC_path.(custom_root / "blocks_per_commitment")
+
   let time_before_reward =
     RPC_service.post_service
       ~description: "Time before reward"
@@ -110,6 +118,9 @@ let () =
   register0 S.voting_period_length begin fun ctxt () () ->
     return (Constants.voting_period_length ctxt)
   end ;
+  register0 S.blocks_per_commitment begin fun ctxt () () ->
+    return (Constants.blocks_per_commitment ctxt)
+  end ;
   register0 S.time_before_reward begin fun ctxt () () ->
     return (Constants.time_before_reward ctxt)
   end ;
@@ -138,6 +149,8 @@ let preserved_cycles ctxt block =
   RPC_context.make_call0 S.preserved_cycles ctxt block () ()
 let voting_period_length ctxt block =
   RPC_context.make_call0 S.voting_period_length ctxt block () ()
+let blocks_per_commitment ctxt block =
+  RPC_context.make_call0 S.blocks_per_commitment ctxt block () ()
 let time_before_reward ctxt block =
   RPC_context.make_call0 S.time_before_reward ctxt block () ()
 let slot_durations ctxt block =

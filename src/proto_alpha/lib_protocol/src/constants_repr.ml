@@ -47,6 +47,7 @@ let bootstrap_wealth =
 type constants = {
   preserved_cycles: int ;
   cycle_length: int32 ;
+  blocks_per_commitment: int32 ;
   voting_period_length: int32 ;
   time_before_reward: Period_repr.t ;
   slot_durations: Period_repr.t list ;
@@ -67,6 +68,7 @@ let read_public_key s = Ed25519.Public_key.of_hex_exn (`Hex s)
 let default = {
   preserved_cycles = 5 ;
   cycle_length = 2048l ;
+  blocks_per_commitment = 32l ;
   voting_period_length = 32768l ;
   time_before_reward =
     Period_repr.of_seconds_exn
@@ -120,6 +122,9 @@ let constants_encoding =
        and cycle_length =
          opt Compare.Int32.(=)
            default.cycle_length c.cycle_length
+       and blocks_per_commitment =
+         opt Compare.Int32.(=)
+           default.blocks_per_commitment c.blocks_per_commitment
        and voting_period_length =
          opt Compare.Int32.(=)
            default.voting_period_length c.voting_period_length
@@ -163,6 +168,7 @@ let constants_encoding =
        in
        ((( preserved_cycles,
            cycle_length,
+           blocks_per_commitment,
            voting_period_length,
            time_before_reward,
            slot_durations,
@@ -178,6 +184,7 @@ let constants_encoding =
            michelson_maximum_type_size)), ()) )
     (fun ((( preserved_cycles,
              cycle_length,
+             blocks_per_commitment,
              voting_period_length,
              time_before_reward,
              slot_durations,
@@ -195,6 +202,8 @@ let constants_encoding =
           unopt default.preserved_cycles preserved_cycles ;
         cycle_length =
           unopt default.cycle_length cycle_length ;
+        blocks_per_commitment =
+          unopt default.blocks_per_commitment blocks_per_commitment ;
         voting_period_length =
           unopt default.voting_period_length voting_period_length ;
         time_before_reward =
@@ -227,9 +236,10 @@ let constants_encoding =
     Data_encoding.(
       merge_objs
         (merge_objs
-           (obj9
+           (obj10
               (opt "preserved_cycles" uint8)
               (opt "cycle_length" int32)
+              (opt "blocks_per_commitment" int32)
               (opt "voting_period_length" int32)
               (opt "time_before_reward" int64)
               (opt "slot_durations" (list Period_repr.encoding))
