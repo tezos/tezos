@@ -290,6 +290,14 @@ module Make (Context : CONTEXT) = struct
              | Ok o -> RPC_answer.return o
              | Error e -> RPC_answer.fail e)
 
+      let opt_register dir service handler =
+        gen_register dir service
+          (fun p q i ->
+             handler p q i >>= function
+             | Ok (Some o) -> RPC_answer.return o
+             | Ok None -> RPC_answer.not_found
+             | Error e -> RPC_answer.fail e)
+
       let lwt_register dir service handler =
         gen_register dir service
           (fun p q i ->
@@ -304,6 +312,13 @@ module Make (Context : CONTEXT) = struct
       let register3 root s f = register root s (curry (S (S (S Z))) f)
       let register4 root s f = register root s (curry (S (S (S (S Z)))) f)
       let register5 root s f = register root s (curry (S (S (S (S (S Z))))) f)
+
+      let opt_register0 root s f = opt_register root s (curry Z f)
+      let opt_register1 root s f = opt_register root s (curry (S Z) f)
+      let opt_register2 root s f = opt_register root s (curry (S (S Z)) f)
+      let opt_register3 root s f = opt_register root s (curry (S (S (S Z))) f)
+      let opt_register4 root s f = opt_register root s (curry (S (S (S (S Z)))) f)
+      let opt_register5 root s f = opt_register root s (curry (S (S (S (S (S Z))))) f)
 
       let gen_register0 root s f = gen_register root s (curry Z f)
       let gen_register1 root s f = gen_register root s (curry (S Z) f)
