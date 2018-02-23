@@ -20,6 +20,7 @@ let from_raw c ?offset l =
     ~first_level
     ~cycle_length:constants.Constants_repr.cycle_length
     ~voting_period_length:constants.Constants_repr.voting_period_length
+    ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
     l
 
 let root c =
@@ -60,6 +61,19 @@ let levels_in_cycle ctxt c =
   let rec loop n acc =
     if Cycle_repr.(n.cycle = first.cycle)
     then loop (succ ctxt n) (n :: acc)
+    else acc
+  in
+  loop first []
+
+let levels_with_commitments_in_cycle ctxt c =
+  let first = first_level_in_cycle ctxt c in
+  let rec loop n acc =
+    if Cycle_repr.(n.cycle = first.cycle)
+    then
+      if n.expected_commitment then
+        loop (succ ctxt n) (n :: acc)
+      else
+        loop (succ ctxt n) acc
     else acc
   in
   loop first []

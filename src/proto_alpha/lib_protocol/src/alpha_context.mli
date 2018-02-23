@@ -307,6 +307,7 @@ module Level : sig
     cycle_position: int32 ;
     voting_period: Voting_period.t ;
     voting_period_position: int32 ;
+    expected_commitment: bool ;
   }
   include BASIC_DATA with type t := t
   val pp_full: Format.formatter -> t -> unit
@@ -653,7 +654,7 @@ module Block_header : sig
 
   and protocol_data = {
     priority: int ;
-    seed_nonce_hash: Nonce_hash.t ;
+    seed_nonce_hash: Nonce_hash.t option ;
     proof_of_work_nonce: MBytes.t ;
   }
 

@@ -66,7 +66,7 @@ let () =
     Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
     return block_header.protocol_data.priority
   end ;
-  register0_fullctxt S.seed_nonce_hash begin fun { block_header ; _ } () ( )->
+  opt_register0_fullctxt S.seed_nonce_hash begin fun { block_header ; _ } () ( )->
     Lwt.return (Block_header.parse block_header) >>=? fun block_header ->
     return block_header.protocol_data.seed_nonce_hash
   end

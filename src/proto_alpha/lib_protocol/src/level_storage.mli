@@ -18,3 +18,6 @@ val succ: Raw_context.t -> Level_repr.t -> Level_repr.t
 
 val last_level_in_cycle: Raw_context.t -> Cycle_repr.t -> Level_repr.t
 val levels_in_cycle: Raw_context.t -> Cycle_repr.t -> Level_repr.t list
+
+val levels_with_commitments_in_cycle:
+  Raw_context.t -> Cycle_repr.t -> Level_repr.t list

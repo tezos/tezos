@@ -38,7 +38,7 @@ let main () =
   let protocol_data =
     Data_encoding.Binary.to_bytes
       Alpha_context.Block_header.protocol_data_encoding
-      (Helpers_block.get_protocol_data 0) in
+      (Helpers_block.get_protocol_data 0 true) in
   let tezos_header = { Block_header.shell = header ; protocol_data } in
   Proto_alpha.Main.begin_construction
     ~predecessor_context: context

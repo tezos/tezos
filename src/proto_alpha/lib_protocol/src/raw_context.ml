@@ -236,6 +236,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
       ~first_level
       ~cycle_length:constants.Constants_repr.cycle_length
       ~voting_period_length:constants.Constants_repr.voting_period_length
+      ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
       level in
   return ({ context = ctxt ; constants ; level ;
             timestamp ; fitness ; first_level ; roll_value ;
@@ -251,9 +252,9 @@ let rec double_roll_value ctxt i =
     set_roll_value ctxt.context roll_value >>=? fun context ->
     double_roll_value { ctxt with context ; roll_value } (i-1)
 
-let activate ({ context = c } as s) h =
+let activate ({ context = c ; _ } as s) h =
   Updater.activate c h >>= fun c -> Lwt.return { s with context = c }
-let fork_test_chain ({ context = c } as s) protocol expiration =
+let fork_test_chain ({ context = c ; _ } as s) protocol expiration =
   Updater.fork_test_chain c ~protocol ~expiration >>= fun c ->
   Lwt.return { s with context = c }
 

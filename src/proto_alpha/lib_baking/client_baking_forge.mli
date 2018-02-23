@@ -22,7 +22,7 @@ val inject_block:
   ?chain_id:Chain_id.t ->
   shell_header:Block_header.shell_header ->
   priority:int ->
-  seed_nonce_hash:Nonce_hash.t ->
+  ?seed_nonce_hash:Nonce_hash.t ->
   src_sk:Client_keys.sk_locator ->
   Operation.raw list list ->
   Block_hash.t tzresult Lwt.t
@@ -44,7 +44,7 @@ val forge_block:
   ?sort:bool ->
   ?timestamp:Time.t ->
   priority:[`Set of int | `Auto of (public_key_hash * int option * bool)] ->
-  seed_nonce_hash:Nonce_hash.t ->
+  ?seed_nonce_hash:Nonce_hash.t ->
   src_sk:Client_keys.sk_locator ->
   unit ->
   Block_hash.t tzresult Lwt.t

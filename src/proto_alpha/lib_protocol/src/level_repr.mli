@@ -14,6 +14,7 @@ type t = private {
   cycle_position: int32 ;
   voting_period: Voting_period_repr.t ;
   voting_period_position: int32 ;
+  expected_commitment: bool ;
 }
 
 type level = t
@@ -30,6 +31,7 @@ val from_raw:
   first_level:Raw_level_repr.t ->
   cycle_length:int32 ->
   voting_period_length:int32 ->
+  blocks_per_commitment:int32 ->
   Raw_level_repr.t -> level
 
 val diff: level -> level -> int32

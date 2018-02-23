@@ -280,7 +280,7 @@ module Forge = struct
         ~input:
           (obj3
              (req "priority" uint16)
-             (req "nonce_hash" Nonce_hash.encoding)
+             (opt "nonce_hash" Nonce_hash.encoding)
              (dft "proof_of_work_nonce"
                 (Fixed.bytes
                    Alpha_context.Constants.proof_of_work_nonce_size)
@@ -425,8 +425,9 @@ module Forge = struct
 
   let protocol_data ctxt
       block
-      ~priority ~seed_nonce_hash
-      ?(proof_of_work_nonce = empty_proof_of_work_nonce) () =
+      ~priority ?seed_nonce_hash
+      ?(proof_of_work_nonce = empty_proof_of_work_nonce)
+      () =
     RPC_context.make_call0 S.protocol_data
       ctxt block () (priority, seed_nonce_hash, proof_of_work_nonce)
 

@@ -46,7 +46,7 @@ let compute_for_cycle c ~revealed cycle =
   match Cycle_repr.pred cycle with
   | None -> assert false (* should not happen *)
   | Some previous_cycle ->
-      let levels = Level_storage.levels_in_cycle c revealed in
+      let levels = Level_storage.levels_with_commitments_in_cycle c revealed in
       let combine (c, random_seed) level =
         Storage.Seed.Nonce.get c level >>=? function
         | Revealed nonce ->

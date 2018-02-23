@@ -17,6 +17,7 @@ type error += Duplicate_endorsement of int (* `Branch *)
 type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.expr option (* `Permanent *)
 type error += Too_many_faucet
 type error += Invalid_endorsement_level
+type error += Invalid_commitment of { expected: bool }
 
 
 let () =
@@ -93,7 +94,20 @@ let () =
         Format.fprintf ppf "Unpexpected level in endorsement.")
     Data_encoding.unit
     (function Invalid_endorsement_level -> Some () | _ -> None)
-    (fun () -> Invalid_endorsement_level)
+    (fun () -> Invalid_endorsement_level) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.invalid_commitment"
+    ~title:"Invalid commitment in block header"
+    ~description:"The block header has invalid commitment."
+    ~pp:(fun ppf expected ->
+        if expected then
+          Format.fprintf ppf "Missing seed's nonce commitment in block header."
+        else
+          Format.fprintf ppf "Unexpected seed's nonce commitment in block header.")
+    Data_encoding.(obj1 (req "expected "bool))
+    (function Invalid_commitment { expected } -> Some expected | _ -> None)
+    (fun expected -> Invalid_commitment { expected })
 
 let apply_consensus_operation_content ctxt
     pred_block block_priority operation = function
@@ -352,6 +366,7 @@ let begin_partial_construction ctxt =
   return ctxt
 
 let begin_application ctxt block_header pred_timestamp =
+  let current_level = Alpha_context.Level.current ctxt in
   Baking.check_proof_of_work_stamp ctxt block_header >>=? fun () ->
   Baking.check_fitness_gap ctxt block_header >>=? fun () ->
   Baking.check_baking_rights
@@ -359,6 +374,14 @@ let begin_application ctxt block_header pred_timestamp =
   Baking.check_signature block_header baker >>=? fun () ->
   Baking.pay_baking_bond ctxt block_header.protocol_data
     (Ed25519.Public_key.hash baker) >>=? fun ctxt ->
+  let has_commitment =
+    match block_header.protocol_data.seed_nonce_hash with
+    | None -> false
+    | Some _ -> true in
+  fail_unless
+    Compare.Bool.(has_commitment = current_level.expected_commitment)
+    (Invalid_commitment
+       { expected = current_level.expected_commitment }) >>=? fun () ->
   let ctxt = Fitness.increase ctxt in
   return (ctxt, baker)
 
@@ -366,8 +389,11 @@ let finalize_application ctxt block_protocol_data baker =
   (* end of level (from this point nothing should fail) *)
   let priority = block_protocol_data.Block_header.priority in
   let reward = Baking.base_baking_reward ctxt ~priority in
-  Nonce.record_hash ctxt
-    baker reward block_protocol_data.seed_nonce_hash >>=? fun ctxt ->
+  begin
+    match block_protocol_data.seed_nonce_hash with
+    | None -> return ctxt
+    | Some nonce -> Nonce.record_hash ctxt baker reward nonce
+  end >>=? fun ctxt ->
   Reward.pay_due_rewards ctxt >>=? fun ctxt ->
   (* end of cycle *)
   may_start_new_cycle ctxt >>=? fun ctxt ->

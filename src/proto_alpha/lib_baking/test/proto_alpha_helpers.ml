@@ -423,24 +423,30 @@ end
 module Baking = struct
 
   let bake block (contract: Account.t) operations =
-    let seed_nonce =
-      match Nonce.of_bytes @@
-        Rand.generate Constants.nonce_length with
-      | Error _ -> assert false
-      | Ok nonce -> nonce in
-    let seed_nonce_hash = Nonce.hash seed_nonce in
+    let ctxt = (new wrap_full (no_write_context ~block !rpc_config)) in
+    Alpha_services.Context.next_level ctxt block >>=? fun level ->
+    let seed_nonce_hash =
+      if level.Level.expected_commitment then
+        let seed_nonce =
+          match Nonce.of_bytes @@
+            Rand.generate Constants.nonce_length with
+          | Error _ -> assert false
+          | Ok nonce -> nonce in
+        Some (Nonce.hash seed_nonce)
+      else
+        None in
     let src_sk = Client_keys.Secret_key_locator.create
         ~scheme:"unencrypted"
         ~location:(Ed25519.Secret_key.to_b58check contract.sk) in
     Client_baking_forge.forge_block
-      (new wrap_full (no_write_context ~block !rpc_config))
+      ctxt
       block
       ~operations
       ~force:true
       ~best_effort:false
       ~sort:false
       ~priority:(`Auto (contract.pkh, Some 1024, false))
-      ~seed_nonce_hash
+      ?seed_nonce_hash
       ~src_sk
       ()
 
