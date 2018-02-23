@@ -169,7 +169,7 @@ let check_endorsements_rights c level slots =
       return delegate
 
 let paying_priorities c =
-  0 --> Constants.first_free_baking_slot c
+  0 --> (Constants.first_free_baking_slot c - 1)
 
 let bond_and_reward =
   match Tez.(Constants.baking_bond_cost +? Constants.baking_reward) with
