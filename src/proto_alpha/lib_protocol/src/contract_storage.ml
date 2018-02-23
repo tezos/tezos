@@ -367,9 +367,9 @@ let init c =
   Storage.Contract.Global_counter.init c 0l
 
 module Big_map = struct
-  let set handle key value =
-    Storage.Contract.Big_map.init_set handle key value >>= return
-  let remove = Storage.Contract.Big_map.delete
-  let mem = Storage.Contract.Big_map.mem
-  let get_opt = Storage.Contract.Big_map.get_option
+  let set ctxt contract key value =
+    Storage.Contract.Big_map.init_set (ctxt, contract) key value >>= return
+  let remove ctxt contract = Storage.Contract.Big_map.delete (ctxt, contract)
+  let mem ctxt contract = Storage.Contract.Big_map.mem (ctxt, contract)
+  let get_opt ctxt contract = Storage.Contract.Big_map.get_option (ctxt, contract)
 end

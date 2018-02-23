@@ -94,11 +94,11 @@ val init:
 
 module Big_map : sig
   val set :
-    Storage.Contract.bigmap_key ->
+    Raw_context.t -> Contract_repr.t ->
     string -> Script_repr.expr -> Raw_context.t tzresult Lwt.t
   val remove :
-    Storage.Contract.bigmap_key -> string -> Raw_context.t tzresult Lwt.t
-  val mem : Storage.Contract.bigmap_key -> string -> bool Lwt.t
+    Raw_context.t -> Contract_repr.t -> string -> Raw_context.t tzresult Lwt.t
+  val mem : Raw_context.t -> Contract_repr.t -> string -> bool Lwt.t
   val get_opt :
-    Storage.Contract.bigmap_key -> string -> Script_repr.expr option tzresult Lwt.t
+    Raw_context.t -> Contract_repr.t -> string -> Script_repr.expr option tzresult Lwt.t
 end

@@ -452,7 +452,7 @@ module Contract : sig
   val check_counter_increment:
     context -> contract -> int32 -> unit tzresult Lwt.t
 
-  module Big_map_storage : sig
+  module Big_map : sig
     val set:
       context -> contract ->
       string -> Script.expr -> context tzresult Lwt.t

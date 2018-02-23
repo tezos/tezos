@@ -211,9 +211,9 @@ let apply_manager_operation_content
         | Some diff ->
             fold_left_s (fun ctxt (key, value) ->
                 match value with
-                | None -> Contract.Big_map_storage.remove ctxt contract key
+                | None -> Contract.Big_map.remove ctxt contract key
                 | Some v ->
-                    Contract.Big_map_storage.set ctxt contract key v)
+                    Contract.Big_map.set ctxt contract key v)
               ctxt diff
       end >>=? fun ctxt ->
       return (ctxt, origination_nonce, None)
