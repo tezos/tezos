@@ -34,6 +34,7 @@
         "Storage_functors",
         "Storage",
 
+        "Constants_storage",
         "Level_storage",
         "Nonce_storage",
         "Seed_storage",
