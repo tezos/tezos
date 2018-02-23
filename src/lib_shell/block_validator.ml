@@ -244,24 +244,20 @@ let on_request
               protect ?canceler begin fun () ->
                 apply_block
                   (Distributed_db.chain_state chain_db)
-                  pred proto hash header operations
+                  pred proto hash header operations >>=? fun result ->
+                Distributed_db.commit_block
+                  chain_db hash header operations result >>=? function
+                | None -> assert false (* should not happen *)
+                | Some block -> return block
               end
             end >>= function
-            | Ok result -> begin
-                Worker.protect w begin fun () ->
-                  Distributed_db.commit_block
-                    chain_db hash header operations result
-                end >>=? function
-                | None ->
-                    assert false (* should not happen *)
-                | Some block ->
-                    Protocol_validator.prefetch_and_compile_protocols
-                      bv.protocol_validator
-                      ?peer ~timeout:bv.limits.protocol_timeout
-                      block ;
-                    notify_new_block block ;
-                    return (Ok block)
-              end
+            | Ok block ->
+                Protocol_validator.prefetch_and_compile_protocols
+                  bv.protocol_validator
+                  ?peer ~timeout:bv.limits.protocol_timeout
+                  block ;
+                notify_new_block block ;
+                return (Ok block)
             (* TODO catch other temporary error (e.g. system errors)
                and do not 'commit' them on disk... *)
             | Error [Canceled | Unavailable_protocol _] as err ->

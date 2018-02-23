@@ -276,8 +276,8 @@ let on_error w r st errs =
 
 let on_close w =
   let pv = Worker.state w in
-  pv.parameters.notify_termination () ;
   Distributed_db.disconnect pv.parameters.chain_db pv.peer_id >>= fun () ->
+  pv.parameters.notify_termination () ;
   Lwt.return ()
 
 let on_launch _ name parameters =
