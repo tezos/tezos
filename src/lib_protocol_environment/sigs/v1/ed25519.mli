@@ -80,6 +80,8 @@ module Signature : sig
   (** Append a signature *)
   val append: Secret_key.t -> MBytes.t -> MBytes.t
 
+  val zero: t
+
 end
 
 val sign: Secret_key.t -> MBytes.t -> Signature.t

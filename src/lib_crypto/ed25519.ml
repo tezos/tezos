@@ -182,6 +182,7 @@ module Signature = struct
 
   let to_bytes x = x
   let size = Sign.bytes
+  let zero = MBytes.init size '\000'
 
   let () =
     Base58.check_encoded_prefix b58check_encoding "edsig" 99

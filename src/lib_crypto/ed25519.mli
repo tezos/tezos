@@ -81,6 +81,8 @@ module Signature : sig
 
   val size: int
 
+  val zero: t
+
   (** Check a signature *)
   val check: Public_key.t -> t -> MBytes.t -> bool
 
