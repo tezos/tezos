@@ -16,6 +16,14 @@ module S = struct
 
   open Data_encoding
 
+  let preserved_cycles =
+    RPC_service.post_service
+      ~description: "How many cycle before the 'no-automatic-fork point'"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req "preserved_cycles" int31))
+      RPC_path.(custom_root / "preserved_cycles")
+
   let cycle_length =
     RPC_service.post_service
       ~description: "Cycle length"
@@ -93,6 +101,9 @@ end
 
 let () =
   let open Services_registration in
+  register0 S.preserved_cycles begin fun ctxt () () ->
+    return (Constants.preserved_cycles ctxt)
+  end ;
   register0 S.cycle_length begin fun ctxt () () ->
     return (Constants.cycle_length ctxt)
   end ;
@@ -123,6 +134,8 @@ let () =
 
 let cycle_length ctxt block =
   RPC_context.make_call0 S.cycle_length ctxt block () ()
+let preserved_cycles ctxt block =
+  RPC_context.make_call0 S.preserved_cycles ctxt block () ()
 let voting_period_length ctxt block =
   RPC_context.make_call0 S.voting_period_length ctxt block () ()
 let time_before_reward ctxt block =

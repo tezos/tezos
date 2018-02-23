@@ -45,6 +45,7 @@ let bootstrap_wealth =
   Tez_repr.(mul_exn one 4_000_000)
 
 type constants = {
+  preserved_cycles: int ;
   cycle_length: int32 ;
   voting_period_length: int32 ;
   time_before_reward: Period_repr.t ;
@@ -64,6 +65,7 @@ type constants = {
 let read_public_key s = Ed25519.Public_key.of_hex_exn (`Hex s)
 
 let default = {
+  preserved_cycles = 5 ;
   cycle_length = 2048l ;
   voting_period_length = 32768l ;
   time_before_reward =
@@ -112,7 +114,10 @@ let constants_encoding =
     (fun c ->
        let module Compare_slot_durations = Compare.List (Period_repr) in
        let module Compare_keys = Compare.List (Ed25519.Public_key) in
-       let cycle_length =
+       let preserved_cycles =
+         opt Compare.Int.(=)
+           default.preserved_cycles c.preserved_cycles
+       and cycle_length =
          opt Compare.Int32.(=)
            default.cycle_length c.cycle_length
        and voting_period_length =
@@ -156,35 +161,39 @@ let constants_encoding =
          opt Compare.Int.(=)
            default.michelson_maximum_type_size c.michelson_maximum_type_size
        in
-       ((( cycle_length,
+       ((( preserved_cycles,
+           cycle_length,
            voting_period_length,
            time_before_reward,
            slot_durations,
            first_free_baking_slot,
            max_signing_slot,
            max_gas,
-           proof_of_work_threshold,
-           bootstrap_keys,
-           dictator_pubkey),
-         (max_number_of_operations,
-          max_operation_data_length,
-          initial_roll_value,
-          michelson_maximum_type_size)), ()) )
-    (fun ((( cycle_length,
+           proof_of_work_threshold),
+         ( bootstrap_keys,
+           dictator_pubkey,
+           max_number_of_operations,
+           max_operation_data_length,
+           initial_roll_value,
+           michelson_maximum_type_size)), ()) )
+    (fun ((( preserved_cycles,
+             cycle_length,
              voting_period_length,
              time_before_reward,
              slot_durations,
              first_free_baking_slot,
              max_signing_slot,
              max_gas,
-             proof_of_work_threshold,
-             bootstrap_keys,
-             dictator_pubkey),
-           (max_number_of_operations,
-            max_operation_data_length,
-            initial_roll_value,
-            michelson_maximum_type_size)), ()) ->
-      { cycle_length =
+             proof_of_work_threshold),
+           ( bootstrap_keys,
+             dictator_pubkey,
+             max_number_of_operations,
+             max_operation_data_length,
+             initial_roll_value,
+             michelson_maximum_type_size)), ()) ->
+      { preserved_cycles =
+          unopt default.preserved_cycles preserved_cycles ;
+        cycle_length =
           unopt default.cycle_length cycle_length ;
         voting_period_length =
           unopt default.voting_period_length voting_period_length ;
@@ -218,7 +227,8 @@ let constants_encoding =
     Data_encoding.(
       merge_objs
         (merge_objs
-           (obj10
+           (obj9
+              (opt "preserved_cycles" uint8)
               (opt "cycle_length" int32)
               (opt "voting_period_length" int32)
               (opt "time_before_reward" int64)
@@ -226,10 +236,10 @@ let constants_encoding =
               (opt "first_free_baking_slot" uint16)
               (opt "max_signing_slot" uint16)
               (opt "instructions_per_transaction" int31)
-              (opt "proof_of_work_threshold" int64)
+              (opt "proof_of_work_threshold" int64))
+           (obj6
               (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
-              (opt "dictator_pubkey" Ed25519.Public_key.encoding))
-           (obj4
+              (opt "dictator_pubkey" Ed25519.Public_key.encoding)
               (opt "max_number_of_operations" (list uint16))
               (opt "max_number_of_operations" int31)
               (opt "initial_roll_value" Tez_repr.encoding)

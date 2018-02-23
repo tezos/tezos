@@ -261,6 +261,7 @@ module Constants : sig
   val endorsement_bond_cost: Tez.t
   val faucet_credit: Tez.t
 
+  val preserved_cycles: context -> int
   val cycle_length: context -> int32
   val voting_period_length: context -> int32
   val time_before_reward: context -> Period.t
