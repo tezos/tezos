@@ -152,7 +152,6 @@ let create_base c contract
     match delegate with
     | None -> return c
     | Some delegate ->
-        Storage.Contract.Delegate.init c contract delegate >>=? fun c ->
         Delegate_storage.init c contract delegate
   end >>=? fun c ->
   Storage.Contract.Spendable.set c contract spendable >>= fun c ->
@@ -182,7 +181,6 @@ let delete c contract =
   Delegate_storage.remove c contract >>=? fun c ->
   Storage.Contract.Balance.delete c contract >>=? fun c ->
   Storage.Contract.Manager.delete c contract >>=? fun c ->
-  Storage.Contract.Delegate.remove c contract >>= fun c ->
   Storage.Contract.Spendable.del c contract >>= fun c ->
   Storage.Contract.Delegatable.del c contract >>= fun c ->
   Storage.Contract.Counter.delete c contract >>=? fun c ->
@@ -334,7 +332,7 @@ let spend_from_script c contract amount =
       else match Contract_repr.is_implicit contract with
         | None -> return c (* Never delete originated contracts *)
         | Some pkh ->
-            Storage.Contract.Delegate.get_option c contract >>=? function
+            Delegate_storage.get c contract >>=? function
             | Some pkh' ->
                 (* Don't delete "delegate" contract *)
                 assert (Ed25519.Public_key_hash.equal pkh pkh') ;

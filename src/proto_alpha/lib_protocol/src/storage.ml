@@ -49,6 +49,28 @@ module Contract = struct
       (struct let name = ["balance"] end)
       (Make_value(Tez_repr))
 
+  module Frozen_balance_index =
+    Make_indexed_subcontext
+      (Make_subcontext
+         (Indexed_context.Raw_context)
+         (struct let name = ["frozen_balance"] end))
+      (Cycle_repr.Index)
+
+  module Frozen_bonds =
+    Frozen_balance_index.Make_map
+      (struct let name = ["bonds"] end)
+      (Make_value(Tez_repr))
+
+  module Frozen_fees =
+    Frozen_balance_index.Make_map
+      (struct let name = ["fees"] end)
+      (Make_value(Tez_repr))
+
+  module Frozen_rewards =
+    Frozen_balance_index.Make_map
+      (struct let name = ["rewards"] end)
+      (Make_value(Tez_repr))
+
   module Manager =
     Indexed_context.Make_map
       (struct let name = ["manager"] end)
@@ -129,7 +151,7 @@ module Contract = struct
 
 end
 
-module Delegate =
+module Delegates =
   Make_data_set_storage
     (Make_subcontext(Raw_context)(struct let name = ["delegates"] end))
     (Ed25519.Public_key_hash)
@@ -148,28 +170,34 @@ module Cycle = struct
       (struct let name = ["last_roll"] end)
       (Make_value(Roll_repr))
 
+  type unrevealed_nonce = {
+    nonce_hash: Nonce_hash.t ;
+    delegate: Ed25519.Public_key_hash.t ;
+    bond: Tez_repr.t ;
+    rewards: Tez_repr.t ;
+    fees: Tez_repr.t ;
+  }
+
   type nonce_status =
-    | Unrevealed of {
-        nonce_hash: Nonce_hash.t ;
-        delegate_to_reward: Ed25519.Public_key_hash.t ;
-        reward_amount: Tez_repr.t ;
-      }
+    | Unrevealed of unrevealed_nonce
     | Revealed of Seed_repr.nonce
 
   let nonce_status_encoding =
     let open Data_encoding in
     union [
       case (Tag 0)
-        (tup3
+        (tup5
            Nonce_hash.encoding
            Ed25519.Public_key_hash.encoding
+           Tez_repr.encoding
+           Tez_repr.encoding
            Tez_repr.encoding)
         (function
-          | Unrevealed { nonce_hash ; delegate_to_reward ; reward_amount } ->
-              Some (nonce_hash, delegate_to_reward, reward_amount)
+          | Unrevealed { nonce_hash ; delegate ; bond ; rewards ; fees } ->
+              Some (nonce_hash, delegate, bond, rewards, fees)
           | _ -> None)
-        (fun (nonce_hash, delegate_to_reward, reward_amount) ->
-           Unrevealed { nonce_hash ; delegate_to_reward ; reward_amount }) ;
+        (fun (nonce_hash, delegate, bond, rewards, fees) ->
+           Unrevealed { nonce_hash ; delegate ; bond ; rewards ; fees }) ;
       case (Tag 1)
         Seed_repr.nonce_encoding
         (function
@@ -196,19 +224,6 @@ module Cycle = struct
          type t = Seed_repr.seed
          let encoding = Seed_repr.seed_encoding
        end))
-
-  module Reward_date =
-    Indexed_context.Make_map
-      (struct let name = [ "reward_date" ] end)
-      (Make_value(Time_repr))
-
-  module Reward_amount =
-    Make_indexed_data_storage
-      (Make_subcontext
-         (Indexed_context.Raw_context)
-         (struct let name = [ "rewards" ] end))
-      (Ed25519.Public_key_hash)
-      (Make_value(Tez_repr))
 
 end
 
@@ -326,12 +341,16 @@ end
 
 module Seed = struct
 
+  type unrevealed_nonce = Cycle.unrevealed_nonce = {
+    nonce_hash: Nonce_hash.t ;
+    delegate: Ed25519.Public_key_hash.t ;
+    bond: Tez_repr.t ;
+    rewards: Tez_repr.t ;
+    fees: Tez_repr.t ;
+  }
+
   type nonce_status = Cycle.nonce_status =
-    | Unrevealed of {
-        nonce_hash: Nonce_hash.t ;
-        delegate_to_reward: Ed25519.Public_key_hash.t ;
-        reward_amount: Tez_repr.t ;
-      }
+    | Unrevealed of unrevealed_nonce
     | Revealed of Seed_repr.nonce
 
   module Nonce = struct
@@ -348,21 +367,6 @@ module Seed = struct
     let remove ctxt l = Cycle.Nonce.remove (ctxt, l.cycle) l.level
   end
   module For_cycle = Cycle.Seed
-
-end
-
-(** Rewards *)
-
-module Rewards = struct
-
-  module Next =
-    Make_single_data_storage
-      (Raw_context)
-      (struct let name = ["next_cycle_to_be_rewarded"] end)
-      (Make_value(Cycle_repr))
-
-  module Date = Cycle.Reward_date
-  module Amount = Cycle.Reward_amount
 
 end
 

@@ -18,8 +18,6 @@ type error +=
   | Missing_public_key of Ed25519.Public_key_hash.t (* `Permanent *)
   | Failure of string (* `Permanent *)
 
-val delete: Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
-
 val exists: Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
 val must_exist: Raw_context.t -> Contract_repr.t -> unit tzresult Lwt.t
 

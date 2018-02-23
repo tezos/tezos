@@ -136,13 +136,12 @@ module I = struct
         let level = Alpha_context.Level.current ctxt in
         Baking.baking_priorities ctxt level >>=? fun (Misc.LCons (baker_pk, _)) ->
         let baker_pkh = Ed25519.Public_key.hash baker_pk in
-        let baker_contract = Contract.implicit_contract baker_pkh in
         let block_prio = 0 in
         Apply.apply_operation
-          ctxt (Some baker_contract) pred_block block_prio operation
+          ctxt (Some baker_pkh) pred_block block_prio operation
         >>=? function
-        | (_ctxt, _, Some script_err) -> Lwt.return (Error script_err)
-        | (_ctxt, contracts, None) -> Lwt.return (Ok contracts)
+        | (_ctxt, _, Some script_err, _, _) -> Lwt.return (Error script_err)
+        | (_ctxt, contracts, None,_ , _) -> Lwt.return (Ok contracts)
 
 
   let run_parameters ctxt (script, storage, input, amount, contract, origination_nonce) =

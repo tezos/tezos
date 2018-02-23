@@ -80,7 +80,6 @@ module Seed = struct
   include Seed_storage
 end
 module Bootstrap = Bootstrap_storage
-module Reward = Reward_storage
 
 module Fitness = struct
 

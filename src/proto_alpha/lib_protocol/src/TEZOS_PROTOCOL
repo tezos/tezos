@@ -41,7 +41,6 @@
         "Roll_storage",
         "Delegate_storage",
         "Contract_storage",
-        "Reward_storage",
         "Bootstrap_storage",
         "Fitness_storage",
         "Vote_storage",

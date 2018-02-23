@@ -12,7 +12,6 @@ let initialize ctxt =
   Roll_storage.init ctxt >>=? fun ctxt ->
   Seed_storage.init ctxt >>=? fun ctxt ->
   Contract_storage.init ctxt >>=? fun ctxt ->
-  Reward_storage.init ctxt >>=? fun ctxt ->
   Bootstrap_storage.init ctxt >>=? fun ctxt ->
   Roll_storage.init_first_cycles ctxt >>=? fun ctxt ->
   Vote_storage.init ctxt >>=? fun ctxt ->

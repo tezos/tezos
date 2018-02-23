@@ -348,20 +348,23 @@ module Nonce : sig
   type nonce = t
   val encoding: nonce Data_encoding.t
 
+  type unrevealed = {
+    nonce_hash: Nonce_hash.t ;
+    delegate: public_key_hash ;
+    bond: Tez.t ;
+    rewards: Tez.t ;
+    fees: Tez.t ;
+  }
+
   val record_hash:
-    context -> public_key_hash -> Tez.t -> Nonce_hash.t ->
-    context tzresult Lwt.t
+    context -> unrevealed -> context tzresult Lwt.t
 
   val reveal:
     context -> Level.t -> nonce ->
-    (context * public_key_hash * Tez.t) tzresult Lwt.t
+    context tzresult Lwt.t
 
   type status =
-    | Unrevealed of {
-        nonce_hash: Nonce_hash.t ;
-        delegate_to_reward: public_key_hash ;
-        reward_amount: Tez.t ;
-      }
+    | Unrevealed of unrevealed
     | Revealed of nonce
 
   val get: context -> Level.t -> status tzresult Lwt.t
@@ -379,7 +382,8 @@ module Seed : sig
                    cycle : Cycle.t ;
                    latest : Cycle.t }
 
-  val cycle_end: context -> Cycle.t -> context tzresult Lwt.t
+  val cycle_end:
+    context -> Cycle.t -> (context * Nonce.unrevealed list) tzresult Lwt.t
 
 end
 
@@ -485,6 +489,32 @@ module Delegate : sig
     init:'a -> f:(public_key_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
   val list: context -> public_key_hash list Lwt.t
+
+  val freeze_bond:
+    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+
+  val freeze_rewards:
+    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+
+  val freeze_fees:
+    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+
+  val cycle_end:
+    context -> Cycle.t -> Nonce.unrevealed list -> context tzresult Lwt.t
+
+  val punish:
+    context -> public_key_hash -> Cycle.t ->
+    context tzresult Lwt.t
+
+  val has_frozen_balance:
+    context -> public_key_hash -> Cycle.t ->
+    bool tzresult Lwt.t
+
+  val frozen_balance:
+    context -> public_key_hash -> Tez.t tzresult Lwt.t
+
+  val full_balance:
+    context -> public_key_hash -> Tez.t tzresult Lwt.t
 
 end
 
@@ -708,21 +738,6 @@ module Roll : sig
 
   val delegate_pubkey:
     context -> public_key_hash -> public_key tzresult Lwt.t
-
-end
-
-module Reward : sig
-
-  val record:
-    context -> public_key_hash -> Cycle.t -> Tez.t -> context tzresult Lwt.t
-
-  val discard:
-    context -> public_key_hash -> Cycle.t -> Tez.t -> context tzresult Lwt.t
-
-  val set_reward_time_for_cycle:
-    context -> Cycle.t -> Time.t -> context tzresult Lwt.t
-
-  val pay_due_rewards: context -> context tzresult Lwt.t
 
 end
 

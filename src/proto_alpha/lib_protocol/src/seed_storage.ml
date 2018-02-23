@@ -47,19 +47,19 @@ let compute_for_cycle c ~revealed cycle =
   | None -> assert false (* should not happen *)
   | Some previous_cycle ->
       let levels = Level_storage.levels_with_commitments_in_cycle c revealed in
-      let combine (c, random_seed) level =
+      let combine (c, random_seed, unrevealed) level =
         Storage.Seed.Nonce.get c level >>=? function
         | Revealed nonce ->
             Storage.Seed.Nonce.delete c level >>=? fun c ->
-            return (c, Seed_repr.nonce random_seed nonce)
-        | Unrevealed _ ->
+            return (c, Seed_repr.nonce random_seed nonce, unrevealed)
+        | Unrevealed u ->
             Storage.Seed.Nonce.delete c level >>=? fun c ->
-            return (c, random_seed)
+            return (c, random_seed, u :: unrevealed)
       in
       Storage.Seed.For_cycle.get c previous_cycle >>=? fun seed ->
-      fold_left_s combine (c, seed) levels >>=? fun (c, seed) ->
+      fold_left_s combine (c, seed, []) levels >>=? fun (c, seed, unrevealed) ->
       Storage.Seed.For_cycle.init c cycle seed >>=? fun c ->
-      return c
+      return (c, unrevealed)
 
 let for_cycle ctxt cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
@@ -97,7 +97,7 @@ let cycle_end ctxt last_cycle =
         clear_cycle ctxt cleared_cycle
   end >>=? fun ctxt ->
   match Cycle_repr.pred last_cycle with
-  | None -> return ctxt
+  | None -> return (ctxt, [])
   | Some revealed ->
       let inited_seed_cycle = Cycle_repr.add last_cycle (preserved+1) in
       compute_for_cycle ctxt ~revealed inited_seed_cycle

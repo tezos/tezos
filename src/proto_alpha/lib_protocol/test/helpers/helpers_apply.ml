@@ -15,10 +15,11 @@ let operation
   return @@ Helpers_operation.apply_of_proto src op_sh proto_op >>=? fun operation ->
   Proto_alpha.Apply.apply_operation
     tc
-    (Option.map ~f:(fun x -> x.Helpers_account.contract) baker)
+    (Option.map ~f:(fun x -> x.Helpers_account.hpub) baker)
     pred_block_hash
     0
-    operation >>=? fun (tc, contracts, err) -> return ((contracts, err), tc)
+    operation >>=? fun (tc, contracts, err, _fees, _rewards) ->
+  return ((contracts, err), tc)
 
 
 let transaction ~tc ?(fee = 0) ?baker

@@ -131,6 +131,7 @@ let test_endorsement_rewards block0 =
   Assert.balance_equal ~block:(`Hash hash2) ~msg:__LOC__ account1
     (Int64.sub (Tez.to_mutez balance1) bond) >>=? fun () ->
 
+  (*
   (* Check rewards after one cycle for account0 *)
   Helpers.Baking.bake (`Hash hash2) b1 [] >>=? fun hash3 ->
   Helpers.display_level (`Hash hash3) >>=? fun () ->
@@ -188,6 +189,8 @@ let test_endorsement_rewards block0 =
        is no reward for him since the endorsement was in the fork branch *)
     else Assert.balance_equal ~block:(`Hash hash9a) ~msg:__LOC__ account4 (Tez.to_mutez balance4)
   end >>=? fun () ->
+
+*)
   return ()
 
 let test_endorsement_rights contract block =

@@ -77,6 +77,7 @@ let registered c delegate =
     c (Contract_repr.implicit_contract delegate)
 
 let init ctxt contract delegate =
+  Storage.Contract.Delegate.init ctxt contract delegate >>=? fun ctxt ->
   Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
   link ctxt contract delegate balance
 
@@ -113,7 +114,7 @@ let set c contract delegate =
         link c contract delegate balance >>=? fun c ->
         begin
           if self_delegation then
-            Storage.Delegate.add c delegate
+            Storage.Delegates.add c delegate
           else
             Lwt.return c
         end >>= fun c ->
@@ -123,5 +124,176 @@ let remove ctxt contract =
   Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
   unlink ctxt contract balance
 
-let fold = Storage.Delegate.fold
-let list = Storage.Delegate.elements
+let fold = Storage.Delegates.fold
+let list = Storage.Delegates.elements
+
+
+let get_frozen_bond ctxt contract cycle =
+  Storage.Contract.Frozen_bonds.get_option (ctxt, contract) cycle >>=? function
+  | None -> return Tez_repr.zero
+  | Some frozen -> return frozen
+
+let credit_frozen_bond ctxt contract cycle amount =
+  get_frozen_bond ctxt contract cycle >>=? fun old_amount ->
+  Lwt.return Tez_repr.(old_amount +? amount) >>=? fun new_amount ->
+  Storage.Contract.Frozen_bonds.init_set
+    (ctxt, contract) cycle new_amount >>= fun ctxt ->
+  return ctxt
+
+let freeze_bond ctxt delegate amount =
+  let { Level_repr.cycle ; _ } = Level_storage.current ctxt in
+  let contract = Contract_repr.implicit_contract delegate in
+  Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
+  Lwt.return Tez_repr.(balance -? amount) >>=? fun new_balance ->
+  Storage.Contract.Balance.set ctxt contract new_balance >>=? fun ctxt ->
+  credit_frozen_bond ctxt contract cycle amount
+
+let burn_bond ctxt delegate cycle amount =
+  let contract = Contract_repr.implicit_contract delegate in
+  get_frozen_bond ctxt contract cycle >>=? fun old_amount ->
+  Roll_storage.Delegate.remove_amount ctxt delegate amount >>=? fun ctxt ->
+  Lwt.return Tez_repr.(old_amount -? amount) >>=? fun new_amount ->
+  Storage.Contract.Frozen_bonds.set (ctxt, contract) cycle new_amount
+
+
+
+let get_frozen_fees ctxt contract cycle =
+  Storage.Contract.Frozen_fees.get_option (ctxt, contract) cycle >>=? function
+  | None -> return Tez_repr.zero
+  | Some frozen -> return frozen
+
+let credit_frozen_fees ctxt contract cycle amount =
+  get_frozen_fees ctxt contract cycle >>=? fun old_amount ->
+  Lwt.return Tez_repr.(old_amount +? amount) >>=? fun new_amount ->
+  Storage.Contract.Frozen_fees.init_set
+    (ctxt, contract) cycle new_amount >>= fun ctxt ->
+  return ctxt
+
+let freeze_fees ctxt delegate amount =
+  let { Level_repr.cycle ; _ } = Level_storage.current ctxt in
+  let contract = Contract_repr.implicit_contract delegate in
+  Roll_storage.Delegate.add_amount ctxt delegate amount >>=? fun ctxt ->
+  credit_frozen_fees ctxt contract cycle amount
+
+let burn_fees ctxt delegate cycle amount =
+  let contract = Contract_repr.implicit_contract delegate in
+  get_frozen_fees ctxt contract cycle >>=? fun old_amount ->
+  Roll_storage.Delegate.remove_amount ctxt delegate amount >>=? fun ctxt ->
+  Lwt.return Tez_repr.(old_amount -? amount) >>=? fun new_amount ->
+  Storage.Contract.Frozen_fees.set (ctxt, contract) cycle new_amount
+
+
+let get_frozen_rewards ctxt contract cycle =
+  Storage.Contract.Frozen_rewards.get_option (ctxt, contract) cycle >>=? function
+  | None -> return Tez_repr.zero
+  | Some frozen -> return frozen
+
+let credit_frozen_rewards ctxt contract cycle amount =
+  get_frozen_rewards ctxt contract cycle >>=? fun old_amount ->
+  Lwt.return Tez_repr.(old_amount +? amount) >>=? fun new_amount ->
+  Storage.Contract.Frozen_rewards.init_set
+    (ctxt, contract) cycle new_amount >>= fun ctxt ->
+  return ctxt
+
+let freeze_rewards ctxt delegate amount =
+  let { Level_repr.cycle ; _ } = Level_storage.current ctxt in
+  let contract = Contract_repr.implicit_contract delegate in
+  credit_frozen_rewards ctxt contract cycle amount
+
+let burn_rewards ctxt delegate cycle amount =
+  let contract = Contract_repr.implicit_contract delegate in
+  get_frozen_rewards ctxt contract cycle >>=? fun old_amount ->
+  Lwt.return Tez_repr.(old_amount -? amount) >>=? fun new_amount ->
+  Storage.Contract.Frozen_rewards.set (ctxt, contract) cycle new_amount
+
+
+
+let unfreeze ctxt delegate cycle =
+  let contract = Contract_repr.implicit_contract delegate in
+  get_frozen_bond ctxt contract cycle >>=? fun bond ->
+  get_frozen_fees ctxt contract cycle >>=? fun fees ->
+  get_frozen_rewards ctxt contract cycle >>=? fun rewards ->
+  Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
+  Lwt.return Tez_repr.(balance +? bond) >>=? fun balance ->
+  Lwt.return Tez_repr.(balance +? fees) >>=? fun balance ->
+  Lwt.return Tez_repr.(balance +? rewards) >>=? fun balance ->
+  Storage.Contract.Balance.set ctxt contract balance >>=? fun ctxt ->
+  Roll_storage.Delegate.add_amount ctxt delegate rewards >>=? fun ctxt ->
+  return ctxt
+
+let cycle_end ctxt last_cycle unrevealed =
+  let preserved = Constants_storage.preserved_cycles ctxt in
+  begin
+    match Cycle_repr.pred last_cycle with
+    | None -> return ctxt
+    | Some revealed_cycle ->
+        List.fold_left
+          (fun ctxt (u : Nonce_storage.unrevealed) ->
+             ctxt >>=? fun ctxt ->
+             burn_bond
+               ctxt u.delegate revealed_cycle u.bond >>=? fun ctxt ->
+             burn_fees
+               ctxt u.delegate revealed_cycle u.fees >>=? fun ctxt ->
+             burn_rewards
+               ctxt u.delegate revealed_cycle u.rewards >>=? fun ctxt ->
+             return ctxt)
+          (return ctxt) unrevealed
+  end >>=? fun ctxt ->
+  match Cycle_repr.sub last_cycle preserved with
+  | None -> return ctxt
+  | Some unfrozen_cycle ->
+      fold ctxt
+        ~init:(Ok ctxt)
+        ~f:(fun delegate ctxt ->
+            Lwt.return ctxt >>=? fun ctxt ->
+            unfreeze ctxt delegate unfrozen_cycle)
+
+
+let punish ctxt delegate cycle =
+  let contract = Contract_repr.implicit_contract delegate in
+  get_frozen_bond ctxt contract cycle >>=? fun bond ->
+  get_frozen_fees ctxt contract cycle >>=? fun fees ->
+  Roll_storage.Delegate.remove_amount ctxt delegate bond >>=? fun ctxt ->
+  Roll_storage.Delegate.remove_amount ctxt delegate fees >>=? fun ctxt ->
+  Storage.Contract.Frozen_bonds.remove (ctxt, contract) cycle >>= fun ctxt ->
+  Storage.Contract.Frozen_fees.remove (ctxt, contract) cycle >>= fun ctxt ->
+  Storage.Contract.Frozen_rewards.remove (ctxt, contract) cycle >>= fun ctxt ->
+  return ctxt
+
+
+let has_frozen_balance ctxt delegate cycle =
+  let contract = Contract_repr.implicit_contract delegate in
+  get_frozen_bond ctxt contract cycle >>=? fun bond ->
+  if Tez_repr.(bond <> zero) then return true
+  else
+    get_frozen_fees ctxt contract cycle >>=? fun fees ->
+    if Tez_repr.(fees <> zero) then return true
+    else
+      get_frozen_rewards ctxt contract cycle >>=? fun rewards ->
+      return Tez_repr.(rewards <> zero)
+
+let frozen_balance ctxt delegate =
+  let contract = Contract_repr.implicit_contract delegate in
+  let balance = Ok Tez_repr.zero in
+  Storage.Contract.Frozen_bonds.fold
+    (ctxt, contract) ~init:balance
+    ~f:(fun _cycle amount acc ->
+        Lwt.return acc >>=? fun acc ->
+        Lwt.return (Tez_repr.(acc +? amount))) >>= fun  balance ->
+  Storage.Contract.Frozen_fees.fold
+    (ctxt, contract) ~init:balance
+    ~f:(fun _cycle amount acc ->
+        Lwt.return acc >>=? fun acc ->
+        Lwt.return (Tez_repr.(acc +? amount))) >>= fun  balance ->
+  Storage.Contract.Frozen_rewards.fold
+    (ctxt, contract) ~init:balance
+    ~f:(fun _cycle amount acc ->
+        Lwt.return acc >>=? fun acc ->
+        Lwt.return (Tez_repr.(acc +? amount))) >>= fun  balance ->
+  Lwt.return balance
+
+let full_balance ctxt delegate =
+  let contract = Contract_repr.implicit_contract delegate in
+  frozen_balance ctxt delegate >>=? fun frozen_balance ->
+  Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
+  Lwt.return Tez_repr.(frozen_balance +? balance)

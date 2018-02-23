@@ -19,4 +19,5 @@ val for_cycle:
   Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 
 val cycle_end:
-  Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+  Raw_context.t -> Cycle_repr.t ->
+  (Raw_context.t * Nonce_storage.unrevealed list) tzresult Lwt.t

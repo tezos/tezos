@@ -64,8 +64,7 @@ module Roll : sig
      and type value = Tez_repr.t
      and type t := Raw_context.t
 
-  (** Frozen rolls per cycle *)
-
+  (** Last roll in the snapshoted roll allocation of a given cycle. *)
   module Last_for_cycle : Indexed_data_storage
     with type key = Cycle_repr.t
      and type value = Roll_repr.t
@@ -95,6 +94,22 @@ module Contract : sig
     with type key = Contract_repr.t
      and type value = Tez_repr.t
      and type t := Raw_context.t
+
+  (** Frozen balance, see 'delegate_storage.mli' for more explanation *)
+  module Frozen_bonds : Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t
+     and type t = Raw_context.t * Contract_repr.t
+
+  module Frozen_fees : Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t
+     and type t = Raw_context.t * Contract_repr.t
+
+  module Frozen_rewards : Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t
+     and type t = Raw_context.t * Contract_repr.t
 
   (** The manager of a contract *)
   module Manager : Indexed_data_storage
@@ -154,7 +169,8 @@ module Contract : sig
 
 end
 
-module Delegate : Data_set_storage
+(** Set of all registred delegates. *)
+module Delegates : Data_set_storage
   with type t := Raw_context.t
    and type elt = Ed25519.Public_key_hash.t
 
@@ -201,12 +217,16 @@ module Seed : sig
   (** Storage from this submodule must only be accessed through the
       module `Seed`. *)
 
+  type unrevealed_nonce = {
+    nonce_hash: Nonce_hash.t ;
+    delegate: Ed25519.Public_key_hash.t ;
+    bond: Tez_repr.t ;
+    rewards: Tez_repr.t ;
+    fees: Tez_repr.t ;
+  }
+
   type nonce_status =
-    | Unrevealed of {
-        nonce_hash: Nonce_hash.t ;
-        delegate_to_reward: Ed25519.Public_key_hash.t ;
-        reward_amount: Tez_repr.t ;
-      }
+    | Unrevealed of unrevealed_nonce
     | Revealed of Seed_repr.nonce
 
   module Nonce : Non_iterable_indexed_data_storage
@@ -219,25 +239,5 @@ module Seed : sig
     val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
     val delete : Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
   end
-
-end
-
-(** Rewards *)
-
-module Rewards : sig
-
-  module Next : Single_data_storage
-    with type value = Cycle_repr.t
-     and type t := Raw_context.t
-
-  module Date : Indexed_data_storage
-    with type key = Cycle_repr.t
-     and type value = Time.t
-     and type t := Raw_context.t
-
-  module Amount : Indexed_data_storage
-    with type key = Ed25519.Public_key_hash.t
-     and type value = Tez_repr.t
-     and type t = Raw_context.t * Cycle_repr.t
 
 end

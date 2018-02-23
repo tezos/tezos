@@ -14,10 +14,10 @@ open Misc
 type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
+type error += Cannot_freeze_baking_bond (* `Permanent *)
+type error += Cannot_freeze_endorsement_bond (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Empty_endorsement
-type error += Cannot_pay_baking_bond (* `Permanent *)
-type error += Cannot_pay_endorsement_bond (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
 
 
@@ -64,6 +64,26 @@ let () =
     (fun (m, g) -> Invalid_endorsement_slot (m, g)) ;
   register_error_kind
     `Permanent
+    ~id:"baking.cannot_freeze_baking_bond"
+    ~title:"Cannot freeze baking bond"
+    ~description:
+      "Impossible to debit the required tokens on the baker's contract"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot freeze the baking bond")
+    Data_encoding.unit
+    (function Cannot_freeze_baking_bond -> Some () | _ -> None)
+    (fun () -> Cannot_freeze_baking_bond) ;
+  register_error_kind
+    `Permanent
+    ~id:"baking.cannot_freeze_endorsement_bond"
+    ~title:"Cannot freeze endorsement bond"
+    ~description:
+      "Impossible to debit the required tokens on the endorser's contract"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot freeze the endorsement bond")
+    Data_encoding.unit
+    (function Cannot_freeze_endorsement_bond -> Some () | _ -> None)
+    (fun () -> Cannot_freeze_endorsement_bond) ;
+  register_error_kind
+    `Permanent
     ~id:"baking.inconsisten_endorsement"
     ~title:"Multiple delegates for a single endorsement"
     ~description:"The operation tries to endorse slots with distinct delegates"
@@ -75,26 +95,6 @@ let () =
                      (req "delegates" (list Ed25519.Public_key_hash.encoding)))
     (function Inconsistent_endorsement l -> Some l | _ -> None)
     (fun l -> Inconsistent_endorsement l) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.cannot_pay_baking_bond"
-    ~title:"Cannot pay baking bond"
-    ~description:
-      "Impossible to debit the required tokens on the baker's contract"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay the baking bond")
-    Data_encoding.unit
-    (function Cannot_pay_baking_bond -> Some () | _ -> None)
-    (fun () -> Cannot_pay_baking_bond) ;
-  register_error_kind
-    `Permanent
-    ~id:"baking.cannot_pay_endorsement_bond"
-    ~title:"Cannot pay endorsement bond"
-    ~description:
-      "Impossible to debit the required tokens on the endorser's contract"
-    ~pp:(fun ppf () -> Format.fprintf ppf "Cannot pay the endorsement bond")
-    Data_encoding.unit
-    (function Cannot_pay_endorsement_bond -> Some () | _ -> None)
-    (fun () -> Cannot_pay_endorsement_bond) ;
   register_error_kind
     `Permanent
     ~id:"baking.invalid_block_signature"
@@ -110,6 +110,7 @@ let () =
                      (req "expected" Ed25519.Public_key_hash.encoding))
     (function Invalid_block_signature (block, pkh) -> Some (block, pkh) | _ -> None)
     (fun (block, pkh) -> Invalid_block_signature (block, pkh))
+
 
 let minimal_time c priority pred_timestamp =
   let priority = Int32.of_int priority in
@@ -129,6 +130,20 @@ let minimal_time c priority pred_timestamp =
     (cumsum_slot_durations
        pred_timestamp (Constants.slot_durations c) (Int32.succ priority))
 
+let freeze_baking_bond ctxt { Block_header.priority ; _ } delegate =
+  if Compare.Int.(priority >= Constants.first_free_baking_slot ctxt)
+  then return (ctxt, Tez.zero)
+  else
+    let bond = Constants.baking_bond_cost in
+    Delegate.freeze_bond ctxt delegate bond
+    |> trace Cannot_freeze_baking_bond >>=? fun ctxt ->
+    return (ctxt, bond)
+
+let freeze_endorsement_bond ctxt delegate =
+  let bond = Constants.endorsement_bond_cost in
+  Delegate.freeze_bond ctxt delegate bond
+  |> trace Cannot_freeze_endorsement_bond
+
 let check_timestamp c priority pred_timestamp =
   minimal_time c priority pred_timestamp >>=? fun minimal_time ->
   let timestamp = Alpha_context.Timestamp.current c in
@@ -141,19 +156,6 @@ let check_baking_rights c { Block_header.priority ; _ }
   Roll.baking_rights_owner c level ~priority >>=? fun delegate ->
   check_timestamp c priority pred_timestamp >>=? fun () ->
   return delegate
-
-let pay_baking_bond c { Block_header.priority ; _ } id =
-  if Compare.Int.(priority >= Constants.first_free_baking_slot c)
-  then return c
-  else
-    Contract.spend c (Contract.implicit_contract id) Constants.baking_bond_cost
-    |> trace Cannot_pay_baking_bond
-
-let pay_endorsement_bond c id =
-  let bond = Constants.endorsement_bond_cost in
-  Contract.spend c (Contract.implicit_contract id) bond
-  |> trace Cannot_pay_endorsement_bond >>=? fun c ->
-  return (c, bond)
 
 let check_endorsements_rights c level slots =
   map_p (fun slot ->
@@ -170,16 +172,6 @@ let check_endorsements_rights c level slots =
 
 let paying_priorities c =
   0 --> (Constants.first_free_baking_slot c - 1)
-
-let bond_and_reward =
-  match Tez.(Constants.baking_bond_cost +? Constants.baking_reward) with
-  | Ok v -> v
-  | Error _ -> assert false
-
-let base_baking_reward c ~priority =
-  if Compare.Int.(priority < Constants.first_free_baking_slot c)
-  then bond_and_reward
-  else Constants.baking_reward
 
 type error += Incorect_priority
 
