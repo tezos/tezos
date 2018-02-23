@@ -471,6 +471,12 @@ module Delegate : sig
   val set:
     context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
 
+  val fold:
+    context ->
+    init:'a -> f:(public_key_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+
+  val list: context -> public_key_hash list Lwt.t
+
 end
 
 module Vote : sig

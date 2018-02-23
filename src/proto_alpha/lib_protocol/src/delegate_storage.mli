@@ -26,3 +26,10 @@ val set:
   Raw_context.t tzresult Lwt.t
 
 val remove: Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
+
+val fold:
+  Raw_context.t ->
+  init:'a ->
+  f:(Ed25519.Public_key_hash.t -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+
+val list: Raw_context.t -> Ed25519.Public_key_hash.t list Lwt.t

@@ -154,6 +154,10 @@ module Contract : sig
 
 end
 
+module Delegate : Data_set_storage
+  with type t := Raw_context.t
+   and type elt = Ed25519.Public_key_hash.t
+
 (** Votes *)
 
 module Vote : sig

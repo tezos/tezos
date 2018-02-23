@@ -111,8 +111,17 @@ let set c contract delegate =
         unlink c contract balance >>=? fun c ->
         Storage.Contract.Delegate.init_set c contract delegate >>= fun c ->
         link c contract delegate balance >>=? fun c ->
+        begin
+          if self_delegation then
+            Storage.Delegate.add c delegate
+          else
+            Lwt.return c
+        end >>= fun c ->
         return c
 
 let remove ctxt contract =
   Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
   unlink ctxt contract balance
+
+let fold = Storage.Delegate.fold
+let list = Storage.Delegate.elements

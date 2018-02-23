@@ -129,6 +129,11 @@ module Contract = struct
 
 end
 
+module Delegate =
+  Make_data_set_storage
+    (Make_subcontext(Raw_context)(struct let name = ["delegates"] end))
+    (Ed25519.Public_key_hash)
+
 (** Rolls *)
 
 module Cycle = struct
