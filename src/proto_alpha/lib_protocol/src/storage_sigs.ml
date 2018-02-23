@@ -178,6 +178,9 @@ module type Data_set_storage = sig
   (** Removes a elt of the set ; does nothing if not a member *)
   val del: context -> elt -> Raw_context.t Lwt.t
 
+  (** Adds/Removes a elt of the set *)
+  val set: context -> elt -> bool -> Raw_context.t Lwt.t
+
   (** Returns the elements of the set, deserialized in a list in no
       particular order. *)
   val elements: context -> elt list Lwt.t

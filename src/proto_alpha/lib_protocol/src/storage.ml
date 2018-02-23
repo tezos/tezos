@@ -14,11 +14,6 @@ module Int32 = struct
   let encoding = Data_encoding.int32
 end
 
-module Bool = struct
-  type t = bool
-  let encoding = Data_encoding.bool
-end
-
 module String_index = struct
   type t = string
   let path_length = 1
@@ -60,9 +55,8 @@ module Contract = struct
       (Make_value(Manager_repr))
 
   module Spendable =
-    Indexed_context.Make_map
+    Indexed_context.Make_set
       (struct let name = ["spendable"] end)
-      (Make_value(Bool))
 
   module Delegatable =
     Indexed_context.Make_set

@@ -139,6 +139,9 @@ module Make_data_set_storage (C : Raw_context.T) (I : INDEX)
   let del s i =
     C.remove s (I.to_path i []) >>= fun t ->
     Lwt.return (C.project t)
+  let set s i = function
+    | true -> add s i
+    | false -> del s i
   let clear s =
     C.remove_rec s [] >>= fun t ->
     Lwt.return (C.project t)
@@ -398,6 +401,9 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX)
     let del s i =
       Raw_context.remove (s, i) N.name >>= fun (s, _) ->
       Lwt.return (C.project s)
+    let set s i = function
+      | true -> add s i
+      | false -> del s i
     let clear s =
       fold_keys s
         ~init:s

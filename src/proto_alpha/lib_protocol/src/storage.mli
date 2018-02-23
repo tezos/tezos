@@ -112,9 +112,8 @@ module Contract : sig
     with type elt = Contract_hash.t
      and type t = Raw_context.t * Contract_repr.t
 
-  module Spendable : Indexed_data_storage
-    with type key = Contract_repr.t
-     and type value = bool
+  module Spendable : Data_set_storage
+    with type elt = Contract_repr.t
      and type t := Raw_context.t
 
   module Delegatable : Data_set_storage

@@ -192,13 +192,8 @@ let create_base c contract
         Storage.Contract.Delegate.init c contract delegate >>=? fun c ->
         link_delegate c contract delegate balance
   end >>=? fun c ->
-  Storage.Contract.Spendable.init c contract spendable >>=? fun c ->
-  begin
-    if delegatable then
-      Storage.Contract.Delegatable.add c contract
-    else
-      Lwt.return c
-  end >>= fun c ->
+  Storage.Contract.Spendable.set c contract spendable >>= fun c ->
+  Storage.Contract.Delegatable.set c contract delegatable >>= fun c ->
   Storage.Contract.Counter.init c contract counter >>=? fun c ->
   (match script with
    | Some ({ Script_repr.code ; storage }, (code_fees, storage_fees)) ->
@@ -225,7 +220,7 @@ let delete c contract =
   Storage.Contract.Balance.delete c contract >>=? fun c ->
   Storage.Contract.Manager.delete c contract >>=? fun c ->
   Storage.Contract.Delegate.remove c contract >>= fun c ->
-  Storage.Contract.Spendable.delete c contract >>=? fun c ->
+  Storage.Contract.Spendable.del c contract >>= fun c ->
   Storage.Contract.Delegatable.del c contract >>= fun c ->
   Storage.Contract.Counter.delete c contract >>=? fun c ->
   Storage.Contract.Code.remove c contract >>= fun c ->
@@ -332,13 +327,10 @@ let is_delegatable c contract =
       Storage.Contract.Delegatable.mem c contract >>= return
 
 let is_spendable c contract =
-  Storage.Contract.Spendable.get_option c contract >>=? function
-  | None -> begin
-      match Contract_repr.is_implicit contract with
-      | Some _ -> return true
-      | None -> failwith "is_spendable"
-    end
-  | Some v -> return v
+  match Contract_repr.is_implicit contract with
+  | Some _ -> return true
+  | None ->
+      Storage.Contract.Spendable.mem c contract >>= return
 
 let set_delegate c contract delegate =
   match delegate with
@@ -442,7 +434,7 @@ let credit c contract amount =
       Roll_storage.Contract.add_amount c contract amount
 
 let spend c contract amount =
-  Storage.Contract.Spendable.get c contract >>=? fun spendable ->
+  is_spendable c contract >>=? fun spendable ->
   if not spendable
   then fail (Unspendable_contract contract)
   else spend_from_script c contract amount
