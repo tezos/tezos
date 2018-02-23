@@ -16,6 +16,8 @@ val pp: Format.formatter -> cycle -> unit
 
 val root: cycle
 val pred: cycle -> cycle option
+val add: cycle -> int -> cycle
+val sub: cycle -> int -> cycle option
 val succ: cycle -> cycle
 
 val to_int32: cycle -> int32

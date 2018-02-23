@@ -8,18 +8,15 @@
 (**************************************************************************)
 
 (* This is the genesis protocol: initialise the state *)
-let initialize store =
-  Roll_storage.init store >>=? fun store ->
-  Seed_storage.init store >>=? fun store ->
-  Contract_storage.init store >>=? fun store ->
-  Reward_storage.init store >>=? fun store ->
-  Bootstrap_storage.init store >>=? fun store ->
-  Roll_storage.freeze_rolls_for_cycle
-    store Cycle_repr.root >>=? fun store ->
-  Roll_storage.freeze_rolls_for_cycle
-    store Cycle_repr.(succ root) >>=? fun store ->
-  Vote_storage.init store >>=? fun store ->
-  return store
+let initialize ctxt =
+  Roll_storage.init ctxt >>=? fun ctxt ->
+  Seed_storage.init ctxt >>=? fun ctxt ->
+  Contract_storage.init ctxt >>=? fun ctxt ->
+  Reward_storage.init ctxt >>=? fun ctxt ->
+  Bootstrap_storage.init ctxt >>=? fun ctxt ->
+  Roll_storage.init_first_cycles ctxt >>=? fun ctxt ->
+  Vote_storage.init ctxt >>=? fun ctxt ->
+  return ctxt
 
 let may_initialize ctxt ~level ~timestamp ~fitness =
   Raw_context.prepare

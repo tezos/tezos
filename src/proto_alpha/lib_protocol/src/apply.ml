@@ -327,19 +327,8 @@ let may_start_new_cycle ctxt =
   Baking.dawn_of_a_new_cycle ctxt >>=? function
   | None -> return ctxt
   | Some last_cycle ->
-      let new_cycle = Cycle.succ last_cycle in
-      let succ_new_cycle = Cycle.succ new_cycle in
-      begin
-        (* Temporary, the seed needs to be preserve until
-           no denunciation are allowed *)
-        match Cycle.pred last_cycle with
-        | None -> return ctxt
-        | Some pred_last_cycle ->
-            Seed.clear_cycle ctxt pred_last_cycle >>=? fun ctxt ->
-            Roll.clear_cycle ctxt pred_last_cycle
-      end >>=? fun ctxt ->
-      Seed.compute_for_cycle ctxt succ_new_cycle >>=? fun ctxt ->
-      Roll.freeze_rolls_for_cycle ctxt succ_new_cycle >>=? fun ctxt ->
+      Seed.cycle_end ctxt last_cycle >>=? fun ctxt ->
+      Roll.cycle_end ctxt last_cycle >>=? fun ctxt ->
       let timestamp = Timestamp.current ctxt in
       Lwt.return (Timestamp.(timestamp +? (Constants.time_before_reward ctxt)))
       >>=? fun reward_date ->

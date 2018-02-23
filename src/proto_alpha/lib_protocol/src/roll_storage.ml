@@ -7,6 +7,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+open Misc
+
 type error +=
   | Consume_roll_change
   | No_roll_for_delegate
@@ -240,5 +242,26 @@ end
 
 let value = Raw_context.roll_value
 
-let init c =
-  Storage.Roll.Next.init c Roll_repr.first
+let init ctxt =
+  Storage.Roll.Next.init ctxt Roll_repr.first
+
+let init_first_cycles ctxt =
+  let preserved = Constants_storage.preserved_cycles ctxt in
+  List.fold_left
+    (fun ctxt c ->
+       ctxt >>=? fun ctxt ->
+       let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
+       freeze_rolls_for_cycle ctxt cycle)
+    (return ctxt) (0 --> (preserved + 1)) >>=? fun ctxt ->
+  return ctxt
+
+let cycle_end ctxt last_cycle =
+  let preserved = Constants_storage.preserved_cycles ctxt in
+  begin
+    match Cycle_repr.sub last_cycle preserved with
+    | None -> return ctxt
+    | Some cleared_cycle ->
+        clear_cycle ctxt cleared_cycle
+  end >>=? fun ctxt ->
+  let frozen_roll_cycle = Cycle_repr.add last_cycle (preserved+2) in
+  freeze_rolls_for_cycle ctxt frozen_roll_cycle

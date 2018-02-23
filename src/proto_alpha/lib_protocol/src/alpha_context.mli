@@ -99,6 +99,8 @@ module Cycle : sig
   val root: cycle
   val succ: cycle -> cycle
   val pred: cycle -> cycle option
+  val add: cycle -> int -> cycle
+  val sub: cycle -> int -> cycle option
   val to_int32: cycle -> int32
 
 end
@@ -370,8 +372,12 @@ end
 
 module Seed : sig
 
-  val compute_for_cycle: context -> Cycle.t -> context tzresult Lwt.t
-  val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t
+  type error +=
+    | Unknown of { oldest : Cycle.t ;
+                   cycle : Cycle.t ;
+                   latest : Cycle.t }
+
+  val cycle_end: context -> Cycle.t -> context tzresult Lwt.t
 
 end
 
@@ -690,8 +696,7 @@ module Roll : sig
 
   val value: context -> Tez.t
 
-  val freeze_rolls_for_cycle: context -> Cycle.t -> context tzresult Lwt.t
-  val clear_cycle: context -> Cycle.t -> context tzresult Lwt.t
+  val cycle_end: context -> Cycle.t -> context tzresult Lwt.t
 
   val baking_rights_owner:
     context -> Level.t -> priority:int -> public_key tzresult Lwt.t
