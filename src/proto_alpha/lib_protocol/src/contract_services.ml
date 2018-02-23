@@ -148,7 +148,7 @@ let () =
          | Some v -> return v) in
   register_field S.balance Contract.get_balance ;
   register_field S.manager Contract.get_manager ;
-  register_opt_field S.delegate Contract.get_delegate_opt ;
+  register_opt_field S.delegate Delegate.get ;
   register_field S.counter Contract.get_counter ;
   register_field S.spendable Contract.is_spendable ;
   register_field S.delegatable Contract.is_delegatable ;
@@ -157,7 +157,7 @@ let () =
   register_field S.info (fun ctxt contract ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Contract.get_manager ctxt contract >>=? fun manager ->
-      Contract.get_delegate_opt ctxt contract >>=? fun delegate ->
+      Delegate.get ctxt contract >>=? fun delegate ->
       Contract.get_counter ctxt contract >>=? fun counter ->
       Contract.is_delegatable ctxt contract >>=? fun delegatable ->
       Contract.is_spendable ctxt contract >>=? fun spendable ->

@@ -215,7 +215,7 @@ let inconsistent_pkh ~msg =
 
 let non_delegatable ~msg =
   contain_error ~msg ~f: begin ecoproto_error (function
-      | Proto_alpha.Contract_storage.Non_delegatable_contract _ -> true
+      | Proto_alpha.Delegate_storage.Non_delegatable_contract _ -> true
       | _ -> false)
   end
 

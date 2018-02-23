@@ -13,7 +13,6 @@ type error +=
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
-  | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
   | Inconsistent_hash of Ed25519.Public_key.t * Ed25519.Public_key_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
   | Inconsistent_public_key of Ed25519.Public_key.t * Ed25519.Public_key.t (* `Permanent *)
   | Missing_public_key of Ed25519.Public_key_hash.t (* `Permanent *)
@@ -91,18 +90,6 @@ let () =
     (fun c -> Non_existing_contract c) ;
   register_error_kind
     `Permanent
-    ~id:"contract.undelagatable_contract"
-    ~title:"Non delegatable contract"
-    ~description:"Tried to delegate a implicit contract \
-                  or a non delegatable originated contract"
-    ~pp:(fun ppf contract ->
-        Format.fprintf ppf "Contract %a is not delegatable"
-          Contract_repr.pp contract)
-    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
-    (function Non_delegatable_contract c -> Some c | _ -> None)
-    (fun c -> Non_delegatable_contract c) ;
-  register_error_kind
-    `Permanent
     ~id:"contract.manager.inconsistent_hash"
     ~title:"Inconsistent public key hash"
     ~description:"A revealed manager public key is inconsistent with the announced hash"
@@ -154,30 +141,6 @@ let () =
 
 let failwith msg = fail (Failure msg)
 
-let get_delegate_opt = Roll_storage.get_contract_delegate
-
-let link_delegate c contract delegate balance =
-  Roll_storage.Delegate.add_amount c delegate balance >>=? fun c ->
-  match Contract_repr.is_originated contract with
-  | None -> return c
-  | Some h ->
-      Storage.Contract.Delegated.add
-        (c, Contract_repr.implicit_contract delegate) h >>= fun c ->
-      return c
-
-let unlink_delegate c contract =
-  Storage.Contract.Balance.get c contract >>=? fun balance ->
-  Storage.Contract.Delegate.get_option c contract >>=? function
-  | None -> return c
-  | Some delegate ->
-      Roll_storage.Delegate.remove_amount c delegate balance >>=? fun c ->
-      match Contract_repr.is_originated contract with
-      | None -> return c
-      | Some h ->
-          Storage.Contract.Delegated.del
-            (c, Contract_repr.implicit_contract delegate) h >>= fun c ->
-          return c
-
 let create_base c contract
     ~balance ~manager ~delegate ?script ~spendable ~delegatable =
   (match Contract_repr.is_implicit contract with
@@ -190,7 +153,7 @@ let create_base c contract
     | None -> return c
     | Some delegate ->
         Storage.Contract.Delegate.init c contract delegate >>=? fun c ->
-        link_delegate c contract delegate balance
+        Delegate_storage.init c contract delegate
   end >>=? fun c ->
   Storage.Contract.Spendable.set c contract spendable >>= fun c ->
   Storage.Contract.Delegatable.set c contract delegatable >>= fun c ->
@@ -216,7 +179,7 @@ let create_implicit c manager ~balance =
     ~spendable:true ~delegatable:false
 
 let delete c contract =
-  unlink_delegate c contract >>=? fun c ->
+  Delegate_storage.remove c contract >>=? fun c ->
   Storage.Contract.Balance.delete c contract >>=? fun c ->
   Storage.Contract.Manager.delete c contract >>=? fun c ->
   Storage.Contract.Delegate.remove c contract >>= fun c ->
@@ -319,51 +282,12 @@ let get_balance c contract =
     end
   | Some v -> return v
 
-let is_delegatable c contract =
-  match Contract_repr.is_implicit contract with
-  | Some _ ->
-      return false
-  | None ->
-      Storage.Contract.Delegatable.mem c contract >>= return
-
+let is_delegatable = Delegate_storage.is_delegatable
 let is_spendable c contract =
   match Contract_repr.is_implicit contract with
   | Some _ -> return true
   | None ->
       Storage.Contract.Spendable.mem c contract >>= return
-
-let set_delegate c contract delegate =
-  match delegate with
-  | None ->
-      unlink_delegate c contract >>=? fun c ->
-      Storage.Contract.Delegate.remove c contract >>= fun c ->
-      return c
-  | Some delegate ->
-      begin
-        Storage.Contract.Manager.get_option
-          c (Contract_repr.implicit_contract delegate) >>=? function
-        | None | Some (Manager_repr.Hash _) -> return false
-        | Some (Manager_repr.Public_key _) -> return true
-      end >>=? fun known_delegate ->
-      Storage.Contract.Delegate.mem
-        c (Contract_repr.implicit_contract delegate)
-      >>= fun registred_delegate ->
-      is_delegatable c contract >>=? fun delegatable ->
-      let self_delegation =
-        match Contract_repr.is_implicit contract with
-        | Some pkh -> Ed25519.Public_key_hash.equal pkh delegate
-        | None -> false in
-      if not known_delegate || not (registred_delegate || self_delegation) then
-        fail (Roll_storage.Unregistred_delegate delegate)
-      else if not (delegatable || self_delegation) then
-        fail (Non_delegatable_contract contract)
-      else
-        unlink_delegate c contract >>=? fun c ->
-        Storage.Contract.Delegate.init_set c contract delegate >>= fun c ->
-        Storage.Contract.Balance.get c contract >>=? fun balance ->
-        link_delegate c contract delegate balance >>=? fun c ->
-        return c
-
 
 let code_and_storage_fee c contract =
   Storage.Contract.Code_fees.get_option c contract >>=? fun code_fees ->

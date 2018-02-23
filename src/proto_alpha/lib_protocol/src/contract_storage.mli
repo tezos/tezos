@@ -13,7 +13,6 @@ type error +=
   | Counter_in_the_future of Contract_repr.contract * int32 * int32 (* `Temporary *)
   | Unspendable_contract of Contract_repr.contract (* `Permanent *)
   | Non_existing_contract of Contract_repr.contract (* `Temporary *)
-  | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
   | Inconsistent_hash of Ed25519.Public_key.t * Ed25519.Public_key_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
   | Inconsistent_public_key of Ed25519.Public_key.t * Ed25519.Public_key.t (* `Permanent *)
   | Missing_public_key of Ed25519.Public_key_hash.t (* `Permanent *)
@@ -44,10 +43,6 @@ val update_manager_key:
   Raw_context.t -> Contract_repr.t -> Ed25519.Public_key.t option ->
   (Raw_context.t * Ed25519.Public_key.t) tzresult Lwt.t
 
-val get_delegate_opt:
-  Raw_context.t -> Contract_repr.t ->
-  Ed25519.Public_key_hash.t option tzresult Lwt.t
-
 val get_balance: Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 val get_counter: Raw_context.t -> Contract_repr.t -> int32 tzresult Lwt.t
 
@@ -61,11 +56,6 @@ type big_map_diff = (string * Script_repr.expr option) list
 val update_script_storage:
   Raw_context.t -> Contract_repr.t ->
   Script_repr.expr -> big_map_diff option ->
-  Raw_context.t tzresult Lwt.t
-
-(** fails if the contract is not delegatable *)
-val set_delegate:
-  Raw_context.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option ->
   Raw_context.t tzresult Lwt.t
 
 val credit:

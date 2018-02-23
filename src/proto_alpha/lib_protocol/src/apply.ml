@@ -218,7 +218,7 @@ let apply_manager_operation_content
       end >>=? fun ctxt ->
       return (ctxt, origination_nonce, None)
   | Delegation delegate ->
-      Contract.set_delegate ctxt source delegate >>=? fun ctxt ->
+      Delegate.set ctxt source delegate >>=? fun ctxt ->
       return (ctxt, origination_nonce, None)
 
 let apply_sourced_operation
@@ -294,7 +294,7 @@ let apply_anonymous_operation ctxt baker_contract origination_nonce kind =
       begin
         match baker_contract with
         | None -> return None
-        | Some contract -> Contract.get_delegate_opt ctxt contract
+        | Some contract -> Delegate.get ctxt contract
       end >>=? fun delegate ->
       if Compare.Int.(faucet_count ctxt < 5) then
         let ctxt = incr_faucet_count ctxt in

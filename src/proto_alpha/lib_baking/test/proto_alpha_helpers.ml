@@ -394,7 +394,7 @@ module Assert = struct
 
   let non_delegatable ~msg =
     contain_error ~msg ~f:begin ecoproto_error (function
-        | Contract_storage.Non_delegatable_contract _ -> true
+        | Delegate_storage.Non_delegatable_contract _ -> true
         | _ -> false)
     end
 

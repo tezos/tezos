@@ -18,7 +18,7 @@ let init_account ctxt account =
     Constants_repr.bootstrap_wealth >>=? fun ctxt ->
   Contract_storage.update_manager_key ctxt contract
     (Some account.public_key) >>=? fun (ctxt, _) ->
-  Contract_storage.set_delegate ctxt contract
+  Delegate_storage.set ctxt contract
     (Some account.public_key_hash) >>=? fun ctxt ->
   return ctxt
 

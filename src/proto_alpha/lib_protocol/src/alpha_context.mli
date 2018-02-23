@@ -404,9 +404,6 @@ module Contract : sig
   val update_manager_key:
     context -> contract -> public_key option -> (context * public_key) tzresult Lwt.t
 
-  val get_delegate_opt:
-    context -> contract -> public_key_hash option tzresult Lwt.t
-
   val is_delegatable:
     context -> contract -> bool tzresult Lwt.t
   val is_spendable:
@@ -419,9 +416,6 @@ module Contract : sig
   val get_counter: context -> contract -> int32 tzresult Lwt.t
   val get_balance:
     context -> contract -> Tez.t tzresult Lwt.t
-
-  val set_delegate:
-    context -> contract -> public_key_hash option -> context tzresult Lwt.t
 
   val originate:
     context ->
@@ -467,6 +461,15 @@ module Contract : sig
     val get_opt:
       context -> contract -> string -> Script_repr.expr option tzresult Lwt.t
   end
+
+end
+
+module Delegate : sig
+
+  val get: context -> Contract.t -> public_key_hash option tzresult Lwt.t
+
+  val set:
+    context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
 
 end
 

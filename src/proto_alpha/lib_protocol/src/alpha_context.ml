@@ -112,6 +112,7 @@ module Contract = struct
   end
 
 end
+module Delegate = Delegate_storage
 module Roll = struct
   include Roll_repr
   include Roll_storage

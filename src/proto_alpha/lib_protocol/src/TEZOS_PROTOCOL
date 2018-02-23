@@ -38,6 +38,7 @@
         "Nonce_storage",
         "Seed_storage",
         "Roll_storage",
+        "Delegate_storage",
         "Contract_storage",
         "Reward_storage",
         "Bootstrap_storage",
