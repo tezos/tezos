@@ -12,7 +12,7 @@ open Chain_validator_worker_state
 module Name = struct
   type t = Chain_id.t
   let encoding = Chain_id.encoding
-  let base = [ "chain_validator" ]
+  let base = [ "validator.chain" ]
   let pp = Chain_id.pp_short
 end
 

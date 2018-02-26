@@ -71,18 +71,18 @@ module Event = struct
     | Debug msg -> Format.fprintf ppf "%s" msg
     | Validation_success (req, { pushed ; treated ; completed }) ->
         Format.fprintf ppf
-          "@[<v 2>Block %a succesfully validated@,\
+          "@[<v 0>Block %a succesfully validated@,\
            Pushed: %a, Treated: %a, Completed: %a@]"
           Block_hash.pp req.block
           Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
     | Validation_failure (req, { pushed ; treated ; completed }, errs)->
         Format.fprintf ppf
-          "@[<v 2>Validation of block %a failed@,\
-           Pushed: %a, Treated: %a, Completed: %a@,\
-           Error: %a@]"
+          "@[<v 0>Validation of block %a failed@,\
+           Pushed: %a, Treated: %a, Failed: %a@,\
+           %a@]"
           Block_hash.pp req.block
           Time.pp_hum pushed Time.pp_hum treated Time.pp_hum completed
-          Error_monad.pp_print_error errs
+          (Format.pp_print_list Error_monad.pp) errs
 end
 
 module Worker_state = struct

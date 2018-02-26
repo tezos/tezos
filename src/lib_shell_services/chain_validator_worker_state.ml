@@ -62,7 +62,7 @@ module Event = struct
 
   let pp ppf = function
     | Processed_block req ->
-        Format.fprintf ppf "@[<v 2>" ;
+        Format.fprintf ppf "@[<v 0>" ;
         begin match req.update with
           | Ignored_head ->
               Format.fprintf ppf
@@ -82,8 +82,8 @@ module Event = struct
           Time.pp_hum req.request_status.treated
           Time.pp_hum req.request_status.completed
     | Could_not_switch_testchain err ->
-        Format.fprintf ppf "@[<v 2>Error while switching test chain:@ %a@]"
-          Error_monad.pp_print_error err
+        Format.fprintf ppf "@[<v 0>Error while switching test chain:@ %a@]"
+          (Format.pp_print_list Error_monad.pp) err
 
 end
 

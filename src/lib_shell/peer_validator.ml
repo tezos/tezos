@@ -15,7 +15,7 @@ module Name = struct
   type t = Chain_id.t * P2p_peer.Id.t
   let encoding =
     Data_encoding.tup2 Chain_id.encoding P2p_peer.Id.encoding
-  let base = [ "peer_validator" ]
+  let base = [ "validator.peer" ]
   let pp ppf (chain, peer) =
     Format.fprintf ppf "%a:%a"
       Chain_id.pp_short chain P2p_peer.Id.pp_short peer
