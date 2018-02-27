@@ -327,12 +327,12 @@ let spend_from_script c contract amount =
   | Error _ ->
       fail (Balance_too_low (contract, balance, amount))
   | Ok new_balance ->
+      Storage.Contract.Balance.set c contract new_balance >>=? fun c ->
+      Roll_storage.Contract.remove_amount c contract amount >>=? fun c ->
       if Tez_repr.(new_balance > Tez_repr.zero) then
-        Storage.Contract.Balance.set c contract new_balance >>=? fun c ->
-        Roll_storage.Contract.remove_amount c contract amount
-      else
-        match Contract_repr.is_implicit contract with
-        | None -> return c (* don't delete originated contract. *)
+        return c
+      else match Contract_repr.is_implicit contract with
+        | None -> return c (* Never delete originated contracts *)
         | Some pkh ->
             Storage.Contract.Delegate.get_option c contract >>=? function
             | Some pkh' ->
