@@ -112,31 +112,31 @@ module Simple = struct
   let rec connect ~timeout pool point =
     lwt_log_info "Connect to %a" P2p_point.Id.pp point >>= fun () ->
     P2p_pool.connect pool point ~timeout >>= function
-    | Error [P2p_pool.Connected] -> begin
+    | Error [P2p_errors.Connected] -> begin
         match P2p_pool.Connection.find_by_point pool point with
         | Some conn -> return conn
         | None -> failwith "Woops..."
       end
-    | Error ([ P2p_pool.Connection_refused
-             | P2p_pool.Pending_connection
-             | P2p_socket.Rejected
+    | Error ([ P2p_errors.Connection_refused
+             | P2p_errors.Pending_connection
+             | P2p_errors.Rejected_socket_connection
              | Canceled
              | Timeout
-             | P2p_pool.Rejected _ as err ]) ->
+             | P2p_errors.Rejected _ as err ]) ->
         lwt_log_info "Connection to %a failed (%a)"
           P2p_point.Id.pp point
           (fun ppf err -> match err with
-             | P2p_pool.Connection_refused ->
+             | P2p_errors.Connection_refused ->
                  Format.fprintf ppf "connection refused"
-             | P2p_pool.Pending_connection ->
+             | P2p_errors.Pending_connection ->
                  Format.fprintf ppf "pending connection"
-             | P2p_socket.Rejected ->
+             | P2p_errors.Rejected_socket_connection ->
                  Format.fprintf ppf "rejected"
              | Canceled ->
                  Format.fprintf ppf "canceled"
              | Timeout ->
                  Format.fprintf ppf "timeout"
-             | P2p_pool.Rejected peer ->
+             | P2p_errors.Rejected peer ->
                  Format.fprintf ppf "rejected (%a)" P2p_peer.Id.pp peer
              | _ -> assert false) err >>= fun () ->
         Lwt_unix.sleep (0.5 +. Random.float 2.) >>= fun () ->
@@ -219,7 +219,7 @@ end
 module Garbled = struct
 
   let is_connection_closed = function
-    | Error ((Write | Read) :: P2p_io_scheduler.Connection_closed :: _) -> true
+    | Error ((Write | Read) :: P2p_errors.Connection_closed :: _) -> true
     | Ok _ -> false
     | Error err ->
         log_info "Unexpected error: %a" pp_print_error err ;

@@ -115,10 +115,10 @@ module Answerer = struct
     | Ok (size, Message msg) ->
         st.callback.message size msg >>= fun () ->
         worker_loop st
-    | Ok (_, Disconnect) | Error [P2p_io_scheduler.Connection_closed] ->
+    | Ok (_, Disconnect) | Error [P2p_errors.Connection_closed] ->
         Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
-    | Error [P2p_socket.Decoding_error] ->
+    | Error [P2p_errors.Decoding_error] ->
         (* TODO: Penalize peer... *)
         Lwt_canceler.cancel st.canceler >>= fun () ->
         Lwt.return_unit
@@ -281,7 +281,7 @@ let register_point pool ?trusted _source_peer_id (addr, port as point) =
   | point_info -> point_info
 
 let may_register_my_id_point pool = function
-  | [P2p_socket.Myself (addr, Some port)] ->
+  | [P2p_errors.Myself (addr, Some port)] ->
       P2p_point.Table.add pool.my_id_points (addr, port) () ;
       P2p_point.Table.remove pool.known_points (addr, port)
   | _ -> ()
@@ -341,12 +341,12 @@ let read { messages ; conn } =
       lwt_debug "%d bytes message popped from queue %a\027[0m"
         s P2p_connection.Info.pp (P2p_socket.info conn) >>= fun () ->
       return msg)
-    (fun _ (* Closed *) -> fail P2p_io_scheduler.Connection_closed)
+    (fun _ (* Closed *) -> fail P2p_errors.Connection_closed)
 
 let is_readable { messages } =
   Lwt.catch
     (fun () -> Lwt_pipe.values_available messages >>= return)
-    (fun _ (* Closed *) -> fail P2p_io_scheduler.Connection_closed)
+    (fun _ (* Closed *) -> fail P2p_errors.Connection_closed)
 
 let write { conn } msg =
   P2p_socket.write conn (Message msg)
@@ -523,25 +523,17 @@ let pool_stat { io_sched } =
 
 (***************************************************************************)
 
-type error += Rejected of P2p_peer.Id.t
-type error += Pending_connection
-type error += Connected
-type error += Connection_closed = P2p_io_scheduler.Connection_closed
-type error += Connection_refused
-type error += Closed_network
-type error += Too_many_connections
-
 let fail_unless_disconnected_point point_info =
   match P2p_point_state.get point_info with
   | Disconnected -> return ()
-  | Requested _ | Accepted _ -> fail Pending_connection
-  | Running _ -> fail Connected
+  | Requested _ | Accepted _ -> fail P2p_errors.Pending_connection
+  | Running _ -> fail P2p_errors.Connected
 
 let fail_unless_disconnected_peer_id peer_info =
   match P2p_peer_state.get peer_info with
   | Disconnected -> return ()
-  | Accepted _ -> fail Pending_connection
-  | Running _ -> fail Connected
+  | Accepted _ -> fail P2p_errors.Pending_connection
+  | Running _ -> fail P2p_errors.Connected
 
 let compare_known_point_info p1 p2 =
   (* The most-recently disconnected peers are greater. *)
@@ -566,7 +558,7 @@ let compare_known_point_info p1 p2 =
 let rec connect ~timeout pool point =
   fail_unless
     (active_connections pool <= pool.config.max_connections)
-    Too_many_connections >>=? fun () ->
+    P2p_errors.Too_many_connections >>=? fun () ->
   let canceler = Lwt_canceler.create () in
   with_timeout ~canceler (Lwt_unix.sleep timeout) begin fun canceler ->
     let point_info =
@@ -574,7 +566,7 @@ let rec connect ~timeout pool point =
     let addr, port as point = P2p_point_state.Info.point point_info in
     fail_unless
       (not pool.config.closed_network || P2p_point_state.Info.trusted point_info)
-      Closed_network >>=? fun () ->
+      P2p_errors.Closed_network >>=? fun () ->
     fail_unless_disconnected_point point_info >>=? fun () ->
     P2p_point_state.set_requested point_info canceler ;
     let fd = Lwt_unix.socket PF_INET6 SOCK_STREAM 0 in
@@ -591,7 +583,7 @@ let rec connect ~timeout pool point =
       Lwt_utils_unix.safe_close fd >>= fun () ->
       match err with
       | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
-          fail Connection_refused
+          fail P2p_errors.Connection_refused
       | err -> Lwt.return (Error err)
     end >>=? fun () ->
     lwt_debug "connect: %a -> authenticate" P2p_point.Id.pp point >>= fun () ->
@@ -724,7 +716,7 @@ and authenticate pool ?point_info canceler fd point =
         Option.iter ~f:P2p_point_state.set_disconnected point_info ;
         (* FIXME P2p_peer_state.set_disconnected ~requested:true peer_info ; *)
       end ;
-      fail (Rejected info.peer_id)
+      fail (P2p_errors.Rejected info.peer_id)
     end
 
 and create_connection pool p2p_conn id_point point_info peer_info _version =

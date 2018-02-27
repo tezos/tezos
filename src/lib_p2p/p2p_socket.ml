@@ -19,16 +19,6 @@
 
 include Logging.Make(struct let name = "p2p.connection" end)
 
-type error += Decipher_error
-type error += Invalid_message_size
-type error += Encoding_error
-type error += Rejected
-type error += Decoding_error
-type error += Myself of P2p_connection.Id.t
-type error += Not_enough_proof_of_work of P2p_peer.Id.t
-type error += Invalid_auth
-type error += Invalid_chunks_size of { value: int ; min: int ; max: int }
-
 module Crypto = struct
 
   let bufsize = 1 lsl 16 - 1
@@ -44,7 +34,7 @@ module Crypto = struct
   let write_chunk fd cryptobox_data msg =
     let msglen = MBytes.length msg in
     fail_unless
-      (msglen <= max_content_length) Invalid_message_size >>=? fun () ->
+      (msglen <= max_content_length) P2p_errors.Invalid_message_size >>=? fun () ->
     let buf = MBytes.init (msglen + Crypto_box.zerobytes) '\x00' in
     MBytes.blit msg 0 buf Crypto_box.zerobytes msglen ;
     let local_nonce = cryptobox_data.local_nonce in
@@ -72,7 +62,7 @@ module Crypto = struct
         cryptobox_data.channel_key remote_nonce buf
     with
     | false ->
-        fail Decipher_error
+        fail P2p_errors.Decipher_error
     | true ->
         return (MBytes.sub buf Crypto_box.zerobytes
                   (encrypted_length - Crypto_box.boxzerobytes))
@@ -84,7 +74,7 @@ let check_binary_chunks_size  size =
   fail_unless
     (value > 0 &&
      value <= Crypto.max_content_length)
-    (Invalid_chunks_size
+    (P2p_errors.Invalid_chunks_size
        { value = size ;
          min = Crypto.(header_length + Crypto_box.boxzerobytes + 1) ;
          max = Crypto.bufsize ;
@@ -125,15 +115,15 @@ module Connection_message = struct
       Data_encoding.Binary.length encoding message in
     fail_unless
       (encoded_message_len < 1 lsl (Crypto.header_length * 8))
-      Encoding_error >>=? fun () ->
+      P2p_errors.Encoding_error >>=? fun () ->
     let len = Crypto.header_length + encoded_message_len in
     let buf = MBytes.create len in
     match Data_encoding.Binary.write
             encoding message buf Crypto.header_length with
     | None ->
-        fail Encoding_error
+        fail P2p_errors.Encoding_error
     | Some last ->
-        fail_unless (last = len) Encoding_error >>=? fun () ->
+        fail_unless (last = len) P2p_errors.Encoding_error >>=? fun () ->
         MBytes.set_int16 buf 0 encoded_message_len ;
         P2p_io_scheduler.write fd buf
 
@@ -146,10 +136,10 @@ module Connection_message = struct
     P2p_io_scheduler.read_full ~len fd buf >>=? fun () ->
     match Data_encoding.Binary.read encoding buf 0 len with
     | None ->
-        fail Decoding_error
+        fail P2p_errors.Decoding_error
     | Some (read_len, message) ->
         if read_len <> len then
-          fail Decoding_error
+          fail P2p_errors.Decoding_error
         else
           return message
 
@@ -201,11 +191,11 @@ let authenticate
   let remote_peer_id = Crypto_box.hash msg.public_key in
   fail_unless
     (remote_peer_id <> identity.P2p_identity.peer_id)
-    (Myself id_point) >>=? fun () ->
+    (P2p_errors.Myself id_point) >>=? fun () ->
   fail_unless
     (Crypto_box.check_proof_of_work
        msg.public_key msg.proof_of_work_stamp proof_of_work_target)
-    (Not_enough_proof_of_work remote_peer_id) >>=? fun () ->
+    (P2p_errors.Not_enough_proof_of_work remote_peer_id) >>=? fun () ->
   let channel_key =
     Crypto_box.precompute identity.P2p_identity.secret_key msg.public_key in
   let info =
@@ -266,7 +256,7 @@ module Reader = struct
       match msg with
       | None ->
           protect ~canceler:st.canceler begin fun () ->
-            Lwt_pipe.push st.messages (Error [Decoding_error]) >>= fun () ->
+            Lwt_pipe.push st.messages (Error [P2p_errors.Decoding_error]) >>= fun () ->
             return None
           end
       | Some (msg, size, rem_mbytes) ->
@@ -341,7 +331,7 @@ module Writer = struct
 
   let encode_message st msg =
     try ok (Data_encoding.Binary.to_bytes_list st.binary_chunks_size st.encoding msg)
-    with _ -> error Encoding_error
+    with _ -> error P2p_errors.Encoding_error
 
   let rec worker_loop st =
     Lwt_unix.yield () >>= fun () ->
@@ -368,13 +358,13 @@ module Writer = struct
             Option.iter wakener
               ~f:(fun u ->
                   Lwt.wakeup_later u
-                    (Error [P2p_io_scheduler.Connection_closed])) ;
+                    (Error [P2p_errors.Connection_closed])) ;
             match err with
             | [ Canceled | Exn Lwt_pipe.Closed ] ->
                 lwt_debug "connection closed to %a"
                   P2p_connection.Info.pp st.conn.info >>= fun () ->
                 Lwt.return_unit
-            | [ P2p_io_scheduler.Connection_closed ] ->
+            | [ P2p_errors.Connection_closed ] ->
                 lwt_debug "connection closed to %a"
                   P2p_connection.Info.pp st.conn.info >>= fun () ->
                 Lwt_canceler.cancel st.canceler >>= fun () ->
@@ -459,11 +449,11 @@ let accept
   end ~on_error:begin fun err ->
     P2p_io_scheduler.close fd >>= fun _ ->
     match err with
-    | [ P2p_io_scheduler.Connection_closed ] -> fail Rejected
-    | [ Decipher_error ] -> fail Invalid_auth
+    | [ P2p_errors.Connection_closed ] -> fail P2p_errors.Rejected_socket_connection
+    | [ P2p_errors.Decipher_error ] -> fail P2p_errors.Invalid_auth
     | err -> Lwt.return (Error err)
   end >>=? fun accepted ->
-  fail_unless accepted Rejected >>=? fun () ->
+  fail_unless accepted P2p_errors.Rejected_socket_connection >>=? fun () ->
   let canceler = Lwt_canceler.create () in
   let conn = { id = next_conn_id () ; fd ; info ; cryptobox_data } in
   let reader =
@@ -482,11 +472,11 @@ let accept
 
 let catch_closed_pipe f =
   Lwt.catch f begin function
-    | Lwt_pipe.Closed -> fail P2p_io_scheduler.Connection_closed
+    | Lwt_pipe.Closed -> fail P2p_errors.Connection_closed
     | exn -> fail (Exn exn)
   end >>= function
   | Error [Exn Lwt_pipe.Closed] ->
-      fail P2p_io_scheduler.Connection_closed
+      fail P2p_errors.Connection_closed
   | Error _ | Ok _ as v -> Lwt.return v
 
 let pp_json encoding ppf msg =
@@ -516,7 +506,7 @@ let write_now { writer ; conn } msg =
     P2p_peer.Id.pp_short conn.info.peer_id (pp_json writer.encoding) msg ;
   Writer.encode_message writer msg >>? fun buf ->
   try Ok (Lwt_pipe.push_now writer.messages (buf, None))
-  with Lwt_pipe.Closed -> Error [P2p_io_scheduler.Connection_closed]
+  with Lwt_pipe.Closed -> Error [P2p_errors.Connection_closed]
 
 let rec split_bytes size bytes =
   if MBytes.length bytes <= size then
@@ -545,7 +535,7 @@ let read { reader } =
   end
 let read_now { reader } =
   try Lwt_pipe.pop_now reader.messages
-  with Lwt_pipe.Closed -> Some (Error [P2p_io_scheduler.Connection_closed])
+  with Lwt_pipe.Closed -> Some (Error [P2p_errors.Connection_closed])
 
 let stat { conn = { fd } } = P2p_io_scheduler.stat fd
 

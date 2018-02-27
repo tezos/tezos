@@ -180,13 +180,6 @@ type ('msg, 'meta) connection
     meta-information and data-structures describing a more
     fine-grained logical state of the connection. *)
 
-type error += Pending_connection
-type error += Connected
-type error += Connection_refused
-type error += Rejected of P2p_peer.Id.t
-type error += Too_many_connections
-type error += Closed_network
-
 val connect:
   timeout:float ->
   ('msg, 'meta) pool -> P2p_point.Id.t ->
@@ -234,8 +227,6 @@ val on_new_connection:
   (P2p_peer.Id.t -> ('msg, 'meta) connection -> unit) -> unit
 
 (** {1 I/O on connections} *)
-
-type error += Connection_closed
 
 val read:  ('msg, 'meta) connection -> 'msg tzresult Lwt.t
 (** [read conn] returns a message popped from [conn]'s app message

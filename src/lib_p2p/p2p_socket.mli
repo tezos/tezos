@@ -17,16 +17,6 @@
 
 (** {1 Types} *)
 
-type error += Decipher_error
-type error += Invalid_message_size
-type error += Encoding_error
-type error += Decoding_error
-type error += Rejected
-type error += Myself of P2p_connection.Id.t
-type error += Not_enough_proof_of_work of P2p_peer.Id.t
-type error += Invalid_auth
-type error += Invalid_chunks_size of { value: int ; min: int ; max: int }
-
 type authenticated_fd
 (** Type of a connection that successfully passed the authentication
     phase, but has not been accepted yet. *)

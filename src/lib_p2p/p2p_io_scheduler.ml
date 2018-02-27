@@ -36,8 +36,6 @@ module type IO = sig
   val close: out_param -> error list -> unit Lwt.t
 end
 
-type error += Connection_closed
-
 module Scheduler(IO : IO) = struct
 
   type t = {
@@ -122,7 +120,7 @@ module Scheduler(IO : IO) = struct
       match msg with
       | Error [ Canceled ] ->
           worker_loop st
-      | Error ([Connection_closed |
+      | Error ([P2p_errors.Connection_closed |
                 Exn ( Lwt_pipe.Closed |
                       Unix.Unix_error ((EBADF | ETIMEDOUT), _, _) )]
                as err) ->
@@ -142,7 +140,7 @@ module Scheduler(IO : IO) = struct
             | Ok ()
             | Error [ Canceled ] ->
                 return ()
-            | Error ([Connection_closed |
+            | Error ([P2p_errors.Connection_closed |
                       Exn (Unix.Unix_error (EBADF, _, _) |
                            Lwt_pipe.Closed)] as err) ->
                 lwt_debug "Connection closed (push: %d, %s)"
@@ -234,12 +232,12 @@ module ReadScheduler = Scheduler(struct
            let buf = MBytes.create maxlen in
            Lwt_bytes.read fd buf 0 maxlen >>= fun len ->
            if len = 0 then
-             fail Connection_closed
+             fail P2p_errors.Connection_closed
            else
              return (MBytes.sub buf 0 len) )
         (function
           | Unix.Unix_error(Unix.ECONNRESET, _, _) ->
-              fail Connection_closed
+              fail P2p_errors.Connection_closed
           | exn ->
               Lwt.return (error_exn exn))
     type out_param = MBytes.t tzresult Lwt_pipe.t
@@ -270,7 +268,7 @@ module WriteScheduler = Scheduler(struct
           | Unix.Unix_error(Unix.EPIPE, _, _)
           | Lwt.Canceled
           | End_of_file ->
-              fail Connection_closed
+              fail P2p_errors.Connection_closed
           | exn ->
               Lwt.return (error_exn exn))
     let close _p _err = Lwt.return_unit
@@ -396,7 +394,7 @@ let register =
 let write { write_queue } msg =
   Lwt.catch
     (fun () -> Lwt_pipe.push write_queue msg >>= return)
-    (fun _ -> fail Connection_closed)
+    (fun _ -> fail P2p_errors.Connection_closed)
 let write_now { write_queue } msg = Lwt_pipe.push_now write_queue msg
 
 let read_from conn ?pos ?len buf msg =
@@ -415,7 +413,7 @@ let read_from conn ?pos ?len buf msg =
           Some (MBytes.sub msg read_len (msg_len - read_len)) ;
       Ok read_len
   | Error _ ->
-      Error [Connection_closed]
+      Error [P2p_errors.Connection_closed]
 
 let read_now conn ?pos ?len buf =
   match conn.partial_read with
@@ -427,7 +425,7 @@ let read_now conn ?pos ?len buf =
         Option.map
           ~f:(read_from conn ?pos ?len buf)
           (Lwt_pipe.pop_now conn.read_queue)
-      with Lwt_pipe.Closed -> Some (Error [Connection_closed])
+      with Lwt_pipe.Closed -> Some (Error [P2p_errors.Connection_closed])
 
 let read conn ?pos ?len buf =
   match conn.partial_read with
@@ -439,7 +437,7 @@ let read conn ?pos ?len buf =
         (fun () ->
            Lwt_pipe.pop conn.read_queue >|= fun msg ->
            read_from conn ?pos ?len buf msg)
-        (fun _ -> fail Connection_closed)
+        (fun _ -> fail P2p_errors.Connection_closed)
 
 let read_full conn ?pos ?len buf =
   let maxlen = MBytes.length buf in

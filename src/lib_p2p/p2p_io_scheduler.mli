@@ -44,8 +44,6 @@ val create:
 val register: t -> Lwt_unix.file_descr -> connection
 (** [register sched fd] is a [connection] managed by [sched]. *)
 
-type error += Connection_closed
-
 val write: connection -> MBytes.t -> unit tzresult Lwt.t
 (** [write conn msg] returns [Ok ()] when [msg] has been added to
     [conn]'s write queue, or fail with an error. *)

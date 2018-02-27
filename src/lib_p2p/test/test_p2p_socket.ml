@@ -116,14 +116,14 @@ let connect sched addr port id =
   return auth_fd
 
 let is_connection_closed = function
-  | Error [P2p_io_scheduler.Connection_closed] -> true
+  | Error [P2p_errors.Connection_closed] -> true
   | Ok _ -> false
   | Error err ->
       log_notice "Error: %a" pp_print_error err ;
       false
 
 let is_decoding_error = function
-  | Error [P2p_socket.Decoding_error] -> true
+  | Error [P2p_errors.Decoding_error] -> true
   | Ok _ -> false
   | Error err ->
       log_notice "Error: %a" pp_print_error err ;
@@ -156,7 +156,7 @@ module Kick = struct
   let encoding = Data_encoding.bytes
 
   let is_rejected = function
-    | Error [P2p_socket.Rejected] -> true
+    | Error [P2p_errors.Rejected_socket_connection] -> true
     | Ok _ -> false
     | Error err ->
         log_notice "Error: %a" pp_print_error err ;
