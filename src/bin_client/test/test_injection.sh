@@ -1,11 +1,15 @@
 #! /usr/bin/env bash
 
+## from genesis to demo
+
 set -e
 
 test_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)")"
 source $test_dir/test_lib.inc.sh "$@"
 
 start_node 1
+
+show_logs="no"
 
 sleep 2
 
@@ -25,4 +29,3 @@ echo
 echo End of test
 echo
 
-show_logs="no"
