@@ -195,7 +195,7 @@ let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
     lwt_log_info "May endorse block %a for %s"
       Block_hash.pp_short block.hash name >>= fun () ->
     let b = `Hash block.hash in
-    let level = Raw_level.succ block.level.level in
+    let level = block.level.level in
     get_signing_slots cctxt b delegate level >>=? fun slots ->
     lwt_debug "Found slots for %a/%s (%d)"
       Block_hash.pp_short block.hash name (List.length slots) >>= fun () ->
@@ -218,7 +218,7 @@ let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
                then begin
                  lwt_log_info
                    "Schedule endorsement for block %a \
-                   \ (level %a, slot %d, time %a) (replace block %a)"
+                    (level %a, slot %d, time %a) (replace block %a)"
                    Block_hash.pp_short block.hash
                    Raw_level.pp level
                    slot
@@ -241,7 +241,7 @@ let schedule_endorsements (cctxt : #Proto_alpha.full) state bis =
              with Not_found ->
                lwt_log_info
                  "Schedule endorsement for block %a \
-                 \ (level %a, slot %d, time %a)"
+                  (level %a, slot %d, time %a)"
                  Block_hash.pp_short block.hash
                  Raw_level.pp level
                  slot
@@ -284,7 +284,7 @@ let endorse cctxt state =
     (fun { delegate ; block ; slot } ->
        let hash = block.hash in
        let b = `Hash hash in
-       let level = Raw_level.succ block.level.level in
+       let level = block.level.level in
        previously_endorsed_slot cctxt level slot >>=? function
        | true -> return ()
        | false ->
@@ -292,11 +292,11 @@ let endorse cctxt state =
            lwt_debug "Endorsing %a for %s (slot %d)!"
              Block_hash.pp_short hash name slot >>= fun () ->
            inject_endorsement cctxt
-             b level ~async:true
+             b level
              sk [slot] >>=? fun oph ->
            cctxt#message
              "Injected endorsement for block '%a' \
-             \ (level %a, slot %d, contract %s) '%a'"
+              (level %a, slot %d, contract %s) '%a'"
              Block_hash.pp_short hash
              Raw_level.pp level
              slot name
@@ -345,7 +345,7 @@ let create (cctxt : #Proto_alpha.full) ~delay contracts block_stream =
               endorse cctxt state >>= function
               | Ok () -> Lwt.return_unit
               | Error errs ->
-                  lwt_log_error "Error while endorsing:\n%a"
+                  lwt_log_error "Error while endorsing:@\n%a"
                     pp_print_error
                     errs >>= fun () ->
                   Lwt.return_unit

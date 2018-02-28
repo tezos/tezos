@@ -458,8 +458,7 @@ let insert_blocks cctxt ?max_priority state bis =
   | Ok () ->
       Lwt.return_unit
   | Error err ->
-      Format.eprintf "Error: %a" pp_print_error err  ;
-      Lwt.return_unit
+      lwt_log_error "Error: %a" pp_print_error err
 
 let bake (cctxt : #Proto_alpha.full) state =
   let slots = pop_baking_slots state in
@@ -491,18 +490,22 @@ let bake (cctxt : #Proto_alpha.full) state =
        Block_services.preapply cctxt block
          ~timestamp ~sort:true ~protocol_data operations >>= function
        | Error errs ->
-           lwt_log_error "Error while prevalidating operations:\n%a"
+           lwt_log_error "Error while prevalidating operations:@\n%a"
              pp_print_error
              errs >>= fun () ->
            return None
        | Ok { operations ; shell_header } ->
-           let operations = List.hd operations in
            lwt_debug
-             "Computed condidate block after %a (slot %d): %d/%d fitness: %a"
+             "Computed candidate block after %a (slot %d): %a/%d fitness: %a"
              Block_hash.pp_short bi.hash priority
-             (List.length operations.applied) request
-             Fitness.pp shell_header.fitness
-           >>= fun () ->
+             (Format.pp_print_list
+                ~pp_sep:(fun ppf () -> Format.fprintf ppf "+")
+                (fun ppf operations -> Format.fprintf ppf "%d" (List.length operations.Preapply_result.applied)))
+             operations
+             request
+             Fitness.pp shell_header.fitness >>= fun () ->
+           let operations =
+             List.map (fun l -> List.map snd l.Preapply_result.applied) operations in
            return
              (Some (bi, priority, shell_header, operations, delegate)))
     slots >>=? fun candidates ->
@@ -530,20 +533,23 @@ let bake (cctxt : #Proto_alpha.full) state =
       inject_block cctxt
         ~force:true ~chain_id:bi.chain_id
         ~shell_header ~priority ~seed_nonce_hash ~src_sk
-        [List.map snd operations.applied]
+        operations
       |> trace_exn (Failure "Error while injecting block") >>=? fun block_hash ->
       State.record_block cctxt level block_hash seed_nonce
       |> trace_exn (Failure "Error while recording block") >>=? fun () ->
       Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
       cctxt#message
         "Injected block %a for %s after %a \
-        \ (level %a, slot %d, fitness %a, operations %d)"
+        \ (level %a, slot %d, fitness %a, operations %a)"
         Block_hash.pp_short block_hash
         name
         Block_hash.pp_short bi.hash
         Raw_level.pp level priority
         Fitness.pp shell_header.fitness
-        (List.length operations.applied) >>= fun () ->
+        (Format.pp_print_list
+           ~pp_sep:(fun ppf () -> Format.fprintf ppf "+")
+           (fun ppf operations -> Format.fprintf ppf "%d" (List.length operations)))
+        operations >>= fun () ->
       return ()
     end
   | _ ->
@@ -614,7 +620,7 @@ let create
               bake cctxt state >>= function
               | Ok () -> Lwt.return_unit
               | Error errs ->
-                  lwt_log_error "Error while baking:\n%a"
+                  lwt_log_error "Error while baking:@\n%a"
                     pp_print_error
                     errs >>= fun () ->
                   Lwt.return_unit
