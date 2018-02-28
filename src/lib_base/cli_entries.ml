@@ -1190,24 +1190,24 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
     | Bad_argument (i, v) ->
         Format.fprintf ppf
           "Erroneous command line argument %d (%s)." i v ;
-        []
+        Some []
     | Option_expected_argument (arg, command) ->
         Format.fprintf ppf
           "Command line option @{<opt>%s@} expects an argument." arg ;
-        Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command
+        Some (Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command)
     | Bad_option_argument (arg, command) ->
         Format.fprintf ppf
           "Wrong value for command line option @{<opt>%s@}." arg ;
-        Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command
+        Some (Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command)
     | Multiple_occurences (arg, command) ->
         Format.fprintf ppf
           "Command line option @{<opt>%s@} appears multiple times." arg ;
-        Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command
+        Some (Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command)
     | No_manual_entry [ keyword ] ->
         Format.fprintf ppf
           "No manual entry that match @{<hilight>%s@}."
           keyword ;
-        []
+        Some []
     | No_manual_entry (keyword :: keywords) ->
         Format.fprintf ppf
           "No manual entry that match %a and @{<hilight>%s@}."
@@ -1216,29 +1216,29 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
              (fun ppf keyword -> Format.fprintf ppf "@{<hilight>%s@}" keyword))
           keywords
           keyword ;
-        []
+        Some []
     | Unknown_option (option, command) ->
         Format.fprintf ppf
           "Unexpected command line option @{<opt>%s@}."
           option ;
-        Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command
+        Some (Option.unopt_map ~f:(fun command -> [ Ex command ]) ~default:[] command)
     | Extra_arguments (extra, command) ->
         Format.fprintf ppf
           "Extra command line arguments:@, @[<h>%a@]."
           (Format.pp_print_list (fun ppf -> Format.fprintf ppf "%s")) extra ;
-        [ Ex command ]
+        Some [ Ex command ]
     | Unterminated_command (_, commands) ->
         Format.fprintf ppf
           "@[<v 2>Unterminated command, here are possible completions.@,%a@]"
           (Format.pp_print_list
              (fun ppf (Command { params ; options = Argument { spec ; _ } ; _ }) ->
                 print_commandline ppf ([], spec, params))) commands ;
-        List.map (fun c -> Ex c) commands
+        Some (List.map (fun c -> Ex c) commands)
     | Command_not_found ([], _all_commands) ->
         Format.fprintf ppf
           "@[<v 0>Unrecognized command.@,\
            Try using the @{<kwd>man@} command to get more information.@]" ;
-        []
+        Some []
     | Command_not_found (_, commands) ->
         Format.fprintf ppf
           "@[<v 0>Unrecognized command.@,\
@@ -1246,20 +1246,29 @@ let pp_cli_errors ppf ~executable_name ~global_options ~default errs =
           (Format.pp_print_list
              (fun ppf (Command { params ; options = Argument { spec ; _ } ; _ }) ->
                 print_commandline ppf ([], spec, params))) commands ;
-        List.map (fun c -> Ex c) commands
-    | err -> default ppf err ; [] in
-  let rec pp acc = function
-    | [] -> []
-    | [ last ] -> pp_one last @ acc
+        Some (List.map (fun c -> Ex c) commands)
+    | err -> default ppf err ; None in
+  let rec pp acc errs =
+    let return command =
+      match command, acc with
+      | None, _ -> acc
+      | Some command, Some commands -> Some (command @ commands)
+      | Some command, None -> Some command in
+    match errs with
+    | [] -> None
+    | [ last ] -> return (pp_one last)
     | err :: errs ->
-        let acc = pp_one err @ acc in
+        let acc = return (pp_one err) in
         Format.fprintf ppf "@," ;
         pp acc errs in
   Format.fprintf ppf "@[<v 2>@{<error>@{<title>Error@}@}@," ;
-  let commands = pp [] errs in
-  Format.fprintf ppf "@]@\n@\n@[<v 0>%a@]"
-    (fun ppf commands -> usage_internal ppf ~executable_name ~global_options commands)
-    commands
+  match pp None errs with
+  | None ->
+      Format.fprintf ppf "@]@\n"
+  | Some commands ->
+      Format.fprintf ppf "@]@\n@\n@[<v 0>%a@]"
+        (fun ppf commands -> usage_internal ppf ~executable_name ~global_options commands)
+        commands
 
 let usage ppf ~executable_name ~global_options commands =
   usage_internal ppf
