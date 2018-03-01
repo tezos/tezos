@@ -28,9 +28,7 @@ The ``alphanet.sh`` script
 
 The recommended way for running an up-to-date Tezos node connected to
 the alphanet is to use ``scripts/alphanet.sh``. Its only requirement is
-a working installation of Docker:
-
-https://www.docker.com/community-edition
+a working installation of `Docker <https://www.docker.com/>`_.
 
 First, you need to download the script:
 
