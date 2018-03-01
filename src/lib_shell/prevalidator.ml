@@ -370,8 +370,7 @@ let on_request
           on_notify w pv peer mempool ;
           return ()
       | Request.Inject op ->
-          on_inject pv op >>= fun tzresult ->
-          return tzresult
+          on_inject pv op
       | Request.Arrived (oph, op) ->
           on_operation_arrived pv oph op ;
           return ()
@@ -427,7 +426,9 @@ let on_launch w _ (limits, chain_db) =
 
 let on_error w r st errs =
   Worker.record_event w (Event.Request (r, st, Some errs)) ;
-  Lwt.return (Error errs)
+  match r with
+  | Request.(View (Inject _)) -> return ()
+  | _ -> Lwt.return (Error errs)
 
 let on_completion w r _ st =
   Worker.record_event w (Event.Request (Request.view r, st, None )) ;
@@ -485,8 +486,7 @@ let context w =
   Prevalidation.end_prevalidation validation_state
 
 let inject_operation w op =
-  Worker.push_request_and_wait w (Inject op) >>=? fun result ->
-  Lwt.return result
+  Worker.push_request_and_wait w (Inject op)
 
 let status = Worker.status
 
