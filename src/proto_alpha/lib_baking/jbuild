@@ -12,7 +12,7 @@
               tezos-client-commands
               tezos-rpc))
   (library_flags (:standard -linkall))
-  (modules (:standard \ client_baking_commands client_baking_commands_registration main_alpha_baker))
+  (modules (:standard \ client_baking_commands client_baking_commands_registration))
   (flags (:standard -w -9+27-30-32-40@8
                     -safe-string
                     -open Tezos_base__TzPervasives

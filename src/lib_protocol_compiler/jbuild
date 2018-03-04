@@ -26,7 +26,7 @@
   (libraries (tezos-base
               tezos-protocol-environment-sigs
               tezos-stdlib-unix
-              compiler-libs
+              compiler-libs.common
               lwt.unix
               ocplib-endian
               ocplib-ocamlres
