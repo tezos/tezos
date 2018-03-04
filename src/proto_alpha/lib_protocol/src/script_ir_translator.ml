@@ -550,77 +550,79 @@ let rec unparse_ty
       let tr = unparse_ty None utr in
       Prim (-1, T_big_map, [ ta; tr ], None)
 
+module Unparse_costs = Michelson_v1_gas.Cost_of.Unparse
+
 let rec unparse_data
   : type a. Gas.t -> a ty -> a -> (Script.node * Gas.t) tzresult
   = fun gas ty a ->
-    Gas.consume_check_error gas Gas.Cost_of.Unparse.cycle >>? fun gas ->
+    Gas.consume_check_error gas Unparse_costs.cycle >>? fun gas ->
     match ty, a with
     | Unit_t, () ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.unit >|? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.unit >|? fun gas ->
         (Prim (-1, D_Unit, [], None), gas)
     | Int_t, v ->
-        Gas.consume_check_error gas (Gas.Cost_of.Unparse.int v) >|? fun gas ->
+        Gas.consume_check_error gas (Unparse_costs.int v) >|? fun gas ->
         (Int (-1, Script_int.to_string v), gas)
     | Nat_t, v ->
-        Gas.consume_check_error gas (Gas.Cost_of.Unparse.int v) >|? fun gas ->
+        Gas.consume_check_error gas (Unparse_costs.int v) >|? fun gas ->
         (Int (-1, Script_int.to_string v), gas)
     | String_t, s ->
-        Gas.consume_check_error gas (Gas.Cost_of.Unparse.string s) >|? fun gas ->
+        Gas.consume_check_error gas (Unparse_costs.string s) >|? fun gas ->
         (String (-1, s), gas)
     | Bool_t, true ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.bool >|? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.bool >|? fun gas ->
         (Prim (-1, D_True, [], None), gas)
     | Bool_t, false ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.bool >|? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.bool >|? fun gas ->
         (Prim (-1, D_False, [], None), gas)
     | Timestamp_t, t ->
-        Gas.consume_check_error gas (Gas.Cost_of.Unparse.timestamp t) >>? fun gas ->
+        Gas.consume_check_error gas (Unparse_costs.timestamp t) >>? fun gas ->
         begin
           match Script_timestamp.to_notation t with
           | None -> ok @@ (Int (-1, Script_timestamp.to_num_str t), gas)
           | Some s -> ok @@ (String (-1, s), gas)
         end
     | Contract_t _, (_, _, c)  ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.contract >|? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.contract >|? fun gas ->
         (String (-1, Contract.to_b58check c), gas)
     | Signature_t, s ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.signature >|? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.signature >|? fun gas ->
         let `Hex text =
           MBytes.to_hex
             (Data_encoding.Binary.to_bytes_exn Signature.encoding s) in
         (String (-1, text), gas)
     | Tez_t, v ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.tez >|? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.tez >|? fun gas ->
         (String (-1, Tez.to_string v), gas)
     | Key_t, k ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.key >|? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.key >|? fun gas ->
         (String (-1, Signature.Public_key.to_b58check k), gas)
     | Key_hash_t, k ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.key_hash >|? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.key_hash >|? fun gas ->
         (String (-1, Signature.Public_key_hash.to_b58check k), gas)
     | Pair_t ((tl, _), (tr, _)), (l, r) ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.pair >>? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.pair >>? fun gas ->
         unparse_data gas tl l >>? fun (l, gas) ->
         unparse_data gas tr r >|? fun (r, gas) ->
         (Prim (-1, D_Pair, [ l; r ], None), gas)
     | Union_t ((tl, _), _), L l ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.union >>? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.union >>? fun gas ->
         unparse_data gas tl l >|? fun (l, gas) ->
         (Prim (-1, D_Left, [ l ], None), gas)
     | Union_t (_, (tr, _)), R r ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.union >>? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.union >>? fun gas ->
         unparse_data gas tr r >|? fun (r, gas) ->
         (Prim (-1, D_Right, [ r ], None), gas)
     | Option_t t, Some v ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.some >>? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.some >>? fun gas ->
         unparse_data gas t v >|? fun (v, gas) ->
         (Prim (-1, D_Some, [ v ], None), gas)
     | Option_t _, None ->
-        Gas.consume_check_error gas Gas.Cost_of.Unparse.none >|? fun gas ->
+        Gas.consume_check_error gas Unparse_costs.none >|? fun gas ->
         (Prim (-1, D_None, [], None), gas)
     | List_t t, items ->
         Gas.fold_right_error
-          ~cycle_cost:Gas.Cost_of.Unparse.list_element
+          ~cycle_cost:Unparse_costs.list_element
           gas
           (fun gas element l ->
              unparse_data gas t element >|? fun (unparsed, gas) ->
@@ -631,11 +633,11 @@ let rec unparse_data
     | Set_t t, set ->
         let t = ty_of_comparable_ty t in
         Gas.consume_check_error gas
-          (Gas.Cost_of.Unparse.set_to_list set) >>? fun gas ->
+          (Unparse_costs.set_to_list set) >>? fun gas ->
         let items = set_fold (fun e acc -> e :: acc) set [] in
         Gas.fold_left_error
           gas
-          ~cycle_cost:Gas.Cost_of.Unparse.set_element
+          ~cycle_cost:Unparse_costs.set_element
           (fun gas item l ->
              unparse_data gas t item >|? fun (item, gas) ->
              (item :: l, gas))
@@ -643,10 +645,10 @@ let rec unparse_data
         (Micheline.Seq (-1, items, None), gas)
     | Map_t (kt, vt), map ->
         let kt = ty_of_comparable_ty kt in
-        Gas.consume_check_error gas (Gas.Cost_of.Unparse.map_to_list map) >>? fun gas ->
+        Gas.consume_check_error gas (Unparse_costs.map_to_list map) >>? fun gas ->
         let elements = map_fold (fun k v acc -> (k, v) :: acc) map [] in
         Gas.fold_left_error gas
-          ~cycle_cost:Gas.Cost_of.Unparse.map_element
+          ~cycle_cost:Unparse_costs.map_element
           (fun gas (k, v) acc ->
              unparse_data gas kt k >>? fun (key, gas) ->
              unparse_data gas vt v >>? fun (value, gas) ->
@@ -893,8 +895,10 @@ let merge_branches
     | Failed { descr = descrt }, Typed dbf ->
         return (Typed (branch (descrt dbf.aft) dbf))
 
+module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
+
 let rec parse_comparable_ty : Gas.t -> Script.node -> (ex_comparable_ty * Gas.t) tzresult = fun gas node ->
-  Gas.consume_check_error gas Gas.Cost_of.Typechecking.cycle >>? fun gas ->
+  Gas.consume_check_error gas Typecheck_costs.cycle >>? fun gas ->
   match node with
   | Prim (_, T_int, [], _) -> ok ((Ex_comparable_ty Int_key), gas)
   | Prim (_, T_nat, [], _) -> ok ((Ex_comparable_ty Nat_key), gas)
@@ -921,7 +925,7 @@ let rec parse_comparable_ty : Gas.t -> Script.node -> (ex_comparable_ty * Gas.t)
 and parse_ty :
   Gas.t -> bool -> Script.node ->
   ((ex_ty * annot) * Gas.t) tzresult = fun gas big_map_possible node ->
-  Gas.consume_check_error gas Gas.Cost_of.Typechecking.cycle >>? fun gas ->
+  Gas.consume_check_error gas Typecheck_costs.cycle >>? fun gas ->
   match node with
   | Prim (_, T_pair,
           [ Prim (big_map_loc, T_big_map, args, map_annot) ; remaining_storage ],
@@ -940,37 +944,37 @@ and parse_ty :
         | args -> error @@ Invalid_arity (big_map_loc, T_big_map, 2, List.length args)
       end
   | Prim (_, T_unit, [], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.primitive_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.primitive_type >>? fun gas ->
       ok ((Ex_ty Unit_t, annot), gas)
   | Prim (_, T_int, [], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.primitive_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.primitive_type >>? fun gas ->
       ok ((Ex_ty Int_t, annot), gas)
   | Prim (_, T_nat, [], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.primitive_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.primitive_type >>? fun gas ->
       ok ((Ex_ty Nat_t, annot), gas)
   | Prim (_, T_string, [], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.primitive_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.primitive_type >>? fun gas ->
       ok ((Ex_ty String_t, annot), gas)
   | Prim (_, T_tez, [], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.primitive_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.primitive_type >>? fun gas ->
       ok ((Ex_ty Tez_t, annot), gas)
   | Prim (_, T_bool, [], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.primitive_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.primitive_type >>? fun gas ->
       ok ((Ex_ty Bool_t, annot), gas)
   | Prim (_, T_key, [], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.primitive_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.primitive_type >>? fun gas ->
       ok ((Ex_ty Key_t, annot), gas)
   | Prim (_, T_key_hash, [], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.primitive_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.primitive_type >>? fun gas ->
       ok ((Ex_ty Key_hash_t, annot), gas)
   | Prim (_, T_timestamp, [], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.primitive_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.primitive_type >>? fun gas ->
       ok ((Ex_ty Timestamp_t, annot), gas)
   | Prim (_, T_signature, [], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.primitive_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.primitive_type >>? fun gas ->
       ok ((Ex_ty Signature_t, annot), gas)
   | Prim (loc, T_contract, [ utl; utr ], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.two_arg_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.two_arg_type >>? fun gas ->
       parse_ty gas false utl >>? fun ((Ex_ty tl, left_annot), gas) ->
       parse_ty gas false utr >>? fun ((Ex_ty tr, right_annot), gas) ->
       error_unexpected_annot loc left_annot >>? fun () ->
@@ -993,16 +997,16 @@ and parse_ty :
       error_unexpected_annot loc annot >|? fun () ->
       ((Ex_ty (Option_t t), opt_annot), gas)
   | Prim (loc, T_list, [ ut ], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.one_arg_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.one_arg_type >>? fun gas ->
       parse_ty gas false ut >>? fun ((Ex_ty t, list_annot), gas) ->
       error_unexpected_annot loc list_annot >>? fun () ->
       ok ((Ex_ty (List_t t), annot), gas)
   | Prim (_, T_set, [ ut ], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.one_arg_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.one_arg_type >>? fun gas ->
       parse_comparable_ty gas ut >>? fun ((Ex_comparable_ty t), gas) ->
       ok ((Ex_ty (Set_t t), annot), gas)
   | Prim (_, T_map, [ uta; utr ], annot) ->
-      Gas.consume_check_error gas Gas.Cost_of.Typechecking.one_arg_type >>? fun gas ->
+      Gas.consume_check_error gas Typecheck_costs.one_arg_type >>? fun gas ->
       parse_comparable_ty gas uta >>? fun ((Ex_comparable_ty ta), gas) ->
       parse_ty gas false utr >>? fun ((Ex_ty tr, _), gas) ->
       ok ((Ex_ty (Map_t (ta, tr)), annot), gas)
@@ -1039,13 +1043,14 @@ let rec parse_data
     ?type_logger: (int -> Script.expr list -> Script.expr list -> unit) ->
     context -> Gas.t -> a ty -> Script.node -> (a * Gas.t) tzresult Lwt.t
   = fun ?type_logger ctxt gas ty script_data ->
-    Gas.consume_check gas Gas.Cost_of.typechecking_cycle >>=? fun gas ->
+    Gas.consume_check gas Typecheck_costs.cycle >>=? fun gas ->
     let error () =
       Invalid_constant (location script_data, strip_locations script_data, ty) in
     let traced body =
       trace (error ()) body in
     let parse_items ?type_logger loc ctxt gas expr key_type value_type items item_wrapper =
       (Gas.fold_left
+         ~cycle_cost:Typecheck_costs.cycle
          gas
          (fun gas item (last_value, map) ->
             match item with
@@ -1074,7 +1079,7 @@ let rec parse_data
     match ty, script_data with
     (* Unit *)
     | Unit_t, Prim (_, D_Unit, [], _) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.unit >>|? fun gas ->
+        Gas.consume_check gas Typecheck_costs.unit >>|? fun gas ->
         ((() : a), gas)
     | Unit_t, Prim (loc, D_Unit, l, _) ->
         traced (fail (Invalid_arity (loc, D_Unit, 0, List.length l)))
@@ -1082,10 +1087,10 @@ let rec parse_data
         traced (fail (unexpected expr [] Constant_namespace [ D_Unit ]))
     (* Booleans *)
     | Bool_t, Prim (_, D_True, [], _) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.bool >>|? fun gas ->
+        Gas.consume_check gas Typecheck_costs.bool >>|? fun gas ->
         (true, gas)
     | Bool_t, Prim (_, D_False, [], _) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.bool >>|? fun gas ->
+        Gas.consume_check gas Typecheck_costs.bool >>|? fun gas ->
         (false, gas)
     | Bool_t, Prim (loc, (D_True | D_False as c), l, _) ->
         traced (fail (Invalid_arity (loc, c, 0, List.length l)))
@@ -1093,19 +1098,19 @@ let rec parse_data
         traced (fail (unexpected expr [] Constant_namespace [ D_True ; D_False ]))
     (* Strings *)
     | String_t, String (_, v) ->
-        Gas.consume_check gas (Gas.Cost_of.Typechecking.string (String.length v)) >>|? fun gas ->
+        Gas.consume_check gas (Typecheck_costs.string (String.length v)) >>|? fun gas ->
         (v, gas)
     | String_t, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Integers *)
     | Int_t, Int (_, v) ->
-        Gas.consume_check gas (Gas.Cost_of.Typechecking.int_of_string v) >>=? fun gas ->
+        Gas.consume_check gas (Typecheck_costs.int_of_string v) >>=? fun gas ->
         begin match Script_int.of_string v with
           | None -> fail (error ())
           | Some v -> return (v, gas)
         end
     | Nat_t, Int (_, v) ->
-        Gas.consume_check gas (Gas.Cost_of.Typechecking.int_of_string v) >>=? fun gas ->
+        Gas.consume_check gas (Typecheck_costs.int_of_string v) >>=? fun gas ->
         begin match Script_int.of_string v with
           | None -> fail (error ())
           | Some v ->
@@ -1119,7 +1124,7 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ Int_kind ], kind expr)))
     (* Tez amounts *)
     | Tez_t, String (_, v) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.tez >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.tez >>=? fun gas ->
         begin try
             match Tez.of_string v with
             | None -> raise Exit
@@ -1131,14 +1136,14 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Timestamps *)
     | Timestamp_t, (Int (_, v)) ->
-        Gas.consume_check gas (Gas.Cost_of.Typechecking.int_of_string v) >>=? fun gas ->
+        Gas.consume_check gas (Typecheck_costs.int_of_string v) >>=? fun gas ->
         begin
           match Script_timestamp.of_string v with
           | Some v -> return (v, gas)
           | None -> fail (error ())
         end
     | Timestamp_t, String (_, s) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.string_timestamp >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.string_timestamp >>=? fun gas ->
         begin try
             match Script_timestamp.of_string s with
             | Some v -> return (v, gas)
@@ -1149,7 +1154,7 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ String_kind ; Int_kind ], kind expr)))
     (* IDs *)
     | Key_t, String (_, s) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.key >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.key >>=? fun gas ->
         begin
           try
             return (Signature.Public_key.of_b58check_exn s, gas)
@@ -1158,7 +1163,7 @@ let rec parse_data
     | Key_t, expr ->
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     | Key_hash_t, String (_, s) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.key_hash >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.key_hash >>=? fun gas ->
         begin
           try
             return (Signature.Public_key_hash.of_b58check_exn s, gas)
@@ -1167,7 +1172,7 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Signatures *)
     | Signature_t, String (_, s) -> begin try
-          Gas.consume_check gas Gas.Cost_of.Typechecking.signature >>=? fun gas ->
+          Gas.consume_check gas Typecheck_costs.signature >>=? fun gas ->
           match Data_encoding.Binary.of_bytes
                   Signature.encoding
                   (MBytes.of_hex (`Hex s)) with
@@ -1180,7 +1185,7 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Contracts *)
     | Contract_t (ty1, ty2), String (loc, s) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.contract >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.contract >>=? fun gas ->
         traced @@
         (Lwt.return (Contract.of_b58check s)) >>=? fun c ->
         parse_contract ctxt gas ty1 ty2 loc c >>=? fun _ ->
@@ -1189,7 +1194,7 @@ let rec parse_data
         traced (fail (Invalid_kind (location expr, [ String_kind ], kind expr)))
     (* Pairs *)
     | Pair_t ((ta, _), (tb, _)), Prim (_, D_Pair, [ va; vb ], _) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.pair >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.pair >>=? fun gas ->
         traced @@
         parse_data ?type_logger ctxt gas ta va >>=? fun (va, gas) ->
         parse_data ?type_logger ctxt gas tb vb >>=? fun (vb, gas) ->
@@ -1200,14 +1205,14 @@ let rec parse_data
         traced (fail (unexpected expr [] Constant_namespace [ D_Pair ]))
     (* Unions *)
     | Union_t ((tl, _), _), Prim (_, D_Left, [ v ], _) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.union >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.union >>=? fun gas ->
         traced @@
         parse_data ?type_logger ctxt gas tl v >>=? fun (v, gas) ->
         return (L v, gas)
     | Union_t _, Prim (loc, D_Left, l, _) ->
         fail @@ Invalid_arity (loc, D_Left, 1, List.length l)
     | Union_t (_, (tr, _)), Prim (_, D_Right, [ v ], _) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.union >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.union >>=? fun gas ->
         traced @@
         parse_data ?type_logger ctxt gas tr v >>=? fun (v, gas) ->
         return (R v, gas)
@@ -1217,21 +1222,21 @@ let rec parse_data
         traced (fail (unexpected expr [] Constant_namespace [ D_Left ; D_Right ]))
     (* Lambdas *)
     | Lambda_t (ta, tr), (Seq _ as script_instr) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.lambda >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.lambda >>=? fun gas ->
         traced @@
         parse_returning Lambda ?type_logger ctxt gas (ta, Some "@arg") tr script_instr
     | Lambda_t _, expr ->
         traced (fail (Invalid_kind (location expr, [ Seq_kind ], kind expr)))
     (* Options *)
     | Option_t t, Prim (_, D_Some, [ v ], _) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.some >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.some >>=? fun gas ->
         traced @@
         parse_data ?type_logger ctxt gas t v >>=? fun (v, gas) ->
         return (Some v, gas)
     | Option_t _, Prim (loc, D_Some, l, _) ->
         fail @@ Invalid_arity (loc, D_Some, 1, List.length l)
     | Option_t _, Prim (_, D_None, [], _) ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.none >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.none >>=? fun gas ->
         return (None, gas)
     | Option_t _, Prim (loc, D_None, l, _) ->
         fail @@ Invalid_arity (loc, D_None, 0, List.length l)
@@ -1241,7 +1246,7 @@ let rec parse_data
     | List_t t, Seq (loc, items, annot) ->
         fail_unexpected_annot loc annot >>=? fun () ->
         traced @@
-        (Gas.fold_right ~cycle_cost:Gas.Cost_of.Typechecking.list_element
+        (Gas.fold_right ~cycle_cost:Typecheck_costs.list_element
            gas
            (fun gas v rest ->
               parse_data ?type_logger ctxt gas t v >>=? fun (v, gas) ->
@@ -1253,7 +1258,7 @@ let rec parse_data
     | Set_t t, (Seq (loc, vs, annot) as expr) ->
         fail_unexpected_annot loc annot >>=? fun () ->
         traced @@
-        Gas.fold_left ~cycle_cost:Gas.Cost_of.Typechecking.set_element
+        Gas.fold_left ~cycle_cost:Typecheck_costs.set_element
           gas
           (fun gas v (last_value, set) ->
              parse_comparable_data ?type_logger ctxt gas t v >>=? fun (v, gas) ->
@@ -1267,7 +1272,7 @@ let rec parse_data
                    else return ()
                | None -> return ()
              end >>=? fun () ->
-             Gas.consume_check gas (Gas.Cost_of.set_update v false set) >>=? fun gas ->
+             Gas.consume_check gas (Michelson_v1_gas.Cost_of.set_update v false set) >>=? fun gas ->
              return ((Some v, set_update v true set), gas))
           (None, empty_set t) vs >>|? fun ((_, set), gas) ->
         (set, gas)
@@ -2103,11 +2108,11 @@ and parse_contract
   : type arg ret. context -> Gas.t -> arg ty -> ret ty -> Script.location -> Contract.t ->
     ((arg, ret) typed_contract * Gas.t) tzresult Lwt.t
   = fun ctxt gas arg ret loc contract ->
-    Gas.consume_check gas Gas.Cost_of.Typechecking.contract_exists >>=? fun gas ->
+    Gas.consume_check gas Typecheck_costs.contract_exists >>=? fun gas ->
     Contract.exists ctxt contract >>=? function
     | false -> fail (Invalid_contract (loc, contract))
     | true ->
-        Gas.consume_check gas Gas.Cost_of.Typechecking.get_script >>=? fun gas ->
+        Gas.consume_check gas Typecheck_costs.get_script >>=? fun gas ->
         trace
           (Invalid_contract (loc, contract)) @@
         Contract.get_script ctxt contract >>=? function
@@ -2132,14 +2137,14 @@ and parse_contract
 and parse_toplevel
   : Gas.t -> Script.expr -> ((Script.node * Script.node * Script.node * Script.node) * Gas.t) tzresult
   = fun gas toplevel ->
-    Gas.consume_check_error gas Gas.Cost_of.Typechecking.cycle >>? fun gas ->
+    Gas.consume_check_error gas Typecheck_costs.cycle >>? fun gas ->
     match root toplevel with
     | Int (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], Int_kind))
     | String (loc, _) -> error (Invalid_kind (loc, [ Seq_kind ], String_kind))
     | Prim (loc, _, _, _) -> error (Invalid_kind (loc, [ Seq_kind ], Prim_kind))
     | Seq (_, fields, _) ->
         let rec find_fields gas p r s c fields =
-          Gas.consume_check_error gas Gas.Cost_of.Typechecking.cycle >>? fun gas ->
+          Gas.consume_check_error gas Typecheck_costs.cycle >>? fun gas ->
           match fields with
           | [] -> ok ((p, r, s, c), gas)
           | Int (loc, _) :: _ -> error (Invalid_kind (loc, [ Prim_kind ], Int_kind))
@@ -2279,9 +2284,10 @@ let big_map_update key value ({ diff ; _ } as map) =
   { map with diff = map_set key value diff }
 
 let to_big_map_diff_list gas { key_type ; value_type ; diff } =
-  Gas.consume_check gas (Gas.Cost_of.map_to_list diff) >>=? fun gas ->
+  Gas.consume_check gas (Michelson_v1_gas.Cost_of.map_to_list diff) >>=? fun gas ->
   let pairs = map_fold (fun key value acc -> (key, value) :: acc) diff [] in
   Gas.fold_left gas
+    ~cycle_cost:Typecheck_costs.cycle
     (fun gas (key, value) acc ->
        Lwt.return @@ hash_data gas key_type key >>=? fun (hash, gas) ->
        begin

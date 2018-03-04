@@ -74,6 +74,8 @@ let rec unparse_stack
         | Ok (data, _) -> (Micheline.strip_locations data) :: (unparse_stack (rest, rest_ty))
         | Error _ -> Pervasives.failwith "Internal error: raise gas limit for unparse_stack"
 
+module Interp_costs = Michelson_v1_gas.Cost_of
+
 let rec interp
   : type p r.
     ?log: (Script.location * Gas.t * Script.expr list) list ref ->
@@ -86,7 +88,7 @@ let rec interp
         Contract.origination_nonce -> Gas.t -> context -> (b, a) descr -> b stack ->
         (a stack * Gas.t * context * Contract.origination_nonce) tzresult Lwt.t =
       fun origination gas ctxt ({ instr ; loc ; _ } as descr) stack ->
-        let gas = Gas.consume gas Gas.Cost_of.cycle in
+        let gas = Gas.consume gas Interp_costs.cycle in
         Gas.check gas >>=? fun () ->
         let logged_return : type a b.
           (b, a) descr ->
@@ -163,7 +165,7 @@ let rec interp
           (((param, return) typed_contract * rest) stack * Gas.t * context * Contract.origination_nonce) tzresult Lwt.t =
           fun descr ~manager ~delegate ~spendable ~delegatable
             ~credit ~code ~init ~param_type ~storage_type ~return_type ~rest ->
-            let gas = Gas.consume gas Gas.Cost_of.create_contract in
+            let gas = Gas.consume gas Interp_costs.create_contract in
             Gas.check gas >>=? fun () ->
             let code =
               Micheline.strip_locations
@@ -189,83 +191,84 @@ let rec interp
         match instr, stack with
         (* stack ops *)
         | Drop, Item (_, rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.stack_op in
+            let gas = Gas.consume gas Interp_costs.stack_op in
             Gas.check gas >>=? fun () ->
             logged_return (rest, gas, ctxt)
         | Dup, Item (v, rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.stack_op in
+            let gas = Gas.consume gas Interp_costs.stack_op in
             Gas.check gas >>=? fun () ->
             logged_return (Item (v, Item (v, rest)), gas, ctxt)
         | Swap, Item (vi, Item (vo, rest)) ->
-            let gas = Gas.consume gas Gas.Cost_of.stack_op in
+            let gas = Gas.consume gas Interp_costs.stack_op in
             Gas.check gas >>=? fun () ->
             logged_return (Item (vo, Item (vi, rest)), gas, ctxt)
         | Const v, rest ->
-            let gas = Gas.consume gas Gas.Cost_of.push in
+            let gas = Gas.consume gas Interp_costs.push in
             Gas.check gas >>=? fun () ->
             logged_return (Item (v, rest), gas, ctxt)
         (* options *)
         | Cons_some, Item (v, rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.wrap in
+            let gas = Gas.consume gas Interp_costs.wrap in
             Gas.check gas >>=? fun () ->
             logged_return (Item (Some v, rest), gas, ctxt)
         | Cons_none _, rest ->
-            let gas = Gas.consume gas Gas.Cost_of.variant_no_data in
+            let gas = Gas.consume gas Interp_costs.variant_no_data in
             Gas.check gas >>=? fun () ->
             logged_return (Item (None, rest), gas, ctxt)
         | If_none (bt, _), Item (None, rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.branch) ctxt bt rest
+            step origination (Gas.consume gas Interp_costs.branch) ctxt bt rest
         | If_none (_, bf), Item (Some v, rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.branch) ctxt bf (Item (v, rest))
+            step origination (Gas.consume gas Interp_costs.branch) ctxt bf (Item (v, rest))
         (* pairs *)
         | Cons_pair, Item (a, Item (b, rest)) ->
-            let gas = Gas.consume gas Gas.Cost_of.pair in
+            let gas = Gas.consume gas Interp_costs.pair in
             Gas.check gas >>=? fun () ->
             logged_return (Item ((a, b), rest), gas, ctxt)
         | Car, Item ((a, _), rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.pair_access in
+            let gas = Gas.consume gas Interp_costs.pair_access in
             Gas.check gas >>=? fun () ->
             logged_return (Item (a, rest), gas, ctxt)
         | Cdr, Item ((_, b), rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.pair_access in
+            let gas = Gas.consume gas Interp_costs.pair_access in
             Gas.check gas >>=? fun () ->
             logged_return (Item (b, rest), gas, ctxt)
         (* unions *)
         | Left, Item (v, rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.wrap in
+            let gas = Gas.consume gas Interp_costs.wrap in
             Gas.check gas >>=? fun () ->
             logged_return (Item (L v, rest), gas, ctxt)
         | Right, Item (v, rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.wrap in
+            let gas = Gas.consume gas Interp_costs.wrap in
             Gas.check gas >>=? fun () ->
             logged_return (Item (R v, rest), gas, ctxt)
         | If_left (bt, _), Item (L v, rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.branch) ctxt bt (Item (v, rest))
+            step origination (Gas.consume gas Interp_costs.branch) ctxt bt (Item (v, rest))
         | If_left (_, bf), Item (R v, rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.branch) ctxt bf (Item (v, rest))
+            step origination (Gas.consume gas Interp_costs.branch) ctxt bf (Item (v, rest))
         (* lists *)
         | Cons_list, Item (hd, Item (tl, rest)) ->
-            let gas = Gas.consume gas Gas.Cost_of.cons in
+            let gas = Gas.consume gas Interp_costs.cons in
             Gas.check gas >>=? fun () ->
             logged_return (Item (hd :: tl, rest), gas, ctxt)
         | Nil, rest ->
-            let gas = Gas.consume gas Gas.Cost_of.variant_no_data in
+            let gas = Gas.consume gas Interp_costs.variant_no_data in
             Gas.check gas >>=? fun () ->
             logged_return (Item ([], rest), gas, ctxt)
         | If_cons (_, bf), Item ([], rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.branch) ctxt bf rest
+            step origination (Gas.consume gas Interp_costs.branch) ctxt bf rest
         | If_cons (bt, _), Item (hd :: tl, rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.branch) ctxt bt (Item (hd, Item (tl, rest)))
+            step origination (Gas.consume gas Interp_costs.branch) ctxt bt (Item (hd, Item (tl, rest)))
         | List_map, Item (lam, Item (l, rest)) ->
-            Gas.fold_right gas (fun gas arg (tail, ctxt, origination) ->
-                interp ?log origination gas orig source amount ctxt lam arg
-                >>=? fun (ret, gas, ctxt, origination) ->
-                return ((ret :: tail, ctxt, origination), gas))
+            Gas.fold_right ~cycle_cost:Interp_costs.cycle gas
+              (fun gas arg (tail, ctxt, origination) ->
+                 interp ?log origination gas orig source amount ctxt lam arg
+                 >>=? fun (ret, gas, ctxt, origination) ->
+                 return ((ret :: tail, ctxt, origination), gas))
               ([], ctxt, origination) l >>=? fun ((res, ctxt, origination), gas) ->
             logged_return ~origination (Item (res, rest), gas, ctxt)
         | List_map_body body, Item (l, rest) ->
             let rec help rest gas l =
-              let gas = Gas.consume gas Gas.Cost_of.loop_cycle in
+              let gas = Gas.consume gas Interp_costs.loop_cycle in
               Gas.check gas >>=? fun () ->
               match l with
               | [] -> logged_return ~origination (Item ([], rest), gas, ctxt)
@@ -278,7 +281,7 @@ let rec interp
             in help rest gas l >>=? fun (res, gas, ctxt, origination) ->
             logged_return ~origination (res, gas, ctxt)
         | List_reduce, Item (lam, Item (l, Item (init, rest))) ->
-            Gas.fold_left gas
+            Gas.fold_left ~cycle_cost:Interp_costs.cycle gas
               (fun gas arg (partial, ctxt, origination) ->
                  interp ?log origination gas orig source amount ctxt lam (arg, partial)
                  >>=? fun (partial, gas, ctxt, origination) ->
@@ -286,14 +289,14 @@ let rec interp
               (init, ctxt, origination) l >>=? fun ((res, ctxt, origination), gas) ->
             logged_return ~origination (Item (res, rest), gas, ctxt)
         | List_size, Item (list, rest) ->
-            Gas.fold_left ~cycle_cost:Gas.Cost_of.list_size gas
+            Gas.fold_left ~cycle_cost:Interp_costs.list_size gas
               (fun gas _ len ->
                  return (len + 1, gas))
               0
               list >>=? fun (len, gas) ->
             logged_return (Item (Script_int.(abs (of_int len)), rest), gas, ctxt)
         | List_iter body, Item (l, init_stack) ->
-            Gas.fold_left gas
+            Gas.fold_left ~cycle_cost:Interp_costs.list_size gas
               (fun gas arg (stack, ctxt, origination) ->
                  step origination gas ctxt body (Item (arg, stack))
                  >>=? fun (stack, gas, ctxt, origination) ->
@@ -302,13 +305,13 @@ let rec interp
             logged_return ~origination (stack, gas, ctxt)
         (* sets *)
         | Empty_set t, rest ->
-            logged_return (Item (empty_set t, rest), Gas.consume gas Gas.Cost_of.empty_set, ctxt)
+            logged_return (Item (empty_set t, rest), Gas.consume gas Interp_costs.empty_set, ctxt)
         | Set_reduce, Item (lam, Item (set, Item (init, rest))) ->
-            let gas = Gas.consume gas (Gas.Cost_of.set_to_list set) in
+            let gas = Gas.consume gas (Interp_costs.set_to_list set) in
             Gas.check gas >>=? fun () ->
             let items =
               List.rev (set_fold (fun e acc -> e :: acc) set []) in
-            Gas.fold_left gas
+            Gas.fold_left ~cycle_cost:Interp_costs.list_size gas
               (fun gas arg (partial, ctxt, origination) ->
                  interp ?log origination gas orig source amount ctxt lam (arg, partial)
                  >>=? fun (partial, gas, ctxt, origination) ->
@@ -316,7 +319,7 @@ let rec interp
               (init, ctxt, origination) items >>=? fun ((res, ctxt, origination), gas) ->
             logged_return ~origination (Item (res, rest), gas, ctxt)
         | Set_iter body, Item (set, init_stack) ->
-            Gas.fold_left gas
+            Gas.fold_left ~cycle_cost:Interp_costs.list_size gas
               (fun gas arg (stack, ctxt, origination) ->
                  step origination gas ctxt body (Item (arg, stack))
                  >>=? fun (stack, gas, ctxt, origination) ->
@@ -325,20 +328,20 @@ let rec interp
               (set_fold (fun e acc -> e :: acc) set []) >>=? fun ((stack, ctxt, origination), gas) ->
             logged_return ~origination (stack, gas, ctxt)
         | Set_mem, Item (v, Item (set, rest)) ->
-            gas_check_binop descr (set_mem, v, set) Gas.Cost_of.set_mem rest ctxt
+            gas_check_binop descr (set_mem, v, set) Interp_costs.set_mem rest ctxt
         | Set_update, Item (v, Item (presence, Item (set, rest))) ->
-            gas_check_terop descr (set_update, v, presence, set) Gas.Cost_of.set_update rest
+            gas_check_terop descr (set_update, v, presence, set) Interp_costs.set_update rest
         | Set_size, Item (set, rest) ->
-            gas_check_unop descr (set_size, set) (fun _ -> Gas.Cost_of.set_size) rest ctxt
+            gas_check_unop descr (set_size, set) (fun _ -> Interp_costs.set_size) rest ctxt
         (* maps *)
         | Empty_map (t, _), rest ->
-            logged_return (Item (empty_map t, rest), Gas.consume gas Gas.Cost_of.empty_map, ctxt)
+            logged_return (Item (empty_map t, rest), Gas.consume gas Interp_costs.empty_map, ctxt)
         | Map_map, Item (lam, Item (map, rest)) ->
-            let gas = Gas.consume gas (Gas.Cost_of.map_to_list map) in
+            let gas = Gas.consume gas (Interp_costs.map_to_list map) in
             Gas.check gas >>=? fun () ->
             let items =
               List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
-            Gas.fold_left gas
+            Gas.fold_left ~cycle_cost:Interp_costs.list_size gas
               (fun gas (k, v) (acc, ctxt, origination) ->
                  interp ?log origination gas orig source amount ctxt lam (k, v)
                  >>=? fun (ret, gas, ctxt, origination) ->
@@ -346,11 +349,11 @@ let rec interp
               (empty_map (map_key_ty map), ctxt, origination) items >>=? fun ((res, ctxt, origination), gas) ->
             logged_return ~origination (Item (res, rest), gas, ctxt)
         | Map_reduce, Item (lam, Item (map, Item (init, rest))) ->
-            let gas = Gas.consume gas (Gas.Cost_of.map_to_list map) in
+            let gas = Gas.consume gas (Interp_costs.map_to_list map) in
             Gas.check gas >>=? fun () ->
             let items =
               List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
-            Gas.fold_left gas
+            Gas.fold_left ~cycle_cost:Interp_costs.list_size gas
               (fun gas arg (partial, ctxt, origination) ->
                  interp ?log origination gas orig source amount ctxt lam (arg, partial)
                  >>=? fun (partial, gas, ctxt, origination) ->
@@ -358,11 +361,11 @@ let rec interp
               (init, ctxt, origination) items >>=? fun ((res, ctxt, origination), gas) ->
             logged_return ~origination (Item (res, rest), gas, ctxt)
         | Map_iter body, Item (map, init_stack) ->
-            let gas = Gas.consume gas (Gas.Cost_of.map_to_list map) in
+            let gas = Gas.consume gas (Interp_costs.map_to_list map) in
             Gas.check gas >>=? fun () ->
             let items =
               List.rev (map_fold (fun k v acc -> (k, v) :: acc) map []) in
-            Gas.fold_left gas
+            Gas.fold_left ~cycle_cost:Interp_costs.list_size gas
               (fun gas arg (stack, ctxt, origination) ->
                  step origination gas ctxt body (Item (arg, stack))
                  >>=? fun (stack, gas, ctxt, origination) ->
@@ -370,59 +373,59 @@ let rec interp
               (init_stack, ctxt, origination) items >>=? fun ((stack, ctxt, origination), gas) ->
             logged_return ~origination (stack, gas, ctxt)
         | Map_mem, Item (v, Item (map, rest)) ->
-            gas_check_binop descr (map_mem, v, map) Gas.Cost_of.map_mem rest ctxt
+            gas_check_binop descr (map_mem, v, map) Interp_costs.map_mem rest ctxt
         | Map_get, Item (v, Item (map, rest)) ->
-            gas_check_binop descr (map_get, v, map) Gas.Cost_of.map_get rest ctxt
+            gas_check_binop descr (map_get, v, map) Interp_costs.map_get rest ctxt
         | Map_update, Item (k, Item (v, Item (map, rest))) ->
-            gas_check_terop descr (map_update, k, v, map) Gas.Cost_of.map_update rest
+            gas_check_terop descr (map_update, k, v, map) Interp_costs.map_update rest
         | Map_size, Item (map, rest) ->
-            gas_check_unop descr (map_size, map) (fun _ -> Gas.Cost_of.map_size) rest ctxt
+            gas_check_unop descr (map_size, map) (fun _ -> Interp_costs.map_size) rest ctxt
         (* Big map operations *)
         | Big_map_mem, Item (key, Item (map, rest)) ->
-            let gas = Gas.consume gas (Gas.Cost_of.big_map_mem key map) in
+            let gas = Gas.consume gas (Interp_costs.big_map_mem key map) in
             Gas.check gas >>=? fun () ->
             Script_ir_translator.big_map_mem ctxt gas source key map >>=? fun (res, gas) ->
             logged_return (Item (res, rest), gas, ctxt)
         | Big_map_get, Item (key, Item (map, rest)) ->
-            let gas = Gas.consume gas (Gas.Cost_of.big_map_get key map) in
+            let gas = Gas.consume gas (Interp_costs.big_map_get key map) in
             Gas.check gas >>=? fun () ->
             Script_ir_translator.big_map_get ctxt gas source key map >>=? fun (res, gas) ->
             logged_return (Item (res, rest), gas, ctxt)
         | Big_map_update, Item (key, Item (maybe_value, Item (map, rest))) ->
             gas_check_terop descr
               (Script_ir_translator.big_map_update, key, maybe_value, map)
-              Gas.Cost_of.big_map_update rest
+              Interp_costs.big_map_update rest
         (* timestamp operations *)
         | Add_seconds_to_timestamp, Item (n, Item (t, rest)) ->
             gas_check_binop descr
               (Script_timestamp.add_delta, t, n)
-              Gas.Cost_of.add_timestamp rest ctxt
+              Interp_costs.add_timestamp rest ctxt
         | Add_timestamp_to_seconds, Item (t, Item (n, rest)) ->
             gas_check_binop descr (Script_timestamp.add_delta, t, n)
-              Gas.Cost_of.add_timestamp rest ctxt
+              Interp_costs.add_timestamp rest ctxt
         | Sub_timestamp_seconds, Item (t, Item (s, rest)) ->
             gas_check_binop descr (Script_timestamp.sub_delta, t, s)
-              Gas.Cost_of.sub_timestamp rest ctxt
+              Interp_costs.sub_timestamp rest ctxt
         | Diff_timestamps, Item (t1, Item (t2, rest)) ->
             gas_check_binop descr (Script_timestamp.diff, t1, t2)
-              Gas.Cost_of.diff_timestamps rest ctxt
+              Interp_costs.diff_timestamps rest ctxt
         (* string operations *)
         | Concat, Item (x, Item (y, rest)) ->
-            gas_check_binop descr ((^), x, y) Gas.Cost_of.concat rest ctxt
+            gas_check_binop descr ((^), x, y) Interp_costs.concat rest ctxt
         (* currency operations *)
         | Add_tez, Item (x, Item (y, rest)) ->
-            let gas = Gas.consume gas Gas.Cost_of.int64_op in
+            let gas = Gas.consume gas Interp_costs.int64_op in
             Gas.check gas >>=? fun () ->
             Lwt.return Tez.(x +? y) >>=? fun res ->
             logged_return (Item (res, rest), gas, ctxt)
         | Sub_tez, Item (x, Item (y, rest)) ->
-            let gas = Gas.consume gas Gas.Cost_of.int64_op in
+            let gas = Gas.consume gas Interp_costs.int64_op in
             Gas.check gas >>=? fun () ->
             Lwt.return Tez.(x -? y) >>=? fun res ->
             logged_return (Item (res, rest), gas, ctxt)
         | Mul_teznat, Item (x, Item (y, rest)) ->
-            let gas = Gas.consume gas Gas.Cost_of.int64_op in
-            let gas = Gas.consume gas Gas.Cost_of.z_to_int64 in
+            let gas = Gas.consume gas Interp_costs.int64_op in
+            let gas = Gas.consume gas Interp_costs.z_to_int64 in
             Gas.check gas >>=? fun () ->
             begin
               match Script_int.to_int64 y with
@@ -432,8 +435,8 @@ let rec interp
                   logged_return (Item (res, rest), gas, ctxt)
             end
         | Mul_nattez, Item (y, Item (x, rest)) ->
-            let gas = Gas.consume gas Gas.Cost_of.int64_op in
-            let gas = Gas.consume gas Gas.Cost_of.z_to_int64 in
+            let gas = Gas.consume gas Interp_costs.int64_op in
+            let gas = Gas.consume gas Interp_costs.z_to_int64 in
             Gas.check gas >>=? fun () ->
             begin
               match Script_int.to_int64 y with
@@ -444,42 +447,42 @@ let rec interp
             end
         (* boolean operations *)
         | Or, Item (x, Item (y, rest)) ->
-            gas_check_binop descr ((||), x, y) Gas.Cost_of.bool_binop rest ctxt
+            gas_check_binop descr ((||), x, y) Interp_costs.bool_binop rest ctxt
         | And, Item (x, Item (y, rest)) ->
-            gas_check_binop descr ((&&), x, y) Gas.Cost_of.bool_binop rest ctxt
+            gas_check_binop descr ((&&), x, y) Interp_costs.bool_binop rest ctxt
         | Xor, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Compare.Bool.(<>), x, y) Gas.Cost_of.bool_binop rest ctxt
+            gas_check_binop descr (Compare.Bool.(<>), x, y) Interp_costs.bool_binop rest ctxt
         | Not, Item (x, rest) ->
-            gas_check_unop descr (not, x) Gas.Cost_of.bool_unop rest ctxt
+            gas_check_unop descr (not, x) Interp_costs.bool_unop rest ctxt
         (* integer operations *)
         | Abs_int, Item (x, rest) ->
-            gas_check_unop descr (Script_int.abs, x) Gas.Cost_of.abs rest ctxt
+            gas_check_unop descr (Script_int.abs, x) Interp_costs.abs rest ctxt
         | Int_nat, Item (x, rest) ->
-            gas_check_unop descr (Script_int.int, x) Gas.Cost_of.int rest ctxt
+            gas_check_unop descr (Script_int.int, x) Interp_costs.int rest ctxt
         | Neg_int, Item (x, rest) ->
-            gas_check_unop descr (Script_int.neg, x) Gas.Cost_of.neg rest ctxt
+            gas_check_unop descr (Script_int.neg, x) Interp_costs.neg rest ctxt
         | Neg_nat, Item (x, rest) ->
-            gas_check_unop descr (Script_int.neg, x) Gas.Cost_of.neg rest ctxt
+            gas_check_unop descr (Script_int.neg, x) Interp_costs.neg rest ctxt
         | Add_intint, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.add, x, y) Gas.Cost_of.add rest ctxt
+            gas_check_binop descr (Script_int.add, x, y) Interp_costs.add rest ctxt
         | Add_intnat, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.add, x, y) Gas.Cost_of.add rest ctxt
+            gas_check_binop descr (Script_int.add, x, y) Interp_costs.add rest ctxt
         | Add_natint, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.add, x, y) Gas.Cost_of.add rest ctxt
+            gas_check_binop descr (Script_int.add, x, y) Interp_costs.add rest ctxt
         | Add_natnat, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.add_n, x, y) Gas.Cost_of.add rest ctxt
+            gas_check_binop descr (Script_int.add_n, x, y) Interp_costs.add rest ctxt
         | Sub_int, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.sub, x, y) Gas.Cost_of.sub rest ctxt
+            gas_check_binop descr (Script_int.sub, x, y) Interp_costs.sub rest ctxt
         | Mul_intint, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.mul, x, y) Gas.Cost_of.mul rest ctxt
+            gas_check_binop descr (Script_int.mul, x, y) Interp_costs.mul rest ctxt
         | Mul_intnat, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.mul, x, y) Gas.Cost_of.mul rest ctxt
+            gas_check_binop descr (Script_int.mul, x, y) Interp_costs.mul rest ctxt
         | Mul_natint, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.mul, x, y) Gas.Cost_of.mul rest ctxt
+            gas_check_binop descr (Script_int.mul, x, y) Interp_costs.mul rest ctxt
         | Mul_natnat, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.mul_n, x, y) Gas.Cost_of.mul rest ctxt
+            gas_check_binop descr (Script_int.mul_n, x, y) Interp_costs.mul rest ctxt
         | Ediv_teznat, Item (x, Item (y, rest)) ->
-            let gas = Gas.consume gas Gas.Cost_of.int64_to_z in
+            let gas = Gas.consume gas Interp_costs.int64_to_z in
             Gas.check gas >>=? fun () ->
             let x = Script_int.of_int64 (Tez.to_mutez x) in
             gas_check_binop ~gas descr
@@ -499,12 +502,12 @@ let rec interp
                       (* Cannot overflow *)
                       | _ -> assert false),
                x, y)
-              Gas.Cost_of.div
+              Interp_costs.div
               rest
               ctxt
         | Ediv_tez, Item (x, Item (y, rest)) ->
-            let gas = Gas.consume gas Gas.Cost_of.int64_to_z in
-            let gas = Gas.consume gas Gas.Cost_of.int64_to_z in
+            let gas = Gas.consume gas Interp_costs.int64_to_z in
+            let gas = Gas.consume gas Interp_costs.int64_to_z in
             let x = Script_int.abs (Script_int.of_int64 (Tez.to_mutez x)) in
             let y = Script_int.abs (Script_int.of_int64 (Tez.to_mutez y)) in
             gas_check_binop ~gas descr
@@ -518,123 +521,123 @@ let rec interp
                           | None -> assert false (* Cannot overflow *)
                           | Some r -> Some (q, r)),
                x, y)
-              Gas.Cost_of.div
+              Interp_costs.div
               rest
               ctxt
         | Ediv_intint, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.ediv, x, y) Gas.Cost_of.div rest ctxt
+            gas_check_binop descr (Script_int.ediv, x, y) Interp_costs.div rest ctxt
         | Ediv_intnat, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.ediv, x, y) Gas.Cost_of.div rest ctxt
+            gas_check_binop descr (Script_int.ediv, x, y) Interp_costs.div rest ctxt
         | Ediv_natint, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.ediv, x, y) Gas.Cost_of.div rest ctxt
+            gas_check_binop descr (Script_int.ediv, x, y) Interp_costs.div rest ctxt
         | Ediv_natnat, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.ediv_n, x, y) Gas.Cost_of.div rest ctxt
+            gas_check_binop descr (Script_int.ediv_n, x, y) Interp_costs.div rest ctxt
         | Lsl_nat, Item (x, Item (y, rest)) ->
-            let gas = Gas.consume gas (Gas.Cost_of.shift_left x y) in
+            let gas = Gas.consume gas (Interp_costs.shift_left x y) in
             Gas.check gas >>=? fun () -> begin
               match Script_int.shift_left_n x y with
               | None -> fail (Overflow loc)
               | Some x -> logged_return (Item (x, rest), gas, ctxt)
             end
         | Lsr_nat, Item (x, Item (y, rest)) ->
-            let gas = Gas.consume gas (Gas.Cost_of.shift_right x y) in
+            let gas = Gas.consume gas (Interp_costs.shift_right x y) in
             Gas.check gas >>=? fun () -> begin
               match Script_int.shift_right_n x y with
               | None -> fail (Overflow loc)
               | Some r -> logged_return (Item (r, rest), gas, ctxt)
             end
         | Or_nat, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.logor, x, y) Gas.Cost_of.logor rest ctxt
+            gas_check_binop descr (Script_int.logor, x, y) Interp_costs.logor rest ctxt
         | And_nat, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.logand, x, y) Gas.Cost_of.logand rest ctxt
+            gas_check_binop descr (Script_int.logand, x, y) Interp_costs.logand rest ctxt
         | Xor_nat, Item (x, Item (y, rest)) ->
-            gas_check_binop descr (Script_int.logxor, x, y) Gas.Cost_of.logxor rest ctxt
+            gas_check_binop descr (Script_int.logxor, x, y) Interp_costs.logxor rest ctxt
         | Not_int, Item (x, rest) ->
-            gas_check_unop descr (Script_int.lognot, x) Gas.Cost_of.lognot rest ctxt
+            gas_check_unop descr (Script_int.lognot, x) Interp_costs.lognot rest ctxt
         | Not_nat, Item (x, rest) ->
-            gas_check_unop descr (Script_int.lognot, x) Gas.Cost_of.lognot rest ctxt
+            gas_check_unop descr (Script_int.lognot, x) Interp_costs.lognot rest ctxt
         (* control *)
         | Seq (hd, tl), stack ->
             step origination gas ctxt hd stack >>=? fun (trans, gas, ctxt, origination) ->
             step origination gas ctxt tl trans
         | If (bt, _), Item (true, rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.branch) ctxt bt rest
+            step origination (Gas.consume gas Interp_costs.branch) ctxt bt rest
         | If (_, bf), Item (false, rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.branch) ctxt bf rest
+            step origination (Gas.consume gas Interp_costs.branch) ctxt bf rest
         | Loop body, Item (true, rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.loop_cycle) ctxt body rest >>=? fun (trans, gas, ctxt, origination) ->
-            step origination (Gas.consume gas Gas.Cost_of.loop_cycle) ctxt descr trans
+            step origination (Gas.consume gas Interp_costs.loop_cycle) ctxt body rest >>=? fun (trans, gas, ctxt, origination) ->
+            step origination (Gas.consume gas Interp_costs.loop_cycle) ctxt descr trans
         | Loop _, Item (false, rest) ->
             logged_return (rest, gas, ctxt)
         | Loop_left body, Item (L v, rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.loop_cycle) ctxt body (Item (v, rest)) >>=? fun (trans, gas, ctxt, origination) ->
-            step origination (Gas.consume gas Gas.Cost_of.loop_cycle) ctxt descr trans
+            step origination (Gas.consume gas Interp_costs.loop_cycle) ctxt body (Item (v, rest)) >>=? fun (trans, gas, ctxt, origination) ->
+            step origination (Gas.consume gas Interp_costs.loop_cycle) ctxt descr trans
         | Loop_left _, Item (R v, rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.loop_cycle in
+            let gas = Gas.consume gas Interp_costs.loop_cycle in
             Gas.check gas >>=? fun () ->
             logged_return (Item (v, rest), gas, ctxt)
         | Dip b, Item (ign, rest) ->
-            step origination (Gas.consume gas Gas.Cost_of.stack_op) ctxt b rest >>=? fun (res, gas, ctxt, origination) ->
+            step origination (Gas.consume gas Interp_costs.stack_op) ctxt b rest >>=? fun (res, gas, ctxt, origination) ->
             logged_return ~origination (Item (ign, res), gas, ctxt)
         | Exec, Item (arg, Item (lam, rest)) ->
-            interp ?log origination (Gas.consume gas Gas.Cost_of.exec) orig source amount ctxt lam arg >>=? fun (res, gas, ctxt, origination) ->
+            interp ?log origination (Gas.consume gas Interp_costs.exec) orig source amount ctxt lam arg >>=? fun (res, gas, ctxt, origination) ->
             logged_return ~origination (Item (res, rest), gas, ctxt)
         | Lambda lam, rest ->
-            logged_return ~origination (Item (lam, rest), Gas.consume gas Gas.Cost_of.push, ctxt)
+            logged_return ~origination (Item (lam, rest), Gas.consume gas Interp_costs.push, ctxt)
         | Fail, _ ->
             fail (Reject loc)
         | Nop, stack ->
             logged_return (stack, gas, ctxt)
         (* comparison *)
         | Compare Bool_key, Item (a, Item (b, rest)) ->
-            gas_compare descr Compare.Bool.compare Gas.Cost_of.compare_bool a b rest
+            gas_compare descr Compare.Bool.compare Interp_costs.compare_bool a b rest
         | Compare String_key, Item (a, Item (b, rest)) ->
-            gas_compare descr Compare.String.compare Gas.Cost_of.compare_string a b rest
+            gas_compare descr Compare.String.compare Interp_costs.compare_string a b rest
         | Compare Tez_key, Item (a, Item (b, rest)) ->
-            gas_compare descr Tez.compare Gas.Cost_of.compare_tez a b rest
+            gas_compare descr Tez.compare Interp_costs.compare_tez a b rest
         | Compare Int_key, Item (a, Item (b, rest)) ->
-            gas_compare descr Script_int.compare Gas.Cost_of.compare_int a b rest
+            gas_compare descr Script_int.compare Interp_costs.compare_int a b rest
         | Compare Nat_key, Item (a, Item (b, rest)) ->
-            gas_compare descr Script_int.compare Gas.Cost_of.compare_nat a b rest
+            gas_compare descr Script_int.compare Interp_costs.compare_nat a b rest
         | Compare Key_hash_key, Item (a, Item (b, rest)) ->
             gas_compare descr Signature.Public_key_hash.compare
-              Gas.Cost_of.compare_key_hash a b rest
+              Interp_costs.compare_key_hash a b rest
         | Compare Timestamp_key, Item (a, Item (b, rest)) ->
-            gas_compare descr Script_timestamp.compare Gas.Cost_of.compare_timestamp a b rest
+            gas_compare descr Script_timestamp.compare Interp_costs.compare_timestamp a b rest
         (* comparators *)
         | Eq, Item (cmpres, rest) ->
             let cmpres = Script_int.compare cmpres Script_int.zero in
             let cmpres = Compare.Int.(cmpres = 0) in
-            logged_return (Item (cmpres, rest), Gas.consume gas Gas.Cost_of.compare_res, ctxt)
+            logged_return (Item (cmpres, rest), Gas.consume gas Interp_costs.compare_res, ctxt)
         | Neq, Item (cmpres, rest) ->
             let cmpres = Script_int.compare cmpres Script_int.zero in
             let cmpres = Compare.Int.(cmpres <> 0) in
-            logged_return (Item (cmpres, rest), Gas.consume gas Gas.Cost_of.compare_res, ctxt)
+            logged_return (Item (cmpres, rest), Gas.consume gas Interp_costs.compare_res, ctxt)
         | Lt, Item (cmpres, rest) ->
             let cmpres = Script_int.compare cmpres Script_int.zero in
             let cmpres = Compare.Int.(cmpres < 0) in
-            logged_return (Item (cmpres, rest), Gas.consume gas Gas.Cost_of.compare_res, ctxt)
+            logged_return (Item (cmpres, rest), Gas.consume gas Interp_costs.compare_res, ctxt)
         | Le, Item (cmpres, rest) ->
             let cmpres = Script_int.compare cmpres Script_int.zero in
             let cmpres = Compare.Int.(cmpres <= 0) in
-            logged_return (Item (cmpres, rest), Gas.consume gas Gas.Cost_of.compare_res, ctxt)
+            logged_return (Item (cmpres, rest), Gas.consume gas Interp_costs.compare_res, ctxt)
         | Gt, Item (cmpres, rest) ->
             let cmpres = Script_int.compare cmpres Script_int.zero in
             let cmpres = Compare.Int.(cmpres > 0) in
-            logged_return (Item (cmpres, rest), Gas.consume gas Gas.Cost_of.compare_res, ctxt)
+            logged_return (Item (cmpres, rest), Gas.consume gas Interp_costs.compare_res, ctxt)
         | Ge, Item (cmpres, rest) ->
             let cmpres = Script_int.compare cmpres Script_int.zero in
             let cmpres = Compare.Int.(cmpres >= 0) in
-            logged_return (Item (cmpres, rest), Gas.consume gas Gas.Cost_of.compare_res, ctxt)
+            logged_return (Item (cmpres, rest), Gas.consume gas Interp_costs.compare_res, ctxt)
         (* protocol *)
         | Manager, Item ((_, _, contract), rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.manager in
+            let gas = Gas.consume gas Interp_costs.manager in
             Gas.check gas >>=? fun () ->
             Contract.get_manager ctxt contract >>=? fun manager ->
             logged_return (Item (manager, rest), gas, ctxt)
         | Transfer_tokens storage_type,
           Item (p, Item (amount, Item ((tp, Unit_t, destination), Item (storage, Empty)))) -> begin
-            let gas = Gas.consume gas Gas.Cost_of.transfer in
+            let gas = Gas.consume gas Interp_costs.transfer in
             Gas.check gas >>=? fun () ->
             Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
             Contract.credit ctxt destination amount >>=? fun ctxt ->
@@ -683,7 +686,7 @@ let rec interp
           end
         | Transfer_tokens storage_type,
           Item (p, Item (amount, Item ((tp, tr, destination), Item (sto, Empty)))) -> begin
-            let gas = Gas.consume gas Gas.Cost_of.transfer in
+            let gas = Gas.consume gas Interp_costs.transfer in
             Gas.check gas >>=? fun () ->
             Contract.spend_from_script ctxt source amount >>=? fun ctxt ->
             Contract.credit ctxt destination amount >>=? fun ctxt ->
@@ -726,7 +729,7 @@ let rec interp
           end
         | Create_account,
           Item (manager, Item (delegate, Item (delegatable, Item (credit, rest)))) ->
-            let gas = Gas.consume gas Gas.Cost_of.create_account in
+            let gas = Gas.consume gas Interp_costs.create_account in
             Gas.check gas >>=? fun () ->
             Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
             Lwt.return Tez.(credit -? Constants.origination_burn ctxt) >>=? fun balance ->
@@ -737,7 +740,7 @@ let rec interp
             Fees.origination_burn ctxt ~source contract >>=? fun ctxt ->
             logged_return ~origination (Item ((Unit_t, Unit_t, contract), rest), gas, ctxt)
         | Default_account, Item (key, rest) ->
-            let gas = Gas.consume gas Gas.Cost_of.implicit_account in
+            let gas = Gas.consume gas Interp_costs.implicit_account in
             Gas.check gas >>=? fun () ->
             let contract = Contract.implicit_contract key in
             logged_return (Item ((Unit_t, Unit_t, contract), rest), gas, ctxt)
@@ -761,40 +764,40 @@ let rec interp
             create_contract descr ~manager ~delegate ~spendable ~delegatable ~credit ~code ~init
               ~param_type ~return_type ~storage_type ~rest
         | Balance, rest ->
-            let gas = Gas.consume gas Gas.Cost_of.balance in
+            let gas = Gas.consume gas Interp_costs.balance in
             Gas.check gas >>=? fun () ->
             Contract.get_balance ctxt source >>=? fun balance ->
             logged_return (Item (balance, rest), gas, ctxt)
         | Now, rest ->
-            let gas = Gas.consume gas Gas.Cost_of.now in
+            let gas = Gas.consume gas Interp_costs.now in
             Gas.check gas >>=? fun () ->
             let now = Script_timestamp.now ctxt in
             logged_return (Item (now, rest), gas, ctxt)
         | Check_signature, Item (key, Item ((signature, message), rest)) ->
-            let gas = Gas.consume gas Gas.Cost_of.check_signature in
+            let gas = Gas.consume gas Interp_costs.check_signature in
             Gas.check gas >>=? fun () ->
             let message = MBytes.of_string message in
             let res = Signature.check key signature message in
             logged_return (Item (res, rest), gas, ctxt)
         | Hash_key, Item (key, rest) ->
-            logged_return (Item (Signature.Public_key.hash key, rest), Gas.consume gas Gas.Cost_of.hash_key, ctxt)
+            logged_return (Item (Signature.Public_key.hash key, rest), Gas.consume gas Interp_costs.hash_key, ctxt)
         | H ty, Item (v, rest) ->
-            Gas.consume_check gas (Gas.Cost_of.hash v) >>=? fun gas ->
+            Gas.consume_check gas (Interp_costs.hash v) >>=? fun gas ->
             Lwt.return @@ hash_data gas ty v >>=? fun (hash, gas) ->
             logged_return (Item (hash, rest), gas, ctxt)
         | Steps_to_quota, rest ->
-            let gas = Gas.consume gas Gas.Cost_of.steps_to_quota in
-            logged_return (Item (Gas.Cost_of.get_steps_to_quota gas, rest), gas, ctxt)
+            let gas = Gas.consume gas Interp_costs.steps_to_quota in
+            logged_return (Item (Interp_costs.get_steps_to_quota gas, rest), gas, ctxt)
         | Source (ta, tb), rest ->
-            let gas = Gas.consume gas Gas.Cost_of.source in
+            let gas = Gas.consume gas Interp_costs.source in
             Gas.check gas >>=? fun () ->
             logged_return (Item ((ta, tb, orig), rest), gas, ctxt)
         | Self (ta, tb), rest ->
-            let gas = Gas.consume gas Gas.Cost_of.self in
+            let gas = Gas.consume gas Interp_costs.self in
             Gas.check gas >>=? fun () ->
             logged_return (Item ((ta, tb, source), rest), gas, ctxt)
         | Amount, rest ->
-            let gas = Gas.consume gas Gas.Cost_of.amount in
+            let gas = Gas.consume gas Interp_costs.amount in
             Gas.check gas >>=? fun () ->
             logged_return (Item (amount, rest), gas, ctxt) in
     let stack = (Item (arg, Empty)) in
