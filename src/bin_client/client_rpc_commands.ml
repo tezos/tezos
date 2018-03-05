@@ -395,6 +395,10 @@ let call raw_url (cctxt : #Client_context.full) =
 let call_with_json raw_url json (cctxt: #Client_context.full) =
   let uri = Uri.of_string raw_url in
   match Data_encoding.Json.from_string json with
+  | exception Assert_failure _ ->
+      (* Ref : https://github.com/mirage/ezjsonm/issues/31 *)
+      cctxt#error
+        "Failed to parse the provided json: unwrapped JSON value.\n%!"
   | Error err ->
       cctxt#error
         "Failed to parse the provided json: %s\n%!"
