@@ -19,6 +19,7 @@ depends: [
   "ezjsonm" { >= "0.5.0" }
   "ipaddr"
   "mtime" { >= "1.0.0" }
+  "re" { >= "1.7.2" }
 ]
 build: [
   [ "jbuilder" "build" "-p" name "-j" jobs ]

@@ -202,8 +202,8 @@ let gen_keys_containing ?(prefix=false) ?(force=false) ~containing ~name (cctxt 
                      String.sub key 0 (String.length containing) = containing)
                   containing_tz1)
             else
-              let re = Re_str.regexp (String.concat "\\|" containing) in
-              (fun key -> try ignore (Re_str.search_forward re key 0); true
+              let re = Re.Str.regexp (String.concat "\\|" containing) in
+              (fun key -> try ignore (Re.Str.search_forward re key 0); true
                 with Not_found -> false) in
           let rec loop attempts =
             let seed = Ed25519.Seed.generate () in

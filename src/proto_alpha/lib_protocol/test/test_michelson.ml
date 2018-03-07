@@ -55,7 +55,7 @@ let parse_execute sb ?tc code_str param_str storage_str =
 let test ctxt ?tc (file_name: string) (storage: string) (input: string) =
   let full_path = contract_path // file_name ^ ".tz" in
   let file = Helpers_misc.read_file full_path in
-  let spaced_file = Re_str.(global_replace (regexp_string "\n") "\n " file) in
+  let spaced_file = Re.Str.(global_replace (regexp_string "\n") "\n " file) in
   let program = "{" ^ spaced_file ^ "}" in
   parse_execute ctxt ?tc program input storage
 

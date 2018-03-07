@@ -158,18 +158,18 @@ let print_highlight highlight_strings formatter str =
   let rec print_string = function
     | [] -> Format.fprintf formatter "%s" str
     | regex :: tl ->
-        begin match Re_str.full_split regex str with
+        begin match Re.Str.full_split regex str with
           | []
-          | [ Re_str.Text _ ] -> print_string tl
+          | [ Re.Str.Text _ ] -> print_string tl
           | list ->
               List.iter
                 (function
-                  | Re_str.Text text -> Format.fprintf formatter "%s" text
-                  | Re_str.Delim delimiter ->
+                  | Re.Str.Text text -> Format.fprintf formatter "%s" text
+                  | Re.Str.Delim delimiter ->
                       Format.fprintf formatter "@{<hilight>%s@}" delimiter)
                 list
         end
-  in print_string (List.map Re_str.regexp_string highlight_strings)
+  in print_string (List.map Re.Str.regexp_string highlight_strings)
 
 let print_commandline ppf (highlights, options, args) =
   let rec print
@@ -746,7 +746,7 @@ let string ~name ~desc next =
 
 let string_contains ~needle ~haystack =
   try
-    Some (Re_str.search_forward (Re_str.regexp_string needle) haystack 0)
+    Some (Re.Str.search_forward (Re.Str.regexp_string needle) haystack 0)
   with Not_found ->
     None
 
@@ -1093,7 +1093,7 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands cct
           end
   end >>|? fun completions ->
   List.filter
-    (fun completion -> Re_str.(string_match (regexp_string cur_arg) completion 0))
+    (fun completion -> Re.Str.(string_match (regexp_string cur_arg) completion 0))
     completions
 
 let parse_global_options global_options ctx args =
