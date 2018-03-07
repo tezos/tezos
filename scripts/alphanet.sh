@@ -42,7 +42,7 @@ services:
   node:
     image: $docker_image
     hostname: node
-    command: tezos-node $@
+    command: tezos-node --net-addr :$port $@
     ports:
       - "$port:$port"$export_rpc
     expose:
@@ -51,8 +51,6 @@ services:
       - node_data:/var/run/tezos/node
       - client_data:/var/run/tezos/client
     restart: on-failure
-    environment:
-      - P2P_PORT=$port
 
   baker:
     image: $docker_image

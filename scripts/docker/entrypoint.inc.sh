@@ -7,11 +7,11 @@ configure_client() {
 
     if [ ! -f "$client_config" ]; then
         "$client" --base-dir "$client_dir" \
-                  --addr "$NODE_HOST" --port "$RPC_PORT" \
+                  --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
                   config init --output "$client_config" >/dev/null 2>&1
     else
         "$client" --base-dir "$client_dir" \
-                  --addr "$NODE_HOST" --port "$RPC_PORT" \
+                  --addr "$NODE_HOST" --port "$NODE_RPC_PORT" \
                   config update >/dev/null 2>&1
     fi
 
@@ -49,15 +49,13 @@ launch_node() {
         echo "Configuring the node..."
         "$node" config init \
                 --data-dir "$node_dir" \
-                --net-addr ":$P2P_PORT" \
-                --rpc-addr ":$RPC_PORT" \
+                --rpc-addr ":$NODE_RPC_PORT" \
                 "$@"
     else
         echo "Updating the node configuration..."
         "$node" config update \
                 --data-dir "$node_dir" \
-                --net-addr ":$port" \
-                --rpc-addr ":$RPC_PORT" \
+                --rpc-addr ":$NODE_RPC_PORT" \
                 "$@"
     fi
 

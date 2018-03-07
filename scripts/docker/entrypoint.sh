@@ -7,9 +7,7 @@ bin_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
 : ${DATA_DIR:="/var/run/tezos"}
 
 : ${NODE_HOST:="node"}
-
-: ${P2P_PORT:="9732"}
-: ${RPC_PORT:="8732"}
+: ${NODE_RPC_PORT:="8732"}
 
 node="/usr/local/bin/tezos-node"
 client="/usr/local/bin/tezos-client"
