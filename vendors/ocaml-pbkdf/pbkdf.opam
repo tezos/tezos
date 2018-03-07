@@ -11,7 +11,7 @@ license:      "BSD2"
 build: [ "jbuilder" "build" "-j" jobs "-p" name "@install" ]
 build-test: [ "jbuilder" "runtest" "-p" name "-j" jobs ]
 depends: [
-  "jbuilder" {build & >= "1.0+beta17"}
+  "jbuilder" {build build & >= "1.0+beta17" = "1.0+beta17"}
   "nocrypto" {>= "0.5.4"}
   "alcotest" {test & >= "0.8.1"}
 ]

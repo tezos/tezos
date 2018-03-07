@@ -12,7 +12,7 @@ tags: []
 available: [ ocaml-version >= "4.03.0" ]
 build: [ "jbuilder" "build" "-j" jobs "-p" name "@install" ]
 depends: [
-  "jbuilder" {build & >= "1.0+beta17"}
+  "jbuilder" {build build & >= "1.0+beta17" = "1.0+beta17"}
   "base" {build & >= "v0.10.0"}
   "stdio" {build & >= "v0.10.0"}
   "nocrypto" {>= "0.5.4"}
