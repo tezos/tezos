@@ -2,7 +2,7 @@
 variables:
   opam_image: ${CI_REGISTRY_IMAGE}/opam
   build_deps_image: ${CI_REGISTRY_IMAGE}/build_deps
-  public_docker_image: docker.io/tezos/tezos
+  public_docker_image: docker.io/${CI_PROJECT_PATH}
 
 stages:
   - prepare
@@ -56,9 +56,7 @@ build_deps:
 .build_deps_template: &build_deps_definition
   image: ${build_deps_image}:${CI_COMMIT_SHA}
   before_script:
-    - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
-        ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
-      fi
+    - ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}"
     - opam list
   tags:
     - gitlab-org
@@ -69,7 +67,9 @@ build:
   <<: *build_deps_definition
   stage: build
   except:
-    - master@tezos/tezos
+    - master
+    - alphanet
+    - zeronet
   script:
     - make all
     - make build-test
@@ -84,7 +84,9 @@ build:
   <<: *build_deps_definition
   stage: test
   except:
-    - master@tezos/tezos
+    - master
+    - alphanet
+    - zeronet
   dependencies:
     - build
 
@@ -200,7 +202,7 @@ test:proto:sandbox:
   stage: opam
   dependencies: []
   only:
-    - master@tezos/tezos
+    - master
     - /^.*opam.*$/
   script:
     - ./scripts/opam-pin.sh
@@ -450,13 +452,11 @@ publish:docker:minimal:
   <<: *dind_definition
   stage: publish
   only:
-    - master@tezos/tezos
-    - alphanet@tezos/tezos
-    - zeronet@tezos/tezos
+    - master
+    - alphanet
+    - zeronet
   script:
-    - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
-        ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
-      fi
+    - ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
     - ./scripts/ci/create_docker_image.build.sh
         "tezos_build" "${CI_COMMIT_REF_NAME}"
         "${build_deps_image}:${CI_COMMIT_SHA}"
@@ -481,9 +481,7 @@ publish:github:
     - echo "${CI_PK_GITHUB}" > ~/.ssh/id_rsa
     - chmod 400 ~/.ssh/id_rsa
     - rm -fr .git/refs/original
-    - if [ "${CI_PROJECT_PATH}" = "tezos/tezos" ] ; then
-        ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
-      fi
+    - ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
     - sudo apk add --no-cache openssh
     - git push git@github.com:tezos/tezos.git -f HEAD:${CI_COMMIT_REF_NAME}
   tags:
