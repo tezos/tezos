@@ -22,6 +22,7 @@ __pycache__
 
 /docs/introduction/readme.rst
 /docs/api/errors.rst
+/docs/api/rpc.rst
 /docs/_extensions/*.pyc
 
 *.install

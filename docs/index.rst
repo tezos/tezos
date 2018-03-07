@@ -84,6 +84,7 @@ license when the main network lunches.
    api/api-inline
    api/cli-commands
    api/errors
+   api/rpc
 
 Indices and tables
 ==================
