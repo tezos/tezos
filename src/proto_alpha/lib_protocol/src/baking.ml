@@ -19,6 +19,8 @@ type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
 type error += Empty_endorsement
 type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
+type error += Invalid_signature  (* `Permanent *)
+type error += Invalid_stamp  (* `Permanent *)
 
 let () =
   register_error_kind
@@ -108,7 +110,9 @@ let () =
                      (req "block" Block_hash.encoding)
                      (req "expected" Ed25519.Public_key_hash.encoding))
     (function Invalid_block_signature (block, pkh) -> Some (block, pkh) | _ -> None)
-    (fun (block, pkh) -> Invalid_block_signature (block, pkh))
+    (fun (block, pkh) -> Invalid_block_signature (block, pkh));
+  register_error_kind
+    `Permanent
     ~id:"baking.invalid_signature"
     ~title:"Invalid block signature"
     ~description:"The block's signature is invalid"
@@ -250,9 +254,6 @@ let check_hash hash stamp_threshold =
 let check_header_hash header stamp_threshold =
   let hash = Block_header.hash header in
   check_hash hash stamp_threshold
-
-type error +=
-  | Invalid_stamp
 
 let check_proof_of_work_stamp ctxt block =
   let proof_of_work_threshold = Constants.proof_of_work_threshold ctxt in

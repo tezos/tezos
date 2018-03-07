@@ -21,6 +21,8 @@ __pycache__
 /scripts/opam-test-all.sh.DONE
 
 /docs/introduction/readme.rst
+/docs/api/errors.rst
+/docs/_extensions/*.pyc
 
 *.install
 .merlin
@@ -30,4 +32,3 @@ __pycache__
 
 *.rej
 *.orig
-
