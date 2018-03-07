@@ -178,8 +178,8 @@ module S = struct
       "A block identifier. This is either a block hash in hexadecimal \
        notation or a one the predefined aliases: \
        'genesis', 'head', 'prevalidation', \
-       'test_head' or 'test_prevalidation'. One might alse use 'head~N'
-       to 'test_head~N', where N is an integer to denotes the Nth predecessors
+       'test_head' or 'test_prevalidation'. One might also use 'head~N'\
+       to 'test_head~N', where N is an integer that denotes the Nth predecessors\
        of 'head' or 'test_head'." in
     let construct = to_string in
     let destruct = parse_block in
