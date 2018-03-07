@@ -33,12 +33,14 @@ cp -a "$build_dir"/leveldb-$leveldb_version-r0.apk \
 mkdir -p "$tmp_dir"/bin
 mkdir -p "$tmp_dir"/scripts
 container=$(docker create $build_image_name)
-for bin in tezos-client tezos-node; do
+for bin in tezos-client tezos-admin-client tezos-node; do
     docker cp -L $container:/home/opam/tezos/$bin "$tmp_dir"/bin
 done
-cp -a "$script_dir"/docker "$tmp_dir"/scripts/
+cp -a "$script_dir"/docker/entrypoint.sh "$tmp_dir"/bin/
+cp -a "$script_dir"/docker/entrypoint.inc.sh "$tmp_dir"/bin/
 cp "$script_dir"/alphanet.sh "$tmp_dir"/scripts/
 cp "$script_dir"/alphanet_version "$tmp_dir"/scripts/
+cp "$src_dir"/src/bin_client/bash-completion.sh "$tmp_dir"/scripts/
 
 echo
 echo "### Building minimal docker image..."
@@ -57,15 +59,9 @@ RUN apk --no-cache add \
       leveldb-1.18-r0.apk && \
     rm leveldb-$leveldb_version-r0.apk
 
-COPY bin/tezos-node \
-     bin/tezos-client \
-     scripts/docker/entrypoint.sh \
-     scripts/docker/entrypoint.inc.sh \
-     /usr/local/bin/
+COPY bin/* /usr/local/bin/
 
-COPY scripts/alphanet_version \
-     scripts/alphanet.sh \
-     /usr/local/share/tezos/
+COPY scripts/* /usr/local/share/tezos/
 
 RUN adduser -S tezos && \
     mkdir -p /var/run/tezos/node /var/run/tezos/client && \
