@@ -11,10 +11,10 @@ open Logging.Node.Main
 
 let genesis : State.Chain.genesis = {
   time =
-    Time.of_notation_exn "2017-10-19T00:00:00Z" ;
+    Time.of_notation_exn "2018-03-07T17:39:23Z" ;
   block =
     Block_hash.of_b58check_exn
-      "BLockGenesisGenesisGenesisGenesisGenesisFFFFFgtaC8G" ;
+      "BLockGenesisGenesisGenesisGenesisGenesis1ff34ei9xjh" ;
   protocol =
     Protocol_hash.of_b58check_exn
       "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im" ;
