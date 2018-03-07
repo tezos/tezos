@@ -7,6 +7,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* let example_args_completions =
+ *   [ ("<block_id>", [ ("head", 0.8) ; ("head~1", 0.1) ; ("genesis", 0.1) ]) ;
+ *     ("<point>", [ ("127.0.0.1:18731", 1.) ]) ;
+ *     ("<hash.Crypto_box.Public_key_hash>", [  ]);
+ *   ] *)
+
 (* Utility functions *)
 
 exception Unsupported_construct
@@ -219,6 +225,18 @@ let rec pp_print_service_tree fmt = function
 
 let collected_args = ref []
 
+let pp_print_collected_args ppf () =
+  let open Resto.Arg in
+  fprintf ppf "@[<v 0>";
+  List.iter
+    (function
+      | { name ; descr=Some d } ->
+          fprintf ppf "@[<v 2>**<%s>** : @[%s@]@]@ @ " name d;
+      | { name=_ ; _ } -> () (* Should we print it anyway ? *)
+    )
+    (List.rev !collected_args);
+  fprintf ppf "@]"
+
 let make_tree cctxt path =
   (* TODO : discuss about automatic example generation *)
   let collect arg =
@@ -323,7 +341,7 @@ let rec pp_print_hierarchy fmt =
 
 let pp_print_rst_title ~char ppf title =
   let sub = String.map (fun _ -> char) title in
-  Format.fprintf ppf "@[<v 0>%s@ %s@ @]" title sub
+  Format.fprintf ppf "@[<v 0>%s@ %s@ @ @]" title sub
 
 let pp_print_rst_h1 = pp_print_rst_title ~char:'#'
 let pp_print_rst_h2 = pp_print_rst_title ~char:'*'
@@ -610,6 +628,14 @@ let run ?(rpc_port=18731) () =
             fprintf ppf "%a@." (pp_print_rst_hierarchy ~title:"Protocol Alpha RPCs - Index") service_tree;
             fprintf ppf "%a" pp_print_rst_h2 "Protocol Alpha RPCs - Full description";
             fprintf ppf "%a@." pp_print_rst_service_tree service_tree;
+
+            if !collected_args <> [] then begin
+              (* If you modify this title, also modify the
+                 hard-referenced link in 'usage.rst' *)
+              fprintf ppf "%a" pp_print_rst_h2 "Dynamic parameters description";
+              fprintf ppf "%a@."  pp_print_collected_args ();
+            end;
+
             Lwt.return 0
         (* TODO : add dynamic parameter description *)
 
