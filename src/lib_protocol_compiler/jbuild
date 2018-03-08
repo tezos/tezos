@@ -78,6 +78,19 @@
   (modules (Main_native))))
 
 (executable
+ ((name main_packer)
+  (public_name tezos-protocol-compiler.tezos-protocol-packer)
+  (libraries (tezos-base
+              tezos-protocol-compiler
+              tezos-stdlib-unix))
+  (flags (:standard -w -9+27-30-32-40@8
+                    -safe-string
+                    -open Tezos_base__TzPervasives
+                    -open Tezos_stdlib_unix
+                    -open Tezos_protocol_compiler))
+  (modules (Main_packer))))
+
+(executable
  ((name main_embedded_packer)
   (public_name tezos-embedded-protocol-packer)
   (modes (native))

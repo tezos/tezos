@@ -54,47 +54,20 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
 (jbuild_version 1)
 
 (rule
- ((targets (tezos_protocol_%s.cmo
-            tezos_protocol_%s_dummy_byte.ml))
-  (deps ((glob_files src/*.ml*)
-         src/TEZOS_PROTOCOL))
-  (action (with-stdout-to ${path-no-dep:tezos_protocol_%s_dummy_byte.ml}
-            (progn
-              (chdir ${ROOT}
-                     (run ${bin:tezos-protocol-compiler-byte} -static -output-dep ${path-no-dep:.tezos_protocol_%s_byte.objs/tezos_protocol_%s} ${path-no-dep:src}))
-              (run ln -s .tezos_protocol_%s_byte.objs/tezos_protocol_%s.cmo tezos_protocol_%s.cmo))))))
-
-(rule
- ((targets (tezos_protocol_%s.o
-            tezos_protocol_%s.cmx
-            tezos_protocol_%s_dummy.ml))
-  (deps ((glob_files src/*.ml)
-         (glob_files src/*.mli)
-         src/TEZOS_PROTOCOL))
-  (action (with-stdout-to ${path-no-dep:tezos_protocol_%s_dummy.ml}
-           (progn
-             (chdir ${ROOT}
-                    (run ${bin:tezos-protocol-compiler} -static -output-dep ${path-no-dep:.tezos_protocol_%s.objs/tezos_protocol_%s} ${path-no-dep:src}))
-              (run ln -s .tezos_protocol_%s.objs/tezos_protocol_%s.o tezos_protocol_%s.o)
-              (run ln -s .tezos_protocol_%s.objs/tezos_protocol_%s.cmx tezos_protocol_%s.cmx))))))
+  ((targets (functor.ml))
+   (deps ((glob_files src/*.ml*)
+           src/TEZOS_PROTOCOL))
+    (action (with-stdout-to ${path-no-dep:functor.ml}
+             (run ${bin:tezos-protocol-compiler.tezos-protocol-packer} ${path-no-dep:src})))))
 
 (library
  ((name tezos_protocol_%s)
   (public_name tezos-protocol-%s)
-  (library_flags (:standard -linkall %s/tezos_protocol_%s.cmx))
-  (flags (:standard -safe-string))
-  (wrapped false)
-  (modes (native))
-  (modules (Tezos_protocol_%s_dummy))))
-
-(library
- ((name tezos_protocol_%s_byte)
-  (public_name tezos-protocol-%s.byte)
-  (library_flags (:standard -linkall %s/tezos_protocol_%s.cmo))
-  (flags (:standard -safe-string))
-  (wrapped false)
-  (modes (byte))
-  (modules (Tezos_protocol_%s_dummy_byte))))
+  (libraries (tezos-protocol-environment-sigs))
+  (flags (-w "+a-4-6-7-9-29-40..42-44-45-48"
+          -warn-error "-a+8"
+          -safe-string -nopervasives))
+  (modules (Functor))))
 
 (install
   ((section lib)
@@ -111,15 +84,6 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
 
 |}
-    version version version version
-    version version version version
-    version version version version
-    version version version version
-    version version version version
-    version version version version
-    path
-    version version version version
-    path
     version version version version
     version version
     Format.(pp_print_list (fun ppf -> Format.fprintf ppf "%S"))
