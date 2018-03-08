@@ -8,7 +8,7 @@ dev-repo: "https://gitlab.com/tezos/tezos.git"
 license: "unreleased"
 depends: [
   "ocamlfind" { build }
-  "jbuilder" { build build & >= "1.0+beta17" = "1.0+beta17" }
+  "jbuilder" { build & = "1.0+beta18" }
   "tezos-stdlib"
   "ezjsonm"
   "js_of_ocaml" # for ocplib-json-typed.bson
