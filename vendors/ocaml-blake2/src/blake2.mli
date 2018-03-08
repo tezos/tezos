@@ -19,8 +19,8 @@ module Blake2b : sig
       far. *)
 
   val direct : ?key:Cstruct.t -> Cstruct.t -> int -> hash
-  (** [direct ?key outbuf inbuf] writes the blake2b hash of [inbuf] in
-      [outbuf], using [key] is present. *)
+  (** [direct ?key inbuf len] is the blake2b hash of length [len],
+      using [key] is present. *)
 end
 
 (*---------------------------------------------------------------------------
