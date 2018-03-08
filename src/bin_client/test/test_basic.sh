@@ -65,12 +65,6 @@ $client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
 $client transfer 10 from bootstrap1 to hardlimit -arg "Unit"
 # $client transfer 10 from bootstrap1 to hardlimit -arg "unit" # should fail
 
-$client originate free account free_account for $key1
-$client get delegate for free_account
-$client register key $key2 as delegate
-$client set delegate for free_account to $key2
-$client get delegate for free_account
-
 $client get balance for bootstrap5 | assert "4,000,000 ꜩ"
 $client transfer 400,000 from bootstrap5 to bootstrap1 -fee 0
 $client transfer 400,000 from bootstrap1 to bootstrap5 -fee 0

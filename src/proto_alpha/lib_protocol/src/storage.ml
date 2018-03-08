@@ -141,6 +141,7 @@ module Contract = struct
          type t = Script_repr.expr
          let encoding = Script_repr.expr_encoding
        end))
+
   type bigmap_key = Raw_context.t * Contract_repr.t
 
   module Big_map =
@@ -420,6 +421,14 @@ module Seed = struct
   module For_cycle = Cycle.Seed
 
 end
+
+(** Commitments *)
+
+module Commitments =
+  Make_indexed_data_storage
+    (Make_subcontext(Raw_context)(struct let name = ["commitments"] end))
+    (Unclaimed_public_key_hash.Index)
+    (Make_value(Commitment_repr))
 
 (** Resolver *)
 

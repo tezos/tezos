@@ -412,10 +412,6 @@ module Forge = struct
         block ~branch ~level ~nonce () =
       operations ctxt block ~branch [Seed_nonce_revelation { level ; nonce }]
 
-    let faucet ctxt
-        block ~branch ~id ~nonce () =
-      operations ctxt block ~branch [Faucet { id ; nonce }]
-
   end
 
   let empty_proof_of_work_nonce =
@@ -521,4 +517,3 @@ module Parse = struct
       S.block ctxt block () ({ shell ; protocol_data } : Block_header.raw)
 
 end
-

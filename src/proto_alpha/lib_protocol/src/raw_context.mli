@@ -137,4 +137,3 @@ include T with type t := t and type context := context
 
 val record_endorsement: context -> int -> context
 val endorsement_already_recorded: context -> int -> bool
-

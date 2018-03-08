@@ -260,23 +260,6 @@ let commands () =
         operation_submitted_message cctxt oph
       end;
 
-    command ~group:alphanet ~desc: "Open a new FREE account (Alphanet only)."
-      (args1 force_switch)
-      (prefixes [ "originate" ; "free" ; "account" ]
-       @@ RawContractAlias.fresh_alias_param
-         ~name: "new" ~desc: "name of the new contract"
-       @@ prefix "for"
-       @@ Public_key_hash.alias_param
-         ~name: "mgr" ~desc: "manager of the new contract"
-       @@ stop)
-      begin fun force alias_name (_, manager_pkh) (cctxt: Proto_alpha.full) ->
-        RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
-        faucet ~manager_pkh cctxt#block cctxt () >>=? fun (oph, contract) ->
-        operation_submitted_message cctxt
-          ~contracts:[contract] oph >>=? fun () ->
-        save_contract ~force cctxt alias_name contract
-      end;
-
     command ~group:alphanet ~desc: "Activate a protocol (Alphanet dictator only)."
       no_options
       (prefixes [ "activate" ; "protocol" ]

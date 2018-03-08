@@ -6,6 +6,8 @@
         "Nonce_hash",
         "Script_expr_hash",
         "Contract_hash",
+        "Blinded_public_key_hash",
+        "Unclaimed_public_key_hash",
 
         "Qty_repr",
         "Tez_repr",
@@ -28,6 +30,7 @@
         "Block_header_repr",
         "Operation_repr",
         "Manager_repr",
+	"Commitment_repr",
 
         "Raw_context",
         "Storage_sigs",
@@ -44,6 +47,7 @@
         "Bootstrap_storage",
         "Fitness_storage",
         "Vote_storage",
+        "Commitment_storage",
         "Init_storage",
 
         "Alpha_context",

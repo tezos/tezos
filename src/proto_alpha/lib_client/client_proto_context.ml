@@ -133,13 +133,6 @@ let originate_account ?branch
   Client_keys.sign cctxt src_sk bytes >>=? fun signature ->
   originate cctxt ~block ~chain_id ~signature bytes
 
-let faucet ?branch ~manager_pkh block rpc_config () =
-  get_branch rpc_config block branch >>=? fun (chain_id, branch) ->
-  let nonce = Rand.generate Constants_repr.nonce_length in
-  Alpha_services.Forge.Anonymous.faucet
-    rpc_config block ~branch ~id:manager_pkh ~nonce () >>=? fun bytes ->
-  originate rpc_config ~chain_id ~block bytes
-
 let delegate_contract cctxt
     block ?branch
     ~source ?src_pk ~manager_sk

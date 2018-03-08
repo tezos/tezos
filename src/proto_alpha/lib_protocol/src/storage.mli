@@ -257,3 +257,10 @@ module Seed : sig
   end
 
 end
+
+(** Commitments *)
+
+module Commitments : Indexed_data_storage
+  with type key = Unclaimed_public_key_hash.t
+   and type value = Commitment_repr.t
+   and type t := Raw_context.t

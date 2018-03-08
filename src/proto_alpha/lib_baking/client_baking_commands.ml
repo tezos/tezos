@@ -51,7 +51,7 @@ let commands () =
        @@ seq_of_param Block_hash.param)
       (fun () block_hashes cctxt ->
          reveal_block_nonces cctxt block_hashes) ;
-    command ~group ~desc: "Forge and inject redemption operations."
+    command ~group ~desc: "Forge and inject all the possible seed-nonce revelation operations."
       no_options
       (prefixes [ "reveal"; "nonces" ]
        @@ stop)

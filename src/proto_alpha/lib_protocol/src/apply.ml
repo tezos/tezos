@@ -36,7 +36,8 @@ type error += Too_early_double_baking_evidence
   of { level: Raw_level.t ; current: Raw_level.t } (* `Temporary *)
 type error += Outdated_double_baking_evidence
   of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
-
+type error += Invalid_activation
+type error += Wrong_activation_secret
 
 let () =
   register_error_kind
@@ -287,7 +288,29 @@ let () =
           Some (level, last)
       | _ -> None)
     (fun (level, last) ->
-       Outdated_double_baking_evidence { level ; last })
+       Outdated_double_baking_evidence { level ; last }) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.invalid_activation"
+    ~title:"Invalid activation"
+    ~description:"The given key has already been activated or the given \
+                  key does not correspond to any preallocated contract"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Invalid activation.")
+    Data_encoding.unit
+    (function Invalid_activation -> Some () | _ -> None)
+    (fun () -> Invalid_activation) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.wrong_activation_secret"
+    ~title:"Wrong activation secret"
+    ~description:"The submitted activation key does not match the \
+                  registered key."
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Wrong activation secret.")
+    Data_encoding.unit
+    (function Wrong_activation_secret -> Some () | _ -> None)
+    (fun () -> Wrong_activation_secret)
 
 let apply_consensus_operation_content ctxt
     pred_block block_priority operation = function
@@ -465,7 +488,7 @@ let apply_sourced_operation
       fork_test_chain ctxt hash expiration >>= fun ctxt ->
       return (ctxt, origination_nonce, None, Tez.zero, Tez.zero)
 
-let apply_anonymous_operation ctxt delegate origination_nonce kind =
+let apply_anonymous_operation ctxt _delegate origination_nonce kind =
   match kind with
   | Seed_nonce_revelation { level ; nonce } ->
       let level = Level.from_raw ctxt level in
@@ -548,12 +571,18 @@ let apply_anonymous_operation ctxt delegate origination_nonce kind =
         | Ok v -> v
         | Error _ -> Tez.zero in
       return (ctxt, origination_nonce, Tez.zero, reward)
-  | Faucet { id = manager ; _ } ->
-      Contract.originate ctxt
-        origination_nonce
-        ~manager ~delegate ~balance:Constants.faucet_credit ?script:None
-        ~spendable:true ~delegatable:true >>=? fun (ctxt, _, origination_nonce) ->
-      return (ctxt, origination_nonce, Tez.zero, Tez.zero)
+  | Activation { id = pkh ; secret } ->
+      let h_pkh = Unclaimed_public_key_hash.of_ed25519_pkh pkh in
+      Commitment.get_opt ctxt h_pkh >>=? function
+      | None -> fail Invalid_activation
+      | Some { blinded_public_key_hash = submitted_bpkh ; amount } ->
+          let blinded_pkh = Blinded_public_key_hash.of_ed25519_pkh secret pkh in
+          fail_unless
+            Blinded_public_key_hash.(blinded_pkh = submitted_bpkh)
+            Wrong_activation_secret >>=? fun () ->
+          Commitment.delete ctxt h_pkh >>=? fun ctxt ->
+          Contract.(credit ctxt (implicit_contract pkh) amount) >>=? fun ctxt ->
+          return (ctxt, origination_nonce,  Tez.zero, Tez.zero)
 
 let apply_operation
     ctxt delegate pred_block block_prio hash operation =

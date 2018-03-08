@@ -38,10 +38,6 @@ let block_reward =
 let endorsement_reward =
   Tez_repr.(mul_exn one 2)
 
-(* 100,000 tez *)
-let faucet_credit =
-  Tez_repr.(mul_exn one 100_000)
-
 (* 4,000,000 tez *)
 let bootstrap_wealth =
   Tez_repr.(mul_exn one 4_000_000)

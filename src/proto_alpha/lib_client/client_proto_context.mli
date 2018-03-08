@@ -104,13 +104,6 @@ val originate_contract:
   #Proto_alpha.full ->
   (Operation_hash.t * Contract.t) tzresult Lwt.t
 
-val faucet :
-  ?branch:int ->
-  manager_pkh:public_key_hash ->
-  Block_services.block ->
-  #Proto_alpha.rpc_context ->
-  unit -> (Operation_list_hash.elt * Contract.t) tzresult Lwt.t
-
 val transfer :
   #Proto_alpha.full ->
   Block_services.block ->

@@ -39,9 +39,9 @@ and anonymous_operation =
       bh1: Block_header_repr.t ;
       bh2: Block_header_repr.t ;
     }
-  | Faucet of {
+  | Activation of {
       id: Ed25519.Public_key_hash.t ;
-      nonce: MBytes.t ;
+      secret: Blinded_public_key_hash.secret ;
     }
 
 and sourced_operations =
@@ -342,19 +342,19 @@ module Encoding = struct
       )
       (fun ((), bh1, bh2) -> Double_baking_evidence { bh1 ; bh2 })
 
-  let faucet_encoding =
+  let activation_encoding =
     (obj3
-       (req "kind" (constant "faucet"))
-       (req "id" Ed25519.Public_key_hash.encoding)
-       (req "nonce" (Fixed.bytes 16)))
+       (req "kind" (constant "activation"))
+       (req "pkh" Ed25519.Public_key_hash.encoding)
+       (req "secret" Blinded_public_key_hash.secret_encoding))
 
-  let faucet_case tag =
-    case tag faucet_encoding
+  let activation_case tag =
+    case tag activation_encoding
       (function
-        | Faucet { id ; nonce } -> Some ((), id, nonce)
+        | Activation { id ; secret } -> Some ((), id, secret)
         | _ -> None
       )
-      (fun ((), id, nonce) -> Faucet { id ; nonce })
+      (fun ((), id, secret) -> Activation { id ; secret })
 
   let unsigned_operation_case tag op_encoding =
     case tag
@@ -365,7 +365,7 @@ module Encoding = struct
                    seed_nonce_revelation_case (Tag 0) ;
                    double_endorsement_evidence_case (Tag 1) op_encoding ;
                    double_baking_evidence_case (Tag 2) ;
-                   faucet_case (Tag 3) ;
+                   activation_case (Tag 3) ;
                  ]))))
       (function Anonymous_operations ops -> Some ops | _ -> None)
       (fun ops -> Anonymous_operations ops)

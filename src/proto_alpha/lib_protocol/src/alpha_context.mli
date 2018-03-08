@@ -262,7 +262,6 @@ module Constants : sig
   val origination_burn: Tez.t
   val block_security_deposit: Tez.t
   val endorsement_security_deposit: Tez.t
-  val faucet_credit: Tez.t
   val max_revelations_per_block: int
 
   val preserved_cycles: context -> int
@@ -642,9 +641,9 @@ and anonymous_operation =
       bh1: Block_header.t ;
       bh2: Block_header.t ;
     }
-  | Faucet of {
+  | Activation of {
       id: Ed25519.Public_key_hash.t ;
-      nonce: MBytes.t ;
+      secret: Blinded_public_key_hash.secret ;
     }
 
 and sourced_operations =
@@ -750,6 +749,19 @@ module Roll : sig
 
   val delegate_pubkey:
     context -> public_key_hash -> public_key tzresult Lwt.t
+
+end
+
+module Commitment : sig
+
+  type t =
+    { blinded_public_key_hash : Blinded_public_key_hash.t ;
+      amount : Tez.tez }
+
+  val get_opt:
+    context ->  Unclaimed_public_key_hash.t -> t option tzresult Lwt.t
+  val delete:
+    context ->  Unclaimed_public_key_hash.t -> context tzresult Lwt.t
 
 end
 

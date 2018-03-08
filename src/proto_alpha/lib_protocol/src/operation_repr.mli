@@ -39,9 +39,9 @@ and anonymous_operation =
       bh1: Block_header_repr.t ;
       bh2: Block_header_repr.t ;
     }
-  | Faucet of {
+  | Activation of {
       id: Ed25519.Public_key_hash.t ;
-      nonce: MBytes.t ;
+      secret: Blinded_public_key_hash.secret ;
     }
 
 and sourced_operations =

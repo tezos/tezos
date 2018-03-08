@@ -90,6 +90,11 @@ module Fitness = struct
 
 end
 
+module Commitment = struct
+  include Commitment_repr
+  include Commitment_storage
+end
+
 let init = Init_storage.may_initialize
 
 let finalize ?commit_message:message c =

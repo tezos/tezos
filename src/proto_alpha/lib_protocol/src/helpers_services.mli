@@ -183,13 +183,6 @@ module Forge : sig
       nonce:Nonce.t ->
       unit -> MBytes.t shell_tzresult Lwt.t
 
-    val faucet:
-      'a #RPC_context.simple -> 'a ->
-      branch:Block_hash.t ->
-      id:public_key_hash ->
-      nonce:MBytes.t ->
-      unit -> MBytes.t shell_tzresult Lwt.t
-
   end
 
   val protocol_data:

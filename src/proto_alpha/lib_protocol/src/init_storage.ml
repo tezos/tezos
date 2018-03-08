@@ -15,6 +15,7 @@ let initialize ctxt =
   Bootstrap_storage.init ctxt >>=? fun ctxt ->
   Roll_storage.init_first_cycles ctxt >>=? fun ctxt ->
   Vote_storage.init ctxt >>=? fun ctxt ->
+  Commitment_storage.init ctxt >>=? fun ctxt ->
   return ctxt
 
 let may_initialize ctxt ~level ~timestamp ~fitness =
