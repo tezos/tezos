@@ -69,11 +69,6 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
           -safe-string -nopervasives))
   (modules (Functor))))
 
-(install
-  ((section lib)
-   (files   (tezos_protocol_%s.cmx tezos_protocol_%s.cmi))
-   (package tezos-protocol-%s)))
-
 (alias
  ((name runtest_sandbox)
   (deps (tezos_protocol_%s.cmx))))
@@ -84,7 +79,6 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
   (action (run bash ${libexec:tezos-stdlib:test-ocp-indent.sh} ${^}))))
 
 |}
-    version version version version
-    version version
+    version version version
     Format.(pp_print_list (fun ppf -> Format.fprintf ppf "%S"))
     sources
