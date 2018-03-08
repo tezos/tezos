@@ -23,8 +23,8 @@ let encoding =
     (fun (name, major, minor) -> { name; major; minor })
     (obj3
        (req "name" string)
-       (req "major" int8)
-       (req "minor" int8))
+       (req "major" uint16)
+       (req "minor" uint16))
 
 (* the common version for a pair of peers, if any, is the maximum one,
    in lexicographic order *)
