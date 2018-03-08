@@ -519,57 +519,85 @@ documentation:
     - gitlab-org
 
 
-## Relaunching the bootstrap servers of the alphanet.zeronet
+## Relaunching the bootstrap servers of the alphanet/zeronet
 
 .bootstrap_template: &bootstrap_definition
   image: ${opam_image}
   stage: deploy
   dependencies: []
-  only:
-    - alphanet@tezos/tezos
-    - zeronet@tezos/tezos
   before_script:
     - echo "${CI_KH}" > ~/.ssh/known_hosts
-    - if [ "${CI_COMMIT_REF_NAME}" = "alphanet" ]; then
-        echo "${CI_PK_ALPHANET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
-      else
-        echo "${CI_PK_ZERONET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
-      fi
+    - echo "${CI_PK_ALPHANET}" | tr -d "\r" > ~/.ssh/id_ed25519 ;
     - echo "${CI_SSH_CONFIG}" | tr -d "\r" > ~/.ssh/config
     - chmod 600 ~/.ssh/id_ed25519
+    - sudo apk add --no-cache openssh
   allow_failure: true
   tags:
     - gitlab-org
 
 deploy:bootstrap1:
   <<: *bootstrap_definition
+  only:
+    - alphanet@tezos/tezos
   script:
     - ssh bootstrap1
 
 deploy:bootstrap2:
   <<: *bootstrap_definition
+  only:
+    - alphanet@tezos/tezos
   script:
     - ssh bootstrap2
 
 deploy:bootstrap3:
   <<: *bootstrap_definition
+  only:
+    - alphanet@tezos/tezos
   script:
     - ssh bootstrap3
 
 deploy:bootstrap4:
   <<: *bootstrap_definition
+  only:
+    - alphanet@tezos/tezos
   script:
     - ssh bootstrap4
 
 deploy:bootstrap5:
   <<: *bootstrap_definition
+  only:
+    - alphanet@tezos/tezos
   script:
     - ssh bootstrap5
 
 deploy:bootstrap6:
   <<: *bootstrap_definition
+  only:
+    - alphanet@tezos/tezos
   script:
     - ssh bootstrap6
+
+
+deploy:zeronet1:
+  <<: *bootstrap_definition
+  only:
+    - zeronet@tezos/tezos
+  script:
+    - ssh zeronet1
+
+deploy:zeronet2:
+  <<: *bootstrap_definition
+  only:
+    - zeronet@tezos/tezos
+  script:
+    - ssh zeronet2
+
+deploy:zeronet3:
+  <<: *bootstrap_definition
+  only:
+    - zeronet@tezos/tezos
+  script:
+    - ssh zeronet3
 
 # cleanup:
   # <<: *dind_definition
