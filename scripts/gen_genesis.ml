@@ -16,9 +16,6 @@
 let date =
   Lwt_main.run (Lwt_process.pread_line (Lwt_process.shell "date +%FT%TZ --utc"))
 
-let int_date =
-  Lwt_main.run (Lwt_process.pread_line (Lwt_process.shell "date +%y%m%d "))
-
 let prefix = "BLockGenesisGenesisGenesisGenesisGenesis"
 let suffix = String.sub Digest.(to_hex (string date)) 0 5
 let p =
@@ -47,9 +44,9 @@ let _ =
 let sed =
   Format.sprintf
     "sed -i \
-     -e 's/minor = [0-9]* ;/minor = %s ;/' \
+     -e 's/name = \"TEZOS[^\"]*\" ;/name = \"TEZOS_%s\" ;/' \
     ../src/lib_shell/distributed_db_message.ml"
-    int_date
+    date
 
 let _ =
   Lwt_main.run (Lwt_process.exec (Lwt_process.shell sed))

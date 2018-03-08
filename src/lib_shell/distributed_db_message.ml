@@ -172,7 +172,7 @@ let versions =
   let open P2p_version in
   [ { name = "TEZOS" ;
       major = 0 ;
-      minor = 180307 ;
+      minor = 0 ;
     }
   ]
 
