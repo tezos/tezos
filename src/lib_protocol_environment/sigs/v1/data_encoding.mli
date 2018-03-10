@@ -164,7 +164,7 @@ type case_tag = Tag of int | Json_only
 
 type 't case
 val case :
-  case_tag -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
+  ?name:string -> case_tag -> 'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 val union :
   ?tag_size:[ `Uint8 | `Uint16 ] -> 't case list -> 't encoding
 

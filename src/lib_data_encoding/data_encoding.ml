@@ -174,7 +174,8 @@ and _ field =
   | Dft : string * 'a t * 'a -> 'a field
 
 and 'a case =
-  | Case : { encoding : 'a t ;
+  | Case : { name : string option ;
+             encoding : 'a t ;
              proj : ('t -> 'a option) ;
              inj : ('a -> 't) ;
              tag : case_tag } -> 't case
@@ -326,8 +327,9 @@ module Json = struct
             make @@
             Union (kind, tag,
                    List.map
-                     (fun (Case { encoding ; proj = proj' ; inj = inj' ; tag }) ->
+                     (fun (Case { name ; encoding ; proj = proj' ; inj = inj' ; tag }) ->
                         Case { encoding ;
+                               name ;
                                proj = (fun x -> proj' (proj x));
                                inj = (fun x -> inj (inj' x)) ;
                                tag })
@@ -352,8 +354,9 @@ module Json = struct
           make @@
           Union (`Dynamic (* ignored *), tag,
                  List.map
-                   (fun (Case { encoding = e2 ; proj ; inj ; tag }) ->
+                   (fun (Case { name ; encoding = e2 ; proj ; inj ; tag }) ->
                       Case { encoding = lift_union_in_pair b p e1 e2 ;
+                             name ;
                              proj = (fun (x, y) ->
                                  match proj y with
                                  | None -> None
@@ -365,8 +368,9 @@ module Json = struct
           make @@
           Union (`Dynamic (* ignored *), tag,
                  List.map
-                   (fun (Case { encoding = e1 ; proj ; inj ; tag }) ->
+                   (fun (Case { name ; encoding = e1 ; proj ; inj ; tag }) ->
                       Case { encoding = lift_union_in_pair b p e1 e2 ;
+                             name ;
                              proj = (fun (x, y) ->
                                  match proj x with
                                  | None -> None
@@ -821,14 +825,16 @@ module Encoding = struct
       List.map (fun (Case { encoding }) -> classify encoding) cases in
     let kind = Kind.merge_list tag_size kinds in
     make @@ Union (kind, tag_size, cases)
-  let case tag encoding proj inj = Case { encoding ; proj ; inj ; tag }
+  let case ?name tag encoding proj inj = Case { name ; encoding ; proj ; inj ; tag }
   let option ty =
     union
       ~tag_size:`Uint8
       [ case (Tag 1) ty
+          ~name:"Some"
           (fun x -> x)
           (fun x -> Some x) ;
         case (Tag 0) empty
+          ~name:"None"
           (function None -> Some () | Some _ -> None)
           (fun () -> None) ;
       ]

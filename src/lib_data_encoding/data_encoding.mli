@@ -357,8 +357,10 @@ type case_tag = Tag of int | Json_only
     An optional tag gives a name to a case and should be used to maintain
     compatibility.
 
-    If no tag is specified, tags are assigned by the union combinator. *)
+    An optional name for the case can be provided,
+    which is used in the binary documentation. *)
 val case :
+  ?name:string ->
   case_tag ->
   'a encoding -> ('t -> 'a option) -> ('a -> 't) -> 't case
 
