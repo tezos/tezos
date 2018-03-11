@@ -8,11 +8,11 @@
 (**************************************************************************)
 
 (**
-   This module implements four tables
-   - ip grey lists used to automatically ban a given ip addr
-   - peer_id greylist used to automatically ban a given peer_id
-   - ip black lists used to manually ban a given ip addr
-   - peers black list used to manually trust a given peer_id
+   This module implements four Access Control Lists:
+   - ip greylist used to automatically ban a given ip address.
+   - peer_id greylist used to automatically ban a given peer_id.
+   - ip blacklist used to manually ban a given ip addr.
+   - peers blacklist used to manually trust a given peer_id.
 
    IP greylists use a time based GC to periodically remove entries from
    the table, while peer_id grey lists are built using a ring structure,
@@ -21,31 +21,30 @@
 
 *)
 
-
 type t
 
-(** Create a new ACL of given size *)
+(** [create size] is a set of four ACLs (see above) with the peer_id
+    greylist being a ring buffer of size [size]. *)
 val create : int -> t
 
-(** Check if an address is banned either temporally or permanently *)
-val is_banned_addr : t -> P2p_addr.t -> bool
+(** [banned_addr t addr] is [true] if [addr] is blacklisted or
+    greylisted. *)
+val banned_addr : t -> P2p_addr.t -> bool
 
-(** Check if a peer is banned either temporally or permanently *)
-val is_banned_peer : t -> P2p_peer.Id.t -> bool
+(** [banned_peer t peer_id] is [true] if peer with id [peer_id] is
+    blacklisted or greylisted. *)
+val banned_peer : t -> P2p_peer.Id.t -> bool
 
-(** Reinitialize the Greylist tables *)
-val greylist_clear : t -> unit
+(** [clear t] clears all four ACLs. *)
+val clear : t -> unit
 
 module IPGreylist : sig
 
-  (* Add the given ip address to the ip greylist *)
+  (** [add t addr] adds [addr] to the address greylist. *)
   val add: t -> P2p_addr.t -> unit
 
-  (** [gc time] removes all banned peers older than the given time in seconds
-      The GC operation works only on the address set. Peers are removed
-      from the ring in a round-robin fashion. If a address is removed
-      by the GC from the greylist set, it could potentially
-      persist in the peers' blacklist set until more peers are banned. *)
+  (** [gc time] removes all banned peers older than the given time in
+      seconds. *)
   val gc: t -> delay:float -> unit
 
   val encoding: P2p_addr.t list Data_encoding.t
@@ -54,20 +53,14 @@ end
 
 module IPBlacklist : sig
 
-  (* Add the given ip address to the ip blacklist *)
   val add: t -> P2p_addr.t -> unit
-
-  (* Remove the given ip address to the ip blacklist *)
   val remove: t -> P2p_addr.t -> unit
 
 end
 
 module PeerBlacklist : sig
 
-  (* Add the given ip address to the ip blacklist *)
   val add: t -> P2p_peer.Id.t -> unit
-
-  (* Remove the given ip address to the ip blacklist *)
   val remove: t -> P2p_peer.Id.t -> unit
 
 end
@@ -75,7 +68,6 @@ end
 
 module PeerGreylist : sig
 
-  (* Ban the given peer_id. It also add the given ip address to the blacklist. *)
   val add: t -> P2p_peer.Id.t -> unit
 
 end

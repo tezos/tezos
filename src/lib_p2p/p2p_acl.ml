@@ -129,45 +129,42 @@ module IpTable = Hashtbl.Make(struct
     let equal x y = Ipaddr.V6.compare x y = 0
   end)
 
-type raw = {
+type t = {
   mutable greylist_ips : IpSet.t ;
   greylist_peers : PeerRing.t ;
   banned_ips : unit IpTable.t ;
   banned_peers : unit P2p_peer.Table.t ;
 }
 
-type t = raw ref
-
-let create size = ref {
-    greylist_ips = IpSet.empty;
-    greylist_peers = PeerRing.create size;
-    banned_ips = IpTable.create 53;
-    banned_peers = P2p_peer.Table.create 53;
-  }
+let create size = {
+  greylist_ips = IpSet.empty;
+  greylist_peers = PeerRing.create size;
+  banned_ips = IpTable.create 53;
+  banned_peers = P2p_peer.Table.create 53;
+}
 
 (* check if an ip is banned. priority is for static blacklist, then
    in the greylist *)
-let is_banned_addr acl addr =
-  (IpTable.mem !acl.banned_ips addr) ||
-  (IpSet.mem addr !acl.greylist_ips)
+let banned_addr acl addr =
+  IpTable.mem acl.banned_ips addr ||
+  IpSet.mem addr acl.greylist_ips
 
 (* Check is the peer_id is in the banned ring. It might be possible that
    a peer ID that is not banned, but its ip address is. *)
-let is_banned_peer acl peer_id =
-  (P2p_peer.Table.mem !acl.banned_peers peer_id) ||
-  (PeerRing.mem !acl.greylist_peers peer_id)
+let banned_peer acl peer_id =
+  P2p_peer.Table.mem acl.banned_peers peer_id ||
+  PeerRing.mem acl.greylist_peers peer_id
 
-let greylist_clear acl =
-  !acl.greylist_ips <- IpSet.empty;
-  P2p_peer.Table.clear !acl.banned_peers;
-  IpTable.clear !acl.banned_ips;
-  PeerRing.clear !acl.greylist_peers
+let clear acl =
+  acl.greylist_ips <- IpSet.empty;
+  P2p_peer.Table.clear acl.banned_peers;
+  IpTable.clear acl.banned_ips;
+  PeerRing.clear acl.greylist_peers
 
 module IPGreylist = struct
 
-  (* Add the given ip address to the ip greylist *)
   let add acl addr =
-    !acl.greylist_ips <- IpSet.add addr (Time.now()) !acl.greylist_ips
+    acl.greylist_ips <- IpSet.add addr (Time.now ()) acl.greylist_ips
 
   let mem acl addr = IpSet.mem addr !acl.greylist_ips
 
@@ -176,7 +173,7 @@ module IPGreylist = struct
      by the GC from the acl.greylist set, it could potentially
      persist in the acl.peers set until more peers are banned. *)
   let gc acl ~delay =
-    !acl.greylist_ips <- IpSet.gc !acl.greylist_ips ~delay
+    acl.greylist_ips <- IpSet.gc acl.greylist_ips ~delay
 
   let encoding = Data_encoding.(list P2p_addr.encoding)
 
@@ -184,40 +181,37 @@ end
 
 module IPBlacklist = struct
 
-  (* Add the given ip address to the ip blacklist *)
   let add acl addr =
-    IpTable.add !acl.banned_ips addr ()
+    IpTable.add acl.banned_ips addr ()
 
-  (* Remove the given ip address to the ip blacklist *)
   let remove acl addr =
-    IpTable.remove !acl.banned_ips addr
+    IpTable.remove acl.banned_ips addr
 
   let mem acl addr =
-    IpTable.mem !acl.banned_ips addr
+    IpTable.mem acl.banned_ips addr
 
 end
 
 module PeerBlacklist = struct
 
   let add acl addr =
-    P2p_peer.Table.add !acl.banned_peers addr ()
+    P2p_peer.Table.add acl.banned_peers addr ()
 
   let remove acl addr =
-    P2p_peer.Table.remove !acl.banned_peers addr
+    P2p_peer.Table.remove acl.banned_peers addr
 
   let mem acl addr =
-    P2p_peer.Table.mem !acl.banned_peers addr
+    P2p_peer.Table.mem acl.banned_peers addr
 
 end
 
 module PeerGreylist = struct
 
-  (* Ban the given peer_id. It also add the given ip address to the blacklist. *)
   let add acl peer_id =
-    PeerRing.add !acl.greylist_peers peer_id
+    PeerRing.add acl.greylist_peers peer_id
 
   let mem acl peer_id =
-    (PeerRing.mem !acl.greylist_peers peer_id)
+    (PeerRing.mem acl.greylist_peers peer_id)
 
 end
 

@@ -93,7 +93,7 @@ module Points : sig
 
   val trust: #simple -> P2p_point.Id.t -> unit tzresult Lwt.t
 
-  val is_banned: #simple -> P2p_point.Id.t -> bool tzresult Lwt.t
+  val banned: #simple -> P2p_point.Id.t -> bool tzresult Lwt.t
 
   module S : sig
 
@@ -127,7 +127,7 @@ module Points : sig
        unit * P2p_point.Id.t, unit, unit,
        unit) RPC_service.t
 
-    val is_banned :
+    val banned :
       ([ `POST ], unit,
        unit * P2p_point.Id.t, unit, unit,
        bool) RPC_service.t
@@ -157,7 +157,7 @@ module Peers : sig
 
   val trust: #simple -> P2p_peer.Id.t -> unit tzresult Lwt.t
 
-  val is_banned: #simple -> P2p_peer.Id.t -> bool tzresult Lwt.t
+  val banned: #simple -> P2p_peer.Id.t -> bool tzresult Lwt.t
 
   module S : sig
 
@@ -191,7 +191,7 @@ module Peers : sig
        unit * P2p_peer.Id.t, unit, unit,
        unit) RPC_service.t
 
-    val is_banned :
+    val banned :
       ([ `POST ], unit,
        unit * P2p_peer.Id.t, unit, unit,
        bool) RPC_service.t
@@ -200,7 +200,7 @@ module Peers : sig
 
 end
 
-module Greylist : sig
+module ACL : sig
 
   val clear: #simple -> unit -> unit tzresult Lwt.t
 

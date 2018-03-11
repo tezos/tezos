@@ -25,7 +25,7 @@ let peers = [foo;bar;baz]
 let test_empty _ =
   let empty = P2p_acl.create 10 in
   List.iter (fun (_peer,addr) ->
-      assert_equal_bool ~msg:__LOC__ false (P2p_acl.is_banned_addr empty addr)
+      assert_equal_bool ~msg:__LOC__ false (P2p_acl.banned_addr empty addr)
     ) peers ;
   Lwt.return ()
 ;;
@@ -34,7 +34,7 @@ let test_ban _ =
   let set = P2p_acl.create 10 in
   List.iter (fun (_,addr) -> P2p_acl.IPGreylist.add set addr) peers;
   List.iter (fun (_,addr) ->
-      assert_equal_bool ~msg:__LOC__ true (P2p_acl.is_banned_addr set addr)
+      assert_equal_bool ~msg:__LOC__ true (P2p_acl.banned_addr set addr)
     ) peers ;
   Lwt.return ()
 ;;
@@ -43,13 +43,13 @@ let test_gc _ =
   let set = P2p_acl.create 10 in
   List.iter (fun (_,addr) -> P2p_acl.IPGreylist.add set addr) peers;
   List.iter (fun (_peer,addr) ->
-      assert_equal_bool ~msg:__LOC__ true (P2p_acl.is_banned_addr set addr)
+      assert_equal_bool ~msg:__LOC__ true (P2p_acl.banned_addr set addr)
     ) peers ;
   Lwt_unix.sleep 3. >>= fun _ ->
   (* remove all peers after one second *)
   P2p_acl.IPGreylist.gc set ~delay:1. ;
   List.iter (fun (_peer,addr) ->
-      assert_equal_bool ~msg:__LOC__ false (P2p_acl.is_banned_addr set addr)
+      assert_equal_bool ~msg:__LOC__ false (P2p_acl.banned_addr set addr)
     ) peers ;
   Lwt.return ()
 

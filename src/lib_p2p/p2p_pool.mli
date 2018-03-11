@@ -153,6 +153,10 @@ val pool_stat: ('msg, 'meta) pool -> P2p_stat.t
 (** [pool_stat pool] is a snapshot of current bandwidth usage for the
     entire [pool]. *)
 
+val config : _ pool -> config
+(** [config pool] is the [config] argument passed to [pool] at
+    creation. *)
+
 val send_swap_request: ('msg, 'meta) pool -> unit
 
 (** {2 Pool events} *)
@@ -270,10 +274,18 @@ val broadcast_bootstrap_msg:  ('msg, 'meta) pool -> unit
 (** [write_all pool msg] is [P2P_connection.write_now conn Bootstrap]
     for all member connections to [pool] in [Running] state. *)
 
-val temp_ban_peer : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
-val temp_ban_addr : ('msg, 'meta) pool -> P2p_addr.t -> unit
+val greylist_addr : ('msg, 'meta) pool -> P2p_addr.t -> unit
+(** [greylist_addr pool addr] adds [addr] to [pool]'s IP greylist. *)
+
+val greylist_peer : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
+(** [greylist_peer pool peer] adds [peer] to [pool]'s peer greylist
+    and [peer]'s address to [pool]'s IP greylist. *)
+
 val gc_greylist: delay:float -> ('msg, 'meta) pool -> unit
-val greylist_clear : ('msg, 'meta) pool -> unit
+(** [gc_greylist ~delay pool] *)
+
+val acl_clear : ('msg, 'meta) pool -> unit
+(** [acl_clear pool] clears ACL tables. *)
 
 (** {1 Functions on [Peer_id]} *)
 
@@ -307,7 +319,7 @@ module Peers : sig
   val forget : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
   val ban : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
   val trust : ('msg, 'meta) pool -> P2p_peer.Id.t -> unit
-  val is_banned : ('msg, 'meta) pool -> P2p_peer.Id.t -> bool
+  val banned : ('msg, 'meta) pool -> P2p_peer.Id.t -> bool
 
 end
 
@@ -339,7 +351,7 @@ module Points : sig
   val forget : ('msg, 'meta) pool -> P2p_point.Id.t -> unit
   val ban : ('msg, 'meta) pool -> P2p_point.Id.t -> unit
   val trust : ('msg, 'meta) pool -> P2p_point.Id.t -> unit
-  val is_banned : ('msg, 'meta) pool -> P2p_point.Id.t -> bool
+  val banned : ('msg, 'meta) pool -> P2p_point.Id.t -> bool
 
 end
 

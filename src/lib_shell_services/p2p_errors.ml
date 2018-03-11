@@ -216,10 +216,10 @@ let () =
     ~id:"node.p2p_pool.point_banned"
     ~title:"Point Banned"
     ~description:"The addr you tried to connect is banned."
-    ~pp:(fun ppf point ->
+    ~pp:(fun ppf (addr, _port) ->
         Format.fprintf ppf
           "The addr you tried to connect (%a) is banned."
-          P2p_addr.pp (fst point))
+          P2p_addr.pp addr)
     Data_encoding.(obj1 (req "point" P2p_point.Id.encoding))
     (function Point_banned point -> Some point | _ -> None)
     (fun point -> Point_banned point) ;

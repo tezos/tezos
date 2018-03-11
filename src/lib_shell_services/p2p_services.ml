@@ -137,7 +137,7 @@ module Points = struct
         ~query: RPC_query.empty
         ~input: Data_encoding.empty
         ~output: Data_encoding.empty
-        ~description:"Ban the given address permanently."
+        ~description:"Blacklist the given address."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "ban" )
 
     let trust =
@@ -147,16 +147,17 @@ module Points = struct
         ~output: Data_encoding.empty
         ~description:"Trust a given address permanently. \
                       Connections from this address can still be closed \
-                      on authentication if the peer is banned or blocked."
+                      on authentication if the peer is blacklisted or greylisted."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "trust" )
 
-    let is_banned =
+    let banned =
       RPC_service.post_service
         ~query: RPC_query.empty
         ~input: Data_encoding.empty
         ~output: Data_encoding.bool
-        ~description:"Check is a given address is blocked, permanently or temporarily."
-        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "isbanned" )
+        ~description:"Check is a given address is blacklisted or \
+                      greylisted."
+        RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "banned" )
 
   end
 
@@ -168,7 +169,7 @@ module Points = struct
   let forget ctxt peer_id = make_call1 S.forget ctxt peer_id () ()
   let ban ctxt peer_id = make_call1 S.ban ctxt peer_id () ()
   let trust ctxt peer_id = make_call1 S.trust ctxt peer_id () ()
-  let is_banned ctxt peer_id = make_call1 S.is_banned ctxt peer_id () ()
+  let banned ctxt peer_id = make_call1 S.banned ctxt peer_id () ()
 
 end
 
@@ -220,7 +221,7 @@ module Peers = struct
         ~query: RPC_query.empty
         ~input: Data_encoding.empty
         ~output: Data_encoding.empty
-        ~description:"Ban the given peer permanently."
+        ~description:"Blacklist the given peer."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "ban" )
 
     let trust =
@@ -228,17 +229,18 @@ module Peers = struct
         ~query: RPC_query.empty
         ~input: Data_encoding.empty
         ~output: Data_encoding.empty
-        ~description:"Trust a given peer permanently: \
-                      the peer cannot be blocked (but its machine's IP still can)."
+        ~description:"Trust a given peer permanently: the peer cannot \
+                      be blocked (but its host IP still can)."
         RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "trust" )
 
-    let is_banned =
+    let banned =
       RPC_service.post_service
         ~query: RPC_query.empty
         ~input: Data_encoding.empty
         ~output: Data_encoding.bool
-        ~description:"Check is a given peer is blocked, permanently or temporarily."
-        RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "isbanned" )
+        ~description:"Check if a given peer is blacklisted or \
+                      greylisted."
+        RPC_path.(root / "network" / "peers" /: P2p_peer.Id.rpc_arg / "banned" )
 
   end
 
@@ -249,11 +251,11 @@ module Peers = struct
   let forget ctxt point_id = make_call1 S.forget ctxt point_id () ()
   let ban ctxt point_id = make_call1 S.ban ctxt point_id () ()
   let trust ctxt point_id = make_call1 S.trust ctxt point_id () ()
-  let is_banned ctxt point_id = make_call1 S.is_banned ctxt point_id () ()
+  let banned ctxt point_id = make_call1 S.banned ctxt point_id () ()
 
 end
 
-module Greylist = struct
+module ACL = struct
 
   module S = struct
 

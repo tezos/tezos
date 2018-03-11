@@ -487,7 +487,7 @@ module P2p_reader = struct
           chain_db.callback.notify_branch state.gid locator
         else
           (* Kickban *)
-          P2p.temp_ban_peer global_db.p2p state.gid;
+          P2p.greylist_peer global_db.p2p state.gid;
         Lwt.return_unit
 
     | Deactivate chain_id ->
@@ -513,7 +513,7 @@ module P2p_reader = struct
           chain_db.callback.notify_head state.gid header mempool
         else
           (* Kickban *)
-          P2p.temp_ban_peer global_db.p2p state.gid ;
+          P2p.greylist_peer global_db.p2p state.gid ;
         Lwt.return_unit
 
     | Get_block_headers hashes ->
@@ -768,8 +768,8 @@ let get_chain { active_chains } chain_id =
   try Some (Chain_id.Table.find active_chains chain_id)
   with Not_found -> None
 
-let temp_ban { global_db = { p2p } } peer_id =
-  Lwt.return (P2p.temp_ban_peer p2p peer_id)
+let greylist { global_db = { p2p } } peer_id =
+  Lwt.return (P2p.greylist_peer p2p peer_id)
 
 let disconnect { global_db = { p2p } } peer_id =
   match P2p.find_connection p2p peer_id with

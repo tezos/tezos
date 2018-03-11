@@ -213,8 +213,8 @@ val on_new_connection :
 
 val build_rpc_directory : _ t -> unit RPC_directory.t
 
-val temp_ban_addr : ('msg, 'meta) net -> P2p_addr.t -> unit
-val temp_ban_peer : ('msg, 'meta) net -> P2p_peer.Id.t -> unit
+val greylist_addr : ('msg, 'meta) net -> P2p_addr.t -> unit
+val greylist_peer : ('msg, 'meta) net -> P2p_peer.Id.t -> unit
 
 (**/**)
 

@@ -28,14 +28,14 @@ General operation
 I/O Scheduling
 ~~~~~~~~~~~~~~
 
-The P2P layer uses a scheduling mechanism in order to be able to control its
-bandwidth usage as well as implementing different policies (e.g. read/write
-quotas) to different peers. For now, each peer is granted a fair share of the
-global allocated bandwidth, but it is planned for the individual allocated
-bandwidth to each peer to be a function of the peer's score. Each connection is
-associated tp a read/write queues where data is copied at a rate of equivalent
-to max_download_speed / num_connections (resp. max_upload_speed /
-num_connections).
+The P2P layer uses a scheduling mechanism in order to control its
+bandwidth usage as well as implementing different policies
+(e.g. read/write quotas) to different peers. For now, each peer is
+granted a fair share of the global allocated bandwidth, but it is
+planned for the individual allocated bandwidth to each peer to be a
+function of the peer's score. Each connection has a read (resp. write)
+queue where data is copied at a rate of ``max_download_speed /
+num_connections`` (resp. ``max_upload_speed / num_connections``).
 
 
 Encryption
@@ -86,18 +86,19 @@ layer. It basically runs the ``accept(2)`` syscall and call
 that it is made aware of an incoming connection. From there, the pool
 will decide how this new connection must be handled.
 
-BlackLists, WhiteLists, GreyLists
---------------------------------
+{Black, While, Grey}lists
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The welcome worker takes care of filtering all incoming connections using two
-static lists of address provided by the admin (either via the ``tezos-admin``
-client or directly in the configuration file) and an automatic (grey)list
-handled automatically by the p2p layer. The node admin can block or whitelist
-individual ip addresses, while the p2p layer can temporarly ban ip addresses and
-peer's identities that misbihaved. The delay to remove an ip address from
-the greylist table is defined by the varaible ``greylist_timeout``, while
-identities are greylisted in a fixed size ring and periodically removed. The
-node admin can also flush the greylist tables using the ``tezos-admin`` client.
+The welcome worker takes care of filtering all incoming connections
+using two static lists of addresses provided either by ``tezos-admin``
+or directly in the configuration file. Also, an automatic (grey) list
+is handled automatically by the p2p layer. The node admin can block or
+whitelist individual ip addresses, while the p2p layer can temporarily
+ban ip addresses and peers who misbehaved. The delay to remove an ip
+address from the greylist table is defined by the configuration
+variable ``greylist_timeout``, while peers are greylisted in a
+fixed-size ring buffer and periodically removed. The node admin can
+also flush greylist tables with the ``tezos-admin`` client.
 
 Maintenance worker
 ------------------
@@ -127,5 +128,5 @@ Given these bounds, the maintenance worker:
   peers until it reaches at least ``min_target`` connections (and never
   more than ``max_target`` connections).
 
-The maintenance worker is also in charge to periodically run the greylists
-GC functions to unban ip addresses from the greylist.
+The maintenance worker is also in charge to periodically run the
+greylists GC functions to unban ip addresses from the greylist.

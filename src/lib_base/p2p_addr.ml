@@ -34,15 +34,15 @@ let pp ppf addr =
   | None ->
       Format.fprintf ppf "[%a]" Ipaddr.V6.pp_hum addr
 
-let of_string_exn str =
-  match Ipaddr.of_string_exn str with
-  | V4 addr -> Ipaddr.v6_of_v4 addr
-  | V6 addr -> addr
+let of_string_opt str =
+  Option.map (Ipaddr.of_string str) ~f:begin function
+    | Ipaddr.V4 addr -> Ipaddr.v6_of_v4 addr
+    | V6 addr -> addr
+  end
 
-let of_string str =
-  try Ok (of_string_exn str) with
-  | Invalid_argument s -> Error s
-  | Failure s -> Error s
-  | _ -> Error "P2p_addr.of_string"
+let of_string_exn str =
+  match of_string_opt str with
+  | None -> Pervasives.failwith "P2p_addr.of_string"
+  | Some t -> t
 
 let to_string saddr = Format.asprintf "%a" pp saddr

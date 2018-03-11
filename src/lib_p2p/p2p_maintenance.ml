@@ -20,7 +20,6 @@ type 'meta pool = Pool : ('msg, 'meta) P2p_pool.t -> 'meta pool
 
 type 'meta t = {
   canceler: Lwt_canceler.t ;
-  greylist_timeout: float;
   bounds: bounds ;
   pool: 'meta pool ;
   just_maintained: unit Lwt_condition.t ;
@@ -53,7 +52,7 @@ let connectable st start_time expected =
           match P2p_point_state.Info.last_miss pi with
           | Some last when Time.(start_time < last)
                         || P2p_point_state.Info.greylisted ~now pi -> ()
-          | _ when (P2p_pool.Points.is_banned pool point) -> ()
+          | _ when (P2p_pool.Points.banned pool point) -> ()
           | last ->
               Bounded_point_info.insert (last, point) acc
         end
@@ -95,7 +94,8 @@ let rec try_to_contact
 let rec maintain st =
   let Pool pool = st.pool in
   let n_connected = P2p_pool.active_connections pool in
-  P2p_pool.gc_greylist pool ~delay:st.greylist_timeout;
+  let pool_cfg = P2p_pool.config pool in
+  P2p_pool.gc_greylist pool ~delay:pool_cfg.greylist_timeout;
   if n_connected < st.bounds.min_threshold then
     too_few_connections st n_connected
   else if st.bounds.max_threshold < n_connected then
@@ -168,11 +168,10 @@ let rec worker_loop st =
   | Error [ Canceled ] -> Lwt.return_unit
   | Error _ -> Lwt.return_unit
 
-let run ~greylist_timeout bounds pool =
+let run bounds pool =
   let canceler = Lwt_canceler.create () in
   let st = {
     canceler ;
-    greylist_timeout ;
     bounds ;
     pool = Pool pool ;
     just_maintained = Lwt_condition.create () ;

@@ -15,7 +15,7 @@ let port_arg () =
   let open Clic in
   default_arg
     ~long:"port"
-    ~placeholder:"number"
+    ~placeholder:"IP port"
     ~doc:"peer-to-peer port of the node"
     ~default: "9732"
     (parameter
@@ -89,8 +89,7 @@ let commands () =
        @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
        @@ stop)
       (fun port address (cctxt : #Client_context.full) ->
-         P2p_services.connect cctxt ~timeout:10. (address,port) >>=? fun () ->
-         return ()
+         P2p_services.connect cctxt ~timeout:10. (address, port)
       );
 
     command ~group ~desc: "Remove an IP address from the blacklist and whitelist."
@@ -99,28 +98,25 @@ let commands () =
        @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
        @@ stop)
       (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.forget cctxt (address,0) >>=? fun () ->
-         return ()
+         P2p_services.Points.forget cctxt (address, 0)
       );
 
-    command ~group ~desc: "Add a IP address to the blacklist."
+    command ~group ~desc: "Add an IP address to the blacklist."
       no_options
       (prefixes [ "ban" ; "address" ]
        @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
        @@ stop)
       (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.ban cctxt (address,0) >>=? fun () ->
-         return ()
+         P2p_services.Points.ban cctxt (address, 0)
       );
 
-    command ~group ~desc: "Add a IP address to the whitelist."
+    command ~group ~desc: "Add an IP address to the whitelist."
       no_options
       (prefixes [ "trust" ; "address" ]
        @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
        @@ stop)
       (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.trust cctxt (address,0) >>=? fun () ->
-         return ()
+         P2p_services.Points.trust cctxt (address, 0)
       );
 
     command ~group ~desc: "Check if an IP address is banned."
@@ -129,10 +125,10 @@ let commands () =
        @@ param ~name:"address" ~desc:"IPv4 or IPV6 address" addr_parameter
        @@ stop)
       (fun () address (cctxt : #Client_context.full) ->
-         P2p_services.Points.is_banned cctxt (address,0) >>=? fun answer ->
+         P2p_services.Points.banned cctxt (address, 0) >>=? fun banned ->
          cctxt#message
            "The given ip address is %s"
-           (if answer then "banned" else "not banned") >>= fun () ->
+           (if banned then "banned" else "not banned") >>= fun () ->
          return ()
       );
 
@@ -142,8 +138,7 @@ let commands () =
        @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
        @@ stop)
       (fun () peer (cctxt : #Client_context.full) ->
-         P2p_services.Peers.forget cctxt peer >>=? fun () ->
-         return ()
+         P2p_services.Peers.forget cctxt peer
       );
 
     command ~group ~desc: "Add a peer ID to the blacklist."
@@ -152,8 +147,7 @@ let commands () =
        @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
        @@ stop)
       (fun () peer (cctxt : #Client_context.full) ->
-         P2p_services.Peers.ban cctxt peer >>=? fun () ->
-         return ()
+         P2p_services.Peers.ban cctxt peer
       );
 
     command ~group ~desc: "Add a peer ID to the whitelist."
@@ -162,8 +156,7 @@ let commands () =
        @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
        @@ stop)
       (fun () peer (cctxt : #Client_context.full) ->
-         P2p_services.Peers.trust cctxt peer >>=? fun () ->
-         return ()
+         P2p_services.Peers.trust cctxt peer
       );
 
     command ~group ~desc: "Check if a peer ID is banned."
@@ -172,18 +165,17 @@ let commands () =
        @@ P2p_peer.Id.param ~name:"peer" ~desc:"peer network identity"
        @@ stop)
       (fun () peer (cctxt : #Client_context.full) ->
-         P2p_services.Peers.is_banned cctxt peer >>=? fun answer ->
+         P2p_services.Peers.banned cctxt peer >>=? fun banned ->
          cctxt#message
            "The given peer ID is %s"
-           (if answer then "banned" else "not banned") >>= fun () ->
+           (if banned then "banned" else "not banned") >>= fun () ->
          return ()
       );
 
-    command ~group ~desc: "Clear all greylist tables."
+    command ~group ~desc: "Clear all ACLs."
       no_options
-      (prefixes [ "clear" ; "greylists" ] @@ stop)
+      (prefixes [ "clear" ; "acls" ] @@ stop)
       (fun () (cctxt : #Client_context.full) ->
-         P2p_services.Greylist.clear cctxt () >>=? fun () ->
-         return ()
+         P2p_services.ACL.clear cctxt ()
       );
 ]

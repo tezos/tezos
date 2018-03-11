@@ -54,8 +54,8 @@ val set_callback: chain_db -> callback -> unit
 (** Kick a given peer. *)
 val disconnect: chain_db -> P2p_peer.Id.t -> unit Lwt.t
 
-(** Temporarily ban of a given peer. *)
-val temp_ban: chain_db -> P2p_peer.Id.t -> unit Lwt.t
+(** Greylist a given peer. *)
+val greylist: chain_db -> P2p_peer.Id.t -> unit Lwt.t
 
 (** Various accessors. *)
 val chain_state: chain_db -> State.Chain.t
