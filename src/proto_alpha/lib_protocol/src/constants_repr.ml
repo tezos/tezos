@@ -64,14 +64,13 @@ type constants = {
 let read_public_key s = Ed25519.Public_key.of_hex_exn (`Hex s)
 
 let default = {
-  cycle_length = 2048l ;
-  voting_period_length = 32768l ;
+  cycle_length = 128l ;
+  voting_period_length = 1024l ;
   time_before_reward =
     Period_repr.of_seconds_exn
-      (* One year in seconds *)
-      Int64.(mul 365L (mul 24L 3600L)) ;
+      Int64.(mul 6L 3600L) ; (* 6 hours *)
   slot_durations =
-    List.map Period_repr.of_seconds_exn [ 60L ] ;
+    List.map Period_repr.of_seconds_exn [ 60L ; 30L ; 20L ; 10L ] ;
   first_free_baking_slot = 16 ;
   max_signing_slot = 15 ;
   max_gas = 40_000 ;
