@@ -84,10 +84,10 @@ module type TABLE = sig
   type t
   type v
   val create : int -> t
-  val clear : t -> unit
   val add : t -> v -> unit
   val mem : t -> v -> bool
   val remove : t -> v -> unit
+  val clear : t -> unit
   val elements : t -> v list
 end
 
@@ -99,44 +99,35 @@ module MakeTable (V: Hashtbl.HashedType) = struct
 
   type raw = {
     size : int ;
-    mutable capacity : int ;
     ring : V.t Ring.t ;
     table : unit Table.t ;
   }
-
   type t = raw ref
   type v = V.t
 
   let create size = ref {
       size;
-      capacity = 0;
       ring = Ring.create size;
       table = Table.create size }
 
-  let add ({contents = t } as tt) v =
-    assert (t.capacity <= t.size);
-    if t.capacity = t.size then begin
-      try Table.remove t.table (Ring.last_exn t.ring) with Ring.Empty -> assert false
-    end;
-    Ring.add t.ring v;
-    Table.replace t.table v ();
-    let capacity = if t.capacity = t.size then t.capacity else t.capacity + 1 in
-    tt := { ring = t.ring ; table = t.table; size = t.size ; capacity = capacity }
+  let add {contents = t } v =
+    Table.add t.table v ();
+    Option.iter
+      (Ring.add_and_return_erased t.ring v)
+      ~f:(Table.remove t.table)
 
-  let mem t v = Table.mem !t.table v
+  let mem {contents = t} v = Table.mem t.table v
 
-  let remove ({contents = t } as tt) v =
-    Table.remove t.table v;
-    let capacity = if t.capacity = 0 then t.capacity else t.capacity - 1 in
-    tt := { ring = t.ring ; table = t.table; size = t.size ; capacity = capacity }
+  let remove {contents = t} v =
+    Table.remove t.table v
 
-  let clear ({contents = t } as tt) =
+  let clear ({contents = t} as tt) =
     tt := { t with
-            capacity = 0;
             ring = Ring.create t.size;
             table = Table.create t.size
           }
 
-  let elements t = Ring.elements !t.ring
+  let elements {contents = t} =
+    Table.fold (fun k _ acc -> k::acc) t.table []
 
 end

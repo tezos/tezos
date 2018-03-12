@@ -52,9 +52,6 @@ module type TABLE = sig
   (** [create size] inizialize an empty ring *)
   val create : int -> t
 
-  (** [retest t] remore all bindings from the current ring *)
-  val clear : t -> unit
-
   (** [add t v] add a value to the ring. If the ring already contains size elements,
       the first element is removed and [v] is added. *)
   val add : t -> v -> unit
@@ -64,6 +61,9 @@ module type TABLE = sig
 
   (** [remove t v] remove one element from the table *)
   val remove : t -> v -> unit
+
+  (** [retest t] remore all bindings from the current ring *)
+  val clear : t -> unit
 
   (** [elements t] return the list of elements currently in the ring *)
   val elements : t -> v list
