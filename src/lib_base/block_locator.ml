@@ -44,14 +44,14 @@ let encoding =
      (req "current_head" (dynamic_size Block_header.encoding))
      (req "history" (dynamic_size (list Block_hash.encoding))))
 
-(** 
-   Computes a locator for block [b] picking 10 times the immediate
-   predecessors of [b], then 10 times one predecessor every 2, then 
-   10 times one predecessor every 4, ..., until genesis or it reaches 
-   the desired size.
-*)
+(** Computes a locator for block [b] picking 10 times the immediate
+    predecessors of [b], then 10 times one predecessor every 2, then
+    10 times one predecessor every 4, ..., until genesis or it reaches
+    the desired size. *)
 let compute ~predecessor ~genesis b header size =
-  if size < 0 then invalid_arg "compute: negative size" else
+  if size < 0 then
+    invalid_arg "Block_locator.compute: negative size"
+  else
     let repeats = 10 in (* number of repetitions for each power of 2 *)
     let rec loop acc size step cnt b =
       if size = 0 then
@@ -65,17 +65,16 @@ let compute ~predecessor ~genesis b header size =
               Lwt.return (List.rev (genesis :: acc))
         | Some pred ->
             if cnt = 1 then
-              loop (pred :: acc) (size - 1)
-                (step * 2) repeats pred
+              loop (pred :: acc) (size - 1) (step * 2) repeats pred
             else
-              loop (pred :: acc) (size - 1)
-                step (cnt - 1) pred
-    in
-    if size = 0 then Lwt.return (header, []) else
+              loop (pred :: acc) (size - 1) step (cnt - 1) pred in
+    if size = 0 then
+      Lwt.return (header, [])
+    else
       predecessor b 1 >>= function
       | None -> Lwt.return (header, [])
       | Some p ->
-          loop [p] (size-1) 1 repeats p >>= fun hist ->
+          loop [p] (size-1) 1 (repeats-1) p >>= fun hist ->
           Lwt.return (header, hist)
 
 type validity =
