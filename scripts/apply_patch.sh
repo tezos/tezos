@@ -21,13 +21,13 @@ case "$branch" in
         sed -i s/TEZOS/TEZOS_ZERONET/ ./src/lib_shell/distributed_db_message.ml
         patch -p1 < scripts/alphanet_constants.patch
         patch -p1 < scripts/zeronet.patch
-        if has_git; then git commit -a -m "Zeronet: DO NOT MERGE" --author "Tezos CI <null@tezos.com>"; fi
+        if has_git; then git commit -a -m "Zeronet: change economic constants." --author "Tezos CI <null@tezos.com>"; fi
         echo "Done"
         ;;
     alphanet)
         sed -i s/TEZOS/TEZOS_ALPHANET/ ./src/lib_shell/distributed_db_message.ml
         patch -p1 < scripts/alphanet_constants.patch
-        if has_git; then git commit -a -m "Alphanet: DO NOT MERGE" --author "Tezos CI <null@tezos.com>"; fi
+        if has_git; then git commit -a -m "Alphanet: change economic constants." --author "Tezos CI <null@tezos.com>"; fi
         echo "Done"
         ;;
     *)

@@ -5,6 +5,7 @@ variables:
   public_docker_image: docker.io/${CI_PROJECT_PATH}
 
 stages:
+  - precheck
   - prepare
   - build_deps
   - build
@@ -13,6 +14,17 @@ stages:
   - publish
   - deploy
   - cleanup
+
+## Check zeronet/alphanet
+
+precheck:constant:
+  image: ${opam_image}
+  stage: precheck
+  only:
+    - zeronet
+    - alphanet
+  script:
+    - ./scripts/check_patch.sh "${CI_COMMIT_REF_NAME}"
 
 ## Template for `docker_in_docker` jobs
 
@@ -56,7 +68,6 @@ build_deps:
 .build_deps_template: &build_deps_definition
   image: ${build_deps_image}:${CI_COMMIT_SHA}
   before_script:
-    - ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}"
     - opam list
   tags:
     - gitlab-org
@@ -456,7 +467,6 @@ publish:docker:minimal:
     - alphanet
     - zeronet
   script:
-    - ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
     - ./scripts/ci/create_docker_image.build.sh
         "tezos_build" "${CI_COMMIT_REF_NAME}"
         "${build_deps_image}:${CI_COMMIT_SHA}"
@@ -481,7 +491,6 @@ publish:github:
     - echo "${CI_PK_GITHUB}" > ~/.ssh/id_rsa
     - chmod 400 ~/.ssh/id_rsa
     - rm -fr .git/refs/original
-    - ./scripts/apply_patch.sh "${CI_COMMIT_REF_NAME}" ;
     - sudo apk add --no-cache openssh
     - git push git@github.com:tezos/tezos.git -f HEAD:${CI_COMMIT_REF_NAME}
   tags:
