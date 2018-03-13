@@ -98,6 +98,8 @@ let finalize ?commit_message:message c =
   let constants = Raw_context.constants c in
   { Updater.context ; fitness ; message ; max_operations_ttl = 60 ;
     max_operation_data_length = constants.max_operation_data_length ;
+    last_allowed_fork_level =
+      Raw_level.to_int32 @@ Level.last_allowed_fork_level c;
   }
 
 let configure_sandbox = Raw_context.configure_sandbox

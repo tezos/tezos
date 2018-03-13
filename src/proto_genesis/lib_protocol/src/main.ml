@@ -82,7 +82,7 @@ let precheck_block
   Lwt.return (parse_block raw_block) >>=? fun _ ->
   return ()
 
-let prepare_application ctxt command timestamp fitness =
+let prepare_application ctxt command level timestamp fitness =
   match command with
   | Data.Command.Activate { protocol = hash ; fitness } ->
       let message =
@@ -90,7 +90,8 @@ let prepare_application ctxt command timestamp fitness =
       Updater.activate ctxt hash >>= fun ctxt ->
       return { Updater.message ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
-               max_operation_data_length = 0 }
+               max_operation_data_length = 0 ;
+               last_allowed_fork_level = level }
   | Activate_testchain { protocol = hash ; delay } ->
       let message =
         Some (Format.asprintf "activate testchain %a" Protocol_hash.pp_short hash) in
@@ -98,7 +99,9 @@ let prepare_application ctxt command timestamp fitness =
       Updater.fork_test_chain ctxt ~protocol:hash ~expiration >>= fun ctxt ->
       return { Updater.message ; context = ctxt ; fitness ;
                max_operations_ttl = 0 ;
-               max_operation_data_length = 0 }
+               max_operation_data_length = 0 ;
+               last_allowed_fork_level = Int32.succ level ;
+             }
 
 
 let begin_application
@@ -109,12 +112,13 @@ let begin_application
   Data.Init.may_initialize ctxt >>=? fun ctxt ->
   Lwt.return (parse_block raw_block) >>=? fun block ->
   check_signature ctxt block >>=? fun () ->
-  prepare_application ctxt block.command block.shell.timestamp block.shell.fitness
+  prepare_application ctxt block.command
+    block.shell.level block.shell.timestamp block.shell.fitness
 
 let begin_construction
     ~predecessor_context:ctxt
     ~predecessor_timestamp:_
-    ~predecessor_level:_
+    ~predecessor_level:level
     ~predecessor_fitness:fitness
     ~predecessor:_
     ~timestamp
@@ -126,13 +130,14 @@ let begin_construction
       return { Updater.message = None ; context = ctxt ;
                fitness ; max_operations_ttl = 0 ;
                max_operation_data_length = 0 ;
+               last_allowed_fork_level = 0l ;
              }
   | Some command ->
       match Data_encoding.Binary.of_bytes Data.Command.encoding command with
       | None -> failwith "Failed to parse proto header"
       | Some command ->
           Data.Init.may_initialize ctxt >>=? fun ctxt ->
-          prepare_application ctxt command timestamp fitness
+          prepare_application ctxt command level timestamp fitness
 
 let apply_operation _vctxt _ =
   Lwt.return (Error []) (* absurd *)

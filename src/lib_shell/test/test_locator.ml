@@ -95,6 +95,7 @@ let make_empty_chain (chain:State.Chain.t) n : Block_hash.t Lwt.t =
     message = None ;
     max_operation_data_length = 0 ;
     max_operations_ttl = 0 ;
+    last_allowed_fork_level = 0l ;
   } in
   let rec loop lvl pred =
     if lvl >= n then
