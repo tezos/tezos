@@ -9,7 +9,6 @@
 
 module PeerRing = Ring.MakeTable(struct
     include P2p_peer.Id
-    let hash = Hashtbl.hash
   end)
 
 module PatriciaTree(V:HashPtree.Value) = struct

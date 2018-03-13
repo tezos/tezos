@@ -95,6 +95,8 @@ module type INDEXES = sig
 
   type t
 
+  val hash : t -> int
+
   val to_path: t -> string list -> string list
   val of_path: string list -> t option
   val of_path_exn: string list -> t
