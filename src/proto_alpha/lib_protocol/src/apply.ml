@@ -329,6 +329,18 @@ let apply_operation
       return (ctxt, Contract.originated_contracts origination_nonce, err,
               Ok fees, Ok rewards)
 
+let may_snapshot_roll ctxt =
+  let level = Alpha_context.Level.current ctxt in
+  let block_per_roll_snapshot = Constants.block_per_roll_snapshot ctxt in
+  if Compare.Int32.equal
+      (Int32.rem level.cycle_position block_per_roll_snapshot)
+      (Int32.pred block_per_roll_snapshot)
+  then
+    Alpha_context.Roll.snapshot_rolls ctxt >>=? fun ctxt ->
+    return ctxt
+  else
+    return ctxt
+
 let may_start_new_cycle ctxt =
   Baking.dawn_of_a_new_cycle ctxt >>=? function
   | None -> return ctxt
@@ -387,6 +399,7 @@ let finalize_application ctxt protocol_data delegate bond fees rewards =
           { nonce_hash ; delegate ; bond ; rewards ; fees }
   end >>=? fun ctxt ->
   (* end of cycle *)
+  may_snapshot_roll ctxt >>=? fun ctxt ->
   may_start_new_cycle ctxt >>=? fun ctxt ->
   Amendment.may_start_new_voting_cycle ctxt >>=? fun ctxt ->
   return ctxt

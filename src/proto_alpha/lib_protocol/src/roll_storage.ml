@@ -61,12 +61,34 @@ let fold ctxt ~f init =
           loop ctxt (Roll_repr.succ roll) (f roll delegate acc) in
   loop ctxt Roll_repr.first (return init)
 
-let freeze_rolls_for_cycle ctxt cycle =
-  let index = 0 in
+let snapshot_rolls_for_cycle ctxt cycle =
+  Storage.Roll.Snapshot_for_cycle.get ctxt cycle >>=? fun index ->
+  Storage.Roll.Snapshot_for_cycle.set ctxt cycle (index + 1) >>=? fun ctxt ->
   Storage.Roll.Owner.snapshot ctxt (cycle, index) >>=? fun ctxt ->
   Storage.Roll.Next.get ctxt >>=? fun last ->
-  Storage.Roll.Snapshot_for_cycle.init ctxt cycle index >>=? fun ctxt ->
-  Storage.Roll.Last_for_snapshot.init (ctxt, cycle) index last
+  Storage.Roll.Last_for_snapshot.init (ctxt, cycle) index last >>=? fun ctxt ->
+  return ctxt
+
+let freeze_rolls_for_cycle ctxt cycle =
+  Storage.Roll.Snapshot_for_cycle.get ctxt cycle >>=? fun max_index ->
+  Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+  let rd = Seed_repr.initialize_new seed [MBytes.of_string "roll_snapshot"] in
+  let seq = Seed_repr.sequence rd 0l in
+  let selected_index =
+    Seed_repr.take_int32 seq (Int32.of_int max_index) |> fst |> Int32.to_int in
+  Storage.Roll.Snapshot_for_cycle.set ctxt cycle selected_index >>=? fun ctxt ->
+  fold_left_s
+    (fun ctxt index ->
+       if Compare.Int.(index = selected_index) then
+         return ctxt
+       else
+         Storage.Roll.Owner.delete_snapshot ctxt (cycle, index) >>= fun ctxt ->
+         Storage.Roll.Last_for_snapshot.delete (ctxt, cycle) index >>=? fun ctxt ->
+         return ctxt
+    )
+    ctxt
+    Misc.(0 --> (max_index - 1)) >>=? fun ctxt ->
+  return ctxt
 
 (* Roll selection *)
 
@@ -252,13 +274,29 @@ let init ctxt =
 
 let init_first_cycles ctxt =
   let preserved = Constants_storage.preserved_cycles ctxt in
+  (* Precompute rolls for cycle (0 --> preserved_cycles) *)
   List.fold_left
     (fun ctxt c ->
        ctxt >>=? fun ctxt ->
        let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
+       Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0 >>=? fun ctxt ->
+       snapshot_rolls_for_cycle ctxt cycle >>=? fun ctxt ->
        freeze_rolls_for_cycle ctxt cycle)
-    (return ctxt) (0 --> (preserved + 1)) >>=? fun ctxt ->
+    (return ctxt) (0 --> preserved) >>=? fun ctxt ->
+  let cycle = Cycle_repr.of_int32_exn (Int32.of_int (preserved + 1)) in
+  (* Precomputed a snapshot for cycle (preserved_cycles + 1) *)
+  Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0 >>=? fun ctxt ->
+  snapshot_rolls_for_cycle ctxt cycle >>=? fun ctxt ->
+  (* Prepare storage for storing snapshots for cycle (preserved_cycles+2) *)
+  let cycle = Cycle_repr.of_int32_exn (Int32.of_int (preserved + 2)) in
+  Storage.Roll.Snapshot_for_cycle.init ctxt cycle 0 >>=? fun ctxt ->
   return ctxt
+
+let snapshot_rolls ctxt =
+  let current_level = Raw_context.current_level ctxt in
+  let preserved = Constants_storage.preserved_cycles ctxt in
+  let cycle = Cycle_repr.add current_level.cycle (preserved+2) in
+  snapshot_rolls_for_cycle ctxt cycle
 
 let cycle_end ctxt last_cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
@@ -268,5 +306,8 @@ let cycle_end ctxt last_cycle =
     | Some cleared_cycle ->
         clear_cycle ctxt cleared_cycle
   end >>=? fun ctxt ->
-  let frozen_roll_cycle = Cycle_repr.add last_cycle (preserved+2) in
-  freeze_rolls_for_cycle ctxt frozen_roll_cycle
+  let frozen_roll_cycle = Cycle_repr.add last_cycle (preserved+1) in
+  freeze_rolls_for_cycle ctxt frozen_roll_cycle >>=? fun ctxt ->
+  Storage.Roll.Snapshot_for_cycle.init
+    ctxt (Cycle_repr.succ (Cycle_repr.succ frozen_roll_cycle)) 0 >>=? fun ctxt ->
+  return ctxt

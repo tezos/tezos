@@ -26,6 +26,8 @@ val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 val init_first_cycles : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 val cycle_end : Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
+val snapshot_rolls : Raw_context.t -> Raw_context.t tzresult Lwt.t
+
 
 val fold :
   Raw_context.t ->

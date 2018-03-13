@@ -65,7 +65,11 @@ let for_cycle ctxt cycle =
   let preserved = Constants_storage.preserved_cycles ctxt in
   let current_level = Level_storage.current ctxt in
   let current_cycle = current_level.cycle in
-  let latest = Cycle_repr.add current_cycle preserved in
+  let latest =
+    if Cycle_repr.(current_cycle = root) then
+      Cycle_repr.add current_cycle (preserved + 1)
+    else
+      Cycle_repr.add current_cycle preserved in
   let oldest =
     match Cycle_repr.sub current_cycle preserved with
     | None -> Cycle_repr.root

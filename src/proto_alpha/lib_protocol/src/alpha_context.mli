@@ -731,6 +731,7 @@ module Roll : sig
 
   val value: context -> Tez.t
 
+  val snapshot_rolls: context -> context tzresult Lwt.t
   val cycle_end: context -> Cycle.t -> context tzresult Lwt.t
 
   val baking_rights_owner:
