@@ -42,11 +42,19 @@ module S = struct
 
   let blocks_per_commitment =
     RPC_service.post_service
-      ~description: "How many blocks beetween random seed's nonce commitment"
+      ~description: "How many blocks between random seed's nonce commitment"
       ~query: RPC_query.empty
       ~input: empty
       ~output: (obj1 (req "blocks_per_commitment" int32))
       RPC_path.(custom_root / "blocks_per_commitment")
+
+  let block_per_roll_snapshot =
+    RPC_service.post_service
+      ~description: "How many blocks between roll snapshots"
+      ~query: RPC_query.empty
+      ~input: empty
+      ~output: (obj1 (req "block_per_roll_snapshot" int32))
+      RPC_path.(custom_root / "block_per_roll_snapshot")
 
   let time_before_reward =
     RPC_service.post_service
@@ -121,6 +129,9 @@ let () =
   register0 S.blocks_per_commitment begin fun ctxt () () ->
     return (Constants.blocks_per_commitment ctxt)
   end ;
+  register0 S.block_per_roll_snapshot begin fun ctxt () () ->
+    return (Constants.block_per_roll_snapshot ctxt)
+  end ;
   register0 S.time_before_reward begin fun ctxt () () ->
     return (Constants.time_before_reward ctxt)
   end ;
@@ -151,6 +162,8 @@ let voting_period_length ctxt block =
   RPC_context.make_call0 S.voting_period_length ctxt block () ()
 let blocks_per_commitment ctxt block =
   RPC_context.make_call0 S.blocks_per_commitment ctxt block () ()
+let block_per_roll_snapshot ctxt block =
+  RPC_context.make_call0 S.block_per_roll_snapshot ctxt block () ()
 let time_before_reward ctxt block =
   RPC_context.make_call0 S.time_before_reward ctxt block () ()
 let slot_durations ctxt block =

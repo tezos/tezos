@@ -10,6 +10,7 @@
     ],
     "slot_durations" : [ 1, 0 ],
     "cycle_length" : 4,
+    "block_per_roll_snapshot" : 2,
     "voting_period_length" : 2,
     "time_before_reward" : 1,
     "first_free_baking_slot" : 4

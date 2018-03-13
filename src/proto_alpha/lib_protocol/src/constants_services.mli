@@ -21,6 +21,9 @@ val voting_period_length:
 val blocks_per_commitment:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
+val block_per_roll_snapshot:
+  'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
+
 val time_before_reward:
   'a #RPC_context.simple -> 'a -> Period.t shell_tzresult Lwt.t
 

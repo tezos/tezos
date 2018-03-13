@@ -48,6 +48,7 @@ type constants = {
   preserved_cycles: int ;
   cycle_length: int32 ;
   blocks_per_commitment: int32 ;
+  block_per_roll_snapshot: int32 ;
   voting_period_length: int32 ;
   time_before_reward: Period_repr.t ;
   slot_durations: Period_repr.t list ;
@@ -69,6 +70,7 @@ let default = {
   preserved_cycles = 5 ;
   cycle_length = 2048l ;
   blocks_per_commitment = 32l ;
+  block_per_roll_snapshot = 256l ;
   voting_period_length = 32768l ;
   time_before_reward =
     Period_repr.of_seconds_exn
@@ -125,6 +127,9 @@ let constants_encoding =
        and blocks_per_commitment =
          opt Compare.Int32.(=)
            default.blocks_per_commitment c.blocks_per_commitment
+       and block_per_roll_snapshot =
+         opt Compare.Int32.(=)
+           default.block_per_roll_snapshot c.block_per_roll_snapshot
        and voting_period_length =
          opt Compare.Int32.(=)
            default.voting_period_length c.voting_period_length
@@ -169,14 +174,15 @@ let constants_encoding =
        ((( preserved_cycles,
            cycle_length,
            blocks_per_commitment,
+           block_per_roll_snapshot,
            voting_period_length,
            time_before_reward,
            slot_durations,
            first_free_baking_slot,
            max_signing_slot,
-           max_gas,
-           proof_of_work_threshold),
-         ( bootstrap_keys,
+           max_gas),
+         ( proof_of_work_threshold,
+           bootstrap_keys,
            dictator_pubkey,
            max_number_of_operations,
            max_operation_data_length,
@@ -185,14 +191,15 @@ let constants_encoding =
     (fun ((( preserved_cycles,
              cycle_length,
              blocks_per_commitment,
+             block_per_roll_snapshot,
              voting_period_length,
              time_before_reward,
              slot_durations,
              first_free_baking_slot,
              max_signing_slot,
-             max_gas,
-             proof_of_work_threshold),
-           ( bootstrap_keys,
+             max_gas),
+           ( proof_of_work_threshold,
+             bootstrap_keys,
              dictator_pubkey,
              max_number_of_operations,
              max_operation_data_length,
@@ -204,6 +211,8 @@ let constants_encoding =
           unopt default.cycle_length cycle_length ;
         blocks_per_commitment =
           unopt default.blocks_per_commitment blocks_per_commitment ;
+        block_per_roll_snapshot =
+          unopt default.block_per_roll_snapshot block_per_roll_snapshot ;
         voting_period_length =
           unopt default.voting_period_length voting_period_length ;
         time_before_reward =
@@ -240,14 +249,15 @@ let constants_encoding =
               (opt "preserved_cycles" uint8)
               (opt "cycle_length" int32)
               (opt "blocks_per_commitment" int32)
+              (opt "block_per_roll_snapshot" int32)
               (opt "voting_period_length" int32)
               (opt "time_before_reward" int64)
               (opt "slot_durations" (list Period_repr.encoding))
               (opt "first_free_baking_slot" uint16)
               (opt "max_signing_slot" uint16)
-              (opt "instructions_per_transaction" int31)
-              (opt "proof_of_work_threshold" int64))
-           (obj6
+              (opt "instructions_per_transaction" int31))
+           (obj7
+              (opt "proof_of_work_threshold" int64)
               (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
               (opt "dictator_pubkey" Ed25519.Public_key.encoding)
               (opt "max_number_of_operations" (list uint16))
@@ -265,4 +275,8 @@ let read = function
   | Some json ->
       match Data_encoding.Json.(destruct constants_encoding json) with
       | exception exn -> fail (Constant_read exn)
-      | c -> return c
+      | c ->
+          if Compare.Int32.(c.block_per_roll_snapshot > c.cycle_length) then
+            failwith "Invalid sandbox: 'block_per_roll_snapshot > cycle_length'"
+          else
+            return c
