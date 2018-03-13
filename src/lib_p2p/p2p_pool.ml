@@ -689,19 +689,30 @@ and authenticate pool ?point_info canceler fd point =
       ?listening_port:pool.config.listening_port
       pool.config.identity pool.message_config.versions
   end ~on_error: begin fun err ->
-    (* TODO do something when the error is Not_enough_proof_of_work ?? *)
     begin match err with
       | [ Canceled ] ->
           (* Currently only on time out *)
           lwt_debug "authenticate: %a%s -> canceled"
             P2p_point.Id.pp point
             (if incoming then " incoming" else "")
-      | err ->
-          (* Authentication incorrect! *)
+      | err -> begin
+          (* Authentication incorrect! Temp ban the offending points/peers *)
+          List.iter (function
+              | P2p_errors.Not_enough_proof_of_work _
+              | P2p_errors.Invalid_auth
+              | P2p_errors.Decipher_error
+              | P2p_errors.Invalid_message_size
+              | P2p_errors.Encoding_error
+              | P2p_errors.Decoding_error
+              | P2p_errors.Invalid_chunks_size _ ->
+                  greylist_addr pool (fst point)
+              | _ -> ()
+            ) err ;
           lwt_debug "@[authenticate: %a%s -> failed@ %a@]"
             P2p_point.Id.pp point
             (if incoming then " incoming" else "")
             pp_print_error err
+        end
     end >>= fun () ->
     may_register_my_id_point pool err ;
     log pool (Authentication_failed point) ;
