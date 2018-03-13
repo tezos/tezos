@@ -111,10 +111,10 @@ module MakeTable (V: Hashtbl.HashedType) = struct
       table = Table.create size }
 
   let add {contents = t } v =
-    Table.add t.table v ();
     Option.iter
       (Ring.add_and_return_erased t.ring v)
-      ~f:(Table.remove t.table)
+      ~f:(Table.remove t.table);
+    Table.add t.table v ()
 
   let mem {contents = t} v = Table.mem t.table v
 
