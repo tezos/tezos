@@ -152,10 +152,10 @@ let simple_decode ?alphabet { prefix ; of_raw ; _ } s =
 let simple_encode ?alphabet { prefix ; to_raw ; _ } d =
   safe_encode ?alphabet (prefix ^ to_raw d)
 
-type registred_encoding = Encoding : 'a encoding -> registred_encoding
+type registered_encoding = Encoding : 'a encoding -> registered_encoding
 
 module MakeEncodings(E: sig
-    val encodings: registred_encoding list
+    val encodings: registered_encoding list
   end) = struct
 
   let encodings = ref E.encodings
@@ -175,7 +175,7 @@ module MakeEncodings(E: sig
     let len = String.length zeros in
     if String.length ones <> len then
       Format.ksprintf invalid_arg
-        "Base58.registred_encoding: variable length encoding." ;
+        "Base58.registered_encoding: variable length encoding." ;
     let rec loop i =
       if i = len then len
       else if zeros.[i] = ones.[i] then loop (i+1)

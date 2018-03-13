@@ -442,20 +442,20 @@ module Make() = struct
       Error_kind { id ; from_error ; category ; encoding_case ; pp } :: !error_kinds
 
   (** Catch all error when 'deserializing' an error. *)
-  type error += Unregistred_error of Data_encoding.json
+  type error += Unregistered_error of Data_encoding.json
 
   let () =
     let id = "" in
     let category = `Temporary in
-    let to_error msg = Unregistred_error msg in
+    let to_error msg = Unregistered_error msg in
     let from_error = function
-      | Unregistred_error json -> Some json
+      | Unregistered_error json -> Some json
       | _ -> None in
     let encoding_case =
       let open Data_encoding in
       case Json_only json from_error to_error in
     let pp ppf json =
-      Format.fprintf ppf "@[<v 2>Unregistred error:@ %a@]"
+      Format.fprintf ppf "@[<v 2>Unregistered error:@ %a@]"
         Data_encoding.Json.pp json in
     error_kinds :=
       Error_kind { id ; from_error ; category ; encoding_case ; pp } :: !error_kinds

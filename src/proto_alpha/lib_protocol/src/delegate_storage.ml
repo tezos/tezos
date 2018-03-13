@@ -70,9 +70,9 @@ let known c delegate =
   | None | Some (Manager_repr.Hash _) -> return false
   | Some (Manager_repr.Public_key _) -> return true
 
-(* A delegate is registred if its "implicit account"
+(* A delegate is registered if its "implicit account"
    delegates to itself. *)
-let registred c delegate =
+let registered c delegate =
   Storage.Contract.Delegate.mem
     c (Contract_repr.implicit_contract delegate)
 
@@ -96,14 +96,14 @@ let set c contract delegate =
     end
   | Some delegate ->
       known c delegate >>=? fun known_delegate ->
-      registred c delegate >>= fun registred_delegate ->
+      registered c delegate >>= fun registered_delegate ->
       is_delegatable c contract >>=? fun delegatable ->
       let self_delegation =
         match Contract_repr.is_implicit contract with
         | Some pkh -> Ed25519.Public_key_hash.equal pkh delegate
         | None -> false in
-      if not known_delegate || not (registred_delegate || self_delegation) then
-        fail (Roll_storage.Unregistred_delegate delegate)
+      if not known_delegate || not (registered_delegate || self_delegation) then
+        fail (Roll_storage.Unregistered_delegate delegate)
       else if not (delegatable || self_delegation) then
         fail (Non_delegatable_contract contract)
       else

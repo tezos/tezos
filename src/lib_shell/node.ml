@@ -34,7 +34,7 @@ let inject_protocol state ?force:_ proto =
         State.Protocol.store state proto >>= function
         | None ->
             failwith
-              "Previously registred protocol (%a)"
+              "Previously registered protocol (%a)"
               Protocol_hash.pp_short hash
         | Some _ -> return ()
   in

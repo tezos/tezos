@@ -20,7 +20,7 @@
 type error +=
   | Consume_roll_change
   | No_roll_for_delegate
-  | Unregistred_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
+  | Unregistered_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
 
 val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
 

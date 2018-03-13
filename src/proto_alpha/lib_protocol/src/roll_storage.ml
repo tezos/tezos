@@ -11,21 +11,21 @@ type error +=
   | Consume_roll_change
   | No_roll_for_delegate
   | No_roll_snapshot_for_cycle of Cycle_repr.t
-  | Unregistred_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
+  | Unregistered_delegate of Ed25519.Public_key_hash.t (* `Permanent *)
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"contract.manager.unregistred_delegate"
-    ~title:"Unregistred delegate"
-    ~description:"A contract cannot be delegated to an unregistred delegate"
+    ~id:"contract.manager.unregistered_delegate"
+    ~title:"Unregistered delegate"
+    ~description:"A contract cannot be delegated to an unregistered delegate"
     ~pp:(fun ppf (k) ->
         Format.fprintf ppf "The provided public key (with hash %a) is \
-                           \ not registred as valid delegate key."
+                           \ not registered as valid delegate key."
           Ed25519.Public_key_hash.pp k)
     Data_encoding.(obj1 (req "hash" Ed25519.Public_key_hash.encoding))
-    (function Unregistred_delegate (k) -> Some (k) | _ -> None)
-    (fun (k) -> Unregistred_delegate (k))
+    (function Unregistered_delegate (k) -> Some (k) | _ -> None)
+    (fun (k) -> Unregistered_delegate (k))
 
 let get_contract_delegate c contract =
   Storage.Contract.Delegate.get_option c contract
@@ -34,7 +34,7 @@ let delegate_pubkey ctxt delegate =
   Storage.Contract.Manager.get_option ctxt
     (Contract_repr.implicit_contract delegate) >>=? function
   | None | Some (Manager_repr.Hash _) ->
-      fail (Unregistred_delegate delegate)
+      fail (Unregistered_delegate delegate)
   | Some (Manager_repr.Public_key pk) ->
       return pk
 
