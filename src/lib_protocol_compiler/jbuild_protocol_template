@@ -58,7 +58,8 @@ let () = Format.kasprintf Jbuild_plugin.V1.send {|
    (deps ((glob_files src/*.ml*)
            src/TEZOS_PROTOCOL))
     (action (with-stdout-to ${path-no-dep:functor.ml}
-             (run ${bin:tezos-protocol-compiler.tezos-protocol-packer} ${path-no-dep:src})))))
+             (chdir ${ROOT}
+               (run ${bin:tezos-protocol-compiler.tezos-protocol-packer} ${path-no-dep:src}))))))
 
 (library
  ((name tezos_protocol_%s)
