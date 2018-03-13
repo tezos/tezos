@@ -9,9 +9,25 @@
 
 open Storage_functors
 
+module Int = struct
+  type t = int
+  let encoding = Data_encoding.uint16
+end
+
 module Int32 = struct
   type t = Int32.t
   let encoding = Data_encoding.int32
+end
+
+module Int_index = struct
+  type t = int
+  let path_length = 1
+  let to_path c l = string_of_int c :: l
+  let of_path = function
+    | [] | _ :: _ :: _ -> None
+    | [ c ] ->
+        try Some (int_of_string c)
+        with _ -> None
 end
 
 module String_index = struct
@@ -166,9 +182,17 @@ module Cycle = struct
       (Cycle_repr.Index)
 
   module Last_roll =
-    Indexed_context.Make_map
-      (struct let name = ["last_roll"] end)
+    Make_indexed_data_storage
+      (Make_subcontext
+         (Indexed_context.Raw_context)
+         (struct let name = ["last_roll"] end))
+      (Int_index)
       (Make_value(Roll_repr))
+
+  module Roll_snapshot =
+    Indexed_context.Make_map
+      (struct let name = ["roll_snapshot"] end)
+      (Make_value(Int))
 
   type unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
@@ -268,14 +292,32 @@ module Roll = struct
       let unwrap = Contract_repr.is_implicit
     end)
 
+  module Snapshoted_owner_index = struct
+    type t = Cycle_repr.t * int
+    let path_length = Cycle_repr.Index.path_length + 1
+    let to_path (c, n) s =
+      Cycle_repr.Index.to_path c (string_of_int n :: s)
+    let of_path l =
+      match Misc.take Cycle_repr.Index.path_length l with
+      | None | Some (_, ([] | _ :: _ :: _ ))-> None
+      | Some (l1, [l2]) ->
+          match Cycle_repr.Index.of_path l1 with
+          | None -> None
+          | Some c -> begin
+              try Some (c, int_of_string l2)
+              with _ -> None
+            end
+  end
+
   module Owner =
     Make_indexed_data_snapshotable_storage
       (Make_subcontext(Raw_context)(struct let name = ["owner"] end))
-      (Cycle_repr.Index)
+      (Snapshoted_owner_index)
       (Roll_repr.Index)
       (Make_value(Ed25519.Public_key))
 
-  module Last_for_cycle = Cycle.Last_roll
+  module Snapshot_for_cycle = Cycle.Roll_snapshot
+  module Last_for_snapshot = Cycle.Last_roll
 
   let clear = Indexed_context.clear
 

@@ -41,8 +41,10 @@ let delegate_pubkey ctxt delegate =
       return pk
 
 let clear_cycle c cycle =
-  Storage.Roll.Last_for_cycle.delete c cycle >>=? fun c ->
-  Storage.Roll.Owner.delete_snapshot c cycle >>= fun c ->
+  Storage.Roll.Snapshot_for_cycle.get c cycle >>=? fun index ->
+  Storage.Roll.Snapshot_for_cycle.delete c cycle >>=? fun c ->
+  Storage.Roll.Last_for_snapshot.delete (c, cycle) index >>=? fun c ->
+  Storage.Roll.Owner.delete_snapshot c (cycle, index) >>= fun c ->
   return c
 
 let fold ctxt ~f init =
@@ -60,9 +62,11 @@ let fold ctxt ~f init =
   loop ctxt Roll_repr.first (return init)
 
 let freeze_rolls_for_cycle ctxt cycle =
-  Storage.Roll.Owner.snapshot ctxt cycle >>=? fun ctxt ->
+  let index = 0 in
+  Storage.Roll.Owner.snapshot ctxt (cycle, index) >>=? fun ctxt ->
   Storage.Roll.Next.get ctxt >>=? fun last ->
-  Storage.Roll.Last_for_cycle.init ctxt cycle last
+  Storage.Roll.Snapshot_for_cycle.init ctxt cycle index >>=? fun ctxt ->
+  Storage.Roll.Last_for_snapshot.init (ctxt, cycle) index last
 
 (* Roll selection *)
 
@@ -84,15 +88,16 @@ module Random = struct
     Seed_storage.for_cycle c cycle >>=? fun random_seed ->
     let rd = level_random random_seed kind level in
     let sequence = Seed_repr.sequence rd (Int32.of_int offset) in
-    Storage.Roll.Last_for_cycle.get c cycle >>=? fun bound ->
+    Storage.Roll.Snapshot_for_cycle.get c cycle >>=? fun index ->
+    Storage.Roll.Last_for_snapshot.get (c, cycle) index >>=? fun bound ->
     let rec loop sequence =
       let roll, sequence = Roll_repr.random sequence ~bound in
-      Storage.Roll.Owner.Snapshot.get_option c (cycle, roll) >>=? function
+      Storage.Roll.Owner.Snapshot.get_option c ((cycle, index), roll) >>=? function
       | None ->
           loop sequence
       | Some delegate ->
           return delegate in
-    Storage.Roll.Owner.snapshot_exists c cycle >>= fun snapshot_exists ->
+    Storage.Roll.Owner.snapshot_exists c (cycle, index) >>= fun snapshot_exists ->
     fail_unless snapshot_exists (No_roll_snapshot_for_cycle cycle) >>=? fun () ->
     loop sequence
 

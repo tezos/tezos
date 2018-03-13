@@ -27,7 +27,7 @@ module Roll : sig
 
   module Owner : Indexed_data_snapshotable_storage
     with type key = Roll_repr.t
-     and type snapshot = Cycle_repr.t
+     and type snapshot = (Cycle_repr.t * int)
      and type value = Ed25519.Public_key.t
      and type t := Raw_context.t
 
@@ -64,11 +64,17 @@ module Roll : sig
      and type value = Tez_repr.t
      and type t := Raw_context.t
 
-  (** Last roll in the snapshoted roll allocation of a given cycle. *)
-  module Last_for_cycle : Indexed_data_storage
+  (** Index of the randomly selected roll snapshot of a given cycle. *)
+  module Snapshot_for_cycle : Indexed_data_storage
     with type key = Cycle_repr.t
-     and type value = Roll_repr.t
+     and type value = int
      and type t := Raw_context.t
+
+  (** Last roll in the snapshoted roll allocation of a given cycle. *)
+  module Last_for_snapshot : Indexed_data_storage
+    with type key = int
+     and type value = Roll_repr.t
+     and type t = Raw_context.t * Cycle_repr.t
 
 end
 
