@@ -1175,7 +1175,7 @@ module Binary = struct
     | RangedFloat { minimum ; maximum } ->
         fun v ->
           if v < minimum || v > maximum
-          then invalid_arg (Printf.sprintf "Integer %f not in range [%f, %f]." v minimum maximum) ;
+          then invalid_arg (Printf.sprintf "Float %f not in range [%f, %f]." v minimum maximum) ;
           float v
     | Bytes (`Fixed n) -> fixed_kind_bytes n
     | String (`Fixed n) -> fixed_kind_string n
