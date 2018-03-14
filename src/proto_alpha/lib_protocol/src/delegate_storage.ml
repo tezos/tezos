@@ -261,7 +261,8 @@ let punish ctxt delegate cycle =
   Storage.Contract.Frozen_bonds.remove (ctxt, contract) cycle >>= fun ctxt ->
   Storage.Contract.Frozen_fees.remove (ctxt, contract) cycle >>= fun ctxt ->
   Storage.Contract.Frozen_rewards.remove (ctxt, contract) cycle >>= fun ctxt ->
-  return ctxt
+  Lwt.return Tez_repr.(bond +? fees) >>=? fun burned ->
+  return (ctxt, burned)
 
 
 let has_frozen_balance ctxt delegate cycle =

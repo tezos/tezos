@@ -507,7 +507,7 @@ module Delegate : sig
 
   val punish:
     context -> public_key_hash -> Cycle.t ->
-    context tzresult Lwt.t
+    (context * Tez.t) tzresult Lwt.t
 
   val has_frozen_balance:
     context -> public_key_hash -> Cycle.t ->
@@ -581,6 +581,10 @@ and anonymous_operation =
   | Seed_nonce_revelation of {
       level: Raw_level.t ;
       nonce: Nonce.t ;
+    }
+  | Double_endorsement of {
+      op1: operation ;
+      op2: operation ;
     }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;

@@ -19,6 +19,12 @@ type error += Too_many_faucet
 type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
 
+type error += Invalid_double_endorsement (* `Permanent *)
+type error += Inconsistent_double_endorsement of { delegate1: Ed25519.Public_key_hash.t ; delegate2: Ed25519.Public_key_hash.t } (* `Permanent *)
+type error += Unrequired_double_endorsement (* `Branch*)
+type error += Too_early_double_endorsement of { level: Raw_level.t ; current: Raw_level.t } (* `Temporary *)
+type error += Outdated_double_endorsement of { level: Raw_level.t ; last: Raw_level.t } (* `Permanent *)
+
 
 let () =
   register_error_kind
@@ -107,7 +113,90 @@ let () =
           Format.fprintf ppf "Unexpected seed's nonce commitment in block header.")
     Data_encoding.(obj1 (req "expected "bool))
     (function Invalid_commitment { expected } -> Some expected | _ -> None)
-    (fun expected -> Invalid_commitment { expected })
+    (fun expected -> Invalid_commitment { expected }) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.invalid_double_endorsement"
+    ~title:"Invalid double endorsement"
+    ~description:"A double-endorsement denunciation is malformed"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "Malformed double-endorsement denunciation")
+    Data_encoding.empty
+    (function Invalid_double_endorsement -> Some () | _ -> None)
+    (fun () -> Invalid_double_endorsement) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.inconsistent_double_endorsement"
+    ~title:"Inconsistent double endorsement"
+    ~description:"A double-endorsement denunciation is inconsistent \
+                 \ (two distinct delegates)"
+    ~pp:(fun ppf (delegate1, delegate2) ->
+        Format.fprintf ppf
+          "Inconsistent double-endorsement denunciation \
+          \ (distinct delegate: %a and %a)"
+          Ed25519.Public_key_hash.pp_short delegate1
+          Ed25519.Public_key_hash.pp_short delegate2)
+    Data_encoding.(obj2
+                     (req "delegate1" Ed25519.Public_key_hash.encoding)
+                     (req "delegate2" Ed25519.Public_key_hash.encoding))
+    (function
+      | Inconsistent_double_endorsement { delegate1 ; delegate2 } ->
+          Some (delegate1, delegate2)
+      | _ -> None)
+    (fun (delegate1, delegate2) ->
+       Inconsistent_double_endorsement { delegate1 ; delegate2 }) ;
+  register_error_kind
+    `Branch
+    ~id:"block.unrequired_double_endorsement"
+    ~title:"Unrequired double endorsement"
+    ~description:"A double-endorsement denunciation is unrequired"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf "A valid double-endorsement operation cannot \
+                           \ be applied: the associated delegate \
+                           \ has previously been denunciated in this cycle.")
+    Data_encoding.empty
+    (function Unrequired_double_endorsement -> Some () | _ -> None)
+    (fun () -> Unrequired_double_endorsement) ;
+  register_error_kind
+    `Temporary
+    ~id:"block.too_early_double_endorsement"
+    ~title:"Too early double endorsement"
+    ~description:"A double-endorsement denunciation is in the future"
+    ~pp:(fun ppf (level, current) ->
+        Format.fprintf ppf
+          "A double-endorsement denunciation is in the future \
+          \ (current level: %a, endorsement level: %a)"
+          Raw_level.pp current
+          Raw_level.pp level)
+    Data_encoding.(obj2
+                     (req "level" Raw_level.encoding)
+                     (req "current" Raw_level.encoding))
+    (function
+      | Too_early_double_endorsement { level ; current } ->
+          Some (level, current)
+      | _ -> None)
+    (fun (level, current) ->
+       Too_early_double_endorsement { level ; current }) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.outdated_double_endorsement"
+    ~title:"Outdated double endorsement"
+    ~description:"A double-endorsement denunciation is outdated."
+    ~pp:(fun ppf (level, last) ->
+        Format.fprintf ppf
+          "A double-endorsement denunciation is outdated \
+          \ (last acceptable level: %a, endorsement level: %a)"
+          Raw_level.pp last
+          Raw_level.pp level)
+    Data_encoding.(obj2
+                     (req "level" Raw_level.encoding)
+                     (req "last" Raw_level.encoding))
+    (function
+      | Outdated_double_endorsement { level ; last } ->
+          Some (level, last)
+      | _ -> None)
+    (fun (level, last) ->
+       Outdated_double_endorsement { level ; last })
 
 let apply_consensus_operation_content ctxt
     pred_block block_priority operation = function
@@ -292,6 +381,46 @@ let apply_anonymous_operation ctxt delegate origination_nonce kind =
       Nonce.reveal ctxt level nonce >>=? fun ctxt ->
       return (ctxt, origination_nonce,
               Tez.zero, Constants.seed_nonce_revelation_tip)
+  | Double_endorsement { op1 ; op2 } -> begin
+      match op1.contents, op2.contents with
+      | Sourced_operations (Consensus_operation (Endorsements e1)),
+        Sourced_operations (Consensus_operation (Endorsements e2))
+        when Raw_level.(e1.level = e2.level) &&
+             not (Block_hash.equal e1.block e2.block) ->
+          let level = Level.from_raw ctxt e1.level in
+          let oldest_level = Level.last_allowed_fork_level ctxt in
+          fail_unless Level.(level < Level.current ctxt)
+            (Too_early_double_endorsement
+               { level = level.level ;
+                 current = (Level.current ctxt).level }) >>=? fun () ->
+          fail_unless Raw_level.(oldest_level <= level.level)
+            (Outdated_double_endorsement
+               { level = level.level ;
+                 last = oldest_level }) >>=? fun () ->
+          (* Whenever a delegate might have multiple endorsement slots for
+             given level, she should not endorse different block with different
+             slots. Hence, we don't check that [e1.slots] and [e2.slots]
+             intersect. *)
+          Baking.check_endorsements_rights ctxt level e1.slots >>=? fun delegate1 ->
+          Operation.check_signature delegate1 op1 >>=? fun () ->
+          Baking.check_endorsements_rights ctxt level e2.slots >>=? fun delegate2 ->
+          Operation.check_signature delegate2 op2 >>=? fun () ->
+          fail_unless
+            (Ed25519.Public_key.equal delegate1 delegate2)
+            (Inconsistent_double_endorsement
+               { delegate1 = Ed25519.Public_key.hash delegate1 ;
+                 delegate2 = Ed25519.Public_key.hash delegate2 }) >>=? fun () ->
+          let delegate = Ed25519.Public_key.hash delegate1 in
+          Delegate.has_frozen_balance ctxt delegate level.cycle >>=? fun valid ->
+          fail_unless valid Unrequired_double_endorsement >>=? fun () ->
+          Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, burned) ->
+          let reward =
+            match Tez.(burned /? 2L) with
+            | Ok v -> v
+            | Error _ -> Tez.zero in
+          return (ctxt, origination_nonce, Tez.zero, reward)
+      | _, _ -> fail Invalid_double_endorsement
+    end
   | Faucet { id = manager ; _ } ->
       (* Free tez for all! *)
       if Compare.Int.(faucet_count ctxt < 5) then

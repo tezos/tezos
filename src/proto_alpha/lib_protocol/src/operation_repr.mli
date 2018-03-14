@@ -31,6 +31,10 @@ and anonymous_operation =
       level: Raw_level_repr.t ;
       nonce: Seed_repr.nonce ;
     }
+  | Double_endorsement of {
+      op1: operation ;
+      op2: operation ;
+    }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
       nonce: MBytes.t ;

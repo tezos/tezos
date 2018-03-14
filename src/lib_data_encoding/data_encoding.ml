@@ -665,6 +665,7 @@ module Encoding = struct
         List.for_all (fun (Case { encoding = e }) -> is_obj e) cases
     | Empty -> true
     | Ignore -> true
+    | Mu (_,_,self) -> is_obj (self e)
     | _ -> false
 
   let rec is_tup : type a. a t -> bool = fun e ->
@@ -675,6 +676,7 @@ module Encoding = struct
     | Dynamic_size e  -> is_tup e
     | Union (_,_,cases) ->
         List.for_all (function Case { encoding = e} -> is_tup e) cases
+    | Mu (_,_,self) -> is_tup (self e)
     | _ -> false
 
   let merge_objs o1 o2 =

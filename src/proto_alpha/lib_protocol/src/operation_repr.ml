@@ -31,6 +31,10 @@ and anonymous_operation =
       level: Raw_level_repr.t ;
       nonce: Seed_repr.nonce ;
     }
+  | Double_endorsement of {
+      op1: operation ;
+      op2: operation ;
+    }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
       nonce: MBytes.t ;
@@ -306,6 +310,20 @@ module Encoding = struct
       )
       (fun ((), level, nonce) -> Seed_nonce_revelation { level ; nonce })
 
+  let double_endorsement_encoding op_encoding =
+    (obj3
+       (req "kind" (constant "double_endorsement"))
+       (req "op1" (dynamic_size op_encoding))
+       (req "op2" (dynamic_size op_encoding)))
+
+  let double_endorsement_case tag op_encoding =
+    case tag (double_endorsement_encoding op_encoding)
+      (function
+        | Double_endorsement { op1 ; op2 } -> Some ((), op1, op2)
+        | _ -> None
+      )
+      (fun ((), op1, op2) -> Double_endorsement { op1 ; op2 })
+
   let faucet_encoding =
     (obj3
        (req "kind" (constant "faucet"))
@@ -320,48 +338,58 @@ module Encoding = struct
       )
       (fun ((), id, nonce) -> Faucet { id ; nonce })
 
-  let unsigned_operation_case tag =
+  let unsigned_operation_case tag op_encoding =
     case tag
       (obj1
          (req "operations"
             (list
                (union [
                    seed_nonce_revelation_case (Tag 0) ;
-                   faucet_case (Tag 1) ;
+                   double_endorsement_case (Tag 1) op_encoding ;
+                   faucet_case (Tag 2) ;
                  ]))))
       (function Anonymous_operations ops -> Some ops | _ -> None)
       (fun ops -> Anonymous_operations ops)
 
-  let proto_operation_encoding =
+  let mu_proto_operation_encoding op_encoding =
     union [
       signed_operations_case (Tag 0) ;
-      unsigned_operation_case (Tag 1) ;
+      unsigned_operation_case (Tag 1) op_encoding ;
     ]
+
+  let mu_signed_proto_operation_encoding op_encoding =
+    merge_objs
+      (mu_proto_operation_encoding op_encoding)
+      (obj1 (varopt "signature" Ed25519.Signature.encoding))
+
+  let operation_encoding =
+    mu "operation"
+      (fun encoding ->
+         conv
+           (fun { shell ; contents ; signature } ->
+              (shell, (contents, signature)))
+           (fun (shell, (contents, signature)) ->
+              { shell ; contents ; signature })
+           (merge_objs
+              Operation.shell_header_encoding
+              (mu_signed_proto_operation_encoding encoding)))
+
+  let proto_operation_encoding =
+    mu_proto_operation_encoding operation_encoding
+
+  let signed_proto_operation_encoding =
+    mu_signed_proto_operation_encoding operation_encoding
 
   let unsigned_operation_encoding =
     merge_objs
       Operation.shell_header_encoding
       proto_operation_encoding
 
-  let signed_proto_operation_encoding =
-    merge_objs
-      proto_operation_encoding
-      (obj1 (varopt "signature" Ed25519.Signature.encoding))
-
 end
 
 type error += Cannot_parse_operation
 
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun { shell ; contents ; signature } ->
-       (shell, (contents, signature)))
-    (fun (shell, (contents, signature)) ->
-       { shell ; contents ; signature })
-    (merge_objs
-       Operation.shell_header_encoding
-       Encoding.signed_proto_operation_encoding)
+let encoding = Encoding.operation_encoding
 
 let () =
   register_error_kind
