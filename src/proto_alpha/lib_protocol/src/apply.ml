@@ -87,11 +87,11 @@ let () =
   register_error_kind
     `Temporary
     ~id:"operation.invalid_endorsement_level"
-    ~title:"Unpexpected level in endorsement"
+    ~title:"Unexpected level in endorsement"
     ~description:"The level of an endorsement is inconsistent with the \
                  \ provided block hash."
     ~pp:(fun ppf () ->
-        Format.fprintf ppf "Unpexpected level in endorsement.")
+        Format.fprintf ppf "Unexpected level in endorsement.")
     Data_encoding.unit
     (function Invalid_endorsement_level -> Some () | _ -> None)
     (fun () -> Invalid_endorsement_level) ;
