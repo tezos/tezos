@@ -15,9 +15,3 @@ input, would display on the standard output : ``{ "balance":
 "4000000000000" }``. When calling a RPC that requires an input
 through command-line, you will be prompted to provide the JSON input
 in your default configured text editor.
-
-In the following sections, you may find the complete list of RPCs
-available for the client and for the protocol Alpha. You may also
-find, for each RPC, its input, output and errors in JSON schema
-format. Dynamic parameters, such as ``<block-id>``, are described in
-`Dynamic parameters description`_

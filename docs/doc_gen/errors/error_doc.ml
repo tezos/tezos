@@ -7,7 +7,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Todo : add section descriptions *)
+open Format
+
+(* TODO: add section descriptions *)
 
 let default_section_id = "default"
 let default_section_title = "Miscellaneous"
@@ -21,45 +23,20 @@ let default_section_title = "Miscellaneous"
    bottom of the document. Unprefixed ids or unreferenced prefixes
    will default to `Miscellaneous` *)
 let section_titles =
-  [
-    [ "proto" ], "Protocol Alpha";
-    [ "baking" ], "Baking" ;
-    [ "contract" ], "Smart Contracts" ;
-    [ "distributed_db" ], "Database" ;
-    [ "micheline" ; "michelson" ], "Smart Contracts" ;
-    (* [ "michelson" ], "Michelson" ; *)
-    [ "node" ], "Client Node" ;
-    [ "operation" ], "Operations" ;
-    [ "prevalidation" ], "Prevalidation" ;
-    [ "raw_store" ], "Store" ;
-    [ "rpc_client" ], "RPC Client" ;
-    [ "tez" ], "Tezos operations" ;
-    [ "validator" ], "Validator" ;
-    [ "worker" ], "Worker" ;
-    (* [ "cli" ], "Command Line" ; *)
+  [ [ "proto.alpha" ], "Protocol Alpha";
+    [ "distributed_db" ; "node" ; "raw_store" ; "validator" ; "worker" ], "Shell" ;
+    [ "micheline" ; "michelson" ], "Michelson parsing/macros" ;
+    [ "rpc_client" ], "Client" ;
     [ "cli"; "utils"; default_section_id ], default_section_title ;
   ]
-
-let categories_detail =
-  [ "temporary", "An error resulting from an operation that might be \
-                  valid in the future, for example, a contract’s balance \
-                  being too low to execute the intended operation. This \
-                  can be fixed by adding more to the contract’s balance."
-  ; "branch", "An error that occurs in one branch of the chain, but may not \
-               occur in a different one. For example, receiving an \
-               operation for an old or future protocol version."
-  ; "permanent", "An error that is not recoverable because the operation \
-                  is never going to be valid. For example, an invalid ꜩ \
-                  notation." ]
-
 let pp_rst_title ~char ppf title =
   let sub = String.map (fun _ -> char) title in
-  Format.fprintf ppf "@[<v 0>%s@\n@]@[<v 0>%s@\n@\n@]" title sub
+  fprintf ppf "@[<v 0>%s@\n@]@[<v 0>%s@\n@\n@]" title sub
 
 let pp_rst_h1 = pp_rst_title ~char:'#'
 let pp_rst_h2 = pp_rst_title ~char:'*'
-let pp_rst_h3 = pp_rst_title ~char:'='
-let pp_rst_h4 = pp_rst_title ~char:'`'
+(* let pp_rst_h3 = pp_rst_title ~char:'='
+ * let pp_rst_h4 = pp_rst_title ~char:'`' *)
 
 let string_of_err_category =
   let open Error_monad in function
@@ -67,28 +44,68 @@ let string_of_err_category =
     | `Temporary -> "temporary"
     | `Permanent -> "permanent"
 
+let make_counter () =
+  let i = ref 1 in
+  fun () -> incr i; !i
+
+let count = make_counter ()
+
+let unique_label () =
+  let label = sprintf "ref%d" (count ()) in
+  label
+
+let pp_print_html_tab_button fmt ?(default=false) ~shortlabel ~content idref =
+  fprintf fmt "<button class=\"tablinks%s\" onclick=\"showTab(this, '%s', '%s')\">%s</button>@ "
+    (if default then " defaultOpen" else "")
+    (idref ^ shortlabel) idref content
+
+let pp_print_html_tabs fmt { Error_monad.id ; category ; description ; schema ; _  } =
+  let idref = unique_label () in
+  let descr_label = "descr" in
+  let schema_label = "schema" in
+
+  fprintf fmt "@[<v 2>.. raw:: html@ @ ";
+  fprintf fmt "@[<v 2><div class=\"tab\">@ ";
+
+  fprintf fmt "%a" (pp_print_html_tab_button ~default:true ~shortlabel:descr_label ~content:"Description") idref;
+  fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:schema_label ~content:"JSON Schema") idref;
+  fprintf fmt "@ </div>@ @]";
+
+  let description_content =
+    asprintf "<p>%s</p><p><i>Id</i> : %s<br/><i>Category</i> : %s</p>" description id (string_of_err_category category)
+  in
+
+  open_vbox 2;
+
+  (* Print description *)
+  begin
+    fprintf fmt "<div id=\"%s\" class=\"%s tabcontent\" style=\"min-height:100px; max-height:200px; overflow:auto\" >@ "
+      (idref ^ descr_label) idref;
+    fprintf fmt "%s@ " description_content;
+    fprintf fmt "</div>@]";
+  end;
+
+  (* Print schema *)
+  begin
+    (* Hack: negative offset in order to reduce the <pre>'s content left-margin *)
+    (* TODO: pretty-(html)-print the schema *)
+    open_vbox (-8);
+    fprintf fmt "<div id=\"%s\" class=\"%s tabcontent\" style=\"min-height:100px; max-height:200px; overflow:auto\" >@ "
+      (idref ^ schema_label) idref;
+    fprintf fmt "<%s>@ %a</%s>@ " "pre" Json_schema.pp schema "pre";
+    fprintf fmt "</div>";
+    close_box ();
+  end;
+
+  close_box ()
+
 let pp_info_to_rst
     ppf
-    { Error_monad.id ; title ; category ; description ; schema } =
+    (Error_monad.{ title ; _ } as error_info) =
   let open Format in
 
-  fprintf ppf "@[<v 2>- **%s**@,@,"
-    (if title = "" then "<Untitled>" else title) ;
-
-  fprintf ppf "@[<v 0>%s@\n@\n@]"
-    (if description = "" then "Not description available" else description) ;
-
-  fprintf ppf "@[<v 0>* *Id* : %s@\n@\n@]" id ;
-
-  fprintf ppf "@[* *Category* : %s@\n@\n@]" (string_of_err_category category) ;
-
-  fprintf ppf "@[<v 2>.. container:: schema-button@\n@\n" ;
-  fprintf ppf "@[<v 2>Show schema@]@]@\n@\n" ;
-
-  fprintf ppf "@[<v 2>.. container:: schema@\n@\n" ;
-  fprintf ppf "@[<v 2>.. code-block:: json@\n@\n" ;
-
-  fprintf ppf "@[%a@]@]@]@]" Json_schema.pp schema
+  fprintf ppf "**%s**@\n@\n" (if title = "" then "<Untitled>" else title);
+  fprintf ppf "@[<v>%a@ @ @]" pp_print_html_tabs error_info;
 
 module ErrorSet = Set.Make(struct
     type t = Error_monad.error_info
@@ -113,32 +130,20 @@ module ErrorPartition = struct
     end)
 
   let add_error (id : key) (error : Error_monad.error_info) (map : 'a t) =
-    let lr_opt = Stringext.cut id ~on:"." in
-
-    let id_prefix =
-      match lr_opt with
-      | None -> default_section_id
-      | Some (prefix, _r) -> prefix
-    in
-
     let title =
       try
-        snd (List.find
-               (fun (id_set, _) -> List.mem id_prefix id_set)
-               section_titles)
+        snd
+          (List.find
+             (fun (id_set, _) ->
+                List.exists (fun pattern -> Stringext.find_from id ~pattern = Some 0) id_set)
+             section_titles)
       with
       | Not_found -> default_section_title
     in
-
     let set =
-      try
-        find title map
-      with
-      | Not_found -> ErrorSet.empty
+      try find title map with Not_found -> ErrorSet.empty
     in
-
     add title (ErrorSet.add error set) map
-
 end
 
 let pp_error_map ppf (map : ErrorSet.t ErrorPartition.t) : unit =
@@ -152,21 +157,67 @@ let pp_error_map ppf (map : ErrorSet.t ErrorPartition.t) : unit =
         ) set
     ) map
 
+let script =
+  "<script>\
+   function showTab(elt, tab, ref) {\
+   var i, tabcontent, tablinks;\
+   \
+   tabcontent = document.getElementsByClassName(ref);\
+   for (i = 0; i < tabcontent.length; i++) {\
+   tabcontent[i].style.display = 'none';\
+   }\
+   \
+   tablinks = elt.parentNode.children;\
+   for (i = 0; i < tablinks.length; i++) {\
+   tablinks[i].className = tablinks[i].className.replace(' active', '');\
+   }\
+   \
+   document.getElementById(tab).style.display = 'block';\
+   elt.className += ' active';\
+   }\
+   \
+   document.addEventListener('DOMContentLoaded', function(){\
+   var a = document.getElementsByClassName('defaultOpen');\
+   for (i = 0; i < a.length; i++) { a[i].click() }\
+   })\
+   </script>"
+
+let style =
+  "<style>\
+   .tab {\
+   overflow: hidden;\
+   border: 1px solid #ccc;\
+   background-color: #f1f1f1;\
+   }\
+   .tab button {\
+   background-color: inherit;\
+   float: left;\
+   border: none;\
+   outline: none;\
+   cursor: pointer;\
+   padding: 5px 10px;\
+   }\
+   .tab button:hover {\
+   background-color: #ddd;\
+   }\
+   .tab button.active {\
+   background-color: #ccc;\
+   }\
+   .tabcontent {\
+   display: none;\
+   padding: 6px 12px;\
+   border: 1px solid #ccc;\
+   border-top: none;\
+   margin-bottom: 20px;\
+   }\
+   pre {\
+   font-size: 12px\
+   }</style>"
+
 let print_script ppf =
   (* HACK : show/hide JSON schemas + style *)
-  Format.fprintf ppf "@[<v 2>.. raw:: html@\n@\n" ;
-  Format.fprintf ppf "@[<v 0>%s%s@]@\n@\n@]"
-    "<script>document.addEventListener('DOMContentLoaded', function(){\
-     $(\".schema-button\").click(function(){$(this).next(\".schema\")\
-     .first().toggle()})}, false);</script>"
-    "<style>.schema { display:none; margin:0 0 0 10px; }\
-     .schema-button { cursor:pointer; font-size:11px;\
-     font-weight: bold; background-color: #EEEEEE;\
-     color: #333333; padding: 2px 6px 2px 6px;\
-     border-top: 1px solid #CCCCCC; border-right: 1px solid #333333;\
-     border-bottom: 1px solid #333333; border-left: 1px solid #CCCCCC;\
-     width : -moz-fit-content; }\
-     section li { margin:10px 0 10px 0;  } </style>"
+  fprintf ppf "@[<v 2>.. raw:: html@\n@\n" ;
+  fprintf ppf "@[<v 0>%s%s@]@\n@\n@]@]@." script style
 
 (* Main *)
 let () =
@@ -174,22 +225,14 @@ let () =
   let ppf = std_formatter in
 
   (* Header *)
-  let title = "Tezos Client Errors" in
+  let title = "RPC Errors" in
   fprintf ppf "%a" pp_rst_h1 title ;
 
   print_script ppf ;
 
-  fprintf ppf "This document references possible errors.@\n@\n" ;
-
-  fprintf ppf "There are three categories of error :@\n@\n" ;
-
-  List.iter (fun (cat, descr) ->
-      fprintf ppf "- :literal:`%s` - %s@\n@\n" cat descr) categories_detail ;
-
-  fprintf ppf "See `The Error Monad`_ for further details.@\n@\n" ;
-  fprintf
-    ppf ".. _The Error Monad: \
-         ../tutorials/error_monad.html#the-actual-tezos-error-monad@\n@\n" ;
+  fprintf ppf "This document references possible errors that can come\
+               from RPC calls. It is generated from the OCaml source\
+               code (master branch).@\n@\n" ;
 
   (* Body *)
   let map =

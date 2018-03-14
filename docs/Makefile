@@ -7,12 +7,15 @@ BUILDDIR      = _build
 
 DOCGENDIR     = doc_gen
 DOCERRORDIR   = $(DOCGENDIR)/errors
-DOCRPCDIR   = $(DOCGENDIR)/rpcs
+DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
 all: html linkcheck
 
 linkcheck:
 	$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)"
+
+introduction/readme.rst: ../README.rst
+	sed 's/TEZOS/How to build and run/' $< > $@
 
 api/errors.rst: $(DOCERRORDIR)/error_doc.ml
 	@jbuilder build $(DOCERRORDIR)/error_doc.exe
@@ -31,4 +34,4 @@ html: Makefile api/errors.rst api/rpc.rst
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf introduction/readme.rst api/errors.rst
+	@-rm -Rf introduction/readme.rst api/errors.rst api/rpc.rst

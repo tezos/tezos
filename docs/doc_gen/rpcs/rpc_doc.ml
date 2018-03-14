@@ -7,124 +7,13 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Utility functions *)
-
-exception Unsupported_construct
-
-type input = {
-  int : int -> int -> string option -> string list -> int ;
-  float : string option -> string list -> float ;
-  string : string option -> string list -> string ;
-  bool : string option -> string list -> bool ;
-  continue : string option -> string list -> bool ;
-  display : string -> unit ;
-}
-
-open Json_schema
-
-(* generic JSON generation from a schema with callback for random or
-   interactive filling *)
-let fill_in ?(show_optionals=true) input schema : ([> `A of 'a list | `Null | `O of (string * 'a) list | `String of string ]
-                                                   as 'a) =
-  let rec element path { title ; kind }=
-    match kind with
-    | Integer { minimum ; maximum } ->
-        let minimum =
-          match minimum with
-          | None -> min_int
-          | Some (m, `Inclusive) -> int_of_float m
-          | Some (m, `Exclusive) -> int_of_float m + 1 in
-        let maximum =
-          match maximum with
-          | None -> max_int
-          | Some (m, `Inclusive) -> int_of_float m
-          | Some (m, `Exclusive) -> int_of_float m - 1 in
-        let i = input.int minimum maximum title path  in
-        `Float (float i)
-    | Number _ ->
-        let f = input.float title path in
-        `Float f
-    | Boolean ->
-        let f = input.bool title path in
-        `Bool f
-    | String _ ->
-        let f = input.string title path in
-        `String f
-    | Combine ((One_of | Any_of), elts) ->
-        let nb = List.length elts in
-        let n = input.int 0 (nb - 1) (Some "Select the schema to follow") path in
-        element path (List.nth elts n)
-    | Combine ((All_of | Not), _) ->  raise Unsupported_construct
-    | Def_ref name ->
-        (`String (Json_query.json_pointer_of_path name))
-    | Id_ref _ | Ext_ref _ ->
-        raise Unsupported_construct
-    | Array (elts, _) ->
-        let rec fill_loop acc n ls =
-          match ls with
-          | [] -> acc
-          | elt :: elts ->
-              let json = element (string_of_int n :: path) elt in
-              fill_loop (json :: acc) (succ n) elts
-        in
-        let acc = fill_loop [] 0 elts in
-        (`A (List.rev acc))
-    | Object { properties } ->
-        let properties =
-          if show_optionals
-          then properties
-          else (List.filter (fun (_, _, b, _) -> b) properties) in
-        let rec fill_loop acc ls =
-          match ls with
-          | [] -> acc
-          | (n, elt, _, _) :: elts ->
-              let json = element (n :: path) elt in
-              fill_loop ((n, json) :: acc) elts
-        in
-        let acc = fill_loop [] properties in
-        (`O (List.rev acc))
-    | Monomorphic_array (elt, specs) ->
-        let rec fill_loop acc min n max =
-          if n > max then
-            acc
-          else
-            let json = element (string_of_int n :: path) elt in
-            if n < min || input.continue title path then
-              fill_loop (json :: acc) min (succ n) max
-            else (json :: acc)
-        in
-        let max = match specs.max_items with None -> max_int | Some m -> m in
-        let acc = fill_loop [] specs.min_items 0 max in
-        `A (List.rev acc)
-    | Any -> raise Unsupported_construct
-    | Dummy -> raise Unsupported_construct
-    | Null -> `Null
-  in
-  element [] (Json_schema.root schema)
-
-let random_fill_in ?(show_optionals=true) schema =
-  let display _ = () in
-  let int min max _ _ =
-    let max = Int64.of_int max
-    and min = Int64.of_int min in
-    let range = Int64.sub max min in
-    let random_int64 = Int64.add (Random.int64 range) min in
-    Int64.to_int random_int64 in
-  let string _title _ = "" in
-  let float _ _ = Random.float infinity in
-  let bool _ _ =  (Random.int 2 = 0) in
-  let continue _ _ =  (Random.int 4 = 0) in
-  fill_in ~show_optionals
-    { int ; float ; string ; bool ; display ; continue }
-    schema
-
 type service_repr =
   { path : string list ;
     meth : Resto.meth ;
     description : string ;
-    input : Json_schema.schema option;
-    output : Json_schema.schema ;
-    example : string option;
+    input : Json_schema.schema option ;
+    output : Json_schema.schema option ;
+    example : string option ;
     error : Json_schema.schema option
   }
 
@@ -137,51 +26,28 @@ let make_descr = function
   | None | Some "" -> "No description"
   | Some s -> s
 
+(** Inspect a JSON schema: if it doesn't contain any field (e.g. { }),
+    return None *)
+let normalize_json_schema = function
+  | None -> None
+  | Some schema ->
+      let open Json_schema in
+      let elt = root schema in
+      match elt.kind with
+      | Object specs when
+          specs = object_specs ||
+          specs = { object_specs with additional_properties = None } ->
+          None
+      | _ -> Some schema
+
 let repr_of_service path
     RPC_description.{ description ; error ;
-                      meth ; input ; output ; _ }  : service_repr=
-  (* let escape_html_string str =
-   *   let open Stringext in
-   *   let str = replace_all str ~pattern:"<" ~with_:"&lt;" in
-   *   replace_all str ~pattern:">" ~with_:"&gt;"
-   * in
-   *
-   * let example = begin
-   *   try
-   *     match input with
-   *     | None -> None
-   *     | Some input  -> begin
-   *         let path = List.map escape_html_string path |> String.concat "/" in
-   *         Printf.eprintf "%s\n%!" path;
-   *         let json = random_fill_in ~show_optionals:true input in
-   *         let tezos_client_cmd_example =
-   *           Format.sprintf "tezos-client rpc call /%s with '%s'"
-   *             path
-   *             (Data_encoding.Json.to_string ~minify:true json)
-   *         in
-   *         let curl_cmd_example =
-   *           Format.sprintf "curl -X %s -H \"Content-type: application/json\" http://%s/%s -d '%s'"
-   *             (RPC_service.string_of_meth meth)
-   *             "127.0.0.1:18731"
-   *             path
-   *             (Data_encoding.Json.to_string ~minify:true json)
-   *         in
-   *         let open Format in
-   *         Some (
-   *           List.fold_left (fun acc s ->
-   *               (Format.sprintf "<div class=\"cmdline\">%s</div>" s) :: acc)
-   *             [] [ curl_cmd_example ; tezos_client_cmd_example ]
-   *           |> String.concat "or"
-   *         )
-   *
-   *       end
-   *   with | Unsupported_construct -> None
-   * end in *)
-
+                      meth ; input ; output ; _ }  : service_repr =
   { path ; meth ;
     description = make_descr description ;
-    input ; output ;
-    example=None ; error = Some error  }
+    input = normalize_json_schema input ;
+    output = normalize_json_schema (Some output) ;
+    example = None ; error = Some error  }
 
 open Format
 
@@ -216,34 +82,15 @@ let rec pp_print_service_tree fmt = function
         ) l;
       fprintf fmt "@]"
 
-let collected_args = ref []
-
-let pp_print_collected_args ppf () =
-  let open Resto.Arg in
-  fprintf ppf "@[<v 0>";
-  List.iter
-    (function
-      | { name ; descr=Some d } ->
-          fprintf ppf "@[<v 2>**<%s>** : @[%s@]@]@ @ " name d;
-      | { descr=None ; _ } -> assert false
-    )
-    (List.rev !collected_args);
-  fprintf ppf "@]"
-
 let make_tree cctxt path =
-  let collect arg =
-    if not (arg.RPC_arg.descr = None ||
-            (List.exists (fun { Resto.Arg.name } -> name = arg.name)
-               !collected_args)) then
-      collected_args := arg :: !collected_args
-  in
+  (* TODO : add automatic example generation *)
   let open RPC_description in
   describe cctxt ~recurse:true path >>=? fun dir ->
   let rec loop path : _ directory -> service_tree list = function
     | Dynamic descr ->
         [ Node ({ path ; meth=`POST ;
                   description=make_descr descr ;
-                  input = None ; output = Json_schema.any ;
+                  input = None ; output = None ;
                   example = None ; error = None }, []) ]
 
     | Empty -> []
@@ -274,7 +121,6 @@ let make_tree cctxt path =
         end
 
     | Static { services ; subdirs = Some (Arg (arg, solo)) } ->
-        collect arg;
         let name = Printf.sprintf "<%s>" arg.RPC_arg.name in
 
         let services = RPC_service.MethMap.bindings services in
@@ -372,7 +218,7 @@ let rec pp_print_rst_hierarchy fmt ~title node =
     let rec loop str =
       let open Stringext in
       if find_from str ~pattern:"--" <> None then
-        loop (Stringext.replace_all_assoc str [("--","-")])
+        loop (replace_all_assoc str [("--","-")])
       else
         str
     in loop rst_name
@@ -446,29 +292,20 @@ let pp_print_html_tab_content fmt ~tag ~shortlabel ~pp_content ~content path =
   fprintf fmt "<%s>@ %a</%s>@ " tag pp_content content tag;
   fprintf fmt "</div>@]"
 
-let pp_print_html_tab_content_example fmt ~shortlabel ~pp_content ~content path =
-  let target_ref = ref_of_path path in
-  fprintf fmt "@[<v 2><div id=\"%s\" class=\"%s tabcontent\" style=\"max-height:200px; overflow:auto\" >@ %a</div>@]"
-    (target_ref ^ shortlabel) target_ref pp_content content
-
-let pp_print_html_tabs fmt { path ; description ; input ; output ; example ; error } =
+let pp_print_html_tabs fmt { path ; description ; input ; output ; _ (* example ; error *) } =
   fprintf fmt "@[<v 2>.. raw:: html@ @ ";
   fprintf fmt "@[<v 2><div class=\"tab\">@ ";
 
   fprintf fmt "%a" (pp_print_html_tab_button ~default:true ~shortlabel:"descr" ~content:"Description") path;
   (match input with
    | Some _ ->
-       fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"input" ~content:"Input") path;
+       fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"input" ~content:"Input schema") path;
    | None -> ());
-  fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"output" ~content:"Output") path;
-  (match example with
-   | Some _ ->
-       fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"example" ~content:"Example") path;
-   | None -> ());
-  (match error with
-   | Some _ ->
-       fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"error" ~content:"Errors") path;
-   | None -> ());
+  fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"output" ~content:"Output schema") path;
+  (* (match example with
+   *  | Some _ ->
+   *      fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"example" ~content:"Example") path;
+   *  | None -> ()); *)
   fprintf fmt "</div>@]@ ";
 
   fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"p" ~shortlabel:"descr"
@@ -477,16 +314,15 @@ let pp_print_html_tabs fmt { path ; description ; input ; output ; example ; err
    | Some x -> fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"pre" ~shortlabel:"input"
                                      ~pp_content:Json_schema.pp ~content:x) path;
    | None -> ());
-  fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"pre" ~shortlabel:"output"
-                        ~pp_content:Json_schema.pp ~content:output) path;
-  (match example with
-   | Some x -> fprintf fmt "%a@ " (pp_print_html_tab_content_example ~shortlabel:"example"
-                                     ~pp_content:pp_print_string ~content:x) path;
-   | None -> ());
-  (match error with
-   | Some x -> fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"pre" ~shortlabel:"error"
+  (match output with
+   | Some x -> fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"pre" ~shortlabel:"output"
                                      ~pp_content:Json_schema.pp ~content:x) path;
    | None -> ());
+  (* (match example with
+   *  | Some x -> fprintf fmt "%a@ " (pp_print_html_tab_content ~tag:"pre" ~shortlabel:"example"
+   *                                    ~pp_content:pp_print_string ~content:x) path;
+   *  | None -> ()); *)
+
   fprintf fmt "@]"
 
 let pp_print_rst_full_service fmt ({ path ; meth } as repr) =
@@ -536,11 +372,7 @@ let style =
    }\
    pre {\
    font-size: 12px\
-   }\
-   .cmdline { font-family: monospace; background: #343131; padding: 2px 8px;\
-   border-radius:10px; color: white; margin: 5px; }\
-   .cmdline+.cmddoc { margin: -5px 5px 0 20px; padding: 5px }\
-   </style>"
+   }</style>"
 
 let script =
   "<script>\
@@ -585,25 +417,25 @@ let run ?(rpc_port=18731) () =
     (* Script : hack *)
     fprintf ppf "%a@." pp_print_rst_raw_html script;
     (* Page title *)
-    fprintf ppf "%a" pp_print_rst_h1 "Tezos RPCs";
+    fprintf ppf "%a" pp_print_rst_h1 "RPC API";
     (* include/copy usage.rst from input  *)
-    Lwt_io.(read stdin) >>= fun s ->
-    fprintf ppf "%s@\n" s;
-    Lwt.return ()
+    let rec loop () =
+      let s = read_line () in
+      fprintf ppf "%s@\n" s;
+      loop ()
+    in begin try loop () with End_of_file -> () end
   in
-
   (make_tree cctxt [] >>= function
     | Ok service_tree ->
         (* Print header!! *)
         fprintf ppf "@\n";
-        print_header () >>= fun () ->
+        print_header ();
         fprintf ppf "@\n";
 
         (* Shell RPCs tree *)
         fprintf ppf "%a@." (pp_print_rst_hierarchy ~title:"Client RPCs - Index") service_tree;
         fprintf ppf "%a" pp_print_rst_h2 "Client RPCs - Full description";
         fprintf ppf "%a@." pp_print_rst_service_tree service_tree;
-
         Lwt.return 0
 
     | Error _ ->
@@ -619,13 +451,6 @@ let run ?(rpc_port=18731) () =
             fprintf ppf "%a@." (pp_print_rst_hierarchy ~title:"Protocol Alpha RPCs - Index") service_tree;
             fprintf ppf "%a" pp_print_rst_h2 "Protocol Alpha RPCs - Full description";
             fprintf ppf "%a@." pp_print_rst_service_tree service_tree;
-
-            if !collected_args <> [] then begin
-              (* If you modify this title, also modify the
-                 hard-referenced link in 'usage.rst' *)
-              fprintf ppf "%a" pp_print_rst_h2 "Dynamic parameters description";
-              fprintf ppf "%a@."  pp_print_collected_args ();
-            end;
 
             Lwt.return 0
 
