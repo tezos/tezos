@@ -99,7 +99,7 @@ module RPC : sig
     t -> (Operation_hash.t * Operation.t) Lwt_stream.t * Lwt_watcher.stopper
 
   val pending_operations:
-    t -> block ->
+    t -> 
     (error Preapply_result.t * Operation.t Operation_hash.Map.t) Lwt.t
 
   val protocols:

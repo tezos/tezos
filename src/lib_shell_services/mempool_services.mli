@@ -7,22 +7,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Proto_alpha
-open Alpha_context
 
-type operation = {
-  hash: Operation_hash.t ;
-  content: Operation.t option ;
-}
+module S : sig
+  val pending_operations:
+    ([ `POST ], unit,
+     unit , unit, unit,
+     error Preapply_result.t * Operation.t Operation_hash.Map.t) RPC_service.t
+end
 
-type valid_endorsement = {
-  hash: Operation_hash.t ;
-  source: public_key_hash ;
-  block: Block_hash.t ;
-  slots: int list ;
-}
+open RPC_context
 
-val monitor_endorsement:
-  #Proto_alpha.rpc_context ->
-  valid_endorsement tzresult Lwt_stream.t tzresult Lwt.t
-
+val pending_operations:
+  #simple ->
+  (error Preapply_result.t * Operation.t Operation_hash.Map.t) tzresult Lwt.t

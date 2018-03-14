@@ -15,24 +15,6 @@ type operation = {
   content: Operation.t option
 }
 
-let monitor cctxt ?contents ?check () =
-  Block_services.monitor_prevalidated_operations
-    ?contents cctxt >>=? fun (ops_stream, _) ->
-  let convert ops =
-    map_s
-      (fun (hash, op) ->
-         match op with
-         | None -> return { hash; content = None }
-         | Some (op : Operation.raw) ->
-             Alpha_services.Parse.operations cctxt
-               `Prevalidation ?check [op] >>=? function
-             | [proto] ->
-                 return { hash ; content = Some proto }
-             | _ -> failwith "Error while parsing the operation")
-      (List.concat  ops)
-  in
-  return (Lwt_stream.map_s convert ops_stream)
-
 
 type valid_endorsement = {
   hash: Operation_hash.t ;

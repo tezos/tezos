@@ -9,18 +9,11 @@
 
 type block = [
   | `Genesis
-  | `Head of int | `Prevalidation
-  | `Test_head of int | `Test_prevalidation
+  | `Head of int
+  | `Test_head of int
   | `Hash of Block_hash.t
 ]
 
-val last_baked_block:
-  block -> [>
-    | `Genesis
-    | `Head of int
-    | `Test_head of int
-    | `Hash of Block_hash.t
-  ]
 val parse_block: string -> (block, string) result
 val to_string: block -> string
 
@@ -72,9 +65,6 @@ val protocol:
 val test_chain:
   #simple -> block -> Test_chain_status.t tzresult Lwt.t
 
-val pending_operations:
-  #simple -> block ->
-  (error Preapply_result.t * Operation.t Operation_hash.Map.t) tzresult Lwt.t
 
 val info:
   #simple ->
@@ -116,11 +106,6 @@ val raw_context_result_pp : raw_context_result -> string
 
 val raw_context:
   #simple -> block -> string list -> int -> raw_context_result tzresult Lwt.t
-
-val monitor_prevalidated_operations:
-  ?contents:bool ->
-  #streamed ->
-  ((Operation_hash.t * Operation.t option) list list Lwt_stream.t * stopper) tzresult Lwt.t
 
 val unmark_invalid:
   #simple -> Block_hash.t -> unit Error_monad.tzresult Lwt.t
@@ -185,7 +170,6 @@ module S : sig
 
   type operations_param = {
     contents: bool ;
-    monitor: bool ;
   }
   val operations:
     ([ `POST ], unit,
@@ -200,10 +184,6 @@ module S : sig
     ([ `POST ], unit,
      unit * block, unit, unit,
      Test_chain_status.t) RPC_service.t
-  val pending_operations:
-    ([ `POST ], unit,
-     unit * block, unit, unit,
-     error Preapply_result.t * Operation.t Operation_hash.Map.t) RPC_service.t
 
   type list_param = {
     include_ops: bool ;

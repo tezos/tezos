@@ -14,7 +14,6 @@ let protocol =
     "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
 let bake cctxt ?(timestamp = Time.now ()) block command sk =
-  let block = Block_services.last_baked_block block in
   let protocol_data = Data_encoding.Binary.to_bytes Data.Command.encoding command in
   Block_services.preapply
     cctxt block ~timestamp ~protocol_data

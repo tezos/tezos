@@ -70,7 +70,6 @@ let monitor cctxt
   return (Lwt_stream.map_s convert block_stream)
 
 let blocks_from_cycle cctxt block cycle =
-  let block = Block_services.last_baked_block block in
   Alpha_services.Context.level cctxt block >>=? fun level ->
   Alpha_services.Helpers.levels cctxt block cycle >>=? fun (first, last) ->
   let length = Int32.to_int (Raw_level.diff level.level first) in

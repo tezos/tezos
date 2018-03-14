@@ -94,7 +94,6 @@ let get_signing_slots cctxt ?max_priority block delegate level =
 let inject_endorsement (cctxt : #Proto_alpha.full)
     block level ?async
     src_sk slots =
-  let block = Block_services.last_baked_block block in
   Block_services.info cctxt block >>=? fun bi ->
   Alpha_services.Forge.Consensus.endorsement cctxt
     block
@@ -129,7 +128,6 @@ let check_endorsement cctxt level slot =
 let forge_endorsement (cctxt : #Proto_alpha.full)
     block
     ~src_sk ?slots ?max_priority src_pk =
-  let block = Block_services.last_baked_block block in
   let src_pkh = Ed25519.Public_key.hash src_pk in
   Alpha_services.Context.level cctxt block >>=? fun { level } ->
   begin

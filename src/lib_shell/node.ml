@@ -219,8 +219,8 @@ module RPC = struct
       "BLockPrevaLidationPrevaLidationPrevaLidationPrZ4mr6"
 
   let get_validator node = function
-    | `Genesis | `Head _ | `Prevalidation -> node.mainchain_validator
-    | `Test_head _ | `Test_prevalidation ->
+    | `Genesis | `Head _ -> node.mainchain_validator
+    | `Test_head _ ->
         match Chain_validator.child node.mainchain_validator with
         | None -> raise Not_found
         | Some v -> v
@@ -266,49 +266,6 @@ module RPC = struct
         predecessor chain_db n head >>= convert
     | `Hash h ->
         read_valid_block_exn node h >>= convert
-    | ( `Prevalidation | `Test_prevalidation ) as block ->
-        let validator = get_validator node block in
-        let pv = Chain_validator.prevalidator validator in
-        let chain_state = Chain_validator.chain_state validator in
-        Chain.head chain_state >>= fun head ->
-        let head_header = State.Block.header head in
-        let head_hash = State.Block.hash head in
-        let head_chain_id = State.Block.chain_id head in
-        State.Block.context head >>= fun head_context ->
-        Context.get_protocol head_context >>= fun head_protocol ->
-        Prevalidator.context pv >>= function
-        | Error _ -> Lwt.fail Not_found
-        | Ok { context ; fitness } ->
-            Context.get_protocol context >>= fun protocol ->
-            Context.get_test_chain context >>= fun test_chain ->
-            let proto_level =
-              if Protocol_hash.equal protocol head_protocol then
-                head_header.shell.proto_level
-              else
-                ((head_header.shell.proto_level + 1) mod 256) in
-            let operations =
-              let pv_result, _ = Prevalidator.operations pv in
-              [ pv_result.applied ] in
-            Lwt.return
-              { hash = prevalidation_hash ;
-                level = Int32.succ head_header.shell.level ;
-                proto_level ;
-                predecessor = head_hash ;
-                fitness ;
-                timestamp = Prevalidator.timestamp pv ;
-                protocol ;
-                validation_passes = List.length operations ;
-                operations_hash =
-                  Operation_list_list_hash.compute
-                    (List.map
-                       (fun ops -> Operation_list_hash.compute (List.map fst ops))
-                       operations) ;
-                operations = Some operations ;
-                context = Context_hash.zero ;
-                protocol_data = MBytes.of_string "" ;
-                chain_id = head_chain_id ;
-                test_chain ;
-              }
 
   let rpc_context block : Tezos_protocol_environment_shell.rpc_context Lwt.t =
     let block_hash = State.Block.hash block in
@@ -344,51 +301,7 @@ module RPC = struct
             rpc_context block >>= fun ctxt ->
             Lwt.return (Some ctxt)
       end
-    | ( `Prevalidation | `Test_prevalidation ) as block ->
-        let validator = get_validator node block in
-        let pv = Chain_validator.prevalidator validator in
-        let chain_state = Chain_validator.chain_state validator in
-        Chain.head chain_state >>= fun head ->
-        let head_header = State.Block.header head in
-        let head_hash = State.Block.hash head in
-        State.Block.context head >>= fun head_context ->
-        Context.get_protocol head_context >>= fun head_protocol ->
-        Prevalidator.context pv >>= function
-        | Error _ -> Lwt.fail Not_found
-        | Ok { context ; fitness } ->
-            Context.get_protocol context >>= fun protocol ->
-            let proto_level =
-              if Protocol_hash.equal protocol head_protocol then
-                head_header.shell.proto_level
-              else
-                ((head_header.shell.proto_level + 1) mod 256) in
-            let operation_hashes, operations =
-              let pv_result, _ = Prevalidator.operations pv in
-              [ List.map fst pv_result.applied ],
-              [ List.map snd pv_result.applied ] in
-            let operations_hash =
-              Operation_list_list_hash.compute
-                (List.map Operation_list_hash.compute operation_hashes) in
-            Lwt.return (Some {
-                Tezos_protocol_environment_shell.
-                block_hash = prevalidation_hash ;
-                block_header = {
-                  shell = {
-                    level = Int32.succ head_header.shell.level ;
-                    proto_level ;
-                    predecessor = head_hash ;
-                    timestamp = Prevalidator.timestamp pv ;
-                    validation_passes = List.length operation_hashes ;
-                    operations_hash ;
-                    fitness ;
-                    context = Context_hash.zero ;
-                  } ;
-                  protocol_data = MBytes.create 0 ;
-                } ;
-                operation_hashes = (fun () -> Lwt.return operation_hashes) ;
-                operations = (fun () -> Lwt.return operations) ;
-                context ;
-              })
+
 
   let operation_hashes node block =
     match block with
@@ -400,11 +313,6 @@ module RPC = struct
         Chain.head chain_state >>= fun head ->
         predecessor chain_db n head >>= fun block ->
         State.Block.all_operation_hashes block
-    | (`Prevalidation | `Test_prevalidation) as block ->
-        let validator = get_validator node block in
-        let pv = Chain_validator.prevalidator validator in
-        let { Preapply_result.applied }, _ = Prevalidator.operations pv in
-        Lwt.return [List.map fst applied]
     | `Hash hash ->
         read_valid_block node hash >>= function
         | None -> Lwt.return_nil
@@ -421,51 +329,16 @@ module RPC = struct
         Chain.head chain_state >>= fun head ->
         predecessor chain_db n head >>= fun block ->
         State.Block.all_operations block
-    | (`Prevalidation | `Test_prevalidation) as block ->
-        let validator = get_validator node block in
-        let pv = Chain_validator.prevalidator validator in
-        let { Preapply_result.applied }, _ = Prevalidator.operations pv in
-        Lwt.return [List.map snd applied]
     | `Hash hash ->
         read_valid_block node hash >>= function
         | None -> Lwt.return_nil
         | Some block ->
             State.Block.all_operations block
 
-  let pending_operations node (block: block) =
-    match block with
-    | ( `Head 0 | `Prevalidation
-      | `Test_head 0 | `Test_prevalidation ) as block ->
-        let validator = get_validator node block in
-        let pv = Chain_validator.prevalidator validator in
-        Lwt.return (Prevalidator.operations pv)
-    | ( `Head n | `Test_head n ) as block ->
-        let validator = get_validator node block in
-        let prevalidator = Chain_validator.prevalidator validator in
-        let chain_state = Chain_validator.chain_state validator in
-        let chain_db = Chain_validator.chain_db validator in
-        Chain.head chain_state >>= fun head ->
-        predecessor chain_db n head >>= fun b ->
-        Prevalidator.pending ~block:b prevalidator >|= fun ops ->
-        Preapply_result.empty, ops
-    | `Genesis ->
-        let chain_state = Chain_validator.chain_state node.mainchain_validator in
-        let prevalidator =
-          Chain_validator.prevalidator node.mainchain_validator in
-        Chain.genesis chain_state >>= fun b ->
-        Prevalidator.pending ~block:b prevalidator >|= fun ops ->
-        Preapply_result.empty, ops
-    | `Hash h -> begin
-        get_validator_per_hash node h >>= function
-        | None ->
-            Lwt.return (Preapply_result.empty, Operation_hash.Map.empty)
-        | Some validator ->
-            let chain_state = Chain_validator.chain_state validator in
-            let prevalidator = Chain_validator.prevalidator validator in
-            State.Block.read_exn chain_state h >>= fun block ->
-            Prevalidator.pending ~block prevalidator >|= fun ops ->
-            Preapply_result.empty, ops
-      end
+  let pending_operations node =
+    let validator = get_validator node (`Head 0) in
+    let pv = Chain_validator.prevalidator validator in
+    Lwt.return (Prevalidator.operations pv)
 
   let protocols { state } =
     State.Protocol.list state >>= fun set ->
@@ -482,11 +355,6 @@ module RPC = struct
       | `Genesis ->
           let chain_state = Chain_validator.chain_state node.mainchain_validator in
           Chain.genesis chain_state >>= return
-      | ( `Head 0 | `Prevalidation
-        | `Test_head 0 | `Test_prevalidation ) as block ->
-          let validator = get_validator node block in
-          let chain_state = Chain_validator.chain_state validator in
-          Chain.head chain_state >>= return
       | `Head n | `Test_head n as block -> begin
           let validator = get_validator node block in
           let chain_state = Chain_validator.chain_state validator in

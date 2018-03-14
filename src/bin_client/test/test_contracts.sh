@@ -324,28 +324,29 @@ assert_output $contract_dir/check_signature.tz \
 assert_output $contract_dir/hash_key.tz Unit '"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"' '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
 assert_output $contract_dir/hash_key.tz Unit '"edpkuJqtDcA2m2muMxViSM47MPsGQzmyjnNTawUPqR8vZTAMcx61ES"' '"tz1XPTDmvT3vVE5Uunngmixm7gj7zmdbPq6k"'
 
-$client transfer 1,000 from bootstrap1 to $key1
-$client transfer 2,000 from bootstrap1 to $key2
+
+bake_after $client transfer 1,000 from bootstrap1 to $key1
+bake_after $client transfer 2,000 from bootstrap1 to $key2
 
 assert_balance $key1 "1,000 ꜩ"
 assert_balance $key2 "2,000 ꜩ"
 
 # Create a contract and transfer 100 ꜩ to it
 init_with_transfer $contract_dir/store_input.tz $key1 '""' 100 bootstrap1
-$client transfer 100 from bootstrap1 to store_input -arg '"abcdefg"'
+bake_after $client transfer 100 from bootstrap1 to store_input -arg '"abcdefg"'
 assert_balance store_input "200 ꜩ"
 assert_storage_contains store_input '"abcdefg"'
-$client transfer 100 from bootstrap1 to store_input -arg '"xyz"'
+bake_after $client transfer 100 from bootstrap1 to store_input -arg '"xyz"'
 assert_storage_contains store_input '"xyz"'
 
 init_with_transfer $contract_dir/transfer_amount.tz $key1 '"0"' "100" bootstrap1
-$client transfer 500 from bootstrap1 to transfer_amount -arg Unit
+bake_after $client transfer 500 from bootstrap1 to transfer_amount -arg Unit
 assert_storage_contains transfer_amount 500
 
 # This tests the `NOW` instruction.
 # This test may fail if timings are marginal, though I have not yet seen this happen
 init_with_transfer $contract_dir/store_now.tz $key1 '"2017-07-13T09:19:01Z"' "100" bootstrap1
-$client transfer 500 from bootstrap1 to store_now -arg Unit
+bake_after $client transfer 500 from bootstrap1 to store_now -arg Unit
 assert_storage_contains store_now "$($client get timestamp)"
 
 # Test timestamp operations
@@ -366,43 +367,50 @@ assert_output $contract_dir/diff_timestamps.tz Unit '(Pair 0 1)' -1
 assert_output $contract_dir/diff_timestamps.tz Unit '(Pair 1 0)' 1
 assert_output $contract_dir/diff_timestamps.tz Unit '(Pair "1970-01-01T00:03:20Z" "1970-01-01T00:00:00Z")' 200
 
+
 # Tests TRANSFER_TO
-$client originate account "test_transfer_account1" for $key1 transferring 100 from bootstrap1
-$client originate account "test_transfer_account2" for $key1 transferring 20 from bootstrap1
+bake_after $client originate account "test_transfer_account1" for $key1 transferring 100 from bootstrap1
+bake_after $client originate account "test_transfer_account2" for $key1 transferring 20 from bootstrap1
 init_with_transfer $contract_dir/transfer_to.tz $key2 Unit 1,000 bootstrap1
 assert_balance test_transfer_account1 "100 ꜩ"
-$client transfer 100 from bootstrap1 to transfer_to \
-            -arg "\"$(get_contract_addr test_transfer_account1)\""
+bake_after $client transfer 100 from bootstrap1 to transfer_to \
+           -arg "\"$(get_contract_addr test_transfer_account1)\""
 assert_balance test_transfer_account1 "200 ꜩ" # Why isn't this 200 ꜩ? Baking fee?
-$client transfer 100 from bootstrap1 to transfer_to \
+bake_after $client transfer 100 from bootstrap1 to transfer_to \
             -arg "\"$(get_contract_addr test_transfer_account2)\""
 assert_balance test_transfer_account2 "120 ꜩ" # Why isn't this 120 ꜩ? Baking fee?
+
 
 # Tests create_account
 init_with_transfer $contract_dir/create_account.tz $key2 \
                    "\"$(get_contract_addr test_transfer_account1)\"" 1,000 bootstrap1
 $client transfer 100 from bootstrap1 to create_account \
-            -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' | assert_in_output "New contract"
+           -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' | assert_in_output "New contract"
+$client bake for bootstrap1 -max-priority 512
+sleep 1
+
 
 # Creates a contract, transfers data to it and stores the data
 init_with_transfer $contract_dir/create_contract.tz $key2 \
                    "\"$(get_contract_addr test_transfer_account1)\"" 1,000 bootstrap1
 $client transfer 0 from bootstrap1 to create_contract -arg '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 assert_storage_contains create_contract '"abcdefg"'
 
 # Test DEFAULT_ACCOUNT
 init_with_transfer $contract_dir/default_account.tz $key1 \
 				   Unit 1,000 bootstrap1
-$client transfer 0 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\""
+bake_after $client transfer 0 from bootstrap1 to default_account  -arg "\"$BOOTSTRAP4_IDENTITY\""
 assert_balance $BOOTSTRAP4_IDENTITY "4,000,100 ꜩ"
 account=tz1SuakBpFdG9b4twyfrSMqZzruxhpMeSrE5
-$client transfer 0 from bootstrap1 to default_account  -arg "\"$account\""
+bake_after $client transfer 0 from bootstrap1 to default_account  -arg "\"$account\""
 assert_balance $account "100 ꜩ"
 
 # Test SELF
 init_with_transfer $contract_dir/self.tz $key1 \
 				   '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"' 1,000 bootstrap1
-$client transfer 0 from bootstrap1 to self
+bake_after $client transfer 0 from bootstrap1 to self
 assert_storage_contains self "\"$(get_contract_addr self)\""
 
 # Test sets and map literals
@@ -426,14 +434,24 @@ init_with_transfer $contract_dir/big_map_mem.tz $key1\
                    '(Pair { Elt 1 Unit ; Elt 2 Unit ; Elt 3 Unit } Unit)' \
                    100 bootstrap1
 $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 False)'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 0 True)'
 $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 True)'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 1 False)'
 $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 True)'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 2 False)'
 $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 True)'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 3 False)'
 $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 False)'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 assert_fails $client transfer 1 from bootstrap1 to big_map_mem -arg '(Pair 4 True)'
 
 init_with_transfer $contract_dir/big_map_get_add.tz $key1\
@@ -441,12 +459,26 @@ init_with_transfer $contract_dir/big_map_get_add.tz $key1\
                    100 bootstrap1
 
 $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 (Some 2)) (Pair 200 (Some 2)))'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 200 None))'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 200 None) (Pair 300 None))'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 None) (Pair 200 None))'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 1 (Some 2)) (Pair 0 (Some 1)))'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 400 (Some 1232)) (Pair 400 (Some 1232)))'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 $client transfer 1 from bootstrap1 to big_map_get_add -arg '(Pair (Pair 401 (Some 0)) (Pair 400 (Some 1232)))'
+$client bake for bootstrap1 -max-priority 512
+sleep 1
 
 printf "\nEnd of test\n"
 

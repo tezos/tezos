@@ -113,12 +113,11 @@ let forge_block cctxt block
     ?timestamp
     ~priority
     ?seed_nonce_hash ~src_sk () =
-  let block = Block_services.last_baked_block block in
   begin
     match operations with
     | None ->
-        Block_services.pending_operations
-          cctxt block >>=? fun (ops, pendings) ->
+        Mempool_services.pending_operations
+          cctxt  >>=? fun (ops, pendings) ->
         let ops =
           List.map snd @@
           Operation_hash.Map.bindings @@
@@ -476,8 +475,8 @@ let bake (cctxt : #Proto_alpha.full) state =
        lwt_debug "Try baking after %a (slot %d) for %s (%a)"
          Block_hash.pp_short bi.hash
          priority name Time.pp_hum timestamp >>= fun () ->
-       Block_services.pending_operations cctxt
-         block >>=? fun (res, ops) ->
+       Mempool_services.pending_operations cctxt
+       >>=? fun (res, ops) ->
        let operations =
          List.map snd @@
          Operation_hash.Map.bindings @@

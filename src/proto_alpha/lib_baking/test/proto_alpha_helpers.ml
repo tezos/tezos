@@ -28,7 +28,7 @@ let build_rpc_context config =
 let rpc_ctxt = ref (build_rpc_context !rpc_config)
 
 (* Context that does not write to alias files *)
-let no_write_context ?(block = `Prevalidation) config : #Client_context.full = object
+let no_write_context ?(block = `Head 0) config : #Client_context.full = object
   inherit RPC_client.http_ctxt config Media_type.all_media_types
   inherit Client_context.simple_printer (fun _ _ -> Lwt.return_unit)
   method load : type a. string -> default:a -> a Data_encoding.encoding -> a Error_monad.tzresult Lwt.t =
@@ -171,7 +171,7 @@ module Account = struct
     | _ -> assert false
 
   let transfer
-      ?(block = `Prevalidation)
+      ?(block = `Head 0)
       ?(fee = Tez.fifty_cents)
       ~(account:t)
       ~destination
@@ -190,7 +190,7 @@ module Account = struct
       ~fee ()
 
   let originate
-      ?(block = `Prevalidation)
+      ?(block = `Head 0)
       ?delegate
       ?(fee = Tez.fifty_cents)
       ~(src:t)
@@ -217,7 +217,7 @@ module Account = struct
       ()
 
   let set_delegate
-      ?(block = `Prevalidation)
+      ?(block = `Head 0)
       ?(fee = Tez.fifty_cents)
       ~contract
       ~manager_sk
@@ -232,12 +232,12 @@ module Account = struct
       ~manager_sk
       delegate_opt
 
-  let balance ?(block = `Prevalidation) (account : t) =
+  let balance ?(block = `Head 0) (account : t) =
     Alpha_services.Contract.balance !rpc_ctxt
       block account.contract
 
   (* TODO: gather contract related functions in a Contract module? *)
-  let delegate ?(block = `Prevalidation) (contract : Contract.t) =
+  let delegate ?(block = `Head 0) (contract : Contract.t) =
     Alpha_services.Contract.delegate_opt !rpc_ctxt block contract
 
 end
@@ -246,10 +246,10 @@ module Protocol = struct
 
   open Account
 
-  let voting_period_kind ?(block = `Prevalidation) () =
+  let voting_period_kind ?(block = `Head 0) () =
     Alpha_services.Context.voting_period_kind !rpc_ctxt block
 
-  let proposals ?(block = `Prevalidation) ~src:({ pkh; sk } : Account.t) proposals =
+  let proposals ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) proposals =
     Block_services.info !rpc_ctxt block >>=? fun block_info ->
     Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
     Alpha_services.Forge.Amendment.proposals !rpc_ctxt block
@@ -261,7 +261,7 @@ module Protocol = struct
     let signed_bytes = Ed25519.Signature.append sk bytes in
     return (Tezos_base.Operation.of_bytes_exn signed_bytes)
 
-  let ballot ?(block = `Prevalidation) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
+  let ballot ?(block = `Head 0) ~src:({ pkh; sk } : Account.t) ~proposal ballot =
     Block_services.info !rpc_ctxt block >>=? fun block_info ->
     Alpha_services.Context.next_level !rpc_ctxt block >>=? fun next_level ->
     Alpha_services.Forge.Amendment.ballot !rpc_ctxt block
@@ -463,7 +463,6 @@ module Endorse = struct
       block
       src_sk
       slot =
-    let block = Block_services.last_baked_block block in
     Block_services.info !rpc_ctxt block >>=? fun { hash ; _ } ->
     Alpha_services.Context.level !rpc_ctxt (`Hash hash) >>=? fun level ->
     Alpha_services.Forge.Consensus.endorsement !rpc_ctxt

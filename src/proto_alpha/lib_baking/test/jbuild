@@ -30,8 +30,8 @@
  ((name buildtest)
   (deps (test_endorsement.exe
          test_michelson_parser.exe
-         test_origination.exe
-         test_transaction.exe
+         ;test_origination.exe
+         ;test_transaction.exe
          test_rpc.exe
          test_vote.exe))))
 
@@ -68,8 +68,8 @@
  ((name runtest)
   (deps ((alias runtest_endorsement)
          (alias runtest_michelson_parser)
-         (alias runtest_origination)
-         (alias runtest_transaction)
+         ;(alias runtest_origination)
+         ;(alias runtest_transaction)
          (alias runtest_rpc)
          (alias runtest_vote)))))
 

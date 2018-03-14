@@ -52,7 +52,7 @@ let default_base_dir =
   let home = try Sys.getenv "HOME" with Not_found -> "/root" in
   Filename.concat home ".tezos-client"
 
-let default_block = `Prevalidation
+let default_block = `Head 0
 
 let (//) = Filename.concat
 
@@ -129,7 +129,8 @@ let string_parameter () : (string, #Client_context.full) parameter =
 
 let block_parameter () =
   parameter
-    (fun _ block -> match Block_services.parse_block block with
+    (fun _ block ->
+       match Block_services.parse_block block with
        | Error _ -> fail (Invalid_block_argument block)
        | Ok block -> return block)
 
@@ -139,8 +140,9 @@ let protocol_parameter () =
        try
          let (hash,_commands) =
            List.find (fun (hash,_commands) ->
-               (Protocol_hash.to_short_b58check hash) = arg
-             ) (Client_commands.get_versions ())
+               String.has_prefix ~prefix:arg
+                 (Protocol_hash.to_b58check hash))
+             (Client_commands.get_versions ())
          in
          return (Some hash)
        with Not_found -> fail (Invalid_protocol_argument arg)

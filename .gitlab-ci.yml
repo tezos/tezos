@@ -161,15 +161,15 @@ test:proto_alpha:
   script:
     - jbuilder build @src/proto_alpha/lib_protocol/runtest
 
-test:client_alpha:transaction:
-  <<: *test_definition
-  script:
-    - jbuilder build @src/proto_alpha/lib_baking/runtest_transaction
+# test:client_alpha:transaction:
+  # <<: *test_definition
+  # script:
+    # - jbuilder build @src/proto_alpha/lib_baking/runtest_transaction
 
-test:client_alpha:origination:
-  <<: *test_definition
-  script:
-    - jbuilder build @src/proto_alpha/lib_baking/runtest_origination
+# test:client_alpha:origination:
+  # <<: *test_definition
+  # script:
+    # - jbuilder build @src/proto_alpha/lib_baking/runtest_origination
 
 test:client_alpha:endorsement:
   <<: *test_definition

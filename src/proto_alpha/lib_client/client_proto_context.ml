@@ -28,7 +28,6 @@ let rec find_predecessor rpc_config h n =
 
 let get_branch rpc_config block branch =
   let branch = Option.unopt ~default:0 branch in (* TODO export parameter *)
-  let block = Block_services.last_baked_block block in
   begin
     match block with
     | `Head n -> return (`Head (n+branch))
@@ -188,7 +187,6 @@ let get_manager (cctxt : #Proto_alpha.full) block source =
   return (src_name, src_pkh, src_pk, src_sk)
 
 let dictate rpc_config block command seckey =
-  let block = Block_services.last_baked_block block in
   Block_services.info
     rpc_config block >>=? fun { chain_id ; hash = branch } ->
   Alpha_services.Forge.Dictator.operation

@@ -11,24 +11,17 @@ open Data_encoding
 
 type block = [
   | `Genesis
-  | `Head of int | `Prevalidation
-  | `Test_head of int | `Test_prevalidation
+  | `Head of int
+  | `Test_head of int
   | `Hash of Block_hash.t
 ]
-
-let last_baked_block = function
-  | `Prevalidation -> `Head 0
-  | `Test_prevalidation -> `Test_head 0
-  | `Genesis | `Head _ | `Test_head _ | `Hash _ as block -> block
 
 let parse_block s =
   try
     match String.split '~' s with
     | ["genesis"] -> Ok `Genesis
     | ["head"] -> Ok (`Head 0)
-    | ["prevalidation"] -> Ok `Prevalidation
     | ["test_head"] -> Ok (`Test_head 0)
-    | ["test_prevalidation"] -> Ok `Test_prevalidation
     | ["head"; n] -> Ok (`Head (int_of_string n))
     | ["test_head"; n] -> Ok (`Test_head (int_of_string n))
     | [h] -> Ok (`Hash (Block_hash.of_b58check_exn h))
@@ -39,10 +32,8 @@ let to_string = function
   | `Genesis -> "genesis"
   | `Head 0 -> "head"
   | `Head n -> Printf.sprintf "head~%d" n
-  | `Prevalidation -> "prevalidation"
   | `Test_head 0 -> "test_head"
   | `Test_head n -> Printf.sprintf "test_head~%d" n
-  | `Test_prevalidation -> "test_prevalidation"
   | `Hash h -> Block_hash.to_b58check h
 
 type block_info = {
@@ -177,9 +168,9 @@ module S = struct
     let descr =
       "A block identifier. This is either a block hash in hexadecimal \
        notation or a one the predefined aliases: \
-       'genesis', 'head', 'prevalidation', \
-       'test_head' or 'test_prevalidation'. One might also use 'head~N'\
-       to 'test_head~N', where N is an integer that denotes the Nth predecessors\
+       'genesis', 'head', \
+       or 'test_head'. One might alse use 'head~N'
+       to 'test_head~N', where N is an integer to denotes the Nth predecessors
        of 'head' or 'test_head'." in
     let construct = to_string in
     let destruct = parse_block in
@@ -189,6 +180,7 @@ module S = struct
     RPC_path.(root / "blocks" /: blocks_arg)
   let proto_path () =
     RPC_path.(open_root / "blocks" /: blocks_arg / "proto")
+
 
   let info =
     RPC_service.post_service
@@ -307,17 +299,14 @@ module S = struct
 
   type operations_param = {
     contents: bool ;
-    monitor: bool ;
   }
 
   let operations_param_encoding =
     let open Data_encoding in
     conv
-      (fun { contents ; monitor } -> (contents, monitor))
-      (fun (contents, monitor) -> { contents ; monitor })
-      (obj2
-         (dft "contents" bool false)
-         (dft "monitor" bool false))
+      (fun { contents } -> (contents))
+      (fun (contents) -> { contents })
+      (obj1 (dft "contents" bool false))
 
   let operations =
     RPC_service.post_service
@@ -348,34 +337,6 @@ module S = struct
       ~input: empty
       ~output: Test_chain_status.encoding
       RPC_path.(block_path / "test_chain")
-
-  let pending_operations =
-    let operation_encoding =
-      merge_objs
-        (obj1 (req "hash" Operation_hash.encoding))
-        Operation.encoding in
-    (* TODO: branch_delayed/... *)
-    RPC_service.post_service
-      ~description:
-        "List the not-yet-prevalidated operations."
-      ~query: RPC_query.empty
-      ~input: empty
-      ~output:
-        (conv
-           (fun (preapplied, unprocessed) ->
-              ({ preapplied with
-                 Preapply_result.refused = Operation_hash.Map.empty },
-               Operation_hash.Map.bindings unprocessed))
-           (fun (preapplied, unprocessed) ->
-              (preapplied,
-               List.fold_right
-                 (fun (h, op) m -> Operation_hash.Map.add h op m)
-                 unprocessed Operation_hash.Map.empty))
-           (merge_objs
-              (dynamic_size
-                 (Preapply_result.encoding RPC_error.encoding))
-              (obj1 (req "unprocessed" (list (dynamic_size operation_encoding))))))
-      RPC_path.(block_path / "pending_operations")
 
   type preapply_param = {
     timestamp: Time.t ;
@@ -523,11 +484,6 @@ end
 
 open RPC_context
 
-let monitor_prevalidated_operations ?(contents = false) ctxt =
-  make_streamed_call S.operations ctxt
-    ((), `Prevalidation) ()
-    { contents ; monitor = true }
-
 let chain_id ctxt b = make_call1 S.chain_id ctxt b () ()
 let level ctxt b = make_call1 S.level ctxt b () ()
 let predecessor ctxt b = make_call1 S.predecessor ctxt b () ()
@@ -536,10 +492,9 @@ let hash ctxt b = make_call1 S.hash ctxt b () ()
 let timestamp ctxt b = make_call1 S.timestamp ctxt b () ()
 let fitness ctxt b = make_call1 S.fitness ctxt b () ()
 let operations ctxt ?(contents = false) h =
-  make_call1 S.operations ctxt h () { contents ; monitor = false }
+  make_call1 S.operations ctxt h () { contents }
 let protocol ctxt b = make_call1 S.protocol ctxt b () ()
 let test_chain ctxt b = make_call1 S.test_chain ctxt b () ()
-let pending_operations ctxt b = make_call1 S.pending_operations ctxt b () ()
 let info ctxt ?(include_ops = true) h =
   make_call1 S.info ctxt h () include_ops
 let monitor ?(include_ops = false)

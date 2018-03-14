@@ -149,6 +149,16 @@ init_with_transfer () {
     $client originate contract ${NAME} \
             for ${KEY} transferring "${TRANSFER_AMT}" \
             from ${TRANSFER_SRC} running "${FILE}" -init "${INITIAL_STORAGE}"
+    $client bake for bootstrap1 -max-priority 512
+    sleep 1
+}
+
+
+bake_after () {
+    local ARGS="$@"
+    ${ARGS}
+    $client bake for bootstrap1 -max-priority 512
+    sleep 1
 }
 
 # Takes a grep regexp and fails with an error message if command does not include
