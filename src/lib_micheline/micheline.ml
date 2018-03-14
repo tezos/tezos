@@ -20,7 +20,7 @@ type 'p canonical = Canonical of (canonical_location, 'p) node
 let canonical_location_encoding =
   let open Data_encoding in
   def
-    "canonicalExpressionLocation" @@
+    "micheline.location" @@
   describe
     ~title:
       "Canonical location in a Micheline expression"
@@ -113,7 +113,7 @@ let rec map_node fl fp = function
   | Prim (loc, name, seq, annot) ->
       Prim (fl loc, fp name, List.map (map_node fl fp) seq, annot)
 
-let canonical_encoding prim_encoding =
+let canonical_encoding ~variant prim_encoding =
   let open Data_encoding in
   let int_encoding =
     obj1 (req "int" string) in
@@ -139,9 +139,9 @@ let canonical_encoding prim_encoding =
       (function Prim (_, prim, args, annot) -> Some (prim, args, annot)
               | _ -> None)
       (fun (prim, args, annot) -> Prim (0, prim, args, annot)) in
-  let node_encoding = mu "tezosScriptExpression" (fun expr_encoding ->
+  let node_encoding = mu ("micheline." ^ variant ^ ".expression") (fun expr_encoding ->
       describe
-        ~title: "Script expression (data, type or code)" @@
+        ~title: ("Micheline expression (" ^ variant ^ " variant)") @@
       splitted
         ~json:(union ~tag_size:`Uint8
                  [ int_encoding Json_only;
@@ -210,7 +210,7 @@ let canonical_encoding prim_encoding =
     (fun node -> strip_locations node)
     node_encoding
 
-let table_encoding location_encoding prim_encoding =
+let table_encoding ~variant location_encoding prim_encoding =
   let open Data_encoding in
   conv
     (fun node ->
@@ -221,12 +221,12 @@ let table_encoding location_encoding prim_encoding =
        let table = Array.of_list table in
        inject_locations (fun i -> table.(i)) canon)
     (obj2
-       (req "expression" (canonical_encoding prim_encoding))
+       (req "expression" (canonical_encoding ~variant prim_encoding))
        (req "locations" (list location_encoding)))
 
-let erased_encoding default_location prim_encoding =
+let erased_encoding ~variant default_location prim_encoding =
   let open Data_encoding in
   conv
     (fun node -> strip_locations node)
     (fun canon -> inject_locations (fun _ -> default_location) canon)
-    (canonical_encoding prim_encoding)
+    (canonical_encoding ~variant prim_encoding)
