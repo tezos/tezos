@@ -7,12 +7,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* let example_args_completions =
- *   [ ("<block_id>", [ ("head", 0.8) ; ("head~1", 0.1) ; ("genesis", 0.1) ]) ;
- *     ("<point>", [ ("127.0.0.1:18731", 1.) ]) ;
- *     ("<hash.Crypto_box.Public_key_hash>", [  ]);
- *   ] *)
-
 (* Utility functions *)
 
 exception Unsupported_construct
@@ -146,43 +140,42 @@ let make_descr = function
 let repr_of_service path
     RPC_description.{ description ; error ;
                       meth ; input ; output ; _ }  : service_repr=
-  (* TODO? : check that json schema are not empty *)
-
   (* let escape_html_string str =
    *   let open Stringext in
-   *   let str = replace_all str "<" "&lt;" in
-   *   replace_all str ">" "&gt;"
+   *   let str = replace_all str ~pattern:"<" ~with_:"&lt;" in
+   *   replace_all str ~pattern:">" ~with_:"&gt;"
    * in
    *
    * let example = begin
-   *   match input with
-   *   | None -> None
-   *   | Some input when input = Json_schema.any -> None
-   *   | Some input  -> begin
-   *       let json = random_fill_in ~show_optionals:true input in
-   *       (\* curl -X METH -H "Content-type: application/json" http://<address>:<port><path> -d '<schema>' *\)
+   *   try
+   *     match input with
+   *     | None -> None
+   *     | Some input  -> begin
+   *         let path = List.map escape_html_string path |> String.concat "/" in
+   *         Printf.eprintf "%s\n%!" path;
+   *         let json = random_fill_in ~show_optionals:true input in
+   *         let tezos_client_cmd_example =
+   *           Format.sprintf "tezos-client rpc call /%s with '%s'"
+   *             path
+   *             (Data_encoding.Json.to_string ~minify:true json)
+   *         in
+   *         let curl_cmd_example =
+   *           Format.sprintf "curl -X %s -H \"Content-type: application/json\" http://%s/%s -d '%s'"
+   *             (RPC_service.string_of_meth meth)
+   *             "127.0.0.1:18731"
+   *             path
+   *             (Data_encoding.Json.to_string ~minify:true json)
+   *         in
+   *         let open Format in
+   *         Some (
+   *           List.fold_left (fun acc s ->
+   *               (Format.sprintf "<div class=\"cmdline\">%s</div>" s) :: acc)
+   *             [] [ curl_cmd_example ; tezos_client_cmd_example ]
+   *           |> String.concat "or"
+   *         )
    *
-   *       let tezos_client_cmd_example =
-   *         Format.asprintf "tezos-client rpc call /%s with '%s'"
-   *           (String.concat "/" path |> escape_html_string)
-   *           (Data_encoding.Json.to_string ~minify:true json)
-   *       in
-   *       let curl_cmd_example =
-   *         Format.asprintf "curl -X %s -H \"Content-type: application/json\" http://&lt;address&gt;:&lt;port&gt;/%s -d '%s'"
-   *           (RPC_service.string_of_meth meth)
-   *           (String.concat "/" path |> escape_html_string)
-   *           (Data_encoding.Json.to_string ~minify:true json)
-   *       in
-   *       let open Format in
-   *
-   *       Some (
-   *         List.fold_left (fun acc s ->
-   *             (Format.sprintf "<div class=\"cmdline\">%s</div>" s) :: acc)
-   *           [] [tezos_client_cmd_example ; curl_cmd_example]
-   *         |> List.rev |> String.concat "or"
-   *       )
-   *
-   *     end
+   *       end
+   *   with | Unsupported_construct -> None
    * end in *)
 
   { path ; meth ;
@@ -232,15 +225,16 @@ let pp_print_collected_args ppf () =
     (function
       | { name ; descr=Some d } ->
           fprintf ppf "@[<v 2>**<%s>** : @[%s@]@]@ @ " name d;
-      | { name=_ ; _ } -> () (* Should we print it anyway ? *)
+      | { descr=None ; _ } -> assert false
     )
     (List.rev !collected_args);
   fprintf ppf "@]"
 
 let make_tree cctxt path =
-  (* TODO : discuss about automatic example generation *)
   let collect arg =
-    if not (arg.RPC_arg.descr <> None && List.mem arg !collected_args) then
+    if not (arg.RPC_arg.descr = None ||
+            (List.exists (fun { Resto.Arg.name } -> name = arg.name)
+               !collected_args)) then
       collected_args := arg :: !collected_args
   in
   let open RPC_description in
@@ -593,18 +587,16 @@ let run ?(rpc_port=18731) () =
     (* Page title *)
     fprintf ppf "%a" pp_print_rst_h1 "Tezos RPCs";
     (* include/copy usage.rst from input  *)
-    let rec loop () =
-      let s = read_line () in
-      fprintf ppf "%s@\n" s;
-      loop ()
-    in begin try loop () with End_of_file -> () end
+    Lwt_io.(read stdin) >>= fun s ->
+    fprintf ppf "%s@\n" s;
+    Lwt.return ()
   in
 
   (make_tree cctxt [] >>= function
     | Ok service_tree ->
         (* Print header!! *)
         fprintf ppf "@\n";
-        print_header ();
+        print_header () >>= fun () ->
         fprintf ppf "@\n";
 
         (* Shell RPCs tree *)
@@ -623,7 +615,6 @@ let run ?(rpc_port=18731) () =
       begin
         make_tree cctxt path_proto_alpha >>= function
         | Ok service_tree ->
-            (* TODO : replace head by <block_id> ? *)
             (* Proto alpha RPCs tree *)
             fprintf ppf "%a@." (pp_print_rst_hierarchy ~title:"Protocol Alpha RPCs - Index") service_tree;
             fprintf ppf "%a" pp_print_rst_h2 "Protocol Alpha RPCs - Full description";
@@ -637,7 +628,6 @@ let run ?(rpc_port=18731) () =
             end;
 
             Lwt.return 0
-        (* TODO : add dynamic parameter description *)
 
         | Error _ ->
             Format.fprintf err_ppf "[RPC Doc Generation] Proto alpha : Couldn't reach node\n";

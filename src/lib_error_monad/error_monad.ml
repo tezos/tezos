@@ -538,52 +538,6 @@ module Make(Prefix : sig val id : string end) = struct
           (Format.pp_print_list pp)
           (List.rev errors)
 
-  (** Catch all error when 'serializing' an error. *)
-  type error += Unclassified of string
-
-  let () =
-    let id = "" in
-    let category = `Temporary in
-    let to_error msg = Unclassified msg in
-    let from_error = function
-      | Unclassified msg -> Some msg
-      | error ->
-          let msg = Obj.(extension_name @@ extension_constructor error) in
-          Some ("Unclassified error: " ^ msg ^ ". Was the error registered?") in
-    let title = "Generic error" in
-    let description =  "An unclassified error" in
-    let encoding_case =
-      let open Data_encoding in
-      case Json_only
-        (describe ~title ~description @@
-         conv (fun x -> ((), x)) (fun ((), x) -> x) @@
-         (obj2
-            (req "kind" (constant "generic"))
-            (req "error" string)))
-        from_error to_error in
-    let pp = Format.pp_print_string in
-    error_kinds :=
-      Error_kind { id ; from_error ; category ; encoding_case ; pp } :: !error_kinds
-
-  (** Catch all error when 'deserializing' an error. *)
-  type error += Unregistered_error of Data_encoding.json
-
-  let () =
-    let id = "" in
-    let category = `Temporary in
-    let to_error msg = Unregistered_error msg in
-    let from_error = function
-      | Unregistered_error json -> Some json
-      | _ -> None in
-    let encoding_case =
-      let open Data_encoding in
-      case Json_only json from_error to_error in
-    let pp ppf json =
-      Format.fprintf ppf "@[<v 2>Unregistered error:@ %a@]"
-        Data_encoding.Json.pp json in
-    error_kinds :=
-      Error_kind { id ; from_error ; category ; encoding_case ; pp } :: !error_kinds
-
   type error += Assert_error of string * string
 
   let () =
