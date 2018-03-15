@@ -190,8 +190,17 @@ let freeze_bond ctxt delegate amount =
 let burn_bond ctxt delegate cycle amount =
   let contract = Contract_repr.implicit_contract delegate in
   get_frozen_bond ctxt contract cycle >>=? fun old_amount ->
-  Roll_storage.Delegate.remove_amount ctxt delegate amount >>=? fun ctxt ->
-  Lwt.return Tez_repr.(old_amount -? amount) >>=? fun new_amount ->
+  begin
+    match Tez_repr.(old_amount -? amount) with
+    | Ok new_amount ->
+        Roll_storage.Delegate.remove_amount
+          ctxt delegate amount >>=? fun ctxt ->
+        return (new_amount, ctxt)
+    | Error _ ->
+        Roll_storage.Delegate.remove_amount
+          ctxt delegate old_amount >>=? fun ctxt ->
+        return (Tez_repr.zero, ctxt)
+  end >>=? fun (new_amount, ctxt) ->
   Storage.Contract.Frozen_bonds.set (ctxt, contract) cycle new_amount
 
 
@@ -217,8 +226,17 @@ let freeze_fees ctxt delegate amount =
 let burn_fees ctxt delegate cycle amount =
   let contract = Contract_repr.implicit_contract delegate in
   get_frozen_fees ctxt contract cycle >>=? fun old_amount ->
-  Roll_storage.Delegate.remove_amount ctxt delegate amount >>=? fun ctxt ->
-  Lwt.return Tez_repr.(old_amount -? amount) >>=? fun new_amount ->
+  begin
+    match Tez_repr.(old_amount -? amount) with
+    | Ok new_amount ->
+        Roll_storage.Delegate.remove_amount
+          ctxt delegate amount >>=? fun ctxt ->
+        return (new_amount, ctxt)
+    | Error _ ->
+        Roll_storage.Delegate.remove_amount
+          ctxt delegate old_amount >>=? fun ctxt ->
+        return (Tez_repr.zero, ctxt)
+  end >>=? fun (new_amount, ctxt) ->
   Storage.Contract.Frozen_fees.set (ctxt, contract) cycle new_amount
 
 
@@ -242,7 +260,10 @@ let freeze_rewards ctxt delegate amount =
 let burn_rewards ctxt delegate cycle amount =
   let contract = Contract_repr.implicit_contract delegate in
   get_frozen_rewards ctxt contract cycle >>=? fun old_amount ->
-  Lwt.return Tez_repr.(old_amount -? amount) >>=? fun new_amount ->
+  let new_amount =
+    match Tez_repr.(old_amount -? amount) with
+    | Error _ -> Tez_repr.zero
+    | Ok new_amount -> new_amount in
   Storage.Contract.Frozen_rewards.set (ctxt, contract) cycle new_amount
 
 
