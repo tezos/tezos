@@ -46,6 +46,9 @@ let max_number_of_operations c =
 let max_operation_data_length c =
   let constants = Raw_context.constants c in
   constants.max_operation_data_length
+let token_per_rolls c =
+  let constants = Raw_context.constants c in
+  constants.token_per_rolls
 let michelson_maximum_type_size c =
   let constants = Raw_context.constants c in
   constants.michelson_maximum_type_size

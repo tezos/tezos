@@ -277,6 +277,7 @@ module Constants : sig
   val dictator_pubkey: context -> Ed25519.Public_key.t
   val max_number_of_operations: context -> int list
   val max_operation_data_length: context -> int
+  val token_per_rolls: context -> Tez.t
   val michelson_maximum_type_size: context -> int
 
 end
@@ -737,8 +738,6 @@ module Operation : sig
 end
 
 module Roll : sig
-
-  val value: context -> Tez.t
 
   val snapshot_rolls: context -> context tzresult Lwt.t
   val cycle_end: context -> Cycle.t -> context tzresult Lwt.t

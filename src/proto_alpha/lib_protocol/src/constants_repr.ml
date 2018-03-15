@@ -59,7 +59,7 @@ type constants = {
   dictator_pubkey: Ed25519.Public_key.t ;
   max_number_of_operations: int list ;
   max_operation_data_length: int ;
-  initial_roll_value: Tez_repr.t ;
+  token_per_rolls: Tez_repr.t ;
   michelson_maximum_type_size: int;
 }
 
@@ -93,7 +93,7 @@ let default = {
     [ 300 ] ;
   max_operation_data_length =
     16 * 1024 ; (* 16kB *)
-  initial_roll_value =
+  token_per_rolls =
     Tez_repr.(mul_exn one 10_000) ;
   michelson_maximum_type_size = 1000 ;
 }
@@ -155,9 +155,9 @@ let constants_encoding =
        and max_operation_data_length =
          opt Compare.Int.(=)
            default.max_operation_data_length c.max_operation_data_length
-       and initial_roll_value =
+       and token_per_rolls =
          opt Tez_repr.(=)
-           default.initial_roll_value c.initial_roll_value
+           default.token_per_rolls c.token_per_rolls
        and michelson_maximum_type_size =
          opt Compare.Int.(=)
            default.michelson_maximum_type_size c.michelson_maximum_type_size
@@ -176,7 +176,7 @@ let constants_encoding =
            dictator_pubkey,
            max_number_of_operations,
            max_operation_data_length,
-           initial_roll_value,
+           token_per_rolls,
            michelson_maximum_type_size)), ()) )
     (fun ((( preserved_cycles,
              cycle_length,
@@ -192,7 +192,7 @@ let constants_encoding =
              dictator_pubkey,
              max_number_of_operations,
              max_operation_data_length,
-             initial_roll_value,
+             token_per_rolls,
              michelson_maximum_type_size)), ()) ->
       { preserved_cycles =
           unopt default.preserved_cycles preserved_cycles ;
@@ -223,8 +223,8 @@ let constants_encoding =
           unopt default.max_number_of_operations max_number_of_operations ;
         max_operation_data_length =
           unopt default.max_operation_data_length max_operation_data_length ;
-        initial_roll_value =
-          unopt default.initial_roll_value initial_roll_value ;
+        token_per_rolls =
+          unopt default.token_per_rolls token_per_rolls ;
         michelson_maximum_type_size =
           unopt default.michelson_maximum_type_size michelson_maximum_type_size ;
       } )
@@ -247,7 +247,7 @@ let constants_encoding =
               (opt "dictator_pubkey" Ed25519.Public_key.encoding)
               (opt "max_number_of_operations" (list uint16))
               (opt "max_number_of_operations" int31)
-              (opt "initial_roll_value" Tez_repr.encoding)
+              (opt "token_per_rolls" Tez_repr.encoding)
               (opt "michelson_maximum_type_size" uint16)
            ))
         unit)
