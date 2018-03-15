@@ -41,7 +41,7 @@ doc-html: all
 	@mkdir -p $$(pwd)/docs/_build/api/odoc
 	@rm -rf $$(pwd)/docs/_build/api/odoc/*
 	@cp -r $$(pwd)/_build/default/_doc/* $$(pwd)/docs/_build/api/odoc/
-	@make -C docs
+	@${MAKE} -C docs
 
 build-test:
 	@jbuilder build @buildtest ${DEV}
@@ -77,6 +77,6 @@ clean:
 		tezos-admin-client \
 		tezos-protocol-compiler \
 		tezos-alpha-baker
-	@-make -C docs clean
+	@-${MAKE} -C docs clean
 
 .PHONY: all test build-deps docker-image clean
