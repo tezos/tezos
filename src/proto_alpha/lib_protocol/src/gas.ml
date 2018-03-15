@@ -232,18 +232,20 @@ module Cost_of = struct
     | None -> default
     | Some x -> x
 
+  let max_int = 1073741823
+
   let shift_left x y =
     (alloc_cost @@ words_of_bits @@
      let (+) = Pervasives.(+) in
      Z.numbits (Script_int.to_zint x) +
-     (unopt (Script_int.to_int y) ~default:2147483647))
+     (unopt (Script_int.to_int y) ~default:max_int))
 
   let shift_right x y =
     (alloc_cost @@ words_of_bits @@
      max 1 @@
      let (-) = Pervasives.(-) in
      Z.numbits (Script_int.to_zint x) -
-     unopt (Script_int.to_int y) ~default:2147483647)
+     unopt (Script_int.to_int y) ~default:max_int)
 
 
   let exec = step_cost 1
