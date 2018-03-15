@@ -255,7 +255,7 @@ end
 module Constants : sig
 
   val proof_of_work_nonce_size: int
-  val baking_reward: Tez.t
+  val block_reward: Tez.t
   val endorsement_reward: Tez.t
   val nonce_length: int
   val seed_nonce_revelation_tip: Tez.t

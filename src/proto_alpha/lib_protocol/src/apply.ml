@@ -634,7 +634,7 @@ let begin_application ctxt block_header pred_timestamp =
 
 let finalize_application ctxt protocol_data delegate bond fees rewards =
   (* end of level (from this point nothing should fail) *)
-  Lwt.return Tez.(rewards +? Constants.baking_reward) >>=? fun rewards ->
+  Lwt.return Tez.(rewards +? Constants.block_reward) >>=? fun rewards ->
   Delegate.freeze_fees ctxt delegate fees >>=? fun ctxt ->
   Delegate.freeze_rewards ctxt delegate rewards >>=? fun ctxt ->
   begin

@@ -29,7 +29,7 @@ let endorsement_security_deposit =
   Tez_repr.(mul_exn one 64)
 
 (* 16 tez *)
-let baking_reward =
+let block_reward =
   Tez_repr.(mul_exn one 16)
 
 (* 2 tez *)
