@@ -25,6 +25,8 @@ val get:
   Raw_context.t -> Contract_repr.t ->
   Ed25519.Public_key_hash.t option tzresult Lwt.t
 
+val registered: Raw_context.t -> Ed25519.Public_key_hash.t -> bool Lwt.t
+
 (** Updating the delegate of a contract.
 
     When calling this function on an "implicit contract" this function

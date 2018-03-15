@@ -137,6 +137,12 @@ module Contract : sig
     with type elt = Contract_repr.t
      and type t = Raw_context.t
 
+  (** The cycle where the delegate should be desactivated. *)
+  module Delegate_desactivation : Indexed_data_storage
+    with type key = Contract_repr.t
+     and type value = Cycle_repr.t
+     and type t := Raw_context.t
+
   module Spendable : Data_set_storage
     with type elt = Contract_repr.t
      and type t := Raw_context.t

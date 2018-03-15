@@ -52,7 +52,7 @@ module Delegate : sig
 
   val set_inactive : Raw_context.t -> Ed25519.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
-  val set_active : Raw_context.t -> Ed25519.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
+  val set_active : Raw_context.t -> ?init:bool -> Ed25519.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
 end
 

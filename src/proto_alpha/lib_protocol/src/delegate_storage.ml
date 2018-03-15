@@ -150,10 +150,12 @@ let set c contract delegate =
         link c contract delegate balance >>=? fun c ->
         begin
           if self_delegation then
-            Storage.Delegates.add c delegate
+            Storage.Delegates.add c delegate >>= fun c ->
+            Roll_storage.Delegate.set_active c ~init:true delegate >>=? fun c ->
+            return c
           else
-            Lwt.return c
-        end >>= fun c ->
+            return c
+        end >>=? fun c ->
         return c
 
 let remove ctxt contract =
@@ -178,6 +180,7 @@ let credit_frozen_bond ctxt contract cycle amount =
 
 let freeze_bond ctxt delegate amount =
   let { Level_repr.cycle ; _ } = Level_storage.current ctxt in
+  Roll_storage.Delegate.set_active ctxt delegate >>=? fun ctxt ->
   let contract = Contract_repr.implicit_contract delegate in
   Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
   Lwt.return Tez_repr.(balance -? amount) >>=? fun new_balance ->
@@ -285,8 +288,13 @@ let cycle_end ctxt last_cycle unrevealed =
         ~init:(Ok ctxt)
         ~f:(fun delegate ctxt ->
             Lwt.return ctxt >>=? fun ctxt ->
-            unfreeze ctxt delegate unfrozen_cycle)
-
+            unfreeze ctxt delegate unfrozen_cycle >>=? fun ctxt ->
+            Storage.Contract.Delegate_desactivation.get ctxt
+              (Contract_repr.implicit_contract delegate) >>=? fun cycle ->
+            if Cycle_repr.(cycle <= last_cycle) then
+              Roll_storage.Delegate.set_inactive ctxt delegate
+            else
+              return ctxt)
 
 let punish ctxt delegate cycle =
   let contract = Contract_repr.implicit_contract delegate in

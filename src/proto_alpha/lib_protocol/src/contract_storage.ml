@@ -353,7 +353,20 @@ let credit c contract amount =
   | Some balance ->
       Lwt.return Tez_repr.(amount +? balance) >>=? fun balance ->
       Storage.Contract.Balance.set c contract balance >>=? fun c ->
-      Roll_storage.Contract.add_amount c contract amount
+      Roll_storage.Contract.add_amount c contract amount >>=? fun c ->
+      begin
+        match contract with
+        | Implicit delegate ->
+            Delegate_storage.registered c delegate >>= fun registered ->
+            if registered then
+              Roll_storage.Delegate.set_active c delegate >>=? fun c ->
+              return c
+            else
+              return c
+        | Originated _ ->
+            return c
+      end >>=? fun c ->
+      return c
 
 let spend c contract amount =
   is_spendable c contract >>=? fun spendable ->

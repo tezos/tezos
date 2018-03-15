@@ -109,6 +109,11 @@ module Contract = struct
     Indexed_context.Make_set
       (struct let name = ["inactive_delegate"] end)
 
+  module Delegate_desactivation =
+    Indexed_context.Make_map
+      (struct let name = ["delegate_desactivation"] end)
+      (Make_value(Cycle_repr))
+
   module Delegated =
     Make_data_set_storage
       (Make_subcontext
