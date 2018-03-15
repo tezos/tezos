@@ -133,6 +133,10 @@ module Contract : sig
     with type elt = Contract_hash.t
      and type t = Raw_context.t * Contract_repr.t
 
+  module Inactive_delegate : Data_set_storage
+    with type elt = Contract_repr.t
+     and type t = Raw_context.t
+
   module Spendable : Data_set_storage
     with type elt = Contract_repr.t
      and type t := Raw_context.t

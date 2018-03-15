@@ -229,7 +229,9 @@ module Delegate = struct
         Lwt.return Tez_repr.(change -? roll_value) >>=? fun  change ->
         create_roll_in_delegate c delegate delegate_pk >>=? fun c ->
         loop c change in
-    loop c change
+    Storage.Contract.Inactive_delegate.mem c
+      (Contract_repr.implicit_contract delegate) >>= fun inactive ->
+    if inactive then return c else loop c change
 
   let remove_amount c delegate amount =
     let roll_value = Raw_context.roll_value c in
@@ -241,13 +243,57 @@ module Delegate = struct
         Lwt.return Tez_repr.(change +? roll_value) >>=? fun change ->
         loop c change in
     Storage.Roll.Delegate_change.get c delegate >>=? fun change ->
-    loop c change >>=? fun (c, change) ->
+    Storage.Contract.Inactive_delegate.mem c
+      (Contract_repr.implicit_contract delegate) >>= fun inactive ->
+    begin
+      if inactive then return (c, change) else loop c change
+    end >>=? fun (c, change) ->
     Lwt.return Tez_repr.(change -? amount) >>=? fun change ->
     Storage.Roll.Delegate_roll_list.mem c delegate >>= fun rolls ->
-    if Tez_repr.(change = zero) && not rolls then
+    if not inactive && Tez_repr.(change = zero) && not rolls then
       Storage.Roll.Delegate_change.delete c delegate
     else
       Storage.Roll.Delegate_change.set c delegate change
+
+  let set_inactive ctxt delegate =
+    ensure_inited ctxt delegate >>=? fun ctxt ->
+    let roll_value = Raw_context.roll_value ctxt in
+    Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
+    Storage.Contract.Inactive_delegate.add ctxt
+      (Contract_repr.implicit_contract delegate) >>= fun ctxt ->
+    let rec loop ctxt change =
+      Storage.Roll.Delegate_roll_list.get_option ctxt delegate >>=? function
+      | None -> return (ctxt, change)
+      | Some _roll ->
+          pop_roll_from_delegate ctxt delegate >>=? fun (_, ctxt) ->
+          Lwt.return Tez_repr.(change +? roll_value) >>=? fun change ->
+          loop ctxt change in
+    loop ctxt change >>=? fun (ctxt, change) ->
+    Storage.Roll.Delegate_change.set ctxt delegate change >>=? fun ctxt ->
+    return ctxt
+
+  let set_active ctxt delegate =
+    Storage.Contract.Inactive_delegate.mem ctxt
+      (Contract_repr.implicit_contract delegate) >>= fun inactive ->
+    if not inactive then
+      return ctxt
+    else begin
+      ensure_inited ctxt delegate >>=? fun ctxt ->
+      let roll_value = Raw_context.roll_value ctxt in
+      Storage.Roll.Delegate_change.get ctxt delegate >>=? fun change ->
+      Storage.Contract.Inactive_delegate.del ctxt
+        (Contract_repr.implicit_contract delegate) >>= fun ctxt ->
+      delegate_pubkey ctxt delegate >>=? fun delegate_pk ->
+      let rec loop ctxt change =
+        if Tez_repr.(change < roll_value) then
+          return ctxt
+        else
+          Lwt.return Tez_repr.(change -? roll_value) >>=? fun  change ->
+          create_roll_in_delegate ctxt delegate delegate_pk >>=? fun ctxt ->
+          loop ctxt change in
+      loop ctxt change >>=? fun ctxt ->
+      return ctxt
+    end
 
 end
 

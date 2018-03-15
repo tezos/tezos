@@ -105,6 +105,10 @@ module Contract = struct
       (struct let name = ["delegate"] end)
       (Make_value(Ed25519.Public_key_hash))
 
+  module Inactive_delegate =
+    Indexed_context.Make_set
+      (struct let name = ["inactive_delegate"] end)
+
   module Delegated =
     Make_data_set_storage
       (Make_subcontext
