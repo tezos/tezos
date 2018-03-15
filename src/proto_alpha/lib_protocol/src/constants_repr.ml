@@ -80,7 +80,7 @@ let default = {
   max_signing_slot = 15 ;
   max_gas = 40_000 ;
   proof_of_work_threshold =
-    Int64.(lognot (sub (shift_left 1L 56) 1L)) ;
+    Int64.(sub (shift_left 1L 56) 1L) ;
   bootstrap_keys =
     List.map read_public_key [
       "dd5d3536916765fd00a8cd402bddd34e87b49ae5159c43b8feecfd9f06b267d2" ;
