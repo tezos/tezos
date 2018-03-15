@@ -12,6 +12,7 @@ type error +=
   | No_deletion of Ed25519.Public_key_hash.t (* `Permanent *)
   | Active_delegate (* `Temporary *)
   | Current_delegate (* `Temporary *)
+  | Empty_delegate_account of Ed25519.Public_key_hash.t (* `Temporary *)
 
 let () =
   register_error_kind
@@ -58,7 +59,20 @@ let () =
           "The contract is already delegated to the same delegate")
     Data_encoding.empty
     (function Current_delegate -> Some () | _ -> None)
-    (fun () -> Current_delegate)
+    (fun () -> Current_delegate) ;
+  register_error_kind
+    `Permanent
+    ~id:"delegate.empty_delegate_account"
+    ~title:"Empty delegate account"
+    ~description:"Cannot register a delegate when its implicit account is empty"
+    ~pp:(fun ppf delegate ->
+        Format.fprintf ppf
+          "Delegate registration is forbidden when the delegate
+           implicit account is empty (%a)"
+          Ed25519.Public_key_hash.pp delegate)
+    Data_encoding.(obj1 (req "delegate" Ed25519.Public_key_hash.encoding))
+    (function Empty_delegate_account c -> Some c | _ -> None)
+    (fun c -> Empty_delegate_account c)
 
 let is_delegatable c contract =
   match Contract_repr.is_implicit contract with
@@ -144,6 +158,10 @@ let set c contract delegate =
                 fail Current_delegate
           | None | Some _ -> return ()
         end >>=? fun () ->
+        Storage.Contract.Balance.mem c contract >>= fun exists ->
+        fail_when
+          (self_delegation && not exists)
+          (Empty_delegate_account delegate) >>=? fun () ->
         Storage.Contract.Balance.get c contract >>=? fun balance ->
         unlink c contract balance >>=? fun c ->
         Storage.Contract.Delegate.init_set c contract delegate >>= fun c ->
