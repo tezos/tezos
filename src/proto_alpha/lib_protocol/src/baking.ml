@@ -134,7 +134,7 @@ let freeze_baking_bond ctxt { Block_header.priority ; _ } delegate =
   if Compare.Int.(priority >= Constants.first_free_baking_slot ctxt)
   then return (ctxt, Tez.zero)
   else
-    let bond = Constants.baking_bond_cost in
+    let bond = Constants.block_security_deposit in
     Delegate.freeze_bond ctxt delegate bond
     |> trace Cannot_freeze_baking_bond >>=? fun ctxt ->
     return (ctxt, bond)

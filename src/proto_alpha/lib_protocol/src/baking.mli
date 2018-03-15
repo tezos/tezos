@@ -29,7 +29,7 @@ val paying_priorities: context -> int list
 val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
 
 (** [freeze_baking_bond: ctxt delegate priority]
-    Freeze the baking bond (See !Constants.baking_bond_cost)
+    Freeze the baking bond (See !Constants.block_security_deposit)
     from a delegate account. No bond is frozen if the baking
     priority of this block is greater than the maximum number
     of paying baking in the network (meaning that n. bakers

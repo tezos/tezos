@@ -260,7 +260,7 @@ module Constants : sig
   val nonce_length: int
   val seed_nonce_revelation_tip: Tez.t
   val origination_burn: Tez.t
-  val baking_bond_cost: Tez.t
+  val block_security_deposit: Tez.t
   val endorsement_bond_cost: Tez.t
   val faucet_credit: Tez.t
 

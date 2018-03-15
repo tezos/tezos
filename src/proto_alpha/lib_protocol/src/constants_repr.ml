@@ -21,7 +21,7 @@ let origination_burn =
   Tez_repr.one
 
 (* 512 tez *)
-let baking_bond_cost =
+let block_security_deposit =
   Tez_repr.(mul_exn one 512)
 
 (* 64 tez *)

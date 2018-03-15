@@ -72,11 +72,11 @@ let test_endorsement_payment () =
     let endorsement_bond_cost =
       Constants.endorsement_bond_cost in
     let baking = baker_hpub = contract_p.hpub && block_priority < 4 in
-    let baking_bond_cost =
+    let block_security_deposit =
       if baking
-      then Constants.baking_bond_cost
+      then Constants.block_security_deposit
       else Tez.zero in
-    let cost = Cast.tez_add endorsement_bond_cost baking_bond_cost in
+    let cost = Cast.tez_add endorsement_bond_cost block_security_deposit in
     let expected_balance = Cast.tez_sub init_balance cost in
     Assert.equal_tez ~msg: __LOC__ expected_balance bond_balance ;
     (* After one cycle, (4 blocks in test/proto_alpha/sandbox),
