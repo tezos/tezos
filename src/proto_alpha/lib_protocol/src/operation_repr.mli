@@ -35,6 +35,10 @@ and anonymous_operation =
       op1: operation ;
       op2: operation ;
     }
+  | Double_baking of {
+      bh1: Block_header_repr.t ;
+      bh2: Block_header_repr.t ;
+    }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
       nonce: MBytes.t ;

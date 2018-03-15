@@ -35,6 +35,10 @@ and anonymous_operation =
       op1: operation ;
       op2: operation ;
     }
+  | Double_baking of {
+      bh1: Block_header_repr.t ;
+      bh2: Block_header_repr.t ;
+    }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
       nonce: MBytes.t ;
@@ -324,6 +328,20 @@ module Encoding = struct
       )
       (fun ((), op1, op2) -> Double_endorsement { op1 ; op2 })
 
+  let double_baking_encoding =
+    (obj3
+       (req "kind" (constant "double_baking"))
+       (req "op1" (dynamic_size Block_header_repr.encoding))
+       (req "op2" (dynamic_size Block_header_repr.encoding)))
+
+  let double_baking_case tag =
+    case tag double_baking_encoding
+      (function
+        | Double_baking { bh1 ; bh2 } -> Some ((), bh1, bh2)
+        | _ -> None
+      )
+      (fun ((), bh1, bh2) -> Double_baking { bh1 ; bh2 })
+
   let faucet_encoding =
     (obj3
        (req "kind" (constant "faucet"))
@@ -346,7 +364,8 @@ module Encoding = struct
                (union [
                    seed_nonce_revelation_case (Tag 0) ;
                    double_endorsement_case (Tag 1) op_encoding ;
-                   faucet_case (Tag 2) ;
+                   double_baking_case (Tag 2) ;
+                   faucet_case (Tag 3) ;
                  ]))))
       (function Anonymous_operations ops -> Some ops | _ -> None)
       (fun ops -> Anonymous_operations ops)

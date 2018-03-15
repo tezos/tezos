@@ -87,6 +87,7 @@ module Raw_level : sig
   val succ: raw_level -> raw_level
   val pred: raw_level -> raw_level option
   val to_int32: raw_level -> int32
+  val of_int32: int32 -> raw_level tzresult
 
 end
 
@@ -567,6 +568,56 @@ module Vote : sig
 
 end
 
+module Block_header : sig
+
+  type t = {
+    shell: Block_header.shell_header ;
+    protocol_data: protocol_data ;
+    signature: Ed25519.Signature.t ;
+  }
+
+  and protocol_data = {
+    priority: int ;
+    seed_nonce_hash: Nonce_hash.t option ;
+    proof_of_work_nonce: MBytes.t ;
+  }
+
+  type block_header = t
+
+  type raw = Block_header.t
+  type shell_header = Block_header.shell_header
+
+  val hash: block_header -> Block_hash.t
+  val hash_raw: raw -> Block_hash.t
+
+  val encoding: block_header Data_encoding.encoding
+  val raw_encoding: raw Data_encoding.t
+  val protocol_data_encoding: protocol_data Data_encoding.encoding
+  val shell_header_encoding: shell_header Data_encoding.encoding
+
+  val max_header_length: int
+  (** The maximum size of block headers in bytes *)
+
+  val parse: Block_header.t -> block_header tzresult
+  (** Parse the protocol-specific part of a block header. *)
+
+  val parse_unsigned_protocol_data: MBytes.t -> protocol_data tzresult
+  (** Parse the (unsigned) protocol-specific part of a block header. *)
+
+  val forge_unsigned_protocol_data: protocol_data -> MBytes.t
+  (** [forge_header proto_hdr] is the binary serialization
+      (using [protocol_data_encoding]) of the protocol-specific part
+      of a block header, without the signature. *)
+
+  val forge_unsigned:
+    Block_header.shell_header -> protocol_data -> MBytes.t
+    (** [forge_header shell_hdr proto_hdr] is the binary serialization
+        (using [unsigned_header_encoding]) of a block header,
+        comprising both the shell and the protocol part of the header,
+        without the signature. *)
+
+end
+
 type operation = {
   shell: Operation.shell_header ;
   contents: proto_operation ;
@@ -585,6 +636,10 @@ and anonymous_operation =
   | Double_endorsement of {
       op1: operation ;
       op2: operation ;
+    }
+  | Double_baking of {
+      bh1: Block_header.t ;
+      bh2: Block_header.t ;
     }
   | Faucet of {
       id: Ed25519.Public_key_hash.t ;
@@ -678,56 +733,6 @@ module Operation : sig
 
   val unsigned_operation_encoding:
     (Operation.shell_header * proto_operation) Data_encoding.t
-
-end
-
-module Block_header : sig
-
-  type t = {
-    shell: Block_header.shell_header ;
-    protocol_data: protocol_data ;
-    signature: Ed25519.Signature.t ;
-  }
-
-  and protocol_data = {
-    priority: int ;
-    seed_nonce_hash: Nonce_hash.t option ;
-    proof_of_work_nonce: MBytes.t ;
-  }
-
-  type block_header = t
-
-  type raw = Block_header.t
-  type shell_header = Block_header.shell_header
-
-  val hash: block_header -> Block_hash.t
-  val hash_raw: raw -> Block_hash.t
-
-  val encoding: block_header Data_encoding.encoding
-  val raw_encoding: raw Data_encoding.t
-  val protocol_data_encoding: protocol_data Data_encoding.encoding
-  val shell_header_encoding: shell_header Data_encoding.encoding
-
-  val max_header_length: int
-  (** The maximum size of block headers in bytes *)
-
-  val parse: Block_header.t -> block_header tzresult
-  (** Parse the protocol-specific part of a block header. *)
-
-  val parse_unsigned_protocol_data: MBytes.t -> protocol_data tzresult
-  (** Parse the (unsigned) protocol-specific part of a block header. *)
-
-  val forge_unsigned_protocol_data: protocol_data -> MBytes.t
-  (** [forge_header proto_hdr] is the binary serialization
-      (using [protocol_data_encoding]) of the protocol-specific part
-      of a block header, without the signature. *)
-
-  val forge_unsigned:
-    Block_header.shell_header -> protocol_data -> MBytes.t
-    (** [forge_header shell_hdr proto_hdr] is the binary serialization
-        (using [unsigned_header_encoding]) of a block header,
-        comprising both the shell and the protocol part of the header,
-        without the signature. *)
 
 end
 

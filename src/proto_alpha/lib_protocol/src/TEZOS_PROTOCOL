@@ -25,9 +25,9 @@
         "Contract_repr",
         "Roll_repr",
         "Vote_repr",
+        "Block_header_repr",
         "Operation_repr",
         "Manager_repr",
-        "Block_header_repr",
 
         "Raw_context",
         "Storage_sigs",
