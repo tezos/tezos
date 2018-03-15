@@ -189,10 +189,9 @@ let rec interp
                            Prim (0, K_code, [ Micheline.root code ], None) ], None)) in
             let storage = Micheline.strip_locations (unparse_data storage_type init) in
             Contract.spend_from_script ctxt source credit >>=? fun ctxt ->
-            Lwt.return Tez.(credit -? Constants.origination_burn) >>=? fun balance ->
             Contract.originate ctxt
               origination
-              ~manager ~delegate ~balance
+              ~manager ~delegate ~balance:credit
               ~script:({ code ; storage }, (dummy_code_fee, dummy_storage_fee))
               ~spendable ~delegatable
             >>=? fun (ctxt, contract, origination) ->
