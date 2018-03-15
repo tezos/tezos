@@ -24,7 +24,7 @@ val blocks_per_commitment:
 val blocks_per_roll_snapshot:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
-val slot_durations:
+val time_between_blocks:
   'a #RPC_context.simple -> 'a -> Period.t list shell_tzresult Lwt.t
 
 val first_free_baking_slot:

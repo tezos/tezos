@@ -114,21 +114,21 @@ let () =
 
 let minimal_time c priority pred_timestamp =
   let priority = Int32.of_int priority in
-  let rec cumsum_slot_durations acc durations p =
+  let rec cumsum_time_between_blocks acc durations p =
     if Compare.Int32.(<=) p 0l then
       ok acc
     else match durations with
-      | [] -> cumsum_slot_durations acc [ Period.one_minute ] p
+      | [] -> cumsum_time_between_blocks acc [ Period.one_minute ] p
       | [ last ] ->
           Period.mult p last >>? fun period ->
           Timestamp.(acc +? period)
       | first :: durations ->
           Timestamp.(acc +? first) >>? fun acc ->
           let p = Int32.pred p in
-          cumsum_slot_durations acc durations p in
+          cumsum_time_between_blocks acc durations p in
   Lwt.return
-    (cumsum_slot_durations
-       pred_timestamp (Constants.slot_durations c) (Int32.succ priority))
+    (cumsum_time_between_blocks
+       pred_timestamp (Constants.time_between_blocks c) (Int32.succ priority))
 
 let freeze_baking_bond ctxt { Block_header.priority ; _ } delegate =
   if Compare.Int.(priority >= Constants.first_free_baking_slot ctxt)

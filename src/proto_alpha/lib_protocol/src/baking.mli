@@ -24,7 +24,7 @@ val paying_priorities: context -> int list
 (** [minimal_time ctxt priority pred_block_time] returns the minimal
     time, given the predecessor block timestamp [pred_block_time],
     after which a baker with priority [priority] is allowed to
-    bake. Fail with [Invalid_slot_durations_constant] if the minimal
+    bake. Fail with [Invalid_time_between_blocks_constant] if the minimal
     time cannot be computed. *)
 val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
 

@@ -22,9 +22,9 @@ let blocks_per_roll_snapshot c =
 let voting_period_length c =
   let constants = Raw_context.constants c in
   constants.voting_period_length
-let slot_durations c =
+let time_between_blocks c =
   let constants = Raw_context.constants c in
-  constants.slot_durations
+  constants.time_between_blocks
 let first_free_baking_slot c =
   let constants = Raw_context.constants c in
   constants.first_free_baking_slot

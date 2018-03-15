@@ -56,7 +56,7 @@ module S = struct
       ~output: (obj1 (req "blocks_per_roll_snapshot" int32))
       RPC_path.(custom_root / "blocks_per_roll_snapshot")
 
-  let slot_durations =
+  let time_between_blocks =
     RPC_service.post_service
       ~description: "Slot durations"
       ~query: RPC_query.empty
@@ -124,8 +124,8 @@ let () =
   register0 S.blocks_per_roll_snapshot begin fun ctxt () () ->
     return (Constants.blocks_per_roll_snapshot ctxt)
   end ;
-  register0 S.slot_durations begin fun ctxt () () ->
-    return (Constants.slot_durations ctxt)
+  register0 S.time_between_blocks begin fun ctxt () () ->
+    return (Constants.time_between_blocks ctxt)
   end ;
   register0 S.first_free_baking_slot begin fun ctxt () () ->
     return (Constants.first_free_baking_slot ctxt)
@@ -153,8 +153,8 @@ let blocks_per_commitment ctxt block =
   RPC_context.make_call0 S.blocks_per_commitment ctxt block () ()
 let blocks_per_roll_snapshot ctxt block =
   RPC_context.make_call0 S.blocks_per_roll_snapshot ctxt block () ()
-let slot_durations ctxt block =
-  RPC_context.make_call0 S.slot_durations ctxt block () ()
+let time_between_blocks ctxt block =
+  RPC_context.make_call0 S.time_between_blocks ctxt block () ()
 let first_free_baking_slot ctxt block =
   RPC_context.make_call0 S.first_free_baking_slot ctxt block () ()
 let max_signing_slot ctxt block =

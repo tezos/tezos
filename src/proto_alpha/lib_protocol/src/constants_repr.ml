@@ -50,7 +50,7 @@ type constants = {
   blocks_per_commitment: int32 ;
   blocks_per_roll_snapshot: int32 ;
   voting_period_length: int32 ;
-  slot_durations: Period_repr.t list ;
+  time_between_blocks: Period_repr.t list ;
   first_free_baking_slot: int ;
   max_signing_slot: int ;
   max_gas: int ;
@@ -71,7 +71,7 @@ let default = {
   blocks_per_commitment = 32l ;
   blocks_per_roll_snapshot = 256l ;
   voting_period_length = 32768l ;
-  slot_durations =
+  time_between_blocks =
     List.map Period_repr.of_seconds_exn [ 60L ] ;
   first_free_baking_slot = 16 ;
   max_signing_slot = 32 ;
@@ -111,7 +111,7 @@ let constants_encoding =
   (* let open Data_encoding in *)
   Data_encoding.conv
     (fun c ->
-       let module Compare_slot_durations = Compare.List (Period_repr) in
+       let module Compare_time_between_blocks = Compare.List (Period_repr) in
        let module Compare_keys = Compare.List (Ed25519.Public_key) in
        let preserved_cycles =
          opt Compare.Int.(=)
@@ -128,9 +128,9 @@ let constants_encoding =
        and voting_period_length =
          opt Compare.Int32.(=)
            default.voting_period_length c.voting_period_length
-       and slot_durations =
-         opt Compare_slot_durations.(=)
-           default.slot_durations c.slot_durations
+       and time_between_blocks =
+         opt Compare_time_between_blocks.(=)
+           default.time_between_blocks c.time_between_blocks
        and first_free_baking_slot =
          opt Compare.Int.(=)
            default.first_free_baking_slot c.first_free_baking_slot
@@ -167,7 +167,7 @@ let constants_encoding =
            blocks_per_commitment,
            blocks_per_roll_snapshot,
            voting_period_length,
-           slot_durations,
+           time_between_blocks,
            first_free_baking_slot,
            max_signing_slot,
            max_gas),
@@ -183,7 +183,7 @@ let constants_encoding =
              blocks_per_commitment,
              blocks_per_roll_snapshot,
              voting_period_length,
-             slot_durations,
+             time_between_blocks,
              first_free_baking_slot,
              max_signing_slot,
              max_gas),
@@ -204,9 +204,9 @@ let constants_encoding =
           unopt default.blocks_per_roll_snapshot blocks_per_roll_snapshot ;
         voting_period_length =
           unopt default.voting_period_length voting_period_length ;
-        slot_durations =
-          unopt default.slot_durations @@
-          slot_durations ;
+        time_between_blocks =
+          unopt default.time_between_blocks @@
+          time_between_blocks ;
         first_free_baking_slot =
           unopt default.first_free_baking_slot first_free_baking_slot ;
         max_signing_slot =
@@ -237,7 +237,7 @@ let constants_encoding =
               (opt "blocks_per_commitment" int32)
               (opt "blocks_per_roll_snapshot" int32)
               (opt "voting_period_length" int32)
-              (opt "slot_durations" (list Period_repr.encoding))
+              (opt "time_between_blocks" (list Period_repr.encoding))
               (opt "first_free_baking_slot" uint16)
               (opt "max_signing_slot" uint16)
               (opt "instructions_per_transaction" int31))

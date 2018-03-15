@@ -72,7 +72,7 @@ module Constants = struct
       ~output: (obj1 (req "time_before_reward" Period.encoding))
       RPC_path.(custom_root / "constants" / "time_before_reward")
 
-  let slot_durations custom_root =
+  let time_between_blocks custom_root =
     RPC_service.post_service
       ~description: "Slot durations"
       ~query: RPC_query.empty
