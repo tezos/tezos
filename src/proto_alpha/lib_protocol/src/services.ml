@@ -56,13 +56,13 @@ module Constants = struct
       ~output: (obj1 (req "blocks_per_cycle" int32))
       RPC_path.(custom_root / "constants" / "blocks_per_cycle")
 
-  let voting_period_length custom_root =
+  let blocks_per_voting_period custom_root =
     RPC_service.post_service
       ~description: "Length of the voting period"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "voting_period_length" int32))
-      RPC_path.(custom_root / "constants" / "voting_period_length")
+      ~output: (obj1 (req "blocks_per_voting_period" int32))
+      RPC_path.(custom_root / "constants" / "blocks_per_voting_period")
 
   let time_before_reward custom_root =
     RPC_service.post_service

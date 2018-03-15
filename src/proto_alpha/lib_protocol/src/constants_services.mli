@@ -15,7 +15,7 @@ val preserved_cycles:
 val blocks_per_cycle:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
-val voting_period_length:
+val blocks_per_voting_period:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
 val blocks_per_commitment:

@@ -49,7 +49,7 @@ type constants = {
   blocks_per_cycle: int32 ;
   blocks_per_commitment: int32 ;
   blocks_per_roll_snapshot: int32 ;
-  voting_period_length: int32 ;
+  blocks_per_voting_period: int32 ;
   time_between_blocks: Period_repr.t list ;
   first_free_baking_slot: int ;
   endorsers_per_block: int ;
@@ -70,7 +70,7 @@ let default = {
   blocks_per_cycle = 4096l ;
   blocks_per_commitment = 32l ;
   blocks_per_roll_snapshot = 256l ;
-  voting_period_length = 32768l ;
+  blocks_per_voting_period = 32768l ;
   time_between_blocks =
     List.map Period_repr.of_seconds_exn [ 60L ] ;
   first_free_baking_slot = 16 ;
@@ -125,9 +125,9 @@ let constants_encoding =
        and blocks_per_roll_snapshot =
          opt Compare.Int32.(=)
            default.blocks_per_roll_snapshot c.blocks_per_roll_snapshot
-       and voting_period_length =
+       and blocks_per_voting_period =
          opt Compare.Int32.(=)
-           default.voting_period_length c.voting_period_length
+           default.blocks_per_voting_period c.blocks_per_voting_period
        and time_between_blocks =
          opt Compare_time_between_blocks.(=)
            default.time_between_blocks c.time_between_blocks
@@ -166,7 +166,7 @@ let constants_encoding =
            blocks_per_cycle,
            blocks_per_commitment,
            blocks_per_roll_snapshot,
-           voting_period_length,
+           blocks_per_voting_period,
            time_between_blocks,
            first_free_baking_slot,
            endorsers_per_block,
@@ -182,7 +182,7 @@ let constants_encoding =
              blocks_per_cycle,
              blocks_per_commitment,
              blocks_per_roll_snapshot,
-             voting_period_length,
+             blocks_per_voting_period,
              time_between_blocks,
              first_free_baking_slot,
              endorsers_per_block,
@@ -202,8 +202,8 @@ let constants_encoding =
           unopt default.blocks_per_commitment blocks_per_commitment ;
         blocks_per_roll_snapshot =
           unopt default.blocks_per_roll_snapshot blocks_per_roll_snapshot ;
-        voting_period_length =
-          unopt default.voting_period_length voting_period_length ;
+        blocks_per_voting_period =
+          unopt default.blocks_per_voting_period blocks_per_voting_period ;
         time_between_blocks =
           unopt default.time_between_blocks @@
           time_between_blocks ;
@@ -236,7 +236,7 @@ let constants_encoding =
               (opt "blocks_per_cycle" int32)
               (opt "blocks_per_commitment" int32)
               (opt "blocks_per_roll_snapshot" int32)
-              (opt "voting_period_length" int32)
+              (opt "blocks_per_voting_period" int32)
               (opt "time_between_blocks" (list Period_repr.encoding))
               (opt "first_free_baking_slot" uint16)
               (opt "endorsers_per_block" uint16)

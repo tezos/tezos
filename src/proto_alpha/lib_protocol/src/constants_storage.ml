@@ -19,9 +19,9 @@ let blocks_per_commitment c =
 let blocks_per_roll_snapshot c =
   let constants = Raw_context.constants c in
   constants.blocks_per_roll_snapshot
-let voting_period_length c =
+let blocks_per_voting_period c =
   let constants = Raw_context.constants c in
-  constants.voting_period_length
+  constants.blocks_per_voting_period
 let time_between_blocks c =
   let constants = Raw_context.constants c in
   constants.time_between_blocks

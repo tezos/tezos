@@ -72,7 +72,7 @@ let root first_level =
   }
 
 let from_raw
-    ~first_level ~blocks_per_cycle ~voting_period_length
+    ~first_level ~blocks_per_cycle ~blocks_per_voting_period
     ~blocks_per_commitment
     level =
   let raw_level = Raw_level_repr.to_int32 level in
@@ -84,9 +84,9 @@ let from_raw
   let cycle_position = Int32.rem level_position blocks_per_cycle in
   let voting_period =
     Voting_period_repr.of_int32_exn
-      (Int32.div level_position voting_period_length) in
+      (Int32.div level_position blocks_per_voting_period) in
   let voting_period_position =
-    Int32.rem level_position voting_period_length in
+    Int32.rem level_position blocks_per_voting_period in
   let pos = Int32.rem cycle_position blocks_per_commitment in
   let expected_commitment = Compare.Int32.(pos = 0l) in
   { level ; level_position ;
