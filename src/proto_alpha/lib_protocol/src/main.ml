@@ -20,7 +20,8 @@ let max_block_length =
 let validation_passes =
   Updater.[ { max_size = 32 * 1024 ; max_op = Some 32 } ; (* 32kB FIXME *)
             { max_size = 32 * 1024 ; max_op = None } ; (* 32kB FIXME *)
-            { max_size = 32 * 1024 ; max_op = Some 32 } ; (* 32kB FIXME *)
+            { max_size = 32 * 1024 ; (* 32kB FIXME *)
+              max_op = Some Alpha_context.Constants.max_revelations_per_block } ;
             { max_size = 512 * 1024 ; max_op = None } ] (* 512kB *)
 
 let rpc_services = Services_registration.get_rpc_services ()

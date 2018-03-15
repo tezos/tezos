@@ -263,6 +263,7 @@ module Constants : sig
   val block_security_deposit: Tez.t
   val endorsement_security_deposit: Tez.t
   val faucet_credit: Tez.t
+  val max_revelations_per_block: int
 
   val preserved_cycles: context -> int
   val blocks_per_cycle: context -> int32

@@ -44,6 +44,8 @@ let faucet_credit =
 let bootstrap_wealth =
   Tez_repr.(mul_exn one 4_000_000)
 
+let max_revelations_per_block = 32
+
 type constants = {
   preserved_cycles: int ;
   blocks_per_cycle: int32 ;
