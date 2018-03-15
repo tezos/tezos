@@ -271,7 +271,7 @@ module Constants : sig
   val voting_period_length: context -> int32
   val time_between_blocks: context -> Period.t list
   val first_free_baking_slot: context -> int
-  val max_signing_slot: context -> int
+  val endorsers_per_block: context -> int
   val max_gas: context -> int
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Ed25519.Public_key.t

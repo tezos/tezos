@@ -72,13 +72,13 @@ module S = struct
       ~output: (obj1 (req "first_free_baking_slot" uint16))
       RPC_path.(custom_root / "first_free_baking_slot")
 
-  let max_signing_slot =
+  let endorsers_per_block =
     RPC_service.post_service
       ~description: "Max signing slot"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "max_signing_slot" uint16))
-      RPC_path.(custom_root / "max_signing_slot")
+      ~output: (obj1 (req "endorsers_per_block" uint16))
+      RPC_path.(custom_root / "endorsers_per_block")
 
   let max_gas =
     RPC_service.post_service
@@ -130,8 +130,8 @@ let () =
   register0 S.first_free_baking_slot begin fun ctxt () () ->
     return (Constants.first_free_baking_slot ctxt)
   end ;
-  register0 S.max_signing_slot begin fun ctxt () () ->
-    return (Constants.max_signing_slot ctxt)
+  register0 S.endorsers_per_block begin fun ctxt () () ->
+    return (Constants.endorsers_per_block ctxt)
   end ;
   register0 S.max_gas begin fun ctxt () () ->
     return (Constants.max_gas ctxt)
@@ -157,8 +157,8 @@ let time_between_blocks ctxt block =
   RPC_context.make_call0 S.time_between_blocks ctxt block () ()
 let first_free_baking_slot ctxt block =
   RPC_context.make_call0 S.first_free_baking_slot ctxt block () ()
-let max_signing_slot ctxt block =
-  RPC_context.make_call0 S.max_signing_slot ctxt block () ()
+let endorsers_per_block ctxt block =
+  RPC_context.make_call0 S.endorsers_per_block ctxt block () ()
 let max_gas ctxt block =
   RPC_context.make_call0 S.max_gas ctxt block () ()
 let proof_of_work_threshold ctxt block =

@@ -159,8 +159,8 @@ let check_baking_rights c { Block_header.priority ; _ }
 
 let check_endorsements_rights c level slots =
   map_p (fun slot ->
-      fail_unless Compare.Int.(0 <= slot && slot <= Constants.max_signing_slot c)
-        (Invalid_endorsement_slot (Constants.max_signing_slot c, slot)) >>=? fun () ->
+      fail_unless Compare.Int.(0 <= slot && slot <= Constants.endorsers_per_block c)
+        (Invalid_endorsement_slot (Constants.endorsers_per_block c, slot)) >>=? fun () ->
       Roll.endorsement_rights_owner c level ~slot)
     slots >>=? function
   | [] -> fail Empty_endorsement
@@ -220,7 +220,7 @@ let first_baking_priorities
 
 let first_endorsement_slots
     ctxt
-    ?(max_priority = Constants.max_signing_slot ctxt)
+    ?(max_priority = Constants.endorsers_per_block ctxt)
     delegate level =
   endorsement_priorities ctxt level >>=? fun delegate_list ->
   select_delegate delegate delegate_list max_priority
@@ -255,7 +255,7 @@ let check_signature block key =
                                    Ed25519.Public_key.hash key))
 
 let max_fitness_gap ctxt =
-  let slots = Int64.of_int (Constants.max_signing_slot ctxt + 1) in
+  let slots = Int64.of_int (Constants.endorsers_per_block ctxt + 1) in
   Int64.add slots 1L
 
 let check_fitness_gap ctxt (block : Block_header.t) =

@@ -28,9 +28,9 @@ let time_between_blocks c =
 let first_free_baking_slot c =
   let constants = Raw_context.constants c in
   constants.first_free_baking_slot
-let max_signing_slot c =
+let endorsers_per_block c =
   let constants = Raw_context.constants c in
-  constants.max_signing_slot
+  constants.endorsers_per_block
 let max_gas c =
   let constants = Raw_context.constants c in
   constants.max_gas

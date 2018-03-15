@@ -251,7 +251,7 @@ module Endorser = struct
   module I = struct
 
     let default_max_endorsement_priority ctxt arg =
-      let default = Constants.max_signing_slot ctxt in
+      let default = Constants.endorsers_per_block ctxt in
       match arg with
       | None -> default
       | Some m -> m

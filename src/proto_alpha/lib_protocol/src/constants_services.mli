@@ -30,7 +30,7 @@ val time_between_blocks:
 val first_free_baking_slot:
   'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
 
-val max_signing_slot:
+val endorsers_per_block:
   'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
 
 val max_gas:

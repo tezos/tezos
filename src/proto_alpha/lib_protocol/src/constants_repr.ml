@@ -52,7 +52,7 @@ type constants = {
   voting_period_length: int32 ;
   time_between_blocks: Period_repr.t list ;
   first_free_baking_slot: int ;
-  max_signing_slot: int ;
+  endorsers_per_block: int ;
   max_gas: int ;
   proof_of_work_threshold: int64 ;
   bootstrap_keys: Ed25519.Public_key.t list ;
@@ -74,7 +74,7 @@ let default = {
   time_between_blocks =
     List.map Period_repr.of_seconds_exn [ 60L ] ;
   first_free_baking_slot = 16 ;
-  max_signing_slot = 32 ;
+  endorsers_per_block = 32 ;
   max_gas = 40_000 ;
   proof_of_work_threshold =
     Int64.(sub (shift_left 1L 56) 1L) ;
@@ -134,9 +134,9 @@ let constants_encoding =
        and first_free_baking_slot =
          opt Compare.Int.(=)
            default.first_free_baking_slot c.first_free_baking_slot
-       and max_signing_slot =
+       and endorsers_per_block =
          opt Compare.Int.(=)
-           default.max_signing_slot c.max_signing_slot
+           default.endorsers_per_block c.endorsers_per_block
        and max_gas =
          opt Compare.Int.(=)
            default.max_gas c.max_gas
@@ -169,7 +169,7 @@ let constants_encoding =
            voting_period_length,
            time_between_blocks,
            first_free_baking_slot,
-           max_signing_slot,
+           endorsers_per_block,
            max_gas),
          ( proof_of_work_threshold,
            bootstrap_keys,
@@ -185,7 +185,7 @@ let constants_encoding =
              voting_period_length,
              time_between_blocks,
              first_free_baking_slot,
-             max_signing_slot,
+             endorsers_per_block,
              max_gas),
            ( proof_of_work_threshold,
              bootstrap_keys,
@@ -209,8 +209,8 @@ let constants_encoding =
           time_between_blocks ;
         first_free_baking_slot =
           unopt default.first_free_baking_slot first_free_baking_slot ;
-        max_signing_slot =
-          unopt default.max_signing_slot max_signing_slot ;
+        endorsers_per_block =
+          unopt default.endorsers_per_block endorsers_per_block ;
         max_gas =
           unopt default.max_gas max_gas ;
         proof_of_work_threshold =
@@ -239,7 +239,7 @@ let constants_encoding =
               (opt "voting_period_length" int32)
               (opt "time_between_blocks" (list Period_repr.encoding))
               (opt "first_free_baking_slot" uint16)
-              (opt "max_signing_slot" uint16)
+              (opt "endorsers_per_block" uint16)
               (opt "instructions_per_transaction" int31))
            (obj7
               (opt "proof_of_work_threshold" int64)

@@ -88,13 +88,13 @@ module Constants = struct
       ~output: (obj1 (req "first_free_baking_slot" uint16))
       RPC_path.(custom_root / "constants" / "first_free_baking_slot")
 
-  let max_signing_slot custom_root =
+  let endorsers_per_block custom_root =
     RPC_service.post_service
       ~description: "Max signing slot"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "max_signing_slot" uint16))
-      RPC_path.(custom_root / "constants" / "max_signing_slot")
+      ~output: (obj1 (req "endorsers_per_block" uint16))
+      RPC_path.(custom_root / "constants" / "endorsers_per_block")
 
   let max_gas custom_root =
     RPC_service.post_service
