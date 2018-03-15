@@ -58,11 +58,11 @@ module Make (Encoding : ENCODING) : sig
     error : 'error Encoding.t ;
   }
 
-  type registred_service =
+  type registered_service =
     | Service :
         { types : ('q, 'i, 'o, 'e) types ;
           handler : ('q -> 'i -> ('o, 'e) Answer.t Lwt.t) ;
-        } -> registred_service
+        } -> registered_service
 
   (** Dispatch tree *)
   type 'prefix t
@@ -77,7 +77,7 @@ module Make (Encoding : ENCODING) : sig
   (** Resolve a service. *)
   val lookup:
     'prefix directory -> 'prefix ->
-    meth -> string list -> (registred_service, [> lookup_error ]) result Lwt.t
+    meth -> string list -> (registered_service, [> lookup_error ]) result Lwt.t
 
   val allowed_methods:
     'prefix directory -> 'prefix -> string list ->

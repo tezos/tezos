@@ -67,11 +67,11 @@ type ('q, 'i, 'o, 'e) types = ('q, 'i, 'o, 'e) Directory.types = {
   error : 'e Json_encoding.encoding ;
 }
 
-type registred_service = Directory.registred_service =
+type registered_service = Directory.registered_service =
   | Service :
       { types : ('q, 'i, 'o, 'e) types ;
         handler : ('q -> 'i -> ('o, 'e) Answer.t Lwt.t) ;
-      } -> registred_service
+      } -> registered_service
 
 type lookup_error = Directory.lookup_error
 

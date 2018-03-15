@@ -92,7 +92,7 @@ let init_logger ?verbosity (log_config : Node_config_file.log) =
 
 let init_node ?sandbox (config : Node_config_file.t) =
   let patch_context json ctxt =
-    let module Proto = (val Registred_protocol.get_exn genesis.protocol) in
+    let module Proto = (val Registered_protocol.get_exn genesis.protocol) in
     protect begin fun () ->
       Proto.configure_sandbox ctxt json
     end >|= function

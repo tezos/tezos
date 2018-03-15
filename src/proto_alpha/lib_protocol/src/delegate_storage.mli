@@ -30,8 +30,8 @@ val registered: Raw_context.t -> Ed25519.Public_key_hash.t -> bool Lwt.t
 (** Updating the delegate of a contract.
 
     When calling this function on an "implicit contract" this function
-    fails, unless when the registred delegate is the contract manager.
-    In the that case, the manager is now registred as a delegate. One
+    fails, unless when the registered delegate is the contract manager.
+    In the that case, the manager is now registered as a delegate. One
     cannot unregister a delegate for now. The associate contract is
     now 'undeletable'. *)
 val set:
@@ -41,13 +41,13 @@ val set:
 type error +=
   | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
 
-(** Iterate on all registred delegates. *)
+(** Iterate on all registered delegates. *)
 val fold:
   Raw_context.t ->
   init:'a ->
   f:(Ed25519.Public_key_hash.t -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
-(** List all registred delegates. *)
+(** List all registered delegates. *)
 val list: Raw_context.t -> Ed25519.Public_key_hash.t list Lwt.t
 
 (** Various functions to 'freeze' tokens.  A frozen 'deposit' keeps its

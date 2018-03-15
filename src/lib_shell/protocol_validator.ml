@@ -15,7 +15,7 @@ type 'a request =
   | Request_validation: {
       hash: Protocol_hash.t ;
       protocol: Protocol.t ;
-    } -> Registred_protocol.t tzresult request
+    } -> Registered_protocol.t tzresult request
 
 type message = Message: 'a request * 'a Lwt.u option -> message
 
@@ -50,7 +50,7 @@ let rec worker_loop bv =
             return ()
         | Some wakener ->
             if valid then
-              match Registred_protocol.get hash with
+              match Registered_protocol.get hash with
               | Some protocol ->
                   Lwt.wakeup_later wakener (Ok protocol)
               | None ->
@@ -97,7 +97,7 @@ let shutdown { canceler ; worker } =
   worker
 
 let validate { messages } hash protocol =
-  match Registred_protocol.get hash with
+  match Registered_protocol.get hash with
   | Some protocol ->
       lwt_debug "previously validated protocol %a (before pipe)"
         Protocol_hash.pp_short hash >>= fun () ->
@@ -112,7 +112,7 @@ let validate { messages } hash protocol =
       res
 
 let fetch_and_compile_protocol pv ?peer ?timeout hash =
-  match Registred_protocol.get hash with
+  match Registered_protocol.get hash with
   | Some proto -> return proto
   | None ->
       begin
