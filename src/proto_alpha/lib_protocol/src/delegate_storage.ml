@@ -10,6 +10,8 @@
 type error +=
   | Non_delegatable_contract of Contract_repr.contract (* `Permanent *)
   | No_deletion of Ed25519.Public_key_hash.t (* `Permanent *)
+  | Active_delegate (* `Temporary *)
+  | Current_delegate (* `Temporary *)
 
 let () =
   register_error_kind
@@ -108,6 +110,18 @@ let set c contract delegate =
       else if not (delegatable || self_delegation) then
         fail (Non_delegatable_contract contract)
       else
+        begin
+          Storage.Contract.Delegate.get_option c contract >>=? function
+          | Some current_delegate
+            when Ed25519.Public_key_hash.equal delegate current_delegate ->
+              if self_delegation then
+                Storage.Contract.Inactive_delegate.mem c contract >>= function
+                | true -> return ()
+                | false -> fail Active_delegate
+              else
+                fail Current_delegate
+          | None | Some _ -> return ()
+        end >>=? fun () ->
         Storage.Contract.Balance.get c contract >>=? fun balance ->
         unlink c contract balance >>=? fun c ->
         Storage.Contract.Delegate.init_set c contract delegate >>= fun c ->
