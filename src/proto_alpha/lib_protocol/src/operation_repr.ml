@@ -433,10 +433,10 @@ let parse (op: Operation.t) =
 
 let acceptable_passes op =
   match op.contents with
-  | Anonymous_operations _
   | Sourced_operations (Consensus_operation _) -> [0]
   | Sourced_operations (Amendment_operation _ | Dictator_operation _) -> [1]
-  | Sourced_operations (Manager_operations _) -> [2]
+  | Anonymous_operations _ -> [2]
+  | Sourced_operations (Manager_operations _) -> [3]
 
 type error += Invalid_signature (* `Permanent *)
 type error += Missing_signature (* `Permanent *)
