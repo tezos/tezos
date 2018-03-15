@@ -17,7 +17,6 @@ type raw = Operation.t = {
 val raw_encoding: raw Data_encoding.t
 
 type operation = {
-  hash: Operation_hash.t ;
   shell: Operation.shell_header ;
   contents: proto_operation ;
   signature: Ed25519.Signature.t option ;
@@ -97,9 +96,9 @@ type error += Cannot_parse_operation (* `Branch *)
 val encoding: operation Data_encoding.t
 
 val hash_raw: raw -> Operation_hash.t
+val hash: operation -> Operation_hash.t
 
-val parse:
-  Operation_hash.t -> Operation.t -> operation tzresult
+val parse: Operation.t -> operation tzresult
 
 val acceptable_passes: operation -> int list
 

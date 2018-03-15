@@ -122,12 +122,8 @@ let main_of_proto (src: Helpers_account.t) operation_header protocol_operation =
 
 let apply_of_proto
     (source: Helpers_account.t option) operation_header protocol_operation =
-  let (proto, signature) = sign source operation_header protocol_operation in
-  let data_operation: Tezos_base.Operation.t =
-    {shell = operation_header ; proto} in
-  let hash = Tezos_base.Operation.hash data_operation in
+  let (_proto, signature) = sign source operation_header protocol_operation in
   {
-    hash ;
     shell = operation_header ;
     contents = protocol_operation ;
     signature

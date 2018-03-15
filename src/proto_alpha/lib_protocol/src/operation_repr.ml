@@ -17,7 +17,6 @@ type raw = Operation.t = {
 let raw_encoding = Operation.encoding
 
 type operation = {
-  hash: Operation_hash.t ;
   shell: Operation.shell_header ;
   contents: proto_operation ;
   signature: Ed25519.Signature.t option ;
@@ -356,15 +355,13 @@ type error += Cannot_parse_operation
 let encoding =
   let open Data_encoding in
   conv
-    (fun { hash ; shell ; contents ; signature } ->
-       (hash, (shell, (contents, signature))))
-    (fun (hash, (shell, (contents, signature))) ->
-       { hash ; shell ; contents ; signature })
+    (fun { shell ; contents ; signature } ->
+       (shell, (contents, signature)))
+    (fun (shell, (contents, signature)) ->
+       { shell ; contents ; signature })
     (merge_objs
-       (obj1 (req "hash" Operation_hash.encoding))
-       (merge_objs
-          Operation.shell_header_encoding
-          Encoding.signed_proto_operation_encoding))
+       Operation.shell_header_encoding
+       Encoding.signed_proto_operation_encoding)
 
 let () =
   register_error_kind
@@ -379,12 +376,12 @@ let () =
     (function Cannot_parse_operation -> Some () | _ -> None)
     (fun () -> Cannot_parse_operation)
 
-let parse hash (op: Operation.t) =
+let parse (op: Operation.t) =
   match Data_encoding.Binary.of_bytes
           Encoding.signed_proto_operation_encoding
           op.proto with
   | Some (contents, signature) ->
-      ok { hash ; shell = op.shell ; contents ; signature }
+      ok { shell = op.shell ; contents ; signature }
   | None -> error Cannot_parse_operation
 
 let acceptable_passes op =
@@ -425,7 +422,7 @@ let forge shell proto =
   Data_encoding.Binary.to_bytes
     Encoding.unsigned_operation_encoding (shell, proto)
 
-let check_signature key { shell ; contents ; signature }  =
+let check_signature key { shell ; contents ; signature } =
   match contents, signature with
   | Anonymous_operations _, _ -> return ()
   | Sourced_operations _, None ->
@@ -444,6 +441,12 @@ let parse_proto bytes =
   | Some (proto, signature) -> return (proto, signature)
   | None -> fail Cannot_parse_operation
 
-include Encoding
-
 let hash_raw = Operation.hash
+let hash o =
+  let proto =
+    Data_encoding.Binary.to_bytes
+      Encoding.signed_proto_operation_encoding
+      (o.contents, o.signature) in
+  Operation.hash { shell = o.shell ; proto }
+
+include Encoding

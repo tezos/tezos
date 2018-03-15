@@ -568,7 +568,6 @@ module Vote : sig
 end
 
 type operation = {
-  hash: Operation_hash.t ;
   shell: Operation.shell_header ;
   contents: proto_operation ;
   signature: signature option ;
@@ -654,10 +653,11 @@ module Operation : sig
   type t = operation
   val encoding: operation Data_encoding.t
 
+  val hash: operation -> Operation_hash.t
   val hash_raw: raw -> Operation_hash.t
 
   type error += Cannot_parse_operation (* `Branch *)
-  val parse: Operation_hash.t -> Operation.t -> operation tzresult
+  val parse: Operation.t -> operation tzresult
   val acceptable_passes: operation -> int list
 
   val parse_proto:

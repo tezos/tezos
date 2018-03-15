@@ -305,10 +305,10 @@ let apply_anonymous_operation ctxt delegate origination_nonce kind =
         fail Too_many_faucet
 
 let apply_operation
-    ctxt delegate pred_block block_prio operation =
+    ctxt delegate pred_block block_prio hash operation =
   match operation.contents with
   | Anonymous_operations ops ->
-      let origination_nonce = Contract.initial_origination_nonce operation.hash in
+      let origination_nonce = Contract.initial_origination_nonce hash in
       fold_left_s
         (fun (ctxt, origination_nonce, fees, rewards) op ->
            apply_anonymous_operation ctxt delegate origination_nonce op
@@ -321,7 +321,7 @@ let apply_operation
       return (ctxt, Contract.originated_contracts origination_nonce, None,
               fees, rewards)
   | Sourced_operations op ->
-      let origination_nonce = Contract.initial_origination_nonce operation.hash in
+      let origination_nonce = Contract.initial_origination_nonce hash in
       apply_sourced_operation
         ctxt pred_block block_prio
         operation origination_nonce op >>=? fun (ctxt, origination_nonce, err,

@@ -13,11 +13,13 @@ let operation
     ~tc ?(baker: Helpers_account.t option) ?(src: Helpers_account.t option)
     pred_block_hash op_sh proto_op =
   return @@ Helpers_operation.apply_of_proto src op_sh proto_op >>=? fun operation ->
+  let hash = Proto_alpha.Alpha_context.Operation.hash operation in
   Proto_alpha.Apply.apply_operation
     tc
     (Option.map ~f:(fun x -> x.Helpers_account.hpub) baker)
     pred_block_hash
     0
+    hash
     operation >>=? fun (tc, contracts, err, _fees, _rewards) ->
   return ((contracts, err), tc)
 

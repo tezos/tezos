@@ -98,8 +98,7 @@ let classify_operations (ops: Operation.raw list) =
   let t = Array.make (List.length Proto_alpha.Main.validation_passes) [] in
   List.iter
     (fun op ->
-       let h = Operation.hash_raw op in
-       match Operation.parse h op with
+       match Operation.parse op with
        | Ok o ->
            List.iter
              (fun pass -> t.(pass) <- op :: t.(pass))

@@ -11,7 +11,7 @@
 
 type operation = Alpha_context.operation
 
-let parse_operation = Alpha_context.Operation.parse
+let parse_operation _hash op = Alpha_context.Operation.parse op
 let acceptable_passes = Alpha_context.Operation.acceptable_passes
 
 let max_block_length =
@@ -118,7 +118,8 @@ let apply_operation ({ mode ; ctxt ; op_count ; _ } as data) operation =
         predecessor,
         protocol_data.priority,
         Some baker in
-  Apply.apply_operation ctxt baker pred_block block_prio operation
+  Apply.apply_operation ctxt baker pred_block block_prio
+    (Alpha_context.Operation.hash operation) operation
   >>=? fun (ctxt, _contracts, _ignored_script_error, fees, rewards) ->
   let op_count = op_count + 1 in
   Lwt.return Alpha_context.Tez.(fees >>? (+?) data.fees) >>=? fun fees ->
