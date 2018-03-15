@@ -73,13 +73,15 @@ module Make_minimal (K : Name) = struct
   let read src off = of_bytes_exn @@ MBytes.sub src off size
   let write dst off h = MBytes.blit (to_bytes h) 0 dst off size
 
-  let hash_bytes l =
-    let state = Blake2b.init size in
+  let hash_bytes ?key l =
+    let key = Option.map ~f:Cstruct.of_bigarray key in
+    let state = Blake2b.init ?key size in
     List.iter (fun b -> Blake2b.update state (Cstruct.of_bigarray b)) l ;
     Blake2b.final state
 
-  let hash_string l =
-    let state = Blake2b.init size in
+  let hash_string ?key l =
+    let key = Option.map ~f:Cstruct.of_string key in
+    let state = Blake2b.init ?key size in
     List.iter (fun s -> Blake2b.update state (Cstruct.of_string s)) l ;
     Blake2b.final state
 

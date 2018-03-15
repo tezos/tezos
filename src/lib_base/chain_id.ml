@@ -16,8 +16,8 @@ module Raw = struct
 
   let extract bh =
     MBytes.substring (Block_hash.to_bytes bh) 0 4
-  let hash_bytes l = extract (Block_hash.hash_bytes l)
-  let hash_string l = extract (Block_hash.hash_string l)
+  let hash_bytes ?key l = extract (Block_hash.hash_bytes ?key l)
+  let hash_string ?key l = extract (Block_hash.hash_string ?key l)
 
   let size = 4
 

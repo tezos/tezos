@@ -23,8 +23,8 @@ module type MINIMAL_HASH = sig
   val name: string
   val title: string
 
-  val hash_bytes: Cstruct.buffer list -> t
-  val hash_string: string list -> t
+  val hash_bytes: ?key:Cstruct.buffer -> Cstruct.buffer list -> t
+  val hash_string: ?key:string -> string list -> t
   val size: int (* in bytes *)
   val compare: t -> t -> int
   val equal: t -> t -> bool
