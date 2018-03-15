@@ -219,6 +219,9 @@ let unfreeze ctxt delegate cycle =
   Lwt.return Tez_repr.(balance +? rewards) >>=? fun balance ->
   Storage.Contract.Balance.set ctxt contract balance >>=? fun ctxt ->
   Roll_storage.Delegate.add_amount ctxt delegate rewards >>=? fun ctxt ->
+  Storage.Contract.Frozen_bonds.remove (ctxt, contract) cycle >>= fun ctxt ->
+  Storage.Contract.Frozen_fees.remove (ctxt, contract) cycle >>= fun ctxt ->
+  Storage.Contract.Frozen_rewards.remove (ctxt, contract) cycle >>= fun ctxt ->
   return ctxt
 
 let cycle_end ctxt last_cycle unrevealed =
