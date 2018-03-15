@@ -74,5 +74,3 @@ val delegate_pubkey:
 
 val get_contract_delegate:
   Raw_context.t -> Contract_repr.t -> Ed25519.Public_key_hash.t option tzresult Lwt.t
-
-val value: Raw_context.t -> Tez_repr.t

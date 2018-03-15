@@ -16,7 +16,6 @@ type t = {
   level: Level_repr.t ;
   timestamp: Time.t ;
   fitness: Int64.t ;
-  faucet_count: int;
   endorsements_received: Int_set.t;
 }
 
@@ -27,14 +26,12 @@ let current_level ctxt = ctxt.level
 let current_timestamp ctxt = ctxt.timestamp
 let current_fitness ctxt = ctxt.fitness
 let first_level ctxt = ctxt.first_level
-let faucet_count ctxt = ctxt.faucet_count
 let constants ctxt = ctxt.constants
 let recover ctxt = ctxt.context
 
 let record_endorsement ctxt k = { ctxt with endorsements_received = Int_set.add k ctxt.endorsements_received }
 let endorsement_already_recorded ctxt k = Int_set.mem k ctxt.endorsements_received
 
-let incr_faucet_count ctxt = { ctxt with faucet_count = ctxt.faucet_count + 1 }
 let set_current_fitness ctxt fitness = { ctxt with fitness }
 
 type storage_error =
@@ -211,8 +208,8 @@ let prepare ~level ~timestamp ~fitness ctxt =
       ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
       level in
   return ({ context = ctxt ; constants ; level ;
-            faucet_count = 0 ; endorsements_received = Int_set.empty ;
             timestamp ; fitness ; first_level ;
+            endorsements_received = Int_set.empty ;
           },
           first_block)
 
@@ -231,7 +228,6 @@ let register_resolvers enc resolve =
       level =  Level_repr.root Raw_level_repr.root ;
       timestamp = Time.of_seconds 0L ;
       fitness = 0L ;
-      faucet_count = 0 ;
       endorsements_received = Int_set.empty ;
     } in
     resolve faked_context str in

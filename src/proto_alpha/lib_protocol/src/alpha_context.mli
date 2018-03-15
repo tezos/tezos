@@ -769,9 +769,3 @@ val fork_test_chain: context -> Protocol_hash.t -> Time.t -> context Lwt.t
 
 val endorsement_already_recorded: context -> int -> bool
 val record_endorsement: context -> int -> context
-
-(**/**)
-
-(* HACK alphanet *)
-val faucet_count: context -> int
-val incr_faucet_count: context -> context

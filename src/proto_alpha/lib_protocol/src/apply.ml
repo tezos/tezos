@@ -15,7 +15,6 @@ type error += Wrong_voting_period of Voting_period.t * Voting_period.t (* `Tempo
 type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t (* `Temporary *)
 type error += Duplicate_endorsement of int (* `Branch *)
 type error += Bad_contract_parameter of Contract.t * Script.expr option * Script.expr option (* `Permanent *)
-type error += Too_many_faucet
 type error += Invalid_endorsement_level
 type error += Invalid_commitment of { expected: bool }
 
@@ -87,17 +86,6 @@ let () =
     Data_encoding.(obj1 (req "slot" uint16))
     (function Duplicate_endorsement k -> Some k | _ -> None)
     (fun k -> Duplicate_endorsement k);
-  register_error_kind
-    `Temporary
-    ~id:"operation.too_many_faucet"
-    ~title:"Too many faucet"
-    ~description:"Trying to include a faucet operation in a block \
-                 \ with more than 5 faucet operations."
-    ~pp:(fun ppf () ->
-        Format.fprintf ppf "Too many faucet operation.")
-    Data_encoding.unit
-    (function Too_many_faucet -> Some () | _ -> None)
-    (fun () -> Too_many_faucet) ;
   register_error_kind
     `Temporary
     ~id:"operation.invalid_endorsement_level"
@@ -556,16 +544,11 @@ let apply_anonymous_operation ctxt delegate origination_nonce kind =
         | Error _ -> Tez.zero in
       return (ctxt, origination_nonce, Tez.zero, reward)
   | Faucet { id = manager ; _ } ->
-      (* Free tez for all! *)
-      if Compare.Int.(faucet_count ctxt < 5) then
-        let ctxt = incr_faucet_count ctxt in
-        Contract.originate ctxt
-          origination_nonce
-          ~manager ~delegate ~balance:Constants.faucet_credit ?script:None
-          ~spendable:true ~delegatable:true >>=? fun (ctxt, _, origination_nonce) ->
-        return (ctxt, origination_nonce, Tez.zero, Tez.zero)
-      else
-        fail Too_many_faucet
+      Contract.originate ctxt
+        origination_nonce
+        ~manager ~delegate ~balance:Constants.faucet_credit ?script:None
+        ~spendable:true ~delegatable:true >>=? fun (ctxt, _, origination_nonce) ->
+      return (ctxt, origination_nonce, Tez.zero, Tez.zero)
 
 let apply_operation
     ctxt delegate pred_block block_prio hash operation =

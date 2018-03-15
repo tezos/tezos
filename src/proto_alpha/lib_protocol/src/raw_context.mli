@@ -138,8 +138,3 @@ include T with type t := t and type context := context
 val record_endorsement: context -> int -> context
 val endorsement_already_recorded: context -> int -> bool
 
-
-(** HACK alphanet *)
-val double_roll_value: context -> int -> context tzresult Lwt.t
-val faucet_count: context -> int
-val incr_faucet_count: context -> context
