@@ -57,7 +57,6 @@ type constants = {
   proof_of_work_threshold: int64 ;
   bootstrap_keys: Ed25519.Public_key.t list ;
   dictator_pubkey: Ed25519.Public_key.t ;
-  max_number_of_operations: int list ;
   max_operation_data_length: int ;
   token_per_rolls: Tez_repr.t ;
   michelson_maximum_type_size: int;
@@ -89,8 +88,6 @@ let default = {
   dictator_pubkey =
     read_public_key
       "4d5373455738070434f214826d301a1c206780d7f789fcbf94c2149b2e0718cc" ;
-  max_number_of_operations =
-    [ 300 ] ;
   max_operation_data_length =
     16 * 1024 ; (* 16kB *)
   token_per_rolls =
@@ -149,9 +146,6 @@ let constants_encoding =
        and dictator_pubkey =
          opt Ed25519.Public_key.(=)
            default.dictator_pubkey c.dictator_pubkey
-       and max_number_of_operations =
-         opt CompareListInt.(=)
-           default.max_number_of_operations c.max_number_of_operations
        and max_operation_data_length =
          opt Compare.Int.(=)
            default.max_operation_data_length c.max_operation_data_length
@@ -174,7 +168,6 @@ let constants_encoding =
          ( proof_of_work_threshold,
            bootstrap_keys,
            dictator_pubkey,
-           max_number_of_operations,
            max_operation_data_length,
            token_per_rolls,
            michelson_maximum_type_size)), ()) )
@@ -190,7 +183,6 @@ let constants_encoding =
            ( proof_of_work_threshold,
              bootstrap_keys,
              dictator_pubkey,
-             max_number_of_operations,
              max_operation_data_length,
              token_per_rolls,
              michelson_maximum_type_size)), ()) ->
@@ -219,8 +211,6 @@ let constants_encoding =
           unopt default.bootstrap_keys bootstrap_keys ;
         dictator_pubkey =
           unopt default.dictator_pubkey dictator_pubkey ;
-        max_number_of_operations =
-          unopt default.max_number_of_operations max_number_of_operations ;
         max_operation_data_length =
           unopt default.max_operation_data_length max_operation_data_length ;
         token_per_rolls =
@@ -241,12 +231,11 @@ let constants_encoding =
               (opt "first_free_baking_slot" uint16)
               (opt "endorsers_per_block" uint16)
               (opt "instructions_per_transaction" int31))
-           (obj7
+           (obj6
               (opt "proof_of_work_threshold" int64)
               (opt "bootstrap_keys" (list Ed25519.Public_key.encoding))
               (opt "dictator_pubkey" Ed25519.Public_key.encoding)
-              (opt "max_number_of_operations" (list uint16))
-              (opt "max_number_of_operations" int31)
+              (opt "max_operation_data_length" int31)
               (opt "token_per_rolls" Tez_repr.encoding)
               (opt "michelson_maximum_type_size" uint16)
            ))

@@ -40,9 +40,6 @@ let proof_of_work_threshold c =
 let dictator_pubkey c =
   let constants = Raw_context.constants c in
   constants.dictator_pubkey
-let max_number_of_operations c =
-  let constants = Raw_context.constants c in
-  constants.max_number_of_operations
 let max_operation_data_length c =
   let constants = Raw_context.constants c in
   constants.max_operation_data_length

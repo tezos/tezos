@@ -275,7 +275,6 @@ module Constants : sig
   val max_gas: context -> int
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Ed25519.Public_key.t
-  val max_number_of_operations: context -> int list
   val max_operation_data_length: context -> int
   val token_per_rolls: context -> Tez.t
   val michelson_maximum_type_size: context -> int
