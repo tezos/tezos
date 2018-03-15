@@ -72,9 +72,9 @@ module Contract = struct
          (struct let name = ["frozen_balance"] end))
       (Cycle_repr.Index)
 
-  module Frozen_bonds =
+  module Frozen_deposits =
     Frozen_balance_index.Make_map
-      (struct let name = ["bonds"] end)
+      (struct let name = ["deposits"] end)
       (Make_value(Tez_repr))
 
   module Frozen_fees =
@@ -206,7 +206,7 @@ module Cycle = struct
   type unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
     delegate: Ed25519.Public_key_hash.t ;
-    bond: Tez_repr.t ;
+    deposit: Tez_repr.t ;
     rewards: Tez_repr.t ;
     fees: Tez_repr.t ;
   }
@@ -226,11 +226,11 @@ module Cycle = struct
            Tez_repr.encoding
            Tez_repr.encoding)
         (function
-          | Unrevealed { nonce_hash ; delegate ; bond ; rewards ; fees } ->
-              Some (nonce_hash, delegate, bond, rewards, fees)
+          | Unrevealed { nonce_hash ; delegate ; deposit ; rewards ; fees } ->
+              Some (nonce_hash, delegate, deposit, rewards, fees)
           | _ -> None)
-        (fun (nonce_hash, delegate, bond, rewards, fees) ->
-           Unrevealed { nonce_hash ; delegate ; bond ; rewards ; fees }) ;
+        (fun (nonce_hash, delegate, deposit, rewards, fees) ->
+           Unrevealed { nonce_hash ; delegate ; deposit ; rewards ; fees }) ;
       case (Tag 1)
         Seed_repr.nonce_encoding
         (function
@@ -395,7 +395,7 @@ module Seed = struct
   type unrevealed_nonce = Cycle.unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
     delegate: Ed25519.Public_key_hash.t ;
-    bond: Tez_repr.t ;
+    deposit: Tez_repr.t ;
     rewards: Tez_repr.t ;
     fees: Tez_repr.t ;
   }

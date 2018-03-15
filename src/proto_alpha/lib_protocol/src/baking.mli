@@ -15,8 +15,8 @@ type error += Invalid_fitness_gap of int64 * int64 (* `Permanent *)
 type error += Invalid_endorsement_slot of int * int (* `Permanent *)
 type error += Timestamp_too_early of Timestamp.t * Timestamp.t (* `Permanent *)
 type error += Inconsistent_endorsement of public_key_hash list (* `Permanent *)
-type error += Cannot_freeze_baking_bond (* `Permanent *)
-type error += Cannot_freeze_endorsement_bond (* `Permanent *)
+type error += Cannot_freeze_baking_deposit (* `Permanent *)
+type error += Cannot_freeze_endorsement_deposit (* `Permanent *)
 type error += Invalid_block_signature of Block_hash.t * Ed25519.Public_key_hash.t (* `Permanent *)
 
 val paying_priorities: context -> int list
@@ -28,34 +28,34 @@ val paying_priorities: context -> int list
     time cannot be computed. *)
 val minimal_time: context -> int -> Time.t -> Time.t tzresult Lwt.t
 
-(** [freeze_baking_bond: ctxt delegate priority]
-    Freeze the baking bond (See !Constants.block_security_deposit)
-    from a delegate account. No bond is frozen if the baking
+(** [freeze_baking_deposit: ctxt delegate priority]
+    Freeze the baking deposit (See !Constants.block_security_deposit)
+    from a delegate account. No deposit is frozen if the baking
     priority of this block is greater than the maximum number
     of paying baking in the network (meaning that n. bakers
     skipped their turn).
 
     Raise an error if the delegate account does not have enough
     funds to claim baking rights. *)
-val freeze_baking_bond:
+val freeze_baking_deposit:
   context ->
   Block_header.protocol_data ->
   public_key_hash ->
   (context * Tez.t) tzresult Lwt.t
 
-(** [freeze_endorsement_bond: ctxt delegate]
-    Freeze the endorsement bond (See !Constants.endorsement_security_deposit)
+(** [freeze_endorsement_deposit: ctxt delegate]
+    Freeze the endorsement deposit (See !Constants.endorsement_security_deposit)
     from the delegate account.
 
     Raise an error if the baker account does not have enough
     funds to claim endorsement rights *)
-val freeze_endorsement_bond:
+val freeze_endorsement_deposit:
   context -> public_key_hash -> context tzresult Lwt.t
 
 (** [check_baking_rights ctxt block pred_timestamp] verifies that:
     * the contract that owned the roll at cycle start has the block signer as delegate.
     * the timestamp is coherent with the announced slot.
-    * the bond have been payed if the slot is below [Constants.first_free_baking_slot].
+    * the deposit have been payed if the slot is below [Constants.first_free_baking_slot].
 *)
 val check_baking_rights:
   context -> Block_header.protocol_data -> Time.t ->

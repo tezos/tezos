@@ -27,7 +27,7 @@ type validation_state =
   { mode : validation_mode ;
     ctxt : Alpha_context.t ;
     op_count : int ;
-    bond : Alpha_context.Tez.t ;
+    deposit : Alpha_context.Tez.t ;
     fees : Alpha_context.Tez.t ;
     rewards : Alpha_context.Tez.t ;
   }

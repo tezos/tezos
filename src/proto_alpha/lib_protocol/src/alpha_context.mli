@@ -356,7 +356,7 @@ module Nonce : sig
   type unrevealed = {
     nonce_hash: Nonce_hash.t ;
     delegate: public_key_hash ;
-    bond: Tez.t ;
+    deposit: Tez.t ;
     rewards: Tez.t ;
     fees: Tez.t ;
   }
@@ -495,7 +495,7 @@ module Delegate : sig
 
   val list: context -> public_key_hash list Lwt.t
 
-  val freeze_bond:
+  val freeze_deposit:
     context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
 
   val freeze_rewards:

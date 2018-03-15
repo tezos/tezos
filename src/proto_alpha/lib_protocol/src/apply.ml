@@ -308,7 +308,7 @@ let apply_consensus_operation_content ctxt
       Operation.check_signature delegate operation >>=? fun () ->
       let delegate = Ed25519.Public_key.hash delegate in
       let ctxt = Fitness.increase ~gap:(List.length slots) ctxt in
-      Baking.freeze_endorsement_bond ctxt delegate >>=? fun ctxt ->
+      Baking.freeze_endorsement_deposit ctxt delegate >>=? fun ctxt ->
       Baking.endorsement_reward ~block_priority >>=? fun reward ->
       Delegate.freeze_rewards ctxt delegate reward >>=? fun ctxt ->
       return ctxt
@@ -603,9 +603,9 @@ let begin_full_construction ctxt pred_timestamp protocol_data =
   Baking.check_baking_rights
     ctxt protocol_data pred_timestamp >>=? fun delegate_pk ->
   let delegate_pkh = Ed25519.Public_key.hash delegate_pk in
-  Baking.freeze_baking_bond ctxt protocol_data delegate_pkh >>=? fun (ctxt, bond) ->
+  Baking.freeze_baking_deposit ctxt protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, protocol_data, delegate_pk, bond)
+  return (ctxt, protocol_data, delegate_pk, deposit)
 
 let begin_partial_construction ctxt =
   let ctxt = Fitness.increase ctxt in
@@ -627,12 +627,12 @@ let begin_application ctxt block_header pred_timestamp =
     (Invalid_commitment
        { expected = current_level.expected_commitment }) >>=? fun () ->
   let delegate_pkh = Ed25519.Public_key.hash delegate_pk in
-  Baking.freeze_baking_bond ctxt
-    block_header.protocol_data delegate_pkh >>=? fun (ctxt, bond) ->
+  Baking.freeze_baking_deposit ctxt
+    block_header.protocol_data delegate_pkh >>=? fun (ctxt, deposit) ->
   let ctxt = Fitness.increase ctxt in
-  return (ctxt, delegate_pk, bond)
+  return (ctxt, delegate_pk, deposit)
 
-let finalize_application ctxt protocol_data delegate bond fees rewards =
+let finalize_application ctxt protocol_data delegate deposit fees rewards =
   (* end of level (from this point nothing should fail) *)
   Lwt.return Tez.(rewards +? Constants.block_reward) >>=? fun rewards ->
   Delegate.freeze_fees ctxt delegate fees >>=? fun ctxt ->
@@ -642,7 +642,7 @@ let finalize_application ctxt protocol_data delegate bond fees rewards =
     | None -> return ctxt
     | Some nonce_hash ->
         Nonce.record_hash ctxt
-          { nonce_hash ; delegate ; bond ; rewards ; fees }
+          { nonce_hash ; delegate ; deposit ; rewards ; fees }
   end >>=? fun ctxt ->
   (* end of cycle *)
   may_snapshot_roll ctxt >>=? fun ctxt ->

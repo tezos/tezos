@@ -107,7 +107,7 @@ let test_endorsement_rewards block0 =
     done ;
     return (!account, !cpt) in
 
-  let bond = Tez.to_mutez Constants.endorsement_security_deposit in
+  let deposit = Tez.to_mutez Constants.endorsement_security_deposit in
 
   (* Endorsement Rights *)
   (* #1 endorse & inject in a block *)
@@ -118,7 +118,7 @@ let test_endorsement_rewards block0 =
   Helpers.Baking.bake block0 b1 [ op ] >>=? fun hash1 ->
   Helpers.display_level (`Hash hash1) >>=? fun () ->
   Assert.balance_equal ~block:(`Hash hash1) ~msg:__LOC__ account0
-    (Int64.sub (Tez.to_mutez balance0) bond) >>=? fun () ->
+    (Int64.sub (Tez.to_mutez balance0) deposit) >>=? fun () ->
 
   (* #2 endorse & inject in a block  *)
   let block1 = `Hash hash1 in
@@ -129,7 +129,7 @@ let test_endorsement_rewards block0 =
   Helpers.Baking.bake block1 b1 [ op ] >>=? fun hash2 ->
   Helpers.display_level (`Hash hash2) >>=? fun () ->
   Assert.balance_equal ~block:(`Hash hash2) ~msg:__LOC__ account1
-    (Int64.sub (Tez.to_mutez balance1) bond) >>=? fun () ->
+    (Int64.sub (Tez.to_mutez balance1) deposit) >>=? fun () ->
 
   (*
   (* Check rewards after one cycle for account0 *)

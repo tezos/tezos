@@ -102,7 +102,7 @@ module Contract : sig
      and type t := Raw_context.t
 
   (** Frozen balance, see 'delegate_storage.mli' for more explanation *)
-  module Frozen_bonds : Indexed_data_storage
+  module Frozen_deposits : Indexed_data_storage
     with type key = Cycle_repr.t
      and type value = Tez_repr.t
      and type t = Raw_context.t * Contract_repr.t
@@ -236,7 +236,7 @@ module Seed : sig
   type unrevealed_nonce = {
     nonce_hash: Nonce_hash.t ;
     delegate: Ed25519.Public_key_hash.t ;
-    bond: Tez_repr.t ;
+    deposit: Tez_repr.t ;
     rewards: Tez_repr.t ;
     fees: Tez_repr.t ;
   }

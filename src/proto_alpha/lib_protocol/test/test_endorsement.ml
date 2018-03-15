@@ -57,13 +57,13 @@ let test_endorsement_payment () =
       @@ List.nth endorsers endorser_slot in
     Contract.get_balance tc (Contract.implicit_contract contract_p.hpub) >>=? fun init_balance ->
 
-    (* After one block, endorsement bond cost should be paid *)
+    (* After one block, endorsement deposit cost should be paid *)
     Block.endorsement
       root.tezos_header.shell root.hash
       root.level block_priority contract_p
       root.validation.context endorser_slot
     >>=? fun result ->
-    get_balance_res contract_p result >>=? fun bond_balance ->
+    get_balance_res contract_p result >>=? fun deposit_balance ->
     let protocol_data = Block.get_protocol_data block_priority in
     Proto_alpha.Baking.check_baking_rights
       result.tezos_context protocol_data root.tezos_header.shell.timestamp
@@ -78,7 +78,7 @@ let test_endorsement_payment () =
       else Tez.zero in
     let cost = Cast.tez_add endorsement_security_deposit block_security_deposit in
     let expected_balance = Cast.tez_sub init_balance cost in
-    Assert.equal_tez ~msg: __LOC__ expected_balance bond_balance ;
+    Assert.equal_tez ~msg: __LOC__ expected_balance deposit_balance ;
     (* After one cycle, (4 blocks in test/proto_alpha/sandbox),
        endorsement reward sould be received *)
     chain_empty_block result >>=? chain_empty_block >>=?

@@ -50,11 +50,11 @@ val fold:
 (** List all registred delegates. *)
 val list: Raw_context.t -> Ed25519.Public_key_hash.t list Lwt.t
 
-(** Various functions to 'freeze' tokens.  A frozen 'bond' keeps its
+(** Various functions to 'freeze' tokens.  A frozen 'deposit' keeps its
     associated rolls. When frozen, 'fees' may trigger new rolls
     allocation. Rewards won't trigger new rolls allocation until
     unfrozen. *)
-val freeze_bond:
+val freeze_deposit:
   Raw_context.t -> Ed25519.Public_key_hash.t -> Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
@@ -67,14 +67,14 @@ val freeze_rewards:
   Raw_context.t tzresult Lwt.t
 
 (** Trigger the context maintenance at the end of cycle 'n', i.e.:
-    unfroze bond/fees/rewards from 'n - preserved_cycle' ; punish the
+    unfroze deposit/fees/rewards from 'n - preserved_cycle' ; punish the
     provided unrevealed seeds (tipically seed from from cycle 'n -
     1'). *)
 val cycle_end:
   Raw_context.t -> Cycle_repr.t -> Nonce_storage.unrevealed list ->
   Raw_context.t tzresult Lwt.t
 
-(** Burn all then frozen bond/fees/rewards for a delegate at a given
+(** Burn all then frozen deposit/fees/rewards for a delegate at a given
     cycle. Returns the burned amount. *)
 val punish:
   Raw_context.t -> Ed25519.Public_key_hash.t -> Cycle_repr.t ->

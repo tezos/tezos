@@ -86,7 +86,7 @@ let source_arg =
   arg
     ~long:"source"
     ~placeholder:"identity"
-    ~doc:"source of the bonds to be paid\n\
+    ~doc:"source of the deposits to be paid\n\
           Must be a known identity."
     string_parameter
 
