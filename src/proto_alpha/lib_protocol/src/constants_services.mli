@@ -24,9 +24,6 @@ val blocks_per_commitment:
 val block_per_roll_snapshot:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
-val time_before_reward:
-  'a #RPC_context.simple -> 'a -> Period.t shell_tzresult Lwt.t
-
 val slot_durations:
   'a #RPC_context.simple -> 'a -> Period.t list shell_tzresult Lwt.t
 

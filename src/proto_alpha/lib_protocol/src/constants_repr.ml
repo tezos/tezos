@@ -20,21 +20,21 @@ let seed_nonce_revelation_tip =
 let origination_burn =
   Tez_repr.one
 
-(* 1000 tez *)
+(* 512 tez *)
 let baking_bond_cost =
-  Tez_repr.(mul_exn one 1000)
+  Tez_repr.(mul_exn one 512)
 
-(* 1000 tez *)
+(* 64 tez *)
 let endorsement_bond_cost =
-  Tez_repr.(mul_exn one 1000)
+  Tez_repr.(mul_exn one 64)
 
-(* 150 tez *)
+(* 16 tez *)
 let baking_reward =
-  Tez_repr.(mul_exn one 150)
+  Tez_repr.(mul_exn one 16)
 
-(* 150 tez *)
+(* 2 tez *)
 let endorsement_reward =
-  Tez_repr.(mul_exn one 150)
+  Tez_repr.(mul_exn one 2)
 
 (* 100,000 tez *)
 let faucet_credit =
@@ -50,7 +50,6 @@ type constants = {
   blocks_per_commitment: int32 ;
   block_per_roll_snapshot: int32 ;
   voting_period_length: int32 ;
-  time_before_reward: Period_repr.t ;
   slot_durations: Period_repr.t list ;
   first_free_baking_slot: int ;
   max_signing_slot: int ;
@@ -68,18 +67,14 @@ let read_public_key s = Ed25519.Public_key.of_hex_exn (`Hex s)
 
 let default = {
   preserved_cycles = 5 ;
-  cycle_length = 2048l ;
+  cycle_length = 4096l ;
   blocks_per_commitment = 32l ;
   block_per_roll_snapshot = 256l ;
   voting_period_length = 32768l ;
-  time_before_reward =
-    Period_repr.of_seconds_exn
-      (* One year in seconds *)
-      Int64.(mul 365L (mul 24L 3600L)) ;
   slot_durations =
     List.map Period_repr.of_seconds_exn [ 60L ] ;
   first_free_baking_slot = 16 ;
-  max_signing_slot = 15 ;
+  max_signing_slot = 32 ;
   max_gas = 40_000 ;
   proof_of_work_threshold =
     Int64.(sub (shift_left 1L 56) 1L) ;
@@ -133,10 +128,6 @@ let constants_encoding =
        and voting_period_length =
          opt Compare.Int32.(=)
            default.voting_period_length c.voting_period_length
-       and time_before_reward =
-         map_option Period_repr.to_seconds @@
-         opt Period_repr.(=)
-           default.time_before_reward c.time_before_reward
        and slot_durations =
          opt Compare_slot_durations.(=)
            default.slot_durations c.slot_durations
@@ -176,7 +167,6 @@ let constants_encoding =
            blocks_per_commitment,
            block_per_roll_snapshot,
            voting_period_length,
-           time_before_reward,
            slot_durations,
            first_free_baking_slot,
            max_signing_slot,
@@ -193,7 +183,6 @@ let constants_encoding =
              blocks_per_commitment,
              block_per_roll_snapshot,
              voting_period_length,
-             time_before_reward,
              slot_durations,
              first_free_baking_slot,
              max_signing_slot,
@@ -215,9 +204,6 @@ let constants_encoding =
           unopt default.block_per_roll_snapshot block_per_roll_snapshot ;
         voting_period_length =
           unopt default.voting_period_length voting_period_length ;
-        time_before_reward =
-          unopt default.time_before_reward @@
-          map_option Period_repr.of_seconds_exn time_before_reward ;
         slot_durations =
           unopt default.slot_durations @@
           slot_durations ;
@@ -245,13 +231,12 @@ let constants_encoding =
     Data_encoding.(
       merge_objs
         (merge_objs
-           (obj10
+           (obj9
               (opt "preserved_cycles" uint8)
               (opt "cycle_length" int32)
               (opt "blocks_per_commitment" int32)
               (opt "block_per_roll_snapshot" int32)
               (opt "voting_period_length" int32)
-              (opt "time_before_reward" int64)
               (opt "slot_durations" (list Period_repr.encoding))
               (opt "first_free_baking_slot" uint16)
               (opt "max_signing_slot" uint16)

@@ -269,7 +269,6 @@ module Constants : sig
   val blocks_per_commitment: context -> int32
   val block_per_roll_snapshot: context -> int32
   val voting_period_length: context -> int32
-  val time_before_reward: context -> Period.t
   val slot_durations: context -> Period.t list
   val first_free_baking_slot: context -> int
   val max_signing_slot: context -> int
@@ -279,6 +278,7 @@ module Constants : sig
   val max_number_of_operations: context -> int list
   val max_operation_data_length: context -> int
   val michelson_maximum_type_size: context -> int
+
 end
 
 module Voting_period : sig

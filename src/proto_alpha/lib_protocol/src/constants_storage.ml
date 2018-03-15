@@ -22,9 +22,6 @@ let block_per_roll_snapshot c =
 let voting_period_length c =
   let constants = Raw_context.constants c in
   constants.voting_period_length
-let time_before_reward c =
-  let constants = Raw_context.constants c in
-  constants.time_before_reward
 let slot_durations c =
   let constants = Raw_context.constants c in
   constants.slot_durations
