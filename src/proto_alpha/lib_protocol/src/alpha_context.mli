@@ -267,7 +267,7 @@ module Constants : sig
   val preserved_cycles: context -> int
   val cycle_length: context -> int32
   val blocks_per_commitment: context -> int32
-  val block_per_roll_snapshot: context -> int32
+  val blocks_per_roll_snapshot: context -> int32
   val voting_period_length: context -> int32
   val slot_durations: context -> Period.t list
   val first_free_baking_slot: context -> int

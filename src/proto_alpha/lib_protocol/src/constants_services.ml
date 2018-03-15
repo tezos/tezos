@@ -48,13 +48,13 @@ module S = struct
       ~output: (obj1 (req "blocks_per_commitment" int32))
       RPC_path.(custom_root / "blocks_per_commitment")
 
-  let block_per_roll_snapshot =
+  let blocks_per_roll_snapshot =
     RPC_service.post_service
       ~description: "How many blocks between roll snapshots"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "block_per_roll_snapshot" int32))
-      RPC_path.(custom_root / "block_per_roll_snapshot")
+      ~output: (obj1 (req "blocks_per_roll_snapshot" int32))
+      RPC_path.(custom_root / "blocks_per_roll_snapshot")
 
   let slot_durations =
     RPC_service.post_service
@@ -121,8 +121,8 @@ let () =
   register0 S.blocks_per_commitment begin fun ctxt () () ->
     return (Constants.blocks_per_commitment ctxt)
   end ;
-  register0 S.block_per_roll_snapshot begin fun ctxt () () ->
-    return (Constants.block_per_roll_snapshot ctxt)
+  register0 S.blocks_per_roll_snapshot begin fun ctxt () () ->
+    return (Constants.blocks_per_roll_snapshot ctxt)
   end ;
   register0 S.slot_durations begin fun ctxt () () ->
     return (Constants.slot_durations ctxt)
@@ -151,8 +151,8 @@ let voting_period_length ctxt block =
   RPC_context.make_call0 S.voting_period_length ctxt block () ()
 let blocks_per_commitment ctxt block =
   RPC_context.make_call0 S.blocks_per_commitment ctxt block () ()
-let block_per_roll_snapshot ctxt block =
-  RPC_context.make_call0 S.block_per_roll_snapshot ctxt block () ()
+let blocks_per_roll_snapshot ctxt block =
+  RPC_context.make_call0 S.blocks_per_roll_snapshot ctxt block () ()
 let slot_durations ctxt block =
   RPC_context.make_call0 S.slot_durations ctxt block () ()
 let first_free_baking_slot ctxt block =

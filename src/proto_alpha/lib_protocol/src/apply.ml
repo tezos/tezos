@@ -577,10 +577,10 @@ let apply_operation
 
 let may_snapshot_roll ctxt =
   let level = Alpha_context.Level.current ctxt in
-  let block_per_roll_snapshot = Constants.block_per_roll_snapshot ctxt in
+  let blocks_per_roll_snapshot = Constants.blocks_per_roll_snapshot ctxt in
   if Compare.Int32.equal
-      (Int32.rem level.cycle_position block_per_roll_snapshot)
-      (Int32.pred block_per_roll_snapshot)
+      (Int32.rem level.cycle_position blocks_per_roll_snapshot)
+      (Int32.pred blocks_per_roll_snapshot)
   then
     Alpha_context.Roll.snapshot_rolls ctxt >>=? fun ctxt ->
     return ctxt

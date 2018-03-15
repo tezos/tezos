@@ -48,7 +48,7 @@ type constants = {
   preserved_cycles: int ;
   cycle_length: int32 ;
   blocks_per_commitment: int32 ;
-  block_per_roll_snapshot: int32 ;
+  blocks_per_roll_snapshot: int32 ;
   voting_period_length: int32 ;
   slot_durations: Period_repr.t list ;
   first_free_baking_slot: int ;
@@ -69,7 +69,7 @@ let default = {
   preserved_cycles = 5 ;
   cycle_length = 4096l ;
   blocks_per_commitment = 32l ;
-  block_per_roll_snapshot = 256l ;
+  blocks_per_roll_snapshot = 256l ;
   voting_period_length = 32768l ;
   slot_durations =
     List.map Period_repr.of_seconds_exn [ 60L ] ;
@@ -122,9 +122,9 @@ let constants_encoding =
        and blocks_per_commitment =
          opt Compare.Int32.(=)
            default.blocks_per_commitment c.blocks_per_commitment
-       and block_per_roll_snapshot =
+       and blocks_per_roll_snapshot =
          opt Compare.Int32.(=)
-           default.block_per_roll_snapshot c.block_per_roll_snapshot
+           default.blocks_per_roll_snapshot c.blocks_per_roll_snapshot
        and voting_period_length =
          opt Compare.Int32.(=)
            default.voting_period_length c.voting_period_length
@@ -165,7 +165,7 @@ let constants_encoding =
        ((( preserved_cycles,
            cycle_length,
            blocks_per_commitment,
-           block_per_roll_snapshot,
+           blocks_per_roll_snapshot,
            voting_period_length,
            slot_durations,
            first_free_baking_slot,
@@ -181,7 +181,7 @@ let constants_encoding =
     (fun ((( preserved_cycles,
              cycle_length,
              blocks_per_commitment,
-             block_per_roll_snapshot,
+             blocks_per_roll_snapshot,
              voting_period_length,
              slot_durations,
              first_free_baking_slot,
@@ -200,8 +200,8 @@ let constants_encoding =
           unopt default.cycle_length cycle_length ;
         blocks_per_commitment =
           unopt default.blocks_per_commitment blocks_per_commitment ;
-        block_per_roll_snapshot =
-          unopt default.block_per_roll_snapshot block_per_roll_snapshot ;
+        blocks_per_roll_snapshot =
+          unopt default.blocks_per_roll_snapshot blocks_per_roll_snapshot ;
         voting_period_length =
           unopt default.voting_period_length voting_period_length ;
         slot_durations =
@@ -235,7 +235,7 @@ let constants_encoding =
               (opt "preserved_cycles" uint8)
               (opt "cycle_length" int32)
               (opt "blocks_per_commitment" int32)
-              (opt "block_per_roll_snapshot" int32)
+              (opt "blocks_per_roll_snapshot" int32)
               (opt "voting_period_length" int32)
               (opt "slot_durations" (list Period_repr.encoding))
               (opt "first_free_baking_slot" uint16)
@@ -261,7 +261,7 @@ let read = function
       match Data_encoding.Json.(destruct constants_encoding json) with
       | exception exn -> fail (Constant_read exn)
       | c ->
-          if Compare.Int32.(c.block_per_roll_snapshot > c.cycle_length) then
-            failwith "Invalid sandbox: 'block_per_roll_snapshot > cycle_length'"
+          if Compare.Int32.(c.blocks_per_roll_snapshot > c.cycle_length) then
+            failwith "Invalid sandbox: 'blocks_per_roll_snapshot > cycle_length'"
           else
             return c

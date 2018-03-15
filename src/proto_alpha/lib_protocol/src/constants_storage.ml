@@ -16,9 +16,9 @@ let cycle_length c =
 let blocks_per_commitment c =
   let constants = Raw_context.constants c in
   constants.blocks_per_commitment
-let block_per_roll_snapshot c =
+let blocks_per_roll_snapshot c =
   let constants = Raw_context.constants c in
-  constants.block_per_roll_snapshot
+  constants.blocks_per_roll_snapshot
 let voting_period_length c =
   let constants = Raw_context.constants c in
   constants.voting_period_length
