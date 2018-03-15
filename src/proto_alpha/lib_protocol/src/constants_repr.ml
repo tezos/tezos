@@ -25,7 +25,7 @@ let block_security_deposit =
   Tez_repr.(mul_exn one 512)
 
 (* 64 tez *)
-let endorsement_bond_cost =
+let endorsement_security_deposit =
   Tez_repr.(mul_exn one 64)
 
 (* 16 tez *)

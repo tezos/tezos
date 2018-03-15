@@ -44,7 +44,7 @@ val freeze_baking_bond:
   (context * Tez.t) tzresult Lwt.t
 
 (** [freeze_endorsement_bond: ctxt delegate]
-    Freeze the endorsement bond (See !Constants.endorsement_bond_cost)
+    Freeze the endorsement bond (See !Constants.endorsement_security_deposit)
     from the delegate account.
 
     Raise an error if the baker account does not have enough

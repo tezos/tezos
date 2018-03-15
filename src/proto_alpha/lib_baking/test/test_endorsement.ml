@@ -107,7 +107,7 @@ let test_endorsement_rewards block0 =
     done ;
     return (!account, !cpt) in
 
-  let bond = Tez.to_mutez Constants.endorsement_bond_cost in
+  let bond = Tez.to_mutez Constants.endorsement_security_deposit in
 
   (* Endorsement Rights *)
   (* #1 endorse & inject in a block *)

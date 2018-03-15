@@ -140,7 +140,7 @@ let freeze_baking_bond ctxt { Block_header.priority ; _ } delegate =
     return (ctxt, bond)
 
 let freeze_endorsement_bond ctxt delegate =
-  let bond = Constants.endorsement_bond_cost in
+  let bond = Constants.endorsement_security_deposit in
   Delegate.freeze_bond ctxt delegate bond
   |> trace Cannot_freeze_endorsement_bond
 
