@@ -10,9 +10,9 @@
 let preserved_cycles c =
   let constants = Raw_context.constants c in
   constants.preserved_cycles
-let cycle_length c =
+let blocks_per_cycle c =
   let constants = Raw_context.constants c in
-  constants.cycle_length
+  constants.blocks_per_cycle
 let blocks_per_commitment c =
   let constants = Raw_context.constants c in
   constants.blocks_per_commitment

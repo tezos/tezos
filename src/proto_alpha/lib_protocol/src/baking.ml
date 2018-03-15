@@ -269,7 +269,7 @@ let check_fitness_gap ctxt (block : Block_header.t) =
 
 let last_of_a_cycle ctxt l =
   Compare.Int32.(Int32.succ l.Level.cycle_position =
-                 Constants.cycle_length ctxt)
+                 Constants.blocks_per_cycle ctxt)
 
 let dawn_of_a_new_cycle ctxt =
   let level = Level.current ctxt in

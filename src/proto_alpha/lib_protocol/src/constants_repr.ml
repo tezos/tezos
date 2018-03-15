@@ -46,7 +46,7 @@ let bootstrap_wealth =
 
 type constants = {
   preserved_cycles: int ;
-  cycle_length: int32 ;
+  blocks_per_cycle: int32 ;
   blocks_per_commitment: int32 ;
   blocks_per_roll_snapshot: int32 ;
   voting_period_length: int32 ;
@@ -67,7 +67,7 @@ let read_public_key s = Ed25519.Public_key.of_hex_exn (`Hex s)
 
 let default = {
   preserved_cycles = 5 ;
-  cycle_length = 4096l ;
+  blocks_per_cycle = 4096l ;
   blocks_per_commitment = 32l ;
   blocks_per_roll_snapshot = 256l ;
   voting_period_length = 32768l ;
@@ -116,9 +116,9 @@ let constants_encoding =
        let preserved_cycles =
          opt Compare.Int.(=)
            default.preserved_cycles c.preserved_cycles
-       and cycle_length =
+       and blocks_per_cycle =
          opt Compare.Int32.(=)
-           default.cycle_length c.cycle_length
+           default.blocks_per_cycle c.blocks_per_cycle
        and blocks_per_commitment =
          opt Compare.Int32.(=)
            default.blocks_per_commitment c.blocks_per_commitment
@@ -163,7 +163,7 @@ let constants_encoding =
            default.michelson_maximum_type_size c.michelson_maximum_type_size
        in
        ((( preserved_cycles,
-           cycle_length,
+           blocks_per_cycle,
            blocks_per_commitment,
            blocks_per_roll_snapshot,
            voting_period_length,
@@ -179,7 +179,7 @@ let constants_encoding =
            token_per_rolls,
            michelson_maximum_type_size)), ()) )
     (fun ((( preserved_cycles,
-             cycle_length,
+             blocks_per_cycle,
              blocks_per_commitment,
              blocks_per_roll_snapshot,
              voting_period_length,
@@ -196,8 +196,8 @@ let constants_encoding =
              michelson_maximum_type_size)), ()) ->
       { preserved_cycles =
           unopt default.preserved_cycles preserved_cycles ;
-        cycle_length =
-          unopt default.cycle_length cycle_length ;
+        blocks_per_cycle =
+          unopt default.blocks_per_cycle blocks_per_cycle ;
         blocks_per_commitment =
           unopt default.blocks_per_commitment blocks_per_commitment ;
         blocks_per_roll_snapshot =
@@ -233,7 +233,7 @@ let constants_encoding =
         (merge_objs
            (obj9
               (opt "preserved_cycles" uint8)
-              (opt "cycle_length" int32)
+              (opt "blocks_per_cycle" int32)
               (opt "blocks_per_commitment" int32)
               (opt "blocks_per_roll_snapshot" int32)
               (opt "voting_period_length" int32)
@@ -261,7 +261,7 @@ let read = function
       match Data_encoding.Json.(destruct constants_encoding json) with
       | exception exn -> fail (Constant_read exn)
       | c ->
-          if Compare.Int32.(c.blocks_per_roll_snapshot > c.cycle_length) then
-            failwith "Invalid sandbox: 'blocks_per_roll_snapshot > cycle_length'"
+          if Compare.Int32.(c.blocks_per_roll_snapshot > c.blocks_per_cycle) then
+            failwith "Invalid sandbox: 'blocks_per_roll_snapshot > blocks_per_cycle'"
           else
             return c

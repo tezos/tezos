@@ -203,7 +203,7 @@ let prepare ~level ~timestamp ~fitness ctxt =
   let level =
     Level_repr.from_raw
       ~first_level
-      ~cycle_length:constants.Constants_repr.cycle_length
+      ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
       ~voting_period_length:constants.Constants_repr.voting_period_length
       ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
       level in

@@ -18,7 +18,7 @@ let from_raw c ?offset l =
   let first_level = Raw_context.first_level c in
   Level_repr.from_raw
     ~first_level
-    ~cycle_length:constants.Constants_repr.cycle_length
+    ~blocks_per_cycle:constants.Constants_repr.blocks_per_cycle
     ~voting_period_length:constants.Constants_repr.voting_period_length
     ~blocks_per_commitment:constants.Constants_repr.blocks_per_commitment
     l
@@ -48,7 +48,7 @@ let first_level_in_cycle ctxt c =
        (Int32.add
           (Raw_level_repr.to_int32 first_level)
           (Int32.mul
-             constants.Constants_repr.cycle_length
+             constants.Constants_repr.blocks_per_cycle
              (Cycle_repr.to_int32 c))))
 
 let last_level_in_cycle ctxt c =

@@ -12,7 +12,7 @@ open Alpha_context
 val preserved_cycles:
   'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
 
-val cycle_length:
+val blocks_per_cycle:
   'a #RPC_context.simple -> 'a -> int32 shell_tzresult Lwt.t
 
 val voting_period_length:

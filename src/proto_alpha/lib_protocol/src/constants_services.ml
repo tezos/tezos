@@ -24,13 +24,13 @@ module S = struct
       ~output: (obj1 (req "preserved_cycles" int31))
       RPC_path.(custom_root / "preserved_cycles")
 
-  let cycle_length =
+  let blocks_per_cycle =
     RPC_service.post_service
       ~description: "Cycle length"
       ~query: RPC_query.empty
       ~input: empty
-      ~output: (obj1 (req "cycle_length" int32))
-      RPC_path.(custom_root / "cycle_length")
+      ~output: (obj1 (req "blocks_per_cycle" int32))
+      RPC_path.(custom_root / "blocks_per_cycle")
 
   let voting_period_length =
     RPC_service.post_service
@@ -112,8 +112,8 @@ let () =
   register0 S.preserved_cycles begin fun ctxt () () ->
     return (Constants.preserved_cycles ctxt)
   end ;
-  register0 S.cycle_length begin fun ctxt () () ->
-    return (Constants.cycle_length ctxt)
+  register0 S.blocks_per_cycle begin fun ctxt () () ->
+    return (Constants.blocks_per_cycle ctxt)
   end ;
   register0 S.voting_period_length begin fun ctxt () () ->
     return (Constants.voting_period_length ctxt)
@@ -143,8 +143,8 @@ let () =
     return (Data_encoding.Json.(schema error_encoding))
   end
 
-let cycle_length ctxt block =
-  RPC_context.make_call0 S.cycle_length ctxt block () ()
+let blocks_per_cycle ctxt block =
+  RPC_context.make_call0 S.blocks_per_cycle ctxt block () ()
 let preserved_cycles ctxt block =
   RPC_context.make_call0 S.preserved_cycles ctxt block () ()
 let voting_period_length ctxt block =
