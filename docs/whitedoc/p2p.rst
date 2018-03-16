@@ -128,5 +128,5 @@ Given these bounds, the maintenance worker:
   peers until it reaches at least ``min_target`` connections (and never
   more than ``max_target`` connections).
 
-The maintenance worker is also in charge to periodically run the
+The maintenance worker is also in charge of periodically run the
 greylists GC functions to unban ip addresses from the greylist.
