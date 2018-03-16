@@ -36,7 +36,29 @@ let () =
           Ed25519.Public_key_hash.pp delegate)
     Data_encoding.(obj1 (req "delegate" Ed25519.Public_key_hash.encoding))
     (function No_deletion c -> Some c | _ -> None)
-    (fun c -> No_deletion c)
+    (fun c -> No_deletion c) ;
+  register_error_kind
+    `Temporary
+    ~id:"delegate.already_active"
+    ~title:"Delegate already active"
+    ~description:"Useless delegate reactivation"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf
+          "The delegate is still active, no need to refresh it")
+    Data_encoding.empty
+    (function Active_delegate -> Some () | _ -> None)
+    (fun () -> Active_delegate) ;
+  register_error_kind
+    `Temporary
+    ~id:"delegate.unchanged"
+    ~title:"Unchanged delegated"
+    ~description:"Contract already delegated to the given delegate"
+    ~pp:(fun ppf () ->
+        Format.fprintf ppf
+          "The contract is already delegated to the same delegate")
+    Data_encoding.empty
+    (function Current_delegate -> Some () | _ -> None)
+    (fun () -> Current_delegate)
 
 let is_delegatable c contract =
   match Contract_repr.is_implicit contract with
