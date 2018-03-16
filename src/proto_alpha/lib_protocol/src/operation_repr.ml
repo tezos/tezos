@@ -31,11 +31,11 @@ and anonymous_operation =
       level: Raw_level_repr.t ;
       nonce: Seed_repr.nonce ;
     }
-  | Double_endorsement of {
+  | Double_endorsement_evidence of {
       op1: operation ;
       op2: operation ;
     }
-  | Double_baking of {
+  | Double_baking_evidence of {
       bh1: Block_header_repr.t ;
       bh2: Block_header_repr.t ;
     }
@@ -314,33 +314,33 @@ module Encoding = struct
       )
       (fun ((), level, nonce) -> Seed_nonce_revelation { level ; nonce })
 
-  let double_endorsement_encoding op_encoding =
+  let double_endorsement_evidence_encoding op_encoding =
     (obj3
-       (req "kind" (constant "double_endorsement"))
+       (req "kind" (constant "double_endorsement_evidence"))
        (req "op1" (dynamic_size op_encoding))
        (req "op2" (dynamic_size op_encoding)))
 
-  let double_endorsement_case tag op_encoding =
-    case tag (double_endorsement_encoding op_encoding)
+  let double_endorsement_evidence_case tag op_encoding =
+    case tag (double_endorsement_evidence_encoding op_encoding)
       (function
-        | Double_endorsement { op1 ; op2 } -> Some ((), op1, op2)
+        | Double_endorsement_evidence { op1 ; op2 } -> Some ((), op1, op2)
         | _ -> None
       )
-      (fun ((), op1, op2) -> Double_endorsement { op1 ; op2 })
+      (fun ((), op1, op2) -> Double_endorsement_evidence { op1 ; op2 })
 
-  let double_baking_encoding =
+  let double_baking_evidence_encoding =
     (obj3
-       (req "kind" (constant "double_baking"))
+       (req "kind" (constant "double_baking_evidence"))
        (req "op1" (dynamic_size Block_header_repr.encoding))
        (req "op2" (dynamic_size Block_header_repr.encoding)))
 
-  let double_baking_case tag =
-    case tag double_baking_encoding
+  let double_baking_evidence_case tag =
+    case tag double_baking_evidence_encoding
       (function
-        | Double_baking { bh1 ; bh2 } -> Some ((), bh1, bh2)
+        | Double_baking_evidence { bh1 ; bh2 } -> Some ((), bh1, bh2)
         | _ -> None
       )
-      (fun ((), bh1, bh2) -> Double_baking { bh1 ; bh2 })
+      (fun ((), bh1, bh2) -> Double_baking_evidence { bh1 ; bh2 })
 
   let faucet_encoding =
     (obj3
@@ -363,8 +363,8 @@ module Encoding = struct
             (list
                (union [
                    seed_nonce_revelation_case (Tag 0) ;
-                   double_endorsement_case (Tag 1) op_encoding ;
-                   double_baking_case (Tag 2) ;
+                   double_endorsement_evidence_case (Tag 1) op_encoding ;
+                   double_baking_evidence_case (Tag 2) ;
                    faucet_case (Tag 3) ;
                  ]))))
       (function Anonymous_operations ops -> Some ops | _ -> None)

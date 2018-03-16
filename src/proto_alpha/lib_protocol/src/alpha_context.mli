@@ -634,11 +634,11 @@ and anonymous_operation =
       level: Raw_level.t ;
       nonce: Nonce.t ;
     }
-  | Double_endorsement of {
+  | Double_endorsement_evidence of {
       op1: operation ;
       op2: operation ;
     }
-  | Double_baking of {
+  | Double_baking_evidence of {
       bh1: Block_header.t ;
       bh2: Block_header.t ;
     }

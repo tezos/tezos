@@ -78,7 +78,7 @@ val economic_error :
   msg:string -> (proto_error -> bool) -> 'a tzresult -> unit
 val ill_typed_data_error : msg:string -> 'a tzresult -> unit
 val ill_typed_return_error : msg:string -> 'a tzresult -> unit
-val double_endorsement : msg:string -> 'a tzresult -> unit
+val double_endorsement_evidence : msg:string -> 'a tzresult -> unit
 val contain_error_alpha :
   ?msg:string -> f:('a -> bool) -> ('b, 'a list) result -> unit
 val unknown_contract : msg:string -> 'a proto_tzresult -> unit

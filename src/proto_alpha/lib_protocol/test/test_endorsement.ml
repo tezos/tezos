@@ -106,7 +106,7 @@ let test_multiple_endorsement () =
   let op =
     Isolate_helpers.Operation.endorsement_full pred.hash level.level, endorser in
   Block.of_res ~res: pred ~ops: [op ;op] () >>= Assert.wrap >>= fun x ->
-  Assert.double_endorsement ~msg: __LOC__ x ;
+  Assert.double_endorsement_evidence ~msg: __LOC__ x ;
   return ()
 
 

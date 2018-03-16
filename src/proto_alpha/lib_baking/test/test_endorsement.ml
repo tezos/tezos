@@ -18,7 +18,7 @@ let { Helpers.Account.b1 ; b2 ; b3 ; b4 ; b5 } =
 let default_account =
   Helpers.Account.create "default_account"
 
-let test_double_endorsement contract block =
+let test_double_endorsement_evidence contract block =
 
   (* Double endorsement for the same level *)
   Helpers.Baking.bake block contract [] >>=? fun b1 ->
@@ -239,7 +239,7 @@ let run genesis =
   (* FIXME: cannot inject double endorsement operation yet, but the
      code is still here
      Double endorsement *)
-  test_double_endorsement b4 block >>=? fun _ ->
+  test_double_endorsement_evidence b4 block >>=? fun _ ->
 
   return ()
 
