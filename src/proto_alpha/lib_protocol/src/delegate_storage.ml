@@ -151,7 +151,7 @@ let set c contract delegate =
         begin
           if self_delegation then
             Storage.Delegates.add c delegate >>= fun c ->
-            Roll_storage.Delegate.set_active c ~init:true delegate >>=? fun c ->
+            Roll_storage.Delegate.set_active c delegate >>=? fun c ->
             return c
           else
             return c

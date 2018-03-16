@@ -272,21 +272,30 @@ module Delegate = struct
     Storage.Roll.Delegate_change.set ctxt delegate change >>=? fun ctxt ->
     return ctxt
 
-  let set_active ctxt ?(init = false) delegate =
+  let set_active ctxt delegate =
     Storage.Contract.Inactive_delegate.mem ctxt
       (Contract_repr.implicit_contract delegate) >>= fun inactive ->
     let current_cycle = (Raw_context.current_level ctxt).cycle in
     let preserved_cycles = Constants_storage.preserved_cycles ctxt in
     (* When the delegate is new or inactive, she will become active in
-       `1+preserved_cycles`, and we allows `preserved_cycles` for the
+       `1+preserved_cycles`, and we allow `preserved_cycles` for the
        delegate to start baking. When the delegate is active, we only
-       give me at least `preserved_cycles` after the current cycle
+       give her at least `preserved_cycles` after the current cycle
        before to be deactivated.  *)
-    let delay =
-      if init || inactive then (1+2*preserved_cycles) else 1+preserved_cycles in
+    Storage.Contract.Delegate_desactivation.get_option ctxt
+      (Contract_repr.implicit_contract delegate) >>=? fun current_expiration ->
+    let expiration = match current_expiration with
+      | None ->
+          Cycle_repr.add current_cycle (1+2*preserved_cycles)
+      | Some current_expiration ->
+          let delay =
+            if inactive then (1+2*preserved_cycles) else 1+preserved_cycles in
+          let updated =
+            Cycle_repr.add current_cycle delay in
+          Cycle_repr.max current_expiration updated in
     Storage.Contract.Delegate_desactivation.init_set ctxt
       (Contract_repr.implicit_contract delegate)
-      Cycle_repr.(add current_cycle delay) >>= fun ctxt ->
+      expiration >>= fun ctxt ->
     if not inactive then
       return ctxt
     else begin
