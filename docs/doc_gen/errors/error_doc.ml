@@ -230,9 +230,10 @@ let () =
 
   print_script ppf ;
 
-  fprintf ppf "This document references possible errors that can come\
-               from RPC calls. It is generated from the OCaml source\
-               code (master branch).@\n@\n" ;
+  fprintf ppf
+    "This document references possible errors that can come \
+     from RPC calls. It is generated from the OCaml source \
+     code (master branch).@\n@\n" ;
 
   (* Body *)
   let map =

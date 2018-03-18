@@ -299,9 +299,9 @@ let pp_print_html_tabs fmt { path ; description ; input ; output ; _ (* example 
   fprintf fmt "%a" (pp_print_html_tab_button ~default:true ~shortlabel:"descr" ~content:"Description") path;
   (match input with
    | Some _ ->
-       fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"input" ~content:"Input schema") path;
+       fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"input" ~content:"Input format") path;
    | None -> ());
-  fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"output" ~content:"Output schema") path;
+  fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"output" ~content:"Output format") path;
   (* (match example with
    *  | Some _ ->
    *      fprintf fmt "%a" (pp_print_html_tab_button ~default:false ~shortlabel:"example" ~content:"Example") path;
