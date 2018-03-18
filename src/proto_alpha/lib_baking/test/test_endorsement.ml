@@ -92,7 +92,7 @@ let test_invalid_endorsement_slot contract block =
   Helpers.Endorse.endorse ~slot:16 contract block >>=? fun op ->
   Helpers.Baking.bake block contract [ op ] >>= fun res ->
   Assert.failed_to_preapply ~msg:__LOC__ ~op begin function
-    | Baking.Invalid_endorsement_slot _ -> true
+    | Operation.Invalid_signature -> true
     | _ -> false
   end res ;
   return ()
@@ -211,7 +211,7 @@ let run genesis =
   Assert.equal_bool ~msg:__LOC__ has_right_to_endorse true ;
 
   Assert.balance_equal
-    ~block:block ~msg:__LOC__ b1 3_999_000_000_000L >>=? fun () ->
+    ~block:block ~msg:__LOC__ b1 3_999_488_000_000L >>=? fun () ->
   Assert.balance_equal
     ~block:block ~msg:__LOC__ b2 4_000_000_000_000L >>=? fun () ->
   Assert.balance_equal
