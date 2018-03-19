@@ -87,8 +87,9 @@ let from_raw
       (Int32.div level_position blocks_per_voting_period) in
   let voting_period_position =
     Int32.rem level_position blocks_per_voting_period in
-  let pos = Int32.rem cycle_position blocks_per_commitment in
-  let expected_commitment = Compare.Int32.(pos = 0l) in
+  let expected_commitment =
+    Compare.Int32.(Int32.rem cycle_position blocks_per_commitment =
+                   Int32.pred blocks_per_commitment) in
   { level ; level_position ;
     cycle ; cycle_position ;
     voting_period ; voting_period_position ;
