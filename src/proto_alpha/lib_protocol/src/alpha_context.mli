@@ -277,7 +277,7 @@ module Constants : sig
   val proof_of_work_threshold: context -> int64
   val dictator_pubkey: context -> Ed25519.Public_key.t
   val max_operation_data_length: context -> int
-  val token_per_rolls: context -> Tez.t
+  val tokens_per_roll: context -> Tez.t
   val michelson_maximum_type_size: context -> int
 
 end
