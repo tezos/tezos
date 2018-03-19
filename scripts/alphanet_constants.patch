@@ -1,5 +1,5 @@
 diff --git a/src/proto_alpha/lib_protocol/src/constants_repr.ml b/src/proto_alpha/lib_protocol/src/constants_repr.ml
-index 8ccaaee8..b88c1ae7 100644
+index 8ccaaee8..d17c4ada 100644
 --- a/src/proto_alpha/lib_protocol/src/constants_repr.ml
 +++ b/src/proto_alpha/lib_protocol/src/constants_repr.ml
 @@ -68,12 +68,12 @@ let read_public_key s = Ed25519.Public_key.of_hex_exn (`Hex s)
@@ -7,13 +7,11 @@ index 8ccaaee8..b88c1ae7 100644
  let default = {
    preserved_cycles = 5 ;
 -  blocks_per_cycle = 4096l ;
--  blocks_per_commitment = 32l ;
--  blocks_per_roll_snapshot = 256l ;
--  blocks_per_voting_period = 32768l ;
 +  blocks_per_cycle = 128l ;
-+  blocks_per_commitment = 8l ;
-+  blocks_per_roll_snapshot = 32l ;
-+  blocks_per_voting_period = 1024l ;
+   blocks_per_commitment = 32l ;
+-  blocks_per_roll_snapshot = 256l ;
++  blocks_per_roll_snapshot = 8l ;
+   blocks_per_voting_period = 32768l ;
    time_between_blocks =
 -    List.map Period_repr.of_seconds_exn [ 60L ] ;
 +    List.map Period_repr.of_seconds_exn [ 60L ; 30L ; 20L ; 10L ] ;
